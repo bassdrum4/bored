@@ -20,9 +20,9 @@ Everything is inlined into the one file:
 
 | Dependency | How it's handled |
 |---|---|
-| 26 games | Original `data-code` source, UTF-8 inlined strings |
+| 26 games | Original `data-code` source, base64-embedded |
 | Google Fonts (20 games) | 88 `@font-face` rules, woff2 as base64 data URIs |
-| three.js 0.176 (lighthouse) | `three.core.min` + `three.module.min` inlined as UTF-8, loaded via blob URL with a `data:` URI fallback |
+| three.js 0.176 (lighthouse) | `three.core.min` + `three.module.min` inlined, loaded via blob URL with a `data:` URI fallback |
 | Font Awesome (shadow-net) | Subset to the 4 icons it actually uses (~2 KB) |
 | F-14, DC, Klang | **Not inlined** — remote SPAs, loaded in the player from their own origins |
 
