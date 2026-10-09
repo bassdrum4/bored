@@ -1,118 +1,146 @@
-# Bored — single-file site
+# Bored — single-file arcade
 
-**[index.html](index.html)** is the deliverable: one self-contained file containing all
-26 games from `https://sites.google.com/midlandps.org/vibecoding/`, plus three entries
-(F-14, DC, Klang) that live on their own servers and load in the player over the
-network.
+**[index.html](index.html)** is the entire playable site: **30 offline games and
+3 online extras**, with no runtime dependencies, installs, server, or asset folder.
+Double-click it to play, or serve it as a static page.
 
-Open it by double-clicking. No server, no build step, no assets folder. The 26
-embedded games need no network; the last three rows do (see below).
+GitHub Pages address: **https://bassdrum4.github.io/bored/**.
+Local changes appear there only after they are published.
 
-Live copy: **https://bassdrum4.github.io/bored/** (GitHub Pages).
+## Find something to play
 
-## What's inside
+- Search game names, categories, and descriptions; press **/** to focus search.
+- Filter by **New**, **Favorites**, **Arcade**, **Puzzle**, **Strategy**,
+  **Sandbox**, or **Online**.
+- Sort by the original order or A–Z.
+- Star games to save favorites and revisit the last four recently played games.
+- **Surprise me** chooses from the current results. Remote entries are excluded
+  unless you deliberately select **Online**.
+- **All games** returns to the library; **Esc** also works inside offline games.
+  Remote pages run on another origin, so use **All games** when they have focus.
+- Use **Restart** for a fresh game, or **Fullscreen** where the browser supports it.
 
-A plain list of 29 rows — the 26 pulled games plus three remote entries — with a
-search box. Clicking a game opens it full-screen;
-**Back** (top-left) or **Esc** returns to the list.
+Favorites, recent games, and best scores stay in your browser's local storage.
+If storage is blocked, the games still work; progress may not persist.
+The layout supports phones, touch controls in the new games, keyboard navigation,
+visible focus states, and reduced-motion preferences.
 
-Everything is inlined into the one file:
+## Daily challenge
 
-| Dependency | How it's handled |
+The featured challenge rotates through **all 30 offline games**, with a distinct
+goal for each game. Everyone gets the same game and target for a given UTC date;
+after a full circuit, most targets change difficulty. Goals reset at **midnight
+UTC**, including when the hub is left open. Normal gameplay randomness is unchanged:
+this is a shared objective, not a promise of identical boards or enemy spawns.
+
+Examples include clearing Tetris lines, completing Simon sequences (not merely
+watching them), rescuing Lighthouse's three ships, beating the Connect Four
+computer, clearing Minesweeper without hints, growing Eco's populations, and
+building a multi-material Sand world. Each goal describes its rules before launch.
+
+Use the **daily challenge button** to enter a tracked attempt. The player shows
+live progress and automatically awards completion from current-run game state.
+Regular launches and saved high scores do not count. Restart or retry freely;
+a completed result remains saved for its date. Individual in-progress game runs
+are not resumed after closing the player.
+
+Use **Copy result** after completion to share the game, goal, date, and verified
+result. If clipboard access is blocked, a selectable text box provides a fallback.
+The challenge works offline. With storage blocked, completion survives within the
+current page session but not a reload.
+
+Verification runs locally in the browser. It prevents accidental completion and
+checks the stated conditions; it is **not anti-cheat or a server-verified leaderboard**.
+The three remote extras are excluded because the hub cannot inspect their
+cross-origin game state (and Klang is a music player).
+
+## New games (4)
+
+| Game | How to play |
 |---|---|
-| 26 games | Original `data-code` source, base64-embedded |
-| Google Fonts (20 games) | 88 `@font-face` rules, woff2 as base64 data URIs |
-| three.js 0.176 (lighthouse) | `three.core.min` + `three.module.min` inlined, loaded via blob URL with a `data:` URI fallback |
-| Font Awesome (shadow-net) | Subset to the 4 icons it actually uses (~2 KB) |
-| F-14, DC, Klang | **Not inlined** — remote SPAs, loaded in the player from their own origins |
+| **2048** | Merge equal tiles with arrow keys, WASD, swipes, or the on-screen arrows. Includes one-move undo and a saved best score. |
+| **Memory** | Flip cards to find eight pairs. Tracks moves and your best completed game. Mouse, touch, Tab, and Enter work. |
+| **Connect Four** | Connect four discs against a look-ahead computer opponent or a local friend. Choose a column with its button or keys 1–7. |
+| **Aim Lab** | Hit targets in a 20-second challenge. Tracks hits, accuracy, and separate best scores for normal/small targets. |
 
-Games run in isolated `srcdoc` iframes, so each keeps its own CSS, JS globals, and
-canvas exactly as before; the three remote entries use a normal iframe `src` instead.
-A small shim installs a memory-backed `localStorage`
-fallback only if the browser blocks storage on `file://`.
+These additions are readable JavaScript inside the deliverable. They need no
+network requests, fonts, libraries, or other files.
 
-## Pulled from the class site (26)
+## Original offline games (26)
+
+Pulled from `https://sites.google.com/midlandps.org/vibecoding/`:
 
 sumo, sand, lighthouse, poker, wordle, lava, volletball, solitaire, commanders, eco,
 void-runner, qbert, simon, frogger, pac-man, snake, tank, space-invaders, pong,
 asteroids, breakout, tetris, minesweeper, tank2, gun-mayhem, shadow-net
 
-## Embedded live (3)
+Everything needed by these games is inlined:
 
-These three were originally left out because they are not self-contained pages.
-They are back as rows 27–29 — same row look, same Back/Esc flow — but they load
-in the player from their own servers, so they need internet:
+| Dependency | How it is handled |
+|---|---|
+| Original games | Original `data-code` source, base64-embedded |
+| Google Fonts (20 games) | 88 `@font-face` rules with embedded woff2 data |
+| three.js 0.176 (Lighthouse) | Inlined modules loaded via blob URLs, with a data-URI fallback |
+| Font Awesome (shadow.net) | Subset to the four icons actually used |
 
-- **F-14** → `flyer2.freebuff.app` — Vite SPA flight sim
-- **DC** → `workbag.dpdns.org` — the original class-site dc tile pointed elsewhere;
-  this URL is the one the hub's row opens. It loads its own Firebase/GTM deps.
-- **Klang** → `youtubeplayer.freebuff.app/player` — Vite SPA YouTube music player;
-  signed-out visitors see Klang's own sign-in screen
+Games run in separate `srcdoc` iframes, keeping their CSS and JavaScript isolated
+from the hub. A storage shim in the original games provides an in-memory fallback
+where needed on `file://`.
 
-None of the three sends `X-Frame-Options` or a framing `Content-Security-Policy`
-(re-checked 2026-10-05), so they run inside the player iframe.
+### Lighthouse fix
 
-## Deliberately excluded (2)
+The original game declared `#fatal { display: grid }`, overriding its `hidden`
+attribute and covering gameplay with the fatal overlay. The player now injects
+`#fatal[hidden] { display: none !important }`. Actual fatal errors can still show
+normally, and the original embedded source is preserved.
 
-- **proxy** → `breezy-foxes-jump.freebuff.dev` — CORS-blocked, source not readable
-- **jellyfish** → `milcktoast.com/medusae/` — CORS-blocked, source not readable
+## Online extras (3)
 
-To inline any of the remote three instead, their own build output plus their asset
-bundles would have to be bundled into the file.
+These use an ordinary iframe pointing to their own servers and **require internet**:
 
-## Known pre-existing bug: lighthouse
+- **F-14** → `https://spanish4.freebuff.app/` — flight simulator
+- **DC** → `https://workbag.dpdns.org/` — remote class-site entry
+- **Klang** → `https://youtubeplayer.freebuff.app/player` — music player;
+  signed-out visitors may see its sign-in screen
 
-The original game's CSS sets `#fatal { display: grid }` but never adds a
-`#fatal[hidden] { display: none }` rule. The `display` declaration outranks the
-`hidden` attribute, so the "The light is out." overlay always covers the game —
-**including on the live site today.** Verified by opening the untouched
-`_source/lighthouse.html` directly: same overlay, same cause.
+Their availability, sign-in requirements, and framing policies belong to the
+remote sites. They were not re-verified as part of the offline regression run.
+The idle hub does not contact these servers.
 
-This build preserves that behaviour unchanged, on purpose. A one-line CSS addition
-fixes it; ask and it's done.
-
-## Rebuilding
-
-```bash
-cd _build
-python build.py          # writes ../index.html
-```
-
-`build.py` reads `_source/*.html` and downloads anything external (fonts, three.js,
-Font Awesome) into `_build/cache/`, so rebuilds work offline once cached.
-
-### Layout
-
-The published GitHub repo contains only `index.html` and this README; everything
-else below stays on the author's machine.
-
-- `index.html` — the deliverable (4.6 MB)
-- `_source/` — the 26 games exactly as pulled from the live site (**provenance**)
-- `_build/build.py` — the build script
-- `_build/collector.py` — local sink used to pull source out of the authenticated
-  browser (the site requires sign-in, so `curl` cannot read it)
-- `_build/shots/` — screenshots from verification
-- `_build/verify_*.js` — the verification suite
+The original **proxy** and **jellyfish** entries remain excluded because their
+source could not be collected as self-contained pages.
 
 ## Verification
 
-Run from `_build/` (uses the installed Chrome via `puppeteer-core`):
+[tests/bored.test.cjs](tests/bored.test.cjs) uses Node's built-in test runner,
+`puppeteer-core`, and an installed Chrome. No package is needed to **play** the site.
+For testing, make `puppeteer-core` available in your Node environment and run from
+the repository root:
 
-| Script | Checks |
-|---|---|
-| `verify_file_url.js` | all 26 games boot from `file://`, zero external requests |
-| `verify_default_flags.js` | same, with **default** Chrome flags (plain double-click) |
-| `verify_deep.js` | WebGL, Font Awesome glyphs, storage, fonts |
-| `verify_input.js` | real keyboard input reaches games |
-| `verify_ui.js` | search, Back, Esc, re-open |
-| `verify_embeds.js` | the 3 remote entries load in the player; the idle hub makes zero requests |
-| `verify_hidden_bug.js` | scans all games for `hidden`-attribute/CSS conflicts |
+```bash
+node --test tests/bored.test.cjs
+```
 
-Last full run: **26/26 games boot, 0 external requests, 0 console errors; 3 embeds
-navigate and render; idle hub makes 0 requests.**
+Set `CHROME_PATH` if Chrome is not installed in a standard location. The test
+runner also accepts a cached browser from an existing `puppeteer` installation.
 
-### One caveat the screenshots exposed
+The suite covers JavaScript syntax, 2048 merge rules and undo, Connect Four wins
+and computer tactics, actual browser gameplay, Memory completion and timer
+cleanup, Aim Lab accuracy and expiration, search/filter/sort, saved favorites,
+Escape and focus restoration, all 30 offline game boots, Lighthouse's overlay,
+all 30 daily state adapters, per-game goal acceptance/rejection, real Memory
+challenge completion, saved results, sharing with clipboard fallback, UTC rollover,
+320px layouts, blocked storage, and zero external requests.
 
-`shots/lighthouse.png` shows the fatal overlay rather than gameplay — that is the
-pre-existing bug described above, not a build failure. The canvas underneath is
-created and rendering (verified via `toDataURL()` and a live WebGL context).
+Verified locally: **17 tests passed, 0 failures**, all **30 offline games booted**,
+**0 uncaught JavaScript errors**, and **0 external HTTP requests**.
+
+## Maintenance
+
+Edit [index.html](index.html) directly. Keep the game additions, hub behavior, and
+embedded payloads in that single file; tests and this README are not runtime assets.
+
+The author's ignored `_source/` and `_build/` folders contain the original game
+sources, collector, cached dependencies, and older verification scripts. The
+legacy `_build/build.py` generator predates the new hub and games: **running it
+will overwrite these additions**. It is not the current site's build step.
