@@ -58,6 +58,11 @@ async function noOverflow(frame = page) {
   assert.ok(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow');
 }
 
+test('F-14 points to its GitHub Pages build', () => {
+  const externs = JSON.parse(source.match(/const EXTERNS = (.*);/)[1]);
+  assert.equal(externs['f-14'], 'https://bassdrum4.github.io/f-14-4/');
+});
+
 test('all hub JavaScript parses', () => {
   assert.doesNotThrow(() => new vm.Script(source));
   const context = rules(['arcadeGame', 'nativeHTML']);

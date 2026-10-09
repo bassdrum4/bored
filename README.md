@@ -98,14 +98,15 @@ normally, and the original embedded source is preserved.
 
 These use an ordinary iframe pointing to their own servers and **require internet**:
 
-- **F-14** → `https://spanish4.freebuff.app/` — flight simulator
+- **F-14** → `https://bassdrum4.github.io/f-14-4/` — flight simulator
 - **DC** → `https://workbag.dpdns.org/` — remote class-site entry
 - **Klang** → `https://youtubeplayer.freebuff.app/player` — music player;
   signed-out visitors may see its sign-in screen
 
 Their availability, sign-in requirements, and framing policies belong to the
 remote sites. They were not re-verified as part of the offline regression run.
-The idle hub does not contact these servers.
+The idle hub does not contact these servers. F-14's new GitHub Pages build was
+also verified separately to load its menu and canvas inside the player.
 
 The original **proxy** and **jellyfish** entries remain excluded because their
 source could not be collected as self-contained pages.
@@ -132,8 +133,17 @@ all 30 daily state adapters, per-game goal acceptance/rejection, real Memory
 challenge completion, saved results, sharing with clipboard fallback, UTC rollover,
 320px layouts, blocked storage, and zero external requests.
 
-Verified locally: **17 tests passed, 0 failures**, all **30 offline games booted**,
+Verified locally: **18 regression tests passed, 0 failures**, all **30 offline games booted**,
 **0 uncaught JavaScript errors**, and **0 external HTTP requests**.
+
+For release screenshots and a live F-14 embed smoke test (requires internet):
+
+```bash
+node --test tests/visual.test.cjs
+```
+
+This writes desktop and mobile screenshots into the ignored `_build/shots/`
+folder; it checks 1100px, 375px, and 320px layouts and the new game screens.
 
 ## Maintenance
 
