@@ -1,6 +1,6 @@
 # Bored — single-file arcade
 
-**[index.html](index.html)** is the entire playable site: **30 offline games and
+**[index.html](index.html)** is the entire playable site: **31 offline games and
 3 online extras**, with no runtime dependencies, installs, server, or asset folder.
 Double-click it to play, or serve it as a static page.
 
@@ -27,7 +27,7 @@ visible focus states, and reduced-motion preferences.
 
 ## Daily challenge
 
-The featured challenge rotates through **all 30 offline games**, with a distinct
+The featured challenge rotates through **30 of the offline games**, with a distinct
 goal for each game. Everyone gets the same game and target for a given UTC date;
 after a full circuit, most targets change difficulty. Goals reset at **midnight
 UTC**, including when the hub is left open. Normal gameplay randomness is unchanged:
@@ -128,12 +128,12 @@ runner also accepts a cached browser from an existing `puppeteer` installation.
 The suite covers JavaScript syntax, 2048 merge rules and undo, Connect Four wins
 and computer tactics, actual browser gameplay, Memory completion and timer
 cleanup, Aim Lab accuracy and expiration, search/filter/sort, saved favorites,
-Escape and focus restoration, all 30 offline game boots, Lighthouse's overlay,
+Escape and focus restoration, all 31 offline game boots, Lighthouse's overlay,
 all 30 daily state adapters, per-game goal acceptance/rejection, real Memory
 challenge completion, saved results, sharing with clipboard fallback, UTC rollover,
 320px layouts, blocked storage, and zero external requests.
 
-Verified locally: **18 regression tests passed, 0 failures**, all **30 offline games booted**,
+Verified locally: **18 regression tests passed, 0 failures**, all **31 offline games booted**,
 **0 uncaught JavaScript errors**, and **0 external HTTP requests**.
 
 For release screenshots and a live F-14 embed smoke test (requires internet):

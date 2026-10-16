@@ -189,8 +189,8 @@ test('browser regressions', async t => {
   await page.goto(url);
 
   await t.test('hub categories, search, sorting, empty state, and stored favorites', async () => {
-    assert.equal(await page.$$eval('.card', els => els.length), 33);
-    assert.equal(await text(page, '#count'), '33');
+    assert.equal(await page.$$eval('.card', els => els.length), 34);
+    assert.equal(await text(page, '#count'), '34');
     await filter('New');
     assert.equal(await page.$$eval('.card', els => els.length), 4);
     await filter('Puzzle');
@@ -445,7 +445,7 @@ test('browser regressions', async t => {
       Object.defineProperty(window, 'localStorage', { get() { throw new Error('Storage blocked'); } });
     });
     await restricted.goto(url);
-    assert.equal(await restricted.$$eval('.card', els => els.length), 33);
+    assert.equal(await restricted.$$eval('.card', els => els.length), 34);
     for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
       await restricted.evaluate(id => openGame(id), slug);
       await restricted.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#board')?.childElementCount > 0);
