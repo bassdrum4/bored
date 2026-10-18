@@ -87,6 +87,26 @@ Games run in separate `srcdoc` iframes, keeping their CSS and JavaScript isolate
 from the hub. A storage shim in the original games provides an in-memory fallback
 where needed on `file://`.
 
+### Card and tank tuning
+
+- **tank2** — driving over a powerup equips it for you: ammo, fuel, health,
+  shield and teleport all apply on pickup, and the picked-up weapon is still
+  equipped on your next turn. Number keys 1–4 remain as an override, and a spent
+  powerup falls back to the standard shell.
+- **solitaire** — the waste fans its three drawn cards wider and never reaches the
+  foundation row; a dropped card always lands flush with its pile (the reduced-motion
+  path used to leave a card drawn away from its pile); tapping a face-down card
+  counts as tapping its pile, so click-to-move works anywhere in the target pile;
+  and a drag interrupted by the pointer leaving the window or frame snaps back
+  instead of leaving an invisible card behind.
+- **poker** — the table is dressed as a saloon (wood, brass and felt, with a
+  parchment sidebar), and folding out a hand can no longer throw: whoever is left
+  wins the pot, the last player standing is never asked to act or fold, and the
+  history lists one line per winner instead of one per side pot.
+- The three games give their own toolbar room under the hub player's floating
+  **All games / Restart / Fullscreen** buttons when they are embedded, so those
+  in-frame controls stay clickable.
+
 ### Lighthouse fix
 
 The original game declared `#fatal { display: grid }`, overriding its `hidden`
@@ -135,6 +155,22 @@ challenge completion, saved results, sharing with clipboard fallback, UTC rollov
 
 Verified locally: **18 regression tests passed, 0 failures**, all **31 offline games booted**,
 **0 uncaught JavaScript errors**, and **0 external HTTP requests**.
+
+[tests/cards.test.cjs](tests/cards.test.cjs) adds the card-and-tank regressions,
+played through the hub player so the packed payloads and the injected head are
+covered too:
+
+```bash
+node --test tests/cards.test.cjs
+```
+
+It checks that poker ends a hand cleanly when it is folded out (including the
+case where everybody folds), that a folded player never blocks the table and
+chips are conserved through a hand, that tank2 powerups equip themselves without
+the number keys, that solitaire drag/drop and click-to-move always land a card on
+its pile (with and without reduced motion), that an interrupted drag never hides a
+card, and that the waste fans three readable cards clear of the foundations.
+Verified locally: **9 tests passed, 0 failures**.
 
 For release screenshots and a live F-14 embed smoke test (requires internet):
 
