@@ -54,6 +54,29 @@ checks the stated conditions; it is **not anti-cheat or a server-verified leader
 The three remote extras are excluded because the hub cannot inspect their
 cross-origin game state (and Klang is a music player).
 
+## Shared leaderboard (optional)
+
+Sign in with an email and password to keep your best scores on a shared board and
+see how other players are doing. The leaderboard is backed by Supabase and is
+entirely optional: without keys the hub stays offline and every game still works.
+
+To turn it on:
+
+1. Create a Supabase project, then run [`supabase/schema.sql`](supabase/schema.sql)
+in the SQL editor. It creates a `scores` table with row-level security: everyone
+can read scores, but players can only write their own rows.
+2. In **Project Settings → API**, copy the project URL and the **anon public** key
+into `SUPABASE_URL` and `SUPABASE_ANON_KEY` near the top of the hub script in
+`index.html`. The anon key is designed to be public; do not use the service role key.
+3. In **Authentication → Providers → Email**, enable email sign-in. For quick
+testing you can turn off **Confirm email**; otherwise players confirm by email
+before their first sign-in.
+
+The board tracks the best score each player has on this device for the games that
+persist one (2048, Aim Lab, Memory, Tetris, Snake, Pac-Man, Breakout, Void Runner,
+Commanders, Simon, and Minesweeper). Scores are submitted by the browser, so this
+is a friendly board, not anti-cheat. Signing out keeps local bests intact.
+
 ## New games (4)
 
 | Game | How to play |

@@ -95,6 +95,39 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
 #player-tools button{background:var(--paper);color:var(--ink);border:1px solid var(--ink);
   padding:8px 10px;font:12px var(--mono);cursor:pointer}
 #back{font-family:var(--mono)}
+#account{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font:11px/1.6 var(--mono);color:var(--dim)}
+#account-state{flex:1;min-width:190px}
+#account-state b{color:var(--ink);font-weight:400}
+#account button{background:none;border:1px solid var(--rule);color:var(--ink);padding:5px 8px;font:10.5px var(--mono);cursor:pointer}
+#account button:hover{border-color:var(--ink)}
+#leaderboard{margin:24px 0 12px;padding:18px;border:1px solid var(--rule);border-left:3px solid var(--ink)}
+#leaderboard h2{font-size:23px;font-weight:400;margin-bottom:6px}
+#lb-note{font-size:14px;color:var(--dim);margin-bottom:12px}
+.lb-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;font:11px var(--mono);color:var(--dim)}
+#lb-game{background:var(--paper);color:var(--ink);border:1px solid var(--rule);font:11px var(--mono);padding:6px;max-width:180px}
+#lb-list{list-style:none}
+#lb-list li{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--rule);font-size:14px}
+#lb-list li:last-child{border-bottom:0}
+#lb-list .lb-rank{font:11px var(--mono);color:var(--dim);min-width:2.2ch}
+#lb-list .lb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lb-list .lb-score{font:12px var(--mono);white-space:nowrap}
+#lb-list li.you .lb-name{color:var(--red)}
+#lb-mine{margin-top:10px;font:11px/1.7 var(--mono);color:var(--dim)}
+#lb-empty{padding:12px 0;color:var(--dim);font-style:italic;font-size:14px}
+dialog{border:1px solid var(--ink);background:var(--paper);color:var(--ink);max-width:min(420px,calc(100vw - 32px));padding:22px;font:14px/1.5 Georgia,"Times New Roman",serif}
+dialog::backdrop{background:rgba(25,23,19,.55)}
+dialog h2{font-size:24px;font-weight:400;margin-bottom:4px}
+#auth-blurb{font-size:13px;color:var(--dim);margin-bottom:14px}
+#auth-form label{display:block;font:10.5px var(--mono);color:var(--dim);margin-bottom:10px}
+#auth-form input{display:block;width:100%;margin-top:4px;padding:8px;background:#fff9ed;border:1px solid var(--rule);font:13px var(--mono);color:var(--ink);border-radius:0}
+#auth-form input:focus{outline:2px solid var(--red);outline-offset:1px}
+#auth-message{min-height:18px;font:11px/1.5 var(--mono);color:var(--red);margin:4px 0 10px}
+.auth-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.auth-actions button{background:none;border:1px solid var(--rule);color:var(--ink);padding:8px 10px;font:11px var(--mono);cursor:pointer}
+.auth-actions button[type="submit"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.auth-actions button:disabled{opacity:.5;cursor:default}
+.auth-actions #auth-toggle{border:0;padding-left:0;color:var(--dim);text-decoration:underline}
+#auth-cancel{margin-left:auto}
 @media(max-width:480px){#hub{padding:30px 16px 44px}.card .idx{display:none}.card .detail{font-size:10px}
   .search-row{gap:9px}#hint{max-width:90%;text-align:center;width:max-content}#player-tools{right:8px;top:8px}#back{left:8px;top:8px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
@@ -108,6 +141,12 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
     <h1>Bored</h1>
     <p class="sub"><b id="count">33</b> things to play &middot; one file &middot; no installs</p>
     <p class="intro">A little arcade for your spare time. Pick a favorite or find something new.</p>
+    <div id="account">
+      <span id="account-state">Playing as a guest. Scores stay in this browser.</span>
+      <button id="account-action" type="button">Sign in</button>
+      <button id="account-rename" type="button" hidden>Change name</button>
+    </div>
+
   </header>
   <section id="daily" aria-labelledby="daily-heading">
     <p id="daily-date"></p>
@@ -117,6 +156,17 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
     <button id="daily-play" class="action" type="button">Play today's challenge &#8594;</button>
     <button id="daily-share" class="action" type="button" hidden>Copy result</button>
     <textarea id="daily-result" aria-label="Daily challenge result to share" readonly rows="5" hidden></textarea>
+  </section>
+  <section id="leaderboard" aria-labelledby="leaderboard-heading">
+    <h2 id="leaderboard-heading">Leaderboard</h2>
+    <p id="lb-note">Best scores from the games that keep one. Sign in to put your name up.</p>
+    <div class="lb-bar">
+      <label>Game <select id="lb-game" aria-label="Leaderboard game"></select></label>
+      <button id="lb-refresh" class="action" type="button">Refresh</button>
+    </div>
+    <ol id="lb-list"></ol>
+    <p id="lb-empty" hidden></p>
+    <p id="lb-mine"></p>
   </section>
   <section id="recent" aria-labelledby="recent-heading" hidden>
     <h2 id="recent-heading">RECENTLY PLAYED</h2>
@@ -147,6 +197,22 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
   <footer class="foot"><span>have fun. stay a while.</span><span>31 offline games / 3 online extras</span></footer>
 </div>
 
+<dialog id="auth-dialog" aria-labelledby="auth-title">
+  <form id="auth-form" novalidate>
+    <h2 id="auth-title">Sign in</h2>
+    <p id="auth-blurb">Save your best scores and see how everyone else is doing.</p>
+    <label id="auth-email-row">Email<input id="auth-email" type="email" autocomplete="email" required></label>
+    <label id="auth-pass-row">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required></label>
+    <label id="auth-name-row" hidden>Display name<input id="auth-name" type="text" autocomplete="nickname" maxlength="20" required></label>
+    <p id="auth-message" role="status" aria-live="polite"></p>
+    <div class="auth-actions">
+      <button id="auth-submit" type="submit">Sign in</button>
+      <button id="auth-toggle" type="button">Create an account</button>
+      <button id="auth-cancel" type="button">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
 <div id="player" hidden>
   <button id="back" type="button">&#8249; All games</button>
   <div id="player-tools">
@@ -168,6 +234,414 @@ const THREE_MOD = "LyoqCiAqIEBsaWNlbnNlCiAqIENvcHlyaWdodCAyMDEwLTIwMjUgVGhyZWUua
 
 const $ = s => document.querySelector(s);
 const grid = $('#grid'), player = $('#player'), frame = $('#frame'), q = $('#q');
+
+// ── Shared leaderboard (optional Supabase backend) ──────────────────────────
+// Paste the project URL and anon public key from Supabase → Project Settings → API.
+// Both are safe to ship in a static page; Row Level Security protects the table.
+const SUPABASE_URL = '';
+const SUPABASE_ANON_KEY = '';
+const LB_GAMES = [
+  { id: '2048', name: '2048', unit: 'points', key: 'bored.best.2048' },
+  { id: 'aim-lab', name: 'Aim Lab', unit: 'hits', key: 'bored.best.aim-lab.64' },
+  { id: 'memory', name: 'Memory', unit: 'moves', key: 'bored.best.memory', lower: true },
+  { id: 'tetris', name: 'Tetris', unit: 'points', key: 'tetris-high-score' },
+  { id: 'snake', name: 'Snake', unit: 'apples', key: 'snake.bestScore' },
+  { id: 'pac-man', name: 'Pac-Man', unit: 'points', key: 'pacHi' },
+  { id: 'breakout', name: 'Breakout', unit: 'points', key: 'breakout_hi_pro' },
+  { id: 'void-runner', name: 'Void Runner', unit: 'points', key: 'voidrunner_best' },
+  { id: 'commanders', name: 'Commanders', unit: 'points', key: 'scHi' },
+  { id: 'simon', name: 'Simon', unit: 'rounds', key: 'simonBest' },
+  { id: 'minesweeper', name: 'Minesweeper', unit: 'seconds', lower: true, read() {
+    try {
+      const all = JSON.parse(localStorage.getItem('minesweeper_scores') || '{}');
+      const times = Array.isArray(all.beginner) ? all.beginner.map(entry => Number(entry.time)).filter(n => n > 0) : [];
+      return times.length ? Math.min(...times) : 0;
+    } catch { return 0; }
+  } }
+];
+const lbCache = new Map();
+let session = loadSession();
+let submitted = {};
+let lbGame = LB_GAMES[0].id;
+let authMode = 'signin';
+let authBusy = false;
+
+function readJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+}
+function writeJson(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+function supabaseOn() {
+  return /^https:\/\//.test(SUPABASE_URL) && SUPABASE_ANON_KEY.length > 20;
+}
+function loadSession() {
+  const saved = readJson('bored.session', null);
+  return saved && saved.access_token && saved.user ? saved : null;
+}
+function loadSubmitted() {
+  submitted = session ? readJson('bored.submitted.' + session.user.id, {}) : {};
+}
+function saveSubmitted() {
+  if (session) writeJson('bored.submitted.' + session.user.id, submitted);
+}
+function storeSession(data) {
+  const user = data.user || session?.user;
+  if (!user) return;
+  session = {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: data.expires_at || Math.floor(Date.now() / 1000) + (data.expires_in || 3600),
+    user
+  };
+  writeJson('bored.session', session);
+  loadSubmitted();
+}
+function forgetSession() {
+  session = null;
+  try { localStorage.removeItem('bored.session'); } catch {}
+  submitted = {};
+  lbCache.clear();
+}
+function userName() {
+  const meta = session?.user?.user_metadata || {};
+  const name = String(meta.display_name || session?.user?.email || 'player').split('@')[0];
+  return name.slice(0, 20) || 'player';
+}
+async function sb(path, { method = 'GET', body, prefer, token } = {}) {
+  const headers = { apikey: SUPABASE_ANON_KEY };
+  headers.Authorization = 'Bearer ' + (token || session?.access_token || SUPABASE_ANON_KEY);
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (prefer) headers.Prefer = prefer;
+  const res = await fetch(SUPABASE_URL.replace(/\/+$/, '') + path, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  if (!res.ok) {
+    let message = res.status + ' ' + res.statusText;
+    try {
+      const data = await res.json();
+      message = data.msg || data.message || data.error_description || data.error || message;
+    } catch {}
+    const error = new Error(message);
+    error.status = res.status;
+    throw error;
+  }
+  if (res.status === 204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+async function refreshSession() {
+  if (!session?.refresh_token) { forgetSession(); return null; }
+  try {
+    const data = await sb('/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      body: { refresh_token: session.refresh_token },
+      token: SUPABASE_ANON_KEY
+    });
+    storeSession(data);
+    return session;
+  } catch {
+    forgetSession();
+    return null;
+  }
+}
+async function freshSession() {
+  if (!session) return null;
+  if (session.expires_at && session.expires_at * 1000 < Date.now() + 60000) return refreshSession();
+  return session;
+}
+function authError(err) {
+  const message = String(err?.message || err);
+  if (/invalid login credentials/i.test(message)) return 'Wrong email or password.';
+  if (/user already registered/i.test(message)) return 'That email already has an account. Try signing in.';
+  if (/email not confirmed/i.test(message)) return 'Check your email to confirm the account first.';
+  if (/password should be at least/i.test(message)) return 'Use at least 6 characters for the password.';
+  if (/failed to fetch/i.test(message)) return 'Could not reach the leaderboard server.';
+  return message;
+}
+function bestValue(game) {
+  if (game.read) return game.read();
+  try { return Number(localStorage.getItem(game.key)) || 0; } catch { return 0; }
+}
+function formatScore(value, game) {
+  const number = Number(value);
+  return (Number.isFinite(number) ? Math.round(number * 10) / 10 : 0) + ' ' + game.unit;
+}
+async function syncScores() {
+  if (!supabaseOn() || !session) return;
+  if (!(await freshSession())) { renderAccount(); renderLeaderboard(); return; }
+  const name = userName();
+  let changed = false;
+  for (const game of LB_GAMES) {
+    const score = bestValue(game);
+    if (!score || !Number.isFinite(score)) continue;
+    const previous = submitted[game.id];
+    if (previous != null && (game.lower ? score >= previous : score <= previous)) continue;
+    try {
+      await sb('/rest/v1/scores?on_conflict=user_id,game', {
+        method: 'POST',
+        body: {
+          user_id: session.user.id,
+          game: game.id,
+          score,
+          lower_is_better: !!game.lower,
+          display_name: name,
+          updated_at: new Date().toISOString()
+        },
+        prefer: 'resolution=merge-duplicates,return=minimal'
+      });
+      submitted[game.id] = score;
+      saveSubmitted();
+      lbCache.delete(game.id);
+      changed = true;
+    } catch (err) {
+      if (err.status === 401) await refreshSession();
+    }
+  }
+  if (changed) loadLeaderboard(true);
+}
+async function loadLeaderboard(force = false) {
+  if (!supabaseOn()) { renderLeaderboard(); return; }
+  const game = LB_GAMES.find(entry => entry.id === lbGame) || LB_GAMES[0];
+  const cached = lbCache.get(game.id);
+  if (!force && cached && Date.now() - cached.at < 30000) { renderLeaderboard(); return; }
+  if (!cached || force) {
+    const empty = $('#lb-empty');
+    if (!$('#lb-list').children.length) { empty.hidden = false; empty.textContent = 'Loading scores…'; }
+  }
+  try {
+    const query = new URLSearchParams({
+      select: 'user_id,score,display_name',
+      game: 'eq.' + game.id,
+      order: 'score.' + (game.lower ? 'asc' : 'desc'),
+      limit: '10'
+    });
+    const rows = await sb('/rest/v1/scores?' + query, { token: SUPABASE_ANON_KEY });
+    lbCache.set(game.id, { rows: Array.isArray(rows) ? rows : [], at: Date.now() });
+  } catch (err) {
+    lbCache.set(game.id, { rows: [], at: Date.now(), error: authError(err) });
+  }
+  if (lbGame === game.id) renderLeaderboard();
+}
+function renderLeaderboard() {
+  const game = LB_GAMES.find(entry => entry.id === lbGame) || LB_GAMES[0];
+  const select = $('#lb-game');
+  if (select.value !== game.id) select.value = game.id;
+  const list = $('#lb-list');
+  const empty = $('#lb-empty');
+  list.replaceChildren();
+  $('#lb-refresh').disabled = !supabaseOn();
+  $('#lb-note').textContent = supabaseOn()
+    ? 'Best scores from the games that keep one. ' + (game.lower ? 'Lowest score wins.' : 'Highest score wins.')
+    : 'The shared leaderboard needs a Supabase URL and anon key near the top of the script.';
+  if (!supabaseOn()) {
+    empty.hidden = false;
+    empty.textContent = 'Playing as a guest? Your local bests still work.';
+    $('#lb-mine').textContent = '';
+    return;
+  }
+  const cached = lbCache.get(game.id);
+  const rows = cached?.rows || [];
+  if (cached?.error) {
+    empty.hidden = false;
+    empty.textContent = 'Could not load scores: ' + cached.error;
+  } else if (!rows.length) {
+    empty.hidden = false;
+    empty.textContent = cached ? 'No scores yet. Be the first.' : 'Loading scores…';
+  } else {
+    empty.hidden = true;
+  }
+  rows.forEach((row, index) => {
+    const item = document.createElement('li');
+    if (session && row.user_id === session.user.id) item.className = 'you';
+    const rank = document.createElement('span');
+    rank.className = 'lb-rank';
+    rank.textContent = String(index + 1).padStart(2, '0');
+    const name = document.createElement('span');
+    name.className = 'lb-name';
+    name.textContent = (row.display_name || 'player') + (session && row.user_id === session.user.id ? ' (you)' : '');
+    const score = document.createElement('span');
+    score.className = 'lb-score';
+    score.textContent = formatScore(row.score, game);
+    item.append(rank, name, score);
+    list.appendChild(item);
+  });
+  const mine = bestValue(game);
+  $('#lb-mine').textContent = mine
+    ? 'Your best on this device: ' + formatScore(mine, game) + (session ? ' · synced when you sign in.' : ' · sign in to add it.')
+    : (session ? 'Play ' + game.name + ' to put a score on the board.' : 'Sign in to add your best scores.');
+}
+function renderAccount() {
+  const state = $('#account-state');
+  const action = $('#account-action');
+  const rename = $('#account-rename');
+  state.replaceChildren();
+  if (!supabaseOn()) {
+    state.textContent = 'Shared leaderboard is offline until Supabase is connected.';
+    action.hidden = true;
+    rename.hidden = true;
+    return;
+  }
+  action.hidden = false;
+  if (session) {
+    const who = document.createElement('b');
+    who.textContent = userName();
+    state.append('Signed in as ', who, '. Best scores sync to the shared board.');
+    action.textContent = 'Sign out';
+    rename.hidden = false;
+  } else {
+    state.textContent = 'Playing as a guest. Scores stay in this browser.';
+    action.textContent = 'Sign in';
+    rename.hidden = true;
+  }
+}
+function openAuth(mode = 'signin') {
+  if (!supabaseOn()) return;
+  authMode = mode === 'name' && !session ? 'signin' : mode;
+  const dialog = $('#auth-dialog');
+  const naming = authMode === 'name';
+  $('#auth-title').textContent = authMode === 'signup' ? 'Create an account' : naming ? 'Display name' : 'Sign in';
+  $('#auth-blurb').textContent = authMode === 'signup'
+    ? 'Pick a name for the leaderboard. The email is only used to sign in.'
+    : naming ? 'This is the name other players see.' : 'Save your best scores and see how everyone else is doing.';
+  $('#auth-email-row').hidden = naming;
+  $('#auth-pass-row').hidden = naming;
+  $('#auth-name-row').hidden = authMode === 'signin';
+  $('#auth-submit').textContent = authMode === 'signup' ? 'Create account' : naming ? 'Save name' : 'Sign in';
+  const toggle = $('#auth-toggle');
+  toggle.hidden = naming;
+  toggle.textContent = authMode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account';
+  $('#auth-message').textContent = '';
+  $('#auth-name').value = naming ? userName() : '';
+  $('#auth-password').value = '';
+  if (!dialog.open) {
+    if (dialog.showModal) dialog.showModal();
+    else dialog.setAttribute('open', '');
+  }
+  setTimeout(() => (naming ? $('#auth-name') : $('#auth-email')).focus(), 40);
+}
+function closeAuth() {
+  const dialog = $('#auth-dialog');
+  if (dialog.close) dialog.close();
+  else dialog.removeAttribute('open');
+}
+async function handleAuth(event) {
+  event.preventDefault();
+  if (!supabaseOn() || authBusy) return;
+  const message = $('#auth-message');
+  const name = $('#auth-name').value.trim().slice(0, 20);
+  const email = $('#auth-email').value.trim();
+  const password = $('#auth-password').value;
+  if (authMode === 'name') {
+    if (!name) { message.textContent = 'Choose a name first.'; return; }
+    authBusy = true;
+    $('#auth-submit').disabled = true;
+    message.textContent = 'Saving…';
+    try {
+      await renameUser(name);
+      closeAuth();
+      renderAccount();
+      await syncScores();
+      renderLeaderboard();
+    } catch (err) {
+      message.textContent = authError(err);
+    } finally {
+      authBusy = false;
+      $('#auth-submit').disabled = false;
+    }
+    return;
+  }
+  if (!email || !password) { message.textContent = 'Email and password are required.'; return; }
+  if (password.length < 6) { message.textContent = 'Use at least 6 characters for the password.'; return; }
+  if (authMode === 'signup' && !name) { message.textContent = 'Choose a display name.'; return; }
+  authBusy = true;
+  $('#auth-submit').disabled = true;
+  message.textContent = authMode === 'signup' ? 'Creating your account…' : 'Signing in…';
+  try {
+    if (authMode === 'signup') {
+      const data = await sb('/auth/v1/signup', {
+        method: 'POST',
+        body: { email, password, data: { display_name: name } },
+        token: SUPABASE_ANON_KEY
+      });
+      const payload = data.session || data;
+      if (payload.access_token) storeSession(payload);
+      if (!session) {
+        openAuth('signin');
+        message.textContent = 'Check your email to confirm the account, then sign in.';
+        return;
+      }
+    } else {
+      const data = await sb('/auth/v1/token?grant_type=password', {
+        method: 'POST',
+        body: { email, password },
+        token: SUPABASE_ANON_KEY
+      });
+      storeSession(data);
+    }
+    closeAuth();
+    renderAccount();
+    renderLeaderboard();
+    await syncScores();
+    loadLeaderboard(true);
+  } catch (err) {
+    message.textContent = authError(err);
+  } finally {
+    authBusy = false;
+    $('#auth-submit').disabled = false;
+  }
+}
+async function renameUser(name) {
+  if (!(await freshSession())) throw new Error('Sign in again first.');
+  const user = await sb('/auth/v1/user', { method: 'PUT', body: { data: { display_name: name } } });
+  if (user) {
+    session.user = user;
+    writeJson('bored.session', session);
+  }
+  await sb('/rest/v1/scores?user_id=eq.' + encodeURIComponent(session.user.id), {
+    method: 'PATCH',
+    body: { display_name: name },
+    prefer: 'return=minimal'
+  });
+  lbCache.clear();
+}
+async function signOutUser() {
+  if (session) { try { await sb('/auth/v1/logout', { method: 'POST' }); } catch {} }
+  forgetSession();
+  renderAccount();
+  renderLeaderboard();
+  loadLeaderboard(true);
+}
+function initAccount() {
+  loadSubmitted();
+  const select = $('#lb-game');
+  for (const game of LB_GAMES) {
+    const option = document.createElement('option');
+    option.value = game.id;
+    option.textContent = game.name;
+    select.appendChild(option);
+  }
+  select.value = lbGame;
+  select.onchange = () => { lbGame = select.value; renderLeaderboard(); loadLeaderboard(); };
+  $('#lb-refresh').onclick = () => loadLeaderboard(true);
+  $('#account-action').onclick = () => { if (session) signOutUser(); else openAuth('signin'); };
+  $('#account-rename').onclick = () => openAuth('name');
+  $('#auth-cancel').onclick = closeAuth;
+  $('#auth-toggle').onclick = () => openAuth(authMode === 'signup' ? 'signin' : 'signup');
+  $('#auth-form').addEventListener('submit', handleAuth);
+  $('#auth-dialog').addEventListener('click', event => { if (event.target === $('#auth-dialog')) closeAuth(); });
+  renderAccount();
+  renderLeaderboard();
+  loadLeaderboard();
+  if (session) {
+    freshSession().then(fresh => {
+      renderAccount();
+      if (fresh) syncScores(); else renderLeaderboard();
+    });
+  }
+}
 
 const decode = b => {
   const bin = atob(b), bytes = new Uint8Array(bin.length);
@@ -689,6 +1163,7 @@ function closeGame() {
   current = null;
   const wasDaily = currentDaily; currentDaily = null;
   $('#challenge-progress').hidden = true;
+  syncScores();
   renderDaily();
   (wasDaily ? $('#daily-play') : ($(`[data-slug="${lastSlug}"]`) || q)).focus();
 }
@@ -844,7 +1319,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Escape' && current) closeGame();
   else if (e.key === '/' && !current && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); q.focus(); }
 });
-renderDaily(); renderRecent(); render();
+renderDaily(); renderRecent(); render(); initAccount();
 
 </script>
 </body>
