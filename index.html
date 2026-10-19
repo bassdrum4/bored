@@ -238,8 +238,8 @@ const grid = $('#grid'), player = $('#player'), frame = $('#frame'), q = $('#q')
 // ── Shared leaderboard (optional Supabase backend) ──────────────────────────
 // Paste the project URL and anon public key from Supabase → Project Settings → API.
 // Both are safe to ship in a static page; Row Level Security protects the table.
-const SUPABASE_URL = '';
-const SUPABASE_ANON_KEY = '';
+const SUPABASE_URL = 'https://djdpttltfmwkofdrvkem.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ';
 const LB_GAMES = [
   { id: '2048', name: '2048', unit: 'points', key: 'bored.best.2048' },
   { id: 'aim-lab', name: 'Aim Lab', unit: 'hits', key: 'bored.best.aim-lab.64' },
@@ -380,7 +380,7 @@ async function syncScores() {
     const previous = submitted[game.id];
     if (previous != null && (game.lower ? score >= previous : score <= previous)) continue;
     try {
-      await sb('/rest/v1/scores?on_conflict=user_id,game', {
+      await sb('/rest/v1/bored_scores?on_conflict=user_id,game', {
         method: 'POST',
         body: {
           user_id: session.user.id,
@@ -418,7 +418,7 @@ async function loadLeaderboard(force = false) {
       order: 'score.' + (game.lower ? 'asc' : 'desc'),
       limit: '10'
     });
-    const rows = await sb('/rest/v1/scores?' + query, { token: SUPABASE_ANON_KEY });
+    const rows = await sb('/rest/v1/bored_scores?' + query, { token: SUPABASE_ANON_KEY });
     lbCache.set(game.id, { rows: Array.isArray(rows) ? rows : [], at: Date.now() });
   } catch (err) {
     lbCache.set(game.id, { rows: [], at: Date.now(), error: authError(err) });
@@ -600,7 +600,7 @@ async function renameUser(name) {
     session.user = user;
     writeJson('bored.session', session);
   }
-  await sb('/rest/v1/scores?user_id=eq.' + encodeURIComponent(session.user.id), {
+  await sb('/rest/v1/bored_scores?user_id=eq.' + encodeURIComponent(session.user.id), {
     method: 'PATCH',
     body: { display_name: name },
     prefer: 'return=minimal'

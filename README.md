@@ -65,8 +65,9 @@ entirely optional: without keys the hub stays offline and every game still works
 To turn it on:
 
 1. Create a Supabase project, then run [`supabase/schema.sql`](supabase/schema.sql)
-in the SQL editor. It creates a `scores` table with row-level security: everyone
-can read scores, but players can only write their own rows.
+in the SQL editor. It creates a `bored_scores` table with row-level security:
+everyone can read scores, but players can only write their own rows. The name is
+deliberate so it will not collide with another app's `scores` table in the same project.
 2. In **Project Settings → API**, copy the project URL and the **anon public** key
 into `SUPABASE_URL` and `SUPABASE_ANON_KEY` near the top of the hub script in
 `index.html`. The anon key is designed to be public; do not use the service role key.

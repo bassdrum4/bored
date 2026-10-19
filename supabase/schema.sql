@@ -1,7 +1,9 @@
 -- Bored shared leaderboard.
 -- Run this once in the Supabase SQL editor before adding the project keys to index.html.
+-- The table name is deliberately specific so it cannot collide with another app's
+-- "scores" table in the same project.
 
-create table if not exists public.scores (
+create table if not exists public.bored_scores (
   user_id uuid not null references auth.users (id) on delete cascade,
   game text not null,
   score double precision not null check (score >= 0),
@@ -11,35 +13,35 @@ create table if not exists public.scores (
   primary key (user_id, game)
 );
 
-create index if not exists scores_leaderboard_idx on public.scores (game, score);
+create index if not exists bored_scores_leaderboard_idx on public.bored_scores (game, score);
 
-alter table public.scores enable row level security;
+alter table public.bored_scores enable row level security;
 
 -- Anyone (including signed-out visitors) can read the board.
-drop policy if exists "scores are public" on public.scores;
-create policy "scores are public"
-  on public.scores for select
+drop policy if exists "bored scores are public" on public.bored_scores;
+create policy "bored scores are public"
+  on public.bored_scores for select
   using (true);
 
 -- Signed-in players can only write rows that belong to their own account.
-drop policy if exists "players insert own scores" on public.scores;
-create policy "players insert own scores"
-  on public.scores for insert
+drop policy if exists "players insert own bored scores" on public.bored_scores;
+create policy "players insert own bored scores"
+  on public.bored_scores for insert
   to authenticated
   with check (auth.uid() = user_id);
 
-drop policy if exists "players update own scores" on public.scores;
-create policy "players update own scores"
-  on public.scores for update
+drop policy if exists "players update own bored scores" on public.bored_scores;
+create policy "players update own bored scores"
+  on public.bored_scores for update
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
-drop policy if exists "players delete own scores" on public.scores;
-create policy "players delete own scores"
-  on public.scores for delete
+drop policy if exists "players delete own bored scores" on public.bored_scores;
+create policy "players delete own bored scores"
+  on public.bored_scores for delete
   to authenticated
   using (auth.uid() = user_id);
 
-grant select on public.scores to anon, authenticated;
-grant insert, update, delete on public.scores to authenticated;
+grant select on public.bored_scores to anon, authenticated;
+grant insert, update, delete on public.bored_scores to authenticated;
