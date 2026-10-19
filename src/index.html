@@ -88,10 +88,17 @@
 </dialog>
 
 <div id="player" hidden>
-  <button id="back" type="button">&#8249; All games</button>
-  <div id="player-tools">
-    <button id="restart" type="button" aria-label="Restart current game">Restart</button>
-    <button id="fullscreen" type="button">Fullscreen</button>
+  <div id="player-menu">
+    <button id="menu-toggle" type="button" aria-label="Game menu" aria-haspopup="menu" aria-expanded="false" aria-controls="player-actions" title="Game menu (Esc)">
+      <span class="waffle" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+    </button>
+    <div id="player-actions" role="menu" aria-label="Game actions" hidden>
+      <button id="resume" type="button" role="menuitem"><span>Resume</span></button>
+      <button id="restart" type="button" role="menuitem" aria-label="Restart current game"><span>Restart</span><kbd>Shift+R</kbd></button>
+      <button id="fullscreen" type="button" role="menuitem"><span id="fullscreen-label">Fullscreen</span><kbd>Shift+F</kbd></button>
+      <button id="back" type="button" role="menuitem"><span>&#8249; All games</span></button>
+      <p class="menu-note">Esc closes this menu. Press Esc again to leave.</p>
+    </div>
   </div>
   <div id="hint" role="status">Click the game to control it</div>
   <div id="challenge-progress" role="status" aria-live="polite" hidden></div>

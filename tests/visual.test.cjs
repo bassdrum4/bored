@@ -5,6 +5,11 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const puppeteer = require('puppeteer-core');
 
+async function leave(page) {
+  await page.click('#menu-toggle');
+  await page.click('#back');
+}
+
 test('visual release captures and live F-14 embed', async t => {
   const root = path.resolve(__dirname, '..');
   const chrome = [process.env.CHROME_PATH, path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'), '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p)) || require('puppeteer').executablePath();
@@ -26,12 +31,12 @@ test('visual release captures and live F-14 embed', async t => {
     // Let the original game's entrance animation finish before judging its contrast.
     await new Promise(resolve => setTimeout(resolve, 900));
     await page.screenshot({ path: path.join(shots, 'release-daily-' + width + '.png') });
-    await page.click('#back');
+    await leave(page);
     for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
       await page.evaluate(id => openGame(id), slug);
       await page.waitForFunction(id => document.querySelector('#frame').contentWindow.__boredSnapshot?.().slug === id, {}, slug);
       await page.screenshot({ path: path.join(shots, 'release-' + slug + '-' + width + '.png') });
-      await page.click('#back');
+      await leave(page);
     }
   }
   assert.deepEqual(errors, []);

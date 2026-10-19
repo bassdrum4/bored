@@ -45,8 +45,13 @@ async function open(slug, selector = '#board') {
   return frame;
 }
 async function close() {
+  await page.click('#menu-toggle');
   await page.click('#back');
   await page.waitForFunction(() => document.querySelector('#player').hidden);
+}
+async function restart() {
+  await page.click('#menu-toggle');
+  await page.click('#restart');
 }
 async function filter(name) {
   await page.click('[data-filter="' + name + '"]');
@@ -240,12 +245,34 @@ test('browser regressions', async t => {
     await page.mouse.move(bounds.x + 150, bounds.y + 30);
     await page.mouse.up();
     assert.deepEqual((await cells()).slice(0, 4), [2, 0, 0, 4]);
-    await page.click('#restart');
+    await restart();
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#stats')?.textContent.includes('Score 0'));
     frame = await (await page.$('#frame')).contentFrame();
     assert.match(await text(frame, '#stats'), /Best 4/);
     await close();
     assert.equal(await page.evaluate(() => document.activeElement.dataset.slug), '2048');
+  });
+
+  await t.test('game menu collapses the player controls and keyboard shortcuts drive them', async () => {
+    let frame = await open('2048');
+    assert.equal(await page.$eval('#menu-toggle', el => el.getAttribute('aria-expanded')), 'false');
+    await page.click('#menu-toggle');
+    assert.equal(await page.$eval('#player-actions', el => el.hidden), false);
+    assert.equal(await page.$eval('#menu-toggle', el => el.getAttribute('aria-expanded')), 'true');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.$eval('#player-actions', el => el.hidden), true, 'Esc closes the menu first');
+    assert.equal(await page.$eval('#player', el => el.hidden), false, 'Esc does not leave while closing the menu');
+    await frame.click('#title');
+    await page.keyboard.press('ArrowLeft');
+    assert.match(await text(frame, '#stats'), /Score 4 /);
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('R');
+    await page.keyboard.up('Shift');
+    await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#stats')?.textContent.includes('Score 0'));
+    frame = await (await page.$('#frame')).contentFrame();
+    assert.match(await text(frame, '#stats'), /Score 0 /);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('#player').hidden);
   });
 
   await t.test('Memory locks mismatches, clears pending timers on reset, and completes all pairs', async () => {
@@ -386,7 +413,7 @@ test('browser regressions', async t => {
     assert.match(await text(page, '#daily-status'), /Automatically verified/);
     await page.click('#daily-play');
     await page.waitForFunction(() => typeof document.querySelector('#frame').contentWindow.__boredSnapshot === 'function');
-    await page.click('#restart');
+    await restart();
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#stats')?.textContent.includes('Moves 0'));
     await close();
     assert.match(await text(page, '#daily-status'), /Automatically verified/, 'retry cannot erase earned completion');
@@ -433,9 +460,13 @@ test('browser regressions', async t => {
     for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
       const frame = await open(slug);
       await noOverflow(frame);
-      const back = await (await page.$('#back')).boundingBox();
-      const tools = await (await page.$('#player-tools')).boundingBox();
-      assert.ok(back.x + back.width <= tools.x, 'player controls do not overlap');
+      const toggle = await (await page.$('#menu-toggle')).boundingBox();
+      assert.ok(toggle.x >= 0 && toggle.x + toggle.width <= 320, 'menu button fits on mobile');
+      await page.click('#menu-toggle');
+      const menu = await (await page.$('#player-actions')).boundingBox();
+      assert.ok(menu.x >= 0 && menu.x + menu.width <= 320 && menu.y >= 0 && menu.y + menu.height <= 740, 'player menu fits on mobile');
+      await page.keyboard.press('Escape');
+      assert.equal(await page.$eval('#player-actions', el => el.hidden), true);
       await close();
     }
   });
@@ -452,6 +483,7 @@ test('browser regressions', async t => {
     for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
       await restricted.evaluate(id => openGame(id), slug);
       await restricted.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#board')?.childElementCount > 0);
+      await restricted.click('#menu-toggle');
       await restricted.click('#back');
     }
     await restricted.evaluate(day => { dailyDate = () => day; renderDaily(); }, dateFor('memory'));
@@ -464,6 +496,7 @@ test('browser regressions', async t => {
       await daily.click('.memory-card:nth-child(' + (i + 8) + ')');
     }
     await restricted.waitForFunction(() => dailyResults.size === 1);
+    await restricted.click('#menu-toggle');
     await restricted.click('#back');
     assert.match(await text(restricted, '#daily-status'), /Automatically verified/);
     await noOverflow(daily);

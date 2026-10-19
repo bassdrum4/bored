@@ -47,9 +47,11 @@ server; see [INFISICAL.md](INFISICAL.md).
 - Star games to save favorites and revisit the last four recently played games.
 - **Surprise me** chooses from the current results. Remote entries are excluded
   unless you deliberately select **Online**.
-- **All games** returns to the library; **Esc** also works inside offline games.
-  Remote pages run on another origin, so use **All games** when they have focus.
-- Use **Restart** for a fresh game, or **Fullscreen** where the browser supports it.
+- The **waffle menu** in the top-right holds **Resume**, **Restart**, **Fullscreen**,
+  and **All games**. **Esc** closes the menu first, then leaves the game from
+  offline games. Remote pages run on another origin, so use the menu when they
+  have focus.
+- **Shift+R** restarts and **Shift+F** toggles fullscreen inside offline games.
 
 Favorites, recent games, and best scores stay in your browser's local storage.
 Signing in to the optional shared leaderboard also copies best scores to Supabase.
