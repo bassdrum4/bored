@@ -13,6 +13,7 @@ if (typeof window !== 'undefined') window.dailyDate = defaultDailyDate;
 
 const $ = s => document.querySelector(s);
 const grid = $('#grid'), player = $('#player'), frame = $('#frame'), q = $('#q');
+const menuToggle = $('#menu-toggle'), playerActions = $('#player-actions');
 
 // ── Shared leaderboard (Supabase) ───────────────────────────────────────────
 // The project URL and publishable key are safe to ship in a static page; the
@@ -585,8 +586,33 @@ function injectHead(html, extra) {
 }
 
 
+function setMenu(open, { focusFirst = false, returnFocus = false } = {}) {
+  if (open === !playerActions.hidden) return;
+  playerActions.hidden = !open;
+  menuToggle.setAttribute('aria-expanded', String(open));
+  if (open && focusFirst) playerActions.querySelector('button')?.focus();
+  else if (!open && returnFocus) menuToggle.focus();
+}
+function closeMenu(options) { setMenu(false, options); }
+function restartGame() {
+  if (!current) return;
+  captureHighScore();
+  closeMenu();
+  openGame(current, currentDaily);
+}
+async function toggleFullscreen() {
+  closeMenu();
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else if (player.requestFullscreen) await player.requestFullscreen();
+    else { showHint('Fullscreen is not available in this browser'); return; }
+    frame.focus();
+  } catch { showHint('Fullscreen is not available in this browser'); }
+}
+
 function openGame(slug, daily = null) {
   if (!ORDER.some(([id]) => id === slug)) return;
+  closeMenu();
   currentDaily = daily;
   const ext = EXTERNS[slug];
   current = lastSlug = slug;
@@ -605,13 +631,13 @@ function openGame(slug, daily = null) {
     const g = GAMES[slug];
     let html = NEW_GAMES.includes(slug) ? nativeHTML(slug) : decode(g.b64);
     if (!NEW_GAMES.includes(slug)) html = installDailyAdapter(html, slug);
-    let head = '<scr' + 'ipt>addEventListener("keydown",function(e){if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*")}},true);<\/scr' + 'ipt>';
+    let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
     if (g?.fonts) head += '<style>' + FONT_CSS + '</style>';
     if (slug === 'lighthouse') head += '<style>#fatal[hidden]{display:none!important}</style>' + threeBootstrap();
     if (head) html = injectHead(html, head);
     frame.removeAttribute('src');
     frame.srcdoc = html;
-    showHint('Click or tap to play · Esc returns to the library');
+    showHint('Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
   }
   player.hidden = false;
   document.body.classList.add('playing');
@@ -630,6 +656,7 @@ function showHint(msg) {
 function closeGame() {
   pollDaily();
   captureHighScore();
+  closeMenu();
   clearTimeout(hintTimer); clearTimeout(focusTimer);
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   player.hidden = true;
@@ -776,26 +803,46 @@ $('#random').onclick = () => {
 };
 function showLibraryMessage() { $('#results').textContent = 'These entries need internet. Choose Online to include them in Surprise me.'; }
 $('#back').onclick = closeGame;
-$('#restart').onclick = () => {
-  captureHighScore();
-  if (current) openGame(current, currentDaily);
+$('#resume').onclick = () => { closeMenu(); frame.focus(); };
+$('#restart').onclick = restartGame;
+$('#fullscreen').onclick = toggleFullscreen;
+menuToggle.onclick = e => {
+  const open = playerActions.hidden;
+  setMenu(open, { focusFirst: open && e.detail === 0 });
 };
-$('#fullscreen').onclick = async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else if (player.requestFullscreen) await player.requestFullscreen();
-    else { showHint('Fullscreen is not available in this browser'); return; }
-    frame.focus();
-  } catch { showHint('Fullscreen is not available in this browser'); }
-};
-addEventListener('fullscreenchange', () => { $('#fullscreen').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
+playerActions.addEventListener('keydown', e => {
+  const items = [...playerActions.querySelectorAll('button')];
+  const index = items.indexOf(document.activeElement);
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    items[(index + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus();
+  } else if (e.key === 'Home' || e.key === 'End') {
+    e.preventDefault();
+    items[e.key === 'Home' ? 0 : items.length - 1].focus();
+  }
+});
+document.addEventListener('pointerdown', e => {
+  if (!playerActions.hidden && !e.target.closest('#player-menu')) closeMenu();
+});
+addEventListener('fullscreenchange', () => { $('#fullscreen-label').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
 addEventListener('message', e => {
   if (!current || EXTERNS[current] || e.source !== frame.contentWindow) return;
-  if (e.data?.type === 'bored:close') closeGame();
+  switch (e.data?.type) {
+    case 'bored:close': closeGame(); break;
+    case 'bored:restart': restartGame(); break;
+    case 'bored:fullscreen': toggleFullscreen(); break;
+    case 'bored:menuclose': closeMenu(); break;
+  }
 });
 addEventListener('keydown', e => {
-  if (e.key === 'Escape' && current) closeGame();
-  else if (e.key === '/' && !current && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); q.focus(); }
+  const typing = e.target instanceof Element && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
+  if (e.key === 'Escape') {
+    if (!playerActions.hidden) { e.preventDefault(); closeMenu({ returnFocus: true }); }
+    else if (current) closeGame();
+  } else if (current && !typing && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.key === 'R' || e.key === 'r') { e.preventDefault(); restartGame(); }
+    else if (e.key === 'F' || e.key === 'f') { e.preventDefault(); toggleFullscreen(); }
+  } else if (e.key === '/' && !current && !typing) { e.preventDefault(); q.focus(); }
 });
 renderDaily(); renderRecent(); render(); initAccount();
 
