@@ -70,6 +70,13 @@ security limits writes to the signed-in player's own rows. The client writes to
 `scores` directly because the existing `submit_score` RPC does not populate the
 table's NOT NULL `score` column.
 
+Set **Authentication → URL Configuration → Site URL** to the deployed address
+(`https://bassdrum4.github.io/bored/`) and add that address to **Redirect URLs**.
+Confirmation emails otherwise fall back to the Site URL, which may still point at
+`http://localhost:3000`. The signup request asks Supabase to return to the page
+that created the account, and the hub reads the returned session from the URL,
+so a successful confirmation signs the player in automatically.
+
 For quick testing, turn off **Authentication → Providers → Email → Confirm email**;
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.

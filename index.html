@@ -617,7 +617,8 @@ async function handleAuth(event) {
   message.textContent = authMode === 'signup' ? 'Creating your account…' : 'Signing in…';
   try {
     if (authMode === 'signup') {
-      const data = await sb('/auth/v1/signup', {
+      const redirectTo = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : '';
+      const data = await sb('/auth/v1/signup' + (redirectTo ? '?redirect_to=' + encodeURIComponent(redirectTo) : ''), {
         method: 'POST',
         body: { email, password, data: { display_name: name } },
         token: SUPABASE_ANON_KEY
@@ -626,7 +627,7 @@ async function handleAuth(event) {
       if (payload.access_token) storeSession(payload);
       if (!session) {
         openAuth('signin');
-        message.textContent = 'Check your email to confirm the account, then sign in.';
+        message.textContent = 'Check your email to confirm the account. The link brings you back here.';
         return;
       }
     } else {
@@ -663,6 +664,36 @@ async function signOutUser() {
   renderLeaderboard();
   loadLeaderboard(true);
 }
+async function consumeAuthRedirect() {
+  if (!location.hash || location.hash.length < 2) return false;
+  const params = new URLSearchParams(location.hash.slice(1));
+  const access = params.get('access_token');
+  const refresh = params.get('refresh_token');
+  const error = params.get('error_description') || params.get('error');
+  if (!access && !error) return false;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch {}
+  if (error) {
+    let reason = error;
+    try { reason = decodeURIComponent(error.replace(/\+/g, ' ')); } catch {}
+    lbNotice = reason;
+    renderAccount();
+    return true;
+  }
+  try {
+    const user = await sb('/auth/v1/user', { token: access });
+    storeSession({ access_token: access, refresh_token: refresh, expires_in: Number(params.get('expires_in')) || 3600, user });
+    lbNotice = '';
+    renderAccount();
+    renderLeaderboard();
+    await syncScores();
+    renderAccount();
+    loadLeaderboard(true);
+  } catch (err) {
+    lbNotice = authError(err);
+    renderAccount();
+  }
+  return true;
+}
 function initAccount() {
   loadSubmitted();
   const select = $('#lb-game');
@@ -685,7 +716,8 @@ function initAccount() {
   renderLeaderboard();
   loadRules();
   loadLeaderboard();
-  if (session) {
+  consumeAuthRedirect().then(handled => {
+    if (handled || !session) return;
     freshSession().then(fresh => {
       if (!fresh) { renderAccount(); renderLeaderboard(); return; }
       ensureProfile().then(() => { renderAccount(); syncScores(); }).catch(err => {
@@ -693,7 +725,7 @@ function initAccount() {
         renderAccount();
       });
     });
-  }
+  });
 }
 
 
