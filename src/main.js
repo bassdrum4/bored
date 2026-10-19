@@ -600,14 +600,53 @@ function restartGame() {
   closeMenu();
   openGame(current, currentDaily);
 }
+// Fullscreen is not uniform: Safari still ships a webkit-prefixed API, phones
+// cannot fullscreen a page at all, and a page embedded in another page only gets
+// the feature when its host allows it. Report the real reason and offer the
+// standalone tab when embedding is what blocks it.
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+const fsExit = () => document.exitFullscreen || document.webkitExitFullscreen;
+const isEmbedded = () => { try { return window.self !== window.top; } catch { return true; } };
+let leftFullscreenAt = 0;
+async function leaveFullscreen() {
+  const exit = fsExit();
+  if (!exit) return;
+  try { await exit.call(document); } catch {}
+  frame.focus();
+}
+function openStandalone() {
+  try {
+    const tab = window.open(location.href, '_blank');
+    if (tab) { try { tab.opener = null; } catch {} return true; }
+  } catch {}
+  return false;
+}
+function fullscreenUnavailable() {
+  if (!isEmbedded()) {
+    showHint(/iPad|iPhone|iPod/.test(navigator.userAgent)
+      ? 'This browser cannot fullscreen a page. Add the arcade to your Home Screen instead.'
+      : 'This browser cannot fullscreen a page.');
+    return;
+  }
+  showHint(openStandalone()
+    ? 'Fullscreen is blocked inside this embedded view. The arcade is open in its own tab.'
+    : 'Fullscreen is blocked inside this embedded view. Open the arcade in its own tab.');
+}
 async function toggleFullscreen() {
   closeMenu();
+  if (fsElement()) { await leaveFullscreen(); return; }
+  const request = player.requestFullscreen || player.webkitRequestFullscreen;
+  if (!request) { fullscreenUnavailable(); return; }
+  const enabled = document.fullscreenEnabled ?? document.webkitFullscreenEnabled;
+  if (enabled === false) { fullscreenUnavailable(); return; }
   try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else if (player.requestFullscreen) await player.requestFullscreen();
-    else { showHint('Fullscreen is not available in this browser'); return; }
+    if (player.webkitRequestFullscreen && !player.requestFullscreen) await player.webkitRequestFullscreen();
+    else await player.requestFullscreen({ navigationUI: 'hide' });
     frame.focus();
-  } catch { showHint('Fullscreen is not available in this browser'); }
+  } catch {
+    if (isEmbedded()) fullscreenUnavailable();
+    else showHint('The browser blocked fullscreen for this page.');
+  }
 }
 
 function openGame(slug, daily = null) {
@@ -642,7 +681,9 @@ function openGame(slug, daily = null) {
   player.hidden = false;
   document.body.classList.add('playing');
   clearTimeout(focusTimer);
-  focusTimer = setTimeout(() => { if (current === slug) frame.focus(); }, 60);
+  // Do not steal focus back while the player menu is open, or Esc and the
+  // arrow keys would go to the game instead of the menu.
+  focusTimer = setTimeout(() => { if (current === slug && playerActions.hidden) frame.focus(); }, 60);
 }
 
 function showHint(msg) {
@@ -658,7 +699,7 @@ function closeGame() {
   captureHighScore();
   closeMenu();
   clearTimeout(hintTimer); clearTimeout(focusTimer);
-  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  if (fsElement()) leaveFullscreen();
   player.hidden = true;
   hub.inert = false;
   document.body.classList.remove('playing');
@@ -824,11 +865,18 @@ playerActions.addEventListener('keydown', e => {
 document.addEventListener('pointerdown', e => {
   if (!playerActions.hidden && !e.target.closest('#player-menu')) closeMenu();
 });
-addEventListener('fullscreenchange', () => { $('#fullscreen-label').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
+function onFullscreenChange() {
+  if (!fsElement()) leftFullscreenAt = Date.now();
+  $('#fullscreen-label').textContent = fsElement() ? 'Exit fullscreen' : 'Fullscreen';
+}
+addEventListener('fullscreenchange', onFullscreenChange);
+addEventListener('webkitfullscreenchange', onFullscreenChange);
 addEventListener('message', e => {
   if (!current || EXTERNS[current] || e.source !== frame.contentWindow) return;
   switch (e.data?.type) {
-    case 'bored:close': closeGame(); break;
+    case 'bored:close':
+      if (fsElement()) leaveFullscreen(); else closeGame();
+      break;
     case 'bored:restart': restartGame(); break;
     case 'bored:fullscreen': toggleFullscreen(); break;
     case 'bored:menuclose': closeMenu(); break;
@@ -838,7 +886,8 @@ addEventListener('keydown', e => {
   const typing = e.target instanceof Element && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
   if (e.key === 'Escape') {
     if (!playerActions.hidden) { e.preventDefault(); closeMenu({ returnFocus: true }); }
-    else if (current) closeGame();
+    else if (fsElement()) { e.preventDefault(); leaveFullscreen(); }
+    else if (current && Date.now() - leftFullscreenAt > 500) closeGame();
   } else if (current && !typing && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
     if (e.key === 'R' || e.key === 'r') { e.preventDefault(); restartGame(); }
     else if (e.key === 'F' || e.key === 'f') { e.preventDefault(); toggleFullscreen(); }

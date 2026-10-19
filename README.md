@@ -52,6 +52,9 @@ server; see [INFISICAL.md](INFISICAL.md).
   offline games. Remote pages run on another origin, so use the menu when they
   have focus.
 - **Shift+R** restarts and **Shift+F** toggles fullscreen inside offline games.
+  **Esc** leaves fullscreen without leaving the game. When the arcade is embedded
+  in another page that blocks fullscreen, the Fullscreen action opens it in its
+  own tab instead, where the browser allows it.
 
 Favorites, recent games, and best scores stay in your browser's local storage.
 Signing in to the optional shared leaderboard also copies best scores to Supabase.

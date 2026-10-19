@@ -282,6 +282,19 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#player').hidden);
   });
 
+  await t.test('fullscreen toggles from the menu and Esc leaves fullscreen before the game', async () => {
+    await openTitle('tetris', 'Tetris');
+    await page.click('#menu-toggle');
+    await page.click('#fullscreen');
+    await page.waitForFunction(() => document.fullscreenElement === document.querySelector('#player'));
+    await page.waitForFunction(() => document.querySelector('#fullscreen-label').textContent === 'Exit fullscreen');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.fullscreenElement);
+    assert.equal(await page.$eval('#player', el => el.hidden), false, 'Esc leaves fullscreen before leaving the game');
+    await page.waitForFunction(() => document.querySelector('#fullscreen-label').textContent === 'Fullscreen');
+    await close();
+  });
+
   await t.test('Memory locks mismatches, clears pending timers on reset, and completes all pairs', async () => {
     const frame = await open('memory');
     await frame.click('.memory-card:nth-child(1)');
