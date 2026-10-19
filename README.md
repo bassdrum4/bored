@@ -21,6 +21,7 @@ Local changes appear there only after they are published.
 - Use **Restart** for a fresh game, or **Fullscreen** where the browser supports it.
 
 Favorites, recent games, and best scores stay in your browser's local storage.
+Signing in to the optional shared leaderboard also copies best scores to Supabase.
 If storage is blocked, the games still work; progress may not persist.
 The layout supports phones, touch controls in the new games, keyboard navigation,
 visible focus states, and reduced-motion preferences.
@@ -50,7 +51,8 @@ The challenge works offline. With storage blocked, completion survives within th
 current page session but not a reload.
 
 Verification runs locally in the browser. It prevents accidental completion and
-checks the stated conditions; it is **not anti-cheat or a server-verified leaderboard**.
+checks the stated conditions; it is **not anti-cheat**, and the optional shared
+leaderboard accepts browser-submitted bests too.
 The three remote extras are excluded because the hub cannot inspect their
 cross-origin game state (and Klang is a music player).
 
