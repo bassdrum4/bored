@@ -62,23 +62,22 @@ Sign in with an email and password to keep your best scores on a shared board an
 see how other players are doing. The leaderboard is backed by Supabase and is
 entirely optional: without keys the hub stays offline and every game still works.
 
-To turn it on:
+This project's backend is already provisioned: `score_rules`, `profiles`,
+`scores`, the public `leaderboard` view, and the `set_handle` RPC. The hub reads
+the project URL and publishable key from `SUPABASE_URL` / `SUPABASE_ANON_KEY`
+near the top of the script. That key is safe in a static page, and row-level
+security limits writes to the signed-in player's own rows. The client writes to
+`scores` directly because the existing `submit_score` RPC does not populate the
+table's NOT NULL `score` column.
 
-1. Create a Supabase project, then run [`supabase/schema.sql`](supabase/schema.sql)
-in the SQL editor. It creates a `bored_scores` table with row-level security:
-everyone can read scores, but players can only write their own rows. The name is
-deliberate so it will not collide with another app's `scores` table in the same project.
-2. In **Project Settings → API**, copy the project URL and the **anon public** key
-into `SUPABASE_URL` and `SUPABASE_ANON_KEY` near the top of the hub script in
-`index.html`. The anon key is designed to be public; do not use the service role key.
-3. In **Authentication → Providers → Email**, enable email sign-in. For quick
-testing you can turn off **Confirm email**; otherwise players confirm by email
-before their first sign-in.
+For quick testing, turn off **Authentication → Providers → Email → Confirm email**;
+otherwise players confirm by email before their first sign-in. Handles use 3–16
+letters, numbers, `_` or `-`.
 
 The board tracks the best score each player has on this device for the games that
-persist one (2048, Aim Lab, Memory, Tetris, Snake, Pac-Man, Breakout, Void Runner,
-Commanders, Simon, and Minesweeper). Scores are submitted by the browser, so this
-is a friendly board, not anti-cheat. Signing out keeps local bests intact.
+persist a matching metric (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner,
+Simon, and Minesweeper). Scores are submitted by the browser, so this is a
+friendly board, not anti-cheat. Signing out keeps local bests intact.
 
 ## New games (4)
 

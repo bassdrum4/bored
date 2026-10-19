@@ -235,21 +235,18 @@ const THREE_MOD = "LyoqCiAqIEBsaWNlbnNlCiAqIENvcHlyaWdodCAyMDEwLTIwMjUgVGhyZWUua
 const $ = s => document.querySelector(s);
 const grid = $('#grid'), player = $('#player'), frame = $('#frame'), q = $('#q');
 
-// ── Shared leaderboard (optional Supabase backend) ──────────────────────────
-// Paste the project URL and anon public key from Supabase → Project Settings → API.
-// Both are safe to ship in a static page; Row Level Security protects the table.
+// ── Shared leaderboard (Supabase) ───────────────────────────────────────────
+// The project URL and publishable key are safe to ship in a static page; the
+// leaderboard tables are protected by row-level security.
 const SUPABASE_URL = 'https://djdpttltfmwkofdrvkem.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ';
 const LB_GAMES = [
   { id: '2048', name: '2048', unit: 'points', key: 'bored.best.2048' },
   { id: 'aim-lab', name: 'Aim Lab', unit: 'hits', key: 'bored.best.aim-lab.64' },
   { id: 'memory', name: 'Memory', unit: 'moves', key: 'bored.best.memory', lower: true },
-  { id: 'tetris', name: 'Tetris', unit: 'points', key: 'tetris-high-score' },
   { id: 'snake', name: 'Snake', unit: 'apples', key: 'snake.bestScore' },
   { id: 'pac-man', name: 'Pac-Man', unit: 'points', key: 'pacHi' },
-  { id: 'breakout', name: 'Breakout', unit: 'points', key: 'breakout_hi_pro' },
   { id: 'void-runner', name: 'Void Runner', unit: 'points', key: 'voidrunner_best' },
-  { id: 'commanders', name: 'Commanders', unit: 'points', key: 'scHi' },
   { id: 'simon', name: 'Simon', unit: 'rounds', key: 'simonBest' },
   { id: 'minesweeper', name: 'Minesweeper', unit: 'seconds', lower: true, read() {
     try {
@@ -260,11 +257,14 @@ const LB_GAMES = [
   } }
 ];
 const lbCache = new Map();
+const scoreRules = new Map();
 let session = loadSession();
 let submitted = {};
+let myHandle = '';
 let lbGame = LB_GAMES[0].id;
 let authMode = 'signin';
 let authBusy = false;
+let lbNotice = '';
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
@@ -299,6 +299,8 @@ function storeSession(data) {
 }
 function forgetSession() {
   session = null;
+  myHandle = '';
+  lbNotice = '';
   try { localStorage.removeItem('bored.session'); } catch {}
   submitted = {};
   lbCache.clear();
@@ -307,6 +309,11 @@ function userName() {
   const meta = session?.user?.user_metadata || {};
   const name = String(meta.display_name || session?.user?.email || 'player').split('@')[0];
   return name.slice(0, 20) || 'player';
+}
+function cleanHandle(value) {
+  let handle = String(value || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 16);
+  while (handle.length < 3) handle += '_';
+  return handle.slice(0, 16);
 }
 async function sb(path, { method = 'GET', body, prefer, token } = {}) {
   const headers = { apikey: SUPABASE_ANON_KEY };
@@ -358,6 +365,8 @@ function authError(err) {
   if (/user already registered/i.test(message)) return 'That email already has an account. Try signing in.';
   if (/email not confirmed/i.test(message)) return 'Check your email to confirm the account first.';
   if (/password should be at least/i.test(message)) return 'Use at least 6 characters for the password.';
+  if (/names use 3 to 16/i.test(message)) return 'Names use 3–16 letters, numbers, _ or -.';
+  if (/taken|already in use|duplicate/i.test(message)) return 'That name is taken. Try another.';
   if (/failed to fetch/i.test(message)) return 'Could not reach the leaderboard server.';
   return message;
 }
@@ -369,25 +378,68 @@ function formatScore(value, game) {
   const number = Number(value);
   return (Number.isFinite(number) ? Math.round(number * 10) / 10 : 0) + ' ' + game.unit;
 }
+async function setHandle(name, retry = false) {
+  let attempt = cleanHandle(name);
+  for (let tries = 0; tries < (retry ? 3 : 1); tries++) {
+    try {
+      const result = await sb('/rest/v1/rpc/set_handle', { method: 'POST', body: { p_handle: attempt } });
+      return typeof result === 'string' && result ? result : attempt;
+    } catch (err) {
+      if (!retry || !/taken|already|unique|duplicate/i.test(err.message)) throw err;
+      attempt = cleanHandle(attempt.slice(0, 10) + '-' + Math.floor(1000 + Math.random() * 9000));
+    }
+  }
+  return attempt;
+}
+async function ensureProfile(preferred) {
+  if (!session) return '';
+  if (!(await freshSession())) return '';
+  if (myHandle) return myHandle;
+  try {
+    const rows = await sb('/rest/v1/profiles?select=handle&id=eq.' + encodeURIComponent(session.user.id));
+    if (rows?.[0]?.handle) myHandle = rows[0].handle;
+  } catch {}
+  if (!myHandle) myHandle = await setHandle(preferred || userName(), true);
+  return myHandle;
+}
+async function loadRules() {
+  try {
+    const rows = await sb('/rest/v1/score_rules?select=game,label,better,max_value', { token: SUPABASE_ANON_KEY });
+    for (const row of rows || []) scoreRules.set(row.game, row);
+  } catch {}
+}
 async function syncScores() {
   if (!supabaseOn() || !session) return;
-  if (!(await freshSession())) { renderAccount(); renderLeaderboard(); return; }
-  const name = userName();
+  try {
+    if (!(await ensureProfile())) { renderAccount(); return; }
+    const rows = await sb('/rest/v1/scores?select=game,value&user_id=eq.' + encodeURIComponent(session.user.id));
+    for (const row of rows || []) {
+      const value = Number(row.value);
+      if (Number.isFinite(value)) submitted[row.game] = value;
+    }
+    saveSubmitted();
+  } catch (err) {
+    lbNotice = authError(err);
+    renderAccount();
+    return;
+  }
   let changed = false;
   for (const game of LB_GAMES) {
-    const score = bestValue(game);
+    let score = bestValue(game);
     if (!score || !Number.isFinite(score)) continue;
+    score = Math.round(score);
+    const rule = scoreRules.get(game.id);
+    if (rule && Number.isFinite(rule.max_value) && score > rule.max_value) continue;
     const previous = submitted[game.id];
     if (previous != null && (game.lower ? score >= previous : score <= previous)) continue;
     try {
-      await sb('/rest/v1/bored_scores?on_conflict=user_id,game', {
+      await sb('/rest/v1/scores?on_conflict=user_id,game', {
         method: 'POST',
         body: {
           user_id: session.user.id,
           game: game.id,
+          value: score,
           score,
-          lower_is_better: !!game.lower,
-          display_name: name,
           updated_at: new Date().toISOString()
         },
         prefer: 'resolution=merge-duplicates,return=minimal'
@@ -398,8 +450,10 @@ async function syncScores() {
       changed = true;
     } catch (err) {
       if (err.status === 401) await refreshSession();
+      else lbNotice = authError(err);
     }
   }
+  renderAccount();
   if (changed) loadLeaderboard(true);
 }
 async function loadLeaderboard(force = false) {
@@ -413,12 +467,12 @@ async function loadLeaderboard(force = false) {
   }
   try {
     const query = new URLSearchParams({
-      select: 'user_id,score,display_name',
+      select: 'game,handle,value,updated_at',
       game: 'eq.' + game.id,
-      order: 'score.' + (game.lower ? 'asc' : 'desc'),
+      order: 'value.' + (game.lower ? 'asc' : 'desc'),
       limit: '10'
     });
-    const rows = await sb('/rest/v1/bored_scores?' + query, { token: SUPABASE_ANON_KEY });
+    const rows = await sb('/rest/v1/leaderboard?' + query, { token: SUPABASE_ANON_KEY });
     lbCache.set(game.id, { rows: Array.isArray(rows) ? rows : [], at: Date.now() });
   } catch (err) {
     lbCache.set(game.id, { rows: [], at: Date.now(), error: authError(err) });
@@ -434,8 +488,8 @@ function renderLeaderboard() {
   list.replaceChildren();
   $('#lb-refresh').disabled = !supabaseOn();
   $('#lb-note').textContent = supabaseOn()
-    ? 'Best scores from the games that keep one. ' + (game.lower ? 'Lowest score wins.' : 'Highest score wins.')
-    : 'The shared leaderboard needs a Supabase URL and anon key near the top of the script.';
+    ? 'Best scores from around the arcade. ' + (game.lower ? 'Lowest score wins.' : 'Highest score wins.')
+    : 'The shared leaderboard needs a Supabase URL and publishable key near the top of the script.';
   if (!supabaseOn()) {
     empty.hidden = false;
     empty.textContent = 'Playing as a guest? Your local bests still work.';
@@ -455,22 +509,24 @@ function renderLeaderboard() {
   }
   rows.forEach((row, index) => {
     const item = document.createElement('li');
-    if (session && row.user_id === session.user.id) item.className = 'you';
+    const mine = myHandle && row.handle === myHandle;
+    if (mine) item.className = 'you';
     const rank = document.createElement('span');
     rank.className = 'lb-rank';
     rank.textContent = String(index + 1).padStart(2, '0');
     const name = document.createElement('span');
     name.className = 'lb-name';
-    name.textContent = (row.display_name || 'player') + (session && row.user_id === session.user.id ? ' (you)' : '');
+    name.textContent = (row.handle || 'player') + (mine ? ' (you)' : '');
     const score = document.createElement('span');
     score.className = 'lb-score';
-    score.textContent = formatScore(row.score, game);
+    score.textContent = formatScore(row.value, game);
     item.append(rank, name, score);
     list.appendChild(item);
   });
   const mine = bestValue(game);
   $('#lb-mine').textContent = mine
-    ? 'Your best on this device: ' + formatScore(mine, game) + (session ? ' · synced when you sign in.' : ' · sign in to add it.')
+    ? 'Your best on this device: ' + formatScore(mine, game) +
+      (session ? ' · saved as ' + (myHandle || userName()) : ' · sign in to add it.')
     : (session ? 'Play ' + game.name + ' to put a score on the board.' : 'Sign in to add your best scores.');
 }
 function renderAccount() {
@@ -487,8 +543,8 @@ function renderAccount() {
   action.hidden = false;
   if (session) {
     const who = document.createElement('b');
-    who.textContent = userName();
-    state.append('Signed in as ', who, '. Best scores sync to the shared board.');
+    who.textContent = myHandle || userName();
+    state.append('Signed in as ', who, lbNotice ? ' · ' + lbNotice : '. Best scores sync to the shared board.');
     action.textContent = 'Sign out';
     rename.hidden = false;
   } else {
@@ -505,7 +561,7 @@ function openAuth(mode = 'signin') {
   $('#auth-title').textContent = authMode === 'signup' ? 'Create an account' : naming ? 'Display name' : 'Sign in';
   $('#auth-blurb').textContent = authMode === 'signup'
     ? 'Pick a name for the leaderboard. The email is only used to sign in.'
-    : naming ? 'This is the name other players see.' : 'Save your best scores and see how everyone else is doing.';
+    : naming ? 'This is the name other players see. 3–16 letters, numbers, _ or -.' : 'Save your best scores and see how everyone else is doing.';
   $('#auth-email-row').hidden = naming;
   $('#auth-pass-row').hidden = naming;
   $('#auth-name-row').hidden = authMode === 'signin';
@@ -514,7 +570,7 @@ function openAuth(mode = 'signin') {
   toggle.hidden = naming;
   toggle.textContent = authMode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account';
   $('#auth-message').textContent = '';
-  $('#auth-name').value = naming ? userName() : '';
+  $('#auth-name').value = naming ? (myHandle || userName()) : '';
   $('#auth-password').value = '';
   if (!dialog.open) {
     if (dialog.showModal) dialog.showModal();
@@ -543,8 +599,8 @@ async function handleAuth(event) {
       await renameUser(name);
       closeAuth();
       renderAccount();
-      await syncScores();
       renderLeaderboard();
+      loadLeaderboard(true);
     } catch (err) {
       message.textContent = authError(err);
     } finally {
@@ -581,10 +637,12 @@ async function handleAuth(event) {
       });
       storeSession(data);
     }
+    lbNotice = '';
     closeAuth();
     renderAccount();
     renderLeaderboard();
     await syncScores();
+    renderAccount();
     loadLeaderboard(true);
   } catch (err) {
     message.textContent = authError(err);
@@ -595,16 +653,7 @@ async function handleAuth(event) {
 }
 async function renameUser(name) {
   if (!(await freshSession())) throw new Error('Sign in again first.');
-  const user = await sb('/auth/v1/user', { method: 'PUT', body: { data: { display_name: name } } });
-  if (user) {
-    session.user = user;
-    writeJson('bored.session', session);
-  }
-  await sb('/rest/v1/bored_scores?user_id=eq.' + encodeURIComponent(session.user.id), {
-    method: 'PATCH',
-    body: { display_name: name },
-    prefer: 'return=minimal'
-  });
+  myHandle = await setHandle(name, false);
   lbCache.clear();
 }
 async function signOutUser() {
@@ -634,14 +683,19 @@ function initAccount() {
   $('#auth-dialog').addEventListener('click', event => { if (event.target === $('#auth-dialog')) closeAuth(); });
   renderAccount();
   renderLeaderboard();
+  loadRules();
   loadLeaderboard();
   if (session) {
     freshSession().then(fresh => {
-      renderAccount();
-      if (fresh) syncScores(); else renderLeaderboard();
+      if (!fresh) { renderAccount(); renderLeaderboard(); return; }
+      ensureProfile().then(() => { renderAccount(); syncScores(); }).catch(err => {
+        lbNotice = authError(err);
+        renderAccount();
+      });
     });
   }
 }
+
 
 const decode = b => {
   const bin = atob(b), bytes = new Uint8Array(bin.length);
