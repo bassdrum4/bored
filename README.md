@@ -112,9 +112,15 @@ For quick testing, turn off **Authentication → Providers → Email → Confirm
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.
 
-The board tracks the best score each player has on this device for the games that
-persist a matching metric (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner,
-Simon, and Minesweeper). Scores are submitted by the browser, so this is a
+The board tracks a best score for **29 of the 34 games**. The original eight
+(2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
+their existing saved bests. Every other offline game except Connect Four and
+Tank2 is read from live game state when you leave or restart: Tetris lines,
+Wordle guesses (solved runs only), 8 Ball balls pocketed, Poker chips, and each
+game's displayed score, waves, levels, wins, ships, or other progress metric.
+Connect Four and Tank2 are excluded because their only totals are per-session
+win counts; the three remote extras are excluded because the hub cannot inspect
+their cross-origin state. Scores are submitted by the browser, so this is a
 friendly board, not anti-cheat. Signing out keeps local bests intact.
 
 ## New games (4)
@@ -194,7 +200,8 @@ accuracy and expiration, search/filter/sort, saved favorites, Escape and focus
 restoration, all 31 offline game boots, Lighthouse's overlay, all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, UTC rollover, 320px layouts,
-blocked storage, and zero external requests.
+blocked storage, high-score capture and the 29-game leaderboard list, and no
+external game requests beyond the configured leaderboard API.
 
 The built `index.html` is the artifact the browser block loads. The bundle keeps
 the small `window` compatibility surface (`openGame`, `dailyDate`, `CHALLENGES`,

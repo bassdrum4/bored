@@ -35,6 +35,46 @@ const LB_GAMES = [
     } catch { return 0; }
   } }
 ];
+
+// Most games expose a live snapshot through the daily adapter. Store the best
+// value seen for the metrics the backend accepts, then read it like any other
+// local best when the leaderboard syncs.
+const highScore = (id, name, unit, extra = {}) => ({
+  id, name, unit, key: 'bored.high.' + id,
+  ...extra,
+  read() {
+    try { return Number(localStorage.getItem('bored.high.' + this.id)) || 0; } catch { return 0; }
+  }
+});
+const HIGH_SCORE_GAMES = [
+  highScore('8ball', '8 Ball', 'balls', { metric: 'potted' }),
+  highScore('tetris', 'Tetris', 'lines', { metric: 'lines' }),
+  highScore('breakout', 'Breakout', 'layouts', { metric: 'layouts' }),
+  highScore('frogger', 'Frogger', 'lily pads', { metric: 'homes' }),
+  highScore('wordle', 'Wordle', 'guesses', {
+    metric: 'guesses', lower: true,
+    when: snapshot => snapshot.solved === true,
+    transform: snapshot => snapshot.guesses + 1
+  }),
+  highScore('space-invaders', 'Space Invaders', 'waves', { metric: 'waves' }),
+  highScore('qbert', 'Q*bert', 'levels', { metric: 'levels' }),
+  highScore('pong', 'Pong', 'points', { metric: 'points' }),
+  highScore('sumo', 'SUMO', 'rounds', { metric: 'wins' }),
+  highScore('lighthouse', 'Lighthouse', 'ships', { metric: 'ships' }),
+  highScore('poker', 'Poker', 'chips', { metric: 'profit', when: snapshot => snapshot.handOver === true }),
+  highScore('tank', 'Tank', 'rounds', { metric: 'wins' }),
+  highScore('solitaire', 'Solitaire', 'cards', { metric: 'cards' }),
+  highScore('commanders', 'Commanders', 'waves', { metric: 'waves' }),
+  highScore('lava', 'Lava', 'points', { metric: 'points' }),
+  highScore('volletball', 'VolletBall', 'points', { metric: 'points' }),
+  highScore('gun-mayhem', 'Gun Mayhem', 'rounds', { metric: 'wins' }),
+  highScore('shadow-net', 'shadow.net', 'files', { metric: 'files' }),
+  highScore('sand', 'Sand', 'cells', { metric: 'cells' }),
+  highScore('eco', 'Eco', 'plants', { metric: 'plants', when: snapshot => snapshot.seconds >= 60 }),
+  highScore('asteroids', 'Asteroids', 'waves', { metric: 'waves' })
+];
+LB_GAMES.push(...HIGH_SCORE_GAMES);
+const highScoreSpec = new Map(HIGH_SCORE_GAMES.map(game => [game.id, game]));
 const lbCache = new Map();
 const scoreRules = new Map();
 let session = loadSession();
@@ -187,6 +227,32 @@ async function loadRules() {
     for (const row of rows || []) scoreRules.set(row.game, row);
   } catch {}
 }
+function captureHighScore() {
+  if (!current || player.hidden) return;
+  const spec = highScoreSpec.get(current);
+  if (!spec) return;
+  let snapshot;
+  try {
+    if (current === '8ball') {
+      const balls = frame.contentWindow.__test?.balls?.();
+      if (!Array.isArray(balls)) return;
+      snapshot = { slug: '8ball', potted: balls.filter(ball => ball.id !== 0 && !ball.alive).length };
+    } else {
+      snapshot = frame.contentWindow.__boredSnapshot?.();
+    }
+  } catch { return; }
+  if (!snapshot || snapshot.slug !== current) return;
+  if (spec.when && !spec.when(snapshot)) return;
+  let value = spec.transform ? spec.transform(snapshot) : Number(snapshot[spec.metric]);
+  if (!Number.isFinite(value)) return;
+  value = Math.round(value);
+  if (value <= 0) return;
+  const key = 'bored.high.' + spec.id;
+  let previous = 0;
+  try { previous = Number(localStorage.getItem(key)) || 0; } catch { return; }
+  if (previous && (spec.lower ? value >= previous : value <= previous)) return;
+  try { localStorage.setItem(key, String(value)); } catch {}
+}
 async function syncScores() {
   if (!supabaseOn() || !session) return;
   try {
@@ -267,8 +333,8 @@ function renderLeaderboard() {
   list.replaceChildren();
   $('#lb-refresh').disabled = !supabaseOn();
   $('#lb-note').textContent = supabaseOn()
-    ? 'Best scores from around the arcade. ' + (game.lower ? 'Lowest score wins.' : 'Highest score wins.')
-    : 'The shared leaderboard needs a Supabase URL and publishable key near the top of the script.';
+    ? 'Best scores across ' + LB_GAMES.length + ' games. ' + (game.lower ? 'Lowest score wins.' : 'Highest score wins.')
+    : 'The shared leaderboard is offline until Supabase is configured.';
   if (!supabaseOn()) {
     empty.hidden = false;
     empty.textContent = 'Playing as a guest? Your local bests still work.';
@@ -538,7 +604,7 @@ function openGame(slug, daily = null) {
   } else {
     const g = GAMES[slug];
     let html = NEW_GAMES.includes(slug) ? nativeHTML(slug) : decode(g.b64);
-    if (daily && !NEW_GAMES.includes(slug)) html = installDailyAdapter(html, slug);
+    if (!NEW_GAMES.includes(slug)) html = installDailyAdapter(html, slug);
     let head = '<scr' + 'ipt>addEventListener("keydown",function(e){if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*")}},true);<\/scr' + 'ipt>';
     if (g?.fonts) head += '<style>' + FONT_CSS + '</style>';
     if (slug === 'lighthouse') head += '<style>#fatal[hidden]{display:none!important}</style>' + threeBootstrap();
@@ -563,6 +629,7 @@ function showHint(msg) {
 
 function closeGame() {
   pollDaily();
+  captureHighScore();
   clearTimeout(hintTimer); clearTimeout(focusTimer);
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   player.hidden = true;
@@ -612,7 +679,7 @@ function pollDaily() {
     if ($('#challenge-progress').textContent !== message) $('#challenge-progress').textContent = message;
   } catch { /* Wait for the next game frame to finish loading. */ }
 }
-setInterval(pollDaily, 250);
+setInterval(() => { pollDaily(); captureHighScore(); }, 250);
 $('#daily-play').onclick = () => {
   const challenge = dailyChallenge(challengeDate());
   openGame(challenge.slug, challenge);
@@ -710,6 +777,7 @@ $('#random').onclick = () => {
 function showLibraryMessage() { $('#results').textContent = 'These entries need internet. Choose Online to include them in Surprise me.'; }
 $('#back').onclick = closeGame;
 $('#restart').onclick = () => {
+  captureHighScore();
   if (current) openGame(current, currentDaily);
 };
 $('#fullscreen').onclick = async () => {
@@ -735,7 +803,7 @@ renderDaily(); renderRecent(); render(); initAccount();
 // suite and for anyone poking at the console.
 Object.assign(window, {
   openGame, closeGame, renderDaily, readDaily, dailyChallenge, dailyCheck,
-  CHALLENGES, ORDER, EXTERNS, NEW_GAMES
+  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, LB_GAMES, HIGH_SCORE_GAMES, captureHighScore
 });
 Object.defineProperty(window, 'currentDaily', { get: () => currentDaily });
 Object.defineProperty(window, 'current', { get: () => current });

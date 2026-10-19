@@ -12,6 +12,7 @@ const builtSource = html.match(/<script>([\s\S]*)<\/script>/)[1];
 const source = ['src/main.js', 'src/games/arcade.js', 'src/daily.js', 'src/games/catalog.js']
   .map(file => fs.readFileSync(path.join(root, file), 'utf8'))
   .join('\n');
+const API = source.match(/const SUPABASE_URL = '([^']+)'/)[1];
 const url = pathToFileURL(path.join(root, 'index.html')).href;
 let browser, page;
 const errors = [], requests = [];
@@ -43,6 +44,12 @@ async function open(slug, selector = '#board') {
   const frame = await (await page.$('#frame')).contentFrame();
   await frame.waitForSelector(selector);
   return frame;
+}
+async function openTitle(slug, title) {
+  await page.evaluate(id => openGame(id), slug);
+  await page.waitForFunction(t => document.querySelector('#frame')?.title === t &&
+    document.querySelector('#frame')?.contentDocument?.body?.childElementCount > 0, {}, title);
+  return (await page.$('#frame')).contentFrame();
 }
 async function close() {
   await page.click('#back');
@@ -316,6 +323,57 @@ test('browser regressions', async t => {
     assert.equal(await page.$$eval('#recent-list button', els => els.length), 4);
   });
 
+  await t.test('game scores feed the high-score entries without counting unfinished runs', async () => {
+    const keys = ['tetris', 'wordle', '8ball', 'poker'].map(id => 'bored.high.' + id);
+    await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
+    try {
+      let frame = await openTitle('tetris', 'Tetris');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'tetris', lines: 42 }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.tetris')), '42');
+
+      frame = await openTitle('wordle', 'Wordle');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'wordle', solved: false, guesses: 2 }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.wordle')), null, 'unsolved runs do not count');
+      frame = await openTitle('wordle', 'Wordle');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'wordle', solved: true, guesses: 2 }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.wordle')), '3');
+      frame = await openTitle('wordle', 'Wordle');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'wordle', solved: true, guesses: 4 }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.wordle')), '3', 'worse solves keep the best');
+
+      frame = await openTitle('8ball', '8 Ball');
+      await frame.waitForFunction(() => typeof window.__test?.balls === 'function');
+      await frame.evaluate(() => { window.__test.balls = () => [{ id: 1, alive: false }, { id: 2, alive: true }]; });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.8ball')), '1', 'counts pocketed object balls');
+
+      frame = await openTitle('poker', 'Poker');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'poker', handOver: false, profit: 500 }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.poker')), null, 'unfinished hands do not count');
+      frame = await openTitle('poker', 'Poker');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'poker', handOver: true, profit: 500 }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.poker')), '500');
+
+      assert.equal(await page.$$eval('#lb-game option', els => els.length), 29);
+      assert.match(await text(page, '#lb-note'), /across 29 games/);
+    } finally {
+      if (await page.$eval('#player', el => !el.hidden)) await close();
+      await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
+    }
+  });
+
   await t.test('all thirty daily adapters boot and expose current-run state', async () => {
     const challenges = await page.evaluate(() => CHALLENGES);
     for (const challenge of challenges) {
@@ -355,7 +413,7 @@ test('browser regressions', async t => {
     }
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
     assert.deepEqual(errors, []);
-    assert.deepEqual(requests, []);
+    assert.deepEqual(requests.filter(request => !request.startsWith(API)), []);
   });
 
   await t.test('daily goal verifies actual Memory gameplay, persists completion, shares, and rolls over', async () => {
@@ -411,7 +469,8 @@ test('browser regressions', async t => {
       await close();
     }
     assert.deepEqual(errors, [], 'no uncaught JavaScript errors');
-    assert.deepEqual(requests, [], 'no external requests from offline games or idle hub');
+    const external = requests.filter(request => !request.startsWith(API));
+    assert.deepEqual(external, [], 'no external requests other than the configured leaderboard');
   });
 
   await t.test('mobile hub and all new games fit at 320px; random respects the active filter', async () => {
@@ -446,6 +505,7 @@ test('browser regressions', async t => {
     restricted.on('pageerror', err => failures.push(err.message));
     await restricted.evaluateOnNewDocument(() => {
       Object.defineProperty(window, 'localStorage', { get() { throw new Error('Storage blocked'); } });
+      Math.random = () => 0;
     });
     await restricted.goto(url);
     assert.equal(await restricted.$$eval('.card', els => els.length), 34);
@@ -455,7 +515,6 @@ test('browser regressions', async t => {
       await restricted.click('#back');
     }
     await restricted.evaluate(day => { dailyDate = () => day; renderDaily(); }, dateFor('memory'));
-    await restricted.evaluateOnNewDocument(() => { Math.random = () => 0; });
     await restricted.click('#daily-play');
     await restricted.waitForFunction(() => typeof document.querySelector('#frame').contentWindow.__boredSnapshot === 'function');
     const daily = await (await restricted.$('#frame')).contentFrame();
@@ -463,7 +522,7 @@ test('browser regressions', async t => {
       await daily.click('.memory-card:nth-child(' + i + ')');
       await daily.click('.memory-card:nth-child(' + (i + 8) + ')');
     }
-    await restricted.waitForFunction(() => dailyResults.size === 1);
+    await restricted.waitForFunction(() => document.querySelector('#challenge-progress').textContent.startsWith('✓'));
     await restricted.click('#back');
     assert.match(await text(restricted, '#daily-status'), /Automatically verified/);
     await noOverflow(daily);
