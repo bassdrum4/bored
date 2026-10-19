@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
+var m={};
+function k(i){return Object.keys(m)[i]||null}
+var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
+setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
+clear:function(){m={}},key:k};
+Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
+try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
+})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Snake</title>
+<style>
+  :root{
+    --white:#FFFFFF;
+    --field:#F8F9FA;
+    --grid:#E8EAED;
+    --grid-major:#DADCE0;
+    --ink:#202124;
+    --muted:#5F6368;
+    --chip:#F1F3F4;
+    --hair:#DADCE0;
+    --blue:#1A73E8;
+    --blue-dark:#1B66C9;
+    --green:#34A853;
+    --green-dark:#1E8E3E;
+    --red:#EA4335;
+    --yellow:#FBBC04;
+    --shadow:0 1px 2px rgba(60,64,67,.10), 0 4px 16px rgba(60,64,67,.08);
+    --shadow-lift:0 8px 32px rgba(60,64,67,.20);
+    --display:"Google Sans","Product Sans","DM Sans",Roboto,Arial,sans-serif;
+    --ui:Roboto,Arial,Helvetica,sans-serif;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+
+  body{
+    background:var(--white);
+    color:var(--ink);
+    font-family:var(--ui);
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+    user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .sr-only{
+    position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+  }
+
+  button{font-family:var(--ui);color:inherit;background:none;border:0;cursor:pointer}
+  :focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:8px}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    height:64px;
+    max-width:1280px;
+    margin:0 auto;
+    padding:0 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+  }
+  .brand{display:flex;align-items:center;gap:12px}
+  .dots{display:flex;gap:4px}
+  .dots span{width:8px;height:8px;border-radius:50%}
+  .dots span:nth-child(1){background:var(--blue)}
+  .dots span:nth-child(2){background:var(--red)}
+  .dots span:nth-child(3){background:var(--yellow)}
+  .dots span:nth-child(4){background:var(--green)}
+  h1{
+    font-family:var(--display);
+    font-size:30px;
+    font-weight:700;
+    letter-spacing:-0.5px;
+    line-height:1;
+  }
+
+  .tools{display:flex;align-items:center;gap:6px}
+  .icon-btn{
+    width:40px;height:40px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--muted);
+    transition:background 120ms ease,color 120ms ease,transform 120ms ease;
+  }
+  .icon-btn:hover{background:var(--chip);color:var(--ink)}
+  .icon-btn:active{transform:scale(.94)}
+  .icon-btn svg{width:20px;height:20px}
+  .icon-btn.on{color:var(--green-dark)}
+
+  /* ---------- play column ---------- */
+  .play{
+    max-width:1280px;
+    margin:0 auto;
+    padding:8px 24px 32px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:20px;
+  }
+
+  .stats{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:10px;
+    width:100%;
+  }
+  .stat{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--white);
+    border:1px solid var(--hair);
+    border-radius:100px;
+    padding:8px 18px 8px 12px;
+    box-shadow:var(--shadow);
+    transition:transform 200ms cubic-bezier(.22,1,.36,1);
+  }
+  .stat .mark{
+    width:22px;height:22px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    flex:0 0 22px;
+  }
+  .stat .mark svg{width:14px;height:14px}
+  .stat .k{
+    font-family:var(--ui);
+    font-size:13px;
+    color:var(--muted);
+  }
+  .stat .v{
+    font-family:var(--display);
+    font-size:24px;
+    font-weight:700;
+    line-height:1;
+    letter-spacing:-.4px;
+    min-width:1.2ch;
+  }
+  .stat.bump{transform:scale(1.12)}
+  .mark.score{background:rgba(234,67,53,.12);color:var(--red)}
+  .mark.best{background:rgba(251,188,4,.16);color:#F9AB00}
+  .mark.len{background:rgba(52,168,83,.14);color:var(--green-dark)}
+  .mark.speed{background:rgba(26,115,232,.12);color:var(--blue)}
+
+  /* ---------- board ---------- */
+  .board{
+    position:relative;
+    width:min(72dvh, calc(100vw - 48px), 680px);
+    height:min(72dvh, calc(100vw - 48px), 680px);
+    border-radius:20px;
+    background:var(--field);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+    touch-action:none;
+  }
+  #canvas{display:block;width:100%;height:100%;transition:opacity 150ms linear}
+  #canvas.dim{opacity:.5}
+
+  .veil{
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    padding:24px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity 180ms ease;
+  }
+  .veil.show{opacity:1;pointer-events:auto}
+
+  .card{
+    background:var(--white);
+    border-radius:28px;
+    padding:32px 36px;
+    box-shadow:var(--shadow-lift);
+    text-align:center;
+    max-width:min(360px, 100%);
+    transform:translateY(12px) scale(.96);
+    opacity:0;
+  }
+  .veil.show .card{
+    animation:cardIn 260ms cubic-bezier(.22,1,.36,1) forwards;
+  }
+  @keyframes cardIn{
+    to{transform:translateY(0) scale(1);opacity:1}
+  }
+  .card h2{
+    font-family:var(--display);
+    font-size:32px;
+    font-weight:700;
+    letter-spacing:-.6px;
+    line-height:1.1;
+  }
+  .card .lead{
+    font-family:var(--ui);
+    font-size:14px;
+    line-height:1.5;
+    color:var(--muted);
+    margin-top:10px;
+  }
+  .card .final{
+    font-family:var(--display);
+    font-size:44px;
+    font-weight:700;
+    letter-spacing:-1px;
+    line-height:1;
+    margin:16px 0 4px;
+    color:var(--green-dark);
+  }
+  .card .sub{
+    font-family:var(--ui);
+    font-size:13px;
+    color:var(--muted);
+    margin-bottom:22px;
+  }
+
+  .pill{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    height:44px;
+    padding:0 26px;
+    border-radius:100px;
+    font-family:var(--ui);
+    font-size:14px;
+    font-weight:500;
+    transition:background 120ms ease,transform 120ms ease,box-shadow 120ms ease;
+  }
+  .pill.primary{background:var(--blue);color:#fff}
+  .pill.primary:hover{background:var(--blue-dark);box-shadow:0 2px 10px rgba(26,115,232,.35)}
+  .pill.primary:active{transform:scale(.97)}
+  .pill.ghost{background:var(--chip);color:var(--ink)}
+  .pill.ghost:hover{background:#E8EAED}
+
+  .keyrow{display:flex;gap:8px;justify-content:center;margin-top:18px}
+  .keycap{
+    width:38px;height:30px;
+    border:1px solid var(--hair);
+    border-radius:8px;
+    background:var(--white);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--ui);
+    font-size:13px;
+    color:var(--muted);
+    box-shadow:0 1px 1px rgba(60,64,67,.10);
+  }
+  .apple-badge{
+    width:52px;height:52px;border-radius:50%;
+    background:rgba(234,67,53,.10);
+    display:flex;align-items:center;justify-content:center;
+    margin:0 auto 14px;
+    color:var(--red);
+  }
+  .apple-badge svg{width:28px;height:28px}
+
+  .pause-card{padding:28px 34px}
+
+  /* ---------- under bar ---------- */
+  .underbar{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+    width:100%;
+  }
+  .hint{
+    font-family:var(--ui);
+    font-size:14px;
+    line-height:1.5;
+    color:var(--muted);
+    text-align:center;
+    max-width:60ch;
+  }
+  .hint b{color:var(--ink);font-weight:500}
+
+  .dpad{
+    display:none;
+    grid-template-columns:repeat(3,48px);
+    grid-template-rows:repeat(2,48px);
+    gap:8px;
+  }
+  .dbtn{
+    width:48px;height:48px;
+    border-radius:12px;
+    background:var(--chip);
+    color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    transition:background 120ms ease,transform 100ms ease;
+  }
+  .dbtn:active{background:#E8EAED;transform:scale(.95)}
+  .dbtn svg{width:22px;height:22px}
+  .dbtn.up{grid-column:2;grid-row:1}
+  .dbtn.left{grid-column:1;grid-row:2}
+  .dbtn.down{grid-column:2;grid-row:2}
+  .dbtn.right{grid-column:3;grid-row:2}
+
+  .footnote{
+    font-family:var(--ui);
+    font-size:12px;
+    color:#9AA0A6;
+    text-align:center;
+  }
+
+  /* ---------- responsive ---------- */
+  @media (max-width:899px){
+    .dpad{display:grid}
+    .board{
+      width:min(calc(100vw - 32px), 62dvh);
+      height:min(calc(100vw - 32px), 62dvh);
+    }
+    .play{padding:4px 16px 28px;gap:16px}
+    .topbar{padding:0 16px;height:56px}
+    h1{font-size:24px}
+    .stat{padding:6px 14px 6px 10px}
+    .stat .v{font-size:20px}
+    .stat .k{font-size:12px}
+  }
+
+  @media (max-width:560px){
+    .card{padding:26px 22px}
+    .card h2{font-size:26px}
+    .card .final{font-size:36px}
+    .stat .k{display:none}
+    .stat{padding:8px 16px 8px 10px}
+    .tools .opt{display:none}
+    .footnote{display:none}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .veil.show .card{animation-duration:1ms}
+    .stat{transition:none}
+    #canvas{transition:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <h1>Snake</h1>
+  </div>
+
+  <div class="tools">
+    <button class="icon-btn opt" id="soundBtn" title="Sound" aria-label="Sound">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 7.5h2.5L10 4.5v11L6.5 12.5H4z"></path>
+        <path class="wave" d="M13 7.2a4 4 0 0 1 0 5.6"></path>
+        <path class="wave" d="M15.4 5.2a7 7 0 0 1 0 9.6"></path>
+      </svg>
+    </button>
+
+    <button class="icon-btn opt" id="motionBtn" title="Motion" aria-label="Motion">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="10" cy="10" r="3"></circle>
+        <path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M15.3 4.7l-1.4 1.4M6.1 13.9l-1.4 1.4"></path>
+      </svg>
+    </button>
+
+    <button class="icon-btn" id="pauseBtn" title="Pause" aria-label="Pause">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" id="pauseIcon">
+        <line x1="7" y1="4.5" x2="7" y2="15.5"></line>
+        <line x1="13" y1="4.5" x2="13" y2="15.5"></line>
+      </svg>
+    </button>
+
+    <button class="icon-btn" id="resetBtn" title="Restart" aria-label="Restart">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M16.2 7A7 7 0 1 0 17 10.4"></path>
+        <polyline points="16.6,3.2 16.6,7.2 12.6,7.2"></polyline>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main class="play">
+
+  <div class="stats">
+    <div class="stat" id="scoreChip">
+      <span class="mark score" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="10" cy="11.4" r="5.6"/><path d="M10 5.6c.9-1.4 2.4-2.1 4-2.1-.2 1.8-1.3 3-2.8 3.4z"/></svg>
+      </span>
+      <span class="k">Score</span>
+      <span class="v" id="scoreValue">0</span>
+    </div>
+
+    <div class="stat">
+      <span class="mark best" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2.6l2.1 4.4 4.8.7-3.5 3.4.8 4.8-4.2-2.3-4.2 2.3.8-4.8L3.1 7.7l4.8-.7z"/></svg>
+      </span>
+      <span class="k">Best</span>
+      <span class="v" id="bestValue">0</span>
+    </div>
+
+    <div class="stat">
+      <span class="mark len" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="2.5" y="8" width="6" height="6" rx="2"/><rect x="10.5" y="8" width="7" height="6" rx="2"/></svg>
+      </span>
+      <span class="k">Length</span>
+      <span class="v" id="lengthValue">3</span>
+    </div>
+
+    <div class="stat">
+      <span class="mark speed" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M11.4 2L4 11.2h4.2L8 18l7.6-9.4h-4.4z"/></svg>
+      </span>
+      <span class="k">Speed</span>
+      <span class="v" id="speedValue">1.0×</span>
+    </div>
+  </div>
+
+  <div class="board" id="board">
+    <canvas id="canvas" role="img" aria-label="Snake board, 20 by 20 cells"></canvas>
+
+    <div class="veil show" id="startVeil">
+      <div class="card">
+        <div class="apple-badge" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="11.6" r="5.8"/><path d="M10 5.4c.9-1.5 2.5-2.3 4.2-2.3-.2 1.9-1.4 3.2-3 3.6z"/></svg>
+        </div>
+        <h2>Ready to play?</h2>
+        <p class="lead">Press an arrow key to start. Eat apples to grow — don’t hit the edges or yourself.</p>
+        <div class="keyrow" aria-hidden="true">
+          <div class="keycap">↑</div><div class="keycap">←</div><div class="keycap">↓</div><div class="keycap">→</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="veil" id="pauseVeil">
+      <div class="card pause-card">
+        <h2>Paused</h2>
+        <p class="lead">Take your time. Nothing moves until you do.</p>
+        <div style="margin-top:22px">
+          <button class="pill primary" id="resumeBtn">Resume</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="veil" id="overVeil">
+      <div class="card">
+        <h2>Game over</h2>
+        <div class="final" id="finalScore">0</div>
+        <div class="sub" id="finalSub">Best score 0</div>
+        <button class="pill primary" id="playAgain">Play again</button>
+        <p class="lead" style="margin-top:14px">or press Enter</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="underbar">
+    <p class="hint">
+      Use the <b>arrow keys</b> or <b>WASD</b> to move. <b>Space</b> pauses,
+      <b>R</b> restarts. Arrow keys work on every keyboard, including mobile browsers.
+    </p>
+
+    <div class="dpad" aria-label="Direction controls">
+      <button class="dbtn up" data-dir="up" aria-label="Move up">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,12 10,7 15,12"/></svg>
+      </button>
+      <button class="dbtn left" data-dir="left" aria-label="Move left">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="12,5 7,10 12,15"/></svg>
+      </button>
+      <button class="dbtn down" data-dir="down" aria-label="Move down">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,8 10,13 15,8"/></svg>
+      </button>
+      <button class="dbtn right" data-dir="right" aria-label="Move right">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,5 13,10 8,15"/></svg>
+      </button>
+    </div>
+
+    <p class="footnote">A Snake tribute. Not affiliated with or endorsed by Google.</p>
+  </div>
+
+</main>
+
+<div class="sr-only" aria-live="polite" id="live"></div>
+<div class="sr-only" id="boardDesc"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================================================================
+     CONSTANTS
+  ================================================================ */
+  var COLS = 20, ROWS = 20;
+  var BASE_STEP = 110;          // ms per move — the whole responsiveness budget
+  var MAX_SPEED = 1.35;
+  var LAUNCH_MS = 520;
+  var RING_MS = 240;
+  var OVER_MS = 260;
+
+  var COL = {
+    field: "#F8F9FA",
+    grid: "#E8EAED",
+    gridMajor: "#DADCE0",
+    body: "#34A853",
+    bodyEdge: "#1E8E3E",
+    head: "#34A853",
+    apple: "#EA4335",
+    appleShine: "#F28B82",
+    leaf: "#34A853",
+    stem: "#1E8E3E",
+    eyeWhite: "#FFFFFF",
+    pupil: "#202124"
+  };
+
+  /* ================================================================
+     DOM
+  ================================================================ */
+  var $ = function (id) { return document.getElementById(id); };
+  var canvas = $("canvas");
+  var ctx = canvas.getContext("2d");
+  var board = $("board");
+
+  var elScore = $("scoreValue"), elBest = $("bestValue");
+  var elLength = $("lengthValue"), elSpeed = $("speedValue");
+  var elScoreChip = $("scoreChip");
+  var elLive = $("live"), elBoardDesc = $("boardDesc");
+  var elStartVeil = $("startVeil"), elPauseVeil = $("pauseVeil"), elOverVeil = $("overVeil");
+  var elFinalScore = $("finalScore"), elFinalSub = $("finalSub");
+  var elPauseIcon = $("pauseIcon"), elPauseBtn = $("pauseBtn");
+
+  /* ================================================================
+     STATE
+  ================================================================ */
+  var state = "ready";            // ready | running | paused | over
+  var snake = [];
+  var dir = { x: 1, y: 0 };
+  var pending = null;
+  var apple = { x: 14, y: 10 };
+  var score = 0;
+  var stepMs = BASE_STEP;
+
+  var lastTime = 0;
+  var acc = 0;
+
+  var launch = { on: false, t0: 0 };
+  var ring = { on: false, t0: 0, x: 0, y: 0 };
+  var applePop = { on: false, t0: 0 };
+  var overFx = { on: false, t0: 0 };
+
+  var motionOn = true;
+  var soundOn = false;
+  var best = loadBest();
+
+  /* ================================================================
+     STORAGE
+  ================================================================ */
+  function loadBest() {
+    try {
+      var v = window.localStorage.getItem("snake.bestScore");
+      var n = v === null ? 0 : parseInt(v, 10);
+      return isNaN(n) ? 0 : n;
+    } catch (e) { return 0; }
+  }
+  function saveBest() {
+    try { window.localStorage.setItem("snake.bestScore", String(best)); }
+    catch (e) { /* storage blocked — keep it in memory */ }
+  }
+
+  /* ================================================================
+     SOUND
+  ================================================================ */
+  var actx = null;
+  function tone(freq, dur, gain, type) {
+    if (!soundOn) return;
+    try {
+      if (!actx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+      }
+      if (actx.state === "suspended") actx.resume();
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = type || "triangle";
+      o.frequency.value = freq;
+      g.gain.value = gain || 0.05;
+      o.connect(g); g.connect(actx.destination);
+      var t = actx.currentTime;
+      g.gain.setValueAtTime(g.gain.value, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.start(t); o.stop(t + dur + 0.03);
+    } catch (e) { /* audio unavailable */ }
+  }
+
+  /* ================================================================
+     CANVAS
+  ================================================================ */
+  var size = 0, cell = 0, dpr = 1;
+
+  function resize() {
+    var r = canvas.getBoundingClientRect();
+    if (!r.width) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    size = r.width;
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cell = size / COLS;
+    render();
+  }
+
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(resize).observe(canvas);
+  window.addEventListener("resize", resize);
+
+  /* ================================================================
+     RENDER
+  ================================================================ */
+  function render() {
+    if (!size) return;
+    var now = performance.now();
+
+    ctx.fillStyle = COL.field;
+    ctx.fillRect(0, 0, size, size);
+
+    drawGrid();
+    drawApple(now);
+    drawRing(now);
+    drawLaunch(now);
+    drawSnake(now);
+  }
+
+  function drawGrid() {
+    var i, p;
+    for (i = 1; i < COLS; i++) {
+      var major = (i % 5 === 0);
+      ctx.strokeStyle = major ? COL.gridMajor : COL.grid;
+      ctx.lineWidth = 1;
+      p = Math.round(i * cell) + 0.5;
+      ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, size); ctx.stroke();
+    }
+    for (i = 1; i < ROWS; i++) {
+      var maj = (i % 5 === 0);
+      ctx.strokeStyle = maj ? COL.gridMajor : COL.grid;
+      ctx.lineWidth = 1;
+      p = Math.round(i * cell) + 0.5;
+      ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(size, p); ctx.stroke();
+    }
+  }
+
+  function drawApple(now) {
+    var scale = 1;
+    if (applePop.on) {
+      var p = (now - applePop.t0) / 180;
+      if (p >= 1) applePop.on = false;
+      else scale = 0.55 + 0.45 * easeOut(p);
+    }
+
+    var cx = (apple.x + 0.5) * cell;
+    var cy = (apple.y + 0.5) * cell;
+    var r = cell * 0.30 * scale;
+
+    // body
+    ctx.fillStyle = COL.apple;
+    ctx.beginPath();
+    ctx.arc(cx, cy + r * 0.08, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // shine
+    ctx.fillStyle = COL.appleShine;
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.34, cy - r * 0.28, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+
+    // stem
+    ctx.strokeStyle = COL.stem;
+    ctx.lineWidth = Math.max(1.5, cell * 0.06);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 0.78);
+    ctx.lineTo(cx + r * 0.16, cy - r * 1.35);
+    ctx.stroke();
+
+    // leaf
+    ctx.fillStyle = COL.leaf;
+    ctx.save();
+    ctx.translate(cx + r * 0.5, cy - r * 1.12);
+    ctx.rotate(-0.5);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.42, r * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.lineCap = "butt";
+  }
+
+  function drawRing(now) {
+    if (!ring.on || !motionOn) return;
+    var p = (now - ring.t0) / RING_MS;
+    if (p >= 1) { ring.on = false; return; }
+    var e = easeOut(p);
+    var cx = (ring.x + 0.5) * cell;
+    var cy = (ring.y + 0.5) * cell;
+    ctx.strokeStyle = "rgba(52,168,83," + (0.55 * (1 - e)).toFixed(3) + ")";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, cell * 0.32 + cell * 0.55 * e, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawLaunch(now) {
+    if (!launch.on) return;
+    if (!motionOn) { launch.on = false; return; }
+    var p = (now - launch.t0) / LAUNCH_MS;
+    if (p >= 1) { launch.on = false; return; }
+
+    var e = easeOut(p);
+    var y = 10 * cell;
+    var head = size * e;
+
+    var grad = ctx.createLinearGradient(0, 0, Math.max(1, head), 0);
+    grad.addColorStop(0, "rgba(52,168,83,0)");
+    grad.addColorStop(0.55, "rgba(52,168,83," + (0.22 * (1 - p)).toFixed(3) + ")");
+    grad.addColorStop(1, "rgba(52,168,83," + (0.34 * (1 - p)).toFixed(3) + ")");
+
+    ctx.fillStyle = grad;
+    roundRect(0, y + cell * 0.12, Math.max(0, head), cell * 0.76, cell * 0.32);
+    ctx.fill();
+  }
+
+  function drawSnake(now) {
+    if (!snake.length) return;
+
+    // body — back to front
+    for (var i = snake.length - 1; i >= 1; i--) {
+      var s = snake[i];
+      var cx = (s.x + 0.5) * cell;
+      var cy = (s.y + 0.5) * cell;
+      var b = cell * 0.86;
+      roundRect(cx - b / 2, cy - b / 2, b, b, b * 0.32);
+      ctx.fillStyle = COL.body;
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(30,142,62,0.35)";
+      ctx.stroke();
+    }
+
+    // head
+    var h = snake[0];
+    var hx = (h.x + 0.5) * cell;
+    var hy = (h.y + 0.5) * cell;
+    var scale = 1;
+    if (overFx.on && motionOn) {
+      var p = (now - overFx.t0) / OVER_MS;
+      if (p < 1) scale = 1 - 0.22 * easeOut(p);
+    }
+    var d = cell * 0.94 * scale;
+    roundRect(hx - d / 2, hy - d / 2, d, d, d * 0.32);
+    ctx.fillStyle = COL.head;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = COL.bodyEdge;
+    ctx.stroke();
+
+    // eyes
+    var perpX = -dir.y, perpY = dir.x;
+    var fwd = cell * 0.16 * scale;
+    var spread = cell * 0.19 * scale;
+    var er = Math.max(2, cell * 0.13 * scale);
+    var pr = Math.max(1, cell * 0.065 * scale);
+
+    drawEye(hx + dir.x * fwd + perpX * spread, hy + dir.y * fwd + perpY * spread, er, pr);
+    drawEye(hx + dir.x * fwd - perpX * spread, hy + dir.y * fwd - perpY * spread, er, pr);
+  }
+
+  function drawEye(x, y, er, pr) {
+    ctx.fillStyle = COL.eyeWhite;
+    ctx.beginPath(); ctx.arc(x, y, er, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = COL.pupil;
+    ctx.beginPath();
+    ctx.arc(x + dir.x * er * 0.32, y + dir.y * er * 0.32, pr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function easeOut(p) { return 1 - Math.pow(1 - p, 3); }
+
+  /* ================================================================
+     APPLE PLACEMENT
+  ================================================================ */
+  var seed = 0x9e3779b9 >>> 0;
+  function rnd() {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  }
+  function placeApple() {
+    var taken = {}, i;
+    for (i = 0; i < snake.length; i++) taken[snake[i].x + "," + snake[i].y] = true;
+    var free = [];
+    for (var y = 0; y < ROWS; y++) {
+      for (var x = 0; x < COLS; x++) {
+        if (!taken[x + "," + y]) free.push({ x: x, y: y });
+      }
+    }
+    if (!free.length) { gameOver(); return; }
+    var pick = free[Math.floor(rnd() * free.length)];
+    apple.x = pick.x; apple.y = pick.y;
+    applePop.on = motionOn;
+    applePop.t0 = performance.now();
+  }
+
+  /* ================================================================
+     SIMULATION
+  ================================================================ */
+  function tick() {
+    if (pending) {
+      if (!(pending.x === -dir.x && pending.y === -dir.y)) dir = pending;
+      pending = null;
+    }
+
+    var head = snake[0];
+    var nx = head.x + dir.x;
+    var ny = head.y + dir.y;
+
+    if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) { gameOver(); return; }
+
+    var grows = (nx === apple.x && ny === apple.y);
+    var limit = grows ? snake.length : snake.length - 1;
+    for (var i = 0; i < limit; i++) {
+      if (snake[i].x === nx && snake[i].y === ny) { gameOver(); return; }
+    }
+
+    snake.unshift({ x: nx, y: ny });
+
+    if (grows) {
+      score += 1;
+      stepMs = BASE_STEP / Math.min(MAX_SPEED, 1 + score * 0.03);
+      onEat();
+      placeApple();
+    } else {
+      snake.pop();
+    }
+  }
+
+  /* ================================================================
+     LOOP — fixed step, always scheduled
+  ================================================================ */
+  function frame(now) {
+    if (!lastTime) lastTime = now;
+    var dt = now - lastTime;
+    lastTime = now;
+    if (dt > 250) dt = 250;
+
+    if (state === "running") {
+      acc += dt;
+      var guard = 0;
+      while (acc >= stepMs && guard < 8) {
+        acc -= stepMs;
+        guard++;
+        tick();
+        if (state !== "running") { acc = 0; break; }
+      }
+    }
+
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  /* ================================================================
+     STATE TRANSITIONS
+  ================================================================ */
+  function startGame() {
+    if (state === "running") return;
+    if (state === "over" || state === "ready") {
+      if (state === "ready") {
+        // dormant specimen pops out to its first playable length
+        snake = [
+          { x: 3, y: 10 }, { x: 2, y: 10 }, { x: 1, y: 10 }, { x: 0, y: 10 }
+        ];
+      }
+    }
+    state = "running";
+    pending = null;
+    acc = 0;
+    lastTime = performance.now();
+    launch.on = motionOn;
+    launch.t0 = performance.now();
+    hideVeils();
+    canvas.classList.remove("dim");
+    syncUI();
+    announce("Game started. Score zero.");
+  }
+
+  function resetGame() {
+    snake = [{ x: 3, y: 10 }, { x: 2, y: 10 }, { x: 1, y: 10 }];
+    dir = { x: 1, y: 0 };
+    pending = null;
+    score = 0;
+    stepMs = BASE_STEP;
+    state = "ready";
+    acc = 0;
+    seed = 0x9e3779b9 >>> 0;
+    apple = { x: 14, y: 10 };
+    launch.on = ring.on = applePop.on = overFx.on = false;
+
+    elStartVeil.classList.add("show");
+    elPauseVeil.classList.remove("show");
+    elOverVeil.classList.remove("show");
+    canvas.classList.remove("dim");
+
+    syncUI();
+    updateDesc();
+    announce("Game reset. Ready to play.");
+  }
+
+  function togglePause() {
+    if (state === "running") {
+      state = "paused";
+      elPauseVeil.classList.add("show");
+      canvas.classList.add("dim");
+      syncUI();
+      announce("Paused.");
+    } else if (state === "paused") {
+      state = "running";
+      acc = 0;
+      lastTime = performance.now();
+      elPauseVeil.classList.remove("show");
+      canvas.classList.remove("dim");
+      syncUI();
+      announce("Resumed.");
+    }
+  }
+
+  function gameOver() {
+    state = "over";
+    pending = null;
+    overFx.on = motionOn;
+    overFx.t0 = performance.now();
+
+    var isNewBest = score > best;
+    if (isNewBest) { best = score; saveBest(); }
+
+    elFinalScore.textContent = String(score);
+    elFinalSub.textContent = isNewBest
+      ? "New best score!"
+      : "Best score " + best;
+
+    elOverVeil.classList.add("show");
+    canvas.classList.add("dim");
+
+    tone(320, 0.14, 0.05, "triangle");
+    setTimeout(function () { tone(220, 0.18, 0.05, "triangle"); }, 110);
+    setTimeout(function () { tone(150, 0.28, 0.045, "triangle"); }, 220);
+
+    syncUI();
+    updateDesc();
+    announce("Game over. Final score " + score + ". " + elFinalSub.textContent + ". Press Enter or Play again.");
+  }
+
+  function onEat() {
+    ring.on = motionOn;
+    ring.t0 = performance.now();
+    ring.x = snake[0].x;
+    ring.y = snake[0].y;
+
+    elScore.textContent = String(score);
+    if (motionOn) {
+      elScoreChip.classList.remove("bump");
+      void elScoreChip.offsetWidth;
+      elScoreChip.classList.add("bump");
+      setTimeout(function () { elScoreChip.classList.remove("bump"); }, 200);
+    }
+
+    tone(620, 0.07, 0.05, "triangle");
+    setTimeout(function () { tone(820, 0.08, 0.04, "triangle"); }, 55);
+
+    announce("Apple eaten. Score " + score + ".");
+    updateDesc();
+    syncUI();
+  }
+
+  /* ================================================================
+     UI SYNC
+  ================================================================ */
+  function syncUI() {
+    elScore.textContent = String(score);
+    elBest.textContent = String(Math.max(best, score));
+    elLength.textContent = String(snake.length);
+    elSpeed.innerHTML = (BASE_STEP / stepMs).toFixed(1) + "&times;";
+
+    if (state === "paused") {
+      elPauseBtn.title = "Resume";
+      elPauseBtn.setAttribute("aria-label", "Resume");
+      elPauseIcon.innerHTML = '<polygon points="6,4 16,10 6,16" fill="currentColor" stroke="none"></polygon>';
+    } else {
+      elPauseBtn.title = "Pause";
+      elPauseBtn.setAttribute("aria-label", "Pause");
+      elPauseIcon.innerHTML =
+        '<line x1="7" y1="4.5" x2="7" y2="15.5"></line><line x1="13" y1="4.5" x2="13" y2="15.5"></line>';
+    }
+  }
+
+  function announce(msg) { elLive.textContent = msg; }
+
+  function updateDesc() {
+    var lookup = {}, i;
+    for (i = 0; i < snake.length; i++) lookup[snake[i].x + "," + snake[i].y] = i === 0 ? "H" : "#";
+    lookup[apple.x + "," + apple.y] = "O";
+    var lines = [];
+    for (var y = 0; y < ROWS; y++) {
+      var row = "";
+      for (var x = 0; x < COLS; x++) row += (lookup[x + "," + y] || ".") + " ";
+      lines.push(row);
+    }
+    var h = snake[0];
+    elBoardDesc.textContent =
+      "Board: " + state + ". Snake head row " + (h.y + 1) + " column " + (h.x + 1) +
+      ", length " + snake.length + ". Apple row " + (apple.y + 1) + " column " + (apple.x + 1) +
+      ". Matrix where H is head, hash is body, O is apple, dot is empty: " + lines.join(" ");
+  }
+
+  function hideVeils() {
+    elStartVeil.classList.remove("show");
+    elPauseVeil.classList.remove("show");
+    elOverVeil.classList.remove("show");
+  }
+
+  /* ================================================================
+     INPUT — one global listener, one buffered turn
+  ================================================================ */
+  var DIRS = {
+    up: { x: 0, y: -1 }, down: { x: 0, y: 1 },
+    left: { x: -1, y: 0 }, right: { x: 1, y: 0 }
+  };
+  var KEYMAP = {
+    arrowup: "up", arrowdown: "down", arrowleft: "left", arrowright: "right",
+    w: "up", s: "down", a: "left", d: "right"
+  };
+
+  function queueDir(name) {
+    var nd = DIRS[name];
+    if (!nd) return;
+
+    if (state === "ready") {
+      if (!(nd.x === -dir.x && nd.y === -dir.y)) dir = nd;
+      startGame();
+      return;
+    }
+    if (state === "over") return;
+    if (state === "paused") return;
+
+    var travel = pending || dir;
+    if (nd.x === -travel.x && nd.y === -travel.y) return;   // no reversal
+    if (nd.x === travel.x && nd.y === travel.y) return;     // no duplicate
+    pending = nd;
+  }
+
+  window.addEventListener("keydown", function (e) {
+    var key = (e.key || "").toLowerCase();
+    var name = KEYMAP[key];
+
+    if (name) {
+      e.preventDefault();
+      if (e.repeat) return;
+      queueDir(name);
+      return;
+    }
+    if (key === " " || key === "spacebar") {
+      e.preventDefault();
+      if (e.repeat) return;
+      if (state === "ready") { startGame(); return; }
+      if (state === "running" || state === "paused") togglePause();
+      return;
+    }
+    if (key === "enter") {
+      e.preventDefault();
+      if (state === "over") { resetGame(); startGame(); }
+      return;
+    }
+    if (key === "r") {
+      e.preventDefault();
+      if (e.repeat) return;
+      resetGame();
+    }
+  }, { passive: false });
+
+  /* D-pad */
+  Array.prototype.forEach.call(document.querySelectorAll(".dbtn"), function (b) {
+    var go = function (e) {
+      if (e && e.cancelable) e.preventDefault();
+      queueDir(b.getAttribute("data-dir"));
+    };
+    b.addEventListener("click", go);
+    b.addEventListener("touchstart", go, { passive: false });
+  });
+
+  /* swipe */
+  var tStart = null;
+  board.addEventListener("touchstart", function (e) {
+    if (e.touches.length !== 1) return;
+    tStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, { passive: true });
+
+  board.addEventListener("touchmove", function (e) {
+    if (!tStart || e.touches.length !== 1) return;
+    var dx = e.touches[0].clientX - tStart.x;
+    var dy = e.touches[0].clientY - tStart.y;
+    if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+    if (Math.abs(dx) > Math.abs(dy)) queueDir(dx > 0 ? "right" : "left");
+    else queueDir(dy > 0 ? "down" : "up");
+    tStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    e.preventDefault();
+  }, { passive: false });
+
+  board.addEventListener("touchend", function () { tStart = null; }, { passive: true });
+  board.addEventListener("click", function () {
+    if (state === "ready") startGame();
+  });
+
+  /* ================================================================
+     CONTROLS
+  ================================================================ */
+  $("playAgain").addEventListener("click", function () {
+    resetGame();
+    startGame();
+  });
+
+  $("resumeBtn").addEventListener("click", togglePause);
+
+  elPauseBtn.addEventListener("click", function () {
+    if (state === "ready") { startGame(); return; }
+    if (state === "over") return;
+    togglePause();
+  });
+
+  $("resetBtn").addEventListener("click", function () {
+    resetGame();
+    startGame();
+  });
+
+  var soundBtn = $("soundBtn");
+  soundBtn.addEventListener("click", function () {
+    soundOn = !soundOn;
+    soundBtn.classList.toggle("on", soundOn);
+    soundBtn.title = soundOn ? "Sound on" : "Sound off";
+    soundBtn.setAttribute("aria-label", soundOn ? "Sound on" : "Sound off");
+    soundBtn.querySelectorAll(".wave").forEach(function (w) {
+      w.style.opacity = soundOn ? "1" : "0.25";
+    });
+    if (soundOn) tone(660, 0.08, 0.05, "triangle");
+  });
+  soundBtn.querySelectorAll(".wave").forEach(function (w) { w.style.opacity = "0.25"; });
+
+  var prefersReduced = false;
+  try { prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
+  catch (e) { /* no matchMedia */ }
+
+  motionOn = !prefersReduced;
+  var motionBtn = $("motionBtn");
+  motionBtn.classList.toggle("on", motionOn);
+  motionBtn.title = motionOn ? "Motion on" : "Motion off";
+  motionBtn.setAttribute("aria-label", motionOn ? "Motion on" : "Motion off");
+
+  motionBtn.addEventListener("click", function () {
+    motionOn = !motionOn;
+    motionBtn.classList.toggle("on", motionOn);
+    motionBtn.title = motionOn ? "Motion on" : "Motion off";
+    motionBtn.setAttribute("aria-label", motionOn ? "Motion on" : "Motion off");
+    if (!motionOn) {
+      launch.on = ring.on = applePop.on = overFx.on = false;
+    }
+  });
+
+  /* auto-pause when the tab loses focus */
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden && state === "running") togglePause();
+  });
+
+  /* ================================================================
+     BOOT
+  ================================================================ */
+  snake = [{ x: 3, y: 10 }, { x: 2, y: 10 }, { x: 1, y: 10 }];
+  syncUI();
+  updateDesc();
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>

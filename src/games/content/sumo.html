@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
+var m={};
+function k(i){return Object.keys(m)[i]||null}
+var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
+setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
+clear:function(){m={}},key:k};
+Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
+try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
+})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON SUMO</title>
+<style>
+  :root {
+    --bg: #080810;
+    --p1: #00f0ff;
+    --p2: #ff2d55;
+    --gold: #ffe04a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'DM Mono', monospace;
+    color: #eee;
+    overflow: hidden;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    margin-bottom: 8px;
+  }
+  .score {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    letter-spacing: 2px;
+  }
+  .score.p1 { color: var(--p1); text-shadow: 0 0 20px var(--p1); }
+  .score.p2 { color: var(--p2); text-shadow: 0 0 20px var(--p2); }
+  .title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    letter-spacing: 8px;
+    color: var(--gold);
+    text-shadow: 0 0 15px rgba(255,224,74,0.5);
+  }
+  .info {
+    font-size: 11px;
+    color: #444;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  .info span { color: #777; }
+  canvas {
+    border-radius: 50%;
+    box-shadow: 0 0 80px rgba(0,0,0,0.9), inset 0 0 60px rgba(0,0,0,0.2);
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8,8,16,0.93);
+    z-index: 10;
+    transition: opacity 0.3s;
+  }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  #overlay h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 72px;
+    letter-spacing: 10px;
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(255,224,74,0.4);
+  }
+  #overlay .sub {
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 20px;
+    letter-spacing: 2px;
+  }
+  #overlay .sub kbd {
+    background: #1a1a2a;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid #333;
+    color: #aaa;
+  }
+  #winner-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    letter-spacing: 6px;
+    margin-bottom: 4px;
+  }
+  .restart-hint {
+    font-size: 13px;
+    color: #444;
+    margin-top: 24px;
+    letter-spacing: 2px;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="score p1" id="s1">0</div>
+  <div class="title">NEON SUMO</div>
+  <div class="score p2" id="s2">0</div>
+</div>
+<div class="info">
+  <span style="color:var(--p1)">P1</span> WASD + C to dash &nbsp;·&nbsp;
+  <span style="color:var(--p2)">P2</span> ARROWS + / to dash
+</div>
+<canvas id="c"></canvas>
+
+<div id="overlay">
+  <h1>NEON SUMO</h1>
+  <div class="sub">Press <kbd>SPACE</kbd> to start — first to 7</div>
+  <div style="font-size:11px;color:#444;margin-top:8px;letter-spacing:1px">Push your opponent out of the ring</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const S = canvas.width = canvas.height = 520;
+const cx = S / 2, cy = S / 2;
+const WIN = 7;
+
+const INITIAL_RADIUS = S / 2 - 30;
+const PLAYER_RADIUS = 18;
+const ACCEL = 0.42;
+const FRICTION = 0.89;
+const DASH_SPEED = 14;
+const DASH_COOLDOWN = 40;
+const SHRINK_RATE = 0.15;
+const MAX_SPEED = 5;
+const BOUNCE_FORCE = 6;
+
+let keys = {};
+let ringRadius, gameRunning = false, roundActive = false, animId = null;
+let shake = 0;
+let shockwaves = [];
+let particles = [];
+let p1 = {}, p2 = {};
+
+function makePlayer(px, py, color, glow) {
+  return {
+    x: px, y: py, vx: 0, vy: 0,
+    color, glow, score: 0,
+    radius: PLAYER_RADIUS,
+    dashCooldown: 0,
+    isDashing: false,
+    dashTimer: 0,
+    trail: []
+  };
+}
+
+function resetRound() {
+  ringRadius = INITIAL_RADIUS;
+  Object.assign(p1, { x: cx - 80, y: cy, vx: 0, vy: 0, dashCooldown: 0, isDashing: false, dashTimer: 0, trail: [] });
+  Object.assign(p2, { x: cx + 80, y: cy, vx: 0, vy: 0, dashCooldown: 0, isDashing: false, dashTimer: 0, trail: [] });
+  roundActive = true;
+  shockwaves = [];
+  particles = [];
+  shake = 0;
+}
+
+function startGame() {
+  p1 = makePlayer(cx - 80, cy, '#00f0ff', 'rgba(0,240,255,');
+  p2 = makePlayer(cx + 80, cy, '#ff2d55', 'rgba(255,45,85,');
+  updateScores();
+  resetRound();
+  gameRunning = true;
+  document.getElementById('overlay').classList.add('hidden');
+  if (!animId) loop();
+}
+
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') e.preventDefault();
+  if (!gameRunning && e.code === 'Space') startGame();
+});
+document.addEventListener('keyup', e => keys[e.code] = false);
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+document.addEventListener('visibilitychange', () => { if (document.hidden) for(const k in keys)keys[k]=false });
+
+function dash(user, target) {
+  const dx = target.x - user.x, dy = target.y - user.y;
+  const d = Math.sqrt(dx * dx + dy * dy) || 1;
+  user.vx = (dx / d) * DASH_SPEED;
+  user.vy = (dy / d) * DASH_SPEED;
+  user.isDashing = true;
+  user.dashTimer = 8;
+  user.dashCooldown = DASH_COOLDOWN;
+  shockwaves.push({ x: user.x, y: user.y, r: 0, maxR: 40, life: 1, color: user.color });
+}
+
+function spawnExplosion(x, y, color) {
+  for (let i = 0; i < 30; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = Math.random() * 6 + 2;
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, color, size: Math.random() * 4 + 2 });
+  }
+}
+
+function updateScores() {
+  document.getElementById('s1').textContent = p1.score || 0;
+  document.getElementById('s2').textContent = p2.score || 0;
+}
+
+function endGame(text, color) {
+  gameRunning = false;
+  roundActive = false;
+  const overlay = document.getElementById('overlay');
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = `
+    <div id="winner-text" style="color:${color};text-shadow:0 0 30px ${color}">${text}</div>
+    <h1 style="text-shadow:0 0 30px rgba(255,224,74,0.4)">WINS!</h1>
+    <div class="restart-hint">Press SPACE to play again</div>
+  `;
+}
+
+function update() {
+  if (!roundActive) return;
+
+  ringRadius -= SHRINK_RATE;
+
+  // P1 input
+  if (keys['KeyA']) p1.vx -= ACCEL;
+  if (keys['KeyD']) p1.vx += ACCEL;
+  if (keys['KeyW']) p1.vy -= ACCEL;
+  if (keys['KeyS']) p1.vy += ACCEL;
+  if (keys['KeyC'] && p1.dashCooldown <= 0) dash(p1, p2);
+
+  // P2 input
+  if (keys['ArrowLeft'])  p2.vx -= ACCEL;
+  if (keys['ArrowRight']) p2.vx += ACCEL;
+  if (keys['ArrowUp'])    p2.vy -= ACCEL;
+  if (keys['ArrowDown'])  p2.vy += ACCEL;
+  if (keys['Slash'] && p2.dashCooldown <= 0) dash(p2, p1);
+
+  [p1, p2].forEach(p => {
+    if (p.dashCooldown > 0) p.dashCooldown--;
+    if (p.dashTimer > 0) {
+      p.dashTimer--;
+      if (p.dashTimer <= 0) p.isDashing = false;
+    }
+
+    p.vx *= FRICTION;
+    p.vy *= FRICTION;
+    const sp = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+    const cap = p.isDashing ? DASH_SPEED : MAX_SPEED;
+    if (sp > cap) { p.vx = p.vx / sp * cap; p.vy = p.vy / sp * cap; }
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    if (sp > 0.5) p.trail.push({ x: p.x, y: p.y, life: 1, dash: p.isDashing });
+    p.trail = p.trail.filter(t => { t.life -= 0.08; return t.life > 0; });
+  });
+
+  // Player-player collision
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const minDist = p1.radius + p2.radius;
+  if (dist < minDist && dist > 0) {
+    const nx = dx / dist, ny = dy / dist;
+    const overlap = minDist - dist;
+    p1.x -= nx * overlap / 2;
+    p1.y -= ny * overlap / 2;
+    p2.x += nx * overlap / 2;
+    p2.y += ny * overlap / 2;
+
+    const relVx = p1.vx - p2.vx, relVy = p1.vy - p2.vy;
+    const dot = relVx * nx + relVy * ny;
+    if (dot > 0) {
+      const force = p1.isDashing || p2.isDashing ? BOUNCE_FORCE * 1.8 : BOUNCE_FORCE;
+      p1.vx -= nx * dot * 0.8;
+      p1.vy -= ny * dot * 0.8;
+      p2.vx += nx * dot * 0.8;
+      p2.vy += ny * dot * 0.8;
+
+      if (p1.isDashing) { p2.vx += nx * force; p2.vy += ny * force; }
+      if (p2.isDashing) { p1.vx -= nx * force; p1.vy -= ny * force; }
+
+      shake = 6;
+      shockwaves.push({ x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2, r: 0, maxR: 60, life: 1, color: '#fff' });
+    }
+  }
+
+  // Check out of ring — center-based
+  [p1, p2].forEach((p, i) => {
+    const pd = Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2);
+    if (pd > ringRadius + 10) {
+      roundActive = false;
+      const winner = i === 0 ? p2 : p1;
+      const loser = i === 0 ? p1 : p2;
+      const winIdx = i === 0 ? 2 : 1;
+      winner.score = (winner.score || 0) + 1;
+      updateScores();
+      spawnExplosion(loser.x, loser.y, loser.color);
+      shake = 12;
+      shockwaves.push({ x: loser.x, y: loser.y, r: 0, maxR: 200, life: 1, color: loser.color });
+
+      if (winner.score >= WIN) {
+        const label = winIdx === 1 ? 'PLAYER 1' : 'PLAYER 2';
+        setTimeout(() => endGame(label, winner.color), 600);
+      } else {
+        setTimeout(resetRound, 800);
+      }
+    }
+  });
+
+  // Shockwaves
+  shockwaves.forEach(sw => { sw.r += 4; sw.life -= 0.03; });
+  shockwaves = shockwaves.filter(sw => sw.life > 0);
+
+  if (shake > 0) shake -= 0.5;
+}
+
+function draw() {
+  ctx.save();
+  if (shake > 0) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+
+  ctx.fillStyle = 'rgba(8,8,16,0.4)';
+  ctx.fillRect(-10, -10, S + 20, S + 20);
+
+  // Ring background
+  ctx.beginPath();
+  ctx.arc(cx, cy, ringRadius + 20, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.01)';
+  ctx.fill();
+
+  // Danger zone
+  const gradient = ctx.createRadialGradient(cx, cy, ringRadius - 10, cx, cy, ringRadius + 15);
+  gradient.addColorStop(0, 'rgba(255,60,60,0)');
+  gradient.addColorStop(0.5, 'rgba(255,60,60,0.15)');
+  gradient.addColorStop(1, 'rgba(255,60,60,0)');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(cx, cy, ringRadius + 15, 0, Math.PI * 2);
+  ctx.arc(cx, cy, ringRadius - 10, 0, Math.PI * 2, true);
+  ctx.fill();
+
+  // Ring line
+  ctx.beginPath();
+  ctx.arc(cx, cy, ringRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([8, 6]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Inner rings
+  for (let r = 100; r < ringRadius; r += 100) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Shockwaves
+  shockwaves.forEach(sw => {
+    ctx.beginPath();
+    ctx.arc(sw.x, sw.y, sw.r, 0, Math.PI * 2);
+    ctx.strokeStyle = sw.color;
+    ctx.globalAlpha = sw.life * 0.5;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+
+  // Particles
+  particles.forEach(pt => {
+    pt.x += pt.vx;
+    pt.y += pt.vy;
+    pt.vx *= 0.95;
+    pt.vy *= 0.95;
+    pt.life -= 0.02;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, pt.size * pt.life, 0, Math.PI * 2);
+    ctx.fillStyle = pt.color;
+    ctx.globalAlpha = pt.life;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+  particles = particles.filter(p => p.life > 0);
+
+  // Players
+  [p1, p2].forEach(p => {
+    if (!p.x && p.x !== 0) return;
+
+    // Trail
+    p.trail.forEach(t => {
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, p.radius * t.life * 0.7, 0, Math.PI * 2);
+      ctx.fillStyle = p.glow + (t.life * 0.2) + ')';
+      ctx.fill();
+    });
+
+    // Glow
+    const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius * 3);
+    grd.addColorStop(0, p.glow + '0.12)');
+    grd.addColorStop(1, p.glow + '0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(p.x - p.radius * 3, p.y - p.radius * 3, p.radius * 6, p.radius * 6);
+
+    // Body
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fillStyle = p.isDashing ? '#fff' : p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = p.isDashing ? 30 : 15;
+    ctx.fill();
+
+    // Inner
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius * 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = 0;
+    ctx.fill();
+
+    // Dash cooldown indicator
+    if (p.dashCooldown > 0) {
+      const pct = 1 - p.dashCooldown / DASH_COOLDOWN;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius + 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct);
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.005) * 0.2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  });
+
+  ctx.restore();
+}
+
+function loop() {
+  update();
+  draw();
+  animId = requestAnimationFrame(loop);
+}
+
+ctx.fillStyle = '#080810';
+ctx.fillRect(0, 0, S, S);
+updateScores();
+</script>
+</body>
+</html>

@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
+var m={};
+function k(i){return Object.keys(m)[i]||null}
+var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
+setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
+clear:function(){m={}},key:k};
+Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
+try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
+})();</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minesweeper | Modern Reinterpretation</title>
+    <meta name="description" content="A premium, minimalist Minesweeper experience with procedural generation, chording, and smooth animations.">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --surface-color: #1e293b;
+            --accent-color: #38bdf8;
+            --text-color: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --cell-bg: #334155;
+            --cell-revealed: #1e293b;
+            --cell-hover: #475569;
+            --mine-color: #f43f5e;
+            --flag-color: #fbbf24;
+            --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            
+            --n1: #3b82f6;
+            --n2: #22c55e;
+            --n3: #ef4444;
+            --n4: #8b5cf6;
+            --n5: #f59e0b;
+            --n6: #06b6d4;
+            --n7: #ec4899;
+            --n8: #64748b;
+        }
+
+        .light-mode {
+            --bg-color: #f8fafc;
+            --surface-color: #ffffff;
+            --accent-color: #0284c7;
+            --text-color: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --cell-bg: #e2e8f0;
+            --cell-revealed: #f1f5f9;
+            --cell-hover: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            transition: background-color 0.3s ease;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 900px;
+            padding: 2rem;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Header & Stats */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            width: 100%;
+        }
+
+        .title-group h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            color: var(--accent-color);
+        }
+
+        .title-group p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .stats {
+            display: flex;
+            gap: 2rem;
+            background: var(--surface-color);
+            padding: 0.75rem 1.5rem;
+            border-radius: 1rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            font-size: 0.625rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .difficulty-selector {
+            display: flex;
+            background: var(--surface-color);
+            padding: 0.25rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn.active {
+            background: var(--accent-color);
+            color: white;
+        }
+
+        .btn:hover:not(.active) {
+            color: var(--text-color);
+            background: var(--cell-hover);
+        }
+
+        .icon-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.75rem;
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .icon-btn:hover {
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+        }
+
+        /* Board */
+        .board-container {
+            position: relative;
+            background: var(--surface-color);
+            padding: 1rem;
+            border-radius: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            flex: 1;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+        }
+
+        #board {
+            display: grid;
+            gap: 4px;
+            margin: auto;
+            transform-origin: center center;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .cell {
+            width: 32px;
+            height: 32px;
+            background: var(--cell-bg);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.125rem;
+            cursor: pointer;
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            transform-style: preserve-3d;
+        }
+
+        .cell:hover:not(.revealed):not(.flagged) {
+            background: var(--cell-hover);
+            transform: scale(1.05);
+        }
+
+        .cell.revealed {
+            background: var(--cell-revealed);
+            cursor: default;
+        }
+
+        .cell.flagged::after {
+            content: '🚩';
+            font-size: 0.875rem;
+        }
+
+        .cell.mine.exploded {
+            background: var(--mine-color) !important;
+            animation: shake 0.4s ease-in-out;
+        }
+
+        .cell.mine.revealed:not(.exploded) {
+            background: var(--surface-color);
+        }
+        .cell.mine.revealed::after {
+            content: '💣';
+            font-size: 1rem;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+
+        .n1 { color: var(--n1); }
+        .n2 { color: var(--n2); }
+        .n3 { color: var(--n3); }
+        .n4 { color: var(--n4); }
+        .n5 { color: var(--n5); }
+        .n6 { color: var(--n6); }
+        .n7 { color: var(--n7); }
+        .n8 { color: var(--n8); }
+
+        /* Overlays */
+        #overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal {
+            background: var(--surface-color);
+            padding: 2.5rem;
+            border-radius: 2rem;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal h2 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal p {
+            color: var(--text-muted);
+            margin-bottom: 2rem;
+        }
+
+        /* Particle Canvas */
+        #particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        /* Leaderboard */
+        .leaderboard {
+            margin-top: 2rem;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .leaderboard h3 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .score-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.875rem;
+        }
+
+        /* Custom Mode */
+        .custom-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            text-align: left;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .input-group label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        input {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            outline: none;
+        }
+
+        /* Mobile specific */
+        @media (max-width: 640px) {
+            #app { padding: 1rem; }
+            .cell { width: 28px; height: 28px; font-size: 0.9rem; }
+            .stats { gap: 1rem; padding: 0.5rem 1rem; }
+            .header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particles"></canvas>
+
+    <div id="app">
+        <header class="header">
+            <div class="title-group">
+                <h1>Minesweeper</h1>
+                <p>Modern Reinterpretation</p>
+            </div>
+            <div class="stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="mine-count">000</span>
+                    <span class="stat-label">Mines</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="timer">000</span>
+                    <span class="stat-label">Time</span>
+                </div>
+            </div>
+        </header>
+
+        <section class="controls">
+            <div class="difficulty-selector" id="difficulty-tabs">
+                <button class="btn active" data-diff="beginner">Beginner</button>
+                <button class="btn" data-diff="intermediate">Intermediate</button>
+                <button class="btn" data-diff="expert">Expert</button>
+                <button class="btn" data-diff="custom">Custom</button>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="icon-btn" id="hint-btn" title="Hint">💡</button>
+                <button class="icon-btn" id="leaderboard-btn" title="Leaderboard">🏆</button>
+                <button class="icon-btn" id="theme-btn" title="Toggle Theme">🌓</button>
+                <button class="icon-btn" id="restart-btn" title="Restart">🔄</button>
+            </div>
+        </section>
+
+        <div class="board-container">
+            <div id="board"></div>
+        </div>
+    </div>
+
+    <div id="overlay">
+        <div class="modal" id="game-over-modal" style="display: none;">
+            <h2 id="result-title">Victory!</h2>
+            <p id="result-text">You cleared the field in 42 seconds.</p>
+            <button class="btn active" style="width: 100%; padding: 1rem;" onclick="game.restart()">Play Again</button>
+        </div>
+
+        <div class="modal" id="leaderboard-modal" style="display: none;">
+            <h2>Top Scores</h2>
+            <div id="leaderboard-content" class="leaderboard"></div>
+            <button class="btn active" style="width: 100%; padding: 1rem; margin-top: 1.5rem;" onclick="ui.hideOverlay()">Close</button>
+        </div>
+
+        <div class="modal" id="custom-modal" style="display: none;">
+            <h2>Custom Board</h2>
+            <div class="custom-form">
+                <div class="input-group">
+                    <label>Width (5-50)</label>
+                    <input type="number" id="custom-w" value="20" min="5" max="50">
+                </div>
+                <div class="input-group">
+                    <label>Height (5-50)</label>
+                    <input type="number" id="custom-h" value="20" min="5" max="50">
+                </div>
+                <div class="input-group">
+                    <label>Mines</label>
+                    <input type="number" id="custom-m" value="40" min="1">
+                </div>
+                <button class="btn active" style="width: 100%; padding: 1rem;" onclick="game.startCustom()">Start Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * MINESWEEPER CORE LOGIC
+         */
+        const CONFIG = {
+            beginner: { w: 9, h: 9, m: 10 },
+            intermediate: { w: 16, h: 16, m: 40 },
+            expert: { w: 30, h: 16, m: 99 },
+            custom: { w: 20, h: 20, m: 40 }
+        };
+
+        /* Storage can be blocked (private mode) or hold truncated JSON;
+           a bad value must never take the win screen down with it. */
+        function loadScores() {
+            try {
+                const s = JSON.parse(localStorage.getItem('minesweeper_scores') || '{}');
+                return s && typeof s === 'object' ? s : {};
+            } catch (e) { return {}; }
+        }
+
+        class Game {
+            constructor() {
+                this.width = 0;
+                this.height = 0;
+                this.mineCount = 0;
+                this.board = []; // 2D array of Cell objects
+                this.state = 'READY'; // READY, PLAYING, WON, LOST
+                this.timer = 0;
+                this.timerInterval = null;
+                this.minesLeft = 0;
+                this.revealedCount = 0;
+                this.difficulty = 'beginner';
+                this.isFirstClick = true;
+
+                this.init();
+            }
+
+            init() {
+                this.setDifficulty(this.difficulty);
+                this.setupBoard();
+                ui.renderBoard(this);
+                this.updateStats();
+            }
+
+            setDifficulty(diff) {
+                this.difficulty = diff;
+                const cfg = CONFIG[diff];
+                this.width = cfg.w;
+                this.height = cfg.h;
+                this.mineCount = cfg.m;
+                this.minesLeft = this.mineCount;
+            }
+
+            setupBoard() {
+                this.board = Array.from({ length: this.height }, (_, y) => 
+                    Array.from({ length: this.width }, (_, x) => new Cell(x, y))
+                );
+                this.isFirstClick = true;
+                this.revealedCount = 0;
+                this.state = 'READY';
+                this.stopTimer();
+                this.timer = 0;
+            }
+
+            generateMines(safeX, safeY) {
+                let minesPlaced = 0;
+                while (minesPlaced < this.mineCount) {
+                    const x = Math.floor(Math.random() * this.width);
+                    const y = Math.floor(Math.random() * this.height);
+                    
+                    // Don't place on safe spot or its neighbors
+                    const isSafe = Math.abs(x - safeX) <= 1 && Math.abs(y - safeY) <= 1;
+                    
+                    if (!this.board[y][x].isMine && !isSafe) {
+                        this.board[y][x].isMine = true;
+                        minesPlaced++;
+                    }
+                }
+
+                // Calculate neighbor counts
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        if (this.board[y][x].isMine) continue;
+                        let count = 0;
+                        this.getNeighbors(x, y).forEach(n => {
+                            if (n.isMine) count++;
+                        });
+                        this.board[y][x].neighborMines = count;
+                    }
+                }
+            }
+
+            getNeighbors(x, y) {
+                const neighbors = [];
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+                            neighbors.push(this.board[ny][nx]);
+                        }
+                    }
+                }
+                return neighbors;
+            }
+
+            reveal(x, y) {
+                if (this.state !== 'READY' && this.state !== 'PLAYING') return;
+                
+                const cell = this.board[y][x];
+                if (cell.isRevealed || cell.isFlagged) return;
+
+                if (this.isFirstClick) {
+                    this.generateMines(x, y);
+                    this.isFirstClick = false;
+                    this.startTimer();
+                    this.state = 'PLAYING';
+                }
+
+                cell.isRevealed = true;
+                this.revealedCount++;
+                ui.updateCell(cell);
+
+                if (cell.isMine) {
+                    this.gameOver(false, cell);
+                    return;
+                }
+
+                if (cell.neighborMines === 0) {
+                    this.getNeighbors(x, y).forEach(n => this.reveal(n.x, n.y));
+                }
+
+                this.checkWin();
+            }
+
+            toggleFlag(x, y) {
+                if (this.state !== 'PLAYING' && this.state !== 'READY') return;
+                const cell = this.board[y][x];
+                if (cell.isRevealed) return;
+
+                cell.isFlagged = !cell.isFlagged;
+                this.minesLeft += cell.isFlagged ? -1 : 1;
+                ui.updateCell(cell);
+                this.updateStats();
+            }
+
+            chord(x, y) {
+                const cell = this.board[y][x];
+                if (!cell.isRevealed || cell.neighborMines === 0) return;
+
+                const neighbors = this.getNeighbors(x, y);
+                const flagsAround = neighbors.filter(n => n.isFlagged).length;
+
+                if (flagsAround === cell.neighborMines) {
+                    neighbors.forEach(n => {
+                        if (!n.isRevealed && !n.isFlagged) {
+                            this.reveal(n.x, n.y);
+                        }
+                    });
+                }
+            }
+
+            checkWin() {
+                if (this.revealedCount === (this.width * this.height) - this.mineCount) {
+                    this.gameOver(true);
+                }
+            }
+
+            gameOver(won, explodedCell = null) {
+                this.state = won ? 'WON' : 'LOST';
+                this.stopTimer();
+
+                // Reveal all mines
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        const cell = this.board[y][x];
+                        if (cell.isMine) {
+                            cell.isRevealed = true;
+                            if (cell === explodedCell) cell.isExploded = true;
+                            ui.updateCell(cell);
+                        }
+                    }
+                }
+
+                if (won) {
+                    this.saveScore();
+                    particles.burst(window.innerWidth / 2, window.innerHeight / 2, 'gold');
+                } else {
+                    const rect = ui.getCellElement(explodedCell).getBoundingClientRect();
+                    particles.burst(rect.left + rect.width/2, rect.top + rect.height/2, 'red');
+                }
+
+                setTimeout(() => ui.showGameOver(won, this.timer), 800);
+            }
+
+            startTimer() {
+                this.timerInterval = setInterval(() => {
+                    this.timer++;
+                    this.updateStats();
+                }, 1000);
+            }
+
+            stopTimer() {
+                clearInterval(this.timerInterval);
+            }
+
+            updateStats() {
+                ui.updateStats(this.minesLeft, this.timer);
+            }
+
+            restart() {
+                ui.hideOverlay();
+                this.init();
+            }
+
+            startCustom() {
+                const w = parseInt(document.getElementById('custom-w').value);
+                const h = parseInt(document.getElementById('custom-h').value);
+                const m = parseInt(document.getElementById('custom-m').value);
+                
+                CONFIG.custom = { 
+                    w: Math.max(5, Math.min(50, w)), 
+                    h: Math.max(5, Math.min(50, h)), 
+                    m: Math.max(1, Math.min((w * h) - 9, m)) 
+                };
+                
+                ui.hideOverlay();
+                this.setDifficulty('custom');
+                this.setupBoard();
+                ui.renderBoard(this);
+                this.updateStats();
+            }
+
+            saveScore() {
+                if (this.difficulty === 'custom') return;
+                const scores = loadScores();
+                if (!scores[this.difficulty]) scores[this.difficulty] = [];
+                scores[this.difficulty].push({ time: this.timer, date: new Date().toLocaleDateString() });
+                scores[this.difficulty].sort((a, b) => a.time - b.time);
+                scores[this.difficulty] = scores[this.difficulty].slice(0, 10);
+                try { localStorage.setItem('minesweeper_scores', JSON.stringify(scores)); } catch (e) { /* storage blocked */ }
+            }
+
+            getHint() {
+                if (this.state !== 'PLAYING') return;
+
+                // Simple AI logic for hint
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        const cell = this.board[y][x];
+                        if (!cell.isRevealed || cell.neighborMines === 0) continue;
+
+                        const neighbors = this.getNeighbors(x, y);
+                        const hidden = neighbors.filter(n => !n.isRevealed);
+                        const flags = neighbors.filter(n => n.isFlagged);
+
+                        // If flags == value, remaining hidden are safe
+                        if (flags.length === cell.neighborMines && hidden.length > flags.length) {
+                            const target = hidden.find(n => !n.isFlagged);
+                            ui.highlightCell(target, 'hint-safe');
+                            return;
+                        }
+
+                        // If hidden == value, all hidden are mines
+                        if (hidden.length === cell.neighborMines && flags.length < hidden.length) {
+                            const target = hidden.find(n => !n.isFlagged);
+                            ui.highlightCell(target, 'hint-mine');
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        class Cell {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.isMine = false;
+                this.isRevealed = false;
+                this.isFlagged = false;
+                this.isExploded = false;
+                this.neighborMines = 0;
+            }
+        }
+
+        /**
+         * UI & RENDERING
+         */
+        const ui = {
+            boardEl: document.getElementById('board'),
+            mineEl: document.getElementById('mine-count'),
+            timerEl: document.getElementById('timer'),
+            overlayEl: document.getElementById('overlay'),
+
+            renderBoard(game) {
+                this.boardEl.innerHTML = '';
+                this.boardEl.style.gridTemplateColumns = `repeat(${game.width}, 32px)`;
+                
+                for (let y = 0; y < game.height; y++) {
+                    for (let x = 0; x < game.width; x++) {
+                        const cell = game.board[y][x];
+                        const el = document.createElement('div');
+                        el.className = 'cell';
+                        el.dataset.x = x;
+                        el.dataset.y = y;
+                        el.id = `cell-${x}-${y}`;
+                        
+                        el.addEventListener('click', (e) => game.reveal(x, y));
+                        el.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            game.toggleFlag(x, y);
+                        });
+                        
+                        // Double click or long click for chording
+                        el.addEventListener('dblclick', () => game.chord(x, y));
+
+                        this.boardEl.appendChild(el);
+                    }
+                }
+                this.adjustScale(game);
+            },
+
+            adjustScale(game) {
+                if (!game) game = window.game;
+                const container = document.querySelector('.board-container');
+                const padding = 32;
+                const availableW = container.clientWidth - padding;
+                const availableH = container.clientHeight - padding;
+                
+                const boardW = game.width * 32 + (game.width - 1) * 4;
+                const boardH = game.height * 32 + (game.height - 1) * 4;
+                
+                const scale = Math.min(1.5, Math.min(availableW / boardW, availableH / boardH));
+                this.boardEl.style.transform = `scale(${scale})`;
+            },
+
+            updateCell(cell) {
+                const el = document.getElementById(`cell-${cell.x}-${cell.y}`);
+                if (!el) return;
+
+                el.className = 'cell';
+                if (cell.isRevealed) {
+                    el.classList.add('revealed');
+                    if (cell.isMine) {
+                        el.classList.add('mine');
+                        if (cell.isExploded) el.classList.add('exploded');
+                    } else if (cell.neighborMines > 0) {
+                        el.textContent = cell.neighborMines;
+                        el.classList.add(`n${cell.neighborMines}`);
+                    }
+                    
+                    // Reveal animation
+                    el.animate([
+                        { transform: 'scale(0.8)', opacity: 0.5 },
+                        { transform: 'scale(1)', opacity: 1 }
+                    ], { duration: 200, easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)' });
+                }
+                
+                if (cell.isFlagged) el.classList.add('flagged');
+            },
+
+            getCellElement(cell) {
+                return document.getElementById(`cell-${cell.x}-${cell.y}`);
+            },
+
+            updateStats(mines, time) {
+                this.mineEl.textContent = String(Math.max(0, mines)).padStart(3, '0');
+                this.timerEl.textContent = String(Math.min(999, time)).padStart(3, '0');
+            },
+
+            showGameOver(won, time) {
+                this.overlayEl.classList.add('active');
+                document.getElementById('game-over-modal').style.display = 'block';
+                document.getElementById('leaderboard-modal').style.display = 'none';
+                document.getElementById('custom-modal').style.display = 'none';
+
+                document.getElementById('result-title').textContent = won ? 'Victory!' : 'Game Over';
+                document.getElementById('result-title').style.color = won ? 'var(--accent-color)' : 'var(--mine-color)';
+                document.getElementById('result-text').textContent = won 
+                    ? `You cleared the field in ${time} seconds.` 
+                    : `Better luck next time.`;
+            },
+
+            showLeaderboard() {
+                this.overlayEl.classList.add('active');
+                document.getElementById('game-over-modal').style.display = 'none';
+                document.getElementById('leaderboard-modal').style.display = 'block';
+                document.getElementById('custom-modal').style.display = 'none';
+
+                const scores = loadScores();
+                const content = document.getElementById('leaderboard-content');
+                content.innerHTML = '';
+
+                ['beginner', 'intermediate', 'expert'].forEach(diff => {
+                    const header = document.createElement('h3');
+                    header.textContent = diff;
+                    content.appendChild(header);
+
+                    const diffScores = scores[diff] || [];
+                    if (diffScores.length === 0) {
+                        const empty = document.createElement('div');
+                        empty.className = 'score-row';
+                        empty.textContent = 'No scores yet';
+                        content.appendChild(empty);
+                    } else {
+                        diffScores.forEach((s, i) => {
+                            const row = document.createElement('div');
+                            row.className = 'score-row';
+                            row.innerHTML = `<span>#${i+1} ${s.date}</span> <strong>${s.time}s</strong>`;
+                            content.appendChild(row);
+                        });
+                    }
+                });
+            },
+
+            showCustom() {
+                this.overlayEl.classList.add('active');
+                document.getElementById('game-over-modal').style.display = 'none';
+                document.getElementById('leaderboard-modal').style.display = 'none';
+                document.getElementById('custom-modal').style.display = 'block';
+            },
+
+            hideOverlay() {
+                this.overlayEl.classList.remove('active');
+            },
+
+            highlightCell(cell, type) {
+                const el = this.getCellElement(cell);
+                if (!el) return;
+                
+                const originalColor = el.style.backgroundColor;
+                el.style.backgroundColor = type === 'hint-safe' ? 'rgba(34, 197, 94, 0.4)' : 'rgba(244, 63, 94, 0.4)';
+                el.style.transform = 'scale(1.1)';
+                
+                setTimeout(() => {
+                    el.style.backgroundColor = originalColor;
+                    el.style.transform = '';
+                }, 1000);
+            }
+        };
+
+        /**
+         * PARTICLES
+         */
+        const particles = {
+            canvas: document.getElementById('particles'),
+            ctx: null,
+            pool: [],
+
+            init() {
+                this.ctx = this.canvas.getContext('2d');
+                window.addEventListener('resize', () => this.resize());
+                this.resize();
+                this.loop();
+            },
+
+            resize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            },
+
+            burst(x, y, color) {
+                const count = 30;
+                for (let i = 0; i < count; i++) {
+                    this.pool.push({
+                        x, y,
+                        vx: (Math.random() - 0.5) * 10,
+                        vy: (Math.random() - 0.5) * 10,
+                        size: Math.random() * 4 + 2,
+                        life: 1,
+                        color: color === 'gold' ? '#fbbf24' : '#f43f5e'
+                    });
+                }
+            },
+
+            loop() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                for (let i = this.pool.length - 1; i >= 0; i--) {
+                    const p = this.pool[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2; // Gravity
+                    p.life -= 0.02;
+                    
+                    if (p.life <= 0) {
+                        this.pool.splice(i, 1);
+                        continue;
+                    }
+
+                    this.ctx.globalAlpha = p.life;
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+                requestAnimationFrame(() => this.loop());
+            }
+        };
+
+        /**
+         * INITIALIZATION
+         */
+        const game = new Game();
+        window.game = game; // Make accessible for resize
+        particles.init();
+
+        window.addEventListener('resize', () => ui.adjustScale(game));
+
+        // Event Listeners
+        document.getElementById('difficulty-tabs').addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                const diff = e.target.dataset.diff;
+                if (diff === 'custom') {
+                    ui.showCustom();
+                } else {
+                    document.querySelectorAll('#difficulty-tabs .btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    game.difficulty = diff;
+                    game.init();
+                }
+            }
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => game.init());
+        document.getElementById('theme-btn').addEventListener('click', () => {
+            document.body.classList.toggle('light-mode');
+        });
+        document.getElementById('leaderboard-btn').addEventListener('click', () => ui.showLeaderboard());
+        document.getElementById('hint-btn').addEventListener('click', () => game.getHint());
+
+        // Mobile long-press for flagging
+        let touchTimer;
+        ui.boardEl.addEventListener('touchstart', (e) => {
+            if (e.target.classList.contains('cell')) {
+                const x = parseInt(e.target.dataset.x);
+                const y = parseInt(e.target.dataset.y);
+                touchTimer = setTimeout(() => game.toggleFlag(x, y), 500);
+            }
+        }, { passive: true });
+        ui.boardEl.addEventListener('touchend', () => clearTimeout(touchTimer));
+        ui.boardEl.addEventListener('touchmove', () => clearTimeout(touchTimer));
+
+    </script>
+</body>
+</html>

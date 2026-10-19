@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A little arcade for your spare time. Play 31 offline games, save favorites, or let Bored pick your next game.">
+<meta name="theme-color" content="#f5f2ea">
+<title>Bored</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<div id="hub">
+  <header class="masthead">
+    <h1>Bored</h1>
+    <p class="sub"><b id="count">33</b> things to play &middot; one file &middot; no installs</p>
+    <p class="intro">A little arcade for your spare time. Pick a favorite or find something new.</p>
+    <div id="account">
+      <span id="account-state">Playing as a guest. Scores stay in this browser.</span>
+      <button id="account-action" type="button">Sign in</button>
+      <button id="account-rename" type="button" hidden>Change name</button>
+    </div>
+
+  </header>
+  <section id="daily" aria-labelledby="daily-heading">
+    <p id="daily-date"></p>
+    <h2 id="daily-heading">Daily challenge</h2>
+    <p id="daily-goal"></p>
+    <p id="daily-status" role="status">A different game and a fresh goal every day.</p>
+    <button id="daily-play" class="action" type="button">Play today's challenge &#8594;</button>
+    <button id="daily-share" class="action" type="button" hidden>Copy result</button>
+    <textarea id="daily-result" aria-label="Daily challenge result to share" readonly rows="5" hidden></textarea>
+  </section>
+  <section id="leaderboard" aria-labelledby="leaderboard-heading">
+    <h2 id="leaderboard-heading">Leaderboard</h2>
+    <p id="lb-note">Best scores from the games that keep one. Sign in to put your name up.</p>
+    <div class="lb-bar">
+      <label>Game <select id="lb-game" aria-label="Leaderboard game"></select></label>
+      <button id="lb-refresh" class="action" type="button">Refresh</button>
+    </div>
+    <ol id="lb-list"></ol>
+    <p id="lb-empty" hidden></p>
+    <p id="lb-mine"></p>
+  </section>
+  <section id="recent" aria-labelledby="recent-heading" hidden>
+    <h2 id="recent-heading">RECENTLY PLAYED</h2>
+    <div id="recent-list"></div>
+  </section>
+  <div class="tools">
+    <div class="search-row">
+      <input id="q" type="search" placeholder="Find a game or a category" autocomplete="off" aria-label="Find a game or a category" aria-controls="grid">
+      <button id="random" class="action" type="button">Surprise me &#8599;</button>
+    </div>
+    <nav id="filters" class="filters" aria-label="Filter games">
+      <button class="filter" type="button" data-filter="All" aria-pressed="true">All</button>
+      <button class="filter" type="button" data-filter="New" aria-pressed="false">New</button>
+      <button class="filter" type="button" data-filter="Favorites" aria-pressed="false">Favorites</button>
+      <button class="filter" type="button" data-filter="Arcade" aria-pressed="false">Arcade</button>
+      <button class="filter" type="button" data-filter="Puzzle" aria-pressed="false">Puzzle</button>
+      <button class="filter" type="button" data-filter="Strategy" aria-pressed="false">Strategy</button>
+      <button class="filter" type="button" data-filter="Sandbox" aria-pressed="false">Sandbox</button>
+      <button class="filter" type="button" data-filter="Online" aria-pressed="false">Online</button>
+    </nav>
+    <div class="library-bar">
+      <span id="results" role="status" aria-live="polite"></span>
+      <label>Sort <select id="sort" aria-label="Sort games"><option value="original">Original order</option><option value="az">A to Z</option></select></label>
+    </div>
+  </div>
+  <main id="grid" class="grid" aria-label="Game library"></main>
+  <p id="empty" hidden></p>
+  <footer class="foot"><span>have fun. stay a while.</span><span>31 offline games / 3 online extras</span></footer>
+</div>
+
+<dialog id="auth-dialog" aria-labelledby="auth-title">
+  <form id="auth-form" novalidate>
+    <h2 id="auth-title">Sign in</h2>
+    <p id="auth-blurb">Save your best scores and see how everyone else is doing.</p>
+    <label id="auth-email-row">Email<input id="auth-email" type="email" autocomplete="email" required></label>
+    <label id="auth-pass-row">Password<input id="auth-password" type="password" autocomplete="current-password" minlength="6" required></label>
+    <label id="auth-name-row" hidden>Display name<input id="auth-name" type="text" autocomplete="nickname" maxlength="20" required></label>
+    <p id="auth-message" role="status" aria-live="polite"></p>
+    <div class="auth-actions">
+      <button id="auth-submit" type="submit">Sign in</button>
+      <button id="auth-toggle" type="button">Create an account</button>
+      <button id="auth-cancel" type="button">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="player" hidden>
+  <button id="back" type="button">&#8249; All games</button>
+  <div id="player-tools">
+    <button id="restart" type="button" aria-label="Restart current game">Restart</button>
+    <button id="fullscreen" type="button">Fullscreen</button>
+  </div>
+  <div id="hint" role="status">Click the game to control it</div>
+  <div id="challenge-progress" role="status" aria-live="polite" hidden></div>
+  <iframe id="frame" title="game" allow="autoplay; fullscreen; gamepad; clipboard-write; encrypted-media; picture-in-picture"></iframe>
+</div>
+<script type="module" src="/main.js"></script>
+</body>
+</html>

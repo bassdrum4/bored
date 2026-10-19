@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
+var m={};
+function k(i){return Object.keys(m)[i]||null}
+var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
+setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
+clear:function(){m={}},key:k};
+Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
+try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
+})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pastel Tanks</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#2D2438;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
+canvas{display:block;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.35);cursor:pointer}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const W=960,H=540;canvas.width=W;canvas.height=H;
+function resize(){const s=Math.min(innerWidth/W,innerHeight/H)*0.95;canvas.style.width=W*s+'px';canvas.style.height=H*s+'px'}
+resize();addEventListener('resize',resize);
+
+const PL={
+  skyT:'#D4BFE6',skyM:'#CCD6E8',skyB:'#C2E0BE',hill:'rgba(195,220,195,0.25)',
+  ter:'#8CC88A',terD:'#6BA869',terL:'#5A965A',terH:'rgba(255,255,255,0.18)',
+  rock:'#B5A6BB',rockL:'#A090A6',
+  t1:'#C4A7D7',t1d:'#A88BC5',t2:'#8ECFB0',t2d:'#6BAF91',
+  sh:'#F5E0A0',shG:'#FAF0CC',hSh:'#E8A860',hShG:'#F5D0A0',
+  cSh:'#DDA0DD',cShG:'#EECCF0',nSh:'#FF7B8E',nShG:'#FFB0C0',
+  exp:['#F0C4D4','#F5E6A3','#FFF0F0','#DDA0DD','#98FB98','#FFD1DC'],
+  hp1:'#C4A7D7',hp2:'#8ECFB0',hpBg:'rgba(255,255,255,0.2)',
+  fuel:'#88D8A0',fuelBg:'rgba(255,255,255,0.12)',
+  pw:'#F0D58E',pwBg:'rgba(255,255,255,0.15)',
+  tx:'#5A4A6A',txL:'#8A7A9A',w:'#FFFAF5',
+  cld:'rgba(255,255,255,0.2)',hud:'rgba(255,255,255,0.12)',
+  aA:'#F5E6A3',aI:'rgba(255,255,255,0.25)',aim:'#E88080',
+  shield:'#88C8E8',tele:'#D8A0F0',
+};
+
+const G=0.1,MAXPW=20,PWSPD=0.3,MINPW=1,MAXPU=5,BEDY=H-25;
+const EXPR={standard:30,heavy:48,cluster:20,cluster_child:16,nuke:65};
+const MAXHP=100,FUELMAX=100,FUELCOST=0.25,MOVESP=1.5;
+const ASPD=0.8,TW=26,TH=12,TRH=5,TURR=6,BLEN=20,PWF=0.5;
+const AI_ERR_A=7,AI_ERR_P=2;
+
+// ── Terrain ──
+const TERRAINS=[
+  {name:'Rolling Hills',fn:genHills},
+  {name:'Mountains',fn:genMountains},
+  {name:'Valley',fn:genValley},
+  {name:'Dunes',fn:genDunes},
+  {name:'Plateau',fn:genPlateau},
+];
+function genHills(){terrain=[];for(let x=0;x<W;x++){let h=H*.55+Math.sin(x*.002+1)*50+Math.sin(x*.009+2)*25+Math.sin(x*.025+.5)*12+Math.sin(x*.07+3)*6;terrain[x]=Math.max(H*.32,Math.min(BEDY-15,h))}}
+function genMountains(){terrain=[];for(let x=0;x<W;x++){let h=H*.48+Math.sin(x*.003)*65+Math.sin(x*.013+1)*32+Math.sin(x*.038+2)*16+Math.sin(x*.09+.5)*7;terrain[x]=Math.max(H*.15,Math.min(BEDY-15,h))}}
+function genValley(){terrain=[];for(let x=0;x<W;x++){const d=Math.abs(x-W/2)/(W/2);let h=H*.42+d*110+Math.sin(x*.01)*15+Math.sin(x*.035+1)*8;terrain[x]=Math.max(H*.3,Math.min(BEDY-15,h))}}
+function genDunes(){terrain=[];for(let x=0;x<W;x++){let h=H*.52+Math.sin(x*.004+.5)*35+Math.sin(x*.016+2)*18+Math.sin(x*.05+1)*8+Math.sin(x*.13)*3;terrain[x]=Math.max(H*.35,Math.min(BEDY-15,h))}}
+function genPlateau(){terrain=[];for(let x=0;x<W;x++){let h=H*.58;h-=Math.exp(-((x-W*.22)**2)/(2*85**2))*110;h-=Math.exp(-((x-W*.5)**2)/(2*70**2))*80;h-=Math.exp(-((x-W*.78)**2)/(2*85**2))*110;h+=Math.sin(x*.01)*8+Math.sin(x*.035)*4;terrain[x]=Math.max(H*.18,Math.min(BEDY-15,h))}}
+
+// ── Powerups ──
+const PUTYPES=[
+  {name:'Heavy',sym:'H',col:'#E8A860',eff:'ammo',key:'heavy',amt:2,w:20},
+  {name:'Cluster',sym:'C',col:'#DDA0DD',eff:'ammo',key:'cluster',amt:2,w:16},
+  {name:'Nuke',sym:'N',col:'#FF7B8E',eff:'ammo',key:'nuke',amt:1,w:5},
+  {name:'Fuel',sym:'F',col:'#7ECDA0',eff:'fuel',key:'fuel',amt:35,w:18},
+  {name:'Heal',sym:'+',col:'#FFB5C5',eff:'heal',key:'heal',amt:25,w:13},
+  {name:'Shield',sym:'S',col:'#88C8E8',eff:'shield',key:'shield',amt:1,w:16},
+  {name:'Teleport',sym:'T',col:'#D8A0F0',eff:'teleport',key:'teleport',amt:1,w:10},
+];
+function pickPU(){const tot=PUTYPES.reduce((s,p)=>s+p.w,0);let r=Math.random()*tot;for(const p of PUTYPES){r-=p.w;if(r<=0)return p}return PUTYPES[0]}
+
+// ── State ──
+let mode,terrain,tanks,proj,parts,popups,powerups,debris;
+let power,keys,winner,timer,shake,flashX,flashY,flashR,flashA;
+let overT,turnCnt,nextPU,selWeap,anyHit,nukeFlash,missed;
+let aiEnabled,aiTimer,aiTarget,deathTimer,deathWinner,terrainIdx,turn;
+const clouds=Array.from({length:5},()=>({x:Math.random()*W,y:20+Math.random()*70,sc:.5+Math.random()*.7,sp:.08+Math.random()*.12}));
+
+// ── Helpers ──
+function tY(x){return terrain[Math.max(0,Math.min(W-1,Math.round(x)))]}
+function fillRR(x,y,w,h,r){if(w<0)w=0;r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();ctx.fill()}
+function crater(cx,cy,r){const l=Math.max(0,Math.floor(cx-r)),ri=Math.min(W-1,Math.ceil(cx+r));for(let x=l;x<=ri;x++){const dy=Math.sqrt(Math.max(0,r*r-(x-cx)**2));terrain[x]=Math.min(Math.max(terrain[x],cy+dy),BEDY)}}
+
+// ── Tanks ──
+function mkTank(xp,pi){return{x:Math.round(W*xp),p:pi,hp:MAXHP,angle:45,fuel:FUELMAX,ammo:{heavy:0,cluster:0,nuke:0},shield:false}}
+function adjSpawn(){for(const t of tanks){let bx=t.x,bv=Infinity;for(let cx=t.x-60;cx<=t.x+60;cx++){if(cx<30||cx>W-30)continue;let v=0;for(let d=-8;d<=8;d++){v+=Math.abs(terrain[Math.max(0,Math.min(W-1,cx+d))]-terrain[Math.max(0,Math.min(W-1,cx))])}if(v<bv){bv=v;bx=cx}}t.x=bx}if(Math.abs(tanks[0].x-tanks[1].x)<120){tanks[0].x=Math.max(50,tanks[0].x-60);tanks[1].x=Math.min(W-50,tanks[1].x+60)}}
+
+// ── Powerup Logic ──
+function spawnPU(){if(powerups.length>=MAXPU)return;powerups.push({x:80+Math.random()*(W-160),y:-20,vy:1.5+Math.random()*.5,ty:pickPU(),gnd:false})}
+function updatePU(){for(let i=powerups.length-1;i>=0;i--){const p=powerups[i];if(!p.gnd){p.y+=p.vy;const gy=tY(p.x);if(p.y+8>=gy){p.y=gy-8;p.gnd=true}}else{for(const t of tanks){if(Math.abs(t.x-p.x)<TW/2+16){collectPU(t,p);powerups.splice(i,1);break}}}}}
+function collectPU(tank,pu){
+  const t=pu.ty,gy=tY(tank.x);
+  if(t.eff==='ammo'){tank.ammo[t.key]=(tank.ammo[t.key]||0)+t.amt;mkPopup(pu.x,gy-30,'+'+t.amt+' '+t.name+'!',t.col)}
+  else if(t.eff==='fuel'){tank.fuel=Math.min(FUELMAX,tank.fuel+t.amt);mkPopup(pu.x,gy-30,'+'+t.amt+' Fuel!',t.col)}
+  else if(t.eff==='heal'){tank.hp=Math.min(MAXHP,tank.hp+t.amt);mkPopup(pu.x,gy-30,'+'+t.amt+' HP!',t.col)}
+  else if(t.eff==='shield'){tank.shield=true;mkPopup(pu.x,gy-30,'Shield!',PL.shield)}
+  else if(t.eff==='teleport'){mkParts(tank.x,gy-20,15,PL.tele);let nx,att=0;do{nx=60+Math.random()*(W-120);att++}while(att<80&&(Math.abs(tY(nx)-tY(nx-10))>8||Math.abs(tY(nx)-tY(nx+10))>8));tank.x=nx;const ngy=tY(tank.x);mkParts(tank.x,ngy-20,15,PL.tele);mkPopup(tank.x,ngy-30,'Warped!',PL.tele)}
+  mkParts(pu.x,pu.y,8,t.col);
+}
+
+// ── Particles, Popups, Debris ──
+function mkParts(x,y,n,col){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,sp=1+Math.random()*4;parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,life:1,dec:.015+Math.random()*.02,rad:2+Math.random()*4,col:col||PL.exp[Math.floor(Math.random()*PL.exp.length)]})}}
+function mkDust(x,y){for(let i=0;i<3;i++)parts.push({x:x+(Math.random()-.5)*10,y:y+Math.random()*3,vx:(Math.random()-.5)*1,vy:-.5-Math.random()*.5,life:.6,dec:.03,rad:2+Math.random()*2,col:'rgba(140,200,140,0.5)'})}
+function mkPopup(x,y,t,c){popups.push({x,y,t,c,life:1,vy:-.8})}
+function spawnDebris(tank){
+  const gy=tY(tank.x),cx=tank.x,cy=gy-TRH-TH/2;
+  const c1=tank.p===0?PL.t1:PL.t2,c2=tank.p===0?PL.t1d:PL.t2d;
+  for(let i=0;i<14;i++){const a=-Math.PI/2+(Math.random()-.5)*Math.PI*1.2,sp=2+Math.random()*6;
+    debris.push({x:cx+(Math.random()-.5)*TW,y:cy+(Math.random()-.5)*TH,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,rot:Math.random()*Math.PI*2,rotSpd:(Math.random()-.5)*.2,w:3+Math.random()*10,h:2+Math.random()*7,col:Math.random()>.5?c1:c2,life:1,dec:.007+Math.random()*.007})}
+  mkParts(cx,cy,60);mkParts(cx,cy,30,c1);shake=22;flashX=cx;flashY=cy;flashR=15;flashA=1;nukeFlash=.4;
+}
+function updateDebris(){for(const d of debris){d.x+=d.vx;d.y+=d.vy;d.vy+=G*.7;d.rot+=d.rotSpd;d.life-=d.dec;const sx=Math.round(d.x);if(sx>=0&&sx<W&&d.y+d.h/2>=terrain[sx]){d.y=terrain[sx]-d.h/2;d.vy*=-.3;d.vx*=.7;d.rotSpd*=.5}if(d.y>BEDY){d.y=BEDY;d.vy*=-.2}}}
+
+// ── Projectiles ──
+const WCOL={standard:{f:PL.sh,g:PL.shG},heavy:{f:PL.hSh,g:PL.hShG},cluster:{f:PL.cSh,g:PL.cShG},nuke:{f:PL.nSh,g:PL.nShG}};
+const WRAD={standard:4,heavy:5,cluster:4,nuke:6};
+function mkProj(tank,wp){const gy=tY(tank.x),ar=tank.angle*Math.PI/180,dir=tank.p===0?1:-1;const pivY=gy-TRH-TH;const tx=tank.x+dir*Math.cos(ar)*BLEN,ty=pivY-Math.sin(ar)*BLEN;const sp=Math.max(power,1)*PWF;const c=WCOL[wp]||WCOL.standard;return{x:tx,y:ty,vx:dir*Math.cos(ar)*sp,vy:-Math.sin(ar)*sp,type:wp,f:c.f,g:c.g,rad:WRAD[wp]||4,trail:[]}}
+
+// ── Explosions & Damage ──
+function explode(p){const{x,y,type}=p;const r=EXPR[type];crater(x,y,r);dealDmg(x,y,r,type);const pc=type==='nuke'?60:type==='heavy'?40:type==='cluster'?15:30;mkParts(x,y,pc);shake=Math.max(shake,type==='nuke'?25:type==='heavy'?14:type==='cluster'?6:8);flashX=x;flashY=y;flashR=type==='nuke'?15:5;flashA=type==='nuke'?1:.8;if(type==='nuke')nukeFlash=1;for(let i=powerups.length-1;i>=0;i--){const pu=powerups[i];if(Math.hypot(pu.x-x,pu.y-y)<r+8){mkParts(pu.x,pu.y,8,pu.ty.col);powerups.splice(i,1)}}if(type==='cluster')spawnChildren(x,y);anyHit=true}
+function spawnChildren(x,y){const sps=[{vx:-3.5,vy:-5},{vx:-2,vy:-6},{vx:-.5,vy:-6.5},{vx:.5,vy:-6.5},{vx:2,vy:-6},{vx:3.5,vy:-5}];for(const s of sps)proj.push({x,y,vx:s.vx+(Math.random()-.5)*.5,vy:s.vy+(Math.random()-.5)*.5,type:'cluster_child',f:PL.cSh,g:PL.cShG,rad:3,trail:[]})}
+function dealDmg(cx,cy,r,type){const bd={standard:20,heavy:30,cluster:10,cluster_child:8,nuke:40},md={standard:50,heavy:65,cluster:25,cluster_child:20,nuke:90};for(const t of tanks){const gy=tY(t.x),tcy=gy-TRH-TH/2;const d=Math.hypot(t.x-cx,tcy-cy);if(d<r+TW/2){let dmg=Math.round((bd[type]||20)+Math.max(0,1-d/(r+TW/2))*((md[type]||50)-(bd[type]||20)));if(t.shield){dmg=Math.min(15,dmg);t.shield=false;mkParts(t.x,gy-20,10,PL.shield);mkPopup(t.x,gy-40,'Shield!',PL.shield)}t.hp=Math.max(0,t.hp-dmg)}}}
+
+// ── AI ──
+function aiCalcShot(weapon){
+  const me=tanks[1],tgt=tanks[0],meGY=tY(me.x),tgtGY=tY(tgt.x);
+  const pivY=meGY-TRH-TH,tgtX=tgt.x,tgtY=tgtGY-TRH-TH/2;
+  const expR=EXPR[weapon]||EXPR.standard,hitZone=expR+TW/2+5;
+  let hits=[];
+  for(let ang=10;ang<=80;ang+=2){const aRad=ang*Math.PI/180,cosA=Math.cos(aRad),sinA=Math.sin(aRad);const tipX=me.x-cosA*BLEN,tipY=pivY-sinA*BLEN;
+    for(let pw=2;pw<=MAXPW;pw+=.5){const spd=pw*PWF;let vx=-cosA*spd,vy=-sinA*spd,px=tipX,py=tipY;
+      for(let f=0;f<180;f++){px+=vx;py+=vy;vy+=G;const sx=Math.round(px);if(sx>=0&&sx<W&&py>=terrain[sx]){const dist=Math.hypot(px-tgtX,py-tgtY);if(dist<hitZone)hits.push({ang,pw,dist});break}if(px<-20||px>W+20||py>BEDY+20)break}}}
+  hits.sort((a,b)=>a.dist-b.dist);
+  if(hits.length>0){const pick=hits[Math.floor(Math.random()*Math.min(8,hits.length))];return{angle:Math.max(5,Math.min(85,pick.ang+(Math.random()-.5)*AI_ERR_A*2)),power:Math.max(MINPW,Math.min(MAXPW,pick.pw+(Math.random()-.5)*AI_ERR_P*2))}}
+  return{angle:35+Math.random()*30,power:8+Math.random()*8};
+}
+
+// ── Aim Preview ──
+function aimDots(){const t=tanks[turn],gy=tY(t.x),ar=t.angle*Math.PI/180,dir=t.p===0?1:-1;const pivY=gy-TRH-TH;let px=t.x+dir*Math.cos(ar)*BLEN,py=pivY-Math.sin(ar)*BLEN;const sp=Math.max(power,3)*PWF;let vx=dir*Math.cos(ar)*sp,vy=-Math.sin(ar)*sp;const dots=[];for(let i=0;i<45;i++){px+=vx;py+=vy;vy+=G;if(px<0||px>W||py>BEDY)break;if(i%3===0)dots.push({x:px,y:py})}return dots}
+
+// ── Input ──
+addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.key===','||e.key==='<')keys._cL=true;
+  if(e.key==='.'||e.key==='>')keys._cR=true;
+  const prevent=['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyW','KeyS','KeyA','KeyD','KeyQ','KeyE','Comma','Period','Enter','Digit1','Digit2','Digit3','Digit4'];
+  if(prevent.includes(e.code))e.preventDefault();
+
+  if(mode==='TITLE'){
+    if(e.code==='KeyT')terrainIdx=(terrainIdx+1)%TERRAINS.length;
+    if(e.code==='Digit1'||e.code==='Numpad1'){aiEnabled=true;startGame()}
+    if(e.code==='Digit2'||e.code==='Numpad2'){aiEnabled=false;startGame()}
+    return;
+  }
+  if(mode==='OVER'&&e.code==='KeyR'){init();return}
+  if(mode!=='AIM')return;
+  if(!e.repeat){
+    const wm={Digit1:'standard',Digit2:'heavy',Digit3:'cluster',Digit4:'nuke'};
+    if(wm[e.code]){const w=wm[e.code],t=tanks[turn];if(w==='standard'||(t.ammo[w]&&t.ammo[w]>0))selWeap=w;else mkPopup(t.x,tY(t.x)-40,'No '+w+'!','#FF7B8E')}
+    if(e.code==='Space'&&turn===0)fire();
+    if(e.code==='Enter'&&turn===1&&!aiEnabled)fire();
+  }
+});
+addEventListener('keyup',e=>{keys[e.code]=false;if(e.key===','||e.key==='<')keys._cL=false;if(e.key==='.'||e.key==='>')keys._cR=false});
+addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)for(const k in keys)keys[k]=false});
+
+// ── Fire ──
+function fire(){const t=tanks[turn];let w=selWeap;if(w!=='standard'){if(!t.ammo[w]||t.ammo[w]<=0){w='standard'}else t.ammo[w]--}proj.push(mkProj(t,w));mode='FLY';anyHit=false}
+
+// ── Update ──
+function update(){
+  shake*=.9;if(shake<.3)shake=0;if(flashA>0){flashR+=3;flashA-=.06}if(nukeFlash>0)nukeFlash-=.025;
+  for(const c of clouds){c.x+=c.sp;if(c.x>W+80)c.x=-80}
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.04;p.life-=p.dec;if(p.life<=0)parts.splice(i,1)}
+  for(let i=popups.length-1;i>=0;i--){const p=popups[i];p.y+=p.vy;p.life-=.015;if(p.life<=0)popups.splice(i,1)}
+  updatePU();
+
+  switch(mode){
+    case'AIM':{
+      const t=tanks[turn];let mov=false;
+      if(t.p===0){
+        if(keys.KeyQ&&t.fuel>0){t.x=Math.max(20,t.x-MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
+        if(keys.KeyE&&t.fuel>0){t.x=Math.min(W-20,t.x+MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
+        if(keys.KeyA)t.angle=Math.min(85,t.angle+ASPD);
+        if(keys.KeyD)t.angle=Math.max(5,t.angle-ASPD);
+        if(keys.KeyW)power=Math.min(MAXPW,power+PWSPD);
+        if(keys.KeyS)power=Math.max(MINPW,power-PWSPD);
+      }else{
+        if((keys.Comma||keys._cL)&&t.fuel>0){t.x=Math.max(20,t.x-MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
+        if((keys.Period||keys._cR)&&t.fuel>0){t.x=Math.min(W-20,t.x+MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
+        if(keys.ArrowRight)t.angle=Math.min(85,t.angle+ASPD);
+        if(keys.ArrowLeft)t.angle=Math.max(5,t.angle-ASPD);
+        if(keys.ArrowUp)power=Math.min(MAXPW,power+PWSPD);
+        if(keys.ArrowDown)power=Math.max(MINPW,power-PWSPD);
+      }
+      if(mov)mkDust(t.x,tY(t.x));
+      break;
+    }
+    case'AI_THINK':{
+      aiTimer++;
+      if(aiTimer===5){
+        const me=tanks[1],roll=Math.random();
+        if(me.ammo.nuke>0&&roll<.08)selWeap='nuke';
+        else if(me.ammo.cluster>0&&roll<.2)selWeap='cluster';
+        else if(me.ammo.heavy>0&&roll<.35)selWeap='heavy';
+        else selWeap='standard';
+        aiTarget=aiCalcShot(selWeap);
+      }
+      if(aiTimer>=5&&aiTimer<55){const t=tanks[turn];t.angle+=(aiTarget.angle-t.angle)*.08;power+=(aiTarget.power-power)*.08}
+      if(aiTimer>=55)fire();
+      break;
+    }
+    case'FLY':{
+      for(let i=proj.length-1;i>=0;i--){const p=proj[i];p.x+=p.vx;p.y+=p.vy;p.vy+=G;p.trail.push({x:p.x,y:p.y});if(p.trail.length>15)p.trail.shift();if(p.x<-20||p.x>W+20||p.y>BEDY+50){proj.splice(i,1);continue}const sx=Math.round(p.x);if(sx>=0&&sx<W&&p.y>=terrain[sx]){explode(p);proj.splice(i,1);continue}let hit=false;for(const t of tanks){const gy=tY(t.x),tcy=gy-TRH-TH/2;if(Math.abs(p.x-t.x)<TW/2+5&&Math.abs(p.y-tcy)<TH/2+TRH+5){explode(p);proj.splice(i,1);hit=true;break}}if(hit)continue}
+      if(proj.length===0){if(anyHit){mode='BOOM';timer=30}else{missed=true;mode='SWITCH';timer=50}}
+      break;
+    }
+    case'BOOM':timer--;if(timer<=0){if(tanks[0].hp<=0||tanks[1].hp<=0){if(tanks[0].hp<=0)spawnDebris(tanks[0]);if(tanks[1].hp<=0)spawnDebris(tanks[1]);deathWinner=tanks[0].hp>tanks[1].hp?0:tanks[1].hp>tanks[0].hp?1:(turn===0?1:0);mode='DEATH';deathTimer=0}else{mode='SWITCH';timer=30}}break;
+    case'DEATH':deathTimer++;updateDebris();if(deathTimer>100){winner=deathWinner;mode='OVER';overT=0}break;
+    case'SWITCH':timer--;if(timer<=0){turn=1-turn;turnCnt++;power=5;selWeap='standard';missed=false;if(turnCnt>=nextPU&&powerups.length<MAXPU){spawnPU();nextPU=turnCnt+1+Math.floor(Math.random()*2);if(Math.random()<.35&&powerups.length<MAXPU)spawnPU()}mode=turn===1&&aiEnabled?'AI_THINK':'AIM';aiTimer=0}break;
+    case'OVER':overT++;break;
+  }
+}
+
+// ── Render ──
+function render(){
+  if(mode==='TITLE'){drawTitle();return}
+  ctx.save();if(shake>.5)ctx.translate((Math.random()-.5)*shake*2,(Math.random()-.5)*shake*2);
+  // Sky
+  const sg=ctx.createLinearGradient(0,0,0,H);sg.addColorStop(0,PL.skyT);sg.addColorStop(.45,PL.skyM);sg.addColorStop(1,PL.skyB);ctx.fillStyle=sg;ctx.fillRect(0,0,W,H);
+  // Hills bg
+  ctx.fillStyle=PL.hill;ctx.beginPath();ctx.moveTo(0,H);for(let x=0;x<=W;x+=4)ctx.lineTo(x,H*.48+Math.sin(x*.003+1)*40+Math.sin(x*.01+2)*15);ctx.lineTo(W,H);ctx.closePath();ctx.fill();
+  // Clouds
+  for(const c of clouds){ctx.fillStyle=PL.cld;ctx.beginPath();ctx.arc(c.x,c.y,18*c.sc,0,Math.PI*2);ctx.arc(c.x+14*c.sc,c.y-6*c.sc,13*c.sc,0,Math.PI*2);ctx.arc(c.x+28*c.sc,c.y-1*c.sc,15*c.sc,0,Math.PI*2);ctx.arc(c.x-8*c.sc,c.y+2*c.sc,10*c.sc,0,Math.PI*2);ctx.fill()}
+  // Terrain
+  const tg=ctx.createLinearGradient(0,H*.3,0,BEDY);tg.addColorStop(0,PL.ter);tg.addColorStop(1,PL.terD);ctx.beginPath();ctx.moveTo(0,terrain[0]);for(let x=1;x<W;x++)ctx.lineTo(x,terrain[x]);ctx.lineTo(W,BEDY);ctx.lineTo(0,BEDY);ctx.closePath();ctx.fillStyle=tg;ctx.fill();
+  ctx.strokeStyle=PL.terH;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,terrain[0]);for(let x=1;x<W;x++)ctx.lineTo(x,terrain[x]-1);ctx.stroke();
+  ctx.strokeStyle=PL.terL;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,terrain[0]);for(let x=1;x<W;x+=2)ctx.lineTo(x,terrain[x]);ctx.stroke();
+  ctx.strokeStyle=PL.terL;ctx.lineWidth=1;ctx.globalAlpha=.4;for(let x=3;x<W-3;x+=6){if(terrain[x]>=BEDY-2)continue;const y=terrain[x];ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-1,y-3-Math.sin(x*.7)*2);ctx.stroke();ctx.beginPath();ctx.moveTo(x+3,y);ctx.lineTo(x+4,y-2-Math.cos(x*1.3)*1.5);ctx.stroke()}ctx.globalAlpha=1;
+  // Bedrock
+  ctx.fillStyle=PL.rock;ctx.fillRect(0,BEDY,W,H-BEDY);ctx.strokeStyle=PL.rockL;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,BEDY);ctx.lineTo(W,BEDY);ctx.stroke();ctx.globalAlpha=.12;ctx.strokeStyle=PL.rockL;ctx.lineWidth=.5;for(let y=BEDY+5;y<H;y+=6){ctx.beginPath();for(let x=0;x<W;x+=20){ctx.moveTo(x,y);ctx.lineTo(x+10,y+(Math.sin(x+y)>0?2:-2))}ctx.stroke()}ctx.globalAlpha=1;
+  // Powerups
+  for(const p of powerups)drawPU(p);
+  // Aim dots
+  if(mode==='AIM'||mode==='AI_THINK'){const dots=aimDots();for(let i=0;i<dots.length;i++){ctx.globalAlpha=.45*(1-i/dots.length);ctx.fillStyle=PL.aim;ctx.beginPath();ctx.arc(dots[i].x,dots[i].y,2.5,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
+  // Tanks
+  for(let i=0;i<2;i++)drawTank(tanks[i],i===turn&&(mode==='AIM'||mode==='AI_THINK'));
+  // Trails
+  for(const p of proj){for(let i=0;i<p.trail.length;i++){ctx.globalAlpha=.15*(i/p.trail.length);ctx.fillStyle=p.g;ctx.beginPath();ctx.arc(p.trail[i].x,p.trail[i].y,3,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
+  // Projectiles
+  for(const p of proj){ctx.fillStyle=p.g;ctx.globalAlpha=.35;ctx.beginPath();ctx.arc(p.x,p.y,p.rad+3,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle=p.f;ctx.beginPath();ctx.arc(p.x,p.y,p.rad,0,Math.PI*2);ctx.fill()}
+  // Flash
+  if(flashA>0){ctx.globalAlpha=Math.max(0,flashA);ctx.fillStyle=PL.w;ctx.beginPath();ctx.arc(flashX,flashY,flashR,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1}
+  if(nukeFlash>0){ctx.globalAlpha=Math.max(0,nukeFlash*.6);ctx.fillStyle='#fff';ctx.fillRect(-50,-50,W+100,H+100);ctx.globalAlpha=1}
+  // Particles
+  for(const p of parts){ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(p.x,p.y,p.rad*Math.max(.2,p.life),0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
+  // Debris
+  for(const d of debris){ctx.save();ctx.translate(d.x,d.y);ctx.rotate(d.rot);ctx.globalAlpha=Math.max(0,d.life);ctx.fillStyle=d.col;ctx.fillRect(-d.w/2,-d.h/2,d.w,d.h);ctx.restore()}ctx.globalAlpha=1;
+  // Popups
+  for(const p of popups){ctx.globalAlpha=Math.max(0,p.life);ctx.font='600 14px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=p.c;ctx.fillText(p.t,p.x,p.y)}ctx.globalAlpha=1;
+  ctx.restore();drawHUD();
+}
+
+function drawPU(pu){
+  if(!pu.gnd){ctx.fillStyle='rgba(255,255,255,0.35)';ctx.beginPath();ctx.arc(pu.x,pu.y-14,10,Math.PI,0);ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(pu.x-8,pu.y-14);ctx.lineTo(pu.x-3,pu.y-2);ctx.moveTo(pu.x+8,pu.y-14);ctx.lineTo(pu.x+3,pu.y-2);ctx.stroke()}
+  const pulse=pu.gnd?1+Math.sin(Date.now()*.004)*.08:1,sz=10*pulse;
+  ctx.fillStyle=pu.ty.col;fillRR(pu.x-sz/2,pu.y-sz/2,sz,sz,2);
+  ctx.globalAlpha=.2+Math.sin(Date.now()*.003)*.1;ctx.fillStyle=pu.ty.col;ctx.beginPath();ctx.arc(pu.x,pu.y,14,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+  ctx.font='600 8px Fredoka,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';ctx.fillText(pu.ty.sym,pu.x,pu.y+.5);ctx.textBaseline='alphabetic';
+}
+
+function drawTank(tank,act){
+  const gy=tY(tank.x),x=tank.x,isP1=tank.p===0;
+  const bc=isP1?PL.t1:PL.t2,dc=isP1?PL.t1d:PL.t2d,dir=isP1?1:-1;
+  const ar=tank.angle*Math.PI/180,bt=gy-TRH-TH,dy=bt;
+  // Shield
+  if(tank.shield){ctx.strokeStyle=PL.shield;ctx.lineWidth=2;ctx.globalAlpha=.35+Math.sin(Date.now()*.005)*.1;ctx.beginPath();ctx.arc(x,dy+TH/2,TW/2+10,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=.08;ctx.fillStyle=PL.shield;ctx.fill();ctx.globalAlpha=1}
+  ctx.fillStyle=dc;fillRR(x-TW/2-2,gy-TRH,TW+4,TRH+2,3);
+  ctx.fillStyle=bc;fillRR(x-TW/2,bt,TW,TH,3);
+  ctx.fillStyle='rgba(255,255,255,0.15)';fillRR(x-TW/2+2,bt+2,TW-4,3,1);
+  ctx.fillStyle=bc;ctx.beginPath();ctx.arc(x,dy,TURR,Math.PI,0);ctx.fill();
+  const tipX=x+dir*Math.cos(ar)*BLEN,tipY=dy-Math.sin(ar)*BLEN;
+  ctx.strokeStyle=dc;ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,dy);ctx.lineTo(tipX,tipY);ctx.stroke();
+  ctx.strokeStyle=bc;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,dy);ctx.lineTo(tipX,tipY);ctx.stroke();
+  if(act){ctx.strokeStyle=PL.w;ctx.lineWidth=2;ctx.globalAlpha=.25+Math.sin(Date.now()*.005)*.1;ctx.beginPath();ctx.arc(x,dy,TURR+5,Math.PI,0,false);ctx.stroke();ctx.globalAlpha=1}
+  if(tank.hp<MAXHP&&tank.hp>0){ctx.font='500 10px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=PL.tx;ctx.globalAlpha=.7;ctx.fillText(tank.hp,x,bt-TURR-10);ctx.globalAlpha=1}
+}
+
+// ── HUD ──
+function drawHUD(){
+  ctx.fillStyle=PL.hud;fillRR(15,10,W-30,72,10);
+  const p2n=aiEnabled?'Mint (AI)':'Mint';
+  drawHP(30,22,170,12,tanks[0].hp/MAXHP,PL.hp1,'Lavender');drawFuel(30,42,170,8,tanks[0].fuel/FUELMAX);
+  drawHP(W-200,22,170,12,tanks[1].hp/MAXHP,PL.hp2,p2n);drawFuel(W-200,42,170,8,tanks[1].fuel/FUELMAX);
+  ctx.textAlign='center';
+  if(mode!=='OVER'&&mode!=='DEATH'){
+    const tc=turn===0?PL.t1:PL.t2,tn=turn===0?'Lavender':p2n;
+    ctx.font='600 14px Fredoka,sans-serif';ctx.fillStyle=tc;
+    if(mode==='AI_THINK'){const dots='.'.repeat(Math.floor(aiTimer/12)%4);ctx.fillText('Thinking'+dots,W/2,28)}
+    else ctx.fillText(tn+"'s Turn",W/2,28);
+    const t=tanks[turn];
+    const wps=[{k:'standard',n:'Std',nm:'1'},{k:'heavy',n:'Hvy',nm:'2',a:t.ammo.heavy},{k:'cluster',n:'Clu',nm:'3',a:t.ammo.cluster},{k:'nuke',n:'Nuk',nm:'4',a:t.ammo.nuke}];
+    let ax=W/2-108;
+    for(const w of wps){const isA=selWeap===w.k,has=w.k==='standard'||(w.a&&w.a>0);if(isA){ctx.fillStyle='rgba(255,255,255,0.1)';fillRR(ax-20,37,42,16,4)}ctx.globalAlpha=has?(isA?1:.5):.25;ctx.font=isA?'600 11px Fredoka,sans-serif':'400 11px Fredoka,sans-serif';ctx.fillStyle=isA?PL.aA:PL.aI;ctx.fillText(w.k==='standard'?w.nm+':Std ∞':w.nm+':'+w.n+' ×'+(w.a||0),ax,49);ax+=54}ctx.globalAlpha=1;
+    if(mode==='AIM'||mode==='AI_THINK'){ctx.font='400 10px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.fillText(Math.round(tanks[turn].angle)+'°  |  Power: '+power.toFixed(1),W/2,62);const mx=W/2-40,my=66,mw=80,mh=5;ctx.fillStyle=PL.pwBg;fillRR(mx,my,mw,mh,2);ctx.fillStyle=PL.pw;fillRR(mx,my,Math.max(0,mw*(power/MAXPW)),mh,2)}
+    // Terrain name
+    ctx.font='400 10px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.3;ctx.fillText(TERRAINS[terrainIdx].name,W/2,H-22);ctx.globalAlpha=1;
+  }
+  if(mode==='AIM'&&!aiEnabled){
+    const hint=turn===0?'Q/E Move  ·  A/D Aim  ·  W/S Power  ·  1-4 Weapon  ·  Space Fire'
+                      : ', . Move  ·  ← → Aim  ·  ↑ ↓ Power  ·  1-4 Weapon  ·  Enter Fire';
+    ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.6;ctx.fillText(hint,W/2,H-8);ctx.globalAlpha=1;
+  }
+  if(mode==='AIM'&&aiEnabled&&turn===0){
+    ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.6;ctx.fillText('Q/E Move  ·  A/D Aim  ·  W/S Power  ·  1-4 Weapon  ·  Space Fire',W/2,H-8);ctx.globalAlpha=1;
+  }
+  if(missed&&mode==='SWITCH'&&timer>15){ctx.globalAlpha=Math.min(1,(timer-15)/20);ctx.font='500 22px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=PL.txL;ctx.fillText('Miss!',W/2,H/2-40);ctx.globalAlpha=1}
+  if(mode==='OVER'){ctx.fillStyle='rgba(45,36,56,0.55)';ctx.fillRect(0,0,W,H);const a=Math.min(1,overT/30);const wn=winner===0?'Lavender':'Mint',wc=winner===0?PL.t1:PL.t2;ctx.globalAlpha=a;ctx.font='700 48px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=wc;ctx.fillText(wn+' Wins!',W/2,H/2-15);ctx.font='400 18px Fredoka,sans-serif';ctx.fillStyle=PL.w;ctx.fillText('Press R to play again',W/2,H/2+25);ctx.globalAlpha=1}
+}
+
+function drawHP(x,y,w,h,r,col,lbl){ctx.fillStyle=PL.hpBg;fillRR(x,y,w,h,3);if(r>0){ctx.fillStyle=col;fillRR(x,y,Math.max(h,w*r),h,3)}ctx.font='600 11px Fredoka,sans-serif';ctx.textAlign='left';ctx.fillStyle=PL.tx;ctx.fillText(lbl+'  '+Math.round(r*MAXHP)+' HP',x+2,y-3)}
+function drawFuel(x,y,w,h,r){ctx.fillStyle=PL.fuelBg;fillRR(x,y,w,h,2);if(r>0){ctx.fillStyle=PL.fuel;fillRR(x,y,Math.max(h,w*r),h,2)}ctx.font='400 9px Fredoka,sans-serif';ctx.textAlign='left';ctx.fillStyle=PL.txL;ctx.fillText('Fuel '+Math.round(r*FUELMAX),x+w+5,y+h-1)}
+
+// ── Title Screen ──
+function drawTitle(){
+  const sg=ctx.createLinearGradient(0,0,0,H);sg.addColorStop(0,PL.skyT);sg.addColorStop(.45,PL.skyM);sg.addColorStop(1,PL.skyB);ctx.fillStyle=sg;ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=PL.hill;ctx.beginPath();ctx.moveTo(0,H);for(let x=0;x<=W;x+=4)ctx.lineTo(x,H*.48+Math.sin(x*.003+1)*40+Math.sin(x*.01+2)*15);ctx.lineTo(W,H);ctx.closePath();ctx.fill();
+  for(const c of clouds){ctx.fillStyle=PL.cld;ctx.beginPath();ctx.arc(c.x,c.y,18*c.sc,0,Math.PI*2);ctx.arc(c.x+14*c.sc,c.y-6*c.sc,13*c.sc,0,Math.PI*2);ctx.arc(c.x+28*c.sc,c.y-1*c.sc,15*c.sc,0,Math.PI*2);ctx.arc(c.x-8*c.sc,c.y+2*c.sc,10*c.sc,0,Math.PI*2);ctx.fill()}
+
+  ctx.textAlign='center';ctx.font='700 52px Fredoka,sans-serif';ctx.fillStyle=PL.tx;ctx.fillText('Pastel Tanks',W/2,115);
+
+  // Terrain selector
+  ctx.fillStyle=PL.hud;fillRR(W/2-130,150,260,36,8);
+  ctx.font='400 15px Fredoka,sans-serif';ctx.fillStyle=PL.tx;
+  ctx.fillText('Terrain: '+TERRAINS[terrainIdx].name,W/2,174);
+  ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.5;
+  ctx.fillText('Press T to change',W/2,198);ctx.globalAlpha=1;
+
+  // 1 Player button
+  const bW=220,bH=46,b1Y=230,b2Y=295;
+  ctx.fillStyle=PL.t1;fillRR(W/2-bW/2,b1Y,bW,bH,10);
+  ctx.font='600 18px Fredoka,sans-serif';ctx.fillStyle='#fff';ctx.fillText('1 Player  (vs AI)',W/2,b1Y+30);
+  // 2 Players button
+  ctx.fillStyle=PL.t2;fillRR(W/2-bW/2,b2Y,bW,bH,10);
+  ctx.fillStyle='#fff';ctx.fillText('2 Players',W/2,b2Y+30);
+
+  // Controls
+  ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.45;
+  ctx.fillText('P1: Q/E move  ·  A/D aim  ·  W/S power  ·  Space fire',W/2,380);
+  ctx.fillText('P2: ,/. move  ·  ← → aim  ·  ↑↓ power  ·  Enter fire',W/2,398);
+  ctx.fillText('1-4 select weapon  ·  Collect powerups by driving over them',W/2,416);
+  ctx.globalAlpha=1;
+
+  ctx.font='400 12px Fredoka,sans-serif';ctx.fillStyle=PL.tx;ctx.globalAlpha=.5;
+  ctx.fillText('Press 1 or 2 to start',W/2,460);ctx.globalAlpha=1;
+}
+
+// ── Init ──
+function startGame(){
+  TERRAINS[terrainIdx].fn();
+  tanks=[mkTank(.15,0),mkTank(.85,1)];adjSpawn();
+  proj=[];parts=[];popups=[];powerups=[];debris=[];
+  power=5;selWeap='standard';turn=0;mode='AIM';
+  winner=-1;shake=0;flashA=0;nukeFlash=0;missed=false;overT=0;turnCnt=0;deathTimer=0;deathWinner=0;
+  nextPU=1;anyHit=false;aiTimer=0;keys={};
+}
+
+function init(){mode='TITLE';terrainIdx=terrainIdx||0;keys={};debris=[];parts=[];popups=[];powerups=[];proj=[]}
+
+// ── Loop ──
+function loop(){update();render();requestAnimationFrame(loop)}
+Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,2000))]).then(()=>{init();loop()});
+</script>
+</body>
+</html>

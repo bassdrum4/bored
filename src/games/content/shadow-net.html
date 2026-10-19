@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
+var m={};
+function k(i){return Object.keys(m)[i]||null}
+var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
+setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
+clear:function(){m={}},key:k};
+Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
+try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
+})();</script>
+<style>
+@font-face{font-family:'Font Awesome 6 Free';font-style:normal;font-weight:900;font-display:block;src:url(data:font/woff;base64,d09GRgABAAAAAATIAAoAAAAABnwDBQEAAAAAAAAAAAAAAAAAAAAAAAAAAABPUy8yAAABaAAAAE4AAABgUVVUBmNtYXAAAAHMAAAAOwAAAEzjJuC/Z2x5ZgAAAhQAAAHoAAAC0KvtXd5oZWFkAAAA9AAAADYAAAA2LNu1mGhoZWEAAAEsAAAAIAAAACQEDwH4aG10eAAAAbgAAAAUAAAAFAjBAA5sb2NhAAACCAAAAAwAAAAMAYYB+21heHAAAAFMAAAAGgAAACAACgBhbmFtZQAAA/wAAAC1AAABmB14OHdwb3N0AAAEtAAAABMAAAAg/94AGQABAAADBQEAM6GHI18PPPUACwIAAAAAAOGKuboAAAAA5uy6Yf/+/74CQwHCAAAACAACAAAAAAAAeJxjYGRgYDz9fysDA5PD/3///zI5MwBFUAArALBvBwh4nGNgZGBgYGWIZ2BmAAFGMGZkgAMACnsAbAAAeJxjYGFiZm5hYGVgYPRhTGNgYHCH0l8ZJBlaGBiYGDiZGeBAAMFkcAwP9mVo+MDzcRPj6f9bgfpPM3gDhRlBcoyOjOuBlAIDAwAbRQz2AAABgAAAAUAAEAHAAAACQP/+AgAAAHicY2BgYGJgYGAGYhEgyQimWRgsgDQXAwdQjukDz4e8jxofN/3/z8CAYPN/45/Kd5MvCKwDCgAE+hGdAAAAAAAAZgCTASABaHicZVLNbtNAEJ5xmqzXdorJ2l4gFvFPaldw8TaJV5FaBKIXbr1xQ1zLU/QN6CPkCbgioQpZPEmuwI0HiJm1XXpgR56d/Wa+8c7sgAV+u8cKd3AO7wBErZWq9UpFMpKhmjBGX6gCGa3OdL3ZqLXW5DdWURZlTt4Ju/cSuSaQICJf4Ww2T+azGWL8skTOj485d1/Ej3xcntRJfbIcsCvpOY4ne409g6hHmYifVUgBFIZTez6L4/TI0Ay/hw8NiiAQ2GtAAEiwwY/wHACjUKmAoZrkWVmqYrPW9epMSkX3px2/ct6CM506N5yb7fqn0fje6BY4vzEG559+cQ4wag/t3npLXSrgDXyg7BOmutr7Ynuh8nspi0HYumun+SEFhIEJp+uQa6P7DHQw/ZPRPx7lCzG5qKplLqU7HrtS5suquhgQbzz2BuRWiCwriiwT4sG6Nc1zuWONvDQ9LYXg/MnTBbdGuEMpszTPY8+L8zzNpMT/kX2ZpoEQQZqWD9Zr8ygjizuuyWfyLoSwLIe7MAJov1uAP2ABp6DMBFGPTbE0NaybH9N9KtjMTq21ZJqZRyiFZnqjmAp/h1EjXM9zRRMNVtCEX7qV7GjhN9u+tH0//BP6Pln2JXt8fzh/1a3D5+12e7e9+wuoU2mEeJyVj0kKwlAQRF+MA7r0BFkaMCIOEV0IIngBwYVbx4ATURQv5Rktf2JMFlnIp39Xd3X1AFRYYmMVq0BPFmGLjqIIF6ixjbHNmEuMi6maEmteMS7TtOpMOavySUjAjj03HBqscOVn4k4mM+HBhqvio3xe3sE3qlD4E82VP6jvOoX+13piWvRlbRbiQmkC08VhoNc1TFt+qN/XtX1zQ/6ke6bLyMz+TnATXVblJ7t5v93eR+A5DQAAAHicY2BmAIP/txkkGbAAAC4fAfcA) format('woff')}
+.fas{font-family:'Font Awesome 6 Free';font-weight:900;-moz-osx-font-smoothing:grayscale;-webkit-font-smoothing:antialiased;display:inline-block;font-style:normal;font-variant:normal;line-height:1;text-rendering:auto}
+.fa-question::before{content:"\f128"}
+.fa-check::before{content:"\f00c"}
+.fa-eye::before{content:"\f06e"}
+.fa-cube::before{content:"\f1b2"}
+</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHADOW.NET</title>
+<style>
+:root{--bg:#080c12;--terminal-bg:#0b1018;--fg:#00ff41;--fg-dim:#00992a;--accent:#ffb000;--error:#ff3c38;--info:#00d4ff;--success:#39ff14;--muted:#4a5568;--card:#111922;--border:#1a2533;--sidebar:#0a0f16}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:'Fira Code',monospace;height:100vh;overflow:hidden}
+#game{display:flex;flex-direction:column;height:100vh}
+#top-bar{background:var(--card);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:16px;flex-shrink:0}
+#top-bar .logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:16px;color:var(--accent);letter-spacing:3px}
+#top-bar .ver{color:var(--muted);font-size:11px}
+#top-bar .conn{margin-left:auto;font-size:11px;display:flex;align-items:center;gap:6px}
+#top-bar .conn .dot{width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse-dot 2s infinite}
+#top-bar .conn.disconnected .dot{background:var(--error);animation:none}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+#main{display:flex;flex:1;overflow:hidden}
+#terminal-wrap{flex:1;display:flex;flex-direction:column;position:relative;overflow:hidden}
+#terminal-output{flex:1;overflow-y:auto;padding:16px 20px;font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-all;scroll-behavior:smooth}
+#terminal-output::-webkit-scrollbar{width:6px}
+#terminal-output::-webkit-scrollbar-track{background:var(--terminal-bg)}
+#terminal-output::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+#terminal-output .line{min-height:1.1em}
+.c-default{color:var(--fg)}.c-error{color:var(--error)}.c-warning{color:var(--accent)}.c-info{color:var(--info)}.c-success{color:var(--success)}.c-muted{color:var(--muted)}.c-highlight{color:#fff}.c-accent{color:var(--accent)}
+#input-line{display:flex;align-items:center;padding:8px 20px;background:var(--card);border-top:1px solid var(--border);flex-shrink:0}
+#prompt{color:var(--fg);font-size:13px;white-space:nowrap;margin-right:4px}
+#terminal-input{flex:1;background:transparent;border:none;color:var(--fg);font-family:inherit;font-size:13px;outline:none;caret-color:var(--fg)}
+#sidebar{width:260px;background:var(--sidebar);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.panel{padding:14px 16px;border-bottom:1px solid var(--border)}
+.panel-title{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;color:var(--accent);letter-spacing:2px;margin-bottom:10px;text-transform:uppercase}
+.trace-bar-wrap{background:#1a1a2e;border-radius:4px;height:14px;overflow:hidden;position:relative}
+.trace-bar{height:100%;border-radius:4px;transition:width .5s ease,background .5s ease}
+.trace-label{font-size:11px;margin-top:4px;display:flex;justify-content:space-between;color:var(--muted)}
+.stat-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}
+.stat-row .label{color:var(--muted)}.stat-row .val{color:var(--fg)}
+.inv-item{font-size:11px;color:var(--info);padding:2px 0}
+.mission-obj{font-size:11px;color:var(--fg-dim);padding:4px 8px;border-left:2px solid var(--accent);margin-bottom:6px;background:rgba(255,176,0,.04);line-height:1.5}
+.server-entry{font-size:11px;padding:3px 0;display:flex;align-items:center;gap:6px}
+.server-entry .s-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.s-unknown{color:var(--muted)}.s-discovered{color:var(--info)}.s-cracked{color:var(--success)}
+.scanlines{position:absolute;inset:0;pointer-events:none;z-index:10;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 4px)}
+.glitch-overlay{position:absolute;inset:0;pointer-events:none;z-index:11;opacity:0;transition:opacity .3s}
+.glitch-active .glitch-overlay{opacity:1;animation:glitch-flicker .15s infinite}
+@keyframes glitch-flicker{0%{background:rgba(255,60,56,.03)}50%{background:transparent}100%{background:rgba(0,212,255,.02)}}
+.glitch-active{animation:glitch-shake .1s infinite}
+@keyframes glitch-shake{0%{transform:translate(0)}25%{transform:translate(-1px,1px)}50%{transform:translate(1px,-1px)}75%{transform:translate(-1px,0)}100%{transform:translate(0)}}
+@media(max-width:768px){#sidebar{display:none}#top-bar .ver{display:none}}
+.fade-in{animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="top-bar">
+    <span class="logo">SHADOW.NET</span>
+    <span class="ver">v2.4.1</span>
+    <div class="conn" id="conn-status"><span class="dot"></span><span id="conn-text">LOCAL</span></div>
+  </div>
+  <div id="main">
+    <div id="terminal-wrap">
+      <div id="terminal-output"></div>
+      <div class="scanlines"></div>
+      <div class="glitch-overlay"></div>
+      <div id="input-line">
+        <span id="prompt">ghost@localhost:~$ </span>
+        <input type="text" id="terminal-input" autofocus autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+    <div id="sidebar">
+      <div class="panel">
+        <div class="panel-title">Trace Level</div>
+        <div class="trace-bar-wrap"><div class="trace-bar" id="trace-bar"></div></div>
+        <div class="trace-label"><span id="trace-text">0%</span><span>DANGER</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Status</div>
+        <div class="stat-row"><span class="label">Credits</span><span class="val" id="s-credits">500</span></div>
+        <div class="stat-row"><span class="label">Server</span><span class="val" id="s-server">localhost</span></div>
+        <div class="stat-row"><span class="label">Path</span><span class="val" id="s-path">~</span></div>
+        <div class="stat-row"><span class="label">Files</span><span class="val" id="s-files">0</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Inventory</div>
+        <div id="inventory-list"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Current Mission</div>
+        <div id="mission-display"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Servers</div>
+        <div id="server-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================
+// SHADOW.NET - Corporate Infiltration Terminal
+// ============================================
+
+// --- GAME DATA ---
+
+const CRACK_WORDS = {
+  5: ['BRAIN','FLAME','GHOST','HEART','KNIFE','LIGHT','MAGIC','NIGHT','OCEAN','POWER','QUEEN','STORM'],
+  6: ['BREACH','CIPHER','DELETE','ENIGMA','FALCON','HIDDEN','MATRIX','NEURAL','RENDER','SHADOW','TARGET','VECTOR'],
+  7: ['CONSOLE','CORRUPT','DECRYPT','ENCRYPT','EXPLOIT','GATEWAY','HACKING','NETWORK','ROOTKIT','CONTROL','ROUTINE','VOLTAGE']
+};
+
+const SERVERS = {
+  'localhost':{ip:'127.0.0.1',security:0,cracked:true,discovered:true,desc:'Your local machine',pwdLen:0,maxAttempts:0},
+  'nexus-corp.net':{ip:'10.0.44.12',security:1,cracked:false,discovered:false,desc:'Nexus Corp public server',pwdLen:5,maxAttempts:4},
+  'relay.nexus-corp.net':{ip:'10.0.44.50',security:2,cracked:false,discovered:false,desc:'Nexus Corp relay node',pwdLen:6,maxAttempts:4},
+  'vault.nexus-corp.net':{ip:'10.0.44.99',security:3,cracked:false,discovered:false,desc:'Nexus Corp secure vault',pwdLen:7,maxAttempts:3}
+};
+
+// File system: objects = dirs, strings = plain files, {content,encrypted,shift,classified} = encrypted files
+const FS = {
+  localhost:{
+    home:{ghost:{
+      'readme.txt':'Welcome to SHADOW.NET v2.4.1\n\nYou are a freelance operative.\nYour handler: VEGA\nEncrypted channel: ACTIVE\n\nType "help" for commands.\nType "missions" for objectives.',
+      downloads:{},
+      notes:{
+        'targets.txt':'Known targets:\n- nexus-corp.net (10.0.44.12) - Primary\n- relay.nexus-corp.net - Unknown IP\n- vault.nexus-corp.net - Unknown IP\n\nNote: Scan network to discover servers.',
+        'contacts.txt':'Handler: VEGA\nSecure channel: Port 8443\nDead drop: /var/tmp/.drop\n\nTrust no one.'
+      },
+      tools:{
+        'cracker.exe':'[Binary: Password cracker v1.0]\nCapabilities: Dictionary attack, brute force\nNote: Use "crack" on remote servers.',
+        'scanner.exe':'[Binary: Network scanner v1.0]\nCapabilities: Port scan, service detection\nNote: Use "scan" to find servers.'
+      }
+    }},
+    etc:{
+      'hosts':'127.0.0.1  localhost\n10.0.44.12  nexus-corp.net',
+      'passwd':'root:x:0:0:root:/root:/bin/bash\nghost:x:1000:1000::/home/ghost:/bin/zsh'
+    },
+    var:{log:{'system.log':'[2024-01-15 03:14:07] SHADOW.NET initialized\n[2024-01-15 03:14:08] Encrypted tunnel up\n[2024-01-15 03:14:09] Identity: ghost@shadow.net'}}
+  },
+  'nexus-corp.net':{
+    home:{
+      admin:{'.secret':{'helios_notes.txt':{content:'PROJECT HELIOS - INTERNAL MEMO\n\nThe AI surveillance system is 94% complete.\nFacial recognition: OPERATIONAL\nVoice analysis: OPERATIONAL\nNetwork intercept: OPERATIONAL\nPredictive behavior: IN TESTING\n\nDeployment: March 2024\nBuyers confirmed: 3 sovereign states\nRevenue: $2.4 billion\n\n- Dr. Marcus Webb, CTO',encrypted:true,shift:3,classified:true}}},
+      jdoe:{
+        documents:{
+          'project_helios_brief.txt':'PROJECT HELIOS - EXECUTIVE BRIEF\n\nNexus Corp is developing an AI-powered mass\nsurveillance platform capable of:\n- Real-time monitoring of all digital comms\n- Facial recognition from any connected camera\n- Predictive behavior modeling\n\nThis system violates international privacy laws.\nIf deployed, it could suppress entire populations.\n\nWe need to get this information out.',
+          'meeting_notes.txt':'Meeting Notes - Jan 10, 2024\n\nAttendees: Webb, Chen, Rodriguez, Park\n\n1. HELIOS progress update - on schedule\n2. New buyers from SE Asia interested\n3. Security audit next month\n4. Relay server migration to new IP block\n5. Vault access protocol updated\n\nAction items:\n- Rodriguez: Update relay config\n- Park: Rotate vault encryption keys\n- Chen: Prepare demo for buyers'
+        },
+        'todo.txt':'TODO:\n- [x] Set up relay server\n- [ ] Migrate vault to new subnet\n- [ ] Update encryption protocols\n- [x] Brief the team on HELIOS\n- [ ] Rotate access keys'
+      },
+      public:{
+        'welcome.txt':'Welcome to Nexus Corp.\nWe build a safer future through innovation.\n\nNexus Corp - "Securing Tomorrow, Today"',
+        news:{'press_release.txt':'FOR IMMEDIATE RELEASE\n\nNexus Corp Announces Cybersecurity Division\n\nSAN FRANCISCO, Jan 15 - Nexus Corp announced\na new cybersecurity division focused on advanced\nthreat detection and prevention.\n\n"Our new division will pioneer the next\ngeneration of security solutions." - CEO Harlow'}
+      }
+    },
+    etc:{
+      'hosts':'127.0.0.1  localhost\n10.0.44.50  relay.nexus-corp.net\n10.0.44.99  vault.nexus-corp.net\n# Internal network - do not distribute',
+      'shadow':'Password hint for relay:\n"It lurks in darkness, following every move."\nLength: 6 characters'
+    },
+    var:{www:{'index.html':'<html><body><h1>Nexus Corp</h1><p>Under maintenance</p></body></html>'}}
+  },
+  'relay.nexus-corp.net':{
+    home:{relay:{
+      config:{
+        'routes.txt':'Relay Configuration\n==================\nPrimary: 10.0.44.50 (this server)\nSecondary: 10.0.44.51 (backup)\nVault: 10.0.44.99\n\nRouting table updated: 2024-01-12',
+        'vault_access.txt':'VAULT ACCESS PROTOCOL\n=====================\nServer: vault.nexus-corp.net (10.0.44.99)\nPort: 22\nAuth: Password (7 chars)\n\nSecurity Level: MAXIMUM\nIntrusion detection: ACTIVE\n\nNote: Vault encryption key must be obtained\nbefore accessing classified data.\nKey location: /etc/keys/vault_key.dat'
+      },
+      logs:{'access.log':'[2024-01-12] admin login from 10.0.44.5\n[2024-01-13] jdoe login from 10.0.44.23\n[2024-01-14] root accessed vault_key.dat\n[2024-01-15] ANOMALY: Unknown connection\n[2024-01-15] ALERT: Security level increased'}
+    }},
+    etc:{keys:{'vault_key.dat':{content:'VAULT ENCRYPTION KEY\n===================\nShift protocol: CAESAR\nShift value: [REDACTED]\n\nDecrypted message:\n"The vault awaits the patient shadow"\n\nUse this key to decrypt vault files.',encrypted:true,shift:7}}},
+    tmp:{cache:{'session.dat':'[Session data - binary]\nLast: 2024-01-14 22:15:03\nUser: admin\nDuration: 47 min\nFiles accessed: 12'}}
+  },
+  'vault.nexus-corp.net':{
+    data:{
+      classified:{
+        'helios_blueprint.txt':{content:'========================================\n  PROJECT HELIOS - MASTER BLUEPRINT\n  CLASSIFICATION: UMBRA - TOP SECRET\n========================================\n\nSystem Architecture:\n- Core AI: HELIOS-v4.2\n- Collection: Global mesh network\n- Processing: Distributed quantum cluster\n- Storage: 5 encrypted vaults\n\nSurveillance Capabilities:\n1. Communication intercept (99.97% coverage)\n2. Facial recognition (2.3M cameras, <0.3s ID)\n3. Predictive behavior (91% accuracy target)\n\nDeployment:\n- Phase 1: SE Asia (Q1 2024)\n- Phase 2: Middle East (Q2 2024)\n- Phase 3: Global (Q4 2024)\n\nBuyer Contracts: $2.71 billion total\nLaundered via Meridian, Atlas, Phoenix funds\n\nTHIS DOCUMENT CONSTITUTES EVIDENCE OF\nCRIMINAL ACTIVITY UNDER INTERNATIONAL LAW\n========================================',encrypted:true,shift:13,classified:true,missionCritical:true},
+        'financial_records.txt':{content:'NEXUS CORP - OFF-BOOK RECORDS\n=============================\n\nHELIOS Revenue:\n- Contract A: $890M (5-year)\n- Contract B: $720M (3-year)\n- Contract C: $1.1B (10-year)\nTotal: $2,710,000,000\n\nLaundered through:\n- Meridian Holdings (Cayman)\n- Atlas Fund (Switzerland)\n- Phoenix Capital (Singapore)\n\nKey payments:\n- P. Harlow (CEO): $45M offshore\n- M. Webb (CTO): $28M offshore\n- J. Rodriguez (CFO): $22M offshore\n\nEVIDENCE OF FRAUD AND MONEY LAUNDERING\n=========================================',encrypted:true,shift:5,classified:true}
+      },
+      backups:{'server_backup.tar':'[Archive: 2.4GB - Binary data]'}
+    },
+    admin:{root:{'access_log.txt':'[2024-01-10] Reboot\n[2024-01-12] Keys rotated\n[2024-01-14] New protocol\n[2024-01-15] INTRUSION DETECTED\n[2024-01-15] LOCKDOWN INITIATED\n[2024-01-15] COUNTERMEASURES ACTIVE'}},
+    etc:{security:{'protocols.txt':'SECURITY PROTOCOLS - VAULT\n==========================\n\n1. Classified data: Caesar protocol encrypted\n2. Auth: Valid credentials required\n3. Intrusion detection: Level 5\n4. Countermeasures: Active trace\n5. Data destruction: Remote wipe capable\n\nWARNING: Unauthorized access will be\ntraced and reported to authorities.'}}
+  }
+};
+
+const MISSIONS = [
+  {id:1,name:'Reconnaissance',desc:'Scan the network to discover Nexus Corp servers.',obj:'Run "scan" to find target servers',check:()=>SERVERS['nexus-corp.net'].discovered,reward:100},
+  {id:2,name:'First Breach',desc:'Infiltrate the Nexus Corp public server.',obj:'Connect to nexus-corp.net and crack the password',check:()=>SERVERS['nexus-corp.net'].cracked,reward:200},
+  {id:3,name:'Intel Extraction',desc:'Find evidence of Project HELIOS on the Nexus Corp server.',obj:'Locate and download "project_helios_brief.txt"',check:()=>state.downloaded.includes('project_helios_brief.txt'),reward:300},
+  {id:4,name:'Relay Access',desc:'Find and infiltrate the Nexus Corp relay server.',obj:'Discover the relay server and crack its password',check:()=>SERVERS['relay.nexus-corp.net'].cracked,reward:300},
+  {id:5,name:'The Key',desc:'Obtain and decrypt the vault encryption key from the relay.',obj:'Download and decrypt "vault_key.dat" from the relay',check:()=>state.decrypted.some(f=>f.includes('vault_key.dat')),reward:400},
+  {id:6,name:'The Vault',desc:'Access the vault and steal the HELIOS blueprint.',obj:'Crack the vault, decrypt and download "helios_blueprint.txt"',check:()=>state.downloaded.includes('helios_blueprint.txt')&&state.decrypted.some(f=>f.includes('helios_blueprint.txt')),reward:500},
+  {id:7,name:'Exfiltration',desc:'Disconnect safely before being traced.',obj:'Disconnect with trace below 75 after getting the blueprint',check:()=>!state.connected&&state.trace<75&&state.downloaded.includes('helios_blueprint.txt'),reward:500}
+];
+
+const SHOP = [
+  {id:'trace_wipe',name:'Trace Wipe',desc:'Reduce trace by 25',price:200,consumable:true},
+  {id:'heavy_wipe',name:'Heavy Trace Wipe',desc:'Reduce trace by 50',price:400,consumable:true},
+  {id:'cracker_v2',name:'Cracker v2',desc:'Eliminate 3 wrong words when cracking',price:300,consumable:false},
+  {id:'decryptor',name:'Decryptor v2',desc:'Reveal 3 letter hints when decrypting',price:250,consumable:false},
+  {id:'stealth',name:'Stealth Module',desc:'Reduce all trace gains by 50%',price:500,consumable:false}
+];
+
+// --- GAME STATE ---
+
+const state = {
+  connected: null,       // server key or null (localhost)
+  currentDir: '/home/ghost',
+  trace: 0,
+  credits: 500,
+  inventory: ['cracker_v1'],
+  downloaded: [],        // filenames
+  decrypted: [],         // "server:path" ids
+  missionIdx: 0,
+  completedMissions: [],
+  mode: 'normal',        // normal, crack, decrypt
+  crackState: null,
+  decryptState: null,
+  gameEnded: false,
+  booted: false,
+  stealthBought: false,
+  crackerV2Bought: false,
+  decryptorBought: false,
+  discoveredServers: new Set(['localhost']),
+  crackedServers: new Set(['localhost']),
+  downloadCount: 0
+};
+
+// --- TERMINAL ENGINE ---
+
+const output = document.getElementById('terminal-output');
+const inputEl = document.getElementById('terminal-input');
+const cmdHistory = [];
+let histIdx = -1;
+
+function print(text, cls='c-default'){
+  const span = document.createElement('span');
+  span.className = 'line ' + cls;
+  span.textContent = text;
+  output.appendChild(span);
+  output.appendChild(document.createTextNode('\n'));
+  scrollToBottom();
+}
+
+function printHTML(html){
+  const div = document.createElement('div');
+  div.className = 'line';
+  div.innerHTML = html;
+  output.appendChild(div);
+  output.appendChild(document.createTextNode('\n'));
+  scrollToBottom();
+}
+
+function scrollToBottom(){
+  requestAnimationFrame(()=>{ output.scrollTop = output.scrollHeight; });
+}
+
+function clearTerm(){
+  output.innerHTML = '';
+}
+
+function getPrompt(){
+  const srv = state.connected || 'localhost';
+  let dir = state.currentDir;
+  if(srv==='localhost' && dir==='/home/ghost') dir='~';
+  return `ghost@${srv}:${dir}$ `;
+}
+
+function updatePrompt(){
+  document.getElementById('prompt').textContent = getPrompt();
+}
+
+// --- UTILITIES ---
+
+function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function caesarEnc(text, shift){
+  return text.split('').map(c=>{
+    if(c>='A'&&c<='Z') return String.fromCharCode(((c.charCodeAt(0)-65+shift)%26)+65);
+    if(c>='a'&&c<='z') return String.fromCharCode(((c.charCodeAt(0)-97+shift)%26)+97);
+    return c;
+  }).join('');
+}
+
+function addTrace(amount){
+  if(state.stealthBought) amount = Math.ceil(amount/2);
+  state.trace = Math.min(100, state.trace + amount);
+  updateUI();
+  if(state.trace >= 100 && !state.gameEnded){
+    gameOver();
+  }
+}
+
+function addCredits(n){
+  state.credits += n;
+  updateUI();
+}
+
+// --- FILE SYSTEM ---
+
+function isFile(node){ return typeof node==='string' || (typeof node==='object' && node.content!==undefined); }
+function isDir(node){ return typeof node==='object' && node.content===undefined; }
+function getContent(node){ return typeof node==='string' ? node : node.content; }
+
+function resolvePath(base, rel){
+  if(rel.startsWith('/')) return normalizePath(rel);
+  if(rel==='..') {
+    const p = base.split('/').filter(Boolean);
+    p.pop();
+    return '/'+p.join('/');
+  }
+  if(rel==='.') return base;
+  return normalizePath(base==='/'? '/'+rel : base+'/'+rel);
+}
+
+function normalizePath(p){
+  const parts = p.split('/').filter(Boolean);
+  const res = [];
+  for(const part of parts){
+    if(part==='..') res.pop();
+    else if(part!=='.') res.push(part);
+  }
+  return '/'+res.join('/');
+}
+
+function getNode(server, path){
+  const fs = FS[server];
+  if(!fs) return null;
+  const parts = path.split('/').filter(Boolean);
+  let node = fs;
+  for(const part of parts){
+    if(!node || typeof node==='string' || node.content!==undefined) return null;
+    node = node[part];
+    if(!node) return null;
+  }
+  return node;
+}
+
+function getFileId(server, path){
+  return server+':'+path;
+}
+
+function isDecrypted(server, path){
+  return state.decrypted.includes(getFileId(server, path));
+}
+
+// --- UI UPDATES ---
+
+function updateUI(){
+  // Trace bar
+  const bar = document.getElementById('trace-bar');
+  const pct = state.trace;
+  bar.style.width = pct+'%';
+  let col = '#00ff41';
+  if(pct>30) col='#ffb000';
+  if(pct>60) col='#ff6b00';
+  if(pct>80) col='#ff3c38';
+  bar.style.background = col;
+  document.getElementById('trace-text').textContent = pct+'%';
+
+  // Stats
+  document.getElementById('s-credits').textContent = state.credits+'cr';
+  document.getElementById('s-server').textContent = state.connected||'localhost';
+  document.getElementById('s-path').textContent = state.currentDir;
+  document.getElementById('s-files').textContent = state.downloadCount;
+
+  // Connection
+  const connEl = document.getElementById('conn-status');
+  const connText = document.getElementById('conn-text');
+  if(state.connected){
+    connEl.classList.remove('disconnected');
+    connText.textContent = 'CONNECTED';
+  } else {
+    connEl.classList.add('disconnected');
+    connText.textContent = 'LOCAL';
+  }
+
+  // Inventory
+  const inv = document.getElementById('inventory-list');
+  inv.innerHTML = state.inventory.map(i=>{
+    const item = SHOP.find(s=>s.id===i);
+    const name = item ? item.name : i;
+    return `<div class="inv-item"><i class="fas fa-cube"></i> ${name}</div>`;
+  }).join('');
+
+  // Mission
+  const mEl = document.getElementById('mission-display');
+  if(state.missionIdx < MISSIONS.length){
+    const m = MISSIONS[state.missionIdx];
+    mEl.innerHTML = `<div class="mission-obj"><strong style="color:var(--accent)">#${m.id} ${m.name}</strong><br>${m.obj}</div>`;
+  } else {
+    mEl.innerHTML = `<div class="mission-obj" style="border-color:var(--success);color:var(--success)">All missions complete!</div>`;
+  }
+
+  // Servers
+  const sEl = document.getElementById('server-list');
+  sEl.innerHTML = Object.keys(SERVERS).filter(s=>s!=='localhost').map(s=>{
+    const srv = SERVERS[s];
+    let cls='s-unknown', icon='fa-question';
+    if(srv.cracked){cls='s-cracked';icon='fa-check';}
+    else if(srv.discovered){cls='s-discovered';icon='fa-eye';}
+    return `<div class="server-entry ${cls}"><span class="s-dot" style="background:currentColor"></span><i class="fas ${icon}"></i> ${s}</div>`;
+  }).join('');
+
+  // Glitch effect
+  const wrap = document.getElementById('terminal-wrap');
+  if(state.trace > 75) wrap.classList.add('glitch-active');
+  else wrap.classList.remove('glitch-active');
+
+  updatePrompt();
+}
+
+// --- MISSION CHECKER ---
+
+function checkMissions(){
+  if(state.gameEnded) return;
+  if(state.missionIdx >= MISSIONS.length) return;
+  const m = MISSIONS[state.missionIdx];
+  if(m.check()){
+    state.completedMissions.push(m.id);
+    addCredits(m.reward);
+    print(`\n╔══════════════════════════════════╗`, 'c-success');
+    print(`║  MISSION COMPLETE: ${m.name.padEnd(14)}║`, 'c-success');
+    print(`║  Reward: ${m.reward}cr`.padEnd(37)+'║', 'c-success');
+    print(`╚══════════════════════════════════╝\n`, 'c-success');
+    state.missionIdx++;
+    if(state.missionIdx < MISSIONS.length){
+      const next = MISSIONS[state.missionIdx];
+      print(`NEW MISSION: ${next.name}`, 'c-warning');
+      print(`${next.desc}`, 'c-warning');
+      print(`Objective: ${next.obj}\n`, 'c-info');
+    } else {
+      gameWin();
+    }
+    updateUI();
+  }
+}
+
+// --- COMMAND PROCESSOR ---
+
+function processCmd(raw){
+  const input = raw.trim();
+  if(!input) return;
+  cmdHistory.push(input);
+  histIdx = -1;
+
+  print(getPrompt()+input, 'c-muted');
+
+  if(state.gameEnded){
+    if(input.toLowerCase()==='restart') { restartGame(); return; }
+    print('Connection terminated. Type "restart" to try again.','c-error');
+    return;
+  }
+
+  if(state.mode==='crack') { handleCrackInput(input); return; }
+  if(state.mode==='decrypt') { handleDecryptInput(input); return; }
+
+  const parts = input.split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+  const args = parts.slice(1);
+
+  switch(cmd){
+    case 'help': cmdHelp(); break;
+    case 'ls': case 'dir': cmdLs(); break;
+    case 'cd': cmdCd(args[0]||''); break;
+    case 'cat': case 'read': case 'type': cmdCat(args[0]); break;
+    case 'clear': case 'cls': clearTerm(); break;
+    case 'scan': cmdScan(); break;
+    case 'connect': cmdConnect(args[0]); break;
+    case 'disconnect': case 'dc': cmdDisconnect(); break;
+    case 'crack': cmdCrack(); break;
+    case 'decrypt': cmdDecrypt(args[0]); break;
+    case 'download': cmdDownload(args[0]); break;
+    case 'analyze': cmdAnalyze(); break;
+    case 'status': cmdStatus(); break;
+    case 'missions': cmdMissions(); break;
+    case 'trace': print(`Trace level: ${state.trace}/100`, state.trace>60?'c-error':'c-default'); break;
+    case 'shop': cmdShop(); break;
+    case 'buy': cmdBuy(args[0]); break;
+    case 'whoami': print('ghost @ SHADOW.NET\nClearance: OPERATIVE\nStatus: ACTIVE','c-info'); break;
+    case 'map': cmdMap(); break;
+    case 'exit': if(state.connected){cmdDisconnect();}else{print('Nice try. There is no escape.','c-muted');} break;
+    default:
+      print(`Command not found: ${cmd}`, 'c-error');
+      print('Type "help" for available commands.', 'c-muted');
+  }
+  checkMissions();
+  updateUI();
+}
+
+// --- COMMANDS ---
+
+function cmdHelp(){
+  print('Available Commands:', 'c-highlight');
+  print('═══════════════════', 'c-muted');
+  print('');
+  print('  Navigation:', 'c-accent');
+  print('    ls              List directory contents');
+  print('    cd <dir>        Change directory');
+  print('    cat <file>      Read file contents');
+  print('    clear           Clear terminal');
+  print('');
+  print('  Network:', 'c-accent');
+  print('    scan            Scan for servers');
+  print('    connect <host>  Connect to server');
+  print('    disconnect      Disconnect from server');
+  print('    map             Show network map');
+  print('');
+  print('  Hacking:', 'c-accent');
+  print('    crack           Crack password (on remote server)');
+  print('    decrypt <file>  Decrypt encrypted file');
+  print('    download <file> Download file to local');
+  print('    analyze         Analyze system vulnerabilities');
+  print('');
+  print('  Game:', 'c-accent');
+  print('    status          Show operative status');
+  print('    missions        View mission objectives');
+  print('    trace           Check trace level');
+  print('    shop            Browse upgrades');
+  print('    buy <item>      Purchase upgrade');
+  print('    whoami          Display identity');
+}
+
+function cmdLs(){
+  const srv = state.connected || 'localhost';
+  const node = getNode(srv, state.currentDir);
+  if(!node || isFile(node)){ print('Not a directory.','c-error'); return; }
+  const entries = Object.keys(node);
+  if(entries.length===0){ print('(empty directory)','c-muted'); return; }
+  let output_str = '';
+  entries.forEach(e=>{
+    const child = node[e];
+    if(isDir(child)) output_str += `<span class="c-info">${e}/</span>  `;
+    else {
+      const enc = typeof child==='object' && child.encrypted && !isDecrypted(srv, state.currentDir+'/'+e);
+      output_str += enc ? `<span class="c-warning">${e} [ENC]</span>  ` : `<span class="c-default">${e}</span>  `;
+    }
+  });
+  printHTML(output_str);
+}
+
+function cmdCd(arg){
+  if(!arg){ 
+    const srv = state.connected || 'localhost';
+    if(srv==='localhost') state.currentDir='/home/ghost';
+    else state.currentDir='/';
+    updateUI(); return; 
+  }
+  const srv = state.connected || 'localhost';
+  const newPath = resolvePath(state.currentDir, arg);
+  const node = getNode(srv, newPath);
+  if(!node){ print(`Directory not found: ${arg}`,'c-error'); return; }
+  if(isFile(node)){ print(`Not a directory: ${arg}`,'c-error'); return; }
+  state.currentDir = newPath;
+  updateUI();
+}
+
+function cmdCat(arg){
+  if(!arg){ print('Usage: cat <filename>','c-error'); return; }
+  const srv = state.connected || 'localhost';
+  const path = resolvePath(state.currentDir, arg);
+  const node = getNode(srv, path);
+  if(!node){ print(`File not found: ${arg}`,'c-error'); return; }
+  if(isDir(node)){ print(`"${arg}" is a directory. Use "ls" to list.`,'c-error'); return; }
+
+  const enc = typeof node==='object' && node.encrypted;
+  const dec = isDecrypted(srv, path);
+
+  if(enc && !dec){
+    print(`[ENCRYPTED - Caesar cipher detected]`, 'c-warning');
+    print('', 'c-default');
+    print(caesarEnc(getContent(node), node.shift), 'c-muted');
+    print('', 'c-default');
+    print(`Use "decrypt ${arg}" to attempt decryption.`, 'c-info');
+  } else {
+    print(getContent(node), 'c-default');
+  }
+}
+
+function cmdScan(){
+  if(state.connected){ print('Disconnect before scanning.','c-error'); return; }
+  addTrace(3);
+  print('Scanning network...', 'c-info');
+  setTimeout(()=>{
+    let found = [];
+    // Always discover nexus-corp on first scan
+    if(!SERVERS['nexus-corp.net'].discovered){
+      SERVERS['nexus-corp.net'].discovered = true;
+      state.discoveredServers.add('nexus-corp.net');
+      found.push('nexus-corp.net (10.0.44.12) - Security: LOW');
+    }
+    // Discover relay if nexus is cracked
+    if(SERVERS['nexus-corp.net'].cracked && !SERVERS['relay.nexus-corp.net'].discovered){
+      SERVERS['relay.nexus-corp.net'].discovered = true;
+      state.discoveredServers.add('relay.nexus-corp.net');
+      found.push('relay.nexus-corp.net (10.0.44.50) - Security: MEDIUM');
+    }
+    // Discover vault if relay is cracked
+    if(SERVERS['relay.nexus-corp.net'].cracked && !SERVERS['vault.nexus-corp.net'].discovered){
+      SERVERS['vault.nexus-corp.net'].discovered = true;
+      state.discoveredServers.add('vault.nexus-corp.net');
+      found.push('vault.nexus-corp.net (10.0.44.99) - Security: HIGH');
+    }
+
+    if(found.length===0){
+      print('Scan complete. No new servers found.', 'c-muted');
+      print('Tip: Crack discovered servers to reveal more of the network.', 'c-muted');
+    } else {
+      print('Scan complete. Servers found:', 'c-success');
+      found.forEach(f=>print('  > '+f, 'c-success'));
+    }
+    checkMissions();
+    updateUI();
+  }, 800);
+}
+
+function cmdConnect(arg){
+  if(!arg){ print('Usage: connect <server>','c-error'); return; }
+  if(state.connected){ print('Already connected. Disconnect first.','c-error'); return; }
+  const srv = SERVERS[arg];
+  if(!srv){ print(`Unknown server: ${arg}`,'c-error'); return; }
+  if(!srv.discovered){ print(`Server "${arg}" not found on network.`,'c-error'); return; }
+  if(arg==='localhost'){ print('You are already on localhost.','c-muted'); return; }
+  if(srv.cracked){
+    state.connected = arg;
+    state.currentDir = '/';
+    addTrace(2);
+    print(`Connected to ${arg} (${srv.ip})`, 'c-success');
+    print('Type "ls" to explore.', 'c-muted');
+    updateUI();
+  } else {
+    state.connected = arg;
+    state.currentDir = '/';
+    addTrace(5);
+    print(`Connecting to ${arg} (${srv.ip})...`, 'c-info');
+    print(`Access denied. Authentication required.`, 'c-warning');
+    print(`Type "crack" to attempt password breach.`, 'c-info');
+    print(`Type "disconnect" to abort.`, 'c-muted');
+    updateUI();
+  }
+}
+
+function cmdDisconnect(){
+  if(!state.connected){ print('Not connected to any remote server.','c-error'); return; }
+  print(`Disconnected from ${state.connected}.`, 'c-info');
+  state.connected = null;
+  state.currentDir = '/home/ghost';
+  updateUI();
+  checkMissions();
+}
+
+function cmdCrack(){
+  if(!state.connected){ print('Not connected to a remote server.','c-error'); return; }
+  const srv = SERVERS[state.connected];
+  if(srv.cracked){ print('Server already accessed. You\'re in.','c-muted'); return; }
+  startCrackGame(state.connected);
+}
+
+function cmdDecrypt(arg){
+  if(!arg){ print('Usage: decrypt <filename>','c-error'); return; }
+  const srv = state.connected || 'localhost';
+  const path = resolvePath(state.currentDir, arg);
+  const node = getNode(srv, path);
+  if(!node){ print(`File not found: ${arg}`,'c-error'); return; }
+  if(isDir(node)){ print(`Cannot decrypt a directory.`,'c-error'); return; }
+  if(typeof node!=='object' || !node.encrypted){ print(`File is not encrypted.`,'c-muted'); return; }
+  if(isDecrypted(srv, path)){ print(`File already decrypted.`,'c-muted'); return; }
+  startDecryptGame(arg, path, node);
+}
+
+function cmdDownload(arg){
+  if(!arg){ print('Usage: download <filename>','c-error'); return; }
+  if(!state.connected){ print('Connect to a remote server first.','c-error'); return; }
+  const srv = state.connected;
+  const path = resolvePath(state.currentDir, arg);
+  const node = getNode(srv, path);
+  if(!node){ print(`File not found: ${arg}`,'c-error'); return; }
+  if(isDir(node)){ print(`Cannot download a directory.`,'c-error'); return; }
+
+  const enc = typeof node==='object' && node.encrypted && !isDecrypted(srv, path);
+  if(enc){ print(`File is encrypted. Decrypt it first.`,'c-warning'); return; }
+
+  const fname = path.split('/').pop();
+  if(state.downloaded.includes(fname)){ print(`File already downloaded.`,'c-muted'); return; }
+
+  // Add to local downloads
+  const localDL = getNode('localhost', '/home/ghost/downloads');
+  if(localDL) localDL[fname] = getContent(node);
+
+  state.downloaded.push(fname);
+  state.downloadCount++;
+  const classified = typeof node==='object' && node.classified;
+  addTrace(classified ? 8 : 2);
+  addCredits(classified ? 100 : 30);
+
+  print(`Downloaded: ${fname}`, 'c-success');
+  if(classified) print(`[CLASSIFIED FILE - Trace increased significantly]`, 'c-warning');
+  print(`Saved to /home/ghost/downloads/`, 'c-muted');
+
+  checkMissions();
+  updateUI();
+}
+
+function cmdAnalyze(){
+  if(!state.connected){ print('Connect to a remote server first.','c-error'); return; }
+  const srv = SERVERS[state.connected];
+  if(srv.cracked){ print('Server already accessed.','c-muted'); return; }
+  addTrace(5);
+  print(`Analyzing ${state.connected}...`, 'c-info');
+  print(`Security level: ${srv.security}/3`, 'c-default');
+  print(`Password length: ${srv.pwdLen} characters`, 'c-default');
+  print(`Max attempts: ${srv.maxAttempts}`, 'c-default');
+
+  if(state.connected==='nexus-corp.net'){
+    print(`Hint: Check /etc/shadow for clues.`, 'c-accent');
+  } else if(state.connected==='relay.nexus-corp.net'){
+    print(`Hint: The password hides in darkness.`, 'c-accent');
+  } else if(state.connected==='vault.nexus-corp.net'){
+    print(`Hint: To exploit a system, you must think like one.`, 'c-accent');
+  }
+  print(`[Trace +5]`, 'c-warning');
+}
+
+function cmdStatus(){
+  print('╔═══════════════════════════════╗', 'c-accent');
+  print('║     OPERATIVE STATUS          ║', 'c-accent');
+  print('╠═══════════════════════════════╣', 'c-accent');
+  print(`║  Credits:  ${String(state.credits).padEnd(18)}║`, 'c-default');
+  print(`║  Trace:    ${(state.trace+'/100').padEnd(18)}║`, state.trace>60?'c-error':'c-default');
+  print(`║  Server:   ${(state.connected||'localhost').padEnd(18)}║`, 'c-default');
+  print(`║  Files:    ${String(state.downloadCount).padEnd(18)}║`, 'c-default');
+  print(`║  Missions: ${String(state.completedMissions.length+'/'+MISSIONS.length).padEnd(18)}║`, 'c-default');
+  print('╚═══════════════════════════════╝', 'c-accent');
+}
+
+function cmdMissions(){
+  print('═══ MISSION OBJECTIVES ═══', 'c-accent');
+  MISSIONS.forEach((m,i)=>{
+    const done = state.completedMissions.includes(m.id);
+    const current = i === state.missionIdx;
+    const marker = done ? '[x]' : current ? '[>]' : '[ ]';
+    const cls = done ? 'c-success' : current ? 'c-accent' : 'c-muted';
+    print(`${marker} #${m.id} ${m.name}`, cls);
+    if(current) print(`    ${m.obj}`, 'c-info');
+  });
+}
+
+function cmdShop(){
+  print('═══ SHADOW SHOP ═══', 'c-accent');
+  print(`Credits: ${state.credits}cr\n`, 'c-default');
+  SHOP.forEach(item=>{
+    const owned = !item.consumable && state.inventory.includes(item.id);
+    const cls = owned ? 'c-muted' : 'c-default';
+    print(`  [${item.id}] ${item.name} - ${item.price}cr`, cls);
+    print(`    ${item.desc}${owned?' (OWNED)':''}`, 'c-muted');
+  });
+  print('\nUse "buy <id>" to purchase.', 'c-info');
+}
+
+function cmdBuy(arg){
+  if(!arg){ print('Usage: buy <item_id>','c-error'); return; }
+  const item = SHOP.find(s=>s.id===arg);
+  if(!item){ print(`Item not found: ${arg}`,'c-error'); return; }
+  if(!item.consumable && state.inventory.includes(item.id)){ print('You already own this item.','c-muted'); return; }
+  if(state.credits < item.price){ print('Insufficient credits.','c-error'); return; }
+
+  state.credits -= item.price;
+  if(item.consumable){
+    if(item.id==='trace_wipe'){ state.trace=Math.max(0,state.trace-25); print('Trace wiped: -25','c-success'); }
+    if(item.id==='heavy_wipe'){ state.trace=Math.max(0,state.trace-50); print('Heavy trace wipe: -50','c-success'); }
+  } else {
+    state.inventory.push(item.id);
+    if(item.id==='stealth') state.stealthBought=true;
+    if(item.id==='cracker_v2') state.crackerV2Bought=true;
+    if(item.id==='decryptor') state.decryptorBought=true;
+    print(`Purchased: ${item.name}`, 'c-success');
+  }
+  updateUI();
+}
+
+function cmdMap(){
+  print('═══ NETWORK MAP ═══', 'c-accent');
+  print('');
+  print('    [localhost]', SERVERS['localhost']?'c-success':'c-muted');
+  print('        │', 'c-muted');
+  print('    [nexus-corp.net]', SERVERS['nexus-corp.net'].cracked?'c-success':SERVERS['nexus-corp.net'].discovered?'c-info':'c-muted');
+  print('        │', 'c-muted');
+  print('    [relay.nexus-corp.net]', SERVERS['relay.nexus-corp.net'].cracked?'c-success':SERVERS['relay.nexus-corp.net'].discovered?'c-info':'c-muted');
+  print('        │', 'c-muted');
+  print('    [vault.nexus-corp.net]', SERVERS['vault.nexus-corp.net'].cracked?'c-success':SERVERS['vault.nexus-corp.net'].discovered?'c-info':'c-muted');
+  print('');
+  print('  Legend: ', 'c-muted');
+  print('    <span class="c-success">Accessed</span>  <span class="c-info">Discovered</span>  <span class="c-muted">Unknown</span>', 'c-default');
+  printHTML(`  <span style="color:var(--success)">● Accessed</span>  <span style="color:var(--info)">● Discovered</span>  <span style="color:var(--muted)">● Unknown</span>`);
+}
+
+// --- MINI-GAME: PASSWORD CRACK ---
+
+function startCrackGame(server){
+  const srv = SERVERS[server];
+  const wordLen = srv.pwdLen;
+  let words = [...CRACK_WORDS[wordLen]];
+  const password = words[Math.floor(Math.random()*words.length)];
+
+  // If cracker_v2, eliminate some wrong words
+  let eliminated = [];
+  if(state.crackerV2Bought){
+    const wrongWords = words.filter(w=>w!==password);
+    const toElim = wrongWords.sort(()=>Math.random()-0.5).slice(0,3);
+    eliminated = toElim;
+    words = words.filter(w=>!eliminated.includes(w));
+  }
+
+  state.mode = 'crack';
+  state.crackState = {
+    server, password, words, attemptsLeft: srv.maxAttempts, maxAttempts: srv.maxAttempts, eliminated
+  };
+
+  print('\n╔══════════════════════════════════════╗', 'c-warning');
+  print('║      PASSWORD CRACK INTERFACE        ║', 'c-warning');
+  print('╚══════════════════════════════════════╝', 'c-warning');
+  print(`\nTarget: ${server}`, 'c-info');
+  print(`Attempts: ${'●'.repeat(srv.maxAttempts)} ${srv.maxAttempts}/${srv.maxAttempts}`, 'c-default');
+
+  if(eliminated.length>0){
+    print(`\n[Cracker v2] Eliminated: ${eliminated.join(', ')}`, 'c-success');
+  }
+
+  print('\nSelect a word to guess the password:', 'c-default');
+  print('─'.repeat(40), 'c-muted');
+
+  // Display words in columns with hex addresses
+  const hexChars = '0123456789ABCDEF';
+  words.forEach((w,i)=>{
+    const addr = '0x'+hexChars[Math.floor(Math.random()*16)]+hexChars[Math.floor(Math.random()*16)]
+      +hexChars[Math.floor(Math.random()*16)]+hexChars[Math.floor(Math.random()*16)];
+    const padded = w.padEnd(10);
+    printHTML(`  <span class="c-muted">${addr}:</span> <span class="c-highlight">${padded}</span>${(i%3===2)?'':''}`);
+  });
+
+  print('─'.repeat(40), 'c-muted');
+  print('Type a word to guess. Type "exit" to abort.\n', 'c-info');
+}
+
+function handleCrackInput(input){
+  const cs = state.crackState;
+  if(!cs) return;
+  const word = input.toUpperCase().trim();
+
+  if(word==='EXIT'){
+    state.mode='normal';
+    state.crackState=null;
+    print('Crack aborted. Disconnected from server.','c-warning');
+    state.connected=null;
+    state.currentDir='/home/ghost';
+    updateUI();
+    return;
+  }
+
+  if(!cs.words.includes(word)){
+    print(`"${input}" is not a valid option. Pick from the list.`,'c-error');
+    return;
+  }
+
+  if(word===cs.password){
+    // Success!
+    SERVERS[cs.server].cracked = true;
+    state.crackedServers.add(cs.server);
+    addCredits(150);
+    state.mode='normal';
+    state.crackState=null;
+    print(`\n★ PASSWORD CRACKED: ${cs.password} ★`, 'c-success');
+    print(`Access granted to ${cs.server}!`, 'c-success');
+    print(`[+150cr]`, 'c-accent');
+    checkMissions();
+    updateUI();
+    return;
+  }
+
+  // Wrong guess - calculate likeness
+  cs.attemptsLeft--;
+  let likeness = 0;
+  for(let i=0;i<word.length;i++){
+    if(word[i]===cs.password[i]) likeness++;
+  }
+
+  print(`> ${word}`, 'c-highlight');
+  print(`  Likeness: ${likeness}/${word.length} letters in correct position`, likeness>0?'c-warning':'c-error');
+  print(`  Attempts remaining: ${'●'.repeat(cs.attemptsLeft)}${'○'.repeat(cs.maxAttempts-cs.attemptsLeft)} ${cs.attemptsLeft}/${cs.maxAttempts}\n`, cs.attemptsLeft<=1?'c-error':'c-default');
+
+  if(cs.attemptsLeft<=0){
+    // Failed!
+    state.mode='normal';
+    state.crackState=null;
+    addTrace(10);
+    print(`CRACK FAILED. Lockout triggered.`, 'c-error');
+    print(`Trace increased significantly. Disconnected.`, 'c-error');
+    state.connected=null;
+    state.currentDir='/home/ghost';
+    checkMissions();
+    updateUI();
+  }
+}
+
+// --- MINI-GAME: DECRYPTION ---
+
+function startDecryptGame(filename, path, node){
+  state.mode = 'decrypt';
+  state.decryptState = {
+    filename, path, shift: node.shift, attemptsLeft:3,
+    content: node.content, server: state.connected||'localhost'
+  };
+
+  const encText = caesarEnc(node.content, node.shift);
+  const preview = encText.substring(0, 120) + (encText.length>120?'...':'');
+
+  print('\n╔══════════════════════════════════════╗', 'c-warning');
+  print('║       DECRYPTION INTERFACE           ║', 'c-warning');
+  print('╚══════════════════════════════════════╝', 'c-warning');
+  print(`\nFile: ${filename}`, 'c-info');
+  print(`Cipher: Caesar (shift unknown)`, 'c-info');
+  print(`Attempts: ${3}/3\n`, 'c-default');
+  print('Encrypted preview:', 'c-muted');
+  print('─'.repeat(40), 'c-muted');
+  print(preview, 'c-muted');
+  print('─'.repeat(40), 'c-muted');
+
+  if(state.decryptorBought){
+    // Reveal 3 letter positions
+    const real = node.content;
+    const letters = [];
+    for(let i=0;i<Math.min(real.length,3);i++){
+      if(real[i]!==' '&&real[i]!=='\n'){
+        letters.push(`Position ${i+1}: "${real[i]}"`);
+      }
+    }
+    if(letters.length>0){
+      print(`\n[Decryptor v2] Hints: ${letters.join(', ')}`, 'c-success');
+    }
+  }
+
+  print('\nCommands:', 'c-default');
+  print('  try <shift>     Preview with shift (no penalty)', 'c-info');
+  print('  submit <shift>  Submit answer (-1 attempt if wrong)', 'c-info');
+  print('  hint            Get a hint (+3 trace)', 'c-info');
+  print('  exit            Abort decryption\n', 'c-muted');
+}
+
+function handleDecryptInput(input){
+  const ds = state.decryptState;
+  if(!ds) return;
+  const parts = input.trim().split(/\s+/);
+  const cmd = parts[0].toLowerCase();
+
+  if(cmd==='exit'){
+    state.mode='normal';
+    state.decryptState=null;
+    print('Decryption aborted.','c-warning');
+    return;
+  }
+
+  if(cmd==='hint'){
+    addTrace(3);
+    // Give a useful hint about the shift
+    const s = ds.shift;
+    const hints = [
+      `The shift is ${s%2===0?'even':'odd'}.`,
+      `The shift is ${s<=6?'between 1-6':s<=10?'between 7-10':'between 11-25'}.`,
+      `Try subtracting each letter position from the encrypted text by the same number.`,
+      `The first word decrypted starts with "${ds.content[0]}".`,
+      `The shift is ${s<=13?'at most 13':'greater than 13'}.`
+    ];
+    // Pick a hint that's somewhat helpful but not too obvious
+    const hintIdx = Math.floor(Math.random()*hints.length);
+    print(`Hint: ${hints[hintIdx]}`, 'c-accent');
+    print(`[Trace +3]`, 'c-warning');
+    return;
+  }
+
+  if(cmd==='try'){
+    const shift = parseInt(parts[1]);
+    if(isNaN(shift)||shift<0||shift>25){
+      print('Invalid shift. Use a number 0-25.','c-error');
+      return;
+    }
+    // Decrypt with the given shift (to reverse Caesar, shift by 26-shift)
+    const decrypted = caesarEnc(ds.content, 26-shift);
+    const preview = decrypted.substring(0,150)+(decrypted.length>150?'...':'');
+    print(`\nShift ${shift} preview:`, 'c-info');
+    print('─'.repeat(40), 'c-muted');
+    print(preview, 'c-default');
+    print('─'.repeat(40), 'c-muted');
+    print('(This is a preview. Use "submit" if it looks correct.)\n', 'c-muted');
+    return;
+  }
+
+  if(cmd==='submit'){
+    const shift = parseInt(parts[1]);
+    if(isNaN(shift)||shift<0||shift>25){
+      print('Invalid shift. Use a number 0-25.','c-error');
+      return;
+    }
+    if(shift===ds.shift){
+      // Correct!
+      const fid = getFileId(ds.server, ds.path);
+      state.decrypted.push(fid);
+      addTrace(5);
+      addCredits(50);
+      state.mode='normal';
+      state.decryptState=null;
+      print(`\n★ DECRYPTION SUCCESSFUL ★`, 'c-success');
+      print(`File "${ds.filename}" has been decrypted!`, 'c-success');
+      print(`Use "cat ${ds.filename}" to read it.`, 'c-info');
+      print(`[+50cr]`, 'c-accent');
+      checkMissions();
+      updateUI();
+    } else {
+      ds.attemptsLeft--;
+      print(`Incorrect shift. Attempts remaining: ${ds.attemptsLeft}`, 'c-error');
+      if(ds.attemptsLeft<=0){
+        state.mode='normal';
+        state.decryptState=null;
+        addTrace(8);
+        print(`Decryption failed. File remains encrypted.`, 'c-error');
+        print(`[Trace +8]`, 'c-warning');
+        updateUI();
+      }
+    }
+    return;
+  }
+
+  print('Unknown command. Use: try <shift>, submit <shift>, hint, or exit.','c-error');
+}
+
+// --- GAME END STATES ---
+
+function gameOver(){
+  state.gameEnded = true;
+  state.mode = 'normal';
+  print('\n╔══════════════════════════════════════╗', 'c-error');
+  print('║       CONNECTION TERMINATED          ║', 'c-error');
+  print('╠══════════════════════════════════════╣', 'c-error');
+  print('║                                      ║', 'c-error');
+  print('║  Your trace level reached maximum.   ║', 'c-error');
+  print('║  Counter-cyber units triangulated    ║', 'c-error');
+  print('║  your position. Emergency disconnect ║', 'c-error');
+  print('║  initiated too late.                 ║', 'c-error');
+  print('║                                      ║', 'c-error');
+  print('║  VEGA: "We\'ve been burned. Go dark.  ║', 'c-error');
+  print('║  I\'ll try to extract you... maybe."  ║', 'c-error');
+  print('║                                      ║', 'c-error');
+  print('║  Type "restart" to try again.        ║', 'c-error');
+  print('╚══════════════════════════════════════╝\n', 'c-error');
+}
+
+function gameWin(){
+  state.gameEnded = true;
+  print('\n╔════════════════════════════════════════════╗', 'c-success');
+  print('║          MISSION COMPLETE                  ║', 'c-success');
+  print('╠════════════════════════════════════════════╣', 'c-success');
+  print('║                                            ║', 'c-success');
+  print('║  You\'ve exposed Project HELIOS.            ║', 'c-success');
+  print('║  The evidence has been leaked worldwide.   ║', 'c-success');
+  print('║  Nexus Corp stock has crashed.             ║', 'c-success');
+  print('║  Criminal investigations in 4 countries.   ║', 'c-success');
+  print('║                                            ║', 'c-success');
+  print(`║  Missions: ${String(state.completedMissions.length+'/'+MISSIONS.length).padEnd(33)}║`, 'c-default');
+  print(`║  Credits:  ${String(state.credits+'cr').padEnd(33)}║`, 'c-default');
+  print(`║  Trace:    ${String(state.trace+'/100').padEnd(33)}║`, 'c-default');
+  print('║                                            ║', 'c-success');
+  print('║  VEGA: "Outstanding work, operator.        ║', 'c-accent');
+  print('║  Payment transferred. Until next time."    ║', 'c-accent');
+  print('║                                            ║', 'c-success');
+  print('║  Type "restart" to play again.             ║', 'c-muted');
+  print('╚════════════════════════════════════════════╝\n', 'c-success');
+}
+
+function restartGame(){
+  // Reset all state
+  state.connected=null;
+  state.currentDir='/home/ghost';
+  state.trace=0;
+  state.credits=500;
+  state.inventory=['cracker_v1'];
+  state.downloaded=[];
+  state.decrypted=[];
+  state.missionIdx=0;
+  state.completedMissions=[];
+  state.mode='normal';
+  state.crackState=null;
+  state.decryptState=null;
+  state.gameEnded=false;
+  state.stealthBought=false;
+  state.crackerV2Bought=false;
+  state.decryptorBought=false;
+  state.discoveredServers=new Set(['localhost']);
+  state.crackedServers=new Set(['localhost']);
+  state.downloadCount=0;
+
+  // Reset servers
+  Object.keys(SERVERS).forEach(k=>{
+    if(k!=='localhost'){
+      SERVERS[k].cracked=false;
+      SERVERS[k].discovered=false;
+    }
+  });
+
+  // Reset file system downloads
+  const dl = getNode('localhost','/home/ghost/downloads');
+  if(dl) Object.keys(dl).forEach(k=>delete dl[k]);
+
+  clearTerm();
+  updateUI();
+  print('System reset. Welcome back, operator.','c-success');
+  print('Type "missions" to view objectives.\n','c-info');
+}
+
+// --- BOOT SEQUENCE ---
+
+async function bootSequence(){
+  const lines = [
+    {t:'[SHADOW.NET v2.4.1] Initializing...',c:'c-muted',d:300},
+    {t:'[OK] Loading kernel modules',c:'c-success',d:200},
+    {t:'[OK] Establishing encrypted tunnel',c:'c-success',d:350},
+    {t:'[OK] Connecting to darknet relay',c:'c-success',d:300},
+    {t:'[OK] Identity spoofed: ghost@shadow.net',c:'c-success',d:200},
+    {t:'[OK] Trace countermeasures: ACTIVE',c:'c-info',d:200},
+    {t:'',c:'c-default',d:80},
+    {t:'╔═══════════════════════════════╗',c:'c-accent',d:30},
+    {t:'║      S H A D O W . N E T     ║',c:'c-accent',d:30},
+    {t:'║     ─────────────────────     ║',c:'c-accent',d:30},
+    {t:'║    Corporate Infiltration     ║',c:'c-accent',d:30},
+    {t:'║         Terminal v2.4.1       ║',c:'c-accent',d:30},
+    {t:'╚═══════════════════════════════╝',c:'c-accent',d:30},
+    {t:'',c:'c-default',d:80},
+    {t:'Welcome, operator.',c:'c-default',d:300},
+    {t:'Type "help" for available commands.',c:'c-muted',d:100},
+    {t:'Type "missions" to view your objectives.',c:'c-muted',d:100},
+    {t:'',c:'c-default',d:80},
+    {t:'VEGA says: "We\'ve got a job. Nexus Corp is hiding',c:'c-info',d:200},
+    {t:'something big. Start by scanning the network.',c:'c-info',d:200},
+    {t:'Find their servers. Good luck."\\n',c:'c-info',d:200}
+  ];
+
+  for(const line of lines){
+    await delay(line.d);
+    print(line.t, line.c);
+  }
+
+  state.booted = true;
+  updateUI();
+  inputEl.focus();
+}
+
+// --- INPUT HANDLING ---
+
+inputEl.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    const val = inputEl.value;
+    inputEl.value = '';
+    processCmd(val);
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    if(cmdHistory.length>0 && histIdx<cmdHistory.length-1){
+      histIdx++;
+      inputEl.value = cmdHistory[cmdHistory.length-1-histIdx];
+    }
+  } else if(e.key==='ArrowDown'){
+    e.preventDefault();
+    if(histIdx>0){
+      histIdx--;
+      inputEl.value = cmdHistory[cmdHistory.length-1-histIdx];
+    } else {
+      histIdx=-1;
+      inputEl.value='';
+    }
+  } else if(e.key==='Tab'){
+    e.preventDefault();
+    tabComplete();
+  }
+});
+
+// Keep focus on input
+document.addEventListener('click', ()=>{
+  if(!state.gameEnded || true) inputEl.focus();
+});
+
+function tabComplete(){
+  const val = inputEl.value.trim();
+  const parts = val.split(/\s+/);
+
+  if(parts.length<=1){
+    const cmds = ['help','ls','cd','cat','clear','scan','connect','disconnect','crack','decrypt','download','analyze','status','missions','trace','shop','buy','whoami','map','exit'];
+    const match = cmds.find(c=>c.startsWith(parts[0]));
+    if(match) inputEl.value = match+' ';
+  } else if(parts.length===2){
+    const cmd = parts[0].toLowerCase();
+    if(['cd','cat','download','decrypt','read','type'].includes(cmd)){
+      const srv = state.connected||'localhost';
+      const node = getNode(srv, state.currentDir);
+      if(node && isDir(node)){
+        const entries = Object.keys(node);
+        const match = entries.find(e=>e.toLowerCase().startsWith(parts[1].toLowerCase()));
+        if(match) inputEl.value = cmd+' '+match;
+      }
+    } else if(cmd==='connect'){
+      const discovered = Object.keys(SERVERS).filter(s=>SERVERS[s].discovered && s!=='localhost');
+      const match = discovered.find(s=>s.startsWith(parts[1]));
+      if(match) inputEl.value = cmd+' '+match;
+    } else if(cmd==='buy'){
+      const ids = SHOP.map(s=>s.id);
+      const match = ids.find(s=>s.startsWith(parts[1]));
+      if(match) inputEl.value = cmd+' '+match;
+    }
+  }
+}
+
+// --- GLITCH EFFECT (random chars at high trace) ---
+
+setInterval(()=>{
+  if(state.trace > 75 && !state.gameEnded && Math.random()<0.15){
+    const glitchChars = '!@#$%^&*()_+{}|:<>?~`-=[]\\;\',./0123456789';
+    const len = Math.floor(Math.random()*8)+2;
+    let txt = '';
+    for(let i=0;i<len;i++) txt+=glitchChars[Math.floor(Math.random()*glitchChars.length)];
+    const span = document.createElement('span');
+    span.className = 'line c-error';
+    span.style.opacity = '0.3';
+    span.style.fontSize = '10px';
+    span.textContent = txt;
+    output.appendChild(span);
+    output.appendChild(document.createTextNode('\n'));
+    // Remove after 2 seconds
+    setTimeout(()=>{ span.remove(); }, 2000);
+  }
+}, 1000);
+
+// --- INIT ---
+
+updateUI();
+bootSequence();
+
+</script>
+</body>
+</html>

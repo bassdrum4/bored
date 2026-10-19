@@ -8,7 +8,10 @@ const puppeteer = require('puppeteer-core');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const source = html.match(/<script>([\s\S]*)<\/script>/)[1];
+const builtSource = html.match(/<script>([\s\S]*)<\/script>/)[1];
+const source = ['src/main.js', 'src/games/arcade.js', 'src/daily.js', 'src/games/catalog.js']
+  .map(file => fs.readFileSync(path.join(root, file), 'utf8'))
+  .join('\n');
 const url = pathToFileURL(path.join(root, 'index.html')).href;
 let browser, page;
 const errors = [], requests = [];
@@ -64,7 +67,7 @@ test('F-14 points to its GitHub Pages build', () => {
 });
 
 test('all hub JavaScript parses', () => {
-  assert.doesNotThrow(() => new vm.Script(source));
+  assert.doesNotThrow(() => new vm.Script(builtSource));
   const context = rules(['arcadeGame', 'nativeHTML']);
   for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
     const game = context.nativeHTML(slug);
@@ -76,7 +79,7 @@ test('all hub JavaScript parses', () => {
 function challengeRules() {
   const start = source.indexOf('const CHALLENGES = [');
   const end = source.indexOf('function dailyChallenge', start);
-  const context = rules(['dailyDate', 'dailyChallenge', 'dailyCheck'], source.slice(start, end));
+  const context = rules(['dailyDate', 'dailyChallenge', 'dailyCheck'], source.slice(start, end).replace(/export\s+$/, ''));
   return context;
 }
 function dateFor(slug) {

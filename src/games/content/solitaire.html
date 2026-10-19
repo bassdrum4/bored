@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
+var m={};
+function k(i){return Object.keys(m)[i]||null}
+var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
+setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
+clear:function(){m={}},key:k};
+Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
+try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
+})();</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solitaire — Classic Klondike</title>
+<meta name="description" content="Classic Klondike solitaire. Draw three, undo, timer and score.">
+<meta name="color-scheme" content="dark">
+<style>
+/* ============================================================
+   Solitaire — Classic Klondike. Single file. No dependencies.
+   ============================================================ */
+*,*::before,*::after{box-sizing:border-box}
+
+:root{
+  --canvas:#17352D;
+  --table:#23483D;
+  --table-light:#2B5648;
+  --table-deep:#356553;
+  --card:#F4F1E9;
+  --card-alt:#E9E6DD;
+  --ink:#17211D;
+  --ink-inverse:#F4F1E9;
+  --voltage:#E4B447;
+  --voltage-hi:#EDC264;
+  --danger:#D77A68;
+  --hairline:rgba(244,241,233,0.22);
+  --card-border:rgba(23,33,29,0.16);
+  --card-shadow:1px 3px 8px rgba(0,0,0,0.20);
+  --sans:'DM Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --serif:'Fraunces',Georgia,'Times New Roman',serif;
+  --gap:clamp(8px,1.4vw,22px);
+  --pad:clamp(12px,2.2vw,32px);
+  --rail:72px;
+  --card-w:104px;
+  --card-h:calc(var(--card-w) * 1.42);
+}
+
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--canvas);
+  color:var(--ink-inverse);
+  font-family:var(--sans);
+  font-size:14px;
+  line-height:1.45;
+  overflow:hidden;
+  overscroll-behavior:none;
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+}
+
+.sprite-sheet{position:absolute;width:0;height:0;overflow:hidden}
+
+.app{
+  height:100vh;
+  height:100dvh;
+  display:flex;
+  flex-direction:column;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+
+/* ---------- Top rail ---------- */
+.rail{
+  height:var(--rail);
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+  gap:16px;
+  padding:0 var(--pad);
+}
+.brand{display:flex;flex-direction:column;gap:3px;min-width:0}
+.brand h1{
+  font-family:var(--serif);
+  font-size:28px;font-weight:500;line-height:1;margin:0;
+  color:var(--ink-inverse);letter-spacing:.01em;
+}
+.brand .sub{
+  font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(244,241,233,0.58);
+}
+.stats{display:flex;gap:10px;justify-content:center;align-items:stretch}
+.stat{
+  min-width:72px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:6px 12px;border:1px solid var(--hairline);border-radius:6px;
+}
+.stat .k{
+  font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(244,241,233,0.58);line-height:1;
+}
+.stat .v{font-size:16px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.actions{display:flex;gap:8px;justify-content:flex-end;align-items:center}
+
+.icon-btn{
+  width:40px;height:40px;min-width:40px;
+  display:grid;place-items:center;
+  border:1px solid transparent;border-radius:6px;
+  background:transparent;color:var(--ink-inverse);
+  cursor:pointer;padding:0;
+  transition:background 120ms ease,border-color 120ms ease,opacity 120ms ease;
+}
+.icon-btn:hover{background:rgba(244,241,233,0.08);border-color:var(--voltage)}
+.icon-btn:active{background:var(--table-deep)}
+.icon-btn svg{width:20px;height:20px;display:block}
+.icon-btn[disabled]{opacity:.38;cursor:default}
+.icon-btn[disabled]:hover{background:transparent;border-color:transparent}
+
+/* ---------- Table surface ---------- */
+.table{
+  position:relative;
+  flex:1 1 auto;
+  min-height:0;
+  margin:var(--pad);
+  background:var(--table);
+  border-radius:12px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.18),inset 0 1px 0 rgba(244,241,233,0.12);
+  padding:var(--pad);
+  display:flex;flex-direction:column;
+  gap:24px;
+  overflow:hidden;
+  touch-action:none;
+  -webkit-user-select:none;user-select:none;
+}
+
+.top-zone{
+  flex:0 0 auto;display:flex;justify-content:space-between;align-items:flex-start;
+  gap:var(--gap);height:var(--card-h);
+}
+.stock-area{display:flex;gap:var(--gap)}
+.foundations{display:flex;gap:var(--gap)}
+.tableau{flex:1 1 auto;min-height:0;display:flex;gap:var(--gap);align-items:stretch}
+
+.pile{position:relative;width:var(--card-w);height:100%;border-radius:12px;flex:0 0 auto}
+.top-zone .pile{height:var(--card-h)}
+
+.slot{
+  position:absolute;inset:0;
+  border:1px solid rgba(244,241,233,0.24);
+  border-radius:12px;
+  display:grid;place-items:center;
+  color:rgba(244,241,233,0.24);
+  box-shadow:0 1px 0 rgba(0,0,0,0.2);
+  z-index:0;
+  transition:border-color 120ms ease,background 120ms ease;
+}
+.pile.drop-hot .slot{border-color:rgba(228,180,71,0.5);background:rgba(228,180,71,0.07)}
+.slot .glyph{width:26px;height:26px;display:block}
+.slot .glyph.ring{width:20px;height:20px;opacity:.9}
+.slot .glyph.deck{width:30px;height:30px;transform:rotate(12deg);opacity:.85}
+.pile.is-empty .g-deck{display:none}
+.pile:not(.is-empty) .g-recycle{display:none}
+
+.count{
+  position:absolute;right:5px;bottom:5px;z-index:60;
+  background:rgba(23,33,29,0.55);color:#F4F1E9;
+  padding:1px 6px;border-radius:4px;
+  font-size:11px;font-weight:600;line-height:1.5;
+  font-variant-numeric:tabular-nums;pointer-events:none;
+}
+.pile.is-empty .count{display:none}
+
+/* ---------- Cards ---------- */
+.card{
+  position:absolute;left:0;top:0;
+  width:var(--card-w);height:var(--card-h);
+  border-radius:8px;overflow:hidden;
+  background:var(--card);
+  border:1px solid var(--card-border);
+  box-shadow:var(--card-shadow);
+  color:var(--ink);
+  cursor:default;
+  transform-origin:50% 50%;
+  -webkit-user-select:none;user-select:none;
+}
+.card.red{color:#B52C35}
+.card.black{color:#17211D}
+.card.playable{cursor:pointer}
+.card.down{background:var(--card-alt)}
+.card.ghost{visibility:hidden;pointer-events:none}
+.card.dragging{visibility:hidden}
+.card.sel{
+  outline:2px solid var(--voltage);outline-offset:-1px;
+  box-shadow:0 4px 14px rgba(0,0,0,0.22);
+  translate:0 -3px;
+  z-index:40 !important;
+}
+.card:focus-visible{outline:2px solid var(--voltage);outline-offset:3px}
+.card.invalid{box-shadow:0 0 0 2px rgba(215,122,104,0.28),var(--card-shadow)}
+
+.card-back{
+  position:absolute;inset:0;
+  background:
+    repeating-linear-gradient(45deg,rgba(93,139,115,0.35) 0 1px,transparent 1px 8px),
+    repeating-linear-gradient(-45deg,rgba(93,139,115,0.35) 0 1px,transparent 1px 8px),
+    var(--card-alt);
+}
+.card-back::after{content:"";position:absolute;inset:3px;border:1px solid #B9C8BA;border-radius:5px}
+.card-face{position:absolute;inset:0}
+.card.up .card-back{display:none}
+.card.down .card-face{display:none}
+
+.corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:1;gap:1px}
+.corner.tl{top:6px;left:6px}
+.corner.br{bottom:6px;right:6px;transform:rotate(180deg)}
+.corner .rank{
+  font-family:var(--serif);
+  font-size:clamp(15px,calc(var(--card-w) * 0.185),21px);
+  font-weight:500;line-height:1;
+}
+.pip{width:11px;height:11px;display:block;fill:currentColor}
+.card .center{position:absolute;inset:0;display:grid;place-items:center;opacity:.92}
+.card .center .pip{width:calc(var(--card-w) * 0.42);height:calc(var(--card-w) * 0.42)}
+
+/* ---------- Toast ---------- */
+.toast{
+  position:absolute;left:50%;top:10px;transform:translateX(-50%);
+  background:var(--table-deep);border:1px solid var(--hairline);
+  color:var(--ink-inverse);padding:7px 14px;border-radius:6px;
+  font-size:13px;font-weight:500;
+  opacity:0;transition:opacity 180ms ease;
+  pointer-events:none;z-index:70;white-space:nowrap;
+}
+.toast.show{opacity:1}
+
+/* ---------- Layers ---------- */
+.drag-layer{position:fixed;inset:0;pointer-events:none;z-index:90}
+.drag-ghost{position:absolute;left:0;top:0;will-change:transform}
+.drag-ghost .card{position:absolute;left:0;top:0}
+
+/* ---------- Modals ---------- */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(23,33,29,0.64);
+  display:grid;place-items:center;padding:20px;z-index:120;
+}
+.modal-backdrop[hidden]{display:none !important}
+.modal{
+  position:relative;width:100%;max-width:420px;
+  background:var(--card);color:var(--ink);
+  border-radius:8px;padding:28px;
+  box-shadow:0 24px 80px rgba(0,0,0,0.32);
+}
+.modal h2{font-family:var(--serif);font-size:32px;font-weight:500;line-height:1.1;margin:0 0 6px}
+.modal .lead{margin:0;color:rgba(23,33,29,0.72);font-size:15px}
+.modal-close{position:absolute;top:12px;right:12px;color:var(--ink)}
+.modal-close:hover{background:rgba(23,33,29,0.07);border-color:var(--voltage)}
+.rules{list-style:none;margin:22px 0 0;padding:0;display:flex;flex-direction:column;gap:13px}
+.rules li{display:flex;gap:13px;align-items:flex-start;font-size:15px;line-height:1.45}
+.rules .n{
+  font-family:var(--serif);font-size:15px;font-weight:600;
+  width:22px;height:22px;flex:0 0 22px;
+  border:1px solid rgba(23,33,29,0.22);border-radius:50%;
+  display:grid;place-items:center;line-height:1;
+}
+.modal-actions{display:flex;align-items:center;gap:10px;margin-top:26px}
+.btn-primary{
+  background:var(--voltage);color:var(--ink);
+  border:none;border-radius:4px;padding:12px 20px;min-height:44px;
+  font-family:var(--sans);font-size:16px;font-weight:600;line-height:1;
+  cursor:pointer;transition:background 120ms ease;
+}
+.btn-primary:hover{background:var(--voltage-hi)}
+.btn-text{
+  background:transparent;border:none;color:rgba(23,33,29,0.7);
+  padding:12px 14px;min-height:44px;border-radius:4px;
+  font-family:var(--sans);font-size:16px;font-weight:600;line-height:1;cursor:pointer;
+}
+.btn-text:hover{background:rgba(23,33,29,0.07)}
+
+.win-stats{display:flex;gap:10px;margin:24px 0 0}
+.win-stats .cell{flex:1;border:1px solid rgba(23,33,29,0.2);border-radius:6px;padding:12px 8px;text-align:center}
+.win-stats .k{
+  display:block;font-size:11px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:rgba(23,33,29,0.55);
+}
+.win-stats .v{display:block;margin-top:4px;font-size:20px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+
+:where(button,.card,.pile):focus-visible{outline:2px solid var(--voltage);outline-offset:3px}
+
+/* ---------- Responsive ---------- */
+@media (max-width:1199px){
+  :root{--rail:64px}
+  .brand h1{font-size:24px}
+  .brand .sub{display:none}
+  .stat-status{display:none}
+}
+@media (max-width:820px){ .stat-score{display:none} }
+@media (max-width:699px){
+  :root{--rail:68px}
+  .rail{
+    height:auto;min-height:68px;
+    grid-template-columns:1fr auto;
+    grid-template-areas:"brand actions" "stats stats";
+    row-gap:8px;padding-top:10px;padding-bottom:10px;
+  }
+  .brand{grid-area:brand}
+  .actions{grid-area:actions}
+  .stats{grid-area:stats;justify-content:flex-start;gap:8px}
+  .stat{min-width:64px;padding:5px 10px}
+  .stat .v{font-size:15px}
+  .table{gap:18px}
+  .icon-btn{width:44px;height:44px}
+}
+@media (max-width:419px){
+  .corner .rank{font-size:15px}
+  .icon-btn{width:38px;height:38px}
+  .modal{padding:22px}
+  .modal h2{font-size:26px}
+}
+@media (max-height:520px){ .brand .sub{display:none} }
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ SVG sprite sheet ============ -->
+<svg class="sprite-sheet" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="suit-spades" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 2 C12 2 3.5 9.5 3.5 13.9 C3.5 16.7 5.6 18.7 8.2 18.7 C10 18.7 11.3 17.7 12 16.1 C12.7 17.7 14 18.7 15.8 18.7 C18.4 18.7 20.5 16.7 20.5 13.9 C20.5 9.5 12 2 12 2 Z"/>
+    <path fill="currentColor" d="M11.2 17.1 C11.2 19.3 10.4 21 9 22 L15 22 C13.6 21 12.8 19.3 12.8 17.1 Z"/>
+  </symbol>
+  <symbol id="suit-hearts" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 21 C12 21 3 15 3 9.8 C3 7 5.1 5 7.7 5 C9.5 5 11.1 6 12 7.6 C12.9 6 14.5 5 16.3 5 C18.9 5 21 7 21 9.8 C21 15 12 21 12 21 Z"/>
+  </symbol>
+  <symbol id="suit-diamonds" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 1.8 L20.2 12 L12 22.2 L3.8 12 Z"/>
+  </symbol>
+  <symbol id="suit-clubs" viewBox="0 0 24 24">
+    <circle cx="12" cy="7" r="4.3" fill="currentColor"/>
+    <circle cx="6.3" cy="14.6" r="4.3" fill="currentColor"/>
+    <circle cx="17.7" cy="14.6" r="4.3" fill="currentColor"/>
+    <path fill="currentColor" d="M11 15.4 H13 C13 18.6 14.1 21 15.6 22.6 H8.4 C9.9 21 11 18.6 11 15.4 Z"/>
+  </symbol>
+
+  <symbol id="ic-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8.5 5.5 4 10l4.5 4.5"/><path d="M4 10h9.4a5.5 5.5 0 1 1 0 11H10"/>
+  </symbol>
+  <symbol id="ic-deal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20.4 12a8.4 8.4 0 1 1-2.5-6"/><path d="M20.4 4.2v5.4h-5.4"/>
+  </symbol>
+  <symbol id="ic-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <path d="M9.5 9.3a2.6 2.6 0 1 1 3.3 2.9c-.8.3-1.1.9-1.1 1.7v.4"/>
+    <circle cx="11.7" cy="17.1" r="1" fill="currentColor" stroke="none"/>
+  </symbol>
+  <symbol id="ic-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.5 6.5 17.5 17.5"/><path d="M17.5 6.5 6.5 17.5"/>
+  </symbol>
+  <symbol id="ic-score" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3.2 19.6 12 12 20.8 4.4 12z"/><path d="M4.4 12h15.2"/>
+  </symbol>
+  <symbol id="ic-ring" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+    <circle cx="12" cy="12" r="8.4"/>
+  </symbol>
+  <symbol id="ic-deck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+    <rect x="4.2" y="6.6" width="12.4" height="14.2" rx="2"/>
+    <path d="M7.6 3.4h10a2.2 2.2 0 0 1 2.2 2.2v11.6"/>
+  </symbol>
+  <symbol id="ic-recycle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.4 8.6h10.2a4 4 0 0 1 0 8H8.6"/><path d="M9 5.6 6 8.6l3 3"/><path d="M11.4 19.4 8.4 16.6"/>
+  </symbol>
+</svg>
+
+<div class="app">
+  <!-- ============ Top rail ============ -->
+  <header class="rail">
+    <div class="brand">
+      <h1>Solitaire</h1>
+      <span class="sub">Classic Klondike</span>
+    </div>
+
+    <div class="stats" role="group" aria-label="Game statistics">
+      <div class="stat"><span class="k">Moves</span><span class="v" id="statMoves">0</span></div>
+      <div class="stat"><span class="k">Time</span><span class="v" id="statTime">00:00</span></div>
+      <div class="stat stat-score"><span class="k">Score</span><span class="v" id="statScore">0</span></div>
+      <div class="stat stat-status"><span class="k">Status</span><span class="v" id="statStatus">Ready</span></div>
+    </div>
+
+    <div class="actions">
+      <button class="icon-btn" id="btnScore" aria-label="Show score details" title="Score">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-score"></use></svg>
+      </button>
+      <button class="icon-btn" id="btnUndo" aria-label="Undo last move" title="Undo (U)" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-undo"></use></svg>
+      </button>
+      <button class="icon-btn" id="btnNew" aria-label="Start a new deal" title="New deal (N)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-deal"></use></svg>
+      </button>
+      <button class="icon-btn" id="btnHelp" aria-label="How to play" title="How to play">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-help"></use></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============ Table ============ -->
+  <main class="table" id="table">
+    <div class="top-zone">
+      <div class="stock-area">
+        <div class="pile" id="pileStock" data-zone="stock" data-index="0" tabindex="0" role="group" aria-label="Stock, draw three cards">
+          <div class="slot">
+            <svg class="glyph g-deck" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-deck"></use></svg>
+            <svg class="glyph g-recycle" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-recycle"></use></svg>
+          </div>
+          <div class="count" id="stockCount"></div>
+        </div>
+        <div class="pile" id="pileWaste" data-zone="waste" data-index="0" tabindex="0" role="group" aria-label="Waste pile">
+          <div class="slot"></div>
+        </div>
+      </div>
+      <div class="foundations" id="foundations"></div>
+    </div>
+
+    <div class="tableau" id="tableau"></div>
+    <div class="toast" id="toast" aria-hidden="true"></div>
+  </main>
+</div>
+
+<div class="drag-layer" id="dragLayer" aria-hidden="true"></div>
+<div class="drag-layer" id="winLayer" aria-hidden="true"></div>
+
+<!-- ============ Help modal ============ -->
+<div class="modal-backdrop" id="helpModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <button class="icon-btn modal-close" id="helpClose" aria-label="Close" title="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-close"></use></svg>
+    </button>
+    <h2 id="helpTitle">How to play</h2>
+    <p class="lead">Classic Klondike, draw three.</p>
+    <ol class="rules">
+      <li><span class="n">1</span><span>Build the four foundations from Ace to King by suit.</span></li>
+      <li><span class="n">2</span><span>Build tableau piles in descending order and alternating colors.</span></li>
+      <li><span class="n">3</span><span>Only a King can fill an empty tableau slot.</span></li>
+      <li><span class="n">4</span><span>Draw three cards from the stock. When the stock is empty, recycle the waste.</span></li>
+      <li><span class="n">5</span><span>Click or drag cards to move them. Undo restores the exact previous state.</span></li>
+      <li><span class="n">6</span><span>Win when all four foundations reach the King.</span></li>
+    </ol>
+    <div class="modal-actions">
+      <button class="btn-primary" id="helpNew">New deal</button>
+      <button class="btn-text" id="helpCloseText">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Win modal ============ -->
+<div class="modal-backdrop" id="winModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <h2 id="winTitle">You won.</h2>
+    <p class="lead">A clean game.</p>
+    <div class="win-stats">
+      <div class="cell"><span class="k">Time</span><span class="v" id="winTime">00:00</span></div>
+      <div class="cell"><span class="k">Moves</span><span class="v" id="winMoves">0</span></div>
+      <div class="cell"><span class="k">Score</span><span class="v" id="winScore">0</span></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="winNew">Deal again</button>
+      <button class="btn-text" id="winClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Stats sheet (small screens) ============ -->
+<div class="modal-backdrop" id="statsModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <button class="icon-btn modal-close" id="statsClose" aria-label="Close" title="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-close"></use></svg>
+    </button>
+    <h2 id="statsTitle">Game status</h2>
+    <div class="win-stats">
+      <div class="cell"><span class="k">Time</span><span class="v" id="sheetTime">00:00</span></div>
+      <div class="cell"><span class="k">Moves</span><span class="v" id="sheetMoves">0</span></div>
+      <div class="cell"><span class="k">Score</span><span class="v" id="sheetScore">0</span></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="sheetNew">New deal</button>
+      <button class="btn-text" id="sheetClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="sr-only" id="live" aria-live="polite" aria-atomic="true"></div>
+
+<noscript>
+  <p style="padding:24px;font-family:system-ui,sans-serif;color:#F4F1E9">
+    Solitaire needs JavaScript to deal the cards. Please enable it and reload.
+  </p>
+</noscript>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     0. Utilities
+     ============================================================ */
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $$(sel, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  }
+  function reduceMotion() {
+    try {
+      return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch (err) { return false; }
+  }
+  function randomInt(n) {
+    if (window.crypto && window.crypto.getRandomValues) {
+      var limit = Math.floor(4294967296 / n) * n;
+      var arr = new Uint32Array(1);
+      var x;
+      do { window.crypto.getRandomValues(arr); x = arr[0]; } while (x >= limit);
+      return x % n;
+    }
+    return Math.floor(Math.random() * n);
+  }
+  function fmtTime(ms) {
+    var t = Math.floor(ms / 1000);
+    var m = Math.floor(t / 60), s = t % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  /* closest() that also walks out of SVG subtrees */
+  function up(el, cls) {
+    while (el && el.nodeType === 1) {
+      if (el.classList && el.classList.contains(cls)) return el;
+      el = el.parentNode;
+    }
+    return null;
+  }
+  function safe(fn) {
+    try { fn(); } catch (err) { /* motion must never break play */ }
+  }
+
+  /* ============================================================
+     1. Deck model
+     ============================================================ */
+  var SUITS = ['spades', 'hearts', 'diamonds', 'clubs'];
+  var RED = { hearts: true, diamonds: true };
+  var RANK_LABEL = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  var RANK_NAME = ['', 'Ace', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Jack', 'Queen', 'King'];
+
+  var CARDS = [];
+  var BY_ID = {};
+  (function buildDeck() {
+    for (var s = 0; s < SUITS.length; s++) {
+      for (var r = 1; r <= 13; r++) {
+        var suit = SUITS[s];
+        var card = {
+          id: (suit.charAt(0) + r).toUpperCase(),
+          suit: suit,
+          rank: r,
+          faceUp: false,
+          el: null
+        };
+        CARDS.push(card);
+        BY_ID[card.id] = card;
+      }
+    }
+  })();
+
+  function cardName(c) { return RANK_NAME[c.rank] + ' of ' + c.suit; }
+
+  /* ============================================================
+     2. DOM references
+     ============================================================ */
+  var tableEl = $('#table');
+  var railEl = $('.rail');
+  var appEl = $('.app');
+  var tableauRow = $('#tableau');
+  var foundationsRow = $('#foundations');
+  var stockPile = $('#pileStock');
+  var wastePile = $('#pileWaste');
+  var stockCountEl = $('#stockCount');
+  var toastEl = $('#toast');
+  var liveEl = $('#live');
+  var dragLayer = $('#dragLayer');
+  var winLayer = $('#winLayer');
+
+  var statMoves = $('#statMoves'), statTime = $('#statTime'),
+      statScore = $('#statScore'), statStatus = $('#statStatus');
+  var btnUndo = $('#btnUndo'), btnNew = $('#btnNew'),
+      btnHelp = $('#btnHelp'), btnScore = $('#btnScore');
+
+  var helpModal = $('#helpModal'), winModal = $('#winModal'), statsModal = $('#statsModal');
+
+  var tableauPiles = [], foundationPiles = [];
+
+  /* ============================================================
+     3. Board construction
+     ============================================================ */
+  function pipMarkup(suit) {
+    return '<svg class="pip" viewBox="0 0 24 24" aria-hidden="true"><use href="#suit-' + suit + '"></use></svg>';
+  }
+
+  function buildCardEl(c) {
+    var e = document.createElement('div');
+    e.className = 'card ' + (RED[c.suit] ? 'red' : 'black') + ' down';
+    e.setAttribute('data-id', c.id);
+    e.setAttribute('role', 'button');
+    e.tabIndex = -1;
+    e.innerHTML =
+      '<div class="card-back" aria-hidden="true"></div>' +
+      '<div class="card-face" aria-hidden="true">' +
+        '<div class="corner tl"><span class="rank">' + RANK_LABEL[c.rank] + '</span>' + pipMarkup(c.suit) + '</div>' +
+        '<div class="center">' + pipMarkup(c.suit) + '</div>' +
+        '<div class="corner br"><span class="rank">' + RANK_LABEL[c.rank] + '</span>' + pipMarkup(c.suit) + '</div>' +
+      '</div>';
+    c.el = e;
+    return e;
+  }
+
+  function buildBoard() {
+    for (var i = 0; i < CARDS.length; i++) buildCardEl(CARDS[i]);
+
+    for (var f = 0; f < 4; f++) {
+      var p = document.createElement('div');
+      p.className = 'pile';
+      p.setAttribute('data-zone', 'foundation');
+      p.setAttribute('data-index', String(f));
+      p.tabIndex = 0;
+      p.setAttribute('role', 'group');
+      p.setAttribute('aria-label', 'Foundation ' + (f + 1));
+      p.innerHTML = '<div class="slot"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><use href="#suit-' + SUITS[f] + '"></use></svg></div>';
+      foundationsRow.appendChild(p);
+      foundationPiles.push(p);
+    }
+
+    for (var t = 0; t < 7; t++) {
+      var q = document.createElement('div');
+      q.className = 'pile';
+      q.setAttribute('data-zone', 'tableau');
+      q.setAttribute('data-index', String(t));
+      q.tabIndex = 0;
+      q.setAttribute('role', 'group');
+      q.setAttribute('aria-label', 'Tableau pile ' + (t + 1));
+      q.innerHTML = '<div class="slot"><svg class="glyph ring" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-ring"></use></svg></div>';
+      tableauRow.appendChild(q);
+      tableauPiles.push(q);
+    }
+  }
+
+  /* ============================================================
+     4. State + rules
+     ============================================================ */
+  var G = {
+    stock: [], waste: [],
+    foundations: [[], [], [], []],
+    tableau: [[], [], [], [], [], [], []],
+    score: 0, moves: 0
+  };
+  var undoHistory = [];
+  var sel = null;
+  var won = false;
+  var started = false;
+  var openModalEl = null;
+  var lastFocus = null;
+
+  function pileCards(zone, index) {
+    if (zone === 'stock') return G.stock;
+    if (zone === 'waste') return G.waste;
+    if (zone === 'foundation') return G.foundations[index];
+    return G.tableau[index];
+  }
+
+  function canDropFoundation(card, top) {
+    if (!top) return card.rank === 1;
+    return top.suit === card.suit && card.rank === top.rank + 1;
+  }
+  function canDropTableau(card, top) {
+    if (!top) return card.rank === 13;
+    return (!!RED[card.suit] !== !!RED[top.suit]) && card.rank === top.rank - 1;
+  }
+
+  /* ============================================================
+     5. Timer
+     ============================================================ */
+  var tAccum = 0, tLast = null;
+  function timerNow() { return tAccum + (tLast !== null ? (performance.now() - tLast) : 0); }
+  function timerStart() {
+    if (tLast === null && started && !openModalEl && !document.hidden && !won) {
+      tLast = performance.now();
+    }
+  }
+  function timerStop() {
+    if (tLast !== null) { tAccum += performance.now() - tLast; tLast = null; }
+  }
+  function timerReset() { tAccum = 0; tLast = null; }
+  function startTimerIfNeeded() {
+    if (!started) { started = true; timerStart(); }
+  }
+
+  /* ============================================================
+     6. Layout + render
+     ============================================================ */
+  var CARD_W = 104, CARD_H = 148;
+
+  function layout() {
+    var gap = parseFloat(window.getComputedStyle(tableauRow).columnGap);
+    if (!isFinite(gap)) gap = 12;
+    var rowW = tableauRow.clientWidth || 700;
+    var pad = parseFloat(window.getComputedStyle(tableEl).paddingTop) || 16;
+    var margin = parseFloat(window.getComputedStyle(tableEl).marginTop) || 16;
+    var gapY = parseFloat(window.getComputedStyle(tableEl).rowGap) || 24;
+    var appPad = parseFloat(window.getComputedStyle(appEl).paddingBottom) || 0;
+    var contentH = window.innerHeight - railEl.offsetHeight - 2 * margin - 2 * pad - appPad;
+
+    var cw = Math.min(116, (rowW - 6 * gap) / 7, (contentH - gapY) / 6);
+    if (!isFinite(cw) || cw < 34) cw = 34;
+    CARD_W = cw;
+    CARD_H = cw * 1.42;
+    document.documentElement.style.setProperty('--card-w', cw.toFixed(2) + 'px');
+  }
+
+  function isSelected(id) { return !!sel && sel.ids.indexOf(id) !== -1; }
+
+  function ariaFor(c, playable) {
+    return cardName(c) + ', ' + (c.faceUp ? 'face up' : 'face down') +
+      (isSelected(c.id) ? ', selected' : '') + (playable ? '' : ', not movable');
+  }
+
+  function placeCards(container, cards, mode) {
+    var n = cards.length, i, c, e;
+
+    for (i = 0; i < n; i++) {
+      c = cards[i]; e = c.el;
+      e.classList.toggle('up', !!c.faceUp);
+      e.classList.toggle('down', !c.faceUp);
+      e.classList.toggle('sel', isSelected(c.id));
+    }
+
+    if (mode === 'waste') {
+      var visible = Math.min(3, n);
+      var fan = Math.round(CARD_W * 0.24);
+      for (i = 0; i < n; i++) {
+        c = cards[i]; e = c.el;
+        container.appendChild(e);
+        var vis = (i >= n - visible);
+        e.style.left = (vis ? ((i - (n - visible)) * fan) : 0) + 'px';
+        e.style.top = '0px';
+        e.style.zIndex = String(i + 1);
+        e.classList.toggle('ghost', !vis);
+        var isTop = (i === n - 1);
+        e.classList.toggle('playable', isTop);
+        e.tabIndex = isTop ? 0 : -1;
+        e.setAttribute('aria-label', ariaFor(c, isTop));
+      }
+      return;
+    }
+
+    if (mode === 'stock') {
+      for (i = 0; i < n; i++) {
+        c = cards[i]; e = c.el;
+        container.appendChild(e);
+        e.style.left = '0px'; e.style.top = '0px';
+        e.style.zIndex = String(i + 1);
+        e.classList.remove('ghost');
+        e.classList.remove('playable');
+        e.tabIndex = -1;
+        e.setAttribute('aria-label', cardName(c) + ', face down in the stock');
+      }
+      return;
+    }
+
+    if (mode === 'foundation') {
+      for (i = 0; i < n; i++) {
+        c = cards[i]; e = c.el;
+        container.appendChild(e);
+        e.style.left = '0px'; e.style.top = '0px';
+        e.style.zIndex = String(i + 1);
+        e.classList.remove('ghost');
+        var isTopF = (i === n - 1);
+        e.classList.toggle('playable', isTopF);
+        e.tabIndex = isTopF ? 0 : -1;
+        e.setAttribute('aria-label', ariaFor(c, isTopF));
+      }
+      return;
+    }
+
+    /* tableau */
+    var sd0 = CARD_H * 0.22, su0 = CARD_H * 0.30;
+    var offs = [], acc = 0;
+    for (i = 0; i < n; i++) {
+      offs.push(acc);
+      acc += cards[i].faceUp ? su0 : sd0;
+    }
+    var span = n ? offs[n - 1] : 0;
+    var avail = container.clientHeight || (CARD_H * 3.2);
+    var maxSpan = Math.max(0, avail - CARD_H - 2);
+    var f = (span > maxSpan && span > 0) ? (maxSpan / span) : 1;
+
+    for (i = 0; i < n; i++) {
+      c = cards[i]; e = c.el;
+      container.appendChild(e);
+      e.style.left = '0px';
+      e.style.top = (offs[i] * f).toFixed(2) + 'px';
+      e.style.zIndex = String(i + 1);
+      e.classList.remove('ghost');
+      e.classList.toggle('playable', !!c.faceUp);
+      e.tabIndex = c.faceUp ? 0 : -1;
+      e.setAttribute('aria-label', ariaFor(c, !!c.faceUp));
+    }
+  }
+
+  function statusLabel() {
+    if (won) return 'Won';
+    if (openModalEl) return 'Paused';
+    return G.moves > 0 ? 'Playing' : 'Ready';
+  }
+
+  function render() {
+    placeCards(stockPile, G.stock, 'stock');
+    placeCards(wastePile, G.waste, 'waste');
+    for (var i = 0; i < 4; i++) placeCards(foundationPiles[i], G.foundations[i], 'foundation');
+    for (var j = 0; j < 7; j++) placeCards(tableauPiles[j], G.tableau[j], 'tableau');
+
+    var sN = G.stock.length;
+    stockCountEl.textContent = sN ? String(sN) : '';
+    if (sN === 0) stockPile.classList.add('is-empty'); else stockPile.classList.remove('is-empty');
+    stockPile.setAttribute('aria-label', sN ?
+      'Stock, ' + sN + ' cards left, draw three cards' :
+      'Stock empty, recycle the waste');
+
+    for (var f = 0; f < 4; f++) {
+      var pile = G.foundations[f];
+      var top = pile.length ? pile[pile.length - 1] : null;
+      foundationPiles[f].setAttribute('aria-label', 'Foundation ' + (f + 1) +
+        (top ? ', ' + top.suit + ', ' + RANK_LABEL[top.rank] : ', empty'));
+    }
+
+    statMoves.textContent = String(G.moves);
+    statScore.textContent = String(G.score);
+    statTime.textContent = fmtTime(timerNow());
+    statStatus.textContent = statusLabel();
+    btnUndo.disabled = (undoHistory.length === 0);
+  }
+
+  /* ============================================================
+     7. Announcements
+     ============================================================ */
+  function announce(msg) {
+    liveEl.textContent = '';
+    window.setTimeout(function () { liveEl.textContent = msg; }, 30);
+  }
+  var toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (toastTimer) window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(function () { toastEl.classList.remove('show'); }, 2000);
+    announce(msg);
+  }
+
+  /* ============================================================
+     8. Moves
+     ============================================================ */
+  function snapshot() {
+    return {
+      stock: G.stock.map(function (c) { return c.id; }),
+      waste: G.waste.map(function (c) { return c.id; }),
+      foundations: G.foundations.map(function (p) { return p.map(function (c) { return c.id; }); }),
+      tableau: G.tableau.map(function (p) { return p.map(function (c) { return c.id; }); }),
+      face: CARDS.map(function (c) { return !!c.faceUp; }),
+      score: G.score,
+      moves: G.moves,
+      started: started
+    };
+  }
+  function restore(s) {
+    G.stock = s.stock.map(function (id) { return BY_ID[id]; });
+    G.waste = s.waste.map(function (id) { return BY_ID[id]; });
+    G.foundations = s.foundations.map(function (p) { return p.map(function (id) { return BY_ID[id]; }); });
+    G.tableau = s.tableau.map(function (p) { return p.map(function (id) { return BY_ID[id]; }); });
+    for (var i = 0; i < CARDS.length; i++) CARDS[i].faceUp = s.face[i];
+    G.score = s.score;
+    G.moves = s.moves;
+  }
+
+  function captureRects(els) {
+    var out = [];
+    for (var i = 0; i < els.length; i++) out.push(els[i].getBoundingClientRect());
+    return out;
+  }
+
+  function animateTo(els, rects) {
+    var i, el;
+    for (i = 0; i < els.length; i++) {
+      el = els[i];
+      var a = rects[i], b = el.getBoundingClientRect();
+      var dx = a.left - b.left, dy = a.top - b.top;
+      el.style.transition = 'none';
+      el.style.transform = (dx === 0 && dy === 0) ? '' : ('translate(' + dx + 'px,' + dy + 'px)');
+    }
+    if (reduceMotion()) return;
+    for (i = 0; i < els.length; i++) {
+      el = els[i];
+      if (!el.style.transform) continue;
+      void el.offsetWidth;
+      el.style.transition = 'transform 220ms cubic-bezier(0.2,0.75,0.25,1)';
+      el.style.transform = '';
+    }
+  }
+
+  function applyMove(m) {
+    var i;
+    if (m.type === 'draw') {
+      var n = Math.min(3, G.stock.length);
+      for (i = 0; i < n; i++) {
+        var c = G.stock.pop();
+        c.faceUp = true;
+        G.waste.push(c);
+      }
+      return;
+    }
+    if (m.type === 'recycle') {
+      var moved = G.waste.splice(0, G.waste.length).reverse();
+      for (i = 0; i < moved.length; i++) moved[i].faceUp = false;
+      G.stock = moved;
+      return;
+    }
+
+    var src = pileCards(m.from.zone, m.from.index);
+    var dest = pileCards(m.to.zone, m.to.index);
+    var idx = -1;
+    for (i = 0; i < src.length; i++) {
+      if (src[i].id === m.cardIds[0]) { idx = i; break; }
+    }
+    if (idx < 0) return;
+    var taken = src.splice(idx, m.cardIds.length);
+    for (i = 0; i < taken.length; i++) dest.push(taken[i]);
+
+    if (m.from.zone === 'tableau') {
+      var pile = G.tableau[m.from.index];
+      var top = pile.length ? pile[pile.length - 1] : null;
+      if (top && !top.faceUp) {
+        top.faceUp = true;
+        m.flippedId = top.id;
+        G.score += 5;
+      }
+    }
+  }
+
+  function announceMove(m) {
+    if (m.type === 'draw') { announce('Drew from the stock'); return; }
+    if (m.type === 'recycle') { announce('Waste recycled into the stock'); return; }
+    var c = BY_ID[m.cardIds[0]];
+    var toName = 'the waste';
+    if (m.to.zone === 'tableau') toName = 'tableau pile ' + (m.to.index + 1);
+    else if (m.to.zone === 'foundation') toName = 'foundation ' + (m.to.index + 1);
+    announce(cardName(c) + ' moved to ' + toName);
+  }
+
+  function execute(m, beforeRects) {
+    startTimerIfNeeded();
+
+    var els = m.cardIds.map(function (id) { return BY_ID[id].el; });
+    var rects = beforeRects || captureRects(els);
+
+    undoHistory.push({ record: m, snapshot: snapshot() });
+    if (undoHistory.length > 20) undoHistory.shift();
+
+    applyMove(m);
+    G.moves += 1;
+    G.score = Math.max(0, G.score + (m.score || 0));
+
+    render();
+    safe(function () { animateTo(els, rects); });
+
+    if (m.flippedId) {
+      announce('Card flipped');
+      safe(function () {
+        var fe = BY_ID[m.flippedId].el;
+        if (!reduceMotion() && fe.animate) {
+          fe.animate(
+            [{ transform: 'rotateY(90deg)' }, { transform: 'rotateY(0deg)' }],
+            { duration: 160, easing: 'ease-out' }
+          );
+        }
+      });
+    }
+
+    announceMove(m);
+    afterMove();
+  }
+
+  function afterMove() {
+    btnUndo.disabled = (undoHistory.length === 0);
+    if (isWon()) { winSequence(); return; }
+    if (!hasProgressMove()) toast('No moves available');
+  }
+
+  function isWon() {
+    for (var i = 0; i < 4; i++) if (G.foundations[i].length !== 13) return false;
+    return true;
+  }
+
+  function moveFor(selection, toZone, toIndex) {
+    if (!selection) return null;
+    var ids = selection.ids;
+    var first = BY_ID[ids[0]];
+    var from = { zone: selection.zone, index: selection.index };
+    if (from.zone === toZone && from.index === toIndex) return null;
+
+    if (toZone === 'foundation') {
+      if (ids.length !== 1) return null;
+      var fp = G.foundations[toIndex];
+      if (!canDropFoundation(first, fp.length ? fp[fp.length - 1] : null)) return null;
+      var sc = (from.zone === 'tableau' || from.zone === 'waste') ? 10 : 0;
+      return {
+        type: from.zone + 'ToFoundation',
+        from: from, to: { zone: 'foundation', index: toIndex },
+        cardIds: ids, score: sc
+      };
+    }
+    if (toZone === 'tableau') {
+      var tp = G.tableau[toIndex];
+      if (!canDropTableau(first, tp.length ? tp[tp.length - 1] : null)) return null;
+      var s2 = 0;
+      if (from.zone === 'waste') s2 = 5;
+      if (from.zone === 'foundation') s2 = -15;
+      return {
+        type: from.zone + 'ToTableau',
+        from: from, to: { zone: 'tableau', index: toIndex },
+        cardIds: ids, score: s2
+      };
+    }
+    return null;
+  }
+
+  function tryDrop(zone, index) {
+    var m = moveFor(sel, zone, index);
+    if (!m) return false;
+    execute(m);
+    return true;
+  }
+
+  function draw() {
+    if (G.stock.length === 0 && G.waste.length === 0) { toast('No moves available'); return; }
+    startTimerIfNeeded();
+    var recycle = (G.stock.length === 0);
+    var ids = [];
+    if (recycle) {
+      for (var i = 0; i < G.waste.length; i++) ids.push(G.waste[i].id);
+    } else {
+      var from = Math.max(0, G.stock.length - 3);
+      for (var j = from; j < G.stock.length; j++) ids.push(G.stock[j].id);
+    }
+    execute({
+      type: recycle ? 'recycle' : 'draw',
+      from: { zone: recycle ? 'waste' : 'stock', index: 0 },
+      to: { zone: recycle ? 'stock' : 'waste', index: 0 },
+      cardIds: ids,
+      score: recycle ? -20 : 0
+    });
+  }
+
+  function undo() {
+    if (!undoHistory.length) return;
+    var entry = undoHistory.pop();
+    var els = CARDS.map(function (c) { return c.el; });
+    var rects = captureRects(els);
+
+    restore(entry.snapshot);
+    if (!entry.snapshot.started && started) { started = false; timerReset(); }
+
+    sel = null;
+    render();
+    safe(function () { animateTo(els, rects); });
+    announce('Move undone');
+    btnUndo.disabled = (undoHistory.length === 0);
+    statStatus.textContent = statusLabel();
+  }
+
+  /* ---- progress detection ---- */
+  function canFoundationSomewhere(c) {
+    for (var f = 0; f < 4; f++) {
+      var p = G.foundations[f];
+      if (canDropFoundation(c, p.length ? p[p.length - 1] : null)) return true;
+    }
+    return false;
+  }
+  function canTableauSomewhere(c, srcIndex) {
+    for (var t = 0; t < 7; t++) {
+      if (t === srcIndex) continue;
+      var p = G.tableau[t];
+      if (canDropTableau(c, p.length ? p[p.length - 1] : null)) return true;
+    }
+    return false;
+  }
+  function hasProgressMove() {
+    if (G.stock.length > 0) return true;
+    if (G.waste.length > 0) return true;
+    var w = G.waste.length ? G.waste[G.waste.length - 1] : null;
+    if (w && (canFoundationSomewhere(w) || canTableauSomewhere(w, -1))) return true;
+    for (var i = 0; i < 7; i++) {
+      var pile = G.tableau[i];
+      for (var j = 0; j < pile.length; j++) {
+        var c = pile[j];
+        if (!c.faceUp) break;
+        if (canFoundationSomewhere(c)) return true;
+        if (canTableauSomewhere(c, i)) return true;
+      }
+    }
+    return false;
+  }
+
+  /* ============================================================
+     9. Selection + activation
+     ============================================================ */
+  function selectFrom(zone, index, cardIndex) {
+    var cards = pileCards(zone, index);
+    var c = cards[cardIndex];
+    if (!c || !c.faceUp) return;
+    var ids = [];
+    if (zone === 'tableau') {
+      for (var i = cardIndex; i < cards.length; i++) ids.push(cards[i].id);
+    } else {
+      ids.push(c.id);
+    }
+    sel = { zone: zone, index: index, cardIndex: cardIndex, ids: ids };
+    render();
+    announce(cardName(c) + ' selected');
+  }
+
+  function clearSel() {
+    if (!sel) return;
+    sel = null;
+    render();
+  }
+
+  function activateCard(meta, cardEl) {
+    var cards = pileCards(meta.zone, meta.index);
+    if (meta.zone === 'stock') { draw(); return; }
+
+    if (meta.zone === 'waste') {
+      var topW = cards.length ? cards[cards.length - 1] : null;
+      if (!topW) { clearSel(); return; }
+      if (sel && sel.zone === 'waste') { clearSel(); return; }
+      selectFrom('waste', 0, cards.length - 1);
+      return;
+    }
+
+    var idx = -1;
+    if (cardEl) {
+      var id = cardEl.getAttribute('data-id');
+      for (var i = 0; i < cards.length; i++) {
+        if (cards[i].id === id) { idx = i; break; }
+      }
+    } else {
+      idx = cards.length - 1;
+    }
+
+    if (meta.zone === 'foundation') {
+      if (sel && !(sel.zone === 'foundation' && sel.index === meta.index)) {
+        if (tryDrop('foundation', meta.index)) return;
+      }
+      if (idx < 0) { clearSel(); return; }
+      if (sel && sel.zone === 'foundation' && sel.index === meta.index) { clearSel(); return; }
+      selectFrom('foundation', meta.index, cards.length - 1);
+      return;
+    }
+
+    /* tableau */
+    if (idx >= 0) {
+      if (sel) {
+        if (sel.zone === 'tableau' && sel.index === meta.index && sel.cardIndex === idx) {
+          clearSel(); return;
+        }
+        if (idx === cards.length - 1 && tryDrop('tableau', meta.index)) return;
+      }
+      if (cards[idx].faceUp) { selectFrom('tableau', meta.index, idx); return; }
+    }
+    clearSel();
+  }
+
+  function activatePile(meta) {
+    if (meta.zone === 'stock') { draw(); return; }
+    if (sel && tryDrop(meta.zone, meta.index)) return;
+    clearSel();
+  }
+
+  function autoPlay(meta) {
+    var cards = pileCards(meta.zone, meta.index);
+    if (!cards.length) return;
+    var c = cards[cards.length - 1];
+    if (!c.faceUp) return;
+    var fake = { zone: meta.zone, index: meta.index, cardIndex: cards.length - 1, ids: [c.id] };
+    var f, t, m;
+    for (f = 0; f < 4; f++) {
+      m = moveFor(fake, 'foundation', f);
+      if (m) { execute(m); return; }
+    }
+    for (t = 0; t < 7; t++) {
+      m = moveFor(fake, 'tableau', t);
+      if (m) { execute(m); return; }
+    }
+    safe(function () {
+      c.el.classList.add('invalid');
+      window.setTimeout(function () { c.el.classList.remove('invalid'); }, 180);
+    });
+    toast('Move not available');
+  }
+
+  function metaOf(el) {
+    return {
+      zone: el.getAttribute('data-zone'),
+      index: parseInt(el.getAttribute('data-index') || '0', 10)
+    };
+  }
+
+  /* ============================================================
+     10. Pointer input — press / move / release
+     Activation happens on release so it can never be cancelled
+     by drag handling.
+     ============================================================ */
+  var press = null;
+
+  function bindPointer() {
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
+  }
+  function unbindPointer() {
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    window.removeEventListener('pointercancel', onPointerCancel);
+  }
+
+  function onPointerDown(e) {
+    if (openModalEl) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    var pileEl = up(e.target, 'pile');
+    if (!pileEl) return;
+
+    var meta = metaOf(pileEl);
+    if (meta.zone === 'stock') {
+      press = { pointerId: e.pointerId, stock: true };
+      bindPointer();
+      return;
+    }
+
+    var cardEl = up(e.target, 'card');
+    if (!cardEl || cardEl.classList.contains('ghost')) {
+      press = { pointerId: e.pointerId, meta: meta, cardEl: null };
+      bindPointer();
+      return;
+    }
+
+    var cards = pileCards(meta.zone, meta.index);
+    var id = cardEl.getAttribute('data-id');
+    var idx = -1, i;
+    for (i = 0; i < cards.length; i++) if (cards[i].id === id) { idx = i; break; }
+    if (idx < 0 || !cards[idx].faceUp) return;
+
+    var ids = [];
+    if (meta.zone === 'tableau') {
+      for (i = idx; i < cards.length; i++) ids.push(cards[i].id);
+    } else if (idx === cards.length - 1) {
+      ids.push(cards[idx].id);
+    } else {
+      return;
+    }
+
+    var rects = ids.map(function (cid) { return BY_ID[cid].el.getBoundingClientRect(); });
+
+    press = {
+      pointerId: e.pointerId,
+      meta: meta,
+      cardEl: cardEl,
+      ids: ids,
+      zone: meta.zone,
+      index: meta.index,
+      cardIndex: idx,
+      startX: e.clientX,
+      startY: e.clientY,
+      originRects: rects,
+      started: false,
+      ghost: null
+    };
+    bindPointer();
+  }
+
+  function onPointerMove(e) {
+    if (!press || e.pointerId !== press.pointerId) return;
+    if (!press.meta && press.stock) return;
+
+    var dx = e.clientX - press.startX, dy = e.clientY - press.startY;
+    if (!press.started) {
+      if (Math.sqrt(dx * dx + dy * dy) < 6) return;
+      if (press.stock || !press.ids) return;
+      startDrag();
+    }
+    if (press.started && e.cancelable) e.preventDefault();
+    positionGhost(e.clientX, e.clientY);
+  }
+
+  function startDrag() {
+    press.started = true;
+    sel = {
+      zone: press.zone, index: press.index,
+      cardIndex: press.cardIndex, ids: press.ids.slice()
+    };
+    render();
+
+    var g = document.createElement('div');
+    g.className = 'drag-ghost';
+    var base = press.originRects[0];
+
+    for (var i = 0; i < press.ids.length; i++) {
+      var src = BY_ID[press.ids[i]].el;
+      var r = press.originRects[i];
+      var clone = src.cloneNode(true);
+      clone.classList.remove('sel');
+      clone.classList.remove('dragging');
+      clone.classList.remove('ghost');
+      clone.style.left = '0px';
+      clone.style.top = '0px';
+      clone.style.transform = 'translate(' + (r.left - base.left) + 'px,' + (r.top - base.top) + 'px)';
+      g.appendChild(clone);
+      src.classList.add('dragging');
+    }
+    dragLayer.appendChild(g);
+    press.ghost = g;
+    press.grabX = press.startX - base.left;
+    press.grabY = press.startY - base.top;
+    positionGhost(press.startX, press.startY);
+  }
+
+  function positionGhost(x, y) {
+    if (!press || !press.ghost) return;
+    press.ghost.style.transform =
+      'translate(' + (x - press.grabX) + 'px,' + (y - press.grabY) + 'px)';
+  }
+
+  function clearDragShadows() {
+    var list = $$('.card.dragging');
+    for (var i = 0; i < list.length; i++) list[i].classList.remove('dragging');
+  }
+
+  function findTarget(x, y) {
+    var cands = foundationPiles.concat(tableauPiles, [stockPile, wastePile]);
+    for (var i = 0; i < cands.length; i++) {
+      var r = cands[i].getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return cands[i];
+    }
+    return null;
+  }
+
+  function onPointerUp(e) {
+    if (!press || e.pointerId !== press.pointerId) return;
+    unbindPointer();
+    var p = press;
+    press = null;
+
+    if (p.started) {
+      finishDrag(p, e.clientX, e.clientY);
+      return;
+    }
+    if (p.stock) { draw(); return; }
+    if (p.meta) {
+      if (p.cardEl) activateCard(p.meta, p.cardEl);
+      else activatePile(p.meta);
+    }
+  }
+
+  function onPointerCancel() {
+    if (!press) return;
+    unbindPointer();
+    var p = press;
+    press = null;
+    if (p.started) {
+      if (p.ghost && p.ghost.parentNode) p.ghost.parentNode.removeChild(p.ghost);
+      clearDragShadows();
+      render();
+      toast('Move not available');
+    }
+  }
+
+  function finishDrag(p, x, y) {
+    var target = findTarget(x, y);
+    var meta = target ? metaOf(target) : null;
+    var m = meta ? moveFor(sel, meta.zone, meta.index) : null;
+
+    if (m) {
+      var ids = p.ids.slice();
+      var clones = $$('.card', p.ghost);
+      var rects = clones.map(function (node) { return node.getBoundingClientRect(); });
+      if (p.ghost && p.ghost.parentNode) p.ghost.parentNode.removeChild(p.ghost);
+      clearDragShadows();
+      execute(m, rects);
+      return;
+    }
+
+    /* invalid: the stack must never leave its pile */
+    if (target) {
+      target.classList.add('drop-hot');
+      window.setTimeout(function () { target.classList.remove('drop-hot'); }, 220);
+    }
+    var g = p.ghost;
+    var base = p.originRects[0];
+    if (!g) return;
+
+    if (reduceMotion()) {
+      if (g.parentNode) g.parentNode.removeChild(g);
+      clearDragShadows();
+      render();
+      toast('Move not available');
+      return;
+    }
+
+    g.style.transition = 'transform 180ms cubic-bezier(0.2,0.75,0.25,1)';
+    g.style.transform = 'translate(' + base.left + 'px,' + base.top + 'px)';
+    window.setTimeout(function () {
+      if (g.parentNode) g.parentNode.removeChild(g);
+      clearDragShadows();
+      render();
+    }, 190);
+    toast('Move not available');
+  }
+
+  tableEl.addEventListener('pointerdown', onPointerDown);
+  tableEl.addEventListener('dragstart', function (e) { e.preventDefault(); });
+
+  /* double-click / double-tap = auto move */
+  tableEl.addEventListener('dblclick', function (e) {
+    if (openModalEl || won) return;
+    var pileEl = up(e.target, 'pile');
+    if (!pileEl) return;
+    var meta = metaOf(pileEl);
+    if (meta.zone === 'stock') return;
+    var cards = pileCards(meta.zone, meta.index);
+    if (!cards.length) return;
+    if (meta.zone === 'tableau') {
+      var cardEl = up(e.target, 'card');
+      if (!cardEl) return;
+      if (cardEl.getAttribute('data-id') !== cards[cards.length - 1].id) return;
+    }
+    autoPlay(meta);
+  });
+
+  /* ============================================================
+     11. Keyboard
+     ============================================================ */
+  function focusables(root) {
+    return $$('button, [href], input, select, textarea, [tabindex]', root).filter(function (el) {
+      return !el.disabled && el.tabIndex !== -1 && el.offsetParent !== null;
+    });
+  }
+
+  function trapTab(e, container) {
+    var f = focusables(container);
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  function moveFocus(cardEl, key) {
+    var pileEl = up(cardEl, 'pile');
+    var list = $$('.card', pileEl).filter(function (el) { return !el.classList.contains('ghost'); });
+    var i = list.indexOf(cardEl);
+    if (key === 'ArrowDown' && i < list.length - 1) { list[i + 1].focus(); return; }
+    if (key === 'ArrowUp' && i > 0) { list[i - 1].focus(); return; }
+    if (key === 'ArrowLeft' || key === 'ArrowRight') {
+      var all = $$('.pile', tableEl);
+      var pi = all.indexOf(pileEl);
+      var next = all[pi + (key === 'ArrowRight' ? 1 : -1)];
+      if (next) {
+        var first = $('.card', next);
+        if (first && first.classList.contains('ghost')) first = null;
+        (first || next).focus();
+      }
+    }
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      if (openModalEl) { e.preventDefault(); closeModal(); }
+      else clearSel();
+      return;
+    }
+    if (openModalEl) {
+      if (e.key === 'Tab') trapTab(e, openModalEl);
+      return;
+    }
+
+    var t = document.activeElement;
+    var isCard = !!(t && t.classList && t.classList.contains('card'));
+    var isPile = !!(t && t.classList && t.classList.contains('pile'));
+
+    if ((e.key === 'u' || e.key === 'U') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault(); undo(); return;
+    }
+    if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault(); newGame(); return;
+    }
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (isCard) {
+        e.preventDefault();
+        activateCard(metaOf(up(t, 'pile')), t);
+        return;
+      }
+      if (isPile) {
+        e.preventDefault();
+        activatePile(metaOf(t));
+        return;
+      }
+      return;
+    }
+    if (isCard && (e.key === 'ArrowDown' || e.key === 'ArrowUp' ||
+                   e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      moveFocus(t, e.key);
+    }
+  });
+
+  /* ============================================================
+     12. Modals
+     ============================================================ */
+  function openModal(el) {
+    if (openModalEl) return;
+    openModalEl = el;
+    lastFocus = document.activeElement;
+    el.hidden = false;
+    timerStop();
+
+    if (el === statsModal) {
+      $('#sheetTime').textContent = fmtTime(timerNow());
+      $('#sheetMoves').textContent = String(G.moves);
+      $('#sheetScore').textContent = String(G.score);
+    }
+    var f = focusables(el);
+    if (f.length) f[0].focus();
+    render();
+  }
+
+  function closeModal() {
+    if (!openModalEl) return;
+    openModalEl.hidden = true;
+    openModalEl = null;
+    if (!won) timerStart();
+    render();
+    if (lastFocus && lastFocus.focus) {
+      try { lastFocus.focus(); } catch (err) { /* ignore */ }
+    }
+  }
+
+  $('#helpClose').addEventListener('click', closeModal);
+  $('#helpCloseText').addEventListener('click', closeModal);
+  $('#helpNew').addEventListener('click', function () { closeModal(); newGame(); });
+  $('#winClose').addEventListener('click', closeModal);
+  $('#winNew').addEventListener('click', function () { closeModal(); newGame(); });
+  $('#statsClose').addEventListener('click', closeModal);
+  $('#sheetClose').addEventListener('click', closeModal);
+  $('#sheetNew').addEventListener('click', function () { closeModal(); newGame(); });
+
+  btnHelp.addEventListener('click', function () { openModal(helpModal); });
+  btnScore.addEventListener('click', function () { openModal(statsModal); });
+  btnUndo.addEventListener('click', function () { undo(); });
+  btnNew.addEventListener('click', function () { newGame(); });
+
+  [helpModal, winModal, statsModal].forEach(function (m) {
+    m.addEventListener('pointerdown', function (e) {
+      if (e.target === m) closeModal();
+    });
+  });
+
+  /* ============================================================
+     13. Deal
+     ============================================================ */
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = randomInt(i + 1);
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  function newGame() {
+    if (openModalEl) { openModalEl.hidden = true; openModalEl = null; }
+    won = false;
+    started = false;
+    timerReset();
+    undoHistory = [];
+    sel = null;
+
+    for (var i = 0; i < CARDS.length; i++) CARDS[i].faceUp = false;
+    var deck = shuffle(CARDS.slice());
+
+    G.stock = []; G.waste = [];
+    G.foundations = [[], [], [], []];
+    G.tableau = [[], [], [], [], [], [], []];
+
+    for (var col = 0; col < 7; col++) {
+      for (var k = 0; k <= col; k++) {
+        var c = deck.pop();
+        c.faceUp = (k === col);
+        G.tableau[col].push(c);
+      }
+    }
+    for (var d = 0; d < deck.length; d++) deck[d].faceUp = false;
+    G.stock = deck;
+    G.score = 0;
+    G.moves = 0;
+
+    layout();
+    render();
+    safe(animateDeal);
+    announce('New deal');
+  }
+
+  function animateDeal() {
+    var els = [];
+    for (var i = 0; i < 7; i++) {
+      var pile = G.tableau[i];
+      for (var j = 0; j < pile.length; j++) els.push({ el: pile[j].el, round: j });
+    }
+
+    if (reduceMotion()) {
+      for (var k = 0; k < els.length; k++) {
+        if (els[k].el.animate) {
+          els[k].el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 80 });
+        }
+      }
+      return;
+    }
+
+    var sr = stockPile.getBoundingClientRect();
+    var cx = sr.left + sr.width / 2, cy = sr.top + sr.height / 2;
+
+    for (var n = 0; n < els.length; n++) {
+      var e = els[n].el;
+      var b = e.getBoundingClientRect();
+      var dx = cx - (b.left + b.width / 2);
+      var dy = cy - (b.top + b.height / 2);
+      var delay = (els[n].round * 22) + 'ms';
+      e.style.transition = 'none';
+      e.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(0.94)';
+      e.style.opacity = '0.35';
+      void e.offsetWidth;
+      e.style.transition = 'transform 280ms cubic-bezier(0.22,0.8,0.24,1) ' + delay +
+        ', opacity 280ms ease ' + delay;
+      e.style.transform = '';
+      e.style.opacity = '';
+    }
+  }
+
+  /* ============================================================
+     14. Win choreography
+     ============================================================ */
+  function winSequence() {
+    won = true;
+    timerStop();
+    statStatus.textContent = 'Won';
+    playWinAnimation(function () {
+      $('#winTime').textContent = fmtTime(timerNow());
+      $('#winMoves').textContent = String(G.moves);
+      $('#winScore').textContent = String(G.score);
+      openModal(winModal);
+      announce('You won');
+    });
+  }
+
+  function playWinAnimation(done) {
+    if (reduceMotion()) {
+      for (var i = 0; i < foundationPiles.length; i++) {
+        foundationPiles[i].style.outline = '2px solid var(--voltage)';
+        foundationPiles[i].style.outlineOffset = '3px';
+      }
+      window.setTimeout(function () {
+        for (var j = 0; j < foundationPiles.length; j++) foundationPiles[j].style.outline = '';
+        done();
+      }, 220);
+      return;
+    }
+
+    var wrap = foundationsRow;
+    if (wrap.animate) {
+      wrap.animate(
+        [{ transform: 'translateY(0)' }, { transform: 'translateY(-18px)' }],
+        { duration: 180, easing: 'cubic-bezier(0.2,0.8,0.2,1)', fill: 'forwards' }
+      );
+    }
+
+    winLayer.innerHTML = '';
+    winLayer.hidden = false;
+    winLayer.style.opacity = '1';
+
+    var W = window.innerWidth, H = window.innerHeight;
+    var items = [];
+    for (var f = 0; f < 4; f++) {
+      var pile = G.foundations[f];
+      for (var i2 = 0; i2 < pile.length; i2++) items.push({ c: pile[i2], fi: f, ci: i2 });
+    }
+
+    var originals = items.map(function (o) { return o.c.el; });
+
+    for (var n = 0; n < items.length; n++) {
+      (function (o) {
+        var src = o.c.el.getBoundingClientRect();
+        var node = o.c.el.cloneNode(true);
+        node.classList.remove('sel');
+        node.classList.remove('dragging');
+        node.classList.remove('ghost');
+        node.style.left = src.left + 'px';
+        node.style.top = src.top + 'px';
+        node.style.width = src.width + 'px';
+        node.style.height = src.height + 'px';
+        node.style.transform = 'none';
+        node.style.transition = 'none';
+        node.style.zIndex = '10';
+        winLayer.appendChild(node);
+
+        var dir = (o.fi === 0) ? -1 : (o.fi === 1) ? -0.42 : (o.fi === 2) ? 0.42 : 1;
+        var x1 = W * 0.12 * dir, y1 = -H * 0.17;
+        var x2 = W * 0.30 * dir, y2 = -H * 0.05;
+        var x3 = W * 0.44 * dir, y3 = H * 0.10;
+        var x4 = W * 0.52 * dir, y4 = H * 0.28;
+
+        if (node.animate) {
+          node.animate([
+            { transform: 'translate(0px,0px) rotate(0deg)', opacity: 1, offset: 0 },
+            { transform: 'translate(' + x1 + 'px,' + y1 + 'px) rotate(' + (dir * 12) + 'deg)', opacity: 1, offset: 0.28 },
+            { transform: 'translate(' + x2 + 'px,' + y2 + 'px) rotate(' + (dir * 22) + 'deg)', opacity: 1, offset: 0.52 },
+            { transform: 'translate(' + x3 + 'px,' + y3 + 'px) rotate(' + (dir * 14) + 'deg)', opacity: 1, offset: 0.76 },
+            { transform: 'translate(' + x4 + 'px,' + y4 + 'px) rotate(' + (dir * 6) + 'deg)', opacity: 0.96, offset: 1 }
+          ], {
+            duration: 1100,
+            delay: o.ci * 45 + o.fi * 18,
+            easing: 'cubic-bezier(0.16,0.9,0.24,1)',
+            fill: 'forwards'
+          });
+        }
+      })(items[n]);
+    }
+
+    for (var o = 0; o < originals.length; o++) originals[o].style.visibility = 'hidden';
+
+    window.setTimeout(function () {
+      winLayer.style.transition = 'opacity 200ms ease';
+      winLayer.style.opacity = '0';
+      for (var i = 0; i < originals.length; i++) originals[i].style.visibility = '';
+      if (wrap.animate) {
+        wrap.animate(
+          [{ transform: 'translateY(-18px)' }, { transform: 'translateY(0)' }],
+          { duration: 200, easing: 'ease-out', fill: 'forwards' }
+        );
+      }
+      window.setTimeout(function () {
+        winLayer.hidden = true;
+        winLayer.innerHTML = '';
+        winLayer.style.transition = '';
+        done();
+      }, 210);
+    }, 1800);
+  }
+
+  /* ============================================================
+     15. Lifecycle
+     ============================================================ */
+  var resizePending = false;
+  function onResize() {
+    if (resizePending) return;
+    resizePending = true;
+    window.requestAnimationFrame(function () {
+      resizePending = false;
+      if (press && press.started) return;
+      layout();
+      render();
+    });
+  }
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', function () {
+    window.setTimeout(function () { layout(); render(); }, 120);
+  });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) timerStop();
+    else timerStart();
+  });
+  window.addEventListener('blur', timerStop);
+  window.addEventListener('blur', onPointerCancel);
+  window.addEventListener('focus', timerStart);
+
+  window.setInterval(function () {
+    statTime.textContent = fmtTime(timerNow());
+  }, 250);
+
+  /* ---- boot ---- */
+  buildBoard();
+  layout();
+  newGame();
+  window.setTimeout(function () { layout(); render(); }, 60);
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { layout(); render(); });
+  }
+
+})();
+</script>
+</body>
+</html>

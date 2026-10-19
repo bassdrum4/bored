@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
+var m={};
+function k(i){return Object.keys(m)[i]||null}
+var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
+setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
+clear:function(){m={}},key:k};
+Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
+try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
+})();</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PONG</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #000;
+            --fg: #fff;
+            --accent: #33ff33;
+        }
+
+        body {
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Press Start 2P', monospace;
+            color: var(--fg);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #menu {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+            z-index: 10;
+        }
+
+        #menu h1 {
+            font-size: 64px;
+            letter-spacing: 8px;
+            text-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .menu-btn {
+            background: transparent;
+            border: 2px solid var(--fg);
+            color: var(--fg);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 16px;
+            padding: 18px 40px;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .menu-btn:hover {
+            background: var(--fg);
+            color: var(--bg);
+            transform: scale(1.05);
+        }
+
+        .menu-btn.selected {
+            background: var(--fg);
+            color: var(--bg);
+        }
+
+        #gameCanvas {
+            display: none;
+            border: 2px solid #333;
+        }
+
+        #hud {
+            display: none;
+            width: 800px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 11px;
+            color: #555;
+        }
+
+        #backBtn {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: transparent;
+            border: 1px solid #444;
+            color: #666;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            padding: 8px 14px;
+            cursor: pointer;
+            z-index: 20;
+            transition: all 0.2s;
+        }
+
+        #backBtn:hover {
+            border-color: #fff;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="menu">
+        <h1>PONG</h1>
+        <button class="menu-btn" onclick="startGame('ai')">1 PLAYER</button>
+        <button class="menu-btn" onclick="startGame('2p')">2 PLAYERS</button>
+    </div>
+
+    <div id="hud">
+        <span id="hudLeft">W / S</span>
+        <span id="hudMid">ESC = MENU</span>
+        <span id="hudRight">↑ / ↓</span>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+    <button id="backBtn" onclick="backToMenu()">ESC</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const menu = document.getElementById('menu');
+        const hud = document.getElementById('hud');
+        const hudLeft = document.getElementById('hudLeft');
+        const hudRight = document.getElementById('hudRight');
+        const backBtn = document.getElementById('backBtn');
+
+        const W = 800, H = 500;
+        const PADDLE_W = 12, PADDLE_H = 80;
+        const BALL_SIZE = 10;
+        const PADDLE_SPEED = 6;
+        const BALL_SPEED_INIT = 5;
+        const BALL_SPEED_MAX = 12;
+        const WIN_SCORE = 7;
+
+        let mode = 'ai';
+        let gameRunning = false;
+        let ballX, ballY, ballVX, ballVY, ballSpeed;
+        let p1Y, p2Y;
+        let score1, score2;
+        let keys = {};
+        let lastTime = 0;
+        let serveDelay = 0;
+        let winningSide = 0; // 0=none, 1=left, -1=right
+        let winTimer = 0;
+
+        // AI state
+        let aiReactionDelay = 0;
+        let aiTargetY = H / 2;
+        let aiError = 0;
+        let aiErrorTimer = 0;
+
+        function resetBall(dir) {
+            ballX = W / 2;
+            ballY = H / 2;
+            ballSpeed = BALL_SPEED_INIT;
+            const angle = (Math.random() * 0.6 - 0.3); // ±~17 degrees
+            ballVX = dir * ballSpeed * Math.cos(angle);
+            ballVY = ballSpeed * Math.sin(angle);
+            serveDelay = 60; // frames before ball moves
+            winningSide = 0;
+            winTimer = 0;
+        }
+
+        function initGame() {
+            p1Y = H / 2 - PADDLE_H / 2;
+            p2Y = H / 2 - PADDLE_H / 2;
+            score1 = 0;
+            score2 = 0;
+            resetBall(Math.random() < 0.5 ? 1 : -1);
+        }
+
+        function startGame(m) {
+            mode = m;
+            menu.style.display = 'none';
+            canvas.style.display = 'block';
+            hud.style.display = 'flex';
+            backBtn.style.display = 'block';
+
+            if (mode === 'ai') {
+                hudLeft.textContent = 'W / S';
+                hudRight.textContent = 'CPU';
+            } else {
+                hudLeft.textContent = 'W / S';
+                hudRight.textContent = '↑ / ↓';
+            }
+
+            initGame();
+            gameRunning = true;
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+
+        function backToMenu() {
+            gameRunning = false;
+            menu.style.display = 'flex';
+            canvas.style.display = 'none';
+            hud.style.display = 'none';
+            backBtn.style.display = 'none';
+        }
+
+        document.addEventListener('keydown', e => {
+            keys[e.key] = true;
+            if (e.key === 'Escape' && gameRunning) backToMenu();
+        });
+        document.addEventListener('keyup', e => { keys[e.key] = false; });
+        window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+        document.addEventListener('visibilitychange', () => { if (document.hidden) for(const k in keys)keys[k]=false });
+
+        function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+        function updateAI() {
+            // Pays more attention as the ball enters its side
+            let attention = clamp((ballX - W / 2) / (W / 2), 0, 1);
+
+            aiErrorTimer--;
+            if (aiErrorTimer <= 0) {
+                // Error increases at high speeds, making fast balls harder to catch perfectly
+                let speedFactor = (ballSpeed - BALL_SPEED_INIT) * 5;
+                aiError = (Math.random() - 0.5) * (30 + speedFactor);
+                aiErrorTimer = 20 + Math.random() * 30;
+            }
+
+            if (ballVX > 0) {
+                // Only "serious" prediction once the ball crosses the 40% line
+                if (ballX > W * 0.4) {
+                    let predictedY = ballY;
+                    let predictedX = ballX;
+                    let simVY = ballVY;
+                    let simVX = ballVX;
+
+                    // Simulate path to the right side
+                    while (predictedX < W - 20) {
+                        predictedX += simVX;
+                        predictedY += simVY;
+                        if (predictedY <= BALL_SIZE / 2 || predictedY >= H - BALL_SIZE / 2) {
+                            simVY = -simVY;
+                            predictedY = clamp(predictedY, BALL_SIZE / 2, H - BALL_SIZE / 2);
+                        }
+                    }
+                    
+                    // Smoothly transition the target towards the predicted spot
+                    // This adds a slight "reaction lag" as it doesn't snap instantly to the result
+                    let target = predictedY + aiError;
+                    aiTargetY = aiTargetY + (target - aiTargetY) * (0.08 + attention * 0.12);
+                } else {
+                    // Ball is far: loosely follow the ball or drift toward center
+                    let lazyTarget = H / 2 + (ballY - H / 2) * 0.4;
+                    aiTargetY = aiTargetY + (lazyTarget - aiTargetY) * 0.04;
+                }
+            } else {
+                // Ball moving away: return to center slowly
+                aiTargetY = aiTargetY + (H / 2 - aiTargetY) * 0.02;
+            }
+
+            const paddleCenter = p2Y + PADDLE_H / 2;
+            const diff = aiTargetY - paddleCenter;
+            const deadzone = 4;
+
+            if (Math.abs(diff) > deadzone) {
+                // Variable speed to feel less robotic
+                let moveSpeed = PADDLE_SPEED * (0.85 + Math.sin(Date.now() / 150) * 0.1);
+                const move = clamp(diff, -moveSpeed, moveSpeed);
+                p2Y = clamp(p2Y + move, 0, H - PADDLE_H);
+            }
+        }
+
+        function update() {
+            if (serveDelay > 0) {
+                serveDelay--;
+                return;
+            }
+
+            // Player 1
+            if (keys['w'] || keys['W']) p1Y -= PADDLE_SPEED;
+            if (keys['s'] || keys['S']) p1Y += PADDLE_SPEED;
+            p1Y = clamp(p1Y, 0, H - PADDLE_H);
+
+            // Player 2 / AI
+            if (mode === '2p') {
+                if (keys['ArrowUp']) p2Y -= PADDLE_SPEED;
+                if (keys['ArrowDown']) p2Y += PADDLE_SPEED;
+                p2Y = clamp(p2Y, 0, H - PADDLE_H);
+            } else {
+                updateAI();
+            }
+
+            // Ball movement
+            ballX += ballVX;
+            ballY += ballVY;
+
+            // Top/bottom wall bounce
+            if (ballY - BALL_SIZE / 2 <= 0) {
+                ballY = BALL_SIZE / 2;
+                ballVY = -ballVY;
+            }
+            if (ballY + BALL_SIZE / 2 >= H) {
+                ballY = H - BALL_SIZE / 2;
+                ballVY = -ballVY;
+            }
+
+            // Paddle collision - Player 1 (left)
+            if (ballVX < 0 &&
+                ballX - BALL_SIZE / 2 <= PADDLE_W + 16 &&
+                ballX - BALL_SIZE / 2 >= 16 &&
+                ballY >= p1Y - 2 &&
+                ballY <= p1Y + PADDLE_H + 2) {
+
+                const hitPos = (ballY - p1Y) / PADDLE_H; // 0 to 1
+                const angle = (hitPos - 0.5) * (Math.PI * 0.55); // ±~50 degrees
+
+                ballSpeed = Math.min(ballSpeed + 0.3, BALL_SPEED_MAX);
+                ballVX = ballSpeed * Math.cos(angle);
+                ballVY = ballSpeed * Math.sin(angle);
+                ballX = PADDLE_W + 16 + BALL_SIZE / 2 + 1;
+            }
+
+            // Paddle collision - Player 2 (right)
+            if (ballVX > 0 &&
+                ballX + BALL_SIZE / 2 >= W - PADDLE_W - 16 &&
+                ballX + BALL_SIZE / 2 <= W - 16 &&
+                ballY >= p2Y - 2 &&
+                ballY <= p2Y + PADDLE_H + 2) {
+
+                const hitPos = (ballY - p2Y) / PADDLE_H;
+                const angle = Math.PI - (hitPos - 0.5) * (Math.PI * 0.55);
+
+                ballSpeed = Math.min(ballSpeed + 0.3, BALL_SPEED_MAX);
+                ballVX = ballSpeed * Math.cos(angle);
+                ballVY = ballSpeed * Math.sin(angle);
+                ballX = W - PADDLE_W - 16 - BALL_SIZE / 2 - 1;
+            }
+
+            // Score
+            if (ballX < -BALL_SIZE) {
+                score2++;
+                resetBall(-1);
+            }
+            if (ballX > W + BALL_SIZE) {
+                score1++;
+                resetBall(1);
+            }
+        }
+
+        function drawNet() {
+            ctx.setLineDash([8, 12]);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(W / 2, 0);
+            ctx.lineTo(W / 2, H);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawPaddle(x, y) {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(x, y, PADDLE_W, PADDLE_H);
+        }
+
+        function drawBall() {
+            if (serveDelay > 0 && serveDelay % 10 < 5) return; // blink before serve
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(ballX - BALL_SIZE / 2, ballY - BALL_SIZE / 2, BALL_SIZE, BALL_SIZE);
+        }
+
+        function drawScore() {
+            ctx.fillStyle = '#fff';
+            ctx.font = '48px "Press Start 2P", monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(score1, W / 4, 65);
+            ctx.fillText(score2, 3 * W / 4, 65);
+        }
+
+        function draw() {
+            // Background
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, W, H);
+
+            // Top/bottom borders
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, W, 3);
+            ctx.fillRect(0, H - 3, W, 3);
+
+            drawNet();
+            drawScore();
+            drawPaddle(16, p1Y);
+            drawPaddle(W - 16 - PADDLE_W, p2Y);
+            drawBall();
+
+            // Serve message
+            if (serveDelay > 0) {
+                ctx.fillStyle = '#555';
+                ctx.font = '10px "Press Start 2P", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('GET READY', W / 2, H / 2 + 40);
+            }
+        }
+
+        function loop(timestamp) {
+            if (!gameRunning) return;
+            requestAnimationFrame(loop);
+
+            // Simple fixed-step game loop
+            update();
+            draw();
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
+var m={};
+function k(i){return Object.keys(m)[i]||null}
+var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
+setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
+clear:function(){m={}},key:k};
+Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
+try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
+})();</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Sand</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            background: #0d0b0a;
+            color: #e8e0d4;
+            font-family: 'DM Mono', monospace;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none
+        }
+
+        #toolbar {
+            width: 232px;
+            min-width: 232px;
+            background: #141210;
+            border-right: 1px solid #2a2520;
+            padding: 20px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            overflow-y: auto
+        }
+
+        #toolbar::-webkit-scrollbar {
+            width: 4px
+        }
+
+        #toolbar::-webkit-scrollbar-track {
+            background: transparent
+        }
+
+        #toolbar::-webkit-scrollbar-thumb {
+            background: #2a2520;
+            border-radius: 2px
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: #d4a843;
+            letter-spacing: .2em;
+            margin-bottom: 16px
+        }
+
+        .label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: .2em;
+            color: #4a4538;
+            margin-top: 10px;
+            margin-bottom: 3px;
+            padding-bottom: 3px;
+            border-bottom: 1px solid #1e1c18
+        }
+
+        .elem-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 10px;
+            background: none;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            color: #a09888;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all .12s ease
+        }
+
+        .elem-btn:hover {
+            background: #1c1a17;
+            border-color: #2a2520;
+            color: #d0c8b8
+        }
+
+        .elem-btn.active {
+            background: #1c1914;
+            border-color: #d4a843;
+            color: #d4a843
+        }
+
+        .swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            flex-shrink: 0
+        }
+
+        .key-hint {
+            margin-left: auto;
+            font-size: 10px;
+            opacity: .3
+        }
+
+        .slider-row {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-top: 6px
+        }
+
+        .slider-row label {
+            font-size: 11px;
+            color: #6a6058;
+            display: flex;
+            justify-content: space-between
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 3px;
+            background: #2a2520;
+            border-radius: 2px;
+            outline: none
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #d4a843;
+            border-radius: 50%;
+            cursor: pointer
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 12px;
+            height: 12px;
+            background: #d4a843;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none
+        }
+
+        .btn {
+            padding: 7px 10px;
+            background: #1c1a17;
+            border: 1px solid #2a2520;
+            border-radius: 5px;
+            color: #a09888;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all .12s ease
+        }
+
+        .btn:hover {
+            background: #2a2520;
+            color: #d0c8b8
+        }
+
+        .btn:disabled {
+            opacity: .4;
+            pointer-events: none
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px
+        }
+
+        .btn-row .btn {
+            flex: 1;
+            text-align: center
+        }
+
+        #help {
+            margin-top: auto;
+            font-size: 10px;
+            color: #3a3530;
+            line-height: 1.7;
+            padding-top: 14px
+        }
+
+        .cooking-locked {
+            display: none
+        }
+
+        #cookToast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #1c1914;
+            border: 1px solid #d4a843;
+            color: #d4a843;
+            font-family: 'DM Mono', monospace;
+            font-size: 12px;
+            padding: 10px 20px;
+            border-radius: 6px;
+            opacity: 0;
+            transition: opacity .4s, transform .4s;
+            pointer-events: none;
+            z-index: 99
+        }
+
+        #cookToast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0)
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: #d4a843;
+            letter-spacing: .2em;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: color .15s
+        }
+
+        h1:hover {
+            color: #e8bc55
+        }
+
+        #main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            overflow: hidden
+        }
+
+        #canvas {
+            background: #0a0908;
+            border: 1px solid #1e1c18;
+            cursor: crosshair;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges
+        }
+
+        #stats {
+            font-size: 10px;
+            color: #3a3530;
+            text-align: center;
+            margin-top: 8px
+        }
+    </style>
+</head>
+
+<body>
+    <aside id="toolbar">
+        <h1 id="sandTitle">SAND</h1>
+        <div id="elements"></div>
+        <div class="label">Size <span id="bsVal">3</span></div>
+        <div class="slider-row"><input type="range" id="bs" min="1" max="20" value="3"></div>
+        <div class="label">Mode</div>
+        <div class="btn-row">
+            <button class="btn active" id="modeBrush">Brush</button>
+            <button class="btn" id="modeRect">Rect</button>
+            <button class="btn" id="modeFill">Fill</button>
+        </div>
+        <div class="label">Speed <span id="spVal">1.0x</span></div>
+        <div class="slider-row"><input type="range" id="sp" min="1" max="40" value="10"></div>
+        <div class="btn-row"><button class="btn" id="saveBtn">Save</button><button class="btn" id="resetBtn"
+                disabled>Reset</button></div>
+        <div class="btn-row"><button class="btn" id="clearBtn">Clear</button><button class="btn"
+                id="pauseBtn">Pause</button></div>
+        <div id="help">Left click &mdash; draw<br>Right click &mdash; erase<br>Space &mdash; pause<br>1&ndash;0
+            Q/W/E/R/T/Y/U/A/S/D/G/H/N/I/B/C/V/Z/X &mdash; select</div>
+    </aside>
+    <main id="main">
+        <div><canvas id="canvas"></canvas>
+            <div id="stats"></div>
+        </div>
+    </main>
+    <div id="cookToast">🍳 cooking mode unlocked</div>
+
+    <script>
+        (function () {
+            'use strict';
+
+            const EMPTY = 0, SAND = 1, WATER = 2, STONE = 3, FIRE = 4, SMOKE = 5, OIL = 6, WOOD = 7, STEAM = 8,
+                ACID = 9, LAVA = 10, GUNPOWDER = 11, PLANT = 12, ICE = 13,
+                MUD = 14, SALT = 15, GOLD = 16, METHANE = 17,
+                COAL = 18, DUST = 19, TAR = 20, VINE = 21, ELECTRICITY = 22, SODIUM = 23,
+                IRON = 24, TNT = 25, NITROGEN = 26, CLONER = 27, DESTAT = 28, OBSIDIAN = 29,
+                STOVE = 30, PAN = 31, FLOUR = 32, EGG = 33, DOUGH = 34, BREAD = 35, SUGAR = 36, CARAMEL = 37;
+
+            const ELEMENTS = [
+                { id: SAND, name: 'Sand', color: [194, 178, 128], key: '1', cat: 'Powders', desc: 'Falls and piles, absorbs water into mud' },
+                { id: GUNPOWDER, name: 'Gunpowder', color: [90, 80, 65], key: '2', cat: 'Powders', desc: 'Explosive — keep away from fire' },
+                { id: SALT, name: 'Salt', color: [220, 215, 200], key: 'r', cat: 'Powders', desc: 'Dissolves in water, melts ice' },
+                { id: DUST, name: 'Dust', color: [140, 125, 110], key: 's', cat: 'Powders', desc: 'Ultra-light powder, explosive near fire' },
+                { id: WATER, name: 'Water', color: [50, 120, 210], key: '3', cat: 'Liquids', desc: 'Flows, extinguishes fire, conducts electricity' },
+                { id: OIL, name: 'Oil', color: [80, 50, 20], key: '4', cat: 'Liquids', desc: 'Floats on water, flammable' },
+                { id: ACID, name: 'Acid', color: [100, 230, 50], key: '5', cat: 'Liquids', desc: 'Dissolves most materials' },
+                { id: LAVA, name: 'Lava', color: [230, 70, 20], key: '6', cat: 'Liquids', desc: 'Hot liquid, hardens in water' },
+                { id: MUD, name: 'Mud', color: [90, 60, 25], key: 't', cat: 'Liquids', desc: 'Viscous, made from sand + water' },
+                { id: TAR, name: 'Tar', color: [30, 20, 10], key: 'd', cat: 'Liquids', desc: 'Viscous, extremely flammable' },
+                { id: STONE, name: 'Stone', color: [140, 140, 140], key: '7', cat: 'Solids', desc: 'Immovable solid' },
+                { id: WOOD, name: 'Wood', color: [120, 75, 30], key: '8', cat: 'Solids', desc: 'Flammable solid' },
+                { id: ICE, name: 'Ice', color: [180, 210, 240], key: '9', cat: 'Solids', desc: 'Melts near heat, freezes water' },
+                { id: PLANT, name: 'Plant', color: [50, 140, 40], key: '0', cat: 'Solids', desc: 'Grows with water, flammable' },
+                { id: GOLD, name: 'Gold', color: [212, 175, 55], key: 'y', cat: 'Solids', desc: 'Heavy metal, excellent conductor' },
+                { id: COAL, name: 'Coal', color: [50, 45, 40], key: 'a', cat: 'Solids', desc: 'Burns slowly, self-sustaining ember' },
+                { id: VINE, name: 'Vine', color: [25, 100, 30], key: 'g', cat: 'Solids', desc: 'Grows downward with water, fire-resistant' },
+                { id: SODIUM, name: 'Sodium', color: [180, 175, 185], key: 'n', cat: 'Solids', desc: 'Reactive metal — explosive in water' },
+                { id: IRON, name: 'Iron', color: [160, 155, 150], key: 'i', cat: 'Solids', desc: 'Heavy metal — conducts electricity as a one-shot ripple, melts in lava, dissolves in acid' },
+                { id: TNT, name: 'TNT', color: [200, 40, 30], key: 'b', cat: 'Solids', desc: 'Massive explosion on contact with fire, electricity, or impact' },
+                { id: OBSIDIAN, name: 'Obsidian', color: [30, 20, 45], key: 'f', cat: 'Solids', desc: 'Forms when lava meets water — immune to acid and explosions, harder than stone' },
+                { id: FIRE, name: 'Fire', color: [255, 100, 30], key: 'q', cat: 'Gases', desc: 'Ignites flammable materials' },
+                { id: SMOKE, name: 'Smoke', color: [100, 100, 100], key: 'w', cat: 'Gases', desc: 'Rises from fire' },
+                { id: STEAM, name: 'Steam', color: [200, 210, 225], key: 'e', cat: 'Gases', desc: 'Rises from hot water' },
+                { id: METHANE, name: 'Methane', color: [60, 70, 50], key: 'u', cat: 'Gases', desc: 'Flammable gas — explodes near fire' },
+                { id: ELECTRICITY, name: 'Electricity', color: [255, 255, 100], key: 'h', cat: 'Gases', desc: 'Spark — charges water/gold, ignites materials' },
+                { id: NITROGEN, name: 'Nitrogen', color: [180, 220, 255], key: 'c', cat: 'Gases', desc: 'Cryogenic gas — freezes water/lava/mud, extinguishes fire' },
+                { id: CLONER, name: 'Cloner', color: [130, 60, 200], key: 'v', cat: 'Tools', desc: 'Absorbs first falling particle it touches, emits clones above and below' },
+                { id: DESTAT, name: 'Destat', color: [60, 180, 120], key: 'z', cat: 'Tools', desc: 'Neutralizes electrified elements on contact — drains charged water, gold, and iron' },
+                { id: EMPTY, name: 'Eraser', color: [50, 46, 40], key: 'x', cat: 'Tools', desc: 'Removes elements' },
+                { id: STOVE, name: 'Stove', color: [180, 60, 20], key: 'j', cat: 'Cooking', cooking: true, desc: 'Constant heat source — warms everything above it' },
+                { id: PAN, name: 'Pan', color: [90, 85, 80], key: 'k', cat: 'Cooking', cooking: true, desc: 'Heavy cookware — conducts and holds heat, cooks things placed in it' },
+                { id: FLOUR, name: 'Flour', color: [240, 235, 220], key: 'l', cat: 'Cooking', cooking: true, desc: 'Powder — mix with water to make dough' },
+                { id: EGG, name: 'Egg', color: [255, 240, 180], key: 'm', cat: 'Cooking', cooking: true, desc: 'Liquid — sets solid when heated' },
+                { id: DOUGH, name: 'Dough', color: [220, 200, 160], key: 'o', cat: 'Cooking', cooking: true, desc: 'Viscous liquid — bakes into bread when hot enough' },
+                { id: BREAD, name: 'Bread', color: [190, 140, 70], key: 'p', cat: 'Cooking', cooking: true, desc: 'Solid — burns to coal if overheated' },
+                { id: SUGAR, name: 'Sugar', color: [250, 248, 240], key: '[', cat: 'Cooking', cooking: true, desc: 'Powder — melts into caramel when heated' },
+                { id: CARAMEL, name: 'Caramel', color: [200, 120, 30], key: ']', cat: 'Cooking', cooking: true, desc: 'Viscous liquid — burns to smoke if overheated' }
+            ];
+
+            const DENSITY = new Float32Array(38);
+            DENSITY[EMPTY] = 0; DENSITY[FIRE] = .5; DENSITY[METHANE] = .3; DENSITY[SMOKE] = 1;
+            DENSITY[NITROGEN] = .8;
+            DENSITY[STEAM] = 1; DENSITY[ELECTRICITY] = 1; DENSITY[OIL] = 2; DENSITY[DUST] = 3; DENSITY[WATER] = 4;
+            DENSITY[MUD] = 5; DENSITY[ACID] = 5;
+            DENSITY[SAND] = 6; DENSITY[GUNPOWDER] = 6; DENSITY[SALT] = 6; DENSITY[COAL] = 6; DENSITY[TAR] = 6; DENSITY[SODIUM] = 6;
+            DENSITY[LAVA] = 8; DENSITY[ICE] = 10; DENSITY[PLANT] = 10;
+            DENSITY[WOOD] = 10; DENSITY[STONE] = 10; DENSITY[VINE] = 10; DENSITY[GOLD] = 15;
+            DENSITY[IRON] = 15; DENSITY[TNT] = 10; DENSITY[CLONER] = 10; DENSITY[DESTAT] = 10; DENSITY[OBSIDIAN] = 10;
+            DENSITY[STOVE] = 10; DENSITY[PAN] = 10; DENSITY[FLOUR] = 6; DENSITY[EGG] = 4; DENSITY[DOUGH] = 5; DENSITY[BREAD] = 10; DENSITY[SUGAR] = 6; DENSITY[CARAMEL] = 6;
+
+            const FLAMMABLE = new Set([WOOD, OIL, PLANT, COAL, TAR, DUST, VINE, SODIUM]);
+
+            const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+            const CELL = 4, TW = 232, PAD = 32;
+            const availW = Math.max(CELL, (document.documentElement.clientWidth || window.innerWidth) - TW - PAD);
+            const availH = Math.max(CELL, (document.documentElement.clientHeight || window.innerHeight) - PAD);
+            canvas.width = Math.floor(availW / CELL) * CELL;
+            canvas.height = Math.floor(availH / CELL) * CELL;
+            const COLS = canvas.width / CELL, ROWS = canvas.height / CELL;
+            const off = document.createElement('canvas'); off.width = COLS; off.height = ROWS;
+            const offCtx = off.getContext('2d'), imgData = offCtx.createImageData(COLS, ROWS), px = imgData.data;
+            for (let i = 3; i < px.length; i += 4)px[i] = 255;
+            const grid = new Uint8Array(COLS * ROWS), gLife = new Uint8Array(COLS * ROWS), gMove = new Uint8Array(COLS * ROWS), gExtra = new Uint8Array(COLS * ROWS), gTemp = new Uint8Array(COLS * ROWS);
+            let frame = 0, flashIntensity = 0;
+
+            let savedGrid = null, savedLife = null;
+            document.getElementById('saveBtn').addEventListener('click', () => {
+                savedGrid = new Uint8Array(grid); savedLife = new Uint8Array(gLife);
+                document.getElementById('resetBtn').disabled = false;
+            });
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                if (savedGrid) { grid.set(savedGrid); gLife.set(savedLife); gMove.fill(0); gExtra.fill(0); gTemp.fill(0); }
+            });
+
+            const I = (x, y) => y * COLS + x, ok = (x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS;
+            const cl = (v, a, b) => v < a ? a : v > b ? b : v, rnd = (a, b) => (Math.random() * (b - a + 1) | 0) + a;
+            function hash(x, y) { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return (h ^ (h >> 16)) >>> 0; }
+
+            function moveTo(x1, y1, x2, y2) { const a = I(x1, y1), b = I(x2, y2); grid[b] = grid[a]; grid[a] = EMPTY; gLife[b] = gLife[a]; gLife[a] = 0; gMove[b] = 1; }
+            function swapC(x1, y1, x2, y2) { const a = I(x1, y1), b = I(x2, y2); let t = grid[a]; grid[a] = grid[b]; grid[b] = t; t = gLife[a]; gLife[a] = gLife[b]; gLife[b] = t; gMove[b] = 1; }
+            function fallTo(x, y, dx, dy) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) return false; const tgt = grid[I(nx, ny)]; if (tgt === EMPTY) { moveTo(x, y, nx, ny); return true; } const me = grid[I(x, y)]; if (DENSITY[me] > DENSITY[tgt] && DENSITY[tgt] < 10) { swapC(x, y, nx, ny); return true; } return false; }
+            function slideTo(x, y, dx, dy) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny) || grid[I(nx, ny)] !== EMPTY) return false; moveTo(x, y, nx, ny); return true; }
+
+            function explode(cx, cy, R) {
+                for (let dy = -R; dy <= R; dy++)for (let dx = -R; dx <= R; dx++) {
+                    const x = cx + dx, y = cy + dy; if (!ok(x, y)) continue;
+                    const dist = Math.sqrt(dx * dx + dy * dy); if (dist > R) continue;
+                    const i = I(x, y); if (grid[i] === STONE && dist > R * .3) continue;
+                    if (grid[i] === OBSIDIAN) continue;
+                    if (grid[i] === IRON && dist > R * .5) continue;// iron absorbs blast partially
+                    if (grid[i] === TNT && dist > 0 && gLife[i] === 0) { gLife[i] = rnd(2, 6); gMove[i] = 1; continue; }// chain fuse
+                    if (Math.random() < (1 - dist / R) * .85) {
+                        if (dist < R * .2) { grid[i] = FIRE; gLife[i] = rnd(20, 50); }
+                        else if (dist < R * .5) { grid[i] = Math.random() < .6 ? FIRE : EMPTY; gLife[i] = rnd(30, 70); }
+                        else if (dist < R * .8) { grid[i] = Math.random() < .5 ? SMOKE : FIRE; gLife[i] = rnd(20, 50); }
+                        else if (Math.random() < .5) { grid[i] = SMOKE; gLife[i] = rnd(20, 40); }
+                        gExtra[i] = 0; gMove[i] = 1;
+                    }
+                }
+                const SR = R + 5;
+                for (let dy = -SR; dy <= SR; dy++)for (let dx = -SR; dx <= SR; dx++) {
+                    const x = cx + dx, y = cy + dy; if (!ok(x, y)) continue;
+                    const dist = Math.sqrt(dx * dx + dy * dy); if (dist < R * .7 || dist > SR) continue;
+                    const i = I(x, y); if (grid[i] === EMPTY || grid[i] === STONE || grid[i] === OBSIDIAN || gMove[i]) continue;
+                    const px2 = dx === 0 ? 0 : (dx > 0 ? 1 : -1), py2 = dy === 0 ? 0 : (dy > 0 ? 1 : -1);
+                    const baseStr = Math.ceil((1 - (dist - R * .7) / (SR - R * .7)) * 4);
+                    const str = grid[I(x, y)] === DUST ? Math.min(baseStr * 2, 12) : baseStr;
+                    for (let s = str; s >= 1; s--) { const nx = x + px2 * s, ny = y + py2 * s; if (ok(nx, ny) && grid[I(nx, ny)] === EMPTY) { moveTo(x, y, nx, ny); break; } }
+                }
+                flashIntensity = Math.max(flashIntensity, R * .1);
+            }
+
+            function propagateCharge(x, y, rateW, rateG, ignRate) {
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if (nt === WATER && gLife[ni] === 0 && Math.random() < rateW) { gLife[ni] = rnd(12, 20); }
+                    else if (nt === GOLD && gLife[ni] === 0 && Math.random() < rateG) { gLife[ni] = rnd(18, 30); }
+                    else if (nt === IRON && gExtra[ni] === 0) { gExtra[ni] = IRON_COUNTDOWN; }
+                    else if (nt === TNT) { explode(nx, ny, 18); }
+                    else if (nt === GUNPOWDER) { explode(nx, ny, 10); }
+                    else if (nt === METHANE) { explode(nx, ny, 6); }
+                    else if (nt === SODIUM) { explode(nx, ny, 8); }
+                    else if (nt === COAL && gLife[ni] === 0 && Math.random() < ignRate) { gLife[ni] = rnd(200, 255); }
+                    else if ((nt === TAR || nt === OIL) && Math.random() < ignRate) { grid[ni] = FIRE; gLife[ni] = rnd(200, 255); }
+                    else if (nt === DUST && Math.random() < ignRate) { grid[ni] = FIRE; gLife[ni] = rnd(30, 60); }
+                    else if (nt === WOOD && Math.random() < ignRate) { grid[ni] = FIRE; gLife[ni] = rnd(50, 100); }
+                }
+            }
+
+            /* ── Element updates ── */
+
+            function updSand(x, y) {
+                if (gMove[I(x, y)]) return;
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (ok(nx, ny) && grid[I(nx, ny)] === WATER && Math.random() < .003) { grid[I(x, y)] = MUD; gLife[I(x, y)] = 0; grid[I(nx, ny)] = EMPTY; gLife[I(nx, ny)] = 0; gMove[I(x, y)] = 1; return; } }
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1);
+            }
+
+            function updWater(x, y) {
+                if (gMove[I(x, y)]) return;
+                const i = I(x, y);
+                if (gLife[i] === 253) {
+                    // drain wave: spread drain to charged neighbours, then clear self
+                    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                        const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                        const ni = I(nx, ny), nt = grid[ni];
+                        if ((nt === WATER || nt === GOLD) && gLife[ni] > 0 && gLife[ni] !== 253) { gLife[ni] = 253; }
+                        else if (nt === IRON && gExtra[ni] > IRON_COOLDOWN) { gExtra[ni] = 0; }
+                    }
+                    gLife[i] = 0;
+                } else if (gLife[i] > 0) { gLife[i]--; propagateCharge(x, y, .4, .5, .1); }
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (ok(nx, ny) && grid[I(nx, ny)] === SMOKE && Math.random() < .15) { grid[I(nx, ny)] = EMPTY; gLife[I(nx, ny)] = 0; } }
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; if (fallTo(x, y, -d, 1)) return; if (Math.random() < .8) { if (slideTo(x, y, d, 0)) return; slideTo(x, y, -d, 0); }
+            }
+
+            function updOil(x, y) {
+                if (gMove[I(x, y)]) return;
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; if (fallTo(x, y, -d, 1)) return; if (Math.random() < .5) { if (slideTo(x, y, d, 0)) return; slideTo(x, y, -d, 0); }
+            }
+
+            function updFire(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y); gLife[i]--;
+                if (gLife[i] <= 0) { grid[i] = Math.random() < .6 ? SMOKE : EMPTY; gLife[i] = rnd(30, 70); return; }
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if (nt === WATER) { grid[ni] = STEAM; gLife[ni] = rnd(30, 60); gMove[ni] = 1; grid[i] = SMOKE; gLife[i] = rnd(15, 30); return; }
+                    if (nt === ICE && Math.random() < .05) { grid[ni] = WATER; gMove[ni] = 1; }
+                    if (nt === GUNPOWDER) { explode(nx, ny, 10); return; }
+                    if (nt === METHANE) { explode(nx, ny, 6); return; }
+                    if (nt === TNT) { explode(nx, ny, 18); return; }
+                    if (nt === NITROGEN) { grid[i] = SMOKE; gLife[i] = rnd(10, 20); grid[ni] = EMPTY; return; }// nitrogen snuffs fire
+                    if (nt === MUD && Math.random() < .008) { grid[ni] = SAND; gMove[ni] = 1; }
+                    if (nt === LAVA) continue;
+                    if (nt === COAL && gLife[ni] === 0 && Math.random() < .15) { gLife[ni] = rnd(200, 255); gMove[ni] = 1; }
+                    else if (nt === TAR && Math.random() < .2) { grid[ni] = FIRE; gLife[ni] = rnd(200, 255); gMove[ni] = 1; }
+                    else if (nt === DUST && Math.random() < .25) { grid[ni] = FIRE; gLife[ni] = rnd(30, 60); gMove[ni] = 1; }
+                    else if (nt === OIL && Math.random() < .25) { grid[ni] = FIRE; gLife[ni] = rnd(200, 255); gMove[ni] = 1; }
+                    else if (nt === VINE && Math.random() < .1) { grid[ni] = FIRE; gLife[ni] = rnd(50, 100); gMove[ni] = 1; }
+                    else if ((nt === WOOD || nt === PLANT) && Math.random() < .15) { grid[ni] = FIRE; gLife[ni] = rnd(50, 100); gMove[ni] = 1; }
+                }
+                if (grid[i] !== FIRE) return;
+                // Core upward movement bias
+                if (Math.random() < .4) { if (slideTo(x, y, 0, -1)) return; const d = Math.random() < .5 ? 1 : -1; if (slideTo(x, y, d, -1)) return; if (slideTo(x, y, -d, -1)) return; }
+                // Occasional "creeping" sideways or down to allow burning downwards/sideways more naturally
+                if (Math.random() < .15) { 
+                    const d = Math.random() < .5 ? 1 : -1;
+                    if (slideTo(x, y, d, 0)) return; if (slideTo(x, y, -d, 0)) return;
+                    if (Math.random() < .2) { // very small chance to drift down if blocked elsewhere
+                        if (slideTo(x, y, 0, 1)) return; if (slideTo(x, y, d, 1)) return; if (slideTo(x, y, -d, 1)) return;
+                    }
+                }
+            }
+
+            function updSmoke(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y); gLife[i]--; if (gLife[i] === 255) { grid[i] = EMPTY; return; }
+                if (Math.random() < .6 && slideTo(x, y, 0, -1)) return; const d = Math.random() < .5 ? 1 : -1;
+                if (slideTo(x, y, d, -1)) return; if (slideTo(x, y, -d, -1)) return; if (Math.random() < .15) slideTo(x, y, d, 0);
+            }
+
+            function updSteam(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y); gLife[i]--; if (gLife[i] === 255) { grid[i] = Math.random() < .35 ? WATER : EMPTY; gLife[i] = 0; return; }
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (ok(nx, ny) && grid[I(nx, ny)] === ICE && Math.random() < .06) { grid[i] = WATER; gLife[i] = 0; return; } }
+                if (Math.random() < .5 && slideTo(x, y, 0, -1)) return; const d = Math.random() < .5 ? 1 : -1;
+                if (slideTo(x, y, d, -1)) return; if (slideTo(x, y, -d, -1)) return; if (Math.random() < .1) slideTo(x, y, d, 0);
+            }
+
+            function updAcid(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y);
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if (nt === EMPTY || nt === ACID || nt === OBSIDIAN) continue;
+                    if (nt === LAVA) { grid[ni] = SMOKE; gLife[ni] = rnd(20, 40); gMove[ni] = 1; if (Math.random() < .4) { grid[i] = OBSIDIAN; gLife[i] = 0; return; } continue; }
+                    if (nt === GOLD && Math.random() < .001) { grid[ni] = EMPTY; gMove[ni] = 1; if (Math.random() < .15) { grid[i] = EMPTY; return; } continue; }
+                    let ch = .015; if (nt === STONE) ch = .002; if (nt === ICE) ch = .01; if (nt === PLANT || nt === VINE) ch = .06;
+                    if (Math.random() < ch) { grid[ni] = Math.random() < .3 ? SMOKE : EMPTY; gLife[ni] = rnd(10, 25); gMove[ni] = 1; if (Math.random() < .2) { grid[i] = EMPTY; return; } }
+                }
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (ok(nx, ny) && grid[I(nx, ny)] === WATER && Math.random() < .003) { grid[i] = WATER; return; } }
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; if (fallTo(x, y, -d, 1)) return; if (Math.random() < .7) { if (slideTo(x, y, d, 0)) return; slideTo(x, y, -d, 0); }
+            }
+
+            function updLava(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y);
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if (nt === WATER) { grid[ni] = STEAM; gLife[ni] = rnd(30, 60); gMove[ni] = 1; grid[i] = OBSIDIAN; gLife[i] = 0; return; }
+                    if (nt === ICE) { grid[ni] = WATER; gMove[ni] = 1; }
+                    if (nt === ACID) { grid[ni] = SMOKE; gLife[ni] = rnd(20, 40); gMove[ni] = 1; if (Math.random() < .3) { grid[i] = STONE; gLife[i] = 0; return; } }
+                    if (nt === MUD && Math.random() < .03) { grid[ni] = STONE; gMove[ni] = 1; }
+                    if (nt === SALT && Math.random() < .01) { grid[ni] = EMPTY; gMove[ni] = 1; }
+                    if (nt === SAND && Math.random() < .015) { grid[ni] = LAVA; gMove[ni] = 1; }
+                    if (nt === GOLD && Math.random() < .003) { grid[ni] = LAVA; gMove[ni] = 1; }
+                    if (nt === GUNPOWDER && Math.random() < .08) { explode(nx, ny, 10); if (grid[i] !== LAVA) return; continue; }
+                    if (nt === METHANE) { explode(nx, ny, 6); if (grid[i] !== LAVA) return; continue; }
+                    if (nt === TNT) { explode(nx, ny, 18); if (grid[i] !== LAVA) return; continue; }
+                    if (nt === IRON && Math.random() < .003) { grid[ni] = LAVA; gExtra[ni] = 0; gMove[ni] = 1; }// lava melts iron
+                    if (nt === COAL && gLife[ni] === 0 && Math.random() < .06) { gLife[ni] = rnd(200, 255); gMove[ni] = 1; }
+                    else if (nt === TAR) { grid[ni] = FIRE; gLife[ni] = rnd(200, 255); gMove[ni] = 1; }
+                    else if (nt === DUST && Math.random() < .15) { grid[ni] = FIRE; gLife[ni] = rnd(30, 60); gMove[ni] = 1; }
+                    else if (nt === OIL && Math.random() < .10) { grid[ni] = FIRE; gLife[ni] = rnd(200, 255); gMove[ni] = 1; }
+                    else if (nt === VINE && Math.random() < .01) { grid[ni] = FIRE; gLife[ni] = rnd(50, 100); gMove[ni] = 1; }
+                    else if ((nt === WOOD || nt === PLANT) && Math.random() < .06) { grid[ni] = FIRE; gLife[ni] = rnd(50, 100); gMove[ni] = 1; }
+                }
+                if (grid[i] !== LAVA) return;
+                let ln = 0; for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { if (ok(x + dx, y + dy) && grid[I(x + dx, y + dy)] === LAVA) ln++; }
+                if (Math.random() < .0005 / (1 + ln * .6)) { grid[i] = STONE; return; }
+                if (Math.random() > .35) return;
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; if (fallTo(x, y, -d, 1)) return; if (Math.random() < .3) { if (slideTo(x, y, d, 0)) return; slideTo(x, y, -d, 0); }
+            }
+
+            function updGunpowder(x, y) {
+                if (gMove[I(x, y)]) return;
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; const nt = grid[I(nx, ny)]; if (nt === FIRE || nt === LAVA) { explode(x, y, 10); return; } }
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1);
+            }
+
+            function updPlant(x, y) {
+                const i = I(x, y);
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; const nt = grid[I(nx, ny)]; if (nt === FIRE || nt === LAVA) { grid[i] = FIRE; gLife[i] = rnd(50, 100); return; } if (nt === ACID && Math.random() < .04) { grid[i] = EMPTY; return; } }
+                if (Math.random() > .8) return;
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; if (grid[I(nx, ny)] === WATER) { for (const [gx, gy] of [[0, -1], [-1, -1], [1, -1], [-1, 0], [1, 0]]) { const gnx = x + gx, gny = y + gy; if (ok(gnx, gny) && grid[I(gnx, gny)] === EMPTY) { grid[I(nx, ny)] = EMPTY; grid[I(gnx, gny)] = PLANT; gMove[I(gnx, gny)] = 1; return; } } return; } }
+            }
+
+            function updIce(x, y) {
+                const i = I(x, y); let heat = 0;
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; const nt = grid[I(nx, ny)]; if (nt === FIRE || nt === LAVA) heat += 3; if (nt === WATER) heat--; if (nt === SALT) heat += 2; }
+                if (heat > 0 && Math.random() < heat * .015) { grid[i] = WATER; return; }
+                if (Math.random() > .003) return;
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; if (grid[I(nx, ny)] === WATER && Math.random() < .08) { grid[I(nx, ny)] = ICE; gMove[I(nx, ny)] = 1; return; } }
+            }
+
+            function updMud(x, y) {
+                if (gMove[I(x, y)]) return;
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; const nt = grid[I(nx, ny)]; if (nt === LAVA && Math.random() < .03) { grid[I(x, y)] = STONE; return; } if (nt === FIRE && Math.random() < .008) { grid[I(x, y)] = SAND; return; } }
+                if (Math.random() > .4) return;
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; if (fallTo(x, y, -d, 1)) return; if (Math.random() < .2) { if (slideTo(x, y, d, 0)) return; slideTo(x, y, -d, 0); }
+            }
+
+            function updSalt(x, y) {
+                if (gMove[I(x, y)]) return;
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if (nt === WATER && Math.random() < .08) { grid[I(x, y)] = EMPTY; return; }
+                    if (nt === ICE && Math.random() < .04) { grid[ni] = WATER; gMove[ni] = 1; }
+                    if (nt === PLANT && Math.random() < .01) { grid[ni] = SAND; gMove[ni] = 1; }
+                    if (nt === MUD && Math.random() < .02) { grid[ni] = SAND; gMove[ni] = 1; }
+                }
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1);
+            }
+
+            function updGold(x, y) {
+                const i = I(x, y);
+                if (gLife[i] === 253) {
+                    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                        const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                        const ni = I(nx, ny), nt = grid[ni];
+                        if ((nt === WATER || nt === GOLD) && gLife[ni] > 0 && gLife[ni] !== 253) { gLife[ni] = 253; }
+                        else if (nt === IRON && gExtra[ni] > IRON_COOLDOWN) { gExtra[ni] = 0; }
+                    }
+                    gLife[i] = 0;
+                } else if (gLife[i] > 0) { gLife[i]--; propagateCharge(x, y, .5, .6, .15); }
+                if (gMove[I(x, y)]) return;
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1);
+            }
+
+            function updMethane(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y);
+                if (Math.random() < .0008) { grid[i] = EMPTY; return; }
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; const nt = grid[I(nx, ny)]; if (nt === FIRE || nt === LAVA) { explode(x, y, 6); return; } }
+                if (Math.random() < .7 && slideTo(x, y, 0, -1)) return;
+                const d = Math.random() < .5 ? 1 : -1; if (slideTo(x, y, d, -1)) return; if (slideTo(x, y, -d, -1)) return;
+                if (Math.random() < .3) { if (slideTo(x, y, d, 0)) return; slideTo(x, y, -d, 0); }
+            }
+
+            function updCoal(x, y) {
+                const i = I(x, y);
+                if (gLife[i] > 0) {
+                    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; if (grid[I(nx, ny)] === WATER) { grid[I(nx, ny)] = STEAM; gLife[I(nx, ny)] = rnd(30, 60); gMove[I(nx, ny)] = 1; gLife[i] = 0; return; } }
+                    gLife[i]--; if (gLife[i] === 0) { grid[i] = SMOKE; gLife[i] = rnd(30, 50); return; }
+                    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                        const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                        const ni = I(nx, ny), nt = grid[ni];
+                        if (nt === ICE && Math.random() < .05) { grid[ni] = WATER; gMove[ni] = 1; }
+                        if (nt === GUNPOWDER && Math.random() < .015) { explode(nx, ny, 10); return; }
+                        if (nt === METHANE && Math.random() < .015) { explode(nx, ny, 6); return; }
+                        if (nt === COAL && gLife[ni] === 0 && Math.random() < .02) { gLife[ni] = rnd(200, 255); gMove[ni] = 1; }
+                        else if (nt !== COAL && FLAMMABLE.has(nt) && Math.random() < (nt === OIL ? .03 : nt === TAR ? .03 : (nt === PLANT || nt === VINE) ? .02 : .015)) { grid[ni] = FIRE; gLife[ni] = rnd(50, 100); gMove[ni] = 1; }
+                    }
+                    if (Math.random() < .02) { for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (ok(nx, ny) && grid[I(nx, ny)] === EMPTY) { grid[I(nx, ny)] = SMOKE; gLife[I(nx, ny)] = rnd(30, 50); gMove[I(nx, ny)] = 1; break; } } }
+                    return;
+                }
+                if (gMove[I(x, y)]) return;
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1);
+            }
+
+            function updDust(x, y) {
+                if (gMove[I(x, y)]) return;
+                if (Math.random() > .6) return;
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1);
+            }
+
+            function updTar(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y);
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; const nt = grid[I(nx, ny)]; if (nt === FIRE && Math.random() < .5) { grid[i] = FIRE; gLife[i] = rnd(200, 255); return; } if (nt === LAVA) { grid[i] = FIRE; gLife[i] = rnd(200, 255); return; } }
+                if (Math.random() > .6) return;
+                fallTo(x, y, 0, 1);
+            }
+
+            function updVine(x, y) {
+                const i = I(x, y);
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; const nt = grid[I(nx, ny)]; if (nt === LAVA) { grid[i] = FIRE; gLife[i] = rnd(50, 100); return; } if (nt === FIRE && Math.random() < .4) { grid[i] = FIRE; gLife[i] = rnd(50, 100); return; } if (nt === ACID && Math.random() < .04) { grid[i] = EMPTY; return; } }
+                if (Math.random() > .8) return;
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue; if (grid[I(nx, ny)] === WATER) { for (const [gx, gy] of [[0, 1], [-1, 1], [1, 1], [-1, 0], [1, 0]]) { const gnx = x + gx, gny = y + gy; if (ok(gnx, gny) && grid[I(gnx, gny)] === EMPTY) { grid[I(nx, ny)] = EMPTY; grid[I(gnx, gny)] = VINE; gMove[I(gnx, gny)] = 1; return; } } return; } }
+            }
+
+            function updSodium(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y);
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if (nt === WATER) {
+                        grid[ni] = STEAM; gLife[ni] = rnd(30, 60); gMove[ni] = 1;
+                        for (let dy2 = -5; dy2 <= 5; dy2++)for (let dx2 = -5; dx2 <= 5; dx2++) {
+                            if (Math.sqrt(dx2 * dx2 + dy2 * dy2) > 5) continue;
+                            const wx = x + dx2, wy = y + dy2; if (!ok(wx, wy)) continue;
+                            const wi = I(wx, wy); if (grid[wi] === WATER) { grid[wi] = STEAM; gLife[wi] = rnd(30, 60); gMove[wi] = 1; }
+                        }
+                        explode(x, y, 10); return;
+                    }
+                    if (nt === ACID) { grid[ni] = EMPTY; gMove[ni] = 1; explode(x, y, 6); if (grid[i] === SODIUM) { grid[i] = FIRE; gLife[i] = rnd(30, 60); } return; }
+                    if (nt === ICE) { grid[ni] = WATER; gMove[ni] = 1; grid[i] = FIRE; gLife[i] = rnd(50, 80); return; }
+                    if (nt === STEAM && Math.random() < .1) { grid[ni] = EMPTY; gMove[ni] = 1; grid[i] = FIRE; gLife[i] = rnd(20, 40); return; }
+                    if (nt === FIRE || nt === LAVA) { grid[i] = FIRE; gLife[i] = rnd(80, 120); return; }
+                }
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1);
+            }
+
+            function updElectricity(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y);
+                gLife[i]--; if (gLife[i] === 0) { grid[i] = EMPTY; return; }
+                let nearConductor = false;
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if (nt === WATER && gLife[ni] === 0) { nearConductor = true; if (Math.random() < .5) { gLife[ni] = rnd(12, 20); } }
+                    else if (nt === GOLD && gLife[ni] === 0) { nearConductor = true; if (Math.random() < .6) { gLife[ni] = rnd(18, 30); } }
+                    else if (nt === IRON && gExtra[ni] === 0) { nearConductor = true; gExtra[ni] = IRON_COUNTDOWN; }
+                    else if (nt === GUNPOWDER) { explode(nx, ny, 10); return; }
+                    else if (nt === METHANE) { explode(nx, ny, 6); return; }
+                    else if (nt === LAVA && Math.random() < .3) { explode(nx, ny, 3); return; }
+                    else if (nt === ICE && Math.random() < .05) { grid[ni] = WATER; }
+                    else if ((nt === PLANT || nt === VINE) && Math.random() < .15) { grid[ni] = EMPTY; }
+                    else if (nt === COAL && gLife[ni] === 0 && Math.random() < .15) { gLife[ni] = rnd(200, 255); }
+                    else if ((nt === TAR || nt === OIL) && Math.random() < .15) { grid[ni] = FIRE; gLife[ni] = rnd(200, 255); }
+                    else if (nt === DUST && Math.random() < .15) { grid[ni] = FIRE; gLife[ni] = rnd(30, 60); }
+                    else if (nt === WOOD && Math.random() < .15) { grid[ni] = FIRE; gLife[ni] = rnd(50, 100); }
+                }
+                if (nearConductor) { grid[i] = EMPTY; return; }
+                if (slideTo(x, y, 0, -1)) return; const d = Math.random() < .5 ? 1 : -1; if (slideTo(x, y, d, -1)) return; slideTo(x, y, -d, -1);
+            }
+
+            /* ── Iron ── */
+            // gExtra[i]: low nibble = rust level scaled (0-15 mapped to 0-250), bit 4 = energized this frame
+            // Simpler: use gExtra for rust 0-250, and a separate energized check via gMove
+            // Actually: gExtra = rust (0-250). Energized state stored as gExtra=255 (special sentinel, won't rust).
+            // Iron gExtra ranges: 0=neutral, 1-50=cooldown, 51-255=countdown-to-fire (fires when hits 50)
+            const IRON_COUNTDOWN = 70; // ticks before charge propagates
+            const IRON_COOLDOWN = 50;
+            function updIron(x, y) {
+                const i = I(x, y);
+                const e = gExtra[i];
+                if (e === 0) { }// neutral — check for environmental effects below
+                else if (e > IRON_COOLDOWN) {
+                    // counting down
+                    gExtra[i]--;
+                    if (gExtra[i] === IRON_COOLDOWN) {
+                        // fire: propagate to neutral neighbours
+                        for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                            const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                            const ni = I(nx, ny), nt = grid[ni];
+                            if (nt === IRON && gExtra[ni] === 0) { gExtra[ni] = IRON_COUNTDOWN; }
+                            else if (nt === WATER && gLife[ni] === 0 && Math.random() < .4) { gLife[ni] = rnd(12, 20); }
+                            else if (nt === GOLD && gLife[ni] === 0 && Math.random() < .5) { gLife[ni] = rnd(18, 30); }
+                            else if (nt === GUNPOWDER) { explode(nx, ny, 10); gExtra[i] = IRON_COOLDOWN; return; }
+                            else if (nt === METHANE) { explode(nx, ny, 6); gExtra[i] = IRON_COOLDOWN; return; }
+                            else if (nt === TNT) { explode(nx, ny, 18); gExtra[i] = IRON_COOLDOWN; return; }
+                        }
+                    }
+                    return;
+                }
+                else { gExtra[i]--; return; }// cooldown
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if (nt === ACID && Math.random() < .004) { grid[i] = EMPTY; gExtra[i] = 0; return; }
+                }
+            }
+
+            /* ── TNT ── */
+            // Explodes (radius 18) on: fire, electricity, lava, nearby explosion shockwave, or other TNT chain.
+            function updTNT(x, y) {
+                const i = I(x, y);
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const nt = grid[I(nx, ny)];
+                    if (nt === FIRE || nt === LAVA) { explode(x, y, 18); return; }
+                    if (nt === ELECTRICITY && gLife[I(nx, ny)] > 0) { explode(x, y, 18); return; }
+                }
+                // chain reaction: if life>0 it was set by nearby explosion
+                if (gLife[i] > 0) { gLife[i]--; if (gLife[i] === 0) { explode(x, y, 18); return; } }
+            }
+
+            /* ── Nitrogen ── */
+            // Light cold gas, rises. Freezes water→ice, lava→obsidian(stone), mud→ice, steam→water.
+            // Extinguishes fire. Liquefies (becomes a falling liquid droplet) at the bottom row.
+            // Dissipates over time.
+            function updNitrogen(x, y) {
+                if (gMove[I(x, y)]) return; const i = I(x, y);
+                gLife[i]--; if (gLife[i] === 255) { grid[i] = EMPTY; gExtra[i] = 0; return; }
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if (nt === FIRE) { grid[ni] = EMPTY; gLife[ni] = 0; gMove[ni] = 1; continue; }
+                    if (nt === WATER && Math.random() < .04) { grid[ni] = ICE; gMove[ni] = 1; }
+                    else if (nt === LAVA && Math.random() < .06) { grid[ni] = STONE; gMove[ni] = 1; }
+                    else if (nt === MUD && Math.random() < .04) { grid[ni] = ICE; gMove[ni] = 1; }
+                    else if (nt === STEAM && Math.random() < .08) { grid[ni] = WATER; gLife[ni] = 0; gMove[ni] = 1; }
+                    else if (nt === OIL && Math.random() < .015) { grid[ni] = ICE; gMove[ni] = 1; }
+                    else if (nt === METHANE && Math.random() < .02) { grid[ni] = ICE; gMove[ni] = 1; }
+                    else if (nt === ACID && Math.random() < .01) { grid[ni] = ICE; gMove[ni] = 1; }
+                    else if (nt === TAR && Math.random() < .02) { grid[ni] = STONE; gMove[ni] = 1; }
+                    else if (nt === SODIUM) { grid[ni] = ICE; gMove[ni] = 1; grid[i] = EMPTY; return; }
+                }
+                // falls downward (heavier-than-air cryogenic gas)
+                if (Math.random() < .65 && slideTo(x, y, 0, 1)) return;
+                const d = Math.random() < .5 ? 1 : -1;
+                if (slideTo(x, y, d, 1)) return; if (slideTo(x, y, -d, 1)) return;
+                if (Math.random() < .2) { if (slideTo(x, y, d, 0)) return; slideTo(x, y, -d, 0); }
+            }
+
+            /* ── Cloner ── */
+            // gExtra[i] stores the element id it has learned (0=unlearned).
+            // Once it learns an element, it tries to spawn one copy above (y-1) and one below (y+1) each tick.
+            // Only clones elements with density < 10 (powders + liquids + gases that fall/flow).
+            const CLONABLE = new Set([SAND, WATER, OIL, ACID, LAVA, MUD, SALT, GUNPOWDER, DUST, TAR, FIRE, SMOKE, STEAM, ELECTRICITY, GOLD, COAL, SODIUM, NITROGEN]);
+            function updCloner(x, y) {
+                const i = I(x, y);
+                if (gExtra[i] === 0) {
+                    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                        const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                        const nt = grid[I(nx, ny)];
+                        if (CLONABLE.has(nt)) { gExtra[i] = nt; break; }
+                    }
+                    return;
+                }
+                const elem = gExtra[i];
+                function spawnClone(ni) {
+                    grid[ni] = elem;
+                    if (elem === FIRE) gLife[ni] = rnd(50, 120);
+                    else if (elem === SMOKE) gLife[ni] = rnd(30, 70);
+                    else if (elem === STEAM) gLife[ni] = rnd(30, 60);
+                    else if (elem === ELECTRICITY) gLife[ni] = rnd(30, 50);
+                    else if (elem === NITROGEN) gLife[ni] = rnd(80, 160);
+                    else if (elem === COAL) gLife[ni] = 0;
+                    else gLife[ni] = 0;
+                    gMove[ni] = 1;
+                }
+                if (ok(x, y - 1) && grid[I(x, y - 1)] === EMPTY) spawnClone(I(x, y - 1));
+                if (ok(x, y + 1) && grid[I(x, y + 1)] === EMPTY) spawnClone(I(x, y + 1));
+            }
+
+            /* ── Destat ── */
+            // Seeds a drain wave (gLife=253) into adjacent charged water/gold/iron.
+            // The wave then propagates hop-by-hop through the charged network each tick.
+            function updDestat(x, y) {
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), nt = grid[ni];
+                    if ((nt === WATER || nt === GOLD) && gLife[ni] > 0 && gLife[ni] !== 253) { gLife[ni] = 253; }
+                    else if (nt === IRON && gExtra[ni] > IRON_COOLDOWN) { gExtra[ni] = 0; }
+                    else if (nt === ELECTRICITY) { grid[ni] = EMPTY; gLife[ni] = 0; }
+                }
+            }
+
+            /* ══ COOKING SYSTEM ══ */
+
+            // heatPass: called once per simulate tick. Stove/fire/lava raise gTemp;
+            // heat diffuses between adjacent cells; empty cells cool fast.
+            function heatPass() {
+                // heat sources raise their own gTemp
+                for (let i = 0; i < COLS * ROWS; i++) {
+                    const t = grid[i];
+                    if (t === STOVE) { gTemp[i] = 245; }
+                    else if (t === FIRE) { gTemp[i] = Math.min(gTemp[i] + 8, 200); }
+                    else if (t === LAVA) { gTemp[i] = Math.min(gTemp[i] + 12, 240); }
+                    else if (t === PAN) {/* holds heat — only cools slowly */ }
+                }
+                // diffuse heat to neighbours
+                for (let y = 0; y < ROWS; y++)for (let x = 0; x < COLS; x++) {
+                    const i = I(x, y);
+                    if (gTemp[i] < 2) continue;
+                    const spread = grid[i] === PAN ? 3 : 1;
+                    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                        const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                        const ni = I(nx, ny);
+                        if (gTemp[ni] < gTemp[i] - 1) gTemp[ni] = Math.min(gTemp[ni] + spread, gTemp[i] - 1);
+                    }
+                }
+                // cooling: empty cools fast, other non-source cells cool slowly
+                for (let i = 0; i < COLS * ROWS; i++) {
+                    if (gTemp[i] === 0) continue;
+                    const t = grid[i];
+                    if (t === STOVE) continue;
+                    const loss = t === EMPTY ? 4 : t === PAN ? 0 : 1;
+                    gTemp[i] = gTemp[i] > loss ? gTemp[i] - loss : 0;
+                }
+            }
+
+            function updStove(x, y) {
+                // already handled in heatPass; just immune to most things
+                const i = I(x, y);
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const nt = grid[I(nx, ny)];
+                    if (nt === WATER && Math.random() < .01) { grid[I(nx, ny)] = STEAM; gLife[I(nx, ny)] = rnd(30, 60); }
+                }
+            }
+
+            function updPan(x, y) {
+                // solid — just sits there and conducts. No physics needed.
+            }
+
+            function updFlour(x, y) {
+                if (gMove[I(x, y)]) return;
+                const i = I(x, y);
+                // flour + water → dough
+                for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                    const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny);
+                    if (grid[ni] === WATER && Math.random() < .05) { grid[i] = DOUGH; gLife[i] = 0; grid[ni] = EMPTY; gMove[i] = 1; return; }
+                }
+                // falls like sand
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1);
+            }
+
+            function updEgg(x, y) {
+                if (gMove[I(x, y)]) return;
+                const i = I(x, y);
+                // cook when hot enough
+                if (gTemp[i] > 85 && Math.random() < .04) { grid[i] = BREAD; gLife[i] = 0; gTemp[i] = Math.min(gTemp[i], 120); return; }// cooked egg → use bread id with a yellowish gLife marker
+                // flows like water but slower
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; if (fallTo(x, y, -d, 1)) return;
+                if (Math.random() < .4) { if (slideTo(x, y, d, 0)) return; slideTo(x, y, -d, 0); }
+            }
+
+            function updDough(x, y) {
+                if (gMove[I(x, y)]) return;
+                const i = I(x, y);
+                if (gTemp[i] > 115 && Math.random() < .015) { grid[i] = BREAD; gLife[i] = 1; gMove[i] = 1; return; }// baked → bread (gLife=1 marks baked)
+                // very viscous — falls slowly, barely spreads
+                if (Math.random() < .6 && fallTo(x, y, 0, 1)) return;
+                if (Math.random() < .2) { const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1); }
+            }
+
+            function updBread(x, y) {
+                const i = I(x, y);
+                // overheated bread burns to coal
+                if (gTemp[i] > 205 && Math.random() < .01) { grid[i] = COAL; gLife[i] = 0; gExtra[i] = 0; return; }
+            }
+
+            function updSugar(x, y) {
+                if (gMove[I(x, y)]) return;
+                const i = I(x, y);
+                if (gTemp[i] > 95 && Math.random() < .03) { grid[i] = CARAMEL; gLife[i] = 0; gMove[i] = 1; return; }
+                if (fallTo(x, y, 0, 1)) return; const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1);
+            }
+
+            function updCaramel(x, y) {
+                if (gMove[I(x, y)]) return;
+                const i = I(x, y);
+                if (gTemp[i] > 185 && Math.random() < .02) { grid[i] = SMOKE; gLife[i] = rnd(20, 50); return; }
+                // very viscous flow
+                if (Math.random() < .5 && fallTo(x, y, 0, 1)) return;
+                if (Math.random() < .15) { const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1); }
+            }
+
+            /* ── Simulation ── */
+            function simulate() {
+                gMove.fill(0);
+                for (let y = ROWS - 1; y >= 0; y--) {
+                    const ltr = frame % 2 === 0;
+                    for (let j = 0; j < COLS; j++) {
+                        const x = ltr ? j : COLS - 1 - j;
+                        switch (grid[I(x, y)]) {
+                            case SAND: updSand(x, y); break; case WATER: updWater(x, y); break;
+                            case OIL: updOil(x, y); break; case FIRE: updFire(x, y); break;
+                            case SMOKE: updSmoke(x, y); break; case STEAM: updSteam(x, y); break;
+                            case ACID: updAcid(x, y); break; case LAVA: updLava(x, y); break;
+                            case GUNPOWDER: updGunpowder(x, y); break; case PLANT: updPlant(x, y); break;
+                            case ICE: updIce(x, y); break; case MUD: updMud(x, y); break;
+                            case SALT: updSalt(x, y); break; case GOLD: updGold(x, y); break;
+                            case METHANE: updMethane(x, y); break;
+                            case COAL: updCoal(x, y); break; case DUST: updDust(x, y); break;
+                            case TAR: updTar(x, y); break; case VINE: updVine(x, y); break;
+                            case SODIUM: updSodium(x, y); break;
+                            case ELECTRICITY: updElectricity(x, y); break;
+                            case IRON: updIron(x, y); break;
+                            case TNT: updTNT(x, y); break;
+                            case NITROGEN: updNitrogen(x, y); break;
+                            case CLONER: updCloner(x, y); break;
+                            case DESTAT: updDestat(x, y); break;
+                            case STOVE: updStove(x, y); break;
+                            case PAN: updPan(x, y); break;
+                            case FLOUR: updFlour(x, y); break;
+                            case EGG: updEgg(x, y); break;
+                            case DOUGH: updDough(x, y); break;
+                            case BREAD: updBread(x, y); break;
+                            case SUGAR: updSugar(x, y); break;
+                            case CARAMEL: updCaramel(x, y); break;
+                            // OBSIDIAN is fully inert — no update needed
+                        }
+                    }
+                } frame++; heatPass();
+            }
+
+            /* ── Rendering ── */
+            function cellColor(x, y) {
+                const t = grid[I(x, y)];
+                if (t === EMPTY) {
+                    let g = 0, nb = 0;
+                    if (y > 0) { const n = grid[I(x, y - 1)]; if (n === FIRE) g += 5; if (n === LAVA) g += 3; if (n === METHANE) g += 1; if (n === ELECTRICITY) g += 4; if (n === NITROGEN) nb += 2; }
+                    if (y < ROWS - 1) { const n = grid[I(x, y + 1)]; if (n === FIRE) g += 3; if (n === LAVA) g += 2; if (n === ELECTRICITY) g += 2; if (n === NITROGEN) nb += 1; }
+                    if (x > 0) { const n = grid[I(x - 1, y)]; if (n === FIRE) g += 4; if (n === LAVA) g += 2; if (n === ELECTRICITY) g += 3; if (n === NITROGEN) nb += 2; }
+                    if (x < COLS - 1) { const n = grid[I(x + 1, y)]; if (n === FIRE) g += 4; if (n === LAVA) g += 2; if (n === ELECTRICITY) g += 3; if (n === NITROGEN) nb += 2; }
+                    if (nb > 0) { return [cl(10 + nb, 0, 40), cl(10 + nb, 0, 40), cl(15 + nb * 3, 0, 60)]; }
+                    if (g > 0) { const eg = g > 6 ? 3 : 0; return [cl(10 + g + eg, 0, 70), cl(9 + (g >> 1) + eg, 0, 35), cl(8, 0, 15)]; }
+                    return [10, 9, 8];
+                }
+                const h = hash(x, y), v = (h % 30) - 15;
+                switch (t) {
+                    case SAND: return [194 + v, 178 + v, 128 + v];
+                    case WATER: { const l = gLife[I(x, y)]; if (l > 0) { const f = ((frame * 7 + x * 13 + y * 23) % 20) - 10, b = l / 20; return [cl(Math.round(50 + b * 205) + f, 0, 255), cl(Math.round(120 + b * 135) + f, 0, 255), cl(Math.round(210 + b * 45) + f, 0, 255)]; } const w = (h % 40) - 20, ff = ((frame * 5 + x * 11 + y * 17) % 16) - 8; return [cl(40 + w + ff, 0, 255), cl(100 + w + ff, 0, 255), cl(195 + w + ff, 0, 255)]; }
+                    case STONE: return [130 + v, 130 + v, 130 + v];
+                    case FIRE: { const l = gLife[I(x, y)], f = (h % 50) - 25, ff = ((frame * 7 + x * 13 + y * 23) % 20) - 10; if (l > 90) return [255, cl(220 + f + ff, 0, 255), cl(80 + f + ff, 0, 255)]; if (l > 60) return [255, cl(180 + f + ff, 0, 255), cl(40 + f + ff, 0, 255)]; if (l > 30) return [255, cl(100 + f + ff, 0, 255), 10]; return [cl(180 + f + ff, 0, 255), cl(30 + v, 0, 255), 5]; }
+                    case SMOKE: { const l = gLife[I(x, y)], b = 55 * l / 70 | 0, ff = ((frame * 3 + x * 7 + y * 11) % 10) - 5; return [cl(b + v + ff, 0, 255), cl(b + v + ff, 0, 255), cl(b + v + ff, 0, 255)]; }
+                    case OIL: return [55 + v, 38 + v, 12 + (v >> 1)];
+                    case WOOD: return [110 + v, 68 + v, 22 + (v >> 1)];
+                    case STEAM: { const l = gLife[I(x, y)], b = 150 + (60 * l / 60 | 0), ff = ((frame * 3 + x * 7 + y * 11) % 10) - 5; return [cl(b + v + ff, 0, 255), cl(b + 8 + v + ff, 0, 255), cl(b + 18 + v + ff, 0, 255)]; }
+                    case ACID: { const sh = ((frame * 3 + x * 13 + y * 7) % 20) - 10; return [cl(80 + v + sh, 0, 255), cl(220 + v + sh, 0, 255), cl(40 + v, 0, 255)]; }
+                    case LAVA: { const p = ((frame * 2 + x * 11 + y * 7) % 30) - 15, c = (h % 50) - 25; return [cl(220 + p + c, 0, 255), cl(80 + (p >> 1) + c, 0, 255), cl(15 + (c / 3 | 0), 0, 255)]; }
+                    case GUNPOWDER: return [cl(75 + v, 0, 255), cl(68 + v, 0, 255), cl(50 + v, 0, 255)];
+                    case PLANT: { const lf = (h % 30) - 15; return [cl(35 + lf + v, 0, 255), cl(130 + lf + v, 0, 255), cl(25 + v, 0, 255)]; }
+                    case ICE: { const cr = (h % 20) - 10; return [cl(180 + cr + v, 0, 255), cl(210 + cr + v, 0, 255), cl(240 + v, 0, 255)]; }
+                    case MUD: return [cl(85 + v, 0, 255), cl(58 + v, 0, 255), cl(22 + v, 0, 255)];
+                    case SALT: { const cr = (h % 20) - 10; return [cl(215 + cr + v, 0, 255), cl(210 + cr + v, 0, 255), cl(195 + cr + v, 0, 255)]; }
+                    case GOLD: { const l = gLife[I(x, y)]; if (l > 0) { const f = ((frame * 5 + x * 11 + y * 17) % 16) - 8, b = l / 30; return [cl(Math.round(212 + b * 43) + f, 0, 255), cl(Math.round(175 + b * 80) + f, 0, 255), cl(Math.round(55 + b * 200) + f, 0, 255)]; } const sp = ((frame * 3 + x * 7 + y * 13) % 24), br = sp < 3 ? 50 : 0; return [cl(212 + v + br, 0, 255), cl(175 + v + br, 0, 255), cl(55 + v, 0, 255)]; }
+                    case METHANE: { const sh = ((frame * 2 + x * 9 + y * 11) % 12) - 6; return [cl(30 + v + sh, 0, 255), cl(42 + v + sh, 0, 255), cl(25 + v + sh, 0, 255)]; }
+                    case COAL: { const l = gLife[I(x, y)]; if (l > 0) { const t2 = l / 255, f2 = ((frame * 3 + x * 7 + y * 11) % 10) - 5; return [cl(Math.round(80 + t2 * 60) + v + f2, 0, 255), cl(Math.round(30 + t2 * 20) + v + (f2 >> 1), 0, 255), cl(Math.round(10 + t2 * 5) + v, 0, 255)]; } return [cl(50 + v, 0, 255), cl(45 + v, 0, 255), cl(40 + v, 0, 255)]; }
+                    case DUST: return [cl(140 + v, 0, 255), cl(125 + v, 0, 255), cl(110 + v, 0, 255)];
+                    case TAR: return [cl(30 + v, 0, 255), cl(20 + v, 0, 255), cl(10 + (v >> 1), 0, 255)];
+                    case VINE: return [cl(25 + v, 0, 255), cl(100 + v, 0, 255), cl(30 + v, 0, 255)];
+                    case SODIUM: { const f = ((frame * 3 + x * 7 + y * 13) % 16) - 8; return [cl(180 + v + f, 0, 255), cl(175 + v + f, 0, 255), cl(185 + v + f, 0, 255)]; }
+                    case ELECTRICITY: { const l = gLife[I(x, y)], f = ((frame * 7 + x * 13 + y * 23) % 20) - 10; if (l > 15) return [255, 255, cl(150 + f, 0, 255)]; if (l > 7) return [255, cl(200 + f, 0, 255), cl(50 + f, 0, 255)]; return [cl(200 + f, 0, 255), cl(150 + f, 0, 255), 20]; }
+                    case IRON: {
+                        const e = gExtra[I(x, y)], rv = (h % 20) - 10;
+                        if (e > IRON_COOLDOWN) { const t = (e - IRON_COOLDOWN) / (IRON_COUNTDOWN - IRON_COOLDOWN); const f = ((frame * 8 + x * 5 + y * 7) % 20) - 10; return [cl(Math.round(155 + t * 65) + rv + f, 0, 255), cl(Math.round(152 + t * 78) + rv + f, 0, 255), cl(Math.round(148 + t * 107) + rv + f, 0, 255)]; }
+                        return [cl(155 + rv, 0, 255), cl(152 + rv, 0, 255), cl(148 + rv, 0, 255)];
+                    }
+                    case TNT: { const f = ((frame * 4 + x * 11 + y * 13) % 16) - 8; return [cl(195 + v + f, 0, 255), cl(35 + v, 0, 255), cl(25 + v, 0, 255)]; }
+                    case NITROGEN: { const l = gLife[I(x, y)], b = 180 + (40 * l / 160 | 0), ff = ((frame * 4 + x * 9 + y * 13) % 12) - 6; return [cl(b + v + ff - 20, 0, 255), cl(b + v + ff, 0, 255), cl(255, 0, 255)]; }
+                    case CLONER: {
+                        const learned = gExtra[I(x, y)]; if (learned === 0) {// unlearned: pulsing purple
+                            const pulse = ((frame * 3 + x * 7 + y * 11) % 20) - 10; return [cl(120 + pulse, 0, 255), cl(40 + pulse, 0, 255), cl(200 + pulse, 0, 255)];
+                        }
+                        // learned: tint based on stored element color
+                        const el = ELEMENTS.find(e => e.id === learned); if (el) { const [r, g2, b2] = el.color, pulse = ((frame * 3) % 20) - 10; return [cl(r / 2 + 60 + pulse, 0, 255), cl(g2 / 2 + 20 + pulse, 0, 255), cl(b2 / 2 + 100 + pulse, 0, 255)]; }
+                        return [100, 30, 180];
+                    }
+                    case DESTAT: { const pulse = ((frame * 2 + x * 5 + y * 7) % 16) - 8; return [cl(50 + pulse, 0, 255), cl(175 + pulse, 0, 255), cl(110 + pulse, 0, 255)]; }
+                    case OBSIDIAN: { const cr = (h % 16) - 8; return [cl(28 + cr, 0, 255), cl(18 + cr, 0, 255), cl(42 + cr, 0, 255)]; }
+                    case STOVE: { const t = gTemp[I(x, y)] / 245, f = ((frame * 3 + x * 7 + y * 5) % 12) - 6; return [cl(Math.round(120 + t * 135) + f, 0, 255), cl(Math.round(30 + t * 30) + f, 0, 255), cl(Math.round(10 + t * 10), 0, 255)]; }
+                    case PAN: { const t = gTemp[I(x, y)] / 240, f = ((frame * 2 + x * 5 + y * 7) % 8) - 4; if (t > .4) { return [cl(Math.round(90 + t * 120) + f, 0, 255), cl(Math.round(85 + t * 40) + f, 0, 255), cl(Math.round(80) + f, 0, 255)]; } return [cl(88 + v, 0, 255), cl(83 + v, 0, 255), cl(78 + v, 0, 255)]; }
+                    case FLOUR: return [cl(238 + v, 0, 255), cl(233 + v, 0, 255), cl(218 + v, 0, 255)];
+                    case EGG: { const f = ((frame * 2 + x * 9 + y * 7) % 10) - 5; return [cl(250 + f, 0, 255), cl(232 + f, 0, 255), cl(150 + f, 0, 255)]; }
+                    case DOUGH: { const t = gTemp[I(x, y)] / 245, f = ((frame * 2 + x * 7 + y * 9) % 8) - 4; return [cl(Math.round(215 + t * 20) + v + f, 0, 255), cl(Math.round(195 + t * 10) + v + f, 0, 255), cl(Math.round(150 + t * 10) + v, 0, 255)]; }
+                    case BREAD: { return [cl(185 + v, 0, 255), cl(gLife[I(x, y)] === 1 ? 135 + v : 100 + v, 0, 255), cl(gLife[I(x, y)] === 1 ? 55 + v : 30 + v, 0, 255)]; } // baked vs cooked egg
+                    case SUGAR: { const cr = (h % 16) - 8; return [cl(248 + cr, 0, 255), cl(245 + cr, 0, 255), cl(235 + cr, 0, 255)]; }
+                    case CARAMEL: { const t = gTemp[I(x, y)] / 245, f = ((frame * 2 + x * 7 + y * 5) % 10) - 5; return [cl(Math.round(195 + t * 20) + v + f, 0, 255), cl(Math.round(110 + t * 20) + v + f, 0, 255), cl(Math.round(20 + t * 10) + v, 0, 255)]; }
+                    default: return [255, 0, 255];
+                }
+            }
+
+            function initCell(i, t) {
+                grid[i] = t;
+                gExtra[i] = 0;
+                if (t === FIRE) gLife[i] = rnd(50, 120);
+                else if (t === SMOKE) gLife[i] = rnd(30, 70);
+                else if (t === STEAM) gLife[i] = rnd(30, 60);
+                else if (t === ELECTRICITY) gLife[i] = rnd(30, 50);
+                else if (t === NITROGEN) gLife[i] = rnd(80, 160);
+                else gLife[i] = 0;
+            }
+
+            function floodFill(startX, startY, targetType, replacementType) {
+                if (targetType === replacementType) return;
+                const stack = [[startX, startY]];
+                const visited = new Uint8Array(COLS * ROWS);
+                while (stack.length > 0) {
+                    const [x, y] = stack.pop();
+                    if (!ok(x, y)) continue;
+                    const i = I(x, y);
+                    if (visited[i]) continue;
+                    visited[i] = 1;
+                    if (grid[i] === targetType) {
+                        initCell(i, replacementType);
+                        stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+                    }
+                }
+            }
+
+            // dirty-rect: only recompute cells that changed or are animated
+            const ANIMATED_TYPES = new Set([FIRE, SMOKE, STEAM, LAVA, ELECTRICITY, ACID, NITROGEN, METHANE, WATER, GOLD, CLONER, DESTAT, SODIUM, IRON, COAL, STOVE, PAN, EGG, CARAMEL, DOUGH]);
+            const GLOW_TYPES = new Set([FIRE, LAVA, ELECTRICITY, NITROGEN]);
+            const prevGrid = new Uint8Array(COLS * ROWS);
+            const prevLife = new Uint8Array(COLS * ROWS);
+            const prevExtra = new Uint8Array(COLS * ROWS);
+
+            function render() {
+                for (let y = 0; y < ROWS; y++)for (let x = 0; x < COLS; x++) {
+                    const i = y * COLS + x, t = grid[i];
+                    let dirty;
+                    if (t === EMPTY) {
+                        if (prevGrid[i] !== EMPTY) { dirty = true; }
+                        else {
+                            dirty = false;
+                            if (y > 0) { const n = grid[i - COLS], pn = prevGrid[i - COLS]; if (GLOW_TYPES.has(n) || GLOW_TYPES.has(pn)) { dirty = true; } }
+                            if (!dirty && y < ROWS - 1) { const n = grid[i + COLS], pn = prevGrid[i + COLS]; if (GLOW_TYPES.has(n) || GLOW_TYPES.has(pn)) { dirty = true; } }
+                            if (!dirty && x > 0) { const n = grid[i - 1], pn = prevGrid[i - 1]; if (GLOW_TYPES.has(n) || GLOW_TYPES.has(pn)) { dirty = true; } }
+                            if (!dirty && x < COLS - 1) { const n = grid[i + 1], pn = prevGrid[i + 1]; if (GLOW_TYPES.has(n) || GLOW_TYPES.has(pn)) { dirty = true; } }
+                        }
+                    } else if (ANIMATED_TYPES.has(t)) {
+                        dirty = true;
+                    } else {
+                        dirty = t !== prevGrid[i] || gLife[i] !== prevLife[i] || gExtra[i] !== prevExtra[i];
+                    }
+                    if (dirty) { const ci = i * 4, c = cellColor(x, y); px[ci] = c[0]; px[ci + 1] = c[1]; px[ci + 2] = c[2]; }
+                }
+                prevGrid.set(grid); prevLife.set(gLife); prevExtra.set(gExtra);
+                offCtx.putImageData(imgData, 0, 0);
+                ctx.imageSmoothingEnabled = false; ctx.drawImage(off, 0, 0, canvas.width, canvas.height);
+                if (flashIntensity > 0) { ctx.fillStyle = `rgba(255,180,30,${flashIntensity * .18})`; ctx.fillRect(0, 0, canvas.width, canvas.height); flashIntensity = Math.max(0, flashIntensity - .06); }
+                // cursor preview
+                if (cursorCX >= 0) {
+                    const r = canvas.getBoundingClientRect();
+                    const cellPx = r.width / COLS;
+                    ctx.save();
+                    ctx.setLineDash([4, 4]);
+                    
+                    if (currentMode === 'rect' && painting) {
+                        ctx.strokeStyle = eraseMode ? 'rgba(255,80,80,0.8)' : 'rgba(255,255,255,0.7)';
+                        ctx.lineWidth = 2;
+                        const x = Math.min(rectStartX, rectEndX) * CELL;
+                        const y = Math.min(rectStartY, rectEndY) * CELL;
+                        const w = (Math.abs(rectEndX - rectStartX) + 1) * CELL;
+                        const h = (Math.abs(rectEndY - rectStartY) + 1) * CELL;
+                        ctx.strokeRect(x, y, w, h);
+                    } else if (currentMode === 'fill') {
+                        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(cursorCX - 10, cursorCY); ctx.lineTo(cursorCX + 10, cursorCY);
+                        ctx.moveTo(cursorCX, cursorCY - 10); ctx.lineTo(cursorCX, cursorCY + 10);
+                        ctx.stroke();
+                    } else {
+                        const radius = (brushSize >> 1) * cellPx + cellPx * .5;
+                        ctx.strokeStyle = eraseMode ? 'rgba(255,80,80,0.8)' : 'rgba(255,255,255,0.7)';
+                        ctx.lineWidth = 1.5;
+                        ctx.beginPath(); ctx.arc(cursorCX, cursorCY, radius, 0, Math.PI * 2); ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            }
+
+            let selected = SAND, brushSize = 3, painting = false, lastMX = -1, lastMY = -1, eraseMode = false, paused = false, simSpeed = 1.0, simAccum = 0, cursorCX = -1, cursorCY = -1;
+            let currentMode = 'brush'; // 'brush', 'rect', 'fill'
+            let rectStartX = -1, rectStartY = -1, rectEndX = -1, rectEndY = -1;
+
+            function paintAt(cx, cy) {
+                const r = brushSize >> 1, t = eraseMode ? EMPTY : selected;
+                for (let dy = -r; dy <= r; dy++)for (let dx = -r; dx <= r; dx++) {
+                    if (dx * dx + dy * dy > r * r + 1) continue; const x = cx + dx, y = cy + dy; if (!ok(x, y)) continue; const i = I(x, y);
+                    initCell(i, t);
+                }
+            }
+
+            function bresenham(x0, y0, x1, y1, fn) { const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0); const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let err = dx - dy; while (true) { fn(x0, y0); if (x0 === x1 && y0 === y1) break; const e2 = 2 * err; if (e2 > -dy) { err -= dy; x0 += sx; } if (e2 < dx) { err += dx; y0 += sy; } } }
+            function cell(e) { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / CELL | 0, (e.clientY - r.top) / CELL | 0]; }
+
+            canvas.addEventListener('mousedown', e => {
+                e.preventDefault();
+                const [x, y] = cell(e);
+                painting = true;
+                eraseMode = e.button === 2;
+                if (currentMode === 'brush') {
+                    paintAt(x, y);
+                } else if (currentMode === 'rect') {
+                    rectStartX = x; rectStartY = y;
+                    rectEndX = x; rectEndY = y;
+                } else if (currentMode === 'fill') {
+                    floodFill(x, y, grid[I(x, y)], eraseMode ? EMPTY : selected);
+                }
+                lastMX = x; lastMY = y;
+            });
+            canvas.addEventListener('mousemove', e => {
+                const r = canvas.getBoundingClientRect();
+                cursorCX = e.clientX - r.left;
+                cursorCY = e.clientY - r.top;
+                if (!painting) return;
+                const [x, y] = cell(e);
+                if (currentMode === 'brush') {
+                    if (lastMX >= 0) bresenham(lastMX, lastMY, x, y, paintAt);
+                    else paintAt(x, y);
+                } else if (currentMode === 'rect') {
+                    rectEndX = x; rectEndY = y;
+                }
+                lastMX = x; lastMY = y;
+            });
+            canvas.addEventListener('mouseup', () => {
+                if (painting && currentMode === 'rect') {
+                    const x0 = Math.min(rectStartX, rectEndX), x1 = Math.max(rectStartX, rectEndX);
+                    const y0 = Math.min(rectStartY, rectEndY), y1 = Math.max(rectStartY, rectEndY);
+                    const t = eraseMode ? EMPTY : selected;
+                    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+                        if (ok(x, y)) initCell(I(x, y), t);
+                    }
+                }
+                painting = false; lastMX = -1;
+            });
+            canvas.addEventListener('mouseleave', () => { painting = false; lastMX = -1; cursorCX = -1; cursorCY = -1; });
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+            canvas.addEventListener('touchstart', e => {
+                e.preventDefault();
+                painting = true; eraseMode = false;
+                const t = e.touches[0], [x, y] = cell(t);
+                if (currentMode === 'brush') {
+                    paintAt(x, y);
+                } else if (currentMode === 'rect') {
+                    rectStartX = x; rectStartY = y;
+                    rectEndX = x; rectEndY = y;
+                } else if (currentMode === 'fill') {
+                    floodFill(x, y, grid[I(x, y)], selected);
+                }
+                lastMX = x; lastMY = y;
+            }, { passive: false });
+            canvas.addEventListener('touchmove', e => {
+                e.preventDefault();
+                if (!painting) return;
+                const t = e.touches[0], [x, y] = cell(t);
+                if (currentMode === 'brush') {
+                    if (lastMX >= 0) bresenham(lastMX, lastMY, x, y, paintAt);
+                    else paintAt(x, y);
+                } else if (currentMode === 'rect') {
+                    rectEndX = x; rectEndY = y;
+                }
+                lastMX = x; lastMY = y;
+            }, { passive: false });
+            canvas.addEventListener('touchend', () => {
+                if (painting && currentMode === 'rect') {
+                    const x0 = Math.min(rectStartX, rectEndX), x1 = Math.max(rectStartX, rectEndX);
+                    const y0 = Math.min(rectStartY, rectEndY), y1 = Math.max(rectStartY, rectEndY);
+                    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+                        if (ok(x, y)) initCell(I(x, y), selected);
+                    }
+                }
+                painting = false; lastMX = -1;
+            });
+
+            const elemDiv = document.getElementById('elements'); const btns = []; let lastCat = '';
+            let cookingUnlocked = false; const cookingEls = [];
+            ELEMENTS.forEach((el, idx) => {
+                if (el.cat !== lastCat) {
+                    const lbl = document.createElement('div'); lbl.className = 'label' + (el.cooking ? ' cooking-locked' : '');
+                    lbl.textContent = el.cat; elemDiv.appendChild(lbl); lastCat = el.cat;
+                    if (el.cooking) cookingEls.push(lbl);
+                }
+                const btn = document.createElement('button'); btn.className = 'elem-btn' + (el.id === selected ? ' active' : '') + (el.cooking ? ' cooking-locked' : '');
+                btn.innerHTML = `<span class="swatch" style="background:rgb(${el.color})"></span>${el.name}<span class="key-hint">${el.key}</span>`;
+                btn.title = el.desc; btn.addEventListener('click', () => selElem(idx)); elemDiv.appendChild(btn); btns.push(btn);
+                if (el.cooking) cookingEls.push(btn);
+            });
+            function selElem(i) { btns.forEach(b => b.classList.remove('active')); btns[i].classList.add('active'); selected = ELEMENTS[i].id; eraseMode = false; }
+            document.addEventListener('keydown', e => { if (e.repeat) return; const i = ELEMENTS.findIndex(el => el.key === e.key.toLowerCase() && (!el.cooking || cookingUnlocked)); if (i >= 0) selElem(i); if (e.key === ' ') { e.preventDefault(); paused = !paused; document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause'; } });
+
+            // secret unlock: click title 6 times
+            let titleClicks = 0, titleTimer = null;
+            document.getElementById('sandTitle').addEventListener('click', () => {
+                titleClicks++; clearTimeout(titleTimer); titleTimer = setTimeout(() => { titleClicks = 0; }, 1800);
+                if (titleClicks >= 6 && !cookingUnlocked) {
+                    cookingUnlocked = true;
+                    cookingEls.forEach(el => el.classList.remove('cooking-locked'));
+                    const toast = document.getElementById('cookToast');
+                    toast.classList.add('show'); setTimeout(() => toast.classList.remove('show'), 2500);
+                    titleClicks = 0;
+                }
+            });
+
+            function setMode(mode) {
+                currentMode = mode;
+                ['modeBrush', 'modeRect', 'modeFill'].forEach(id => {
+                    document.getElementById(id).classList.toggle('active', id.toLowerCase().endsWith(mode));
+                });
+            }
+            document.getElementById('modeBrush').addEventListener('click', () => setMode('brush'));
+            document.getElementById('modeRect').addEventListener('click', () => setMode('rect'));
+            document.getElementById('modeFill').addEventListener('click', () => setMode('fill'));
+
+            document.getElementById('bs').addEventListener('input', e => { brushSize = +e.target.value; document.getElementById('bsVal').textContent = brushSize; });
+            document.getElementById('sp').addEventListener('input', e => { simSpeed = +e.target.value / 10; document.getElementById('spVal').textContent = simSpeed.toFixed(1) + 'x'; });
+
+            document.getElementById('clearBtn').addEventListener('click', () => { grid.fill(0); gLife.fill(0); gExtra.fill(0); gTemp.fill(0); });
+
+            document.getElementById('pauseBtn').addEventListener('click', () => { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause'; });
+
+            const statsEl = document.getElementById('stats'); let lastT = performance.now(), fps = 0;
+            function loop(now) { if (now - lastT >= 1000) { statsEl.textContent = COLS + '\u00d7' + ROWS + ' \u00b7 ' + fps + ' fps'; fps = 0; lastT = now; } fps++; if (!paused) { simAccum += simSpeed; const steps = Math.floor(simAccum); simAccum -= steps; for (let s = 0; s < steps; s++)simulate(); } render(); requestAnimationFrame(loop); }
+            requestAnimationFrame(loop);
+        })();
+    </script>
+</body>
+
+</html>

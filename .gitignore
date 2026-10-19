@@ -1,2 +1,11 @@
 _build/
 _source/
+
+# Local secrets stay out of git; commit .env.example instead.
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.vite/
+src/games/content/*.b64

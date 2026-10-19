@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
+var m={};
+function k(i){return Object.keys(m)[i]||null}
+var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
+setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
+clear:function(){m={}},key:k};
+Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
+try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
+try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
+})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Micro Ecosystem</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+body{background:#080c0a;font-family:Georgia,'Times New Roman',serif;color:#d4d0c8;-webkit-font-smoothing:antialiased}
+canvas#world{display:block;position:fixed;top:0;left:0;cursor:crosshair}
+.panel{position:fixed;background:rgba(8,12,10,0.9);border:1px solid rgba(107,143,113,0.2);border-radius:6px;padding:14px 16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:10}
+.panel h2{font-size:10px;letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;color:#6b8f71;font-weight:400;border-bottom:1px solid rgba(107,143,113,0.12);padding-bottom:6px}
+.panel h2.sub{margin-top:12px;margin-bottom:7px;border-top:1px solid rgba(107,143,113,0.1);padding-top:9px}
+.stat-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:3px;font-family:'Courier New',Courier,monospace}
+.stat-row .label{color:#5a5648;display:flex;align-items:center;gap:5px}
+.stat-row .value{color:#d4d0c8;font-weight:600}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%}
+.dot-green{background:#4ade80}.dot-blue{background:#60a5fa}.dot-red{background:#f87171}.dot-yellow{background:#fbbf24}.dot-grey{background:#666}
+#statsPanel{top:16px;left:16px;min-width:185px}
+#ctrlPanel{top:16px;right:16px;width:215px;max-height:calc(100vh - 32px);overflow-y:auto}
+.ctrl-group{margin-bottom:9px}
+.ctrl-group label{display:flex;justify-content:space-between;font-size:10px;letter-spacing:1px;margin-bottom:2px;color:#5a5648;font-family:'Courier New',Courier,monospace}
+.ctrl-group label span{color:#c4a35a}
+input[type=range]{width:100%;-webkit-appearance:none;height:2px;background:rgba(107,143,113,0.18);border-radius:1px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:#6b8f71;cursor:pointer;border:2px solid #080c0a}
+input[type=range]::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:#6b8f71;cursor:pointer;border:2px solid #080c0a}
+.energy-bar-bg{width:100%;height:4px;background:rgba(107,143,113,0.12);border-radius:2px;margin-top:5px}
+.energy-bar-fill{height:100%;background:#4ade80;border-radius:2px;transition:width 0.12s ease;width:100%}
+.tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px}
+.tbtn,.sbtn{background:rgba(107,143,113,0.07);border:1px solid rgba(107,143,113,0.14);color:#5a5648;font-size:9px;letter-spacing:1px;padding:5px 6px;cursor:pointer;font-family:'Courier New',Courier,monospace;text-transform:uppercase;transition:all .2s ease;text-align:center}
+.tbtn:hover,.sbtn:hover{background:rgba(107,143,113,0.14);color:#8a8578}
+.tbtn.on,.sbtn.on{background:rgba(107,143,113,0.2);color:#c4a35a;border-color:rgba(196,163,90,0.3)}
+.speed-row{display:flex;gap:4px}
+.speed-row .sbtn{flex:1}
+.hint{font-size:8.5px;color:#3e3a30;letter-spacing:1px;margin-top:4px;font-family:'Courier New',Courier,monospace;font-style:italic}
+#graphPanel{bottom:16px;left:16px}
+#graphPanel h2{margin-bottom:6px}
+#graphCanvas{display:block}
+.legend{display:flex;gap:9px;margin-top:5px;font-size:9px;letter-spacing:1px;font-family:'Courier New',Courier,monospace;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:3px;color:#5a5648}
+#seasonBanner{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:rgba(8,12,10,0.85);border:1px solid rgba(107,143,113,0.15);border-radius:4px;padding:5px 18px;font-size:10px;letter-spacing:3px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;z-index:10;display:flex;align-items:center;gap:10px;transition:border-color 1.2s ease}
+#seasonName{color:#6b8f71;transition:color 1.2s ease}
+#seasonYear{color:#5a5648;font-size:9px}
+#footer{position:fixed;bottom:18px;right:18px;font-size:9px;letter-spacing:4px;text-transform:uppercase;color:rgba(107,143,113,0.2);z-index:10;font-family:'Courier New',Courier,monospace}
+</style>
+</head>
+<body>
+<canvas id="world"></canvas>
+
+<div class="panel" id="statsPanel">
+  <h2>Observatory</h2>
+  <div class="stat-row"><span class="label">Time</span><span class="value" id="dTime">0:00</span></div>
+  <div class="stat-row"><span class="label"><span class="dot dot-green"></span>Flora</span><span class="value" id="dPlants">0</span></div>
+  <div class="stat-row"><span class="label"><span class="dot dot-blue"></span>Herbivores</span><span class="value" id="dHerbs">0</span></div>
+  <div class="stat-row"><span class="label"><span class="dot dot-red"></span>Predators</span><span class="value" id="dPreds">0</span></div>
+  <div class="stat-row"><span class="label"><span class="dot dot-yellow"></span>Scavengers</span><span class="value" id="dScavs">0</span></div>
+  <div class="stat-row"><span class="label"><span class="dot dot-grey"></span>Corpses</span><span class="value" id="dCorps">0</span></div>
+  <div class="stat-row"><span class="label">Infected</span><span class="value" id="dInf" style="color:#b0a030">0</span></div>
+  <div class="stat-row"><span class="label">Wind</span><span class="value" id="dWind">Calm</span></div>
+  <div class="stat-row"><span class="label">Status</span><span class="value" id="dStatus">—</span></div>
+</div>
+
+<div class="panel" id="ctrlPanel">
+  <h2>Environment</h2>
+  <div class="ctrl-group"><label>Temperature <span id="vT">1.0</span></label><input type="range" id="sT" min="0.2" max="3.0" step="0.1" value="1.0"></div>
+  <div class="ctrl-group"><label>Sunlight <span id="vS">1.0</span></label><input type="range" id="sS" min="0.1" max="3.0" step="0.1" value="1.0"></div>
+  <div class="ctrl-group"><label>Fertility <span id="vF">1.0</span></label><input type="range" id="sF" min="0.1" max="3.0" step="0.1" value="1.0"></div>
+  <div class="ctrl-group"><label>Mutation <span id="vM">0.10</span></label><input type="range" id="sM" min="0.0" max="0.5" step="0.05" value="0.10"></div>
+  <h2 class="sub">Wind</h2>
+  <div class="ctrl-group"><label>Direction <span id="vWD">0°</span></label><input type="range" id="sWD" min="0" max="359" step="5" value="0"></div>
+  <div class="ctrl-group"><label>Strength <span id="vWS">0.0</span></label><input type="range" id="sWS" min="0" max="3" step="0.1" value="0"></div>
+  <h2 class="sub">Tools</h2>
+  <div class="tool-grid">
+    <button class="tbtn on" data-tool="plant">Flora</button>
+    <button class="tbtn" data-tool="rain">Rain</button>
+    <button class="tbtn" data-tool="scare">Scare</button>
+    <button class="tbtn" data-tool="purge">Purge</button>
+  </div>
+  <div class="energy-bar-bg"><div class="energy-bar-fill" id="eBar"></div></div>
+  <div class="stat-row" style="margin-top:4px"><span class="label">Energy</span><span class="value" id="dEnergy">100</span></div>
+  <div class="hint" id="toolHint">Click canvas to plant flora</div>
+  <h2 class="sub">Speed</h2>
+  <div class="speed-row">
+    <button class="sbtn" data-speed="0">Pause</button>
+    <button class="sbtn on" data-speed="1">1x</button>
+    <button class="sbtn" data-speed="2">2x</button>
+    <button class="sbtn" data-speed="3">3x</button>
+  </div>
+</div>
+
+<div class="panel" id="graphPanel">
+  <h2>Population</h2>
+  <canvas id="graphCanvas" width="260" height="80"></canvas>
+  <div class="legend">
+    <span><span class="dot dot-green"></span>Flora</span>
+    <span><span class="dot dot-blue"></span>Herb.</span>
+    <span><span class="dot dot-red"></span>Pred.</span>
+    <span><span class="dot dot-yellow"></span>Scav.</span>
+  </div>
+</div>
+
+<div id="seasonBanner"><span id="seasonName">Spring</span><span id="seasonYear">Year 1</span></div>
+<div id="footer">Micro Ecosystem</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var cv = document.getElementById('world');
+  var cx = cv.getContext('2d');
+  var gc = document.getElementById('graphCanvas');
+  var gx = gc.getContext('2d');
+  var TAU = Math.PI * 2;
+  var bgC = null, bgW = 0, bgH = 0;
+  var waterBodies = [], forestPatches = [], rockyPatches = [];
+
+  function resize() { cv.width = window.innerWidth; cv.height = window.innerHeight; bgC = null; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // ─── Config (rebalanced) ───
+  var C = {
+    temp: 1, sun: 1, fert: 1, mut: 0.1,
+    windDir: 0, windStr: 0, speedMul: 1,
+
+    pMax: 250, pSE: 35, pME: 100, pGR: 8, pRT: 70, pRC: 0.0003, pER: 15, pMA: 110,
+
+    hMax: 130, hSE: 80, hME: 150, hSpd: 54, hVis: 130, hER: 20, hEE: 0.85,
+    hMeta: 3, hMC: 0.025, hRT: 110, hRCost: 45, hRCh: 0.0008, hMA: 90,
+
+    rMax: 40, rSE: 120, rME: 200, rSpd: 62, rVis: 170, rER: 16, rEE: 0.60,
+    rMeta: 4.5, rMC: 0.04, rRT: 150, rRCost: 55, rRCh: 0.0003, rMA: 75,
+
+    scMax: 60, scSE: 60, scME: 130, scSpd: 38, scVis: 160, scER: 14, scEE: 0.75,
+    scMeta: 2, scMC: 0.025, scRT: 95, scRCost: 30, scRCh: 0.0005, scMA: 85,
+
+    cHE: 40, cPE: 60, cSE: 35, cDR: 2.5,
+    aeMax: 150, aeCost: { plant: 25, rain: 40, scare: 30, purge: 50 }, aeRegen: 12,
+    disChk: 0.4, disRad: 50, disThr: 7, disInf: 0.12, disSpr: 0.025, disDur: 12, disEM: 1.6,
+    elderThr: 0.7, elderEM: 1.5,
+    seaDur: 40, migCh: 0.0003
+  };
+
+  var seasons = [
+    { name: 'Spring', sun: 1.3, tmp: 0.9, ov: [100, 180, 100] },
+    { name: 'Summer', sun: 1.5, tmp: 1.7, ov: [200, 160, 60] },
+    { name: 'Autumn', sun: 0.7, tmp: 1.0, ov: [180, 120, 50] },
+    { name: 'Winter', sun: 0.3, tmp: 0.4, ov: [100, 120, 160] }
+  ];
+
+  // ─── State ───
+  var plants = [], herbs = [], preds = [], scavs = [];
+  var corpses = [], particles = [], rainZones = [], scareZones = [];
+  var nutrientZones = [];
+  var gTime = 0, lastTs = 0, lastHT = 0, HMAX = 260;
+  var pHist = { p: [], h: [], r: [], s: [] };
+  var actE = 100, curTool = 'plant', mouseX = -200, mouseY = -200;
+  var seaIdx = 0, seaTime = 0, disTimer = 0;
+
+  // ─── Terrain ───
+  function genTerrain() {
+    waterBodies = []; forestPatches = []; rockyPatches = [];
+    var scale = Math.min(cv.width, cv.height) / 800;
+    var at = 0;
+    while (waterBodies.length < 4 && at < 60) {
+      var wx = cv.width * 0.12 + Math.random() * cv.width * 0.76;
+      var wy = cv.height * 0.12 + Math.random() * cv.height * 0.76;
+      var wr = (50 + Math.random() * 70) * scale;
+      var ok = true;
+      for (var w = 0; w < waterBodies.length; w++) {
+        var d = Math.sqrt(Math.pow(wx - waterBodies[w].x, 2) + Math.pow(wy - waterBodies[w].y, 2));
+        if (d < wr + waterBodies[w].r + 50 * scale) { ok = false; break; }
+      }
+      if (ok) waterBodies.push({ x: wx, y: wy, r: wr });
+      at++;
+    }
+    for (var f = 0; f < 6; f++) forestPatches.push({ x: Math.random() * cv.width, y: Math.random() * cv.height, r: (40 + Math.random() * 60) * scale });
+    for (var r = 0; r < 4; r++) rockyPatches.push({ x: Math.random() * cv.width, y: Math.random() * cv.height, r: (30 + Math.random() * 40) * scale });
+  }
+
+  function terrainAt(x, y) {
+    for (var w = 0; w < waterBodies.length; w++) {
+      var wb = waterBodies[w], d = Math.sqrt(Math.pow(x - wb.x, 2) + Math.pow(y - wb.y, 2));
+      if (d < wb.r * 0.6) return 3; if (d < wb.r) return 4;
+    }
+    for (var f = 0; f < forestPatches.length; f++) {
+      var fp = forestPatches[f], d2 = Math.sqrt(Math.pow(x - fp.x, 2) + Math.pow(y - fp.y, 2));
+      if (d2 < fp.r) return 1;
+    }
+    for (var r = 0; r < rockyPatches.length; r++) {
+      var rp = rockyPatches[r], d3 = Math.sqrt(Math.pow(x - rp.x, 2) + Math.pow(y - rp.y, 2));
+      if (d3 < rp.r) return 2;
+    }
+    return 0;
+  }
+
+  function tSpeedM(x, y) { var t = terrainAt(x, y); return t === 1 ? 0.7 : t === 2 ? 1.15 : t === 3 ? 0.15 : t === 4 ? 0.5 : 1; }
+  function tGrowthM(x, y) { var t = terrainAt(x, y); return t === 1 ? 1.3 : t === 2 ? 0.2 : t === 3 ? 0 : t === 4 ? 1.8 : 1; }
+  function tVisionM(x, y) { return terrainAt(x, y) === 1 ? 0.6 : 1; }
+
+  function safePos() {
+    var x, y, i = 0;
+    do { x = Math.random() * cv.width; y = Math.random() * cv.height; i++; } while (terrainAt(x, y) === 3 && i < 30);
+    return { x: x, y: y };
+  }
+
+  // ─── Utils ───
+  function dst(a, b) { var dx = a.x - b.x, dy = a.y - b.y; return Math.sqrt(dx * dx + dy * dy); }
+  function cl(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+  function mt(v, r) { return v * (1 + (Math.random() * 2 - 1) * r); }
+  function lr(a, b, t) { return a + (b - a) * t; }
+
+  // ─── Seasons ───
+  function updSeason(dt) { seaTime += dt; if (seaTime >= C.seaDur) { seaTime -= C.seaDur; seaIdx = (seaIdx + 1) % 4; } }
+  function sMods() {
+    var ni = (seaIdx + 1) % 4, t = seaTime / C.seaDur, bt = 0;
+    if (t > 0.75) { bt = (t - 0.75) / 0.25; bt = bt * bt * (3 - 2 * bt); }
+    var c = seasons[seaIdx], n = seasons[ni];
+    return { sun: lr(c.sun, n.sun, bt), tmp: lr(c.tmp, n.tmp, bt), ov: [lr(c.ov[0], n.ov[0], bt), lr(c.ov[1], n.ov[1], bt), lr(c.ov[2], n.ov[2], bt)], name: bt > 0.5 ? n.name : c.name };
+  }
+  function eSun() { return C.sun * sMods().sun; }
+  function eTemp() { return C.temp * sMods().tmp; }
+
+  // ─── Factories ───
+  function mkP(x, y, e) {
+    var pos = safePos();
+    return { x: x !== undefined ? x : pos.x, y: y !== undefined ? y : pos.y, energy: e !== undefined ? e : C.pSE + Math.random() * 15, me: C.pME, age: 0, ma: C.pMA, hue: 130 + Math.random() * 40, alive: true, inf: false, it: 0, _ct: 0, _nc: 0 };
+  }
+
+  function mkM(x, y, e, par, tp) {
+    var m = C.mut, c;
+    if (tp === 'herb') c = { sE: C.hSE, mE: C.hME, sp: C.hSpd, vi: C.hVis, mt: C.hMeta, ma: C.hMA, hue: 200 + Math.random() * 30 };
+    else if (tp === 'pred') c = { sE: C.rSE, mE: C.rME, sp: C.rSpd, vi: C.rVis, mt: C.rMeta, ma: C.rMA, hue: -5 + Math.random() * 20 };
+    else c = { sE: C.scSE, mE: C.scME, sp: C.scSpd, vi: C.scVis, mt: C.scMeta, ma: C.scMA, hue: 40 + Math.random() * 15 };
+    var pos = safePos();
+    return {
+      x: x !== undefined ? x : pos.x, y: y !== undefined ? y : pos.y,
+      vx: (Math.random() - 0.5) * 30, vy: (Math.random() - 0.5) * 30,
+      energy: e !== undefined ? e : c.sE, me: par ? mt(c.mE, m) : c.mE, speed: par ? mt(c.sp, m) : c.sp,
+      vision: par ? mt(c.vi, m) : c.vi, metabolism: par ? mt(c.mt, m) : c.mt,
+      age: 0, ma: par ? mt(c.ma, m) : c.ma, hue: c.hue, ang: Math.random() * TAU, wt: 0,
+      alive: true, inf: false, it: 0, type: tp
+    };
+  }
+
+  function mkC(x, y, e, tp) { return { x: x, y: y, energy: e, maxE: e, type: tp, alive: true }; }
+
+  // ─── Particles ───
+  function sP(x, y, col, n) {
+    for (var i = 0; i < n; i++) particles.push({
+      x: x, y: y, vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 80,
+      life: 0.35 + Math.random() * 0.25, ml: 0.6, col: col, sz: 1.5 + Math.random() * 2
+    });
+  }
+
+  function updPart(dt) {
+    var wv = windV();
+    for (var i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      p.x += (p.vx + wv.x * 0.3) * dt; p.y += (p.vy + wv.y * 0.3) * dt;
+      p.vx *= 0.95; p.vy *= 0.95; p.life -= dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  // ─── Wind ───
+  function windV() { var r = C.windDir * Math.PI / 180; return { x: Math.cos(r) * C.windStr * 30, y: Math.sin(r) * C.windStr * 30 }; }
+
+  // ─── Movement ───
+  function findN(e, arr, rng) {
+    var best = null, bd = rng;
+    for (var i = 0; i < arr.length; i++) {
+      if (!arr[i].alive) continue;
+      var d = dst(e, arr[i]);
+      if (d < bd) { bd = d; best = arr[i]; }
+    }
+    return best;
+  }
+
+  function steer(e, tx, ty, dt) {
+    var dx = tx - e.x, dy = ty - e.y, d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 0.01) return;
+    e.vx = lr(e.vx, (dx / d) * e.speed, 3.5 * dt);
+    e.vy = lr(e.vy, (dy / d) * e.speed, 3.5 * dt);
+  }
+
+  function wander(e, dt, sf) {
+    e.wt -= dt;
+    if (e.wt <= 0) { e.ang += (Math.random() - 0.5) * 2; e.wt = 0.5 + Math.random() * 2; }
+    sf = sf || 0.4;
+    e.vx = lr(e.vx, Math.cos(e.ang) * e.speed * sf, 2 * dt);
+    e.vy = lr(e.vy, Math.sin(e.ang) * e.speed * sf, 2 * dt);
+  }
+
+  function bnd(e, mg, fc, dt) {
+    if (e.x < mg) e.vx += fc * dt;
+    if (e.x > cv.width - mg) e.vx -= fc * dt;
+    if (e.y < mg) e.vy += fc * dt;
+    if (e.y > cv.height - mg) e.vy -= fc * dt;
+  }
+
+  function waterPush(e, dt) {
+    for (var w = 0; w < waterBodies.length; w++) {
+      var wb = waterBodies[w], dx = e.x - wb.x, dy = e.y - wb.y, d = Math.sqrt(dx * dx + dy * dy);
+      if (d < wb.r && d > 0.01) { var s = 300 * (1 - d / wb.r); e.vx += (dx / d) * s * dt; e.vy += (dy / d) * s * dt; }
+    }
+  }
+
+  function scarePush(e, dt) {
+    for (var s = 0; s < scareZones.length; s++) {
+      var z = scareZones[s], dx = e.x - z.x, dy = e.y - z.y, d = Math.sqrt(dx * dx + dy * dy);
+      if (d < z.r && d > 0.01) { var f = 180 * (1 - d / z.r); e.vx += (dx / d) * f * dt; e.vy += (dy / d) * f * dt; }
+    }
+  }
+
+  function rainBoost(x, y) {
+    var b = 1;
+    for (var r = 0; r < rainZones.length; r++) { var z = rainZones[r], d = dst({ x: x, y: y }, z); if (d < z.r) b *= z.boost; }
+    return b;
+  }
+
+  // ─── Disease ───
+  function chkDis(arr) {
+    var n = arr.length;
+    for (var i = 0; i < n; i++) {
+      var c = arr[i]; if (!c.alive || c.inf) continue;
+      var nc = 0, nI = false;
+      for (var j = 0; j < n; j++) {
+        if (i === j || !arr[j].alive) continue;
+        var d = dst(c, arr[j]);
+        if (d < C.disRad) { nc++; if (arr[j].inf && d < C.disRad * 0.5) nI = true; }
+      }
+      if (nc >= C.disThr && Math.random() < C.disInf) { c.inf = true; c.it = C.disDur; }
+      else if (nI && Math.random() < C.disSpr) { c.inf = true; c.it = C.disDur; }
+    }
+  }
+
+  function updDis(dt) { disTimer -= dt; if (disTimer > 0) return; disTimer = C.disChk; chkDis(herbs); chkDis(preds); chkDis(scavs); }
+
+  // ─── Meta mult ───
+  function metaM(e) { var m = 1; if (e.inf) m *= C.disEM; if (e.age > e.ma * C.elderThr) m *= C.elderEM; return m; }
+
+  // ─── Update Plants (with overcrowding, soil depletion, winter frost) ───
+  function updPlants(dt) {
+    var sun = eSun(), wv = windV(), sm = sMods();
+
+    // Decay nutrient zones
+    for (var d = nutrientZones.length - 1; d >= 0; d--) {
+      nutrientZones[d].timer -= dt;
+      if (nutrientZones[d].timer <= 0) nutrientZones.splice(d, 1);
+    }
+
+    for (var i = plants.length - 1; i >= 0; i--) {
+      var p = plants[i];
+      if (!p.alive) { plants.splice(i, 1); continue; }
+      p.age += dt;
+
+      // Winter frost damage
+      if (sm.name === 'Winter') {
+        p.energy -= (3 + Math.random() * 2) * dt;
+      }
+
+      if (p.age >= p.ma || p.energy <= 0) {
+        p.alive = false; sP(p.x, p.y, 'hsl(120,40%,40%)', 2); continue;
+      }
+
+      // Soil depletion factor
+      var soilF = 1;
+      for (var d2 = 0; d2 < nutrientZones.length; d2++) {
+        var nz = nutrientZones[d2];
+        var ddx = p.x - nz.x, ddy = p.y - nz.y, dd2 = ddx * ddx + ddy * ddy;
+        if (dd2 < nz.r * nz.r) {
+          soilF *= (1 - nz.str * (1 - Math.sqrt(dd2) / nz.r));
+        }
+      }
+
+      // Overcrowding check (every 0.4s using squared distance)
+      p._ct += dt;
+      if (p._ct >= 0.4) {
+        p._ct = 0;
+        var ncount = 0;
+        for (var j = 0; j < plants.length; j++) {
+          if (i === j || !plants[j].alive) continue;
+          var dx = p.x - plants[j].x, dy = p.y - plants[j].y;
+          if (dx * dx + dy * dy < 1225) ncount++;
+        }
+        p._nc = ncount;
+      }
+
+      var crowdMul = p._nc > 0 ? Math.max(0.1, 1 - p._nc * 0.15) : 1;
+      var gm = tGrowthM(p.x, p.y) * rainBoost(p.x, p.y);
+      p.energy = Math.min(p.energy + C.pGR * sun * gm * crowdMul * soilF * dt, p.me);
+
+      // Overcrowding death
+      if (p._nc >= 5 && Math.random() < 0.01 * dt * 60) {
+        p.alive = false; sP(p.x, p.y, 'hsl(80,30%,30%)', 2); continue;
+      }
+
+      if (p.inf) { p.it -= dt; p.energy -= 2 * dt; if (p.it <= 0) p.inf = false; }
+
+      // Reproduction (also reduced by crowding)
+      if (p.energy > C.pRT && plants.length < C.pMax) {
+        if (Math.random() < C.pRC * C.fert * gm * crowdMul * dt * 60) {
+          var nx = cl(p.x + (Math.random() - 0.5) * 80 + wv.x * dt * 2, 10, cv.width - 10);
+          var ny = cl(p.y + (Math.random() - 0.5) * 80 + wv.y * dt * 2, 10, cv.height - 10);
+          if (terrainAt(nx, ny) !== 3) { plants.push(mkP(nx, ny, p.energy * 0.3)); p.energy *= 0.6; }
+        }
+      }
+    }
+  }
+
+  // ─── Update Mobile (herbivore eating creates soil depletion) ───
+  function updMob(arr, dt, prey, cfgER, cfgEE, cfgRT, cfgRCost, cfgRCh, cfgMax, cE, wSf) {
+    var tmp = eTemp();
+    for (var i = arr.length - 1; i >= 0; i--) {
+      var e = arr[i];
+      if (!e.alive) { arr.splice(i, 1); continue; }
+      e.age += dt;
+      if (e.age >= e.ma) { e.alive = false; corpses.push(mkC(e.x, e.y, cE, e.type)); sP(e.x, e.y, 'hsl(' + e.hue + ',50%,40%)', 4); continue; }
+      if (e.inf) { e.it -= dt; if (e.it <= 0) e.inf = false; }
+      e.energy -= e.metabolism * tmp * metaM(e) * dt;
+      if (e.type === 'pred') scarePush(e, dt);
+      waterPush(e, dt);
+
+      var tgt = null;
+      if (prey === 'plants') tgt = findN(e, plants, e.vision * tVisionM(e.x, e.y));
+      else if (prey === 'herbs') tgt = findN(e, herbs, e.vision * tVisionM(e.x, e.y));
+      else tgt = findN(e, corpses, e.vision);
+
+      var mv = false;
+      if (tgt) {
+        var d = dst(e, tgt);
+        if (d < cfgER && tgt.alive) {
+          e.energy = Math.min(e.energy + tgt.energy * cfgEE, e.me); tgt.alive = false;
+          // Soil depletion when herbivore eats a plant
+          if (prey === 'plants') {
+            nutrientZones.push({ x: tgt.x, y: tgt.y, r: 50, str: 0.5, timer: 8 });
+          }
+          if (prey === 'herbs') corpses.push(mkC(tgt.x, tgt.y, C.cHE, 'herb'));
+          sP(tgt.x, tgt.y, prey === 'plants' ? 'hsl(150,80%,60%)' : prey === 'herbs' ? 'hsl(0,80%,65%)' : 'hsl(45,80%,60%)', 3);
+        } else { steer(e, tgt.x, tgt.y, dt); mv = true; }
+      } else { wander(e, dt, wSf); mv = true; }
+
+      var sm = tSpeedM(e.x, e.y);
+      e.x += e.vx * sm * dt; e.y += e.vy * sm * dt;
+      if (mv) { var sp = Math.sqrt(e.vx * e.vx + e.vy * e.vy); e.energy -= sp * (e.type === 'herb' ? C.hMC : e.type === 'pred' ? C.rMC : C.scMC) * dt; }
+      bnd(e, 30, 50, dt);
+
+      if (e.energy <= 0) { e.alive = false; corpses.push(mkC(e.x, e.y, cE, e.type)); sP(e.x, e.y, 'hsl(' + e.hue + ',70%,55%)', 5); continue; }
+      if (e.energy > cfgRT && arr.length < cfgMax) {
+        if (Math.random() < cfgRCh * dt * 60) {
+          e.energy -= cfgRCost;
+          arr.push(mkM(cl(e.x + (Math.random() - 0.5) * 30, 0, cv.width), cl(e.y + (Math.random() - 0.5) * 30, 0, cv.height), cfgRCost, e, e.type));
+        }
+      }
+    }
+  }
+
+  // ─── Corpses ───
+  function updCorps(dt) { for (var i = corpses.length - 1; i >= 0; i--) { var c = corpses[i]; if (!c.alive) { corpses.splice(i, 1); continue; } c.energy -= C.cDR * dt; if (c.energy <= 0) corpses.splice(i, 1); } }
+
+  // ─── Zones ───
+  function updZones(dt) {
+    for (var i = rainZones.length - 1; i >= 0; i--) { rainZones[i].t -= dt; if (rainZones[i].t <= 0) rainZones.splice(i, 1); }
+    for (var j = scareZones.length - 1; j >= 0; j--) { scareZones[j].t -= dt; if (scareZones[j].t <= 0) scareZones.splice(j, 1); }
+  }
+
+  // ─── Migration ───
+  function updMig(dt) {
+    if (herbs.length === 0 && Math.random() < C.migCh * dt * 60) { var ex = Math.random() < 0.5 ? 10 : cv.width - 10; herbs.push(mkM(ex, Math.random() * cv.height, C.hSE * 0.8, null, 'herb')); sP(ex, herbs[herbs.length - 1].y, 'hsl(210,80%,70%)', 6); }
+    if (preds.length === 0 && Math.random() < C.migCh * 0.5 * dt * 60) { var ex2 = Math.random() < 0.5 ? 10 : cv.width - 10; preds.push(mkM(ex2, Math.random() * cv.height, C.rSE * 0.8, null, 'pred')); sP(ex2, preds[preds.length - 1].y, 'hsl(0,80%,70%)', 6); }
+    if (scavs.length === 0 && Math.random() < C.migCh * 0.7 * dt * 60) { var ex3 = Math.random() < 0.5 ? 10 : cv.width - 10; scavs.push(mkM(ex3, Math.random() * cv.height, C.scSE * 0.8, null, 'scav')); sP(ex3, scavs[scavs.length - 1].y, 'hsl(45,80%,70%)', 6); }
+  }
+
+  function updAE(dt) { actE = Math.min(actE + C.aeRegen * dt, C.aeMax); }
+
+  // ─── Purge ───
+  function applyPurge(x, y, r) {
+    var srcs = [herbs, preds, scavs, plants];
+    for (var s = 0; s < srcs.length; s++) for (var i = 0; i < srcs[s].length; i++) {
+      var e = srcs[s][i]; if (!e.alive || !e.inf) continue;
+      if (dst({ x: x, y: y }, e) < r) { e.alive = false; sP(e.x, e.y, 'hsl(60,80%,55%)', 8); }
+    }
+  }
+
+  // ─── Render: BG ───
+  function buildBG() {
+    var c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height;
+    var x2 = c.getContext('2d');
+    x2.fillStyle = '#080c0a'; x2.fillRect(0, 0, c.width, c.height);
+    var g = x2.createRadialGradient(c.width / 2, c.height / 2, 0, c.width / 2, c.height / 2, c.width * 0.6);
+    g.addColorStop(0, 'rgba(12,22,16,0.4)'); g.addColorStop(1, 'rgba(8,12,10,0)');
+    x2.fillStyle = g; x2.fillRect(0, 0, c.width, c.height);
+    for (var w = 0; w < waterBodies.length; w++) {
+      var wb = waterBodies[w], wg = x2.createRadialGradient(wb.x, wb.y, 0, wb.x, wb.y, wb.r);
+      wg.addColorStop(0, 'rgba(15,45,75,0.55)'); wg.addColorStop(0.55, 'rgba(20,55,85,0.4)');
+      wg.addColorStop(0.8, 'rgba(35,70,70,0.18)'); wg.addColorStop(1, 'rgba(35,70,70,0)');
+      x2.fillStyle = wg; x2.beginPath(); x2.arc(wb.x, wb.y, wb.r, 0, TAU); x2.fill();
+    }
+    for (var f = 0; f < forestPatches.length; f++) {
+      var fp = forestPatches[f], fg = x2.createRadialGradient(fp.x, fp.y, 0, fp.x, fp.y, fp.r);
+      fg.addColorStop(0, 'rgba(12,38,18,0.3)'); fg.addColorStop(0.7, 'rgba(12,38,18,0.18)'); fg.addColorStop(1, 'rgba(12,38,18,0)');
+      x2.fillStyle = fg; x2.beginPath(); x2.arc(fp.x, fp.y, fp.r, 0, TAU); x2.fill();
+      x2.fillStyle = 'rgba(18,48,22,0.12)';
+      for (var t = 0; t < 20; t++) {
+        var tx = fp.x + (Math.random() - 0.5) * fp.r * 1.5, ty = fp.y + (Math.random() - 0.5) * fp.r * 1.5;
+        if (Math.sqrt(Math.pow(tx - fp.x, 2) + Math.pow(ty - fp.y, 2)) < fp.r * 0.7) { x2.beginPath(); x2.arc(tx, ty, 2 + Math.random() * 3, 0, TAU); x2.fill(); }
+      }
+    }
+    for (var r = 0; r < rockyPatches.length; r++) {
+      var rp = rockyPatches[r], rg = x2.createRadialGradient(rp.x, rp.y, 0, rp.x, rp.y, rp.r);
+      rg.addColorStop(0, 'rgba(48,42,32,0.22)'); rg.addColorStop(0.7, 'rgba(48,42,32,0.12)'); rg.addColorStop(1, 'rgba(48,42,32,0)');
+      x2.fillStyle = rg; x2.beginPath(); x2.arc(rp.x, rp.y, rp.r, 0, TAU); x2.fill();
+      x2.fillStyle = 'rgba(58,52,42,0.08)';
+      for (var t2 = 0; t2 < 15; t2++) {
+        var rx = rp.x + (Math.random() - 0.5) * rp.r * 1.4, ry = rp.y + (Math.random() - 0.5) * rp.r * 1.4;
+        if (Math.sqrt(Math.pow(rx - rp.x, 2) + Math.pow(ry - rp.y, 2)) < rp.r * 0.7) x2.fillRect(rx, ry, 2 + Math.random() * 4, 2 + Math.random() * 3);
+      }
+    }
+    x2.strokeStyle = 'rgba(107,143,113,0.022)'; x2.lineWidth = 1;
+    for (var gx2 = 0; gx2 < c.width; gx2 += 80) { x2.beginPath(); x2.moveTo(gx2 + 0.5, 0); x2.lineTo(gx2 + 0.5, c.height); x2.stroke(); }
+    for (var gy2 = 0; gy2 < c.height; gy2 += 80) { x2.beginPath(); x2.moveTo(0, gy2 + 0.5); x2.lineTo(c.width, gy2 + 0.5); x2.stroke(); }
+    var v = x2.createRadialGradient(c.width / 2, c.height / 2, c.width * 0.2, c.width / 2, c.height / 2, c.width * 0.75);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.3)');
+    x2.fillStyle = v; x2.fillRect(0, 0, c.width, c.height);
+    bgC = c; bgW = c.width; bgH = c.height;
+  }
+
+  function drawBG() {
+    if (!bgC || bgW !== cv.width || bgH !== cv.height) buildBG();
+    cx.drawImage(bgC, 0, 0);
+    var sm = sMods();
+    cx.globalAlpha = 0.04;
+    cx.fillStyle = 'rgb(' + Math.round(sm.ov[0]) + ',' + Math.round(sm.ov[1]) + ',' + Math.round(sm.ov[2]) + ')';
+    cx.fillRect(0, 0, cv.width, cv.height); cx.globalAlpha = 1;
+  }
+
+  function drawRipples() {
+    for (var w = 0; w < waterBodies.length; w++) {
+      var wb = waterBodies[w];
+      for (var r = 0; r < 3; r++) {
+        var rr = (wb.r * 0.3 + r * wb.r * 0.2 + gTime * 10) % (wb.r * 0.8);
+        cx.globalAlpha = 0.05 * (1 - rr / (wb.r * 0.8)); cx.strokeStyle = '#6a9ab8'; cx.lineWidth = 1;
+        cx.beginPath(); cx.arc(wb.x, wb.y, rr, 0, TAU); cx.stroke();
+      }
+    }
+    cx.globalAlpha = 1;
+  }
+
+  function drawWind() {
+    if (C.windStr < 0.1) return;
+    var wv = windV(), len = C.windStr * 12;
+    cx.globalAlpha = 0.04 * C.windStr; cx.strokeStyle = '#8a9a80'; cx.lineWidth = 1; cx.lineCap = 'round';
+    for (var i = 0; i < 15; i++) {
+      var bx = ((i * 173 + gTime * C.windStr * 10) % (cv.width + 100)) - 50;
+      var by = ((i * 97 + i * i * 31) % (cv.height + 100)) - 50;
+      cx.beginPath(); cx.moveTo(bx, by);
+      cx.quadraticCurveTo(bx + wv.x * 0.04 * len + Math.sin(i + gTime) * 3, by + wv.y * 0.04 * len + Math.cos(i + gTime) * 3, bx + wv.x * 0.04 * len * 2, by + wv.y * 0.04 * len * 2);
+      cx.stroke();
+    }
+    cx.globalAlpha = 1;
+  }
+
+  // ─── Soil depletion visual ───
+  function drawSoilDepletion() {
+    for (var i = 0; i < nutrientZones.length; i++) {
+      var nz = nutrientZones[i];
+      cx.globalAlpha = 0.06 * (nz.timer / 8);
+      cx.fillStyle = '#3a2a15';
+      cx.beginPath(); cx.arc(nz.x, nz.y, nz.r, 0, TAU); cx.fill();
+    }
+    cx.globalAlpha = 1;
+  }
+
+  // ─── Entity render ───
+  function szP(p) { return 3 + (p.energy / p.me) * 7; }
+  function szM(e) { return (e.type === 'pred' ? 5 : 4) + (e.energy / e.me) * (e.type === 'pred' ? 6 : 5); }
+  function szC(c) { return 3 + (c.energy / c.maxE) * 5; }
+  function ageOp(e) { var r = e.age / e.ma; return r > C.elderThr ? 1 - (r - C.elderThr) / (1 - C.elderThr) * 0.5 : 1; }
+
+  function drawCorpses() {
+    for (var i = 0; i < corpses.length; i++) {
+      var c = corpses[i]; if (!c.alive) continue;
+      var s = szC(c), a = 0.2 + 0.4 * (c.energy / c.maxE);
+      cx.globalAlpha = a; cx.fillStyle = '#4a4540'; cx.beginPath(); cx.arc(c.x, c.y, s, 0, TAU); cx.fill();
+      cx.globalAlpha = a * 0.4; cx.fillStyle = '#3a3530'; cx.beginPath(); cx.arc(c.x, c.y, s * 0.4, 0, TAU); cx.fill();
+    }
+  }
+
+  function drawArr(arr, glM) {
+    var i, e, s, a, col, hue;
+    for (i = 0; i < arr.length; i++) {
+      e = arr[i]; if (!e.alive) continue;
+      s = e.type ? szM(e) : szP(e);
+      a = ageOp(e) * (e.type ? 0.08 : 0.06 + 0.06 * (e.energy / e.me));
+      // Overcrowded plants shift toward yellow
+      hue = e.hue;
+      if (!e.type && e._nc >= 3) hue = lr(hue, 80, Math.min(1, (e._nc - 3) * 0.25));
+      col = e.inf ? 'hsl(80,35%,45%)' : 'hsl(' + Math.round(hue) + ',70%,55%)';
+      cx.globalAlpha = a; cx.fillStyle = col; cx.beginPath(); cx.arc(e.x, e.y, s * (glM || 2.5), 0, TAU); cx.fill();
+    }
+    for (i = 0; i < arr.length; i++) {
+      e = arr[i]; if (!e.alive) continue;
+      s = e.type ? szM(e) : szP(e);
+      a = ageOp(e) * (0.5 + 0.5 * (e.energy / (e.me || 100)));
+      hue = e.hue;
+      if (!e.type && e._nc >= 3) hue = lr(hue, 80, Math.min(1, (e._nc - 3) * 0.25));
+      col = e.inf ? 'hsl(80,35%,45%)' : 'hsl(' + Math.round(hue) + ',70%,55%)';
+      cx.globalAlpha = a; cx.fillStyle = col; cx.beginPath(); cx.arc(e.x, e.y, s, 0, TAU); cx.fill();
+      if (!e.type) {
+        cx.globalAlpha = ageOp(e) * (0.3 + 0.4 * (e.energy / e.me));
+        cx.fillStyle = e.inf ? 'hsl(80,25%,58%)' : 'hsl(' + Math.round(hue) + ',55%,72%)';
+        cx.beginPath(); cx.arc(e.x, e.y, s * 0.35, 0, TAU); cx.fill();
+      }
+    }
+  }
+
+  function drawInfRings() {
+    var all = herbs.concat(preds, scavs);
+    for (var i = 0; i < all.length; i++) {
+      var e = all[i]; if (!e.alive || !e.inf) continue;
+      cx.globalAlpha = 0.2 + 0.15 * Math.sin(gTime * 5); cx.strokeStyle = '#b0a030'; cx.lineWidth = 1.5;
+      cx.beginPath(); cx.arc(e.x, e.y, szM(e) + 4, 0, TAU); cx.stroke();
+    }
+    for (var j = 0; j < plants.length; j++) {
+      var p = plants[j]; if (!p.alive || !p.inf) continue;
+      cx.globalAlpha = 0.2 + 0.15 * Math.sin(gTime * 5); cx.strokeStyle = '#b0a030'; cx.lineWidth = 1;
+      cx.beginPath(); cx.arc(p.x, p.y, szP(p) + 3, 0, TAU); cx.stroke();
+    }
+    cx.globalAlpha = 1;
+  }
+
+  function drawZones() {
+    for (var r = 0; r < rainZones.length; r++) {
+      var z = rainZones[r], a = 0.06 * (z.t / 10);
+      cx.globalAlpha = a; cx.fillStyle = '#4488cc'; cx.beginPath(); cx.arc(z.x, z.y, z.r, 0, TAU); cx.fill();
+      cx.globalAlpha = a * 1.5; cx.strokeStyle = '#5599dd'; cx.lineWidth = 0.5; cx.setLineDash([4, 4]);
+      cx.beginPath(); cx.arc(z.x, z.y, z.r, 0, TAU); cx.stroke(); cx.setLineDash([]);
+    }
+    for (var s = 0; s < scareZones.length; s++) {
+      var z2 = scareZones[s], a2 = 0.05 * (z2.t / 15);
+      cx.globalAlpha = a2; cx.fillStyle = '#cc6644'; cx.beginPath(); cx.arc(z2.x, z2.y, z2.r, 0, TAU); cx.fill();
+      cx.globalAlpha = a2 * 1.5; cx.strokeStyle = '#dd7755'; cx.lineWidth = 0.5; cx.setLineDash([5, 5]);
+      cx.beginPath(); cx.arc(z2.x, z2.y, z2.r, 0, TAU); cx.stroke(); cx.setLineDash([]);
+    }
+    cx.globalAlpha = 1;
+  }
+
+  function drawParts() {
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i], a = cl(p.life / p.ml, 0, 1);
+      cx.globalAlpha = a * 0.7; cx.fillStyle = p.col;
+      cx.beginPath(); cx.arc(p.x, p.y, p.sz * a, 0, TAU); cx.fill();
+    }
+    cx.globalAlpha = 1;
+  }
+
+  function drawCursor() {
+    if (mouseX < 0) return;
+    var col, radius, cost;
+    switch (curTool) {
+      case 'plant': col = '#4ade80'; radius = 8; cost = C.aeCost.plant; break;
+      case 'rain': col = '#4488cc'; radius = 100; cost = C.aeCost.rain; break;
+      case 'scare': col = '#cc6644'; radius = 120; cost = C.aeCost.scare; break;
+      case 'purge': col = '#cc4444'; radius = 80; cost = C.aeCost.purge; break;
+    }
+    var ok = actE >= cost;
+    if (curTool === 'plant') {
+      cx.globalAlpha = ok ? 0.2 : 0.08; cx.fillStyle = ok ? col : '#4a4540';
+      cx.beginPath(); cx.arc(mouseX, mouseY, 8, 0, TAU); cx.fill();
+      if (ok) { cx.globalAlpha = 0.07; cx.beginPath(); cx.arc(mouseX, mouseY, 22, 0, TAU); cx.fill(); }
+    } else {
+      cx.globalAlpha = ok ? 0.12 : 0.04; cx.strokeStyle = ok ? col : '#4a4540'; cx.lineWidth = 1.5; cx.setLineDash([6, 4]);
+      cx.beginPath(); cx.arc(mouseX, mouseY, radius, 0, TAU); cx.stroke(); cx.setLineDash([]);
+      cx.globalAlpha = ok ? 0.04 : 0.015; cx.fillStyle = col;
+      cx.beginPath(); cx.arc(mouseX, mouseY, radius, 0, TAU); cx.fill();
+    }
+    cx.globalAlpha = 1;
+  }
+
+  // ─── Graph ───
+  function drawGraph() {
+    var w = gc.width, h = gc.height;
+    gx.clearRect(0, 0, w, h); gx.fillStyle = 'rgba(8,12,10,0.5)'; gx.fillRect(0, 0, w, h);
+    if (pHist.p.length < 2) return;
+    var mx = 1;
+    for (var k = 0; k < pHist.p.length; k++) {
+      if (pHist.p[k] > mx) mx = pHist.p[k]; if (pHist.h[k] > mx) mx = pHist.h[k];
+      if (pHist.r[k] > mx) mx = pHist.r[k]; if (pHist.s[k] > mx) mx = pHist.s[k];
+    }
+    gx.strokeStyle = 'rgba(107,143,113,0.06)'; gx.lineWidth = 1;
+    for (var g = 1; g <= 3; g++) { var gy = h * (1 - g / 4); gx.beginPath(); gx.moveTo(0, gy); gx.lineTo(w, gy); gx.stroke(); }
+    function ln(data, col) {
+      gx.beginPath(); gx.strokeStyle = col; gx.lineWidth = 1.5; gx.lineJoin = 'round';
+      for (var j = 0; j < data.length; j++) {
+        var px = (j / (HMAX - 1)) * w, py = h - 2 - (data[j] / mx) * (h - 4);
+        j === 0 ? gx.moveTo(px, py) : gx.lineTo(px, py);
+      }
+      gx.stroke();
+    }
+    ln(pHist.p, 'rgba(74,222,128,0.8)'); ln(pHist.h, 'rgba(96,165,250,0.8)');
+    ln(pHist.r, 'rgba(248,113,113,0.6)'); ln(pHist.s, 'rgba(251,191,36,0.7)');
+  }
+
+  // ─── UI ───
+  function cntInf() {
+    var c = 0, i;
+    for (i = 0; i < herbs.length; i++) if (herbs[i].inf) c++;
+    for (i = 0; i < preds.length; i++) if (preds[i].inf) c++;
+    for (i = 0; i < scavs.length; i++) if (scavs[i].inf) c++;
+    return c;
+  }
+
+  function wDir(a) { var d = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE']; return d[Math.round(((a % 360) + 360) % 360 / 45) % 8]; }
+
+  function updUI() {
+    var ts = Math.floor(gTime), m = Math.floor(ts / 60), s = ts % 60;
+    document.getElementById('dTime').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+    document.getElementById('dPlants').textContent = plants.length;
+    document.getElementById('dHerbs').textContent = herbs.length;
+    document.getElementById('dPreds').textContent = preds.length;
+    document.getElementById('dScavs').textContent = scavs.length;
+    document.getElementById('dCorps').textContent = corpses.length;
+    document.getElementById('dInf').textContent = cntInf();
+    document.getElementById('dWind').textContent = C.windStr < 0.1 ? 'Calm' : wDir(C.windDir) + ' ' + C.windStr.toFixed(1);
+    document.getElementById('eBar').style.width = (actE / C.aeMax * 100) + '%';
+    document.getElementById('dEnergy').textContent = Math.floor(actE);
+    var sm = sMods();
+    document.getElementById('seasonName').textContent = sm.name;
+    document.getElementById('seasonYear').textContent = 'Year ' + (Math.floor(gTime / (C.seaDur * 4)) + 1);
+    var sc = { Spring: '#6b8f71', Summer: '#c4a35a', Autumn: '#b87333', Winter: '#8899aa' }[sm.name] || '#6b8f71';
+    document.getElementById('seasonName').style.color = sc;
+    document.getElementById('seasonBanner').style.borderColor = sc + '33';
+    var tot = plants.length + herbs.length + preds.length + scavs.length, st = '—';
+    if (herbs.length > 0 && preds.length > 0 && scavs.length > 0 && plants.length > 10) {
+      var pr = plants.length / tot, hr = herbs.length / tot, rr = preds.length / tot, sr = scavs.length / tot;
+      var div = -(pr * Math.log(pr) + hr * Math.log(hr) + rr * Math.log(rr) + sr * Math.log(sr));
+      st = div > 1.2 ? 'Thriving' : div > 0.9 ? 'Stable' : div > 0.5 ? 'Stressed' : 'Critical';
+    } else if (tot > 10) st = 'Unbalanced'; else if (tot > 0) st = 'Collapsed';
+    document.getElementById('dStatus').textContent = st;
+    var hints = { plant: 'Click canvas to plant flora', rain: 'Click to create rain zone', scare: 'Click to repel predators', purge: 'Click to remove infected' };
+    document.getElementById('toolHint').textContent = hints[curTool];
+  }
+
+  // ─── Main Loop ───
+  function frame(ts) {
+    var rawDt = lastTs ? Math.min((ts - lastTs) / 1000, 0.05) : 0; lastTs = ts;
+    var dt = rawDt * C.speedMul;
+    if (dt > 0) {
+      updSeason(dt); updPlants(dt);
+      updMob(herbs, dt, 'plants', C.hER, C.hEE, C.hRT, C.hRCost, C.hRCh, C.hMax, C.cHE, 0.4);
+      updMob(preds, dt, 'herbs', C.rER, C.rEE, C.rRT, C.rRCost, C.rRCh, C.rMax, C.cPE, 0.3);
+      updMob(scavs, dt, 'corpses', C.scER, C.scEE, C.scRT, C.scRCost, C.scRCh, C.scMax, C.cSE, 0.35);
+      updCorps(dt); updPart(dt); updDis(dt); updZones(dt); updAE(dt); updMig(dt);
+      gTime += dt;
+      if (gTime - lastHT > 0.5) {
+        pHist.p.push(plants.length); pHist.h.push(herbs.length); pHist.r.push(preds.length); pHist.s.push(scavs.length);
+        if (pHist.p.length > HMAX) { pHist.p.shift(); pHist.h.shift(); pHist.r.shift(); pHist.s.shift(); }
+        lastHT = gTime;
+      }
+    }
+    drawBG(); drawRipples(); drawWind(); drawSoilDepletion();
+    drawCorpses(); drawArr(plants, 3); drawArr(herbs, 2.5); drawArr(preds, 2.5); drawArr(scavs, 2.5);
+    drawInfRings(); drawZones(); drawParts(); drawCursor();
+    cx.globalAlpha = 1; drawGraph(); updUI();
+    requestAnimationFrame(frame);
+  }
+
+  // ─── Init ───
+  function init() {
+    genTerrain();
+    var i;
+    for (i = 0; i < 100; i++) plants.push(mkP());
+    for (i = 0; i < 30; i++) herbs.push(mkM(undefined, undefined, undefined, null, 'herb'));
+    for (i = 0; i < 8; i++) preds.push(mkM(undefined, undefined, undefined, null, 'pred'));
+    for (i = 0; i < 10; i++) scavs.push(mkM(undefined, undefined, undefined, null, 'scav'));
+
+    function bindS(sid, key, did, fmt) {
+      var sl = document.getElementById(sid);
+      sl.addEventListener('input', function () { C[key] = parseFloat(sl.value); document.getElementById(did).textContent = fmt(C[key]); });
+    }
+    bindS('sT', 'temp', 'vT', function (v) { return v.toFixed(1); });
+    bindS('sS', 'sun', 'vS', function (v) { return v.toFixed(1); });
+    bindS('sF', 'fert', 'vF', function (v) { return v.toFixed(1); });
+    bindS('sM', 'mut', 'vM', function (v) { return v.toFixed(2); });
+    bindS('sWD', 'windDir', 'vWD', function (v) { return Math.round(v) + '\u00B0'; });
+    bindS('sWS', 'windStr', 'vWS', function (v) { return v.toFixed(1); });
+
+    var tbtns = document.querySelectorAll('.tbtn');
+    for (var t = 0; t < tbtns.length; t++) {
+      tbtns[t].addEventListener('click', function () {
+        for (var j = 0; j < tbtns.length; j++) tbtns[j].classList.remove('on');
+        this.classList.add('on'); curTool = this.getAttribute('data-tool');
+      });
+    }
+    var sbtns = document.querySelectorAll('.sbtn');
+    for (var s = 0; s < sbtns.length; s++) {
+      sbtns[s].addEventListener('click', function () {
+        for (var j = 0; j < sbtns.length; j++) sbtns[j].classList.remove('on');
+        this.classList.add('on'); C.speedMul = parseInt(this.getAttribute('data-speed'));
+      });
+    }
+
+    cv.addEventListener('mousemove', function (e) { mouseX = e.clientX; mouseY = e.clientY; });
+    cv.addEventListener('mouseleave', function () { mouseX = -200; mouseY = -200; });
+    cv.addEventListener('click', function (e) {
+      var x = e.clientX, y = e.clientY;
+      if (curTool === 'plant') {
+        if (actE >= C.aeCost.plant && plants.length < C.pMax && terrainAt(x, y) !== 3) {
+          actE -= C.aeCost.plant; plants.push(mkP(x, y, 40)); sP(x, y, 'hsl(150,80%,60%)', 5);
+        }
+      } else if (curTool === 'rain') {
+        if (actE >= C.aeCost.rain) { actE -= C.aeCost.rain; rainZones.push({ x: x, y: y, r: 100, t: 10, boost: 2 }); sP(x, y, 'hsl(200,80%,60%)', 10); }
+      } else if (curTool === 'scare') {
+        if (actE >= C.aeCost.scare) { actE -= C.aeCost.scare; scareZones.push({ x: x, y: y, r: 120, t: 15 }); sP(x, y, 'hsl(20,80%,60%)', 10); }
+      } else if (curTool === 'purge') {
+        if (actE >= C.aeCost.purge) { actE -= C.aeCost.purge; applyPurge(x, y, 80); }
+      }
+    });
+
+    requestAnimationFrame(frame);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
