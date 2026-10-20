@@ -672,6 +672,36 @@ test('browser regressions', async t => {
     await close();
   });
 
+  await t.test('Solitaire sweeps up a drag that loses its ending instead of freezing a card', async () => {
+    const frame = await openTitle('solitaire', 'Solitaire');
+    await frame.waitForSelector('#pileStock');
+    await frame.click('#pileStock');
+    await frame.click('#pileStock');
+    const orphaned = await frame.evaluate(() => {
+      // what a press that never reports its release leaves behind
+      const card = document.querySelector('#pileWaste .card:not(.ghost)');
+      const ghost = document.createElement('div');
+      ghost.className = 'drag-ghost';
+      document.querySelector('#dragLayer').appendChild(ghost);
+      card.classList.add('dragging');
+      return { ghosts: document.querySelectorAll('.drag-ghost').length,
+        hidden: document.querySelectorAll('.card.dragging').length };
+    });
+    assert.equal(orphaned.ghosts, 1);
+    assert.equal(orphaned.hidden, 1);
+    await frame.click('#pileStock');
+    const after = await frame.evaluate(() => ({
+      ghosts: document.querySelectorAll('.drag-ghost').length,
+      hidden: document.querySelectorAll('.card.dragging').length,
+      moves: document.querySelector('#statMoves').textContent,
+      waste: document.querySelectorAll('#pileWaste .card').length
+    }));
+    assert.equal(after.ghosts, 0, 'the frozen drag is cleared');
+    assert.equal(after.hidden, 0, 'its card is visible again');
+    assert.equal(after.moves, '3', 'and the click still draws: ' + after.moves + ' moves');
+    await close();
+  });
+
   await t.test('the 8 Ball CPU simulates its shots, so it pots, never fouls, and never scratches', async () => {
     const frame = await openTitle('8ball', '8 Ball');
     await frame.waitForFunction(() => typeof window.__8ball === 'object');

@@ -1237,6 +1237,21 @@ body{
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerCancel);
   }
+
+  /* A press that leaves the frame never reports its release, which used to leave
+     the dragged card frozen in mid-air with its pile slot still hidden. Sweep up
+     any drag that lost its ending before the next one starts. */
+  function dropStrayDrag() {
+    var ghosts = $$('.drag-ghost');
+    if (!ghosts.length && !press) return;
+    for (var i = 0; i < ghosts.length; i++) {
+      if (ghosts[i].parentNode) ghosts[i].parentNode.removeChild(ghosts[i]);
+    }
+    clearDragShadows();
+    unbindPointer();
+    press = null;
+    render();
+  }
   function unbindPointer() {
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', onPointerUp);
@@ -1244,11 +1259,16 @@ body{
   }
 
   function onPointerDown(e) {
+    dropStrayDrag();
     if (openModalEl) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
 
     var pileEl = up(e.target, 'pile');
     if (!pileEl) return;
+
+    /* keep receiving move/release even when the pointer slides off the pile,
+       the table, or the game frame itself */
+    try { tableEl.setPointerCapture(e.pointerId); } catch (err) {}
 
     var meta = metaOf(pileEl);
     if (meta.zone === 'stock') {
@@ -1438,6 +1458,10 @@ body{
 
   tableEl.addEventListener('pointerdown', onPointerDown);
   tableEl.addEventListener('dragstart', function (e) { e.preventDefault(); });
+  window.addEventListener('blur', dropStrayDrag);
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) dropStrayDrag();
+  });
 
   /* double-click / double-tap = auto move */
   tableEl.addEventListener('dblclick', function (e) {
