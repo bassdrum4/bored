@@ -429,8 +429,8 @@ function gameNote(game) {
   if (game.note) parts.push(game.note + '.');
   const shared = mergedInto(game.id).map(entry => entry.name);
   if (shared.length) {
-    parts.push(shared.join(' and ') + ' scores share this board — the backend has no rule row of its own for ' +
-      (shared.length > 1 ? 'them' : 'it') + ' yet.');
+    parts.push(shared.join(' and ') + (shared.length > 1 ? ' share' : ' shares') +
+      ' this board — the backend has no rule for ' + (shared.length > 1 ? 'them' : 'it') + ' yet.');
   }
   if (isLocalOnly(game.id)) parts.push('Not ranked online yet — scores for this game stay in your browser.');
   return parts.join(' ');
