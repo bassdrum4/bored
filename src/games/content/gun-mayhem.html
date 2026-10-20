@@ -52,7 +52,7 @@ canvas{display:block;border-radius:6px}
 <div class="diffrow">
 <button class="dbtn" data-d="easy" onclick="setDiff('easy')">EASY</button>
 <button class="dbtn on" data-d="medium" onclick="setDiff('medium')">MEDIUM</button>
-<button class="dbtn on" data-d="hard" onclick="setDiff('hard')">HARD</button>
+<button class="dbtn" data-d="hard" onclick="setDiff('hard')">HARD</button>
 </div>
 <button class="btn" onclick="launch('1p')">1 PLAYER vs CPU</button>
 <button class="btn" onclick="launch('2p')">2 PLAYERS LOCAL</button>
@@ -240,10 +240,10 @@ function aiUpdate(p,dt){
     if(p.aiStrafeT>0){p.aiStrafeT-=dt;}else{p.aiStrafeT=30+Math.random()*60;p.aiStrafeDir=Math.random()<.5?1:-1;}
 
     // Difficulty parameters
-    const dodgeRng=diff==='easy'?0:diff==='hard'?250:180;
-    const dodgeT=diff==='hard'?18:12;
-    const shootProb=diff==='easy'?.03:diff==='hard'?.15:.09;
-    const leadFactor=diff==='easy'?0:diff==='hard'?.8:.5;
+    const dodgeRng=diff==='easy'?0:diff==='hard'?300:240;
+    const dodgeT=diff==='hard'?20:16;
+    const shootProb=diff==='easy'?.03:diff==='hard'?.2:.14;
+    const leadFactor=diff==='easy'?0:diff==='hard'?.95:.75;
     const cratePriority=diff==='easy'?.2:diff==='hard'?1.5:1;
 
     // === BULLET DODGING ===
@@ -273,7 +273,12 @@ function aiUpdate(p,dt){
                 moveX=bc.x>p.x?1:-1;
                 if(bc.y<p.y-50&&p.gnd)wantJump=true;
                 if(bc.y>p.y+60&&p.gnd)wantDrop=true;
-                if(minD<350)wantShoot=Math.random()<shootProb;
+                if(minD<350){
+                    // aim before pulling the trigger; walking to a crate used to point the gun the wrong way
+                    p.face=dx>0?1:-1;
+                    if(leadFactor>0){const tl=minD/(WPNS[p.wpn].sp||16);const px=target.x+target.vx*tl*leadFactor;if(px<p.x)p.face=-1;else if(px>p.x)p.face=1;}
+                    wantShoot=Math.abs((p.y+p.h/2)-(target.y+target.h/2))<34&&Math.random()<shootProb;
+                }
             }
         }else if(crates.length>0&&Math.random()<.005*cratePriority){
             let bc=null,bd=1e9;
@@ -297,17 +302,25 @@ function aiUpdate(p,dt){
             if(dy<-90&&p.gnd)wantJump=true;
             if(dy>120&&p.gnd)wantDrop=true;
 
+            // Bullets fly level: firing at someone on another platform just wastes ammo,
+            // so line up first and only shoot once the target is on our height.
+            const lineUp=Math.abs((p.y+p.h/2)-(target.y+target.h/2))<34;
+            if(!lineUp&&p.gnd){
+                if(target.y<p.y-20)wantJump=true;
+                else if(target.y>p.y+40)wantDrop=true;
+            }
+
             if(absDx<550&&absDy<350){
                 if(p.wpn==='rocket'){
                     const tHit=absDx/WPNS.rocket.sp;
                     const predY=target.y+target.vy*tHit;
-                    if(Math.abs(predY-p.y)<150)wantShoot=true;
+                    if(Math.abs(predY-p.y)<150&&lineUp)wantShoot=true;
                 }else if(p.wpn==='sniper'){
-                    if(absDy<(diff==='hard'?160:120))wantShoot=true;
+                    if(absDy<(diff==='hard'?160:120)&&lineUp)wantShoot=true;
                 }else if(p.wpn==='shotgun'){
-                    if(absDx<(diff==='hard'?200:160))wantShoot=true;
+                    if(absDx<(diff==='hard'?200:160)&&lineUp)wantShoot=true;
                 }else{
-                    wantShoot=Math.random()<shootProb;
+                    wantShoot=lineUp&&Math.random()<shootProb;
                 }
                 // Shot leading
                 if(wantShoot&&leadFactor>0&&p.wpn!=='rocket'){
@@ -317,13 +330,13 @@ function aiUpdate(p,dt){
                 }
             }
 
-            if(absDx<300&&dy>0&&!p.gnd&&Math.random()<shootProb)wantShoot=true;
+            if(absDx<300&&dy>0&&!p.gnd&&lineUp&&Math.random()<shootProb)wantShoot=true;
             if(p.gnd&&Math.random()<(diff==='easy'?.004:.01))wantJump=true;
             if(p.wpn==='shotgun'&&absDx<180&&p.gnd&&Math.random()<.04)wantJump=true;
         }
 
         // === HARD: EDGE GUARDING ===
-        if(diff==='hard'){
+        if(diff!=='easy'){
             const offStage=ops.filter(q=>!q.gnd&&(q.x<120||q.x>W-120||q.y>H-150));
             if(offStage.length>0&&p.gnd){
                 const victim=offStage[0];

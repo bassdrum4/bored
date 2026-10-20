@@ -159,6 +159,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         const PADDLE_W = 12, PADDLE_H = 80;
         const BALL_SIZE = 10;
         const PADDLE_SPEED = 6;
+        const AI_SPEED = 3.1;
         const BALL_SPEED_INIT = 5;
         const BALL_SPEED_MAX = 12;
         const WIN_SCORE = 7;
@@ -246,14 +247,14 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             aiErrorTimer--;
             if (aiErrorTimer <= 0) {
                 // Error increases at high speeds, making fast balls harder to catch perfectly
-                let speedFactor = (ballSpeed - BALL_SPEED_INIT) * 5;
-                aiError = (Math.random() - 0.5) * (30 + speedFactor);
+                let speedFactor = (ballSpeed - BALL_SPEED_INIT) * 12;
+                aiError = (Math.random() - 0.5) * (95 + speedFactor);
                 aiErrorTimer = 20 + Math.random() * 30;
             }
 
             if (ballVX > 0) {
-                // Only "serious" prediction once the ball crosses the 40% line
-                if (ballX > W * 0.4) {
+                // Only "serious" prediction once the ball crosses the 55% line
+                if (ballX > W * 0.6) {
                     let predictedY = ballY;
                     let predictedX = ballX;
                     let simVY = ballVY;
@@ -272,7 +273,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                     // Smoothly transition the target towards the predicted spot
                     // This adds a slight "reaction lag" as it doesn't snap instantly to the result
                     let target = predictedY + aiError;
-                    aiTargetY = aiTargetY + (target - aiTargetY) * (0.08 + attention * 0.12);
+                    aiTargetY = aiTargetY + (target - aiTargetY) * (0.045 + attention * 0.07);
                 } else {
                     // Ball is far: loosely follow the ball or drift toward center
                     let lazyTarget = H / 2 + (ballY - H / 2) * 0.4;
@@ -280,7 +281,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 }
             } else {
                 // Ball moving away: return to center slowly
-                aiTargetY = aiTargetY + (H / 2 - aiTargetY) * 0.02;
+                aiTargetY = aiTargetY + (H / 2 - aiTargetY) * 0.012;
             }
 
             const paddleCenter = p2Y + PADDLE_H / 2;
@@ -289,7 +290,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
             if (Math.abs(diff) > deadzone) {
                 // Variable speed to feel less robotic
-                let moveSpeed = PADDLE_SPEED * (0.85 + Math.sin(Date.now() / 150) * 0.1);
+                let moveSpeed = AI_SPEED * (0.85 + Math.sin(Date.now() / 150) * 0.1);
                 const move = clamp(diff, -moveSpeed, moveSpeed);
                 p2Y = clamp(p2Y + move, 0, H - PADDLE_H);
             }
