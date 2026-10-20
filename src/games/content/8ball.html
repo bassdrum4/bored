@@ -1002,6 +1002,7 @@ document.getElementById('btnMenu').onclick = () => {
 window.__test = {
   set: (a, p)=>{ if(state==='aim'){ aimAngle=a; if(p) strike(p); } },
   state: () => state,
+  mode: () => mode,
   frame: (n)=>{ for(let i=0;i<(n||1);i++){ tick(1/60); } },
   balls: () => balls.map(b=>({id:b.id, alive:b.alive, x:+b.x.toFixed(1), y:+b.y.toFixed(1), vx:+b.vx.toFixed(2), vy:+b.vy.toFixed(2)})),
   pb: (id,p)=>{ const b=balls.find(b=>b.id===id); if(b&&state!=='run'){ b.x=p.x; b.y=p.y; } }

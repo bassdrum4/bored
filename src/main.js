@@ -54,7 +54,7 @@ const HIGH_SCORE_GAMES = [
     // clear bonus, and an abandoned run should not post a partial score.
     when: snapshot => snapshot.finished === true
   }),
-  highScore('8ball', '8 Ball', 'balls', { metric: 'potted' }),
+  highScore('8ball', '8 Ball', 'balls', { metric: 'potted', when: snapshot => snapshot.cpu === true }),
   highScore('tetris', 'Tetris', 'lines', { metric: 'lines' }),
   highScore('breakout', 'Breakout', 'layouts', { metric: 'layouts' }),
   highScore('frogger', 'Frogger', 'lily pads', { metric: 'homes' }),
@@ -65,17 +65,26 @@ const HIGH_SCORE_GAMES = [
   }),
   highScore('space-invaders', 'Space Invaders', 'waves', { metric: 'waves' }),
   highScore('qbert', 'Q*bert', 'levels', { metric: 'levels' }),
-  highScore('pong', 'Pong', 'points', { metric: 'points' }),
-  highScore('sumo', 'SUMO', 'rounds', { metric: 'wins' }),
+  highScore('pong', 'Pong', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
+  highScore('sumo', 'SUMO', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   highScore('lighthouse', 'Lighthouse', 'ships', { metric: 'ships' }),
   highScore('poker', 'Poker', 'chips', { metric: 'profit', when: snapshot => snapshot.handOver === true }),
-  highScore('tank', 'Tank', 'rounds', { metric: 'wins' }),
-  highScore('solitaire', 'Solitaire', 'cards', { metric: 'cards' }),
+  highScore('tank', 'Tank', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
+  // Solitaire is finishable, so the board ranks the time to clear it.
+  highScore('solitaire', 'Solitaire', 'seconds', {
+    metric: 'seconds',
+    lower: true,
+    when: snapshot => snapshot.won === true,
+    // The shared rule was written for foundation cards, so the range check has
+    // to come from here now that the board ranks seconds.
+    max: 86400,
+    note: 'Fastest clear of all 52 cards'
+  }),
   highScore('lights-out', 'Lights Out', 'boards', { metric: 'cleared' }),
   highScore('commanders', 'Commanders', 'waves', { metric: 'waves' }),
-  highScore('lava', 'Lava', 'points', { metric: 'points' }),
-  highScore('volletball', 'VolletBall', 'points', { metric: 'points' }),
-  highScore('gun-mayhem', 'Gun Mayhem', 'rounds', { metric: 'wins' }),
+  highScore('lava', 'Lava', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
+  highScore('volletball', 'VolletBall', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
+  highScore('gun-mayhem', 'Gun Mayhem', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   highScore('shadow-net', 'shadow.net', 'files', { metric: 'files' }),
   highScore('sand', 'Sand', 'cells', { metric: 'cells' }),
   highScore('eco', 'Eco', 'plants', { metric: 'plants', when: snapshot => snapshot.seconds >= 60 }),
@@ -85,10 +94,17 @@ LB_GAMES.push(...HIGH_SCORE_GAMES);
 const highScoreSpec = new Map(HIGH_SCORE_GAMES.map(game => [game.id, game]));
 const lbCache = new Map();
 const scoreRules = new Map();
+// The scores table has a foreign key on game id, so nothing is posted until the
+// list of games the backend accepts has actually loaded.
+let rulesLoaded = false;
 let session = loadSession();
 let submitted = {};
 let myHandle = '';
 let lbGame = 'overall';
+let lbView = 'players';
+let lbOpenPlayer = '';
+const rankedGames = new Set();
+const unrankedGames = new Set();
 let authMode = 'signin';
 let authBusy = false;
 let lbNotice = '';
@@ -154,12 +170,15 @@ async function sb(path, { method = 'GET', body, prefer, token } = {}) {
   });
   if (!res.ok) {
     let message = res.status + ' ' + res.statusText;
+    let code;
     try {
       const data = await res.json();
       message = data.msg || data.message || data.error_description || data.error || message;
+      code = data.code;
     } catch {}
     const error = new Error(message);
     error.status = res.status;
+    error.code = code;
     throw error;
   }
   if (res.status === 204) return null;
@@ -203,7 +222,12 @@ function bestValue(game) {
 }
 function formatScore(value, game) {
   const number = Number(value);
-  return (Number.isFinite(number) ? Math.round(number * 10) / 10 : 0) + ' ' + game.unit;
+  if (!Number.isFinite(number)) return '0 ' + game.unit;
+  if (game.unit === 'seconds') {
+    const total = Math.max(0, Math.round(number));
+    return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+  }
+  return Math.round(number * 10) / 10 + ' ' + game.unit;
 }
 async function setHandle(name, retry = false) {
   let attempt = cleanHandle(name);
@@ -230,10 +254,21 @@ async function ensureProfile(preferred) {
   return myHandle;
 }
 async function loadRules() {
+  if (rulesLoaded) return true;
   try {
     const rows = await sb('/rest/v1/score_rules?select=game,label,better,max_value', { token: SUPABASE_ANON_KEY });
-    for (const row of rows || []) scoreRules.set(row.game, row);
-  } catch {}
+    if (!Array.isArray(rows) || !rows.length) return false;
+    for (const row of rows || []) {
+      scoreRules.set(row.game, row);
+      rankedGames.add(row.game);
+    }
+    // The scores table only accepts games that have a rule row, so anything
+    // without one is played and saved locally but cannot post to the board.
+    for (const game of LB_GAMES) if (!rankedGames.has(game.id)) unrankedGames.add(game.id);
+    rulesLoaded = true;
+    renderGamePicker();
+    return true;
+  } catch { return false; }
 }
 function captureHighScore() {
   if (!current || player.hidden) return;
@@ -242,9 +277,14 @@ function captureHighScore() {
   let snapshot;
   try {
     if (current === '8ball') {
-      const balls = frame.contentWindow.__test?.balls?.();
+      const test = frame.contentWindow.__test;
+      const balls = test?.balls?.();
       if (!Array.isArray(balls)) return;
-      snapshot = { slug: '8ball', potted: balls.filter(ball => ball.id !== 0 && !ball.alive).length };
+      snapshot = {
+        slug: '8ball',
+        potted: balls.filter(ball => ball.id !== 0 && !ball.alive).length,
+        cpu: test.mode?.() === 'cpu'
+      };
     } else {
       snapshot = frame.contentWindow.__boredSnapshot?.();
     }
@@ -263,6 +303,9 @@ function captureHighScore() {
 }
 async function syncScores() {
   if (!supabaseOn() || !session) return;
+  // Posting a game the backend has no row for trips scores_game_fkey. Wait for
+  // the rule list instead of guessing, and try again next time.
+  if (!rulesLoaded && !(await loadRules())) return;
   try {
     if (!(await ensureProfile())) { renderAccount(); return; }
     const rows = await sb('/rest/v1/scores?select=game,value&user_id=eq.' + encodeURIComponent(session.user.id));
@@ -278,11 +321,13 @@ async function syncScores() {
   }
   let changed = false;
   for (const game of LB_GAMES) {
+    if (unrankedGames.has(game.id)) continue;
     let score = bestValue(game);
     if (!score || !Number.isFinite(score)) continue;
     score = Math.round(score);
     const rule = scoreRules.get(game.id);
-    if (rule && Number.isFinite(rule.max_value) && score > rule.max_value) continue;
+    const ceiling = Number.isFinite(game.max) ? game.max : rule?.max_value;
+    if (Number.isFinite(ceiling) && score > ceiling) continue;
     const previous = submitted[game.id];
     if (previous != null && (game.lower ? score >= previous : score <= previous)) continue;
     try {
@@ -304,7 +349,10 @@ async function syncScores() {
       changed = true;
     } catch (err) {
       if (err.status === 401) await refreshSession();
-      else lbNotice = authError(err);
+      else if (err.code === '23503' || /foreign key/i.test(err.message || '')) {
+        // No rule row for this game yet: keep the local best and stop retrying.
+        unrankedGames.add(game.id);
+      } else lbNotice = authError(err);
     }
   }
   renderAccount();
@@ -353,8 +401,8 @@ function accountStandings(scores) {
 
 async function loadLeaderboard(force = false) {
   if (!supabaseOn()) { renderLeaderboard(); return; }
-  const key = lbGame;
-  const game = LB_GAMES.find(entry => entry.id === key);
+  const key = lbView === 'players' ? 'overall' : lbGame;
+  const game = lbView === 'games' ? LB_GAMES.find(entry => entry.id === lbGame) : null;
   const cached = lbCache.get(key);
   if (!force && cached && Date.now() - cached.at < 30000) { renderLeaderboard(); return; }
   if (!cached || force) {
@@ -394,30 +442,70 @@ async function loadLeaderboard(force = false) {
   } catch (err) {
     lbCache.set(key, { rows: [], at: Date.now(), error: authError(err) });
   }
-  if (lbGame === key) renderLeaderboard();
+  if ((lbView === 'players' ? 'overall' : lbGame) === key) renderLeaderboard();
 }
-function renderLeaderboard() {
-  const isOverall = lbGame === 'overall';
-  const game = LB_GAMES.find(entry => entry.id === lbGame) || LB_GAMES[0];
+function rankedGamesList() {
+  // Once the rules are known, keep every game visible so a local-only best is
+  // still reachable, but mark the ones the shared board cannot hold.
+  return LB_GAMES.slice().sort((a, b) => {
+    const left = rankedGames.size ? rankedGames.has(a.id) : true;
+    const right = rankedGames.size ? rankedGames.has(b.id) : true;
+    return left === right ? 0 : left ? -1 : 1;
+  });
+}
+
+function renderGamePicker() {
   const select = $('#lb-game');
-  if (select.value !== lbGame) select.value = lbGame;
+  if (!select) return;
+  const options = rankedGamesList();
+  if (!options.some(game => game.id === lbGame)) lbGame = options[0]?.id || 'overall';
+  select.replaceChildren();
+  for (const game of options) {
+    const option = document.createElement('option');
+    option.value = game.id;
+    option.textContent = game.name + (rankedGames.size && !rankedGames.has(game.id) ? ' (local only)' : '');
+    select.appendChild(option);
+  }
+  select.value = lbGame;
+}
+
+function renderLeaderboard() {
+  const select = $('#lb-game');
   const list = $('#lb-list');
   const empty = $('#lb-empty');
+  const picker = $('#lb-pick');
+  const players = lbView === 'players';
+  if (picker) picker.hidden = players;
+  for (const tab of document.querySelectorAll('.lb-tab')) {
+    tab.setAttribute('aria-selected', String(tab.dataset.view === (players ? 'players' : 'games')));
+  }
+  const game = LB_GAMES.find(entry => entry.id === lbGame) || rankedGamesList()[0];
+  if (select && game && select.value !== game.id) select.value = game.id;
   list.replaceChildren();
   $('#lb-refresh').disabled = !supabaseOn();
-  $('#lb-note').textContent = !supabaseOn()
-    ? 'The shared leaderboard is offline until Supabase is configured.'
-    : isOverall
-      ? 'Players ranked across ' + LB_GAMES.length + ' games. Each game awards 10 points for first, 9 for second, down to 1 for tenth. Ties share points.'
-      : 'Best scores for ' + game.name + '. ' + (game.lower ? 'Lowest score wins.' : 'Highest score wins.');
+
   if (!supabaseOn()) {
+    $('#lb-note').textContent = 'The shared leaderboard is offline until Supabase is configured.';
     empty.hidden = false;
     empty.textContent = 'Playing as a guest? Your local bests still work.';
     $('#lb-mine').textContent = '';
     return;
   }
-  const cached = lbCache.get(lbGame);
-  const rows = isOverall ? accountStandings(cached?.rows || []) : (cached?.rows || []);
+
+  const cached = lbCache.get(players ? 'overall' : lbGame);
+  const all = cached?.rows || [];
+  const rows = players ? accountStandings(all) : all;
+
+  if (players) {
+    const played = new Set(all.map(row => row.game).filter(id => LB_GAMES.some(entry => entry.id === id))).size;
+    $('#lb-note').textContent = 'Players ranked across ' + LB_GAMES.length + ' games · ' + rows.length +
+      (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores · 10 points for a first place, down to 1 for tenth. Pick a name to see its games.';
+  } else if (game) {
+    const unit = game.unit === 'seconds' ? 'time' : game.unit;
+    $('#lb-note').textContent = game.name + ' · ' + (game.lower ? 'lowest' : 'highest') + ' ' + unit + ' first. ' +
+      (game.note ? game.note + '. ' : '') +
+      (rankedGames.has(game.id) ? '' : 'Not ranked online yet — scores for this game stay in your browser.');
+  }
   if (cached?.error) {
     empty.hidden = false;
     empty.textContent = 'Could not load rankings: ' + cached.error;
@@ -427,10 +515,14 @@ function renderLeaderboard() {
   } else {
     empty.hidden = true;
   }
+
   rows.slice(0, 10).forEach((row, index) => {
     const item = document.createElement('li');
-    const mine = Boolean(myHandle) && row.handle.toLowerCase() === myHandle.toLowerCase();
+    const mine = Boolean(myHandle) && String(row.handle || '').toLowerCase() === myHandle.toLowerCase();
     if (mine) item.className = 'you';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'lb-row';
     const rank = document.createElement('span');
     rank.className = 'lb-rank';
     rank.textContent = String(index + 1).padStart(2, '0');
@@ -439,32 +531,71 @@ function renderLeaderboard() {
     name.textContent = (row.handle || 'player') + (mine ? ' (you)' : '');
     const score = document.createElement('span');
     score.className = 'lb-score';
-    if (isOverall) {
+
+    if (players) {
       const details = document.createElement('small');
       details.className = 'lb-player-meta';
-      details.textContent = row.gamesRanked + ' top-10 games · ' + row.gamesPlayed + ' games scored';
+      details.textContent = row.gamesRanked + ' of ' + row.gamesPlayed + ' games scoring';
       name.appendChild(details);
       score.textContent = row.points + ' pts';
+      // clicking a player opens their per-game bests
+      const key = String(row.handle || '').toLowerCase();
+      const open = lbOpenPlayer === key;
+      button.setAttribute('aria-expanded', String(open));
+      button.onclick = () => { lbOpenPlayer = open ? '' : key; renderLeaderboard(); };
+      const detail = document.createElement('ul');
+      detail.className = 'lb-breakdown';
+      detail.hidden = !open;
+      if (open) {
+        const own = all.filter(entry => String(entry.handle || '').toLowerCase() === key);
+        own.sort((a, b) => LB_GAMES.findIndex(g => g.id === a.game) - LB_GAMES.findIndex(g => g.id === b.game));
+        for (const entry of own) {
+          const spec = LB_GAMES.find(g => g.id === entry.game);
+          if (!spec) continue;
+          const line = document.createElement('li');
+          const label = document.createElement('span');
+          label.textContent = spec.name;
+          const value = document.createElement('span');
+          value.textContent = formatScore(entry.value, spec);
+          line.append(label, value);
+          detail.appendChild(line);
+        }
+        if (!detail.children.length) {
+          const line = document.createElement('li');
+          line.textContent = 'No saved scores yet.';
+          detail.appendChild(line);
+        }
+      }
+      item.append(button, detail);
     } else {
       score.textContent = formatScore(row.value, game);
+      item.appendChild(button);
     }
-    item.append(rank, name, score);
+
+    button.append(rank, name, score);
     list.appendChild(item);
   });
-  if (isOverall) {
+
+  if (players) {
     const myRank = myHandle ? rows.findIndex(row => row.handle.toLowerCase() === myHandle.toLowerCase()) : -1;
     const me = myRank < 0 ? null : rows[myRank];
     $('#lb-mine').textContent = me
-      ? 'Your account: #' + (myRank + 1) + ' · ' + me.points + ' points · ' + me.gamesRanked + ' top-10 games.'
+      ? 'Your account: #' + (myRank + 1) + ' · ' + me.points + ' points · ' + me.gamesRanked + ' games scoring.'
       : (session ? 'Play a game to put your account on the board.' : 'Sign in to put your account on the board.');
-  } else {
-    const mine = bestValue(game);
-    $('#lb-mine').textContent = mine
-      ? 'Your best on this device: ' + formatScore(mine, game) +
-        (session ? ' · saved as ' + (myHandle || userName()) : ' · sign in to add it.')
+  } else if (game) {
+    const local = bestValue(game);
+    const ranked = rankedGames.has(game.id) || !rankedGames.size;
+    const myRow = session && myHandle ? rows.find(row => String(row.handle).toLowerCase() === myHandle.toLowerCase()) : null;
+    const parts = [];
+    if (rows.length) parts.push(rows.length + (rows.length === 1 ? ' player' : ' players') + ' ranked');
+    if (local) parts.push('your best: ' + formatScore(local, game));
+    if (myRow) parts.push('on the board: #' + (rows.indexOf(myRow) + 1));
+    $('#lb-mine').textContent = parts.length
+      ? parts.join(' · ') + (ranked ? '' : ' · not ranked online yet')
       : (session ? 'Play ' + game.name + ' to put a score on the board.' : 'Sign in to add your best scores.');
   }
 }
+
 function renderAccount() {
   const state = $('#account-state');
   const action = $('#account-action');
@@ -632,19 +763,16 @@ async function consumeAuthRedirect() {
 }
 function initAccount() {
   loadSubmitted();
-  const select = $('#lb-game');
-  const overallOption = document.createElement('option');
-  overallOption.value = 'overall';
-  overallOption.textContent = 'Overall players';
-  select.appendChild(overallOption);
-  for (const game of LB_GAMES) {
-    const option = document.createElement('option');
-    option.value = game.id;
-    option.textContent = game.name;
-    select.appendChild(option);
+  renderGamePicker();
+  $('#lb-game').onchange = event => { lbGame = event.target.value; lbOpenPlayer = ''; renderLeaderboard(); loadLeaderboard(); };
+  for (const tab of document.querySelectorAll('.lb-tab')) {
+    tab.onclick = () => {
+      lbView = tab.dataset.view === 'games' ? 'games' : 'players';
+      lbOpenPlayer = '';
+      renderLeaderboard();
+      loadLeaderboard();
+    };
   }
-  select.value = lbGame;
-  select.onchange = () => { lbGame = select.value; renderLeaderboard(); loadLeaderboard(); };
   $('#lb-refresh').onclick = () => loadLeaderboard(true);
   $('#account-action').onclick = () => { if (session) signOutUser(); else openAuth('signin'); };
   $('#account-rename').onclick = () => openAuth('name');

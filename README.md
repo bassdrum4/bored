@@ -128,12 +128,13 @@ cross-origin game state (and Klang is a music player).
 ## Shared leaderboard (optional)
 
 Sign in with an email and password to keep your best scores on a shared board and
-see how other players are doing. The leaderboard starts with **Overall players**:
-accounts collect 10 points for first place in a game, 9 for second, down to 1
-for tenth. Tied scores get equal points, and every game counts the same instead
-of adding incomparable raw scores. Select an individual game to see its original
-best-score rankings. The leaderboard is backed by Supabase and is entirely
-optional: without keys the hub stays offline and every game still works.
+see how other players are doing. The leaderboard has two views. **By player**
+ranks accounts: 10 points for first place in a game, 9 for second, down to 1 for
+tenth, ties sharing points, so no game's raw units get added to another's. Click
+a name to expand its per-game bests. **By game** ranks one game at a time, with a
+picker that also carries your own local best and marks games the shared board
+cannot hold. The leaderboard is backed by Supabase and is entirely optional:
+without keys the hub stays offline and every game still works.
 
 This project's backend is already provisioned: `score_rules`, `profiles`,
 `scores`, the public `leaderboard` view, and the `set_handle` RPC. The hub reads
@@ -164,6 +165,36 @@ Connect Four and Tank2 are excluded because their only totals are per-session
 win counts; the three remote extras are excluded because the hub cannot inspect
 their cross-origin state. Scores are submitted by the browser, so this is a
 friendly board, not anti-cheat. Signing out keeps local bests intact.
+
+### What counts as a score
+
+Games that end are ranked on how they ended: Solitaire posts the seconds it took
+to clear all 52 cards, Wordle posts the guesses of a solved board, Memory posts
+moves for a finished board, Minesweeper posts the clock on a cleared field. Games
+that can run forever post partial progress instead — lines, waves, levels,
+boards, chips, apples — so a good run always beats an abandoned one.
+
+Two-player games are local games with a CPU in one seat, so they only post when
+the opponent was the computer: Pong, SUMO, VolletBall, Lava, Tank, Gun Mayhem and
+8 Ball all check the mode they were played in, and a win over a person stays in
+that browser. SUMO, VolletBall and Lava start against the CPU and switch to two
+players from the button in their controls.
+
+`score_rules` decides which games the shared `scores` table accepts, and the
+hub will not attempt a game that is missing from it (`scores_game_fkey`). DEEP
+and Lights Out currently have no rule row, so their bests are saved locally and
+shown as *local only* in the picker. Adding a row turns the shared board on for
+them:
+
+```sql
+insert into score_rules (game, label, better, max_value)
+values ('deep', 'Score', 'high', 1000000),
+       ('lights-out', 'Boards cleared', 'high', 999)
+on conflict (game) do nothing;
+```
+
+Solitaire's rule row still says "Foundation cards"; the hub now ranks it on
+time, so any value it posts is seconds rather than cards.
 
 ## New games (4)
 

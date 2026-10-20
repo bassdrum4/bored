@@ -38,6 +38,9 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
   }
   #restart:hover{background:rgba(255,215,0,0.12);box-shadow:0 0 25px rgba(255,215,0,0.3)}
   #restart.show{opacity:1;pointer-events:all}
+  .mode{background:none;border:1px solid #231414;border-radius:3px;color:#8a7373;
+    cursor:pointer;font:11px/1 'DM Mono',monospace;letter-spacing:1px;padding:4px 8px}
+  .mode:hover{border-color:#553030;color:#e8c8c8}
 </style>
 </head>
 <body>
@@ -52,7 +55,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 <canvas id="c" width="900" height="500"></canvas>
 <div class="controls">
   <div class="p1c"><span>WASD</span> move &nbsp; <span>SPACE</span> stomp</div>
-  <div class="p2c"><span>↑←↓→</span> move &nbsp; <span>ENTER</span> stomp</div>
+  <button type="button" class="mode" id="mode">vs CPU</button>
+  <div class="p2c" id="p2hint"><span>CPU</span> hunts you</div>
 </div>
 <div class="msg" id="msg"></div>
 <button id="restart" onclick="init()">PLAY AGAIN</button>
@@ -70,6 +74,7 @@ const EDGE_INT=7,MAX_RING=Math.floor(Math.min(ROWS,COLS)/2);
 const CASCADE=0.35,WIN=3;
 
 let grid,p1,p2,sc,gs,gt,parts,lb,stomps,edgeRing,edgeTimer,t;
+let cpuMode=true,aiTick=0,aiAim=null,aiStomp=false;
 
 const keys={};
 onkeydown=e=>{keys[e.code]=true;e.preventDefault()};
@@ -133,6 +138,30 @@ function moveP(p,u,d,l,r){
   p.x=Math.max(GX+PR,Math.min(GX+GW-PR,p.x));
   p.y=Math.max(GY+PR,Math.min(GY+GH-PR,p.y));
   if(p.stCd>0)p.stCd=Math.max(0,p.stCd-1/60);
+}
+
+// One-player opponent: hop between safe tiles toward you, stomping when close.
+function driveCpu(){
+  if(!p2.alive){aiAim=null;aiStomp=false;return;}
+  if(aiTick--<=0){
+    aiTick=5;
+    let best=null,bestScore=1e9;
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      if(grid[r][c].s!==SAFE)continue;
+      const x=GX+c*T+T/2,y=GY+r*T+T/2;
+      const mine=Math.hypot(x-p2.x,y-p2.y),theirs=Math.hypot(x-p1.x,y-p1.y);
+      if(mine<T*0.75)continue;
+      const score=mine+theirs*0.55;
+      if(score<bestScore){bestScore=score;best={x,y};}
+    }
+    aiAim=best||{x:p2.x,y:p2.y};
+    const d=Math.hypot(p1.x-p2.x,p1.y-p2.y);
+    aiStomp=p2.stCd<=0&&p1.alive&&d<STOMP_RANGE*0.8&&Math.random()<0.35;
+  }
+  const dx=(aiAim?aiAim.x:p2.x)-p2.x,dy=(aiAim?aiAim.y:p2.y)-p2.y;
+  keys.ArrowLeft=dx<-6;keys.ArrowRight=dx>6;
+  keys.ArrowUp=dy<-6;keys.ArrowDown=dy>6;
+  if(aiStomp){doStomp(p2,1);aiStomp=false;}
 }
 
 function collide(){
@@ -211,16 +240,16 @@ function update(){
     gt-=1/60;
     [p1,p2].forEach(p=>{if(!p.alive&&p.fall>0){p.fall-=0.02;p.y+=1.5;if(Math.random()<0.3)spark(p.x,p.y,'#ff6600',1,2);}
       if(p.alive&&overVoid(p)){p.alive=false;p.fall=1;spark(p.x,p.y,p.c,20,5);spark(p.x,p.y,'#ff6600',12,4);}});
-    updateGrid();
-    if(gt<=0){if(sc[0]>=WIN||sc[1]>=WIN){gs='over';showMsg(sc[0]>=WIN?'P1 WINS!':'P2 WINS!',sc[0]>=WIN?'#00e5ff':'#ff4757');rstE.classList.add('show');}else reset();}
+    updateGrid();      if(gt<=0){if(sc[0]>=WIN||sc[1]>=WIN){gs='over';showMsg(sc[0]>=WIN?'P1 WINS!':(cpuMode?'CPU WINS!':'P2 WINS!'),sc[0]>=WIN?'#00e5ff':'#ff4757');rstE.classList.add('show');}else reset();}
     return;
   }
 
   updateGrid();updateEdge();
   moveP(p1,'KeyW','KeyS','KeyA','KeyD');
+  if(cpuMode)driveCpu();
   moveP(p2,'ArrowUp','ArrowDown','ArrowLeft','ArrowRight');
   if(keys.Space){doStomp(p1,0);keys.Space=false;}
-  if(keys.Enter){doStomp(p2,1);keys.Enter=false;}
+  if(!cpuMode&&keys.Enter){doStomp(p2,1);keys.Enter=false;}
   collide();
   if(p1.alive)trigTile((p1.y-GY)/T|0,(p1.x-GX)/T|0);
   if(p2.alive)trigTile((p2.y-GY)/T|0,(p2.x-GX)/T|0);
@@ -347,6 +376,21 @@ function draw(){
 }
 
 function loop(){update();draw();requestAnimationFrame(loop);}
+
+const modeBtn=document.getElementById('mode'),p2hint=document.getElementById('p2hint');
+function setMode(cpu){
+  cpuMode=cpu;aiAim=null;aiStomp=false;
+  modeBtn.textContent=cpu?'vs CPU':'2 players';
+  p2hint.innerHTML=cpu?'<span>CPU</span> hunts you':'<span>↑←↓→</span> move &nbsp; <span>ENTER</span> stomp';
+  keys.ArrowLeft=keys.ArrowRight=keys.ArrowUp=keys.ArrowDown=keys.Enter=false;
+}
+modeBtn.onclick=()=>{setMode(!cpuMode);init();};
+window.__test={
+  players:()=>[p1,p2].map(p=>({x:+(p.x||0).toFixed(1),y:+(p.y||0).toFixed(1),alive:!!p.alive})),
+  cpu:()=>cpuMode,
+  scores:()=>sc.slice(),
+  state:()=>gs
+};
 init();loop();
 </script>
 </body>

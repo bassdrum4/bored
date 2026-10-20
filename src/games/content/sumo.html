@@ -108,6 +108,20 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
     letter-spacing: 2px;
     animation: pulse 1.5s ease-in-out infinite;
   }
+  .menu { display: flex; gap: 12px; margin-top: 18px; }
+  .opt {
+    background: none;
+    border: 1px solid #2a2a3a;
+    border-radius: 3px;
+    color: #bbb;
+    cursor: pointer;
+    font: 12px/1 'DM Mono', monospace;
+    letter-spacing: 2px;
+    padding: 10px 14px;
+    text-transform: uppercase;
+  }
+  .opt:hover { border-color: var(--gold); color: var(--gold); }
+  .opt small { color: #555; display: block; font-size: 10px; letter-spacing: 1px; margin-top: 5px; text-transform: none; }
   @keyframes pulse {
     0%, 100% { opacity: 0.3; }
     50% { opacity: 1; }
@@ -129,8 +143,11 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
 <div id="overlay">
   <h1>NEON SUMO</h1>
-  <div class="sub">Press <kbd>SPACE</kbd> to start — first to 7</div>
-  <div style="font-size:11px;color:#444;margin-top:8px;letter-spacing:1px">Push your opponent out of the ring</div>
+  <div class="sub">First to 7 · push your opponent out of the ring</div>
+  <div class="menu">
+    <button type="button" class="opt" id="opt-cpu">1 player <small>vs CPU</small></button>
+    <button type="button" class="opt" id="opt-two">2 players <small>same keyboard</small></button>
+  </div>
 </div>
 
 <script>
@@ -151,6 +168,7 @@ const MAX_SPEED = 5;
 const BOUNCE_FORCE = 6;
 
 let keys = {};
+let cpuMode = true, aiFrame = 0, aiBias = 0;
 let ringRadius, gameRunning = false, roundActive = false, animId = null;
 let shake = 0;
 let shockwaves = [];
@@ -179,7 +197,15 @@ function resetRound() {
   shake = 0;
 }
 
-function startGame() {
+function startGame(vsCpu = cpuMode) {
+  cpuMode = vsCpu;
+  aiBias = 0;
+  const info = document.querySelector('.info');
+  if (info) {
+    info.innerHTML = cpuMode
+      ? '<span style="color:var(--p1)">YOU</span> WASD + C to dash &nbsp;·&nbsp; <span style="color:var(--p2)">CPU</span> holds the far side'
+      : '<span style="color:var(--p1)">P1</span> WASD + C to dash &nbsp;·&nbsp; <span style="color:var(--p2)">P2</span> ARROWS + / to dash';
+  }
   p1 = makePlayer(cx - 80, cy, '#00f0ff', 'rgba(0,240,255,');
   p2 = makePlayer(cx + 80, cy, '#ff2d55', 'rgba(255,45,85,');
   updateScores();
@@ -192,8 +218,13 @@ function startGame() {
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.code === 'Space') e.preventDefault();
-  if (!gameRunning && e.code === 'Space') startGame();
+  if (!gameRunning && (e.code === 'Space' || e.code === 'Enter')) startGame(cpuMode);
+  if (!gameRunning && (e.code === 'Digit2' || e.code === 'Numpad2')) startGame(false);
 });
+for (const [id, vsCpu] of [['opt-cpu', true], ['opt-two', false]]) {
+  const button = document.getElementById(id);
+  if (button) button.onclick = () => { if (!gameRunning) startGame(vsCpu); };
+}
 document.addEventListener('keyup', e => keys[e.code] = false);
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 document.addEventListener('visibilitychange', () => { if (document.hidden) for(const k in keys)keys[k]=false });
@@ -207,6 +238,31 @@ function dash(user, target) {
   user.dashTimer = 8;
   user.dashCooldown = DASH_COOLDOWN;
   shockwaves.push({ x: user.x, y: user.y, r: 0, maxR: 40, life: 1, color: user.color });
+}
+
+// One-player opponent: work around to the ring side of P1 so every push sends
+// them outward, and never trade position for the edge.
+function driveCpu(me, foe) {
+  aiFrame++;
+  if (aiFrame % 30 === 0) aiBias = (Math.random() - 0.5) * 0.5;
+  const dx = foe.x - me.x, dy = foe.y - me.y;
+  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+  const outX = foe.x - cx, outY = foe.y - cy;
+  const outLen = Math.sqrt(outX * outX + outY * outY) || 1;
+  const behindX = foe.x + (outX / outLen) * 26, behindY = foe.y + (outY / outLen) * 26;
+  const aimX = behindX - me.x + aiBias * 26, aimY = behindY - me.y + aiBias * 26;
+  const aimLen = Math.sqrt(aimX * aimX + aimY * aimY) || 1;
+  const myEdge = Math.sqrt((me.x - cx) ** 2 + (me.y - cy) ** 2);
+  const panic = myEdge > ringRadius - 48;
+  const gx = panic ? cx - me.x : aimX / aimLen;
+  const gy = panic ? cy - me.y : aimY / aimLen;
+  const gl = Math.sqrt(gx * gx + gy * gy) || 1;
+  const push = panic ? 1 : 0.85;
+  me.vx += (gx / gl) * ACCEL * push;
+  me.vy += (gy / gl) * ACCEL * push;
+  // Dash through the foe when they are on the far side of us from the centre.
+  const outward = ((foe.x - me.x) * outX + (foe.y - me.y) * outY) / (dist * outLen || 1);
+  if (me.dashCooldown <= 0 && dist < 110 && outward > 0.35 && !panic) dash(me, foe);
 }
 
 function spawnExplosion(x, y, color) {
@@ -230,7 +286,7 @@ function endGame(text, color) {
   overlay.innerHTML = `
     <div id="winner-text" style="color:${color};text-shadow:0 0 30px ${color}">${text}</div>
     <h1 style="text-shadow:0 0 30px rgba(255,224,74,0.4)">WINS!</h1>
-    <div class="restart-hint">Press SPACE to play again</div>
+    <div class="restart-hint">SPACE — play again · 2 — two players</div>
   `;
 }
 
@@ -246,12 +302,16 @@ function update() {
   if (keys['KeyS']) p1.vy += ACCEL;
   if (keys['KeyC'] && p1.dashCooldown <= 0) dash(p1, p2);
 
-  // P2 input
-  if (keys['ArrowLeft'])  p2.vx -= ACCEL;
-  if (keys['ArrowRight']) p2.vx += ACCEL;
-  if (keys['ArrowUp'])    p2.vy -= ACCEL;
-  if (keys['ArrowDown'])  p2.vy += ACCEL;
-  if (keys['Slash'] && p2.dashCooldown <= 0) dash(p2, p1);
+  // P2 input — the CPU takes the right side in one-player mode.
+  if (cpuMode) {
+    driveCpu(p2, p1);
+  } else {
+    if (keys['ArrowLeft'])  p2.vx -= ACCEL;
+    if (keys['ArrowRight']) p2.vx += ACCEL;
+    if (keys['ArrowUp'])    p2.vy -= ACCEL;
+    if (keys['ArrowDown'])  p2.vy += ACCEL;
+    if (keys['Slash'] && p2.dashCooldown <= 0) dash(p2, p1);
+  }
 
   [p1, p2].forEach(p => {
     if (p.dashCooldown > 0) p.dashCooldown--;
@@ -317,7 +377,7 @@ function update() {
       shockwaves.push({ x: loser.x, y: loser.y, r: 0, maxR: 200, life: 1, color: loser.color });
 
       if (winner.score >= WIN) {
-        const label = winIdx === 1 ? 'PLAYER 1' : 'PLAYER 2';
+        const label = winIdx === 1 ? 'PLAYER 1' : (cpuMode ? 'CPU' : 'PLAYER 2');
         setTimeout(() => endGame(label, winner.color), 600);
       } else {
         setTimeout(resetRound, 800);
@@ -462,6 +522,13 @@ function loop() {
   draw();
   animId = requestAnimationFrame(loop);
 }
+
+window.__test = {
+  players: () => [p1, p2].map(p => ({ x: +(p.x || 0).toFixed(1), y: +(p.y || 0).toFixed(1) })),
+  cpu: () => cpuMode,
+  ring: () => +ringRadius.toFixed(1),
+  scores: () => [p1.score || 0, p2.score || 0]
+};
 
 ctx.fillStyle = '#080810';
 ctx.fillRect(0, 0, S, S);

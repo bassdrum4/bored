@@ -283,7 +283,7 @@ test('browser regressions', async t => {
   });
 
   await t.test('overall ranking groups scores by account, respects lower-is-better and ties', async () => {
-    assert.equal(await page.$eval('#lb-game', el => el.value), 'overall');
+    assert.equal(await page.$eval('#lb-pick', el => el.hidden), true, 'the player view hides the game picker');
     const rankings = await page.evaluate(() => accountStandings([
       { game: '2048', handle: 'Ada', value: 300 },
       { game: '2048', handle: 'Ben', value: 300 },
@@ -839,9 +839,22 @@ test('browser regressions', async t => {
 
       frame = await openTitle('8ball', '8 Ball');
       await frame.waitForFunction(() => typeof window.__test?.balls === 'function');
-      await frame.evaluate(() => { window.__test.balls = () => [{ id: 1, alive: false }, { id: 2, alive: true }]; });
+      await frame.evaluate(() => {
+        window.__test.balls = () => [{ id: 1, alive: false }, { id: 2, alive: true }];
+        window.__test.mode = () => 'cpu';
+      });
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.8ball')), '1', 'counts pocketed object balls');
+      // 8 Ball is a two-player game: only the CPU counts, never a human opponent.
+      await page.evaluate(() => localStorage.removeItem('bored.high.8ball'));
+      frame = await openTitle('8ball', '8 Ball');
+      await frame.waitForFunction(() => typeof window.__test?.balls === 'function');
+      await frame.evaluate(() => {
+        window.__test.balls = () => [{ id: 1, alive: false }, { id: 2, alive: false }];
+        window.__test.mode = () => '2p';
+      });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.8ball')), null, 'two-player wins stay off the board');
 
       frame = await openTitle('poker', 'Poker');
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
@@ -866,8 +879,8 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), '2402', 'a cleared descent posts its bonus score');
 
-      assert.equal(await page.$eval('#lb-game', el => el.options.length), 32);
-      assert.equal(await page.$eval('#lb-game', el => el.value), 'overall');
+      assert.equal(await page.$eval('#lb-game', el => el.options.length), 31, 'every scored game is pickable');
+      assert.equal(await page.$eval('#lb-game', el => el.value), '2048');
       assert.match(await text(page, '#lb-note'), /across 31 games/);
     } finally {
       if (await page.$eval('#player', el => !el.hidden)) await close();

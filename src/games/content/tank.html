@@ -161,8 +161,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         /* -------------------------- TUNING -------------------------- */
 
         const TS = 10;
-        const SPD = 1.9;
-        const ROT = 0.048;
+        const SPD = 2.1;
+        const ROT = 0.052;
         const BSPD = 4.2;
         const FRATE = 220;
         const BLIM = 18;
@@ -1137,6 +1137,12 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         }
 
         /* -------------------------- START -------------------------- */
+        // Read-only handle for the offline suite: position and tuning, no setters.
+        window.__test = {
+            tanks: () => [p1, p2].map(t => ({ x: +t.x.toFixed(2), y: +t.y.toFixed(2), angle: +t.angle.toFixed(3) })),
+            spd: () => SPD,
+            rot: () => ROT
+        };
         updateScores(); initRound(); loop();
     </script>
 </body>

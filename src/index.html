@@ -33,11 +33,15 @@
   </section>
   <section id="leaderboard" aria-labelledby="leaderboard-heading">
     <h2 id="leaderboard-heading">Leaderboard</h2>
-    <p id="lb-note">See the top players across all games. Sign in to earn account points.</p>
     <div class="lb-bar">
-      <label>Rank by <select id="lb-game" aria-label="Leaderboard view"></select></label>
+      <div class="lb-tabs" role="tablist" aria-label="Leaderboard view">
+        <button class="lb-tab" type="button" role="tab" data-view="players" aria-selected="true">By player</button>
+        <button class="lb-tab" type="button" role="tab" data-view="games" aria-selected="false">By game</button>
+      </div>
+      <label id="lb-pick" hidden>Game <select id="lb-game" aria-label="Leaderboard game"></select></label>
       <button id="lb-refresh" class="action" type="button">Refresh</button>
     </div>
+    <p id="lb-note">Ranked by points: 10 for a first place in a game, down to 1 for tenth.</p>
     <ol id="lb-list"></ol>
     <p id="lb-empty" hidden></p>
     <p id="lb-mine"></p>

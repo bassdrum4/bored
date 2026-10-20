@@ -67,6 +67,12 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
   .p1c span { border: 1px solid rgba(0,229,255,0.15); }
   .p2c span { border: 1px solid rgba(255,71,87,0.15); }
   .p2c { text-align: right; }
+  .mode {
+    background: none; border: 1px solid #1b1b28; border-radius: 3px;
+    color: #777; cursor: pointer; font: 11px/1 'DM Mono', monospace;
+    letter-spacing: 1px; padding: 4px 8px;
+  }
+  .mode:hover { border-color: #444; color: #ccc; }
   .msg {
     position: fixed; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
@@ -91,7 +97,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 <canvas id="c" width="900" height="500"></canvas>
 <div class="controls">
   <div class="p1c"><span>W</span> jump &nbsp; <span>A</span> <span>D</span> move</div>
-  <div class="p2c"><span>↑</span> jump &nbsp; <span>←</span> <span>→</span> move</div>
+  <button type="button" class="mode" id="mode">vs CPU</button>
+  <div class="p2c" id="p2hint"><span>CPU</span> covers the far side</div>
 </div>
 <div class="msg" id="msg"></div>
 
@@ -116,6 +123,7 @@ const WIN = 7;
 
 let sc = [0, 0], serv = 0;
 let ball, p1, p2;
+let cpuMode = true, aiDir = 0, aiJump = false, aiTick = 0, aiTargetX = 0;
 let parts = [], trail = [];
 let st = 'serve', stT = 55, lastHit = -1;
 
@@ -155,6 +163,31 @@ function reset() {
   ball.vy = 0.3;
   parts = []; trail = [];
   st = 'serve'; stT = 55; lastHit = -1;
+}
+
+// The CPU reads the ball like a player would: work out where it will come
+// down on its side, walk there, and jump when the ball is overhead.
+function driveCpu() {
+  if (st !== 'play' && st !== 'serve') { aiTargetX = NET_X + 150; aiDir = 0; aiJump = false; return; }
+  if (aiTick-- <= 0) {
+    aiTick = 4;
+    let tx = NET_X + 160, ty = GROUND - PL_R;
+    if (ball.x > NET_X || ball.vx > 0.4) {
+      let x = ball.x, y = ball.y, vx = ball.vx, vy = ball.vy, t = 0;
+      while (t < 200 && y < GROUND - PL_R) {
+        vy += GRAV_BALL; x += vx; y += vy; vx *= 0.998; t++;
+        if (x - BALL_R < WALL_L) { x = WALL_L + BALL_R; vx = Math.abs(vx) * 0.7; }
+        if (x + BALL_R > WALL_R) { x = WALL_R - BALL_R; vx = -Math.abs(vx) * 0.7; }
+        if (x > NET_X - 40 && y > NET_TOP && y < NET_TOP + 20) x = Math.max(x, NET_X + 20);
+      }
+      tx = x; ty = y;
+      // A little slop so clean angles still beat it.
+      if (ball.vx !== 0) tx += (Math.random() - 0.5) * 18;
+    }
+    aiTargetX = Math.max(NET_X + 50, Math.min(WALL_R - 30, tx));
+    aiDir = aiTargetX - p2.x > 12 ? 1 : aiTargetX - p2.x < -12 ? -1 : 0;
+    aiJump = p2.gnd && ball.x > NET_X - 60 && ball.y < p2.y - 10 && ty < GROUND - PL_R - 8 && Math.abs(ball.x - p2.x) < 90;
+  }
 }
 
 function moveP(p, up, l, r, side) {
@@ -250,6 +283,12 @@ function update() {
   }
 
   moveP(p1, 'KeyW', 'KeyA', 'KeyD', 0);
+  driveCpu();
+  if (cpuMode) {
+    keys['ArrowLeft'] = aiDir < 0;
+    keys['ArrowRight'] = aiDir > 0;
+    keys['ArrowUp'] = aiJump;
+  }
   moveP(p2, 'ArrowUp', 'ArrowLeft', 'ArrowRight', 1);
 
   ball.vy += (st === 'serve' ? GRAV_BALL * 0.3 : GRAV_BALL);
@@ -413,6 +452,28 @@ function drawP(p) {
 }
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+const modeBtn = document.getElementById('mode');
+const p2hint = document.getElementById('p2hint');
+function setMode(cpu) {
+  cpuMode = cpu;
+  modeBtn.textContent = cpu ? 'vs CPU' : '2 players';
+  p2hint.innerHTML = cpu
+    ? '<span>CPU</span> covers the far side'
+    : '<span>↑</span> jump &nbsp; <span>←</span> <span>→</span> move';
+  keys['ArrowLeft'] = keys['ArrowRight'] = keys['ArrowUp'] = false;
+  aiDir = 0; aiJump = false; aiTick = 0;
+}
+modeBtn.onclick = () => setMode(!cpuMode);
+
+window.__test = {
+  pads: () => [p1, p2].map(p => ({ x: +p.x.toFixed(1), y: +p.y.toFixed(1) })),
+  ball: () => ({ x: +ball.x.toFixed(1), y: +ball.y.toFixed(1), vx: +ball.vx.toFixed(2) }),
+  cpu: () => cpuMode,
+  scores: () => sc.slice(),
+  state: () => st
+};
+
 reset(); loop();
 </script>
 </body>
