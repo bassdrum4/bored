@@ -433,7 +433,7 @@ function nextTurn(){
 function beginHand(){
   const c = cue();
   if(isCpu()){
-    if(!c.alive){ const best = findHandSpot(); c.x=best.x; c.y=best.y; c.vx=c.vy=0; }
+    if(!c.alive){ const best = findHandSpotCpu(); c.x=best.x; c.y=best.y; c.vx=c.vy=0; }
     c.alive = true;
     beginCpu(false);
     return;
@@ -476,9 +476,14 @@ function gameOver(winner){
 }
 
 /* ================= CPU ================= */
-function segClear(ax, ay, bx, by, exList, clearance){
-  for(const b of balls){
-    if(!b.alive || exList.includes(b.id)) continue;
+/* The CPU plans by simulating the real physics: it clones the table, rolls a
+   candidate shot forward with the same integrator, and keeps only shots that
+   actually drop the ball, never scratch, and leave something good behind. */
+const SIM_STEP = 1/300;
+
+function clearPath(layout, ax, ay, bx, by, exList, clearance){
+  for(const b of layout){
+    if(exList.includes(b.id)) continue;
     const abx = bx-ax, aby = by-ay;
     const len2 = abx*abx + aby*aby;
     if(len2 < 1e-6) continue;
@@ -489,67 +494,367 @@ function segClear(ax, ay, bx, by, exList, clearance){
   }
   return true;
 }
+function segClear(ax, ay, bx, by, exList, clearance){
+  return clearPath(balls.filter(b=>b.alive), ax, ay, bx, by, exList, clearance);
+}
 
-function aiPlan(){
+/* ---- sandboxed copy of the physics: no sound, no scoring side effects ---- */
+function simPotGeo(b){
+  for(const p of POCKETS){ if(Math.hypot(b.x-p.x, b.y-p.y) < p.r*0.94) return p; }
+  return null;
+}
+function simStep(b, h, potted, cueState, isCue){
+  b.x += b.vx*h; b.y += b.vy*h;
+  const s = Math.hypot(b.vx, b.vy);
+  if(s > 0){
+    const ns = s * Math.max(0, 1 - FRICTION*h);
+    b.vx *= ns/s; b.vy *= ns/s;
+  }
+  if(simPotGeo(b)){ b.alive = false; b.vx = b.vy = 0; potted.push(b.id); return; }
+  if(b.y < R){
+    if(b.y <= -0.5 && (inCornerTL(b.x)||inCornerTR(b.x)||inSideT(b.x))){ b.alive=false; b.vx=b.vy=0; potted.push(b.id); return; }
+    if(!(inCornerTL(b.x)||inCornerTR(b.x)||inSideT(b.x))){
+      b.y = R;
+      if(b.vy < 0){ if(isCue) cueState.rail = true; b.vy = -b.vy*CUSH; b.vx *= 0.96; }
+    }
+  }
+  if(b.y > PH-R){
+    if(b.y >= PH+0.5 && (inCornerBL(b.x)||inCornerBR(b.x)||inSideB(b.x))){ b.alive=false; b.vx=b.vy=0; potted.push(b.id); return; }
+    if(!(inCornerBL(b.x)||inCornerBR(b.x)||inSideB(b.x))){
+      b.y = PH-R;
+      if(b.vy > 0){ if(isCue) cueState.rail = true; b.vy = -b.vy*CUSH; b.vx *= 0.96; }
+    }
+  }
+  if(b.x < R){
+    if(b.x <= -0.5 && inLeft(b.y)){ b.alive=false; b.vx=b.vy=0; potted.push(b.id); return; }
+    if(!inLeft(b.y)){
+      b.x = R;
+      if(b.vx < 0){ if(isCue) cueState.rail = true; b.vx = -b.vx*CUSH; b.vy *= 0.96; }
+    }
+  }
+  if(b.x > PW-R){
+    if(b.x >= PW+0.5 && inRight(b.y)){ b.alive=false; b.vx=b.vy=0; potted.push(b.id); return; }
+    if(!inRight(b.y)){
+      b.x = PW-R;
+      if(b.vx > 0){ if(isCue) cueState.rail = true; b.vx = -b.vx*CUSH; b.vy *= 0.96; }
+    }
+  }
+}
+
+const POT_GHOST = R*2;             // centre-to-centre gap at contact (exact, or the cut drifts)
+
+/* A ball rolled at the corner point itself clips the jaw and rebounds, so each
+   pocket also offers an aiming point just inside the mouth. Both are tried and
+   the simulation decides which line actually drops. */
+const POCKET_IN = POCKETS.map(p => {
+  const dx = p.x - PW/2, dy = p.y - PH/2, d = Math.hypot(dx, dy) || 1;
+  return {x: p.x - dx/d*2.2, y: p.y - dy/d*2.2};
+});
+const POCKET_AIMS = POCKETS.map((p, i) => [p, POCKET_IN[i]]);
+
+/* Roll one shot forward and report everything the planner cares about. */
+function simulateShot(layout, angle, power){
+  const bs = layout.map(b => ({id:b.id, x:b.x, y:b.y, vx:0, vy:0, alive:true}));
+  const cueB = bs[0];
+  cueB.vx = Math.cos(angle)*MAXPOWER*power;
+  cueB.vy = Math.sin(angle)*MAXPOWER*power;
+  const potted = [], cueState = {rail:false};
+  let firstHit = null;
+  for(let n=0; n<2600; n++){
+    let moving = false;
+    for(const b of bs){
+      if(!b.alive) continue;
+      simStep(b, SIM_STEP, potted, cueState, b.id===0);
+      if(Math.hypot(b.vx, b.vy) > STOPV) moving = true;
+    }
+    for(let i=0;i<bs.length;i++){
+      const a = bs[i]; if(!a.alive) continue;
+      for(let j=i+1;j<bs.length;j++){
+        const b = bs[j]; if(!b.alive) continue;
+        let dx = b.x-a.x, dy = b.y-a.y;
+        let d = Math.hypot(dx,dy);
+        if(d >= R*2) continue;
+        if(d < 0.0001){ dx = 1; dy = 0; d = 1; }
+        const nx = dx/d, ny = dy/d;
+        const overlap = R*2 - d;
+        a.x -= nx*overlap/2; a.y -= ny*overlap/2;
+        b.x += nx*overlap/2; b.y += ny*overlap/2;
+        const rel = (a.vx-b.vx)*nx + (a.vy-b.vy)*ny;
+        if(rel > 0){
+          const imp = rel*(1+BB_E)/2;
+          a.vx -= nx*imp; a.vy -= ny*imp;
+          b.vx += nx*imp; b.vy += ny*imp;
+          if(firstHit === null && (a.id===0 || b.id===0)) firstHit = (a.id===0 ? b.id : a.id);
+        }
+      }
+    }
+    if(!moving) break;
+  }
+  const after = bs.filter(b=>b.alive).map(b=>({id:b.id, x:b.x, y:b.y}));
+  const settled = bs.find(b=>b.id===0);
+  return {potted, firstHit, after, cueRail: cueState.rail,
+    cue: settled && settled.alive ? {x:settled.x, y:settled.y} : null};
+}
+
+/* ---- line-of-sight helpers used to find a legal contact ---- */
+function firstBallHit(ox, oy, dx, dy){
+  let bestT = 1e9, hit = null;
+  for(const b of balls){
+    if(!b.alive || b.id===0) continue;
+    const cx = b.x-ox, cy = b.y-oy;
+    const proj = cx*dx + cy*dy;
+    if(proj <= 0) continue;
+    const d2 = cx*cx + cy*cy - proj*proj;
+    if(d2 > (R*2)*(R*2)) continue;
+    const t = proj - Math.sqrt((R*2)*(R*2) - d2);
+    if(t > 0 && t < bestT){ bestT = t; hit = b; }
+  }
+  let railT = 1e9;
+  if(dx < -1e-9) railT = Math.min(railT, (R-ox)/dx);
+  if(dx >  1e-9) railT = Math.min(railT, (PW-R-ox)/dx);
+  if(dy < -1e-9) railT = Math.min(railT, (R-oy)/dy);
+  if(dy >  1e-9) railT = Math.min(railT, (PH-R-oy)/dy);
+  if(railT < bestT) return null;
+  return hit;
+}
+/* the colour of ball a shot would touch first, allowing one cushion */
+function firstBallAfterRail(ox, oy, dx, dy){
+  const direct = firstBallHit(ox, oy, dx, dy);
+  if(direct) return {hit:direct, dist: Math.hypot(direct.x-ox, direct.y-oy)};
+  let t = 1e9, axis = null;
+  const sides = [
+    [dx < -1e-9, (R-ox)/dx, 'x'], [dx > 1e-9, (PW-R-ox)/dx, 'x'],
+    [dy < -1e-9, (R-oy)/dy, 'y'], [dy > 1e-9, (PH-R-oy)/dy, 'y']
+  ];
+  for(const [okay, tt, which] of sides){ if(okay && tt > 0 && tt < t){ t = tt; axis = which; } }
+  if(!t || !isFinite(t) || t === 1e9) return null;
+  let px = ox + dx*t, py = oy + dy*t;
+  let rx = dx, ry = dy;
+  if(axis === 'x') rx = -rx; else ry = -ry;
+  px = Math.max(R+0.05, Math.min(PW-R-0.05, px));
+  py = Math.max(R+0.05, Math.min(PH-R-0.05, py));
+  const second = firstBallHit(px + rx*0.05, py + ry*0.05, rx, ry);
+  if(!second) return null;
+  return {hit:second, dist: t + Math.hypot(second.x-px, second.y-py)};
+}
+/* centre of the widest fan of directions that legally reach a target */
+function legalFanAngle(targetIds){
   const c = cue();
-  const own = balls.filter(b=>b.alive && b.id!==0 && (openTable ? b.id!==8 : groupOf(b.id)===groups[turn]));
-  const pockets = [POCKETS[0],POCKETS[1],POCKETS[2],POCKETS[3],POCKETS[4],POCKETS[5]];
+  const N = 240;
+  const ok = new Array(N);
+  for(let i=0;i<N;i++){
+    const a = (i/N)*Math.PI*2;
+    const hit = firstBallHit(c.x, c.y, Math.cos(a), Math.sin(a));
+    ok[i] = !!hit && targetIds.includes(hit.id);
+  }
+  let bestLen = 0, bestStart = 0;
+  for(let i=0;i<N;i++){
+    if(!ok[i]) continue;
+    let len = 0;
+    while(len < N && ok[(i+len)%N]) len++;
+    if(len > bestLen){ bestLen = len; bestStart = i; }
+  }
+  if(!bestLen) return null;
+  return ((bestStart + bestLen/2)/N)*Math.PI*2;
+}
+/* cheapest one-cushion route to a legal first contact */
+function escapeAngle(targetIds){
+  const c = cue();
   let best = null;
-  for(const b of own){
-    for(const p of pockets){
-      const px = p.x, py = p.y;
-      const bp = {x:px-b.x, y:py-b.y};
-      const d2 = Math.hypot(bp.x, bp.y);
-      if(d2 < R*2.5) continue;
-      const dirBP = {x:bp.x/d2, y:bp.y/d2};
-      const ghost = {x:b.x - dirBP.x*R*2.08, y:b.y - dirBP.y*R*2.08};
-      if(ghost.x < R*0.6 || ghost.x > PW-R*0.6 || ghost.y < R*0.6 || ghost.y > PH-R*0.6) continue;
-      const cg = {x:ghost.x-c.x, y:ghost.y-c.y};
-      const d1 = Math.hypot(cg.x, cg.y);
-      if(d1 < 0.5) continue;
-      const aim = {x:cg.x/d1, y:cg.y/d1};
-      const cut = aim.x*dirBP.x + aim.y*dirBP.y;
-      if(cut < 0.33) continue;
-      if(!segClear(c.x, c.y, ghost.x, ghost.y, [0, b.id], R*1.98)) continue;
-      if(!segClear(b.x, b.y, px, py, [0, b.id], R*1.98)) continue;
-      const score = cut*cut*cut / (1 + d1 + d2);
-      if(!best || score > best.score){
-        best = {score, angle: Math.atan2(aim.y, aim.x), dist: d1+d2, ball: b, pocket: p, cut};
+  for(let i=0;i<360;i++){
+    const a = (i/360)*Math.PI*2;
+    const route = firstBallAfterRail(c.x, c.y, Math.cos(a), Math.sin(a));
+    if(!route || !targetIds.includes(route.hit.id)) continue;
+    if(!best || route.dist < best.dist) best = {angle:a, dist:route.dist};
+  }
+  return best;
+}
+
+/* ---- what may the CPU hit first, and what may it pot? ---- */
+function shotTargets(){
+  const live = balls.filter(b=>b.alive && b.id!==0);
+  if(openTable){
+    const open = live.filter(b=>b.id!==8);
+    return open.length ? open : live.filter(b=>b.id===8);
+  }
+  const own = live.filter(b=>groupOf(b.id)===groups[turn]);
+  return own.length ? own : live.filter(b=>b.id===8);
+}
+const eightIsLegal = () => !openTable && !!groups[turn] && remainingOwn(turn)===0;
+
+/* ---- every pot a shooter could attempt from a given cue spot (analytic) ---- */
+function potCandidates(layout, targets, from){
+  const ids = targets.map(t=>t.id);
+  const list = [];
+  for(const b of layout){
+    if(b.id===0 || !ids.includes(b.id)) continue;
+    for(let pi=0; pi<POCKETS.length; pi++){
+      const p = POCKETS[pi];
+      for(const aim of POCKET_AIMS[pi]){
+        const dx = aim.x-b.x, dy = aim.y-b.y, d2 = Math.hypot(dx,dy);
+        if(d2 < R*2.6) continue;
+        const ux = dx/d2, uy = dy/d2;
+        const gx = b.x - ux*POT_GHOST, gy = b.y - uy*POT_GHOST;
+        if(gx < R*0.7 || gx > PW-R*0.7 || gy < R*0.7 || gy > PH-R*0.7) continue;
+        const cgx = gx-from.x, cgy = gy-from.y, d1 = Math.hypot(cgx,cgy);
+        if(d1 < R*1.3) continue;
+        const cut = (cgx/d1)*ux + (cgy/d1)*uy;
+        if(cut < 0.12) continue;
+        if(!clearPath(layout, from.x, from.y, gx, gy, [0,b.id], R*1.9)) continue;
+        if(!clearPath(layout, b.x, b.y, p.x, p.y, [0,b.id], R*1.9)) continue;
+        list.push({ball:b, pocket:p, cut, d1, d2, angle: Math.atan2(cgy,cgx),
+          score: cut*cut*cut/(1 + d1 + d2*0.9)});
       }
     }
   }
-  if(best){
-    const pow = Math.max(0.3, Math.min(1, 0.26 + best.dist/150 + Math.max(0,best.cut-0.5)*0.35));
-    const err = (Math.random()-0.5)*0.022*(1.4-best.cut);
-    return {angle: best.angle+err, power: pow, label: null};
+  return list.sort((a,b)=>b.score-a.score);
+}
+function bestPotOn(layout, targets, from){
+  const list = potCandidates(layout, targets, from);
+  return {score: list.length ? list[0].score : 0, pick: list.length ? list[0] : null};
+}
+
+function potPower(cut, d1, d2){
+  const speed = 1.42*(d1 + d2/Math.max(cut, 0.3));
+  return Math.max(0.16, Math.min(1, speed/MAXPOWER + 0.1));
+}
+
+function breakPlan(){
+  const c = cue();
+  const live = balls.filter(b=>b.alive && b.id!==0);
+  let apex = null, bd = 1e9;
+  for(const b of live){ const d = Math.hypot(b.x-c.x, b.y-c.y); if(d < bd){ bd = d; apex = b; } }
+  if(!apex) return {angle: aimAngle, power: 0.6, label: null};
+  // square contact with a touch of spread, struck hard enough to open the rack
+  const base = Math.atan2(apex.y-c.y, apex.x-c.x);
+  return {angle: base + (Math.random()-0.5)*0.02, power: 0.9 + Math.random()*0.1, label: 'breaking'};
+}
+
+function aiPlan(){
+  const c = cue();
+  if(!c || !c.alive) return {angle: aimAngle, power: 0.4, label: null};
+  if(breakShot) return breakPlan();
+
+  const layout = balls.filter(b=>b.alive).map(b=>({id:b.id, x:b.x, y:b.y}));
+  const targets = shotTargets();
+  if(!targets.length) return {angle: aimAngle, power: 0.3, label: null};
+  const targetIds = targets.map(b=>b.id);
+  const legalEight = eightIsLegal();
+
+  /* ---- 1. shots that actually drop a ball ---- */
+  const cand = potCandidates(layout, targets, c);
+
+  let best = null, tried = 0, landed = 0;
+  for(const k of cand.slice(0, 8)){
+    if(landed >= 3 || tried > 20) break;
+    const base = potPower(k.cut, k.d1, k.d2);
+    // the ideal line often rattles: adjust pace first, then the line by a hair
+    const tries = [[base, 0], [Math.min(1, base*1.3), 0], [base*0.78, 0], [base, 0.008], [base, -0.008]];
+    let verified = false;
+    for(const [pw, off] of tries){
+      if(tried++ > 20) break;
+      const angle = k.angle + off;
+      const r = simulateShot(layout, angle, pw);
+      if(!r.cue || r.potted.includes(0)) continue;
+      if(!r.potted.includes(k.ball.id)) continue;
+      if(r.firstHit !== k.ball.id) continue;
+      if(r.potted.includes(8) && !legalEight) continue;
+      if(r.potted.includes(8)) return {angle, power:pw, score:1e6, label:'going for the 8'};
+      // what is left to shoot at after this one? that is what makes it a good shot
+      const pottedGroup = openTable ? groupOf(k.ball.id) : groups[turn];
+      const nextTargets = r.after.filter(b=>b.id!==0 && b.id!==8 && groupOf(b.id)===pottedGroup);
+      const next = nextTargets.length ? bestPotOn(r.after, nextTargets, r.cue).score : 1;
+      const value = 200 + next*260 - (pw > 0.94 ? 3 : 0);
+      if(!best || value > best.score) best = {angle, power:pw, score:value, label:'potting'};
+      verified = true;
+      break;
+    }
+    if(verified) landed++;
   }
-  // safety: nudge nearest own ball toward centre of the table
-  if(own.length){
-    let tgt=null, nd=1e9;
-    for(const b of own){ const d=Math.hypot(b.x-c.x,b.y-c.y); if(d<nd){nd=d;tgt=b;} }
-    let ang = Math.atan2(tgt.y-c.y, tgt.x-c.x);
-    // avoid straight potting of the wrong thing: add jitter
-    ang += (Math.random()-0.5)*0.5;
-    const clear = segClear(c.x, c.y, c.x+Math.cos(ang)*220, c.y+Math.sin(ang)*220, [0], R*1.98);
-    if(!clear) ang += 0.9;
-    return {angle: ang, power: 0.3+Math.random()*0.25, label:'Safety'};
+  if(best) return best;
+
+  /* ---- 2. no pot: pick the safety that leaves the worst table behind ---- */
+  const oppTargets = openTable
+    ? balls.filter(b=>b.alive && b.id!==0 && b.id!==8)
+    : balls.filter(b=>b.alive && b.id!==0 && groupOf(b.id)!==groups[turn]);
+  let safety = null;
+  for(const t of targets){
+    if(!clearPath(layout, c.x, c.y, t.x, t.y, [0,t.id], R*1.9)) continue;
+    const base = Math.atan2(t.y-c.y, t.x-c.x);
+    const d = Math.hypot(t.x-c.x, t.y-c.y);
+    for(const off of [-0.65, -0.3, 0, 0.3, 0.65]){
+      for(const pw of [Math.max(0.2, 0.15 + d/260), 0.5]){
+        const tx = t.x - Math.sin(base)*R*off;
+        const ty = t.y + Math.cos(base)*R*off;
+        const angle = Math.atan2(ty-c.y, tx-c.x);
+        const r = simulateShot(layout, angle, pw);
+        if(!r.cue || r.potted.includes(0)) continue;
+        if(r.firstHit !== t.id) continue;
+        if(r.potted.includes(8)) continue;
+        const opp = oppTargets.length ? bestPotOn(r.after, oppTargets, r.cue).score : 0;
+        const dist = oppTargets.length
+          ? Math.min(...oppTargets.map(b=>Math.hypot(b.x-r.cue.x, b.y-r.cue.y)))
+          : 60;
+        // a potted own ball keeps the turn, so it counts, but not above a locked-up leave
+        const bonus = r.potted.some(id=>id!==0 && (openTable || groupOf(id)===groups[turn])) ? 90 : 0;
+        const value = bonus - opp*900 + Math.min(dist, 70)*0.35 + (r.cueRail ? 4 : 0);
+        if(!safety || value > safety.score) safety = {angle, power:pw, score:value, label:'playing safe', opp};
+      }
+    }
   }
-  // nothing own left: shoot at the 8 (or any ball if open)
-  const e8 = balls.find(b=>b.alive && b.id===8) || balls.find(b=>b.alive && b.id!==0);
-  if(e8) return {angle: Math.atan2(e8.y-c.y, e8.x-c.x) + (Math.random()-0.5)*0.06, power: 0.55, label:'8!'};
-  return {angle: aimAngle, power: 0.3};
+  if(safety) return safety;
+
+  /* ---- 3. snookered: find the cheapest cushion route to a legal ball ---- */
+  const esc = escapeAngle(targetIds);
+  if(esc){
+    const need = Math.min(1, Math.max(0.3, (esc.dist*1.5)/MAXPOWER));
+    for(const pw of [need, Math.min(1, need*1.5), 1]){
+      for(const off of [0, 0.05, -0.05]){
+        const angle = esc.angle + off;
+        const r = simulateShot(layout, angle, pw);
+        if(!r.cue || r.potted.includes(0)) continue;
+        if(r.firstHit === null || !targetIds.includes(r.firstHit)) continue;
+        if(r.potted.includes(8) && !legalEight) continue;
+        return {angle, power:pw, label:'playing out'};
+      }
+    }
+  }
+  // nothing legal is reachable: aim at a legal ball rather than gift a foul on the 8
+  const legalFan = legalFanAngle(targetIds);
+  const any = targets[0];
+  const angle = legalFan !== null ? legalFan : (any ? Math.atan2(any.y-c.y, any.x-c.x) : aimAngle);
+  return {angle, power: 0.3, label: null};
+}
+
+/* CPU ball in hand: look for the spot that unlocks the best pot. */
+function findHandSpotCpu(){
+  const layout = balls.filter(b=>b.alive && b.id!==0).map(b=>({id:b.id, x:b.x, y:b.y}));
+  const targets = shotTargets();
+  let best = null;
+  for(let ix=0; ix<10; ix++){
+    for(let iy=0; iy<5; iy++){
+      const x = PW*(0.08 + ix*0.105), y = PH*(0.12 + iy*0.19);
+      if(!handValid(x, y)) continue;
+      const pot = targets.length ? bestPotOn(layout, targets, {x, y}) : {score:0};
+      let scratch = 0;
+      for(const p of POCKETS){ if(Math.hypot(x-p.x, y-p.y) < R*3.5) scratch += 1; }
+      const value = pot.score*100 - scratch*0.35;
+      if(!best || value > best.value) best = {value, x, y};
+    }
+  }
+  return best || findHandSpot();
 }
 
 function beginCpu(breaking){
   state = 'cpu';
-  cpuTimer = 0.9 + Math.random()*0.5;
+  cpuTimer = (breaking ? 1.1 : 0.85) + Math.random()*0.4;
 }
 let cpuShot = null, cpuShotT = 0;
 function cpuTick(dt){
   if(cpuTimer > 0){ cpuTimer -= dt; return; }
   const plan = aiPlan();
   aimAngle = plan.angle;
-  toast(nameOf(1)+(plan.label?': '+plan.label:' is shooting'), null, 1200);
+  toast(nameOf(1) + (plan.label ? ' \u2014 ' + plan.label : ' is shooting'), null, 1200);
   cpuShotT = 0.45; cpuShot = plan.power;
   state = 'cpu-wait';
 }
@@ -657,6 +962,41 @@ window.__test = {
   frame: (n)=>{ for(let i=0;i<(n||1);i++){ tick(1/60); } },
   balls: () => balls.map(b=>({id:b.id, alive:b.alive, x:+b.x.toFixed(1), y:+b.y.toFixed(1), vx:+b.vx.toFixed(2), vy:+b.vy.toFixed(2)})),
   pb: (id,p)=>{ const b=balls.find(b=>b.id===id); if(b&&state!=='run'){ b.x=p.x; b.y=p.y; } }
+};
+window.__8ball = {
+  layout: () => balls.filter(b=>b.alive).map(b=>({id:b.id, x:b.x, y:b.y})),
+  plan: () => aiPlan(),
+  targets: () => shotTargets().map(b=>b.id),
+  turn: () => turn,
+  state: () => state,
+  pottedThisShot: () => pottedThisShot.slice(),
+  groups: () => groups.slice(),
+  start: m => startGame(m || 'cpu'),
+  autoPlay: () => {
+    turn = 1;
+    const c = cue();
+    if(state === 'hand'){ const s = findHandSpotCpu(); c.x = s.x; c.y = s.y; c.alive = true; c.vx = c.vy = 0; }
+    beginCpu(false);
+  },
+  frame: n => { for(let i=0;i<(n||1);i++) tick(1/60); },
+  escape: () => escapeAngle(shotTargets().map(b=>b.id)),
+  fan: () => legalFanAngle(shotTargets().map(b=>b.id)),
+  simulate: (angle, power) => simulateShot(balls.filter(b=>b.alive).map(b=>({id:b.id, x:b.x, y:b.y})), angle, power),
+  setup: cfg => {
+    mode = 'cpu'; turn = 1; state = 'cpu'; cpuTimer = 1e9; cpuShot = null;
+    if(cfg.groups !== undefined) groups = cfg.groups.slice();
+    if(cfg.openTable !== undefined) openTable = !!cfg.openTable;
+    breakShot = !!cfg.breakShot;
+    firstHit = null; pottedThisShot = [];
+    for(const b of balls){ b.alive = false; b.vx = b.vy = 0; }
+    for(const spec of cfg.balls){
+      let b = balls.find(x=>x.id===spec.id);
+      if(!b){ b = ball(spec.id); balls.push(b); }
+      b.alive = true; b.x = spec.x; b.y = spec.y; b.vx = b.vy = 0;
+    }
+    return true;
+  },
+  handSpot: () => findHandSpotCpu()
 };
 
 /* ================= rendering ================= */

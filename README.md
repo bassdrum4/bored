@@ -235,7 +235,9 @@ JavaScript syntax, 2048 merge rules and undo, Connect Four wins and computer
 tactics, actual browser gameplay, Memory completion and timer cleanup, Aim Lab
 accuracy and expiration, search/filter/sort, the jump palette, saved favorites,
 Escape and focus restoration, all 32 offline game boots, DEEP's seeded dungeon and boss gate, poker's
-simulated equity, no-peeking opponents and draw discards, Lighthouse's overlay, all 30 daily state
+simulated equity, no-peeking opponents and draw discards, 8 Ball's simulated shot planning
+(pots, safeties, escapes, no avoidable fouls or scratches, a whole self-played rack),
+Lighthouse's overlay, all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, UTC rollover, 320px layouts,
 blocked storage, high-score capture and the 30-game leaderboard list, and no

@@ -672,6 +672,100 @@ test('browser regressions', async t => {
     await close();
   });
 
+  await t.test('the 8 Ball CPU simulates its shots, so it pots, never fouls, and never scratches', async () => {
+    const frame = await openTitle('8ball', '8 Ball');
+    await frame.waitForFunction(() => typeof window.__8ball === 'object');
+
+    // Only the black left: it must play the pot, not bump the 8 around.
+    const black = await frame.evaluate(() => {
+      __8ball.setup({ groups: ['stripe', 'solid'], openTable: false, breakShot: false,
+        balls: [{ id: 0, x: 120, y: 55 }, { id: 8, x: 170, y: 30 }] });
+      const plan = __8ball.plan();
+      return { plan, sim: __8ball.simulate(plan.angle, plan.power) };
+    });
+    assert.match(String(black.plan.label), /8/, 'lines up the black');
+    assert.ok(black.sim.potted.includes(8), 'and drops it');
+    assert.ok(!black.sim.potted.includes(0), 'without following it in');
+
+    // Snookered behind an opponent ball: still a legal contact, never a foul on the 8.
+    const snookered = await frame.evaluate(() => {
+      __8ball.setup({ groups: ['stripe', 'solid'], openTable: false, breakShot: false,
+        balls: [{ id: 0, x: 60, y: 55 }, { id: 1, x: 130, y: 55 }, { id: 2, x: 190, y: 55 },
+          { id: 9, x: 100, y: 55 }, { id: 10, x: 150, y: 30 }, { id: 8, x: 190, y: 90 }] });
+      const targets = __8ball.targets();
+      const plan = __8ball.plan();
+      return { targets, plan, sim: __8ball.simulate(plan.angle, plan.power) };
+    });
+    assert.ok(snookered.targets.length > 0);
+    assert.ok(snookered.targets.includes(snookered.sim.firstHit),
+      'first contact is legal (' + snookered.sim.firstHit + ' vs ' + snookered.targets.join(',') + ')');
+    assert.ok(!snookered.sim.potted.includes(0), 'no scratch out of a snooker');
+
+    // Seeded layouts: whatever it chooses must be a legal shot that leaves the 8 on the table.
+    const sweep = await frame.evaluate(() => {
+      let seed = 7;
+      const rand = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+      const out = { turns: 0, fouls: 0, stuck: 0, scratches: 0, eights: 0, pots: 0, ms: 0, worst: 0 };
+      for (let trial = 0; trial < 40; trial++) {
+        const balls = [{ id: 0, x: 20 + rand() * 180, y: 12 + rand() * 86 }];
+        const place = id => balls.push({ id, x: 10 + rand() * 200, y: 10 + rand() * 90 });
+        for (let i = 0; i < 2 + Math.floor(rand() * 4); i++) place(i + 1);
+        for (let i = 0; i < 2 + Math.floor(rand() * 3); i++) place(i + 9);
+        place(8);
+        for (let a = 0; a < balls.length; a++) for (let b = a + 1; b < balls.length; b++) {
+          if (Math.hypot(balls[b].x - balls[a].x, balls[b].y - balls[a].y) < 7.2) {
+            balls[b].x = Math.min(214, Math.max(6, balls[b].x + 7.4));
+          }
+        }
+        __8ball.setup({ groups: ['stripe', 'solid'], openTable: false, breakShot: false, balls });
+        const legal = __8ball.targets();
+        const t0 = performance.now();
+        const plan = __8ball.plan();
+        const ms = performance.now() - t0;
+        const sim = __8ball.simulate(plan.angle, plan.power);
+        const stuck = __8ball.fan() === null && __8ball.escape() === null;
+        out.turns++;
+        out.ms += ms;
+        out.worst = Math.max(out.worst, ms);
+        if (sim.potted.includes(0)) out.scratches++;
+        if (sim.potted.includes(8)) out.eights++;
+        if (sim.firstHit === null || !legal.includes(sim.firstHit)) {
+          if (stuck) out.stuck++; else out.fouls++;
+        }
+        if (sim.potted.some(id => id !== 0 && id !== 8)) out.pots++;
+      }
+      out.avg = +(out.ms / out.turns).toFixed(1);
+      return out;
+    });
+    assert.equal(sweep.fouls, 0, 'no avoidable foul in ' + sweep.turns + ' layouts');
+    assert.ok(sweep.stuck <= 4, 'only racks with no legal contact at all leave a foul: ' + sweep.stuck);
+    assert.equal(sweep.scratches, 0, 'no scratches');
+    assert.equal(sweep.eights, 0, 'never pots the 8 early');
+    assert.ok(sweep.pots >= 28, 'converts most open looks: ' + sweep.pots + '/' + sweep.turns);
+    assert.ok(sweep.avg < 120, 'decisions stay interactive: ' + sweep.avg + 'ms average, ' + sweep.worst.toFixed(0) + 'ms worst');
+
+    // A whole self-played rack: the old planner never finished a game at all.
+    const game = await frame.evaluate(() => {
+      __8ball.start('cpu');
+      let frames = 0, pots = 0, wasRunning = false;
+      while (frames < 24000) {
+        __8ball.frame(1); frames++;
+        const now = __8ball.state();
+        if (wasRunning && now !== 'run') pots += __8ball.pottedThisShot().filter(id => id !== 0 && id !== 8).length;
+        wasRunning = now === 'run';
+        if (now === 'over') break;
+        if (now === 'aim' || now === 'hand') __8ball.autoPlay();
+      }
+      return { over: __8ball.state() === 'over', pots, frames };
+    });
+    assert.equal(game.over, true, 'a rack reaches a winner');
+    assert.ok(game.pots >= 7, 'and both seats are sinking balls: ' + game.pots);
+    await close();
+    // that rack posts a real score; clear it so the scoring checks below start clean
+    await pause(300);
+    await page.evaluate(() => localStorage.removeItem('bored.high.8ball'));
+  });
+
   await t.test('game scores feed the high-score entries without counting unfinished runs', async () => {
     const keys = ['tetris', 'wordle', '8ball', 'poker', 'deep'].map(id => 'bored.high.' + id);
     await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
