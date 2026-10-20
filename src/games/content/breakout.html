@@ -16,12 +16,13 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
     <title>NEON BREAKOUT | PRO</title>
     <style>
         :root {
-            --primary: #00f2ff;
-            --secondary: #7000ff;
-            --accent: #ff007a;
-            --bg: #050508;
-            --surface: rgba(255, 255, 255, 0.05);
-            --text: #ffffff;
+            --bg: #f6f5f0;
+            --well: #efeee7;
+            --ink: #22221e;
+            --muted: #7b7669;
+            --hair: #d9d5c9;
+            --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
 
         * {
@@ -36,184 +37,147 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             justify-content: center;
             align-items: center;
             height: 100vh;
-            font-family: 'Outfit', sans-serif;
+            font: 13px/1.45 var(--sans);
             overflow: hidden;
             user-select: none;
-            color: var(--text);
+            color: var(--ink);
         }
 
         #container {
             position: relative;
-            box-shadow: 0 0 100px rgba(0, 242, 255, 0.1);
-            border-radius: 12px;
+            border: 1px solid var(--hair);
             overflow: hidden;
         }
 
         canvas {
             display: block;
-            background: #000;
+            background: var(--well);
             cursor: none;
         }
 
         #overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            inset: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            background: rgba(5, 5, 8, 0.85);
-            backdrop-filter: blur(8px);
-            transition: opacity 0.4s ease, visibility 0.4s;
+            background: var(--bg);
+            transition: opacity 0.15s linear;
             z-index: 10;
         }
 
-        #overlay.hidden {
-            opacity: 0;
-            visibility: hidden;
-        }
+        #overlay.hidden { opacity: 0; visibility: hidden; }
 
         #overlay h1 {
-            font-size: 64px;
-            font-weight: 900;
-            letter-spacing: -2px;
-            background: linear-gradient(to bottom, #fff, #888);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
+            margin-bottom: 14px;
         }
 
         #overlay h2 {
-            font-size: 24px;
-            color: var(--primary);
+            font-family: var(--mono);
+            font-size: 10px;
+            font-weight: 400;
+            color: var(--muted);
             text-transform: uppercase;
-            letter-spacing: 4px;
-            margin-bottom: 30px;
-            font-weight: 300;
+            letter-spacing: 0.1em;
+            margin-bottom: 6px;
         }
 
         #overlay .stats {
-            margin-bottom: 40px;
             text-align: center;
+            margin-bottom: 18px;
         }
 
         #overlay .stats p {
-            font-size: 16px;
-            color: #888;
-            margin-bottom: 5px;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
         }
 
         #overlay .stats span {
-            font-size: 32px;
-            font-weight: 700;
-            color: #fff;
+            font-family: var(--mono);
+            font-size: 22px;
+            font-weight: 600;
         }
 
         #overlay .btn {
-            padding: 15px 40px;
-            background: var(--primary);
-            color: #000;
-            font-weight: 700;
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            border-radius: 50px;
+            border-bottom: 1px solid var(--ink);
+            padding-bottom: 2px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            animation: pulse 2s infinite;
         }
 
-        #overlay .btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 30px rgba(0, 242, 255, 0.4);
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0, 242, 255, 0.4); }
-            70% { box-shadow: 0 0 0 20px rgba(0, 242, 255, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 242, 255, 0); }
-        }
+        #overlay .btn:hover { color: var(--muted); border-color: var(--muted); }
 
         #hud {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
-            padding: 20px;
+            padding: 10px 12px;
             display: flex;
             justify-content: space-between;
             pointer-events: none;
             z-index: 5;
         }
 
-        .hud-item {
-            display: flex;
-            flex-direction: column;
-        }
+        .hud-item { display: flex; align-items: baseline; gap: 6px; }
 
         .hud-label {
+            font-family: var(--mono);
             font-size: 10px;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            color: #666;
+            letter-spacing: 0.08em;
+            color: var(--muted);
         }
 
         .hud-value {
-            font-size: 20px;
-            font-weight: 700;
-            color: #fff;
-            font-family: 'Space Grotesk', sans-serif;
-        }
-
-        #level-indicator {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
+            font-family: var(--mono);
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+            color: var(--ink);
         }
 
         #active-effects {
             position: absolute;
-            bottom: 60px;
+            bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 10px;
-        }
-
-        .effect-pill {
-            padding: 4px 12px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
             gap: 6px;
         }
 
-        .effect-pill.E { color: #40e0e0; border-color: #40e0e044; }
-        .effect-pill.S { color: #e040e0; border-color: #e040e044; }
-        .effect-pill.C { color: #e08040; border-color: #e0804044; }
-        .effect-pill.L { color: #ff007a; border-color: #ff007a44; }
+        .effect-pill {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            border: 1px solid var(--hair);
+            padding: 1px 6px;
+        }
+
+        .effect-pill.E, .effect-pill.S, .effect-pill.C, .effect-pill.L { color: var(--ink); border-color: var(--hair); }
 
         #controls-hint {
             position: absolute;
-            bottom: 20px;
+            bottom: 10px;
             width: 100%;
             text-align: center;
+            font-family: var(--mono);
             font-size: 10px;
-            color: #444;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+            color: var(--muted);
+            letter-spacing: 0.06em;
         }
-    </style>
+</style>
 </head>
 
 <body>
@@ -313,21 +277,21 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         ];
 
         const COLORS = {
-            '1': '#ff007a', // Pink
-            '2': '#ff5e00', // Orange
-            '3': '#ffea00', // Yellow
-            '4': '#00ff73', // Green
-            '5': '#00f2ff', // Cyan
-            '6': '#7000ff', // Purple
-            'H': '#ffffff', // Hard (White-ish)
-            'I': '#333333', // Indestructible
+            '1': '#a4402f', // Rust
+            '2': '#96772a', // Ochre
+            '3': '#b08a2e', // Sand
+            '4': '#3f6b45', // Green
+            '5': '#33557f', // Blue
+            '6': '#6b4a7a', // Plum
+            'H': '#22221e', // Hard (ink)
+            'I': '#c9c5ba', // Indestructible
         };
 
         const PU_TYPES = [
-            { letter: 'E', color: '#40e0e0', name: 'EXPAND' },
-            { letter: 'S', color: '#e040e0', name: 'SLOW' },
-            { letter: 'M', color: '#e0e040', name: 'MULTI' },
-            { letter: 'L', color: '#ff007a', name: 'LIFE' },
+            { letter: 'E', color: '#3f6b45', name: 'EXPAND' },
+            { letter: 'S', color: '#6b4a7a', name: 'SLOW' },
+            { letter: 'M', color: '#96772a', name: 'MULTI' },
+            { letter: 'L', color: '#a4402f', name: 'LIFE' },
             { letter: 'C', color: '#e08040', name: 'CATCH' },
         ];
 
@@ -670,7 +634,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         }
 
         function draw() {
-            ctx.fillStyle = '#000';
+            ctx.fillStyle = varColor('--well');
             ctx.fillRect(0, 0, W, H);
 
             ctx.save();
@@ -681,72 +645,54 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             // Bricks
             bricks.forEach(br => {
                 if (!br.alive) return;
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = br.color;
                 ctx.fillStyle = br.color;
-                if (br.type === 'H' && br.hits === 1) ctx.globalAlpha = 0.5;
+                if (br.type === 'H' && br.hits === 1) ctx.globalAlpha = 0.45;
                 ctx.fillRect(br.x, br.y, br.w, br.h);
                 ctx.globalAlpha = 1.0;
-                ctx.shadowBlur = 0;
-                
-                // Bevel
-                ctx.fillStyle = 'rgba(255,255,255,0.2)';
-                ctx.fillRect(br.x, br.y, br.w, 2);
-                ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                ctx.fillRect(br.x, br.y + br.h - 2, br.w, 2);
+                ctx.strokeStyle = 'rgba(34,34,30,0.18)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(br.x + 0.5, br.y + 0.5, br.w - 1, br.h - 1);
             });
 
             // Paddle
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = varColor('--primary');
-            ctx.fillStyle = effects.some(e => e.type === 'C') ? '#e08040' : '#fff';
-            ctx.beginPath();
-            ctx.roundRect(paddle.x, paddle.y, paddle.w, paddle.h, 6);
-            ctx.fill();
-            ctx.shadowBlur = 0;
+            ctx.fillStyle = varColor('--ink');
+            ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
 
             // Powerups
             powerUps.forEach(p => {
                 ctx.fillStyle = p.type.color;
-                ctx.shadowBlur = 10;
-                ctx.shadowColor = p.type.color;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#000';
-                ctx.font = 'bold 10px Outfit';
+                ctx.fillRect(p.x - 7, p.y - 7, 14, 14);
+                ctx.fillStyle = varColor('--bg');
+                ctx.font = '600 10px ui-monospace, monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(p.type.letter, p.x, p.y);
-                ctx.shadowBlur = 0;
             });
 
             // Balls
             balls.forEach(b => {
                 // Trail
                 b.trail.forEach((t, i) => {
-                    ctx.globalAlpha = i / b.trail.length * 0.5;
-                    ctx.fillStyle = '#fff';
+                    ctx.globalAlpha = i / b.trail.length * 0.35;
+                    ctx.fillStyle = varColor('--ink');
                     ctx.beginPath();
                     ctx.arc(t.x, t.y, b.r * (i / b.trail.length), 0, Math.PI * 2);
                     ctx.fill();
                 });
                 ctx.globalAlpha = 1.0;
 
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = '#fff';
-                ctx.fillStyle = '#fff';
+                ctx.fillStyle = varColor('--ink');
                 ctx.beginPath();
                 ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.shadowBlur = 0;
+            ctx.shadowBlur = 0;
             });
 
             // Sticky Balls
             stickyBalls.forEach(sb => {
                 const bx = paddle.x + paddle.w/2 + sb.offsetX;
                 const by = paddle.y - 8;
-                ctx.fillStyle = '#fff';
+                ctx.fillStyle = varColor('--ink');
                 ctx.beginPath();
                 ctx.arc(bx, by, 5, 0, Math.PI * 2);
                 ctx.fill();
