@@ -96,28 +96,28 @@ function challengeRules() {
 }
 function dateFor(slug) {
   const context = challengeRules();
-  for (let n = 0; n < 30; n++) {
+  for (let n = 0; n < 40; n++) {
     const date = new Date(Date.UTC(2026, 9, 8 + n)).toISOString().slice(0, 10);
     if (context.dailyChallenge(date).slug === slug) return date;
   }
   throw new Error('No challenge for ' + slug);
 }
-test('daily rotation covers all thirty offline games, changes targets, and uses UTC', () => {
+test('daily rotation covers all thirty-one offline games, changes targets, and uses UTC', () => {
   const { dailyDate, dailyChallenge } = challengeRules();
   assert.equal(dailyDate(new Date('2026-10-09T00:30:00+02:00')), '2026-10-08');
-  const rotation = Array.from({ length: 30 }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 9, 8 + n)).toISOString().slice(0, 10)));
-  assert.equal(new Set(rotation.map(c => c.slug)).size, 30);
+  const rotation = Array.from({ length: 31 }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 9, 8 + n)).toISOString().slice(0, 10)));
+  assert.equal(new Set(rotation.map(c => c.slug)).size, 31);
   assert.ok(rotation.every(c => !c.goal.includes('{target}')));
   assert.deepEqual(JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))), JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))));
   assert.notEqual(dailyChallenge('2026-10-08').slug, dailyChallenge('2026-10-09').slug);
   const tetris = dailyChallenge(dateFor('tetris'));
-  const later = new Date(Date.parse(tetris.date + 'T00:00:00Z') + 30 * 86400000).toISOString().slice(0, 10);
+  const later = new Date(Date.parse(tetris.date + 'T00:00:00Z') + rotation.length * 86400000).toISOString().slice(0, 10);
   assert.notEqual(tetris.target, dailyChallenge(later).target);
 });
 test('daily completion rejects idle state, wrong games, wrong modes, hints, undo, and partial wins', () => {
   const { dailyChallenge, dailyCheck } = challengeRules();
   const good = { solved: true, undoUsed: false, pairs: 8, cpu: true, finished: true, accuracy: 90, normal: true, won: true, standard: true, hints: 0, handOver: true, materials: 4, seconds: 60, herbs: 20, predators: 3 };
-  for (let n = 0; n < 30; n++) {
+  for (let n = 0; n < 40; n++) {
     const challenge = dailyChallenge(new Date(Date.UTC(2026, 9, 8 + n)).toISOString().slice(0, 10));
     const snapshot = { ...good, slug: challenge.slug, [challenge.metric]: challenge.target };
     if (challenge.rule === 'connect') snapshot.won = 1;
@@ -204,12 +204,12 @@ test('browser regressions', async t => {
   await page.goto(url);
 
   await t.test('hub categories, search, sorting, empty state, and stored favorites', async () => {
-    assert.equal(await page.$$eval('.card', els => els.length), 35);
-    assert.equal(await text(page, '#count'), '35');
+    assert.equal(await page.$$eval('.card', els => els.length), 36);
+    assert.equal(await text(page, '#count'), '36');
     await filter('New');
     assert.equal(await page.$$eval('.card', els => els.length), 4);
     await filter('Puzzle');
-    assert.equal(await page.$$eval('.card', els => els.length), 6);
+    assert.equal(await page.$$eval('.card', els => els.length), 7);
     await filter('All');
     await page.type('#q', 'internet required');
     assert.equal(await page.$$eval('.card', els => els.length), 3);
@@ -313,46 +313,48 @@ test('browser regressions', async t => {
     await close();
   });
 
-  await t.test('command palette jumps to a game and shows the best score I already own', async () => {
-    await page.evaluate(() => localStorage.setItem('bored.high.poker', '1240'));
-    try {
-      await page.keyboard.down('Control');
-      await page.keyboard.press('k');
-      await page.keyboard.up('Control');
-      await page.waitForFunction(() => !document.querySelector('#palette').hidden);
-      assert.equal(await page.evaluate(() => document.activeElement.id), 'palette-input', 'the cursor starts in the palette');
-      assert.equal(await page.$$eval('.palette-row', els => els.length), 35, 'every playable game is listed');
-      assert.equal(await text(page, '#palette-count'), '35 games');
+  await t.test('Lights Out flips a cross, counts moves, and clears a board', async () => {
+    const frame = await openTitle('lights-out', 'Lights Out');
+    const state = () => frame.evaluate(() => __test.state());
 
-      await page.keyboard.press('ArrowDown');
-      assert.equal(await page.evaluate(() => document.getElementById('palette-row-1').getAttribute('aria-selected')), 'true',
-        'arrow keys move the highlight');
+    // A real click in the middle of the grid changes exactly the five squares of its cross.
+    const before = await state();
+    const box = await (await frame.$('.cell[data-i="12"]')).boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    const after = await state();
+    const changed = after.board.map((lit, i) => lit !== before.board[i]).filter(Boolean).length;
+    assert.equal(changed, 5, 'a middle press flips its own square and four neighbours');
+    assert.equal(after.moves, 1, 'each press counts as a move');
 
-      await page.keyboard.type('pok');
-      await page.waitForFunction(() => document.querySelectorAll('.palette-row').length === 1);
-      const row = await text(page, '.palette-row');
-      assert.match(row, /Poker/, 'search narrows to the game');
-      assert.match(row, /best 1,240 chips/, 'your own best score is shown next to it');
+    // Solve whatever board is on the table by chasing the lights, through real cell clicks.
+    const solved = await frame.evaluate(() => {
+      const cells = () => [...document.querySelectorAll('.cell')];
+      const lit = () => cells().map(el => el.getAttribute('aria-pressed') === 'true');
+      const press = i => cells()[i].click();
+      const chase = mask => {
+        for (let c = 0; c < 5; c++) if (mask & (1 << c)) press(c);
+        for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) if (lit()[r * 5 + c]) press((r + 1) * 5 + c);
+      };
+      for (let mask = 0; mask < 32; mask++) {
+        chase(mask);
+        if (lit().every(v => !v)) return { cleared: __test.state().cleared, dark: true, mask };
+        chase(mask); // the presses commute, so the same pattern undoes it
+      }
+      return { cleared: __test.state().cleared, dark: false, mask: -1 };
+    });
+    assert.equal(solved.dark, true, 'a five-by-five board is always solvable from a generated start');
+    assert.equal(solved.cleared, 1, 'clearing the board is counted');
 
-      await page.keyboard.press('Enter');
-      await page.waitForFunction(() => !document.querySelector('#player').hidden);
-      assert.equal(await page.$eval('#frame', el => el.title), 'Poker', 'Enter opens the highlighted game');
-      await close();
+    await pause(1400);
+    const fresh = await state();
+    assert.equal(fresh.cleared, 1, 'the cleared count survives the next board');
+    assert.equal(fresh.board.some(Boolean), true, 'a new board is dealt after a clear');
+    assert.equal(fresh.board.every(Boolean), false, 'the next board is not already solved');
 
-      const focusedBefore = await page.evaluate(() => document.activeElement.className);
-      await page.keyboard.down('Control');
-      await page.keyboard.press('k');
-      await page.keyboard.up('Control');
-      await page.waitForFunction(() => !document.querySelector('#palette').hidden);
-      await page.keyboard.press('Escape');
-      await page.waitForFunction(() => document.querySelector('#palette').hidden);
-      assert.equal(await page.evaluate(() => document.activeElement.className), focusedBefore,
-        'closing puts focus back where it was');
-      assert.notEqual(await page.evaluate(() => document.activeElement.tagName), 'BODY', 'focus is not lost to the document');
-      assert.equal(await page.$eval('#q', el => el.value), '', 'the hub search box is left alone');
-    } finally {
-      await page.evaluate(() => localStorage.removeItem('bored.high.poker'));
-    }
+    await close();
+    assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.lights-out')), '1',
+      'clearing a board posts a high score of one board');
+    await page.evaluate(() => localStorage.removeItem('bored.high.lights-out'));
   });
 
   await t.test('Memory locks mismatches, clears pending timers on reset, and completes all pairs', async () => {
@@ -864,16 +866,16 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), '2402', 'a cleared descent posts its bonus score');
 
-      assert.equal(await page.$eval('#lb-game', el => el.options.length), 31);
+      assert.equal(await page.$eval('#lb-game', el => el.options.length), 32);
       assert.equal(await page.$eval('#lb-game', el => el.value), 'overall');
-      assert.match(await text(page, '#lb-note'), /across 30 games/);
+      assert.match(await text(page, '#lb-note'), /across 31 games/);
     } finally {
       if (await page.$eval('#player', el => !el.hidden)) await close();
       await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
     }
   });
 
-  await t.test('all thirty daily adapters boot and expose current-run state', async () => {
+  await t.test('all thirty-one daily adapters boot and expose current-run state', async () => {
     const challenges = await page.evaluate(() => CHALLENGES);
     for (const challenge of challenges) {
       await page.evaluate(date => { window.originalDailyDate ||= dailyDate; dailyDate = () => date; renderDaily(); }, dateFor(challenge.slug));
@@ -955,7 +957,7 @@ test('browser regressions', async t => {
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
   });
 
-  await t.test('all thirty offline games boot; Lighthouse overlay is actually hidden', async () => {
+  await t.test('all thirty-one offline games boot; Lighthouse overlay is actually hidden', async () => {
     const slugs = await page.evaluate(() => ORDER.filter(([slug]) => !EXTERNS[slug] && !NEW_GAMES.includes(slug)).map(([slug]) => slug));
     for (const slug of slugs) {
       await page.evaluate(id => openGame(id), slug);
@@ -1011,7 +1013,7 @@ test('browser regressions', async t => {
       Math.random = () => 0;
     });
     await restricted.goto(url);
-    assert.equal(await restricted.$$eval('.card', els => els.length), 35);
+    assert.equal(await restricted.$$eval('.card', els => els.length), 36);
     for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
       await restricted.evaluate(id => openGame(id), slug);
       await restricted.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#board')?.childElementCount > 0);

@@ -20,6 +20,7 @@ export const CHALLENGES = [
   { slug: 'aim-lab', label: 'Precision under pressure', goal: 'Finish a normal-target challenge with at least {target} hits and 80% accuracy.', metric: 'hits', targets: [20, 25, 30], rule: 'aim', unit: 'hits' },
   { slug: 'qbert', label: 'Paint the pyramid', goal: 'Complete {target} pyramid levels in one run.', metric: 'levels', targets: [1, 2, 3], unit: 'levels cleared' },
   { slug: 'minesweeper', label: 'Clean sweep', goal: 'Win a standard Beginner or harder board within {target} seconds, without hints.', metric: 'seconds', targets: [180, 120, 90], rule: 'mines', unit: 'seconds' },
+  { slug: 'lights-out', label: 'Dark room', goal: 'Clear {target} boards in one session.', metric: 'cleared', targets: [2, 3, 4], unit: 'boards' },
   { slug: 'pong', label: 'Paddle supremacy', goal: 'Score {target} points against the CPU in one match.', metric: 'points', targets: [5, 7, 10], rule: 'cpu', unit: 'points' },
   { slug: 'sumo', label: 'Ring ruler', goal: 'Win {target} rounds as Player 1 in one match.', metric: 'wins', targets: [3, 4, 5], unit: 'rounds won' },
   { slug: 'lighthouse', label: 'Safe harbor', goal: 'Guide all {target} ships safely home in one watch.', metric: 'ships', targets: [3, 3, 3], unit: 'ships home' },

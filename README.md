@@ -1,6 +1,6 @@
 # Bored — single-file arcade
 
-**[index.html](index.html)** is the built, self-contained site: **32 offline games
+**[index.html](index.html)** is the built, self-contained site: **33 offline games
 and 3 online extras**, with no runtime dependencies, installs, server, or asset
 folder. Double-click it to play, or serve it as a static page.
 
@@ -97,7 +97,7 @@ matches the frame, so a portrait phone sees tall rooms rather than a letterbox.
 
 ## Daily challenge
 
-The featured challenge rotates through **30 of the offline games**, with a distinct
+The featured challenge rotates through **31 of the offline games**, with a distinct
 goal for each game. Everyone gets the same game and target for a given UTC date;
 after a full circuit, most targets change difficulty. Goals reset at **midnight
 UTC**, including when the hub is left open. Normal gameplay randomness is unchanged:
@@ -154,7 +154,7 @@ For quick testing, turn off **Authentication → Providers → Email → Confirm
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.
 
-The board tracks a best score for **30 of the 35 games**. The original eight
+The board tracks a best score for **31 of the 36 games**. The original eight
 (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
 their existing saved bests. Every other offline game except Connect Four and
 Tank2 is read from live game state when you leave or restart: Tetris lines,
@@ -177,6 +177,15 @@ friendly board, not anti-cheat. Signing out keeps local bests intact.
 These additions live in readable JavaScript in
 [`src/games/arcade.js`](src/games/arcade.js). They need no network requests,
 fonts, libraries, or other files.
+
+## Lights Out
+
+A 5 × 5 grid of paper squares: press one and it flips together with the squares
+sharing an edge with it. Clear the board by turning every light off, and the next
+board is dealt straight away. Cleared boards, moves, and your best sit on one line
+above the grid; arrows move a cursor and Enter presses. Best of all, it is small:
+one HTML file, [`src/games/content/lights-out.html`](src/games/content/lights-out.html),
+with no fonts, libraries, or images.
 
 ## Original offline games (26)
 

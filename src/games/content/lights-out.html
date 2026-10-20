@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Lights Out</title>
+<meta name="description" content="Turn every light off. Each press flips a square and the four around it.">
+<style>
+  :root {
+    --bg: #f6f5f0;
+    --ink: #22221e;
+    --muted: #7b7669;
+    --hair: #d9d5c9;
+    --cell: #e4e0d4;
+    --cell-hover: #ebe7db;
+    --on: #33332c;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.45 var(--sans);
+    display: flex;
+    justify-content: center;
+    min-height: 100%;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 440px;
+    min-height: 100vh;
+    padding: 14px 16px 18px;
+  }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 18px 0;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--hair);
+  }
+  h1 {
+    font: 600 12px/1 var(--sans);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  #hud {
+    display: flex;
+    gap: 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  #hud b {
+    font-weight: 400;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+    touch-action: manipulation;
+    outline: none;
+  }
+  .cell {
+    aspect-ratio: 1;
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    background: var(--cell);
+    padding: 0;
+    cursor: pointer;
+    transition: background-color .09s linear;
+  }
+  .cell:hover { background: var(--cell-hover); }
+  .cell[aria-pressed="true"] { background: var(--on); border-color: var(--on); }
+  .cell[aria-pressed="true"]:hover { background: #3c3c34; }
+  #board:focus-visible .cell.cursor { outline: 2px solid var(--ink); outline-offset: 1px; }
+  #status {
+    margin-top: 20px;
+    min-height: 20px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  #status.done { color: var(--ink); }
+  .note {
+    margin-top: 6px;
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  #hud button.plain {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  #hud button.plain:hover, #hud button.plain:focus-visible { color: var(--ink); text-decoration: underline; outline: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Lights Out</h1>
+    <div id="hud" aria-live="off">
+      <span>cleared <b id="cleared">0</b></span>
+      <span>moves <b id="moves">0</b></span>
+      <span>best <b id="best">0</b></span>
+      <button class="plain" id="reset" type="button">reset</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="board" role="group" aria-label="Five by five light grid" tabindex="0"></div>
+    <p id="status" role="status">Turn every light off.</p>
+    <p class="note">Click a square to flip it and its neighbours. Arrows and Enter work too.</p>
+  </main>
+</div>
+<script>
+const SIZE = 5, COUNT = SIZE * SIZE;
+const boardEl = document.getElementById('board');
+const clearedEl = document.getElementById('cleared');
+const movesEl = document.getElementById('moves');
+const bestEl = document.getElementById('best');
+const statusEl = document.getElementById('status');
+
+let board = new Array(COUNT).fill(false);
+let cleared = 0, moves = 0, best = 0, paused = false;
+let cursor = 12;
+let nextTimer = 0;
+
+function readBest() {
+  try { return Number(localStorage.getItem('bored.lights-out.best')) || 0; } catch (e) { return 0; }
+}
+function writeBest(value) {
+  try { localStorage.setItem('bored.lights-out.best', String(value)); } catch (e) {}
+}
+
+/* Each press flips the square and the ones sharing an edge with it. */
+function neighbours(i) {
+  const x = i % SIZE, y = (i - x) / SIZE;
+  const out = [i];
+  if (x > 0) out.push(i - 1);
+  if (x < SIZE - 1) out.push(i + 1);
+  if (y > 0) out.push(i - SIZE);
+  if (y < SIZE - 1) out.push(i + SIZE);
+  return out;
+}
+
+function paint() {
+  for (let i = 0; i < COUNT; i++) {
+    const cell = boardEl.children[i];
+    cell.setAttribute('aria-pressed', String(board[i]));
+    cell.setAttribute('aria-label', 'Square ' + (((i - i % SIZE) / SIZE) + 1) + ', ' + (i % SIZE + 1) + (board[i] ? ', lit' : ', dark'));
+    cell.classList.toggle('cursor', i === cursor);
+  }
+  clearedEl.textContent = cleared;
+  movesEl.textContent = moves;
+  bestEl.textContent = best;
+}
+
+function allDark() {
+  for (let i = 0; i < COUNT; i++) if (board[i]) return false;
+  return true;
+}
+
+function newBoard() {
+  do {
+    board = new Array(COUNT).fill(false);
+    const presses = 9 + Math.floor(Math.random() * 5);
+    for (let n = 0; n < presses; n++) {
+      const i = Math.floor(Math.random() * COUNT);
+      for (const j of neighbours(i)) board[j] = !board[j];
+    }
+  } while (allDark());
+  paused = false;
+  statusEl.classList.remove('done');
+  statusEl.textContent = 'Turn every light off.';
+  paint();
+}
+
+function press(i) {
+  if (paused) return;
+  for (const j of neighbours(i)) board[j] = !board[j];
+  moves += 1;
+  cursor = i;
+  if (allDark()) {
+    cleared += 1;
+    if (cleared > best) { best = cleared; writeBest(best); }
+    paused = true;
+    statusEl.classList.add('done');
+    statusEl.textContent = 'Cleared in ' + moves + (moves === 1 ? ' move.' : ' moves.');
+    paint();
+    clearTimeout(nextTimer);
+    nextTimer = setTimeout(() => { moves = 0; newBoard(); }, 1100);
+    return;
+  }
+  paint();
+}
+
+for (let i = 0; i < COUNT; i++) {
+  const cell = document.createElement('button');
+  cell.type = 'button';
+  cell.className = 'cell';
+  cell.tabIndex = -1;
+  cell.dataset.i = String(i);
+  cell.addEventListener('click', () => { boardEl.focus({ preventScroll: true }); press(i); });
+  boardEl.appendChild(cell);
+}
+
+boardEl.addEventListener('keydown', e => {
+  const x = cursor % SIZE, y = (cursor - x) / SIZE;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (e.key === 'ArrowLeft') cursor = y * SIZE + (x + SIZE - 1) % SIZE;
+    if (e.key === 'ArrowRight') cursor = y * SIZE + (x + 1) % SIZE;
+    if (e.key === 'ArrowUp') cursor = ((y + SIZE - 1) % SIZE) * SIZE + x;
+    if (e.key === 'ArrowDown') cursor = ((y + 1) % SIZE) * SIZE + x;
+    paint();
+  } else if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    press(cursor);
+  }
+});
+
+boardEl.addEventListener('focus', () => { boardEl.classList.add('focused'); paint(); });
+boardEl.addEventListener('blur', () => { boardEl.classList.remove('focused'); paint(); });
+
+document.getElementById('reset').addEventListener('click', () => {
+  clearTimeout(nextTimer);
+  cleared = 0;
+  moves = 0;
+  paused = false;
+  newBoard();
+});
+
+best = readBest();
+newBoard();
+
+/* The hub reads this for high scores and the daily challenge. */
+window.__boredSnapshot = () => ({ slug: 'lights-out', cleared: cleared, moves: moves });
+
+/* Small handle for the test suite; it only exposes what the board already shows. */
+window.__test = {
+  state: () => ({ board: board.slice(), cleared: cleared, moves: moves, paused: paused }),
+  press: i => { press(i); },
+  load: cells => { board = cells.map(Boolean); paused = false; paint(); }
+};
+</script>
+</body>
+</html>

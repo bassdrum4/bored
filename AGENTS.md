@@ -78,8 +78,10 @@ literal over in-scope game variables:
 not anything the game keeps inside a closure or a class. If the values are only reachable inside
 a function, use `{ closure: true, expression: '…' }` when they are globals on the window, or give
 the game a small accessor of its own (e.g. `__test` in 8-ball, `__boredSnapshot` written by hand)
-and set `setup` for any scaffolding. A game with no entry gets the generic adapter and will look
-broken in the daily feature.
+and set `setup` for any scaffolding. If the game writes `window.__boredSnapshot` itself (as
+`lights-out` does), leave `DAILY_ADAPTERS` alone — an entry there would inject a second copy and
+throw when the injection point is not a closure. A game with neither will look broken in the
+daily feature.
 
 ## Hook 2 — high score
 
