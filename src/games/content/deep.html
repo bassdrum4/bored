@@ -976,7 +976,7 @@ textarea.result[hidden] { display:none; }
     Object.assign(state, {
       depth: 1, hp: 20, maxHp: 20, atk: 3, def: 0,
       gold: 0, potions: 1, kills: 0, turns: 0,
-      alive: true, won: false, running: true,
+      alive: true, won: false, running: true, finished: false, finalScore: 0,
       hurt: 0, shake: 0, sealed: false, cause: ''
     });
     logs.length = 0;
@@ -995,6 +995,10 @@ textarea.result[hidden] { display:none; }
     state.won = won;
     state.running = false;
     const score = liveScore() + (won ? 1500 : 0);
+    // Remember the score the run actually ended on: the clear bonus lives here,
+    // not in the live HUD number, so the hub must read this instead.
+    state.finished = true;
+    state.finalScore = score;
     const best = loadBest();
     const record = !best || score > best.score;
     if (record) writeJSON('deep.best', { score, depth: state.depth, won, date: today() });
@@ -1042,10 +1046,10 @@ textarea.result[hidden] { display:none; }
     if (best) bits.push('Best <b>' + best.score + '</b> · floor ' + best.depth + (best.won ? ' · cleared' : ''));
     if (daily && daily.streak) bits.push('Daily streak <b>' + daily.streak + '</b>');
     $('titleBest').innerHTML = bits.length ? bits.join(' &nbsp;·&nbsp; ') : '<b>First descent?</b> The dungeon is generated from today\'s date.';
-    const todays = state.mode === 'daily' ? today() : today();
+    const dated = state.mode === 'daily';
+    const seed = dated ? today() : state.seed;
     $('seedline').innerHTML =
-      'SEED <b>' + shortCode(todays) + '</b> · ' + todays +
-      ' · one dungeon for every diver';
+      'SEED <b>' + shortCode(seed) + '</b> · ' + (dated ? seed + ' · one dungeon for every diver' : 'random dive');
   }
 
   /* ─────────────────────────── input ─────────────────────────── */
@@ -1690,7 +1694,9 @@ textarea.result[hidden] { display:none; }
   };
   window.__boredSnapshot = () => ({
     slug: 'deep', depth: state.depth, floor: state.depth,
-    score: liveScore(), kills: state.kills, gold: state.gold,
+    score: state.finished ? state.finalScore : liveScore(),
+    kills: state.kills, gold: state.gold,
+    finished: state.finished === true,
     won: state.won ? 1 : 0
   });
   window.__test = window.__deep;

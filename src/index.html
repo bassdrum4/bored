@@ -14,6 +14,7 @@
   <header class="masthead">
     <h1>Bored</h1>
     <p class="sub"><b id="count">33</b> things to play &middot; one file &middot; no installs</p>
+    <p class="jump"><button id="palette-open" class="kbd-hint" type="button" aria-haspopup="dialog">Jump to a game <kbd id="palette-key">Ctrl K</kbd></button></p>
     <p class="intro">A little arcade for your spare time. Pick a favorite or find something new.</p>
     <div id="account">
       <span id="account-state">Playing as a guest. Scores stay in this browser.</span>
@@ -69,6 +70,16 @@
   <main id="grid" class="grid" aria-label="Game library"></main>
   <p id="empty" hidden></p>
   <footer class="foot"><span>have fun. stay a while.</span><span>32 offline games / 3 online extras</span></footer>
+</div>
+
+<div id="palette" hidden>
+  <div class="palette-card" role="dialog" aria-modal="true" aria-labelledby="palette-label">
+    <label id="palette-label" class="sr-only" for="palette-input">Jump to a game</label>
+    <input id="palette-input" type="text" autocomplete="off" spellcheck="false"
+      placeholder="Jump to a game&hellip;" aria-controls="palette-list" aria-autocomplete="list">
+    <div id="palette-list" role="listbox" aria-label="Games"></div>
+    <p class="palette-foot"><kbd>&uarr;</kbd><kbd>&darr;</kbd> move <kbd>&crarr;</kbd> play <kbd>esc</kbd> close<span id="palette-count"></span></p>
+  </div>
 </div>
 
 <dialog id="auth-dialog" aria-labelledby="auth-title">

@@ -48,7 +48,12 @@ const highScore = (id, name, unit, extra = {}) => ({
   }
 });
 const HIGH_SCORE_GAMES = [
-  highScore('deep', 'DEEP', 'points', { metric: 'score' }),
+  highScore('deep', 'DEEP', 'points', {
+    metric: 'score',
+    // A descent only counts once it ends: the end-screen score carries the
+    // clear bonus, and an abandoned run should not post a partial score.
+    when: snapshot => snapshot.finished === true
+  }),
   highScore('8ball', '8 Ball', 'balls', { metric: 'potted' }),
   highScore('tetris', 'Tetris', 'lines', { metric: 'lines' }),
   highScore('breakout', 'Breakout', 'layouts', { metric: 'layouts' }),
@@ -968,8 +973,139 @@ addEventListener('message', e => {
     case 'bored:menuclose': closeMenu(); break;
   }
 });
+/* --------------------------------------------------------------------------
+ * Jump-to-game palette. Thirty-five games is too many to scan with a mouse;
+ * this is a keyboard launcher that also shows the best score you already own,
+ * so it doubles as a record book.
+ * ------------------------------------------------------------------------ */
+const palette = $('#palette'), paletteInput = $('#palette-input'), paletteList = $('#palette-list'), paletteCount = $('#palette-count');
+let paletteRows = [], paletteIndex = 0, paletteReturnFocus = null;
+
+const playable = slug => !!(EXTERNS[slug] || GAMES[slug] || NEW_GAMES.includes(slug));
+
+function bestLabel(slug) {
+  const spec = HIGH_SCORE_GAMES.find(entry => entry.id === slug);
+  if (!spec) return '';
+  const value = spec.read();
+  return value ? 'best ' + value.toLocaleString('en-US') + ' ' + spec.unit : '';
+}
+
+function paletteMatches(query) {
+  const needle = query.trim().toLowerCase();
+  const rows = [];
+  ORDER.forEach(([slug, name], index) => {
+    if (!playable(slug)) return;
+    const meta = META[slug] || [];
+    if (needle && ![name, slug, ...meta].join(' ').toLowerCase().includes(needle)) return;
+    const lowered = name.toLowerCase();
+    const rank = !needle ? 0 : lowered.startsWith(needle) ? 0 : lowered.includes(needle) ? 1 : 2;
+    rows.push({ slug, name, meta, index, rank });
+  });
+  return rows.sort((a, b) => a.rank - b.rank || a.index - b.index);
+}
+
+function paintPalette() {
+  const rows = [...paletteList.querySelectorAll('.palette-row')];
+  rows.forEach((el, i) => {
+    el.setAttribute('aria-selected', String(i === paletteIndex));
+    if (i === paletteIndex) el.scrollIntoView({ block: 'nearest' });
+  });
+  paletteInput.setAttribute('aria-activedescendant', rows.length ? 'palette-row-' + paletteIndex : '');
+}
+
+function renderPalette() {
+  paletteRows = paletteMatches(paletteInput.value);
+  if (paletteIndex >= paletteRows.length) paletteIndex = Math.max(0, paletteRows.length - 1);
+  paletteList.replaceChildren();
+
+  paletteRows.forEach((row, i) => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'palette-row';
+    el.id = 'palette-row-' + i;
+    el.setAttribute('role', 'option');
+    el.innerHTML = '<span class="p-idx"></span><span class="p-name"></span><span class="p-meta"></span><span class="p-best"></span>';
+    el.querySelector('.p-idx').textContent = String(row.index + 1).padStart(2, '0');
+    el.querySelector('.p-name').textContent = row.name;
+    el.querySelector('.p-meta').textContent = row.meta[0] || '';
+    el.querySelector('.p-best').textContent = bestLabel(row.slug);
+    el.onpointerenter = () => { paletteIndex = i; paintPalette(); };
+    el.onclick = () => runPalette(i);
+    paletteList.appendChild(el);
+  });
+
+  if (!paletteRows.length) {
+    const empty = document.createElement('p');
+    empty.className = 'palette-empty';
+    empty.textContent = 'No game matches \u201c' + paletteInput.value.trim() + '\u201d.';
+    paletteList.appendChild(empty);
+  }
+
+  paletteCount.textContent = paletteRows.length
+    ? paletteRows.length + (paletteRows.length === 1 ? ' game' : ' games')
+    : 'no matches';
+  paintPalette();
+}
+
+function openPalette() {
+  if (current || !palette.hidden) return;
+  paletteReturnFocus = document.activeElement;
+  palette.hidden = false;
+  document.body.classList.add('palette-open');
+  paletteInput.value = '';
+  paletteIndex = 0;
+  renderPalette();
+  paletteInput.focus();
+}
+
+function closePalette() {
+  if (palette.hidden) return;
+  palette.hidden = true;
+  document.body.classList.remove('palette-open');
+  const target = paletteReturnFocus;
+  paletteReturnFocus = null;
+  if (target && target.focus && target !== document.body) target.focus();
+  else $('#palette-open').focus();
+}
+
+function runPalette(index) {
+  const row = paletteRows[index];
+  if (!row) return;
+  closePalette();
+  openGame(row.slug);
+}
+
+paletteInput.addEventListener('input', () => { paletteIndex = 0; renderPalette(); });
+paletteInput.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!paletteRows.length) return;
+    paletteIndex = (paletteIndex + (e.key === 'ArrowDown' ? 1 : -1) + paletteRows.length) % paletteRows.length;
+    paintPalette();
+  } else if (e.key === 'Home' || e.key === 'End') {
+    e.preventDefault();
+    paletteIndex = e.key === 'Home' ? 0 : Math.max(0, paletteRows.length - 1);
+    paintPalette();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    runPalette(paletteIndex);
+  }
+});
+palette.addEventListener('pointerdown', e => { if (e.target === palette) closePalette(); });
+$('#palette-open').onclick = openPalette;
+if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) $('#palette-key').textContent = '\u2318K';
+
 addEventListener('keydown', e => {
   const typing = e.target instanceof Element && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    if (palette.hidden) openPalette(); else closePalette();
+    return;
+  }
+  if (!palette.hidden) {
+    if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
+    return;
+  }
   if (e.key === 'Escape') {
     if (!playerActions.hidden) { e.preventDefault(); closeMenu({ returnFocus: true }); }
     else if (fsElement()) { e.preventDefault(); leaveFullscreen(); }
@@ -985,7 +1121,8 @@ renderDaily(); renderRecent(); render(); initAccount();
 // suite and for anyone poking at the console.
 Object.assign(window, {
   openGame, closeGame, renderDaily, readDaily, dailyChallenge, dailyCheck,
-  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, LB_GAMES, HIGH_SCORE_GAMES, captureHighScore, accountStandings
+  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, LB_GAMES, HIGH_SCORE_GAMES, captureHighScore, accountStandings,
+  openPalette, closePalette, paletteMatches
 });
 Object.defineProperty(window, 'currentDaily', { get: () => currentDaily });
 Object.defineProperty(window, 'current', { get: () => current });

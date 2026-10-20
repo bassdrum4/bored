@@ -635,6 +635,13 @@ const G = {
 const human = () => G.players.find(p => p.isHuman);
 function potTotal(){ return G.players.reduce((s, p) => s + p.totalBet, 0); }
 
+/* "You fold", "Dusty folds" — the human gets the bare verb. */
+const IRREGULAR = { have: 'has' };
+function verb(p, base){
+  if (p && p.isHuman) return base;
+  return IRREGULAR[base] || base + 's';
+}
+
 function log(text, isResult){
   G.log.push({ hand: G.handNumber, text, result: !!isResult });
   if (G.log.length > 400) G.log.shift();
@@ -705,14 +712,14 @@ function applyAction(p, type, amount){
   if (type === 'fold'){
     p.folded = true;
     p.hasActed = true;
-    label = 'folds';
+    label = verb(p, 'fold');
   } else if (type === 'check'){
     p.hasActed = true;
-    label = 'checks';
+    label = verb(p, 'check');
   } else if (type === 'call'){
     const pay = putChips(p, Math.min(p.stack, Math.max(0, toCall)));
     p.hasActed = true;
-    label = pay > 0 ? ('calls ' + fmt(pay)) : 'checks';
+    label = pay > 0 ? (verb(p, 'call') + ' ' + fmt(pay)) : verb(p, 'check');
   } else {
     const target = Math.max(p.bet, Math.min(amount, p.bet + p.stack));
     const pay = target - p.bet;
@@ -724,9 +731,9 @@ function applyAction(p, type, amount){
       G.players.forEach(o => {
         if (o !== p && !o.folded && !o.allIn) o.hasActed = false;
       });
-      label = (wasBet ? 'bets ' : 'raises to ') + fmt(target) + (p.allIn ? ' (all-in)' : '');
+      label = verb(p, wasBet ? 'bet' : 'raise') + (wasBet ? ' ' : ' to ') + fmt(target) + (p.allIn ? ' (all-in)' : '');
     } else {
-      label = 'calls ' + fmt(pay);
+      label = verb(p, 'call') + ' ' + fmt(pay);
     }
     p.hasActed = true;
   }
@@ -926,13 +933,13 @@ function startHand(){
   });
 
   G.button = (G.button + 1) % G.players.length;
-  log('Hand ' + G.handNumber + ' — ' + G.players[G.button].name + ' has the button');
+  log('Hand ' + G.handNumber + ' — ' + G.players[G.button].name + ' ' + verb(G.players[G.button], 'have') + ' the button');
 
   if (G.variant === 'holdem'){
     const { sbSeat, bbSeat } = blindSeats();
     const sbP = G.players[sbSeat], bbP = G.players[bbSeat];
-    log(sbP.name + ' posts small blind ' + fmt(putChips(sbP, G.settings.sb)));
-    log(bbP.name + ' posts big blind ' + fmt(putChips(bbP, G.settings.bb)));
+    log(sbP.name + ' ' + verb(sbP, 'post') + ' small blind ' + fmt(putChips(sbP, G.settings.sb)));
+    log(bbP.name + ' ' + verb(bbP, 'post') + ' big blind ' + fmt(putChips(bbP, G.settings.bb)));
 
     for (let k = 0; k < 2; k++) for (const p of G.players) p.hand.push(drawCard());
 
@@ -994,7 +1001,7 @@ function doDraw(){
     for (let i = 0; i < discards.length; i++) fresh.push(drawCard());
     p.hand = kept.concat(fresh);
     p.drawInfo = discards.length;
-    log(p.name + ' ' + (discards.length === 0 ? 'stands pat' : 'draws ' + discards.length));
+    log(p.name + ' ' + (discards.length === 0 ? verb(p, 'stand') + ' pat' : verb(p, 'draw') + ' ' + discards.length));
   }
 
   G.awaitingHumanDraw = false;
@@ -1021,6 +1028,7 @@ function settlePots(){
   G.players.forEach(p => p.totalBet = 0);
 
   const won = new Map();
+  const winnings = new Map();
   for (const pot of pots){
     if (!pot.eligible.length) continue;
     let best = -1, winners = [];
@@ -1035,10 +1043,16 @@ function settlePots(){
     if (extra > 0){ winners[0].stack += extra; won.set(winners[0], (won.get(winners[0]) || 0) + extra); }
 
     if (winners.length === 1){
-      log(winners[0].name + ' wins ' + fmt(pot.amount) + ' with ' + describe(winners[0].result));
+      winnings.set(winners[0], (winnings.get(winners[0]) || 0) + pot.amount);
     } else {
       log('Pot of ' + fmt(pot.amount) + ' split between ' + winners.map(w => w.name).join(', '));
     }
+  }
+
+  // Main pot and side pots are one story to the player: total them per winner
+  // instead of printing "wins 380" and then "wins 420" for the same hand.
+  for (const [winner, amount] of winnings){
+    log(winner.name + ' ' + verb(winner, 'win') + ' ' + fmt(amount) + ' with ' + describe(winner.result));
   }
   return won;
 }
@@ -1067,7 +1081,7 @@ function showdown(){
       contenders.filter(p => p.result.score === top.result.score).map(p => p.name).join(' and ') +
       ' tie with ' + describe(top.result);
   } else {
-    G.message = top.name + ' wins ' + fmt(won.get(top) || 0) + ' with ' + describe(top.result);
+    G.message = top.name + ' ' + verb(top, 'win') + ' ' + fmt(won.get(top) || 0) + ' with ' + describe(top.result);
   }
 
   G.phase = 'handOver';
@@ -1082,15 +1096,15 @@ function finishUncontested(){
   if (refund > 0){
     winner.stack += refund;
     winner.totalBet -= refund;
-    log(winner.name + ' gets ' + fmt(refund) + ' back (uncalled bet)');
+    log(winner.name + ' ' + verb(winner, 'get') + ' ' + fmt(refund) + ' back (uncalled bet)');
   }
   const pot = G.players.reduce((s, p) => s + p.totalBet, 0);
   G.lastPot = pot;
   G.players.forEach(p => p.totalBet = 0);
   winner.stack += pot;
 
-  log(winner.name + ' wins ' + fmt(pot) + ' — everyone else folded', true);
-  G.message = winner.name + ' wins ' + fmt(pot) + ' — everyone else folded';
+  log(winner.name + ' ' + verb(winner, 'win') + ' ' + fmt(pot) + ' — everyone else folded', true);
+  G.message = winner.name + ' ' + verb(winner, 'win') + ' ' + fmt(pot) + ' — everyone else folded';
   G.phase = 'handOver';
   render();
 }
@@ -1290,12 +1304,20 @@ function aiEquity(hole, board, opponents, iterations, cut){
     for (let o = 0; o < opp; o++){
       const base = boardNeed + o * perOpp;
       if (cut > 0 && o === 0){
-        for (let tries = 0; tries < 4 && startStrength(deck[base], deck[base + 1]) < cut; tries++){
+        // Hill-climb towards the aggressor's range: keep the strongest of a few
+        // sampled hands, and stop as soon as one clears the cut. Rejection alone
+        // almost never lands a premium hand inside a tight range.
+        let bestStr = startStrength(deck[base], deck[base + 1]);
+        for (let attempt = 0; attempt < 5 && bestStr < cut; attempt++){
           const free = deck.length - need;
           if (free < perOpp) break;
-          for (let k = 0; k < perOpp; k++){
-            const j = need + Math.floor(aiRand() * free);
-            const t = deck[base + k]; deck[base + k] = deck[j]; deck[j] = t;
+          const j = need + Math.floor(aiRand() * (free - perOpp + 1));
+          const str = startStrength(deck[j], deck[j + 1]);
+          if (str > bestStr){
+            const o0 = deck[base], o1 = deck[base + 1];
+            deck[base] = deck[j]; deck[base + 1] = deck[j + 1];
+            deck[j] = o0; deck[j + 1] = o1;
+            bestStr = str;
           }
         }
       }
@@ -1408,7 +1430,14 @@ function aiDecide(p){
   const facing = t.callAmount > 0;
 
   const iters = G.variant === 'draw' ? 180 : board.length === 0 ? 220 : board.length === 3 ? 260 : 230;
-  const cut = facing ? (G.streetRaises >= 3 ? 0.05 : G.streetRaises === 2 ? 0.11 : 0.2) : 0;
+
+  // Size matters as much as the count: a 2x pot shove is a stronger claim than
+  // a min-bet, so it is treated as one aggression level higher when estimating
+  // what the bettor can be holding.
+  const betRatio = facing ? t.toCall / pot : 0;
+  const levels = G.streetRaises + (betRatio > 1.5 ? 1 : 0) + (betRatio > 4 ? 1 : 0);
+  const cutPct = !facing ? 0 : levels >= 4 ? 0.04 : levels === 3 ? 0.07 : levels === 2 ? 0.12 : 0.2;
+  const cut = cutPct ? startCut(cutPct) : 0;
   const eq = aiEquity(p.hand, board, opp, iters, cut);
 
   const potOdds = t.callAmount / Math.max(1, pot + t.callAmount);
@@ -1447,8 +1476,11 @@ function aiDecide(p){
     return { type: 'check' };
   }
 
-  let need = potOdds + 0.03 + tight * 0.05;
-  if (G.streetRaises >= 2) need += 0.05;
+  // Calling an all-in ends the betting, so there are no future streets to pay
+  // for: the price is simply the pot odds, with almost no extra margin.
+  const allInCall = t.callAmount >= p.stack;
+  let need = potOdds + (allInCall ? 0.015 : 0.03) + (allInCall ? 0 : tight * 0.05);
+  if (!allInCall && G.streetRaises >= 2) need += 0.05;
   if (p.style === 'station') need -= 0.05;
   if (p.style === 'rock') need += 0.03;
   if (G.lastAggressor && G.lastAggressor.isHuman) need -= (humanTendency() - 0.4) * 0.10;
@@ -1461,7 +1493,7 @@ function aiDecide(p){
     return { type: 'raise', amount: sizing(0.6) };
   }
   if (eq > 0.94) return { type: 'call' };
-  if (commit > 0.6 && eq < need + 0.08) return { type: 'fold' };
+  if (commit > 0.6 && eq < need + (allInCall ? 0.02 : 0.08)) return { type: 'fold' };
   if (eq >= need) return { type: 'call' };
   if (t.callAmount <= pot * 0.05 && eq > 0.18) return { type: 'call' };
   return { type: 'fold' };
@@ -1807,6 +1839,7 @@ window.__pokerAI = {
   discards(hand, opponents){ return bestDiscards(hand, opponents).discards; },
   draw: hasDraw,
   startStrength: startStrength,
+  startCut: startCut,
   readOf: readOf
 };
 

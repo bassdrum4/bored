@@ -313,6 +313,48 @@ test('browser regressions', async t => {
     await close();
   });
 
+  await t.test('command palette jumps to a game and shows the best score I already own', async () => {
+    await page.evaluate(() => localStorage.setItem('bored.high.poker', '1240'));
+    try {
+      await page.keyboard.down('Control');
+      await page.keyboard.press('k');
+      await page.keyboard.up('Control');
+      await page.waitForFunction(() => !document.querySelector('#palette').hidden);
+      assert.equal(await page.evaluate(() => document.activeElement.id), 'palette-input', 'the cursor starts in the palette');
+      assert.equal(await page.$$eval('.palette-row', els => els.length), 35, 'every playable game is listed');
+      assert.equal(await text(page, '#palette-count'), '35 games');
+
+      await page.keyboard.press('ArrowDown');
+      assert.equal(await page.evaluate(() => document.getElementById('palette-row-1').getAttribute('aria-selected')), 'true',
+        'arrow keys move the highlight');
+
+      await page.keyboard.type('pok');
+      await page.waitForFunction(() => document.querySelectorAll('.palette-row').length === 1);
+      const row = await text(page, '.palette-row');
+      assert.match(row, /Poker/, 'search narrows to the game');
+      assert.match(row, /best 1,240 chips/, 'your own best score is shown next to it');
+
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(() => !document.querySelector('#player').hidden);
+      assert.equal(await page.$eval('#frame', el => el.title), 'Poker', 'Enter opens the highlighted game');
+      await close();
+
+      const focusedBefore = await page.evaluate(() => document.activeElement.className);
+      await page.keyboard.down('Control');
+      await page.keyboard.press('k');
+      await page.keyboard.up('Control');
+      await page.waitForFunction(() => !document.querySelector('#palette').hidden);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => document.querySelector('#palette').hidden);
+      assert.equal(await page.evaluate(() => document.activeElement.className), focusedBefore,
+        'closing puts focus back where it was');
+      assert.notEqual(await page.evaluate(() => document.activeElement.tagName), 'BODY', 'focus is not lost to the document');
+      assert.equal(await page.$eval('#q', el => el.value), '', 'the hub search box is left alone');
+    } finally {
+      await page.evaluate(() => localStorage.removeItem('bored.high.poker'));
+    }
+  });
+
   await t.test('Memory locks mismatches, clears pending timers on reset, and completes all pairs', async () => {
     const frame = await open('memory');
     await frame.click('.memory-card:nth-child(1)');
@@ -437,9 +479,17 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument.getElementById('end').hidden === false);
     assert.match(await text(frame, '#endWord'), /CORE CLAIMED/);
     assert.equal(await frame.$eval('#endDepth', el => el.textContent), '5/5');
-    assert.ok(Number(await text(frame, '#endScore')) >= 1500, 'claiming the core pays the clear bonus');
+    const endScore = Number(await text(frame, '#endScore'));
+    assert.ok(endScore >= 1500, 'claiming the core pays the clear bonus');
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('deep.best')));
     assert.ok(stored && stored.won === true && stored.score >= 1500, 'the best descent is saved');
+
+    // The end screen, the saved best and the snapshot the hub reads must agree.
+    const reported = await frame.evaluate(() => ({ snap: window.__boredSnapshot(), live: __deep.score() }));
+    assert.equal(reported.snap.score, endScore, 'the snapshot reports the same score as the end screen');
+    assert.equal(reported.snap.finished, true, 'a cleared run is finished');
+    assert.equal(stored.score, endScore, 'the saved best matches the end screen');
+    assert.ok(endScore - reported.live >= 1500, 'the reported score carries the clear bonus the live HUD omits');
     await close();
   });
 
@@ -556,6 +606,53 @@ test('browser regressions', async t => {
     assert.equal(behaviour.pat, 0, 'a straight flush stands pat');
     assert.ok(behaviour.trashCount >= 3, 'a dead draw hand throws most of itself away');
 
+    // Betting ranges must actually tighten: the same hand is worth less against
+    // a bettor than against a random hand. This was silently a no-op once.
+    const ranges = await frame.evaluate(() => {
+      const AI = window.__pokerAI;
+      const c = (r, s) => ({ rank: r, suit: s });
+      const board = [c(13, 0), c(9, 1), c(4, 2)];
+      const topPair = [c(13, 2), c(7, 0)];
+      AI.seed(99);
+      const wild = AI.equity(topPair, board, 1, 500, 0);
+      const tight = AI.equity(topPair, board, 1, 500, AI.startCut(0.1));
+      AI.unseed();
+      return {
+        wild: +wild.toFixed(3), tight: +tight.toFixed(3),
+        cut: +AI.startCut(0.1).toFixed(3), randomCut: +AI.startCut(0.2).toFixed(3)
+      };
+    });
+    assert.ok(ranges.tight < ranges.wild - 0.06,
+      'a tighter betting range lowers equity (' + ranges.wild + ' -> ' + ranges.tight + ')');
+    assert.ok(ranges.cut > ranges.randomCut, 'the top 10% of hands is a stricter cut than the top 20%');
+
+    // Side pots are one story: the same winner must not be logged once per pot,
+    // and the human is never "You wins".
+    const ledgers = await frame.evaluate(() => {
+      G.phase = 'showdown';
+      G.variant = 'holdem';
+      G.revealAll = true;
+      G.community = [{ rank: 14, suit: 0 }, { rank: 13, suit: 1 }, { rank: 9, suit: 2 }, { rank: 4, suit: 3 }, { rank: 2, suit: 0 }];
+      G.log = [];
+      G.players = G.players.slice(0, 3);
+      const hands = [[{ rank: 14, suit: 1 }, { rank: 13, suit: 2 }], [{ rank: 13, suit: 0 }, { rank: 12, suit: 1 }], [{ rank: 5, suit: 0 }, { rank: 6, suit: 1 }]];
+      // unequal contributions create a side pot that the same player wins
+      const bets = [300, 150, 100];
+      G.players.forEach((p, i) => {
+        p.hand = hands[i];
+        p.totalBet = bets[i];
+        p.stack = 100;
+        p.folded = false;
+        p.result = bestHand(p.hand.concat(G.community));
+      });
+      const won = settlePots();
+      const winLines = G.log.filter(e => /wins? /.test(e.text));
+      return { log: G.log.map(e => e.text), winLines: winLines.length, winner: G.players[0].name, won: won.get(G.players[0]) };
+    });
+    assert.equal(ledgers.winLines, 1, 'one win line for a hand that takes the main pot and a side pot');
+    assert.match(ledgers.log[0], /^You win 550 /, 'the human reads "You win", not "You wins" (got: ' + ledgers.log[0] + ')');
+    assert.equal(ledgers.won, 550, 'the main pot and side pot are paid out once');
+
     // The draw UI still works end to end against the new opponent code.
     await frame.click('#tab-draw');
     await frame.waitForFunction(() => G.variant === 'draw' && G.phase === 'betting' && G.awaitingHuman);
@@ -570,11 +667,13 @@ test('browser regressions', async t => {
     assert.match(await text(frame, '#ctrl-draw'), /Draw 1 card/);
     await frame.click('#ctrl-draw');
     await frame.waitForFunction(() => G.street === 'bet2' || G.phase === 'handOver', { timeout: 20000 });
+    const spoken = await frame.evaluate(() => G.log.map(e => e.text).filter(t => /\bYou (wins|calls|folds|checks|raises|bets|posts|gets|draws|stands)\b/.test(t)));
+    assert.deepEqual(spoken, [], 'the ledger conjugates for the human: ' + spoken.join(' | '));
     await close();
   });
 
   await t.test('game scores feed the high-score entries without counting unfinished runs', async () => {
-    const keys = ['tetris', 'wordle', '8ball', 'poker'].map(id => 'bored.high.' + id);
+    const keys = ['tetris', 'wordle', '8ball', 'poker', 'deep'].map(id => 'bored.high.' + id);
     await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
     try {
       let frame = await openTitle('tetris', 'Tetris');
@@ -615,6 +714,18 @@ test('browser regressions', async t => {
       await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'poker', handOver: true, profit: 500 }); });
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.poker')), '500');
+
+      // DEEP only counts a descent that ended, and keeps its clear bonus.
+      frame = await openTitle('deep', 'DEEP');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'deep', score: 900, finished: false }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), null, 'an abandoned descent does not post');
+      frame = await openTitle('deep', 'DEEP');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'deep', score: 2402, finished: true }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), '2402', 'a cleared descent posts its bonus score');
 
       assert.equal(await page.$eval('#lb-game', el => el.options.length), 31);
       assert.equal(await page.$eval('#lb-game', el => el.value), 'overall');

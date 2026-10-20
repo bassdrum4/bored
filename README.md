@@ -41,6 +41,9 @@ server; see [INFISICAL.md](INFISICAL.md).
 ## Find something to play
 
 - Search game names, categories, and descriptions; press **/** to focus search.
+- Press **Ctrl+K** (**⌘K** on a Mac) for the jump palette: type a name, arrow
+  through the matches, and press Enter to play. Each row also shows the best
+  score you already own in that game.
 - Filter by **New**, **Favorites**, **Arcade**, **Puzzle**, **Strategy**,
   **Sandbox**, or **Online**.
 - Sort by the original order or A–Z.
@@ -230,8 +233,8 @@ runner also accepts a cached browser from an existing `puppeteer` installation.
 The rules and daily tests run without a browser. The browser block covers
 JavaScript syntax, 2048 merge rules and undo, Connect Four wins and computer
 tactics, actual browser gameplay, Memory completion and timer cleanup, Aim Lab
-accuracy and expiration, search/filter/sort, saved favorites, Escape and focus
-restoration, all 32 offline game boots, DEEP's seeded dungeon and boss gate, poker's
+accuracy and expiration, search/filter/sort, the jump palette, saved favorites,
+Escape and focus restoration, all 32 offline game boots, DEEP's seeded dungeon and boss gate, poker's
 simulated equity, no-peeking opponents and draw discards, Lighthouse's overlay, all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, UTC rollover, 320px layouts,
