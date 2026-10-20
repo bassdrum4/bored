@@ -282,16 +282,34 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#player').hidden);
   });
 
-  await t.test('fullscreen toggles from the menu and Esc leaves fullscreen before the game', async () => {
+  await t.test('overall ranking groups scores by account, respects lower-is-better and ties', async () => {
+    assert.equal(await page.$eval('#lb-game', el => el.value), 'overall');
+    const rankings = await page.evaluate(() => accountStandings([
+      { game: '2048', handle: 'Ada', value: 300 },
+      { game: '2048', handle: 'Ben', value: 300 },
+      { game: '2048', handle: 'Cy', value: 200 },
+      { game: 'memory', handle: 'Ada', value: 20 },
+      { game: 'memory', handle: 'Ben', value: 15 },
+      { game: 'memory', handle: 'Cy', value: 0 },
+      { game: 'not-a-game', handle: 'Outsider', value: 9999 }
+    ]));
+    assert.deepEqual(rankings.map(({ handle, points, gamesPlayed, gamesRanked }) => [handle, points, gamesPlayed, gamesRanked]), [
+      ['Ben', 20, 2, 2], ['Ada', 19, 2, 2], ['Cy', 8, 1, 1]
+    ]);
+  });
+
+  await t.test('fullscreen menu button is absent while Shift+F and Escape still work', async () => {
     await openTitle('tetris', 'Tetris');
     await page.click('#menu-toggle');
-    await page.click('#fullscreen');
+    assert.equal(await page.$('#fullscreen'), null);
+    await page.click('#resume');
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('F');
+    await page.keyboard.up('Shift');
     await page.waitForFunction(() => document.fullscreenElement === document.querySelector('#player'));
-    await page.waitForFunction(() => document.querySelector('#fullscreen-label').textContent === 'Exit fullscreen');
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.fullscreenElement);
-    assert.equal(await page.$eval('#player', el => el.hidden), false, 'Esc leaves fullscreen before leaving the game');
-    await page.waitForFunction(() => document.querySelector('#fullscreen-label').textContent === 'Fullscreen');
+    assert.equal(await page.$eval('#player', el => el.hidden), false);
     await close();
   });
 
@@ -406,7 +424,8 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.poker')), '500');
 
-      assert.equal(await page.$$eval('#lb-game option', els => els.length), 29);
+      assert.equal(await page.$eval('#lb-game option', els => els.length), 30);
+      assert.equal(await page.$eval('#lb-game', el => el.value), 'overall');
       assert.match(await text(page, '#lb-note'), /across 29 games/);
     } finally {
       if (await page.$eval('#player', el => !el.hidden)) await close();
