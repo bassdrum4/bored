@@ -29,6 +29,11 @@ npm run build    # writes dist/index.html, then copies it to index.html
 | [`src/daily.js`](src/daily.js) | Daily challenge rules and adapters |
 | [`vite.config.js`](vite.config.js) | Vite dev server and single-file production build |
 
+Adding a game? Read [`AGENTS.md`](AGENTS.md) first: it lists the three hooks
+(snapshot, high score, daily challenge) a game has to expose to show up in scores
+and the daily rotation, plus the house style. A game that skips a hook silently
+drops out of those features.
+
 Games are edited as normal HTML. `npm run games:sync` encodes them to the
 base64 payloads the browser loads; it runs automatically before `dev` and
 `build`. Generated payloads (`src/games/content/*.b64`) and `dist/` are ignored.
