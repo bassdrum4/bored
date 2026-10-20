@@ -299,7 +299,7 @@ function endGame(text, color) {
 function update() {
   if (!roundActive) return;
 
-  ringRadius -= SHRINK_RATE;
+  ringRadius = Math.max(0, ringRadius - SHRINK_RATE);
 
   // P1 input
   if (keys['KeyA']) p1.vx -= ACCEL;
@@ -451,13 +451,15 @@ function draw() {
     ctx.globalAlpha = 1;
   });
 
-  // Particles
+  // Particles — update() stops ticking when a match ends, so the fade has to
+  // happen here and meet the same zero check: a negative radius throws.
   particles.forEach(pt => {
     pt.x += pt.vx;
     pt.y += pt.vy;
     pt.vx *= 0.95;
     pt.vy *= 0.95;
     pt.life -= 0.02;
+    if (pt.life <= 0) return;
     ctx.beginPath();
     ctx.arc(pt.x, pt.y, pt.size * pt.life, 0, Math.PI * 2);
     ctx.fillStyle = pt.color;
@@ -471,11 +473,14 @@ function draw() {
   [p1, p2].forEach(p => {
     if (!p.x && p.x !== 0) return;
 
-    // Trail
+    // Trail — a trail left at the end of a round can fade past zero before it is
+    // cleaned up, and a negative radius throws inside arc().
     p.trail.forEach(t => {
+      const radius = p.radius * t.life * 0.7;
+      if (radius <= 0) return;
       ctx.beginPath();
-      ctx.arc(t.x, t.y, p.radius * t.life * 0.7, 0, Math.PI * 2);
-      ctx.fillStyle = p.glow + (t.life * 0.2) + ')';
+      ctx.arc(t.x, t.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = p.glow + Math.max(0, t.life * 0.2) + ')';
       ctx.fill();
     });
 
