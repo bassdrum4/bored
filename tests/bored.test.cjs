@@ -92,7 +92,9 @@ test('all hub JavaScript parses', () => {
 function challengeRules() {
   const start = source.indexOf('const CHALLENGES = [');
   const end = source.indexOf('function dailyChallenge', start);
-  const context = rules(['dailyDate', 'dailyChallenge', 'dailyCheck'], source.slice(start, end).replace(/export\s+$/, ''));
+  // `const` in the vm script is lexical, so hand the list to the test explicitly.
+  const context = rules(['dailyDate', 'dailyChallenge', 'dailyCheck'],
+    source.slice(start, end).replace(/export\s+$/, '') + '\nthis.CHALLENGES = CHALLENGES;');
   return context;
 }
 function dateFor(slug) {
@@ -103,11 +105,11 @@ function dateFor(slug) {
   }
   throw new Error('No challenge for ' + slug);
 }
-test('daily rotation covers all thirty-one offline games, changes targets, and uses UTC', () => {
-  const { dailyDate, dailyChallenge } = challengeRules();
+test('the daily rotation covers every challenge game, changes targets, and uses UTC', () => {
+  const { dailyDate, dailyChallenge, CHALLENGES } = challengeRules();
   assert.equal(dailyDate(new Date('2026-10-09T00:30:00+02:00')), '2026-10-08');
-  const rotation = Array.from({ length: 31 }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 9, 8 + n)).toISOString().slice(0, 10)));
-  assert.equal(new Set(rotation.map(c => c.slug)).size, 31);
+  const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 9, 8 + n)).toISOString().slice(0, 10)));
+  assert.equal(new Set(rotation.map(c => c.slug)).size, CHALLENGES.length);
   assert.ok(rotation.every(c => !c.goal.includes('{target}')));
   assert.deepEqual(JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))), JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))));
   assert.notEqual(dailyChallenge('2026-10-08').slug, dailyChallenge('2026-10-09').slug);
@@ -205,15 +207,23 @@ test('browser regressions', async t => {
   await page.goto(url);
 
   await t.test('hub categories, search, sorting, empty state, and stored favorites', async () => {
-    assert.equal(await page.$$eval('.card', els => els.length), 36);
-    assert.equal(await text(page, '#count'), '36');
+    // Counts come from the catalog so adding a game does not have to touch this
+    // file: the suite checks the wiring, not the catalogue's contents.
+    const catalog = await page.evaluate(() => ({
+      total: ORDER.length,
+      newest: NEW_GAMES.length,
+      puzzle: ORDER.filter(([slug]) => META[slug][0] === 'Puzzle').length,
+      online: Object.keys(EXTERNS).length
+    }));
+    assert.equal(await page.$$eval('.card', els => els.length), catalog.total);
+    assert.equal(await text(page, '#count'), String(catalog.total));
     await filter('New');
-    assert.equal(await page.$$eval('.card', els => els.length), 4);
+    assert.equal(await page.$$eval('.card', els => els.length), catalog.newest);
     await filter('Puzzle');
-    assert.equal(await page.$$eval('.card', els => els.length), 7);
+    assert.equal(await page.$$eval('.card', els => els.length), catalog.puzzle);
     await filter('All');
     await page.type('#q', 'internet required');
-    assert.equal(await page.$$eval('.card', els => els.length), 3);
+    assert.equal(await page.$$eval('.card', els => els.length), catalog.online);
     await page.$eval('#q', el => { el.value = 'nothingmatches'; el.dispatchEvent(new Event('input')); });
     assert.equal(await page.$eval('#random', el => el.disabled), true);
     assert.equal(await page.$eval('#empty', el => el.hidden), false);
@@ -900,19 +910,21 @@ test('browser regressions', async t => {
         { deep: 'void-runner', lights: 'breakout', own: 'tetris' }
       );
       const options = await page.$$eval('#lb-game option', els => els.map(el => [el.value, el.textContent]));
-      assert.equal(options.length, 29, 'one picker entry per shared board');
+      const boards = await page.evaluate(() => ({ total: LB_GAMES.length, pickable: boardGames().length }));
+      assert.equal(options.length, boards.pickable, 'one picker entry per shared board');
+      assert.equal(boards.pickable, boards.total - 2, 'only DEEP and Lights Out borrow a board');
       assert.deepEqual(options.filter(([id]) => id === 'deep' || id === 'lights-out'), [], 'borrowed boards are not listed twice');
       assert.match(options.find(([id]) => id === 'void-runner')[1], /Void Runner \+ DEEP/, 'the shared board names both games');
       assert.match(options.find(([id]) => id === 'breakout')[1], /Breakout \+ Lights Out/);
       assert.equal(await page.$eval('#lb-game', el => el.value), '2048');
-      assert.match(await text(page, '#lb-note'), /across 31 games/);
+      assert.match(await text(page, '#lb-note'), new RegExp('across ' + boards.total + ' games'));
     } finally {
       if (await page.$eval('#player', el => !el.hidden)) await close();
       await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
     }
   });
 
-  await t.test('all thirty-one daily adapters boot and expose current-run state', async () => {
+  await t.test('every daily adapter boots and exposes current-run state', async () => {
     const challenges = await page.evaluate(() => CHALLENGES);
     for (const challenge of challenges) {
       await page.evaluate(date => { window.originalDailyDate ||= dailyDate; dailyDate = () => date; renderDaily(); }, dateFor(challenge.slug));
@@ -994,7 +1006,7 @@ test('browser regressions', async t => {
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
   });
 
-  await t.test('all thirty-one offline games boot; Lighthouse overlay is actually hidden', async () => {
+  await t.test('every offline game boots; Lighthouse overlay is actually hidden', async () => {
     const slugs = await page.evaluate(() => ORDER.filter(([slug]) => !EXTERNS[slug] && !NEW_GAMES.includes(slug)).map(([slug]) => slug));
     for (const slug of slugs) {
       await page.evaluate(id => openGame(id), slug);
@@ -1050,7 +1062,7 @@ test('browser regressions', async t => {
       Math.random = () => 0;
     });
     await restricted.goto(url);
-    assert.equal(await restricted.$$eval('.card', els => els.length), 36);
+    assert.equal(await restricted.$$eval('.card', els => els.length), await page.evaluate(() => ORDER.length));
     for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
       await restricted.evaluate(id => openGame(id), slug);
       await restricted.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#board')?.childElementCount > 0);

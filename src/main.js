@@ -912,7 +912,7 @@ initAccount();
 // suite and for anyone poking at the console.
 Object.assign(window, {
   openGame, closeGame, renderDaily, readDaily, dailyChallenge, dailyCheck,
-  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, LB_GAMES, HIGH_SCORE_GAMES,
+  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, META, LB_GAMES, HIGH_SCORE_GAMES,
   captureHighScore: captureBest, accountStandings, boardGames, postingGameId, mergedInto, scoreRules
 });
 Object.defineProperty(window, 'currentDaily', { get: () => activeChallenge });

@@ -6,13 +6,18 @@ router, no server. Read this before adding or editing a game — a game that mis
 silently disappears from scores, the daily challenge, or the build.
 
 ```
-src/main.js              hub: catalog, high scores, accounts, leaderboard, daily, shell
+src/main.js              hub wiring: library, player chrome, daily, leaderboard + account UI
+src/hub/backend.js       Supabase request/session layer, score rules, auth helpers
+src/hub/scores.js        score specs, shared-board aliases, best capture, sync, ranking
+src/hub/store.js         safe localStorage helpers
 src/daily.js             daily challenge rotation + snapshot adapters
 src/games/catalog.js     ORDER (grid order), META (category, blurb), EXTERNS (off-site games)
+src/games/score-rules.json  what each game's score means on the shared board (label, better, max)
 src/games/content/*.html one file per game — the game's entire source
 src/games/content/*.b64  generated payload, git-ignored — rebuild with npm run build
 tests/bored.test.cjs     node:test suite, runs the real build output in Chrome
 scripts/sync-games.mjs   html -> .b64
+scripts/games.mjs        add a game / sync the shared board's rule list
 scripts/verify-snapshot.cjs  sanity-checks every game's snapshot in a browser
 ```
 
@@ -31,7 +36,26 @@ touches a game.
 
 ## Adding a game
 
-1. Create `src/games/content/<slug>.html`. It must be a complete document that works alone in a
+Scaffold it in one command:
+
+```bash
+npm run games:add -- <slug> "<Name>" "<Category>" "<blurb>" [--unit points] [--lower] [--metric field]
+```
+
+It writes a playable starter, adds the slug to `ORDER` and `META`, records what its score means
+in `src/games/score-rules.json`, and prints the two snippets to paste (the high-score spec and the
+optional daily challenge). Then:
+
+```bash
+npm run games:register        # give the shared board its score_rules row (--apply needs a key)
+npm run build
+node --test tests/bored.test.cjs
+```
+
+The suite derives its counts from the catalog, so adding games does not mean editing test
+assertions. What it still insists on:
+
+1. `src/games/content/<slug>.html`. It must be a complete document that works alone in a
    browser and is fetched into an iframe, so:
    - No external requests. No CDNs, fonts, images, or analytics — only inline CSS/JS, canvas,
      or emoji/text. The tests fail on off-site fetches, and the bundle is meant to work offline.
@@ -41,12 +65,11 @@ touches a game.
      `touch-action`/pointer events that work for touch as well as mouse. Keyboard input is a nice
      to have; a mouse-only game is fine.
    - `<title>` is the display name.
-2. Register it in `src/games/catalog.js`: add the slug to `ORDER` and `[category, blurb]` to
-   `META`. Off-site games go in `EXTERNS` instead and need no content file.
-3. Run `npm run build` (regenerates `<slug>.html.b64` and inlines everything into `index.html`).
-4. Update the counts the tests assert (`tests/bored.test.cjs`): the card count, the leaderboard
-   option count, and the daily-adapter count. Grep for the current numbers; the suite tells you
-   which assertion drifted if you miss one.
+2. Registered in `src/games/catalog.js` — the script does this; off-site games go in `EXTERNS`
+   instead and need no content file.
+3. A row in `score_rules` on the shared board, which `npm run games:register` adds for you (or
+   prints as SQL if you would rather paste it — the publishable key cannot write rules).
+4. Run `npm run build` (regenerates `<slug>.html.b64` and inlines everything into `index.html`).
 
 ## Hook 1 — snapshot (required by everything else)
 
@@ -85,7 +108,7 @@ daily feature.
 
 ## Hook 2 — high score
 
-In `src/main.js`, `HIGH_SCORE_GAMES`:
+In `src/hub/scores.js`, `HIGH_SCORE_GAMES`:
 
 ```js
 highScore('mygame', 'My Game', 'points', { metric: 'points' }),
@@ -102,7 +125,10 @@ Arguments are `(id, display name, unit, options)`. Options:
 
 Best values are cached locally (`bored.high.<id>`) and pushed to the `scores` table for signed-in
 players. Games in that list appear in the leaderboard picker, so the id must match the snapshot
-`slug` and the catalog key.
+`slug` and the catalog key. `scores.game` is a foreign key to `score_rules.game`, so a game only
+posts once it has a rule row: keep `src/games/score-rules.json` in step with the specs and run
+`npm run games:register` after adding games. Two games that lack a row borrow the closest rule
+(`RULE_ALIAS`) instead of sharing nothing.
 
 ## Hook 3 — daily challenge
 

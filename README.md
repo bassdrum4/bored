@@ -29,7 +29,9 @@ npm run build    # writes dist/index.html, then copies it to index.html
 | [`src/games/content/`](src/games/content) | The hand-written games, one readable HTML file each — including DEEP |
 | [`src/games/arcade.js`](src/games/arcade.js) | The four generated games: 2048, Memory, Connect Four, Aim Lab |
 | [`src/games/catalog.js`](src/games/catalog.js) | Game order, names, categories, and external links |
+| [`src/games/score-rules.json`](src/games/score-rules.json) | What each game's score means on the shared board (label, better, max) |
 | [`src/daily.js`](src/daily.js) | Daily challenge rules and adapters |
+| [`scripts/games.mjs`](scripts/games.mjs) | `add` a new game, `register` its shared-board rule |
 | [`vite.config.js`](vite.config.js) | Vite dev server and single-file production build |
 
 Adding a game? Read [`AGENTS.md`](AGENTS.md) first: it lists the three hooks
@@ -312,6 +314,35 @@ node --test tests/visual.test.cjs
 
 This writes desktop and mobile screenshots into the ignored `_build/shots/`
 folder; it checks 1100px, 375px, and 320px layouts and the new game screens.
+
+## Adding a game
+
+One command scaffolds a playable game, wires it into the catalog, and records
+what its score means:
+
+```bash
+npm run games:add -- whack-a-mole "Whack-a-Mole" Arcade "Bonk them before they hide" \
+  --unit moles --metric moles
+```
+
+It prints the two short snippets to paste — the `highScore()` entry in
+[`src/hub/scores.js`](src/hub/scores.js) and an optional daily challenge in
+[`src/daily.js`](src/daily.js) — then finish with:
+
+```bash
+npm run games:register   # add the missing score_rules rows (or print the SQL)
+npm run build            # encode the game and rebuild index.html
+node --test tests/bored.test.cjs
+```
+
+`games:register` is the command that used to be a database chore. The shared
+board only accepts games that have a `score_rules` row, so this compares the
+catalog with the table and inserts anything missing. With
+`SUPABASE_SERVICE_KEY` set (environment or `.env.local`) it writes the rows
+itself; without one it prints the SQL to paste. The test suite reads its counts
+from the catalog, so adding games never means editing assertions.
+
+Adding any number of games is the same loop; nothing else has to be updated.
 
 ## Maintenance
 

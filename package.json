@@ -11,7 +11,9 @@
     "build": "vite build && node scripts/publish.mjs",
     "prebuild": "node scripts/sync-games.mjs",
     "preview": "vite preview",
-    "games:sync": "node scripts/sync-games.mjs"
+    "games:sync": "node scripts/sync-games.mjs",
+    "games:add": "node scripts/games.mjs add",
+    "games:register": "node scripts/games.mjs register"
   },
   "devDependencies": {
     "puppeteer-core": "^25.14.0",
