@@ -145,6 +145,7 @@ let power = 0, shownPower = 0;
 let aimAngle = 0;
 let handX = PW*0.28, handY = PH/2, handOK = true;
 let cpuTimer = 0;
+let eightSafeties = 0;        // consecutive safeties played when only the 8 is left
 let flashPocket = null;       // {x,y,t}
 let guideHit = null;          // computed for render
 let nameOf = p => mode==='2p' ? (p?'P2':'P1') : (p ? 'CPU' : 'YOU');
@@ -173,7 +174,7 @@ function startGame(m, keepTurn){
   mode = m;
   layout();
   groups = [null,null]; openTable = true; breakShot = true;
-  firstHit = null; pottedThisShot = []; flashPocket = null;
+  firstHit = null; pottedThisShot = []; flashPocket = null; eightSafeties = 0;
   turn = keepTurn!==undefined ? keepTurn : (Math.random()<0.5 ? 0 : 1);
   document.getElementById('menu').classList.add('hidden');
   document.getElementById('over').classList.add('hidden');
@@ -393,6 +394,7 @@ function endShot(){
     toast(nameOf(shooter)+' is '+(g==='solid'?'SOLIDS':'STRIPES'), 'good', 1800);
   }
   breakShot = false;
+  if(objPots.length) eightSafeties = 0;
 
   // keep turn?
   let keep = false;
@@ -740,6 +742,7 @@ function aiPlan(){
   if(!targets.length) return {angle: aimAngle, power: 0.3, label: null};
   const targetIds = targets.map(b=>b.id);
   const legalEight = eightIsLegal();
+  const onlyTheEight = legalEight && targets.length === 1 && targets[0].id === 8;
 
   /* ---- 1. shots that actually drop a ball ---- */
   const cand = potCandidates(layout, targets, c);
@@ -774,9 +777,14 @@ function aiPlan(){
   if(best) return best;
 
   /* ---- 2. no pot: pick the safety that leaves the worst table behind ---- */
+  const theirGroup = groups[1-turn];
+  const theirBalls = theirGroup
+    ? balls.filter(b=>b.alive && b.id!==0 && groupOf(b.id)===theirGroup)
+    : [];
+  // mid-rack the 8 is not a legal target for them, so it is not a leave they can take
   const oppTargets = openTable
     ? balls.filter(b=>b.alive && b.id!==0 && b.id!==8)
-    : balls.filter(b=>b.alive && b.id!==0 && groupOf(b.id)!==groups[turn]);
+    : (theirBalls.length ? theirBalls : balls.filter(b=>b.alive && b.id===8));
   // nearest legal balls first: they are the ones a safety can actually control
   const reach = targets
     .filter(t => clearPath(layout, c.x, c.y, t.x, t.y, [0,t.id], R*1.9))
@@ -809,7 +817,29 @@ function aiPlan(){
       }
     }
   }
-  if(safety) return safety;
+  if(safety){
+    if(onlyTheEight) eightSafeties++;
+    return safety;
+  }
+
+  /* ---- 2b. on the black: after a couple of safeties, go at the pocket ---- */
+  if(onlyTheEight && eightSafeties >= 2){
+    let nudge = null;
+    for(const k of cand.slice(0, 10)){
+      for(const pw of [potPower(k.cut, k.d1, k.d2), 0.55]){
+        const r = simulateShot(layout, k.angle, pw);
+        if(!r.cue || r.potted.includes(0) || r.firstHit !== 8) continue;
+        if(r.potted.includes(8)) return {angle:k.angle, power:pw, score:1e6, label:'going for the 8'};
+        const eight = r.after.find(b=>b.id===8);
+        if(!eight) continue;
+        let pd = 1e9;
+        for(const p of POCKETS) pd = Math.min(pd, Math.hypot(eight.x-p.x, eight.y-p.y));
+        const opp = bestPotOn(r.after, [eight], r.cue).score;
+        if(!nudge || pd - opp*8 < nudge.score) nudge = {angle:k.angle, power:pw, score:pd - opp*8, label:'going for the 8'};
+      }
+    }
+    if(nudge) return nudge;
+  }
 
   /* ---- 3. snookered: find the cheapest cushion route to a legal ball ---- */
   const esc = escapeAngle(targetIds);
@@ -822,6 +852,7 @@ function aiPlan(){
         if(!r.cue || r.potted.includes(0)) continue;
         if(r.firstHit === null || !targetIds.includes(r.firstHit)) continue;
         if(r.potted.includes(8) && !legalEight) continue;
+        if(onlyTheEight) eightSafeties++;
         return {angle, power:pw, label:'playing out'};
       }
     }
@@ -840,12 +871,16 @@ function findHandSpotCpu(){
   let best = null;
   for(let ix=0; ix<10; ix++){
     for(let iy=0; iy<5; iy++){
-      const x = PW*(0.08 + ix*0.105), y = PH*(0.12 + iy*0.19);
+      const x = PW*(0.14 + ix*0.09), y = PH*(0.2 + iy*0.15);
       if(!handValid(x, y)) continue;
-      const pot = targets.length ? bestPotOn(layout, targets, {x, y}) : {score:0};
+      const pot = targets.length ? bestPotOn(layout, targets, {x, y}).score : 0;
+      // a legal first contact matters more than a hard pot: placing into a dead
+      // corner leaves nothing to hit at all, which turns into a foul loop
+      const contact = targets.some(t => clearPath(layout, x, y, t.x, t.y, [0,t.id], R*1.9)) ? 1 : 0;
       let scratch = 0;
       for(const p of POCKETS){ if(Math.hypot(x-p.x, y-p.y) < R*3.5) scratch += 1; }
-      const value = pot.score*100 - scratch*0.35;
+      const centre = Math.hypot(x-PW/2, y-PH/2)/(PW/2);
+      const value = contact + pot*4 - scratch*0.3 - centre*0.05;
       if(!best || value > best.value) best = {value, x, y};
     }
   }
@@ -1003,7 +1038,8 @@ window.__8ball = {
     }
     return true;
   },
-  handSpot: () => findHandSpotCpu()
+  handSpot: () => findHandSpotCpu(),
+  reach: (x, y) => shotTargets().some(t => clearPath(balls.filter(b=>b.alive), x, y, t.x, t.y, [0,t.id], R*1.9))
 };
 
 /* ================= rendering ================= */

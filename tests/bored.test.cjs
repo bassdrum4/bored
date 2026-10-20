@@ -745,21 +745,34 @@ test('browser regressions', async t => {
     assert.ok(sweep.avg < 120, 'decisions stay interactive: ' + sweep.avg + 'ms average, ' + sweep.worst.toFixed(0) + 'ms worst');
 
     // A whole self-played rack: the old planner never finished a game at all.
-    const game = await frame.evaluate(() => {
+    const rack = await frame.evaluate(() => {
       __8ball.start('cpu');
-      let frames = 0, pots = 0, wasRunning = false;
+      let frames = 0, pots = 0, shots = 0, wasRunning = false;
       while (frames < 24000) {
         __8ball.frame(1); frames++;
         const now = __8ball.state();
         if (wasRunning && now !== 'run') pots += __8ball.pottedThisShot().filter(id => id !== 0 && id !== 8).length;
+        if (now === 'run' && !wasRunning) shots++;
         wasRunning = now === 'run';
         if (now === 'over') break;
         if (now === 'aim' || now === 'hand') __8ball.autoPlay();
       }
-      return { over: __8ball.state() === 'over', pots, frames };
+      return { over: __8ball.state() === 'over', pots, shots, frames };
     });
-    assert.equal(game.over, true, 'a rack reaches a winner');
-    assert.ok(game.pots >= 7, 'and both seats are sinking balls: ' + game.pots);
+    assert.equal(rack.over, true, 'a rack reaches a winner');
+    assert.ok(rack.pots >= 7, 'somebody clears their group: ' + rack.pots);
+    assert.ok(rack.shots <= 60, 'without bunting the black around forever: ' + rack.shots + ' shots');
+
+    // Ball in hand must land somewhere the player can legally reach a ball.
+    const hand = await frame.evaluate(() => {
+      __8ball.setup({ groups: ['stripe', 'solid'], openTable: false, breakShot: false, balls: [
+        { id: 1, x: 145, y: 65 }, { id: 2, x: 118, y: 69 }, { id: 3, x: 102, y: 93 },
+        { id: 4, x: 184, y: 66 }, { id: 5, x: 180, y: 79 }, { id: 6, x: 192, y: 19 },
+        { id: 7, x: 188, y: 78 }, { id: 15, x: 171, y: 75 }, { id: 8, x: 175, y: 67 }] });
+      const spot = __8ball.handSpot();
+      return { spot, reachable: __8ball.reach(spot.x, spot.y) };
+    });
+    assert.equal(hand.reachable, true, 'ball in hand finds a legal line: ' + JSON.stringify(hand.spot));
     await close();
     // that rack posts a real score; clear it so the scoring checks below start clean
     await pause(300);
