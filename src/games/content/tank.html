@@ -117,6 +117,55 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             color: #b6b6b6;
             font-size: 11px;
         }
+
+        #menu {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            background: #f7f4ee;
+            z-index: 8;
+        }
+
+        #menu[hidden] { display: none; }
+
+        #menu h1 {
+            font-size: 15px;
+            font-weight: 600;
+            letter-spacing: .2em;
+            color: #33302a;
+            margin-bottom: 2px;
+        }
+
+        #menu p {
+            font-size: 11px;
+            color: #8d887c;
+            margin-bottom: 8px;
+        }
+
+        #menu button {
+            background: none;
+            border: 1px solid #c9c2b4;
+            color: #33302a;
+            cursor: pointer;
+            font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+            letter-spacing: .06em;
+            min-width: 210px;
+            padding: 10px 16px;
+        }
+
+        #menu button:hover { border-color: #33302a; }
+
+        #menu button small {
+            color: #9a9487;
+            display: block;
+            font-size: 10px;
+            letter-spacing: 0;
+            margin-top: 4px;
+        }
     </style>
 </head>
 
@@ -139,6 +188,13 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         <div id="cd"></div>
 
         <canvas id="c"></canvas>
+
+        <div id="menu">
+            <h1>TANK</h1>
+            <p>Rounds are scored as you go</p>
+            <button id="m1" type="button">1 PLAYER<small>against the CPU</small></button>
+            <button id="m2" type="button">2 PLAYERS<small>same keyboard</small></button>
+        </div>
 
         <div id="help">
             P1: WASD + C &nbsp;·&nbsp;
@@ -1141,9 +1197,25 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         window.__test = {
             tanks: () => [p1, p2].map(t => ({ x: +t.x.toFixed(2), y: +t.y.toFixed(2), angle: +t.angle.toFixed(3) })),
             spd: () => SPD,
-            rot: () => ROT
+            rot: () => ROT,
+            cpu: () => aiEnabled
         };
-        updateScores(); initRound(); loop();
+        updateScores(); initRound();
+
+        // Pick an opponent before the first round instead of dropping the player
+        // straight into a match against the AI. E still swaps sides mid-game.
+        const menuEl = document.getElementById("menu");
+        let matchOn = false;
+        function beginMatch(vsCpu) {
+            aiEnabled = vsCpu;
+            if (ai) ai.clearKeys();
+            initRound();
+            updateScores();
+            menuEl.hidden = true;
+            if (!matchOn) { matchOn = true; loop(); }
+        }
+        document.getElementById("m1").onclick = () => beginMatch(true);
+        document.getElementById("m2").onclick = () => beginMatch(false);
     </script>
 </body>
 

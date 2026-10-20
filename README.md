@@ -181,11 +181,14 @@ the opponent was the computer: Pong, SUMO, VolletBall, Lava, Tank, Gun Mayhem an
 that browser. SUMO, VolletBall and Lava start against the CPU and switch to two
 players from the button in their controls.
 
-`score_rules` decides which games the shared `scores` table accepts, and the
-hub will not attempt a game that is missing from it (`scores_game_fkey`). DEEP
-and Lights Out currently have no rule row, so their bests are saved locally and
-shown as *local only* in the picker. Adding a row turns the shared board on for
-them:
+`scores.game` is a foreign key to `score_rules.game` (constraint
+`scores_game_fkey`), so `score_rules` is the list of games the shared board
+accepts. The hub waits for that list and never posts a game missing from it,
+which is why a new game no longer produces a foreign-key error — but it also
+means a game with no rule row can only save locally. DEEP and Lights Out are in
+that state today and show as *local only* in the picker. Row-level security
+does not let the publishable key insert rules, so add them once in the Supabase
+SQL editor:
 
 ```sql
 insert into score_rules (game, label, better, max_value)

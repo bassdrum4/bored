@@ -286,8 +286,14 @@ function endGame(text, color) {
   overlay.innerHTML = `
     <div id="winner-text" style="color:${color};text-shadow:0 0 30px ${color}">${text}</div>
     <h1 style="text-shadow:0 0 30px rgba(255,224,74,0.4)">WINS!</h1>
-    <div class="restart-hint">SPACE — play again · 2 — two players</div>
+    <div class="menu">
+      <button type="button" class="opt" id="again">REMATCH<small>same opponent</small></button>
+      <button type="button" class="opt" id="switch">${cpuMode ? '2 PLAYERS' : '1 PLAYER'}<small>switch sides</small></button>
+    </div>
+    <div class="restart-hint">SPACE — play again</div>
   `;
+  overlay.querySelector('#again').onclick = () => startGame(cpuMode);
+  overlay.querySelector('#switch').onclick = () => startGame(!cpuMode);
 }
 
 function update() {

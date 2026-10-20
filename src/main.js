@@ -271,15 +271,15 @@ async function loadRules() {
   } catch { return false; }
 }
 function captureHighScore() {
-  if (!current || player.hidden) return;
+  if (!current || player.hidden) return false;
   const spec = highScoreSpec.get(current);
-  if (!spec) return;
+  if (!spec) return false;
   let snapshot;
   try {
     if (current === '8ball') {
       const test = frame.contentWindow.__test;
       const balls = test?.balls?.();
-      if (!Array.isArray(balls)) return;
+      if (!Array.isArray(balls)) return false;
       snapshot = {
         slug: '8ball',
         potted: balls.filter(ball => ball.id !== 0 && !ball.alive).length,
@@ -288,18 +288,27 @@ function captureHighScore() {
     } else {
       snapshot = frame.contentWindow.__boredSnapshot?.();
     }
-  } catch { return; }
-  if (!snapshot || snapshot.slug !== current) return;
-  if (spec.when && !spec.when(snapshot)) return;
+  } catch { return false; }
+  if (!snapshot || snapshot.slug !== current) return false;
+  if (spec.when && !spec.when(snapshot)) return false;
   let value = spec.transform ? spec.transform(snapshot) : Number(snapshot[spec.metric]);
-  if (!Number.isFinite(value)) return;
+  if (!Number.isFinite(value)) return false;
   value = Math.round(value);
-  if (value <= 0) return;
+  if (value <= 0) return false;
   const key = 'bored.high.' + spec.id;
   let previous = 0;
-  try { previous = Number(localStorage.getItem(key)) || 0; } catch { return; }
-  if (previous && (spec.lower ? value >= previous : value <= previous)) return;
-  try { localStorage.setItem(key, String(value)); } catch {}
+  try { previous = Number(localStorage.getItem(key)) || 0; } catch { return false; }
+  if (previous && (spec.lower ? value >= previous : value <= previous)) return false;
+  try { localStorage.setItem(key, String(value)); } catch { return false; }
+  // A run that just ended should reach the shared board now, not on exit.
+  requestScoreSync();
+  return true;
+}
+let syncTimer = 0;
+function requestScoreSync() {
+  if (!session || !supabaseOn()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => { syncScores(); }, 600);
 }
 async function syncScores() {
   if (!supabaseOn() || !session) return;
@@ -619,10 +628,13 @@ function renderAccount() {
     who.textContent = myHandle || userName();
     state.append('Signed in as ', who, lbNotice ? ' · ' + lbNotice : '. Best scores sync to the shared board.');
     action.textContent = 'Sign out';
+    action.classList.remove('primary');
     rename.hidden = false;
   } else {
     state.textContent = 'Playing as a guest. Scores stay in this browser.';
     action.textContent = 'Sign in';
+    // The sign-in call to action is the one button in the header worth noticing.
+    action.classList.add('primary');
     rename.hidden = true;
   }
 }

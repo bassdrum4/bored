@@ -146,6 +146,16 @@ function aiCalcShot(weapon){
 function aimDots(){const t=tanks[turn],gy=tY(t.x),ar=t.angle*Math.PI/180,dir=t.p===0?1:-1;const pivY=gy-TRH-TH;let px=t.x+dir*Math.cos(ar)*BLEN,py=pivY-Math.sin(ar)*BLEN;const sp=Math.max(power,3)*PWF;let vx=dir*Math.cos(ar)*sp,vy=-Math.sin(ar)*sp;const dots=[];for(let i=0;i<45;i++){px+=vx;py+=vy;vy+=G;if(px<0||px>W||py>BEDY)break;if(i%3===0)dots.push({x:px,y:py})}return dots}
 
 // ── Input ──
+// The title screen draws two buttons; make them clickable for touch players.
+canvas.addEventListener('click',e=>{
+  if(mode!=='TITLE')return;
+  const r=canvas.getBoundingClientRect();
+  const x=(e.clientX-r.left)*(W/r.width),y=(e.clientY-r.top)*(H/r.height);
+  if(Math.abs(x-W/2)>110)return;
+  if(y>=230&&y<=276){aiEnabled=true;startGame()}
+  else if(y>=295&&y<=341){aiEnabled=false;startGame()}
+});
+
 addEventListener('keydown',e=>{
   keys[e.code]=true;
   if(e.key===','||e.key==='<')keys._cL=true;
