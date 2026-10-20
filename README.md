@@ -47,14 +47,13 @@ server; see [INFISICAL.md](INFISICAL.md).
 - Star games to save favorites and revisit the last four recently played games.
 - **Surprise me** chooses from the current results. Remote entries are excluded
   unless you deliberately select **Online**.
-- The **waffle menu** in the top-right holds **Resume**, **Restart**, **Fullscreen**,
-  and **All games**. **Esc** closes the menu first, then leaves the game from
-  offline games. Remote pages run on another origin, so use the menu when they
-  have focus.
+- The **waffle menu** in the top-right holds **Resume**, **Restart**, and
+  **All games**. **Esc** closes the menu first, then leaves an offline game.
+  Remote pages run on another origin, so use the menu when they have focus.
 - **Shift+R** restarts and **Shift+F** toggles fullscreen inside offline games.
-  **Esc** leaves fullscreen without leaving the game. When the arcade is embedded
-  in another page that blocks fullscreen, the Fullscreen action opens it in its
-  own tab instead, where the browser allows it.
+  **Esc** leaves fullscreen without leaving the game. Fullscreen is no longer a
+  menu button; on browsers or embedded pages that block it, Shift+F displays a
+  message and may offer a standalone tab.
 
 Favorites, recent games, and best scores stay in your browser's local storage.
 Signing in to the optional shared leaderboard also copies best scores to Supabase.
@@ -95,8 +94,12 @@ cross-origin game state (and Klang is a music player).
 ## Shared leaderboard (optional)
 
 Sign in with an email and password to keep your best scores on a shared board and
-see how other players are doing. The leaderboard is backed by Supabase and is
-entirely optional: without keys the hub stays offline and every game still works.
+see how other players are doing. The leaderboard starts with **Overall players**:
+accounts collect 10 points for first place in a game, 9 for second, down to 1
+for tenth. Tied scores get equal points, and every game counts the same instead
+of adding incomparable raw scores. Select an individual game to see its original
+best-score rankings. The leaderboard is backed by Supabase and is entirely
+optional: without keys the hub stays offline and every game still works.
 
 This project's backend is already provisioned: `score_rules`, `profiles`,
 `scores`, the public `leaderboard` view, and the `set_handle` RPC. The hub reads

@@ -111,6 +111,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
 #lb-list .lb-rank{font:11px var(--mono);color:var(--dim);min-width:2.2ch}
 #lb-list .lb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #lb-list .lb-score{font:12px var(--mono);white-space:nowrap}
+#lb-list .lb-player-meta{display:block;font:10px/1.6 var(--mono);color:var(--dim);overflow:hidden;text-overflow:ellipsis}
 #lb-list li.you .lb-name{color:var(--red)}
 #lb-mine{margin-top:10px;font:11px/1.7 var(--mono);color:var(--dim)}
 #lb-empty{padding:12px 0;color:var(--dim);font-style:italic;font-size:14px}

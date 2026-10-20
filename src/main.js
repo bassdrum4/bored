@@ -81,7 +81,7 @@ const scoreRules = new Map();
 let session = loadSession();
 let submitted = {};
 let myHandle = '';
-let lbGame = LB_GAMES[0].id;
+let lbGame = 'overall';
 let authMode = 'signin';
 let authBusy = false;
 let lbNotice = '';
@@ -293,6 +293,7 @@ async function syncScores() {
       submitted[game.id] = score;
       saveSubmitted();
       lbCache.delete(game.id);
+      lbCache.delete('overall');
       changed = true;
     } catch (err) {
       if (err.status === 401) await refreshSession();
@@ -300,62 +301,128 @@ async function syncScores() {
     }
   }
   renderAccount();
+  renderLeaderboard();
   if (changed) loadLeaderboard(true);
 }
+
+/**
+ * Account-wide ranking: a top-ten finish earns 10 down to 1 points in each
+ * game, with ties sharing a rank. Compare scores only *within* each game:
+ * raw score units across different games cannot meaningfully be summed.
+ */
+function accountStandings(scores) {
+  const accounts = new Map();
+  const scoresByGame = new Map(LB_GAMES.map(game => [game.id, []]));
+  for (const row of scores) {
+    const gameScores = scoresByGame.get(row.game);
+    const handle = String(row.handle || '').trim();
+    const value = Number(row.value);
+    if (!gameScores || !handle || !Number.isFinite(value) || value <= 0) continue;
+    const key = handle.toLowerCase();
+    if (!accounts.has(key)) accounts.set(key, { handle, points: 0, gamesPlayed: 0, gamesRanked: 0, wins: 0 });
+    accounts.get(key).gamesPlayed++;
+    gameScores.push({ key, value });
+  }
+  for (const game of LB_GAMES) {
+    const rows = scoresByGame.get(game.id);
+    rows.sort((a, b) => (game.lower ? a.value - b.value : b.value - a.value) || a.key.localeCompare(b.key));
+    let rank = 0;
+    let previous = null;
+    for (let i = 0; i < rows.length; i++) {
+      if (previous !== rows[i].value) rank = i + 1;
+      previous = rows[i].value;
+      if (rank > 10) break;
+      const account = accounts.get(rows[i].key);
+      account.points += 11 - rank;
+      account.gamesRanked++;
+      if (rank === 1) account.wins++;
+    }
+  }
+  return [...accounts.values()].sort((a, b) =>
+    b.points - a.points || b.wins - a.wins || b.gamesRanked - a.gamesRanked ||
+    a.handle.localeCompare(b.handle)
+  );
+}
+
 async function loadLeaderboard(force = false) {
   if (!supabaseOn()) { renderLeaderboard(); return; }
-  const game = LB_GAMES.find(entry => entry.id === lbGame) || LB_GAMES[0];
-  const cached = lbCache.get(game.id);
+  const key = lbGame;
+  const game = LB_GAMES.find(entry => entry.id === key);
+  const cached = lbCache.get(key);
   if (!force && cached && Date.now() - cached.at < 30000) { renderLeaderboard(); return; }
   if (!cached || force) {
     const empty = $('#lb-empty');
-    if (!$('#lb-list').children.length) { empty.hidden = false; empty.textContent = 'Loading scores…'; }
+    if (!$('#lb-list').children.length) { empty.hidden = false; empty.textContent = 'Loading rankings…'; }
   }
   try {
-    const query = new URLSearchParams({
-      select: 'game,handle,value,updated_at',
-      game: 'eq.' + game.id,
-      order: 'value.' + (game.lower ? 'asc' : 'desc'),
-      limit: '10'
-    });
-    const rows = await sb('/rest/v1/leaderboard?' + query, { token: SUPABASE_ANON_KEY });
-    lbCache.set(game.id, { rows: Array.isArray(rows) ? rows : [], at: Date.now() });
+    let rows;
+    if (game) {
+      const query = new URLSearchParams({
+        select: 'game,handle,value,updated_at',
+        game: 'eq.' + game.id,
+        order: 'value.' + (game.lower ? 'asc' : 'desc'),
+        limit: '10'
+      });
+      rows = await sb('/rest/v1/leaderboard?' + query, { token: SUPABASE_ANON_KEY });
+    } else {
+      // Read the shared leaderboard in pages. PostgREST projects commonly cap
+      // individual responses at 1,000 records, so one request misses players.
+      rows = [];
+      const pageSize = 1000;
+      for (let offset = 0; offset < 50000; offset += pageSize) {
+        const query = new URLSearchParams({
+          select: 'game,handle,value',
+          order: 'game.asc,handle.asc',
+          limit: String(pageSize),
+          offset: String(offset)
+        });
+        const page = await sb('/rest/v1/leaderboard?' + query, { token: SUPABASE_ANON_KEY });
+        if (!Array.isArray(page)) throw new Error('Invalid leaderboard response.');
+        rows.push(...page);
+        if (page.length < pageSize) break;
+        if (offset + pageSize >= 50000) throw new Error('Too many scores to rank right now.');
+      }
+    }
+    lbCache.set(key, { rows: Array.isArray(rows) ? rows : [], at: Date.now() });
   } catch (err) {
-    lbCache.set(game.id, { rows: [], at: Date.now(), error: authError(err) });
+    lbCache.set(key, { rows: [], at: Date.now(), error: authError(err) });
   }
-  if (lbGame === game.id) renderLeaderboard();
+  if (lbGame === key) renderLeaderboard();
 }
 function renderLeaderboard() {
+  const isOverall = lbGame === 'overall';
   const game = LB_GAMES.find(entry => entry.id === lbGame) || LB_GAMES[0];
   const select = $('#lb-game');
-  if (select.value !== game.id) select.value = game.id;
+  if (select.value !== lbGame) select.value = lbGame;
   const list = $('#lb-list');
   const empty = $('#lb-empty');
   list.replaceChildren();
   $('#lb-refresh').disabled = !supabaseOn();
-  $('#lb-note').textContent = supabaseOn()
-    ? 'Best scores across ' + LB_GAMES.length + ' games. ' + (game.lower ? 'Lowest score wins.' : 'Highest score wins.')
-    : 'The shared leaderboard is offline until Supabase is configured.';
+  $('#lb-note').textContent = !supabaseOn()
+    ? 'The shared leaderboard is offline until Supabase is configured.'
+    : isOverall
+      ? 'Players ranked across ' + LB_GAMES.length + ' games. Each game awards 10 points for first, 9 for second, down to 1 for tenth. Ties share points.'
+      : 'Best scores for ' + game.name + '. ' + (game.lower ? 'Lowest score wins.' : 'Highest score wins.');
   if (!supabaseOn()) {
     empty.hidden = false;
     empty.textContent = 'Playing as a guest? Your local bests still work.';
     $('#lb-mine').textContent = '';
     return;
   }
-  const cached = lbCache.get(game.id);
-  const rows = cached?.rows || [];
+  const cached = lbCache.get(lbGame);
+  const rows = isOverall ? accountStandings(cached?.rows || []) : (cached?.rows || []);
   if (cached?.error) {
     empty.hidden = false;
-    empty.textContent = 'Could not load scores: ' + cached.error;
+    empty.textContent = 'Could not load rankings: ' + cached.error;
   } else if (!rows.length) {
     empty.hidden = false;
-    empty.textContent = cached ? 'No scores yet. Be the first.' : 'Loading scores…';
+    empty.textContent = cached ? 'No scores yet. Be the first.' : 'Loading rankings…';
   } else {
     empty.hidden = true;
   }
-  rows.forEach((row, index) => {
+  rows.slice(0, 10).forEach((row, index) => {
     const item = document.createElement('li');
-    const mine = myHandle && row.handle === myHandle;
+    const mine = Boolean(myHandle) && row.handle.toLowerCase() === myHandle.toLowerCase();
     if (mine) item.className = 'you';
     const rank = document.createElement('span');
     rank.className = 'lb-rank';
@@ -365,15 +432,31 @@ function renderLeaderboard() {
     name.textContent = (row.handle || 'player') + (mine ? ' (you)' : '');
     const score = document.createElement('span');
     score.className = 'lb-score';
-    score.textContent = formatScore(row.value, game);
+    if (isOverall) {
+      const details = document.createElement('small');
+      details.className = 'lb-player-meta';
+      details.textContent = row.gamesRanked + ' top-10 games · ' + row.gamesPlayed + ' games scored';
+      name.appendChild(details);
+      score.textContent = row.points + ' pts';
+    } else {
+      score.textContent = formatScore(row.value, game);
+    }
     item.append(rank, name, score);
     list.appendChild(item);
   });
-  const mine = bestValue(game);
-  $('#lb-mine').textContent = mine
-    ? 'Your best on this device: ' + formatScore(mine, game) +
-      (session ? ' · saved as ' + (myHandle || userName()) : ' · sign in to add it.')
-    : (session ? 'Play ' + game.name + ' to put a score on the board.' : 'Sign in to add your best scores.');
+  if (isOverall) {
+    const myRank = myHandle ? rows.findIndex(row => row.handle.toLowerCase() === myHandle.toLowerCase()) : -1;
+    const me = myRank < 0 ? null : rows[myRank];
+    $('#lb-mine').textContent = me
+      ? 'Your account: #' + (myRank + 1) + ' · ' + me.points + ' points · ' + me.gamesRanked + ' top-10 games.'
+      : (session ? 'Play a game to put your account on the board.' : 'Sign in to put your account on the board.');
+  } else {
+    const mine = bestValue(game);
+    $('#lb-mine').textContent = mine
+      ? 'Your best on this device: ' + formatScore(mine, game) +
+        (session ? ' · saved as ' + (myHandle || userName()) : ' · sign in to add it.')
+      : (session ? 'Play ' + game.name + ' to put a score on the board.' : 'Sign in to add your best scores.');
+  }
 }
 function renderAccount() {
   const state = $('#account-state');
@@ -543,6 +626,10 @@ async function consumeAuthRedirect() {
 function initAccount() {
   loadSubmitted();
   const select = $('#lb-game');
+  const overallOption = document.createElement('option');
+  overallOption.value = 'overall';
+  overallOption.textContent = 'Overall players';
+  select.appendChild(overallOption);
   for (const game of LB_GAMES) {
     const option = document.createElement('option');
     option.value = game.id;
@@ -846,7 +933,6 @@ function showLibraryMessage() { $('#results').textContent = 'These entries need 
 $('#back').onclick = closeGame;
 $('#resume').onclick = () => { closeMenu(); frame.focus(); };
 $('#restart').onclick = restartGame;
-$('#fullscreen').onclick = toggleFullscreen;
 menuToggle.onclick = e => {
   const open = playerActions.hidden;
   setMenu(open, { focusFirst: open && e.detail === 0 });
@@ -867,7 +953,6 @@ document.addEventListener('pointerdown', e => {
 });
 function onFullscreenChange() {
   if (!fsElement()) leftFullscreenAt = Date.now();
-  $('#fullscreen-label').textContent = fsElement() ? 'Exit fullscreen' : 'Fullscreen';
 }
 addEventListener('fullscreenchange', onFullscreenChange);
 addEventListener('webkitfullscreenchange', onFullscreenChange);
@@ -899,7 +984,7 @@ renderDaily(); renderRecent(); render(); initAccount();
 // suite and for anyone poking at the console.
 Object.assign(window, {
   openGame, closeGame, renderDaily, readDaily, dailyChallenge, dailyCheck,
-  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, LB_GAMES, HIGH_SCORE_GAMES, captureHighScore
+  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, LB_GAMES, HIGH_SCORE_GAMES, captureHighScore, accountStandings
 });
 Object.defineProperty(window, 'currentDaily', { get: () => currentDaily });
 Object.defineProperty(window, 'current', { get: () => current });
