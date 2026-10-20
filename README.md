@@ -129,9 +129,10 @@ cross-origin game state (and Klang is a music player).
 
 Sign in with an email and password to keep your best scores on a shared board and
 see how other players are doing. The leaderboard has two views. **By player**
-ranks accounts: 10 points for first place in a game, 9 for second, down to 1 for
-tenth, ties sharing points, so no game's raw units get added to another's. Click
-a name to expand its per-game bests. **By game** ranks one game at a time, with a
+ranks accounts: 5 points for first place in a game, 4 for second, down to 1 for
+fifth, ties sharing points, so no game's raw units get added to another's. Only
+the top five in each game score — with a board this small, tenth place was
+mostly everybody. Click a name to expand its per-game bests. **By game** ranks one game at a time, with a
 picker that also carries your own local best and marks games the shared board
 cannot hold. The leaderboard is backed by Supabase and is entirely optional:
 without keys the hub stays offline and every game still works.

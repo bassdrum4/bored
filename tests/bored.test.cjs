@@ -293,9 +293,18 @@ test('browser regressions', async t => {
       { game: 'memory', handle: 'Cy', value: 0 },
       { game: 'not-a-game', handle: 'Outsider', value: 9999 }
     ]));
+    // Ada and Ben share first in 2048 (5 each); the lower-is-better Memory board
+    // flips them, so Ben takes 5 there and 10 overall.
     assert.deepEqual(rankings.map(({ handle, points, gamesPlayed, gamesRanked }) => [handle, points, gamesPlayed, gamesRanked]), [
-      ['Ben', 20, 2, 2], ['Ada', 19, 2, 2], ['Cy', 8, 1, 1]
+      ['Ben', 10, 2, 2], ['Ada', 9, 2, 2], ['Cy', 3, 1, 1]
     ]);
+
+    // Only the top five in a game score; sixth place is worth nothing.
+    const ladder = await page.evaluate(() => accountStandings(
+      [10, 9, 8, 7, 6, 5].map((value, i) => ({ game: 'snake', handle: 'P' + i, value }))
+    ));
+    assert.deepEqual(ladder.map(entry => entry.points), [5, 4, 3, 2, 1, 0]);
+    assert.deepEqual(ladder.map(entry => entry.gamesRanked), [1, 1, 1, 1, 1, 0]);
   });
 
   await t.test('fullscreen menu button is absent while Shift+F and Escape still work', async () => {

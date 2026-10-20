@@ -361,10 +361,15 @@ async function syncScores() {
 }
 
 /**
- * Account-wide ranking: a top-ten finish earns 10 down to 1 points in each
+ * Account-wide ranking: a top-five finish earns 5 down to 1 points in each
  * game, with ties sharing a rank. Compare scores only *within* each game:
  * raw score units across different games cannot meaningfully be summed.
+ * Five places because the board is small — tenth place was mostly everybody.
  */
+const RANK_WINDOW = 5;
+function rankPoints(rank) {
+  return RANK_WINDOW + 1 - rank;
+}
 function accountStandings(scores) {
   const accounts = new Map();
   const scoresByGame = new Map(LB_GAMES.map(game => [game.id, []]));
@@ -386,9 +391,9 @@ function accountStandings(scores) {
     for (let i = 0; i < rows.length; i++) {
       if (previous !== rows[i].value) rank = i + 1;
       previous = rows[i].value;
-      if (rank > 10) break;
+      if (rank > RANK_WINDOW) break;
       const account = accounts.get(rows[i].key);
-      account.points += 11 - rank;
+      account.points += rankPoints(rank);
       account.gamesRanked++;
       if (rank === 1) account.wins++;
     }
@@ -499,7 +504,8 @@ function renderLeaderboard() {
   if (players) {
     const played = new Set(all.map(row => row.game).filter(id => LB_GAMES.some(entry => entry.id === id))).size;
     $('#lb-note').textContent = 'Players ranked across ' + LB_GAMES.length + ' games · ' + rows.length +
-      (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores · 10 points for a first place, down to 1 for tenth. Pick a name to see its games.';
+      (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores · ' + rankPoints(1) +
+      ' points for a first place, down to 1 for fifth. Pick a name to see its games.';
   } else if (game) {
     const unit = game.unit === 'seconds' ? 'time' : game.unit;
     $('#lb-note').textContent = game.name + ' · ' + (game.lower ? 'lowest' : 'highest') + ' ' + unit + ' first. ' +
