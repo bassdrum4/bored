@@ -87,11 +87,11 @@ const RAIL = 8;                    // rail thickness
 const CORNER_PR = 5.6, SIDE_PR = 5.1;
 const JAW = 4.7;                   // corner gap from corner along rail
 const SIDEGAP = 3.9;               // half-gap of side pockets
-const FRICTION = 1.4;             // per-second exponential (fast balls die out naturally)
+const FRICTION = 1.3;             // per-second exponential (fast balls die out naturally)
 const CUSH = 0.72;                 // cushion restitution
 const BB_E = 0.94;                 // ball-ball restitution
 const STOPV = 9;                   // snapshot stop speed
-const MAXPOWER = 265;
+const MAXPOWER = 274;
 const D2R = Math.PI/180;
 
 const POCKETS = [
@@ -717,7 +717,8 @@ function bestPotOn(layout, targets, from){
 }
 
 function potPower(cut, d1, d2){
-  const speed = 1.42*(d1 + d2/Math.max(cut, 0.3));
+  // friction, not a magic number, sets how far a given pace rolls
+  const speed = FRICTION*1.0143*(d1 + d2/Math.max(cut, 0.3));
   return Math.max(0.16, Math.min(1, speed/MAXPOWER + 0.1));
 }
 
@@ -797,7 +798,7 @@ function aiPlan(){
     const d = Math.hypot(t.x-c.x, t.y-c.y);
     for(const off of [-0.65, -0.3, 0, 0.3, 0.65]){
       if(safeTried > 14) break;
-      for(const pw of [Math.max(0.2, 0.15 + d/260), 0.5]){
+      for(const pw of [Math.max(0.2, 0.15 + d/290), 0.5]){
         if(safeTried++ > 14) break;
         const tx = t.x - Math.sin(base)*R*off;
         const ty = t.y + Math.cos(base)*R*off;
@@ -844,7 +845,7 @@ function aiPlan(){
   /* ---- 3. snookered: find the cheapest cushion route to a legal ball ---- */
   const esc = escapeAngle(targetIds);
   if(esc){
-    const need = Math.min(1, Math.max(0.3, (esc.dist*1.5)/MAXPOWER));
+    const need = Math.min(1, Math.max(0.3, (esc.dist*FRICTION*1.071)/MAXPOWER));
     for(const pw of [need, Math.min(1, need*1.5), 1]){
       for(const off of [0, 0.05, -0.05]){
         const angle = esc.angle + off;
