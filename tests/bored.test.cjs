@@ -9,10 +9,11 @@ const puppeteer = require('puppeteer-core');
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const builtSource = html.match(/<script>([\s\S]*)<\/script>/)[1];
-const source = ['src/main.js', 'src/games/arcade.js', 'src/daily.js', 'src/games/catalog.js']
-  .map(file => fs.readFileSync(path.join(root, file), 'utf8'))
-  .join('\n');
-const API = source.match(/const SUPABASE_URL = '([^']+)'/)[1];
+const source = [
+  'src/main.js', 'src/hub/store.js', 'src/hub/backend.js', 'src/hub/scores.js',
+  'src/games/arcade.js', 'src/daily.js', 'src/games/catalog.js'
+].map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
+const API = source.match(/const API_URL = '([^']+)'/)[1];
 const url = pathToFileURL(path.join(root, 'index.html')).href;
 let browser, page;
 const errors = [], requests = [];
@@ -888,7 +889,21 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), '2402', 'a cleared descent posts its bonus score');
 
-      assert.equal(await page.$eval('#lb-game', el => el.options.length), 31, 'every scored game is pickable');
+      // DEEP and Lights Out have no score_rules row of their own, so they post
+      // under the closest existing rule rather than needing a schema change.
+      assert.deepEqual(
+        await page.evaluate(() => ({
+          deep: postingGameId('deep'),
+          lights: postingGameId('lights-out'),
+          own: postingGameId('tetris')
+        })),
+        { deep: 'void-runner', lights: 'breakout', own: 'tetris' }
+      );
+      const options = await page.$$eval('#lb-game option', els => els.map(el => [el.value, el.textContent]));
+      assert.equal(options.length, 29, 'one picker entry per shared board');
+      assert.deepEqual(options.filter(([id]) => id === 'deep' || id === 'lights-out'), [], 'borrowed boards are not listed twice');
+      assert.match(options.find(([id]) => id === 'void-runner')[1], /Void Runner \+ DEEP/, 'the shared board names both games');
+      assert.match(options.find(([id]) => id === 'breakout')[1], /Breakout \+ Lights Out/);
       assert.equal(await page.$eval('#lb-game', el => el.value), '2048');
       assert.match(await text(page, '#lb-note'), /across 31 games/);
     } finally {

@@ -21,7 +21,10 @@ npm run build    # writes dist/index.html, then copies it to index.html
 | Path | What it holds |
 |---|---|
 | [`src/index.html`](src/index.html) | Page shell and leaderboard/auth dialogs |
-| [`src/main.js`](src/main.js) | Hub, auth, leaderboard, daily challenge, and player logic |
+| [`src/main.js`](src/main.js) | Hub wiring: library, player chrome, daily section, leaderboard and account UI |
+| [`src/hub/backend.js`](src/hub/backend.js) | Supabase request/session layer, score rules, auth helpers |
+| [`src/hub/scores.js`](src/hub/scores.js) | Score specs, borrowed rules, best capture, sync, and ranking |
+| [`src/hub/store.js`](src/hub/store.js) | Safe `localStorage` helpers |
 | [`src/styles.css`](src/styles.css) | Site styles |
 | [`src/games/content/`](src/games/content) | The hand-written games, one readable HTML file each — including DEEP |
 | [`src/games/arcade.js`](src/games/arcade.js) | The four generated games: 2048, Memory, Connect Four, Aim Lab |
@@ -139,8 +142,8 @@ without keys the hub stays offline and every game still works.
 
 This project's backend is already provisioned: `score_rules`, `profiles`,
 `scores`, the public `leaderboard` view, and the `set_handle` RPC. The hub reads
-the project URL and publishable key from `SUPABASE_URL` / `SUPABASE_ANON_KEY`
-near the top of [`src/main.js`](src/main.js). That key is safe in a static page, and row-level
+the project URL and publishable key from `API_URL` / `API_KEY` at the top of
+[`src/hub/backend.js`](src/hub/backend.js). That key is safe in a static page, and row-level
 security limits writes to the signed-in player's own rows. The client writes to
 `scores` directly because the existing `submit_score` RPC does not populate the
 table's NOT NULL `score` column.
@@ -184,11 +187,15 @@ players from the button in their controls.
 `scores.game` is a foreign key to `score_rules.game` (constraint
 `scores_game_fkey`), so `score_rules` is the list of games the shared board
 accepts. The hub waits for that list and never posts a game missing from it,
-which is why a new game no longer produces a foreign-key error — but it also
-means a game with no rule row can only save locally. DEEP and Lights Out are in
-that state today and show as *local only* in the picker. Row-level security
-does not let the publishable key insert rules, so add them once in the Supabase
-SQL editor:
+which is why a new game no longer produces a foreign-key error.
+
+Two games have no rule row of their own: DEEP and Lights Out. Instead of needing
+a schema change they borrow the closest existing rule (`RULE_ALIAS` in
+[`src/hub/scores.js`](src/hub/scores.js)): DEEP ranks on Void Runner's generic
+*Score* rule and Lights Out on Breakout's *Layouts cleared*. Their scores appear
+on that game's board, which the picker labels **Void Runner + DEEP** and
+**Breakout + Lights Out** and the note underneath explains. A real row for the
+game always wins, so this needs no code change if the rules are ever added:
 
 ```sql
 insert into score_rules (game, label, better, max_value)
@@ -289,8 +296,9 @@ simulated equity, no-peeking opponents and draw discards, 8 Ball's simulated sho
 Lighthouse's overlay, all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, UTC rollover, 320px layouts,
-blocked storage, high-score capture and the 30-game leaderboard list, and no
-external game requests beyond the configured leaderboard API.
+blocked storage, high-score capture, the shared-board picker (including DEEP and
+Lights Out borrowing a rule), and no external game requests beyond the
+configured leaderboard API.
 
 The built `index.html` is the artifact the browser block loads. The bundle keeps
 the small `window` compatibility surface (`openGame`, `dailyDate`, `CHALLENGES`,
