@@ -11,7 +11,9 @@ export const ORDER = [["sumo", "SUMO"], ["sand", "Sand"], ["lighthouse", "Lighth
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "dc": "https://workbag.dpdns.org/", "klang": "https://youtubeplayer.freebuff.app/player"};
 export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 ORDER.unshift(['2048', '2048'], ['memory', 'Memory'], ['connect-four', 'Connect Four'], ['aim-lab', 'Aim Lab']);
+ORDER.unshift(['deep', 'DEEP']);
 export const META = {
+  deep: ['Arcade', 'A daily-seeded dungeon dive'],
   '2048': ['Puzzle', 'Slide, merge, and chase 2048'],
   memory: ['Puzzle', 'Find all eight matching pairs'],
   'connect-four': ['Strategy', 'Challenge the computer or a friend'],

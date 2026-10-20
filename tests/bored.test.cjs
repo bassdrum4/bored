@@ -204,8 +204,8 @@ test('browser regressions', async t => {
   await page.goto(url);
 
   await t.test('hub categories, search, sorting, empty state, and stored favorites', async () => {
-    assert.equal(await page.$$eval('.card', els => els.length), 34);
-    assert.equal(await text(page, '#count'), '34');
+    assert.equal(await page.$$eval('.card', els => els.length), 35);
+    assert.equal(await text(page, '#count'), '35');
     await filter('New');
     assert.equal(await page.$$eval('.card', els => els.length), 4);
     await filter('Puzzle');
@@ -381,6 +381,68 @@ test('browser regressions', async t => {
     assert.equal(await page.$$eval('#recent-list button', els => els.length), 4);
   });
 
+  await t.test('DEEP cuts one dungeon per day, descends five floors, and the Warden seals the Core', async () => {
+    const frame = await openTitle('deep', 'DEEP');
+    await frame.waitForFunction(() => typeof __deep === 'object');
+    const deterministic = await frame.evaluate(() => {
+      __deep.start('daily');
+      const first = Array.from(__deep.map).join('');
+      __deep.start('daily');
+      return first === Array.from(__deep.map).join('');
+    });
+    assert.equal(deterministic, true, 'the same date cuts the same dungeon');
+    await frame.evaluate(() => __deep.start('daily'));
+    const opening = await frame.evaluate(() => ({
+      depth: __deep.state.depth,
+      alive: __deep.state.alive,
+      enemies: __deep.enemies.length,
+      lit: Array.from(__deep.vis).reduce((n, v) => n + v, 0)
+    }));
+    assert.equal(opening.depth, 1);
+    assert.equal(opening.alive, true);
+    assert.ok(opening.enemies >= 3, 'the first floor is inhabited');
+    assert.ok(opening.lit > 30, 'the delver can see the room around them');
+    let depth = 1;
+    while (depth < 5) {
+      await frame.evaluate(() => { const s = __deep.stairs; __deep.setPos(s.x, s.y); __deep.useStairs(); });
+      depth += 1;
+      assert.equal(await frame.evaluate(() => __deep.state.depth), depth);
+    }
+    const sealed = await frame.evaluate(() => {
+      const core = __deep.items.find(i => i.kind === 'core');
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      const dir = dirs.find(([dx, dy]) => __deep.map[(core.y + dy) * 44 + (core.x + dx)] === 1);
+      __deep.setPos(core.x + dir[0], core.y + dir[1]);
+      __deep.move(-dir[0], -dir[1]);
+      return { won: __deep.state.won, warden: __deep.enemies.some(e => e.type === 'warden' && e.hp > 0) };
+    });
+    assert.equal(sealed.warden, true, 'the boss guards the core');
+    assert.equal(sealed.won, false, 'the core refuses to open early');
+    const victory = await frame.evaluate(() => {
+      __deep.state.atk = 999;
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      const warden = __deep.enemies.find(e => e.type === 'warden');
+      const hit = dirs.find(([dx, dy]) => __deep.map[(warden.y + dy) * 44 + (warden.x + dx)] === 1);
+      __deep.setPos(warden.x + hit[0], warden.y + hit[1]);
+      __deep.move(-hit[0], -hit[1]);
+      const core = __deep.items.find(i => i.kind === 'core');
+      const inTo = dirs.find(([dx, dy]) => __deep.map[(core.y + dy) * 44 + (core.x + dx)] === 1);
+      __deep.setPos(core.x + inTo[0], core.y + inTo[1]);
+      __deep.move(-inTo[0], -inTo[1]);
+      return { won: __deep.state.won, kills: __deep.state.kills, score: __deep.score() };
+    });
+    assert.equal(victory.kills, 1);
+    assert.equal(victory.won, true);
+    assert.ok(victory.score >= 800, 'depth five alone is worth 800');
+    await page.waitForFunction(() => document.querySelector('#frame').contentDocument.getElementById('end').hidden === false);
+    assert.match(await text(frame, '#endWord'), /CORE CLAIMED/);
+    assert.equal(await frame.$eval('#endDepth', el => el.textContent), '5/5');
+    assert.ok(Number(await text(frame, '#endScore')) >= 1500, 'claiming the core pays the clear bonus');
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('deep.best')));
+    assert.ok(stored && stored.won === true && stored.score >= 1500, 'the best descent is saved');
+    await close();
+  });
+
   await t.test('game scores feed the high-score entries without counting unfinished runs', async () => {
     const keys = ['tetris', 'wordle', '8ball', 'poker'].map(id => 'bored.high.' + id);
     await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
@@ -424,9 +486,9 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.poker')), '500');
 
-      assert.equal(await page.$eval('#lb-game', el => el.options.length), 30);
+      assert.equal(await page.$eval('#lb-game', el => el.options.length), 31);
       assert.equal(await page.$eval('#lb-game', el => el.value), 'overall');
-      assert.match(await text(page, '#lb-note'), /across 29 games/);
+      assert.match(await text(page, '#lb-note'), /across 30 games/);
     } finally {
       if (await page.$eval('#player', el => !el.hidden)) await close();
       await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
@@ -571,7 +633,7 @@ test('browser regressions', async t => {
       Math.random = () => 0;
     });
     await restricted.goto(url);
-    assert.equal(await restricted.$$eval('.card', els => els.length), 34);
+    assert.equal(await restricted.$$eval('.card', els => els.length), 35);
     for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
       await restricted.evaluate(id => openGame(id), slug);
       await restricted.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#board')?.childElementCount > 0);

@@ -1,6 +1,6 @@
 # Bored — single-file arcade
 
-**[index.html](index.html)** is the built, self-contained site: **31 offline games
+**[index.html](index.html)** is the built, self-contained site: **32 offline games
 and 3 online extras**, with no runtime dependencies, installs, server, or asset
 folder. Double-click it to play, or serve it as a static page.
 
@@ -23,7 +23,7 @@ npm run build    # writes dist/index.html, then copies it to index.html
 | [`src/index.html`](src/index.html) | Page shell and leaderboard/auth dialogs |
 | [`src/main.js`](src/main.js) | Hub, auth, leaderboard, daily challenge, and player logic |
 | [`src/styles.css`](src/styles.css) | Site styles |
-| [`src/games/content/`](src/games/content) | The 27 original games, one readable HTML file each |
+| [`src/games/content/`](src/games/content) | The hand-written games, one readable HTML file each — including DEEP |
 | [`src/games/arcade.js`](src/games/arcade.js) | The four generated games: 2048, Memory, Connect Four, Aim Lab |
 | [`src/games/catalog.js`](src/games/catalog.js) | Game order, names, categories, and external links |
 | [`src/daily.js`](src/daily.js) | Daily challenge rules and adapters |
@@ -60,6 +60,32 @@ Signing in to the optional shared leaderboard also copies best scores to Supabas
 If storage is blocked, the games still work; progress may not persist.
 The layout supports phones, touch controls in the new games, keyboard navigation,
 visible focus states, and reduced-motion preferences.
+
+## DEEP
+
+**DEEP** is a five-floor roguelike built into the hub, and the only game that
+generates its world from the date. Every player gets the same dungeon on a given
+UTC day; **Random dive** cuts a fresh one from a different seed. The seed is
+printed on the title screen and in the share text, so a run can be replayed
+exactly with **Retry this dungeon**.
+
+Each floor is carved from rooms and corridors by a seeded RNG, then populated
+with crawlers, stalkers, bone knights, wraiths, and loot. Movement is turn-based:
+one step, one enemy action. Vision uses line-of-sight shadowcasting with a
+remembered map, so the layout is explored rather than revealed. Enemies path to
+you with a breadth-first flow field instead of greedy steps, which means corners
+and dead ends actually matter.
+
+Floors one to four end at a staircase that restores a little health. Floor five
+holds **The Warden** and the Vault Core: stepping on the Core while the Warden
+lives only tells you it is sealed, so the boss cannot be skipped. Score combines
+gold, kills, depth, and a clear bonus, and the best descent is saved locally and
+submitted to the shared leaderboard like every other game.
+
+Controls are arrows/WASD/hjkl, space to wait, `Q` to drink a flask, and `>`
+or Enter to take the stairs. On touch screens a d-pad, swipe gestures, and
+Drink/Descend buttons replace the keyboard. The canvas picks a tile window that
+matches the frame, so a portrait phone sees tall rooms rather than a letterbox.
 
 ## Daily challenge
 
@@ -120,7 +146,7 @@ For quick testing, turn off **Authentication → Providers → Email → Confirm
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.
 
-The board tracks a best score for **29 of the 34 games**. The original eight
+The board tracks a best score for **30 of the 35 games**. The original eight
 (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
 their existing saved bests. Every other offline game except Connect Four and
 Tank2 is read from live game state when you leave or restart: Tetris lines,
@@ -205,10 +231,10 @@ The rules and daily tests run without a browser. The browser block covers
 JavaScript syntax, 2048 merge rules and undo, Connect Four wins and computer
 tactics, actual browser gameplay, Memory completion and timer cleanup, Aim Lab
 accuracy and expiration, search/filter/sort, saved favorites, Escape and focus
-restoration, all 31 offline game boots, Lighthouse's overlay, all 30 daily state
+restoration, all 32 offline game boots, DEEP's seeded dungeon and boss gate, Lighthouse's overlay, all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, UTC rollover, 320px layouts,
-blocked storage, high-score capture and the 29-game leaderboard list, and no
+blocked storage, high-score capture and the 30-game leaderboard list, and no
 external game requests beyond the configured leaderboard API.
 
 The built `index.html` is the artifact the browser block loads. The bundle keeps

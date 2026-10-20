@@ -48,6 +48,7 @@ const highScore = (id, name, unit, extra = {}) => ({
   }
 });
 const HIGH_SCORE_GAMES = [
+  highScore('deep', 'DEEP', 'points', { metric: 'score' }),
   highScore('8ball', '8 Ball', 'balls', { metric: 'potted' }),
   highScore('tetris', 'Tetris', 'lines', { metric: 'lines' }),
   highScore('breakout', 'Breakout', 'layouts', { metric: 'layouts' }),
@@ -885,7 +886,7 @@ function render() {
     const card = document.createElement('button'); card.type = 'button'; card.className = 'card'; card.dataset.slug = slug;
     card.innerHTML = '<span class="idx" aria-hidden="true"></span><span class="text"><span class="name"></span><span class="detail"></span></span><span class="go" aria-hidden="true">&#8594;</span>';
     card.querySelector('.name').textContent = name;
-    if (NEW_GAMES.includes(slug)) {
+    if (NEW_GAMES.includes(slug) || slug === 'deep') {
       const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = 'NEW'; card.querySelector('.name').appendChild(badge);
     }
     card.querySelector('.detail').textContent = META[slug].join(' · ');
