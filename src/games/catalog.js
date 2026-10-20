@@ -20,7 +20,7 @@ export const META = {
   'aim-lab': ['Arcade', 'A 20-second accuracy challenge'],
   '8ball': ['Arcade', 'Break, pot, and clear the table'],
   sumo: ['Arcade', 'Step into the ring'], sand: ['Sandbox', 'Build a tiny world'],
-  lighthouse: ['Sandbox', 'Keep the light alive'], poker: ['Strategy', 'Play your hand'],
+  lighthouse: ['Sandbox', 'Keep the light alive'], poker: ['Strategy', 'The Lucky Spur'],
   wordle: ['Puzzle', 'Crack the five-letter word'], lava: ['Arcade', 'Stay above the heat'],
   volletball: ['Arcade', 'Keep the ball in play'], solitaire: ['Strategy', 'A quiet game of cards'],
   commanders: ['Strategy', 'Take command'], eco: ['Sandbox', 'Explore an ecosystem'],

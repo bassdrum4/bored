@@ -443,6 +443,136 @@ test('browser regressions', async t => {
     await close();
   });
 
+  await t.test('poker opponents price hands by equity, never peek, and draw to real outs', async () => {
+    const frame = await openTitle('poker', 'Poker');
+    await frame.waitForFunction(() => typeof window.__pokerAI === 'object');
+
+    // The fast 7-card evaluator must agree with the showdown evaluator exactly.
+    const fast = await frame.evaluate(() => {
+      const AI = window.__pokerAI;
+      const deck = [];
+      for (let s = 0; s < 4; s++) for (let r = 2; r <= 14; r++) deck.push({ rank: r, suit: s });
+      let checked = 0, mismatches = 0;
+      for (let n = 5; n <= 7; n++) {
+        for (let trial = 0; trial < 40; trial++) {
+          const copy = deck.slice();
+          for (let i = copy.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = copy[i]; copy[i] = copy[j]; copy[j] = t; }
+          const cards = copy.slice(0, n);
+          checked++;
+          if (AI.eval7(cards).score !== bestHand(cards).score) mismatches++;
+        }
+      }
+      AI.seed(2026);
+      const c = (r, s) => ({ rank: r, suit: s });
+      const aces = AI.equity([c(14, 0), c(14, 1)], [], 1, 500, 0);
+      const rags = AI.equity([c(7, 0), c(2, 1)], [], 1, 500, 0);
+      const multi = AI.equity([c(14, 0), c(14, 1)], [], 4, 500, 0);
+      AI.unseed();
+      return { checked, mismatches, aces, rags, multi };
+    });
+    assert.equal(fast.mismatches, 0, 'the simulation evaluator agrees with the showdown evaluator on ' + fast.checked + ' hands');
+    assert.ok(fast.aces > 0.78 && fast.aces < 0.92, 'aces are a favourite heads-up');
+    assert.ok(fast.rags < 0.42, 'seven-deuce is a dog heads-up');
+    assert.ok(fast.multi < fast.aces - 0.15, 'extra opponents cost equity');
+
+    const behaviour = await frame.evaluate(() => {
+      const AI = window.__pokerAI;
+      const c = (r, s) => ({ rank: r, suit: s });
+      const spot = (hole, bet, raised) => {
+        G.phase = 'betting';
+        G.variant = 'holdem';
+        G.community = [];
+        G.settings.bb = 10;
+        G.minRaise = 10;
+        G.streetRaises = raised;
+        G.players.forEach(p => { p.folded = false; p.allIn = false; p.bet = 0; p.totalBet = 0; p.stack = 1000; });
+        G.players[0].isHuman = true;
+        G.players[0].bet = bet;
+        G.players[0].totalBet = bet;
+        G.currentBet = bet;
+        G.lastAggressor = raised ? G.players[0] : null;
+        const p = G.players[1];
+        p.hand = hole;
+        p.stack = 1000;
+        p.style = 'balanced';
+        p.tightness = 0.45;
+        p.aggression = 0.5;
+        return p;
+      };
+      AI.seed(777);
+      spot([c(14, 0), c(14, 1)], 200, 1);
+      const aces = AI.decide(1);
+      spot([c(7, 0), c(2, 1)], 200, 1);
+      const trash = AI.decide(1);
+      AI.unseed();
+
+      // Same marginal hand, two prices: a small bet is a call, an overbet is not.
+      const flopSpot = (bet) => {
+        spot([c(9, 0), c(9, 1)], bet, 1);
+        G.community = [c(14, 0), c(13, 1), c(4, 2)];
+        G.street = 'flop';
+        G.players[2].totalBet = 60;
+        G.players[3].totalBet = 60;
+        AI.seed(31337);
+        const move = AI.decide(1);
+        AI.unseed();
+        return move;
+      };
+      const cheap = flopSpot(10);
+      const dear = flopSpot(600);
+
+      // Same spot, same seed, different hidden cards: the move cannot change.
+      const peek = (holes) => {
+        spot([c(11, 0), c(11, 1)], 120, 1);
+        holes.forEach((hole, i) => { G.players[i + 2].hand = hole; });
+        AI.seed(4242);
+        const move = AI.decide(1);
+        return JSON.stringify(move);
+      };
+      const first = peek([[c(14, 0), c(14, 1)], [c(13, 0), c(13, 1)]]);
+      const second = peek([[c(2, 0), c(3, 1)], [c(4, 0), c(6, 1)]]);
+      AI.unseed();
+
+      AI.seed(99);
+      const flushDraw = AI.discards([c(14, 0), c(13, 0), c(12, 0), c(11, 0), c(2, 1)], 1);
+      const pat = AI.discards([c(6, 0), c(7, 0), c(8, 0), c(9, 0), c(10, 0)], 1);
+      const trashHand = AI.discards([c(2, 0), c(7, 1), c(9, 2), c(11, 3), c(13, 0)], 1);
+      AI.unseed();
+
+      return {
+        aces, trash, first, second, cheap, dear,
+        flushDiscards: flushDraw.map(x => x.rank + ':' + x.suit),
+        pat: pat.length,
+        trashCount: trashHand.length
+      };
+    });
+
+    assert.ok(behaviour.aces.type !== 'fold', 'aces never fold to a big bet');
+    assert.equal(behaviour.trash.type, 'fold', 'seven-deuce folds to a pot-sized bet');
+    assert.ok(behaviour.cheap.type !== 'fold', 'calls a tiny bet with a marginal pair');
+    assert.equal(behaviour.dear.type, 'fold', 'folds the same pair to an overbet');
+    assert.equal(behaviour.first, behaviour.second, 'the same spot gives the same move whatever the other players hold');
+    assert.deepEqual(behaviour.flushDiscards, ['2:1'], 'five-card draw keeps four to a flush');
+    assert.equal(behaviour.pat, 0, 'a straight flush stands pat');
+    assert.ok(behaviour.trashCount >= 3, 'a dead draw hand throws most of itself away');
+
+    // The draw UI still works end to end against the new opponent code.
+    await frame.click('#tab-draw');
+    await frame.waitForFunction(() => G.variant === 'draw' && G.phase === 'betting' && G.awaitingHuman);
+    await frame.evaluate(() => {
+      const call = document.getElementById('ctrl-call');
+      const check = document.getElementById('ctrl-check');
+      (call || check).click();
+    });
+    await frame.waitForFunction(() => G.phase === 'draw' && document.getElementById('ctrl-draw') !== null, { timeout: 20000 });
+    await frame.click('.card-slot');
+    await frame.waitForFunction(() => document.querySelectorAll('.discard-tag').length === 1);
+    assert.match(await text(frame, '#ctrl-draw'), /Draw 1 card/);
+    await frame.click('#ctrl-draw');
+    await frame.waitForFunction(() => G.street === 'bet2' || G.phase === 'handOver', { timeout: 20000 });
+    await close();
+  });
+
   await t.test('game scores feed the high-score entries without counting unfinished runs', async () => {
     const keys = ['tetris', 'wordle', '8ball', 'poker'].map(id => 'bored.high.' + id);
     await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);

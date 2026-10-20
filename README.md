@@ -231,7 +231,8 @@ The rules and daily tests run without a browser. The browser block covers
 JavaScript syntax, 2048 merge rules and undo, Connect Four wins and computer
 tactics, actual browser gameplay, Memory completion and timer cleanup, Aim Lab
 accuracy and expiration, search/filter/sort, saved favorites, Escape and focus
-restoration, all 32 offline game boots, DEEP's seeded dungeon and boss gate, Lighthouse's overlay, all 30 daily state
+restoration, all 32 offline game boots, DEEP's seeded dungeon and boss gate, poker's
+simulated equity, no-peeking opponents and draw discards, Lighthouse's overlay, all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, UTC rollover, 320px layouts,
 blocked storage, high-score capture and the 30-game leaderboard list, and no
