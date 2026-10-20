@@ -12,43 +12,27 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 })();</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minesweeper | Modern Reinterpretation</title>
-    <meta name="description" content="A premium, minimalist Minesweeper experience with procedural generation, chording, and smooth animations.">
+    <title>Minesweeper</title>
+    <meta name="description" content="Classic Minesweeper with beginner, intermediate and expert fields.">
     <style>
         :root {
-            --bg-color: #0f172a;
-            --surface-color: #1e293b;
-            --accent-color: #38bdf8;
-            --text-color: #f1f5f9;
-            --text-muted: #94a3b8;
-            --border-color: #334155;
-            --cell-bg: #334155;
-            --cell-revealed: #1e293b;
-            --cell-hover: #475569;
-            --mine-color: #f43f5e;
-            --flag-color: #fbbf24;
-            --font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            
-            --n1: #3b82f6;
-            --n2: #22c55e;
-            --n3: #ef4444;
-            --n4: #8b5cf6;
-            --n5: #f59e0b;
-            --n6: #06b6d4;
-            --n7: #ec4899;
-            --n8: #64748b;
+            --bg: #f6f5f0;
+            --ink: #22221e;
+            --muted: #7b7669;
+            --hair: #d9d5c9;
+            --cell: #e4e0d4;
+            --cell-hover: #eceadf;
+            --open: #f6f5f0;
+            --red: #a4402f;
+            --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
 
         .light-mode {
-            --bg-color: #f8fafc;
-            --surface-color: #ffffff;
-            --accent-color: #0284c7;
-            --text-color: #0f172a;
-            --text-muted: #64748b;
-            --border-color: #e2e8f0;
-            --cell-bg: #e2e8f0;
-            --cell-revealed: #f1f5f9;
-            --cell-hover: #cbd5e1;
+            --cell: #cfcbbc;
+            --cell-hover: #d8d4c6;
+            --open: #e2ded2;
+            --bg: #eceadf;
         }
 
         * {
@@ -60,376 +44,260 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: var(--font-family);
+            background: var(--bg);
+            color: var(--ink);
+            font: 13px/1.45 var(--sans);
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
             min-height: 100vh;
             overflow: hidden;
-            transition: background-color 0.3s ease;
         }
+
+        #particles { display: none; }
 
         #app {
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
+            gap: 10px;
             width: 100%;
-            max-width: 900px;
-            padding: 2rem;
-            animation: fadeIn 0.5s ease-out;
+            max-width: 860px;
+            padding: 14px 16px;
+            height: 100vh;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Header & Stats */
         .header {
             display: flex;
+            align-items: baseline;
             justify-content: space-between;
-            align-items: flex-end;
-            width: 100%;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--hair);
         }
 
         .title-group h1 {
-            font-size: 1.5rem;
-            font-weight: 800;
-            letter-spacing: -0.025em;
-            color: var(--accent-color);
-        }
-
-        .title-group p {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-        }
-
-        .stats {
-            display: flex;
-            gap: 2rem;
-            background: var(--surface-color);
-            padding: 0.75rem 1.5rem;
-            border-radius: 1rem;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .stat-value {
-            font-family: 'JetBrains Mono', 'Courier New', monospace;
-            font-size: 1.25rem;
-            font-weight: 700;
-        }
-
-        .stat-label {
-            font-size: 0.625rem;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
         }
 
-        /* Controls */
+        .stats { display: flex; gap: 18px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+        .stat-item { display: flex; align-items: baseline; gap: 6px; }
+        .stat-value { color: var(--ink); font-variant-numeric: tabular-nums; }
+        .stat-label { font-size: 12px; }
+
         .controls {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
+            align-items: baseline;
+            gap: 12px;
             flex-wrap: wrap;
         }
 
-        .difficulty-selector {
-            display: flex;
-            background: var(--surface-color);
-            padding: 0.25rem;
-            border-radius: 0.75rem;
-            border: 1px solid var(--border-color);
-        }
+        .difficulty-selector { display: flex; gap: 16px; }
 
         .btn {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
+            background: none;
+            border: 0;
+            color: var(--muted);
+            padding: 0;
             cursor: pointer;
-            font-size: 0.875rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
+            font-family: var(--sans);
+            font-size: 13px;
         }
 
-        .btn.active {
-            background: var(--accent-color);
-            color: white;
-        }
-
-        .btn:hover:not(.active) {
-            color: var(--text-color);
-            background: var(--cell-hover);
-        }
+        .btn:hover { color: var(--ink); }
+        .btn.active { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 
         .icon-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 0.75rem;
-            background: var(--surface-color);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
+            background: none;
+            border: 0;
+            padding: 0;
+            color: var(--muted);
             cursor: pointer;
-            transition: all 0.2s ease;
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
-        .icon-btn:hover {
-            border-color: var(--accent-color);
-            transform: translateY(-2px);
-        }
+        .icon-btn:hover { color: var(--ink); }
+        .icon-btn.on { color: var(--ink); }
+        .icon-btn.on::before { content: "2"; margin-right: 4px; }
 
-        /* Board */
         .board-container {
-            position: relative;
-            background: var(--surface-color);
-            padding: 1rem;
-            border-radius: 1.5rem;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
             flex: 1;
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 200px;
+            min-height: 0;
+            overflow: hidden;
         }
 
         #board {
             display: grid;
-            gap: 4px;
+            gap: 1px;
             margin: auto;
+            background: var(--hair);
             transform-origin: center center;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .cell {
             width: 32px;
             height: 32px;
-            background: var(--cell-bg);
-            border-radius: 6px;
+            background: var(--cell);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 800;
-            font-size: 1.125rem;
+            font-family: var(--mono);
+            font-weight: 600;
+            font-size: 13px;
             cursor: pointer;
-            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
-            transform-style: preserve-3d;
         }
 
-        .cell:hover:not(.revealed):not(.flagged) {
-            background: var(--cell-hover);
-            transform: scale(1.05);
-        }
-
-        .cell.revealed {
-            background: var(--cell-revealed);
-            cursor: default;
-        }
+        .cell:hover:not(.revealed):not(.flagged) { background: var(--cell-hover); }
+        .cell.revealed { background: var(--open); cursor: default; }
 
         .cell.flagged::after {
-            content: '🚩';
-            font-size: 0.875rem;
+            content: '';
+            width: 0;
+            height: 0;
+            border-left: 6px solid var(--ink);
+            border-top: 4px solid transparent;
+            border-bottom: 4px solid transparent;
+            margin-left: 2px;
         }
 
-        .cell.mine.exploded {
-            background: var(--mine-color) !important;
-            animation: shake 0.4s ease-in-out;
-        }
+        .cell.mine.exploded { background: var(--red) !important; }
+        .cell.mine.exploded::after { background: var(--bg); }
 
-        .cell.mine.revealed:not(.exploded) {
-            background: var(--surface-color);
-        }
         .cell.mine.revealed::after {
-            content: '💣';
-            font-size: 1rem;
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--ink);
         }
 
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-4px); }
-            75% { transform: translateX(4px); }
-        }
+        .cell.n1 { color: #2f5d8a; }
+        .cell.n2 { color: #3f6b45; }
+        .cell.n3 { color: var(--red); }
+        .cell.n4 { color: #4b4470; }
+        .cell.n5 { color: #8a5a2b; }
+        .cell.n6 { color: #2f6b6b; }
+        .cell.n7 { color: var(--ink); }
+        .cell.n8 { color: var(--muted); }
 
-        .n1 { color: var(--n1); }
-        .n2 { color: var(--n2); }
-        .n3 { color: var(--n3); }
-        .n4 { color: var(--n4); }
-        .n5 { color: var(--n5); }
-        .n6 { color: var(--n6); }
-        .n7 { color: var(--n7); }
-        .n8 { color: var(--n8); }
-
-        /* Overlays */
         #overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(8px);
+            inset: 0;
+            background: rgba(246, 245, 240, 0.92);
             display: none;
             align-items: center;
             justify-content: center;
             z-index: 100;
-            opacity: 0;
-            transition: opacity 0.3s ease;
         }
 
-        #overlay.active {
-            display: flex;
-            opacity: 1;
-        }
+        #overlay.active { display: flex; }
 
         .modal {
-            background: var(--surface-color);
-            padding: 2.5rem;
-            border-radius: 2rem;
-            border: 1px solid var(--border-color);
+            background: var(--bg);
+            border: 1px solid var(--hair);
+            padding: 20px;
+            max-width: 320px;
+            width: calc(100% - 32px);
             text-align: center;
-            max-width: 400px;
-            width: 90%;
-            transform: scale(0.9);
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        #overlay.active .modal {
-            transform: scale(1);
         }
 
         .modal h2 {
-            font-size: 2rem;
-            margin-bottom: 0.5rem;
-        }
-
-        .modal p {
-            color: var(--text-muted);
-            margin-bottom: 2rem;
-        }
-
-        /* Particle Canvas */
-        #particles {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 99;
-        }
-
-        /* Leaderboard */
-        .leaderboard {
-            margin-top: 2rem;
-            width: 100%;
-            max-width: 400px;
-        }
-
-        .leaderboard h3 {
-            font-size: 0.875rem;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
-            color: var(--text-muted);
-            margin-bottom: 1rem;
-            text-align: center;
+            margin-bottom: 6px;
         }
+
+        .modal p { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+
+        .modal .btn.active {
+            display: inline-block;
+            border-bottom: 1px solid var(--ink);
+            padding-bottom: 2px;
+            text-decoration: none;
+            font-family: var(--mono);
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .leaderboard { margin-top: 12px; text-align: left; }
 
         .score-row {
             display: flex;
             justify-content: space-between;
-            padding: 0.5rem 1rem;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 0.875rem;
+            padding: 4px 0;
+            border-bottom: 1px solid var(--hair);
+            font-family: var(--mono);
+            font-size: 11px;
         }
 
-        /* Custom Mode */
-        .custom-form {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            text-align: left;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .input-group label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
+        .custom-form { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+        .input-group { display: flex; flex-direction: column; gap: 3px; }
+        .input-group label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 
         input {
-            background: var(--bg-color);
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            padding: 0.5rem;
-            border-radius: 0.5rem;
+            background: none;
+            border: 1px solid var(--hair);
+            color: var(--ink);
+            padding: 4px 6px;
+            font-family: var(--mono);
+            font-size: 12px;
             outline: none;
+            width: 100%;
         }
 
-        /* Mobile specific */
         @media (max-width: 640px) {
-            #app { padding: 1rem; }
-            .cell { width: 28px; height: 28px; font-size: 0.9rem; }
-            .stats { gap: 1rem; padding: 0.5rem 1rem; }
-            .header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+            #app { padding: 10px; gap: 8px; }
+            .cell { width: 26px; height: 26px; font-size: 12px; }
+            .controls { gap: 8px; }
+            .difficulty-selector { gap: 12px; }
         }
-    </style>
+</style>
 </head>
 <body>
     <canvas id="particles"></canvas>
 
     <div id="app">
         <header class="header">
-            <div class="title-group">
-                <h1>Minesweeper</h1>
-                <p>Modern Reinterpretation</p>
-            </div>
+            <div class="title-group"><h1>Minesweeper</h1></div>
             <div class="stats">
                 <div class="stat-item">
+                    <span class="stat-label">mines</span>
                     <span class="stat-value" id="mine-count">000</span>
-                    <span class="stat-label">Mines</span>
                 </div>
                 <div class="stat-item">
+                    <span class="stat-label">time</span>
                     <span class="stat-value" id="timer">000</span>
-                    <span class="stat-label">Time</span>
                 </div>
             </div>
         </header>
 
         <section class="controls">
             <div class="difficulty-selector" id="difficulty-tabs">
-                <button class="btn active" data-diff="beginner">Beginner</button>
-                <button class="btn" data-diff="intermediate">Intermediate</button>
-                <button class="btn" data-diff="expert">Expert</button>
-                <button class="btn" data-diff="custom">Custom</button>
+                <button class="btn active" data-diff="beginner">beginner</button>
+                <button class="btn" data-diff="intermediate">intermediate</button>
+                <button class="btn" data-diff="expert">expert</button>
+                <button class="btn" data-diff="custom">custom</button>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <button class="icon-btn" id="hint-btn" title="Hint">💡</button>
-                <button class="icon-btn" id="leaderboard-btn" title="Leaderboard">🏆</button>
-                <button class="icon-btn" id="theme-btn" title="Toggle Theme">🌓</button>
-                <button class="icon-btn" id="restart-btn" title="Restart">🔄</button>
+            <div style="display:flex;gap:14px">
+                <button class="icon-btn" id="hint-btn" title="Reveal a safe cell">hint</button>
+                <button class="icon-btn" id="leaderboard-btn" title="Best times">best</button>
+                <button class="icon-btn" id="theme-btn" title="Invert the board colours">theme</button>
+                <button class="icon-btn" id="restart-btn" title="Deal a new field">new</button>
             </div>
         </section>
 
@@ -440,33 +308,33 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
     <div id="overlay">
         <div class="modal" id="game-over-modal" style="display: none;">
-            <h2 id="result-title">Victory!</h2>
-            <p id="result-text">You cleared the field in 42 seconds.</p>
-            <button class="btn active" style="width: 100%; padding: 1rem;" onclick="game.restart()">Play Again</button>
+            <h2 id="result-title">Field cleared</h2>
+            <p id="result-text">All 10 mines accounted for.</p>
+            <button class="btn active" onclick="game.restart()">new field</button>
         </div>
 
         <div class="modal" id="leaderboard-modal" style="display: none;">
-            <h2>Top Scores</h2>
+            <h2>Best times</h2>
             <div id="leaderboard-content" class="leaderboard"></div>
-            <button class="btn active" style="width: 100%; padding: 1rem; margin-top: 1.5rem;" onclick="ui.hideOverlay()">Close</button>
+            <button class="btn active" style="margin-top:14px" onclick="ui.hideOverlay()">close</button>
         </div>
 
         <div class="modal" id="custom-modal" style="display: none;">
-            <h2>Custom Board</h2>
+            <h2>Custom field</h2>
             <div class="custom-form">
                 <div class="input-group">
-                    <label>Width (5-50)</label>
+                    <label>width 5-50</label>
                     <input type="number" id="custom-w" value="20" min="5" max="50">
                 </div>
                 <div class="input-group">
-                    <label>Height (5-50)</label>
+                    <label>height 5-50</label>
                     <input type="number" id="custom-h" value="20" min="5" max="50">
                 </div>
                 <div class="input-group">
-                    <label>Mines</label>
+                    <label>mines</label>
                     <input type="number" id="custom-m" value="40" min="1">
                 </div>
-                <button class="btn active" style="width: 100%; padding: 1rem;" onclick="game.startCustom()">Start Game</button>
+                <button class="btn active" style="align-self:flex-start" onclick="game.startCustom()">deal</button>
             </div>
         </div>
     </div>

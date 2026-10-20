@@ -14,466 +14,161 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Snake</title>
 <style>
-  :root{
-    --white:#FFFFFF;
-    --field:#F8F9FA;
-    --grid:#E8EAED;
-    --grid-major:#DADCE0;
-    --ink:#202124;
-    --muted:#5F6368;
-    --chip:#F1F3F4;
-    --hair:#DADCE0;
-    --blue:#1A73E8;
-    --blue-dark:#1B66C9;
-    --green:#34A853;
-    --green-dark:#1E8E3E;
-    --red:#EA4335;
-    --yellow:#FBBC04;
-    --shadow:0 1px 2px rgba(60,64,67,.10), 0 4px 16px rgba(60,64,67,.08);
-    --shadow-lift:0 8px 32px rgba(60,64,67,.20);
-    --display:"Google Sans","Product Sans","DM Sans",Roboto,Arial,sans-serif;
-    --ui:Roboto,Arial,Helvetica,sans-serif;
-  }
+:root{
+  --paper:#f6f5f0;
+  --ink:#22221e;
+  --muted:#7b7669;
+  --hair:#d9d5c9;
+  --green:#3f6b45;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --ui:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+}
 
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font:14px/1.45 var(--ui);
+  overflow-x:hidden;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:1px solid var(--ink);outline-offset:3px}
 
-  body{
-    background:var(--white);
-    color:var(--ink);
-    font-family:var(--ui);
-    -webkit-font-smoothing:antialiased;
-    overflow-x:hidden;
-    user-select:none;
-    -webkit-tap-highlight-color:transparent;
-  }
+header{
+  max-width:760px;margin:0 auto;padding:14px 16px;
+  display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+  border-bottom:1px solid var(--hair);
+}
+h1{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.hud{display:flex;gap:16px;font-family:var(--mono);font-size:12px;color:var(--muted);margin-right:auto}
+.hud .v{color:var(--ink);font-variant-numeric:tabular-nums;margin-left:4px}
+.stat.bump .v{color:var(--green)}
+.tools{display:flex;gap:14px}
+.tools button{
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);padding:1px 0;
+}
+.tools button:hover{color:var(--ink)}
+.tools button.on{color:var(--ink)}
+.tools button.on::before{content:"\2022";margin-right:4px}
 
-  .sr-only{
-    position:absolute;width:1px;height:1px;padding:0;margin:-1px;
-    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
-  }
+main{max-width:760px;margin:0 auto;padding:18px 16px 26px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.board{
+  position:relative;
+  width:min(70dvh, 100%, 520px);
+  aspect-ratio:1/1;
+  border:1px solid var(--hair);
+  background:#efeee7;
+  overflow:hidden;
+  touch-action:none;
+}
+canvas{display:block;width:100%;height:100%}
+canvas.dim{opacity:.4}
 
-  button{font-family:var(--ui);color:inherit;background:none;border:0;cursor:pointer}
-  :focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:8px}
+.veil{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(246,245,240,.94);
+  opacity:0;pointer-events:none;
+  transition:opacity .1s linear;
+}
+.veil.show{opacity:1;pointer-events:auto}
+.card{border:1px solid var(--hair);background:var(--paper);padding:18px 20px;text-align:center;max-width:280px}
+.card h2{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+.card .lead{font-size:12px;color:var(--muted);margin-top:6px}
+.card .final{font-family:var(--mono);font-size:30px;line-height:1.1;margin-top:10px}
+.card .sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
+.pill{
+  display:inline-block;margin-top:14px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  border-bottom:1px solid var(--ink);padding-bottom:2px;
+}
+.hint{font-size:12px;color:var(--muted);text-align:center;max-width:44ch}
+.hint b{color:var(--ink);font-weight:600}
 
-  /* ---------- top bar ---------- */
-  .topbar{
-    height:64px;
-    max-width:1280px;
-    margin:0 auto;
-    padding:0 24px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:16px;
-  }
-  .brand{display:flex;align-items:center;gap:12px}
-  .dots{display:flex;gap:4px}
-  .dots span{width:8px;height:8px;border-radius:50%}
-  .dots span:nth-child(1){background:var(--blue)}
-  .dots span:nth-child(2){background:var(--red)}
-  .dots span:nth-child(3){background:var(--yellow)}
-  .dots span:nth-child(4){background:var(--green)}
-  h1{
-    font-family:var(--display);
-    font-size:30px;
-    font-weight:700;
-    letter-spacing:-0.5px;
-    line-height:1;
-  }
-
-  .tools{display:flex;align-items:center;gap:6px}
-  .icon-btn{
-    width:40px;height:40px;
-    border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    color:var(--muted);
-    transition:background 120ms ease,color 120ms ease,transform 120ms ease;
-  }
-  .icon-btn:hover{background:var(--chip);color:var(--ink)}
-  .icon-btn:active{transform:scale(.94)}
-  .icon-btn svg{width:20px;height:20px}
-  .icon-btn.on{color:var(--green-dark)}
-
-  /* ---------- play column ---------- */
-  .play{
-    max-width:1280px;
-    margin:0 auto;
-    padding:8px 24px 32px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:20px;
-  }
-
-  .stats{
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:center;
-    gap:10px;
-    width:100%;
-  }
-  .stat{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    background:var(--white);
-    border:1px solid var(--hair);
-    border-radius:100px;
-    padding:8px 18px 8px 12px;
-    box-shadow:var(--shadow);
-    transition:transform 200ms cubic-bezier(.22,1,.36,1);
-  }
-  .stat .mark{
-    width:22px;height:22px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    flex:0 0 22px;
-  }
-  .stat .mark svg{width:14px;height:14px}
-  .stat .k{
-    font-family:var(--ui);
-    font-size:13px;
-    color:var(--muted);
-  }
-  .stat .v{
-    font-family:var(--display);
-    font-size:24px;
-    font-weight:700;
-    line-height:1;
-    letter-spacing:-.4px;
-    min-width:1.2ch;
-  }
-  .stat.bump{transform:scale(1.12)}
-  .mark.score{background:rgba(234,67,53,.12);color:var(--red)}
-  .mark.best{background:rgba(251,188,4,.16);color:#F9AB00}
-  .mark.len{background:rgba(52,168,83,.14);color:var(--green-dark)}
-  .mark.speed{background:rgba(26,115,232,.12);color:var(--blue)}
-
-  /* ---------- board ---------- */
-  .board{
-    position:relative;
-    width:min(72dvh, calc(100vw - 48px), 680px);
-    height:min(72dvh, calc(100vw - 48px), 680px);
-    border-radius:20px;
-    background:var(--field);
-    box-shadow:var(--shadow);
-    overflow:hidden;
-    touch-action:none;
-  }
-  #canvas{display:block;width:100%;height:100%;transition:opacity 150ms linear}
-  #canvas.dim{opacity:.5}
-
-  .veil{
-    position:absolute;inset:0;
-    display:flex;align-items:center;justify-content:center;
-    padding:24px;
-    opacity:0;
-    pointer-events:none;
-    transition:opacity 180ms ease;
-  }
-  .veil.show{opacity:1;pointer-events:auto}
-
-  .card{
-    background:var(--white);
-    border-radius:28px;
-    padding:32px 36px;
-    box-shadow:var(--shadow-lift);
-    text-align:center;
-    max-width:min(360px, 100%);
-    transform:translateY(12px) scale(.96);
-    opacity:0;
-  }
-  .veil.show .card{
-    animation:cardIn 260ms cubic-bezier(.22,1,.36,1) forwards;
-  }
-  @keyframes cardIn{
-    to{transform:translateY(0) scale(1);opacity:1}
-  }
-  .card h2{
-    font-family:var(--display);
-    font-size:32px;
-    font-weight:700;
-    letter-spacing:-.6px;
-    line-height:1.1;
-  }
-  .card .lead{
-    font-family:var(--ui);
-    font-size:14px;
-    line-height:1.5;
-    color:var(--muted);
-    margin-top:10px;
-  }
-  .card .final{
-    font-family:var(--display);
-    font-size:44px;
-    font-weight:700;
-    letter-spacing:-1px;
-    line-height:1;
-    margin:16px 0 4px;
-    color:var(--green-dark);
-  }
-  .card .sub{
-    font-family:var(--ui);
-    font-size:13px;
-    color:var(--muted);
-    margin-bottom:22px;
-  }
-
-  .pill{
-    display:inline-flex;align-items:center;justify-content:center;gap:8px;
-    height:44px;
-    padding:0 26px;
-    border-radius:100px;
-    font-family:var(--ui);
-    font-size:14px;
-    font-weight:500;
-    transition:background 120ms ease,transform 120ms ease,box-shadow 120ms ease;
-  }
-  .pill.primary{background:var(--blue);color:#fff}
-  .pill.primary:hover{background:var(--blue-dark);box-shadow:0 2px 10px rgba(26,115,232,.35)}
-  .pill.primary:active{transform:scale(.97)}
-  .pill.ghost{background:var(--chip);color:var(--ink)}
-  .pill.ghost:hover{background:#E8EAED}
-
-  .keyrow{display:flex;gap:8px;justify-content:center;margin-top:18px}
-  .keycap{
-    width:38px;height:30px;
-    border:1px solid var(--hair);
-    border-radius:8px;
-    background:var(--white);
-    display:flex;align-items:center;justify-content:center;
-    font-family:var(--ui);
-    font-size:13px;
-    color:var(--muted);
-    box-shadow:0 1px 1px rgba(60,64,67,.10);
-  }
-  .apple-badge{
-    width:52px;height:52px;border-radius:50%;
-    background:rgba(234,67,53,.10);
-    display:flex;align-items:center;justify-content:center;
-    margin:0 auto 14px;
-    color:var(--red);
-  }
-  .apple-badge svg{width:28px;height:28px}
-
-  .pause-card{padding:28px 34px}
-
-  /* ---------- under bar ---------- */
-  .underbar{
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:16px;
-    width:100%;
-  }
-  .hint{
-    font-family:var(--ui);
-    font-size:14px;
-    line-height:1.5;
-    color:var(--muted);
-    text-align:center;
-    max-width:60ch;
-  }
-  .hint b{color:var(--ink);font-weight:500}
-
-  .dpad{
-    display:none;
-    grid-template-columns:repeat(3,48px);
-    grid-template-rows:repeat(2,48px);
-    gap:8px;
-  }
-  .dbtn{
-    width:48px;height:48px;
-    border-radius:12px;
-    background:var(--chip);
-    color:var(--ink);
-    display:flex;align-items:center;justify-content:center;
-    transition:background 120ms ease,transform 100ms ease;
-  }
-  .dbtn:active{background:#E8EAED;transform:scale(.95)}
-  .dbtn svg{width:22px;height:22px}
+.dpad{display:none}
+@media (max-width:700px){
+  header{gap:12px}
+  .hud{order:3;width:100%;gap:14px}
+  .tools{margin-left:auto}
+  .dpad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,40px);gap:6px}
+  .dbtn{border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+  .dbtn:active{background:var(--hair)}
+  .dbtn svg{width:18px;height:18px}
   .dbtn.up{grid-column:2;grid-row:1}
   .dbtn.left{grid-column:1;grid-row:2}
   .dbtn.down{grid-column:2;grid-row:2}
   .dbtn.right{grid-column:3;grid-row:2}
-
-  .footnote{
-    font-family:var(--ui);
-    font-size:12px;
-    color:#9AA0A6;
-    text-align:center;
-  }
-
-  /* ---------- responsive ---------- */
-  @media (max-width:899px){
-    .dpad{display:grid}
-    .board{
-      width:min(calc(100vw - 32px), 62dvh);
-      height:min(calc(100vw - 32px), 62dvh);
-    }
-    .play{padding:4px 16px 28px;gap:16px}
-    .topbar{padding:0 16px;height:56px}
-    h1{font-size:24px}
-    .stat{padding:6px 14px 6px 10px}
-    .stat .v{font-size:20px}
-    .stat .k{font-size:12px}
-  }
-
-  @media (max-width:560px){
-    .card{padding:26px 22px}
-    .card h2{font-size:26px}
-    .card .final{font-size:36px}
-    .stat .k{display:none}
-    .stat{padding:8px 16px 8px 10px}
-    .tools .opt{display:none}
-    .footnote{display:none}
-  }
-
-  @media (prefers-reduced-motion: reduce){
-    .veil.show .card{animation-duration:1ms}
-    .stat{transition:none}
-    #canvas{transition:none}
-  }
+}
 </style>
 </head>
 <body>
-
-<header class="topbar">
-  <div class="brand">
-    <div class="dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-    <h1>Snake</h1>
+<header>
+  <h1>Snake</h1>
+  <div class="hud">
+    <span class="stat" id="scoreChip">score<span class="v" id="scoreValue">0</span></span>
+    <span class="stat">best<span class="v" id="bestValue">0</span></span>
+    <span class="stat">len<span class="v" id="lengthValue">3</span></span>
+    <span class="stat">speed<span class="v" id="speedValue">1.0&times;</span></span>
   </div>
-
   <div class="tools">
-    <button class="icon-btn opt" id="soundBtn" title="Sound" aria-label="Sound">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 7.5h2.5L10 4.5v11L6.5 12.5H4z"></path>
-        <path class="wave" d="M13 7.2a4 4 0 0 1 0 5.6"></path>
-        <path class="wave" d="M15.4 5.2a7 7 0 0 1 0 9.6"></path>
-      </svg>
-    </button>
-
-    <button class="icon-btn opt" id="motionBtn" title="Motion" aria-label="Motion">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="10" cy="10" r="3"></circle>
-        <path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M15.3 4.7l-1.4 1.4M6.1 13.9l-1.4 1.4"></path>
-      </svg>
-    </button>
-
-    <button class="icon-btn" id="pauseBtn" title="Pause" aria-label="Pause">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" id="pauseIcon">
-        <line x1="7" y1="4.5" x2="7" y2="15.5"></line>
-        <line x1="13" y1="4.5" x2="13" y2="15.5"></line>
-      </svg>
-    </button>
-
-    <button class="icon-btn" id="resetBtn" title="Restart" aria-label="Restart">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M16.2 7A7 7 0 1 0 17 10.4"></path>
-        <polyline points="16.6,3.2 16.6,7.2 12.6,7.2"></polyline>
-      </svg>
-    </button>
+    <button id="soundBtn" title="Sound">sound</button>
+    <button id="motionBtn" title="Motion">motion</button>
+    <button id="pauseBtn" title="Pause">pause</button>
+    <button id="resetBtn" title="Restart">restart</button>
   </div>
 </header>
 
-<main class="play">
-
-  <div class="stats">
-    <div class="stat" id="scoreChip">
-      <span class="mark score" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><circle cx="10" cy="11.4" r="5.6"/><path d="M10 5.6c.9-1.4 2.4-2.1 4-2.1-.2 1.8-1.3 3-2.8 3.4z"/></svg>
-      </span>
-      <span class="k">Score</span>
-      <span class="v" id="scoreValue">0</span>
-    </div>
-
-    <div class="stat">
-      <span class="mark best" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2.6l2.1 4.4 4.8.7-3.5 3.4.8 4.8-4.2-2.3-4.2 2.3.8-4.8L3.1 7.7l4.8-.7z"/></svg>
-      </span>
-      <span class="k">Best</span>
-      <span class="v" id="bestValue">0</span>
-    </div>
-
-    <div class="stat">
-      <span class="mark len" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="2.5" y="8" width="6" height="6" rx="2"/><rect x="10.5" y="8" width="7" height="6" rx="2"/></svg>
-      </span>
-      <span class="k">Length</span>
-      <span class="v" id="lengthValue">3</span>
-    </div>
-
-    <div class="stat">
-      <span class="mark speed" aria-hidden="true">
-        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M11.4 2L4 11.2h4.2L8 18l7.6-9.4h-4.4z"/></svg>
-      </span>
-      <span class="k">Speed</span>
-      <span class="v" id="speedValue">1.0×</span>
-    </div>
-  </div>
-
+<main>
   <div class="board" id="board">
     <canvas id="canvas" role="img" aria-label="Snake board, 20 by 20 cells"></canvas>
 
     <div class="veil show" id="startVeil">
       <div class="card">
-        <div class="apple-badge" aria-hidden="true">
-          <svg viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="11.6" r="5.8"/><path d="M10 5.4c.9-1.5 2.5-2.3 4.2-2.3-.2 1.9-1.4 3.2-3 3.6z"/></svg>
-        </div>
-        <h2>Ready to play?</h2>
-        <p class="lead">Press an arrow key to start. Eat apples to grow — don’t hit the edges or yourself.</p>
-        <div class="keyrow" aria-hidden="true">
-          <div class="keycap">↑</div><div class="keycap">←</div><div class="keycap">↓</div><div class="keycap">→</div>
-        </div>
+        <h2>Press an arrow</h2>
+        <p class="lead">or WASD. Eat, grow, don&rsquo;t bite yourself.</p>
       </div>
     </div>
 
     <div class="veil" id="pauseVeil">
-      <div class="card pause-card">
+      <div class="card">
         <h2>Paused</h2>
-        <p class="lead">Take your time. Nothing moves until you do.</p>
-        <div style="margin-top:22px">
-          <button class="pill primary" id="resumeBtn">Resume</button>
-        </div>
+        <button class="pill" id="resumeBtn">resume</button>
       </div>
     </div>
 
     <div class="veil" id="overVeil">
       <div class="card">
-        <h2>Game over</h2>
+        <h2>Dead</h2>
         <div class="final" id="finalScore">0</div>
-        <div class="sub" id="finalSub">Best score 0</div>
-        <button class="pill primary" id="playAgain">Play again</button>
-        <p class="lead" style="margin-top:14px">or press Enter</p>
+        <div class="sub" id="finalSub">best 0</div>
+        <button class="pill" id="playAgain">again</button>
       </div>
     </div>
   </div>
 
-  <div class="underbar">
-    <p class="hint">
-      Use the <b>arrow keys</b> or <b>WASD</b> to move. <b>Space</b> pauses,
-      <b>R</b> restarts. Arrow keys work on every keyboard, including mobile browsers.
-    </p>
+  <p class="hint"><b>space</b> pause &middot; <b>r</b> restart</p>
 
-    <div class="dpad" aria-label="Direction controls">
-      <button class="dbtn up" data-dir="up" aria-label="Move up">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,12 10,7 15,12"/></svg>
-      </button>
-      <button class="dbtn left" data-dir="left" aria-label="Move left">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="12,5 7,10 12,15"/></svg>
-      </button>
-      <button class="dbtn down" data-dir="down" aria-label="Move down">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,8 10,13 15,8"/></svg>
-      </button>
-      <button class="dbtn right" data-dir="right" aria-label="Move right">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,5 13,10 8,15"/></svg>
-      </button>
-    </div>
-
-    <p class="footnote">A Snake tribute. Not affiliated with or endorsed by Google.</p>
+  <div class="dpad" aria-label="Direction controls">
+    <button class="dbtn up" data-dir="up" aria-label="Move up">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,12 10,7 15,12"/></svg>
+    </button>
+    <button class="dbtn left" data-dir="left" aria-label="Move left">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="12,5 7,10 12,15"/></svg>
+    </button>
+    <button class="dbtn down" data-dir="down" aria-label="Move down">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,8 10,13 15,8"/></svg>
+    </button>
+    <button class="dbtn right" data-dir="right" aria-label="Move right">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="8,5 13,10 8,15"/></svg>
+    </button>
   </div>
-
 </main>
+
 
 <div class="sr-only" aria-live="polite" id="live"></div>
 <div class="sr-only" id="boardDesc"></div>
@@ -493,18 +188,18 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
   var OVER_MS = 260;
 
   var COL = {
-    field: "#F8F9FA",
-    grid: "#E8EAED",
-    gridMajor: "#DADCE0",
-    body: "#34A853",
-    bodyEdge: "#1E8E3E",
-    head: "#34A853",
-    apple: "#EA4335",
-    appleShine: "#F28B82",
-    leaf: "#34A853",
-    stem: "#1E8E3E",
-    eyeWhite: "#FFFFFF",
-    pupil: "#202124"
+    field: "#EEECE5",
+    grid: "#E2DFD5",
+    gridMajor: "#D3CFC5",
+    body: "#3F6B45",
+    bodyEdge: "#2E5236",
+    head: "#3F6B45",
+    apple: "#A4402F",
+    appleShine: "#C0674F",
+    leaf: "#3F6B45",
+    stem: "#2E5236",
+    eyeWhite: "#FBFAF6",
+    pupil: "#1D1D1B"
   };
 
   /* ================================================================
@@ -521,7 +216,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
   var elLive = $("live"), elBoardDesc = $("boardDesc");
   var elStartVeil = $("startVeil"), elPauseVeil = $("pauseVeil"), elOverVeil = $("overVeil");
   var elFinalScore = $("finalScore"), elFinalSub = $("finalSub");
-  var elPauseIcon = $("pauseIcon"), elPauseBtn = $("pauseBtn");
+  var elPauseBtn = $("pauseBtn");
 
   /* ================================================================
      STATE
@@ -693,7 +388,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
     var e = easeOut(p);
     var cx = (ring.x + 0.5) * cell;
     var cy = (ring.y + 0.5) * cell;
-    ctx.strokeStyle = "rgba(52,168,83," + (0.55 * (1 - e)).toFixed(3) + ")";
+    ctx.strokeStyle = "rgba(63,107,69," + (0.55 * (1 - e)).toFixed(3) + ")";
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.arc(cx, cy, cell * 0.32 + cell * 0.55 * e, 0, Math.PI * 2);
@@ -711,9 +406,9 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
     var head = size * e;
 
     var grad = ctx.createLinearGradient(0, 0, Math.max(1, head), 0);
-    grad.addColorStop(0, "rgba(52,168,83,0)");
-    grad.addColorStop(0.55, "rgba(52,168,83," + (0.22 * (1 - p)).toFixed(3) + ")");
-    grad.addColorStop(1, "rgba(52,168,83," + (0.34 * (1 - p)).toFixed(3) + ")");
+    grad.addColorStop(0, "rgba(63,107,69,0)");
+    grad.addColorStop(0.55, "rgba(63,107,69," + (0.22 * (1 - p)).toFixed(3) + ")");
+    grad.addColorStop(1, "rgba(63,107,69," + (0.34 * (1 - p)).toFixed(3) + ")");
 
     ctx.fillStyle = grad;
     roundRect(0, y + cell * 0.12, Math.max(0, head), cell * 0.76, cell * 0.32);
@@ -733,7 +428,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
       ctx.fillStyle = COL.body;
       ctx.fill();
       ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(30,142,62,0.35)";
+      ctx.strokeStyle = "rgba(46,82,54,0.35)";
       ctx.stroke();
     }
 
@@ -997,12 +692,11 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
     if (state === "paused") {
       elPauseBtn.title = "Resume";
       elPauseBtn.setAttribute("aria-label", "Resume");
-      elPauseIcon.innerHTML = '<polygon points="6,4 16,10 6,16" fill="currentColor" stroke="none"></polygon>';
+      elPauseBtn.textContent = "resume";
     } else {
       elPauseBtn.title = "Pause";
       elPauseBtn.setAttribute("aria-label", "Pause");
-      elPauseIcon.innerHTML =
-        '<line x1="7" y1="4.5" x2="7" y2="15.5"></line><line x1="13" y1="4.5" x2="13" y2="15.5"></line>';
+      elPauseBtn.textContent = "pause";
     }
   }
 
