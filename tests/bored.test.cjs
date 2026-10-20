@@ -424,7 +424,7 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.poker')), '500');
 
-      assert.equal(await page.$eval('#lb-game option', els => els.length), 30);
+      assert.equal(await page.$eval('#lb-game', el => el.options.length), 30);
       assert.equal(await page.$eval('#lb-game', el => el.value), 'overall');
       assert.match(await text(page, '#lb-note'), /across 29 games/);
     } finally {
