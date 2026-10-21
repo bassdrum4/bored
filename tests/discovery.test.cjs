@@ -36,7 +36,8 @@ test('discovery works offline, keeps its controls, and fits small screens', asyn
     await page.waitForFunction(() => [...document.querySelectorAll('#grid img')].every(image => image.complete && image.naturalWidth > 0));
     assert.ok(fs.statSync(path.join(root, 'index.html')).size < 5096942 * 1.06, 'redesign adds less than 6% to the existing build');
     assert.equal(await page.$eval('#recent-empty', e => e.hidden), false);
-    assert.ok(await page.evaluate(() => document.querySelector('#leaderboard').offsetTop > document.querySelector('#grid').offsetTop));
+    // The board sits above the library now: it belongs to the top of the page.
+    assert.ok(await page.evaluate(() => document.querySelector('#leaderboard').offsetTop < document.querySelector('#library').offsetTop));
   });
 
   await t.test('collections intersect with search and filters, and can be cleared', async () => {
@@ -46,7 +47,7 @@ test('discovery works offline, keeps its controls, and fits small screens', asyn
       await page.click('[data-collection="' + id + '"]');
       assert.equal(await page.evaluate(() => document.activeElement.dataset.collection), id, 'collection keeps keyboard focus');
       const actual = await page.$$eval('#grid .card', cards => cards.map(card => card.dataset.slug));
-      const expected = await page.evaluate(kind => ORDER.filter(([slug]) => kind === 'quick' ? DISCOVERY[slug].quick : kind === 'players' ? DISCOVERY[slug].players === '2 local' : kind === 'pace' ? DISCOVERY[slug].pace === 'Relaxing' : PICKS.some(pick => pick.slug === slug)).map(([slug]) => slug), predicate);
+      const expected = await page.evaluate(kind => ORDER.filter(([slug]) => kind === 'quick' ? DISCOVERY[slug].quick : kind === 'players' ? DISCOVERY[slug].players === '2 local' : DISCOVERY[slug].pace === 'Relaxing').map(([slug]) => slug), predicate);
       assert.deepEqual(actual.sort(), expected.sort());
     }
     await page.click('[data-collection="friends"]');
@@ -61,20 +62,23 @@ test('discovery works offline, keeps its controls, and fits small screens', asyn
     await page.click('#clear-filters');
   });
 
-  await t.test('favorites and recents populate Jump Back In and survive reload', async () => {
+  await t.test('favorites and recents share one shelf of four and survive reload', async () => {
     await page.click('[aria-label="Add Memory to favorites"]');
     assert.equal(await page.$eval('#recent-empty', e => e.hidden), true);
-    await page.click('#favorite-list [data-slug="memory"]');
+    await page.click('#recent-list [data-slug="memory"]');
     await page.waitForFunction(() => document.querySelector('#frame').contentWindow.__boredSnapshot?.().slug === 'memory');
     await page.evaluate(() => closeGame());
     assert.equal(await page.evaluate(() => document.activeElement.closest('#recent-list')?.id), 'recent-list', 'focus follows a favorite when it becomes recent');
     await page.reload();
     assert.equal(await page.$$eval('#recent-list [data-slug="memory"]', nodes => nodes.length), 1);
     assert.match(await page.$eval('#recent-list', node => node.textContent), /Favorite/);
-    await page.click('#picks-list [data-slug="sand"]');
-    await page.waitForFunction(() => document.querySelector('#frame').contentWindow.__boredSeed);
-    await page.evaluate(() => closeGame());
-    assert.equal(await page.evaluate(() => document.activeElement.closest('#picks-list')?.id), 'picks-list');
+    // Five games played, four slots: the oldest drops off the shelf.
+    for (const slug of ['2048', 'lights-out', 'snake', 'solitaire']) {
+      await page.evaluate(id => openGame(id), slug);
+      await page.evaluate(() => closeGame());
+    }
+    assert.equal(await page.$$eval('#recent-list [data-slug]', nodes => nodes.length), 4);
+    assert.equal(await page.$$eval('#recent-list [data-slug="memory"]', nodes => nodes.length), 0);
   });
 
   await t.test('Surprise Me honors collections and keeps online extras opt-in', async () => {
@@ -105,7 +109,7 @@ test('discovery works offline, keeps its controls, and fits small screens', asyn
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow at ' + width);
       const targets = await page.$$eval('#daily-play,#collections button,#filters button,#grid .star,#random', nodes => nodes.map(node => ({ label: node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })));
       assert.ok(targets.every(box => box.width >= 30 && box.height >= 30), 'usable control sizes at ' + width);
-      const regions = await page.$$eval('#daily,#recent,#recommendations,#library,#leaderboard', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
+      const regions = await page.$$eval('#daily,#recent,#leaderboard,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
       assert.ok(regions.every((region, index) => !index || region.top >= regions[index - 1].top + regions[index - 1].height), 'sections do not overlap');
     }
     await page.evaluate(() => document.querySelector('.skip-link').focus());
@@ -129,7 +133,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
   const browser = await puppeteer.launch({ executablePath, headless: true });
   t.after(() => browser.close());
   const page = await browser.newPage();
-  const rows = [], posted = [], unexpected = [];
+  const rows = [], posted = [], notes = [], unexpected = [];
   const rules = Object.entries(JSON.parse(fs.readFileSync(path.join(root, 'src/games/score-rules.json')))).map(([game, rule]) => ({ game, ...rule }));
   const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS' };
   await page.setRequestInterception(true);
@@ -151,14 +155,22 @@ test('account UI and score sync still work through the redesigned hub (mock back
       return reply(rows);
     }
     if (url.pathname === '/rest/v1/leaderboard') return reply(rows.filter(row => !url.searchParams.get('game') || url.searchParams.get('game') === 'eq.' + row.game).map(row => ({ ...row, handle: 'tester' })));
+    if (url.pathname === '/rest/v1/feedback' && method === 'POST') { notes.push(JSON.parse(request.postData())); return reply(null); }
     if (url.pathname === '/auth/v1/logout') return reply(null);
     unexpected.push(method + ' ' + url.pathname);
     return request.abort();
   });
   await page.goto(pathToFileURL(path.join(root, 'index.html')).href);
   await page.click('#account-action');
+  await page.waitForFunction(() => document.querySelector('#auth-dialog')?.open === true);
+  // Click each field before typing: a dialog that opens while the page is still
+  // laying out can otherwise swallow the keystrokes and submit empty fields.
+  await page.click('#auth-email');
   await page.type('#auth-email', 'tester@example.test');
+  await page.click('#auth-password');
   await page.type('#auth-password', 'test-password');
+  assert.equal(await page.$eval('#auth-email', el => el.value), 'tester@example.test');
+  assert.equal(await page.$eval('#auth-password', el => el.value), 'test-password');
   await page.click('#auth-submit');
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('tester'));
   assert.equal(await page.$eval('#auth-dialog', dialog => dialog.open), false);
@@ -180,6 +192,14 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.reload();
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('tester'));
   assert.equal(posted.length, 1, 'restoring the account does not repost an equal best');
+  await page.click('#feedback-open');
+  await page.type('#feedback-text', 'Snake ate my whole afternoon.');
+  await page.click('#feedback-submit');
+  await page.waitForFunction(() => document.querySelector('#feedback-open').textContent.includes('Thanks'));
+  assert.equal(notes.length, 1, 'feedback posts once');
+  assert.equal(notes[0].message, 'Snake ate my whole afternoon.');
+  assert.equal(notes[0].email, 'tester@example.test', 'a signed-in sender gets a reply address filled in');
+  assert.equal(notes[0].handle, 'tester');
   await page.click('#account-action');
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('guest'));
   assert.equal(await page.evaluate(() => localStorage.getItem('bored.session')), null);

@@ -25,16 +25,18 @@ npm test         # game regressions, discovery, offline/mobile and mock account 
 | [`src/main.js`](src/main.js) | Hub wiring: library, player chrome, daily section, leaderboard and account UI |
 | [`src/hub/backend.js`](src/hub/backend.js) | Supabase request/session layer, score rules, auth helpers |
 | [`src/hub/scores.js`](src/hub/scores.js) | Score specs, best capture, sync, and ranking |
+| [`src/hub/feedback.js`](src/hub/feedback.js) | The write-only feedback request (insert, never read) |
 | [`src/hub/store.js`](src/hub/store.js) | Safe `localStorage` helpers |
 | [`src/styles.css`](src/styles.css) | Site styles |
 | [`src/games/content/`](src/games/content) | The hand-written games, one readable HTML file each — including DEEP |
 | [`src/games/arcade.js`](src/games/arcade.js) | The four generated games: 2048, Memory, Connect Four, Aim Lab |
 | [`src/games/catalog.js`](src/games/catalog.js) | Game order, names, categories, and external links |
-| [`src/games/discovery.js`](src/games/discovery.js) | Session estimates, gameplay controls, collections, editorial picks and bundled previews |
+| [`src/games/discovery.js`](src/games/discovery.js) | Session estimates, gameplay controls, collections and bundled previews |
 | [`src/games/previews/`](src/games/previews) | Small WebP captures of every offline game, inlined by Vite |
 | [`src/games/score-rules.json`](src/games/score-rules.json) | What each game's score means on the shared board (label, better, max) |
 | [`src/daily.js`](src/daily.js) | Daily challenge rules and adapters |
 | [`scripts/games.mjs`](scripts/games.mjs) | `add` a new game, `register` its shared-board rule |
+| [`scripts/setup-feedback.mjs`](scripts/setup-feedback.mjs) | Creates the feedback table ([SQL](scripts/feedback-setup.sql)) |
 | [`vite.config.js`](vite.config.js) | Vite dev server and single-file production build |
 
 Adding a game? Read [`AGENTS.md`](AGENTS.md) first: it lists the three hooks
@@ -54,12 +56,17 @@ server; see [INFISICAL.md](INFISICAL.md).
 ## Find something to play
 
 - Start with the featured **Daily challenge**, including its objective, verified
-  completion status and Play button. **Jump Back In** holds recent games and
-  saved favorites. **Worth Trying** contains fixed editorial picks with reasons.
+  completion status and Play button.
+- **Jump Back In** is one shelf of four cards: recent games first, saved
+  favorites filling whatever room is left. **Browse favorites** jumps to the
+  library filtered to them.
+- The **Leaderboard** follows the shelf, above the library, and is linked in the
+  masthead. The account strip under the intro keeps **Sign in** as its only
+  filled button, and **Send feedback** sits beside it.
 - Search names, categories, descriptions, controls (for example `touch` or
   `keyboard`), pace, and session estimates; press **/** to focus search.
-- Browse **Quick Break**, **Play Against Friends**, **Relax & Unwind**, or
-  **Worth Trying**. Collections combine with search and category filters;
+- Browse **Quick Break**, **Play Against Friends**, or **Relax & Unwind**.
+  Collections combine with search and category filters;
   **Clear filters** returns to the whole library. Friends means local two-player
   games on one device. Online multiplayer is identified separately on its card.
 - Filter by **New**, **Favorites**, **Arcade**, **Puzzle**, **Strategy**,
@@ -82,11 +89,13 @@ If storage is blocked, the games still work; progress may not persist.
 The layout supports phones, touch controls in the new games, keyboard navigation,
 visible focus states, and reduced-motion preferences.
 
-The leaderboard follows the library and is also linked in the masthead. Every
-offline game has an actual captured preview; online extras use labeled panels
-and still require internet. Session lengths are editorial estimates, and the
-cards list gameplay inputs rather than just the ability to click a start menu.
-Discovery adds no runtime network requests or image services.
+Every offline game has an actual captured preview; online extras use labeled
+panels and still require internet. Landscape captures fill the card edge to
+edge; square and phone-shaped boards (Commanders, Wordle, Tetris) keep the whole
+board and sit in paper instead, because cropping one would cut it. Session
+lengths are editorial estimates, and the cards list gameplay inputs rather than
+just the ability to click a start menu. Discovery adds no runtime network
+requests or image services.
 
 To refresh the captures after changing a game's appearance:
 
@@ -101,8 +110,31 @@ CHROME_PATH=/path/to/chrome npm run test:visual      # includes a live F-14 embe
 
 Raw captures and verification screenshots go under ignored `_build/`. Commit
 the optimized `src/games/previews/*.webp` and rebuilt `index.html`. The 32 previews
-total about 81 KB before base64 embedding; images below the first screen load
-lazily. No capture tooling is shipped as a runtime dependency.
+total about 74 KB before base64 embedding; images below the first screen load
+lazily. `previews:optimize` also refits the previews already on disk when there
+are no raw captures, which is how the filled cards were produced without a
+browser. No capture tooling is shipped as a runtime dependency.
+
+## Feedback
+
+**Send feedback** in the masthead opens a short dialog: a message, an optional
+reply address, and no account needed. It inserts a row into the `feedback` table
+with the publishable key, which may only insert — notes cannot be read back out
+of the page. Read them in the Supabase dashboard, or with the service key.
+
+The table has to be created once:
+
+```sh
+npm run feedback:setup                                # report state, print the SQL
+SUPABASE_ACCESS_TOKEN=sbp_... npm run feedback:setup -- --apply
+```
+
+`SUPABASE_ACCESS_TOKEN` is a personal token from
+[supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens);
+the service key cannot run DDL. Without a token, paste
+[`scripts/feedback-setup.sql`](scripts/feedback-setup.sql) into the SQL editor,
+then re-run `npm run feedback:setup` to confirm it reports `insert-only`. Until
+the table exists the dialog says so instead of posting.
 
 ## DEEP
 

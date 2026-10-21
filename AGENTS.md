@@ -9,6 +9,7 @@ silently disappears from scores, the daily challenge, or the build.
 src/main.js              hub wiring: library, player chrome, daily, leaderboard + account UI
 src/hub/backend.js       Supabase request/session layer, score rules, auth helpers
 src/hub/scores.js        score specs, best capture, sync, ranking
+src/hub/feedback.js      write-only feedback insert (anon key, no reads)
 src/hub/store.js         safe localStorage helpers
 src/daily.js             daily challenge rotation + snapshot adapters
 src/games/catalog.js     ORDER (grid order), META (category, blurb), EXTERNS (off-site games)
@@ -16,7 +17,7 @@ src/games/score-rules.json  what each game's score means on the shared board (la
 src/games/content/*.html one file per game — the game's entire source
 src/games/content/*.b64  generated payload, git-ignored — rebuild with npm run build
 src/games/arcade.js      2048, Memory, Connect Four, Aim Lab — native JS, no payload
-src/games/discovery.js   session estimates, controls, collections, editorial picks, previews
+src/games/discovery.js   session estimates, controls, collections, previews
 tests/bored.test.cjs     node:test suite, runs the real build output in Chrome
 tests/discovery.test.cjs discovery, layout and mock-account flows
 tests/visual.test.cjs    release captures and the live F-14 embed (needs internet)
@@ -24,7 +25,17 @@ scripts/sync-games.mjs   html -> .b64
 scripts/publish.mjs      copies dist/index.html to the served index.html
 scripts/games.mjs        add a game / sync the shared board's rule list
 scripts/capture-previews.mjs  re-shoot the library previews in Chrome
+scripts/optimize-previews.py  resize them: fill landscape cards, keep portrait boards whole
+scripts/setup-feedback.mjs    create the feedback table (scripts/feedback-setup.sql)
 ```
+
+The homepage order is fixed in `src/index.html`: daily, Jump Back In, leaderboard, library.
+The shelf is one row of four cards shared by recent games and favorites. `PICKS` and the
+"Worth Trying" section are gone; do not bring back a second editorial shelf.
+
+Feedback posts through `src/hub/feedback.js` with the publishable key. The `feedback` table is
+insert-only for that key (`npm run feedback:setup`), so the page can send a note and never read
+one; check the table in the Supabase dashboard.
 
 ## Build and verify
 

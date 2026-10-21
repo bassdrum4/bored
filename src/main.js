@@ -1,5 +1,5 @@
 import { ORDER, GAMES, EXTERNS, NEW_GAMES, FRESH_GAMES, META } from './games/catalog.js';
-import { DISCOVERY, PICKS, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
+import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
 import { nativeHTML } from './games/arcade.js';
 import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, installDailyAdapter, seedNumber, seedCode, CHALLENGES } from './daily.js';
 import { readStored, writeStored } from './hub/store.js';
@@ -13,6 +13,7 @@ import {
   isLocalOnly, bestValue, formatScore, recordBest,
   syncScores, onScoresPosted
 } from './hub/scores.js';
+import { sendFeedback, feedbackErrorMessage } from './hub/feedback.js';
 
 // Keep the original console/test surface available from the bundled file. The
 // date wrapper also lets the offline Puppeteer suite pin a challenge date.
@@ -118,21 +119,20 @@ function shelfGame(slug, note) {
   return button;
 }
 
-function renderRecent() {
-  const list = $('#recent-list');
-  list.replaceChildren(...recentGames.map(slug => shelfGame(slug,
-    (favorites.has(slug) ? 'Favorite · ' : '') + (EXTERNS[slug] ? 'Online extra' : 'Recently played'))));
-  const saved = [...favorites].filter(slug => !recentGames.includes(slug));
-  $('#favorite-list').replaceChildren(...saved.slice(0, 4).map(slug => shelfGame(slug,
-    EXTERNS[slug] ? 'Favorite · Online extra' : gameMeta(slug))));
-  $('#favorites-all').hidden = saved.length <= 4;
-  $('#favorites-all').textContent = 'Browse all ' + favorites.size + ' favorites →';
-  $('#favorite-shelf').hidden = !saved.length;
-  $('#recent-empty').hidden = !!(recentGames.length || saved.length);
-}
+// One shelf, four cards. Recent games come first; favorites fill whatever room
+// is left, so the row never grows into a second shelf under itself.
+const SHELF_LIMIT = 4;
 
-function renderPicks() {
-  $('#picks-list').replaceChildren(...PICKS.map(pick => shelfGame(pick.slug, pick.reason)));
+function renderRecent() {
+  const saved = [...favorites].filter(slug => !recentGames.includes(slug));
+  const shown = [...recentGames, ...saved].slice(0, SHELF_LIMIT);
+  $('#recent-list').replaceChildren(...shown.map(slug => shelfGame(slug,
+    (EXTERNS[slug] ? 'Online extra · ' : '') + (recentGames.includes(slug)
+      ? (favorites.has(slug) ? 'Favorite · Recently played' : 'Recently played')
+      : 'Favorite'))));
+  $('#favorites-all').hidden = !favorites.size;
+  $('#favorites-all').textContent = 'Browse ' + favorites.size + (favorites.size === 1 ? ' favorite' : ' favorites') + ' →';
+  $('#recent-empty').hidden = shown.length > 0;
 }
 
 function renderCollections() {
@@ -306,7 +306,7 @@ function openGame(slug, challenge = null) {
   if (!ORDER.some(([id]) => id === slug)) return;
   if (!activeSlug) {
     const origin = document.activeElement;
-    const shelf = origin.closest?.('#recent-list, #favorite-list, #picks-list, #grid');
+    const shelf = origin.closest?.('#recent-list, #grid');
     launchSelector = shelf ? '#' + shelf.id + ' [data-slug="' + slug + '"]' : origin.id ? '#' + origin.id : '';
   }
   closeMenu();
@@ -364,9 +364,10 @@ function closeGame() {
   $('#challenge-progress').hidden = true;
   syncSharedScores();
   renderDaily();
-  const movedFavorite = launchSelector.startsWith('#favorite-list ')
-    ? $(`#recent-list [data-slug="${previousSlug}"]`) : null;
-  (wasDaily ? $('#daily-play') : ((launchSelector && $(launchSelector)) || movedFavorite || $(`#grid [data-slug="${previousSlug}"]`) || searchInput)).focus();
+  const returnTo = (launchSelector && $(launchSelector)) ||
+    $(`#recent-list [data-slug="${previousSlug}"]`) ||
+    $(`#grid [data-slug="${previousSlug}"]`) || searchInput;
+  (wasDaily ? $('#daily-play') : returnTo).focus();
 }
 
 function showHint(message) {
@@ -696,10 +697,68 @@ function renderAccount() {
   } else {
     state.textContent = 'Playing as a guest. Scores stay in this browser.';
     action.textContent = 'Sign in';
-    // Accounts are optional; the daily Play button carries the primary emphasis.
-    action.classList.remove('primary');
+    // Signing in is the one thing a guest has to find, so it carries the weight.
+    action.classList.add('primary');
     rename.hidden = true;
   }
+}
+
+/* ── Feedback ─────────────────────────────────────────────────────────────── */
+
+let feedbackBusy = false;
+
+function openFeedbackDialog() {
+  if (!backendReady()) return;
+  const dialog = $('#feedback-dialog');
+  $('#feedback-status').textContent = '';
+  $('#feedback-email').value = getSession()?.user?.email || '';
+  if (!dialog.open) {
+    if (dialog.showModal) dialog.showModal();
+    else dialog.setAttribute('open', '');
+  }
+  setTimeout(() => $('#feedback-text').focus(), 40);
+}
+
+function closeFeedbackDialog() {
+  const dialog = $('#feedback-dialog');
+  if (dialog.close) dialog.close();
+  else dialog.removeAttribute('open');
+}
+
+async function submitFeedback(event) {
+  event.preventDefault();
+  if (feedbackBusy) return;
+  const message = $('#feedback-text').value.trim();
+  const email = $('#feedback-email').value.trim();
+  const status = $('#feedback-status');
+  if (message.length < 4) { status.textContent = 'Tell us a little more first.'; return; }
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { status.textContent = 'That email does not look right.'; return; }
+  feedbackBusy = true;
+  $('#feedback-submit').disabled = true;
+  status.textContent = 'Sending…';
+  try {
+    await sendFeedback({ message, email });
+    $('#feedback-text').value = '';
+    closeFeedbackDialog();
+    const button = $('#feedback-open');
+    button.textContent = 'Thanks — sent';
+    button.disabled = true;
+    setTimeout(() => { button.textContent = 'Send feedback'; button.disabled = false; }, 4000);
+  } catch (err) {
+    status.textContent = feedbackErrorMessage(err);
+  } finally {
+    feedbackBusy = false;
+    $('#feedback-submit').disabled = false;
+  }
+}
+
+function initFeedback() {
+  $('#feedback-open').onclick = openFeedbackDialog;
+  $('#feedback-cancel').onclick = closeFeedbackDialog;
+  $('#feedback-form').addEventListener('submit', submitFeedback);
+  $('#feedback-dialog').addEventListener('click', event => {
+    if (event.target === $('#feedback-dialog')) closeFeedbackDialog();
+  });
 }
 
 function openAuthDialog(mode = 'signin') {
@@ -1013,16 +1072,16 @@ setInterval(renderDaily, 60000);
 loadLibrary();
 renderDaily();
 renderRecent();
-renderPicks();
 renderCollections();
 renderLibrary();
 initAccount();
+initFeedback();
 
 // The original single-file hub exposed these globals; keep them for the test
 // suite and for anyone poking at the console.
 Object.assign(window, {
   openGame, closeGame, renderDaily, readDaily, dailyChallenge, dailyCheck,
-  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, DISCOVERY, COLLECTIONS, PICKS, PREVIEWS, LB_GAMES, HIGH_SCORE_GAMES,
+  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, DISCOVERY, COLLECTIONS, PREVIEWS, LB_GAMES, HIGH_SCORE_GAMES,
   captureHighScore: captureBest, accountStandings, boardGames, isLocalOnly, scoreRules
 });
 Object.defineProperty(window, 'currentDaily', { get: () => activeChallenge });

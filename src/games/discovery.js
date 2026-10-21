@@ -38,14 +38,6 @@ export const DISCOVERY = {
   klang: info('Open-ended', 'Listening', ['Mouse', 'Touch'])
 };
 
-// Deliberately fixed picks with reasons; never presented as algorithmic personalization.
-export const PICKS = [
-  { slug: 'deep', reason: 'A dungeon you can take one turn at a time.' },
-  { slug: 'sand', reason: 'No timer. Just materials and a little curiosity.' },
-  { slug: 'connect-four', reason: 'One device, two players, a familiar rivalry.' },
-  { slug: 'lights-out', reason: 'Five by five. A small puzzle with a clever twist.' }
-];
-
 export const COLLECTIONS = [
   { id: 'all', name: 'All games', note: 'The whole arcade, at your own pace.' },
   { id: 'quick', name: 'Quick Break', note: 'Short rounds or easy stopping points. A few minutes is enough.' },
