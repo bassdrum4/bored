@@ -124,52 +124,22 @@ export const HIGH_SCORE_GAMES = [
 export const LB_GAMES = [...LEGACY_GAMES, ...HIGH_SCORE_GAMES];
 const highScoreSpec = new Map(HIGH_SCORE_GAMES.map(game => [game.id, game]));
 
-/* ── Which rule a game posts under ─────────────────────────────────────────── */
+/* ── Which boards the shared table can hold ───────────────────────────────── */
 
-// The scores table only accepts games that have a row in score_rules, and adding
-// rows is a schema change. Games without a row of their own borrow the closest
-// existing one instead, so their scores still reach the shared board: DEEP ranks
-// on Void Runner's generic "Score" rule and Lights Out on Breakout's "Layouts
-// cleared". A real row for the game wins automatically if one is ever added.
-export const RULE_ALIAS = {
-  deep: 'void-runner',
-  'lights-out': 'breakout'
-};
+// The scores table only accepts games that have a row in score_rules, so each
+// game is its own board and one without a row yet is marked local-only: its
+// best still saves in the browser, and nothing is posted for it.
 
-/** The game id the scores table will actually hold, or null when nothing fits. */
-export function postingGameId(id) {
-  // Until the rule list arrives, assume every game is its own board; the picker
-  // re-renders once the backend has answered.
-  if (!scoreRules.size) return id;
-  if (scoreRules.has(id)) return id;
-  const borrowed = RULE_ALIAS[id];
-  return borrowed && scoreRules.has(borrowed) ? borrowed : null;
-}
-
-/** True when the game posts on another game's board instead of its own. */
-export function isMerged(id) {
-  const host = postingGameId(id);
-  return host !== null && host !== id;
-}
-
-/** Games that are their own board, so the picker lists one entry per board. */
-export function boardGames() {
-  return LB_GAMES.filter(game => !isMerged(game.id));
-}
-
-/** Games folded into this board because they have no rule row of their own. */
-export function mergedInto(hostId) {
-  return LB_GAMES.filter(game => game.id !== hostId && postingGameId(game.id) === hostId);
-}
-
-/** True when the game has no rule and no stand-in, so it can only save locally. */
+/** True when the backend has no rule for the game, so it can only save locally. */
 export function isLocalOnly(id) {
-  return postingGameId(id) === null;
+  return scoreRules.size ? !scoreRules.has(id) : false;
 }
 
-export function boardTitle(game) {
-  const shared = mergedInto(game.id).map(entry => entry.name);
-  return shared.length ? game.name + ' + ' + shared.join(' + ') : game.name;
+/** Games in picker order: boards the backend can hold come first. */
+export function boardGames() {
+  if (!scoreRules.size) return LB_GAMES.slice();
+  return LB_GAMES.slice().sort((a, b) =>
+    (scoreRules.has(a.id) ? 0 : 1) - (scoreRules.has(b.id) ? 0 : 1));
 }
 
 export function bestValue(game) {
@@ -249,29 +219,28 @@ export async function syncScores() {
   }
   let posted = false;
   for (const game of LB_GAMES) {
-    const gameId = postingGameId(game.id);
-    if (!gameId) continue;
+    if (isLocalOnly(game.id)) continue;
     let score = bestValue(game);
     if (!score || !Number.isFinite(score)) continue;
     score = Math.round(score);
-    const rule = scoreRules.get(gameId);
+    const rule = scoreRules.get(game.id);
     const ceiling = Number.isFinite(game.max) ? game.max : rule?.max_value;
     if (Number.isFinite(ceiling) && score > ceiling) continue;
-    const previous = submitted[gameId];
+    const previous = submitted[game.id];
     if (previous != null && (game.lower ? score >= previous : score <= previous)) continue;
     try {
       await request('/rest/v1/scores?on_conflict=user_id,game', {
         method: 'POST',
         body: {
           user_id: session.user.id,
-          game: gameId,
+          game: game.id,
           value: score,
           score,
           updated_at: new Date().toISOString()
         },
         prefer: 'resolution=merge-duplicates,return=minimal'
       });
-      submitted[gameId] = score;
+      submitted[game.id] = score;
       writeStored(submittedKey, submitted);
       posted = true;
     } catch (err) {

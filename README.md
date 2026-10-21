@@ -23,7 +23,7 @@ npm run build    # writes dist/index.html, then copies it to index.html
 | [`src/index.html`](src/index.html) | Page shell and leaderboard/auth dialogs |
 | [`src/main.js`](src/main.js) | Hub wiring: library, player chrome, daily section, leaderboard and account UI |
 | [`src/hub/backend.js`](src/hub/backend.js) | Supabase request/session layer, score rules, auth helpers |
-| [`src/hub/scores.js`](src/hub/scores.js) | Score specs, borrowed rules, best capture, sync, and ranking |
+| [`src/hub/scores.js`](src/hub/scores.js) | Score specs, best capture, sync, and ranking |
 | [`src/hub/store.js`](src/hub/store.js) | Safe `localStorage` helpers |
 | [`src/styles.css`](src/styles.css) | Site styles |
 | [`src/games/content/`](src/games/content) | The hand-written games, one readable HTML file each — including DEEP |
@@ -191,13 +191,11 @@ players from the button in their controls.
 accepts. The hub waits for that list and never posts a game missing from it,
 which is why a new game no longer produces a foreign-key error.
 
-Two games have no rule row of their own: DEEP and Lights Out. Instead of needing
-a schema change they borrow the closest existing rule (`RULE_ALIAS` in
-[`src/hub/scores.js`](src/hub/scores.js)): DEEP ranks on Void Runner's generic
-*Score* rule and Lights Out on Breakout's *Layouts cleared*. Their scores appear
-on that game's board, which the picker labels **Void Runner + DEEP** and
-**Breakout + Lights Out** and the note underneath explains. A real row for the
-game always wins, so this needs no code change if the rules are ever added:
+Every game ranks on its own board and nothing is ever folded into another
+score. Two games have no rule row of their own yet — DEEP and Lights Out — so
+they are marked **(local only)** in the leaderboard picker: their bests still
+save in the browser, and the note under the board says so. Adding their rows
+puts them on their own boards exactly like every other game, no code change:
 
 ```sql
 insert into score_rules (game, label, better, max_value)
@@ -298,8 +296,8 @@ simulated equity, no-peeking opponents and draw discards, 8 Ball's simulated sho
 Lighthouse's overlay, all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, UTC rollover, 320px layouts,
-blocked storage, high-score capture, the shared-board picker (including DEEP and
-Lights Out borrowing a rule), and no external game requests beyond the
+blocked storage, high-score capture, the shared-board picker (one board per
+game, local-only ones marked), and no external game requests beyond the
 configured leaderboard API.
 
 The built `index.html` is the artifact the browser block loads. The bundle keeps

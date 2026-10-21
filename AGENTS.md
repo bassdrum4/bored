@@ -8,7 +8,7 @@ silently disappears from scores, the daily challenge, or the build.
 ```
 src/main.js              hub wiring: library, player chrome, daily, leaderboard + account UI
 src/hub/backend.js       Supabase request/session layer, score rules, auth helpers
-src/hub/scores.js        score specs, shared-board aliases, best capture, sync, ranking
+src/hub/scores.js        score specs, best capture, sync, ranking
 src/hub/store.js         safe localStorage helpers
 src/daily.js             daily challenge rotation + snapshot adapters
 src/games/catalog.js     ORDER (grid order), META (category, blurb), EXTERNS (off-site games)
@@ -127,8 +127,8 @@ Best values are cached locally (`bored.high.<id>`) and pushed to the `scores` ta
 players. Games in that list appear in the leaderboard picker, so the id must match the snapshot
 `slug` and the catalog key. `scores.game` is a foreign key to `score_rules.game`, so a game only
 posts once it has a rule row: keep `src/games/score-rules.json` in step with the specs and run
-`npm run games:register` after adding games. Two games that lack a row borrow the closest rule
-(`RULE_ALIAS`) instead of sharing nothing.
+`npm run games:register` after adding games. A game with no row is listed as *local only* in the
+picker and never posts — every game gets its own board, nothing shares one.
 
 ## Hook 3 — daily challenge
 

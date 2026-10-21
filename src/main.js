@@ -9,8 +9,8 @@ import {
   signIn, signUp, signOut, adoptToken
 } from './hub/backend.js';
 import {
-  LB_GAMES, HIGH_SCORE_GAMES, accountStandings, rankPoints, boardGames, boardTitle,
-  mergedInto, postingGameId, isLocalOnly, bestValue, formatScore, recordBest,
+  LB_GAMES, HIGH_SCORE_GAMES, accountStandings, rankPoints, boardGames,
+  isLocalOnly, bestValue, formatScore, recordBest,
   syncScores, onScoresPosted
 } from './hub/scores.js';
 
@@ -409,15 +409,12 @@ function renderGamePicker() {
   const select = $('#lb-game');
   if (!select) return;
   const options = boardGames();
-  // A game that borrows another board should land on that board when picked.
-  const host = postingGameId(lbGameId);
-  if (host && host !== lbGameId) lbGameId = host;
   if (!options.some(game => game.id === lbGameId)) lbGameId = options[0]?.id || 'overall';
   select.replaceChildren();
   for (const game of options) {
     const option = document.createElement('option');
     option.value = game.id;
-    option.textContent = boardTitle(game) + (isLocalOnly(game.id) ? ' (local only)' : '');
+    option.textContent = game.name + (isLocalOnly(game.id) ? ' (local only)' : '');
     select.appendChild(option);
   }
   select.value = lbGameId;
@@ -425,13 +422,8 @@ function renderGamePicker() {
 
 function gameNote(game) {
   const unit = game.unit === 'seconds' ? 'time' : game.unit;
-  const parts = [boardTitle(game) + ' · ' + (game.lower ? 'lowest' : 'highest') + ' ' + unit + ' first.'];
+  const parts = [game.name + ' · ' + (game.lower ? 'lowest' : 'highest') + ' ' + unit + ' first.'];
   if (game.note) parts.push(game.note + '.');
-  const shared = mergedInto(game.id).map(entry => entry.name);
-  if (shared.length) {
-    parts.push(shared.join(' and ') + (shared.length > 1 ? ' share' : ' shares') +
-      ' this board — the backend has no rule for ' + (shared.length > 1 ? 'them' : 'it') + ' yet.');
-  }
   if (isLocalOnly(game.id)) parts.push('Not ranked online yet — scores for this game stay in your browser.');
   return parts.join(' ');
 }
@@ -511,7 +503,7 @@ function renderLeaderboard() {
           const spec = LB_GAMES.find(g => g.id === entry.game);
           if (!spec) continue;
           const line = element('li');
-          line.append(element('span', '', boardTitle(spec)), element('span', '', formatScore(entry.value, spec)));
+          line.append(element('span', '', spec.name), element('span', '', formatScore(entry.value, spec)));
           detail.appendChild(line);
         }
         if (!detail.children.length) detail.appendChild(element('li', '', 'No saved scores yet.'));
@@ -533,15 +525,10 @@ function renderLeaderboard() {
       ? 'Your account: #' + (myRank + 1) + ' · ' + me.points + ' points · ' + me.gamesRanked + ' games scoring.'
       : (getSession() ? 'Play a game to put your account on the board.' : 'Sign in to put your account on the board.');
   } else if (game) {
-    // Scores that share this board still deserve their own local best line.
     const parts = [];
     if (rows.length) parts.push(rows.length + (rows.length === 1 ? ' player' : ' players') + ' ranked');
     const local = bestValue(game);
     if (local) parts.push('your best: ' + formatScore(local, game));
-    for (const entry of mergedInto(game.id)) {
-      const shared = bestValue(entry);
-      if (shared) parts.push('your ' + entry.name + ' best: ' + formatScore(shared, entry));
-    }
     const myRow = getSession() && handle ? rows.find(row => String(row.handle).toLowerCase() === mineKey) : null;
     if (myRow) parts.push('on the board: #' + (rows.indexOf(myRow) + 1));
     $('#lb-mine').textContent = parts.length
@@ -913,7 +900,7 @@ initAccount();
 Object.assign(window, {
   openGame, closeGame, renderDaily, readDaily, dailyChallenge, dailyCheck,
   CHALLENGES, ORDER, EXTERNS, NEW_GAMES, META, LB_GAMES, HIGH_SCORE_GAMES,
-  captureHighScore: captureBest, accountStandings, boardGames, postingGameId, mergedInto, scoreRules
+  captureHighScore: captureBest, accountStandings, boardGames, isLocalOnly, scoreRules
 });
 Object.defineProperty(window, 'currentDaily', { get: () => activeChallenge });
 Object.defineProperty(window, 'current', { get: () => activeSlug });

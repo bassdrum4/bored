@@ -899,23 +899,23 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), '2402', 'a cleared descent posts its bonus score');
 
-      // DEEP and Lights Out have no score_rules row of their own, so they post
-      // under the closest existing rule rather than needing a schema change.
-      assert.deepEqual(
-        await page.evaluate(() => ({
-          deep: postingGameId('deep'),
-          lights: postingGameId('lights-out'),
-          own: postingGameId('tetris')
-        })),
-        { deep: 'void-runner', lights: 'breakout', own: 'tetris' }
-      );
+      // Every game ranks on its own board. One the server has no rule row for
+      // is listed too, marked local-only, rather than folding into another
+      // game's score — so this holds whatever the live rule list contains.
       const options = await page.$$eval('#lb-game option', els => els.map(el => [el.value, el.textContent]));
-      const boards = await page.evaluate(() => ({ total: LB_GAMES.length, pickable: boardGames().length }));
-      assert.equal(options.length, boards.pickable, 'one picker entry per shared board');
-      assert.equal(boards.pickable, boards.total - 2, 'only DEEP and Lights Out borrow a board');
-      assert.deepEqual(options.filter(([id]) => id === 'deep' || id === 'lights-out'), [], 'borrowed boards are not listed twice');
-      assert.match(options.find(([id]) => id === 'void-runner')[1], /Void Runner \+ DEEP/, 'the shared board names both games');
-      assert.match(options.find(([id]) => id === 'breakout')[1], /Breakout \+ Lights Out/);
+      const boards = await page.evaluate(() => ({
+        total: LB_GAMES.length,
+        pickable: boardGames().length,
+        localOnly: LB_GAMES.filter(game => isLocalOnly(game.id)).map(game => game.id)
+      }));
+      assert.equal(boards.pickable, boards.total, 'every game is its own board');
+      assert.equal(options.length, boards.total, 'one picker entry per game');
+      assert.equal(new Set(options.map(([id]) => id)).size, boards.total, 'no board is listed twice');
+      assert.ok(options.every(([, label]) => !label.includes(' + ')), 'no board is labelled with borrowed games');
+      for (const [id, label] of options) {
+        assert.equal(label.endsWith(' (local only)'), boards.localOnly.includes(id),
+          id + ' is marked local-only exactly when the server has no rule for it');
+      }
       assert.equal(await page.$eval('#lb-game', el => el.value), '2048');
       assert.match(await text(page, '#lb-note'), new RegExp('across ' + boards.total + ' games'));
     } finally {
