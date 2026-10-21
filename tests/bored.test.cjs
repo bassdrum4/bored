@@ -105,9 +105,18 @@ function dateFor(slug) {
   }
   throw new Error('No challenge for ' + slug);
 }
-test('the daily rotation covers every challenge game, changes targets, and uses UTC', () => {
+test('the daily rotation covers every challenge game, changes targets, and uses Eastern Time', () => {
   const { dailyDate, dailyChallenge, CHALLENGES } = challengeRules();
   assert.equal(dailyDate(new Date('2026-10-09T00:30:00+02:00')), '2026-10-08');
+  // The day turns at midnight in Detroit, not UTC: in summer (EDT, UTC-4)
+  // 03:30Z is still the previous evening and 04:30Z is already the next day.
+  assert.equal(dailyDate(new Date('2026-10-09T03:30:00Z')), '2026-10-08');
+  assert.equal(dailyDate(new Date('2026-10-09T04:30:00Z')), '2026-10-09');
+  // In winter (EST, UTC-5) the turn happens an hour later than in summer.
+  assert.equal(dailyDate(new Date('2026-01-10T04:30:00Z')), '2026-01-09');
+  assert.equal(dailyDate(new Date('2026-01-10T05:30:00Z')), '2026-01-10');
+  // The spring-forward morning still produces one date per Detroit day.
+  assert.equal(dailyDate(new Date('2026-03-08T06:30:00Z')), '2026-03-08');
   const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 9, 8 + n)).toISOString().slice(0, 10)));
   assert.equal(new Set(rotation.map(c => c.slug)).size, CHALLENGES.length);
   assert.ok(rotation.every(c => !c.goal.includes('{target}')));

@@ -103,10 +103,12 @@ matches the frame, so a portrait phone sees tall rooms rather than a letterbox.
 ## Daily challenge
 
 The featured challenge rotates through **31 of the offline games**, with a distinct
-goal for each game. Everyone gets the same game and target for a given UTC date;
-after a full circuit, most targets change difficulty. Goals reset at **midnight
-UTC**, including when the hub is left open. Normal gameplay randomness is unchanged:
-this is a shared objective, not a promise of identical boards or enemy spawns.
+goal for each game. Everyone gets the same game and target for a given date;
+after a full circuit, most targets change difficulty. The day is **Eastern Time**:
+`dailyDate` formats the clock in `America/Detroit`, so the challenge rolls over at
+**midnight in Detroit** (DST included) wherever the player is, even when the hub
+is left open. Normal gameplay randomness is unchanged: this is a shared objective,
+not a promise of identical boards or enemy spawns.
 
 Examples include clearing Tetris lines, completing Simon sequences (not merely
 watching them), rescuing Lighthouse's three ships, beating the Connect Four
@@ -295,7 +297,7 @@ simulated equity, no-peeking opponents and draw discards, 8 Ball's simulated sho
 (pots, safeties, escapes, no avoidable fouls or scratches, a whole self-played rack),
 Lighthouse's overlay, all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
-saved results, sharing with clipboard fallback, UTC rollover, 320px layouts,
+saved results, sharing with clipboard fallback, Detroit-time rollover, 320px layouts,
 blocked storage, high-score capture, the shared-board picker (one board per
 game, local-only ones marked), and no external game requests beyond the
 configured leaderboard API.

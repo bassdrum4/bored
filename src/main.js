@@ -352,7 +352,7 @@ function readDaily(challenge) {
 function renderDaily() {
   const challenge = dailyChallenge(challengeDate());
   const result = readDaily(challenge);
-  $('#daily-date').textContent = challenge.date + ' · RESETS AT MIDNIGHT UTC';
+  $('#daily-date').textContent = challenge.date + ' · RESETS AT MIDNIGHT DETROIT TIME';
   $('#daily-heading').textContent = ORDER.find(([slug]) => slug === challenge.slug)[1] + ' · ' + challenge.label;
   $('#daily-goal').textContent = challenge.goal;
   $('#daily-status').textContent = result

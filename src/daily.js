@@ -1,7 +1,13 @@
 // Daily challenge definitions and verification. Kept data-only so it can be tested in isolation.
 
+// The challenge day rolls over at midnight in Detroit (Eastern Time) wherever
+// the player is; Intl applies the daylight-saving shifts for free. The formatter
+// is built once and cached on the function, which keeps it self-contained.
 export function dailyDate(now = new Date()) {
-  return now.toISOString().slice(0, 10);
+  dailyDate.day ||= new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Detroit', year: 'numeric', month: '2-digit', day: '2-digit'
+  });
+  return dailyDate.day.format(now);
 }
 // Each adapter reads current-run state, never saved high scores. Thresholds rotate every circuit.
 export const CHALLENGES = [
