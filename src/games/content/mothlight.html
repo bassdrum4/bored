@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mothlight</title>
+<meta name="description" content="A moth, a lantern, and seven moonflowers. Play the CPU or a friend on one keyboard.">
+<style>
+  :root {
+    --bg: #f6f5f0;
+    --field: #ece8dc;
+    --ink: #22221e;
+    --muted: #7b7669;
+    --hair: #d9d5c9;
+    --accent: #b3261e;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.5 var(--sans);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #app { display: flex; flex-direction: column; height: 100%; max-width: 1000px; margin: 0 auto; padding: 12px 16px 14px; gap: 10px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; padding: 0 56px 8px 0; border-bottom: 1px solid var(--hair); }
+  h1 { font: 600 12px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; }
+  #hud { display: flex; flex-wrap: wrap; gap: 2px 16px; font: 11px/1.5 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  #hud b { color: var(--ink); font-weight: 600; }
+  #hud .hot { color: var(--accent); }
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #stage { position: relative; width: min(100%, calc((100vh - 130px) * 1.6)); border: 1px solid var(--ink); background: var(--field); }
+  canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; touch-action: none; }
+  #screen { position: absolute; inset: 0; display: grid; padding: 12px; overflow: auto; background: rgba(246, 245, 240, .94); }
+  #screen.soft { background: rgba(246, 245, 240, .82); }
+  #box { margin: auto; width: min(100%, 470px); display: flex; flex-direction: column; gap: 10px; }
+  #box p { max-width: 62ch; }
+  .eyebrow { font: 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .title { font: 600 26px/1.15 var(--sans); }
+  .rules { list-style: none; display: grid; gap: 6px; }
+  .rules li { display: grid; grid-template-columns: 64px 1fr; gap: 10px; }
+  .rules b { font: 11px/1.7 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+  .keys { border-top: 1px solid var(--hair); padding-top: 8px; display: grid; gap: 4px; color: var(--muted); }
+  .keys b { color: var(--ink); font-weight: 600; margin-right: 8px; }
+  .muted { color: var(--muted); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  button {
+    font: 600 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+    background: transparent; color: var(--ink); border: 1px solid var(--ink); border-radius: 2px;
+    padding: 11px 14px; cursor: pointer;
+  }
+  button:hover, button:focus-visible { background: var(--ink); color: var(--bg); outline: none; }
+  button.primary { background: var(--ink); color: var(--bg); }
+  button.primary:hover, button.primary:focus-visible { background: var(--accent); border-color: var(--accent); }
+  #act { min-width: 120px; touch-action: none; }
+  #act.on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  kbd { font: 11px/1 var(--mono); border: 1px solid var(--hair); border-bottom-width: 2px; border-radius: 2px; padding: 2px 5px; margin-right: 2px; color: var(--ink); }
+  [hidden] { display: none !important; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  @media (max-height: 560px) { .rules, .keys { display: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Mothlight</h1>
+    <div id="hud"></div>
+  </header>
+  <main>
+    <div id="stage">
+      <canvas id="cv" width="960" height="600" role="img" aria-label="Playing field with a lantern, a moth and moonflowers."></canvas>
+      <div id="screen"><div id="box"></div></div>
+    </div>
+    <button id="act" type="button" hidden>Action</button>
+  </main>
+  <div class="sr" id="live" aria-live="polite"></div>
+</div>
+
+<script>
+(function () {
+'use strict';
+var W = 960, H = 600;
+var C = {
+  WIN: 3, BLOOMS: 7, DAWN: 30,
+  mothSpeed: 235, dartSpeed: 560, dartTime: 0.2, dartCD: 2.0,
+  lanternSpeed: 170, flareSlow: 0.55,
+  pullR: 200, flarePullR: 260, pull: 135, flarePull: 230,
+  flameR: 42, burnRate: 1.0, burnDecay: 0.28,
+  oilDrain: 0.42, oilRegen: 0.2, oilMin: 0.25,
+  bloomLife: 10, bloomCount: 3, bloomSafe: 170, pickR: 24,
+  aiChase: 0.7, aiLead: 0.2, aiFlareAt: 220
+};
+var INK = '#22221e', MUTED = '#7b7669', HAIR = '#d9d5c9', ACCENT = '#b3261e', FIELD = '#ece8dc';
+function $(id) { return document.getElementById(id); }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function rand(a, b) { return a + Math.random() * (b - a); }
+function get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+function put(key, v) { try { localStorage.setItem(key, v); } catch (e) {} }
+
+var cv = $('cv'), ctx = cv.getContext('2d');
+var dpr = Math.min(window.devicePixelRatio || 1, 2);
+cv.width = W * dpr; cv.height = H * dpr;
+var screenEl = $('screen'), box = $('box'), hudEl = $('hud'), liveEl = $('live'), actBtn = $('act');
+
+/* ---------- state ---------- */
+var S = { state: 'title', paused: false, t: 0, round: 0, wins: [0, 0], mothP: 0, introT: 0,
+  time: C.DAWN, got: 0, why: '', winner: -1, endT: 0, shown: false, cpu: false, auto: false };
+var M = { x: 0, y: 0, vx: 0, vy: 0, ang: -Math.PI / 2, flap: 0, burn: 0, dartT: 0, dartCD: 0, dx: 0, dy: 0 };
+var L = { x: W / 2, y: H / 2, oil: 1, flaring: false, exhausted: false, needRelease: false, ring: C.pullR };
+var blooms = [];
+var ai = { x: 0, y: 0 };
+var best = Number(get('bored.mothlight.best')) || 0;
+
+/* ---------- input ---------- */
+var MAP = [
+  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], act: ['Space'] },
+  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], act: ['ShiftRight', 'Slash'] }
+];
+/* One player on the keyboard may use either set. */
+var SOLO = {
+  up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
+  act: ['Space', 'ShiftRight', 'ShiftLeft', 'Slash']
+};
+var down = {};
+var edge = [false, false];
+var touch = { x: null, y: null, act: false };
+var BLOCK = { Space: 1, ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Slash: 1 };
+function any(codes) { for (var i = 0; i < codes.length; i++) if (down[codes[i]]) return true; return false; }
+function keyAxis(m) {
+  var x = (any(m.right) ? 1 : 0) - (any(m.left) ? 1 : 0);
+  var y = (any(m.down) ? 1 : 0) - (any(m.up) ? 1 : 0);
+  var l = Math.hypot(x, y);
+  return l ? { x: x / l, y: y / l } : { x: 0, y: 0 };
+}
+function humanInput(p) {
+  var m = S.cpu ? SOLO : MAP[p];
+  var a = keyAxis(m), held = any(m.act);
+  if (S.cpu && touch.x !== null) {
+    var from = S.mothP === p ? M : L;
+    var dx = touch.x - from.x, dy = touch.y - from.y, d = Math.hypot(dx, dy);
+    if (d > 10) a = { x: dx / d, y: dy / d };
+  }
+  if (S.cpu && touch.act) held = true;
+  return { x: a.x, y: a.y, held: held };
+}
+addEventListener('keydown', function (e) {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (BLOCK[e.code]) e.preventDefault();
+  if (!e.repeat) {
+    var codes = S.cpu ? [SOLO.act, SOLO.act] : [MAP[0].act, MAP[1].act];
+    for (var p = 0; p < 2; p++) if (codes[p].indexOf(e.code) >= 0) edge[p] = true;
+    if (e.code === 'KeyP') togglePause();
+    if (e.code === 'Enter') advance();
+    if (e.code === 'Space' && (S.state === 'roundEnd' || S.state === 'matchEnd')) advance();
+  }
+  down[e.code] = true;
+});
+addEventListener('keyup', function (e) { if (BLOCK[e.code]) e.preventDefault(); delete down[e.code]; });
+addEventListener('blur', function () { down = {}; touch.act = false; touch.x = null; actBtn.classList.remove('on'); });
+document.addEventListener('visibilitychange', function () { if (document.hidden && S.state === 'play' && !S.paused) togglePause(); });
+
+function toField(e) {
+  var r = cv.getBoundingClientRect();
+  touch.x = clamp((e.clientX - r.left) / r.width * W, 0, W);
+  touch.y = clamp((e.clientY - r.top) / r.height * H, 0, H);
+}
+cv.addEventListener('pointerdown', function (e) { if (!S.cpu || S.state !== 'play') return; cv.setPointerCapture(e.pointerId); toField(e); });
+cv.addEventListener('pointermove', function (e) { if (touch.x !== null) toField(e); });
+function stopSteer() { touch.x = null; touch.y = null; }
+cv.addEventListener('pointerup', stopSteer);
+cv.addEventListener('pointercancel', stopSteer);
+actBtn.addEventListener('pointerdown', function (e) { e.preventDefault(); touch.act = true; edge[0] = true; actBtn.classList.add('on'); });
+function actUp() { touch.act = false; actBtn.classList.remove('on'); }
+actBtn.addEventListener('pointerup', actUp);
+actBtn.addEventListener('pointerleave', actUp);
+actBtn.addEventListener('pointercancel', actUp);
+
+/* ---------- CPU ---------- */
+function aiMoth() {
+  var dx = L.x - M.x, dy = L.y - M.y, d = Math.hypot(dx, dy) || 1;
+  var pick = null, bestScore = 1e9, i;
+  for (i = 0; i < blooms.length; i++) {
+    var b = blooms[i];
+    var bd = Math.hypot(b.x - M.x, b.y - M.y), ld = Math.hypot(b.x - L.x, b.y - L.y);
+    var s = bd + (ld < 150 ? (150 - ld) * 2.5 : 0);
+    if (s < bestScore) { bestScore = s; pick = b; }
+  }
+  var tx = 0, ty = 0;
+  if (pick) {
+    var bx = pick.x - M.x, by = pick.y - M.y, bl = Math.hypot(bx, by) || 1;
+    tx = bx / bl; ty = by / bl;
+  }
+  var R = L.flaring ? C.flarePullR : C.pullR;
+  if (d < R) { var f = 1 - d / R; tx -= dx / d * f * 1.1; ty -= dy / d * f * 1.1; }
+  var safe = C.flameR * 2.6;
+  if (d < safe) { var g = (safe - d) / safe; tx -= dx / d * g * 3; ty -= dy / d * g * 3; }
+  var danger = (d < C.flameR * 1.8 && M.burn > 0.2) || M.burn > 0.55;
+  if (danger && M.dartCD <= 0 && M.dartT <= 0) return { x: -dx / d, y: -dy / d, held: true, tap: true };
+  var l = Math.hypot(tx, ty) || 1;
+  return { x: tx / l, y: ty / l, held: false };
+}
+function aiLantern() {
+  var px = M.x + M.vx * C.aiLead, py = M.y + M.vy * C.aiLead;
+  var dx = px - L.x, dy = py - L.y, d = Math.hypot(dx, dy) || 1;
+  var d0 = Math.hypot(M.x - L.x, M.y - L.y);
+  var want = L.flaring ? (d0 > C.flameR * 1.2 && L.oil > 0.05)
+    : (d0 < C.aiFlareAt && d0 > C.flameR * 2 && L.oil > 0.5);
+  return { x: dx / d * C.aiChase, y: dy / d * C.aiChase, held: want };
+}
+function cpuInput(p) {
+  var raw = S.mothP === p ? aiMoth() : aiLantern();
+  /* Smooth the steering so the CPU does not twitch, but let a dart go out at once. */
+  if (raw.tap) { ai.x = raw.x; ai.y = raw.y; } else { ai.x += (raw.x - ai.x) * 0.25; ai.y += (raw.y - ai.y) * 0.25; }
+  return { x: ai.x, y: ai.y, held: raw.held, tap: !!raw.tap };
+}
+function inputFor(p) {
+  if (S.auto || (S.cpu && p === 1)) return cpuInput(p);
+  return humanInput(p);
+}
+
+/* ---------- HUD and screens ---------- */
+function pct(v) { return Math.round(v * 100) + '%'; }
+function clock(t) { t = Math.ceil(t); return Math.floor(t / 60) + ':' + ('0' + (t % 60)).slice(-2); }
+function who(p) { return S.cpu ? (p === 0 ? 'You' : 'CPU') : 'P' + (p + 1); }
+function updateHUD() {
+  var h;
+  if (S.state === 'title') h = '<span>One moth, one lantern</span><span>Best <b>' + best + '</b> rounds vs CPU</span>';
+  else {
+    var mp = S.mothP, lp = 1 - mp;
+    h = '<span><b>' + who(mp) + '</b> moth</span>' +
+      '<span>Flowers <b>' + S.got + '/' + C.BLOOMS + '</b></span>' +
+      '<span>Singe <b class="' + (M.burn > 0.6 ? 'hot' : '') + '">' + pct(M.burn) + '</b></span>' +
+      '<span>Dart <b>' + (M.dartCD > 0 ? M.dartCD.toFixed(1) + 's' : 'ready') + '</b></span>' +
+      '<span><b>' + who(lp) + '</b> lantern</span>' +
+      '<span>Oil <b>' + pct(L.oil) + '</b></span>' +
+      '<span>Dawn <b>' + clock(S.time) + '</b></span>' +
+      '<span>Round <b>' + (S.round + 1) + '</b></span>' +
+      '<span>' + who(0) + ' <b>' + S.wins[0] + '</b> / ' + who(1) + ' <b>' + S.wins[1] + '</b></span>';
+  }
+  if (hudEl._h !== h) { hudEl._h = h; hudEl.innerHTML = h; }
+}
+function show(html, soft, focus) {
+  box.innerHTML = html; screenEl.hidden = false; screenEl.classList.toggle('soft', !!soft);
+  if (focus) { var b = box.querySelector('button'); if (b) b.focus({ preventScroll: true }); }
+}
+function hide() { screenEl.hidden = true; }
+function showTitle() {
+  show('<p class="eyebrow">One keyboard, one or two players</p>' +
+    '<h2 class="title">Mothlight</h2>' +
+    '<ul class="rules">' +
+    '<li><b>Moth</b><span>Gather seven moonflowers before dawn. The lantern pulls you in. Stay out of the flame.</span></li>' +
+    '<li><b>Lantern</b><span>Drag the moth into the flame. Hold action to flare: a wider, stronger pull, slower feet, and it burns oil.</span></li>' +
+    '<li><b>Match</b><span>Roles swap every round. Two players: first to three rounds. One player: the CPU holds the other side, and the match ends when it wins three rounds. Your rounds won are your score.</span></li>' +
+    '</ul>' +
+    '<div class="keys">' +
+    '<p><b>One player</b><kbd>WASD</kbd> or arrows to move, <kbd>Space</kbd> to dart or flare. Touch: drag to steer, hold Action.</p>' +
+    '<p><b>Player 1</b><kbd>WASD</kbd> <kbd>Space</kbd> <b style="margin-left:12px">Player 2</b><kbd>Arrows</kbd> <kbd>Right Shift</kbd> or <kbd>/</kbd></p>' +
+    '<p>Action darts the moth (tap) or flares the lantern (hold). P pauses.</p>' +
+    '</div>' +
+    '<div class="row"><button type="button" class="primary" data-mode="1">One player</button><button type="button" data-mode="2">Two players</button></div>', false, true);
+}
+function showIntro() {
+  var mp = S.mothP, lp = 1 - mp;
+  show('<p class="eyebrow">Round ' + (S.round + 1) + '</p>' +
+    '<h2 class="title">' + who(mp) + (who(mp) === 'You' ? ' are' : ' is') + ' the moth</h2>' +
+    '<p class="muted">' + who(lp) + (who(lp) === 'You' ? ' carry' : ' carries') + ' the lantern.</p>' +
+    '<p class="eyebrow" id="count">Starting</p>', true);
+  liveEl.textContent = 'Round ' + (S.round + 1) + '. ' + who(mp) + ' moth, ' + who(lp) + ' lantern.';
+}
+function scoreLine() {
+  return '<p>' + who(0) + ' ' + S.wins[0] + ' &ndash; ' + S.wins[1] + ' ' + who(1) + '</p>';
+}
+function showRoundEnd() {
+  var mp = S.mothP, lp = 1 - mp, head, line;
+  if (S.why === 'singe') { head = 'Singed'; line = who(lp) + ' held the flame. The moth burned.'; }
+  else if (S.why === 'dawn') { head = 'Dawn'; line = 'The night ran out with ' + S.got + ' of ' + C.BLOOMS + ' moonflowers.'; }
+  else { head = 'Seven moonflowers'; line = who(mp) + ' gathered the full set before dawn.'; }
+  show('<p class="eyebrow">Round ' + (S.round + 1) + ' result</p><h2 class="title">' + head + '</h2>' +
+    '<p>' + line + '</p>' + scoreLine() +
+    '<p class="muted">Round to ' + who(S.winner) + '. ' + who((S.round + 1) % 2) + ' will be the moth.</p>' +
+    '<div class="row"><button type="button" class="primary" data-act="next">Next round</button></div>', true, true);
+  liveEl.textContent = head + '. Round to ' + who(S.winner) + '. Score ' + S.wins[0] + ' to ' + S.wins[1] + '.';
+}
+function showMatchEnd() {
+  var title, sub;
+  if (S.cpu) { title = 'The CPU wins the match'; sub = 'You won ' + S.wins[0] + (S.wins[0] === 1 ? ' round.' : ' rounds.') + (S.wins[0] >= best && S.wins[0] > 0 ? ' That is your best.' : ' Best ' + best + '.'); }
+  else { title = who(S.winner) + ' takes the match'; sub = 'First to ' + C.WIN + ' rounds.'; }
+  show('<p class="eyebrow">Match over</p><h2 class="title">' + title + '</h2><p>' + sub + '</p>' + scoreLine() +
+    '<div class="row"><button type="button" class="primary" data-act="again">Play again</button><button type="button" data-act="title">Change mode</button></div>', true, true);
+  liveEl.textContent = title + '. ' + S.wins[0] + ' to ' + S.wins[1] + '.';
+}
+function showPause() {
+  show('<p class="eyebrow">Paused</p><h2 class="title">Paused</h2>' +
+    '<div class="row"><button type="button" class="primary" data-act="resume">Resume</button></div>' +
+    '<p class="muted">P resumes. Esc leaves the game.</p>', true, true);
+}
+box.addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.mode) { startMatch(b.dataset.mode === '1'); return; }
+  var a = b.dataset.act;
+  if (a === 'resume') togglePause();
+  else if (a === 'title') toTitle();
+  else if (a === 'again') startMatch(S.cpu);
+  else advance();
+});
+
+/* ---------- flow ---------- */
+function toTitle() {
+  S.state = 'title'; S.cpu = false; S.wins = [0, 0]; S.round = 0; S.paused = false;
+  actBtn.hidden = true;
+  resetWorld(); showTitle();
+}
+function startMatch(cpu) {
+  S.cpu = !!cpu; S.wins = [0, 0]; S.round = 0; S.paused = false;
+  actBtn.hidden = !S.cpu;
+  startRound();
+}
+function startRound() {
+  S.mothP = S.round % 2;
+  resetWorld();
+  S.state = 'intro'; S.introT = 1.8; S.winner = -1;
+  showIntro();
+}
+function advance() {
+  if (S.paused) return;
+  if ((S.state === 'roundEnd' || S.state === 'matchEnd') && S.shown && S.endT > 1.0) {
+    if (S.state === 'roundEnd') { S.round++; startRound(); } else startMatch(S.cpu);
+  }
+}
+function togglePause() {
+  if (S.paused) { S.paused = false; hide(); }
+  else if (S.state === 'play') { S.paused = true; showPause(); }
+}
+function endRound(key, why) {
+  var mp = S.mothP, lp = 1 - mp;
+  S.winner = key === 'moth' ? mp : lp; S.why = why; S.wins[S.winner]++;
+  S.endT = 0; S.shown = false; L.flaring = false;
+  var over = S.cpu ? S.wins[1] >= C.WIN : S.wins[S.winner] >= C.WIN;
+  S.state = over ? 'matchEnd' : 'roundEnd';
+  if (S.cpu && S.wins[0] > best) { best = S.wins[0]; put('bored.mothlight.best', String(best)); }
+}
+
+/* ---------- world ---------- */
+function resetWorld() {
+  M.x = W * (Math.random() < 0.5 ? 0.14 : 0.86); M.y = H * 0.8;
+  M.vx = M.vy = 0; M.ang = -Math.PI / 2; M.burn = 0; M.dartT = 0; M.dartCD = 0;
+  L.x = W / 2; L.y = H * 0.42; L.oil = 1; L.flaring = false; L.exhausted = false; L.needRelease = false; L.ring = C.pullR;
+  S.time = C.DAWN; S.got = 0; blooms = []; ai.x = ai.y = 0;
+  for (var i = 0; i < C.bloomCount; i++) spawnBloom(0.4);
+}
+function spawnBloom(age) {
+  var pick = null, i, tries;
+  for (tries = 0; tries < 40 && !pick; tries++) {
+    var x = rand(70, W - 70), y = rand(70, H - 70), ok = true;
+    if (Math.hypot(x - L.x, y - L.y) < C.bloomSafe) ok = false;
+    if (ok && Math.hypot(x - M.x, y - M.y) < 110) ok = false;
+    for (i = 0; ok && i < blooms.length; i++) if (Math.hypot(blooms[i].x - x, blooms[i].y - y) < 130) ok = false;
+    if (ok) pick = { x: x, y: y };
+  }
+  if (!pick) pick = { x: rand(70, W - 70), y: rand(70, H - 70) };
+  blooms.push({ x: pick.x, y: pick.y, age: age || 0 });
+}
+function lerpAngle(a, b, t) {
+  var d = ((b - a + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  return a + d * t;
+}
+
+/* ---------- update ---------- */
+function updateIdle(dt) {
+  L.x = W / 2 + Math.cos(S.t * 0.35) * 260; L.y = H / 2 + Math.sin(S.t * 0.5) * 120;
+  var a = S.t * 1.3, r = 100 + 25 * Math.sin(S.t * 0.8);
+  M.vx = (L.x + Math.cos(a) * r - M.x) * 3; M.vy = (L.y + Math.sin(a) * r * 0.7 - M.y) * 3;
+  M.x += M.vx * dt; M.y += M.vy * dt;
+  M.ang = Math.atan2(M.vy, M.vx); M.flap += dt * 30;
+}
+function updatePlay(dt) {
+  var mp = S.mothP, lp = 1 - mp, i;
+  var li = inputFor(lp), mi = inputFor(mp);
+
+  /* lantern */
+  var was = L.flaring;
+  if (!li.held) L.needRelease = false;
+  if (L.exhausted && L.oil >= C.oilMin) L.exhausted = false;
+  L.flaring = li.held && !L.exhausted && !L.needRelease && L.oil > 0;
+  if (L.flaring) {
+    L.oil -= C.oilDrain * dt;
+    if (L.oil <= 0) { L.oil = 0; L.exhausted = true; L.needRelease = true; L.flaring = false; }
+  } else L.oil = Math.min(1, L.oil + C.oilRegen * dt);
+  L.ring += ((L.flaring ? C.flarePullR : C.pullR) - L.ring) * Math.min(1, dt * 8);
+  var ls = C.lanternSpeed * (L.flaring ? C.flareSlow : 1);
+  L.x = clamp(L.x + li.x * ls * dt, 28, W - 28);
+  L.y = clamp(L.y + li.y * ls * dt, 28, H - 28);
+
+  /* moth */
+  var wantDart = edge[mp] || mi.tap;
+  if (wantDart && M.dartCD <= 0 && M.dartT <= 0) {
+    var dx = mi.x, dy = mi.y;
+    if (!dx && !dy) { dx = Math.cos(M.ang); dy = Math.sin(M.ang); }
+    var dl = Math.hypot(dx, dy) || 1;
+    M.dx = dx / dl; M.dy = dy / dl; M.dartT = C.dartTime; M.dartCD = C.dartCD;
+  }
+  edge[0] = edge[1] = false;
+  M.dartCD = Math.max(0, M.dartCD - dt);
+  var ddx = L.x - M.x, ddy = L.y - M.y, d = Math.hypot(ddx, ddy) || 1;
+  if (M.dartT > 0) {
+    M.vx = M.dx * C.dartSpeed; M.vy = M.dy * C.dartSpeed; M.dartT -= dt;
+  } else {
+    var tx = mi.x * C.mothSpeed, ty = mi.y * C.mothSpeed;
+    var R = L.flaring ? C.flarePullR : C.pullR, str = L.flaring ? C.flarePull : C.pull;
+    if (d < R) {
+      var f = 1 - d / R, nx = ddx / d, ny = ddy / d;
+      tx += (nx * str - ny * str * 0.28) * f;
+      ty += (ny * str + nx * str * 0.28) * f;
+    }
+    var k = Math.min(1, dt * 12);
+    M.vx += (tx - M.vx) * k; M.vy += (ty - M.vy) * k;
+  }
+  M.x += M.vx * dt; M.y += M.vy * dt;
+  if (M.x < 18) { M.x = 18; M.vx = Math.abs(M.vx) * 0.2; }
+  if (M.x > W - 18) { M.x = W - 18; M.vx = -Math.abs(M.vx) * 0.2; }
+  if (M.y < 18) { M.y = 18; M.vy = Math.abs(M.vy) * 0.2; }
+  if (M.y > H - 18) { M.y = H - 18; M.vy = -Math.abs(M.vy) * 0.2; }
+  var sp = Math.hypot(M.vx, M.vy);
+  if (sp > 25) M.ang = lerpAngle(M.ang, Math.atan2(M.vy, M.vx), Math.min(1, dt * 12));
+  M.flap += dt * (26 + sp / 14);
+
+  /* singe */
+  var fr = C.flameR * (L.flaring ? 1.25 : 1);
+  if (Math.hypot(L.x - M.x, L.y - M.y) < fr) M.burn = Math.min(1, M.burn + C.burnRate * dt);
+  else M.burn = Math.max(0, M.burn - C.burnDecay * dt);
+  if (M.burn >= 1) { endRound('lantern', 'singe'); return; }
+
+  /* moonflowers */
+  for (i = blooms.length - 1; i >= 0; i--) {
+    var b = blooms[i];
+    b.age += dt;
+    if (Math.hypot(b.x - M.x, b.y - M.y) < C.pickR) {
+      S.got++; M.burn = Math.max(0, M.burn - 0.2);
+      blooms.splice(i, 1);
+      if (S.got >= C.BLOOMS) { endRound('moth', 'blooms'); return; }
+      spawnBloom(0);
+    } else if (b.age > C.bloomLife) { blooms.splice(i, 1); spawnBloom(0); }
+  }
+
+  /* dawn */
+  S.time -= dt;
+  if (S.time <= 0) { S.time = 0; endRound('lantern', 'dawn'); }
+}
+function update(dt) {
+  if (S.paused) return;
+  S.t += dt;
+  if (S.state === 'title') updateIdle(dt);
+  else if (S.state === 'intro') {
+    S.introT -= dt;
+    var n = $('count');
+    if (n) n.textContent = 'Starting in ' + Math.max(1, Math.ceil(S.introT));
+    if (S.introT <= 0) { S.state = 'play'; hide(); edge[0] = edge[1] = false; }
+  } else if (S.state === 'play') updatePlay(dt);
+  else {
+    S.endT += dt;
+    if (!S.shown && S.endT >= 0.6) { S.shown = true; if (S.state === 'matchEnd') showMatchEnd(); else showRoundEnd(); }
+  }
+  if (S.state !== 'play') edge[0] = edge[1] = false;
+}
+
+/* ---------- drawing ---------- */
+function mix(a, b, t) { return Math.round(a + (b - a) * t); }
+function drawBloom(b) {
+  var wilt = C.bloomLife - b.age < 3;
+  ctx.save(); ctx.translate(b.x, b.y);
+  ctx.strokeStyle = INK; ctx.fillStyle = INK; ctx.lineWidth = 1.5;
+  if (wilt) ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.arc(0, 0, 9, 0, 7); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawMoth() {
+  var sx = 0.4 + 0.6 * Math.abs(Math.sin(M.flap));
+  var r = mix(34, 179, M.burn), g = mix(34, 38, M.burn), bl = mix(30, 30, M.burn);
+  var col = 'rgb(' + r + ',' + g + ',' + bl + ')';
+  ctx.save(); ctx.translate(M.x, M.y); ctx.rotate(M.ang + Math.PI / 2);
+  ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+  for (var side = 0; side < 2; side++) {
+    ctx.save(); if (side) ctx.scale(-1, 1);
+    ctx.beginPath(); ctx.moveTo(1, -4); ctx.lineTo(16 * sx + 2, -2); ctx.lineTo(13 * sx + 2, 9); ctx.lineTo(1, 5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.beginPath(); ctx.ellipse(0, 0, 2.6, 7, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-1, -8); ctx.lineTo(-4, -13); ctx.moveTo(1, -8); ctx.lineTo(4, -13); ctx.stroke();
+  ctx.restore();
+}
+function drawLantern() {
+  var fr = C.flameR * (L.flaring ? 1.25 : 1);
+  ctx.save();
+  ctx.strokeStyle = MUTED; ctx.lineWidth = 1; ctx.setLineDash([2, 8]);
+  ctx.beginPath(); ctx.arc(L.x, L.y, L.ring, 0, 7); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = ACCENT; ctx.fillStyle = 'rgba(179,38,30,0.10)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(L.x, L.y, fr, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.translate(L.x, L.y);
+  ctx.strokeStyle = INK; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, -13, 6, Math.PI, 0); ctx.stroke();
+  ctx.fillStyle = FIELD; ctx.fillRect(-8, -12, 16, 22); ctx.strokeRect(-8, -12, 16, 22);
+  ctx.fillStyle = ACCENT;
+  ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(-4, 0); ctx.lineTo(0, -8); ctx.lineTo(4, 0); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawLabels() {
+  ctx.save();
+  ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'; ctx.textAlign = 'center';
+  ctx.fillStyle = MUTED;
+  ctx.fillText(who(S.mothP), M.x, M.y - 20);
+  ctx.fillText(who(1 - S.mothP), L.x, L.y - 32);
+  ctx.restore();
+}
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = FIELD; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = HAIR; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+  for (var i = 0; i < blooms.length; i++) drawBloom(blooms[i]);
+  drawLantern();
+  drawMoth();
+  if (S.state !== 'title') drawLabels();
+}
+
+/* ---------- loop ---------- */
+var last = performance.now();
+function frame(now) {
+  var dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  update(dt); draw(); updateHUD();
+  requestAnimationFrame(frame);
+}
+
+/* The hub reads this for high scores and the daily challenge: current match only, never the saved best. */
+window.__boredSnapshot = function () {
+  return { slug: 'mothlight', wins: S.wins[0], cpu: S.cpu === true };
+};
+/* Small handle for the test suite and tuning: it only exposes what the field already shows. */
+window.__test = {
+  C: C,
+  state: function () { return { state: S.state, round: S.round, mothP: S.mothP, wins: S.wins.slice(), cpu: S.cpu, got: S.got, why: S.why, time: S.time, burn: M.burn }; },
+  start: function (cpu) { startMatch(cpu); },
+  auto: function (on) { S.auto = !!on; },
+  step: function (seconds) { var n = Math.round(seconds * 60); for (var i = 0; i < n; i++) update(1 / 60); }
+};
+
+resetWorld();
+showTitle();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

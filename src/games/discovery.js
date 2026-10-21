@@ -9,6 +9,7 @@ export const DISCOVERY = {
   'aim-lab': info('20 sec', 'Competitive', ['Mouse', 'Touch'], { quick: true }),
   '8ball': info('5–15 min', 'Competitive', ['Mouse', 'Touch'], { players: '2 local' }),
   sumo: info('1–3 min', 'Competitive', ['Keyboard'], { quick: true, players: '2 local' }),
+  mothlight: info('3–8 min', 'Competitive', ['Keyboard', 'Touch'], { players: '2 local' }),
   sand: info('Open-ended', 'Relaxing', ['Mouse', 'Touch']),
   lighthouse: info('2–5 min', 'Focused', ['Keyboard', 'Mouse', 'Touch']),
   poker: info('5–15 min', 'Competitive', ['Mouse', 'Touch']),

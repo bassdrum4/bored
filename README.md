@@ -1,6 +1,6 @@
 # Bored — single-file arcade
 
-**[index.html](index.html)** is the built, self-contained site: **33 offline games
+**[index.html](index.html)** is the built, self-contained site: **34 offline games
 and 3 online extras**, with no runtime dependencies, installs, server, or asset
 folder. Double-click it to play, or serve it as a static page.
 
@@ -100,8 +100,8 @@ CHROME_PATH=/path/to/chrome npm run test:visual      # includes a live F-14 embe
 ```
 
 Raw captures and verification screenshots go under ignored `_build/`. Commit
-the optimized `src/games/previews/*.webp` and rebuilt `index.html`. The 33 previews
-total about 81 KB before base64 embedding; images below the first screen load
+the optimized `src/games/previews/*.webp` and rebuilt `index.html`. The 34 previews
+total about 82 KB before base64 embedding; images below the first screen load
 lazily. No capture tooling is shipped as a runtime dependency.
 
 ## DEEP
@@ -134,7 +134,7 @@ matches the frame, so a portrait phone sees tall rooms rather than a letterbox.
 
 ## Daily challenge
 
-The featured challenge rotates through **31 of the offline games**, with a distinct
+The featured challenge rotates through **32 of the offline games**, with a distinct
 goal for each game. Everyone gets the same game and target for a given date;
 after a full circuit, most targets change difficulty. The day is **Eastern Time**:
 `dailyDate` formats the clock in `America/Detroit`, so the challenge rolls over at
@@ -197,7 +197,7 @@ For quick testing, turn off **Authentication → Providers → Email → Confirm
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.
 
-The board tracks a best score for **31 of the 36 games**. The original eight
+The board tracks a best score for **32 of the 37 games**. The original eight
 (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
 their existing saved bests. Every other offline game except Connect Four and
 Tank2 is read from live game state when you leave or restart: Tetris lines,
@@ -217,8 +217,8 @@ that can run forever post partial progress instead — lines, waves, levels,
 boards, chips, apples — so a good run always beats an abandoned one.
 
 Two-player games are local games with a CPU in one seat, so they only post when
-the opponent was the computer: Pong, SUMO, VolletBall, Lava, Tank, Gun Mayhem and
-8 Ball all check the mode they were played in, and a win over a person stays in
+the opponent was the computer: Pong, SUMO, VolletBall, Lava, Tank, Gun Mayhem,
+Mothlight and 8 Ball all check the mode they were played in, and a win over a person stays in
 that browser. SUMO, VolletBall and Lava start against the CPU and switch to two
 players from the button in their controls.
 
@@ -264,6 +264,22 @@ board is dealt straight away. Cleared boards, moves, and your best sit on one li
 above the grid; arrows move a cursor and Enter presses. Best of all, it is small:
 one HTML file, [`src/games/content/lights-out.html`](src/games/content/lights-out.html),
 with no fonts, libraries, or images.
+
+## Mothlight
+
+A moth, a lantern and seven moonflowers, in one file:
+[`src/games/content/mothlight.html`](src/games/content/mothlight.html). The moth has to
+gather the flowers before dawn while the lantern pulls it in; the lantern wins by
+holding the moth in the flame. Hold the action key to flare the lantern (a wider,
+stronger pull, slower feet, and it burns oil). Tap it to dart as the moth. Roles swap
+every round.
+
+**One player** pits you (WASD or arrows, Space; touch: drag to steer, hold Action)
+against a CPU that plays whichever side you are not, and the match ends when the CPU
+wins three rounds. **Two players** share the keyboard (Player 1 WASD and Space, Player
+2 arrows and Right Shift or `/`) and play first to three. Rounds won against the CPU are
+the score and the daily challenge asks for a number of them in one match; two-player
+runs are not counted.
 
 ## Original offline games (26)
 

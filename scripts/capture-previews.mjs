@@ -31,7 +31,7 @@ try {
   const starts = {
     deep: '#btnDaily', sumo: '#opt-cpu', lighthouse: '#btnBegin', 'aim-lab': '#actions button',
     'void-runner': '#screen-overlay', simon: '#btnStart', snake: '#start',
-    tank: '#m1', '8ball': '#btnCpu', tetris: '#start-btn'
+    tank: '#m1', '8ball': '#btnCpu', tetris: '#start-btn', mothlight: '[data-mode="1"]'
   };
   const buttons = { pong: '1 PLAYER', 'gun-mayhem': '1 PLAYER vs CPU' };
   const keys = { commanders: 'Space', qbert: 'Space', frogger: 'Space', 'pac-man': 'Space',
@@ -54,6 +54,8 @@ try {
       await new Promise(resolve => setTimeout(resolve, 80));
       await frame.evaluate(({ code, key }) => document.dispatchEvent(new KeyboardEvent('keyup', { code, key, bubbles: true })), { code, key });
     }
+    // Skip Mothlight's countdown and let two CPUs play a few seconds, so the shot shows a live round.
+    if (slug === 'mothlight') await frame.evaluate(() => { __test.step(3); __test.auto(true); __test.step(1.5); __test.auto(false); });
     if (keys[slug]) await press(keys[slug]);
     if (slug === 'snake') await press('ArrowRight');
     if (slug === '2048') for (const key of ['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowDown']) await press(key);

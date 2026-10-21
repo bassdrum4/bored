@@ -7,17 +7,18 @@ export const GAMES = Object.fromEntries(Object.entries(gameModules).map(([file, 
 }));
 if (!Object.keys(GAMES).length) throw new Error('No game payloads found. Run npm run games:sync.');
 
-export const ORDER = [["sumo", "SUMO"], ["sand", "Sand"], ["lighthouse", "Lighthouse"], ["poker", "Poker"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["lights-out", "Lights Out"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["dc", "DC"], ["klang", "Klang"], ["8ball", "8 Ball"]];
+export const ORDER = [["sumo", "SUMO"], ["sand", "Sand"], ["lighthouse", "Lighthouse"], ["poker", "Poker"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["lights-out", "Lights Out"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["dc", "DC"], ["klang", "Klang"], ["8ball", "8 Ball"], ["mothlight", "Mothlight"]];
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "dc": "https://workbag.dpdns.org/", "klang": "https://youtubeplayer.freebuff.app/player"};
 export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
-export const FRESH_GAMES = ['deep', 'aim-lab', 'connect-four', 'memory'];
+export const FRESH_GAMES = ['mothlight', 'deep', 'aim-lab', 'connect-four'];
 ORDER.unshift(['2048', '2048'], ['memory', 'Memory'], ['connect-four', 'Connect Four'], ['aim-lab', 'Aim Lab']);
 ORDER.unshift(['deep', 'DEEP']);
 export const META = {
   deep: ['Arcade', 'A daily-seeded dungeon dive'],
+  mothlight: ['Arcade', 'A moth, a lantern, and a friend or the CPU'],
   '2048': ['Puzzle', 'Slide, merge, and chase 2048'],
   memory: ['Puzzle', 'Find all eight matching pairs'],
   'connect-four': ['Strategy', 'Challenge the computer or a friend'],

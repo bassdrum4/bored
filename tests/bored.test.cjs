@@ -89,6 +89,34 @@ test('all hub JavaScript parses', () => {
   }
 });
 
+// Every offline game takes part in the daily challenge and the leaderboard, and a game on the
+// leaderboard has its score rule recorded for the shared board (see AGENTS.md). The games below
+// are the only exceptions. Do not add to these lists to get a green build: give the new game a
+// snapshot, a CHALLENGES entry, a HIGH_SCORE_GAMES entry and a src/games/score-rules.json record.
+const NO_DAILY = ['8ball', 'deep'];
+const NO_BOARD = ['tank2', 'connect-four'];
+test('every offline game has a daily challenge, a leaderboard entry and a recorded score rule', () => {
+  const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+  const catalog = read('src/games/catalog.js');
+  const order = [...catalog.split('export const META')[0].matchAll(/\[["']([a-z0-9-]+)["'], ["'][^"']+["']\]/g)].map(match => match[1]);
+  const remote = [...catalog.matchAll(/"([a-z0-9-]+)": "https:/g)].map(match => match[1]);
+  const offline = [...new Set(order)].filter(slug => !remote.includes(slug));
+  const dailySource = read('src/daily.js');
+  const daily = [...dailySource.slice(0, dailySource.indexOf('export function dailyChallenge')).matchAll(/\bslug: '([^']+)'/g)].map(match => match[1]);
+  const scores = read('src/hub/scores.js');
+  const board = [...scores.matchAll(/\{ id: '([^']+)'|highScore\('([^']+)'/g)].map(match => match[1] || match[2]);
+  const rules = JSON.parse(read('src/games/score-rules.json'));
+  assert.ok(offline.length > 30, 'the catalog was read');
+  for (const slug of offline) {
+    if (!NO_DAILY.includes(slug)) assert.ok(daily.includes(slug), slug + ' needs a CHALLENGES entry in src/daily.js (see AGENTS.md)');
+    if (!NO_BOARD.includes(slug)) {
+      assert.ok(board.includes(slug), slug + ' needs a HIGH_SCORE_GAMES entry in src/hub/scores.js (see AGENTS.md)');
+      assert.ok(rules[slug], slug + ' needs a record in src/games/score-rules.json (see AGENTS.md)');
+    }
+  }
+  for (const slug of daily) assert.ok(offline.includes(slug), 'challenge ' + slug + ' is not an offline game');
+});
+
 function challengeRules() {
   const start = source.indexOf('const CHALLENGES = [');
   const end = source.indexOf('function dailyChallenge', start);
@@ -870,8 +898,25 @@ test('browser regressions', async t => {
     await page.evaluate(() => localStorage.removeItem('bored.high.8ball'));
   });
 
+  await t.test('Mothlight reports cpu mode, ends a round by itself, and keeps two-player runs off the CPU rules', async () => {
+    const frame = await openTitle('mothlight', 'Mothlight');
+    await frame.waitForFunction(() => typeof window.__test === 'object');
+    assert.deepEqual(await frame.evaluate(() => __boredSnapshot()), { slug: 'mothlight', wins: 0, cpu: false }, 'zeroed before a run');
+    await frame.click('[data-mode="1"]');
+    assert.equal(await frame.evaluate(() => __boredSnapshot().cpu), true, 'one player is CPU mode');
+    await frame.evaluate(() => { __test.auto(true); __test.step(120); });
+    const done = await frame.evaluate(() => __test.state());
+    assert.ok(['roundEnd', 'matchEnd'].includes(done.state), 'a round ends by itself');
+    assert.equal(done.wins[0] + done.wins[1], 1);
+    assert.equal(await frame.evaluate(() => __boredSnapshot().wins), done.wins[0], 'the snapshot reports Player 1 rounds');
+    await frame.evaluate(() => { __test.auto(false); __test.start(false); });
+    assert.deepEqual(await frame.evaluate(() => __boredSnapshot()), { slug: 'mothlight', wins: 0, cpu: false }, 'two players are not CPU mode');
+    await close();
+    assert.deepEqual(errors, []);
+  });
+
   await t.test('game scores feed the high-score entries without counting unfinished runs', async () => {
-    const keys = ['tetris', 'wordle', '8ball', 'poker', 'deep'].map(id => 'bored.high.' + id);
+    const keys = ['tetris', 'wordle', '8ball', 'poker', 'deep', 'mothlight'].map(id => 'bored.high.' + id);
     await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
     try {
       let frame = await openTitle('tetris', 'Tetris');
@@ -937,6 +982,18 @@ test('browser regressions', async t => {
       await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'deep', score: 2402, finished: true }); });
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), '2402', 'a cleared descent posts its bonus score');
+
+      // Mothlight counts rounds won, and only against the CPU.
+      frame = await openTitle('mothlight', 'Mothlight');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'mothlight', wins: 3, cpu: false }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.mothlight')), null, 'two-player wins stay off the board');
+      frame = await openTitle('mothlight', 'Mothlight');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'mothlight', wins: 2, cpu: true }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.mothlight')), '2', 'rounds won against the CPU post');
 
       // Every game ranks on its own board. One the server has no rule row for
       // is listed too, marked local-only, rather than folding into another

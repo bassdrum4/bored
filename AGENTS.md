@@ -5,6 +5,21 @@ every game is a self-contained HTML document embedded in the bundle. There is no
 router, no server. Read this before adding or editing a game — a game that misses these hooks
 silently disappears from scores, the daily challenge, or the build.
 
+## The rule: every game works with the daily challenges and the leaderboard
+
+A new offline game is not finished until it takes part in both. That means all of:
+
+1. a `window.__boredSnapshot` that reports the current run (Hook 1),
+2. a `HIGH_SCORE_GAMES` entry plus a record in `src/games/score-rules.json`, so its best score can
+   reach the leaderboard (Hook 2 and `npm run games:register`),
+3. a `CHALLENGES` entry, so it can be the daily challenge (Hook 3).
+
+`tests/bored.test.cjs` enforces this ("every offline game has a daily challenge, a leaderboard
+entry and a recorded score rule") and names the missing piece when it fails. The only games allowed
+to opt out are the ones listed in `NO_DAILY` and `NO_BOARD` at the top of that test, each for a
+reason specific to the game. Do not add a game to those lists to get a green build; change the game
+so it can be tracked. Off-site games (`EXTERNS`) are exempt because the hub cannot read their state.
+
 ```
 src/main.js              hub wiring: library, player chrome, daily, leaderboard + account UI
 src/hub/backend.js       Supabase request/session layer, score rules, auth helpers
@@ -164,6 +179,12 @@ posts once it has a rule row: keep `src/games/score-rules.json` in step with the
 `npm run games:register` after adding games. A game with no row is listed as *local only* in the
 picker and never posts — every game gets its own board, nothing shares one.
 
+**Two-player games need a CPU mode, and only CPU runs score.** Put `cpu: true` in the snapshot when
+the player is up against the computer, and gate the entry with
+`when: snapshot => snapshot.cpu === true` (as Pong, SUMO, Tank, Lava, VolletBall, Gun Mayhem and
+Mothlight do). Scores from two people on one keyboard are not comparable and stay off the board. If a
+game is local-multiplayer only, give it a one-player mode first.
+
 ## Hook 3 — daily challenge
 
 Add to `CHALLENGES` in `src/daily.js`:
@@ -178,6 +199,8 @@ the whole list, so adding an entry reshuffles the schedule — that is expected.
 the goal needs a qualifier the plain metric cannot express (`cpu`, `merge`, `mines`, `aim`,
 `poker`, `connect`, `memory`, `word`, `sand`, `eco`); each rule lives in `dailyCheck` and reads a
 snapshot boolean. Adding a new rule means a new `case` there plus a snapshot field that proves it.
+Use the `cpu` rule for any goal in a two-player game, so the challenge cannot be completed with a
+friend at the other keyboard. A goal must never be complete at boot or from an idle game.
 
 ## Accounts and scores (hub-owned — mostly nothing for a game to do)
 

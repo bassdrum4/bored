@@ -97,6 +97,7 @@ export const HIGH_SCORE_GAMES = [
   highScore('qbert', 'Q*bert', 'levels', { metric: 'levels' }),
   highScore('pong', 'Pong', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
   highScore('sumo', 'SUMO', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
+  highScore('mothlight', 'Mothlight', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   highScore('lighthouse', 'Lighthouse', 'ships', { metric: 'ships' }),
   highScore('poker', 'Poker', 'chips', { metric: 'profit', when: snapshot => snapshot.handOver === true }),
   highScore('tank', 'Tank', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
