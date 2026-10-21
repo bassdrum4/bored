@@ -13,109 +13,126 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 })();</script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tank Trouble Clone</title>
+    <title>Tank</title>
 
     <style>
         :root {
-            --bg: #ebe7df;
-            --arena: #f7f4ee;
-            --wall: #2f2b27;
-            --grid: rgba(0, 0, 0, .035);
-            --p1: #2563eb;
-            --p2: #dc2626;
-            --text: #171717;
-            --muted: #999;
+            --paper: #f5f2ea;
+            --arena: #f7f4ec;
+            --ink: #191713;
+            --dim: #6b6558;
+            --rule: #d8d2c4;
+            --red: #b3261e;
+            --wall: #e2dbca;
+            --wall-line: #b9b1a0;
+            --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body { height: 100%; }
 
         body {
-            background: var(--bg);
-            height: 100vh;
-            overflow: hidden;
+            background: var(--paper);
+            color: var(--ink);
+            font: 13px/1.5 var(--mono);
             display: flex;
-            justify-content: center;
             align-items: center;
-            font-family: "Space Mono", monospace;
+            justify-content: center;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
         #wrap {
+            --w: min(900px, calc(100vw - 20px), calc((100vh - 108px) * 1.5));
+            width: var(--w);
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        #hud {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            font-size: 10.5px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--dim);
+            white-space: nowrap;
+        }
+
+        .side {
+            display: flex;
+            gap: 12px;
+            align-items: baseline;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .side.right { justify-content: flex-end; }
+
+        #hud b {
+            color: var(--ink);
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: .08em;
+        }
+
+        .p2 b, .p2 .power { color: var(--red); }
+
+        .power {
+            color: var(--ink);
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #stage {
             position: relative;
+            border: 1px solid var(--ink);
+            background: var(--arena);
+            line-height: 0;
         }
 
         canvas {
             display: block;
-            border-radius: 2px;
-            box-shadow:
-                0 12px 50px rgba(0, 0, 0, .08),
-                0 1px 3px rgba(0, 0, 0, .05);
-        }
-
-        #ui {
-            position: absolute;
-            top: -52px;
-            left: 0;
-            right: 0;
-            display: flex;
-            justify-content: space-between;
-            font-size: 20px;
-            font-weight: 700;
-            letter-spacing: .06em;
-        }
-
-        #p1s {
-            color: var(--p1);
-        }
-
-        #p2s {
-            color: var(--p2);
-        }
-
-        #p1fx,
-        #p2fx {
-            font-size: 11px;
-            font-weight: 400;
-            letter-spacing: .03em;
-            margin-top: 2px;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 3 / 2;
+            background: var(--arena);
+            touch-action: none;
         }
 
         #msg {
             position: absolute;
-            top: 42%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 54px;
-            font-weight: 700;
-            letter-spacing: .08em;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity .2s;
-            z-index: 5;
-        }
-
-        #cd {
-            position: absolute;
-            top: 56%;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 14px;
-            color: var(--muted);
-            opacity: 0;
-            transition: opacity .2s;
-        }
-
-        #help {
-            position: absolute;
-            bottom: -34px;
             left: 0;
             right: 0;
+            top: 43%;
             text-align: center;
-            color: #b6b6b6;
-            font-size: 11px;
+            line-height: 1.4;
+            font-size: 15px;
+            letter-spacing: .24em;
+            text-transform: uppercase;
+            color: var(--ink);
+            opacity: 0;
+            transition: opacity .15s linear;
+            pointer-events: none;
+        }
+
+        #sub {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 51%;
+            text-align: center;
+            line-height: 1.4;
+            font-size: 10px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--dim);
+            opacity: 0;
+            transition: opacity .15s linear;
+            pointer-events: none;
         }
 
         #menu {
@@ -125,47 +142,67 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 9px;
-            background: #f7f4ee;
-            z-index: 8;
+            gap: 7px;
+            padding: 18px;
+            text-align: center;
+            line-height: 1.5;
+            background: var(--arena);
+            z-index: 4;
         }
 
         #menu[hidden] { display: none; }
 
         #menu h1 {
-            font-size: 15px;
-            font-weight: 600;
-            letter-spacing: .2em;
-            color: #33302a;
-            margin-bottom: 2px;
+            font-family: var(--mono);
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: .34em;
+            text-transform: uppercase;
         }
 
         #menu p {
-            font-size: 11px;
-            color: #8d887c;
-            margin-bottom: 8px;
+            font-size: 10.5px;
+            color: var(--dim);
+            letter-spacing: .04em;
+            margin-bottom: 10px;
         }
 
         #menu button {
             background: none;
-            border: 1px solid #c9c2b4;
-            color: #33302a;
+            border: 1px solid var(--rule);
+            border-radius: 0;
+            color: var(--ink);
             cursor: pointer;
-            font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
-            letter-spacing: .06em;
-            min-width: 210px;
-            padding: 10px 16px;
+            font: 11px var(--mono);
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            min-width: 214px;
+            padding: 9px 14px;
         }
 
-        #menu button:hover { border-color: #33302a; }
+        #menu button:hover,
+        #menu button:focus-visible { border-color: var(--ink); outline: none; }
 
         #menu button small {
-            color: #9a9487;
             display: block;
-            font-size: 10px;
-            letter-spacing: 0;
-            margin-top: 4px;
+            color: var(--dim);
+            font-size: 9.5px;
+            letter-spacing: .02em;
+            text-transform: none;
+            margin-top: 3px;
         }
+
+        #help {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: var(--dim);
+            font-size: 10px;
+            letter-spacing: .02em;
+        }
+
+        #help kbd { font: inherit; color: var(--ink); }
     </style>
 </head>
 
@@ -173,91 +210,125 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
     <div id="wrap">
 
-        <div id="ui">
-            <div>
-                <span id="p1s">P1: 0</span>
-                <div id="p1fx"></div>
+        <div id="hud">
+            <div class="side">
+                <b id="p1s">P1 0</b>
+                <span class="power" id="p1p"></span>
             </div>
-            <div style="text-align:right">
-                <span id="p2s">AI: 0</span>
-                <div id="p2fx"></div>
+            <div class="side right p2">
+                <span class="power" id="p2p"></span>
+                <b id="p2s">AI 0</b>
             </div>
         </div>
 
-        <div id="msg"></div>
-        <div id="cd"></div>
+        <div id="stage">
+            <canvas id="c"></canvas>
+            <div id="msg"></div>
+            <div id="sub"></div>
 
-        <canvas id="c"></canvas>
-
-        <div id="menu">
-            <h1>TANK</h1>
-            <p>Rounds are scored as you go</p>
-            <button id="m1" type="button">1 PLAYER<small>against the CPU</small></button>
-            <button id="m2" type="button">2 PLAYERS<small>same keyboard</small></button>
+            <div id="menu">
+                <h1>Tank</h1>
+                <p>Tanks, walls that bounce bullets, and a rack of powerups.</p>
+                <button id="m1" type="button">One player<small>against the CPU</small></button>
+                <button id="m2" type="button">Two players<small>same keyboard</small></button>
+            </div>
         </div>
 
         <div id="help">
-            P1: WASD + C &nbsp;·&nbsp;
-            P2: Arrows + M &nbsp;·&nbsp;
-            E: Toggle AI &nbsp;·&nbsp;
-            R: New Map
+            <span><kbd>WASD</kbd> drive · <kbd>C</kbd> fire</span>
+            <span><kbd>Arrows</kbd> + <kbd>M</kbd> player two</span>
+            <span><kbd>E</kbd> AI · <kbd>R</kbd> new map</span>
         </div>
 
     </div>
 
     <script>
+        /* ---------------------------------------------------------------------
+           Tank — a small maze duel. Six original powerups, fifteen bullets in
+           the air per tank, and a CPU that paths the maze and fires on sight.
+           --------------------------------------------------------------------- */
+
         const C = document.getElementById("c");
         const X = C.getContext("2d");
-
         const W = 900;
         const H = 600;
         C.width = W;
         C.height = H;
 
+        const p1sEl = document.getElementById("p1s");
+        const p2sEl = document.getElementById("p2s");
+        const p1pEl = document.getElementById("p1p");
+        const p2pEl = document.getElementById("p2p");
+        const msgEl = document.getElementById("msg");
+        const subEl = document.getElementById("sub");
+
         /* -------------------------- TUNING -------------------------- */
 
-        const TS = 10;
+        const TS = 10;                    // tank half-size
         const SPD = 2.1;
         const ROT = 0.052;
         const BSPD = 4.2;
-        const FRATE = 220;
-        const BLIM = 18;
-        const MAX_PLAYER_BULLETS = 5;
+        const FRATE = 220;                // ms between plain shots
+        const MAX_PLAYER_BULLETS = 15;    // live projectiles a tank may own
+        const POWERUP_INTERVAL = 6200;
+        const POWERUP_SIZE = 10;
+        const ROUND_PAUSE = 2600;
 
-        const POWERUP_INTERVAL = 5000;
-        const POWERUP_DURATION = 8000;
-        const SHIELD_DURATION = 15000;
-        const POWERUP_SIZE = 12;
+        const P1 = "#191713";
+        const P2 = "#b3261e";
+        const PAPER = "#f5f2ea";
+
+        /* -------------------------- POWERUPS -------------------------- */
+
+        // Laser: hitscan, crosses inner maze walls, stops at the arena edge.
+        // Missile: locked-on rocket you steer by hand; your tank sits still.
+        // Frag: big shell, fire again to burst it into shards.
+        // Shotgun: short cone of pellets that bounce and die out in ~2.5s.
+        // Gatling: a held-button stream until the rounds run out.
+        // Shield: six seconds of deflecting incoming fire.
+        const POWERS = {
+            laser: { name: "Laser", tag: "LZ", dur: 14000, rate: 900 },
+            missile: { name: "Missile", tag: "RC", dur: 14000, rate: 2200 },
+            frag: { name: "Frag", tag: "FG", dur: 14000, rate: 900 },
+            shotgun: { name: "Shotgun", tag: "SG", dur: 14000, rate: 850 },
+            gatling: { name: "Gatling", tag: "GT", dur: 12000, rate: 55, ammo: 45 },
+            shield: { name: "Shield", tag: "SH", dur: 6000 }
+        };
+        const POWER_TYPES = ["laser", "missile", "frag", "shotgun", "gatling", "shield"];
 
         /* -------------------------- STATE -------------------------- */
 
         let keys = {};
         let bullets = [];
+        let queued = [];
         let walls = [];
         let particles = [];
         let powerups = [];
-        let explosions = [];
+        let beams = [];
         let flashes = [];
         let popups = [];
 
         let scores = [0, 0];
         let roundOver = false;
-        let roundTime = 0;
+        let roundEndedAt = 0;
+        let nextPowerup = 0;
 
-        let deathGrace = false;
-        let deathGraceStart = 0;
-        let deathGraceWinner = -1;
-        let lastPowerup = 0;
+        let p1, p2;
+        let aiEnabled = true;
+        let ai = null;
+        let navData = null;
 
-        /* -------------------------- POWERUPS -------------------------- */
+        const now = () => performance.now();
 
-        const POWERUPS = [
-            { type: "machinegun", color: "#ca8a04", symbol: "MG", name: "RAPID FIRE" },
-            { type: "triple", color: "#9333ea", symbol: "3", name: "TRIPLE SHOT" },
-            { type: "laser", color: "#0891b2", symbol: "⌁", name: "LASER" },
-            { type: "rocket", color: "#ea580c", symbol: "R", name: "ROCKET" },
-            { type: "shield", color: "#16a34a", symbol: "S", name: "SHIELD" }
-        ];
+        function norm(a) {
+            while (a > Math.PI) a -= Math.PI * 2;
+            while (a < -Math.PI) a += Math.PI * 2;
+            return a;
+        }
+
+        function dist(ax, ay, bx, by) {
+            return Math.hypot(ax - bx, ay - by);
+        }
 
         /* -------------------------- TANK -------------------------- */
 
@@ -265,18 +336,32 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             return {
                 x, y, angle, color,
                 alive: true,
-                lastFire: 0,
-                machinegun: false,
-                triple: false,
-                laser: false,
-                rocket: false,
-                shield: false,
-                shieldHP: 0,
-                effects: []
+                lastFire: -9999,
+                ready: true,
+                power: null,      // { type, until, ammo }
+                shieldUntil: 0,
+                missile: null     // the rocket this tank is currently steering
             };
         }
 
-        let p1, p2;
+        function think(t) {
+            if (t.power && now() > t.power.until) t.power = null;
+            return t.power;
+        }
+
+        function shielded(t) {
+            return now() < t.shieldUntil;
+        }
+
+        function drivingMissile(t) {
+            return !!(t.missile && t.missile.alive);
+        }
+
+        function ownedShots(t) {
+            let n = 0;
+            for (const b of bullets) if (b.alive && b.owner === t && !b.shard) n++;
+            return n;
+        }
 
         /* -------------------------- MAP -------------------------- */
 
@@ -317,8 +402,9 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 stack.push([nr, nc]);
             }
 
-            for (let r = 1; r < rows; r++) for (let c = 0; c < cols; c++) if (hWalls[r][c] && Math.random() < .12) hWalls[r][c] = false;
-            for (let r = 0; r < rows; r++) for (let c = 1; c < cols; c++) if (vWalls[r][c] && Math.random() < .12) vWalls[r][c] = false;
+            // A few extra gaps so lanes loop instead of forcing long detours.
+            for (let r = 1; r < rows; r++) for (let c = 0; c < cols; c++) if (hWalls[r][c] && Math.random() < .14) hWalls[r][c] = false;
+            for (let r = 0; r < rows; r++) for (let c = 1; c < cols; c++) if (vWalls[r][c] && Math.random() < .14) vWalls[r][c] = false;
 
             const cl = [[1, rows >> 1], [cols - 2, rows >> 1]];
             for (const [cc, rr] of cl) {
@@ -338,520 +424,6 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             return out;
         }
 
-        /* -------------------------- ROUND -------------------------- */
-
-        function findSafeSpawn(preferX, preferY, otherTanks) {
-            if (canMove(preferX, preferY, TS + 4)) {
-                if (otherTanks.every(t => { const dx = preferX - t.x, dy = preferY - t.y; return dx * dx + dy * dy > (TS * 4) ** 2; }))
-                    return { x: preferX, y: preferY };
-            }
-            const side = preferX < W / 2 ? 0 : 1;
-            for (let i = 0; i < 200; i++) {
-                const x = side === 0 ? 50 + Math.random() * (W / 2 - 100) : W / 2 + 50 + Math.random() * (W / 2 - 100);
-                const y = 50 + Math.random() * (H - 100);
-                if (!canMove(x, y, TS + 4)) continue;
-                if (otherTanks.every(t => { const dx = x - t.x, dy = y - t.y; return dx * dx + dy * dy > (TS * 4) ** 2; }))
-                    return { x, y };
-            }
-            return { x: preferX, y: preferY };
-        }
-
-        function initRound() {
-            walls = generateWalls();
-            bullets = []; particles = []; powerups = []; explosions = []; flashes = []; popups = [];
-            const s1 = findSafeSpawn(80, H / 2, []);
-            p1 = makeTank(s1.x, s1.y, 0, "#2563eb");
-            const s2 = findSafeSpawn(W - 80, H / 2, [p1]);
-            p2 = makeTank(s2.x, s2.y, Math.PI, "#dc2626");
-            roundOver = false; deathGrace = false; deathGraceWinner = -1;
-            document.getElementById("msg").style.opacity = 0;
-            document.getElementById("cd").style.opacity = 0;
-            lastPowerup = Date.now() - POWERUP_INTERVAL + 2000;
-            buildNavGrid();
-            ai = new AdvancedAI(p2, p1);
-        }
-
-        /* -------------------------- INPUT -------------------------- */
-
-        document.addEventListener("keydown", e => {
-            keys[e.key] = true; keys[e.key.toLowerCase()] = true;
-            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
-            if (e.key.toLowerCase() === "r") initRound();
-            if (e.key.toLowerCase() === "e") { aiEnabled = !aiEnabled; if (!aiEnabled && ai) ai.clearKeys(); updateScores(); }
-        });
-        document.addEventListener("keyup", e => { keys[e.key] = false; keys[e.key.toLowerCase()] = false; });
-        window.addEventListener("blur", () => { for (const k in keys) keys[k] = false; });
-        document.addEventListener("visibilitychange", () => { if (document.hidden) for (const k in keys) keys[k] = false; });
-
-        /* ========================================================================
-           AI — COMPLETE REWRITE
-           ======================================================================== */
-
-        let aiEnabled = true, navData = null, ai = null;
-
-        function buildNavGrid() {
-            const cs = 20, cols = Math.ceil(W / cs) + 1, rows = Math.ceil(H / cs) + 1;
-            const grid = new Uint8Array(rows * cols);
-            for (let r = 0; r < rows; r++)
-                for (let c = 0; c < cols; c++)
-                    grid[r * cols + c] = canMove(c * cs, r * cs, TS + 2) ? 1 : 0;
-            navData = { cs, cols, rows, grid };
-        }
-
-        /*  Angle normalisation helper — also used by rocket homing  */
-        function aiNorm(a) {
-            while (a > Math.PI) a -= 2 * Math.PI;
-            while (a < -Math.PI) a += 2 * Math.PI;
-            return a;
-        }
-
-        class AdvancedAI {
-            constructor(self, target) {
-                this.self = self;
-                this.target = target;
-
-                /* pathfinding */
-                this.path = [];
-                this.pathAge = 999;
-                this.pathGoal = null;
-
-                /* stuck recovery */
-                this.stuckFrames = 0;
-                this.prevX = self.x;
-                this.prevY = self.y;
-                this.unstuckPhase = 0;
-
-                /* frame counter */
-                this.frame = 0;
-
-                /* bounce-shot cache (recomputed every few frames) */
-                this.bestShot = null;
-                this.bestShotFrame = -99;
-
-                /* target velocity tracking (for lead aiming) */
-                this.prevTX = target.x;
-                this.prevTY = target.y;
-                this.tVelX = 0;
-                this.tVelY = 0;
-            }
-
-            /* -------------------------------------------------- */
-            /*  MAIN UPDATE                                       */
-            /* -------------------------------------------------- */
-            update() {
-                if (!this.self.alive || !this.target.alive) return;
-                this.clearKeys();
-                this.frame++;
-
-                /* track target velocity (smoothed) */
-                this.tVelX = this.tVelX * 0.55 + (this.target.x - this.prevTX) * 0.45;
-                this.tVelY = this.tVelY * 0.55 + (this.target.y - this.prevTY) * 0.45;
-                this.prevTX = this.target.x;
-                this.prevTY = this.target.y;
-
-                /* stuck detection */
-                const moved = Math.hypot(this.self.x - this.prevX, this.self.y - this.prevY);
-                this.stuckFrames = moved < 0.4 ? this.stuckFrames + 1 : Math.max(0, this.stuckFrames - 3);
-                this.prevX = this.self.x;
-                this.prevY = this.self.y;
-
-                if (this.stuckFrames > 28) {
-                    this.handleStuck();
-                    return;
-                }
-
-                /* threat check (dodge has highest priority) */
-                const dodgeAngle = this.checkThreats();
-                if (dodgeAngle !== null) {
-                    this.steerAndMove(dodgeAngle, true);
-                } else {
-                    const pu = this.pickPowerup();
-                    if (pu) {
-                        this.navigateToward(pu.x, pu.y);
-                    } else {
-                        this.combatBehavior();
-                    }
-                }
-
-                /* always try to shoot */
-                this.tryShoot();
-            }
-
-            clearKeys() {
-                for (const k of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "m"]) delete keys[k];
-            }
-
-            /* -------------------------------------------------- */
-            /*  THREAT DETECTION — traces bullets with bouncing   */
-            /* -------------------------------------------------- */
-            checkThreats() {
-                let closest = null, closestT = Infinity;
-
-                for (const b of bullets) {
-                    if (b.owner === this.self) continue;
-                    const bDist = Math.hypot(this.self.x - b.x, this.self.y - b.y);
-                    if (bDist > 220) continue;
-
-                    /* trace the bullet forward, accounting for bounces */
-                    let x = b.x, y = b.y, vx = b.vx, vy = b.vy;
-                    for (let t = 1; t <= 40; t++) {
-                        x += vx; y += vy;
-
-                        /* arena bounds */
-                        if (x < b.size) { x = b.size; vx = Math.abs(vx); }
-                        else if (x > W - b.size) { x = W - b.size; vx = -Math.abs(vx); }
-                        if (y < b.size) { y = b.size; vy = Math.abs(vy); }
-                        else if (y > H - b.size) { y = H - b.size; vy = -Math.abs(vy); }
-
-                        /* wall segments */
-                        for (const w of walls) {
-                            if (circleRect(x, y, b.size, w.x, w.y, w.w, w.h)) {
-                                const cx = Math.max(w.x, Math.min(w.x + w.w, x));
-                                const cy = Math.max(w.y, Math.min(w.y + w.h, y));
-                                if (Math.abs(x - cx) >= Math.abs(y - cy)) vx *= -1; else vy *= -1;
-                                break;
-                            }
-                        }
-
-                        if (Math.hypot(this.self.x - x, this.self.y - y) < 42) {
-                            if (t < closestT) { closestT = t; closest = b; }
-                            break;
-                        }
-                    }
-                }
-
-                if (closest && closestT < 22) {
-                    /* dodge perpendicular to bullet travel */
-                    const ba = Math.atan2(closest.vy, closest.vx);
-                    const o1 = ba + Math.PI / 2, o2 = ba - Math.PI / 2;
-                    return this.rateDir(o1) >= this.rateDir(o2) ? o1 : o2;
-                }
-                return null;
-            }
-
-            rateDir(a) {
-                let s = 0;
-                for (let d = 15; d <= 60; d += 15) {
-                    if (canMove(this.self.x + Math.cos(a) * d, this.self.y + Math.sin(a) * d, TS + 2)) s += d;
-                    else break;
-                }
-                return s;
-            }
-
-            /* -------------------------------------------------- */
-            /*  COMBAT — distance management + weaving            */
-            /* -------------------------------------------------- */
-            combatBehavior() {
-                const dx = this.target.x - this.self.x;
-                const dy = this.target.y - this.self.y;
-                const dist = Math.hypot(dx, dy);
-                const see = this.hasLOS(this.self.x, this.self.y, this.target.x, this.target.y);
-
-                /* weapon-specific preferred range */
-                let prefDist = 220;
-                if (this.self.machinegun) prefDist = 150;
-                else if (this.self.laser) prefDist = 340;
-                else if (this.self.rocket) prefDist = 280;
-                else if (this.self.triple) prefDist = 200;
-
-                if (see) {
-                    if (dist > prefDist + 90) {
-                        /* too far — close in */
-                        this.steerAndMove(Math.atan2(dy, dx), false);
-                    } else if (dist < 110) {
-                        /* too close — back-pedal while facing target */
-                        this.steerAndMove(Math.atan2(-dy, -dx), false);
-                    } else {
-                        /* good range — weave to be harder to hit */
-                        const base = Math.atan2(dy, dx);
-                        const wobble = Math.sin(this.frame * 0.07) * 0.32
-                                     + Math.sin(this.frame * 0.13) * 0.16;
-                        this.steerAndMove(base + wobble, false);
-                    }
-                } else {
-                    this.navigateToward(this.target.x, this.target.y);
-                }
-            }
-
-            /* -------------------------------------------------- */
-            /*  SHOOTING — direct + systematic bounce-shot sweep   */
-            /* -------------------------------------------------- */
-            tryShoot() {
-                if (!this.target.alive) return;
-
-                /* respect fire rate */
-                let rate = this.self.machinegun ? 90 : FRATE;
-                if (Date.now() - this.self.lastFire < rate) return;
-                if (bullets.filter(b => b.owner === this.self).length >= MAX_PLAYER_BULLETS) return;
-
-                /* 1) Direct shot with lead prediction */
-                if (this.checkDirectShot()) { keys["m"] = true; return; }
-
-                /* 2) Bounce shot — recompute every ~5 frames */
-                if (this.frame - this.bestShotFrame > 5) {
-                    this.bestShot = this.findBounceShot();
-                    this.bestShotFrame = this.frame;
-                }
-                if (this.bestShot !== null) {
-                    const d = aiNorm(this.bestShot - this.self.angle);
-                    if (Math.abs(d) < 0.1) {
-                        keys["m"] = true;
-                    } else {
-                        keys[d > 0 ? "ArrowRight" : "ArrowLeft"] = true;
-                        /* pause forward movement while rotating hard for a trick shot */
-                        if (Math.abs(d) > 0.45) delete keys["ArrowUp"];
-                    }
-                }
-            }
-
-            checkDirectShot() {
-                const dist = Math.hypot(this.target.x - this.self.x, this.target.y - this.self.y);
-                const tth = dist / BSPD;
-                const lx = this.target.x + this.tVelX * tth * 0.6;
-                const ly = this.target.y + this.tVelY * tth * 0.6;
-                const a = Math.atan2(ly - this.self.y, lx - this.self.x);
-
-                let tol = 0.13;
-                if (this.self.machinegun) tol = 0.19;
-                if (this.self.triple) tol = 0.16;
-
-                if (Math.abs(aiNorm(a - this.self.angle)) > tol) return false;
-                return this.hasLOS(this.self.x, this.self.y, this.target.x, this.target.y);
-            }
-
-            findBounceShot() {
-                const N = 72;
-                let best = null, bestSc = -Infinity;
-                for (let i = 0; i < N; i++) {
-                    const a = (i / N) * Math.PI * 2;
-                    const r = this.traceShot(this.self.x, this.self.y, a, 3);
-                    if (r.hit) {
-                        const sc = 1000 - r.bounces * 70 - r.closest;
-                        if (sc > bestSc) { bestSc = sc; best = a; }
-                    }
-                }
-                return best;
-            }
-
-            traceShot(sx, sy, angle, maxBounces) {
-                const sp = BSPD;
-                const sz = this.self.laser ? 2 : this.self.rocket ? 6 : 4;
-                let x = sx + Math.cos(angle) * 20;
-                let y = sy + Math.sin(angle) * 20;
-                let vx = Math.cos(angle) * sp;
-                let vy = Math.sin(angle) * sp;
-                let bnc = 0, closest = Infinity, hit = false;
-
-                for (let s = 0; s < 160; s++) {
-                    x += vx; y += vy;
-
-                    /* arena bounds */
-                    if (x < sz) { x = sz; vx = Math.abs(vx); bnc++; }
-                    else if (x > W - sz) { x = W - sz; vx = -Math.abs(vx); bnc++; }
-                    if (y < sz) { y = sz; vy = Math.abs(vy); bnc++; }
-                    else if (y > H - sz) { y = H - sz; vy = -Math.abs(vy); bnc++; }
-
-                    /* wall segments */
-                    for (const w of walls) {
-                        if (circleRect(x, y, sz, w.x, w.y, w.w, w.h)) {
-                            const cx = Math.max(w.x, Math.min(w.x + w.w, x));
-                            const cy = Math.max(w.y, Math.min(w.y + w.h, y));
-                            if (Math.abs(x - cx) >= Math.abs(y - cy)) vx *= -1; else vy *= -1;
-                            const dx2 = x - cx, dy2 = y - cy, l = Math.hypot(dx2, dy2) || 1;
-                            x += dx2 / l * 2; y += dy2 / l * 2;
-                            bnc++; break;
-                        }
-                    }
-                    if (bnc > maxBounces) break;
-
-                    /* target proximity (skip early frames near origin) */
-                    if (s > 10) {
-                        const d = Math.hypot(x - this.target.x, y - this.target.y);
-                        if (d < closest) closest = d;
-                        if (d < 22) { hit = true; break; }
-                    }
-                }
-                return { hit, bounces: bnc, closest };
-            }
-
-            /* -------------------------------------------------- */
-            /*  NAVIGATION — A* pathfinding + wall-aware movement  */
-            /* -------------------------------------------------- */
-            navigateToward(tx, ty) {
-                const d = Math.hypot(tx - this.self.x, ty - this.self.y);
-                if (d < 110 && this.hasLOS(this.self.x, this.self.y, tx, ty)) {
-                    this.steerAndMove(Math.atan2(ty - this.self.y, tx - this.self.x), false);
-                    return;
-                }
-                this.updatePath(tx, ty);
-                if (this.path.length > 0) {
-                    this.steerAndMove(
-                        Math.atan2(this.path[0].y - this.self.y, this.path[0].x - this.self.x), false);
-                } else {
-                    this.steerAndMove(Math.atan2(ty - this.self.y, tx - this.self.x), false);
-                }
-            }
-
-            updatePath(tx, ty) {
-                const goalMoved = this.pathGoal &&
-                    Math.hypot(tx - this.pathGoal.x, ty - this.pathGoal.y) > 60;
-                this.pathAge++;
-                if (this.pathAge > 25 || this.path.length === 0 || goalMoved) {
-                    this.path = this.findPath(this.self.x, this.self.y, tx, ty);
-                    this.pathAge = 0;
-                    this.pathGoal = { x: tx, y: ty };
-                }
-                while (this.path.length > 0 &&
-                    Math.hypot(this.self.x - this.path[0].x, this.self.y - this.path[0].y) < 22)
-                    this.path.shift();
-            }
-
-            findPath(sx, sy, ex, ey) {
-                if (!navData) return [];
-                const { cs, cols, rows, grid } = navData;
-                const clamp = (v, m) => Math.max(0, Math.min(m, v));
-                const sr = clamp(Math.round(sy / cs), rows - 1);
-                const sc = clamp(Math.round(sx / cs), cols - 1);
-                const er = clamp(Math.round(ey / cs), rows - 1);
-                const ec = clamp(Math.round(ex / cs), cols - 1);
-
-                const key = (r, c) => r * cols + c;
-                const open = new Map();
-                const gS = new Map();
-                const came = new Map();
-                const sk = key(sr, sc);
-                gS.set(sk, 0);
-                open.set(sk, { r: sr, c: sc, f: Math.hypot(er - sr, ec - sc) });
-
-                let iters = 0;
-                while (open.size > 0 && iters < 500) {
-                    iters++;
-                    let bk = null, bf = Infinity;
-                    for (const [k, n] of open) { if (n.f < bf) { bf = n.f; bk = k; } }
-                    const cur = open.get(bk);
-                    open.delete(bk);
-
-                    if (cur.r === er && cur.c === ec) {
-                        const p = [];
-                        let t = cur;
-                        while (came.has(key(t.r, t.c))) {
-                            p.unshift({ x: t.c * cs, y: t.r * cs });
-                            t = came.get(key(t.r, t.c));
-                        }
-                        return p;
-                    }
-
-                    for (let dr = -1; dr <= 1; dr++) {
-                        for (let dc = -1; dc <= 1; dc++) {
-                            if (!dr && !dc) continue;
-                            /* block diagonal squeeze through walls */
-                            if (dr && dc &&
-                                (!grid[(cur.r + dr) * cols + cur.c] ||
-                                 !grid[cur.r * cols + (cur.c + dc)])) continue;
-
-                            const nr = cur.r + dr, nc = cur.c + dc;
-                            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-                            if (!grid[nr * cols + nc]) continue;
-
-                            const g = gS.get(bk) + Math.hypot(dr, dc);
-                            const nk = key(nr, nc);
-                            if (g < (gS.get(nk) ?? Infinity)) {
-                                gS.set(nk, g);
-                                came.set(nk, cur);
-                                open.set(nk, { r: nr, c: nc, f: g + Math.hypot(er - nr, ec - nc) });
-                            }
-                        }
-                    }
-                }
-                return [];
-            }
-
-            /* -------------------------------------------------- */
-            /*  POWERUP COLLECTION                                 */
-            /* -------------------------------------------------- */
-            pickPowerup() {
-                if (powerups.length === 0) return null;
-                let best = null, bestV = -Infinity;
-                for (const p of powerups) {
-                    const d = Math.hypot(this.self.x - p.x, this.self.y - p.y);
-                    let v = 80;
-                    if (p.type === 'shield' && !this.self.shield) v = 155;
-                    else if (p.type === 'rocket') v = 125;
-                    else if (p.type === 'triple') v = 118;
-                    else if (p.type === 'laser') v = 112;
-                    else v = 100;
-                    if (!this.hasAdvancedWeapon()) v += 70;
-                    const sc = v - d * 0.65;
-                    if (sc > bestV && d < 450) { bestV = sc; best = p; }
-                }
-                return best;
-            }
-
-            hasAdvancedWeapon() {
-                return this.self.machinegun || this.self.triple ||
-                       this.self.laser || this.self.rocket;
-            }
-
-            /* -------------------------------------------------- */
-            /*  STUCK RECOVERY                                     */
-            /* -------------------------------------------------- */
-            handleStuck() {
-                this.unstuckPhase++;
-                keys["ArrowDown"] = true;
-                if (this.unstuckPhase % 4 < 2) keys["ArrowLeft"] = true;
-                else keys["ArrowRight"] = true;
-
-                if (this.stuckFrames > 55) {
-                    for (const w of walls) {
-                        if (circleRect(this.self.x, this.self.y, TS, w.x, w.y, w.w, w.h)) {
-                            const cx = Math.max(w.x, Math.min(w.x + w.w, this.self.x));
-                            const cy = Math.max(w.y, Math.min(w.y + w.h, this.self.y));
-                            const dx = this.self.x - cx, dy = this.self.y - cy;
-                            const l = Math.hypot(dx, dy) || 1;
-                            this.self.x += dx / l * 2;
-                            this.self.y += dy / l * 2;
-                        }
-                    }
-                    this.stuckFrames = 28;
-                }
-                this.tryShoot();
-            }
-
-            /* -------------------------------------------------- */
-            /*  MOVEMENT PRIMITIVES                                */
-            /* -------------------------------------------------- */
-            steerAndMove(angle, urgent) {
-                const d = aiNorm(angle - this.self.angle);
-                if (Math.abs(d) > (urgent ? 0.03 : 0.06))
-                    keys[d > 0 ? "ArrowRight" : "ArrowLeft"] = true;
-                if (Math.abs(d) < (urgent ? 0.7 : 0.5) * Math.PI)
-                    keys["ArrowUp"] = true;
-                if (Math.abs(d) > 0.85 * Math.PI)
-                    keys["ArrowDown"] = true;
-            }
-
-            /* -------------------------------------------------- */
-            /*  UTILITIES                                          */
-            /* -------------------------------------------------- */
-            hasLOS(x1, y1, x2, y2) {
-                const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy);
-                const steps = Math.ceil(d / 8);
-                for (let i = 1; i < steps; i++) {
-                    const f = i / steps, px = x1 + dx * f, py = y1 + dy * f;
-                    for (const w of walls)
-                        if (px >= w.x - 3 && px <= w.x + w.w + 3 &&
-                            py >= w.y - 3 && py <= w.y + w.h + 3) return false;
-                }
-                return true;
-            }
-        }
-
-        /* ========================================================================
-           END AI
-           ======================================================================== */
-
-        /* -------------------------- COLLISION -------------------------- */
-
         function circleRect(cx, cy, cr, rx, ry, rw, rh) {
             const px = Math.max(rx, Math.min(rx + rw, cx));
             const py = Math.max(ry, Math.min(ry + rh, cy));
@@ -865,334 +437,1048 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             return true;
         }
 
-        /* -------------------------- TANK UPDATE -------------------------- */
-
-        function updateTank(t, left, right, forward, backward, fire) {
-            if (!t.alive) return;
-            if (keys[left]) t.angle -= ROT;
-            if (keys[right]) t.angle += ROT;
-
-            if (keys[forward]) {
-                const nx = t.x + Math.cos(t.angle) * SPD, ny = t.y + Math.sin(t.angle) * SPD;
-                if (canMove(nx, ny, TS)) { t.x = nx; t.y = ny; }
-                else {
-                    const sx = t.x + Math.cos(t.angle) * SPD;
-                    if (canMove(sx, t.y, TS)) t.x = sx;
-                    else { const sy = t.y + Math.sin(t.angle) * SPD; if (canMove(t.x, sy, TS)) t.y = sy; }
-                }
-            }
-
-            if (keys[backward]) {
-                const nx = t.x - Math.cos(t.angle) * SPD * .65, ny = t.y - Math.sin(t.angle) * SPD * .65;
-                if (canMove(nx, ny, TS)) { t.x = nx; t.y = ny; }
-                else {
-                    const sx = t.x - Math.cos(t.angle) * SPD * .65;
-                    if (canMove(sx, t.y, TS)) t.x = sx;
-                    else { const sy = t.y - Math.sin(t.angle) * SPD * .65; if (canMove(t.x, sy, TS)) t.y = sy; }
-                }
-            }
-
-            if (!canMove(t.x, t.y, TS)) {
+        function los(x1, y1, x2, y2) {
+            const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy);
+            const steps = Math.ceil(d / 8);
+            for (let i = 1; i < steps; i++) {
+                const f = i / steps, px = x1 + dx * f, py = y1 + dy * f;
                 for (const w of walls) {
-                    if (circleRect(t.x, t.y, TS, w.x, w.y, w.w, w.h)) {
-                        const px = Math.max(w.x, Math.min(w.x + w.w, t.x));
-                        const py = Math.max(w.y, Math.min(w.y + w.h, t.y));
-                        const dx = t.x - px, dy = t.y - py, len = Math.sqrt(dx * dx + dy * dy) || 0.1;
-                        t.x += (dx / len) * 1.5; t.y += (dy / len) * 1.5;
-                    }
+                    if (px >= w.x - 2 && px <= w.x + w.w + 2 &&
+                        py >= w.y - 2 && py <= w.y + w.h + 2) return false;
                 }
             }
-
-            let fireRate = FRATE;
-            if (t.machinegun) fireRate = 90;
-
-            if (keys[fire] && Date.now() - t.lastFire > fireRate) {
-                const owned = bullets.filter(b => b.owner === t).length;
-                if (owned < MAX_PLAYER_BULLETS) { t.lastFire = Date.now(); fireBullet(t); }
-            }
-
-            for (let i = t.effects.length - 1; i >= 0; i--) {
-                if (Date.now() > t.effects[i].end) { t[t.effects[i].type] = false; t.effects.splice(i, 1); }
-            }
+            return true;
         }
 
-        /* -------------------------- BULLETS -------------------------- */
-
-        function fireBullet(t) {
-            let size, speed, maxB;
-            if (t.rocket) { size = 6; speed = BSPD * .8; maxB = 8; }
-            else if (t.laser) { size = 2; speed = BSPD * 1.8; maxB = 3; }
-            else { size = 4; speed = BSPD; maxB = BLIM; }
-
-            const spawn = angle => {
-                bullets.push({
-                    x: t.x + Math.cos(angle) * 18, y: t.y + Math.sin(angle) * 18,
-                    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-                    owner: t, ownerColor: t.color,
-                    bounces: 0, maxBounces: maxB,
-                    size, fade: 0, age: 0,
-                    isRocket: !!t.rocket, isLaser: !!t.laser
-                });
-            };
-
-            spawn(t.angle);
-            if (t.triple) { spawn(t.angle - .22); spawn(t.angle + .22); }
+        function straightClear(x1, y1, x2, y2, r) {
+            const d = Math.hypot(x2 - x1, y2 - y1);
+            const steps = Math.max(1, Math.ceil(d / 6));
+            for (let i = 1; i <= steps; i++) {
+                const f = i / steps;
+                if (!canMove(x1 + (x2 - x1) * f, y1 + (y2 - y1) * f, r)) return false;
+            }
+            return true;
         }
 
-        function updateBullets() {
-            for (let i = bullets.length - 1; i >= 0; i--) {
-                const b = bullets[i];
-                b.age++;
+        /* -------------------------- ROUND -------------------------- */
 
-                if (b.isRocket && b.age > 12) {
-                    const tgt = b.owner === p1 ? p2 : p1;
-                    if (tgt.alive) {
-                        const dx = tgt.x - b.x, dy = tgt.y - b.y;
-                        const toTgt = Math.atan2(dy, dx);
-                        let cur = Math.atan2(b.vy, b.vx);
-                        let df = aiNorm(toTgt - cur);
-                        df = Math.max(-.05, Math.min(.05, df));
-                        cur += df;
-                        const sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-                        b.vx = Math.cos(cur) * sp; b.vy = Math.sin(cur) * sp;
-                    }
-                    if (b.age % 3 === 0) particles.push({ x: b.x, y: b.y, vx: (Math.random() - .5) * .8, vy: (Math.random() - .5) * .8, life: 12, color: "#ea580c" });
-                }
-
-                const prevX = b.x, prevY = b.y;
-                b.x += b.vx; b.y += b.vy;
-                let bounced = false;
-
-                if (b.x - b.size <= 0) { b.x = b.size; b.vx = Math.abs(b.vx); bounced = true; }
-                else if (b.x + b.size >= W) { b.x = W - b.size; b.vx = -Math.abs(b.vx); bounced = true; }
-                if (b.y - b.size <= 0) { b.y = b.size; b.vy = Math.abs(b.vy); bounced = true; }
-                else if (b.y + b.size >= H) { b.y = H - b.size; b.vy = -Math.abs(b.vy); bounced = true; }
-
-                for (const w of walls) {
-                    if (!circleRect(b.x, b.y, b.size, w.x, w.y, w.w, w.h)) continue;
-                    const px = circleRect(prevX, b.y, b.size, w.x, w.y, w.w, w.h);
-                    const py = circleRect(b.x, prevY, b.size, w.x, w.y, w.w, w.h);
-                    if (!px && py) { const s = Math.sign(b.vx); b.vx *= -1; b.x = s > 0 ? w.x - b.size : w.x + w.w + b.size; }
-                    else if (px && !py) { const s = Math.sign(b.vy); b.vy *= -1; b.y = s > 0 ? w.y - b.size : w.y + w.h + b.size; }
-                    else {
-                        const cx = Math.max(w.x, Math.min(w.x + w.w, b.x)), cy = Math.max(w.y, Math.min(w.y + w.h, b.y));
-                        if (Math.abs(b.x - cx) >= Math.abs(b.y - cy)) { const s = Math.sign(b.vx); b.vx *= -1; b.x = s > 0 ? w.x - b.size : w.x + w.w + b.size; }
-                        else { const s = Math.sign(b.vy); b.vy *= -1; b.y = s > 0 ? w.y - b.size : w.y + w.h + b.size; }
-                    }
-                    bounced = true;
-                }
-
-                if (bounced) {
-                    b.bounces++; b.fade += .05;
-                    for (let p = 0; p < 2; p++) particles.push({ x: b.x, y: b.y, vx: (Math.random() - .5) * 1.2, vy: (Math.random() - .5) * 1.2, life: 10, color: "#888" });
-                }
-
-                if (b.bounces > b.maxBounces) { bullets.splice(i, 1); continue; }
-
-                for (const t of [p1, p2]) {
-                    if (!t.alive) continue;
-                    if (b.owner === t && b.age < 8) continue;
-                    const dx = b.x - t.x, dy = b.y - t.y;
-                    if (dx * dx + dy * dy < (TS + b.size) * (TS + b.size)) {
-                        if (t.shield && t.shieldHP > 0) {
-                            t.shieldHP--;
-                            if (t.shieldHP <= 0) { t.shield = false; t.effects = t.effects.filter(e => e.type !== 'shield'); }
-                            for (let p = 0; p < 12; p++) {
-                                const a = Math.random() * Math.PI * 2, s = Math.random() * 3;
-                                particles.push({ x: b.x, y: b.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 20, color: "#16a34a" });
-                            }
-                            bullets.splice(i, 1); break;
-                        }
-                        explode(t); t.alive = false; bullets.splice(i, 1);
-                        if (!deathGrace) { deathGrace = true; deathGraceStart = Date.now(); deathGraceWinner = t === p1 ? 1 : 0; }
-                        else { deathGraceWinner = -1; endRound(-1); }
-                        break;
-                    }
-                }
+        function findSafeSpawn(preferX, preferY, otherTanks) {
+            const clearOf = (x, y) => otherTanks.every(t => {
+                const dx = x - t.x, dy = y - t.y;
+                return dx * dx + dy * dy > (TS * 5) ** 2;
+            });
+            if (canMove(preferX, preferY, TS + 4) && clearOf(preferX, preferY))
+                return { x: preferX, y: preferY };
+            const side = preferX < W / 2 ? 0 : 1;
+            for (let i = 0; i < 240; i++) {
+                const x = side === 0
+                    ? 50 + Math.random() * (W / 2 - 100)
+                    : W / 2 + 50 + Math.random() * (W / 2 - 100);
+                const y = 50 + Math.random() * (H - 100);
+                if (!canMove(x, y, TS + 4)) continue;
+                if (!clearOf(x, y)) continue;
+                return { x, y };
             }
+            return { x: preferX, y: preferY };
+        }
+
+        function initRound() {
+            walls = generateWalls();
+            bullets = []; queued = []; particles = []; powerups = [];
+            beams = []; flashes = []; popups = [];
+
+            const s1 = findSafeSpawn(80, H / 2, []);
+            p1 = makeTank(s1.x, s1.y, 0, P1);
+            const s2 = findSafeSpawn(W - 80, H / 2, [p1]);
+            p2 = makeTank(s2.x, s2.y, Math.PI, P2);
+
+            roundOver = false;
+            roundEndedAt = 0;
+            nextPowerup = now() + 2400;
+            msgEl.style.opacity = 0;
+            subEl.style.opacity = 0;
+
+            buildNavGrid();
+            ai = new AI(p2, p1);
+            syncScores();
+        }
+
+        function syncScores() {
+            p1sEl.textContent = "P1 " + scores[0];
+            p2sEl.textContent = (aiEnabled ? "AI" : "P2") + " " + scores[1];
         }
 
         function endRound(winner) {
-            roundOver = true; deathGrace = false; roundTime = Date.now();
-            if (winner >= 0) { scores[winner]++; updateScores(); }
-            const msg = document.getElementById("msg");
-            if (winner === 0) { msg.textContent = "P1 WINS"; msg.style.color = "#2563eb"; }
-            else if (winner === 1) { msg.textContent = aiEnabled ? "AI WINS" : "P2 WINS"; msg.style.color = "#dc2626"; }
-            else { msg.textContent = "DRAW"; msg.style.color = "#666"; }
-            msg.style.opacity = 1;
-            document.getElementById("cd").style.opacity = 1;
+            if (roundOver) return;
+            roundOver = true;
+            roundEndedAt = now();
+            if (winner >= 0) scores[winner]++;
+            const label = winner === 0 ? "P1 wins" : winner === 1 ? (aiEnabled ? "AI wins" : "P2 wins") : "Draw";
+            msgEl.textContent = label;
+            msgEl.style.color = winner === 1 ? P2 : P1;
+            msgEl.style.opacity = 1;
+            subEl.textContent = "new round";
+            subEl.style.opacity = 1;
+            syncScores();
+        }
+
+        /* -------------------------- INPUT -------------------------- */
+
+        document.addEventListener("keydown", e => {
+            const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+            keys[e.key] = true;
+            keys[k] = true;
+            if (e.key.startsWith("Arrow")) e.preventDefault();
+            if (e.repeat) return;
+            if (k === "r") initRound();
+            if (k === "e") {
+                aiEnabled = !aiEnabled;
+                if (!aiEnabled && ai) ai.clearKeys();
+                if (aiEnabled && ai) ai = new AI(p2, p1);
+                syncScores();
+            }
+        });
+
+        document.addEventListener("keyup", e => {
+            const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+            keys[e.key] = false;
+            keys[k] = false;
+        });
+
+        function releaseKeys() { for (const k in keys) keys[k] = false; }
+        window.addEventListener("blur", releaseKeys);
+        document.addEventListener("visibilitychange", () => { if (document.hidden) releaseKeys(); });
+
+        const CTRL = {
+            p1: { left: "a", right: "d", fwd: "w", back: "s", fire: "c" },
+            p2: { left: "ArrowLeft", right: "ArrowRight", fwd: "ArrowUp", back: "ArrowDown", fire: "m" }
+        };
+
+        /* ======================================================================
+           AI — A* through the maze, line-of-sight fire the moment it sees you
+           ====================================================================== */
+
+        function buildNavGrid() {
+            const cs = 18;
+            const cols = Math.ceil(W / cs) + 1;
+            const rows = Math.ceil(H / cs) + 1;
+            const grid = new Uint8Array(cols * rows);
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    grid[r * cols + c] = canMove(c * cs, r * cs, TS + 3) ? 1 : 0;
+                }
+            }
+            navData = { cs, cols, rows, grid };
+        }
+
+        function findPath(sx, sy, ex, ey) {
+            if (!navData) return [];
+            const { cs, cols, rows, grid } = navData;
+            const clamp = (v, max) => Math.max(0, Math.min(max, v));
+            const openAt = (r, c) => grid[r * cols + c] === 1;
+
+            let sr = clamp(Math.round(sy / cs), rows - 1);
+            let sc = clamp(Math.round(sx / cs), cols - 1);
+            if (!openAt(sr, sc)) {
+                let found = false;
+                for (let ring = 1; ring <= 4 && !found; ring++) {
+                    for (let dr = -ring; dr <= ring && !found; dr++) {
+                        for (let dc = -ring; dc <= ring && !found; dc++) {
+                            const r = sr + dr, c = sc + dc;
+                            if (r < 0 || r >= rows || c < 0 || c >= cols) continue;
+                            if (openAt(r, c)) { sr = r; sc = c; found = true; }
+                        }
+                    }
+                }
+                if (!found) return [];
+            }
+
+            let er = clamp(Math.round(ey / cs), rows - 1);
+            let ec = clamp(Math.round(ex / cs), cols - 1);
+            if (!openAt(er, ec)) {
+                // The goal is often a tank pressed against a wall; pick the nearest open cell.
+                let best = Infinity, br = -1, bc = -1;
+                for (let r = Math.max(0, er - 4); r <= Math.min(rows - 1, er + 4); r++) {
+                    for (let c = Math.max(0, ec - 4); c <= Math.min(cols - 1, ec + 4); c++) {
+                        if (!openAt(r, c)) continue;
+                        const d = Math.hypot(r - er, c - ec);
+                        if (d < best) { best = d; br = r; bc = c; }
+                    }
+                }
+                if (br < 0) return [];
+                er = br; ec = bc;
+            }
+
+            const id = (r, c) => r * cols + c;
+            const gScore = new Map();
+            const came = new Map();
+            const open = new Map();
+            const start = id(sr, sc);
+            gScore.set(start, 0);
+            open.set(start, { r: sr, c: sc, f: Math.hypot(er - sr, ec - sc) });
+
+            let guard = 0;
+            while (open.size && guard++ < 1200) {
+                let bk = null, bf = Infinity;
+                for (const [k, n] of open) { if (n.f < bf) { bf = n.f; bk = k; } }
+                const cur = open.get(bk);
+                open.delete(bk);
+
+                if (cur.r === er && cur.c === ec) {
+                    const path = [];
+                    let node = cur;
+                    while (came.has(id(node.r, node.c))) {
+                        path.unshift({ x: node.c * cs, y: node.r * cs });
+                        node = came.get(id(node.r, node.c));
+                    }
+                    return path;
+                }
+
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (!dr && !dc) continue;
+                        const nr = cur.r + dr, nc = cur.c + dc;
+                        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+                        if (!openAt(nr, nc)) continue;
+                        if (dr && dc &&
+                            (!openAt(cur.r + dr, cur.c) || !openAt(cur.r, cur.c + dc))) continue;
+
+                        const g = gScore.get(bk) + Math.hypot(dr, dc);
+                        const nk = id(nr, nc);
+                        if (g < (gScore.get(nk) ?? Infinity)) {
+                            gScore.set(nk, g);
+                            came.set(nk, cur);
+                            open.set(nk, { r: nr, c: nc, f: g + Math.hypot(er - nr, ec - nc) });
+                        }
+                    }
+                }
+            }
+            return [];
+        }
+
+        class AI {
+            constructor(self, target) {
+                this.self = self;
+                this.target = target;
+                this.frame = 0;
+
+                this.path = [];
+                this.pathAge = 999;
+                this.pathGoal = null;
+
+                this.prevX = self.x;
+                this.prevY = self.y;
+                this.stuck = 0;
+                this.recover = 0;
+
+                this.rtx = target.x;
+                this.rty = target.y;
+                this.tvx = 0;
+                this.tvy = 0;
+            }
+
+            clearKeys() {
+                for (const k of ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "m"]) delete keys[k];
+            }
+
+            update() {
+                this.clearKeys();
+                if (!this.self.alive || !this.target.alive) return;
+                this.frame++;
+                if (drivingMissile(this.self)) return;
+                if (this.recover > 0) {
+                    this.recover--;
+                    keys.ArrowDown = true;
+                    keys[this.recover % 8 < 4 ? "ArrowLeft" : "ArrowRight"] = true;
+                    this.tryFire();
+                    return;
+                }
+
+                this.tvx = this.tvx * 0.6 + (this.target.x - this.rtx) * 0.4;
+                this.tvy = this.tvy * 0.6 + (this.target.y - this.rty) * 0.4;
+                this.rtx = this.target.x;
+                this.rty = this.target.y;
+
+                const moved = Math.hypot(this.self.x - this.prevX, this.self.y - this.prevY);
+                this.stuck = moved < 0.35 ? this.stuck + 1 : Math.max(0, this.stuck - 2);
+                this.prevX = this.self.x;
+                this.prevY = this.self.y;
+                if (this.stuck > 24) {
+                    this.recover = 18;
+                    this.stuck = 0;
+                    this.path = [];
+                    this.pathAge = 999;
+                }
+
+                if (this.dodge()) { this.tryFire(); return; }
+
+                const pickup = this.wantPowerup();
+                if (pickup) {
+                    this.travelTo(pickup.x, pickup.y);
+                    this.tryFire();
+                    return;
+                }
+
+                this.combat();
+                this.tryFire();
+            }
+
+            /* Incoming fire gets priority: step out of the lane, then keep going. */
+            dodge() {
+                const s = this.self;
+                let threat = null, best = Infinity;
+                for (const b of bullets) {
+                    if (!b.alive || b.owner === s) continue;
+                    const d = dist(s.x, s.y, b.x, b.y);
+                    if (d > 200) continue;
+                    const sp = Math.hypot(b.vx, b.vy) || 1;
+                    const closing = ((s.x - b.x) * b.vx + (s.y - b.y) * b.vy) / sp;
+                    if (closing < d * 0.55) continue;
+                    const sideways = Math.abs((s.x - b.x) * b.vy - (s.y - b.y) * b.vx) / sp;
+                    if (sideways > 36) continue;
+                    if (d < best) { best = d; threat = b; }
+                }
+                if (!threat) return false;
+                const travel = Math.atan2(threat.vy, threat.vx);
+                const a = travel + Math.PI / 2;
+                const b2 = travel - Math.PI / 2;
+                this.step(Math.abs(norm(a - s.angle)) < Math.abs(norm(b2 - s.angle)) ? a : b2, true);
+                return true;
+            }
+
+            wantPowerup() {
+                const s = this.self;
+                let best = null, bestScore = -Infinity;
+                for (const p of powerups) {
+                    const d = dist(s.x, s.y, p.x, p.y);
+                    if (d > 440) continue;
+                    let value = s.power ? 55 : 145;
+                    if (p.type === "shield") value += 25;
+                    if (p.type === "gatling" || p.type === "shotgun") value += 10;
+                    const score = value - d * 0.55;
+                    if (score > bestScore) { bestScore = score; best = p; }
+                }
+                return best;
+            }
+
+            preferredRange() {
+                const p = think(this.self);
+                const type = p ? p.type : null;
+                if (type === "shotgun") return 70;
+                if (type === "gatling") return 130;
+                if (type === "laser") return 320;
+                if (type === "missile") return 260;
+                if (type === "frag") return 210;
+                return 185;
+            }
+
+            aimAngle(distance) {
+                const s = this.self, t = this.target;
+                const p = think(s);
+                if (p && p.type === "laser") return Math.atan2(t.y - s.y, t.x - s.x);
+                const flight = distance / BSPD;
+                const lx = t.x + this.tvx * flight * 0.5;
+                const ly = t.y + this.tvy * flight * 0.5;
+                return Math.atan2(ly - s.y, lx - s.x);
+            }
+
+            combat() {
+                const s = this.self, t = this.target;
+                const d = dist(s.x, s.y, t.x, t.y);
+                if (!los(s.x, s.y, t.x, t.y)) {
+                    this.travelTo(t.x, t.y);
+                    return;
+                }
+                const range = this.preferredRange();
+                const aim = this.aimAngle(d);
+                if (d > range + 70) {
+                    this.step(aim, true);
+                } else if (d < range - 45) {
+                    this.step(aim, false);
+                    keys.ArrowDown = true;
+                } else {
+                    this.step(aim, Math.sin(this.frame * 0.045) > 0.55);
+                }
+            }
+
+            tryFire() {
+                const s = this.self, t = this.target;
+                if (!t.alive) return;
+                const p = think(s);
+                const type = p ? p.type : null;
+
+                // A frag shell in flight is a detonator waiting for the right moment.
+                const frag = bullets.find(b => b.alive && b.owner === s && b.kind === "frag");
+                if (frag) {
+                    if (dist(frag.x, frag.y, t.x, t.y) < 62) keys.m = true;
+                    return;
+                }
+
+                const see = los(s.x, s.y, t.x, t.y);
+                const d = dist(s.x, s.y, t.x, t.y);
+                const aim = this.aimAngle(d);
+                const error = Math.abs(norm(aim - s.angle));
+
+                if (type === "missile") {
+                    if (!drivingMissile(s) && see && error < 0.5) keys.m = true;
+                    return;
+                }
+
+                const tolerance = type === "shotgun" ? 0.3 : type === "gatling" ? 0.16 : 0.11;
+                if (see && error < tolerance) keys.m = true;
+            }
+
+            travelTo(tx, ty) {
+                const s = this.self;
+                const d = dist(s.x, s.y, tx, ty);
+                if (d < 90 && los(s.x, s.y, tx, ty)) {
+                    this.step(Math.atan2(ty - s.y, tx - s.x), true);
+                    return;
+                }
+
+                this.repath(tx, ty);
+                while (this.path.length &&
+                    dist(s.x, s.y, this.path[0].x, this.path[0].y) < 14) this.path.shift();
+
+                if (!this.path.length) {
+                    this.step(Math.atan2(ty - s.y, tx - s.x), true);
+                    return;
+                }
+
+                let node = this.path[0];
+                for (let i = this.path.length - 1; i > 0; i--) {
+                    if (straightClear(s.x, s.y, this.path[i].x, this.path[i].y, TS + 1)) {
+                        node = this.path[i];
+                        this.path.splice(0, i);
+                        break;
+                    }
+                }
+                this.step(Math.atan2(node.y - s.y, node.x - s.x), true);
+            }
+
+            repath(tx, ty) {
+                const movedGoal = !this.pathGoal ||
+                    Math.hypot(tx - this.pathGoal.x, ty - this.pathGoal.y) > 50;
+                this.pathAge++;
+                if (this.pathAge > 24 || movedGoal || !this.path.length) {
+                    this.path = findPath(this.self.x, this.self.y, tx, ty);
+                    this.pathAge = 0;
+                    this.pathGoal = { x: tx, y: ty };
+                }
+            }
+
+            step(angle, forward) {
+                const error = norm(angle - this.self.angle);
+                if (Math.abs(error) > 0.04) {
+                    keys[error > 0 ? "ArrowRight" : "ArrowLeft"] = true;
+                }
+                if (forward && Math.abs(error) < 0.9) keys.ArrowUp = true;
+            }
+        }
+
+        /* -------------------------- TANK UPDATE -------------------------- */
+
+        function moveTank(t, amount, direction) {
+            const nx = t.x + Math.cos(t.angle) * amount * direction;
+            const ny = t.y + Math.sin(t.angle) * amount * direction;
+            if (canMove(nx, ny, TS)) { t.x = nx; t.y = ny; return; }
+            if (canMove(nx, t.y, TS)) t.x = nx;
+            else if (canMove(t.x, ny, TS)) t.y = ny;
+        }
+
+        function updateTank(t, ctl) {
+            if (!t.alive) return;
+            think(t);
+            if (drivingMissile(t)) { steerMissile(t, ctl); return; }
+
+            if (keys[ctl.left]) t.angle -= ROT;
+            if (keys[ctl.right]) t.angle += ROT;
+            if (keys[ctl.fwd]) moveTank(t, SPD, 1);
+            if (keys[ctl.back]) moveTank(t, SPD * 0.65, -1);
+            handleFire(t, !!keys[ctl.fire]);
+        }
+
+        function handleFire(t, held) {
+            if (!held) { t.ready = true; return; }
+
+            const power = think(t);
+            const type = power ? power.type : null;
+            if (!t.ready && type !== "gatling") return;
+
+            const frag = bullets.find(b => b.alive && b.owner === t && b.kind === "frag");
+            if (type === "frag" && frag) {
+                if (now() - t.lastFire < 100) return;
+                t.lastFire = now();
+                t.ready = false;
+                detonate(frag);
+                return;
+            }
+
+            const rate = type ? POWERS[type].rate : FRATE;
+            if (now() - t.lastFire < rate) return;
+            if (type === "missile" && drivingMissile(t)) return;
+            if (type !== "laser" && ownedShots(t) >= MAX_PLAYER_BULLETS) return;
+
+            t.lastFire = now();
+            t.ready = false;
+
+            if (type === "laser") fireLaser(t);
+            else if (type === "missile") fireMissile(t);
+            else if (type === "frag") fireFrag(t);
+            else if (type === "shotgun") fireShotgun(t);
+            else if (type === "gatling") fireGatling(t, power);
+            else fireStandard(t);
+        }
+
+        /* -------------------------- PROJECTILES -------------------------- */
+
+        function spawnBullet(t, angle, opts) {
+            const b = {
+                x: t.x + Math.cos(angle) * (TS + 8),
+                y: t.y + Math.sin(angle) * (TS + 8),
+                vx: Math.cos(angle) * opts.speed,
+                vy: Math.sin(angle) * opts.speed,
+                dir: angle,
+                owner: t,
+                size: opts.size ?? 4,
+                bounces: 0,
+                maxBounces: opts.bounces ?? 6,
+                life: opts.life ?? 600,
+                age: 0,
+                kind: opts.kind ?? "bullet",
+                shard: !!opts.shard,
+                alive: true
+            };
+            bullets.push(b);
+            for (let i = 0; i < 3; i++) {
+                particles.push({
+                    x: b.x, y: b.y,
+                    vx: Math.cos(angle) * (0.6 + Math.random()) + (Math.random() - .5),
+                    vy: Math.sin(angle) * (0.6 + Math.random()) + (Math.random() - .5),
+                    life: 12, color: t.color
+                });
+            }
+            return b;
+        }
+
+        function fireStandard(t) {
+            spawnBullet(t, t.angle, { speed: BSPD, size: 4, bounces: 6 });
+        }
+
+        function fireGatling(t, power) {
+            spawnBullet(t, t.angle, { speed: BSPD * 1.15, size: 3, bounces: 4, life: 420 });
+            power.ammo -= 1;
+            if (power.ammo <= 0) t.power = null;
+        }
+
+        function fireShotgun(t) {
+            for (const offset of [-0.3, -0.18, -0.06, 0.06, 0.18, 0.3]) {
+                spawnBullet(t, t.angle + offset, {
+                    speed: BSPD * 1.1, size: 2.4, bounces: 3, life: 150, kind: "pellet"
+                });
+            }
+        }
+
+        function fireFrag(t) {
+            spawnBullet(t, t.angle, {
+                speed: BSPD * 0.82, size: 8, bounces: 0, life: 600, kind: "frag"
+            });
+        }
+
+        function fireMissile(t) {
+            const b = spawnBullet(t, t.angle, {
+                speed: 2.4, size: 5, bounces: 0, life: 300, kind: "missile"
+            });
+            t.missile = b;
+        }
+
+        function fireLaser(t) {
+            const dx = Math.cos(t.angle), dy = Math.sin(t.angle);
+            let x = t.x + dx * (TS + 4), y = t.y + dy * (TS + 4);
+            let endX = x, endY = y;
+            let hit = null;
+
+            // Inner maze walls are thin and do not stop the beam; the arena edge is solid.
+            for (let i = 0; i < 280; i++) {
+                x += dx * 4;
+                y += dy * 4;
+                if (x < 0 || x > W || y < 0 || y > H) break;
+                endX = x; endY = y;
+                for (const other of [p1, p2]) {
+                    if (other === t || !other.alive) continue;
+                    if (Math.hypot(other.x - x, other.y - y) < TS + 2) { hit = other; break; }
+                }
+                if (hit) break;
+            }
+
+            beams.push({
+                x1: t.x + dx * (TS + 4), y1: t.y + dy * (TS + 4),
+                x2: endX, y2: endY,
+                life: 9, max: 9, color: t.color
+            });
+
+            if (hit) {
+                explodeAt(hit.x, hit.y, hit.color, 26);
+                hit.alive = false;
+                if (hit.missile) { hit.missile.alive = false; hit.missile = null; }
+            }
+        }
+
+        function steerMissile(t, ctl) {
+            const m = t.missile;
+            if (!m || !m.alive) { t.missile = null; return; }
+
+            let steer = 0;
+            if (keys[ctl.left]) steer -= 0.062;
+            if (keys[ctl.right]) steer += 0.062;
+
+            const enemy = t === p1 ? p2 : p1;
+            if (enemy && enemy.alive) {
+                const want = Math.atan2(enemy.y - m.y, enemy.x - m.x);
+                const error = norm(want - m.dir);
+                const bias = steer ? 0.014 : 0.05;   // hand-flying weakens the lock
+                m.dir += steer + Math.max(-bias, Math.min(bias, error));
+            } else {
+                m.dir += steer;
+            }
+
+            const speed = Math.min(5.4, Math.hypot(m.vx, m.vy) + 0.03);
+            m.vx = Math.cos(m.dir) * speed;
+            m.vy = Math.sin(m.dir) * speed;
+
+            if (Math.random() < .5) {
+                particles.push({
+                    x: m.x, y: m.y,
+                    vx: (Math.random() - .5) * .7, vy: (Math.random() - .5) * .7,
+                    life: 16, color: "#8a8272"
+                });
+            }
+        }
+
+        function releaseBullet(b) {
+            b.alive = false;
+            if (b.owner && b.owner.missile === b) b.owner.missile = null;
+        }
+
+        function detonate(b) {
+            if (!b.alive) return;
+            releaseBullet(b);
+            explodeAt(b.x, b.y, b.owner ? b.owner.color : P1, 10);
+            for (let i = 0; i < 26; i++) {
+                const angle = (i / 26) * Math.PI * 2 + Math.random() * 0.2;
+                const speed = 2 + Math.random() * 3;
+                queued.push({
+                    x: b.x, y: b.y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    dir: angle,
+                    owner: b.owner,
+                    size: 2,
+                    bounces: 0,
+                    maxBounces: 2,
+                    life: 70 + Math.floor(Math.random() * 30),
+                    age: 0,
+                    kind: "shard",
+                    shard: true,
+                    alive: true
+                });
+            }
+        }
+
+        function updateBullets() {
+            const count = bullets.length;
+
+            for (let i = 0; i < count; i++) {
+                const b = bullets[i];
+                if (!b.alive) continue;
+                b.age++;
+
+                if (b.kind === "missile") {
+                    const speed = Math.hypot(b.vx, b.vy);
+                    b.vx = Math.cos(b.dir) * speed;
+                    b.vy = Math.sin(b.dir) * speed;
+                }
+
+                const prevX = b.x, prevY = b.y;
+                b.x += b.vx;
+                b.y += b.vy;
+
+                let consumed = false;
+
+                const hitBorder =
+                    b.x - b.size <= 0 || b.x + b.size >= W ||
+                    b.y - b.size <= 0 || b.y + b.size >= H;
+
+                if (hitBorder) {
+                    if (b.kind === "missile") {
+                        explodeAt(b.x, b.y, b.owner ? b.owner.color : P1, 14);
+                        releaseBullet(b);
+                        continue;
+                    }
+                    if (b.kind === "frag") { detonate(b); continue; }
+                    if (b.x - b.size <= 0) { b.x = b.size; b.vx = Math.abs(b.vx); }
+                    else if (b.x + b.size >= W) { b.x = W - b.size; b.vx = -Math.abs(b.vx); }
+                    if (b.y - b.size <= 0) { b.y = b.size; b.vy = Math.abs(b.vy); }
+                    else if (b.y + b.size >= H) { b.y = H - b.size; b.vy = -Math.abs(b.vy); }
+                    b.bounces++;
+                }
+
+                for (const w of walls) {
+                    if (!circleRect(b.x, b.y, b.size, w.x, w.y, w.w, w.h)) continue;
+
+                    if (b.kind === "missile") {
+                        explodeAt(b.x, b.y, b.owner ? b.owner.color : P1, 14);
+                        releaseBullet(b);
+                        consumed = true;
+                        break;
+                    }
+                    if (b.kind === "frag") {
+                        detonate(b);
+                        consumed = true;
+                        break;
+                    }
+
+                    const onPrevX = circleRect(prevX, b.y, b.size, w.x, w.y, w.w, w.h);
+                    const onPrevY = circleRect(b.x, prevY, b.size, w.x, w.y, w.w, w.h);
+                    if (!onPrevX && onPrevY) {
+                        const side = Math.sign(b.vx);
+                        b.vx *= -1;
+                        b.x = side > 0 ? w.x - b.size : w.x + w.w + b.size;
+                    } else if (onPrevX && !onPrevY) {
+                        const side = Math.sign(b.vy);
+                        b.vy *= -1;
+                        b.y = side > 0 ? w.y - b.size : w.y + w.h + b.size;
+                    } else {
+                        const cx = Math.max(w.x, Math.min(w.x + w.w, b.x));
+                        const cy = Math.max(w.y, Math.min(w.y + w.h, b.y));
+                        if (Math.abs(b.x - cx) >= Math.abs(b.y - cy)) {
+                            const side = Math.sign(b.vx);
+                            b.vx *= -1;
+                            b.x = side > 0 ? w.x - b.size : w.x + w.w + b.size;
+                        } else {
+                            const side = Math.sign(b.vy);
+                            b.vy *= -1;
+                            b.y = side > 0 ? w.y - b.size : w.y + w.h + b.size;
+                        }
+                    }
+                    b.bounces++;
+                    for (let p = 0; p < 2; p++) {
+                        particles.push({
+                            x: b.x, y: b.y,
+                            vx: (Math.random() - .5) * 1.2, vy: (Math.random() - .5) * 1.2,
+                            life: 10, color: "#8a8272"
+                        });
+                    }
+                    break;
+                }
+
+                if (consumed || !b.alive) continue;
+                if (b.bounces > b.maxBounces || b.age > b.life) { releaseBullet(b); continue; }
+
+                for (const t of [p1, p2]) {
+                    if (!t.alive) continue;
+                    const d = Math.hypot(b.x - t.x, b.y - t.y);
+
+                    // A shield swats incoming projectiles out of the air.
+                    if (b.owner !== t && shielded(t) && d < 23) {
+                        for (let p = 0; p < 10; p++) {
+                            const a = Math.random() * Math.PI * 2, s = Math.random() * 2.6;
+                            particles.push({
+                                x: b.x, y: b.y,
+                                vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+                                life: 16, color: "#6b6558"
+                            });
+                        }
+                        releaseBullet(b);
+                        break;
+                    }
+
+                    if (b.owner === t && b.age < 10) continue;
+                    if (d >= TS + b.size) continue;
+
+                    // Your own ricochet can still catch you, shield or no shield.
+                    explodeAt(t.x, t.y, t.color, 30);
+                    t.alive = false;
+                    if (t.missile) { t.missile.alive = false; t.missile = null; }
+                    // A frag breaks open on the tank it hits, not just on walls.
+                    if (b.kind === "frag") detonate(b);
+                    else releaseBullet(b);
+                    break;
+                }
+            }
+
+            if (queued.length) {
+                bullets = bullets.concat(queued);
+                queued = [];
+            }
+            bullets = bullets.filter(b => b.alive);
         }
 
         /* -------------------------- POWERUPS -------------------------- */
 
         function spawnPowerup() {
             if (powerups.length >= 2) return;
-            const type = POWERUPS[Math.floor(Math.random() * POWERUPS.length)];
-            let x, y, tries = 0;
-            do { x = 60 + Math.random() * (W - 120); y = 60 + Math.random() * (H - 120); tries++; }
-            while (tries < 80 && !canMove(x, y, POWERUP_SIZE + 6));
-            if (canMove(x, y, POWERUP_SIZE + 6)) powerups.push({ x, y, ...type, spawn: Date.now() });
+            const type = POWER_TYPES[Math.floor(Math.random() * POWER_TYPES.length)];
+            for (let i = 0; i < 90; i++) {
+                const x = 60 + Math.random() * (W - 120);
+                const y = 60 + Math.random() * (H - 120);
+                if (!canMove(x, y, POWERUP_SIZE + 8)) continue;
+                if (powerups.some(p => Math.hypot(p.x - x, p.y - y) < 120)) continue;
+                powerups.push({ x, y, type, born: now() });
+                return;
+            }
         }
 
-        function checkPowerups(t) {
+        function checkPickups(t) {
             if (!t.alive) return;
             for (let i = powerups.length - 1; i >= 0; i--) {
                 const p = powerups[i];
-                const dx = t.x - p.x, dy = t.y - p.y;
-                if (dx * dx + dy * dy < 900) {
-                    t.effects = t.effects.filter(e => e.type !== p.type);
-                    const dur = p.type === 'shield' ? SHIELD_DURATION : POWERUP_DURATION;
-                    t[p.type] = true;
-                    t.effects.push({ type: p.type, end: Date.now() + dur });
-                    if (p.type === 'shield') t.shieldHP = 1;
-                    flashes.push({ x: p.x, y: p.y, color: p.color, radius: POWERUP_SIZE, alpha: .9, life: 30 });
-                    popups.push({ x: p.x, y: p.y - 20, text: p.name, color: p.color, life: 70, vy: -1.2 });
-                    powerups.splice(i, 1);
-                }
+                if (Math.hypot(t.x - p.x, t.y - p.y) > TS + POWERUP_SIZE + 4) continue;
+                powerups.splice(i, 1);
+                const def = POWERS[p.type];
+                if (p.type === "shield") t.shieldUntil = now() + def.dur;
+                else t.power = { type: p.type, until: now() + def.dur, ammo: def.ammo || 0 };
+
+                flashes.push({ x: p.x, y: p.y, r: POWERUP_SIZE, life: 14, max: 14 });
+                popups.push({
+                    x: p.x, y: p.y - 18, text: def.name.toUpperCase(),
+                    life: 55, color: t === p1 ? P1 : P2
+                });
             }
         }
 
         /* -------------------------- FX -------------------------- */
 
-        function explode(t) {
-            for (let i = 0; i < 30; i++) {
-                const a = Math.random() * Math.PI * 2, s = Math.random() * 4;
-                explosions.push({ x: t.x, y: t.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 30 + Math.random() * 20, max: 50, color: t.color });
+        function explodeAt(x, y, color, n) {
+            for (let i = 0; i < n; i++) {
+                const a = Math.random() * Math.PI * 2, s = Math.random() * 3.4;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+                    life: 26 + Math.random() * 16, color
+                });
             }
         }
-        function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.x += p.vx; p.y += p.vy; if (--p.life <= 0) particles.splice(i, 1); } }
-        function updateExplosions() { for (let i = explosions.length - 1; i >= 0; i--) { const e = explosions[i]; e.x += e.vx; e.y += e.vy; e.vx *= .96; e.vy *= .96; if (--e.life <= 0) explosions.splice(i, 1); } }
-        function updateFlashes() { for (let i = flashes.length - 1; i >= 0; i--) { const f = flashes[i]; f.radius += 1.8; f.alpha -= .03; if (--f.life <= 0) flashes.splice(i, 1); } }
-        function updatePopups() { for (let i = popups.length - 1; i >= 0; i--) { const p = popups[i]; p.y += p.vy; if (--p.life <= 0) popups.splice(i, 1); } }
+
+        function updateFx() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy;
+                p.vx *= .97; p.vy *= .97;
+                if (--p.life <= 0) particles.splice(i, 1);
+            }
+            for (let i = beams.length - 1; i >= 0; i--) if (--beams[i].life <= 0) beams.splice(i, 1);
+            for (let i = flashes.length - 1; i >= 0; i--) {
+                const f = flashes[i];
+                f.r += 1.2;
+                if (--f.life <= 0) flashes.splice(i, 1);
+            }
+            for (let i = popups.length - 1; i >= 0; i--) {
+                const p = popups[i];
+                p.y -= 0.55;
+                if (--p.life <= 0) popups.splice(i, 1);
+            }
+        }
+
+        /* -------------------------- HUD -------------------------- */
+
+        function powerText(t) {
+            if (!t || !t.alive) return "";
+            const parts = [];
+            const p = think(t);
+            if (p) {
+                const def = POWERS[p.type];
+                parts.push(p.type === "gatling" ? def.name + " " + p.ammo : def.name + " " + Math.ceil((p.until - now()) / 1000) + "s");
+            }
+            if (shielded(t)) parts.push("Shield " + Math.ceil((t.shieldUntil - now()) / 1000) + "s");
+            return parts.join(" · ");
+        }
+
+        function tickHud() {
+            p1pEl.textContent = powerText(p1);
+            p2pEl.textContent = powerText(p2);
+        }
 
         /* -------------------------- DRAW -------------------------- */
 
-        function drawGrid() {
-            X.strokeStyle = "rgba(0,0,0,.03)"; X.lineWidth = 1;
-            for (let x = 0; x < W; x += 40) { X.beginPath(); X.moveTo(x + .5, 0); X.lineTo(x + .5, H); X.stroke(); }
-            for (let y = 0; y < H; y += 40) { X.beginPath(); X.moveTo(0, y + .5); X.lineTo(W, y + .5); X.stroke(); }
+        function drawArena() {
+            X.fillStyle = "#f7f4ec";
+            X.fillRect(0, 0, W, H);
+
+            X.strokeStyle = "rgba(25,23,19,.05)";
+            X.lineWidth = 1;
+            X.beginPath();
+            for (let x = 0; x <= W; x += 40) { X.moveTo(x + .5, 0); X.lineTo(x + .5, H); }
+            for (let y = 0; y <= H; y += 40) { X.moveTo(0, y + .5); X.lineTo(W, y + .5); }
+            X.stroke();
         }
 
-        function drawWalls() { X.fillStyle = "#2f2b27"; for (const w of walls) X.fillRect(w.x, w.y, w.w, w.h); }
-
-        function drawTank(t) {
-            if (!t.alive) return;
-            X.save(); X.translate(t.x, t.y); X.rotate(t.angle);
-
-            if (t.shield && t.shieldHP > 0) {
-                X.save(); X.rotate(-t.angle);
-                const pulse = (Math.sin(Date.now() / 100) + 1) / 2;
-                X.beginPath(); X.arc(0, 0, 16, 0, Math.PI * 2);
-                X.fillStyle = "rgba(22,163,74,.08)"; X.fill();
-                X.beginPath(); X.arc(0, 0, 18 + pulse * 2, 0, Math.PI * 2);
-                X.strokeStyle = "#16a34a"; X.globalAlpha = .5 + pulse * .3; X.lineWidth = 2.5; X.stroke();
-                X.globalAlpha = 1; X.restore();
+        function drawWalls() {
+            for (const w of walls) {
+                X.fillStyle = "#e2dbca";
+                X.fillRect(w.x, w.y, w.w, w.h);
+                X.strokeStyle = "#b9b1a0";
+                X.lineWidth = 1;
+                X.strokeRect(w.x + .5, w.y + .5, w.w - 1, w.h - 1);
             }
-
-            for (const ef of t.effects) {
-                if (ef.type === 'shield') continue;
-                const pu = POWERUPS.find(p => p.type === ef.type);
-                if (pu) {
-                    const rem = Math.max(0, ef.end - Date.now());
-                    const urg = rem < 2000, pulse = (Math.sin(Date.now() / 120) + 1) / 2;
-                    X.save(); X.rotate(-t.angle);
-                    X.beginPath(); X.arc(0, 0, 14 + pulse * 3, 0, Math.PI * 2);
-                    X.strokeStyle = pu.color; X.globalAlpha = urg ? .15 + pulse * .5 : .35 + pulse * .2;
-                    X.lineWidth = urg ? 3.5 : 2.5; X.stroke(); X.globalAlpha = 1; X.restore();
-                }
-            }
-
-            X.fillStyle = t.color; X.fillRect(-10, -8, 20, 16);
-            X.fillStyle = "rgba(0,0,0,.18)"; X.fillRect(-10, -8, 20, 3); X.fillRect(-10, 5, 20, 3);
-            X.fillStyle = "#111"; X.fillRect(2, -2, 16, 4);
-            X.restore();
-        }
-
-        function drawBullets() {
-            for (const b of bullets) {
-                X.globalAlpha = 1 - Math.min(1, b.fade) * .7;
-                if (b.isRocket) { X.fillStyle = "#ea580c"; X.shadowColor = "#ea580c"; X.shadowBlur = 8; }
-                else if (b.isLaser) { X.fillStyle = "#0891b2"; X.shadowColor = "#0891b2"; X.shadowBlur = 6; }
-                else X.fillStyle = b.ownerColor || "#888";
-                X.beginPath(); X.arc(b.x, b.y, b.size, 0, Math.PI * 2); X.fill();
-                X.shadowBlur = 0;
-            }
-            X.globalAlpha = 1;
         }
 
         function drawPowerups() {
             for (const p of powerups) {
-                const pulse = (Math.sin((Date.now() - p.spawn) / 180) + 1) / 2;
-                X.save(); X.translate(p.x, p.y);
-                X.beginPath(); X.arc(0, 0, POWERUP_SIZE + pulse * 4, 0, Math.PI * 2);
-                X.strokeStyle = p.color; X.globalAlpha = .3; X.lineWidth = 2; X.stroke();
-                X.globalAlpha = 1;
-                X.beginPath(); X.arc(0, 0, POWERUP_SIZE, 0, Math.PI * 2);
-                X.fillStyle = "#f7f4ee"; X.fill(); X.strokeStyle = p.color; X.lineWidth = 2; X.stroke();
-                X.fillStyle = p.color; X.font = 'bold 13px "Space Mono"'; X.textAlign = "center"; X.textBaseline = "middle";
-                X.fillText(p.symbol, 0, 1);
+                X.save();
+                X.translate(p.x, p.y);
+                X.fillStyle = "#f7f4ec";
+                X.fillRect(-10, -10, 20, 20);
+                X.strokeStyle = "#191713";
+                X.lineWidth = 1;
+                X.strokeRect(-9.5, -9.5, 19, 19);
+                X.fillStyle = "#191713";
+                X.font = "8px ui-monospace, Menlo, monospace";
+                X.textAlign = "center";
+                X.textBaseline = "middle";
+                X.fillText(POWERS[p.type].tag, 0, 1);
                 X.restore();
             }
         }
 
-        function drawParticles() { for (const p of particles) { X.globalAlpha = p.life / 10; X.fillStyle = p.color; X.fillRect(p.x, p.y, 2, 2); } X.globalAlpha = 1; }
-        function drawExplosions() { for (const e of explosions) { X.globalAlpha = e.life / e.max; X.fillStyle = e.color; X.fillRect(e.x, e.y, 4, 4); } X.globalAlpha = 1; }
-        function drawFlashes() { for (const f of flashes) { X.beginPath(); X.arc(f.x, f.y, f.radius, 0, Math.PI * 2); X.strokeStyle = f.color; X.globalAlpha = Math.max(0, f.alpha); X.lineWidth = 3; X.stroke(); } X.globalAlpha = 1; }
-        function drawPopups() { for (const p of popups) { X.globalAlpha = Math.min(1, p.life / 20); X.fillStyle = p.color; X.font = 'bold 14px "Space Mono"'; X.textAlign = "center"; X.fillText(p.text, p.x, p.y); } X.globalAlpha = 1; }
+        function drawTank(t) {
+            if (!t.alive) return;
 
-        /* -------------------------- UI -------------------------- */
+            X.save();
+            X.translate(t.x, t.y);
+            X.rotate(t.angle);
+            X.fillStyle = t.color;
+            X.fillRect(-10, -8, 20, 16);
+            X.fillStyle = "rgba(245,242,234,.85)";
+            X.fillRect(-10, -8, 20, 2);
+            X.fillRect(-10, 6, 20, 2);
+            X.fillStyle = "#191713";
+            X.fillRect(0, -1.5, 18, 3);
+            X.restore();
 
-        function updateScores() {
-            document.getElementById("p1s").textContent = "P1: " + scores[0];
-            document.getElementById("p2s").textContent = (aiEnabled ? "AI" : "P2") + ": " + scores[1];
+            if (shielded(t)) {
+                const left = Math.max(0, (t.shieldUntil - now()) / 6000);
+                X.beginPath();
+                X.arc(t.x, t.y, 17, 0, Math.PI * 2);
+                X.strokeStyle = "rgba(25,23,19," + (0.3 + left * 0.45).toFixed(3) + ")";
+                X.lineWidth = left < 0.2 ? 2 : 1;
+                X.stroke();
+            }
         }
 
-        function updateEffectHUD() {
-            for (const { el, t } of [{ el: "p1fx", t: p1 }, { el: "p2fx", t: p2 }]) {
-                const div = document.getElementById(el);
-                if (!t || !t.alive || !t.effects.length) { div.textContent = ""; continue; }
-                const parts = [];
-                for (const ef of t.effects) {
-                    const left = Math.max(0, Math.ceil((ef.end - Date.now()) / 1000));
-                    const pu = POWERUPS.find(p => p.type === ef.type);
-                    if (pu) parts.push(pu.symbol + " " + left + "s");
+        function drawBullets() {
+            for (const b of bullets) {
+                if (!b.alive) continue;
+                X.fillStyle = b.owner === p2 ? P2 : P1;
+
+                if (b.kind === "missile") {
+                    X.save();
+                    X.translate(b.x, b.y);
+                    X.rotate(b.dir);
+                    X.fillRect(-5, -1.5, 10, 3);
+                    X.restore();
+                } else if (b.kind === "frag") {
+                    X.beginPath(); X.arc(b.x, b.y, b.size, 0, Math.PI * 2); X.fill();
+                    X.fillStyle = "#f7f4ec";
+                    X.beginPath(); X.arc(b.x, b.y, b.size - 3, 0, Math.PI * 2); X.fill();
+                } else if (b.kind === "shard") {
+                    X.fillRect(b.x - 1, b.y - 1, 2, 2);
+                } else if (b.kind === "pellet") {
+                    X.fillRect(b.x - 1.2, b.y - 1.2, 2.4, 2.4);
+                } else {
+                    X.beginPath(); X.arc(b.x, b.y, b.size, 0, Math.PI * 2); X.fill();
                 }
-                div.textContent = parts.join("  ");
-                div.style.color = (POWERUPS.find(p => p.type === t.effects[t.effects.length - 1].type) || { color: "#888" }).color;
             }
+        }
+
+        function drawBeams() {
+            for (const b of beams) {
+                X.globalAlpha = Math.max(0, b.life / b.max);
+                X.strokeStyle = b.color;
+                X.lineWidth = 1.5;
+                X.beginPath();
+                X.moveTo(b.x1, b.y1);
+                X.lineTo(b.x2, b.y2);
+                X.stroke();
+                X.globalAlpha = 1;
+            }
+        }
+
+        function drawFx() {
+            for (const p of particles) {
+                X.globalAlpha = Math.min(1, p.life / 14);
+                X.fillStyle = p.color;
+                X.fillRect(p.x - 1, p.y - 1, 2, 2);
+            }
+            X.globalAlpha = 1;
+
+            for (const f of flashes) {
+                X.globalAlpha = Math.max(0, f.life / f.max);
+                X.strokeStyle = "#6b6558";
+                X.lineWidth = 1;
+                X.beginPath();
+                X.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+                X.stroke();
+            }
+            X.globalAlpha = 1;
+
+            X.font = "9px ui-monospace, Menlo, monospace";
+            X.textAlign = "center";
+            X.textBaseline = "middle";
+            for (const p of popups) {
+                X.globalAlpha = Math.min(1, p.life / 22);
+                X.fillStyle = p.color;
+                X.fillText(p.text, p.x, p.y);
+            }
+            X.globalAlpha = 1;
+        }
+
+        function draw() {
+            drawArena();
+            drawWalls();
+            drawPowerups();
+            drawBullets();
+            drawTank(p1);
+            drawTank(p2);
+            drawBeams();
+            drawFx();
         }
 
         /* -------------------------- LOOP -------------------------- */
 
-        function loop() {
-            X.fillStyle = "#f7f4ee"; X.fillRect(0, 0, W, H);
-            drawGrid(); drawWalls();
+        function step() {
+            updateTank(p1, CTRL.p1);
+            if (aiEnabled && ai) ai.update();
+            updateTank(p2, CTRL.p2);
+            updateBullets();
 
-            if (!roundOver) {
-                updateTank(p1, "a", "d", "w", "s", "c");
-                if (aiEnabled && ai) ai.update();
-                updateTank(p2, "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "m");
-                updateBullets();
-                checkPowerups(p1); checkPowerups(p2);
-                if (Date.now() - lastPowerup > POWERUP_INTERVAL) { lastPowerup = Date.now(); spawnPowerup(); }
-                if (deathGrace && Date.now() - deathGraceStart >= 3000) endRound(deathGraceWinner);
-            } else {
-                const elapsed = Date.now() - roundTime;
-                const remain = Math.ceil((3000 - elapsed) / 1000);
-                if (remain > 0) document.getElementById("cd").textContent = "New round in " + remain;
-                if (elapsed >= 3000) initRound();
+            checkPickups(p1);
+            checkPickups(p2);
+
+            if (now() > nextPowerup) {
+                nextPowerup = now() + POWERUP_INTERVAL;
+                spawnPowerup();
             }
 
-            updateParticles(); updateExplosions(); updateFlashes(); updatePopups();
-            drawParticles(); drawBullets(); drawExplosions(); drawFlashes();
-            drawPowerups(); drawPopups();
-            drawTank(p1); drawTank(p2);
-            updateEffectHUD();
+            if (!roundOver) {
+                if (!p1.alive && !p2.alive) endRound(-1);
+                else if (!p1.alive) endRound(1);
+                else if (!p2.alive) endRound(0);
+            }
+        }
 
+        function loop() {
+            if (!roundOver) step();
+            else if (now() - roundEndedAt >= ROUND_PAUSE) initRound();
+
+            updateFx();
+            draw();
+            tickHud();
             requestAnimationFrame(loop);
         }
 
         /* -------------------------- START -------------------------- */
+
         // Read-only handle for the offline suite: position and tuning, no setters.
         window.__test = {
             tanks: () => [p1, p2].map(t => ({ x: +t.x.toFixed(2), y: +t.y.toFixed(2), angle: +t.angle.toFixed(3) })),
@@ -1200,22 +1486,23 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             rot: () => ROT,
             cpu: () => aiEnabled
         };
-        updateScores(); initRound();
 
-        // Pick an opponent before the first round instead of dropping the player
-        // straight into a match against the AI. E still swaps sides mid-game.
         const menuEl = document.getElementById("menu");
-        let matchOn = false;
+        let started = false;
+
         function beginMatch(vsCpu) {
             aiEnabled = vsCpu;
             if (ai) ai.clearKeys();
             initRound();
-            updateScores();
+            syncScores();
             menuEl.hidden = true;
-            if (!matchOn) { matchOn = true; loop(); }
+            if (!started) { started = true; loop(); }
         }
+
         document.getElementById("m1").onclick = () => beginMatch(true);
         document.getElementById("m2").onclick = () => beginMatch(false);
+
+        initRound();
     </script>
 </body>
 
