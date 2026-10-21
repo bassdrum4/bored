@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { pathToFileURL } = require('node:url');
 const puppeteer = require('puppeteer-core');
+const { serve } = require('./serve.cjs');
 
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
@@ -14,7 +14,9 @@ const source = [
   'src/games/arcade.js', 'src/daily.js', 'src/games/catalog.js'
 ].map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
 const API = source.match(/const API_URL = '([^']+)'/)[1];
-const url = pathToFileURL(path.join(root, 'index.html')).href;
+// Games are downloaded on demand now, so the suite serves the repository over
+// loopback the way GitHub Pages does instead of loading file://.
+let origin = '', url = '';
 let browser, page;
 const errors = [], requests = [];
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -93,7 +95,7 @@ function challengeRules() {
   const start = source.indexOf('const CHALLENGES = [');
   const end = source.indexOf('function dailyChallenge', start);
   // `const` in the vm script is lexical, so hand the list to the test explicitly.
-  const context = rules(['dailyDate', 'dailyChallenge', 'dailyCheck'],
+  const context = rules(['dailyDate', 'dailyChallenge', 'dailyCheck', 'dailyStreak'],
     source.slice(start, end).replace(/export\s+$/, '') + '\nthis.CHALLENGES = CHALLENGES;');
   return context;
 }
@@ -105,6 +107,25 @@ function dateFor(slug) {
   }
   throw new Error('No challenge for ' + slug);
 }
+test('a streak counts consecutive completed days and survives an outstanding today', () => {
+  const { dailyStreak } = challengeRules();
+  const streak = (dates, today) => {
+    const result = dailyStreak(dates, today);
+    return result.current + '/' + result.best;
+  };
+  assert.equal(streak([], '2031-01-07'), '0/0');
+  assert.equal(streak(['2031-01-07'], '2031-01-07'), '1/1');
+  // Today is still to play, so yesterday's run has not been broken.
+  assert.equal(streak(['2031-01-06'], '2031-01-07'), '1/1');
+  assert.equal(streak(['2031-01-05'], '2031-01-07'), '0/1');
+  // Duplicates and out-of-order days count once each.
+  assert.equal(streak(['2031-01-06', '2031-01-04', '2031-01-05', '2031-01-06'], '2031-01-07'), '3/3');
+  // A gap ends the run; only the longest one is remembered.
+  assert.equal(streak(['2031-01-04', '2031-01-05', '2031-01-07'], '2031-01-07'), '1/2');
+  // A longer gap, months apart, still only counts as one pair.
+  assert.equal(streak(['2030-12-31', '2031-01-01', '2031-03-01'], '2031-03-01'), '1/2');
+});
+
 test('the daily rotation covers every challenge game, changes targets, and uses Eastern Time', () => {
   const { dailyDate, dailyChallenge, CHALLENGES } = challengeRules();
   assert.equal(dailyDate(new Date('2026-10-09T00:30:00+02:00')), '2026-10-08');
@@ -206,11 +227,35 @@ test('browser regressions', async t => {
     try { const installed = require('puppeteer').executablePath(); if (fs.existsSync(installed)) executablePath = installed; } catch {}
   }
   assert.ok(executablePath, 'Chrome is required; set CHROME_PATH if it is not in a standard location');
+  const site = await serve(root);
+  ({ origin, url } = site);
   browser = await puppeteer.launch({ executablePath, headless: true });
-  t.after(async () => { await browser.close(); });
+  t.after(async () => { await browser.close(); await site.close(); });
   page = await browser.newPage();
   page.on('pageerror', err => errors.push(err.message));
-  page.on('request', request => { if (/^https?:/.test(request.url())) requests.push(request.url()); });
+  await page.setRequestInterception(true);
+  // The leaderboard is the only server this page is allowed to reach; the loopback
+  // site that serves it is not an external request. Anonymous sign-ups are
+  // answered here so the suite never creates a real account on the project.
+  page.on('request', request => {
+    const target = request.url();
+    if (/^https?:/.test(target) && !target.startsWith(origin)) requests.push(target);
+    if (target.includes('/auth/v1/signup')) {
+      return request.respond({
+        status: 200,
+        contentType: 'application/json',
+        headers: {
+          'access-control-allow-origin': '*', 'access-control-allow-headers': '*',
+          'access-control-allow-methods': 'GET,POST,OPTIONS'
+        },
+        body: JSON.stringify({
+          access_token: 'anon-access', refresh_token: 'anon-refresh', expires_in: 3600,
+          user: { id: 'anon-user', email: null, is_anonymous: true }
+        })
+      });
+    }
+    return request.continue();
+  });
   await page.evaluateOnNewDocument(() => { Math.random = () => 0; });
   await page.setViewport({ width: 1000, height: 900 });
   await page.goto(url);
@@ -539,14 +584,17 @@ test('browser regressions', async t => {
     assert.ok(endScore - reported.live >= 1500, 'the reported score carries the clear bonus the live HUD omits');
 
     // A death on the first floor still has to save: turns make the score positive,
-    // so a finished run is never dropped for being zero.
-    await page.evaluate(() => localStorage.removeItem('bored.high.deep'));
+    // so a finished run is never dropped for being zero. Clear the older best
+    // only once the death run is the live snapshot — the hub recaptures on a
+    // 250 ms tick, and clearing while the victory run is still on screen would
+    // let that tick restore the higher score instead.
     const death = await frame.evaluate(() => {
       __deep.start('daily');
       Object.assign(__deep.state, { gold: 0, kills: 0, depth: 1, turns: 7 });
       __deep.finish(false);
       return window.__boredSnapshot();
     });
+    await page.evaluate(() => localStorage.removeItem('bored.high.deep'));
     await page.waitForFunction(() => (Number(localStorage.getItem('bored.high.deep')) || 0) > 0, { timeout: 4000 });
     assert.equal(death.finished, true, 'a death ends the run');
     assert.ok(death.score > 0, 'a floor-one death still scores');
@@ -1045,6 +1093,55 @@ test('browser regressions', async t => {
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
   });
 
+  await t.test('completed challenge days show as a streak, and nothing at all shows nothing', async () => {
+    const days = ['2031-01-04', '2031-01-05', '2031-01-06', '2031-01-07'];
+    // Whatever completions the suite has already earned, the line has to end up
+    // exactly as it started once these four days are taken back out.
+    const before = {
+      hidden: await page.$eval('#daily-streak', el => el.hidden),
+      text: await text(page, '#daily-streak')
+    };
+    // Each day is completed against its own goal, whatever the rotation picked.
+    const verified = await page.evaluate(list => {
+      window.originalDailyDate ||= dailyDate;
+      const checks = [];
+      for (const date of list) {
+        const challenge = dailyChallenge(date);
+        const snapshot = { slug: challenge.slug, solved: true, undoUsed: false, pairs: 8,
+          cpu: true, finished: true, accuracy: 100, normal: true, standard: true,
+          hints: 0, handOver: true, materials: 4, seconds: 120, herbs: 20, predators: 3 };
+        snapshot[challenge.metric] = ['word', 'memory', 'mines'].includes(challenge.rule) ? 0 : challenge.target;
+        if (challenge.rule === 'connect') snapshot.won = 1;
+        else if (challenge.rule === 'mines') snapshot.won = true;
+        checks.push(dailyCheck(challenge, snapshot).complete);
+        localStorage.setItem('bored.daily.' + challenge.id, JSON.stringify({ id: challenge.id, snapshot }));
+      }
+      return checks;
+    }, days);
+    assert.deepEqual(verified, [true, true, true, true], 'every seeded day verifies against its own goal');
+
+    await page.evaluate(day => { dailyDate = () => day; renderDaily(); }, days[3]);
+    assert.equal(await page.$eval('#daily-streak', el => el.hidden), false);
+    assert.equal(await text(page, '#daily-streak'), '4-day streak');
+
+    // Today is still to play, so the run from yesterday carries on.
+    await page.evaluate(day => { dailyDate = () => day; renderDaily(); }, '2031-01-08');
+    assert.equal(await text(page, '#daily-streak'), '4-day streak', 'an outstanding today does not break the run');
+
+    // A gap ends the run but the longest one is remembered.
+    await page.evaluate(() => localStorage.removeItem('bored.daily.' + dailyChallenge('2031-01-06').id));
+    await page.evaluate(day => { dailyDate = () => day; renderDaily(); }, days[3]);
+    assert.equal(await text(page, '#daily-streak'), '1-day streak · best 2');
+
+    await page.evaluate(list => {
+      for (const date of list) localStorage.removeItem('bored.daily.' + dailyChallenge(date).id);
+      renderDaily();
+    }, days);
+    assert.equal(await page.$eval('#daily-streak', el => el.hidden), before.hidden, 'removing the seeded days restores the line');
+    assert.equal(await text(page, '#daily-streak'), before.text);
+    await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
+  });
+
   await t.test('every offline game boots with the shared daily seed', async () => {
     const slugs = await page.evaluate(() => ORDER.filter(([slug]) => !EXTERNS[slug] && !NEW_GAMES.includes(slug)).map(([slug]) => slug));
     const seeds = new Set();
@@ -1124,5 +1221,31 @@ test('browser regressions', async t => {
     await noOverflow(daily);
     assert.deepEqual(failures, []);
     await restricted.close();
+  });
+
+  await t.test('a guest is quietly given an account on their first best, and nothing announces it', async () => {
+    await page.evaluate(() => { localStorage.removeItem('bored.high.lights-out'); openGame('lights-out'); });
+    await page.waitForFunction(() => document.querySelector('#frame').contentWindow.__boredSnapshot?.().slug === 'lights-out');
+    await page.evaluate(() => {
+      document.querySelector('#frame').contentWindow.__boredSnapshot = () => ({ slug: 'lights-out', cleared: 3 });
+      captureHighScore();
+    });
+    // The suite answers the sign-up with a stand-in session rather than a real user.
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('bored.session') || 'null')?.user?.is_anonymous === true);
+    assert.equal(await text(page, '#account-state'), 'Playing as a guest. Scores stay in this browser.');
+    assert.equal(await text(page, '#account-action'), 'Sign in');
+    assert.equal(await page.$eval('#account-rename', el => el.hidden), true);
+    assert.equal(await page.$eval('#account-action', el => el.classList.contains('primary')), true);
+    await close();
+    // The board keeps not pointing at them either.
+    await page.click('#lb-refresh');
+    await page.waitForFunction(() => document.querySelector('#lb-note').textContent.includes('Players ranked'));
+    assert.doesNotMatch(await text(page, '#lb-mine'), /Your account/);
+    assert.doesNotMatch(await text(page, '#lb-list'), /\(you\)/);
+    // Signing in stays what the button says it is: an anonymous session must not
+    // turn "Sign in" into "Sign out".
+    await page.click('#account-action');
+    await page.waitForFunction(() => document.querySelector('#auth-dialog')?.open === true);
+    await page.click('#auth-cancel');
   });
 });

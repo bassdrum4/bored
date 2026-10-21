@@ -1,32 +1,34 @@
 # Working in this repo
 
-Bored is a single-page arcade. One `index.html` is built from `src/` and served by GitHub Pages;
-every game is a self-contained HTML document embedded in the bundle. There is no framework, no
+Bored is a single-page arcade. One `index.html` is the whole hub and is served by GitHub Pages;
+the games are separate HTML documents in `src/games/content/` that the hub fetches over HTTP when
+you open one — they are not in the bundle. There is no framework, no
 router, no server. Read this before adding or editing a game — a game that misses these hooks
 silently disappears from scores, the daily challenge, or the build.
 
 ```
 src/main.js              hub wiring: library, player chrome, daily, leaderboard + account UI
 src/hub/backend.js       Supabase request/session layer, score rules, auth helpers
+src/hub/cloud.js         player_state pull/push — the account follows the player across browsers
 src/hub/scores.js        score specs, best capture, sync, ranking
 src/hub/feedback.js      write-only feedback insert (anon key, no reads)
 src/hub/store.js         safe localStorage helpers
-src/daily.js             daily challenge rotation + snapshot adapters
-src/games/catalog.js     ORDER (grid order), META (category, blurb), EXTERNS (off-site games)
+src/daily.js             daily rotation, snapshot adapters, streak counting
+src/games/catalog.js     ORDER, META, EXTERNS, NEW_GAMES + the on-demand document loader
 src/games/score-rules.json  what each game's score means on the shared board (label, better, max)
-src/games/content/*.html one file per game — the game's entire source
-src/games/content/*.b64  generated payload, git-ignored — rebuild with npm run build
+src/games/content/*.html one file per game — the game's entire source, and the payload
 src/games/arcade.js      2048, Memory, Connect Four, Aim Lab — native JS, no payload
 src/games/discovery.js   session estimates, controls, collections, previews
+tests/serve.cjs          loopback static server the browser suites load through
 tests/bored.test.cjs     node:test suite, runs the real build output in Chrome
 tests/discovery.test.cjs discovery, layout and mock-account flows
 tests/visual.test.cjs    release captures and the live F-14 embed (needs internet)
-scripts/sync-games.mjs   html -> .b64
 scripts/publish.mjs      copies dist/index.html to the served index.html
 scripts/games.mjs        add a game / sync the shared board's rule list
 scripts/capture-previews.mjs  re-shoot the library previews in Chrome
 scripts/optimize-previews.py  resize them: fill landscape cards, keep portrait boards whole
 scripts/setup-feedback.mjs    create the feedback table (scripts/feedback-setup.sql)
+scripts/player-state.sql     create the per-account player_state table (SQL editor)
 ```
 
 The homepage order is fixed in `src/index.html`: daily, Jump Back In, leaderboard, library.
@@ -41,12 +43,14 @@ one; check the table in the Supabase dashboard.
 
 ```bash
 npm ci                     # once
-npm run build              # vite build (single file) + publish copies it to index.html
+npm run build              # vite build (hub only) + publish copies it to index.html
 npm test                   # game, discovery and layout suites; needs CHROME_PATH
 ```
 
-`npm run build` must be run and its `index.html` committed whenever a game changes — Pages serves
-the built file, not `src/`. The `.b64` payloads it regenerates are git-ignored, so nothing else to stage. The test suite boots the build in headless Chrome (set
+`npm run build` must be run and its `index.html` committed whenever the hub changes. A change to a
+single `src/games/content/*.html` file needs no rebuild at all: GitHub Pages serves the repository,
+so those files are fetched straight from `src/games/content/`. Keep the two in step by rebuildinganyway — the catalog guard and the suite expect a current `index.html`. The test suite boots the
+build through a loopback server in headless Chrome (set
 `CHROME_PATH` if it is not found) and takes about a minute; run it before committing anything that
 touches a game.
 
@@ -55,11 +59,16 @@ touches a game.
 This repo is edited by several agents at once, so these are the rules that keep them from breaking
 each other. They are not style preferences; each one has already caused a live regression.
 
+- **`hasIdentity()`, never `getSession()`, decides what the interface says.** A guest may hold a
+  background anonymous session (`ensureAnonymousSession`) so their scores reach the server. Any UI
+  that would read "signed in" — the account strip, the board's "(you)" — asks `hasIdentity()`;
+  transport (syncing, pushing state) keeps using `getSession()`. Turning an anonymous session into a
+  visible identity breaks the promise that nothing about it is announced.
 - **`index.html` is build output.** Never hand-edit it. Edit `src/`, run `npm run build`, commit the
   regenerated file. If two agents both rebuilt it, resolve the conflict by rerunning
   `npm run build` on the merged tree — never by hand-merging that diff.
-- **Push ships.** GitHub Pages serves the committed bytes, so a `src/` change without a rebuild is
-  invisible and a rebuild made before the suite is green goes live instantly. Test, build, push.
+- **Push ships.** GitHub Pages serves the committed bytes, so a hub change without a rebuild is
+  invisible, and a rebuild made before the suite is green goes live instantly. Test, build, push.
 - **The slug is a primary key** repeated in six places: the content file, `catalog.js`, the snapshot,
   `HIGH_SCORE_GAMES`, `CHALLENGES`, and `score-rules.json` (plus the `score_rules` row). A typo in
   one place does not throw — the game silently drops out of scoring, the daily or the board.
@@ -107,7 +116,8 @@ assertions. What it still insists on:
 1. `src/games/content/<slug>.html`. It must be a complete document that works alone in a
    browser and is fetched into an iframe, so:
    - No external requests. No CDNs, fonts, images, or analytics — only inline CSS/JS, canvas,
-     or emoji/text. The tests fail on off-site fetches, and the bundle is meant to work offline.
+     or emoji/text. The tests fail on off-site fetches. The hub itself works offline; a game
+document is downloaded the first time its card is opened, so it needs a connection exactly once.
    - No `localStorage`/`sessionStorage` unless wrapped in try/catch (embedded contexts throw).
      Key it under `bored.<slug>.…`. Persistence is optional; the hub owns real scores.
    - Fold on its own: no fixed width over ~360px, no page scroll that hides the board, and
@@ -119,7 +129,8 @@ assertions. What it still insists on:
    no content file.
 3. A row in `score_rules` on the shared board, which `npm run games:register` adds for you (or
    prints as SQL if you would rather paste it — the publishable key cannot write rules).
-4. Run `npm run build` (regenerates `<slug>.html.b64` and inlines everything into `index.html`).
+4. Run `npm run build` (the game document itself needs no build — it is served from
+   `src/games/content/` — but the hub's catalog and the test suite expect a current `index.html`).
 
 ## Hook 1 — snapshot (required by everything else)
 

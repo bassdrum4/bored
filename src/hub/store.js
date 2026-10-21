@@ -43,3 +43,17 @@ export function readNumber(key) {
   const value = Number(readStored(key, 0));
   return Number.isFinite(value) ? value : 0;
 }
+
+// Every stored value under a prefix, keyed by the part after it. Used for the
+// daily completions, which are written one key per challenge rather than as a
+// single list.
+export function readStoredPrefix(prefix) {
+  const found = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) found[key.slice(prefix.length)] = readStored(key, null);
+    }
+  } catch {}
+  return found;
+}

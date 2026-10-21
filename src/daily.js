@@ -26,6 +26,36 @@ export function seedNumber(date) {
 export function seedCode(seed) {
   return (seed >>> 0).toString(16).toUpperCase().padStart(8, '0').slice(0, 6);
 }
+
+/**
+ * Consecutive days with a verified completion.
+ *
+ * `dates` are challenge days (`YYYY-MM-DD`), `today` is the current challenge
+ * day. A streak that ran through yesterday is still alive while today's
+ * challenge is outstanding, so today only has to be complete for the streak to
+ * have grown — not for it to survive. Everything is self-contained because the
+ * test suite extracts this function body and runs it on its own.
+ */
+export function dailyStreak(dates, today) {
+  const back = (date, days) => {
+    const at = new Date(date + 'T00:00:00Z');
+    at.setUTCDate(at.getUTCDate() + days);
+    return at.toISOString().slice(0, 10);
+  };
+  const done = new Set(dates);
+  const sorted = [...done].sort();
+  let best = 0;
+  let run = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    run = i > 0 && sorted[i] === back(sorted[i - 1], 1) ? run + 1 : 1;
+    if (run > best) best = run;
+  }
+  const yesterday = back(today, -1);
+  const start = done.has(today) ? today : (done.has(yesterday) ? yesterday : null);
+  let current = 0;
+  for (let cursor = start; cursor && done.has(cursor); cursor = back(cursor, -1)) current++;
+  return { current, best };
+}
 // Each adapter reads current-run state, never saved high scores. Thresholds rotate every circuit.
 export const CHALLENGES = [
   { slug: 'tetris', label: 'Line sweep', goal: 'Clear {target} lines in one run.', metric: 'lines', targets: [10, 15, 20], unit: 'lines' },

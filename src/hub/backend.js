@@ -32,6 +32,18 @@ export function getSession() {
   return session;
 }
 
+/**
+ * Whether this player has actually named themselves.
+ *
+ * A guest may still hold an anonymous session — see `ensureAnonymousSession` —
+ * and the transport needs that session, but nothing in the interface may say
+ * "signed in" because of it. Every UI decision asks this instead of
+ * `getSession`.
+ */
+export function hasIdentity() {
+  return Boolean(session && !session.user?.is_anonymous);
+}
+
 export function getHandle() {
   return handle;
 }
@@ -179,6 +191,34 @@ export function authErrorMessage(err) {
   if (/taken|already in use|duplicate/i.test(message)) return 'That name is taken. Try another.';
   if (/failed to fetch/i.test(message)) return 'Could not reach the leaderboard server.';
   return message;
+}
+
+// One attempt per page load, ever. Anonymous sign-ins are rate limited per IP,
+// and a school shares one; a refusal has to stay invisible and must not retry.
+let anonymousTried = false;
+
+/**
+ * Give a guest an account without asking for one, so their scores and library
+ * have a home on the server instead of living in one browser's storage.
+ *
+ * Nothing announces it: the account strip keeps calling the player a guest, and
+ * this resolves to null when the project has anonymous sign-ins turned off, the
+ * network is out, or the quota is spent. Callers must treat null as "carry on".
+ */
+export async function ensureAnonymousSession() {
+  if (session || !backendReady() || anonymousTried) return null;
+  anonymousTried = true;
+  try {
+    const data = await request('/auth/v1/signup', {
+      method: 'POST',
+      body: { data: { source: 'bored-arcade' } },
+      token: API_KEY
+    });
+    const payload = data.session || data;
+    return payload?.access_token ? applySession(payload) : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function signIn(email, password) {

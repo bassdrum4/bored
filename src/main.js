@@ -1,18 +1,21 @@
-import { ORDER, GAMES, EXTERNS, NEW_GAMES, FRESH_GAMES, META } from './games/catalog.js';
+import {
+  ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, loadGameDocument
+} from './games/catalog.js';
 import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
 import { nativeHTML } from './games/arcade.js';
-import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, installDailyAdapter, seedNumber, seedCode, CHALLENGES } from './daily.js';
-import { readStored, writeStored } from './hub/store.js';
+import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, dailyStreak, installDailyAdapter, seedNumber, seedCode, CHALLENGES } from './daily.js';
+import { readStored, writeStored, writeRaw, readStoredPrefix } from './hub/store.js';
 import {
   backendReady, request, getSession, getHandle, setHandle, loadRules, scoreRules, ANON_TOKEN,
   freshSession, ensureProfile, renameHandle, authErrorMessage, suggestedHandle,
-  signIn, signUp, signOut, adoptToken
+  signIn, signUp, signOut, adoptToken, hasIdentity, ensureAnonymousSession
 } from './hub/backend.js';
 import {
   LB_GAMES, HIGH_SCORE_GAMES, accountStandings, rankPoints, boardGames,
   isLocalOnly, bestValue, formatScore, recordBest,
   syncScores, onScoresPosted
 } from './hub/scores.js';
+import { pullPlayerState, pushPlayerState } from './hub/cloud.js';
 import { sendFeedback, feedbackErrorMessage } from './hub/feedback.js';
 
 // Keep the original console/test surface available from the bundled file. The
@@ -50,6 +53,9 @@ let launchSelector = '';
 let activeChallenge = null;
 let hintTimer = 0;
 let focusTimer = 0;
+// Bumped whenever the frame should stop accepting a document, so a download
+// that finishes after the player moved on cannot paint over the current game.
+let loadToken = 0;
 const dailyResults = new Map();
 
 let category = 'All';
@@ -80,6 +86,7 @@ function loadLibrary() {
 
 function saveLibrary() {
   writeStored('bored.library', { favorites: [...favorites], recent: recentGames });
+  requestCloudPush();
 }
 
 function previewFor(slug) {
@@ -162,7 +169,7 @@ function renderLibrary() {
   const shelf = libraryOrder();
   visibleGames = shelf.filter(([slug, name]) => {
     const meta = META[slug];
-    return (EXTERNS[slug] || GAMES[slug] || NEW_GAMES.includes(slug)) &&
+    return (EXTERNS[slug] || PAYLOAD_SLUGS.includes(slug) || NEW_GAMES.includes(slug)) &&
       inCollection(slug, collection) &&
       (!filter || [name, slug, ...meta, gameMeta(slug), ...DISCOVERY[slug].inputs].join(' ').toLowerCase().includes(filter)) &&
       (category === 'All' || (category === 'New' ? FRESH_GAMES.includes(slug) :
@@ -316,7 +323,8 @@ function openGame(slug, challenge = null) {
   recentGames = [slug, ...recentGames.filter(id => id !== slug)].slice(0, 4);
   saveLibrary();
   renderRecent();
-  gameFrame.title = ORDER.find(([id]) => id === slug)[1];
+  const name = ORDER.find(([id]) => id === slug)[1];
+  gameFrame.title = name;
   $('#challenge-progress').hidden = !challenge;
   $('#hint').hidden = !!challenge;
   if (challenge) $('#challenge-progress').textContent = challenge.goal;
@@ -327,15 +335,31 @@ function openGame(slug, challenge = null) {
     gameFrame.src = external;
     showHint('Internet required · use All games to return');
   } else {
-    const game = GAMES[slug];
-    let html = NEW_GAMES.includes(slug) ? nativeHTML(slug) : decode(game.b64);
-    if (!NEW_GAMES.includes(slug)) html = installDailyAdapter(html, slug);
-    html = injectSeed(html);
-    let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
-    if (head) html = injectHead(html, head);
+    const native = NEW_GAMES.includes(slug);
+    const token = ++loadToken;
+    const paint = source => {
+      // The player may have left, or opened another game, while this one was on
+      // its way. Dropping the response keeps a late document from painting over
+      // whatever is on screen now.
+      if (token !== loadToken) return;
+      let html = native ? source : installDailyAdapter(source, slug);
+      html = injectSeed(html);
+      let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
+      gameFrame.removeAttribute('src');
+      gameFrame.srcdoc = injectHead(html, head);
+      showHint('Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
+    };
+    const fail = () => {
+      if (token !== loadToken) return;
+      gameFrame.srcdoc = frameStandIn(name + ' did not load.',
+        'A game only downloads the first time you open it. Check the connection and choose it again.');
+      showHint('That game could not be downloaded.');
+    };
     gameFrame.removeAttribute('src');
-    gameFrame.srcdoc = html;
-    showHint('Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
+    // A blank white rectangle reads as "broken" while the document is in flight.
+    gameFrame.srcdoc = native ? '' : frameStandIn('Loading ' + name + '…', 'Downloading the game.');
+    if (native) paint(nativeHTML(slug));
+    else loadGameDocument(slug).then(paint).catch(fail);
   }
 
   playerPanel.hidden = false;
@@ -350,6 +374,7 @@ function closeGame() {
   pollDaily();
   captureBest();
   closeMenu();
+  loadToken++;
   clearTimeout(hintTimer);
   clearTimeout(focusTimer);
   if (fullscreenElement()) leaveFullscreen();
@@ -402,7 +427,25 @@ function snapshotFor(slug) {
 function captureBest() {
   if (!activeSlug || playerPanel.hidden) return false;
   const snapshot = snapshotFor(activeSlug);
-  return snapshot ? recordBest(activeSlug, snapshot) : false;
+  const improved = snapshot ? recordBest(activeSlug, snapshot) : false;
+  if (improved) {
+    requestCloudPush();
+    quietAccount();
+  }
+  return improved;
+}
+
+// The first thing worth keeping is the moment a guest gets an account, without
+// being asked to make one. It happens in the background and never changes what
+// the page looks like; if it fails, the arcade simply keeps saving locally.
+function quietAccount() {
+  if (hasIdentity() || !backendReady()) return;
+  ensureAnonymousSession().then(async session => {
+    if (!session) return;
+    await restorePlayerState();
+    syncSharedScores();
+    requestCloudPush();
+  }).catch(() => { /* No account this visit. Nothing to report. */ });
 }
 
 async function syncSharedScores() {
@@ -411,6 +454,94 @@ async function syncSharedScores() {
     lbNotice = authErrorMessage(result.error);
     renderAccount();
   }
+}
+
+/* ── Player state on the account ──────────────────────────────────────────── */
+
+// The browser's copy is what play reads; this keeps a second copy on the
+// account so it shows up again on another device. Chrome partitions third-party
+// storage, so without this a student who plays inside the Google Sites embed
+// starts from nothing everywhere else.
+
+const DAILY_PREFIX = 'bored.daily.';
+// A daily result is a few hundred bytes; a year of them is a page of JSON.
+const DAILY_LIMIT = 60;
+
+function localPlayerState() {
+  const daily = Object.entries(readStoredPrefix(DAILY_PREFIX))
+    .filter(([, result]) => result && result.id)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, DAILY_LIMIT);
+  return {
+    library: { favorites: [...favorites], recent: recentGames },
+    bests: Object.fromEntries(HIGH_SCORE_GAMES
+      .map(game => [game.id, bestValue(game)])
+      .filter(([, value]) => Number.isFinite(value) && value > 0)),
+    daily: Object.fromEntries(daily)
+  };
+}
+
+// A cloud value replaces a local one only where it is better, so two devices
+// that both played offline keep the union of what they achieved rather than
+// whatever happened to save last.
+function mergePlayerState(data) {
+  const validSlug = id => ORDER.some(([slug]) => slug === id);
+  const library = data.library || {};
+  let changed = false;
+
+  const merged = new Set(
+    [...favorites, ...(Array.isArray(library.favorites) ? library.favorites : [])].filter(validSlug)
+  );
+  if (merged.size !== favorites.size) changed = true;
+  favorites = merged;
+
+  const cloudRecent = [...new Set(
+    (Array.isArray(library.recent) ? library.recent : []).filter(validSlug)
+  )].slice(0, 4);
+  if (cloudRecent.length > recentGames.length) {
+    recentGames = cloudRecent;
+    changed = true;
+  }
+
+  for (const game of HIGH_SCORE_GAMES) {
+    const cloud = Math.round(Number(data.bests?.[game.id]));
+    if (!Number.isFinite(cloud) || cloud <= 0) continue;
+    const local = bestValue(game);
+    if (local && (game.lower ? local <= cloud : local >= cloud)) continue;
+    if (writeRaw(game.key, cloud)) changed = true;
+  }
+
+  for (const [id, result] of Object.entries(data.daily || {})) {
+    if (!result || result.id !== id || readStored(DAILY_PREFIX + id, null)) continue;
+    if (writeStored(DAILY_PREFIX + id, result)) changed = true;
+  }
+  return changed;
+}
+
+let cloudTimer = 0;
+
+/** Debounced: one run can move a best and the recent shelf in the same gesture. */
+function requestCloudPush() {
+  if (!getSession() || !backendReady()) return;
+  clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(() => { pushPlayerState(localPlayerState()).catch(() => {}); }, 900);
+}
+
+// Called as soon as a session exists. A table that has not been created yet, an
+// unreachable network, or a token that will not refresh all resolve to "keep
+// the local copy": play must never depend on the account server being up.
+async function restorePlayerState() {
+  try {
+    const cloud = await pullPlayerState();
+    if (!cloud) return;
+    if (mergePlayerState(cloud)) {
+      saveLibrary();
+      renderRecent();
+      renderLibrary();
+      renderDaily();
+    }
+    requestCloudPush();
+  } catch { /* Nothing to restore yet. */ }
 }
 
 onScoresPosted(() => {
@@ -424,7 +555,7 @@ onScoresPosted(() => {
 
 function readDaily(challenge) {
   let result = dailyResults.get(challenge.id) || null;
-  const stored = readStored('bored.daily.' + challenge.id, null);
+  const stored = readStored(DAILY_PREFIX + challenge.id, null);
   if (stored) result = stored;
   return result?.id === challenge.id && dailyCheck(challenge, result.snapshot).complete ? result : null;
 }
@@ -451,6 +582,37 @@ function renderDaily() {
   $('#daily-play').textContent = result ? 'Play again →' : 'Play today’s challenge →';
   $('#daily-share').hidden = !result;
   if ($('#daily-result').dataset.challenge !== challenge.id) $('#daily-result').hidden = true;
+  renderStreak();
+}
+
+// Days with a verified completion. Completions are stored one key each
+// (`bored.daily.<id>`), so they have to be gathered before they can be counted,
+// and each is re-checked against its own challenge so a partial or rewritten
+// entry cannot inflate the run.
+function completedDailyDates() {
+  const days = [];
+  for (const [id, result] of Object.entries(readStoredPrefix(DAILY_PREFIX))) {
+    if (!result || result.id !== id) continue;
+    const date = id.split(':')[1];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    const challenge = dailyChallenge(date);
+    if (challenge.id !== id) continue;
+    if (dailyCheck(challenge, result.snapshot).complete) days.push(date);
+  }
+  return days;
+}
+
+// One quiet line. It stays out of the way until there is something worth saying,
+// and a streak that has not started yet is not worth saying anything about.
+function renderStreak() {
+  const line = $('#daily-streak');
+  if (!line) return;
+  const { current, best } = dailyStreak(completedDailyDates(), challengeDate());
+  if (!current && !best) { line.hidden = true; return; }
+  line.hidden = false;
+  line.textContent = current
+    ? current + '-day streak' + (best > current ? ' · best ' + best : '')
+    : 'Longest streak: ' + best + (best === 1 ? ' day' : ' days');
 }
 
 function pollDaily() {
@@ -463,7 +625,8 @@ function pollDaily() {
     if (check.complete && !result) {
       result = { id: activeChallenge.id, snapshot: { ...snapshot } };
       dailyResults.set(activeChallenge.id, result);
-      writeStored('bored.daily.' + activeChallenge.id, result);
+      writeStored(DAILY_PREFIX + activeChallenge.id, result);
+      requestCloudPush();
       renderDaily();
     }
     const message = result
@@ -565,7 +728,7 @@ function renderLeaderboard() {
   }
 
   const handle = getHandle();
-  const mineKey = handle ? handle.toLowerCase() : '';
+  const mineKey = handle && hasIdentity() ? handle.toLowerCase() : '';
   rows.slice(0, 10).forEach((row, index) => {
     const name = String(row.handle || 'player');
     const mine = Boolean(mineKey) && name.toLowerCase() === mineKey;
@@ -613,17 +776,17 @@ function renderLeaderboard() {
     const me = myRank < 0 ? null : rows[myRank];
     $('#lb-mine').textContent = me
       ? 'Your account: #' + (myRank + 1) + ' · ' + me.points + ' points · ' + me.gamesRanked + ' games scoring.'
-      : (getSession() ? 'Play a game to put your account on the board.' : 'Sign in to put your account on the board.');
+      : (hasIdentity() ? 'Play a game to put your account on the board.' : 'Sign in to put your account on the board.');
   } else if (game) {
     const parts = [];
     if (rows.length) parts.push(rows.length + (rows.length === 1 ? ' player' : ' players') + ' ranked');
     const local = bestValue(game);
     if (local) parts.push('your best: ' + formatScore(local, game));
-    const myRow = getSession() && handle ? rows.find(row => String(row.handle).toLowerCase() === mineKey) : null;
+    const myRow = hasIdentity() && handle ? rows.find(row => String(row.handle).toLowerCase() === mineKey) : null;
     if (myRow) parts.push('on the board: #' + (rows.indexOf(myRow) + 1));
     $('#lb-mine').textContent = parts.length
       ? parts.join(' · ') + (isLocalOnly(game.id) ? ' · not ranked online yet' : '')
-      : (getSession() ? 'Play ' + game.name + ' to put a score on the board.' : 'Sign in to add your best scores.');
+      : (hasIdentity() ? 'Play ' + game.name + ' to put a score on the board.' : 'Sign in to add your best scores.');
   }
 }
 
@@ -676,7 +839,7 @@ async function loadLeaderboard(force = false) {
 /* ── Account ──────────────────────────────────────────────────────────────── */
 
 function renderAccount() {
-  const session = getSession();
+  const anonymous = !hasIdentity();
   const state = $('#account-state');
   const action = $('#account-action');
   const rename = $('#account-rename');
@@ -688,7 +851,9 @@ function renderAccount() {
     return;
   }
   action.hidden = false;
-  if (session) {
+  // A guest who holds a background anonymous session reads exactly as a guest
+  // does; nothing about the account strip changes until they name themselves.
+  if (!anonymous) {
     state.append('Signed in as ', element('b', '', getHandle() || suggestedHandle()),
       lbNotice ? ' · ' + lbNotice : '. Best scores sync to the shared board.');
     action.textContent = 'Sign out';
@@ -763,7 +928,7 @@ function initFeedback() {
 
 function openAuthDialog(mode = 'signin') {
   if (!backendReady()) return;
-  authMode = mode === 'name' && !getSession() ? 'signin' : mode;
+  authMode = mode === 'name' && !hasIdentity() ? 'signin' : mode;
   const dialog = $('#auth-dialog');
   const naming = authMode === 'name';
   $('#auth-title').textContent = authMode === 'signup' ? 'Create an account' : naming ? 'Display name' : 'Sign in';
@@ -841,6 +1006,7 @@ async function submitAuth(event) {
     closeAuthDialog();
     renderAccount();
     renderLeaderboard();
+    await restorePlayerState();
     await syncSharedScores();
     renderAccount();
     loadLeaderboard(true);
@@ -882,6 +1048,7 @@ async function consumeAuthRedirect() {
     lbNotice = '';
     renderAccount();
     renderLeaderboard();
+    await restorePlayerState();
     await syncSharedScores();
     renderAccount();
     loadLeaderboard(true);
@@ -909,7 +1076,7 @@ function initAccount() {
     };
   }
   $('#lb-refresh').onclick = () => loadLeaderboard(true);
-  $('#account-action').onclick = () => { if (getSession()) signOutUser(); else openAuthDialog('signin'); };
+  $('#account-action').onclick = () => { if (hasIdentity()) signOutUser(); else openAuthDialog('signin'); };
   $('#account-rename').onclick = () => openAuthDialog('name');
   $('#auth-cancel').onclick = closeAuthDialog;
   $('#auth-toggle').onclick = () => openAuthDialog(authMode === 'signup' ? 'signin' : 'signup');
@@ -928,7 +1095,11 @@ function initAccount() {
     if (handled || !getSession()) return;
     freshSession().then(fresh => {
       if (!fresh) { renderAccount(); renderLeaderboard(); return; }
-      ensureProfile().then(() => { renderAccount(); syncSharedScores(); }).catch(err => {
+      ensureProfile().then(async () => {
+        renderAccount();
+        await restorePlayerState();
+        syncSharedScores();
+      }).catch(err => {
         lbNotice = authErrorMessage(err);
         renderAccount();
       });
@@ -938,11 +1109,20 @@ function initAccount() {
 
 /* ── Game document plumbing ───────────────────────────────────────────────── */
 
-function decode(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder('utf-8').decode(bytes);
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+}
+
+// Shown in the frame while a document is downloading, and again when it never
+// arrives, so the player gets a reason instead of a white rectangle.
+function frameStandIn(message, detail) {
+  return '<!doctype html><html><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Game</title><style>' +
+    'html,body{height:100%}body{margin:0;display:grid;place-content:center;gap:6px;background:#fff;' +
+    'color:#111;text-align:center;padding:24px;font:14px/1.5 system-ui,-apple-system,sans-serif}' +
+    'p{margin:0;font-weight:600}span{color:#666}</style></head><body>' +
+    '<p>' + escapeHtml(message) + '</p><span>' + escapeHtml(detail) + '</span></body></html>';
 }
 
 function injectHead(html, extra) {
