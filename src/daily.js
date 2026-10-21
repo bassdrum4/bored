@@ -9,6 +9,23 @@ export function dailyDate(now = new Date()) {
   });
   return dailyDate.day.format(now);
 }
+
+// One shared seed for anything that generates a board, so the first run of a day
+// plays out the same for everyone. The hub injects it into every game as
+// `window.__boredSeed = { date, seed, code }`; games that seed themselves (DEEP)
+// derive exactly this value from the date, so the two always agree.
+export function seedNumber(date) {
+  let hash = 2166136261 >>> 0;
+  for (let i = 0; i < date.length; i++) {
+    hash ^= date.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+export function seedCode(seed) {
+  return (seed >>> 0).toString(16).toUpperCase().padStart(8, '0').slice(0, 6);
+}
 // Each adapter reads current-run state, never saved high scores. Thresholds rotate every circuit.
 export const CHALLENGES = [
   { slug: 'tetris', label: 'Line sweep', goal: 'Clear {target} lines in one run.', metric: 'lines', targets: [10, 15, 20], unit: 'lines' },

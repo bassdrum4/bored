@@ -220,12 +220,20 @@ test('browser regressions', async t => {
     // file: the suite checks the wiring, not the catalogue's contents.
     const catalog = await page.evaluate(() => ({
       total: ORDER.length,
-      newest: NEW_GAMES.length,
+      newest: FRESH_GAMES.length,
+      fresh: FRESH_GAMES,
       puzzle: ORDER.filter(([slug]) => META[slug][0] === 'Puzzle').length,
       online: Object.keys(EXTERNS).length
     }));
     assert.equal(await page.$$eval('.card', els => els.length), catalog.total);
     assert.equal(await text(page, '#count'), String(catalog.total));
+    // The NEW badge holds four games at most, and they sit at the top of the shelf.
+    assert.ok(catalog.newest > 0 && catalog.newest <= 4, 'the NEW badge holds four games at most');
+    assert.deepEqual(
+      await page.$$eval('.card', els => els.slice(0, 4).map(el => el.dataset.slug)),
+      catalog.fresh,
+      'new games are pinned to the top in badge order'
+    );
     await filter('New');
     assert.equal(await page.$$eval('.card', els => els.length), catalog.newest);
     await filter('Puzzle');
@@ -457,13 +465,21 @@ test('browser regressions', async t => {
   await t.test('DEEP cuts one dungeon per day, descends five floors, and the Warden seals the Core', async () => {
     const frame = await openTitle('deep', 'DEEP');
     await frame.waitForFunction(() => typeof __deep === 'object');
-    const deterministic = await frame.evaluate(() => {
+    // The first dive of the day is the shared, deterministic dungeon; a second
+    // dive that day is cut fresh, and retrying a seed reproduces it exactly.
+    const dives = await frame.evaluate(() => {
+      localStorage.removeItem('deep.dailyPlayed');
       __deep.start('daily');
-      const first = Array.from(__deep.map).join('');
+      const shared = Array.from(__deep.map).join('');
+      const seed = __deep.state.seed;
       __deep.start('daily');
-      return first === Array.from(__deep.map).join('');
+      const second = Array.from(__deep.map).join('');
+      __deep.start('daily', seed);
+      const retried = Array.from(__deep.map).join('');
+      return { shared: shared === retried, fresh: shared !== second, seed, date: __deep.state.seed };
     });
-    assert.equal(deterministic, true, 'the same date cuts the same dungeon');
+    assert.equal(dives.shared, true, 'retrying the day\'s seed cuts the same dungeon');
+    assert.equal(dives.fresh, true, 'a second dive the same day is cut fresh');
     await frame.evaluate(() => __deep.start('daily'));
     const opening = await frame.evaluate(() => ({
       depth: __deep.state.depth,
@@ -521,6 +537,20 @@ test('browser regressions', async t => {
     assert.equal(reported.snap.finished, true, 'a cleared run is finished');
     assert.equal(stored.score, endScore, 'the saved best matches the end screen');
     assert.ok(endScore - reported.live >= 1500, 'the reported score carries the clear bonus the live HUD omits');
+
+    // A death on the first floor still has to save: turns make the score positive,
+    // so a finished run is never dropped for being zero.
+    await page.evaluate(() => localStorage.removeItem('bored.high.deep'));
+    const death = await frame.evaluate(() => {
+      __deep.start('daily');
+      Object.assign(__deep.state, { gold: 0, kills: 0, depth: 1, turns: 7 });
+      __deep.finish(false);
+      return window.__boredSnapshot();
+    });
+    await page.waitForFunction(() => (Number(localStorage.getItem('bored.high.deep')) || 0) > 0, { timeout: 4000 });
+    assert.equal(death.finished, true, 'a death ends the run');
+    assert.ok(death.score > 0, 'a floor-one death still scores');
+    assert.equal(await page.evaluate(() => Number(localStorage.getItem('bored.high.deep'))), death.score, 'the hub captures that score');
     await close();
   });
 
@@ -1017,16 +1047,21 @@ test('browser regressions', async t => {
 
   await t.test('every offline game boots; Lighthouse overlay is actually hidden', async () => {
     const slugs = await page.evaluate(() => ORDER.filter(([slug]) => !EXTERNS[slug] && !NEW_GAMES.includes(slug)).map(([slug]) => slug));
+    const seeds = new Set();
     for (const slug of slugs) {
       await page.evaluate(id => openGame(id), slug);
       await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.body?.childElementCount > 0);
       await pause(slug === 'lighthouse' ? 1500 : 180);
+      const seed = await page.evaluate(() => document.querySelector('#frame').contentWindow.__boredSeed);
+      assert.ok(seed && Number.isFinite(seed.seed) && /^[0-9A-F]{6}$/.test(seed.code), slug + ' receives the shared daily seed');
+      seeds.add(seed.date + ':' + seed.seed);
       if (slug === 'lighthouse') {
         const frame = await (await page.$('#frame')).contentFrame();
         assert.equal(await frame.$eval('#fatal', el => el.hidden && getComputedStyle(el).display === 'none'), true);
       }
       await close();
     }
+    assert.equal(seeds.size, 1, 'every game receives the same daily seed');
     assert.deepEqual(errors, [], 'no uncaught JavaScript errors');
     const external = requests.filter(request => !request.startsWith(API));
     assert.deepEqual(external, [], 'no external requests other than the configured leaderboard');
@@ -1038,7 +1073,7 @@ test('browser regressions', async t => {
     await noOverflow();
     await page.click('#random');
     await page.waitForFunction(() => !document.querySelector('#player').hidden);
-    assert.ok(await page.evaluate(() => NEW_GAMES.includes(current)));
+    assert.ok(await page.evaluate(() => FRESH_GAMES.includes(current)));
     await close();
     await page.evaluate(day => { window.originalDailyDate ||= dailyDate; dailyDate = () => day; renderDaily(); }, dateFor('memory'));
     await page.click('#daily-play');

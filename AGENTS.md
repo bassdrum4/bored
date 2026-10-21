@@ -34,6 +34,39 @@ the built file, not `src/`. The `.b64` payloads it regenerates are git-ignored, 
 `CHROME_PATH` if it is not found) and takes about a minute; run it before committing anything that
 touches a game.
 
+## Working with several agents
+
+This repo is edited by several agents at once, so these are the rules that keep them from breaking
+each other. They are not style preferences; each one has already caused a live regression.
+
+- **`index.html` is build output.** Never hand-edit it. Edit `src/`, run `npm run build`, commit the
+  regenerated file. If two agents both rebuilt it, resolve the conflict by rerunning
+  `npm run build` on the merged tree — never by hand-merging that diff.
+- **Push ships.** GitHub Pages serves the committed bytes, so a `src/` change without a rebuild is
+  invisible and a rebuild made before the suite is green goes live instantly. Test, build, push.
+- **The slug is a primary key** repeated in six places: the content file, `catalog.js`, the snapshot,
+  `HIGH_SCORE_GAMES`, `CHALLENGES`, and `score-rules.json` (plus the `score_rules` row). A typo in
+  one place does not throw — the game silently drops out of scoring, the daily or the board.
+  `npm run games:register` reports the drift; run it after touching the catalog.
+- **The suite reads source text.** `tests/bored.test.cjs` slices `function name(…)` bodies out of the
+  real files and runs them in a VM. Keep any tested function self-contained: a module-level constant
+  beside it does not exist in that context. Counts come from the catalog — never hardcode them.
+- **Two lists, two jobs.** `NEW_GAMES` is the games built into `arcade.js` (native HTML, not decoded
+  from a payload). `FRESH_GAMES` is the NEW badge: newest first, four at most. A new game goes on the
+  front of `FRESH_GAMES`, the oldest falls off, and the shelf lists badge members first. The
+  `games:add` script maintains both plus `ORDER`/`META`.
+- **One shared daily seed.** The hub injects `window.__boredSeed = { date, seed, code }` into every
+  game document (`injectSeed` in `main.js`); `date` is the Detroit day, `seed` is `seedNumber(date)`
+  from `src/daily.js`. Anything that generates a board should seed itself from it so the **first** run
+  of the day is the same for everyone, and cut a fresh random one afterwards (DEEP does this, with
+  `deep.dailyPlayed` marking the day). Never replace a game's whole document with `replace('</body>')`
+  — inject at the last closing tag, because games contain that text as data.
+- **A score must be capturable.** `recordBest` ignores zero and unfinished runs, so a game whose score
+  can end at 0 never saves: DEEP adds `state.turns` to its score for exactly this reason. Any new
+  scored game needs a metric that is positive from the first action.
+- **Secrets and deploys.** `.env.local` holds the Supabase service key (full write). It is git-ignored
+  — never commit it, never print it. Push to `main` deploys; never force-push.
+
 ## Adding a game
 
 Scaffold it in one command:
@@ -65,8 +98,9 @@ assertions. What it still insists on:
      `touch-action`/pointer events that work for touch as well as mouse. Keyboard input is a nice
      to have; a mouse-only game is fine.
    - `<title>` is the display name.
-2. Registered in `src/games/catalog.js` — the script does this; off-site games go in `EXTERNS`
-   instead and need no content file.
+2. Registered in `src/games/catalog.js` — the script does this (ORDER, META and the NEW badge in
+   `FRESH_GAMES`, which keeps only the four newest); off-site games go in `EXTERNS` instead and need
+   no content file.
 3. A row in `score_rules` on the shared board, which `npm run games:register` adds for you (or
    prints as SQL if you would rather paste it — the publishable key cannot write rules).
 4. Run `npm run build` (regenerates `<slug>.html.b64` and inlines everything into `index.html`).

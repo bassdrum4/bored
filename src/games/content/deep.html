@@ -403,8 +403,19 @@ textarea.result[hidden] { display:none; }
   function writeJSON(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
   }
-  function today() { return new Date().toISOString().slice(0, 10); }
-  function yesterday() { return new Date(Date.now() - 86400000).toISOString().slice(0, 10); }
+  // The hub injects the day's shared seed, so DEEP's date agrees with every
+  // other game; standalone it computes the same Detroit day itself.
+  function today() {
+    return (window.__boredSeed && window.__boredSeed.date) || (function () {
+      try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Detroit' }).format(new Date()); }
+      catch { return new Date().toISOString().slice(0, 10); }
+    })();
+  }
+  function yesterday() {
+    const date = new Date(today() + 'T12:00:00Z');
+    date.setUTCDate(date.getUTCDate() - 1);
+    return date.toISOString().slice(0, 10);
+  }
   function loadBest() {
     const best = readJSON('deep.best', null);
     return best && Number.isFinite(best.score) ? best : null;
@@ -670,8 +681,10 @@ textarea.result[hidden] { display:none; }
   }
 
   /* ─────────────────────────── hud ─────────────────────────── */
+  // Turns count a little, so a descent that dies on floor one still ends on a
+  // positive score and can be saved and ranked (a zero is never captured).
   function liveScore() {
-    return Math.round(state.gold + state.kills * 12 + (state.depth - 1) * 200);
+    return Math.round(state.gold + state.kills * 12 + (state.depth - 1) * 200 + state.turns);
   }
   function updateHUD() {
     const pct = Math.max(0, state.hp) / state.maxHp * 100;
@@ -968,9 +981,15 @@ textarea.result[hidden] { display:none; }
   function shortCode(seed) {
     return hash(seed).toString(16).toUpperCase().padStart(8, '0').slice(0, 6);
   }
+  // The shared dungeon is deterministic, but only for the first dive of the
+  // day; after that a dive is cut fresh unless the player retries a seed.
+  function dailyPlayed() { return readJSON('deep.dailyPlayed', '') === today(); }
   function newRun(mode, seed) {
-    state.mode = mode || 'daily';
-    state.seed = seed || (state.mode === 'daily' ? today() : 'dive-' + Math.random().toString(36).slice(2, 9));
+    let next = mode || 'daily';
+    if (!seed && next === 'daily' && dailyPlayed()) next = 'random';
+    state.mode = next;
+    state.seed = seed || (next === 'daily' ? today() : 'dive-' + Math.random().toString(36).slice(2, 9));
+    if (next === 'daily') writeJSON('deep.dailyPlayed', today());
     state.seedCode = shortCode(state.seed);
     rnd = mulberry32(hash(state.seed));
     Object.assign(state, {
@@ -1046,10 +1065,12 @@ textarea.result[hidden] { display:none; }
     if (best) bits.push('Best <b>' + best.score + '</b> · floor ' + best.depth + (best.won ? ' · cleared' : ''));
     if (daily && daily.streak) bits.push('Daily streak <b>' + daily.streak + '</b>');
     $('titleBest').innerHTML = bits.length ? bits.join(' &nbsp;·&nbsp; ') : '<b>First descent?</b> The dungeon is generated from today\'s date.';
-    const dated = state.mode === 'daily';
-    const seed = dated ? today() : state.seed;
-    $('seedline').innerHTML =
-      'SEED <b>' + shortCode(seed) + '</b> · ' + (dated ? seed + ' · one dungeon for every diver' : 'random dive');
+    // The title describes the dive the button will start: the shared dungeon
+    // until it has been played today, then a fresh cut.
+    const dated = !dailyPlayed();
+    $('seedline').innerHTML = dated
+      ? 'SEED <b>' + shortCode(today()) + '</b> · ' + today() + ' · one dungeon for every diver'
+      : 'FRESH CUT · the shared dungeon is done for today';
   }
 
   /* ─────────────────────────── input ─────────────────────────── */
@@ -1688,6 +1709,7 @@ textarea.result[hidden] { display:none; }
     get pos() { return { x: px, y: py }; },
     get stairs() { return stairs; },
     start: newRun,
+    finish,
     move, useStairs, usePotion, waitTurn, computeFOV, fit,
     setPos(x, y) { px = x; py = y; computeFOV(); updateHUD(); },
     score: liveScore

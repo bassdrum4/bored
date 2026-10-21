@@ -1,7 +1,7 @@
-import { ORDER, GAMES, EXTERNS, NEW_GAMES, META, FONT_CSS } from './games/catalog.js';
+import { ORDER, GAMES, EXTERNS, NEW_GAMES, FRESH_GAMES, META, FONT_CSS } from './games/catalog.js';
 import { threeBootstrap } from './games/three.js';
 import { nativeHTML } from './games/arcade.js';
-import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, installDailyAdapter, CHALLENGES } from './daily.js';
+import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, installDailyAdapter, seedNumber, seedCode, CHALLENGES } from './daily.js';
 import { readStored, writeStored } from './hub/store.js';
 import {
   backendReady, request, getSession, getHandle, setHandle, loadRules, scoreRules, ANON_TOKEN,
@@ -91,14 +91,23 @@ function renderRecent() {
   $('#recent').hidden = !recentGames.length;
 }
 
+// The shelf lists the NEW-badged games first, in badge order, then the rest of
+// the catalog. Keeping it derived means a game that falls off the badge simply
+// drops back into its catalog slot.
+function libraryOrder() {
+  const fresh = FRESH_GAMES.map(slug => ORDER.find(([id]) => id === slug)).filter(Boolean);
+  return [...fresh, ...ORDER.filter(([slug]) => !FRESH_GAMES.includes(slug))];
+}
+
 function renderLibrary() {
   const filter = searchInput.value.trim().toLowerCase();
   gameGrid.replaceChildren();
-  visibleGames = ORDER.filter(([slug, name]) => {
+  const shelf = libraryOrder();
+  visibleGames = shelf.filter(([slug, name]) => {
     const meta = META[slug];
     return (EXTERNS[slug] || GAMES[slug] || NEW_GAMES.includes(slug)) &&
       (!filter || [name, slug, ...meta].join(' ').toLowerCase().includes(filter)) &&
-      (category === 'All' || (category === 'New' ? NEW_GAMES.includes(slug) :
+      (category === 'All' || (category === 'New' ? FRESH_GAMES.includes(slug) :
         category === 'Favorites' ? favorites.has(slug) : meta[0] === category));
   });
   if ($('#sort').value === 'az') visibleGames.sort((a, b) => a[1].localeCompare(b[1]));
@@ -110,11 +119,11 @@ function renderLibrary() {
     card.dataset.slug = slug;
     card.innerHTML = '<span class="idx" aria-hidden="true"></span><span class="text"><span class="name"></span><span class="detail"></span></span><span class="go" aria-hidden="true">&#8594;</span>';
     card.querySelector('.name').textContent = name;
-    if (NEW_GAMES.includes(slug) || slug === 'deep') {
+    if (FRESH_GAMES.includes(slug)) {
       card.querySelector('.name').appendChild(element('span', 'badge', 'NEW'));
     }
     card.querySelector('.detail').textContent = META[slug].join(' · ');
-    card.querySelector('.idx').textContent = String(ORDER.findIndex(([id]) => id === slug) + 1).padStart(2, '0');
+    card.querySelector('.idx').textContent = String(shelf.findIndex(([id]) => id === slug) + 1).padStart(2, '0');
     card.onclick = () => openGame(slug);
 
     const star = element('button', 'star');
@@ -252,6 +261,7 @@ function openGame(slug, challenge = null) {
     const game = GAMES[slug];
     let html = NEW_GAMES.includes(slug) ? nativeHTML(slug) : decode(game.b64);
     if (!NEW_GAMES.includes(slug)) html = installDailyAdapter(html, slug);
+    html = injectSeed(html);
     let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
     if (game?.fonts) head += '<style>' + FONT_CSS + '</style>';
     if (slug === 'lighthouse') head += '<style>#fatal[hidden]{display:none!important}</style>' + threeBootstrap();
@@ -801,6 +811,20 @@ function injectHead(html, extra) {
   return html.replace(/<head([^>]*)>/i, (match, attrs) => '<head' + attrs + '>' + extra);
 }
 
+// Every game document learns the day's shared seed before its own script runs,
+// so anything board-generated can be the same for everyone on the first run of
+// the day. Games that ignore it behave exactly as before.
+function injectSeed(html) {
+  const date = challengeDate();
+  const seed = seedNumber(date);
+  const script = '<scr' + 'ipt>window.__boredSeed={date:' + JSON.stringify(date) +
+    ',seed:' + seed + ',code:' + JSON.stringify(seedCode(seed)) + '};<\/scr' + 'ipt>';
+  // The last closing tag is the document's; a game may well contain the text
+  // "</body>" earlier as data (shadow-net's fake web pages do).
+  const at = html.toLowerCase().lastIndexOf('</body>');
+  return at < 0 ? html + script : html.slice(0, at) + script + html.slice(at);
+}
+
 /* ── Wiring ───────────────────────────────────────────────────────────────── */
 
 searchInput.addEventListener('input', renderLibrary);
@@ -899,7 +923,7 @@ initAccount();
 // suite and for anyone poking at the console.
 Object.assign(window, {
   openGame, closeGame, renderDaily, readDaily, dailyChallenge, dailyCheck,
-  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, META, LB_GAMES, HIGH_SCORE_GAMES,
+  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, LB_GAMES, HIGH_SCORE_GAMES,
   captureHighScore: captureBest, accountStandings, boardGames, isLocalOnly, scoreRules
 });
 Object.defineProperty(window, 'currentDaily', { get: () => activeChallenge });

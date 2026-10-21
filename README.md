@@ -77,10 +77,12 @@ visible focus states, and reduced-motion preferences.
 ## DEEP
 
 **DEEP** is a five-floor roguelike built into the hub, and the only game that
-generates its world from the date. Every player gets the same dungeon on a given
-UTC day; **Random dive** cuts a fresh one from a different seed. The seed is
-printed on the title screen and in the share text, so a run can be replayed
-exactly with **Retry this dungeon**.
+generates its world from the date. Every player gets the same dungeon on the
+**first dive of a given day** (the day is Eastern Time, matching the daily
+challenge); later dives are cut fresh unless the player retries a seed.
+**Random dive** cuts a new one immediately. The seed is printed on the title
+screen and in the share text, so a run can be replayed exactly with **Retry this
+dungeon**.
 
 Each floor is carved from rooms and corridors by a seeded RNG, then populated
 with crawlers, stalkers, bone knights, wraiths, and loot. Movement is turn-based:
@@ -107,8 +109,10 @@ goal for each game. Everyone gets the same game and target for a given date;
 after a full circuit, most targets change difficulty. The day is **Eastern Time**:
 `dailyDate` formats the clock in `America/Detroit`, so the challenge rolls over at
 **midnight in Detroit** (DST included) wherever the player is, even when the hub
-is left open. Normal gameplay randomness is unchanged: this is a shared objective,
-not a promise of identical boards or enemy spawns.
+is left open. The hub also hands every game one shared seed for the day
+(`window.__boredSeed`), so a board-generating game can open the day with the same
+layout for everyone — DEEP does, for its first dive, then cuts fresh ones. Most
+games stay random: the goal is shared, not identical boards or enemy spawns.
 
 Examples include clearing Tetris lines, completing Simon sequences (not merely
 watching them), rescuing Lighthouse's three ships, beating the Connect Four

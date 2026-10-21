@@ -201,7 +201,14 @@ function addGame([slug, name, category, blurb, ...rest], flags) {
     .replace('export const ORDER = [', `export const ORDER = [["${slug}", "${name}"], `)
     .replace('export const META = {\n', `export const META = {\n  ${metaKey}: ['${category}', '${blurb}'],\n`);
   if (updated === catalog) usage('could not patch src/games/catalog.js');
-  writeFileSync(catalogPath, updated);
+  // The NEW badge holds four games, newest first: this one pushes the oldest off.
+  const fresh = (updated.match(/export const FRESH_GAMES = \[([^\]]*)\]/)?.[1] || '')
+    .match(/'[^']+'/g)?.map(id => id.slice(1, -1)) || [];
+  const nextFresh = [slug, ...fresh.filter(id => id !== slug)].slice(0, 4);
+  writeFileSync(catalogPath, updated.replace(
+    /export const FRESH_GAMES = \[[^\]]*\]/,
+    'export const FRESH_GAMES = [' + nextFresh.map(id => `'${id}'`).join(', ') + ']'
+  ));
 
   const rules = readJson(rulesPath, {});
   if (!flags.noScore) {
