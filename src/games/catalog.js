@@ -1,9 +1,11 @@
-const gameModules = import.meta.glob('./content/*.html.b64', { eager: true, query: '?raw', import: 'default' });
-export const GAMES = Object.fromEntries(Object.entries(gameModules).map(([file, b64]) => {
-  const slug = file.slice(file.lastIndexOf('/') + 1).replace(/\.html\.b64$/, '');
-  return [slug, { b64 }];
-}));
-if (!Object.keys(GAMES).length) throw new Error('No game payloads found. Run npm run games:sync.');
+// Every game is a complete HTML document in `content/`. They used to be inlined
+// into the hub as base64, which made every visitor download all 28 games before
+// they could open one. The hub now fetches a document only when its card is
+// clicked, so the first paint is the arcade shell alone.
+//
+// GitHub Pages serves this repository itself, so the committed source documents
+// in `src/games/content/` are the payloads: there is nothing extra to publish,
+// and editing a game updates it without rebuilding the hub.
 
 export const ORDER = [["sumo", "SUMO"], ["sand", "Sand"], ["poker", "Poker"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["lights-out", "Lights Out"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["klang", "Klang"], ["8ball", "8 Ball"]];
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://youtubeplayer.freebuff.app/player"};
@@ -38,3 +40,41 @@ export const META = {
   'f-14': ['Online', 'Flight simulator · internet required'],
   klang: ['Online', 'Music player · internet required']
 };
+
+/* ── Loading a game document on demand ────────────────────────────────────── */
+
+// Vite serves `src/` as its own root in development, so the same file sits at a
+// different depth there than it does once the repository is the site.
+const PAYLOAD_DIR = import.meta.env.DEV ? 'games/content/' : 'src/games/content/';
+
+/** Offline games that are plain documents rather than games built into arcade.js. */
+export const PAYLOAD_SLUGS = ORDER.map(([slug]) => slug)
+  .filter(slug => !EXTERNS[slug] && !NEW_GAMES.includes(slug));
+
+if (!PAYLOAD_SLUGS.length) throw new Error('No game documents found in src/games/content/.');
+
+const payloads = new Map();
+
+/**
+ * Fetch a game document once and remember it for the rest of the visit. The
+ * cache stores the promise, so opening two games at once still downloads each
+ * document exactly once, and a failed download is forgotten so a retry works.
+ */
+export function loadGameDocument(slug) {
+  if (!PAYLOAD_SLUGS.includes(slug)) {
+    return Promise.reject(new Error(slug + ' has no game document.'));
+  }
+  if (!payloads.has(slug)) {
+    payloads.set(slug, fetch(new URL(PAYLOAD_DIR + slug + '.html', document.baseURI))
+      .then(response => {
+        if (!response.ok) throw new Error(slug + ' returned HTTP ' + response.status);
+        return response.text();
+      })
+      .then(text => {
+        if (!/<html[\s>]/i.test(text)) throw new Error(slug + ' is not a complete document.');
+        return text;
+      })
+      .catch(error => { payloads.delete(slug); throw error; }));
+  }
+  return payloads.get(slug);
+}

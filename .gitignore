@@ -8,4 +8,4 @@ _source/
 node_modules/
 dist/
 .vite/
-src/games/content/*.b64
+/freebuff-sites-build/

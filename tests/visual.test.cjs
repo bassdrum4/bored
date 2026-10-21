@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 const puppeteer = require('puppeteer-core');
+const { serve } = require('./serve.cjs');
 
 async function leave(page) {
   await page.click('#menu-toggle');
@@ -14,13 +14,14 @@ test('visual release captures and live F-14 embed', async t => {
   const root = path.resolve(__dirname, '..');
   const chrome = [process.env.CHROME_PATH, path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'), '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p)) || require('puppeteer').executablePath();
   const browser = await puppeteer.launch({ executablePath: chrome, headless: true });
-  t.after(() => browser.close());
+  const site = await serve(root);
+  t.after(async () => { await browser.close(); await site.close(); });
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const shots = path.join(root, '_build', 'shots');
   fs.mkdirSync(shots, { recursive: true });
-  await page.goto(pathToFileURL(path.join(root, 'index.html')).href);
+  await page.goto(site.url);
   for (const width of [1100, 375, 320]) {
     await page.setViewport({ width, height: 900 });
     await page.evaluate(() => window.scrollTo(0, 0));

@@ -6,12 +6,9 @@
   "description": "A single-file arcade hub built from split Vite source files",
   "scripts": {
     "dev": "vite",
-    "predev": "node scripts/sync-games.mjs",
     "dev:infisical": "infisical run --env=dev -- vite",
     "build": "vite build && node scripts/publish.mjs",
-    "prebuild": "node scripts/sync-games.mjs",
     "preview": "vite preview",
-    "games:sync": "node scripts/sync-games.mjs",
     "games:add": "node scripts/games.mjs add",
     "games:register": "node scripts/games.mjs register",
     "feedback:setup": "node scripts/setup-feedback.mjs",

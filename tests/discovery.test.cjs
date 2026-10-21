@@ -2,27 +2,29 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 const puppeteer = require('puppeteer-core');
+const { serve } = require('./serve.cjs');
 const root = path.resolve(__dirname, '..');
 // Match bored.test.cjs: hosted Ubuntu also has a Chromium launcher whose sandbox
 // may be unavailable. Prefer the same working Google Chrome as the game suite.
 
-test('discovery works offline, keeps its controls, and fits small screens', async t => {
+test('discovery reaches nothing off-site, keeps its controls, and fits small screens', async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
+  const site = await serve(root);
   const browser = await puppeteer.launch({ executablePath, headless: true });
-  t.after(() => browser.close());
+  t.after(async () => { await browser.close(); await site.close(); });
   const page = await browser.newPage();
   const errors = [], requests = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.setRequestInterception(true);
   page.on('request', req => {
-    if (/^https?:/.test(req.url())) { requests.push(req.url()); req.abort(); }
+    // The loopback site is the arcade's own host, not an off-site dependency.
+    if (/^https?:/.test(req.url()) && !req.url().startsWith(site.origin)) { requests.push(req.url()); req.abort(); }
     else req.continue();
   });
   await page.setViewport({ width: 1366, height: 900 });
-  await page.goto(pathToFileURL(path.join(root, 'index.html')).href);
+  await page.goto(site.url);
   await page.waitForFunction(() => document.querySelectorAll('#grid .card').length === ORDER.length);
 
   await t.test('every game has useful metadata; every offline preview is in the file', async () => {
@@ -34,7 +36,9 @@ test('discovery works offline, keeps its controls, and fits small screens', asyn
     }
     await page.$$eval('#grid img', images => images.forEach(image => image.loading = 'eager'));
     await page.waitForFunction(() => [...document.querySelectorAll('#grid img')].every(image => image.complete && image.naturalWidth > 0));
-    assert.ok(fs.statSync(path.join(root, 'index.html')).size < 5096942 * 1.06, 'redesign adds less than 6% to the existing build');
+    // The hub no longer carries the games: only the shell and the previews are
+    // inlined, and a game document is downloaded when its card is opened.
+    assert.ok(fs.statSync(path.join(root, 'index.html')).size < 600 * 1024, 'the shell stays small now the games are fetched on demand');
     assert.equal(await page.$eval('#recent-empty', e => e.hidden), false);
     // The board sits above the library now: it belongs to the top of the page.
     assert.ok(await page.evaluate(() => document.querySelector('#leaderboard').offsetTop < document.querySelector('#library').offsetTop));
@@ -130,21 +134,28 @@ test('discovery works offline, keeps its controls, and fits small screens', asyn
 test('account UI and score sync still work through the redesigned hub (mock backend)', async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
+  const site = await serve(root);
   const browser = await puppeteer.launch({ executablePath, headless: true });
-  t.after(() => browser.close());
+  t.after(async () => { await browser.close(); await site.close(); });
   const page = await browser.newPage();
-  const rows = [], posted = [], notes = [], unexpected = [];
+  const rows = [], posted = [], notes = [], state = [], unexpected = [];
   const rules = Object.entries(JSON.parse(fs.readFileSync(path.join(root, 'src/games/score-rules.json')))).map(([game, rule]) => ({ game, ...rule }));
   const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS' };
   await page.setRequestInterception(true);
   page.on('request', request => {
     if (!/^https?:/.test(request.url())) return request.continue();
+    // The arcade's own host serves the game documents; only the API is mocked.
+    if (request.url().startsWith(site.origin)) return request.continue();
     const url = new URL(request.url()), method = request.method();
     const reply = body => request.respond({ status: 200, contentType: 'application/json', headers, body: JSON.stringify(body) });
     if (method === 'OPTIONS') return request.respond({ status: 204, headers });
     if (url.pathname === '/rest/v1/score_rules') return reply(rules);
     if (url.pathname === '/auth/v1/token') return reply({ access_token: 'mock-access', refresh_token: 'mock-refresh', expires_in: 3600, user: { id: 'test-user', email: 'tester@example.test' } });
     if (url.pathname === '/rest/v1/profiles') return reply([{ handle: 'tester' }]);
+    if (url.pathname === '/rest/v1/player_state') {
+      if (method === 'POST') { state.push(JSON.parse(request.postData())); return reply(null); }
+      return reply([]);
+    }
     if (url.pathname === '/rest/v1/scores') {
       if (method === 'POST') {
         const row = JSON.parse(request.postData());
@@ -160,7 +171,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
     unexpected.push(method + ' ' + url.pathname);
     return request.abort();
   });
-  await page.goto(pathToFileURL(path.join(root, 'index.html')).href);
+  await page.goto(site.url);
   await page.click('#account-action');
   await page.waitForFunction(() => document.querySelector('#auth-dialog')?.open === true);
   // Click each field before typing: a dialog that opens while the page is still
@@ -186,6 +197,14 @@ test('account UI and score sync still work through the redesigned hub (mock back
   assert.equal(posted[0].game, 'lights-out');
   assert.equal(posted[0].value, 2);
   assert.equal(posted[0].authorization, 'Bearer mock-access');
+  // The account, not this browser, owns the state now: the arcade pushes it so
+  // it turns up again on the next device.
+  await new Promise(resolve => setTimeout(resolve, 1200));
+  const pushed = state.at(-1);
+  assert.ok(pushed, 'the player state is pushed to the account');
+  assert.equal(pushed.user_id, 'test-user');
+  assert.ok(pushed.data.library.recent.includes('lights-out'), 'recent games follow the account');
+  assert.equal(pushed.data.bests['lights-out'], 2, 'a new best follows the account');
   await page.click('.lb-tab[data-view="games"]');
   await page.select('#lb-game', 'lights-out');
   await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('2 boards'));

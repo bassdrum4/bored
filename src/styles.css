@@ -172,7 +172,7 @@ section[id]{scroll-margin-top:20px}
 .daily-actions{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 12px}
 .primary-action{background:var(--ink);color:var(--paper);border-color:var(--ink);padding:13px 18px;font-size:12px}
 .primary-action:hover{background:var(--red);border-color:var(--red)}
-#daily-status{font:11px/1.7 var(--mono);color:var(--dim);margin:0}
+#daily-status,#daily-streak{font:11px/1.7 var(--mono);color:var(--dim);margin:0}
 .daily-visual{min-width:0}
 .game-preview{display:block;width:100%;aspect-ratio:8/5;overflow:hidden;background:#e7e2d6;border-bottom:1px solid var(--rule)}
 .game-preview img{display:block;width:100%;height:100%;object-fit:cover;filter:saturate(.65)}
