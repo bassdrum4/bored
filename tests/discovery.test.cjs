@@ -5,9 +5,11 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const puppeteer = require('puppeteer-core');
 const root = path.resolve(__dirname, '..');
+// Match bored.test.cjs: hosted Ubuntu also has a Chromium launcher whose sandbox
+// may be unavailable. Prefer the same working Google Chrome as the game suite.
 
 test('discovery works offline, keeps its controls, and fits small screens', async t => {
-  const executablePath = [process.env.CHROME_PATH, '/usr/bin/chromium', '/usr/bin/google-chrome'].filter(Boolean).find(p => fs.existsSync(p));
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
   const browser = await puppeteer.launch({ executablePath, headless: true });
   t.after(() => browser.close());
@@ -122,7 +124,7 @@ test('discovery works offline, keeps its controls, and fits small screens', asyn
 });
 
 test('account UI and score sync still work through the redesigned hub (mock backend)', async t => {
-  const executablePath = [process.env.CHROME_PATH, '/usr/bin/chromium', '/usr/bin/google-chrome'].filter(Boolean).find(p => fs.existsSync(p));
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
   const browser = await puppeteer.launch({ executablePath, headless: true });
   t.after(() => browser.close());
