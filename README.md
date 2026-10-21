@@ -1,7 +1,7 @@
 # Bored — single-file arcade
 
-**[index.html](index.html)** is the built, self-contained site: **33 offline games
-and 3 online extras**, with no runtime dependencies, installs, server, or asset
+**[index.html](index.html)** is the built, self-contained site: **32 offline games
+and 2 online extras**, with no runtime dependencies, installs, server, or asset
 folder. Double-click it to play, or serve it as a static page.
 
 GitHub Pages address: **https://bassdrum4.github.io/bored/**.
@@ -100,7 +100,7 @@ CHROME_PATH=/path/to/chrome npm run test:visual      # includes a live F-14 embe
 ```
 
 Raw captures and verification screenshots go under ignored `_build/`. Commit
-the optimized `src/games/previews/*.webp` and rebuilt `index.html`. The 33 previews
+the optimized `src/games/previews/*.webp` and rebuilt `index.html`. The 32 previews
 total about 81 KB before base64 embedding; images below the first screen load
 lazily. No capture tooling is shipped as a runtime dependency.
 
@@ -134,7 +134,7 @@ matches the frame, so a portrait phone sees tall rooms rather than a letterbox.
 
 ## Daily challenge
 
-The featured challenge rotates through **31 of the offline games**, with a distinct
+The featured challenge rotates through **30 of the offline games**, with a distinct
 goal for each game. Everyone gets the same game and target for a given date;
 after a full circuit, most targets change difficulty. The day is **Eastern Time**:
 `dailyDate` formats the clock in `America/Detroit`, so the challenge rolls over at
@@ -145,8 +145,7 @@ layout for everyone — DEEP does, for its first dive, then cuts fresh ones. Mos
 games stay random: the goal is shared, not identical boards or enemy spawns.
 
 Examples include clearing Tetris lines, completing Simon sequences (not merely
-watching them), rescuing Lighthouse's three ships, beating the Connect Four
-computer, clearing Minesweeper without hints, growing Eco's populations, and
+watching them), beating the Connect Four computer, clearing Minesweeper without hints, growing Eco's populations, and
 building a multi-material Sand world. Each goal describes its rules before launch.
 
 Use the **daily challenge button** to enter a tracked attempt. The player shows
@@ -163,7 +162,7 @@ current page session but not a reload.
 Verification runs locally in the browser. It prevents accidental completion and
 checks the stated conditions; it is **not anti-cheat**, and the optional shared
 leaderboard accepts browser-submitted bests too.
-The three remote extras are excluded because the hub cannot inspect their
+The two remote extras are excluded because the hub cannot inspect their
 cross-origin game state (and Klang is a music player).
 
 ## Shared leaderboard (optional)
@@ -197,14 +196,14 @@ For quick testing, turn off **Authentication → Providers → Email → Confirm
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.
 
-The board tracks a best score for **31 of the 36 games**. The original eight
+The board tracks a best score for **30 of the 34 games**. The original eight
 (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
 their existing saved bests. Every other offline game except Connect Four and
 Tank2 is read from live game state when you leave or restart: Tetris lines,
 Wordle guesses (solved runs only), 8 Ball balls pocketed, Poker chips, and each
 game's displayed score, waves, levels, wins, ships, or other progress metric.
 Connect Four and Tank2 are excluded because their only totals are per-session
-win counts; the three remote extras are excluded because the hub cannot inspect
+win counts; the two remote extras are excluded because the hub cannot inspect
 their cross-origin state. Scores are submitted by the browser, so this is a
 friendly board, not anti-cheat. Signing out keeps local bests intact.
 
@@ -265,11 +264,11 @@ above the grid; arrows move a cursor and Enter presses. Best of all, it is small
 one HTML file, [`src/games/content/lights-out.html`](src/games/content/lights-out.html),
 with no fonts, libraries, or images.
 
-## Original offline games (26)
+## Original offline games (25)
 
 Pulled from `https://sites.google.com/midlandps.org/vibecoding/`:
 
-sumo, sand, lighthouse, poker, wordle, lava, volletball, solitaire, commanders, eco,
+sumo, sand, poker, wordle, lava, volletball, solitaire, commanders, eco,
 void-runner, qbert, simon, frogger, pac-man, snake, tank, space-invaders, pong,
 asteroids, breakout, tetris, minesweeper, tank2, gun-mayhem, shadow-net
 
@@ -278,27 +277,17 @@ Everything needed by these games is inlined:
 | Dependency | How it is handled |
 |---|---|
 | Original games | Readable HTML in `src/games/content/`, encoded at build time |
-| Google Fonts (20 games) | 88 `@font-face` rules with embedded woff2 data |
-| three.js 0.176 (Lighthouse) | Inlined modules loaded via blob URLs, with a data-URI fallback |
 | Font Awesome (shadow.net) | Subset to the four icons actually used |
 
 Games run in separate `srcdoc` iframes, keeping their CSS and JavaScript isolated
 from the hub. A storage shim in the original games provides an in-memory fallback
 where needed on `file://`.
 
-### Lighthouse fix
-
-The original game declared `#fatal { display: grid }`, overriding its `hidden`
-attribute and covering gameplay with the fatal overlay. The player now injects
-`#fatal[hidden] { display: none !important }`. Actual fatal errors can still show
-normally, and the original embedded source is preserved.
-
-## Online extras (3)
+## Online extras (2)
 
 These use an ordinary iframe pointing to their own servers and **require internet**:
 
 - **F-14** → `https://bassdrum4.github.io/f-14-4/` — flight simulator
-- **DC** → `https://workbag.dpdns.org/` — remote class-site entry
 - **Klang** → `https://youtubeplayer.freebuff.app/player` — music player;
   signed-out visitors may see its sign-in screen
 
@@ -329,7 +318,7 @@ accuracy and expiration, search/filter/sort, the jump palette, saved favorites,
 Escape and focus restoration, all 32 offline game boots, DEEP's seeded dungeon and boss gate, poker's
 simulated equity, no-peeking opponents and draw discards, 8 Ball's simulated shot planning
 (pots, safeties, escapes, no avoidable fouls or scratches, a whole self-played rack),
-Lighthouse's overlay, all 30 daily state
+all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, Detroit-time rollover, 320px layouts,
 blocked storage, high-score capture, the shared-board picker (one board per

@@ -1045,20 +1045,16 @@ test('browser regressions', async t => {
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
   });
 
-  await t.test('every offline game boots; Lighthouse overlay is actually hidden', async () => {
+  await t.test('every offline game boots with the shared daily seed', async () => {
     const slugs = await page.evaluate(() => ORDER.filter(([slug]) => !EXTERNS[slug] && !NEW_GAMES.includes(slug)).map(([slug]) => slug));
     const seeds = new Set();
     for (const slug of slugs) {
       await page.evaluate(id => openGame(id), slug);
       await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.body?.childElementCount > 0);
-      await pause(slug === 'lighthouse' ? 1500 : 180);
+      await pause(180);
       const seed = await page.evaluate(() => document.querySelector('#frame').contentWindow.__boredSeed);
       assert.ok(seed && Number.isFinite(seed.seed) && /^[0-9A-F]{6}$/.test(seed.code), slug + ' receives the shared daily seed');
       seeds.add(seed.date + ':' + seed.seed);
-      if (slug === 'lighthouse') {
-        const frame = await (await page.$('#frame')).contentFrame();
-        assert.equal(await frame.$eval('#fatal', el => el.hidden && getComputedStyle(el).display === 'none'), true);
-      }
       await close();
     }
     assert.equal(seeds.size, 1, 'every game receives the same daily seed');

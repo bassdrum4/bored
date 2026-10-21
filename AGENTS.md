@@ -15,18 +15,23 @@ src/games/catalog.js     ORDER (grid order), META (category, blurb), EXTERNS (of
 src/games/score-rules.json  what each game's score means on the shared board (label, better, max)
 src/games/content/*.html one file per game — the game's entire source
 src/games/content/*.b64  generated payload, git-ignored — rebuild with npm run build
+src/games/arcade.js      2048, Memory, Connect Four, Aim Lab — native JS, no payload
+src/games/discovery.js   session estimates, controls, collections, editorial picks, previews
 tests/bored.test.cjs     node:test suite, runs the real build output in Chrome
+tests/discovery.test.cjs discovery, layout and mock-account flows
+tests/visual.test.cjs    release captures and the live F-14 embed (needs internet)
 scripts/sync-games.mjs   html -> .b64
+scripts/publish.mjs      copies dist/index.html to the served index.html
 scripts/games.mjs        add a game / sync the shared board's rule list
-scripts/verify-snapshot.cjs  sanity-checks every game's snapshot in a browser
+scripts/capture-previews.mjs  re-shoot the library previews in Chrome
 ```
 
 ## Build and verify
 
 ```bash
 npm ci                     # once
-npm run build              # inlines src/* into index.html (also runs sync-games)
-node --test tests/bored.test.cjs
+npm run build              # vite build (single file) + publish copies it to index.html
+npm test                   # game, discovery and layout suites; needs CHROME_PATH
 ```
 
 `npm run build` must be run and its `index.html` committed whenever a game changes — Pages serves
@@ -82,7 +87,7 @@ optional daily challenge). Then:
 ```bash
 npm run games:register        # give the shared board its score_rules row (--apply needs a key)
 npm run build
-node --test tests/bored.test.cjs
+npm test
 ```
 
 The suite derives its counts from the catalog, so adding games does not mean editing test

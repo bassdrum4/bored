@@ -41,7 +41,7 @@ test('discovery works offline, keeps its controls, and fits small screens', asyn
 
   await t.test('collections intersect with search and filters, and can be cleared', async () => {
     for (const [id, predicate] of [
-      ['quick', 'quick'], ['friends', 'players'], ['relax', 'pace'], ['picks', 'picks']
+      ['quick', 'quick'], ['friends', 'players'], ['relax', 'pace']
     ]) {
       await page.click('[data-collection="' + id + '"]');
       assert.equal(await page.evaluate(() => document.activeElement.dataset.collection), id, 'collection keeps keyboard focus');
@@ -120,7 +120,7 @@ test('discovery works offline, keeps its controls, and fits small screens', asyn
   });
   assert.deepEqual(errors, []);
   // The hub may try its existing score API. Previews and discovery must add none.
-  assert.ok(requests.every(url => url.includes('.supabase.co/') || Object.values({f14:'https://bassdrum4.github.io/f-14-4/',dc:'https://workbag.dpdns.org/',klang:'https://youtubeplayer.freebuff.app/player'}).some(external => url.startsWith(external))), requests.join('\n'));
+  assert.ok(requests.every(url => url.includes('.supabase.co/') || Object.values({f14:'https://bassdrum4.github.io/f-14-4/',klang:'https://youtubeplayer.freebuff.app/player'}).some(external => url.startsWith(external))), requests.join('\n'));
 });
 
 test('account UI and score sync still work through the redesigned hub (mock backend)', async t => {

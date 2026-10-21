@@ -44,7 +44,7 @@ export function rulesLoaded() {
   return rulesReady;
 }
 
-export function applySession(data) {
+function applySession(data) {
   const user = data.user || session?.user;
   if (!user) return null;
   session = {
@@ -57,7 +57,7 @@ export function applySession(data) {
   return session;
 }
 
-export function forgetSession() {
+function forgetSession() {
   session = null;
   handle = '';
   removeStored(SESSION_KEY);
@@ -125,7 +125,7 @@ export async function freshSession() {
   return session;
 }
 
-export function cleanHandle(value) {
+function cleanHandle(value) {
   let cleaned = String(value || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 16);
   while (cleaned.length < 3) cleaned += '_';
   return cleaned.slice(0, 16);

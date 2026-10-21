@@ -1,6 +1,5 @@
-import { ORDER, GAMES, EXTERNS, NEW_GAMES, FRESH_GAMES, META, FONT_CSS } from './games/catalog.js';
+import { ORDER, GAMES, EXTERNS, NEW_GAMES, FRESH_GAMES, META } from './games/catalog.js';
 import { DISCOVERY, PICKS, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
-import { threeBootstrap } from './games/three.js';
 import { nativeHTML } from './games/arcade.js';
 import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, installDailyAdapter, seedNumber, seedCode, CHALLENGES } from './daily.js';
 import { readStored, writeStored } from './hub/store.js';
@@ -218,7 +217,9 @@ function renderLibrary() {
     : 'Nothing here. Try another search, category, or collection, or clear the filters.';
   $('#results').textContent = visibleGames.length + ' of ' + ORDER.length + ' entries';
   $('#count').textContent = ORDER.length;
-  $('#library-count').textContent = (ORDER.length - Object.keys(EXTERNS).length) + ' offline / ' + Object.keys(EXTERNS).length + ' online extras';
+  const counts = (ORDER.length - Object.keys(EXTERNS).length) + ' offline / ' + Object.keys(EXTERNS).length + ' online extras';
+  $('#library-count').textContent = counts;
+  $('#foot-count').textContent = counts;
   $('#clear-filters').hidden = !filter && category === 'All' && collection === 'all';
   $('#random').disabled = !visibleGames.length;
 }
@@ -331,8 +332,6 @@ function openGame(slug, challenge = null) {
     if (!NEW_GAMES.includes(slug)) html = installDailyAdapter(html, slug);
     html = injectSeed(html);
     let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
-    if (game?.fonts) head += '<style>' + FONT_CSS + '</style>';
-    if (slug === 'lighthouse') head += '<style>#fatal[hidden]{display:none!important}</style>' + threeBootstrap();
     if (head) html = injectHead(html, head);
     gameFrame.removeAttribute('src');
     gameFrame.srcdoc = html;

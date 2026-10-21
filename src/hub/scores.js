@@ -14,7 +14,7 @@ import {
  * with ties sharing a rank. Scores are only comparable *within* a game, so raw
  * units are never summed across them. Five places because the board is small.
  */
-export const RANK_WINDOW = 5;
+const RANK_WINDOW = 5;
 export const rankPoints = rank => RANK_WINDOW + 1 - rank;
 
 export function accountStandings(scores) {
@@ -97,7 +97,6 @@ export const HIGH_SCORE_GAMES = [
   highScore('qbert', 'Q*bert', 'levels', { metric: 'levels' }),
   highScore('pong', 'Pong', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
   highScore('sumo', 'SUMO', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
-  highScore('lighthouse', 'Lighthouse', 'ships', { metric: 'ships' }),
   highScore('poker', 'Poker', 'chips', { metric: 'profit', when: snapshot => snapshot.handOver === true }),
   highScore('tank', 'Tank', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   // Solitaire is finishable, so the board ranks the time to clear it.
@@ -190,7 +189,7 @@ export function onScoresPosted(listener) {
 let syncTimer = 0;
 
 /** Debounced because a run ends with several snapshots in a row. */
-export function requestScoreSync() {
+function requestScoreSync() {
   if (!getSession() || !backendReady()) return;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => { syncScores(); }, 600);

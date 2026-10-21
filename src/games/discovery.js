@@ -10,7 +10,6 @@ export const DISCOVERY = {
   '8ball': info('5–15 min', 'Competitive', ['Mouse', 'Touch'], { players: '2 local' }),
   sumo: info('1–3 min', 'Competitive', ['Keyboard'], { quick: true, players: '2 local' }),
   sand: info('Open-ended', 'Relaxing', ['Mouse', 'Touch']),
-  lighthouse: info('2–5 min', 'Focused', ['Keyboard', 'Mouse', 'Touch']),
   poker: info('5–15 min', 'Competitive', ['Mouse', 'Touch']),
   wordle: info('2–5 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   lava: info('1–3 min', 'Competitive', ['Keyboard'], { quick: true, players: '2 local' }),
@@ -36,7 +35,6 @@ export const DISCOVERY = {
   'gun-mayhem': info('3–10 min', 'Competitive', ['Keyboard'], { players: '2 local' }),
   'shadow-net': info('10–20 min', 'Focused', ['Keyboard', 'Mouse']),
   'f-14': info('5–20 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { players: 'Online multiplayer' }),
-  dc: info('Open-ended', 'Social', ['Keyboard', 'Mouse', 'Touch']),
   klang: info('Open-ended', 'Listening', ['Mouse', 'Touch'])
 };
 
@@ -52,8 +50,7 @@ export const COLLECTIONS = [
   { id: 'all', name: 'All games', note: 'The whole arcade, at your own pace.' },
   { id: 'quick', name: 'Quick Break', note: 'Short rounds or easy stopping points. A few minutes is enough.' },
   { id: 'friends', name: 'Play Against Friends', note: 'Pass a turn or share a keyboard. These games have local two-player modes.' },
-  { id: 'relax', name: 'Relax & Unwind', note: 'Unhurried puzzles, cards, and worlds to tinker with.' },
-  { id: 'picks', name: 'Worth Trying', note: 'Four editor’s picks, each with a different way to play.' }
+  { id: 'relax', name: 'Relax & Unwind', note: 'Unhurried puzzles, cards, and worlds to tinker with.' }
 ];
 
 export function inCollection(slug, collection) {
@@ -63,7 +60,6 @@ export function inCollection(slug, collection) {
     case 'quick': return game.quick === true;
     case 'friends': return game.players === '2 local';
     case 'relax': return game.pace === 'Relaxing';
-    case 'picks': return PICKS.some(pick => pick.slug === slug);
     default: return true;
   }
 }

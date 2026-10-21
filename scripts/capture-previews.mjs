@@ -29,7 +29,7 @@ try {
   const games = await catalog.evaluate(() => ORDER.filter(([slug]) => !EXTERNS[slug]));
   await catalog.close();
   const starts = {
-    deep: '#btnDaily', sumo: '#opt-cpu', lighthouse: '#btnBegin', 'aim-lab': '#actions button',
+    deep: '#btnDaily', sumo: '#opt-cpu', 'aim-lab': '#actions button',
     'void-runner': '#screen-overlay', simon: '#btnStart', snake: '#start',
     tank: '#m1', '8ball': '#btnCpu', tetris: '#start-btn'
   };
@@ -43,7 +43,7 @@ try {
     await page.evaluate(id => openGame(id), slug);
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.body?.childElementCount > 0);
     const frame = await (await page.$('#frame')).contentFrame();
-    await new Promise(resolve => setTimeout(resolve, slug === 'lighthouse' ? 1800 : 150));
+    await new Promise(resolve => setTimeout(resolve, 150));
     if (starts[slug] && await frame.$(starts[slug])) {
       try { await frame.click(starts[slug]); } catch {}
     }

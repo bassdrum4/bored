@@ -12,7 +12,6 @@
   "gun-mayhem": { "label": "Rounds won", "better": "high", "max_value": 99 },
   "lava": { "label": "Points", "better": "high", "max_value": 999 },
   "lights-out": { "label": "Boards cleared", "better": "high", "max_value": 999 },
-  "lighthouse": { "label": "Ships guided home", "better": "high", "max_value": 3 },
   "memory": { "label": "Fewest moves to finish a board", "better": "low", "max_value": 10000 },
   "minesweeper": { "label": "Seconds to clear a board", "better": "low", "max_value": 99999 },
   "pac-man": { "label": "Points", "better": "high", "max_value": 10000000 },
