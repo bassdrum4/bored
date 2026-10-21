@@ -13,7 +13,11 @@
     "preview": "vite preview",
     "games:sync": "node scripts/sync-games.mjs",
     "games:add": "node scripts/games.mjs add",
-    "games:register": "node scripts/games.mjs register"
+    "games:register": "node scripts/games.mjs register",
+    "test": "node --test tests/bored.test.cjs tests/discovery.test.cjs",
+    "test:visual": "node --test tests/visual.test.cjs",
+    "previews:capture": "node scripts/capture-previews.mjs",
+    "previews:optimize": "python3 scripts/optimize-previews.py"
   },
   "devDependencies": {
     "puppeteer-core": "^25.14.0",

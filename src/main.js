@@ -1,4 +1,5 @@
 import { ORDER, GAMES, EXTERNS, NEW_GAMES, FRESH_GAMES, META, FONT_CSS } from './games/catalog.js';
+import { DISCOVERY, PICKS, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
 import { threeBootstrap } from './games/three.js';
 import { nativeHTML } from './games/arcade.js';
 import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, installDailyAdapter, seedNumber, seedCode, CHALLENGES } from './daily.js';
@@ -45,12 +46,14 @@ function element(tag, className, text) {
 
 let activeSlug = null;
 let previousSlug = null;
+let launchSelector = '';
 let activeChallenge = null;
 let hintTimer = 0;
 let focusTimer = 0;
 const dailyResults = new Map();
 
 let category = 'All';
+let collection = 'all';
 let visibleGames = [];
 let favorites = new Set();
 let recentGames = [];
@@ -79,16 +82,71 @@ function saveLibrary() {
   writeStored('bored.library', { favorites: [...favorites], recent: recentGames });
 }
 
+function previewFor(slug) {
+  const preview = element('span', 'game-preview');
+  preview.setAttribute('aria-hidden', 'true');
+  if (PREVIEWS[slug]) {
+    const image = element('img');
+    image.src = PREVIEWS[slug];
+    image.alt = '';
+    image.width = 384;
+    image.height = 240;
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    preview.appendChild(image);
+  } else {
+    preview.classList.add('external-preview');
+    preview.append(element('span', 'external-mark', '↗'), element('span', '', 'ONLINE EXTRA'));
+  }
+  return preview;
+}
+
+function gameMeta(slug) {
+  const game = DISCOVERY[slug];
+  return [game.minutes, game.pace, game.players].filter(Boolean).join(' · ');
+}
+
+function shelfGame(slug, note) {
+  const name = ORDER.find(([id]) => id === slug)[1];
+  const button = element('button', 'shelf-play');
+  button.type = 'button';
+  button.dataset.slug = slug;
+  button.appendChild(previewFor(slug));
+  const text = element('span', 'shelf-copy');
+  text.append(element('span', 'shelf-name', name + '\u00a0↗'), element('span', 'shelf-note', note));
+  button.appendChild(text);
+  button.onclick = () => openGame(slug);
+  return button;
+}
+
 function renderRecent() {
   const list = $('#recent-list');
-  list.replaceChildren();
-  for (const slug of recentGames) {
-    const button = element('button', 'action', ORDER.find(([id]) => id === slug)[1]);
+  list.replaceChildren(...recentGames.map(slug => shelfGame(slug,
+    (favorites.has(slug) ? 'Favorite · ' : '') + (EXTERNS[slug] ? 'Online extra' : 'Recently played'))));
+  const saved = [...favorites].filter(slug => !recentGames.includes(slug));
+  $('#favorite-list').replaceChildren(...saved.slice(0, 4).map(slug => shelfGame(slug,
+    EXTERNS[slug] ? 'Favorite · Online extra' : gameMeta(slug))));
+  $('#favorites-all').hidden = saved.length <= 4;
+  $('#favorites-all').textContent = 'Browse all ' + favorites.size + ' favorites →';
+  $('#favorite-shelf').hidden = !saved.length;
+  $('#recent-empty').hidden = !!(recentGames.length || saved.length);
+}
+
+function renderPicks() {
+  $('#picks-list').replaceChildren(...PICKS.map(pick => shelfGame(pick.slug, pick.reason)));
+}
+
+function renderCollections() {
+  if (!$('#collections').children.length) $('#collections').replaceChildren(...COLLECTIONS.map(entry => {
+    const button = element('button', 'collection', entry.name);
     button.type = 'button';
-    button.onclick = () => openGame(slug);
-    list.appendChild(button);
-  }
-  $('#recent').hidden = !recentGames.length;
+    button.dataset.collection = entry.id;
+    button.setAttribute('aria-pressed', String(collection === entry.id));
+    button.onclick = () => { collection = entry.id; renderCollections(); renderLibrary(); };
+    return button;
+  }));
+  for (const button of $('#collections').children) button.setAttribute('aria-pressed', String(button.dataset.collection === collection));
+  $('#collection-note').textContent = COLLECTIONS.find(entry => entry.id === collection).note;
 }
 
 // The shelf lists the NEW-badged games first, in badge order, then the rest of
@@ -106,7 +164,8 @@ function renderLibrary() {
   visibleGames = shelf.filter(([slug, name]) => {
     const meta = META[slug];
     return (EXTERNS[slug] || GAMES[slug] || NEW_GAMES.includes(slug)) &&
-      (!filter || [name, slug, ...meta].join(' ').toLowerCase().includes(filter)) &&
+      inCollection(slug, collection) &&
+      (!filter || [name, slug, ...meta, gameMeta(slug), ...DISCOVERY[slug].inputs].join(' ').toLowerCase().includes(filter)) &&
       (category === 'All' || (category === 'New' ? FRESH_GAMES.includes(slug) :
         category === 'Favorites' ? favorites.has(slug) : meta[0] === category));
   });
@@ -117,13 +176,14 @@ function renderLibrary() {
     const card = element('button', 'card');
     card.type = 'button';
     card.dataset.slug = slug;
-    card.innerHTML = '<span class="idx" aria-hidden="true"></span><span class="text"><span class="name"></span><span class="detail"></span></span><span class="go" aria-hidden="true">&#8594;</span>';
-    card.querySelector('.name').textContent = name;
-    if (FRESH_GAMES.includes(slug)) {
-      card.querySelector('.name').appendChild(element('span', 'badge', 'NEW'));
-    }
-    card.querySelector('.detail').textContent = META[slug].join(' · ');
-    card.querySelector('.idx').textContent = String(shelf.findIndex(([id]) => id === slug) + 1).padStart(2, '0');
+    card.appendChild(previewFor(slug));
+    const text = element('span', 'text');
+    const title = element('span', 'name', name);
+    if (FRESH_GAMES.includes(slug)) title.appendChild(element('span', 'badge', 'NEW'));
+    text.append(element('span', 'card-category', EXTERNS[slug] ? 'Online extra · Internet required' : META[slug][0] + ' · Offline'),
+      title, element('span', 'detail', META[slug][1]), element('span', 'game-meta', gameMeta(slug)),
+      element('span', 'game-inputs', DISCOVERY[slug].inputs.join(' / ')));
+    card.appendChild(text);
     card.onclick = () => openGame(slug);
 
     const star = element('button', 'star');
@@ -140,6 +200,7 @@ function renderLibrary() {
       else favorites.add(slug);
       saveLibrary();
       updateStar();
+      renderRecent();
       if (category === 'Favorites') {
         const index = visibleGames.findIndex(([id]) => id === slug);
         renderLibrary();
@@ -154,9 +215,11 @@ function renderLibrary() {
   $('#empty').hidden = visibleGames.length > 0;
   $('#empty').textContent = category === 'Favorites' && !favorites.size
     ? 'Your favorites live here. Tap a star beside any game to save it.'
-    : 'Nothing here. Try a different search or category.';
+    : 'Nothing here. Try another search, category, or collection, or clear the filters.';
   $('#results').textContent = visibleGames.length + ' of ' + ORDER.length + ' entries';
   $('#count').textContent = ORDER.length;
+  $('#library-count').textContent = (ORDER.length - Object.keys(EXTERNS).length) + ' offline / ' + Object.keys(EXTERNS).length + ' online extras';
+  $('#clear-filters').hidden = !filter && category === 'All' && collection === 'all';
   $('#random').disabled = !visibleGames.length;
 }
 
@@ -240,6 +303,11 @@ async function toggleFullscreen() {
 
 function openGame(slug, challenge = null) {
   if (!ORDER.some(([id]) => id === slug)) return;
+  if (!activeSlug) {
+    const origin = document.activeElement;
+    const shelf = origin.closest?.('#recent-list, #favorite-list, #picks-list, #grid');
+    launchSelector = shelf ? '#' + shelf.id + ' [data-slug="' + slug + '"]' : origin.id ? '#' + origin.id : '';
+  }
   closeMenu();
   activeChallenge = challenge;
   const external = EXTERNS[slug];
@@ -297,7 +365,9 @@ function closeGame() {
   $('#challenge-progress').hidden = true;
   syncSharedScores();
   renderDaily();
-  (wasDaily ? $('#daily-play') : ($(`[data-slug="${previousSlug}"]`) || searchInput)).focus();
+  const movedFavorite = launchSelector.startsWith('#favorite-list ')
+    ? $(`#recent-list [data-slug="${previousSlug}"]`) : null;
+  (wasDaily ? $('#daily-play') : ((launchSelector && $(launchSelector)) || movedFavorite || $(`#grid [data-slug="${previousSlug}"]`) || searchInput)).focus();
 }
 
 function showHint(message) {
@@ -365,9 +435,19 @@ function renderDaily() {
   $('#daily-date').textContent = challenge.date + ' · RESETS AT MIDNIGHT DETROIT TIME';
   $('#daily-heading').textContent = ORDER.find(([slug]) => slug === challenge.slug)[1] + ' · ' + challenge.label;
   $('#daily-goal').textContent = challenge.goal;
+  $('#daily-meta').textContent = gameMeta(challenge.slug);
+  $('#daily-state').textContent = result ? 'Completed ✓' : 'Ready to play';
+  $('#daily').classList.toggle('completed', !!result);
+  if ($('#daily-preview').dataset.slug !== challenge.slug) {
+    const preview = previewFor(challenge.slug);
+    const image = preview.querySelector('img');
+    if (image) { image.loading = 'eager'; image.fetchPriority = 'high'; }
+    $('#daily-preview').replaceChildren(preview);
+    $('#daily-preview').dataset.slug = challenge.slug;
+  }
   $('#daily-status').textContent = result
     ? '✓ Automatically verified. Your completed result is saved.'
-    : 'One daily goal for everyone. Completion is checked by the game—not a checkbox. Retry as often as you like.';
+    : 'One goal for everyone. Retry as often as you like. Your result is checked automatically.';
   $('#daily-play').textContent = result ? 'Play again →' : 'Play today’s challenge →';
   $('#daily-share').hidden = !result;
   if ($('#daily-result').dataset.challenge !== challenge.id) $('#daily-result').hidden = true;
@@ -617,8 +697,8 @@ function renderAccount() {
   } else {
     state.textContent = 'Playing as a guest. Scores stay in this browser.';
     action.textContent = 'Sign in';
-    // The sign-in call to action is the one button in the header worth noticing.
-    action.classList.add('primary');
+    // Accounts are optional; the daily Play button carries the primary emphasis.
+    action.classList.remove('primary');
     rename.hidden = true;
   }
 }
@@ -829,6 +909,24 @@ function injectSeed(html) {
 
 searchInput.addEventListener('input', renderLibrary);
 $('#sort').addEventListener('change', renderLibrary);
+$('#clear-filters').onclick = () => {
+  category = 'All';
+  collection = 'all';
+  searchInput.value = '';
+  for (const button of $('#filters').children) button.setAttribute('aria-pressed', String(button.dataset.filter === 'All'));
+  renderCollections();
+  renderLibrary();
+  searchInput.focus();
+};
+$('#favorites-all').onclick = () => {
+  collection = 'all';
+  category = 'Favorites';
+  searchInput.value = '';
+  for (const button of $('#filters').children) button.setAttribute('aria-pressed', String(button.dataset.filter === 'Favorites'));
+  renderCollections();
+  renderLibrary();
+  $('#filters [data-filter="Favorites"]').focus();
+};
 $('#filters').addEventListener('click', event => {
   const button = event.target.closest('[data-filter]');
   if (!button) return;
@@ -916,6 +1014,8 @@ setInterval(renderDaily, 60000);
 loadLibrary();
 renderDaily();
 renderRecent();
+renderPicks();
+renderCollections();
 renderLibrary();
 initAccount();
 
@@ -923,7 +1023,7 @@ initAccount();
 // suite and for anyone poking at the console.
 Object.assign(window, {
   openGame, closeGame, renderDaily, readDaily, dailyChallenge, dailyCheck,
-  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, LB_GAMES, HIGH_SCORE_GAMES,
+  CHALLENGES, ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, DISCOVERY, COLLECTIONS, PICKS, PREVIEWS, LB_GAMES, HIGH_SCORE_GAMES,
   captureHighScore: captureBest, accountStandings, boardGames, isLocalOnly, scoreRules
 });
 Object.defineProperty(window, 'currentDaily', { get: () => activeChallenge });

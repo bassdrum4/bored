@@ -23,7 +23,7 @@ jobs:
       - name: Build single-file arcade
         run: npm run build
       - name: Run browser and logic tests
-        run: node --test tests/bored.test.cjs
+        run: npm test
       - name: Publish generated index.html
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
