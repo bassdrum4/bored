@@ -238,5 +238,8 @@ that looks like it was written by one person in an afternoon in 2009 and still w
 ## Deploying
 
 Push to `main`; the workflow deploys `src/` to Pages, so the shipped files are the committed ones.
-Confirm the served copy matches the repo (compare a hash of `src/index.html`) and that the page
-still boots before calling it done.
+Confirm the served copy matches the repo (compare a hash of `src/index.html`), that
+`https://bassdrum4.github.io/bored/version.json` names the commit you pushed — the deploy
+overwrites that file with `$GITHUB_SHA`, which is also the `?v=` stamp on game documents, so a
+stale stamp means the deploy has not landed yet — and that the page still boots before calling it
+done.

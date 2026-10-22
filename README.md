@@ -57,7 +57,11 @@ a preview at `games/previews/<slug>.webp`.
 
 GitHub Pages is set to **Settings → Pages → Source: GitHub Actions**, so the
 deployed root is `src/index.html` byte for byte; there is no top-level
-`index.html` in the repository. Keep that setting — a branch deploy can only
+`index.html` in the repository. Every push to `main` therefore redeploys: the
+workflow writes the commit it published into `src/version.json`, the hub asks for
+game documents with that stamp (`games/content/<slug>.html?v=<commit>`), and
+<https://bassdrum4.github.io/bored/version.json> names the commit that is live —
+so a deploy is easy to confirm and a cached game document cannot outlive one. Keep that setting — a branch deploy can only
 serve the repo root or `/docs`, neither of which is this folder.
 
 If you use Infisical for local secrets, `npm run dev:infisical` wraps the Vite
