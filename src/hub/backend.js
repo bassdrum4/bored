@@ -59,6 +59,9 @@ export function rulesLoaded() {
 function applySession(data) {
   const user = data.user || session?.user;
   if (!user) return null;
+  // A background anonymous user or a different person may have been active.
+  // Display names are strictly account-specific.
+  if (session?.user?.id !== user.id) handle = '';
   session = {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
@@ -238,8 +241,11 @@ export async function signUp(email, password, name) {
     token: API_KEY
   });
   const payload = data.session || data;
-  if (payload.access_token) applySession(payload);
-  return Boolean(session);
+  // A still-active anonymous session is not proof that email signup worked.
+  // An unconfirmed signup returns a user but no new session.
+  const confirmed = Boolean(payload?.access_token && payload?.user && !payload.user.is_anonymous);
+  if (confirmed) applySession(payload);
+  return { confirmed, userId: data.user?.id || payload?.user?.id || null };
 }
 
 export async function signOut() {
