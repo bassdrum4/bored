@@ -9,6 +9,11 @@ silently disappears from scores, the daily challenge, or the build.
 
 ```
 src/main.js              hub wiring: library, player chrome, daily, leaderboard + account UI
+src/hub/library-view.js  game library, filters, preview cards and recent shelf
+src/hub/leaderboard-view.js  leaderboard rendering and fetching
+src/hub/account-ui.js  sign-in and profile dialogs
+src/hub/feedback-ui.js  feedback modal
+src/hub/game-document.js  game HTML and seed injection
 src/hub/backend.js       Supabase request/session layer, score rules, auth helpers
 src/hub/cloud.js         player_state pull/push — the account follows the player across browsers
 src/hub/scores.js        score specs, best capture, sync, ranking
@@ -45,7 +50,8 @@ one; check the table in the Supabase dashboard.
 ```bash
 npm ci                     # once
 npm run dev                # the site at http://localhost:3000, live from src/
-npm test                   # game, discovery and layout suites; needs CHROME_PATH
+npm run games:check        # validate every catalog entry, score rule, preview and hook
+npm test                   # contracts + game, discovery and layout suites; needs CHROME_PATH
 ```
 
 There is no build. `.github/workflows/deploy.yml` uploads `src/` as the GitHub Pages artifact and
@@ -73,10 +79,10 @@ each other. They are not style preferences; each one has already caused a live r
 them directly and push. Nothing rebuilds, re-encodes or copies a page behind your back.
 - **Push ships.** GitHub Pages deploys the committed `src/` folder, so a merge to `main` goes live
   as soon as the workflow finishes. Test before pushing, not after.
-- **The slug is a primary key** repeated in six places: the content file, `catalog.js`, the snapshot,
-  `HIGH_SCORE_GAMES`, `CHALLENGES`, and `score-rules.json` (plus the `score_rules` row). A typo in
-  one place does not throw — the game silently drops out of scoring, the daily or the board.
-  `npm run games:register` reports the drift; run it after touching the catalog.
+- **The slug is a primary key.** Use `npm run games:add` to create it: this scaffolds the document,
+  preview, catalog, discovery metadata, snapshot score capture, and score rule together.
+  `npm run games:check` now fails if any of those pieces drift; `npm run games:register`
+  still checks which database rule rows need to be inserted.
 - **The suite reads source text.** `tests/bored.test.cjs` slices `function name(…)` bodies out of the
   real files and runs them in a VM. Keep any tested function self-contained: a module-level constant
   beside it does not exist in that context. Counts come from the catalog — never hardcode them.
@@ -104,11 +110,11 @@ Scaffold it in one command:
 npm run games:add -- <slug> "<Name>" "<Category>" "<blurb>" [--unit points] [--lower] [--metric field]
 ```
 
-It writes a playable starter, adds the slug to `ORDER` and `META`, records what its score means
-in `src/games/score-rules.json`, and prints the two snippets to paste (the high-score spec and the
-optional daily challenge). Then:
+It writes a playable starter, adds the slug to `ORDER` and `META`, records its metadata and score rule, installs the high-score capture spec automatically, and creates
+an SVG preview placeholder. Daily challenges remain opt-in because their goals need deliberate design. Then:
 
 ```bash
+npm run games:check           # mandatory offline contract validation
 npm run games:register        # give the shared board its score_rules row (--apply needs a key)
 npm test
 ```
@@ -243,3 +249,12 @@ Confirm the served copy matches the repo (compare a hash of `src/index.html`), t
 overwrites that file with `$GITHUB_SHA`, which is also the `?v=` stamp on game documents, so a
 stale stamp means the deploy has not landed yet — and that the page still boots before calling it
 done.
+
+## Source boundaries
+
+The main module coordinates player state and delegates rendering to `src/hub/*-view.js` and
+`src/hub/*-ui.js`. Keep DOM selectors and storage keys literal when refactoring; never do blind
+identifier replacement inside strings, CSS classes, or dataset properties. New games must pass
+`npm run games:check` and the full browser suite. The scaffolder adds the high-score hook;
+manual games must implement `window.__boredSnapshot()` with `{slug, metric, finished}` and a
+matching score spec. `--no-score` explicitly records an intentionally unscored game.
