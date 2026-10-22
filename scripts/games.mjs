@@ -20,6 +20,9 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const catalogPath = join(root, 'src/games/catalog.js');
 const backendPath = join(root, 'src/hub/backend.js');
 const rulesPath = join(root, 'src/games/score-rules.json');
+const discoveryPath = join(root, 'src/games/discovery.js');
+const scoresPath = join(root, 'src/hub/scores.js');
+const previewsDir = join(root, 'src/games/previews');
 const contentDir = join(root, 'src/games/content');
 
 const CATEGORIES = ['Arcade', 'Puzzle', 'Strategy', 'Sandbox', 'Online'];
@@ -106,7 +109,7 @@ function sqlFor(rules) {
 
 /* ── add: scaffold a game and wire it into the catalog ───────────────────── */
 
-const starterGame = ({ slug, name, unit }) => `<!DOCTYPE html>
+const starterGame = ({ slug, name, unit, metric }) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -140,23 +143,26 @@ const starterGame = ({ slug, name, unit }) => `<!DOCTYPE html>
    challenge. Keep persistence try/catch-ed and under "${slug}.…". */
 const $ = selector => document.querySelector(selector);
 const ROUND = 20000;
-let hits = 0, endsAt = 0, timer = 0;
+const UNIT = ${JSON.stringify(unit)};
+let hits = 0, endsAt = 0, timer = 0, finished = false;
 
 function move() {
   const stage = $('#stage').getBoundingClientRect();
   $('#target').style.left = Math.round(Math.random() * (stage.width - 52)) + 'px';
   $('#target').style.top = Math.round(Math.random() * (stage.height - 52)) + 'px';
 }
-function hud(text) { $('#hud').textContent = text || (unit.toUpperCase() + ' ' + hits); }
+function hud(text) { $('#hud').textContent = text || (UNIT.toUpperCase() + ' ' + hits); }
 function finish() {
-  clearTimeout(timer);
+  finished = true;
+  clearInterval(timer);
   $('#target').hidden = true;
   $('#start').hidden = false;
   $('#start').textContent = 'Play again';
-  $('#hint').textContent = 'Final: ' + hits + ' ' + unit + '.';
+  $('#hint').textContent = 'Final: ' + hits + ' ' + UNIT + '.';
   hud();
 }
 function start() {
+  finished = false;
   hits = 0;
   endsAt = Date.now() + ROUND;
   $('#start').hidden = true;
@@ -173,71 +179,87 @@ $('#start').onclick = start;
 $('#target').onclick = () => { hits++; hud(); move(); };
 
 // The hub reads this: integer metrics, the current run, never null.
-window.__boredSnapshot = () => ({ slug: '${slug}', hits });
+window.__boredSnapshot = () => ({ slug: '${slug}', [${JSON.stringify(metric)}]: hits, finished });
 </script>
 </body>
 </html>
 `;
 
-function addGame([slug, name, category, blurb, ...rest], flags) {
-  if (!slug || !name || !category || !blurb) usage('add needs a slug, a name, a category and a blurb');
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) usage('slugs are lower-case letters, digits and dashes');
+function addGame([slug, name, category, blurb], flags) {
+  if (!slug || !name || !category || !blurb) usage('add needs a slug, name, category and blurb');
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) usage('slugs must be lowercase letters, digits and dashes');
   if (!CATEGORIES.includes(category)) usage('unknown category "' + category + '"');
-  if (flags.metric && !/^[A-Za-z_$][\w$]*$/.test(flags.metric)) usage('--metric must be a snapshot field name');
-
+  if (name.length > 80 || blurb.length > 240) usage('name or description is too long');
+  const metric = flags.metric || 'hits';
+  if (!/^[A-Za-z_$][\w$]*$/.test(metric)) usage('--metric must be a snapshot field name');
+  const unit = String(flags.unit || 'points');
+  if (!/^[\w -]{1,28}$/.test(unit)) usage('--unit must be a short printable label');
+  const max = flags.max === undefined ? (unit === 'points' ? 10000000 : 999) : Number(flags.max);
+  if (!Number.isSafeInteger(max) || max < 1) usage('--max must be a positive integer');
+  const noScore = Boolean(flags['no-score']);
+  const lower = Boolean(flags.lower);
   const { entries } = catalogEntries();
   const contentFile = join(contentDir, slug + '.html');
-  if (entries.has(slug)) usage(slug + ' is already in the catalog');
-  if (existsSync(contentFile)) usage(slug + '.html already exists');
-
-  const unit = flags.unit || 'points';
-  const lower = Boolean(flags.lower);
-  const metric = flags.metric || unit.replace(/s$/, '');
-  writeFileSync(contentFile, starterGame({ slug, name, unit }));
+  const previewFile = join(previewsDir, slug + '.svg');
+  if (entries.has(slug) || existsSync(contentFile) || existsSync(previewFile)) usage('game already exists: ' + slug);
 
   const catalog = readFileSync(catalogPath, 'utf8');
-  const metaKey = /^[a-z0-9]+$/.test(slug) ? slug : "'" + slug + "'";
-  const updated = catalog
-    .replace('export const ORDER = [', `export const ORDER = [["${slug}", "${name}"], `)
-    .replace('export const META = {\n', `export const META = {\n  ${metaKey}: ['${category}', '${blurb}'],\n`);
-  if (updated === catalog) usage('could not patch src/games/catalog.js');
-  // The NEW badge holds four games, newest first: this one pushes the oldest off.
-  const fresh = (updated.match(/export const FRESH_GAMES = \[([^\]]*)\]/)?.[1] || '')
-    .match(/'[^']+'/g)?.map(id => id.slice(1, -1)) || [];
-  const nextFresh = [slug, ...fresh.filter(id => id !== slug)].slice(0, 4);
-  writeFileSync(catalogPath, updated.replace(
-    /export const FRESH_GAMES = \[[^\]]*\]/,
-    'export const FRESH_GAMES = [' + nextFresh.map(id => `'${id}'`).join(', ') + ']'
-  ));
-
+  const discovery = readFileSync(discoveryPath, 'utf8');
+  const scores = readFileSync(scoresPath, 'utf8');
   const rules = readJson(rulesPath, {});
-  if (!flags.noScore) {
-    // A new score needs a row in score_rules before the board accepts it, so
-    // record it here and let `register` add it to the backend.
-    rules[slug] = {
-      label: flags.label || (lower ? metric.charAt(0).toUpperCase() + metric.slice(1) : (unit === 'points' ? 'Score' : unit.charAt(0).toUpperCase() + unit.slice(1))),
-      better: lower ? 'low' : 'high',
-      max_value: Number(flags.max) || (unit === 'points' ? 10000000 : 999)
-    };
+  const q = JSON.stringify;
+  const updatedCatalog = catalog
+    .replace('export const ORDER = [', 'export const ORDER = [[' + q(slug) + ', ' + q(name) + '], ')
+    .replace('export const META = {\n', 'export const META = {\n  ' + q(slug) + ': [' + q(category) + ', ' + q(blurb) + '],\n');
+  if (updatedCatalog === catalog) usage('could not insert game metadata into catalog.js');
+  const fresh = (catalog.match(/export const FRESH_GAMES = \[([^\]]*)\]/)?.[1] || '')
+    .match(/['"][^'"]+['"]/g)?.map(id => id.slice(1, -1)) || [];
+  const nextFresh = [slug, ...fresh.filter(id => id !== slug)].slice(0, 4);
+  let nextCatalog = updatedCatalog.replace(
+    /export const FRESH_GAMES = \[[^\]]*\]/,
+    'export const FRESH_GAMES = [' + nextFresh.map(id => q(id)).join(', ') + ']'
+  );
+  if (noScore) nextCatalog = nextCatalog.replace('export const UNSCORED_GAMES = [',
+    'export const UNSCORED_GAMES = [' + q(slug) + ', ');
+  const discoveryAnchor = 'export const DISCOVERY = {\n';
+  const nextDiscovery = discovery.replace(discoveryAnchor,
+    discoveryAnchor + '  ' + q(slug) + ": info('1–3 min', 'Competitive', ['Mouse', 'Touch'], { quick: true }),\n");
+  const previewAnchor = 'export const PREVIEW_FALLBACKS = {';
+  const withPreview = nextDiscovery.replace(previewAnchor, previewAnchor + q(slug) + ": '.svg', ");
+  const scoreAnchor = 'export const HIGH_SCORE_GAMES = [\n';
+  const snippet = '  highScore(' + q(slug) + ', ' + q(name) + ', ' + q(unit) +
+    ', { metric: ' + q(metric) + ', when: snapshot => snapshot.finished === true' +
+    (lower ? ', lower: true' : '') + ' }),\n';
+  const nextScores = noScore ? scores : scores.replace(scoreAnchor, scoreAnchor + snippet);
+  if (!nextCatalog.includes(q(slug)) || withPreview === discovery || (!noScore && nextScores === scores) ||
+      !discovery.includes(discoveryAnchor) || !discovery.includes(previewAnchor) ||
+      (noScore && !catalog.includes('export const UNSCORED_GAMES = ['))) {
+    usage('source structure changed; no files were written (update the generator first)');
+  }
+  if (!noScore) rules[slug] = {
+    label: String(flags.label || (lower ? 'Fewest ' + unit : (unit === 'points' ? 'Score' : unit))),
+    better: lower ? 'low' : 'high', max_value: max
+  };
+
+  // Validate all modifications before writing. Each file is updated once.
+  const starter = starterGame({ slug, name, unit, metric });
+  const escape = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="384" height="240" viewBox="0 0 384 240">' +
+    '<rect width="384" height="240" fill="#f5f2ea"/><rect x="12" y="12" width="360" height="216" rx="12" fill="#fffdf7" stroke="#d8d2c4"/>' +
+    '<text x="192" y="122" text-anchor="middle" font-family="monospace" font-size="22" fill="#191713">' +
+    escape(name.slice(0, 28)) + '</text></svg>\n';
+  writeFileSync(contentFile, starter);
+  writeFileSync(previewFile, svg);
+  writeFileSync(catalogPath, nextCatalog);
+  writeFileSync(discoveryPath, withPreview);
+  if (!noScore) {
+    writeFileSync(scoresPath, nextScores);
     writeFileSync(rulesPath, JSON.stringify(sortObject(rules), null, 2) + '\n');
   }
-
-  console.log(`added ${slug} (${name}) to src/games/content/${slug}.html and the catalog\n`);
-  if (flags.noScore) {
-    console.log('next:\n  npm test               # boots the new game in Chrome\n');
-    return;
-  }
-  console.log(`score: ${rules[slug].label} (${rules[slug].better}, max ${rules[slug].max_value})\n`);
-  console.log(
-    'next:\n' +
-    `  1. src/hub/scores.js — HIGH_SCORE_GAMES, so bests are captured:\n` +
-    `       highScore('${slug}', '${name}', '${unit}', { metric: '${metric}'${lower ? ', lower: true' : ''} }),\n` +
-    `  2. src/daily.js — CHALLENGES, so it can be a daily (optional):\n` +
-    `       { slug: '${slug}', label: 'Short title', goal: 'Reach {target} ${unit} in one run.',\n` +
-    `         metric: '${metric}', targets: [10, 20, 30], unit: '${unit}' },\n` +
-    `  3. npm run games:register   # give the shared board its rule row\n` +
-    `  4. npm test\n`
-  );
+  console.log('Added ' + name + ': HTML game, preview, metadata, discovery and ' +
+    (noScore ? 'explicit unscored status.' : 'snapshot score capture + score rule.'));
+  console.log('Next: npm run games:check && npm test && npm run games:register');
+  console.log('Daily challenges are opt-in: add a CHALLENGES rule in src/daily.js when appropriate.');
 }
 
 function sortObject(object) {

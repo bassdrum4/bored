@@ -79,6 +79,10 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Native Connect Four counts human victories against its AI across the session.
+  highScore('connect-four', 'Connect Four', 'wins', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
+  // Tank2's adapter reports an AI match win when the match ends.
+  highScore('tank2', 'Tank2', 'wins', { metric: 'won', when: snapshot => snapshot.cpu === true }),
   highScore('deep', 'DEEP', 'points', {
     metric: 'score',
     // A descent only counts once it ends: the end-screen score carries the

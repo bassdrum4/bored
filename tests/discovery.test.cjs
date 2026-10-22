@@ -37,7 +37,7 @@ test('discovery reaches nothing off-site, keeps its controls, and fits small scr
     for (const game of catalog) {
       assert.ok(game.meta.minutes && game.meta.pace && game.meta.inputs.length, game.slug);
       assert.ok(game.meta.inputs.every(input => ['Keyboard', 'Mouse', 'Touch'].includes(input)), game.slug);
-      if (!game.online) assert.match(game.preview || '', new RegExp('/previews/' + game.slug + '\\.webp$'), game.slug + ' has a capture file');
+      if (!game.online) assert.match(game.preview || '', new RegExp('/previews/' + game.slug + '\\.(?:webp|svg)$'), game.slug + ' has a preview asset');
     }
     await page.$$eval('#grid img', images => images.forEach(image => image.loading = 'eager'));
     await page.waitForFunction(() => [...document.querySelectorAll('#grid img')].every(image => image.complete && image.naturalWidth > 0));

@@ -149,8 +149,8 @@ function arcadeGame(kind) {
     mode.innerHTML = '<option value="computer">Vs computer</option><option value="friend">Two players</option>';
     $('#actions').appendChild(mode);
     const columns = document.createElement('div'); columns.className = 'columns'; board.before(columns);
-    let cells, turn, over, busy, timer;
-    window.__boredSnapshot = () => ({ slug: kind, won: over && winner(cells, 1) ? 1 : 0, cpu: mode.value === 'computer' });
+    let cells, turn, over, busy, timer, sessionWins = 0;
+    window.__boredSnapshot = () => ({ slug: kind, won: over && winner(cells, 1) ? 1 : 0, wins: sessionWins, cpu: mode.value === 'computer' });
     const columnButtons = Array.from({ length: 7 }, (_, col) => {
       const el = button('↓', () => play(col), columns); el.setAttribute('aria-label', 'Drop in column ' + (col + 1)); return el;
     });
@@ -216,7 +216,7 @@ function arcadeGame(kind) {
     function drop(col) {
       const index = landing(cells, col); if (index < 0) return false;
       cells[index] = turn;
-      if (winner(cells, turn)) { over = true; status.textContent = (turn === 1 ? 'Red' : 'Gold') + ' wins! Play again?'; }
+      if (winner(cells, turn)) { over = true; if (turn === 1 && mode.value === 'computer') sessionWins++; status.textContent = (turn === 1 ? 'Red' : 'Gold') + ' wins! Play again?'; }
       else if (cells.every(Boolean)) { over = true; status.textContent = 'A draw. Good defense on both sides.'; }
       else { turn = 3 - turn; status.textContent = (turn === 1 ? 'Red' : 'Gold') + ' to move.'; }
       draw(); return true;
