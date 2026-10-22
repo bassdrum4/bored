@@ -772,10 +772,15 @@ async function shareDailyResult() {
 
 /* ── Leaderboard ──────────────────────────────────────────────────────────── */
 
+// The catalog keeps its own order for the hub; the scoreboard lists its games
+// A–Z so one is easy to find by name.
+const byGameName = (a, b) =>
+  a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }) || a.id.localeCompare(b.id);
+
 function renderGamePicker() {
   const select = $('#lb-game');
   if (!select) return;
-  const options = boardGames();
+  const options = boardGames().sort(byGameName);
   if (!options.some(game => game.id === lbGameId)) lbGameId = options[0]?.id || 'overall';
   select.replaceChildren();
   for (const game of options) {
@@ -876,9 +881,10 @@ function renderLeaderboard() {
       const detail = element('ul', 'lb-breakdown');
       detail.hidden = !open;
       if (open) {
+        const specOf = id => LB_GAMES.find(game => game.id === id) || { id, name: id };
         const own = all
           .filter(entry => String(entry.handle || '').toLowerCase() === key)
-          .sort((a, b) => LB_GAMES.findIndex(g => g.id === a.game) - LB_GAMES.findIndex(g => g.id === b.game));
+          .sort((a, b) => byGameName(specOf(a.game), specOf(b.game)));
         for (const entry of own) {
           const spec = LB_GAMES.find(g => g.id === entry.game);
           if (!spec) continue;
