@@ -9,3 +9,6 @@ node_modules/
 dist/
 .vite/
 /freebuff-sites-build/
+
+# Local Chrome used to run the browser suite in a sandbox.
+.chrome/

@@ -162,18 +162,29 @@ export function formatScore(value, game) {
 /* ── Capturing a best ──────────────────────────────────────────────────────── */
 
 /**
+ * The number a snapshot would rank on, after `when`/`transform`, or 0 when the
+ * run does not count. The hub uses it both to keep a best and to tell a guest
+ * what they just scored.
+ */
+export function scoreValue(slug, snapshot) {
+  const spec = highScoreSpec.get(slug);
+  if (!spec || !snapshot || snapshot.slug !== slug) return 0;
+  if (spec.when && !spec.when(snapshot)) return 0;
+  const value = spec.transform ? spec.transform(snapshot) : Number(snapshot[spec.metric]);
+  if (!Number.isFinite(value)) return 0;
+  const rounded = Math.round(value);
+  return rounded > 0 ? rounded : 0;
+}
+
+/**
  * Keep a run's best when it beats the stored one. Returns true only when the
  * local best improved, which is also the moment the shared board should learn
  * about it rather than waiting for the player to leave the game.
  */
 export function recordBest(slug, snapshot) {
   const spec = highScoreSpec.get(slug);
-  if (!spec || !snapshot || snapshot.slug !== slug) return false;
-  if (spec.when && !spec.when(snapshot)) return false;
-  let value = spec.transform ? spec.transform(snapshot) : Number(snapshot[spec.metric]);
-  if (!Number.isFinite(value)) return false;
-  value = Math.round(value);
-  if (value <= 0) return false;
+  const value = scoreValue(slug, snapshot);
+  if (!spec || !value) return false;
   const previous = readNumber(spec.key);
   if (previous && (spec.lower ? value >= previous : value <= previous)) return false;
   if (!writeRaw(spec.key, value)) return false;

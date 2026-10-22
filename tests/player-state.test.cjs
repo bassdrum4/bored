@@ -117,37 +117,44 @@ test('browser score and library keys follow their account, not the next person',
   assert.equal(adoptSignupProgress('a11ce'), false);
 });
 
-test('email signup cannot be mistaken for a still-active anonymous account', async () => {
-  let signupType = 'anonymous';
+test('a session saved by the old anonymous sign-in does not come back', () => {
+  const storage = new MemoryStorage();
+  storage.setItem('bored.session', JSON.stringify({
+    access_token: 'anon-token', refresh_token: 'anon-refresh', expires_at: 9999999999,
+    user: { id: 'anon-1', email: null, is_anonymous: true }
+  }));
+  const auth = moduleUnderTest('src/hub/backend.js', ['getSession', 'hasIdentity'], {
+    readStored: (key, fallback) => JSON.parse(storage.getItem(key) || 'null') || fallback,
+    writeStored: (key, value) => { storage.setItem(key, JSON.stringify(value)); return true; },
+    removeStored: key => storage.removeItem(key)
+  });
+  assert.equal(auth.getSession(), null);
+  assert.equal(auth.hasIdentity(), false);
+  assert.equal(storage.getItem('bored.session'), null);
+});
+
+test('an unconfirmed email signup does not touch the account already signed in', async () => {
   const storage = new MemoryStorage();
   const readStored = (key, fallback) => JSON.parse(storage.getItem(key) || 'null') || fallback;
   const writeStored = (key, value) => { storage.setItem(key, JSON.stringify(value)); return true; };
   const removeStored = key => storage.removeItem(key);
   const request = async (url) => {
-    if (url.startsWith('/auth/v1/signup')) {
-      if (signupType === 'anonymous') return {
-        access_token: 'anon-token', refresh_token: 'anon-refresh',
-        user: { id: 'anon-1', is_anonymous: true }
-      };
-      return { user: { id: 'new-1', is_anonymous: false } }; // awaiting email verification
-    }
     if (url.startsWith('/auth/v1/token?grant_type=password'))
-      return { access_token: 'new-token', refresh_token: 'new-refresh',
-        user: { id: 'new-1', is_anonymous: false, email: 'player@test.invalid' } };
+      return { access_token: 'old-token', refresh_token: 'old-refresh',
+        user: { id: 'old-1', is_anonymous: false, email: 'old@test.invalid' } };
+    // An unconfirmed signup returns a user but no session.
+    if (url.startsWith('/auth/v1/signup')) return { user: { id: 'new-1', is_anonymous: false } };
     throw Error('unexpected endpoint ' + url);
   };
   const auth = moduleUnderTest('src/hub/backend.js', [
-    'ensureAnonymousSession', 'signUp', 'signIn', 'getSession', 'getHandle', 'setHandle', 'hasIdentity'
+    'signUp', 'signIn', 'getSession', 'getHandle', 'setHandle', 'hasIdentity'
   ], { readStored, writeStored, removeStored, request,
     location: { protocol: 'https:', origin: 'https://example.com', pathname: '/bored/' } });
-  await auth.ensureAnonymousSession();
-  assert.equal(auth.getSession().user.is_anonymous, true);
-  auth.setHandle('old-guest');
-  signupType = 'email';
+  await auth.signIn('old@test.invalid', 'secretpass');
+  auth.setHandle('old-player');
   const status = await auth.signUp('player@test.invalid', 'secretpass', 'player');
   assert.deepEqual(status, { confirmed: false, userId: 'new-1' });
-  assert.equal(auth.hasIdentity(), false);
-  await auth.signIn('player@test.invalid', 'secretpass');
+  assert.equal(auth.getSession().user.id, 'old-1');
+  assert.equal(auth.getHandle(), 'old-player');
   assert.equal(auth.hasIdentity(), true);
-  assert.equal(auth.getHandle(), '', 'old anonymous name cannot leak to registered user');
 });

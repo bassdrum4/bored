@@ -54,10 +54,19 @@ async function openTitle(slug, title) {
     document.querySelector('#frame')?.contentDocument?.body?.childElementCount > 0, {}, title);
   return (await page.$('#frame')).contentFrame();
 }
-async function close() {
+async function close({ dismissClaim = true } = {}) {
   await page.click('#menu-toggle');
   await page.click('#back');
   await page.waitForFunction(() => document.querySelector('#player').hidden);
+  // Leaving a game with a new guest best opens the account offer, which is a
+  // modal: dismiss it so the next step reaches the hub. Only the offer's own
+  // test keeps it.
+  if (dismissClaim) {
+    await page.evaluate(() => {
+      const dialog = document.querySelector('#claim-dialog');
+      if (dialog.open) dialog.close();
+    });
+  }
 }
 async function restart() {
   await page.click('#menu-toggle');
@@ -235,25 +244,12 @@ test('browser regressions', async t => {
   page.on('pageerror', err => errors.push(err.message));
   await page.setRequestInterception(true);
   // The leaderboard is the only server this page is allowed to reach; the loopback
-  // site that serves it is not an external request. Anonymous sign-ups are
-  // answered here so the suite never creates a real account on the project.
+  // site that serves it is not an external request. Nothing here answers an auth
+  // request on the page's behalf: a guest visit must not create an account on the
+  // project, so no sign-up may leave the browser at all.
   page.on('request', request => {
     const target = request.url();
     if (/^https?:/.test(target) && !target.startsWith(origin)) requests.push(target);
-    if (target.includes('/auth/v1/signup')) {
-      return request.respond({
-        status: 200,
-        contentType: 'application/json',
-        headers: {
-          'access-control-allow-origin': '*', 'access-control-allow-headers': '*',
-          'access-control-allow-methods': 'GET,POST,OPTIONS'
-        },
-        body: JSON.stringify({
-          access_token: 'anon-access', refresh_token: 'anon-refresh', expires_in: 3600,
-          user: { id: 'anon-user', email: null, is_anonymous: true }
-        })
-      });
-    }
     return request.continue();
   });
   await page.evaluateOnNewDocument(() => { Math.random = () => 0; });
@@ -1225,29 +1221,40 @@ test('browser regressions', async t => {
     await restricted.close();
   });
 
-  await t.test('a guest is quietly given an account on their first best, and nothing announces it', async () => {
+  await t.test('a guest plays without an account and is offered the best they just set', async () => {
     await page.evaluate(() => { localStorage.removeItem('bored.high.lights-out'); openGame('lights-out'); });
     await page.waitForFunction(() => document.querySelector('#frame').contentWindow.__boredSnapshot?.().slug === 'lights-out');
     await page.evaluate(() => {
       document.querySelector('#frame').contentWindow.__boredSnapshot = () => ({ slug: 'lights-out', cleared: 3 });
       captureHighScore();
     });
-    // The suite answers the sign-up with a stand-in session rather than a real user.
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('bored.session') || 'null')?.user?.is_anonymous === true);
+    // No account appears in the background, and the strip keeps calling them a guest.
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.session') || 'null')), null);
     assert.equal(await text(page, '#account-state'), 'Playing as a guest. Scores stay in this browser.');
     assert.equal(await text(page, '#account-action'), 'Sign in');
     assert.equal(await page.$eval('#account-rename', el => el.hidden), true);
     assert.equal(await page.$eval('#account-action', el => el.classList.contains('primary')), true);
-    await close();
+    await close({ dismissClaim: false });
+    // Leaving the game names the run they just saved and offers an account for it.
+    await page.waitForFunction(() => document.querySelector('#claim-dialog')?.open === true);
+    assert.equal(await text(page, '#claim-heading'), 'You scored 3 boards in Lights Out.');
+    assert.match(await text(page, '#claim-blurb'), /sign in or create an account to add it to the leaderboard/i);
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.pendingClaim') || 'null')), null,
+      'showing the offer stores nothing; only choosing an account does');
+    await page.click('#claim-signin');
+    await page.waitForFunction(() => document.querySelector('#auth-dialog')?.open === true);
+    assert.equal(await page.$eval('#claim-dialog', dialog => dialog.open), false);
+    assert.equal(await text(page, '#auth-title'), 'Sign in');
+    assert.deepEqual(
+      await page.evaluate(() => JSON.parse(localStorage.getItem('bored.pendingClaim') || 'null')),
+      { slug: 'lights-out', value: 3 },
+      'choosing an account remembers which run was offered'
+    );
+    await page.click('#auth-cancel');
     // The board keeps not pointing at them either.
     await page.click('#lb-refresh');
     await page.waitForFunction(() => document.querySelector('#lb-note').textContent.includes('Players ranked'));
     assert.doesNotMatch(await text(page, '#lb-mine'), /Your account/);
     assert.doesNotMatch(await text(page, '#lb-list'), /\(you\)/);
-    // Signing in stays what the button says it is: an anonymous session must not
-    // turn "Sign in" into "Sign out".
-    await page.click('#account-action');
-    await page.waitForFunction(() => document.querySelector('#auth-dialog')?.open === true);
-    await page.click('#auth-cancel');
   });
 });

@@ -59,11 +59,11 @@ touches a game.
 This repo is edited by several agents at once, so these are the rules that keep them from breaking
 each other. They are not style preferences; each one has already caused a live regression.
 
-- **`hasIdentity()`, never `getSession()`, decides what the interface says.** A guest may hold a
-  background anonymous session (`ensureAnonymousSession`) so their scores reach the server. Any UI
-  that would read "signed in" — the account strip, the board's "(you)" — asks `hasIdentity()`;
-  transport (syncing, pushing state) keeps using `getSession()`. Turning an anonymous session into a
-  visible identity breaks the promise that nothing about it is announced.
+- **`hasIdentity()`, never `getSession()`, decides what the interface says.** There are no
+  anonymous accounts — a guest stays a guest until they sign in or create one — and any UI that
+  would read "signed in" (the account strip, the board's "(you)") asks `hasIdentity()`, while
+  transport keeps using `getSession()`. A guest's best is offered back to them on the hub, so
+  don't make guest scores post, sync or announce themselves before there is an account.
 - **`index.html` is build output.** Never hand-edit it. Edit `src/`, run `npm run build`, commit the
   regenerated file. If two agents both rebuilt it, resolve the conflict by rerunning
   `npm run build` on the merged tree — never by hand-merging that diff.

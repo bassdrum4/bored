@@ -25,7 +25,14 @@ export function backendReady() {
 
 function restoredSession() {
   const saved = readStored(SESSION_KEY, null);
-  return saved && saved.access_token && saved.user ? saved : null;
+  if (!saved || !saved.access_token || !saved.user) return null;
+  // Anonymous accounts are gone. A session an older build left behind must not
+  // come back as a signed-in player.
+  if (saved.user.is_anonymous) {
+    removeStored(SESSION_KEY);
+    return null;
+  }
+  return saved;
 }
 
 export function getSession() {
@@ -33,12 +40,9 @@ export function getSession() {
 }
 
 /**
- * Whether this player has actually named themselves.
- *
- * A guest may still hold an anonymous session — see `ensureAnonymousSession` —
- * and the transport needs that session, but nothing in the interface may say
- * "signed in" because of it. Every UI decision asks this instead of
- * `getSession`.
+ * Whether this player actually has an account of their own. There are no
+ * anonymous accounts any more, so this is simply "signed in", but the guard
+ * stays so a stale token can never make a guest look like a named player.
  */
 export function hasIdentity() {
   return Boolean(session && !session.user?.is_anonymous);
@@ -59,8 +63,8 @@ export function rulesLoaded() {
 function applySession(data) {
   const user = data.user || session?.user;
   if (!user) return null;
-  // A background anonymous user or a different person may have been active.
-  // Display names are strictly account-specific.
+  // A different person may have been active. Display names are strictly
+  // account-specific.
   if (session?.user?.id !== user.id) handle = '';
   session = {
     access_token: data.access_token,
@@ -227,34 +231,6 @@ export function authErrorMessage(err) {
   return message;
 }
 
-// One attempt per page load, ever. Anonymous sign-ins are rate limited per IP,
-// and a school shares one; a refusal has to stay invisible and must not retry.
-let anonymousTried = false;
-
-/**
- * Give a guest an account without asking for one, so their scores and library
- * have a home on the server instead of living in one browser's storage.
- *
- * Nothing announces it: the account strip keeps calling the player a guest, and
- * this resolves to null when the project has anonymous sign-ins turned off, the
- * network is out, or the quota is spent. Callers must treat null as "carry on".
- */
-export async function ensureAnonymousSession() {
-  if (session || !backendReady() || anonymousTried) return null;
-  anonymousTried = true;
-  try {
-    const data = await request('/auth/v1/signup', {
-      method: 'POST',
-      body: { data: { source: 'bored-arcade' } },
-      token: API_KEY
-    });
-    const payload = data.session || data;
-    return payload?.access_token ? applySession(payload) : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function signIn(email, password) {
   const data = await request('/auth/v1/token?grant_type=password', {
     method: 'POST',
@@ -272,9 +248,9 @@ export async function signUp(email, password, name) {
     token: API_KEY
   });
   const payload = data.session || data;
-  // A still-active anonymous session is not proof that email signup worked.
-  // An unconfirmed signup returns a user but no new session.
-  const confirmed = Boolean(payload?.access_token && payload?.user && !payload.user.is_anonymous);
+  // An unconfirmed signup returns a user but no session, so only a payload
+  // carrying both is proof that the account is usable right away.
+  const confirmed = Boolean(payload?.access_token && payload?.user);
   if (confirmed) applySession(payload);
   return { confirmed, userId: data.user?.id || payload?.user?.id || null };
 }

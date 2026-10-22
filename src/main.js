@@ -4,15 +4,15 @@ import {
 import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
 import { nativeHTML } from './games/arcade.js';
 import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, dailyStreak, installDailyAdapter, seedNumber, seedCode, CHALLENGES } from './daily.js';
-import { readStored, writeStored, writeRaw, readStoredPrefix } from './hub/store.js';
+import { readStored, writeStored, writeRaw, removeStored, readStoredPrefix } from './hub/store.js';
 import {
   backendReady, request, getSession, getHandle, setHandle, loadRules, scoreRules, ANON_TOKEN,
   freshSession, ensureProfile, renameHandle, authErrorMessage, suggestedHandle,
-  signIn, signUp, signOut, adoptToken, hasIdentity, ensureAnonymousSession
+  signIn, signUp, signOut, adoptToken, hasIdentity
 } from './hub/backend.js';
 import {
   LB_GAMES, HIGH_SCORE_GAMES, accountStandings, rankPoints, boardGames,
-  isLocalOnly, bestValue, formatScore, recordBest,
+  isLocalOnly, bestValue, formatScore, recordBest, scoreValue,
   syncScores, onScoresPosted
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState } from './hub/cloud.js';
@@ -77,6 +77,11 @@ const lbCache = new Map();
 
 let authMode = 'signin';
 let authBusy = false;
+// A guest's best from the run they just left, held only long enough to offer
+// them an account for it.
+let guestClaim = null;
+let claimOffered = null;
+let claimReturnFocus = null;
 
 /* ── Library: grid, filters, favorites, recent ────────────────────────────── */
 
@@ -385,6 +390,8 @@ function openGame(slug, challenge = null, origin = null) {
 function closeGame() {
   pollDaily();
   captureBest();
+  const claim = guestClaim;
+  guestClaim = null;
   closeMenu();
   loadToken++;
   clearTimeout(hintTimer);
@@ -408,7 +415,11 @@ function closeGame() {
     $(`#recent-list [data-slug="${previousSlug}"]`) ||
     $(`#grid [data-slug="${previousSlug}"]`) || searchInput;
   launchFocus = null;
-  (wasDaily ? $('#daily-play') : returnTo).focus();
+  const target = wasDaily ? $('#daily-play') : returnTo;
+  target.focus();
+  // Back on the hub, a guest who just set a best is offered an account while
+  // the run is still something they can keep.
+  if (claim) offerClaim(claim, target);
 }
 
 function showHint(message) {
@@ -446,22 +457,64 @@ function captureBest() {
   const improved = snapshot ? recordBest(activeSlug, snapshot) : false;
   if (improved) {
     requestCloudPush();
-    quietAccount();
+    // A guest has no account to post under. Remember the run so leaving the
+    // game can offer them one instead of quietly dropping the score.
+    if (!hasIdentity()) {
+      const value = scoreValue(activeSlug, snapshot);
+      if (value && !isLocalOnly(activeSlug)) guestClaim = { slug: activeSlug, value };
+    }
   }
   return improved;
 }
 
-// The first thing worth keeping is the moment a guest gets an account, without
-// being asked to make one. It happens in the background and never changes what
-// the page looks like; if it fails, the arcade simply keeps saving locally.
-function quietAccount() {
-  if (hasIdentity() || !backendReady()) return;
-  ensureAnonymousSession().then(async session => {
-    if (!session) return;
-    await restorePlayerState();
-    syncSharedScores();
-    requestCloudPush();
-  }).catch(() => { /* No account this visit. Nothing to report. */ });
+/* A guest's run, offered back to them on the hub. Nothing is posted until they
+ * have an account, and only the score they were just shown is carried over. */
+
+const CLAIM_KEY = 'bored.pendingClaim';
+
+function offerClaim(claim, returnTo) {
+  const spec = LB_GAMES.find(game => game.id === claim.slug);
+  if (!spec || !backendReady()) return;
+  claimOffered = claim;
+  claimReturnFocus = returnTo;
+  $('#claim-heading').textContent = 'You scored ' + formatScore(claim.value, spec) + ' in ' + spec.name + '.';
+  const dialog = $('#claim-dialog');
+  if (!dialog.open) {
+    if (dialog.showModal) dialog.showModal();
+    else dialog.setAttribute('open', '');
+  }
+}
+
+function closeClaimDialog({ restoreFocus = true } = {}) {
+  const dialog = $('#claim-dialog');
+  if (dialog.close) dialog.close();
+  else dialog.removeAttribute('open');
+  claimOffered = null;
+  if (restoreFocus && claimReturnFocus?.isConnected) claimReturnFocus.focus();
+  claimReturnFocus = null;
+}
+
+// Sign in or sign up from the offer. The claim is saved first so the dialog can
+// be dismissed, or the page reloaded, without losing which score was promised.
+function startClaimAuth(mode) {
+  const claim = claimOffered;
+  if (claim) writeStored(CLAIM_KEY, claim);
+  closeClaimDialog({ restoreFocus: false });
+  openAuthDialog(mode);
+}
+
+/** Give a claimed run to the account that just signed in, if it is still better. */
+function applyPendingClaim() {
+  const claim = readStored(CLAIM_KEY, null);
+  if (!claim || !hasIdentity() || !claim.slug || !(claim.value > 0)) return false;
+  removeStored(CLAIM_KEY);
+  const spec = LB_GAMES.find(game => game.id === claim.slug);
+  if (!spec || !spec.key || isLocalOnly(spec.id)) return false;
+  const previous = bestValue(spec);
+  if (previous && (spec.lower ? previous <= claim.value : previous >= claim.value)) return false;
+  if (!writeRaw(spec.key, claim.value)) return false;
+  requestCloudPush();
+  return true;
 }
 
 async function syncSharedScores() {
@@ -928,7 +981,7 @@ async function loadLeaderboard(force = false) {
 /* ── Account ──────────────────────────────────────────────────────────────── */
 
 function renderAccount() {
-  const anonymous = !hasIdentity();
+  const guest = !hasIdentity();
   const state = $('#account-state');
   const action = $('#account-action');
   const rename = $('#account-rename');
@@ -940,9 +993,7 @@ function renderAccount() {
     return;
   }
   action.hidden = false;
-  // A guest who holds a background anonymous session reads exactly as a guest
-  // does; nothing about the account strip changes until they name themselves.
-  if (!anonymous) {
+  if (!guest) {
     state.append('Signed in as ', element('b', '', getHandle() || suggestedHandle()),
       lbNotice ? ' · ' + lbNotice : '. Best scores sync to the shared board.');
     action.textContent = 'Sign out';
@@ -1094,6 +1145,8 @@ async function submitAuth(event) {
       }
       activateProfile();
       adoptSignupProgress(result.userId, guest);
+      // The guest profile carried the run already; this only clears the offer.
+      applyPendingClaim();
       loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
     } else {
       await signIn(email, password);
@@ -1103,6 +1156,8 @@ async function submitAuth(event) {
       if (adoptSignupProgress(getSession()?.user?.id)) {
         loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
       }
+      // A run the guest chose to keep when offered an account.
+      applyPendingClaim();
     }
     lbNotice = '';
     closeAuthDialog();
@@ -1152,6 +1207,7 @@ async function consumeAuthRedirect() {
     if (adoptSignupProgress(getSession()?.user?.id)) {
       loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
     }
+    applyPendingClaim();
     lbNotice = '';
     renderAccount();
     renderLeaderboard();
@@ -1183,6 +1239,12 @@ function initAccount() {
     };
   }
   $('#lb-refresh').onclick = () => loadLeaderboard(true);
+  $('#claim-signin').onclick = () => startClaimAuth('signin');
+  $('#claim-signup').onclick = () => startClaimAuth('signup');
+  $('#claim-cancel').onclick = () => closeClaimDialog();
+  $('#claim-dialog').addEventListener('click', event => {
+    if (event.target === $('#claim-dialog')) closeClaimDialog();
+  });
   $('#account-action').onclick = () => { if (hasIdentity()) signOutUser(); else openAuthDialog('signin'); };
   $('#account-rename').onclick = () => openAuthDialog('name');
   $('#auth-cancel').onclick = closeAuthDialog;

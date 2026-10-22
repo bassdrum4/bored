@@ -76,37 +76,39 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
 .lb-tab[aria-selected="true"]{background:var(--ink);color:var(--paper)}
 #lb-pick[hidden]{display:none}
 #lb-game{background:var(--paper);color:var(--ink);border:1px solid var(--rule);font:11px var(--mono);padding:6px;max-width:210px}
-#lb-note{font:11px/1.6 var(--mono);color:var(--dim);margin-bottom:10px}
+#lb-note{font:11px/1.7 var(--mono);color:var(--dim);margin-bottom:14px}
 #lb-list{list-style:none}
 #lb-list li{display:block;border-bottom:1px solid var(--rule)}
 #lb-list li:last-child{border-bottom:0}
-.lb-row{display:flex;gap:10px;align-items:baseline;width:100%;padding:7px 0;border:0;
+.lb-row{display:flex;gap:14px;align-items:baseline;width:100%;padding:11px 0;border:0;
   background:none;color:inherit;font:14px var(--sans,inherit);text-align:left;cursor:pointer;border-radius:0}
 .lb-row:hover .lb-name,.lb-row:focus-visible .lb-name{text-decoration:underline;text-underline-offset:2px}
 .lb-row:focus-visible{outline:1px solid var(--ink);outline-offset:2px}
-#lb-list .lb-rank{font:11px var(--mono);color:var(--dim);min-width:2.2ch}
-#lb-list .lb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lb-list .lb-rank{font:11px/1.6 var(--mono);color:var(--dim);min-width:2.2ch}
+#lb-list .lb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
 #lb-list .lb-score{font:12px var(--mono);white-space:nowrap}
-#lb-list .lb-player-meta{display:block;font:10px/1.6 var(--mono);color:var(--dim);overflow:hidden;text-overflow:ellipsis}
+#lb-list .lb-player-meta{display:block;font:10px/1.7 var(--mono);color:var(--dim);margin-top:4px;overflow:hidden;text-overflow:ellipsis}
 #lb-list li.you .lb-name{color:var(--red)}
-.lb-breakdown{list-style:none;margin:0 0 8px 3.4ch;padding:0;border-left:1px solid var(--rule)}
+.lb-breakdown{list-style:none;margin:0 0 12px 3.4ch;padding:0;border-left:1px solid var(--rule)}
 .lb-breakdown[hidden]{display:none}
-.lb-breakdown li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:3px 0 3px 10px;
-  border:0;font:11px/1.5 var(--mono);color:var(--dim)}
+.lb-breakdown li{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;padding:7px 0 7px 12px;
+  border:0;font:11px/1.7 var(--mono);color:var(--dim)}
 .lb-line-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim)}
 .lb-line-score{white-space:nowrap;color:var(--ink)}
 /* The comparison wraps under the game on a phone, where one line cannot hold it. */
-.lb-line-you{flex:1 1 100%;font:10px/1.5 var(--mono);color:var(--dim)}
+.lb-line-you{flex:1 1 100%;font:10px/1.7 var(--mono);color:var(--dim);margin-top:2px}
 .lb-play{background:none;border:1px solid var(--rule);color:var(--dim);font:10px var(--mono);
   padding:2px 7px;cursor:pointer;white-space:nowrap}
 .lb-play:hover,.lb-play:focus-visible{border-color:var(--ink);color:var(--ink)}
 .lb-play:focus-visible{outline:1px solid var(--ink);outline-offset:2px}
-#lb-mine{margin-top:10px;font:11px/1.7 var(--mono);color:var(--dim)}
+#lb-mine{margin-top:14px;font:11px/1.7 var(--mono);color:var(--dim)}
 #lb-empty{padding:12px 0;color:var(--dim);font-style:italic;font-size:14px}
 dialog{border:1px solid var(--ink);background:var(--paper);color:var(--ink);max-width:min(420px,calc(100vw - 32px));padding:22px;font:14px/1.5 Georgia,"Times New Roman",serif}
 dialog::backdrop{background:rgba(25,23,19,.55)}
 dialog h2{font-size:24px;font-weight:400;margin-bottom:4px}
 #auth-blurb{font-size:13px;color:var(--dim);margin-bottom:14px}
+#claim-blurb{font-size:13px;color:var(--dim);margin-bottom:16px}
+#claim-signin{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 #auth-form label{display:block;font:10.5px var(--mono);color:var(--dim);margin-bottom:10px}
 #auth-form input{display:block;width:100%;margin-top:4px;padding:8px;background:#fff9ed;border:1px solid var(--rule);font:13px var(--mono);color:var(--ink);border-radius:0}
 #auth-form input:focus{outline:2px solid var(--red);outline-offset:1px}

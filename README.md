@@ -218,8 +218,8 @@ cross-origin game state (and Klang is a music player).
 
 ## Shared leaderboard (optional)
 
-Sign in with an email and password to keep your best scores on a shared board and
-see how other players are doing. The leaderboard has two views. **By player**
+Sign in with an email and password to keep your best scores on a shared board
+and see how other players are doing. The leaderboard has two views. **By player**
 ranks accounts: 5 points for first place in a game, 4 for second, down to 1 for
 fifth, ties sharing points, so no game's raw units get added to another's. Only
 the top five in each game score — with a board this small, tenth place was
@@ -254,25 +254,16 @@ The table is created by [`scripts/player-state.sql`](scripts/player-state.sql),
 which is safe to re-run from the SQL editor. Until it exists, or whenever the
 network is out, the hub keeps its local copy and play never depends on it.
 
-### Guests are quietly given an account
+### Guests keep the score they just earned
 
-Nobody is ever asked to make one. The first time a visitor keeps something worth
-keeping — a personal best — the hub opens an account in the background
-(`ensureAnonymousSession` in [`src/hub/backend.js`](src/hub/backend.js)) and their
-scores and library start syncing. Nothing announces it: the account strip still
-reads "Playing as a guest", the board still does not mark their row, and "Sign
-in" still means sign in. The only visible difference is that their name shows up
-on the leaderboard like everybody else's.
-
-This needs **Authentication → Sign In / Providers → Allow anonymous sign-ins**
-turned on. Until it is, the request fails, the failure is swallowed, and the
-arcade keeps saving locally — so shipping the code before flipping the switch is
-safe. Anonymous sign-ins are rate limited per IP (30 an hour by default), so the
-hub makes at most one attempt per page load.
-
-An anonymous account is only reachable from the browser that created it. If the
-player signs in or registers later, their scores carry across to the named
-account, but the anonymous account and its name stay on the board.
+There are no anonymous accounts: a guest plays under the guest profile in this
+browser, and nothing is posted to the shared board until they sign in or create
+an account. When a guest leaves a game that they just set a best in, the hub says
+what they scored and offers them an account — "You scored 500 points in
+Asteroids" — with **Sign in**, **Create an account** and **Not now**. The offer
+names only that run: choosing an account carries that best over and syncs it, so
+the score is not lost by signing in later. Creating an account still adopts the
+whole guest profile; signing into an existing account takes only the offered run.
 
 Set **Authentication → URL Configuration → Site URL** to the deployed address
 (`https://bassdrum4.github.io/bored/`) and add that address to **Redirect URLs**.
