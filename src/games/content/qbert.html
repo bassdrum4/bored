@@ -63,43 +63,90 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
         // ═══════════════════ AUDIO ═══════════════════
         let audioCtx;
-        function snd(freq, dur, type = 'square', vol = 0.05) {
+        function snd(freq, dur, type = 'square', vol = 0.05, to) {
             if (!audioCtx) return;
             try {
                 const o = audioCtx.createOscillator();
                 const g = audioCtx.createGain();
-                o.type = type; o.frequency.value = freq;
+                const t = audioCtx.currentTime;
+                o.type = type; o.frequency.setValueAtTime(freq, t);
+                if (to) o.frequency.exponentialRampToValueAtTime(Math.max(30, to), t + dur);
                 g.gain.value = vol;
-                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+                g.gain.exponentialRampToValueAtTime(0.001, t + dur);
                 o.connect(g).connect(audioCtx.destination);
-                o.start(); o.stop(audioCtx.currentTime + dur);
+                o.start(t); o.stop(t + dur);
             } catch (e) { }
         }
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
 
-        // ═══════════════════ CONSTANTS ═══════════════════
-        const ROWS = 7;
-        const CW = 28, CH = 14, CD = 20;
-        const PX = 300, PY = 150;
-        const SPX = CW * 2, SPY = CH + CD;
+        // ═══════════════════ BOARD GEOMETRY ═══════════════════
+        const CW = 28, CH = 14, CD = 20;      // cube half-width, face height, depth
+        const SPX = CW * 2, SPY = CH + CD;    // spacing between cube centres
+        const PX = 300;
         const JDUR = 0.2, JH = 48;
         const PR = 12, ER = 10;
 
-        // Enemy type constants
-        const E_RED = 0, E_EGG = 1, E_COILY = 2, E_SLICK = 3, E_SAM = 4;
+        let ROWS = 7, PY = 146;
 
-        // Level color schemes cycling every 4 levels
-        const SCHEMES = [
-            { rounds: 1, c: [{ t: '#2858a8', l: '#1a3870', r: '#3878d0' }, { t: '#eebb00', l: '#aa8800', r: '#ffdd44' }] },
-            { rounds: 2, c: [{ t: '#2858a8', l: '#1a3870', r: '#3878d0' }, { t: '#eebb00', l: '#aa8800', r: '#ffdd44' }, { t: '#2858a8', l: '#1a3870', r: '#3878d0' }] },
-            { rounds: 2, c: [{ t: '#2858a8', l: '#1a3870', r: '#3878d0' }, { t: '#7733bb', l: '#4a1f77', r: '#9955dd' }, { t: '#eebb00', l: '#aa8800', r: '#ffdd44' }] },
-            { rounds: 1, c: [{ t: '#1e8e3e', l: '#145528', r: '#30b058' }, { t: '#dd6611', l: '#994408', r: '#ff8833' }] }
+        // A taller pyramid sits higher so every level is centred on the same band.
+        function setBoard(rows) {
+            ROWS = Math.max(4, Math.min(7, rows));
+            PY = 146 + (7 - ROWS) * (SPY / 2);
+        }
+
+        const gp = (r, c) => ({ x: PX + (c - r / 2) * SPX, y: PY + r * SPY });
+
+        // ═══════════════════ PALETTES ═══════════════════
+        const P = {
+            blue: { t: '#2858a8', l: '#1a3870', r: '#3878d0' },
+            yellow: { t: '#eebb00', l: '#aa8800', r: '#ffdd44' },
+            purple: { t: '#7733bb', l: '#4a1f77', r: '#9955dd' },
+            green: { t: '#1e8e3e', l: '#145528', r: '#30b058' },
+            orange: { t: '#dd6611', l: '#994408', r: '#ff8833' },
+            teal: { t: '#0f8a8a', l: '#075656', r: '#1fb8b8' }
+        };
+
+        // ═══════════════════ LEVELS ═══════════════════
+        // Each level changes the board size, the number of colour passes and the
+        // enemies that show up, so the run is a real climb rather than one board
+        // with a bigger number in the corner. After the authored levels the
+        // generator keeps going with faster hops and fewer discs.
+        const ALL_TYPES = ['red', 'egg', 'slick', 'sam'];
+
+        const LEVELS = [
+            { name: 'First Steps', rows: 5, paint: [P.blue, P.yellow], discs: 4, spawn: 3.4, speed: 1.00, types: ['red'] },
+            { name: 'Two-Way Traffic', rows: 6, paint: [P.blue, P.yellow], discs: 4, spawn: 3.0, speed: 1.00, types: ['red', 'egg'] },
+            { name: 'Double Dip', rows: 6, paint: [P.blue, P.purple, P.yellow], discs: 4, spawn: 2.7, speed: 1.05, types: ['red', 'egg'] },
+            { name: 'Slick Work', rows: 7, paint: [P.green, P.orange], discs: 4, spawn: 2.4, speed: 1.05, types: ['red', 'slick', 'sam'] },
+            { name: 'Coily Nest', rows: 7, paint: [P.blue, P.yellow], discs: 3, spawn: 2.1, speed: 1.10, types: ['red', 'egg', 'slick'] },
+            { name: 'Triple Play', rows: 7, paint: [P.blue, P.yellow, P.purple, P.green], discs: 3, spawn: 1.9, speed: 1.15, types: ALL_TYPES },
+            { name: 'The Gauntlet', rows: 7, paint: [P.orange, P.teal], discs: 2, spawn: 1.5, speed: 1.25, types: ALL_TYPES },
+            { name: 'Last Hop', rows: 7, paint: [P.purple, P.yellow, P.blue], discs: 2, spawn: 1.25, speed: 1.35, types: ALL_TYPES }
         ];
 
-        // Disc definitions (side + row Q*bert jumps from)
-        const DDEFS = [
-            { side: 'left', row: 1 }, { side: 'right', row: 2 },
-            { side: 'left', row: 4 }, { side: 'right', row: 5 }
+        const ENDLESS_PAINTS = [
+            [P.blue, P.yellow], [P.yellow, P.purple], [P.green, P.orange],
+            [P.blue, P.purple, P.yellow], [P.teal, P.orange],
+            [P.purple, P.green, P.blue, P.yellow]
         ];
+
+        function levelDefFor(n) {
+            if (LEVELS[n - 1]) return LEVELS[n - 1];
+            const i = n - LEVELS.length - 1;
+            const paint = ENDLESS_PAINTS[i % ENDLESS_PAINTS.length];
+            return {
+                name: 'Endless ' + n,
+                rows: 7,
+                paint,
+                discs: 2,
+                spawn: Math.max(0.9, 1.3 - i * 0.02),
+                speed: Math.min(1.8, 1.4 + i * 0.04),
+                types: ALL_TYPES
+            };
+        }
 
         // Background stars
         const STARS = Array.from({ length: 80 }, () => ({
@@ -108,19 +155,14 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         }));
 
         // ═══════════════════ STATE ═══════════════════
-        let state, tmr, grid, pl, jmp, dth, enemies, discs;
-        let score, lives, gameLvl, scheme, curRound, maxRounds;
-        let eTmr, ride, lastT = 0, nextExtraLife = 8000;
-        let particles = [];
+        let state, tmr, grid, pl, jmp, dth, enemies, discs, ride;
+        let score, lives, gameLvl, paint, curRound, maxRounds, streak;
+        let eTmr, lastT = 0, nextExtraLife = 8000, paused = false, banner = '';
+        let spawnEvery = 3, enemySpeed = 1, spawnTypes = ['red'];
+        let particles = [], pops = [];
 
-        // ═══════════════════ HELPERS ═══════════════════
-        const gp = (r, c) => ({ x: PX + (c - r / 2) * SPX, y: PY + r * SPY });
+        // ═══════════════════ SMALL HELPERS ═══════════════════
         const lp = (a, b, t) => a + (b - a) * t;
-
-        function discVisualPos(d) {
-            if (d.side === 'left') return gp(d.row - 1, -1);
-            else return gp(d.row - 1, d.row);
-        }
 
         function emitParticles(x, y, col) {
             for (let i = 0; i < 6; i++) {
@@ -135,37 +177,79 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             }
         }
 
-        // ═══════════════════ INITIALIZATION ═══════════════════
+        function addPop(x, y, text, col) {
+            pops.push({ x, y, text, col, life: 0.9, max: 0.9 });
+        }
+
+        function countLeft() {
+            let n = 0;
+            for (let r = 0; r < ROWS; r++)
+                for (let c = 0; c <= r; c++)
+                    if (grid[r][c] < curRound) n++;
+            return n;
+        }
+
+        function maxEnemies() {
+            return Math.min(5, 1 + Math.floor(gameLvl / 2) + (curRound - 1));
+        }
+
+        // ═══════════════════ INITIALISATION ═══════════════════
         function init() {
-            state = 'title'; tmr = 0;
-            score = 0; lives = 3; gameLvl = 1; nextExtraLife = 8000;
-            scheme = SCHEMES[0];
+            state = 'title'; tmr = 0; paused = false;
+            score = 0; lives = 3; gameLvl = 1; nextExtraLife = 8000; streak = 0;
+            setBoard(7);
+            paint = [P.blue, P.yellow];
+            maxRounds = 1; curRound = 1; banner = '';
             grid = Array.from({ length: ROWS }, (_, r) => Array(r + 1).fill(0));
             pl = null; enemies = []; discs = [];
             jmp = null; dth = null; ride = null;
-            particles = [];
+            particles = []; pops = [];
+        }
+
+        function newGame() {
+            score = 0; lives = 3; gameLvl = 1; nextExtraLife = 8000;
+            startLevel();
         }
 
         function startLevel() {
-            scheme = SCHEMES[(gameLvl - 1) % SCHEMES.length];
-            maxRounds = scheme.rounds;
+            const def = levelDefFor(gameLvl);
+            setBoard(def.rows);
+            paint = def.paint;
+            maxRounds = Math.min(3, paint.length - 1);
             curRound = 1;
+            spawnEvery = def.spawn;
+            enemySpeed = def.speed;
+            spawnTypes = def.types;
             grid = Array.from({ length: ROWS }, (_, r) => Array(r + 1).fill(0));
             pl = { r: 0, c: 0, x: 0, y: 0 };
             jmp = null; dth = null; ride = null;
-            enemies = [];
-            initDiscs();
-            eTmr = Math.max(1.5, 3.0 - gameLvl * 0.12);
-            particles = [];
+            enemies = []; particles = []; pops = [];
+            streak = 0; paused = false;
+            initDiscs(def.discs);
+            eTmr = 0.8;
             setPPos();
-            state = 'ready'; tmr = 1.5;
+            state = 'ready'; tmr = 1.8;
+            banner = def.name;
         }
 
-        function initDiscs() {
-            discs = DDEFS.map((d, i) => ({
-                side: d.side, row: d.row,
-                active: i < 2, respawnTmr: 0
+        // Discs sit on the sides of the pyramid and ferry Q*bert back to the top.
+        function initDiscs(count) {
+            const last = ROWS - 2;
+            let rows;
+            if (count >= 4) rows = [1, Math.max(2, Math.round(last * 0.45)), Math.max(3, Math.round(last * 0.75)), last];
+            else if (count === 3) rows = [1, Math.max(2, Math.round(last * 0.55)), last];
+            else rows = [Math.max(1, Math.round(last * 0.4)), last];
+            rows = [...new Set(rows)].sort((a, b) => a - b);
+            discs = rows.map((row, i) => ({
+                side: i % 2 === 0 ? 'left' : 'right',
+                row,
+                active: true,
+                respawnTmr: 0
             }));
+        }
+
+        function discVisualPos(d) {
+            return d.side === 'left' ? gp(d.row - 1, -1) : gp(d.row - 1, d.row);
         }
 
         function setPPos() {
@@ -181,11 +265,11 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
         // ═══════════════════ MOVEMENT ═══════════════════
         function tryMove(dr, dc) {
-            if (state !== 'playing' || jmp || dth || ride) return;
+            if (state !== 'playing' || paused || jmp || dth || ride) return;
             const nr = pl.r + dr, nc = pl.c + dc;
 
             if (nr < 0 || nr >= ROWS || nc < 0 || nc > nr) {
-                // Off grid — check for disc
+                // Off the pyramid: is there a disc on this side of this row?
                 if (dr === -1) {
                     let ds = null;
                     if (dc === -1 && nc < 0) {
@@ -206,63 +290,77 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             const p = gp(pl.r, pl.c);
             pl.x = p.x; pl.y = p.y - PR;
 
-            // Advance cube color toward current round target
-            const target = curRound;
-            let flipped = false;
-            if (grid[pl.r][pl.c] < target) {
+            if (grid[pl.r][pl.c] < curRound) {
                 grid[pl.r][pl.c]++;
-                score += 25;
-                flipped = true;
-                const col = scheme.c[Math.min(grid[pl.r][pl.c], scheme.c.length - 1)];
+                streak++;
+                const mult = 1 + Math.min(3, Math.floor(streak / 6));
+                const pts = 25 * mult;
+                score += pts;
+                addPop(p.x, p.y + 2, '+' + pts, mult > 1 ? '#ffcc00' : '#dfe4ff');
+                const col = paint[Math.min(grid[pl.r][pl.c], paint.length - 1)];
                 emitParticles(p.x, p.y + CH, col.t);
-                snd(600, 0.08);
+                snd(480 + Math.min(streak, 14) * 20, 0.06);
             } else {
-                snd(400, 0.06);
+                snd(330, 0.04);
             }
 
-            // Check enemy collision at landing position
+            // Landing on a cube an enemy occupies
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const e = enemies[i];
-                if (e.r === pl.r && e.c === pl.c) {
-                    if (e.type === E_SLICK || e.type === E_SAM) {
-                        enemies.splice(i, 1);
-                        score += 300;
-                        snd(800, 0.1);
-                        return;
-                    }
-                    doDie(); return;
+                if (e.r !== pl.r || e.c !== pl.c) continue;
+                if (e.type === 'slick' || e.type === 'sam') {
+                    enemies.splice(i, 1);
+                    score += 300;
+                    addPop(p.x, p.y - 18, '+300', '#88ffaa');
+                    emitParticles(e.x, e.y, '#c8ffd8');
+                    snd(780, 0.09);
+                    // This landing still painted the cube, so it can still clear the board.
+                    checkClear();
+                    return;
                 }
+                doDie(); return;
             }
 
-            // Check round/level win
-            if (chkWin()) {
-                if (curRound < maxRounds) {
-                    curRound++;
-                    state = 'roundclear'; tmr = 1.5;
-                    score += 1000;
-                    snd(800, 0.1);
-                    setTimeout(() => snd(1000, 0.1), 100);
-                } else {
-                    state = 'win'; tmr = 2.5;
-                    score += 1000 + gameLvl * 250;
-                    snd(800, 0.15);
-                    setTimeout(() => snd(1000, 0.12), 120);
-                    setTimeout(() => snd(1200, 0.15), 240);
-                }
-            }
+            checkClear();
         }
 
-        function chkWin() {
-            const target = curRound;
-            for (let r = 0; r < ROWS; r++)
-                for (let c = 0; c <= r; c++)
-                    if (grid[r][c] < target) return false;
-            return true;
+        function resetToTop() {
+            pl.r = 0; pl.c = 0;
+            jmp = null; dth = null; ride = null;
+            enemies = [];
+            setPPos();
+        }
+
+        function checkClear() {
+            if (countLeft() > 0) return;
+
+            if (curRound < maxRounds) {
+                curRound++;
+                streak = 0;
+                score += 1000;
+                addPop(PX, PY + 110, 'ROUND CLEAR +1000', '#7dffa0');
+                snd(700, 0.09);
+                setTimeout(() => snd(900, 0.1), 100);
+                resetToTop();
+                eTmr = 1.2;
+                state = 'ready'; tmr = 1.3;
+                banner = 'ROUND ' + curRound;
+                return;
+            }
+
+            const bonus = 1000 + gameLvl * 250;
+            score += bonus;
+            addPop(PX, PY + 110, 'LEVEL CLEAR +' + bonus, '#7dffa0');
+            snd(700, 0.1);
+            setTimeout(() => snd(920, 0.1), 110);
+            setTimeout(() => snd(1180, 0.14), 220);
+            state = 'win'; tmr = 2.2;
         }
 
         // ═══════════════════ DEATH ═══════════════════
         function doDie(fdr, fdc) {
             state = 'dying';
+            streak = 0;
             const p = gp(pl.r, pl.c);
             const isFall = fdr !== undefined;
             dth = {
@@ -271,13 +369,13 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 vy: isFall ? -100 : -200,
                 rot: 0, rs: (Math.random() - 0.5) * 10, t: 0
             };
-            snd(200, 0.3, 'sawtooth');
+            snd(220, 0.32, 'sawtooth', 0.07, 60);
         }
 
         // ═══════════════════ DISC RIDE ═══════════════════
         function startRide(disc) {
             disc.active = false;
-            disc.respawnTmr = 12 + Math.random() * 6;
+            disc.respawnTmr = 11 + Math.random() * 5;
             const dp = discVisualPos(disc);
             const tp = gp(0, 0);
             ride = {
@@ -286,8 +384,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 dx: dp.x, dy: dp.y - PR,
                 ex: tp.x, ey: tp.y - PR
             };
-            score += 50;
-            snd(500, 0.1);
+            snd(520, 0.09, 'triangle', 0.05, 900);
         }
 
         function updateRide(dt) {
@@ -306,39 +403,49 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                     pl.r = 0; pl.c = 0;
                     pl.x = ride.ex; pl.y = ride.ey;
                     ride = null;
-                    // Riding disc clears Coily
-                    enemies = enemies.filter(e => e.type !== E_COILY && e.type !== E_EGG);
-                    snd(400, 0.06);
+                    enemies = enemies.filter(e => e.type !== 'coily' && e.type !== 'egg');
+                    score += 100;
+                    addPop(pl.x, pl.y - 22, '+100', '#ff9ce6');
+                    snd(420, 0.07);
                 }
             }
         }
 
         // ═══════════════════ ENEMIES ═══════════════════
         function spawnEnemy() {
-            const maxE = Math.min(5, 2 + Math.floor(gameLvl / 2));
-            if (enemies.length >= maxE) return;
+            if (enemies.length >= maxEnemies()) return;
+            const hasCoily = enemies.some(e => e.type === 'egg' || e.type === 'coily');
+            const pool = [];
+            for (const t of spawnTypes) {
+                if (t === 'egg' && hasCoily) continue;
+                const weight = t === 'red' ? 3 : t === 'egg' ? 2 : 1;
+                for (let i = 0; i < weight; i++) pool.push(t);
+            }
+            if (!pool.length) return;
 
-            const hasCoily = enemies.some(e => e.type === E_EGG || e.type === E_COILY);
-            let type;
-            if (!hasCoily && Math.random() < 0.4) type = E_EGG;
-            else if (gameLvl >= 2 && Math.random() < 0.3) type = Math.random() < 0.5 ? E_SLICK : E_SAM;
-            else type = E_RED;
-
+            const type = pool[Math.floor(Math.random() * pool.length)];
             const c = Math.random() < 0.5 ? 0 : 1;
             const p = gp(1, c);
-            const baseSpeed = type === E_EGG ? 0.85 : (type === E_SLICK || type === E_SAM) ? 0.7 : 0.75;
             enemies.push({
-                type, r: 1, c, dir: Math.random() < 0.5 ? 0 : 1,
-                mt: 0, mi: Math.max(0.38, baseSpeed - gameLvl * 0.018),
+                type, r: 1, c,
+                dir: Math.random() < 0.5 ? 0 : 1,
+                mt: 0, mi: enemyInterval(type),
                 x: p.x, y: p.y - ER
             });
         }
 
+        function enemyInterval(type) {
+            const base = type === 'egg' ? 0.9
+                : type === 'coily' ? 0.85
+                    : (type === 'slick' || type === 'sam') ? 0.72 : 0.8;
+            return base / enemySpeed;
+        }
+
         function updateEnemies(dt) {
             eTmr -= dt;
-            if (eTmr <= 0 && state === 'playing') {
+            if (eTmr <= 0) {
                 spawnEnemy();
-                eTmr = Math.max(1.0, 3.0 - gameLvl * 0.12);
+                eTmr = spawnEvery * (0.85 + Math.random() * 0.4);
             }
 
             for (let i = enemies.length - 1; i >= 0; i--) {
@@ -348,7 +455,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                     e.mt -= e.mi;
                     let nr, nc;
 
-                    if (e.type === E_COILY) {
+                    if (e.type === 'coily') {
                         const m = coilyMove(e);
                         if (!m) { enemies.splice(i, 1); continue; }
                         nr = m.r; nc = m.c;
@@ -356,35 +463,40 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                         nr = e.r + 1;
                         nc = e.c + e.dir;
                         if (nr >= ROWS || nc < 0 || nc > nr) {
-                            if (e.type === E_EGG && e.r >= ROWS - 1) {
-                                e.type = E_COILY;
-                                e.mi = Math.max(0.45, 0.85 - gameLvl * 0.018);
-                                continue;
-                            }
+                            // An egg that runs out of room at the bottom hatches there
+                            // and starts hunting instead of falling away.
+                            if (e.type === 'egg' && e.r >= ROWS - 1) { hatch(e); continue; }
                             enemies.splice(i, 1); continue;
                         }
                     }
 
-                    // Slick/Sam reverse cube colors
-                    if ((e.type === E_SLICK || e.type === E_SAM) && grid[nr] && grid[nr][nc] !== undefined) {
-                        if (grid[nr][nc] > 0) grid[nr][nc]--;
+                    // Slick and Sam turn a cube back one colour.
+                    if ((e.type === 'slick' || e.type === 'sam') && grid[nr] && grid[nr][nc] !== undefined) {
+                        if (grid[nr][nc] > 0) {
+                            grid[nr][nc]--;
+                            const t = gp(nr, nc);
+                            emitParticles(t.x, t.y + CH, '#9cffb4');
+                        }
                     }
 
                     e.r = nr; e.c = nc;
                     if (Math.random() < 0.25) e.dir = 1 - e.dir;
 
-                    // Egg hatches at bottom row
-                    if (e.type === E_EGG && e.r >= ROWS - 1) {
-                        e.type = E_COILY;
-                        e.mi = Math.max(0.45, 0.85 - gameLvl * 0.018);
-                    }
+                    // An egg that reaches the bottom row hatches into Coily.
+                    if (e.type === 'egg' && e.r >= ROWS - 1) hatch(e);
                 }
 
                 const tp = gp(e.r, e.c);
-                const ey = e.type === E_COILY ? tp.y - ER * 1.8 : tp.y - ER;
+                const ey = e.type === 'coily' ? tp.y - ER * 1.8 : tp.y - ER;
                 e.x = lp(e.x, tp.x, 0.15);
                 e.y = lp(e.y, ey, 0.15);
             }
+        }
+
+        function hatch(e) {
+            e.type = 'coily';
+            e.mi = enemyInterval('coily');
+            snd(300, 0.12, 'sawtooth', 0.06, 140);
         }
 
         function coilyMove(e) {
@@ -407,23 +519,20 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             if (jmp || dth || ride || state !== 'playing') return;
             for (let i = enemies.length - 1; i >= 0; i--) {
                 const e = enemies[i];
-                if (e.r === pl.r && e.c === pl.c) {
-                    if (e.type === E_SLICK || e.type === E_SAM) {
-                        enemies.splice(i, 1);
-                        score += 300;
-                        snd(800, 0.1);
-                        continue;
-                    }
-                    doDie(); return;
+                if (e.r !== pl.r || e.c !== pl.c) continue;
+                if (e.type === 'slick' || e.type === 'sam') {
+                    enemies.splice(i, 1);
+                    score += 300;
+                    addPop(e.x, e.y - 18, '+300', '#88ffaa');
+                    snd(780, 0.09);
+                    continue;
                 }
+                doDie(); return;
             }
         }
 
         // ═══════════════════ UPDATE ═══════════════════
         function update(dt) {
-            tmr -= dt;
-
-            // Particles
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
                 p.vy += 250 * dt;
@@ -431,15 +540,29 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 p.life -= dt;
                 if (p.life <= 0) particles.splice(i, 1);
             }
-
-            // Extra life every 8000
-            if (score >= nextExtraLife) {
-                lives++; nextExtraLife += 8000;
-                snd(1000, 0.1);
-                setTimeout(() => snd(1200, 0.1), 100);
+            for (let i = pops.length - 1; i >= 0; i--) {
+                const p = pops[i];
+                p.y -= 26 * dt;
+                p.life -= dt;
+                if (p.life <= 0) pops.splice(i, 1);
             }
 
-            // Disc respawn
+            if (state === 'title' || state === 'gameover') {
+                tmr -= dt;
+                return;
+            }
+            if (paused) return;
+
+            tmr -= dt;
+
+            if (score >= nextExtraLife) {
+                lives = Math.min(9, lives + 1);
+                nextExtraLife += 12000;
+                addPop(PX, 90, 'EXTRA LIFE', '#ffcc00');
+                snd(1000, 0.1);
+                setTimeout(() => snd(1300, 0.1), 100);
+            }
+
             for (const d of discs) {
                 if (!d.active) {
                     d.respawnTmr -= dt;
@@ -449,7 +572,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
             switch (state) {
                 case 'ready':
-                    if (tmr <= 0) state = 'playing';
+                    if (tmr <= 0) { state = 'playing'; banner = ''; }
                     break;
 
                 case 'playing':
@@ -460,20 +583,10 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                             jmp.t = 1; pl.r = jmp.tr; pl.c = jmp.tc;
                             jmp = null; land();
                         }
-                        setPPos();
+                        if (pl) setPPos();
                     }
                     updateEnemies(dt);
                     checkHit();
-                    break;
-
-                case 'roundclear':
-                    if (tmr <= 0) {
-                        pl.r = 0; pl.c = 0; enemies = [];
-                        jmp = null; dth = null;
-                        eTmr = Math.max(1.5, 3.0 - gameLvl * 0.12);
-                        setPPos();
-                        state = 'ready'; tmr = 1.2;
-                    }
                     break;
 
                 case 'dying':
@@ -485,12 +598,14 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                         dth.t += dt;
                         if (dth.y > H + 60) {
                             lives--;
-                            if (lives <= 0) { state = 'gameover'; tmr = 2; }
-                            else {
-                                pl.r = 0; pl.c = 0; enemies = [];
-                                jmp = null; dth = null;
-                                eTmr = Math.max(1.5, 3.0 - gameLvl * 0.12);
-                                setPPos(); state = 'playing';
+                            dth = null;
+                            if (lives <= 0) {
+                                state = 'gameover'; tmr = 1.5;
+                            } else {
+                                resetToTop();
+                                eTmr = 1.4;
+                                state = 'ready'; tmr = 1.0;
+                                banner = '';
                             }
                         }
                     }
@@ -511,10 +626,10 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
             const now = Date.now() / 1000;
             for (const s of STARS) {
-                ctx.fillStyle = `rgba(170,180,240,${Math.max(0, s.a + Math.sin(now * s.f) * 0.12)})`;
+                ctx.fillStyle = 'rgba(170,180,240,' + Math.max(0, s.a + Math.sin(now * s.f) * 0.12) + ')';
                 ctx.fillRect(s.x, s.y, s.s, s.s);
             }
-            const gl = ctx.createRadialGradient(PX, PY + 150, 40, PX, PY + 150, 280);
+            const gl = ctx.createRadialGradient(PX, PY + 130, 40, PX, PY + 130, 280);
             gl.addColorStop(0, 'rgba(25,40,90,0.12)');
             gl.addColorStop(1, 'transparent');
             ctx.fillStyle = gl; ctx.fillRect(0, 0, W, H);
@@ -540,11 +655,10 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
         function drawGrid() {
             if (!grid) return;
-            const s = scheme.c;
             for (let r = 0; r < ROWS; r++)
                 for (let c = 0; c <= r; c++) {
-                    const p = gp(r, c), v = grid[r][c];
-                    const col = s[Math.min(v, s.length - 1)];
+                    const p = gp(r, c);
+                    const col = paint[Math.min(grid[r][c], paint.length - 1)];
                     drawCube(p.x, p.y, col.t, col.l, col.r);
                 }
         }
@@ -559,11 +673,9 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 ctx.save();
                 ctx.translate(p.x, p.y + wb);
 
-                // Shadow
                 ctx.fillStyle = 'rgba(0,0,0,0.2)';
                 ctx.beginPath(); ctx.ellipse(0, 5, 13, 4, 0, 0, Math.PI * 2); ctx.fill();
 
-                // Body — spinning ellipse
                 const spin = Math.sin(now * 2.5 + d.row) * 0.4;
                 const dg = ctx.createLinearGradient(-12, -3, 12, 3);
                 dg.addColorStop(0, '#ff44ff'); dg.addColorStop(0.5, '#ff99ff'); dg.addColorStop(1, '#cc22cc');
@@ -571,7 +683,6 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 ctx.beginPath(); ctx.ellipse(0, 0, 13, 5, spin, 0, Math.PI * 2); ctx.fill();
                 ctx.strokeStyle = '#aa00aa'; ctx.lineWidth = 1; ctx.stroke();
 
-                // Center light
                 ctx.fillStyle = 'rgba(255,255,255,0.6)';
                 ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
 
@@ -581,14 +692,12 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
         // ─── Character sprites ───
         function drawQbertSprite(x, y) {
-            // Body
             ctx.beginPath(); ctx.arc(x, y, PR, 0, Math.PI * 2);
             const bg = ctx.createRadialGradient(x - 3, y - 3, 1, x, y, PR);
             bg.addColorStop(0, '#ffaa33'); bg.addColorStop(1, '#dd6600');
             ctx.fillStyle = bg; ctx.fill();
             ctx.strokeStyle = '#aa4400'; ctx.lineWidth = 1.5; ctx.stroke();
 
-            // Eyes
             ctx.fillStyle = '#fff';
             ctx.beginPath(); ctx.arc(x - 4, y - 3, 4, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(x + 4, y - 3, 4, 0, Math.PI * 2); ctx.fill();
@@ -596,7 +705,6 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             ctx.beginPath(); ctx.arc(x - 3, y - 2, 2, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(x + 5, y - 2, 2, 0, Math.PI * 2); ctx.fill();
 
-            // Snout
             ctx.beginPath();
             ctx.moveTo(x - 3, y + 2); ctx.lineTo(x + 3, y + 2);
             ctx.quadraticCurveTo(x + 4, y + 8, x, y + 10);
@@ -606,7 +714,6 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             ctx.beginPath(); ctx.arc(x - 1, y + 8, 1, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(x + 1, y + 8, 1, 0, Math.PI * 2); ctx.fill();
 
-            // Feet
             ctx.fillStyle = '#ff8800';
             ctx.beginPath(); ctx.ellipse(x - 5, y + PR + 1, 4, 3, -0.2, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.ellipse(x + 5, y + PR + 1, 4, 3, 0.2, 0, Math.PI * 2); ctx.fill();
@@ -630,33 +737,28 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             ctx.strokeStyle = '#441177'; ctx.lineWidth = 1; ctx.stroke();
             ctx.beginPath(); ctx.arc(x - 2, y - 3, 3, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.fill();
-            // Crack lines
             ctx.strokeStyle = 'rgba(100,50,150,0.4)'; ctx.lineWidth = 0.7;
             ctx.beginPath(); ctx.moveTo(x - 3, y - 1); ctx.lineTo(x, y + 1); ctx.lineTo(x + 2, y - 2); ctx.stroke();
         }
 
         function drawCoilySnake(x, y) {
-            // Body
             ctx.beginPath(); ctx.arc(x, y + 4, ER * 1.2, 0, Math.PI * 2);
             const bg = ctx.createRadialGradient(x - 2, y + 2, 1, x, y + 4, ER * 1.2);
             bg.addColorStop(0, '#9944cc'); bg.addColorStop(1, '#551188');
             ctx.fillStyle = bg; ctx.fill();
             ctx.strokeStyle = '#330055'; ctx.lineWidth = 1.5; ctx.stroke();
 
-            // Neck
             ctx.beginPath();
             ctx.moveTo(x - 4, y + 1); ctx.quadraticCurveTo(x - 5, y - 5, x, y - 8);
             ctx.quadraticCurveTo(x + 5, y - 5, x + 4, y + 1);
             ctx.fillStyle = '#7733aa'; ctx.fill();
 
-            // Head
             ctx.beginPath(); ctx.arc(x, y - 10, 7, 0, Math.PI * 2);
             const hg = ctx.createRadialGradient(x - 1, y - 11, 1, x, y - 10, 7);
             hg.addColorStop(0, '#bb66ee'); hg.addColorStop(1, '#7733aa');
             ctx.fillStyle = hg; ctx.fill();
             ctx.strokeStyle = '#551188'; ctx.lineWidth = 1; ctx.stroke();
 
-            // Eyes (angry yellow)
             ctx.fillStyle = '#ffff00';
             ctx.beginPath(); ctx.arc(x - 3, y - 12, 2.5, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(x + 3, y - 12, 2.5, 0, Math.PI * 2); ctx.fill();
@@ -664,50 +766,33 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             ctx.beginPath(); ctx.ellipse(x - 2.5, y - 12, 1, 1.8, 0.2, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.ellipse(x + 3.5, y - 12, 1, 1.8, -0.2, 0, Math.PI * 2); ctx.fill();
 
-            // Fangs
             ctx.fillStyle = '#fff';
             ctx.beginPath(); ctx.moveTo(x - 2, y - 5); ctx.lineTo(x - 1, y - 2); ctx.lineTo(x - 3, y - 4); ctx.fill();
             ctx.beginPath(); ctx.moveTo(x + 2, y - 5); ctx.lineTo(x + 1, y - 2); ctx.lineTo(x + 3, y - 4); ctx.fill();
         }
 
-        function drawSlickChar(x, y) {
+        function drawSlickChar(x, y, base, dark) {
             const gl = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, ER);
-            gl.addColorStop(0, '#66ff88'); gl.addColorStop(1, '#118833');
+            gl.addColorStop(0, base); gl.addColorStop(1, dark);
             ctx.beginPath(); ctx.arc(x, y, ER, 0, Math.PI * 2);
             ctx.fillStyle = gl; ctx.fill();
-            ctx.strokeStyle = '#005522'; ctx.lineWidth = 1; ctx.stroke();
-            // Sunglasses
+            ctx.strokeStyle = dark; ctx.lineWidth = 1; ctx.stroke();
             ctx.fillStyle = '#111';
             ctx.fillRect(x - 7, y - 4, 5, 3.5); ctx.fillRect(x + 2, y - 4, 5, 3.5);
             ctx.fillRect(x - 2, y - 3, 4, 1);
             ctx.beginPath(); ctx.arc(x - 4.5, y - 2, 2, 0, Math.PI * 2); ctx.fillStyle = '#335'; ctx.fill();
             ctx.beginPath(); ctx.arc(x + 4.5, y - 2, 2, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#0a6622';
-            ctx.beginPath(); ctx.ellipse(x, y + 3, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
-        }
-
-        function drawSamChar(x, y) {
-            const gl = ctx.createRadialGradient(x - 2, y - 2, 1, x, y, ER);
-            gl.addColorStop(0, '#dd88ff'); gl.addColorStop(1, '#6622aa');
-            ctx.beginPath(); ctx.arc(x, y, ER, 0, Math.PI * 2);
-            ctx.fillStyle = gl; ctx.fill();
-            ctx.strokeStyle = '#441177'; ctx.lineWidth = 1; ctx.stroke();
-            ctx.fillStyle = '#111';
-            ctx.fillRect(x - 7, y - 4, 5, 3.5); ctx.fillRect(x + 2, y - 4, 5, 3.5);
-            ctx.fillRect(x - 2, y - 3, 4, 1);
-            ctx.beginPath(); ctx.arc(x - 4.5, y - 2, 2, 0, Math.PI * 2); ctx.fillStyle = '#335'; ctx.fill();
-            ctx.beginPath(); ctx.arc(x + 4.5, y - 2, 2, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#551188';
+            ctx.fillStyle = dark;
             ctx.beginPath(); ctx.ellipse(x, y + 3, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
         }
 
         function drawEnemy(e) {
             switch (e.type) {
-                case E_RED: drawRedBall(e.x, e.y); break;
-                case E_EGG: drawEgg(e.x, e.y); break;
-                case E_COILY: drawCoilySnake(e.x, e.y); break;
-                case E_SLICK: drawSlickChar(e.x, e.y); break;
-                case E_SAM: drawSamChar(e.x, e.y); break;
+                case 'red': drawRedBall(e.x, e.y); break;
+                case 'egg': drawEgg(e.x, e.y); break;
+                case 'coily': drawCoilySnake(e.x, e.y); break;
+                case 'slick': drawSlickChar(e.x, e.y, '#66ff88', '#118833'); break;
+                case 'sam': drawSlickChar(e.x, e.y, '#dd88ff', '#6622aa'); break;
             }
         }
 
@@ -727,7 +812,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
         function drawBubble(x, y) {
             const txt = '@!#?@!';
-            ctx.font = '7px "Press Start 2P", monospace';
+            ctx.font = '7px ui-monospace, SFMono-Regular, Menlo, monospace';
             const tw = ctx.measureText(txt).width;
             const bw = tw + 12, bh = 18;
             const bx = x - bw / 2, by = y - 36;
@@ -736,7 +821,6 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             ctx.fillRect(bx, by, bw, bh);
             ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, bw, bh);
 
-            // Tail
             ctx.beginPath();
             ctx.moveTo(x - 3, by + bh); ctx.lineTo(x, by + bh + 6); ctx.lineTo(x + 3, by + bh);
             ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill();
@@ -747,7 +831,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             ctx.fillStyle = '#d00';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(txt, x + 1, by + bh / 2 + 1);
-            ctx.textBaseline = 'alphabetic';
+            ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
         }
 
         function drawParticles() {
@@ -759,27 +843,58 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             ctx.globalAlpha = 1;
         }
 
-        function drawHUD() {
-            if (state === 'title') return;
-
-            ctx.font = '14px "Press Start 2P", monospace';
-            ctx.fillStyle = '#ddd';
+        function drawPops() {
+            ctx.textAlign = 'center';
+            ctx.font = '8px ui-monospace, SFMono-Regular, Menlo, monospace';
+            for (const p of pops) {
+                ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.max));
+                ctx.fillStyle = '#000';
+                ctx.fillText(p.text, p.x + 1, p.y + 1);
+                ctx.fillStyle = p.col;
+                ctx.fillText(p.text, p.x, p.y);
+            }
+            ctx.globalAlpha = 1;
             ctx.textAlign = 'left';
-            ctx.fillText('SCORE ' + score, 16, 28);
-            ctx.textAlign = 'right';
-            ctx.fillText('LVL ' + gameLvl, W - 16, 28);
+        }
 
-            if (maxRounds > 1) {
-                ctx.font = '9px "Press Start 2P", monospace';
-                ctx.fillStyle = '#777';
-                ctx.textAlign = 'center';
-                ctx.fillText('ROUND ' + curRound + '/' + maxRounds, PX, 50);
+        function drawHUD() {
+            if (state === 'title' || !grid) return;
+
+            ctx.textAlign = 'left';
+            ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, monospace';
+            ctx.fillStyle = '#e6e8f6';
+            ctx.fillText('SCORE ' + score, 18, 30);
+
+            if (streak >= 6) {
+                ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+                ctx.fillStyle = '#ffcc00';
+                ctx.fillText('COMBO x' + (1 + Math.min(3, Math.floor(streak / 6))), 18, 48);
             }
 
-            // Lives at bottom
+            ctx.textAlign = 'right';
+            ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, monospace';
+            ctx.fillStyle = '#e6e8f6';
+            ctx.fillText('LEVEL ' + gameLvl, W - 18, 30);
+            ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+            ctx.fillStyle = '#8a8ab2';
+            ctx.fillText('ROUND ' + curRound + '/' + maxRounds, W - 18, 48);
+
+            ctx.textAlign = 'center';
+            ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+            ctx.fillStyle = '#9a9ac2';
+            ctx.fillText(countLeft() + ' CUBES LEFT', PX, 30);
+
+            // The colour this round has to reach
+            const sw = paint[Math.min(curRound, paint.length - 1)];
+            ctx.beginPath();
+            ctx.moveTo(PX, 40); ctx.lineTo(PX + 10, 45); ctx.lineTo(PX, 50); ctx.lineTo(PX - 10, 45);
+            ctx.closePath();
+            ctx.fillStyle = sw.t; ctx.fill();
+            ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1; ctx.stroke();
+
+            // Lives, bottom-left
             for (let i = 0; i < lives; i++) {
-                ctx.save();
-                const bx = 24 + i * 26, by = H - 24;
+                const bx = 26 + i * 26, by = H - 24;
                 ctx.beginPath(); ctx.arc(bx, by, 8, 0, Math.PI * 2);
                 const bg = ctx.createRadialGradient(bx - 2, by - 2, 1, bx, by, 8);
                 bg.addColorStop(0, '#ffaa33'); bg.addColorStop(1, '#dd6600');
@@ -791,47 +906,68 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 ctx.fillStyle = '#111';
                 ctx.beginPath(); ctx.arc(bx - 1.5, by - 1.5, 1, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath(); ctx.arc(bx + 2.5, by - 1.5, 1, 0, Math.PI * 2); ctx.fill();
-                ctx.restore();
             }
+
+            ctx.textAlign = 'right';
+            ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+            ctx.fillStyle = '#4c4c6e';
+            ctx.fillText('P PAUSE', W - 18, H - 20);
+            ctx.textAlign = 'left';
         }
 
-        function drawMsg(txt, col, yo, sz = 22) {
+        function drawMsg(txt, col, yo, sz = 20) {
             ctx.textAlign = 'center';
-            ctx.font = `bold ${sz}px "Press Start 2P", monospace`;
+            ctx.font = 'bold ' + sz + 'px ui-monospace, SFMono-Regular, Menlo, monospace';
             ctx.fillStyle = '#000';
             ctx.fillText(txt, PX + 2, PY + yo + 2);
             ctx.fillStyle = col;
             ctx.fillText(txt, PX, PY + yo);
+            ctx.textAlign = 'left';
         }
 
         function drawTitle() {
-            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.fillStyle = 'rgba(0,0,0,0.42)';
             ctx.fillRect(0, 0, W, H);
 
             ctx.textAlign = 'center';
-            ctx.font = 'bold 44px "Press Start 2P", monospace';
-            ctx.fillStyle = '#222';
-            ctx.fillText('Q*BERT', PX + 3, 223);
-            const tg = ctx.createLinearGradient(PX - 130, 200, PX + 130, 230);
+            ctx.font = 'bold 42px ui-monospace, SFMono-Regular, Menlo, monospace';
+            ctx.fillStyle = '#1a1a2a';
+            ctx.fillText('Q*BERT', PX + 3, 213);
+            const tg = ctx.createLinearGradient(PX - 130, 190, PX + 130, 220);
             tg.addColorStop(0, '#ff8800'); tg.addColorStop(0.5, '#ffcc00'); tg.addColorStop(1, '#ff8800');
             ctx.fillStyle = tg;
-            ctx.fillText('Q*BERT', PX, 220);
+            ctx.fillText('Q*BERT', PX, 210);
 
-            ctx.font = '10px "Press Start 2P", monospace';
-            ctx.fillStyle = '#8888bb';
-            ctx.fillText('COLOR ALL THE CUBES', PX, 268);
-            ctx.fillStyle = '#6666aa';
-            ctx.fillText('ARROWS / WASD TO MOVE', PX, 308);
-            ctx.fillText('SWIPE ON MOBILE', PX, 332);
-            ctx.fillStyle = '#5555aa';
-            ctx.fillText('RIDE DISCS TO ESCAPE', PX, 362);
-            ctx.fillText('COILY CHASES YOU!', PX, 386);
+            ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+            ctx.fillStyle = '#9d9dc6';
+            ctx.fillText('HOP EVERY CUBE ONTO THE TARGET COLOUR', PX, 258);
+
+            const lines = [
+                ['ARROWS / WASD', 'hop'],
+                ['SWIPE', 'hop on touch'],
+                ['DISC', 'ride back to the top'],
+                ['SLICK & SAM', 'land on them for 300'],
+                ['P', 'pause']
+            ];
+            let y = 306;
+            for (const [key, what] of lines) {
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffcc00';
+                ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
+                ctx.fillText(key, PX - 18, y);
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#7f7fa8';
+                ctx.fillText(what, PX + 18, y);
+                y += 26;
+            }
 
             if (Math.sin(Date.now() / 300) > 0) {
+                ctx.textAlign = 'center';
                 ctx.fillStyle = '#ffcc00';
-                ctx.font = '13px "Press Start 2P", monospace';
-                ctx.fillText('PRESS ANY KEY', PX, 450);
+                ctx.font = '13px ui-monospace, SFMono-Regular, Menlo, monospace';
+                ctx.fillText('PRESS ANY KEY', PX, 476);
             }
+            ctx.textAlign = 'left';
         }
 
         // ═══════════════════ MAIN LOOP ═══════════════════
@@ -844,7 +980,6 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             drawGrid();
             drawDiscs();
 
-            // Depth-sorted entity rendering
             const drawList = [];
             for (const e of enemies) drawList.push({ t: 'e', d: e, y: e.y, r: e.r });
             if (pl) {
@@ -859,20 +994,27 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             }
 
             drawParticles();
+            drawPops();
             drawHUD();
 
             if (state === 'title') drawTitle();
             if (state === 'ready') {
-                if (curRound > 1) drawMsg('ROUND ' + curRound, '#ffcc00', 260);
-                else drawMsg('LEVEL ' + gameLvl, '#ffcc00', 255);
+                drawMsg(banner || ('LEVEL ' + gameLvl), '#ffcc00', 250, curRound > 1 ? 18 : 22);
+                if (curRound === 1) drawMsg('HOP THE ' + ROWS + '-ROW PYRAMID', '#8f8fb8', 282, 9);
             }
-            if (state === 'roundclear') drawMsg('ROUND ' + (curRound - 1) + ' CLEAR!', '#44ff44', 260);
-            if (state === 'win') drawMsg('LEVEL CLEAR!', '#44ff44', 260);
+            if (state === 'win') drawMsg('LEVEL CLEAR!', '#7dffa0', 250, 22);
             if (state === 'gameover') {
-                drawMsg('GAME OVER', '#ff4444', 240);
-                drawMsg('SCORE: ' + score, '#aaaacc', 280, 16);
+                drawMsg('GAME OVER', '#ff6a6a', 236, 24);
+                drawMsg('SCORE ' + score, '#b9bde0', 274, 14);
+                drawMsg('LEVEL ' + gameLvl + ' REACHED', '#8f8fb8', 302, 9);
                 if (tmr <= 0 && Math.sin(Date.now() / 300) > 0)
-                    drawMsg('PRESS KEY', '#ffcc00', 330, 16);
+                    drawMsg('PRESS ANY KEY', '#ffcc00', 344, 13);
+            }
+            if (paused) {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(0, 0, W, H);
+                drawMsg('PAUSED', '#ffcc00', 250, 22);
+                drawMsg('PRESS P TO RESUME', '#8f8fb8', 282, 9);
             }
 
             requestAnimationFrame(frame);
@@ -885,14 +1027,23 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             s: [1, 0], S: [1, 0], d: [1, 1], D: [1, 1]
         };
 
-        function initAudio() {
-            if (!audioCtx) audioCtx = new (AudioContext || window.webkitAudioContext)();
+        function pauseKey() {
+            if (state === 'playing' || state === 'ready') {
+                paused = !paused;
+                return true;
+            }
+            return false;
         }
 
         addEventListener('keydown', e => {
             initAudio();
-            if (state === 'title') { startLevel(); e.preventDefault(); return; }
-            if (state === 'gameover' && tmr <= 0) { init(); e.preventDefault(); return; }
+            if (state === 'title') { newGame(); e.preventDefault(); return; }
+            if (state === 'gameover' && tmr <= 0) { newGame(); e.preventDefault(); return; }
+            if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
+                if (pauseKey()) e.preventDefault();
+                return;
+            }
+            if (paused) return;
             const m = MOVES[e.key];
             if (m) { tryMove(m[0], m[1]); e.preventDefault(); }
         });
@@ -900,8 +1051,9 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         let tStart = null;
         canvas.addEventListener('touchstart', e => {
             initAudio();
-            if (state === 'title') { startLevel(); e.preventDefault(); return; }
-            if (state === 'gameover' && tmr <= 0) { init(); e.preventDefault(); return; }
+            if (state === 'title') { newGame(); e.preventDefault(); return; }
+            if (state === 'gameover' && tmr <= 0) { newGame(); e.preventDefault(); return; }
+            if (paused) { paused = false; e.preventDefault(); return; }
             tStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             e.preventDefault();
         }, { passive: false });
