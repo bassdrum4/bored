@@ -47,8 +47,8 @@
   <button class="btn" id="btn2p">TWO PLAYERS</button>
   <button class="btn ghost" id="btnCpu">PLAY VS COMPUTER</button>
   <div class="hint">
-    Drag on the felt to aim. Power lives on the bar &mdash; slide it up<br>
-    for a break. Click the cue ball face to add english.<br>
+    Click the felt to aim, click again to set the angle. Power, english<br>
+    and the shoot button live in the rail beside the table.<br>
     Pot your group, then the 8. Foul and your opponent shoots.
   </div>
 </div>
@@ -220,7 +220,9 @@ let openTable = true;
 let breakShot = true;
 let firstHit = null;
 let pottedThisShot = [];
-let dragAim = false, dragSlider = false, dragSpin = false;
+let aimMode = false;          // the pointer is steering the line
+let aimLocked = false;        // the angle is set and the pointer no longer moves it
+let dragSlider = false, dragSpin = false;
 let power = 0.55;             // the power slider, 0..1 — no longer the drag distance
 let spin = {x:0, y:0};        // cue-ball contact point, in ball radii, ±0.8
 let difficulty = 'normal';
@@ -261,7 +263,7 @@ function startGame(m, keepTurn){
   document.getElementById('menu').classList.add('hidden');
   document.getElementById('over').classList.add('hidden');
   aimAngle = 0; power = 0.55; spin.x = 0; spin.y = 0;
-  dragAim = dragSlider = dragSpin = false;
+  aimMode = aimLocked = false; dragSlider = dragSpin = false;
   document.getElementById('diff').classList.add('hidden');
   if(isCpu()) beginCpu(true);
   else state = 'aim';
@@ -435,7 +437,7 @@ function strike(pow){
   state = 'run';
   firstHit = null;
   pottedThisShot = [];
-  dragAim = false;
+  aimMode = aimLocked = false;
   sndCue(pow);
 }
 
@@ -576,6 +578,7 @@ function endShot(){
 
 function nextTurn(){
   const c = cue();
+  aimMode = aimLocked = false;
   if(!c.alive) state = 'hand', handOK=true;
   else {
     state = 'aim';
@@ -597,6 +600,7 @@ function beginHand(){
   else { handX = PW*0.28; handY = PH/2; }
   if(!handValid(handX, handY)){ const b = findHandSpot(); handX = b.x; handY = b.y; }
   c.alive = false; c.vx = c.vy = 0;
+  aimMode = aimLocked = false;
   state = 'hand';
 }
 function handValid(x, y){
@@ -1088,39 +1092,41 @@ function toWorld(sx, sy){
   }
   return {x:(sx-ox)/scale, y:(sy-oy)/scale};
 }
-const ctrlH = () => (SW < 620 ? 76 : 84);
-/* The control bar: spin face on the left, power track in the middle, shoot on the right.
-   It is always reserved so the table never jumps size when a shot starts. */
+const HUD_H = 46;
+const railW = () => (SW < 620 ? 66 : 92);
+/* The side rail holds the whole shot: english at the top, the power meter down the
+   middle, shoot at the bottom. Putting it beside the table leaves the felt the full
+   height of the screen. */
 function ctrlLayout(){
   const compact = SW < 620;
-  const h = ctrlH(), y0 = SH - h, yc = y0 + h*0.66;
-  const spinR = compact ? 19 : 22;
-  const spinFace = {x: 14 + spinR, y: yc, r: spinR};
-  const shootW = compact ? 70 : 88, shootH = compact ? 34 : 38;
-  const shoot = {x: SW - 14 - shootW, y: yc - shootH/2, w: shootW, h: shootH};
-  const t0 = spinFace.x + spinR + (compact ? 14 : 24);
-  const t1 = shoot.x - (compact ? 14 : 24);
-  return {compact, h, y0, yc, spin: spinFace, shoot,
-    track: {x0: t0, x1: Math.max(t0 + 60, t1), y: yc, w: compact ? 5 : 6},
-    labelY: y0 + 14};
+  const w = railW(), x0 = SW - w, pad = compact ? 8 : 12;
+  const spinR = compact ? 18 : 23;
+  const spinLabelY = HUD_H + (compact ? 13 : 16);
+  const spin = {x: x0 + w/2, y: spinLabelY + (compact ? 9 : 11) + spinR, r: spinR};
+  const shootH = compact ? 36 : 40;
+  const shoot = {x: x0 + pad, y: SH - pad - shootH, w: w - pad*2, h: shootH};
+  const powerLabelY = spin.y + spinR + (compact ? 24 : 30);
+  const track = {x: x0 + w/2, y0: powerLabelY + (compact ? 26 : 30),
+                 y1: Math.max(powerLabelY + 110, shoot.y - (compact ? 26 : 32)), w: compact ? 5 : 6};
+  return {compact, w, x0, pad, spin, shoot, track, spinLabelY, powerLabelY};
 }
 
 function viewParams(){
-  const hudH = 46;
-  const availW = SW - 24, availH = SH - hudH - ctrlH() - 14;
+  const tableX = SW - railW();
+  const availW = tableX - 18, availH = SH - HUD_H - 18;
   if(VERT){
     // table rotated: playfield is PH wide x PW tall on screen; reserve room for rails
     const scale = Math.min(availW/(PH + 2*RAIL), availH/(PW + 2*RAIL));
     return {
       scale,
-      ox: (SW - PH*scale)/2,                 // screen x of playfield left edge (world y=0)
-      oy: hudH + availH/2 - PW/2*scale       // screen y of playfield bottom edge (world x=0)
+      ox: (tableX - PH*scale)/2,              // screen x of playfield left edge (world y=0)
+      oy: HUD_H + availH/2 - PW/2*scale       // screen y of playfield bottom edge (world x=0)
     };
   }
   const tableW = PW + 2*RAIL, tableH = PH + 2*RAIL;
   const scale = Math.min(availW/tableW, availH/tableH);
   return {
-    scale, ox:(SW - PW*scale)/2, oy: hudH + (availH - tableH*scale)/2 + RAIL*scale
+    scale, ox:(tableX - PW*scale)/2, oy: HUD_H + (availH - tableH*scale)/2 + RAIL*scale
   };
 }
 
@@ -1130,19 +1136,27 @@ cv.addEventListener('pointerdown', e => {
   audio();
   CTRL = ctrlLayout();
   const x = e.clientX, y = e.clientY;
-  if(y >= CTRL.y0 && (state==='aim' || state==='hand')){
+  if(x >= CTRL.x0 && (state==='aim' || state==='hand')){
     if(state==='aim'){
       if(hitRect(CTRL.shoot, x, y)) shootNow();
       else if(hitCircle(CTRL.spin, x, y)){ dragSpin = true; setSpinFromPoint(x, y); sndSpin(); }
-      else if(hitTrack(x, y)){ dragSlider = true; setPowerFromX(x); }
+      else if(hitTrack(x, y)){ dragSlider = true; setPowerFromY(y); }
     }
     e.preventDefault();
     return;
   }
   if(state==='aim'){
-    dragAim = true; ptr.down = true;
-    ptr.x = x; ptr.y = y;
-    updateAimFromPointer();
+    // first click takes the line, the second click sets it, the third picks it up again
+    if(aimLocked){
+      aimLocked = false; aimMode = true;
+      ptr.x = x; ptr.y = y; updateAimFromPointer();
+    } else if(aimMode){
+      aimMode = false; aimLocked = true;
+    } else {
+      aimMode = true;
+      ptr.x = x; ptr.y = y; updateAimFromPointer();
+    }
+    ptr.down = true;
     e.preventDefault();
   } else if(state==='hand'){
     ptr.down = true;
@@ -1152,23 +1166,20 @@ cv.addEventListener('pointerdown', e => {
 });
 cv.addEventListener('pointermove', e => {
   const x = e.clientX, y = e.clientY;
-  if(dragSlider){ setPowerFromX(x); return; }
+  if(dragSlider){ setPowerFromY(y); return; }
   if(dragSpin){ setSpinFromPoint(x, y); return; }
-  if(state==='aim'){
-    if(dragAim || y < CTRL.y0){
-      ptr.x = x; ptr.y = y;
-      updateAimFromPointer();
-    }
+  if(state==='aim' && aimMode && x < CTRL.x0){
+    ptr.x = x; ptr.y = y;
+    updateAimFromPointer();
   } else if(state==='hand' && ptr.down){
     moveHand(x, y);
   }
 });
 window.addEventListener('pointerup', e => {
   if(dragSlider || dragSpin){ dragSlider = dragSpin = false; return; }
-  if(state==='aim' && dragAim){
-    ptr.down = false; dragAim = false;
-  } else if(state==='hand' && ptr.down){
-    ptr.down = false;
+  if(!ptr.down) return;
+  ptr.down = false;
+  if(state==='hand'){
     if(handOK && handValid(handX, handY)){
       const c = cue(); c.x = handX; c.y = handY; c.alive = true; c.vx=c.vy=0; c.sw=c.fb=0;
       state = 'aim';
@@ -1181,17 +1192,17 @@ window.addEventListener('pointerup', e => {
   }
 });
 window.addEventListener('pointercancel', () => {
-  dragAim = dragSlider = dragSpin = false; ptr.down = false;
+  dragSlider = dragSpin = false; ptr.down = false;
 });
 
 function shootNow(){ if(state==='aim' && power > 0.03) strike(power); }
-function hitCircle(c, x, y){ return Math.hypot(x-c.x, y-c.y) <= c.r + 12; }
-function hitRect(r, x, y){ return x >= r.x-10 && x <= r.x+r.w+10 && y >= r.y-10 && y <= r.y+r.h+10; }
+function hitCircle(c, x, y){ return Math.hypot(x-c.x, y-c.y) <= c.r + 14; }
+function hitRect(r, x, y){ return x >= r.x-8 && x <= r.x+r.w+8 && y >= r.y-8 && y <= r.y+r.h+8; }
 function hitTrack(x, y){
-  return x >= CTRL.track.x0-10 && x <= CTRL.track.x1+10 && Math.abs(y-CTRL.track.y) <= 24;
+  return x >= CTRL.x0 && y >= CTRL.track.y0-16 && y <= CTRL.track.y1+16;
 }
-function setPowerFromX(x){
-  const t = (x - CTRL.track.x0)/Math.max(1, CTRL.track.x1 - CTRL.track.x0);
+function setPowerFromY(y){
+  const t = (CTRL.track.y1 - y)/Math.max(1, CTRL.track.y1 - CTRL.track.y0);
   power = Math.max(0.05, Math.min(1, t));   // never a dead slider
 }
 function setSpinFromPoint(x, y){
@@ -1262,6 +1273,8 @@ window.__test = {
   power: () => power,
   spin: () => ({x:spin.x, y:spin.y}),
   aim: () => aimAngle,
+  aiming: () => aimMode,
+  locked: () => aimLocked,
   setPower: p => { power = Math.max(0, Math.min(1, p)); },
   setSpin: (x, y) => { spin.x = Math.max(-.8, Math.min(.8, x)); spin.y = Math.max(-.8, Math.min(.8, y)); },
   shoot: () => shootNow(),
@@ -1529,7 +1542,7 @@ function drawGuide(){
 
   ctx.save();
   ctx.globalAlpha = .85;
-  ctx.setLineDash([1.6, 2.2]);
+  ctx.setLineDash(aimLocked ? [] : [1.6, 2.2]);   // solid once the angle is set
   ctx.lineWidth = 0.55;
   ctx.strokeStyle = 'rgba(240,248,242,.9)';
   ctx.beginPath();
@@ -1696,13 +1709,20 @@ function drawHUD(ox, oy, scale){
   ctx.fillStyle='rgba(255,255,255,.5)';
   ctx.fillText(status, SW/2, hudH/2);
 
-  // controls hint, sitting just above the bar
-  if(state==='aim' && !compact && !hasSpin()){
-    const L = ctrlLayout();
-    ctx.font='500 11px system-ui, sans-serif';
-    ctx.fillStyle='rgba(255,255,255,.26)';
-    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-    ctx.fillText('drag to aim \u00b7 slide for power \u00b7 tap the ball face for english', SW/2, L.y0 - 12);
+  // aiming hint, under the felt
+  if(!compact){
+    let hint = '';
+    if(state==='aim'){
+      hint = aimLocked ? 'angle set \u2014 shoot when ready'
+           : aimMode   ? 'move to aim \u2014 click again to set the angle'
+           :             'click the felt to aim';
+    }
+    if(hint){
+      ctx.font='500 11px system-ui, sans-serif';
+      ctx.fillStyle='rgba(255,255,255,.26)';
+      ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+      ctx.fillText(hint, (SW - railW())/2, SH - 12);
+    }
   }
 }
 
@@ -1712,42 +1732,22 @@ function drawControls(){
   const L = ctrlLayout();
   CTRL = L;
   ctx.setTransform(DPR,0,0,DPR,0,0);
+  // the rail beside the table
   ctx.fillStyle='rgba(13,17,15,.95)';
-  ctx.fillRect(0, L.y0, SW, L.h);
+  ctx.fillRect(L.x0, HUD_H, L.w, SH - HUD_H);
   ctx.fillStyle='rgba(255,255,255,.08)';
-  ctx.fillRect(0, L.y0, SW, 1);
+  ctx.fillRect(L.x0, HUD_H, 1, SH - HUD_H);
 
   const live = state==='aim';
   ctx.globalAlpha = live ? 1 : .42;
   ctx.textBaseline = 'middle';
+  const cx = L.spin.x;
 
-  // ---- power
-  ctx.font='600 9.5px system-ui, sans-serif';
-  ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,.42)';
-  ctx.fillText('POWER', L.track.x0, L.labelY);
-  ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,.5)';
-  ctx.fillText(Math.round(power*100)+'%', L.track.x1, L.labelY);
-
-  const tw = L.track.w, ty = L.track.y, span = L.track.x1 - L.track.x0;
-  ctx.fillStyle='rgba(255,255,255,.12)';
-  roundRect(ctx, L.track.x0, ty-tw/2, span, tw, tw/2); ctx.fill();
-  const kx = L.track.x0 + span*power;
-  if(power > 0.005){
-    const pg = ctx.createLinearGradient(L.track.x0, 0, L.track.x1, 0);
-    pg.addColorStop(0, '#59bd83'); pg.addColorStop(.55, '#d6c85d'); pg.addColorStop(1, '#df564e');
-    ctx.fillStyle = pg;
-    roundRect(ctx, L.track.x0, ty-tw/2, Math.max(tw, kx-L.track.x0), tw, tw/2); ctx.fill();
-  }
-  ctx.beginPath(); ctx.arc(kx, ty, tw*1.55, 0, Math.PI*2);
-  ctx.fillStyle = '#eef4ee'; ctx.fill();
-
-  // ---- spin face
+  // ---- english
   const s = L.spin;
-  if(!L.compact){
-    ctx.font='600 9.5px system-ui, sans-serif';
-    ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,.42)';
-    ctx.fillText('SPIN', s.x - s.r, L.labelY);
-  }
+  ctx.font='600 9.5px system-ui, sans-serif';
+  ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,.42)';
+  ctx.fillText('SPIN', cx, L.spinLabelY);
   ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
   ctx.fillStyle = '#efece2'; ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.stroke();
@@ -1761,6 +1761,27 @@ function drawControls(){
   const dx = s.x + spin.x*s.r*.72, dy = s.y - spin.y*s.r*.72;
   ctx.beginPath(); ctx.arc(dx, dy, s.r*.24, 0, Math.PI*2);
   ctx.fillStyle = '#cf4a42'; ctx.fill();
+
+  // ---- power, filled from the bottom up
+  ctx.font='600 9.5px system-ui, sans-serif';
+  ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,.42)';
+  ctx.fillText('POWER', cx, L.powerLabelY);
+  ctx.font='700 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.fillStyle='rgba(255,255,255,.55)';
+  ctx.fillText(Math.round(power*100)+'%', cx, L.powerLabelY + (L.compact ? 12 : 14));
+
+  const t = L.track, tw = t.w, top = t.y0, bot = t.y1;
+  ctx.fillStyle='rgba(255,255,255,.12)';
+  roundRect(ctx, t.x-tw/2, top, tw, bot-top, tw/2); ctx.fill();
+  const ky = bot - (bot-top)*power;
+  if(power > 0.005){
+    const pg = ctx.createLinearGradient(0, bot, 0, top);
+    pg.addColorStop(0, '#59bd83'); pg.addColorStop(.55, '#d6c85d'); pg.addColorStop(1, '#df564e');
+    ctx.fillStyle = pg;
+    roundRect(ctx, t.x-tw/2, ky, tw, Math.max(tw, bot-ky), tw/2); ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(t.x, ky, tw*1.6, 0, Math.PI*2);
+  ctx.fillStyle = '#eef4ee'; ctx.fill();
 
   // ---- shoot
   const b = L.shoot;
