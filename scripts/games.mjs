@@ -224,7 +224,7 @@ function addGame([slug, name, category, blurb, ...rest], flags) {
 
   console.log(`added ${slug} (${name}) to src/games/content/${slug}.html and the catalog\n`);
   if (flags.noScore) {
-    console.log('next:\n  npm run build          # encodes the game and rebuilds index.html\n');
+    console.log('next:\n  npm test               # boots the new game in Chrome\n');
     return;
   }
   console.log(`score: ${rules[slug].label} (${rules[slug].better}, max ${rules[slug].max_value})\n`);
@@ -236,7 +236,7 @@ function addGame([slug, name, category, blurb, ...rest], flags) {
     `       { slug: '${slug}', label: 'Short title', goal: 'Reach {target} ${unit} in one run.',\n` +
     `         metric: '${metric}', targets: [10, 20, 30], unit: '${unit}' },\n` +
     `  3. npm run games:register   # give the shared board its rule row\n` +
-    `  4. npm run build\n`
+    `  4. npm test\n`
   );
 }
 

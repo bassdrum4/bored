@@ -5,13 +5,15 @@ const path = require('node:path');
 const puppeteer = require('puppeteer-core');
 const { serve } = require('./serve.cjs');
 const root = path.resolve(__dirname, '..');
+// The site is the src/ folder itself, deployed as written.
+const siteRoot = path.join(root, 'src');
 // Match bored.test.cjs: hosted Ubuntu also has a Chromium launcher whose sandbox
 // may be unavailable. Prefer the same working Google Chrome as the game suite.
 
 test('discovery reaches nothing off-site, keeps its controls, and fits small screens', async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
-  const site = await serve(root);
+  const site = await serve(siteRoot);
   const browser = await puppeteer.launch({ executablePath, headless: true });
   t.after(async () => { await browser.close(); await site.close(); });
   const page = await browser.newPage();
@@ -32,13 +34,15 @@ test('discovery reaches nothing off-site, keeps its controls, and fits small scr
     for (const game of catalog) {
       assert.ok(game.meta.minutes && game.meta.pace && game.meta.inputs.length, game.slug);
       assert.ok(game.meta.inputs.every(input => ['Keyboard', 'Mouse', 'Touch'].includes(input)), game.slug);
-      if (!game.online) assert.match(game.preview || '', /^data:image\/webp;base64,/, game.slug + ' has a bundled capture');
+      if (!game.online) assert.match(game.preview || '', new RegExp('/previews/' + game.slug + '\\.webp$'), game.slug + ' has a capture file');
     }
     await page.$$eval('#grid img', images => images.forEach(image => image.loading = 'eager'));
     await page.waitForFunction(() => [...document.querySelectorAll('#grid img')].every(image => image.complete && image.naturalWidth > 0));
-    // The hub no longer carries the games: only the shell and the previews are
-    // inlined, and a game document is downloaded when its card is opened.
-    assert.ok(fs.statSync(path.join(root, 'index.html')).size < 600 * 1024, 'the shell stays small now the games are fetched on demand');
+    // The entry document is hand-written markup: it carries no games and no
+    // inlined script, so a game is downloaded only when its card is opened.
+    const shell = fs.readFileSync(path.join(siteRoot, 'index.html'), 'utf8');
+    assert.ok(Buffer.byteLength(shell) < 40 * 1024, 'the shell stays a small document');
+    assert.ok(!/import\.meta\.(?:glob|env)/.test(fs.readFileSync(path.join(siteRoot, 'main.js'), 'utf8')), 'the hub runs unbundled');
     assert.equal(await page.$eval('#recent-empty', e => e.hidden), false);
     // The board sits above the library now: it belongs to the top of the page.
     assert.ok(await page.evaluate(() => document.querySelector('#leaderboard').offsetTop < document.querySelector('#library').offsetTop));
@@ -134,7 +138,7 @@ test('discovery reaches nothing off-site, keeps its controls, and fits small scr
 test('account UI and score sync still work through the redesigned hub (mock backend)', async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
-  const site = await serve(root);
+  const site = await serve(siteRoot);
   const browser = await puppeteer.launch({ executablePath, headless: true });
   t.after(async () => { await browser.close(); await site.close(); });
   const page = await browser.newPage();

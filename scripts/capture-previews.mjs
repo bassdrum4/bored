@@ -1,12 +1,15 @@
-// Rebuild first, then: CHROME_PATH=/path/to/chrome node scripts/capture-previews.mjs
-// Captures real offline gameplay. Run in a fresh profile; no account or network needed.
+// CHROME_PATH=/path/to/chrome node scripts/capture-previews.mjs
+// Captures real offline gameplay. Run in a fresh profile; no account or network
+// needed. The hub is served over loopback from src/, the same tree the site
+// deploys, because the page is modules and cannot run from file://.
 import puppeteer from 'puppeteer-core';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { serve } from '../tests/serve.cjs';
 const root = path.resolve(import.meta.dirname, '..');
 const shots = path.join(root, '_build/game-previews');
 await fs.mkdir(shots, { recursive: true });
+const site = await serve(path.join(root, 'src'));
 const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/chromium', headless: true,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
@@ -20,7 +23,7 @@ try {
       let seed = 4981;
       Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
     });
-    await page.goto(pathToFileURL(path.join(root, 'index.html')).href);
+    await page.goto(site.url);
     await page.addStyleTag({ content: '#player-menu,#hint,#challenge-progress{display:none!important}' });
     return page;
   }
@@ -93,4 +96,4 @@ try {
     console.log(slug + ': ' + (await frame.evaluate(() => [...document.querySelectorAll('button')].filter(b => b.getBoundingClientRect().width).slice(0, 6).map(b => b.id + '=' + b.textContent.trim().slice(0, 25)).join(', '))));
     await page.close();
   }
-} finally { await browser.close(); }
+} finally { await browser.close(); await site.close(); }

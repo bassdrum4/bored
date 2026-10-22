@@ -1,8 +1,9 @@
 # Working in this repo
 
-Bored is a single-page arcade. One `index.html` is the whole hub and is served by GitHub Pages;
-the games are separate HTML documents in `src/games/content/` that the hub fetches over HTTP when
-you open one — they are not in the bundle. There is no framework, no
+Bored is a single-page arcade. The site is the `src/` folder served as written: `src/index.html`
+loads `main.js` and the hub modules as native ES modules, and the games are separate HTML
+documents in `src/games/content/` that the hub fetches over HTTP when you open one. Nothing is
+built or bundled — `src/` is both the source and the deployed tree. There is no framework, no
 router, no server. Read this before adding or editing a game — a game that misses these hooks
 silently disappears from scores, the daily challenge, or the build.
 
@@ -20,10 +21,10 @@ src/games/content/*.html one file per game — the game's entire source, and the
 src/games/arcade.js      2048, Memory, Connect Four, Aim Lab — native JS, no payload
 src/games/discovery.js   session estimates, controls, collections, previews
 tests/serve.cjs          loopback static server the browser suites load through
-tests/bored.test.cjs     node:test suite, runs the real build output in Chrome
+tests/bored.test.cjs     node:test suite, runs src/ as the site in Chrome
 tests/discovery.test.cjs discovery, layout and mock-account flows
 tests/visual.test.cjs    release captures and the live F-14 embed (needs internet)
-scripts/publish.mjs      copies dist/index.html to the served index.html
+.github/workflows/deploy.yml  test, then publish src/ as the Pages artifact
 scripts/games.mjs        add a game / sync the shared board's rule list
 scripts/capture-previews.mjs  re-shoot the library previews in Chrome
 scripts/optimize-previews.py  resize them: fill landscape cards, keep portrait boards whole
@@ -43,16 +44,20 @@ one; check the table in the Supabase dashboard.
 
 ```bash
 npm ci                     # once
-npm run build              # vite build (hub only) + publish copies it to index.html
+npm run dev                # the site at http://localhost:3000, live from src/
 npm test                   # game, discovery and layout suites; needs CHROME_PATH
 ```
 
-`npm run build` must be run and its `index.html` committed whenever the hub changes. A change to a
-single `src/games/content/*.html` file needs no rebuild at all: GitHub Pages serves the repository,
-so those files are fetched straight from `src/games/content/`. Keep the two in step by rebuildinganyway — the catalog guard and the suite expect a current `index.html`. The test suite boots the
-build through a loopback server in headless Chrome (set
-`CHROME_PATH` if it is not found) and takes about a minute; run it before committing anything that
-touches a game.
+There is no build. `.github/workflows/deploy.yml` uploads `src/` as the GitHub Pages artifact and
+deploys it, so every push to `main` publishes exactly the files that are in the repo — no generated
+`index.html`, no commit back to the branch. Paths in `src/index.html` are relative (`./main.js`,
+`./styles.css`) because the site is served under `/bored/`; a root-absolute path would 404 there.
+The test suite serves `src/` through a loopback server in headless Chrome (set `CHROME_PATH` if it is
+not found) and takes about a minute; run it before committing anything that touches a game.
+
+GitHub Pages must be set to **Settings → Pages → Source: GitHub Actions**. While it is still on a
+branch deploy, the root `index.html` is a redirect stub to `src/index.html` and nothing else; delete
+that stub once the setting is switched.
 
 ## Working with several agents
 
@@ -64,11 +69,10 @@ each other. They are not style preferences; each one has already caused a live r
   would read "signed in" (the account strip, the board's "(you)") asks `hasIdentity()`, while
   transport keeps using `getSession()`. A guest's best is offered back to them on the hub, so
   don't make guest scores post, sync or announce themselves before there is an account.
-- **`index.html` is build output.** Never hand-edit it. Edit `src/`, run `npm run build`, commit the
-  regenerated file. If two agents both rebuilt it, resolve the conflict by rerunning
-  `npm run build` on the merged tree — never by hand-merging that diff.
-- **Push ships.** GitHub Pages serves the committed bytes, so a hub change without a rebuild is
-  invisible, and a rebuild made before the suite is green goes live instantly. Test, build, push.
+- **Edit `src/`, never the root `index.html`.** The root file is a redirect stub kept only until
+  Pages is switched to GitHub Actions; the arcade is `src/index.html` and the modules beside it.
+- **Push ships.** GitHub Pages deploys the committed `src/` folder, so a merge to `main` goes live
+  as soon as the workflow finishes. Test before pushing, not after.
 - **The slug is a primary key** repeated in six places: the content file, `catalog.js`, the snapshot,
   `HIGH_SCORE_GAMES`, `CHALLENGES`, and `score-rules.json` (plus the `score_rules` row). A typo in
   one place does not throw — the game silently drops out of scoring, the daily or the board.
@@ -106,7 +110,6 @@ optional daily challenge). Then:
 
 ```bash
 npm run games:register        # give the shared board its score_rules row (--apply needs a key)
-npm run build
 npm test
 ```
 
@@ -129,8 +132,8 @@ document is downloaded the first time its card is opened, so it needs a connecti
    no content file.
 3. A row in `score_rules` on the shared board, which `npm run games:register` adds for you (or
    prints as SQL if you would rather paste it — the publishable key cannot write rules).
-4. Run `npm run build` (the game document itself needs no build — it is served from
-   `src/games/content/` — but the hub's catalog and the test suite expect a current `index.html`).
+4. There is nothing to build: the game document is served from `src/games/content/` and the suite
+   reads the catalog itself. Run `npm test`.
 
 ## Hook 1 — snapshot (required by everything else)
 
@@ -234,6 +237,6 @@ that looks like it was written by one person in an afternoon in 2009 and still w
 
 ## Deploying
 
-Push to `main` with the rebuilt `index.html`; Pages serves it. Confirm the shipped bytes match
-the tested build (compare a hash of the served file) and that the page still boots before
-calling it done.
+Push to `main`; the workflow deploys `src/` to Pages, so the shipped files are the committed ones.
+Confirm the served copy matches the repo (compare a hash of `src/index.html`) and that the page
+still boots before calling it done.

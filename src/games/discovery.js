@@ -1,3 +1,5 @@
+import { ORDER, EXTERNS } from './catalog.js';
+
 // Editorial estimates, not telemetry. Controls describe gameplay, not menu buttons.
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
@@ -56,7 +58,9 @@ export function inCollection(slug, collection) {
   }
 }
 
-// Vite inlines these small, locally captured WebP images in the single HTML file.
-const captures = import.meta.glob('./previews/*.webp', { eager: true, query: '?inline', import: 'default' });
-export const PREVIEWS = Object.fromEntries(Object.entries(captures).map(([file, data]) =>
-  [file.slice(file.lastIndexOf('/') + 1, -5), data]));
+// The locally captured WebP images ship beside this module, one per offline
+// game and named after its slug. They are ordinary files the page requests when
+// it builds a card, so the site needs no build step to carry them.
+const previewUrl = slug => new URL('./previews/' + slug + '.webp', import.meta.url).href;
+export const PREVIEWS = Object.fromEntries(
+  ORDER.filter(([slug]) => !EXTERNS[slug]).map(([slug]) => [slug, previewUrl(slug)]));

@@ -2,11 +2,11 @@
 
 Secrets manager in use: none
 
-`src/` is the source for the arcade; `npm run build` emits the single-file
-`index.html` that ships to GitHub Pages. The app reads no runtime environment
-variables, so nothing in it has to change for Infisical: the local dev server can
-run under `infisical run`, which injects the `dev` environment's secrets into the
-process. The Supabase URL and publishable key are constants near the top of
+`src/` is the arcade and is deployed as-is; the GitHub Actions workflow publishes
+that folder straight to GitHub Pages, with no build step. The app reads no runtime
+environment variables, so nothing in it has to change for Infisical: the local
+dev server can run under `infisical run`, which injects the `dev` environment's
+secrets into the process. The Supabase URL and publishable key are constants near the top of
 `src/main.js` (the publishable key is safe in a public page); if that
 configuration ever moves to secrets, the server can expose them without touching
 the games.
@@ -17,16 +17,15 @@ the games.
 | --- | --- |
 | Local development (plain) | `npm run dev` → `vite` |
 | Local development (secrets injected) | `npm run dev:infisical` → `infisical run --env=dev -- vite` |
-| Production build | `npm run build` → `dist/index.html`, copied to `index.html` |
-| Play with no server | open the built `index.html` in a browser |
+| Production | push to `main`; the workflow deploys `src/` (Pages source: GitHub Actions) |
+| Play without the network | `npm run dev`, then open http://localhost:3000 |
 | Tests (unit rules offline; browser block needs Chrome) | `node --test tests/bored.test.cjs` |
 | Release screenshots (needs internet) | `node --test tests/visual.test.cjs` |
 
-`npm run dev` serves the Vite source at `http://localhost:3000`. The build emits
-one classic inline script, so the published page remains a single file that also
-works from `file://`.
-Production is a static `index.html` published to GitHub Pages; there is no
-`start` script, pm2 process, Procfile, Dockerfile or CI job to wrap.
+`npm run dev` serves the site from `src/` at `http://localhost:3000`, the same
+addresses the deployed site uses.
+Production is that static folder published to GitHub Pages; there is no `start`
+script, pm2 process, Procfile or Dockerfile to wrap.
 
 ## Variables
 

@@ -3,12 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "A single-file arcade hub built from split Vite source files",
+  "description": "An arcade hub served straight from src/ by GitHub Pages",
   "scripts": {
     "dev": "vite",
     "dev:infisical": "infisical run --env=dev -- vite",
-    "build": "vite build && node scripts/publish.mjs",
-    "preview": "vite preview",
     "games:add": "node scripts/games.mjs add",
     "games:register": "node scripts/games.mjs register",
     "feedback:setup": "node scripts/setup-feedback.mjs",
@@ -19,7 +17,6 @@
   },
   "devDependencies": {
     "puppeteer-core": "^25.14.0",
-    "vite": "^8.3.4",
-    "vite-plugin-singlefile": "^2.3.4"
+    "vite": "^8.3.4"
   }
 }

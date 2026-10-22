@@ -43,9 +43,9 @@ export const META = {
 
 /* ── Loading a game document on demand ────────────────────────────────────── */
 
-// Vite serves `src/` as its own root in development, so the same file sits at a
-// different depth there than it does once the repository is the site.
-const PAYLOAD_DIR = import.meta.env.DEV ? 'games/content/' : 'src/games/content/';
+// The site root is `src/` both in development and on GitHub Pages, so a game
+// document sits beside the hub at the same relative address in both.
+const PAYLOAD_DIR = 'games/content/';
 
 /** Offline games that are plain documents rather than games built into arcade.js. */
 export const PAYLOAD_SLUGS = ORDER.map(([slug]) => slug)

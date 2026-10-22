@@ -7,8 +7,11 @@ const puppeteer = require('puppeteer-core');
 const { serve } = require('./serve.cjs');
 
 const root = path.resolve(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-const builtSource = html.match(/<script>([\s\S]*)<\/script>/)[1];
+// GitHub Pages publishes src/ as the site root, so the suite serves that folder
+// exactly as written: the same entry document, modules and game files a visitor
+// gets. Nothing here is built.
+const siteRoot = path.join(root, 'src');
+const entry = fs.readFileSync(path.join(siteRoot, 'index.html'), 'utf8');
 const source = [
   'src/main.js', 'src/hub/store.js', 'src/hub/backend.js', 'src/hub/scores.js',
   'src/games/arcade.js', 'src/daily.js', 'src/games/catalog.js'
@@ -90,8 +93,11 @@ test('F-14 points to its GitHub Pages build', () => {
   assert.equal(externs['f-14'], 'https://bassdrum4.github.io/f-14-4/');
 });
 
-test('all hub JavaScript parses', () => {
-  assert.doesNotThrow(() => new vm.Script(builtSource));
+test('the entry document loads the hub as modules from its own folder', () => {
+  assert.match(entry, /<script type="module" src="\.\/main\.js"><\/script>/, 'the hub is a module beside the page');
+  assert.match(entry, /<link rel="stylesheet" href="\.\/styles\.css">/, 'the stylesheet is a sibling file');
+  assert.doesNotMatch(entry, /(?:src|href)="\/(?!\/)/, 'no root-absolute paths: the site is served under /bored/');
+  assert.doesNotMatch(entry, /<script>/, 'nothing is inlined into the page');
   const context = rules(['arcadeGame', 'nativeHTML']);
   for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
     const game = context.nativeHTML(slug);
@@ -236,7 +242,7 @@ test('browser regressions', async t => {
     try { const installed = require('puppeteer').executablePath(); if (fs.existsSync(installed)) executablePath = installed; } catch {}
   }
   assert.ok(executablePath, 'Chrome is required; set CHROME_PATH if it is not in a standard location');
-  const site = await serve(root);
+  const site = await serve(siteRoot);
   ({ origin, url } = site);
   browser = await puppeteer.launch({ executablePath, headless: true });
   t.after(async () => { await browser.close(); await site.close(); });

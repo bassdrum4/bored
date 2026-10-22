@@ -12,9 +12,10 @@ async function leave(page) {
 
 test('visual release captures and live F-14 embed', async t => {
   const root = path.resolve(__dirname, '..');
+  const siteRoot = path.join(root, 'src');
   const chrome = [process.env.CHROME_PATH, path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'), '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p)) || require('puppeteer').executablePath();
   const browser = await puppeteer.launch({ executablePath: chrome, headless: true });
-  const site = await serve(root);
+  const site = await serve(siteRoot);
   t.after(async () => { await browser.close(); await site.close(); });
   const page = await browser.newPage();
   const errors = [];
