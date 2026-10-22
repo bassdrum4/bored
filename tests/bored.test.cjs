@@ -243,9 +243,13 @@ test('browser regressions', async t => {
   }
   assert.ok(executablePath, 'Chrome is required; set CHROME_PATH if it is not in a standard location');
   const site = await serve(siteRoot);
+  // Register cleanup before launching Chrome. If launch times out, the static
+  // server must not keep the Node test process open indefinitely.
+  t.after(async () => {
+    try { await browser?.close(); } finally { await site.close(); }
+  });
   ({ origin, url } = site);
   browser = await puppeteer.launch({ executablePath, headless: true });
-  t.after(async () => { await browser.close(); await site.close(); });
   page = await browser.newPage();
   page.on('pageerror', err => errors.push(err.message));
   await page.setRequestInterception(true);

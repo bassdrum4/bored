@@ -7,8 +7,9 @@ loads the hub modules as plain ES modules, and the games are ordinary HTML in
 time you open its card, and never before.
 
 GitHub Pages address: **https://bassdrum4.github.io/bored/**.
-There is no build: the deploy workflow publishes `src/` as written, so a change
-is live a minute or two after the push.
+There is no build: the deploy workflow publishes `src/` as written on every push
+to `main`. Tests run in a separate workflow, so a browser-test failure does not
+prevent publishing (but should still be investigated).
 
 `npm run dev` serves that same folder at `http://localhost:3000`.
 
@@ -41,7 +42,8 @@ npm test         # game regressions, discovery, layout and mock account flows
 | [`scripts/setup-feedback.mjs`](scripts/setup-feedback.mjs) | Creates the feedback table ([SQL](scripts/feedback-setup.sql)) |
 | [`scripts/player-state.sql`](scripts/player-state.sql) | Creates the per-account `player_state` table — run it in the SQL editor |
 | [`vite.config.js`](vite.config.js) | Dev server (`src/` as root); there is no production build |
-| [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) | Test, then publish `src/` as the GitHub Pages artifact |
+| [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) | Publish `src/` on every push to `main` |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Run browser and logic checks on pushes and pull requests |
 
 Adding a game? Read [`AGENTS.md`](AGENTS.md) first: it lists the three hooks
 (snapshot, high score, daily challenge) a game has to expose to show up in scores

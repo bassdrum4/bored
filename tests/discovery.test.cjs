@@ -14,8 +14,11 @@ test('discovery reaches nothing off-site, keeps its controls, and fits small scr
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
   const site = await serve(siteRoot);
-  const browser = await puppeteer.launch({ executablePath, headless: true });
-  t.after(async () => { await browser.close(); await site.close(); });
+  let browser;
+  t.after(async () => {
+    try { await browser?.close(); } finally { await site.close(); }
+  });
+  browser = await puppeteer.launch({ executablePath, headless: true });
   const page = await browser.newPage();
   const errors = [], requests = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -139,8 +142,11 @@ test('account UI and score sync still work through the redesigned hub (mock back
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
   const site = await serve(siteRoot);
-  const browser = await puppeteer.launch({ executablePath, headless: true });
-  t.after(async () => { await browser.close(); await site.close(); });
+  let browser;
+  t.after(async () => {
+    try { await browser?.close(); } finally { await site.close(); }
+  });
+  browser = await puppeteer.launch({ executablePath, headless: true });
   const page = await browser.newPage();
   const rows = [], posted = [], notes = [], state = [], unexpected = [];
   const rules = Object.entries(JSON.parse(fs.readFileSync(path.join(root, 'src/games/score-rules.json')))).map(([game, rule]) => ({ game, ...rule }));
