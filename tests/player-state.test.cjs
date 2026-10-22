@@ -109,12 +109,12 @@ test('browser score and library keys follow their account, not the next person',
   activatePlayerStorage('guest');
   assert.equal(localStorage.getItem('bored.best.2048'), '256');
 
-  stashPendingSignup('charlie', guest);
-  activatePlayerStorage('user:charlie');
+  stashPendingSignup('a11ce', guest);
+  activatePlayerStorage('user:a11ce');
   assert.equal(localStorage.getItem('bored.best.2048'), null);
-  assert.equal(adoptSignupProgress('charlie'), true);
+  assert.equal(adoptSignupProgress('a11ce'), true);
   assert.equal(localStorage.getItem('bored.best.2048'), '256');
-  assert.equal(adoptSignupProgress('charlie'), false);
+  assert.equal(adoptSignupProgress('a11ce'), false);
 });
 
 test('email signup cannot be mistaken for a still-active anonymous account', async () => {
