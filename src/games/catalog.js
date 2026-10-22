@@ -56,6 +56,24 @@ if (!PAYLOAD_SLUGS.length) throw new Error('No game documents found in src/games
 const payloads = new Map();
 
 /**
+ * The deploy workflow writes the commit it published into `version.json`, so a
+ * game document is fetched from a URL that changes with every push to main.
+ * Pages caches files for ten minutes; without the stamp a returning visitor can
+ * open yesterday's game. Locally the file is just "dev", and a missing one
+ * simply means no stamp.
+ */
+let versionTag = null;
+function deployVersion() {
+  if (!versionTag) {
+    versionTag = fetch(new URL('version.json', document.baseURI), { cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null)
+      .then(version => version && typeof version.commit === 'string' ? version.commit : '')
+      .catch(() => '');
+  }
+  return versionTag;
+}
+
+/**
  * Fetch a game document once and remember it for the rest of the visit. The
  * cache stores the promise, so opening two games at once still downloads each
  * document exactly once, and a failed download is forgotten so a retry works.
@@ -65,7 +83,12 @@ export function loadGameDocument(slug) {
     return Promise.reject(new Error(slug + ' has no game document.'));
   }
   if (!payloads.has(slug)) {
-    payloads.set(slug, fetch(new URL(PAYLOAD_DIR + slug + '.html', document.baseURI))
+    payloads.set(slug, deployVersion()
+      .then(version => {
+        const url = new URL(PAYLOAD_DIR + slug + '.html', document.baseURI);
+        if (version) url.searchParams.set('v', version);
+        return fetch(url);
+      })
       .then(response => {
         if (!response.ok) throw new Error(slug + ' returned HTTP ' + response.status);
         return response.text();
