@@ -166,6 +166,12 @@ test('account UI and score sync still work through the redesigned hub (mock back
       if (method === 'POST') { state.push(JSON.parse(request.postData())); return reply(null); }
       return reply([]);
     }
+    if (url.pathname === '/rest/v1/rpc/submit_score' && method === 'POST') {
+      const { p_game, p_value } = JSON.parse(request.postData());
+      posted.push({ game: p_game, value: p_value, authorization: request.headers().authorization });
+      rows.push({ game: p_game, value: p_value });
+      return reply(p_value);
+    }
     if (url.pathname === '/rest/v1/scores') {
       if (method === 'POST') {
         const row = JSON.parse(request.postData());

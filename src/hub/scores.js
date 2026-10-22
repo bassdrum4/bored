@@ -248,48 +248,18 @@ export async function syncScores() {
     const previous = serverValues.get(game.id);
     if (previous != null && (game.lower ? score >= previous : score <= previous)) continue;
     if (getSession()?.user?.id !== session.user.id) return false;
-    const body = {
-      user_id: session.user.id,
-      game: game.id,
-      value: score,
-      score,
-      updated_at: new Date().toISOString()
-    };
-    // A normal PostgREST upsert can replace a better result with a worse one
-    // when two devices submit in parallel. A guarded UPDATE only succeeds if
-    // the current stored value is still worse than ours.
-    const guardedPath = '/rest/v1/scores?user_id=eq.' + encodeURIComponent(session.user.id) +
-      '&game=eq.' + encodeURIComponent(game.id) +
-      '&value=' + (game.lower ? 'gt.' : 'lt.') + score + '&select=game';
-    let saved = false;
     try {
-      if (previous != null) {
-        const updated = await request(guardedPath, {
-          method: 'PATCH', body, prefer: 'return=representation'
-        });
-        saved = Array.isArray(updated) && updated.length > 0;
-      } else {
-        try {
-          // A plain INSERT fails with a unique conflict if another device
-          // creates the same score row first; retry that race as a guarded
-          // UPDATE rather than an overwriting upsert.
-          await request('/rest/v1/scores', {
-            method: 'POST', body, prefer: 'return=minimal'
-          });
-          saved = true;
-        } catch (err) {
-          if (err.status !== 409 && err.code !== '23505') throw err;
-          const updated = await request(guardedPath, {
-            method: 'PATCH', body, prefer: 'return=representation'
-          });
-          saved = Array.isArray(updated) && updated.length > 0;
-        }
-      }
-      if (saved && getSession()?.user?.id === session.user.id) {
-        submitted[game.id] = score;
-        writeStored(submittedKey, submitted);
-        posted = true;
-      }
+      // The server applies score rules and atomically keeps the personal best.
+      // No client-side UPDATE or INSERT on scores is required.
+      const stored = await request('/rest/v1/rpc/submit_score', {
+        method: 'POST', body: { p_game: game.id, p_value: score }
+      });
+      if (getSession()?.user?.id !== session.user.id) return false;
+      const accepted = Number(stored);
+      if (!Number.isFinite(accepted)) return { error: new Error('Invalid score confirmation') };
+      submitted[game.id] = accepted;
+      writeStored(submittedKey, submitted);
+      if (accepted === score) posted = true;
     } catch (err) {
       // A missing rule row means this game cannot post; every other game can.
       if (err.status !== 401 && err.code !== '23503' && !/foreign key/i.test(err.message || '')) {

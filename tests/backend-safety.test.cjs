@@ -94,29 +94,20 @@ function scoreHarness(rows, slug, localScore) {
   const calls = [];
   const request = async (path, options = {}) => {
     const url = new URL(path, 'https://example.test');
-    if (!url.pathname.endsWith('/scores')) throw new Error('Unexpected request ' + path);
-    if (!options.method || options.method === 'GET') {
+    if (url.pathname.endsWith('/scores') && !options.method) {
       await Promise.resolve();
       return [...rows].map(([game, value]) => ({ game, value }));
     }
-    const { game, value } = options.body;
-    calls.push(options.method);
-    if (options.method === 'POST') {
-      assert.equal(url.searchParams.has('on_conflict'), false);
-      if (rows.has(game)) throw Object.assign(new Error('Already exists'), { status: 409 });
-      rows.set(game, value);
-      return null;
+    if (url.pathname.endsWith('/rpc/submit_score') && options.method === 'POST') {
+      const { p_game, p_value } = options.body;
+      calls.push('RPC');
+      const prev = rows.get(p_game);
+      const best = prev === undefined ? p_value
+        : p_game === 'memory' ? Math.min(prev, p_value) : Math.max(prev, p_value);
+      rows.set(p_game, best);
+      return best;
     }
-    if (options.method === 'PATCH') {
-      const filter = url.searchParams.get('value');
-      const existing = rows.get(game);
-      const matches = filter === 'lt.' + value ? existing < value
-        : filter === 'gt.' + value && existing > value;
-      if (existing === undefined || !matches) return [];
-      rows.set(game, value);
-      return [{ game }];
-    }
-    throw new Error('Unexpected method');
+    throw new Error('Unexpected scoring request ' + path);
   };
   const deps = {
     readStored: (key, fallback) => local.get(key) ?? fallback,
@@ -138,7 +129,7 @@ test('two devices cannot overwrite a better high score', async () => {
   const b = scoreHarness(remote, 'snake', 90);
   await Promise.all([a.sync(), b.sync()]);
   assert.equal(remote.get('snake'), 100);
-  assert.ok([...a.calls, ...b.calls].includes('PATCH'));
+  assert.ok([...a.calls, ...b.calls].every(method => method === 'RPC'));
 });
 
 test('lowest completion time wins even when two writes race', async () => {
@@ -147,5 +138,5 @@ test('lowest completion time wins even when two writes race', async () => {
   const b = scoreHarness(remote, 'memory', 30);
   await Promise.all([a.sync(), b.sync()]);
   assert.equal(remote.get('memory'), 20);
-  assert.ok([...a.calls, ...b.calls].every(method => method === 'PATCH'));
+  assert.ok([...a.calls, ...b.calls].every(method => method === 'RPC'));
 });

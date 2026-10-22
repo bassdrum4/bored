@@ -16,6 +16,7 @@ import {
   syncScores, onScoresPosted
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState } from './hub/cloud.js';
+import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { sendFeedback, feedbackErrorMessage } from './hub/feedback.js';
 
@@ -645,7 +646,8 @@ async function restorePlayerState() {
   if (!id) return;
   try {
     const cloud = await pullPlayerState();
-    if (!cloud || getSession()?.user?.id !== id) return;
+    if (getSession()?.user?.id !== id) return;
+    if (!cloud) { syncSavedDailyResults(); return; }
     if (mergePlayerState(cloud)) {
       saveLibrary();
       renderRecent();
@@ -653,7 +655,18 @@ async function restorePlayerState() {
       renderDaily();
     }
     requestCloudPush();
+    syncSavedDailyResults();
   } catch { /* Nothing to restore yet. */ }
+}
+
+function syncSavedDailyResults() {
+  const saved = Object.entries(readStoredPrefix(DAILY_PREFIX))
+    .filter(([id, result]) => result?.id === id)
+    .slice(-DAILY_LIMIT);
+  for (const [, result] of saved) {
+    // Keep daily play working during outages. The RPC is first-write-wins.
+    void submitDailyResult(result);
+  }
 }
 
 onScoresPosted(() => {
@@ -738,6 +751,7 @@ function pollDaily() {
       result = { id: activeChallenge.id, snapshot: { ...snapshot } };
       dailyResults.set(activeChallenge.id, result);
       writeStored(DAILY_PREFIX + activeChallenge.id, result);
+      void submitDailyResult(result);
       requestCloudPush();
       renderDaily();
     }
