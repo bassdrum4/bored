@@ -165,7 +165,12 @@ test('account UI and score sync still work through the redesigned hub (mock back
       }
       return reply(rows);
     }
-    if (url.pathname === '/rest/v1/leaderboard') return reply(rows.filter(row => !url.searchParams.get('game') || url.searchParams.get('game') === 'eq.' + row.game).map(row => ({ ...row, handle: 'tester' })));
+    // A second account is on the board so the player view has somebody to be
+    // compared against.
+    if (url.pathname === '/rest/v1/leaderboard') {
+      const board = [...rows.map(row => ({ ...row, handle: 'tester' })), { game: 'lights-out', handle: 'rival', value: 9 }];
+      return reply(board.filter(row => !url.searchParams.get('game') || url.searchParams.get('game') === 'eq.' + row.game));
+    }
     if (url.pathname === '/rest/v1/feedback' && method === 'POST') { notes.push(JSON.parse(request.postData())); return reply(null); }
     if (url.pathname === '/auth/v1/logout') return reply(null);
     unexpected.push(method + ' ' + url.pathname);
@@ -208,6 +213,32 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.click('.lb-tab[data-view="games"]');
   await page.select('#lb-game', 'lights-out');
   await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('2 boards'));
+
+  // Another player's game shows their best as it always did, the viewer's own
+  // best beside it, and a way to go and beat it.
+  await page.click('.lb-tab[data-view="players"]');
+  await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('rival'));
+  await page.evaluate(() => {
+    [...document.querySelectorAll('#lb-list .lb-row')]
+      .find(row => row.textContent.includes('rival')).click();
+  });
+  await page.waitForSelector('#lb-list .lb-breakdown .lb-line');
+  const line = await page.$eval('#lb-list .lb-breakdown .lb-line', el => ({
+    game: el.querySelector('.lb-line-name').textContent,
+    theirs: el.querySelector('.lb-line-score').textContent,
+    mine: el.querySelector('.lb-line-you')?.textContent || '',
+    play: el.querySelector('.lb-play')?.getAttribute('aria-label') || ''
+  }));
+  assert.equal(line.game, 'Lights Out');
+  assert.equal(line.theirs, '9 boards');
+  assert.equal(line.mine, 'you 2 boards · behind');
+  assert.equal(line.play, 'Play Lights Out');
+  await page.click('#lb-list .lb-breakdown .lb-play');
+  await page.waitForFunction(() => document.querySelector('#player').hidden === false);
+  await page.waitForFunction(() => document.querySelector('#frame').title === 'Lights Out');
+  await page.evaluate(() => closeGame());
+  await page.waitForFunction(() => document.querySelector('#player').hidden === true);
+
   await page.reload();
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('tester'));
   assert.equal(posted.length, 1, 'restoring the account does not repost an equal best');

@@ -924,9 +924,11 @@ test('browser regressions', async t => {
     try {
       let frame = await openTitle('tetris', 'Tetris');
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
-      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'tetris', lines: 42 }); });
+      // Tetris is ranked on the score the game keeps, not the line count: two
+      // runs can clear the same lines and still be different runs.
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'tetris', lines: 42, score: 4200 }); });
       await close();
-      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.tetris')), '42');
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.tetris')), '4200');
 
       frame = await openTitle('wordle', 'Wordle');
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');

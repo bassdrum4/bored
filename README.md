@@ -223,7 +223,9 @@ see how other players are doing. The leaderboard has two views. **By player**
 ranks accounts: 5 points for first place in a game, 4 for second, down to 1 for
 fifth, ties sharing points, so no game's raw units get added to another's. Only
 the top five in each game score — with a board this small, tenth place was
-mostly everybody. Click a name to expand its per-game bests. **By game** ranks one game at a time, with a
+mostly everybody. Click a name to expand its per-game bests: each game keeps that
+player's score where it was, shows your own best on it underneath — ahead, behind
+or tied — and carries a **Play** button that opens the game. **By game** ranks one game at a time, with a
 picker that also carries your own local best and marks games the shared board
 cannot hold. The leaderboard is backed by Supabase and is entirely optional:
 without keys the hub stays offline and every game still works.
@@ -286,9 +288,11 @@ letters, numbers, `_` or `-`.
 The board tracks a best score for **30 of the 34 games**. The original eight
 (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
 their existing saved bests. Every other offline game except Connect Four and
-Tank2 is read from live game state when you leave or restart: Tetris lines,
-Wordle guesses (solved runs only), 8 Ball balls pocketed, Poker chips, and each
-game's displayed score, waves, levels, wins, ships, or other progress metric.
+Tank2 is read from live game state when you leave or restart: Tetris, Breakout,
+Frogger, Space Invaders, Q*bert, Asteroids and Commanders post their running
+score, Wordle guesses (solved runs only), 8 Ball balls pocketed, Poker chips, and
+every other game's displayed points, waves, levels, wins, ships or other progress
+metric.
 Connect Four and Tank2 are excluded because their only totals are per-session
 win counts; the two remote extras are excluded because the hub cannot inspect
 their cross-origin state. Scores are submitted by the browser, so this is a
@@ -299,8 +303,9 @@ friendly board, not anti-cheat. Signing out keeps local bests intact.
 Games that end are ranked on how they ended: Solitaire posts the seconds it took
 to clear all 52 cards, Wordle posts the guesses of a solved board, Memory posts
 moves for a finished board, Minesweeper posts the clock on a cleared field. Games
-that can run forever post partial progress instead — lines, waves, levels,
-boards, chips, apples — so a good run always beats an abandoned one.
+that can run forever post the score the game itself keeps, so a good run always
+beats an abandoned one — and two runs that tie on a coarse counter (lines
+cleared, waves survived, levels painted) still separate on points.
 
 Two-player games are local games with a CPU in one seat, so they only post when
 the opponent was the computer: Pong, SUMO, VolletBall, Lava, Tank, Gun Mayhem and
@@ -326,8 +331,10 @@ values ('deep', 'Score', 'high', 1000000),
 on conflict (game) do nothing;
 ```
 
-Solitaire's rule row still says "Foundation cards"; the hub now ranks it on
-time, so any value it posts is seconds rather than cards.
+Solitaire's rule row is ranked on seconds to clear rather than foundation cards,
+so `scripts/score-rules-update.sql` rewrites it together with the seven boards
+that moved to a score and clears the values saved under the old units — a stored
+4 meant four layouts, and nothing converts it into four points.
 
 ## New games (4)
 

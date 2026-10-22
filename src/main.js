@@ -50,6 +50,9 @@ function element(tag, className, text) {
 let activeSlug = null;
 let previousSlug = null;
 let launchSelector = '';
+// The element that opened the current game, kept as a node so a control built
+// on the fly (a leaderboard row's Play button) still takes focus back on close.
+let launchFocus = null;
 let activeChallenge = null;
 let hintTimer = 0;
 let focusTimer = 0;
@@ -309,12 +312,16 @@ async function toggleFullscreen() {
   }
 }
 
-function openGame(slug, challenge = null) {
+function openGame(slug, challenge = null, origin = null) {
   if (!ORDER.some(([id]) => id === slug)) return;
   if (!activeSlug) {
-    const origin = document.activeElement;
-    const shelf = origin.closest?.('#recent-list, #grid');
-    launchSelector = shelf ? '#' + shelf.id + ' [data-slug="' + slug + '"]' : origin.id ? '#' + origin.id : '';
+    const from = origin || document.activeElement;
+    // A caller that hands over the control it was launched from (the board's
+    // Play button is rebuilt on every render) gets focus back on that same node;
+    // every other game still returns to its card, as before.
+    launchFocus = origin && origin.isConnected ? origin : null;
+    const shelf = from.closest?.('#recent-list, #grid');
+    launchSelector = shelf ? '#' + shelf.id + ' [data-slug="' + slug + '"]' : from.id ? '#' + from.id : '';
   }
   closeMenu();
   activeChallenge = challenge;
@@ -389,9 +396,13 @@ function closeGame() {
   $('#challenge-progress').hidden = true;
   syncSharedScores();
   renderDaily();
-  const returnTo = (launchSelector && $(launchSelector)) ||
+  // A card that was on screen when the game opened wins; a rebuilt control
+  // (the leaderboard re-renders) has been replaced, so its selector is used.
+  const returnTo = (launchFocus?.isConnected ? launchFocus : null) ||
+    (launchSelector && $(launchSelector)) ||
     $(`#recent-list [data-slug="${previousSlug}"]`) ||
     $(`#grid [data-slug="${previousSlug}"]`) || searchInput;
+  launchFocus = null;
   (wasDaily ? $('#daily-play') : returnTo).focus();
 }
 
@@ -681,6 +692,19 @@ function gameNote(game) {
   return parts.join(' ');
 }
 
+/**
+ * The viewer's own best on one game. The posted score comes first so a best set
+ * on another device still shows up; a guest, or a game that has not reached the
+ * board yet, falls back to the best this browser holds.
+ */
+function ownValue(spec, all, mineKey) {
+  const posted = mineKey
+    ? all.find(row => row.game === spec.id && String(row.handle || '').toLowerCase() === mineKey)
+    : null;
+  const onBoard = posted ? Number(posted.value) : 0;
+  return Number.isFinite(onBoard) && onBoard > 0 ? onBoard : bestValue(spec);
+}
+
 function renderLeaderboard() {
   const select = $('#lb-game');
   const list = $('#lb-list');
@@ -755,8 +779,23 @@ function renderLeaderboard() {
         for (const entry of own) {
           const spec = LB_GAMES.find(g => g.id === entry.game);
           if (!spec) continue;
-          const line = element('li');
-          line.append(element('span', '', spec.name), element('span', '', formatScore(entry.value, spec)));
+          const value = Number(entry.value);
+          const line = element('li', 'lb-line');
+          line.append(element('span', 'lb-line-name', spec.name), element('span', 'lb-line-score', formatScore(value, spec)));
+          // Their best stays where it was; the comparison sits under it so the
+          // row is still one game wide at 320px.
+          if (key !== mineKey) {
+            const mine = ownValue(spec, all, mineKey);
+            const note = !mine ? 'no score from you yet'
+              : mine === value ? 'you ' + formatScore(mine, spec) + ' · tied'
+                : 'you ' + formatScore(mine, spec) + ((spec.lower ? mine < value : mine > value) ? ' · ahead' : ' · behind');
+            line.append(element('span', 'lb-line-you', note));
+          }
+          const play = element('button', 'lb-play', 'Play');
+          play.type = 'button';
+          play.setAttribute('aria-label', 'Play ' + spec.name);
+          play.onclick = event => openGame(spec.id, null, event.currentTarget);
+          line.append(play);
           detail.appendChild(line);
         }
         if (!detail.children.length) detail.appendChild(element('li', '', 'No saved scores yet.'));

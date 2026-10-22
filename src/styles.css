@@ -91,9 +91,16 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
 #lb-list li.you .lb-name{color:var(--red)}
 .lb-breakdown{list-style:none;margin:0 0 8px 3.4ch;padding:0;border-left:1px solid var(--rule)}
 .lb-breakdown[hidden]{display:none}
-.lb-breakdown li{display:flex;justify-content:space-between;gap:12px;padding:3px 0 3px 10px;
+.lb-breakdown li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;padding:3px 0 3px 10px;
   border:0;font:11px/1.5 var(--mono);color:var(--dim)}
-.lb-breakdown li span:last-child{color:var(--ink)}
+.lb-line-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim)}
+.lb-line-score{white-space:nowrap;color:var(--ink)}
+/* The comparison wraps under the game on a phone, where one line cannot hold it. */
+.lb-line-you{flex:1 1 100%;font:10px/1.5 var(--mono);color:var(--dim)}
+.lb-play{background:none;border:1px solid var(--rule);color:var(--dim);font:10px var(--mono);
+  padding:2px 7px;cursor:pointer;white-space:nowrap}
+.lb-play:hover,.lb-play:focus-visible{border-color:var(--ink);color:var(--ink)}
+.lb-play:focus-visible{outline:1px solid var(--ink);outline-offset:2px}
 #lb-mine{margin-top:10px;font:11px/1.7 var(--mono);color:var(--dim)}
 #lb-empty{padding:12px 0;color:var(--dim);font-style:italic;font-size:14px}
 dialog{border:1px solid var(--ink);background:var(--paper);color:var(--ink);max-width:min(420px,calc(100vw - 32px));padding:22px;font:14px/1.5 Georgia,"Times New Roman",serif}

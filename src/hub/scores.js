@@ -85,16 +85,19 @@ export const HIGH_SCORE_GAMES = [
     when: snapshot => snapshot.finished === true
   }),
   highScore('8ball', '8 Ball', 'balls', { metric: 'potted', when: snapshot => snapshot.cpu === true }),
-  highScore('tetris', 'Tetris', 'lines', { metric: 'lines' }),
-  highScore('breakout', 'Breakout', 'layouts', { metric: 'layouts' }),
-  highScore('frogger', 'Frogger', 'lily pads', { metric: 'homes' }),
+  // These games keep a running score, so the board ranks that rather than the
+  // coarse counter: two decent runs tie on lines cleared or waves survived and
+  // only separate on the score. The daily challenge still uses the counter.
+  highScore('tetris', 'Tetris', 'points', { metric: 'score' }),
+  highScore('breakout', 'Breakout', 'points', { metric: 'score' }),
+  highScore('frogger', 'Frogger', 'points', { metric: 'score' }),
   highScore('wordle', 'Wordle', 'guesses', {
     metric: 'guesses', lower: true,
     when: snapshot => snapshot.solved === true,
     transform: snapshot => snapshot.guesses + 1
   }),
-  highScore('space-invaders', 'Space Invaders', 'waves', { metric: 'waves' }),
-  highScore('qbert', 'Q*bert', 'levels', { metric: 'levels' }),
+  highScore('space-invaders', 'Space Invaders', 'points', { metric: 'score' }),
+  highScore('qbert', 'Q*bert', 'points', { metric: 'score' }),
   highScore('pong', 'Pong', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
   highScore('sumo', 'SUMO', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   highScore('poker', 'Poker', 'chips', { metric: 'profit', when: snapshot => snapshot.handOver === true }),
@@ -110,14 +113,14 @@ export const HIGH_SCORE_GAMES = [
     note: 'Fastest clear of all 52 cards'
   }),
   highScore('lights-out', 'Lights Out', 'boards', { metric: 'cleared' }),
-  highScore('commanders', 'Commanders', 'waves', { metric: 'waves' }),
+  highScore('commanders', 'Commanders', 'points', { metric: 'score' }),
   highScore('lava', 'Lava', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
   highScore('volletball', 'VolletBall', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
   highScore('gun-mayhem', 'Gun Mayhem', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   highScore('shadow-net', 'shadow.net', 'files', { metric: 'files' }),
   highScore('sand', 'Sand', 'cells', { metric: 'cells' }),
   highScore('eco', 'Eco', 'plants', { metric: 'plants', when: snapshot => snapshot.seconds >= 60 }),
-  highScore('asteroids', 'Asteroids', 'waves', { metric: 'waves' })
+  highScore('asteroids', 'Asteroids', 'points', { metric: 'score' })
 ];
 
 export const LB_GAMES = [...LEGACY_GAMES, ...HIGH_SCORE_GAMES];
