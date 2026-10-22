@@ -209,12 +209,17 @@ export async function syncScores() {
   if (!rulesLoaded() && !(await loadRules())) return false;
   const submittedKey = 'bored.submitted.' + session.user.id;
   const submitted = readStored(submittedKey, {}) || {};
+  const serverValues = new Map();
   try {
-    if (!(await ensureProfile())) return false;
+    if (!(await ensureProfile()) || getSession()?.user?.id !== session.user.id) return false;
     const rows = await request('/rest/v1/scores?select=game,value&user_id=eq.' + encodeURIComponent(session.user.id));
+    if (getSession()?.user?.id !== session.user.id) return false;
     for (const row of rows || []) {
       const value = Number(row.value);
-      if (Number.isFinite(value)) submitted[row.game] = value;
+      if (Number.isFinite(value)) {
+        serverValues.set(row.game, value);
+        submitted[row.game] = value;
+      }
     }
     writeStored(submittedKey, submitted);
   } catch (err) {
@@ -229,23 +234,51 @@ export async function syncScores() {
     const rule = scoreRules.get(game.id);
     const ceiling = Number.isFinite(game.max) ? game.max : rule?.max_value;
     if (Number.isFinite(ceiling) && score > ceiling) continue;
-    const previous = submitted[game.id];
+    const previous = serverValues.get(game.id);
     if (previous != null && (game.lower ? score >= previous : score <= previous)) continue;
+    if (getSession()?.user?.id !== session.user.id) return false;
+    const body = {
+      user_id: session.user.id,
+      game: game.id,
+      value: score,
+      score,
+      updated_at: new Date().toISOString()
+    };
+    // A normal PostgREST upsert can replace a better result with a worse one
+    // when two devices submit in parallel. A guarded UPDATE only succeeds if
+    // the current stored value is still worse than ours.
+    const guardedPath = '/rest/v1/scores?user_id=eq.' + encodeURIComponent(session.user.id) +
+      '&game=eq.' + encodeURIComponent(game.id) +
+      '&value=' + (game.lower ? 'gt.' : 'lt.') + score + '&select=game';
+    let saved = false;
     try {
-      await request('/rest/v1/scores?on_conflict=user_id,game', {
-        method: 'POST',
-        body: {
-          user_id: session.user.id,
-          game: game.id,
-          value: score,
-          score,
-          updated_at: new Date().toISOString()
-        },
-        prefer: 'resolution=merge-duplicates,return=minimal'
-      });
-      submitted[game.id] = score;
-      writeStored(submittedKey, submitted);
-      posted = true;
+      if (previous != null) {
+        const updated = await request(guardedPath, {
+          method: 'PATCH', body, prefer: 'return=representation'
+        });
+        saved = Array.isArray(updated) && updated.length > 0;
+      } else {
+        try {
+          // A plain INSERT fails with a unique conflict if another device
+          // creates the same score row first; retry that race as a guarded
+          // UPDATE rather than an overwriting upsert.
+          await request('/rest/v1/scores', {
+            method: 'POST', body, prefer: 'return=minimal'
+          });
+          saved = true;
+        } catch (err) {
+          if (err.status !== 409 && err.code !== '23505') throw err;
+          const updated = await request(guardedPath, {
+            method: 'PATCH', body, prefer: 'return=representation'
+          });
+          saved = Array.isArray(updated) && updated.length > 0;
+        }
+      }
+      if (saved && getSession()?.user?.id === session.user.id) {
+        submitted[game.id] = score;
+        writeStored(submittedKey, submitted);
+        posted = true;
+      }
     } catch (err) {
       // A missing rule row means this game cannot post; every other game can.
       if (err.status !== 401 && err.code !== '23503' && !/foreign key/i.test(err.message || '')) {
