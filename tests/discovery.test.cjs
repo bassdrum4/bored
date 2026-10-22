@@ -210,13 +210,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
   assert.equal(pushed.user_id, 'test-user');
   assert.ok(pushed.data.library.recent.includes('lights-out'), 'recent games follow the account');
   assert.equal(pushed.data.bests['lights-out'], 2, 'a new best follows the account');
-  await page.click('.lb-tab[data-view="games"]');
-  await page.select('#lb-game', 'lights-out');
-  await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('2 boards'));
-
   // Another player's game shows their best as it always did, the viewer's own
   // best beside it, and a way to go and beat it.
-  await page.click('.lb-tab[data-view="players"]');
   await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('rival'));
   await page.evaluate(() => {
     [...document.querySelectorAll('#lb-list .lb-row')]

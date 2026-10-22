@@ -66,16 +66,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
 #challenge-progress{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:60;width:max-content;max-width:94%;padding:9px 14px;background:var(--paper);color:var(--ink);border:1px solid var(--ink);font:11px/1.6 var(--mono);text-align:center;pointer-events:none}
 .foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 
-.lb-bar{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;font:11px var(--mono);color:var(--dim)}
-#lb-pick{display:flex;align-items:center;gap:6px;margin-right:auto}
-.lb-tabs{display:flex;gap:0;border:1px solid var(--rule)}
-.lb-tab{background:none;border:0;border-right:1px solid var(--rule);font:11px var(--mono);
-  letter-spacing:.04em;padding:6px 11px;color:var(--dim);cursor:pointer;border-radius:0}
-.lb-tab:last-child{border-right:0}
-.lb-tab:hover{color:var(--ink)}
-.lb-tab[aria-selected="true"]{background:var(--ink);color:var(--paper)}
-#lb-pick[hidden]{display:none}
-#lb-game{background:var(--paper);color:var(--ink);border:1px solid var(--rule);font:11px var(--mono);padding:6px;max-width:210px}
+.lb-bar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px;margin-bottom:10px;font:11px var(--mono);color:var(--dim)}
 #lb-note{font:11px/1.7 var(--mono);color:var(--dim);margin-bottom:14px}
 #lb-list{list-style:none}
 #lb-list li{display:block;border-bottom:1px solid var(--rule)}
@@ -296,7 +287,6 @@ dialog{margin:auto}
   .card .game-meta{font-size:10px}
   .game-inputs{font-size:9px}
   .star{top:7px;left:7px;right:auto;width:32px;height:32px;font-size:21px}
-  #lb-game{max-width:170px}
 }
 @media(max-width:360px){
   .site-nav{gap:8px;font-size:9px}

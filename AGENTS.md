@@ -185,11 +185,11 @@ Arguments are `(id, display name, unit, options)`. Options:
   potted balls).
 
 Best values are cached locally (`bored.high.<id>`) and pushed to the `scores` table for signed-in
-players. Games in that list appear in the leaderboard picker, so the id must match the snapshot
+players. Games in that list rank on the shared board, so the id must match the snapshot
 `slug` and the catalog key. `scores.game` is a foreign key to `score_rules.game`, so a game only
 posts once it has a rule row: keep `src/games/score-rules.json` in step with the specs and run
-`npm run games:register` after adding games. A game with no row is listed as *local only* in the
-picker and never posts — every game gets its own board, nothing shares one.
+`npm run games:register` after adding games. A game with no row never posts — every game gets its
+own board, nothing shares one.
 
 ## Hook 3 — daily challenge
 

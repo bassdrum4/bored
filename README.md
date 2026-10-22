@@ -219,16 +219,15 @@ cross-origin game state (and Klang is a music player).
 ## Shared leaderboard (optional)
 
 Sign in with an email and password to keep your best scores on a shared board
-and see how other players are doing. The leaderboard has two views. **By player**
-ranks accounts: 5 points for first place in a game, 4 for second, down to 1 for
-fifth, ties sharing points, so no game's raw units get added to another's. Only
-the top five in each game score — with a board this small, tenth place was
-mostly everybody. Click a name to expand its per-game bests: each game keeps that
-player's score where it was, shows your own best on it underneath — ahead, behind
-or tied — and carries a **Play** button that opens the game. **By game** ranks one game at a time, with a
-picker that also carries your own local best and marks games the shared board
-cannot hold. The leaderboard is backed by Supabase and is entirely optional:
-without keys the hub stays offline and every game still works.
+and see how other players are doing. The leaderboard ranks accounts: 5 points
+for first place in a game, 4 for second, down to 1 for fifth, ties sharing
+points, so no game's raw units get added to another's. Only the top five in each
+game score — with a board this small, tenth place was mostly everybody. Click a
+name to expand its per-game bests, listed A–Z: each game keeps that player's
+score where it was, shows your own best on it underneath — ahead, behind or
+tied — and carries a **Play** button that opens the game. The leaderboard is
+backed by Supabase and is entirely optional: without keys the hub stays offline
+and every game still works.
 
 This project's backend is already provisioned: `score_rules`, `profiles`,
 `scores`, `player_state`, the public `leaderboard` view, and the `set_handle` RPC. The hub reads
@@ -311,9 +310,9 @@ which is why a new game no longer produces a foreign-key error.
 
 Every game ranks on its own board and nothing is ever folded into another
 score. Two games have no rule row of their own yet — DEEP and Lights Out — so
-they are marked **(local only)** in the leaderboard picker: their bests still
-save in the browser, and the note under the board says so. Adding their rows
-puts them on their own boards exactly like every other game, no code change:
+their bests save in the browser and nothing is posted for them. Adding their
+rows puts them on the shared board exactly like every other game, no code
+change:
 
 ```sql
 insert into score_rules (game, label, better, max_value)
@@ -406,8 +405,8 @@ simulated equity, no-peeking opponents and draw discards, 8 Ball's simulated sho
 all 30 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, Detroit-time rollover, 320px layouts,
-blocked storage, high-score capture, the shared-board picker (one board per
-game, local-only ones marked), and no external game requests beyond the
+blocked storage, high-score capture, one shared board per game with the
+local-only ones kept off it, and no external game requests beyond the
 configured leaderboard API.
 
 The built `index.html` is the artifact the browser block loads. The bundle keeps

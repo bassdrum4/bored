@@ -352,7 +352,6 @@ test('browser regressions', async t => {
   });
 
   await t.test('overall ranking groups scores by account, respects lower-is-better and ties', async () => {
-    assert.equal(await page.$eval('#lb-pick', el => el.hidden), true, 'the player view hides the game picker');
     const rankings = await page.evaluate(() => accountStandings([
       { game: '2048', handle: 'Ada', value: 300 },
       { game: '2048', handle: 'Ben', value: 300 },
@@ -984,25 +983,17 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), '2402', 'a cleared descent posts its bonus score');
 
-      // Every game ranks on its own board. One the server has no rule row for
-      // is listed too, marked local-only, rather than folding into another
-      // game's score — so this holds whatever the live rule list contains.
-      const options = await page.$$eval('#lb-game option', els => els.map(el => [el.value, el.textContent]));
+      // Every game ranks on its own board, and one the server has no rule row
+      // for is only saved locally rather than folding into another game's
+      // score — so this holds whatever the live rule list contains.
       const boards = await page.evaluate(() => ({
-        total: LB_GAMES.length,
-        pickable: boardGames().length,
-        localOnly: LB_GAMES.filter(game => isLocalOnly(game.id)).map(game => game.id)
+        ids: LB_GAMES.map(game => game.id),
+        boards: boardGames().length,
+        localOnly: LB_GAMES.filter(game => isLocalOnly(game.id)).length
       }));
-      assert.equal(boards.pickable, boards.total, 'every game is its own board');
-      assert.equal(options.length, boards.total, 'one picker entry per game');
-      assert.equal(new Set(options.map(([id]) => id)).size, boards.total, 'no board is listed twice');
-      assert.ok(options.every(([, label]) => !label.includes(' + ')), 'no board is labelled with borrowed games');
-      for (const [id, label] of options) {
-        assert.equal(label.endsWith(' (local only)'), boards.localOnly.includes(id),
-          id + ' is marked local-only exactly when the server has no rule for it');
-      }
-      assert.equal(await page.$eval('#lb-game', el => el.value), '2048');
-      assert.match(await text(page, '#lb-note'), new RegExp('across ' + boards.total + ' games'));
+      assert.equal(boards.boards, boards.ids.length, 'every game is its own board');
+      assert.equal(new Set(boards.ids).size, boards.ids.length, 'no board is listed twice');
+      assert.match(await text(page, '#lb-note'), new RegExp('across ' + boards.ids.length + ' games'));
     } finally {
       if (await page.$eval('#player', el => !el.hidden)) await close();
       await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);

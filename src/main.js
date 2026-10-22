@@ -69,8 +69,6 @@ let favorites = new Set();
 let recentGames = [];
 let favoriteEvents = {};
 
-let lbGameId = 'overall';
-let lbView = 'players';
 let lbOpenPlayer = '';
 let lbNotice = '';
 const lbCache = new Map();
@@ -777,29 +775,6 @@ async function shareDailyResult() {
 const byGameName = (a, b) =>
   a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }) || a.id.localeCompare(b.id);
 
-function renderGamePicker() {
-  const select = $('#lb-game');
-  if (!select) return;
-  const options = boardGames().sort(byGameName);
-  if (!options.some(game => game.id === lbGameId)) lbGameId = options[0]?.id || 'overall';
-  select.replaceChildren();
-  for (const game of options) {
-    const option = document.createElement('option');
-    option.value = game.id;
-    option.textContent = game.name + (isLocalOnly(game.id) ? ' (local only)' : '');
-    select.appendChild(option);
-  }
-  select.value = lbGameId;
-}
-
-function gameNote(game) {
-  const unit = game.unit === 'seconds' ? 'time' : game.unit;
-  const parts = [game.name + ' · ' + (game.lower ? 'lowest' : 'highest') + ' ' + unit + ' first.'];
-  if (game.note) parts.push(game.note + '.');
-  if (isLocalOnly(game.id)) parts.push('Not ranked online yet — scores for this game stay in your browser.');
-  return parts.join(' ');
-}
-
 /**
  * The viewer's own best on one game. The posted score comes first so a best set
  * on another device still shows up; a guest, or a game that has not reached the
@@ -814,17 +789,8 @@ function ownValue(spec, all, mineKey) {
 }
 
 function renderLeaderboard() {
-  const select = $('#lb-game');
   const list = $('#lb-list');
   const empty = $('#lb-empty');
-  const picker = $('#lb-pick');
-  const players = lbView === 'players';
-  if (picker) picker.hidden = players;
-  for (const tab of $$('.lb-tab')) {
-    tab.setAttribute('aria-selected', String(tab.dataset.view === (players ? 'players' : 'games')));
-  }
-  const game = LB_GAMES.find(entry => entry.id === lbGameId) || boardGames()[0];
-  if (select && game && select.value !== game.id) select.value = game.id;
   list.replaceChildren();
   $('#lb-refresh').disabled = !backendReady();
 
@@ -836,18 +802,13 @@ function renderLeaderboard() {
     return;
   }
 
-  const cached = lbCache.get(players ? 'overall' : lbGameId);
+  const cached = lbCache.get('overall');
   const all = cached?.rows || [];
-  const rows = players ? accountStandings(all) : all;
-
-  if (players) {
-    const played = new Set(all.map(row => row.game).filter(id => LB_GAMES.some(entry => entry.id === id))).size;
-    $('#lb-note').textContent = 'Players ranked across ' + LB_GAMES.length + ' games · ' + rows.length +
-      (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores · ' + rankPoints(1) +
-      ' points for a first place, down to 1 for fifth. Pick a name to see its games.';
-  } else if (game) {
-    $('#lb-note').textContent = gameNote(game);
-  }
+  const rows = accountStandings(all);
+  const played = new Set(all.map(row => row.game).filter(id => LB_GAMES.some(entry => entry.id === id))).size;
+  $('#lb-note').textContent = 'Players ranked across ' + LB_GAMES.length + ' games · ' + rows.length +
+    (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores · ' + rankPoints(1) +
+    ' points for a first place, down to 1 for fifth. Pick a name to see its games.';
 
   if (cached?.error) {
     empty.hidden = false;
@@ -871,77 +832,59 @@ function renderLeaderboard() {
     const label = element('span', 'lb-name', name + (mine ? ' (you)' : ''));
     const score = element('span', 'lb-score');
 
-    if (players) {
-      label.appendChild(element('small', 'lb-player-meta', row.gamesRanked + ' of ' + row.gamesPlayed + ' games scoring'));
-      score.textContent = row.points + ' pts';
-      const key = name.toLowerCase();
-      const open = lbOpenPlayer === key;
-      button.setAttribute('aria-expanded', String(open));
-      button.onclick = () => { lbOpenPlayer = open ? '' : key; renderLeaderboard(); };
-      const detail = element('ul', 'lb-breakdown');
-      detail.hidden = !open;
-      if (open) {
-        const specOf = id => LB_GAMES.find(game => game.id === id) || { id, name: id };
-        const own = all
-          .filter(entry => String(entry.handle || '').toLowerCase() === key)
-          .sort((a, b) => byGameName(specOf(a.game), specOf(b.game)));
-        for (const entry of own) {
-          const spec = LB_GAMES.find(g => g.id === entry.game);
-          if (!spec) continue;
-          const value = Number(entry.value);
-          const line = element('li', 'lb-line');
-          line.append(element('span', 'lb-line-name', spec.name), element('span', 'lb-line-score', formatScore(value, spec)));
-          // Their best stays where it was; the comparison sits under it so the
-          // row is still one game wide at 320px.
-          if (key !== mineKey) {
-            const mine = ownValue(spec, all, mineKey);
-            const note = !mine ? 'no score from you yet'
-              : mine === value ? 'you ' + formatScore(mine, spec) + ' · tied'
-                : 'you ' + formatScore(mine, spec) + ((spec.lower ? mine < value : mine > value) ? ' · ahead' : ' · behind');
-            line.append(element('span', 'lb-line-you', note));
-          }
-          const play = element('button', 'lb-play', 'Play');
-          play.type = 'button';
-          play.setAttribute('aria-label', 'Play ' + spec.name);
-          play.onclick = event => openGame(spec.id, null, event.currentTarget);
-          line.append(play);
-          detail.appendChild(line);
+    label.appendChild(element('small', 'lb-player-meta', row.gamesRanked + ' of ' + row.gamesPlayed + ' games scoring'));
+    score.textContent = row.points + ' pts';
+    const key = name.toLowerCase();
+    const open = lbOpenPlayer === key;
+    button.setAttribute('aria-expanded', String(open));
+    button.onclick = () => { lbOpenPlayer = open ? '' : key; renderLeaderboard(); };
+    const detail = element('ul', 'lb-breakdown');
+    detail.hidden = !open;
+    if (open) {
+      const specOf = id => LB_GAMES.find(game => game.id === id) || { id, name: id };
+      const own = all
+        .filter(entry => String(entry.handle || '').toLowerCase() === key)
+        .sort((a, b) => byGameName(specOf(a.game), specOf(b.game)));
+      for (const entry of own) {
+        const spec = LB_GAMES.find(g => g.id === entry.game);
+        if (!spec) continue;
+        const value = Number(entry.value);
+        const line = element('li', 'lb-line');
+        line.append(element('span', 'lb-line-name', spec.name), element('span', 'lb-line-score', formatScore(value, spec)));
+        // Their best stays where it was; the comparison sits under it so the
+        // row is still one game wide at 320px.
+        if (key !== mineKey) {
+          const mine = ownValue(spec, all, mineKey);
+          const note = !mine ? 'no score from you yet'
+            : mine === value ? 'you ' + formatScore(mine, spec) + ' · tied'
+              : 'you ' + formatScore(mine, spec) + ((spec.lower ? mine < value : mine > value) ? ' · ahead' : ' · behind');
+          line.append(element('span', 'lb-line-you', note));
         }
-        if (!detail.children.length) detail.appendChild(element('li', '', 'No saved scores yet.'));
+        const play = element('button', 'lb-play', 'Play');
+        play.type = 'button';
+        play.setAttribute('aria-label', 'Play ' + spec.name);
+        play.onclick = event => openGame(spec.id, null, event.currentTarget);
+        line.append(play);
+        detail.appendChild(line);
       }
-      item.append(button, detail);
-    } else {
-      score.textContent = formatScore(row.value, game);
-      item.appendChild(button);
+      if (!detail.children.length) detail.appendChild(element('li', '', 'No saved scores yet.'));
     }
+    item.append(button, detail);
 
     button.append(rank, label, score);
     list.appendChild(item);
   });
 
-  if (players) {
-    const myRank = handle ? rows.findIndex(row => row.handle.toLowerCase() === mineKey) : -1;
-    const me = myRank < 0 ? null : rows[myRank];
-    $('#lb-mine').textContent = me
-      ? 'Your account: #' + (myRank + 1) + ' · ' + me.points + ' points · ' + me.gamesRanked + ' games scoring.'
-      : (hasIdentity() ? 'Play a game to put your account on the board.' : 'Sign in to put your account on the board.');
-  } else if (game) {
-    const parts = [];
-    if (rows.length) parts.push(rows.length + (rows.length === 1 ? ' player' : ' players') + ' ranked');
-    const local = bestValue(game);
-    if (local) parts.push('your best: ' + formatScore(local, game));
-    const myRow = hasIdentity() && handle ? rows.find(row => String(row.handle).toLowerCase() === mineKey) : null;
-    if (myRow) parts.push('on the board: #' + (rows.indexOf(myRow) + 1));
-    $('#lb-mine').textContent = parts.length
-      ? parts.join(' · ') + (isLocalOnly(game.id) ? ' · not ranked online yet' : '')
-      : (hasIdentity() ? 'Play ' + game.name + ' to put a score on the board.' : 'Sign in to add your best scores.');
-  }
+  const myRank = handle ? rows.findIndex(row => row.handle.toLowerCase() === mineKey) : -1;
+  const me = myRank < 0 ? null : rows[myRank];
+  $('#lb-mine').textContent = me
+    ? 'Your account: #' + (myRank + 1) + ' · ' + me.points + ' points · ' + me.gamesRanked + ' games scoring.'
+    : (hasIdentity() ? 'Play a game to put your account on the board.' : 'Sign in to put your account on the board.');
 }
 
 async function loadLeaderboard(force = false) {
   if (!backendReady()) { renderLeaderboard(); return; }
-  const key = lbView === 'players' ? 'overall' : lbGameId;
-  const game = lbView === 'games' ? LB_GAMES.find(entry => entry.id === lbGameId) : null;
+  const key = 'overall';
   const cached = lbCache.get(key);
   if (!force && cached && Date.now() - cached.at < 30000) { renderLeaderboard(); return; }
   if (!cached || force) {
@@ -949,39 +892,28 @@ async function loadLeaderboard(force = false) {
     if (!$('#lb-list').children.length) { empty.hidden = false; empty.textContent = 'Loading rankings…'; }
   }
   try {
-    let rows;
-    if (game) {
+    // Read the shared leaderboard in pages. PostgREST projects commonly cap
+    // individual responses at 1,000 records, so one request misses players.
+    const rows = [];
+    const pageSize = 1000;
+    for (let offset = 0; offset < 50000; offset += pageSize) {
       const query = new URLSearchParams({
-        select: 'game,handle,value,updated_at',
-        game: 'eq.' + game.id,
-        order: 'value.' + (game.lower ? 'asc' : 'desc'),
-        limit: '10'
+        select: 'game,handle,value',
+        order: 'game.asc,handle.asc',
+        limit: String(pageSize),
+        offset: String(offset)
       });
-      rows = await request('/rest/v1/leaderboard?' + query, { token: ANON_TOKEN });
-    } else {
-      // Read the shared leaderboard in pages. PostgREST projects commonly cap
-      // individual responses at 1,000 records, so one request misses players.
-      rows = [];
-      const pageSize = 1000;
-      for (let offset = 0; offset < 50000; offset += pageSize) {
-        const query = new URLSearchParams({
-          select: 'game,handle,value',
-          order: 'game.asc,handle.asc',
-          limit: String(pageSize),
-          offset: String(offset)
-        });
-        const page = await request('/rest/v1/leaderboard?' + query, { token: ANON_TOKEN });
-        if (!Array.isArray(page)) throw new Error('Invalid leaderboard response.');
-        rows.push(...page);
-        if (page.length < pageSize) break;
-        if (offset + pageSize >= 50000) throw new Error('Too many scores to rank right now.');
-      }
+      const page = await request('/rest/v1/leaderboard?' + query, { token: ANON_TOKEN });
+      if (!Array.isArray(page)) throw new Error('Invalid leaderboard response.');
+      rows.push(...page);
+      if (page.length < pageSize) break;
+      if (offset + pageSize >= 50000) throw new Error('Too many scores to rank right now.');
     }
-    lbCache.set(key, { rows: Array.isArray(rows) ? rows : [], at: Date.now() });
+    lbCache.set(key, { rows, at: Date.now() });
   } catch (err) {
     lbCache.set(key, { rows: [], at: Date.now(), error: authErrorMessage(err) });
   }
-  if ((lbView === 'players' ? 'overall' : lbGameId) === key) renderLeaderboard();
+  renderLeaderboard();
 }
 
 /* ── Account ──────────────────────────────────────────────────────────────── */
@@ -1229,21 +1161,6 @@ async function consumeAuthRedirect() {
 }
 
 function initAccount() {
-  renderGamePicker();
-  $('#lb-game').onchange = event => {
-    lbGameId = event.target.value;
-    lbOpenPlayer = '';
-    renderLeaderboard();
-    loadLeaderboard();
-  };
-  for (const tab of $$('.lb-tab')) {
-    tab.onclick = () => {
-      lbView = tab.dataset.view === 'games' ? 'games' : 'players';
-      lbOpenPlayer = '';
-      renderLeaderboard();
-      loadLeaderboard();
-    };
-  }
   $('#lb-refresh').onclick = () => loadLeaderboard(true);
   $('#claim-signin').onclick = () => startClaimAuth('signin');
   $('#claim-signup').onclick = () => startClaimAuth('signup');
@@ -1262,7 +1179,6 @@ function initAccount() {
   renderLeaderboard();
   loadRules().then(loaded => {
     if (!loaded) return;
-    renderGamePicker();
     renderLeaderboard();
   });
   loadLeaderboard();
