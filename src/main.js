@@ -16,6 +16,7 @@ import {
   syncScores, onScoresPosted
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState } from './hub/cloud.js';
+import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { sendFeedback, feedbackErrorMessage } from './hub/feedback.js';
 
 // Keep the original console/test surface available from the bundled file. The
@@ -63,6 +64,7 @@ let collection = 'all';
 let visibleGames = [];
 let favorites = new Set();
 let recentGames = [];
+let favoriteEvents = {};
 
 let lbGameId = 'overall';
 let lbView = 'players';
@@ -82,6 +84,7 @@ function loadLibrary() {
     : [];
   favorites = new Set(valid(saved.favorites));
   recentGames = valid(saved.recent).slice(0, 4);
+  favoriteEvents = readStored('bored.favoriteEvents', {}) || {};
 }
 
 function saveLibrary() {
@@ -204,6 +207,8 @@ function renderLibrary() {
     star.onclick = () => {
       if (favorites.has(slug)) favorites.delete(slug);
       else favorites.add(slug);
+      favoriteEvents[slug] = { saved: favorites.has(slug), at: Date.now() };
+      writeStored('bored.favoriteEvents', favoriteEvents);
       saveLibrary();
       updateStar();
       renderRecent();
@@ -473,8 +478,8 @@ function localPlayerState() {
     .sort((a, b) => b[0].localeCompare(a[0]))
     .slice(0, DAILY_LIMIT);
   return {
-    library: { favorites: [...favorites], recent: recentGames },
-    bests: Object.fromEntries(HIGH_SCORE_GAMES
+    library: { favorites: [...favorites], recent: recentGames, favoriteEvents },
+    bests: Object.fromEntries(LB_GAMES
       .map(game => [game.id, bestValue(game)])
       .filter(([, value]) => Number.isFinite(value) && value > 0)),
     daily: Object.fromEntries(daily)
@@ -489,26 +494,42 @@ function mergePlayerState(data) {
   const library = data.library || {};
   let changed = false;
 
+  const events = library.favoriteEvents || {};
+  for (const [slug, event] of Object.entries(events)) {
+    if (!validSlug(slug) || !event || typeof event.saved !== 'boolean' || !Number.isFinite(event.at)) continue;
+    if (!favoriteEvents[slug] || event.at >= favoriteEvents[slug].at) {
+      if (!favoriteEvents[slug] || favoriteEvents[slug].at !== event.at || favoriteEvents[slug].saved !== event.saved) changed = true;
+      favoriteEvents[slug] = event;
+    }
+  }
   const merged = new Set(
     [...favorites, ...(Array.isArray(library.favorites) ? library.favorites : [])].filter(validSlug)
   );
-  if (merged.size !== favorites.size) changed = true;
+  for (const [slug, event] of Object.entries(favoriteEvents)) {
+    if (!validSlug(slug)) continue;
+    if (event.saved) merged.add(slug);
+    else merged.delete(slug);
+  }
+  if (merged.size !== favorites.size || [...merged].some(slug => !favorites.has(slug))) changed = true;
   favorites = merged;
+  writeStored('bored.favoriteEvents', favoriteEvents);
 
   const cloudRecent = [...new Set(
     (Array.isArray(library.recent) ? library.recent : []).filter(validSlug)
   )].slice(0, 4);
-  if (cloudRecent.length > recentGames.length) {
-    recentGames = cloudRecent;
+  const recent = [...new Set([...recentGames, ...cloudRecent])].slice(0, 4);
+  if (recent.join('|') !== recentGames.join('|')) {
+    recentGames = recent;
     changed = true;
   }
 
-  for (const game of HIGH_SCORE_GAMES) {
+  for (const game of LB_GAMES) {
     const cloud = Math.round(Number(data.bests?.[game.id]));
     if (!Number.isFinite(cloud) || cloud <= 0) continue;
     const local = bestValue(game);
     if (local && (game.lower ? local <= cloud : local >= cloud)) continue;
-    if (writeRaw(game.key, cloud)) changed = true;
+    const key = game.key || (game.id === 'minesweeper' ? 'bored.synced.minesweeper' : null);
+    if (key && writeRaw(key, cloud)) changed = true;
   }
 
   for (const [id, result] of Object.entries(data.daily || {})) {
@@ -518,22 +539,51 @@ function mergePlayerState(data) {
   return changed;
 }
 
+function activePlayerId() {
+  return hasIdentity() ? getSession().user.id : null;
+}
+
+// Legacy games write score keys themselves, so replace the entire set of
+// player-owned keys rather than just changing the library JSON namespace.
+function activateProfile() {
+  clearTimeout(cloudTimer);
+  const id = activePlayerId();
+  activatePlayerStorage(id ? 'user:' + id : 'guest');
+  dailyResults.clear();
+  loadLibrary();
+  renderRecent();
+  renderLibrary();
+  renderDaily();
+}
+
 let cloudTimer = 0;
 
 /** Debounced: one run can move a best and the recent shelf in the same gesture. */
 function requestCloudPush() {
   if (!getSession() || !backendReady()) return;
   clearTimeout(cloudTimer);
-  cloudTimer = setTimeout(() => { pushPlayerState(localPlayerState()).catch(() => {}); }, 900);
+  const id = getSession().user.id;
+  cloudTimer = setTimeout(async () => {
+    if (getSession()?.user?.id !== id) return;
+    try {
+      const merged = await pushPlayerState(localPlayerState());
+      if (!merged || getSession()?.user?.id !== id) return;
+      if (mergePlayerState(merged)) {
+        saveLibrary(); renderRecent(); renderLibrary(); renderDaily();
+      }
+    } catch { /* Offline: the next save or login retries. */ }
+  }, 900);
 }
 
 // Called as soon as a session exists. A table that has not been created yet, an
 // unreachable network, or a token that will not refresh all resolve to "keep
 // the local copy": play must never depend on the account server being up.
 async function restorePlayerState() {
+  const id = getSession()?.user?.id;
+  if (!id) return;
   try {
     const cloud = await pullPlayerState();
-    if (!cloud) return;
+    if (!cloud || getSession()?.user?.id !== id) return;
     if (mergePlayerState(cloud)) {
       saveLibrary();
       renderRecent();
@@ -993,14 +1043,27 @@ async function submitAuth(event) {
   message.textContent = authMode === 'signup' ? 'Creating your account…' : 'Signing in…';
   try {
     if (authMode === 'signup') {
-      await signUp(email, password, name);
-      if (!getSession()) {
+      // New accounts may inherit this browser's guest scores only at signup;
+      // signing into an existing account never imports somebody else's data.
+      const guest = capturePlayerSnapshot();
+      const result = await signUp(email, password, name);
+      if (!result.confirmed) {
+        stashPendingSignup(result.userId, guest);
         openAuthDialog('signin');
-        message.textContent = 'Check your email to confirm the account. The link brings you back here.';
+        message.textContent = 'Check your email to confirm the account, then sign in. Your guest progress stays here until confirmation.';
         return;
       }
+      activateProfile();
+      adoptSignupProgress(result.userId, guest);
+      loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
     } else {
       await signIn(email, password);
+      activateProfile();
+      // An email-confirmed signup may require a separate sign-in rather than
+      // redirecting with a session. Transfer only that pending signup's data.
+      if (adoptSignupProgress(getSession()?.user?.id)) {
+        loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
+      }
     }
     lbNotice = '';
     closeAuthDialog();
@@ -1020,6 +1083,7 @@ async function submitAuth(event) {
 
 async function signOutUser() {
   await signOut();
+  activateProfile();
   setHandle('');
   lbNotice = '';
   lbCache.clear();
@@ -1045,6 +1109,10 @@ async function consumeAuthRedirect() {
   }
   try {
     await adoptToken(access, refresh, Number(params.get('expires_in')) || 3600);
+    activateProfile();
+    if (adoptSignupProgress(getSession()?.user?.id)) {
+      loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
+    }
     lbNotice = '';
     renderAccount();
     renderLeaderboard();
@@ -1094,8 +1162,9 @@ function initAccount() {
   consumeAuthRedirect().then(handled => {
     if (handled || !getSession()) return;
     freshSession().then(fresh => {
-      if (!fresh) { renderAccount(); renderLeaderboard(); return; }
+      if (!fresh) { activateProfile(); renderAccount(); renderLeaderboard(); return; }
       ensureProfile().then(async () => {
+        activateProfile();
         renderAccount();
         await restorePlayerState();
         syncSharedScores();
@@ -1249,6 +1318,7 @@ setInterval(() => {
 addEventListener('focus', renderDaily);
 setInterval(renderDaily, 60000);
 
+activatePlayerStorage(activePlayerId() ? 'user:' + activePlayerId() : 'guest');
 loadLibrary();
 renderDaily();
 renderRecent();

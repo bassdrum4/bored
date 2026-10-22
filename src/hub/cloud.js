@@ -1,37 +1,110 @@
-// Account state that has to survive the browser it was written in.
-//
-// Chrome partitions third-party storage, so anything saved inside the Google
-// Sites embed belongs to that embed alone: the same student opening the arcade
-// in another embed, or straight from bassdrum4.github.io, sees an empty
-// profile. A signed-in player's library and bests are therefore mirrored to
-// Supabase and keyed by account rather than by browser.
-//
-// The local copy stays authoritative for play — nothing here blocks a game —
-// and the cloud copy is a merge, never a replacement: two devices that both
-// played offline keep the union of what they achieved instead of whoever
-// saved last.
-
+// Cross-browser player data, written with optimistic concurrency. The previous
+// last-writer-wins upsert silently erased progress from another device.
+// Conditional updates on updated_at make each merge atomic with respect to
+// concurrent clients, without changing the existing Supabase schema.
 import { request, getSession, freshSession } from './backend.js';
 
 const TABLE = '/rest/v1/player_state';
+const LOWER_BESTS = new Set(['wordle', 'solitaire', 'memory', 'minesweeper']);
+const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 
-/** Read the row for the signed-in account. Resolves to null when there is none. */
-export async function pullPlayerState() {
-  const session = getSession();
-  if (!session || !(await freshSession())) return null;
-  const rows = await request(TABLE + '?select=data&user_id=eq.' + encodeURIComponent(session.user.id));
-  const data = rows?.[0]?.data;
-  return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
+function eventsFrom(state) {
+  const result = {};
+  for (const [slug, event] of Object.entries(object(state.library?.favoriteEvents))) {
+    if (!event || typeof event.saved !== 'boolean' || !Number.isFinite(event.at) || event.at < 0) continue;
+    result[slug] = { saved: event.saved, at: event.at };
+  }
+  return result;
 }
 
-/** Replace the row for the signed-in account. */
-export async function pushPlayerState(data) {
+export function mergeCloudState(remote, incoming) {
+  const a = object(remote), b = object(incoming);
+  const al = object(a.library), bl = object(b.library);
+  const events = eventsFrom(a);
+  for (const [slug, event] of Object.entries(eventsFrom(b))) {
+    if (!events[slug] || event.at >= events[slug].at) events[slug] = event;
+  }
+  // Existing rows have only favorites arrays. Treat those as historical adds,
+  // but honor newer explicit remove events instead of resurrecting favorites.
+  const favorites = new Set([
+    ...(Array.isArray(al.favorites) ? al.favorites : []),
+    ...(Array.isArray(bl.favorites) ? bl.favorites : [])
+  ].filter(slug => typeof slug === 'string'));
+  for (const [slug, event] of Object.entries(events)) {
+    if (event.saved) favorites.add(slug);
+    else favorites.delete(slug);
+  }
+  const recent = [...new Set([
+    ...(Array.isArray(bl.recent) ? bl.recent : []),
+    ...(Array.isArray(al.recent) ? al.recent : [])
+  ])].filter(slug => typeof slug === 'string').slice(0, 4);
+
+  const bests = {};
+  for (const source of [object(a.bests), object(b.bests)]) {
+    for (const [slug, raw] of Object.entries(source)) {
+      const score = Number(raw);
+      if (!Number.isFinite(score) || score <= 0) continue;
+      if (!(slug in bests) ||
+          (LOWER_BESTS.has(slug) ? score < bests[slug] : score > bests[slug])) bests[slug] = score;
+    }
+  }
+  const daily = { ...object(a.daily) };
+  for (const [id, result] of Object.entries(object(b.daily))) {
+    if (result && result.id === id && !daily[id]) daily[id] = result;
+  }
+  return { library: { favorites: [...favorites], recent, favoriteEvents: events }, bests, daily };
+}
+
+function sameSession(id) {
+  return getSession()?.user?.id === id;
+}
+
+async function currentRow(id) {
+  const rows = await request(TABLE + '?select=data,updated_at&user_id=eq.' + encodeURIComponent(id));
+  return rows?.[0] || null;
+}
+
+export async function pullPlayerState() {
   const session = getSession();
-  if (!session || !(await freshSession())) return false;
-  await request(TABLE + '?on_conflict=user_id', {
-    method: 'POST',
-    body: { user_id: session.user.id, data, updated_at: new Date().toISOString() },
-    prefer: 'resolution=merge-duplicates,return=minimal'
-  });
-  return true;
+  if (!session || !(await freshSession()) || !sameSession(session.user.id)) return null;
+  const row = await currentRow(session.user.id);
+  return sameSession(session.user.id) ? object(row?.data) : null;
+}
+
+export async function pushPlayerState(incoming) {
+  const session = getSession();
+  if (!session || !(await freshSession()) || !sameSession(session.user.id)) return null;
+  const id = session.user.id;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    if (!sameSession(id)) return null;
+    const row = await currentRow(id);
+    if (!sameSession(id)) return null;
+    const data = mergeCloudState(row?.data, incoming);
+    const body = { data, updated_at: new Date().toISOString() };
+    try {
+      let result;
+      if (row) {
+        // With the existing touch_player_state trigger each update gets a
+        // fresh DB timestamp. Zero returned rows means another device won
+        // the race, so re-read and merge rather than overwriting it.
+        result = await request(TABLE +
+          '?user_id=eq.' + encodeURIComponent(id) +
+          '&updated_at=eq.' + encodeURIComponent(row.updated_at) +
+          '&select=data', {
+          method: 'PATCH', body, prefer: 'return=representation'
+        });
+        if (!result?.length) continue;
+      } else {
+        result = await request(TABLE + '?select=data', {
+          method: 'POST', body: { ...body, user_id: id },
+          prefer: 'return=representation'
+        });
+      }
+      return sameSession(id) ? (result?.[0]?.data || data) : null;
+    } catch (error) {
+      if (!row && error.status === 409) continue; // concurrent first insert
+      throw error;
+    }
+  }
+  throw new Error('Player state changed too many times; will retry next save.');
 }
