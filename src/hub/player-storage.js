@@ -10,7 +10,7 @@ const EXACT = new Set([
   'bored.best.2048', 'bored.best.aim-lab.64', 'bored.best.memory'
 ]);
 const isPlayerKey = key => EXACT.has(key) ||
-  ['bored.daily.', 'bored.high.', 'bored.best.'].some(prefix => key.startsWith(prefix));
+  ['bored.daily.', 'bored.high.', 'bored.best.', 'bored.synced.'].some(prefix => key.startsWith(prefix));
 
 export function capturePlayerSnapshot() {
   const snapshot = {};
@@ -38,7 +38,7 @@ function restoreSnapshot(snapshot, onlyMissing = false) {
 }
 
 export function activatePlayerStorage(scope) {
-  if (!scope || !/^(guest|user:[a-f0-9-]+)$/.test(scope)) throw new Error('Invalid player scope.');
+  if (!scope || !/^(guest|user:[A-Za-z0-9_-]{1,128})$/.test(scope)) throw new Error('Invalid player scope.');
   let old;
   try { old = localStorage.getItem(ACTIVE); } catch { return false; }
   // First run after upgrading Bored: claim existing legacy data for the identity
