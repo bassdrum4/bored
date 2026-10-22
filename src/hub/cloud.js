@@ -5,7 +5,7 @@
 import { request, getSession, freshSession } from './backend.js';
 
 const TABLE = '/rest/v1/player_state';
-const LOWER_BESTS = new Set(['wordle', 'solitaire']);
+const LOWER_BESTS = new Set(['wordle', 'solitaire', 'memory', 'minesweeper']);
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 
 function eventsFrom(state) {
