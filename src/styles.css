@@ -87,18 +87,23 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
 #lb-list .lb-rank{font:11px/1.6 var(--mono);color:var(--dim);min-width:2.2ch}
 #lb-list .lb-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
 #lb-list .lb-score{font:12px var(--mono);white-space:nowrap}
-#lb-list .lb-player-meta{display:block;font:10px/1.7 var(--mono);color:var(--dim);margin-top:4px;overflow:hidden;text-overflow:ellipsis}
+#lb-list .lb-player-meta{display:block;font:10px/1.8 var(--mono);color:var(--dim);margin-top:6px;overflow:hidden;text-overflow:ellipsis}
 #lb-list li.you .lb-name{color:var(--red)}
-.lb-breakdown{list-style:none;margin:0 0 12px 3.4ch;padding:0;border-left:1px solid var(--rule)}
+.lb-breakdown{list-style:none;margin:2px 0 16px 3.4ch;padding:0;border-left:1px solid var(--rule)}
 .lb-breakdown[hidden]{display:none}
-.lb-breakdown li{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;padding:7px 0 7px 12px;
+/* Each game is two lines: its name and that player's best, then your comparison
+   and Play. This has to name the list because `#lb-list li` is display:block,
+   which used to flatten the row into one run of glued-together text. */
+#lb-list .lb-breakdown li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:baseline;column-gap:16px;row-gap:6px;padding:10px 12px 10px 14px;
   border:0;font:11px/1.7 var(--mono);color:var(--dim)}
-.lb-line-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dim)}
-.lb-line-score{white-space:nowrap;color:var(--ink)}
-/* The comparison wraps under the game on a phone, where one line cannot hold it. */
-.lb-line-you{flex:1 1 100%;font:10px/1.7 var(--mono);color:var(--dim);margin-top:2px}
-.lb-play{background:none;border:1px solid var(--rule);color:var(--dim);font:10px var(--mono);
-  padding:2px 7px;cursor:pointer;white-space:nowrap}
+.lb-line-name{grid-column:1;grid-row:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:var(--dim)}
+.lb-line-score{grid-column:2;grid-row:1;white-space:nowrap;color:var(--ink)}
+/* The comparison owns a whole line, so it never crowds the score. */
+.lb-line-you{grid-column:1/-1;grid-row:2;font:10px/1.8 var(--mono);color:var(--dim)}
+.lb-play{grid-column:3;grid-row:1;justify-self:end;background:none;border:1px solid var(--rule);
+  color:var(--dim);font:10px var(--mono);padding:2px 8px;cursor:pointer;white-space:nowrap}
 .lb-play:hover,.lb-play:focus-visible{border-color:var(--ink);color:var(--ink)}
 .lb-play:focus-visible{outline:1px solid var(--ink);outline-offset:2px}
 #lb-mine{margin-top:14px;font:11px/1.7 var(--mono);color:var(--dim)}
