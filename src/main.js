@@ -479,7 +479,7 @@ function localPlayerState() {
     .slice(0, DAILY_LIMIT);
   return {
     library: { favorites: [...favorites], recent: recentGames, favoriteEvents },
-    bests: Object.fromEntries(HIGH_SCORE_GAMES
+    bests: Object.fromEntries(LB_GAMES
       .map(game => [game.id, bestValue(game)])
       .filter(([, value]) => Number.isFinite(value) && value > 0)),
     daily: Object.fromEntries(daily)
@@ -523,12 +523,13 @@ function mergePlayerState(data) {
     changed = true;
   }
 
-  for (const game of HIGH_SCORE_GAMES) {
+  for (const game of LB_GAMES) {
     const cloud = Math.round(Number(data.bests?.[game.id]));
     if (!Number.isFinite(cloud) || cloud <= 0) continue;
     const local = bestValue(game);
     if (local && (game.lower ? local <= cloud : local >= cloud)) continue;
-    if (writeRaw(game.key, cloud)) changed = true;
+    const key = game.key || (game.id === 'minesweeper' ? 'bored.synced.minesweeper' : null);
+    if (key && writeRaw(key, cloud)) changed = true;
   }
 
   for (const [id, result] of Object.entries(data.daily || {})) {
