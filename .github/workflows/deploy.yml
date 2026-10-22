@@ -49,6 +49,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # The hub asks for game documents with this stamp in the query string, so
+      # every push to main publishes new URLs instead of Pages' ten-minute cache.
+      - name: Stamp the deploy with its commit
+        run: |
+          printf '{"commit":"%s","published":"%s"}\n' \
+            "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > src/version.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: src
