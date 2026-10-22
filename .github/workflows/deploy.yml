@@ -30,7 +30,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/configure-pages@v5
       # The hub asks for game documents with this stamp in the query string, so
       # every push to main publishes new URLs instead of Pages' ten-minute cache.
