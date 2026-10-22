@@ -7,7 +7,10 @@ const root = path.resolve(__dirname, '..');
 function moduleUnderTest(file, names, injections = {}) {
   const source = fs.readFileSync(path.join(root, file), 'utf8')
     .replace(/^import .*;\s*$/gm, '')
-    .replace(/\bexport\s+(?=(?:async\s+)?(?:function|const|let|class))/g, '');
+    .replace(/\bexport\s+(?=(?:async\s+)?(?:function|const|let|class))/g, '')
+    // Backend tests mock transport; keep its internal implementation from
+    // shadowing that injected request function.
+    .replace(file === 'src/hub/backend.js' ? /async function request\(/ : /never-match/, 'async function unusedRequest(');
   const keys = Object.keys(injections);
   return new Function(...keys, source + '\nreturn {' + names.join(',') + '};')
     (...keys.map(key => injections[key]));
