@@ -17,6 +17,9 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # A hung job would otherwise hold the `pages` group and delay every later
+    # push, so both jobs are bounded.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,9 +32,11 @@ jobs:
         run: npm test
 
   deploy:
+    # Every push to main deploys; a pull request only runs the tests above.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       pages: write
       id-token: write
