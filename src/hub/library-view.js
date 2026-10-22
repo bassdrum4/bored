@@ -49,7 +49,7 @@ function shelfGame(slug, note) {
   return button;
 }
 
-// One shelf, four cards. Recent games come first; state.favorites fill whatever room
+// One shelf, four cards. Recent games come first; favorites fill whatever room
 // is left, so the row never grows into a second shelf under itself.
 const SHELF_LIMIT = 4;
 
@@ -60,22 +60,22 @@ function renderRecent() {
     (EXTERNS[slug] ? 'Online extra · ' : '') + (state.recentGames.includes(slug)
       ? (state.favorites.has(slug) ? 'Favorite · Recently played' : 'Recently played')
       : 'Favorite'))));
-  $('#state.favorites-all').hidden = !state.favorites.size;
-  $('#state.favorites-all').textContent = 'Browse ' + state.favorites.size + (state.favorites.size === 1 ? ' favorite' : ' state.favorites') + ' →';
+  $('#favorites-all').hidden = !state.favorites.size;
+  $('#favorites-all').textContent = 'Browse ' + state.favorites.size + (state.favorites.size === 1 ? ' favorite' : ' favorites') + ' →';
   $('#recent-empty').hidden = shown.length > 0;
 }
 
 function renderCollections() {
   if (!$('#collections').children.length) $('#collections').replaceChildren(...COLLECTIONS.map(entry => {
-    const button = element('button', 'state.collection', entry.name);
+    const button = element('button', 'collection', entry.name);
     button.type = 'button';
-    button.dataset.state.collection = entry.id;
+    button.dataset.collection = entry.id;
     button.setAttribute('aria-pressed', String(state.collection === entry.id));
     button.onclick = () => { state.collection = entry.id; renderCollections(); renderLibrary(); };
     return button;
   }));
-  for (const button of $('#collections').children) button.setAttribute('aria-pressed', String(button.dataset.state.collection === state.collection));
-  $('#state.collection-note').textContent = COLLECTIONS.find(entry => entry.id === state.collection).note;
+  for (const button of $('#collections').children) button.setAttribute('aria-pressed', String(button.dataset.collection === state.collection));
+  $('#collection-note').textContent = COLLECTIONS.find(entry => entry.id === state.collection).note;
 }
 
 // The shelf lists the NEW-badged games first, in badge order, then the rest of
@@ -109,7 +109,7 @@ function renderLibrary() {
     const text = element('span', 'text');
     const title = element('span', 'name', name);
     if (FRESH_GAMES.includes(slug)) title.appendChild(element('span', 'badge', 'NEW'));
-    text.append(element('span', 'card-state.category', EXTERNS[slug] ? 'Online extra · Internet required' : META[slug][0] + ' · Offline'),
+    text.append(element('span', 'card-category', EXTERNS[slug] ? 'Online extra · Internet required' : META[slug][0] + ' · Offline'),
       title, element('span', 'detail', META[slug][1]), element('span', 'game-meta', gameMeta(slug)),
       element('span', 'game-inputs', DISCOVERY[slug].inputs.join(' / ')));
     card.appendChild(text);
@@ -121,14 +121,14 @@ function renderLibrary() {
       const saved = state.favorites.has(slug);
       star.textContent = saved ? '★' : '☆';
       star.setAttribute('aria-pressed', String(saved));
-      star.setAttribute('aria-label', (saved ? 'Remove ' : 'Add ') + name + (saved ? ' from' : ' to') + ' state.favorites');
+      star.setAttribute('aria-label', (saved ? 'Remove ' : 'Add ') + name + (saved ? ' from' : ' to') + ' favorites');
     };
     updateStar();
     star.onclick = () => {
       if (state.favorites.has(slug)) state.favorites.delete(slug);
       else state.favorites.add(slug);
       state.favoriteEvents[slug] = { saved: state.favorites.has(slug), at: Date.now() };
-      writeStored('bored.state.favoriteEvents', state.favoriteEvents);
+      writeStored('bored.favoriteEvents', state.favoriteEvents);
       saveLibrary();
       updateStar();
       renderRecent();
@@ -145,8 +145,8 @@ function renderLibrary() {
 
   $('#empty').hidden = state.visibleGames.length > 0;
   $('#empty').textContent = state.category === 'Favorites' && !state.favorites.size
-    ? 'Your state.favorites live here. Tap a star beside any game to save it.'
-    : 'Nothing here. Try another search, state.category, or state.collection, or clear the filters.';
+    ? 'Your favorites live here. Tap a star beside any game to save it.'
+    : 'Nothing here. Try another search, category, or collection, or clear the filters.';
   $('#results').textContent = state.visibleGames.length + ' of ' + ORDER.length + ' entries';
   $('#count').textContent = ORDER.length;
   const counts = (ORDER.length - Object.keys(EXTERNS).length) + ' offline / ' + Object.keys(EXTERNS).length + ' online extras';

@@ -1,6 +1,6 @@
 import { backendReady, getSession, getHandle, suggestedHandle, hasIdentity, renameHandle, authErrorMessage, signIn, signUp, signOut, adoptToken, setHandle, loadRules, freshSession, ensureProfile } from './backend.js';
 import { capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './player-storage.js';
-export function createAccountUI({ state, activateProfile, applyPendingClaim, startClaimAuth, closeClaimDialog,
+export function createAccountUI({ state: ui, activateProfile, applyPendingClaim, startClaimAuth, closeClaimDialog,
   loadLibrary, renderRecent, renderLibrary, renderDaily, renderLeaderboard, loadLeaderboard,
   syncSharedScores, restorePlayerState }) {
 const $ = selector => document.querySelector(selector);
@@ -29,7 +29,7 @@ function renderAccount() {
   action.hidden = false;
   if (!guest) {
     state.append('Signed in as ', element('b', '', getHandle() || suggestedHandle()),
-      state.lbNotice ? ' · ' + state.lbNotice : '. Best scores sync to the shared board.');
+      ui.lbNotice ? ' · ' + ui.lbNotice : '. Best scores sync to the shared board.');
     action.textContent = 'Sign out';
     action.classList.remove('primary');
     rename.hidden = false;
@@ -89,7 +89,7 @@ async function submitAuth(event) {
     message.textContent = 'Saving…';
     try {
       await renameHandle(name);
-      state.lbCache.clear();
+      ui.lbCache.clear();
       closeAuthDialog();
       renderAccount();
       renderLeaderboard();
@@ -136,7 +136,7 @@ async function submitAuth(event) {
       // A run the guest chose to keep when offered an account.
       applyPendingClaim();
     }
-    state.lbNotice = '';
+    ui.lbNotice = '';
     closeAuthDialog();
     renderAccount();
     renderLeaderboard();
@@ -156,8 +156,8 @@ async function signOutUser() {
   await signOut();
   activateProfile();
   setHandle('');
-  state.lbNotice = '';
-  state.lbCache.clear();
+  ui.lbNotice = '';
+  ui.lbCache.clear();
   renderAccount();
   renderLeaderboard();
   loadLeaderboard(true);
@@ -174,7 +174,7 @@ async function consumeAuthRedirect() {
   if (error) {
     let reason = error;
     try { reason = decodeURIComponent(error.replace(/\+/g, ' ')); } catch {}
-    state.lbNotice = reason;
+    ui.lbNotice = reason;
     renderAccount();
     return true;
   }
@@ -185,7 +185,7 @@ async function consumeAuthRedirect() {
       loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
     }
     applyPendingClaim();
-    state.lbNotice = '';
+    ui.lbNotice = '';
     renderAccount();
     renderLeaderboard();
     await restorePlayerState();
@@ -193,7 +193,7 @@ async function consumeAuthRedirect() {
     renderAccount();
     loadLeaderboard(true);
   } catch (err) {
-    state.lbNotice = authErrorMessage(err);
+    ui.lbNotice = authErrorMessage(err);
     renderAccount();
   }
   return true;
@@ -231,7 +231,7 @@ function initAccount() {
         await restorePlayerState();
         syncSharedScores();
       }).catch(err => {
-        state.lbNotice = authErrorMessage(err);
+        ui.lbNotice = authErrorMessage(err);
         renderAccount();
       });
     });
