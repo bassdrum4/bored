@@ -55,11 +55,10 @@ live on the next push. Serving the source unbundled means paths are relative to
 `src/` — a game document lives at `games/content/<slug>.html` beside the hub, and
 a preview at `games/previews/<slug>.webp`.
 
-GitHub Pages must be set to **Settings → Pages → Source: GitHub Actions** for the
-deploy workflow to publish. Until that is switched, the root `index.html` is a
-plain redirect to `src/index.html` so the old branch deploy keeps working; it is
-the only generated-then-stale file this repo had, and it can be deleted once the
-setting is changed.
+GitHub Pages is set to **Settings → Pages → Source: GitHub Actions**, so the
+deployed root is `src/index.html` byte for byte; there is no top-level
+`index.html` in the repository. Keep that setting — a branch deploy can only
+serve the repo root or `/docs`, neither of which is this folder.
 
 If you use Infisical for local secrets, `npm run dev:infisical` wraps the Vite
 server; see [INFISICAL.md](INFISICAL.md).

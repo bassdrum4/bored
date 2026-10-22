@@ -55,9 +55,9 @@ deploys it, so every push to `main` publishes exactly the files that are in the 
 The test suite serves `src/` through a loopback server in headless Chrome (set `CHROME_PATH` if it is
 not found) and takes about a minute; run it before committing anything that touches a game.
 
-GitHub Pages must be set to **Settings → Pages → Source: GitHub Actions**. While it is still on a
-branch deploy, the root `index.html` is a redirect stub to `src/index.html` and nothing else; delete
-that stub once the setting is switched.
+GitHub Pages is set to **Settings → Pages → Source: GitHub Actions**, which is what lets the
+workflow publish `src/`; a branch deploy can only serve the repo root or `/docs`. There is no
+top-level `index.html` — the deployed root is `src/index.html` itself.
 
 ## Working with several agents
 
@@ -69,8 +69,8 @@ each other. They are not style preferences; each one has already caused a live r
   would read "signed in" (the account strip, the board's "(you)") asks `hasIdentity()`, while
   transport keeps using `getSession()`. A guest's best is offered back to them on the hub, so
   don't make guest scores post, sync or announce themselves before there is an account.
-- **Edit `src/`, never the root `index.html`.** The root file is a redirect stub kept only until
-  Pages is switched to GitHub Actions; the arcade is `src/index.html` and the modules beside it.
+- **There is no generated file.** The arcade is `src/index.html` and the modules beside it; edit
+them directly and push. Nothing rebuilds, re-encodes or copies a page behind your back.
 - **Push ships.** GitHub Pages deploys the committed `src/` folder, so a merge to `main` goes live
   as soon as the workflow finishes. Test before pushing, not after.
 - **The slug is a primary key** repeated in six places: the content file, `catalog.js`, the snapshot,
