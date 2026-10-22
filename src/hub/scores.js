@@ -65,7 +65,8 @@ const LEGACY_GAMES = [
   { id: 'minesweeper', name: 'Minesweeper', unit: 'seconds', lower: true, read() {
     const all = readStored('minesweeper_scores', {}) || {};
     const times = Array.isArray(all.beginner) ? all.beginner.map(entry => Number(entry.time)).filter(n => n > 0) : [];
-    return times.length ? Math.min(...times) : 0;
+    const synced = readNumber('bored.synced.minesweeper');
+    return Math.min(...[...times, synced].filter(n => n > 0)) || 0;
   } }
 ];
 
