@@ -18,7 +18,7 @@ try {
     page.setDefaultTimeout(4000);
     await page.setViewport({ width: 768, height, deviceScaleFactor: 1 });
     await page.setRequestInterception(true);
-    page.on('request', request => /^https?:/.test(request.url()) ? request.abort() : request.continue());
+    page.on('request', request => /^https?:/.test(request.url()) && !request.url().startsWith(site.origin + '/') ? request.abort() : request.continue());
     await page.evaluateOnNewDocument(() => {
       let seed = 4981;
       Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -59,6 +59,7 @@ try {
     }
     if (keys[slug]) await press(keys[slug]);
     if (slug === 'snake') await press('ArrowRight');
+    if (slug === 'minigolf') await frame.evaluate(() => { holeIndex = 4; loadHole(); });
     if (slug === '2048') for (const key of ['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowDown']) await press(key);
     if (slug === 'wordle') for (const code of ['KeyC', 'KeyR', 'KeyA', 'KeyN', 'KeyE', 'Enter']) await press(code);
     if (slug === 'minesweeper') await frame.click('#board .cell');

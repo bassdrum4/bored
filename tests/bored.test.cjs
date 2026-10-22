@@ -400,6 +400,69 @@ test('browser regressions', async t => {
     await close();
   });
 
+  await t.test('Minigolf pointer and keyboard putts, cancellation, mobile layout and completed-round scoring', async () => {
+    const frame = await openTitle('minigolf', 'Minigolf');
+    await frame.waitForSelector('#course');
+    await frame.waitForFunction(() => document.querySelector('#course').getBoundingClientRect().height > 100);
+    const box = await (await frame.$('#course')).boundingBox();
+    const x = box.x + box.width / 2, y = box.y + box.height * .6;
+    await page.mouse.click(x, y);
+    assert.equal(await frame.evaluate(() => __boredSnapshot().strokes), 0, 'a tap is not a putt');
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + box.height * .14, { steps: 4 });
+    await page.mouse.up();
+    assert.equal(await frame.evaluate(() => __boredSnapshot().strokes), 1);
+    await page.keyboard.press('Space');
+    assert.equal(await frame.evaluate(() => __boredSnapshot().strokes), 1, 'cannot shoot while rolling');
+    assert.equal(await page.evaluate(() => { captureHighScore(); return Number(localStorage.getItem('bored.high.minigolf')); }), 0);
+    await frame.click('#restart');
+    await frame.focus('#course');
+    await page.keyboard.press('ArrowUp');
+    assert.match(await text(frame, '#power'), /48%/);
+    await page.keyboard.press('Space');
+    assert.equal(await frame.evaluate(() => __boredSnapshot().strokes), 1);
+    await frame.click('#restart');
+    const touch = await page.touchscreen.touchStart(x, y);
+    await touch.move(x, y + box.height * .14);
+    await touch.end();
+    assert.equal(await frame.evaluate(() => __boredSnapshot().strokes), 1, 'a touch drag putts');
+    await frame.click('#restart');
+    await frame.evaluate(() => {
+      // Pointer capture cancellation must discard an in-progress touch drag.
+      const course = document.querySelector('#course');
+      const rect = course.getBoundingClientRect();
+      course.setPointerCapture = () => {};
+      course.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 91, pointerType: 'touch', clientX: rect.x + 40, clientY: rect.y + 40 }));
+      course.dispatchEvent(new PointerEvent('pointermove', { pointerId: 91, clientX: rect.x + 40, clientY: rect.y + 100 }));
+      course.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 91 }));
+      course.dispatchEvent(new PointerEvent('pointerup', { pointerId: 91, clientX: rect.x + 40, clientY: rect.y + 100 }));
+    });
+    assert.equal(await frame.evaluate(() => __boredSnapshot().strokes), 0);
+    for (const viewport of [{ width: 320, height: 568 }, { width: 568, height: 320 }]) {
+      await page.setViewport(viewport);
+      await pause(100);
+      const layout = await frame.evaluate(() => {
+        const box = document.querySelector('#course').getBoundingClientRect();
+        return { width: innerWidth, height: innerHeight, scroll: document.documentElement.scrollWidth,
+          x: box.x, y: box.y, right: box.right, bottom: box.bottom, boardHeight: box.height };
+      });
+      assert.ok(layout.scroll <= layout.width + 1);
+      assert.ok(layout.x >= 0 && layout.y >= 0 && layout.right <= layout.width + 1 && layout.bottom <= layout.height + 1);
+      assert.ok(layout.boardHeight > 100, 'course stays visible on small screens');
+    }
+    // The physics suite plays the entire course. Here isolate capture timing:
+    // finishing must use the final total, then a new round must clear the flag.
+    await frame.evaluate(() => { card = Array(8).fill(3); holeIndex = 8; strokes = 26; pocket(); });
+    await page.evaluate(() => captureHighScore());
+    assert.equal(await page.evaluate(() => Number(localStorage.getItem('bored.high.minigolf'))), 26);
+    await frame.click('#restart');
+    assert.equal(await frame.evaluate(() => __boredSnapshot().finished), false);
+    await page.setViewport({ width: 1100, height: 800 });
+    await close();
+    await page.evaluate(() => localStorage.removeItem('bored.high.minigolf'));
+  });
+
   await t.test('Lights Out flips a cross, counts moves, and clears a board', async () => {
     const frame = await openTitle('lights-out', 'Lights Out');
     const state = () => frame.evaluate(() => __test.state());
@@ -1134,6 +1197,7 @@ test('browser regressions', async t => {
 
     await page.evaluate(list => {
       for (const date of list) localStorage.removeItem('bored.daily.' + dailyChallenge(date).id);
+      dailyDate = window.originalDailyDate;
       renderDaily();
     }, days);
     assert.equal(await page.$eval('#daily-streak', el => el.hidden), before.hidden, 'removing the seeded days restores the line');

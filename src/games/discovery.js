@@ -4,6 +4,7 @@ import { ORDER, EXTERNS } from './catalog.js';
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
 export const DISCOVERY = {
+  'minigolf': info('5–10 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch']),
   deep: info('5–15 min', 'Turn-based', ['Keyboard', 'Mouse', 'Touch']),
   '2048': info('3–10 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   memory: info('2–5 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),

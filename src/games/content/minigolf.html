@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Minigolf</title>
+<style>
+* { box-sizing: border-box }
+html, body { margin: 0; height: 100%; overflow: hidden }
+body { background: #f5f2ea; color: #253b30; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace }
+main { height: 100%; height: 100dvh; max-width: 660px; margin: auto; padding: 10px; display: flex; flex-direction: column; gap: 7px }
+header, footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap }
+h1 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .08em }
+button { border: 1px solid #253b30; border-radius: 3px; background: transparent; color: inherit; padding: 7px 10px; font: inherit; cursor: pointer }
+button:focus-visible, canvas:focus-visible { outline: 2px solid #253b30; outline-offset: 2px }
+[hidden] { display: none !important }
+#stage { flex: 1; min-height: 0; display: grid; place-items: center }
+canvas { display: block; touch-action: none; max-width: 100%; cursor: crosshair }
+#status { margin: 0; min-height: 2.8em }
+table { border-collapse: collapse; width: 100%; text-align: center; font-size: 11px }
+th, td { padding: 2px; border-bottom: 1px solid #c8ccbc; font-weight: normal }
+th:first-child { text-align: left }
+td.current { outline: 1px solid #253b30; outline-offset: -1px }
+#controls { margin: 0; font-size: 10px }
+/* Leave the hub's top-right menu clear on phones and short landscape frames. */
+@media (max-width: 700px) { header { padding-right: 52px } header span { font-size: 11px } }
+@media (max-height: 480px) { main { padding: 5px; gap: 3px } #status { min-height: 1.4em } #controls { display: none } button { padding: 4px 8px } }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>MINIGOLF</h1><span id="hud">HOLE 1/9 · PAR 2 · STROKES 0</span></header>
+  <div id="stage"><canvas id="course" width="400" height="520" tabindex="0" aria-label="Minigolf course. Drag back and release to putt. Left and right aim, up and down change power, Space shoots."></canvas></div>
+  <p id="status" role="status" aria-live="polite"></p>
+  <table aria-label="Round scorecard"><thead><tr><th scope="col">Hole</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>Total</th></tr></thead><tbody>
+    <tr id="pars"><th scope="row">Par</th></tr>
+    <tr id="card"><th scope="row">You</th></tr>
+  </tbody></table>
+  <footer><button id="restart" type="button">New round</button><span id="power">POWER 45%</span><button id="next" type="button" hidden>Next hole</button></footer>
+  <p id="controls">Drag back anywhere on the green; release to putt. Longer pull = more power. Arrows aim / power; Space putts.</p>
+</main>
+<script>
+'use strict';
+// Authored holes stay identical on every visit, including daily attempts and
+// leaderboard rounds. No random layouts, storage, or network inside the game.
+const W = 400, H = 520, R = 6, CUP = 11, STEP = 1 / 240;
+const PAPER = '#f5f2ea', INK = '#253b30', GREEN = '#c8d4b7';
+const holes = [
+  { name: 'First putt', par: 2, tee: [200, 440], cup: [200, 100], walls: [], sand: [] },
+  { name: 'Go around', par: 3, tee: [100, 440], cup: [300, 100], walls: [[140, 210, 120, 85]], sand: [] },
+  { name: 'The dogleg', par: 3, tee: [90, 440], cup: [90, 90], walls: [[26, 235, 235, 22]], sand: [] },
+  { name: 'Through the gate', par: 3, tee: [200, 440], cup: [200, 90], walls: [[26, 245, 130, 20], [244, 245, 130, 20]], sand: [[145, 135, 110, 65]] },
+  { name: 'Switchback', par: 4, tee: [90, 450], cup: [300, 85], walls: [[26, 330, 235, 20], [150, 175, 224, 20]], sand: [] },
+  { name: 'The bunker', par: 3, tee: [85, 440], cup: [310, 90], walls: [], sand: [[125, 205, 160, 120]] },
+  { name: 'Bank on it', par: 3, tee: [85, 420], cup: [310, 420], walls: [[190, 210, 20, 284]], sand: [] },
+  { name: 'Narrow margins', par: 3, tee: [200, 450], cup: [200, 80], walls: [[92, 170, 20, 220], [288, 170, 20, 220]], sand: [[155, 240, 90, 65]] },
+  { name: 'Home stretch', par: 4, tee: [80, 450], cup: [320, 80], walls: [[26, 340, 225, 20], [150, 210, 224, 20], [26, 130, 180, 20]], sand: [[275, 380, 65, 65]] }
+];
+const canvas = document.querySelector('#course'), ctx = canvas.getContext('2d');
+const hud = document.querySelector('#hud'), status = document.querySelector('#status');
+const next = document.querySelector('#next'), powerLabel = document.querySelector('#power');
+const totalPar = holes.reduce((sum, hole) => sum + hole.par, 0);
+let holeIndex = 0, strokes = 0, card = [], sunk = false, finished = false;
+let ball = { x: 0, y: 0, vx: 0, vy: 0 }, moving = false;
+let angle = -Math.PI / 2, power = .45, drag = null, lastTime = 0, accumulator = 0;
+
+window.__boredSnapshot = () => ({ slug: 'minigolf', strokes, holes: card.length, finished });
+
+function circle(x, y, radius, fill) {
+  ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
+}
+function updateHud(message) {
+  const hole = holes[holeIndex];
+  hud.textContent = finished ? 'ROUND · ' + strokes + ' STROKES · PAR ' + totalPar :
+    'HOLE ' + (holeIndex + 1) + '/9 · PAR ' + hole.par + ' · STROKES ' + strokes;
+  if (message !== undefined) status.textContent = message;
+  powerLabel.textContent = 'POWER ' + Math.round(power * 100) + '%';
+  document.querySelector('#card').innerHTML = '<th scope="row">You</th>' + holes.map((_, i) =>
+    '<td' + (i === holeIndex && !finished ? ' class="current"' : '') + '>' +
+    (card[i] ?? (i === holeIndex ? strokes - card.reduce((a, b) => a + b, 0) : '–')) + '</td>').join('') + '<td>' + strokes + '</td>';
+}
+function loadHole() {
+  const hole = holes[holeIndex];
+  ball = { x: hole.tee[0], y: hole.tee[1], vx: 0, vy: 0 };
+  sunk = moving = false; drag = null; accumulator = 0;
+  angle = Math.atan2(hole.cup[1] - ball.y, hole.cup[0] - ball.x); power = .45;
+  next.hidden = true;
+  updateHud(hole.name + '. Pull back and release.');
+}
+function newRound() {
+  holeIndex = strokes = 0; card = []; finished = false;
+  loadHole();
+}
+function advanceHole() {
+  if (!sunk || finished) return;
+  holeIndex++; loadHole();
+}
+function putt(direction, strength) {
+  if (moving || sunk || finished || !Number.isFinite(direction) || !Number.isFinite(strength)) return false;
+  const speed = Math.max(.04, Math.min(1, strength)) * 480;
+  ball.vx = Math.cos(direction) * speed; ball.vy = Math.sin(direction) * speed;
+  strokes++; moving = true; drag = null;
+  updateHud('Ball rolling…');
+  return true;
+}
+function pocket() {
+  if (sunk) return;
+  const hole = holes[holeIndex], previous = card.reduce((a, b) => a + b, 0);
+  ball.x = hole.cup[0]; ball.y = hole.cup[1]; ball.vx = ball.vy = 0;
+  moving = false; sunk = true; card.push(strokes - previous);
+  finished = card.length === holes.length;
+  next.hidden = finished;
+  const relative = strokes - totalPar;
+  updateHud(finished ? 'Nine holes in ' + strokes + ' strokes. ' +
+    (relative === 0 ? 'Even par.' : (relative > 0 ? '+' : '') + relative + ' to par.') :
+    'Holed in ' + card[holeIndex] + '. ' + (card[holeIndex] === 1 ? 'Hole in one! ' : '') + 'Next hole when ready.');
+}
+function collide(rect) {
+  const [x, y, w, h] = rect;
+  const nearX = Math.max(x, Math.min(x + w, ball.x));
+  const nearY = Math.max(y, Math.min(y + h, ball.y));
+  const dx = ball.x - nearX, dy = ball.y - nearY, distance = Math.hypot(dx, dy);
+  if (distance >= R) return;
+  let nx, ny, depth;
+  if (distance > 0) { nx = dx / distance; ny = dy / distance; depth = R - distance; }
+  else {
+    // Recover from a ball exactly inside a rectangle, without a zero normal.
+    const edges = [[ball.x - x, -1, 0], [x + w - ball.x, 1, 0], [ball.y - y, 0, -1], [y + h - ball.y, 0, 1]];
+    edges.sort((a, b) => a[0] - b[0]);
+    [depth, nx, ny] = edges[0]; depth += R;
+  }
+  ball.x += nx * (depth + .001); ball.y += ny * (depth + .001);
+  const incoming = ball.vx * nx + ball.vy * ny;
+  if (incoming < 0) { ball.vx -= 1.8 * incoming * nx; ball.vy -= 1.8 * incoming * ny; }
+}
+function step(dt) {
+  if (!moving || sunk) return;
+  const hole = holes[holeIndex];
+  // 240 Hz keeps even a full-power putt below the ball radius per step,
+  // so narrow walls and cups cannot be skipped by slow frames.
+  ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+  for (const rect of [[0, 0, 26, H], [374, 0, 26, H], [0, 0, W, 26], [0, 494, W, 26], ...hole.walls]) collide(rect);
+  const speed = Math.hypot(ball.vx, ball.vy);
+  if (Math.hypot(ball.x - hole.cup[0], ball.y - hole.cup[1]) < CUP && speed < 150) { pocket(); return; }
+  const sand = hole.sand.some(([x, y, w, h]) => ball.x >= x && ball.x <= x + w && ball.y >= y && ball.y <= y + h);
+  const slower = Math.max(0, speed - (sand ? 430 : 110) * dt);
+  if (slower < 3) {
+    ball.vx = ball.vy = 0; moving = false;
+    updateHud(sand ? 'In the sand. More power needed here.' : 'Your putt. Pull back and release.');
+  } else { ball.vx *= slower / speed; ball.vy *= slower / speed; }
+}
+function draw() {
+  const hole = holes[holeIndex];
+  ctx.fillStyle = PAPER; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = GREEN; ctx.fillRect(26, 26, 348, 468);
+  ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.strokeRect(25.5, 25.5, 349, 469);
+  // Bunkers use paper and hatching, keeping the same three-colour palette.
+  for (const [x, y, w, h] of hole.sand) {
+    ctx.fillStyle = PAPER; ctx.fillRect(x, y, w, h);
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+    ctx.strokeStyle = GREEN;
+    for (let s = x - h; s < x + w; s += 10) { ctx.beginPath(); ctx.moveTo(s, y); ctx.lineTo(s + h, y + h); ctx.stroke(); }
+    ctx.restore();
+  }
+  ctx.fillStyle = INK;
+  for (const rect of hole.walls) ctx.fillRect(...rect);
+  circle(...hole.tee, 2, INK);
+  circle(...hole.cup, CUP, INK);
+  ctx.strokeStyle = INK; ctx.beginPath(); ctx.moveTo(hole.cup[0], hole.cup[1] - 4); ctx.lineTo(hole.cup[0], hole.cup[1] - 39); ctx.stroke();
+  ctx.fillStyle = INK; ctx.beginPath(); ctx.moveTo(hole.cup[0], hole.cup[1] - 39); ctx.lineTo(hole.cup[0] + 22, hole.cup[1] - 31); ctx.lineTo(hole.cup[0], hole.cup[1] - 24); ctx.fill();
+  if (!sunk) {
+    if (!moving) {
+      const length = 22 + power * 85;
+      ctx.strokeStyle = INK; ctx.setLineDash([4, 5]);
+      ctx.beginPath(); ctx.moveTo(ball.x, ball.y); ctx.lineTo(ball.x + Math.cos(angle) * length, ball.y + Math.sin(angle) * length); ctx.stroke(); ctx.setLineDash([]);
+      if (drag) {
+        ctx.beginPath(); ctx.moveTo(ball.x, ball.y); ctx.lineTo(ball.x - Math.cos(angle) * power * 120, ball.y - Math.sin(angle) * power * 120); ctx.stroke();
+      }
+    }
+    circle(ball.x, ball.y, R + 1, INK); circle(ball.x, ball.y, R, PAPER);
+  }
+  ctx.fillStyle = INK; ctx.font = '11px ui-monospace, monospace'; ctx.textAlign = 'left';
+  ctx.fillText(String(holeIndex + 1).padStart(2, '0') + ' / ' + hole.name.toUpperCase(), 28, 16);
+  if (finished) {
+    ctx.fillStyle = PAPER; ctx.fillRect(57, 215, 286, 90); ctx.strokeStyle = INK; ctx.strokeRect(57.5, 215.5, 285, 89);
+    ctx.textAlign = 'center'; ctx.fillStyle = INK; ctx.font = '20px ui-monospace, monospace';
+    ctx.fillText(strokes + ' STROKES', 200, 252); ctx.font = '12px ui-monospace, monospace'; ctx.fillText('NINE HOLES · PAR ' + totalPar, 200, 280);
+  }
+}
+function frame(time) {
+  if (lastTime) accumulator += Math.min(.1, (time - lastTime) / 1000);
+  lastTime = time;
+  while (accumulator >= STEP) { step(STEP); accumulator -= STEP; }
+  draw(); requestAnimationFrame(frame);
+}
+function coordinates(event) {
+  const box = canvas.getBoundingClientRect();
+  return { x: (event.clientX - box.left) * W / box.width, y: (event.clientY - box.top) * H / box.height };
+}
+function aim(event) {
+  const at = coordinates(event), dx = drag.x - at.x, dy = drag.y - at.y;
+  const length = Math.hypot(dx, dy);
+  if (length > 0) angle = Math.atan2(dy, dx);
+  power = Math.min(1, length / 120); drag.length = length;
+  powerLabel.textContent = 'POWER ' + Math.round(power * 100) + '%';
+}
+canvas.addEventListener('pointerdown', event => {
+  if (event.button !== 0 || drag || moving || sunk || finished) return;
+  event.preventDefault(); canvas.focus(); canvas.setPointerCapture(event.pointerId);
+  drag = { ...coordinates(event), id: event.pointerId, length: 0 };
+});
+canvas.addEventListener('pointermove', event => { if (drag?.id === event.pointerId) aim(event); });
+canvas.addEventListener('pointerup', event => {
+  if (drag?.id !== event.pointerId) return;
+  aim(event); const length = drag.length; drag = null;
+  if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  if (length >= 5) putt(angle, power);
+});
+function cancelDrag() { drag = null; }
+canvas.addEventListener('pointercancel', cancelDrag);
+canvas.addEventListener('lostpointercapture', cancelDrag);
+window.addEventListener('blur', cancelDrag);
+document.addEventListener('visibilitychange', () => { cancelDrag(); lastTime = 0; accumulator = 0; });
+canvas.addEventListener('keydown', event => {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Enter'].includes(event.key)) return;
+  event.preventDefault();
+  if (sunk || moving || drag || finished) return;
+  if (event.key === 'ArrowLeft') angle -= .05;
+  else if (event.key === 'ArrowRight') angle += .05;
+  else if (event.key === 'ArrowUp') power = Math.min(1, power + .025);
+  else if (event.key === 'ArrowDown') power = Math.max(.05, power - .025);
+  else if (!event.repeat) putt(angle, power);
+  updateHud();
+});
+document.querySelector('#restart').onclick = newRound;
+next.onclick = () => { advanceHole(); canvas.focus(); };
+document.querySelector('#pars').innerHTML += holes.map(hole => '<td>' + hole.par + '</td>').join('') + '<td>' + totalPar + '</td>';
+new ResizeObserver(() => {
+  const box = document.querySelector('#stage').getBoundingClientRect(), scale = Math.max(.01, Math.min(box.width / W, box.height / H));
+  const ratio = Math.min(2, window.devicePixelRatio || 1);
+  canvas.style.width = W * scale + 'px'; canvas.style.height = H * scale + 'px';
+  canvas.width = Math.round(W * scale * ratio); canvas.height = Math.round(H * scale * ratio);
+  ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  draw();
+}).observe(document.querySelector('#stage'));
+newRound(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

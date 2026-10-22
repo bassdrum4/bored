@@ -58,6 +58,7 @@ export function dailyStreak(dates, today) {
 }
 // Each adapter reads current-run state, never saved high scores. Thresholds rotate every circuit.
 export const CHALLENGES = [
+  { slug: 'minigolf', label: 'On the green', goal: 'Sink {target} holes in one round of Minigolf.', metric: 'holes', targets: [3, 6, 9], unit: 'holes sunk' },
   { slug: 'tetris', label: 'Line sweep', goal: 'Clear {target} lines in one run.', metric: 'lines', targets: [10, 15, 20], unit: 'lines' },
   { slug: 'snake', label: 'Hungry snake', goal: 'Eat {target} apples in one run without crashing.', metric: 'apples', targets: [10, 15, 20], unit: 'apples' },
   { slug: 'wordle', label: 'Word detective', goal: 'Solve a word in {target} guesses or fewer.', metric: 'guesses', targets: [4, 3, 5], rule: 'word', unit: 'guesses' },

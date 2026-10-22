@@ -1,6 +1,6 @@
 # Bored — an arcade in one folder
 
-**32 offline games and 2 online extras**, with no runtime dependencies, installs,
+**33 offline games and 2 online extras**, with no runtime dependencies, installs,
 or server. The site is the [`src/`](src/) folder itself: [`src/index.html`](src/index.html)
 loads the hub modules as plain ES modules, and the games are ordinary HTML in
 [`src/games/content/`](src/games/content). The page downloads a game the first
@@ -129,7 +129,7 @@ CHROME_PATH=/path/to/chrome npm run test:visual      # includes a live F-14 embe
 ```
 
 Raw captures and verification screenshots go under ignored `_build/`. Commit
-the optimized `src/games/previews/*.webp`. The 32 previews total about 74 KB;
+the optimized `src/games/previews/*.webp`. The 33 previews total about 77 KB;
 images below the first screen load
 lazily. `previews:optimize` also refits the previews already on disk when there
 are no raw captures, which is how the filled cards were produced without a
@@ -186,7 +186,7 @@ matches the frame, so a portrait phone sees tall rooms rather than a letterbox.
 
 ## Daily challenge
 
-The featured challenge rotates through **30 of the offline games**, with a distinct
+The featured challenge rotates through **31 of the offline games**, with a distinct
 goal for each game. Everyone gets the same game and target for a given date;
 after a full circuit, most targets change difficulty. The day is **Eastern Time**:
 `dailyDate` formats the clock in `America/Detroit`, so the challenge rolls over at
@@ -286,16 +286,16 @@ For quick testing, turn off **Authentication → Providers → Email → Confirm
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.
 
-The board tracks a best score for **30 of the 34 games**. The original eight
+The board tracks a best score for **33 of the 35 games**. The original eight
 (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
-their existing saved bests. Every other offline game except Connect Four and
-Tank2 is read from live game state when you leave or restart: Tetris, Breakout,
+their existing saved bests. Every other offline game is read from live game
+state while playing and when you leave or restart: Tetris, Breakout,
 Frogger, Space Invaders, Q*bert, Asteroids and Commanders post their running
 score, Wordle guesses (solved runs only), 8 Ball balls pocketed, Poker chips, and
 every other game's displayed points, waves, levels, wins, ships or other progress
 metric.
-Connect Four and Tank2 are excluded because their only totals are per-session
-win counts; the two remote extras are excluded because the hub cannot inspect
+Connect Four and Tank2 count wins against the computer; Minigolf counts total
+strokes only after all nine holes are sunk. The two remote extras are excluded because the hub cannot inspect
 their cross-origin state. Scores are submitted by the browser, so this is a
 friendly board, not anti-cheat. Signing out keeps local bests intact.
 
@@ -320,10 +320,9 @@ accepts. The hub waits for that list and never posts a game missing from it,
 which is why a new game no longer produces a foreign-key error.
 
 Every game ranks on its own board and nothing is ever folded into another
-score. Two games have no rule row of their own yet — DEEP and Lights Out — so
-their bests save in the browser and nothing is posted for them. Adding their
-rows puts them on the shared board exactly like every other game, no code
-change:
+score. DEEP, Lights Out, and Minigolf have their own registered rule rows,
+just like the other offline games. For a new game, `games:register` checks
+which rows are missing and supplies an idempotent insert such as:
 
 ```sql
 insert into score_rules (game, label, better, max_value)
@@ -349,6 +348,20 @@ that moved to a score and clears the values saved under the old units — a stor
 These additions live in readable JavaScript in
 [`src/games/arcade.js`](src/games/arcade.js). They need no network requests,
 fonts, libraries, or other files.
+
+## Minigolf
+
+Nine fixed holes with bank shots, doglegs, narrow gates, and sand bunkers. Drag
+back anywhere on the green and release to putt; longer pulls hit harder. Mouse
+and touch use the same controls. With the course focused, Left/Right aim,
+Up/Down change power, and Space or Enter putts. Use **Next hole** after sinking
+the ball, or **New round** to start over.
+
+The scorecard tracks each hole against par. Only a completed nine-hole round
+posts a best, ranked by **fewest total strokes**; unfinished rounds never count.
+The daily goal rotates between sinking 3, 6, and 9 holes in one round. Catalog,
+favorites, recent games, guest bests, account sync, and the shared board all use
+the existing hub hooks. The game works standalone without storage or network.
 
 ## Lights Out
 
@@ -410,10 +423,10 @@ The rules and daily tests run without a browser. The browser block covers
 JavaScript syntax, 2048 merge rules and undo, Connect Four wins and computer
 tactics, actual browser gameplay, Memory completion and timer cleanup, Aim Lab
 accuracy and expiration, search/filter/sort, the jump palette, saved favorites,
-Escape and focus restoration, all 32 offline game boots, DEEP's seeded dungeon and boss gate, poker's
+Escape and focus restoration, all 33 offline game boots, DEEP's seeded dungeon and boss gate, poker's
 simulated equity, no-peeking opponents and draw discards, 8 Ball's simulated shot planning
 (pots, safeties, escapes, no avoidable fouls or scratches, a whole self-played rack),
-all 30 daily state
+all 31 daily state
 adapters, per-game goal acceptance/rejection, real Memory challenge completion,
 saved results, sharing with clipboard fallback, Detroit-time rollover, 320px layouts,
 blocked storage, high-score capture, one shared board per game with the

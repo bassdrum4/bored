@@ -14,6 +14,7 @@
   "lights-out": { "label": "Boards cleared", "better": "high", "max_value": 999 },
   "memory": { "label": "Fewest moves to finish a board", "better": "low", "max_value": 10000 },
   "minesweeper": { "label": "Seconds to clear a board", "better": "low", "max_value": 99999 },
+  "minigolf": { "label": "Strokes over nine holes", "better": "low", "max_value": 9999 },
   "pac-man": { "label": "Points", "better": "high", "max_value": 10000000 },
   "poker": { "label": "Chips above the start stack", "better": "high", "max_value": 100000 },
   "pong": { "label": "Points", "better": "high", "max_value": 999 },
