@@ -20,12 +20,11 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block;touch
 .ov{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none}
 .sl{background:repeating-linear-gradient(0deg,rgba(0,0,0,.1) 0px,rgba(0,0,0,.1) 1px,transparent 1px,transparent 3px);z-index:10}
 .vg{background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.6) 100%);z-index:11}
-#ui{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:15}
-#pause-btn,#mute-btn,#shop-btn{position:absolute;top:8px;pointer-events:all;background:rgba(0,0,0,.75);border:1px solid #333;color:#555;font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 9px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:color .15s,border-color .15s}
-#pause-btn{right:8px}
-#mute-btn{right:66px}
-#shop-btn{right:124px}
-#bomb-btn{position:absolute;bottom:22px;right:18px;pointer-events:all;background:rgba(255,170,0,.15);border:2px solid #ffaa00;color:#ffaa00;font-family:'Press Start 2P',monospace;font-size:8px;padding:15px 20px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;display:none;border-radius:3px;letter-spacing:1px}
+#ui{position:fixed;top:0;left:0;pointer-events:none;z-index:15;font-family:'Press Start 2P',monospace}
+#topbtns{position:absolute;top:.9em;right:.9em;left:.9em;display:flex;justify-content:flex-end;gap:.5em;pointer-events:none}
+#topbtns button{pointer-events:all;background:rgba(4,6,14,.85);border:1px solid #333;color:#8a8a9c;font-family:inherit;font-size:1em;letter-spacing:.05em;padding:.85em .9em;cursor:pointer;border-radius:3px;-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:color .15s,border-color .15s,background .15s}
+#topbtns button:active{background:rgba(57,255,20,.14)}
+#bomb-btn{position:absolute;bottom:1.4em;right:.9em;pointer-events:all;background:rgba(255,170,0,.15);border:2px solid #ffaa00;color:#ffaa00;font-family:inherit;font-size:1em;padding:1.1em 1.3em;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;display:none;border-radius:3px;letter-spacing:.1em}
 #bomb-btn:active{background:rgba(255,170,0,.4)}
 </style>
 </head>
@@ -34,16 +33,31 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block;touch
 <div class="ov sl"></div>
 <div class="ov vg"></div>
 <div id="ui">
-  <button id="pause-btn">II</button>
-  <button id="mute-btn">&#9834;</button>
-  <button id="shop-btn">&#128722;</button>
+  <div id="topbtns">
+    <button id="shop-btn">SHOP</button>
+    <button id="mute-btn">SOUND</button>
+    <button id="pause-btn">PAUSE</button>
+  </div>
   <button id="bomb-btn">BOMB</button>
 </div>
 <script>
 (()=>{
 'use strict';
 const cv=document.getElementById('c'),cx=cv.getContext('2d'),W=480,H=720;
-function resize(){const r=W/H;let w=innerWidth,h=innerHeight;if(w/h>r)w=h*r;else h=w/r;cv.style.width=w+'px';cv.style.height=h+'px'}
+// The buttons live in the page, so they are pinned to the canvas rectangle rather
+// than the viewport: on a wide window the game is a centred column and viewport
+// corners are nowhere near it.
+const ui=document.getElementById('ui'),topBtns=document.getElementById('topbtns');
+function resize(){
+  const r=W/H;let w=innerWidth,h=innerHeight;if(w/h>r)w=h*r;else h=w/r;
+  cv.style.width=w+'px';cv.style.height=h+'px';
+  const b=cv.getBoundingClientRect(),s=b.width/W;
+  ui.style.left=b.left+'px';ui.style.top=b.top+'px';
+  ui.style.width=b.width+'px';ui.style.height=b.height+'px';
+  const fs=Math.max(10,Math.min(15,10*s));
+  topBtns.style.fontSize=fs+'px';
+  document.getElementById('bomb-btn').style.fontSize=fs+'px';
+}
 addEventListener('resize',resize);resize();
 
 // AUDIO
@@ -83,15 +97,17 @@ const pauseBtn=document.getElementById('pause-btn');
 const muteBtn=document.getElementById('mute-btn');
 const shopBtn=document.getElementById('shop-btn');
 const bombBtn=document.getElementById('bomb-btn');
-pauseBtn.addEventListener('click',()=>{if(!shopOpen&&(st==='PLAY'||st==='BFIGHT')){paused=!paused;refreshPauseBtn()}});
-muteBtn.addEventListener('click',()=>{muted=!muted;refreshMuteBtn()});
-shopBtn.addEventListener('click',()=>{if(st==='PLAY'||st==='BFIGHT'){shopOpen=!shopOpen;paused=shopOpen;refreshPauseBtn();refreshShopBtn()}});
+// Clicking a button leaves it focused, and a focused button swallows the next
+// SPACE/ENTER press (closing the shop again), so hand focus back to the game.
+pauseBtn.addEventListener('click',()=>{pauseBtn.blur();if(!shopOpen&&(st==='PLAY'||st==='BFIGHT')){paused=!paused;refreshPauseBtn()}});
+muteBtn.addEventListener('click',()=>{muteBtn.blur();muted=!muted;refreshMuteBtn()});
+shopBtn.addEventListener('click',()=>{shopBtn.blur();if(st==='PLAY'||st==='BFIGHT'){shopOpen=!shopOpen;paused=shopOpen;refreshPauseBtn();refreshShopBtn()}});
 function fireBomb(){if(P&&P.hb){aBomb();P.hb=false}}
 bombBtn.addEventListener('touchstart',e=>{e.preventDefault();fireBomb()});
 bombBtn.addEventListener('click',fireBomb);
-function refreshPauseBtn(){pauseBtn.textContent=paused?'\u25B6':'II';pauseBtn.style.color=paused?'#39ff14':'#555';pauseBtn.style.borderColor=paused?'#39ff14':'#333'}
-function refreshMuteBtn(){muteBtn.textContent=muted?'\u2715\u266A':'\u266A';muteBtn.style.color=muted?'#ff4444':'#555';muteBtn.style.borderColor=muted?'#ff4444':'#333'}
-function refreshShopBtn(){shopBtn.style.color=shopOpen?'#ffaa00':'#555';shopBtn.style.borderColor=shopOpen?'#ffaa00':'#333'}
+function refreshPauseBtn(){const on=paused&&!shopOpen;pauseBtn.textContent=on?'RESUME':'PAUSE';pauseBtn.style.color=on?'#39ff14':'#8a8a9c';pauseBtn.style.borderColor=on?'#39ff14':'#333'}
+function refreshMuteBtn(){muteBtn.textContent=muted?'MUTED':'SOUND';muteBtn.style.color=muted?'#ff4444':'#8a8a9c';muteBtn.style.borderColor=muted?'#ff4444':'#333'}
+function refreshShopBtn(){shopBtn.style.color=shopOpen?'#ffaa00':'#8a8a9c';shopBtn.style.borderColor=shopOpen?'#ffaa00':'#333'}
 function refreshBombBtn(){bombBtn.style.display=(P&&P.hb&&(st==='PLAY'||st==='BFIGHT'))?'block':'none'}
 
 // TOUCH CONTROLS
@@ -164,8 +180,8 @@ function dBanner(){
   if(wb.a<=0)return;
   wb.a-=.022;
   cx.save();cx.globalAlpha=Math.min(1,wb.a);
-  cx.fillStyle=wb.c;cx.font='22px "Press Start 2P"';cx.textAlign='center';
-  cx.shadowColor=wb.c;cx.shadowBlur=25;cx.fillText(wb.txt,W/2,H/2);cx.shadowBlur=0;
+  cx.fillStyle=wb.c;cx.font='18px "Press Start 2P"';cx.textAlign='center';
+  cx.shadowColor=wb.c;cx.shadowBlur=18;cx.fillText(wb.txt,W/2,H*.6);cx.shadowBlur=0;
   cx.restore();
 }
 
@@ -318,12 +334,12 @@ function dBoss(){
       for(let t=0;t<3;t++){cx.fillStyle='#3355aa';cx.beginPath();cx.arc(tp[t].tx,tp[t].ty,8,0,6.283);cx.fill();cx.strokeStyle='#88aaff';cx.lineWidth=3;cx.beginPath();cx.moveTo(tp[t].tx,tp[t].ty);cx.lineTo(tp[t].tx+Math.cos(ta[t])*14,tp[t].ty+Math.sin(ta[t])*14);cx.stroke()}
       cx.fillStyle='#ff4444';cx.beginPath();cx.arc(x,y-8,6,0,6.283);cx.fill();cx.fillStyle=C.wh;cx.beginPath();cx.arc(x,y-8,3,0,6.283);cx.fill();break;
   }
-  // Boss HP bar
-  const bw=200,bh=6,bx=(W-bw)/2,by=15;
+  // Boss HP bar, tucked just under the top strip so it never covers the HUD
+  const bw=200,bh=6,bx=(W-bw)/2,by=46;
   cx.fillStyle='#222';cx.fillRect(bx,by,bw,bh);
   const r=boss.hp/boss.mhp;cx.fillStyle=r>.5?C.gn:r>.25?C.yw:C.rd;cx.fillRect(bx,by,bw*r,bh);
   cx.strokeStyle='#666';cx.lineWidth=1;cx.strokeRect(bx,by,bw,bh);
-  cx.fillStyle=C.wh;cx.font='8px "Press Start 2P"';cx.textAlign='center';cx.fillText(boss.type,W/2,by+bh+14);cx.textAlign='left';
+  cx.fillStyle=C.wh;cx.font='9px "Press Start 2P"';cx.textAlign='center';cx.fillText(boss.type,W/2,by+bh+14);cx.textAlign='left';
 }
 function hitBoss(amt){
   boss.hp-=amt;sP(boss.x+R(-20,20),boss.y+R(-15,15),C.yw,5,2,15);dShk(3);
@@ -391,30 +407,40 @@ function gW(n){
   st='PLAY';
 }
 
-// SHOP — overlay accessed via TAB anytime during PLAY or BFIGHT
+// SHOP — overlay accessed via the SHOP button or TAB during PLAY or BFIGHT
 const ups={damage:{lv:0,mx:5,cost:[30,60,120,250,500]},speed:{lv:0,mx:4,cost:[25,50,100,200]},bullets:{lv:0,mx:4,cost:[25,50,100,200]},life:{lv:0,mx:99,cost:[50]},luck:{lv:0,mx:3,cost:[40,80,160]}};
 const sk=['damage','speed','bullets','life','luck'];
 const sn={damage:'DAMAGE',speed:'SPEED',bullets:'BULLETS',life:'EXTRA LIFE',luck:'LUCK'};
+const SHOP={x:36,y:60,w:W-72,h:H-120,row:200,rowH:62};
 let ss=0;
 function dShop(){
-  // Dim background
-  cx.fillStyle='rgba(4,4,18,.93)';cx.fillRect(24,36,W-48,H-72);
-  cx.strokeStyle='#39ff14';cx.lineWidth=1;cx.strokeRect(24,36,W-48,H-72);
-  const xc=W/2;let ty=78;
-  cx.fillStyle=C.gn;cx.font='12px "Press Start 2P"';cx.textAlign='center';cx.fillText('UPGRADES',xc,ty);ty+=26;
-  cx.fillStyle=C.yw;cx.font='9px "Press Start 2P"';cx.fillText(`CREDITS: ${P.cr}`,xc,ty);ty+=38;
+  // Dim the fight first, then the panel
+  cx.fillStyle='rgba(2,3,10,.72)';cx.fillRect(0,0,W,H);
+  cx.fillStyle='rgba(4,4,18,.96)';cx.fillRect(SHOP.x,SHOP.y,SHOP.w,SHOP.h);
+  cx.strokeStyle='#39ff14';cx.lineWidth=1;cx.strokeRect(SHOP.x+.5,SHOP.y+.5,SHOP.w-1,SHOP.h-1);
+  const xc=W/2;
+  cx.textAlign='center';
+  cx.fillStyle=C.gn;cx.font='16px "Press Start 2P"';cx.fillText('UPGRADES',xc,SHOP.y+48);
+  cx.fillStyle=C.yw;cx.font='12px "Press Start 2P"';cx.fillText(`CREDITS ${P.cr}`,xc,SHOP.y+80);
+  cx.strokeStyle='#1b3a1b';cx.lineWidth=1;cx.beginPath();cx.moveTo(SHOP.x+20,SHOP.y+100);cx.lineTo(SHOP.x+SHOP.w-20,SHOP.y+100);cx.stroke();
   for(let i=0;i<sk.length;i++){
-    const k=sk[i],u=ups[k],sl=i===ss,mx=u.lv>=u.mx,cst=mx?99999:u.cost[u.lv],af=!mx&&P.cr>=cst;
-    if(sl){cx.fillStyle='#0c1a0c';cx.fillRect(38,ty-18,W-76,30);cx.strokeStyle=C.gn;cx.lineWidth=1;cx.strokeRect(38,ty-18,W-76,30)}
-    cx.fillStyle=sl?C.gn:'#777';cx.font='8px "Press Start 2P"';cx.textAlign='left';cx.fillText(`[${i+1}] ${sn[k]}`,56,ty);
-    if(k!=='life'){for(let d=0;d<u.mx;d++){cx.fillStyle=d<u.lv?C.gn:'#2a2a2a';cx.fillRect(255+d*14,ty-7,9,9)}}
-    else{cx.fillStyle='#888';cx.font='7px "Press Start 2P"';cx.fillText(`x${P.lv}`,275,ty)}
-    cx.fillStyle=mx?'#444':af?C.yw:C.rd;cx.font='8px "Press Start 2P"';cx.textAlign='right';cx.fillText(mx?'MAX':`${cst}c`,W-52,ty);
-    ty+=36;
+    const k=sk[i],u=ups[k],sl=i===ss,mx=u.lv>=u.mx,cst=mx?null:u.cost[u.lv],af=!mx&&P.cr>=cst;
+    const top=SHOP.row+i*SHOP.rowH;
+    if(sl){cx.fillStyle='#0d1c0d';cx.fillRect(SHOP.x+8,top-30,SHOP.w-16,48);cx.strokeStyle=C.gn;cx.lineWidth=1;cx.strokeRect(SHOP.x+8,top-30,SHOP.w-16,48)}
+    cx.textAlign='left';
+    cx.fillStyle=sl?C.gn:'#8a8a98';cx.font='12px "Press Start 2P"';
+    cx.fillText(`${i+1} ${sn[k]}`,SHOP.x+22,top);
+    if(k!=='life'){for(let d=0;d<u.mx;d++){cx.fillStyle=d<u.lv?C.gn:'#262626';cx.fillRect(SHOP.x+216+d*18,top-11,13,13)}}
+    else{cx.fillStyle='#8a8a98';cx.font='11px "Press Start 2P"';cx.fillText(`x${P.lv}`,SHOP.x+216,top)}
+    cx.textAlign='right';
+    cx.fillStyle=mx?'#4a4a5c':af?C.yw:C.rd;
+    cx.font='12px "Press Start 2P"';
+    cx.fillText(mx?'MAX':cst+'c',SHOP.x+SHOP.w-22,top);
   }
-  ty+=8;
-  cx.fillStyle='#444';cx.font='7px "Press Start 2P"';cx.textAlign='center';cx.fillText('\u2191\u2193 SELECT    ENTER BUY    1-5 QUICK BUY',xc,ty);ty+=20;
-  cx.fillStyle=C.rd;cx.fillText('TAB / ESC  CLOSE & RESUME',xc,ty);
+  cx.textAlign='center';
+  cx.fillStyle='#8a8a98';cx.font='10px "Press Start 2P"';cx.fillText('UP/DOWN SELECT   ENTER BUY   1-5 BUY',xc,SHOP.y+SHOP.h-78);
+  cx.fillStyle='#6a6a7a';cx.font='9px "Press Start 2P"';cx.fillText('TAP A ROW TO BUY',xc,SHOP.y+SHOP.h-52);
+  cx.fillStyle=C.rd;cx.font='10px "Press Start 2P"';cx.fillText('TAB / ESC  CLOSE',xc,SHOP.y+SHOP.h-24);
   cx.textAlign='left';
 }
 function hShop(){
@@ -434,13 +460,15 @@ function bUp(){
   else if(k==='luck')P.lk=u.lv;
   sf.buy();
 }
-// Shop tap-to-buy on mobile
+// Shop tap-to-buy on mobile: hit the same rows the panel draws
 cv.addEventListener('click',e=>{
   if(!shopOpen)return;
   const rect=cv.getBoundingClientRect();
   const cy2=(e.clientY-rect.top)*(H/rect.height);
-  const row=Math.floor((cy2-142)/36);
-  if(row>=0&&row<sk.length){ss=row;bUp()}
+  for(let i=0;i<sk.length;i++){
+    const top=SHOP.row+i*SHOP.rowH-30;
+    if(cy2>=top&&cy2<=top+48){ss=i;bUp();return}
+  }
 });
 
 // COLLISIONS
@@ -494,48 +522,70 @@ function iG(){
   gW(wn);
 }
 function dHUD(){
-  cx.fillStyle=C.wh;cx.font='8px "Press Start 2P"';cx.textAlign='left';cx.fillText(`SCORE ${P.sc}`,10,30);
-  cx.fillStyle='#555';cx.fillText(`HI ${hi}`,10,44);
-  // Lives (top-right, but leave room for 3 HUD buttons)
-  cx.fillStyle=C.gn;
-  for(let i=0;i<P.lv;i++){const lx=W-175-i*18,ly=25;cx.beginPath();cx.moveTo(lx,ly-6);cx.lineTo(lx-6,ly+4);cx.lineTo(lx,ly+1);cx.lineTo(lx+6,ly+4);cx.closePath();cx.fill()}
-  cx.textAlign='center';cx.fillStyle='#444';cx.font='7px "Press Start 2P"';cx.fillText(`WAVE ${wn}`,W/2,44);
-  cx.fillStyle=C.yw;cx.textAlign='left';cx.fillText(`${P.cr}c`,10,58);
-  // Subtle TAB hint
-  cx.fillStyle='#2a2a2a';cx.font='6px "Press Start 2P"';cx.textAlign='right';cx.fillText('TAB=SHOP',W-10,58);
-  // Active powerup timers
-  let px=10;
-  for(const t in P.pw){cx.fillStyle=PC[t];cx.font='6px "Press Start 2P"';cx.textAlign='left';cx.fillText(PL[t]+' '+Math.ceil(P.pw[t]/60)+'s',px,H-15);px+=58}
+  // Left block: score and the credit balance, nothing else
   cx.textAlign='left';
+  cx.fillStyle='#8a8a9c';cx.font='8px "Press Start 2P"';cx.fillText('SCORE',12,22);
+  cx.fillStyle=C.wh;cx.font='15px "Press Start 2P"';cx.fillText(String(P.sc),12,43);
+  cx.fillStyle=C.yw;cx.font='10px "Press Start 2P"';cx.fillText(P.cr+'c',12,62);
+  // Centre: wave
+  cx.textAlign='center';
+  cx.fillStyle=C.gn;cx.font='11px "Press Start 2P"';cx.fillText('WAVE '+wn,W/2,30);
+  // Right: lives, under the button row
+  cx.fillStyle=C.gn;
+  for(let i=0;i<P.lv;i++){const lx=W-16-i*18,ly=62;cx.beginPath();cx.moveTo(lx,ly-7);cx.lineTo(lx-7,ly+4);cx.lineTo(lx,ly+1);cx.lineTo(lx+7,ly+4);cx.closePath();cx.fill()}
+  // Active powerup timers: one compact strip along the bottom
+  let px=12;
+  cx.textAlign='left';
+  for(const t in P.pw){cx.fillStyle=PC[t];cx.font='8px "Press Start 2P"';cx.fillText(PL[t]+' '+Math.ceil(P.pw[t]/60)+'s',px,H-16);px+=64}
 }
 function dGO(){
-  cx.fillStyle=C.bg;cx.globalAlpha=.8;cx.fillRect(0,0,W,H);cx.globalAlpha=1;
-  cx.fillStyle=C.rd;cx.font='20px "Press Start 2P"';cx.textAlign='center';cx.fillText('GAME OVER',W/2,H/2-40);
-  cx.fillStyle=C.wh;cx.font='10px "Press Start 2P"';cx.fillText(`SCORE: ${P.sc}`,W/2,H/2);
-  if(P.sc>=hi&&P.sc>0){cx.fillStyle=C.yw;cx.fillText('NEW HIGH SCORE!',W/2,H/2+25)}
-  else{cx.fillStyle='#888';cx.fillText(`BEST: ${hi}`,W/2,H/2+25)}
-  cx.fillStyle='#555';cx.font='8px "Press Start 2P"';cx.fillText(`REACHED WAVE ${wn}`,W/2,H/2+55);
-  if((Date.now()/500|0)%2===0){cx.fillStyle=C.gn;cx.font='9px "Press Start 2P"';cx.fillText('PRESS SPACE TO RETRY',W/2,H/2+90)}
+  cx.fillStyle=C.bg;cx.globalAlpha=.82;cx.fillRect(0,0,W,H);cx.globalAlpha=1;
+  cx.textAlign='center';
+  cx.fillStyle=C.rd;cx.font='22px "Press Start 2P"';cx.fillText('GAME OVER',W/2,H/2-64);
+  cx.fillStyle=C.wh;cx.font='14px "Press Start 2P"';cx.fillText('SCORE '+P.sc,W/2,H/2-16);
+  if(P.sc>=hi&&P.sc>0){cx.fillStyle=C.yw;cx.font='10px "Press Start 2P"';cx.fillText('NEW HIGH SCORE',W/2,H/2+22)}
+  else{cx.fillStyle='#8a8a98';cx.font='10px "Press Start 2P"';cx.fillText('BEST '+hi,W/2,H/2+22)}
+  cx.fillStyle='#7c7c90';cx.font='10px "Press Start 2P"';cx.fillText('REACHED WAVE '+wn,W/2,H/2+58);
+  if((Date.now()/500|0)%2===0){cx.fillStyle=C.gn;cx.font='11px "Press Start 2P"';cx.fillText('PRESS SPACE TO RETRY',W/2,H/2+110)}
   cx.textAlign='left';
 }
 function dMn(){
-  cx.fillStyle=C.gn;cx.font='20px "Press Start 2P"';cx.textAlign='center';
-  cx.shadowColor=C.gn;cx.shadowBlur=20;cx.fillText('SPACE',W/2,H/3-20);cx.fillText('COMMANDERS',W/2,H/3+15);cx.shadowBlur=0;
-  cx.fillStyle='#555';cx.font='6px "Press Start 2P"';cx.fillText('COLUMBIA DATA PRODUCTS \u2022 1983',W/2,H/3+40);cx.fillText('REIMAGINED',W/2,H/3+55);
-  if((Date.now()/600|0)%2===0){cx.fillStyle=C.wh;cx.font='9px "Press Start 2P"';cx.fillText('PRESS SPACE TO START',W/2,H/2+60)}
-  cx.fillStyle='#444';cx.font='7px "Press Start 2P"';
-  cx.fillText('ARROWS/WASD: MOVE',W/2,H/2+110);
-  cx.fillText('SPACE: FIRE     B: BOMB',W/2,H/2+130);
-  cx.fillText('TAB: UPGRADES   P: PAUSE',W/2,H/2+150);
-  cx.fillText('M: MUTE',W/2,H/2+170);
-  if(hi>0){cx.fillStyle=C.yw;cx.font='8px "Press Start 2P"';cx.fillText(`HIGH SCORE: ${hi}`,W/2,H-40)}
+  cx.textAlign='center';
+  cx.fillStyle=C.gn;cx.font='22px "Press Start 2P"';
+  cx.shadowColor=C.gn;cx.shadowBlur=20;
+  cx.fillText('SPACE',W/2,128);
+  cx.fillText('COMMANDERS',W/2,164);
+  cx.shadowBlur=0;
+  cx.fillStyle='#666';cx.font='8px "Press Start 2P"';
+  cx.fillText('COLUMBIA DATA PRODUCTS \u2022 1983',W/2,192);
+
+  // One control panel instead of a scatter of loose lines
+  const px=54,py=228,pw=W-108,ph=214;
+  cx.fillStyle='rgba(8,10,20,.75)';cx.fillRect(px,py,pw,ph);
+  cx.strokeStyle='#1e3a1e';cx.lineWidth=1;cx.strokeRect(px+.5,py+.5,pw-1,ph-1);
+  cx.fillStyle=C.gn;cx.font='11px "Press Start 2P"';cx.fillText('HOW TO FLY',W/2,py+30);
+  const rows=[['ARROWS / WASD','MOVE'],['SPACE','FIRE'],['B','BOMB'],['SHOP BUTTON','UPGRADES'],['P','PAUSE']];
+  let y=py+62;
+  for(const [key,act] of rows){
+    cx.font='11px "Press Start 2P"';
+    cx.textAlign='left';cx.fillStyle=C.yw;cx.fillText(key,px+22,y);
+    cx.textAlign='right';cx.fillStyle='#9a9ab0';cx.fillText(act,px+pw-22,y);
+    y+=28;
+  }
+
+  cx.textAlign='center';
+  if((Date.now()/600|0)%2===0){cx.fillStyle=C.wh;cx.font='12px "Press Start 2P"';cx.fillText('PRESS SPACE TO START',W/2,492)}
+  if(hi>0){cx.fillStyle=C.yw;cx.font='10px "Press Start 2P"';cx.fillText('HIGH SCORE '+hi,W/2,532)}
+  cx.fillStyle='#555';cx.font='9px "Press Start 2P"';cx.fillText('TAP TO START ON MOBILE',W/2,600);
   cx.textAlign='left';
 }
 function dPaused(){
-  cx.fillStyle='rgba(0,0,0,.55)';cx.fillRect(0,0,W,H);
-  cx.fillStyle=C.gn;cx.font='18px "Press Start 2P"';cx.textAlign='center';
-  cx.shadowColor=C.gn;cx.shadowBlur=15;cx.fillText('PAUSED',W/2,H/2-10);cx.shadowBlur=0;
-  cx.fillStyle='#555';cx.font='7px "Press Start 2P"';cx.fillText('P TO RESUME',W/2,H/2+20);cx.textAlign='left';
+  cx.fillStyle='rgba(0,0,0,.6)';cx.fillRect(0,0,W,H);
+  cx.textAlign='center';
+  cx.fillStyle=C.gn;cx.font='20px "Press Start 2P"';
+  cx.shadowColor=C.gn;cx.shadowBlur=15;cx.fillText('PAUSED',W/2,H/2-8);cx.shadowBlur=0;
+  cx.fillStyle='#8a8a98';cx.font='9px "Press Start 2P"';cx.fillText('P TO RESUME',W/2,H/2+28);
+  cx.textAlign='left';
 }
 
 // MAIN LOOP

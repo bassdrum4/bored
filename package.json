@@ -12,7 +12,7 @@
     "games:add": "node scripts/games.mjs add",
     "games:register": "node scripts/games.mjs register",
     "feedback:setup": "node scripts/setup-feedback.mjs",
-    "test": "node --test tests/bored.test.cjs tests/discovery.test.cjs",
+    "test": "node --test tests/bored.test.cjs tests/discovery.test.cjs tests/player-state.test.cjs",
     "test:visual": "node --test tests/visual.test.cjs",
     "previews:capture": "node scripts/capture-previews.mjs",
     "previews:optimize": "python3 scripts/optimize-previews.py"
