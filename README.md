@@ -24,7 +24,12 @@ npm test         # game regressions, discovery, layout and mock account flows
 | Path | What it holds |
 |---|---|
 | [`src/index.html`](src/index.html) | Page shell and leaderboard/auth dialogs — the entry document |
-| [`src/main.js`](src/main.js) | Hub wiring: library, player chrome, daily section, leaderboard and account UI |
+| [`src/main.js`](src/main.js) | Player state and hub coordination (game launch, account sync and daily state) |
+| [`src/hub/library-view.js`](src/hub/library-view.js) | Library cards, filters, favorites and recent shelf |
+| [`src/hub/leaderboard-view.js`](src/hub/leaderboard-view.js) | Leaderboard UI and fetching |
+| [`src/hub/account-ui.js`](src/hub/account-ui.js) | Account dialogs and account UI |
+| [`src/hub/feedback-ui.js`](src/hub/feedback-ui.js) | Feedback dialog |
+| [`src/hub/game-document.js`](src/hub/game-document.js) | Frame document helpers and seed injection |
 | [`src/hub/backend.js`](src/hub/backend.js) | Supabase request/session layer, score rules, auth helpers |
 | [`src/hub/cloud.js`](src/hub/cloud.js) | The `player_state` pull/push that lets an account follow the player |
 | [`src/hub/scores.js`](src/hub/scores.js) | Score specs, best capture, sync, and ranking |
@@ -38,7 +43,8 @@ npm test         # game regressions, discovery, layout and mock account flows
 | [`src/games/previews/`](src/games/previews) | Small WebP captures of every offline game, one file each, named after the slug |
 | [`src/games/score-rules.json`](src/games/score-rules.json) | What each game's score means on the shared board (label, better, max) |
 | [`src/daily.js`](src/daily.js) | Daily challenge rules and adapters |
-| [`scripts/games.mjs`](scripts/games.mjs) | `add` a new game, `register` its shared-board rule |
+| [`scripts/games.mjs`](scripts/games.mjs) | Scaffold a playable game including all core metadata and score capture; register its rule |
+| [`scripts/validate-games.mjs`](scripts/validate-games.mjs) | Offline contract checks for catalog, assets, snapshots and leaderboard specs |
 | [`scripts/setup-feedback.mjs`](scripts/setup-feedback.mjs) | Creates the feedback table ([SQL](scripts/feedback-setup.sql)) |
 | [`scripts/player-state.sql`](scripts/player-state.sql) | Creates the per-account `player_state` table — run it in the SQL editor |
 | [`vite.config.js`](vite.config.js) | Dev server (`src/` as root); there is no production build |
@@ -438,13 +444,15 @@ npm run games:add -- whack-a-mole "Whack-a-Mole" Arcade "Bonk them before they h
   --unit moles --metric moles
 ```
 
-It prints the two short snippets to paste — the `highScore()` entry in
-[`src/hub/scores.js`](src/hub/scores.js) and an optional daily challenge in
-[`src/daily.js`](src/daily.js) — then finish with:
+It automatically creates a starter HTML game, an SVG preview placeholder, discovery metadata,
+score rule and a `highScore()` capture spec. The generated snapshot reports a numeric metric and
+`finished` flag, so unfinished rounds are not posted. Daily challenges are deliberately opt-in:
+add a challenge in [`src/daily.js`](src/daily.js) only after choosing a measurable goal. Finish with:
 
 ```bash
-npm run games:register   # add the missing score_rules rows (or print the SQL)
-node --test tests/bored.test.cjs
+npm run games:check      # fail on missing files, preview, score specs or snapshot hooks
+npm run games:register   # add missing score_rules rows (or print SQL)
+npm test
 ```
 
 `games:register` is the command that used to be a database chore. The shared
@@ -467,3 +475,12 @@ The author's ignored `_source/` and `_build/` folders contain the original game
 sources, collector, cached dependencies, and older verification scripts. The
 legacy `_build/build.py` generator **will overwrite these additions** — it is not
 part of the site and never was.
+
+### Game contract checks
+
+`npm run games:check` is included in `npm test` and runs without accessing Supabase.
+It verifies unique slugs, catalog and discovery metadata, missing/orphan HTML files,
+preview assets, score rule consistency, registered best-score capture and daily challenge
+references. New scored games use a completed-run snapshot; intentionally unscored games
+must be created with `--no-score`. The starter is exercised in a temporary directory by
+`tests/scaffolder.test.cjs`.

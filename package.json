@@ -10,10 +10,11 @@
     "games:add": "node scripts/games.mjs add",
     "games:register": "node scripts/games.mjs register",
     "feedback:setup": "node scripts/setup-feedback.mjs",
-    "test": "node --test --test-concurrency=1 tests/bored.test.cjs tests/discovery.test.cjs tests/player-state.test.cjs tests/backend-safety.test.cjs",
+    "test": "npm run games:check && node --test tests/bored.test.cjs tests/discovery.test.cjs tests/player-state.test.cjs tests/backend-safety.test.cjs tests/scaffolder.test.cjs",
     "test:visual": "node --test tests/visual.test.cjs",
     "previews:capture": "node scripts/capture-previews.mjs",
-    "previews:optimize": "python3 scripts/optimize-previews.py"
+    "previews:optimize": "python3 scripts/optimize-previews.py",
+    "games:check": "node scripts/validate-games.mjs"
   },
   "devDependencies": {
     "puppeteer-core": "^25.14.0",
