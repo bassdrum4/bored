@@ -70,9 +70,14 @@ function backendSettings() {
 function catalogEntries() {
   const source = readFileSync(catalogPath, 'utf8');
   const entries = new Map();
-  const orderStatements = source.match(/(?:export const ORDER = \[[\s\S]*?\];)|(?:ORDER\.unshift\([\s\S]*?\);)/g) || [];
-  for (const statement of orderStatements) {
-    for (const [, id, name] of statement.matchAll(/\[\s*["']([^"']+)["'],\s*["']([^"']+)["']\s*\]/g)) {
+  // The main ORDER literal is valid JSON. Parse it rather than using a
+  // quote-sensitive regex: a game's display name may contain apostrophes.
+  const literal = source.match(/export const ORDER = (\[[\s\S]*?\]);/);
+  if (!literal) throw new Error('catalog.js has no ORDER literal');
+  for (const [id, name] of JSON.parse(literal[1])) entries.set(id, name);
+  // Preserve the older short unshift statements for native and featured games.
+  for (const statement of source.matchAll(/ORDER\.unshift\(([\s\S]*?)\);/g)) {
+    for (const [, id, name] of statement[1].matchAll(/\[\s*["']([^"']+)["'],\s*["']([^"']+)["']\s*\]/g)) {
       entries.set(id, name);
     }
   }

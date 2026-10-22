@@ -32,6 +32,8 @@ test('the generator wires playable documents, previews, discovery and scoring at
   assert.equal(first.status, 0, first.stderr);
   const second = run(tmp, 'another-game', 'Another Game', 'Arcade', 'Second starter');
   assert.equal(second.status, 0, second.stderr);
+  const duplicate = run(tmp, 'quiz-room', 'Duplicate', 'Arcade', 'Should be refused');
+  assert.notEqual(duplicate.status, 0, 'duplicate slug must be rejected even when name has an apostrophe');
   for (const slug of ['quiz-room', 'another-game']) {
     const html = fs.readFileSync(path.join(tmp, 'src/games/content', slug + '.html'), 'utf8');
     assert.match(html, /window\.__boredSnapshot/);
@@ -45,7 +47,7 @@ test('the generator wires playable documents, previews, discovery and scoring at
   const rules = JSON.parse(fs.readFileSync(path.join(tmp, 'src/games/score-rules.json'), 'utf8'));
   assert.match(catalog, /quiz-room/);
   assert.match(catalog, /another-game/);
-  assert.match(discovery, /'quiz-room': '\.svg'/);
+  assert.match(discovery, /["']quiz-room["']: '\.svg'/);
   assert.match(scores, /highScore\("quiz-room"/);
   assert.equal(rules['quiz-room'].max_value, 999);
   assert.equal(rules['quiz-room'].better, 'high');
