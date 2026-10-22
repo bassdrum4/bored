@@ -5,9 +5,9 @@ const path = require('node:path');
 
 function load(file, names, deps) {
   const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
-    .replace(/^import[\\s\\S]*?from ['"][^'"]+['"];\\s*/gm, '')
-    .replace(/\\bexport\\s+(?=(?:async\\s+)?(?:function|const|let|class))/g, '');
-  return new Function(...Object.keys(deps), source + '\\nreturn {' + names.join(',') + '};')
+    .replace(/^import[\s\S]*?from ['"][^'"]+['"];\s*/gm, '')
+    .replace(/\bexport\s+(?=(?:async\s+)?(?:function|const|let|class))/g, '');
+  return new Function(...Object.keys(deps), source + '\nreturn {' + names.join(',') + '};')
     (...Object.values(deps));
 }
 
