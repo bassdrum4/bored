@@ -119,19 +119,50 @@ export async function loadRules() {
   }
 }
 
+// Supabase refresh tokens rotate after use. Multiple backend requests often
+// call freshSession() together on page load; they must share one refresh rather
+// than each spending the same token. Never discard an account because the
+// network, rate limiter or server was temporarily unavailable.
+let refreshInFlight = null;
+
+function temporaryRefreshFailure(error) {
+  const status = Number(error?.status);
+  return !status || status === 408 || status === 429 || status >= 500;
+}
+
 export async function refreshSession() {
-  if (!session?.refresh_token) { forgetSession(); return null; }
-  try {
-    const data = await request('/auth/v1/token?grant_type=refresh_token', {
-      method: 'POST',
-      body: { refresh_token: session.refresh_token },
-      token: API_KEY
-    });
-    return applySession(data);
-  } catch {
-    forgetSession();
-    return null;
+  const startingSession = session;
+  if (!startingSession) return null;
+  if (!startingSession.refresh_token) { forgetSession(); return null; }
+  if (refreshInFlight?.token === startingSession.refresh_token &&
+      refreshInFlight.userId === startingSession.user.id) {
+    return refreshInFlight.promise;
   }
+
+  const pending = (async () => {
+    try {
+      const data = await request('/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        body: { refresh_token: startingSession.refresh_token },
+        token: API_KEY
+      });
+      // A logout or a new login can happen while the request is in flight.
+      // Never restore the old identity or tokens after that transition.
+      if (session !== startingSession) return null;
+      return applySession(data);
+    } catch (error) {
+      if (session !== startingSession) return null;
+      if (!temporaryRefreshFailure(error)) forgetSession();
+      // An expired local token cannot authorize a write, but retaining the
+      // refresh token on temporary failures allows the next action to retry.
+      return null;
+    }
+  })();
+
+  const flight = { token: startingSession.refresh_token, userId: startingSession.user.id, promise: pending };
+  refreshInFlight = flight;
+  try { return await pending; }
+  finally { if (refreshInFlight === flight) refreshInFlight = null; }
 }
 
 export async function freshSession() {
