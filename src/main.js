@@ -1059,6 +1059,11 @@ async function submitAuth(event) {
     } else {
       await signIn(email, password);
       activateProfile();
+      // An email-confirmed signup may require a separate sign-in rather than
+      // redirecting with a session. Transfer only that pending signup's data.
+      if (adoptSignupProgress(getSession()?.user?.id)) {
+        loadLibrary(); renderRecent(); renderLibrary(); renderDaily();
+      }
     }
     lbNotice = '';
     closeAuthDialog();
