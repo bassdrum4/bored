@@ -3,6 +3,7 @@
 // here never prevent a player from completing or sharing a daily challenge.
 // The server accepts a first submission per user/challenge for a future
 // cross-account board, but a snapshot alone is not proof of a legitimate run.
+import { dailyChallenge, dailyCheck } from '../daily.js';
 import { backendReady, freshSession, getSession, request, ensureProfile } from './backend.js';
 
 const sent = new Set();
@@ -15,17 +16,14 @@ export async function submitDailyResult(result) {
   if (sent.has(key)) return true;
   try {
     if (!(await ensureProfile()) || getSession()?.user?.id !== session.user.id) return false;
-    // The value is the recorded game metric for future comparison; do not
-    // invent a score when the snapshot doesn't contain the expected metric.
-    const snapshot = result.snapshot;
-    const candidates = ['score', 'points', 'lines', 'apples', 'moves', 'guesses',
-      'waves', 'cleared', 'wins', 'seconds', 'cards', 'hits', 'layouts',
-      'levels', 'homes', 'tile', 'rounds', 'plants', 'files', 'cells', 'profit', 'won'];
-    const metric = candidates.find(k => Number.isFinite(snapshot[k]) && snapshot[k] >= 0);
-    const value = metric ? Math.round(snapshot[metric]) : 0;
+    const date = result.id.split(':')[1];
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return false;
+    const challenge = dailyChallenge(date);
+    if (challenge.id !== result.id || !dailyCheck(challenge, result.snapshot).complete) return false;
+    const value = Math.max(0, Math.round(result.snapshot[challenge.metric]));
     await request('/rest/v1/rpc/submit_daily', {
       method: 'POST',
-      body: { p_challenge: result.id, p_value: Math.max(0, value), p_snapshot: snapshot }
+      body: { p_challenge: result.id, p_value: value, p_snapshot: result.snapshot }
     });
     if (getSession()?.user?.id !== session.user.id) return false;
     sent.add(key);
