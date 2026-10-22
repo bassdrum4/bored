@@ -646,7 +646,8 @@ async function restorePlayerState() {
   if (!id) return;
   try {
     const cloud = await pullPlayerState();
-    if (!cloud || getSession()?.user?.id !== id) return;
+    if (getSession()?.user?.id !== id) return;
+    if (!cloud) { syncSavedDailyResults(); return; }
     if (mergePlayerState(cloud)) {
       saveLibrary();
       renderRecent();
