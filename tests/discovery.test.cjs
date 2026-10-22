@@ -214,8 +214,9 @@ test('account UI and score sync still work through the redesigned hub (mock back
   assert.equal(pushed.user_id, 'test-user');
   assert.ok(pushed.data.library.recent.includes('lights-out'), 'recent games follow the account');
   assert.equal(pushed.data.bests['lights-out'], 2, 'a new best follows the account');
-  // Another player's game shows their best as it always did, the viewer's own
-  // best beside it, and a way to go and beat it.
+  // Their game row carries the viewer's own best — the number they can act on —
+  // with the other player's best and the verdict underneath, plus a way to go
+  // and beat it.
   await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('rival'));
   await page.evaluate(() => {
     [...document.querySelectorAll('#lb-list .lb-row')]
@@ -224,13 +225,15 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.waitForSelector('#lb-list .lb-breakdown .lb-line');
   const line = await page.$eval('#lb-list .lb-breakdown .lb-line', el => ({
     game: el.querySelector('.lb-line-name').textContent,
-    theirs: el.querySelector('.lb-line-score').textContent,
-    mine: el.querySelector('.lb-line-you')?.textContent || '',
+    mine: el.querySelector('.lb-line-score').textContent,
+    versus: el.querySelector('.lb-line-versus')?.textContent || '',
+    theirs: el.querySelector('.lb-line-versus b')?.textContent || '',
     play: el.querySelector('.lb-play')?.getAttribute('aria-label') || ''
   }));
   assert.equal(line.game, 'Lights Out');
-  assert.equal(line.theirs, '9 boards');
-  assert.equal(line.mine, 'you 2 boards · behind');
+  assert.equal(line.mine, '2 boards', 'the row carries your own best');
+  assert.equal(line.theirs, '9 boards', 'their best is named underneath');
+  assert.equal(line.versus, "them 9 boards · you're behind");
   assert.equal(line.play, 'Play Lights Out');
   await page.click('#lb-list .lb-breakdown .lb-play');
   await page.waitForFunction(() => document.querySelector('#player').hidden === false);

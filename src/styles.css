@@ -90,9 +90,12 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
   border:0;font:11px/1.7 var(--mono);color:var(--dim)}
 .lb-line-name{grid-column:1;grid-row:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap;color:var(--dim)}
+/* Your best sits on the row; their best and the verdict get the line under it. */
 .lb-line-score{grid-column:2;grid-row:1;white-space:nowrap;color:var(--ink)}
-/* The comparison owns a whole line, so it never crowds the score. */
-.lb-line-you{grid-column:1/-1;grid-row:2;font:10px/1.8 var(--mono);color:var(--dim)}
+.lb-line-score.empty{color:var(--dim)}
+.lb-line-versus{grid-column:1/-1;grid-row:2;font:10px/1.8 var(--mono);color:var(--dim)}
+/* Their number stays dark inside the quiet line so it can be read and compared. */
+.lb-line-versus b{color:var(--ink);font-weight:400}
 .lb-play{grid-column:3;grid-row:1;justify-self:end;background:none;border:1px solid var(--rule);
   color:var(--dim);font:10px var(--mono);padding:2px 8px;cursor:pointer;white-space:nowrap}
 .lb-play:hover,.lb-play:focus-visible{border-color:var(--ink);color:var(--ink)}

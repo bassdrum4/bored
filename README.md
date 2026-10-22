@@ -222,9 +222,9 @@ and see how other players are doing. The leaderboard ranks accounts: 5 points
 for first place in a game, 4 for second, down to 1 for fifth, ties sharing
 points, so no game's raw units get added to another's. Only the top five in each
 game score — with a board this small, tenth place was mostly everybody. Click a
-name to expand its per-game bests, listed A–Z: each game keeps that player's
-score where it was, shows your own best on it underneath — ahead, behind or
-tied — and carries a **Play** button that opens the game. The leaderboard is
+name to expand its per-game bests, listed A–Z: each game row carries your own
+best, names the other player's best underneath with whether you are ahead,
+behind or tied, and carries a **Play** button that opens the game. The leaderboard is
 backed by Supabase and is entirely optional: without keys the hub stays offline
 and every game still works.
 

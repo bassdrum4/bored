@@ -850,15 +850,23 @@ function renderLeaderboard() {
         if (!spec) continue;
         const value = Number(entry.value);
         const line = element('li', 'lb-line');
-        line.append(element('span', 'lb-line-name', spec.name), element('span', 'lb-line-score', formatScore(value, spec)));
-        // Their best stays where it was; the comparison sits under it so the
-        // row is still one game wide at 320px.
+        // The number on the row is the viewer's own best, since that is the one
+        // they can act on; the other player's best reads under it, with the
+        // verdict, so the row is still one game wide at 320px.
+        // A stored best can be the string '0', and Minesweeper reads Infinity
+        // until a board is cleared; neither is a run to print.
+        const raw = Number(key === mineKey ? value : ownValue(spec, all, mineKey));
+        const mine = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : 0;
+        const score = mine ? element('span', 'lb-line-score', formatScore(mine, spec))
+          : element('span', 'lb-line-score empty', 'no score');
+        line.append(element('span', 'lb-line-name', spec.name), score);
         if (key !== mineKey) {
-          const mine = ownValue(spec, all, mineKey);
-          const note = !mine ? 'no score from you yet'
-            : mine === value ? 'you ' + formatScore(mine, spec) + ' · tied'
-              : 'you ' + formatScore(mine, spec) + ((spec.lower ? mine < value : mine > value) ? ' · ahead' : ' · behind');
-          line.append(element('span', 'lb-line-you', note));
+          const verdict = !mine ? ''
+            : mine === value ? ' · tied'
+              : (spec.lower ? mine < value : mine > value) ? " · you're ahead" : " · you're behind";
+          const versus = element('span', 'lb-line-versus');
+          versus.append('them ', element('b', '', formatScore(value, spec)), verdict);
+          line.append(versus);
         }
         const play = element('button', 'lb-play', 'Play');
         play.type = 'button';
