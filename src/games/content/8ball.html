@@ -14,8 +14,13 @@
   .overlay.hidden{display:none}
   .title{font-size:clamp(44px,9vw,84px);font-weight:800;letter-spacing:6px;color:#f4f0e6;
     text-shadow:0 4px 0 #0a3b1e,0 8px 24px rgba(0,0,0,.6)}
-  .title .b8{display:inline-block;width:.9em;height:.9em;line-height:.9em;text-align:center;border-radius:50%;
-    background:#111;color:#fff;font-size:.62em;vertical-align:-.06em;box-shadow:inset -4px -6px 10px rgba(0,0,0,.7),0 3px 8px rgba(0,0,0,.5)}
+  /* the 8 is the ball itself: black sphere, white number patch, dark numeral */
+  .title .b8{position:relative;display:inline-block;width:.82em;height:.82em;border-radius:50%;vertical-align:-.07em;
+    background:radial-gradient(circle at 34% 28%,#5b5b64 0%,#26262c 36%,#0a0a0d 100%);
+    box-shadow:inset 0 -.02em .06em rgba(0,0,0,.75),0 .05em .12em rgba(0,0,0,.55)}
+  .title .b8 b{position:absolute;inset:25%;display:flex;align-items:center;justify-content:center;
+    border-radius:50%;background:#f6f3ea;color:#15151a;letter-spacing:0;text-shadow:none;
+    font:800 .30em/1 system-ui,sans-serif;box-shadow:inset 0 0 .02em rgba(0,0,0,.28)}
   .sub{margin-top:10px;font-size:13px;letter-spacing:2px;color:#9fb3a6}
   .btn{margin-top:14px;width:min(300px,78vw);padding:14px 20px;font:600 17px/1 system-ui,sans-serif;letter-spacing:1px;
     color:#0c3d21;background:linear-gradient(#49d17a,#2aa858);border:0;border-radius:12px;cursor:pointer;
@@ -42,7 +47,7 @@
 <div id="toasts"></div>
 
 <div class="overlay" id="menu">
-  <div class="title"><span class="b8">8</span> BALL</div>
+  <div class="title"><span class="b8"><b>8</b></span> BALL</div>
   <div class="sub">CLASSIC POOL &middot; FIRST TO POT THE 8</div>
   <button class="btn" id="btn2p">TWO PLAYERS</button>
   <button class="btn ghost" id="btnCpu">PLAY VS COMPUTER</button>
