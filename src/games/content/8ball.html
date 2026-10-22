@@ -1220,14 +1220,26 @@ function updateAimFromPointer(){
   if(Math.hypot(dx,dy) > R*1.7) aimAngle = Math.atan2(dy, dx);
 }
 
+/* Arrows set the pace, WASD walks the contact point around the cue ball. */
+const SPIN_KEY = {w:[0,1], s:[0,-1], a:[-1,0], d:[1,0]};
 window.addEventListener('keydown', e => {
   if(state!=='aim') return;
   const k = e.key;
-  if(k===' ' || k==='Enter'){ shootNow(); e.preventDefault(); }
-  else if(k==='ArrowLeft'){ aimAngle -= 0.006; e.preventDefault(); }
-  else if(k==='ArrowRight'){ aimAngle += 0.006; e.preventDefault(); }
-  else if(k==='ArrowUp'){ power = Math.min(1, power + 0.05); e.preventDefault(); }
-  else if(k==='ArrowDown'){ power = Math.max(0.05, power - 0.05); e.preventDefault(); }
+  if(k===' ' || k==='Enter'){ shootNow(); e.preventDefault(); return; }
+  if(k==='ArrowUp' || k==='ArrowDown'){
+    power = Math.max(0.05, Math.min(1, power + (k==='ArrowUp' ? 0.05 : -0.05)));
+    e.preventDefault(); return;
+  }
+  if(k==='ArrowLeft' || k==='ArrowRight'){
+    aimAngle += k==='ArrowLeft' ? -0.006 : 0.006;
+    e.preventDefault(); return;
+  }
+  const nudge = SPIN_KEY[k.toLowerCase()];
+  if(nudge){
+    spin.x = Math.max(-0.8, Math.min(0.8, spin.x + nudge[0]*0.16));
+    spin.y = Math.max(-0.8, Math.min(0.8, spin.y + nudge[1]*0.16));
+    e.preventDefault();
+  }
 });
 
 function moveHand(sx, sy){
@@ -1713,9 +1725,9 @@ function drawHUD(ox, oy, scale){
   if(!compact){
     let hint = '';
     if(state==='aim'){
-      hint = aimLocked ? 'angle set \u2014 shoot when ready'
+      hint = aimLocked ? 'angle set \u2014 shoot when ready \u00b7 arrows power \u00b7 wasd english'
            : aimMode   ? 'move to aim \u2014 click again to set the angle'
-           :             'click the felt to aim';
+           :             'click the felt to aim \u00b7 arrows power \u00b7 wasd english';
     }
     if(hint){
       ctx.font='500 11px system-ui, sans-serif';
