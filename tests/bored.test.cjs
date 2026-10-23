@@ -181,7 +181,8 @@ test('daily completion rejects idle state, wrong games, wrong modes, hints, undo
     ['connect-four', { cpu: false }], ['aim-lab', { finished: false }], ['aim-lab', { accuracy: 79 }],
     ['aim-lab', { normal: false }], ['minesweeper', { hints: 1 }], ['minesweeper', { won: false }],
     ['minesweeper', { standard: false }], ['tank', { cpu: false }], ['poker', { handOver: false }],
-    ['sand', { materials: 3 }], ['eco', { herbs: 19 }], ['eco', { predators: 2 }], ['eco', { seconds: 59 }]
+    ['sand', { materials: 3 }], ['eco', { herbs: 19 }], ['eco', { predators: 2 }], ['eco', { seconds: 59 }],
+    ['chess', { cpu: false }], ['chess', { won: 0 }]
   ]) {
     const challenge = dailyChallenge(dateFor(slug));
     const snapshot = { ...good, slug, [challenge.metric]: challenge.target, ...fields };

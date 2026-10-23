@@ -79,6 +79,10 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Chess counts the human's wins against the computer in a session, like Connect Four.
+  highScore('chess', 'Chess', 'wins', { metric: 'wins', when: snapshot => snapshot.cpu === true && snapshot.won === 1 }),
+  // Mahjong ranks the pairs cleared from one deal; a half-finished board still counts.
+  highScore('mahjong', 'Mahjong', 'pairs', { metric: 'pairs' }),
   highScore("minigolf", "Minigolf", "strokes", { metric: "strokes", when: snapshot => snapshot.finished === true, lower: true }),
   // Native Connect Four counts human victories against its AI across the session.
   highScore('connect-four', 'Connect Four', 'wins', { metric: 'wins', when: snapshot => snapshot.cpu === true }),

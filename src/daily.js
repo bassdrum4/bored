@@ -88,7 +88,9 @@ export const CHALLENGES = [
   { slug: 'gun-mayhem', label: 'Last one standing', goal: 'Win {target} rounds as P1 in one-player mode against the CPU.', metric: 'wins', targets: [1, 2, 3], rule: 'cpu', unit: 'rounds won' },
   { slug: 'shadow-net', label: 'Data extraction', goal: 'Download {target} files from remote servers in one session.', metric: 'files', targets: [3, 4, 5], unit: 'files downloaded' },
   { slug: 'sand', label: 'Tiny world architect', goal: 'Keep {target} occupied cells and at least four different materials together.', metric: 'cells', targets: [250, 500, 750], rule: 'sand', unit: 'occupied cells' },
-  { slug: 'eco', label: 'Thriving ecosystem', goal: 'After 60 simulation seconds, sustain {target} plants, 20 herbivores, and 3 predators together.', metric: 'plants', targets: [150, 175, 200], rule: 'eco', unit: 'plants' }
+  { slug: 'eco', label: 'Thriving ecosystem', goal: 'After 60 simulation seconds, sustain {target} plants, 20 herbivores, and 3 predators together.', metric: 'plants', targets: [150, 175, 200], rule: 'eco', unit: 'plants' },
+  { slug: 'mahjong', label: 'Pair by pair', goal: 'Clear {target} pairs from one Mahjong deal.', metric: 'pairs', targets: [12, 20, 28], unit: 'pairs' },
+  { slug: 'chess', label: 'Board room', goal: 'Beat the computer in {target} moves or fewer.', metric: 'moves', targets: [40, 32, 24], rule: 'chess', unit: 'moves' }
 ];
 export function dailyChallenge(date) {
   const day = Math.floor(Date.parse(date + 'T00:00:00Z') / 86400000);
@@ -114,6 +116,7 @@ export function dailyCheck(challenge, snapshot) {
     case 'poker': complete = complete && snapshot.handOver === true; notes.push(snapshot.handOver ? 'hand finished' : 'finish the hand'); break;
     case 'sand': complete = complete && snapshot.materials >= 4; notes.push(snapshot.materials + '/4 materials'); break;
     case 'eco': complete = complete && snapshot.seconds >= 60 && snapshot.herbs >= 20 && snapshot.predators >= 3; notes.push(Math.floor(snapshot.seconds) + '/60s', snapshot.herbs + '/20 herbivores', snapshot.predators + '/3 predators'); break;
+    case 'chess': complete = (snapshot.won === 1 || snapshot.won === true) && snapshot.cpu === true && value > 0 && value <= t; if (!snapshot.cpu) notes.push('computer mode required'); if (snapshot.won !== 1) notes.push('beat the computer'); break;
   }
   return { complete, progress: value + ' ' + challenge.unit + ' · target ' + t + (notes.length ? ' · ' + notes.join(' · ') : '') };
 }

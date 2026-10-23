@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mahjong</title>
+<style>
+  :root {
+    --bg: #f5f2ea;
+    --ink: #191713;
+    --muted: #6b6558;
+    --hair: #d8d2c4;
+    --tile: #fffdf7;
+    --blocked: #e3ddcc;
+    --accent: #b3261e;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  body {
+    min-height: 100vh; display: grid; place-items: center; overflow-x: hidden;
+    background: var(--bg); color: var(--ink); font: 14px/1.5 var(--sans);
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  main { width: min(420px, 96vw); padding: 16px 6px 20px; text-align: center }
+  h1 { font: 600 12px/1.4 var(--mono); letter-spacing: .1em; text-transform: uppercase }
+  #board { position: relative; margin: 12px auto 0; touch-action: manipulation }
+  .tile {
+    position: absolute; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 0; line-height: 1; cursor: pointer;
+    border: 1px solid var(--hair); border-radius: 2px;
+    background: var(--tile); color: var(--ink); font: inherit;
+  }
+  .tile .num { display: block; font: 600 1em/1 var(--mono) }
+  .tile .suit { display: block; margin-top: 2px; background: var(--muted) }
+  .tile .suit.dots { width: .24em; height: .24em; border-radius: 50% }
+  .tile .suit.bamboo { width: .14em; height: .44em }
+  .tile.blocked { background: var(--blocked); color: #968d7b; cursor: default }
+  .tile.blocked .suit { background: #968d7b }
+  .tile.selected { border-color: var(--ink); background: #efe3d1 }
+  .tile.hint { outline: 2px solid var(--accent); outline-offset: -2px }
+  .tile.gone { display: none }
+  .bar { display: flex; justify-content: center; gap: 8px; margin: 14px 0 8px; flex-wrap: wrap }
+  button, select {
+    font: 12px/1 var(--mono); background: none; color: var(--ink);
+    border: 1px solid var(--hair); border-radius: 2px; padding: 9px 12px; cursor: pointer;
+  }
+  button:hover, select:hover { border-color: var(--ink) }
+  button[aria-pressed="true"] { border-color: var(--ink); background: #efe3d1 }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+  #status { min-height: 2.9em; font-size: 12px; color: var(--muted); margin-top: 6px }
+  #tutorial { margin-top: 10px; border-top: 1px solid var(--hair); padding-top: 10px; text-align: left }
+  #tutorial[hidden] { display: none }
+  #tutorial h2 { font: 600 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 6px }
+  #tutorial ol { counter-reset: step; list-style: none; display: grid; gap: 5px }
+  #tutorial li { position: relative; padding-left: 18px; font-size: 12px; color: var(--muted) }
+  #tutorial li::before {
+    counter-increment: step; content: counter(step); position: absolute; left: 0;
+    font: 11px/1.6 var(--mono); color: var(--muted);
+  }
+  #tutorial li.current { color: var(--ink) }
+  #tutorial li.done::before { content: "\2713"; color: var(--ink) }
+  #tutorial p { margin-top: 8px; font-size: 12px; color: var(--muted) }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="hud">Pairs 0 / 36 &middot; Left 72</h1>
+  <div id="board" aria-label="Mahjong board"></div>
+  <div class="bar">
+    <button id="deal" type="button">New deal</button>
+    <button id="shuffle" type="button">Shuffle</button>
+    <button id="tutorial-toggle" type="button" aria-pressed="false">Tutorial</button>
+  </div>
+  <p id="status" role="status" aria-live="polite"></p>
+  <section id="tutorial" hidden aria-label="Mahjong tutorial">
+    <h2>Tutorial</h2>
+    <ol>
+      <li id="step-free">A tile is free when nothing rests on it and its left or right side is open.</li>
+      <li id="step-match">Two free tiles of the same kind match. Tap one, then its pair.</li>
+      <li id="step-clear">Clear all six pairs on this small board.</li>
+    </ol>
+    <div class="bar">
+      <button id="hint" type="button">Show a pair</button>
+      <button id="tutorial-exit" type="button">Back to the full board</button>
+    </div>
+    <p id="tutorial-note"></p>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const boardEl = $('board'), hudEl = $('hud'), statusEl = $('status');
+const tutorialEl = $('tutorial'), tutorialToggle = $('tutorial-toggle');
+const PAD = 4, LAYER_LIFT = 0.08;
+
+/* ── The boards ──────────────────────────────────────────────────────────── */
+
+// Each layer is a row map on a ten-column grid. Layers stack on the same
+// coordinates, so a tile is buried when any higher layer covers its square.
+const NORMAL_LAYERS = [
+  { rows: ['..######..', '.########.', '##########', '##########', '.########.', '..######..'], dy: 0 },
+  { rows: ['...####...', '..######..', '..######..', '...####...'], dy: 1 },
+  { rows: ['...####...'], dy: 2 }
+];
+
+// Twelve tiles in two layers: enough to explain free sides and matching without
+// the size of a full board.
+const TUTORIAL_LAYERS = [
+  { rows: ['####', '####'], dy: 0 },
+  { rows: ['.##.', '.##.'], dy: 0 }
+];
+
+const KINDS = new Map();
+for (const suit of ['dots', 'bamboo']) {
+  for (let n = 1; n <= 9; n++) KINDS.set(suit[0] + n, { n, suit });
+}
+const KIND_IDS = [...KINDS.keys()];
+
+/* ── Deal generation ─────────────────────────────────────────────────────── */
+
+const key = (layer, x, y) => layer + ':' + x + ':' + y;
+
+function layoutSpots(layers) {
+  const spots = [];
+  layers.forEach((layer, index) => layer.rows.forEach((row, rowIndex) => {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === '#') spots.push({ layer: index, x, y: rowIndex + layer.dy, kind: '', gone: false, el: null });
+    }
+  }));
+  return spots;
+}
+
+function freeIn(alive, spot) {
+  for (let layer = spot.layer + 1; layer <= 2; layer++) {
+    if (alive.has(key(layer, spot.x, spot.y))) return false;
+  }
+  const left = alive.has(key(spot.layer, spot.x - 1, spot.y));
+  const right = alive.has(key(spot.layer, spot.x + 1, spot.y));
+  return !left || !right;
+}
+
+/*
+ * The deal is laid out by removing pairs from a full board: two tiles that are
+ * free at the same moment get the same kind. Replaying those removals in order
+ * clears the board, so every deal this game hands out has a solution.
+ */
+function createTiles(layers, rand) {
+  const spots = layoutSpots(layers);
+  const pairKinds = shuffle(KIND_IDS.flatMap(id => [id, id]), rand);
+  const alive = new Set(spots.map(spot => key(spot.layer, spot.x, spot.y)));
+  const bySpot = new Map(spots.map(spot => [key(spot.layer, spot.x, spot.y), spot]));
+  while (alive.size >= 2) {
+    const free = [...alive].map(id => bySpot.get(id)).filter(spot => freeIn(alive, spot));
+    let a, b;
+    if (free.length >= 2) {
+      a = free.splice(Math.floor(rand() * free.length), 1)[0];
+      b = free[Math.floor(rand() * free.length)];
+    } else {
+      const rest = [...alive].map(id => bySpot.get(id));
+      a = rest.pop();
+      b = rest.pop();
+    }
+    const kind = pairKinds.pop() || KIND_IDS[0];
+    a.kind = kind;
+    b.kind = kind;
+    alive.delete(key(a.layer, a.x, a.y));
+    alive.delete(key(b.layer, b.x, b.y));
+  }
+  return spots;
+}
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffle(list, rand) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    const swap = list[i];
+    list[i] = list[j];
+    list[j] = swap;
+  }
+  return list;
+}
+
+// The hub injects its seed before a game runs, but this document's script is
+// earlier in the body, so derive the same value from the Detroit day instead.
+function dailySeed() {
+  const day = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Detroit', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
+  let hash = 2166136261 >>> 0;
+  for (let i = 0; i < day.length; i++) {
+    hash ^= day.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+/* ── Game state ──────────────────────────────────────────────────────────── */
+
+let tiles = [], byKey = new Map(), selected = null, pairHint = [];
+let pairs = 0, left = 0, won = false, mode = 'deal', step = 0;
+let minX = 0, maxX = 9, minY = 0, maxY = 5;
+
+function beginGame(layers, seeded) {
+  const injected = window.__boredSeed;
+  const seed = injected && Number.isFinite(injected.seed) ? injected.seed >>> 0 : dailySeed();
+  const rand = seeded ? mulberry32(seed) : Math.random;
+  tiles = createTiles(layers, rand);
+  byKey = new Map(tiles.map(tile => [key(tile.layer, tile.x, tile.y), tile]));
+  selected = null;
+  pairHint = [];
+  pairs = 0;
+  left = tiles.length;
+  won = false;
+  if (mode === 'tutorial') step = 0;
+  minX = Math.min(...tiles.map(tile => tile.x));
+  maxX = Math.max(...tiles.map(tile => tile.x));
+  minY = Math.min(...tiles.map(tile => tile.y));
+  maxY = Math.max(...tiles.map(tile => tile.y));
+  buildBoard();
+  resize();
+  paint();
+}
+
+function buildBoard() {
+  boardEl.replaceChildren();
+  for (const tile of tiles) {
+    const info = KINDS.get(tile.kind);
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'tile';
+    el.dataset.kind = tile.kind;
+    el.dataset.layer = String(tile.layer);
+    el.innerHTML = '<span class="num">' + info.n + '</span><span class="suit ' + info.suit + '"></span>';
+    el.addEventListener('click', () => choose(tile));
+    tile.el = el;
+    boardEl.appendChild(el);
+  }
+}
+
+function resize() {
+  if (!tiles.length) return;
+  const available = Math.min(window.innerWidth - 24, 400);
+  const columns = maxX - minX + 1;
+  const rows = maxY - minY + 1;
+  const size = Math.max(22, Math.min(46, Math.floor((available - PAD * 2) / columns)));
+  const lift = Math.max(2, Math.round(size * LAYER_LIFT));
+  boardEl.style.width = columns * size + PAD * 2 + 'px';
+  boardEl.style.height = rows * size + PAD * 2 + 'px';
+  for (const tile of tiles) {
+    const el = tile.el;
+    el.style.width = size - 2 + 'px';
+    el.style.height = size - 2 + 'px';
+    el.style.left = PAD + (tile.x - minX) * size - tile.layer * lift + 'px';
+    el.style.top = PAD + (tile.y - minY) * size - tile.layer * lift + 'px';
+    el.style.zIndex = String(tile.layer + 1);
+    el.style.fontSize = Math.round(size * 0.44) + 'px';
+  }
+}
+
+/* ── Play ────────────────────────────────────────────────────────────────── */
+
+function label(tile) {
+  const info = KINDS.get(tile.kind);
+  return info.n + ' of ' + info.suit;
+}
+
+function isFree(tile) {
+  if (tile.gone) return false;
+  for (let layer = tile.layer + 1; layer <= 2; layer++) {
+    const above = byKey.get(key(layer, tile.x, tile.y));
+    if (above && !above.gone) return false;
+  }
+  const leftTile = byKey.get(key(tile.layer, tile.x - 1, tile.y));
+  const rightTile = byKey.get(key(tile.layer, tile.x + 1, tile.y));
+  const blockedLeft = leftTile && !leftTile.gone;
+  const blockedRight = rightTile && !rightTile.gone;
+  return !blockedLeft || !blockedRight;
+}
+
+function findPair() {
+  const free = tiles.filter(tile => !tile.gone && isFree(tile));
+  for (let i = 0; i < free.length; i++) {
+    for (let j = i + 1; j < free.length; j++) {
+      if (free[i].kind === free[j].kind) return [free[i], free[j]];
+    }
+  }
+  return null;
+}
+
+function paint() {
+  for (const tile of tiles) {
+    if (!tile.el) continue;
+    tile.el.classList.toggle('gone', tile.gone);
+    if (tile.gone) { tile.el.tabIndex = -1; continue; }
+    const free = isFree(tile);
+    tile.el.classList.toggle('blocked', !free);
+    tile.el.classList.toggle('selected', tile === selected);
+    tile.el.classList.toggle('hint', pairHint.includes(tile));
+    tile.el.dataset.free = free ? 'true' : 'false';
+    tile.el.tabIndex = free ? 0 : -1;
+    tile.el.setAttribute('aria-pressed', String(tile === selected));
+    tile.el.setAttribute('aria-label', label(tile) + (free ? ', free' : ', blocked'));
+  }
+  hudEl.textContent = 'Pairs ' + pairs + ' / ' + tiles.length / 2 + ' \u00b7 Left ' + left;
+  if (mode === 'tutorial') paintSteps();
+}
+
+function paintSteps() {
+  ['step-free', 'step-match', 'step-clear'].forEach((id, index) => {
+    const item = $(id);
+    item.classList.toggle('done', step > index);
+    item.classList.toggle('current', step === index);
+  });
+  $('tutorial-note').textContent =
+    step === 0 ? 'Cream tiles are free; grey tiles are blocked. Tap a cream tile.'
+    : step === 1 ? 'Now tap another free tile with the same number and suit.'
+    : step === 2 ? 'Keep matching until all six pairs are gone.'
+    : 'That is the whole game. The full board has 36 pairs.';
+}
+
+function choose(tile) {
+  if (tile.gone) return;
+  if (!isFree(tile)) {
+    statusEl.textContent = 'That tile is blocked. Free a side or lift what rests on it.';
+    return;
+  }
+  pairHint = [];
+  if (mode === 'tutorial' && step === 0) step = 1;
+  if (selected === tile) {
+    selected = null;
+    paint();
+    return;
+  }
+  if (!selected) {
+    selected = tile;
+    statusEl.textContent = 'Selected ' + label(tile) + '. Pick its match.';
+    paint();
+    return;
+  }
+  const first = selected;
+  if (first.kind !== tile.kind) {
+    selected = tile;
+    statusEl.textContent = 'Not a pair. Selected ' + label(tile) + '.';
+    paint();
+    return;
+  }
+  selected = null;
+  first.gone = true;
+  tile.gone = true;
+  pairs += 1;
+  left -= 2;
+  if (mode === 'tutorial' && step === 1) step = 2;
+  if (!left) {
+    won = true;
+    if (mode === 'tutorial') step = 3;
+    statusEl.textContent = mode === 'tutorial'
+      ? 'Tutorial cleared. Nicely done.'
+      : 'Board cleared in ' + pairs + ' pairs. Deal another?';
+  } else {
+    statusEl.textContent = 'Matched ' + label(tile) + '.';
+    if (!findPair()) statusEl.textContent = 'No free pair left. Shuffle the remaining tiles or deal again.';
+  }
+  paint();
+}
+
+function shuffleRemaining() {
+  if (!left) {
+    statusEl.textContent = 'The board is clear. Deal a new one.';
+    return;
+  }
+  const remaining = tiles.filter(tile => !tile.gone);
+  const kinds = shuffle(remaining.map(tile => tile.kind), Math.random);
+  remaining.forEach((tile, index) => {
+    tile.kind = kinds[index];
+    const info = KINDS.get(tile.kind);
+    tile.el.dataset.kind = tile.kind;
+    tile.el.innerHTML = '<span class="num">' + info.n + '</span><span class="suit ' + info.suit + '"></span>';
+  });
+  selected = null;
+  pairHint = [];
+  statusEl.textContent = 'Remaining tiles shuffled.';
+  paint();
+}
+
+function showHint() {
+  const pair = findPair();
+  if (!pair) {
+    statusEl.textContent = 'No free pair. Shuffle or deal again.';
+    return;
+  }
+  pairHint = pair;
+  statusEl.textContent = 'These two tiles are free and match.';
+  paint();
+}
+
+function setTutorial(on) {
+  mode = on ? 'tutorial' : 'deal';
+  tutorialToggle.setAttribute('aria-pressed', String(on));
+  tutorialEl.hidden = !on;
+  selected = null;
+  pairHint = [];
+  if (on) {
+    beginGame(TUTORIAL_LAYERS, false);
+    statusEl.textContent = 'Tutorial: tap one of the cream tiles.';
+  } else {
+    beginGame(NORMAL_LAYERS, false);
+    statusEl.textContent = 'Match two free tiles of the same kind.';
+  }
+}
+
+$('deal').onclick = () => setTutorial(false);
+$('shuffle').onclick = shuffleRemaining;
+$('hint').onclick = showHint;
+$('tutorial-exit').onclick = () => setTutorial(false);
+tutorialToggle.onclick = () => setTutorial(mode !== 'tutorial');
+window.addEventListener('resize', resize);
+
+window.__boredSnapshot = () => mode === 'tutorial'
+  ? { slug: 'mahjong', pairs: 0, remaining: left, total: tiles.length, finished: false, won: false, tutorial: true }
+  : { slug: 'mahjong', pairs: pairs, remaining: left, total: tiles.length, finished: left === 0 && won, won: left === 0 && won };
+
+/* Small handle for the test suite; it only exposes what the board already shows. */
+window.__test = {
+  state: () => ({
+    tiles: tiles.map(tile => ({
+      layer: tile.layer, x: tile.x, y: tile.y, kind: tile.kind,
+      gone: tile.gone, free: !tile.gone && isFree(tile)
+    })),
+    pairs: pairs, left: left, won: won, tutorial: mode === 'tutorial', step: step
+  }),
+  choose: index => choose(tiles[index]),
+  hint: showHint,
+  deal: () => setTutorial(false),
+  tutorial: () => setTutorial(true)
+};
+
+/* ── Start ───────────────────────────────────────────────────────────────── */
+
+// The first deal of the visit is the shared daily board; later deals are fresh.
+beginGame(NORMAL_LAYERS, true);
+statusEl.textContent = 'Match two free tiles of the same kind. A tile is free when nothing rests on it and its left or right side is open.';
+</script>
+</body>
+</html>
