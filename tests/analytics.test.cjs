@@ -18,6 +18,14 @@ test('active time excludes hidden, idle, unfocused, paused, loading and clock sl
   assert.deepEqual(cleanSnapshot({ slug: 'snake', input: 'private words', score: 20, won: true, token: 'secret', infinite: Infinity, nested: { email: 'x' } }), { score: 20, won: true });
 });
 
+test('analytics admin accounts are dropped from reported events and time', async () => {
+  const { excludeAdmins } = await import('../src/hub/analytics-data.js');
+  const events = [{ user_id:'admin-a' }, { user_id:'u1' }, { user_id:null }];
+  assert.deepEqual(excludeAdmins(events, ['admin-a', 'admin-b']), [{ user_id:'u1' }, { user_id:null }]);
+  assert.equal(excludeAdmins(events, []), events);
+  assert.equal(excludeAdmins(events, undefined), events);
+});
+
 test('aggregation preserves identity, session counts, mixed games, repeat days and CSV safety', async () => {
   const { summarizeEvents, eventsCSV } = await import('../src/hub/analytics-data.js');
   const event = (id, session, user, game, kind, time, active = 0, visible = active) => ({ id, session_id: session, user_id: user, game, kind, received_at: time, active_ms: active, visible_ms: visible, details: {} });
@@ -51,14 +59,16 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   const fixture = [
     { id:'a', session_id:'s1', user_id:'admin-id', game:'snake', kind:'start', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{} },
     { id:'b', session_id:'s1', user_id:'admin-id', game:'snake', kind:'end', received_at:new Date().toISOString(), active_ms:30000, visible_ms:45000, details:{score:10,reason:'close',snapshot:{score:10}} },
-    { id:'c', session_id:'s2', user_id:null, game:'memory', kind:'error', received_at:new Date().toISOString(), active_ms:5000, visible_ms:5000, details:{code:'runtime'} }
+    { id:'c', session_id:'s2', user_id:null, game:'memory', kind:'error', received_at:new Date().toISOString(), active_ms:5000, visible_ms:5000, details:{code:'runtime'} },
+    { id:'d', session_id:'s3', user_id:'player-id', game:'snake', kind:'start', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{} },
+    { id:'e', session_id:'s3', user_id:'player-id', game:'snake', kind:'end', received_at:new Date().toISOString(), active_ms:20000, visible_ms:20000, details:{score:20,reason:'close',snapshot:{score:20}} }
   ];
   const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
   page.on('request', req => {
     if (req.url().startsWith(site.origin)) return req.continue();
     if (req.method() === 'OPTIONS') return req.respond({ status:204, headers });
     if (req.url().includes('/play_events') && req.method() === 'POST') { writes.push(JSON.parse(req.postData())); return req.respond({ status:201, headers, body:'' }); }
-    const body = req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/play_events') ? fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'}] : [];
+    const body = req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/play_events') ? fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
     return req.respond({status:200, headers, contentType:'application/json', body:JSON.stringify(body)});
   });
   await page.goto(site.url);
@@ -90,15 +100,20 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   admin = true;
   await page.reload();
   await page.waitForFunction(() => document.querySelectorAll('#totals strong').length === 8);
+  // Admin play is staff activity: its two snake events never reach the report.
+  assert.match(await page.$eval('#status',n=>n.textContent), /2 admin events excluded/);
+  assert.equal(await page.$$eval('#person option', options => options.some(o => o.value === 'admin-id')), false);
+  assert.equal(await page.$eval('#totals strong',n=>n.textContent), '25 s');
   assert.equal(await page.$eval('#games-table tbody',n=>n.children.length),2);
+  assert.doesNotMatch(await page.$eval('#players-table',n=>n.textContent), /Daniel/);
   fs.mkdirSync(path.join(root, '_build/shots'), { recursive:true });
   await page.setViewport({width:1100,height:900});
   await page.screenshot({path:path.join(root,'_build/shots/analytics-desktop.png'),fullPage:true});
-  await page.select('#person','admin-id');
+  await page.select('#person','player-id');
   assert.equal(await page.$eval('#games-table tbody',n=>n.children.length),1);
   await page.click('[data-view="sessions"]');
   await page.click('#sessions-table button');
-  assert.match(await page.$eval('#session-json',n=>n.textContent), /"score": 10/);
+  assert.match(await page.$eval('#session-json',n=>n.textContent), /"score": 20/);
   await page.select('#person','guest');
   await page.click('#errors-only');
   assert.equal(await page.$eval('#sessions-table tbody',n=>n.children.length),1);

@@ -507,6 +507,9 @@ game/day/hour breakdowns, each player's games, errors, session snapshots and CSV
 export. Date filters are UTC; displayed activity days/hours are Detroit time.
 Game and player filters also apply to exports. Session tables are paginated;
 reports stop at 20,000 events with an explicit warning to narrow the date range.
+Play from analytics admin accounts is excluded from every total, chart, table
+and export before aggregation, so an owner testing the arcade never inflates
+the player numbers; the status line reports how many admin events were dropped.
 
 [`src/hub/analytics.js`](src/hub/analytics.js) is the shared collector: every game
 gets launches, load timing, source, periodic checkpoints, closes/restarts, daily
@@ -530,6 +533,9 @@ It creates `play_events` (insert-only clients; server timestamps) and
 `analytics_admins` (no client writes). RLS binds signed-in events to `auth.uid()`;
 guests may only insert unidentified events. Only admins can read activity. Admin
 membership is database-owned, never based on a handle or editable user metadata.
+The roster exception is deliberate: analytics admins may also read the
+`analytics_admins` rows (via the security-definer `is_analytics_admin()`) so the
+report can leave admin play out of the player totals.
 The owner's `danilowe28@midlandps.org` account was granted access during setup.
 To grant another account, run this in the authenticated database SQL editor:
 

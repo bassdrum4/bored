@@ -8,6 +8,17 @@ revoke all on public.analytics_admins from anon, authenticated;
 grant select on public.analytics_admins to authenticated;
 create policy "admins see their own membership" on public.analytics_admins for select to authenticated
   using (user_id = (select auth.uid()));
+-- Reports exclude analytics admin accounts from player totals and time, so the
+-- page has to know who the admins are. A security definer helper avoids the RLS
+-- self-recursion a policy on this table would otherwise create.
+create or replace function public.is_analytics_admin()
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.analytics_admins where user_id = (select auth.uid()))
+$$;
+revoke all on function public.is_analytics_admin() from public, anon;
+grant execute on function public.is_analytics_admin() to authenticated;
+create policy "admins read the admin roster" on public.analytics_admins for select to authenticated
+  using ((select public.is_analytics_admin()));
 
 create table public.play_events (
   id uuid primary key,

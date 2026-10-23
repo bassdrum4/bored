@@ -1,6 +1,6 @@
 import { request, freshSession, getSession } from './backend.js';
 import { ORDER } from '../games/catalog.js';
-import { summarizeEvents, eventsCSV } from './analytics-data.js';
+import { summarizeEvents, eventsCSV, excludeAdmins } from './analytics-data.js';
 const $ = selector => document.querySelector(selector);
 let events = [], handles = {}, report = null, page = 0, loading = false, epoch = 0;
 const names = Object.fromEntries(ORDER), PAGE_SIZE = 40, MAX_EVENTS = 20000;
@@ -108,15 +108,20 @@ async function load() {
       if (loaded.length >= MAX_EVENTS) capped = true;
     }
     const profiles = await request('/rest/v1/profiles?select=id,handle&order=id&limit=1000');
+    // Admin accounts are staff, not players: their events never enter a report.
+    const roster = await request('/rest/v1/analytics_admins?select=user_id');
     if (seq !== epoch || getSession()?.user?.id !== user.user.id) throw new Error('Account changed. Reload this page.');
-    handles = Object.fromEntries(profiles.map(p => [p.id, p.handle])); events = loaded;
+    handles = Object.fromEntries(profiles.map(p => [p.id, p.handle]));
+    events = excludeAdmins(loaded, roster.map(row => row.user_id));
+    const excluded = loaded.length - events.length;
     const previous = $('#person').value;
     $('#person').replaceChildren(new Option('All players', ''), new Option('Unidentified guests', 'guest'),
       ...[...new Set(events.map(e => e.user_id).filter(Boolean))].map(id => new Option(handles[id] || id.slice(0, 8), id)));
     $('#person').value = [...$('#person').options].some(o => o.value === previous) ? previous : '';
     page = 0; render();
     $('#status').textContent = (capped ? 'EVENT LIMIT REACHED — showing only the earliest 20,000 events. Narrow the date range. ' : '') +
-      events.length.toLocaleString() + ' events loaded · refreshed ' + dateTime(cutoff) + (events.length ? '' : ' · Collection begins with this release.');
+      events.length.toLocaleString() + ' events loaded · refreshed ' + dateTime(cutoff) + (events.length ? '' : ' · Collection begins with this release.') +
+      (excluded ? ' · ' + excluded.toLocaleString() + ' admin events excluded' : '');
   } catch (error) {
     events = []; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
     if (authorized) render();

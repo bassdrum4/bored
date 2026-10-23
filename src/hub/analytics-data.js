@@ -1,3 +1,10 @@
+// Analytics admin accounts are staff, not players. Their own events and time are
+// dropped before anything is counted, charted or exported.
+export function excludeAdmins(events, adminIds) {
+  const admins = new Set(adminIds || []);
+  return admins.size ? events.filter(event => !admins.has(event.user_id)) : events;
+}
+
 // Pure aggregation shared by the admin page and regression tests. No fixture data.
 export function summarizeEvents(events, handles = {}) {
   const sessions = new Map(), days = new Map(), hours = new Map();
