@@ -60,6 +60,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   async function flush(keepalive = false) {
     if (busy || !pending.length || !enabled) return;
     busy = true;
+    let delivered = false;
     try {
       const id = owner();
       // A former user's tokens are not retained and their records never become the next user's.
@@ -81,8 +82,14 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
         } catch (error) { if (error.code !== '23505') throw error; }
         pending = pending.filter(item => item.id !== event.id);
       }
+      delivered = true;
     } catch { /* Offline analytics must never interrupt a game. Retry on the next tick. */ }
-    finally { busy = false; }
+    finally {
+      busy = false;
+      // Events queued while a request was in flight (including close/pagehide)
+      // should follow it immediately, not wait for the next 30-second checkpoint.
+      if (delivered && enabled && pending.length) queueMicrotask(() => void flush(keepalive));
+    }
   }
   function end(reason = 'close') {
     if (!run) return;

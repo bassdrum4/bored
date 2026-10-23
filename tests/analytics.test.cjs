@@ -38,8 +38,8 @@ test('aggregation preserves identity, session counts, mixed games, repeat days a
 });
 
 test('browser collects real iframe sessions; opt-out, admin denial, filtering, export and mobile layout', async t => {
-  const executablePath = process.env.CHROME_PATH;
-  assert.ok(executablePath && fs.existsSync(executablePath), 'Set CHROME_PATH');
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(file => fs.existsSync(file));
+  assert.ok(executablePath, 'Set CHROME_PATH or install Chrome');
   const site = await serve(path.join(root, 'src'));
   let browser;
   t.after(async () => { await browser?.close(); await site.close(); });
