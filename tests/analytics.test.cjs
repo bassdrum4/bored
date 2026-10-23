@@ -110,3 +110,18 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   await page.screenshot({path:path.join(root,'_build/shots/analytics-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
 });
+
+
+test('browser test telemetry is answered locally instead of reaching live analytics', async () => {
+  const { respondToAnalytics, isolateAnalytics } = require('./telemetry-isolation.cjs');
+  let replied = 0, continued = 0, handler;
+  const request = url => ({ url: () => url, respond: async response => { assert.equal(response.status, 204); replied++; }, continue: () => continued++ });
+  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events')), true);
+  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events?select=*')), true);
+  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/score_rules')), false);
+  await isolateAnalytics({ setRequestInterception: async enabled => assert.equal(enabled, true), on: (name, fn) => { assert.equal(name, 'request'); handler = fn; } });
+  handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events'));
+  handler(request('http://127.0.0.1/index.html'));
+  assert.equal(replied, 3);
+  assert.equal(continued, 1);
+});

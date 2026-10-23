@@ -1,3 +1,4 @@
+const { isolateAnalytics } = require('./telemetry-isolation.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -18,6 +19,7 @@ test('visual release captures and live F-14 embed', async t => {
   const site = await serve(siteRoot);
   t.after(async () => { await browser.close(); await site.close(); });
   const page = await browser.newPage();
+  await isolateAnalytics(page);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const shots = path.join(root, '_build', 'shots');

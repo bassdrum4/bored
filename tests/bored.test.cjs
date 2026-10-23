@@ -1,3 +1,4 @@
+const { respondToAnalytics, isolateAnalytics } = require('./telemetry-isolation.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -258,6 +259,7 @@ test('browser regressions', async t => {
   // request on the page's behalf: a guest visit must not create an account on the
   // project, so no sign-up may leave the browser at all.
   page.on('request', request => {
+    if (respondToAnalytics(request)) return;
     const target = request.url();
     if (/^https?:/.test(target) && !target.startsWith(origin)) requests.push(target);
     return request.continue();
@@ -1255,6 +1257,7 @@ test('browser regressions', async t => {
 
   await t.test('blocked storage does not break the hub or new games', async () => {
     const restricted = await browser.newPage();
+    await isolateAnalytics(restricted);
     const failures = [];
     restricted.on('pageerror', err => failures.push(err.message));
     await restricted.evaluateOnNewDocument(() => {
