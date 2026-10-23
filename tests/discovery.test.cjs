@@ -148,7 +148,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
   });
   browser = await puppeteer.launch({ executablePath, headless: true });
   const page = await browser.newPage();
-  const rows = [], posted = [], notes = [], state = [], unexpected = [];
+  const rows = [], posted = [], notes = [], state = [], activity = [], unexpected = [];
   const rules = Object.entries(JSON.parse(fs.readFileSync(path.join(root, 'src/games/score-rules.json')))).map(([game, rule]) => ({ game, ...rule }));
   const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS' };
   await page.setRequestInterception(true);
@@ -159,6 +159,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
     const url = new URL(request.url()), method = request.method();
     const reply = body => request.respond({ status: 200, contentType: 'application/json', headers, body: JSON.stringify(body) });
     if (method === 'OPTIONS') return request.respond({ status: 204, headers });
+    if (url.pathname === '/rest/v1/play_events' && method === 'POST') { activity.push(JSON.parse(request.postData())); return reply(null); }
     if (url.pathname === '/rest/v1/score_rules') return reply(rules);
     if (url.pathname === '/auth/v1/token') return reply({ access_token: 'mock-access', refresh_token: 'mock-refresh', expires_in: 3600, user: { id: 'test-user', email: 'tester@example.test' } });
     if (url.pathname === '/rest/v1/profiles') return reply([{ handle: 'tester' }]);
@@ -267,5 +268,6 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.click('#account-action');
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('guest'));
   assert.equal(await page.evaluate(() => localStorage.getItem('bored.session')), null);
+  assert.ok(activity.some(e => e.user_id === 'test-user' && e.game === 'lights-out'), 'signed-in telemetry uses the current account');
   assert.deepEqual(unexpected, []);
 });

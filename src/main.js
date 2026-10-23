@@ -22,6 +22,7 @@ import { createLibraryView } from './hub/library-view.js';
 import { createLeaderboardView } from './hub/leaderboard-view.js';
 import { createAccountUI } from './hub/account-ui.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
+import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
 import { createGameDocument } from './hub/game-document.js';
 
 // Keep the original console/test surface available from the bundled file. The
@@ -131,10 +132,14 @@ function closeMenu(options) {
   setMenu(false, options);
 }
 
+const analytics = createAnalytics({ frame: gameFrame, snapshot: snapshotFor, score: scoreValue, isLower: slug => !!LB_GAMES.find(g => g.id === slug)?.lower, paused: () => !menuPanel.hidden });
+gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXTERNS[activeSlug]); });
+
 function restartGame() {
   if (!activeSlug) return;
   captureBest();
   closeMenu();
+  analytics.end('restart');
   openGame(activeSlug, activeChallenge);
 }
 
@@ -202,10 +207,15 @@ function openGame(slug, challenge = null, origin = null) {
     const shelf = from.closest?.('#recent-list, #grid');
     launchSelector = shelf ? '#' + shelf.id + ' [data-slug="' + slug + '"]' : from.id ? '#' + from.id : '';
   }
+  if (activeSlug) { pollDaily(); captureBest(); }
+  analytics.end('switch');
   closeMenu();
   activeChallenge = challenge;
   const external = EXTERNS[slug];
   activeSlug = previousSlug = slug;
+  const from = origin || document.activeElement;
+  const launchSource = challenge ? 'daily' : from?.closest?.('#recent') ? 'recent' : from?.closest?.('#leaderboard') ? 'leaderboard' : from?.id === 'random' ? 'random' : from?.closest?.('#grid') ? 'library' : 'other';
+  analytics.start(slug, { source: launchSource, daily: !!challenge, external: !!external, embedded: isEmbedded(), device: matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop' });
   recentGames = [slug, ...recentGames.filter(id => id !== slug)].slice(0, 4);
   saveLibrary();
   renderRecent();
@@ -232,13 +242,15 @@ function openGame(slug, challenge = null, origin = null) {
       html = injectSeed(html);
       let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
       gameFrame.removeAttribute('src');
-      gameFrame.srcdoc = injectHead(html, head);
+      gameFrame.srcdoc = injectHead(html, ANALYTICS_BRIDGE + head);
       showHint('Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
     };
     const fail = () => {
       if (token !== loadToken) return;
       gameFrame.srcdoc = frameStandIn(name + ' did not load.',
         'A game only downloads the first time you open it. Check the connection and choose it again.');
+      analytics.event('error', { code: 'load_failed' });
+      analytics.end('load_failed');
       showHint('That game could not be downloaded.');
     };
     gameFrame.removeAttribute('src');
@@ -259,6 +271,7 @@ function openGame(slug, challenge = null, origin = null) {
 function closeGame() {
   pollDaily();
   captureBest();
+  analytics.end('close');
   const claim = guestClaim;
   guestClaim = null;
   closeMenu();
@@ -618,6 +631,7 @@ function pollDaily() {
     const check = dailyCheck(activeChallenge, snapshot);
     let result = readDaily(activeChallenge);
     if (check.complete && !result) {
+      analytics.event('daily_complete');
       result = { id: activeChallenge.id, snapshot: { ...snapshot } };
       dailyResults.set(activeChallenge.id, result);
       writeStored(DAILY_PREFIX + activeChallenge.id, result);
@@ -744,6 +758,7 @@ addEventListener('message', event => {
     case 'bored:close':
       if (fullscreenElement()) leaveFullscreen(); else closeGame();
       break;
+    case 'bored:runtime-error': analytics.event('error', { code: 'runtime' }); break;
     case 'bored:restart': restartGame(); break;
     case 'bored:fullscreen': toggleFullscreen(); break;
     case 'bored:menuclose': closeMenu(); break;
@@ -780,6 +795,9 @@ renderCollections();
 renderLibrary();
 initAccount();
 initFeedback();
+const analyticsToggle = $('#analytics-enabled');
+analyticsToggle.checked = analytics.enabled();
+analyticsToggle.onchange = () => analytics.setEnabled(analyticsToggle.checked);
 
 // The original single-file hub exposed these globals; keep them for the test
 // suite and for anyone poking at the console.

@@ -497,3 +497,48 @@ preview assets, score rule consistency, registered best-score capture and daily 
 references. New scored games use a completed-run snapshot; intentionally unscored games
 must be created with `--no-score`. The starter is exercised in a temporary directory by
 `tests/scaffolder.test.cjs`.
+
+## Admin gameplay analytics
+
+Open [`analytics.html`](https://bassdrum4.github.io/bored/analytics.html) after signing
+in on the arcade with an analytics admin account. The page shows active/visible
+time, account and guest sessions, repeat accounts within the selected range,
+game/day/hour breakdowns, each player's games, errors, session snapshots and CSV
+export. Date filters are UTC; displayed activity days/hours are Detroit time.
+Game and player filters also apply to exports. Session tables are paginated;
+reports stop at 20,000 events with an explicit warning to narrow the date range.
+
+[`src/hub/analytics.js`](src/hub/analytics.js) is the shared collector: every game
+gets launches, load timing, source, periodic checkpoints, closes/restarts, daily
+completions, eligible best scores and numeric/boolean snapshots. Games exposing a
+finished/won/solved/handOver flag also produce a checkpoint when it becomes true.
+Active time requires visibility, focus, a closed menu and input within 60 seconds;
+long clock gaps are capped instead of counting computer sleep as play. The two
+cross-origin extras record visible presence only. Their internal gameplay and
+errors cannot be inspected. Internal game runtime errors are counted (up to five
+per session), without logging error messages or input values.
+
+Collection starts at this release; prior play duration cannot be reconstructed.
+Telemetry is client-reported, approximate, and incomplete when requests are
+blocked, opted out or offline. A memory-only queue retries stable event IDs;
+closing the page can lose the last checkpoint. No guest fingerprint, raw input,
+email, full user agent or referring URL is collected. The footer explains the
+collection and includes an opt-out for this browser/embed.
+
+The additive database setup is [`scripts/analytics-setup.sql`](scripts/analytics-setup.sql).
+It creates `play_events` (insert-only clients; server timestamps) and
+`analytics_admins` (no client writes). RLS binds signed-in events to `auth.uid()`;
+guests may only insert unidentified events. Only admins can read activity. Admin
+membership is database-owned, never based on a handle or editable user metadata.
+The owner's `danilowe28@midlandps.org` account was granted access during setup.
+To grant another account, run this in the authenticated database SQL editor:
+
+```sql
+insert into public.analytics_admins (user_id)
+select id from auth.users where lower(email) = lower('owner@example.com')
+on conflict do nothing;
+```
+
+`npm run test:analytics` covers timing, aggregation, privacy boundaries, actual
+iframe events, opt-out, admin access, player filtering and mobile layout. Like
+other browser tests it needs `CHROME_PATH`. No service key is included in the site.

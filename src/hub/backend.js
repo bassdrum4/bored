@@ -82,7 +82,7 @@ function forgetSession() {
   removeStored(SESSION_KEY);
 }
 
-export async function request(path, { method = 'GET', body, prefer, token } = {}) {
+export async function request(path, { method = 'GET', body, prefer, token, keepalive = false } = {}) {
   const headers = { apikey: API_KEY };
   headers.Authorization = 'Bearer ' + (token || session?.access_token || API_KEY);
   if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -90,6 +90,7 @@ export async function request(path, { method = 'GET', body, prefer, token } = {}
   const res = await fetch(API_URL.replace(/\/+$/, '') + path, {
     method,
     headers,
+    keepalive,
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   if (!res.ok) {
