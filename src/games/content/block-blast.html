@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Block Blast</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  html, body { height: 100% }
+  body { display: grid; place-items: center; padding: 10px; background: #f5f2ea; color: #191713;
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif }
+  main { width: min(332px, 100%); display: grid; gap: 10px; justify-items: center }
+  #hud { display: flex; gap: 16px; font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+         letter-spacing: .09em; text-transform: uppercase; color: #6b6558 }
+  #hud b { font-weight: 600; color: #191713 }
+  #board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; width: 100%; padding: 6px;
+           border: 1px solid #d8d2c4; border-radius: 4px; background: #fffdf7; touch-action: none;
+           outline: none }
+  #board:focus-visible { border-color: #a9542f }
+  .cell { aspect-ratio: 1 / 1; border: 1px solid #e7e0d0; border-radius: 2px; background: #faf7ee }
+  .cell.on { background: #a9542f; border-color: #8d4526 }
+  .cell.preview { background: #e8c6b5; border-color: #c07a5a }
+  .cell.bad { background: #f6ece5; border: 1px dotted #a9542f }
+  #board.kbd .cell.cursor { border-color: #191713; border-style: solid }
+  .cell.clearing { background: #191713; border-color: #191713 }
+  #tray { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100% }
+  .slot { min-height: 56px; display: grid; place-items: center; padding: 0; border: 1px solid #e2dbcb;
+          border-radius: 4px; background: #fffdf7; color: inherit; font: inherit; cursor: grab;
+          touch-action: none; appearance: none }
+  .slot.picked { border-color: #a9542f }
+  .slot.spent { border-style: dashed; background: none; cursor: default }
+  .mini { display: grid; gap: 2px }
+  .mini i { display: block; width: 9px; height: 9px; border-radius: 2px; background: #a9542f }
+  .mini i.off { background: none }
+  #status { min-height: 2.7em; font-size: 11.5px; color: #6b6558; text-align: center }
+  #again { padding: 7px 14px; border: 1px solid #191713; border-radius: 3px; background: none;
+           color: inherit; font: inherit; font-size: 12px; cursor: pointer }
+  #again[hidden] { display: none }
+</style>
+</head>
+<body>
+<main>
+  <div id="hud">
+    <span>Score <b id="score">0</b></span>
+    <span>Best <b id="best">0</b></span>
+    <span>Lines <b id="lines">0</b></span>
+  </div>
+  <div id="board" role="grid" aria-label="Block grid, eight by eight" tabindex="0"></div>
+  <div id="tray" role="group" aria-label="Pieces"></div>
+  <p id="status">Drag a piece onto the grid. Fill a row or column to clear it.</p>
+  <button id="again" type="button" hidden>Play again</button>
+</main>
+<script>
+const SIZE = 8, COUNT = SIZE * SIZE;
+const $ = id => document.getElementById(id);
+const boardEl = $('board'), trayEl = $('tray'), statusEl = $('status');
+const scoreEl = $('score'), bestEl = $('best'), linesEl = $('lines');
+const HINT = 'Drag a piece onto the grid. Fill a row or column to clear it.';
+
+/* ── Pieces ──────────────────────────────────────────────────────────────── */
+
+// Each shape is a list of [column, row] offsets. The weight is how often the
+// deal hands it out: small pieces keep coming, the big ones stay rare.
+const shape = (cells, weight) => ({
+  cells,
+  w: Math.max(...cells.map(([x]) => x)) + 1,
+  h: Math.max(...cells.map(([, y]) => y)) + 1,
+  weight
+});
+
+const SHAPES = [
+  shape([[0, 0]], 6),
+  shape([[0, 0], [1, 0]], 9), shape([[0, 0], [0, 1]], 9),
+  shape([[0, 0], [1, 0], [2, 0]], 7), shape([[0, 0], [0, 1], [0, 2]], 7),
+  shape([[0, 0], [1, 0], [2, 0], [3, 0]], 3), shape([[0, 0], [0, 1], [0, 2], [0, 3]], 3),
+  shape([[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]], 2), shape([[0, 0], [0, 1], [0, 2], [0, 3], [0, 4]], 2),
+  shape([[0, 0], [1, 0], [0, 1], [1, 1]], 6),
+  shape([[0, 0], [1, 0], [2, 0], [0, 1], [1, 1], [2, 1], [0, 2], [1, 2], [2, 2]], 1),
+  // Four corners, then two Ts and two Zs.
+  shape([[0, 0], [0, 1], [1, 1]], 3), shape([[0, 0], [1, 0], [0, 1]], 3),
+  shape([[0, 0], [1, 0], [1, 1]], 3), shape([[1, 0], [0, 1], [1, 1]], 3),
+  shape([[0, 0], [1, 0], [2, 0], [1, 1]], 2), shape([[0, 0], [0, 1], [1, 1], [0, 2]], 2),
+  shape([[1, 0], [2, 0], [0, 1], [1, 1]], 2), shape([[0, 0], [1, 0], [1, 1], [2, 1]], 2)
+];
+const WEIGHT_TOTAL = SHAPES.reduce((total, piece) => total + piece.weight, 0);
+
+/* ── The shared daily seed ───────────────────────────────────────────────── */
+
+// The hub puts today's date and seed on every game document before it runs. The
+// first deal of the day uses it so everyone opens on the same tray; once that
+// run has been started, later visits are random.
+function mulberry32(a) {
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+let rng = Math.random;
+try {
+  const shared = window.__boredSeed;
+  const seen = localStorage.getItem('bored.block-blast.daily');
+  if (shared && Number.isFinite(shared.seed) && seen !== shared.date) {
+    rng = mulberry32(shared.seed >>> 0);
+    localStorage.setItem('bored.block-blast.daily', shared.date);
+  }
+} catch (error) { /* storage is unavailable in some embedded contexts */ }
+
+/* ── State ───────────────────────────────────────────────────────────────── */
+
+const board = new Uint8Array(COUNT);
+let tray = [];
+let selected = -1;
+let score = 0, lines = 0, combo = 0, cursor = 0;
+let finished = false, busy = false;
+let drag = null, press = null, preview = null;
+// Bumped by a restart so the clear animation of an abandoned run cannot undo it.
+let run = 0;
+
+function readBest() {
+  try { return Number(localStorage.getItem('bored.block-blast.best')) || 0; } catch (error) { return 0; }
+}
+function writeBest(value) {
+  try { localStorage.setItem('bored.block-blast.best', String(value)); } catch (error) {}
+}
+let best = readBest();
+
+/* ── Board helpers ───────────────────────────────────────────────────────── */
+
+function fits(piece, row, col) {
+  for (const [x, y] of piece.cells) {
+    const c = col + x, r = row + y;
+    if (c < 0 || c >= SIZE || r < 0 || r >= SIZE) return false;
+    if (board[r * SIZE + c]) return false;
+  }
+  return true;
+}
+
+function canPlaceAnywhere(piece) {
+  for (let row = 0; row <= SIZE - piece.h; row++) {
+    for (let col = 0; col <= SIZE - piece.w; col++) if (fits(piece, row, col)) return true;
+  }
+  return false;
+}
+
+function filledCells() {
+  let total = 0;
+  for (let i = 0; i < COUNT; i++) if (board[i]) total += 1;
+  return total;
+}
+
+function paint() {
+  for (let i = 0; i < COUNT; i++) {
+    const cell = cellEls[i];
+    cell.classList.toggle('on', board[i] === 1);
+    cell.classList.toggle('cursor', i === cursor);
+    cell.setAttribute('aria-label', 'Row ' + (Math.floor(i / SIZE) + 1) + ', column ' + (i % SIZE + 1) +
+      (board[i] ? ', filled' : ', empty'));
+  }
+  if (score > best) { best = score; writeBest(best); }
+  scoreEl.textContent = score;
+  bestEl.textContent = best;
+  linesEl.textContent = lines;
+}
+
+/* ── Preview ─────────────────────────────────────────────────────────────── */
+
+function clearPreview() {
+  if (!preview) return;
+  for (const index of preview.cells) cellEls[index].classList.remove('preview', 'bad');
+  preview = null;
+}
+
+function showPreview(row, col, piece) {
+  clearPreview();
+  if (!piece) return;
+  const ok = fits(piece, row, col);
+  const cells = [];
+  for (const [x, y] of piece.cells) {
+    const c = col + x, r = row + y;
+    if (c < 0 || c >= SIZE || r < 0 || r >= SIZE) continue;
+    const index = r * SIZE + c;
+    cellEls[index].classList.add(ok ? 'preview' : 'bad');
+    cells.push(index);
+  }
+  preview = { row, col, ok, cells };
+}
+
+// Where a pointer is pointing in board terms. The piece is centred on the
+// pointer, and on a touch drag it is lifted clear of the finger.
+function cellAt(clientX, clientY, lift, piece) {
+  if (!piece) return null;
+  const first = cellEls[0].getBoundingClientRect();
+  const last = cellEls[COUNT - 1].getBoundingClientRect();
+  const step = (last.left - first.left) / (SIZE - 1) || (last.top - first.top) / (SIZE - 1);
+  if (!step) return null;
+  const col = Math.round((clientX - first.left) / step - (piece.w - 1) / 2);
+  const row = Math.round((clientY - lift - first.top) / step - (piece.h - 1) / 2);
+  if (row < -2 || col < -2 || row > SIZE + 1 || col > SIZE + 1) return null;
+  return { row, col };
+}
+
+function cellStep() {
+  const first = cellEls[0].getBoundingClientRect();
+  const last = cellEls[COUNT - 1].getBoundingClientRect();
+  return (last.left - first.left) / (SIZE - 1) || 28;
+}
+
+/* ── The tray ────────────────────────────────────────────────────────────── */
+
+function pickShape() {
+  let roll = rng() * WEIGHT_TOTAL;
+  for (const piece of SHAPES) {
+    roll -= piece.weight;
+    if (roll <= 0) return piece;
+  }
+  return SHAPES[0];
+}
+
+// A fresh tray always offers at least one piece that fits, so the game is lost
+// to the board filling up rather than to a deal nobody could play.
+function deal() {
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const pieces = [pickShape(), pickShape(), pickShape()];
+    if (pieces.some(canPlaceAnywhere)) { tray = pieces; return; }
+  }
+  tray = [pickShape(), pickShape(), pickShape()];
+}
+
+function miniPiece(piece) {
+  const grid = document.createElement('span');
+  grid.className = 'mini';
+  grid.style.gridTemplateColumns = 'repeat(' + piece.w + ', 9px)';
+  grid.setAttribute('aria-hidden', 'true');
+  for (let y = 0; y < piece.h; y++) {
+    for (let x = 0; x < piece.w; x++) {
+      const cell = document.createElement('i');
+      if (!piece.cells.some(([cx, cy]) => cx === x && cy === y)) cell.className = 'off';
+      grid.appendChild(cell);
+    }
+  }
+  return grid;
+}
+
+function renderTray() {
+  trayEl.textContent = '';
+  for (let i = 0; i < 3; i++) {
+    const piece = tray[i];
+    const slot = document.createElement('button');
+    slot.type = 'button';
+    slot.className = 'slot' + (piece ? '' : ' spent') + (i === selected ? ' picked' : '');
+    slot.disabled = !piece || finished;
+    slot.setAttribute('aria-label', piece
+      ? 'Piece ' + (i + 1) + ', ' + piece.w + ' by ' + piece.h + (i === selected ? ', picked up' : '')
+      : 'Piece ' + (i + 1) + ', used');
+    if (piece) {
+      slot.appendChild(miniPiece(piece));
+      slot.addEventListener('pointerdown', event => startDrag(event, i));
+    }
+    trayEl.appendChild(slot);
+  }
+}
+
+/* ── Playing ─────────────────────────────────────────────────────────────── */
+
+function setStatus(text) { statusEl.textContent = text; }
+
+function place(index, row, col) {
+  const piece = tray[index];
+  if (!piece || finished || busy || !fits(piece, row, col)) return false;
+  busy = true;
+  for (const [x, y] of piece.cells) board[(row + y) * SIZE + col + x] = 1;
+  tray[index] = null;
+  selected = -1;
+  score += piece.cells.length;
+  clearPreview();
+
+  const rows = [], cols = [];
+  for (let r = 0; r < SIZE; r++) {
+    let full = true;
+    for (let c = 0; c < SIZE; c++) if (!board[r * SIZE + c]) { full = false; break; }
+    if (full) rows.push(r);
+  }
+  for (let c = 0; c < SIZE; c++) {
+    let full = true;
+    for (let r = 0; r < SIZE; r++) if (!board[r * SIZE + c]) { full = false; break; }
+    if (full) cols.push(c);
+  }
+
+  if (!rows.length && !cols.length) {
+    combo = 0;
+    busy = false;
+    paint();
+    setStatus(HINT);
+    finishTurn();
+    return true;
+  }
+
+  // A cell shared by a cleared row and column is still one cell.
+  const cleared = new Set();
+  for (const r of rows) for (let c = 0; c < SIZE; c++) cleared.add(r * SIZE + c);
+  for (const c of cols) for (let r = 0; r < SIZE; r++) cleared.add(r * SIZE + c);
+  combo += 1;
+  const gained = cleared.size * 10 * combo;
+  score += gained;
+  lines += rows.length + cols.length;
+  paint();
+  for (const cell of cleared) cellEls[cell].classList.add('clearing');
+  setStatus('+' + gained + ' points' + (combo > 1 ? ' · combo ' + combo : '') +
+    ' · ' + (rows.length + cols.length) + ' line' + (rows.length + cols.length === 1 ? '' : 's'));
+
+  const turn = run;
+  setTimeout(() => {
+    if (turn !== run) return;
+    for (const cell of cleared) board[cell] = 0;
+    for (const cell of cleared) cellEls[cell].classList.remove('clearing');
+    busy = false;
+    paint();
+    finishTurn();
+  }, 170);
+  return true;
+}
+
+function finishTurn() {
+  if (tray.every(piece => !piece)) deal();
+  renderTray();
+  paint();
+  if (finished) return;
+  if (tray.every(piece => !piece || !canPlaceAnywhere(piece))) return gameOver();
+  if (statusEl.textContent !== HINT && combo === 0) setStatus(HINT);
+}
+
+function gameOver() {
+  if (finished) return;
+  finished = true;
+  busy = false;
+  selected = -1;
+  clearPreview();
+  renderTray();
+  setStatus('No piece fits. Final score ' + score + ' over ' + lines + ' line' + (lines === 1 ? '' : 's') + '.');
+  $('again').hidden = false;
+  boardEl.focus({ preventScroll: true });
+}
+
+function restart() {
+  run += 1;
+  board.fill(0);
+  score = 0;
+  lines = 0;
+  combo = 0;
+  cursor = 0;
+  finished = false;
+  busy = false;
+  selected = -1;
+  drag = null;
+  press = null;
+  clearPreview();
+  $('again').hidden = true;
+  setStatus(HINT);
+  rng = Math.random;
+  deal();
+  renderTray();
+  paint();
+}
+
+/* ── Pointer play: drag a piece, or pick it up and tap a cell ─────────────── */
+
+function startDrag(event, index) {
+  if (finished || busy || !tray[index]) return;
+  event.preventDefault();
+  selected = index;
+  drag = {
+    pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
+    moved: false, touch: event.pointerType !== 'mouse', index
+  };
+  renderTray();
+  window.addEventListener('pointermove', onDragMove);
+  window.addEventListener('pointerup', onDragUp);
+  window.addEventListener('pointercancel', onDragCancel);
+}
+
+function endDrag() {
+  drag = null;
+  window.removeEventListener('pointermove', onDragMove);
+  window.removeEventListener('pointerup', onDragUp);
+  window.removeEventListener('pointercancel', onDragCancel);
+}
+
+function onDragMove(event) {
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 6) drag.moved = true;
+  if (!drag.moved) return;
+  const piece = tray[drag.index];
+  if (!piece) return;
+  const lift = drag.touch ? cellStep() * 1.6 : 0;
+  const at = cellAt(event.clientX, event.clientY, lift, piece);
+  if (at) showPreview(at.row, at.col, piece);
+  else clearPreview();
+}
+
+function onDragUp(event) {
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  const { index, moved, touch } = drag;
+  const piece = tray[index];
+  endDrag();
+  if (!piece) return;
+  if (!moved) { clearPreview(); return; }   // a tap leaves the piece picked up
+  const at = cellAt(event.clientX, event.clientY, touch ? cellStep() * 1.6 : 0, piece);
+  if (at && fits(piece, at.row, at.col)) place(index, at.row, at.col);
+  else {
+    selected = -1;
+    clearPreview();
+    renderTray();
+    paint();
+  }
+}
+
+function onDragCancel() {
+  endDrag();
+  clearPreview();
+}
+
+boardEl.addEventListener('pointerdown', event => {
+  boardEl.classList.remove('kbd');
+  if (finished || busy || selected < 0 || !tray[selected]) return;
+  event.preventDefault();
+  boardEl.focus({ preventScroll: true });
+  press = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+  if (boardEl.setPointerCapture) boardEl.setPointerCapture(event.pointerId);
+  const at = cellAt(event.clientX, event.clientY, 0, tray[selected]);
+  if (at) showPreview(at.row, at.col, tray[selected]);
+});
+
+boardEl.addEventListener('pointermove', event => {
+  if (drag || finished || busy || selected < 0 || !tray[selected]) return;
+  const at = cellAt(event.clientX, event.clientY, 0, tray[selected]);
+  if (at) showPreview(at.row, at.col, tray[selected]);
+  else clearPreview();
+});
+
+boardEl.addEventListener('pointerup', event => {
+  if (!press || finished || busy) return;
+  press = null;
+  if (selected < 0 || !tray[selected]) return;
+  const at = cellAt(event.clientX, event.clientY, 0, tray[selected]);
+  if (!at) return clearPreview();
+  if (fits(tray[selected], at.row, at.col)) place(selected, at.row, at.col);
+  else clearPreview();
+});
+
+/* ── Keyboard: arrows pick a cell, Enter drops the piece ─────────────────── */
+
+boardEl.addEventListener('keydown', event => {
+  boardEl.classList.add('kbd');
+  if (event.key === 'r' || event.key === 'R') { event.preventDefault(); restart(); return; }
+  if (event.key >= '1' && event.key <= '3') {
+    const index = Number(event.key) - 1;
+    if (tray[index] && !finished) {
+      selected = index;
+      renderTray();
+      const at = { row: Math.floor(cursor / SIZE), col: cursor % SIZE };
+      showPreview(at.row, at.col, tray[index]);
+      paint();
+    }
+    return;
+  }
+  const x = cursor % SIZE, y = (cursor - x) / SIZE;
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    if (event.key === 'ArrowLeft') cursor = y * SIZE + (x + SIZE - 1) % SIZE;
+    if (event.key === 'ArrowRight') cursor = y * SIZE + (x + 1) % SIZE;
+    if (event.key === 'ArrowUp') cursor = ((y + SIZE - 1) % SIZE) * SIZE + x;
+    if (event.key === 'ArrowDown') cursor = ((y + 1) % SIZE) * SIZE + x;
+    if (selected >= 0 && tray[selected]) showPreview(Math.floor(cursor / SIZE), cursor % SIZE, tray[selected]);
+    paint();
+    return;
+  }
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    if (selected < 0) {
+      const index = tray.findIndex(Boolean);
+      if (index >= 0) { selected = index; renderTray(); }
+    }
+    if (selected >= 0 && tray[selected]) {
+      showPreview(Math.floor(cursor / SIZE), cursor % SIZE, tray[selected]);
+      place(selected, Math.floor(cursor / SIZE), cursor % SIZE);
+    }
+  }
+});
+
+/* ── Start ───────────────────────────────────────────────────────────────── */
+
+const cellEls = [];
+for (let i = 0; i < COUNT; i++) {
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.setAttribute('role', 'gridcell');
+  boardEl.appendChild(cell);
+  cellEls.push(cell);
+}
+
+$('again').addEventListener('click', restart);
+deal();
+renderTray();
+paint();
+
+/* The hub reads this for high scores and the daily challenge. */
+window.__boredSnapshot = () => ({
+  slug: 'block-blast',
+  score,
+  lines,
+  filled: filledCells(),
+  combo,
+  finished
+});
+
+/* Small handle for the test suite; it exposes only what the board shows. */
+window.__test = {
+  state: () => ({
+    board: Array.from(board), tray: tray.map(piece => piece ? piece.cells.slice() : null),
+    score, lines, combo, finished, selected
+  }),
+  setBoard: rows => {
+    board.fill(0);
+    rows.forEach((line, r) => { for (let c = 0; c < SIZE; c++) board[r * SIZE + c] = line[c] === '1' ? 1 : 0; });
+    paint();
+  },
+  setTray: pieces => {
+    tray = pieces.map(cells => cells ? shape(cells, 1) : null);
+    selected = -1;
+    renderTray();
+    paint();
+  }
+};
+</script>
+</body>
+</html>

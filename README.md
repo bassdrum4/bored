@@ -1,6 +1,6 @@
 # Bored — an arcade in one folder
 
-**33 offline games and 2 online extras**, with no runtime dependencies, installs,
+**36 offline games and 2 online extras**, with no runtime dependencies, installs,
 or server. The site is the [`src/`](src/) folder itself: [`src/index.html`](src/index.html)
 loads the hub modules as plain ES modules, and the games are ordinary HTML in
 [`src/games/content/`](src/games/content). The page downloads a game the first
@@ -129,7 +129,7 @@ CHROME_PATH=/path/to/chrome npm run test:visual      # includes a live F-14 embe
 ```
 
 Raw captures and verification screenshots go under ignored `_build/`. Commit
-the optimized `src/games/previews/*.webp`. The 33 previews total about 77 KB;
+the optimized `src/games/previews/*.webp`. The 36 previews total about 100 KB;
 images below the first screen load
 lazily. `previews:optimize` also refits the previews already on disk when there
 are no raw captures, which is how the filled cards were produced without a
@@ -286,7 +286,7 @@ For quick testing, turn off **Authentication → Providers → Email → Confirm
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.
 
-The board tracks a best score for **33 of the 35 games**. The original eight
+The board tracks a best score for **all 36 offline games**. The original eight
 (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
 their existing saved bests. Every other offline game is read from live game
 state while playing and when you leave or restart: Tetris, Breakout,
@@ -423,11 +423,11 @@ The rules and daily tests run without a browser. The browser block covers
 JavaScript syntax, 2048 merge rules and undo, Connect Four wins and computer
 tactics, actual browser gameplay, Memory completion and timer cleanup, Aim Lab
 accuracy and expiration, search/filter/sort, the jump palette, saved favorites,
-Escape and focus restoration, all 33 offline game boots, DEEP's seeded dungeon and boss gate, poker's
+Escape and focus restoration, all 36 offline game boots, DEEP's seeded dungeon and boss gate, poker's
 simulated equity, no-peeking opponents and draw discards, 8 Ball's simulated shot planning
 (pots, safeties, escapes, no avoidable fouls or scratches, a whole self-played rack),
-all 31 daily state
-adapters, per-game goal acceptance/rejection, real Memory challenge completion,
+all 34 daily challenges, per-game goal acceptance/rejection, real Memory
+challenge completion,
 saved results, sharing with clipboard fallback, Detroit-time rollover, 320px layouts,
 blocked storage, high-score capture, one shared board per game with the
 local-only ones kept off it, and no external game requests beyond the

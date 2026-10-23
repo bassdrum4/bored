@@ -79,6 +79,8 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Block Blast counts the score of a run that ended with no piece left to place.
+  highScore('block-blast', 'Block Blast', 'points', { metric: 'score', when: snapshot => snapshot.finished === true }),
   // Chess counts the human's wins against the computer in a session, like Connect Four.
   highScore('chess', 'Chess', 'wins', { metric: 'wins', when: snapshot => snapshot.cpu === true && snapshot.won === 1 }),
   // Mahjong ranks the pairs cleared from one deal; a half-finished board still counts.

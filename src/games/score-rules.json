@@ -3,6 +3,7 @@
   "8ball": { "label": "Balls potted", "better": "high", "max_value": 15 },
   "aim-lab": { "label": "Hits in a finished round", "better": "high", "max_value": 1000 },
   "asteroids": { "label": "Score", "better": "high", "max_value": 10000000 },
+  "block-blast": { "label": "Score", "better": "high", "max_value": 10000000 },
   "breakout": { "label": "Score", "better": "high", "max_value": 10000000 },
   "chess": { "label": "Computer wins in a session", "better": "high", "max_value": 999 },
   "commanders": { "label": "Score", "better": "high", "max_value": 10000000 },
