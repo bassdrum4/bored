@@ -209,3 +209,21 @@ unchanged and serves `src/` directly. CI is separate. After publishing, compare
 Live backend validation should check RPC/table grants, RLS, the cron job, the
 schema cache and advisors; a live unauthenticated call must fail. Real student
 accounts have not been used to manufacture test matches.
+
+### Initial deployment verification (2026-10-25)
+
+The migration was applied to the existing project. Catalog inspection confirmed
+RLS on all eight new tables, no authenticated direct table read/write grants,
+an invoker public wrapper callable only by authenticated accounts, and the
+active daily cleanup job. A live nonmember account saw only `{enrolled:false}`
+in a rolled-back check; an unauthenticated REST call returned HTTP 401. No
+production test memberships or matches were created. Supabase advisors reported
+no new warning-level findings. The eight informational
+[RLS-without-policy notices](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
+are intentional: these private tables have no direct client access, and all
+access goes through the checked RPC.
+
+The complete local suite passed 74 tests. The draft-release CI also passed both
+the ordinary suite and the independent-connection PostgreSQL 17 race test.
+Live student-to-student play has not been manufactured or observed as part of
+release verification; the complete match test uses isolated simulated accounts.

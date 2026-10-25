@@ -1213,8 +1213,14 @@ test('browser regressions', async t => {
     const seeds = new Set();
     for (const slug of slugs) {
       await page.evaluate(id => openGame(id), slug);
-      await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.body?.childElementCount > 0);
-      await pause(180);
+      // A populated iframe can still be the loading stand-in. Wait for the
+      // current document's title and seed, not a fixed delay or live metrics
+      // (some snapshot metrics are initialized only when a run starts).
+      await page.waitForFunction(() => {
+        const frame = document.querySelector('#frame');
+        const expected = new DOMParser().parseFromString(frame.srcdoc, 'text/html').title;
+        return frame.contentDocument?.title === expected && Number.isFinite(frame.contentWindow.__boredSeed?.seed);
+      });
       const seed = await page.evaluate(() => document.querySelector('#frame').contentWindow.__boredSeed);
       assert.ok(seed && Number.isFinite(seed.seed) && /^[0-9A-F]{6}$/.test(seed.code), slug + ' receives the shared daily seed');
       seeds.add(seed.date + ':' + seed.seed);
