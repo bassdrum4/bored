@@ -14,7 +14,7 @@
 <main id="hub">
   <header class="masthead">
     <div class="masthead-top"><h1>Bored<span class="wordmark-dot">.</span></h1>
-    <nav class="site-nav" aria-label="On this page"><a href="#daily">Daily</a><a href="#leaderboard">Leaderboard</a><a href="#library">Library</a></nav></div>
+    <nav class="site-nav" aria-label="On this page"><a href="#daily">Daily</a><a href="#leaderboard">Leaderboard</a><a href="#library">Library</a><a id="together-nav" href="#together">Bored Together <span id="together-badge" class="badge" hidden></span></a></nav></div>
     <p class="sub"><b id="count"></b> things to play &middot; in your browser &middot; no installs</p>
     <p class="intro">A little arcade for your spare time. What are you playing today?</p>
     <div class="masthead-bar">
@@ -27,6 +27,13 @@
     </div>
 
   </header>
+  <p id="together-home" class="bt-home" hidden><a id="together-home-link" href="#together"></a></p>
+  <section id="together" aria-labelledby="together-heading" hidden>
+    <div class="section-heading"><div><p class="eyebrow">Bored / Together</p><h2 id="together-heading">Bored Together</h2></div>
+    <div class="bt-actions"><button id="together-refresh" class="action" type="button">Refresh</button><button id="together-back" class="action" type="button">Game library</button></div></div>
+    <p id="together-status" role="status" aria-live="polite"></p>
+    <div id="together-content"></div>
+  </section>
   <section id="daily" aria-labelledby="daily-heading">
     <div class="daily-copy">
       <div class="daily-kicker"><span class="eyebrow">01 / The daily challenge</span><span id="daily-state">Ready to play</span></div>

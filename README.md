@@ -548,3 +548,27 @@ on conflict do nothing;
 `npm run test:analytics` covers timing, aggregation, privacy boundaries, actual
 iframe events, opt-out, admin access, player filtering and mobile layout. Like
 other browser tests it needs `CHROME_PATH`. No service key is included in the site.
+
+## Bored Together (optional asynchronous multiplayer)
+
+Open **Bored Together** in the navigation or from the Connect Four catalog card.
+Join explicitly using your existing Bored account, find an enrolled friend by
+username or exact email, or enter random matchmaking. Challenge acceptance,
+turns, match replay, rematches, friends, blocks, privacy controls and recent
+head-to-head statistics are saved in Supabase. Existing users are never enrolled
+automatically. Email stays hidden unless a member explicitly shares it with
+accepted friends; random matches never display it.
+
+The first supported game is **Connect Four**. Mini Golf multiplayer is deferred
+until shot replay and server validation are implemented; its existing offline
+game and single-player leaderboard remain available. Notifications use durable
+database records and 15-second polling, so no push notification or shared link
+is required inside Google Sites.
+
+Install [`scripts/bored-together.sql`](scripts/bored-together.sql) once before
+shipping the frontend. See [architecture, privacy/retention, setup, tests and
+extending the game engine](docs/bored-together.md). The SQL migration adds a
+private schema, restricted RPC and daily retention job; it does not change
+existing single-player data. `npm test` includes the isolated database and
+two-account browser suite. CI also runs concurrent requests against a disposable
+PostgreSQL 17 service.

@@ -15,6 +15,7 @@ let authBusy = false;
 /* ── Account ──────────────────────────────────────────────────────────────── */
 
 function renderAccount() {
+  window.dispatchEvent(new Event('bored:identity'));
   const guest = !hasIdentity();
   const state = $('#account-state');
   const action = $('#account-action');
@@ -50,7 +51,7 @@ function openAuthDialog(mode = 'signin') {
   const naming = authMode === 'name';
   $('#auth-title').textContent = authMode === 'signup' ? 'Create an account' : naming ? 'Display name' : 'Sign in';
   $('#auth-blurb').textContent = authMode === 'signup'
-    ? 'Pick a name for the leaderboard. The email is only used to sign in.'
+    ? 'Pick a name for the leaderboard. Email is used to sign in; optional Bored Together enrollment has its own privacy notice.'
     : naming ? 'This is the name other players see. 3–16 letters, numbers, _ or -.' : 'Save your best scores and see how everyone else is doing.';
   $('#auth-email-row').hidden = naming;
   $('#auth-pass-row').hidden = naming;

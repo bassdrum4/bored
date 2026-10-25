@@ -298,3 +298,41 @@ dialog{margin:auto}
   .section-aside{max-width:110px}
   #recent-list,#favorite-list{grid-template-columns:minmax(0,1fr)}
 }
+
+/* Together uses the same paper, rules and quiet buttons as the hub. */
+#together{padding-top:28px;scroll-margin-top:12px}
+#together h2{font-size:clamp(26px,6vw,38px);font-weight:400}
+#together h3{font-size:23px;font-weight:400;margin-bottom:12px}
+#together h4{font:600 14px var(--mono);overflow-wrap:anywhere}
+#together p{margin-bottom:10px;overflow-wrap:anywhere}
+#together-status{font:12px/1.6 var(--mono);color:var(--red);min-height:22px}
+.bt-section{border-top:1px solid var(--rule);padding:22px 0}
+.bt-intro{max-width:720px;padding:24px 0}
+.bt-intro p{margin:0 0 18px}
+.bt-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--rule)}
+.bt-row>div:first-child{min-width:0}
+.bt-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#together .action{white-space:normal;min-height:36px}
+#together .action:disabled{opacity:.4;cursor:default}
+#together[aria-busy="true"] button{cursor:wait}
+.bt-search-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bt-search-form label{flex-basis:100%;font:12px var(--mono)}
+.bt-search-form input{min-width:0;flex:1;border:1px solid var(--rule);background:var(--paper);color:var(--ink);padding:10px;font:14px var(--mono)}
+.bt-email{font:12px var(--mono)}
+.bt-home{padding:12px 0;border-bottom:1px solid var(--rule);font:12px/1.6 var(--mono)}
+.bt-home a{color:var(--red)}
+#together table{width:100%;border-collapse:collapse;font:12px/1.6 var(--mono);margin-top:12px;table-layout:fixed}
+#together th,#together td{text-align:left;border-bottom:1px solid var(--rule);padding:8px 4px;overflow-wrap:anywhere}
+#together select{max-width:100%;font:12px var(--mono);padding:8px;background:var(--paper);color:var(--ink);border:1px solid var(--rule)}
+#together details{margin:14px 0}
+#together summary{cursor:pointer;font:12px var(--mono);padding:8px 0}
+.bt-board,.bt-columns{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;width:100%;max-width:440px}
+.bt-board{background:#292e38;padding:10px;margin:10px 0 18px}
+.bt-disc{aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:var(--paper);color:#6b6558;font:12px var(--mono)}
+.bt-p1{background:#b3261e;color:white}.bt-p2{background:#e7af35;color:#191713}
+.bt-columns .action{padding:8px 0}
+#together input[type="range"]{max-width:100%;vertical-align:middle}
+.row.has-together .card{height:calc(100% - 38px)}
+.catalog-together{display:block;height:38px;width:100%;background:transparent;border:0;border-top:1px solid var(--rule);font:11px var(--mono);color:var(--red);text-align:left;padding:8px 16px;cursor:pointer}
+.catalog-together:hover{background:var(--ink);color:var(--paper)}
+@media(max-width:600px){.bt-row{align-items:flex-start;flex-direction:column}.bt-actions{gap:6px}.bt-row .bt-actions{width:100%}.bt-board,.bt-columns{gap:4px}#together .section-heading{align-items:flex-start;gap:12px;flex-wrap:wrap}.site-nav{gap:10px}}
