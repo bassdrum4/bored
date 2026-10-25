@@ -21,6 +21,7 @@ import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adopt
 import { createLibraryView } from './hub/library-view.js';
 import { createLeaderboardView } from './hub/leaderboard-view.js';
 import { createAccountUI } from './hub/account-ui.js';
+import { createTogetherUI } from './hub/together-ui.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
 import { createGameDocument } from './hub/game-document.js';
@@ -793,6 +794,7 @@ renderDaily();
 renderRecent();
 renderCollections();
 renderLibrary();
+createTogetherUI({ openAuthDialog });
 initAccount();
 initFeedback();
 const analyticsToggle = $('#analytics-enabled');

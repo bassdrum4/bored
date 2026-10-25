@@ -1,4 +1,4 @@
-import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS } from '../games/catalog.js';
+import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
 import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from '../games/discovery.js';
 import { writeStored } from './store.js';
 
@@ -140,6 +140,14 @@ function renderLibrary() {
       }
     };
     row.append(card, star);
+    if (TOGETHER_GAMES[slug]) {
+      row.classList.add('has-together');
+      const together = element('button', 'catalog-together', 'Bored Together →');
+      together.type = 'button';
+      together.setAttribute('aria-label', 'Play ' + name + ' on Bored Together');
+      together.onclick = () => window.dispatchEvent(new Event('bored:together-open'));
+      row.append(together);
+    }
     gameGrid.appendChild(row);
   }
 

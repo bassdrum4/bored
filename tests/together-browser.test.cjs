@@ -1,0 +1,113 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const puppeteer=require('puppeteer-core');
+const {serve}=require('./serve.cjs');
+const {database,call,ids}=require('./together-db.cjs');
+
+test('two embedded browser accounts play, disconnect, resume, review and rematch using production SQL',async t=>{
+  const executablePath=[process.env.CHROME_PATH,'/usr/bin/google-chrome','/usr/bin/chromium'].filter(Boolean).find(p=>fs.existsSync(p));
+  assert.ok(executablePath,'Set CHROME_PATH to run browser verification');
+  const db=await database(), site=await serve(path.join(__dirname,'../src'));
+  const browser=await puppeteer.launch({executablePath,headless:true});
+  t.after(async()=>{await browser.close();await site.close();await db.close();});
+  let serial=Promise.resolve();
+  const errors=[], unexpected=[], calls=[], outages=new Set();
+  const handles=['WackyPenguin','BananaWizard','QuietOwl','NeverJoined','FourthPlayer','FifthPlayer','Anonymous'];
+  const cors={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'*'};
+  async function player(user) {
+    const context=await browser.createBrowserContext();const page=await context.newPage();
+    page.on('pageerror',e=>errors.push(e.message));
+    await page.setRequestInterception(true);
+    page.on('request',async req=>{
+      if(req.url().startsWith(site.origin)||!/^https?:/.test(req.url()))return req.continue();
+      const url=new URL(req.url());
+      const reply=(body,status=200)=>req.respond({status,headers:cors,contentType:'application/json',body:JSON.stringify(body)});
+      if(req.method()==='OPTIONS')return req.respond({status:204,headers:cors});
+      if(url.hostname!=='djdpttltfmwkofdrvkem.supabase.co'){unexpected.push(req.url());return req.abort();}
+      const identity=req.headers().authorization?.replace('Bearer ','');
+      if(url.pathname==='/rest/v1/rpc/bt_rpc') {
+        if(outages.has(identity))return req.abort('internetdisconnected');
+        const {action,args}=JSON.parse(req.postData());calls.push({identity,action});
+        const pending=serial.then(()=>call(db,ids.includes(identity)?identity:null,action,args));
+        serial=pending.catch(()=>{});
+        try{return reply(await pending);}catch(e){return reply({message:e.message,code:e.code},400);}
+      }
+      if(url.pathname==='/rest/v1/profiles')return reply([{handle:handles[ids.indexOf(identity)]}]);
+      if(url.pathname==='/auth/v1/logout')return reply(null);
+      if(['/rest/v1/score_rules','/rest/v1/leaderboard','/rest/v1/scores','/rest/v1/player_state','/rest/v1/daily_results','/rest/v1/play_events'].includes(url.pathname))return reply(req.method()==='GET'?[]:null);
+      unexpected.push(req.method()+' '+url.pathname);return req.abort();
+    });
+    await page.goto(site.url);await page.waitForFunction(()=>document.querySelectorAll('#grid .card').length>0);
+    if(user){await page.evaluate(u=>localStorage.setItem('bored.session',JSON.stringify({access_token:u,refresh_token:'fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:u,is_anonymous:false,email:'fixture@example.test'}})),user);await page.reload();}
+    return page;
+  }
+  async function click(page,text) {
+    await page.waitForFunction(text=>!document.querySelector('#together').hasAttribute('aria-busy')&&[...document.querySelectorAll('#together button')].some(b=>b.textContent===text&&!b.disabled),{},text);
+    await page.$$eval('#together button',(buttons,text)=>buttons.find(b=>b.textContent===text).click(),text);
+    await page.waitForFunction(()=>!document.querySelector('#together').hasAttribute('aria-busy'));
+  }
+  async function open(page){await page.click('#together-nav');await page.waitForFunction(()=>!document.querySelector('#together').hidden);}
+  async function refresh(page){await click(page,'Refresh');}
+  async function column(page,n){await page.waitForSelector(`.bt-columns button[aria-label="Drop in column ${n}"]:not([disabled])`);await page.click(`.bt-columns button[aria-label="Drop in column ${n}"]`);await page.waitForFunction(()=>!document.querySelector('#together').hasAttribute('aria-busy'));}
+  const guest=await player();
+  await open(guest);
+  assert.equal(calls.length,0,'guest makes no multiplayer requests');
+  assert.match(await guest.$eval('#together-content',e=>e.textContent),/email address stays hidden/);
+  await click(guest,'Join Bored Together');assert.ok(await guest.$eval('#auth-dialog',e=>e.open));
+  assert.equal(await guest.$eval('#together-home',e=>e.hidden),true);
+  const a=await player(ids[0]), b=await player(ids[1]);
+  await open(a);await open(b);
+  await click(a,'Join Bored Together');await click(b,'Join Bored Together');
+  await a.waitForSelector('#bt-search');
+  await a.type('#bt-search','student2@example.test');await click(a,'Find players');
+  await a.waitForFunction(()=>document.querySelector('#bt-find').textContent.includes('BananaWizard'));
+  assert.ok(!(await a.$eval('#bt-find',e=>e.textContent)).includes('student2@example.test'));
+  await click(a,'Add friend');await refresh(b);
+  await click(b,'Accept friend');await refresh(a);
+  assert.match(await a.$eval('#together-content',e=>e.textContent),/Remove friend/);
+  // Challenge from the accepted friend profile.
+  await click(a,'Challenge');await refresh(b);await click(b,'Accept');await refresh(a);
+  await a.waitForSelector('.bt-columns');
+  assert.equal(await a.$$eval('.bt-columns button:not([disabled])',x=>x.length),7);
+  assert.equal(await b.$$eval('.bt-columns button:not([disabled])',x=>x.length),0);
+  await column(a,1);
+  // Reopening the embedded document preserves the match, not a local board.
+  await a.reload();await a.waitForSelector('.bt-board');
+  assert.equal(await a.$$eval('.bt-p1',x=>x.length),1);
+  await refresh(b);await column(b,2);await refresh(a);await column(a,1);
+  await refresh(b);await column(b,2);await refresh(a);await column(a,1);
+  await refresh(b);await column(b,2);await refresh(a);await column(a,1);
+  await a.waitForFunction(()=>document.querySelector('#together-content').textContent.includes('You won.'));
+  await refresh(b);assert.match(await b.$eval('#together-content',e=>e.textContent),/Your opponent won/);
+  await a.$eval('input[type="range"]',e=>{e.value='0';e.dispatchEvent(new Event('input'));});
+  assert.equal(await a.$$eval('.bt-p1,.bt-p2',x=>x.length),0);
+  await click(a,'Rematch');assert.match(await a.$eval('#together-content',e=>e.textContent),/Invitation sent/);
+  await refresh(b);await click(b,'← Dashboard');await click(b,'Accept');
+  await click(b,'← Dashboard');await click(b,'Play Random');
+  assert.match(await b.$eval('#together-content',e=>e.textContent),/Waiting for another Connect Four player/);
+  await b.reload();await b.waitForFunction(()=>document.querySelector('#together-content').textContent.includes('Cancel random search'));
+  await click(b,'Cancel random search');
+  // Member dashboard and match view remain usable in narrow Google Sites embeds.
+  fs.mkdirSync(path.join(__dirname,'../_build/together'),{recursive:true});
+  for(const width of [1100,375,320]) {
+    await a.setViewport({width,height:900});
+    await a.screenshot({path:path.join(__dirname,`../_build/together/match-${width}.png`),fullPage:true});
+    assert.ok(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no overflow '+width);
+    await b.setViewport({width,height:900});
+    await b.screenshot({path:path.join(__dirname,`../_build/together/dashboard-${width}.png`),fullPage:true});
+    assert.ok(await b.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'dashboard no overflow '+width);
+  }
+  // A failed/offline fetch never replaces the authoritative board with a local move.
+  const before=await a.$$eval('.bt-disc',x=>x.map(e=>e.textContent));
+  outages.add(ids[0]);await a.setOfflineMode(true);await refresh(a);
+  assert.deepEqual(await a.$$eval('.bt-disc',x=>x.map(e=>e.textContent)),before);
+  assert.match(await a.$eval('#together-status',e=>e.textContent),/Could not refresh|offline/i);
+  outages.delete(ids[0]);await a.setOfflineMode(false);await refresh(a);
+  await a.click('#account-action');
+  await a.waitForFunction(()=>document.querySelector('#together-content').textContent.includes('Join Bored Together'));
+  assert.ok(!(await a.$eval('#together-content',e=>e.textContent)).includes('BananaWizard'));
+  assert.equal(await a.$eval('#together-home',e=>e.hidden),true);
+  assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);
+});
