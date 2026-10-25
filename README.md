@@ -551,22 +551,26 @@ other browser tests it needs `CHROME_PATH`. No service key is included in the si
 
 ## Bored Together (optional asynchronous multiplayer)
 
-Open **Bored Together** in the navigation or from the Connect Four catalog card.
+Open **Bored Together** in the navigation or from the Connect Four or 8 Ball catalog cards.
 Join explicitly using your existing Bored account, find an enrolled friend by
 username or exact email, or enter random matchmaking. Challenge acceptance,
 turns, match replay, rematches, friends, blocks, privacy controls and recent
 head-to-head statistics are saved in Supabase. Existing users are never enrolled
-automatically. Email stays hidden unless a member explicitly shares it with
-accepted friends; random matches never display it.
+automatically. An exact-email search automatically shows the matching email and
+username. Username searches hide email unless shared with accepted friends;
+random matches never display it.
 
-The first supported game is **Connect Four**. Mini Golf multiplayer is deferred
+Choose **Connect Four** or **8 Ball Pool** from the game selector. Pool includes
+server-validated shots, ball-in-hand placement, saved tables and shot replay. Mini Golf multiplayer is deferred
 until shot replay and server validation are implemented; its existing offline
 game and single-player leaderboard remain available. Notifications use durable
 database records and 15-second polling, so no push notification or shared link
 is required inside Google Sites.
 
-Install [`scripts/bored-together.sql`](scripts/bored-together.sql) once before
-shipping the frontend. See [architecture, privacy/retention, setup, tests and
+For a new backend, install [`scripts/bored-together.sql`](scripts/bored-together.sql),
+then the forward SQL files in `supabase/migrations/`. Existing backends apply only
+the forward migration. Pool also requires the authenticated `together-pool` Edge
+Function; see the deployment instructions below. See [architecture, privacy/retention, setup, tests and
 extending the game engine](docs/bored-together.md). The SQL migration adds a
 private schema, restricted RPC and daily retention job; it does not change
 existing single-player data. `npm test` includes the isolated database and

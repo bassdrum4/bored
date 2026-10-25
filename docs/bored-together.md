@@ -7,9 +7,16 @@ popup, link sharing or push notification is needed, including in Google Sites.
 ## Shipped games and behavior
 
 Connect Four is playable from challenge to acceptance, individual turns,
-completion, move replay and a rematch invitation. The existing Connect Four
-catalog card links to Together; single-player/CPU/local play stays available.
+completion, move replay and a rematch invitation. Both Connect Four and 8 Ball
+catalog cards link to Together; single-player/CPU/local play stays available.
 Friends and random opponents use the same authoritative match lifecycle.
+
+**8 Ball Pool** is also supported through the game selector: friend challenges,
+random matchmaking, server-validated shots, ball-in-hand placement, continued
+turns after legal pots, saved tables, review/replay, winner detection and rematches.
+It shares the original pool game's zero-spin shot physics. House rules are
+explained next to the table: no spin, called pockets or rail-after-contact rule;
+an 8 on the break re-racks, and an early/fouled 8 loses.
 
 The dashboard includes turns, waiting matches, incoming/outgoing challenges,
 friend requests/friends, restricted discovery, queue status, recent games,
@@ -38,10 +45,14 @@ No browser-submitted golf score is used for a multiplayer result.
 
 ## Database installation
 
-The existing project is `djdpttltfmwkofdrvkem`. The additive SQL setup is
+The existing project is `djdpttltfmwkofdrvkem`. The baseline SQL setup is
 [`../scripts/bored-together.sql`](../scripts/bored-together.sql). Apply it once
 through a Supabase migration or the authenticated SQL editor before publishing
-the frontend. It creates its own private schema and a single exposed RPC:
+the frontend on a new project, then apply
+[`../supabase/migrations/20261025214401_together_pool_and_exact_email.sql`](../supabase/migrations/20261025214401_together_pool_and_exact_email.sql).
+Existing installations apply only the forward migration. It preserves accounts,
+existing memberships, games and moves; it adds pool support, shot snapshots and
+exact-email echo. The baseline exposes the ordinary RPC:
 
 ```sql
 select public.bt_rpc('dashboard', '{}'::jsonb);
@@ -52,7 +63,14 @@ rerun it over a populated deployment. Subsequent schema changes need new
 forward-only migrations. It neither rewrites nor deletes existing accounts,
 profiles, scores, player state, analytics or leaderboard objects.
 
-No new API keys or Auth providers are required. Keep `bored_together` out of
+No new client API keys or Auth providers are required. Pool additionally uses
+`supabase/functions/together-pool/index.ts`, deployed as **together-pool** with
+`verify_jwt = true` (tracked in `supabase/config.toml`). Include `handler.js` and
+its canonical relative dependency `src/games/pool-engine.js` in the bundle.
+The Edge runtime's built-in `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
+`SUPABASE_SERVICE_ROLE_KEY` supply server configuration. No service key belongs
+in the repository or browser. The frontend and Edge function must ship the same
+version of the pool engine. Deploy the migration and function before the frontend. Keep `bored_together` out of
 Supabase's exposed schemas (the default exposed `public` is sufficient).
 `public.bt_rpc` is SECURITY INVOKER; the authorized dispatcher lives in the
 private schema with SECURITY DEFINER and an empty search path. Only the
@@ -81,7 +99,10 @@ an unrestricted API. `NOTIFY pgrst` refreshes the RPC schema cache on installati
 ## Consent, identity and retention
 
 Existing users have no membership row until pressing **Join Bored Together**.
-The backend requires consent version `2026-10-25-v1` and records its timestamp.
+New enrollment requires consent version `2026-10-25-v2` and records its timestamp.
+Existing version-1 memberships remain enrolled; their saved visibility settings
+and games are preserved. Exact-email lookup already identified those members;
+version 2 additionally echoes the matching address supplied by the searcher.
 Members can find members by username prefix (minimum 3 literal characters,
 maximum 10 results) or exact case-insensitive current Auth email. Searches have
 no pagination/directory endpoint, require membership and omit blocked pairs.
@@ -90,12 +111,14 @@ requests have a separate 30/hour limit, and RPCs have a 180/minute budget.
 Account-based limits do not prevent abuse by somebody creating many accounts;
 this version does not add IP-level rate limiting or CAPTCHA.
 
-Email is read from Auth only inside a controlled projection, never copied into
-multiplayer tables. The default visibility is hidden. Choosing **Show to
-accepted friends only** permits disclosure in a friend profile/search result
-only while both the membership and accepted relationship are valid. Pending
-requests and random strangers cannot see email. Match responses always remove
-email, including random matches between people who happen to be friends.
+Email is read from Auth inside controlled functions and never copied into
+multiplayer tables. **An exact-email result automatically contains that matching
+email and username**, without a friend request or visibility toggle. Partial
+email matches are unsupported. Username searches and friend profiles still hide
+email by default. The optional **Show to accepted friends only** setting applies
+to those profile/username projections, not to an exact-email search. Blocking,
+nonmembership and leaving suppress results in either mode. Match responses always
+remove email, including random matches between accepted friends.
 
 Leaving immediately disables discovery, exits queues, deletes friendships,
 cancels pending invitations, deletes the departing player's notifications and
@@ -161,6 +184,24 @@ To add a game:
 as the original local game. Its small dashboard renderer is separate from the
 CPU game loop; the entire offline game was not duplicated.
 
+Pool sends `{angle, power, cue?}` inside the usual versioned request. Angle is an
+integer in tenths of a degree (0–3599), power an integer 1–100, and cue placement
+is allowed only with ball in hand. `together-pool` validates the live Auth user,
+reads the match using that user's JWT and existing RPC, and simulates the entire
+shot with the shared pure engine. This computation runs outside the shared SQL
+lock. It then calls the service-only `bt_pool_commit` wrapper; its private
+transaction rechecks current membership, block state, participants, turn,
+version and request ID before committing. Only that trusted server operation can
+supply pool state or a winner. Authenticated/anonymous browser roles cannot call
+it; the ordinary `move` RPC rejects pool result submissions.
+
+Each pool move stores `state_after` for fast history review. Replays use the same
+versioned input/physics. Client animation is a prediction and never awards a
+result. Its RAF/timer fallback settles when an embed is backgrounded or detached;
+refresh/reconnect reads the authoritative saved state. The pool engine is derived
+from the original game's CPU simulator and has a parity test against that source.
+The existing single-player pool document, CPU and scoring hooks are untouched.
+
 ## Fetching, persistence and notifications
 
 The hub uses the existing `backend.js` session and token refresh handling.
@@ -189,6 +230,15 @@ npm run games:check
 CHROME_PATH=/path/to/chrome npm test
 CHROME_PATH=/path/to/chrome npm run test:together
 ```
+
+`tests/together-pool.test.cjs` covers physics parity, deterministic state,
+legal pots/retained turns, scratches, wrong contacts, cue placement, early/valid
+8-ball outcomes, break re-racks, direct-result denial, duplicate IDs, stale
+versions, blocks during server computation, saved history and pool rematches.
+The two-account browser flow also plays pool through the real Edge handler with
+an isolated database, reloads the saved table, reviews shots and checks desktop
+and phone layouts. Native PostgreSQL CI races two pool commits on the same
+version while the shooter retains the turn.
 
 The SQL suite uses PGlite (PostgreSQL WASM) with isolated Auth fixtures, exercising
 the exact setup SQL. It covers consent/nonmembership, email/prefix discovery,

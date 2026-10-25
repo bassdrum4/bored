@@ -33,6 +33,7 @@ test('Together production SQL: consent, privacy, social, queue, moves and retent
     assert.deepEqual(await call(db,a,'search',{query:'Nev'}),[]);
     assert.deepEqual(await call(db,a,'search',{query:'%%%'}),[]);
     assert.equal((await call(db,a,'search',{query:'Ban'}))[0].email,null);
+    assert.equal((await call(db,a,'search',{query:'student2@example.test'}))[0].email,'student2@example.test','exact email is visible without friendship or a visibility toggle');
     await assert.rejects(call(db,a,'search',{query:'B'}),/at least 3/);
     await assert.rejects(call(db,a,'friend_request',{user_id:non}),/unavailable/);
     await assert.rejects(call(db,a,'challenge',{user_id:non}),/unavailable/);

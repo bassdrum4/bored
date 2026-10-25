@@ -12,3 +12,6 @@ dist/
 
 # Local Chrome used to run the browser suite in a sandbox.
 .chrome/
+
+# Supabase CLI cache is local tooling state.
+supabase/.temp/

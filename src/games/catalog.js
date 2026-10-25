@@ -109,5 +109,6 @@ export function loadGameDocument(slug) {
 
 // Async rules are server-owned; the existing catalog slug stays the game identity.
 export const TOGETHER_GAMES = Object.freeze({
-  'connect-four': Object.freeze({ name: 'Connect Four', rulesVersion: 1, mode: 'turns' })
+  'connect-four': Object.freeze({ name: 'Connect Four', rulesVersion: 1, mode: 'turns', preview: 'connect-four', blurb: 'Seven columns. One good rivalry.' }),
+  '8ball': Object.freeze({ name: '8 Ball Pool', rulesVersion: 1, mode: 'turns', preview: '8ball', blurb: 'Clear your group. Finish on the eight.' })
 });
