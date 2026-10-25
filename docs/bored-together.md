@@ -17,6 +17,15 @@ head-to-head statistics, notifications, privacy settings and blocks. Homepage
 and navigation badges count actionable turns, invitations and friend requests.
 Existing single-player scores and leaderboards do not include multiplayer wins.
 
+The **Games** view leads with pending turns, saved-board match cards and a
+smaller invitations/quick-challenge sidebar. **People** holds search, requests
+and friends; **History** holds records and completed matches; **Settings** holds
+email visibility, blocks and membership controls. Tabs support arrow-key
+navigation, and activity updates are collapsed by default. On phones the panels
+stack, the account strip stays compact, and pending turns take priority over
+starting another game. The enrollment disclosure stays before the Join action
+in the mobile layout.
+
 Mini Golf multiplayer is **deferred**, and is not presented as playable. Its
 current nine fixed holes already satisfy identical-course fairness, but its
 240 Hz physics, mutable browser state and completed-round stroke total are

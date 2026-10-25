@@ -49,26 +49,37 @@ test('two embedded browser accounts play, disconnect, resume, review and rematch
     await page.waitForFunction(()=>!document.querySelector('#together').hasAttribute('aria-busy'));
   }
   async function open(page){await page.click('#together-nav');await page.waitForFunction(()=>!document.querySelector('#together').hidden);}
+  async function tab(page,id){await page.click('#bt-tab-'+id);await page.waitForFunction(id=>document.querySelector('#bt-tab-panel')?.getAttribute('aria-labelledby')==='bt-tab-'+id,{},id);}
   async function refresh(page){await click(page,'Refresh');}
   async function column(page,n){await page.waitForSelector(`.bt-columns button[aria-label="Drop in column ${n}"]:not([disabled])`);await page.click(`.bt-columns button[aria-label="Drop in column ${n}"]`);await page.waitForFunction(()=>!document.querySelector('#together').hasAttribute('aria-busy'));}
   const guest=await player();
   await open(guest);
   assert.equal(calls.length,0,'guest makes no multiplayer requests');
   assert.match(await guest.$eval('#together-content',e=>e.textContent),/email address stays hidden/);
+  fs.mkdirSync(path.join(__dirname,'../_build/together'),{recursive:true});
+  for(const width of [1100,375,320]) {
+    await guest.setViewport({width,height:900});await guest.evaluate(()=>window.scrollTo(0,0));
+    await guest.screenshot({path:path.join(__dirname,`../_build/together/join-${width}.png`),fullPage:true});
+    assert.ok(await guest.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'enrollment no overflow '+width);
+    if(width<700) assert.ok(await guest.evaluate(()=>document.querySelector('.bt-enroll-action').getBoundingClientRect().top>=document.querySelector('.bt-consent').getBoundingClientRect().bottom),'mobile disclosure precedes joining');
+  }
   await click(guest,'Join Bored Together');assert.ok(await guest.$eval('#auth-dialog',e=>e.open));
   assert.equal(await guest.$eval('#together-home',e=>e.hidden),true);
   const a=await player(ids[0]), b=await player(ids[1]);
   await open(a);await open(b);
   await click(a,'Join Bored Together');await click(b,'Join Bored Together');
+  await a.setViewport({width:1100,height:900});await a.evaluate(()=>window.scrollTo(0,0));
+  await a.screenshot({path:path.join(__dirname,'../_build/together/empty-1100.png'),fullPage:true});
+  await tab(a,'people');
   await a.waitForSelector('#bt-search');
   await a.type('#bt-search','student2@example.test');await click(a,'Find players');
   await a.waitForFunction(()=>document.querySelector('#bt-find').textContent.includes('BananaWizard'));
   assert.ok(!(await a.$eval('#bt-find',e=>e.textContent)).includes('student2@example.test'));
-  await click(a,'Add friend');await refresh(b);
+  await click(a,'Add friend');await refresh(b);await tab(b,'people');
   await click(b,'Accept friend');await refresh(a);
   assert.match(await a.$eval('#together-content',e=>e.textContent),/Remove friend/);
   // Challenge from the accepted friend profile.
-  await click(a,'Challenge');await refresh(b);await click(b,'Accept');await refresh(a);
+  await click(a,'Challenge');await refresh(b);await tab(b,'games');await click(b,'Accept');await refresh(a);
   await a.waitForSelector('.bt-columns');
   assert.equal(await a.$$eval('.bt-columns button:not([disabled])',x=>x.length),7);
   assert.equal(await b.$$eval('.bt-columns button:not([disabled])',x=>x.length),0);
@@ -89,16 +100,40 @@ test('two embedded browser accounts play, disconnect, resume, review and rematch
   assert.match(await b.$eval('#together-content',e=>e.textContent),/Waiting for another Connect Four player/);
   await b.reload();await b.waitForFunction(()=>document.querySelector('#together-content').textContent.includes('Cancel random search'));
   await click(b,'Cancel random search');
-  // Member dashboard and match view remain usable in narrow Google Sites embeds.
+  // Populate the local database with realistic mixed activity for layout QA.
+  for(const id of [ids[2],ids[4]])await call(db,id,'enroll',{consent_version:'2026-10-25-v1'});
+  const extra=await call(db,ids[0],'challenge',{user_id:ids[2]});await call(db,ids[2],'accept',{match_id:extra.id});
+  await call(db,ids[4],'challenge',{user_id:ids[0]});await call(db,ids[2],'friend_request',{user_id:ids[0]});
+  await refresh(a);await click(a,'← Dashboard');await tab(a,'games');
+  await a.waitForSelector('.bt-match-featured');
+  assert.equal(await a.$eval('#bt-tab-games',e=>e.getAttribute('aria-selected')),'true');
+  assert.equal(await a.$('#bt-search'),null,'search belongs to People, not the games overview');
+  assert.equal(await a.$('#bt-email-visibility'),null,'settings do not crowd the overview');
+  assert.equal(await a.$$eval('.bt-match-featured',e=>e.length),2);
+  const positions=await a.evaluate(()=>({main:document.querySelector('.bt-match-list').getBoundingClientRect().left,sidebar:document.querySelector('.bt-sidebar').getBoundingClientRect().left}));
+  assert.ok(positions.sidebar>positions.main,'invitations and quick challenge are beside games on desktop');
+  const activity=await a.$eval('.bt-activity',e=>e.open);assert.equal(activity,false,'activity starts collapsed');
   fs.mkdirSync(path.join(__dirname,'../_build/together'),{recursive:true});
   for(const width of [1100,375,320]) {
-    await a.setViewport({width,height:900});
+    await a.setViewport({width,height:900});await a.evaluate(()=>window.scrollTo(0,0));
+    await a.screenshot({path:path.join(__dirname,`../_build/together/overview-${width}.png`),fullPage:true});
+    assert.ok(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'overview no overflow '+width);
+    for(const id of ['people','history','settings']) {
+      await tab(a,id);await a.evaluate(()=>window.scrollTo(0,0));
+      await a.screenshot({path:path.join(__dirname,`../_build/together/${id}-${width}.png`),fullPage:true});
+      assert.ok(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),id+' no overflow '+width);
+    }
+    await a.reload();await a.waitForSelector('#bt-tab-games');await tab(a,'games');
+    await click(a,'Play your next turn →');await a.evaluate(()=>window.scrollTo(0,0));
     await a.screenshot({path:path.join(__dirname,`../_build/together/match-${width}.png`),fullPage:true});
-    assert.ok(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no overflow '+width);
-    await b.setViewport({width,height:900});
-    await b.screenshot({path:path.join(__dirname,`../_build/together/dashboard-${width}.png`),fullPage:true});
-    assert.ok(await b.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'dashboard no overflow '+width);
+    assert.ok(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'match no overflow '+width);
+    await click(a,'← Dashboard');await tab(a,'games');
   }
+  await a.focus('#bt-tab-games');await a.keyboard.press('ArrowRight');
+  assert.equal(await a.$eval('#bt-tab-people',e=>e.getAttribute('aria-selected')),'true','keyboard tab navigation');
+  await a.type('#bt-search','Quiet');await refresh(a);
+  assert.equal(await a.$eval('#bt-search',e=>e.value),'Quiet','polling preserves typed search');
+  await tab(a,'games');await click(a,'Play your next turn →');
   // A failed/offline fetch never replaces the authoritative board with a local move.
   const before=await a.$$eval('.bt-disc',x=>x.map(e=>e.textContent));
   outages.add(ids[0]);await a.setOfflineMode(true);await refresh(a);
