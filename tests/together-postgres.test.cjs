@@ -38,8 +38,8 @@ test('native PostgreSQL: competing moves, queues, crossed requests and leave rac
   }
   const [a,b,c,d]=ids;
   for(const id of ids)await rpc(id,'enroll',consent);
-  const pending=await rpc(a,'challenge',{user_id:b});
-  const active=await rpc(b,'accept',{match_id:pending.id});
+  // Play-first: the challenger's game is active immediately, with their turn.
+  const active=await rpc(a,'challenge',{user_id:b});
   const moves=await Promise.allSettled([0,1].map(column=>rpc(a,'move',{match_id:active.id,version:active.version,column,request_id:randomUUID()})));
   assert.equal(moves.filter(r=>r.status==='fulfilled').length,1);
   assert.equal((await admin.query('select count(*)::int n from bored_together.moves')).rows[0].n,1);
@@ -56,8 +56,7 @@ test('native PostgreSQL: competing moves, queues, crossed requests and leave rac
   assert.equal((await admin.query('select count(*)::int n from bored_together.queue where user_id=$1',[c])).rows[0].n,0);
   // Two validated pool results competing while a legal pot keeps the same
   // shooter: version checks must still prevent the second result committing.
-  const poolInvite=await rpc(a,'challenge',{user_id:b,game:'8ball'});
-  const poolMatch=await rpc(b,'accept',{match_id:poolInvite.id});
+  const poolMatch=await rpc(a,'challenge',{user_id:b,game:'8ball'});
   const state={balls:[{id:0,x:110,y:50},{id:1,x:110,y:20},{id:8,x:175,y:70},{id:9,x:195,y:85}],groups:['solid','stripe'],ballInHand:false,breakShot:false,shotCount:0,lastShot:null};
   await admin.query('update bored_together.matches set state=$1::jsonb where id=$2',[JSON.stringify(state),poolMatch.id]);
   const {applyPoolShot}=await import('../src/games/pool-engine.js');

@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
-const consent = { consent_version:'2026-10-25-v2' };
+const consent = { consent_version:'2026-10-26-v3' };
 const ids = Array.from({length:7},(_,i)=>`00000000-0000-4000-8000-00000000000${i+1}`);
 
 // Production SQL, real PostgreSQL WASM execution, isolated auth fixtures. Nothing
@@ -36,9 +36,10 @@ async function call(db,user,action,args={}) {
 }
 const enroll=(db,u)=>call(db,u,'enroll',consent);
 const dashboard=(db,u)=>call(db,u,'dashboard');
-async function challenge(db,a,b) {
-  const m=await call(db,a,'challenge',{user_id:b});
-  return call(db,b,'accept',{match_id:m.id});
+// A challenge now opens the game for the challenger, who moves first; the
+// opponent only gets it once that turn is saved. Test setup can move straight in.
+async function challenge(db,a,b,game) {
+  return call(db,a,'challenge',game?{user_id:b,game}:{user_id:b});
 }
 async function move(db,m,u,column,extra={}) {
   return call(db,u,'move',{match_id:m.id,version:m.version,column,request_id:randomUUID(),...extra});

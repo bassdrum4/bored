@@ -1,6 +1,8 @@
 import { request, freshSession, getSession, hasIdentity } from './backend.js';
 
-export const CONSENT_VERSION = '2026-10-25-v2';
+// v3 shows members to each other in a list, with their email. Existing members
+// are asked to review it once before their games load again.
+export const CONSENT_VERSION = '2026-10-26-v3';
 
 export async function togetherRPC(action, args = {}) {
   if (!hasIdentity()) throw new Error('Sign in to your Bored account first.');

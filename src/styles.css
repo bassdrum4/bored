@@ -326,8 +326,12 @@ dialog{margin:auto}
 .bt-search-form{display:flex;gap:10px;flex-wrap:wrap;max-width:640px}
 .bt-search-form label{flex-basis:100%;font:12px var(--mono)}
 .bt-search-form input{flex:1;min-width:0}
-.bt-person{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--rule);padding:12px 0;margin-top:12px}
+.bt-people{max-height:300px;overflow:auto;margin-top:8px}
+.bt-person{display:flex;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--rule);padding:10px 0}
+.bt-people .bt-person:first-child{border-top:0}
+.bt-person>div{display:grid;gap:2px;min-width:0}
 .bt-person strong{overflow-wrap:anywhere;min-width:0}
+.bt-person .bt-caption{margin:0}
 .bt-match-row{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:18px 0;border-top:1px solid var(--rule)}
 .bt-match-copy{min-width:0}
 .bt-ready .bt-caption{color:var(--red)}

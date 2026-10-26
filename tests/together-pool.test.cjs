@@ -52,19 +52,23 @@ async function shotRequest(handler,user,body){
 test('pool endpoint and SQL: complete saved game, repeat requests, auth and result tampering',async t=>{
  const db=await database();t.after(()=>db.close());const [a,b,c]=ids;
  for(const u of [a,b,c])await enroll(db,u);
- const pending=await call(db,a,'challenge',{user_id:b,game:'8ball'});let m=await call(db,b,'accept',{match_id:pending.id});
+ // The challenger starts: the table is already theirs to shoot from.
+ let m=await call(db,a,'challenge',{user_id:b,game:'8ball'});
  const {initialPoolState}=await engine();assert.deepEqual(m.state,initialPoolState());
  const handler=await localHandler(db),payload={match_id:m.id,version:m.version,request_id:randomUUID(),move:{angle:0,power:85}};
  for(const u of [a,b,c,null])await assert.rejects(as(db,u,()=>db.query('select public.bt_pool_commit($1::jsonb)',[JSON.stringify({actor:a,winner_seat:1})])),/permission denied/);
  await assert.rejects(call(db,a,'move',{...payload,move:{angle:0,power:85}}),/verified pool/);
  const unauthorized=await shotRequest(handler,c,payload);assert.ok(unauthorized.status>=400);
- const notTurn=await shotRequest(handler,b,payload);assert.equal(notTurn.status,409);
+ // The opponent cannot even read a game that has not reached them yet.
+ const notTurn=await shotRequest(handler,b,payload);assert.ok(notTurn.status>=400,'an unrevealed table stays private');
  const forged=await shotRequest(handler,a,{...payload,state:{balls:[]},winner:1});assert.equal(forged.status,422);
  const first=await shotRequest(handler,a,payload);assert.equal(first.status,200);m=first.body;assert.equal(m.state.shotCount,1);assert.equal(m.turn_user,b);
  const duplicate=await shotRequest(handler,a,payload);assert.equal(duplicate.status,200);assert.equal(duplicate.body.version,m.version);
  assert.equal((await call(db,a,'match',{match_id:m.id})).moves.length,1);
  assert.equal((await shotRequest(handler,a,{...payload,move:{angle:1,power:85}})).status,409);
- assert.equal((await shotRequest(handler,b,{...payload,request_id:randomUUID()})).status,409);
+ // A break that pots keeps the shooter's turn, so the opponent is still shut
+ // out; once the turn passes, their stale version is refused instead.
+ assert.ok([409,422].includes((await shotRequest(handler,b,{...payload,request_id:randomUUID()})).status));
  // Controlled table fixtures exercise rule-to-database winner assignment. All
  // fixtures stay inside this disposable database, never the production project.
  await db.query('update bored_together.matches set state=$1::jsonb,turn_user=$2 where id=$3',[JSON.stringify(position('win')),a,m.id]);
@@ -73,9 +77,9 @@ test('pool endpoint and SQL: complete saved game, repeat requests, auth and resu
  const reopened=await call(db,b,'match',{match_id:m.id});assert.equal(reopened.moves.length,2);assert.ok(reopened.moves[1].state_after);assert.equal(reopened.winner,a);
  assert.ok(!JSON.stringify(reopened).includes('@example.test'));
  const rematch=await call(db,b,'rematch',{match_id:m.id});assert.equal(rematch.game,'8ball');assert.deepEqual(rematch.state,initialPoolState());
- await call(db,a,'accept',{match_id:rematch.id});
+ assert.equal(rematch.turn_user,b,'a rematch is played first too');
  await db.query('update bored_together.matches set state=$1::jsonb where id=$2',[JSON.stringify(position('early')),rematch.id]);
- const loss=await shotRequest(handler,b,{match_id:rematch.id,version:1,request_id:randomUUID(),move:{angle:2700,power:25}});assert.equal(loss.body.winner,a,'an early 8 awards the opponent, not the shooter');
+ const loss=await shotRequest(handler,b,{match_id:rematch.id,version:rematch.version,request_id:randomUUID(),move:{angle:2700,power:25}});assert.equal(loss.body.winner,a,'an early 8 awards the opponent, not the shooter');
  await call(db,a,'queue_join',{game:'8ball'});await call(db,c,'queue_join',{game:'connect-four'});
  assert.deepEqual((await call(db,c,'dashboard')).queue,['connect-four']);
  const matched=await call(db,b,'queue_join',{game:'8ball'});assert.equal(matched.game,'8ball');assert.equal(matched.source,'random');assert.ok(!JSON.stringify(matched).includes('email'));

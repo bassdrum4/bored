@@ -552,22 +552,25 @@ other browser tests it needs `CHROME_PATH`. No service key is included in the si
 ## Bored Together (optional asynchronous multiplayer)
 
 Open **Bored Together** in the navigation or from a Connect Four or 8 Ball card.
-Join with your existing account, then use **Challenge Someone** or **Play Random**.
-Choose a game and find an opted-in opponent by username or exact account email.
-Email addresses stay private, including in search results.
+Join with your existing account, then use **Start a Game** or **Play Random**.
+Starting a game means picking a game and then a member from the list of everyone
+in Bored Together, by display name and email — there is no address to type. The
+game opens straight away with your turn, and reaches the other player as theirs
+to play once you save it. Leave before that and nothing is sent.
 
-**Your Games** lists turns, incoming challenges and waiting games. Accept a
-challenge or open a match to play the original game in Bored's normal full-size
-player. A confirmed finished turn automatically returns to the list; Pool
-stays open while legal pots retain your turn. Failed saves keep the game open
-with retry/reload controls. Escape or the player menu returns without forfeiting.
-CPU/local games, single-player scores and daily challenges remain independent.
+**Your Games** lists every game, turns first. Open one to play the original game
+in Bored's normal full-size player. A confirmed finished turn automatically
+returns to the list; Pool stays open while legal pots retain your turn. Failed
+saves keep the game open with retry/reload controls. Escape or the player menu
+returns without forfeiting. CPU/local games, single-player scores and daily
+challenges remain independent.
 
-There are no social tabs, friend requests, stats dashboards, activity feed,
-visibility settings or mini-game renderers. Rematches remain beside recently
-finished games; small overflow menus hold blocking and leaving. Matches persist
-in Supabase, so opponents can play at different times and on different devices.
-Mini Golf multiplayer remains deferred pending authoritative shot validation.
+There are no social tabs, friend requests, stats dashboards, activity feed or
+mini-game renderers. Rematches are played first too and sit beside recently
+finished games; small overflow menus hold blocking, deleting a game for both
+players and leaving. Matches persist in Supabase, so opponents can play at
+different times and on different devices. Mini Golf multiplayer remains deferred
+pending authoritative shot validation.
 
 New backends install `scripts/bored-together.sql` once and the forward migrations
 in order. Existing backends apply only missing migrations. Pool also requires

@@ -8,7 +8,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   const $ = s => document.querySelector(s);
   const root = $('#together'), content = $('#together-content'), status = $('#together-status');
   let owner = null, data = null, visible = false, busy = false, generation = 0, flight = null;
-  let flow = null, selectedGame = 'connect-four', query = '', results = null;
+  let flow = null, selectedGame = 'connect-four', people = null;
   const name = game => TOGETHER_GAMES[game]?.name || game;
   function node(tag, text, className) {
     const el = document.createElement(tag);
@@ -31,7 +31,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     const next = hasIdentity() ? getSession()?.user?.id : null;
     if (owner === next) return;
     owner = next; generation++; flight = null; busy = false; root.removeAttribute('aria-busy');
-    data = flow = results = null; query = ''; status.textContent = '';
+    data = flow = people = null; status.textContent = '';
     updateBadge(); render();
   }
   async function refresh(force = false) {
@@ -66,7 +66,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     const match = await togetherRPC('match', { match_id: id });
     if (stamp !== generation || !visible) return;
     if (!['active', 'completed'].includes(match.status)) { await refresh(true); return; }
-    flow = null; query = ''; results = null; render();
+    flow = null; people = null; render();
     playMatch(match, player, {
       async submit(current, move, action) {
         if (stamp !== generation || owner !== player) throw new Error('Your account changed.');
@@ -86,25 +86,39 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     });
   }
   function intro() {
+    // A member who joined under the older notice is shown the new one once
+    // before their list loads: the directory now shows their email.
+    const renew = data?.renew === true;
     const intro = node('div', undefined, 'bt-enrollment');
-    intro.append(node('h3', 'Play a turn. Come back whenever.'),
-      node('p', 'Challenge someone or find a random opponent. Your games save between turns.'),
-      node('p', 'Joining lets other members find your username or look you up by your exact account email. Your email stays private.', 'bt-caption'),
-      button('Join Bored Together', async () => {
+    intro.append(node('h3', renew ? 'A change to Bored Together' : 'Play a turn. Come back whenever.'),
+      node('p', renew
+        ? 'Games now start with your turn and go to the other player when you save it. Members are picked from a list, so you can see who else is here without typing an address.'
+        : 'Send a game by playing the first turn. It reaches the other player as theirs to play, and it waits for both of you between turns.'),
+      node('p', 'Joining puts your display name and email in the member list, where other members can see and pick you. Leaving removes you from it.', 'bt-caption'),
+      button(renew ? 'Review and continue' : 'Join Bored Together', async () => {
         if (!hasIdentity()) { openAuthDialog('signin'); return; }
         await ensureProfile(); await togetherRPC('enroll', { consent_version: CONSENT_VERSION });
       }, true));
     content.append(intro);
   }
-  function overflow(host, opponent) {
+  function overflow(host, match) {
+    const opponent = match?.opponent;
     const more = node('details', undefined, 'bt-more');
     const summary = node('summary', 'More'); summary.setAttribute('aria-label', opponent ? 'Options for ' + opponent.handle : 'Bored Together options');
     more.append(summary);
+    if (match) {
+      // Deleting removes the game for both players; nothing is awarded.
+      const remove = node('details');
+      remove.append(node('summary', 'Delete game'),
+        node('p', 'This deletes the game for both of you. No winner is recorded.', 'bt-caption'),
+        button('Confirm delete', () => togetherRPC('delete', { match_id: match.id })));
+      more.append(remove);
+    }
     if (opponent) more.append(button('Block ' + opponent.handle, () => togetherRPC('block', { user_id: opponent.id })));
     else {
       for (const p of data.blocks || []) more.append(button('Unblock ' + p.handle, () => togetherRPC('unblock', { user_id: p.id })));
       const leave = node('details'); leave.append(node('summary', 'Leave Bored Together'),
-        node('p', 'Leaving hides you from search, cancels invitations and forfeits active games.', 'bt-caption'),
+        node('p', 'Leaving removes you from the member list, cancels games you have not sent and forfeits ones in progress.', 'bt-caption'),
         button('Confirm leave', () => togetherRPC('leave')));
       more.append(leave);
     }
@@ -112,46 +126,39 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   }
   function picker() {
     const box = node('section', undefined, 'bt-start');
-    box.setAttribute('aria-label', flow === 'challenge' ? 'Challenge someone' : 'Play random');
+    box.setAttribute('aria-label', flow === 'challenge' ? 'Start a game' : 'Play random');
     const label = node('label', 'Choose a game ', 'bt-game-picker'), select = node('select'); select.id = 'bt-game-select';
     for (const [slug, game] of Object.entries(TOGETHER_GAMES)) {
       if (!TOGETHER_ADAPTERS[slug]) continue;
       const option = node('option', game.name); option.value = slug; select.append(option);
     }
     select.value = selectedGame;
-    select.onchange = () => { selectedGame = select.value; results = null; render(); };
+    select.onchange = () => { selectedGame = select.value; render(); };
     label.append(select); box.append(label);
     if (flow === 'random') box.append(button('Find opponent', async () => {
       const result = await togetherRPC('queue_join', { game: selectedGame });
       flow = null; if (result.id) await launch(result.id);
     }, true));
     else {
-      const form = node('form', undefined, 'bt-search-form');
-      const label = node('label', 'Username or exact email'); label.htmlFor = 'bt-search';
-      const input = node('input'); input.id = 'bt-search'; input.value = query; input.required = true; input.minLength = 3; input.maxLength = 254;
-      input.autocomplete = 'off'; input.oninput = () => { query = input.value; results = null; $('#bt-find')?.remove(); };
-      const find = node('button', 'Find player', 'action'); find.type = 'submit';
-      form.onsubmit = e => { e.preventDefault(); run(async () => {
-        const stamp = generation, searched = query.trim();
-        const found = await togetherRPC('search', { query: searched });
-        if (stamp === generation && query.trim() === searched) { results = found; render(); }
-      }); };
-      form.append(label, input, find); box.append(form);
-      if (results) {
-        const list = node('div'); list.id = 'bt-find';
-        if (!results.length) list.append(node('p', 'No player found. They need to join Bored Together first.', 'bt-caption'));
-        for (const person of results) {
+      box.append(node('p', 'Pick a member and play the first turn. It reaches them as their game, so nothing is sent until your turn is saved.', 'bt-caption'));
+      if (!people) box.append(node('p', 'Loading members…', 'bt-caption'));
+      else if (!people.length) box.append(node('p', 'Nobody else has joined yet. Anyone who joins appears here.', 'bt-caption'));
+      else {
+        const list = node('div', undefined, 'bt-people'); list.id = 'bt-people';
+        for (const person of people) {
           const row = node('div', undefined, 'bt-person');
-          row.append(node('strong', person.handle), button('Challenge', async () => {
-            await togetherRPC('challenge', { user_id: person.id, game: selectedGame });
-            flow = results = null; query = ''; status.textContent = 'Challenge sent.';
+          const who = node('div');
+          who.append(node('strong', person.handle), node('span', person.email || 'No email on this account', 'bt-caption'));
+          row.append(who, button('Play', async () => {
+            const match = await togetherRPC('challenge', { user_id: person.id, game: selectedGame });
+            flow = null; people = null; await launch(match.id);
           }, true));
           list.append(row);
         }
         box.append(list);
       }
     }
-    box.append(button('Cancel', () => { flow = results = null; query = ''; render(); }));
+    box.append(button('Cancel', () => { flow = null; people = null; render(); }));
     content.append(box);
   }
   function matchRow(m, host) {
@@ -168,16 +175,24 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     else if (m.status === 'pending') actions.append(button('Cancel challenge', () => togetherRPC('cancel', { match_id: m.id })));
     else if (m.status === 'active') actions.append(button(turn ? 'Play turn' : 'Open', () => launch(m.id), turn));
     else actions.append(button('Rematch', async () => {
-      await togetherRPC('rematch', { match_id: m.id, game: m.game }); status.textContent = 'Rematch sent.';
+      // A rematch is played first too, so it usually opens straight away. If the
+      // other player already started it, there is nothing to send.
+      const next = await togetherRPC('rematch', { match_id: m.id, game: m.game });
+      if (next.turn_user === owner) await launch(next.id);
+      else status.textContent = 'They already started the rematch.';
     }));
-    if (m.opponent) overflow(actions, m.opponent);
+    overflow(actions, m);
     row.append(copy, actions); host.append(row);
   }
   function dashboard() {
     const start = node('div', undefined, 'bt-start-actions');
-    start.append(button('Challenge Someone', () => { flow = 'challenge'; results = null; render(); $('#bt-game-select')?.focus(); }, true),
-      button('Play Random', () => { flow = 'random'; results = null; render(); $('#bt-game-select')?.focus(); }));
-    overflow(start); content.append(start);
+    // The member list is only fetched when the picker is opened.
+    start.append(button('Start a Game', async () => {
+      people = await togetherRPC('people');
+      flow = 'challenge'; render(); $('#bt-game-select')?.focus();
+    }, true),
+      button('Play Random', () => { flow = 'random'; people = null; render(); $('#bt-game-select')?.focus(); }));
+    overflow(start, null); content.append(start);
     if (flow) picker();
     const games = node('section'); games.id = 'bt-your-games'; games.append(node('h3', 'Your Games'));
     const attention = m => m.status === 'active' && m.turn_user === owner || m.status === 'pending' && m.p2 === owner ? 0 : m.status === 'completed' ? 2 : 1;
@@ -204,14 +219,14 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     if (focus) { const next = document.getElementById(focus); if (next) { next.focus({ preventScroll: true }); try { next.setSelectionRange(start, end); } catch {} } }
   }
   function open() {
-    visible = true; document.body.classList.add('together-open');
+    visible = true; people = null; document.body.classList.add('together-open');
     for (const el of document.querySelectorAll('#daily,#recent,#leaderboard,#library,.activity-notice')) el.hidden = true;
     root.hidden = false; $('#together-nav').setAttribute('aria-current', 'page');
     try { history.replaceState(null, '', '#together'); } catch {}
     resetIdentity(); render(); refresh(true); root.scrollIntoView({ block: 'start' });
   }
   function close() {
-    visible = false; flow = results = null; query = ''; root.hidden = true;
+    visible = false; flow = people = null; root.hidden = true;
     document.body.classList.remove('together-open'); $('#together-nav').removeAttribute('aria-current');
     for (const el of document.querySelectorAll('#daily,#recent,#leaderboard,#library,.activity-notice')) el.hidden = false;
   }
@@ -224,6 +239,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   window.addEventListener('bored:together-open', event => {
     if (TOGETHER_ADAPTERS[event.detail?.game]) selectedGame = event.detail.game;
     open(); flow = 'challenge'; render();
+    if (data?.enrolled) run(async () => { people = await togetherRPC('people'); render(); });
   });
   window.addEventListener('focus', () => refresh());
   window.addEventListener('online', () => refresh(true));

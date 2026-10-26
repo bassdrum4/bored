@@ -24,6 +24,12 @@ test('Together production SQL: consent, privacy, social, queue, moves and retent
     for(const u of [a,b,c,d,e])await enroll(db,u);
     const member=(await db.query('select * from bored_together.members where user_id=$1',[a])).rows[0];
     assert.equal(member.consent_version,consent.consent_version);assert.ok(member.consent_at);
+    // The notice grew an email column, so an older consent is shown once more
+    // before the member list loads again.
+    await db.query("update bored_together.members set consent_version='2026-10-25-v2' where user_id=$1",[a]);
+    assert.deepEqual(await dashboard(db,a),{enrolled:false,renew:true});
+    await enroll(db,a);
+    assert.equal((await dashboard(db,a)).enrolled,true);
   });
   await t.test('exact email, prefix username, hidden accounts, no email leaks or wildcard enumeration',async()=>{
     assert.equal((await call(db,a,'search',{query:' STUDENT2@EXAMPLE.TEST '}))[0].handle,'BananaWizard');
@@ -37,6 +43,13 @@ test('Together production SQL: consent, privacy, social, queue, moves and retent
     await assert.rejects(call(db,a,'search',{query:'B'}),/at least 3/);
     await assert.rejects(call(db,a,'friend_request',{user_id:non}),/unavailable/);
     await assert.rejects(call(db,a,'challenge',{user_id:non}),/unavailable/);
+    // The picker's directory lists the members themselves, address included,
+    // and never the viewer or anyone who has not joined.
+    const people=await call(db,a,'people');
+    assert.deepEqual(people.map(p=>p.handle),['BananaWizard','FifthPlayer','FourthPlayer','QuietOwl']);
+    assert.equal(people.find(p=>p.id===b).email,'student2@example.test');
+    assert.equal(people.some(p=>p.id===a),false,'the viewer is not in their own list');
+    assert.equal(people.some(p=>p.id===non),false,'nonmembers are never listed');
   });
   await t.test('all private tables and internal helpers deny direct reads/writes even to members',async()=>{
     for(const table of ['members','friendships','blocks','matches','moves','queue','notifications','limits']) {
@@ -67,49 +80,83 @@ test('Together production SQL: consent, privacy, social, queue, moves and retent
     await call(db,a,'block',{user_id:b});
     assert.deepEqual(await call(db,a,'search',{query:'Ban'}),[]);
     assert.deepEqual(await call(db,b,'search',{query:'Wac'}),[]);
+    assert.equal((await call(db,a,'people')).some(p=>p.id===b),false,'blocked members leave the directory');
+    assert.equal((await call(db,b,'people')).some(p=>p.id===a),false,'blocking works both ways');
     await assert.rejects(call(db,b,'friend_request',{user_id:a}),/unavailable/);
     await assert.rejects(call(db,b,'challenge',{user_id:a}),/unavailable/);
     await call(db,a,'unblock',{user_id:b});
   });
   let finished;
-  await t.test('challenge accept/decline/cancel, legal match to win, idempotency, stale and illegal moves',async()=>{
-    let pending=await call(db,a,'challenge',{user_id:b});
-    await assert.rejects(call(db,a,'accept',{match_id:pending.id}),/unavailable/);
-    await assert.rejects(call(db,c,'accept',{match_id:pending.id}),/unavailable/);
-    await assert.rejects(move(db,pending,a,0),/not your turn/);
-    await call(db,b,'decline',{match_id:pending.id});
-    pending=await call(db,a,'challenge',{user_id:b});
-    await call(db,a,'cancel',{match_id:pending.id});
-    let m=await challenge(db,a,b);
-    await assert.rejects(call(db,a,'challenge',{user_id:b}),/unique/);
-    await assert.rejects(move(db,m,b,0),/not your turn/);
-    await assert.rejects(move(db,m,a,7),/Invalid move|column/);
-    await assert.rejects(move(db,m,a,null),/column|Invalid move/);
+  await t.test('a game starts with the challenger\'s turn and reaches the opponent on save',async()=>{
+    const started=await call(db,a,'challenge',{user_id:b});
+    assert.equal(started.status,'active');assert.equal(started.turn_user,a);
+    // Nothing has been sent yet: the opponent has no row and cannot open it.
+    assert.equal((await dashboard(db,b)).matches.some(x=>x.id===started.id),false);
+    await assert.rejects(call(db,b,'match',{match_id:started.id}),/unavailable/);
+    await assert.rejects(call(db,c,'match',{match_id:started.id}),/unavailable/);
+    await assert.rejects(move(db,started,b,0),/unavailable/);
+    // A second game with the same person names the one to finish instead of
+    // leaking the unique index's duplicate-key error.
+    await assert.rejects(call(db,a,'challenge',{user_id:b}),/already have a Connect Four game with BananaWizard/);
+    await assert.rejects(call(db,b,'challenge',{user_id:a}),/already have a Connect Four game with WackyPenguin/);
+    await assert.rejects(call(db,a,'accept',{match_id:started.id}),/Challenge unavailable/,'there is nothing left to accept');
+    let m=await move(db,started,a,0);
+    const delivered=(await dashboard(db,b)).matches.find(x=>x.id===m.id);
+    assert.equal(delivered.status,'active');assert.equal(delivered.turn_user,b);
+    assert.ok((await dashboard(db,b)).notifications.some(n=>n.kind==='New game — your turn'));
+    await assert.rejects(move(db,m,b,7),/Invalid move|column/);
+    await assert.rejects(move(db,m,b,null),/column|Invalid move/);
     const rid=randomUUID(), original=m;
-    m=await move(db,m,a,0,{request_id:rid});
-    const retry=await move(db,original,a,0,{request_id:rid});
+    m=await move(db,m,b,1,{request_id:rid});
+    const retry=await move(db,original,b,1,{request_id:rid});
     assert.equal(retry.version,m.version);assert.deepEqual(retry.state,m.state);
-    await assert.rejects(move(db,m,a,1,{request_id:rid}),/already used/);
-    await assert.rejects(move(db,m,b,1,{version:0}),/board changed/);
-    m=await move(db,m,b,1);m=await move(db,m,a,0);m=await move(db,m,b,1);m=await move(db,m,a,0);m=await move(db,m,b,1);m=await move(db,m,a,0);
+    await assert.rejects(move(db,m,b,2,{request_id:rid}),/already used/);
+    await assert.rejects(move(db,m,a,2,{version:0}),/board changed/);
+    m=await move(db,m,a,0);m=await move(db,m,b,1);m=await move(db,m,a,0);m=await move(db,m,b,1);m=await move(db,m,a,0);
     assert.equal(m.winner,a);assert.equal(m.status,'completed');assert.equal(m.turn_user,null);
     await assert.rejects(move(db,m,b,2),/not your turn/);
     const reopened=await call(db,a,'match',{match_id:m.id});
     assert.deepEqual(reopened.state,m.state);assert.equal(reopened.moves.length,7);
     assert.equal(reopened.moves.filter(x=>x.actor===a).length,4);
     assert.ok(!JSON.stringify(reopened).includes('@example.test'));
-    await assert.rejects(call(db,c,'match',{match_id:m.id}),/unavailable/);
     finished=m;
     const stats=(await dashboard(db,b)).stats.find(s=>s.opponent.id===a);
     assert.equal(stats.losses,1);
   });
-  await t.test('rematches are idempotent invitations and can be resigned',async()=>{
+  await t.test('rematches are played first too, and either player can delete a match',async()=>{
     const rematch=await call(db,b,'rematch',{match_id:finished.id});
-    assert.equal(rematch.status,'pending');assert.equal(rematch.p1,b);
-    assert.equal((await call(db,a,'rematch',{match_id:finished.id})).id,rematch.id);
-    await call(db,a,'accept',{match_id:rematch.id});
-    const resigned=await call(db,b,'resign',{match_id:rematch.id});
-    assert.equal(resigned.winner,a);assert.equal(resigned.reason,'Resigned');
+    assert.equal(rematch.status,'active');assert.equal(rematch.p1,b);assert.equal(rematch.turn_user,b);
+    assert.equal((await call(db,a,'rematch',{match_id:finished.id})).id,rematch.id,'a rematch is created once');
+    await assert.rejects(call(db,a,'match',{match_id:rematch.id}),/unavailable/,'an unplayed rematch is private');
+    await move(db,rematch,b,0);
+    const resigned=await call(db,a,'resign',{match_id:rematch.id});
+    assert.equal(resigned.winner,b);assert.equal(resigned.reason,'Resigned');
+    // Removing a game removes it for both sides and awards nothing.
+    const live=await move(db,await call(db,d,'challenge',{user_id:e}),d,0);
+    assert.ok((await dashboard(db,e)).matches.some(x=>x.id===live.id));
+    assert.deepEqual(await call(db,e,'delete',{match_id:live.id}),{ok:true});
+    assert.equal((await dashboard(db,d)).matches.some(x=>x.id===live.id),false);
+    assert.equal((await db.query('select count(*) n from bored_together.matches where id=$1',[live.id])).rows[0].n,0);
+    assert.equal((await db.query('select count(*) n from bored_together.moves where match_id=$1',[live.id])).rows[0].n,0);
+    await assert.rejects(call(db,c,'delete',{match_id:live.id}),/unavailable/);
+    // Abandoning the first turn leaves nothing behind, on either list.
+    const draft=await call(db,e,'challenge',{user_id:d});
+    assert.deepEqual(await call(db,e,'resign',{match_id:draft.id}),{ok:true});
+    await assert.rejects(call(db,d,'match',{match_id:draft.id}),/unavailable/);
+    assert.equal((await dashboard(db,e)).matches.some(x=>x.id===draft.id),false);
+  });
+  await t.test('challenges created before play-first can still be accepted, declined or cancelled',async()=>{
+    const insert=async(p1,p2)=>(await db.query("insert into bored_together.matches(game,p1,p2,source,status,turn_user,revealed_at,state) values('connect-four',$1,$2,'challenge','pending',null,now(),bored_together.initial_state('connect-four',1)) returning id",[p1,p2])).rows[0].id;
+    const accepted=await call(db,e,'accept',{match_id:await insert(d,e)});
+    assert.equal(accepted.status,'active');assert.equal(accepted.turn_user,d);
+    await call(db,e,'delete',{match_id:accepted.id});
+    const declined=await insert(d,e);
+    await call(db,e,'decline',{match_id:declined});
+    assert.equal((await call(db,d,'match',{match_id:declined})).status,'declined');
+    const cancelled=await insert(d,e);
+    await call(db,d,'cancel',{match_id:cancelled});
+    assert.equal((await call(db,d,'match',{match_id:cancelled})).status,'cancelled');
+    await assert.rejects(call(db,e,'accept',{match_id:cancelled}),/Challenge unavailable/);
   });
   await t.test('random queue pairing excludes self, blocked pairs and duplicate active pairs',async()=>{
     assert.deepEqual(await call(db,c,'queue_join'),{queued:true});
@@ -144,13 +191,16 @@ test('Together production SQL: consent, privacy, social, queue, moves and retent
   await t.test('leaving immediately disables discovery, queues, invitations and friendships; forfeits active matches',async()=>{
     await call(db,a,'friend_request',{user_id:d});await call(db,d,'friend_accept',{user_id:a});
     const pending=await call(db,d,'challenge',{user_id:b});
-    const active=await challenge(db,a,d);
+    const active=await move(db,await challenge(db,a,d),a,0);
     await call(db,d,'queue_join');
     await call(db,d,'leave');
     assert.deepEqual(await dashboard(db,d),{enrolled:false});
-    assert.deepEqual(await call(db,a,'search',{query:'student5@example.test'}),[]);
+    await assert.deepEqual(await call(db,a,'search',{query:'student5@example.test'}),[]);
     await assert.rejects(call(db,a,'challenge',{user_id:d}),/unavailable/);
-    assert.equal((await call(db,b,'match',{match_id:pending.id})).status,'cancelled');
+    // A game the opponent never saw disappears with the player who started it.
+    await assert.rejects(call(db,b,'match',{match_id:pending.id}),/unavailable/);
+    assert.equal((await db.query('select count(*) n from bored_together.matches where id=$1',[pending.id])).rows[0].n,0);
+    // A game both players had is forfeited to the one who stayed.
     const ended=await call(db,a,'match',{match_id:active.id});
     assert.equal(ended.status,'completed');assert.equal(ended.winner,a);
     assert.equal((await dashboard(db,a)).friends.length,0);
@@ -158,7 +208,13 @@ test('Together production SQL: consent, privacy, social, queue, moves and retent
     await enroll(db,d);assert.equal((await dashboard(db,d)).email_visibility,'hidden');
   });
   await t.test('expiry, retention, notification ownership and read acknowledgments',async()=>{
-    const m=await challenge(db,a,b);
+    const m=await move(db,await challenge(db,a,b),a,0);
+    // An unplayed game is never delivered, so it is dropped sooner than one
+    // both players are ignoring.
+    const draft=await challenge(db,c,b);
+    await db.query("update bored_together.matches set created_at=now()-interval '8 days' where id=$1",[draft.id]);
+    await db.query('select bored_together.cleanup()');
+    await assert.rejects(call(db,c,'match',{match_id:draft.id}),/unavailable/);
     await db.query("update bored_together.matches set updated_at=now()-interval '31 days' where id=$1",[m.id]);
     await db.query('select bored_together.cleanup()');
     const expired=await call(db,a,'match',{match_id:m.id});assert.equal(expired.status,'expired');assert.equal(expired.winner,null);

@@ -6,23 +6,34 @@ there is no second arcade, login, popup or link-sharing requirement.
 
 ## One screen
 
-After explicit enrollment, the screen has **Challenge Someone**, **Play Random**
-and **Your Games**. Starting a challenge means choosing a game, then searching
-for an opted-in username (literal prefix, minimum three characters) or an exact
-account email. Random play means choosing a game and joining its saved queue.
+After explicit enrollment, the screen has **Start a Game**, **Play Random** and
+**Your Games**. Starting a game means choosing a game, then a member from the
+list of everyone in Bored Together — display name and email, the people you
+would recognise. There is no address to type. Random play means choosing a game
+and joining its saved queue.
 
-The list contains every active match and incoming/outgoing challenge, with turns
-and incoming challenges first. Accept/Decline are inline. The latest three
-completed matches remain at the bottom with a result and Rematch action; there
-is no history browser, records dashboard or replay. Small More menus hold Block,
-Unblock and Leave. Leaving explicitly warns that active games are forfeited.
+Starting a game also plays it: the original game opens straight away with the
+challenger's turn. The match stays private to them until the first saved turn
+passes it to the opponent, who then sees it in their list as their turn. Leaving
+before that sends nothing at all, so no half-started game appears on anyone's
+list. Rematches work the same way. Nothing is "invited" and nothing is accepted;
+a game simply arrives when it is yours.
 
-Friend requests/management, People/History/Settings tabs, statistics, feeds,
-notification history/read controls, replay sliders and email visibility controls
-have been removed from the frontend. Existing private tables, retention,
-authorization and legacy RPC operations are retained for compatibility. Old
-friendships do not grant email access. Badges count only turns and incoming
-challenges, never friendships or notification history.
+The list contains every game, with the ones waiting on you first. The latest
+three completed matches remain at the bottom with a result and Rematch action;
+there is no history browser, records dashboard or replay. Small More menus hold
+Block, Unblock, **Delete game** — either player can remove a match for both of
+them, recording no winner — and Leave. Leaving removes you from the directory,
+drops games nobody has seen yet, cancels games you have not sent and forfeits the
+ones in progress.
+
+Challenges created before play-first shipped are still `pending`, and keep their
+inline Accept/Decline so nobody's list rots. Friend requests/management,
+People/History/Settings tabs, statistics, feeds, notification history/read
+controls, replay sliders and email visibility controls are not in the frontend.
+Existing private tables, retention, authorization and legacy RPC operations are
+retained for compatibility. Badges count only turns and incoming games, never
+friendships or notification history.
 
 ## Original-game integration
 
@@ -61,6 +72,13 @@ rendering and sound. The old Together-specific mini-game renderers were removed.
 Pool's existing shared `pool-engine.js`, validating Edge function, shot commit
 RPC, rules, migrations and tests are preserved.
 
+A game is only delivered on the turn boundary: a challenge row is created
+unrevealed with the challenger to move, and `revealed_at` is set when the turn
+leaves them — including on a completed game. Pool's committing RPC follows the
+same rule, so a legal pot that keeps the shooter at the table keeps the game
+private until their turn actually ends. `resign` on an undelivered game deletes
+it rather than awarding the opponent a win they never saw.
+
 Pool v1 continues to use the previously shipped zero-spin house rules, with no
 called pockets or rail-after-contact requirement. Its original spin control is
 labeled **NO SPIN** and disabled for online play. An 8 on the break re-racks;
@@ -84,19 +102,22 @@ being added to `TOGETHER_ADAPTERS`.
 
 ## Privacy, persistence and security
 
-Enrollment is optional; existing accounts are not automatically discoverable.
-Exact-email search is case-insensitive and requires active membership. It
-returns only the matching user ID and username, never the address. Username
-search also never returns email, including for legacy accepted friends. Email
-is read from Auth for exact comparison, never copied into multiplayer tables or
-indexed in a public directory. Partial email, wildcard and directory scans are
-unsupported. Blocked pairs and nonmembers are excluded from discovery.
+Enrollment is optional; existing accounts are not automatically discoverable
+until they join. A member can see every other member's display name and account
+email in the picker, and their own entry in everyone else's list. Blocked pairs
+and nonmembers are excluded, and the viewer is never in their own list. Email is
+read from Auth by the directory query; it is not copied into multiplayer tables,
+and no match, move or stats payload carries an address — only the picker does.
 
-The forward `together_private_discovery` migration narrows both profile
-projections and exact-email results without deleting or changing saved games.
-Existing memberships remain valid. The current enrollment consent version is
-`2026-10-25-v2`; the frontend now explains the stricter private-email behavior.
-Legacy visibility settings have no effect on email disclosure.
+The current enrollment consent version is `2026-10-26-v3`. An enrolled member
+whose consent predates it gets `{enrolled:false, renew:true}` from `dashboard`
+and is shown the new notice once before their games load again, because the
+notice now covers the address being visible to other members. The earlier
+`together_private_discovery` migration had narrowed projections to hide email;
+this change deliberately reverses that for the directory only, and the SQL
+suite asserts the new behavior. Legacy `search` (exact email or username
+prefix, never returning an address) is retained for compatibility but is no
+longer reachable from the interface.
 
 All eight `bored_together` tables have RLS and no direct browser table grants.
 Keep this private schema outside the exposed Data API schemas. `public.bt_rpc`
@@ -178,11 +199,13 @@ and concurrent-change protection.
 
 The browser test uses two separate account contexts against production SQL and
 the actual Pool Edge handler, with external Auth/transport simulated locally.
-It tests private-email and username challenges, acceptance into the original
-player, failed saves, lost-response retries, automatic returns, opponent resume,
-completion/rematches, queue persistence/cancellation, exit, refresh, a legal
-multi-shot Pool turn, sign-out privacy, original offline play, 1100/375/320px
-layouts and a sandboxed nested iframe equivalent to a Google Sites embed.
+It plays a game from the picker: the challenger starts in the original player, a
+failed save is retried, the opponent only receives the game once the turn is
+saved, the board resumes, the game completes, and a rematch is played first too.
+It also covers the member directory (addresses shown, never in a game row), queue
+persistence/cancellation, exit, refresh, a legal multi-shot Pool turn, sign-out
+privacy, original offline play, 1100/375/320px layouts and a sandboxed nested
+iframe equivalent to a Google Sites embed.
 Screenshots are captured in ignored `_build/together/` for visual inspection.
 A bridge unit test rejects unrelated windows and previous-account results and
 proves a retained Pool turn cannot auto-close.
