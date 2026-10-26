@@ -136,7 +136,7 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   assert.equal(await page.$eval('#totals strong',n=>n.textContent), '25 s');
   // The new admin-only tab renders from the same protected endpoint set.
   await page.click('[data-view="engagement"]');
-  assert.equal(await page.$eval('#engagement-kpis .analytics-stat', nodes => nodes.length), 8);
+  assert.equal(await page.$$eval('#engagement-kpis .analytics-stat', nodes => nodes.length), 8);
   assert.match(await page.$eval('#engagement-together', n => n.textContent), /Organic matches/);
   assert.match(await page.$eval('#engagement-feedback', n => n.textContent), /Responses/);
   await page.click('[data-view="overview"]');
