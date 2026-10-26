@@ -59,7 +59,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     const time = now();
     if (run) {
       const slice = timeSlice(last, time, lastInput, {
-        visible: !document.hidden, focused: document.hasFocus() && (!run.context.external || run.externalPhase === 'flying'), ready: run.ready, paused: paused()
+        visible: !document.hidden, focused: document.hasFocus() && !run.context.external, ready: run.ready, paused: paused()
       });
       run.active += slice.activeMs;
       run.totalActive += slice.activeMs;
@@ -198,23 +198,6 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   track('visit');
   return {
     start, end, ready, track,
-    externalSignal(phase, interacted = false) {
-      if (!run || run.game !== 'f-14' || !run.context.external) return;
-      if (!['menu','flying','paused','result'].includes(phase)) return;
-      sample();
-      const previous = run.externalPhase;
-      run.externalPhase = phase;
-      if (phase !== previous) {
-        emit('checkpoint', { f14_phase: phase,
-          ...(phase === 'flying' && previous !== 'paused' ? { mission_started: true } : {}),
-          ...(phase === 'result' ? { mission_ended: true } : {}) });
-        scheduleFlush();
-      }
-      if (interacted && phase === 'flying') {
-        lastInput = now();
-        if (!run.interacted) { run.interacted = true; emit('interaction'); scheduleFlush(); }
-      }
-    },
     visitorId: () => enabled ? visitor : null,
     event(kind, details) {
       if (kind === 'error' && run && (run.errors = (run.errors || 0) + 1) > 5) return;

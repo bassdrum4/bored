@@ -30,7 +30,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   function resetIdentity() {
     const next = hasIdentity() ? getSession()?.user?.id : null;
     if (owner === next) return;
-    owner = next; generation++; flight = null; busy = false; root.removeAttribute('aria-busy');
+    owner = next; generation++; flight = null; busy = false; lastRefresh = 0; root.removeAttribute('aria-busy');
     data = flow = people = null; status.textContent = '';
     updateBadge(); render();
   }
