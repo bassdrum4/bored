@@ -52,8 +52,8 @@
   <button class="btn" id="btn2p">TWO PLAYERS</button>
   <button class="btn ghost" id="btnCpu">PLAY VS COMPUTER</button>
   <div class="hint">
-    Click the felt to aim, click again to set the angle. Power, english<br>
-    and the shoot button live in the rail beside the table.<br>
+    Click the felt to aim, click again to set the angle. Power and the<br>
+    shoot button live in the rail beside the table.<br>
     Pot your group, then the 8. Foul and your opponent shoots.
   </div>
 </div>
@@ -108,8 +108,6 @@ const CUSH = 0.72;                 // cushion restitution
 const BB_E = 0.94;                 // ball-ball restitution
 const STOPV = 9;                   // snapshot stop speed
 const MAXPOWER = 780;              // px/s at a full slider: a break, not a nudge
-const SPIN_FOLLOW = 0.90;          // top/bottom spin carries the cue through contact
-const SPIN_DECAY = 1.8;            // how fast english dies on the cloth
 const D2R = Math.PI/180;
 
 const POCKETS = [
@@ -209,7 +207,6 @@ const sndScratch = () => {
   tone(250, .24, .055, 'sine', {to: 110, delay: .11});
 };
 const sndFoul = () => tone(170, .22, .05, 'sawtooth', {to: 110});
-const sndSpin = () => tone(880, .03, .018, 'square');
 const sndWin  = () => [0,4,7,12].forEach((s,i)=> tone(523.25*Math.pow(2,s/12), .22, .05, 'triangle', {delay:i*.09}));
 const sndLose = () => [10,6,2].forEach((s,i)=> tone(392*Math.pow(2,s/12), .3, .05, 'sine', {delay:i*.13}));
 
@@ -225,9 +222,8 @@ let firstHit = null;
 let pottedThisShot = [];
 let aimMode = false;          // the pointer is steering the line
 let aimLocked = false;        // the angle is set and the pointer no longer moves it
-let dragSlider = false, dragSpin = false;
-let power = 0.55;             // the power slider, 0..1 — no longer the drag distance
-let spin = {x:0, y:0};        // cue-ball contact point, in ball radii, ±0.8
+let dragSlider = false;
+let power = 0.55;             // the power slider, 0..1 — not the drag distance
 let difficulty = 'normal';
 let aimAngle = 0;
 let handX = PW*0.28, handY = PH/2, handOK = true;
@@ -267,8 +263,8 @@ function startGame(m, keepTurn){
   turn = keepTurn!==undefined ? keepTurn : (Math.random()<0.5 ? 0 : 1);
   document.getElementById('menu').classList.add('hidden');
   document.getElementById('over').classList.add('hidden');
-  aimAngle = 0; power = 0.55; spin.x = 0; spin.y = 0;
-  aimMode = aimLocked = false; dragSlider = dragSpin = false;
+  aimAngle = 0; power = 0.55;
+  aimMode = aimLocked = false; dragSlider = false;
   document.getElementById('diff').classList.add('hidden');
   if(isCpu()) beginCpu(true);
   else state = 'aim';
@@ -294,7 +290,6 @@ function potBall(b){
   let np = POCKETS[0], nd = 1e9;
   for(const p of POCKETS){ const d=Math.hypot(b.x-p.x,b.y-p.y); if(d<nd){nd=d;np=p;} }
   flashPocket = {x:Math.max(0,Math.min(PW,np.x)), y:Math.max(0,Math.min(PH,np.y)), t:1};
-  b.sw = b.fb = 0;
   sndPot(pottedThisShot.length);
   pottedThisShot.push(b.id);
 }
@@ -316,20 +311,18 @@ function potByGeometry(b){
 }
 
 function stepBall(b, h){
+  // remember where the step began: collisions() rewinds to the exact touch
+  b.px = b.x; b.py = b.y;
   // integrate
   b.x += b.vx*h; b.y += b.vy*h;
   const s = Math.hypot(b.vx, b.vy);
-  // English never bends the line of travel: the cue ball leaves along the aim
-  // and only the strike point changes what happens after contact. Anything else
-  // makes power and spin move the ball you were aiming at.
+  // The cue ball leaves along the aim and keeps that line: nothing about the
+  // stroke bends it, so what the guide draws is what the shot does.
   // friction
   if(s > 0){
     const ns = s * Math.max(0, 1 - FRICTION*h);
     b.vx *= ns/s; b.vy *= ns/s;
   }
-  // english bleeds off as the ball rolls
-  if(b.sw) b.sw *= Math.max(0, 1 - SPIN_DECAY*h);
-  if(b.fb) b.fb *= Math.max(0, 1 - SPIN_DECAY*h);
   // direct pocket capture
   const pc = potByGeometry(b);
   if(pc){ potBall(b); return; }
@@ -340,7 +333,7 @@ function stepBall(b, h){
       b.y = R;
       if(b.vy < 0){
         sndCush(Math.abs(b.vy)/420);
-        b.vy = -b.vy*CUSH; b.vx = b.vx*0.96 + (b.sw||0)*Math.abs(b.vy)*0.30; b.sw *= 0.65;
+        b.vy = -b.vy*CUSH; b.vx *= 0.96;
       }
     }
   }
@@ -351,7 +344,7 @@ function stepBall(b, h){
       b.y = PH-R;
       if(b.vy > 0){
         sndCush(Math.abs(b.vy)/420);
-        b.vy = -b.vy*CUSH; b.vx = b.vx*0.96 - (b.sw||0)*Math.abs(b.vy)*0.30; b.sw *= 0.65;
+        b.vy = -b.vy*CUSH; b.vx *= 0.96;
       }
     }
   }
@@ -362,7 +355,7 @@ function stepBall(b, h){
       b.x = R;
       if(b.vx < 0){
         sndCush(Math.abs(b.vx)/420);
-        b.vx = -b.vx*CUSH; b.vy = b.vy*0.96 - (b.sw||0)*Math.abs(b.vx)*0.30; b.sw *= 0.65;
+        b.vx = -b.vx*CUSH; b.vy *= 0.96;
       }
     }
   }
@@ -373,54 +366,69 @@ function stepBall(b, h){
       b.x = PW-R;
       if(b.vx > 0){
         sndCush(Math.abs(b.vx)/420);
-        b.vx = -b.vx*CUSH; b.vy = b.vy*0.96 + (b.sw||0)*Math.abs(b.vx)*0.30; b.sw *= 0.65;
+        b.vx = -b.vx*CUSH; b.vy *= 0.96;
       }
     }
   }
 }
 
-function collisions(){
+/* The moment two balls touch inside one step. Resolving there instead of
+   wherever the step happened to land makes the contact normal a property of the
+   aim alone: pace and sub-degree aim changes no longer move the ball you aimed
+   at, and the guide's ghost ball is the contact the shot really makes. */
+function touchAt(a, b, h){
+  if(a.px === undefined || b.px === undefined) return null;
+  const px = a.px-b.px, py = a.py-b.py;
+  const vx = a.vx-b.vx, vy = a.vy-b.vy;
+  const A = vx*vx + vy*vy;
+  const B = 2*(px*vx + py*vy);
+  const C = px*px + py*py - (R*2)*(R*2);
+  if(C < 0) return 0;                       // already touching: resolve on the spot
+  if(A < 1e-9) return null;
+  const disc = B*B - 4*A*C;
+  if(disc < 0) return null;
+  const t = (-B - Math.sqrt(disc))/(2*A);
+  return t >= 0 && t <= h ? t : null;
+}
+
+function collisions(h){
   for(let i=0;i<balls.length;i++){
     const a = balls[i]; if(!a.alive) continue;
     for(let j=i+1;j<balls.length;j++){
       const b = balls[j]; if(!b.alive) continue;
       let dx = b.x-a.x, dy = b.y-a.y;
       let d = Math.hypot(dx,dy);
-      if(d >= R*2 || d===0) continue;
-      if(d < 0.0001){ dx = 1; dy = 0; d = 1; }
+      if(d >= R*2) continue;
+      const t = touchAt(a, b, h);
+      const rest = t === null ? 0 : h - t;
+      if(t === null){
+        // No sweep explains this overlap — a ball pinned on a cushion, or a
+        // placement — so separate them where they stand.
+        if(d < 0.0001){ dx = 1; dy = 0; d = 1; }
+      } else {
+        a.x = a.px + a.vx*t; a.y = a.py + a.vy*t;
+        b.x = b.px + b.vx*t; b.y = b.py + b.vy*t;
+        dx = b.x-a.x; dy = b.y-a.y; d = Math.hypot(dx,dy) || 1;
+      }
       const nx = dx/d, ny = dy/d;
-      const overlap = R*2 - d;
-      a.x -= nx*overlap/2; a.y -= ny*overlap/2;
-      b.x += nx*overlap/2; b.y += ny*overlap/2;
+      if(t === null){
+        const overlap = R*2 - d;
+        a.x -= nx*overlap/2; a.y -= ny*overlap/2;
+        b.x += nx*overlap/2; b.y += ny*overlap/2;
+      }
       const rel = (a.vx-b.vx)*nx + (a.vy-b.vy)*ny;
       if(rel > 0){
         const imp = rel*(1+BB_E)/2;
-        const cueB = a.id===0 ? a : (b.id===0 ? b : null);
-        const obj  = cueB===a ? b : a;
-        const cvx = cueB ? cueB.vx : 0, cvy = cueB ? cueB.vy : 0;
         a.vx -= nx*imp; a.vy -= ny*imp;
         b.vx += nx*imp; b.vy += ny*imp;
-        // Follow and draw carry the cue through the contact. English must not
-        // throw the object ball: it leaves along the contact normal whatever
-        // spin was chosen, so the guide's object line is the real one. The cue
-        // takes a small nudge and the object carries the spin into a cushion.
-        if(cueB){
-          const cs = Math.hypot(cvx, cvy) || 1;
-          if(cueB.fb){
-            cueB.vx += (cvx/cs)*cueB.fb*imp*SPIN_FOLLOW;
-            cueB.vy += (cvy/cs)*cueB.fb*imp*SPIN_FOLLOW;
-          }
-          if(cueB.sw){
-            const px = -cvy/cs, py = cvx/cs;
-            cueB.vx -= px*cueB.sw*imp*0.12;
-            cueB.vy -= py*cueB.sw*imp*0.12;
-            obj.sw = cueB.sw*0.45; obj.fb = 0;
-          }
-        }
         if(firstHit === null && (a.id===0 || b.id===0)){
           firstHit = (a.id===0 ? b.id : a.id);
         }
         sndClick(imp/330);
+      }
+      if(rest > 0){
+        a.x += a.vx*rest; a.y += a.vy*rest;
+        b.x += b.vx*rest; b.y += b.vy*rest;
       }
     }
   }
@@ -440,9 +448,6 @@ function strike(pow){
   const v = MAXPOWER*pow;
   c.vx = Math.cos(aimAngle)*v;
   c.vy = Math.sin(aimAngle)*v;
-  const bite = Math.min(1, pow*1.35);      // a soft tap spins less than a full stroke
-  c.sw = (spin.x||0)*0.90*bite;
-  c.fb = (spin.y||0)*0.90*bite;
   state = 'run';
   firstHit = null;
   pottedThisShot = [];
@@ -453,9 +458,9 @@ function strike(pow){
 /* ================= aim preview ================= */
 /* The guide is the shot: the cue ball is rolled forward on a throwaway copy with
    the same integrator, so the line is exactly as long as the ball will travel.
-   English does not bend it — the cue ball leaves along the aim line, so the line
-   and the ghost ball stay put while power and spin are adjusted. It stops where
-   the cue ball runs out of pace, meets another ball, or drops. */
+   The contact is solved, not sampled, so the ghost ball sits exactly where the
+   real ball will be met and the object line points where it will go. The line
+   stops where the cue ball runs out of pace, meets a ball, or drops. */
 function guideShot(){
   const cpu = (state==='cpu' || state==='cpu-wait');
   return {pw: cpu ? (cpuShot !== null ? cpuShot : 0.4) : power};
@@ -478,6 +483,13 @@ function previewPath(){
       for(const o of balls){
         if(!o.alive || o.id===0) continue;
         if(Math.hypot(o.x-probe.x, o.y-probe.y) < R*2){
+          // wind the probe back to the exact touch, so the ghost ball and the
+          // object line are the contact the shot makes
+          const t = touchAt(probe, {px:o.x, py:o.y, vx:0, vy:0}, dt);
+          if(t !== null){
+            probe.x = probe.px + probe.vx*t;
+            probe.y = probe.py + probe.vy*t;
+          }
           hit = o; contact = {x:probe.x, y:probe.y};
           break;
         }
@@ -684,6 +696,7 @@ function simPotGeo(b){
   return null;
 }
 function simStep(b, h, potted, cueState, isCue){
+  b.px = b.x; b.py = b.y;
   b.x += b.vx*h; b.y += b.vy*h;
   const s = Math.hypot(b.vx, b.vy);
   if(s > 0){
@@ -754,17 +767,32 @@ function simulateShot(layout, angle, power){
         let dx = b.x-a.x, dy = b.y-a.y;
         let d = Math.hypot(dx,dy);
         if(d >= R*2) continue;
-        if(d < 0.0001){ dx = 1; dy = 0; d = 1; }
+        // same resolved contact as the table, so the plan matches the shot
+        const t = touchAt(a, b, SIM_STEP);
+        const rest = t === null ? 0 : SIM_STEP - t;
+        if(t === null){
+          if(d < 0.0001){ dx = 1; dy = 0; d = 1; }
+        } else {
+          a.x = a.px + a.vx*t; a.y = a.py + a.vy*t;
+          b.x = b.px + b.vx*t; b.y = b.py + b.vy*t;
+          dx = b.x-a.x; dy = b.y-a.y; d = Math.hypot(dx,dy) || 1;
+        }
         const nx = dx/d, ny = dy/d;
-        const overlap = R*2 - d;
-        a.x -= nx*overlap/2; a.y -= ny*overlap/2;
-        b.x += nx*overlap/2; b.y += ny*overlap/2;
+        if(t === null){
+          const overlap = R*2 - d;
+          a.x -= nx*overlap/2; a.y -= ny*overlap/2;
+          b.x += nx*overlap/2; b.y += ny*overlap/2;
+        }
         const rel = (a.vx-b.vx)*nx + (a.vy-b.vy)*ny;
         if(rel > 0){
           const imp = rel*(1+BB_E)/2;
           a.vx -= nx*imp; a.vy -= ny*imp;
           b.vx += nx*imp; b.vy += ny*imp;
           if(firstHit === null && (a.id===0 || b.id===0)) firstHit = (a.id===0 ? b.id : a.id);
+        }
+        if(rest > 0){
+          a.x += a.vx*rest; a.y += a.vy*rest;
+          b.x += b.vx*rest; b.y += b.vy*rest;
         }
       }
     }
@@ -1102,21 +1130,18 @@ function toWorld(sx, sy){
 }
 const HUD_H = 46;
 const railW = () => (SW < 620 ? 66 : 92);
-/* The side rail holds the whole shot: english at the top, the power meter down the
-   middle, shoot at the bottom. Putting it beside the table leaves the felt the full
-   height of the screen. */
+/* The side rail holds the whole shot: the power meter down the middle, shoot at
+   the bottom. Putting it beside the table leaves the felt the full height of the
+   screen. */
 function ctrlLayout(){
   const compact = SW < 620;
   const w = railW(), x0 = SW - w, pad = compact ? 8 : 12;
-  const spinR = compact ? 18 : 23;
-  const spinLabelY = HUD_H + (compact ? 13 : 16);
-  const spin = {x: x0 + w/2, y: spinLabelY + (compact ? 9 : 11) + spinR, r: spinR};
   const shootH = compact ? 36 : 40;
   const shoot = {x: x0 + pad, y: SH - pad - shootH, w: w - pad*2, h: shootH};
-  const powerLabelY = spin.y + spinR + (compact ? 24 : 30);
-  const track = {x: x0 + w/2, y0: powerLabelY + (compact ? 26 : 30),
+  const powerLabelY = HUD_H + (compact ? 20 : 26);
+  const track = {x: x0 + w/2, y0: powerLabelY + (compact ? 28 : 34),
                  y1: Math.max(powerLabelY + 110, shoot.y - (compact ? 26 : 32)), w: compact ? 5 : 6};
-  return {compact, w, x0, pad, spin, shoot, track, spinLabelY, powerLabelY};
+  return {compact, w, x0, pad, shoot, track, powerLabelY};
 }
 
 function viewParams(){
@@ -1147,7 +1172,6 @@ cv.addEventListener('pointerdown', e => {
   if(x >= CTRL.x0 && (state==='aim' || state==='hand')){
     if(state==='aim'){
       if(hitRect(CTRL.shoot, x, y)) shootNow();
-      else if(hitCircle(CTRL.spin, x, y)){ dragSpin = true; setSpinFromPoint(x, y); sndSpin(); }
       else if(hitTrack(x, y)){ dragSlider = true; setPowerFromY(y); }
     }
     e.preventDefault();
@@ -1175,7 +1199,6 @@ cv.addEventListener('pointerdown', e => {
 cv.addEventListener('pointermove', e => {
   const x = e.clientX, y = e.clientY;
   if(dragSlider){ setPowerFromY(y); return; }
-  if(dragSpin){ setSpinFromPoint(x, y); return; }
   if(state==='aim' && aimMode && x < CTRL.x0){
     ptr.x = x; ptr.y = y;
     updateAimFromPointer();
@@ -1184,12 +1207,12 @@ cv.addEventListener('pointermove', e => {
   }
 });
 window.addEventListener('pointerup', e => {
-  if(dragSlider || dragSpin){ dragSlider = dragSpin = false; return; }
+  if(dragSlider){ dragSlider = false; return; }
   if(!ptr.down) return;
   ptr.down = false;
   if(state==='hand'){
     if(handOK && handValid(handX, handY)){
-      const c = cue(); c.x = handX; c.y = handY; c.alive = true; c.vx=c.vy=0; c.sw=c.fb=0;
+      const c = cue(); c.x = handX; c.y = handY; c.alive = true; c.vx=c.vy=0;
       state = 'aim';
       aimAngle = Math.atan2(PH/2-c.y, PW/2-c.x);
       toast('Cue ball placed — aim and shoot', 'good', 1200);
@@ -1200,11 +1223,10 @@ window.addEventListener('pointerup', e => {
   }
 });
 window.addEventListener('pointercancel', () => {
-  dragSlider = dragSpin = false; ptr.down = false;
+  dragSlider = false; ptr.down = false;
 });
 
 function shootNow(){ if(state==='aim' && power > 0.03) strike(power); }
-function hitCircle(c, x, y){ return Math.hypot(x-c.x, y-c.y) <= c.r + 14; }
 function hitRect(r, x, y){ return x >= r.x-8 && x <= r.x+r.w+8 && y >= r.y-8 && y <= r.y+r.h+8; }
 function hitTrack(x, y){
   return x >= CTRL.x0 && y >= CTRL.track.y0-16 && y <= CTRL.track.y1+16;
@@ -1213,15 +1235,6 @@ function setPowerFromY(y){
   const t = (CTRL.track.y1 - y)/Math.max(1, CTRL.track.y1 - CTRL.track.y0);
   power = Math.max(0.05, Math.min(1, t));   // never a dead slider
 }
-function setSpinFromPoint(x, y){
-  if(online) return;
-  const s = CTRL.spin;
-  let ox = (x - s.x)/(s.r*0.86), oy = (s.y - y)/(s.r*0.86);
-  const d = Math.hypot(ox, oy);
-  if(d > 0.80){ ox = ox/d*0.80; oy = oy/d*0.80; }
-  spin.x = ox; spin.y = oy;
-}
-
 function updateAimFromPointer(){
   const c = cue(); if(!c || !c.alive) return;
   const w = toWorld(ptr.x, ptr.y);
@@ -1229,8 +1242,7 @@ function updateAimFromPointer(){
   if(Math.hypot(dx,dy) > R*1.7) aimAngle = Math.atan2(dy, dx);
 }
 
-/* Arrows set the pace, WASD walks the contact point around the cue ball. */
-const SPIN_KEY = {w:[0,1], s:[0,-1], a:[-1,0], d:[1,0]};
+/* Arrows set the pace; the felt sets the line. */
 window.addEventListener('keydown', e => {
   if(state!=='aim') return;
   const k = e.key;
@@ -1242,12 +1254,6 @@ window.addEventListener('keydown', e => {
   if(k==='ArrowLeft' || k==='ArrowRight'){
     aimAngle += k==='ArrowLeft' ? -0.006 : 0.006;
     e.preventDefault(); return;
-  }
-  const nudge = SPIN_KEY[k.toLowerCase()];
-  if(nudge && !online){
-    spin.x = Math.max(-0.8, Math.min(0.8, spin.x + nudge[0]*0.16));
-    spin.y = Math.max(-0.8, Math.min(0.8, spin.y + nudge[1]*0.16));
-    e.preventDefault();
   }
 });
 
@@ -1292,12 +1298,10 @@ window.__test = {
   mode: () => mode,
   diff: () => difficulty,
   power: () => power,
-  spin: () => ({x:spin.x, y:spin.y}),
   aim: () => aimAngle,
   aiming: () => aimMode,
   locked: () => aimLocked,
   setPower: p => { power = Math.max(0, Math.min(1, p)); },
-  setSpin: (x, y) => { spin.x = Math.max(-.8, Math.min(.8, x)); spin.y = Math.max(-.8, Math.min(.8, y)); },
   shoot: () => shootNow(),
   frame: (n)=>{ for(let i=0;i<(n||1);i++){ tick(1/60); } },
   balls: () => balls.map(b=>({id:b.id, alive:b.alive, x:+b.x.toFixed(1), y:+b.y.toFixed(1), vx:+b.vx.toFixed(2), vy:+b.vy.toFixed(2)})),
@@ -1606,11 +1610,8 @@ function drawCueStick(){
   const swing = (state==='cpu' || state==='cpu-wait') ? (cpuShot !== null ? cpuShot : 0.4) : power;
   const pull = 2 + swing*16;
   const len = 72;
-  // the tip meets the ball at the contact point, so english sits the stick off-centre
-  const rx = -Math.sin(aimAngle), ry = Math.cos(aimAngle);
-  const side = (spin.x||0)*R*0.85;
-  const bx = c.x + Math.cos(back)*(R*1.2 + pull) + rx*side;
-  const by = c.y + Math.sin(back)*(R*1.2 + pull) + ry*side;
+  const bx = c.x + Math.cos(back)*(R*1.2 + pull);
+  const by = c.y + Math.sin(back)*(R*1.2 + pull);
   const ex = bx + Math.cos(back)*len;
   const ey = by + Math.sin(back)*len;
   // tappered shaft: draw as polygon
@@ -1635,15 +1636,6 @@ function drawCueStick(){
   ctx.beginPath(); ctx.arc(tx + ux*0.6, ty + uy*0.6, w1*0.95, 0, Math.PI*2);
   ctx.fillStyle = '#6fa8d8'; ctx.fill();
   ctx.beginPath(); ctx.arc(bx, by, w1*0.55, 0, Math.PI*2); ctx.fillStyle='#0c0c0d'; ctx.fill();
-  // contact point on the ball, so the english you picked is visible at the table
-  if(hasSpin()){
-    const ax = Math.cos(aimAngle), ay = Math.sin(aimAngle);
-    const mx = c.x + rx*side*0.72 + ax*(spin.y||0)*R*0.72;
-    const my = c.y + ry*side*0.72 + ay*(spin.y||0)*R*0.72;
-    ctx.beginPath(); ctx.arc(mx, my, R*0.3, 0, Math.PI*2);
-    ctx.fillStyle = '#cf4a42'; ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 0.5; ctx.stroke();
-  }
   ctx.lineCap='butt';
 }
 
@@ -1734,12 +1726,11 @@ function drawHUD(ox, oy, scale){
   if(!compact){
     let hint = '';
     if(state==='aim'){
-      hint = aimLocked ? 'angle set \u2014 shoot when ready \u00b7 arrows power \u00b7 wasd english'
+      hint = aimLocked ? 'angle set \u2014 shoot when ready \u00b7 arrows power'
            : aimMode   ? 'move to aim \u2014 click again to set the angle'
-           :             'click the felt to aim \u00b7 arrows power \u00b7 wasd english';
+           :             'click the felt to aim \u00b7 arrows power';
     }
     if(hint){
-      if(online) hint=hint.replace(' · wasd english','');
       ctx.font='500 11px system-ui, sans-serif';
       ctx.fillStyle='rgba(255,255,255,.26)';
       ctx.textAlign='center'; ctx.textBaseline='alphabetic';
@@ -1747,8 +1738,6 @@ function drawHUD(ox, oy, scale){
     }
   }
 }
-
-const hasSpin = () => Math.abs(spin.x) > 0.02 || Math.abs(spin.y) > 0.02;
 
 function drawControls(){
   const L = ctrlLayout();
@@ -1763,26 +1752,7 @@ function drawControls(){
   const live = state==='aim';
   ctx.globalAlpha = live ? 1 : .42;
   ctx.textBaseline = 'middle';
-  const cx = L.spin.x;
-
-  // ---- english
-  const s = L.spin;
-  ctx.font='600 9.5px system-ui, sans-serif';
-  ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,.42)';
-  ctx.fillText(online?'NO SPIN':'SPIN', cx, L.spinLabelY);
-  ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
-  ctx.fillStyle = '#efece2'; ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.strokeStyle = 'rgba(0,0,0,.16)'; ctx.lineWidth = .8;
-  ctx.beginPath();
-  ctx.moveTo(s.x - s.r*.82, s.y); ctx.lineTo(s.x + s.r*.82, s.y);
-  ctx.moveTo(s.x, s.y - s.r*.82); ctx.lineTo(s.x, s.y + s.r*.82);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(s.x, s.y, s.r*.34, 0, Math.PI*2); ctx.strokeStyle = 'rgba(0,0,0,.12)'; ctx.stroke();
-  const dx = s.x + spin.x*s.r*.72, dy = s.y - spin.y*s.r*.72;
-  ctx.beginPath(); ctx.arc(dx, dy, s.r*.24, 0, Math.PI*2);
-  ctx.fillStyle = '#cf4a42'; ctx.fill();
+  const cx = L.track.x;
 
   // ---- power, filled from the bottom up
   ctx.font='600 9.5px system-ui, sans-serif';
@@ -1827,13 +1797,13 @@ function restoreOnline(){
     return {...ball(id),...(position||{}),alive:!!position};
   });
   mode='2p'; turn=match.seat-1; groups=saved.groups.slice();
-  openTable=!groups[0]; breakShot=saved.breakShot; spin={x:0,y:0};
-  aimMode=aimLocked=dragSlider=dragSpin=false;
+  openTable=!groups[0]; breakShot=saved.breakShot;
+  aimMode=aimLocked=dragSlider=false;
   for(const id of ['menu','diff','over']) document.getElementById(id).classList.add('hidden');
   state=match.canPlay?'aim':'online-wait';
   if(match.canPlay && saved.ballInHand) beginHand();
   else if(match.canPlay) aimAngle=Math.atan2(PH/2-cue().y,PW/2-cue().x);
-  toast(match.canPlay?'Your turn · no spin in online pool':'Their turn · game saved',null,2200);
+  toast(match.canPlay?'Your turn':'Their turn · game saved',null,2200);
 }
 async function animateOnlineShot(saved,move,seat){
   const engine=await import(online.engineURL);
@@ -1855,7 +1825,7 @@ async function animateOnlineShot(saved,move,seat){
 }
 async function saveOnlineShot(move){
   const saved=online.context.state, seat=online.context.seat;
-  state='online-saving'; aimMode=aimLocked=dragSlider=dragSpin=false;
+  state='online-saving'; aimMode=aimLocked=dragSlider=false;
   sndCue(move.power/100);
   const [result]=await Promise.allSettled([online.submit(move),animateOnlineShot(saved,move,seat)]);
   if(result.status==='rejected'){
@@ -1877,7 +1847,7 @@ function tick(dt){
     const SUB = Math.max(5, Math.min(26, Math.ceil(fast*dt/(R*0.45)))), h = dt/SUB;
     for(let s=0;s<SUB && state==='run';s++){
       for(const b of balls){ if(b.alive) stepBall(b, h); }
-      collisions();
+      collisions(h);
     }
     if(!anyMoving()){
       // settle

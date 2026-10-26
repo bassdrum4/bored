@@ -85,9 +85,9 @@ same rule, so a legal pot that keeps the shooter at the table keeps the game
 private until their turn actually ends. `resign` on an undelivered game deletes
 it rather than awarding the opponent a win they never saw.
 
-Pool v1 continues to use the previously shipped zero-spin house rules, with no
-called pockets or rail-after-contact requirement. Its original spin control is
-labeled **NO SPIN** and disabled for online play. An 8 on the break re-racks;
+Pool v1 uses zero-spin house rules, with no called pockets or rail-after-contact
+requirement. The game no longer offers a spin control at all: the cue ball leaves
+along the aim, so both seats in a match see the same shot. An 8 on the break re-racks;
 an early/fouled 8 loses. Prediction uses the same canonical engine as validation
 and is drawn by the original game; it never supplies a result to the backend.
 Timer-based animation settles even if an embed stops receiving animation frames.

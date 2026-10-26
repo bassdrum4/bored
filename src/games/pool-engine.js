@@ -34,7 +34,20 @@ export function defaultCuePlacement(balls){
  }
  throw new Error('No cue-ball placement available.');
 }
+// The moment two balls touch inside one step. Resolving there, not wherever the
+// step landed, makes the contact a function of the aim alone rather than of pace.
+function touchAt(a,b,h){
+ const px=a.px-b.px,py=a.py-b.py,vx=a.vx-b.vx,vy=a.vy-b.vy;
+ const A=vx*vx+vy*vy,B=2*(px*vx+py*vy),C=px*px+py*py-(R*2)*(R*2);
+ if(C<0)return 0;
+ if(A<1e-9)return null;
+ const disc=B*B-4*A*C;
+ if(disc<0)return null;
+ const t=(-B-Math.sqrt(disc))/(2*A);
+ return t>=0&&t<=h?t:null;
+}
 function stepBall(b,potted){
+ b.px=b.x;b.py=b.y;
  b.x+=b.vx*DT;b.y+=b.vy*DT;
  const speed=Math.hypot(b.vx,b.vy);
  if(speed>0){const ns=speed*Math.max(0,1-DT);b.vx*=ns/speed;b.vy*=ns/speed;}
@@ -62,11 +75,15 @@ export function simulatePoolShot(layout,angle,power,{trace=false}={}){
    for(let j=i+1;j<bs.length;j++){
     const b=bs[j];if(!b.alive)continue;
     let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d>=R*2)continue;
-    if(d<.0001){dx=1;dy=0;d=1;}
-    const nx=dx/d,ny=dy/d,overlap=R*2-d;
-    a.x-=nx*overlap/2;a.y-=ny*overlap/2;b.x+=nx*overlap/2;b.y+=ny*overlap/2;
+    const t=touchAt(a,b,DT),rest=t===null?0:DT-t;
+    if(t===null){if(d<.0001){dx=1;dy=0;d=1;}}
+    else{a.x=a.px+a.vx*t;a.y=a.py+a.vy*t;b.x=b.px+b.vx*t;b.y=b.py+b.vy*t;
+      dx=b.x-a.x;dy=b.y-a.y;d=Math.hypot(dx,dy)||1;}
+    const nx=dx/d,ny=dy/d;
+    if(t===null){const overlap=R*2-d;a.x-=nx*overlap/2;a.y-=ny*overlap/2;b.x+=nx*overlap/2;b.y+=ny*overlap/2;}
     const rel=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;
     if(rel>0){const imp=rel*(1+.94)/2;a.vx-=nx*imp;a.vy-=ny*imp;b.vx+=nx*imp;b.vy+=ny*imp;if(firstHit===null&&(a.id===0||b.id===0))firstHit=a.id===0?b.id:a.id;}
+    if(rest>0){a.x+=a.vx*rest;a.y+=a.vy*rest;b.x+=b.vx*rest;b.y+=b.vy*rest;}
    }
   }
   if(trace&&n%10===0)capture();

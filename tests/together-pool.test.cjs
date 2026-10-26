@@ -3,7 +3,7 @@ const {database,call,as,ids,enroll,serviceCommit,poolHandler:localHandler}=requi
 const engine=()=>import('../src/games/pool-engine.js');
 function oldSimulator(){
  const source=fs.readFileSync(path.join(__dirname,'../src/games/content/8ball.html'),'utf8');
- const names=['simPotGeo','simStep','simulateShot','inCornerTL','inCornerTR','inCornerBL','inCornerBR','inSideT','inSideB','inLeft','inRight'];
+ const names=['simPotGeo','simStep','touchAt','simulateShot','inCornerTL','inCornerTR','inCornerBL','inCornerBR','inSideT','inSideB','inLeft','inRight'];
  const extract=name=>{const start=source.indexOf('function '+name+'(');let end=source.indexOf('{',start),depth=1;while(depth&&++end<source.length){if(source[end]==='{')depth++;if(source[end]==='}')depth--;}return source.slice(start,end+1);};
  const setup=`const PW=220,PH=110,R=3.05,FRICTION=1,CUSH=.72,BB_E=.94,STOPV=9,MAXPOWER=780,SIM_STEP=1/300,JAW=4.7,SIDEGAP=3.9;
  const POCKETS=[{x:0,y:0,r:5.6},{x:220,y:0,r:5.6},{x:0,y:110,r:5.6},{x:220,y:110,r:5.6},{x:110,y:-1.1,r:5.1},{x:110,y:111.1,r:5.1}];`;

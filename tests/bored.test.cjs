@@ -1010,20 +1010,16 @@ test('browser regressions', async t => {
     await page.evaluate(() => localStorage.removeItem('bored.high.8ball'));
   });
 
-  await t.test('8 Ball english and power leave the shot line alone', async () => {
+  await t.test('8 Ball keeps the shot line steady as power and aim change', async () => {
     const frame = await openTitle('8ball', '8 Ball');
     await frame.waitForFunction(() => typeof window.__test?.balls === 'function');
-    // Straight in: cue at 40, object at 90, both on y=55, aim along +x. Whatever
-    // english or power is picked, the cue must leave along the aim and the
-    // object ball must leave along the contact normal.
-    const trials = await frame.evaluate(() => {
-      const trial = (spinX, spinY, power) => {
-        __8ball.setup({ groups: ['solid', 'stripe'], openTable: false, breakShot: false,
-          balls: [{ id: 0, x: 40, y: 55 }, { id: 1, x: 90, y: 55 }] });
-        __test.setSpin(spinX, spinY);
-        __test.setPower(power);
-        __test.set(0, power);
-        __test.frame(1);
+    const out = await frame.evaluate(() => {
+      const R = 3.05, CUE = { x: 40, y: 55 }, OBJ = { x: 90, y: 55 };
+      const table = () => [{ id: 0, ...CUE }, { id: 1, ...OBJ }];
+      const setup = () => __8ball.setup({ groups: ['solid', 'stripe'], openTable: false, breakShot: false, balls: table() });
+      // Fire the shot and read the object ball's direction the moment it moves.
+      const fire = (angle, power) => {
+        setup(); __test.set(angle, power); __test.frame(1);
         const cue = __test.balls().find(b => b.id === 0);
         let objectAngle = null;
         for (let i = 0; i < 120 && objectAngle === null; i++) {
@@ -1031,16 +1027,50 @@ test('browser regressions', async t => {
           const object = __test.balls().find(b => b.id === 1);
           if (Math.hypot(object.vx, object.vy) > 1) objectAngle = Math.atan2(object.vy, object.vx) * 180 / Math.PI;
         }
-        return { spinX, spinY, power, cueAngle: Math.atan2(cue.vy, cue.vx) * 180 / Math.PI, objectAngle };
+        return { cueAngle: Math.atan2(cue.vy, cue.vx) * 180 / Math.PI, objectAngle };
       };
-      return [trial(0, 0, 0.3), trial(0.8, 0, 0.3), trial(0.8, 0, 1), trial(-0.8, 0, 1), trial(0.8, 0.8, 1)];
+      // Where a cut must touch: the cue centre two radii behind the ball, on the
+      // aim line. Any sampled contact drifts off this as the step size changes.
+      const contactFor = angle => {
+        const dx = Math.cos(angle), dy = Math.sin(angle);
+        const along = (OBJ.x - CUE.x) * dx + (OBJ.y - CUE.y) * dy;
+        const cx = CUE.x + dx * along, cy = CUE.y + dy * along;
+        const px = OBJ.x - cx, py = OBJ.y - cy, gap = Math.hypot(px, py);
+        const back = Math.sqrt(Math.max(0, (R * 2) ** 2 - gap ** 2));
+        return { x: cx - dx * back, y: cy - dy * back };
+      };
+      const powers = [0.3, 0.55, 1].map(power => ({ power, ...fire(1 * Math.PI / 180, power) }));
+      const cuts = [];
+      for (const deg of [-6, -3, -1, 0, 1, 3, 6]) {
+        const angle = deg * Math.PI / 180;
+        setup(); __test.set(angle, 0); __test.setPower(0.55);
+        const guide = __8ball.guide();
+        cuts.push({ deg, end: guide && guide.end, hit: guide && guide.hit, want: contactFor(angle) });
+      }
+      // A sub-degree sweep must move the object ball in even steps, never jump.
+      const sweep = [];
+      for (let deg = -0.3; deg <= 0.3001; deg += 0.05) sweep.push(fire(deg * Math.PI / 180, 0.7).objectAngle);
+      return { powers, cuts, sweep, spinControl: typeof __test.setSpin };
     });
-    for (const shot of trials) {
-      const where = 'spin ' + shot.spinX + '/' + shot.spinY + ' at power ' + shot.power;
-      assert.ok(Math.abs(shot.cueAngle) < 1e-6, 'the cue ball leaves along the aim at ' + where + ': ' + shot.cueAngle);
-      assert.ok(shot.objectAngle !== null, 'the object ball is struck at ' + where);
-      assert.ok(Math.abs(shot.objectAngle) < 1e-6, 'english does not change the hit angle at ' + where + ': ' + shot.objectAngle);
+    assert.equal(out.spinControl, 'undefined', 'the english control is gone');
+    for (const shot of out.powers) {
+      // __test.balls() rounds to hundredths, which is worth ~0.001 degrees here.
+      assert.ok(Math.abs(shot.cueAngle - 1) < 0.01, 'the cue ball leaves along the aim at power ' + shot.power + ': ' + shot.cueAngle);
+      assert.ok(shot.objectAngle !== null, 'the object ball is struck at power ' + shot.power);
+      assert.ok(Math.abs(shot.objectAngle - out.powers[0].objectAngle) < 0.02,
+        'power does not change the hit angle: ' + shot.power + ' gives ' + shot.objectAngle + ', 0.3 gives ' + out.powers[0].objectAngle);
     }
+    for (const cut of out.cuts) {
+      assert.ok(cut.hit === 1, 'the guide finds the ball at ' + cut.deg + ' degrees');
+      assert.ok(Math.hypot(cut.end.x - cut.want.x, cut.end.y - cut.want.y) < 0.2,
+        'the guide touches at the real contact at ' + cut.deg + ' degrees: ' + JSON.stringify(cut.end) + ' vs ' + JSON.stringify(cut.want));
+    }
+    // Every 0.05 degrees of aim must move the object ball by the same amount: a
+    // sampled contact would show gaps and doubled steps instead.
+    const gaps = out.sweep.slice(1).map((angle, i) => Math.abs(angle - out.sweep[i]));
+    const median = [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)];
+    assert.ok(Math.min(...gaps) > median * 0.7, 'the object ball always moves with the aim: ' + JSON.stringify(gaps.map(g => +g.toFixed(3))));
+    assert.ok(Math.max(...gaps) < median * 1.4, 'the aim steps evenly instead of jumping: ' + JSON.stringify(gaps.map(g => +g.toFixed(3))));
     await close();
   });
 
