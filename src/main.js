@@ -135,6 +135,7 @@ function closeMenu(options) {
 }
 
 const analytics = createAnalytics({ frame: gameFrame, snapshot: snapshotFor, score: scoreValue, isLower: slug => !!LB_GAMES.find(g => g.id === slug)?.lower, paused: () => !menuPanel.hidden });
+window.addEventListener('bored:together-telemetry', event => analytics.track(event.detail?.kind, event.detail));
 gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXTERNS[activeSlug]); });
 
 function restartGame() {
@@ -225,7 +226,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   activeSlug = previousSlug = slug;
   const from = origin || document.activeElement;
   const launchSource = challenge ? 'daily' : from?.closest?.('#recent') ? 'recent' : from?.closest?.('#leaderboard') ? 'leaderboard' : from?.id === 'random' ? 'random' : from?.closest?.('#grid') ? 'library' : 'other';
-  analytics.start(slug, { source: launchSource, daily: !!challenge, external: !!external, embedded: isEmbedded(), device: matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop' });
+  analytics.start(slug, { source: multiplayer ? 'together' : launchSource, daily: !!challenge, external: !!external, embedded: isEmbedded(), device: matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop' });
   recentGames = [slug, ...recentGames.filter(id => id !== slug)].slice(0, 4);
   saveLibrary();
   renderRecent();
