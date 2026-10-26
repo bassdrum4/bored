@@ -38,8 +38,11 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   let visitor = enabled ? getVisitorId() : null;
   let detach = () => {}, lastFlush = now();
   const owner = () => getSession()?.user?.id || null;
-  const input = () => {
-    lastInput = now();
+  const input = () => { lastInput = now(); };
+  // Only an input inside the game's iframe proves engagement. Hub buttons,
+  // menu keys and feedback dialogs must never count as playing the game.
+  const gameInput = () => {
+    input();
     if (run?.ready && !run.context.external && !run.interacted) {
       run.interacted = true;
       emit('interaction');
@@ -141,9 +144,9 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     try {
       const doc = frame.contentDocument;
       const types = ['pointerdown', 'keydown', 'touchstart'];
-      types.forEach(type => doc.addEventListener(type, input, { passive: true }));
+      types.forEach(type => doc.addEventListener(type, gameInput, { passive: true }));
       detach = () => {
-        types.forEach(type => doc.removeEventListener(type, input));
+        types.forEach(type => doc.removeEventListener(type, gameInput));
       };
     } catch {}
   }
