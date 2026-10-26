@@ -171,6 +171,6 @@ test('browser test telemetry is answered locally instead of reaching live analyt
   handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/product_events'));
   handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/enjoyment_feedback'));
   handler(request('http://127.0.0.1/index.html'));
-  assert.equal(replied, 5);
+  assert.equal(replied, 7);
   assert.equal(continued, 1);
 });

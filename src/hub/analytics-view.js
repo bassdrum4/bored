@@ -35,7 +35,7 @@ function renderEngagement(rows) {
   const selected = $('#person').value;
   const products = productEvents.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
   const feedback = surveyRows.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
-  const data = summarizeEngagement(rows, products, feedback);
+  const data = summarizeEngagement(rows, products, feedback, new Date($('#through').value + 'T23:59:59Z'));
   const percent = (numerator, denominator) => denominator ? Math.round(numerator / denominator * 100) + '%' : 'Not enough history';
   const stats = [
     ['Visitors with an ID', data.uniqueVisitors], ['Meaningful sessions', data.meaningful],
