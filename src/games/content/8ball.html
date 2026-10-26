@@ -108,8 +108,6 @@ const CUSH = 0.72;                 // cushion restitution
 const BB_E = 0.94;                 // ball-ball restitution
 const STOPV = 9;                   // snapshot stop speed
 const MAXPOWER = 780;              // px/s at a full slider: a break, not a nudge
-const SPIN_CURVE = 0.55;           // side spin bends the cue ball's line
-const SPIN_THROW = 0.38;           // side spin throws the object ball off line
 const SPIN_FOLLOW = 0.90;          // top/bottom spin carries the cue through contact
 const SPIN_DECAY = 1.8;            // how fast english dies on the cloth
 const D2R = Math.PI/180;
@@ -321,12 +319,9 @@ function stepBall(b, h){
   // integrate
   b.x += b.vx*h; b.y += b.vy*h;
   const s = Math.hypot(b.vx, b.vy);
-  // side spin bends the line: the ball is still spinning on its vertical axis
-  if(s > 0 && b.sw){
-    const px = -b.vy/s, py = b.vx/s;
-    const acc = b.sw * s * SPIN_CURVE;
-    b.vx += px*acc*h; b.vy += py*acc*h;
-  }
+  // English never bends the line of travel: the cue ball leaves along the aim
+  // and only the strike point changes what happens after contact. Anything else
+  // makes power and spin move the ball you were aiming at.
   // friction
   if(s > 0){
     const ns = s * Math.max(0, 1 - FRICTION*h);
@@ -405,7 +400,10 @@ function collisions(){
         const cvx = cueB ? cueB.vx : 0, cvy = cueB ? cueB.vy : 0;
         a.vx -= nx*imp; a.vy -= ny*imp;
         b.vx += nx*imp; b.vy += ny*imp;
-        // follow and draw carry the cue through the contact; english throws the object
+        // Follow and draw carry the cue through the contact. English must not
+        // throw the object ball: it leaves along the contact normal whatever
+        // spin was chosen, so the guide's object line is the real one. The cue
+        // takes a small nudge and the object carries the spin into a cushion.
         if(cueB){
           const cs = Math.hypot(cvx, cvy) || 1;
           if(cueB.fb){
@@ -414,8 +412,6 @@ function collisions(){
           }
           if(cueB.sw){
             const px = -cvy/cs, py = cvx/cs;
-            obj.vx += px*cueB.sw*imp*SPIN_THROW;
-            obj.vy += py*cueB.sw*imp*SPIN_THROW;
             cueB.vx -= px*cueB.sw*imp*0.12;
             cueB.vy -= py*cueB.sw*imp*0.12;
             obj.sw = cueB.sw*0.45; obj.fb = 0;
@@ -456,14 +452,13 @@ function strike(pow){
 
 /* ================= aim preview ================= */
 /* The guide is the shot: the cue ball is rolled forward on a throwaway copy with
-   the same integrator, so the line is exactly as long as the ball will travel and
-   bends exactly as far as the english takes it. It stops where the cue ball runs
-   out of pace, meets another ball, or drops. */
+   the same integrator, so the line is exactly as long as the ball will travel.
+   English does not bend it — the cue ball leaves along the aim line, so the line
+   and the ghost ball stay put while power and spin are adjusted. It stops where
+   the cue ball runs out of pace, meets another ball, or drops. */
 function guideShot(){
   const cpu = (state==='cpu' || state==='cpu-wait');
-  if(cpu) return {pw: cpuShot !== null ? cpuShot : 0.4, sw:0, fb:0};
-  const bite = Math.min(1, power*1.35);
-  return {pw: power, sw:(spin.x||0)*0.90*bite, fb:(spin.y||0)*0.90*bite};
+  return {pw: cpu ? (cpuShot !== null ? cpuShot : 0.4) : power};
 }
 
 function previewPath(){
@@ -472,7 +467,7 @@ function previewPath(){
   const g = guideShot();
   const probe = {x:c.x, y:c.y,
     vx: Math.cos(aimAngle)*MAXPOWER*g.pw, vy: Math.sin(aimAngle)*MAXPOWER*g.pw,
-    sw:g.sw, fb:g.fb, alive:true};
+    alive:true};
   const dt = 1/240, pts = [{x:probe.x, y:probe.y}];
   let hit = null, contact = null, dropped = false;
   PREVIEW = true;

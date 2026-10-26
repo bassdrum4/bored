@@ -1010,6 +1010,40 @@ test('browser regressions', async t => {
     await page.evaluate(() => localStorage.removeItem('bored.high.8ball'));
   });
 
+  await t.test('8 Ball english and power leave the shot line alone', async () => {
+    const frame = await openTitle('8ball', '8 Ball');
+    await frame.waitForFunction(() => typeof window.__test?.balls === 'function');
+    // Straight in: cue at 40, object at 90, both on y=55, aim along +x. Whatever
+    // english or power is picked, the cue must leave along the aim and the
+    // object ball must leave along the contact normal.
+    const trials = await frame.evaluate(() => {
+      const trial = (spinX, spinY, power) => {
+        __8ball.setup({ groups: ['solid', 'stripe'], openTable: false, breakShot: false,
+          balls: [{ id: 0, x: 40, y: 55 }, { id: 1, x: 90, y: 55 }] });
+        __test.setSpin(spinX, spinY);
+        __test.setPower(power);
+        __test.set(0, power);
+        __test.frame(1);
+        const cue = __test.balls().find(b => b.id === 0);
+        let objectAngle = null;
+        for (let i = 0; i < 120 && objectAngle === null; i++) {
+          __test.frame(1);
+          const object = __test.balls().find(b => b.id === 1);
+          if (Math.hypot(object.vx, object.vy) > 1) objectAngle = Math.atan2(object.vy, object.vx) * 180 / Math.PI;
+        }
+        return { spinX, spinY, power, cueAngle: Math.atan2(cue.vy, cue.vx) * 180 / Math.PI, objectAngle };
+      };
+      return [trial(0, 0, 0.3), trial(0.8, 0, 0.3), trial(0.8, 0, 1), trial(-0.8, 0, 1), trial(0.8, 0.8, 1)];
+    });
+    for (const shot of trials) {
+      const where = 'spin ' + shot.spinX + '/' + shot.spinY + ' at power ' + shot.power;
+      assert.ok(Math.abs(shot.cueAngle) < 1e-6, 'the cue ball leaves along the aim at ' + where + ': ' + shot.cueAngle);
+      assert.ok(shot.objectAngle !== null, 'the object ball is struck at ' + where);
+      assert.ok(Math.abs(shot.objectAngle) < 1e-6, 'english does not change the hit angle at ' + where + ': ' + shot.objectAngle);
+    }
+    await close();
+  });
+
   await t.test('game scores feed the high-score entries, and leaving keeps the run', async () => {
     const keys = ['tetris', 'wordle', '8ball', 'poker', 'deep', 'block-blast'].map(id => 'bored.high.' + id);
     await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
