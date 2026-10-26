@@ -25,6 +25,7 @@ import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
+import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
 
 // Keep the original console/test surface available from the bundled file. The
@@ -136,6 +137,7 @@ function closeMenu(options) {
 
 const analytics = createAnalytics({ frame: gameFrame, snapshot: snapshotFor, score: scoreValue, isLower: slug => !!LB_GAMES.find(g => g.id === slug)?.lower, paused: () => !menuPanel.hidden });
 window.addEventListener('bored:together-telemetry', event => analytics.track(event.detail?.kind, event.detail));
+const enjoyment = createEnjoymentUI({ analytics });
 gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXTERNS[activeSlug]); });
 
 function restartGame() {
@@ -320,7 +322,7 @@ function closeGame({ force = false } = {}) {
   // Leaving is not a pause: the run has ended as far as the player is concerned,
   // so a spec that accumulates keeps what it has reached.
   captureBest({ leaving: true });
-  analytics.end('close');
+  const engagement = analytics.end('close');
   const claim = guestClaim;
   guestClaim = null;
   closeMenu();
@@ -331,6 +333,7 @@ function closeGame({ force = false } = {}) {
   playerPanel.hidden = true;
   hubRoot.inert = false;
   document.body.classList.remove('playing');
+  enjoyment.maybePrompt(engagement);
   gameFrame.removeAttribute('src');
   gameFrame.srcdoc = '';
   activeSlug = null;
