@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rooftop Snipers</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; connect-src blob:; worker-src blob:; img-src blob: data:; media-src blob: data:; base-uri 'none'; form-action 'none'">
+<!-- Packaged by scripts/package-rooftop-snipers.mjs. Edit this template, then repack.
+     Upstream: SoBloxsy/rooftop-snipers @ 44aad84ec9c5f70ffb6179ed7f4fa91eb5c824bd
+     Original game credited by upstream to Michael Eichler / New Eich Games.
+__UPSTREAM_LICENSE__
+-->
+<style>
+* { box-sizing: border-box }
+html, body { margin: 0; height: 100%; overflow: hidden }
+body { background: #17191d; color: #f5f2ea; font: 12px/1.5 system-ui, sans-serif }
+main { height: 100%; height: 100dvh; display: flex; flex-direction: column }
+#stage { flex: 1; min-height: 0; position: relative; overflow: hidden; display: grid; place-items: center }
+#game { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 100%; height: 100% }
+#game canvas { display: block; width: 100%; height: 100%; outline: none }
+#cover { position: relative; width: min(360px, 100%); padding: 24px; text-align: center; background: #17191d }
+h1 { margin: 0 0 14px; font-size: 22px }
+p { margin: 10px 0 }
+.muted { color: #b4b5b8 }
+button { color: inherit; background: #252830; border: 1px solid #777b83; border-radius: 3px; padding: 10px 14px; font: inherit; cursor: pointer }
+button:focus-visible { outline: 2px solid #f5f2ea; outline-offset: 2px }
+button:disabled { cursor: wait }
+[hidden] { display: none !important }
+progress { display: block; width: 100%; height: 8px; margin: 16px 0 }
+footer { flex: none; padding: 6px 10px; text-align: center; font-size: 11px; background: #17191d }
+#pads { display: flex; justify-content: space-between; gap: 12px; padding-top: 6px }
+.pad { display: flex; gap: 6px }
+.pad button { min-width: 56px; touch-action: none; user-select: none; -webkit-user-select: none }
+.pad button.on { background: #f5f2ea; color: #17191d }
+@media (pointer: fine) { #pads { display: none } }
+@media (max-height: 420px) { #keys { display: none } #cover { padding: 8px 20px } #cover h1 { font-size: 16px; margin: 0 } }
+</style>
+</head>
+<body>
+<main>
+  <section id="stage" aria-label="Rooftop Snipers game">
+    <div id="game"></div>
+    <div id="cover">
+      <h1>Rooftop Snipers</h1>
+      <p>The original two-button rooftop duel.<br>Play the computer or share a keyboard.</p>
+      <p class="muted">W jumps. Hold E to aim, release to shoot.<br>Player two uses I and O.</p>
+      <button type="button" id="start">Load game</button>
+      <progress id="progress" max="1" value="0" hidden aria-label="Game loading"></progress>
+      <p id="status" role="status" aria-live="polite">Unity WebGL · about 11 MB · needs WebGL</p>
+      <p class="muted">Original game: New Eich Games.<br>No Bored leaderboard for this version.</p>
+    </div>
+  </section>
+  <footer>
+    <span id="keys">P1: W jump · hold/release E to shoot. P2: I / O.</span>
+    <div id="pads" hidden aria-label="Touch controls">
+      <div class="pad"><button data-code="87" type="button" aria-label="Player one jump">P1 ↑</button><button data-code="69" type="button" aria-label="Player one aim and shoot">P1 FIRE</button></div>
+      <div class="pad"><button data-code="73" type="button" aria-label="Player two jump">P2 ↑</button><button data-code="79" type="button" aria-label="Player two aim and shoot">P2 FIRE</button></div>
+    </div>
+  </footer>
+</main>
+<script>
+__UNITY_LOADER__
+</script>
+<script id="unity-build" type="application/json">__UNITY_BUILD__</script>
+<script>
+'use strict';
+const cover = document.querySelector('#cover');
+const statusEl = document.querySelector('#status');
+const progressEl = document.querySelector('#progress');
+const start = document.querySelector('#start');
+let gameInstance = null, loading = false, ready = false, failed = false;
+const urls = [];
+const pressed = new Map();
+// Unity's camera crops the sides in a portrait canvas. Keep the complete
+// landscape playfield visible, including both players and the native menus.
+new ResizeObserver(entries => {
+  const { width, height } = entries[0].contentRect;
+  const game = document.querySelector('#game');
+  const fittedWidth = Math.min(width, height * 16 / 9);
+  game.style.width = fittedWidth + 'px';
+  game.style.height = fittedWidth * 9 / 16 + 'px';
+}).observe(document.querySelector('#stage'));
+
+// This export intentionally has no score: the compiled game exposes no score API.
+window.__boredSnapshot = () => ({ slug: 'rooftop-snipers', loaded: ready, finished: false });
+
+function blobUrl(bytes, type) {
+  const url = URL.createObjectURL(new Blob([bytes], { type }));
+  urls.push(url);
+  return url;
+}
+function fail(message) {
+  failed = true;
+  cover.hidden = false;
+  progressEl.hidden = true;
+  start.hidden = true;
+  statusEl.textContent = message + ' Restart the game to try again.';
+}
+
+start.addEventListener('click', () => {
+  if (loading) return;
+  loading = true;
+  start.disabled = true;
+  start.textContent = 'Loading…';
+  statusEl.textContent = 'Preparing the original Unity game…';
+  progressEl.hidden = false;
+  // Let the loading message paint before decoding the embedded payload.
+  requestAnimationFrame(() => setTimeout(() => {
+    try {
+      const element = document.querySelector('#unity-build');
+      const build = JSON.parse(element.textContent);
+      element.remove();
+      const assets = Object.create(null);
+      for (const [name, encoded] of Object.entries(build.assets)) {
+        const binary = atob(encoded);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        assets[name] = blobUrl(bytes, 'application/octet-stream');
+      }
+      // Unity 2017's resolver only understands http/file paths. Supply its own
+      // explicit resolver so blob resources work in srcdoc and in a saved file.
+      const configUrl = blobUrl(JSON.stringify(build.config), 'application/json');
+      gameInstance = UnityLoader.instantiate('game', configUrl, {
+        compatibilityCheck(instance, proceed, reject) {
+          if (UnityLoader.SystemInfo.hasWebGL) proceed();
+          else { fail('This browser does not support WebGL.'); reject(); }
+        },
+        onProgress(instance, value) {
+          progressEl.value = value;
+          statusEl.textContent = 'Loading original game… ' + Math.round(value * 100) + '%';
+        },
+        Module: {
+          boredCreateRequest() {
+            // The original game's Unity analytics/config calls are optional.
+            // Report a real network failure locally, with no HTTP request.
+            return {
+              status: 0, statusText: '', response: null,
+              setRequestHeader() {}, getAllResponseHeaders() { return ''; },
+              send() { queueMicrotask(() => this.onerror?.(new Event('error'))); },
+              abort() { this.onabort?.(new Event('abort')); }
+            };
+          },
+          resolveBuildUrl(name) {
+            if (!Object.hasOwn(assets, name)) throw new Error('Unknown embedded Unity asset: ' + name);
+            return assets[name];
+          },
+          onRuntimeInitialized() {
+            if (failed) return;
+            ready = true;
+            cover.hidden = true;
+            document.querySelector('#pads').hidden = false;
+            const canvas = document.querySelector('#game canvas');
+            canvas.tabIndex = 0;
+            canvas.setAttribute('aria-label', 'Original Rooftop Snipers. W and E for player one, I and O for player two.');
+            canvas.focus({ preventScroll: true });
+          },
+          onAbort() { fail('The Unity game could not start.'); }
+        }
+      });
+      document.querySelector('#game canvas').addEventListener('webglcontextlost', () => fail('The graphics context was lost.'));
+    } catch (error) {
+      fail('The game could not load: ' + error.message);
+      console.error(error);
+    }
+  }, 0));
+});
+
+// Legacy Unity reads keyCode/which rather than KeyboardEvent.code. Keep these
+// events inside the game document; independent pointer IDs permit two thumbs.
+function key(code, down) {
+  const letter = String.fromCharCode(code);
+  document.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', {
+    key: letter.toLowerCase(), code: 'Key' + letter, keyCode: code, which: code,
+    bubbles: true, cancelable: true
+  }));
+}
+function release(pointerId) {
+  const held = pressed.get(pointerId);
+  if (!held) return;
+  pressed.delete(pointerId);
+  if (![...pressed.values()].some(other => other.code === held.code)) {
+    held.button.classList.remove('on');
+    key(held.code, false);
+  }
+}
+document.querySelectorAll('#pads button').forEach(button => {
+  button.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    if (!ready || pressed.has(event.pointerId)) return;
+    button.setPointerCapture(event.pointerId);
+    const code = Number(button.dataset.code);
+    const alreadyDown = [...pressed.values()].some(other => other.code === code);
+    pressed.set(event.pointerId, { code, button });
+    button.classList.add('on');
+    if (!alreadyDown) key(code, true);
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    button.addEventListener(type, event => release(event.pointerId));
+  }
+  button.addEventListener('contextmenu', event => event.preventDefault());
+});
+function releaseAll() { for (const id of [...pressed.keys()]) release(id); }
+addEventListener('blur', releaseAll);
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
+addEventListener('pagehide', () => { releaseAll(); for (const url of urls) URL.revokeObjectURL(url); });
+</script>
+</body>
+</html>
