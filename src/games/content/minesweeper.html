@@ -28,13 +28,6 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
 
-        .light-mode {
-            --cell: #cfcbbc;
-            --cell-hover: #d8d4c6;
-            --open: #e2ded2;
-            --bg: #eceadf;
-        }
-
         * {
             box-sizing: border-box;
             margin: 0;
@@ -296,7 +289,6 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             <div style="display:flex;gap:14px">
                 <button class="icon-btn" id="hint-btn" title="Reveal a safe cell">hint</button>
                 <button class="icon-btn" id="leaderboard-btn" title="Best times">best</button>
-                <button class="icon-btn" id="theme-btn" title="Invert the board colours">theme</button>
                 <button class="icon-btn" id="restart-btn" title="Deal a new field">new</button>
             </div>
         </section>
@@ -865,9 +857,6 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         });
 
         document.getElementById('restart-btn').addEventListener('click', () => game.init());
-        document.getElementById('theme-btn').addEventListener('click', () => {
-            document.body.classList.toggle('light-mode');
-        });
         document.getElementById('leaderboard-btn').addEventListener('click', () => ui.showLeaderboard());
         document.getElementById('hint-btn').addEventListener('click', () => game.getHint());
 
