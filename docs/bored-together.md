@@ -225,6 +225,22 @@ When pg_cron is available, the baseline schedules `bored-together-retention`
 daily at 04:17 UTC. Otherwise a trusted scheduler must call the private cleanup
 function. Never expose cleanup through an unrestricted browser endpoint.
 
+**Production migration tracking (reconciled 2026-10-26):** The Pool migration
+was originally recorded remotely as `20261026094426` and Mahjong's rule
+update as `20261026145657`, although this repository contains their SQL
+under different timestamps. The repository versions `20261025214401`,
+`20261026180000`, `20261026230000`, `20261026234500`, and
+`20261027000000` were subsequently marked applied **without rerunning SQL**
+after confirming the live schema already had their changes. Never replay
+these migrations as a reset or assume an absent history entry means absent
+schema; inspect the live database first.
+
+**The Pages deploy does not deploy backend code or score rules.** After changes
+to `src/games/pool-engine.js`, redeploy `together-pool` with the current
+engine file as well as `index.ts` and `handler.js`, keeping JWT verification
+enabled. After adding a scored game, register its `score-rules.json` entry
+in Supabase before relying on the shared leaderboard.
+
 Publishing remains a push to `main`; Pages serves `src/` without a build. Recheck
 remote changes before pushing and never force-push. Confirm `version.json`
 names the release commit and the served entry document matches `src/index.html`.
