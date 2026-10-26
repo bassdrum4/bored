@@ -46,7 +46,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
       }
       if(url.pathname==='/rest/v1/profiles')return reply([{handle:handles[ids.indexOf(identity)]}]);
       if(url.pathname==='/auth/v1/logout')return reply(null);
-      if(['/rest/v1/score_rules','/rest/v1/leaderboard','/rest/v1/scores','/rest/v1/player_state','/rest/v1/daily_results','/rest/v1/play_events'].includes(url.pathname))return reply(req.method()==='GET'?[]:null);
+      if(['/rest/v1/score_rules','/rest/v1/leaderboard','/rest/v1/scores','/rest/v1/player_state','/rest/v1/daily_results','/rest/v1/play_events','/rest/v1/product_events','/rest/v1/enjoyment_feedback'].includes(url.pathname))return reply(req.method()==='GET'?[]:null);
       unexpected.push(req.method()+' '+url.pathname);return req.abort();
     });
     await page.goto(site.url);await page.waitForFunction(()=>document.querySelectorAll('#grid .card').length>0);

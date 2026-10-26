@@ -2,7 +2,7 @@
 // real player activity, even when the test deliberately blocks localStorage.
 function respondToAnalytics(request) {
   const url = new URL(request.url());
-  if (!url.hostname.endsWith('.supabase.co') || url.pathname !== '/rest/v1/play_events') return false;
+  if (!url.hostname.endsWith('.supabase.co') || !['/rest/v1/play_events','/rest/v1/product_events','/rest/v1/enjoyment_feedback'].includes(url.pathname)) return false;
   void request.respond({ status: 204, headers: {
     'access-control-allow-origin': '*',
     'access-control-allow-headers': '*',
