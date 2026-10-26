@@ -63,11 +63,26 @@ function renderEngagement(rows) {
     ['Organic moves',match.organic_moves??'—'],
     ['Avg organic opponent turn delay',match.organic_turn_delay_minutes==null?'—':match.organic_turn_delay_minutes+' min']
   ];
+  // Client funnel counts explain intent and dropoff; match outcomes above
+  // remain authoritative even when the sender closes the browser early.
+  const labels = {
+    bt_view:'Together opened',bt_enroll:'Members enrolled',bt_challenge:'Direct challenges sent',
+    bt_random:'Random-match requests',bt_open:'Match views',
+    bt_move:'Successful client move submissions',bt_complete:'Client-reported completions',
+    bt_rematch:'Rematch requests',bt_delete:'Matches deleted',bt_leave:'Members leaving'
+  };
+  const counts = new Map();
+  for (const e of products) if (labels[e.kind]) counts.set(e.kind,(counts.get(e.kind)||0)+1);
+  for (const [kind,label] of Object.entries(labels)) multiplayer.push([label,counts.get(kind)||0]);
   table('#engagement-together',['Measure','Value'],multiplayer);
   const sentiment = [['Responses',data.survey.responses],
     ['Positive (4 or 5)',data.survey.positive],
     ['Positive share',percent(data.survey.positive,data.survey.responses)]];
   table('#engagement-feedback',['Measure','Value'],sentiment);
+  table('#engagement-comments',['Date','Rating','Comment'],feedback
+    .filter(row => typeof row.comment === 'string' && row.comment.trim())
+    .slice(-25).reverse()
+    .map(row => [dateTime(row.created_at),row.rating,row.comment]));
 }
 function render() {
   const selected = $('#person').value;
