@@ -21,8 +21,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     b.type = 'button'; b.onclick = () => run(fn); return b;
   }
   function updateBadge() {
-    const count = data?.enrolled ? data.matches.filter(m =>
-      m.status === 'active' && m.turn_user === owner || m.status === 'pending' && m.p2 === owner).length : 0;
+    const count = data?.enrolled ? data.matches.filter(m => m.status === 'active' && m.turn_user === owner).length : 0;
     $('#together-badge').hidden = !count; $('#together-badge').textContent = String(count);
     $('#together-home').hidden = !count;
     $('#together-home-link').textContent = count + (count === 1 ? ' game needs' : ' games need') + ' your attention →';
@@ -93,7 +92,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     intro.append(node('h3', renew ? 'A change to Bored Together' : 'Play a turn. Come back whenever.'),
       node('p', renew
         ? 'Games now start with your turn and go to the other player when you save it. Members are picked from a list, so you can see who else is here without typing an address.'
-        : 'Send a game by playing the first turn. It reaches the other player as theirs to play, and it waits for both of you between turns.'),
+        : 'Send a game by playing the first turn. It reaches the other player as theirs to play, and it waits for both of you between turns. A few games are a single run instead: the same board for both, and the higher score wins.'),
       node('p', 'Joining puts your display name and email in the member list, where other members can see and pick you. Leaving removes you from it.', 'bt-caption'),
       button(renew ? 'Review and continue' : 'Join Bored Together', async () => {
         if (!hasIdentity()) { openAuthDialog('signin'); return; }
@@ -140,7 +139,9 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
       flow = null; if (result.id) await launch(result.id);
     }, true));
     else {
-      box.append(node('p', 'Pick a member and play the first turn. It reaches them as their game, so nothing is sent until your turn is saved.', 'bt-caption'));
+      box.append(node('p', TOGETHER_GAMES[selectedGame]?.mode === 'duel'
+        ? 'Pick a member. You both get the same board and the higher run wins; neither score is shown until both are in.'
+        : 'Pick a member and play the first turn. It reaches them as their game, so nothing is sent until your turn is saved.', 'bt-caption'));
       if (!people) box.append(node('p', 'Loading members…', 'bt-caption'));
       else if (!people.length) box.append(node('p', 'Nobody else has joined yet. Anyone who joins appears here.', 'bt-caption'));
       else {
@@ -161,20 +162,40 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     box.append(button('Cancel', () => { flow = null; people = null; render(); }));
     content.append(box);
   }
+  function valueText(m, seat) {
+    const value = Number(m.state?.plays?.[seat]);
+    const unit = TOGETHER_GAMES[m.game]?.unit;
+    if (!Number.isFinite(value)) return '';
+    return value.toLocaleString('en-US') + (unit ? ' ' + unit : '');
+  }
+  // A duel has no shared board to show, so the row is the scoreboard: what you
+  // sent, what you have to beat, and how it ended.
+  function runLine(m, turn) {
+    const mine = m.p1 === owner ? '1' : '2', theirs = mine === '1' ? '2' : '1';
+    if (m.status === 'completed') {
+      const head = m.winner === owner ? 'You won' : m.winner ? 'You lost' : 'Draw';
+      const scores = [valueText(m, mine), valueText(m, theirs)].filter(Boolean);
+      return head + (scores.length === 2 ? ' · ' + scores[0] + ' to ' + scores[1] : '');
+    }
+    if (turn) return valueText(m, theirs) ? 'Your run · beat ' + valueText(m, theirs) : 'Your run';
+    return valueText(m, mine) ? 'Their run · you sent ' + valueText(m, mine) : 'Their run';
+  }
   function matchRow(m, host) {
-    const incoming = m.status === 'pending' && m.p2 === owner;
+    const duel = m.mode === 'duel';
     const turn = m.status === 'active' && m.turn_user === owner;
-    const row = node('article', undefined, 'bt-match-row' + (turn || incoming ? ' bt-ready' : ''));
+    const row = node('article', undefined, 'bt-match-row' + (turn ? ' bt-ready' : ''));
     row.dataset.matchId = m.id;
     const copy = node('div', undefined, 'bt-match-copy');
     copy.append(node('h4', name(m.game) + ' · ' + (m.opponent?.handle || 'Former member')),
-      node('p', incoming ? 'Challenge received' : m.status === 'pending' ? 'Challenge sent' : m.status === 'active' ? turn ? 'Your turn' : 'Their turn' : m.winner === owner ? 'You won' : m.winner ? 'You lost' : 'Draw', 'bt-caption'));
+      node('p', duel ? runLine(m, turn)
+        : m.status === 'active' ? (turn ? 'Your turn' : 'Their turn')
+        : m.winner === owner ? 'You won' : m.winner ? 'You lost' : 'Draw', 'bt-caption'));
     const actions = node('div', undefined, 'bt-actions');
-    if (incoming) actions.append(button('Accept', async () => { await togetherRPC('accept', { match_id: m.id }); await launch(m.id); }, true),
-      button('Decline', () => togetherRPC('decline', { match_id: m.id })));
-    else if (m.status === 'pending') actions.append(button('Cancel challenge', () => togetherRPC('cancel', { match_id: m.id })));
-    else if (m.status === 'active') actions.append(button(turn ? 'Play turn' : 'Open', () => launch(m.id), turn));
-    else actions.append(button('Rematch', async () => {
+    if (m.status === 'active' && turn) actions.append(button(duel ? 'Play run' : 'Play turn', () => launch(m.id), true));
+    // Watching the board you are waiting on is harmless in a turn game; a duel
+    // has nothing to look at once your run is in.
+    else if (m.status === 'active' && !duel) actions.append(button('Open', () => launch(m.id)));
+    else if (m.status === 'completed') actions.append(button('Rematch', async () => {
       // A rematch is played first too, so it usually opens straight away. If the
       // other player already started it, there is nothing to send.
       const next = await togetherRPC('rematch', { match_id: m.id, game: m.game });
@@ -195,8 +216,8 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     overflow(start, null); content.append(start);
     if (flow) picker();
     const games = node('section'); games.id = 'bt-your-games'; games.append(node('h3', 'Your Games'));
-    const attention = m => m.status === 'active' && m.turn_user === owner || m.status === 'pending' && m.p2 === owner ? 0 : m.status === 'completed' ? 2 : 1;
-    const open = data.matches.filter(m => ['pending', 'active'].includes(m.status));
+    const attention = m => m.status === 'active' && m.turn_user === owner ? 0 : m.status === 'completed' ? 2 : 1;
+    const open = data.matches.filter(m => m.status === 'active');
     // Keep rematches close to the finished game, without a history page or records.
     const completed = data.matches.filter(m => m.status === 'completed').slice(0, 3);
     const matches = [...open, ...completed].sort((a, b) => attention(a) - attention(b));

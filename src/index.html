@@ -152,6 +152,10 @@
   </div>
   <div id="hint" role="status">Click the game to control it</div>
   <div id="challenge-progress" role="status" aria-live="polite" hidden></div>
+  <div id="duel-finish" role="alertdialog" aria-labelledby="duel-finish-text" hidden>
+    <p id="duel-finish-text">Finish and send this run? It becomes their turn.</p>
+    <div><button id="duel-send" type="button" class="action">Send run</button><button id="duel-cancel" type="button" class="action">Keep playing</button></div>
+  </div>
   <iframe id="frame" title="game" allow="autoplay; fullscreen; gamepad; clipboard-write; encrypted-media; picture-in-picture"></iframe>
 </div>
 <script type="module" src="./main.js"></script>

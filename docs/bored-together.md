@@ -27,17 +27,23 @@ them, recording no winner — and Leave. Leaving removes you from the directory,
 drops games nobody has seen yet, cancels games you have not sent and forfeits the
 ones in progress.
 
-Challenges created before play-first shipped are still `pending`, and keep their
-inline Accept/Decline so nobody's list rots. Friend requests/management,
-People/History/Settings tabs, statistics, feeds, notification history/read
-controls, replay sliders and email visibility controls are not in the frontend.
-Existing private tables, retention, authorization and legacy RPC operations are
-retained for compatibility. Badges count only turns and incoming games, never
-friendships or notification history.
+Two games are a single run rather than a turn: **2048** and **Mahjong**. The server
+picks the seed, both players get that board, and the game's own score is
+submitted once. Neither result is shown to the other player until both are in,
+so nobody plays against a known target; the row is then the scoreboard. Leaving
+one asks before sending the run.
+
+Friend requests, the notification feed, email-visibility settings, name/address
+search, Accept/Decline/Cancel and the pre-play-first `pending` state have been
+removed from the database, not just hidden. What remains is one dispatcher with
+`enroll`, `people`, `block`, `unblock`, `challenge`, `queue_join`,
+`queue_cancel`, `match`, `move`, `submit_run`, `resign`, `rematch`, `delete`,
+`leave` and `dashboard` — anything else answers "Unknown operation", and the SQL
+suite asserts that. Badges count turns only.
 
 ## Original-game integration
 
-`src/hub/together-ui.js` owns enrollment, search, invitations, queues and the list.
+`src/hub/together-ui.js` owns enrollment, the member directory, queues and the list.
 `src/hub/together-player.js` defines the small original-game adapter contract.
 `main.js` launches matches through the same `openGame`, original document loader,
 full-viewport `#player` and `#frame` used by ordinary games. The hub remains behind
@@ -93,12 +99,32 @@ Reload fetches fresh authoritative state to recover stale versions. Exiting
 while a save is in flight does not cancel the server transaction; reopening
 always loads the saved state. There are no offline multiplayer moves.
 
-Only Connect Four and Pool have ready original-game adapters and authoritative
-rules. The selector intersects the catalog with the adapter registry. Mini Golf
+Two kinds of adapter exist, distinguished by `mode` in `TOGETHER_ADAPTERS`:
+
+- `turns` — the server owns the board, validates each move and decides the
+  result. Connect Four and Pool.
+- `duel` — the server owns the seed and one submission per player, and compares
+  two numbers. 2048 and Mahjong. It is the same trust the single-player boards
+  already use, bounded by `duel_limit`; there is no replay and no claim that the
+  board was played honestly.
+
+A duel's seed is chosen once per Detroit day (`duel_seed`) and injected as
+`window.__boredSeed = { seed, match: true }` before the game's own script, which
+replaces the hub's daily seed so a re-deal replays the same board. 2048 draws
+both its spawns and its restarts from that seed; Mahjong deals and re-deals from
+it. The hub polls the game's `__boredSnapshot()` and sends the run itself the
+moment the game reports `finished`, so a completed run is never lost to a
+forgotten send.
+
+The selector intersects the catalog with the adapter registry. Mini Golf
 multiplayer remains deferred: its browser-reported stroke total is not trusted.
-A new game must implement the contract in its original game, add a versioned
-server validator, and pass the same lifecycle and two-account tests before
-being added to `TOGETHER_ADAPTERS`.
+Tank2 was considered and left out: it is a real-time artillery match whose AI
+aims with its own randomness, so two runs on the same terrain still face
+different opponents and the only result is a single win or loss — a real 1v1
+would need an authoritative real-time server, which is a different project. A
+new game must implement the contract in its original game, add a versioned
+server rule, and pass the same lifecycle and two-account tests before being
+added to `TOGETHER_ADAPTERS`.
 
 ## Privacy, persistence and security
 
@@ -115,25 +141,28 @@ and is shown the new notice once before their games load again, because the
 notice now covers the address being visible to other members. The earlier
 `together_private_discovery` migration had narrowed projections to hide email;
 this change deliberately reverses that for the directory only, and the SQL
-suite asserts the new behavior. Legacy `search` (exact email or username
-prefix, never returning an address) is retained for compatibility but is no
-longer reachable from the interface.
+suite asserts the new behavior. `search` was removed with the rest of the
+retired surface, so the directory is the only way to find someone.
 
-All eight `bored_together` tables have RLS and no direct browser table grants.
+All six remaining `bored_together` tables (`members`, `blocks`, `matches`,
+`moves`, `queue`, `limits`) have RLS and no direct browser table grants.
 Keep this private schema outside the exposed Data API schemas. `public.bt_rpc`
 is SECURITY INVOKER; the dispatcher is in the private schema, SECURITY DEFINER
 with empty search path, and derives identity from `auth.uid()` after checking
 that the non-anonymous Auth account exists. Internal helpers cannot be called
 by browser roles. User-editable metadata never grants authorization.
 
-Discovery is limited to 20/minute and 200/UTC day per account; social mutations
-have a separate 30/hour limit and RPCs a 180/minute budget. These are per-account
-limits, not IP-level protection against mass account creation. Existing shared
-transaction advisory locks, match-row locks, participant checks, turn ownership,
-rule versions, stale-version checks and unique request IDs are unchanged.
+The directory is limited to 30/minute and 2,880/day per account; social
+mutations (challenge, rematch) share a 30/hour limit and every RPC draws on a
+180/minute budget. These are per-account limits, not IP-level protection against
+mass account creation. Shared transaction advisory locks, match-row locks,
+participant checks, turn ownership, rule versions, stale-version checks and
+unique request IDs are unchanged.
 
-Connect Four moves contain only a column. Pool sends angle (integer tenths of a
-degree), power (1–100) and optional legal cue placement. The `together-pool` Edge
+Connect Four moves contain only a column; a duel submission is one integer
+bounded by the game's own limit (36 pairs for Mahjong, 10,000,000 for 2048).
+Pool sends angle (integer tenths of a degree), power (1–100) and optional legal
+cue placement. The `together-pool` Edge
 function authenticates the player, reads the match through their JWT, simulates
 with the canonical engine and invokes the service-only commit wrapper. The
 commit transaction rechecks membership, blocks, participant, turn and version.
@@ -147,16 +176,16 @@ list and close an old account's game; same-account profile refreshes do not.
 There is no required realtime connection. Another device or page refresh
 restores each match from the backend, including Pool turns with multiple shots.
 
-Leaving hides membership, exits queues, cancels invitations, removes legacy
-friendships/notifications and forfeits active games. Blocking excludes both
-players from discovering/challenging/matching each other and cancels their open
-games without awarding a winner. Unblocking does not restart cancelled matches.
+Leaving hides membership, exits queues, drops games nobody has seen yet
+(`revealed_at is null`), forfeits the rest and removes the player from the
+directory. Blocking excludes both players from the directory, challenging and
+matching, and cancels their open games without awarding a winner. Unblocking
+does not restart cancelled matches.
 
-Retention is unchanged: queues/invitations expire after 7 days, inactive active
-matches after 30 days (no clock-based winner), terminal matches/moves after 90
-days and notifications after 30 days. Legacy friend requests expire after 30
-days. Daily cleanup can lag nominal cutoffs by up to a day. Notifications are
-still stored by legacy backend operations but have no user-facing feed.
+Retention is unchanged: queues expire after 7 days, unplayed games after 7 days,
+inactive active matches after 30 days (no clock-based winner), and terminal
+matches/moves after 90 days. Daily cleanup can lag nominal cutoffs by up to a
+day.
 
 ## Installation and publishing
 
@@ -190,8 +219,10 @@ CHROME_PATH=/path/to/chrome npm test
 ```
 
 The SQL tests execute the baseline and every forward migration in isolated
-PGlite databases, including privacy, opt-in, auth/role denial, blocks, rate
-limits, legal/illegal/stale/duplicate moves, completed games, rematches, leaving
+PGlite databases, including privacy, opt-in, auth/role denial, the retired
+actions answering "Unknown operation", blocks, rate limits,
+legal/illegal/stale/duplicate moves, duels (shared seed, hidden opponent run,
+bounds, draw, one submission each), completed games, rematches, delete, leaving
 and retention. Independent Connect Four rules check seeded games and draws.
 Pool tests retain physics parity with the original game, legal pots/retained
 turns, fouls, ball in hand, 8-ball outcomes, idempotency, service-role validation
@@ -203,9 +234,10 @@ It plays a game from the picker: the challenger starts in the original player, a
 failed save is retried, the opponent only receives the game once the turn is
 saved, the board resumes, the game completes, and a rematch is played first too.
 It also covers the member directory (addresses shown, never in a game row), queue
-persistence/cancellation, exit, refresh, a legal multi-shot Pool turn, sign-out
-privacy, original offline play, 1100/375/320px layouts and a sandboxed nested
-iframe equivalent to a Google Sites embed.
+persistence/cancellation, exit, refresh, a legal multi-shot Pool turn, a 2048
+duel where both players get the match's seed and the scores stay hidden until
+both runs are in, sign-out privacy, original offline play, 1100/375/320px
+layouts and a sandboxed nested iframe equivalent to a Google Sites embed.
 Screenshots are captured in ignored `_build/together/` for visual inspection.
 A bridge unit test rejects unrelated windows and previous-account results and
 proves a retained Pool turn cannot auto-close.

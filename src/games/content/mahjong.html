@@ -412,7 +412,9 @@ function setTutorial(on) {
     beginGame(TUTORIAL_LAYERS, false);
     statusEl.textContent = 'Tutorial: tap one of the cream tiles.';
   } else {
-    beginGame(NORMAL_LAYERS, false);
+    // In a Bored Together duel the opening board is the match's, and a re-deal
+    // replays it rather than handing that player an easier arrangement.
+    beginGame(NORMAL_LAYERS, !!window.__boredSeed?.match);
     statusEl.textContent = 'Match two free tiles of the same kind.';
   }
 }

@@ -212,6 +212,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     launchSelector = shelf ? '#' + shelf.id + ' [data-slug="' + slug + '"]' : from.id ? '#' + from.id : '';
   }
   if (activeSlug) { pollDaily(); captureBest({ leaving: true }); }
+  $('#duel-finish').hidden = true;
   const previousTogether = activeTogether;
   activeTogether = multiplayer;
   if (previousTogether && previousTogether !== multiplayer) previousTogether.dispose();
@@ -248,12 +249,17 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       // whatever is on screen now.
       if (token !== loadToken) return;
       let html = native ? source : installDailyAdapter(source, slug);
-      html = injectSeed(html);
+      // A duel brings the match's own seed instead of the day's, injected before
+      // the game's script reads it; adding the daily one afterwards would
+      // overwrite it and let a re-deal reroll the shared board.
+      html = multiplayer?.mode === 'duel' ? html : injectSeed(html);
       if (multiplayer) html = multiplayer.document(html);
       let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
       gameFrame.removeAttribute('src');
       gameFrame.srcdoc = injectHead(html, ANALYTICS_BRIDGE + head);
-      showHint(multiplayer ? 'Your turn saves automatically · Esc returns to Bored Together' : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
+      showHint(multiplayer
+        ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player' : 'Your turn saves automatically · Esc returns to Bored Together'
+        : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
     };
     const fail = () => {
       if (token !== loadToken) return;
@@ -282,7 +288,33 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   }, 60);
 }
 
-function closeGame() {
+// A duel is a single run: leaving ends it, and the result goes to the opponent,
+// so the player is asked first instead of losing the run to a stray Escape.
+function showDuelFinish(message) {
+  $('#duel-finish-text').textContent = message || 'Finish and send this run? It becomes their turn.';
+  $('#duel-finish').hidden = false;
+  $('#duel-send').focus();
+}
+
+function hideDuelFinish(focusGame = true) {
+  $('#duel-finish').hidden = true;
+  if (focusGame) gameFrame.focus();
+}
+
+function closeGame({ force = false } = {}) {
+  if (!force && activeTogether?.needsConfirm?.()) {
+    // Escape is also how the bar is dismissed, so it never sticks around.
+    if ($('#duel-finish').hidden) {
+      const run = activeTogether.pendingRun?.();
+      showDuelFinish(Number.isFinite(run)
+        ? 'Send your run of ' + run.toLocaleString('en-US') + '? It becomes their turn.' : undefined);
+    } else hideDuelFinish();
+    return;
+  }
+  $('#duel-finish').hidden = true;
+  // A closed match stops watching its frame, so a finished run is only sent
+  // while the game is still open.
+  activeTogether?.stop?.();
   pollDaily();
   // Leaving is not a pause: the run has ended as far as the player is concerned,
   // so a spec that accumulates keeps what it has reached.
@@ -737,6 +769,14 @@ $('#random').onclick = () => {
   else showLibraryMessage();
 };
 $('#back').onclick = closeGame;
+$('#duel-send').onclick = async () => {
+  const send = $('#duel-send');
+  send.disabled = true;
+  try { await activeTogether?.sendRun(); $('#duel-finish').hidden = true; }
+  catch (error) { showDuelFinish('Run not sent. ' + error.message); }
+  finally { send.disabled = false; }
+};
+$('#duel-cancel').onclick = () => hideDuelFinish();
 $('#resume').onclick = () => { closeMenu(); gameFrame.focus(); };
 $('#restart').onclick = restartGame;
 $('#daily-play').onclick = () => {
@@ -815,10 +855,10 @@ renderRecent();
 renderCollections();
 renderLibrary();
 createTogetherUI({ openAuthDialog, playMatch(match, owner, callbacks) {
-  const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame });
+  const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });
   openGame(match.game, null, document.querySelector('#together-nav'), player);
 } });
-window.addEventListener('bored:identity', () => { if (activeTogether && !activeTogether.isOwner()) closeGame(); });
+window.addEventListener('bored:identity', () => { if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true }); });
 initAccount();
 initFeedback();
 const analyticsToggle = $('#analytics-enabled');

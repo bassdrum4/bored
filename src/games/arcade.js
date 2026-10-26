@@ -25,7 +25,28 @@ function arcadeGame(kind) {
     $('#instructions').textContent = 'Arrow keys, WASD, swipe, or tap the arrows. Equal tiles merge once per move. Reach 2048, then keep going.';
     board.className = 'tiles'; board.setAttribute('aria-label', '2048 board');
     let cells, score, previous, best = read(kind), won, undoUsed = false;
-    window.__boredSnapshot = () => ({ slug: kind, tile: Math.max(...cells), undoUsed });
+    // A Bored Together duel deals everyone the same opening board: the bridge
+    // supplies the match seed before this script runs, so both spawns and every
+    // restart come from one stream. Ordinary play keeps Math.random.
+    const matchSeed = () => {
+      const bridge = window.__boredTogether?.context?.state?.seed;
+      const injected = window.__boredSeed;
+      const seed = Number.isFinite(bridge) ? bridge : injected?.match ? injected.seed : null;
+      return Number.isFinite(seed) ? seed >>> 0 : null;
+    };
+    function makeRand(start) {
+      let state = start >>> 0;
+      return () => {
+        state = (state + 0x6D2B79F5) >>> 0;
+        let t = state; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+    const seed = matchSeed();
+    let rand = seed === null ? Math.random : makeRand(seed);
+    // The hub ranks a duel on the score, and needs to know when the board is out
+    // of moves, exactly like the "No moves left" line already shown.
+    window.__boredSnapshot = () => ({ slug: kind, tile: Math.max(...cells), score, finished: !canMove(), undoUsed });
     function collapse(line) {
       const values = line.filter(Boolean), out = [];
       let gained = 0;
@@ -38,7 +59,7 @@ function arcadeGame(kind) {
     }
     function spawn() {
       const empty = cells.flatMap((value, i) => value ? [] : [i]);
-      if (empty.length) cells[empty[Math.floor(Math.random() * empty.length)]] = Math.random() < .9 ? 2 : 4;
+      if (empty.length) cells[empty[Math.floor(rand() * empty.length)]] = rand() < .9 ? 2 : 4;
     }
     function canMove() {
       return cells.some((value, i) => !value || (i % 4 < 3 && value === cells[i + 1]) || (i < 12 && value === cells[i + 4]));
@@ -74,7 +95,12 @@ function arcadeGame(kind) {
       previous = { cells: cells.slice(), score, won }; cells = next; score += gained;
       status.textContent = 'Keep merging.'; spawn(); draw();
     }
-    function reset() { cells = Array(16).fill(0); score = 0; previous = null; won = false; undoUsed = false; spawn(); spawn(); status.textContent = 'Your next high score starts here.'; draw(); }
+    function reset() {
+      cells = Array(16).fill(0); score = 0; previous = null; won = false; undoUsed = false;
+      // Restarting a duel replays the same opening board rather than rerolling it.
+      if (seed !== null) rand = makeRand(seed);
+      spawn(); spawn(); status.textContent = 'Your next high score starts here.'; draw();
+    }
     button('New game', reset);
     const undo = button('Undo', () => {
       if (!previous) return;

@@ -164,6 +164,35 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   await a.reload();await a.waitForSelector('#bt-your-games');await launch(a,poolMatch.id);
   game=await frame(a,'#c');assert.equal(await game.evaluate(()=>__boredTogether.context.state.shotCount),4,'retained turn survives refresh');
   await shoot(a,0,.05);await a.waitForFunction(()=>document.querySelector('#player').hidden);
+  // A duel deals both players the same board and compares one run each; the
+  // opponent's score stays hidden until your own run is in.
+  await challengePlayer(a,'2048','BananaWizard');
+  const duel=(await call(db,ids[0],'dashboard')).matches.find(m=>m.game==='2048');
+  assert.equal(duel.mode,'duel');assert.equal(duel.turn_user,ids[0]);
+  let duelBoard=await frame(a,'.tiles');
+  assert.equal(await duelBoard.evaluate(()=>window.__boredSeed.seed),duel.state.seed,'the match seed reaches the game');
+  for(const key of ['ArrowLeft','ArrowDown','ArrowLeft','ArrowUp']){await a.focus('#frame');await a.keyboard.press(key);await a.keyboard.press(key);}
+  const mine=await duelBoard.evaluate(()=>__boredSnapshot().score);assert.ok(mine>0,'a duel run scores');
+  await a.focus('#frame');await a.keyboard.press('Escape');
+  await a.waitForFunction(()=>!document.querySelector('#duel-finish').hidden);
+  assert.match(await a.$eval('#duel-finish-text',e=>e.textContent),/Send your run/);
+  await a.click('#duel-send');
+  await a.waitForFunction(()=>document.querySelector('#player').hidden);
+  await refresh(a);await refresh(b);
+  assert.ok(!(await b.$eval(`[data-match-id="${duel.id}"]`,e=>e.textContent)).includes('beat'),'the run to beat is hidden');
+  await launch(b,duel.id);
+  duelBoard=await frame(b,'.tiles');
+  assert.equal(await duelBoard.evaluate(()=>window.__boredSeed.seed),duel.state.seed,'both players get the same board');
+  for(const key of ['ArrowUp','ArrowRight','ArrowUp','ArrowRight']){await b.focus('#frame');await b.keyboard.press(key);await b.keyboard.press(key);}
+  await b.focus('#frame');await b.keyboard.press('Escape');
+  await b.waitForFunction(()=>!document.querySelector('#duel-finish').hidden);
+  await b.click('#duel-send');await b.waitForFunction(()=>document.querySelector('#player').hidden);
+  await refresh(a);
+  const done=(await call(db,ids[0],'dashboard')).matches.find(m=>m.id===duel.id);
+  assert.equal(done.status,'completed');assert.equal(done.state.plays['1'],mine);
+  const theirs=done.state.plays['2'];
+  assert.equal(done.winner,theirs===mine?null:theirs>mine?ids[1]:ids[0]);
+  assert.match(await a.$eval(`[data-match-id="${duel.id}"]`,e=>e.textContent),/\d+ points to \d+ points/,'both runs are shown once they are in');
   // Mixed list: attention first, no separate people/history/settings/feed.
   await call(db,ids[2],'enroll',{consent_version:'2026-10-26-v3'});
   const fromC=await call(db,ids[2],'challenge',{user_id:ids[0]});
@@ -178,7 +207,8 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
     await a.setViewport({width,height:850});await a.evaluate(()=>scrollTo(0,0));
     await a.screenshot({path:path.join(__dirname,`../_build/together/simple-${width}.png`),fullPage:true});
     assert.ok(await a.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'list no overflow '+width);
-    const active=(await call(db,ids[0],'dashboard')).matches.find(m=>m.status==='active'&&m.game==='connect-four');
+    // Only the player whose turn it is gets a button on the row.
+    const active=(await call(db,ids[0],'dashboard')).matches.find(m=>m.status==='active'&&m.turn_user===ids[0]&&m.game==='connect-four');
     await launch(a,active.id);game=await frame(a,'.connect');
     assert.ok(await game.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'original board no overflow '+width);
     await a.screenshot({path:path.join(__dirname,`../_build/together/original-${width}.png`)});await exit(a);
@@ -189,7 +219,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   // Google Sites equivalent: nested frame with normal script/same-origin sandbox permissions.
   await a.setContent('<iframe title="Google Sites embed" style="width:100%;height:750px;border:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" src="'+site.url+'#together"></iframe>');
   const embed=await (await a.$('iframe')).contentFrame();await embed.waitForSelector('#bt-your-games');
-  const active=(await call(db,ids[0],'dashboard')).matches.find(m=>m.status==='active'&&m.game==='connect-four');
+  const active=(await call(db,ids[0],'dashboard')).matches.find(m=>m.status==='active'&&m.turn_user===ids[0]&&m.game==='connect-four');
   await embed.$eval(`[data-match-id="${active.id}"]`,e=>e.querySelector('button').click());
   await embed.waitForFunction(()=>document.querySelector('#frame').contentDocument?.querySelector('.connect'));
   assert.ok(await embed.$eval('#player',e=>!e.hidden),'full player works within embedded site');
