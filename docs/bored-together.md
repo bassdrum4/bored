@@ -116,13 +116,32 @@ it. The hub polls the game's `__boredSnapshot()` and sends the run itself the
 moment the game reports `finished`, so a completed run is never lost to a
 forgotten send.
 
+**Pastel Tanks** is a `turns` game without a server-side simulation, because the
+game itself is already turn-based. A match stores one seed — which picks one of
+the original's five hand-shaped maps plus a phase — and the list of shots. A
+shot is `{seat, x, angle, power, weapon, won}`: where the tank drove, how it
+aimed, which shell it used. `src/games/tank-engine.js` replays that list into
+the board, the craters, hit points, power-ups and the winner, and both players
+run it, so the result is recomputed on the other side rather than reported.
+
+The document keeps its own drawing and input code and, when a match is open,
+replaces its simulation with the engine's: the same field, the same arc, the
+same explosion. Power-ups are no longer random per client — the spawn stream is a
+seeded function of the shot index, and their positions are part of the replayed
+state. A shot that a client claims ended the game is stored as a win; the
+opponent's replay of the same shots is what shows whether that was true, and the
+stored result is not silently trusted by either screen.
+
+This is deliberately weaker than Pool: the database bounds the shot (field,
+angle, power, weapon, turn, version, shot count) but does not simulate it. A
+modified client could therefore submit a shot geometry that never happened;
+what it cannot do is make the other player's replay agree. Adding an Edge
+function that runs the engine, as Pool does, is the step that would make the
+referee authoritative, and the engine is written to be that referee already.
+
 The selector intersects the catalog with the adapter registry. Mini Golf
 multiplayer remains deferred: its browser-reported stroke total is not trusted.
-Tank2 was considered and left out: it is a real-time artillery match whose AI
-aims with its own randomness, so two runs on the same terrain still face
-different opponents and the only result is a single win or loss — a real 1v1
-would need an authoritative real-time server, which is a different project. A
-new game must implement the contract in its original game, add a versioned
+A new game must implement the contract in its original game, add a versioned
 server rule, and pass the same lifecycle and two-account tests before being
 added to `TOGETHER_ADAPTERS`.
 
@@ -236,8 +255,12 @@ saved, the board resumes, the game completes, and a rematch is played first too.
 It also covers the member directory (addresses shown, never in a game row), queue
 persistence/cancellation, exit, refresh, a legal multi-shot Pool turn, a 2048
 duel where both players get the match's seed and the scores stay hidden until
-both runs are in, sign-out privacy, original offline play, 1100/375/320px
-layouts and a sandboxed nested iframe equivalent to a Google Sites embed.
+both runs are in, a Tanks match where the second player's screen rebuilds the
+first player's damage from the stored aim, sign-out privacy, original offline
+play, 1100/375/320px layouts and a sandboxed nested iframe equivalent to a
+Google Sites embed. `tests/tank-engine.test.cjs` holds the engine to the
+document's own terrain, column for column on all five layouts, and proves a shot
+list replays identically and that only the seed decides the map.
 Screenshots are captured in ignored `_build/together/` for visual inspection.
 A bridge unit test rejects unrelated windows and previous-account results and
 proves a retained Pool turn cannot auto-close.

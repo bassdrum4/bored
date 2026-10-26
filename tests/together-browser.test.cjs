@@ -85,7 +85,11 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
       const row=rows.find(r=>r.querySelector('strong').textContent===handle);
       if(!row)throw new Error('member missing: '+handle);row.querySelector('button').click();
     },handle);
-    await page.waitForFunction(()=>!document.querySelector('#player').hidden);
+    try {
+      await page.waitForFunction(()=>!document.querySelector('#player').hidden);
+    } catch (error) {
+      throw new Error('starting ' + game + ' did not open the player: ' + await page.$eval('#together-status', node => node.textContent));
+    }
   }
   async function shoot(page,angle,power){
     const game=await frame(page,'#c');
@@ -164,6 +168,56 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   await a.reload();await a.waitForSelector('#bt-your-games');await launch(a,poolMatch.id);
   game=await frame(a,'#c');assert.equal(await game.evaluate(()=>__boredTogether.context.state.shotCount),4,'retained turn survives refresh');
   await shoot(a,0,.05);await a.waitForFunction(()=>document.querySelector('#player').hidden);
+  // Tanks: the move on the wire is an aim, and the other side recomputes the
+  // shell, the crater and the damage from the stored shot.
+  const aimAt = async (state, seat) => {
+    const engine = await import('../src/games/tank-engine.js');
+    const world = engine.replay(state), tank = world.tanks[seat - 1], before = world.tanks[2 - seat].hp;
+    for (const angle of [45, 50, 40, 55, 35, 60, 30, 65, 25, 70, 20]) {
+      for (const power of [20, 18, 16, 14, 12, 10]) {
+        try {
+          const out = engine.advance(state, { seat, x: tank.x, angle, power, weapon: 'standard' });
+          if (out.world.tanks[2 - seat].hp < before) return { angle, power, hp: out.world.tanks.map(t => t.hp), world: out.world };
+        } catch { /* try the next aim */ }
+      }
+    }
+    throw new Error('no shot reaches the other tank');
+  };
+  const inGame = async (page, check) => {
+    try { await page.waitForFunction(check, { timeout: 20000 }); }
+    catch {
+      const info = await page.evaluate(() => {
+        const element = document.querySelector('#frame'), frame = element.contentWindow;
+        return { srcdoc: element.srcdoc.length, test: !!(frame && frame.__test),
+          state: frame && frame.__test ? frame.__test.state() : null,
+          text: frame ? frame.document.body.innerText.slice(0, 300) : 'no frame',
+          status: document.querySelector('#together-status')?.textContent || '' };
+      });
+      throw new Error('the tank game did not start: ' + JSON.stringify({ ...info, errors }));
+    }
+  };
+  await challengePlayer(a, 'tank2', 'BananaWizard');
+  const tanks = (await call(db, ids[0], 'dashboard')).matches.find(m => m.game === 'tank2');
+  assert.equal(tanks.mode, 'turns'); assert.equal(tanks.turn_user, ids[0]);
+  await inGame(a, () => { const w = document.querySelector('#frame').contentWindow, s = w && w.__test && w.__test.state(); return !!(s && s.online && s.mode === 'AIM'); });
+  const firstShot = await aimAt(tanks.state, 1);
+  await frame(a, 'canvas').then(f => f.evaluate(s => __test.aim(s.angle, s.power), firstShot));
+  await a.focus('#frame'); await a.keyboard.press('Space');
+  await a.waitForFunction(() => document.querySelector('#player').hidden, { timeout: 20000 });
+  await refresh(a); await refresh(b);
+  assert.match(await b.$eval(`[data-match-id="${tanks.id}"]`, e => e.textContent), /Your turn/);
+  await launch(b, tanks.id);
+  await inGame(b, () => { const w = document.querySelector('#frame').contentWindow, s = w && w.__test && w.__test.state(); return !!(s && s.online && s.shots === 1 && s.mode === 'AIM'); });
+  assert.deepEqual(await frame(b, 'canvas').then(f => f.evaluate(() => __test.state().hp)), firstShot.hp, 'the opponent rebuilds the damage from the shot');
+  const secondShot = await aimAt((await call(db, ids[1], 'match', { match_id: tanks.id })).state, 2);
+  await frame(b, 'canvas').then(f => f.evaluate(s => __test.aim(s.angle, s.power), secondShot));
+  await b.focus('#frame'); await b.keyboard.press('Space');
+  await b.waitForFunction(() => document.querySelector('#player').hidden, { timeout: 20000 });
+  await refresh(a); await launch(a, tanks.id);
+  await inGame(a, () => { const w = document.querySelector('#frame').contentWindow, s = w && w.__test && w.__test.state(); return !!(s && s.online && s.shots === 2); });
+  assert.deepEqual(await frame(a, 'canvas').then(f => f.evaluate(() => __test.state().hp)), secondShot.hp, 'both shots replay on the first player\u2019s screen');
+  assert.equal(await frame(a, 'canvas').then(f => f.evaluate(() => __test.state().seed)), tanks.state.seed, 'the same battlefield seed');
+  await exit(a);
   // A duel deals both players the same board and compares one run each; the
   // opponent's score stays hidden until your own run is in.
   await challengePlayer(a,'2048','BananaWizard');

@@ -6,7 +6,10 @@ import { hasIdentity, getSession } from './backend.js';
 // for the server to referee — the same trust the single-player boards already use.
 export const TOGETHER_ADAPTERS = Object.freeze({
   'connect-four': { rulesVersion: 1, action: 'move', mode: 'turns' },
-  '8ball': { rulesVersion: 1, action: 'pool_move', mode: 'turns' },
+  '8ball': { rulesVersion: 1, action: 'pool_move', mode: 'turns', engine: 'pool-engine.js' },
+  // Tanks stores its seed and the shots fired; both clients replay them through
+  // the same rules file, so the move on the wire is an angle, not a result.
+  'tank2': { rulesVersion: 1, action: 'move', mode: 'turns', engine: 'tank-engine.js' },
   '2048': { rulesVersion: 1, action: 'submit_run', mode: 'duel', metric: 'score' },
   mahjong: { rulesVersion: 1, action: 'submit_run', mode: 'duel', metric: 'pairs' }
 });
@@ -113,7 +116,8 @@ export function createTogetherPlayer({ match, owner, frame, submit, reload, clos
         const script = '<script>window.__boredSeed=' + JSON.stringify({ seed, match: true }).replace(/</g, '\\u003c') + ';<\/script>';
         return html.replace(/<head([^>]*)>/i, head => head + script);
       }
-      const json = JSON.stringify([context(current), channel, new URL('./games/pool-engine.js', location.href).href]).replace(/</g, '\\u003c');
+      const engineURL = new URL('./games/' + (adapter.engine || 'pool-engine.js'), location.href).href;
+      const json = JSON.stringify([context(current), channel, engineURL]).replace(/</g, '\\u003c');
       return html.replace(/<head([^>]*)>/i, head => head + '<script>(' + gameBridge.toString() + ')(...' + json + ');<\/script>');
     },
     async message(event) {

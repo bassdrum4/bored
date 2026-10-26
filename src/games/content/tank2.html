@@ -81,6 +81,9 @@ let mode,terrain,tanks,proj,parts,popups,powerups,debris;
 let power,keys,winner,timer,shake,flashX,flashY,flashR,flashA;
 let overT,turnCnt,nextPU,selWeap,anyHit,nukeFlash,missed;
 let aiEnabled,aiTimer,aiTarget,deathTimer,deathWinner,terrainIdx,turn;
+// Bored Together: the match stores a seed and a shot list, and this document
+// replays both through the shared rules file instead of simulating on its own.
+let online=null,onlineAnim=null,onlineBusy=false;
 const clouds=Array.from({length:5},()=>({x:Math.random()*W,y:20+Math.random()*70,sc:.5+Math.random()*.7,sp:.08+Math.random()*.12}));
 
 // ── Helpers ──
@@ -174,8 +177,11 @@ addEventListener('keydown',e=>{
   if(!e.repeat){
     const wm={Digit1:'standard',Digit2:'heavy',Digit3:'cluster',Digit4:'nuke'};
     if(wm[e.code]){const w=wm[e.code],t=tanks[turn];if(w==='standard'||(t.ammo[w]&&t.ammo[w]>0))selWeap=w;else mkPopup(t.x,tY(t.x)-40,'No '+w+'!','#FF7B8E')}
-    if(e.code==='Space'&&turn===0)fire();
-    if(e.code==='Enter'&&turn===1&&!aiEnabled)fire();
+    if(online){if(e.code==='Space'||e.code==='Enter')fire()}
+    else{
+      if(e.code==='Space'&&turn===0)fire();
+      if(e.code==='Enter'&&turn===1&&!aiEnabled)fire();
+    }
   }
 });
 addEventListener('keyup',e=>{keys[e.code]=false;if(e.key===','||e.key==='<')keys._cL=false;if(e.key==='.'||e.key==='>')keys._cR=false});
@@ -183,10 +189,13 @@ addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
 document.addEventListener('visibilitychange',()=>{if(document.hidden)for(const k in keys)keys[k]=false});
 
 // ── Fire ──
-function fire(){const t=tanks[turn];let w=selWeap;if(w!=='standard'){if(!t.ammo[w]||t.ammo[w]<=0){w='standard'}else t.ammo[w]--}proj.push(mkProj(t,w));mode='FLY';anyHit=false}
+function fire(){
+  if(online)return onlineFire();
+  const t=tanks[turn];let w=selWeap;if(w!=='standard'){if(!t.ammo[w]||t.ammo[w]<=0){w='standard'}else t.ammo[w]--}proj.push(mkProj(t,w));mode='FLY';anyHit=false}
 
 // ── Update ──
 function update(){
+  if(onlineAnim&&onlineAnim.frame<onlineAnim.max)onlineAnim.frame++;
   shake*=.9;if(shake<.3)shake=0;if(flashA>0){flashR+=3;flashA-=.06}if(nukeFlash>0)nukeFlash-=.025;
   for(const c of clouds){c.x+=c.sp;if(c.x>W+80)c.x=-80}
   for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.04;p.life-=p.dec;if(p.life<=0)parts.splice(i,1)}
@@ -196,6 +205,7 @@ function update(){
   switch(mode){
     case'AIM':{
       const t=tanks[turn];let mov=false;
+      if(online){onlineAim(t);break}
       if(t.p===0){
         if(keys.KeyQ&&t.fuel>0){t.x=Math.max(20,t.x-MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
         if(keys.KeyE&&t.fuel>0){t.x=Math.min(W-20,t.x+MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
@@ -260,6 +270,7 @@ function render(){
   // Powerups
   for(const p of powerups)drawPU(p);
   // Aim dots
+  if(onlineAnim)drawOnlineAnim();
   if(mode==='AIM'||mode==='AI_THINK'){const dots=aimDots();for(let i=0;i<dots.length;i++){ctx.globalAlpha=.45*(1-i/dots.length);ctx.fillStyle=PL.aim;ctx.beginPath();ctx.arc(dots[i].x,dots[i].y,2.5,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
   // Tanks
   for(let i=0;i<2;i++)drawTank(tanks[i],i===turn&&(mode==='AIM'||mode==='AI_THINK'));
@@ -307,12 +318,14 @@ function drawTank(tank,act){
 // ── HUD ──
 function drawHUD(){
   ctx.fillStyle=PL.hud;fillRR(15,10,W-30,72,10);
-  const p2n=aiEnabled?'Mint (AI)':'Mint';
-  drawHP(30,22,170,12,tanks[0].hp/MAXHP,PL.hp1,'Lavender');drawFuel(30,42,170,8,tanks[0].fuel/FUELMAX);
+  const names=online?online.names:null;
+  const p1n=names?names[0]||'Lavender':'Lavender';
+  const p2n=names?names[1]||'Mint':aiEnabled?'Mint (AI)':'Mint';
+  drawHP(30,22,170,12,tanks[0].hp/MAXHP,PL.hp1,p1n);drawFuel(30,42,170,8,tanks[0].fuel/FUELMAX);
   drawHP(W-200,22,170,12,tanks[1].hp/MAXHP,PL.hp2,p2n);drawFuel(W-200,42,170,8,tanks[1].fuel/FUELMAX);
   ctx.textAlign='center';
   if(mode!=='OVER'&&mode!=='DEATH'){
-    const tc=turn===0?PL.t1:PL.t2,tn=turn===0?'Lavender':p2n;
+    const tc=turn===0?PL.t1:PL.t2,tn=turn===0?p1n:p2n;
     ctx.font='600 14px Fredoka,sans-serif';ctx.fillStyle=tc;
     if(mode==='AI_THINK'){const dots='.'.repeat(Math.floor(aiTimer/12)%4);ctx.fillText('Thinking'+dots,W/2,28)}
     else ctx.fillText(tn+"'s Turn",W/2,28);
@@ -324,7 +337,10 @@ function drawHUD(){
     // Terrain name
     ctx.font='400 10px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.3;ctx.fillText(TERRAINS[terrainIdx].name,W/2,H-22);ctx.globalAlpha=1;
   }
-  if(mode==='AIM'&&!aiEnabled){
+  if(mode==='AIM'&&online){
+    ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.6;
+    ctx.fillText('Drive Q/E · Aim A/D or ←→ · Power W/S or ↑↓ · 1-4 weapon · Space fire',W/2,H-8);ctx.globalAlpha=1;
+  } else if(mode==='AIM'&&!aiEnabled){
     const hint=turn===0?'Q/E Move  ·  A/D Aim  ·  W/S Power  ·  1-4 Weapon  ·  Space Fire'
                       : ', . Move  ·  ← → Aim  ·  ↑ ↓ Power  ·  1-4 Weapon  ·  Enter Fire';
     ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.6;ctx.fillText(hint,W/2,H-8);ctx.globalAlpha=1;
@@ -333,7 +349,7 @@ function drawHUD(){
     ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.6;ctx.fillText('Q/E Move  ·  A/D Aim  ·  W/S Power  ·  1-4 Weapon  ·  Space Fire',W/2,H-8);ctx.globalAlpha=1;
   }
   if(missed&&mode==='SWITCH'&&timer>15){ctx.globalAlpha=Math.min(1,(timer-15)/20);ctx.font='500 22px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=PL.txL;ctx.fillText('Miss!',W/2,H/2-40);ctx.globalAlpha=1}
-  if(mode==='OVER'){ctx.fillStyle='rgba(45,36,56,0.55)';ctx.fillRect(0,0,W,H);const a=Math.min(1,overT/30);const wn=winner===0?'Lavender':'Mint',wc=winner===0?PL.t1:PL.t2;ctx.globalAlpha=a;ctx.font='700 48px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=wc;ctx.fillText(wn+' Wins!',W/2,H/2-15);ctx.font='400 18px Fredoka,sans-serif';ctx.fillStyle=PL.w;ctx.fillText('Press R to play again',W/2,H/2+25);ctx.globalAlpha=1}
+  if(mode==='OVER'){ctx.fillStyle='rgba(45,36,56,0.55)';ctx.fillRect(0,0,W,H);const a=Math.min(1,overT/30);const wn=online?(online.names[winner]||(winner===0?'Lavender':'Mint')):(winner===0?'Lavender':'Mint'),wc=winner===0?PL.t1:PL.t2;ctx.globalAlpha=a;ctx.font='700 48px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=wc;ctx.fillText(wn+' Wins!',W/2,H/2-15);if(!online){ctx.font='400 18px Fredoka,sans-serif';ctx.fillStyle=PL.w;ctx.fillText('Press R to play again',W/2,H/2+25)}ctx.globalAlpha=1}
 }
 
 function drawHP(x,y,w,h,r,col,lbl){ctx.fillStyle=PL.hpBg;fillRR(x,y,w,h,3);if(r>0){ctx.fillStyle=col;fillRR(x,y,Math.max(h,w*r),h,3)}ctx.font='600 11px Fredoka,sans-serif';ctx.textAlign='left';ctx.fillStyle=PL.tx;ctx.fillText(lbl+'  '+Math.round(r*MAXHP)+' HP',x+2,y-3)}
@@ -385,9 +401,130 @@ function startGame(){
 
 function init(){mode='TITLE';terrainIdx=terrainIdx||0;keys={};debris=[];parts=[];popups=[];powerups=[];proj=[]}
 
+/* ── Bored Together ──────────────────────────────────────────────────────── */
+// The bridge arrives before this script does. It carries the match state (seed
+// and shots), the seat and the rules URL; nothing else is trusted from here.
+const together=window.__boredTogether;
+
+function onlineAim(t){
+  if(!online||!online.canPlay||onlineAnim)return;
+  let mov=false;
+  if((keys.KeyQ||keys.Comma||keys._cL)&&t.fuel>0){t.x=Math.max(20,t.x-MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
+  if((keys.KeyE||keys.Period||keys._cR)&&t.fuel>0){t.x=Math.min(W-20,t.x+MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
+  if(keys.KeyA||keys.ArrowLeft)t.angle=Math.min(85,t.angle+ASPD);
+  if(keys.KeyD||keys.ArrowRight)t.angle=Math.max(5,t.angle-ASPD);
+  if(keys.KeyW||keys.ArrowUp)power=Math.min(MAXPW,power+PWSPD);
+  if(keys.KeyS||keys.ArrowDown)power=Math.max(MINPW,power-PWSPD);
+  if(mov)mkDust(t.x,tY(t.x));
+}
+
+function onlineTank(t,i){
+  return{x:t.x,p:i,hp:t.hp,angle:t.angle,fuel:t.fuel,shield:!!t.shield,
+    ammo:{heavy:t.ammo.heavy||0,cluster:t.ammo.cluster||0,nuke:t.ammo.nuke||0}};
+}
+
+// Everything on screen comes out of the stored shots. The saved battle is not
+// read directly: the seed and the shots are handed to the shared rules, and the
+// board, hit points and winner below are what that replay produced.
+function paintOnline(state){
+  const world=online.engine.replay(state);
+  terrain=Array.from(world.board);
+  tanks=world.tanks.map(onlineTank);
+  powerups=world.powerups.map(p=>({x:p.x,y:p.y,ty:PUTYPES.find(u=>u.key===p.key)||PUTYPES[0],gnd:true}));
+  proj=[];parts=[];popups=[];debris=[];
+  terrainIdx=world.layout;
+  turn=world.winner?0:(state.turn===2?1:0);
+  winner=world.winner?world.winner-1:-1;
+  overT=0;power=5;selWeap='standard';
+  online.state=state;online.world=world;
+  online.canPlay=!!online.context.canPlay&&!world.winner&&online.status==='active';
+  mode=world.winner?'OVER':(online.canPlay?'AIM':'WATCH');
+}
+
+// The arc that was just sent, drawn from the same simulation the opponent will
+// replay. Past shots are not animated: a load paints their result directly.
+function drawOnlineAnim(){
+  const{trails,bursts,frame}=onlineAnim;
+  for(const trail of trails){
+    const upto=Math.min(frame+1,trail.length);
+    for(let i=0;i<upto;i++){
+      ctx.globalAlpha=.15+.3*(i/upto);
+      ctx.fillStyle=trail.child?PL.cShG:PL.shG;
+      ctx.beginPath();ctx.arc(trail[i].x,trail[i].y,trail.child?2:3,0,Math.PI*2);ctx.fill();
+    }
+    if(upto<trail.length){
+      const head=trail[upto-1];
+      ctx.globalAlpha=1;ctx.fillStyle=trail.child?PL.cSh:PL.sh;
+      ctx.beginPath();ctx.arc(head.x,head.y,trail.child?3.5:5,0,Math.PI*2);ctx.fill();
+    }
+  }
+  for(const b of bursts){
+    const step=frame-b.at;
+    if(step<0)continue;
+    ctx.globalAlpha=Math.max(0,1-step/24);
+    ctx.fillStyle=b.type==='nuke'?'#fff':PL.exp[0];
+    ctx.beginPath();ctx.arc(b.x,b.y,Math.min(b.r,8+step*3),0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+async function onlineFire(){
+  if(!online||!online.canPlay||onlineBusy||onlineAnim)return;
+  const seat=online.seat,t=tanks[seat-1];
+  const shot={seat,x:Math.round(t.x),angle:Math.round(t.angle),power:Math.round(power*10)/10,weapon:selWeap};
+  let result;
+  try{result=online.engine.advance(online.state,shot)}
+  catch(error){mkPopup(t.x,tY(t.x)-40,error.message,'#FF7B8E');return}
+  onlineBusy=true;
+  try{
+    const context=await together.submit({...shot,won:result.next.winner===seat});
+    online.context=context;online.status=context.status;
+    const longest=result.world.trails.reduce((n,trail)=>Math.max(n,trail.length),0);
+    onlineAnim={trails:result.world.trails,bursts:result.world.bursts,frame:0,max:longest+24};
+    setTimeout(()=>{
+      onlineAnim=null;onlineBusy=false;
+      paintOnline(context.state);
+      together.finishTurn();
+    },Math.max(320,Math.min(3200,longest*16)));
+  }catch(error){
+    onlineBusy=false;
+    together.error(error,()=>{onlineBusy=false;onlineFire()});
+  }
+}
+
+async function startOnline(){
+  const bridge=together.context;
+  online={engine:null,seat:bridge.seat===2?2:1,names:Array.isArray(bridge.players)?bridge.players:['Lavender','Mint'],
+    canPlay:false,status:bridge.status||'active',context:bridge,state:bridge.state,world:null};
+  try{online.engine=await import(together.engineURL)}
+  catch(error){
+    const note=document.createElement('p');
+    note.style.cssText='position:fixed;left:0;right:0;bottom:18px;text-align:center;font:14px system-ui;color:#fff';
+    note.textContent='This game could not load its rules. '+error.message;
+    document.body.append(note);
+    return;
+  }
+  keys={};
+  paintOnline(bridge.state);
+  loop();
+}
+
+/* Small handle for the test suite; it only exposes what the board already shows. */
+window.__test={
+  state:()=>({mode,turn,power,online:!!online,
+    seed:online&&online.state?online.state.seed:null,
+    shots:online&&online.state&&Array.isArray(online.state.shots)?online.state.shots.length:0,
+    hp:tanks?tanks.map(t=>t.hp):[],x:tanks?tanks.map(t=>Math.round(t.x)):[],
+    angle:tanks?tanks.map(t=>Math.round(t.angle)):[],
+    terrain:tanks?tanks.map(t=>Math.round(tY(t.x))):[]}),
+  aim:(angle,pw)=>{if(tanks){tanks[turn].angle=angle;power=pw}},
+  fire:()=>fire()
+};
+
 // ── Loop ──
 function loop(){update();render();requestAnimationFrame(loop)}
-Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,2000))]).then(()=>{init();loop()});
+if(together)startOnline();
+else Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,2000))]).then(()=>{init();loop()});
 </script>
 </body>
 </html>
