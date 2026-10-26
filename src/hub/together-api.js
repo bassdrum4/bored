@@ -21,5 +21,9 @@ export async function togetherRPC(action, args = {}) {
   if (tracked) window.dispatchEvent(new CustomEvent('bored:together-telemetry', {
     detail: { kind: tracked, game: result?.game || args.game || null, match_id: result?.id || args.match_id || null }
   }));
+  if (result?.status === 'completed' && ['move','pool_move','submit_run'].includes(action))
+    window.dispatchEvent(new CustomEvent('bored:together-telemetry', {
+      detail: { kind: 'bt_complete', game: result.game || args.game || null, match_id: result.id || args.match_id || null }
+    }));
   return result;
 }
