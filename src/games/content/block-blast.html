@@ -6,37 +6,51 @@
 <title>Block Blast</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box }
-  html, body { height: 100% }
-  body { display: grid; place-items: center; padding: 10px; background: #f5f2ea; color: #191713;
-         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif }
-  main { width: min(332px, 100%); display: grid; gap: 10px; justify-items: center }
-  #hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px;
-         font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-         letter-spacing: .09em; text-transform: uppercase; color: #6b6558 }
-  #hud b { font-weight: 600; color: #191713 }
-  #board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; width: 100%; padding: 6px;
-           border: 1px solid #d8d2c4; border-radius: 4px; background: #fffdf7; touch-action: none;
-           outline: none }
-  #board:focus-visible { border-color: #a9542f }
-  .cell { aspect-ratio: 1 / 1; border: 1px solid #e7e0d0; border-radius: 2px; background: #faf7ee }
-  .cell.on { background: #a9542f; border-color: #8d4526 }
-  .cell.preview { background: #e8c6b5; border-color: #c07a5a }
-  .cell.bad { background: #f6ece5; border: 1px dotted #a9542f }
-  #board.kbd .cell.cursor { border-color: #191713; border-style: solid }
-  .cell.clearing { background: #191713; border-color: #191713 }
-  #tray { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 100% }
-  .slot { min-height: 56px; display: grid; place-items: center; padding: 0; border: 1px solid #e2dbcb;
-          border-radius: 4px; background: #fffdf7; color: inherit; font: inherit; cursor: grab;
-          touch-action: none; appearance: none }
-  .slot.picked { border-color: #a9542f }
-  .slot.spent { border-style: dashed; background: none; cursor: default }
-  .mini { display: grid; gap: 2px }
-  .mini i { display: block; width: 9px; height: 9px; border-radius: 2px; background: #a9542f }
-  .mini i.off { background: none }
-  #status { min-height: 2.7em; font-size: 11.5px; color: #6b6558; text-align: center }
-  #again { padding: 7px 14px; border: 1px solid #191713; border-radius: 3px; background: none;
-           color: inherit; font: inherit; font-size: 12px; cursor: pointer }
+  html, body { min-height: 100%; overscroll-behavior: contain }
+  body { display: grid; place-items: center; min-height: 100dvh; padding: 12px;
+    background: #f5f2ea; color: #191713;
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif }
+  main { width: min(390px, 100%); display: grid; gap: 12px; justify-items: center }
+  #hud { display: flex; width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px;
+    font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .07em; text-transform: uppercase; color: #6b6558 }
+  #hud b { font-weight: 700; color: #191713; font-variant-numeric: tabular-nums }
+  #hud #combo { color: #a9542f }
+  #board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px;
+    width: 100%; padding: 8px; border: 1px solid #d8d2c4; border-radius: 5px;
+    background: #fffdf7; touch-action: none; user-select: none; outline: none }
+  #board:focus-visible { border-color: #a9542f; outline: 2px solid #c78863; outline-offset: 2px }
+  .cell { aspect-ratio: 1 / 1; border: 1px solid #e7e0d0; border-radius: 3px; background: #f5f0e5;
+    transition: background-color 90ms ease, transform 90ms ease }
+  .cell.on { background: #a9542f; border-color: #8d4526;
+    box-shadow: inset 0 2px 0 #c47a53, inset 0 -2px 0 #8d4526 }
+  .cell.preview { background: #de9e78; border-color: #b56842;
+    box-shadow: inset 0 2px 0 #f0c1a3 }
+  .cell.bad { background: #f6e5dc; border: 1px dashed #a9542f }
+  #board.kbd .cell.cursor { outline: 2px solid #191713; outline-offset: -2px }
+  .cell.clearing { background: #191713; border-color: #191713; box-shadow: none; transform: scale(.86) }
+  #tray { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; width: 100%;
+    touch-action: none }
+  .slot { min-width: 0; min-height: 88px; display: grid; place-items: center; padding: 8px 3px;
+    border: 1px solid #e2dbcb; border-radius: 5px; background: #fffdf7; color: inherit;
+    font: inherit; cursor: grab; touch-action: none; user-select: none; appearance: none }
+  .slot:not(.spent):hover { border-color: #bd947b }
+  .slot.picked { border-color: #a9542f; background: #faeee4; outline: 1px solid #a9542f;
+    outline-offset: -3px }
+  .slot.spent { border-style: dashed; background: transparent; cursor: default }
+  .mini { --mini-cell: clamp(10px, 3.4vw, 16px); display: grid; gap: 2px; pointer-events: none }
+  .mini i { display: block; width: var(--mini-cell); height: var(--mini-cell);
+    border: 1px solid #8d4526; border-radius: 3px; background: #a9542f;
+    box-shadow: inset 0 2px 0 #c47a53 }
+  .mini i.off { background: none; border-color: transparent; box-shadow: none }
+  #drag-ghost { position: fixed; z-index: 5; left: 0; top: 0; transform: translate(-50%, -50%);
+    pointer-events: none; opacity: .94; filter: drop-shadow(0 2px 2px #19171333) }
+  #drag-ghost[hidden] { display: none }
+  #status { min-height: 2.8em; font-size: 12px; color: #6b6558; text-align: center }
+  #again { padding: 9px 16px; border: 1px solid #191713; border-radius: 4px;
+    background: #fffdf7; color: inherit; font: inherit; font-size: 12px; cursor: pointer }
   #again[hidden] { display: none }
+  @media (prefers-reduced-motion: reduce) { .cell { transition: none } }
 </style>
 </head>
 <body>
@@ -49,15 +63,16 @@
   </div>
   <div id="board" role="grid" aria-label="Block grid, eight by eight" tabindex="0"></div>
   <div id="tray" role="group" aria-label="Pieces"></div>
-  <p id="status">Drag a piece onto the grid. Clear a row or column, then clear again with the next piece to build a combo.</p>
+  <div id="drag-ghost" aria-hidden="true" hidden></div>
+  <p id="status" aria-live="polite">Drag a block onto the grid, or select one and tap to place it.</p>
   <button id="again" type="button" hidden>Play again</button>
 </main>
 <script>
 const SIZE = 8, COUNT = SIZE * SIZE;
 const $ = id => document.getElementById(id);
-const boardEl = $('board'), trayEl = $('tray'), statusEl = $('status');
+const boardEl = $('board'), trayEl = $('tray'), statusEl = $('status'), ghostEl = $('drag-ghost');
 const scoreEl = $('score'), bestEl = $('best'), linesEl = $('lines'), comboEl = $('combo');
-const HINT = 'Drag a piece onto the grid. Clear a row or column, then clear again with the next piece to build a combo.';
+const HINT = 'Drag a block onto the grid, or select one and tap to place it.';
 
 /* ── Pieces ──────────────────────────────────────────────────────────────── */
 
@@ -115,7 +130,7 @@ try {
 const board = new Uint8Array(COUNT);
 let tray = [];
 let selected = -1;
-let score = 0, lines = 0, combo = 0, cursor = 0;
+let score = 0, lines = 0, combo = 0, misses = 0, cursor = 0;
 let finished = false, busy = false;
 let drag = null, press = null, preview = null;
 // Bumped by a restart so the clear animation of an abandoned run cannot undo it.
@@ -165,9 +180,8 @@ function paint() {
   scoreEl.textContent = score;
   bestEl.textContent = best;
   linesEl.textContent = lines;
-  // A combo is a run of placements that each clear something. It is shown only
-  // while it is alive, because ×1 is just a clear.
-  comboEl.textContent = combo > 1 ? '×' + combo : '—';
+  // A combo counts clearing placements, with up to two setup moves in between.
+  comboEl.textContent = combo > 1 ? '×' + Math.min(combo, 8) : '—';
 }
 
 /* ── Preview ─────────────────────────────────────────────────────────────── */
@@ -224,20 +238,81 @@ function pickShape() {
   return SHAPES[0];
 }
 
-// A fresh tray always offers at least one piece that fits, so the game is lost
-// to the board filling up rather than to a deal nobody could play.
-function deal() {
-  for (let attempt = 0; attempt < 16; attempt++) {
-    const pieces = [pickShape(), pickShape(), pickShape()];
-    if (pieces.some(canPlaceAnywhere)) { tray = pieces; return; }
+// Exact three-piece lookahead. Occupied cells fit in a 64-bit bitboard.
+// Clearing happens after EACH placement, including crossed rows/columns.
+// All three pieces may be played in any order: the solver tries every order
+// and every legal position, memoizing dead states rather than guessing.
+const ROW_MASKS = Array.from({ length: SIZE }, (_, r) => 255n << BigInt(r * SIZE));
+const COL_MASKS = Array.from({ length: SIZE }, (_, c) =>
+  ROW_MASKS.reduce((mask, _, r) => mask | (1n << BigInt(r * SIZE + c)), 0n));
+const shapeMasks = new WeakMap();
+
+function boardMask() {
+  let mask = 0n;
+  for (let i = 0; i < COUNT; i++) if (board[i]) mask |= 1n << BigInt(i);
+  return mask;
+}
+
+function placementsFor(piece) {
+  if (shapeMasks.has(piece)) return shapeMasks.get(piece);
+  const placements = [];
+  for (let r = 0; r <= SIZE - piece.h; r++) {
+    for (let c = 0; c <= SIZE - piece.w; c++) {
+      let mask = 0n;
+      for (const [x, y] of piece.cells) mask |= 1n << BigInt((r + y) * SIZE + c + x);
+      placements.push(mask);
+    }
   }
-  tray = [pickShape(), pickShape(), pickShape()];
+  shapeMasks.set(piece, placements);
+  return placements;
+}
+
+function clearLines(mask) {
+  let clear = 0n;
+  for (const row of ROW_MASKS) if ((mask & row) === row) clear |= row;
+  for (const col of COL_MASKS) if ((mask & col) === col) clear |= col;
+  return mask & ~clear;
+}
+
+function canFinishHand(pieces, start = boardMask()) {
+  if (!pieces.length) return true;
+  const placements = pieces.map(placementsFor);
+  const dead = new Set();
+  const all = (1 << pieces.length) - 1;
+  function search(occupied, remaining) {
+    if (!remaining) return true;
+    const key = occupied.toString(16) + ':' + remaining;
+    if (dead.has(key)) return false;
+    for (let i = 0; i < pieces.length; i++) {
+      if (!(remaining & (1 << i))) continue;
+      for (const cells of placements[i]) {
+        if ((occupied & cells) !== 0n) continue;
+        if (search(clearLines(occupied | cells), remaining & ~(1 << i))) return true;
+      }
+    }
+    dead.add(key);
+    return false;
+  }
+  return search(start, all);
+}
+
+// Only accept a tray after proving that ALL three pieces can be placed.
+// When a crowded board defeats the random candidates, three singles are a
+// guaranteed fallback: after line clears, each of the 8 rows has an empty
+// square, so there are always enough cells for three singles.
+function deal() {
+  for (let attempt = 0; attempt < 48; attempt++) {
+    const pieces = [pickShape(), pickShape(), pickShape()];
+    if (canFinishHand(pieces)) { tray = pieces; return; }
+  }
+  tray = [SHAPES[0], SHAPES[0], SHAPES[0]];
+  if (!canFinishHand(tray)) throw new Error('The dealt hand must be solvable');
 }
 
 function miniPiece(piece) {
   const grid = document.createElement('span');
   grid.className = 'mini';
-  grid.style.gridTemplateColumns = 'repeat(' + piece.w + ', 9px)';
+  grid.style.gridTemplateColumns = 'repeat(' + piece.w + ', var(--mini-cell))';
   grid.setAttribute('aria-hidden', 'true');
   for (let y = 0; y < piece.h; y++) {
     for (let x = 0; x < piece.w; x++) {
@@ -257,6 +332,7 @@ function renderTray() {
     slot.type = 'button';
     slot.className = 'slot' + (piece ? '' : ' spent') + (i === selected ? ' picked' : '');
     slot.disabled = !piece || finished;
+    slot.setAttribute('aria-pressed', String(i === selected));
     slot.setAttribute('aria-label', piece
       ? 'Piece ' + (i + 1) + ', ' + piece.w + ' by ' + piece.h + (i === selected ? ', picked up' : '')
       : 'Piece ' + (i + 1) + ', used');
@@ -295,10 +371,12 @@ function place(index, row, col) {
   }
 
   if (!rows.length && !cols.length) {
-    combo = 0;
+    misses += 1;
+    if (misses >= 3) { combo = 0; misses = 0; }
     busy = false;
     paint();
-    setStatus(HINT);
+    setStatus(combo ? 'Combo ×' + Math.min(combo, 8) + ' · clear within ' +
+      (3 - misses) + ' more placement' + (3 - misses === 1 ? '' : 's') : HINT);
     finishTurn();
     return true;
   }
@@ -307,11 +385,14 @@ function place(index, row, col) {
   const cleared = new Set();
   for (const r of rows) for (let c = 0; c < SIZE; c++) cleared.add(r * SIZE + c);
   for (const c of cols) for (let r = 0; r < SIZE; r++) cleared.add(r * SIZE + c);
-  // Clearing several lines at once is worth more than one at a time: each line
-  // that goes in the same placement steps the combo on.
+  // The original classic-style chain advances once per clearing PLACEMENT,
+  // not once per line, and survives up to two non-clearing placements.
   const count = rows.length + cols.length;
-  combo += count;
-  const gained = cleared.size * 10 * combo;
+  combo += 1;
+  misses = 0;
+  const bonus = cleared.size * 10 * Math.min(combo, 8);
+  const allClear = board.every((cell, i) => !cell || cleared.has(i));
+  const gained = bonus + (allClear ? 300 : 0);
   score += gained;
   lines += count;
   paint();
@@ -358,11 +439,12 @@ function restart() {
   score = 0;
   lines = 0;
   combo = 0;
+  misses = 0;
   cursor = 0;
   finished = false;
   busy = false;
   selected = -1;
-  drag = null;
+  endDrag();
   press = null;
   clearPreview();
   $('again').hidden = true;
@@ -375,15 +457,30 @@ function restart() {
 
 /* ── Pointer play: drag a piece, or pick it up and tap a cell ─────────────── */
 
+function updateTraySelection() {
+  for (let i = 0; i < trayEl.children.length; i++) {
+    trayEl.children[i].classList.toggle('picked', i === selected);
+    if (tray[i]) trayEl.children[i].setAttribute('aria-pressed', String(i === selected));
+  }
+}
+
+function moveGhost(x, y, lift) {
+  ghostEl.style.left = x + 'px';
+  ghostEl.style.top = (y - lift) + 'px';
+}
+
 function startDrag(event, index) {
-  if (finished || busy || !tray[index]) return;
+  if (finished || busy || !tray[index] || drag) return;
   event.preventDefault();
   selected = index;
   drag = {
     pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
     moved: false, touch: event.pointerType !== 'mouse', index
   };
-  renderTray();
+  // Keep the original button mounted throughout the gesture: rebuilding it
+  // during pointerdown cancelled touch drags on some mobile browsers.
+  updateTraySelection();
+  if (trayEl.setPointerCapture) trayEl.setPointerCapture(event.pointerId);
   window.addEventListener('pointermove', onDragMove);
   window.addEventListener('pointerup', onDragUp);
   window.addEventListener('pointercancel', onDragCancel);
@@ -391,6 +488,8 @@ function startDrag(event, index) {
 
 function endDrag() {
   drag = null;
+  ghostEl.hidden = true;
+  ghostEl.textContent = '';
   window.removeEventListener('pointermove', onDragMove);
   window.removeEventListener('pointerup', onDragUp);
   window.removeEventListener('pointercancel', onDragCancel);
@@ -402,7 +501,14 @@ function onDragMove(event) {
   if (!drag.moved) return;
   const piece = tray[drag.index];
   if (!piece) return;
-  const lift = drag.touch ? cellStep() * 1.6 : 0;
+  const lift = drag.touch ? cellStep() * 1.7 : 0;
+  if (ghostEl.hidden) {
+    const mini = miniPiece(piece);
+    mini.style.setProperty('--mini-cell', Math.max(10, cellStep() - 3) + 'px');
+    ghostEl.appendChild(mini);
+    ghostEl.hidden = false;
+  }
+  moveGhost(event.clientX, event.clientY, lift);
   const at = cellAt(event.clientX, event.clientY, lift, piece);
   if (at) showPreview(at.row, at.col, piece);
   else clearPreview();
@@ -414,8 +520,8 @@ function onDragUp(event) {
   const piece = tray[index];
   endDrag();
   if (!piece) return;
-  if (!moved) { clearPreview(); return; }   // a tap leaves the piece picked up
-  const at = cellAt(event.clientX, event.clientY, touch ? cellStep() * 1.6 : 0, piece);
+  if (!moved) { clearPreview(); renderTray(); return; } // tap to select
+  const at = cellAt(event.clientX, event.clientY, touch ? cellStep() * 1.7 : 0, piece);
   if (at && fits(piece, at.row, at.col)) place(index, at.row, at.col);
   else {
     selected = -1;
@@ -425,9 +531,11 @@ function onDragUp(event) {
   }
 }
 
-function onDragCancel() {
+function onDragCancel(event) {
+  if (!drag || event.pointerId !== drag.pointerId) return;
   endDrag();
   clearPreview();
+  renderTray();
 }
 
 boardEl.addEventListener('pointerdown', event => {
@@ -448,8 +556,10 @@ boardEl.addEventListener('pointermove', event => {
   else clearPreview();
 });
 
+boardEl.addEventListener('pointercancel', () => { press = null; clearPreview(); });
+
 boardEl.addEventListener('pointerup', event => {
-  if (!press || finished || busy) return;
+  if (!press || event.pointerId !== press.pointerId || finished || busy) return;
   press = null;
   if (selected < 0 || !tray[selected]) return;
   const at = cellAt(event.clientX, event.clientY, 0, tray[selected]);
@@ -528,7 +638,7 @@ window.__boredSnapshot = () => ({
 window.__test = {
   state: () => ({
     board: Array.from(board), tray: tray.map(piece => piece ? piece.cells.slice() : null),
-    score, lines, combo, finished, selected
+    score, lines, combo, misses, finished, selected
   }),
   setBoard: rows => {
     board.fill(0);
@@ -540,7 +650,11 @@ window.__test = {
     selected = -1;
     renderTray();
     paint();
-  }
+  },
+  deal: () => { deal(); renderTray(); return canFinishHand(tray); },
+  canFinishHand: () => canFinishHand(tray.filter(Boolean)),
+  place: (index, row, col) => place(index, row, col),
+  restart
 };
 </script>
 </body>
