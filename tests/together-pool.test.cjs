@@ -86,15 +86,3 @@ test('pool endpoint and SQL: complete saved game, repeat requests, auth and resu
  const preflight=await handler(new Request('https://example.test',{method:'OPTIONS'}));assert.equal(preflight.status,204);
  const signedOut=await handler(new Request('https://example.test',{method:'POST',body:'{}'}));assert.equal(signedOut.status,401);
 });
-
-test('pool animation tolerates an RAF timestamp before the shot starts and always settles',async t=>{
- const saved={document:global.document,requestAnimationFrame:global.requestAnimationFrame,cancelAnimationFrame:global.cancelAnimationFrame};
- t.after(()=>{for(const [key,value] of Object.entries(saved)){if(value===undefined)delete global[key];else global[key]=value;}});
- global.document={hidden:false,addEventListener(){},removeEventListener(){}};
- let n=0;global.requestAnimationFrame=callback=>{const frame=++n;queueMicrotask(()=>callback(performance.now()+(frame===1?-500:5000)));return frame;};global.cancelAnimationFrame=()=>{};
- const painted=[];const context=new Proxy({arc:(x,y,r)=>{if(r===3.05)painted.push(x);}},{get:(target,key)=>key in target?target[key]:()=>{}});
- const canvas={width:240,isConnected:true,getContext:()=>context};
- const {animatePoolShot}=await import('../src/hub/together-pool.js');
- await animatePoolShot(canvas,[[{id:0,x:50,y:55}],[{id:0,x:70,y:55}]]);
- assert.deepEqual(painted,[50,50,70]);
-});

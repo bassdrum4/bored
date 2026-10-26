@@ -143,6 +143,7 @@ function arcadeGame(kind) {
   }
 
   if (kind === 'connect-four') {
+    const online = window.__boredTogether;
     $('#instructions').textContent = 'Drop a disc into a column. Connect four horizontally, vertically, or diagonally. Use the buttons or keys 1–7. You are red; the computer is gold.';
     board.className = 'connect'; board.setAttribute('aria-label', 'Connect Four board');
     const mode = document.createElement('select'); mode.setAttribute('aria-label', 'Opponent');
@@ -222,6 +223,7 @@ function arcadeGame(kind) {
       draw(); return true;
     }
     function play(col) {
+      if (online) { if (!over && !busy && online.context.canPlay && landing(cells, col) >= 0) saveTurn(col); return; }
       if (over || busy || !drop(col) || over || mode.value !== 'computer') return;
       busy = true; status.textContent = 'The computer is thinking…'; draw();
       timer = setTimeout(() => { const col = chooseMove(cells); busy = false; drop(col); }, 260);
@@ -229,7 +231,23 @@ function arcadeGame(kind) {
     function reset() { clearTimeout(timer); cells = Array(42).fill(0); turn = 1; over = false; busy = false; status.textContent = 'Red goes first. Pick a column.'; draw(); }
     mode.onchange = reset; button('New game', reset);
     addEventListener('keydown', e => { if (/^[1-7]$/.test(e.key) && e.target.tagName !== 'SELECT') { e.preventDefault(); play(Number(e.key) - 1); } });
-    reset();
+    function restoreOnline() {
+      const match = online.context;
+      cells = match.state.board.slice(); turn = match.seat; over = match.status !== 'active'; busy = !match.canPlay;
+      draw();
+      stats.textContent = match.players[0] + ': red / ' + match.players[1] + ': gold';
+      status.textContent = over ? 'Game finished.' : match.canPlay ? 'Your turn. Pick a column.' : 'Their turn. Your game is saved.';
+    }
+    async function saveTurn(col) {
+      busy = true; draw(); status.textContent = 'Saving your move…';
+      try { await online.submit({ column: col }); restoreOnline(); online.finishTurn(); }
+      catch (error) { status.textContent = 'Move not confirmed.'; online.error(error, () => saveTurn(col)); }
+    }
+    if (online) {
+      $('#actions').hidden = true;
+      $('#instructions').textContent = 'Connect four horizontally, vertically, or diagonally. Use the buttons or keys 1–7. Your turn saves automatically.';
+      restoreOnline();
+    } else reset();
   }
 
   if (kind === 'aim-lab') {

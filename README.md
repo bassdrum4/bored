@@ -551,28 +551,27 @@ other browser tests it needs `CHROME_PATH`. No service key is included in the si
 
 ## Bored Together (optional asynchronous multiplayer)
 
-Open **Bored Together** in the navigation or from the Connect Four or 8 Ball catalog cards.
-Join explicitly using your existing Bored account, find an enrolled friend by
-username or exact email, or enter random matchmaking. Challenge acceptance,
-turns, match replay, rematches, friends, blocks, privacy controls and recent
-head-to-head statistics are saved in Supabase. Existing users are never enrolled
-automatically. An exact-email search automatically shows the matching email and
-username. Username searches hide email unless shared with accepted friends;
-random matches never display it.
+Open **Bored Together** in the navigation or from a Connect Four or 8 Ball card.
+Join with your existing account, then use **Challenge Someone** or **Play Random**.
+Choose a game and find an opted-in opponent by username or exact account email.
+Email addresses stay private, including in search results.
 
-Choose **Connect Four** or **8 Ball Pool** from the game selector. Pool includes
-server-validated shots, ball-in-hand placement, saved tables and shot replay. Mini Golf multiplayer is deferred
-until shot replay and server validation are implemented; its existing offline
-game and single-player leaderboard remain available. Notifications use durable
-database records and 15-second polling, so no push notification or shared link
-is required inside Google Sites.
+**Your Games** lists turns, incoming challenges and waiting games. Accept a
+challenge or open a match to play the original game in Bored's normal full-size
+player. A confirmed finished turn automatically returns to the list; Pool
+stays open while legal pots retain your turn. Failed saves keep the game open
+with retry/reload controls. Escape or the player menu returns without forfeiting.
+CPU/local games, single-player scores and daily challenges remain independent.
 
-For a new backend, install [`scripts/bored-together.sql`](scripts/bored-together.sql),
-then the forward SQL files in `supabase/migrations/`. Existing backends apply only
-the forward migration. Pool also requires the authenticated `together-pool` Edge
-Function; see the deployment instructions below. See [architecture, privacy/retention, setup, tests and
-extending the game engine](docs/bored-together.md). The SQL migration adds a
-private schema, restricted RPC and daily retention job; it does not change
-existing single-player data. `npm test` includes the isolated database and
-two-account browser suite. CI also runs concurrent requests against a disposable
-PostgreSQL 17 service.
+There are no social tabs, friend requests, stats dashboards, activity feed,
+visibility settings or mini-game renderers. Rematches remain beside recently
+finished games; small overflow menus hold blocking and leaving. Matches persist
+in Supabase, so opponents can play at different times and on different devices.
+Mini Golf multiplayer remains deferred pending authoritative shot validation.
+
+New backends install `scripts/bored-together.sql` once and the forward migrations
+in order. Existing backends apply only missing migrations. Pool also requires
+the authenticated `together-pool` Edge function. See
+[architecture, adapter contract, privacy, setup and verification](docs/bored-together.md).
+`npm test` includes isolated production-SQL tests, the original-game bridge and
+two-account browser flows; CI also checks races on disposable PostgreSQL 17.

@@ -1,288 +1,198 @@
 # Bored Together
 
-Bored Together is an optional part of the existing Bored account. It ships
-as ordinary native ES modules in `src/`; no bundler, second login, redirect,
-popup, link sharing or push notification is needed, including in Google Sites.
+Bored Together finds opponents and manages saved turns. The original games handle
+playing. It uses the existing Bored account, hub, native ES modules and player;
+there is no second arcade, login, popup or link-sharing requirement.
 
-## Shipped games and behavior
+## One screen
 
-Connect Four is playable from challenge to acceptance, individual turns,
-completion, move replay and a rematch invitation. Both Connect Four and 8 Ball
-catalog cards link to Together; single-player/CPU/local play stays available.
-Friends and random opponents use the same authoritative match lifecycle.
+After explicit enrollment, the screen has **Challenge Someone**, **Play Random**
+and **Your Games**. Starting a challenge means choosing a game, then searching
+for an opted-in username (literal prefix, minimum three characters) or an exact
+account email. Random play means choosing a game and joining its saved queue.
 
-**8 Ball Pool** is also supported through the game selector: friend challenges,
-random matchmaking, server-validated shots, ball-in-hand placement, continued
-turns after legal pots, saved tables, review/replay, winner detection and rematches.
-It shares the original pool game's zero-spin shot physics. House rules are
-explained next to the table: no spin, called pockets or rail-after-contact rule;
-an 8 on the break re-racks, and an early/fouled 8 loses.
+The list contains every active match and incoming/outgoing challenge, with turns
+and incoming challenges first. Accept/Decline are inline. The latest three
+completed matches remain at the bottom with a result and Rematch action; there
+is no history browser, records dashboard or replay. Small More menus hold Block,
+Unblock and Leave. Leaving explicitly warns that active games are forfeited.
 
-The dashboard includes turns, waiting matches, incoming/outgoing challenges,
-friend requests/friends, restricted discovery, queue status, recent games,
-head-to-head statistics, notifications, privacy settings and blocks. Homepage
-and navigation badges count actionable turns, invitations and friend requests.
-Existing single-player scores and leaderboards do not include multiplayer wins.
+Friend requests/management, People/History/Settings tabs, statistics, feeds,
+notification history/read controls, replay sliders and email visibility controls
+have been removed from the frontend. Existing private tables, retention,
+authorization and legacy RPC operations are retained for compatibility. Old
+friendships do not grant email access. Badges count only turns and incoming
+challenges, never friendships or notification history.
 
-The **Games** view leads with pending turns, saved-board match cards and a
-smaller invitations/quick-challenge sidebar. **People** holds search, requests
-and friends; **History** holds records and completed matches; **Settings** holds
-email visibility, blocks and membership controls. Tabs support arrow-key
-navigation, and activity updates are collapsed by default. On phones the panels
-stack, the account strip stays compact, and pending turns take priority over
-starting another game. The enrollment disclosure stays before the Join action
-in the mobile layout.
+## Original-game integration
 
-Mini Golf multiplayer is **deferred**, and is not presented as playable. Its
-current nine fixed holes already satisfy identical-course fairness, but its
-240 Hz physics, mutable browser state and completed-round stroke total are
-client-owned. Accepting that total would let a client award itself wins. The
-next implementation should extract versioned deterministic physics shared with
-a backend replay validator, store each player's ordered shot inputs, and
-reconstruct partial independent runs across devices. This is feasible, but is
-additional rule/physics work; simply wrapping the score snapshot is insufficient.
-No browser-submitted golf score is used for a multiplayer result.
+`src/hub/together-ui.js` owns enrollment, search, invitations, queues and the list.
+`src/hub/together-player.js` defines the small original-game adapter contract.
+`main.js` launches matches through the same `openGame`, original document loader,
+full-viewport `#player` and `#frame` used by ordinary games. The hub remains behind
+the player and is inert while playing. Multiplayer runs never post single-player
+high scores or count toward daily challenges. Restart is hidden for online games;
+Escape or **Bored Together** in the normal player menu exits without forfeiting.
 
-## Database installation
+Before the original game script runs, a bridge supplies:
 
-The existing project is `djdpttltfmwkofdrvkem`. The baseline SQL setup is
-[`../scripts/bored-together.sql`](../scripts/bored-together.sql). Apply it once
-through a Supabase migration or the authenticated SQL editor before publishing
-the frontend on a new project, then apply
-[`../supabase/migrations/20261025214401_together_pool_and_exact_email.sql`](../supabase/migrations/20261025214401_together_pool_and_exact_email.sql).
-Existing installations apply only the forward migration. It preserves accounts,
-existing memberships, games and moves; it adds pool support, shot snapshots and
-exact-email echo. The baseline exposes the ordinary RPC:
-
-```sql
-select public.bt_rpc('dashboard', '{}'::jsonb);
+```js
+window.__boredTogether = {
+  context: { state, status, seat, canPlay, players },
+  submit(move),        // Promise of the next authoritative context
+  finishTurn(),       // request a return after animation/input has settled
+  error(error, retry), // recoverable Retry save / Reload saved game controls
+  engineURL           // canonical shared Pool physics, for visual prediction only
+};
 ```
 
-The script is a **one-time migration**, not an idempotent reset script. Do not
-rerun it over a populated deployment. Subsequent schema changes need new
-forward-only migrations. It neither rewrites nor deletes existing accounts,
-profiles, scores, player state, analytics or leaderboard objects.
+The hub validates source window, unique launch channel and current account on
+messages. It attaches match ID, expected version and an idempotent request ID.
+No credentials or networking are passed into the iframe. The SQL/Edge validator
+alone decides state, turn ownership and result. `finishTurn()` only closes the
+player after a confirmed save whose authoritative response says the turn ended
+or match completed. A legal Pool pot can retain the turn for several shots.
 
-No new client API keys or Auth providers are required. Pool additionally uses
-`supabase/functions/together-pool/index.ts`, deployed as **together-pool** with
-`verify_jwt = true` (tracked in `supabase/config.toml`). Include `handler.js` and
-its canonical relative dependency `src/games/pool-engine.js` in the bundle.
-The Edge runtime's built-in `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
-`SUPABASE_SERVICE_ROLE_KEY` supply server configuration. No service key belongs
-in the repository or browser. The frontend and Edge function must ship the same
-version of the pool engine. Deploy the migration and function before the frontend. Keep `bored_together` out of
-Supabase's exposed schemas (the default exposed `public` is sufficient).
-`public.bt_rpc` is SECURITY INVOKER; the authorized dispatcher lives in the
-private schema with SECURITY DEFINER and an empty search path. Only the
-`authenticated` role may execute the dispatcher. Anonymous Supabase identities
-are rejected explicitly. Internal helpers have no client EXECUTE grants.
+Connect Four's adapter is inside its existing `arcade.js` implementation. It
+uses the original board, column buttons and keyboard input; CPU/local play still
+uses its original loop. Pool's adapter is inside `content/8ball.html` and uses the
+original canvas, aiming guide, cue placement, power rail, keyboard controls,
+rendering and sound. The old Together-specific mini-game renderers were removed.
+Pool's existing shared `pool-engine.js`, validating Edge function, shot commit
+RPC, rules, migrations and tests are preserved.
 
-All eight private tables have RLS enabled, no client table grants and no client
-policies. Clients cannot scan profiles, write matches, insert results, edit
-moves or read notifications directly. The dispatcher derives identity from
-`auth.uid()` and verifies the account still exists. Authorization never uses
-editable user metadata. The existing public single-player `profiles` table
-remains unchanged; Together does not grant it additional permissions.
+Pool v1 continues to use the previously shipped zero-spin house rules, with no
+called pockets or rail-after-contact requirement. Its original spin control is
+labeled **NO SPIN** and disabled for online play. An 8 on the break re-racks;
+an early/fouled 8 loses. Prediction uses the same canonical engine as validation
+and is drawn by the original game; it never supplies a result to the backend.
+Timer-based animation settles even if an embed stops receiving animation frames.
 
-When pg_cron is installed (as on this project), the migration schedules
-`bored-together-retention` daily at **04:17 UTC**. Check it with:
+If saving fails, the game stays open with an error and recovery controls. Retry
+uses the same request ID, including when the server saved but its response was
+lost. The board is restored from confirmed state, not a guessed winner or score.
+Reload fetches fresh authoritative state to recover stale versions. Exiting
+while a save is in flight does not cancel the server transaction; reopening
+always loads the saved state. There are no offline multiplayer moves.
 
-```sql
-select jobname, schedule, active from cron.job
-where jobname = 'bored-together-retention';
-```
+Only Connect Four and Pool have ready original-game adapters and authoritative
+rules. The selector intersects the catalog with the adapter registry. Mini Golf
+multiplayer remains deferred: its browser-reported stroke total is not trusted.
+A new game must implement the contract in its original game, add a versioned
+server validator, and pass the same lifecycle and two-account tests before
+being added to `TOGETHER_ADAPTERS`.
 
-On a backend without pg_cron, arrange a trusted daily call to
-`bored_together.cleanup()`; clients cannot execute it. Never expose cleanup as
-an unrestricted API. `NOTIFY pgrst` refreshes the RPC schema cache on installation.
+## Privacy, persistence and security
 
-## Consent, identity and retention
+Enrollment is optional; existing accounts are not automatically discoverable.
+Exact-email search is case-insensitive and requires active membership. It
+returns only the matching user ID and username, never the address. Username
+search also never returns email, including for legacy accepted friends. Email
+is read from Auth for exact comparison, never copied into multiplayer tables or
+indexed in a public directory. Partial email, wildcard and directory scans are
+unsupported. Blocked pairs and nonmembers are excluded from discovery.
 
-Existing users have no membership row until pressing **Join Bored Together**.
-New enrollment requires consent version `2026-10-25-v2` and records its timestamp.
-Existing version-1 memberships remain enrolled; their saved visibility settings
-and games are preserved. Exact-email lookup already identified those members;
-version 2 additionally echoes the matching address supplied by the searcher.
-Members can find members by username prefix (minimum 3 literal characters,
-maximum 10 results) or exact case-insensitive current Auth email. Searches have
-no pagination/directory endpoint, require membership and omit blocked pairs.
-They are limited to 20/minute and 200/UTC day per account. Mutating social
-requests have a separate 30/hour limit, and RPCs have a 180/minute budget.
-Account-based limits do not prevent abuse by somebody creating many accounts;
-this version does not add IP-level rate limiting or CAPTCHA.
+The forward `together_private_discovery` migration narrows both profile
+projections and exact-email results without deleting or changing saved games.
+Existing memberships remain valid. The current enrollment consent version is
+`2026-10-25-v2`; the frontend now explains the stricter private-email behavior.
+Legacy visibility settings have no effect on email disclosure.
 
-Email is read from Auth inside controlled functions and never copied into
-multiplayer tables. **An exact-email result automatically contains that matching
-email and username**, without a friend request or visibility toggle. Partial
-email matches are unsupported. Username searches and friend profiles still hide
-email by default. The optional **Show to accepted friends only** setting applies
-to those profile/username projections, not to an exact-email search. Blocking,
-nonmembership and leaving suppress results in either mode. Match responses always
-remove email, including random matches between accepted friends.
+All eight `bored_together` tables have RLS and no direct browser table grants.
+Keep this private schema outside the exposed Data API schemas. `public.bt_rpc`
+is SECURITY INVOKER; the dispatcher is in the private schema, SECURITY DEFINER
+with empty search path, and derives identity from `auth.uid()` after checking
+that the non-anonymous Auth account exists. Internal helpers cannot be called
+by browser roles. User-editable metadata never grants authorization.
 
-Leaving immediately disables discovery, exits queues, deletes friendships,
-cancels pending invitations, deletes the departing player's notifications and
-forfeits active matches. Minimal consent/membership records and block lists
-remain, so rejoining is explicit and existing blocks continue to protect the
-player. Rejoining resets email visibility to hidden. There is no cached email
-index to remove. Existing Bored identities and scores are untouched.
+Discovery is limited to 20/minute and 200/UTC day per account; social mutations
+have a separate 30/hour limit and RPCs a 180/minute budget. These are per-account
+limits, not IP-level protection against mass account creation. Existing shared
+transaction advisory locks, match-row locks, participant checks, turn ownership,
+rule versions, stale-version checks and unique request IDs are unchanged.
 
-Blocking is bilateral for discovery, invitations, friend requests and queue
-eligibility. It removes the friendship and cancels outstanding/active matches
-between the pair without awarding either player a win. Unblocking does not
-restore friendship or reactivate a match.
+Connect Four moves contain only a column. Pool sends angle (integer tenths of a
+degree), power (1–100) and optional legal cue placement. The `together-pool` Edge
+function authenticates the player, reads the match through their JWT, simulates
+with the canonical engine and invokes the service-only commit wrapper. The
+commit transaction rechecks membership, blocks, participant, turn and version.
+Ordinary browser roles cannot commit Pool state or choose a winner. The service
+key stays in the Edge runtime, never the page or game document.
 
-Queues/invitations expire after 7 days; active matches after 30 inactive days,
-with no clock-based winner. Pending friend requests expire after 30 days.
-Notifications are retained for 30 days. Terminal matches and their moves are
-retained for 90 days; statistics are calculated from that retained history,
-not lifetime totals. Cleanup runs daily, so deletion/expiry can lag its nominal
-cutoff by up to a day. The dashboard shows all open matches and the most recent
-50 terminal matches. Historical opponent usernames remain available to the
-other participant while the match is retained.
+Durable match and queue state lives in PostgreSQL. Visible pages poll every
+15 seconds and refresh on focus, visibility return and reconnection. Requests
+and UI results are tied to their initiating identity. Account changes clear the
+list and close an old account's game; same-account profile refreshes do not.
+There is no required realtime connection. Another device or page refresh
+restores each match from the backend, including Pool turns with multiple shots.
 
-## Authoritative engine and extending it
+Leaving hides membership, exits queues, cancels invitations, removes legacy
+friendships/notifications and forfeits active games. Blocking excludes both
+players from discovering/challenging/matching each other and cancels their open
+games without awarding a winner. Unblocking does not restart cancelled matches.
 
-`members`, `friendships`, `blocks`, `queue`, `matches`, `moves`, `notifications`
-and `limits` belong to the private schema. Foreign keys, a canonical unique
-friend pair, unique open game/pair, unique rematch reference and unique
-match/request IDs enforce invariants independently of the UI.
+Retention is unchanged: queues/invitations expire after 7 days, inactive active
+matches after 30 days (no clock-based winner), terminal matches/moves after 90
+days and notifications after 30 days. Legacy friend requests expire after 30
+days. Daily cleanup can lag nominal cutoffs by up to a day. Notifications are
+still stored by legacy backend operations but have no user-facing feed.
 
-Every RPC runs in one transaction. A short transaction-level advisory lock
-serializes social, queue, block and leave changes. Move/accept/resign reads also
-lock the match row. The current school-sized implementation uses one shared
-lock, including for dashboard/search reads; this favors simple correct ordering
-over maximum throughput. At much larger scale, replace it with carefully
-ordered per-pair/per-queue locks and repeat the concurrent-transaction tests.
+## Installation and publishing
 
-Moves carry `{match_id, version, request_id, move}`. The current client sends
-`column` as a compatibility shorthand for `move: {column}`. The backend checks
-participation, active status, turn, expected version and rule version. It applies
-its own transition, records the move and derives turn/result. Duplicate request
-IDs return current state without applying twice; reusing an ID for a different
-move or actor fails. Terminal transitions also bump the state version, so
-versions are monotonic rather than a move counter. Clients cannot provide board
-state, a winner, authoritative score or another user's identity.
+The existing project is `djdpttltfmwkofdrvkem`. New installations apply
+`scripts/bored-together.sql` once, then all forward migrations in order. Existing
+installations apply only missing forward migrations. Never rerun the baseline
+as a reset. The private tables do not modify accounts, single-player scores,
+analytics, leaderboard or player-state data.
 
-To add a game:
+Pool also requires `supabase/functions/together-pool/index.ts` and `handler.js`,
+bundled with the canonical `src/games/pool-engine.js`, deployed as
+**together-pool**, `verify_jwt = true`. Built-in Edge configuration supplies
+`SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`. The frontend
+and Edge bundle must use the same engine version. Deploy backend changes before
+the frontend. This redesign makes no changes to the engine or Edge handler.
 
-1. Reuse its existing catalog slug; add metadata to `TOGETHER_GAMES`.
-2. Extend supported-game constraints and `initial_state(game, rules_version)`.
-3. Add a branch to `apply_move(game, rules_version, state, payload, seat)` with
-   strict payload validation. Return `{state, won, draw}` for alternating turns.
-   Independent-run games need a rule adapter that records each player's state
-   and derives readiness/comparison from both runs rather than alternating turns.
-4. Render its authoritative state in the hub (or adapt the existing game via a
-   narrow hub-owned bridge). Keep credentials and networking out of game iframes.
-5. Reuse challenge, acceptance, queue, result, resign, rematch and notification
-   operations. Never let a renderer write result fields directly.
-6. Test rules, invalid moves, duplicate/stale requests, privacy, restoration and
-   real concurrent transactions. Keep old rule adapters available for open matches
-   after introducing a new rule version.
+When pg_cron is available, the baseline schedules `bored-together-retention`
+daily at 04:17 UTC. Otherwise a trusted scheduler must call the private cleanup
+function. Never expose cleanup through an unrestricted browser endpoint.
 
-`connect_four` uses the same board dimensions, gravity and four-in-a-row rules
-as the original local game. Its small dashboard renderer is separate from the
-CPU game loop; the entire offline game was not duplicated.
+Publishing remains a push to `main`; Pages serves `src/` without a build. Recheck
+remote changes before pushing and never force-push. Confirm `version.json`
+names the release commit and the served entry document matches `src/index.html`.
 
-Pool sends `{angle, power, cue?}` inside the usual versioned request. Angle is an
-integer in tenths of a degree (0–3599), power an integer 1–100, and cue placement
-is allowed only with ball in hand. `together-pool` validates the live Auth user,
-reads the match using that user's JWT and existing RPC, and simulates the entire
-shot with the shared pure engine. This computation runs outside the shared SQL
-lock. It then calls the service-only `bt_pool_commit` wrapper; its private
-transaction rechecks current membership, block state, participants, turn,
-version and request ID before committing. Only that trusted server operation can
-supply pool state or a winner. Authenticated/anonymous browser roles cannot call
-it; the ordinary `move` RPC rejects pool result submissions.
-
-Each pool move stores `state_after` for fast history review. Replays use the same
-versioned input/physics. Client animation is a prediction and never awards a
-result. Its RAF/timer fallback settles when an embed is backgrounded or detached;
-refresh/reconnect reads the authoritative saved state. The pool engine is derived
-from the original game's CPU simulator and has a parity test against that source.
-The existing single-player pool document, CPU and scoring hooks are untouched.
-
-## Fetching, persistence and notifications
-
-The hub uses the existing `backend.js` session and token refresh handling.
-`together-api.js` binds each response to the identity that started the request,
-so a delayed response cannot populate another person's session. UI state is
-cleared synchronously on account changes. No opponent email is persisted locally.
-
-Durable matches and notifications live in PostgreSQL. Visible documents poll
-every 15 seconds, with refresh on focus, reconnection and visibility return.
-Realtime is not required/configured: normal fetching is the reliable path and
-avoids a second auth/socket stack in this REST-only app. Browser closure does
-not lose a match or cancel queue membership. The selected match and retry ID
-are stored through the existing storage-safe helpers; blocked browser storage
-still allows resume through the dashboard. Failed moves do not update the board
-optimistically or silently submit after reconnection. Press Refresh to recover.
-
-This does not provide offline multiplayer moves, push notifications, external
-email delivery, a realtime socket, or an account deletion UI. Those are distinct
-from durable asynchronous play.
-
-## Verification and release
+## Verification
 
 ```sh
 npm ci
 npm run games:check
 CHROME_PATH=/path/to/chrome npm test
-CHROME_PATH=/path/to/chrome npm run test:together
 ```
 
-`tests/together-pool.test.cjs` covers physics parity, deterministic state,
-legal pots/retained turns, scratches, wrong contacts, cue placement, early/valid
-8-ball outcomes, break re-racks, direct-result denial, duplicate IDs, stale
-versions, blocks during server computation, saved history and pool rematches.
-The two-account browser flow also plays pool through the real Edge handler with
-an isolated database, reloads the saved table, reviews shots and checks desktop
-and phone layouts. Native PostgreSQL CI races two pool commits on the same
-version while the shooter retains the turn.
+The SQL tests execute the baseline and every forward migration in isolated
+PGlite databases, including privacy, opt-in, auth/role denial, blocks, rate
+limits, legal/illegal/stale/duplicate moves, completed games, rematches, leaving
+and retention. Independent Connect Four rules check seeded games and draws.
+Pool tests retain physics parity with the original game, legal pots/retained
+turns, fouls, ball in hand, 8-ball outcomes, idempotency, service-role validation
+and concurrent-change protection.
 
-The SQL suite uses PGlite (PostgreSQL WASM) with isolated Auth fixtures, exercising
-the exact setup SQL. It covers consent/nonmembership, email/prefix discovery,
-rate limits, direct table/helper denial, friend state, blocks, invitations,
-queue selection, legal/illegal/stale/duplicate moves, full games, rematches,
-forfeits, expiry, retention and notification ownership. A seeded independent
-rules model checks 100 games, including full-board draws and full columns.
+The browser test uses two separate account contexts against production SQL and
+the actual Pool Edge handler, with external Auth/transport simulated locally.
+It tests private-email and username challenges, acceptance into the original
+player, failed saves, lost-response retries, automatic returns, opponent resume,
+completion/rematches, queue persistence/cancellation, exit, refresh, a legal
+multi-shot Pool turn, sign-out privacy, original offline play, 1100/375/320px
+layouts and a sandboxed nested iframe equivalent to a Google Sites embed.
+Screenshots are captured in ignored `_build/together/` for visual inspection.
+A bridge unit test rejects unrelated windows and previous-account results and
+proves a retained Pool turn cannot auto-close.
 
-The browser suite uses two isolated account contexts connected to that same SQL
-API: enrollment, exact-email friend discovery, acceptance, challenge, a complete
-match, page reload midgame, replay, rematch, queue persistence/cancellation,
-offline refresh, sign-out privacy, and desktop/phone layouts. External auth and
-transport are simulated; the rules and stored state are the production SQL.
-No tests create accounts or demo games in production.
+CI additionally provisions disposable PostgreSQL 17 for independent-connection
+race tests (competing moves, duplicate queues, crossed requests, leaving and
+Pool commits). PGlite cannot prove native transaction locking. To run these
+locally, use `BT_TEST_DATABASE_URL` pointing to an entirely EMPTY disposable
+database; the test refuses an occupied database. Never use production.
 
-PGlite serializes connections and cannot establish native lock behavior. The
-additional `together-postgres` CI job provisions disposable **PostgreSQL 17** and
-runs `tests/together-postgres.test.cjs` on independent connections. It tests
-competing moves, duplicate queue entries, crossed requests and leaving while
-other operations are in flight. For a local equivalent, set
-`BT_TEST_DATABASE_URL` to a completely EMPTY disposable database; the suite
-refuses an occupied database. Never set it to production.
-
-Publishing remains automatic on every push to `main`; the deploy workflow is
-unchanged and serves `src/` directly. CI is separate. After publishing, compare
-`version.json` to the shipped commit and check that the actual page boots.
-Live backend validation should check RPC/table grants, RLS, the cron job, the
-schema cache and advisors; a live unauthenticated call must fail. Real student
-accounts have not been used to manufacture test matches.
-
-### Initial deployment verification (2026-10-25)
-
-The migration was applied to the existing project. Catalog inspection confirmed
-RLS on all eight new tables, no authenticated direct table read/write grants,
-an invoker public wrapper callable only by authenticated accounts, and the
-active daily cleanup job. A live nonmember account saw only `{enrolled:false}`
-in a rolled-back check; an unauthenticated REST call returned HTTP 401. No
-production test memberships or matches were created. Supabase advisors reported
-no new warning-level findings. The eight informational
-[RLS-without-policy notices](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)
-are intentional: these private tables have no direct client access, and all
-access goes through the checked RPC.
-
-The complete local suite passed 74 tests. The draft-release CI also passed both
-the ordinary suite and the independent-connection PostgreSQL 17 race test.
-Live student-to-student play has not been manufactured or observed as part of
-release verification; the complete match test uses isolated simulated accounts.
+No test creates student accounts, memberships or demo matches in production.
+A real Google Sites page and real external Auth providers are not controlled
+by this suite; the nested-frame and two-account tests are local equivalents.

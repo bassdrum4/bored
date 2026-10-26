@@ -22,6 +22,7 @@ import { createLibraryView } from './hub/library-view.js';
 import { createLeaderboardView } from './hub/leaderboard-view.js';
 import { createAccountUI } from './hub/account-ui.js';
 import { createTogetherUI } from './hub/together-ui.js';
+import { createTogetherPlayer } from './hub/together-player.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
 import { createGameDocument } from './hub/game-document.js';
@@ -138,6 +139,7 @@ gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXT
 
 function restartGame() {
   if (!activeSlug) return;
+  if (activeTogether) { showHint('Your online game is saved. Exit and reopen it to reload.'); closeMenu(); return; }
   captureBest();
   closeMenu();
   analytics.end('restart');
@@ -197,7 +199,8 @@ async function toggleFullscreen() {
   }
 }
 
-function openGame(slug, challenge = null, origin = null) {
+let activeTogether = null;
+function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (!ORDER.some(([id]) => id === slug)) return;
   if (!activeSlug) {
     const from = origin || document.activeElement;
@@ -209,6 +212,11 @@ function openGame(slug, challenge = null, origin = null) {
     launchSelector = shelf ? '#' + shelf.id + ' [data-slug="' + slug + '"]' : from.id ? '#' + from.id : '';
   }
   if (activeSlug) { pollDaily(); captureBest(); }
+  const previousTogether = activeTogether;
+  activeTogether = multiplayer;
+  if (previousTogether && previousTogether !== multiplayer) previousTogether.dispose();
+  $('#back span').textContent = multiplayer ? '‹ Bored Together' : '‹ All games';
+  $('#restart').hidden = !!multiplayer;
   analytics.end('switch');
   closeMenu();
   activeChallenge = challenge;
@@ -241,10 +249,11 @@ function openGame(slug, challenge = null, origin = null) {
       if (token !== loadToken) return;
       let html = native ? source : installDailyAdapter(source, slug);
       html = injectSeed(html);
+      if (multiplayer) html = multiplayer.document(html);
       let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
       gameFrame.removeAttribute('src');
       gameFrame.srcdoc = injectHead(html, ANALYTICS_BRIDGE + head);
-      showHint('Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
+      showHint(multiplayer ? 'Your turn saves automatically · Esc returns to Bored Together' : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
     };
     const fail = () => {
       if (token !== loadToken) return;
@@ -286,6 +295,9 @@ function closeGame() {
   gameFrame.removeAttribute('src');
   gameFrame.srcdoc = '';
   activeSlug = null;
+  const together = activeTogether;
+  activeTogether = null;
+  if (together) together.dispose();
   const wasDaily = activeChallenge;
   activeChallenge = null;
   $('#challenge-progress').hidden = true;
@@ -335,6 +347,7 @@ function snapshotFor(slug) {
 }
 
 function captureBest() {
+  if (activeTogether) return false;
   if (!activeSlug || playerPanel.hidden) return false;
   const snapshot = snapshotFor(activeSlug);
   const improved = snapshot ? recordBest(activeSlug, snapshot) : false;
@@ -732,7 +745,7 @@ menuButton.onclick = event => {
 };
 
 menuPanel.addEventListener('keydown', event => {
-  const items = [...menuPanel.querySelectorAll('button')];
+  const items = [...menuPanel.querySelectorAll('button:not([hidden])')];
   const index = items.indexOf(document.activeElement);
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault();
@@ -755,6 +768,7 @@ addEventListener('webkitfullscreenchange', onFullscreenChange);
 
 addEventListener('message', event => {
   if (!activeSlug || EXTERNS[activeSlug] || event.source !== gameFrame.contentWindow) return;
+  if (activeTogether) activeTogether.message(event);
   switch (event.data?.type) {
     case 'bored:close':
       if (fullscreenElement()) leaveFullscreen(); else closeGame();
@@ -794,7 +808,11 @@ renderDaily();
 renderRecent();
 renderCollections();
 renderLibrary();
-createTogetherUI({ openAuthDialog });
+createTogetherUI({ openAuthDialog, playMatch(match, owner, callbacks) {
+  const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame });
+  openGame(match.game, null, document.querySelector('#together-nav'), player);
+} });
+window.addEventListener('bored:identity', () => { if (activeTogether && !activeTogether.isOwner()) closeGame(); });
 initAccount();
 initFeedback();
 const analyticsToggle = $('#analytics-enabled');

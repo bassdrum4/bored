@@ -238,6 +238,8 @@ let eightSafeties = 0;        // consecutive safeties played when only the 8 is 
 let flashPocket = null;       // {x,y,t}
 let guide = null;             // predicted path, computed for render
 let nameOf = p => mode==='2p' ? (p?'P2':'P1') : (p ? 'CPU' : 'YOU');
+const online = window.__boredTogether;
+if(online) nameOf = p => online.context.players[p];
 const isCpu = () => mode==='cpu' && turn===1;
 
 function ball(id){ return {id, x:0, y:0, vx:0, vy:0, alive:true}; }
@@ -431,6 +433,12 @@ function collisions(){
 const anyMoving = () => balls.some(b => b.alive && (b.vx||b.vy) && Math.hypot(b.vx,b.vy) > STOPV);
 
 function strike(pow){
+  if(online){
+    if(state!=='aim' || !online.context.canPlay) return;
+    const move = {angle:Math.round((aimAngle*1800/Math.PI%3600+3600)%3600)%3600,power:Math.max(1,Math.round(pow*100))};
+    if(online.context.state.ballInHand) move.cue={x:cue().x,y:cue().y};
+    saveOnlineShot(move); return;
+  }
   const c = cue();
   if(!c || !c.alive) return;
   const v = MAXPOWER*pow;
@@ -1211,6 +1219,7 @@ function setPowerFromY(y){
   power = Math.max(0.05, Math.min(1, t));   // never a dead slider
 }
 function setSpinFromPoint(x, y){
+  if(online) return;
   const s = CTRL.spin;
   let ox = (x - s.x)/(s.r*0.86), oy = (s.y - y)/(s.r*0.86);
   const d = Math.hypot(ox, oy);
@@ -1240,7 +1249,7 @@ window.addEventListener('keydown', e => {
     e.preventDefault(); return;
   }
   const nudge = SPIN_KEY[k.toLowerCase()];
-  if(nudge){
+  if(nudge && !online){
     spin.x = Math.max(-0.8, Math.min(0.8, spin.x + nudge[0]*0.16));
     spin.y = Math.max(-0.8, Math.min(0.8, spin.y + nudge[1]*0.16));
     e.preventDefault();
@@ -1655,7 +1664,7 @@ function drawHUD(ox, oy, scale){
 
   const chips = [
     {p:0, x:16},
-    {p:1, x:SW-16, right:true}
+    {p:1, x:SW-(online && compact ? 66 : 16), right:true}
   ];
   const dotGap = compact ? 11 : 13, dotR = compact ? 3.9 : 4.5, chipR = compact ? 11.5 : 13;
   for(const ch of chips){
@@ -1684,7 +1693,7 @@ function drawHUD(ox, oy, scale){
       ctx.font = (compact?'700 13px':'700 15px') + ' system-ui, sans-serif';
       ctx.fillStyle = '#aab6ac';
     }
-    ctx.fillText(label, tx, hudH/2-6);
+    ctx.fillText(label, tx, hudH/2-6, online ? SW/2-74 : SW);
     // group dots
     const g = groups[p];
     ctx.font = '600 10px system-ui, sans-serif';
@@ -1724,7 +1733,7 @@ function drawHUD(ox, oy, scale){
   else if(groups[turn]) status=(groups[turn]==='solid'?'SOLIDS':'STRIPES') + (isCpu()?'':' — SHOOT');
   if(isCpu() && state==='cpu') status= compact ? 'CPU...' : 'CPU THINKING...';
   ctx.fillStyle='rgba(255,255,255,.5)';
-  ctx.fillText(status, SW/2, hudH/2);
+  if(!online || !compact) ctx.fillText(status, SW/2, hudH/2);
 
   // aiming hint, under the felt
   if(!compact){
@@ -1735,6 +1744,7 @@ function drawHUD(ox, oy, scale){
            :             'click the felt to aim \u00b7 arrows power \u00b7 wasd english';
     }
     if(hint){
+      if(online) hint=hint.replace(' · wasd english','');
       ctx.font='500 11px system-ui, sans-serif';
       ctx.fillStyle='rgba(255,255,255,.26)';
       ctx.textAlign='center'; ctx.textBaseline='alphabetic';
@@ -1764,7 +1774,7 @@ function drawControls(){
   const s = L.spin;
   ctx.font='600 9.5px system-ui, sans-serif';
   ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,.42)';
-  ctx.fillText('SPIN', cx, L.spinLabelY);
+  ctx.fillText(online?'NO SPIN':'SPIN', cx, L.spinLabelY);
   ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
   ctx.fillStyle = '#efece2'; ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1; ctx.stroke();
@@ -1812,6 +1822,56 @@ function drawControls(){
   ctx.fillText('SHOOT', b.x + b.w/2, b.y + b.h/2 + .5);
   ctx.globalAlpha = 1;
 }
+
+/* Together supplies state and accepts input; this game's canvas, aim, cue,
+   power rail, ball placement and drawing loop remain the player interface. */
+function restoreOnline(){
+  const match=online.context, saved=match.state;
+  balls=Array.from({length:16},(_,id)=>{
+    const position=saved.balls.find(b=>b.id===id);
+    return {...ball(id),...(position||{}),alive:!!position};
+  });
+  mode='2p'; turn=match.seat-1; groups=saved.groups.slice();
+  openTable=!groups[0]; breakShot=saved.breakShot; spin={x:0,y:0};
+  aimMode=aimLocked=dragSlider=dragSpin=false;
+  for(const id of ['menu','diff','over']) document.getElementById(id).classList.add('hidden');
+  state=match.canPlay?'aim':'online-wait';
+  if(match.canPlay && saved.ballInHand) beginHand();
+  else if(match.canPlay) aimAngle=Math.atan2(PH/2-cue().y,PW/2-cue().x);
+  toast(match.canPlay?'Your turn · no spin in online pool':'Their turn · game saved',null,2200);
+}
+async function animateOnlineShot(saved,move,seat){
+  const engine=await import(online.engineURL);
+  const prediction=engine.applyPoolShot(saved,move,seat,{trace:true});
+  const frames=prediction.frames, start=performance.now();
+  const duration=Math.min(3600,Math.max(650,frames.length/30*1000));
+  // Timers settle even when an embedded document stops receiving animation frames.
+  await new Promise(resolve=>{
+    const timer=setInterval(()=>{
+      const progress=Math.min(1,(performance.now()-start)/duration);
+      const frame=frames[Math.min(frames.length-1,Math.floor(progress*frames.length))];
+      if(frame) balls=Array.from({length:16},(_,id)=>{
+        const position=frame.find(b=>b.id===id);
+        return {...ball(id),...(position||{}),alive:!!position};
+      });
+      if(progress>=1 || document.hidden){ clearInterval(timer); resolve(); }
+    },32);
+  });
+}
+async function saveOnlineShot(move){
+  const saved=online.context.state, seat=online.context.seat;
+  state='online-saving'; aimMode=aimLocked=dragSlider=dragSpin=false;
+  sndCue(move.power/100);
+  const [result]=await Promise.allSettled([online.submit(move),animateOnlineShot(saved,move,seat)]);
+  if(result.status==='rejected'){
+    restoreOnline(); state='online-saving';
+    online.error(result.reason,()=>saveOnlineShot(move)); return;
+  }
+  restoreOnline();
+  // A legal pot can retain the turn. Only the backend decides when to return.
+  online.finishTurn();
+}
+if(online) restoreOnline();
 
 /* ================= loop ================= */
 function tick(dt){

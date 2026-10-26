@@ -32,8 +32,8 @@ test('Together production SQL: consent, privacy, social, queue, moves and retent
     assert.deepEqual(await call(db,a,'search',{query:'student4@example.test'}),[]);
     assert.deepEqual(await call(db,a,'search',{query:'Nev'}),[]);
     assert.deepEqual(await call(db,a,'search',{query:'%%%'}),[]);
-    assert.equal((await call(db,a,'search',{query:'Ban'}))[0].email,null);
-    assert.equal((await call(db,a,'search',{query:'student2@example.test'}))[0].email,'student2@example.test','exact email is visible without friendship or a visibility toggle');
+    assert.equal((await call(db,a,'search',{query:'Ban'}))[0].email,undefined);
+    assert.equal((await call(db,a,'search',{query:'student2@example.test'}))[0].email,undefined,'exact email finds a member without returning the address');
     await assert.rejects(call(db,a,'search',{query:'B'}),/at least 3/);
     await assert.rejects(call(db,a,'friend_request',{user_id:non}),/unavailable/);
     await assert.rejects(call(db,a,'challenge',{user_id:non}),/unavailable/);
@@ -57,10 +57,10 @@ test('Together production SQL: consent, privacy, social, queue, moves and retent
     await call(db,b,'friend_accept',{user_id:a});
     assert.equal((await dashboard(db,a)).friends[0].status,'accepted');
     await call(db,b,'settings',{email_visibility:'friends'});
-    assert.equal((await call(db,a,'search',{query:'Ban'}))[0].email,'student2@example.test');
-    assert.equal((await call(db,c,'search',{query:'Ban'}))[0].email,null);
+    assert.equal((await call(db,a,'search',{query:'Ban'}))[0].email,undefined);
+    assert.equal((await call(db,c,'search',{query:'Ban'}))[0].email,undefined);
     await call(db,a,'friend_remove',{user_id:b});
-    assert.equal((await call(db,a,'search',{query:'Ban'}))[0].email,null);
+    assert.equal((await call(db,a,'search',{query:'Ban'}))[0].email,undefined);
     await call(db,b,'friend_request',{user_id:a});
     await call(db,a,'friend_decline',{user_id:b});
     assert.equal((await dashboard(db,a)).friends.length,0);
