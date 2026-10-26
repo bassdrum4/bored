@@ -20,7 +20,7 @@ ORDER.unshift(['deep', 'DEEP']);
 export const META = {
   "block-blast": ["Puzzle", "Drop blocks into an 8x8 grid and clear full lines."],
   "chess": ["Strategy", "Play the computer or a friend on an 8x8 board."],
-  "mahjong": ["Puzzle", "Clear the turtle, one matching pair at a time."],
+  "mahjong": ["Puzzle", "The full 144-tile set: three suits, winds, dragons, flowers and seasons."],
   "minigolf": ["Arcade", "Nine holes. Mind the bank shot."],
   deep: ['Arcade', 'A daily-seeded dungeon dive'],
   '2048': ['Puzzle', 'Slide, merge, and chase 2048'],

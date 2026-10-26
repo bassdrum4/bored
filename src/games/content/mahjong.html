@@ -12,6 +12,7 @@
     --hair: #d8d2c4;
     --tile: #fffdf7;
     --blocked: #e3ddcc;
+    --faint: #968d7b;
     --accent: #b3261e;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
@@ -32,11 +33,23 @@
     background: var(--tile); color: var(--ink); font: inherit;
   }
   .tile .num { display: block; font: 600 1em/1 var(--mono) }
-  .tile .suit { display: block; margin-top: 2px; background: var(--muted) }
-  .tile .suit.dots { width: .24em; height: .24em; border-radius: 50% }
-  .tile .suit.bamboo { width: .14em; height: .44em }
-  .tile.blocked { background: var(--blocked); color: #968d7b; cursor: default }
-  .tile.blocked .suit { background: #968d7b }
+  .tile .mark { display: block; margin-top: 2px; background: var(--muted) }
+  .tile .mark.dots { width: .2em; height: .2em; border-radius: 50% }
+  .tile .mark.bamboo { width: .13em; height: .4em }
+  .tile .mark.chars { width: .44em; height: .13em }
+  .tile .mark.ring { width: .22em; height: .22em; border-radius: 50%; background: none; border: 1px solid var(--muted) }
+  .tile .mark.flower { width: .18em; height: .18em; background: var(--accent); transform: rotate(45deg) }
+  .tile .mark.season { width: .18em; height: .18em; background: none; border: 1px solid var(--muted); transform: rotate(45deg) }
+  .tile .dragon { display: block; width: .6em; height: .6em }
+  .tile .dragon.red { background: var(--accent); border-radius: 50% }
+  .tile .dragon.green { background: var(--ink) }
+  .tile .dragon.white { border: 1px solid var(--ink) }
+  .tile.blocked { background: var(--blocked); color: var(--faint); cursor: default }
+  .tile.blocked .mark.dots, .tile.blocked .mark.bamboo,
+  .tile.blocked .mark.chars, .tile.blocked .mark.flower { background: var(--faint) }
+  .tile.blocked .mark.ring, .tile.blocked .mark.season { border-color: var(--faint) }
+  .tile.blocked .dragon { border-color: var(--faint) }
+  .tile.blocked .dragon.red, .tile.blocked .dragon.green { background: var(--faint) }
   .tile.selected { border-color: var(--ink); background: #efe3d1 }
   .tile.hint { outline: 2px solid var(--accent); outline-offset: -2px }
   .tile.gone { display: none }
@@ -65,7 +78,7 @@
 </head>
 <body>
 <main>
-  <h1 id="hud">Pairs 0 / 36 &middot; Left 72</h1>
+  <h1 id="hud">Pairs 0 / 72 &middot; Left 144</h1>
   <div id="board" aria-label="Mahjong board"></div>
   <div class="bar">
     <button id="deal" type="button">New deal</button>
@@ -91,16 +104,20 @@
 const $ = id => document.getElementById(id);
 const boardEl = $('board'), hudEl = $('hud'), statusEl = $('status');
 const tutorialEl = $('tutorial'), tutorialToggle = $('tutorial-toggle');
-const PAD = 4, LAYER_LIFT = 0.08;
+const PAD = 4, LAYER_LIFT = 0.07;
 
 /* ── The boards ──────────────────────────────────────────────────────────── */
 
-// Each layer is a row map on a ten-column grid. Layers stack on the same
-// coordinates, so a tile is buried when any higher layer covers its square.
+// The turtle: a flat 12 by 8 shell with cut corners and four tiers stacked in
+// the middle, holding the whole 144-tile set. Each layer is a row map on the
+// same twelve-column grid, so a tile is buried when a higher layer covers it.
 const NORMAL_LAYERS = [
-  { rows: ['..######..', '.########.', '##########', '##########', '.########.', '..######..'], dy: 0 },
-  { rows: ['...####...', '..######..', '..######..', '...####...'], dy: 1 },
-  { rows: ['...####...'], dy: 2 }
+  { rows: ['..########..', '############', '############', '############',
+           '############', '############', '############', '..########..'], dy: 0 },
+  { rows: ['...######...', '...######...', '...######...',
+           '...######...', '...######...', '...######...'], dy: 1 },
+  { rows: ['....####....', '....####....', '....####....', '....####....'], dy: 2 },
+  { rows: ['.....##.....', '.....##.....'], dy: 3 }
 ];
 
 // Twelve tiles in two layers: enough to explain free sides and matching without
@@ -110,11 +127,39 @@ const TUTORIAL_LAYERS = [
   { rows: ['.##.', '.##.'], dy: 0 }
 ];
 
+/* ── The set ─────────────────────────────────────────────────────────────── */
+
+// 27 suited tiles, 4 winds and 3 dragons come four to a kind; the eight bonus
+// tiles come once each, and any flower matches any flower (same for seasons).
 const KINDS = new Map();
-for (const suit of ['dots', 'bamboo']) {
-  for (let n = 1; n <= 9; n++) KINDS.set(suit[0] + n, { n, suit });
+const SUITS = [['dots', 'dots'], ['bamboo', 'bamboo'], ['chars', 'characters']];
+for (const [id, name] of SUITS) {
+  for (let n = 1; n <= 9; n++) {
+    KINDS.set(id + n, { n, mark: id, group: id + n, label: n + ' of ' + name });
+  }
 }
-const KIND_IDS = [...KINDS.keys()];
+for (const [letter, name] of [['e', 'East'], ['s', 'South'], ['w', 'West'], ['n', 'North']]) {
+  KINDS.set('wind-' + letter, { letter: letter.toUpperCase(), mark: 'ring', group: 'wind-' + letter, label: name + ' wind' });
+}
+for (const [id, name] of [['red', 'Red'], ['green', 'Green'], ['white', 'White']]) {
+  KINDS.set('dragon-' + id, { dragon: id, group: 'dragon-' + id, label: name + ' dragon' });
+}
+for (let i = 1; i <= 4; i++) KINDS.set('flower-' + i, { n: i, mark: 'flower', group: 'flower', label: 'Flower ' + i });
+for (let i = 1; i <= 4; i++) KINDS.set('season-' + i, { n: i, mark: 'season', group: 'season', label: 'Season ' + i });
+
+const CORE_KINDS = [...KINDS.keys()].filter(id => !/^(flower|season)-/.test(id));
+
+// The 72 pairs of a full set: every suited tile, wind and dragon twice over,
+// plus the two flower and two season pairs.
+function dealPairs() {
+  const pairs = [];
+  for (const id of CORE_KINDS) pairs.push([id, id], [id, id]);
+  pairs.push(['flower-1', 'flower-2'], ['flower-3', 'flower-4'],
+             ['season-1', 'season-2'], ['season-3', 'season-4']);
+  return pairs;
+}
+
+const sameKind = (a, b) => KINDS.get(a).group === KINDS.get(b).group;
 
 /* ── Deal generation ─────────────────────────────────────────────────────── */
 
@@ -130,8 +175,8 @@ function layoutSpots(layers) {
   return spots;
 }
 
-function freeIn(alive, spot) {
-  for (let layer = spot.layer + 1; layer <= 2; layer++) {
+function freeIn(alive, spot, depth) {
+  for (let layer = spot.layer + 1; layer < depth; layer++) {
     if (alive.has(key(layer, spot.x, spot.y))) return false;
   }
   const left = alive.has(key(spot.layer, spot.x - 1, spot.y));
@@ -141,32 +186,44 @@ function freeIn(alive, spot) {
 
 /*
  * The deal is laid out by removing pairs from a full board: two tiles that are
- * free at the same moment get the same kind. Replaying those removals in order
- * clears the board, so every deal this game hands out has a solution.
+ * free at the same moment get a matching pair of kinds. Replaying those
+ * removals in order clears the board, so every deal has a solution. If a layout
+ * ever deadlocks mid-deal the whole assignment is retried, rather than handing
+ * out a board that cannot be finished.
  */
 function createTiles(layers, rand) {
   const spots = layoutSpots(layers);
-  const pairKinds = shuffle(KIND_IDS.flatMap(id => [id, id]), rand);
+  const need = spots.length / 2;
+  const pool = dealPairs();
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const pairs = shuffle(pool.slice(), rand).slice(0, need);
+    if (assignPairs(spots, pairs, rand, layers.length)) return spots;
+  }
+  // A half-dealt board is worse than a plain one: finish the deal by pairing
+  // whatever is left, and let the shuffle find the player a move.
+  const open = spots.filter(spot => !spot.kind);
+  for (let i = 0; i + 1 < open.length; i += 2) {
+    const kind = CORE_KINDS[(i / 2) % CORE_KINDS.length];
+    open[i].kind = kind;
+    open[i + 1].kind = kind;
+  }
+  return spots;
+}
+
+function assignPairs(spots, pairs, rand, depth) {
   const alive = new Set(spots.map(spot => key(spot.layer, spot.x, spot.y)));
   const bySpot = new Map(spots.map(spot => [key(spot.layer, spot.x, spot.y), spot]));
-  while (alive.size >= 2) {
-    const free = [...alive].map(id => bySpot.get(id)).filter(spot => freeIn(alive, spot));
-    let a, b;
-    if (free.length >= 2) {
-      a = free.splice(Math.floor(rand() * free.length), 1)[0];
-      b = free[Math.floor(rand() * free.length)];
-    } else {
-      const rest = [...alive].map(id => bySpot.get(id));
-      a = rest.pop();
-      b = rest.pop();
-    }
-    const kind = pairKinds.pop() || KIND_IDS[0];
-    a.kind = kind;
-    b.kind = kind;
+  for (const [first, second] of pairs) {
+    const free = [...alive].map(id => bySpot.get(id)).filter(spot => freeIn(alive, spot, depth));
+    if (free.length < 2) return false;
+    const a = free.splice(Math.floor(rand() * free.length), 1)[0];
+    const b = free[Math.floor(rand() * free.length)];
+    a.kind = first;
+    b.kind = second;
     alive.delete(key(a.layer, a.x, a.y));
     alive.delete(key(b.layer, b.x, b.y));
   }
-  return spots;
+  return true;
 }
 
 function mulberry32(seed) {
@@ -206,7 +263,7 @@ function dailySeed() {
 /* ── Game state ──────────────────────────────────────────────────────────── */
 
 let tiles = [], byKey = new Map(), selected = null, pairHint = [];
-let pairs = 0, left = 0, won = false, mode = 'deal', step = 0;
+let pairs = 0, left = 0, won = false, mode = 'deal', step = 0, depth = 4;
 let minX = 0, maxX = 9, minY = 0, maxY = 5;
 
 function beginGame(layers, seeded) {
@@ -214,6 +271,7 @@ function beginGame(layers, seeded) {
   const seed = injected && Number.isFinite(injected.seed) ? injected.seed >>> 0 : dailySeed();
   const rand = seeded ? mulberry32(seed) : Math.random;
   tiles = createTiles(layers, rand);
+  depth = layers.length;
   byKey = new Map(tiles.map(tile => [key(tile.layer, tile.x, tile.y), tile]));
   selected = null;
   pairHint = [];
@@ -230,16 +288,21 @@ function beginGame(layers, seeded) {
   paint();
 }
 
+function faceHTML(kind) {
+  const info = KINDS.get(kind);
+  if (info.dragon) return '<span class="dragon ' + info.dragon + '"></span>';
+  return '<span class="num">' + (info.letter || info.n) + '</span><i class="mark ' + info.mark + '"></i>';
+}
+
 function buildBoard() {
   boardEl.replaceChildren();
   for (const tile of tiles) {
-    const info = KINDS.get(tile.kind);
     const el = document.createElement('button');
     el.type = 'button';
     el.className = 'tile';
     el.dataset.kind = tile.kind;
     el.dataset.layer = String(tile.layer);
-    el.innerHTML = '<span class="num">' + info.n + '</span><span class="suit ' + info.suit + '"></span>';
+    el.innerHTML = faceHTML(tile.kind);
     el.addEventListener('click', () => choose(tile));
     tile.el = el;
     boardEl.appendChild(el);
@@ -254,7 +317,7 @@ function resize() {
   const size = Math.max(22, Math.min(46, Math.floor((available - PAD * 2) / columns)));
   const lift = Math.max(2, Math.round(size * LAYER_LIFT));
   boardEl.style.width = columns * size + PAD * 2 + 'px';
-  boardEl.style.height = rows * size + PAD * 2 + 'px';
+  boardEl.style.height = rows * size + PAD * 2 + (depth - 1) * lift + 'px';
   for (const tile of tiles) {
     const el = tile.el;
     el.style.width = size - 2 + 'px';
@@ -268,14 +331,11 @@ function resize() {
 
 /* ── Play ────────────────────────────────────────────────────────────────── */
 
-function label(tile) {
-  const info = KINDS.get(tile.kind);
-  return info.n + ' of ' + info.suit;
-}
+const label = tile => KINDS.get(tile.kind).label;
 
 function isFree(tile) {
   if (tile.gone) return false;
-  for (let layer = tile.layer + 1; layer <= 2; layer++) {
+  for (let layer = tile.layer + 1; layer < depth; layer++) {
     const above = byKey.get(key(layer, tile.x, tile.y));
     if (above && !above.gone) return false;
   }
@@ -290,7 +350,7 @@ function findPair() {
   const free = tiles.filter(tile => !tile.gone && isFree(tile));
   for (let i = 0; i < free.length; i++) {
     for (let j = i + 1; j < free.length; j++) {
-      if (free[i].kind === free[j].kind) return [free[i], free[j]];
+      if (sameKind(free[i].kind, free[j].kind)) return [free[i], free[j]];
     }
   }
   return null;
@@ -322,9 +382,9 @@ function paintSteps() {
   });
   $('tutorial-note').textContent =
     step === 0 ? 'Cream tiles are free; grey tiles are blocked. Tap a cream tile.'
-    : step === 1 ? 'Now tap another free tile with the same number and suit.'
+    : step === 1 ? 'Now tap another free tile of the same kind.'
     : step === 2 ? 'Keep matching until all six pairs are gone.'
-    : 'That is the whole game. The full board has 36 pairs.';
+    : 'That is the whole game. The full board has 72 pairs, flowers and seasons included.';
 }
 
 function choose(tile) {
@@ -347,7 +407,7 @@ function choose(tile) {
     return;
   }
   const first = selected;
-  if (first.kind !== tile.kind) {
+  if (!sameKind(first.kind, tile.kind)) {
     selected = tile;
     statusEl.textContent = 'Not a pair. Selected ' + label(tile) + '.';
     paint();
@@ -372,6 +432,14 @@ function choose(tile) {
   paint();
 }
 
+function faceTile(tile) {
+  tile.el.dataset.kind = tile.kind;
+  tile.el.innerHTML = faceHTML(tile.kind);
+}
+
+// Pairs only ever leave the board together, so every kind is still in an even
+// count. That means a shuffle can always be made enterable: deal the remaining
+// kinds afresh, and if no pair landed on two free tiles, swap a kind onto one.
 function shuffleRemaining() {
   if (!left) {
     statusEl.textContent = 'The board is clear. Deal a new one.';
@@ -381,10 +449,16 @@ function shuffleRemaining() {
   const kinds = shuffle(remaining.map(tile => tile.kind), Math.random);
   remaining.forEach((tile, index) => {
     tile.kind = kinds[index];
-    const info = KINDS.get(tile.kind);
-    tile.el.dataset.kind = tile.kind;
-    tile.el.innerHTML = '<span class="num">' + info.n + '</span><span class="suit ' + info.suit + '"></span>';
+    faceTile(tile);
   });
+  const free = remaining.filter(isFree);
+  if (free.length >= 2 && !findPair()) {
+    const [first, second] = free;
+    const partner = remaining.find(tile => tile !== first && sameKind(tile.kind, first.kind));
+    [second.kind, partner.kind] = [partner.kind, second.kind];
+    faceTile(second);
+    faceTile(partner);
+  }
   selected = null;
   pairHint = [];
   statusEl.textContent = 'Remaining tiles shuffled.';
@@ -415,7 +489,7 @@ function setTutorial(on) {
     // In a Bored Together duel the opening board is the match's, and a re-deal
     // replays it rather than handing that player an easier arrangement.
     beginGame(NORMAL_LAYERS, !!window.__boredSeed?.match);
-    statusEl.textContent = 'Match two free tiles of the same kind.';
+    statusEl.textContent = 'Match two free tiles of the same kind. Three suits, four winds, three dragons, flowers and seasons.';
   }
 }
 

@@ -179,7 +179,7 @@ participant checks, turn ownership, rule versions, stale-version checks and
 unique request IDs are unchanged.
 
 Connect Four moves contain only a column; a duel submission is one integer
-bounded by the game's own limit (36 pairs for Mahjong, 10,000,000 for 2048).
+bounded by the game's own limit (72 pairs for Mahjong, 10,000,000 for 2048).
 Pool sends angle (integer tenths of a degree), power (1–100) and optional legal
 cue placement. The `together-pool` Edge
 function authenticates the player, reads the match through their JWT, simulates

@@ -6,7 +6,7 @@ const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ..
 export const DISCOVERY = {
   'block-blast': info('2–5 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   chess: info('5–15 min', 'Competitive', ['Mouse', 'Touch'], { players: '2 local' }),
-  mahjong: info('5–15 min', 'Relaxing', ['Mouse', 'Touch']),
+  mahjong: info('10–25 min', 'Focused', ['Mouse', 'Touch']),
   'minigolf': info('5–10 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch']),
   deep: info('5–15 min', 'Turn-based', ['Keyboard', 'Mouse', 'Touch']),
   '2048': info('3–10 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
