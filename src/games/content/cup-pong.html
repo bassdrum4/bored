@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cup Pong</title>
+<style>
+  :root {
+    --bg: #f5f2ea;
+    --ink: #191713;
+    --muted: #6b6558;
+    --hair: #d8d2c4;
+    --table: #e7e0d0;
+    --accent: #b3261e;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  * { box-sizing: border-box }
+  html, body { margin: 0; height: 100%; overflow: hidden }
+  body {
+    background: var(--bg); color: var(--ink); font: 12px/1.4 var(--sans);
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  main { height: 100dvh; max-width: 560px; margin: 0 auto; padding: 10px; display: flex; flex-direction: column; gap: 7px }
+  header, footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap }
+  h1 { margin: 0; font: 600 11px/1.4 var(--mono); letter-spacing: .09em }
+  #hud { font: 11px/1.4 var(--mono) }
+  button {
+    font: 11px/1 var(--mono); background: none; color: var(--ink);
+    border: 1px solid var(--hair); border-radius: 2px; padding: 7px 10px; cursor: pointer;
+  }
+  button:hover { border-color: var(--ink) }
+  button:focus-visible, canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+  #stage { flex: 1; min-height: 0; display: grid; place-items: center }
+  canvas { display: block; touch-action: none; max-width: 100%; cursor: crosshair }
+  #status { margin: 0; min-height: 2.6em; font-size: 12px }
+  #power { color: var(--muted); font: 10px/1 var(--mono); letter-spacing: .06em }
+  #hint { margin: 0; font-size: 10px; color: var(--muted) }
+  @media (max-width: 700px) { header { padding-right: 52px } }
+  @media (max-height: 470px) { main { padding: 5px; gap: 3px } #status { min-height: 1.3em } #hint { display: none } }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>CUP PONG</h1><span id="hud">CUPS 0 &middot; MISSES 0/3</span></header>
+  <div id="stage">
+    <canvas id="table" width="420" height="360" tabindex="0" aria-label="A table with six cups. Drag back from the ball and release to throw it toward the cups."></canvas>
+  </div>
+  <p id="status" role="status" aria-live="polite">Pull back from the ball and release. Three misses ends the run.</p>
+  <footer>
+    <span id="power">POWER 55%</span>
+    <button id="new" type="button">New run</button>
+  </footer>
+  <p id="hint">Drag down and to the side to aim, release to throw. Arrows aim, Space throws. Clear a rack for a fresh one.</p>
+</main>
+<script>
+'use strict';
+// Six cups, one ball, a table that recedes. The throw is a slingshot: pull back
+// from the ball, release, and the ball rolls toward the far end with friction.
+// Cups are fixed layouts, so every visit plays the same racks.
+
+const W = 420, H = 360, STEP = 1 / 180;
+const PAPER = '#f5f2ea', INK = '#191713', TABLE = '#e7e0d0', ACCENT = '#b3261e', MUTED = '#6b6558';
+const NEAR_Y = 300, FAR_Y = 96, NEAR_HALF = 150, FAR_HALF = 92, CX = 210;
+const CUP_RX = .115, CUP_RY = .52, BALL_R = .05, DECEL = 1.3, MISSES = 3;
+// Each rack is six cups: `t` is the distance down the table, `us` the lateral
+// offsets. Three far, two middle, one near reads as a triangle from the thrower.
+const RACKS = [
+  [{ t: .76, us: [-.3, 0, .3] }, { t: .86, us: [-.16, .16] }, { t: .95, us: [0] }],
+  [{ t: .74, us: [-.24, .24] }, { t: .84, us: [-.34, 0, .34] }, { t: .94, us: [0] }],
+  [{ t: .76, us: [-.3, 0, .3] }, { t: .9, us: [-.3, 0, .3] }],
+  [{ t: .75, us: [-.34, -.11, .11, .34] }, { t: .9, us: [-.17, .17] }]
+];
+
+const canvas = document.querySelector('#table'), ctx = canvas.getContext('2d');
+const hud = document.querySelector('#hud'), statusEl = document.querySelector('#status'), powerEl = document.querySelector('#power');
+const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+const halfWidth = t => NEAR_HALF + (FAR_HALF - NEAR_HALF) * t;
+const project = (u, t) => ({ x: CX + u * halfWidth(t), y: NEAR_Y + (FAR_Y - NEAR_Y) * t });
+
+let rack = [], rackIndex = 0, cups = 0, misses = 0, throws = 0;
+let ball = null, aim = { u: 0, power: .55 }, drag = null, pause = 0, finished = false;
+let lastTime = 0, accumulator = 0;
+
+window.__boredSnapshot = () => ({ slug: 'cup-pong', cups, misses, throws, rack: rackIndex + 1, finished });
+
+/* ── The run ──────────────────────────────────────────────────────────────── */
+
+function loadRack(index) {
+  const layout = RACKS[index % RACKS.length];
+  rack = [];
+  layout.forEach(row => row.us.forEach(u => rack.push({ u, t: row.t })));
+}
+
+function nextBall() {
+  ball = { u: 0, t: .05, vu: 0, vt: 0, moving: false };
+}
+
+function newRun() {
+  cups = 0;
+  misses = 0;
+  throws = 0;
+  rackIndex = 0;
+  finished = false;
+  pause = 0;
+  drag = null;
+  aim = { u: 0, power: .55 };
+  loadRack(0);
+  nextBall();
+  statusEl.textContent = 'Pull back from the ball and release. Three misses ends the run.';
+  updateHud();
+  canvas.focus({ preventScroll: true });
+}
+
+function updateHud() {
+  hud.textContent = 'CUPS ' + cups + ' \u00b7 ' + (finished ? 'RUN OVER' : 'MISSES ' + misses + '/' + MISSES) +
+    ' \u00b7 RACK ' + (rackIndex + 1);
+  powerEl.textContent = 'POWER ' + Math.round(aim.power * 100) + '%';
+}
+
+function throwBall() {
+  if (!ball || ball.moving || finished || pause > 0 || drag) return false;
+  const direction = { u: aim.u * .75, t: 1 };
+  const length = Math.hypot(direction.u, direction.t);
+  const speed = .7 + 1.45 * aim.power;
+  ball.vu = direction.u / length * speed;
+  ball.vt = direction.t / length * speed;
+  ball.moving = true;
+  throws += 1;
+  statusEl.textContent = 'Ball away.';
+  updateHud();
+  return true;
+}
+
+function miss(reason) {
+  misses += 1;
+  ball = null;
+  pause = .6;
+  if (misses >= MISSES) {
+    finished = true;
+    statusEl.textContent = 'Run over: ' + cups + (cups === 1 ? ' cup.' : ' cups.') + ' New run when ready.';
+  } else {
+    statusEl.textContent = reason + ' ' + misses + ' of ' + MISSES + ' misses.';
+  }
+  updateHud();
+}
+
+function sink(cup) {
+  rack = rack.filter(other => other !== cup);
+  cups += 1;
+  ball = null;
+  if (!rack.length) {
+    rackIndex += 1;
+    loadRack(rackIndex);
+    pause = .75;
+    statusEl.textContent = 'Rack cleared. Six fresh cups.';
+  } else {
+    pause = .35;
+    statusEl.textContent = 'In the cup. ' + rack.length + ' left on this rack.';
+  }
+  updateHud();
+}
+
+/* ── Ball physics ─────────────────────────────────────────────────────────── */
+
+function stepBall(dt) {
+  if (!ball || !ball.moving) return;
+  ball.u += ball.vu * dt;
+  ball.t += ball.vt * dt;
+  const speed = Math.hypot(ball.vu, ball.vt);
+  const next = Math.max(0, speed - DECEL * dt);
+  if (!next) {
+    ball.vu = ball.vt = 0;
+    ball.moving = false;
+    miss('Short of the cups.');
+    return;
+  }
+  ball.vu *= next / speed;
+  ball.vt *= next / speed;
+
+  // The table edge bounces the ball back in; the far end is a miss.
+  if (ball.u > .9) { ball.u = .9; ball.vu = -Math.abs(ball.vu) * .55; }
+  if (ball.u < -.9) { ball.u = -.9; ball.vu = Math.abs(ball.vu) * .55; }
+  if (ball.t > 1.06) { miss('Off the back of the table.'); return; }
+
+  const at = project(ball.u, ball.t);
+  for (const cup of rack) {
+    const mouth = project(cup.u, cup.t);
+    const rx = CUP_RX * halfWidth(cup.t), ry = rx * CUP_RY;
+    const dx = (at.x - mouth.x) / rx, dy = (at.y - mouth.y) / ry;
+    if (dx * dx + dy * dy <= 1) { sink(cup); return; }
+  }
+}
+
+function step(dt) {
+  if (pause > 0) {
+    pause -= dt;
+    if (pause <= 0) {
+      pause = 0;
+      if (!finished) { nextBall(); statusEl.textContent = 'Aim and throw.'; }
+    }
+    return;
+  }
+  stepBall(dt);
+}
+
+/* ── Drawing ──────────────────────────────────────────────────────────────── */
+
+function drawTable() {
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(0, 0, W, H);
+  ctx.beginPath();
+  ctx.moveTo(CX - NEAR_HALF, NEAR_Y);
+  ctx.lineTo(CX + NEAR_HALF, NEAR_Y);
+  ctx.lineTo(CX + FAR_HALF, FAR_Y);
+  ctx.lineTo(CX - FAR_HALF, FAR_Y);
+  ctx.closePath();
+  ctx.fillStyle = TABLE;
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // A throw line and the far edge, nothing louder than that.
+  ctx.beginPath();
+  ctx.moveTo(CX - halfWidth(.1) + 26, project(0, .1).y);
+  ctx.lineTo(CX + halfWidth(.1) - 26, project(0, .1).y);
+  ctx.strokeStyle = MUTED;
+  ctx.setLineDash([3, 5]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawCup(cup) {
+  const at = project(cup.u, cup.t);
+  const rx = CUP_RX * halfWidth(cup.t), ry = rx * CUP_RY;
+  ctx.beginPath();
+  ctx.ellipse(at.x, at.y, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fillStyle = PAPER;
+  ctx.fill();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  // A short body below the mouth so a cup reads as a cup, not a coin.
+  ctx.beginPath();
+  ctx.moveTo(at.x - rx, at.y);
+  ctx.lineTo(at.x - rx * .8, at.y + ry * 2.2);
+  ctx.lineTo(at.x + rx * .8, at.y + ry * 2.2);
+  ctx.lineTo(at.x + rx, at.y);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function drawBall() {
+  if (!ball) return;
+  const at = project(ball.u, ball.t);
+  const radius = Math.max(2.5, BALL_R * halfWidth(ball.t));
+  ctx.beginPath();
+  ctx.arc(at.x, at.y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = PAPER;
+  ctx.fill();
+  ctx.strokeStyle = ball.moving ? INK : ACCENT;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+function previewPath() {
+  if (!ball || ball.moving || finished || pause > 0) return;
+  const direction = { u: aim.u * .75, t: 1 };
+  const length = Math.hypot(direction.u, direction.t);
+  const speed = .7 + 1.45 * aim.power;
+  let u = ball.u, t = ball.t, vu = direction.u / length * speed, vt = direction.t / length * speed;
+  const dots = [];
+  for (let i = 0; i < 46 && t < 1.04; i++) {
+    const frame = 1 / 40;
+    u += vu * frame;
+    t += vt * frame;
+    const ballSpeed = Math.hypot(vu, vt);
+    const next = Math.max(0, ballSpeed - DECEL * frame);
+    if (!next) break;
+    vu *= next / ballSpeed;
+    vt *= next / ballSpeed;
+    if (u > .9 || u < -.9) break;
+    if (i % 4 === 0) dots.push(project(u, t));
+  }
+  ctx.fillStyle = MUTED;
+  for (const dot of dots) {
+    ctx.beginPath();
+    ctx.arc(dot.x, dot.y, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawAim() {
+  if (!ball || ball.moving || finished || pause > 0) return;
+  const start = project(ball.u, ball.t);
+  const reach = 40 + aim.power * 70;
+  const direction = { u: aim.u * .75, t: 1 };
+  const length = Math.hypot(direction.u, direction.t);
+  const end = { u: ball.u + direction.u / length * (reach / 210), t: ball.t + direction.t / length * (reach / 210) };
+  const at = project(end.u, end.t);
+  ctx.strokeStyle = ACCENT;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(at.x, at.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawOverlay() {
+  if (!finished) return;
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(104, 66, 212, 74);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(104.5, 66.5, 211, 73);
+  ctx.fillStyle = INK;
+  ctx.textAlign = 'center';
+  ctx.font = '17px ui-monospace, monospace';
+  ctx.fillText(cups + (cups === 1 ? ' CUP' : ' CUPS'), W / 2, 98);
+  ctx.fillStyle = MUTED;
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillText(throws + ' THROWS \u00b7 NEW RUN TO GO AGAIN', W / 2, 120);
+  ctx.textAlign = 'left';
+}
+
+function draw() {
+  drawTable();
+  // Far cups first so a nearer cup overlaps the one behind it.
+  [...rack].sort((a, b) => b.t - a.t).forEach(drawCup);
+  previewPath();
+  drawAim();
+  drawBall();
+  drawOverlay();
+}
+
+/* ── Input ────────────────────────────────────────────────────────────────── */
+
+function coordinates(event) {
+  const box = canvas.getBoundingClientRect();
+  return { x: (event.clientX - box.left) * W / box.width, y: (event.clientY - box.top) * H / box.height };
+}
+
+function aimFromDrag(event) {
+  const at = coordinates(event);
+  const dx = drag.x - at.x, dy = drag.y - at.y;
+  aim.u = clamp(dx / 95, -1, 1);
+  aim.power = clamp(Math.hypot(dx, dy) / 150, .06, 1);
+  updateHud();
+}
+
+canvas.addEventListener('pointerdown', event => {
+  if (event.button !== 0 || drag || !ball || ball.moving || finished || pause > 0) return;
+  event.preventDefault();
+  canvas.focus({ preventScroll: true });
+  canvas.setPointerCapture(event.pointerId);
+  drag = { ...coordinates(event), id: event.pointerId, length: 0 };
+});
+canvas.addEventListener('pointermove', event => {
+  if (drag?.id !== event.pointerId) return;
+  aimFromDrag(event);
+});
+canvas.addEventListener('pointerup', event => {
+  if (drag?.id !== event.pointerId) return;
+  aimFromDrag(event);
+  const pulled = Math.hypot(drag.x - coordinates(event).x, drag.y - coordinates(event).y);
+  drag = null;
+  if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  if (pulled >= 12) throwBall();
+  else { aim.power = .55; updateHud(); }
+});
+function cancelDrag() { drag = null; }
+canvas.addEventListener('pointercancel', cancelDrag);
+canvas.addEventListener('lostpointercapture', cancelDrag);
+window.addEventListener('blur', cancelDrag);
+
+canvas.addEventListener('keydown', event => {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Enter'].includes(event.key)) return;
+  event.preventDefault();
+  if (event.repeat && (event.key === ' ' || event.key === 'Enter')) return;
+  if (event.key === 'ArrowLeft') aim.u = clamp(aim.u - .06, -1, 1);
+  else if (event.key === 'ArrowRight') aim.u = clamp(aim.u + .06, -1, 1);
+  else if (event.key === 'ArrowUp') aim.power = clamp(aim.power + .04, .06, 1);
+  else if (event.key === 'ArrowDown') aim.power = clamp(aim.power - .04, .06, 1);
+  else throwBall();
+  updateHud();
+});
+
+document.querySelector('#new').onclick = newRun;
+
+/* ── Frame loop and fitting ───────────────────────────────────────────────── */
+
+function frame(time) {
+  if (lastTime) accumulator += Math.min(.1, (time - lastTime) / 1000);
+  lastTime = time;
+  while (accumulator >= STEP) { step(STEP); accumulator -= STEP; }
+  draw();
+  requestAnimationFrame(frame);
+}
+
+new ResizeObserver(() => {
+  const box = document.querySelector('#stage').getBoundingClientRect();
+  const scale = Math.max(.01, Math.min(box.width / W, box.height / H));
+  const ratio = Math.min(2, window.devicePixelRatio || 1);
+  canvas.style.width = W * scale + 'px';
+  canvas.style.height = H * scale + 'px';
+  canvas.width = Math.round(W * scale * ratio);
+  canvas.height = Math.round(H * scale * ratio);
+  ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  draw();
+}).observe(document.querySelector('#stage'));
+
+newRun();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

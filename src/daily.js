@@ -91,7 +91,10 @@ export const CHALLENGES = [
   { slug: 'eco', label: 'Thriving ecosystem', goal: 'After 60 simulation seconds, sustain {target} plants, 20 herbivores, and 3 predators together.', metric: 'plants', targets: [150, 175, 200], rule: 'eco', unit: 'plants' },
   { slug: 'mahjong', label: 'Pair by pair', goal: 'Clear {target} pairs from one Mahjong deal.', metric: 'pairs', targets: [24, 40, 56], unit: 'pairs' },
   { slug: 'chess', label: 'Board room', goal: 'Beat the computer in {target} moves or fewer.', metric: 'moves', targets: [40, 32, 24], rule: 'chess', unit: 'moves' },
-  { slug: 'block-blast', label: 'Blast radius', goal: 'Clear {target} lines in one run.', metric: 'lines', targets: [6, 10, 14], unit: 'lines' }
+  { slug: 'block-blast', label: 'Blast radius', goal: 'Clear {target} lines in one run.', metric: 'lines', targets: [6, 10, 14], unit: 'lines' },
+  { slug: 'cup-pong', label: 'Steady hand', goal: 'Sink {target} cups in one run before the third miss.', metric: 'cups', targets: [6, 9, 12], unit: 'cups sunk' },
+  { slug: 'rooftop-snipers', label: 'High ground', goal: 'Win {target} rounds against the computer in one match.', metric: 'wins', targets: [3, 4, 5], rule: 'cpu', unit: 'rounds won' },
+  { slug: 'deep', label: 'Deep pockets', goal: 'Reach {target} points in one descent.', metric: 'score', targets: [1200, 2000, 3000], unit: 'points' }
 ];
 export function dailyChallenge(date) {
   const day = Math.floor(Date.parse(date + 'T00:00:00Z') / 86400000);

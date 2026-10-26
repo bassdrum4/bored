@@ -80,6 +80,11 @@ function dst(c1,r1,c2,r2){ return Math.sqrt((c1-c2)**2+(r1-r2)**2); }
 
 let maze, score, hiScore = +(localStorage.getItem('pacHi')||0), lives, level, gameState, frame;
 let dotsLeft, modeIdx, modeTimer, frightTimer, ghostsEatenCombo, stateTimer;
+// Ghost mode: the player steers the red ghost, Pac-Man is the computer, and no
+// game points are awarded — the run is judged on catches instead, so the points
+// board and the daily challenge keep meaning the same thing.
+let playAsGhost = false, playerGhost = -1, catches = 0;
+let ghostNextDir = null;
 
 const MODE_DUR = [420,1200,420,1200,300,1200,300,Infinity];
 const FRIGHT_DUR = [360,300,240,180,120,120,60,60,60,60,60,60,60,60];
@@ -103,16 +108,83 @@ function isWalkable(c, r, isGhost) {
 
 function inTunnel(c, r) { return r === TUNNEL_ROW && (c < 6 || c > 21); }
 
+// Pac-Man's computer brain: breadth-first to the nearest dot, stepping around
+// the player's ghost. Used only when the player is the ghost.
+function routeToDot(col, row, avoid) {
+  const seen = new Set([row * COLS + col]);
+  const queue = [[col, row, null]];
+  for (let head = 0; head < queue.length && head < 400; head++) {
+    const [c, r, first] = queue[head];
+    if (first && (maze[r][c] === 0 || maze[r][c] === 3)) return first;
+    for (const d of DIRS) {
+      let nc = c + d.x, nr = r + d.y;
+      if (nr === TUNNEL_ROW) { if (nc < 0) nc = COLS - 1; else if (nc >= COLS) nc = 0; }
+      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
+      if (!isWalkable(nc, nr, false)) continue;
+      const key = nr * COLS + nc;
+      if (seen.has(key)) continue;
+      if (avoid && Math.abs(nc - avoid.col) + Math.abs(nr - avoid.row) < 2) continue;
+      seen.add(key);
+      queue.push([nc, nr, first || d]);
+    }
+  }
+  return null;
+}
+
+function pacBrain() {
+  const threat = playAsGhost && ghosts[playerGhost] && !ghosts[playerGhost].fright && ghosts[playerGhost].state === 'active'
+    ? ghosts[playerGhost] : null;
+  const step = routeToDot(pac.col, pac.row, threat);
+  if (step) return step;
+  // Cornered or no dots left: take the walkable turn that buys the most room.
+  let best = N, bestRoom = -Infinity;
+  for (const d of DIRS) {
+    const nc = pac.col + d.x, nr = pac.row + d.y;
+    if (!isWalkable(nc, nr, false)) continue;
+    const room = threat ? Math.abs(nc - threat.col) + Math.abs(nr - threat.row) : 0;
+    if (room > bestRoom) { bestRoom = room; best = d; }
+  }
+  return best === N ? opp(pac.dir) : best;
+}
+
+// The player's ghost turns at tile boundaries like any other, but takes the
+// direction that was asked for instead of choosing one.
+function ghostTurn(g) {
+  const passable = d => {
+    let nc = g.col + d.x, nr = g.row + d.y;
+    if (nr === TUNNEL_ROW && (nc < 0 || nc >= COLS)) return true;
+    if (!isWalkable(nc, nr, true)) return false;
+    return maze[nr][nc] !== 4 && maze[nr][nc] !== 5;
+  };
+  // A key press is kept until it can actually be taken, like Pac-Man's own
+  // buffered turn; it is used up at that junction so it cannot steer the ghost
+  // back towards it again on every later corner.
+  if (ghostNextDir && ghostNextDir !== N && passable(ghostNextDir)) {
+    const want = ghostNextDir;
+    ghostNextDir = null;
+    return want;
+  }
+  // Nothing held: hunt like any other ghost rather than reversing up and down
+  // the first corner, which is what a straight-then-reverse fallback does in
+  // the dead-end alcove above the house.
+  return chooseDir(g);
+}
+
 // Input
 let nextDir = LT;
 document.addEventListener('keydown', e => {
-  if (e.code==='ArrowUp'||e.code==='KeyW') nextDir = UP;
-  if (e.code==='ArrowDown'||e.code==='KeyS') nextDir = DN;
-  if (e.code==='ArrowLeft'||e.code==='KeyA') nextDir = LT;
-  if (e.code==='ArrowRight'||e.code==='KeyD') nextDir = RT;
+  if (e.code==='ArrowUp'||e.code==='KeyW') { nextDir = UP; ghostNextDir = UP; }
+  if (e.code==='ArrowDown'||e.code==='KeyS') { nextDir = DN; ghostNextDir = DN; }
+  if (e.code==='ArrowLeft'||e.code==='KeyA') { nextDir = LT; ghostNextDir = LT; }
+  if (e.code==='ArrowRight'||e.code==='KeyD') { nextDir = RT; ghostNextDir = RT; }
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
-  if (e.code === 'Enter') {
-    if (gameState === 'start' || gameState === 'gameover') newGame();
+  if (gameState === 'start') {
+    if (e.code === 'Enter' || e.code === 'Space') newGame(false);
+    else if (e.code === 'KeyG') newGame(true);
+  } else if (gameState === 'gameover' && (e.code === 'Enter' || e.code === 'Space')) {
+    newGame(playAsGhost);
+  } else if (gameState === 'gameover' && e.code === 'KeyG') {
+    newGame(true);
   }
 });
 
@@ -223,7 +295,14 @@ function updateGhost(g) {
     }
     return;
   }
-  g.speed = g.state==='eaten' ? 4 : g.fright ? 1 : inTunnel(g.col,g.row) ? 1 : 2;
+  // Comfortably slower than Pac-Man (2), so a clean run is still possible. The
+  // one the player steers is quicker instead: a single ghost against a dodging
+  // Pac-Man needs the edge, or the mode is a chase that never ends.
+  const mine = playAsGhost && g.type === playerGhost;
+  g.speed = g.state==='eaten' ? 4
+    : g.fright ? (mine ? 1.2 : 0.9)
+    : inTunnel(g.col,g.row) ? 0.9
+    : mine ? 2.7 : 1.6;
   g.progress += g.speed;
   if (g.progress >= T) {
     g.col += g.dir.x; g.row += g.dir.y; g.progress = 0;
@@ -232,7 +311,8 @@ function updateGhost(g) {
     if (g.state === 'eaten' && g.col === 14 && g.row === 11) {
       g.state = 'entering'; return;
     }
-    const nd = chooseDir(g);
+    const steered = playAsGhost && g.type === playerGhost && g.state !== 'eaten';
+    const nd = steered ? ghostTurn(g) : chooseDir(g);
     if (nd) g.dir = nd;
   }
   g.x = g.col*T + T/2 + g.dir.x * g.progress;
@@ -243,9 +323,11 @@ function updateGhost(g) {
 function eatDot() {
   const t = maze[pac.row][pac.col];
   if (t === 0) {
-    maze[pac.row][pac.col] = 2; score += 10; dotsLeft--;
+    maze[pac.row][pac.col] = 2; dotsLeft--;
+    if (!playAsGhost) score += 10;
   } else if (t === 3) {
-    maze[pac.row][pac.col] = 2; score += 50; dotsLeft--;
+    maze[pac.row][pac.col] = 2; dotsLeft--;
+    if (!playAsGhost) score += 50;
     frightTimer = FRIGHT_DUR[Math.min(level-1, FRIGHT_DUR.length-1)];
     ghostsEatenCombo = 0;
     for (const g of ghosts) {
@@ -265,15 +347,20 @@ function checkGhostCollisions() {
       if (g.fright) {
         g.state = 'eaten'; g.fright = false; g.flash = false;
         ghostsEatenCombo++;
-        score += [200,400,800,1600][Math.min(ghostsEatenCombo-1, 3)];
+        if (!playAsGhost) score += [200,400,800,1600][Math.min(ghostsEatenCombo-1, 3)];
       } else {
+        if (g.type === playerGhost) catches++;
         pac.alive = false; pac.deathTimer = 90; gameState = 'dying';
+        return;
       }
     }
   }
 }
 
-function newGame() {
+function newGame(asGhost) {
+  playAsGhost = asGhost === true;
+  playerGhost = playAsGhost ? 0 : -1;
+  catches = 0; ghostNextDir = null;
   score = 0; lives = 3; level = 1; frame = 0; nextDir = LT;
   loadMaze(); resetPac(); resetGhosts();
   modeIdx = 0; modeTimer = MODE_DUR[0]; frightTimer = 0; ghostsEatenCombo = 0;
@@ -318,10 +405,10 @@ function update() {
       }
     }
 
-    pac.nextDir = nextDir;
+    if (!playAsGhost) pac.nextDir = nextDir;
     if (pac.dir === N) {
-      if (isWalkable(pac.col + pac.nextDir.x, pac.row + pac.nextDir.y, false))
-        pac.dir = pac.nextDir;
+      const want = playAsGhost ? pacBrain() : pac.nextDir;
+      if (isWalkable(pac.col + want.x, pac.row + want.y, false)) pac.dir = want;
     }
     if (pac.dir !== N) {
       pac.progress += pac.speed;
@@ -330,8 +417,11 @@ function update() {
         if (pac.col < 0) pac.col += COLS;
         if (pac.col >= COLS) pac.col -= COLS;
         eatDot();
-        if (isWalkable(pac.col + pac.nextDir.x, pac.row + pac.nextDir.y, false))
-          pac.dir = pac.nextDir;
+        // The computer plans from the tile it has just reached, not the one it
+        // left: a direction queued a tile early makes it turn straight back.
+        const want = playAsGhost ? pacBrain() : pac.nextDir;
+        if (isWalkable(pac.col + want.x, pac.row + want.y, false))
+          pac.dir = want;
         else if (!isWalkable(pac.col + pac.dir.x, pac.row + pac.dir.y, false))
           pac.dir = N;
       }
@@ -351,7 +441,7 @@ function update() {
       lives--;
       if (lives <= 0) {
         gameState = 'gameover'; stateTimer = 240;
-        if (score > hiScore) { hiScore = score; localStorage.setItem('pacHi', ''+hiScore); }
+        if (!playAsGhost && score > hiScore) { hiScore = score; localStorage.setItem('pacHi', ''+hiScore); }
       } else {
         respawnAll();
       }
@@ -373,16 +463,21 @@ function render() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   if (gameState === 'start') {
+    const cx = canvas.width/2, cy = canvas.height/2;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ff0';
     ctx.font = '20px "Press Start 2P",monospace';
-    ctx.fillText('PAC-MAN', canvas.width/2, canvas.height/2 - 60);
+    ctx.fillText('PAC-MAN', cx, cy - 92);
     ctx.fillStyle = '#fff';
     ctx.font = '10px "Press Start 2P",monospace';
-    ctx.fillText('PRESS ENTER TO START', canvas.width/2, canvas.height/2);
-    ctx.fillText('ARROWS / WASD TO MOVE', canvas.width/2, canvas.height/2 + 30);
+    ctx.fillText('ENTER — PLAY PAC-MAN', cx, cy - 42);
+    ctx.fillStyle = '#ff0000';
+    ctx.fillText('G — PLAY AS A GHOST', cx, cy - 6);
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px "Press Start 2P",monospace';
+    ctx.fillText('ARROWS / WASD TO MOVE', cx, cy + 34);
     ctx.fillStyle = '#888';
-    ctx.fillText('HI SCORE: ' + hiScore, canvas.width/2, canvas.height/2 + 70);
+    ctx.fillText('HI SCORE: ' + hiScore, cx, cy + 72);
     return;
   }
 
@@ -484,7 +579,7 @@ function render() {
   const hy = ROWS*T + OY + 4;
   ctx.font = '10px "Press Start 2P",monospace';
   ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
-  ctx.fillText('SCORE ' + score, 8, hy + 12);
+  ctx.fillText(playAsGhost ? 'CATCHES ' + catches : 'SCORE ' + score, 8, hy + 12);
   ctx.textAlign = 'right';
   ctx.fillText('LEVEL ' + level, canvas.width - 8, hy + 12);
   ctx.textAlign = 'center';

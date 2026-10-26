@@ -73,6 +73,28 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
     letter-spacing: 1px; padding: 4px 8px;
   }
   .mode:hover { border-color: #444; color: #ccc; }
+  .start {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    background: rgba(8,6,14,0.82); z-index: 20;
+  }
+  .start[hidden] { display: none; }
+  .start .panel {
+    border: 1px solid #23233a; background: #0d0b16; border-radius: 6px;
+    padding: 22px 26px; text-align: center;
+  }
+  .start h2 {
+    font-family: 'Bebas Neue', sans-serif; font-size: 26px;
+    letter-spacing: 6px; margin-bottom: 4px;
+  }
+  .start p { font-size: 11px; color: #777; letter-spacing: 1px; margin-bottom: 16px; }
+  .start .choices { display: flex; gap: 10px; }
+  .start button {
+    display: grid; gap: 6px; background: none; color: #ddd; cursor: pointer;
+    border: 1px solid #2c2c44; border-radius: 4px;
+    font: 12px/1.2 'DM Mono', monospace; padding: 12px 16px;
+  }
+  .start button:hover, .start button:focus-visible { border-color: #e67e22; color: #fff; outline: none; }
+  .start button small { color: #6a6a80; font-size: 9px; letter-spacing: .5px; }
   .msg {
     position: fixed; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
@@ -101,6 +123,16 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
   <div class="p2c" id="p2hint"><span>CPU</span> covers the far side</div>
 </div>
 <div class="msg" id="msg"></div>
+<div class="start" id="start">
+  <div class="panel">
+    <h2>SUNSET VOLLEY</h2>
+    <p>Who takes the far side?</p>
+    <div class="choices">
+      <button type="button" data-cpu="1"><b>1 player</b><small>the computer returns serve</small></button>
+      <button type="button" data-cpu="0"><b>2 players</b><small>someone sits on the far side</small></button>
+    </div>
+  </div>
+</div>
 
 <script>
 const canvas = document.getElementById('c');
@@ -125,10 +157,17 @@ let sc = [0, 0], serv = 0;
 let ball, p1, p2;
 let cpuMode = true, aiDir = 0, aiJump = false, aiTick = 0, aiTargetX = 0;
 let parts = [], trail = [];
-let st = 'serve', stT = 55, lastHit = -1;
+let st = 'choose', stT = 55, lastHit = -1;
 
 const keys = {};
-onkeydown = e => { keys[e.code] = true; if ('ArrowUp ArrowDown ArrowLeft ArrowRight Space Enter'.includes(e.code)) e.preventDefault(); };
+onkeydown = e => {
+  keys[e.code] = true;
+  if ('ArrowUp ArrowDown ArrowLeft ArrowRight Space Enter'.includes(e.code)) e.preventDefault();
+  if (st === 'choose') {
+    if (e.code === 'Digit1' || e.code === 'Enter') startMatch(true);
+    else if (e.code === 'Digit2') startMatch(false);
+  }
+};
 onkeyup = e => { keys[e.code] = false; };
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 document.addEventListener('visibilitychange', () => { if (document.hidden) for(const k in keys)keys[k]=false });
@@ -269,6 +308,7 @@ function tickParts() {
 }
 
 function update() {
+  if (st === 'choose') { tickParts(); return; }
   if (st === 'over') {
     tickParts();
     if (keys['KeyR'] || keys['Space'] || keys['Enter']) {
@@ -457,7 +497,7 @@ const modeBtn = document.getElementById('mode');
 const p2hint = document.getElementById('p2hint');
 function setMode(cpu) {
   cpuMode = cpu;
-  modeBtn.textContent = cpu ? 'vs CPU' : '2 players';
+  modeBtn.textContent = cpu ? '1 player' : '2 players';
   p2hint.innerHTML = cpu
     ? '<span>CPU</span> covers the far side'
     : '<span>↑</span> jump &nbsp; <span>←</span> <span>→</span> move';
@@ -465,6 +505,19 @@ function setMode(cpu) {
   aiDir = 0; aiJump = false; aiTick = 0;
 }
 modeBtn.onclick = () => setMode(!cpuMode);
+
+const startEl = document.getElementById('start');
+function startMatch(cpu) {
+  setMode(cpu);
+  sc = [0, 0];
+  s1El.textContent = '0'; s2El.textContent = '0';
+  serv = 0;
+  reset();
+  startEl.hidden = true;
+}
+for (const button of document.querySelectorAll('#start [data-cpu]')) {
+  button.onclick = () => startMatch(button.dataset.cpu === '1');
+}
 
 window.__test = {
   pads: () => [p1, p2].map(p => ({ x: +p.x.toFixed(1), y: +p.y.toFixed(1) })),
@@ -474,7 +527,10 @@ window.__test = {
   state: () => st
 };
 
-reset(); loop();
+reset();
+setMode(cpuMode);
+st = 'choose';
+loop();
 </script>
 </body>
 </html>

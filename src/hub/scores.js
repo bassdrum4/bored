@@ -88,6 +88,10 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Cup Pong ranks the cups sunk in a run; a run still going keeps what it has.
+  highScore('cup-pong', 'Cup Pong', 'cups', { metric: 'cups', when: snapshot => snapshot.finished === true, resumable: true }),
+  // Rooftop Snipers counts round wins against the computer in a session, like SUMO.
+  highScore('rooftop-snipers', 'Rooftop Snipers', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   // Block Blast counts the score of a run that ended with no piece left to place.
   highScore('block-blast', 'Block Blast', 'points', { metric: 'score', when: snapshot => snapshot.finished === true, resumable: true }),
   // Chess counts the human's wins against the computer in a session, like Connect Four.

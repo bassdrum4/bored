@@ -4,6 +4,8 @@ import { ORDER, EXTERNS } from './catalog.js';
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
 export const DISCOVERY = {
+  'cup-pong': info('2–5 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
+  'rooftop-snipers': info('1–3 min', 'Competitive', ['Keyboard', 'Touch'], { quick: true, players: '2 local' }),
   'block-blast': info('2–5 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   chess: info('5–15 min', 'Competitive', ['Mouse', 'Touch'], { players: '2 local' }),
   mahjong: info('10–25 min', 'Focused', ['Mouse', 'Touch']),
@@ -19,7 +21,7 @@ export const DISCOVERY = {
   poker: info('5–15 min', 'Competitive', ['Mouse', 'Touch']),
   wordle: info('2–5 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   lava: info('1–3 min', 'Competitive', ['Keyboard'], { quick: true, players: '2 local' }),
-  volletball: info('3–5 min', 'Competitive', ['Keyboard'], { players: '2 local' }),
+  volletball: info('3–5 min', 'Competitive', ['Keyboard'], { players: '1 or 2 local' }),
   solitaire: info('5–15 min', 'Relaxing', ['Mouse', 'Touch']),
   commanders: info('5–15 min', 'Competitive', ['Keyboard', 'Touch']),
   eco: info('Open-ended', 'Relaxing', ['Mouse', 'Touch']),
@@ -67,7 +69,7 @@ export function inCollection(slug, collection) {
 // it builds a card, so the site needs no build step to carry them.
 // Newly scaffolded games start with an SVG placeholder; captured screenshots
 // remain WebP and can replace it later without changing the loader.
-export const PREVIEW_FALLBACKS = { 'block-blast': '.svg', chess: '.svg', mahjong: '.svg' };
+export const PREVIEW_FALLBACKS = { 'cup-pong': '.svg', 'rooftop-snipers': '.svg', 'block-blast': '.svg', chess: '.svg', mahjong: '.svg' };
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
   ORDER.filter(([slug]) => !EXTERNS[slug]).map(([slug]) => [slug, previewUrl(slug)]));

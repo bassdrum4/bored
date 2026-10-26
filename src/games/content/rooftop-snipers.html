@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rooftop Snipers</title>
+<style>
+  :root {
+    --bg: #f5f2ea;
+    --ink: #191713;
+    --muted: #6b6558;
+    --hair: #d8d2c4;
+    --roof: #ccc2ae;
+    --accent: #b3261e;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  * { box-sizing: border-box }
+  html, body { margin: 0; height: 100%; overflow: hidden }
+  body {
+    background: var(--bg); color: var(--ink); font: 12px/1.4 var(--sans);
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  main { height: 100dvh; max-width: 640px; margin: 0 auto; padding: 10px; display: flex; flex-direction: column; gap: 7px }
+  header, footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap }
+  h1 { margin: 0; font: 600 11px/1.4 var(--mono); letter-spacing: .09em }
+  #hud { font: 11px/1.4 var(--mono); color: var(--ink) }
+  button, select {
+    font: 11px/1 var(--mono); background: none; color: var(--ink);
+    border: 1px solid var(--hair); border-radius: 2px; padding: 7px 10px; cursor: pointer;
+  }
+  button:hover, select:hover { border-color: var(--ink) }
+  button:focus-visible, select:focus-visible, canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+  [hidden] { display: none !important }
+  #stage { flex: 1; min-height: 0; display: grid; place-items: center }
+  canvas { display: block; touch-action: none; max-width: 100% }
+  #status { margin: 0; min-height: 2.6em; font-size: 12px; color: var(--ink) }
+  #status span { color: var(--muted) }
+  #pads { display: grid; gap: 5px }
+  .pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px }
+  .pad b { font: 600 9px/1 var(--mono); letter-spacing: .08em; color: var(--muted); align-self: center; padding-right: 2px }
+  .pad button { padding: 10px 4px; touch-action: none; user-select: none; -webkit-user-select: none }
+  .pad button.on { background: var(--ink); color: var(--bg) }
+  #hint { margin: 0; font-size: 10px; color: var(--muted) }
+  @media (max-width: 700px) { header { padding-right: 52px } }
+  @media (max-height: 470px) { main { padding: 5px; gap: 3px } #status { min-height: 1.3em } #hint { display: none } .pad button { padding: 7px 4px } }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>ROOFTOP SNIPERS</h1><span id="hud">P1 0 &middot; P2 0 &middot; FIRST TO 5</span></header>
+  <div id="stage">
+    <canvas id="yard" width="460" height="300" tabindex="0" aria-label="Two players on neighbouring rooftops. Player one moves with A and D, jumps with W and fires with F. Player two uses the arrow keys and L."></canvas>
+  </div>
+  <p id="status" role="status" aria-live="polite"></p>
+  <div id="pads">
+    <div class="pad" id="pad-p1"><b>P1</b><button type="button" data-who="0" data-act="left">&#9664;</button><button type="button" data-who="0" data-act="right">&#9654;</button><button type="button" data-who="0" data-act="jump">JUMP</button><button type="button" data-who="0" data-act="fire">FIRE</button></div>
+    <div class="pad" id="pad-p2" hidden><b>P2</b><button type="button" data-who="1" data-act="left">&#9664;</button><button type="button" data-who="1" data-act="right">&#9654;</button><button type="button" data-who="1" data-act="jump">JUMP</button><button type="button" data-who="1" data-act="fire">FIRE</button></div>
+  </div>
+  <footer>
+    <select id="mode" aria-label="Opponent">
+      <option value="computer">Vs computer</option>
+      <option value="friend">Two players</option>
+    </select>
+    <button id="new" type="button">New match</button>
+  </footer>
+  <p id="hint">A/D walk, W jumps, F fires. Player two: arrows and L. Knock the other sniper off the roof.</p>
+</main>
+<script>
+'use strict';
+// A small duel: two neighbours, two rooftops, one gap. Physics are deliberately
+// plain — gravity, a shove per hit, and the street below.
+
+const W = 460, H = 300, ROOF = 196, STEP = 1 / 120;
+const PAPER = '#f5f2ea', INK = '#191713', ROOF_TONE = '#ccc2ae', ACCENT = '#b3261e', MUTED = '#6b6558';
+const ROOFS = [{ x0: 0, x1: 178 }, { x0: 282, x1: 460 }];
+const GRAVITY = 1500, WALK = 145, JUMP = 430, BULLET_SPEED = 520, COOLDOWN = .62;
+const HALF = 8, BODY = 22, MATCH_WINS = 5;
+
+const canvas = document.querySelector('#yard'), ctx = canvas.getContext('2d');
+const hud = document.querySelector('#hud'), statusEl = document.querySelector('#status');
+const modeEl = document.querySelector('#mode'), padP2 = document.querySelector('#pad-p2');
+const held = { 0: {}, 1: {} };
+
+let players = [], bullets = [], wins = [0, 0], round = 1, lastWinner = -1;
+let roundOver = false, roundTimer = 0, matchOver = false, cpuCooldown = 0, cpuIntent = 0;
+let lastTime = 0, accumulator = 0;
+
+/* ── State ────────────────────────────────────────────────────────────────── */
+
+function spawn(who) {
+  const roof = ROOFS[who];
+  return {
+    who, x: (roof.x0 + roof.x1) / 2 + (who ? 24 : -24), y: ROOF,
+    vx: 0, vy: 0, ground: true, facing: who ? -1 : 1, cooldown: 0, flash: 0, alive: true
+  };
+}
+
+function resetRound(message) {
+  players = [spawn(0), spawn(1)];
+  bullets = [];
+  roundOver = false;
+  roundTimer = 0;
+  cpuCooldown = .4;
+  cpuIntent = 0;
+  if (message !== undefined) statusEl.textContent = message;
+  render();
+}
+
+function newMatch() {
+  wins = [0, 0];
+  round = 1;
+  lastWinner = -1;
+  matchOver = false;
+  // The computer holds keys while it plays; a new match (and a mode switch)
+  // must not hand a stuck direction to whoever takes that side.
+  held[0] = {};
+  held[1] = {};
+  resetRound('Round 1. A/D walk, W jumps, F fires.');
+  canvas.focus({ preventScroll: true });
+}
+
+const cpu = () => modeEl.value === 'computer';
+
+function updateHud() {
+  hud.textContent = 'P1 ' + wins[0] + ' \u00b7 ' + (cpu() ? 'CPU' : 'P2') + ' ' + wins[1] +
+    ' \u00b7 ' + (matchOver ? 'MATCH OVER' : 'ROUND ' + round);
+}
+
+function render() {
+  draw();
+  updateHud();
+}
+
+/* ── Simulation ───────────────────────────────────────────────────────────── */
+
+const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+
+function fire(player) {
+  if (roundOver || matchOver || !player.alive || player.cooldown > 0) return false;
+  player.cooldown = COOLDOWN;
+  player.facing = player.who === 0 ? 1 : -1;
+  bullets.push({ x: player.x + player.facing * 15, y: player.y - 12, vx: player.facing * BULLET_SPEED, life: 1.6, from: player.who });
+  // The recoil is small but real: firing from the edge costs you footing.
+  player.vx -= player.facing * 34;
+  return true;
+}
+
+function shove(player, fromX) {
+  const direction = player.x >= fromX ? 1 : -1;
+  player.vx = direction * 300;
+  player.vy = -330;
+  player.ground = false;
+  player.flash = .18;
+}
+
+function endRound(winner) {
+  if (roundOver) return;
+  roundOver = true;
+  roundTimer = 1.5;
+  lastWinner = winner;
+  if (winner >= 0) wins[winner] += 1;
+  if (wins[0] >= MATCH_WINS || wins[1] >= MATCH_WINS) {
+    matchOver = true;
+    statusEl.textContent = (wins[0] >= MATCH_WINS ? 'You take the match' : (cpu() ? 'The computer takes the match' : 'Player two takes the match')) +
+      ' ' + wins[0] + '\u2013' + wins[1] + '. Press New match.';
+    return;
+  }
+  statusEl.textContent = winner < 0 ? 'Both of you went over. No point.' :
+    (winner === 0 ? 'You take the round' : (cpu() ? 'The computer takes the round' : 'Player two takes the round')) +
+    '. ' + wins[0] + '\u2013' + wins[1] + '.';
+}
+
+function stepPlayer(player, dt) {
+  if (!player.alive) return;
+  player.cooldown = Math.max(0, player.cooldown - dt);
+  player.flash = Math.max(0, player.flash - dt);
+  const keys = held[player.who];
+  const walking = !roundOver && !matchOver;
+  if (player.ground) {
+    const direction = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    player.vx = walking ? direction * WALK : 0;
+    if (walking && keys.jump) {
+      player.vy = -JUMP;
+      player.ground = false;
+    }
+  }
+  player.vy += GRAVITY * dt;
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  const roof = ROOFS[player.who];
+  if (player.y >= ROOF && player.vy >= 0 && player.x >= roof.x0 && player.x <= roof.x1) {
+    player.y = ROOF;
+    player.vy = 0;
+    player.ground = true;
+  } else if (player.ground) {
+    // Walking past the parapet is not a fall — the roof holds you at its edge.
+    player.x = clamp(player.x, roof.x0 + HALF, roof.x1 - HALF);
+    if (player.x <= roof.x0 + HALF + .01 || player.x >= roof.x1 - HALF - .01) player.vx = 0;
+  }
+  if (player.y > ROOF + 1) player.ground = false;
+  if (player.y > H + 40) {
+    player.alive = false;
+    const other = players[1 - player.who];
+    endRound(other.alive ? other.who : -1);
+  }
+}
+
+function stepBullets(dt) {
+  for (const bullet of bullets) {
+    bullet.x += bullet.vx * dt;
+    bullet.life -= dt;
+  }
+  for (const bullet of bullets) {
+    if (bullet.life <= 0) continue;
+    for (const player of players) {
+      if (!player.alive || player.who === bullet.from) continue;
+      if (bullet.x > player.x - HALF && bullet.x < player.x + HALF &&
+          bullet.y > player.y - BODY && bullet.y < player.y) {
+        bullet.life = 0;
+        shove(player, bullet.from === 0 ? -Infinity : Infinity);
+      }
+    }
+  }
+  // Two shots that meet cancel each other out.
+  for (let i = 0; i < bullets.length; i++) {
+    for (let j = i + 1; j < bullets.length; j++) {
+      if (bullets[i].life <= 0 || bullets[j].life <= 0) continue;
+      if (Math.abs(bullets[i].x - bullets[j].x) < 8 && Math.abs(bullets[i].y - bullets[j].y) < 8) {
+        bullets[i].life = 0;
+        bullets[j].life = 0;
+      }
+    }
+  }
+  bullets = bullets.filter(bullet => bullet.life > 0 && bullet.x > -30 && bullet.x < W + 30);
+}
+
+function stepCpu(dt) {
+  if (!cpu() || roundOver || matchOver) return;
+  const me = players[1], foe = players[0];
+  cpuCooldown -= dt;
+  cpuIntent -= dt;
+  if (cpuIntent <= 0) {
+    cpuIntent = .16 + Math.random() * .14;
+    held[1] = {};
+    // Stay on the roof, keep roughly opposite the player, dodge what is coming.
+    const incoming = bullets.find(bullet => bullet.from === 0 && bullet.vx > 0 && bullet.x < me.x && me.x - bullet.x < 190);
+    const target = clamp(foe.x + 60, ROOFS[1].x0 + 24, ROOFS[1].x1 - 24);
+    if (incoming && Math.random() < .5) held[1].jump = true;
+    else if (Math.abs(me.x - target) > 12) held[1][me.x > target ? 'left' : 'right'] = true;
+    if (cpuCooldown <= 0 && Math.abs(me.x - foe.x) < 260 && Math.random() < .55) {
+      fire(me);
+      cpuCooldown = .55 + Math.random() * .5;
+    }
+  }
+}
+
+function step(dt) {
+  if (!roundOver) {
+    players.forEach(player => stepPlayer(player, dt));
+    stepBullets(dt);
+    stepCpu(dt);
+  } else {
+    stepBullets(dt);
+    roundTimer -= dt;
+    if (roundTimer <= 0) {
+      if (!matchOver) {
+        round += 1;
+        resetRound('Round ' + round + '.');
+      }
+    }
+  }
+}
+
+/* ── Drawing ──────────────────────────────────────────────────────────────── */
+
+function drawFigure(player) {
+  const colour = player.who === 0 ? ACCENT : INK;
+  const top = player.y - BODY;
+  ctx.fillStyle = player.flash > 0 ? PAPER : colour;
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.rect(player.x - HALF, top, HALF * 2, BODY);
+  ctx.fill();
+  if (player.flash > 0) ctx.stroke();
+  // Head and hat brim: enough silhouette to tell the two apart at a glance.
+  ctx.beginPath();
+  ctx.arc(player.x, top - 5, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(player.x - 8, top - 6, 16, 2);
+  // The pistol points where the next shot goes.
+  const gunY = player.y - 13;
+  ctx.fillRect(player.x + (player.facing > 0 ? HALF : -HALF - 9), gunY, 9, 2);
+}
+
+function draw() {
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(0, 0, W, H);
+
+  // Two rooftops and the street between them.
+  for (const roof of ROOFS) {
+    ctx.fillStyle = ROOF_TONE;
+    ctx.fillRect(roof.x0, ROOF, roof.x1 - roof.x0, H - ROOF);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(roof.x0 + .5, ROOF + .5, roof.x1 - roof.x0 - 1, H - ROOF);
+    ctx.fillStyle = PAPER;
+    for (let x = roof.x0 + 16; x < roof.x1 - 22; x += 34) {
+      for (let y = ROOF + 22; y < H - 20; y += 32) {
+        ctx.fillRect(x, y, 16, 16);
+        ctx.strokeStyle = INK;
+        ctx.strokeRect(x + .5, y + .5, 15, 15);
+      }
+    }
+  }
+  ctx.fillStyle = MUTED;
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('THE STREET', W / 2, H - 10);
+
+  for (const bullet of bullets) {
+    ctx.fillStyle = bullet.from === 0 ? ACCENT : INK;
+    ctx.beginPath();
+    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  players.forEach(drawFigure);
+
+  if (matchOver) {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(112, 66, 236, 78);
+    ctx.strokeStyle = INK;
+    ctx.strokeRect(112.5, 66.5, 235, 77);
+    ctx.fillStyle = INK;
+    ctx.font = '15px ui-monospace, monospace';
+    ctx.fillText((wins[0] > wins[1] ? 'YOU WIN' : (cpu() ? 'CPU WINS' : 'P2 WINS')) + ' ' + Math.max(wins[0], wins[1]) + '\u2013' + Math.min(wins[0], wins[1]), W / 2, 100);
+    ctx.fillStyle = MUTED;
+    ctx.font = '10px ui-monospace, monospace';
+    ctx.fillText('NEW MATCH TO GO AGAIN', W / 2, 122);
+  }
+}
+
+/* ── Input ────────────────────────────────────────────────────────────────── */
+
+const KEYMAP = {
+  a: [0, 'left'], d: [0, 'right'], w: [0, 'jump'], f: [0, 'fire'],
+  ArrowLeft: [1, 'left'], ArrowRight: [1, 'right'], ArrowUp: [1, 'jump'], l: [1, 'fire'], '/': [1, 'fire']
+};
+
+function press(who, action) {
+  if (action === 'fire') {
+    if (players[who]) fire(players[who]);
+    return;
+  }
+  held[who][action] = true;
+}
+function release(who, action) {
+  if (action === 'fire') return;
+  held[who][action] = false;
+}
+
+addEventListener('keydown', event => {
+  const map = KEYMAP[event.key];
+  if (!map) return;
+  const [who, action] = map;
+  if (who === 1 && cpu()) return;
+  event.preventDefault();
+  if (event.repeat && action === 'jump') return;
+  if (!event.repeat) press(who, action);
+});
+addEventListener('keyup', event => {
+  const map = KEYMAP[event.key];
+  if (!map) return;
+  event.preventDefault();
+  release(map[0], map[1]);
+});
+
+document.querySelectorAll('#pads button').forEach(button => {
+  const who = Number(button.dataset.who), action = button.dataset.act;
+  const down = event => {
+    event.preventDefault();
+    if (who === 1 && cpu()) return;
+    button.classList.add('on');
+    press(who, action);
+  };
+  const up = () => {
+    button.classList.remove('on');
+    release(who, action);
+  };
+  button.addEventListener('pointerdown', down);
+  button.addEventListener('pointerup', up);
+  button.addEventListener('pointercancel', up);
+  button.addEventListener('pointerleave', up);
+  button.addEventListener('contextmenu', event => event.preventDefault());
+});
+
+modeEl.onchange = () => {
+  padP2.hidden = cpu();
+  newMatch();
+};
+document.querySelector('#new').onclick = newMatch;
+
+window.__boredSnapshot = () => ({
+  slug: 'rooftop-snipers',
+  wins: wins[0],
+  rounds: round - 1,
+  won: lastWinner === 0 ? 1 : 0,
+  cpu: cpu(),
+  finished: matchOver
+});
+
+/* Small handle for the test suite: it only drives what the buttons already do. */
+window.__test = {
+  state: () => ({ wins: wins.slice(), round, lastWinner, matchOver, roundOver, bullets: bullets.length,
+    players: players.map(player => ({ x: player.x, y: player.y, alive: player.alive })) }),
+  mode: value => { modeEl.value = value; padP2.hidden = cpu(); newMatch(); },
+  step: seconds => { for (let t = 0; t < seconds; t += STEP) step(STEP); draw(); updateHud(); },
+  fire: who => fire(players[who]),
+  shove: who => shove(players[who], players[who].who === 0 ? Infinity : -Infinity),
+  key: (who, action, down) => (down ? press(who, action) : release(who, action))
+};
+
+/* ── Frame loop and fitting ───────────────────────────────────────────────── */
+
+function frame(time) {
+  if (lastTime) accumulator += Math.min(.1, (time - lastTime) / 1000);
+  lastTime = time;
+  while (accumulator >= STEP) { step(STEP); accumulator -= STEP; }
+  draw();
+  updateHud();
+  requestAnimationFrame(frame);
+}
+
+new ResizeObserver(() => {
+  const box = document.querySelector('#stage').getBoundingClientRect();
+  const scale = Math.max(.01, Math.min(box.width / W, box.height / H));
+  const ratio = Math.min(2, window.devicePixelRatio || 1);
+  canvas.style.width = W * scale + 'px';
+  canvas.style.height = H * scale + 'px';
+  canvas.width = Math.round(W * scale * ratio);
+  canvas.height = Math.round(H * scale * ratio);
+  ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  draw();
+}).observe(document.querySelector('#stage'));
+
+resetRound('Round 1. A/D walk, W jumps, F fires.');
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
