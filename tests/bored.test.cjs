@@ -79,6 +79,19 @@ async function restart() {
 async function filter(name) {
   await page.click('[data-filter="' + name + '"]');
 }
+// The shared leaderboard resolves after first paint and pushes the library down
+// with it. Clicks are coordinate based, so let the page stop moving before
+// touching the shelf: otherwise a click lands on whatever slid under the pointer.
+async function settleBoard() {
+  await page.waitForFunction(() => {
+    const note = document.querySelector('#lb-empty');
+    if (note && !note.hidden && /loading/i.test(note.textContent)) return false;
+    const height = Math.round(document.querySelector('#leaderboard').getBoundingClientRect().height);
+    const stable = window.__lbHeight === height;
+    window.__lbHeight = height;
+    return stable;
+  }, { polling: 100, timeout: 10000 }).catch(() => {});
+}
 async function text(frame, selector) {
   return frame.$eval(selector, el => el.textContent);
 }
@@ -268,6 +281,7 @@ test('browser regressions', async t => {
   await page.evaluateOnNewDocument(() => { Math.random = () => 0; });
   await page.setViewport({ width: 1000, height: 900 });
   await page.goto(url);
+  await settleBoard();
 
   await t.test('hub categories, search, sorting, empty state, and stored favorites', async () => {
     // Counts come from the catalog so adding a game does not have to touch this
@@ -307,6 +321,7 @@ test('browser regressions', async t => {
     await filter('Favorites');
     assert.equal(await page.$$eval('.card', els => els.length), 1);
     await page.reload();
+    await settleBoard();
     await filter('Favorites');
     assert.equal(await page.$$eval('.card', els => els.length), 1);
     await page.click('[aria-label="Remove Memory from favorites"]');
