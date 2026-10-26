@@ -10,7 +10,7 @@
     "games:add": "node scripts/games.mjs add",
     "games:register": "node scripts/games.mjs register",
     "feedback:setup": "node scripts/setup-feedback.mjs",
-    "test": "npm run games:check && node --test tests/bored.test.cjs tests/discovery.test.cjs tests/player-state.test.cjs tests/backend-safety.test.cjs tests/scaffolder.test.cjs tests/minigolf.test.cjs tests/analytics.test.cjs tests/tank-engine.test.cjs tests/bored-together.test.cjs tests/together-browser.test.cjs tests/together-transport.test.cjs tests/together-pool.test.cjs tests/together-player.test.cjs tests/rooftop-snipers.test.cjs",
+    "test": "npm run games:check && node --test tests/bored.test.cjs tests/discovery.test.cjs tests/player-state.test.cjs tests/backend-safety.test.cjs tests/scaffolder.test.cjs tests/block-blast.test.cjs tests/minigolf.test.cjs tests/analytics.test.cjs tests/tank-engine.test.cjs tests/bored-together.test.cjs tests/together-browser.test.cjs tests/together-transport.test.cjs tests/together-pool.test.cjs tests/together-player.test.cjs tests/rooftop-snipers.test.cjs",
     "test:visual": "node --test tests/visual.test.cjs",
     "previews:capture": "node scripts/capture-previews.mjs",
     "previews:optimize": "python3 scripts/optimize-previews.py",

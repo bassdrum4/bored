@@ -19,7 +19,17 @@
 <p class="analytics-note">Activity from analytics admin accounts is excluded from every total, chart, table and export. Active time: game visible, focused, menu closed, with input in the last 60 seconds. Visible time includes idle play. Times are sampled; unfinished sessions may be missing their last 30 seconds. Remote games report presence only, since their internal input and scores are inaccessible.</p>
 <div id="totals" class="analytics-totals"></div>
 <nav class="analytics-tabs" aria-label="Analytics views"><button type="button" data-view="overview" aria-pressed="true">Overview</button><button type="button" data-view="engagement" aria-pressed="false">Enjoyment & retention</button><button type="button" data-view="players" aria-pressed="false">Players</button><button type="button" data-view="sessions" aria-pressed="false">Sessions & errors</button></nav>
-<section id="overview-view"><div class="analytics-charts"><section><h2>Active time by game</h2><div id="game-chart"></div></section><section><h2>Daily active time</h2><div id="day-chart"></div></section><section><h2>Discovery source</h2><div id="source-chart"></div></section><section><h2>Device & embed</h2><div id="device-chart"></div></section><section><h2>Daily challenge vs free play</h2><div id="mode-chart"></div></section><section><h2>Time of day · Detroit</h2><div id="hour-chart"></div></section></div><h2>Game breakdown</h2><div id="games-table"></div></section>
+<section id="overview-view"><div class="analytics-charts"><section><h2>Active time by game</h2><div id="game-chart"></div></section><section><h2>Daily active time</h2><div id="day-chart"></div></section><section><h2>Discovery source</h2><div id="source-chart"></div></section><section><h2>Device & embed</h2><div id="device-chart"></div></section><section><h2>Daily challenge vs free play</h2><div id="mode-chart"></div></section><section><h2>Time of day · Detroit</h2><div id="hour-chart"></div></section></div><h2>Game breakdown</h2><div id="games-table"></div>
+<section id="f14-section">
+  <h2>F-14 · flight analytics</h2>
+  <p class="analytics-note">Shares this dashboard's date and player filters. Only sorties, gameplay engagement, flight outcomes and vehicle/mission choices are collected; multiplayer room codes and callsigns are not. Recoveries are not necessarily mission victories.</p>
+  <div id="f14-totals" class="analytics-totals"></div>
+  <div class="analytics-charts">
+    <section><h3>Mission modes</h3><div id="f14-modes"></div></section>
+    <section><h3>Aircraft &amp; vessels</h3><div id="f14-aircraft"></div></section>
+  </div>
+  <h3>Flight outcomes</h3><div id="f14-outcomes"></div>
+</section></section>
 <section id="engagement-view" hidden>
   <h2>Do players want to return?</h2>
   <p class="analytics-note">Only genuinely engaged sessions count (at least 60 seconds of active play or a completed round). Visitor counts are browser-based estimates, not proven individuals. Next-school-week retention excludes cohorts whose following week has not yet ended. New tracking is not retroactive.</p>

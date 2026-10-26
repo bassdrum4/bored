@@ -133,7 +133,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   }
   function start(game, context = {}) {
     end('switch');
-    if (!enabled) return;
+    if (!enabled || (game === 'f-14' && context.external)) return;
     last = now(); lastInput = -Infinity;
     run = { id: uuid(), user: owner(), game, context, active: 0, totalActive: 0, visible: 0, ready: false, interacted: false, everFinished: false, opened: now() };
     emit('start');
