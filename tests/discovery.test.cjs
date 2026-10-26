@@ -160,6 +160,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
     const reply = body => request.respond({ status: 200, contentType: 'application/json', headers, body: JSON.stringify(body) });
     if (method === 'OPTIONS') return request.respond({ status: 204, headers });
     if (url.pathname === '/rest/v1/play_events' && method === 'POST') { activity.push(JSON.parse(request.postData())); return reply(null); }
+    if (url.pathname === '/rest/v1/product_events' && method === 'POST') return reply(null);
     if (url.pathname === '/rest/v1/rpc/bt_rpc') return reply({ enrolled: false });
     if (url.pathname === '/rest/v1/score_rules') return reply(rules);
     if (url.pathname === '/auth/v1/token') return reply({ access_token: 'mock-access', refresh_token: 'mock-refresh', expires_in: 3600, user: { id: 'test-user', email: 'tester@example.test' } });

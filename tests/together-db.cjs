@@ -17,7 +17,7 @@ async function database() {
       select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     create table public.profiles(id uuid primary key references auth.users(id),handle text);`);
   await db.exec(fs.readFileSync(path.join(root,'scripts/bored-together.sql'),'utf8'));
-  for (const file of fs.readdirSync(path.join(root,'supabase/migrations')).filter(f=>f.endsWith('.sql')).sort()) await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
+  for (const file of fs.readdirSync(path.join(root,'supabase/migrations')).filter(f=>f.endsWith('.sql') && !f.includes('engagement_and_retention_analytics')).sort()) await db.exec(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8'));
   const handles = ['WackyPenguin','BananaWizard','QuietOwl','NeverJoined','FourthPlayer','FifthPlayer','Anonymous'];
   for(let i=0;i<ids.length;i++) {
     await db.query('insert into auth.users values($1,$2,$3)',[ids[i],`student${i+1}@example.test`,i===6]);

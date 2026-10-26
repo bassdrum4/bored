@@ -369,3 +369,6 @@ dialog{margin:auto}
   .bt-search-form input{flex-basis:100%}
   .bt-start{padding:16px}
 }
+
+/* Minimal occasional enjoyment prompt (the arcade does not load analytics.css). */
+.enjoyment-choices{display:flex;flex-wrap:wrap;gap:8px 16px;border:1px solid #ccc;margin:12px 0;padding:12px}.enjoyment-choices label{white-space:nowrap}#enjoyment-dialog{max-width:min(460px,94vw)}#enjoyment-dialog form{display:grid;gap:10px}#enjoyment-dialog textarea{display:block;width:100%;box-sizing:border-box;min-height:54px}#enjoyment-dialog .dialog-actions{display:flex;gap:12px}

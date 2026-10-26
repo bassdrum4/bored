@@ -2,7 +2,10 @@
 // dropped before anything is counted, charted or exported.
 export function excludeAdmins(events, adminIds) {
   const admins = new Set(adminIds || []);
-  return admins.size ? events.filter(event => !admins.has(event.user_id)) : events;
+  if (!admins.size) return events;
+  // Exclude a signed-in admin's anonymous activity on the same opted-in browser.
+  const adminBrowsers = new Set(events.filter(e => admins.has(e.user_id) && e.visitor_id).map(e => e.visitor_id));
+  return events.filter(e => !admins.has(e.user_id) && !(e.visitor_id && adminBrowsers.has(e.visitor_id)));
 }
 
 // Pure aggregation shared by the admin page and regression tests. No fixture data.
@@ -66,4 +69,102 @@ export function csvCell(value) {
 export function eventsCSV(events, handles) {
   const fields = ['received_at','session_id','user_id','handle','game','kind','active_ms','visible_ms','details'];
   return [fields.map(csvCell).join(','), ...events.map(e => fields.map(k => csvCell(k === 'handle' ? handles[e.user_id] || '' : k === 'details' ? JSON.stringify(e.details) : e[k])).join(','))].join('\r\n');
+}
+
+// Retention uses meaningful play and dates, never raw page loads as proof of fun.
+export function summarizeEngagement(events, productEvents = [], survey = [], cutoff = new Date()) {
+  const dateOf = date => new Intl.DateTimeFormat('en-CA', { timeZone:'America/Detroit',
+    year:'numeric',month:'2-digit',day:'2-digit' }).format(new Date(date));
+  const dateMs = value => Date.parse(value + 'T12:00:00Z');
+  const monday = day => {
+    const d = new Date(dateMs(day));
+    d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+    return d.toISOString().slice(0,10);
+  };
+  const identity = e => e.user_id ? 'u:' + e.user_id : e.visitor_id ? 'v:' + e.visitor_id : null;
+  const sessions = new Map();
+  for (const e of events) {
+    if (!e.session_id || !['start','checkpoint','interaction','end','daily_complete','error'].includes(e.kind)) continue;
+    const key = e.session_id + ':' + (e.user_id || 'guest');
+    if (!sessions.has(key)) sessions.set(key, { game:e.game, who:identity(e), date:dateOf(e.received_at),
+      active:0, loaded:false, interacted:false, finished:false });
+    const s = sessions.get(key);
+    s.active += Number(e.active_ms) || 0;
+    s.loaded ||= e.kind === 'checkpoint' && e.details?.loaded === true;
+    s.interacted ||= e.kind === 'interaction';
+    s.finished ||= e.kind === 'daily_complete' || (e.kind === 'checkpoint' && e.details?.round_finished === true);
+  }
+  const games = new Map(), people = new Map();
+  let loaded = 0, interacting = 0, meaningful = 0;
+  for (const s of sessions.values()) {
+    loaded += Number(s.loaded);
+    interacting += Number(s.interacted);
+    s.meaningful = s.active >= 60000 || s.finished;
+    meaningful += Number(s.meaningful);
+    if (!games.has(s.game)) games.set(s.game, { game:s.game, sessions:0, meaningful:0, players:new Set(),
+      returners:new Set(), days:new Map() });
+    const g = games.get(s.game);
+    g.sessions++; g.meaningful += Number(s.meaningful);
+    if (!s.meaningful || !s.who) continue;
+    g.players.add(s.who);
+    if (!g.days.has(s.who)) g.days.set(s.who,new Set());
+    g.days.get(s.who).add(s.date);
+    if (!people.has(s.who)) people.set(s.who,new Set());
+    people.get(s.who).add(s.date);
+  }
+  const today = dateOf(cutoff), cutoffMs = dateMs(today);
+  const firstWeeks = new Map();
+  for (const [who, dates] of people) {
+    const first = [...dates].sort()[0];
+    firstWeeks.set(who,monday(first));
+  }
+  let eligible = 0, nextWeekReturns = 0;
+  for (const [who, firstWeek] of firstWeeks) {
+    const start = dateMs(firstWeek);
+    // A full following school week must have elapsed before scoring the cohort.
+    if (cutoffMs < start + 14*86400000) continue;
+    eligible++;
+    const returned = [...people.get(who)].some(day => {
+      const ms = dateMs(day), weekday = new Date(ms).getUTCDay();
+      return ms >= start+7*86400000 && ms < start+14*86400000 && weekday>=1 && weekday<=5;
+    });
+    nextWeekReturns += Number(returned);
+  }
+  let repeatEligible = 0, repeatReturns = 0;
+  for (const g of games.values()) {
+    for (const [who, dates] of g.days) {
+      const first = [...dates].sort()[0];
+      if (cutoffMs - dateMs(first) < 7*86400000) continue;
+      repeatEligible++;
+      if ([...dates].some(d => d > first)) { repeatReturns++; g.returners.add(who); }
+    }
+  }
+  const visitors = new Map();
+  for (const e of productEvents) {
+    if (e.kind !== 'visit') continue;
+    const who = identity(e);
+    if (!who) continue;
+    const day = dateOf(e.received_at);
+    if (!visitors.has(who)) visitors.set(who,new Set());
+    visitors.get(who).add(day);
+  }
+  const visitorDays = new Map();
+  for (const dates of visitors.values()) {
+    const ordered = [...dates].sort();
+    for (let i=0;i<ordered.length;i++) {
+      const day = ordered[i];
+      if (!visitorDays.has(day)) visitorDays.set(day,{ day,new:0,returning:0 });
+      visitorDays.get(day)[i ? 'returning':'new']++;
+    }
+  }
+  const ratings = survey.filter(e => Number.isInteger(Number(e.rating)) && e.rating>=1 && e.rating<=5);
+  const average = ratings.length ? ratings.reduce((n,e)=>n+Number(e.rating),0)/ratings.length : null;
+  return {
+    sessions:sessions.size, loaded, interacting, meaningful, identifiedEngaged:people.size,
+    uniqueVisitors:visitors.size, visitorsByDay:[...visitorDays.values()].sort((a,b)=>a.day.localeCompare(b.day)),
+    retention:{eligible,returned:nextWeekReturns},repeatGame:{eligible:repeatEligible,returned:repeatReturns},
+    games:[...games.values()].map(g=>({game:g.game,sessions:g.sessions,meaningful:g.meaningful,
+      engagedPlayers:g.players.size,repeatPlayers:g.returners.size})).sort((a,b)=>b.meaningful-a.meaningful || b.sessions-a.sessions),
+    survey:{responses:ratings.length,average,positive:ratings.filter(e=>Number(e.rating)>=4).length}
+  };
 }

@@ -1,8 +1,8 @@
 import { request, freshSession, getSession } from './backend.js';
 import { ORDER } from '../games/catalog.js';
-import { summarizeEvents, eventsCSV, excludeAdmins } from './analytics-data.js';
+import { summarizeEvents, summarizeEngagement, eventsCSV, excludeAdmins } from './analytics-data.js';
 const $ = selector => document.querySelector(selector);
-let events = [], handles = {}, report = null, page = 0, loading = false, epoch = 0;
+let events = [], productEvents = [], surveyRows = [], togetherSummary = null, handles = {}, report = null, page = 0, loading = false, epoch = 0;
 const names = Object.fromEntries(ORDER), PAGE_SIZE = 40, MAX_EVENTS = 20000;
 const duration = ms => ms >= 3600000 ? (ms / 3600000).toFixed(1) + ' h' : ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
 const dateTime = iso => new Date(iso).toLocaleString([], { timeZone: 'America/Detroit', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -31,6 +31,59 @@ function gameRows(games) {
   return games.map(g => [names[g.id] || g.id, g.sessions, g.users.size, duration(g.active), duration(g.visible), duration(g.active / g.sessions), g.completed, g.errors]);
 }
 const gameColumns = ['Game','Sessions','Accounts','Active time','Visible time','Avg active / session','Daily completions','Errors'];
+function renderEngagement(rows) {
+  const selected = $('#person').value;
+  const products = productEvents.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
+  const feedback = surveyRows.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
+  const data = summarizeEngagement(rows, products, feedback, new Date($('#through').value + 'T23:59:59Z'));
+  const percent = (numerator, denominator) => denominator ? Math.round(numerator / denominator * 100) + '%' : 'Not enough history';
+  const stats = [
+    ['Visitors with an ID', data.uniqueVisitors], ['Meaningful sessions', data.meaningful],
+    ['Players meaningfully engaged', data.identifiedEngaged],
+    ['Next-school-week retention', percent(data.retention.returned,data.retention.eligible)],
+    ['Eligible retention cohort', data.retention.eligible],
+    ['Repeat-game rate', percent(data.repeatGame.returned,data.repeatGame.eligible)],
+    ['Game interactions', data.interacting],
+    ['Average enjoyment rating', data.survey.average === null ? 'No feedback' : data.survey.average.toFixed(1) + ' / 5']
+  ];
+  $('#engagement-kpis').replaceChildren(...stats.map(([label,value]) => {
+    const n=el('div');n.className='analytics-stat';n.append(el('strong',value),el('span',label));return n;
+  }));
+  table('#engagement-games',
+    ['Game','Opens','Meaningful sessions','Engaged players','Repeat players (matured)'],
+    data.games.map(g => [names[g.game]||g.game,g.sessions,g.meaningful,g.engagedPlayers,g.repeatPlayers]));
+  table('#engagement-visitors',['Detroit date','New tracked visitors','Returning tracked visitors'],
+    data.visitorsByDay.map(d=>[d.day,d.new,d.returning]));
+  const match = togetherSummary && !Array.isArray(togetherSummary) ? togetherSummary : {};
+  const multiplayer = [
+    ['Matches created (all)',match.all_matches??'—'],
+    ['Organic matches',match.organic_matches??'—'],
+    ['Organic matches with both players moving',match.organic_both_played??'—'],
+    ['Organic completed matches',match.organic_completed??'—'],
+    ['Organic moves',match.organic_moves??'—'],
+    ['Avg organic opponent turn delay',match.organic_turn_delay_minutes==null?'—':match.organic_turn_delay_minutes+' min']
+  ];
+  // Client funnel counts explain intent and dropoff; match outcomes above
+  // remain authoritative even when the sender closes the browser early.
+  const labels = {
+    bt_view:'Together opened',bt_enroll:'Members enrolled',bt_challenge:'Direct challenges sent',
+    bt_random:'Random-match requests',bt_open:'Match views',
+    bt_move:'Successful client move submissions',bt_complete:'Client-reported completions',
+    bt_rematch:'Rematch requests',bt_delete:'Matches deleted',bt_leave:'Members leaving'
+  };
+  const counts = new Map();
+  for (const e of products) if (labels[e.kind]) counts.set(e.kind,(counts.get(e.kind)||0)+1);
+  for (const [kind,label] of Object.entries(labels)) multiplayer.push([label,counts.get(kind)||0]);
+  table('#engagement-together',['Measure','Value'],multiplayer);
+  const sentiment = [['Responses',data.survey.responses],
+    ['Positive (4 or 5)',data.survey.positive],
+    ['Positive share',percent(data.survey.positive,data.survey.responses)]];
+  table('#engagement-feedback',['Measure','Value'],sentiment);
+  table('#engagement-comments',['Date','Rating','Comment'],feedback
+    .filter(row => typeof row.comment === 'string' && row.comment.trim())
+    .slice(-25).reverse()
+    .map(row => [dateTime(row.created_at),row.rating,row.comment]));
+}
 function render() {
   const selected = $('#person').value;
   const rows = events.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
@@ -57,6 +110,7 @@ function render() {
   $('#player-detail').hidden = !selected;
   $('#player-heading').textContent = selected === 'guest' ? 'Unidentified guests' : handles[selected] || selected;
   if (selected) table('#player-games', gameColumns, gameRows(report.games));
+  renderEngagement(rows);
   renderSessions(); $('#export').disabled = !rows.length;
 }
 function renderSessions() {
@@ -107,12 +161,26 @@ async function load() {
       cursor = batch.at(-1);
       if (loaded.length >= MAX_EVENTS) capped = true;
     }
+    // Independent visit/survey events do not inflate game-session totals.
+    const [productLoaded,feedbackLoaded,authoritativeTogether] = await Promise.all([
+      request('/rest/v1/product_events?select=*&received_at=gte.' + start.toISOString() +
+        '&received_at=lt.' + end.toISOString() + '&order=received_at.asc&limit=20000'),
+      request('/rest/v1/enjoyment_feedback?select=*&created_at=gte.' + start.toISOString() +
+        '&created_at=lt.' + end.toISOString() + '&order=created_at.asc&limit=20000'),
+      request('/rest/v1/rpc/analytics_together_summary',{method:'POST',
+        body:{p_from:start.toISOString(),p_to:end.toISOString()}})
+    ]);
     const profiles = await request('/rest/v1/profiles?select=id,handle&order=id&limit=1000');
     // Admin accounts are staff, not players: their events never enter a report.
     const roster = await request('/rest/v1/analytics_admins?select=user_id');
     if (seq !== epoch || getSession()?.user?.id !== user.user.id) throw new Error('Account changed. Reload this page.');
     handles = Object.fromEntries(profiles.map(p => [p.id, p.handle]));
-    events = excludeAdmins(loaded, roster.map(row => row.user_id));
+    const cleaned = excludeAdmins([...loaded,...productLoaded,...feedbackLoaded],roster.map(row => row.user_id));
+    const allowed = new Set(cleaned);
+    events = loaded.filter(e => allowed.has(e));
+    productEvents = productLoaded.filter(e => allowed.has(e));
+    surveyRows = feedbackLoaded.filter(e => allowed.has(e));
+    togetherSummary = authoritativeTogether;
     const excluded = loaded.length - events.length;
     const previous = $('#person').value;
     $('#person').replaceChildren(new Option('All players', ''), new Option('Unidentified guests', 'guest'),
@@ -123,7 +191,7 @@ async function load() {
       events.length.toLocaleString() + ' events loaded · refreshed ' + dateTime(cutoff) + (events.length ? '' : ' · Collection begins with this release.') +
       (excluded ? ' · ' + excluded.toLocaleString() + ' admin events excluded' : '');
   } catch (error) {
-    events = []; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
+    events = []; productEvents = []; surveyRows = []; togetherSummary = null; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
     if (authorized) render();
     $('#status').textContent = error.message || 'Could not load analytics. Try again.';
   } finally { loading = false; $('#refresh').disabled = false; }
@@ -148,5 +216,5 @@ $('#export').onclick = () => {
   const link = el('a'); link.href = url; link.download = 'bored-activity.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 // Clear sensitive DOM when a different tab signs out or switches account.
-window.addEventListener('storage', event => { if (event.key === 'bored.session') { epoch++; events = []; report = null; $('#dashboard').replaceChildren(); $('#dashboard').hidden = true; $('#status').textContent = 'Account changed. Reload to check access again.'; } });
+window.addEventListener('storage', event => { if (event.key === 'bored.session') { epoch++; events = []; productEvents = []; surveyRows = []; togetherSummary = null; report = null; $('#dashboard').replaceChildren(); $('#dashboard').hidden = true; $('#status').textContent = 'Account changed. Reload to check access again.'; } });
 void load();

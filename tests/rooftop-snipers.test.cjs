@@ -84,7 +84,10 @@ test('Rooftop Snipers launches the real Unity game through Bored, fits touch scr
   await new Promise(resolve => setTimeout(resolve, 6000));
   assert.equal(await frame.evaluate(() => gameInstance.Module.calledRun), true);
   assert.equal(await frame.$eval('#cover', element => element.hidden), true);
-  assert.deepEqual(remote.slice(before), [], 'Unity makes no HTTP calls, including optional telemetry');
+  // The surrounding hub records game/visit analytics; the Unity payload itself
+  // must not initiate its own requests.
+  assert.deepEqual(remote.slice(before).filter(url => !/\/rest\/v1\/(?:play_events|product_events)$/.test(url)), [],
+    'Unity makes no HTTP calls, including optional telemetry');
 
   await page.setViewport({ width: 320, height: 740, isMobile: true, hasTouch: true });
   await frame.waitForFunction(() => document.querySelector('#game').getBoundingClientRect().width <= innerWidth);

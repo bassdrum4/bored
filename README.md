@@ -586,3 +586,37 @@ the authenticated `together-pool` Edge function. See
 [architecture, adapter contract, privacy, setup and verification](docs/bored-together.md).
 `npm test` includes isolated production-SQL tests, the original-game bridge and
 two-account browser flows; CI also checks races on disposable PostgreSQL 17.
+
+## Enjoyment and retention analytics
+
+The admin-only [Gameplay analytics](src/analytics.html) now includes an **Enjoyment & retention**
+tab. Data collection is opt-out via the Gameplay analytics disclosure at the bottom of
+the arcade. The client sends a randomly generated browser identifier for repeat-visit
+estimates, together with the signed-in account ID when available; it sends no keystrokes,
+email address or precise location. Opting out stops collection and deletes the
+browser identifier. Shared computers and cross-device use can distort visitor counts.
+
+`play_events` keeps gameplay timing and records the first actual interaction separately
+from loading. `product_events` counts page visits and Bored Together UI actions without
+inventing gameplay sessions. `enjoyment_feedback` holds an occasional optional 1–5
+rating and comment. These tables are append-only from the client and readable only
+by analytics admins. The `analytics_together_summary` RPC returns anonymized match
+and move counts from the authoritative private match tables after verifying admin access.
+
+Primary definitions: a **meaningful session** has at least 60 seconds of sampled
+active time or a finished round; **repeat-game rate** counts mature player/game
+cohorts (first meaningful play at least seven days earlier) who played meaningfully
+again on a later date; **next-school-week retention** counts engaged players who
+returned Monday–Friday of the next Detroit calendar week, *only after that
+following week has finished*. Until cohorts mature, the dashboard says there is
+not enough history instead of showing a misleading 0%. Accounts and browser IDs
+are proxies for people, not guaranteed unique individuals. Client analytics are
+not proof of enjoyment; the optional survey provides a complementary signal.
+
+All metrics explicitly exclude known analytics admin accounts and their associated
+tracked browser IDs. The anonymous browser identifier was introduced with this
+release: earlier anonymous sessions cannot be linked together retroactively.
+Cross-origin extras (including F-14) cannot report their internal play time until
+those games integrate a secure first-party event bridge, so their measured active
+time remains unavailable rather than inferred. The existing score and match history
+is preserved.

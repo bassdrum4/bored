@@ -18,6 +18,36 @@ test('active time excludes hidden, idle, unfocused, paused, loading and clock sl
   assert.deepEqual(cleanSnapshot({ slug: 'snake', input: 'private words', score: 20, won: true, token: 'secret', infinite: Infinity, nested: { email: 'x' } }), { score: 20, won: true });
 });
 
+test('retention cohorts, meaningful play, and returning visitor calculations', async () => {
+  const { summarizeEngagement, excludeAdmins } = await import('../src/hub/analytics-data.js');
+  const make = (day, session, kind, active=0, details={}) => ({
+    session_id:session, user_id:'u1', visitor_id:'11111111-1111-4111-8111-111111111111',
+    game:'snake', kind, received_at:day+'T14:00:00Z', active_ms:active, details
+  });
+  const events = [
+    make('2026-10-05','s1','start'),make('2026-10-05','s1','interaction'),
+    make('2026-10-05','s1','end',65000),
+    make('2026-10-12','s2','start'),make('2026-10-12','s2','end',62000)
+  ];
+  const visits=['2026-10-05','2026-10-12'].map((day,i)=>({
+    user_id:'u1',visitor_id:'11111111-1111-4111-8111-111111111111',
+    kind:'visit',received_at:day+'T13:00:00Z'
+  }));
+  const result=summarizeEngagement(events,visits,[{rating:5}],new Date('2026-10-21T14:00:00Z'));
+  assert.equal(result.meaningful,2);
+  assert.equal(result.interacting,1);
+  assert.deepEqual(result.retention,{eligible:1,returned:1});
+  assert.deepEqual(result.repeatGame,{eligible:1,returned:1});
+  assert.equal(result.uniqueVisitors,1);
+  assert.equal(result.visitorsByDay[1].returning,1);
+  assert.equal(result.survey.average,5);
+  const immature=summarizeEngagement(events,visits,[],new Date('2026-10-13T14:00:00Z'));
+  assert.equal(immature.retention.eligible,0);
+  const adminGuest={...events[0],session_id:'sx',user_id:null};
+  const adminSigned={...events[1],user_id:'admin'};
+  assert.deepEqual(excludeAdmins([adminGuest,adminSigned],['admin']),[]);
+});
+
 test('analytics admin accounts are dropped from reported events and time', async () => {
   const { excludeAdmins } = await import('../src/hub/analytics-data.js');
   const events = [{ user_id:'admin-a' }, { user_id:'u1' }, { user_id:null }];
@@ -104,6 +134,12 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   assert.match(await page.$eval('#status',n=>n.textContent), /2 admin events excluded/);
   assert.equal(await page.$$eval('#person option', options => options.some(o => o.value === 'admin-id')), false);
   assert.equal(await page.$eval('#totals strong',n=>n.textContent), '25 s');
+  // The new admin-only tab renders from the same protected endpoint set.
+  await page.click('[data-view="engagement"]');
+  assert.equal(await page.$$eval('#engagement-kpis .analytics-stat', nodes => nodes.length), 8);
+  assert.match(await page.$eval('#engagement-together', n => n.textContent), /Organic matches/);
+  assert.match(await page.$eval('#engagement-feedback', n => n.textContent), /Responses/);
+  await page.click('[data-view="overview"]');
   assert.equal(await page.$eval('#games-table tbody',n=>n.children.length),2);
   assert.doesNotMatch(await page.$eval('#players-table',n=>n.textContent), /Daniel/);
   fs.mkdirSync(path.join(root, '_build/shots'), { recursive:true });
@@ -133,10 +169,14 @@ test('browser test telemetry is answered locally instead of reaching live analyt
   const request = url => ({ url: () => url, respond: async response => { assert.equal(response.status, 204); replied++; }, continue: () => continued++ });
   assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events')), true);
   assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events?select=*')), true);
+  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/product_events')), true);
+  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/enjoyment_feedback')), true);
   assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/score_rules')), false);
   await isolateAnalytics({ setRequestInterception: async enabled => assert.equal(enabled, true), on: (name, fn) => { assert.equal(name, 'request'); handler = fn; } });
   handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events'));
+  handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/product_events'));
+  handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/enjoyment_feedback'));
   handler(request('http://127.0.0.1/index.html'));
-  assert.equal(replied, 3);
+  assert.equal(replied, 7);
   assert.equal(continued, 1);
 });

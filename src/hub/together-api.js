@@ -13,5 +13,17 @@ export async function togetherRPC(action, args = {}) {
     method: 'POST', body: action === 'pool_move' ? args : { action, args }, token: session.access_token
   });
   if (getSession()?.user?.id !== owner) throw new Error('Your account changed. Please try again.');
+  // An event is a client-side funnel indicator only; the authoritative matches
+  // and moves tables determine whether a match actually completed.
+  const tracked = { enroll: 'bt_enroll', challenge: 'bt_challenge', queue_join: 'bt_random',
+    match: 'bt_open', move: 'bt_move', pool_move: 'bt_move', submit_run: 'bt_move',
+    rematch: 'bt_rematch', delete: 'bt_delete', leave: 'bt_leave' }[action];
+  if (tracked && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('bored:together-telemetry', {
+    detail: { kind: tracked, game: result?.game || args.game || null, match_id: result?.id || args.match_id || null }
+  }));
+  if (typeof window !== 'undefined' && result?.status === 'completed' && ['move','pool_move','submit_run'].includes(action))
+    window.dispatchEvent(new CustomEvent('bored:together-telemetry', {
+      detail: { kind: 'bt_complete', game: result.game || args.game || null, match_id: result.id || args.match_id || null }
+    }));
   return result;
 }

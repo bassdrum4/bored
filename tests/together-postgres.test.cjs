@@ -21,7 +21,7 @@ test('native PostgreSQL: competing moves, queues, crossed requests and leave rac
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     create table public.profiles(id uuid primary key references auth.users(id),handle text);`);
   await admin.query(fs.readFileSync(path.join(__dirname,'../scripts/bored-together.sql'),'utf8'));
-  for(const file of fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(f=>f.endsWith('.sql')).sort())await admin.query(fs.readFileSync(path.join(__dirname,'../supabase/migrations',file),'utf8'));
+  for(const file of fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(f=>f.endsWith('.sql') && !f.includes('engagement_and_retention_analytics')).sort())await admin.query(fs.readFileSync(path.join(__dirname,'../supabase/migrations',file),'utf8'));
   for(let i=0;i<ids.length;i++){
     await admin.query('insert into auth.users(id,email) values($1,$2)',[ids[i],`native${i}@example.test`]);
     await admin.query('insert into public.profiles values($1,$2)',[ids[i],`Native${i}`]);

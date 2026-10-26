@@ -94,7 +94,7 @@
   <p id="empty" hidden></p>
   </section>
 
-  <details class="activity-notice"><summary>Gameplay analytics</summary><p>Bored records games opened, play time, results and errors for the site owner. Signed-in play is linked to your account handle; guest sessions are unidentified. No keystrokes, email addresses or browsing history are collected.</p><label><input id="analytics-enabled" type="checkbox" checked> Share gameplay activity</label> · <a href="./analytics.html">Admin analytics</a></details>
+  <details class="activity-notice"><summary>Gameplay analytics</summary><p>Bored records games opened, play time, results and errors for the site owner. Signed-in play is linked to your account handle; guest activity uses a random browser identifier to estimate return visits. You can turn off tracking and clear that identifier at any time. No keystrokes, email addresses or browsing history are collected.</p><label><input id="analytics-enabled" type="checkbox" checked> Share gameplay activity</label> · <a href="./analytics.html">Admin analytics</a></details>
   <footer class="foot"><span>have fun. stay a while.</span><span id="foot-count"></span></footer>
 </main>
 
@@ -135,6 +135,23 @@
       <button id="feedback-submit" type="submit">Send feedback</button>
       <button id="feedback-cancel" type="button">Cancel</button>
     </div>
+  </form>
+</dialog>
+
+<dialog id="enjoyment-dialog" aria-labelledby="enjoyment-title">
+  <form id="enjoyment-form">
+    <h2 id="enjoyment-title">Quick question</h2>
+    <p>How much fun are you having with Bored?</p>
+    <fieldset class="enjoyment-choices"><legend>Your rating</legend>
+      <label><input type="radio" name="rating" value="5" required> A lot</label>
+      <label><input type="radio" name="rating" value="4"> Pretty fun</label>
+      <label><input type="radio" name="rating" value="3"> It's okay</label>
+      <label><input type="radio" name="rating" value="2"> Not much</label>
+      <label><input type="radio" name="rating" value="1"> Not fun</label>
+    </fieldset>
+    <label>Anything we should improve? (optional)<textarea name="comment" maxlength="500" rows="2"></textarea></label>
+    <p id="enjoyment-status" role="status"></p>
+    <div class="dialog-actions"><button type="submit">Send</button><button id="enjoyment-skip" type="button">Not now</button></div>
   </form>
 </dialog>
 
