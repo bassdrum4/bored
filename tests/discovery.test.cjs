@@ -232,6 +232,10 @@ test('account UI and score sync still work through the redesigned hub (mock back
   // with the other player's best and the verdict underneath, plus a way to go
   // and beat it.
   await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('rival'));
+  // The card byline names the board leader, and a game with no board has none.
+  await page.waitForFunction(() => document.querySelector('#grid [data-slug="lights-out"] .card-best')?.textContent.includes('rival'));
+  assert.equal(await page.$eval('#grid [data-slug="lights-out"] .card-best', el => el.textContent), 'Best 9 boards · rival');
+  assert.equal(await page.$eval('#grid [data-slug="8ball"]', card => card.querySelector('.card-best')), null);
   await page.evaluate(() => {
     [...document.querySelectorAll('#lb-list .lb-row')]
       .find(row => row.textContent.includes('rival')).click();

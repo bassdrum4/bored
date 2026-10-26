@@ -286,14 +286,16 @@ For quick testing, turn off **Authentication → Providers → Email → Confirm
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.
 
-The board tracks a best score for **all 36 offline games**. The original eight
+The board tracks a best score for **all 33 offline games**. The original eight
 (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
 their existing saved bests. Every other offline game is read from live game
 state while playing and when you leave or restart: Tetris, Breakout,
 Frogger, Space Invaders, Q*bert, Asteroids and Commanders post their running
-score, Wordle guesses (solved runs only), 8 Ball balls pocketed, Poker chips, and
-every other game's displayed points, waves, levels, wins, ships or other progress
-metric.
+score, Wordle guesses (solved runs only), Poker chips, and every other game's
+displayed points, waves, levels, wins, ships or other progress metric. 8 Ball,
+Sand and Eco stay off the board entirely: they are open-ended toys rather than
+runs with a finish line, so the hub keeps no best for them and their cards carry
+no score line.
 Connect Four and Tank2 count wins against the computer; Minigolf counts total
 strokes only after all nine holes are sunk. The two remote extras are excluded because the hub cannot inspect
 their cross-origin state. Scores are submitted by the browser, so this is a
@@ -309,9 +311,9 @@ beats an abandoned one — and two runs that tie on a coarse counter (lines
 cleared, waves survived, levels painted) still separate on points.
 
 Two-player games are local games with a CPU in one seat, so they only post when
-the opponent was the computer: Pong, SUMO, VolletBall, Lava, Tank, Gun Mayhem and
-8 Ball all check the mode they were played in, and a win over a person stays in
-that browser. SUMO, VolletBall and Lava start against the CPU and switch to two
+the opponent was the computer: Pong, SUMO, VolletBall, Lava, Tank and Gun Mayhem
+all check the mode they were played in, and a win over a person stays in that
+browser. SUMO, VolletBall and Lava start against the CPU and switch to two
 players from the button in their controls.
 
 `scores.game` is a foreign key to `score_rules.game` (constraint

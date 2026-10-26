@@ -984,8 +984,7 @@ test('browser regressions', async t => {
     });
     assert.equal(hand.reachable, true, 'ball in hand finds a legal line: ' + JSON.stringify(hand.spot));
     await close();
-    // that rack posts a real score; clear it so the scoring checks below start clean
-    await pause(300);
+    // A rack is never a score: 8 Ball has no board, so nothing was saved to clear.
     await page.evaluate(() => localStorage.removeItem('bored.high.8ball'));
   });
 
@@ -1017,24 +1016,18 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.wordle')), '3', 'worse solves keep the best');
 
-      frame = await openTitle('8ball', '8 Ball');
-      await frame.waitForFunction(() => typeof window.__test?.balls === 'function');
-      await frame.evaluate(() => {
-        window.__test.balls = () => [{ id: 1, alive: false }, { id: 2, alive: true }];
-        window.__test.mode = () => 'cpu';
-      });
-      await close();
-      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.8ball')), '1', 'counts pocketed object balls');
-      // 8 Ball is a two-player game: only the CPU counts, never a human opponent.
-      await page.evaluate(() => localStorage.removeItem('bored.high.8ball'));
+      // 8 Ball, Sand and Eco are open-ended toys, not runs to compare: they keep
+      // no best at all, so a fine rack leaves nothing in this browser.
       frame = await openTitle('8ball', '8 Ball');
       await frame.waitForFunction(() => typeof window.__test?.balls === 'function');
       await frame.evaluate(() => {
         window.__test.balls = () => [{ id: 1, alive: false }, { id: 2, alive: false }];
-        window.__test.mode = () => '2p';
+        window.__test.mode = () => 'cpu';
       });
       await close();
-      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.8ball')), null, 'two-player wins stay off the board');
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.8ball')), null, '8 Ball keeps no high score');
+      const ranked = await page.evaluate(() => LB_GAMES.map(game => game.id));
+      assert.deepEqual(ranked.filter(id => ['8ball', 'sand', 'eco'].includes(id)), [], 'open-ended games are off the board');
 
       frame = await openTitle('poker', 'Poker');
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');

@@ -365,19 +365,8 @@ function showHint(message) {
 
 /* ── Best scores ──────────────────────────────────────────────────────────── */
 
-function snapshotFor(slug) {
+function snapshotFor() {
   try {
-    if (slug === '8ball') {
-      // 8 Ball keeps its table inside a closure, so it exposes an accessor.
-      const table = gameFrame.contentWindow.__test;
-      const balls = table?.balls?.();
-      if (!Array.isArray(balls)) return null;
-      return {
-        slug: '8ball',
-        potted: balls.filter(ball => ball.id !== 0 && !ball.alive).length,
-        cpu: table.mode?.() === 'cpu'
-      };
-    }
     return gameFrame.contentWindow.__boredSnapshot?.() || null;
   } catch {
     return null;
@@ -718,7 +707,15 @@ async function shareDailyResult() {
   }
 }
 
-const { renderLeaderboard, loadLeaderboard } = createLeaderboardView({ state: uiState, openGame });
+const { renderLeaderboard, loadLeaderboard } = createLeaderboardView({
+  state: uiState, openGame,
+  // The cards carry each board's leader, so fresh rows repaint them. Never out
+  // from under a game or a card the player is already on.
+  onBoard: () => {
+    if (activeSlug || document.activeElement?.closest?.('#grid')) return;
+    renderLibrary();
+  }
+});
 
 const { renderAccount, openAuthDialog, initAccount } = createAccountUI({
   state: uiState, activateProfile, applyPendingClaim, startClaimAuth, closeClaimDialog,

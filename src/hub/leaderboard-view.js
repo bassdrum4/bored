@@ -1,6 +1,6 @@
 import { backendReady, request, getHandle, hasIdentity, authErrorMessage, ANON_TOKEN } from './backend.js';
 import { LB_GAMES, accountStandings, rankPoints, bestValue, formatScore } from './scores.js';
-export function createLeaderboardView({ state, openGame }) {
+export function createLeaderboardView({ state, openGame, onBoard = () => {} }) {
 const $ = selector => document.querySelector(selector);
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -162,6 +162,8 @@ async function loadLeaderboard(force = false) {
     state.lbCache.set(key, { rows: [], at: Date.now(), error: authErrorMessage(err) });
   }
   renderLeaderboard();
+  // The library cards read the same rows, so they redraw once they land.
+  onBoard();
 }
 
 

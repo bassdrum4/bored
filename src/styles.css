@@ -240,6 +240,7 @@ section[id]{scroll-margin-top:20px}
 .card:hover .detail,.card:focus-visible .detail{color:var(--dim)}
 .card:hover .name,.shelf-play:hover .shelf-name{text-decoration:underline;text-underline-offset:4px}
 .game-inputs{display:block;font:10px/1.7 var(--mono);color:var(--dim);margin-top:5px}
+.card-best{display:block;font:10px/1.7 var(--mono);color:var(--dim);margin-top:8px;padding-top:7px;border-top:1px solid var(--rule);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .badge{display:inline-block;vertical-align:middle;font-size:8px;margin-left:7px;line-height:1.3}
 .star{position:absolute;top:10px;right:10px;width:36px;height:36px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);font-size:23px;line-height:1}
 .star:hover{border-color:var(--ink);background:var(--paper)}

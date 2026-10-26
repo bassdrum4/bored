@@ -1,5 +1,6 @@
 import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
 import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from '../games/discovery.js';
+import { LB_GAMES, boardLeaders, bestValue, formatScore } from './scores.js';
 import { writeStored } from './store.js';
 
 export function createLibraryView({ state, openGame, saveLibrary }) {
@@ -34,6 +35,35 @@ function previewFor(slug) {
 function gameMeta(slug) {
   const game = DISCOVERY[slug];
   return [game.minutes, game.pace, game.players].filter(Boolean).join(' · ');
+}
+
+// The scored games, and the leaders of the rows the leaderboard last fetched.
+// Rows are cached by array identity so typing in the search box does not walk a
+// whole board on every keystroke.
+const scoredGames = new Map(LB_GAMES.map(game => [game.id, game]));
+let leaderRows = null;
+let leaders = new Map();
+function boardLeader(slug) {
+  const rows = state.lbCache.get('overall')?.rows || [];
+  if (rows !== leaderRows) {
+    leaderRows = rows;
+    leaders = boardLeaders(rows);
+  }
+  return leaders.get(slug) || null;
+}
+
+// One quiet byline: the posted high score and who holds it, or the best this
+// browser has when the game has not reached the shared board.
+function cardBest(slug) {
+  const spec = scoredGames.get(slug);
+  if (!spec) return null;
+  const line = element('span', 'card-best');
+  const leader = boardLeader(slug);
+  const own = bestValue(spec);
+  if (leader) line.textContent = 'Best ' + formatScore(leader.value, spec) + ' · ' + leader.handle;
+  else if (Number.isFinite(own) && own > 0) line.textContent = 'Your best ' + formatScore(own, spec);
+  else line.textContent = 'No score yet';
+  return line;
 }
 
 function shelfGame(slug, note) {
@@ -112,6 +142,8 @@ function renderLibrary() {
     text.append(element('span', 'card-category', EXTERNS[slug] ? 'Online extra · Internet required' : META[slug][0] + ' · Offline'),
       title, element('span', 'detail', META[slug][1]), element('span', 'game-meta', gameMeta(slug)),
       element('span', 'game-inputs', DISCOVERY[slug].inputs.join(' / ')));
+    const best = cardBest(slug);
+    if (best) text.appendChild(best);
     card.appendChild(text);
     card.onclick = () => openGame(slug);
 

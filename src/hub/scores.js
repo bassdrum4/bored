@@ -106,7 +106,6 @@ export const HIGH_SCORE_GAMES = [
     when: snapshot => snapshot.finished === true,
     resumable: true
   }),
-  highScore('8ball', '8 Ball', 'balls', { metric: 'potted', when: snapshot => snapshot.cpu === true }),
   // These games keep a running score, so the board ranks that rather than the
   // coarse counter: two decent runs tie on lines cleared or waves survived and
   // only separate on the score. The daily challenge still uses the counter.
@@ -140,13 +139,33 @@ export const HIGH_SCORE_GAMES = [
   highScore('volletball', 'VolletBall', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
   highScore('gun-mayhem', 'Gun Mayhem', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   highScore('shadow-net', 'shadow.net', 'files', { metric: 'files' }),
-  highScore('sand', 'Sand', 'cells', { metric: 'cells' }),
-  highScore('eco', 'Eco', 'plants', { metric: 'plants', when: snapshot => snapshot.seconds >= 60 }),
   highScore('asteroids', 'Asteroids', 'points', { metric: 'score' })
 ];
 
 export const LB_GAMES = [...LEGACY_GAMES, ...HIGH_SCORE_GAMES];
 const highScoreSpec = new Map(HIGH_SCORE_GAMES.map(game => [game.id, game]));
+
+/**
+ * The posted high score of each board, with the handle that holds it. The
+ * library cards use it as a byline, so it works from the same rows the
+ * leaderboard reads: one best per game, the minimum for a lower-is-better
+ * board. Games the hub no longer ranks are simply absent.
+ */
+export function boardLeaders(rows) {
+  const leaders = new Map();
+  const specs = new Map(LB_GAMES.map(game => [game.id, game]));
+  for (const row of rows || []) {
+    const spec = specs.get(row.game);
+    const handle = String(row.handle || '').trim();
+    const value = Number(row.value);
+    if (!spec || !handle || !Number.isFinite(value) || value <= 0) continue;
+    const held = leaders.get(spec.id);
+    if (!held || (spec.lower ? value < held.value : value > held.value)) {
+      leaders.set(spec.id, { value, handle });
+    }
+  }
+  return leaders;
+}
 
 /* ── Which boards the shared table can hold ───────────────────────────────── */
 
