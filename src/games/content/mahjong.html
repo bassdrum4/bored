@@ -14,6 +14,9 @@
     --blocked: #e3ddcc;
     --faint: #968d7b;
     --accent: #b3261e;
+    --tile-ink: #1c2b48;
+    --tile-red: #b3261e;
+    --tile-green: #14603a;
     --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   }
@@ -32,24 +35,9 @@
     border: 1px solid var(--hair); border-radius: 2px;
     background: var(--tile); color: var(--ink); font: inherit;
   }
-  .tile .num { display: block; font: 600 1em/1 var(--mono) }
-  .tile .mark { display: block; margin-top: 2px; background: var(--muted) }
-  .tile .mark.dots { width: .2em; height: .2em; border-radius: 50% }
-  .tile .mark.bamboo { width: .13em; height: .4em }
-  .tile .mark.chars { width: .44em; height: .13em }
-  .tile .mark.ring { width: .22em; height: .22em; border-radius: 50%; background: none; border: 1px solid var(--muted) }
-  .tile .mark.flower { width: .18em; height: .18em; background: var(--accent); transform: rotate(45deg) }
-  .tile .mark.season { width: .18em; height: .18em; background: none; border: 1px solid var(--muted); transform: rotate(45deg) }
-  .tile .dragon { display: block; width: .6em; height: .6em }
-  .tile .dragon.red { background: var(--accent); border-radius: 50% }
-  .tile .dragon.green { background: var(--ink) }
-  .tile .dragon.white { border: 1px solid var(--ink) }
+  .tile svg.face { display: block; width: 100%; height: 100% }
   .tile.blocked { background: var(--blocked); color: var(--faint); cursor: default }
-  .tile.blocked .mark.dots, .tile.blocked .mark.bamboo,
-  .tile.blocked .mark.chars, .tile.blocked .mark.flower { background: var(--faint) }
-  .tile.blocked .mark.ring, .tile.blocked .mark.season { border-color: var(--faint) }
-  .tile.blocked .dragon { border-color: var(--faint) }
-  .tile.blocked .dragon.red, .tile.blocked .dragon.green { background: var(--faint) }
+  .tile.blocked svg.face { opacity: .32 }
   .tile.selected { border-color: var(--ink); background: #efe3d1 }
   .tile.hint { outline: 2px solid var(--accent); outline-offset: -2px }
   .tile.gone { display: none }
@@ -139,13 +127,13 @@ for (const [id, name] of SUITS) {
   }
 }
 for (const [letter, name] of [['e', 'East'], ['s', 'South'], ['w', 'West'], ['n', 'North']]) {
-  KINDS.set('wind-' + letter, { letter: letter.toUpperCase(), mark: 'ring', group: 'wind-' + letter, label: name + ' wind' });
+  KINDS.set('wind-' + letter, { letter: letter.toUpperCase(), group: 'wind-' + letter, label: name + ' wind' });
 }
 for (const [id, name] of [['red', 'Red'], ['green', 'Green'], ['white', 'White']]) {
   KINDS.set('dragon-' + id, { dragon: id, group: 'dragon-' + id, label: name + ' dragon' });
 }
-for (let i = 1; i <= 4; i++) KINDS.set('flower-' + i, { n: i, mark: 'flower', group: 'flower', label: 'Flower ' + i });
-for (let i = 1; i <= 4; i++) KINDS.set('season-' + i, { n: i, mark: 'season', group: 'season', label: 'Season ' + i });
+for (let i = 1; i <= 4; i++) KINDS.set('flower-' + i, { n: i, group: 'flower', label: 'Flower ' + i });
+for (let i = 1; i <= 4; i++) KINDS.set('season-' + i, { n: i, group: 'season', label: 'Season ' + i });
 
 const CORE_KINDS = [...KINDS.keys()].filter(id => !/^(flower|season)-/.test(id));
 
@@ -288,10 +276,123 @@ function beginGame(layers, seeded) {
   paint();
 }
 
+/* ── Faces ───────────────────────────────────────────────────────────────── */
+
+/* The faces are drawn rather than set in a symbol font: pips, bamboo, characters
+   and dragons follow the printed tiles, so a three of bamboo reads at a glance.
+   One viewBox for every face keeps them the same weight at any tile size. */
+const CJK = '"Songti SC","Hiragino Mincho ProN","Noto Serif CJK SC","Noto Serif SC","Source Han Serif SC","MS Mincho",serif';
+const NUMERAL = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+const SEASON = ['', '春', '夏', '秋', '冬'];
+const WIND = { e: '東', s: '南', w: '西', n: '北' };
+
+const SVG_HEAD = '<svg class="face" viewBox="0 0 40 40" aria-hidden="true" focusable="false">';
+const face = inner => SVG_HEAD + inner + '</svg>';
+const glyph = (text, x, y, size, colour) =>
+  '<text x="' + x + '" y="' + y + '" text-anchor="middle" font-size="' + size +
+  '" font-family=\'' + CJK + '\' fill="' + colour + '">' + text + '</text>';
+
+// Pips: the ringed circles of the circle suit, in the printed arrangements.
+const PIPS = {
+  1: [[20, 20]],
+  2: [[20, 11], [20, 29]],
+  3: [[10, 9], [20, 20], [30, 31]],
+  4: [[11, 12], [29, 12], [11, 28], [29, 28]],
+  5: [[9, 10], [31, 10], [20, 20], [9, 30], [31, 30]],
+  6: [[11, 8], [29, 8], [11, 20], [29, 20], [11, 32], [29, 32]],
+  7: [[7, 7], [20, 12], [33, 17], [12, 27], [28, 27], [12, 35], [28, 35]],
+  8: [[11, 5], [29, 5], [11, 15], [29, 15], [11, 25], [29, 25], [11, 35], [29, 35]],
+  9: [[9, 7], [20, 7], [31, 7], [9, 20], [20, 20], [31, 20], [9, 33], [20, 33], [31, 33]]
+};
+const PIP_R = { 1: 8.2, 2: 5.4, 3: 4.9, 4: 4.8, 5: 4.4, 6: 4.3, 7: 3.9, 8: 3.8, 9: 3.9 };
+
+function dotFace(n) {
+  const cells = PIPS[n];
+  const middle = (cells.length - 1) / 2;
+  return face(cells.map(([x, y], index) => {
+    const r = PIP_R[n];
+    // The one of circles is the red tile; odd patterns accent their centre pip.
+    const red = n === 1 || (n % 2 === 1 && index === middle);
+    const colour = red ? 'var(--tile-red)' : 'var(--tile-ink)';
+    return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="none" stroke="' + colour + '" stroke-width="1.5"/>' +
+      '<circle cx="' + x + '" cy="' + y + '" r="' + (r * 0.4) + '" fill="' + colour + '"/>';
+  }).join(''));
+}
+
+// Bamboo: jointed sticks, green like a printed set, red for the single and for
+// the centre of the five.
+const STICKS = {
+  1: [[20, 20]],
+  2: [[14, 20], [26, 20]],
+  3: [[20, 9], [14, 30], [26, 30]],
+  4: [[12, 12], [28, 12], [12, 28], [28, 28]],
+  5: [[11, 8], [29, 8], [20, 20], [11, 32], [29, 32]],
+  6: [[12, 7], [28, 7], [12, 19], [28, 19], [12, 31], [28, 31]],
+  7: [[10, 7], [19, 7], [28, 7], [12, 24], [28, 24], [12, 34], [28, 34]],
+  8: [[12, 6], [28, 6], [12, 15], [28, 15], [12, 24], [28, 24], [12, 33], [28, 33]],
+  9: [[10, 7], [20, 7], [30, 7], [10, 20], [20, 20], [30, 20], [10, 33], [20, 33], [30, 33]]
+};
+// One jointed stick: a stick of bamboo with its node band across the middle.
+const stick = (x, y, colour, seg) =>
+  '<rect x="' + (x - 1.6) + '" y="' + (y - seg) + '" width="3.2" height="' + (seg * 2) + '" rx="1.5" fill="' + colour + '"/>' +
+  '<rect x="' + (x - 1.6) + '" y="' + (y - 0.55) + '" width="3.2" height="1.1" fill="var(--tile-ink)" opacity=".22"/>';
+
+function bambooFace(n) {
+  if (n === 1) {
+    // The single bamboo is the bird tile: one tall stalk with leaves.
+    return face(stick(20, 19, 'var(--tile-red)', 7.4) +
+      '<path d="M20 6 q-11 1 -15 -6 q10 -1 15 6Z" fill="var(--tile-green)"/>' +
+      '<path d="M20 34 q11 -1 15 6 q-10 1 -15 -6Z" fill="var(--tile-green)"/>');
+  }
+  const seg = n >= 6 ? 3.6 : 4.6;
+  const drawn = STICKS[n].map(([x, y], index) => stick(x, y,
+    n === 5 && index === 2 ? 'var(--tile-red)' : 'var(--tile-green)', seg)).join('');
+  return face(drawn);
+}
+
+// Characters: a red numeral over the ink 萬, the way the suit is printed.
+const charsFace = n => face(glyph(NUMERAL[n], 20, 17, 14, 'var(--tile-red)') +
+  glyph('萬', 20, 34, 15, 'var(--tile-ink)'));
+
+const windFace = letter => face(glyph(WIND[letter], 20, 30, 27, 'var(--tile-ink)'));
+
+const DRAGONS = {
+  red: ['中', 'var(--tile-red)'],
+  green: ['發', 'var(--tile-green)']
+};
+
+function dragonFace(colour) {
+  if (colour === 'white') {
+    // The white dragon is the empty tile: a plain double frame.
+    return face('<rect x="8" y="7" width="24" height="26" fill="none" stroke="var(--tile-ink)" stroke-width="1.8"/>' +
+      '<rect x="11" y="10" width="18" height="20" fill="none" stroke="var(--tile-ink)" stroke-width=".8"/>');
+  }
+  const [mark, ink] = DRAGONS[colour];
+  return face(glyph(mark, 20, 31, 27, ink));
+}
+
+/* Any flower matches any flower and any season any season, so the faces differ
+   only to keep the tiles pretty, never to make a pair. */
+function flowerFace(n) {
+  const petals = [0, 72, 144, 216, 288].map(angle =>
+    '<ellipse cx="20" cy="10.5" rx="4.4" ry="6.2" fill="var(--tile-red)" transform="rotate(' + angle + ' 20 20)"/>').join('');
+  const lean = n % 2 ? 1 : -1;
+  return face(petals + '<circle cx="20" cy="20" r="3.2" fill="var(--tile-green)"/>' +
+    '<path d="M20 23 q' + (lean * -4) + ' 7 ' + (lean * -1) + ' 13" stroke="var(--tile-green)" stroke-width="1.8" fill="none" stroke-linecap="round"/>' +
+    '<ellipse cx="' + (20 + lean * 5) + '" cy="33" rx="4.4" ry="2.4" fill="var(--tile-green)" transform="rotate(' + (lean * -24) + ' ' + (20 + lean * 5) + ' 33)"/>');
+}
+
+const seasonFace = n => face(glyph(SEASON[n], 20, 29, 24, 'var(--tile-green)'));
+
 function faceHTML(kind) {
   const info = KINDS.get(kind);
-  if (info.dragon) return '<span class="dragon ' + info.dragon + '"></span>';
-  return '<span class="num">' + (info.letter || info.n) + '</span><i class="mark ' + info.mark + '"></i>';
+  if (info.dragon) return dragonFace(info.dragon);
+  if (kind.startsWith('wind-')) return windFace(kind.slice(5));
+  if (kind.startsWith('flower-')) return flowerFace(info.n);
+  if (kind.startsWith('season-')) return seasonFace(info.n);
+  if (info.mark === 'dots') return dotFace(info.n);
+  if (info.mark === 'bamboo') return bambooFace(info.n);
+  return charsFace(info.n);
 }
 
 function buildBoard() {
