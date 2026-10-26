@@ -1838,6 +1838,10 @@ async function saveOnlineShot(move){
 }
 if(online) restoreOnline();
 
+// Bored's host uses this hook to distinguish successful loads from abandoned
+// iframe placeholders. Do not expose full online state or player details.
+window.__boredSnapshot = () => ({ slug: '8ball', finished: state === 'over' });
+
 /* ================= loop ================= */
 function tick(dt){
   if(state==='run'){

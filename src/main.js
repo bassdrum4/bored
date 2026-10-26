@@ -814,7 +814,16 @@ addEventListener('fullscreenchange', onFullscreenChange);
 addEventListener('webkitfullscreenchange', onFullscreenChange);
 
 addEventListener('message', event => {
-  if (!activeSlug || EXTERNS[activeSlug] || event.source !== gameFrame.contentWindow) return;
+  if (!activeSlug || event.source !== gameFrame.contentWindow) return;
+  if (EXTERNS[activeSlug]) {
+    // Only the expected, embedded flight simulator may report its gameplay
+    // state. It never receives Supabase credentials or account information.
+    if (activeSlug === 'f-14' && event.origin === new URL(EXTERNS['f-14']).origin &&
+        event.data?.type === 'bored:f14-telemetry') {
+      analytics.externalSignal(event.data.phase, event.data.event === 'input');
+    }
+    return;
+  }
   if (activeTogether) activeTogether.message(event);
   switch (event.data?.type) {
     case 'bored:close':
