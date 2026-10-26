@@ -1,6 +1,6 @@
 # Bored — an arcade in one folder
 
-**36 offline games and 2 online extras**, with no runtime dependencies, installs,
+**39 offline games and 2 online extras**, with no runtime dependencies, installs,
 or server. The site is the [`src/`](src/) folder itself: [`src/index.html`](src/index.html)
 loads the hub modules as plain ES modules, and the games are ordinary HTML in
 [`src/games/content/`](src/games/content). The page downloads a game the first
@@ -20,6 +20,12 @@ npm install
 npm run dev      # http://localhost:3000, live from src/
 npm test         # game regressions, discovery, layout and mock account flows
 ```
+
+[Rooftop Snipers Classic](docs/rooftop-snipers-classic.md) packages the original
+Unity WebGL export as one self-contained game document. It sits alongside the
+native remake, with local one/two-player play and touch controls. It is explicitly
+unscored because the compiled build exposes no score API. Run its focused checks
+with `npm run test:rooftop`.
 
 | Path | What it holds |
 |---|---|

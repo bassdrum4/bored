@@ -7,20 +7,22 @@
 // in `src/games/content/` are the payloads: there is nothing extra to publish,
 // and editing a game updates it without rebuilding the hub.
 
-export const ORDER = [["cup-pong", "Cup Pong"], ["rooftop-snipers", "Rooftop Snipers"], ["block-blast", "Block Blast"], ["chess", "Chess"], ["mahjong", "Mahjong"], ["minigolf", "Minigolf"], ["sumo", "SUMO"], ["sand", "Sand"], ["poker", "Poker"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["lights-out", "Lights Out"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["klang", "Klang"], ["8ball", "8 Ball"]];
+export const ORDER = [["rooftop-snipers-classic", "Rooftop Snipers Classic"], ["cup-pong", "Cup Pong"], ["rooftop-snipers", "Rooftop Snipers"], ["block-blast", "Block Blast"], ["chess", "Chess"], ["mahjong", "Mahjong"], ["minigolf", "Minigolf"], ["sumo", "SUMO"], ["sand", "Sand"], ["poker", "Poker"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["lights-out", "Lights Out"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["klang", "Klang"], ["8ball", "8 Ball"]];
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://youtubeplayer.freebuff.app/player"};
 // Offline games with no board of their own: they still play, but the hub keeps
 // no best for them. 8 Ball, Sand and Eco are open-ended toys, so a "high score"
 // only invited comparing two unrelated afternoons.
-export const UNSCORED_GAMES = ["8ball", "eco", "sand"];
+// Classic is the compiled original Unity export: it exposes no score API.
+export const UNSCORED_GAMES = ["rooftop-snipers-classic", "8ball", "eco", "sand"];
 export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
-export const FRESH_GAMES = ["cup-pong", "rooftop-snipers", "block-blast", "chess"];
+export const FRESH_GAMES = ["rooftop-snipers-classic", "cup-pong", "rooftop-snipers", "block-blast"];
 ORDER.unshift(['2048', '2048'], ['memory', 'Memory'], ['connect-four', 'Connect Four'], ['aim-lab', 'Aim Lab']);
 ORDER.unshift(['deep', 'DEEP']);
 export const META = {
+  "rooftop-snipers-classic": ["Arcade", "The original two-button rooftop duel. Jump, aim, and knock your rival off the roof."],
   "cup-pong": ["Arcade", "Arc a ball into the cups. Three misses ends the run."],
   "rooftop-snipers": ["Arcade", "Two neighbours, two rooftops, one last shot."],
   "block-blast": ["Puzzle", "Drop blocks into an 8x8 grid and clear full lines."],

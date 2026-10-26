@@ -4,6 +4,7 @@ import { ORDER, EXTERNS } from './catalog.js';
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
 export const DISCOVERY = {
+  'rooftop-snipers-classic': info('2–5 min', 'Competitive', ['Keyboard', 'Touch'], { quick: true, players: '2 local' }),
   'cup-pong': info('2–5 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   'rooftop-snipers': info('1–3 min', 'Competitive', ['Keyboard', 'Touch'], { quick: true, players: '2 local' }),
   'block-blast': info('2–5 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
