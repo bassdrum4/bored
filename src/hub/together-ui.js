@@ -8,6 +8,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   const $ = s => document.querySelector(s);
   const root = $('#together'), content = $('#together-content'), status = $('#together-status');
   let owner = null, data = null, visible = false, busy = false, generation = 0, flight = null;
+  let lastRefresh = 0;
   let flow = null, selectedGame = 'connect-four', people = null;
   const name = game => TOGETHER_GAMES[game]?.name || game;
   function node(tag, text, className) {
@@ -29,7 +30,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   function resetIdentity() {
     const next = hasIdentity() ? getSession()?.user?.id : null;
     if (owner === next) return;
-    owner = next; generation++; flight = null; busy = false; root.removeAttribute('aria-busy');
+    owner = next; generation++; flight = null; busy = false; lastRefresh = 0; root.removeAttribute('aria-busy');
     data = flow = people = null; status.textContent = '';
     updateBadge(); render();
   }
@@ -37,13 +38,16 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     resetIdentity();
     if (!owner || document.hidden || busy && !force) return;
     if (flight) return flight;
+    // An unopened Together tab still gets badge updates, but doesn't poll
+    // every 15 seconds for someone playing other games.
+    if (!force && Date.now() - lastRefresh < (visible ? 14000 : 55000)) return;
     const stamp = generation;
     const task = (async () => {
       try {
         const next = await togetherRPC('dashboard');
         if (stamp !== generation) return;
         const changed = JSON.stringify(data) !== JSON.stringify(next);
-        data = next; updateBadge();
+        data = next; lastRefresh = Date.now(); updateBadge();
         if (changed || force) render();
       } catch (error) {
         if (stamp === generation) status.textContent = 'Could not refresh. Your saved games are safe. ' + error.message;
@@ -267,6 +271,8 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   window.addEventListener('online', () => refresh(true));
   window.addEventListener('hashchange', () => { if (location.hash === '#together') open(); else close(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  // Preserve quick updates while Together is open; outside it, a minute-level
+  // badge refresh costs far fewer Auth and database requests on the Free tier.
   setInterval(() => { if (!document.hidden && hasIdentity()) refresh(); }, 15000);
   resetIdentity(); refresh(); if (location.hash === '#together') open();
   return { open, refresh };

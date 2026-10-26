@@ -228,7 +228,10 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   activeSlug = previousSlug = slug;
   const from = origin || document.activeElement;
   const launchSource = challenge ? 'daily' : from?.closest?.('#recent') ? 'recent' : from?.closest?.('#leaderboard') ? 'leaderboard' : from?.id === 'random' ? 'random' : from?.closest?.('#grid') ? 'library' : 'other';
-  analytics.start(slug, { source: multiplayer ? 'together' : launchSource, daily: !!challenge, external: !!external, embedded: isEmbedded(), device: matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop' });
+  // F-14 now tracks its own genuine flight phases, actions, and mission
+  // outcomes in Supabase. A second host session would double-count every
+  // Bored-launched flight, so defer to the native game for this slug.
+  if (slug !== 'f-14') analytics.start(slug, { source: multiplayer ? 'together' : launchSource, daily: !!challenge, external: !!external, embedded: isEmbedded(), device: matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop' });
   recentGames = [slug, ...recentGames.filter(id => id !== slug)].slice(0, 4);
   saveLibrary();
   renderRecent();

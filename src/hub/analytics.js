@@ -36,7 +36,11 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   let enabled = readStored(ANALYTICS_PREFERENCE, true) !== false;
   let run = null, last = now(), lastInput = -Infinity, pending = [], busy = false;
   let visitor = enabled ? getVisitorId() : null;
-  let detach = () => {}, lastFlush = now();
+  let detach = () => {}, lastFlush = now(), flushTimer = null;
+  const scheduleFlush = () => {
+    if (flushTimer) return;
+    flushTimer = setTimeout(() => { flushTimer = null; void flush(); }, 1200);
+  };
   const owner = () => getSession()?.user?.id || null;
   const input = () => { lastInput = now(); };
   // Only an input inside the game's iframe proves engagement. Hub buttons,
@@ -46,7 +50,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     if (run?.ready && !run.context.external && !run.interacted) {
       run.interacted = true;
       emit('interaction');
-      void flush();
+      scheduleFlush();
     }
   };
   const uuid = () => crypto.randomUUID();
@@ -88,24 +92,27 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       pending = pending.filter(event => event.user_id === null || event.user_id === id);
       const user = pending[0]?.user_id;
       if (user === undefined) return;
-      const batch = pending.filter(event => event.user_id === user).slice(0, 20);
+      const table = pending[0]._table === 'product_events' ? 'product_events' : 'play_events';
+      const batch = pending.filter(event => event.user_id === user &&
+        (event._table === 'product_events' ? 'product_events' : 'play_events') === table).slice(0, 20);
       let token = ANON_TOKEN;
       if (user) {
         const fresh = await freshSession();
         if (fresh?.user?.id !== user) return;
         token = fresh.access_token;
       }
-      // Insert individually with stable IDs: a retry receiving 23505 is already delivered.
-      for (const event of batch) {
-        if (!enabled) break;
-        try {
-          const { _table, ...body } = event;
-          await request('/rest/v1/' + (_table === 'product_events' ? 'product_events' : 'play_events'),
-            { method: 'POST', body, token, keepalive });
-        } catch (error) { if (error.code !== '23505') throw error; }
-        pending = pending.filter(item => item.id !== event.id);
+      // PostgREST accepts arrays: grouping adjacent events cuts round-trips and
+      // request overhead, while ON CONFLICT DO NOTHING makes retries idempotent.
+      const rows = batch.map(({ _table, ...row }) => row);
+      if (enabled && rows.length) {
+        await request('/rest/v1/' + table, {
+          method: 'POST', body: rows.length === 1 ? rows[0] : rows,
+          token, keepalive, prefer: 'return=minimal,resolution=ignore-duplicates'
+        });
+        const sent = new Set(batch.map(row => row.id));
+        pending = pending.filter(item => !sent.has(item.id));
+        delivered = true;
       }
-      delivered = true;
     } catch { /* Offline analytics must never interrupt a game. Retry on the next tick. */ }
     finally {
       busy = false;
@@ -126,13 +133,11 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   }
   function start(game, context = {}) {
     end('switch');
-    // F-14 now instruments its own actual flights in the same-origin iframe.
-    // The hub's former external presence session would double-count sorties.
     if (!enabled || (game === 'f-14' && context.external)) return;
     last = now(); lastInput = -Infinity;
     run = { id: uuid(), user: owner(), game, context, active: 0, totalActive: 0, visible: 0, ready: false, interacted: false, everFinished: false, opened: now() };
     emit('start');
-    void flush();
+    scheduleFlush();
   }
   function ready(external = false) {
     if (!run) return;
@@ -140,7 +145,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     if (run.ready) return;
     sample(); run.ready = true;
     emit('checkpoint', { loaded: true, load_ms: Math.round(now() - run.opened) });
-    void flush();
+    scheduleFlush();
     detach();
     if (external) return; // cross-origin internals are deliberately inaccessible
     try {
@@ -163,7 +168,8 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       if (finished && !run.finished) { run.everFinished = true; emit('checkpoint', { round_finished: true }); void flush(); }
       if (run) run.finished = finished;
     }
-    if (now() - lastFlush >= 30000) {
+    if (run && !run.ready && !run.context.external) ready();
+    if (now() - lastFlush >= 60000) {
       if (run?.ready) emit('checkpoint');
       lastFlush = now(); void flush();
     }
@@ -187,7 +193,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       visitor_id: visitor, kind, game: safeGame,
       details: safeMatch ? { match_id: safeMatch } : {} });
     if (pending.length > 200) pending.splice(0, pending.length - 200);
-    void flush();
+    scheduleFlush();
   }
   track('visit');
   return {
@@ -199,11 +205,11 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     },
     enabled: () => enabled,
     setEnabled(value) {
-      if (!value) { run = null; pending = []; detach(); visitor = null; removeStored(VISITOR_KEY); }
+      if (!value) { run = null; pending = []; clearTimeout(flushTimer); flushTimer = null; detach(); visitor = null; removeStored(VISITOR_KEY); }
       enabled = !!value; writeStored(ANALYTICS_PREFERENCE, enabled);
       if (enabled && !visitor) { visitor = getVisitorId(); track('visit'); }
     },
     // Used by isolated tests; the app creates one tracker for its lifetime.
-    dispose() { clearInterval(tick); detach(); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', leave); window.removeEventListener('pageshow', resume); }
+    dispose() { clearInterval(tick); clearTimeout(flushTimer); detach(); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', leave); window.removeEventListener('pageshow', resume); }
   };
 }

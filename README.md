@@ -620,3 +620,20 @@ Cross-origin extras (including F-14) cannot report their internal play time unti
 those games integrate a secure first-party event bridge, so their measured active
 time remains unavailable rather than inferred. The existing score and match history
 is preserved.
+
+### Free-tier Supabase efficiency and F-14 ownership
+
+Bored sends gameplay events in small idempotent PostgREST batches, samples time
+locally every second, and checkpoints at 60-second intervals with final exits
+recorded immediately. Bored Together retains its 15-second refresh while open,
+with background turn badges refreshing approximately once a minute and immediate
+refresh on opening, returning to the tab, or a successful action. It never polls
+when the page is hidden. These adjustments reduce database requests without
+removing saved games, score records, match updates, or gameplay analytics.
+
+F-14 owns its flight instrumentation (from its own TypeScript simulator) and
+records flying time, missions, aircraft, and outcomes directly to the **same
+Supabase play_events table**; Bored intentionally skips creating a duplicate
+shell session for F-14. This preserves accurate playtime metrics while allowing
+the flight game to run on its own. For F-14, its own analytics opt-out also
+shares Bored's browser preference.

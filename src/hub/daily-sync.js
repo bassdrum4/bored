@@ -8,6 +8,13 @@ import { backendReady, freshSession, getSession, request, ensureProfile } from '
 
 const sent = new Set();
 
+// Extracting the date here makes a subtle escaped-regex failure testable.
+export function dailyResultDate(id) {
+  if (typeof id !== 'string' || !/^v2:\d{4}-\d{2}-\d{2}:[a-z0-9-]+$/.test(id)) return null;
+  const date = id.split(':')[1];
+  return Number.isFinite(Date.parse(date + 'T12:00:00Z')) ? date : null;
+}
+
 export async function submitDailyResult(result) {
   if (!result?.id || !result.snapshot || !backendReady()) return false;
   const session = getSession();
@@ -16,8 +23,8 @@ export async function submitDailyResult(result) {
   if (sent.has(key)) return true;
   try {
     if (!(await ensureProfile()) || getSession()?.user?.id !== session.user.id) return false;
-    const date = result.id.split(':')[1];
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return false;
+    const date = dailyResultDate(result.id);
+    if (!date) return false;
     const challenge = dailyChallenge(date);
     if (challenge.id !== result.id || !dailyCheck(challenge, result.snapshot).complete) return false;
     const value = Math.max(0, Math.round(result.snapshot[challenge.metric]));
