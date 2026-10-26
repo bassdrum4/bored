@@ -41,10 +41,10 @@ files[frameworkName] = Buffer.concat([packedFramework.subarray(0, 10),
   Buffer.from('UnityWeb Compressed Content (gzip)\0'), packedFramework.subarray(10)]);
 const assets = Object.fromEntries(Object.keys(hashes).filter(name => name.endsWith('.unityweb'))
   .map(name => [name.slice('Build/'.length), files[name].toString('base64')]));
-const template = readFileSync(resolve(root, 'scripts/templates/rooftop-snipers-classic.html'), 'utf8');
+const template = readFileSync(resolve(root, 'scripts/templates/rooftop-snipers.html'), 'utf8');
 const html = template
   .replace('__UPSTREAM_LICENSE__', () => files.LICENSE.toString().trim())
   .replace('__UNITY_LOADER__', () => files['TemplateData/UnityLoader.js'].toString().replace(/<\/script/gi, '<\\/script'))
   .replace('__UNITY_BUILD__', () => JSON.stringify({ config, assets }));
-writeFileSync(resolve(root, 'src/games/content/rooftop-snipers-classic.html'), html);
+writeFileSync(resolve(root, 'src/games/content/rooftop-snipers.html'), html);
 console.log('Packaged original Unity build: ' + html.length + ' bytes; no runtime network dependencies.');

@@ -1,4 +1,4 @@
-# Rooftop Snipers Classic
+# Rooftop Snipers
 
 This is the original Unity WebGL export from
 [SoBloxsy/rooftop-snipers](https://github.com/SoBloxsy/rooftop-snipers), pinned to
@@ -12,8 +12,11 @@ license, not independent verification of ownership of the original game assets.
 
 ## Bored integration
 
-- Slug: `rooftop-snipers-classic`. The existing native `rooftop-snipers` remake,
-  its daily challenge, and saved scores are unchanged.
+- Slug: `rooftop-snipers`. The original game replaces the native remake in the
+  same library entry, preserving favorites and recent-game identity. The duplicate
+  Classic entry and remake preview are removed. The remake’s score-capture spec,
+  score-rule manifest entry and daily challenge are retired; existing stored
+  score records are not deleted or applied to this different implementation.
 - Launch from the normal library or Play Against Friends collection. The native
   game menu selects one or two players. P1 uses W to jump and holds/releases E
   to aim/fire; P2 uses I and O. Touch buttons send those same legacy key events.
@@ -43,7 +46,7 @@ site wrapper's metadata, icons, stylesheet and links are omitted.
 ## Reproduce or edit
 
 The shipped HTML contains generated binary payloads. Edit
-`scripts/templates/rooftop-snipers-classic.html`, then regenerate:
+`scripts/templates/rooftop-snipers.html`, then regenerate:
 
 ```sh
 git clone https://github.com/SoBloxsy/rooftop-snipers.git ../rooftop-snipers-upstream

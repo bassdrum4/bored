@@ -21,7 +21,6 @@
   "poker": { "label": "Chips above the start stack", "better": "high", "max_value": 100000 },
   "pong": { "label": "Points", "better": "high", "max_value": 999 },
   "qbert": { "label": "Score", "better": "high", "max_value": 10000000 },
-  "rooftop-snipers": { "label": "Computer wins in a session", "better": "high", "max_value": 999 },
   "shadow-net": { "label": "Files downloaded", "better": "high", "max_value": 999 },
   "simon": { "label": "Rounds completed", "better": "high", "max_value": 999 },
   "snake": { "label": "Apples eaten", "better": "high", "max_value": 9999 },

@@ -9,11 +9,23 @@ const puppeteer = require('puppeteer-core');
 const { serve } = require('./serve.cjs');
 
 const root = path.resolve(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'src/games/content/rooftop-snipers-classic.html'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'src/games/content/rooftop-snipers.html'), 'utf8');
 const build = JSON.parse(html.match(/<script id="unity-build" type="application\/json">(.*?)<\/script>/s)[1]);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 
-test('Classic preserves original gameplay/assets and packages a valid offline Unity framework', () => {
+test('the original replaces the remake under its existing identity without obsolete scoring', async () => {
+  const { ORDER, UNSCORED_GAMES } = await import('../src/games/catalog.js');
+  const { CHALLENGES } = await import('../src/daily.js');
+  const { LB_GAMES } = await import('../src/hub/scores.js');
+  assert.deepEqual(ORDER.filter(([slug]) => slug.startsWith('rooftop-snipers')), [['rooftop-snipers', 'Rooftop Snipers']]);
+  assert.ok(UNSCORED_GAMES.includes('rooftop-snipers'));
+  assert.ok(!CHALLENGES.some(game => game.slug === 'rooftop-snipers'));
+  assert.ok(!LB_GAMES.some(game => game.id === 'rooftop-snipers'));
+  assert.equal(fs.existsSync(path.join(root, 'src/games/content/rooftop-snipers-classic.html')), false);
+  assert.match(html, /slug: 'rooftop-snipers'/);
+});
+
+test('Rooftop Snipers preserves original gameplay/assets and packages a valid offline Unity framework', () => {
   // Prevent accidentally swapping the actual game for the native remake or a
   // placeholder while keeping the new card. Core code, data and memory stay exact.
   for (const [name, hash] of Object.entries({
@@ -36,7 +48,7 @@ test('Classic preserves original gameplay/assets and packages a valid offline Un
   for (const script of scripts) if (!script[0].includes('application/json')) assert.doesNotThrow(() => new vm.Script(script[1]));
 });
 
-test('Classic launches the real Unity game through Bored, fits touch screens, and restarts/exits', { timeout: 120000 }, async t => {
+test('Rooftop Snipers launches the real Unity game through Bored, fits touch screens, and restarts/exits', { timeout: 120000 }, async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
   const site = await serve(path.join(root, 'src'));
@@ -61,7 +73,7 @@ test('Classic launches the real Unity game through Bored, fits touch screens, an
   await page.setViewport({ width: 960, height: 720, isMobile: true, hasTouch: true });
   await page.goto(site.url);
   await page.waitForFunction(() => typeof openGame === 'function');
-  await page.evaluate(() => openGame('rooftop-snipers-classic'));
+  await page.evaluate(() => openGame('rooftop-snipers'));
   const frame = await (await page.$('#frame')).contentFrame();
   await frame.waitForSelector('#start');
   assert.equal(await frame.evaluate(() => __boredSnapshot().loaded), false);
@@ -93,13 +105,13 @@ test('Classic launches the real Unity game through Bored, fits touch screens, an
     dispatchEvent(new Event('blur'));
   });
   assert.deepEqual(await frame.evaluate(() => observedKeys), [['keydown', 87], ['keydown', 69], ['keyup', 69], ['keyup', 87]]);
-  const shots = path.join(root, '_build', 'rooftop-classic');
+  const shots = path.join(root, '_build', 'rooftop-snipers');
   fs.mkdirSync(shots, { recursive: true });
   await page.screenshot({ path: path.join(shots, 'mobile.png') });
   await page.setViewport({ width: 960, height: 720, isMobile: true, hasTouch: true });
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => document.querySelector('#player').hidden);
-  await page.evaluate(() => openGame('rooftop-snipers-classic'));
+  await page.evaluate(() => openGame('rooftop-snipers'));
   const reopened = await (await page.$('#frame')).contentFrame();
   await reopened.waitForSelector('#start');
   assert.equal(await reopened.evaluate(() => __boredSnapshot().loaded), false, 'a new frame frees the prior Unity session');
