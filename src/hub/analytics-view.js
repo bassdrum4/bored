@@ -3,7 +3,7 @@ import { ORDER } from '../games/catalog.js';
 import { summarizeEvents, summarizeEngagement, eventsCSV, excludeAdmins } from './analytics-data.js';
 const $ = selector => document.querySelector(selector);
 let events = [], productEvents = [], surveyRows = [], togetherSummary = null, handles = {}, report = null, page = 0, loading = false, epoch = 0;
-const names = Object.fromEntries(ORDER), PAGE_SIZE = 40, MAX_EVENTS = 20000;
+const names = { ...Object.fromEntries(ORDER), 'f-14': 'F-14 Simulator' }, PAGE_SIZE = 40, MAX_EVENTS = 20000;
 const duration = ms => ms >= 3600000 ? (ms / 3600000).toFixed(1) + ' h' : ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
 const dateTime = iso => new Date(iso).toLocaleString([], { timeZone: 'America/Detroit', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 function el(tag, text) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; return n; }
@@ -84,6 +84,67 @@ function renderEngagement(rows) {
     .slice(-25).reverse()
     .map(row => [dateTime(row.created_at),row.rating,row.comment]));
 }
+
+/** Flight-specific aggregates use the same admin-protected events as Bored.
+ * A sortie is a session ID, not a raw event count (checkpoints are repeated). */
+function renderF14(rows) {
+  const chosen = $('#game').value;
+  $('#f14-section').hidden = Boolean(chosen && chosen !== 'f-14');
+  if ($('#f14-section').hidden) return;
+  const sessions = new Map();
+  for (const e of rows) {
+    if (e.game !== 'f-14') continue;
+    if (!sessions.has(e.session_id)) sessions.set(e.session_id, {
+      mode: 'Unknown', aircraft: 'Unknown', active: 0, visible: 0, interacted: false,
+      finished: false, outcome: 'Unfinished', kills: 0
+    });
+    const s = sessions.get(e.session_id), d = e.details || {};
+    s.active += e.active_ms || 0;
+    s.visible += e.visible_ms || 0;
+    s.interacted ||= e.kind === 'interaction';
+    if (typeof d.mode === 'string') s.mode = d.mode;
+    if (typeof d.aircraft === 'string') s.aircraft = d.aircraft;
+    if (Number.isFinite(d.kills)) s.kills = Math.max(s.kills, d.kills);
+    if (e.kind === 'end') {
+      s.finished = true;
+      s.outcome = ({
+        success: 'Mission success', failure: 'Mission failure',
+        crash: 'Crashed', recovered: 'Recovered'
+      })[d.outcome] || 'Quit / unfinished';
+    }
+  }
+  const flights = [...sessions.values()];
+  const active = flights.reduce((sum, s) => sum + s.active, 0);
+  const engaged = flights.filter(s => s.interacted || s.active >= 60000).length;
+  const recovered = flights.filter(s => s.outcome === 'Recovered').length;
+  const successes = flights.filter(s => s.outcome === 'Mission success').length;
+  const crashes = flights.filter(s => s.outcome === 'Crashed').length;
+  const stats = [
+    ['Sorties', flights.length], ['Active flight time', duration(active)],
+    ['Engaged sorties', engaged], ['Mission victories', successes],
+    ['Recoveries', recovered], ['Crashes', crashes]
+  ];
+  $('#f14-totals').replaceChildren(...stats.map(([label,value]) => {
+    const n = el('div'); n.className = 'analytics-stat';
+    n.append(el('strong', value), el('span', label)); return n;
+  }));
+  const group = field => {
+    const map = new Map();
+    for (const s of flights) {
+      const key = s[field];
+      if (!map.has(key)) map.set(key, { id: key, count: 0, active: 0 });
+      const g = map.get(key); g.count++; g.active += s.active;
+    }
+    return [...map.values()].sort((a,b) => b.count-a.count || b.active-a.active);
+  };
+  table('#f14-modes', ['Mode','Sorties','Active time'],
+    group('mode').map(s => [s.id,s.count,duration(s.active)]));
+  table('#f14-aircraft', ['Vehicle','Sorties','Active time'],
+    group('aircraft').map(s => [s.id,s.count,duration(s.active)]));
+  const outcomes = group('outcome');
+  table('#f14-outcomes', ['Outcome','Sorties'],
+    outcomes.map(s => [s.id,s.count]));
+}
 function render() {
   const selected = $('#person').value;
   const rows = events.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
@@ -103,6 +164,7 @@ function render() {
     n.append(el('span', h.id + ':00'), el('strong', duration(h.active))); return n;
   }));
   table('#games-table', gameColumns, gameRows(report.games));
+  renderF14(rows);
   table('#players-table', ['Player','Sessions','Games','Days active','Active time','Avg / session','Last seen'], report.players.map(p => [
     action(p.label, () => { $('#person').value = p.id === 'Unidentified guests' ? 'guest' : p.id; page = 0; render(); }),
     p.sessions, p.games.size, p.days.size, duration(p.active), duration(p.active / p.sessions), dateTime(p.last)
@@ -199,6 +261,7 @@ async function load() {
 $('#from').value = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
 $('#through').value = new Date().toISOString().slice(0, 10);
 ORDER.forEach(([id, name]) => $('#game').append(new Option(name, id)));
+$('#game').append(new Option('F-14 Simulator', 'f-14'));
 $('#filters-form').onsubmit = event => { event.preventDefault(); void load(); };
 $('#refresh').onclick = () => void load();
 $('#person').onchange = () => { page = 0; render(); };
