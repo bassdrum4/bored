@@ -118,7 +118,7 @@ const GRAV_BALL = 0.07;
 const BALL_R = 12, PL_R = 19;
 const JUMP = -10;
 const P_ACC = 0.92, P_FRIC = 0.82, P_MAX = 4.4;  // friction drags toward a 4.19 px/frame top speed
-const B_MAX = 11;
+const B_MAX = 8, B_E = 1.05, B_DRAG = 0.996;  // a slower ball: the cap and the live bounce both drop
 const WIN = 7;
 
 let sc = [0, 0], serv = 0;
@@ -175,7 +175,7 @@ function driveCpu() {
     if (ball.x > NET_X || ball.vx > 0.4) {
       let x = ball.x, y = ball.y, vx = ball.vx, vy = ball.vy, t = 0;
       while (t < 200 && y < GROUND - PL_R) {
-        vy += GRAV_BALL; x += vx; y += vy; vx *= 0.998; t++;
+        vy += GRAV_BALL; x += vx; y += vy; vx *= B_DRAG; t++;
         if (x - BALL_R < WALL_L) { x = WALL_L + BALL_R; vx = Math.abs(vx) * 0.7; }
         if (x + BALL_R > WALL_R) { x = WALL_R - BALL_R; vx = -Math.abs(vx) * 0.7; }
         if (x > NET_X - 40 && y > NET_TOP && y < NET_TOP + 20) x = Math.max(x, NET_X + 20);
@@ -226,8 +226,8 @@ function hitP(pl, idx) {
     const dvn = (ball.vx - pl.vx) * nx + (ball.vy - pl.vy) * ny;
     if (dvn < 0) {
       // Bias upward so ball naturally goes over net
-      let e = 1.15;
-      let upBoost = -0.8;
+      const e = B_E;
+      const upBoost = -0.8;
       ball.vx -= (1 + e) * dvn * nx;
       ball.vy -= (1 + e) * dvn * ny;
       ball.vy += upBoost;
@@ -292,7 +292,7 @@ function update() {
   moveP(p2, 'ArrowUp', 'ArrowLeft', 'ArrowRight', 1);
 
   ball.vy += (st === 'serve' ? GRAV_BALL * 0.3 : GRAV_BALL);
-  ball.vx *= 0.998;
+  ball.vx *= B_DRAG;
   ball.x += ball.vx; ball.y += ball.vy;
   bounceWalls();
   bounceNet();
