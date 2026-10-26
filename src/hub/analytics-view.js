@@ -261,7 +261,6 @@ async function load() {
 $('#from').value = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
 $('#through').value = new Date().toISOString().slice(0, 10);
 ORDER.forEach(([id, name]) => $('#game').append(new Option(name, id)));
-$('#game').append(new Option('F-14 Simulator', 'f-14'));
 $('#filters-form').onsubmit = event => { event.preventDefault(); void load(); };
 $('#refresh').onclick = () => void load();
 $('#person').onchange = () => { page = 0; render(); };
