@@ -18,10 +18,10 @@ export async function togetherRPC(action, args = {}) {
   const tracked = { enroll: 'bt_enroll', challenge: 'bt_challenge', queue_join: 'bt_random',
     match: 'bt_open', move: 'bt_move', pool_move: 'bt_move', submit_run: 'bt_move',
     rematch: 'bt_rematch', delete: 'bt_delete', leave: 'bt_leave' }[action];
-  if (tracked) window.dispatchEvent(new CustomEvent('bored:together-telemetry', {
+  if (tracked && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('bored:together-telemetry', {
     detail: { kind: tracked, game: result?.game || args.game || null, match_id: result?.id || args.match_id || null }
   }));
-  if (result?.status === 'completed' && ['move','pool_move','submit_run'].includes(action))
+  if (typeof window !== 'undefined' && result?.status === 'completed' && ['move','pool_move','submit_run'].includes(action))
     window.dispatchEvent(new CustomEvent('bored:together-telemetry', {
       detail: { kind: 'bt_complete', game: result.game || args.game || null, match_id: result.id || args.match_id || null }
     }));
