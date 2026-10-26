@@ -10,7 +10,8 @@
   body { display: grid; place-items: center; padding: 10px; background: #f5f2ea; color: #191713;
          font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif }
   main { width: min(332px, 100%); display: grid; gap: 10px; justify-items: center }
-  #hud { display: flex; gap: 16px; font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  #hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px;
+         font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
          letter-spacing: .09em; text-transform: uppercase; color: #6b6558 }
   #hud b { font-weight: 600; color: #191713 }
   #board { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; width: 100%; padding: 6px;
@@ -44,18 +45,19 @@
     <span>Score <b id="score">0</b></span>
     <span>Best <b id="best">0</b></span>
     <span>Lines <b id="lines">0</b></span>
+    <span>Combo <b id="combo">&mdash;</b></span>
   </div>
   <div id="board" role="grid" aria-label="Block grid, eight by eight" tabindex="0"></div>
   <div id="tray" role="group" aria-label="Pieces"></div>
-  <p id="status">Drag a piece onto the grid. Fill a row or column to clear it.</p>
+  <p id="status">Drag a piece onto the grid. Clear a row or column, then clear again with the next piece to build a combo.</p>
   <button id="again" type="button" hidden>Play again</button>
 </main>
 <script>
 const SIZE = 8, COUNT = SIZE * SIZE;
 const $ = id => document.getElementById(id);
 const boardEl = $('board'), trayEl = $('tray'), statusEl = $('status');
-const scoreEl = $('score'), bestEl = $('best'), linesEl = $('lines');
-const HINT = 'Drag a piece onto the grid. Fill a row or column to clear it.';
+const scoreEl = $('score'), bestEl = $('best'), linesEl = $('lines'), comboEl = $('combo');
+const HINT = 'Drag a piece onto the grid. Clear a row or column, then clear again with the next piece to build a combo.';
 
 /* ── Pieces ──────────────────────────────────────────────────────────────── */
 
@@ -163,6 +165,9 @@ function paint() {
   scoreEl.textContent = score;
   bestEl.textContent = best;
   linesEl.textContent = lines;
+  // A combo is a run of placements that each clear something. It is shown only
+  // while it is alive, because ×1 is just a clear.
+  comboEl.textContent = combo > 1 ? '×' + combo : '—';
 }
 
 /* ── Preview ─────────────────────────────────────────────────────────────── */
@@ -302,14 +307,17 @@ function place(index, row, col) {
   const cleared = new Set();
   for (const r of rows) for (let c = 0; c < SIZE; c++) cleared.add(r * SIZE + c);
   for (const c of cols) for (let r = 0; r < SIZE; r++) cleared.add(r * SIZE + c);
-  combo += 1;
+  // Clearing several lines at once is worth more than one at a time: each line
+  // that goes in the same placement steps the combo on.
+  const count = rows.length + cols.length;
+  combo += count;
   const gained = cleared.size * 10 * combo;
   score += gained;
-  lines += rows.length + cols.length;
+  lines += count;
   paint();
   for (const cell of cleared) cellEls[cell].classList.add('clearing');
-  setStatus('+' + gained + ' points' + (combo > 1 ? ' · combo ' + combo : '') +
-    ' · ' + (rows.length + cols.length) + ' line' + (rows.length + cols.length === 1 ? '' : 's'));
+  setStatus('+' + gained + ' points' + (combo > 1 ? ' · combo ×' + combo : '') +
+    ' · ' + count + ' line' + (count === 1 ? '' : 's'));
 
   const turn = run;
   setTimeout(() => {
