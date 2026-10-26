@@ -113,7 +113,6 @@ canvas.dim{opacity:.4}
     <span class="stat" id="scoreChip">score<span class="v" id="scoreValue">0</span></span>
     <span class="stat">best<span class="v" id="bestValue">0</span></span>
     <span class="stat">len<span class="v" id="lengthValue">3</span></span>
-    <span class="stat">speed<span class="v" id="speedValue">1.0&times;</span></span>
   </div>
   <div class="tools">
     <button id="soundBtn" title="Sound">sound</button>
@@ -181,8 +180,7 @@ canvas.dim{opacity:.4}
      CONSTANTS
   ================================================================ */
   var COLS = 20, ROWS = 20;
-  var BASE_STEP = 110;          // ms per move — the whole responsiveness budget
-  var MAX_SPEED = 1.35;
+  var BASE_STEP = 110;          // ms per move — the pace is the same all run
   var LAUNCH_MS = 520;
   var RING_MS = 240;
   var OVER_MS = 260;
@@ -211,7 +209,7 @@ canvas.dim{opacity:.4}
   var board = $("board");
 
   var elScore = $("scoreValue"), elBest = $("bestValue");
-  var elLength = $("lengthValue"), elSpeed = $("speedValue");
+  var elLength = $("lengthValue");
   var elScoreChip = $("scoreChip");
   var elLive = $("live"), elBoardDesc = $("boardDesc");
   var elStartVeil = $("startVeil"), elPauseVeil = $("pauseVeil"), elOverVeil = $("overVeil");
@@ -535,7 +533,6 @@ canvas.dim{opacity:.4}
 
     if (grows) {
       score += 1;
-      stepMs = BASE_STEP / Math.min(MAX_SPEED, 1 + score * 0.03);
       onEat();
       placeApple();
     } else {
@@ -687,7 +684,6 @@ canvas.dim{opacity:.4}
     elScore.textContent = String(score);
     elBest.textContent = String(Math.max(best, score));
     elLength.textContent = String(snake.length);
-    elSpeed.innerHTML = (BASE_STEP / stepMs).toFixed(1) + "&times;";
 
     if (state === "paused") {
       elPauseBtn.title = "Resume";
