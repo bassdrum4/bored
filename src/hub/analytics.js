@@ -1,10 +1,19 @@
 import { request, getSession, freshSession, ANON_TOKEN } from './backend.js';
-import { readStored, writeStored } from './store.js';
+import { readStored, writeStored, removeStored } from './store.js';
 
 // Installed before game scripts so startup failures are observed too. No error text is sent.
 export const ANALYTICS_BRIDGE = '<script>addEventListener("error",function(){parent.postMessage({type:"bored:runtime-error"},"*")});addEventListener("unhandledrejection",function(){parent.postMessage({type:"bored:runtime-error"},"*")});<\/script>';
 
 export const ANALYTICS_PREFERENCE = 'bored.analytics.enabled';
+export const VISITOR_KEY = 'bored.analytics.visitor';
+// This identifies one browser, not a real person. Never create it on opt-out.
+export function getVisitorId() {
+  if (readStored(ANALYTICS_PREFERENCE, true) === false) return null;
+  const value = readStored(VISITOR_KEY, null);
+  if (typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value)) return value;
+  const id = crypto.randomUUID();
+  return writeStored(VISITOR_KEY, id) ? id : null;
+}
 export function cleanSnapshot(value) {
   const result = {};
   if (!value || typeof value !== 'object') return result;
@@ -26,9 +35,17 @@ export function timeSlice(previous, now, lastInput, { visible, focused, ready, p
 export function createAnalytics({ frame, snapshot, score, paused = () => false, isLower = () => false, now = () => performance.now() }) {
   let enabled = readStored(ANALYTICS_PREFERENCE, true) !== false;
   let run = null, last = now(), lastInput = -Infinity, pending = [], busy = false;
+  let visitor = enabled ? getVisitorId() : null;
   let detach = () => {}, lastFlush = now();
   const owner = () => getSession()?.user?.id || null;
-  const input = () => { lastInput = now(); };
+  const input = () => {
+    lastInput = now();
+    if (run?.ready && !run.context.external && !run.interacted) {
+      run.interacted = true;
+      emit('interaction');
+      void flush();
+    }
+  };
   const uuid = () => crypto.randomUUID();
 
   function sample() {
@@ -38,6 +55,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
         visible: !document.hidden, focused: document.hasFocus() && !run.context.external, ready: run.ready, paused: paused()
       });
       run.active += slice.activeMs;
+      run.totalActive += slice.activeMs;
       run.visible += slice.visibleMs;
     }
     last = time;
@@ -49,7 +67,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     const valid = current?.slug === run.game ? current : null;
     const value = score(run.game, valid);
     if (value > 0 && (!run.best || (isLower(run.game) ? value < run.best : value > run.best))) run.best = value;
-    pending.push({ id: uuid(), session_id: run.id, user_id: run.user, game: run.game, kind,
+    pending.push({ id: uuid(), visitor_id: visitor, session_id: run.id, user_id: run.user, game: run.game, kind,
       active_ms: Math.min(65000, Math.floor(run.active)), visible_ms: Math.min(65000, Math.floor(run.visible)),
       details: { ...run.context, ...details, best_score: run.best || 0, ...(Number.isFinite(value) ? { score: value } : {}), snapshot: cleanSnapshot(valid) }
     });
@@ -78,7 +96,9 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       for (const event of batch) {
         if (!enabled) break;
         try {
-          await request('/rest/v1/play_events', { method: 'POST', body: event, token, keepalive });
+          const { _table, ...body } = event;
+          await request('/rest/v1/' + (_table === 'product_events' ? 'product_events' : 'play_events'),
+            { method: 'POST', body, token, keepalive });
         } catch (error) { if (error.code !== '23505') throw error; }
         pending = pending.filter(item => item.id !== event.id);
       }
@@ -92,17 +112,20 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     }
   }
   function end(reason = 'close') {
-    if (!run) return;
+    if (!run) return null;
     emit('end', { reason });
+    const summary = { game: run.game, active_ms: Math.floor(run.totalActive), interacted: !!run.interacted,
+      finished: !!run.everFinished, external: !!run.context.external };
     run = null;
     detach(); detach = () => {};
     void flush();
+    return summary;
   }
   function start(game, context = {}) {
     end('switch');
     if (!enabled) return;
     last = now(); lastInput = -Infinity;
-    run = { id: uuid(), user: owner(), game, context, active: 0, visible: 0, ready: false, opened: now() };
+    run = { id: uuid(), user: owner(), game, context, active: 0, totalActive: 0, visible: 0, ready: false, interacted: false, everFinished: false, opened: now() };
     emit('start');
     void flush();
   }
@@ -110,14 +133,14 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     if (!run) return;
     if (!external && snapshot(run.game)?.slug !== run.game) return;
     if (run.ready) return;
-    sample(); run.ready = true; input();
+    sample(); run.ready = true;
     emit('checkpoint', { loaded: true, load_ms: Math.round(now() - run.opened) });
     void flush();
     detach();
     if (external) return; // cross-origin internals are deliberately inaccessible
     try {
       const doc = frame.contentDocument;
-      const types = ['pointerdown', 'pointermove', 'keydown', 'touchstart'];
+      const types = ['pointerdown', 'keydown', 'touchstart'];
       types.forEach(type => doc.addEventListener(type, input, { passive: true }));
       detach = () => {
         types.forEach(type => doc.removeEventListener(type, input));
@@ -132,7 +155,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       const value = score(run.game, state);
       if (value > 0 && (!run.best || (isLower(run.game) ? value < run.best : value > run.best))) run.best = value;
       const finished = !!(state?.finished || state?.won || state?.solved || state?.handOver);
-      if (finished && !run.finished) { emit('checkpoint', { round_finished: true }); void flush(); }
+      if (finished && !run.finished) { run.everFinished = true; emit('checkpoint', { round_finished: true }); void flush(); }
       if (run) run.finished = finished;
     }
     if (now() - lastFlush >= 30000) {
@@ -150,16 +173,30 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   window.addEventListener('online', () => void flush());
   document.addEventListener('pointerdown', input, { passive: true });
   document.addEventListener('keydown', input, { passive: true });
+  function track(kind, { game = null, match_id = null } = {}) {
+    const allowed = ['visit','bt_view','bt_enroll','bt_challenge','bt_random','bt_open','bt_move','bt_complete','bt_rematch','bt_delete','bt_leave'];
+    if (!enabled || !allowed.includes(kind)) return;
+    const safeGame = typeof game === 'string' && /^[a-z0-9][a-z0-9-]{0,49}$/.test(game) ? game : null;
+    const safeMatch = typeof match_id === 'string' && /^[0-9a-f-]{36}$/i.test(match_id) ? match_id : null;
+    pending.push({ _table: 'product_events', id: uuid(), user_id: owner(),
+      visitor_id: visitor, kind, game: safeGame,
+      details: safeMatch ? { match_id: safeMatch } : {} });
+    if (pending.length > 200) pending.splice(0, pending.length - 200);
+    void flush();
+  }
+  track('visit');
   return {
-    start, end, ready,
+    start, end, ready, track,
+    visitorId: () => enabled ? visitor : null,
     event(kind, details) {
       if (kind === 'error' && run && (run.errors = (run.errors || 0) + 1) > 5) return;
       emit(kind, details); void flush();
     },
     enabled: () => enabled,
     setEnabled(value) {
-      if (!value) { run = null; pending = []; detach(); }
+      if (!value) { run = null; pending = []; detach(); visitor = null; removeStored(VISITOR_KEY); }
       enabled = !!value; writeStored(ANALYTICS_PREFERENCE, enabled);
+      if (enabled && !visitor) { visitor = getVisitorId(); track('visit'); }
     },
     // Used by isolated tests; the app creates one tracker for its lifetime.
     dispose() { clearInterval(tick); detach(); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', leave); window.removeEventListener('pageshow', resume); }

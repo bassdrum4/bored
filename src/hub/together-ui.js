@@ -240,6 +240,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     if (focus) { const next = document.getElementById(focus); if (next) { next.focus({ preventScroll: true }); try { next.setSelectionRange(start, end); } catch {} } }
   }
   function open() {
+    if (!visible) window.dispatchEvent(new CustomEvent('bored:together-telemetry', { detail: { kind: 'bt_view' } }));
     visible = true; people = null; document.body.classList.add('together-open');
     for (const el of document.querySelectorAll('#daily,#recent,#leaderboard,#library,.activity-notice')) el.hidden = true;
     root.hidden = false; $('#together-nav').setAttribute('aria-current', 'page');
