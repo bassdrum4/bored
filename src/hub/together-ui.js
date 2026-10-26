@@ -1,5 +1,7 @@
 import { hasIdentity, getSession, ensureProfile } from './backend.js';
 import { togetherRPC, CONSENT_VERSION } from './together-api.js';
+import { poolPreview, renderPoolGame, animatePoolShot } from './together-pool.js';
+import { applyPoolShot } from '../games/pool-engine.js';
 import { TOGETHER_GAMES } from '../games/catalog.js';
 import { readStored, writeStored, removeStored } from './store.js';
 
@@ -12,6 +14,7 @@ export function createTogetherUI({ openAuthDialog }) {
   let owner = null, data = null, current = null, selected = null;
   let visible = false, busy = false, flight = null, generation = 0, fingerprint = '';
   let searchResults = [], searchQuery = '', review = null, dashboardView = 'games', searched = false;
+  let selectedGame = 'connect-four';
   const key = () => 'bored.together.match.' + owner;
   const name = game => TOGETHER_GAMES[game]?.name || game;
   const node = (tag, text, className) => {
@@ -29,7 +32,10 @@ export function createTogetherUI({ openAuthDialog }) {
   function resetIdentity() {
     const next = hasIdentity() ? getSession()?.user?.id : null;
     if (next === owner) return;
-    owner = next; generation++; flight = null; fingerprint = '';
+    owner = next;
+    const savedGame = readStored('bored.together.game.' + owner, 'connect-four');
+    selectedGame = TOGETHER_GAMES[savedGame] ? savedGame : 'connect-four';
+    generation++; flight = null; fingerprint = '';
     data = current = selected = null; searchResults = []; searchQuery = ''; review = null; dashboardView = 'games'; searched = false;
     updateBadge(); render();
   }
@@ -45,7 +51,7 @@ export function createTogetherUI({ openAuthDialog }) {
   }
   async function refresh(force = false) {
     resetIdentity();
-    if (!owner || document.hidden) return;
+    if (!owner || document.hidden || (busy && !force)) return;
     if (flight) return flight;
     const stamp = generation;
     const task = (async () => {
@@ -79,13 +85,13 @@ export function createTogetherUI({ openAuthDialog }) {
     flight = task;
     try { await task; } finally { if (flight === task) flight = null; }
   }
-  async function run(fn) {
+  async function run(fn, notice = 'Saving…') {
     if (busy) return;
-    busy = true; root.setAttribute('aria-busy', 'true'); message('Saving…');
+    busy = true; root.setAttribute('aria-busy', 'true'); message(notice);
     const stamp = generation;
     try {
       await fn();
-      if (stamp === generation) { if (status.textContent === 'Saving…') message(''); await refresh(true); }
+      if (stamp === generation) { if (status.textContent === notice) message(''); await refresh(true); }
     } catch (error) {
       if (stamp === generation) {
         await refresh(true);
@@ -126,13 +132,14 @@ export function createTogetherUI({ openAuthDialog }) {
     $('#bt-find')?.scrollIntoView({ block: 'nearest' });
   }
   function miniBoard(m) {
+    if (m.game === '8ball') return poolPreview(m.state);
     const preview = node('div', undefined, 'bt-mini-board'); preview.setAttribute('aria-hidden', 'true');
     for (const value of m.state?.board || Array(42).fill(0)) preview.append(node('span', undefined, 'bt-mini-cell bt-mini-' + value));
     return preview;
   }
   function gamePreview() {
     const image = node('img', undefined, 'bt-game-image');
-    image.src = './games/previews/connect-four.webp'; image.alt = ''; image.width = 180; image.height = 120;
+    image.src = './games/previews/' + TOGETHER_GAMES[selectedGame].preview + '.webp'; image.alt = ''; image.width = 180; image.height = 120;
     return image;
   }
   function intro() {
@@ -147,14 +154,14 @@ export function createTogetherUI({ openAuthDialog }) {
     }));
     const enrollmentAction = node('div', undefined, 'bt-enroll-action');
     enrollmentAction.append(join, node('p', owner ? 'Your existing account. No new password.' : 'Use your existing Bored account. Sign in first, then choose Join.', 'bt-caption'));
-    const game = node('div', undefined, 'bt-welcome-game'); game.append(gamePreview(), node('span', 'Connect Four · ready to play', 'bt-caption')); pitch.append(game);
+    const game = node('div', undefined, 'bt-welcome-game'); game.append(gamePreview(), node('span', name(selectedGame) + ' · ready to play', 'bt-caption')); pitch.append(game);
     const privacy = node('aside', undefined, 'bt-consent');
     privacy.append(node('p', 'BEFORE YOU JOIN', 'bt-kicker'), node('h4', 'You choose to be discoverable.'));
     const list = node('ul');
     for (const text of [
       'Only members can find your username or send you a challenge.',
-      'People who know your exact account email can use it to find your username.',
-      'Your email address stays hidden by default. You can choose to show it to accepted friends; random matches never show email.'
+      'Anyone in Bored Together who searches your exact account email can see that email and your username automatically.',
+      'Username searches do not reveal your email unless you choose to share it with accepted friends. Random matches never show email.'
     ]) list.append(node('li', text));
     privacy.append(list, node('p', 'Joining is optional. You can leave or block a player at any time.', 'bt-caption'));
     const policy = node('details'); policy.append(node('summary', 'Leaving & game history'),
@@ -177,7 +184,7 @@ export function createTogetherUI({ openAuthDialog }) {
     row.append(copy);
     const actions = node('div', undefined, 'bt-actions');
     actions.append(button('Challenge', async () => {
-      const m = await act('challenge', { user_id: p.id, game: 'connect-four' }); await viewMatch(m.id);
+      const m = await act('challenge', { user_id: p.id, game: selectedGame }); await viewMatch(m.id);
     }, 'Challenge ' + p.handle));
     if (!friend) actions.append(button('Add friend', () => act('friend_request', { user_id: p.id }), 'Add ' + p.handle + ' as a friend'));
     else if (friend.status === 'pending') {
@@ -238,6 +245,12 @@ export function createTogetherUI({ openAuthDialog }) {
     }
     const body = node('div', undefined, 'bt-view'); body.id = 'bt-tab-panel'; body.setAttribute('role', 'tabpanel'); body.setAttribute('aria-labelledby', 'bt-tab-' + dashboardView);
     content.append(nav, body);
+    if (dashboardView === 'games' || dashboardView === 'people') {
+      const picker = node('label', 'Game', 'bt-game-picker'); const select = node('select'); select.id = 'bt-game-select';
+      for (const [slug, game] of Object.entries(TOGETHER_GAMES)) { const option = node('option', game.name); option.value = slug; select.append(option); }
+      select.value = selectedGame; select.onchange = () => { selectedGame = select.value; writeStored('bored.together.game.' + owner, selectedGame); render(); };
+      picker.append(select); body.append(picker);
+    }
     if (dashboardView === 'people') peopleView(body, incoming);
     else if (dashboardView === 'history') historyView(body);
     else if (dashboardView === 'settings') settingsView(body);
@@ -250,16 +263,16 @@ export function createTogetherUI({ openAuthDialog }) {
     if (turns.length) copy.append(primary(button('Play your next turn →', () => viewMatch(turns[0].id))));
     else copy.append(primary(control('Challenge Someone', findPlayers)));
     const start = node('div', undefined, 'bt-start-game'); start.append(gamePreview());
-    const startCopy = node('div'); startCopy.append(node('h4', 'Connect Four'), node('p', 'Seven columns. One good rivalry.', 'bt-caption'));
+    const startCopy = node('div'); startCopy.append(node('h4', name(selectedGame)), node('p', TOGETHER_GAMES[selectedGame].blurb, 'bt-caption'));
     const choices = node('div', undefined, 'bt-actions');
     if (turns.length) choices.append(control('Challenge Someone', findPlayers));
     choices.append(button('Play Random', async () => {
-      const result = await act('queue_join', { game: 'connect-four' }); if (result.id) await viewMatch(result.id);
+      const result = await act('queue_join', { game: selectedGame }); if (result.id) await viewMatch(result.id);
     })); startCopy.append(choices); start.append(startCopy); hero.append(copy, start); host.append(hero);
-    if (data.queue.length) {
+    for (const queuedGame of data.queue) {
       const queue = node('div', undefined, 'bt-queue');
-      const note = node('div'); note.append(node('strong', 'Finding your next opponent'), node('p', 'Waiting for another Connect Four player. You can close Bored; we’ll save the match when someone joins.', 'bt-caption'));
-      queue.append(note, button('Cancel random search', () => act('queue_cancel', { game: 'connect-four' }))); host.append(queue);
+      const note = node('div'); note.append(node('strong', 'Finding your next opponent'), node('p', 'Waiting for another ' + name(queuedGame) + ' player. You can close Bored; we’ll save the match when someone joins.', 'bt-caption'));
+      queue.append(note, button('Cancel random search', () => act('queue_cancel', { game: queuedGame }))); host.append(queue);
     }
     const layout = node('div', undefined, 'bt-overview'); const main = node('div', undefined, 'bt-match-list'); const aside = node('aside', undefined, 'bt-sidebar');
     layout.append(main, aside); host.append(layout);
@@ -280,7 +293,7 @@ export function createTogetherUI({ openAuthDialog }) {
     const quick = panel('Quick challenge', aside);
     for (const f of friends.slice(0, 4)) {
       const row = node('div', undefined, 'bt-quick-friend'); row.append(node('span', f.person.handle), button('Challenge', async () => {
-        const m = await act('challenge', { user_id: f.person.id, game: 'connect-four' }); await viewMatch(m.id);
+        const m = await act('challenge', { user_id: f.person.id, game: selectedGame }); await viewMatch(m.id);
       }, 'Challenge ' + f.person.handle)); quick.append(row);
     }
     if (!friends.length) empty(quick, 'Add a friend to keep the rivalry going.');
@@ -309,7 +322,7 @@ export function createTogetherUI({ openAuthDialog }) {
     form.onsubmit = e => { e.preventDefault(); run(async () => {
       searchResults = await act('search', { query: searchQuery.trim() }); searched = true; render(); $('#bt-search')?.focus();
     }); };
-    find.append(form, node('p', 'Only opted-in members appear. Enter at least 3 username characters or a full email. Email visibility is controlled by each player.', 'bt-caption'));
+    find.append(form, node('p', 'Only opted-in members appear. Enter at least 3 username characters or a full email. Exact-email results show the matching account email automatically.', 'bt-caption'));
     if (searched) {
       const results = node('div', undefined, 'bt-people-grid');
       if (!searchResults.length) empty(results, 'No members found. Check the username or exact account email.');
@@ -341,11 +354,11 @@ export function createTogetherUI({ openAuthDialog }) {
   function settingsView(host) {
     const settings = panel('Privacy & membership', host, undefined, 'bt-settings-panel');
     settings.append(node('p', 'Choose what other players can see.', 'bt-lead'));
-    const label = node('label', 'Email visibility'); const select = node('select'); select.id = 'bt-email-visibility';
-    for (const [value, text] of [['hidden', 'Hidden from everyone'], ['friends', 'Show to accepted friends only']]) { const opt = node('option', text); opt.value = value; select.append(opt); }
+    const label = node('label', 'Email on friend profiles'); const select = node('select'); select.id = 'bt-email-visibility';
+    for (const [value, text] of [['hidden', 'Hidden on username searches'], ['friends', 'Show to accepted friends only']]) { const opt = node('option', text); opt.value = value; select.append(opt); }
     select.value = data.email_visibility; label.append(select);
     const form = node('div', undefined, 'bt-settings-form'); form.append(label, button('Save visibility', () => act('settings', { email_visibility: select.value })));
-    settings.append(form, node('p', 'Exact email lookup identifies your username even when your address is hidden. Random matches never display email.', 'bt-caption'));
+    settings.append(form, node('p', 'Joining always lets another member find and see your email by searching that exact email. This setting only controls showing it to accepted friends on username searches and friend profiles. Random matches never display email.', 'bt-caption'));
     const blocks = panel('Blocked players', host);
     if (!data.blocks.length) empty(blocks, 'You have not blocked anyone.');
     for (const p of data.blocks) { const row = node('div', undefined, 'bt-row'); row.append(node('p', p.handle), button('Unblock', () => act('unblock', { user_id: p.id }))); blocks.append(row); }
@@ -391,17 +404,31 @@ export function createTogetherUI({ openAuthDialog }) {
     const h = node('h3', name(m.game)); h.id = 'bt-match-heading'; h.tabIndex = -1;
     game.append(node('p', 'YOU VS ' + (m.opponent?.handle || 'FORMER MEMBER').toUpperCase(), 'bt-kicker'), h);
     const result = m.status === 'completed' ? (m.winner === owner ? 'You won.' : m.winner ? 'Your opponent won.' : 'A draw.') :
-      m.status === 'active' ? (m.turn_user === owner ? 'Your turn. Pick a column.' : 'Waiting for your opponent. Come back whenever.') :
+      m.status === 'active' ? (m.turn_user === owner ? (m.game === '8ball' ? 'Your turn. Aim your shot.' : 'Your turn. Pick a column.') : 'Waiting for your opponent. Come back whenever.') :
       m.status === 'pending' ? (m.p2 === owner ? 'You have been challenged.' : 'Invitation sent. Waiting for acceptance.') : m.status + '.';
     game.append(node('p', result, 'bt-match-message'));
     if (m.game === 'connect-four') renderBoard(m, game);
+    if (m.game === '8ball') renderPoolGame(game, { match: m, owner, review, replay: fn => run(fn, 'Replaying shot…'), submit: (move, canvas) => run(async () => {
+      const pendingKey = 'bored.together.pending.' + owner + '.' + m.id;
+      let pending = readStored(pendingKey, null);
+      if (!pending || pending.version !== m.version || JSON.stringify(pending.move) !== JSON.stringify(move)) {
+        pending = { match_id: m.id, version: m.version, request_id: crypto.randomUUID(), move }; writeStored(pendingKey, pending);
+      }
+      const prediction = applyPoolShot(m.state, move, m.p1 === owner ? 1 : 2, { trace: true });
+      await Promise.all([act('pool_move', pending), animatePoolShot(canvas, prediction.frames)]);
+      removeStored(pendingKey);
+    }) });
+
     const aside = node('aside', undefined, 'bt-match-info');
     aside.append(node('p', 'THE MATCH', 'bt-kicker'), node('h4', m.p1_handle + ' vs ' + m.p2_handle));
     const legend = node('div', undefined, 'bt-legend');
     for (const [seat, handle] of [[1, m.p1_handle], [2, m.p2_handle]]) {
-      const row = node('p'); row.append(node('span', undefined, 'bt-legend-dot bt-mini-' + seat), node('span', handle + (seat === 1 ? ' · Red' : ' · Gold'))); legend.append(row);
+      const row = node('p'); row.append(node('span', undefined, 'bt-legend-dot bt-mini-' + seat), node('span', handle + (m.game === '8ball' ? ' · ' + (m.state.groups[seat - 1] || 'Open table') : seat === 1 ? ' · Red' : ' · Gold'))); legend.append(row);
     }
     aside.append(legend, node('p', m.reason || 'Your game is saved after every turn. Neither player needs to stay online.', 'bt-caption'));
+    if (m.game === '8ball') {
+      const rules = node('details'); rules.append(node('summary', 'Pool rules'), node('p', 'Pot your solids or stripes, then the 8. A legal pot keeps your turn. Scratching, missing every ball, or hitting the wrong group first gives the opponent ball in hand. Potting the 8 early or with a foul loses. The 8 on the break re-racks. House rules: no spin, called pockets or rail-after-contact requirement.', 'bt-caption')); aside.append(rules);
+    }
     const actions = node('div', undefined, 'bt-match-options');
     if (m.status === 'pending') {
       if (m.p2 === owner) actions.append(primary(button('Accept challenge', () => act('accept', { match_id: m.id }))), button('Decline challenge', () => act('decline', { match_id: m.id })));
@@ -414,7 +441,7 @@ export function createTogetherUI({ openAuthDialog }) {
       const next = await act('rematch', { match_id: m.id, game: m.game }); await viewMatch(next.id);
     })));
     if (m.status !== 'pending' && m.moves?.length) {
-      const label = node('label', 'Review moves '), slider = node('input'); slider.type = 'range'; slider.min = '0'; slider.max = String(m.moves.length);
+      const label = node('label', m.game === '8ball' ? 'Review shots ' : 'Review moves '), slider = node('input'); slider.type = 'range'; slider.min = '0'; slider.max = String(m.moves.length);
       slider.value = String(review ?? m.moves.length); slider.setAttribute('aria-label', 'Review move number');
       slider.oninput = () => { review = Number(slider.value); render(); }; label.append(slider);
       actions.append(label, node('p', 'Move ' + (review ?? m.moves.length) + ' of ' + m.moves.length, 'bt-caption'));
@@ -442,7 +469,10 @@ export function createTogetherUI({ openAuthDialog }) {
   $('#together-back').onclick=()=>{close();try{history.replaceState(null,'','#library');}catch{} $('#library').scrollIntoView();};
   for (const link of document.querySelectorAll('.site-nav a:not(#together-nav)')) link.addEventListener('click',close);
   window.addEventListener('bored:identity',()=>{resetIdentity();refresh(true);});
-  window.addEventListener('bored:together-open',open);
+  window.addEventListener('bored:together-open', event => {
+    if (TOGETHER_GAMES[event.detail?.game]) { selectedGame = event.detail.game; if (owner) writeStored('bored.together.game.' + owner, selectedGame); back(); }
+    open();
+  });
   window.addEventListener('focus',()=>refresh());
   window.addEventListener('online',()=>refresh(true));
   window.addEventListener('hashchange',()=>{if(location.hash==='#together')open();else close();});

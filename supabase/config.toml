@@ -1,0 +1,2 @@
+[functions.together-pool]
+verify_jwt = true

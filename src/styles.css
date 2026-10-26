@@ -453,3 +453,26 @@ dialog{margin:auto}
   .bt-spotlight.has-turns .bt-start-game .bt-actions{margin:0}
   .bt-start-game .action{font-size:11px;padding:9px 10px}
 }
+/* A small paper label makes Together easier to spot in the main navigation. */
+.site-nav #together-nav{background:#ede5d7;border:1px solid #d3c4af;border-left:3px solid var(--red);border-radius:2px;color:var(--red);font-weight:600;padding:7px 10px;align-self:center}
+.site-nav #together-nav:hover,.site-nav #together-nav:focus-visible{background:#e5d9c7;text-decoration:none}
+.site-nav #together-nav[aria-current="page"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.bt-game-picker{display:flex;gap:12px;align-items:center;font:12px var(--mono);margin:0 0 18px}
+.bt-game-picker select{min-width:180px}
+.bt-mini-pool{width:76px;max-width:100%;height:auto;align-self:center;display:block}
+.bt-pool-table{width:100%;height:auto;display:block;touch-action:manipulation;cursor:crosshair;border-radius:3px}
+.bt-pool-score{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin:14px 0;font:11px/1.6 var(--mono)}
+.bt-pool-controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-top:18px}
+.bt-pool-controls label{font:12px var(--mono);display:flex;flex-direction:column;gap:8px;min-width:0}
+.bt-pool-controls input[type="number"]{width:110px;max-width:100%;border:1px solid var(--rule);background:var(--paper);color:var(--ink);padding:10px;font:14px var(--mono)}
+#together .bt-pool-controls input[type="range"]{margin:0;width:145px;height:38px}
+.bt-pool-controls button[aria-pressed="true"]{border-color:var(--ink);background:#e5d9c7}
+@media(max-width:480px){.site-nav #together-nav{padding:6px 8px}.bt-game-picker select{min-width:0;flex:1}.bt-pool-controls{gap:10px}.bt-pool-controls label{flex:1}.bt-pool-controls input[type="number"]{width:100%}#together .bt-pool-controls input[type="range"]{width:100%}.bt-pool-score{flex-direction:column}}
+
+@media(max-width:700px){
+  .bt-pool-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end}
+  .bt-pool-controls label{width:100%;min-width:0}
+  .bt-pool-controls input[type="number"],#together .bt-pool-controls input[type="range"]{width:100%}
+  .bt-pool-controls button{width:100%}
+  #bt-pool-shoot{grid-column:1/-1}
+}

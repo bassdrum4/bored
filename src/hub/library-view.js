@@ -145,7 +145,7 @@ function renderLibrary() {
       const together = element('button', 'catalog-together', 'Bored Together →');
       together.type = 'button';
       together.setAttribute('aria-label', 'Play ' + name + ' on Bored Together');
-      together.onclick = () => window.dispatchEvent(new Event('bored:together-open'));
+      together.onclick = () => window.dispatchEvent(new CustomEvent('bored:together-open', { detail: { game: slug } }));
       row.append(together);
     }
     gameGrid.appendChild(row);

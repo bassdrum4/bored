@@ -17,3 +17,8 @@ test('Together transport rejects guest requests and results from a previous iden
  await assert.rejects(pending,/account changed/);assert.equal(called,1);
  owner=null;await assert.rejects(rpc('dashboard'),/Sign in/);assert.equal(called,1);
 });
+test('pool shots use the authenticated Edge endpoint rather than accepting client results through the database RPC',async()=>{
+ const payload={match_id:'match',version:1,request_id:'request',move:{angle:0,power:80}};let seen;
+ const rpc=load({hasIdentity:()=>true,getSession:()=>({user:{id:'player'}}),freshSession:async()=>({user:{id:'player'},access_token:'token'}),request:async(path,options)=>{seen={path,options};return {ok:true};}});
+ await rpc('pool_move',payload);assert.equal(seen.path,'/functions/v1/together-pool');assert.deepEqual(seen.options.body,payload);assert.equal(seen.options.token,'token');
+});
