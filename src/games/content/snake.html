@@ -224,7 +224,7 @@ canvas.dim{opacity:.4}
   var state = "ready";            // ready | running | paused | over
   var snake = [];
   var dir = { x: 1, y: 0 };
-  var pending = null;
+  var turns = [];                 // buffered turns, oldest first (see queueDir)
   var apple = { x: 14, y: 10 };
   var score = 0;
   var stepMs = BASE_STEP;
@@ -514,9 +514,9 @@ canvas.dim{opacity:.4}
      SIMULATION
   ================================================================ */
   function tick() {
-    if (pending) {
-      if (!(pending.x === -dir.x && pending.y === -dir.y)) dir = pending;
-      pending = null;
+    if (turns.length) {
+      var next = turns.shift();
+      if (!(next.x === -dir.x && next.y === -dir.y)) dir = next;
     }
 
     var head = snake[0];
@@ -581,7 +581,7 @@ canvas.dim{opacity:.4}
       }
     }
     state = "running";
-    pending = null;
+    turns = [];
     acc = 0;
     lastTime = performance.now();
     launch.on = motionOn;
@@ -595,7 +595,7 @@ canvas.dim{opacity:.4}
   function resetGame() {
     snake = [{ x: 3, y: 10 }, { x: 2, y: 10 }, { x: 1, y: 10 }];
     dir = { x: 1, y: 0 };
-    pending = null;
+    turns = [];
     score = 0;
     stepMs = BASE_STEP;
     state = "ready";
@@ -634,7 +634,7 @@ canvas.dim{opacity:.4}
 
   function gameOver() {
     state = "over";
-    pending = null;
+    turns = [];
     overFx.on = motionOn;
     overFx.t0 = performance.now();
 
@@ -726,12 +726,15 @@ canvas.dim{opacity:.4}
   }
 
   /* ================================================================
-     INPUT — one global listener, one buffered turn
+     INPUT — one global listener, a short queue of turns
   ================================================================ */
   var DIRS = {
     up: { x: 0, y: -1 }, down: { x: 0, y: 1 },
     left: { x: -1, y: 0 }, right: { x: 1, y: 0 }
   };
+  // Two is enough to double back (up then left while travelling right) and to
+  // set up a corner without the snake dancing to keys pressed a second ago.
+  var QUEUE_MAX = 2;
   var KEYMAP = {
     arrowup: "up", arrowdown: "down", arrowleft: "left", arrowright: "right",
     w: "up", s: "down", a: "left", d: "right"
@@ -749,10 +752,14 @@ canvas.dim{opacity:.4}
     if (state === "over") return;
     if (state === "paused") return;
 
-    var travel = pending || dir;
-    if (nd.x === -travel.x && nd.y === -travel.y) return;   // no reversal
-    if (nd.x === travel.x && nd.y === travel.y) return;     // no duplicate
-    pending = nd;
+    // Judge the press against the last turn already waiting, not against the
+    // direction on screen. Pressing up then left while heading right used to
+    // overwrite the up with the left, which then looked like a reversal and was
+    // dropped, so the snake sailed on. Buffered, both turns happen in order.
+    var last = turns.length ? turns[turns.length - 1] : dir;
+    if (nd.x === -last.x && nd.y === -last.y) return;       // no reversal
+    if (nd.x === last.x && nd.y === last.y) return;         // no duplicate
+    if (turns.length < QUEUE_MAX) turns.push(nd);
   }
 
   window.addEventListener("keydown", function (e) {
@@ -875,6 +882,12 @@ canvas.dim{opacity:.4}
   document.addEventListener("visibilitychange", function () {
     if (document.hidden && state === "running") togglePause();
   });
+
+  /* Read-only: the browser suite checks the buffered turns here. */
+  window.__snake = {
+    dir: function () { return { x: dir.x, y: dir.y }; },
+    turns: function () { return turns.length; }
+  };
 
   /* ================================================================
      BOOT

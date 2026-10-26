@@ -510,6 +510,28 @@ test('browser regressions', async t => {
     await page.evaluate(() => localStorage.removeItem('bored.high.lights-out'));
   });
 
+  await t.test('Snake buffers two turns, so a quick up-left doubles it back', async () => {
+    const frame = await openTitle('snake', 'Snake');
+    await frame.waitForFunction(() => typeof window.__snake === 'object');
+    // One task: start heading right, then ask for up and left before a single
+    // tick can run. A one-slot buffer would keep only the left, see it as a
+    // reversal of "up" and drop it, and the snake would climb instead.
+    const queued = await frame.evaluate(() => {
+      const press = key => window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+      press('ArrowRight');
+      press('ArrowUp');
+      press('ArrowLeft');
+      const held = __snake.turns();
+      press('ArrowRight');             // reversal of the last buffered turn
+      return { held, afterReversal: __snake.turns() };
+    });
+    assert.equal(queued.held, 2, 'both quick presses are held');
+    assert.equal(queued.afterReversal, 2, 'a plain reversal is still refused');
+    // Right to left can only happen through both turns, one per move.
+    await frame.waitForFunction(() => __snake.dir().x === -1 && __snake.dir().y === 0, { timeout: 5000 });
+    await close();
+  });
+
   await t.test('Memory locks mismatches, clears pending timers on reset, and completes all pairs', async () => {
     const frame = await open('memory');
     await frame.click('.memory-card:nth-child(1)');
