@@ -140,7 +140,7 @@ gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXT
 function restartGame() {
   if (!activeSlug) return;
   if (activeTogether) { showHint('Your online game is saved. Exit and reopen it to reload.'); closeMenu(); return; }
-  captureBest();
+  captureBest({ leaving: true });
   closeMenu();
   analytics.end('restart');
   openGame(activeSlug, activeChallenge);
@@ -211,7 +211,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     const shelf = from.closest?.('#recent-list, #grid');
     launchSelector = shelf ? '#' + shelf.id + ' [data-slug="' + slug + '"]' : from.id ? '#' + from.id : '';
   }
-  if (activeSlug) { pollDaily(); captureBest(); }
+  if (activeSlug) { pollDaily(); captureBest({ leaving: true }); }
   const previousTogether = activeTogether;
   activeTogether = multiplayer;
   if (previousTogether && previousTogether !== multiplayer) previousTogether.dispose();
@@ -274,13 +274,19 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   document.body.classList.add('playing');
   clearTimeout(focusTimer);
   // Do not steal focus back while the player menu is open, or Esc and the
-  // arrow keys would go to the game instead of the menu.
-  focusTimer = setTimeout(() => { if (activeSlug === slug && menuPanel.hidden) gameFrame.focus(); }, 60);
+  // arrow keys would go to the game instead of the menu — and do not take it
+  // from the game itself: a drag begun in the first frame would be cancelled by
+  // the blur, which loses the putt (Minigolf drops a drag on window blur).
+  focusTimer = setTimeout(() => {
+    if (activeSlug === slug && menuPanel.hidden && document.activeElement !== gameFrame) gameFrame.focus();
+  }, 60);
 }
 
 function closeGame() {
   pollDaily();
-  captureBest();
+  // Leaving is not a pause: the run has ended as far as the player is concerned,
+  // so a spec that accumulates keeps what it has reached.
+  captureBest({ leaving: true });
   analytics.end('close');
   const claim = guestClaim;
   guestClaim = null;
@@ -346,17 +352,17 @@ function snapshotFor(slug) {
   }
 }
 
-function captureBest() {
+function captureBest({ leaving = false } = {}) {
   if (activeTogether) return false;
   if (!activeSlug || playerPanel.hidden) return false;
   const snapshot = snapshotFor(activeSlug);
-  const improved = snapshot ? recordBest(activeSlug, snapshot) : false;
+  const improved = snapshot ? recordBest(activeSlug, snapshot, { leaving }) : false;
   if (improved) {
     requestCloudPush();
     // A guest has no account to post under. Remember the run so leaving the
     // game can offer them one instead of quietly dropping the score.
     if (!hasIdentity()) {
-      const value = scoreValue(activeSlug, snapshot);
+      const value = scoreValue(activeSlug, snapshot, { leaving });
       if (value && !isLocalOnly(activeSlug)) guestClaim = { slug: activeSlug, value };
     }
   }

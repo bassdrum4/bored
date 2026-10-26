@@ -72,6 +72,15 @@ const LEGACY_GAMES = [
 
 // Games with a live snapshot: the hub stores the best value it sees for the
 // metric the backend accepts, then reads that like any other local best.
+//
+// `run` is the contract for a run that is still going when the player leaves:
+// `qualify` is a condition the run must always meet (a CPU opponent, a minimum
+// time), while `when` is the moment the hub will capture it during play. A spec
+// marked `resumable` counts on the way out even though `when` has not passed,
+// because the score it keeps is a running total — the points are already yours
+// half way through. Boards that rank *finishing* (a solved Wordle, the seconds
+// to clear Solitaire) are deliberately not resumable: a half-played board is
+// not a fast time, it is no time at all.
 const highScore = (id, name, unit, extra = {}) => ({
   id, name, unit, key: 'bored.high.' + id,
   ...extra,
@@ -80,9 +89,9 @@ const highScore = (id, name, unit, extra = {}) => ({
 
 export const HIGH_SCORE_GAMES = [
   // Block Blast counts the score of a run that ended with no piece left to place.
-  highScore('block-blast', 'Block Blast', 'points', { metric: 'score', when: snapshot => snapshot.finished === true }),
+  highScore('block-blast', 'Block Blast', 'points', { metric: 'score', when: snapshot => snapshot.finished === true, resumable: true }),
   // Chess counts the human's wins against the computer in a session, like Connect Four.
-  highScore('chess', 'Chess', 'wins', { metric: 'wins', when: snapshot => snapshot.cpu === true && snapshot.won === 1 }),
+  highScore('chess', 'Chess', 'wins', { metric: 'wins', qualify: snapshot => snapshot.cpu === true, when: snapshot => snapshot.won === 1, resumable: true }),
   // Mahjong ranks the pairs cleared from one deal; a half-finished board still counts.
   highScore('mahjong', 'Mahjong', 'pairs', { metric: 'pairs' }),
   highScore("minigolf", "Minigolf", "strokes", { metric: "strokes", when: snapshot => snapshot.finished === true, lower: true }),
@@ -92,9 +101,10 @@ export const HIGH_SCORE_GAMES = [
   highScore('tank2', 'Tank2', 'wins', { metric: 'won', when: snapshot => snapshot.cpu === true }),
   highScore('deep', 'DEEP', 'points', {
     metric: 'score',
-    // A descent only counts once it ends: the end-screen score carries the
-    // clear bonus, and an abandoned run should not post a partial score.
-    when: snapshot => snapshot.finished === true
+    // The end screen adds the clear bonus, so a finished descent is captured
+    // then; leaving part way through still keeps the points already earned.
+    when: snapshot => snapshot.finished === true,
+    resumable: true
   }),
   highScore('8ball', '8 Ball', 'balls', { metric: 'potted', when: snapshot => snapshot.cpu === true }),
   // These games keep a running score, so the board ranks that rather than the
@@ -175,12 +185,14 @@ export function formatScore(value, game) {
 /**
  * The number a snapshot would rank on, after `when`/`transform`, or 0 when the
  * run does not count. The hub uses it both to keep a best and to tell a guest
- * what they just scored.
+ * what they just scored. `leaving` says the player is walking out of the game,
+ * so a resumable spec keeps what the run has so far.
  */
-export function scoreValue(slug, snapshot) {
+export function scoreValue(slug, snapshot, { leaving = false } = {}) {
   const spec = highScoreSpec.get(slug);
   if (!spec || !snapshot || snapshot.slug !== slug) return 0;
-  if (spec.when && !spec.when(snapshot)) return 0;
+  if (spec.qualify && !spec.qualify(snapshot)) return 0;
+  if (spec.when && !spec.when(snapshot) && !(leaving && spec.resumable)) return 0;
   const value = spec.transform ? spec.transform(snapshot) : Number(snapshot[spec.metric]);
   if (!Number.isFinite(value)) return 0;
   const rounded = Math.round(value);
@@ -192,9 +204,9 @@ export function scoreValue(slug, snapshot) {
  * local best improved, which is also the moment the shared board should learn
  * about it rather than waiting for the player to leave the game.
  */
-export function recordBest(slug, snapshot) {
+export function recordBest(slug, snapshot, options) {
   const spec = highScoreSpec.get(slug);
-  const value = scoreValue(slug, snapshot);
+  const value = scoreValue(slug, snapshot, options);
   if (!spec || !value) return false;
   const previous = readNumber(spec.key);
   if (previous && (spec.lower ? value >= previous : value <= previous)) return false;

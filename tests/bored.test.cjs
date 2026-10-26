@@ -989,8 +989,8 @@ test('browser regressions', async t => {
     await page.evaluate(() => localStorage.removeItem('bored.high.8ball'));
   });
 
-  await t.test('game scores feed the high-score entries without counting unfinished runs', async () => {
-    const keys = ['tetris', 'wordle', '8ball', 'poker', 'deep'].map(id => 'bored.high.' + id);
+  await t.test('game scores feed the high-score entries, and leaving keeps the run', async () => {
+    const keys = ['tetris', 'wordle', '8ball', 'poker', 'deep', 'block-blast'].map(id => 'bored.high.' + id);
     await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
     try {
       let frame = await openTitle('tetris', 'Tetris');
@@ -1047,12 +1047,22 @@ test('browser regressions', async t => {
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.poker')), '500');
 
-      // DEEP only counts a descent that ended, and keeps its clear bonus.
+      // Leaving a game keeps what the run has reached: Esc or the way back to
+      // the hub ends the run, so a live score is the score. Block Blast is the
+      // case that prompted this — walking out used to keep only the last lost game.
+      frame = await openTitle('block-blast', 'Block Blast');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'block-blast', score: 120, lines: 2, finished: false }); });
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.block-blast')), '120', 'a run in progress keeps its score on the way out');
+
+      // DEEP keeps its clear bonus when a descent ends, and still keeps the
+      // points already earned when the player leaves part way down.
       frame = await openTitle('deep', 'DEEP');
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
       await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'deep', score: 900, finished: false }); });
       await close();
-      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), null, 'an abandoned descent does not post');
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.deep')), '900', 'an abandoned descent keeps the points earned so far');
       frame = await openTitle('deep', 'DEEP');
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
       await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'deep', score: 2402, finished: true }); });
