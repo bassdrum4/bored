@@ -78,10 +78,13 @@ test('Together production SQL: consent, directory, blocks, moves, duels and rete
     await assert.rejects(call(db,b,'match',{match_id:started.id}),/unavailable/);
     await assert.rejects(call(db,c,'match',{match_id:started.id}),/unavailable/);
     await assert.rejects(move(db,started,b,0),/unavailable/);
-    // A second game with the same person names the one to finish instead of
-    // leaking the unique index's duplicate-key error.
-    await assert.rejects(call(db,a,'challenge',{user_id:b}),/already have a Connect Four game with BananaWizard/);
-    await assert.rejects(call(db,b,'challenge',{user_id:a}),/already have a Connect Four game with WackyPenguin/);
+    // Both directions can start independent games of the same type.
+    const parallel=await call(db,a,'challenge',{user_id:b});
+    const reverse=await call(db,b,'challenge',{user_id:a});
+    assert.equal(new Set([started.id,parallel.id,reverse.id]).size,3);
+    assert.equal(parallel.turn_user,a);assert.equal(reverse.turn_user,b);
+    await call(db,b,'delete',{match_id:parallel.id});
+    await call(db,a,'delete',{match_id:reverse.id});
     let m=await move(db,started,a,0);
     const delivered=(await dashboard(db,b)).matches.find(x=>x.id===m.id);
     assert.equal(delivered.status,'active');assert.equal(delivered.turn_user,b);

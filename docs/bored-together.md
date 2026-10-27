@@ -290,3 +290,13 @@ database; the test refuses an occupied database. Never use production.
 No test creates student accounts, memberships or demo matches in production.
 A real Google Sites page and real external Auth providers are not controlled
 by this suite; the nested-frame and two-account tests are local equivalents.
+
+### Multiple games with one opponent
+
+Each direct challenge creates an independent match, including when another game
+of that type is already open with that opponent. Both players may initiate
+separate games. The former unique pair index is now an ordinary lookup index;
+match IDs, move request IDs, turn validation and rate limits remain enforced.
+Each new game opens for its creator's first turn. Either participant can use
+More → Delete game to remove the selected game for both without affecting other
+games with that opponent or awarding a win.

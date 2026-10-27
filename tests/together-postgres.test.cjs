@@ -85,6 +85,15 @@ test('native PostgreSQL: competing moves, queues, crossed requests and leave rac
   const competing=await Promise.allSettled([poolCommit(randomUUID()),poolCommit(randomUUID())]);
   assert.equal(competing.filter(r=>r.status==='fulfilled').length,1);
   assert.equal((await admin.query('select count(*)::int n from bored_together.moves where match_id=$1',[poolMatch.id])).rows[0].n,1);
+  // Concurrent same-type challenges must not collide or share state.
+  const parallel=await Promise.all([rpc(a,'challenge',{user_id:b}),rpc(a,'challenge',{user_id:b}),rpc(b,'challenge',{user_id:a})]);
+  assert.equal(new Set(parallel.map(m=>m.id)).size,3);
+  const opening=await rpc(a,'move',{match_id:parallel[0].id,version:parallel[0].version,column:3,request_id:randomUUID()});
+  assert.equal(opening.turn_user,b);
+  const untouched=await rpc(a,'match',{match_id:parallel[1].id});
+  assert.equal(untouched.state.board.filter(Boolean).length,0);
+  await rpc(b,'delete',{match_id:parallel[0].id});
+  assert.ok(!(await rpc(a,'dashboard')).matches.some(m=>m.id===parallel[0].id));
   const f=await admin.query("select prosrc from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='bored_together' and proname='api'");
   assert.match(f.rows[0].prosrc,/pg_advisory_xact_lock/);
 });
