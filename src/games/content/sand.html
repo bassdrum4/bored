@@ -285,7 +285,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 disabled>Reset</button></div>
         <div class="btn-row"><button class="btn" id="clearBtn">Clear</button><button class="btn"
                 id="pauseBtn">Pause</button></div>
-        <div id="help">Left click &mdash; draw<br>Right click &mdash; erase<br>Space &mdash; pause<br>1&ndash;0
+        <div id="help">Left click &mdash; draw<br>Right click &mdash; erase<br>Wind &mdash; drag to aim<br>Mites &mdash; eat plants<br>Space &mdash; pause<br>1&ndash;0
             Q/W/E/R/T/Y/U/A/S/D/G/H/N/I/B/C/V/Z/X &mdash; select</div>
     </aside>
     <main id="main">
@@ -304,7 +304,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 MUD = 14, SALT = 15, GOLD = 16, METHANE = 17,
                 COAL = 18, DUST = 19, TAR = 20, VINE = 21, ELECTRICITY = 22, SODIUM = 23,
                 IRON = 24, TNT = 25, NITROGEN = 26, CLONER = 27, DESTAT = 28, OBSIDIAN = 29,
-                STOVE = 30, PAN = 31, FLOUR = 32, EGG = 33, DOUGH = 34, BREAD = 35, SUGAR = 36, CARAMEL = 37, FAN_LEFT = 38, FAN_RIGHT = 39;
+                STOVE = 30, PAN = 31, FLOUR = 32, EGG = 33, DOUGH = 34, BREAD = 35, SUGAR = 36, CARAMEL = 37, WIND = 38, MITE = 39;
 
             const ELEMENTS = [
                 { id: SAND, name: 'Sand', color: [194, 178, 128], key: '1', cat: 'Powders', desc: 'Falls and piles, absorbs water into mud' },
@@ -334,10 +334,10 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 { id: METHANE, name: 'Methane', color: [60, 70, 50], key: 'u', cat: 'Gases', desc: 'Flammable gas — explodes near fire' },
                 { id: ELECTRICITY, name: 'Electricity', color: [255, 255, 100], key: 'h', cat: 'Gases', desc: 'Spark — charges water/gold, ignites materials' },
                 { id: NITROGEN, name: 'Nitrogen', color: [180, 220, 255], key: 'c', cat: 'Gases', desc: 'Cryogenic gas — freezes water/lava/mud, extinguishes fire' },
+                { id: WIND, name: 'Wind', color: [100, 190, 210], key: ',', cat: 'Gases', desc: 'Paint a breeze: gusts follow your drag direction and push smoke, dust, and water' },
                 { id: CLONER, name: 'Cloner', color: [130, 60, 200], key: 'v', cat: 'Tools', desc: 'Absorbs first falling particle it touches, emits clones above and below' },
                 { id: DESTAT, name: 'Destat', color: [60, 180, 120], key: 'z', cat: 'Tools', desc: 'Neutralizes electrified elements on contact — drains charged water, gold, and iron' },
-                { id: FAN_LEFT, name: 'Fan ←', color: [80, 165, 175], key: ',', cat: 'Tools', desc: 'Place an anchored fan blowing left: pushes gas and light liquid' },
-                { id: FAN_RIGHT, name: 'Fan →', color: [80, 165, 175], key: '.', cat: 'Tools', desc: 'Place an anchored fan blowing right: pushes gas and light liquid' },
+                { id: MITE, name: 'Mites', color: [215, 155, 85], key: '.', cat: 'Tools', desc: 'Tiny decomposers: crawl toward plants and crumbs, eat, multiply, and avoid fire or water' },
                 { id: EMPTY, name: 'Eraser', color: [50, 46, 40], key: 'x', cat: 'Tools', desc: 'Removes elements' },
                 { id: STOVE, name: 'Stove', color: [180, 60, 20], key: 'j', cat: 'Cooking', cooking: true, desc: 'Constant heat source — warms everything above it' },
                 { id: PAN, name: 'Pan', color: [90, 85, 80], key: 'k', cat: 'Cooking', cooking: true, desc: 'Heavy cookware — conducts and holds heat, cooks things placed in it' },
@@ -356,7 +356,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             DENSITY[MUD] = 5; DENSITY[ACID] = 5;
             DENSITY[SAND] = 6; DENSITY[GUNPOWDER] = 6; DENSITY[SALT] = 6; DENSITY[COAL] = 6; DENSITY[TAR] = 6; DENSITY[SODIUM] = 6;
             DENSITY[LAVA] = 8; DENSITY[ICE] = 10; DENSITY[PLANT] = 10;
-            DENSITY[WOOD] = 10; DENSITY[STONE] = 10; DENSITY[VINE] = 10; DENSITY[GOLD] = 15; DENSITY[FAN_LEFT] = 10; DENSITY[FAN_RIGHT] = 10;
+            DENSITY[WOOD] = 10; DENSITY[STONE] = 10; DENSITY[VINE] = 10; DENSITY[GOLD] = 15; DENSITY[WIND] = .2; DENSITY[MITE] = 6;
             DENSITY[IRON] = 15; DENSITY[TNT] = 10; DENSITY[CLONER] = 10; DENSITY[DESTAT] = 10; DENSITY[OBSIDIAN] = 10;
             DENSITY[STOVE] = 10; DENSITY[PAN] = 10; DENSITY[FLOUR] = 6; DENSITY[EGG] = 4; DENSITY[DOUGH] = 5; DENSITY[BREAD] = 10; DENSITY[SUGAR] = 6; DENSITY[CARAMEL] = 6;
 
@@ -375,21 +375,38 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             const grid = new Uint8Array(COLS * ROWS), gLife = new Uint8Array(COLS * ROWS), gMove = new Uint8Array(COLS * ROWS), gExtra = new Uint8Array(COLS * ROWS), gTemp = new Uint8Array(COLS * ROWS);
             let frame = 0, flashIntensity = 0;
 
-            let savedGrid = null, savedLife = null;
+            let savedGrid = null, savedLife = null, savedExtra = null, savedTemp = null;
             document.getElementById('saveBtn').addEventListener('click', () => {
                 savedGrid = new Uint8Array(grid); savedLife = new Uint8Array(gLife);
+                savedExtra = new Uint8Array(gExtra); savedTemp = new Uint8Array(gTemp);
                 document.getElementById('resetBtn').disabled = false;
             });
             document.getElementById('resetBtn').addEventListener('click', () => {
-                if (savedGrid) { grid.set(savedGrid); gLife.set(savedLife); gMove.fill(0); gExtra.fill(0); gTemp.fill(0); }
+                if (savedGrid) {
+                    grid.set(savedGrid); gLife.set(savedLife); gExtra.set(savedExtra);
+                    gTemp.set(savedTemp); gMove.fill(0);
+                }
             });
 
             const I = (x, y) => y * COLS + x, ok = (x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS;
             const cl = (v, a, b) => v < a ? a : v > b ? b : v, rnd = (a, b) => (Math.random() * (b - a + 1) | 0) + a;
             function hash(x, y) { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return (h ^ (h >> 16)) >>> 0; }
 
-            function moveTo(x1, y1, x2, y2) { const a = I(x1, y1), b = I(x2, y2); grid[b] = grid[a]; grid[a] = EMPTY; gLife[b] = gLife[a]; gLife[a] = 0; gMove[b] = 1; }
-            function swapC(x1, y1, x2, y2) { const a = I(x1, y1), b = I(x2, y2); let t = grid[a]; grid[a] = grid[b]; grid[b] = t; t = gLife[a]; gLife[a] = gLife[b]; gLife[b] = t; gMove[b] = 1; }
+            function moveTo(x1, y1, x2, y2) {
+                const a = I(x1, y1), b = I(x2, y2);
+                grid[b] = grid[a]; grid[a] = EMPTY;
+                gLife[b] = gLife[a]; gLife[a] = 0;
+                // Direction (wind), age (mite) and other per-particle state
+                // must travel with the particle, not stay on the old cell.
+                gExtra[b] = gExtra[a]; gExtra[a] = 0; gMove[b] = 1;
+            }
+            function swapC(x1, y1, x2, y2) {
+                const a = I(x1, y1), b = I(x2, y2);
+                let t = grid[a]; grid[a] = grid[b]; grid[b] = t;
+                t = gLife[a]; gLife[a] = gLife[b]; gLife[b] = t;
+                t = gExtra[a]; gExtra[a] = gExtra[b]; gExtra[b] = t;
+                gMove[a] = 1; gMove[b] = 1;
+            }
             function fallTo(x, y, dx, dy) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) return false; const tgt = grid[I(nx, ny)]; if (tgt === EMPTY) { moveTo(x, y, nx, ny); return true; } const me = grid[I(x, y)]; if (DENSITY[me] > DENSITY[tgt] && DENSITY[tgt] < 10) { swapC(x, y, nx, ny); return true; } return false; }
             function slideTo(x, y, dx, dy) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny) || grid[I(nx, ny)] !== EMPTY) return false; moveTo(x, y, nx, ny); return true; }
 
@@ -939,34 +956,136 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 if (Math.random() < .15) { const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1); }
             }
 
-            /* ── Fans ── */
-            // Local row-only airflow: rigid barriers stop it, gases move quickly,
-            // and water/oil/acid move more slowly. Move far cells first to avoid
-            // moving a single particle multiple times during one tick.
-            const AIRBORNE = new Set([SMOKE, STEAM, FIRE, METHANE, NITROGEN, ELECTRICITY]);
-            const FAN_LIQUIDS = new Set([WATER, OIL, ACID]);
-            function updFan(x, y, dir) {
-                let reach = 0;
-                for (let step = 1; step <= 9; step++) {
-                    const nx = x + dir * step;
-                    if (!ok(nx, y)) break;
-                    const material = grid[I(nx, y)];
-                    if (material !== EMPTY && !AIRBORNE.has(material) && !FAN_LIQUIDS.has(material)) break;
-                    reach = step;
+            /* ── Wind ── */
+            // Wind is a fleeting gas-like particle, not a stationary machine.
+            // The direction is stored in gExtra (1..8), set by the direction
+            // the player dragged. A gust carries its direction as it travels.
+            const WIND_DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1],
+                               [-1, 0], [-1, -1], [0, -1], [1, -1]];
+            const WIND_BLOWN = new Set([SMOKE, STEAM, FIRE, METHANE, NITROGEN,
+                                        ELECTRICITY, DUST, MITE]);
+            const WIND_LIQUIDS = new Set([WATER, OIL, ACID]);
+            function windHeading(dx, dy) {
+                if (!dx && !dy) return 1;
+                return ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8) + 1;
+            }
+            function updWind(x, y) {
+                const i = I(x, y);
+                if (gMove[i]) return;
+                if (gLife[i] <= 1) {
+                    grid[i] = EMPTY; gLife[i] = 0; gExtra[i] = 0;
+                    return;
                 }
-                for (let step = reach; step >= 1; step--) {
-                    const tx = x + dir * step, nx = tx + dir, i = I(tx, y);
-                    const material = grid[i];
-                    if (gMove[i] || !ok(nx, y) || grid[I(nx, y)] !== EMPTY) continue;
-                    if (AIRBORNE.has(material) || (FAN_LIQUIDS.has(material) && Math.random() < .2)) {
-                        moveTo(tx, y, nx, y);
+                gLife[i]--;
+                const heading = ((gExtra[i] || 1) - 1) % 8;
+                const [dx, dy] = WIND_DIRS[heading];
+                const nx = x + dx, ny = y + dy;
+                if (ok(nx, ny)) {
+                    const ni = I(nx, ny), target = grid[ni];
+                    if (target === EMPTY) { moveTo(x, y, nx, ny); return; }
+                    // Push lightweight material into an empty slot; gases and
+                    // mites blow readily, liquids only with a stronger gust.
+                    const bx = nx + dx, by = ny + dy;
+                    if (ok(bx, by) && grid[I(bx, by)] === EMPTY &&
+                        (WIND_BLOWN.has(target) || (WIND_LIQUIDS.has(target) && Math.random() < .28))) {
+                        moveTo(nx, ny, bx, by);
+                        moveTo(x, y, nx, ny);
+                        return;
                     }
                 }
+                // A wall breaks up the gust; occasionally curl around corners.
+                const side = (frame + x + y) % 2 ? 1 : -1;
+                for (const turn of [side, -side]) {
+                    const [sx, sy] = WIND_DIRS[(heading + turn * 2 + 8) % 8];
+                    if (ok(x + sx, y + sy) && grid[I(x + sx, y + sy)] === EMPTY) {
+                        gLife[i] = Math.max(1, gLife[i] - 2);
+                        moveTo(x, y, x + sx, y + sy);
+                        return;
+                    }
+                }
+                gLife[i] = Math.max(1, gLife[i] - 5);
+            }
+
+            /* ── Mites ── */
+            // Mites are tiny decomposers: plant matter and crumbs feed them;
+            // eating leaves compost (mud/dust), high energy supports offspring.
+            // Fire, acid and deep water kill them. Hunger limits population.
+            const MITE_FOOD = new Set([PLANT, VINE, BREAD, SUGAR, FLOUR, DOUGH, WOOD]);
+            const MITE_NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1],
+                                    [1, 1], [-1, 1], [1, -1], [-1, -1]];
+            const MITE_LIMIT = 300;
+            let mitePopulation = 0;
+            function updMite(x, y) {
+                const i = I(x, y);
+                if (gMove[i]) return;
+                gExtra[i] = Math.min(250, gExtra[i] + 1);
+                if (frame % 8 === 0) gLife[i] = Math.max(0, gLife[i] - 1);
+                if (gLife[i] === 0) {
+                    grid[i] = DUST; gExtra[i] = 0; gMove[i] = 1;
+                    return;
+                }
+                const adjacent = [];
+                for (const [dx, dy] of MITE_NEIGHBORS) {
+                    const nx = x + dx, ny = y + dy;
+                    if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), t = grid[ni];
+                    if (t === FIRE || t === LAVA || t === ACID ||
+                        (t === WATER && Math.random() < .17)) {
+                        grid[i] = DUST; gLife[i] = 0; gExtra[i] = 0; gMove[i] = 1;
+                        return;
+                    }
+                    adjacent.push([nx, ny, t]);
+                }
+                // A mite needs food to reproduce; one particle of foliage or
+                // bread becomes compost. Don't eat on every tick.
+                if ((frame + i) % 4 === 0) {
+                    const meal = adjacent.find(([, , t]) => MITE_FOOD.has(t));
+                    if (meal) {
+                        const [fx, fy, food] = meal, fi = I(fx, fy);
+                        grid[fi] = food === PLANT || food === VINE ? MUD : DUST;
+                        gLife[fi] = 0; gExtra[fi] = 0; gMove[fi] = 1;
+                        gLife[i] = Math.min(240, gLife[i] + 27);
+                        if (gLife[i] >= 112 && gExtra[i] >= 24 &&
+                            mitePopulation < MITE_LIMIT && Math.random() < .09) {
+                            const spot = adjacent.find(([, , t]) => t === EMPTY);
+                            if (spot) {
+                                const bi = I(spot[0], spot[1]);
+                                grid[bi] = MITE; gLife[bi] = 54;
+                                gExtra[bi] = 0; gMove[bi] = 1;
+                                gLife[i] -= 52; mitePopulation++;
+                            }
+                        }
+                    }
+                }
+                // Crawl every other tick, following the scent of nearby food.
+                // Mites that cannot find food wander and eventually starve.
+                if ((frame + x + y) % 2 !== 0) return;
+                let target = null, bestFood = 99;
+                for (let dy = -3; dy <= 3; dy++)for (let dx = -3; dx <= 3; dx++) {
+                    const nx = x + dx, ny = y + dy;
+                    if (!ok(nx, ny) || !MITE_FOOD.has(grid[I(nx, ny)])) continue;
+                    const distance = Math.abs(dx) + Math.abs(dy);
+                    if (distance < bestFood) { bestFood = distance; target = [nx, ny]; }
+                }
+                let options = adjacent.filter(([, , t]) => t === EMPTY);
+                if (!options.length) return;
+                if (target) options.sort((a, b) =>
+                    (Math.abs(a[0] - target[0]) + Math.abs(a[1] - target[1])) -
+                    (Math.abs(b[0] - target[0]) + Math.abs(b[1] - target[1])));
+                else options.sort((a, b) => (a[1] === y + 1 ? -1 : 0) - (b[1] === y + 1 ? -1 : 0));
+                const choice = target && Math.random() < .86
+                    ? options[0] : options[Math.floor(Math.random() * Math.min(4, options.length))];
+                moveTo(x, y, choice[0], choice[1]);
             }
 
             /* ── Simulation ── */
             function simulate() {
                 gMove.fill(0);
+                // Amortized count avoids runaway reproduction on dense gardens.
+                if (frame % 40 === 0) {
+                    mitePopulation = 0;
+                    for (let i = 0; i < grid.length; i++) if (grid[i] === MITE) mitePopulation++;
+                }
                 for (let y = ROWS - 1; y >= 0; y--) {
                     const ltr = frame % 2 === 0;
                     for (let j = 0; j < COLS; j++) {
@@ -989,8 +1108,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                             case NITROGEN: updNitrogen(x, y); break;
                             case CLONER: updCloner(x, y); break;
                             case DESTAT: updDestat(x, y); break;
-                            case FAN_LEFT: updFan(x, y, -1); break;
-                            case FAN_RIGHT: updFan(x, y, 1); break;
+                            case WIND: updWind(x, y); break;
+                            case MITE: updMite(x, y); break;
                             case STOVE: updStove(x, y); break;
                             case PAN: updPan(x, y); break;
                             case FLOUR: updFlour(x, y); break;
@@ -1059,8 +1178,18 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                         return [100, 30, 180];
                     }
                     case DESTAT: { const pulse = ((frame * 2 + x * 5 + y * 7) % 16) - 8; return [cl(50 + pulse, 0, 255), cl(175 + pulse, 0, 255), cl(110 + pulse, 0, 255)]; }
-                    case FAN_LEFT: return (x % 3 === 0) ? [145, 215, 215] : [45, 95, 105];
-                    case FAN_RIGHT: return (x % 3 === 2) ? [145, 215, 215] : [45, 95, 105];
+                    case WIND: {
+                        const fade = gLife[I(x, y)] / 55;
+                        const ripple = ((h + frame * 9) % 21) - 10;
+                        return [cl(16 + fade * 56 + ripple, 0, 255),
+                                cl(25 + fade * 95 + ripple, 0, 255),
+                                cl(32 + fade * 114 + ripple, 0, 255)];
+                    }
+                    case MITE: {
+                        const step = ((frame >> 2) + h) % 4;
+                        return [cl(158 + step * 12 + v, 0, 255),
+                                cl(83 + step * 14 + v, 0, 255), cl(39 + v, 0, 255)];
+                    }
                     case OBSIDIAN: { const cr = (h % 16) - 8; return [cl(28 + cr, 0, 255), cl(18 + cr, 0, 255), cl(42 + cr, 0, 255)]; }
                     case STOVE: { const t = gTemp[I(x, y)] / 245, f = ((frame * 3 + x * 7 + y * 5) % 12) - 6; return [cl(Math.round(120 + t * 135) + f, 0, 255), cl(Math.round(30 + t * 30) + f, 0, 255), cl(Math.round(10 + t * 10), 0, 255)]; }
                     case PAN: { const t = gTemp[I(x, y)] / 240, f = ((frame * 2 + x * 5 + y * 7) % 8) - 4; if (t > .4) { return [cl(Math.round(90 + t * 120) + f, 0, 255), cl(Math.round(85 + t * 40) + f, 0, 255), cl(Math.round(80) + f, 0, 255)]; } return [cl(88 + v, 0, 255), cl(83 + v, 0, 255), cl(78 + v, 0, 255)]; }
@@ -1082,6 +1211,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 else if (t === STEAM) gLife[i] = rnd(30, 60);
                 else if (t === ELECTRICITY) gLife[i] = rnd(30, 50);
                 else if (t === NITROGEN) gLife[i] = rnd(80, 160);
+                else if (t === WIND) { gLife[i] = rnd(32, 55); gExtra[i] = windDirection; }
+                else if (t === MITE) gLife[i] = rnd(60, 100);
                 else gLife[i] = 0;
             }
 
@@ -1103,7 +1234,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             }
 
             // dirty-rect: only recompute cells that changed or are animated
-            const ANIMATED_TYPES = new Set([FIRE, SMOKE, STEAM, LAVA, ELECTRICITY, ACID, NITROGEN, METHANE, WATER, GOLD, CLONER, DESTAT, SODIUM, IRON, COAL, STOVE, PAN, EGG, CARAMEL, DOUGH]);
+            const ANIMATED_TYPES = new Set([FIRE, SMOKE, STEAM, LAVA, ELECTRICITY, ACID, NITROGEN, METHANE, WATER, GOLD, CLONER, DESTAT, SODIUM, IRON, COAL, STOVE, PAN, EGG, CARAMEL, DOUGH, WIND, MITE]);
             const GLOW_TYPES = new Set([FIRE, LAVA, ELECTRICITY, NITROGEN]);
             const prevGrid = new Uint8Array(COLS * ROWS);
             const prevLife = new Uint8Array(COLS * ROWS);
@@ -1167,12 +1298,15 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
             let selected = SAND, brushSize = 3, painting = false, lastMX = -1, lastMY = -1, eraseMode = false, paused = false, simSpeed = 1.0, simAccum = 0, cursorCX = -1, cursorCY = -1;
             let currentMode = 'brush'; // 'brush', 'rect', 'fill'
+            let windDirection = 1; // right by default; updated from mouse/touch drag
             let rectStartX = -1, rectStartY = -1, rectEndX = -1, rectEndY = -1;
 
             function paintAt(cx, cy) {
                 const r = brushSize >> 1, t = eraseMode ? EMPTY : selected;
                 for (let dy = -r; dy <= r; dy++)for (let dx = -r; dx <= r; dx++) {
                     if (dx * dx + dy * dy > r * r + 1) continue; const x = cx + dx, y = cy + dy; if (!ok(x, y)) continue; const i = I(x, y);
+                    // A gust passes through air; don't overwrite existing terrain.
+                    if (t === WIND && grid[i] !== EMPTY && grid[i] !== WIND) continue;
                     initCell(i, t);
                 }
             }
@@ -1202,6 +1336,9 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 if (!painting) return;
                 const [x, y] = cell(e);
                 if (currentMode === 'brush') {
+                    if (!eraseMode && selected === WIND && lastMX >= 0 &&
+                        (x !== lastMX || y !== lastMY))
+                        windDirection = windHeading(x - lastMX, y - lastMY);
                     if (lastMX >= 0) bresenham(lastMX, lastMY, x, y, paintAt);
                     else paintAt(x, y);
                 } else if (currentMode === 'rect') {
@@ -1241,6 +1378,9 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 if (!painting) return;
                 const t = e.touches[0], [x, y] = cell(t);
                 if (currentMode === 'brush') {
+                    if (!eraseMode && selected === WIND && lastMX >= 0 &&
+                        (x !== lastMX || y !== lastMY))
+                        windDirection = windHeading(x - lastMX, y - lastMY);
                     if (lastMX >= 0) bresenham(lastMX, lastMY, x, y, paintAt);
                     else paintAt(x, y);
                 } else if (currentMode === 'rect') {
@@ -1272,7 +1412,11 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 btn.title = el.desc; btn.addEventListener('click', () => selElem(idx)); elemDiv.appendChild(btn); btns.push(btn);
                 if (el.cooking) cookingEls.push(btn);
             });
-            function selElem(i) { btns.forEach(b => b.classList.remove('active')); btns[i].classList.add('active'); selected = ELEMENTS[i].id; eraseMode = false; }
+            function selElem(i) {
+                btns.forEach(b => b.classList.remove('active'));
+                btns[i].classList.add('active'); selected = ELEMENTS[i].id; eraseMode = false;
+                if (selected === WIND) setMode('brush');
+            }
             document.addEventListener('keydown', e => { if (e.repeat) return; const i = ELEMENTS.findIndex(el => el.key === e.key.toLowerCase() && (!el.cooking || cookingUnlocked)); if (i >= 0) selElem(i); if (e.key === ' ') { e.preventDefault(); paused = !paused; document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause'; } });
 
             // secret unlock: click title 6 times
@@ -1289,9 +1433,10 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             });
 
             function setMode(mode) {
-                currentMode = mode;
+                // A gust needs a direction, so rectangular/flood wind isn't useful.
+                currentMode = selected === WIND ? 'brush' : mode;
                 ['modeBrush', 'modeRect', 'modeFill'].forEach(id => {
-                    document.getElementById(id).classList.toggle('active', id.toLowerCase().endsWith(mode));
+                    document.getElementById(id).classList.toggle('active', id.toLowerCase().endsWith(currentMode));
                 });
             }
             document.getElementById('modeBrush').addEventListener('click', () => setMode('brush'));
@@ -1301,7 +1446,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             document.getElementById('bs').addEventListener('input', e => { brushSize = +e.target.value; document.getElementById('bsVal').textContent = brushSize; });
             document.getElementById('sp').addEventListener('input', e => { simSpeed = +e.target.value / 10; document.getElementById('spVal').textContent = simSpeed.toFixed(1) + 'x'; });
 
-            document.getElementById('clearBtn').addEventListener('click', () => { grid.fill(0); gLife.fill(0); gExtra.fill(0); gTemp.fill(0); });
+            document.getElementById('clearBtn').addEventListener('click', () => { grid.fill(0); gLife.fill(0); gMove.fill(0); gExtra.fill(0); gTemp.fill(0); mitePopulation = 0; });
 
             document.getElementById('pauseBtn').addEventListener('click', () => { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause'; });
 
