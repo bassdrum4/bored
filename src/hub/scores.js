@@ -98,7 +98,7 @@ export const HIGH_SCORE_GAMES = [
   // available for daily challenges, but partial deals are not speed records.
   highScore('mahjong', 'Mahjong', 'seconds', {
     metric: 'seconds', lower: true, min: 60, max: 86400,
-    key: 'bored.high.mahjong-time-v3',
+    key: 'bored.high.mahjong-time-v4',
     when: snapshot => snapshot.won === true && snapshot.finished === true && snapshot.total === 144 && snapshot.pairs === 72
   }),
   highScore("minigolf", "Minigolf", "strokes", { metric: "strokes", when: snapshot => snapshot.finished === true, lower: true }),
@@ -136,7 +136,7 @@ export const HIGH_SCORE_GAMES = [
     lower: true,
     when: snapshot => snapshot.won === true && snapshot.cards === 52 && snapshot.moves >= 52,
     // Ignore implausible times and legacy scores from the pausable timer.
-    min: 20, max: 86400, key: 'bored.high.solitaire-wall-v3',
+    min: 20, max: 86400, key: 'bored.high.solitaire-wall-v4',
     note: 'Fastest clear of all 52 cards'
   }),
   highScore('lights-out', 'Lights Out', 'boards', { metric: 'cleared' }),
@@ -192,7 +192,13 @@ export function boardGames() {
 }
 
 export function bestValue(game) {
-  return game.read ? game.read() : readNumber(game.key);
+  const value = game.read ? game.read() : readNumber(game.key);
+  // Cloud restores or older releases may have put incompatible values in
+  // local storage. Ignore them so a real win can replace the corrupt best.
+  if (!Number.isFinite(value) || value <= 0 ||
+      (Number.isFinite(game.min) && value < game.min) ||
+      (Number.isFinite(game.max) && value > game.max)) return 0;
+  return value;
 }
 
 export function formatScore(value, game) {
