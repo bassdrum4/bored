@@ -13,7 +13,7 @@
   "gun-mayhem": { "label": "Rounds won", "better": "high", "max_value": 99 },
   "lava": { "label": "Points", "better": "high", "max_value": 999 },
   "lights-out": { "label": "Boards cleared", "better": "high", "max_value": 999 },
-  "mahjong": { "label": "Pairs matched in one deal", "better": "high", "max_value": 72 },
+  "mahjong": { "label": "Seconds to clear all 144 tiles", "better": "low", "max_value": 86400 },
   "memory": { "label": "Fewest moves to finish a board", "better": "low", "max_value": 10000 },
   "minesweeper": { "label": "Seconds to clear a board", "better": "low", "max_value": 99999 },
   "minigolf": { "label": "Strokes over nine holes", "better": "low", "max_value": 9999 },
