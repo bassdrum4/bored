@@ -9,7 +9,7 @@ const load = path => fs.readFileSync(require('node:path').join(root, path), 'utf
 function extractFunction(source, name) {
   const start = source.indexOf('function ' + name + '(');
   assert.ok(start >= 0, name + ' exists');
-  const first = source.indexOf('{', start);
+  const first = source.indexOf('{', source.indexOf(') {', start));
   let depth = 1, end = first + 1;
   while (depth > 0 && end < source.length) {
     if (source[end] === '{') depth++;
