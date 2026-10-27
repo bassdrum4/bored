@@ -49,8 +49,8 @@ test('cloud merge retains independent bests, days, and favorite removals', () =>
 test('speedrun cloud score versions preserve legacy records without restoring their units', () => {
   const { cloudScoreKey, mergeCloudState } =
     moduleUnderTest('src/hub/cloud.js', ['cloudScoreKey', 'mergeCloudState']);
-  assert.equal(cloudScoreKey('solitaire'), 'solitaire:wall-v3');
-  assert.equal(cloudScoreKey('mahjong'), 'mahjong:time-v3');
+  assert.equal(cloudScoreKey('solitaire'), 'solitaire:wall-v4');
+  assert.equal(cloudScoreKey('mahjong'), 'mahjong:time-v4');
   assert.equal(cloudScoreKey('snake'), 'snake');
 
   const legacy = { bests: { solitaire: 3, mahjong: 72, snake: 15 } };
@@ -59,14 +59,14 @@ test('speedrun cloud score versions preserve legacy records without restoring th
   const combined = mergeCloudState(legacy, current);
   assert.equal(combined.bests.solitaire, 3, 'old records remain archived in cloud state');
   assert.equal(combined.bests.mahjong, 72);
-  assert.equal(combined.bests['solitaire:wall-v3'], 235);
-  assert.equal(combined.bests['mahjong:time-v3'], 400);
+  assert.equal(combined.bests['solitaire:wall-v4'], 235);
+  assert.equal(combined.bests['mahjong:time-v4'], 400);
   // A second device with better times keeps the lower value.
   const improved = mergeCloudState(combined, { bests: {
-    'solitaire:wall-v3': 180, 'mahjong:time-v3': 380
+    'solitaire:wall-v4': 180, 'mahjong:time-v4': 380
   } });
-  assert.equal(improved.bests['solitaire:wall-v3'], 180);
-  assert.equal(improved.bests['mahjong:time-v3'], 380);
+  assert.equal(improved.bests['solitaire:wall-v4'], 180);
+  assert.equal(improved.bests['mahjong:time-v4'], 380);
 
   const main = fs.readFileSync(path.join(root, 'src/main.js'), 'utf8');
   assert.match(main, /\.map\(game => \[cloudScoreKey\(game.id\), bestValue\(game\)\]\)/);
