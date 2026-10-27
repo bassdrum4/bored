@@ -304,7 +304,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 MUD = 14, SALT = 15, GOLD = 16, METHANE = 17,
                 COAL = 18, DUST = 19, TAR = 20, VINE = 21, ELECTRICITY = 22, SODIUM = 23,
                 IRON = 24, TNT = 25, NITROGEN = 26, CLONER = 27, DESTAT = 28, OBSIDIAN = 29,
-                STOVE = 30, PAN = 31, FLOUR = 32, EGG = 33, DOUGH = 34, BREAD = 35, SUGAR = 36, CARAMEL = 37, FAN_LEFT = 38, FAN_RIGHT = 39;
+                STOVE = 30, PAN = 31, FLOUR = 32, EGG = 33, DOUGH = 34, BREAD = 35, SUGAR = 36, CARAMEL = 37, WIND = 38, MITE = 39;
 
             const ELEMENTS = [
                 { id: SAND, name: 'Sand', color: [194, 178, 128], key: '1', cat: 'Powders', desc: 'Falls and piles, absorbs water into mud' },
@@ -336,8 +336,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 { id: NITROGEN, name: 'Nitrogen', color: [180, 220, 255], key: 'c', cat: 'Gases', desc: 'Cryogenic gas — freezes water/lava/mud, extinguishes fire' },
                 { id: CLONER, name: 'Cloner', color: [130, 60, 200], key: 'v', cat: 'Tools', desc: 'Absorbs first falling particle it touches, emits clones above and below' },
                 { id: DESTAT, name: 'Destat', color: [60, 180, 120], key: 'z', cat: 'Tools', desc: 'Neutralizes electrified elements on contact — drains charged water, gold, and iron' },
-                { id: FAN_LEFT, name: 'Fan ←', color: [80, 165, 175], key: ',', cat: 'Tools', desc: 'Place an anchored fan blowing left: pushes gas and light liquid' },
-                { id: FAN_RIGHT, name: 'Fan →', color: [80, 165, 175], key: '.', cat: 'Tools', desc: 'Place an anchored fan blowing right: pushes gas and light liquid' },
+                { id: WIND, name: 'Wind', color: [100, 190, 210], key: ',', cat: 'Gases', desc: 'Paint a breeze: gusts follow your drag direction and push smoke, dust, and water' },
+                { id: MITE, name: 'Mites', color: [215, 155, 85], key: '.', cat: 'Tools', desc: 'Tiny decomposers: crawl toward plants and crumbs, eat, multiply, and avoid fire or water' },
                 { id: EMPTY, name: 'Eraser', color: [50, 46, 40], key: 'x', cat: 'Tools', desc: 'Removes elements' },
                 { id: STOVE, name: 'Stove', color: [180, 60, 20], key: 'j', cat: 'Cooking', cooking: true, desc: 'Constant heat source — warms everything above it' },
                 { id: PAN, name: 'Pan', color: [90, 85, 80], key: 'k', cat: 'Cooking', cooking: true, desc: 'Heavy cookware — conducts and holds heat, cooks things placed in it' },
@@ -356,7 +356,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             DENSITY[MUD] = 5; DENSITY[ACID] = 5;
             DENSITY[SAND] = 6; DENSITY[GUNPOWDER] = 6; DENSITY[SALT] = 6; DENSITY[COAL] = 6; DENSITY[TAR] = 6; DENSITY[SODIUM] = 6;
             DENSITY[LAVA] = 8; DENSITY[ICE] = 10; DENSITY[PLANT] = 10;
-            DENSITY[WOOD] = 10; DENSITY[STONE] = 10; DENSITY[VINE] = 10; DENSITY[GOLD] = 15; DENSITY[FAN_LEFT] = 10; DENSITY[FAN_RIGHT] = 10;
+            DENSITY[WOOD] = 10; DENSITY[STONE] = 10; DENSITY[VINE] = 10; DENSITY[GOLD] = 15; DENSITY[WIND] = .2; DENSITY[MITE] = 6;
             DENSITY[IRON] = 15; DENSITY[TNT] = 10; DENSITY[CLONER] = 10; DENSITY[DESTAT] = 10; DENSITY[OBSIDIAN] = 10;
             DENSITY[STOVE] = 10; DENSITY[PAN] = 10; DENSITY[FLOUR] = 6; DENSITY[EGG] = 4; DENSITY[DOUGH] = 5; DENSITY[BREAD] = 10; DENSITY[SUGAR] = 6; DENSITY[CARAMEL] = 6;
 
@@ -375,13 +375,17 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             const grid = new Uint8Array(COLS * ROWS), gLife = new Uint8Array(COLS * ROWS), gMove = new Uint8Array(COLS * ROWS), gExtra = new Uint8Array(COLS * ROWS), gTemp = new Uint8Array(COLS * ROWS);
             let frame = 0, flashIntensity = 0;
 
-            let savedGrid = null, savedLife = null;
+            let savedGrid = null, savedLife = null, savedExtra = null, savedTemp = null;
             document.getElementById('saveBtn').addEventListener('click', () => {
                 savedGrid = new Uint8Array(grid); savedLife = new Uint8Array(gLife);
+                savedExtra = new Uint8Array(gExtra); savedTemp = new Uint8Array(gTemp);
                 document.getElementById('resetBtn').disabled = false;
             });
             document.getElementById('resetBtn').addEventListener('click', () => {
-                if (savedGrid) { grid.set(savedGrid); gLife.set(savedLife); gMove.fill(0); gExtra.fill(0); gTemp.fill(0); }
+                if (savedGrid) {
+                    grid.set(savedGrid); gLife.set(savedLife); gExtra.set(savedExtra);
+                    gTemp.set(savedTemp); gMove.fill(0);
+                }
             });
 
             const I = (x, y) => y * COLS + x, ok = (x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS;
