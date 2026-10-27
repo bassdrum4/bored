@@ -692,17 +692,19 @@ body{
   /* ============================================================
      5. Timer
      ============================================================ */
-  var tAccum = 0, tLast = null;
-  function timerNow() { return tAccum + (tLast !== null ? (performance.now() - tLast) : 0); }
+  // Monotonic elapsed time includes hidden tabs and open modals; neither
+  // can pause the clock for leaderboard timing.
+  var tWallStart = null, tWallFinish = null;
+  function timerNow() {
+    return tWallStart === null ? 0 : Math.max(0, (tWallFinish === null ? performance.now() : tWallFinish) - tWallStart);
+  }
   function timerStart() {
-    if (tLast === null && started && !openModalEl && !document.hidden && !won) {
-      tLast = performance.now();
-    }
+    if (started && tWallStart === null && !won) tWallStart = performance.now();
   }
   function timerStop() {
-    if (tLast !== null) { tAccum += performance.now() - tLast; tLast = null; }
+    if (won && tWallStart !== null && tWallFinish === null) tWallFinish = performance.now();
   }
-  function timerReset() { tAccum = 0; tLast = null; }
+  function timerReset() { tWallStart = null; tWallFinish = null; }
   function startTimerIfNeeded() {
     if (!started) { started = true; timerStart(); }
   }

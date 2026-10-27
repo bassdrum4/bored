@@ -59,8 +59,11 @@ async function openTitle(slug, title) {
   return (await page.$('#frame')).contentFrame();
 }
 async function close({ dismissClaim = true } = {}) {
-  await page.click('#menu-toggle');
-  await page.click('#back');
+  // Some games resize/replace their iframe while Puppeteer is finding the
+  // floating menu's click point. Test the actual click handlers without
+  // depending on a temporary element geometry snapshot.
+  await page.$eval('#menu-toggle', button => button.click());
+  await page.$eval('#back', button => button.click());
   await page.waitForFunction(() => document.querySelector('#player').hidden);
   // Leaving a game with a new guest best opens the account offer, which is a
   // modal: dismiss it so the next step reaches the hub. Only the offer's own
@@ -130,8 +133,8 @@ function challengeRules() {
 }
 function dateFor(slug) {
   const context = challengeRules();
-  for (let n = 0; n < 40; n++) {
-    const date = new Date(Date.UTC(2026, 9, 8 + n)).toISOString().slice(0, 10);
+  for (let n = 0; n < 36; n++) {
+    const date = new Date(Date.UTC(2026, 9, 28 + n)).toISOString().slice(0, 10);
     if (context.dailyChallenge(date).slug === slug) return date;
   }
   throw new Error('No challenge for ' + slug);
@@ -167,11 +170,19 @@ test('the daily rotation covers every challenge game, changes targets, and uses 
   assert.equal(dailyDate(new Date('2026-01-10T05:30:00Z')), '2026-01-10');
   // The spring-forward morning still produces one date per Detroit day.
   assert.equal(dailyDate(new Date('2026-03-08T06:30:00Z')), '2026-03-08');
-  const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 9, 8 + n)).toISOString().slice(0, 10)));
+  const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 9, 28 + n)).toISOString().slice(0, 10)));
   assert.equal(new Set(rotation.map(c => c.slug)).size, CHALLENGES.length);
   assert.ok(rotation.every(c => !c.goal.includes('{target}')));
   assert.deepEqual(JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))), JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))));
   assert.notEqual(dailyChallenge('2026-10-08').slug, dailyChallenge('2026-10-09').slug);
+  assert.match(dailyChallenge('2026-10-27').id, /^v2:/, 'old challenges keep their IDs');
+  assert.match(dailyChallenge('2026-10-28').id, /^v3:/, 'new calendar uses versioned IDs');
+  // No repeats within a circuit or across its boundaries, even years later.
+  const calendar = Array.from({ length: 200 }, (_, n) =>
+    dailyChallenge(new Date(Date.UTC(2026, 9, 21 + n)).toISOString().slice(0, 10)).slug);
+  for (let i = 7; i < calendar.length; i++) {
+    assert.ok(!calendar.slice(i - 7, i).includes(calendar[i]), 'no repeat in seven days at day ' + i);
+  }
   const tetris = dailyChallenge(dateFor('tetris'));
   const later = new Date(Date.parse(tetris.date + 'T00:00:00Z') + rotation.length * 86400000).toISOString().slice(0, 10);
   assert.notEqual(tetris.target, dailyChallenge(later).target);

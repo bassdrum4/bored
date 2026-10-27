@@ -252,6 +252,7 @@ function dailySeed() {
 
 let tiles = [], byKey = new Map(), selected = null, pairHint = [];
 let pairs = 0, left = 0, won = false, mode = 'deal', step = 0, depth = 4;
+let startedAt = null, finishedAt = null;
 let minX = 0, maxX = 9, minY = 0, maxY = 5;
 
 function beginGame(layers, seeded) {
@@ -266,6 +267,8 @@ function beginGame(layers, seeded) {
   pairs = 0;
   left = tiles.length;
   won = false;
+  startedAt = null;
+  finishedAt = null;
   if (mode === 'tutorial') step = 0;
   minX = Math.min(...tiles.map(tile => tile.x));
   maxX = Math.max(...tiles.map(tile => tile.x));
@@ -494,6 +497,7 @@ function choose(tile) {
     statusEl.textContent = 'That tile is blocked. Free a side or lift what rests on it.';
     return;
   }
+  if (mode === 'deal' && startedAt === null) startedAt = performance.now();
   pairHint = [];
   if (mode === 'tutorial' && step === 0) step = 1;
   if (selected === tile) {
@@ -522,10 +526,11 @@ function choose(tile) {
   if (mode === 'tutorial' && step === 1) step = 2;
   if (!left) {
     won = true;
+    if (mode === 'deal') finishedAt = performance.now();
     if (mode === 'tutorial') step = 3;
     statusEl.textContent = mode === 'tutorial'
       ? 'Tutorial cleared. Nicely done.'
-      : 'Board cleared in ' + pairs + ' pairs. Deal another?';
+      : 'Board cleared in ' + pairs + ' pairs and ' + Math.ceil((finishedAt - startedAt) / 1000) + ' seconds. Deal another?';
   } else {
     statusEl.textContent = 'Matched ' + label(tile) + '.';
     if (!findPair()) statusEl.textContent = 'No free pair left. Shuffle the remaining tiles or deal again.';
@@ -603,7 +608,8 @@ window.addEventListener('resize', resize);
 
 window.__boredSnapshot = () => mode === 'tutorial'
   ? { slug: 'mahjong', pairs: 0, remaining: left, total: tiles.length, finished: false, won: false, tutorial: true }
-  : { slug: 'mahjong', pairs: pairs, remaining: left, total: tiles.length, finished: left === 0 && won, won: left === 0 && won };
+  : { slug: 'mahjong', pairs: pairs, remaining: left, total: tiles.length, finished: left === 0 && won, won: left === 0 && won,
+      seconds: won && startedAt !== null && finishedAt !== null ? Math.ceil((finishedAt - startedAt) / 1000) : 0 };
 
 /* Small handle for the test suite; it only exposes what the board already shows. */
 window.__test = {

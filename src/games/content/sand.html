@@ -304,7 +304,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 MUD = 14, SALT = 15, GOLD = 16, METHANE = 17,
                 COAL = 18, DUST = 19, TAR = 20, VINE = 21, ELECTRICITY = 22, SODIUM = 23,
                 IRON = 24, TNT = 25, NITROGEN = 26, CLONER = 27, DESTAT = 28, OBSIDIAN = 29,
-                STOVE = 30, PAN = 31, FLOUR = 32, EGG = 33, DOUGH = 34, BREAD = 35, SUGAR = 36, CARAMEL = 37;
+                STOVE = 30, PAN = 31, FLOUR = 32, EGG = 33, DOUGH = 34, BREAD = 35, SUGAR = 36, CARAMEL = 37, FAN_LEFT = 38, FAN_RIGHT = 39;
 
             const ELEMENTS = [
                 { id: SAND, name: 'Sand', color: [194, 178, 128], key: '1', cat: 'Powders', desc: 'Falls and piles, absorbs water into mud' },
@@ -336,6 +336,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 { id: NITROGEN, name: 'Nitrogen', color: [180, 220, 255], key: 'c', cat: 'Gases', desc: 'Cryogenic gas — freezes water/lava/mud, extinguishes fire' },
                 { id: CLONER, name: 'Cloner', color: [130, 60, 200], key: 'v', cat: 'Tools', desc: 'Absorbs first falling particle it touches, emits clones above and below' },
                 { id: DESTAT, name: 'Destat', color: [60, 180, 120], key: 'z', cat: 'Tools', desc: 'Neutralizes electrified elements on contact — drains charged water, gold, and iron' },
+                { id: FAN_LEFT, name: 'Fan ←', color: [80, 165, 175], key: ',', cat: 'Tools', desc: 'Place an anchored fan blowing left: pushes gas and light liquid' },
+                { id: FAN_RIGHT, name: 'Fan →', color: [80, 165, 175], key: '.', cat: 'Tools', desc: 'Place an anchored fan blowing right: pushes gas and light liquid' },
                 { id: EMPTY, name: 'Eraser', color: [50, 46, 40], key: 'x', cat: 'Tools', desc: 'Removes elements' },
                 { id: STOVE, name: 'Stove', color: [180, 60, 20], key: 'j', cat: 'Cooking', cooking: true, desc: 'Constant heat source — warms everything above it' },
                 { id: PAN, name: 'Pan', color: [90, 85, 80], key: 'k', cat: 'Cooking', cooking: true, desc: 'Heavy cookware — conducts and holds heat, cooks things placed in it' },
@@ -347,14 +349,14 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 { id: CARAMEL, name: 'Caramel', color: [200, 120, 30], key: ']', cat: 'Cooking', cooking: true, desc: 'Viscous liquid — burns to smoke if overheated' }
             ];
 
-            const DENSITY = new Float32Array(38);
+            const DENSITY = new Float32Array(40);
             DENSITY[EMPTY] = 0; DENSITY[FIRE] = .5; DENSITY[METHANE] = .3; DENSITY[SMOKE] = 1;
             DENSITY[NITROGEN] = .8;
             DENSITY[STEAM] = 1; DENSITY[ELECTRICITY] = 1; DENSITY[OIL] = 2; DENSITY[DUST] = 3; DENSITY[WATER] = 4;
             DENSITY[MUD] = 5; DENSITY[ACID] = 5;
             DENSITY[SAND] = 6; DENSITY[GUNPOWDER] = 6; DENSITY[SALT] = 6; DENSITY[COAL] = 6; DENSITY[TAR] = 6; DENSITY[SODIUM] = 6;
             DENSITY[LAVA] = 8; DENSITY[ICE] = 10; DENSITY[PLANT] = 10;
-            DENSITY[WOOD] = 10; DENSITY[STONE] = 10; DENSITY[VINE] = 10; DENSITY[GOLD] = 15;
+            DENSITY[WOOD] = 10; DENSITY[STONE] = 10; DENSITY[VINE] = 10; DENSITY[GOLD] = 15; DENSITY[FAN_LEFT] = 10; DENSITY[FAN_RIGHT] = 10;
             DENSITY[IRON] = 15; DENSITY[TNT] = 10; DENSITY[CLONER] = 10; DENSITY[DESTAT] = 10; DENSITY[OBSIDIAN] = 10;
             DENSITY[STOVE] = 10; DENSITY[PAN] = 10; DENSITY[FLOUR] = 6; DENSITY[EGG] = 4; DENSITY[DOUGH] = 5; DENSITY[BREAD] = 10; DENSITY[SUGAR] = 6; DENSITY[CARAMEL] = 6;
 
@@ -937,6 +939,31 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 if (Math.random() < .15) { const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1); }
             }
 
+            /* ── Fans ── */
+            // Local row-only airflow: rigid barriers stop it, gases move quickly,
+            // and water/oil/acid move more slowly. Move far cells first to avoid
+            // moving a single particle multiple times during one tick.
+            const AIRBORNE = new Set([SMOKE, STEAM, FIRE, METHANE, NITROGEN, ELECTRICITY]);
+            const FAN_LIQUIDS = new Set([WATER, OIL, ACID]);
+            function updFan(x, y, dir) {
+                let reach = 0;
+                for (let step = 1; step <= 9; step++) {
+                    const nx = x + dir * step;
+                    if (!ok(nx, y)) break;
+                    const material = grid[I(nx, y)];
+                    if (material !== EMPTY && !AIRBORNE.has(material) && !FAN_LIQUIDS.has(material)) break;
+                    reach = step;
+                }
+                for (let step = reach; step >= 1; step--) {
+                    const tx = x + dir * step, nx = tx + dir, i = I(tx, y);
+                    const material = grid[i];
+                    if (gMove[i] || !ok(nx, y) || grid[I(nx, y)] !== EMPTY) continue;
+                    if (AIRBORNE.has(material) || (FAN_LIQUIDS.has(material) && Math.random() < .2)) {
+                        moveTo(tx, y, nx, y);
+                    }
+                }
+            }
+
             /* ── Simulation ── */
             function simulate() {
                 gMove.fill(0);
@@ -962,6 +989,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                             case NITROGEN: updNitrogen(x, y); break;
                             case CLONER: updCloner(x, y); break;
                             case DESTAT: updDestat(x, y); break;
+                            case FAN_LEFT: updFan(x, y, -1); break;
+                            case FAN_RIGHT: updFan(x, y, 1); break;
                             case STOVE: updStove(x, y); break;
                             case PAN: updPan(x, y); break;
                             case FLOUR: updFlour(x, y); break;
@@ -1030,6 +1059,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                         return [100, 30, 180];
                     }
                     case DESTAT: { const pulse = ((frame * 2 + x * 5 + y * 7) % 16) - 8; return [cl(50 + pulse, 0, 255), cl(175 + pulse, 0, 255), cl(110 + pulse, 0, 255)]; }
+                    case FAN_LEFT: return (x % 3 === 0) ? [145, 215, 215] : [45, 95, 105];
+                    case FAN_RIGHT: return (x % 3 === 2) ? [145, 215, 215] : [45, 95, 105];
                     case OBSIDIAN: { const cr = (h % 16) - 8; return [cl(28 + cr, 0, 255), cl(18 + cr, 0, 255), cl(42 + cr, 0, 255)]; }
                     case STOVE: { const t = gTemp[I(x, y)] / 245, f = ((frame * 3 + x * 7 + y * 5) % 12) - 6; return [cl(Math.round(120 + t * 135) + f, 0, 255), cl(Math.round(30 + t * 30) + f, 0, 255), cl(Math.round(10 + t * 10), 0, 255)]; }
                     case PAN: { const t = gTemp[I(x, y)] / 240, f = ((frame * 2 + x * 5 + y * 7) % 8) - 4; if (t > .4) { return [cl(Math.round(90 + t * 120) + f, 0, 255), cl(Math.round(85 + t * 40) + f, 0, 255), cl(Math.round(80) + f, 0, 255)]; } return [cl(88 + v, 0, 255), cl(83 + v, 0, 255), cl(78 + v, 0, 255)]; }

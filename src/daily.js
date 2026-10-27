@@ -95,13 +95,88 @@ export const CHALLENGES = [
   { slug: 'cup-pong', label: 'Steady hand', goal: 'Sink {target} cups in one run before the third miss.', metric: 'cups', targets: [6, 9, 12], unit: 'cups sunk' },
   { slug: 'deep', label: 'Deep pockets', goal: 'Reach {target} points in one descent.', metric: 'score', targets: [1200, 2000, 3000], unit: 'points' }
 ];
+// Frozen v3 calendar lineup; future additions must make a new schedule version
+// instead of silently moving previously published daily challenges.
+const DAILY_SCHEDULE_V3 = Object.freeze([
+  'minigolf',
+  'tetris',
+  'snake',
+  'wordle',
+  'space-invaders',
+  '2048',
+  'simon',
+  'breakout',
+  'memory',
+  'frogger',
+  'connect-four',
+  'asteroids',
+  'pac-man',
+  'aim-lab',
+  'qbert',
+  'minesweeper',
+  'lights-out',
+  'pong',
+  'sumo',
+  'poker',
+  'tank',
+  'void-runner',
+  'solitaire',
+  'commanders',
+  'lava',
+  'volletball',
+  'tank2',
+  'gun-mayhem',
+  'shadow-net',
+  'sand',
+  'eco',
+  'mahjong',
+  'chess',
+  'block-blast',
+  'cup-pong',
+  'deep'
+]);
+const DAILY_SCHEDULE_START = Date.parse('2026-10-28T00:00:00Z') / 86400000;
+
 export function dailyChallenge(date) {
   const day = Math.floor(Date.parse(date + 'T00:00:00Z') / 86400000);
-  const index = ((day % CHALLENGES.length) + CHALLENGES.length) % CHALLENGES.length;
-  const definition = CHALLENGES[index];
-  const circuit = ((Math.floor(day / CHALLENGES.length) % 3) + 3) % 3;
-  const target = definition.targets[circuit];
-  return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v2:' + date + ':' + definition.slug };
+  if (day < DAILY_SCHEDULE_START) {
+    // Preserve old completions/streaks under their original v2 IDs.
+    const index = ((day % CHALLENGES.length) + CHALLENGES.length) % CHALLENGES.length;
+    const definition = CHALLENGES[index];
+    const circuit = ((Math.floor(day / CHALLENGES.length) % 3) + 3) % 3;
+    const target = definition.targets[circuit];
+    return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v2:' + date + ':' + definition.slug };
+  }
+  const size = DAILY_SCHEDULE_V3.length;
+  const offset = day - DAILY_SCHEDULE_START;
+  const cycleNumber = Math.floor(offset / size);
+  let previous = [];
+  // Deterministic seeded order per cycle: each game once per circuit.
+  // Keep the first seven days disjoint from the preceding seven, including
+  // the boundary between the old and new schedules.
+  for (let cycle = 0; cycle <= cycleNumber; cycle++) {
+    const order = DAILY_SCHEDULE_V3.slice();
+    let state = (Math.imul(cycle + 1, 1664525) ^ 0x9e3779b9) >>> 0;
+    for (let i = size - 1; i > 0; i--) {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      const j = state % (i + 1);
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    const recent = cycle ? previous.slice(-7) : Array.from({ length: 7 }, (_, i) => {
+      const historicDay = DAILY_SCHEDULE_START - 7 + i;
+      return CHALLENGES[((historicDay % CHALLENGES.length) + CHALLENGES.length) % CHALLENGES.length].slug;
+    });
+    for (let i = 0; i < 7 && i < size; i++) {
+      if (!recent.includes(order[i])) continue;
+      const j = order.findIndex((slug, index) => index >= 7 && !recent.includes(slug));
+      if (j >= 0) [order[i], order[j]] = [order[j], order[i]];
+    }
+    previous = order;
+  }
+  const slug = previous[offset % size];
+  const definition = CHALLENGES.find(item => item.slug === slug);
+  const target = definition.targets[cycleNumber % definition.targets.length];
+  return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v3:' + date + ':' + definition.slug };
 }
 export function dailyCheck(challenge, snapshot) {
   if (!snapshot || snapshot.slug !== challenge.slug || !Number.isFinite(snapshot[challenge.metric]) || snapshot[challenge.metric] < 0) return { complete: false, progress: 'Start playing to track your goal.' };
@@ -142,7 +217,7 @@ const DAILY_ADAPTERS = {
   poker: { expression: '({profit:human()?human().stack-G.settings.stack:0,handOver:G.phase==="handOver"})' },
   tank: { setup: 'let boredCpuOnly=true;document.addEventListener("keydown",e=>{if(e.key.toLowerCase()==="e"&&!aiEnabled)boredCpuOnly=false});', expression: '((!aiEnabled&&(boredCpuOnly=false)),({wins:scores[0],cpu:aiEnabled&&boredCpuOnly}))' },
   'void-runner': { closure: true, expression: '({score})' },
-  solitaire: { closure: true, expression: '({cards:G.foundations.reduce((n,p)=>n+p.length,0),moves:G.moves,won:won===true,seconds:won?Math.round(tAccum/1000):0})' },
+  solitaire: { closure: true, expression: '({cards:G.foundations.reduce((n,p)=>n+p.length,0),moves:G.moves,won:won===true,seconds:won?Math.ceil(timerNow()/1000):0})' },
   commanders: { closure: true, expression: '({waves:Math.max(0,wn-1),score:P&&P.sc?P.sc:0})' },
   lava: { expression: '({points:sc?sc[0]:0,cpu:cpuMode===true})' },
   volletball: { expression: '({points:sc[0],cpu:cpuMode===true})' },
