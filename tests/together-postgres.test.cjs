@@ -47,21 +47,23 @@ test('native PostgreSQL: competing moves, queues, crossed requests and leave rac
   assert.ok(queue.some(x=>x.id));
   assert.equal((await admin.query("select count(*)::int n from bored_together.matches where source='random'")).rows[0].n,1);
   // The old friend-request API was removed. Concurrent direct challenges
-  // instead race for the same game/pair: exactly one should win.
+  // now create separate games for the same pair: both should succeed.
   const challenges=await Promise.allSettled([
     rpc(a,'challenge',{user_id:c}),
     rpc(c,'challenge',{user_id:a})
   ]);
-  assert.equal(challenges.filter(r=>r.status==='fulfilled').length,1);
+  assert.equal(challenges.filter(r=>r.status==='fulfilled').length,2);
+  assert.notEqual(challenges[0].value.id,challenges[1].value.id);
   assert.equal((await admin.query(
     "select count(*)::int n from bored_together.matches where game='connect-four' and status='active' and ((p1=$1 and p2=$2) or (p1=$2 and p2=$1))",
     [a,c]
-  )).rows[0].n,1);
-  // The pair can play a different game simultaneously, but not two active
-  // games of the same type. Retired social operations remain unavailable.
+  )).rows[0].n,2);
+  // Same-type and different-type games can coexist. Retired social operations
+  // remain unavailable.
   const duel=await rpc(a,'challenge',{user_id:b,game:'2048'});
   assert.ok(duel.id && duel.id!==active.id);
-  await assert.rejects(rpc(a,'challenge',{user_id:b}),/already have/i);
+  const another=await rpc(a,'challenge',{user_id:b});
+  assert.notEqual(another.id,active.id);
   await assert.rejects(rpc(a,'friend_request',{user_id:c}),/Unknown operation/);
   // Whichever transaction obtains the lock first, leave cannot leave an active
   // match or queue entry referring to a departed player.
