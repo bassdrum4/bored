@@ -392,8 +392,21 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             const cl = (v, a, b) => v < a ? a : v > b ? b : v, rnd = (a, b) => (Math.random() * (b - a + 1) | 0) + a;
             function hash(x, y) { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return (h ^ (h >> 16)) >>> 0; }
 
-            function moveTo(x1, y1, x2, y2) { const a = I(x1, y1), b = I(x2, y2); grid[b] = grid[a]; grid[a] = EMPTY; gLife[b] = gLife[a]; gLife[a] = 0; gMove[b] = 1; }
-            function swapC(x1, y1, x2, y2) { const a = I(x1, y1), b = I(x2, y2); let t = grid[a]; grid[a] = grid[b]; grid[b] = t; t = gLife[a]; gLife[a] = gLife[b]; gLife[b] = t; gMove[b] = 1; }
+            function moveTo(x1, y1, x2, y2) {
+                const a = I(x1, y1), b = I(x2, y2);
+                grid[b] = grid[a]; grid[a] = EMPTY;
+                gLife[b] = gLife[a]; gLife[a] = 0;
+                // Direction (wind), age (mite) and other per-particle state
+                // must travel with the particle, not stay on the old cell.
+                gExtra[b] = gExtra[a]; gExtra[a] = 0; gMove[b] = 1;
+            }
+            function swapC(x1, y1, x2, y2) {
+                const a = I(x1, y1), b = I(x2, y2);
+                let t = grid[a]; grid[a] = grid[b]; grid[b] = t;
+                t = gLife[a]; gLife[a] = gLife[b]; gLife[b] = t;
+                t = gExtra[a]; gExtra[a] = gExtra[b]; gExtra[b] = t;
+                gMove[a] = 1; gMove[b] = 1;
+            }
             function fallTo(x, y, dx, dy) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) return false; const tgt = grid[I(nx, ny)]; if (tgt === EMPTY) { moveTo(x, y, nx, ny); return true; } const me = grid[I(x, y)]; if (DENSITY[me] > DENSITY[tgt] && DENSITY[tgt] < 10) { swapC(x, y, nx, ny); return true; } return false; }
             function slideTo(x, y, dx, dy) { const nx = x + dx, ny = y + dy; if (!ok(nx, ny) || grid[I(nx, ny)] !== EMPTY) return false; moveTo(x, y, nx, ny); return true; }
 
@@ -943,34 +956,136 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 if (Math.random() < .15) { const d = Math.random() < .5 ? 1 : -1; if (fallTo(x, y, d, 1)) return; fallTo(x, y, -d, 1); }
             }
 
-            /* ── Fans ── */
-            // Local row-only airflow: rigid barriers stop it, gases move quickly,
-            // and water/oil/acid move more slowly. Move far cells first to avoid
-            // moving a single particle multiple times during one tick.
-            const AIRBORNE = new Set([SMOKE, STEAM, FIRE, METHANE, NITROGEN, ELECTRICITY]);
-            const FAN_LIQUIDS = new Set([WATER, OIL, ACID]);
-            function updFan(x, y, dir) {
-                let reach = 0;
-                for (let step = 1; step <= 9; step++) {
-                    const nx = x + dir * step;
-                    if (!ok(nx, y)) break;
-                    const material = grid[I(nx, y)];
-                    if (material !== EMPTY && !AIRBORNE.has(material) && !FAN_LIQUIDS.has(material)) break;
-                    reach = step;
+            /* ── Wind ── */
+            // Wind is a fleeting gas-like particle, not a stationary machine.
+            // The direction is stored in gExtra (1..8), set by the direction
+            // the player dragged. A gust carries its direction as it travels.
+            const WIND_DIRS = [[1, 0], [1, 1], [0, 1], [-1, 1],
+                               [-1, 0], [-1, -1], [0, -1], [1, -1]];
+            const WIND_BLOWN = new Set([SMOKE, STEAM, FIRE, METHANE, NITROGEN,
+                                        ELECTRICITY, DUST, MITE]);
+            const WIND_LIQUIDS = new Set([WATER, OIL, ACID]);
+            function windHeading(dx, dy) {
+                if (!dx && !dy) return 1;
+                return ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8) + 1;
+            }
+            function updWind(x, y) {
+                const i = I(x, y);
+                if (gMove[i]) return;
+                if (gLife[i] <= 1) {
+                    grid[i] = EMPTY; gLife[i] = 0; gExtra[i] = 0;
+                    return;
                 }
-                for (let step = reach; step >= 1; step--) {
-                    const tx = x + dir * step, nx = tx + dir, i = I(tx, y);
-                    const material = grid[i];
-                    if (gMove[i] || !ok(nx, y) || grid[I(nx, y)] !== EMPTY) continue;
-                    if (AIRBORNE.has(material) || (FAN_LIQUIDS.has(material) && Math.random() < .2)) {
-                        moveTo(tx, y, nx, y);
+                gLife[i]--;
+                const heading = ((gExtra[i] || 1) - 1) % 8;
+                const [dx, dy] = WIND_DIRS[heading];
+                const nx = x + dx, ny = y + dy;
+                if (ok(nx, ny)) {
+                    const ni = I(nx, ny), target = grid[ni];
+                    if (target === EMPTY) { moveTo(x, y, nx, ny); return; }
+                    // Push lightweight material into an empty slot; gases and
+                    // mites blow readily, liquids only with a stronger gust.
+                    const bx = nx + dx, by = ny + dy;
+                    if (ok(bx, by) && grid[I(bx, by)] === EMPTY &&
+                        (WIND_BLOWN.has(target) || (WIND_LIQUIDS.has(target) && Math.random() < .28))) {
+                        moveTo(nx, ny, bx, by);
+                        moveTo(x, y, nx, ny);
+                        return;
                     }
                 }
+                // A wall breaks up the gust; occasionally curl around corners.
+                const side = (frame + x + y) % 2 ? 1 : -1;
+                for (const turn of [side, -side]) {
+                    const [sx, sy] = WIND_DIRS[(heading + turn * 2 + 8) % 8];
+                    if (ok(x + sx, y + sy) && grid[I(x + sx, y + sy)] === EMPTY) {
+                        gLife[i] = Math.max(1, gLife[i] - 2);
+                        moveTo(x, y, x + sx, y + sy);
+                        return;
+                    }
+                }
+                gLife[i] = Math.max(1, gLife[i] - 5);
+            }
+
+            /* ── Mites ── */
+            // Mites are tiny decomposers: plant matter and crumbs feed them;
+            // eating leaves compost (mud/dust), high energy supports offspring.
+            // Fire, acid and deep water kill them. Hunger limits population.
+            const MITE_FOOD = new Set([PLANT, VINE, BREAD, SUGAR, FLOUR, DOUGH, WOOD]);
+            const MITE_NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1],
+                                    [1, 1], [-1, 1], [1, -1], [-1, -1]];
+            const MITE_LIMIT = 300;
+            let mitePopulation = 0;
+            function updMite(x, y) {
+                const i = I(x, y);
+                if (gMove[i]) return;
+                gExtra[i] = Math.min(250, gExtra[i] + 1);
+                if (frame % 8 === 0) gLife[i] = Math.max(0, gLife[i] - 1);
+                if (gLife[i] === 0) {
+                    grid[i] = DUST; gExtra[i] = 0; gMove[i] = 1;
+                    return;
+                }
+                const adjacent = [];
+                for (const [dx, dy] of MITE_NEIGHBORS) {
+                    const nx = x + dx, ny = y + dy;
+                    if (!ok(nx, ny)) continue;
+                    const ni = I(nx, ny), t = grid[ni];
+                    if (t === FIRE || t === LAVA || t === ACID ||
+                        (t === WATER && Math.random() < .17)) {
+                        grid[i] = DUST; gLife[i] = 0; gExtra[i] = 0; gMove[i] = 1;
+                        return;
+                    }
+                    adjacent.push([nx, ny, t]);
+                }
+                // A mite needs food to reproduce; one particle of foliage or
+                // bread becomes compost. Don't eat on every tick.
+                if ((frame + i) % 4 === 0) {
+                    const meal = adjacent.find(([, , t]) => MITE_FOOD.has(t));
+                    if (meal) {
+                        const [fx, fy, food] = meal, fi = I(fx, fy);
+                        grid[fi] = food === PLANT || food === VINE ? MUD : DUST;
+                        gLife[fi] = 0; gExtra[fi] = 0; gMove[fi] = 1;
+                        gLife[i] = Math.min(240, gLife[i] + 27);
+                        if (gLife[i] >= 112 && gExtra[i] >= 24 &&
+                            mitePopulation < MITE_LIMIT && Math.random() < .09) {
+                            const spot = adjacent.find(([, , t]) => t === EMPTY);
+                            if (spot) {
+                                const bi = I(spot[0], spot[1]);
+                                grid[bi] = MITE; gLife[bi] = 54;
+                                gExtra[bi] = 0; gMove[bi] = 1;
+                                gLife[i] -= 52; mitePopulation++;
+                            }
+                        }
+                    }
+                }
+                // Crawl every other tick, following the scent of nearby food.
+                // Mites that cannot find food wander and eventually starve.
+                if ((frame + x + y) % 2 !== 0) return;
+                let target = null, bestFood = 99;
+                for (let dy = -3; dy <= 3; dy++)for (let dx = -3; dx <= 3; dx++) {
+                    const nx = x + dx, ny = y + dy;
+                    if (!ok(nx, ny) || !MITE_FOOD.has(grid[I(nx, ny)])) continue;
+                    const distance = Math.abs(dx) + Math.abs(dy);
+                    if (distance < bestFood) { bestFood = distance; target = [nx, ny]; }
+                }
+                let options = adjacent.filter(([, , t]) => t === EMPTY);
+                if (!options.length) return;
+                if (target) options.sort((a, b) =>
+                    (Math.abs(a[0] - target[0]) + Math.abs(a[1] - target[1])) -
+                    (Math.abs(b[0] - target[0]) + Math.abs(b[1] - target[1])));
+                else options.sort((a, b) => (a[1] === y + 1 ? -1 : 0) - (b[1] === y + 1 ? -1 : 0));
+                const choice = target && Math.random() < .86
+                    ? options[0] : options[Math.floor(Math.random() * Math.min(4, options.length))];
+                moveTo(x, y, choice[0], choice[1]);
             }
 
             /* ── Simulation ── */
             function simulate() {
                 gMove.fill(0);
+                // Amortized count avoids runaway reproduction on dense gardens.
+                if (frame % 40 === 0) {
+                    mitePopulation = 0;
+                    for (let i = 0; i < grid.length; i++) if (grid[i] === MITE) mitePopulation++;
+                }
                 for (let y = ROWS - 1; y >= 0; y--) {
                     const ltr = frame % 2 === 0;
                     for (let j = 0; j < COLS; j++) {
@@ -993,8 +1108,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                             case NITROGEN: updNitrogen(x, y); break;
                             case CLONER: updCloner(x, y); break;
                             case DESTAT: updDestat(x, y); break;
-                            case FAN_LEFT: updFan(x, y, -1); break;
-                            case FAN_RIGHT: updFan(x, y, 1); break;
+                            case WIND: updWind(x, y); break;
+                            case MITE: updMite(x, y); break;
                             case STOVE: updStove(x, y); break;
                             case PAN: updPan(x, y); break;
                             case FLOUR: updFlour(x, y); break;
