@@ -171,7 +171,7 @@ test('Mites feed on plant matter, reproduce when well-fed, and die near flames',
   grid[at(4, 2)] = 12;
   ctx.updMite(3, 2);
   assert.equal(grid.filter(v => v === 39).length, 2, 'well-fed adults produce offspring');
-  assert.equal(ctx.mitePopulation, 1, 'population cap accounts for births');
+  assert.equal(vm.runInContext('mitePopulation', ctx), 1, 'population cap accounts for births');
 
   grid.fill(0); gLife.fill(0); gExtra.fill(0); gMove.fill(0);
   grid[at(3, 2)] = 39; gLife[at(3, 2)] = 80;
