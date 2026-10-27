@@ -8,14 +8,14 @@ const TABLE = '/rest/v1/player_state';
 // Score units changed in v3. Never interpret a legacy pair count or
 // pauseable Solitaire time as a new verified speedrun.
 const SCORE_CLOUD_KEYS = Object.freeze({
-  solitaire: 'solitaire:wall-v3',
-  mahjong: 'mahjong:time-v3'
+  solitaire: 'solitaire:wall-v4',
+  mahjong: 'mahjong:time-v4'
 });
 export function cloudScoreKey(slug) {
   return SCORE_CLOUD_KEYS[slug] || slug;
 }
 const LOWER_BESTS = new Set(['wordle', 'solitaire', 'memory', 'minesweeper',
-  'solitaire:wall-v3', 'mahjong:time-v3']);
+  'solitaire:wall-v4', 'mahjong:time-v4']);
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 
 function eventsFrom(state) {
