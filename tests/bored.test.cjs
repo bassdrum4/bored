@@ -59,8 +59,11 @@ async function openTitle(slug, title) {
   return (await page.$('#frame')).contentFrame();
 }
 async function close({ dismissClaim = true } = {}) {
-  await page.click('#menu-toggle');
-  await page.click('#back');
+  // Some games resize/replace their iframe while Puppeteer is finding the
+  // floating menu's click point. Test the actual click handlers without
+  // depending on a temporary element geometry snapshot.
+  await page.$eval('#menu-toggle', button => button.click());
+  await page.$eval('#back', button => button.click());
   await page.waitForFunction(() => document.querySelector('#player').hidden);
   // Leaving a game with a new guest best opens the account offer, which is a
   // modal: dismiss it so the next step reaches the hub. Only the offer's own
