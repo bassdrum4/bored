@@ -76,36 +76,106 @@ test('Mahjong requires a full timed deal for a leaderboard entry', () => {
   assert.equal(scoreCtx.scoreValue('mahjong', { ...completed, finished: false }), 0);
 });
 
-test('Sand fans move gases and liquids in their facing direction but stop at solids', () => {
+test('Wind follows eight drag headings, flows through air, pushes material, and fades', () => {
   const html = load('src/games/content/sand.html');
-  const begin = html.indexOf('const AIRBORNE = new Set(');
+  const begin = html.indexOf('const WIND_DIRS = [');
   const end = html.indexOf('/* ── Simulation ── */', begin);
-  assert.ok(begin >= 0 && end > begin);
-  const g = new Uint8Array(20), moved = new Uint8Array(20);
-  const types = {
-    EMPTY: 0, SMOKE: 5, STEAM: 8, FIRE: 4, METHANE: 17,
-    NITROGEN: 26, ELECTRICITY: 22, WATER: 2, OIL: 6, ACID: 9
-  };
-  const context = vm.createContext({
-    ...types, grid: g, gMove: moved, Math: { random: () => 0 },
-    I: (x, y) => x, ok: (x, y) => y === 0 && x >= 0 && x < g.length,
-    moveTo: (x1, y1, x2, y2) => { g[x2] = g[x1]; g[x1] = 0; moved[x2] = 1; }
+  assert.ok(begin >= 0 && end > begin, 'wind and mite simulation extracted');
+  const width = 12, height = 8;
+  const grid = new Uint8Array(width * height), gLife = new Uint8Array(grid.length);
+  const gExtra = new Uint8Array(grid.length), gMove = new Uint8Array(grid.length);
+  const at = (x, y) => y * width + x;
+  const ctx = vm.createContext({
+    grid, gLife, gExtra, gMove, frame: 1, mitePopulation: 0,
+    WIND: 38, MITE: 39, EMPTY: 0, SMOKE: 5, STEAM: 8, FIRE: 4,
+    METHANE: 17, NITROGEN: 26, ELECTRICITY: 22, DUST: 19,
+    WATER: 2, OIL: 6, ACID: 9, PLANT: 12, VINE: 21, BREAD: 35,
+    SUGAR: 36, FLOUR: 32, DOUGH: 34, WOOD: 7, MUD: 14, LAVA: 10,
+    Math: Object.assign(Object.create(Math), { random: () => 0 }),
+    I: at, ok: (x, y) => x >= 0 && x < width && y >= 0 && y < height,
+    moveTo: (x, y, nx, ny) => {
+      const a = at(x, y), b = at(nx, ny);
+      grid[b] = grid[a]; grid[a] = 0;
+      gLife[b] = gLife[a]; gLife[a] = 0;
+      gExtra[b] = gExtra[a]; gExtra[a] = 0;
+      gMove[b] = 1;
+    }
   });
-  vm.runInContext(html.slice(begin, end), context);
-  g[3] = types.SMOKE;
-  context.updFan(2, 0, 1);
-  assert.equal(g[4], types.SMOKE, 'right-facing fan pushes smoke right');
-  g.fill(0); moved.fill(0);
-  g[9] = types.SMOKE;
-  context.updFan(10, 0, -1);
-  assert.equal(g[8], types.SMOKE, 'left-facing fan pushes smoke left');
-  g.fill(0); moved.fill(0);
-  g[3] = types.SMOKE; g[4] = 3; // stone
-  context.updFan(2, 0, 1);
-  assert.equal(g[3], types.SMOKE, 'stone blocks the stream');
-  g.fill(0); moved.fill(0);
-  g[3] = types.WATER;
-  context.updFan(2, 0, 1);
-  assert.equal(g[4], types.WATER, 'light liquids move when the fan impulse succeeds');
+  vm.runInContext(html.slice(begin, end), ctx);
+  assert.equal(ctx.windHeading(4, 0), 1);
+  assert.equal(ctx.windHeading(3, 3), 2);
+  assert.equal(ctx.windHeading(0, 4), 3);
+  assert.equal(ctx.windHeading(-2, 0), 5);
+  assert.equal(ctx.windHeading(0, -4), 7);
+  assert.equal(ctx.windHeading(2, -2), 8);
+
+  grid[at(2, 2)] = 38; gLife[at(2, 2)] = 40; gExtra[at(2, 2)] = 1;
+  ctx.updWind(2, 2);
+  assert.equal(grid[at(3, 2)], 38, 'wind advances like a gas, no anchored block');
+  assert.equal(gExtra[at(3, 2)], 1, 'gust carries its direction');
+  assert.equal(gLife[at(3, 2)], 39, 'gust energy dissipates');
+
+  grid.fill(0); gLife.fill(0); gExtra.fill(0); gMove.fill(0);
+  grid[at(2, 2)] = 38; gLife[at(2, 2)] = 40; gExtra[at(2, 2)] = 3;
+  ctx.updWind(2, 2);
+  assert.equal(grid[at(2, 3)], 38, 'vertical drag sends wind down');
+
+  grid.fill(0); gLife.fill(0); gExtra.fill(0); gMove.fill(0);
+  grid[at(2, 2)] = 38; gLife[at(2, 2)] = 40; gExtra[at(2, 2)] = 1;
+  grid[at(3, 2)] = 19;
+  ctx.updWind(2, 2);
+  assert.equal(grid[at(4, 2)], 19, 'wind moves loose dust');
+  assert.equal(grid[at(3, 2)], 38, 'gust enters the cleared cell');
+
+  grid.fill(0); gLife.fill(0); gExtra.fill(0); gMove.fill(0);
+  grid[at(2, 2)] = 38; gLife[at(2, 2)] = 1; gExtra[at(2, 2)] = 1;
+  ctx.updWind(2, 2);
+  assert.equal(grid[at(2, 2)], 0, 'old wind dissipates entirely');
   new vm.Script(html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>')));
+});
+
+test('Mites feed on plant matter, reproduce when well-fed, and die near flames', () => {
+  const html = load('src/games/content/sand.html');
+  const begin = html.indexOf('const WIND_DIRS = [');
+  const end = html.indexOf('/* ── Simulation ── */', begin);
+  const width = 12, height = 8;
+  const grid = new Uint8Array(width * height), gLife = new Uint8Array(grid.length);
+  const gExtra = new Uint8Array(grid.length), gMove = new Uint8Array(grid.length);
+  const at = (x, y) => y * width + x;
+  const ctx = vm.createContext({
+    grid, gLife, gExtra, gMove, frame: 1, mitePopulation: 0,
+    WIND: 38, MITE: 39, EMPTY: 0, SMOKE: 5, STEAM: 8, FIRE: 4,
+    METHANE: 17, NITROGEN: 26, ELECTRICITY: 22, DUST: 19,
+    WATER: 2, OIL: 6, ACID: 9, PLANT: 12, VINE: 21, BREAD: 35,
+    SUGAR: 36, FLOUR: 32, DOUGH: 34, WOOD: 7, MUD: 14, LAVA: 10,
+    Math: Object.assign(Object.create(Math), { random: () => 0 }),
+    I: at, ok: (x, y) => x >= 0 && x < width && y >= 0 && y < height,
+    moveTo: (x, y, nx, ny) => {
+      const a = at(x, y), b = at(nx, ny);
+      grid[b] = grid[a]; grid[a] = 0;
+      gLife[b] = gLife[a]; gLife[a] = 0;
+      gExtra[b] = gExtra[a]; gExtra[a] = 0;
+      gMove[b] = 1;
+    }
+  });
+  vm.runInContext(html.slice(begin, end), ctx);
+  grid[at(3, 2)] = 39; gLife[at(3, 2)] = 70;
+  grid[at(4, 2)] = 12;
+  ctx.updMite(3, 2);
+  assert.equal(grid[at(4, 2)], 14, 'eaten plant becomes compost');
+  assert.ok([...gLife].some(value => value >= 90), 'feeding restores energy');
+
+  grid.fill(0); gLife.fill(0); gExtra.fill(0); gMove.fill(0);
+  ctx.frame = 1;
+  grid[at(3, 2)] = 39; gLife[at(3, 2)] = 140; gExtra[at(3, 2)] = 40;
+  grid[at(4, 2)] = 12;
+  ctx.updMite(3, 2);
+  assert.equal(grid.filter(v => v === 39).length, 2, 'well-fed adults produce offspring');
+  assert.equal(ctx.mitePopulation, 1, 'population cap accounts for births');
+
+  grid.fill(0); gLife.fill(0); gExtra.fill(0); gMove.fill(0);
+  grid[at(3, 2)] = 39; gLife[at(3, 2)] = 80;
+  grid[at(4, 2)] = 4;
+  ctx.updMite(3, 2);
+  assert.equal(grid[at(3, 2)], 19, 'a mite dies from nearby fire');
 });
