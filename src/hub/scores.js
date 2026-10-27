@@ -84,7 +84,7 @@ const LEGACY_GAMES = [
 const highScore = (id, name, unit, extra = {}) => ({
   id, name, unit, key: 'bored.high.' + id,
   ...extra,
-  read: () => readNumber('bored.high.' + id)
+  read: () => readNumber(extra.key || ('bored.high.' + id))
 });
 
 export const HIGH_SCORE_GAMES = [
@@ -94,8 +94,13 @@ export const HIGH_SCORE_GAMES = [
   highScore('block-blast', 'Block Blast', 'points', { metric: 'score', when: snapshot => snapshot.finished === true, resumable: true }),
   // Chess counts the human's wins against the computer in a session, like Connect Four.
   highScore('chess', 'Chess', 'wins', { metric: 'wins', qualify: snapshot => snapshot.cpu === true, when: snapshot => snapshot.won === 1, resumable: true }),
-  // Mahjong ranks the pairs cleared from one deal; a half-finished board still counts.
-  highScore('mahjong', 'Mahjong', 'pairs', { metric: 'pairs' }),
+  // Rank full 144-tile Mahjong clears by completion time; pairs remain
+  // available for daily challenges, but partial deals are not speed records.
+  highScore('mahjong', 'Mahjong', 'seconds', {
+    metric: 'seconds', lower: true, min: 60, max: 86400,
+    key: 'bored.high.mahjong-time-v3',
+    when: snapshot => snapshot.won === true && snapshot.finished === true && snapshot.total === 144 && snapshot.pairs === 72
+  }),
   highScore("minigolf", "Minigolf", "strokes", { metric: "strokes", when: snapshot => snapshot.finished === true, lower: true }),
   // Native Connect Four counts human victories against its AI across the session.
   highScore('connect-four', 'Connect Four', 'wins', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
@@ -129,10 +134,9 @@ export const HIGH_SCORE_GAMES = [
   highScore('solitaire', 'Solitaire', 'seconds', {
     metric: 'seconds',
     lower: true,
-    when: snapshot => snapshot.won === true,
-    // The shared rule was written for foundation cards, so the range check has
-    // to come from here now that the board ranks seconds.
-    max: 86400,
+    when: snapshot => snapshot.won === true && snapshot.cards === 52 && snapshot.moves >= 52,
+    // Ignore implausible times and legacy scores from the pausable timer.
+    min: 20, max: 86400, key: 'bored.high.solitaire-wall-v3',
     note: 'Fastest clear of all 52 cards'
   }),
   highScore('lights-out', 'Lights Out', 'boards', { metric: 'cleared' }),
@@ -217,7 +221,7 @@ export function scoreValue(slug, snapshot, { leaving = false } = {}) {
   const value = spec.transform ? spec.transform(snapshot) : Number(snapshot[spec.metric]);
   if (!Number.isFinite(value)) return 0;
   const rounded = Math.round(value);
-  return rounded > 0 ? rounded : 0;
+  return rounded > 0 && (!spec.min || rounded >= spec.min) && (!spec.max || rounded <= spec.max) ? rounded : 0;
 }
 
 /**
@@ -229,7 +233,7 @@ export function recordBest(slug, snapshot, options) {
   const spec = highScoreSpec.get(slug);
   const value = scoreValue(slug, snapshot, options);
   if (!spec || !value) return false;
-  const previous = readNumber(spec.key);
+  const previous = bestValue(spec);
   if (previous && (spec.lower ? value >= previous : value <= previous)) return false;
   if (!writeRaw(spec.key, value)) return false;
   requestScoreSync();
