@@ -285,7 +285,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 disabled>Reset</button></div>
         <div class="btn-row"><button class="btn" id="clearBtn">Clear</button><button class="btn"
                 id="pauseBtn">Pause</button></div>
-        <div id="help">Left click &mdash; draw<br>Right click &mdash; erase<br>Space &mdash; pause<br>1&ndash;0
+        <div id="help">Left click &mdash; draw<br>Right click &mdash; erase<br>Wind &mdash; drag to aim<br>Mites &mdash; eat plants<br>Space &mdash; pause<br>1&ndash;0
             Q/W/E/R/T/Y/U/A/S/D/G/H/N/I/B/C/V/Z/X &mdash; select</div>
     </aside>
     <main id="main">
@@ -1178,8 +1178,18 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                         return [100, 30, 180];
                     }
                     case DESTAT: { const pulse = ((frame * 2 + x * 5 + y * 7) % 16) - 8; return [cl(50 + pulse, 0, 255), cl(175 + pulse, 0, 255), cl(110 + pulse, 0, 255)]; }
-                    case FAN_LEFT: return (x % 3 === 0) ? [145, 215, 215] : [45, 95, 105];
-                    case FAN_RIGHT: return (x % 3 === 2) ? [145, 215, 215] : [45, 95, 105];
+                    case WIND: {
+                        const fade = gLife[I(x, y)] / 55;
+                        const ripple = ((h + frame * 9) % 21) - 10;
+                        return [cl(16 + fade * 56 + ripple, 0, 255),
+                                cl(25 + fade * 95 + ripple, 0, 255),
+                                cl(32 + fade * 114 + ripple, 0, 255)];
+                    }
+                    case MITE: {
+                        const step = ((frame >> 2) + h) % 4;
+                        return [cl(158 + step * 12 + v, 0, 255),
+                                cl(83 + step * 14 + v, 0, 255), cl(39 + v, 0, 255)];
+                    }
                     case OBSIDIAN: { const cr = (h % 16) - 8; return [cl(28 + cr, 0, 255), cl(18 + cr, 0, 255), cl(42 + cr, 0, 255)]; }
                     case STOVE: { const t = gTemp[I(x, y)] / 245, f = ((frame * 3 + x * 7 + y * 5) % 12) - 6; return [cl(Math.round(120 + t * 135) + f, 0, 255), cl(Math.round(30 + t * 30) + f, 0, 255), cl(Math.round(10 + t * 10), 0, 255)]; }
                     case PAN: { const t = gTemp[I(x, y)] / 240, f = ((frame * 2 + x * 5 + y * 7) % 8) - 4; if (t > .4) { return [cl(Math.round(90 + t * 120) + f, 0, 255), cl(Math.round(85 + t * 40) + f, 0, 255), cl(Math.round(80) + f, 0, 255)]; } return [cl(88 + v, 0, 255), cl(83 + v, 0, 255), cl(78 + v, 0, 255)]; }
@@ -1201,6 +1211,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 else if (t === STEAM) gLife[i] = rnd(30, 60);
                 else if (t === ELECTRICITY) gLife[i] = rnd(30, 50);
                 else if (t === NITROGEN) gLife[i] = rnd(80, 160);
+                else if (t === WIND) { gLife[i] = rnd(32, 55); gExtra[i] = windDirection; }
+                else if (t === MITE) gLife[i] = rnd(60, 100);
                 else gLife[i] = 0;
             }
 
@@ -1222,7 +1234,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             }
 
             // dirty-rect: only recompute cells that changed or are animated
-            const ANIMATED_TYPES = new Set([FIRE, SMOKE, STEAM, LAVA, ELECTRICITY, ACID, NITROGEN, METHANE, WATER, GOLD, CLONER, DESTAT, SODIUM, IRON, COAL, STOVE, PAN, EGG, CARAMEL, DOUGH]);
+            const ANIMATED_TYPES = new Set([FIRE, SMOKE, STEAM, LAVA, ELECTRICITY, ACID, NITROGEN, METHANE, WATER, GOLD, CLONER, DESTAT, SODIUM, IRON, COAL, STOVE, PAN, EGG, CARAMEL, DOUGH, WIND, MITE]);
             const GLOW_TYPES = new Set([FIRE, LAVA, ELECTRICITY, NITROGEN]);
             const prevGrid = new Uint8Array(COLS * ROWS);
             const prevLife = new Uint8Array(COLS * ROWS);
@@ -1286,12 +1298,15 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
             let selected = SAND, brushSize = 3, painting = false, lastMX = -1, lastMY = -1, eraseMode = false, paused = false, simSpeed = 1.0, simAccum = 0, cursorCX = -1, cursorCY = -1;
             let currentMode = 'brush'; // 'brush', 'rect', 'fill'
+            let windDirection = 1; // right by default; updated from mouse/touch drag
             let rectStartX = -1, rectStartY = -1, rectEndX = -1, rectEndY = -1;
 
             function paintAt(cx, cy) {
                 const r = brushSize >> 1, t = eraseMode ? EMPTY : selected;
                 for (let dy = -r; dy <= r; dy++)for (let dx = -r; dx <= r; dx++) {
                     if (dx * dx + dy * dy > r * r + 1) continue; const x = cx + dx, y = cy + dy; if (!ok(x, y)) continue; const i = I(x, y);
+                    // A gust passes through air; don't overwrite existing terrain.
+                    if (t === WIND && grid[i] !== EMPTY && grid[i] !== WIND) continue;
                     initCell(i, t);
                 }
             }
@@ -1321,6 +1336,9 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 if (!painting) return;
                 const [x, y] = cell(e);
                 if (currentMode === 'brush') {
+                    if (!eraseMode && selected === WIND && lastMX >= 0 &&
+                        (x !== lastMX || y !== lastMY))
+                        windDirection = windHeading(x - lastMX, y - lastMY);
                     if (lastMX >= 0) bresenham(lastMX, lastMY, x, y, paintAt);
                     else paintAt(x, y);
                 } else if (currentMode === 'rect') {
@@ -1360,6 +1378,9 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 if (!painting) return;
                 const t = e.touches[0], [x, y] = cell(t);
                 if (currentMode === 'brush') {
+                    if (!eraseMode && selected === WIND && lastMX >= 0 &&
+                        (x !== lastMX || y !== lastMY))
+                        windDirection = windHeading(x - lastMX, y - lastMY);
                     if (lastMX >= 0) bresenham(lastMX, lastMY, x, y, paintAt);
                     else paintAt(x, y);
                 } else if (currentMode === 'rect') {
@@ -1391,7 +1412,11 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 btn.title = el.desc; btn.addEventListener('click', () => selElem(idx)); elemDiv.appendChild(btn); btns.push(btn);
                 if (el.cooking) cookingEls.push(btn);
             });
-            function selElem(i) { btns.forEach(b => b.classList.remove('active')); btns[i].classList.add('active'); selected = ELEMENTS[i].id; eraseMode = false; }
+            function selElem(i) {
+                btns.forEach(b => b.classList.remove('active'));
+                btns[i].classList.add('active'); selected = ELEMENTS[i].id; eraseMode = false;
+                if (selected === WIND) setMode('brush');
+            }
             document.addEventListener('keydown', e => { if (e.repeat) return; const i = ELEMENTS.findIndex(el => el.key === e.key.toLowerCase() && (!el.cooking || cookingUnlocked)); if (i >= 0) selElem(i); if (e.key === ' ') { e.preventDefault(); paused = !paused; document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause'; } });
 
             // secret unlock: click title 6 times
@@ -1408,9 +1433,10 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             });
 
             function setMode(mode) {
-                currentMode = mode;
+                // A gust needs a direction, so rectangular/flood wind isn't useful.
+                currentMode = selected === WIND ? 'brush' : mode;
                 ['modeBrush', 'modeRect', 'modeFill'].forEach(id => {
-                    document.getElementById(id).classList.toggle('active', id.toLowerCase().endsWith(mode));
+                    document.getElementById(id).classList.toggle('active', id.toLowerCase().endsWith(currentMode));
                 });
             }
             document.getElementById('modeBrush').addEventListener('click', () => setMode('brush'));
@@ -1420,7 +1446,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             document.getElementById('bs').addEventListener('input', e => { brushSize = +e.target.value; document.getElementById('bsVal').textContent = brushSize; });
             document.getElementById('sp').addEventListener('input', e => { simSpeed = +e.target.value / 10; document.getElementById('spVal').textContent = simSpeed.toFixed(1) + 'x'; });
 
-            document.getElementById('clearBtn').addEventListener('click', () => { grid.fill(0); gLife.fill(0); gExtra.fill(0); gTemp.fill(0); });
+            document.getElementById('clearBtn').addEventListener('click', () => { grid.fill(0); gLife.fill(0); gMove.fill(0); gExtra.fill(0); gTemp.fill(0); mitePopulation = 0; });
 
             document.getElementById('pauseBtn').addEventListener('click', () => { paused = !paused; document.getElementById('pauseBtn').textContent = paused ? 'Resume' : 'Pause'; });
 
