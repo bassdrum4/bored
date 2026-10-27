@@ -15,7 +15,7 @@ import {
   isLocalOnly, bestValue, formatScore, recordBest, scoreValue,
   syncScores, onScoresPosted
 } from './hub/scores.js';
-import { pullPlayerState, pushPlayerState } from './hub/cloud.js';
+import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
@@ -474,7 +474,7 @@ function localPlayerState() {
   return {
     library: { favorites: [...favorites], recent: recentGames, favoriteEvents },
     bests: Object.fromEntries(LB_GAMES
-      .map(game => [game.id, bestValue(game)])
+      .map(game => [cloudScoreKey(game.id), bestValue(game)])
       .filter(([, value]) => Number.isFinite(value) && value > 0)),
     daily: Object.fromEntries(daily)
   };
@@ -518,8 +518,10 @@ function mergePlayerState(data) {
   }
 
   for (const game of LB_GAMES) {
-    const cloud = Math.round(Number(data.bests?.[game.id]));
-    if (!Number.isFinite(cloud) || cloud <= 0) continue;
+    // Old cloud keys are preserved as history, but must never hydrate new
+    // local score versions (e.g. three-second Solitaire, Mahjong pairs).
+    const cloud = Math.round(Number(data.bests?.[cloudScoreKey(game.id)]));
+    if (!Number.isFinite(cloud) || cloud <= 0 || (game.min && cloud < game.min) || (game.max && cloud > game.max)) continue;
     const local = bestValue(game);
     if (local && (game.lower ? local <= cloud : local >= cloud)) continue;
     const key = game.key || (game.id === 'minesweeper' ? 'bored.synced.minesweeper' : null);
