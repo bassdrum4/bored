@@ -292,7 +292,10 @@ export async function syncScores() {
     score = Math.round(score);
     const rule = scoreRules.get(game.id);
     const ceiling = Number.isFinite(game.max) ? game.max : rule?.max_value;
-    if (Number.isFinite(ceiling) && score > ceiling) continue;
+    // Stored scores can come from older clients or a cloud restore; apply
+    // the same bounds at upload time as when capturing new gameplay.
+    if (score <= 0 || (Number.isFinite(game.min) && score < game.min) ||
+        (Number.isFinite(ceiling) && score > ceiling)) continue;
     const previous = serverValues.get(game.id);
     if (previous != null && (game.lower ? score >= previous : score <= previous)) continue;
     if (getSession()?.user?.id !== session.user.id) return false;
