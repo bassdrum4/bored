@@ -31,7 +31,7 @@ canvas.width = COLS * T;
 canvas.height = ROWS * T + 48;
 
 function fit() {
-  const s = Math.min(innerWidth / canvas.width, innerHeight / canvas.height) * 0.96;
+  const s = Math.min(innerWidth / canvas.width, innerHeight / canvas.height) * 0.995;
   canvas.style.width = (canvas.width * s) + 'px';
   canvas.style.height = (canvas.height * s) + 'px';
 }
@@ -303,7 +303,7 @@ function updateGhost(g) {
     : g.fright ? (mine ? 1.2 : 0.9)
     : inTunnel(g.col,g.row) ? 0.9
     : mine ? 2.7 : 1.6;
-  g.progress += g.speed;
+  g.progress += g.speed * 0.95;
   if (g.progress >= T) {
     g.col += g.dir.x; g.row += g.dir.y; g.progress = 0;
     if (g.col < 0) g.col += COLS;
@@ -517,11 +517,11 @@ function render() {
       const x = c*T + T/2, y = r*T + OY + T/2;
       if (maze[r][c] === 0) {
         ctx.fillStyle = '#ffb8ae';
-        ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI*2); ctx.fill();
       } else if (maze[r][c] === 3) {
         if (frame % 30 < 20) {
           ctx.fillStyle = '#ffb8ae';
-          ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI*2); ctx.fill();
         }
       }
     }
@@ -541,7 +541,7 @@ function render() {
       const a = Math.min(t, 1) * Math.PI;
       ctx.fillStyle = '#ffff00';
       ctx.beginPath(); ctx.moveTo(px, py);
-      ctx.arc(px, py, T/2 - 2, a, Math.PI*2 - a);
+      ctx.arc(px, py, T/2 - 1, a, Math.PI*2 - a);
       ctx.closePath(); ctx.fill();
     } else {
       ctx.fillStyle = '#ffff00';
@@ -553,14 +553,14 @@ function render() {
       else if (pac.dir === UP)  { sa = -Math.PI/2 + ma; ea = -Math.PI/2 - ma; }
       else if (pac.dir === DN)  { sa = Math.PI/2 + ma; ea = Math.PI/2 - ma; }
       else                      { sa = ma; ea = Math.PI*2 - ma; }
-      ctx.arc(px, py, T/2 - 2, sa, ea);
+      ctx.arc(px, py, T/2 - 1, sa, ea);
       ctx.closePath(); ctx.fill();
     }
   }
 
   // Ghosts
   for (const g of ghosts) {
-    const gx = g.x, gy = g.y + OY, r = T/2 - 2;
+    const gx = g.x, gy = g.y + OY, r = T/2 - 1;
     if (g.state === 'eaten') { drawEyes(gx, gy, g.dir); continue; }
     if (g.state === 'pen' || g.state === 'leaving' || g.state === 'entering') {
       drawGhostBody(gx, gy, r, g.color, false, false);
@@ -585,6 +585,8 @@ function render() {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#888';
   ctx.fillText('HI ' + hiScore, canvas.width/2, hy + 12);
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'right';
+  ctx.fillText('LIVES ' + Math.max(0, lives), canvas.width - 8, hy + 31);
   for (let i = 0; i < lives - 1; i++) {
     const lx = 18 + i * 22, ly = hy + 28;
     ctx.fillStyle = '#ffff00';
