@@ -167,7 +167,9 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     content.append(box);
   }
   function valueText(m, seat) {
-    const value = Number(m.state?.plays?.[seat]);
+    const raw = m.state?.plays?.[seat];
+    if (raw == null || raw === '') return '';
+    const value = Number(raw);
     const unit = TOGETHER_GAMES[m.game]?.unit;
     if (!Number.isFinite(value)) return '';
     return value.toLocaleString('en-US') + (unit ? ' ' + unit : '');
@@ -181,6 +183,10 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
       const scores = [valueText(m, mine), valueText(m, theirs)].filter(Boolean);
       return head + (scores.length === 2 ? ' · ' + scores[0] + ' to ' + scores[1] : '');
     }
+    // A submitted run leads provisionally until the opponent has played.
+    // Never label it a final win or expose the score before both finish.
+    if (valueText(m, mine) && !valueText(m, theirs)) return 'Leading for now · awaiting their run';
+    if (valueText(m, theirs) && !valueText(m, mine)) return 'Opponent leading for now · your run';
     if (turn) return valueText(m, theirs) ? 'Your run · beat ' + valueText(m, theirs) : 'Your run';
     return valueText(m, mine) ? 'Their run · you sent ' + valueText(m, mine) : 'Their run';
   }
