@@ -626,6 +626,36 @@ test('browser regressions', async t => {
     assert.equal(await page.$$eval('#recent-list button', els => els.length), 4);
   });
 
+
+  await t.test('Frogger scores forward progress once per life, not up/down loops', async () => {
+    const frame = await openTitle('frogger', 'Frogger');
+    await frame.waitForFunction(() => typeof moveFrog === 'function' && typeof startGame === 'function');
+    const results = await frame.evaluate(() => {
+      startGame();
+      const press = key => document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      press('ArrowUp'); // 13 -> 12, a genuinely new row
+      const first = score;
+      for (let i = 0; i < 5; i++) { press('ArrowDown'); press('ArrowUp'); }
+      const oscillation = score;
+      getLane(11).items = []; // deterministic road without a random collision
+      press('ArrowUp'); // 12 -> 11, another new row
+      const further = score;
+      die(); deathT = 1; tick(); // one lost life resets per-life progress
+      press('ArrowUp');
+      const newLife = score;
+      startGame();
+      press('ArrowUp');
+      return { first, oscillation, further, newLife, restarted: score, state };
+    });
+    assert.equal(results.first, 10, 'first forward row scores');
+    assert.equal(results.oscillation, 10, 'revisiting the same row never farms points');
+    assert.equal(results.further, 20, 'reaching a genuinely new row scores');
+    assert.equal(results.newLife, 30, 'a new life has its own forward-progress record');
+    assert.equal(results.restarted, 10, 'a new game resets score and progress');
+    assert.equal(results.state, 'playing');
+    await close();
+  });
+
   await t.test('DEEP cuts one dungeon per day, descends five floors, and the Warden seals the Core', async () => {
     const frame = await openTitle('deep', 'DEEP');
     await frame.waitForFunction(() => typeof __deep === 'object');
