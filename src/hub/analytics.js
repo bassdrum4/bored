@@ -1,4 +1,4 @@
-import { request, getSession, freshSession, ANON_TOKEN } from './backend.js';
+import { request, getSession, freshSession, refreshSession, ANON_TOKEN } from './backend.js';
 import { readStored, writeStored, removeStored } from './store.js';
 
 // Installed before game scripts so startup failures are observed too. No error text is sent.
@@ -22,6 +22,12 @@ export function cleanSnapshot(value) {
     if (typeof item === 'boolean' || (typeof item === 'number' && Number.isFinite(item))) result[key] = item;
   }
   return result;
+}
+
+// Identity is bound at delivery time. This prevents an account switch or stale
+// queued row from repeatedly failing the insert policy for the current token.
+export function prepareAnalyticsRows(batch, userId) {
+  return batch.map(({ _table, ...row }) => ({ ...row, user_id: userId || null }));
 }
 
 // Integrates time over short samples. Input *values* are never observed or stored.
@@ -103,12 +109,22 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       }
       // PostgREST accepts arrays: grouping adjacent events cuts round-trips and
       // request overhead, while ON CONFLICT DO NOTHING makes retries idempotent.
-      const rows = batch.map(({ _table, ...row }) => row);
+      const rows = prepareAnalyticsRows(batch, user);
       if (enabled && rows.length) {
-        await request('/rest/v1/' + table, {
+        const post = accessToken => request('/rest/v1/' + table, {
           method: 'POST', body: rows.length === 1 ? rows[0] : rows,
-          token, keepalive, prefer: 'return=minimal,resolution=ignore-duplicates'
+          token: accessToken, keepalive, prefer: 'return=minimal,resolution=ignore-duplicates'
         });
+        try {
+          await post(token);
+        } catch (error) {
+          // A token can expire or be revoked before its local expires_at value.
+          // Refresh once, then leave the batch queued for the next normal retry.
+          if (error?.status !== 401 || !user) throw error;
+          const refreshed = await refreshSession();
+          if (refreshed?.user?.id !== user) throw error;
+          await post(refreshed.access_token);
+        }
         const sent = new Set(batch.map(row => row.id));
         pending = pending.filter(item => !sent.has(item.id));
         delivered = true;
