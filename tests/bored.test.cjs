@@ -1121,12 +1121,26 @@ test('browser regressions', async t => {
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
       await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'wordle', solved: true, guesses: 2 }); });
       await close();
-      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.wordle')), '3');
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.wordle')), '2', 'two completed guesses must rank as two, not three');
       frame = await openTitle('wordle', 'Wordle');
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
       await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'wordle', solved: true, guesses: 4 }); });
       await close();
-      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.wordle')), '3', 'worse solves keep the best');
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.wordle')), '2', 'worse solves keep the best');
+
+      // Real Wordle resolves the guess, then increments row. The adapter
+      // already reports completed guesses; don't count an extra attempt.
+      await page.evaluate(() => localStorage.removeItem('bored.high.wordle'));
+      frame = await openTitle('wordle', 'Wordle');
+      await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
+      await frame.evaluate(() => { current = answer; submitGuess(); });
+      await frame.waitForFunction(() => window.__boredSnapshot().solved === true, { timeout: 4000 });
+      assert.deepEqual(await frame.evaluate(() => {
+        const { solved, guesses } = window.__boredSnapshot();
+        return { solved, guesses };
+      }), { solved: true, guesses: 1 }, 'a real first-guess solve exposes exactly one completed guess');
+      await close();
+      assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.wordle')), '1', 'a first-guess solve ranks first');
 
       // 8 Ball, Sand and Eco are open-ended toys, not runs to compare: they keep
       // no best at all, so a fine rack leaves nothing in this browser.
