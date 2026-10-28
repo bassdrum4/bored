@@ -76,8 +76,10 @@ function die(){
   state='dying';deathT=50;
 }
 
+let furthestRow = 13;
 function resetFrog(){
   frog.x=6;frog.y=13;frog.sx=6;frog.sy=13;frog.rideDx=0;
+  furthestRow=13;
 }
 
 function startGame(){
@@ -89,7 +91,8 @@ function moveFrog(dx,dy){
   let nx=frog.x+dx, ny=frog.y+dy;
   if(nx<0||nx>=COLS||ny<0||ny>=ROWS) return;
   frog.x=nx; frog.y=ny;
-  if(dy<0) score+=10;
+  // Pay for reaching a new row, not oscillating between two rows.
+  if(dy<0 && ny<furthestRow){score+=10;furthestRow=ny;}
   frog.rideDx=0;
   check();
 }
