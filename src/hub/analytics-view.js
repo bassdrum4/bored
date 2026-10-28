@@ -249,9 +249,12 @@ async function load() {
       ...[...new Set(events.map(e => e.user_id).filter(Boolean))].map(id => new Option(handles[id] || id.slice(0, 8), id)));
     $('#person').value = [...$('#person').options].some(o => o.value === previous) ? previous : '';
     page = 0; render();
+    const emptyReason = events.length ? '' : loaded.length
+      ? ' · Player report is empty because every recorded event in this selection was staff/admin activity.'
+      : ' · No telemetry was received in this selection.';
     $('#status').textContent = (capped ? 'EVENT LIMIT REACHED — showing only the earliest 20,000 events. Narrow the date range. ' : '') +
-      events.length.toLocaleString() + ' events loaded · refreshed ' + dateTime(cutoff) + (events.length ? '' : ' · Collection begins with this release.') +
-      (excluded ? ' · ' + excluded.toLocaleString() + ' admin events excluded' : '');
+      events.length.toLocaleString() + ' player events loaded · refreshed ' + dateTime(cutoff) + emptyReason +
+      (excluded ? ' · ' + excluded.toLocaleString() + ' staff/admin events recorded and excluded' : '');
   } catch (error) {
     events = []; productEvents = []; surveyRows = []; togetherSummary = null; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
     if (authorized) render();
