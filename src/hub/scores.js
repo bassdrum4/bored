@@ -120,9 +120,10 @@ export const HIGH_SCORE_GAMES = [
   highScore('breakout', 'Breakout', 'points', { metric: 'score' }),
   highScore('frogger', 'Frogger', 'points', { metric: 'score' }),
   highScore('wordle', 'Wordle', 'guesses', {
+    // The Wordle adapter reports the number of submitted rows after each
+    // guess resolves. Adding one made every completed solve rank too slowly.
     metric: 'guesses', lower: true,
-    when: snapshot => snapshot.solved === true,
-    transform: snapshot => snapshot.guesses + 1
+    when: snapshot => snapshot.solved === true
   }),
   highScore('space-invaders', 'Space Invaders', 'points', { metric: 'score' }),
   highScore('qbert', 'Q*bert', 'points', { metric: 'score' }),
