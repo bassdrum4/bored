@@ -681,10 +681,10 @@ textarea.result[hidden] { display:none; }
   }
 
   /* ─────────────────────────── hud ─────────────────────────── */
-  // Turns count a little, so a descent that dies on floor one still ends on a
-  // positive score and can be saved and ranked (a zero is never captured).
+  // Only earned progress counts. Turns include waiting and backtracking and
+  // must never generate points; keep a minimum of 1 for completed attempts.
   function liveScore() {
-    return Math.round(state.gold + state.kills * 12 + (state.depth - 1) * 200 + state.turns);
+    return Math.max(1, Math.round(state.gold + state.kills * 12 + (state.depth - 1) * 200));
   }
   function updateHUD() {
     const pct = Math.max(0, state.hp) / state.maxHp * 100;
