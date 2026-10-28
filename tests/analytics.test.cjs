@@ -7,7 +7,7 @@ const { serve } = require('./serve.cjs');
 const root = path.resolve(__dirname, '..');
 
 test('active time excludes hidden, idle, unfocused, paused, loading and clock sleep', async () => {
-  const { timeSlice, cleanSnapshot } = await import('../src/hub/analytics.js');
+  const { timeSlice, cleanSnapshot, prepareAnalyticsRows } = await import('../src/hub/analytics.js');
   const state = { visible: true, focused: true, ready: true, paused: false };
   assert.deepEqual(timeSlice(1000, 2000, 0, state), { activeMs: 1000, visibleMs: 1000 });
   for (const patch of [{ visible: false }, { ready: false }]) assert.deepEqual(timeSlice(1000, 2000, 0, { ...state, ...patch }), { activeMs: 0, visibleMs: 0 });
@@ -16,6 +16,12 @@ test('active time excludes hidden, idle, unfocused, paused, loading and clock sl
   assert.deepEqual(timeSlice(59500, 60500, 0, state), { activeMs: 500, visibleMs: 1000 });
   assert.deepEqual(timeSlice(1000, 100000, 0, state), { activeMs: 2000, visibleMs: 2000 });
   assert.deepEqual(cleanSnapshot({ slug: 'snake', input: 'private words', score: 20, won: true, token: 'secret', infinite: Infinity, nested: { email: 'x' } }), { score: 20, won: true });
+  assert.deepEqual(prepareAnalyticsRows([
+    { _table:'product_events', id:'1', user_id:'stale-user', kind:'visit' }
+  ], 'current-user'), [{ id:'1', user_id:'current-user', kind:'visit' }]);
+  assert.deepEqual(prepareAnalyticsRows([
+    { _table:'product_events', id:'2', user_id:'stale-user', kind:'visit' }
+  ], null), [{ id:'2', user_id:null, kind:'visit' }]);
 });
 
 test('retention cohorts, meaningful play, and returning visitor calculations', async () => {
@@ -131,7 +137,7 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   await page.reload();
   await page.waitForFunction(() => document.querySelectorAll('#totals strong').length === 8);
   // Admin play is staff activity: its two snake events never reach the report.
-  assert.match(await page.$eval('#status',n=>n.textContent), /2 admin events excluded/);
+  assert.match(await page.$eval('#status',n=>n.textContent), /2 staff\/admin events recorded and excluded/);
   assert.equal(await page.$$eval('#person option', options => options.some(o => o.value === 'admin-id')), false);
   assert.equal(await page.$eval('#totals strong',n=>n.textContent), '25 s');
   // The new admin-only tab renders from the same protected endpoint set.
