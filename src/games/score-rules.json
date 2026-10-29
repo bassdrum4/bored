@@ -20,6 +20,7 @@
   "pac-man": { "label": "Points", "better": "high", "max_value": 10000000 },
   "poker": { "label": "Chips above the start stack", "better": "high", "max_value": 100000 },
   "pong": { "label": "Points", "better": "high", "max_value": 999 },
+  "prism-duel": { "label": "P1 wins in a session", "better": "high", "max_value": 999 },
   "qbert": { "label": "Score", "better": "high", "max_value": 10000000 },
   "shadow-net": { "label": "Files downloaded", "better": "high", "max_value": 999 },
   "simon": { "label": "Rounds completed", "better": "high", "max_value": 999 },
