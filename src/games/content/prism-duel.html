@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prism Duel</title>
+<style>
+:root{--paper:#f5f2ea;--ink:#191713;--dim:#6b6558;--red:#b3261e;--rule:#d8d2c4}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:ui-monospace,Consolas,monospace}
+body{display:flex;justify-content:center;align-items:center;padding:12px}main{width:min(100%,760px);text-align:center}
+h1{font-size:24px;margin:0 0 3px;letter-spacing:1px}h1 span{color:var(--red)}
+.sub{color:var(--dim);font-size:12px;margin:0 0 9px}
+canvas{display:block;width:min(100%,760px);height:auto;aspect-ratio:760/600;background:var(--paper);border:1px solid var(--ink);touch-action:none}
+.controls{display:flex;justify-content:space-between;gap:8px;margin:9px auto 0;color:var(--dim);font-size:11px;text-align:left;line-height:1.5}
+.controls b{color:var(--ink)}.controls div:last-child b{color:var(--red)}
+button{border:1px solid var(--ink);background:var(--paper);font:700 12px ui-monospace,monospace;color:var(--ink);border-radius:3px;cursor:pointer;padding:8px 12px}
+button:disabled{opacity:.4}#again{margin-top:10px;background:var(--ink);color:var(--paper)}[hidden]{display:none!important}
+#touch{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px auto 0;max-width:520px}
+#pad{display:grid;grid-template-columns:repeat(3,40px);gap:3px}#pad button{height:38px;padding:0}
+#pad [data-move=up]{grid-column:2}#pad [data-move=left]{grid-column:1}#pad [data-move=down]{grid-column:2}#pad [data-move=right]{grid-column:3;grid-row:2}
+#actions{display:flex;flex-wrap:wrap;justify-content:center;gap:5px}#actions button{min-width:48px}
+@media(min-width:650px){#touch{display:none}}@media(max-width:500px){h1{font-size:19px}.sub{font-size:10px}.controls{font-size:9px}}
+</style></head><body><main><h1>PRISM DUEL<span>.</span></h1><p class="sub">a game of light &amp; mirrors · bend your beam, burn the core</p>
+<canvas id="game" width="760" height="600" aria-label="Nine-by-nine mirror duel board"></canvas>
+<div class="controls"><div><b>P1</b> WASD move · Q \ · E / · F fire</div><div><b>P2</b> arrows move · I \ · O / · Enter fire</div></div>
+<div id="touch"><div id="pad"><button data-move="up" aria-label="Up">↑</button><button data-move="left" aria-label="Left">←</button><button data-move="down" aria-label="Down">↓</button><button data-move="right" aria-label="Right">→</button></div><div id="actions"><button data-place="1"> \ </button><button data-place="2"> / </button><button id="shoot">Fire</button></div></div>
+<button id="again" hidden>Rematch</button></main>
+<script>
+"use strict";
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d"),again=document.getElementById("again");
+const N=9,CELL=54,BX=(760-9*CELL)/2,BY=76,ACCENT=["#191713","#b3261e"],PAPER="#f5f2ea";
+let grid,turn,over,winner,cur,beam=null,beamOwner=0,switchAfterBeam=false,wins=[0,0];
+function reset(){grid=Array.from({length:N},()=>Array(N).fill(0));grid[4][0]=3;grid[4][8]=4;turn=0;over=false;winner=null;cur={x:4,y:4};beam=null;switchAfterBeam=false;again.hidden=true}
+function move(dx,dy){if(over||beam)return;cur.x=Math.max(0,Math.min(8,cur.x+dx));cur.y=Math.max(0,Math.min(8,cur.y+dy))}
+function next(){turn=1-turn;cur={x:4,y:4}}
+function place(type){if(over||beam||grid[cur.y][cur.x])return;grid[cur.y][cur.x]=type;next()}
+function bounce(dx,dy,type){return type===1?[dy,dx]:[-dy,-dx]}
+function trace(id){const cells=[{x:id===0?0:8,y:4}];let dx=id===0?1:-1,dy=0,x=id===0?1:7,y=4,bounces=0;const visited=new Set();
+while(x>=0&&x<9&&y>=0&&y<9){const state=[x,y,dx,dy].join(",");if(visited.has(state))return{cells,hit:-1,bounces};visited.add(state);cells.push({x,y});const c=grid[y][x];
+if(c===1||c===2){bounces++;[dx,dy]=bounce(dx,dy,c)}
+else if(c===3||c===4)return{cells,hit:c-3,bounces};
+x+=dx;y+=dy}return{cells,hit:-1,bounces}}
+function fire(){if(over||beam)return;const result=trace(turn);beam={cells:result.cells,t:750};beamOwner=turn;
+if(result.bounces>0&&result.hit!==-1){winner=result.hit===turn?1-turn:turn;wins[winner]++;over=true;again.hidden=false}
+else switchAfterBeam=true}
+function snapshot(){return{slug:"prism-duel",wins:wins[0],finished:over,won:over&&winner===0}}
+window.__boredSnapshot=snapshot;
+function drawCell(x,y){const px=BX+x*CELL,py=BY+y*CELL,c=grid[y][x];ctx.fillStyle="rgba(25,23,19,.035)";ctx.fillRect(px+1,py+1,CELL-2,CELL-2);ctx.strokeStyle="rgba(25,23,19,.12)";ctx.lineWidth=1;ctx.strokeRect(px+1,py+1,CELL-2,CELL-2);
+if(c===3||c===4){ctx.fillStyle=ACCENT[c-3];ctx.beginPath();ctx.arc(px+27,py+27,16,0,Math.PI*2);ctx.fill();ctx.fillStyle=PAPER;ctx.textAlign="center";ctx.textBaseline="middle";ctx.font="bold 14px monospace";ctx.fillText(c===3?"P1":"P2",px+27,py+28)}
+if(c===1||c===2){ctx.strokeStyle=ACCENT[0];ctx.lineWidth=4.5;ctx.lineCap="round";ctx.beginPath();if(c===1){ctx.moveTo(px+11,py+11);ctx.lineTo(px+43,py+43)}else{ctx.moveTo(px+43,py+11);ctx.lineTo(px+11,py+43)}ctx.stroke()}}
+function draw(now){const dt=Math.min(50,now-(draw.last||now));draw.last=now;ctx.clearRect(0,0,760,600);
+ctx.textBaseline="top";ctx.textAlign="left";ctx.fillStyle=ACCENT[0];ctx.font="bold 16px monospace";ctx.fillText("P1",BX,18);ctx.fillStyle="#6b6558";ctx.font="12px monospace";ctx.fillText("wins "+wins[0],BX+40,22);
+ctx.textAlign="right";ctx.fillStyle=ACCENT[1];ctx.font="bold 16px monospace";ctx.fillText("P2",BX+486,18);ctx.fillStyle="#6b6558";ctx.font="12px monospace";ctx.fillText("wins "+wins[1],BX+440,40);
+ctx.textAlign="center";ctx.fillStyle=ACCENT[turn];ctx.font="bold 13px monospace";ctx.fillText("— P"+(turn+1)+"’s turn —",380,16);
+for(let y=0;y<9;y++)for(let x=0;x<9;x++)drawCell(x,y);
+if(beam){beam.t-=dt;const fade=Math.max(0,Math.min(1,beam.t/130));for(const [width,color] of [[13,"rgba(231,178,74,"+(.55*fade)+")"],[4,"rgba(25,23,19,"+(.95*fade)+")"]]){ctx.lineWidth=width;ctx.strokeStyle=color;ctx.lineCap="round";ctx.lineJoin="round";ctx.beginPath();beam.cells.forEach((p,i)=>{const x=BX+p.x*CELL+27,y=BY+p.y*CELL+27;if(!i)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke()}if(beam.t<=0){beam=null;if(switchAfterBeam&&!over){switchAfterBeam=false;next()}}}
+if(!over){ctx.save();ctx.setLineDash([5,4]);ctx.strokeStyle=ACCENT[turn];ctx.lineWidth=3;ctx.strokeRect(BX+cur.x*CELL+3,BY+cur.y*CELL+3,CELL-6,CELL-6);ctx.restore()}
+else{ctx.fillStyle="rgba(245,242,234,.9)";ctx.fillRect(0,0,760,600);ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle=ACCENT[winner];ctx.font="bold 36px monospace";ctx.fillText("P"+(winner+1)+" WINS",380,245);ctx.fillStyle="#6b6558";ctx.font="14px monospace";ctx.fillText("P"+(2-winner)+" core burned · a shot needs a mirror bounce",380,315)}
+requestAnimationFrame(draw)}
+window.addEventListener("keydown",e=>{const k=e.key;if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Enter"].includes(k))e.preventDefault();if(e.repeat||over||beam)return;
+if(turn===0){if(k==="w"||k==="W")move(0,-1);else if(k==="s"||k==="S")move(0,1);else if(k==="a"||k==="A")move(-1,0);else if(k==="d"||k==="D")move(1,0);else if(k==="q"||k==="Q")place(1);else if(k==="e"||k==="E")place(2);else if(k==="f"||k==="F")fire()}
+else{if(k==="ArrowUp")move(0,-1);else if(k==="ArrowDown")move(0,1);else if(k==="ArrowLeft")move(-1,0);else if(k==="ArrowRight")move(1,0);else if(k==="i"||k==="I")place(1);else if(k==="o"||k==="O")place(2);else if(k==="Enter")fire()}});
+document.querySelectorAll("[data-move]").forEach(b=>b.addEventListener("click",()=>{const d={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[b.dataset.move];move(...d)}));
+document.querySelectorAll("[data-place]").forEach(b=>b.addEventListener("click",()=>place(Number(b.dataset.place))));
+document.getElementById("shoot").addEventListener("click",fire);
+canvas.addEventListener("pointerdown",e=>{if(over||beam)return;const r=canvas.getBoundingClientRect(),x=Math.floor(((e.clientX-r.left)/r.width*760-BX)/CELL),y=Math.floor(((e.clientY-r.top)/r.height*600-BY)/CELL);if(x>=0&&x<9&&y>=0&&y<9)cur={x,y}});
+again.addEventListener("click",reset);reset();requestAnimationFrame(draw);
+</script></body></html>
