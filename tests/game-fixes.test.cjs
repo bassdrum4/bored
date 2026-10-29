@@ -179,3 +179,60 @@ test('Mites feed on plant matter, reproduce when well-fed, and die near flames',
   ctx.updMite(3, 2);
   assert.equal(grid[at(3, 2)], 19, 'a mite dies from nearby fire');
 });
+
+
+test('DEEP leaderboard score ignores idle turns but rewards earned progress', () => {
+  // Execute the production score formula from inside the game's IIFE, not a
+  // reimplementation. Waiting and walking must never farm leaderboard points.
+  const html = load('src/games/content/deep.html');
+  const state = { gold: 0, kills: 0, depth: 1, turns: 0 };
+  const ctx = vm.createContext({ state });
+  vm.runInContext(extractFunction(html, 'liveScore'), ctx);
+  assert.equal(ctx.liveScore(), 1, 'a completed zero-progress attempt stays capturable');
+
+  state.turns = 10000;
+  assert.equal(ctx.liveScore(), 1, 'waiting thousands of turns cannot raise the score');
+  state.gold = 7;
+  assert.equal(ctx.liveScore(), 7, 'earned gold raises the score');
+  state.turns = 20000;
+  assert.equal(ctx.liveScore(), 7, 'more waiting still cannot add points');
+  state.kills = 2;
+  assert.equal(ctx.liveScore(), 31, 'defeated enemies count as progress');
+  state.depth = 2;
+  assert.equal(ctx.liveScore(), 231, 'descending to a new floor counts as progress');
+});
+
+test('Frogger only awards upward progress once per row per life', () => {
+  // Exercise the real reset/start/movement functions with collision detection
+  // stubbed out. Oscillating in safe rows must not create unlimited points.
+  const html = load('src/games/content/frogger.html');
+  const begin = html.indexOf('function resetFrog(){');
+  const end = html.indexOf('function check(){', begin);
+  assert.ok(begin >= 0 && end > begin, 'Frogger movement functions are present');
+  const ctx = vm.createContext({
+    COLS: 13, ROWS: 15, tMax: 30, timer: 30, score: 0, lives: 3, level: 1,
+    state: 'title', filled: new Set(), furthestRow: 13,
+    frog: { x: 6, y: 13, sx: 6, sy: 13, rideDx: 0 },
+    buildLanes() {}, check() {}
+  });
+  vm.runInContext(html.slice(begin, end), ctx);
+
+  ctx.startGame();
+  assert.equal(ctx.score, 0);
+  ctx.moveFrog(0, -1);
+  assert.equal(ctx.score, 10, 'first new row earns ten points');
+  for (let i = 0; i < 20; i++) {
+    ctx.moveFrog(0, 1);
+    ctx.moveFrog(0, -1);
+  }
+  assert.equal(ctx.score, 10, 'up/down oscillation cannot farm the same row');
+  ctx.moveFrog(0, -1);
+  assert.equal(ctx.score, 20, 'reaching a genuinely new row earns points');
+  ctx.resetFrog();
+  ctx.moveFrog(0, -1);
+  assert.equal(ctx.score, 30, 'a new life resets the progress frontier');
+  ctx.startGame();
+  assert.equal(ctx.score, 0, 'starting a new game resets the score');
+  ctx.moveFrog(0, -1);
+  assert.equal(ctx.score, 10, 'a new run still rewards legitimate progress');
+});
