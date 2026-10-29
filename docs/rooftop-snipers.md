@@ -43,6 +43,28 @@ The CSP permits inline/Blob scripts and legacy asm.js eval,
 but no HTTP asset, analytics, or CDN calls from the game document. The original
 site wrapper's metadata, icons, stylesheet and links are omitted.
 
+## Boring Edition
+
+The game is packaged under its own name, with a "Boring Edition" subtitle drawn
+into its title art. The subtitle is painted into the Unity texture
+`Rooftop Snipers Title` (300×200, uncompressed RGBA32), so it lives in the `data`
+payload rather than in any text this repository owns. The wrapper's `<title>`, the cover heading and the catalog name all read "Rooftop Snipers: Boring
+Edition"; the New Eich Games credit is unchanged.
+
+Because the art is baked in, the code, framework and memory blobs are still
+byte-identical to upstream, but the `data` blob is not: it is the upstream
+archive with one texture swapped, repacked, and re-gzipped as plain gzip (no
+Unity comment marker, matching the original payload). The title texture is
+uncompressed, so its pixels can be replaced without disturbing script data, and
+the bundle reloads with the new image intact.
+
+`tests/rooftop-snipers.test.cjs` pins the hash of that patched blob. Running
+`scripts/package-rooftop-snipers.mjs` against a fresh upstream checkout restores
+the unbranded title, and the suite will fail until the patch is reapplied or the
+hash is put back. The subtitle glyphs are a hand-drawn 5×7 bitmap (B O R I N G E
+D I T) scaled 3×, outlined 2 px, and shaded light grey below the midline to match
+the logo's two-tone letters.
+
 ## Reproduce or edit
 
 The shipped HTML contains generated binary payloads. Edit

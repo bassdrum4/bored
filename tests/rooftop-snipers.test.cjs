@@ -17,7 +17,7 @@ test('the original replaces the remake under its existing identity without obsol
   const { ORDER, UNSCORED_GAMES } = await import('../src/games/catalog.js');
   const { CHALLENGES } = await import('../src/daily.js');
   const { LB_GAMES } = await import('../src/hub/scores.js');
-  assert.deepEqual(ORDER.filter(([slug]) => slug.startsWith('rooftop-snipers')), [['rooftop-snipers', 'Rooftop Snipers']]);
+  assert.deepEqual(ORDER.filter(([slug]) => slug.startsWith('rooftop-snipers')), [['rooftop-snipers', 'Rooftop Snipers: Boring Edition']]);
   assert.ok(UNSCORED_GAMES.includes('rooftop-snipers'));
   assert.ok(!CHALLENGES.some(game => game.slug === 'rooftop-snipers'));
   assert.ok(!LB_GAMES.some(game => game.id === 'rooftop-snipers'));
@@ -30,7 +30,7 @@ test('Rooftop Snipers preserves original gameplay/assets and packages a valid of
   // placeholder while keeping the new card. Core code, data and memory stay exact.
   for (const [name, hash] of Object.entries({
     'rooftop-snipers.asm.code.unityweb': '9fdb1d5414f6bab1f84467e7d834f5694cb612d80af6394e4b6c13b85c7ba5da',
-    'rooftop-snipers.data.unityweb': 'b82dd5d2ee5567e5759c1f49413d8e48428a92fae7cc79d8da577b4345682f82',
+    'rooftop-snipers.data.unityweb': '3630893d0c341d0c13b21c856e55dcb638a005f3f761939f4deac9b505258cc9',
     'rooftop-snipers.asm.memory.unityweb': '884ffa169399ef39af758b6d4fbc0dfd0a97e6dc8bff5d35a4cf2cf46098b682'
   })) assert.equal(sha(Buffer.from(build.assets[name], 'base64')), hash, name);
   for (const key of ['dataUrl', 'asmCodeUrl', 'asmMemoryUrl', 'asmFrameworkUrl']) {
