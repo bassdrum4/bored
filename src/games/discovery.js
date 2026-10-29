@@ -4,6 +4,7 @@ import { ORDER, EXTERNS } from './catalog.js';
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
 export const DISCOVERY = {
+  'prism-duel': info('2–5 min', 'Competitive', ['Keyboard', 'Touch'], { quick: true, players: '2 local' }),
   'cup-pong': info('2–5 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   'rooftop-snipers': info('2–5 min', 'Competitive', ['Keyboard', 'Touch'], { quick: true, players: '2 local' }),
   'block-blast': info('2–5 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
@@ -69,7 +70,7 @@ export function inCollection(slug, collection) {
 // it builds a card, so the site needs no build step to carry them.
 // Newly scaffolded games start with an SVG placeholder; captured screenshots
 // remain WebP and can replace it later without changing the loader.
-export const PREVIEW_FALLBACKS = { 'cup-pong': '.svg', 'block-blast': '.svg', chess: '.svg', mahjong: '.svg' };
+export const PREVIEW_FALLBACKS = { 'prism-duel': '.svg', 'cup-pong': '.svg', 'block-blast': '.svg', chess: '.svg', mahjong: '.svg' };
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
   ORDER.filter(([slug]) => !EXTERNS[slug]).map(([slug]) => [slug, previewUrl(slug)]));
