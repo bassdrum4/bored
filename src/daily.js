@@ -219,7 +219,7 @@ const DAILY_ADAPTERS = {
   commanders: { closure: true, expression: '({waves:Math.max(0,wn-1),score:P&&P.sc?P.sc:0})' },
   lava: { expression: '({points:sc?sc[0]:0,cpu:cpuMode===true})' },
   volletball: { expression: '({points:sc[0],cpu:cpuMode===true})' },
-  tank2: { expression: '({won:mode==="OVER"&&winner===0?1:0,cpu:aiEnabled===true})' },
+  tank2: { expression: '({won:sessionWins,cpu:aiEnabled===true,started:mode!=="TITLE"})' },
   'gun-mayhem': { expression: '({wins:pls[0]?pls[0].wins:0,cpu:mode==="1p"})' },
   'shadow-net': { expression: '({files:state.downloadCount})' },
   sand: { closure: true, expression: '({cells:grid.reduce((n,v)=>n+(v!==EMPTY),0),materials:new Set(grid.filter(v=>v!==EMPTY)).size})' },

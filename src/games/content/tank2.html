@@ -81,6 +81,8 @@ let mode,terrain,tanks,proj,parts,popups,powerups,debris;
 let power,keys,winner,timer,shake,flashX,flashY,flashR,flashA;
 let overT,turnCnt,nextPU,selWeap,anyHit,nukeFlash,missed;
 let aiEnabled,aiTimer,aiTarget,deathTimer,deathWinner,terrainIdx,turn;
+// Rounds roll straight on against the AI, so the board counts the session.
+let sessionWins=0;
 // Bored Together: the match stores a seed and a shot list, and this document
 // replays both through the shared rules file instead of simulating on its own.
 let online=null,onlineAnim=null,onlineBusy=false;
@@ -244,9 +246,9 @@ function update(){
       break;
     }
     case'BOOM':timer--;if(timer<=0){if(tanks[0].hp<=0||tanks[1].hp<=0){if(tanks[0].hp<=0)spawnDebris(tanks[0]);if(tanks[1].hp<=0)spawnDebris(tanks[1]);deathWinner=tanks[0].hp>tanks[1].hp?0:tanks[1].hp>tanks[0].hp?1:(turn===0?1:0);mode='DEATH';deathTimer=0}else{mode='SWITCH';timer=30}}break;
-    case'DEATH':deathTimer++;updateDebris();if(deathTimer>100){winner=deathWinner;mode='OVER';overT=0}break;
+    case'DEATH':deathTimer++;updateDebris();if(deathTimer>100){winner=deathWinner;mode='OVER';overT=0;if(winner===0)sessionWins++}break;
     case'SWITCH':timer--;if(timer<=0){turn=1-turn;turnCnt++;power=5;selWeap='standard';missed=false;if(turnCnt>=nextPU&&powerups.length<MAXPU){spawnPU();nextPU=turnCnt+1+Math.floor(Math.random()*2);if(Math.random()<.35&&powerups.length<MAXPU)spawnPU()}mode=turn===1&&aiEnabled?'AI_THINK':'AIM';aiTimer=0}break;
-    case'OVER':overT++;break;
+    case'OVER':overT++;if(aiEnabled&&!online&&overT>110)startGame(false);break;
   }
 }
 
@@ -349,7 +351,7 @@ function drawHUD(){
     ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.6;ctx.fillText('Q/E Move  ·  A/D Aim  ·  W/S Power  ·  1-4 Weapon  ·  Space Fire',W/2,H-8);ctx.globalAlpha=1;
   }
   if(missed&&mode==='SWITCH'&&timer>15){ctx.globalAlpha=Math.min(1,(timer-15)/20);ctx.font='500 22px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=PL.txL;ctx.fillText('Miss!',W/2,H/2-40);ctx.globalAlpha=1}
-  if(mode==='OVER'){ctx.fillStyle='rgba(45,36,56,0.55)';ctx.fillRect(0,0,W,H);const a=Math.min(1,overT/30);const wn=online?(online.names[winner]||(winner===0?'Lavender':'Mint')):(winner===0?'Lavender':'Mint'),wc=winner===0?PL.t1:PL.t2;ctx.globalAlpha=a;ctx.font='700 48px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=wc;ctx.fillText(wn+' Wins!',W/2,H/2-15);if(!online){ctx.font='400 18px Fredoka,sans-serif';ctx.fillStyle=PL.w;ctx.fillText('Press R to play again',W/2,H/2+25)}ctx.globalAlpha=1}
+  if(mode==='OVER'){ctx.fillStyle='rgba(45,36,56,0.55)';ctx.fillRect(0,0,W,H);const a=Math.min(1,overT/30);const wn=online?(online.names[winner]||(winner===0?'Lavender':'Mint')):(winner===0?'Lavender':'Mint'),wc=winner===0?PL.t1:PL.t2;ctx.globalAlpha=a;ctx.font='700 48px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=wc;ctx.fillText(wn+' Wins!',W/2,H/2-15);if(!online){ctx.font='400 18px Fredoka,sans-serif';ctx.fillStyle=PL.w;ctx.fillText(aiEnabled?'Next round':'Press R to play again',W/2,H/2+25)}ctx.globalAlpha=1}
 }
 
 function drawHP(x,y,w,h,r,col,lbl){ctx.fillStyle=PL.hpBg;fillRR(x,y,w,h,3);if(r>0){ctx.fillStyle=col;fillRR(x,y,Math.max(h,w*r),h,3)}ctx.font='600 11px Fredoka,sans-serif';ctx.textAlign='left';ctx.fillStyle=PL.tx;ctx.fillText(lbl+'  '+Math.round(r*MAXHP)+' HP',x+2,y-3)}
@@ -390,7 +392,8 @@ function drawTitle(){
 }
 
 // ── Init ──
-function startGame(){
+function startGame(fresh=true){
+  if(fresh)sessionWins=0;
   TERRAINS[terrainIdx].fn();
   tanks=[mkTank(.15,0),mkTank(.85,1)];adjSpawn();
   proj=[];parts=[];popups=[];powerups=[];debris=[];

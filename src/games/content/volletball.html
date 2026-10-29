@@ -348,7 +348,9 @@ function update() {
       bump(sc[0] > sc[1] || (ball.x >= NET_X) ? s1El : s2El);
       spark(ball.x, GROUND, '#c4956a', 18, 4);
       spark(ball.x, GROUND, lastHit === 0 ? '#00e5ff' : '#ff4757', 12, 3);
-      if (sc[0] >= WIN || sc[1] >= WIN) {
+      // Seven takes the local match. Against the CPU the rally never stops
+      // asking for a winner, so the score just keeps climbing.
+      if (!cpuMode && (sc[0] >= WIN || sc[1] >= WIN)) {
         st = 'over';
         msg(sc[0] >= WIN ? 'PLAYER 1 WINS!' : 'PLAYER 2 WINS!', sc[0] >= WIN ? '#00e5ff' : '#ff4757');
       } else {

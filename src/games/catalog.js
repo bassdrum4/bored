@@ -24,7 +24,7 @@ ORDER.unshift(['deep', 'DEEP']);
 export const META = {
   "fluid": ["Sandbox", "Drag to stir ink through a live fluid."],
   "signal-tower": ["Strategy", "Thirty waves, six towers and threats that fly, plate up or hide. Hold the line."],
-  "prism-duel": ["Strategy", "Two players place mirrors, reflect beams, and try to burn the rival core."],
+  "prism-duel": ["Strategy", "Place mirrors, bend a beam, burn the other core. The CPU plays too."],
   "rooftop-snipers": ["Arcade", "The original two-button rooftop duel. Jump, aim, and knock your rival off the roof."],
   "block-blast": ["Puzzle", "Drop blocks into an 8x8 grid and clear full lines."],
   "chess": ["Strategy", "Play the computer or a friend on an 8x8 board."],

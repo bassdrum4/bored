@@ -382,7 +382,8 @@ function update() {
       shake = 12;
       shockwaves.push({ x: loser.x, y: loser.y, r: 0, maxR: 200, life: 1, color: loser.color });
 
-      if (winner.score >= WIN) {
+      // A local duel still stops at seven; the CPU never lets you put it down.
+      if (!cpuMode && winner.score >= WIN) {
         const label = winIdx === 1 ? 'PLAYER 1' : (cpuMode ? 'CPU' : 'PLAYER 2');
         setTimeout(() => endGame(label, winner.color), 600);
       } else {

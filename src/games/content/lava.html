@@ -240,7 +240,7 @@ function update(){
     gt-=1/60;
     [p1,p2].forEach(p=>{if(!p.alive&&p.fall>0){p.fall-=0.02;p.y+=1.5;if(Math.random()<0.3)spark(p.x,p.y,'#ff6600',1,2);}
       if(p.alive&&overVoid(p)){p.alive=false;p.fall=1;spark(p.x,p.y,p.c,20,5);spark(p.x,p.y,'#ff6600',12,4);}});
-    updateGrid();      if(gt<=0){if(sc[0]>=WIN||sc[1]>=WIN){gs='over';showMsg(sc[0]>=WIN?'P1 WINS!':(cpuMode?'CPU WINS!':'P2 WINS!'),sc[0]>=WIN?'#00e5ff':'#ff4757');rstE.classList.add('show');}else reset();}
+    updateGrid();      if(gt<=0){if(!cpuMode&&(sc[0]>=WIN||sc[1]>=WIN)){gs='over';showMsg(sc[0]>=WIN?'P1 WINS!':'P2 WINS!',sc[0]>=WIN?'#00e5ff':'#ff4757');rstE.classList.add('show');}else reset();}
     return;
   }
 
@@ -353,7 +353,7 @@ function drawUI(){
   let rem=0;for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(grid[r][c].s<GONE)rem++;
   ctx.font='11px "DM Mono",monospace';ctx.textAlign='right';ctx.fillStyle='rgba(255,255,255,0.1)';
   ctx.fillText(rem+' tiles',GX+GW-4,GY+GH+8);
-  if(gs==='play'){ctx.textAlign='left';ctx.fillText('R '+(Math.max(...sc)+1)+'/'+WIN,GX+4,GY+GH+8);}
+  if(gs==='play'){ctx.textAlign='left';ctx.fillText(cpuMode?'ROUND '+(sc[0]+sc[1]+1):'R '+(Math.max(...sc)+1)+'/'+WIN,GX+4,GY+GH+8);}
   if(gs==='ready'){
     ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(GX,GY,GW,GH);
     ctx.font='80px "Bebas Neue",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';

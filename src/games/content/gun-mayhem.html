@@ -637,7 +637,7 @@ function update(){
         const active=pls.filter(p=>p.lives>0);
         if(active.length<=1){st='rndEnd';rndTmr=140;if(active.length===1){active[0].wins++;showRndEnd(active[0]);}else showRndEnd(null);}
     }
-    if(st==='rndEnd'){rndTmr-=dt;if(rndTmr<=0){const w=pls.find(p=>p.wins>=ROUNDS_WIN);if(w){showGameOver(w);st='gameOver';}else{mapi=(mapi+1)%MAPS.length;st='playing';startRound();}}}
+    if(st==='rndEnd'){rndTmr-=dt;if(rndTmr<=0){const w=mode==='2p'?pls.find(p=>p.wins>=ROUNDS_WIN):null;if(w){showGameOver(w);st='gameOver';}else{mapi=(mapi+1)%MAPS.length;st='playing';startRound();}}}
 }
 
 // ============ RENDER ============
@@ -837,7 +837,7 @@ function drawHUD(){
     X.fillStyle='rgba(255,255,255,.15)';X.font='12px Rajdhani';X.textAlign='right';
     X.fillText(MAPS[mapi].nm+' \u2022 '+diff.toUpperCase(),W-15,H-12);
     X.fillStyle='rgba(255,255,255,.15)';X.font='12px Rajdhani';X.textAlign='left';
-    X.fillText('First to '+ROUNDS_WIN,15,H-12);
+    X.fillText(mode==='2p'?'First to '+ROUNDS_WIN:'Endless',15,H-12);
 }
 
 // ============ GAME LOOP ============

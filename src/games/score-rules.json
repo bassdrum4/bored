@@ -100,8 +100,8 @@
     "max_value": 999
   },
   "prism-duel": {
-    "label": "P1 wins in a session",
-    "better": "high",
+    "label": "Fewest turns to burn the CPU core",
+    "better": "low",
     "max_value": 999
   },
   "qbert": {

@@ -474,8 +474,21 @@ function paint() {
     tile.el.setAttribute('aria-pressed', String(tile === selected));
     tile.el.setAttribute('aria-label', label(tile) + (free ? ', free' : ', blocked'));
   }
-  hudEl.textContent = 'Pairs ' + pairs + ' / ' + tiles.length / 2 + ' \u00b7 Left ' + left;
+  hudEl.textContent = hudText();
   if (mode === 'tutorial') paintSteps();
+}
+
+// The clock runs from the first tile of a deal, so reading the rules costs
+// nothing, and freezes with the finishing time when the board clears.
+function elapsed() {
+  const end = won && finishedAt !== null ? finishedAt : performance.now();
+  const seconds = Math.max(0, Math.floor((end - startedAt) / 1000));
+  return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+}
+
+function hudText() {
+  const clock = mode === 'deal' && startedAt !== null ? ' \u00b7 ' + elapsed() : '';
+  return 'Pairs ' + pairs + ' / ' + tiles.length / 2 + ' \u00b7 Left ' + left + clock;
 }
 
 function paintSteps() {
@@ -605,6 +618,9 @@ $('hint').onclick = showHint;
 $('tutorial-exit').onclick = () => setTutorial(false);
 tutorialToggle.onclick = () => setTutorial(mode !== 'tutorial');
 window.addEventListener('resize', resize);
+setInterval(() => {
+  if (mode === 'deal' && startedAt !== null) hudEl.textContent = hudText();
+}, 500);
 
 window.__boredSnapshot = () => mode === 'tutorial'
   ? { slug: 'mahjong', pairs: 0, remaining: left, total: tiles.length, finished: false, won: false, tutorial: true }

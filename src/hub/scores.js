@@ -91,7 +91,16 @@ export const HIGH_SCORE_GAMES = [
   // Signal Tower keeps the waves already cleared, so leaving mid-defence still
   // keeps what the line has held. A run that never clears wave one saves nothing.
   highScore("signal-tower", "Signal Tower", "waves", { metric: "waves", resumable: true }),
-  highScore('prism-duel', 'Prism Duel', 'wins', { metric: 'wins' }),
+  // Prism Duel ranks the fewest of your own turns it took to burn the CPU's
+  // core across the session; a two-player duel is unranked, so the spec only
+  // reads a win the CPU was actually sitting across the board for. The turns
+  // beat the old win counter, which could not tell a two-turn kill from a
+  // twenty-turn grind, so the stored best starts a fresh key.
+  highScore('prism-duel', 'Prism Duel', 'turns', {
+    metric: 'turns', lower: true, min: 1, max: 999,
+    when: snapshot => snapshot.cpu === true && snapshot.won === true,
+    key: 'bored.high.prism-duel-turns-v1'
+  }),
   // Block Blast counts the score of a run that ended with no piece left to place.
   highScore('block-blast', 'Block Blast', 'points', { metric: 'score', when: snapshot => snapshot.finished === true, resumable: true }),
   // Chess counts the human's wins against the computer in a session, like Connect Four.

@@ -30,3 +30,16 @@ update public.score_rules
 
 delete from public.scores
   where game in ('tetris', 'breakout', 'frogger', 'space-invaders', 'qbert', 'commanders', 'asteroids');
+
+-- Prism Duel now has a CPU opponent, and only that duel is ranked. The board
+-- reads the fewest of your own turns it took to burn the CPU's core, which is
+-- finer than "wins in a session" and cannot be padded by two-player rounds.
+-- Stored values are win counts, so they have no meaning in turns: the board
+-- starts clean here too.
+
+update public.score_rules
+  set label = 'Fewest turns to burn the CPU core', better = 'low', max_value = 999
+  where game = 'prism-duel';
+
+delete from public.scores
+  where game = 'prism-duel';
