@@ -22,7 +22,7 @@ export const FRESH_GAMES = ["signal-tower", "prism-duel", "rooftop-snipers", "bl
 ORDER.unshift(['2048', '2048'], ['memory', 'Memory'], ['connect-four', 'Connect Four'], ['aim-lab', 'Aim Lab']);
 ORDER.unshift(['deep', 'DEEP']);
 export const META = {
-  "signal-tower": ["Strategy", "Hold the line: build towers, upgrade them, and survive twenty waves."],
+  "signal-tower": ["Strategy", "Thirty waves, six towers and threats that fly, plate up or hide. Hold the line."],
   "prism-duel": ["Strategy", "Two players place mirrors, reflect beams, and try to burn the rival core."],
   "rooftop-snipers": ["Arcade", "The original two-button rooftop duel. Jump, aim, and knock your rival off the roof."],
   "block-blast": ["Puzzle", "Drop blocks into an 8x8 grid and clear full lines."],

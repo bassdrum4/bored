@@ -1,13 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="384" height="240" viewBox="0 0 384 240">
-  <rect width="384" height="240" fill="#f5f2ea"/>
-  <rect x="12" y="12" width="360" height="216" fill="#fffdf7" stroke="#d8d2c4"/>
-  <path d="M12 84H84V30H200V198H285V84H372" fill="none" stroke="#456653" stroke-opacity=".18" stroke-width="18"/>
-  <path d="M12 84H84V30H200V198H285V84H372" fill="none" stroke="#456653" stroke-opacity=".5" stroke-width="1" stroke-dasharray="3 4"/>
-  <rect x="110" y="40" width="14" height="14" fill="#456653"/>
-  <rect x="236" y="60" width="14" height="14" fill="#456653"/>
-  <rect x="236" y="120" width="14" height="14" fill="#456653"/>
-  <rect x="150" y="130" width="12" height="12" fill="#191713"/>
-  <rect x="168" y="188" width="12" height="12" fill="#191713"/>
-  <rect x="60" y="76" width="12" height="12" fill="#191713"/>
-  <text x="24" y="214" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#6b6558" letter-spacing="1">SIGNAL TOWER</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="264" viewBox="0 0 384 264">
+  <rect width="384" height="264" fill="#f5f2ea"/>
+  <rect x="12" y="12" width="360" height="240" fill="#fffdf7"/>
+  <g stroke="#d8d2c4" stroke-width="1">
+    <path d="M42 12V252M72 12V252M102 12V252M132 12V252M162 12V252M192 12V252M222 12V252M252 12V252M282 12V252M312 12V252M342 12V252"/>
+    <path d="M12 42H372M12 72H372M12 102H372M12 132H372M12 162H372M12 192H372M12 222H372"/>
+  </g>
+  <g stroke="#191713" stroke-opacity=".2">
+    <path d="M56 20H72M60 28H76"/>
+    <path d="M184 20H200M188 28H204"/>
+    <path d="M310 20H326M314 28H330"/>
+  </g>
+  <g stroke="#456653" stroke-opacity=".35">
+    <path d="M110 96L118 84"/>
+    <path d="M122 96L130 84"/>
+  </g>
+  <rect x="12" y="12" width="360" height="240" fill="none" stroke="#d8d2c4"/>
+  <path d="M2 42H102V122H42V202H162V102H242V222H322V142H362" fill="none" stroke="#456653" stroke-opacity=".14" stroke-width="18"/>
+  <path d="M2 42H102V122H42V202H162V102H242V222H322V142H362" fill="none" stroke="#456653" stroke-opacity=".55" stroke-width="1" stroke-dasharray="3 4"/>
+  <rect x="98" y="74" width="12" height="12" fill="#456653"/>
+  <rect x="98" y="86" width="12" height="12" fill="#456653"/>
+  <rect x="196" y="134" width="12" height="12" fill="#456653"/>
+  <rect x="244" y="70" width="12" height="12" fill="#456653"/>
+  <rect x="196" y="146" width="12" height="12" fill="none" stroke="#456653"/>
+  <rect x="262" y="148" width="10" height="10" fill="#191713"/>
+  <rect x="150" y="70" width="10" height="10" fill="#191713"/>
+  <rect x="130" y="196" width="10" height="10" fill="#191713"/>
+  <rect x="60" y="180" width="8" height="8" fill="#191713"/>
+  <rect x="348" y="130" width="16" height="16" fill="#191713"/>
+  <rect x="352" y="134" width="8" height="8" fill="#fffdf7"/>
+  <text x="24" y="250" font-family="ui-monospace, Menlo, monospace" font-size="10" fill="#6b6558" letter-spacing="1">SIGNAL TOWER</text>
 </svg>

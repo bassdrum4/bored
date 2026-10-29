@@ -5,354 +5,1132 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Signal Tower</title>
 <style>
-  :root { --paper:#f5f2ea; --board:#fffdf7; --ink:#191713; --accent:#456653; --line:#d8d2c4; --dim:#6b6558 }
+  :root { --paper:#f5f2ea; --board:#fffdf7; --ink:#191713; --accent:#456653; --line:#d8d2c4; --dim:#6b6558; --alert:#8a4b3c }
   * { margin:0; padding:0; box-sizing:border-box }
-  body { display:grid; place-items:center; min-height:100vh; padding:14px; background:var(--paper); color:var(--ink);
-         font:13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace }
-  main { width:min(480px,100%) }
-  header { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:8px }
-  h1 { font:600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.1em; text-transform:uppercase }
-  #hud { font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.04em; color:var(--dim); text-align:right }
+  body { display:grid; place-items:center; min-height:100vh; padding:12px; background:var(--paper); color:var(--ink);
+         font:13px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace }
+  main { width:min(560px,100%) }
+  header { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:6px }
+  h1 { font:600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.1em; text-transform:uppercase; white-space:nowrap }
+  #hud { font-size:10px; letter-spacing:.05em; color:var(--dim); text-align:right }
   canvas { display:block; width:100%; height:auto; background:var(--board); border:1px solid var(--line);
            touch-action:none; cursor:crosshair }
-  #build { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px }
-  button { font:inherit; font-size:11px; padding:7px 10px; border:1px solid var(--line); border-radius:3px;
-           background:none; color:inherit; cursor:pointer }
+  #forecast { margin-top:6px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--dim); min-height:1.4em }
+  #palette, #actions, #inspect { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px }
+  #inspect { align-items:center; padding:5px; border:1px solid var(--line) }
+  #inspect[hidden] { display:none }
+  #inspect-name { flex:1 1 150px; font-size:10px; letter-spacing:.04em; color:var(--dim) }
+  button { font:inherit; font-size:10px; letter-spacing:.04em; padding:6px 8px; border:1px solid var(--line);
+           border-radius:3px; background:none; color:inherit; cursor:pointer }
   button:hover:enabled { border-color:var(--ink) }
   button[aria-pressed="true"] { border-color:var(--ink); background:var(--ink); color:var(--paper) }
-  button:disabled { opacity:.4; cursor:default }
-  #note { margin-top:8px; font-size:11px; line-height:1.5; color:var(--dim); min-height:2.8em }
+  button:disabled { opacity:.35; cursor:default }
+  #note { margin-top:6px; font-size:10.5px; line-height:1.5; color:var(--dim); min-height:3em }
 </style>
 </head>
 <body>
 <main>
-  <header><h1>Signal Tower</h1><span id="hud">WAVE 0 / 20 · CORE 20 · 120 CR</span></header>
-  <canvas id="board" width="480" height="320" aria-label="Signal Tower board: grass cells with a winding track"></canvas>
-  <div id="build">
-    <button type="button" data-tower="pulse" aria-pressed="false">Pulse · 40</button>
-    <button type="button" data-tower="frost" aria-pressed="false">Frost · 60</button>
-    <button type="button" data-tower="mortar" aria-pressed="false">Mortar · 75</button>
-    <button type="button" id="wave">Send wave</button>
+  <header><h1>Signal Tower</h1><span id="hud"></span></header>
+  <canvas id="board" width="576" height="384" aria-label="Signal Tower: a winding track across an 18 by 12 field, with six tower types to place"></canvas>
+  <p id="forecast"></p>
+  <div id="palette">
+    <button type="button" data-tower="pulse">Pulse</button>
+    <button type="button" data-tower="frost">Frost</button>
+    <button type="button" data-tower="mortar">Mortar</button>
+    <button type="button" data-tower="arc">Arc</button>
+    <button type="button" data-tower="flak">Flak</button>
+    <button type="button" data-tower="radar">Radar</button>
   </div>
-  <p id="note">Pick a tower, then a grass cell. Tap a built tower to upgrade it. Anything that reaches the right edge costs core.</p>
+  <div id="inspect" hidden>
+    <span id="inspect-name"></span>
+    <button type="button" id="upgrade">Upgrade</button>
+    <button type="button" id="target">Target</button>
+    <button type="button" id="sell">Sell</button>
+  </div>
+  <div id="actions">
+    <button type="button" id="wave">Send wave</button>
+    <button type="button" id="overcharge">Overcharge</button>
+    <button type="button" id="cryo">Cryo</button>
+    <button type="button" id="strike">Strike</button>
+    <button type="button" id="repair">Repair</button>
+    <button type="button" id="speed">1&times;</button>
+    <button type="button" id="pause">Pause</button>
+  </div>
+  <p id="note"></p>
 </main>
 <script>
-const CELL = 32, COLS = 15, ROWS = 10, W = COLS * CELL, H = ROWS * CELL;
-const WAVES = 20, START_CREDITS = 120, START_CORE = 20, FIRST_BUILD = 25, BUILD_SECONDS = 12;
+/* Signal Tower — a tower defence with six towers, nine threats and thirty waves.
+   Everything lives in this document: the hub fetches it into an iframe and reads
+   window.__boredSnapshot() when the run ends. */
+
+const CELL = 32, COLS = 18, ROWS = 12, W = COLS * CELL, H = ROWS * CELL;
+const WAVES_TOTAL = 30;
+const START_CREDITS = 160, START_CORE = 20, MAX_CORE = 20;
+const FIRST_BUILD = 22, BUILD_SECONDS = 16, REPAIR_COST = 80;
+const STRIKE_DAMAGE = 150;
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const $ = id => document.getElementById(id);
 
-/* ── the track ─────────────────────────────────────────────────────────────── */
-const WAYPOINTS = [[-1,4],[3,4],[3,1],[8,1],[8,8],[12,8],[12,4],[15,4]];
-const points = WAYPOINTS.map(([c,r]) => ({ x:(c+0.5)*CELL, y:(r+0.5)*CELL }));
+const C = { paper:'#f5f2ea', board:'#fffdf7', ink:'#191713', accent:'#456653', line:'#d8d2c4', dim:'#6b6558', alert:'#8a4b3c' };
+
+/* ── the field ─────────────────────────────────────────────────────────────── */
+
+// The track doubles back three times, so one stretch of wall covers several
+// passes. The last point is the receiver.
+const WAYPOINTS = [[-1,1],[4,1],[4,5],[1,5],[1,9],[7,9],[7,4],[11,4],[11,10],[15,10],[15,6],[17,6]];
+const points = WAYPOINTS.map(([c, r]) => ({ x:(c + 0.5) * CELL, y:(r + 0.5) * CELL }));
 const segments = [];
 let pathLength = 0;
 for (let i = 1; i < points.length; i++) {
-  const a = points[i-1], b = points[i];
-  const len = Math.hypot(b.x-a.x, b.y-a.y) || 1;
-  segments.push({ a, len, start: pathLength, dx:(b.x-a.x)/len, dy:(b.y-a.y)/len });
+  const a = points[i - 1], b = points[i];
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  segments.push({ a, len, start:pathLength, dx:(b.x - a.x) / len, dy:(b.y - a.y) / len });
   pathLength += len;
-}
-const pathCells = new Set();
-for (let i = 1; i < WAYPOINTS.length; i++) {
-  const [c0,r0] = WAYPOINTS[i-1], [c1,r1] = WAYPOINTS[i];
-  const steps = Math.max(Math.abs(c1-c0), Math.abs(r1-r0));
-  for (let s = 0; s <= steps; s++) {
-    const c = Math.round(c0 + (c1-c0)*s/steps), r = Math.round(r0 + (r1-r0)*s/steps);
-    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) pathCells.add(r*COLS+c);
-  }
 }
 function pointAt(distance) {
   for (const seg of segments) {
     if (distance <= seg.start + seg.len) {
       const t = Math.max(0, distance - seg.start);
-      return { x: seg.a.x + seg.dx*t, y: seg.a.y + seg.dy*t };
+      return { x: seg.a.x + seg.dx * t, y: seg.a.y + seg.dy * t };
     }
   }
-  const last = segments[segments.length-1];
-  return { x: last.a.x + last.dx*last.len, y: last.a.y + last.dy*last.len };
+  const last = segments[segments.length - 1];
+  return { x: last.a.x + last.dx * last.len, y: last.a.y + last.dy * last.len };
+}
+const cellKey = (c, r) => c + ',' + r;
+const pathCells = new Set();
+for (let i = 1; i < WAYPOINTS.length; i++) {
+  const [c0, r0] = WAYPOINTS[i - 1], [c1, r1] = WAYPOINTS[i];
+  const steps = Math.max(Math.abs(c1 - c0), Math.abs(r1 - r0));
+  for (let s = 0; s <= steps; s++) {
+    const c = c0 + Math.round((c1 - c0) * s / steps);
+    const r = r0 + Math.round((r1 - r0) * s / steps);
+    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) pathCells.add(cellKey(c, r));
+  }
+}
+// High ground lengthens a tower's reach; marsh will not hold a foundation.
+const RIDGES = new Set(['5,3', '2,7', '9,5', '9,2', '13,7', '16,4', '3,10']);
+const MARSH = new Set(['2,0', '6,0', '10,0', '14,0', '5,11', '9,11', '13,11', '0,7', '17,2', '6,6']);
+const CORE = { x:(17 + 0.5) * CELL, y:(6 + 0.5) * CELL };
+
+/* ── threats ───────────────────────────────────────────────────────────────── */
+
+// `hp` is the wave-one value; each wave scales it. Armour subtracts from every
+// physical round, so energy and siege towers are the answer to plating.
+const ENEMIES = {
+  grunt:  { hp:34,  speed:0.78, reward:4,  damage:1, armor:0, size:11, mark:'square' },
+  runner: { hp:20,  speed:1.55, reward:4,  damage:1, armor:0, size:9,  mark:'arrow' },
+  swarm:  { hp:12,  speed:0.98, reward:2,  damage:1, armor:0, size:6,  mark:'dot' },
+  brute:  { hp:120, speed:0.50, reward:12, damage:3, armor:4, size:15, mark:'plated', slowResist:0.5 },
+  flyer:  { hp:45,  speed:0.95, reward:7,  damage:2, armor:0, size:11, mark:'wing', air:true },
+  cloak:  { hp:60,  speed:0.85, reward:9,  damage:2, armor:0, size:11, mark:'ghost', cloak:true },
+  regen:  { hp:90,  speed:0.68, reward:10, damage:2, armor:0, size:12, mark:'ring', regenPct:0.06 },
+  hive:   { hp:70,  speed:0.72, reward:10, damage:2, armor:0, size:14, mark:'hive', split:3 },
+  hauler: { hp:420, speed:0.42, reward:70, damage:7, armor:3, size:22, mark:'hauler', slowResist:0.5, boss:true }
+};
+const PLURALS = { grunt:'grunts', runner:'runners', swarm:'swarms', brute:'plated', flyer:'wings',
+                  cloak:'ghosts', regen:'menders', hive:'hives', hauler:'haulers' };
+const SINGULAR = { brute:'plated', flyer:'wing', regen:'mender' };
+
+/* ── towers ────────────────────────────────────────────────────────────────── */
+
+// Physical rounds are stopped by armour; energy and siege ignore it. Each tower
+// has one mechanical perk at a higher level instead of a bigger number alone.
+const LEVEL_DMG = [1, 1.5, 2.2, 3.2];
+const LEVEL_RATE = [1, 1.05, 1.15, 1.3];
+const LEVEL_RANGE = [1, 1.06, 1.12, 1.2];
+const TOWERS = {
+  pulse:  { label:'Pulse', cost:40, dmg:7, rate:2.4, range:2.8, air:true, ground:true, marks:'dot',
+            blurb:'Hits ground and air. Cheap and fast; plating blunts every round.' },
+  frost:  { label:'Frost', cost:55, dmg:3, rate:1.5, range:2.5, air:true, ground:true, energy:true, slowTime:2.0, marks:'ring',
+            blurb:'Energy damage and a slowing field. Armour cannot stop it.' },
+  mortar: { label:'Mortar', cost:80, dmg:26, rate:0.65, range:3.4, minRange:1.5, air:false, ground:true, energy:true,
+            splash:1.3, marks:'box', blurb:'Ground only. Shells splash and ignore plating. Blind inside 1.5 cells.' },
+  arc:    { label:'Arc', cost:95, dmg:12, rate:1.1, range:2.6, air:true, ground:true, energy:true, chainRange:1.7, marks:'cross',
+            blurb:'Energy arcs jump between nearby targets. Hits air and ignores plating.' },
+  flak:   { label:'Flak', cost:65, dmg:8, rate:3.2, range:2.2, air:true, ground:false, marks:'chevron',
+            blurb:'Air only, and the fastest gun here. Nothing answers wings so cheaply.' },
+  radar:  { label:'Radar', cost:50, dmg:0, rate:0, range:3.2, air:true, ground:true, support:true, marks:'plus',
+            blurb:'No gun. Reveals ghosts and lifts nearby towers. Stacks three deep.' }
+};
+const TOWER_ORDER = ['pulse', 'frost', 'mortar', 'arc', 'flak', 'radar'];
+const TARGETS = ['first', 'last', 'strong', 'weak'];
+const TARGET_LABEL = { first:'First', last:'Last', strong:'Strongest', weak:'Weakest' };
+
+function radarBuff(level) {
+  return {
+    range: 0.08 + 0.02 * level,
+    rate: 0.07 + 0.02 * level,
+    radius: 2.4 + 0.2 * level,
+    reveal: 3.0 + 0.3 * level
+  };
+}
+function targetsFor(tower) {
+  if (tower.type === 'pulse') return tower.level >= 4 ? 3 : tower.level >= 3 ? 2 : 1;
+  if (tower.type === 'flak') return tower.level >= 3 ? 2 : 1;
+  if (tower.type === 'mortar') return tower.level >= 4 ? 2 : 1;
+  return 1;
+}
+function chainFor(tower) {
+  return 2 + (tower.level >= 3 ? 1 : 0) + (tower.level >= 4 ? 1 : 0);
+}
+function upgradeCost(tower) {
+  const spec = TOWERS[tower.type];
+  return Math.round(spec.cost * [0, 1.1, 1.45, 1.85][tower.level]);
 }
 
-/* ── towers and waves ──────────────────────────────────────────────────────── */
-const TOWERS = {
-  pulse:  { label:'Pulse',  cost:40, range:2.7*CELL, damage:7,  rate:2.3, mark:'dot' },
-  frost:  { label:'Frost',  cost:60, range:2.4*CELL, damage:3,  rate:1.5, mark:'ring', slow:0.45, slowTime:1.6 },
-  mortar: { label:'Mortar', cost:75, range:3.5*CELL, damage:24, rate:0.7, mark:'box', splash:1.4*CELL }
+/* ── waves ─────────────────────────────────────────────────────────────────── */
+
+// [type, count, seconds between spawns, pause after the group]. `hp` scales
+// every enemy in the wave; `mod` changes the field for that wave alone.
+const WAVES = [
+  { name:'Probe', hp:1.00, units:[['grunt',6,0.85]] },
+  { name:'Probe II', hp:1.08, units:[['grunt',8,0.75]] },
+  { name:'Footfall', hp:1.18, units:[['grunt',8,0.7],['runner',3,0.6]] },
+  { name:'Static', hp:1.30, units:[['swarm',12,0.35],['grunt',4,0.8]] },
+  { name:'Sprint', hp:1.45, units:[['runner',8,0.45],['grunt',6,0.7]] },
+  { name:'Plating', hp:1.60, units:[['brute',4,1.6],['grunt',8,0.6]] },
+  { name:'Crawl', hp:1.78, units:[['swarm',18,0.28],['runner',6,0.5]] },
+  { name:'Wings', hp:1.98, units:[['flyer',5,0.9],['grunt',8,0.6]] },
+  { name:'Crosswind', hp:2.20, units:[['flyer',4,0.8],['brute',3,1.5],['runner',6,0.5]] },
+  { name:'Hauler I', hp:2.45, boss:true, units:[['brute',3,1.4],['hauler',1,1],['grunt',8,0.5]] },
+  { name:'Ghosts', hp:2.70, units:[['cloak',5,1.0],['grunt',8,0.6]] },
+  { name:'Mend', hp:2.98, units:[['regen',4,1.2],['swarm',12,0.3]] },
+  { name:'Brood', hp:3.30, units:[['hive',3,1.6],['runner',6,0.5]] },
+  { name:'Low Ceiling', hp:3.65, mod:'fog', units:[['flyer',7,0.7],['grunt',10,0.5]] },
+  { name:'Pressure', hp:4.00, units:[['brute',5,1.2],['cloak',4,0.9],['swarm',14,0.3]] },
+  { name:'Iron', hp:4.40, mod:'armour', units:[['brute',7,1.1],['grunt',10,0.5]] },
+  { name:'Blackout', hp:4.85, mod:'fog', units:[['cloak',7,0.8],['flyer',5,0.8]] },
+  { name:'Bloom', hp:5.35, units:[['regen',6,1.0],['hive',3,1.5],['swarm',16,0.28]] },
+  { name:'Rush', hp:5.90, mod:'rush', units:[['runner',14,0.32],['hive',3,1.4]] },
+  { name:'Hauler II', hp:6.50, boss:true, units:[['flyer',8,0.6],['brute',4,1.2],['hauler',1,1]] },
+  { name:'Siege', hp:7.10, units:[['brute',8,1.0],['regen',4,1.1]] },
+  { name:'Veil', hp:7.80, mod:'fog', units:[['cloak',9,0.7],['hive',4,1.3]] },
+  { name:'Hail', hp:8.60, units:[['flyer',12,0.5],['runner',10,0.4]] },
+  { name:'Swarm Tide', hp:11.40, units:[['hive',6,1.2],['swarm',20,0.25]] },
+  { name:'Hauler III', hp:12.75, boss:true, units:[['brute',6,1.0],['hauler',1,1],['flyer',6,0.7]] },
+  { name:'Tide', hp:14.00, units:[['grunt',18,0.35],['regen',5,1.0],['cloak',5,0.8]] },
+  { name:'Anvil', hp:15.30, mod:'armour', units:[['brute',10,0.9],['hive',4,1.2]] },
+  { name:'Squall', hp:17.10, mod:'rush', units:[['runner',16,0.3],['flyer',10,0.55]] },
+  { name:'Long Dark', hp:18.75, mod:'fog', units:[['cloak',10,0.6],['regen',6,0.9],['brute',6,1.0]] },
+  { name:'The Last Haul', hp:20.00, boss:true, units:[['hauler',2,2.5],['brute',8,0.9],['flyer',8,0.6],['hive',4,1.2]] }
+];
+const MOD_LABEL = { fog:'fog', rush:'rush', armour:'plated' };
+const MOD_NOTE = {
+  fog: 'fog on the field: every tower sees 20% less.',
+  rush: 'the line is running: everything moves 25% faster.',
+  armour: 'plated column: every threat carries two more points of armour.'
 };
+
+/* ── abilities ─────────────────────────────────────────────────────────────── */
+
+const ABILITIES = {
+  overcharge: { label:'Overcharge', cooldown:40, cd:0, title:'+40% fire rate for 8s' },
+  cryo:       { label:'Cryo', cooldown:50, cd:0, title:'Freeze the field for 3.5s' },
+  strike:     { label:'Strike', cooldown:45, cd:0, title:'Aimed artillery, 150 damage' }
+};
+const ABILITY_ORDER = ['overcharge', 'cryo', 'strike'];
+
+/* ── state ─────────────────────────────────────────────────────────────────── */
+
+let credits, integrity, wave, cleared, kills, leaked, over, victory, phase;
+let buildTimer, waveTime, timeline, enemies, towers, shots, clock, uiTimer;
+let selected, selectedType, hover, paused, speed, waveMod, laneCursor;
+let overchargeUntil, strikeArmed, seed;
+
+function reseed(value) { seed = value >>> 0; }
+function random() { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }
+
+function reset() {
+  credits = START_CREDITS; integrity = START_CORE; wave = 0; cleared = 0; kills = 0; leaked = 0;
+  over = false; victory = false; phase = 'build'; buildTimer = FIRST_BUILD; waveTime = 0;
+  timeline = []; enemies = []; towers = []; shots = []; clock = 0; uiTimer = 0;
+  selected = null; selectedType = null; hover = null; paused = false; speed = 1;
+  waveMod = null; laneCursor = 0; overchargeUntil = 0; strikeArmed = false;
+  for (const key of ABILITY_ORDER) ABILITIES[key].cd = 0;
+  reseed(Math.floor(Math.random() * 4294967296));
+  note('Pick a tower, then a cell. Plating stops bullets; energy and shells do not. Radar sees ghosts.');
+  refreshUi();
+}
+
 // The hub injects __boredSeed after this script runs, so the daily seed is read
 // when the first wave starts: the first run of a Detroit day is the same board
 // for everyone, and every run after it rolls fresh.
-let runSeed = Math.floor(Math.random() * 4294967296), seedAdopted = false;
 function adoptSeed() {
-  const given = Number(window.__boredSeed?.seed);
-  runSeed = (!seedAdopted && Number.isFinite(given) && given) ? given : Math.floor(Math.random() * 4294967296);
-  seedAdopted = true;
-}
-function seedRandom(seed) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6D2B79F5) >>> 0;
-    let t = s;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
-function wavePlan(index, random) {
-  const boss = (index + 1) % 5 === 0;
-  const count = 5 + index * 2 + Math.floor(random() * 3);
-  const hp = Math.round(14 * Math.pow(1.26, index) * (0.9 + random() * 0.2));
-  return { count, hp, speed: 0.85 + index * 0.025, reward: 4 + Math.floor(index/2), boss };
+  const given = Number(window.__boredSeed && window.__boredSeed.seed);
+  reseed(Number.isFinite(given) && given ? given : Math.floor(Math.random() * 4294967296));
 }
 
-/* ── state ─────────────────────────────────────────────────────────────────── */
-let credits, integrity, wave, cleared, kills, leaked, over, victory, phase, buildTimer, spawnQueue, spawnTimer, selected;
-let enemies, towers, shots, clock;
-function reset() {
-  credits = START_CREDITS; integrity = START_CORE; wave = 0; cleared = 0; kills = 0; leaked = 0;
-  over = false; victory = false; phase = 'build'; buildTimer = FIRST_BUILD;
-  spawnQueue = []; spawnTimer = 0; enemies = []; towers = []; shots = []; clock = 0;
-  selected = null;
-  note('Pick a tower, then a grass cell. Tap a built tower to upgrade it.');
-  refreshButtons(); updateHud();
-}
+/* ── helpers ───────────────────────────────────────────────────────────────── */
 
 function note(text) { $('note').textContent = text; }
-function updateHud() {
-  $('hud').textContent = 'WAVE ' + Math.min(wave, WAVES) + ' / ' + WAVES + ' · CORE ' + Math.max(0, integrity) +
-    ' · ' + credits + ' CR' + (phase === 'build' && !over ? ' · NEXT ' + Math.ceil(Math.max(0, buildTimer)) + 's' : '');
+function towerAt(col, row) { return towers.find(t => t.col === col && t.row === row) || null; }
+function isRidge(tower) { return RIDGES.has(cellKey(tower.col, tower.row)); }
+function rangeOf(tower) {
+  let range = TOWERS[tower.type].range * LEVEL_RANGE[tower.level - 1];
+  if (isRidge(tower)) range *= 1.2;
+  range *= 1 + (tower.rRange || 0);
+  if (waveMod === 'fog') range *= 0.8;
+  return range * CELL;
 }
-function refreshButtons() {
-  for (const button of document.querySelectorAll('[data-tower]')) {
-    const spec = TOWERS[button.dataset.tower];
-    button.setAttribute('aria-pressed', String(button.dataset.tower === selected));
-    button.disabled = over || credits < spec.cost;
-  }
-  const waveButton = $('wave');
-  waveButton.disabled = phase === 'wave' && !over;
-  waveButton.textContent = over ? 'Play again' : phase === 'wave' ? 'Wave in progress' : 'Send wave';
+function rateOf(tower) {
+  const spec = TOWERS[tower.type];
+  if (!spec.rate) return 0;
+  const heated = overchargeUntil > clock ? 1.4 : 1;
+  return spec.rate * LEVEL_RATE[tower.level - 1] * (1 + (tower.rRate || 0)) * heated;
+}
+function damageOf(tower) { return TOWERS[tower.type].dmg * LEVEL_DMG[tower.level - 1]; }
+
+function damage(enemy, amount, pierce) {
+  if (!enemy || enemy.gone) return;
+  const dealt = pierce ? amount : Math.max(1, amount - enemy.armor);
+  enemy.hp -= dealt;
+  enemy.hitFlash = 0.1;
+  if (enemy.hp <= 0) killEnemy(enemy);
 }
 
-function startWave() {
-  if (over || wave >= WAVES) return;
-  wave++;
-  if (wave === 1) adoptSeed();
-  const random = seedRandom(runSeed + wave * 7919);
-  const plan = wavePlan(wave - 1, random);
-  spawnQueue = [];
-  for (let i = 0; i < plan.count; i++) spawnQueue.push({ hp: plan.hp, speed: plan.speed, reward: plan.reward, boss: false, damage: 1 });
-  if (plan.boss) spawnQueue.push({ hp: plan.hp * 5, speed: plan.speed * 0.7, reward: plan.reward * 4, boss: true, damage: 3 });
-  spawnTimer = 0.2; phase = 'wave';
-  note(plan.boss ? 'Wave ' + wave + ': a hauler is in the line.' : 'Wave ' + wave + ' is moving.');
-  refreshButtons(); updateHud();
-}
-
-function spawn(entry) {
-  const start = pointAt(0);
-  enemies.push({ x: start.x, y: start.y, dist: 0, hp: entry.hp, maxHp: entry.hp, speed: entry.speed,
-    reward: entry.reward, boss: entry.boss, damage: entry.damage, slowUntil: 0, slowFactor: 1 });
-}
-
-function towersNear(col, row) { return towers.find(t => t.col === col && t.row === row) || null; }
-function hit(enemy, damage) {
-  enemy.hp -= damage;
-  if (enemy.hp > 0) return;
+function killEnemy(enemy) {
+  if (enemy.gone) return;
+  enemy.gone = true;
   kills++;
-  credits += enemy.reward;
-  updateHud();
+  credits += Math.round(enemy.reward * (1 + 0.04 * Math.max(0, wave - 1)));
+  if (enemy.split) {
+    for (let i = 0; i < enemy.split; i++) {
+      const child = spawnEnemy('swarm', enemy.hpMul * 0.45);
+      child.dist = Math.max(0, enemy.dist - 6 - i * 5);
+      const spot = pointAt(child.dist);
+      child.x = spot.x; child.y = spot.y;
+      enemies.push(child);
+    }
+  }
+  if (enemy.boss) note('Hauler down.');
 }
 
-function leak(enemy) {
-  integrity -= enemy.damage;
+function leakEnemy(enemy) {
+  if (enemy.gone || over) return;
+  enemy.gone = true;
   leaked++;
+  integrity -= enemy.damage;
   if (integrity <= 0) { integrity = 0; finish(false); }
-  updateHud();
+}
+
+function spawnEnemy(type, hpMul) {
+  const def = ENEMIES[type];
+  const jitter = 0.95 + random() * 0.1;
+  const hp = Math.max(1, Math.round(def.hp * hpMul * jitter));
+  const air = def.air === true;
+  const lane = laneCursor++ % 2 === 0 ? 0 : ROWS - 1;
+  const enemy = {
+    type, hp, maxHp:hp, hpMul, size:def.size, mark:def.mark,
+    speed: def.speed * (waveMod === 'rush' ? 1.25 : 1),
+    reward: def.reward, damage: def.damage,
+    armor: def.armor + (waveMod === 'armour' ? 2 : 0),
+    air, boss: def.boss === true, cloak: def.cloak === true,
+    slowResist: def.slowResist || 0,
+    regen: def.regenPct ? hp * def.regenPct : 0,
+    split: def.split || 0,
+    x:0, y:0, dist:0, progress:0, heading:0,
+    slowUntil:0, slowFactor:1, frozenUntil:0, revealed:false, hitFlash:0, gone:false
+  };
+  if (air) {
+    enemy.x = -16;
+    enemy.y = lane * CELL + CELL / 2;
+    enemy.startDist = Math.hypot(CORE.x - enemy.x, CORE.y - enemy.y) || 1;
+  } else {
+    const start = pointAt(0);
+    enemy.x = start.x; enemy.y = start.y;
+  }
+  return enemy;
+}
+
+function order(pool, mode) {
+  const copy = pool.slice();
+  if (mode === 'last') return copy.sort((a, b) => a.progress - b.progress);
+  if (mode === 'strong') return copy.sort((a, b) => b.hp - a.hp);
+  if (mode === 'weak') return copy.sort((a, b) => a.hp - b.hp);
+  return copy.sort((a, b) => b.progress - a.progress);
+}
+
+function nearestOther(from, exclude, radius) {
+  let best = null, bestDistance = radius;
+  for (const enemy of enemies) {
+    if (enemy.gone || exclude.has(enemy)) continue;
+    if (enemy.cloak && !enemy.revealed) continue;
+    const distance = Math.hypot(enemy.x - from.x, enemy.y - from.y);
+    if (distance < bestDistance) { bestDistance = distance; best = enemy; }
+  }
+  return best;
+}
+
+/* ── building ──────────────────────────────────────────────────────────────── */
+
+function buildable(col, row) {
+  return !pathCells.has(cellKey(col, row)) && !MARSH.has(cellKey(col, row)) && !towerAt(col, row);
+}
+
+function place(col, row, type) {
+  const spec = TOWERS[type];
+  if (!spec || over) return false;
+  if (pathCells.has(cellKey(col, row))) { note('The track is not a building site.'); return false; }
+  if (MARSH.has(cellKey(col, row))) { note('Marsh will not hold a foundation.'); return false; }
+  if (towerAt(col, row)) { note('That cell already holds a tower.'); return false; }
+  if (credits < spec.cost) { note(spec.label + ' costs ' + spec.cost + ' CR.'); return false; }
+  credits -= spec.cost;
+  const tower = {
+    col, row, x:(col + 0.5) * CELL, y:(row + 0.5) * CELL, type, level:1,
+    cooldown:0, angle:0, targetMode:'first', invested:spec.cost, rRange:0, rRate:0, rStacks:0
+  };
+  towers.push(tower);
+  selected = tower;
+  note(spec.blurb);
+  refreshUi();
+  return true;
+}
+
+function upgrade() {
+  const tower = selected;
+  if (!tower || !towers.includes(tower)) return;
+  if (tower.level >= 4) { note('That tower is already at level 4.'); return; }
+  const cost = upgradeCost(tower);
+  if (credits < cost) { note('An upgrade costs ' + cost + ' CR.'); return; }
+  credits -= cost;
+  tower.invested += cost;
+  tower.level++;
+  const label = TOWERS[tower.type].label;
+  const perk = tower.type === 'pulse' ? (tower.level === 3 ? ' It now fires at two targets.' : tower.level === 4 ? ' It now fires at three targets.' : '')
+    : tower.type === 'arc' ? (tower.level === 3 ? ' The arc reaches one more target.' : tower.level === 4 ? ' The arc reaches a fourth target.' : '')
+    : tower.type === 'frost' ? (tower.level === 3 ? ' Its slow now splashes.' : '')
+    : tower.type === 'flak' ? (tower.level === 3 ? ' It now fires a double burst.' : '')
+    : tower.type === 'mortar' ? (tower.level === 4 ? ' It now fires two shells.' : '')
+    : ' Its reach and lift improve.';
+  note(label + ' up to level ' + tower.level + '.' + perk);
+  refreshUi();
+}
+
+function sell() {
+  const tower = selected;
+  if (!tower || !towers.includes(tower)) return;
+  const refund = Math.floor(tower.invested * 0.6);
+  credits += refund;
+  towers = towers.filter(t => t !== tower);
+  selected = null;
+  note('Tower sold for ' + refund + ' CR.');
+  refreshUi();
+}
+
+function cycleTarget() {
+  if (!selected) return;
+  const index = TARGETS.indexOf(selected.targetMode);
+  selected.targetMode = TARGETS[(index + 1) % TARGETS.length];
+  refreshUi();
+}
+
+function repair() {
+  if (over || phase !== 'build') { note('Repairs only happen between waves.'); return; }
+  if (integrity >= MAX_CORE) { note('The receiver is already sound.'); return; }
+  if (credits < REPAIR_COST) { note('A repair costs ' + REPAIR_COST + ' CR.'); return; }
+  credits -= REPAIR_COST;
+  integrity = Math.min(MAX_CORE, integrity + 2);
+  note('Two integrity restored.');
+  refreshUi();
+}
+
+/* ── waves in motion ───────────────────────────────────────────────────────── */
+
+function buildTimeline(plan) {
+  const schedule = [];
+  let cursor = 0.4;
+  for (const [type, count, gap, pause] of plan.units) {
+    for (let i = 0; i < count; i++) {
+      schedule.push({ at:cursor, type, hpMul:plan.hp });
+      cursor += gap;
+    }
+    cursor += pause === undefined ? 1.2 : pause;
+  }
+  return schedule.sort((a, b) => a.at - b.at);
+}
+
+function startWave(early) {
+  if (over || phase === 'wave' || wave >= WAVES_TOTAL) return;
+  if (wave === 0) adoptSeed();
+  if (early && phase === 'build') {
+    const bonus = Math.floor(Math.max(0, buildTimer) * 2);
+    if (bonus > 0) { credits += bonus; note('Wave sent early: +' + bonus + ' CR.'); }
+  }
+  wave++;
+  const plan = WAVES[wave - 1];
+  waveMod = plan.mod || null;
+  timeline = buildTimeline(plan);
+  waveTime = 0;
+  phase = 'wave';
+  if (plan.mod) note(plan.name + ' — ' + MOD_NOTE[plan.mod]);
+  else note(plan.name + ' is on the track.');
+  refreshUi();
+}
+
+function endWave() {
+  cleared = wave;
+  const bonus = 18 + wave * 3;
+  credits += bonus;
+  if (wave >= WAVES_TOTAL) { finish(true); return; }
+  phase = 'build';
+  buildTimer = BUILD_SECONDS;
+  waveMod = null;
+  note('Wave ' + wave + ' held. +' + bonus + ' CR.');
+  refreshUi();
 }
 
 function finish(won) {
   over = true; victory = won; phase = 'over';
-  note(won ? 'Line held. All ' + WAVES + ' waves stopped.' : 'Overrun on wave ' + Math.max(1, wave) + '.');
-  refreshButtons(); updateHud();
+  strikeArmed = false;
+  note(won ? 'Line held. All ' + WAVES_TOTAL + ' waves stopped.' : 'Overrun on wave ' + Math.max(1, wave) + '.');
+  refreshUi();
 }
 
-function upgrade(tower) {
-  if (tower.level >= 3) { note('That tower is already at level 3.'); return; }
-  const spec = TOWERS[tower.type], cost = Math.round(spec.cost * 0.8 * tower.level);
-  if (credits < cost) { note('An upgrade costs ' + cost + ' CR.'); return; }
-  credits -= cost;
-  tower.level++;
-  note(spec.label + ' upgraded to level ' + tower.level + '.');
-  refreshButtons(); updateHud();
+function spawnDue() {
+  while (timeline.length && timeline[0].at <= waveTime) {
+    const item = timeline.shift();
+    enemies.push(spawnEnemy(item.type, item.hpMul));
+  }
+}
+
+function computeBuffs() {
+  for (const tower of towers) { tower.rRange = 0; tower.rRate = 0; tower.rStacks = 0; }
+  for (const enemy of enemies) enemy.revealed = false;
+  for (const radar of towers) {
+    if (!TOWERS[radar.type].support) continue;
+    const buff = radarBuff(radar.level);
+    const reach = buff.radius * CELL;
+    for (const tower of towers) {
+      if (tower === radar || tower.rStacks >= 3) continue;
+      if (Math.hypot(tower.x - radar.x, tower.y - radar.y) <= reach) {
+        tower.rStacks++;
+        tower.rRange += buff.range;
+        tower.rRate += buff.rate;
+      }
+    }
+    const sight = buff.reveal * CELL;
+    for (const enemy of enemies) {
+      if (!enemy.cloak || enemy.gone) continue;
+      if (Math.hypot(enemy.x - radar.x, enemy.y - radar.y) <= sight) enemy.revealed = true;
+    }
+  }
+}
+
+function applySlow(enemy, power, time) {
+  const net = power * (1 - enemy.slowResist);
+  enemy.slowFactor = Math.min(enemy.slowFactor, 1 - net);
+  enemy.slowUntil = Math.max(enemy.slowUntil, clock + time);
+}
+
+function shotLine(tower, target, kind) {
+  shots.push({ kind, x1:tower.x, y1:tower.y, x2:target.x, y2:target.y, life:0.1, maxLife:0.1 });
+}
+
+function fire(tower, dt) {
+  const spec = TOWERS[tower.type];
+  if (spec.support) return;
+  tower.cooldown -= dt;
+  if (tower.cooldown > 0) return;
+  const range = rangeOf(tower);
+  const minRange = (spec.minRange || 0) * CELL;
+  const pool = [];
+  for (const enemy of enemies) {
+    if (enemy.gone) continue;
+    if (enemy.air ? !spec.air : !spec.ground) continue;
+    if (enemy.cloak && !enemy.revealed) continue;
+    const distance = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
+    if (distance > range || distance < minRange) continue;
+    pool.push(enemy);
+  }
+  if (!pool.length) return;
+  const picked = order(pool, tower.targetMode).slice(0, targetsFor(tower));
+  tower.cooldown = 1 / rateOf(tower);
+  const hit = damageOf(tower);
+  tower.angle = Math.atan2(picked[0].y - tower.y, picked[0].x - tower.x);
+
+  if (tower.type === 'arc') { arcFire(tower, picked[0], hit); return; }
+  if (tower.type === 'mortar') {
+    for (const target of picked) mortarFire(tower, target, hit);
+    return;
+  }
+  for (const target of picked) {
+    shotLine(tower, target, tower.type);
+    damage(target, hit, spec.energy === true);
+    if (tower.type === 'frost' && !target.gone) {
+      const power = 0.4 + 0.05 * (tower.level - 1);
+      applySlow(target, power, spec.slowTime);
+      if (tower.level >= 3) {
+        for (const other of enemies) {
+          if (other === target || other.gone) continue;
+          if (Math.hypot(other.x - target.x, other.y - target.y) <= 1.1 * CELL) applySlow(other, power * 0.75, spec.slowTime);
+        }
+      }
+    }
+  }
+}
+
+function arcFire(tower, first, amount) {
+  const jumps = chainFor(tower);
+  const seen = new Set();
+  const path = [{ x:tower.x, y:tower.y }];
+  let current = first;
+  for (let i = 0; i < jumps && current; i++) {
+    path.push({ x:current.x, y:current.y });
+    seen.add(current);
+    damage(current, amount, true);
+    amount *= 0.72;
+    current = nearestOther(current, seen, TOWERS.arc.chainRange * CELL);
+  }
+  shots.push({ kind:'arc', points:path, life:0.16, maxLife:0.16 });
+}
+
+function mortarFire(tower, target, amount) {
+  const radius = (TOWERS.mortar.splash + (tower.level - 1) * 0.15) * CELL;
+  shots.push({ kind:'shell', x1:tower.x, y1:tower.y, x2:target.x, y2:target.y, r:radius, life:0.3, maxLife:0.3 });
+  for (const enemy of enemies.slice()) {
+    if (enemy.gone || enemy.air) continue;
+    const distance = Math.hypot(enemy.x - target.x, enemy.y - target.y);
+    if (distance <= radius) damage(enemy, amount * (1 - 0.4 * (distance / radius)), true);
+  }
+}
+
+function moveEnemies(dt) {
+  for (const enemy of enemies) {
+    if (enemy.gone) continue;
+    if (enemy.hitFlash > 0) enemy.hitFlash -= dt;
+    if (enemy.frozenUntil > clock) continue;
+    const slow = enemy.slowUntil > clock ? enemy.slowFactor : 1;
+    const step = enemy.speed * CELL * slow * dt;
+    const fromX = enemy.x, fromY = enemy.y;
+    if (enemy.air) {
+      const dx = CORE.x - enemy.x, dy = CORE.y - enemy.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance <= 12) { leakEnemy(enemy); continue; }
+      enemy.x += dx / distance * step;
+      enemy.y += dy / distance * step;
+      enemy.progress = Math.max(0, Math.min(1, 1 - distance / enemy.startDist));
+    } else {
+      enemy.dist += step;
+      if (enemy.dist >= pathLength) { leakEnemy(enemy); continue; }
+      const spot = pointAt(enemy.dist);
+      enemy.x = spot.x; enemy.y = spot.y;
+      enemy.progress = enemy.dist / pathLength;
+    }
+    if (enemy.regen && enemy.hp < enemy.maxHp) enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.regen * dt);
+    if (enemy.x !== fromX || enemy.y !== fromY) enemy.heading = Math.atan2(enemy.y - fromY, enemy.x - fromX);
+  }
+  enemies = enemies.filter(enemy => !enemy.gone);
+}
+
+function update(dt) {
+  if (over || paused) return;
+  clock += dt;
+  uiTimer -= dt;
+  if (uiTimer <= 0) { uiTimer = 0.1; refreshUi(); }
+  for (const key of ABILITY_ORDER) {
+    const ability = ABILITIES[key];
+    if (ability.cd > 0) ability.cd = Math.max(0, ability.cd - dt);
+  }
+  if (phase === 'build') {
+    buildTimer -= dt;
+    if (buildTimer <= 0) startWave(false);
+    return;
+  }
+  if (phase !== 'wave') return;
+  waveTime += dt;
+  spawnDue();
+  moveEnemies(dt);
+  if (over) return;
+  computeBuffs();
+  for (const tower of towers) fire(tower, dt);
+  for (const shot of shots) shot.life -= dt;
+  shots = shots.filter(shot => shot.life > 0);
+  if (!timeline.length && !enemies.length && !over) endWave();
+}
+
+/* ── abilities ─────────────────────────────────────────────────────────────── */
+
+function useAbility(key) {
+  const ability = ABILITIES[key];
+  if (!ability || over || ability.cd > 0) return;
+  if (key === 'strike') {
+    strikeArmed = !strikeArmed;
+    note(strikeArmed ? 'Strike armed. Tap a point on the field.' : 'Strike cancelled.');
+    refreshUi();
+    return;
+  }
+  if (key === 'overcharge') {
+    overchargeUntil = clock + 8;
+    note('Overcharge: every tower fires 40% faster for eight seconds.');
+  }
+  if (key === 'cryo') {
+    for (const enemy of enemies) enemy.frozenUntil = Math.max(enemy.frozenUntil, clock + 3.5);
+    note('Cryo: the field is frozen for three and a half seconds.');
+  }
+  ability.cd = ability.cooldown;
+  refreshUi();
+}
+
+function strikeAt(x, y) {
+  if (!strikeArmed) return;
+  const ability = ABILITIES.strike;
+  if (ability.cd > 0) return;
+  strikeArmed = false;
+  ability.cd = ability.cooldown;
+  const radius = 1.4 * CELL;
+  for (const enemy of enemies.slice()) {
+    if (enemy.gone) continue;
+    if (enemy.cloak && !enemy.revealed) continue;
+    if (Math.hypot(enemy.x - x, enemy.y - y) <= radius) damage(enemy, STRIKE_DAMAGE, true);
+  }
+  shots.push({ kind:'blast', x, y, r:radius, life:0.45, maxLife:0.45 });
+  note('Strike landed.');
+  refreshUi();
+}
+
+/* ── interface ─────────────────────────────────────────────────────────────── */
+
+function clockText(seconds) {
+  const total = Math.max(0, Math.ceil(seconds));
+  return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+}
+
+function describe(plan) {
+  const counts = new Map();
+  for (const [type, count] of plan.units) counts.set(type, (counts.get(type) || 0) + count);
+  return [...counts].map(([type, count]) => count + ' ' + (count === 1 ? (SINGULAR[type] || PLURALS[type].slice(0, -1)) : PLURALS[type])).join(' · ');
+}
+
+function forecastText() {
+  if (over) return victory ? 'line held · all waves stopped' : 'the line broke';
+  if (phase === 'wave') {
+    const remaining = timeline.length + enemies.length;
+    return 'wave ' + wave + ' · ' + remaining + ' left' + (waveMod ? ' · ' + MOD_LABEL[waveMod] : '');
+  }
+  const plan = WAVES[wave];
+  if (!plan) return '';
+  return 'next · ' + describe(plan) + (plan.mod ? ' · ' + MOD_LABEL[plan.mod] : '');
+}
+
+function refreshUi() {
+  $('hud').textContent = 'WAVE ' + Math.min(wave, WAVES_TOTAL) + '/' + WAVES_TOTAL +
+    ' · CORE ' + Math.max(0, integrity) + ' · ' + Math.max(0, Math.floor(credits)) + ' CR' +
+    ' · ' + (paused ? 'PAUSED' : speed + '\u00d7');
+  $('forecast').textContent = forecastText();
+
+  for (const button of document.querySelectorAll('[data-tower]')) {
+    const spec = TOWERS[button.dataset.tower];
+    if (!spec) continue;
+    button.textContent = spec.label + ' ' + spec.cost;
+    button.disabled = over || credits < spec.cost;
+    button.setAttribute('aria-pressed', String(button.dataset.tower === selectedType));
+  }
+
+  const waveButton = $('wave');
+  waveButton.disabled = over || phase === 'wave';
+  waveButton.textContent = over ? 'Play again' : phase === 'wave' ? 'Wave ' + wave + ' in progress'
+    : 'Send wave +' + Math.floor(Math.max(0, buildTimer) * 2);
+
+  for (const key of ABILITY_ORDER) {
+    const button = $(key);
+    const ability = ABILITIES[key];
+    button.title = ability.title;
+    button.textContent = ability.label + (ability.cd > 0 ? ' ' + clockText(ability.cd) : '');
+    button.disabled = over || ability.cd > 0;
+    button.setAttribute('aria-pressed', String(key === 'strike' && strikeArmed));
+  }
+
+  $('repair').textContent = 'Repair ' + REPAIR_COST;
+  $('repair').disabled = over || phase !== 'build' || credits < REPAIR_COST || integrity >= MAX_CORE;
+  $('speed').textContent = speed + '\u00d7';
+  $('pause').textContent = paused ? 'Resume' : 'Pause';
+  $('pause').disabled = over;
+
+  const inspect = $('inspect');
+  if (selected && towers.includes(selected)) {
+    const spec = TOWERS[selected.type];
+    const blind = spec.minRange ? ' · blind <' + spec.minRange : '';
+    const support = spec.support ? ' · lift ' + (radarBuff(selected.level).range * 100).toFixed(0) + '%' : '';
+    inspect.hidden = false;
+    $('inspect-name').textContent = spec.label + ' L' + selected.level +
+      (spec.support ? '' : ' · ' + Math.round(damageOf(selected)) + ' dmg · ' + rateOf(selected).toFixed(1) + '/s') +
+      ' · ' + (rangeOf(selected) / CELL).toFixed(1) + ' range' + blind + support;
+    const cost = upgradeCost(selected);
+    $('upgrade').textContent = selected.level >= 4 ? 'Max level' : 'Upgrade ' + cost;
+    $('upgrade').disabled = selected.level >= 4 || credits < cost;
+    $('target').textContent = 'Target: ' + TARGET_LABEL[selected.targetMode];
+    $('target').disabled = false;
+    $('sell').textContent = 'Sell ' + Math.floor(selected.invested * 0.6);
+    $('sell').disabled = false;
+  } else {
+    inspect.hidden = true;
+  }
 }
 
 /* ── input ─────────────────────────────────────────────────────────────────── */
-for (const button of document.querySelectorAll('[data-tower]')) {
-  button.onclick = () => {
-    const type = button.dataset.tower;
-    selected = selected === type ? null : type;
-    note(selected ? 'Tap a grass cell to place a ' + TOWERS[type].label + '.' : 'Pick a tower, then a grass cell.');
-    refreshButtons();
-  };
-}
-$('wave').onclick = () => { if (over) reset(); else if (phase === 'build') startWave(); };
-canvas.addEventListener('pointerdown', event => {
-  if (over) return;
+
+function cellAt(event) {
   const rect = canvas.getBoundingClientRect();
   const col = Math.floor((event.clientX - rect.left) * (W / rect.width) / CELL);
   const row = Math.floor((event.clientY - rect.top) * (H / rect.height) / CELL);
-  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return;
-  const built = towersNear(col, row);
-  if (built) { upgrade(built); return; }
-  if (!selected) { note('Choose Pulse, Frost or Mortar first.'); return; }
-  if (pathCells.has(row*COLS + col)) { note('The track is not a building site.'); return; }
-  const spec = TOWERS[selected];
-  if (credits < spec.cost) { note(spec.label + ' costs ' + spec.cost + ' CR.'); return; }
-  credits -= spec.cost;
-  towers.push({ col, row, x:(col+0.5)*CELL, y:(row+0.5)*CELL, type: selected, level:1, cooldown:0, aim:0 });
-  note('');
-  refreshButtons(); updateHud();
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return null;
+  return { col, row };
+}
+
+for (const button of document.querySelectorAll('[data-tower]')) {
+  button.onclick = () => {
+    selectedType = selectedType === button.dataset.tower ? null : button.dataset.tower;
+    if (selectedType) {
+      const spec = TOWERS[selectedType];
+      note(spec.label + ' · ' + spec.cost + ' CR. ' + spec.blurb);
+    } else note('Pick a tower, then a cell.');
+    refreshUi();
+  };
+}
+$('wave').onclick = () => { if (over) reset(); else startWave(true); };
+$('upgrade').onclick = upgrade;
+$('sell').onclick = sell;
+$('target').onclick = cycleTarget;
+$('repair').onclick = repair;
+$('overcharge').onclick = () => useAbility('overcharge');
+$('cryo').onclick = () => useAbility('cryo');
+$('strike').onclick = () => useAbility('strike');
+$('speed').onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 3 : 1; refreshUi(); };
+$('pause').onclick = () => { paused = !paused; refreshUi(); };
+
+canvas.addEventListener('pointermove', event => { hover = cellAt(event); });
+canvas.addEventListener('pointerleave', () => { hover = null; });
+canvas.addEventListener('pointerdown', event => {
+  if (over) return;
+  const cell = cellAt(event);
+  if (!cell) return;
+  if (strikeArmed) { strikeAt((cell.col + 0.5) * CELL, (cell.row + 0.5) * CELL); return; }
+  const built = towerAt(cell.col, cell.row);
+  if (built) { selected = built; refreshUi(); return; }
+  if (!selectedType) { note('Pick a tower below, then choose a cell.'); return; }
+  place(cell.col, cell.row, selectedType);
 });
 
-/* ── simulation ────────────────────────────────────────────────────────────── */
-function update(dt) {
-  if (over) return;
-  clock += dt;
-  if (phase === 'build') {
-    buildTimer -= dt;
-    updateHud();
-    if (buildTimer <= 0) startWave();
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') { strikeArmed = false; selectedType = null; selected = null; refreshUi(); return; }
+  if (event.key === ' ') { event.preventDefault(); if (over) reset(); else startWave(true); return; }
+  if (event.key === 'p' || event.key === 'P') { paused = !paused; refreshUi(); return; }
+  if (event.key === 'f' || event.key === 'F') { speed = speed === 1 ? 2 : speed === 2 ? 3 : 1; refreshUi(); return; }
+  const index = Number(event.key);
+  if (index >= 1 && index <= TOWER_ORDER.length) {
+    selectedType = TOWER_ORDER[index - 1];
+    note(TOWERS[selectedType].label + ' selected.');
+    refreshUi();
   }
-  if (phase === 'wave') {
-    if (spawnQueue.length) {
-      spawnTimer -= dt;
-      if (spawnTimer <= 0) { spawn(spawnQueue.shift()); spawnTimer = 0.55; }
-    }
-    for (const enemy of enemies) {
-      const slowed = enemy.slowUntil > clock;
-      enemy.dist += enemy.speed * CELL * (slowed ? enemy.slowFactor : 1) * dt;
-      const spot = pointAt(enemy.dist);
-      enemy.x = spot.x; enemy.y = spot.y;
-      if (enemy.dist >= pathLength && enemy.hp > 0) { enemy.hp = 0; leak(enemy); }
-    }
-    enemies = enemies.filter(enemy => enemy.hp > 0);
+});
 
-    for (const tower of towers) {
-      tower.cooldown -= dt;
-      if (tower.cooldown > 0) continue;
-      const spec = TOWERS[tower.type];
-      const range = spec.range * (1 + (tower.level-1) * 0.08);
-      let target = null;
-      for (const enemy of enemies) {
-        if (Math.hypot(enemy.x - tower.x, enemy.y - tower.y) <= range && (!target || enemy.dist > target.dist)) target = enemy;
-      }
-      if (!target) continue;
-      tower.cooldown = 1 / spec.rate;
-      tower.aim = Math.atan2(target.y - tower.y, target.x - tower.x);
-      shots.push({ x1: tower.x, y1: tower.y, x2: target.x, y2: target.y, life: 0.12 });
-      const damage = spec.damage * Math.pow(1.7, tower.level - 1);
-      if (spec.splash) {
-        for (const enemy of enemies.slice()) {
-          if (Math.hypot(enemy.x - target.x, enemy.y - target.y) <= spec.splash) hit(enemy, damage);
-        }
-        enemies = enemies.filter(enemy => enemy.hp > 0);
-      } else {
-        hit(target, damage);
-        if (spec.slow && target.hp > 0) { target.slowUntil = clock + spec.slowTime; target.slowFactor = spec.slow; }
-        enemies = enemies.filter(enemy => enemy.hp > 0);
-      }
+/* ── drawing ───────────────────────────────────────────────────────────────── */
+
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
+function rgba(hex, alpha) {
+  const value = hex.replace('#', '');
+  const r = parseInt(value.slice(0, 2), 16), g = parseInt(value.slice(2, 4), 16), b = parseInt(value.slice(4, 6), 16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
+function drawGrid() {
+  ctx.strokeStyle = rgba(C.ink, 0.06);
+  ctx.lineWidth = 1;
+  for (let c = 1; c < COLS; c++) { ctx.beginPath(); ctx.moveTo(c * CELL + 0.5, 0); ctx.lineTo(c * CELL + 0.5, H); ctx.stroke(); }
+  for (let r = 1; r < ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r * CELL + 0.5); ctx.lineTo(W, r * CELL + 0.5); ctx.stroke(); }
+}
+
+function drawTerrain() {
+  for (const key of MARSH) {
+    const [c, r] = key.split(',').map(Number);
+    ctx.strokeStyle = rgba(C.ink, 0.2);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      const y = r * CELL + 9 + i * 7;
+      ctx.beginPath(); ctx.moveTo(c * CELL + 7, y); ctx.lineTo(c * CELL + 16, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(c * CELL + 16, y); ctx.lineTo(c * CELL + 25, y); ctx.stroke();
     }
-
-    for (const shot of shots) shot.life -= dt;
-    shots = shots.filter(shot => shot.life > 0);
-
-    if (!spawnQueue.length && !enemies.length && !over) {
-      cleared = wave;
-      credits += 20 + wave;
-      if (wave >= WAVES) finish(true);
-      else { phase = 'build'; buildTimer = BUILD_SECONDS; refreshButtons(); updateHud(); }
+  }
+  for (const key of RIDGES) {
+    const [c, r] = key.split(',').map(Number);
+    ctx.strokeStyle = rgba(C.accent, 0.45);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 2; i++) {
+      const x = c * CELL + 8 + i * 9;
+      ctx.beginPath(); ctx.moveTo(x, r * CELL + 23); ctx.lineTo(x + 6, r * CELL + 11); ctx.stroke();
     }
   }
 }
 
-/* ── drawing ───────────────────────────────────────────────────────────────── */
-function draw() {
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#fffdf7';
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.strokeStyle = 'rgba(25,23,19,.07)';
-  ctx.lineWidth = 1;
-  for (let c = 1; c < COLS; c++) { ctx.beginPath(); ctx.moveTo(c*CELL+.5, 0); ctx.lineTo(c*CELL+.5, H); ctx.stroke(); }
-  for (let r = 1; r < ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r*CELL+.5); ctx.lineTo(W, r*CELL+.5); ctx.stroke(); }
-
-  ctx.strokeStyle = 'rgba(69,102,83,.16)';
-  ctx.lineWidth = 26; ctx.lineCap = 'butt';
+function drawPath() {
+  ctx.strokeStyle = rgba(C.accent, 0.12);
+  ctx.lineWidth = 24; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
   ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(69,102,83,.45)';
+  ctx.strokeStyle = rgba(C.accent, 0.42);
   ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
   ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
   ctx.stroke(); ctx.setLineDash([]);
+}
 
-  for (const tower of towers) {
-    const size = 16;
-    ctx.fillStyle = '#456653';
-    ctx.fillRect(tower.x - size/2, tower.y - size/2, size, size);
-    ctx.fillStyle = '#fffdf7';
-    const spec = TOWERS[tower.type];
-    if (spec.mark === 'dot') { ctx.beginPath(); ctx.arc(tower.x, tower.y, 3, 0, Math.PI*2); ctx.fill(); }
-    else if (spec.mark === 'ring') { ctx.beginPath(); ctx.arc(tower.x, tower.y, 4, 0, Math.PI*2); ctx.strokeStyle = '#fffdf7'; ctx.lineWidth = 1.5; ctx.stroke(); }
-    else { ctx.fillRect(tower.x - 4, tower.y - 4, 8, 8); }
-    ctx.fillStyle = '#191713';
-    for (let i = 0; i < tower.level - 1; i++) ctx.fillRect(tower.x - 5 + i*4, tower.y + size/2 - 4, 2, 2);
-  }
+function drawCore() {
+  const hurt = integrity <= MAX_CORE * 0.35;
+  ctx.fillStyle = hurt ? C.alert : C.ink;
+  ctx.fillRect(CORE.x - 11, CORE.y - 11, 22, 22);
+  ctx.fillStyle = C.board;
+  ctx.fillRect(CORE.x - 6, CORE.y - 6, 12, 12);
+  ctx.strokeStyle = hurt ? C.alert : C.accent;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(CORE.x - 11.5, CORE.y - 11.5, 23, 23);
+}
 
-  for (const shot of shots) {
-    ctx.strokeStyle = 'rgba(25,23,19,.5)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(shot.x1, shot.y1); ctx.lineTo(shot.x2, shot.y2); ctx.stroke();
-  }
-
-  for (const enemy of enemies) {
-    const size = enemy.boss ? 16 : 12;
-    ctx.fillStyle = '#191713';
-    ctx.fillRect(enemy.x - size/2, enemy.y - size/2, size, size);
-    const width = 18, filled = Math.max(0, enemy.hp / enemy.maxHp) * width;
-    ctx.fillStyle = 'rgba(25,23,19,.18)';
-    ctx.fillRect(enemy.x - width/2, enemy.y - size/2 - 5, width, 2);
-    ctx.fillStyle = '#456653';
-    ctx.fillRect(enemy.x - width/2, enemy.y - size/2 - 5, filled, 2);
-  }
-
-  if (over) {
-    ctx.fillStyle = 'rgba(245,242,234,.92)';
-    ctx.fillRect(0, H/2 - 42, W, 84);
-    ctx.fillStyle = '#191713';
-    ctx.font = '600 15px ui-monospace, SFMono-Regular, Menlo, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(victory ? 'LINE HELD' : 'OVERRUN', W/2, H/2 - 6);
-    ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
-    ctx.fillText(cleared + ' of ' + WAVES + ' waves · ' + kills + ' stopped · core ' + Math.max(0, integrity), W/2, H/2 + 18);
-    ctx.textAlign = 'left';
-    $('wave').textContent = 'Play again';
-  }
-
-  if (phase === 'build' && !over) {
-    ctx.fillStyle = 'rgba(107,101,88,.9)';
-    ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
-    ctx.fillText('WAVE ' + (wave + 1) + ' IN ' + Math.ceil(Math.max(0, buildTimer)) + 's', 8, 14);
+function towerGlyph(tower) {
+  const x = tower.x, y = tower.y;
+  ctx.fillStyle = C.board;
+  ctx.strokeStyle = C.board;
+  ctx.lineWidth = 1.4;
+  if (tower.type === 'pulse') {
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+  } else if (tower.type === 'frost') {
+    ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, 1.5, 0, Math.PI * 2); ctx.fill();
+  } else if (tower.type === 'mortar') {
+    ctx.fillRect(x - 4, y - 4, 8, 8);
+    ctx.fillStyle = C.accent;
+    ctx.fillRect(x - 1, y - 1, 2, 2);
+  } else if (tower.type === 'arc') {
+    ctx.beginPath();
+    ctx.moveTo(x - 5, y - 4); ctx.lineTo(x, y); ctx.lineTo(x - 5, y + 4);
+    ctx.moveTo(x + 5, y - 4); ctx.lineTo(x, y); ctx.lineTo(x + 5, y + 4);
+    ctx.stroke();
+  } else if (tower.type === 'flak') {
+    ctx.beginPath();
+    ctx.moveTo(x - 5, y + 4); ctx.lineTo(x, y - 5); ctx.lineTo(x + 5, y + 4);
+    ctx.stroke();
+  } else if (tower.type === 'radar') {
+    ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, 5, -0.8, 0.8); ctx.stroke();
   }
 }
 
+function drawTowers() {
+  for (const tower of towers) {
+    ctx.fillStyle = C.accent;
+    ctx.fillRect(tower.x - 9, tower.y - 9, 18, 18);
+    towerGlyph(tower);
+    ctx.fillStyle = C.paper;
+    for (let i = 0; i < tower.level - 1; i++) ctx.fillRect(tower.x - 5 + i * 4, tower.y + 4, 3, 2);
+  }
+}
+
+function drawRanges() {
+  if (selected && towers.includes(selected)) {
+    ctx.strokeStyle = rgba(C.ink, 0.35);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 5]);
+    ctx.beginPath(); ctx.arc(selected.x, selected.y, rangeOf(selected), 0, Math.PI * 2); ctx.stroke();
+    if (TOWERS[selected.type].minRange) {
+      ctx.beginPath(); ctx.arc(selected.x, selected.y, TOWERS[selected.type].minRange * CELL, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.strokeStyle = rgba(C.ink, 0.6);
+    ctx.strokeRect(selected.x - CELL / 2 + 0.5, selected.y - CELL / 2 + 0.5, CELL - 1, CELL - 1);
+  }
+  if (selectedType && hover) {
+    const x = (hover.col + 0.5) * CELL, y = (hover.row + 0.5) * CELL;
+    const free = buildable(hover.col, hover.row);
+    ctx.strokeStyle = rgba(free ? C.accent : C.alert, free ? 0.55 : 0.45);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 4]);
+    ctx.strokeRect(x - CELL / 2 + 0.5, y - CELL / 2 + 0.5, CELL - 1, CELL - 1);
+    if (free) {
+      const reach = TOWERS[selectedType].range * CELL * (RIDGES.has(cellKey(hover.col, hover.row)) ? 1.2 : 1);
+      ctx.beginPath(); ctx.arc(x, y, reach, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+  if (strikeArmed && hover) {
+    const x = (hover.col + 0.5) * CELL, y = (hover.row + 0.5) * CELL;
+    ctx.strokeStyle = rgba(C.alert, 0.6);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, 1.4 * CELL, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y); ctx.lineTo(x + 8, y);
+    ctx.moveTo(x, y - 8); ctx.lineTo(x, y + 8);
+    ctx.stroke();
+  }
+}
+
+function drawShots() {
+  for (const shot of shots) {
+    const fade = Math.max(0, shot.life / shot.maxLife);
+    if (shot.kind === 'arc') {
+      ctx.strokeStyle = rgba(C.accent, 0.3 + 0.5 * fade);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(shot.points[0].x, shot.points[0].y);
+      for (let i = 1; i < shot.points.length; i++) {
+        const from = shot.points[i - 1], to = shot.points[i];
+        const midX = (from.x + to.x) / 2, midY = (from.y + to.y) / 2;
+        ctx.lineTo(midX + (i % 2 ? 4 : -4), midY + (i % 2 ? -4 : 4));
+        ctx.lineTo(to.x, to.y);
+      }
+      ctx.stroke();
+    } else if (shot.kind === 'shell') {
+      ctx.setLineDash([2, 5]);
+      ctx.strokeStyle = rgba(C.ink, 0.3 * fade);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(shot.x1, shot.y1); ctx.lineTo(shot.x2, shot.y2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = rgba(C.ink, 0.35 + 0.4 * fade);
+      ctx.beginPath(); ctx.arc(shot.x2, shot.y2, shot.r * (1.15 - 0.35 * fade), 0, Math.PI * 2); ctx.stroke();
+    } else if (shot.kind === 'blast') {
+      ctx.strokeStyle = rgba(C.alert, 0.25 + 0.5 * fade);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(shot.x, shot.y, shot.r * (1.2 - 0.4 * fade), 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = rgba(C.alert, 0.12);
+      ctx.beginPath(); ctx.arc(shot.x, shot.y, shot.r, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.strokeStyle = rgba(shot.kind === 'frost' ? C.accent : C.ink, 0.2 + 0.5 * fade);
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(shot.x1, shot.y1); ctx.lineTo(shot.x2, shot.y2); ctx.stroke();
+    }
+  }
+}
+
+function glyph(enemy) {
+  const x = enemy.x, y = enemy.y, s = enemy.size;
+  ctx.lineWidth = 1.5;
+  if (enemy.mark === 'dot') {
+    ctx.beginPath(); ctx.arc(x, y, s / 2, 0, Math.PI * 2); ctx.fill();
+  } else if (enemy.mark === 'arrow') {
+    const a = enemy.heading || 0;
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * s * 0.6, y + Math.sin(a) * s * 0.6);
+    ctx.lineTo(x + Math.cos(a + 2.4) * s * 0.55, y + Math.sin(a + 2.4) * s * 0.55);
+    ctx.lineTo(x + Math.cos(a - 2.4) * s * 0.55, y + Math.sin(a - 2.4) * s * 0.55);
+    ctx.closePath(); ctx.fill();
+  } else if (enemy.mark === 'plated') {
+    ctx.fillRect(x - s / 2, y - s / 2, s, s);
+    ctx.fillStyle = C.board;
+    ctx.fillRect(x - s / 2 + 3, y - 1, s - 6, 2);
+    ctx.fillRect(x - 1, y - s / 2 + 3, 2, s - 6);
+  } else if (enemy.mark === 'wing') {
+    ctx.beginPath();
+    ctx.moveTo(x, y - s / 2); ctx.lineTo(x + s / 2, y); ctx.lineTo(x, y + s / 2); ctx.lineTo(x - s / 2, y);
+    ctx.closePath(); ctx.fill();
+  } else if (enemy.mark === 'ghost') {
+    ctx.setLineDash([2, 2]);
+    ctx.strokeRect(x - s / 2, y - s / 2, s, s);
+    ctx.setLineDash([]);
+  } else if (enemy.mark === 'ring') {
+    ctx.beginPath(); ctx.arc(x, y, s / 2, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+  } else if (enemy.mark === 'hive') {
+    ctx.fillRect(x - s / 2, y - s / 2, s, s);
+    ctx.fillStyle = C.board;
+    ctx.fillRect(x - s / 2 + 3, y - s / 2 + 3, s - 6, s - 6);
+    ctx.fillStyle = C.ink;
+    ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+  } else if (enemy.mark === 'hauler') {
+    ctx.fillRect(x - s / 2, y - s / 2, s, s);
+    ctx.fillStyle = C.board;
+    ctx.fillRect(x - 3, y - s / 2 + 3, 6, s - 6);
+    ctx.fillRect(x - s / 2 + 3, y - 3, s - 6, 6);
+  } else {
+    ctx.fillRect(x - s / 2, y - s / 2, s, s);
+  }
+}
+
+function drawEnemies() {
+  for (const enemy of enemies) {
+    if (enemy.gone) continue;
+    const frozen = enemy.frozenUntil > clock;
+    ctx.globalAlpha = frozen ? 0.5 : (enemy.cloak && !enemy.revealed ? 0.45 : 1);
+    ctx.fillStyle = enemy.boss ? C.alert : C.ink;
+    ctx.strokeStyle = C.ink;
+    glyph(enemy);
+    ctx.globalAlpha = 1;
+    if (enemy.hitFlash > 0) {
+      ctx.strokeStyle = C.alert;
+      ctx.lineWidth = 1;
+      const s = enemy.size + 4;
+      ctx.strokeRect(enemy.x - s / 2, enemy.y - s / 2, s, s);
+    }
+    if (enemy.hp < enemy.maxHp || enemy.boss) {
+      const width = enemy.boss ? 30 : 18;
+      const ratio = Math.max(0, Math.min(1, enemy.hp / enemy.maxHp));
+      ctx.fillStyle = rgba(C.ink, 0.16);
+      ctx.fillRect(enemy.x - width / 2, enemy.y - enemy.size / 2 - 6, width, 2);
+      ctx.fillStyle = ratio < 0.3 ? C.alert : C.accent;
+      ctx.fillRect(enemy.x - width / 2, enemy.y - enemy.size / 2 - 6, width * ratio, 2);
+    }
+  }
+}
+
+function drawOverlay() {
+  ctx.textAlign = 'left';
+  if (phase === 'build' && !over) {
+    ctx.fillStyle = C.dim;
+    ctx.font = '10px ' + MONO;
+    ctx.fillText('WAVE ' + (wave + 1) + ' IN ' + Math.ceil(Math.max(0, buildTimer)) + 'S', 8, 14);
+  }
+  if (paused && !over) {
+    ctx.fillStyle = rgba(C.paper, 0.9);
+    ctx.fillRect(0, H / 2 - 14, W, 28);
+    ctx.fillStyle = C.ink;
+    ctx.font = '600 11px ' + MONO;
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', W / 2, H / 2 + 4);
+    ctx.textAlign = 'left';
+  }
+  if (over) {
+    ctx.fillStyle = rgba(C.paper, 0.94);
+    ctx.fillRect(0, H / 2 - 46, W, 92);
+    ctx.fillStyle = C.ink;
+    ctx.font = '600 15px ' + MONO;
+    ctx.textAlign = 'center';
+    ctx.fillText(victory ? 'LINE HELD' : 'OVERRUN', W / 2, H / 2 - 12);
+    ctx.fillStyle = C.dim;
+    ctx.font = '11px ' + MONO;
+    ctx.fillText(cleared + ' of ' + WAVES_TOTAL + ' waves · ' + kills + ' stopped · core ' + Math.max(0, integrity), W / 2, H / 2 + 8);
+    ctx.fillText('score ' + (cleared * 120 + kills * 6), W / 2, H / 2 + 26);
+    ctx.textAlign = 'left';
+  }
+}
+
+function draw() {
+  ctx.fillStyle = C.board;
+  ctx.fillRect(0, 0, W, H);
+  drawGrid();
+  drawTerrain();
+  drawPath();
+  drawCore();
+  drawRanges();
+  drawTowers();
+  drawShots();
+  drawEnemies();
+  drawOverlay();
+}
+
 /* ── loop ──────────────────────────────────────────────────────────────────── */
-let previous = performance.now();
+
+let previous = 0;
 function frame(now) {
-  const dt = Math.min(0.05, (now - previous) / 1000);
+  const elapsed = previous ? Math.min(0.1, (now - previous) / 1000) : 0;
   previous = now;
-  update(dt);
+  let remaining = elapsed * speed;
+  let guard = 0;
+  while (remaining > 0.0001 && guard++ < 12) {
+    const step = Math.min(0.05, remaining);
+    update(step);
+    remaining -= step;
+  }
   draw();
   requestAnimationFrame(frame);
 }
@@ -361,10 +1139,11 @@ function frame(now) {
 window.__boredSnapshot = () => ({
   slug: 'signal-tower',
   waves: cleared,
+  wave: Math.min(wave, WAVES_TOTAL),
   kills,
   leaked,
   integrity: Math.max(0, integrity || 0),
-  points: cleared * 100 + kills * 5,
+  points: cleared * 120 + kills * 6,
   finished: over === true,
   won: victory === true
 });
