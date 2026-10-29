@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Signal Tower</title>
+<style>
+  :root { --paper:#f5f2ea; --board:#fffdf7; --ink:#191713; --accent:#456653; --line:#d8d2c4; --dim:#6b6558 }
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { display:grid; place-items:center; min-height:100vh; padding:14px; background:var(--paper); color:var(--ink);
+         font:13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace }
+  main { width:min(480px,100%) }
+  header { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:8px }
+  h1 { font:600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.1em; text-transform:uppercase }
+  #hud { font:11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.04em; color:var(--dim); text-align:right }
+  canvas { display:block; width:100%; height:auto; background:var(--board); border:1px solid var(--line);
+           touch-action:none; cursor:crosshair }
+  #build { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px }
+  button { font:inherit; font-size:11px; padding:7px 10px; border:1px solid var(--line); border-radius:3px;
+           background:none; color:inherit; cursor:pointer }
+  button:hover:enabled { border-color:var(--ink) }
+  button[aria-pressed="true"] { border-color:var(--ink); background:var(--ink); color:var(--paper) }
+  button:disabled { opacity:.4; cursor:default }
+  #note { margin-top:8px; font-size:11px; line-height:1.5; color:var(--dim); min-height:2.8em }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Signal Tower</h1><span id="hud">WAVE 0 / 20 · CORE 20 · 120 CR</span></header>
+  <canvas id="board" width="480" height="320" aria-label="Signal Tower board: grass cells with a winding track"></canvas>
+  <div id="build">
+    <button type="button" data-tower="pulse" aria-pressed="false">Pulse · 40</button>
+    <button type="button" data-tower="frost" aria-pressed="false">Frost · 60</button>
+    <button type="button" data-tower="mortar" aria-pressed="false">Mortar · 75</button>
+    <button type="button" id="wave">Send wave</button>
+  </div>
+  <p id="note">Pick a tower, then a grass cell. Tap a built tower to upgrade it. Anything that reaches the right edge costs core.</p>
+</main>
+<script>
+const CELL = 32, COLS = 15, ROWS = 10, W = COLS * CELL, H = ROWS * CELL;
+const WAVES = 20, START_CREDITS = 120, START_CORE = 20, FIRST_BUILD = 25, BUILD_SECONDS = 12;
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const $ = id => document.getElementById(id);
+
+/* ── the track ─────────────────────────────────────────────────────────────── */
+const WAYPOINTS = [[-1,4],[3,4],[3,1],[8,1],[8,8],[12,8],[12,4],[15,4]];
+const points = WAYPOINTS.map(([c,r]) => ({ x:(c+0.5)*CELL, y:(r+0.5)*CELL }));
+const segments = [];
+let pathLength = 0;
+for (let i = 1; i < points.length; i++) {
+  const a = points[i-1], b = points[i];
+  const len = Math.hypot(b.x-a.x, b.y-a.y) || 1;
+  segments.push({ a, len, start: pathLength, dx:(b.x-a.x)/len, dy:(b.y-a.y)/len });
+  pathLength += len;
+}
+const pathCells = new Set();
+for (let i = 1; i < WAYPOINTS.length; i++) {
+  const [c0,r0] = WAYPOINTS[i-1], [c1,r1] = WAYPOINTS[i];
+  const steps = Math.max(Math.abs(c1-c0), Math.abs(r1-r0));
+  for (let s = 0; s <= steps; s++) {
+    const c = Math.round(c0 + (c1-c0)*s/steps), r = Math.round(r0 + (r1-r0)*s/steps);
+    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) pathCells.add(r*COLS+c);
+  }
+}
+function pointAt(distance) {
+  for (const seg of segments) {
+    if (distance <= seg.start + seg.len) {
+      const t = Math.max(0, distance - seg.start);
+      return { x: seg.a.x + seg.dx*t, y: seg.a.y + seg.dy*t };
+    }
+  }
+  const last = segments[segments.length-1];
+  return { x: last.a.x + last.dx*last.len, y: last.a.y + last.dy*last.len };
+}
+
+/* ── towers and waves ──────────────────────────────────────────────────────── */
+const TOWERS = {
+  pulse:  { label:'Pulse',  cost:40, range:2.7*CELL, damage:7,  rate:2.3, mark:'dot' },
+  frost:  { label:'Frost',  cost:60, range:2.4*CELL, damage:3,  rate:1.5, mark:'ring', slow:0.45, slowTime:1.6 },
+  mortar: { label:'Mortar', cost:75, range:3.5*CELL, damage:24, rate:0.7, mark:'box', splash:1.4*CELL }
+};
+// The hub injects __boredSeed after this script runs, so the daily seed is read
+// when the first wave starts: the first run of a Detroit day is the same board
+// for everyone, and every run after it rolls fresh.
+let runSeed = Math.floor(Math.random() * 4294967296), seedAdopted = false;
+function adoptSeed() {
+  const given = Number(window.__boredSeed?.seed);
+  runSeed = (!seedAdopted && Number.isFinite(given) && given) ? given : Math.floor(Math.random() * 4294967296);
+  seedAdopted = true;
+}
+function seedRandom(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function wavePlan(index, random) {
+  const boss = (index + 1) % 5 === 0;
+  const count = 5 + index * 2 + Math.floor(random() * 3);
+  const hp = Math.round(14 * Math.pow(1.26, index) * (0.9 + random() * 0.2));
+  return { count, hp, speed: 0.85 + index * 0.025, reward: 4 + Math.floor(index/2), boss };
+}
+
+/* ── state ─────────────────────────────────────────────────────────────────── */
+let credits, integrity, wave, cleared, kills, leaked, over, victory, phase, buildTimer, spawnQueue, spawnTimer, selected;
+let enemies, towers, shots, clock;
+function reset() {
+  credits = START_CREDITS; integrity = START_CORE; wave = 0; cleared = 0; kills = 0; leaked = 0;
+  over = false; victory = false; phase = 'build'; buildTimer = FIRST_BUILD;
+  spawnQueue = []; spawnTimer = 0; enemies = []; towers = []; shots = []; clock = 0;
+  selected = null;
+  note('Pick a tower, then a grass cell. Tap a built tower to upgrade it.');
+  refreshButtons(); updateHud();
+}
+
+function note(text) { $('note').textContent = text; }
+function updateHud() {
+  $('hud').textContent = 'WAVE ' + Math.min(wave, WAVES) + ' / ' + WAVES + ' · CORE ' + Math.max(0, integrity) +
+    ' · ' + credits + ' CR' + (phase === 'build' && !over ? ' · NEXT ' + Math.ceil(Math.max(0, buildTimer)) + 's' : '');
+}
+function refreshButtons() {
+  for (const button of document.querySelectorAll('[data-tower]')) {
+    const spec = TOWERS[button.dataset.tower];
+    button.setAttribute('aria-pressed', String(button.dataset.tower === selected));
+    button.disabled = over || credits < spec.cost;
+  }
+  const waveButton = $('wave');
+  waveButton.disabled = phase === 'wave' && !over;
+  waveButton.textContent = over ? 'Play again' : phase === 'wave' ? 'Wave in progress' : 'Send wave';
+}
+
+function startWave() {
+  if (over || wave >= WAVES) return;
+  wave++;
+  if (wave === 1) adoptSeed();
+  const random = seedRandom(runSeed + wave * 7919);
+  const plan = wavePlan(wave - 1, random);
+  spawnQueue = [];
+  for (let i = 0; i < plan.count; i++) spawnQueue.push({ hp: plan.hp, speed: plan.speed, reward: plan.reward, boss: false, damage: 1 });
+  if (plan.boss) spawnQueue.push({ hp: plan.hp * 5, speed: plan.speed * 0.7, reward: plan.reward * 4, boss: true, damage: 3 });
+  spawnTimer = 0.2; phase = 'wave';
+  note(plan.boss ? 'Wave ' + wave + ': a hauler is in the line.' : 'Wave ' + wave + ' is moving.');
+  refreshButtons(); updateHud();
+}
+
+function spawn(entry) {
+  const start = pointAt(0);
+  enemies.push({ x: start.x, y: start.y, dist: 0, hp: entry.hp, maxHp: entry.hp, speed: entry.speed,
+    reward: entry.reward, boss: entry.boss, damage: entry.damage, slowUntil: 0, slowFactor: 1 });
+}
+
+function towersNear(col, row) { return towers.find(t => t.col === col && t.row === row) || null; }
+function hit(enemy, damage) {
+  enemy.hp -= damage;
+  if (enemy.hp > 0) return;
+  kills++;
+  credits += enemy.reward;
+  updateHud();
+}
+
+function leak(enemy) {
+  integrity -= enemy.damage;
+  leaked++;
+  if (integrity <= 0) { integrity = 0; finish(false); }
+  updateHud();
+}
+
+function finish(won) {
+  over = true; victory = won; phase = 'over';
+  note(won ? 'Line held. All ' + WAVES + ' waves stopped.' : 'Overrun on wave ' + Math.max(1, wave) + '.');
+  refreshButtons(); updateHud();
+}
+
+function upgrade(tower) {
+  if (tower.level >= 3) { note('That tower is already at level 3.'); return; }
+  const spec = TOWERS[tower.type], cost = Math.round(spec.cost * 0.8 * tower.level);
+  if (credits < cost) { note('An upgrade costs ' + cost + ' CR.'); return; }
+  credits -= cost;
+  tower.level++;
+  note(spec.label + ' upgraded to level ' + tower.level + '.');
+  refreshButtons(); updateHud();
+}
+
+/* ── input ─────────────────────────────────────────────────────────────────── */
+for (const button of document.querySelectorAll('[data-tower]')) {
+  button.onclick = () => {
+    const type = button.dataset.tower;
+    selected = selected === type ? null : type;
+    note(selected ? 'Tap a grass cell to place a ' + TOWERS[type].label + '.' : 'Pick a tower, then a grass cell.');
+    refreshButtons();
+  };
+}
+$('wave').onclick = () => { if (over) reset(); else if (phase === 'build') startWave(); };
+canvas.addEventListener('pointerdown', event => {
+  if (over) return;
+  const rect = canvas.getBoundingClientRect();
+  const col = Math.floor((event.clientX - rect.left) * (W / rect.width) / CELL);
+  const row = Math.floor((event.clientY - rect.top) * (H / rect.height) / CELL);
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return;
+  const built = towersNear(col, row);
+  if (built) { upgrade(built); return; }
+  if (!selected) { note('Choose Pulse, Frost or Mortar first.'); return; }
+  if (pathCells.has(row*COLS + col)) { note('The track is not a building site.'); return; }
+  const spec = TOWERS[selected];
+  if (credits < spec.cost) { note(spec.label + ' costs ' + spec.cost + ' CR.'); return; }
+  credits -= spec.cost;
+  towers.push({ col, row, x:(col+0.5)*CELL, y:(row+0.5)*CELL, type: selected, level:1, cooldown:0, aim:0 });
+  note('');
+  refreshButtons(); updateHud();
+});
+
+/* ── simulation ────────────────────────────────────────────────────────────── */
+function update(dt) {
+  if (over) return;
+  clock += dt;
+  if (phase === 'build') {
+    buildTimer -= dt;
+    updateHud();
+    if (buildTimer <= 0) startWave();
+  }
+  if (phase === 'wave') {
+    if (spawnQueue.length) {
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) { spawn(spawnQueue.shift()); spawnTimer = 0.55; }
+    }
+    for (const enemy of enemies) {
+      const slowed = enemy.slowUntil > clock;
+      enemy.dist += enemy.speed * CELL * (slowed ? enemy.slowFactor : 1) * dt;
+      const spot = pointAt(enemy.dist);
+      enemy.x = spot.x; enemy.y = spot.y;
+      if (enemy.dist >= pathLength && enemy.hp > 0) { enemy.hp = 0; leak(enemy); }
+    }
+    enemies = enemies.filter(enemy => enemy.hp > 0);
+
+    for (const tower of towers) {
+      tower.cooldown -= dt;
+      if (tower.cooldown > 0) continue;
+      const spec = TOWERS[tower.type];
+      const range = spec.range * (1 + (tower.level-1) * 0.08);
+      let target = null;
+      for (const enemy of enemies) {
+        if (Math.hypot(enemy.x - tower.x, enemy.y - tower.y) <= range && (!target || enemy.dist > target.dist)) target = enemy;
+      }
+      if (!target) continue;
+      tower.cooldown = 1 / spec.rate;
+      tower.aim = Math.atan2(target.y - tower.y, target.x - tower.x);
+      shots.push({ x1: tower.x, y1: tower.y, x2: target.x, y2: target.y, life: 0.12 });
+      const damage = spec.damage * Math.pow(1.7, tower.level - 1);
+      if (spec.splash) {
+        for (const enemy of enemies.slice()) {
+          if (Math.hypot(enemy.x - target.x, enemy.y - target.y) <= spec.splash) hit(enemy, damage);
+        }
+        enemies = enemies.filter(enemy => enemy.hp > 0);
+      } else {
+        hit(target, damage);
+        if (spec.slow && target.hp > 0) { target.slowUntil = clock + spec.slowTime; target.slowFactor = spec.slow; }
+        enemies = enemies.filter(enemy => enemy.hp > 0);
+      }
+    }
+
+    for (const shot of shots) shot.life -= dt;
+    shots = shots.filter(shot => shot.life > 0);
+
+    if (!spawnQueue.length && !enemies.length && !over) {
+      cleared = wave;
+      credits += 20 + wave;
+      if (wave >= WAVES) finish(true);
+      else { phase = 'build'; buildTimer = BUILD_SECONDS; refreshButtons(); updateHud(); }
+    }
+  }
+}
+
+/* ── drawing ───────────────────────────────────────────────────────────────── */
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#fffdf7';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(25,23,19,.07)';
+  ctx.lineWidth = 1;
+  for (let c = 1; c < COLS; c++) { ctx.beginPath(); ctx.moveTo(c*CELL+.5, 0); ctx.lineTo(c*CELL+.5, H); ctx.stroke(); }
+  for (let r = 1; r < ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r*CELL+.5); ctx.lineTo(W, r*CELL+.5); ctx.stroke(); }
+
+  ctx.strokeStyle = 'rgba(69,102,83,.16)';
+  ctx.lineWidth = 26; ctx.lineCap = 'butt';
+  ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(69,102,83,.45)';
+  ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
+  ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  for (const tower of towers) {
+    const size = 16;
+    ctx.fillStyle = '#456653';
+    ctx.fillRect(tower.x - size/2, tower.y - size/2, size, size);
+    ctx.fillStyle = '#fffdf7';
+    const spec = TOWERS[tower.type];
+    if (spec.mark === 'dot') { ctx.beginPath(); ctx.arc(tower.x, tower.y, 3, 0, Math.PI*2); ctx.fill(); }
+    else if (spec.mark === 'ring') { ctx.beginPath(); ctx.arc(tower.x, tower.y, 4, 0, Math.PI*2); ctx.strokeStyle = '#fffdf7'; ctx.lineWidth = 1.5; ctx.stroke(); }
+    else { ctx.fillRect(tower.x - 4, tower.y - 4, 8, 8); }
+    ctx.fillStyle = '#191713';
+    for (let i = 0; i < tower.level - 1; i++) ctx.fillRect(tower.x - 5 + i*4, tower.y + size/2 - 4, 2, 2);
+  }
+
+  for (const shot of shots) {
+    ctx.strokeStyle = 'rgba(25,23,19,.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(shot.x1, shot.y1); ctx.lineTo(shot.x2, shot.y2); ctx.stroke();
+  }
+
+  for (const enemy of enemies) {
+    const size = enemy.boss ? 16 : 12;
+    ctx.fillStyle = '#191713';
+    ctx.fillRect(enemy.x - size/2, enemy.y - size/2, size, size);
+    const width = 18, filled = Math.max(0, enemy.hp / enemy.maxHp) * width;
+    ctx.fillStyle = 'rgba(25,23,19,.18)';
+    ctx.fillRect(enemy.x - width/2, enemy.y - size/2 - 5, width, 2);
+    ctx.fillStyle = '#456653';
+    ctx.fillRect(enemy.x - width/2, enemy.y - size/2 - 5, filled, 2);
+  }
+
+  if (over) {
+    ctx.fillStyle = 'rgba(245,242,234,.92)';
+    ctx.fillRect(0, H/2 - 42, W, 84);
+    ctx.fillStyle = '#191713';
+    ctx.font = '600 15px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(victory ? 'LINE HELD' : 'OVERRUN', W/2, H/2 - 6);
+    ctx.font = '11px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillText(cleared + ' of ' + WAVES + ' waves · ' + kills + ' stopped · core ' + Math.max(0, integrity), W/2, H/2 + 18);
+    ctx.textAlign = 'left';
+    $('wave').textContent = 'Play again';
+  }
+
+  if (phase === 'build' && !over) {
+    ctx.fillStyle = 'rgba(107,101,88,.9)';
+    ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+    ctx.fillText('WAVE ' + (wave + 1) + ' IN ' + Math.ceil(Math.max(0, buildTimer)) + 's', 8, 14);
+  }
+}
+
+/* ── loop ──────────────────────────────────────────────────────────────────── */
+let previous = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - previous) / 1000);
+  previous = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+// The hub reads this: integer metrics, the current run, never null.
+window.__boredSnapshot = () => ({
+  slug: 'signal-tower',
+  waves: cleared,
+  kills,
+  leaked,
+  integrity: Math.max(0, integrity || 0),
+  points: cleared * 100 + kills * 5,
+  finished: over === true,
+  won: victory === true
+});
+
+reset();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

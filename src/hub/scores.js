@@ -88,9 +88,10 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Signal Tower keeps the waves already cleared, so leaving mid-defence still
+  // keeps what the line has held. A run that never clears wave one saves nothing.
+  highScore("signal-tower", "Signal Tower", "waves", { metric: "waves", resumable: true }),
   highScore('prism-duel', 'Prism Duel', 'wins', { metric: 'wins' }),
-  // Cup Pong ranks the cups sunk in a run; a run still going keeps what it has.
-  highScore('cup-pong', 'Cup Pong', 'cups', { metric: 'cups', when: snapshot => snapshot.finished === true, resumable: true }),
   // Block Blast counts the score of a run that ended with no piece left to place.
   highScore('block-blast', 'Block Blast', 'points', { metric: 'score', when: snapshot => snapshot.finished === true, resumable: true }),
   // Chess counts the human's wins against the computer in a session, like Connect Four.
@@ -173,6 +174,29 @@ export function boardLeaders(rows) {
     }
   }
   return leaders;
+}
+
+/**
+ * The best posted score of each player on one board, best first. The library
+ * cards list the top three in a tooltip, so this is `boardLeaders` per handle
+ * rather than per game, capped at the number the card shows.
+ */
+export function boardTop(rows, id, limit = 3) {
+  const spec = LB_GAMES.find(game => game.id === id);
+  if (!spec) return [];
+  const best = new Map();
+  for (const row of rows || []) {
+    if (row.game !== id) continue;
+    const handle = String(row.handle || '').trim();
+    const value = Number(row.value);
+    if (!handle || !Number.isFinite(value) || value <= 0) continue;
+    const key = handle.toLowerCase();
+    const held = best.get(key);
+    if (!held || (spec.lower ? value < held.value : value > held.value)) best.set(key, { handle, value });
+  }
+  return [...best.values()]
+    .sort((a, b) => (spec.lower ? a.value - b.value : b.value - a.value) || a.handle.localeCompare(b.handle))
+    .slice(0, limit);
 }
 
 /* ── Which boards the shared table can hold ───────────────────────────────── */
