@@ -88,6 +88,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  highScore('prism-duel', 'Prism Duel', 'wins', { metric: 'wins' }),
   // Cup Pong ranks the cups sunk in a run; a run still going keeps what it has.
   highScore('cup-pong', 'Cup Pong', 'cups', { metric: 'cups', when: snapshot => snapshot.finished === true, resumable: true }),
   // Block Blast counts the score of a run that ended with no piece left to place.
