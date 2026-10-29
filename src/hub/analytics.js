@@ -108,22 +108,42 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
         token = fresh.access_token;
       }
       // PostgREST accepts arrays: grouping adjacent events cuts round-trips and
-      // request overhead, while ON CONFLICT DO NOTHING makes retries idempotent.
+      // request overhead. Rows carry their own UUID, so a retry is a no-op.
       const rows = prepareAnalyticsRows(batch, user);
       if (enabled && rows.length) {
-        const post = accessToken => request('/rest/v1/' + table, {
-          method: 'POST', body: rows.length === 1 ? rows[0] : rows,
-          token: accessToken, keepalive, prefer: 'return=minimal,resolution=ignore-duplicates'
+        // Never send `resolution=ignore-duplicates`: it turns the insert into an
+        // upsert, and an upsert needs SELECT on the table. Telemetry is
+        // insert-only for every role but an analytics admin, so that header made
+        // the server reject every write from every player while the empty catch
+        // below hid it. Plain inserts plus "duplicate key means it already
+        // arrived" keep retries idempotent without read access the client must
+        // not have.
+        const post = (payload, accessToken) => request('/rest/v1/' + table, {
+          method: 'POST', body: payload,
+          token: accessToken, keepalive, prefer: 'return=minimal'
         });
+        const duplicate = error => error?.code === '23505';
+        const send = async accessToken => {
+          try {
+            await post(rows.length === 1 ? rows[0] : rows, accessToken);
+          } catch (error) {
+            // A retried batch can hold one event that already landed. Send the
+            // rest on their own rather than lose the batch to a single repeat.
+            if (!duplicate(error) || rows.length === 1) throw error;
+            for (const row of rows) {
+              try { await post(row, accessToken); } catch (retry) { if (!duplicate(retry)) throw retry; }
+            }
+          }
+        };
         try {
-          await post(token);
+          await send(token);
         } catch (error) {
           // A token can expire or be revoked before its local expires_at value.
           // Refresh once, then leave the batch queued for the next normal retry.
           if (error?.status !== 401 || !user) throw error;
           const refreshed = await refreshSession();
           if (refreshed?.user?.id !== user) throw error;
-          await post(refreshed.access_token);
+          await send(refreshed.access_token);
         }
         const sent = new Set(batch.map(row => row.id));
         pending = pending.filter(item => !sent.has(item.id));
