@@ -45,25 +45,18 @@ site wrapper's metadata, icons, stylesheet and links are omitted.
 
 ## Boring Edition
 
-The game is packaged under its own name, with a "Boring Edition" subtitle drawn
-into its title art. The subtitle is painted into the Unity texture
-`Rooftop Snipers Title` (300×200, uncompressed RGBA32), so it lives in the `data`
-payload rather than in any text this repository owns. The wrapper's `<title>`, the cover heading and the catalog name all read "Rooftop Snipers: Boring
-Edition"; the New Eich Games credit is unchanged.
+The wrapper renames the game to "Rooftop Snipers: Boring Edition": `<title>`, the
+cover heading, the stage label and the catalog card. That is text this repository
+owns, so it is a plain edit to `scripts/templates/rooftop-snipers.html` and
+`src/games/catalog.js`.
 
-Because the art is baked in, the code, framework and memory blobs are still
-byte-identical to upstream, but the `data` blob is not: it is the upstream
-archive with one texture swapped, repacked, and re-gzipped as plain gzip (no
-Unity comment marker, matching the original payload). The title texture is
-uncompressed, so its pixels can be replaced without disturbing script data, and
-the bundle reloads with the new image intact.
-
-`tests/rooftop-snipers.test.cjs` pins the hash of that patched blob. Running
-`scripts/package-rooftop-snipers.mjs` against a fresh upstream checkout restores
-the unbranded title, and the suite will fail until the patch is reapplied or the
-hash is put back. The subtitle glyphs are a hand-drawn 5×7 bitmap (B O R I N G E
-D I T) scaled 3×, outlined 2 px, and shaded light grey below the midline to match
-the logo's two-tone letters.
+The in-game title is a baked Unity texture (`Rooftop Snipers Title`), not text, so
+the running game still shows the original logo. An earlier attempt painted a
+subtitle into that texture and repacked `data.unity3d`; the repacked payload
+opened in UnityPy but the compiled game would not boot, so it was reverted and the
+`data` blob is byte-identical to upstream again. Changing that art needs a loop
+that can watch the game boot in a real browser: the deploy workflow publishes
+`src/` on every push without running the suite, so a broken payload ships.
 
 ## Reproduce or edit
 
