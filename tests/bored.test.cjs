@@ -1211,7 +1211,26 @@ test('browser regressions', async t => {
       await page.evaluate(date => { window.originalDailyDate ||= dailyDate; dailyDate = () => date; renderDaily(); }, dateFor(challenge.slug));
       await page.click('#daily-play');
       try { await page.waitForFunction(() => typeof document.querySelector('#frame').contentWindow.__boredSnapshot === 'function', { timeout: 6000 }); }
-      catch (e) { throw new Error(challenge.slug + ': adapter unavailable; errors=' + JSON.stringify(errors)); }
+      catch (e) {
+        // Diagnose a missing snapshot without silently relaxing the contract.
+        // An iframe may still show the loading/error stand-in, or the wrong
+        // challenge may have launched; pageerror only observes the parent.
+        const state = await page.evaluate(() => {
+          const frame = document.querySelector('#frame');
+          const doc = frame?.contentDocument;
+          return {
+            activeGame: window.current,
+            challenge: window.currentDaily?.slug,
+            frameTitle: frame?.title,
+            frameReadyState: doc?.readyState,
+            frameBody: doc?.body?.innerText?.slice(0, 220),
+            frameSrcdocLength: frame?.srcdoc?.length || 0,
+            snapshotType: typeof frame?.contentWindow?.__boredSnapshot
+          };
+        }).catch(error => ({ diagnosticError: error.message }));
+        throw new Error(challenge.slug + ': adapter unavailable; state=' +
+          JSON.stringify(state) + '; errors=' + JSON.stringify(errors));
+      }
       const snapshot = await page.evaluate(() => { try { return document.querySelector('#frame').contentWindow.__boredSnapshot(); } catch (e) { throw new Error(current + ': ' + e.message); } });
       assert.equal(snapshot.slug, challenge.slug);
       assert.ok(Number.isFinite(snapshot[challenge.metric]), challenge.slug + ' exposes numeric metric');
