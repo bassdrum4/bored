@@ -127,7 +127,7 @@ function challengeRules() {
   const start = source.indexOf('const CHALLENGES = [');
   const end = source.indexOf('function dailyChallenge', start);
   // `const` in the vm script is lexical, so hand the list to the test explicitly.
-  const context = rules(['dailyDate', 'dailyChallenge', 'dailyCheck', 'dailyStreak'],
+  const context = rules(['dailyDate', 'dailyChallenge', 'dailyCheck', 'dailyResultCheck', 'parseDailyId', 'dailyStreak'],
     source.slice(start, end).replace(/export\s+$/, '') + '\nthis.CHALLENGES = CHALLENGES;');
   return context;
 }
@@ -186,6 +186,37 @@ test('the daily rotation covers every challenge game, changes targets, and uses 
   const tetris = dailyChallenge(dateFor('tetris'));
   const later = new Date(Date.parse(tetris.date + 'T00:00:00Z') + rotation.length * 86400000).toISOString().slice(0, 10);
   assert.notEqual(tetris.target, dailyChallenge(later).target);
+});
+test('a saved completion keeps its day when a goal is retuned or the calendar version changes', () => {
+  const { dailyChallenge, dailyCheck, dailyResultCheck, parseDailyId, CHALLENGES } = challengeRules();
+  // Find a plain counters challenge whose published target is not its easiest
+  // one, so the run below met the old bar but not today's.
+  let found = null;
+  for (let n = 0; n < 120 && !found; n++) {
+    const date = new Date(Date.UTC(2026, 9, 28 + n)).toISOString().slice(0, 10);
+    const challenge = dailyChallenge(date);
+    const definition = CHALLENGES.find(item => item.slug === challenge.slug);
+    const easiest = Math.min(...definition.targets);
+    if (!challenge.rule && challenge.target !== easiest) found = { date, challenge, easiest };
+  }
+  assert.ok(found, 'the calendar publishes a retuned target');
+  const snapshot = { slug: found.challenge.slug, [found.challenge.metric]: found.easiest };
+  const result = { id: found.challenge.id, snapshot };
+  assert.equal(dailyCheck(found.challenge, snapshot).complete, false, 'the higher goal for that day is not met');
+  const kept = dailyResultCheck(result.id, result);
+  assert.equal(kept.complete, true, 'the day it was earned on still counts');
+  assert.equal(kept.challenge.target, found.easiest);
+  // A completion stored before a calendar version bump keeps its date too.
+  const older = { id: 'v2:' + found.date + ':' + found.challenge.slug, snapshot };
+  assert.equal(parseDailyId(older.id).date, found.date);
+  assert.equal(parseDailyId(older.id).definition.slug, found.challenge.slug);
+  assert.equal(dailyResultCheck(older.id, older).complete, true);
+  // Rewritten, malformed, and unearned entries still count for nothing.
+  assert.equal(dailyResultCheck(older.id, { id: older.id, snapshot: { ...snapshot, slug: 'wrong' } }).complete, false);
+  assert.equal(dailyResultCheck('v2:2026-13-40:sand', result).complete, false);
+  assert.equal(dailyResultCheck('v2:2026-10-09:not-a-game', result).complete, false);
+  assert.equal(dailyResultCheck(result.id, null).complete, false);
+  assert.equal(parseDailyId('not-an-id'), null);
 });
 test('daily completion rejects idle state, wrong games, wrong modes, hints, undo, and partial wins', () => {
   const { dailyChallenge, dailyCheck } = challengeRules();

@@ -197,6 +197,43 @@ export function dailyCheck(challenge, snapshot) {
   return { complete, progress: value + ' ' + challenge.unit + ' · target ' + t + (notes.length ? ' · ' + notes.join(' · ') : '') };
 }
 
+// A saved run is proof of a day, and a day has to outlive the calendar that
+// produced it: a later schedule version renames a challenge, and a retuned
+// target moves the bar under results already earned. Neither may erase a
+// completed day, because the streak is counted from saved days — so the date and
+// the game are read back out of the stored id, and the run is accepted if it met
+// any goal that game has been published with. A malformed id, a snapshot for a
+// different game, or a run that never reached a published goal still counts for
+// nothing.
+export function parseDailyId(id) {
+  const match = /^v\d+:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+)$/.exec(typeof id === 'string' ? id : '');
+  if (!match) return null;
+  const definition = CHALLENGES.find(item => item.slug === match[2]);
+  if (!definition || !Number.isFinite(Date.parse(match[1] + 'T00:00:00Z'))) return null;
+  return { date: match[1], definition };
+}
+export function dailyResultCheck(id, result) {
+  const parsed = parseDailyId(id);
+  if (!parsed || !result || result.id !== id || !result.snapshot) {
+    return { complete: false, progress: 'Start playing to track your goal.' };
+  }
+  const current = dailyChallenge(parsed.date);
+  const goals = current.slug === parsed.definition.slug
+    ? [current.target, ...parsed.definition.targets]
+    : parsed.definition.targets;
+  let last = { complete: false, progress: 'Start playing to track your goal.' };
+  for (const target of new Set(goals)) {
+    const challenge = {
+      ...parsed.definition, date: parsed.date, id, target,
+      goal: parsed.definition.goal.replace('{target}', target)
+    };
+    const check = dailyCheck(challenge, result.snapshot);
+    if (check.complete) return { complete: true, progress: check.progress, challenge };
+    last = check;
+  }
+  return { complete: false, progress: last.progress };
+}
+
 // Inject the read-only accessor into the game's own scope; original base64 payloads remain untouched.
 const DAILY_ADAPTERS = {
   tetris: { expression: '({lines:game.lines,score:game.score||0})' },

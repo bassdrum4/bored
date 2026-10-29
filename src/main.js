@@ -3,7 +3,7 @@ import {
 } from './games/catalog.js';
 import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
 import { nativeHTML } from './games/arcade.js';
-import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, dailyStreak, installDailyAdapter, seedNumber, seedCode, CHALLENGES } from './daily.js';
+import { dailyDate as defaultDailyDate, dailyChallenge, dailyCheck, dailyResultCheck, parseDailyId, dailyStreak, installDailyAdapter, seedNumber, seedCode, CHALLENGES } from './daily.js';
 import { readStored, writeStored, writeRaw, removeStored, readStoredPrefix } from './hub/store.js';
 import {
   backendReady, request, getSession, getHandle, setHandle, loadRules, scoreRules, ANON_TOKEN,
@@ -615,7 +615,7 @@ function readDaily(challenge) {
   let result = dailyResults.get(challenge.id) || null;
   const stored = readStored(DAILY_PREFIX + challenge.id, null);
   if (stored) result = stored;
-  return result?.id === challenge.id && dailyCheck(challenge, result.snapshot).complete ? result : null;
+  return result && dailyResultCheck(challenge.id, result).complete ? result : null;
 }
 
 function renderDaily() {
@@ -651,11 +651,12 @@ function completedDailyDates() {
   const days = [];
   for (const [id, result] of Object.entries(readStoredPrefix(DAILY_PREFIX))) {
     if (!result || result.id !== id) continue;
-    const date = id.split(':')[1];
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    const challenge = dailyChallenge(date);
-    if (challenge.id !== id) continue;
-    if (dailyCheck(challenge, result.snapshot).complete) days.push(date);
+    // The day comes from the stored id, not from today's schedule: a new
+    // calendar version or a retuned goal is not allowed to delete a day the
+    // player already earned, which is what used to break streaks.
+    const parsed = parseDailyId(id);
+    if (!parsed || !dailyResultCheck(id, result).complete) continue;
+    days.push(parsed.date);
   }
   return days;
 }
