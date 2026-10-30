@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {randomUUID}=require('node:crypto');
-const {database,call,as,ids,consent,enroll,dashboard,challenge,move}=require('./together-db.cjs');
+const {database,call,as,ids,consent,enroll,dashboard,challenge,move,inviteCall}=require('./together-db.cjs');
 
 function reference(board,col,seat) {
   const next=board.slice();let row=5;while(row>=0&&next[row*7+col])row--;
@@ -50,14 +50,14 @@ test('Together production SQL: consent, directory, blocks, moves, duels and rete
     await assert.rejects(call(db,a,'challenge',{user_id:a}),/another player/);
   });
   await t.test('all private tables and internal helpers deny direct reads/writes even to members',async()=>{
-    for(const table of ['members','blocks','matches','moves','queue','limits']) {
+    for(const table of ['members','blocks','matches','moves','queue','limits','invites']) {
       await assert.rejects(as(db,a,()=>db.query('select * from bored_together.'+table)),/permission denied/);
       await assert.rejects(as(db,a,()=>db.query('delete from bored_together.'+table)),/permission denied/);
     }
     await assert.rejects(as(db,a,()=>db.query('select bored_together.person($1)',[non])),/permission denied/);
     await assert.rejects(as(db,a,()=>db.query('select bored_together.finish($1,$2,$3)',[randomUUID(),a,'fake win'])),/permission denied/);
     const rows=(await db.query("select relname,relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='bored_together' and relkind='r'")).rows;
-    assert.equal(rows.length,6);assert.ok(rows.every(r=>r.relsecurity||r.relrowsecurity));
+    assert.equal(rows.length,7);assert.ok(rows.every(r=>r.relsecurity||r.relrowsecurity));
   });
   await t.test('blocking hides both ways, stops challenges and cancels open games',async()=>{
     const live=await move(db,await challenge(db,a,c),a,0);
@@ -235,6 +235,37 @@ test('Together production SQL: consent, directory, blocks, moves, duels and rete
     assert.equal(ended.status,'completed');assert.equal(ended.winner,a);
     assert.equal((await db.query('select count(*) n from bored_together.queue where user_id=$1',[d])).rows[0].n,0);
     await enroll(db,d);assert.equal((await dashboard(db,d)).enrolled,true);
+  });
+  await t.test('a member invites a nonmember from the picker; it waits for them to join',async()=>{
+    // The picker's second list is a short set of accounts outside Together.
+    const candidates=await inviteCall(db,a,'candidates',{game:'tank2'});
+    assert.deepEqual(candidates.map(p=>p.handle),['NeverJoined']);
+    assert.equal(candidates.some(p=>p.id===a),false,'the inviter is not a candidate');
+    assert.equal(candidates.some(p=>p.id===b),false,'members are not candidates');
+    const sent=await inviteCall(db,a,'send',{user_id:non,game:'tank2'});
+    assert.equal(sent.game,'tank2');assert.equal(sent.handle,'NeverJoined');
+    // Nothing is on either list yet: the game exists only after they join.
+    assert.equal((await inviteCall(db,non,'list')).invites.length,1);
+    assert.equal((await inviteCall(db,non,'list')).invites[0].inviter,'WackyPenguin');
+    assert.equal((await inviteCall(db,non,'list')).invites[0].game,'tank2');
+    // Selecting a member in the first list still challenges directly; the
+    // invite endpoint refuses them rather than duplicating a route in.
+    await assert.rejects(inviteCall(db,a,'send',{user_id:b,game:'tank2'}),/already in Bored Together/);
+    // Accepting keeps it, and joining turns it into a visible game.
+    const accept=await inviteCall(db,non,'accept',{id:sent.id});
+    assert.equal(accept.ok,true);
+    await enroll(db,non);
+    const claimed=await inviteCall(db,non,'claim');
+    assert.equal(claimed.claimed,1);
+    assert.equal(claimed.matches[0].game,'tank2');
+    assert.equal(claimed.matches[0].turn_user,a);
+    const waiting=(await dashboard(db,non)).matches.find(m=>m.id===claimed.matches[0].id);
+    assert.ok(waiting,'the accepted invite is in the new member\u2019s games');
+    assert.equal(waiting.opponent.handle,'WackyPenguin');
+    assert.equal((await inviteCall(db,non,'list')).invites.length,0);
+    assert.equal((await inviteCall(db,a,'candidates',{game:'tank2'})).some(p=>p.id===non),false,'a joined account leaves the invite list');
+    await call(db,non,'delete',{match_id:waiting.id});
+    await call(db,non,'leave');
   });
   await t.test('expiry, retention and stale unplayed boards',async()=>{
     const m=await move(db,await challenge(db,a,b),a,0);

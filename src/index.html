@@ -155,6 +155,17 @@
   </form>
 </dialog>
 
+<dialog id="invite-dialog" aria-labelledby="invite-title">
+  <h2 id="invite-title">An invite</h2>
+  <p id="invite-blurb"></p>
+  <p id="invite-how" class="invite-how"></p>
+  <p id="invite-status" role="status" aria-live="polite"></p>
+  <div class="dialog-actions">
+    <button id="invite-accept" type="button">Accept invite</button>
+    <button id="invite-close" type="button">Close</button>
+  </div>
+</dialog>
+
 <div id="player" hidden>
   <div id="player-menu">
     <button id="menu-toggle" type="button" aria-label="Game menu" aria-haspopup="menu" aria-expanded="false" aria-controls="player-actions" title="Game menu (Esc)">

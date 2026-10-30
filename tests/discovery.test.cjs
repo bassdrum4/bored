@@ -162,6 +162,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
     if (url.pathname === '/rest/v1/play_events' && method === 'POST') { activity.push(...[].concat(JSON.parse(request.postData()))); return reply(null); }
     if (url.pathname === '/rest/v1/product_events' && method === 'POST') return reply(null);
     if (url.pathname === '/rest/v1/rpc/bt_rpc') return reply({ enrolled: false });
+    if (url.pathname === '/rest/v1/rpc/bt_invite_rpc') return reply({ enrolled: false, invites: [] });
     if (url.pathname === '/rest/v1/score_rules') return reply(rules);
     if (url.pathname === '/auth/v1/token') return reply({ access_token: 'mock-access', refresh_token: 'mock-refresh', expires_in: 3600, user: { id: 'test-user', email: 'tester@example.test' } });
     if (url.pathname === '/rest/v1/profiles') return reply([{ handle: 'tester' }]);

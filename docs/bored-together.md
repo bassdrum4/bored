@@ -16,8 +16,16 @@ Starting a game also plays it: the original game opens straight away with the
 challenger's turn. The match stays private to them until the first saved turn
 passes it to the opponent, who then sees it in their list as their turn. Leaving
 before that sends nothing at all, so no half-started game appears on anyone's
-list. Rematches work the same way. Nothing is "invited" and nothing is accepted;
-a game simply arrives when it is yours.
+list. Rematches work the same way.
+
+Under the member list, the picker shows a short second list: Bored accounts that
+have not joined Together yet, by their public display name. Their row has one
+**Invite** button, which uses the game selected above. The invitee sees a modal
+the next time they open any game, naming the inviter, the game and how to join.
+Closing it dismisses the notice for that page; **Accept** keeps the invitation on
+the server until they enrol, so joining Bored Together turns it into the game
+they were promised. That game is revealed at once, with the inviter to move, so
+it is already in the new member's list instead of waiting for a first turn.
 
 The list contains every game, with the ones waiting on you first. The latest
 three completed matches remain at the bottom with a result and Rematch action;
@@ -39,7 +47,9 @@ removed from the database, not just hidden. What remains is one dispatcher with
 `enroll`, `people`, `block`, `unblock`, `challenge`, `queue_join`,
 `queue_cancel`, `match`, `move`, `submit_run`, `resign`, `rematch`, `delete`,
 `leave` and `dashboard` — anything else answers "Unknown operation", and the SQL
-suite asserts that. Badges count turns only.
+suite asserts that. Badges count turns only. Invitations are the one separate
+surface: `bt_invite_rpc` handles `candidates`, `send`, `list`, `accept` and
+`claim`, and nothing else.
 
 ## Original-game integration
 
@@ -163,8 +173,10 @@ this change deliberately reverses that for the directory only, and the SQL
 suite asserts the new behavior. `search` was removed with the rest of the
 retired surface, so the directory is the only way to find someone.
 
-All six remaining `bored_together` tables (`members`, `blocks`, `matches`,
-`moves`, `queue`, `limits`) have RLS and no direct browser table grants.
+All seven private `bored_together` tables (`members`, `blocks`, `matches`,
+`moves`, `queue`, `limits`, `invites`) have RLS and no direct browser table
+grants. The invite candidate list is limited to eight accounts that have a
+profile and are not active members; no address is stored or returned.
 Keep this private schema outside the exposed Data API schemas. `public.bt_rpc`
 is SECURITY INVOKER; the dispatcher is in the private schema, SECURITY DEFINER
 with empty search path, and derives identity from `auth.uid()` after checking

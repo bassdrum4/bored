@@ -35,6 +35,9 @@ async function call(db,user,action,args={}) {
   return as(db,user,async()=> (await db.query('select public.bt_rpc($1,$2::jsonb) result',[action,JSON.stringify(args)])).rows[0].result);
 }
 const enroll=(db,u)=>call(db,u,'enroll',consent);
+async function inviteCall(db,user,action,args={}) {
+  return as(db,user,async()=> (await db.query('select public.bt_invite_rpc($1,$2::jsonb) result',[action,JSON.stringify(args)])).rows[0].result);
+}
 const dashboard=(db,u)=>call(db,u,'dashboard');
 // A challenge now opens the game for the challenger, who moves first; the
 // opponent only gets it once that turn is saved. Test setup can move straight in.
@@ -53,4 +56,4 @@ async function poolHandler(db,enqueue=fn=>fn()){
  const {createPoolHandler}=await import('../supabase/functions/together-pool/handler.js');
  return createPoolHandler({authorize:async auth=>{const id=auth.replace('Bearer ','');return ids.includes(id)?{id,is_anonymous:id===ids[6]}:null;},readMatch:(auth,id)=>enqueue(()=>call(db,auth.replace('Bearer ',''),'match',{match_id:id})),commitShot:shot=>enqueue(()=>serviceCommit(db,shot))});
 }
-module.exports={database,call,as,ids,consent,enroll,dashboard,challenge,move,serviceCommit,poolHandler};
+module.exports={database,call,as,ids,consent,enroll,dashboard,challenge,move,inviteCall,serviceCommit,poolHandler};

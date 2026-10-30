@@ -1,5 +1,5 @@
 import { hasIdentity, getSession, ensureProfile } from './backend.js';
-import { togetherRPC, CONSENT_VERSION } from './together-api.js';
+import { togetherRPC, inviteRPC, CONSENT_VERSION } from './together-api.js';
 import { TOGETHER_GAMES } from '../games/catalog.js';
 import { TOGETHER_ADAPTERS } from './together-player.js';
 import { readStored, writeStored, removeStored } from './store.js';
@@ -9,7 +9,12 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   const root = $('#together'), content = $('#together-content'), status = $('#together-status');
   let owner = null, data = null, visible = false, busy = false, generation = 0, flight = null;
   let lastRefresh = 0;
-  let flow = null, selectedGame = 'connect-four', people = null;
+  let flow = null, selectedGame = 'connect-four', people = null, outsiders = null, outsidersError = '';
+  // An invite is an ordinary game for later: the recipient has not joined yet.
+  const invited = new Map();
+  let invite = null, inviteAccepted = false, inviteBusy = false;
+  const dismissedInvites = new Set();
+  const inviteDialog = $('#invite-dialog');
   const name = game => TOGETHER_GAMES[game]?.name || game;
   function node(tag, text, className) {
     const el = document.createElement(tag);
@@ -21,6 +26,14 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     const b = node('button', text, 'action' + (primary ? ' bt-primary' : ''));
     b.type = 'button'; b.onclick = () => run(fn); return b;
   }
+  function dialogOpen(dialog) {
+    if (!dialog) return;
+    if (dialog.showModal) dialog.showModal(); else dialog.setAttribute('open', '');
+  }
+  function dialogClose(dialog) {
+    if (!dialog) return;
+    if (dialog.close) dialog.close(); else dialog.removeAttribute('open');
+  }
   function updateBadge() {
     const count = data?.enrolled ? data.matches.filter(m => m.status === 'active' && m.turn_user === owner).length : 0;
     $('#together-badge').hidden = !count; $('#together-badge').textContent = String(count);
@@ -31,7 +44,9 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     const next = hasIdentity() ? getSession()?.user?.id : null;
     if (owner === next) return;
     owner = next; generation++; flight = null; busy = false; lastRefresh = 0; root.removeAttribute('aria-busy');
-    data = flow = people = null; status.textContent = '';
+    data = flow = people = outsiders = null; outsidersError = ''; invited.clear(); status.textContent = '';
+    invite = null; inviteAccepted = false;
+    if (inviteDialog?.open) dialogClose(inviteDialog);
     updateBadge(); render();
   }
   async function refresh(force = false) {
@@ -88,6 +103,57 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
       onExit() { if (stamp === generation) refresh(true); }
     });
   }
+  /* ── Invitations ────────────────────────────────────────────────────────── */
+
+  // Shown to a signed-in Bored account that is not in Bored Together, the next
+  // time it opens a game. Closing only dismisses it for this page; accepting
+  // holds the challenge on the server until the account joins.
+  function inviteCopy() {
+    const who = invite?.inviter || 'A Bored Together member';
+    $('#invite-title').textContent = who + ' invited you to ' + name(invite.game);
+    $('#invite-blurb').textContent = inviteAccepted
+      ? 'Saved. The game stays with your account and will be in Your Games as soon as you join Bored Together.'
+      : who + ' would like to play ' + name(invite.game) + ' with you on Bored Together, the arcade\u2019s two-player side. Take a turn, then come back whenever.';
+    $('#invite-how').textContent = 'To join, open Bored Together and choose Join Bored Together. ' +
+      name(invite.game) + ' will be waiting in Your Games.';
+    $('#invite-accept').textContent = inviteAccepted ? 'Join Bored Together' : 'Accept invite';
+  }
+  function inviteTone(text, error) {
+    const el = $('#invite-status');
+    el.textContent = text; el.dataset.tone = error ? 'error' : '';
+  }
+  async function checkInvites() {
+    if (!hasIdentity() || inviteBusy || inviteDialog?.open) return;
+    if (!document.body.classList.contains('playing')) return;
+    try {
+      const result = await inviteRPC('list');
+      if (!result || result.enrolled) return;
+      const next = (result.invites || []).find(item => item?.id && !dismissedInvites.has(item.id));
+      if (!next) return;
+      invite = next; inviteAccepted = next.status === 'accepted';
+      inviteTone('', false); inviteCopy(); dialogOpen(inviteDialog);
+      $('#invite-close').focus();
+    } catch {
+      // An invitation is never worth interrupting a game with an error.
+    }
+  }
+  async function acceptInvite() {
+    if (!invite || inviteBusy) return;
+    if (inviteAccepted) { dialogClose(inviteDialog); invite = null; open(); return; }
+    inviteBusy = true; const accept = $('#invite-accept'); accept.disabled = true;
+    inviteTone('Saving\u2026', false);
+    try {
+      await inviteRPC('accept', { id: invite.id });
+      inviteAccepted = true; inviteCopy();
+      inviteTone('Accepted. Join Bored Together and the game will be waiting for you.', false);
+    } catch (error) { inviteTone(error.message, true); }
+    finally { inviteBusy = false; accept.disabled = false; }
+  }
+  if (inviteDialog) {
+    $('#invite-accept').onclick = acceptInvite;
+    $('#invite-close').onclick = () => { if (invite) dismissedInvites.add(invite.id); dialogClose(inviteDialog); };
+    inviteDialog.addEventListener('close', () => { if (invite) dismissedInvites.add(invite.id); });
+  }
   function intro() {
     // A member who joined under the older notice is shown the new one once
     // before their list loads: the directory now shows their email.
@@ -101,6 +167,8 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
       button(renew ? 'Review and continue' : 'Join Bored Together', async () => {
         if (!hasIdentity()) { openAuthDialog('signin'); return; }
         await ensureProfile(); await togetherRPC('enroll', { consent_version: CONSENT_VERSION });
+        // An accepted invite is held until enrollment; it becomes a game now.
+        try { await inviteRPC('claim'); } catch { /* joining still works */ }
       }, true));
     content.append(intro);
   }
@@ -156,12 +224,39 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
           who.append(node('strong', person.handle), node('span', person.email || 'No email on this account', 'bt-caption'));
           row.append(who, button('Play', async () => {
             const match = await togetherRPC('challenge', { user_id: person.id, game: selectedGame });
-            flow = null; people = null; await launch(match.id);
+            flow = null; people = null; outsiders = null; await launch(match.id);
           }, true));
           list.append(row);
         }
         box.append(list);
       }
+      // The second list is short: accounts that exist in Bored but have not
+      // joined Together yet. Inviting uses the game chosen above.
+      const outside = node('section', undefined, 'bt-outsiders');
+      outside.append(node('h4', 'Not in Bored Together yet'),
+        node('p', 'Invite one of them to ' + name(selectedGame) + '. They see it the next time they open a game, and it is waiting for them when they join.', 'bt-caption'));
+      if (outsidersError) outside.append(node('p', outsidersError, 'bt-caption'));
+      else if (!outsiders) outside.append(node('p', 'Loading…', 'bt-caption'));
+      else if (!outsiders.length) outside.append(node('p', 'Nobody else has a Bored account to invite right now.', 'bt-caption'));
+      else {
+        const list = node('div', undefined, 'bt-people'); list.id = 'bt-outsiders';
+        for (const person of outsiders) {
+          const row = node('div', undefined, 'bt-person');
+          const who = node('div');
+          who.append(node('strong', person.handle), node('span', 'Not in Bored Together', 'bt-caption'));
+          const key = person.id + ':' + selectedGame;
+          if (invited.has(key)) row.append(who, node('span', 'Invited', 'bt-caption'));
+          else row.append(who, button('Invite', async () => {
+            const sent = await inviteRPC('send', { user_id: person.id, game: selectedGame });
+            invited.set(key, true);
+            status.textContent = 'Invite sent to ' + sent.handle + '. It waits for them until they join.';
+            render();
+          }, true));
+          list.append(row);
+        }
+        outside.append(list);
+      }
+      box.append(outside);
     }
     box.append(button('Cancel', () => { flow = null; people = null; render(); }));
     content.append(box);
@@ -220,6 +315,15 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     // The member list is only fetched when the picker is opened.
     start.append(button('Start a Game', async () => {
       people = await togetherRPC('people');
+      // A list that failed to load must not read as "nobody to invite": the
+      // endpoint is easy to miss when a deployment lands before its SQL does.
+      outsiders = null; outsidersError = '';
+      try {
+        const list = await inviteRPC('candidates', { game: selectedGame });
+        outsiders = Array.isArray(list) ? list : [];
+      } catch (error) {
+        outsiders = []; outsidersError = error.message || 'Invitations are not available right now.';
+      }
       flow = 'challenge'; render(); $('#bt-game-select')?.focus();
     }, true),
       button('Play Random', () => { flow = 'random'; people = null; render(); $('#bt-game-select')?.focus(); }));
@@ -251,7 +355,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   }
   function open() {
     if (!visible) window.dispatchEvent(new CustomEvent('bored:together-telemetry', { detail: { kind: 'bt_view' } }));
-    visible = true; people = null; document.body.classList.add('together-open');
+    visible = true; people = null; outsiders = null; outsidersError = ''; document.body.classList.add('together-open');
     for (const el of document.querySelectorAll('#daily,#recent,#leaderboard,#library,.activity-notice')) el.hidden = true;
     root.hidden = false; $('#together-nav').setAttribute('aria-current', 'page');
     try { history.replaceState(null, '', '#together'); } catch {}
@@ -267,7 +371,11 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   $('#together-refresh').onclick = () => run(() => refresh(true));
   $('#together-back').onclick = () => { close(); try { history.replaceState(null, '', '#library'); } catch {} $('#library').scrollIntoView(); };
   for (const link of document.querySelectorAll('.site-nav a:not(#together-nav)')) link.addEventListener('click', close);
-  window.addEventListener('bored:identity', () => { resetIdentity(); refresh(true); });
+  window.addEventListener('bored:identity', () => {
+    resetIdentity(); refresh(true);
+    // A game already on screen gets the invite notice for the new account.
+    if (document.body.classList.contains('playing')) setTimeout(checkInvites, 400);
+  });
   window.addEventListener('bored:together-open', event => {
     if (TOGETHER_ADAPTERS[event.detail?.game]) selectedGame = event.detail.game;
     open(); flow = 'challenge'; render();
@@ -281,5 +389,5 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   // badge refresh costs far fewer Auth and database requests on the Free tier.
   setInterval(() => { if (!document.hidden && hasIdentity()) refresh(); }, 15000);
   resetIdentity(); refresh(); if (location.hash === '#together') open();
-  return { open, refresh };
+  return { open, refresh, checkInvites };
 }

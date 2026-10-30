@@ -4,6 +4,20 @@ import { request, freshSession, getSession, hasIdentity } from './backend.js';
 // are asked to review it once before their games load again.
 export const CONSENT_VERSION = '2026-10-26-v3';
 
+// Invitations are their own endpoint: the member picker invites an account that
+// has not joined yet, and that account reads the notice without joining.
+export async function inviteRPC(action, args = {}) {
+  if (!hasIdentity()) throw new Error('Sign in to your Bored account first.');
+  const owner = getSession()?.user?.id;
+  const session = await freshSession();
+  if (!session || session.user.id !== owner) throw new Error('Sign in again to continue.');
+  const result = await request('/rest/v1/rpc/bt_invite_rpc', {
+    method: 'POST', body: { action, args }, token: session.access_token
+  });
+  if (getSession()?.user?.id !== owner) throw new Error('Your account changed. Please try again.');
+  return result;
+}
+
 export async function togetherRPC(action, args = {}) {
   if (!hasIdentity()) throw new Error('Sign in to your Bored account first.');
   const owner = getSession()?.user?.id;

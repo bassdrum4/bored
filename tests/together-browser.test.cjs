@@ -5,7 +5,7 @@ const path=require('node:path');
 const {randomUUID}=require('node:crypto');
 const puppeteer=require('puppeteer-core');
 const {serve}=require('./serve.cjs');
-const {database,call,ids,poolHandler}=require('./together-db.cjs');
+const {database,call,ids,poolHandler,inviteCall}=require('./together-db.cjs');
 
 test('two embedded browser accounts play, save, auto-return, resume and rematch using production SQL',async t=>{
   const executablePath=[process.env.CHROME_PATH,'/usr/bin/google-chrome','/usr/bin/chromium'].filter(Boolean).find(p=>fs.existsSync(p));
@@ -36,6 +36,13 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
         const response=await pool(new Request(req.url(),{method:'POST',headers:{Authorization:req.headers().authorization,'Content-Type':'application/json'},body:req.postData()}));
         calls.push({identity,action:'pool-end',status:response.status});
         return req.respond({status:response.status,headers:cors,contentType:'application/json',body:await response.text()});
+      }
+      if(url.pathname==='/rest/v1/rpc/bt_invite_rpc') {
+        if(outages.has(identity))return req.abort('internetdisconnected');
+        const {action,args}=JSON.parse(req.postData());calls.push({identity,action:'invite:'+action});
+        const pending=serial.then(()=>inviteCall(db,ids.includes(identity)?identity:null,action,args));
+        serial=pending.catch(()=>{});
+        try{return reply(await pending);}catch(e){return reply({message:e.message,code:e.code},400);}
       }
       if(url.pathname==='/rest/v1/rpc/bt_rpc') {
         if(outages.has(identity))return req.abort('internetdisconnected');

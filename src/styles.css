@@ -377,5 +377,14 @@ dialog{margin:auto}
   .bt-start{padding:16px}
 }
 
+/* An invite from the picker, and the notice the recipient gets in a game. */
+.bt-outsiders{margin-top:20px;border-top:1px solid var(--rule);padding-top:14px}
+.bt-outsiders h4{font-size:15px;font-weight:400;margin-bottom:4px}
+#invite-blurb{font-size:13px;color:var(--dim);margin-bottom:10px}
+.invite-how{font:11px/1.7 var(--mono);border-left:1px solid var(--rule);padding-left:12px;margin:0 0 12px;color:var(--dim)}
+#invite-status{min-height:18px;font:11px/1.5 var(--mono);color:var(--dim);margin:4px 0 10px}
+#invite-status[data-tone="error"]{color:var(--red)}
+#invite-accept{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
 /* Minimal occasional enjoyment prompt (the arcade does not load analytics.css). */
 .enjoyment-choices{display:flex;flex-wrap:wrap;gap:8px 16px;border:1px solid #ccc;margin:12px 0;padding:12px}.enjoyment-choices label{white-space:nowrap}#enjoyment-dialog{max-width:min(460px,94vw)}#enjoyment-dialog form{display:grid;gap:10px}#enjoyment-dialog textarea{display:block;width:100%;box-sizing:border-box;min-height:54px}#enjoyment-dialog .dialog-actions{display:flex;gap:12px}

@@ -284,6 +284,8 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
 
   playerPanel.hidden = false;
   document.body.classList.add('playing');
+  // The invitation notice belongs to the game, so it waits for one to open.
+  setTimeout(() => togetherUI.checkInvites(), 500);
   clearTimeout(focusTimer);
   // Do not steal focus back while the player menu is open, or Esc and the
   // arrow keys would go to the game instead of the menu — and do not take it
@@ -343,6 +345,7 @@ function closeGame({ force = false } = {}) {
   const together = activeTogether;
   activeTogether = null;
   if (together) together.dispose();
+  if ($('#invite-dialog')?.open) $('#invite-dialog').close();
   const wasDaily = activeChallenge;
   activeChallenge = null;
   $('#challenge-progress').hidden = true;
@@ -834,6 +837,8 @@ addEventListener('message', event => {
 });
 
 addEventListener('keydown', event => {
+  // A modal owns the keyboard while it is open, including Escape.
+  if (event.target instanceof Element && event.target.closest('dialog[open]')) return;
   const typing = event.target instanceof Element &&
     (event.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName));
   if (event.key === 'Escape') {
@@ -861,7 +866,7 @@ renderDaily();
 renderRecent();
 renderCollections();
 renderLibrary();
-createTogetherUI({ openAuthDialog, playMatch(match, owner, callbacks) {
+const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, callbacks) {
   const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });
   openGame(match.game, null, document.querySelector('#together-nav'), player);
 } });
