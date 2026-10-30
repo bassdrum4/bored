@@ -18,6 +18,10 @@ const source = [
   'src/games/arcade.js', 'src/daily.js', 'src/games/catalog.js'
 ].map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
 const API = source.match(/const API_URL = '([^']+)'/)[1];
+// Public, key-less game APIs. A game may reach these when it has no local answer
+// (Wordle's dictionary); every other off-site request still fails the suite.
+const GAME_APIS = ['https://api.dictionaryapi.dev/'];
+const offSite = () => requests.filter(request => !request.startsWith(API) && !GAME_APIS.some(host => request.startsWith(host)));
 // Games are downloaded on demand now, so the suite serves the repository over
 // loopback the way GitHub Pages does instead of loading file://.
 let origin = '', url = '';
@@ -1360,7 +1364,7 @@ test('browser regressions', async t => {
     }
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
     assert.deepEqual(errors, []);
-    assert.deepEqual(requests.filter(request => !request.startsWith(API)), []);
+    assert.deepEqual(offSite(), []);
   });
 
   await t.test('daily goal verifies actual Memory gameplay, persists completion, shares, and rolls over', async () => {
@@ -1473,8 +1477,7 @@ test('browser regressions', async t => {
     }
     assert.equal(seeds.size, 1, 'every game receives the same daily seed');
     assert.deepEqual(errors, [], 'no uncaught JavaScript errors');
-    const external = requests.filter(request => !request.startsWith(API));
-    assert.deepEqual(external, [], 'no external requests other than the configured leaderboard');
+    assert.deepEqual(offSite(), [], 'no external requests other than the leaderboard and a declared game API');
   });
 
   await t.test('mobile hub and all new games fit at 320px; random respects the active filter', async () => {

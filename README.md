@@ -438,8 +438,8 @@ all 34 daily challenges, per-game goal acceptance/rejection, real Memory
 challenge completion,
 saved results, sharing with clipboard fallback, Detroit-time rollover, 320px layouts,
 blocked storage, high-score capture, one shared board per game with the
-local-only ones kept off it, and no external game requests beyond the
-configured leaderboard API.
+local-only ones kept off it, and no external requests beyond the
+configured leaderboard API and the game APIs a game declares.
 
 The browser block loads `src/index.html` over loopback with `src/` as the site
 root, which is the same tree Pages deploys. The hub keeps the small `window`

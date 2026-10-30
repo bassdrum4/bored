@@ -125,9 +125,16 @@ assertions. What it still insists on:
 
 1. `src/games/content/<slug>.html`. It must be a complete document that works alone in a
    browser and is fetched into an iframe, so:
-   - No external requests. No CDNs, fonts, images, or analytics — only inline CSS/JS, canvas,
-     or emoji/text. The tests fail on off-site fetches. The hub itself works offline; a game
-document is downloaded the first time its card is opened, so it needs a connection exactly once.
+   - **Network calls are allowed where the game needs one, and only there.** A game may call a
+     public, key-less API when the answer has to come from outside the document (Wordle asks
+     `api.dictionaryapi.dev` about a word its bundled list has never seen). The game must still
+     play with the call blocked: bundle the data that matters, treat a failed, slow or erroring
+     request as "no answer" instead of a lost turn, and never let a request decide a score. No
+     CDNs, webfonts, remote images, analytics, trackers, or API keys — only inline CSS/JS, canvas,
+     or emoji/text plus the endpoints the game declares. Every endpoint goes in `GAME_APIS` in
+     `tests/bored.test.cjs`; anything else off-site still fails the suite. The hub itself stays
+     offline and needs a connection only to download a game document the first time its card is
+     opened.
    - No `localStorage`/`sessionStorage` unless wrapped in try/catch (embedded contexts throw).
      Key it under `bored.<slug>.…`. Persistence is optional; the hub owns real scores.
    - Fold on its own: no fixed width over ~360px, no page scroll that hides the board, and
@@ -220,7 +227,9 @@ snapshot boolean. Adding a new rule means a new `case` there plus a snapshot fie
 
 `main.js` handles sign-in, profiles, and the `scores` table. A game's only obligations are the
 snapshot contract above and not swallowing the iframe's errors. Do not add accounts, network
-calls, or your own scoreboard to a game; it will be duplicated and will not follow the player.
+calls that duplicate the hub's, or your own scoreboard to a game; it will be duplicated and will
+not follow the player. A game that needs its own data from a public API is fine — see the network
+rule under "Adding a game".
 
 ## How a game should look
 
