@@ -7,7 +7,7 @@
 // in `src/games/content/` are the payloads: there is nothing extra to publish,
 // and editing a game updates it without rebuilding the hub.
 
-export const ORDER = [["typing-test", "Typing Test"], ["circuit", "Circuit"], ["fluid", "Fluid"], ["signal-tower", "Signal Tower"], ["prism-duel", "Prism Duel"], ["rooftop-snipers", "Rooftop Snipers: Boring Edition"], ["block-blast", "Block Blast"], ["chess", "Chess"], ["mahjong", "Mahjong"], ["minigolf", "Minigolf"], ["sumo", "SUMO"], ["sand", "Sand"], ["poker", "Poker"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["lights-out", "Lights Out"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["klang", "Klang"], ["8ball", "8 Ball"]];
+export const ORDER = [["transit-chaos", "Transit Chaos"], ["typing-test", "Typing Test"], ["circuit", "Circuit"], ["fluid", "Fluid"], ["signal-tower", "Signal Tower"], ["prism-duel", "Prism Duel"], ["rooftop-snipers", "Rooftop Snipers: Boring Edition"], ["block-blast", "Block Blast"], ["chess", "Chess"], ["mahjong", "Mahjong"], ["minigolf", "Minigolf"], ["sumo", "SUMO"], ["sand", "Sand"], ["poker", "Poker"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["lights-out", "Lights Out"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["klang", "Klang"], ["8ball", "8 Ball"]];
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://youtubeplayer.freebuff.app/player"};
 // Offline games with no board of their own: they still play, but the hub keeps
 // no best for them. 8 Ball, Sand and Eco are open-ended toys, so a "high score"
@@ -18,10 +18,11 @@ export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
-export const FRESH_GAMES = ["typing-test", "circuit", "fluid", "signal-tower"];
+export const FRESH_GAMES = ["transit-chaos","typing-test","circuit","fluid"];
 ORDER.unshift(['2048', '2048'], ['memory', 'Memory'], ['connect-four', 'Connect Four'], ['aim-lab', 'Aim Lab']);
 ORDER.unshift(['deep', 'DEEP']);
 export const META = {
+  "transit-chaos": ["Strategy", "Draw subway lines, move passengers, and keep a growing city from gridlock."],
   "typing-test": ["Puzzle", "Thirty seconds, common words, and a keyboard that does not forgive a glance away."],
   "circuit": ["Arcade", "A seeded time trial: three laps, one red car, and corners that punish a late brake."],
   "fluid": ["Sandbox", "Drag to stir ink through a live fluid."],
