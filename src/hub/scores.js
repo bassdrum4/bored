@@ -56,7 +56,7 @@ export function accountStandings(scores) {
 // Older games keep their own storage keys; `read` reads those directly.
 const LEGACY_GAMES = [
   { id: '2048', name: '2048', unit: 'points', key: 'bored.best.2048' },
-  { id: 'aim-lab', name: 'Aim Lab', unit: 'hits', key: 'bored.best.aim-lab.64' },
+  { id: 'aim-lab', name: 'Aim Lab', unit: 'hits', key: 'bored.best.aim-lab.duo-v1.64' },
   { id: 'memory', name: 'Memory', unit: 'moves', key: 'bored.best.memory', lower: true },
   { id: 'snake', name: 'Snake', unit: 'apples', key: 'snake.bestScore' },
   { id: 'pac-man', name: 'Pac-Man', unit: 'points', key: 'pacHi' },
