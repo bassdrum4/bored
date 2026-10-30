@@ -1214,9 +1214,13 @@ async function submitGuess() {
 function updateKey(letter, status) {
   const key = kb.querySelector(`.key[data-key="${letter.toLowerCase()}"]`);
   if (!key) return;
-  const p = { correct: 3, present: 2, absent: 1 };
-  const cur = key.classList.contains('correct') ? 'correct' : key.classList.contains('present') ? 'present' : 'absent';
-  if (p[status] > (p[cur] || 0)) { key.classList.remove('correct','present','absent'); key.classList.add(status); }
+  // A key only ever moves up: a letter marked absent stays absent, a letter
+  // found in the word stays yellow or green. A key with no mark has rank 0, so
+  // the first absent guess can still paint it (it used to default to absent and
+  // then fail its own comparison, which is why nothing ever greyed out).
+  const rank = { correct: 3, present: 2, absent: 1 };
+  const cur = ['correct', 'present', 'absent'].find(c => key.classList.contains(c));
+  if (rank[status] > (rank[cur] || 0)) { key.classList.remove('correct','present','absent'); key.classList.add(status); }
 }
 
 function showMessage(text, duration = 1500) {
