@@ -88,6 +88,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  highScore("transit-chaos", "Transit Chaos", "passengers", { metric: "delivered", when: snapshot => snapshot.finished === true }),
   // Signal Tower keeps the waves already cleared, so leaving mid-defence still
   // keeps what the line has held. A run that never clears wave one saves nothing.
   highScore("signal-tower", "Signal Tower", "waves", { metric: "waves", resumable: true }),
