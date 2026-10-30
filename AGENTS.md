@@ -96,9 +96,10 @@ them directly and push. Nothing rebuilds, re-encodes or copies a page behind you
   of the day is the same for everyone, and cut a fresh random one afterwards (DEEP does this, with
   `deep.dailyPlayed` marking the day). Never replace a game's whole document with `replace('</body>')`
   — inject at the last closing tag, because games contain that text as data.
-- **A score must be capturable.** `recordBest` ignores zero and unfinished runs, so a game whose score
-  can end at 0 never saves: DEEP adds `state.turns` to its score for exactly this reason. Any new
-  scored game needs a metric that is positive from the first action.
+- **A score must be capturable.** `recordBest` ignores zero and unfinished runs. DEEP uses
+  `Math.max(1, earnedProgress)` on finished attempts to preserve a positive first-floor score
+  without rewarding idle turns or backtracking. Any new scored game needs a positive, meaningful
+  first-action metric or an explicit minimum on completed attempts; do not award points for waiting.
 - **Secrets and deploys.** `.env.local` holds the Supabase service key (full write). It is git-ignored
   — never commit it, never print it. Push to `main` deploys; never force-push.
 

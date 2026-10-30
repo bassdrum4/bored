@@ -163,6 +163,12 @@ canvas { display:block; image-rendering:auto; touch-action:none; }
 }
 .titlebest b { color:var(--gold); font-size:14px; }
 
+.route-choices { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; width:100%; }
+.route-choices .btn { flex:1 1 160px; max-width:225px; text-align:left; line-height:1.35; }
+.route-choices small { display:block; font-size:10px; font-family:ui-monospace,monospace; font-weight:400;
+  letter-spacing:0; text-transform:none; margin-top:5px; color:var(--muted); }
+.route-choices .btn:hover small { color:inherit; }
+
 /* ── End screen ── */
 .endword {
   font-family:'Bebas Neue',sans-serif; font-size:clamp(38px, 9vw, 62px);
@@ -285,7 +291,7 @@ textarea.result[hidden] { display:none; }
       <div class="kicker">a daily-seeded descent</div>
       <div class="logo">DE<em>E</em>P</div>
       <p class="blurb">
-        Five floors down, something is still lit. Take the stairs, outfight what lives
+        Five floors down, something is still lit. Choose your path at the stairs, outfight what lives
         below, and unseal the Vault Core. Everyone dives the same dungeon today.
       </p>
       <div class="seedline" id="seedline">SEED —</div>
@@ -298,6 +304,21 @@ textarea.result[hidden] { display:none; }
         <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows move · <kbd>space</kbd> waits<br>
         <kbd>Q</kbd> drinks a flask · <kbd>&gt;</kbd> or <kbd>enter</kbd> takes the stairs
       </div>
+    </div>
+
+    <div class="overlay" id="routes" hidden role="dialog" aria-modal="true" aria-labelledby="routesTitle">
+      <div class="kicker">At the staircase</div>
+      <div class="endword" id="routesTitle">THE WAY SPLITS</div>
+      <p class="blurb">Choose your next descent. Safer passages preserve your strength; dangerous ones hold more treasure.</p>
+      <div class="route-choices">
+        <button class="btn" id="btnSafeRoute" type="button">1 · Sheltered path
+          <small>Recover 6 HP · 1 fewer enemy and gold cache</small>
+        </button>
+        <button class="btn hot" id="btnRiskyRoute" type="button">2 · Unquiet path
+          <small>Recover 1 HP · 3 extra enemies and 2 gold caches</small>
+        </button>
+      </div>
+      <button class="btn ghost small" id="btnCancelRoute" type="button">Back to dungeon · Esc</button>
     </div>
 
     <div class="overlay" id="end" hidden>
@@ -429,7 +450,7 @@ textarea.result[hidden] { display:none; }
     alive: true, won: false, running: false,
     hurt: 0, shake: 0, flash: 0,
     face: { x: 0, y: 1 }, lunge: { x: 0, y: 0, t: 0 },
-    sealed: false, soundOn: true, cause: ''
+    sealed: false, soundOn: true, cause: '', route: 'normal', choosingRoute: false
   };
 
   let map, seen, vis, rooms, stairs, enemies = [], items = [];
@@ -495,6 +516,12 @@ textarea.result[hidden] { display:none; }
     if (depth === 4) return ['bone', 'bone', 'wraith', 'wraith'];
     return ['wraith', 'bone', 'wraith'];
   }
+  // Choices affect only the following floor. Normal is the original first-floor mix.
+  function routeProfile(route) {
+    if (route === 'safe') return { heal: 6, enemies: -1, gold: -1 };
+    if (route === 'risky') return { heal: 1, enemies: 3, gold: 2 };
+    return { heal: 4, enemies: 0, gold: 0 };
+  }
   function buildFloor(depth) {
     map = new Uint8Array(MAP_W * MAP_H);
     seen = new Uint8Array(MAP_W * MAP_H);
@@ -545,7 +572,7 @@ textarea.result[hidden] { display:none; }
     }
 
     const pool = enemyWeights(depth);
-    const count = 2 + depth * 2;
+    const count = Math.max(1, 2 + depth * 2 + routeProfile(state.route).enemies);
     for (let i = 0; i < count; i++) {
       const room = pick(rooms.slice(1));
       const spot = tileInRoom(room);
@@ -561,7 +588,7 @@ textarea.result[hidden] { display:none; }
       if (kind === 'gold') item.value = 8 + ri(24);
       items.push(item);
     };
-    for (let i = 0; i < 4 + depth; i++) place('gold');
+    for (let i = 0; i < Math.max(1, 4 + depth + routeProfile(state.route).gold); i++) place('gold');
     for (let i = 0; i < (depth > 2 ? 2 : 1); i++) place('potion');
     if (depth === 2 || depth === 4) place('sword');
     if (depth === 3) place('shield');
@@ -698,13 +725,13 @@ textarea.result[hidden] { display:none; }
     $('sKills').textContent = state.kills;
     $('sScore').textContent = state.running || state.turns ? liveScore() : 0;
     $('potionN').textContent = state.potions;
-    $('btnPotion').disabled = state.potions <= 0 || !state.running;
+    $('btnPotion').disabled = state.potions <= 0 || !state.running || state.choosingRoute;
     const onStairs = state.running && px === stairs.x && py === stairs.y;
     const btn = $('btnStairs');
     btn.disabled = !onStairs;
     btn.classList.toggle('ready', onStairs);
-    btn.textContent = state.depth >= FLOORS ? (wardenAlive() ? 'Sealed' : 'Claim') : 'Descend';
-    btn.disabled = !onStairs || (state.depth >= FLOORS && wardenAlive());
+    btn.textContent = state.depth >= FLOORS ? (wardenAlive() ? 'Sealed' : 'Claim') : 'Choose path';
+    btn.disabled = !onStairs || state.choosingRoute || (state.depth >= FLOORS && wardenAlive());
   }
 
   /* ─────────────────────────── combat / turns ─────────────────────────── */
@@ -826,7 +853,7 @@ textarea.result[hidden] { display:none; }
   }
 
   function usePotion() {
-    if (!state.running || !state.alive) return;
+    if (!state.running || !state.alive || state.choosingRoute) return;
     if (state.potions <= 0) { sfx('deny'); log('No flasks left.', 'bad'); return; }
     if (state.hp >= state.maxHp) { sfx('deny'); log('You are already whole.', ''); return; }
     state.potions--;
@@ -925,7 +952,7 @@ textarea.result[hidden] { display:none; }
 
   /* ─────────────────────────── actions ─────────────────────────── */
   function move(dx, dy) {
-    if (!state.running || !state.alive) return;
+    if (!state.running || !state.alive || state.choosingRoute) return;
     state.face = { x: dx, y: dy };
     const nx = px + dx, ny = py + dy;
     if (wallAt(nx, ny)) { bump(); sfx('deny'); return; }
@@ -941,20 +968,39 @@ textarea.result[hidden] { display:none; }
     afterTurn();
   }
   function waitTurn() {
-    if (!state.running || !state.alive) return;
+    if (!state.running || !state.alive || state.choosingRoute) return;
     state.turns++;
     afterTurn();
   }
   function useStairs() {
-    if (!state.running || !state.alive) return;
+    if (!state.running || !state.alive || state.choosingRoute) return;
     if (px !== stairs.x || py !== stairs.y) { sfx('deny'); log('No stairs beneath you.', ''); return; }
     if (state.depth >= FLOORS) {
       if (wardenAlive()) { sfx('deny'); log('The Warden must fall first.', 'bad'); return; }
       claimCore();
       return;
     }
+    state.choosingRoute = true;
+    $('routes').hidden = false;
+    updateHUD();
+    $('btnSafeRoute').focus();
+  }
+  function cancelRoute() {
+    if (!state.choosingRoute) return;
+    state.choosingRoute = false;
+    $('routes').hidden = true;
+    updateHUD();
+    $('btnStairs').focus();
+  }
+  function chooseRoute(route) {
+    if (!state.running || !state.alive || !state.choosingRoute ||
+        (route !== 'safe' && route !== 'risky')) return;
+    const profile = routeProfile(route);
+    state.choosingRoute = false;
+    $('routes').hidden = true;
+    state.route = route;
     state.depth++;
-    state.hp = Math.min(state.maxHp, state.hp + 4);
+    state.hp = Math.min(state.maxHp, state.hp + profile.heal);
     state.sealed = false;
     buildFloor(state.depth);
     state.turns++;
@@ -962,8 +1008,10 @@ textarea.result[hidden] { display:none; }
     view.y = clamp(py - VH / 2, 0, MAP_H - VH);
     sfx('stair');
     burst(px + 0.5, py + 0.5, '#5eead4', 14, 1);
-    log('Floor ' + state.depth + '. The air gets colder.', 'good');
+    log('Floor ' + state.depth + '. ' +
+      (route === 'safe' ? 'A quiet passage. You catch your breath.' : 'The walls hum. More treasure, more teeth.'), 'good');
     updateHUD();
+    canvas.focus();
   }
   function claimCore() {
     if (!state.running) return;
@@ -996,13 +1044,14 @@ textarea.result[hidden] { display:none; }
       depth: 1, hp: 20, maxHp: 20, atk: 3, def: 0,
       gold: 0, potions: 1, kills: 0, turns: 0,
       alive: true, won: false, running: true, finished: false, finalScore: 0,
-      hurt: 0, shake: 0, sealed: false, cause: ''
+      hurt: 0, shake: 0, sealed: false, cause: '', route: 'normal', choosingRoute: false
     });
     logs.length = 0;
     buildFloor(1);
     view.x = clamp(px - VW / 2, 0, MAP_W - VW);
     view.y = clamp(py - VH / 2, 0, MAP_H - VH);
     $('title').hidden = true;
+    $('routes').hidden = true;
     $('end').hidden = true;
     $('endResult').hidden = true;
     updateHUD();
@@ -1011,6 +1060,8 @@ textarea.result[hidden] { display:none; }
     canvas.focus();
   }
   function finish(won) {
+    state.choosingRoute = false;
+    $('routes').hidden = true;
     state.won = won;
     state.running = false;
     const score = liveScore() + (won ? 1500 : 0);
@@ -1083,6 +1134,14 @@ textarea.result[hidden] { display:none; }
   addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key.toLowerCase();
+    if (state.choosingRoute) {
+      if (key === '1' || key === '2' || key === 'escape') {
+        e.preventDefault();
+        if (key === 'escape') cancelRoute();
+        else chooseRoute(key === '1' ? 'safe' : 'risky');
+      }
+      return; // Moving or waiting must not advance turns under the route dialog.
+    }
     if (KEY_MOVE[key]) {
       e.preventDefault();
       move(KEY_MOVE[key][0], KEY_MOVE[key][1]);
@@ -1105,6 +1164,9 @@ textarea.result[hidden] { display:none; }
   $('btnMute').onclick = toggleMute;
   $('btnPotion').onclick = usePotion;
   $('btnStairs').onclick = useStairs;
+  $('btnSafeRoute').onclick = () => chooseRoute('safe');
+  $('btnRiskyRoute').onclick = () => chooseRoute('risky');
+  $('btnCancelRoute').onclick = cancelRoute;
   $('btnDaily').onclick = () => newRun('daily');
   $('btnRandom').onclick = () => newRun('random');
   $('btnAgain').onclick = () => newRun(state.mode, state.seed);
@@ -1710,7 +1772,7 @@ textarea.result[hidden] { display:none; }
     get stairs() { return stairs; },
     start: newRun,
     finish,
-    move, useStairs, usePotion, waitTurn, computeFOV, fit,
+    move, useStairs, chooseRoute, cancelRoute, usePotion, waitTurn, computeFOV, fit,
     setPos(x, y) { px = x; py = y; computeFOV(); updateHUD(); },
     score: liveScore
   };
