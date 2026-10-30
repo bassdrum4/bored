@@ -9,6 +9,11 @@
     "better": "high",
     "max_value": 1000
   },
+  "ashcrown": {
+    "label": "Renown in a finished campaign",
+    "better": "high",
+    "max_value": 10000
+  },
   "asteroids": {
     "label": "Score",
     "better": "high",

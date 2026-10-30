@@ -1,0 +1,2740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ashcrown</title>
+<style>
+  :root {
+    --paper: #efe6d1;
+    --paper-2: #e6d9ba;
+    --panel: #f7f0df;
+    --ink: #241c12;
+    --ink-2: #5e5443;
+    --ink-3: #8a7d66;
+    --rule: #c6b694;
+    --rule-2: #dccfae;
+    --rust: #93401d;
+    --moss: #41602f;
+    --sea: #2f6069;
+    --shadow: 0 0 0 1px var(--rule);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  html, body { height: 100% }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    touch-action: manipulation;
+  }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace }
+  .serif { font-family: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif }
+  .muted { color: var(--ink-2) }
+  .faint { color: var(--ink-3) }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer }
+  button:disabled { cursor: default; color: var(--ink-3) }
+  select { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 5px 6px }
+  kbd {
+    font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .04em; color: var(--ink-3);
+    border: 1px solid var(--rule); border-radius: 2px; padding: 2px 3px; margin-left: 6px;
+  }
+  .btn { border: 1px solid var(--rule); border-radius: 3px; padding: 6px 10px; background: var(--panel) }
+  .btn:hover:not(:disabled) { border-color: var(--ink-2); background: #fbf6e9 }
+  .btn.primary { border-color: var(--ink); background: var(--paper-2); font-weight: 600 }
+  .btn.primary:hover:not(:disabled) { background: #ded1ae }
+  .btn.on { border-color: var(--ink); background: var(--paper-2) }
+  .btn.wide { width: 100%; text-align: left }
+
+  /* ── shell ───────────────────────────────────────────────────────────── */
+  #shell { display: grid; grid-template-columns: 1fr 312px; grid-template-rows: 46px 1fr; height: 100vh }
+  #bar {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 0 12px;
+    border-bottom: 1px solid var(--rule); background: var(--panel); min-width: 0;
+  }
+  .brand { display: flex; align-items: baseline; gap: 7px; min-width: 0 }
+  .brand b { font-family: Georgia, "Palatino Linotype", serif; font-size: 15px; letter-spacing: .01em; white-space: nowrap }
+  .brand .epi { font-size: 11px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+  .dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(36,28,18,.4); flex: 0 0 auto; align-self: center }
+  #res-row { display: flex; gap: 12px; flex: 1; min-width: 0; overflow: hidden }
+  .res-item { display: flex; align-items: baseline; gap: 5px; white-space: nowrap }
+  .res-glyph { font-size: 11px; letter-spacing: .04em; color: var(--ink-3); text-transform: uppercase }
+  .res-val { font-family: ui-monospace, Menlo, monospace; font-size: 13px }
+  .res-inc { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--ink-3) }
+  .res-inc.up { color: var(--moss) }
+  .res-inc.down { color: var(--rust) }
+  .bar-right { display: flex; align-items: center; gap: 6px; margin-left: auto }
+  .bar-right .btn { padding: 5px 8px; font-size: 12px }
+  #stage { position: relative; overflow: hidden; background: var(--paper) }
+  #map { display: block; width: 100%; height: 100%; cursor: grab; user-select: none }
+  #map.dragging { cursor: grabbing }
+  #side {
+    border-left: 1px solid var(--rule); background: var(--panel); display: flex;
+    flex-direction: column; min-height: 0;
+  }
+  #side-scroll { overflow-y: auto; padding: 12px 12px 4px; flex: 1; min-height: 0 }
+  #log {
+    border-top: 1px solid var(--rule); padding: 8px 12px 10px; max-height: 132px; overflow-y: auto;
+    font-size: 11.5px; line-height: 1.5; color: var(--ink-2); background: #f3ebd8;
+  }
+  #log .turn-mark { color: var(--ink-3); font-family: ui-monospace, Menlo, monospace; font-size: 10px; letter-spacing: .06em }
+
+  /* ── sidebar content ─────────────────────────────────────────────────── */
+  .side-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px }
+  .side-head h2 { font-family: Georgia, "Palatino Linotype", serif; font-size: 16px; font-weight: 600 }
+  .side-sub { font-size: 11px; color: var(--ink-3); margin-bottom: 10px }
+  .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; padding: 3px 0; border-bottom: 1px dotted var(--rule-2) }
+  .kv:last-child { border-bottom: 0 }
+  .kv span:last-child { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px }
+  .sec { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin: 14px 0 6px }
+  .sec:first-child { margin-top: 0 }
+  .bar { height: 5px; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 2px; overflow: hidden; margin: 6px 0 2px }
+  .bar > i { display: block; height: 100%; background: var(--moss) }
+  .bar.hp > i { background: var(--rust) }
+  .actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px }
+  .act {
+    border: 1px solid var(--rule); border-radius: 3px; padding: 5px 8px; font-size: 12px;
+    background: var(--panel); text-align: left;
+  }
+  .act:hover:not(:disabled) { border-color: var(--ink-2); background: #fbf6e9 }
+  .act .cost { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--ink-3); margin-left: 5px }
+  .act.wide { width: 100% }
+  .act.on { border-color: var(--ink); background: var(--paper-2) }
+  .hint { font-size: 11.5px; color: var(--ink-2); line-height: 1.5; margin-top: 8px }
+  .tag { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); border: 1px solid var(--rule); border-radius: 2px; padding: 1px 4px }
+  .tag.war { color: var(--rust); border-color: var(--rust) }
+  .tag.peace { color: var(--moss); border-color: var(--moss) }
+  .unit-list { display: flex; flex-direction: column; gap: 3px }
+  .unit-row { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 0; border-bottom: 1px dotted var(--rule-2); width: 100%; text-align: left }
+  .unit-row:hover { color: var(--rust) }
+  .unit-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .unit-row .st { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; color: var(--ink-3) }
+
+  /* ── modals ──────────────────────────────────────────────────────────── */
+  #modal-layer { position: fixed; inset: 0; background: rgba(36,28,18,.34); display: grid; place-items: center; padding: 24px; z-index: 20 }
+  #modal-layer[hidden] { display: none }
+  .modal {
+    background: var(--panel); border: 1px solid var(--ink); border-radius: 4px;
+    width: min(860px, 94vw); max-height: min(84vh, 760px); display: flex; flex-direction: column;
+    box-shadow: 0 18px 40px rgba(36,28,18,.22);
+  }
+  .modal.narrow { width: min(460px, 94vw) }
+  .modal-head { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--rule) }
+  .modal-head h2 { font-family: Georgia, "Palatino Linotype", serif; font-size: 17px; font-weight: 600 }
+  .modal-head .sub { font-size: 11.5px; color: var(--ink-3); flex: 1 }
+  .modal-body { padding: 14px 16px 18px; overflow-y: auto }
+  .modal-foot { padding: 10px 16px; border-top: 1px solid var(--rule); display: flex; gap: 8px; justify-content: flex-end }
+  .x { margin-left: auto; font-size: 18px; line-height: 1; padding: 0 2px; color: var(--ink-2) }
+  .x:hover { color: var(--ink) }
+
+  .tech-era { margin-bottom: 16px }
+  .tech-era h3 { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px }
+  .tech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 7px }
+  .tech-card { border: 1px solid var(--rule); border-radius: 3px; padding: 8px 9px; text-align: left; background: var(--paper) }
+  .tech-card .tn { font-family: Georgia, "Palatino Linotype", serif; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 6px }
+  .tech-card .tc { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--ink-3) }
+  .tech-card .te { font-size: 11px; color: var(--ink-2); margin-top: 3px; line-height: 1.4 }
+  .tech-card .tq { font-size: 10.5px; color: var(--ink-3); margin-top: 5px; font-style: italic }
+  .tech-card.ok { border-color: var(--ink); background: #fbf6e9; cursor: pointer }
+  .tech-card.ok:hover { background: #f4ecd8 }
+  .tech-card.owned { border-color: var(--moss); background: #eef0e2 }
+  .tech-card.owned .tn::after { content: "owned"; font: 9px/1 ui-monospace, Menlo, monospace; color: var(--moss); letter-spacing: .06em; text-transform: uppercase; align-self: center }
+  .tech-card.locked { opacity: .62 }
+
+  .council-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--rule-2) }
+  .council-row:last-child { border-bottom: 0 }
+  .council-row .cn { display: flex; align-items: baseline; gap: 7px; font-family: Georgia, "Palatino Linotype", serif; font-size: 14px }
+  .council-row .cd { font-size: 11.5px; color: var(--ink-2); margin-top: 3px }
+  .council-row .ca { display: flex; gap: 5px; align-items: center }
+  .meter { width: 68px; height: 4px; background: var(--paper-2); border: 1px solid var(--rule); position: relative }
+  .meter > i { position: absolute; top: 0; bottom: 0; background: var(--ink-2) }
+
+  /* ── start screen ────────────────────────────────────────────────────── */
+  .screen { position: fixed; inset: 0; z-index: 30; background: var(--paper); display: grid; place-items: center; padding: 22px; overflow-y: auto }
+  .screen[hidden] { display: none }
+  .start-inner { width: min(760px, 96vw); padding: 4px 0 10px }
+  .eyebrow { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3) }
+  .start-inner h1 { font-family: Georgia, "Palatino Linotype", serif; font-size: clamp(34px, 6vw, 52px); font-weight: 600; letter-spacing: -.01em; line-height: 1.05; margin: 6px 0 8px }
+  .lede { font-family: Georgia, "Palatino Linotype", serif; font-size: 15px; color: var(--ink-2); max-width: 46ch; line-height: 1.55 }
+  .faction-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(212px, 1fr)); gap: 8px; margin: 18px 0 14px }
+  .faction-card { border: 1px solid var(--rule); border-radius: 3px; background: var(--paper); padding: 9px 10px 10px; text-align: left }
+  .faction-card:hover { border-color: var(--ink-2); background: #f9f3e4 }
+  .faction-card.on { border-color: var(--ink); background: #fbf6e9; box-shadow: inset 0 0 0 1px var(--ink) }
+  .faction-card .fn { display: flex; align-items: center; gap: 7px; font-family: Georgia, "Palatino Linotype", serif; font-size: 14px; font-weight: 600 }
+  .faction-card .fe { font-size: 10.5px; color: var(--ink-3); margin: 2px 0 6px; font-style: italic }
+  .faction-card .fb { font-size: 11.5px; color: var(--ink-2); line-height: 1.45 }
+  .start-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px }
+  .field { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2) }
+  .fine { font-size: 11px; color: var(--ink-3); margin-top: 10px; line-height: 1.6; max-width: 62ch }
+  .fine b { color: var(--ink-2); font-weight: 600 }
+
+  /* ── map svg ─────────────────────────────────────────────────────────── */
+  .hex { cursor: pointer }
+  .hex .fill { stroke: rgba(36,28,18,.16); stroke-width: .6 }
+  .hex.fog-unk .fill { fill: #ded2b6 }
+  .hex.vis .fill { }
+  .coast { fill: none; stroke: rgba(36,28,18,.62); stroke-width: 1.6; stroke-linecap: round; pointer-events: none }
+  .fog { pointer-events: none }
+  .fog.unk { fill: #ded2b6 }
+  .fog.dim { fill: #e9dfc6; opacity: .58 }
+  .reach { fill: rgba(65,96,47,.16); stroke: rgba(36,28,18,.3); stroke-width: .8; pointer-events: none }
+  .threat { fill: rgba(147,64,29,.18); stroke: rgba(147,64,29,.65); stroke-width: .9; pointer-events: none }
+  .sel-ring { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none }
+  .owner-tint { pointer-events: none; opacity: .5 }
+  .label { font: 10px/1 ui-monospace, Menlo, monospace; fill: rgba(36,28,18,.62); pointer-events: none; letter-spacing: .04em }
+  .site { pointer-events: none }
+  .unit { pointer-events: none }
+  .unit .body { stroke: rgba(36,28,18,.75); stroke-width: 1 }
+  .unit .hp { stroke: rgba(36,28,18,.35); stroke-width: 2.4; stroke-linecap: round }
+  .unit .hpv { stroke: rgba(36,28,18,.85); stroke-width: 2.4; stroke-linecap: round }
+  .unit.exhausted { opacity: .52 }
+  .unit .banner { stroke: rgba(36,28,18,.5); stroke-width: .7 }
+  .hover-ring { fill: none; stroke: rgba(36,28,18,.45); stroke-width: 1.6; pointer-events: none }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+    background: var(--ink); color: var(--paper); font-size: 12.5px; padding: 7px 13px;
+    border-radius: 3px; opacity: 0; transition: opacity .18s ease; pointer-events: none; z-index: 40;
+    max-width: 70vw; text-align: center;
+  }
+  #toast.show { opacity: .95 }
+
+  @media (max-width: 980px) {
+    #shell { grid-template-columns: 1fr; grid-template-rows: 46px 1fr 286px }
+    #side { border-left: 0; border-top: 1px solid var(--rule) }
+    #log { max-height: 86px }
+    #bar { gap: 8px; overflow-x: auto }
+    .brand .epi { display: none }
+    #res-row { gap: 9px }
+  }
+  @media (max-width: 620px) {
+    #res-row .res-glyph { display: none }
+    .bar-right .btn kbd { display: none }
+  }
+</style>
+</head>
+<body>
+<div id="shell">
+  <header id="bar">
+    <div class="brand">
+      <span class="dot" id="banner-dot"></span>
+      <b id="banner-name">Ashcrown</b>
+      <span class="epi" id="banner-epi"></span>
+    </div>
+    <div id="res-row"></div>
+    <div class="bar-right">
+      <span id="turn-readout" class="mono faint" style="font-size:11px"></span>
+      <button class="btn" id="btn-tech" type="button">Technologies<kbd>T</kbd></button>
+      <button class="btn" id="btn-council" type="button">Council<kbd>D</kbd></button>
+      <button class="btn" id="btn-menu" type="button">Menu</button>
+      <button class="btn primary" id="btn-end" type="button">End turn<kbd>space</kbd></button>
+    </div>
+  </header>
+  <main id="stage">
+    <svg id="map" xmlns="http://www.w3.org/2000/svg" aria-label="Campaign map">
+      <g id="cam">
+        <g id="layer-owner"></g>
+        <g id="layer-terrain"></g>
+        <g id="layer-coast"></g>
+        <g id="layer-marks"></g>
+        <g id="layer-sites"></g>
+        <g id="layer-units"></g>
+        <g id="layer-overlay"></g>
+        <g id="layer-fog"></g>
+        <g id="layer-labels"></g>
+      </g>
+    </svg>
+  </main>
+  <aside id="side">
+    <div id="side-scroll"></div>
+    <div id="log"></div>
+  </aside>
+</div>
+
+<div id="modal-layer" hidden><div class="modal" id="modal" role="dialog" aria-modal="true"></div></div>
+<div id="toast"></div>
+
+<div id="start" class="screen">
+  <div class="start-inner">
+    <p class="eyebrow">a hex campaign for one</p>
+    <h1>Ashcrown</h1>
+    <p class="lede">The old crown broke, and six banners rose in the vale it left behind. Found cities, work the land, learn what the ruins kept, and be the last banner standing.</p>
+    <div class="faction-grid" id="faction-grid"></div>
+    <div class="start-row">
+      <label class="field">Realm
+        <select id="opt-size">
+          <option value="small">Small vale &middot; two rivals</option>
+          <option value="medium" selected>Middle vale &middot; three rivals</option>
+          <option value="large">Whole vale &middot; five rivals</option>
+        </select>
+      </label>
+      <label class="field">Turn limit
+        <select id="opt-turns">
+          <option value="30">30 turns</option>
+          <option value="50" selected>50 turns</option>
+          <option value="80">80 turns</option>
+        </select>
+      </label>
+    </div>
+    <div class="start-row" style="margin-top:12px">
+      <button class="btn primary" id="btn-begin" type="button">Begin campaign</button>
+      <button class="btn" id="btn-continue" type="button" hidden>Continue saved campaign</button>
+    </div>
+    <p class="fine" id="start-note">
+      <b>How it plays.</b> Click a banner, then a hex. Cities train a unit or raise a building once per turn;
+      technologies cost insight. Claim neutral keeps and found new cities to grow. Win by taking every rival
+      capital, or by raising the Grand Wonder. If nobody has won when the turn limit falls, the highest
+      renown carries the vale.
+    </p>
+  </div>
+</div>
+<script>
+"use strict";
+/* ───────────────────────────────────────────────────────────────────────────
+   Ashcrown — an original hex campaign game.
+   Everything is in this document: no fonts, images, modules or network calls.
+   The board is drawn as SVG in a flat, inked-parchment style so the whole map
+   is vector art generated at runtime.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── small utilities ───────────────────────────────────────────────────────── */
+
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const sum = (list, pick) => list.reduce((total, item) => total + (pick(item) || 0), 0);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Integer hash in [0,1). Math.imul keeps every multiply inside 32 bits, so the
+// same coordinates always give the same value on every device.
+function hash2(x, y, seed) {
+  let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(seed | 0, 1442695041);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+function noise(x, y, seed, scale) {
+  const fx = x / scale, fy = y / scale;
+  const x0 = Math.floor(fx), y0 = Math.floor(fy);
+  const tx = fx - x0, ty = fy - y0;
+  const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+  const a = hash2(x0, y0, seed), b = hash2(x0 + 1, y0, seed);
+  const c = hash2(x0, y0 + 1, seed), d = hash2(x0 + 1, y0 + 1, seed);
+  return (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
+}
+function fbm(x, y, seed, scale, octaves) {
+  let value = 0, weight = 1, total = 0, size = scale;
+  for (let i = 0; i < octaves; i++) {
+    value += noise(x, y, seed + i * 977, size) * weight;
+    total += weight;
+    weight *= 0.5;
+    size *= 0.48;
+  }
+  return value / total;
+}
+// mulberry32 — a tiny deterministic generator for every random choice in a game.
+function rng(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6D2B79F5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ── hex geometry (odd rows shifted right; pointy-top) ─────────────────────── */
+
+const HEX_R = 30;
+const HEX_W = Math.sqrt(3) * HEX_R;
+const HEX_V = 1.5 * HEX_R;
+
+const NEIGHBOURS = [
+  [[1, 0], [0, -1], [-1, -1], [-1, 0], [-1, 1], [0, 1]],
+  [[1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [1, 1]]
+];
+function neighbourList(x, y) {
+  const odd = y & 1;
+  return NEIGHBOURS[odd].map(([dx, dy]) => [x + dx, y + dy]);
+}
+function hexDistance(ax, ay, bx, by) {
+  const toCube = (x, y) => {
+    const r = y;
+    const q = x - (y - (y & 1)) / 2;
+    return [q, r, -q - r];
+  };
+  const [aq, ar, as] = toCube(ax, ay);
+  const [bq, br, bs] = toCube(bx, by);
+  return Math.max(Math.abs(aq - bq), Math.abs(ar - br), Math.abs(as - bs));
+}
+const hexCenter = (x, y) => [HEX_W * (x + 0.5 * (y & 1)) + HEX_W / 2, HEX_V * y + HEX_R];
+function hexCorners(cx, cy, r) {
+  const points = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 180) * (60 * i - 30);
+    points.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+  }
+  return points;
+}
+const polyPath = points => 'M' + points.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join('L') + 'Z';
+
+/* ── terrain ───────────────────────────────────────────────────────────────── */
+
+const TERRAIN = {
+  ocean:  { name: 'Deep water', fill: '#b2c7c3', water: true, cost: 1, def: 0, y: {} },
+  shoal:  { name: 'Shoals',     fill: '#c9dcd4', water: true, cost: 1, def: 0, y: { food: 1 } },
+  meadow: { name: 'Meadow',     fill: '#d9d1a0', cost: 1, def: 0, y: { food: 2 } },
+  plain:  { name: 'Plain',      fill: '#cbc38c', cost: 1, def: 0, y: { food: 1, timber: 1 } },
+  forest: { name: 'Wood',       fill: '#9db086', cost: 2, def: 1, y: { timber: 2 } },
+  hill:   { name: 'Hills',      fill: '#bfae85', cost: 2, def: 1, y: { ore: 1 } },
+  mount:  { name: 'Mountain',   fill: '#a89b84', cost: 3, def: 2, y: { ore: 2 } },
+  desert: { name: 'Waste',      fill: '#e1d2a6', cost: 1, def: 0, y: { coin: 1 } },
+  tundra: { name: 'Frost',      fill: '#d3d6cf', cost: 1, def: 0, y: { coin: 1 } },
+  ash:    { name: 'Ash field',  fill: '#c2b1a2', cost: 1, def: 0, y: { ore: 1 } },
+  marsh:  { name: 'Marsh',      fill: '#aeb593', cost: 2, def: 0, y: { food: 1, timber: 1 } }
+};
+
+// Bonus resources: a tile keeps one, adding to its yields. Ruins pay once, when
+// a unit walks in.
+const FEATURES = {
+  wheat:   { name: 'Wheat',      on: ['plain', 'meadow'], y: { food: 2 } },
+  grove:   { name: 'Ironwood',   on: ['forest'], y: { timber: 2 } },
+  iron:    { name: 'Iron vein',  on: ['hill', 'mount', 'ash'], y: { ore: 2 } },
+  seam:    { name: 'Gold seam',  on: ['desert', 'tundra', 'hill'], y: { coin: 2 } },
+  glass:   { name: 'Glasscrystal', on: ['tundra', 'marsh', 'mount'], y: { insight: 2 } },
+  shoalrun: { name: 'Shoal run', on: ['shoal'], y: { food: 2 } },
+  ruin:    { name: 'Ruin',       on: ['plain', 'meadow', 'forest', 'desert', 'tundra', 'ash', 'marsh', 'hill'], ruin: true }
+};
+
+/* ── military ──────────────────────────────────────────────────────────────── */
+
+// atk 0 means the unit cannot fight. range is in hexes; a target further away
+// than the defender's own range cannot strike back.
+const UNITS = {
+  pioneer: { name: 'Pioneers', cost: { timber: 5, coin: 4 }, hp: 6,  atk: 0, def: 1, range: 0, move: 2, sight: 2, founds: true,
+             blurb: 'Found a city on unclaimed land.' },
+  scout:   { name: 'Wanderers', cost: { timber: 3, coin: 2 }, hp: 8,  atk: 1, def: 1, range: 1, move: 3, sight: 3,
+             blurb: 'Fast, far-sighted, and no good in a fight.' },
+  spear:   { name: 'Spears',   cost: { timber: 4, coin: 3 }, hp: 12, atk: 3, def: 3, range: 1, move: 1, sight: 2,
+             blurb: 'The line of every banner.' },
+  bow:     { name: 'Bows',     cost: { timber: 6, coin: 4 }, hp: 9,  atk: 3, def: 1, range: 2, move: 1, sight: 2, tech: 'archery',
+             blurb: 'Strikes from two hexes and takes no answer from the front.' },
+  rider:   { name: 'Riders',   cost: { timber: 6, ore: 2, coin: 5 }, hp: 11, atk: 4, def: 1, range: 1, move: 3, sight: 2, tech: 'riding',
+             blurb: 'Reaches the weak point and leaves.' },
+  warden:  { name: 'Wardens',  cost: { timber: 5, ore: 3, coin: 4 }, hp: 16, atk: 2, def: 5, range: 1, move: 1, sight: 2, tech: 'shieldwall',
+             blurb: 'Holds a hex against almost anything.' },
+  ram:     { name: 'Rams',     cost: { timber: 8, ore: 5, coin: 6 }, hp: 14, atk: 6, def: 1, range: 1, move: 1, sight: 2, tech: 'siegeworks',
+             blurb: 'A door-opener. Wretched in the open.' },
+  cog:     { name: 'Cogs',     cost: { timber: 7, coin: 4 }, hp: 12, atk: 3, def: 2, range: 1, move: 3, sight: 2, tech: 'sailing', naval: true,
+             blurb: 'A hull with spears aboard. Water only.' },
+  warship: { name: 'Warships', cost: { timber: 10, ore: 4, coin: 8 }, hp: 16, atk: 5, def: 3, range: 2, move: 3, sight: 3, tech: 'harbour', naval: true,
+             blurb: 'Bombards the shore from two hexes out.' }
+};
+
+/* ── city works ────────────────────────────────────────────────────────────── */
+
+const BUILDINGS = {
+  granary: { name: 'Granary', cost: { timber: 6 },              y: { food: 2 },    blurb: '+2 stores' },
+  sawpit:  { name: 'Sawpit',  cost: { timber: 8 },              y: { timber: 2 },  blurb: '+2 timber' },
+  forge:   { name: 'Forge',   cost: { timber: 6, ore: 6 },      y: { ore: 2 },     blurb: '+2 ore' },
+  market:  { name: 'Market',  cost: { timber: 4, coin: 6 },     y: { coin: 2 },    blurb: '+2 coin' },
+  library: { name: 'Library', cost: { timber: 5, coin: 4 },     y: { insight: 2 }, blurb: '+2 insight', tech: 'scribes' },
+  walls:   { name: 'Walls',   cost: { timber: 10, ore: 8 },     hp: 8, def: 2, tech: 'walls', blurb: '+8 city hp, +2 defence' },
+  temple:  { name: 'Temple',  cost: { timber: 6, ore: 4, coin: 6 }, y: { insight: 1 }, renown: 6, tech: 'ritual', blurb: '+1 insight, +6 renown' },
+  wonder:  { name: 'Grand Wonder', cost: { timber: 45, ore: 30, coin: 45 }, wonder: true, tech: 'ascendancy', blurb: 'Raise it to carry the vale.' }
+};
+
+/* ── technologies ──────────────────────────────────────────────────────────── */
+
+// eff fields: food/timber/ore/coin/insight are added to every city;
+// forestTimber and hillOre are added per owned tile of that kind;
+// the rest are realm-wide modifiers read by the rules.
+const TECHS = [
+  { id: 'forage',      era: 1, name: 'Foraging',        cost: 6,  req: [],                     eff: { food: 1 },      text: '+1 stores in every city.' },
+  { id: 'woodcraft',   era: 1, name: 'Woodcraft',       cost: 8,  req: [],                     eff: { timber: 1 },    text: '+1 timber in every city.' },
+  { id: 'prospecting', era: 1, name: 'Prospecting',     cost: 8,  req: [],                     eff: { ore: 1 },       text: '+1 ore in every city.' },
+  { id: 'scribes',     era: 1, name: 'Scribes',         cost: 8,  req: [],                     eff: { insight: 1 },   text: '+1 insight in every city. Unlocks the Library.' },
+  { id: 'archery',     era: 1, name: 'Archery',         cost: 8,  req: [],                     eff: {},               text: 'Unlocks Bows.', unlocks: ['bow'] },
+  { id: 'masonry',     era: 1, name: 'Masonry',         cost: 10, req: [],                     eff: { cityHp: 2 },    text: '+2 hp for every city.' },
+  { id: 'sailing',     era: 1, name: 'Sailing',         cost: 10, req: [],                     eff: {},               text: 'Unlocks Cogs. Build hulls in coastal cities.' },
+  { id: 'riding',      era: 1, name: 'Riding',          cost: 12, req: [],                     eff: {},               text: 'Unlocks Riders.' },
+  { id: 'trade',       era: 1, name: 'Trade',           cost: 12, req: [],                     eff: { coin: 1 },      text: '+1 coin in every city.' },
+
+  { id: 'crop',        era: 2, name: 'Crop Rotation',   cost: 18, req: ['forage'],             eff: { food: 2 },      text: '+2 more stores in every city.' },
+  { id: 'sawpit',      era: 2, name: 'Sawpits',         cost: 18, req: ['woodcraft'],           eff: { forestTimber: 1 }, text: 'Unlocks the Sawpit. +1 timber per owned wood.' },
+  { id: 'bloomery',    era: 2, name: 'Bloomery',        cost: 18, req: ['prospecting'],         eff: { hillOre: 1 },   text: 'Unlocks the Forge. +1 ore per owned hill.' },
+  { id: 'law',         era: 2, name: 'Law Codes',       cost: 18, req: ['scribes'],             eff: { insight: 1 },   text: '+1 more insight in every city.' },
+  { id: 'bowyers',     era: 2, name: 'Bowyers',         cost: 20, req: ['archery'],             eff: { rangedAtk: 1 }, text: '+1 attack for Bows and Warships.' },
+  { id: 'walls',       era: 2, name: 'Walls',           cost: 22, req: ['masonry'],             eff: { cityDef: 2 },   text: 'Unlocks Walls. +2 defence in every city.' },
+  { id: 'harbour',     era: 2, name: 'Harbours',        cost: 22, req: ['sailing'],             eff: { coastalCoin: 1 }, text: 'Unlocks Warships. +1 coin in coastal cities.' },
+  { id: 'chariots',    era: 2, name: 'Chariots',        cost: 24, req: ['riding'],              eff: { riderMove: 1 }, text: '+1 movement for Riders.' },
+  { id: 'coinage',     era: 2, name: 'Coinage',         cost: 24, req: ['trade'],               eff: { coin: 2 },      text: '+2 coin in every city.' },
+
+  { id: 'granaries',   era: 3, name: 'Granaries',       cost: 26, req: ['crop'],                eff: { growth: 2 },    text: 'Unlocks the Granary. Cities need 2 fewer stores to grow.' },
+  { id: 'ritual',      era: 3, name: 'Ritual',          cost: 26, req: ['scribes'],             eff: {},               text: 'Unlocks the Temple.' },
+  { id: 'siegeworks',  era: 3, name: 'Siegeworks',      cost: 30, req: ['sawpit'],              eff: {},               text: 'Unlocks Rams.' },
+  { id: 'steel',       era: 3, name: 'Steelwrights',    cost: 30, req: ['bloomery'],            eff: { meleeAtk: 1 },  text: '+1 attack for Spears and Riders.' },
+  { id: 'cartography', era: 3, name: 'Cartography',     cost: 30, req: ['law'],                 eff: { sight: 1 },     text: '+1 sight for every unit.' },
+  { id: 'navigation',  era: 3, name: 'Navigation',      cost: 32, req: ['harbour'],             eff: { shipMove: 1, waterSight: 1 }, text: '+1 movement and +1 sight for hulls.' },
+  { id: 'shieldwall',  era: 3, name: 'Shieldwall',      cost: 32, req: ['masonry'],             eff: { defence: 1 },   text: 'Unlocks Wardens. +1 defence for every unit.' },
+  { id: 'citadel',     era: 3, name: 'Citadels',        cost: 34, req: ['walls'],               eff: { cityHp: 8 },    text: '+8 more hp for every city.' },
+  { id: 'longbow',     era: 3, name: 'Longbows',        cost: 34, req: ['bowyers'],             eff: { rangedRange: 1 }, text: '+1 range for Bows.' },
+  { id: 'banking',     era: 3, name: 'Banking',         cost: 36, req: ['coinage'],             eff: { coin: 3 },      text: '+3 more coin in every city.' },
+  { id: 'ascendancy',  era: 4, name: 'Ascendancy',      cost: 40, req: ['ritual', 'banking'],   eff: {},               text: 'Unlocks the Grand Wonder. Raising it wins the vale.' }
+];
+const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
+
+/* ── the six banners ───────────────────────────────────────────────────────── */
+
+const FACTIONS = [
+  { id: 'cindermark', name: 'Cindermark', epithet: 'banner of the burnt plain', ink: '#8f3c1a', light: '#c17247',
+    home: ['ash', 'plain', 'hill'], bonus: 'Melee units strike for +1.' },
+  { id: 'thornwake',  name: 'Thornwake',  epithet: 'banner of the deep wood',   ink: '#3f5c2d', light: '#7b9660',
+    home: ['forest', 'marsh', 'meadow'], bonus: 'Wood and marsh cost 1 to cross.' },
+  { id: 'tidebound',  name: 'Tidebound',  epithet: 'banner of the salt reach',   ink: '#1e5560', light: '#5a8f97',
+    home: ['shoal', 'plain', 'meadow'], bonus: 'Hulls move +1 and see +1 over water.' },
+  { id: 'deepstone',  name: 'Deepstone',  epithet: 'banner of the under-pass',   ink: '#3e4257', light: '#787c93',
+    home: ['hill', 'mount', 'plain'], bonus: 'Hills and mountains cost 1 to cross.' },
+  { id: 'sunspire',   name: 'Sunspire',   epithet: 'banner of the long road',    ink: '#876410', light: '#bb9a3c',
+    home: ['desert', 'tundra', 'meadow'], bonus: '+2 coin in every city.' },
+  { id: 'rimeholt',   name: 'Rimeholt',   epithet: 'banner of the still air',    ink: '#485d6e', light: '#8399a8',
+    home: ['tundra', 'marsh', 'hill'], bonus: 'Fights at +30% defence inside its own borders.' }
+];
+
+const CITY_NAMES = [
+  'Brakenford', 'Ashwell', 'Thornmouth', 'Coldharbour', 'Mirewatch', 'Dunmoor', 'Greyspire',
+  'Saltmere', 'Hollowbeck', 'Stonecross', 'Woldham', 'Fenreach', 'Emberhold', 'Rooksbarrow',
+  'Marrown', 'Kirkvale', 'Larkdeep', 'Pyrewick', 'Quillon', 'Vane', 'Sorrelgate', 'Duskford',
+  'Barrowfield', 'Cinderhall', 'Tarnwold', 'Hearthstone', 'Ostrey', 'Bleakhill', 'Wend',
+  'Marrowgate', 'Yarrow', 'Coldeave', 'Ironbrook', 'Elmspire', 'Grimsby Holt', 'Hallowfen'
+];
+
+const RES_KEYS = ['timber', 'ore', 'coin', 'insight'];
+const RES_LABEL = { timber: 'Timber', ore: 'Ore', coin: 'Coin', insight: 'Insight', food: 'Stores' };
+
+const MAP_SIZES = {
+  small:  { cols: 9,  rows: 7,  rivals: 2, villages: 4 },
+  medium: { cols: 13, rows: 9,  rivals: 3, villages: 7 },
+  large:  { cols: 17, rows: 12, rivals: 5, villages: 10 }
+};
+
+/* ── the game object ───────────────────────────────────────────────────────── */
+
+let G = null;          // the campaign in progress
+let UI = null;         // element references, filled in by boot()
+let selection = null;  // { kind: 'unit' | 'city', id }
+let reachable = null;  // Map of "x,y" -> move cost, for the selected unit
+let hoverKey = null;
+
+const keyOf = (x, y) => x + ',' + y;
+const tileAt = (x, y) => (x < 0 || y < 0 || x >= G.cols || y >= G.rows ? null : G.tiles[y * G.cols + x]);
+const faction = i => (i === null || i === undefined ? null : G.factions[i]);
+const player = () => G.factions[G.player];
+const unitById = id => G.units.find(u => u.id === id) || null;
+const cityById = id => G.cities.find(c => c.id === id) || null;
+const unitAt = (x, y) => G.units.find(u => u.x === x && u.y === y) || null;
+const cityAt = (x, y) => G.cities.find(c => c.x === x && c.y === y) || null;
+
+const ownCities = f => G.cities.filter(c => c.owner === f.i);
+const ownUnits = f => G.units.filter(u => u.owner === f.i);
+const isNeutralCity = c => c.owner === null;
+const atWar = (a, b) => a !== b && G.dip[a][b] === 'war';
+const inBorders = (f, x, y) => { const t = tileAt(x, y); return !!t && t.owner === f.i; };
+const isCoastal = c => neighbourList(c.x, c.y).some(([x, y]) => {
+  const t = tileAt(x, y);
+  return t && TERRAIN[t.t].water;
+});
+
+/* ── realm-wide modifiers ──────────────────────────────────────────────────── */
+
+const MOD_KEYS = ['food', 'timber', 'ore', 'coin', 'insight', 'forestTimber', 'hillOre', 'meleeAtk',
+  'rangedAtk', 'defence', 'cityHp', 'cityDef', 'sight', 'shipMove', 'waterSight', 'growth',
+  'coastalCoin', 'riderMove', 'rangedRange'];
+
+function techMods(f) {
+  const mods = {};
+  for (const k of MOD_KEYS) mods[k] = 0;
+  for (const id of f.techs) {
+    const tech = TECH_BY_ID[id];
+    if (!tech) continue;
+    for (const k in tech.eff) mods[k] = (mods[k] || 0) + tech.eff[k];
+  }
+  return mods;
+}
+const hasTech = (f, id) => f.techs.includes(id);
+function unlocked(f, kind, id) {
+  const entry = kind === 'unit' ? UNITS[id] : BUILDINGS[id];
+  if (!entry) return false;
+  return !entry.tech || hasTech(f, entry.tech);
+}
+
+/* ── yields, income, renown ────────────────────────────────────────────────── */
+
+// The city's own ring of worked tiles plus its buildings and the banner's
+// technologies. Every number the player sees in the resource bar comes from here.
+function cityYields(f, c) {
+  const mods = techMods(f);
+  const out = { food: 2 + mods.food, timber: 1 + mods.timber, ore: 1 + mods.ore, coin: 1 + mods.coin, insight: 1 + mods.insight };
+  for (const b of c.buildings) {
+    const building = BUILDINGS[b];
+    if (building && building.y) for (const k in building.y) out[k] = (out[k] || 0) + building.y[k];
+  }
+  for (let y = 0; y < G.rows; y++) {
+    for (let x = 0; x < G.cols; x++) {
+      const t = G.tiles[y * G.cols + x];
+      if (t.city !== c.id) continue;
+      const terrain = TERRAIN[t.t], feature = t.f ? FEATURES[t.f] : null;
+      if (terrain.y) for (const k in terrain.y) out[k] = (out[k] || 0) + terrain.y[k];
+      if (feature && feature.y) for (const k in feature.y) out[k] = (out[k] || 0) + feature.y[k];
+      if (t.t === 'forest') out.timber += mods.forestTimber;
+      if (t.t === 'hill') out.ore += mods.hillOre;
+    }
+  }
+  if (f.id === 'sunspire') out.coin += 2;
+  if (mods.coastalCoin && isCoastal(c)) out.coin += mods.coastalCoin;
+  return out;
+}
+
+function factionIncome(f) {
+  const income = { food: 0, timber: 0, ore: 0, coin: 0, insight: 0 };
+  for (const c of ownCities(f)) {
+    const y = cityYields(f, c);
+    for (const k in income) income[k] += y[k];
+  }
+  const upkeep = Math.max(0, ownUnits(f).length - 2 * ownCities(f).length);
+  income.coin -= upkeep;
+  return { income, upkeep };
+}
+
+function cityMaxHp(f, c) {
+  const mods = techMods(f);
+  let hp = 12 + c.level * 8 + mods.cityHp;
+  for (const b of c.buildings) {
+    const building = BUILDINGS[b];
+    if (building && building.hp) hp += building.hp;
+  }
+  return hp;
+}
+function cityDefence(f, c) {
+  const mods = techMods(f);
+  let def = 2 + c.level + mods.cityDef;
+  for (const b of c.buildings) {
+    const building = BUILDINGS[b];
+    if (building && building.def) def += building.def;
+  }
+  if (f && f.id === 'rimeholt' && inBorders(f, c.x, c.y)) def += Math.round(def * 0.3);
+  return def;
+}
+
+// Renown is what the board ranks: a single number that says how much vale your
+// banner actually holds. It only accrues from things that stay true.
+function renownOf(f) {
+  const cities = ownCities(f);
+  const pop = cities.reduce((n, c) => n + c.level, 0);
+  const buildings = cities.reduce((n, c) => n + c.buildings.length, 0);
+  const wonders = cities.reduce((n, c) => n + c.buildings.filter(b => b === 'wonder').length, 0);
+  return cities.length * 8 + pop * 3 + f.techs.length * 4 + ownUnits(f).length +
+    buildings * 2 + wonders * 25;
+}
+
+function militaryStrength(f) {
+  return ownUnits(f).reduce((n, u) => n + UNITS[u.type].atk + UNITS[u.type].def + u.hp / 4, 0) +
+    ownCities(f).length * 3;
+}
+
+/* ── map generation ────────────────────────────────────────────────────────── */
+
+function quantile(values, q) {
+  const sorted = values.slice().sort((a, b) => a - b);
+  return sorted[clamp(Math.round(q * (sorted.length - 1)), 0, sorted.length - 1)];
+}
+
+function buildTerrain(seed, cols, rows) {
+  const tiles = [];
+  const elevation = [], moisture = [];
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      elevation.push(fbm(x, y, seed, 4.1, 3));
+      moisture.push(fbm(x + 31, y + 17, seed ^ 0x5bf03635, 3.3, 3));
+    }
+  }
+  const seaLine = quantile(elevation, 0.34);
+  const highLine = quantile(elevation, 0.82);
+  const peakLine = quantile(elevation, 0.92);
+  const wetLine = quantile(moisture, 0.58);
+  const dampLine = quantile(moisture, 0.46);
+  const dryLine = quantile(moisture, 0.34);
+
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const i = y * cols + x;
+      const elev = elevation[i], wet = moisture[i];
+      const temp = (rows > 1 ? y / (rows - 1) : 0.5) * 0.85 + (hash2(x, y, seed + 7) - 0.5) * 0.3;
+      let t;
+      if (elev < seaLine) t = 'ocean';
+      else if (elev > peakLine) t = 'mount';
+      else if (elev > highLine) t = 'hill';
+      else if (temp < 0.26) t = wet > wetLine ? 'marsh' : 'tundra';
+      else if (wet > wetLine) t = elev > highLine - 0.04 ? 'forest' : (temp < 0.42 ? 'tundra' : 'forest');
+      else if (wet > dampLine) t = 'forest';
+      else if (wet > dryLine) t = temp > 0.6 ? (elev > highLine - 0.06 ? 'ash' : 'plain') : 'meadow';
+      else t = temp > 0.66 ? 'desert' : (elev > highLine - 0.03 ? 'ash' : 'plain');
+      tiles.push({ t, f: null, owner: null, city: null, seen: false, vis: false });
+    }
+  }
+
+  // Shoals: shallow water anywhere a land tile touches it, so coasts read as
+  // coastline and hulls have somewhere to work.
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const tile = tiles[y * cols + x];
+      if (tile.t !== 'ocean') continue;
+      const touchesLand = neighbourList(x, y).some(([nx, ny]) =>
+        nx >= 0 && ny >= 0 && nx < cols && ny < rows && tiles[ny * cols + nx].t !== 'ocean' &&
+        !TERRAIN[tiles[ny * cols + nx].t].water);
+      if (touchesLand) tile.t = 'shoal';
+    }
+  }
+
+  // Bonus resources. Each land tile may hold one; ruins are placed sparsely and
+  // are always reachable on foot.
+  const featureKinds = Object.keys(FEATURES).filter(k => k !== 'ruin');
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const tile = tiles[y * cols + x];
+      const candidates = featureKinds.filter(k => FEATURES[k].on.includes(tile.t));
+      const roll = hash2(x, y, seed + 991);
+      const fishy = tile.t === 'shoal';
+      const chance = fishy ? 0.16 : 0.3;
+      if (candidates.length && roll < chance) {
+        tile.f = candidates[Math.floor(hash2(x, y, seed + 313) * candidates.length) % candidates.length];
+      }
+    }
+  }
+  return tiles;
+}
+
+const hexNeighboursIn = (x, y, cols, rows) =>
+  neighbourList(x, y).filter(([nx, ny]) => nx >= 0 && ny >= 0 && nx < cols && ny < rows);
+
+function landScore(tiles, cols, rows, x, y) {
+  const tile = tiles[y * cols + x];
+  if (TERRAIN[tile.t].water || tile.t === 'mount') return -1;
+  let score = 0;
+  for (const [nx, ny] of hexNeighboursIn(x, y, cols, rows)) {
+    const n = tiles[ny * cols + nx];
+    if (!TERRAIN[n.t].water) score += 1;
+    if (n.t === 'mount') score += 0.4;
+    if (n.t === 'shoal') score += 0.3;
+  }
+  return score;
+}
+
+function generateWorld(seed, size, playerFaction) {
+  const cfg = MAP_SIZES[size];
+  const cols = cfg.cols, rows = cfg.rows;
+  let tiles = buildTerrain(seed, cols, rows);
+
+  // The six banners begin as far apart as the vale allows, and each one leans
+  // toward the ground it knows.
+  const rivals = FACTIONS.filter(f => f.id !== playerFaction.id).slice();
+  const order = [playerFaction, ...rivals.slice(0, cfg.rivals)];
+  const chosen = [];
+  const minGap = Math.max(3, Math.floor(cols / 4));
+  for (const f of order) {
+    let best = null, bestScore = -1;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const terrainScore = landScore(tiles, cols, rows, x, y);
+        if (terrainScore < 0) continue;
+        const tile = tiles[y * cols + x];
+        const home = f.home.includes(tile.t) ? 2.2 : 0;
+        const crowd = chosen.reduce((n, s) => n + (hexDistance(s.x, s.y, x, y) < minGap ? 9 : 0), 0);
+        const score = terrainScore + home - crowd - hexDistance(
+          Math.floor(cols / 2), Math.floor(rows / 2), x, y) * 0.05;
+        if (score > bestScore) { bestScore = score; best = { x, y }; }
+      }
+    }
+    if (best) chosen.push({ ...best, faction: f });
+  }
+
+  return { cols, rows, tiles, starts: chosen, rivals: order };
+}
+
+/* ── campaign setup ────────────────────────────────────────────────────────── */
+
+function shuffled(list, rand) {
+  const out = list.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function startCampaign(options) {
+  const size = MAP_SIZES[options.size] ? options.size : 'medium';
+  const factionDef = FACTIONS.find(f => f.id === options.factionId) || FACTIONS[0];
+  const seed = options.seed >>> 0;
+  const world = generateWorld(seed, size, factionDef);
+  const rand = rng(seed ^ 0x9e3779b9);
+  const names = shuffled(CITY_NAMES, rand);
+
+  G = {
+    version: 1, seed, size, turns: options.turns || 50,
+    cols: world.cols, rows: world.rows,
+    turn: 1, maxTurns: options.turns || 50, phase: 'player', player: 0,
+    tiles: world.tiles, units: [], cities: [], factions: [],
+    dip: [], attitude: [], log: [], over: null,
+    nextUnit: 1, nextCity: 1
+  };
+
+  world.starts.forEach((start, i) => {
+    const def = start.faction;
+    const f = {
+      i, id: def.id, name: def.name, epithet: def.epithet, ink: def.ink, light: def.light,
+      home: def.home, bonus: def.bonus, isPlayer: i === 0,
+      alive: true, res: { timber: 8, ore: 5, coin: 10, insight: 0 },
+      techs: [], capital: null
+    };
+    G.factions.push(f);
+  });
+  G.factions.forEach(f => {
+    G.dip[f.i] = G.factions.map(() => 'peace');
+    G.attitude[f.i] = G.factions.map(() => 0);
+  });
+
+  // Capitals.
+  world.starts.forEach((start, i) => {
+    const f = G.factions[i];
+    const city = addCity(f, start.x, start.y, names.pop() || 'Haven', 1);
+    city.capital = true;
+    f.capital = city.id;
+    claimRing(city, 1);
+    // A garrison of spears and a wanderer to see the vale by.
+    addUnit(f, 'spear', start.x, start.y);
+    const spot = neighbourList(start.x, start.y).find(([x, y]) => {
+      const t = tileAt(x, y);
+      return t && !TERRAIN[t.t].water && !unitAt(x, y) && !cityAt(x, y);
+    });
+    if (spot) addUnit(f, 'scout', spot[0], spot[1]);
+  });
+
+  // Neutral keeps: worth taking, and a reason to leave home.
+  const cfg = MAP_SIZES[size];
+  let placed = 0, guard = 0;
+  while (placed < cfg.villages && guard++ < 900) {
+    const x = Math.floor(rand() * G.cols), y = Math.floor(rand() * G.rows);
+    const t = tileAt(x, y);
+    if (!t || TERRAIN[t.t].water || t.t === 'mount' || cityAt(x, y)) continue;
+    if (G.cities.some(c => hexDistance(c.x, c.y, x, y) < 2)) continue;
+    if (unitAt(x, y)) continue;
+    const city = addCity(null, x, y, names.pop() || 'Ruined Keep', 1);
+    city.neutral = true;
+    claimRing(city, 1);
+    placed++;
+  }
+
+  // Ruins, holding what the old crown left.
+  let ruins = 0;
+  guard = 0;
+  while (ruins < 4 + cfg.villages && guard++ < 900) {
+    const x = Math.floor(rand() * G.cols), y = Math.floor(rand() * G.rows);
+    const t = tileAt(x, y);
+    if (!t || t.f || TERRAIN[t.t].water || t.t === 'mount' || cityAt(x, y)) continue;
+    t.f = 'ruin';
+    ruins++;
+  }
+
+  log('The crown breaks. Six banners take the vale.', 'turn');
+  G.factions.forEach(f => {
+    if (!f.isPlayer) log(f.name + ' raises its banner.', f.ink);
+  });
+  beginTurn(player());
+  recomputeVision();
+  return G;
+}
+
+function addCity(f, x, y, name, level) {
+  const city = {
+    id: 'c' + G.nextCity++, x, y, name,
+    owner: f ? f.i : null, level: level || 1, food: 0,
+    buildings: [], trained: false, built: false, capital: false, neutral: !f
+  };
+  city.hp = f ? cityMaxHp(f, city) : cityHpFor(null, city);
+  G.cities.push(city);
+  const tile = tileAt(x, y);
+  if (tile) { tile.city = city.id; if (f) tile.owner = f.i; }
+  return city;
+}
+
+function cityHpFor(f, c) {
+  if (!f) return 12 + c.level * 6;
+  return cityMaxHp(f, c);
+}
+
+function addUnit(f, type, x, y) {
+  const def = UNITS[type];
+  const unit = {
+    id: 'u' + G.nextUnit++, type, owner: f.i, x, y,
+    hp: def.hp, mp: moveOf(f, { type }), acted: false, fortified: false
+  };
+  G.units.push(unit);
+  return unit;
+}
+
+function claimRing(city, radius) {
+  const owner = city.owner;
+  if (owner === null) return;
+  for (let y = 0; y < G.rows; y++) {
+    for (let x = 0; x < G.cols; x++) {
+      if (hexDistance(city.x, city.y, x, y) > radius) continue;
+      const t = G.tiles[y * G.cols + x];
+      if (t.city && t.city !== city.id) continue;
+      if (t.owner !== null && t.owner !== owner) continue;
+      t.owner = owner;
+      t.city = city.id;
+    }
+  }
+}
+
+/* ── vision ────────────────────────────────────────────────────────────────── */
+
+function sightOf(f, u) {
+  const mods = techMods(f);
+  const def = UNITS[u.type];
+  let sight = def.sight + mods.sight;
+  if (def.naval) {
+    sight += mods.waterSight;
+    if (f.id === 'tidebound') sight += 1;
+  }
+  return Math.max(1, sight);
+}
+
+function moveOf(f, u) {
+  const mods = techMods(f);
+  const def = UNITS[u.type];
+  let mp = def.move;
+  if (def.naval) mp += mods.shipMove + (f.id === 'tidebound' ? 1 : 0);
+  if (u.type === 'rider') mp += mods.riderMove;
+  return mp;
+}
+
+function recomputeVision() {
+  if (!G) return;
+  for (const t of G.tiles) t.vis = false;
+  const f = player();
+  if (!f) return;
+  const reveal = (cx, cy, radius) => {
+    for (let y = 0; y < G.rows; y++) {
+      for (let x = 0; x < G.cols; x++) {
+        if (hexDistance(cx, cy, x, y) > radius) continue;
+        const t = G.tiles[y * G.cols + x];
+        t.vis = true;
+        t.seen = true;
+      }
+    }
+  };
+  for (const u of ownUnits(f)) reveal(u.x, u.y, sightOf(f, u));
+  for (const c of ownCities(f)) reveal(c.x, c.y, 3);
+}
+
+/* ── movement and combat ───────────────────────────────────────────────────── */
+
+function moveCost(f, u, x, y) {
+  const t = tileAt(x, y);
+  if (!t) return Infinity;
+  const def = UNITS[u.type], terrain = TERRAIN[t.t];
+  if (def.naval) return terrain.water ? 1 : Infinity;
+  if (terrain.water) return Infinity;
+  if (t.t === 'mount' && f.id === 'deepstone') return 1;
+  if ((t.t === 'forest' || t.t === 'marsh') && f.id === 'thornwake') return 1;
+  if (t.t === 'hill' && f.id === 'deepstone') return 1;
+  return terrain.cost;
+}
+
+function blockedFor(u, x, y) {
+  const other = unitAt(x, y);
+  if (other && other.id !== u.id) return true;
+  const city = cityAt(x, y);
+  if (city && city.owner !== null && city.owner !== u.owner) return true;
+  return false;
+}
+
+function computeReachable(u) {
+  const f = faction(u.owner);
+  const map = new Map();
+  const startKey = keyOf(u.x, u.y);
+  map.set(startKey, 0);
+  const queue = [[u.x, u.y, 0]];
+  while (queue.length) {
+    const [x, y, spent] = queue.shift();
+    for (const [nx, ny] of neighbourList(x, y)) {
+      if (!tileAt(nx, ny)) continue;
+      const cost = moveCost(f, u, nx, ny);
+      if (!isFinite(cost)) continue;
+      if (blockedFor(u, nx, ny)) continue;
+      const total = spent + cost;
+      if (total > u.mp) continue;
+      const key = keyOf(nx, ny);
+      if (key === startKey) continue;
+      if (map.has(key) && map.get(key) <= total) continue;
+      map.set(key, total);
+      queue.push([nx, ny, total]);
+    }
+  }
+  map.delete(startKey);
+  return map;
+}
+
+function attackValue(f, u) {
+  const def = UNITS[u.type];
+  if (!def.atk) return 0;
+  const mods = techMods(f);
+  const ranged = def.range > 1;
+  let atk = def.atk + (ranged ? mods.rangedAtk : mods.meleeAtk);
+  if (!ranged && f.id === 'cindermark') atk += 1;
+  return Math.max(1, atk);
+}
+
+function rangeOf(f, u) {
+  const def = UNITS[u.type];
+  const mods = techMods(f);
+  let range = def.range;
+  if (u.type === 'bow') range += mods.rangedRange;
+  return range;
+}
+
+function defenceValue(u) {
+  const f = faction(u.owner);
+  const mods = techMods(f);
+  const def = UNITS[u.type];
+  const tile = tileAt(u.x, u.y);
+  const city = cityAt(u.x, u.y);
+  let value = def.def + mods.defence + (tile ? TERRAIN[tile.t].def : 0) + (u.fortified ? 2 : 0);
+  if (city && city.owner === u.owner) value += Math.round(cityDefence(f, city) / 2);
+  if (f.id === 'rimeholt' && inBorders(f, u.x, u.y)) value = Math.round(value * 1.3);
+  return value;
+}
+
+const strikeDamage = (atk, def) => Math.max(1, Math.round(atk * 4 * (10 / (10 + def))));
+
+function canAttackTarget(u, x, y) {
+  const f = faction(u.owner);
+  const def = UNITS[u.type];
+  if (!def.atk || u.acted) return false;
+  const distance = hexDistance(u.x, u.y, x, y);
+  if (distance > rangeOf(f, u) || distance < 1) return false;
+  const other = unitAt(x, y);
+  if (other) return atWar(u.owner, other.owner);
+  const city = cityAt(x, y);
+  if (!city) return false;
+  if (city.owner === u.owner) return false;
+  if (city.owner === null) return true;
+  return atWar(u.owner, city.owner);
+}
+
+function attackTarget(u, x, y) {
+  if (!canAttackTarget(u, x, y)) return false;
+  const f = faction(u.owner);
+  const other = unitAt(x, y);
+
+  if (other) {
+    const damage = strikeDamage(attackValue(f, u), defenceValue(other));
+    other.hp -= damage;
+    log(UNITS[u.type].name + ' hit ' + faction(other.owner).name + ' ' + UNITS[other.type].name.toLowerCase() +
+      ' for ' + damage + '.', f.ink);
+    if (other.hp > 0) {
+      const back = rangeOf(faction(other.owner), other);
+      if (hexDistance(u.x, u.y, x, y) <= back) {
+        const retaliation = strikeDamage(attackValue(faction(other.owner), other), defenceValue(u));
+        u.hp -= retaliation;
+        log(UNITS[other.type].name + ' answered for ' + retaliation + '.', faction(other.owner).ink);
+      }
+    }
+    if (other.hp <= 0) killUnit(other);
+    u.acted = true;
+    u.mp = 0;
+    if (u.hp <= 0) killUnit(u);
+    else u.fortified = false;
+    checkElimination();
+    recomputeVision();
+    return true;
+  }
+
+  const city = cityAt(x, y);
+  if (!city) return false;
+  const holder = city.owner === null ? null : faction(city.owner);
+  const cityDef = holder ? cityDefence(holder, city) : 4 + city.level * 2;
+  const damage = strikeDamage(attackValue(f, u), cityDef);
+  city.hp -= damage;
+  const label = holder ? city.name : 'the neutral keep of ' + city.name;
+  log(UNITS[u.type].name + ' struck ' + label + ' for ' + damage + '.', f.ink);
+  if (city.hp <= 0 && !UNITS[u.type].naval) {
+    captureCity(city, f, u);
+  } else if (city.hp <= 0) {
+    city.hp = 1;
+    toast('Hulls cannot hold a city. Send a land unit.');
+  }
+  u.acted = true;
+  u.mp = 0;
+  checkElimination();
+  recomputeVision();
+  return true;
+}
+
+function captureCity(city, f, byUnit) {
+  const wasNeutral = city.owner === null;
+  const previous = city.owner;
+  if (previous !== null) {
+    log(f.name + ' takes ' + city.name + ' from ' + faction(previous).name + '.', f.ink);
+    setAttitude(previous, f.i, G.attitude[previous][f.i] - 25);
+  } else {
+    log(f.name + ' takes the neutral keep of ' + city.name + '.', f.ink);
+  }
+  city.owner = f.i;
+  city.neutral = false;
+  city.level = Math.max(1, wasNeutral ? 1 : city.level - 1);
+  city.food = 0;
+  city.hp = Math.max(4, Math.floor(cityMaxHp(f, city) / 2));
+  for (const t of G.tiles) {
+    if (t.city === city.id) t.owner = f.i;
+  }
+  claimRing(city, city.level + 1);
+  if (byUnit && !unitAt(city.x, city.y)) {
+    byUnit.x = city.x;
+    byUnit.y = city.y;
+    byUnit.mp = 0;
+    byUnit.acted = true;
+  }
+  if (previous !== null && G.dip[f.i][previous] !== 'war') {
+    G.dip[f.i][previous] = 'war';
+    G.dip[previous][f.i] = 'war';
+  }
+}
+
+function killUnit(unit) {
+  const index = G.units.findIndex(u => u.id === unit.id);
+  if (index >= 0) G.units.splice(index, 1);
+  if (selection && selection.kind === 'unit' && selection.id === unit.id) selection = null;
+  log(faction(unit.owner).name + ' loses a ' + UNITS[unit.type].name.toLowerCase() + '.', faction(unit.owner).ink);
+}
+
+function checkElimination() {
+  for (const f of G.factions) {
+    if (!f.alive) continue;
+    if (ownCities(f).length === 0 && !f.isPlayer) {
+      f.alive = false;
+      for (const u of ownUnits(f).slice()) killUnit(u);
+      log(f.name + ' is out of the vale.', f.ink);
+    }
+  }
+}
+
+/* ── player actions ────────────────────────────────────────────────────────── */
+
+const canPay = (f, cost) => Object.keys(cost || {}).every(k => (f.res[k] || 0) >= cost[k]);
+function pay(f, cost) {
+  for (const k in cost) f.res[k] = Math.max(0, (f.res[k] || 0) - cost[k]);
+}
+function unitCost(f, type) {
+  const base = UNITS[type].cost;
+  const cost = { ...base };
+  if (UNITS[type].naval && f.id === 'tidebound') cost.coin = Math.max(1, (cost.coin || 0) - 2);
+  return cost;
+}
+
+function researchTech(id) {
+  const f = player();
+  const tech = TECH_BY_ID[id];
+  if (!tech || f.techs.includes(id)) return false;
+  if (tech.req.some(r => !f.techs.includes(r))) { toast('Needs ' + tech.req.map(r => TECH_BY_ID[r].name).join(' and ') + ' first.'); return false; }
+  if (f.res.insight < tech.cost) { toast('Not enough insight (' + tech.cost + ').'); return false; }
+  f.res.insight -= tech.cost;
+  f.techs.push(id);
+  log('Learned ' + tech.name + '.', f.ink);
+  toast('Learned ' + tech.name);
+  render();
+  autosave();
+  return true;
+}
+
+function trainUnit(cityId, type) {
+  const f = player();
+  const city = cityById(cityId);
+  if (!city || city.owner !== f.i) return false;
+  if (city.trained) { toast(city.name + ' has already trained this turn.'); return false; }
+  if (!unlocked(f, 'unit', type)) { toast('Not yet unlocked.'); return false; }
+  const cost = unitCost(f, type);
+  if (!canPay(f, cost)) { toast('Not enough resources.'); return false; }
+  const spot = spawnSpot(city, type);
+  if (!spot) { toast('No room for another unit here.'); return false; }
+  pay(f, cost);
+  addUnit(f, type, spot[0], spot[1]);
+  city.trained = true;
+  log(city.name + ' trains ' + UNITS[type].name.toLowerCase() + '.', f.ink);
+  recomputeVision();
+  render();
+  autosave();
+  return true;
+}
+
+function spawnSpot(city, type) {
+  const naval = UNITS[type].naval;
+  const fits = (x, y) => {
+    const t = tileAt(x, y);
+    if (!t || unitAt(x, y)) return false;
+    return naval ? TERRAIN[t.t].water : !TERRAIN[t.t].water;
+  };
+  if (fits(city.x, city.y)) return [city.x, city.y];
+  for (const [x, y] of neighbourList(city.x, city.y)) if (fits(x, y)) return [x, y];
+  return null;
+}
+
+function buildInCity(cityId, buildingId) {
+  const f = player();
+  const city = cityById(cityId);
+  const def = BUILDINGS[buildingId];
+  if (!city || city.owner !== f.i || !def) return false;
+  if (city.built) { toast(city.name + ' has already raised a work this turn.'); return false; }
+  if (city.buildings.includes(buildingId)) { toast('Already built here.'); return false; }
+  if (def.unique && G.cities.some(c => c.buildings.includes(buildingId))) { toast('There is only one Grand Wonder.'); return false; }
+  if (!unlocked(f, 'building', buildingId)) { toast('Not yet unlocked.'); return false; }
+  if (!canPay(f, def.cost)) { toast('Not enough resources.'); return false; }
+  pay(f, def.cost);
+  city.buildings.push(buildingId);
+  city.built = true;
+  city.hp = Math.min(city.hp + (def.hp || 0), cityMaxHp(f, city));
+  log(city.name + ' raises ' + def.name.toLowerCase() + '.', f.ink);
+  if (def.wonder) {
+    endGame(true, 'wonder', f.name + ' raises the Grand Wonder. The vale answers to one crown again.');
+  }
+  render();
+  autosave();
+  return true;
+}
+
+function moveUnit(unit, x, y) {
+  if (!unit || unit.owner !== G.player) return false;
+  const cost = reachable ? reachable.get(keyOf(x, y)) : undefined;
+  if (cost === undefined) return false;
+  unit.x = x;
+  unit.y = y;
+  unit.mp = Math.max(0, unit.mp - cost);
+  unit.fortified = false;
+  const tile = tileAt(x, y);
+  if (tile && tile.f === 'ruin' && !tile.looted) {
+    tile.looted = true;
+    tile.f = null;
+    const coin = 6 + Math.floor(hash2(x, y, G.seed + 55) * 8);
+    const insight = 4 + Math.floor(hash2(x, y, G.seed + 91) * 7);
+    const f = player();
+    f.res.coin += coin;
+    f.res.insight += insight;
+    log('Ruins yield ' + coin + ' coin and ' + insight + ' insight.', f.ink);
+    toast('Ruins: +' + coin + ' coin, +' + insight + ' insight');
+  }
+  reachable = computeReachable(unit);
+  recomputeVision();
+  render();
+  return true;
+}
+
+function foundCity(unit) {
+  const f = player();
+  if (!unit || unit.owner !== f.i || !UNITS[unit.type].founds) return false;
+  const tile = tileAt(unit.x, unit.y);
+  if (!tile || TERRAIN[tile.t].water) { toast('Found cities on land.'); return false; }
+  if (tile.owner !== null) { toast('That ground is claimed.'); return false; }
+  if (G.cities.some(c => hexDistance(c.x, c.y, unit.x, unit.y) < 2)) { toast('Too close to another city.'); return false; }
+  const name = CITY_NAMES[(G.nextCity * 7) % CITY_NAMES.length];
+  const city = addCity(f, unit.x, unit.y, name, 1);
+  claimRing(city, 1);
+  G.units = G.units.filter(u => u.id !== unit.id);
+  selection = { kind: 'city', id: city.id };
+  reachable = null;
+  log(f.name + ' founds ' + city.name + '.', f.ink);
+  toast(city.name + ' founded');
+  recomputeVision();
+  render();
+  autosave();
+  return true;
+}
+
+function fortify(unit) {
+  unit.fortified = true;
+  unit.mp = 0;
+  toast(UNITS[unit.type].name + ' holds position.');
+  reachable = null;
+  render();
+}
+
+function disband(unit) {
+  killUnit(unit);
+  selection = null;
+  reachable = null;
+  render();
+  autosave();
+}
+
+/* ── turn cycle ────────────────────────────────────────────────────────────── */
+
+function beginTurn(f) {
+  const { income } = factionIncome(f);
+  for (const k of RES_KEYS) f.res[k] = Math.max(0, (f.res[k] || 0) + (income[k] || 0));
+  for (const c of ownCities(f)) {
+    c.trained = false;
+    c.built = false;
+    const yields = cityYields(f, c);
+    const mods = techMods(f);
+    const need = Math.max(4, 6 + 3 * c.level - mods.growth);
+    c.food += yields.food;
+    c.hp = Math.min(c.hp, cityMaxHp(f, c));
+    if (c.level < 4 && c.food >= need) {
+      c.level++;
+      c.food = 0;
+      claimRing(c, Math.min(4, c.level + 1));
+      c.hp = cityMaxHp(f, c);
+      log(c.name + ' grows to ' + c.level + '.', f.ink);
+    }
+  }
+  for (const u of ownUnits(f)) {
+    u.mp = moveOf(f, u);
+    u.acted = false;
+  }
+}
+
+function endPlayerTurn() {
+  if (!G || G.over) return;
+  selection = null;
+  reachable = null;
+  for (const f of G.factions) {
+    if (f.isPlayer || !f.alive) continue;
+    beginTurn(f);
+    aiTurn(f);
+  }
+  checkElimination();
+  G.turn++;
+  if (G.turn > G.maxTurns) {
+    finishOnRenown();
+  } else {
+    beginTurn(player());
+    if (G.turn % 5 === 0) log('Turn ' + G.turn + ' of ' + G.maxTurns + '.', 'turn');
+  }
+  checkEnd();
+  recomputeVision();
+  render();
+  autosave();
+}
+
+function endGame(won, kind, text) {
+  if (G.over) return;
+  G.over = { won, kind, text, turn: G.turn };
+  G.finished = true;
+  log(text, won ? 'win' : 'loss');
+  render();
+  autosave();
+}
+
+function finishOnRenown() {
+  const ranked = G.factions.filter(f => f.alive).map(f => ({ f, score: renownOf(f) }))
+    .sort((a, b) => b.score - a.score);
+  const best = ranked[0];
+  const mine = renownOf(player());
+  if (best && best.f.isPlayer) {
+    endGame(true, 'renown', 'The turn limit falls. ' + player().name + ' holds the vale with ' + mine + ' renown.');
+  } else {
+    endGame(false, 'renown', 'The turn limit falls. ' + (best ? best.f.name : 'A rival') +
+      ' carries the vale with ' + (best ? best.score : 0) + ' renown.');
+  }
+}
+
+function checkEnd() {
+  if (!G || G.over) return;
+  const f = player();
+  if (ownCities(f).length === 0) {
+    endGame(false, 'defeat', f.name + ' is left with nothing to hold. The banner falls.');
+    return;
+  }
+  const capitals = G.cities.filter(c => c.capital);
+  if (capitals.length && capitals.every(c => c.owner === f.i)) {
+    endGame(true, 'domination', f.name + ' holds every capital in the vale.');
+  }
+}
+
+/* ── diplomacy ─────────────────────────────────────────────────────────────── */
+
+function setAttitude(a, b, value) {
+  if (a === b) return;
+  const v = clamp(value, -100, 100);
+  G.attitude[a][b] = v;
+  G.attitude[b][a] = v;
+}
+function changeAttitude(a, b, delta) {
+  if (a === b) return;
+  setAttitude(a, b, (G.attitude[a][b] || 0) + delta);
+}
+function declareWar(a, b) {
+  if (a === b || G.dip[a][b] === 'war') return;
+  G.dip[a][b] = 'war';
+  G.dip[b][a] = 'war';
+  changeAttitude(a, b, -35);
+  log(faction(a).name + ' declares war on ' + faction(b).name + '.', '#8f3c1a');
+}
+function makePeace(a, b) {
+  if (a === b || G.dip[a][b] === 'peace') return;
+  G.dip[a][b] = 'peace';
+  G.dip[b][a] = 'peace';
+  changeAttitude(a, b, 12);
+  log(faction(a).name + ' and ' + faction(b).name + ' make peace.', '#3f5c2d');
+}
+
+// How an AI answers an offer. A banner that is losing, or already fighting
+// someone else, is far more willing to talk.
+function aiWantsPeace(target, suitor) {
+  const mine = militaryStrength(target);
+  const theirs = militaryStrength(suitor);
+  const attitude = G.attitude[target.i][suitor.i] || 0;
+  const otherWars = G.factions.filter(o => o.alive && o.i !== target.i && o.i !== suitor.i &&
+    atWar(target.i, o.i)).length;
+  let score = attitude + (otherWars * 30);
+  if (theirs > mine * 1.25) score += 40;
+  if (mine > theirs * 1.4) score -= 35;
+  return score > 5;
+}
+
+function playerDeclareWar(targetIdx) {
+  if (!G || G.over) return;
+  const f = player();
+  declareWar(f.i, targetIdx);
+  toast('War with ' + faction(targetIdx).name);
+  render();
+  autosave();
+}
+
+function playerOfferPeace(targetIdx) {
+  if (!G || G.over) return;
+  const f = player(), target = faction(targetIdx);
+  if (!target.alive) return;
+  if (aiWantsPeace(target, f)) {
+    makePeace(f.i, targetIdx);
+    toast(target.name + ' accepts peace');
+  } else {
+    changeAttitude(f.i, targetIdx, -6);
+    log(target.name + ' refuses peace for now.', target.ink);
+    toast(target.name + ' refuses');
+  }
+  render();
+  autosave();
+}
+
+function playerGift(targetIdx, amount) {
+  if (!G || G.over) return;
+  const f = player(), target = faction(targetIdx);
+  const coin = Math.min(amount, f.res.coin);
+  if (coin < 5) { toast('You need coin to send a gift.'); return; }
+  f.res.coin -= coin;
+  target.res.coin += coin;
+  changeAttitude(f.i, targetIdx, Math.round(coin / 1.6));
+  log('A gift of ' + coin + ' coin goes to ' + target.name + '.', target.ink);
+  toast('Gift sent');
+  render();
+  autosave();
+}
+
+function playerDemand(targetIdx) {
+  if (!G || G.over) return;
+  const f = player(), target = faction(targetIdx);
+  if (!target.alive) return;
+  const ratio = militaryStrength(f) / Math.max(1, militaryStrength(target));
+  if (ratio > 1.5) {
+    const coin = Math.min(target.res.coin, 20 + Math.round(ratio * 10));
+    target.res.coin -= coin;
+    f.res.coin += coin;
+    changeAttitude(f.i, targetIdx, -22);
+    log(target.name + ' pays ' + coin + ' coin in tribute.', target.ink);
+    toast(target.name + ' pays ' + coin + ' coin');
+  } else {
+    changeAttitude(f.i, targetIdx, -30);
+    log(target.name + ' scorns the demand.', target.ink);
+    toast(target.name + ' refuses');
+    if (ratio < 0.8) declareWar(targetIdx, f.i);
+  }
+  render();
+  autosave();
+}
+
+/* ── the rival banners ─────────────────────────────────────────────────────── */
+
+// A rival plays the same rules, in a fixed order, using only what it can see
+// around its own pieces. Determinism comes from a hash of the turn and banner,
+// so the same campaign always plays out the same way.
+const aiRoll = (f, salt) => hash2(G.turn, f.i, G.seed + salt);
+
+function aiTurn(f) {
+  if (!f.alive || G.over) return;
+  aiResearch(f);
+  aiBuild(f);
+  aiTrain(f);
+  aiMove(f);
+  aiDiplomacy(f);
+}
+
+const AI_TECH_WEIGHT = {
+  forage: 9, woodcraft: 8, prospecting: 8, scribes: 10, masonry: 6, trade: 7, archery: 7,
+  sailing: 4, riding: 5, crop: 7, law: 7, sawpit: 6, bloomery: 6, coinage: 7, walls: 6,
+  bowyers: 5, granaries: 6, ritual: 4, harbour: 4, chariots: 4, siegeworks: 5, steel: 6,
+  cartography: 5, navigation: 3, shieldwall: 5, citadel: 5, longbow: 4, banking: 6, ascendancy: 3
+};
+
+function aiResearch(f) {
+  const options = TECHS.filter(t => !f.techs.includes(t.id) &&
+    t.req.every(r => f.techs.includes(r)) && f.res.insight >= t.cost);
+  if (!options.length) return;
+  options.sort((a, b) => (AI_TECH_WEIGHT[b.id] || 1) - (AI_TECH_WEIGHT[a.id] || 1) ||
+    a.cost - b.cost);
+  const pick = options[0];
+  if (pick.id === 'ascendancy' && f.res.coin < 40) return;
+  f.res.insight -= pick.cost;
+  f.techs.push(pick.id);
+  log(f.name + ' learns ' + pick.name + '.', f.ink);
+}
+
+function aiBuildingChoice(f, city) {
+  const preferred = ['granary', 'market', 'library', 'sawpit', 'forge', 'walls', 'temple'];
+  if (f.techs.includes('ascendancy')) preferred.unshift('wonder');
+  for (const id of preferred) {
+    const def = BUILDINGS[id];
+    if (city.buildings.includes(id)) continue;
+    if (!unlocked(f, 'building', id)) continue;
+    if (def.unique && G.cities.some(c => c.buildings.includes(id))) continue;
+    if (!canPay(f, def.cost)) continue;
+    return id;
+  }
+  return null;
+}
+
+function aiBuild(f) {
+  for (const city of ownCities(f)) {
+    if (city.built) continue;
+    const pick = aiBuildingChoice(f, city);
+    if (!pick) continue;
+    const def = BUILDINGS[pick];
+    // Keep some coin for troops unless this is the wonder.
+    if (pick !== 'wonder' && f.res.coin - (def.cost.coin || 0) < 4) continue;
+    pay(f, def.cost);
+    city.buildings.push(pick);
+    city.built = true;
+    if (pick === 'wonder') {
+      endGame(false, 'wonder', f.name + ' raises the Grand Wonder first. The vale answers to its crown.');
+      return;
+    }
+  }
+}
+
+function aiTrain(f) {
+  const cities = ownCities(f);
+  const army = ownUnits(f).filter(u => UNITS[u.type].atk > 0).length;
+  for (const city of cities) {
+    if (city.trained) continue;
+    if (f.res.coin < 5) break;
+    let type = null;
+    const wantPioneer = cities.length < 3 && G.turn < G.maxTurns * 0.6 && aiRoll(f, 11) < 0.5;
+    if (wantPioneer && canPay(f, unitCost(f, 'pioneer'))) type = 'pioneer';
+    else if (army < cities.length + 1) type = 'spear';
+    else if (f.techs.includes('harbour') && isCoastal(city) && aiRoll(f, 23) < 0.3) type = 'warship';
+    else if (f.techs.includes('archery') && aiRoll(f, 37) < 0.4) type = 'bow';
+    else if (f.techs.includes('riding') && aiRoll(f, 41) < 0.3) type = 'rider';
+    else if (aiRoll(f, 53) < 0.55) type = 'spear';
+    else if (aiRoll(f, 59) < 0.3) type = 'scout';
+    if (!type) continue;
+    if (!unlocked(f, 'unit', type)) continue;
+    const cost = unitCost(f, type);
+    if (!canPay(f, cost)) continue;
+    const spot = spawnSpot(city, type);
+    if (!spot) continue;
+    pay(f, cost);
+    addUnit(f, type, spot[0], spot[1]);
+    city.trained = true;
+  }
+}
+
+// A rival only looks at what is near its own banners, which keeps it from
+// reacting to armies on the far side of the vale.
+function aiVisibleEnemies(f, radius, around) {
+  const out = [];
+  for (const o of G.factions) {
+    if (!o.alive || o.i === f.i) continue;
+    for (const u of ownUnits(o)) {
+      if (hexDistance(around.x, around.y, u.x, u.y) <= radius) out.push({ kind: 'unit', unit: u, dist: hexDistance(around.x, around.y, u.x, u.y) });
+    }
+    for (const c of ownCities(o)) {
+      if (hexDistance(around.x, around.y, c.x, c.y) <= radius) out.push({ kind: 'city', city: c, dist: hexDistance(around.x, around.y, c.x, c.y) });
+    }
+  }
+  return out;
+}
+
+function aiMove(f) {
+  const units = ownUnits(f).slice();
+  for (const unit of units) {
+    if (G.over) return;
+    if (!G.units.some(u => u.id === unit.id)) continue;
+    const def = UNITS[unit.type];
+    const f2 = faction(unit.owner);
+
+    // 1. Strike anything in reach, preferring a kill, then the weakest target.
+    let bestAttack = null, bestValue = -Infinity;
+    for (let y = 0; y < G.rows; y++) {
+      for (let x = 0; x < G.cols; x++) {
+        if (!canAttackTarget(unit, x, y)) continue;
+        const target = unitAt(x, y);
+        const city = !target ? cityAt(x, y) : null;
+        const targetHp = target ? target.hp : (city ? city.hp : 0);
+        const value = (target ? 20 : 12) - targetHp;
+        if (value > bestValue) { bestValue = value; bestAttack = { x, y }; }
+      }
+    }
+    if (bestAttack) { attackTarget(unit, bestAttack.x, bestAttack.y); continue; }
+
+    // 2. Pioneers look for open ground; everyone else wants a fight or a front.
+    if (def.founds) {
+      const tile = tileAt(unit.x, unit.y);
+      const openHere = tile && tile.owner === null && !TERRAIN[tile.t].water &&
+        !G.cities.some(c => hexDistance(c.x, c.y, unit.x, unit.y) < 2);
+      if (openHere) { aiFoundCity(f2, unit); continue; }
+      const spot = aiFindSettlement(f2, unit);
+      if (spot) aiWalk(unit, spot.x, spot.y);
+      continue;
+    }
+
+    let target = null;
+    if (def.atk > 0) {
+      const enemies = aiVisibleEnemies(f2, 7, unit).sort((a, b) => a.dist - b.dist);
+      const hostile = enemies.filter(e => e.kind === 'unit' ? atWar(f2.i, e.unit.owner) : (e.city.owner === null || atWar(f2.i, e.city.owner)));
+      if (hostile.length) {
+        const e = hostile[0];
+        target = e.kind === 'unit' ? { x: e.unit.x, y: e.unit.y } : { x: e.city.x, y: e.city.y };
+      }
+    }
+    if (!target) {
+      const neutral = G.cities.filter(c => c.owner === null)
+        .sort((a, b) => hexDistance(unit.x, unit.y, a.x, a.y) - hexDistance(unit.x, unit.y, b.x, b.y))[0];
+      if (neutral && hexDistance(unit.x, unit.y, neutral.x, neutral.y) < 9) target = { x: neutral.x, y: neutral.y };
+    }
+    if (!target) {
+      const home = ownCities(f2).sort((a, b) =>
+        hexDistance(unit.x, unit.y, a.x, a.y) - hexDistance(unit.x, unit.y, b.x, b.y))[0];
+      if (home && hexDistance(unit.x, unit.y, home.x, home.y) > 2) target = { x: home.x, y: home.y };
+    }
+    if (target) aiWalk(unit, target.x, target.y);
+  }
+}
+
+function aiFindSettlement(f, unit) {
+  let best = null, bestDist = Infinity;
+  for (let y = 0; y < G.rows; y++) {
+    for (let x = 0; x < G.cols; x++) {
+      const t = G.tiles[y * G.cols + x];
+      if (t.owner !== null || TERRAIN[t.t].water || t.t === 'mount') continue;
+      if (G.cities.some(c => hexDistance(c.x, c.y, x, y) < 2)) continue;
+      const d = hexDistance(unit.x, unit.y, x, y);
+      if (d < bestDist) { bestDist = d; best = { x, y }; }
+    }
+  }
+  return best;
+}
+
+function aiFoundCity(f, unit) {
+  const tile = tileAt(unit.x, unit.y);
+  if (!tile || tile.owner !== null || TERRAIN[tile.t].water) return false;
+  if (G.cities.some(c => hexDistance(c.x, c.y, unit.x, unit.y) < 2)) return false;
+  const name = CITY_NAMES[(G.nextCity * 11 + f.i) % CITY_NAMES.length];
+  const city = addCity(f, unit.x, unit.y, name, 1);
+  claimRing(city, 1);
+  G.units = G.units.filter(u => u.id !== unit.id);
+  log(f.name + ' founds ' + city.name + '.', f.ink);
+  return true;
+}
+
+// One greedy stride toward a target. A rival does not path around the whole
+// world; it follows the hex that shortens the distance and can still be paid for.
+function aiWalk(unit, tx, ty) {
+  const f = faction(unit.owner);
+  let guard = 0;
+  while (unit.mp > 0 && guard++ < 8) {
+    if (unit.x === tx && unit.y === ty) return true;
+    let best = null, bestDist = hexDistance(unit.x, unit.y, tx, ty);
+    for (const [nx, ny] of neighbourList(unit.x, unit.y)) {
+      const cost = moveCost(f, unit, nx, ny);
+      if (!isFinite(cost) || cost > unit.mp) continue;
+      if (blockedFor(unit, nx, ny)) continue;
+      const d = hexDistance(nx, ny, tx, ty);
+      if (d < bestDist) { bestDist = d; best = [nx, ny, cost]; }
+    }
+    if (!best) return false;
+    unit.x = best[0];
+    unit.y = best[1];
+    unit.mp -= best[2];
+  }
+  return true;
+}
+
+function aiDiplomacy(f) {
+  const others = G.factions.filter(o => o.alive && o.i !== f.i);
+  for (const other of others) {
+    if (atWar(f.i, other.i)) {
+      if (aiWantsPeace(other, f) && aiRoll(f, other.i * 17) < 0.5) makePeace(f.i, other.i);
+      continue;
+    }
+    const attitude = G.attitude[f.i][other.i] || 0;
+    const ratio = militaryStrength(f) / Math.max(1, militaryStrength(other));
+    if (attitude < -35 && ratio > 1.35 && aiRoll(f, other.i * 31) < 0.22) {
+      declareWar(f.i, other.i);
+    }
+  }
+  // Grudges cool over time.
+  for (const other of others) {
+    const current = G.attitude[f.i][other.i] || 0;
+    if (current < 0) setAttitude(f.i, other.i, current + 1);
+  }
+}
+
+/* ── drawing the vale ──────────────────────────────────────────────────────── */
+
+// Camera in pixel space: translate then scale, so dragging is felt at every zoom.
+const cam = { x: 0, y: 0, k: 1, fitted: false };
+
+function boardMetrics() {
+  if (!G) return { width: 1, height: 1 };
+  return {
+    width: HEX_W * (G.cols + 0.5) + 8,
+    height: HEX_V * (G.rows - 1) + HEX_R * 2 + 8
+  };
+}
+
+function fitCamera() {
+  if (!UI || !G) return;
+  const stage = UI.stage.getBoundingClientRect();
+  const { width, height } = boardMetrics();
+  const k = clamp(Math.min(stage.width / width, stage.height / height) * 0.96, 0.3, 1.7);
+  cam.k = k;
+  cam.x = (stage.width - width * k) / 2;
+  cam.y = (stage.height - height * k) / 2;
+  cam.fitted = true;
+  applyCamera();
+}
+
+function applyCamera() {
+  if (!UI) return;
+  UI.cam.setAttribute('transform', 'translate(' + cam.x.toFixed(1) + ' ' + cam.y.toFixed(1) +
+    ') scale(' + cam.k.toFixed(3) + ')');
+}
+
+function centreOn(x, y) {
+  if (!UI || !G) return;
+  const stage = UI.stage.getBoundingClientRect();
+  const [cx, cy] = hexCenter(x, y);
+  cam.x = stage.width / 2 - cx * cam.k;
+  cam.y = stage.height / 2 - cy * cam.k;
+  applyCamera();
+}
+
+const TERRAIN_MARK = {
+  forest: 'M-8 5 L-3 -6 L2 5 Z M1 6 L6 -4 L11 6 Z',
+  hill: 'M-9 6 Q-3 -7 3 6 M-2 6 Q4 -3 10 6',
+  mount: 'M-10 6 L-3 -9 L4 6 Z M0 6 L6 -4 L12 6 Z',
+  desert: 'M-8 1 H-2 M2 4 H8 M-6 6 H2',
+  tundra: 'M-6 0 h1.6 M0 3 h1.6 M5 -1 h1.6',
+  ash: 'M-6 -4 L-3 4 M1 -5 L4 3 M6 0 L8 5',
+  marsh: 'M-9 -1 H-1 M1 1 H9 M-7 4 H1',
+  shoal: 'M-7 2 q4 -4 8 0 q4 4 8 0',
+  ocean: 'M-8 0 q4 -3 8 0 q4 3 8 0'
+};
+
+const FEATURE_MARK = { wheat: 'w', grove: 't', iron: 'i', seam: 'g', glass: 'c', shoalrun: 'f', ruin: 'r' };
+
+function unitGlyph(type) {
+  switch (type) {
+    case 'scout':   return 'M-4 4 L4 -4 M4 -4 v5 M4 -4 h-5';
+    case 'spear':   return 'M0 6 V-6 M-3 -3 L0 -7 L3 -3';
+    case 'bow':     return 'M-4 -6 Q6 0 -4 6 M-4 -6 L-1 0 L-4 6';
+    case 'rider':   return 'M-5 5 L0 -6 L5 5 M-2 1 L2 1';
+    case 'warden':  return 'M-5 -5 H5 V5 H-5 Z M-5 0 H5';
+    case 'ram':     return 'M-5 5 L0 -6 L5 5 Z';
+    case 'cog':     return 'M-6 2 L6 2 L4 6 H-4 Z M-1 2 V-6 L4 -3';
+    case 'warship': return 'M-6 2 L6 2 L4 6 H-4 Z M0 2 V-7 M0 -7 L6 -4';
+    case 'pioneer': return 'M-6 6 V-4 M-6 -4 H4 M4 -4 V-7';
+    default:        return 'M-4 0 A4 4 0 1 1 4 0 A4 4 0 1 1 -4 0';
+  }
+}
+
+function renderBoard() {
+  if (!UI || !G) return;
+  const terrain = [], owner = [], coast = [], marks = [], sites = [], unitsOut = [];
+  const overlay = [], fog = [], labels = [];
+  const highlight = reachable || new Map();
+  const selectedUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+
+  for (let y = 0; y < G.rows; y++) {
+    for (let x = 0; x < G.cols; x++) {
+      const tile = G.tiles[y * G.cols + x];
+      const [cx, cy] = hexCenter(x, y);
+      const d = polyPath(hexCorners(cx, cy, HEX_R - 1.6));
+      const key = keyOf(x, y);
+      const known = tile.seen || tile.vis;
+
+      if (!known) {
+        fog.push('<path class="fog unk" d="' + d + '" stroke="rgba(36,28,18,.14)" stroke-width=".7"/>');
+        continue;
+      }
+
+      terrain.push('<g class="hex" data-tile="' + key + '"><path class="fill" d="' + d +
+        '" fill="' + TERRAIN[tile.t].fill + '"/></g>');
+
+      if (tile.owner !== null) {
+        const f = faction(tile.owner);
+        owner.push('<path class="owner-tint" d="' + d + '" fill="' + f.light + '" opacity=".26"/>');
+      }
+
+      // Coastline: an ink edge wherever the land meets water, drawn once per
+      // land hex so the vale reads like a drawn map rather than a colour grid.
+      if (!TERRAIN[tile.t].water) {
+        for (const [nx, ny] of neighbourList(x, y)) {
+          const n = tileAt(nx, ny);
+          if (n && !TERRAIN[n.t].water) continue;
+          // Edge between this hex and its neighbour: find the shared corners.
+          const [ncx, ncy] = n ? hexCenter(nx, ny) : [cx + (nx - x) * HEX_W, cy + (ny - y) * HEX_V];
+          const corners = hexCorners(cx, cy, HEX_R - 1.6);
+          let first = null, second = null;
+          for (let i = 0; i < 6; i++) {
+            const a = corners[i], b = corners[(i + 1) % 6];
+            const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+            const toNeighbour = Math.hypot(mid[0] - ncx, mid[1] - ncy);
+            const toSelf = Math.hypot(mid[0] - cx, mid[1] - cy);
+            if (toNeighbour < toSelf) { first = a; second = b; break; }
+          }
+          if (first && second) {
+            coast.push('<path class="coast" d="M' + first[0].toFixed(1) + ' ' + first[1].toFixed(1) +
+              'L' + second[0].toFixed(1) + ' ' + second[1].toFixed(1) + '"/>');
+          }
+        }
+      } else {
+        coast.push('<path class="coast" d="' + d + '" stroke="rgba(36,28,18,.09)" stroke-width=".8"/>');
+      }
+
+      const mark = TERRAIN_MARK[tile.t];
+      if (mark) {
+        marks.push('<path d="' + mark + '" transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) +
+          ')" fill="none" stroke="rgba(36,28,18,.34)" stroke-width="1.1" stroke-linecap="round" opacity=".8"/>');
+      }
+      if (tile.f && FEATURE_MARK[tile.f]) {
+        marks.push('<circle cx="' + (cx + 12).toFixed(1) + '" cy="' + (cy - 11).toFixed(1) +
+          '" r="5.6" fill="#f7f0df" stroke="rgba(36,28,18,.4)" stroke-width=".7"/>' +
+          '<text x="' + (cx + 12).toFixed(1) + '" y="' + (cy - 8.4).toFixed(1) +
+          '" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="8" fill="rgba(36,28,18,.72)">' +
+          (tile.f === 'ruin' ? 'r' : FEATURE_MARK[tile.f]) + '</text>');
+      }
+
+      if (highlight.has(key)) {
+        overlay.push('<path class="reach" d="' + d + '"/>');
+      }
+      if (selectedUnit && canAttackTarget(selectedUnit, x, y)) {
+        overlay.push('<path class="threat" d="' + d + '"/>');
+      }
+      if (!tile.vis) fog.push('<path class="fog dim" d="' + d + '"/>');
+    }
+  }
+
+  // Keeps.
+  for (const city of G.cities) {
+    const tile = tileAt(city.x, city.y);
+    if (!tile || !tile.seen) continue;
+    const [cx, cy] = hexCenter(city.x, city.y);
+    const known = faction(city.owner);
+    const ink = known ? known.ink : '#5e5443';
+    const light = known ? known.light : '#d8ccb0';
+    const portion = clamp(city.hp / Math.max(1, city.owner === null ? 18 : cityMaxHp(known, city)), 0, 1);
+    const isSel = selection && selection.kind === 'city' && selection.id === city.id;
+    sites.push(
+      '<g class="site">' +
+      '<path d="M' + (cx - 11) + ' ' + (cy + 2) + ' H' + (cx + 11) + ' V' + (cy + 9) + ' H' + (cx - 11) + ' Z" fill="' + light + '" stroke="' + ink + '" stroke-width="1.2"/>' +
+      '<path d="M' + (cx - 11) + ' ' + (cy + 2) + ' V' + (cy - 3) + ' H' + (cx - 7) + ' V' + (cy + 2) + ' M' + (cx - 4) + ' ' + (cy + 2) + ' V' + (cy - 4) + ' H' + (cx + 1) + ' V' + (cy + 2) +
+      ' M' + (cx + 4) + ' ' + (cy + 2) + ' V' + (cy - 3) + ' H' + (cx + 8) + ' V' + (cy + 2) + '" fill="' + light + '" stroke="' + ink + '" stroke-width="1.2"/>' +
+      '<path d="M' + cx + ' ' + (cy - 4) + ' V' + (cy - 15) + ' M' + cx + ' ' + (cy - 15) + ' h9 l-2.5 3 2.5 3 h-9" fill="' + ink + '" stroke="' + ink + '" stroke-width="1"/>' +
+      (city.capital ? '<path d="M' + (cx - 6) + ' ' + (cy - 18) + ' l2 -3 2 3 2 -3 2 3 z" fill="' + ink + '"/>' : '') +
+      '<rect x="' + (cx - 11) + '" y="' + (cy + 11) + '" width="22" height="2.6" fill="rgba(36,28,18,.18)"/>' +
+      '<rect x="' + (cx - 11) + '" y="' + (cy + 11) + '" width="' + (22 * portion).toFixed(1) + '" height="2.6" fill="' + ink + '"/>' +
+      (isSel ? '<circle cx="' + cx + '" cy="' + (cy - 2) + '" r="17" fill="none" stroke="#241c12" stroke-width="1.8" stroke-dasharray="4 3"/>' : '') +
+      '</g>'
+    );
+    labels.push('<text class="label" x="' + cx.toFixed(1) + '" y="' + (cy + 24).toFixed(1) +
+      '" text-anchor="middle" fill="' + (known ? ink : '#5e5443') + '" opacity=".9">' +
+      esc(city.name) + (known ? '' : ' ·') + '</text>');
+  }
+
+  // Banners on the map.
+  for (const unit of G.units) {
+    const tile = tileAt(unit.x, unit.y);
+    if (!tile || !tile.vis) continue;
+    const f = faction(unit.owner);
+    const [cx, cy] = hexCenter(unit.x, unit.y);
+    const def = UNITS[unit.type];
+    const exhausted = unit.mp <= 0 && unit.acted;
+    const portion = clamp(unit.hp / def.hp, 0, 1);
+    const glyph = unitGlyph(unit.type);
+    unitsOut.push(
+      '<g class="unit' + (exhausted ? ' exhausted' : '') + '">' +
+      '<path class="banner" d="M' + (cx - 7) + ' ' + (cy - 19) + ' h13 v9 h-13 z" fill="' + f.ink + '" opacity=".85"/>' +
+      '<path class="body" d="M' + (cx - 9) + ' ' + (cy - 11) + ' h18 v18 h-18 z" fill="' + f.light + '" stroke-width="1.2"/>' +
+      '<path d="' + glyph + '" transform="translate(' + cx + ' ' + (cy - 2) + ') scale(.92)" fill="none" stroke="#241c12" stroke-width="1.4" stroke-linecap="round"/>' +
+      '<line class="hp" x1="' + (cx - 9) + '" y1="' + (cy + 10) + '" x2="' + (cx + 9) + '" y2="' + (cy + 10) + '"/>' +
+      '<line class="hpv" x1="' + (cx - 9) + '" y1="' + (cy + 10) + '" x2="' + (cx - 9 + 18 * portion).toFixed(1) + '" y2="' + (cy + 10) + '"/>' +
+      (unit.fortified ? '<path d="M' + (cx - 4) + ' ' + (cy + 14) + ' l8 0 l-4 4 z" fill="#241c12"/>' : '') +
+      '</g>'
+    );
+  }
+
+  if (selection && selection.kind === 'unit') {
+    const unit = unitById(selection.id);
+    if (unit) {
+      const [cx, cy] = hexCenter(unit.x, unit.y);
+      overlay.push('<circle class="sel-ring" cx="' + cx + '" cy="' + cy + '" r="' + (HEX_R - 3) + '"/>');
+    }
+  }
+
+  UI.layerOwner.innerHTML = owner.join('');
+  UI.layerTerrain.innerHTML = terrain.join('');
+  UI.layerCoast.innerHTML = coast.join('');
+  UI.layerMarks.innerHTML = marks.join('');
+  UI.layerSites.innerHTML = sites.join('');
+  UI.layerUnits.innerHTML = unitsOut.join('');
+  UI.layerOverlay.innerHTML = overlay.join('');
+  UI.layerFog.innerHTML = fog.join('');
+  UI.layerLabels.innerHTML = labels.join('');
+}
+
+/* ── interface: shared pieces ──────────────────────────────────────────────── */
+
+const RES_SHORT = { timber: 't', ore: 'o', coin: 'c', insight: 'i' };
+
+function costText(cost) {
+  return Object.keys(cost).map(k => cost[k] + RES_SHORT[k]).join(' ');
+}
+function log(text, colour) {
+  if (!G) return;
+  G.log.push({ turn: G.turn, text, colour: colour || null });
+  if (G.log.length > 250) G.log.shift();
+  if (UI) renderLog();
+}
+let toastTimer = 0;
+function toast(message) {
+  if (!UI) return;
+  UI.toast.textContent = message;
+  UI.toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => UI.toast.classList.remove('show'), 2100);
+}
+
+function render() {
+  if (!UI || !G) return;
+  renderBar();
+  renderBoard();
+  renderSide();
+  renderLog();
+  if (UI.btnEnd) UI.btnEnd.disabled = !!G.over;
+  if (G.over && !UI.endShown) showEndModal();
+}
+
+function renderBar() {
+  const f = player();
+  const { income } = factionIncome(f);
+  UI.bannerDot.style.background = f.ink;
+  UI.bannerName.textContent = f.name;
+  UI.bannerEpi.textContent = f.epithet;
+  const items = ['renown'].concat(RES_KEYS);
+  UI.resRow.innerHTML = items.map(key => {
+    if (key === 'renown') {
+      return '<span class="res-item"><span class="res-glyph">renown</span>' +
+        '<span class="res-val">' + renownOf(f) + '</span></span>';
+    }
+    const inc = income[key] || 0;
+    const cls = inc > 0 ? 'up' : inc < 0 ? 'down' : '';
+    return '<span class="res-item"><span class="res-glyph">' + RES_LABEL[key].toLowerCase() + '</span>' +
+      '<span class="res-val">' + (f.res[key] || 0) + '</span>' +
+      '<span class="res-inc ' + cls + '">' + (inc > 0 ? '+' : '') + inc + '</span></span>';
+  }).join('');
+  UI.turnReadout.textContent = G.turn + '/' + G.maxTurns;
+}
+
+function renderLog() {
+  if (!UI || !G) return;
+  const rows = G.log.slice(-40).map(entry =>
+    '<div' + (entry.colour ? ' style="color:' + entry.colour + '"' : '') + '>' +
+    '<span class="turn-mark">' + String(entry.turn).padStart(2, '0') + '</span> ' + esc(entry.text) + '</div>'
+  );
+  UI.log.innerHTML = rows.join('') || '<div class="faint">The vale is quiet.</div>';
+  UI.log.scrollTop = UI.log.scrollHeight;
+}
+
+/* ── interface: the side panel ─────────────────────────────────────────────── */
+
+function renderSide() {
+  if (!UI || !G) return;
+  if (selection && selection.kind === 'unit') {
+    const unit = unitById(selection.id);
+    if (unit) { UI.sideScroll.innerHTML = unitPanel(unit); return; }
+    selection = null;
+  }
+  if (selection && selection.kind === 'city') {
+    const city = cityById(selection.id);
+    if (city) { UI.sideScroll.innerHTML = cityPanel(city); return; }
+    selection = null;
+  }
+  UI.sideScroll.innerHTML = realmPanel();
+}
+
+function realmPanel() {
+  const f = player();
+  const { income, upkeep } = factionIncome(f);
+  const cities = ownCities(f);
+  const units = ownUnits(f);
+  const mods = techMods(f);
+  const rivals = G.factions.filter(o => o.i !== f.i && o.alive);
+
+  let html = '<div class="side-head"><h2>' + esc(f.name) + '</h2></div>' +
+    '<div class="side-sub">' + esc(f.epithet) + '</div>' +
+    '<div class="kv"><span>Renown</span><span>' + renownOf(f) + '</span></div>' +
+    '<div class="kv"><span>Cities</span><span>' + cities.length + '</span></div>' +
+    '<div class="kv"><span>Banners afield</span><span>' + units.length + '</span></div>' +
+    '<div class="kv"><span>Technologies</span><span>' + f.techs.length + ' / ' + TECHS.length + '</span></div>' +
+    '<div class="kv"><span>Upkeep</span><span>' + upkeep + ' coin</span></div>';
+
+  html += '<p class="sec">Each turn</p>';
+  for (const key of ['food'].concat(RES_KEYS)) {
+    const value = income[key] || 0;
+    html += '<div class="kv"><span>' + RES_LABEL[key] + '</span><span style="color:' +
+      (value < 0 ? '#8f3c1a' : value > 0 ? '#3f5c2d' : '#8a7d66') + '">' + (value > 0 ? '+' : '') + value + '</span></div>';
+  }
+
+  html += '<p class="sec">Banner</p><div class="hint" style="margin-top:0">' + esc(f.bonus) + '</div>';
+  if (mods.meleeAtk || mods.rangedAtk || mods.defence) {
+    html += '<div class="hint">' + [mods.meleeAtk ? '+' + mods.meleeAtk + ' melee' : '',
+      mods.rangedAtk ? '+' + mods.rangedAtk + ' ranged' : '',
+      mods.defence ? '+' + mods.defence + ' defence' : ''].filter(Boolean).join(' · ') + '</div>';
+  }
+
+  html += '<p class="sec">The vale</p>';
+  if (!rivals.length) html += '<div class="hint">No rival banners remain.</div>';
+  for (const other of rivals) {
+    const war = atWar(f.i, other.i);
+    html += '<div class="kv"><span>' + esc(other.name) +
+      ' <span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'war' : 'peace') + '</span></span>' +
+      '<span>' + ownCities(other).length + ' cities</span></div>';
+  }
+  html += '<div class="actions"><button class="act" data-act="council">Open council</button>' +
+    '<button class="act" data-act="tech">Technologies</button></div>';
+
+  html += '<p class="sec">Banners afield</p>';
+  if (!units.length) html += '<div class="hint">Nothing stands for you in the field.</div>';
+  else {
+    html += '<div class="unit-list">';
+    for (const unit of units) {
+      html += '<button class="unit-row" data-act="select-unit:' + unit.id + '">' +
+        '<span class="nm">' + UNITS[unit.type].name + '</span>' +
+        '<span class="st">' + unit.hp + 'hp · ' + unit.mp + 'mp</span></button>';
+    }
+    html += '</div>';
+  }
+
+  html += '<p class="sec">Cities</p>';
+  if (!cities.length) html += '<div class="hint">Found a city with a Pioneer.</div>';
+  else {
+    html += '<div class="unit-list">';
+    for (const city of cities) {
+      html += '<button class="unit-row" data-act="select-city:' + city.id + '">' +
+        '<span class="nm">' + esc(city.name) + '</span>' +
+        '<span class="st">lvl ' + city.level + '</span></button>';
+    }
+    html += '</div>';
+  }
+  html += '<p class="hint">Drag the map to look around, scroll to zoom. Select a city to train or build; ' +
+    'select a banner to move or strike.</p>';
+  return html;
+}
+
+function growthNeed(f, city) {
+  const mods = techMods(f);
+  return Math.max(4, 6 + 3 * city.level - mods.growth);
+}
+
+function cityPanel(city) {
+  const f = player();
+  const mine = city.owner === f.i;
+  const holder = faction(city.owner);
+  const [cx, cy] = [city.x, city.y];
+  let html = '<div class="side-head"><h2>' + esc(city.name) + '</h2>' +
+    (city.capital ? '<span class="tag">capital</span>' : '') + '</div>' +
+    '<div class="side-sub">' + (holder ? esc(holder.name) : 'unclaimed keep') +
+    ' · level ' + city.level + '</div>' +
+    '<div class="kv"><span>Health</span><span>' + Math.max(0, Math.round(city.hp)) + ' / ' +
+    (holder ? cityMaxHp(holder, city) : 18) + '</span></div>' +
+    '<div class="bar hp"><i style="width:' +
+    clamp(city.hp / Math.max(1, holder ? cityMaxHp(holder, city) : 18), 0, 1) * 100 + '%"></i></div>' +
+    '<div class="kv"><span>Defence</span><span>' + (holder ? cityDefence(holder, city) : 4 + city.level * 2) + '</span></div>';
+
+  if (mine) {
+    const yields = cityYields(f, city);
+    const need = growthNeed(f, city);
+    html += '<p class="sec">Stores</p>' +
+      '<div class="kv"><span>Growing</span><span>' + Math.round(city.food) + ' / ' + need + '</span></div>' +
+      '<div class="bar"><i style="width:' + clamp(city.food / need, 0, 1) * 100 + '%"></i></div>' +
+      '<p class="sec">Worked here</p>' +
+      ['food'].concat(RES_KEYS).map(key =>
+        '<div class="kv"><span>' + RES_LABEL[key] + '</span><span>+' + (yields[key] || 0) + '</span></div>').join('');
+
+    html += '<p class="sec">Train ' + (city.trained ? '<span class="tag">done</span>' : '') + '</p><div class="actions">';
+    for (const type of Object.keys(UNITS)) {
+      const def = UNITS[type];
+      if (def.naval && !neighbourList(cx, cy).some(([x, y]) => {
+        const t = tileAt(x, y); return t && TERRAIN[t.t].water;
+      }) && !TERRAIN[tileAt(cx, cy).t].water) continue;
+      const locked = !unlocked(f, 'unit', type);
+      const cost = unitCost(f, type);
+      const affordable = canPay(f, cost) && !city.trained && !locked;
+      html += '<button class="act' + (affordable ? '' : ' locked') + '" data-act="train:' + city.id + ':' + type + '"' +
+        (affordable ? '' : ' disabled') + ' title="' + esc(def.blurb) + '">' + def.name +
+        '<span class="cost">' + (locked ? 'needs ' + TECH_BY_ID[def.tech].name : costText(cost)) + '</span></button>';
+    }
+    html += '</div>';
+
+    html += '<p class="sec">Raise ' + (city.built ? '<span class="tag">done</span>' : '') + '</p><div class="actions">';
+    for (const id of Object.keys(BUILDINGS)) {
+      const def = BUILDINGS[id];
+      const has = city.buildings.includes(id);
+      const locked = !unlocked(f, 'building', id);
+      const affordable = canPay(f, def.cost) && !city.built && !has && !locked;
+      html += '<button class="act' + (affordable ? '' : ' locked') + '" data-act="build:' + city.id + ':' + id + '"' +
+        (affordable ? '' : ' disabled') + ' title="' + esc(def.blurb) + '">' + def.name +
+        '<span class="cost">' + (has ? 'built' : locked ? 'needs ' + TECH_BY_ID[def.tech].name : costText(def.cost)) +
+        '</span></button>';
+    }
+    html += '</div>';
+
+    if (city.buildings.length) {
+      html += '<p class="sec">Works</p><div class="hint" style="margin-top:0">' +
+        city.buildings.map(b => BUILDINGS[b].name).join(' · ') + '</div>';
+    }
+    html += '<div class="actions"><button class="act" data-act="centre:' + cx + ':' + cy + '">Find on map</button></div>';
+  } else {
+    html += '<p class="sec">Held by</p><div class="hint" style="margin-top:0">' +
+      (holder ? esc(holder.name) + ' · ' + esc(holder.epithet) : 'Nobody. A neutral keep, and fair game for any banner.') +
+      '</div>';
+    html += '<p class="sec">To take it</p><div class="hint" style="margin-top:0">' +
+      'Break its health with a land unit, then step in. Hulls can bombard but cannot hold a keep.' +
+      '</div>';
+    if (holder && holder.i !== f.i) {
+      const war = atWar(f.i, holder.i);
+      html += '<div class="actions">' + (war
+        ? '<button class="act" data-act="peace:' + holder.i + '">Offer peace</button>'
+        : '<button class="act" data-act="war:' + holder.i + '">Declare war</button>') + '</div>';
+    }
+    html += '<div class="actions"><button class="act" data-act="centre:' + cx + ':' + cy + '">Find on map</button></div>';
+  }
+  return html;
+}
+
+function unitPanel(unit) {
+  const f = player();
+  const def = UNITS[unit.type];
+  const mine = unit.owner === f.i;
+  const holder = faction(unit.owner);
+  const tile = tileAt(unit.x, unit.y);
+  const city = cityAt(unit.x, unit.y);
+  const terrain = tile ? TERRAIN[tile.t] : null;
+  let html = '<div class="side-head"><h2>' + def.name + '</h2>' +
+    (unit.fortified ? '<span class="tag">holding</span>' : '') + '</div>' +
+    '<div class="side-sub">' + esc(holder.name) + ' · ' + (terrain ? terrain.name : 'the field') +
+    (city ? ' · ' + esc(city.name) : '') + '</div>' +
+    '<div class="kv"><span>Health</span><span>' + Math.max(0, unit.hp) + ' / ' + def.hp + '</span></div>' +
+    '<div class="bar hp"><i style="width:' + clamp(unit.hp / def.hp, 0, 1) * 100 + '%"></i></div>' +
+    '<div class="kv"><span>Move left</span><span>' + unit.mp + ' / ' + moveOf(holder, unit) + '</span></div>' +
+    '<div class="kv"><span>Attack</span><span>' + (def.atk ? attackValue(holder, unit) : '—') + '</span></div>' +
+    '<div class="kv"><span>Defence</span><span>' + defenceValue(unit) + '</span></div>' +
+    '<div class="kv"><span>Range</span><span>' + (def.atk ? rangeOf(holder, unit) : '—') + '</span></div>' +
+    '<div class="kv"><span>Sight</span><span>' + sightOf(holder, unit) + '</span></div>' +
+    '<div class="hint">' + esc(def.blurb) + '</div>';
+
+  if (mine) {
+    html += '<p class="sec">Orders</p><div class="actions">';
+    if (def.founds) html += '<button class="act" data-act="found">Found city</button>';
+    html += '<button class="act" data-act="fortify">Hold position</button>' +
+      '<button class="act" data-act="disband">Disband</button>';
+    if (city && city.owner === f.i) {
+      html += '<button class="act" data-act="select-city:' + city.id + '">City of ' + esc(city.name) + '</button>';
+    }
+    html += '</div>';
+    if (!unit.mp && !unit.acted) html += '<div class="hint">No movement left this turn.</div>';
+    if (unit.acted) html += '<div class="hint">Has already struck this turn.</div>';
+  } else {
+    html += '<p class="sec">Foreign banner</p><div class="hint" style="margin-top:0">' +
+      (atWar(f.i, unit.owner)
+        ? 'You are at war with ' + esc(holder.name) + '. A unit in reach can strike it.'
+        : 'You are at peace with ' + esc(holder.name) + '. Strike only after declaring war.') + '</div>';
+    if (!atWar(f.i, unit.owner)) {
+      html += '<div class="actions"><button class="act" data-act="war:' + unit.owner + '">Declare war</button></div>';
+    }
+  }
+  return html;
+}
+
+/* ── interface: modals ─────────────────────────────────────────────────────── */
+
+function openModal(html, narrow) {
+  if (!UI) return;
+  UI.modal.className = 'modal' + (narrow ? ' narrow' : '');
+  UI.modal.innerHTML = html;
+  UI.modalLayer.hidden = false;
+}
+function closeModal() {
+  if (!UI) return;
+  UI.modalLayer.hidden = true;
+  UI.modal.innerHTML = '';
+}
+
+function showTechModal() {
+  const f = player();
+  const body = TECHS.reduce((html, tech, index) => {
+    const owned = f.techs.includes(tech.id);
+    const ready = tech.req.every(r => f.techs.includes(r));
+    const affordable = ready && f.res.insight >= tech.cost;
+    const cls = owned ? 'owned' : affordable ? 'ok' : 'locked';
+    if (index === 0 || TECHS[index - 1].era !== tech.era) {
+      if (index !== 0) html += '</div></div>';
+      html += '<div class="tech-era"><h3>Era ' + tech.era + '</h3><div class="tech-grid">';
+    }
+    html += '<button class="tech-card ' + cls + '"' + (affordable ? ' data-act="research:' + tech.id + '"' : ' disabled') + '>' +
+      '<div class="tn"><span>' + tech.name + '</span><span class="tc">' + tech.cost + 'i</span></div>' +
+      '<div class="te">' + tech.text + '</div>' +
+      (!ready ? '<div class="tq">needs ' + tech.req.map(r => TECH_BY_ID[r].name).join(' + ') + '</div>' : '') +
+      '</button>';
+    return html;
+  }, '');
+  const closing = '</div></div>';
+  openModal(
+    '<div class="modal-head"><h2>Technologies</h2><span class="sub">' + f.res.insight +
+    ' insight to spend · ' + f.techs.length + ' of ' + TECHS.length + ' learned</span>' +
+    '<button class="x" data-act="close" aria-label="Close">&times;</button></div>' +
+    '<div class="modal-body">' + body + closing + '</div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Close</button></div>'
+  );
+}
+
+function attitudeMeter(value) {
+  const pct = (clamp(value, -100, 100) + 100) / 2;
+  return '<span class="meter"><i style="left:' + (pct > 50 ? 50 : pct) + '%;width:' +
+    Math.abs(pct - 50) + '%;background:' + (value < 0 ? '#8f3c1a' : '#3f5c2d') + '"></i></span>';
+}
+
+function showCouncilModal() {
+  const f = player();
+  const rivals = G.factions.filter(o => o.i !== f.i);
+  const rows = rivals.map(other => {
+    if (!other.alive) {
+      return '<div class="council-row"><div><div class="cn">' + esc(other.name) +
+        '</div><div class="cd">Out of the vale.</div></div><div class="ca"></div></div>';
+    }
+    const war = atWar(f.i, other.i);
+    const attitude = G.attitude[f.i][other.i] || 0;
+    const mine = militaryStrength(f), theirs = militaryStrength(other);
+    const compare = theirs > mine * 1.2 ? 'stronger than you' : mine > theirs * 1.2 ? 'weaker than you' : 'a fair match';
+    return '<div class="council-row"><div>' +
+      '<div class="cn">' + esc(other.name) +
+      ' <span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'at war' : 'at peace') + '</span></div>' +
+      '<div class="cd">' + esc(other.epithet) + ' · ' + ownCities(other).length + ' cities · ' +
+      ownUnits(other).length + ' banners · ' + compare + '</div>' +
+      '<div class="cd" style="display:flex;align-items:center;gap:6px">' +
+      attitudeMeter(attitude) + '<span class="faint">' + (attitude > 20 ? 'friendly' : attitude < -20 ? 'hostile' : 'wary') +
+      '</span>' + (other.bonus ? ' · <span class="faint">' + esc(other.bonus) + '</span>' : '') + '</div>' +
+      '</div><div class="ca">' +
+      '<button class="act" data-act="gift:' + other.i + '">Gift 20c</button>' +
+      '<button class="act" data-act="demand:' + other.i + '">Demand</button>' +
+      (war ? '<button class="act" data-act="peace:' + other.i + '">Peace</button>'
+          : '<button class="act" data-act="war:' + other.i + '">War</button>') +
+      '</div></div>';
+  }).join('');
+  openModal(
+    '<div class="modal-head"><h2>Council of the vale</h2><span class="sub">Words first, then banners.</span>' +
+    '<button class="x" data-act="close" aria-label="Close">&times;</button></div>' +
+    '<div class="modal-body">' + rows +
+    '<p class="hint">A rival accepts peace when it is losing, or when another war already occupies it. ' +
+    'A gift buys goodwill; a demand only works while your banners clearly outnumber theirs.</p></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Close</button></div>'
+  );
+}
+
+function showMenuModal() {
+  const hasSave = !!readSave();
+  openModal(
+    '<div class="modal-head"><h2>Ashcrown</h2><span class="sub">Turn ' + G.turn + ' of ' + G.maxTurns + '</span>' +
+    '<button class="x" data-act="close" aria-label="Close">&times;</button></div>' +
+    '<div class="modal-body">' +
+    '<div class="actions" style="flex-direction:column;align-items:stretch">' +
+    '<button class="act wide" data-act="save">Save campaign</button>' +
+    '<button class="act wide"' + (hasSave ? '' : ' disabled') + ' data-act="load">Load saved campaign</button>' +
+    '<button class="act wide" data-act="help">How to play</button>' +
+    '<button class="act wide" data-act="new">Abandon and start a new vale</button>' +
+    '</div>' +
+    '<p class="hint">The campaign saves itself at the end of every turn. Loading a saved campaign ' +
+    'replaces the one in front of you.</p></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Resume</button></div>',
+    true
+  );
+}
+
+function showHelpModal() {
+  openModal(
+    '<div class="modal-head"><h2>How it plays</h2><span class="sub">Everything on one page</span>' +
+    '<button class="x" data-act="close" aria-label="Close">&times;</button></div>' +
+    '<div class="modal-body">' +
+    '<p class="sec">A turn</p><p class="hint" style="margin-top:0">Each city may train one unit and raise ' +
+    'one building per turn. Units move once, then strike. Technologies are bought with insight at any time. ' +
+    'Press End turn when you are done; the rival banners then take theirs.</p>' +
+    '<p class="sec">Resources</p><p class="hint" style="margin-top:0">Timber and ore come from wood, hills and ' +
+    'mines. Coin comes from cities and trade, and pays unit upkeep. Insight comes from cities and libraries and ' +
+    'buys technologies. Stores are per city: they fill up and the city grows, claiming the ring of ground around it.</p>' +
+    '<p class="sec">Fighting</p><p class="hint" style="margin-top:0">Damage rises with attack and falls with ' +
+    'defence; hills, woods, mountains, keeps and holding position all add defence. A defender that survives and ' +
+    'can reach the attacker strikes back, so Bows at two hexes are answered by nothing. Take a keep by breaking ' +
+    'its health with a land unit.</p>' +
+    '<p class="sec">Winning</p><p class="hint" style="margin-top:0">Hold every capital in the vale for domination, ' +
+    'or learn Ascendancy and raise the Grand Wonder. If the turn limit falls first, the banner with the most ' +
+    'renown carries the day. Renown counts cities, population, technologies, works and wonders.</p>' +
+    '<p class="sec">Keys</p><p class="hint" style="margin-top:0">Space ends the turn · T technologies · ' +
+    'D council · Esc closes a panel or clears the selection · drag to look around · scroll to zoom.</p>' +
+    '</div><div class="modal-foot"><button class="btn" data-act="close">Close</button></div>'
+  );
+}
+
+function showEndModal() {
+  if (!G || !G.over) return;
+  UI.endShown = true;
+  const f = player();
+  const standings = G.factions.filter(o => o.alive || o.isPlayer)
+    .map(o => ({ name: o.name, renown: renownOf(o), you: o.isPlayer }))
+    .sort((a, b) => b.renown - a.renown)
+    .map(row => '<div class="kv"><span>' + esc(row.name) + (row.you ? ' (you)' : '') +
+      '</span><span>' + row.renown + '</span></div>').join('');
+  openModal(
+    '<div class="modal-head"><h2>' + (G.over.won ? 'The vale is yours' : 'The banner falls') + '</h2>' +
+    '<span class="sub">' + G.over.kind + ' · turn ' + G.over.turn + '</span>' +
+    '<button class="x" data-act="close" aria-label="Close">&times;</button></div>' +
+    '<div class="modal-body"><p class="hint" style="margin-top:0">' + esc(G.over.text) + '</p>' +
+    '<p class="sec">Renown</p>' + standings +
+    '<p class="hint">Renown of ' + renownOf(f) + ' from ' + ownCities(f).length + ' cities and ' +
+    f.techs.length + ' technologies.</p></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button>' +
+    '<button class="btn primary" data-act="new">New vale</button></div>'
+  );
+}
+
+/* ── interface: what a button does ─────────────────────────────────────────── */
+
+function onAction(act) {
+  if (!G) return;
+  const [kind, a, b] = String(act).split(':');
+  switch (kind) {
+    case 'close': closeModal(); break;
+    case 'tech': showTechModal(); break;
+    case 'council': showCouncilModal(); break;
+    case 'menu': showMenuModal(); break;
+    case 'help': showHelpModal(); break;
+    case 'save': toast(saveGame() ? 'Campaign saved on this device' : 'No campaign to save'); closeModal(); break;
+    case 'load': if (loadGame()) { toast('Campaign loaded'); closeModal(); } break;
+    case 'new': closeModal(); UI.start.hidden = false; refreshStart(); break;
+    case 'end': endPlayerTurn(); break;
+    case 'research': researchTech(a); if (!UI.modalLayer.hidden) showTechModal(); break;
+    case 'war': playerDeclareWar(Number(a)); if (!UI.modalLayer.hidden) showCouncilModal(); break;
+    case 'peace': playerOfferPeace(Number(a)); if (!UI.modalLayer.hidden) showCouncilModal(); break;
+    case 'gift': playerGift(Number(a), 20); if (!UI.modalLayer.hidden) showCouncilModal(); break;
+    case 'demand': playerDemand(Number(a)); if (!UI.modalLayer.hidden) showCouncilModal(); break;
+    case 'train': trainUnit(a, b); break;
+    case 'build': buildInCity(a, b); break;
+    case 'select-unit': {
+      const unit = unitById(a);
+      if (unit) {
+        selection = { kind: 'unit', id: unit.id };
+        reachable = unit.owner === G.player && unit.mp > 0 ? computeReachable(unit) : new Map();
+        centreOn(unit.x, unit.y);
+        render();
+      }
+      break;
+    }
+    case 'select-city': {
+      const city = cityById(a);
+      if (city) {
+        selection = { kind: 'city', id: city.id };
+        reachable = null;
+        centreOn(city.x, city.y);
+        render();
+      }
+      break;
+    }
+    case 'centre': centreOn(Number(a), Number(b)); break;
+    case 'found': {
+      const unit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+      if (unit) foundCity(unit);
+      break;
+    }
+    case 'fortify': {
+      const unit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+      if (unit) fortify(unit);
+      break;
+    }
+    case 'disband': {
+      const unit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+      if (unit) disband(unit);
+      break;
+    }
+  }
+}
+
+/* ── saving the campaign ───────────────────────────────────────────────────── */
+
+const SAVE_KEY = 'bored.ashcrown.save.v1';
+
+function saveGame() {
+  if (!G) return false;
+  // A finished campaign is not resumable, so it leaves nothing behind for the
+  // start screen's Continue to offer.
+  if (G.over) { clearSave(); return false; }
+  try {
+    const banner = G.factions.find(f => f.i === G.player);
+    const meta = (banner ? banner.name : 'Campaign') + ' · turn ' + G.turn;
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, at: Date.now(), meta, state: G }));
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+function clearSave() {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch (error) { /* storage is blocked; nothing to clear */ }
+}
+function autosave() {
+  saveGame();
+}
+function readSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.v !== 1 || !parsed.state) return null;
+    const state = parsed.state;
+    if (!Array.isArray(state.tiles) || !Array.isArray(state.factions) || !state.factions.length) return null;
+    if (!Number.isFinite(state.turn) || !Number.isFinite(state.cols) || !Number.isFinite(state.rows)) return null;
+    if (state.tiles.length !== state.cols * state.rows) return null;
+    if (state.over) return null;
+    return parsed;
+  } catch (error) {
+    return null;
+  }
+}
+function loadGame() {
+  const saved = readSave();
+  if (!saved) return false;
+  G = saved.state;
+  if (campaignCount === 0) campaignCount = 1;
+  selection = null;
+  reachable = null;
+  UI.endShown = false;
+  UI.start.hidden = true;
+  recomputeVision();
+  cam.fitted = false;
+  render();
+  fitCamera();
+  return true;
+}
+
+/* ── the start screen ──────────────────────────────────────────────────────── */
+
+const startChoice = { factionId: FACTIONS[0].id, size: 'medium', turns: 50 };
+let campaignCount = 0;
+
+// The first vale of the session is the day's shared seed, so everyone opening
+// Ashcrown on the same day gets the same ground. Any vale after that is fresh.
+function nextSeed() {
+  if (campaignCount === 0) {
+    try {
+      if (window.__boredSeed && Number.isFinite(window.__boredSeed.seed)) return window.__boredSeed.seed >>> 0;
+    } catch (error) { /* no seed from the hub */ }
+  }
+  return (Date.now() ^ Math.imul(campaignCount + 1, 2654435761)) >>> 0;
+}
+
+function buildStartScreen() {
+  if (!UI) return;
+  UI.factionGrid.innerHTML = FACTIONS.map(f =>
+    '<button class="faction-card' + (f.id === startChoice.factionId ? ' on' : '') + '" data-pick="' + f.id + '" type="button">' +
+    '<div class="fn"><span class="dot" style="background:' + f.ink + '"></span>' + f.name + '</div>' +
+    '<div class="fe">' + esc(f.epithet) + '</div>' +
+    '<div class="fb">' + esc(f.bonus) + '</div></button>'
+  ).join('');
+  UI.factionGrid.onclick = event => {
+    const card = event.target.closest('[data-pick]');
+    if (!card) return;
+    startChoice.factionId = card.getAttribute('data-pick');
+    refreshStart();
+  };
+  UI.optSize.value = startChoice.size;
+  UI.optTurns.value = String(startChoice.turns);
+  UI.optSize.onchange = () => { startChoice.size = UI.optSize.value; };
+  UI.optTurns.onchange = () => { startChoice.turns = Number(UI.optTurns.value); };
+  UI.btnBegin.onclick = beginCampaign;
+  UI.btnContinue.onclick = () => { if (loadGame()) closeModal(); };
+  refreshStart();
+}
+
+function refreshStart() {
+  if (!UI) return;
+  for (const card of UI.factionGrid.querySelectorAll('[data-pick]')) {
+    card.classList.toggle('on', card.getAttribute('data-pick') === startChoice.factionId);
+  }
+  const saved = readSave();
+  UI.btnContinue.hidden = !saved;
+  if (saved) UI.btnContinue.textContent = 'Continue · ' + (saved.meta || 'turn ' + saved.state.turn);
+  const rivals = MAP_SIZES[startChoice.size].rivals;
+  const chosen = FACTIONS.find(f => f.id === startChoice.factionId) || FACTIONS[0];
+  const note = UI.startNote;
+  if (note) {
+    note.innerHTML = '<b>' + chosen.name + '</b> against ' + (rivals === 2 ? 'two' : rivals === 3 ? 'three' : 'five') +
+      ' rival banners. <b>How it plays.</b> Click a banner, then a hex. Cities train one unit or raise one ' +
+      'building each turn; technologies cost insight. Claim neutral keeps and found new cities to grow. Win by ' +
+      'taking every rival capital, or by raising the Grand Wonder. If nobody has won when the turn limit falls, ' +
+      'the highest renown carries the vale.';
+  }
+}
+
+function beginCampaign() {
+  if (!UI) return;
+  const seed = nextSeed();
+  campaignCount++;
+  startCampaign({ seed, size: startChoice.size, turns: startChoice.turns, factionId: startChoice.factionId });
+  UI.start.hidden = true;
+  UI.endShown = false;
+  closeModal();
+  selection = null;
+  reachable = null;
+  cam.fitted = false;
+  render();
+  fitCamera();
+  saveGame();
+}
+
+/* ── pointing at the map ───────────────────────────────────────────────────── */
+
+function selectUnit(unit) {
+  selection = { kind: 'unit', id: unit.id };
+  reachable = unit.owner === G.player && unit.mp > 0 ? computeReachable(unit) : new Map();
+  render();
+}
+function selectCity(city) {
+  selection = { kind: 'city', id: city.id };
+  reachable = null;
+  render();
+}
+
+function handleTileClick(x, y) {
+  if (!G || G.over) return;
+  const f = player();
+  const unit = unitAt(x, y);
+  const city = cityAt(x, y);
+  const selected = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+
+  if (selected && selected.owner === f.i) {
+    if (canAttackTarget(selected, x, y)) {
+      attackTarget(selected, x, y);
+      if (unitById(selected.id)) reachable = computeReachable(selected);
+      else { selection = null; reachable = null; }
+      checkEnd();
+      render();
+      autosave();
+      return;
+    }
+    if (reachable && reachable.has(keyOf(x, y)) && !(unit && unit.id === selected.id)) {
+      moveUnit(selected, x, y);
+      checkEnd();
+      render();
+      autosave();
+      return;
+    }
+  }
+  if (unit && unit.owner === f.i) { selectUnit(unit); return; }
+  if (city) { selectCity(city); return; }
+  if (unit) { selectUnit(unit); return; }
+  if (selection) { selection = null; reachable = null; render(); }
+}
+
+function handleMapClick(event) {
+  const element = document.elementFromPoint(event.clientX, event.clientY);
+  const hex = element && element.closest ? element.closest('[data-tile]') : null;
+  if (!hex) {
+    if (selection) { selection = null; reachable = null; render(); }
+    return;
+  }
+  const parts = hex.getAttribute('data-tile').split(',');
+  handleTileClick(Number(parts[0]), Number(parts[1]));
+}
+
+function bindMap() {
+  const svg = UI.map;
+  let drag = null;
+
+  svg.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || !G) return;
+    drag = { x: event.clientX, y: event.clientY, camX: cam.x, camY: cam.y, moved: false };
+    svg.classList.add('dragging');
+    if (svg.setPointerCapture) {
+      try { svg.setPointerCapture(event.pointerId); } catch (error) { /* not captureable */ }
+    }
+  });
+
+  svg.addEventListener('pointermove', event => {
+    if (!drag) return;
+    const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
+    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+    if (drag.moved) {
+      cam.x = drag.camX + dx;
+      cam.y = drag.camY + dy;
+      applyCamera();
+    }
+  });
+
+  const release = event => {
+    if (!drag) return;
+    const moved = drag.moved;
+    drag = null;
+    svg.classList.remove('dragging');
+    if (!moved) handleMapClick(event);
+  };
+  svg.addEventListener('pointerup', release);
+  svg.addEventListener('pointercancel', () => {
+    drag = null;
+    svg.classList.remove('dragging');
+  });
+
+  svg.addEventListener('wheel', event => {
+    if (!G) return;
+    event.preventDefault();
+    const rect = UI.stage.getBoundingClientRect();
+    const px = event.clientX - rect.left, py = event.clientY - rect.top;
+    const worldX = (px - cam.x) / cam.k, worldY = (py - cam.y) / cam.k;
+    const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+    cam.k = clamp(cam.k * factor, 0.32, 2.4);
+    cam.x = px - worldX * cam.k;
+    cam.y = py - worldY * cam.k;
+    applyCamera();
+  }, { passive: false });
+}
+
+function bindKeys() {
+  document.addEventListener('keydown', event => {
+    const tag = event.target && event.target.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (event.key === 'Escape') {
+      if (!UI.modalLayer.hidden) closeModal();
+      else if (selection) { selection = null; reachable = null; render(); }
+      return;
+    }
+    if (!G) return;
+    if (event.code === 'Space') {
+      event.preventDefault();
+      if (!G.over) endPlayerTurn();
+      return;
+    }
+    const key = event.key.toLowerCase();
+    if (key === 't') showTechModal();
+    else if (key === 'd') showCouncilModal();
+    else if (key === 'm') showMenuModal();
+    else if (key === 'h') showHelpModal();
+  });
+}
+
+/* ── the hub's hooks ───────────────────────────────────────────────────────── */
+
+// The arcade reads this to award a high score and rank the board. It runs at any
+// time, including before a campaign starts, so it never throws and never returns
+// null: zeroes until there is something to report, and `finished` only once the
+// campaign is actually over.
+if (typeof window !== 'undefined') {
+  window.__boredSnapshot = function () {
+    try {
+      const f = G ? player() : null;
+      return {
+        slug: 'ashcrown',
+        renown: f ? renownOf(f) : 0,
+        cities: f ? ownCities(f).length : 0,
+        techs: f ? f.techs.length : 0,
+        units: f ? ownUnits(f).length : 0,
+        turn: G ? G.turn : 0,
+        won: G && G.over && G.over.won ? 1 : 0,
+        finished: !!(G && G.over)
+      };
+    } catch (error) {
+      return { slug: 'ashcrown', renown: 0, cities: 0, techs: 0, units: 0, turn: 0, won: 0, finished: false };
+    }
+  };
+}
+
+/* ── boot ──────────────────────────────────────────────────────────────────── */
+
+function boot() {
+  const q = selector => document.querySelector(selector);
+  UI = {
+    stage: q('#stage'), map: q('#map'), cam: q('#cam'),
+    layerOwner: q('#layer-owner'), layerTerrain: q('#layer-terrain'), layerCoast: q('#layer-coast'),
+    layerMarks: q('#layer-marks'), layerSites: q('#layer-sites'), layerUnits: q('#layer-units'),
+    layerOverlay: q('#layer-overlay'), layerFog: q('#layer-fog'), layerLabels: q('#layer-labels'),
+    resRow: q('#res-row'), bannerDot: q('#banner-dot'), bannerName: q('#banner-name'),
+    bannerEpi: q('#banner-epi'), turnReadout: q('#turn-readout'), btnEnd: q('#btn-end'),
+    sideScroll: q('#side-scroll'), log: q('#log'),
+    modalLayer: q('#modal-layer'), modal: q('#modal'), toast: q('#toast'),
+    start: q('#start'), factionGrid: q('#faction-grid'), optSize: q('#opt-size'),
+    optTurns: q('#opt-turns'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'),
+    startNote: q('#start-note'), endShown: false
+  };
+
+  buildStartScreen();
+  bindMap();
+  bindKeys();
+
+  document.addEventListener('click', event => {
+    const button = event.target.closest('[data-act]');
+    if (!button || button.disabled) return;
+    onAction(button.getAttribute('data-act'));
+  });
+
+  UI.modalLayer.addEventListener('click', event => {
+    if (event.target === UI.modalLayer) closeModal();
+  });
+
+  q('#btn-tech').addEventListener('click', () => { if (G) showTechModal(); });
+  q('#btn-council').addEventListener('click', () => { if (G) showCouncilModal(); });
+  q('#btn-menu').addEventListener('click', () => { if (G) showMenuModal(); });
+  q('#btn-end').addEventListener('click', () => { if (G && !G.over) endPlayerTurn(); });
+
+  window.addEventListener('resize', () => { if (G && cam.fitted) fitCamera(); });
+
+  // Closing the tab mid-turn should not cost the player the moves they made:
+  // actions already autosave, and this catches anything that slipped through.
+  window.addEventListener('pagehide', autosave);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autosave(); });
+}
+
+if (typeof document !== 'undefined' && document.querySelector) {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+}
+</script>
+</body>
+</html>
