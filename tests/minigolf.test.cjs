@@ -68,19 +68,21 @@ test('all nine minigolf holes can be played through physics and only the finishe
   // with dry-run physics, then play that putt; never teleport or call pocket().
   run(`
     function shootTo(x, y) {
-      const saved = { ball: { ...ball }, strokes, card: [...card], sunk, finished };
+      const saved = { ball: { ...ball }, strokes, card: [...card], sunk, finished, courseTime, portalCooldown };
       const direction = Math.atan2(y - ball.y, x - ball.x);
-      const distance = Math.hypot(x - ball.x, y - ball.y);
-      let low = .01, high = 1, best = .5, closest = Infinity;
-      function restore() { ball = { ...saved.ball }; strokes = saved.strokes; card = [...saved.card]; sunk = saved.sunk; finished = saved.finished; moving = false; }
-      for (let attempt = 0; attempt < 22; attempt++) {
-        restore(); const strength = (low + high) / 2; putt(direction, strength);
+      let best = .5, closest = Infinity;
+      function restore() {
+        ball = { ...saved.ball }; strokes = saved.strokes; card = [...saved.card];
+        sunk = saved.sunk; finished = saved.finished; moving = false;
+        courseTime = saved.courseTime; portalCooldown = saved.portalCooldown;
+      }
+      // Acceleration strips and moving blades make endpoint distance non-monotonic.
+      for (let n = 4; n <= 100; n++) {
+        restore(); const strength = n / 100; putt(direction, strength);
         for (let tick = 0; tick < 2400 && moving; tick++) step(STEP);
         const error = Math.hypot(ball.x - x, ball.y - y);
         if (error < closest) { closest = error; best = strength; }
         if (sunk) break;
-        const traveled = (ball.x - saved.ball.x) * Math.cos(direction) + (ball.y - saved.ball.y) * Math.sin(direction);
-        if (traveled < distance) low = strength; else high = strength;
       }
       restore(); putt(direction, best);
       for (let tick = 0; tick < 2400 && moving; tick++) step(STEP);
@@ -89,14 +91,14 @@ test('all nine minigolf holes can be played through physics and only the finishe
   `);
   const routes = [
     [[200, 100]],
-    [[310, 370], [300, 100]],
-    [[310, 325], [310, 180], [90, 90]],
-    [[200, 90]],
+    [[345, 370], [345, 190], [300, 100]],
+    [[345, 325], [345, 180], [90, 90]],
+    [[165, 215], [165, 125], [200, 90]],
     [[310, 410], [310, 265], [90, 265], [90, 100], [300, 85]],
     [[310, 390], [310, 90]],
-    [[90, 150], [310, 150], [310, 420]],
-    [[200, 80]],
-    [[310, 420], [310, 280], [90, 280], [90, 175], [265, 175], [320, 80]]
+    [[90, 150], [310, 100], [310, 420]],
+    [[135, 144], [200, 80]],
+    [[310, 420], [310, 280], [90, 280], [90, 175], [235, 175], [235, 95], [320, 80]]
   ];
   const { scoreValue } = await import('../src/hub/scores.js');
   const { CHALLENGES, dailyCheck } = await import('../src/daily.js');
@@ -125,7 +127,7 @@ test('minigolf retains nine holes and its new obstacles affect physics without c
   const run = game();
   assert.equal(run('holes.length'), 9);
   assert.equal(run('holes.reduce((sum, h) => sum + h.par, 0)'), 28);
-  assert.equal(run('holes.filter(h => h.bumpers?.length).length'), 3);
+  assert.equal(run('holes.filter(h => h.bumpers?.length).length'), 2);
   assert.ok(run('holes.some(h => h.sweepers?.length)'));
   assert.ok(run('holes.some(h => h.belts?.length)'));
   assert.ok(run('holes.some(h => h.portals?.length)'));
@@ -150,4 +152,20 @@ test('minigolf retains nine holes and its new obstacles affect physics without c
   run('newRound()');
   assert.equal(run('__boredSnapshot().strokes'), 0);
   assert.equal(run('__boredSnapshot().finished'), false);
+});
+
+test('obstacles alter real shot corridors and flag/aim strokes remain thin', () => {
+  const run = game();
+  const bumper = run('(() => { holeIndex=1;loadHole();function roll(){ball={x:310,y:318,vx:0,vy:-210};moving=true;for(let i=0;i<110;i++)step(STEP);return {y:ball.y,vy:ball.vy};}const blocked=roll();holes[1].bumpers=[];const clear=roll();return {blocked,clear};})()');
+  assert.ok(bumper.blocked.y > bumper.clear.y + 20, 'bumper interrupts the original right-hand lane');
+  const gate = run('(() => { holeIndex=7;loadHole();function roll(){ball={x:200,y:218,vx:0,vy:-220};moving=true;courseTime=0;for(let i=0;i<110;i++)step(STEP);return {y:ball.y,vy:ball.vy};}const blocked=roll();holes[7].gates=[];const clear=roll();return {blocked,clear};})()');
+  assert.ok(gate.blocked.y > gate.clear.y + 15, 'moving gate interrupts center-line approaches');
+  run('holeIndex=5;loadHole();ball={x:85,y:351,vx:0,vy:-100};moving=true;step(STEP)');
+  assert.ok(run('Math.hypot(ball.x-330,ball.y-270)') < 3, 'portal near tee skips the bunker');
+  run('holeIndex=4;loadHole();ball={x:310,y:330,vx:0,vy:-100};moving=true;step(STEP)');
+  assert.ok(run('ball.vy') < -100, 'speed strip accelerates a ball on the main shot path');
+  for (let i = 0; i < 9; i++) {
+    run('holeIndex='+i+';loadHole();ctx.lineWidth=10;draw()');
+    assert.equal(run('ctx.lineWidth'), 1, 'original thin flag and power-guide strokes on hole '+(i+1));
+  }
 });
