@@ -1230,7 +1230,14 @@ function showMessage(text, duration = 1500) {
 }
 
 function shakeRow() { const r = board.children[row]; r.classList.add('shake'); setTimeout(() => r.classList.remove('shake'), 400); }
-function bounceRow() { for (let i = 0; i < 5; i++) setTimeout(() => getTile(row, i).classList.add('bounce'), i * 100); }
+function bounceRow() {
+  // The win handler advances `row` immediately after scheduling these timers.
+  // Keep the animation on the solved row, including the final (sixth) guess.
+  const winningRow = row;
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => getTile(winningRow, i)?.classList.add('bounce'), i * 100);
+  }
+}
 function getWinMessage() { return ['Genius','Magnificent','Impressive','Splendid','Great','Phew'][row] || 'Nice'; }
 
 document.addEventListener('keydown', e => {
