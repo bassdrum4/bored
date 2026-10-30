@@ -791,8 +791,8 @@ test('browser regressions', async t => {
     assert.equal(stored.score, endScore, 'the saved best matches the end screen');
     assert.ok(endScore - reported.live >= 1500, 'the reported score carries the clear bonus the live HUD omits');
 
-    // A death on the first floor still has to save: turns make the score positive,
-    // so a finished run is never dropped for being zero. Clear the older best
+    // A death on the first floor still has to save: the earned-progress score
+    // has a minimum of 1, so a finished run is never dropped for zero. Clear the older best
     // only once the death run is the live snapshot — the hub recaptures on a
     // 250 ms tick, and clearing while the victory run is still on screen would
     // let that tick restore the higher score instead.
