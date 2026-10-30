@@ -47,14 +47,14 @@ const W = 400, H = 520, R = 6, CUP = 11, STEP = 1 / 240;
 const PAPER = '#f5f2ea', INK = '#253b30', GREEN = '#c8d4b7';
 const holes = [
   { name: 'First putt', par: 2, tee: [200, 440], cup: [200, 100], walls: [], sand: [] },
-  { name: 'Go around', par: 3, tee: [100, 440], cup: [300, 100], walls: [[140, 210, 120, 85]], sand: [] },
-  { name: 'The dogleg', par: 3, tee: [90, 440], cup: [90, 90], walls: [[26, 235, 235, 22]], sand: [] },
-  { name: 'Through the gate', par: 3, tee: [200, 440], cup: [200, 90], walls: [[26, 245, 130, 20], [244, 245, 130, 20]], sand: [[145, 135, 110, 65]] },
-  { name: 'Switchback', par: 4, tee: [90, 450], cup: [300, 85], walls: [[26, 330, 235, 20], [150, 175, 224, 20]], sand: [] },
-  { name: 'The bunker', par: 3, tee: [85, 440], cup: [310, 90], walls: [], sand: [[125, 205, 160, 120]] },
-  { name: 'Bank on it', par: 3, tee: [85, 420], cup: [310, 420], walls: [[190, 210, 20, 284]], sand: [] },
-  { name: 'Narrow margins', par: 3, tee: [200, 450], cup: [200, 80], walls: [[92, 170, 20, 220], [288, 170, 20, 220]], sand: [[155, 240, 90, 65]] },
-  { name: 'Home stretch', par: 4, tee: [80, 450], cup: [320, 80], walls: [[26, 340, 225, 20], [150, 210, 224, 20], [26, 130, 180, 20]], sand: [[275, 380, 65, 65]] }
+  { name: 'Go around', par: 3, tee: [100, 440], cup: [300, 100], walls: [[140, 210, 120, 85]], sand: [], bumpers: [[86, 176, 18], [269, 154, 20]] },
+  { name: 'The dogleg', par: 3, tee: [90, 440], cup: [90, 90], walls: [[26, 235, 235, 22]], sand: [], sweepers: [[130, 315, 55, 1.1, 0]] },
+  { name: 'Through the gate', par: 3, tee: [200, 440], cup: [200, 90], walls: [[26, 245, 130, 20], [244, 245, 130, 20]], sand: [[145, 135, 110, 65]], bumpers: [[102, 365, 21], [298, 365, 21]], sweepers: [[288, 327, 30, -1.8, .3]] },
+  { name: 'Switchback', par: 4, tee: [90, 450], cup: [300, 85], walls: [[26, 330, 235, 20], [150, 175, 224, 20]], sand: [], belts: [[50, 378, 110, 42, 0, -230]], sweepers: [[263, 274, 28, 1.2, .5]] },
+  { name: 'The bunker', par: 3, tee: [85, 440], cup: [310, 90], walls: [], sand: [[125, 205, 160, 120]], portals: [[62, 260], [333, 170]] },
+  { name: 'Bank on it', par: 3, tee: [85, 420], cup: [310, 420], walls: [[190, 210, 20, 284]], sand: [], bumpers: [[130, 300, 18], [264, 300, 18]], belts: [[150, 80, 100, 35, 220, 0]] },
+  { name: 'Narrow margins', par: 3, tee: [200, 450], cup: [200, 80], walls: [[92, 170, 20, 220], [288, 170, 20, 220]], sand: [[155, 240, 90, 65]], gates: [[90, 112, 38, 12, 24, 1.5]] },
+  { name: 'Home stretch', par: 4, tee: [80, 450], cup: [320, 80], walls: [[26, 340, 225, 20], [150, 210, 224, 20], [26, 130, 180, 20]], sand: [[275, 380, 65, 65]], sweepers: [[252, 255, 34, 1.6, .8]], belts: [[52, 385, 94, 36, 190, 0]], portals: [[60, 290], [329, 115]] }
 ];
 const canvas = document.querySelector('#course'), ctx = canvas.getContext('2d');
 const hud = document.querySelector('#hud'), status = document.querySelector('#status');
@@ -63,6 +63,7 @@ const totalPar = holes.reduce((sum, hole) => sum + hole.par, 0);
 let holeIndex = 0, strokes = 0, card = [], sunk = false, finished = false;
 let ball = { x: 0, y: 0, vx: 0, vy: 0 }, moving = false;
 let angle = -Math.PI / 2, power = .45, drag = null, lastTime = 0, accumulator = 0;
+let courseTime = 0, portalCooldown = 0;
 
 window.__boredSnapshot = () => ({ slug: 'minigolf', strokes, holes: card.length, finished });
 
@@ -83,9 +84,12 @@ function loadHole() {
   const hole = holes[holeIndex];
   ball = { x: hole.tee[0], y: hole.tee[1], vx: 0, vy: 0 };
   sunk = moving = false; drag = null; accumulator = 0;
+  courseTime = portalCooldown = 0;
   angle = Math.atan2(hole.cup[1] - ball.y, hole.cup[0] - ball.x); power = .45;
   next.hidden = true;
-  updateHud(hole.name + '. Pull back and release.');
+  const obstacles = [hole.bumpers?.length && 'bumpers', hole.sweepers?.length && 'windmills',
+    hole.belts?.length && 'speed strips', hole.portals?.length && 'portals', hole.gates?.length && 'moving gates'].filter(Boolean);
+  updateHud(hole.name + (obstacles.length ? ' · Watch for ' + obstacles.join(', ') + '.' : '.') + ' Pull back and release.');
 }
 function newRound() {
   holeIndex = strokes = 0; card = []; finished = false;
@@ -133,13 +137,72 @@ function collide(rect) {
   const incoming = ball.vx * nx + ball.vy * ny;
   if (incoming < 0) { ball.vx -= 1.8 * incoming * nx; ball.vy -= 1.8 * incoming * ny; }
 }
+function collideBumper([x, y, radius]) {
+  const dx = ball.x - x, dy = ball.y - y, d = Math.hypot(dx, dy);
+  if (d >= radius + R) return;
+  const nx = d > .001 ? dx / d : 1, ny = d > .001 ? dy / d : 0;
+  ball.x = x + nx * (radius + R + .001); ball.y = y + ny * (radius + R + .001);
+  const toward = ball.vx * nx + ball.vy * ny;
+  if (toward < 0) {
+    // Spring bumper gives a small energy boost; a cap prevents runaway speeds.
+    ball.vx -= 2.14 * toward * nx; ball.vy -= 2.14 * toward * ny;
+    const speed = Math.hypot(ball.vx, ball.vy);
+    if (speed > 550) { ball.vx *= 550 / speed; ball.vy *= 550 / speed; }
+  }
+}
+function sweeperState([x, y, length, omega, phase]) {
+  const theta = courseTime * omega + phase;
+  return { x, y, length, omega, dx: Math.cos(theta), dy: Math.sin(theta) };
+}
+function collideSweeper(definition) {
+  const blade = sweeperState(definition);
+  const along = Math.max(-blade.length, Math.min(blade.length,
+    (ball.x - blade.x) * blade.dx + (ball.y - blade.y) * blade.dy));
+  const px = blade.x + along * blade.dx, py = blade.y + along * blade.dy;
+  const dx = ball.x - px, dy = ball.y - py, d = Math.hypot(dx, dy);
+  if (d >= R + 5) return;
+  const nx = d > .001 ? dx / d : -blade.dy, ny = d > .001 ? dy / d : blade.dx;
+  ball.x += nx * (R + 5 - d + .001); ball.y += ny * (R + 5 - d + .001);
+  const surfaceVX = -blade.omega * along * blade.dy;
+  const surfaceVY = blade.omega * along * blade.dx;
+  const impact = (ball.vx - surfaceVX) * nx + (ball.vy - surfaceVY) * ny;
+  if (impact < 0) {
+    ball.vx -= 1.7 * impact * nx; ball.vy -= 1.7 * impact * ny;
+    const speed = Math.hypot(ball.vx, ball.vy);
+    if (speed > 550) { ball.vx *= 550 / speed; ball.vy *= 550 / speed; }
+  }
+}
+function movingGate([x, y, w, h, amplitude, frequency]) {
+  return [x + Math.sin(courseTime * frequency) * amplitude, y, w, h];
+}
+function handlePortals(hole) {
+  if (!hole.portals || portalCooldown > 0) return;
+  for (let i = 0; i < 2; i++) {
+    const from = hole.portals[i], to = hole.portals[1 - i];
+    if (Math.hypot(ball.x - from[0], ball.y - from[1]) < 16) {
+      ball.x = to[0]; ball.y = to[1]; portalCooldown = 1.4;
+      return;
+    }
+  }
+}
 function step(dt) {
+  courseTime += dt;
+  portalCooldown = Math.max(0, portalCooldown - dt);
   if (!moving || sunk) return;
   const hole = holes[holeIndex];
   // 240 Hz keeps even a full-power putt below the ball radius per step,
   // so narrow walls and cups cannot be skipped by slow frames.
   ball.x += ball.vx * dt; ball.y += ball.vy * dt;
   for (const rect of [[0, 0, 26, H], [374, 0, 26, H], [0, 0, W, 26], [0, 494, W, 26], ...hole.walls]) collide(rect);
+  for (const gate of hole.gates || []) collide(movingGate(gate));
+  for (const bumper of hole.bumpers || []) collideBumper(bumper);
+  for (const sweeper of hole.sweepers || []) collideSweeper(sweeper);
+  handlePortals(hole);
+  for (const [x, y, w, h, ax, ay] of hole.belts || []) {
+    if (ball.x >= x && ball.x <= x + w && ball.y >= y && ball.y <= y + h) {
+      ball.vx += ax * dt; ball.vy += ay * dt;
+    }
+  }
   const speed = Math.hypot(ball.vx, ball.vy);
   if (Math.hypot(ball.x - hole.cup[0], ball.y - hole.cup[1]) < CUP && speed < 150) { pocket(); return; }
   const sand = hole.sand.some(([x, y, w, h]) => ball.x >= x && ball.x <= x + w && ball.y >= y && ball.y <= y + h);
@@ -148,6 +211,8 @@ function step(dt) {
     ball.vx = ball.vy = 0; moving = false;
     updateHud(sand ? 'In the sand. More power needed here.' : 'Your putt. Pull back and release.');
   } else { ball.vx *= slower / speed; ball.vy *= slower / speed; }
+  const finalSpeed = Math.hypot(ball.vx, ball.vy);
+  if (finalSpeed > 550) { ball.vx *= 550 / finalSpeed; ball.vy *= 550 / finalSpeed; }
 }
 function draw() {
   const hole = holes[holeIndex];
@@ -164,6 +229,34 @@ function draw() {
   }
   ctx.fillStyle = INK;
   for (const rect of hole.walls) ctx.fillRect(...rect);
+  // Obstacles sit above the turf and below the ball and aiming guide.
+  for (const [x, y, w, h, ax, ay] of hole.belts || []) {
+    ctx.fillStyle = '#a3bca5'; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+    ctx.beginPath(); ctx.moveTo(x + w / 2 - ax / 20, y + h / 2 - ay / 20);
+    ctx.lineTo(x + w / 2 + ax / 20, y + h / 2 + ay / 20); ctx.stroke();
+  }
+  for (const [index, portal] of (hole.portals || []).entries()) {
+    ctx.strokeStyle = index ? '#b3261e' : INK;
+    ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(portal[0], portal[1], 16, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(portal[0], portal[1], 9, 0, Math.PI * 2); ctx.stroke();
+  }
+  for (const [x, y, radius] of hole.bumpers || []) {
+    circle(x, y, radius + 2, INK); circle(x, y, radius - 2, PAPER); circle(x, y, 6, '#b3261e');
+  }
+  ctx.strokeStyle = INK; ctx.lineWidth = 10; ctx.lineCap = 'round';
+  for (const definition of hole.sweepers || []) {
+    const blade = sweeperState(definition);
+    ctx.beginPath();
+    ctx.moveTo(blade.x - blade.length * blade.dx, blade.y - blade.length * blade.dy);
+    ctx.lineTo(blade.x + blade.length * blade.dx, blade.y + blade.length * blade.dy); ctx.stroke();
+    circle(blade.x, blade.y, 6, PAPER);
+  }
+  ctx.lineCap = 'butt';
+  for (const gate of hole.gates || []) {
+    ctx.fillStyle = '#b3261e'; ctx.fillRect(...movingGate(gate));
+  }
+
   circle(...hole.tee, 2, INK);
   circle(...hole.cup, CUP, INK);
   ctx.strokeStyle = INK; ctx.beginPath(); ctx.moveTo(hole.cup[0], hole.cup[1] - 4); ctx.lineTo(hole.cup[0], hole.cup[1] - 39); ctx.stroke();
