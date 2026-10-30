@@ -636,7 +636,7 @@ test('browser regressions', async t => {
     await close();
   });
 
-  await t.test('Aim Lab counts hits/misses, expires, persists a best score, and restarts cleanly', async () => {
+  await t.test('Aim Lab plays Normal then Blindfire, combines completed hits, and preserves Normal daily metrics', async () => {
     const frame = await open('aim-lab');
     await clickText(frame, 'Start challenge');
     assert.equal(await frame.$eval('select', el => el.disabled), true);
@@ -646,13 +646,40 @@ test('browser regressions', async t => {
     const box = await (await frame.$('.target')).boundingBox();
     const area = await (await frame.$('#board')).boundingBox();
     assert.ok(box.x >= area.x && box.y >= area.y && box.x + box.width <= area.x + area.width);
-    // Advance the monotonic clock rather than waiting twenty seconds per test run.
-    await frame.evaluate(() => { const now = performance.now.bind(performance); performance.now = () => now() + 21000; });
-    await frame.waitForFunction(() => document.querySelector('#status').textContent.startsWith('Time!'));
-    assert.match(await text(frame, '#stats'), /0s \/ Best 1/);
+    assert.deepEqual(await frame.evaluate(() => {
+      const s = window.__boredSnapshot();
+      return [s.hits, s.normalHits, s.blindHits, s.finished];
+    }), [1, 1, 0, false]);
+
+    // Move the monotonic clock past round one, without waiting in real time.
+    await frame.evaluate(() => {
+      window.__aimOriginalNow = performance.now.bind(performance);
+      performance.now = () => window.__aimOriginalNow() + 21000;
+    });
+    await frame.waitForFunction(() => document.querySelector('#status').textContent.includes('Blindfire: memorize'));
     assert.equal(await frame.$eval('.target', el => el.hidden), true);
+    assert.equal(await frame.$eval('select', el => el.disabled), true);
+    assert.equal(await frame.evaluate(() => window.__boredSnapshot().finished), false,
+      'finishing Normal alone must not submit a leaderboard score');
+    const memory = await frame.$$eval('.memory-target', nodes =>
+      nodes.map(el => ({ x: parseFloat(el.style.left), y: parseFloat(el.style.top), visible: !el.hidden })));
+    assert.equal(memory.length, 5);
+    assert.ok(memory.every(target => target.visible));
+    await frame.evaluate(() => { performance.now = () => window.__aimOriginalNow() + 23500; });
+    await frame.waitForFunction(() => document.querySelector('#status').textContent.includes('click where'));
+    assert.equal(await frame.$eval('.memory-target', el => el.hidden), true);
+    await frame.click('#board', { offset: { x: memory[0].x, y: memory[0].y } });
+    assert.deepEqual(await frame.evaluate(() => {
+      const s = window.__boredSnapshot();
+      return [s.hits, s.normalHits, s.blindHits, s.finished];
+    }), [2, 1, 1, false]);
+    await frame.evaluate(() => { performance.now = () => window.__aimOriginalNow() + 45000; });
+    await frame.waitForFunction(() => document.querySelector('#status').textContent.startsWith('Time!'));
+    assert.match(await text(frame, '#stats'), /Hits 2 \/.*0s \/ Best 2/);
+    assert.equal(await frame.evaluate(() => window.__boredSnapshot().finished), true);
     await clickText(frame, 'Play again');
     assert.match(await text(frame, '#stats'), /Hits 0 \/ Accuracy 0% \/ 20s/);
+    assert.equal(await frame.evaluate(() => window.__boredSnapshot().finished), false);
     await close();
     assert.equal(await page.$$eval('#recent-list button', els => els.length), 4);
   });

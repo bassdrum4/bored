@@ -102,7 +102,11 @@ test('all nine minigolf holes can be played through physics and only the finishe
   const { CHALLENGES, dailyCheck } = await import('../src/daily.js');
   const daily = { ...CHALLENGES.find(c => c.slug === 'minigolf'), target: 9 };
   for (let hole = 0; hole < routes.length; hole++) {
-    for (const [x, y] of routes[hole]) assert.ok(run(`shootTo(${x}, ${y})`) < 11, 'reachable waypoint on hole ' + (hole + 1));
+    for (const [x, y] of routes[hole]) {
+      const error = run(`shootTo(${x}, ${y})`);
+      assert.ok(error < 11, 'reachable waypoint on hole ' + (hole + 1) +
+        ' target ' + x + ',' + y + ' error ' + error.toFixed(2));
+    }
     assert.equal(run('__boredSnapshot().holes'), hole + 1);
     const snapshot = run('__boredSnapshot()');
     assert.equal(dailyCheck(daily, snapshot).complete, hole === 8);
@@ -114,4 +118,36 @@ test('all nine minigolf holes can be played through physics and only the finishe
   assert.equal(run('putt(0, 1)'), false);
   run('advanceHole()');
   assert.equal(run('holeIndex'), 8, 'last hole cannot advance beyond the course');
+});
+
+
+test('minigolf retains nine holes and its new obstacles affect physics without changing score semantics', () => {
+  const run = game();
+  assert.equal(run('holes.length'), 9);
+  assert.equal(run('holes.reduce((sum, h) => sum + h.par, 0)'), 28);
+  assert.equal(run('holes.filter(h => h.bumpers?.length).length'), 3);
+  assert.ok(run('holes.some(h => h.sweepers?.length)'));
+  assert.ok(run('holes.some(h => h.belts?.length)'));
+  assert.ok(run('holes.some(h => h.portals?.length)'));
+  assert.ok(run('holes.some(h => h.gates?.length)'));
+
+  run('holeIndex=1; loadHole(); ball={x:112,y:176,vx:-160,vy:0}; moving=true; for(let i=0;i<15;i++) step(STEP)');
+  assert.ok(run('ball.vx') > 0, 'spring bumper reverses an incoming ball');
+
+  run('holeIndex=5; loadHole(); ball={x:62,y:260,vx:80,vy:0}; moving=true; step(STEP)');
+  assert.ok(run('ball.x > 315 && ball.y < 190'), 'entering one portal exits at its linked partner');
+  const exit = run('({x:ball.x,y:ball.y})');
+  run('step(STEP)');
+  assert.ok(run('Math.hypot(ball.x-'+exit.x+',ball.y-'+exit.y+')') < 10,
+    'portal cooldown prevents instantaneous bounce-back');
+
+  run('holeIndex=4; loadHole(); ball={x:80,y:396,vx:100,vy:0}; moving=true; for(let i=0;i<12;i++) step(STEP)');
+  assert.ok(run('ball.vy') < -5, 'speed strip deflects a rolling ball in its arrow direction');
+
+  run('holeIndex=7; loadHole(); courseTime=2;');
+  assert.ok(run('movingGate(holes[7].gates[0])[0]') !== run('holes[7].gates[0][0]'),
+    'moving gate changes position with course time');
+  run('newRound()');
+  assert.equal(run('__boredSnapshot().strokes'), 0);
+  assert.equal(run('__boredSnapshot().finished'), false);
 });

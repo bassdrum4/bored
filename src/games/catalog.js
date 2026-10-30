@@ -34,7 +34,7 @@ export const META = {
   '2048': ['Puzzle', 'Slide, merge, and chase 2048'],
   memory: ['Puzzle', 'Find all eight matching pairs'],
   'connect-four': ['Strategy', 'Challenge the computer or a friend'],
-  'aim-lab': ['Arcade', 'A 20-second accuracy challenge'],
+  'aim-lab': ['Arcade', 'Two 20-second rounds: aim, then memorize and hit invisible targets'],
   '8ball': ['Arcade', 'Break, pot, and clear the table'],
   sumo: ['Arcade', 'Push your rival out of the ring'], sand: ['Sandbox', 'Pour, mix, and build a tiny world'],
   poker: ['Strategy', 'Read the table and play your hand'],
