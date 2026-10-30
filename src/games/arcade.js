@@ -277,18 +277,37 @@ function arcadeGame(kind) {
   }
 
   if (kind === 'aim-lab') {
-    $('#instructions').textContent = 'Hit as many targets as you can in 20 seconds. Click or tap; misses count against accuracy. The clock keeps running if you switch tabs.';
+    $('#instructions').textContent = 'Two 20-second rounds: first hit visible targets, then memorize five numbered targets and hit their hidden positions in order. Your score is the total hits across both rounds. Click or tap; misses reduce accuracy. The clock keeps running if you switch tabs.';
     board.className = 'aim';
     const target = button('◎', hit, board); target.className = 'target'; target.setAttribute('aria-label', 'Hit target'); target.hidden = true;
+    const markers = Array.from({ length: 5 }, (_, index) => {
+      const el = document.createElement('span');
+      el.className = 'memory-target'; el.textContent = String(index + 1);
+      el.setAttribute('aria-hidden', 'true'); el.hidden = true; board.appendChild(el);
+      return el;
+    });
     const size = document.createElement('select'); size.setAttribute('aria-label', 'Target difficulty');
     size.innerHTML = '<option value="64">Normal targets</option><option value="44">Small targets</option>';
     $('#actions').appendChild(size);
-    let hits = 0, shots = 0, end = 0, timer, active = false, finished = false, best, runNormal = true;
-    window.__boredSnapshot = () => ({ slug: kind, hits, finished, accuracy: shots ? hits / shots * 100 : 0, normal: runNormal });
-    const bestKey = () => kind + '.' + size.value;
+    let hits = 0, shots = 0, normalHits = 0, normalShots = 0, blindHits = 0;
+    let end = 0, previewEnd = 0, recallEnd = 0, timer, active = false, finished = false;
+    let phase = 'ready', wave = [], nextMemoryTarget = 0, best = 0, runNormal = true;
+    window.__boredSnapshot = () => ({
+      slug: kind, hits, normalHits, blindHits, finished,
+      accuracy: shots ? hits / shots * 100 : 0,
+      normalAccuracy: normalShots ? normalHits / normalShots * 100 : 0,
+      normal: runNormal
+    });
+    // The old 20-second score is not comparable to a 40-second two-round score.
+    const bestKey = () => kind + '.duo-v1.' + size.value;
     function draw() {
       const seconds = active ? Math.max(0, Math.ceil((end - performance.now()) / 1000)) : finished ? 0 : 20;
-      stats.textContent = 'Hits ' + hits + ' / Accuracy ' + (shots ? Math.round(hits / shots * 100) : 0) + '% / ' + seconds + 's / Best ' + best;
+      const round = phase === 'normal' ? 'Round 1/2 · Normal' :
+        phase === 'blind-preview' || phase === 'blind-recall' ? 'Round 2/2 · Blindfire' :
+        finished ? 'Both rounds complete' : 'Two rounds';
+      stats.textContent = 'Hits ' + hits + ' / Accuracy ' + (shots ? Math.round(hits / shots * 100) : 0) +
+        '% / ' + seconds + 's / Best ' + best + ' · ' + round +
+        ' · Normal ' + normalHits + ' · Blindfire ' + blindHits;
     }
     function position() {
       const diameter = Number(size.value), gap = diameter / 2 + 8;
@@ -296,26 +315,104 @@ function arcadeGame(kind) {
       target.style.left = gap + Math.random() * Math.max(0, board.clientWidth - gap * 2) + 'px';
       target.style.top = gap + Math.random() * Math.max(0, board.clientHeight - gap * 2) + 'px';
     }
+    function hideMarkers() { for (const marker of markers) marker.hidden = true; }
+    function startWave(now) {
+      // One target per grid cell avoids accidental overlap on narrow phones.
+      const cells = shuffle(Array.from({ length: 9 }, (_, i) => i)).slice(0, 5);
+      const width = board.clientWidth || 320, height = board.clientHeight || 260;
+      const margin = Math.max(20, Number(size.value) / 2 + 4);
+      wave = cells.map(cell => {
+        const col = cell % 3, row = Math.floor(cell / 3);
+        return {
+          x: margin + (col + .5) / 3 * (width - 2 * margin),
+          y: margin + (row + .5) / 3 * (height - 2 * margin)
+        };
+      });
+      nextMemoryTarget = 0;
+      phase = 'blind-preview';
+      previewEnd = now + 1200;
+      markers.forEach((marker, i) => {
+        marker.style.left = wave[i].x + 'px'; marker.style.top = wave[i].y + 'px';
+        marker.style.width = marker.style.height = Math.min(46, Number(size.value)) + 'px';
+        marker.hidden = false;
+      });
+      status.textContent = 'Blindfire: memorize targets 1–5. They disappear in a moment.';
+    }
+    function beginBlindfire(now) {
+      normalHits = hits;
+      phase = 'blind-preview';
+      target.hidden = true;
+      end = now + 20000;
+      startWave(now);
+    }
     function finish() {
-      active = false; finished = true; clearInterval(timer); target.hidden = true; size.disabled = false; start.textContent = 'Play again';
+      if (finished) return;
+      active = false; finished = true; phase = 'done';
+      clearInterval(timer); target.hidden = true; hideMarkers();
+      size.disabled = false; start.textContent = 'Play again';
       if (hits > best) { best = hits; write(bestKey(), best); }
-      status.textContent = 'Time! ' + hits + ' hits with ' + (shots ? Math.round(hits / shots * 100) : 0) + '% accuracy.';
+      status.textContent = 'Time! ' + normalHits + ' normal + ' + blindHits +
+        ' Blindfire = ' + hits + ' hits (' + (shots ? Math.round(hits / shots * 100) : 0) + '% accuracy).';
+      draw();
+    }
+    function tick() {
+      if (!active) return;
+      const now = performance.now();
+      if (phase === 'normal' && now >= end) beginBlindfire(now);
+      if (phase === 'blind-preview' || phase === 'blind-recall') {
+        if (now >= end) { finish(); return; }
+        if (phase === 'blind-preview' && now >= previewEnd) {
+          hideMarkers(); phase = 'blind-recall'; recallEnd = now + 4500;
+          status.textContent = 'Blindfire: click where target 1 was, then 2, 3, 4 and 5.';
+        } else if (phase === 'blind-recall' && now >= recallEnd) startWave(now);
+      }
       draw();
     }
     function hit(e) {
-      e.stopPropagation(); if (!active) return;
-      if (performance.now() >= end) { finish(); return; }
-      hits++; shots++; position(); draw();
+      e.stopPropagation();
+      if (!active) return;
+      if (performance.now() >= end) { tick(); return; }
+      if (phase !== 'normal') return;
+      hits++; normalHits++; shots++; normalShots++; position(); draw();
     }
-    board.addEventListener('click', () => { if (active) { if (performance.now() >= end) finish(); else { shots++; draw(); } } });
+    board.addEventListener('click', event => {
+      if (!active) return;
+      if (performance.now() >= end) { tick(); return; }
+      if (phase === 'normal') {
+        shots++; normalShots++; draw(); return;
+      }
+      if (phase !== 'blind-recall') return;
+      shots++;
+      const rect = board.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * board.clientWidth / rect.width;
+      const y = (event.clientY - rect.top) * board.clientHeight / rect.height;
+      const required = wave[nextMemoryTarget];
+      if (required && Math.hypot(x - required.x, y - required.y) <= Math.max(20, Number(size.value) * .43)) {
+        hits++; blindHits++; nextMemoryTarget++;
+        if (nextMemoryTarget === wave.length) startWave(performance.now());
+        else status.textContent = 'Blindfire: remembered! Now hit target ' + (nextMemoryTarget + 1) + '.';
+      } else {
+        status.textContent = 'Blindfire: miss. Look for target ' + (nextMemoryTarget + 1) + '.';
+      }
+      draw();
+    });
     const start = button('Start challenge', () => {
-      clearInterval(timer); hits = shots = 0; best = read(bestKey()); active = true; finished = false; runNormal = size.value === '64'; end = performance.now() + 20000;
-      size.disabled = true; target.hidden = false; position(); start.textContent = 'Restart'; status.textContent = 'Go! Make every shot count.'; draw();
-      timer = setInterval(() => { if (performance.now() >= end) finish(); else draw(); }, 100);
+      clearInterval(timer); hits = shots = normalHits = normalShots = blindHits = 0;
+      best = read(bestKey()); active = true; finished = false; phase = 'normal';
+      runNormal = size.value === '64'; end = performance.now() + 20000;
+      hideMarkers(); size.disabled = true; target.hidden = false; position();
+      start.textContent = 'Restart'; status.textContent = 'Round 1: hit visible targets for 20 seconds.';
+      draw(); timer = setInterval(tick, 100);
     });
     size.onchange = () => { best = read(bestKey()); draw(); };
-    addEventListener('resize', () => { if (active) position(); });
-    best = read(bestKey()); status.textContent = 'Ready when you are.'; draw();
+    addEventListener('resize', () => {
+      if (!active) return;
+      if (phase === 'normal') position();
+      // Resizing during Blindfire starts a fresh visible pattern instead of
+      // making a memorized pattern impossible to hit at old coordinates.
+      else if (phase === 'blind-preview' || phase === 'blind-recall') startWave(performance.now());
+    });
+    best = read(bestKey()); status.textContent = 'Ready for Normal + Blindfire.'; draw();
   }
 }
 
@@ -335,6 +432,7 @@ export function nativeHTML(slug) {
     '.disc{aspect-ratio:1;border-radius:50%;background:#f5f2ea}.disc.p1{background:#b3261e}.disc.p2{background:#e7af35}' +
     '.aim{position:relative;min-height:240px;height:min(48vh,370px);border:1px solid #d8d2c4;background:repeating-linear-gradient(0deg,transparent,transparent 31px,#e8e2d5 32px),repeating-linear-gradient(90deg,transparent,transparent 31px,#e8e2d5 32px);overflow:hidden}' +
     '.target{position:absolute;transform:translate(-50%,-50%);border-radius:50%;border:0;background:#b3261e;color:#fff;font-size:34px;padding:0;line-height:1}' +
+    '.memory-target{position:absolute;display:grid;place-items:center;transform:translate(-50%,-50%);pointer-events:none;border-radius:50%;background:#253b30;color:#f5f2ea;font:bold 20px ui-monospace,monospace;box-shadow:0 0 0 3px #f5f2ea,0 0 0 5px #253b30}' +
     '@media(max-width:380px){#app{padding-left:12px;padding-right:12px}.tiles,.memory{gap:6px}#stats{font-size:11px}}' +
     '</style></head><body><main id="app"><h1 id="title"></h1><p id="stats"></p><div id="actions"></div><div id="board"></div><p id="status" role="status" aria-live="polite"></p><p id="instructions"></p></main><scr' +
     'ipt>(' + arcadeGame.toString() + ')(' + JSON.stringify(slug) + ');<\/scr' + 'ipt></body></html>';
