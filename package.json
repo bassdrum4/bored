@@ -15,6 +15,7 @@
     "previews:capture": "node scripts/capture-previews.mjs",
     "previews:optimize": "python3 scripts/optimize-previews.py",
     "games:check": "node scripts/validate-games.mjs",
+    "changelog": "node scripts/changelog.mjs",
     "test:analytics": "node --test tests/analytics.test.cjs",
     "test:together": "node --test tests/bored-together.test.cjs tests/together-browser.test.cjs tests/together-transport.test.cjs tests/together-pool.test.cjs tests/together-player.test.cjs",
     "test:rooftop": "node --test tests/rooftop-snipers.test.cjs"

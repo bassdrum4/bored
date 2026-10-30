@@ -1,0 +1,30 @@
+/* The changelog is a reading page: the hub's masthead and gutters, then one
+   narrow column. A day, then its changes — no cards, no badges. */
+.wordmark-home{text-decoration:none}
+.site-nav a[aria-current="page"]{text-decoration:underline;text-underline-offset:4px}
+
+#log-heading{font-size:clamp(28px,5vw,36px);font-weight:400;line-height:1.1;margin-bottom:8px}
+.log-note{max-width:62ch;margin-bottom:16px;font:11px/1.8 var(--mono);color:var(--dim)}
+#log{max-width:820px}
+
+.log-day{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  margin:26px 0 0;padding-bottom:6px;border-bottom:1px solid var(--ink);
+  font:10px/1.6 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.log-day-count{color:var(--dim);letter-spacing:.04em}
+.log-list{list-style:none}
+.log-row{display:grid;grid-template-columns:minmax(0,1fr) 7ch;align-items:baseline;
+  column-gap:14px;padding:9px 0;border-bottom:1px solid var(--rule)}
+.log-row:last-child{border-bottom:0}
+.log-text{min-width:0;font-size:15px;line-height:1.45}
+.log-subject{overflow-wrap:anywhere}
+.log-pr{display:inline-block;margin-left:8px;padding:1px 4px;border:1px solid var(--rule);
+  font:10px var(--mono);color:var(--dim);text-decoration:none;white-space:nowrap;vertical-align:1px}
+.log-pr:hover,.log-pr:focus-visible{border-color:var(--ink);color:var(--ink)}
+.log-sha{font:10.5px var(--mono);color:var(--dim);text-decoration:none;text-align:right;white-space:nowrap}
+.log-sha:hover,.log-sha:focus-visible{color:var(--ink);text-decoration:underline}
+
+@media(max-width:600px){
+  .log-row{grid-template-columns:minmax(0,1fr);row-gap:2px}
+  .log-text{font-size:14px}
+  .log-sha{text-align:left}
+}
