@@ -88,6 +88,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  highScore("transit-chaos", "Transit Chaos", "passengers", { metric: "delivered", when: snapshot => snapshot.finished === true }),
   // Circuit ranks the best lap of a finished three-lap race. The shared board
   // stores whole units, so the game shows hundredths and the board rounds to
   // seconds; a lap under eight seconds means the circuit was cut, so it cannot

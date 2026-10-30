@@ -164,6 +164,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "transit-chaos": {
+    "label": "Passengers delivered",
+    "better": "high",
+    "max_value": 999999
+  },
   "typing-test": {
     "label": "Words per minute",
     "better": "high",
