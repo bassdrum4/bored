@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Transit Chaos</title>
+<style>
+:root{--paper:#f5f2ea;--ink:#1d2927;--dim:#65736c;--rule:#cbd3c9;--red:#b64d43}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:ui-monospace,Consolas,monospace}
+body{display:flex;justify-content:center;align-items:center;padding:10px}main{width:min(100%,850px)}
+header{text-align:center;margin-bottom:9px}h1{font-size:23px;letter-spacing:.12em;margin:0}header p{margin:4px 0 0;font-size:11px;color:var(--dim)}
+#hud{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:11px;margin:0 0 8px;font-weight:bold}
+#map{width:100%;height:auto;aspect-ratio:800/480;border:1px solid var(--ink);background:#faf9f3;display:block;touch-action:none;cursor:crosshair}
+#toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:9px 0}
+button{cursor:pointer;background:transparent;color:var(--ink);font:12px ui-monospace,monospace;padding:7px 10px;border:1px solid var(--rule);border-radius:3px}
+button:disabled{opacity:.4;cursor:default}button.active{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+#lines{display:flex;flex-wrap:wrap;gap:5px}#status{font-size:11px;color:var(--dim);min-height:18px;margin-bottom:6px}
+#legend{font-size:11px;color:var(--dim);line-height:1.6}
+#overlay{position:absolute;inset:0;background:rgba(250,249,243,.94);display:flex;align-items:center;justify-content:center;padding:14px;text-align:center}
+#overlay[hidden]{display:none}#panel{width:min(100%,430px)}#panel h2{font-size:20px;margin:0 0 9px}#panel p{font-size:12px;line-height:1.6}#options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}#options button{border-color:var(--ink);text-align:left;padding:12px;min-height:60px}
+#options button b,#options button small{display:block}#options button small{font-size:10px;color:var(--dim);margin-top:5px}
+#panel .primary{background:var(--ink);color:var(--paper);border-color:var(--ink);margin-top:12px}
+#mapwrap{position:relative}#panel .muted{color:var(--dim)}@media(max-width:530px){h1{font-size:18px}button{font-size:11px;padding:6px 8px}#panel h2{font-size:17px}#panel p{font-size:11px}#options button{padding:8px}#options button small{font-size:9px}}
+</style>
+</head>
+<body><main>
+<header><h1>TRANSIT CHAOS</h1><p>DRAW THE LINES. KEEP THE CITY MOVING.</p></header>
+<div id="hud"><span id="score">DELIVERED 0</span><span id="time">TIME 0:00</span><span id="fleet">TRAINS 2</span><span id="next">UPGRADE IN 30s</span></div>
+<div id="mapwrap"><canvas id="map" width="800" height="480" aria-label="Subway map. Select a colored line, then connect stations by tapping or dragging."></canvas>
+<div id="overlay"><div id="panel"><h2 id="overlayTitle">BUILD A BETTER NETWORK</h2><p id="overlayText">Connect stations by clicking or dragging through them. Trains carry passengers toward matching symbols, even across transfers. A crowded station left in trouble for 13 seconds ends the run.</p><div id="options"></div><button id="start" class="primary" type="button">Start city</button></div></div></div>
+<div id="toolbar"><span id="lines"></span><button id="undo" type="button">Undo stop</button><button id="pause" type="button">Pause</button><button id="restart" type="button">Restart</button></div>
+<div id="status" role="status">Choose a line, then connect stations. Matching symbols are destinations.</div>
+<div id="legend">○ circle &nbsp; △ triangle &nbsp; □ square &nbsp; ◇ diamond &nbsp; · &nbsp; Tiny marks beside stations are waiting passengers. Red rings indicate overcrowding.</div>
+</main>
+<script>
+"use strict";
+const canvas=document.getElementById("map"),ctx=canvas.getContext("2d"),W=800,H=480;
+const $=id=>document.getElementById(id);
+const COLORS=["#b64d43","#237d85","#ba9141","#76629f","#54784f"];
+const TYPES=["circle","triangle","square","diamond"];
+const TAU=Math.PI*2;
+let stations=[],lines=[],selected=0,delivered=0,elapsed=0,spawnTimer=0,stationTimer=0,upgradeTimer=0,upgradeCount=0;
+let running=false,paused=false,finished=false,last=0,seed=0,uid=0,trainSpeed=0.58,trainCapacity=6;
+let pointerDown=false,dragStart=null,frame=0,overcrowdLimit=12;
+const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296};
+const choice=arr=>arr[Math.floor(random()*arr.length)];
+const clamp=(a,b,c)=>Math.max(b,Math.min(c,a));
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function makeStation(type) {
+  for(let tries=0;tries<220;tries++){
+    const p={id:uid++,x:48+random()*(W-96),y:47+random()*(H-94),type:type||choice(TYPES.slice(0,Math.min(4,3+Math.floor(elapsed/105)))),queue:[],danger:0};
+    if(stations.every(s=>dist(s,p)>94)){stations.push(p);return p}
+  }
+  return null;
+}
+function begin(){
+  seed=((Date.now()^Math.floor(Math.random()*4294967295))>>>0)||123456789;uid=0;
+  stations=[];lines=[];selected=0;delivered=0;elapsed=0;spawnTimer=0;stationTimer=0;upgradeTimer=0;upgradeCount=0;
+  trainSpeed=.58;trainCapacity=6;overcrowdLimit=12;finished=false;paused=false;running=true;
+  ["circle","triangle","square","circle","triangle"].forEach(type=>makeStation(type));
+  addLine();addLine();
+  $("overlay").hidden=true;$("pause").textContent="Pause";$("status").textContent="Select a line, then click or drag through stations.";
+  updateToolbar();updateHud();
+}
+function addLine(){const line={stops:[],trains:[],color:COLORS[lines.length]};lines.push(line);selected=lines.length-1;updateToolbar();return line}
+function addTrain(line){
+  if(line.trains.length>=4)return false;
+  line.trains.push({pos:0,dir:1,passengers:[],started:false});return true;
+}
+function ensureTrain(line){if(line.stops.length>=2&&!line.trains.length)addTrain(line)}
+function updateToolbar(){
+  $("lines").replaceChildren();
+  lines.forEach((line,i)=>{const b=document.createElement("button");b.textContent="LINE "+(i+1)+" · "+line.trains.length+"T";b.className=i===selected?"active":"";b.style.borderBottom="3px solid "+line.color;b.setAttribute("aria-pressed",String(i===selected));b.onclick=()=>{selected=i;updateToolbar()};$("lines").append(b)});
+  $("undo").disabled=!lines[selected]||!lines[selected].stops.length;
+}
+function updateHud(){
+  $("score").textContent="DELIVERED "+delivered;
+  $("time").textContent="TIME "+Math.floor(elapsed/60)+":"+String(Math.floor(elapsed%60)).padStart(2,"0");
+  $("fleet").textContent="TRAINS "+lines.reduce((n,l)=>n+l.trains.length,0);
+  $("next").textContent="UPGRADE IN "+Math.max(0,Math.ceil(30-upgradeTimer))+"s";
+}
+function stationAt(x,y){let best=null,d=29;for(const s of stations){const r=Math.hypot(x-s.x,y-s.y);if(r<d){d=r;best=s}}return best}
+function connect(s){
+  if(!running||paused||!s)return;
+  const line=lines[selected];
+  if(line.stops.at(-1)===s.id)return;
+  if(line.stops.includes(s.id)){$("status").textContent="A line cannot visit the same station twice. Use Undo stop.";return}
+  if(line.stops.length>=11){$("status").textContent="A line is limited to 11 stations.";return}
+  line.stops.push(s.id);ensureTrain(line);
+  $("status").textContent="Line "+(selected+1)+": "+line.stops.length+" stops.";
+  updateToolbar();
+}
+function undo(){
+  if(!running||paused)return;
+  const line=lines[selected];if(!line||!line.stops.length)return;
+  line.stops.pop();
+  for(const train of line.trains){train.pos=0;train.dir=1;train.started=false;for(const p of train.passengers){const home=stations.find(s=>s.id===line.stops[0]);if(home)home.queue.push(p)}train.passengers=[]}
+  if(line.stops.length<2)line.trains=[];updateToolbar();
+}
+function destinationTypes(){return [...new Set(stations.map(s=>s.type))]}
+function spawnPassengers(){
+  const available=destinationTypes();
+  for(const s of stations){
+    if(random()>.31)continue;
+    const others=available.filter(t=>t!==s.type);
+    if(!others.length)continue;
+    s.queue.push({type:choice(others)});
+  }
+}
+function neighbors(id){
+  const near=new Set();
+  for(const l of lines)for(let i=0;i<l.stops.length;i++)if(l.stops[i]===id){
+    if(i>0)near.add(l.stops[i-1]);if(i+1<l.stops.length)near.add(l.stops[i+1]);
+  }
+  return [...near];
+}
+// Breadth-first search permits transfers across any drawn lines.
+function routeDistance(from,type){
+  const seen=new Set([from]),queue=[[from,0]];
+  for(let i=0;i<queue.length;i++){
+    const [id,d]=queue[i],s=stations.find(s=>s.id===id);
+    if(s&&s.type===type)return d;
+    for(const other of neighbors(id))if(!seen.has(other)){seen.add(other);queue.push([other,d+1])}
+  }
+  return Infinity;
+}
+function exchange(train,stopId,nextId){
+  const station=stations.find(s=>s.id===stopId);if(!station)return;
+  const keep=[];
+  for(const p of train.passengers){
+    if(p.type===station.type)delivered++;
+    else if(nextId!=null&&routeDistance(nextId,p.type)<routeDistance(stopId,p.type))keep.push(p);
+    else station.queue.push(p);
+  }
+  train.passengers=keep;
+  if(nextId==null)return;
+  for(let i=0;i<station.queue.length&&train.passengers.length<trainCapacity;){
+    const p=station.queue[i];
+    if(routeDistance(nextId,p.type)<routeDistance(stopId,p.type)){
+      train.passengers.push(p);station.queue.splice(i,1);
+    }else i++;
+  }
+}
+function updateTrains(dt){
+  for(const line of lines){
+    const count=line.stops.length;if(count<2)continue;
+    for(const train of line.trains){
+      if(!train.started){
+        train.pos=clamp(train.pos,0,count-1);train.dir=train.pos>=count-1?-1:1;
+        exchange(train,line.stops[Math.round(train.pos)],line.stops[Math.round(train.pos)+train.dir]);
+        train.started=true;
+      }
+      let remaining=dt*trainSpeed;
+      while(remaining>0){
+        const target=train.dir>0?Math.floor(train.pos+1e-7)+1:Math.ceil(train.pos-1e-7)-1;
+        const goal=clamp(target,0,count-1),gap=Math.abs(goal-train.pos);
+        if(gap<1e-7){train.dir*=-1;break}
+        const step=Math.min(gap,remaining);train.pos+=train.dir*step;remaining-=step;
+        if(step+1e-7>=gap){
+          const index=Math.round(train.pos);
+          if(index===0||index===count-1)train.dir*=-1;
+          const next=index+train.dir;
+          exchange(train,line.stops[index],line.stops[next]);
+        }
+      }
+    }
+  }
+}
+function updateStationRisk(dt){
+  for(const s of stations){
+    const max=overcrowdLimit;
+    if(s.queue.length>=max)s.danger+=dt;else s.danger=Math.max(0,s.danger-dt*1.7);
+    if(s.danger>=13){endGame(s);return}
+  }
+}
+function endGame(s){
+  running=false;finished=true;
+  $("overlayTitle").textContent="NETWORK OVERLOADED";
+  $("overlayText").textContent=(s?"A station was overcrowded too long. ":"")+"You delivered "+delivered+" passengers in "+Math.floor(elapsed)+" seconds. Improve your routes and try again.";
+  $("options").replaceChildren();$("start").hidden=false;$("start").textContent="Play again";$("overlay").hidden=false;updateHud();
+}
+function showUpgrades(){
+  paused=true;upgradeCount++;
+  $("overlayTitle").textContent="CITY EXPANSION · "+upgradeCount;
+  $("overlayText").textContent="Choose one upgrade. The city pauses while you decide.";
+  $("start").hidden=true;$("options").replaceChildren();
+  const upgrades=[
+    {name:"Extra train",note:"Add a train to the selected line (up to 4).",ok:lines.some(l=>l.stops.length>=2&&l.trains.length<4),
+      apply(){const l=lines[selected];if(l.stops.length>=2&&l.trains.length<4)addTrain(l);else {const other=lines.find(l=>l.stops.length>=2&&l.trains.length<4);if(other)addTrain(other)}}},
+    {name:"New line",note:"Unlock another colored route and its first train.",ok:lines.length<COLORS.length,apply(){addLine()}},
+    {name:"Faster trains",note:"All trains move 20% faster.",ok:true,apply(){trainSpeed*=1.2}},
+    {name:"Roomier trains",note:"Carry 2 more passengers per train.",ok:true,apply(){trainCapacity+=2}}
+  ];
+  for(const u of upgrades){
+    const b=document.createElement("button");b.disabled=!u.ok;
+    const name=document.createElement("b");name.textContent=u.name;
+    const note=document.createElement("small");note.textContent=u.note;
+    b.append(name,note);b.onclick=()=>{u.apply();paused=false;$("overlay").hidden=true;updateToolbar();updateHud()};$("options").append(b);
+  }
+  $("overlay").hidden=false;
+}
+function tick(t){
+  const dt=Math.min(.08,Math.max(0,(t-(last||t))/1000));last=t;
+  if(running&&!paused){
+    elapsed+=dt;spawnTimer+=dt;stationTimer+=dt;upgradeTimer+=dt;
+    const interval=Math.max(.7,2.0-elapsed/150);
+    if(spawnTimer>=interval){spawnTimer-=interval;spawnPassengers()}
+    if(stationTimer>=Math.max(8,17-elapsed/75)){
+      stationTimer=0;
+      if(stations.length<23)makeStation();
+    }
+    updateTrains(dt);updateStationRisk(dt);
+    if(running&&upgradeTimer>=30){upgradeTimer-=30;showUpgrades()}
+    updateHud();
+  }
+  draw();
+  frame=requestAnimationFrame(tick);
+}
+function drawSymbol(type,x,y,r,color,fill){
+  ctx.save();ctx.translate(x,y);ctx.strokeStyle=color;ctx.fillStyle=fill||"#faf9f3";ctx.lineWidth=2.5;ctx.beginPath();
+  if(type==="circle")ctx.arc(0,0,r,0,TAU);
+  if(type==="triangle"){ctx.moveTo(0,-r);ctx.lineTo(r*.9,r*.75);ctx.lineTo(-r*.9,r*.75);ctx.closePath()}
+  if(type==="square")ctx.rect(-r*.82,-r*.82,r*1.64,r*1.64);
+  if(type==="diamond"){ctx.moveTo(0,-r);ctx.lineTo(r,0);ctx.lineTo(0,r);ctx.lineTo(-r,0);ctx.closePath()}
+  ctx.fill();ctx.stroke();ctx.restore();
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle="#faf9f3";ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle="#e7e8dd";ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke()}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  lines.forEach((line,i)=>{
+    if(line.stops.length<2)return;
+    ctx.strokeStyle=line.color;ctx.lineWidth=i===selected?8:6;ctx.lineJoin="round";ctx.lineCap="round";
+    ctx.beginPath();line.stops.forEach((id,j)=>{const s=stations.find(s=>s.id===id);if(!s)return;if(j===0)ctx.moveTo(s.x,s.y);else ctx.lineTo(s.x,s.y)});ctx.stroke();
+    ctx.strokeStyle="#faf9f3";ctx.lineWidth=1.2;ctx.stroke();
+  });
+  lines.forEach((l)=>{
+    for(const tr of l.trains){
+      if(l.stops.length<2)continue;
+      const lo=Math.floor(tr.pos),hi=Math.min(l.stops.length-1,lo+1),a=stations.find(s=>s.id===l.stops[lo]),b=stations.find(s=>s.id===l.stops[hi]);
+      if(!a||!b)continue;const part=tr.pos-lo,x=a.x+(b.x-a.x)*part,y=a.y+(b.y-a.y)*part;
+      ctx.fillStyle="#fffdf7";ctx.strokeStyle=l.color;ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(x-12,y-8,24,16,3);ctx.fill();ctx.stroke();
+      ctx.fillStyle=l.color;ctx.font="bold 10px monospace";ctx.textAlign="center";ctx.fillText(tr.passengers.length,x,y+3);
+    }
+  });
+  stations.forEach(s=>{
+    if(s.danger>0){ctx.strokeStyle="#b64d43";ctx.lineWidth=2+s.danger/6;ctx.beginPath();ctx.arc(s.x,s.y,23+s.danger/2,0,TAU);ctx.stroke()}
+    drawSymbol(s.type,s.x,s.y,15,"#23332f","#faf9f3");
+    if(s.queue.length){
+      const types={};for(const p of s.queue)types[p.type]=(types[p.type]||0)+1;
+      let offset=0;
+      for(const [type,n] of Object.entries(types)){
+        drawSymbol(type,s.x-14+offset*13,s.y+32,4.5,n>4?"#b64d43":"#65736c","#faf9f3");offset++;
+      }
+      ctx.fillStyle=s.queue.length>=overcrowdLimit?"#b64d43":"#65736c";
+      ctx.textAlign="center";ctx.font="bold 11px monospace";ctx.fillText(String(s.queue.length),s.x,s.y-25);
+    }
+  });
+  if(pointerDown&&dragStart){ctx.strokeStyle=COLORS[selected];ctx.setLineDash([5,6]);ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(dragStart.x,dragStart.y);ctx.lineTo(pointerPos.x,pointerPos.y);ctx.stroke();ctx.setLineDash([])}
+}
+let pointerPos={x:0,y:0};
+function point(event){const r=canvas.getBoundingClientRect();return{x:(event.clientX-r.left)*W/r.width,y:(event.clientY-r.top)*H/r.height}}
+canvas.addEventListener("pointerdown",e=>{
+  if(!running||paused)return;
+  pointerDown=true;pointerPos=point(e);dragStart=stationAt(pointerPos.x,pointerPos.y);
+  if(dragStart)connect(dragStart);
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove",e=>{
+  if(!pointerDown||!running||paused)return;
+  pointerPos=point(e);const s=stationAt(pointerPos.x,pointerPos.y);
+  if(s&&s!==dragStart){connect(s);dragStart=s}
+});
+function release(e){if(!pointerDown)return;pointerPos=point(e);const s=stationAt(pointerPos.x,pointerPos.y);if(s)connect(s);pointerDown=false;dragStart=null}
+canvas.addEventListener("pointerup",release);
+canvas.addEventListener("pointercancel",()=>{pointerDown=false;dragStart=null});
+$("undo").onclick=undo;
+$("start").onclick=begin;
+$("restart").onclick=()=>{running=false;paused=false;begin()};
+$("pause").onclick=()=>{
+  if(!running)return;
+  paused=!paused;$("pause").textContent=paused?"Resume":"Pause";
+  $("status").textContent=paused?"Paused.":"Click stations to extend the selected line.";
+};
+document.addEventListener("keydown",e=>{
+  if(e.key>="1"&&e.key<="5"&&running){const i=Number(e.key)-1;if(lines[i]){selected=i;updateToolbar()}}
+  if((e.key==="Backspace"||e.key==="Delete")&&running){e.preventDefault();undo()}
+  if(e.code==="Space"&&running&&!$("overlay").hidden){return}
+  if(e.code==="Space"&&running){e.preventDefault();$("pause").click()}
+});
+window.__boredSnapshot=()=>({slug:"transit-chaos",delivered:Math.min(999999,Math.floor(delivered)),finished:finished});
+updateToolbar();updateHud();requestAnimationFrame(tick);
+</script></body></html>
