@@ -8,7 +8,7 @@ const vm = require('node:vm');
 // browser suite separately checks pointer input, resizing and the hub hooks.
 function game() {
   const elements = new Map();
-  const canvasContext = new Proxy({}, { get: (_, key) => () => {}, set: () => true });
+  const canvasContext = new Proxy({}, { get: (obj, key) => key in obj ? obj[key] : () => {}, set: (obj, key, value) => { obj[key] = value; return true; } });
   const element = () => ({ innerHTML: '', textContent: '', hidden: false,
     addEventListener() {}, getContext: () => canvasContext });
   const context = vm.createContext({ document: {
@@ -133,17 +133,17 @@ test('minigolf retains nine holes and its new obstacles affect physics without c
   assert.ok(run('holes.some(h => h.portals?.length)'));
   assert.ok(run('holes.some(h => h.gates?.length)'));
 
-  run('holeIndex=1; loadHole(); ball={x:112,y:176,vx:-160,vy:0}; moving=true; for(let i=0;i<15;i++) step(STEP)');
-  assert.ok(run('ball.vx') > 0, 'spring bumper reverses an incoming ball');
+  run('holeIndex=1; loadHole(); ball={x:310,y:295,vx:0,vy:-180}; moving=true; for(let i=0;i<15;i++) step(STEP)');
+  assert.ok(run('ball.vy') > 0, 'spring bumper reverses an incoming ball');
 
-  run('holeIndex=5; loadHole(); ball={x:62,y:260,vx:80,vy:0}; moving=true; step(STEP)');
-  assert.ok(run('ball.x > 315 && ball.y < 190'), 'entering one portal exits at its linked partner');
+  run('holeIndex=5; loadHole(); ball={x:85,y:350,vx:80,vy:0}; moving=true; step(STEP)');
+  assert.ok(run('ball.x > 315 && ball.y < 290'), 'entering one portal exits at its linked partner');
   const exit = run('({x:ball.x,y:ball.y})');
   run('step(STEP)');
   assert.ok(run('Math.hypot(ball.x-'+exit.x+',ball.y-'+exit.y+')') < 10,
     'portal cooldown prevents instantaneous bounce-back');
 
-  run('holeIndex=4; loadHole(); ball={x:80,y:396,vx:100,vy:0}; moving=true; for(let i=0;i<12;i++) step(STEP)');
+  run('holeIndex=4; loadHole(); ball={x:310,y:330,vx:100,vy:0}; moving=true; for(let i=0;i<12;i++) step(STEP)');
   assert.ok(run('ball.vy') < -5, 'speed strip deflects a rolling ball in its arrow direction');
 
   run('holeIndex=7; loadHole(); courseTime=2;');
