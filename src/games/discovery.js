@@ -4,6 +4,7 @@ import { ORDER, EXTERNS } from './catalog.js';
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
 export const DISCOVERY = {
+  "transit-chaos": info("2–8 min", "Focused", ["Mouse", "Touch"]),
   'typing-test': info('1–3 min', 'Focused', ['Keyboard'], { quick: true }),
   circuit: info('2–5 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   "fluid": info('Open-ended', 'Relaxing', ['Mouse', 'Touch']),
@@ -73,7 +74,7 @@ export function inCollection(slug, collection) {
 // it builds a card, so the site needs no build step to carry them.
 // Newly scaffolded games start with an SVG placeholder; captured screenshots
 // remain WebP and can replace it later without changing the loader.
-export const PREVIEW_FALLBACKS = {"typing-test": '.svg', "circuit": '.svg', "fluid": '.svg',  "signal-tower": '.svg', 'prism-duel': '.svg', 'block-blast': '.svg', chess: '.svg', mahjong: '.svg' };
+export const PREVIEW_FALLBACKS = {"transit-chaos": ".svg", "typing-test": '.svg', "circuit": '.svg', "fluid": '.svg',  "signal-tower": '.svg', 'prism-duel': '.svg', 'block-blast': '.svg', chess: '.svg', mahjong: '.svg' };
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
   ORDER.filter(([slug]) => !EXTERNS[slug]).map(([slug]) => [slug, previewUrl(slug)]));
