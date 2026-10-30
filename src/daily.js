@@ -71,7 +71,7 @@ export const CHALLENGES = [
   { slug: 'connect-four', label: 'Outsmart the computer', goal: 'Win as Red against the computer—not two-player mode.', metric: 'won', targets: [1, 1, 1], rule: 'connect', unit: 'computer wins' },
   { slug: 'asteroids', label: 'Rock breaker', goal: 'Clear {target} asteroid waves in one run.', metric: 'waves', targets: [2, 3, 4], unit: 'waves cleared' },
   { slug: 'pac-man', label: 'Ghost-town feast', goal: 'Earn {target} points in one maze run.', metric: 'score', targets: [1500, 2500, 4000], unit: 'points' },
-  { slug: 'aim-lab', label: 'Precision under pressure', goal: 'Finish a normal-target challenge with at least {target} hits and 80% accuracy.', metric: 'hits', targets: [20, 25, 30], rule: 'aim', unit: 'hits' },
+  { slug: 'aim-lab', label: 'Precision under pressure', goal: 'Finish both Aim Lab rounds with at least {target} Normal-round hits and 80% Normal accuracy.', metric: 'hits', targets: [20, 25, 30], rule: 'aim', unit: 'hits' },
   { slug: 'qbert', label: 'Paint the pyramid', goal: 'Complete {target} pyramid levels in one run.', metric: 'levels', targets: [1, 2, 3], unit: 'levels cleared' },
   { slug: 'minesweeper', label: 'Clean sweep', goal: 'Win a standard Beginner or harder board within {target} seconds, without hints.', metric: 'seconds', targets: [180, 120, 90], rule: 'mines', unit: 'seconds' },
   { slug: 'lights-out', label: 'Dark room', goal: 'Clear {target} boards in one session.', metric: 'cleared', targets: [2, 3, 4], unit: 'boards' },
@@ -178,7 +178,10 @@ export function dailyChallenge(date) {
 }
 export function dailyCheck(challenge, snapshot) {
   if (!snapshot || snapshot.slug !== challenge.slug || !Number.isFinite(snapshot[challenge.metric]) || snapshot[challenge.metric] < 0) return { complete: false, progress: 'Start playing to track your goal.' };
-  const value = snapshot[challenge.metric], t = challenge.target;
+  // The Aim Lab leaderboard uses both rounds, but its established daily goal
+  // remains a 20-second Normal-round challenge. Old saved snapshots still work.
+  const value = challenge.rule === 'aim' && Number.isFinite(snapshot.normalHits)
+    ? snapshot.normalHits : snapshot[challenge.metric], t = challenge.target;
   let complete = value >= t;
   const notes = [];
   switch (challenge.rule) {
@@ -187,7 +190,7 @@ export function dailyCheck(challenge, snapshot) {
     case 'memory': complete = snapshot.pairs === 8 && value <= t; notes.push(snapshot.pairs + '/8 pairs'); break;
     case 'connect': complete = snapshot.won === 1 && snapshot.cpu === true; if (!snapshot.cpu) notes.push('computer mode required'); break;
     case 'cpu': complete = complete && snapshot.cpu === true; if (!snapshot.cpu) notes.push('CPU mode required'); break;
-    case 'aim': complete = complete && snapshot.finished === true && snapshot.accuracy >= 80 && snapshot.normal === true; notes.push(snapshot.accuracy + '% accuracy', snapshot.finished ? 'finished' : 'finish the round'); if (!snapshot.normal) notes.push('normal targets required'); break;
+    case 'aim': { const accuracy = Number.isFinite(snapshot.normalAccuracy) ? snapshot.normalAccuracy : snapshot.accuracy; complete = complete && snapshot.finished === true && accuracy >= 80 && snapshot.normal === true; notes.push(Math.round(accuracy) + '% Normal accuracy', snapshot.finished ? 'finished' : 'finish both rounds'); if (!snapshot.normal) notes.push('normal targets required'); break; }
     case 'mines': complete = snapshot.won === true && snapshot.standard === true && snapshot.hints === 0 && value <= t; notes.push(snapshot.won ? 'board cleared' : 'still playing'); if (snapshot.hints) notes.push('hints used—start a fresh board'); if (!snapshot.standard) notes.push('standard board required'); break;
     case 'poker': complete = complete && snapshot.handOver === true; notes.push(snapshot.handOver ? 'hand finished' : 'finish the hand'); break;
     case 'sand': complete = complete && snapshot.materials >= 4; notes.push(snapshot.materials + '/4 materials'); break;
