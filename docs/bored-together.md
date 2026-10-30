@@ -175,8 +175,10 @@ retired surface, so the directory is the only way to find someone.
 
 All seven private `bored_together` tables (`members`, `blocks`, `matches`,
 `moves`, `queue`, `limits`, `invites`) have RLS and no direct browser table
-grants. The invite candidate list is limited to eight accounts that have a
-profile and are not active members; no address is stored or returned.
+grants. The invite candidate list holds every account that has a profile and
+is not an active member, up to fifty so the reply stays small; no address is
+stored or returned. It was capped at eight, which made a longer list look
+complete, and `together_invites_full_list` raised it.
 Keep this private schema outside the exposed Data API schemas. `public.bt_rpc`
 is SECURITY INVOKER; the dispatcher is in the private schema, SECURITY DEFINER
 with empty search path, and derives identity from `auth.uid()` after checking
