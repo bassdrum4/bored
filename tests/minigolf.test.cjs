@@ -102,7 +102,11 @@ test('all nine minigolf holes can be played through physics and only the finishe
   const { CHALLENGES, dailyCheck } = await import('../src/daily.js');
   const daily = { ...CHALLENGES.find(c => c.slug === 'minigolf'), target: 9 };
   for (let hole = 0; hole < routes.length; hole++) {
-    for (const [x, y] of routes[hole]) assert.ok(run(`shootTo(${x}, ${y})`) < 11, 'reachable waypoint on hole ' + (hole + 1));
+    for (const [x, y] of routes[hole]) {
+      const error = run(`shootTo(${x}, ${y})`);
+      assert.ok(error < 11, 'reachable waypoint on hole ' + (hole + 1) +
+        ' target ' + x + ',' + y + ' error ' + error.toFixed(2));
+    }
     assert.equal(run('__boredSnapshot().holes'), hole + 1);
     const snapshot = run('__boredSnapshot()');
     assert.equal(dailyCheck(daily, snapshot).complete, hole === 8);
