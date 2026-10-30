@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="440" viewBox="0 0 760 440">
+<rect width="760" height="440" fill="#f5f2ea"/>
+<g stroke="#e5e6dc" stroke-width="1"><path d="M0 100H760M0 140H760M0 180H760M0 220H760M0 260H760M0 300H760M0 340H760M0 380H760M0 420H760M40 85V440M80 85V440M120 85V440M160 85V440M200 85V440M240 85V440M280 85V440M320 85V440M360 85V440M400 85V440M440 85V440M480 85V440M520 85V440M560 85V440M600 85V440M640 85V440M680 85V440M720 85V440"/></g>
+<text x="35" y="51" font-family="monospace" font-size="32" font-weight="bold" letter-spacing="3" fill="#1d2927">TRANSIT CHAOS</text>
+<text x="36" y="75" font-family="monospace" font-size="14" fill="#65736c">DRAW THE LINES. KEEP THE CITY MOVING.</text>
+<path d="M90 293 L217 165 L385 224 L551 135 L683 240" stroke="#b64d43" stroke-width="11" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M125 132 L217 165 L330 356 L505 323 L683 240" stroke="#237d85" stroke-width="9" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+<g fill="#faf9f3" stroke="#1d2927" stroke-width="4">
+<circle cx="90" cy="293" r="19"/><circle cx="385" cy="224" r="19"/><circle cx="505" cy="323" r="19"/>
+<rect x="199" y="147" width="36" height="36"/><rect x="665" y="222" width="36" height="36"/>
+<path d="M551 113L572 154H530Z"/><path d="M125 110L146 151H104Z"/>
+<path d="M330 332L352 356L330 380L308 356Z"/>
+</g>
+<rect x="289" y="326" width="27" height="18" rx="3" fill="#fffdf7" stroke="#237d85" stroke-width="4"/>
+<rect x="447" y="189" width="27" height="18" rx="3" fill="#fffdf7" stroke="#b64d43" stroke-width="4"/>
+<g font-family="monospace" font-size="14" fill="#b64d43" font-weight="bold"><text x="365" y="196">8</text><text x="685" y="207">11</text></g>
+</svg>
