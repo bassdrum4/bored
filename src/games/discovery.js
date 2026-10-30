@@ -6,7 +6,7 @@ const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ..
 export const DISCOVERY = {
   "transit-chaos": info("2–8 min", "Focused", ["Mouse", "Touch"]),
   'typing-test': info('1–3 min', 'Focused', ['Keyboard'], { quick: true }),
-  circuit: info('2–5 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
+  circuit: info('2–5 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true, players: '1 or 2 local' }),
   "fluid": info('Open-ended', 'Relaxing', ['Mouse', 'Touch']),
   "signal-tower": info('20–35 min', 'Focused', ['Mouse', 'Touch']),
   'prism-duel': info('2–5 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true, players: '1 or 2 local' }),

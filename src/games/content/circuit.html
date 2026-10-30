@@ -14,13 +14,15 @@ h1 span{color:var(--red)}
 canvas{display:block;width:min(100%,760px);height:auto;aspect-ratio:760/520;border:1px solid var(--ink);background:var(--tar);touch-action:none}
 footer{align-items:center;font-size:11px;color:var(--dim)}
 footer p{margin:0}
+#acts{display:flex;gap:6px}
 button{font:600 11px ui-monospace,monospace;letter-spacing:.06em;border:1px solid var(--ink);background:none;color:inherit;border-radius:3px;padding:7px 10px;cursor:pointer}
 button:active{background:var(--ink);color:var(--paper)}
 #pad{display:none;gap:6px}
 #pad button{width:42px;height:38px;padding:0;font-size:13px}
 @media(max-width:649px){#pad{display:flex}footer p{display:none}}
 </style></head><body>
-<header><h1>CIRCUIT<span>.</span></h1><div id="hud"></div></header>
+<header><h1>CIRCUIT<span>.</span></h1>
+<div id="hud"><span id="tag1"></span><b id="lap1">1/3</b> <span id="time1">0.00</span><span id="duel" hidden> · <span id="tag2">P2</span><b id="lap2">1/3</b> <span id="time2">0.00</span></span></div></header>
 <canvas id="game" width="760" height="520" aria-label="Top-down circuit over three timed laps"></canvas>
 <footer>
 <p id="hint">Arrows or WASD to drive · R restarts · three laps</p>
@@ -30,45 +32,109 @@ button:active{background:var(--ink);color:var(--paper)}
 <button type="button" data-key="down" aria-label="Brake">▼</button>
 <button type="button" data-key="right" aria-label="Steer right">→</button>
 </div>
-<button id="new" type="button">New track</button>
+<div id="acts">
+<button id="mode" type="button">Two players</button>
+<button id="track" type="button">Oval</button>
+</div>
 </footer>
 <script>
 "use strict";
 const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
-const hud=document.getElementById("hud"),hint=document.getElementById("hint");
+const hint=document.getElementById("hint"),modeButton=document.getElementById("mode"),trackButton=document.getElementById("track");
+const hudTag1=document.getElementById("tag1"),hudLap1=document.getElementById("lap1"),hudTime1=document.getElementById("time1");
+const hudDuel=document.getElementById("duel"),hudLap2=document.getElementById("lap2"),hudTime2=document.getElementById("time2");
 const W=760,H=520,CX=W/2,CY=H/2,POINTS=720,HALF=26,LAPS=3;
-const hudLap=document.createElement("b"),hudNow=document.createElement("b"),hudBest=document.createElement("b");
-hud.replaceChildren("LAP ",hudLap," · ",hudNow," · BEST ",hudBest);
 const fmt=seconds=>seconds.toFixed(2);
 
-function rng(seed){let s=(seed>>>0)||1;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296}}
-// The day's seed draws the same circuit for everyone, so a shared daily board is
-// one fair comparison. "New track" moves on to a fresh one, which keeps a
-// finished circuit from becoming a memorised line.
-function daySeed(){const injected=Number(window.__boredSeed&&window.__boredSeed.seed);return Number.isFinite(injected)&&injected>0?injected:4981}
-function makeTrack(seed){
-  const r=rng(seed);
-  const a=244+r()*46,b=146+r()*30;
-  const k1=3+Math.floor(r()*2),k2=5+Math.floor(r()*2);
-  const p1=r()*Math.PI*2,p2=r()*Math.PI*2;
-  const m1=9+r()*15,m2=5+r()*8;
-  const pts=[];
-  for(let i=0;i<POINTS;i++){
-    const t=(i/POINTS)*Math.PI*2;
-    const wobble=m1*Math.sin(k1*t+p1)+m2*Math.sin(k2*t+p2);
-    pts.push({x:CX+Math.cos(t)*(a+wobble),y:CY+Math.sin(t)*(b+wobble)});
+// Four drawn circuits rather than one wobbling ellipse. Each is smoothed
+// through its control points and then scaled to the same length, so a race time
+// means the same thing on any of them: what changes is where the corners are.
+const TRACKS=[
+  {name:"Oval",controls:[[150,180],[300,115],[520,110],[650,175],[665,285],[560,370],[360,390],[190,340],[125,255]]},
+  {name:"Rounded",controls:[[165,120],[500,120],[630,160],[665,235],[640,315],[545,370],[400,395],[255,392],[155,340],[122,255],[128,170]]},
+  {name:"Saddle",controls:[[150,150],[350,115],[560,130],[665,205],[655,310],[560,375],[470,320],[390,355],[300,405],[190,380],[130,290],[135,205]]},
+  {name:"Chicane",controls:[[150,175],[300,125],[370,160],[455,112],[600,130],[668,205],[655,305],[560,380],[395,405],[235,388],[140,325],[118,235]]}
+];
+const TRACK_LENGTH=1420;
+
+// Catmull-Rom through the drawn points, so the loop is the shape that was drawn
+// and not a soft approximation of it.
+function spline(controls){
+  const n=controls.length,out=[];
+  for(let i=0;i<n;i++){
+    const p0=controls[(i-1+n)%n],p1=controls[i],p2=controls[(i+1)%n],p3=controls[(i+2)%n];
+    for(let s=0;s<24;s++){
+      const t=s/24,t2=t*t,t3=t2*t;
+      out.push({
+        x:0.5*(2*p1[0]+(p2[0]-p0[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(3*p1[0]-p0[0]-3*p2[0]+p3[0])*t3),
+        y:0.5*(2*p1[1]+(p2[1]-p0[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(3*p1[1]-p0[1]-3*p2[1]+p3[1])*t3)
+      });
+    }
   }
-  return pts;
+  return out;
+}
+// Lap progress is counted in samples, so they have to be evenly spaced: on a
+// stretched curve a long corner would otherwise tick round faster than a
+// straight of the same length.
+function resample(raw,count){
+  const step=[],cum=[0];
+  for(let i=0;i<raw.length;i++){
+    const a=raw[i],b=raw[(i+1)%raw.length];
+    step.push(Math.hypot(b.x-a.x,b.y-a.y));
+    cum.push(cum[i]+step[i]);
+  }
+  const total=cum[cum.length-1],out=[];
+  let j=0;
+  for(let i=0;i<count;i++){
+    const target=total*i/count;
+    while(j<step.length-1&&cum[j+1]<target)j++;
+    const t=step[j]?(target-cum[j])/step[j]:0;
+    const a=raw[j],b=raw[(j+1)%raw.length];
+    out.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
+  }
+  return out;
+}
+function buildTrack(track){
+  const pts=resample(spline(track.controls),POINTS);
+  let total=0,cx=0,cy=0;
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i],b=pts[(i+1)%pts.length];
+    total+=Math.hypot(b.x-a.x,b.y-a.y);
+    cx+=a.x;cy+=a.y;
+  }
+  const k=TRACK_LENGTH/total;
+  cx/=pts.length;cy/=pts.length;
+  return pts.map(p=>({x:CX+(p.x-cx)*k,y:CY+(p.y-cy)*k}));
+}
+// The day's seed picks which circuit everyone opens on, so the daily board is
+// still one comparison; the button below then changes it for practice.
+function startTrack(){
+  const seed=Number(window.__boredSeed&&window.__boredSeed.seed);
+  return Number.isFinite(seed)&&seed>0?seed%TRACKS.length:0;
 }
 
-let path=makeTrack(daySeed()),attempt=0;
-let car,keys=new Set(),progress=0,lastIndex=0,laps=0,lapStart=0,best=0,finished=false,started=false,off=false;
+// One car is a time trial. Two cars is the same clock twice: they never touch,
+// so a friend can race alongside without changing what a lap costs. The board
+// ranks the whole three laps either way, so the second car is a rival, not a
+// different score.
+const blank=()=>({up:false,down:false,left:false,right:false});
+const keys={p1:blank(),p2:blank()};
+const ARROWS={ArrowUp:"up",ArrowDown:"down",ArrowLeft:"left",ArrowRight:"right"};
+const WASD={w:"up",a:"left",s:"down",d:"right"};
+let trackIndex=startTrack(),path=buildTrack(TRACKS[trackIndex]),twoPlayer=false,cars=[];
 
-function place(){
+function racer(){
   const p0=path[0],p1=path[1];
-  car={x:p0.x,y:p0.y,a:Math.atan2(p1.y-p0.y,p1.x-p0.x),v:0};
-  progress=0;lastIndex=0;laps=0;lapStart=0;best=0;finished=false;started=false;off=false;
-  hint.textContent="Arrows or WASD to drive · R restarts · three laps";
+  // time is the running race clock in seconds; total freezes it at the line, so
+  // the score is all three laps together and not the best one of them.
+  return {x:p0.x,y:p0.y,a:Math.atan2(p1.y-p0.y,p1.x-p0.x),v:0,
+    progress:0,lastIndex:0,laps:0,time:0,total:0,started:false,finished:false,off:false};
+}
+function place(){
+  cars=[racer()];
+  if(twoPlayer)cars.push(racer());
+  keys.p1=blank();keys.p2=blank();
+  hint.textContent=hintText();
   paintHud();
 }
 // Nearest point on the centreline: distance decides grass, the index decides
@@ -81,42 +147,69 @@ function nearest(x,y){
   }
   return {index,distance:Math.sqrt(best2)};
 }
-function paintHud(){
-  const current=started&&!finished?(performance.now()-lapStart)/1000:0;
-  hudLap.textContent=Math.min(laps+1,LAPS)+"/"+LAPS;
-  hudNow.textContent=fmt(current);
-  hudBest.textContent=best?fmt(best):"—";
+function idleHint(){
+  return twoPlayer?"P1 arrows · P2 W A S D · R restarts · three laps":"Arrows or WASD to drive · R restarts · three laps";
 }
-function step(dt){
-  if(finished)return;
-  const gas=keys.has("up"),slow=keys.has("down"),left=keys.has("left"),right=keys.has("right");
-  if(!started&&(gas||slow||left||right)){started=true;lapStart=performance.now()}
+function hintText(){
+  const one=cars[0],two=cars[1];
+  if(one&&one.finished){
+    if(two&&!two.finished)return "P1 "+fmt(one.total)+" · P2 still driving";
+    if(two)return "P1 "+fmt(one.total)+" · P2 "+fmt(two.total)+" · R to race again";
+    return "Race time "+fmt(one.total)+" · R to run it again";
+  }
+  if(two&&two.finished)return "P2 "+fmt(two.total)+" · P1 still driving";
+  if(one&&one.off)return "Off track — the grass is slow.";
+  return idleHint();
+}
+function paintHud(){
+  const one=cars[0],two=cars[1];
+  hudTag1.textContent=twoPlayer?"P1 ":"";
+  hudLap1.textContent=Math.min(one.laps+1,LAPS)+"/"+LAPS;
+  hudTime1.textContent=fmt(one.finished?one.total:one.time);
+  hudDuel.hidden=!twoPlayer;
+  if(two){
+    hudLap2.textContent=Math.min(two.laps+1,LAPS)+"/"+LAPS;
+    hudTime2.textContent=fmt(two.finished?two.total:two.time);
+  }
+}
+function drive(car,input,dt){
+  if(car.finished)return;
+  const gas=input.up,slow=input.down,left=input.left,right=input.right;
+  if(!car.started){
+    if(!(gas||slow||left||right))return;
+    car.started=true;
+  }
+  car.time+=dt;
   const near=nearest(car.x,car.y);
-  const grass=near.distance>HALF;
-  if(grass!==off){off=grass;hint.textContent=off?"Off track — the grass is slow.":"Arrows or WASD to drive · R restarts · three laps"}
-  if(gas)car.v+=(off?140:250)*dt;
+  car.off=near.distance>HALF;
+  if(gas)car.v+=(car.off?140:250)*dt;
   if(slow)car.v-=360*dt;
   if(!gas&&!slow)car.v-=car.v*1.1*dt;
-  if(off)car.v-=car.v*1.9*dt;
-  car.v=Math.max(-70,Math.min(off?95:220,car.v));
+  if(car.off)car.v-=car.v*1.9*dt;
+  car.v=Math.max(-70,Math.min(car.off?95:220,car.v));
   const grip=Math.min(1,Math.abs(car.v)/70);
   const steer=(left?-1:0)+(right?1:0);
   car.a+=steer*2.9*dt*grip*(car.v<0?-1:1);
   car.x+=Math.cos(car.a)*car.v*dt;
   car.y+=Math.sin(car.a)*car.v*dt;
-  let delta=near.index-lastIndex;
+  let delta=near.index-car.lastIndex;
   if(delta>POINTS/2)delta-=POINTS;else if(delta<-POINTS/2)delta+=POINTS;
-  if(Math.abs(delta)<80)progress+=delta;
-  lastIndex=near.index;
-  if(started){
-    while(laps<LAPS&&progress>=POINTS*(laps+1)){
-      const lap=(performance.now()-lapStart)/1000;
-      best=best?Math.min(best,lap):lap;
-      laps++;
-      lapStart=performance.now();
-      if(laps>=LAPS){finished=true;car.v=0;hint.textContent="Best lap "+fmt(best)+" · R to run it again"}
-    }
+  if(Math.abs(delta)<80)car.progress+=delta;
+  car.lastIndex=near.index;
+  while(car.laps<LAPS&&car.progress>=POINTS*(car.laps+1)){
+    car.laps++;
+    // Crossing the line on the last lap is the only thing that banks a score:
+    // the clock has been running since the first keypress, so total is every
+    // lap put together.
+    if(car.laps>=LAPS){car.finished=true;car.total=car.time;car.v=0}
   }
+}
+function step(dt){
+  if(!cars.length)return;
+  drive(cars[0],keys.p1,dt);
+  if(cars[1])drive(cars[1],keys.p2,dt);
+  const text=hintText();
+  if(text!==hint.textContent)hint.textContent=text;
   paintHud();
 }
 function trace(){
@@ -124,6 +217,13 @@ function trace(){
   ctx.moveTo(path[0].x,path[0].y);
   for(let i=1;i<POINTS;i++)ctx.lineTo(path[i].x,path[i].y);
   ctx.closePath();
+}
+function drawCar(car,body,stripe){
+  ctx.save();ctx.translate(car.x,car.y);ctx.rotate(car.a);
+  ctx.fillStyle=body;ctx.fillRect(-7,-4.5,14,9);
+  ctx.fillStyle=stripe;ctx.fillRect(4,-3,3,6);
+  ctx.fillStyle="#f5f2ea";ctx.fillRect(-2,-2.5,3.5,5);
+  ctx.restore();
 }
 function draw(){
   ctx.clearRect(0,0,W,H);
@@ -136,12 +236,9 @@ function draw(){
   ctx.strokeStyle="#191713";ctx.lineWidth=2;ctx.beginPath();
   ctx.moveTo(p0.x+Math.cos(ang)*HALF,p0.y+Math.sin(ang)*HALF);
   ctx.lineTo(p0.x-Math.cos(ang)*HALF,p0.y-Math.sin(ang)*HALF);ctx.stroke();
-  if(!car)return;
-  ctx.save();ctx.translate(car.x,car.y);ctx.rotate(car.a);
-  ctx.fillStyle="#b3261e";ctx.fillRect(-7,-4.5,14,9);
-  ctx.fillStyle="#191713";ctx.fillRect(4,-3,3,6);
-  ctx.fillStyle="#f5f2ea";ctx.fillRect(-2,-2.5,3.5,5);
-  ctx.restore();
+  // The second car is ink and the first is red, so a shared start line reads.
+  if(cars[1])drawCar(cars[1],"#191713","#fffdf7");
+  if(cars[0])drawCar(cars[0],"#b3261e","#191713");
 }
 let last=0;
 function frame(now){
@@ -151,45 +248,68 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 
-const KEYMAP={ArrowUp:"up",ArrowDown:"down",ArrowLeft:"left",ArrowRight:"right",w:"up",a:"left",s:"down",d:"right",W:"up",A:"left",S:"down",D:"right"};
+function steer(event,down){
+  const key=event.key&&event.key.length===1?event.key.toLowerCase():event.key;
+  if(ARROWS[key]){keys.p1[ARROWS[key]]=down;return true}
+  if(WASD[key]){(twoPlayer?keys.p2:keys.p1)[WASD[key]]=down;return true}
+  return false;
+}
 addEventListener("keydown",event=>{
-  const key=KEYMAP[event.key];
-  if(key){event.preventDefault();keys.add(key);return}
+  if(steer(event,true)){event.preventDefault();return}
   if(event.key==="r"||event.key==="R"){event.preventDefault();place()}
 });
-addEventListener("keyup",event=>{const key=KEYMAP[event.key];if(key)keys.delete(key)});
-addEventListener("blur",()=>keys.clear());
+addEventListener("keyup",event=>{
+  const key=event.key&&event.key.length===1?event.key.toLowerCase():event.key;
+  if(ARROWS[key]){keys.p1[ARROWS[key]]=false;return}
+  // Clear both sides: a key held through a mode switch must not stick.
+  if(WASD[key]){keys.p1[WASD[key]]=false;keys.p2[WASD[key]]=false}
+});
+addEventListener("blur",()=>{keys.p1=blank();keys.p2=blank()});
 for(const pad of document.querySelectorAll("#pad button")){
   const key=pad.dataset.key;
-  const down=event=>{event.preventDefault();keys.add(key)};
-  const up=event=>{event.preventDefault();keys.delete(key)};
+  const down=event=>{event.preventDefault();keys.p1[key]=true};
+  const up=event=>{event.preventDefault();keys.p1[key]=false};
   pad.addEventListener("pointerdown",down);
   pad.addEventListener("pointerup",up);
   pad.addEventListener("pointercancel",up);
   pad.addEventListener("pointerleave",up);
 }
-document.getElementById("new").addEventListener("click",()=>{
-  attempt++;
-  path=makeTrack(daySeed()+attempt*7919);
+modeButton.addEventListener("click",()=>{
+  twoPlayer=!twoPlayer;
+  modeButton.textContent=twoPlayer?"Solo":"Two players";
+  place();
+});
+trackButton.addEventListener("click",()=>{
+  trackIndex=(trackIndex+1)%TRACKS.length;
+  path=buildTrack(TRACKS[trackIndex]);
+  trackButton.textContent=TRACKS[trackIndex].name;
   place();
 });
 
-// The hub reads this after a run: integer metrics, the best lap of a finished
-// three-lap race, and the live best lap for the daily goal while still driving.
+// The hub reads this after a run: integer metrics for the first car's finished
+// three-lap race. Nothing scores until all three laps are in, because a clock
+// stopped after one lap says nothing about the race.
 window.__boredSnapshot=()=>({
   slug:"circuit",
-  seconds:Math.round(best||0),
-  centiseconds:Math.round((best||0)*100),
-  laps,
-  lapDone:best>0,
-  finished,
+  seconds:cars[0]?Math.round(cars[0].total||0):0,
+  centiseconds:cars[0]?Math.round((cars[0].total||0)*100):0,
+  laps:cars[0]?cars[0].laps:0,
+  lapDone:!!(cars[0]&&cars[0].laps>=LAPS),
+  finished:!!(cars[0]&&cars[0].finished),
+  twoPlayer,
   offTrack:false
 });
 
 // The contract test drives the real step function along the real centreline
-// rather than a copy of the lap maths, so a broken lap counter fails there.
-window.__test={path:()=>path,car:()=>car,step,place};
+// rather than a copy of the lap maths, so a broken counter fails there.
+window.__test={
+  path:()=>path,cars:()=>cars,step,place,
+  duel:()=>twoPlayer,setDuel:value=>{twoPlayer=!!value;place()},
+  trackName:()=>TRACKS[trackIndex].name,
+  shapes:()=>TRACKS.map(track=>({name:track.name,points:buildTrack(track)}))
+};
 
+trackButton.textContent=TRACKS[trackIndex].name;
 place();
 requestAnimationFrame(frame);
 </script>

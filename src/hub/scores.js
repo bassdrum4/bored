@@ -89,14 +89,15 @@ const highScore = (id, name, unit, extra = {}) => ({
 
 export const HIGH_SCORE_GAMES = [
   highScore("transit-chaos", "Transit Chaos", "passengers", { metric: "delivered", when: snapshot => snapshot.finished === true }),
-  // Circuit ranks the best lap of a finished three-lap race. The shared board
-  // stores whole units, so the game shows hundredths and the board rounds to
-  // seconds; a lap under eight seconds means the circuit was cut, so it cannot
-  // post at all.
+  // Circuit ranks the whole three-lap race: the clock starts on the first
+  // keypress and stops at the line, so a quick lap cannot offset a scrappy one.
+  // The board stores whole seconds and only a finished race posts; under
+  // fifteen seconds means the circuit was cut. Two-player races use the same
+  // clock on both cars, so the first car's time is still the same test.
   highScore('circuit', 'Circuit', 'seconds', {
-    metric: 'seconds', lower: true, min: 8, max: 3600,
+    metric: 'seconds', lower: true, min: 15, max: 3600,
     when: snapshot => snapshot.finished === true && snapshot.seconds > 0,
-    key: 'bored.high.circuit-lap-v1'
+    key: 'bored.high.circuit-race-v1'
   }),
   // Typing Test only ranks a finished run at 90% accuracy or better: fast and
   // wrong is not a typing score.

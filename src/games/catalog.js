@@ -24,7 +24,7 @@ ORDER.unshift(['deep', 'DEEP']);
 export const META = {
   "transit-chaos": ["Strategy", "Draw subway lines, move passengers, and keep a growing city from gridlock."],
   "typing-test": ["Puzzle", "Thirty seconds, common words, and a keyboard that does not forgive a glance away."],
-  "circuit": ["Arcade", "A seeded time trial: three laps, one red car, and corners that punish a late brake."],
+  "circuit": ["Arcade", "Three laps against the clock on four drawn circuits, or a second car on W A S D."],
   "fluid": ["Sandbox", "Drag to stir ink through a live fluid."],
   "signal-tower": ["Strategy", "Thirty waves, six towers and threats that fly, plate up or hide. Hold the line."],
   "prism-duel": ["Strategy", "Place mirrors, bend a beam, burn the other core. The CPU plays too."],

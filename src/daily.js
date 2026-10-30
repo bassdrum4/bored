@@ -93,7 +93,7 @@ export const CHALLENGES = [
   { slug: 'chess', label: 'Board room', goal: 'Beat the computer in {target} moves or fewer.', metric: 'moves', targets: [40, 32, 24], rule: 'chess', unit: 'moves' },
   { slug: 'block-blast', label: 'Blast radius', goal: 'Clear {target} lines in one run.', metric: 'lines', targets: [6, 10, 14], unit: 'lines' },
   { slug: 'deep', label: 'Deep pockets', goal: 'Reach {target} points in one descent.', metric: 'score', targets: [1200, 2000, 3000], unit: 'points' },
-  { slug: 'circuit', label: 'Clean lap', goal: 'Set a lap under {target} seconds on the day\u2019s circuit.', metric: 'seconds', targets: [13, 11, 9], rule: 'lap', unit: 'seconds' },
+  { slug: 'circuit', label: 'Clean race', goal: 'Finish the three-lap race in under {target} seconds on the day\u2019s circuit.', metric: 'seconds', targets: [42, 36, 30], rule: 'race', unit: 'seconds' },
   { slug: 'typing-test', label: 'Home row', goal: 'Type {target} words per minute with 95% accuracy or better.', metric: 'wpm', targets: [35, 45, 55], rule: 'typing', unit: 'words per minute' }
 ];
 // Frozen v3 calendar lineup; future additions must make a new schedule version
@@ -209,9 +209,10 @@ export function dailyCheck(challenge, snapshot) {
     case 'sand': complete = complete && snapshot.materials >= 4; notes.push(snapshot.materials + '/4 materials'); break;
     case 'eco': complete = complete && snapshot.seconds >= 60 && snapshot.herbs >= 20 && snapshot.predators >= 3; notes.push(Math.floor(snapshot.seconds) + '/60s', snapshot.herbs + '/20 herbivores', snapshot.predators + '/3 predators'); break;
     case 'chess': complete = (snapshot.won === 1 || snapshot.won === true) && snapshot.cpu === true && value > 0 && value <= t; if (!snapshot.cpu) notes.push('computer mode required'); if (snapshot.won !== 1) notes.push('beat the computer'); break;
-    // A lap is the rare daily goal that is better when smaller, so it has to
-    // beat the target rather than reach it, and only counts once a lap is in.
-    case 'lap': complete = snapshot.lapDone === true && value > 0 && value <= t; notes.push(snapshot.lapDone ? 'lap banked' : 'finish a lap'); break;
+    // A race is the rare daily goal that is better when smaller, so it has to
+    // beat the target rather than reach it, and only counts once all three laps
+    // are in: the clock covers the whole race, not its best lap.
+    case 'race': complete = snapshot.finished === true && snapshot.laps >= 3 && value > 0 && value <= t; notes.push(snapshot.finished ? 'race finished' : 'finish all three laps'); break;
     // Speed only counts if the test finished and stayed accurate: a flailing
     // 30 seconds of keystrokes is not 60 words per minute.
     case 'typing': complete = complete && snapshot.finished === true && snapshot.accuracy >= 95; notes.push(snapshot.accuracy + '% accuracy', snapshot.finished ? 'finished' : 'finish the test'); break;

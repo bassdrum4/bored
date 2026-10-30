@@ -30,7 +30,7 @@
     "max_value": 999
   },
   "circuit": {
-    "label": "Best lap time",
+    "label": "Seconds for a three-lap race",
     "better": "low",
     "max_value": 3600
   },
