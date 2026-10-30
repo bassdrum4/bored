@@ -5,7 +5,7 @@
     "max_value": 10000000
   },
   "aim-lab": {
-    "label": "Hits in a finished round",
+    "label": "Total hits over Normal + Blindfire",
     "better": "high",
     "max_value": 1000
   },
