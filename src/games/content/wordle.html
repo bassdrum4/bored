@@ -174,7 +174,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 // word list at github.com/dwyl/english-words (words_alpha.txt, public domain),
 // packed five letters per entry with no separator so the whole dictionary is one
 // string (15921 words, sorted). A guess this list has never seen is looked up in
-// the Free Dictionary API instead (dictionaryAccepts below), so a dictionary has
+// Datamuse instead (dictionaryAccepts below), so a dictionary has
 // the last word on what counts as one.
 const WORDS = [
   'aahedaaliiaarghaaronabacaabaciabackabadaabaffabaftabakaabamaabampabandabaseabashabaskabateabaueabave',
@@ -1136,20 +1136,21 @@ keyRows.forEach(r => {
   kb.appendChild(rowEl);
 });
 
-// The words the bundled list does not cover are the dictionary's call: the Free
-// Dictionary API (dictionaryapi.dev) answers 200 for a headword it knows and 404
-// for anything else. Results are kept for the session so a word is asked about
-// once. No answer at all (offline, rate limit) leaves the guess alone rather
-// than spending a row on it.
-const DICTIONARY = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
+// The words the bundled list does not cover are the dictionary's call.
+// Datamuse (datamuse.com/api) answers in about 60ms with no key and no rate
+// limit, and unlike a definitions endpoint it did not miss a single word we
+// tried. sp= is a spelling pattern though, so it answers "wert" for "qwert":
+// only an exact hit counts. A failed lookup is not cached, so Enter retries.
+const DICTIONARY = 'https://api.datamuse.com/words?sp=';
 const looked = new Map();
 
 function lookupWord(word) {
   const key = word.toLowerCase();
   if (!looked.has(key)) {
-    looked.set(key, fetch(DICTIONARY + encodeURIComponent(key), { headers: { accept: 'application/json' } })
-      .then(res => res.status === 200 ? true : res.status === 404 ? false : null)
-      .catch(() => null));
+    looked.set(key, fetch(DICTIONARY + encodeURIComponent(key) + '&max=1', { headers: { accept: 'application/json' } })
+      .then(res => res.ok ? res.json() : Promise.reject(new Error('HTTP ' + res.status)))
+      .then(list => Array.isArray(list) && list.some(entry => entry.word === key))
+      .catch(() => { looked.delete(key); return null; }));
   }
   return looked.get(key);
 }
@@ -1160,8 +1161,8 @@ async function dictionaryAccepts(word) {
   const known = await lookupWord(word);
   checking = false;
   if (current !== word || gameOver) return false;
-  if (known === null) { showMessage('Dictionary unreachable', 2500); return false; }
-  if (!known) { showMessage('Not in word list'); shakeRow(); return false; }
+  if (known === null) { showMessage('Dictionary unavailable, Enter to retry', 3500); return false; }
+  if (!known) { showMessage('Not a word'); shakeRow(); return false; }
   return true;
 }
 

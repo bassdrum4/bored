@@ -20,7 +20,7 @@ const source = [
 const API = source.match(/const API_URL = '([^']+)'/)[1];
 // Public, key-less game APIs. A game may reach these when it has no local answer
 // (Wordle's dictionary); every other off-site request still fails the suite.
-const GAME_APIS = ['https://api.dictionaryapi.dev/'];
+const GAME_APIS = ['https://api.datamuse.com/'];
 const offSite = () => requests.filter(request => !request.startsWith(API) && !GAME_APIS.some(host => request.startsWith(host)));
 // Games are downloaded on demand now, so the suite serves the repository over
 // loopback the way GitHub Pages does instead of loading file://.

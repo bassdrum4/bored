@@ -127,7 +127,7 @@ assertions. What it still insists on:
    browser and is fetched into an iframe, so:
    - **Network calls are allowed where the game needs one, and only there.** A game may call a
      public, key-less API when the answer has to come from outside the document (Wordle asks
-     `api.dictionaryapi.dev` about a word its bundled list has never seen). The game must still
+     `api.datamuse.com` about a word its bundled list has never seen). The game must still
      play with the call blocked: bundle the data that matters, treat a failed, slow or erroring
      request as "no answer" instead of a lost turn, and never let a request decide a score. No
      CDNs, webfonts, remote images, analytics, trackers, or API keys — only inline CSS/JS, canvas,
