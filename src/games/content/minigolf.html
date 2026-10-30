@@ -47,14 +47,14 @@ const W = 400, H = 520, R = 6, CUP = 11, STEP = 1 / 240;
 const PAPER = '#f5f2ea', INK = '#253b30', GREEN = '#c8d4b7';
 const holes = [
   { name: 'First putt', par: 2, tee: [200, 440], cup: [200, 100], walls: [], sand: [] },
-  { name: 'Go around', par: 3, tee: [100, 440], cup: [300, 100], walls: [[140, 210, 120, 85]], sand: [], bumpers: [[86, 176, 18], [269, 154, 20]] },
-  { name: 'The dogleg', par: 3, tee: [90, 440], cup: [90, 90], walls: [[26, 235, 235, 22]], sand: [], sweepers: [[130, 315, 55, 1.1, 0]] },
-  { name: 'Through the gate', par: 3, tee: [200, 440], cup: [200, 90], walls: [[26, 245, 130, 20], [244, 245, 130, 20]], sand: [[145, 135, 110, 65]], bumpers: [[102, 365, 21], [298, 365, 21]], sweepers: [[288, 327, 30, -1.8, .3]] },
-  { name: 'Switchback', par: 4, tee: [90, 450], cup: [300, 85], walls: [[26, 330, 235, 20], [150, 175, 224, 20]], sand: [], belts: [[50, 378, 110, 42, 0, -230]], sweepers: [[95, 385, 28, 1.2, .5]] },
-  { name: 'The bunker', par: 3, tee: [85, 440], cup: [310, 90], walls: [], sand: [[125, 205, 160, 120]], portals: [[62, 260], [333, 170]] },
-  { name: 'Bank on it', par: 3, tee: [85, 420], cup: [310, 420], walls: [[190, 210, 20, 284]], sand: [], bumpers: [[130, 300, 18], [264, 300, 18]], belts: [[150, 80, 100, 35, 220, 0]] },
-  { name: 'Narrow margins', par: 3, tee: [200, 450], cup: [200, 80], walls: [[92, 170, 20, 220], [288, 170, 20, 220]], sand: [[155, 240, 90, 65]], gates: [[90, 112, 38, 12, 24, 1.5]] },
-  { name: 'Home stretch', par: 4, tee: [80, 450], cup: [320, 80], walls: [[26, 340, 225, 20], [150, 210, 224, 20], [26, 130, 180, 20]], sand: [[275, 380, 65, 65]], sweepers: [[230, 100, 25, 1.6, .8]], belts: [[52, 385, 94, 36, 190, 0]] }
+  { name: 'Go around', par: 3, tee: [100, 440], cup: [300, 100], walls: [[140, 210, 120, 85]], sand: [], bumpers: [[310, 260, 19]], hint: 'The bumper blocks the easy right-hand lane. Go wider or bank around it.' },
+  { name: 'The dogleg', par: 3, tee: [90, 440], cup: [90, 90], walls: [[26, 235, 235, 22]], sand: [], sweepers: [[310, 257, 20, 1.1, 0]], hint: 'A rotating blade watches the turn. Take the wide edge or time the shot.' },
+  { name: 'Through the gate', par: 3, tee: [200, 440], cup: [200, 90], walls: [[26, 245, 130, 20], [244, 245, 130, 20]], sand: [[145, 135, 110, 65]], sweepers: [[200, 252, 14, -1.2, .3]], hint: 'A moving blade guards the only opening. Thread the side gap.' },
+  { name: 'Switchback', par: 4, tee: [90, 450], cup: [300, 85], walls: [[26, 330, 235, 20], [150, 175, 224, 20]], sand: [], belts: [[280, 315, 72, 35, 0, -180]], hint: 'The speed strip accelerates shots uphill. Ease off the power.' },
+  { name: 'The bunker', par: 3, tee: [85, 440], cup: [310, 90], walls: [], sand: [[125, 205, 160, 120]], portals: [[85, 350], [330, 270]], hint: 'A portal above the tee offers a shortcut around the sand.' },
+  { name: 'Bank on it', par: 3, tee: [85, 420], cup: [310, 420], walls: [[190, 210, 20, 284]], sand: [], bumpers: [[200, 155, 15]], hint: 'A spring bumper interrupts the bank-shot bridge. Go high or bounce off it.' },
+  { name: 'Narrow margins', par: 3, tee: [200, 450], cup: [200, 80], walls: [[92, 170, 20, 220], [288, 170, 20, 220]], sand: [[155, 240, 90, 65]], gates: [[155, 178, 84, 14, 30, 1.5]], hint: 'The sliding gate cuts across the fairway. Choose a side and a moment.' },
+  { name: 'Home stretch', par: 4, tee: [80, 450], cup: [320, 80], walls: [[26, 340, 225, 20], [150, 210, 224, 20], [26, 130, 180, 20]], sand: [[275, 380, 65, 65]], sweepers: [[290, 157, 18, 1.3, .8]], belts: [[280, 290, 65, 34, 0, -180]], hint: 'The speed strip changes the second turn. The last blade guards the finish.' }
 ];
 const canvas = document.querySelector('#course'), ctx = canvas.getContext('2d');
 const hud = document.querySelector('#hud'), status = document.querySelector('#status');
@@ -89,7 +89,7 @@ function loadHole() {
   next.hidden = true;
   const obstacles = [hole.bumpers?.length && 'bumpers', hole.sweepers?.length && 'windmills',
     hole.belts?.length && 'speed strips', hole.portals?.length && 'portals', hole.gates?.length && 'moving gates'].filter(Boolean);
-  updateHud(hole.name + (obstacles.length ? ' · Watch for ' + obstacles.join(', ') + '.' : '.') + ' Pull back and release.');
+  updateHud(hole.name + '. ' + (hole.hint || 'Pull back and release.'));
 }
 function newRound() {
   holeIndex = strokes = 0; card = []; finished = false;
@@ -229,22 +229,25 @@ function draw() {
   }
   ctx.fillStyle = INK;
   for (const rect of hole.walls) ctx.fillRect(...rect);
+  // Keep obstacle styling isolated: a wide blade stroke must never thicken
+  // the original fine flagpole, dashed aim/power guide, or cup outline.
+  ctx.save();
   // Obstacles sit above the turf and below the ball and aiming guide.
   for (const [x, y, w, h, ax, ay] of hole.belts || []) {
-    ctx.fillStyle = '#a3bca5'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#dce4d3'; ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = INK; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
     ctx.beginPath(); ctx.moveTo(x + w / 2 - ax / 20, y + h / 2 - ay / 20);
     ctx.lineTo(x + w / 2 + ax / 20, y + h / 2 + ay / 20); ctx.stroke();
   }
   for (const [index, portal] of (hole.portals || []).entries()) {
     ctx.strokeStyle = index ? '#b3261e' : INK;
-    ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(portal[0], portal[1], 16, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(portal[0], portal[1], 16, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(portal[0], portal[1], 9, 0, Math.PI * 2); ctx.stroke();
   }
   for (const [x, y, radius] of hole.bumpers || []) {
-    circle(x, y, radius + 2, INK); circle(x, y, radius - 2, PAPER); circle(x, y, 6, '#b3261e');
+    circle(x, y, radius + 1, INK); circle(x, y, radius - 1, PAPER); circle(x, y, 4, '#b3261e');
   }
-  ctx.strokeStyle = INK; ctx.lineWidth = 10; ctx.lineCap = 'round';
+  ctx.strokeStyle = INK; ctx.lineWidth = 5; ctx.lineCap = 'round';
   for (const definition of hole.sweepers || []) {
     const blade = sweeperState(definition);
     ctx.beginPath();
@@ -256,6 +259,8 @@ function draw() {
   for (const gate of hole.gates || []) {
     ctx.fillStyle = '#b3261e'; ctx.fillRect(...movingGate(gate));
   }
+  ctx.restore();
+  ctx.lineWidth = 1; ctx.lineCap = 'butt'; ctx.setLineDash([]);
 
   circle(...hole.tee, 2, INK);
   circle(...hole.cup, CUP, INK);
