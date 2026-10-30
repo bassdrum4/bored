@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="240" viewBox="0 0 384 240">
+<rect width="384" height="240" fill="#f5f2ea"/>
+<rect x="10" y="10" width="364" height="220" fill="#fffdf7" stroke="#191713"/>
+<text x="26" y="38" font-family="ui-monospace, Menlo, monospace" font-size="10" letter-spacing="2.4" fill="#6b6558">TYPING TEST</text>
+<text x="26" y="96" font-family="ui-monospace, Menlo, monospace" font-size="15" fill="#6b6558">the and for you with</text>
+<text x="26" y="128" font-family="ui-monospace, Menlo, monospace" font-size="15" fill="#191713">that</text>
+<rect x="70" y="112" width="2" height="18" fill="#b3261e"/>
+<text x="76" y="128" font-family="ui-monospace, Menlo, monospace" font-size="15" fill="#6b6558">not this have</text>
+<text x="26" y="160" font-family="ui-monospace, Menlo, monospace" font-size="15" fill="#6b6558">from they will</text>
+<line x1="26" y1="186" x2="358" y2="186" stroke="#d8d2c4" stroke-width="1"/>
+<text x="26" y="208" font-family="ui-monospace, Menlo, monospace" font-size="10" letter-spacing="1.2" fill="#6b6558">30 SECONDS · WPM RANKS</text>
+</svg>

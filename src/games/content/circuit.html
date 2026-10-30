@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Circuit</title>
+<style>
+:root{--paper:#f5f2ea;--ink:#191713;--dim:#6b6558;--red:#b3261e;--rule:#d8d2c4;--tar:#fffdf7}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:100vh;padding:12px;user-select:none;-webkit-user-select:none}
+header,footer{width:min(100%,760px);display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+h1{margin:0;font-size:13px;font-weight:600;letter-spacing:.14em}
+h1 span{color:var(--red)}
+#hud{font-size:12px;letter-spacing:.05em;color:var(--dim);font-variant-numeric:tabular-nums}
+#hud b{color:var(--ink);font-weight:600}
+canvas{display:block;width:min(100%,760px);height:auto;aspect-ratio:760/520;border:1px solid var(--ink);background:var(--tar);touch-action:none}
+footer{align-items:center;font-size:11px;color:var(--dim)}
+footer p{margin:0}
+button{font:600 11px ui-monospace,monospace;letter-spacing:.06em;border:1px solid var(--ink);background:none;color:inherit;border-radius:3px;padding:7px 10px;cursor:pointer}
+button:active{background:var(--ink);color:var(--paper)}
+#pad{display:none;gap:6px}
+#pad button{width:42px;height:38px;padding:0;font-size:13px}
+@media(max-width:649px){#pad{display:flex}footer p{display:none}}
+</style></head><body>
+<header><h1>CIRCUIT<span>.</span></h1><div id="hud"></div></header>
+<canvas id="game" width="760" height="520" aria-label="Top-down circuit over three timed laps"></canvas>
+<footer>
+<p id="hint">Arrows or WASD to drive · R restarts · three laps</p>
+<div id="pad">
+<button type="button" data-key="left" aria-label="Steer left">←</button>
+<button type="button" data-key="up" aria-label="Accelerate">▲</button>
+<button type="button" data-key="down" aria-label="Brake">▼</button>
+<button type="button" data-key="right" aria-label="Steer right">→</button>
+</div>
+<button id="new" type="button">New track</button>
+</footer>
+<script>
+"use strict";
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+const hud=document.getElementById("hud"),hint=document.getElementById("hint");
+const W=760,H=520,CX=W/2,CY=H/2,POINTS=720,HALF=26,LAPS=3;
+const hudLap=document.createElement("b"),hudNow=document.createElement("b"),hudBest=document.createElement("b");
+hud.replaceChildren("LAP ",hudLap," · ",hudNow," · BEST ",hudBest);
+const fmt=seconds=>seconds.toFixed(2);
+
+function rng(seed){let s=(seed>>>0)||1;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296}}
+// The day's seed draws the same circuit for everyone, so a shared daily board is
+// one fair comparison. "New track" moves on to a fresh one, which keeps a
+// finished circuit from becoming a memorised line.
+function daySeed(){const injected=Number(window.__boredSeed&&window.__boredSeed.seed);return Number.isFinite(injected)&&injected>0?injected:4981}
+function makeTrack(seed){
+  const r=rng(seed);
+  const a=244+r()*46,b=146+r()*30;
+  const k1=3+Math.floor(r()*2),k2=5+Math.floor(r()*2);
+  const p1=r()*Math.PI*2,p2=r()*Math.PI*2;
+  const m1=9+r()*15,m2=5+r()*8;
+  const pts=[];
+  for(let i=0;i<POINTS;i++){
+    const t=(i/POINTS)*Math.PI*2;
+    const wobble=m1*Math.sin(k1*t+p1)+m2*Math.sin(k2*t+p2);
+    pts.push({x:CX+Math.cos(t)*(a+wobble),y:CY+Math.sin(t)*(b+wobble)});
+  }
+  return pts;
+}
+
+let path=makeTrack(daySeed()),attempt=0;
+let car,keys=new Set(),progress=0,lastIndex=0,laps=0,lapStart=0,best=0,finished=false,started=false,off=false;
+
+function place(){
+  const p0=path[0],p1=path[1];
+  car={x:p0.x,y:p0.y,a:Math.atan2(p1.y-p0.y,p1.x-p0.x),v:0};
+  progress=0;lastIndex=0;laps=0;lapStart=0;best=0;finished=false;started=false;off=false;
+  hint.textContent="Arrows or WASD to drive · R restarts · three laps";
+  paintHud();
+}
+// Nearest point on the centreline: distance decides grass, the index decides
+// how far around the lap the car is, which is what stops a corner being cut.
+function nearest(x,y){
+  let best2=Infinity,index=0;
+  for(let i=0;i<POINTS;i+=2){
+    const dx=path[i].x-x,dy=path[i].y-y,d=dx*dx+dy*dy;
+    if(d<best2){best2=d;index=i}
+  }
+  return {index,distance:Math.sqrt(best2)};
+}
+function paintHud(){
+  const current=started&&!finished?(performance.now()-lapStart)/1000:0;
+  hudLap.textContent=Math.min(laps+1,LAPS)+"/"+LAPS;
+  hudNow.textContent=fmt(current);
+  hudBest.textContent=best?fmt(best):"—";
+}
+function step(dt){
+  if(finished)return;
+  const gas=keys.has("up"),slow=keys.has("down"),left=keys.has("left"),right=keys.has("right");
+  if(!started&&(gas||slow||left||right)){started=true;lapStart=performance.now()}
+  const near=nearest(car.x,car.y);
+  const grass=near.distance>HALF;
+  if(grass!==off){off=grass;hint.textContent=off?"Off track — the grass is slow.":"Arrows or WASD to drive · R restarts · three laps"}
+  if(gas)car.v+=(off?140:250)*dt;
+  if(slow)car.v-=360*dt;
+  if(!gas&&!slow)car.v-=car.v*1.1*dt;
+  if(off)car.v-=car.v*1.9*dt;
+  car.v=Math.max(-70,Math.min(off?95:220,car.v));
+  const grip=Math.min(1,Math.abs(car.v)/70);
+  const steer=(left?-1:0)+(right?1:0);
+  car.a+=steer*2.9*dt*grip*(car.v<0?-1:1);
+  car.x+=Math.cos(car.a)*car.v*dt;
+  car.y+=Math.sin(car.a)*car.v*dt;
+  let delta=near.index-lastIndex;
+  if(delta>POINTS/2)delta-=POINTS;else if(delta<-POINTS/2)delta+=POINTS;
+  if(Math.abs(delta)<80)progress+=delta;
+  lastIndex=near.index;
+  if(started){
+    while(laps<LAPS&&progress>=POINTS*(laps+1)){
+      const lap=(performance.now()-lapStart)/1000;
+      best=best?Math.min(best,lap):lap;
+      laps++;
+      lapStart=performance.now();
+      if(laps>=LAPS){finished=true;car.v=0;hint.textContent="Best lap "+fmt(best)+" · R to run it again"}
+    }
+  }
+  paintHud();
+}
+function trace(){
+  ctx.beginPath();
+  ctx.moveTo(path[0].x,path[0].y);
+  for(let i=1;i<POINTS;i++)ctx.lineTo(path[i].x,path[i].y);
+  ctx.closePath();
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  ctx.lineJoin="round";ctx.lineCap="round";
+  trace();ctx.strokeStyle="#e8e2d4";ctx.lineWidth=HALF*2+9;ctx.stroke();
+  trace();ctx.strokeStyle="#fffdf7";ctx.lineWidth=HALF*2;ctx.stroke();
+  trace();ctx.strokeStyle="#d8d2c4";ctx.lineWidth=1;ctx.setLineDash([7,11]);ctx.stroke();ctx.setLineDash([]);
+  // Start and finish: a plain line across the road, painted once per lap.
+  const p0=path[0],p1=path[2],ang=Math.atan2(p1.y-p0.y,p1.x-p0.x)+Math.PI/2;
+  ctx.strokeStyle="#191713";ctx.lineWidth=2;ctx.beginPath();
+  ctx.moveTo(p0.x+Math.cos(ang)*HALF,p0.y+Math.sin(ang)*HALF);
+  ctx.lineTo(p0.x-Math.cos(ang)*HALF,p0.y-Math.sin(ang)*HALF);ctx.stroke();
+  if(!car)return;
+  ctx.save();ctx.translate(car.x,car.y);ctx.rotate(car.a);
+  ctx.fillStyle="#b3261e";ctx.fillRect(-7,-4.5,14,9);
+  ctx.fillStyle="#191713";ctx.fillRect(4,-3,3,6);
+  ctx.fillStyle="#f5f2ea";ctx.fillRect(-2,-2.5,3.5,5);
+  ctx.restore();
+}
+let last=0;
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000||0);
+  last=now;
+  step(dt);draw();
+  requestAnimationFrame(frame);
+}
+
+const KEYMAP={ArrowUp:"up",ArrowDown:"down",ArrowLeft:"left",ArrowRight:"right",w:"up",a:"left",s:"down",d:"right",W:"up",A:"left",S:"down",D:"right"};
+addEventListener("keydown",event=>{
+  const key=KEYMAP[event.key];
+  if(key){event.preventDefault();keys.add(key);return}
+  if(event.key==="r"||event.key==="R"){event.preventDefault();place()}
+});
+addEventListener("keyup",event=>{const key=KEYMAP[event.key];if(key)keys.delete(key)});
+addEventListener("blur",()=>keys.clear());
+for(const pad of document.querySelectorAll("#pad button")){
+  const key=pad.dataset.key;
+  const down=event=>{event.preventDefault();keys.add(key)};
+  const up=event=>{event.preventDefault();keys.delete(key)};
+  pad.addEventListener("pointerdown",down);
+  pad.addEventListener("pointerup",up);
+  pad.addEventListener("pointercancel",up);
+  pad.addEventListener("pointerleave",up);
+}
+document.getElementById("new").addEventListener("click",()=>{
+  attempt++;
+  path=makeTrack(daySeed()+attempt*7919);
+  place();
+});
+
+// The hub reads this after a run: integer metrics, the best lap of a finished
+// three-lap race, and the live best lap for the daily goal while still driving.
+window.__boredSnapshot=()=>({
+  slug:"circuit",
+  seconds:Math.round(best||0),
+  centiseconds:Math.round((best||0)*100),
+  laps,
+  lapDone:best>0,
+  finished,
+  offTrack:false
+});
+
+// The contract test drives the real step function along the real centreline
+// rather than a copy of the lap maths, so a broken lap counter fails there.
+window.__test={path:()=>path,car:()=>car,step,place};
+
+place();
+requestAnimationFrame(frame);
+</script>
+</body></html>

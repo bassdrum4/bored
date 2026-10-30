@@ -88,6 +88,22 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Circuit ranks the best lap of a finished three-lap race. The shared board
+  // stores whole units, so the game shows hundredths and the board rounds to
+  // seconds; a lap under eight seconds means the circuit was cut, so it cannot
+  // post at all.
+  highScore('circuit', 'Circuit', 'seconds', {
+    metric: 'seconds', lower: true, min: 8, max: 3600,
+    when: snapshot => snapshot.finished === true && snapshot.seconds > 0,
+    key: 'bored.high.circuit-lap-v1'
+  }),
+  // Typing Test only ranks a finished run at 90% accuracy or better: fast and
+  // wrong is not a typing score.
+  highScore('typing-test', 'Typing Test', 'words per minute', {
+    metric: 'wpm', min: 5, max: 300,
+    when: snapshot => snapshot.finished === true && snapshot.accuracy >= 90,
+    key: 'bored.high.typing-test-wpm-v1'
+  }),
   // Signal Tower keeps the waves already cleared, so leaving mid-defence still
   // keeps what the line has held. A run that never clears wave one saves nothing.
   highScore("signal-tower", "Signal Tower", "waves", { metric: "waves", resumable: true }),

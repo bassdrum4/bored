@@ -92,7 +92,9 @@ export const CHALLENGES = [
   { slug: 'mahjong', label: 'Pair by pair', goal: 'Clear {target} pairs from one Mahjong deal.', metric: 'pairs', targets: [24, 40, 56], unit: 'pairs' },
   { slug: 'chess', label: 'Board room', goal: 'Beat the computer in {target} moves or fewer.', metric: 'moves', targets: [40, 32, 24], rule: 'chess', unit: 'moves' },
   { slug: 'block-blast', label: 'Blast radius', goal: 'Clear {target} lines in one run.', metric: 'lines', targets: [6, 10, 14], unit: 'lines' },
-  { slug: 'deep', label: 'Deep pockets', goal: 'Reach {target} points in one descent.', metric: 'score', targets: [1200, 2000, 3000], unit: 'points' }
+  { slug: 'deep', label: 'Deep pockets', goal: 'Reach {target} points in one descent.', metric: 'score', targets: [1200, 2000, 3000], unit: 'points' },
+  { slug: 'circuit', label: 'Clean lap', goal: 'Set a lap under {target} seconds on the day\u2019s circuit.', metric: 'seconds', targets: [13, 11, 9], rule: 'lap', unit: 'seconds' },
+  { slug: 'typing-test', label: 'Home row', goal: 'Type {target} words per minute with 95% accuracy or better.', metric: 'wpm', targets: [35, 45, 55], rule: 'typing', unit: 'words per minute' }
 ];
 // Frozen v3 calendar lineup; future additions must make a new schedule version
 // instead of silently moving previously published daily challenges.
@@ -133,19 +135,30 @@ const DAILY_SCHEDULE_V3 = Object.freeze([
   'block-blast',
   'deep'
 ]);
+// CHALLENGES is append-only, and the v2 rotation that ran before the calendar
+// shipped was cut from the first 35 entries. Pinning that count keeps already
+// played days where they were when new games are appended.
+const DAILY_V2_COUNT = 35;
+// V4 adds the games built after the frozen v3 calendar. Days already played
+// keep their v3 game, so no published challenge moves; the larger calendar
+// starts the day after this release and is never applied retroactively.
+const DAILY_SCHEDULE_V4 = Object.freeze([...DAILY_SCHEDULE_V3, 'circuit', 'typing-test']);
+const DAILY_SCHEDULE_V4_START = Date.parse('2026-10-31T00:00:00Z') / 86400000;
 const DAILY_SCHEDULE_START = Date.parse('2026-10-28T00:00:00Z') / 86400000;
 
 export function dailyChallenge(date) {
   const day = Math.floor(Date.parse(date + 'T00:00:00Z') / 86400000);
   if (day < DAILY_SCHEDULE_START) {
     // Preserve old completions/streaks under their original v2 IDs.
-    const index = ((day % CHALLENGES.length) + CHALLENGES.length) % CHALLENGES.length;
+    const index = ((day % DAILY_V2_COUNT) + DAILY_V2_COUNT) % DAILY_V2_COUNT;
     const definition = CHALLENGES[index];
-    const circuit = ((Math.floor(day / CHALLENGES.length) % 3) + 3) % 3;
+    const circuit = ((Math.floor(day / DAILY_V2_COUNT) % 3) + 3) % 3;
     const target = definition.targets[circuit];
     return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v2:' + date + ':' + definition.slug };
   }
-  const size = DAILY_SCHEDULE_V3.length;
+  const schedule = day < DAILY_SCHEDULE_V4_START ? DAILY_SCHEDULE_V3 : DAILY_SCHEDULE_V4;
+  const version = day < DAILY_SCHEDULE_V4_START ? 3 : 4;
+  const size = schedule.length;
   const offset = day - DAILY_SCHEDULE_START;
   const cycleNumber = Math.floor(offset / size);
   let previous = [];
@@ -153,7 +166,7 @@ export function dailyChallenge(date) {
   // Keep the first seven days disjoint from the preceding seven, including
   // the boundary between the old and new schedules.
   for (let cycle = 0; cycle <= cycleNumber; cycle++) {
-    const order = DAILY_SCHEDULE_V3.slice();
+    const order = schedule.slice();
     let state = (Math.imul(cycle + 1, 1664525) ^ 0x9e3779b9) >>> 0;
     for (let i = size - 1; i > 0; i--) {
       state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
@@ -162,7 +175,7 @@ export function dailyChallenge(date) {
     }
     const recent = cycle ? previous.slice(-7) : Array.from({ length: 7 }, (_, i) => {
       const historicDay = DAILY_SCHEDULE_START - 7 + i;
-      return CHALLENGES[((historicDay % CHALLENGES.length) + CHALLENGES.length) % CHALLENGES.length].slug;
+      return CHALLENGES[((historicDay % DAILY_V2_COUNT) + DAILY_V2_COUNT) % DAILY_V2_COUNT].slug;
     });
     for (let i = 0; i < 7 && i < size; i++) {
       if (!recent.includes(order[i])) continue;
@@ -174,7 +187,7 @@ export function dailyChallenge(date) {
   const slug = previous[offset % size];
   const definition = CHALLENGES.find(item => item.slug === slug);
   const target = definition.targets[cycleNumber % definition.targets.length];
-  return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v3:' + date + ':' + definition.slug };
+  return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v' + version + ':' + date + ':' + definition.slug };
 }
 export function dailyCheck(challenge, snapshot) {
   if (!snapshot || snapshot.slug !== challenge.slug || !Number.isFinite(snapshot[challenge.metric]) || snapshot[challenge.metric] < 0) return { complete: false, progress: 'Start playing to track your goal.' };
@@ -196,6 +209,12 @@ export function dailyCheck(challenge, snapshot) {
     case 'sand': complete = complete && snapshot.materials >= 4; notes.push(snapshot.materials + '/4 materials'); break;
     case 'eco': complete = complete && snapshot.seconds >= 60 && snapshot.herbs >= 20 && snapshot.predators >= 3; notes.push(Math.floor(snapshot.seconds) + '/60s', snapshot.herbs + '/20 herbivores', snapshot.predators + '/3 predators'); break;
     case 'chess': complete = (snapshot.won === 1 || snapshot.won === true) && snapshot.cpu === true && value > 0 && value <= t; if (!snapshot.cpu) notes.push('computer mode required'); if (snapshot.won !== 1) notes.push('beat the computer'); break;
+    // A lap is the rare daily goal that is better when smaller, so it has to
+    // beat the target rather than reach it, and only counts once a lap is in.
+    case 'lap': complete = snapshot.lapDone === true && value > 0 && value <= t; notes.push(snapshot.lapDone ? 'lap banked' : 'finish a lap'); break;
+    // Speed only counts if the test finished and stayed accurate: a flailing
+    // 30 seconds of keystrokes is not 60 words per minute.
+    case 'typing': complete = complete && snapshot.finished === true && snapshot.accuracy >= 95; notes.push(snapshot.accuracy + '% accuracy', snapshot.finished ? 'finished' : 'finish the test'); break;
   }
   return { complete, progress: value + ' ' + challenge.unit + ' · target ' + t + (notes.length ? ' · ' + notes.join(' · ') : '') };
 }

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="240" viewBox="0 0 384 240">
+<rect width="384" height="240" fill="#f5f2ea"/>
+<rect x="10" y="10" width="364" height="220" fill="#fffdf7" stroke="#191713"/>
+<path d="M88 136 C82 92 122 64 178 70 C234 76 286 58 312 94 C336 128 310 172 266 180 C222 188 196 166 156 174 C112 183 92 176 88 136 Z" fill="none" stroke="#e8e2d4" stroke-width="30" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M88 136 C82 92 122 64 178 70 C234 76 286 58 312 94 C336 128 310 172 266 180 C222 188 196 166 156 174 C112 183 92 176 88 136 Z" fill="none" stroke="#fffdf7" stroke-width="24" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M88 136 C82 92 122 64 178 70 C234 76 286 58 312 94 C336 128 310 172 266 180 C222 188 196 166 156 174 C112 183 92 176 88 136 Z" fill="none" stroke="#d8d2c4" stroke-width="1" stroke-dasharray="5 8"/>
+<line x1="88" y1="120" x2="88" y2="152" stroke="#191713" stroke-width="2"/>
+<g transform="translate(104 148) rotate(-38)">
+<rect x="-7" y="-4.5" width="14" height="9" fill="#b3261e"/>
+<rect x="4" y="-3" width="3" height="6" fill="#191713"/>
+</g>
+<text x="26" y="34" font-family="ui-monospace, Menlo, monospace" font-size="10" letter-spacing="2.4" fill="#6b6558">CIRCUIT</text>
+<text x="26" y="214" font-family="ui-monospace, Menlo, monospace" font-size="10" letter-spacing="1.2" fill="#6b6558">3 LAPS · BEST LAP RANKS</text>
+</svg>

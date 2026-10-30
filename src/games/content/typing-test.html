@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Typing Test</title>
+<style>
+:root{--paper:#f5f2ea;--ink:#191713;--dim:#6b6558;--red:#b3261e;--rule:#d8d2c4}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:14px}
+main{width:min(100%,720px)}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+h1{margin:0;font-size:13px;font-weight:600;letter-spacing:.14em}
+h1 span{color:var(--red)}
+#hud{font-size:12px;letter-spacing:.05em;color:var(--dim);font-variant-numeric:tabular-nums}
+#hud b{color:var(--ink);font-weight:600}
+#stage{position:relative;border:1px solid var(--ink);background:#fffdf7;padding:18px 20px;min-height:186px;cursor:text}
+#line{font-size:clamp(17px,4.6vw,25px);line-height:1.65;letter-spacing:.02em;word-break:break-word}
+#line i{font-style:normal}
+#line i.ok{color:var(--ink)}
+#line i.bad{color:var(--red);text-decoration:underline}
+#line i.rest{color:var(--dim)}
+#caret{display:inline-block;width:2px;height:1.05em;margin:0 1px;vertical-align:-.18em;background:var(--red)}
+.note{margin:14px 0 0;font-size:11px;color:var(--dim)}
+#over{display:none;margin-top:4px}
+#over.show{display:block}
+#over strong{display:block;font-size:26px;letter-spacing:.01em;margin-bottom:4px}
+#again{margin-top:14px;font:600 11px ui-monospace,monospace;letter-spacing:.06em;border:1px solid var(--ink);background:none;color:inherit;border-radius:3px;padding:8px 12px;cursor:pointer}
+#field{position:absolute;left:-9999px;top:0;width:1px;height:1px;opacity:0}
+</style></head><body><main>
+<header><h1>TYPING TEST<span>.</span></h1><div id="hud"></div></header>
+<div id="stage">
+<div id="line"></div>
+<div id="over"></div>
+<div class="note" id="note">Click or tap here, then type. Space starts the next word; the clock starts with your first key.</div>
+<button id="again" type="button" hidden>Type again</button>
+<input id="field" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Typing input">
+</div>
+</main>
+<script>
+"use strict";
+const stage=document.getElementById("stage"),line=document.getElementById("line"),over=document.getElementById("over");
+const hud=document.getElementById("hud"),note=document.getElementById("note"),again=document.getElementById("again"),field=document.getElementById("field");
+const hudWpm=document.createElement("b"),hudAcc=document.createElement("b"),hudClock=document.createElement("b");
+hud.replaceChildren("WPM ",hudWpm," · ",hudAcc," · ",hudClock);
+const ROUND=30;
+const WORDS=("the and for you with that not this have from they will one all would there their what about which when make like time just know take people into year your good some could them see other than then now look only come its over think also back after use two how our work first well way even new want because any these give day most us is are was were be been has had can do does did get got go going say said tell told ask asked find found try tried keep kept leave left start start bring think help show hear play run move live believe hold write watch follow stop begin change open close learn talk turn mean feel let put seem become happen sit stand lose pay meet include continue set later late small large great little own old right high low long short big few many much more less very really still already always never often sometimes early hard easy fast slow warm cold hot cool full empty same different next last own sure true false free busy open quiet loud light dark heavy soft rough clean dirty rich poor young safe wild deep near far late ready happy angry tired calm proud kind brave shy quiet")
+  .split(/\s+/).filter((word,index,all)=>word&&all.indexOf(word)===index);
+
+function rng(seed){let s=(seed>>>0)||1;return()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296}}
+function shuffled(seed){
+  const list=WORDS.slice(),random=rng(seed);
+  for(let i=list.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[list[i],list[j]]=[list[j],list[i]]}
+  return list;
+}
+// The first test of the day uses the shared seed, so everybody types the same
+// words; "Type again" cuts a fresh order rather than repeating a memorised one.
+function daySeed(){const injected=Number(window.__boredSeed&&window.__boredSeed.seed);return Number.isFinite(injected)&&injected>0?injected:4981}
+
+let words=[],index=0,typed="",started=false,finished=false,startAt=0,endsAt=0,clock=0;
+let keystrokes=0,correct=0,attempt=0,wpm=0,accuracy=100;
+
+function reset(fresh){
+  if(fresh)attempt++;
+  words=shuffled(daySeed()+attempt*104729);
+  index=0;typed="";started=false;finished=false;startAt=0;endsAt=0;
+  keystrokes=0;correct=0;wpm=0;accuracy=100;
+  clearInterval(clock);
+  over.className="";over.textContent="";again.hidden=true;
+  note.textContent="Click or tap here, then type. Space starts the next word; the clock starts with your first key.";
+  render();
+}
+function current(){return words[index%words.length]}
+function elapsed(){return started?Math.min(ROUND,(performance.now()-startAt)/1000):0}
+function stats(){
+  const seconds=finished?ROUND:elapsed();
+  if(!seconds)return{live:0,acc:100};
+  return{live:Math.round((correct/5)/(seconds/60)),acc:keystrokes?Math.round(correct/keystrokes*100):100};
+}
+function paint(){
+  const s=stats();
+  wpm=s.live;
+  hudWpm.textContent=String(s.live);
+  hudAcc.textContent=s.acc+"%";
+  hudClock.textContent="0:"+String(Math.max(0,Math.ceil(ROUND-elapsed()))).padStart(2,"0");
+}
+function render(){
+  const word=current();
+  const nodes=[];
+  for(let i=0;i<typed.length;i++){
+    const mark=document.createElement("i");
+    mark.className=typed[i]===word[i]?"ok":"bad";
+    mark.textContent=typed[i];
+    nodes.push(mark);
+  }
+  const caret=document.createElement("span");
+  caret.id="caret";
+  nodes.push(caret);
+  if(typed.length<word.length){
+    const rest=document.createElement("i");
+    rest.className="rest";
+    rest.textContent=word.slice(typed.length);
+    nodes.push(rest);
+  }
+  const next=document.createElement("i");
+  next.className="rest";
+  next.textContent=" "+words.slice(index+1,index+5).join(" ");
+  nodes.push(next);
+  line.replaceChildren(...nodes);
+  paint();
+}
+function start(){
+  if(started)return;
+  started=true;
+  startAt=performance.now();
+  note.textContent="Space moves on. Backspace fixes the last letter.";
+  clock=setInterval(()=>{
+    paint();
+    if(elapsed()>=ROUND)finish();
+  },100);
+}
+function type(character){
+  if(finished)return;
+  if(!started)start();
+  if(character===" "||character==="\n"||character==="\t"){
+    if(!typed)return;
+    keystrokes++;
+    if(typed===current())correct++;
+    index++;
+    typed="";
+    render();
+    return;
+  }
+  if(character.length!==1||character.charCodeAt(0)<32)return;
+  const word=current();
+  keystrokes++;
+  if(character===word[typed.length])correct++;
+  typed+=character;
+  render();
+}
+function backspace(){
+  if(finished||!typed)return;
+  typed=typed.slice(0,-1);
+  render();
+}
+function finish(){
+  if(finished)return;
+  finished=true;
+  clearInterval(clock);
+  const s=stats();
+  wpm=s.live;accuracy=s.acc;
+  paint();
+  over.className="show";
+  const headline=document.createElement("strong");
+  headline.textContent=s.live+" words per minute";
+  const detail=document.createElement("div");
+  detail.className="note";
+  detail.textContent=s.acc+"% accuracy · "+correct+" correct of "+keystrokes+" keys · "+Math.round(correct/5)+" words";
+  over.replaceChildren(headline,detail);
+  note.textContent="The board keeps a finished run at 90% accuracy or better.";
+  again.hidden=false;
+  again.focus({preventScroll:true});
+}
+
+// Characters arrive through the field on every platform that shows a keyboard,
+// and straight from the key event when nothing is focused yet.
+field.addEventListener("input",()=>{
+  const text=field.value;
+  field.value="";
+  for(const character of text)type(character);
+});
+addEventListener("keydown",event=>{
+  if(event.key==="Backspace"){
+    if(event.target===field)return;
+    event.preventDefault();
+    backspace();
+    return;
+  }
+  if(event.target===field)return;
+  if(event.ctrlKey||event.metaKey||event.altKey||event.key.length!==1)return;
+  event.preventDefault();
+  type(event.key);
+});
+stage.addEventListener("pointerdown",event=>{
+  if(event.target===again)return;
+  field.focus({preventScroll:true});
+});
+again.addEventListener("click",()=>reset(true));
+
+window.__boredSnapshot=()=>({
+  slug:"typing-test",
+  wpm:finished?wpm:stats().live,
+  accuracy:finished?accuracy:stats().acc,
+  chars:correct,
+  keys:keystrokes,
+  seconds:Math.round(elapsed()),
+  finished
+});
+
+reset(false);
+</script>
+</body></html>
