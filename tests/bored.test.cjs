@@ -686,11 +686,69 @@ test('browser regressions', async t => {
     assert.equal(opening.alive, true);
     assert.ok(opening.enemies >= 3, 'the first floor is inhabited');
     assert.ok(opening.lit > 30, 'the delver can see the room around them');
+    // Different routes on the same seed must change the risk/reward mix,
+    // while preserving the first-floor layout and completed-score contract.
+    const paths = await frame.evaluate(() => {
+      const samples = {};
+      for (const route of ['safe', 'risky']) {
+        __deep.start('random', 'route-regression-seed');
+        const opening = Array.from(__deep.map).join('');
+        __deep.setPos(__deep.stairs.x, __deep.stairs.y);
+        __deep.state.hp = 5;
+        __deep.useStairs();
+        const shown = !document.querySelector('#routes').hidden;
+        const before = __deep.state.turns;
+        __deep.move(1, 0);
+        __deep.waitTurn();
+        __deep.usePotion();
+        const frozen = before === __deep.state.turns;
+        __deep.chooseRoute('invalid'); // Invalid choices must not advance.
+        const invalidGuarded = __deep.state.depth === 1;
+        if (route === 'safe') {
+          __deep.cancelRoute();
+          const canceled = __deep.state.depth === 1 && document.querySelector('#routes').hidden;
+          __deep.useStairs();
+          samples.canceled = canceled;
+        }
+        __deep.chooseRoute(route);
+        samples[route] = {
+          opening, shown, frozen, invalidGuarded,
+          depth: __deep.state.depth, hp: __deep.state.hp, turns: __deep.state.turns,
+          enemies: __deep.enemies.length, gold: __deep.items.filter(i => i.kind === 'gold').length,
+          closed: document.querySelector('#routes').hidden
+        };
+      }
+      return samples;
+    });
+    assert.equal(paths.safe.opening, paths.risky.opening, 'route choices do not change the opening dungeon');
+    assert.equal(paths.canceled, true, 'canceling the choice does not descend');
+    for (const route of ['safe', 'risky']) {
+      assert.equal(paths[route].shown, true, 'the route selection opens');
+      assert.equal(paths[route].frozen, true, 'waiting, moving, and potions are blocked by the choice');
+      assert.equal(paths[route].invalidGuarded, true, 'invalid route choices have no effect');
+      assert.equal(paths[route].closed, true, 'the dialog closes on choosing a route');
+      assert.equal(paths[route].depth, 2);
+      assert.equal(paths[route].turns, 1, 'descending uses one turn');
+    }
+    assert.equal(paths.safe.hp, 11, 'sheltered passage restores 6 HP');
+    assert.equal(paths.risky.hp, 6, 'unquiet passage restores 1 HP');
+    assert.ok(paths.risky.enemies > paths.safe.enemies, 'the unquiet passage adds enemies');
+    assert.ok(paths.risky.gold > paths.safe.gold, 'the unquiet passage adds treasure');
+
+    await frame.evaluate(() => __deep.start('daily', 'route-regression-seed'));
+    assert.equal(await frame.evaluate(() => __deep.state.route), 'normal', 'a new run clears previous route modifiers');
     let depth = 1;
     while (depth < 5) {
-      await frame.evaluate(() => { const s = __deep.stairs; __deep.setPos(s.x, s.y); __deep.useStairs(); });
+      const route = depth % 2 ? 'safe' : 'risky';
+      await frame.evaluate(route => {
+        const s = __deep.stairs;
+        __deep.setPos(s.x, s.y);
+        __deep.useStairs();
+        __deep.chooseRoute(route);
+      }, route);
       depth += 1;
       assert.equal(await frame.evaluate(() => __deep.state.depth), depth);
+      assert.equal(await frame.evaluate(() => document.querySelector('#routes').hidden), true);
     }
     const sealed = await frame.evaluate(() => {
       const core = __deep.items.find(i => i.kind === 'core');
