@@ -23,7 +23,7 @@ const stubs = [
 ].join('\n');
 function makeGame(){
   return new Function(stubs + '\n' + code + '\nreturn {' +
-    'bjNew,bjDeal,bjAction,bjValue,bjHTML,euNew,euDeal,euAction,euLegal,euSuit,euPower,euHTML,' +
+    'bjNew,bjDeal,bjAction,bjValue,bjHTML,euNew,euDeal,euAction,euLegal,euSuit,euPower,euHTML,euFinish,' +
     'get BJ(){return BJ;},get EU(){return EU;}};')();
 }
 test('Blackjack plays complete rounds and never creates invalid chip balances', () => {
@@ -66,4 +66,28 @@ test('Euchre bowers, follow-suit, teams, and five-trick hands', () => {
     assert.match(game.euHTML(),/Tricks/);
     if(game.EU.phase==='matchOver')game.euNew();else game.euDeal();
   }
+});
+
+test('Euchre alone skips partner and awards four points for a sweep', () => {
+  const game=makeGame();
+  game.euNew();
+  const state=game.EU;
+  state.phase='bid';state.bidRound=2;state.turn=0;
+  const trump=[0,1,2,3].find(s=>s!==state.upcard.suit);
+  game.euAction('trump-alone',trump);
+  assert.equal(state.alone,true);
+  assert.equal(state.sittingOut,2);
+  let safety=40;
+  while(!['handOver','matchOver'].includes(state.phase) && safety--){
+    assert.equal(state.turn,0);
+    if(state.phase==='discard')game.euAction('card',0);
+    else if(state.phase==='play')game.euAction('card',game.euLegal(0)[0]);
+    else assert.fail('Unexpected phase '+state.phase);
+  }
+  assert.ok(safety>0);
+  assert.equal(state.tricks[0]+state.tricks[1],5);
+  assert.equal(state.hands[2].length,5,'the partner sits out all five tricks');
+  state.scores=[0,0];state.tricks=[5,0];state.maker=0;state.alone=true;
+  game.euFinish();
+  assert.equal(state.scores[0],4,'a lone maker sweeping earns four points');
 });
