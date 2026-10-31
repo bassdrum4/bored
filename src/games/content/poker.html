@@ -2072,7 +2072,7 @@ function euStrength(cards,trump) {
 }
 function euNew() {
   EU = { dealer:3, scores:[0,0], hands:[[],[],[],[]], round:0, phase:'idle',
-    trick:[], tricks:[0,0], turn:0, maker:-1, trump:-1, message:'' };
+    trick:[], tricks:[0,0], turn:0, maker:-1, trump:-1, alone:false, sittingOut:-1, message:'' };
   euDeal();
 }
 function euDeal() {
@@ -2083,7 +2083,7 @@ function euDeal() {
   for(let i=0;i<5;i++) for(let seat=0;seat<4;seat++) EU.hands[seat].push(EU.deck.pop());
   EU.upcard=EU.deck.pop();
   EU.phase='bid'; EU.bidRound=1; EU.passes=0;
-  EU.trump=-1; EU.maker=-1; EU.tricks=[0,0]; EU.trick=[]; EU.played=0;
+  EU.trump=-1; EU.maker=-1; EU.alone=false; EU.sittingOut=-1; EU.tricks=[0,0]; EU.trick=[]; EU.played=0;
   EU.turn=(EU.dealer+1)%4;
   EU.message='Order up or pass. Your partner sits opposite.';
   euAdvance();
@@ -2100,10 +2100,12 @@ function euDiscardAI(seat) {
 function euStartPlay() {
   EU.phase='play'; EU.trick=[];
   EU.turn=(EU.dealer+1)%4;
+  if(EU.turn===EU.sittingOut)EU.turn=(EU.turn+1)%4;
   EU.message='Follow suit. The left bower counts as trump.';
 }
-function euOrder(seat,trump) {
-  EU.maker=seat; EU.trump=trump;
+function euOrder(seat,trump,alone=false) {
+  EU.maker=seat; EU.trump=trump; EU.alone=alone;
+  EU.sittingOut=alone?(seat+2)%4:-1;
   if(EU.bidRound===1) {
     EU.hands[EU.dealer].push(EU.upcard);
     EU.phase='discard'; EU.turn=EU.dealer;
@@ -2139,7 +2141,7 @@ function euWinner(){
 }
 function euFinish(){
   const makerTeam=euTeam(EU.maker), tricks=EU.tricks[makerTeam];
-  const points=tricks>=3?(tricks===5?2:1):2;
+  const points=tricks>=3?(tricks===5?(EU.alone?4:2):1):2;
   const awarded=tricks>=3?makerTeam:1-makerTeam;
   EU.scores[awarded]+=points;
   EU.phase=EU.scores[awarded]>=10?'matchOver':'handOver';
@@ -2151,7 +2153,7 @@ function euPlay(seat,index) {
   if(EU.phase!=='play'||EU.turn!==seat||!euLegal(seat).includes(index)) return;
   const card=EU.hands[seat].splice(index,1)[0];
   EU.trick.push({seat,card});
-  if(EU.trick.length===4){
+  if(EU.trick.length===(EU.alone?3:4)){
     const won=euWinner();
     EU.tricks[euTeam(won)]++;
     EU.played++;
@@ -2159,7 +2161,7 @@ function euPlay(seat,index) {
     EU.turn=won;
     if(EU.played===5){euFinish();return;}
     EU.trick=[];
-  }else EU.turn=(seat+1)%4;
+  }else { EU.turn=(seat+1)%4; if(EU.turn===EU.sittingOut)EU.turn=(EU.turn+1)%4; }
 }
 function euAICard(seat){
   const choices=euLegal(seat), hand=EU.hands[seat];
@@ -2205,9 +2207,9 @@ function euAction(move,index){
     if(move==='pass'){
       if(EU.bidRound===2 && EU.dealer===0 && EU.passes===3)return;
       euPass();
-    }else if(move==='order'&&EU.bidRound===1)euOrder(0,EU.upcard.suit);
-    else if(move==='trump'&&EU.bidRound===2&&Number.isInteger(index)&&
-      index>=0&&index<=3&&index!==EU.upcard.suit)euOrder(0,index);
+    }else if((move==='order'||move==='order-alone')&&EU.bidRound===1)euOrder(0,EU.upcard.suit,move==='order-alone');
+    else if((move==='trump'||move==='trump-alone')&&EU.bidRound===2&&Number.isInteger(index)&&
+      index>=0&&index<=3&&index!==EU.upcard.suit)euOrder(0,index,move==='trump-alone');
     else return;
   }else if(EU.phase==='discard'&&EU.turn===0&&move==='card'){
     if(!Number.isInteger(index)||index<0||index>=EU.hands[0].length)return;
@@ -2224,7 +2226,8 @@ function euHTML(){
     '<span>West + East '+EU.scores[1]+' / 10</span><span>Hand '+EU.round+
     ' · Tricks '+EU.tricks[0]+'–'+EU.tricks[1]+'</span></div><div class="other-board">';
   out+='<div class="other-notes">Dealer: '+EU_NAMES[EU.dealer]+' · Trump: '+
-    (EU.trump<0?'Unchosen':suitNames[EU.trump]+' '+SUIT_SYMBOLS[EU.trump])+'</div>';
+    (EU.trump<0?'Unchosen':suitNames[EU.trump]+' '+SUIT_SYMBOLS[EU.trump])+
+    (EU.alone?' · Going alone':'')+'</div>';
   out+='<div class="euchre-seats">';
   for(const seat of [2,1,3]){
     out+='<div class="euchre-seat"><strong>'+EU_NAMES[seat]+'</strong><small>'+
@@ -2245,16 +2248,18 @@ function euHTML(){
       '"'+(!picking||!legal.includes(i)?' disabled':'')+'>'+cardHTML(c)+'</button>').join('')+
     '</div></div><div class="other-message" role="status">'+EU.message+'</div><div class="other-controls">';
   if(EU.phase==='bid'&&EU.turn===0){
-    if(EU.bidRound===1)out+='<button class="btn btn-primary" data-eu="order">Order up '+suitNames[EU.upcard.suit]+'</button>';
+    if(EU.bidRound===1)out+='<button class="btn btn-primary" data-eu="order">Order up '+suitNames[EU.upcard.suit]+
+      '</button><button class="btn" data-eu="order-alone">Go alone</button>';
     else for(let i=0;i<4;i++)if(i!==EU.upcard.suit)
-      out+='<button class="btn btn-primary" data-eu="trump" data-i="'+i+'">'+suitNames[i]+'</button>';
+      out+='<button class="btn btn-primary" data-eu="trump" data-i="'+i+'">'+suitNames[i]+'</button>'+
+        '<button class="btn" data-eu="trump-alone" data-i="'+i+'">'+suitNames[i]+' alone</button>';
     if(!(EU.bidRound===2&&EU.dealer===0&&EU.passes===3))
       out+='<button class="btn" data-eu="pass">Pass</button>';
   }
   if(EU.phase==='handOver')out+='<button class="btn btn-primary" data-eu="next">Next hand</button>';
   if(EU.phase==='matchOver')out+='<button class="btn btn-primary" data-eu="next">New match</button>';
   return out+'</div><div class="other-notes">24 cards · Right and left bowers · Follow suit · Stick the dealer · First to 10<br>'+
-    'Makers: 1 point for 3–4 tricks, 2 for five. Defenders: 2 points if makers are euchred.</div></div>';
+    'Makers: 1 for 3–4 tricks, 2 for all five, or 4 for all five alone. Euchred: defenders get 2.</div></div>';
 }
 
 
