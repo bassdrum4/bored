@@ -7,7 +7,7 @@
 // in `src/games/content/` are the payloads: there is nothing extra to publish,
 // and editing a game updates it without rebuilding the hub.
 
-export const ORDER = [["ashcrown", "Ashcrown"], ["transit-chaos", "Transit Chaos"], ["typing-test", "Typing Test"], ["circuit", "Circuit"], ["fluid", "Fluid"], ["signal-tower", "Signal Tower"], ["prism-duel", "Prism Duel"], ["rooftop-snipers", "Rooftop Snipers: Boring Edition"], ["block-blast", "Block Blast"], ["chess", "Chess"], ["mahjong", "Mahjong"], ["minigolf", "Minigolf"], ["sumo", "SUMO"], ["sand", "Sand"], ["poker", "Poker"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["lights-out", "Lights Out"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["klang", "Klang"], ["8ball", "8 Ball"]];
+export const ORDER = [["ashcrown", "Ashcrown"], ["transit-chaos", "Transit Chaos"], ["typing-test", "Typing Test"], ["circuit", "Circuit"], ["fluid", "Fluid"], ["signal-tower", "Signal Tower"], ["prism-duel", "Prism Duel"], ["rooftop-snipers", "Rooftop Snipers: Boring Edition"], ["block-blast", "Block Blast"], ["chess", "Chess"], ["mahjong", "Mahjong"], ["minigolf", "Minigolf"], ["sumo", "SUMO"], ["sand", "Sand"], ["poker", "Card Table"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["lights-out", "Lights Out"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["klang", "Klang"], ["8ball", "8 Ball"]];
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://youtubeplayer.freebuff.app/player"};
 // Offline games with no board of their own: they still play, but the hub keeps
 // no best for them. 8 Ball, Sand and Eco are open-ended toys, so a "high score"
@@ -41,7 +41,7 @@ export const META = {
   'aim-lab': ['Arcade', 'Two 20-second rounds: aim, then memorize and hit invisible targets'],
   '8ball': ['Arcade', 'Break, pot, and clear the table'],
   sumo: ['Arcade', 'Push your rival out of the ring'], sand: ['Sandbox', 'Pour, mix, and build a tiny world'],
-  poker: ['Strategy', 'Read the table and play your hand'],
+  poker: ['Strategy', "Texas Hold'em, Five Card Draw, Blackjack, and Euchre at the Lucky Spur. Poker hands earn chip scores."],
   wordle: ['Puzzle', 'Crack the five-letter word'], lava: ['Arcade', 'Stay above the heat'],
   volletball: ['Arcade', 'Keep the ball in play'], solitaire: ['Strategy', 'A quiet game of cards'],
   commanders: ['Arcade', 'Dodge, shoot, and battle through waves'], eco: ['Sandbox', 'Grow and observe a living ecosystem'],
