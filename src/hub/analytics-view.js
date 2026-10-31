@@ -223,6 +223,27 @@ async function load() {
       cursor = batch.at(-1);
       if (loaded.length >= MAX_EVENTS) capped = true;
     }
+    // Since the F-14 migration, live flight telemetry lives in an isolated
+    // table. Load it through the admin-only RPC rather than duplicating the
+    // events into play_events or granting direct access to the flight table.
+    const flightLoaded = [];
+    if (!$('#game').value || $('#game').value === 'f-14') {
+      let flightCursor = null;
+      while (flightLoaded.length < MAX_EVENTS) {
+        const batch = await request('/rest/v1/rpc/analytics_f14_events', {
+          method: 'POST',
+          body: {
+            p_from: start.toISOString(), p_to: end.toISOString(),
+            p_cutoff: cutoff, p_after_at: flightCursor?.received_at ?? null,
+            p_after_id: flightCursor?.id ?? null, p_limit: 1000
+          }
+        });
+        flightLoaded.push(...batch);
+        if (batch.length < 1000) break;
+        flightCursor = batch.at(-1);
+        if (flightLoaded.length >= MAX_EVENTS) capped = true;
+      }
+    }
     // Independent visit/survey events do not inflate game-session totals.
     const [productLoaded,feedbackLoaded,authoritativeTogether] = await Promise.all([
       request('/rest/v1/product_events?select=*&received_at=gte.' + start.toISOString() +
@@ -237,22 +258,23 @@ async function load() {
     const roster = await request('/rest/v1/analytics_admins?select=user_id');
     if (seq !== epoch || getSession()?.user?.id !== user.user.id) throw new Error('Account changed. Reload this page.');
     handles = Object.fromEntries(profiles.map(p => [p.id, p.handle]));
-    const cleaned = excludeAdmins([...loaded,...productLoaded,...feedbackLoaded],roster.map(row => row.user_id));
+    const cleaned = excludeAdmins([...loaded,...flightLoaded,...productLoaded,...feedbackLoaded],roster.map(row => row.user_id));
     const allowed = new Set(cleaned);
-    events = loaded.filter(e => allowed.has(e));
+    events = [...loaded,...flightLoaded].filter(e => allowed.has(e))
+      .sort((a,b) => a.received_at.localeCompare(b.received_at) || a.id.localeCompare(b.id));
     productEvents = productLoaded.filter(e => allowed.has(e));
     surveyRows = feedbackLoaded.filter(e => allowed.has(e));
     togetherSummary = authoritativeTogether;
-    const excluded = loaded.length - events.length;
+    const excluded = loaded.length + flightLoaded.length - events.length;
     const previous = $('#person').value;
     $('#person').replaceChildren(new Option('All players', ''), new Option('Unidentified guests', 'guest'),
       ...[...new Set(events.map(e => e.user_id).filter(Boolean))].map(id => new Option(handles[id] || id.slice(0, 8), id)));
     $('#person').value = [...$('#person').options].some(o => o.value === previous) ? previous : '';
     page = 0; render();
-    const emptyReason = events.length ? '' : loaded.length
+    const emptyReason = events.length ? '' : loaded.length + flightLoaded.length
       ? ' · Player report is empty because every recorded event in this selection was staff/admin activity.'
       : ' · No telemetry was received in this selection.';
-    $('#status').textContent = (capped ? 'EVENT LIMIT REACHED — showing only the earliest 20,000 events. Narrow the date range. ' : '') +
+    $('#status').textContent = (capped ? 'EVENT LIMIT REACHED — showing at most 20,000 events per source. Narrow the date range. ' : '') +
       events.length.toLocaleString() + ' player events loaded · refreshed ' + dateTime(cutoff) + emptyReason +
       (excluded ? ' · ' + excluded.toLocaleString() + ' staff/admin events recorded and excluded' : '');
   } catch (error) {
