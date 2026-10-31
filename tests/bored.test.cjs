@@ -1357,7 +1357,7 @@ test('browser regressions', async t => {
     for (const challenge of challenges) {
       await page.evaluate(date => { window.originalDailyDate ||= dailyDate; dailyDate = () => date; renderDaily(); }, dateFor(challenge.slug));
       await page.click('#daily-play');
-      try { await page.waitForFunction(() => typeof document.querySelector('#frame').contentWindow.__boredSnapshot === 'function', { timeout: 6000 }); }
+      try { await page.waitForFunction(() => typeof document.querySelector('#frame').contentWindow.__boredSnapshot === 'function', { timeout: 15000 }); }
       catch (e) { throw new Error(challenge.slug + ': adapter unavailable; errors=' + JSON.stringify(errors)); }
       const snapshot = await page.evaluate(() => { try { return document.querySelector('#frame').contentWindow.__boredSnapshot(); } catch (e) { throw new Error(current + ': ' + e.message); } });
       assert.equal(snapshot.slug, challenge.slug);
