@@ -29,7 +29,7 @@ tests/serve.cjs          loopback static server the browser suites load through
 tests/bored.test.cjs     node:test suite, runs src/ as the site in Chrome
 tests/discovery.test.cjs discovery, layout and mock-account flows
 tests/visual.test.cjs    release captures and the live F-14 embed (needs internet)
-.github/workflows/deploy.yml  test, then publish src/ as the Pages artifact
+.github/workflows/deploy.yml  regenerate changelog, stamp version, publish src/ to Pages
 scripts/games.mjs        add a game / sync the shared board's rule list
 scripts/capture-previews.mjs  re-shoot the library previews in Chrome
 scripts/optimize-previews.py  resize them: fill landscape cards, keep portrait boards whole
@@ -54,9 +54,10 @@ npm run games:check        # validate every catalog entry, score rule, preview a
 npm test                   # contracts + game, discovery and layout suites; needs CHROME_PATH
 ```
 
-There is no build. `.github/workflows/deploy.yml` uploads `src/` as the GitHub Pages artifact and
-deploys it, so every push to `main` publishes exactly the files that are in the repo — no generated
-`index.html`, no commit back to the branch. Paths in `src/index.html` are relative (`./main.js`,
+There is no build. `.github/workflows/deploy.yml` regenerates `src/changelog-data.js` from full
+git history, stamps `src/version.json`, then uploads `src/` as the GitHub Pages artifact.
+Every push to `main` publishes the game files as committed, with fresh changelog/version data;
+there is no generated `index.html` and no commit back to the branch. Paths in `src/index.html` are relative (`./main.js`,
 `./styles.css`) because the site is served under `/bored/`; a root-absolute path would 404 there.
 The test suite serves `src/` through a loopback server in headless Chrome (set `CHROME_PATH` if it is
 not found) and takes about a minute; run it before committing anything that touches a game.
@@ -75,8 +76,9 @@ each other. They are not style preferences; each one has already caused a live r
   would read "signed in" (the account strip, the board's "(you)") asks `hasIdentity()`, while
   transport keeps using `getSession()`. A guest's best is offered back to them on the hub, so
   don't make guest scores post, sync or announce themselves before there is an account.
-- **There is no generated file.** The arcade is `src/index.html` and the modules beside it; edit
-them directly and push. Nothing rebuilds, re-encodes or copies a page behind your back.
+- **Game pages are not generated.** The arcade is `src/index.html` and the modules beside it;
+edit them directly and push. The deploy only regenerates `src/changelog-data.js` from git
+history and stamps `src/version.json`; it does not rebuild or re-encode game pages.
 - **Push ships.** GitHub Pages deploys the committed `src/` folder, so a merge to `main` goes live
   as soon as the workflow finishes. Test before pushing, not after.
 - **The slug is a primary key.** Use `npm run games:add` to create it: this scaffolds the document,
@@ -253,7 +255,8 @@ that looks like it was written by one person in an afternoon in 2009 and still w
 
 ## Deploying
 
-Push to `main`; the workflow deploys `src/` to Pages, so the shipped files are the committed ones.
+Push to `main`; the workflow deploys the committed game files to Pages and regenerates the
+changelog from complete git history before uploading the site.
 Confirm the served copy matches the repo (compare a hash of `src/index.html`), that
 `https://bassdrum4.github.io/bored/version.json` names the commit you pushed — the deploy
 overwrites that file with `$GITHUB_SHA`, which is also the `?v=` stamp on game documents, so a
