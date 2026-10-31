@@ -187,6 +187,10 @@ test('the daily rotation covers every challenge game, changes targets, and uses 
   const calendar = Array.from({ length: 200 }, (_, n) =>
     dailyChallenge(new Date(Date.UTC(2026, 9, 21 + n)).toISOString().slice(0, 10)).slug);
   for (let i = 7; i < calendar.length; i++) {
+    // v4 launched October 31 after three already-published v3 days:
+    // Aim Lab had also appeared on October 29. Preserve both saved daily IDs.
+    if (calendar[i] === dailyChallenge('2026-10-31').slug &&
+        i === 10) continue;
     assert.ok(!calendar.slice(i - 7, i).includes(calendar[i]), 'no repeat in seven days at day ' + i);
   }
   const tetris = dailyChallenge(dateFor('tetris'));
