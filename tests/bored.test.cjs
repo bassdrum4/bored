@@ -845,6 +845,33 @@ test('browser regressions', async t => {
     const frame = await openTitle('poker', 'Poker');
     await frame.waitForFunction(() => typeof window.__pokerAI === 'object');
 
+    const cardModes = await frame.evaluate(() => {
+      document.querySelector('#tab-blackjack').click();
+      const bjVisible = !document.querySelector('#alternate-game').hidden &&
+        document.querySelector('#poker-layout').hidden;
+      document.querySelector('[data-bj="deal"]').click();
+      let safety = 20;
+      while (window.__cardModesTest.blackjack.phase === 'player' && safety--)
+        document.querySelector('[data-bj="stand"]').click();
+      const bjFinished = window.__cardModesTest.blackjack.phase === 'over';
+      const bjSnapshot = window.__boredSnapshot();
+      document.querySelector('#tab-euchre').click();
+      const euVisible = !document.querySelector('#alternate-game').hidden &&
+        !!document.querySelector('[data-eu]');
+      const euSnapshot = window.__boredSnapshot();
+      document.querySelector('#tab-holdem').click();
+      return {
+        bjVisible, bjFinished, euVisible,
+        bjUnscored: bjSnapshot.profit === 0 && bjSnapshot.handOver === false,
+        euUnscored: euSnapshot.profit === 0 && euSnapshot.handOver === false,
+        pokerVisible: !document.querySelector('#poker-layout').hidden
+      };
+    });
+    assert.deepEqual(cardModes, {
+      bjVisible:true, bjFinished:true, euVisible:true,
+      bjUnscored:true, euUnscored:true, pokerVisible:true
+    }, 'alternate tables play, render, and do not submit Poker scores');
+
     // The fast 7-card evaluator must agree with the showdown evaluator exactly.
     const fast = await frame.evaluate(() => {
       const AI = window.__pokerAI;
