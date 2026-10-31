@@ -169,6 +169,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "trackbound": {
+    "label": "Gold medals earned",
+    "better": "high",
+    "max_value": 99
+  },
   "transit-chaos": {
     "label": "Passengers delivered",
     "better": "high",
