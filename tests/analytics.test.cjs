@@ -114,7 +114,7 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
     if (req.url().startsWith(site.origin)) return req.continue();
     if (req.method() === 'OPTIONS') return req.respond({ status:204, headers });
     if (req.url().includes('/play_events') && req.method() === 'POST') { writes.push(...[].concat(JSON.parse(req.postData()))); return req.respond({ status:201, headers, body:'' }); }
-    const body = req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/rpc/analytics_f14_events') ? flightAvailable ? flightFixture : [] : req.url().includes('/play_events') ? fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
+    const body = req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/rpc/analytics_f14_events') ? flightAvailable ? flightFixture : [] : req.url().includes('/play_events') ? req.url().includes('game=eq.f-14') ? [] : fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
     return req.respond({status:200, headers, contentType:'application/json', body:JSON.stringify(body)});
   });
   await page.goto(site.url);
