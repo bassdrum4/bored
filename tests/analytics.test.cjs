@@ -91,7 +91,7 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   const page = await browser.newPage(), writes = [], errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.setRequestInterception(true);
-  let admin = false;
+  let admin = false, flightAvailable = false;
   const fixture = [
     { id:'a', session_id:'s1', user_id:'admin-id', game:'snake', kind:'start', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{} },
     { id:'b', session_id:'s1', user_id:'admin-id', game:'snake', kind:'end', received_at:new Date().toISOString(), active_ms:30000, visible_ms:45000, details:{score:10,reason:'close',snapshot:{score:10}} },
@@ -99,12 +99,22 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
     { id:'d', session_id:'s3', user_id:'player-id', game:'snake', kind:'start', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{} },
     { id:'e', session_id:'s3', user_id:'player-id', game:'snake', kind:'end', received_at:new Date().toISOString(), active_ms:20000, visible_ms:20000, details:{score:20,reason:'close',snapshot:{score:20}} }
   ];
+  // Native F-14 flights are stored in a different table and must be read
+  // through the admin-only RPC, not the Bored play_events endpoint.
+  const flightFixture = [
+    { id:'f1', session_id:'flight-1', user_id:null, visitor_id:'00000000-0000-4000-8000-000000000001', game:'f-14',
+      kind:'start', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{mode:'cruise',aircraft:'tomcat'} },
+    { id:'f2', session_id:'flight-1', user_id:null, visitor_id:'00000000-0000-4000-8000-000000000001', game:'f-14',
+      kind:'interaction', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{mode:'cruise',aircraft:'tomcat'} },
+    { id:'f3', session_id:'flight-1', user_id:null, visitor_id:'00000000-0000-4000-8000-000000000001', game:'f-14',
+      kind:'end', received_at:new Date().toISOString(), active_ms:32000, visible_ms:42000, details:{mode:'cruise',aircraft:'tomcat',outcome:'recovered'} }
+  ];
   const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
   page.on('request', req => {
     if (req.url().startsWith(site.origin)) return req.continue();
     if (req.method() === 'OPTIONS') return req.respond({ status:204, headers });
     if (req.url().includes('/play_events') && req.method() === 'POST') { writes.push(...[].concat(JSON.parse(req.postData()))); return req.respond({ status:201, headers, body:'' }); }
-    const body = req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/play_events') ? fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
+    const body = req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/rpc/analytics_f14_events') ? flightAvailable ? flightFixture : [] : req.url().includes('/play_events') ? fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
     return req.respond({status:200, headers, contentType:'application/json', body:JSON.stringify(body)});
   });
   await page.goto(site.url);
@@ -165,6 +175,14 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'layout at ' + width);
   }
   await page.screenshot({path:path.join(root,'_build/shots/analytics-mobile.png'),fullPage:true});
+  flightAvailable = true;
+  await page.select('#game', 'f-14');
+  await page.click('#refresh');
+  await page.waitForFunction(() => document.querySelector('#f14-totals')?.textContent?.includes('32 s'));
+  assert.equal(await page.$eval('#f14-totals strong',n=>n.textContent), '1');
+  assert.match(await page.$eval('#f14-aircraft',n=>n.textContent), /tomcat/);
+  assert.match(await page.$eval('#f14-outcomes',n=>n.textContent), /Recovered/);
+  assert.equal(await page.$eval('#games-table tbody',n=>n.children.length), 1);
   assert.deepEqual(errors,[]);
 });
 
