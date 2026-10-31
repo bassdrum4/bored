@@ -204,14 +204,16 @@
   /* ── map svg ─────────────────────────────────────────────────────────── */
   .hex { cursor: pointer }
   .hex .fill { stroke: rgba(36,28,18,.16); stroke-width: .6 }
-  .hex.fog-unk .fill { fill: #ded2b6 }
+  .hex.fog-unk .fill { fill: #c9b489 }
   .hex.vis .fill { }
   .coast { fill: none; stroke: rgba(36,28,18,.62); stroke-width: 1.6; stroke-linecap: round; pointer-events: none }
   .fog { pointer-events: none }
-  .fog.unk { fill: #ded2b6 }
+  .fog.unk { fill: #c9b489 }
   .fog.dim { fill: #e9dfc6; opacity: .58 }
   .reach { fill: rgba(65,96,47,.16); stroke: rgba(36,28,18,.3); stroke-width: .8; pointer-events: none }
   .threat { fill: rgba(147,64,29,.18); stroke: rgba(147,64,29,.65); stroke-width: .9; pointer-events: none }
+  .worked { fill: rgba(65,96,47,.15); stroke: rgba(65,96,47,.55); stroke-width: .8; pointer-events: none }
+  .idle-tick { fill: var(--panel); stroke: var(--ink); stroke-width: 1; pointer-events: none }
   .sel-ring { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none }
   .owner-tint { pointer-events: none; opacity: .5 }
   .label { font: 10px/1 ui-monospace, Menlo, monospace; fill: rgba(36,28,18,.62); pointer-events: none; letter-spacing: .04em }
@@ -529,17 +531,17 @@ const TECH_BY_ID = Object.fromEntries(TECHS.map(t => [t.id, t]));
 
 const FACTIONS = [
   { id: 'cindermark', name: 'Cindermark', epithet: 'banner of the burnt plain', ink: '#8f3c1a', light: '#c17247',
-    home: ['ash', 'plain', 'hill'], bonus: 'Melee units strike for +1.' },
+    home: ['ash', 'plain', 'hill'], bonus: 'Melee units strike for +1.', pride: 16 },
   { id: 'thornwake',  name: 'Thornwake',  epithet: 'banner of the deep wood',   ink: '#3f5c2d', light: '#7b9660',
-    home: ['forest', 'marsh', 'meadow'], bonus: 'Wood and marsh cost 1 to cross.' },
+    home: ['forest', 'marsh', 'meadow'], bonus: 'Wood and marsh cost 1 to cross.', pride: 8 },
   { id: 'tidebound',  name: 'Tidebound',  epithet: 'banner of the salt reach',   ink: '#1e5560', light: '#5a8f97',
-    home: ['shoal', 'plain', 'meadow'], bonus: 'Hulls move +1 and see +1 over water.' },
+    home: ['shoal', 'plain', 'meadow'], bonus: 'Hulls move +1 and see +1 over water.', pride: 10 },
   { id: 'deepstone',  name: 'Deepstone',  epithet: 'banner of the under-pass',   ink: '#3e4257', light: '#787c93',
-    home: ['hill', 'mount', 'plain'], bonus: 'Hills and mountains cost 1 to cross.' },
+    home: ['hill', 'mount', 'plain'], bonus: 'Hills and mountains cost 1 to cross.', pride: 12 },
   { id: 'sunspire',   name: 'Sunspire',   epithet: 'banner of the long road',    ink: '#876410', light: '#bb9a3c',
-    home: ['desert', 'tundra', 'meadow'], bonus: '+2 coin in every city.' },
+    home: ['desert', 'tundra', 'meadow'], bonus: '+2 coin in every city.', pride: 6 },
   { id: 'rimeholt',   name: 'Rimeholt',   epithet: 'banner of the still air',    ink: '#485d6e', light: '#8399a8',
-    home: ['tundra', 'marsh', 'hill'], bonus: 'Fights at +30% defence inside its own borders.' }
+    home: ['tundra', 'marsh', 'hill'], bonus: 'Fights at +30% defence inside its own borders.', pride: 12 }
 ];
 
 const CITY_NAMES = [
@@ -826,7 +828,7 @@ function startCampaign(options) {
     cols: world.cols, rows: world.rows,
     turn: 1, maxTurns: options.turns || 50, phase: 'player', player: 0,
     tiles: world.tiles, units: [], cities: [], factions: [],
-    dip: [], attitude: [], log: [], over: null,
+    dip: [], attitude: [], log: [], over: null, demands: [],
     nextUnit: 1, nextCity: 1
   };
 
@@ -834,7 +836,7 @@ function startCampaign(options) {
     const def = start.faction;
     const f = {
       i, id: def.id, name: def.name, epithet: def.epithet, ink: def.ink, light: def.light,
-      home: def.home, bonus: def.bonus, isPlayer: i === 0,
+      home: def.home, bonus: def.bonus, pride: def.pride, isPlayer: i === 0,
       alive: true, res: { timber: 8, ore: 5, coin: 10, insight: 0 },
       techs: [], capital: null
     };
@@ -1124,6 +1126,50 @@ function attackTarget(u, x, y) {
   return true;
 }
 
+// What a strike would do, computed the same way attackTarget computes it.
+// Shown in the side panel before the player commits a banner.
+function describeStrike(u, x, y) {
+  if (!canAttackTarget(u, x, y)) return null;
+  const atk = attackValue(faction(u.owner), u);
+  const other = unitAt(x, y);
+  if (other) {
+    const raw = strikeDamage(atk, defenceValue(other));
+    const kills = raw >= other.hp;
+    // A strike cannot deal more than what is there: overkill is lost.
+    const dmg = Math.min(raw, Math.max(0, Math.ceil(other.hp)));
+    let back = 0;
+    if (!kills && hexDistance(u.x, u.y, x, y) <= rangeOf(faction(other.owner), other)) {
+      back = strikeDamage(attackValue(faction(other.owner), other), defenceValue(u));
+    }
+    return { kind: 'unit', type: other.type, name: UNITS[other.type].name,
+      hp: Math.max(0, other.hp), dmg, kills, back, x, y };
+  }
+  const city = cityAt(x, y);
+  const holder = city.owner === null ? null : faction(city.owner);
+  const cityDef = holder ? cityDefence(holder, city) : 4 + city.level * 2;
+  const dmg = Math.min(strikeDamage(atk, cityDef), Math.max(0, Math.ceil(city.hp)));
+  return { kind: 'city', name: city.name, hp: Math.max(0, Math.round(city.hp)), dmg,
+    kills: dmg >= city.hp && !UNITS[u.type].naval, back: 0, x, y };
+}
+
+function strikeTargets(u) {
+  const out = [];
+  for (const o of G.units) {
+    if (o.id === u.id) continue;
+    const tile = tileAt(o.x, o.y);
+    if (!tile || !tile.vis) continue;
+    const d = describeStrike(u, o.x, o.y);
+    if (d) out.push(d);
+  }
+  for (const c of G.cities) {
+    const tile = tileAt(c.x, c.y);
+    if (!tile || !tile.vis) continue;
+    const d = describeStrike(u, c.x, c.y);
+    if (d) out.push(d);
+  }
+  return out.slice(0, 6);
+}
+
 function captureCity(city, f, byUnit) {
   const wasNeutral = city.owner === null;
   const previous = city.owner;
@@ -1324,6 +1370,18 @@ function disband(unit) {
 /* ── turn cycle ────────────────────────────────────────────────────────────── */
 
 function beginTurn(f) {
+  if (f.isPlayer && G.demands) {
+    const kept = [];
+    for (const d of G.demands) {
+      const other = faction(d.from);
+      if (d.to === f.i && G.turn - d.turn > 2) {
+        log((other ? other.name : 'A rival') + ' lets the demand lapse.', other ? other.ink : undefined);
+      } else {
+        kept.push(d);
+      }
+    }
+    G.demands = kept;
+  }
   const { income } = factionIncome(f);
   for (const k of RES_KEYS) f.res[k] = Math.max(0, (f.res[k] || 0) + (income[k] || 0));
   for (const c of ownCities(f)) {
@@ -1346,6 +1404,54 @@ function beginTurn(f) {
     u.mp = moveOf(f, u);
     u.acted = false;
   }
+}
+
+function unitCanHit(u) {
+  for (const o of G.units) {
+    if (o.id !== u.id && canAttackTarget(u, o.x, o.y)) return true;
+  }
+  for (const c of G.cities) {
+    if (canAttackTarget(u, c.x, c.y)) return true;
+  }
+  return false;
+}
+
+// A banner is idle when the player has spent nothing on it: no move left and
+// no strike available, or a held position, clears it.
+function idleUnits() {
+  if (!G) return [];
+  const f = player();
+  return ownUnits(f).filter(u => !u.acted && !u.fortified && (u.mp > 0 || unitCanHit(u)));
+}
+
+function selectNextIdle() {
+  if (!G || G.over) return;
+  const idle = idleUnits();
+  if (!idle.length) { toast('Every banner has spent its turn.'); return; }
+  const i = idle.findIndex(u => !(selection && selection.kind === 'unit' && selection.id === u.id));
+  selectUnit(idle[i < 0 ? 0 : i]);
+  centreOn(idle[i < 0 ? 0 : i].x, idle[i < 0 ? 0 : i].y);
+}
+
+function maybeEndTurn() {
+  if (!G || G.over) return;
+  if (G.tut) { endPlayerTurn(); return; }
+  const idle = idleUnits();
+  if (!idle.length) { endPlayerTurn(); return; }
+  const rows = idle.slice(0, 6).map(u =>
+    '<button class="unit-row" data-act="select-unit:' + u.id + '">' + icon(u.type, 14) +
+    '<span class="nm">' + UNITS[u.type].name + '</span><span class="st">' + u.mp + 'mp</span></button>'
+  ).join('');
+  openModal(
+    '<div class="modal-head"><h2>Banners idle</h2><span class="sub">' + idle.length + ' ' +
+    (idle.length === 1 ? 'banner has' : 'banners have') + ' done nothing</span>' +
+    '<button class="x" data-act="close" aria-label="Close">&times;</button></div>' +
+    '<div class="modal-body">' + (rows ? '<div class="unit-list">' + rows + '</div>' : '') +
+    (idle.length > 6 ? '<p class="hint">And ' + (idle.length - 6) + ' more.</p>' : '') + '</div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Keep playing</button>' +
+    '<button class="btn primary" data-act="end-confirm">End turn anyway</button></div>',
+    true
+  );
 }
 
 function endPlayerTurn() {
@@ -1486,24 +1592,102 @@ function playerGift(targetIdx, amount) {
   autosave();
 }
 
-function playerDemand(targetIdx) {
+// Tribute runs both ways. A demand names timber, ore or coin and sizes itself
+// to the suitor's strength; the answer weighs fear against pride, and a weak
+// demand refused by the strong can mean war.
+const DEMAND_BASE = { timber: 14, ore: 12, coin: 18 };
+
+function demandAmount(suitor, target, res) {
+  const ratio = militaryStrength(suitor) / Math.max(1, militaryStrength(target));
+  const scaled = Math.round(DEMAND_BASE[res] * clamp(ratio, 0.6, 2.5));
+  return Math.max(0, Math.min(target.res[res] || 0, scaled));
+}
+
+function demandWillingness(target, suitor, res, amount) {
+  const ratio = militaryStrength(suitor) / Math.max(1, militaryStrength(target));
+  const attitude = G.attitude[target.i][suitor.i] || 0;
+  const otherWars = G.factions.filter(o => o.alive && o.i !== target.i && o.i !== suitor.i &&
+    atWar(target.i, o.i)).length;
+  const stock = target.res[res] || 0;
+  const pride = target.pride || 8;
+  return attitude + (ratio - 1) * 55 + otherWars * 18 + (stock >= amount * 2 ? 8 : -14) - pride;
+}
+
+function showDemandModal(targetIdx) {
+  const f = player(), target = faction(targetIdx);
+  if (!target || !target.alive) return;
+  const ratio = militaryStrength(f) / Math.max(1, militaryStrength(target));
+  const compare = ratio > 1.2 ? 'weaker than you' : ratio < 0.8 ? 'stronger than you' : 'a fair match';
+  const rows = ['timber', 'ore', 'coin'].map(res => {
+    const amount = demandAmount(f, target, res);
+    const poor = amount < 4;
+    return '<button class="act" data-act="demand2:' + targetIdx + ':' + res + '"' + (poor ? ' disabled' : '') + '>' +
+      icon(res, 14) + ' Demand ' + amount + ' ' + RES_LABEL[res].toLowerCase() +
+      (poor ? ' <span class="chip">too poor</span>' : '') + '</button>';
+  }).join('');
+  openModal(
+    '<div class="modal-head"><h2>Demand tribute</h2><span class="sub">' + esc(target.name) +
+    ' · ' + compare + '</span><button class="x" data-act="close" aria-label="Close">&times;</button></div>' +
+    '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' + rows + '</div>' +
+    '<p class="hint">A demand only lands while your banners clearly outnumber theirs. ' +
+    'A weak demand refused by the strong can mean war.</p></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Think better of it</button></div>',
+    true
+  );
+}
+
+function resolveDemand(targetIdx, res) {
   if (!G || G.over) return;
   const f = player(), target = faction(targetIdx);
-  if (!target.alive) return;
+  if (!target || !target.alive) return;
+  const amount = demandAmount(f, target, res);
+  if (amount < 4) { toast('They have nothing to give.'); return; }
   const ratio = militaryStrength(f) / Math.max(1, militaryStrength(target));
-  if (ratio > 1.5) {
-    const coin = Math.min(target.res.coin, 20 + Math.round(ratio * 10));
-    target.res.coin -= coin;
-    f.res.coin += coin;
-    changeAttitude(f.i, targetIdx, -22);
-    log(target.name + ' pays ' + coin + ' coin in tribute.', target.ink);
-    toast(target.name + ' pays ' + coin + ' coin');
+  if (demandWillingness(target, f, res, amount) > 0) {
+    target.res[res] -= amount;
+    f.res[res] = (f.res[res] || 0) + amount;
+    changeAttitude(f.i, targetIdx, -12);
+    log(target.name + ' pays ' + amount + ' ' + RES_LABEL[res].toLowerCase() + ' in tribute.', target.ink);
+    toast(target.name + ' pays tribute');
   } else {
-    changeAttitude(f.i, targetIdx, -30);
+    changeAttitude(f.i, targetIdx, -25);
     log(target.name + ' scorns the demand.', target.ink);
-    toast(target.name + ' refuses');
-    if (ratio < 0.8) declareWar(targetIdx, f.i);
+    if (ratio < 0.85) {
+      declareWar(targetIdx, f.i);
+      toast(target.name + ' declares war');
+    } else {
+      toast(target.name + ' refuses');
+    }
   }
+  render();
+  autosave();
+}
+
+function answerDemand(fromIdx, accept) {
+  if (!G || G.over) return;
+  const f = player(), other = faction(fromIdx);
+  const demands = G.demands || [];
+  const d = demands.find(x => x.from === fromIdx && x.to === f.i);
+  if (!other || !other.alive || !d) return;
+  if (accept) {
+    if ((f.res[d.res] || 0) < d.amount) { toast('You cannot pay that.'); return; }
+    f.res[d.res] -= d.amount;
+    other.res[d.res] = (other.res[d.res] || 0) + d.amount;
+    changeAttitude(f.i, fromIdx, 10);
+    log('You pay ' + d.amount + ' ' + RES_LABEL[d.res].toLowerCase() + ' to ' + other.name + '.', other.ink);
+    toast('Tribute paid');
+  } else {
+    changeAttitude(f.i, fromIdx, -20);
+    log('You refuse ' + other.name + '. ', other.ink);
+    const ratio = militaryStrength(other) / Math.max(1, militaryStrength(f));
+    if (ratio > 1.6 && aiRoll(other, 77) < 0.5) {
+      declareWar(fromIdx, f.i);
+      toast(other.name + ' declares war');
+    } else {
+      toast('Demand refused');
+    }
+  }
+  G.demands = demands.filter(x => x !== d);
   render();
   autosave();
 }
@@ -1736,6 +1920,32 @@ function aiDiplomacy(f) {
     const ratio = militaryStrength(f) / Math.max(1, militaryStrength(other));
     if (attitude < -35 && ratio > 1.35 && aiRoll(f, other.i * 31) < 0.22) {
       declareWar(f.i, other.i);
+      continue;
+    }
+    // A strong banner with a grievance may demand tribute first. The demand
+    // waits in the council: pay it, or refuse and risk the war anyway.
+    if (!G.tut && ratio > 1.45 && attitude < 0 && aiRoll(f, other.i * 53 + 7) < 0.10 &&
+        !(G.demands || []).some(d => d.from === f.i && d.to === other.i)) {
+      const res = ['timber', 'ore', 'coin'][Math.floor(aiRoll(f, other.i * 91 + 3) * 3) % 3];
+      const amount = Math.max(4, demandAmount(f, other, res));
+      if ((other.res[res] || 0) >= amount) {
+        if (other.isPlayer) {
+          G.demands.push({ from: f.i, to: other.i, res, amount, turn: G.turn });
+          log(f.name + ' demands ' + amount + ' ' + RES_LABEL[res].toLowerCase() +
+            ' from you. Answer in the council.', f.ink);
+          toast(f.name + ' demands tribute');
+        } else if (demandWillingness(other, f, res, amount) > 0) {
+          other.res[res] -= amount;
+          f.res[res] = (f.res[res] || 0) + amount;
+          changeAttitude(f.i, other.i, -12);
+          log(other.name + ' pays ' + amount + ' ' + RES_LABEL[res].toLowerCase() +
+            ' to ' + f.name + '.', f.ink);
+        } else {
+          changeAttitude(f.i, other.i, -25);
+          log(other.name + ' scorns ' + f.name + '.', other.ink);
+          if (ratio > 1.8) declareWar(f.i, other.i);
+        }
+      }
     }
   }
   // Grudges cool over time.
@@ -1981,6 +2191,7 @@ function renderBoard() {
   const overlay = [], fog = [], labels = [];
   const highlight = reachable || new Map();
   const selectedUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+  const workedCity = selection && selection.kind === 'city' ? selection.id : null;
 
   for (let y = 0; y < G.rows; y++) {
     for (let x = 0; x < G.cols; x++) {
@@ -2044,6 +2255,9 @@ function renderBoard() {
       if (selectedUnit && canAttackTarget(selectedUnit, x, y)) {
         overlay.push('<path class="threat" d="' + d + '"/>');
       }
+      if (workedCity !== null && tile.city === workedCity) {
+        overlay.push('<path class="worked" d="' + d + '"/>');
+      }
       if (!tile.vis) fog.push('<path class="fog dim" d="' + d + '"/>');
     }
   }
@@ -2092,6 +2306,8 @@ function renderBoard() {
       '<line class="hp" x1="' + (cx - 9) + '" y1="' + (cy + 10) + '" x2="' + (cx + 9) + '" y2="' + (cy + 10) + '"/>' +
       '<line class="hpv" x1="' + (cx - 9) + '" y1="' + (cy + 10) + '" x2="' + (cx - 9 + 18 * portion).toFixed(1) + '" y2="' + (cy + 10) + '"/>' +
       (unit.fortified ? '<path d="M' + (cx - 4) + ' ' + (cy + 14) + ' l8 0 l-4 4 z" fill="#241c12"/>' : '') +
+      ((!unit.acted && !unit.fortified && unit.owner === G.player && (unit.mp > 0 || unitCanHit(unit)))
+        ? '<path class="idle-tick" d="M' + cx + ' ' + (cy - 19) + ' l3.2 3.2 -3.2 3.2 -3.2 -3.2 z"/>' : '') +
       '</g>'
     );
   }
@@ -2248,6 +2464,9 @@ function realmPanel() {
     '<button class="act" data-act="tech">Technologies</button></div>';
 
   html += '<p class="sec">Banners afield</p>';
+  if (idleUnits().length) {
+    html += '<div class="actions"><button class="act" data-act="next-unit">Next banner<kbd>N</kbd></button></div>';
+  }
   if (!units.length) html += '<div class="hint">Nothing stands for you in the field.</div>';
   else {
     html += '<div class="unit-list">';
@@ -2380,6 +2599,19 @@ function unitPanel(unit) {
     '<div class="kv"><span>Sight</span><span>' + sightOf(holder, unit) + '</span></div>' +
     '<div class="hint">' + esc(def.blurb) + '</div>';
 
+  if (mine && def.atk && !unit.acted) {
+    const targets = strikeTargets(unit);
+    if (targets.length) {
+      html += '<p class="sec">In reach</p><div class="unit-list">' + targets.map(t =>
+        '<button class="unit-row" data-act="centre:' + t.x + ':' + t.y + '" title="Look">' +
+        (t.kind === 'unit' ? icon(t.type, 14) : icon('tower', 14)) +
+        '<span class="nm">' + esc(t.name) + ' · ' + t.hp + 'hp</span>' +
+        '<span class="st">-' + t.dmg + (t.kills ? ' · breaks' : ' · leaves ' + Math.max(0, t.hp - t.dmg) + 'hp') +
+        (t.back > 0 ? ' · answers ' + t.back + (t.back >= unit.hp ? ' · dies' : '') : '') + '</span></button>'
+      ).join('') + '</div>';
+    }
+  }
+
   if (mine) {
     html += '<p class="sec">Orders</p><div class="actions">';
     if (def.founds) html += '<button class="act" data-act="found">Found city</button>';
@@ -2455,6 +2687,19 @@ function attitudeMeter(value) {
 function showCouncilModal() {
   const f = player();
   const rivals = G.factions.filter(o => o.i !== f.i);
+  const pending = (G.demands || []).filter(d => d.to === f.i);
+  const pendingHtml = pending.length ? '<p class="sec">Demands on you</p>' + pending.map(d => {
+    const other = faction(d.from);
+    if (!other || !other.alive) return '';
+    const afford = (f.res[d.res] || 0) >= d.amount;
+    return '<div class="council-row"><div><div class="cn">' + esc(other.name) +
+      ' <span class="tag war">demands</span></div>' +
+      '<div class="cd">' + d.amount + ' ' + RES_LABEL[d.res].toLowerCase() +
+      ' · refusing the strong can mean war</div></div><div class="ca">' +
+      '<button class="act" data-act="demand-accept:' + d.from + '"' + (afford ? '' : ' disabled') + '>Pay</button>' +
+      '<button class="act" data-act="demand-refuse:' + d.from + '">Refuse</button>' +
+      '</div></div>';
+  }).join('') : '';
   const rows = rivals.map(other => {
     if (!other.alive) {
       return '<div class="council-row"><div><div class="cn">' + esc(other.name) +
@@ -2482,9 +2727,10 @@ function showCouncilModal() {
   openModal(
     '<div class="modal-head"><h2>Council of the vale</h2><span class="sub">Words first, then banners.</span>' +
     '<button class="x" data-act="close" aria-label="Close">&times;</button></div>' +
-    '<div class="modal-body">' + rows +
+    '<div class="modal-body">' + pendingHtml + rows +
     '<p class="hint">A rival accepts peace when it is losing, or when another war already occupies it. ' +
-    'A gift buys goodwill; a demand only works while your banners clearly outnumber theirs.</p></div>' +
+    'A gift buys goodwill. A demand names timber, ore or coin and only lands while your banners ' +
+    'clearly outnumber theirs; a strong rival may demand tribute from you in turn.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Close</button></div>'
   );
 }
@@ -2528,7 +2774,8 @@ function showHelpModal() {
     'or learn Ascendancy and raise the Grand Wonder. If the turn limit falls first, the banner with the most ' +
     'renown carries the day. Renown counts cities, population, technologies, works and wonders.</p>' +
     '<p class="sec">Keys</p><p class="hint" style="margin-top:0">Space ends the turn · T technologies · ' +
-    'D council · Esc closes a panel or clears the selection · drag to look around · scroll to zoom.</p>' +
+    'D council · N next idle banner · Esc closes a panel or clears the selection · ' +
+    'drag to look around · scroll to zoom.</p>' +
     '</div><div class="modal-foot"><button class="btn" data-act="tutorial">Play the tutorial</button>' +
     '<button class="btn" data-act="close">Close</button></div>'
   );
@@ -2589,15 +2836,21 @@ function onAction(act) {
     case 'save': toast(saveGame() ? 'Campaign saved on this device' : 'No campaign to save'); closeModal(); break;
     case 'load': if (loadGame()) { toast('Campaign loaded'); closeModal(); } break;
     case 'new': closeModal(); UI.start.hidden = false; refreshStart(); break;
-    case 'end': endPlayerTurn(); break;
+    case 'end': maybeEndTurn(); break;
     case 'research': researchTech(a); if (!UI.modalLayer.hidden) showTechModal(); break;
     case 'war': playerDeclareWar(Number(a)); if (!UI.modalLayer.hidden) showCouncilModal(); break;
     case 'peace': playerOfferPeace(Number(a)); if (!UI.modalLayer.hidden) showCouncilModal(); break;
     case 'gift': playerGift(Number(a), 20); if (!UI.modalLayer.hidden) showCouncilModal(); break;
-    case 'demand': playerDemand(Number(a)); if (!UI.modalLayer.hidden) showCouncilModal(); break;
+    case 'demand': closeModal(); showDemandModal(Number(a)); break;
+    case 'demand2': resolveDemand(Number(a), b); closeModal(); showCouncilModal(); break;
+    case 'demand-accept': answerDemand(Number(a), true); if (!UI.modalLayer.hidden) showCouncilModal(); break;
+    case 'demand-refuse': answerDemand(Number(a), false); if (!UI.modalLayer.hidden) showCouncilModal(); break;
+    case 'end-confirm': closeModal(); endPlayerTurn(); break;
+    case 'next-unit': selectNextIdle(); break;
     case 'train': trainUnit(a, b); break;
     case 'build': buildInCity(a, b); break;
     case 'select-unit': {
+      closeModal();
       const unit = unitById(a);
       if (unit) {
         selection = { kind: 'unit', id: unit.id };
@@ -2686,7 +2939,7 @@ function buildTutorialVale() {
     version: 1, seed: 0x7a17c3, size: 'small', turns: 20, maxTurns: 20,
     cols: 7, rows: 5, turn: 1, phase: 'player', player: 0,
     tiles: [], units: [], cities: [], factions: [], dip: [], attitude: [],
-    log: [], over: null, nextUnit: 1, nextCity: 1, tut: true
+    log: [], over: null, demands: [], nextUnit: 1, nextCity: 1, tut: true
   };
   for (let y = 0; y < G.rows; y++) {
     for (let x = 0; x < G.cols; x++) {
@@ -2696,7 +2949,7 @@ function buildTutorialVale() {
   }
   const banner = (i, d) => ({
     i, id: d.id, name: d.name, epithet: d.epithet, ink: d.ink, light: d.light,
-    home: d.home, bonus: d.bonus, isPlayer: i === 0, alive: true,
+    home: d.home, bonus: d.bonus, pride: d.pride, isPlayer: i === 0, alive: true,
     res: { timber: 18, ore: 12, coin: 16, insight: 14 }, techs: [], capital: null
   });
   G.factions = [banner(0, def), banner(1, rivalDef)];
@@ -2826,6 +3079,7 @@ function loadGame() {
   const saved = readSave();
   if (!saved) return false;
   G = saved.state;
+  if (!Array.isArray(G.demands)) G.demands = [];
   if (campaignCount === 0) campaignCount = 1;
   selection = null;
   reachable = null;
@@ -3031,13 +3285,14 @@ function bindKeys() {
     if (!G) return;
     if (event.code === 'Space') {
       event.preventDefault();
-      if (!G.over) endPlayerTurn();
+      if (!G.over) maybeEndTurn();
       return;
     }
     const key = event.key.toLowerCase();
     if (key === 't') showTechModal();
     else if (key === 'd') showCouncilModal();
     else if (key === 'm') showMenuModal();
+    else if (key === 'n') selectNextIdle();
     else if (key === 'h') showHelpModal();
   });
 }
@@ -3105,7 +3360,7 @@ function boot() {
   q('#btn-tech').addEventListener('click', () => { if (G) showTechModal(); });
   q('#btn-council').addEventListener('click', () => { if (G) showCouncilModal(); });
   q('#btn-menu').addEventListener('click', () => { if (G) showMenuModal(); });
-  q('#btn-end').addEventListener('click', () => { if (G && !G.over) endPlayerTurn(); });
+  q('#btn-end').addEventListener('click', () => { if (G && !G.over) maybeEndTurn(); });
 
   window.addEventListener('resize', () => { if (G && cam.fitted) fitCamera(); });
 
