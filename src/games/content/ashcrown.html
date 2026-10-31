@@ -58,7 +58,7 @@
   .brand .epi { font-size: 11px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
   .dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(36,28,18,.4); flex: 0 0 auto; align-self: center }
   #res-row { display: flex; gap: 12px; flex: 1; min-width: 0; overflow: hidden }
-  .res-item { display: flex; align-items: baseline; gap: 5px; white-space: nowrap }
+  .res-item { display: flex; align-items: center; gap: 5px; white-space: nowrap }
   .res-glyph { font-size: 11px; letter-spacing: .04em; color: var(--ink-3); text-transform: uppercase }
   .res-val { font-family: ui-monospace, Menlo, monospace; font-size: 13px }
   .res-inc { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--ink-3) }
@@ -131,7 +131,8 @@
   .tech-era { margin-bottom: 16px }
   .tech-era h3 { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px }
   .tech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 7px }
-  .tech-card { border: 1px solid var(--rule); border-radius: 3px; padding: 8px 9px; text-align: left; background: var(--paper) }
+  .tech-card { border: 1px solid var(--rule); border-radius: 3px; padding: 8px 9px; text-align: left; background: var(--paper); display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start }
+  .tech-card .ti { color: var(--ink); opacity: .82; padding-top: 1px }
   .tech-card .tn { font-family: Georgia, "Palatino Linotype", serif; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 6px }
   .tech-card .tc { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--ink-3) }
   .tech-card .te { font-size: 11px; color: var(--ink-2); margin-top: 3px; line-height: 1.4 }
@@ -162,12 +163,43 @@
   .faction-card:hover { border-color: var(--ink-2); background: #f9f3e4 }
   .faction-card.on { border-color: var(--ink); background: #fbf6e9; box-shadow: inset 0 0 0 1px var(--ink) }
   .faction-card .fn { display: flex; align-items: center; gap: 7px; font-family: Georgia, "Palatino Linotype", serif; font-size: 14px; font-weight: 600 }
+  .faction-card .emblem { color: var(--ink) }
   .faction-card .fe { font-size: 10.5px; color: var(--ink-3); margin: 2px 0 6px; font-style: italic }
   .faction-card .fb { font-size: 11.5px; color: var(--ink-2); line-height: 1.45 }
   .start-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px }
   .field { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2) }
   .fine { font-size: 11px; color: var(--ink-3); margin-top: 10px; line-height: 1.6; max-width: 62ch }
   .fine b { color: var(--ink-2); font-weight: 600 }
+
+  /* ── icons ───────────────────────────────────────────────────────────── */
+  .ico { flex: 0 0 auto; vertical-align: -2px }
+  .ico path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round }
+  .ico path.f { fill: currentColor; stroke: none }
+  .chip { display: inline-flex; align-items: center; gap: 2px; font: 10px/1 ui-monospace, Menlo, monospace; color: var(--ink-2); margin-left: 4px }
+  .chip + .chip { margin-left: 6px }
+  .emblem { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex: 0 0 auto }
+  .emblem svg { width: 26px; height: 26px; overflow: visible }
+  .emblem path { fill: none; stroke: currentColor; stroke-width: 1.35; stroke-linecap: round; stroke-linejoin: round }
+  .emblem path.f { fill: currentColor; stroke: none }
+  .emblem .dev path { stroke-width: 1.9 }
+
+  /* ── coach: the tutorial's one line at a time ─────────────────────────── */
+  #coach {
+    position: absolute; left: 14px; bottom: 14px; width: min(440px, calc(100% - 28px)); z-index: 6;
+    background: var(--panel); border: 1px solid var(--ink); border-radius: 4px; padding: 10px 13px 12px;
+  }
+  #coach[hidden] { display: none }
+  #coach .ttl {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    font: 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+  }
+  #coach p { font-size: 13px; line-height: 1.5; margin-top: 6px; font-family: Georgia, "Palatino Linotype", serif }
+  #coach .row { display: flex; align-items: center; gap: 6px; margin-top: 9px; flex-wrap: wrap }
+  #coach .row .act { font-size: 12px; padding: 5px 9px }
+  #coach .skip { font-size: 11px; color: var(--ink-3); text-decoration: underline; margin-left: auto }
+  #coach .skip:hover { color: var(--ink) }
+  .coach-target { outline: 1px solid var(--rust); outline-offset: 2px; background: #f7e7d8 }
+  .coach-ring { fill: none; stroke: var(--rust); stroke-width: 2.2; stroke-dasharray: 5 4; pointer-events: none }
 
   /* ── map svg ─────────────────────────────────────────────────────────── */
   .hex { cursor: pointer }
@@ -184,6 +216,13 @@
   .owner-tint { pointer-events: none; opacity: .5 }
   .label { font: 10px/1 ui-monospace, Menlo, monospace; fill: rgba(36,28,18,.62); pointer-events: none; letter-spacing: .04em }
   .site { pointer-events: none }
+  /* Everything drawn above the ground is decoration: it must never take a
+     click meant for the hex beneath it. */
+  #layer-coast, #layer-marks, #layer-sites, #layer-units, #layer-overlay,
+  #layer-fog, #layer-labels { pointer-events: none }
+  .sc { fill: none; stroke: rgba(36,28,18,.34); stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round }
+  .scf { fill: rgba(36,28,18,.20); stroke: rgba(36,28,18,.42); stroke-width: .9; stroke-linejoin: round }
+  .sc-soft { fill: none; stroke: rgba(36,28,18,.2); stroke-width: 1 }
   .unit { pointer-events: none }
   .unit .body { stroke: rgba(36,28,18,.75); stroke-width: 1 }
   .unit .hp { stroke: rgba(36,28,18,.35); stroke-width: 2.4; stroke-linecap: round }
@@ -210,6 +249,8 @@
   }
   @media (max-width: 620px) {
     #res-row .res-glyph { display: none }
+    #coach { left: 8px; right: 8px; bottom: 8px; width: auto; padding: 8px 10px 9px }
+    #coach p { font-size: 12.5px; margin-top: 4px }
     .bar-right .btn kbd { display: none }
   }
 </style>
@@ -245,6 +286,11 @@
         <g id="layer-labels"></g>
       </g>
     </svg>
+    <div id="coach" hidden>
+      <div class="ttl"><span id="coach-tag">Tutorial</span><span id="coach-count"></span></div>
+      <p id="coach-say"></p>
+      <div class="row" id="coach-actions"></div>
+    </div>
   </main>
   <aside id="side">
     <div id="side-scroll"></div>
@@ -279,14 +325,10 @@
     </div>
     <div class="start-row" style="margin-top:12px">
       <button class="btn primary" id="btn-begin" type="button">Begin campaign</button>
+      <button class="btn" id="btn-tutorial" type="button">Play the tutorial</button>
       <button class="btn" id="btn-continue" type="button" hidden>Continue saved campaign</button>
     </div>
-    <p class="fine" id="start-note">
-      <b>How it plays.</b> Click a banner, then a hex. Cities train a unit or raise a building once per turn;
-      technologies cost insight. Claim neutral keeps and found new cities to grow. Win by taking every rival
-      capital, or by raising the Grand Wonder. If nobody has won when the turn limit falls, the highest
-      renown carries the vale.
-    </p>
+    <p class="fine" id="start-note"></p>
   </div>
 </div>
 <script>
@@ -1120,6 +1162,7 @@ function killUnit(unit) {
 }
 
 function checkElimination() {
+  if (!G || G.tut) return;
   for (const f of G.factions) {
     if (!f.alive) continue;
     if (ownCities(f).length === 0 && !f.isPlayer) {
@@ -1171,6 +1214,7 @@ function trainUnit(cityId, type) {
   pay(f, cost);
   addUnit(f, type, spot[0], spot[1]);
   city.trained = true;
+  if (G.tut) TUT.trained = true;
   log(city.name + ' trains ' + UNITS[type].name.toLowerCase() + '.', f.ink);
   recomputeVision();
   render();
@@ -1221,6 +1265,7 @@ function moveUnit(unit, x, y) {
   unit.y = y;
   unit.mp = Math.max(0, unit.mp - cost);
   unit.fortified = false;
+  if (G.tut) TUT.moved = true;
   const tile = tileAt(x, y);
   if (tile && tile.f === 'ruin' && !tile.looted) {
     tile.looted = true;
@@ -1349,7 +1394,7 @@ function finishOnRenown() {
 }
 
 function checkEnd() {
-  if (!G || G.over) return;
+  if (!G || G.over || G.tut) return;
   const f = player();
   if (ownCities(f).length === 0) {
     endGame(false, 'defeat', f.name + ' is left with nothing to hold. The banner falls.');
@@ -1471,6 +1516,7 @@ function playerDemand(targetIdx) {
 const aiRoll = (f, salt) => hash2(G.turn, f.i, G.seed + salt);
 
 function aiTurn(f) {
+  if (G.tut) return;
   if (!f.alive || G.over) return;
   aiResearch(f);
   aiBuild(f);
@@ -1739,34 +1785,195 @@ function centreOn(x, y) {
   applyCamera();
 }
 
-const TERRAIN_MARK = {
-  forest: 'M-8 5 L-3 -6 L2 5 Z M1 6 L6 -4 L11 6 Z',
-  hill: 'M-9 6 Q-3 -7 3 6 M-2 6 Q4 -3 10 6',
-  mount: 'M-10 6 L-3 -9 L4 6 Z M0 6 L6 -4 L12 6 Z',
-  desert: 'M-8 1 H-2 M2 4 H8 M-6 6 H2',
-  tundra: 'M-6 0 h1.6 M0 3 h1.6 M5 -1 h1.6',
-  ash: 'M-6 -4 L-3 4 M1 -5 L4 3 M6 0 L8 5',
-  marsh: 'M-9 -1 H-1 M1 1 H9 M-7 4 H1',
-  shoal: 'M-7 2 q4 -4 8 0 q4 4 8 0',
-  ocean: 'M-8 0 q4 -3 8 0 q4 3 8 0'
+/* ── drawn marks ───────────────────────────────────────────────────────────── */
+
+// Everything the player has to recognise is a small flat drawing rather than a
+// word: resources, ground, sites, banners, works and lore. Each mark lives in a
+// 20x20 box around the origin; strokes go in MARK and one filled accent in
+// SOLID, and the renderers below turn them into inline SVG for the chrome or
+// into map paths in the map's own ink.
+const MARK = {
+  timber: 'M-8 -3 H2 a3 3 0 0 1 0 6 H-8 Z|M2 -3 a3 3 0 1 0 0 6',
+  ore: 'M-6 5 L-3.2 -2 L-0.5 5 Z|M0.5 6 L3.6 -3 L6.8 6 Z|M-4 8 H0',
+  coin: 'M0 0 m-6.4 0 a6.4 6.4 0 1 0 12.8 0 a6.4 6.4 0 1 0 -12.8 0|M0 -3 V3|M-3 0 H3',
+  insight: 'M-8.5 0 C-5 -6.4 5 -6.4 8.5 0 C5 6.4 -5 6.4 -8.5 0 Z',
+  stores: 'M0 8 V0|M0 0 C-4.6 -2 -5 -8 0 -8 C5 -8 4.6 -2 0 0 Z|M0 3 L-3 1|M0 5 L3 3',
+  renown: 'M-7 6 H7|M-7 6 L-8 -3 L-4 1 L0 -7 L4 1 L8 -3 L7 6',
+  wheat: 'M0 8 V0|M0 0 L-4 -4|M0 0 L4 -4|M0 4 L-4 0|M0 4 L4 0',
+  grove: 'M-5 8 V-2|M-8 -2 L-5 -9 L-2 -2 Z|M3 8 V-1|M0 -1 L3 -8 L6 -1 Z',
+  iron: 'M-7 -5 C-3 -8.5 3 -8.5 7 -5|M0 -6 L-4 7|M-6 7 H-2',
+  seam: 'M0 -8 L5 -2 L0 8 L-5 -2 Z|M-5 -2 H5',
+  glass: 'M-3.5 -8 H3.5 L6 0 L0 8 L-6 0 Z|M-3 -1 H3',
+  shoalrun: 'M-7 0 C-3 -5 3 -5 6 0 C3 5 -3 5 -7 0 Z|M6 0 L9 -3 V3 Z',
+  ruin: 'M-5 -8 H5 V-3 H-5 Z|M-4 2 H4 V8 H-4 Z|M-4 -1 L-2 1 L0 -1 L2 1 L4 -1',
+  pioneer: 'M-5 8 V-8|M-6 8 H0|M-5 -8 H4 L1.5 -5 L4 -2 H-5',
+  scout: 'M0 -8 L5 6 L0 3 L-5 6 Z',
+  spear: 'M0 8 V-8|M-3 4 H3|M-3 -4 L0 -9 L3 -4 Z',
+  bow: 'M-4 -8 C5 -4 5 4 -4 8|M-4 -8 V8|M-4 0 H7|M4 -2.5 L7 0 L4 2.5',
+  rider: 'M-6 7 V0 A6 6 0 0 1 6 0 V7|M-6 -1 H5',
+  warden: 'M0 -8 L6 -5 V1 C6 5 3 7 0 9 C-3 7 -6 5 -6 1 V-5 Z|M0 -4 V7',
+  ram: 'M-8 4 H7|M-8 4 a2.2 2.2 0 1 0 4.4 0|M2.4 4 a2.2 2.2 0 1 0 4.4 0|M-6 3 L0 -6 L6 3',
+  cog: 'M-7 3 H7 L5 7 H-5 Z|M0 3 V-7|M0 -7 L6 -3 V3',
+  warship: 'M-7 3 H7 L5 7 H-5 Z|M-3 3 V-6|M3 3 V-6|M-3 -6 L2 -3 H-3|M3 -6 L7 -4',
+  granary: 'M-5 8 V-2 L0 -8 L5 -2 V8 Z|M-2 8 V4 H2 V8|M-5 0 H5',
+  sawpit: 'M-6 -4 H3 L7 2 H-6 Z|M-6 2 l2 2 2 -2 2 2 2 -2 2 2',
+  forge: 'M-6 -4 H6 V-1 H2 L0 3 H4 V5 H-4 V3 H-2 L-4 -1 H-6 Z',
+  market: 'M0 -8 V6|M-7 -5 H7|M-7 -5 L-9 -1 H-5 Z|M7 -5 L5 -1 H9 Z|M-4 7 H4',
+  library: 'M-8 -1 C-4 -4 -1 -3 0 -1 C1 -3 4 -4 8 -1 V6 C4 4 1 3 0 5 C-1 3 -4 4 -8 6 Z|M0 -1 V5',
+  walls: 'M-8 6 V-3 H-5 V-6 H-2 V-3 H2 V-6 H5 V-3 H8 V6 Z|M-8 1 H8',
+  temple: 'M-8 -2 L0 -8 L8 -2 Z|M-6 0 V6|M-2 0 V6|M2 0 V6|M6 0 V6|M-8 7 H8',
+  wonder: 'M-6 7 H6|M-4 7 V-1 H4 V7|M-3 3 H3|M0 -1 V-8|M0 -8 L4 -5 H0',
+  sickle: 'M6 -6 C-2 -8 -7 -3 -5 4|M-5 4 L-8 8',
+  scroll: 'M-6 -6 H5 V6 H-6 Z|M-3 -3 H2|M-3 0 H2|M-3 3 H1',
+  arrow: 'M-7 7 L7 -7|M1 -7 H7 V-1|M-4 4 L-1 7',
+  tower: 'M-4 8 V-2 H-6 V-7 H-3 V-4 H-1 V-7 H1 V-4 H3 V-7 H6 V-2 H4 V8 Z|M-1 8 V4 H1 V8',
+  wheel: 'M0 0 m-7 0 a7 7 0 1 0 14 0 a7 7 0 1 0 -14 0|M0 -7 V7|M-7 0 H7',
+  flame: 'M0 8 C-6 4 -5 -2 0 -8 C3 -3 6 0 4 4 C3 7 1 8 0 8 Z',
+  sword: 'M0 -9 L2 -4 V3 H-2 V-4 Z|M-5 3 H5|M0 3 V8',
+  map: 'M-7 -5 L-2 -7 L2 -5 L7 -7 V6 L2 8 L-2 6 L-7 8 Z|M-2 -7 V6|M2 -5 V8',
+  star: 'M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z',
+  crown: 'M-7 6 H7|M-7 6 L-8 -3 L-4 1 L0 -7 L4 1 L8 -3 L7 6',
+  anchor: 'M0 -5 V8|M-4 -2 H4|M-7 2 C-7 8 7 8 7 2|M-2 -5 H2',
+  stack: 'M-6 -5 H6|M-6 -1 H6|M-6 3 H6|M-6 -5 V3|M6 -5 V3',
+  snow: 'M0 -8 V8|M-7 -4 L7 4|M7 -4 L-7 4',
+  sun: 'M0 0 m-4 0 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0|M0 -8 V-6|M0 6 V8|M-8 0 H-6|M6 0 H8',
+  wave: 'M-8 0 q4 -4 8 0 t8 0|M-8 5 q4 -4 8 0 t8 0',
+  mount: 'M-8 6 L-2 -6 L3 6 Z|M-1 6 L4 -3 L9 6',
 };
 
-const FEATURE_MARK = { wheat: 'w', grove: 't', iron: 'i', seam: 'g', glass: 'c', shoalrun: 'f', ruin: 'r' };
+const SOLID = {
+  insight: 'M0 0 m-2.7 0 a2.7 2.7 0 1 0 5.4 0 a2.7 2.7 0 1 0 -5.4 0',
+  scout: 'M0 -8 L5 6 L0 3 L-5 6 Z',
+  spear: 'M-3 -4 L0 -9 L3 -4 Z',
+  pioneer: 'M-5 -8 H4 L1.5 -5 L4 -2 H-5 Z',
+  ram: 'M-6 3 L0 -6 L6 3 Z',
+  cog: 'M0 -7 L6 -3 V3 H0 Z',
+  flame: 'M0 8 C-6 4 -5 -2 0 -8 C3 -3 6 0 4 4 C3 7 1 8 0 8 Z',
+  star: 'M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z',
+  seam: 'M0 -8 L5 -2 L0 8 L-5 -2 Z'
+};
 
-function unitGlyph(type) {
-  switch (type) {
-    case 'scout':   return 'M-4 4 L4 -4 M4 -4 v5 M4 -4 h-5';
-    case 'spear':   return 'M0 6 V-6 M-3 -3 L0 -7 L3 -3';
-    case 'bow':     return 'M-4 -6 Q6 0 -4 6 M-4 -6 L-1 0 L-4 6';
-    case 'rider':   return 'M-5 5 L0 -6 L5 5 M-2 1 L2 1';
-    case 'warden':  return 'M-5 -5 H5 V5 H-5 Z M-5 0 H5';
-    case 'ram':     return 'M-5 5 L0 -6 L5 5 Z';
-    case 'cog':     return 'M-6 2 L6 2 L4 6 H-4 Z M-1 2 V-6 L4 -3';
-    case 'warship': return 'M-6 2 L6 2 L4 6 H-4 Z M0 2 V-7 M0 -7 L6 -4';
-    case 'pioneer': return 'M-6 6 V-4 M-6 -4 H4 M4 -4 V-7';
-    default:        return 'M-4 0 A4 4 0 1 1 4 0 A4 4 0 1 1 -4 0';
-  }
+const FACTION_EMBLEM = {
+  cindermark: 'flame', thornwake: 'grove', tidebound: 'wave',
+  deepstone: 'mount', sunspire: 'sun', rimeholt: 'snow'
+};
+
+const TECH_MARK = {
+  forage: 'wheat', woodcraft: 'timber', prospecting: 'ore', scribes: 'scroll', archery: 'bow',
+  masonry: 'walls', sailing: 'cog', riding: 'rider', trade: 'market',
+  crop: 'sickle', sawpit: 'sawpit', bloomery: 'iron', law: 'scroll', bowyers: 'arrow',
+  walls: 'tower', harbour: 'anchor', chariots: 'wheel', coinage: 'coin',
+  granaries: 'granary', ritual: 'temple', siegeworks: 'ram', steel: 'sword',
+  cartography: 'map', navigation: 'star', shieldwall: 'warden', citadel: 'tower',
+  longbow: 'bow', banking: 'stack', ascendancy: 'crown'
+};
+
+function markBody(name) {
+  const solid = SOLID[name] ? '<path class="f" d="' + SOLID[name] + '"/>' : '';
+  return solid + (MARK[name] || '').split('|').filter(Boolean)
+    .map(d => '<path d="' + d + '"/>').join('');
 }
+
+// Inline SVG for the chrome, drawn in whatever colour the surrounding text uses.
+function icon(name, size) {
+  const box = size || 14;
+  return '<svg class="ico" viewBox="-10 -10 20 20" width="' + box + '" height="' + box +
+    '" aria-hidden="true">' + markBody(name) + '</svg>';
+}
+
+// The same mark drawn onto the map, in the map's own ink.
+function markOnMap(name, cx, cy, scale, ink, width) {
+  const strokes = (MARK[name] || '').split('|').filter(Boolean)
+    .map(d => '<path d="' + d + '"/>').join('');
+  const solid = SOLID[name]
+    ? '<path d="' + SOLID[name] + '" fill="' + ink + '" stroke="none"/>' : '';
+  return '<g transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ') scale(' + scale +
+    ')" fill="none" stroke="' + ink + '" stroke-width="' + width +
+    '" stroke-linecap="round" stroke-linejoin="round">' + solid + strokes + '</g>';
+}
+
+// A shield carrying the banner's own device, for the start screen.
+function emblem(factionId, size) {
+  const mark = FACTION_EMBLEM[factionId] || 'star';
+  const box = size || 26;
+  return '<span class="emblem"><svg viewBox="-11 -11 22 22" width="' + box + '" height="' + box +
+    '" aria-hidden="true"><path d="M0 -10 L8 -7 V0 C8 5 5 9 0 11 C-5 9 -8 5 -8 0 V-7 Z"/>' +
+    '<g class="dev" transform="scale(.82)">' + markBody(mark) + '</g></svg></span>';
+}
+
+// What a price looks like: the resource's own drawing beside the amount.
+function costMarkup(cost) {
+  return Object.keys(cost || {}).map(k =>
+    '<span class="chip" title="' + RES_LABEL[k] + '">' + icon(k, 11) + cost[k] + '</span>').join('');
+}
+
+/* ── ground, drawn per tile ────────────────────────────────────────────────── */
+
+// A flat fill never said "wood" at a glance, so each kind of ground now carries a
+// few drawn elements of its own: pines, ridge lines, reeds, dunes, cracks, waves.
+// Offsets wobble by tile hash so a field of one ground never looks stamped.
+function tileScenery(tile, x, y, cx, cy) {
+  const wobble = hash2(x, y, G.seed + 17);
+  const j = n => (wobble - 0.5) * n;
+  const out = [];
+  const put = (d, dx, dy, scale, cls) => {
+    const body = d.split('|').map(part =>
+      '<path class="' + (cls || 'sc') + '" d="' + part + '"/>').join('');
+    out.push('<g transform="translate(' + (cx + dx + j(3)).toFixed(1) + ' ' + (cy + dy + j(3)).toFixed(1) +
+      ') scale(' + scale + ')">' + body + '</g>');
+  };
+
+  switch (tile.t) {
+    case 'forest':
+      put('M0 -7 L5 0 H-5 Z|M0 0 V4', -7, 2, 1, 'scf');
+      put('M0 -7 L5 0 H-5 Z|M0 0 V4', 5, -3, 1.15, 'scf');
+      put('M0 -7 L5 0 H-5 Z|M0 0 V4', 1, 6, 0.85, 'scf');
+      break;
+    case 'hill':
+      put('M-9 4 Q-4 -6 1 4|M-1 4 Q4 -1 9 4', 0, 0, 1);
+      put('M-4 1 h3 M1 2 h2', 0, 0, 1, 'sc-soft');
+      break;
+    case 'mount':
+      put('M0 -9 L8 6 H-8 Z', 0, 0, 1, 'scf');
+      put('M-3 -2 L0 -7 L3 -2', 0, 0, 1);
+      break;
+    case 'meadow':
+      put('M-3 4 V-3 M0 4 V-5 M3 4 V-2', -5, 0, 1);
+      put('M-3 4 V-3 M0 4 V-5 M3 4 V-2', 4, 5, 0.9);
+      break;
+    case 'plain':
+      put('M-9 1 H9 M-9 5 H3', 0, 0, 1, 'sc-soft');
+      put('M-3 3 V-3 M0 3 V-4 M3 3 V-3', 1, 4, 0.8);
+      break;
+    case 'desert':
+      put('M-9 3 Q-4 -4 0 3 Q4 9 9 3', 0, 0, 1);
+      put('M-5 7 h2 M3 7 h2', 0, 0, 1, 'sc-soft');
+      break;
+    case 'tundra':
+      put('M-7 -1 h2 M-1 3 h2 M5 -3 h2 M1 -5 h2', 0, 0, 1);
+      break;
+    case 'ash':
+      put('M-6 -5 L-2 0 L-5 5|M4 -6 L2 0 L6 4', 0, 0, 1);
+      put('M-1 3 L0 1 L1 3 L0 5 Z', 2, 2, 0.7, 'scf');
+      break;
+    case 'marsh':
+      put('M-5 6 V-4 M-1 6 V-6 M3 6 V-3', 0, 0, 1);
+      put('M-8 7 q4 -3 8 0 t8 0', 0, 0, 1, 'sc-soft');
+      break;
+    case 'shoal':
+      put('M-8 -2 q4 -4 8 0 t8 0', 0, 0, 1);
+      put('M-8 3 q4 -4 8 0 t8 0', 0, 1, 0.9, 'sc-soft');
+      break;
+    case 'ocean':
+      put('M-8 -1 q4 -4 8 0 t8 0', 0, 0, 1);
+      put('M-8 5 q4 -4 8 0 t8 0', 0, 1, 1, 'sc-soft');
+      break;
+    default:
+      break;
+  }
+  return out.join('');
+}
+
 
 function renderBoard() {
   if (!UI || !G) return;
@@ -1822,17 +2029,13 @@ function renderBoard() {
         coast.push('<path class="coast" d="' + d + '" stroke="rgba(36,28,18,.09)" stroke-width=".8"/>');
       }
 
-      const mark = TERRAIN_MARK[tile.t];
-      if (mark) {
-        marks.push('<path d="' + mark + '" transform="translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) +
-          ')" fill="none" stroke="rgba(36,28,18,.34)" stroke-width="1.1" stroke-linecap="round" opacity=".8"/>');
-      }
-      if (tile.f && FEATURE_MARK[tile.f]) {
+      marks.push(tileScenery(tile, x, y, cx, cy));
+      // A resource sits on a small paper disc carrying its own drawing, so a
+      // wheat field and a gold seam are told apart without a letter or a legend.
+      if (tile.f && MARK[tile.f]) {
         marks.push('<circle cx="' + (cx + 12).toFixed(1) + '" cy="' + (cy - 11).toFixed(1) +
-          '" r="5.6" fill="#f7f0df" stroke="rgba(36,28,18,.4)" stroke-width=".7"/>' +
-          '<text x="' + (cx + 12).toFixed(1) + '" y="' + (cy - 8.4).toFixed(1) +
-          '" text-anchor="middle" font-family="ui-monospace, Menlo, monospace" font-size="8" fill="rgba(36,28,18,.72)">' +
-          (tile.f === 'ruin' ? 'r' : FEATURE_MARK[tile.f]) + '</text>');
+          '" r="7.4" fill="#f7f0df" stroke="rgba(36,28,18,.42)" stroke-width=".8"/>' +
+          markOnMap(tile.f, cx + 12, cy - 11, 0.62, 'rgba(36,28,18,.8)', 2.2));
       }
 
       if (highlight.has(key)) {
@@ -1881,17 +2084,23 @@ function renderBoard() {
     const def = UNITS[unit.type];
     const exhausted = unit.mp <= 0 && unit.acted;
     const portion = clamp(unit.hp / def.hp, 0, 1);
-    const glyph = unitGlyph(unit.type);
     unitsOut.push(
       '<g class="unit' + (exhausted ? ' exhausted' : '') + '">' +
-      '<path class="banner" d="M' + (cx - 7) + ' ' + (cy - 19) + ' h13 v9 h-13 z" fill="' + f.ink + '" opacity=".85"/>' +
-      '<path class="body" d="M' + (cx - 9) + ' ' + (cy - 11) + ' h18 v18 h-18 z" fill="' + f.light + '" stroke-width="1.2"/>' +
-      '<path d="' + glyph + '" transform="translate(' + cx + ' ' + (cy - 2) + ') scale(.92)" fill="none" stroke="#241c12" stroke-width="1.4" stroke-linecap="round"/>' +
+      '<path class="body" d="M' + (cx - 10) + ' ' + (cy - 12) + ' h20 v20 h-20 z" fill="' + f.light +
+        '" style="stroke:' + f.ink + ';stroke-width:2"/>' +
+      markOnMap(unit.type, cx, cy - 2, 0.92, '#241c12', 2.1) +
       '<line class="hp" x1="' + (cx - 9) + '" y1="' + (cy + 10) + '" x2="' + (cx + 9) + '" y2="' + (cy + 10) + '"/>' +
       '<line class="hpv" x1="' + (cx - 9) + '" y1="' + (cy + 10) + '" x2="' + (cx - 9 + 18 * portion).toFixed(1) + '" y2="' + (cy + 10) + '"/>' +
       (unit.fortified ? '<path d="M' + (cx - 4) + ' ' + (cy + 14) + ' l8 0 l-4 4 z" fill="#241c12"/>' : '') +
       '</g>'
     );
+  }
+
+  const coachHex = coachAt();
+  if (coachHex) {
+    const [kx, ky] = hexCenter(coachHex[0], coachHex[1]);
+    labels.push('<circle class="coach-ring" cx="' + kx.toFixed(1) + '" cy="' + ky.toFixed(1) +
+      '" r="' + (HEX_R - 2) + '"/>');
   }
 
   if (selection && selection.kind === 'unit') {
@@ -1937,10 +2146,12 @@ function toast(message) {
 
 function render() {
   if (!UI || !G) return;
+  tutorialTick();
   renderBar();
   renderBoard();
   renderSide();
   renderLog();
+  renderCoach();
   if (UI.btnEnd) UI.btnEnd.disabled = !!G.over;
   if (G.over && !UI.endShown) showEndModal();
 }
@@ -1952,15 +2163,16 @@ function renderBar() {
   UI.bannerName.textContent = f.name;
   UI.bannerEpi.textContent = f.epithet;
   const items = ['renown'].concat(RES_KEYS);
+  // Drawn, not spelled: each resource is its own mark, its stock, its income.
   UI.resRow.innerHTML = items.map(key => {
     if (key === 'renown') {
-      return '<span class="res-item"><span class="res-glyph">renown</span>' +
+      return '<span class="res-item" title="Renown: cities, growth, lore, works">' + icon('renown', 15) +
         '<span class="res-val">' + renownOf(f) + '</span></span>';
     }
     const inc = income[key] || 0;
     const cls = inc > 0 ? 'up' : inc < 0 ? 'down' : '';
-    return '<span class="res-item"><span class="res-glyph">' + RES_LABEL[key].toLowerCase() + '</span>' +
-      '<span class="res-val">' + (f.res[key] || 0) + '</span>' +
+    return '<span class="res-item" title="' + RES_LABEL[key] + ' · ' + (inc > 0 ? '+' : '') + inc + ' a turn">' +
+      icon(key, 15) + '<span class="res-val">' + (f.res[key] || 0) + '</span>' +
       '<span class="res-inc ' + cls + '">' + (inc > 0 ? '+' : '') + inc + '</span></span>';
   }).join('');
   UI.turnReadout.textContent = G.turn + '/' + G.maxTurns;
@@ -2001,18 +2213,19 @@ function realmPanel() {
   const mods = techMods(f);
   const rivals = G.factions.filter(o => o.i !== f.i && o.alive);
 
-  let html = '<div class="side-head"><h2>' + esc(f.name) + '</h2></div>' +
+  let html = '<div class="side-head">' + emblem(f.id, 24) + '<h2>' + esc(f.name) + '</h2></div>' +
     '<div class="side-sub">' + esc(f.epithet) + '</div>' +
-    '<div class="kv"><span>Renown</span><span>' + renownOf(f) + '</span></div>' +
-    '<div class="kv"><span>Cities</span><span>' + cities.length + '</span></div>' +
-    '<div class="kv"><span>Banners afield</span><span>' + units.length + '</span></div>' +
-    '<div class="kv"><span>Technologies</span><span>' + f.techs.length + ' / ' + TECHS.length + '</span></div>' +
-    '<div class="kv"><span>Upkeep</span><span>' + upkeep + ' coin</span></div>';
+    '<div class="kv"><span>' + icon('renown', 13) + ' renown</span><span>' + renownOf(f) + '</span></div>' +
+    '<div class="kv"><span>' + icon('tower', 13) + ' keeps</span><span>' + cities.length + '</span></div>' +
+    '<div class="kv"><span>' + icon('spear', 13) + ' banners</span><span>' + units.length + '</span></div>' +
+    '<div class="kv"><span>' + icon('scroll', 13) + ' lore</span><span>' + f.techs.length + ' / ' + TECHS.length + '</span></div>' +
+    '<div class="kv"><span>' + icon('coin', 13) + ' upkeep</span><span>' + upkeep + '</span></div>';
 
   html += '<p class="sec">Each turn</p>';
   for (const key of ['food'].concat(RES_KEYS)) {
     const value = income[key] || 0;
-    html += '<div class="kv"><span>' + RES_LABEL[key] + '</span><span style="color:' +
+    html += '<div class="kv"><span>' + icon(key === 'food' ? 'stores' : key, 13) + ' ' +
+      RES_LABEL[key].toLowerCase() + '</span><span style="color:' +
       (value < 0 ? '#8f3c1a' : value > 0 ? '#3f5c2d' : '#8a7d66') + '">' + (value > 0 ? '+' : '') + value + '</span></div>';
   }
 
@@ -2040,7 +2253,7 @@ function realmPanel() {
     html += '<div class="unit-list">';
     for (const unit of units) {
       html += '<button class="unit-row" data-act="select-unit:' + unit.id + '">' +
-        '<span class="nm">' + UNITS[unit.type].name + '</span>' +
+        icon(unit.type, 14) + '<span class="nm">' + UNITS[unit.type].name + '</span>' +
         '<span class="st">' + unit.hp + 'hp · ' + unit.mp + 'mp</span></button>';
     }
     html += '</div>';
@@ -2052,13 +2265,13 @@ function realmPanel() {
     html += '<div class="unit-list">';
     for (const city of cities) {
       html += '<button class="unit-row" data-act="select-city:' + city.id + '">' +
-        '<span class="nm">' + esc(city.name) + '</span>' +
+        icon('tower', 14) + '<span class="nm">' + esc(city.name) + '</span>' +
         '<span class="st">lvl ' + city.level + '</span></button>';
     }
     html += '</div>';
   }
-  html += '<p class="hint">Drag the map to look around, scroll to zoom. Select a city to train or build; ' +
-    'select a banner to move or strike.</p>';
+  html += '<p class="hint">Drag to look around, scroll to zoom. A keep trains and builds; a banner moves and ' +
+    'strikes.</p>';
   return html;
 }
 
@@ -2090,7 +2303,8 @@ function cityPanel(city) {
       '<div class="bar"><i style="width:' + clamp(city.food / need, 0, 1) * 100 + '%"></i></div>' +
       '<p class="sec">Worked here</p>' +
       ['food'].concat(RES_KEYS).map(key =>
-        '<div class="kv"><span>' + RES_LABEL[key] + '</span><span>+' + (yields[key] || 0) + '</span></div>').join('');
+        '<div class="kv"><span>' + icon(key === 'food' ? 'stores' : key, 13) + ' ' + RES_LABEL[key].toLowerCase() +
+        '</span><span>+' + (yields[key] || 0) + '</span></div>').join('');
 
     html += '<p class="sec">Train ' + (city.trained ? '<span class="tag">done</span>' : '') + '</p><div class="actions">';
     for (const type of Object.keys(UNITS)) {
@@ -2102,8 +2316,9 @@ function cityPanel(city) {
       const cost = unitCost(f, type);
       const affordable = canPay(f, cost) && !city.trained && !locked;
       html += '<button class="act' + (affordable ? '' : ' locked') + '" data-act="train:' + city.id + ':' + type + '"' +
-        (affordable ? '' : ' disabled') + ' title="' + esc(def.blurb) + '">' + def.name +
-        '<span class="cost">' + (locked ? 'needs ' + TECH_BY_ID[def.tech].name : costText(cost)) + '</span></button>';
+        (affordable ? '' : ' disabled') + ' title="' + esc(def.blurb) + '">' + icon(type, 15) + ' ' + def.name +
+        (locked ? '<span class="chip">' + icon('scroll', 11) + esc(TECH_BY_ID[def.tech].name) + '</span>'
+                : costMarkup(cost)) + '</button>';
     }
     html += '</div>';
 
@@ -2114,15 +2329,16 @@ function cityPanel(city) {
       const locked = !unlocked(f, 'building', id);
       const affordable = canPay(f, def.cost) && !city.built && !has && !locked;
       html += '<button class="act' + (affordable ? '' : ' locked') + '" data-act="build:' + city.id + ':' + id + '"' +
-        (affordable ? '' : ' disabled') + ' title="' + esc(def.blurb) + '">' + def.name +
-        '<span class="cost">' + (has ? 'built' : locked ? 'needs ' + TECH_BY_ID[def.tech].name : costText(def.cost)) +
-        '</span></button>';
+        (affordable ? '' : ' disabled') + ' title="' + esc(def.blurb) + '">' + icon(id, 15) + ' ' + def.name +
+        (has ? '<span class="chip">built</span>'
+             : locked ? '<span class="chip">' + icon('scroll', 11) + esc(TECH_BY_ID[def.tech].name) + '</span>'
+                      : costMarkup(def.cost)) + '</button>';
     }
     html += '</div>';
 
     if (city.buildings.length) {
       html += '<p class="sec">Works</p><div class="hint" style="margin-top:0">' +
-        city.buildings.map(b => BUILDINGS[b].name).join(' · ') + '</div>';
+        city.buildings.map(b => icon(b, 13) + ' ' + BUILDINGS[b].name).join(' ') + '</div>';
     }
     html += '<div class="actions"><button class="act" data-act="centre:' + cx + ':' + cy + '">Find on map</button></div>';
   } else {
@@ -2213,10 +2429,11 @@ function showTechModal() {
       html += '<div class="tech-era"><h3>Era ' + tech.era + '</h3><div class="tech-grid">';
     }
     html += '<button class="tech-card ' + cls + '"' + (affordable ? ' data-act="research:' + tech.id + '"' : ' disabled') + '>' +
-      '<div class="tn"><span>' + tech.name + '</span><span class="tc">' + tech.cost + 'i</span></div>' +
-      '<div class="te">' + tech.text + '</div>' +
+      '<span class="ti">' + icon(TECH_MARK[tech.id] || 'star', 22) + '</span><span>' +
+      '<span class="tn"><span>' + tech.name + '</span><span class="tc">' + icon('insight', 11) + tech.cost + '</span></span>' +
+      '<span class="te">' + tech.text + '</span>' +
       (!ready ? '<div class="tq">needs ' + tech.req.map(r => TECH_BY_ID[r].name).join(' + ') + '</div>' : '') +
-      '</button>';
+      '</span></button>';
     return html;
   }, '');
   const closing = '</div></div>';
@@ -2281,6 +2498,7 @@ function showMenuModal() {
     '<div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act wide" data-act="save">Save campaign</button>' +
     '<button class="act wide"' + (hasSave ? '' : ' disabled') + ' data-act="load">Load saved campaign</button>' +
+    '<button class="act wide" data-act="tutorial">Play the tutorial</button>' +
     '<button class="act wide" data-act="help">How to play</button>' +
     '<button class="act wide" data-act="new">Abandon and start a new vale</button>' +
     '</div>' +
@@ -2311,7 +2529,8 @@ function showHelpModal() {
     'renown carries the day. Renown counts cities, population, technologies, works and wonders.</p>' +
     '<p class="sec">Keys</p><p class="hint" style="margin-top:0">Space ends the turn · T technologies · ' +
     'D council · Esc closes a panel or clears the selection · drag to look around · scroll to zoom.</p>' +
-    '</div><div class="modal-foot"><button class="btn" data-act="close">Close</button></div>'
+    '</div><div class="modal-foot"><button class="btn" data-act="tutorial">Play the tutorial</button>' +
+    '<button class="btn" data-act="close">Close</button></div>'
   );
 }
 
@@ -2348,6 +2567,25 @@ function onAction(act) {
     case 'council': showCouncilModal(); break;
     case 'menu': showMenuModal(); break;
     case 'help': showHelpModal(); break;
+    case 'tutorial': startTutorial(); break;
+    case 'tut-skip':
+      closeCoach();
+      toast('Tutorial skipped');
+      UI.start.hidden = false;
+      G = null;
+      selection = null;
+      reachable = null;
+      refreshStart();
+      break;
+    case 'tut-new':
+      closeCoach();
+      G = null;
+      selection = null;
+      reachable = null;
+      UI.start.hidden = false;
+      refreshStart();
+      break;
+    case 'tut-close': TUT.closed = true; closeCoach(); break;
     case 'save': toast(saveGame() ? 'Campaign saved on this device' : 'No campaign to save'); closeModal(); break;
     case 'load': if (loadGame()) { toast('Campaign loaded'); closeModal(); } break;
     case 'new': closeModal(); UI.start.hidden = false; refreshStart(); break;
@@ -2398,12 +2636,156 @@ function onAction(act) {
   }
 }
 
+/* ── the tutorial ──────────────────────────────────────────────────────────── */
+
+// One small hand-drawn vale and a coach that asks for a single thing at a time.
+// A step only closes when the board actually shows the result, so the tutorial
+// cannot be clicked through without playing it.
+const TUT_ROWS = [
+  'ooooooo',
+  'omhfpso',
+  'opCpHoo',
+  'ofpsPoo',
+  'ooooooo'
+];
+const TUT_GROUND = { o: 'ocean', m: 'meadow', p: 'plain', f: 'forest', h: 'hill', s: 'shoal' };
+
+const TUT = { step: 0, trained: false, moved: false, closed: false };
+
+const TUT_STEPS = [
+  { say: 'This is Thornmouth, your only keep. Click the hex it stands on.',
+    at: () => { const c = G.cities.find(c => c.capital); return c ? [c.x, c.y] : null; },
+    done: () => !!(selection && selection.kind === 'city') },
+  { say: 'A keep trains one banner each turn. Raise a Wanderer.',
+    el: '[data-act^="train:"]',
+    done: () => TUT.trained },
+  { say: 'Click a banner to take it up, then a lit hex to move it.',
+    at: () => { const u = G.units.find(u => u.owner === 0 && u.type === 'scout'); return u ? [u.x, u.y] : null; },
+    done: () => TUT.moved },
+  { say: 'Pioneers plant new keeps. Select them, then press Found city.',
+    at: () => { const u = G.units.find(u => u.owner === 0 && u.type === 'pioneer'); return u ? [u.x, u.y] : null; },
+    done: () => G.cities.length > 1 },
+  { say: 'Each keep may also raise one work a turn. A Granary fills its stores.',
+    el: '[data-act^="build:"]',
+    done: () => G.cities.some(c => c.buildings.length > 0) },
+  { say: 'Lore is bought with insight and never costs a turn. Learn Woodcraft.',
+    el: '#btn-tech',
+    done: () => player().techs.length > 0 },
+  { say: 'A Cindermark raider is in your fields. Select the Spears beside the keep and strike it.',
+    at: () => { const u = G.units.find(u => u.owner === 1); return u ? [u.x, u.y] : null; },
+    done: () => !G.units.some(u => u.owner === 1) },
+  { say: 'That is a turn. Press End turn: the rival banners move when you do.',
+    el: '#btn-end',
+    done: () => G.turn > 1 }
+];
+
+function buildTutorialVale() {
+  const def = FACTIONS.find(f => f.id === 'thornwake') || FACTIONS[0];
+  const rivalDef = FACTIONS.find(f => f.id === 'cindermark') || FACTIONS[1];
+  G = {
+    version: 1, seed: 0x7a17c3, size: 'small', turns: 20, maxTurns: 20,
+    cols: 7, rows: 5, turn: 1, phase: 'player', player: 0,
+    tiles: [], units: [], cities: [], factions: [], dip: [], attitude: [],
+    log: [], over: null, nextUnit: 1, nextCity: 1, tut: true
+  };
+  for (let y = 0; y < G.rows; y++) {
+    for (let x = 0; x < G.cols; x++) {
+      const ground = TUT_GROUND[TUT_ROWS[y][x]] || 'plain';
+      G.tiles.push({ t: ground, f: null, owner: null, city: null, seen: false, vis: false });
+    }
+  }
+  const banner = (i, d) => ({
+    i, id: d.id, name: d.name, epithet: d.epithet, ink: d.ink, light: d.light,
+    home: d.home, bonus: d.bonus, isPlayer: i === 0, alive: true,
+    res: { timber: 18, ore: 12, coin: 16, insight: 14 }, techs: [], capital: null
+  });
+  G.factions = [banner(0, def), banner(1, rivalDef)];
+  G.dip = [['peace', 'war'], ['war', 'peace']];
+  G.attitude = [[0, -45], [-45, 0]];
+
+  const keep = addCity(G.factions[0], 2, 2, 'Thornmouth', 2);
+  keep.capital = true;
+  G.factions[0].capital = keep.id;
+  claimRing(keep, 1);
+  addUnit(G.factions[0], 'spear', 3, 2);
+  addUnit(G.factions[0], 'scout', 1, 1);
+  addUnit(G.factions[0], 'pioneer', 4, 3);
+  addUnit(G.factions[1], 'scout', 2, 1);
+  log('A Cindermark raider has crossed the ford.', G.factions[1].ink);
+  recomputeVision();
+}
+
+function startTutorial() {
+  if (!UI) return;
+  buildTutorialVale();
+  TUT.step = 0; TUT.trained = false; TUT.moved = false; TUT.closed = false;
+  selection = null;
+  reachable = null;
+  UI.start.hidden = true;
+  UI.endShown = false;
+  closeModal();
+  cam.fitted = false;
+  render();
+  fitCamera();
+}
+
+// Closing the coach without finishing the vale: the board stays as it is, and
+// the lit hex for the next step goes away with it.
+function closeCoach() {
+  if (UI && UI.coach) UI.coach.hidden = true;
+  clearCoachMarks();
+}
+
+function clearCoachMarks() {
+  for (const el of document.querySelectorAll('.coach-target')) el.classList.remove('coach-target');
+}
+
+function tutorialTick() {
+  if (!G || !G.tut) return;
+  let guard = 0;
+  while (TUT.step < TUT_STEPS.length && TUT_STEPS[TUT.step].done() && guard++ < 12) TUT.step++;
+}
+
+// The hex the current step is waiting on, if it names one.
+function coachAt() {
+  if (!G || !G.tut) return null;
+  const step = TUT_STEPS[TUT.step];
+  return step && step.at ? step.at() : null;
+}
+
+function renderCoach() {
+  if (!UI || !UI.coach) return;
+  clearCoachMarks();
+  if (!G || !G.tut || TUT.closed) { UI.coach.hidden = true; return; }
+  UI.coach.hidden = false;
+
+  if (TUT.step >= TUT_STEPS.length) {
+    UI.coachCount.textContent = 'done';
+    UI.coachSay.innerHTML = 'That is the whole of it: a keep, a banner, a work, a little lore and a war. ' +
+      'The vale is yours to take.';
+    UI.coachActions.innerHTML =
+      '<button class="act" data-act="tut-new">Start a campaign</button>' +
+      '<button class="act" data-act="tut-close">Keep looking around</button>';
+    return;
+  }
+
+  const step = TUT_STEPS[TUT.step];
+  UI.coachCount.textContent = (TUT.step + 1) + ' / ' + TUT_STEPS.length;
+  UI.coachSay.innerHTML = step.say;
+  UI.coachActions.innerHTML = '<button class="skip" data-act="tut-skip">Skip the tutorial</button>';
+  if (step.el) {
+    for (const el of document.querySelectorAll(step.el)) el.classList.add('coach-target');
+  }
+}
+
 /* ── saving the campaign ───────────────────────────────────────────────────── */
 
 const SAVE_KEY = 'bored.ashcrown.save.v1';
 
 function saveGame() {
   if (!G) return false;
+  // The tutorial vale is a lesson, not a campaign: it never touches the save slot.
+  if (G.tut) return false;
   // A finished campaign is not resumable, so it leaves nothing behind for the
   // start screen's Continue to offer.
   if (G.over) { clearSave(); return false; }
@@ -2476,7 +2858,7 @@ function buildStartScreen() {
   if (!UI) return;
   UI.factionGrid.innerHTML = FACTIONS.map(f =>
     '<button class="faction-card' + (f.id === startChoice.factionId ? ' on' : '') + '" data-pick="' + f.id + '" type="button">' +
-    '<div class="fn"><span class="dot" style="background:' + f.ink + '"></span>' + f.name + '</div>' +
+    '<div class="fn">' + emblem(f.id, 24) + '<span style="color:' + f.ink + '">' + f.name + '</span></div>' +
     '<div class="fe">' + esc(f.epithet) + '</div>' +
     '<div class="fb">' + esc(f.bonus) + '</div></button>'
   ).join('');
@@ -2491,6 +2873,7 @@ function buildStartScreen() {
   UI.optSize.onchange = () => { startChoice.size = UI.optSize.value; };
   UI.optTurns.onchange = () => { startChoice.turns = Number(UI.optTurns.value); };
   UI.btnBegin.onclick = beginCampaign;
+  UI.btnTutorial.onclick = startTutorial;
   UI.btnContinue.onclick = () => { if (loadGame()) closeModal(); };
   refreshStart();
 }
@@ -2507,11 +2890,9 @@ function refreshStart() {
   const chosen = FACTIONS.find(f => f.id === startChoice.factionId) || FACTIONS[0];
   const note = UI.startNote;
   if (note) {
-    note.innerHTML = '<b>' + chosen.name + '</b> against ' + (rivals === 2 ? 'two' : rivals === 3 ? 'three' : 'five') +
-      ' rival banners. <b>How it plays.</b> Click a banner, then a hex. Cities train one unit or raise one ' +
-      'building each turn; technologies cost insight. Claim neutral keeps and found new cities to grow. Win by ' +
-      'taking every rival capital, or by raising the Grand Wonder. If nobody has won when the turn limit falls, ' +
-      'the highest renown carries the vale.';
+    note.innerHTML = emblem(chosen.id, 18) + ' <b>' + chosen.name + '</b> against ' +
+      (rivals === 2 ? 'two' : rivals === 3 ? 'three' : 'five') + ' rival banners. New to the vale? ' +
+      'The tutorial takes about two minutes.';
   }
 }
 
@@ -2561,7 +2942,8 @@ function handleTileClick(x, y) {
       autosave();
       return;
     }
-    if (reachable && reachable.has(keyOf(x, y)) && !(unit && unit.id === selected.id)) {
+    // Never walk onto another banner: click it to take it up instead.
+    if (reachable && reachable.has(keyOf(x, y)) && !unit) {
       moveUnit(selected, x, y);
       checkEnd();
       render();
@@ -2701,7 +3083,9 @@ function boot() {
     modalLayer: q('#modal-layer'), modal: q('#modal'), toast: q('#toast'),
     start: q('#start'), factionGrid: q('#faction-grid'), optSize: q('#opt-size'),
     optTurns: q('#opt-turns'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'),
-    startNote: q('#start-note'), endShown: false
+    startNote: q('#start-note'), coach: q('#coach'), coachSay: q('#coach-say'),
+    coachCount: q('#coach-count'), coachActions: q('#coach-actions'),
+    btnTutorial: q('#btn-tutorial'), endShown: false
   };
 
   buildStartScreen();
