@@ -848,7 +848,7 @@ test('browser regressions', async t => {
   });
 
   await t.test('poker opponents price hands by equity, never peek, and draw to real outs', async () => {
-    const frame = await openTitle('poker', 'Poker');
+    const frame = await openTitle('poker', 'Card Table');
     await frame.waitForFunction(() => typeof window.__pokerAI === 'object');
 
     const cardModes = await frame.evaluate(() => {
@@ -1308,12 +1308,12 @@ test('browser regressions', async t => {
       const ranked = await page.evaluate(() => LB_GAMES.map(game => game.id));
       assert.deepEqual(ranked.filter(id => ['8ball', 'sand', 'eco'].includes(id)), [], 'open-ended games are off the board');
 
-      frame = await openTitle('poker', 'Poker');
+      frame = await openTitle('poker', 'Card Table');
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
       await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'poker', handOver: false, profit: 500 }); });
       await close();
       assert.equal(await page.evaluate(() => localStorage.getItem('bored.high.poker')), null, 'unfinished hands do not count');
-      frame = await openTitle('poker', 'Poker');
+      frame = await openTitle('poker', 'Card Table');
       await frame.waitForFunction(() => typeof __boredSnapshot === 'function');
       await frame.evaluate(() => { window.__boredSnapshot = () => ({ slug: 'poker', handOver: true, profit: 500 }); });
       await close();
