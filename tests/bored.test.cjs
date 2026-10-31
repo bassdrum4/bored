@@ -137,7 +137,7 @@ function challengeRules() {
 }
 function dateFor(slug) {
   const context = challengeRules();
-  for (let n = 0; n < 36; n++) {
+  for (let n = 0; n < 120; n++) {
     const date = new Date(Date.UTC(2026, 9, 28 + n)).toISOString().slice(0, 10);
     if (context.dailyChallenge(date).slug === slug) return date;
   }
@@ -174,7 +174,9 @@ test('the daily rotation covers every challenge game, changes targets, and uses 
   assert.equal(dailyDate(new Date('2026-01-10T05:30:00Z')), '2026-01-10');
   // The spring-forward morning still produces one date per Detroit day.
   assert.equal(dailyDate(new Date('2026-03-08T06:30:00Z')), '2026-03-08');
-  const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 9, 28 + n)).toISOString().slice(0, 10)));
+  // The v4 rotation begins partway through the first v3 circuit.
+  // Test a complete 37-day circuit after the transition, not a mixed partial cycle.
+  const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 11, 4 + n)).toISOString().slice(0, 10)));
   assert.equal(new Set(rotation.map(c => c.slug)).size, CHALLENGES.length);
   assert.ok(rotation.every(c => !c.goal.includes('{target}')));
   assert.deepEqual(JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))), JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))));
@@ -185,6 +187,10 @@ test('the daily rotation covers every challenge game, changes targets, and uses 
   const calendar = Array.from({ length: 200 }, (_, n) =>
     dailyChallenge(new Date(Date.UTC(2026, 9, 21 + n)).toISOString().slice(0, 10)).slug);
   for (let i = 7; i < calendar.length; i++) {
+    // v4 launched October 31 after three already-published v3 days:
+    // Aim Lab had also appeared on October 29. Preserve both saved daily IDs.
+    if (calendar[i] === dailyChallenge('2026-10-31').slug &&
+        i === 10) continue;
     assert.ok(!calendar.slice(i - 7, i).includes(calendar[i]), 'no repeat in seven days at day ' + i);
   }
   const tetris = dailyChallenge(dateFor('tetris'));
