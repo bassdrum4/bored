@@ -1,0 +1,43 @@
+name: Commit changelog updates
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Serialize changelog writes; a new push supersedes an older generator.
+concurrency:
+  group: bored-changelog-commit
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'chore(changelog):')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Generate and commit current changelog
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Pull the latest main before generating; do not commit stale history.
+          git pull --ff-only origin main
+          node scripts/changelog.mjs
+          if git diff --quiet -- src/changelog-data.js; then
+            echo "Changelog already current."
+            exit 0
+          fi
+          git add src/changelog-data.js
+          git commit -m "chore(changelog): sync entries from main history [skip ci]"
+          # GitHub's GITHUB_TOKEN pushes do not start another workflow,
+          # preventing CI / deploy recursion. The original push deploys
+          # the same generated changelog in the Pages workflow.
+          git push origin HEAD:main
