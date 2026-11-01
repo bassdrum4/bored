@@ -183,9 +183,9 @@ export const HIGH_SCORE_GAMES = [
   }),
   highScore('lights-out', 'Lights Out', 'boards', { metric: 'cleared' }),
   highScore('commanders', 'Commanders', 'points', { metric: 'score' }),
-  highScore('lava', 'Lava', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
-  highScore('volletball', 'VolletBall', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
-  highScore('gun-mayhem', 'Gun Mayhem', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
+  highScore('lava', 'Lava', 'CPU points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
+  highScore('volletball', 'VolletBall', 'CPU points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
+  highScore('gun-mayhem', 'Gun Mayhem', 'CPU rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   highScore('shadow-net', 'shadow.net', 'files', { metric: 'files' }),
   highScore('asteroids', 'Asteroids', 'points', { metric: 'score' })
 ];
