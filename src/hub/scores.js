@@ -88,6 +88,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  highScore("brick-run", "Brick Run", "points", { metric: "score", when: snapshot => snapshot.finished === true }),
   // Ashcrown ranks the renown a campaign actually finished with: a banner still
   // growing when the player walked away is not a result. Every finished campaign
   // holds at least one city, so the renown floor is real rather than arbitrary.

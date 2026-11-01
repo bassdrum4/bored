@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Brick Run</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  body { display: grid; place-items: center; min-height: 100vh; background: #f5f2ea; color: #191713;
+         font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 0 }
+  main { width: min(360px, 94vw); text-align: center }
+  h1 { font-size: 11px; font-weight: 600; letter-spacing: .1em; margin-bottom: 8px; text-transform: uppercase }
+  h1 span { color: #6b6558; font-weight: 400 }
+  #wrap { border: 1px solid #d8d2c4; background: #fffdf7 }
+  canvas { display: block; width: 100%; height: auto; touch-action: none; background: #fffdf7 }
+
+  #row { display: flex; gap: 6px; margin-top: 6px }
+  #start, #restart { flex: 1; font: inherit; font-size: 12px; border: 1px solid #191713; background: none;
+                     color: inherit; padding: 8px 0; cursor: pointer }
+  #start:hover, #restart:hover { background: #191713; color: #fffdf7 }
+  #restart[hidden], #start[hidden] { display: none }
+  p { font-size: 11px; color: #6b6558; margin-top: 8px }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="hud">SCORE 0 <span>WORLD 1-1 LIVES 3</span></h1>
+  <div id="wrap"><canvas id="c" width="384" height="216"></canvas></div>
+
+  <div id="row">
+    <button id="start" type="button">Start</button>
+    <button id="restart" type="button" hidden>Restart</button>
+  </div>
+  <p>Arrows / A D move, Space jumps, Down enters pipes. Stomp foes, bump ? blocks, reach the flag.</p>
+</main>
+<script>
+'use strict';
+/* Brick Run — an original small platformer. No assets, no network. */
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const W = 384, H = 216, TILE = 16, ROWS = 13, GROUND = 11;
+const hudEl = document.getElementById('hud');
+const startBtn = document.getElementById('start'), restartBtn = document.getElementById('restart');
+
+// Tiles: 0 empty 1 ground 2 block 3 brick 4 ?coin 5 ?shroom 6 used 7 pipe 8 pole
+const SOLID = new Set([1,2,3,4,5,6,7]);
+
+function emptyGrid(w){ const g=[]; for(let r=0;r<ROWS;r++) g.push(new Array(w).fill(0)); return g; }
+function fillGround(g, gaps){
+  const w = g[0].length;
+  for(let x=0;x<w;x++){
+    if(gaps.some(([a,b])=>x>=a&&x<=b)) continue;
+    if(GROUND<ROWS) g[GROUND][x]=1;
+    if(GROUND+1<ROWS) g[GROUND+1][x]=1;
+    if(GROUND+2<ROWS) g[GROUND+2][x]=1;
+  }
+}
+function pipe(g,x,h){ for(let i=0;i<h;i++){ g[GROUND-1-i][x]=7; g[GROUND-1-i][x+1]=7; } }
+function stairs(g,x,h,dir){ for(let i=0;i<h;i++){ for(let j=0;j<=i;j++){ const xx = dir>0? x+i : x-i; g[GROUND-1-j][xx]=2; } } }
+
+function buildLevel(n){
+  let w, gaps, enemies=[], coins=[];
+  if(n===1){ w=122; gaps=[[21,22],[41,43],[72,73]];
+    const g=emptyGrid(w); fillGround(g,gaps);
+    g[7][14]=3; g[7][15]=4; g[7][16]=3; g[7][17]=5; g[7][18]=3;
+    g[7][26]=4; g[4][32]=3; g[4][33]=3;
+    pipe(g,52,2); pipe(g,62,3);
+    g[7][57]=3; g[7][58]=4; g[7][59]=3;
+    enemies=[[24,GROUND-1],[37,GROUND-1],[55,GROUND-1],[66,GROUND-1],[84,GROUND-1]];
+    for(let x=20;x<=23;x++) coins.push([x,7]); for(let x=71;x<=74;x++) coins.push([x,6]);
+    coins.push([32,3],[46,6],[47,6],[48,6]);
+    stairs(g,104,4,1); g[GROUND-1][104+4]=2;
+    const flagX=112; for(let r=3;r<=10;r++) g[r][flagX]=8; g[10][flagX+1]=2;
+    return {g,w,spawn:[2,GROUND-2],flagX,enemies,coins,pipes:[{x:52,h:2},{x:62,h:3}],warps:{52:62,62:52}};
+  }
+  if(n===2){ w=148; gaps=[[18,19],[34,36],[58,60],[88,90],[118,120]];
+    const g=emptyGrid(w); fillGround(g,gaps);
+    g[7][12]=5; g[7][24]=3; g[7][25]=4; g[7][26]=3;
+    g[6][42]=4; g[6][43]=3; g[4][48]=3; g[4][49]=4; g[4][50]=3;
+    pipe(g,30,2); pipe(g,54,3); pipe(g,66,2); pipe(g,96,4);
+    g[7][76]=3; g[7][77]=5; g[7][78]=3; g[4][82]=4;
+    enemies=[[22,GROUND-1],[40,GROUND-1],[52,GROUND-1],[70,GROUND-1],[80,GROUND-1],[102,GROUND-1],[108,GROUND-1]];
+    for(let x=33;x<=37;x++) coins.push([x,5]); for(let x=57;x<=61;x++) coins.push([x,5]);
+    coins.push([48,3],[82,3],[100,6],[101,6],[102,6]);
+    stairs(g,130,5,1);
+    const flagX=138; for(let r=3;r<=10;r++) g[r][flagX]=8; g[10][flagX+1]=2;
+    return {g,w,spawn:[2,GROUND-2],flagX,enemies,coins,pipes:[{x:30,h:2},{x:54,h:3},{x:66,h:2},{x:96,h:4}],warps:{30:54,54:30,66:96,96:66}};
+  }
+  w=168; gaps=[[14,16],[30,33],[52,54],[74,77],[100,103],[128,131]];
+  const g=emptyGrid(w); fillGround(g,gaps);
+  g[7][10]=4; g[7][20]=3; g[7][21]=5; g[7][22]=3;
+  g[6][38]=3; g[6][39]=4; g[6][40]=3; g[4][44]=5;
+  pipe(g,26,2); pipe(g,48,3); pipe(g,64,4); pipe(g,92,2); pipe(g,112,3);
+  g[7][84]=3; g[7][85]=4; g[7][86]=3; g[4][106]=4; g[4][107]=3;
+  enemies=[[18,GROUND-1],[36,GROUND-1],[56,GROUND-1],[68,GROUND-1],[86,GROUND-1],[96,GROUND-1],[116,GROUND-1],[122,GROUND-1]];
+  for(let x=29;x<=34;x++) coins.push([x,5]); for(let x=73;x<=78;x++) coins.push([x,5]);
+  for(let x=99;x<=104;x++) coins.push([x,5]);
+  coins.push([44,3],[106,3],[120,6],[121,6]);
+  stairs(g,148,6,1);
+  const flagX=157; for(let r=3;r<=10;r++) g[r][flagX]=8; g[10][flagX+1]=2;
+  return {g,w,spawn:[2,GROUND-2],flagX,enemies,coins,pipes:[{x:26,h:2},{x:48,h:3},{x:64,h:4},{x:92,h:2},{x:112,h:3}],warps:{26:48,48:26,64:112,112:64}};
+}
+
+let state='title', level=1, L=null;
+let score=0, coinsGot=0, lives=3, timeLeft=200, finished=false, won=false, levelJustFinished=false;
+let camX=0, shake=0;
+let player=null, foes=[], parts=[], pickups=[], floaters=[];
+let coyote=0, buffer=0, jumpHeld=false, invuln=0, flagAnim=0;
+
+const keys={left:false,right:false,jump:false,down:false};
+let jumpQueued=false, downQueued=false;
+// Per-run progress: taken coins, used ? blocks and broken bricks survive death.
+// resetRun() clears it, so Restart starts fully fresh.
+let runProgress=null;
+function freshProgress(){ return {1:{used:{},coins:{}},2:{used:{},coins:{}},3:{used:{},coins:{}}}; }
+
+function tileAt(tx,ty){ if(tx<0) return 1; if(ty<0||ty>=ROWS) return 0; if(tx>=L.w) return 1; return L.g[ty][tx]; }
+function solidAt(tx,ty){ return SOLID.has(tileAt(tx,ty)); }
+
+function loadLevel(n, keepScore){
+  L=buildLevel(n);
+  if(!runProgress) runProgress=freshProgress();
+  const prog=runProgress[n]||(runProgress[n]={used:{},coins:{}});
+  // Re-apply collected progress so deaths keep coins / used ? / broken bricks.
+  for(const k in prog.used){ const [tx,ty]=k.split(',').map(Number); if(L.g[ty]&&tx<L.w) L.g[ty][tx]=prog.used[k]; }
+  foes=L.enemies.map(([tx,ty])=>({x:tx*TILE+2,y:(ty)*TILE+2,w:12,h:12,vx:-0.35,vy:0,dead:0,fast:n===3}));
+  pickups=L.coins.map(([tx,ty],i)=>({x:tx*TILE+4,y:ty*TILE+4,w:8,h:8,taken:!!prog.coins[i],ph:Math.random()*6}));
+  const [sx,sy]=L.spawn;
+  player={x:sx*TILE,y:sy*TILE,w:12,h:14,vx:0,vy:0,big:false,onGround:false,face:1,anim:0,dead:0};
+  parts=[]; floaters=[]; camX=0; timeLeft=200; buffer=0; coyote=0; invuln=0; flagAnim=0;
+}
+
+function resetRun(){
+  score=0; coinsGot=0; lives=3; level=1; finished=false; won=false; levelJustFinished=false;
+  runProgress=freshProgress();
+  loadLevel(1); state='play';
+}
+
+function hud(){ hudEl.innerHTML='SCORE '+score+' <span>WORLD 1-'+level+' LIVES '+Math.max(0,lives)+'</span>'; }
+
+function beep(f,d){
+  try{
+    beep.ac = beep.ac || new (window.AudioContext||window.webkitAudioContext)();
+    const ac=beep.ac, o=ac.createOscillator(), g=ac.createGain();
+    o.type='square'; o.frequency.value=f; g.gain.value=0.04;
+    o.connect(g); g.connect(ac.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+d);
+    o.stop(ac.currentTime+d);
+  }catch(e){}
+}
+
+function bump(tx,ty){
+  const t=tileAt(tx,ty);
+  if(t===4||t===5){
+    L.g[ty][tx]=6; if(runProgress) runProgress[level].used[tx+','+ty]=6;
+    score+=100; coinsGot+= t===4?1:0; beep(880,0.12);
+    floaters.push({x:tx*TILE+8,y:ty*TILE-4,txt:t===4?'+100':'POW',t:0});
+    if(t===4){ parts.push({x:tx*TILE+8,y:ty*TILE-6,vx:0,vy:-2.5,t:0,c:'#d9a441',coin:true}); }
+    else { foes.push({x:tx*TILE-2,y:ty*TILE-16,w:14,h:12,vx:0.7,vy:-4,shroom:true,dead:0}); }
+  } else if(t===3){
+    if(player.big){ L.g[ty][tx]=0; if(runProgress) runProgress[level].used[tx+','+ty]=0; score+=50; shake=4; beep(220,0.15);
+      for(let i=0;i<6;i++) parts.push({x:tx*TILE+8,y:ty*TILE+8,vx:(Math.random()-0.5)*3,vy:-Math.random()*3,t:0,c:'#b5674a'});
+    } else { beep(140,0.08); floaters.push({x:tx*TILE+8,y:ty*TILE-4,txt:'',t:0}); }
+  }
+}
+
+function collideMove(p, isPlayer){
+  // X
+  p.x+=p.vx;
+  let x0=Math.floor(p.x/TILE), x1=Math.floor((p.x+p.w-0.01)/TILE);
+  let y0=Math.floor(p.y/TILE), y1=Math.floor((p.y+p.h-0.01)/TILE);
+  if(p.vx>0){ for(let ty=y0;ty<=y1;ty++){ if(solidAt(x1,ty)){ p.x=x1*TILE-p.w-0.01; p.vx=0; p.hitWall=true; break; } } }
+  else if(p.vx<0){ for(let ty=y0;ty<=y1;ty++){ if(solidAt(x0,ty)){ p.x=(x0+1)*TILE+0.01; p.vx=0; p.hitWall=true; break; } } }
+  // Y
+  p.y+=p.vy;
+  p.onGround=false;
+  x0=Math.floor((p.x+1)/TILE); x1=Math.floor((p.x+p.w-1.01)/TILE);
+  y0=Math.floor(p.y/TILE); y1=Math.floor((p.y+p.h-0.01)/TILE);
+  if(p.vy>=0){
+    for(let tx=x0;tx<=x1;tx++){ if(solidAt(tx,y1)){ p.y=y1*TILE-p.h-0.01; p.vy=0; p.onGround=true; break; } }
+  } else {
+    for(let tx=x0;tx<=x1;tx++){ if(solidAt(tx,y0)){
+      p.y=(y0+1)*TILE+0.01; p.vy=0;
+      if(isPlayer) bump(tx,y0);
+      break;
+    } }
+  }
+}
+
+function hurt(){
+  if(invuln>0||player.dead) return;
+  if(player.big){ player.big=false; player.h=14; player.y+=10; invuln=120; beep(160,0.2); return; }
+  player.dead=70; beep(110,0.4);
+}
+
+function update(){
+  if(state!=='play') return;
+  timeLeft-=1/60; if(timeLeft<=0){ timeLeft=0; lives--; if(lives<=0){ gameOver(false); return; } else { loadLevel(level,true); hud(); return; } }
+  const p=player;
+  if(p.dead){ p.dead--; p.vy+=0.3; p.y+=p.vy*0.4;
+    if(p.dead<=0){ lives--; if(lives<0) lives=0;
+      if(lives<=0){ gameOver(false); } else { loadLevel(level,true); hud(); } }
+    updateParts(); return;
+  }
+  // input
+  const acc=p.onGround?0.45:0.3, max=2.6;
+  if(keys.left){ p.vx=Math.max(p.vx-acc,-max); p.face=-1; }
+  else if(keys.right){ p.vx=Math.min(p.vx+acc,max); p.face=1; }
+  else { p.vx*=p.onGround?0.78:0.96; if(Math.abs(p.vx)<0.05) p.vx=0; }
+  if(jumpQueued){ buffer=8; jumpQueued=false; } else if(buffer>0) buffer--;
+  if(p.onGround) coyote=6; else if(coyote>0) coyote--;
+  if(buffer>0 && (p.onGround||coyote>0)){
+    p.vy = p.big? -7.6 : -7.2; p.onGround=false; coyote=0; buffer=0; jumpHeld=true; beep(520,0.1);
+  }
+  if(jumpHeld && !keys.jump && p.vy<-2.5){ p.vy=-2.5; jumpHeld=false; }
+  if(p.vy>=0) jumpHeld=false;
+  p.vy=Math.min(p.vy+0.35,8);
+  p.hitWall=false;
+  collideMove(p,true);
+  if(p.hitWall && p.vx!==0){ /* wall */ }
+  p.anim+=Math.abs(p.vx)*0.06;
+  if(invuln>0) invuln--;
+  if(coyote>0) coyote--;
+  // fell
+  if(p.y>H+40){ lives--; beep(110,0.4); if(lives<=0){ gameOver(false); return; } loadLevel(level,true); hud(); return; }
+  // pipe warp: press Down while standing on a pipe mouth
+  if(downQueued){ downQueued=false;
+    if(p.onGround && L.pipes){
+      const feet=Math.floor((p.y+p.h+2)/TILE);
+      const cxL=Math.floor((p.x+2)/TILE), cxR=Math.floor((p.x+p.w-2)/TILE);
+      for(let tx=cxL;tx<=cxR;tx++){
+        if(tileAt(tx,feet)===7 && tileAt(tx,feet-1)===7){
+          // find which pipe this tile belongs to (left edge)
+          let px=tileAt(tx-1,feet)===7?tx-1:tx;
+          const dest=L.warps && L.warps[px];
+          if(dest!=null){ p.x=dest*TILE+2; p.y=(GROUND-3)*TILE-p.h; p.vx=0; p.vy=0; invuln=Math.max(invuln,30);
+            score+=50; beep(300,0.12); setTimeout(()=>beep(500,0.12),110);
+            camX=Math.max(0,Math.min(p.x-W*0.38,L.w*TILE-W));
+            floaters.push({x:p.x+6,y:p.y-8,txt:'PIPE',t:0});
+          }
+          break;
+        }
+      }
+    }
+  }
+  // flag
+  const flagPx=L.flagX*TILE;
+  if(p.x+p.w>=flagPx && p.x<flagPx+24){
+    // slide + bonus
+    const hBonus=Math.max(0,Math.round((GROUND*TILE-p.y)/TILE))*50;
+    const tBonus=Math.round(timeLeft)*10;
+    score+=1000+hBonus+tBonus; coinsGot+=0;
+    beep(660,0.15); setTimeout(()=>beep(880,0.2),140);
+    flagAnim=1;
+    if(level>=3){ gameOver(true); return; }
+    else { level++; loadLevel(level,true); hud();
+      floaters.push({x:p.x,y:p.y-10,txt:'',t:0}); state='play'; return; }
+  }
+  // foes
+  for(const f of foes){
+    if(f.dead){ f.dead--; continue; }
+    if(f.shroom){
+      f.vy=Math.min(f.vy+0.3,7); f.hitWall=false; collideMove(f,false);
+      if(f.hitWall) f.vx*=-1;
+      if(Math.abs(f.x-p.x)<20 && Math.abs(f.y-p.y)<20){
+        if(overlap(p,f)){ f.dead=1; if(!p.big){ p.big=true; p.h=24; p.y-=10; } score+=500; beep(740,0.15); floaters.push({x:f.x,y:f.y-6,txt:'+500',t:0}); }
+      }
+      if(f.y>H+60) f.dead=1;
+      continue;
+    }
+    if(f.x<camX-40||f.x>camX+W+40) continue;
+    f.vy=Math.min(f.vy+0.3,7);
+    f.hitWall=false;
+    const sp=f.fast?0.6:0.35;
+    if(f.vx===0) f.vx=-sp;
+    f.vx=Math.sign(f.vx)*sp;
+    collideMove(f,false);
+    if(f.hitWall) f.vx*=-1;
+    else {
+      // edge turn when grounded
+      const ahead=f.vx>0? Math.floor((f.x+f.w+2)/TILE) : Math.floor((f.x-2)/TILE);
+      const below=Math.floor((f.y+f.h+2)/TILE);
+      if(f.onGround && !solidAt(ahead,below) && tileAt(ahead,below)!==8) f.vx*=-1;
+    }
+    if(f.y>H+60){ f.dead=1; continue; }
+    if(overlap(p,f)){
+      const stomp = p.vy>0.5 && (p.y+p.h)-f.y<10;
+      if(stomp){ f.dead=25; score+=200; p.vy=-5.2; beep(600,0.1); floaters.push({x:f.x,y:f.y-6,txt:'+200',t:0}); }
+      else hurt();
+    }
+  }
+  // coins
+  for(const c of pickups){
+    if(c.taken) continue; c.ph+=0.1;
+    if(p.x<c.x+8 && p.x+p.w>c.x && p.y<c.y+8 && p.y+p.h>c.y){ c.taken=true; if(runProgress){ const idx=pickups.indexOf(c); runProgress[level].coins[idx]=1; } score+=100; coinsGot++; beep(990,0.09); floaters.push({x:c.x,y:c.y-8,txt:'+100',t:0}); }
+  }
+  updateParts();
+  for(const fl of floaters) fl.t++;
+  floaters=floaters.filter(f=>f.t<45);
+  // camera
+  const target=Math.max(0,Math.min(p.x-W*0.38, L.w*TILE-W));
+  camX+=(target-camX)*0.12;
+  if(shake>0) shake*=0.85; if(shake<0.3) shake=0;
+  hud();
+}
+function overlap(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
+function updateParts(){ for(const q of parts){ q.t++; q.vy+=0.25; q.x+=q.vx||0; q.y+=q.vy; } parts=parts.filter(q=>q.t<50&&q.y<H+20); }
+
+function gameOver(win){
+  finished=true; won=win; state='over';
+  startBtn.hidden=true; restartBtn.hidden=false;
+  restartBtn.textContent= win? 'Play again — score '+score : 'Try again — score '+score;
+  hud();
+}
+
+function draw(){
+  ctx.save();
+  ctx.fillStyle='#fffdf7'; ctx.fillRect(0,0,W,H);
+  let sx=0, sy=0;
+  if(shake>0){ sx=(Math.random()-0.5)*shake; sy=(Math.random()-0.5)*shake; }
+  ctx.translate(-Math.round(camX)+sx, sy);
+  const camL=camX-20, camR=camX+W+20;
+  // clouds / hills (flat, quiet)
+  ctx.fillStyle='#ece5d3';
+  for(let i=0;i<6;i++){ const cx=((i*260+level*90)%(L?L.w*TILE:W+400)); const cy=34+(i%3)*14;
+    if(cx>camL&&cx<camR){ ctx.fillRect(cx,cy,42,8); ctx.fillRect(cx+10,cy-6,22,6); } }
+  ctx.fillStyle='#e3dac4';
+  for(let x=0;x<(L?L.w:24);x+=11){ const hx=x*TILE; if(hx>camL-40&&hx<camR){ ctx.fillRect(hx,GROUND*TILE-14,34,14); } }
+  if(!L){ ctx.restore(); return; }
+  const x0=Math.max(0,Math.floor(camL/TILE)), x1=Math.min(L.w-1,Math.ceil(camR/TILE));
+  for(let ty=0;ty<ROWS;ty++) for(let tx=x0;tx<=x1;tx++){
+    const t=L.g[ty][tx]; if(!t) continue;
+    const x=tx*TILE, y=ty*TILE;
+    if(t===1){ ctx.fillStyle='#c9b896'; ctx.fillRect(x,y,16,16); ctx.strokeStyle='#a89572'; ctx.strokeRect(x+0.5,y+0.5,15,15);
+      ctx.fillStyle='#b8a67f'; ctx.fillRect(x+2,y+2,4,4); }
+    else if(t===2){ ctx.fillStyle='#d8d2c4'; ctx.fillRect(x,y,16,16); ctx.strokeStyle='#191713'; ctx.strokeRect(x+0.5,y+0.5,15,15);
+      ctx.strokeStyle='#b8b0a0'; ctx.strokeRect(x+3.5,y+3.5,9,9); }
+    else if(t===3){ ctx.fillStyle='#c98a5e'; ctx.fillRect(x,y,16,16); ctx.strokeStyle='#191713'; ctx.strokeRect(x+0.5,y+0.5,15,15);
+      ctx.strokeStyle='#7a4a2e'; ctx.beginPath(); ctx.moveTo(x,y+8); ctx.lineTo(x+16,y+8); ctx.moveTo(x+8,y); ctx.lineTo(x+8,y+8); ctx.moveTo(x+4,y+8); ctx.lineTo(x+4,y+16); ctx.moveTo(x+12,y+8); ctx.lineTo(x+12,y+16); ctx.stroke(); }
+    else if(t===4||t===5){ const bl=Math.sin(Date.now()/300+tx)>0; ctx.fillStyle=bl?'#d9a441':'#c9952f'; ctx.fillRect(x,y,16,16);
+      ctx.strokeStyle='#191713'; ctx.strokeRect(x+0.5,y+0.5,15,15);
+      ctx.fillStyle='#191713'; ctx.font='10px monospace'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('?',x+8,y+9); }
+    else if(t===6){ ctx.fillStyle='#b8b0a0'; ctx.fillRect(x,y,16,16); ctx.strokeStyle='#191713'; ctx.strokeRect(x+0.5,y+0.5,15,15); }
+    else if(t===7){ ctx.fillStyle='#2d7d46'; ctx.fillRect(x,y,16,16); ctx.strokeStyle='#191713'; ctx.strokeRect(x+0.5,y+0.5,15,15);
+      ctx.fillStyle='#8fbfa0'; ctx.fillRect(x+3,y+2,3,12);
+      // pipe rim on the top tile of a pipe
+      if(!solidAt(tx,ty-1)||tileAt(tx,ty-1)!==7){ ctx.fillStyle='#2d7d46'; ctx.fillRect(x-2,y-2,20,5);
+        ctx.strokeStyle='#191713'; ctx.strokeRect(x-1.5,y-1.5,19,4); ctx.fillStyle='#8fbfa0'; ctx.fillRect(x+1,y,3,3); } }
+    else if(t===8){ ctx.fillStyle='#191713'; ctx.fillRect(x+7,y,2,16); }
+  }
+  // flag
+  if(L){ const fx=L.flagX*TILE; ctx.fillStyle='#2d7d46';
+    const wave=Math.sin(Date.now()/250)*2;
+    ctx.beginPath(); ctx.moveTo(fx+9,44); ctx.lineTo(fx+9+22,50+wave); ctx.lineTo(fx+9,58); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#191713'; ctx.fillRect(fx+6,42,2,4); ctx.fillRect(fx-6,GROUND*TILE-4,28,4);
+  }
+  // coins
+  for(const c of pickups){ if(c.taken) continue; if(c.x<camL||c.x>camR) continue;
+    const bob=Math.sin(c.ph)*1.5;
+    ctx.fillStyle='#d9a441'; ctx.beginPath(); ctx.arc(c.x+4,c.y+4+bob,5,0,7); ctx.fill();
+    ctx.strokeStyle='#191713'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#7a5a17'; ctx.fillRect(c.x+3,c.y+2+bob,2,4);
+  }
+  // foes
+  for(const f of foes){ if(f.dead) { if(!f.shroom&&f.dead>0){ ctx.fillStyle='#7a5c3e'; ctx.fillRect(f.x,f.y+f.h-4,f.w,4); } continue; }
+    if(f.x<camL||f.x>camR) continue;
+    if(f.shroom){ ctx.fillStyle='#a33b2e'; ctx.fillRect(f.x,f.y,f.w,8); ctx.fillStyle='#fffdf7'; ctx.fillRect(f.x+2,f.y+2,3,3); ctx.fillRect(f.x+9,f.y+2,3,3);
+      ctx.fillStyle='#e8dcc8'; ctx.fillRect(f.x,f.y+8,f.w,4); ctx.strokeStyle='#191713'; ctx.strokeRect(f.x+0.5,f.y+0.5,f.w-1,f.h-1); continue; }
+    const squash=f.dead?4:0;
+    ctx.fillStyle='#7a5c3e'; ctx.fillRect(f.x,f.y+squash,f.w,f.h-squash);
+    ctx.strokeStyle='#191713'; ctx.strokeRect(f.x+0.5,f.y+0.5,f.w-1,f.h-1);
+    ctx.fillStyle='#fff'; ctx.fillRect(f.x+2,f.y+3,3,4); ctx.fillRect(f.x+7,f.y+3,3,4);
+    ctx.fillStyle='#191713'; ctx.fillRect(f.x+3,f.y+5,1,2); ctx.fillRect(f.x+8,f.y+5,1,2);
+    const step=Math.sin(Date.now()/120)*1.5;
+    ctx.fillStyle='#191713'; ctx.fillRect(f.x+1,f.y+f.h-2+step*0.3,4,2); ctx.fillRect(f.x+7,f.y+f.h-2-step*0.3,4,2);
+  }
+  // player
+  const p=player;
+  if(p && !(invuln>0 && Math.floor(Date.now()/100)%2===0 && !p.dead)){
+    const run=Math.sin(p.anim*4)* (Math.abs(p.vx)>0.2&&p.onGround?1.5:0);
+    const h=p.h, w=p.w;
+    ctx.fillStyle = p.big? '#2d7d46' : '#3a6ea5';
+    ctx.fillRect(p.x,p.y,w,h);
+    ctx.strokeStyle='#191713'; ctx.strokeRect(p.x+0.5,p.y+0.5,w-1,h-1);
+    // cap
+    ctx.fillStyle='#a33b2e'; ctx.fillRect(p.x-1,p.y-1,w+2,5);
+    ctx.strokeStyle='#191713'; ctx.strokeRect(p.x-0.5,p.y-0.5,w+1,5);
+    // eye
+    ctx.fillStyle='#fff'; ctx.fillRect(p.face>0?p.x+7:p.x+2,p.y+7,3,4);
+    ctx.fillStyle='#191713'; ctx.fillRect(p.face>0?p.x+8:p.x+3,p.y+8,1,2);
+    // feet
+    ctx.fillStyle='#191713'; ctx.fillRect(p.x+1,p.y+h-1+run*0.3,4,2); ctx.fillRect(p.x+7,p.y+h-1-run*0.3,4,2);
+  }
+  // parts
+  for(const q of parts){ if(q.coin){ ctx.fillStyle='#d9a441'; ctx.beginPath(); ctx.arc(q.x,q.y,4,0,7); ctx.fill(); ctx.strokeStyle='#191713'; ctx.stroke(); }
+    else { ctx.fillStyle=q.c; ctx.fillRect(q.x-2,q.y-2,4,4); } }
+  // floaters
+  ctx.fillStyle='#191713'; ctx.font='8px monospace'; ctx.textAlign='center';
+  for(const f of floaters){ if(f.txt) ctx.fillText(f.txt,f.x,f.y-f.t*0.6); }
+  ctx.restore();
+  // overlays
+  ctx.fillStyle='rgba(245,242,234,0.88)';
+  if(state==='title'){ ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#191713'; ctx.textAlign='center';
+    ctx.font='bold 20px monospace'; ctx.fillText('BRICK RUN',W/2,78);
+    ctx.font='11px monospace'; ctx.fillStyle='#6b6558';
+    ctx.fillText('3 worlds. Stomp, bump, flag.',W/2,102);
+    ctx.fillStyle='#191713'; ctx.font='11px monospace'; ctx.fillText('press START',W/2,132);
+  } else if(state==='over'){
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='#191713'; ctx.textAlign='center';
+    ctx.font='bold 16px monospace'; ctx.fillText(won?'YOU WIN!':'GAME OVER',W/2,84);
+    ctx.font='11px monospace'; ctx.fillText('score '+score+'  coins '+coinsGot,W/2,106);
+    ctx.fillStyle='#6b6558'; ctx.fillText(won?'cleared 1-3!':'reached 1-'+level,W/2,122);
+  } else {
+    // time
+    ctx.fillStyle='#6b6558'; ctx.font='9px monospace'; ctx.textAlign='right';
+    ctx.fillText('TIME '+Math.ceil(timeLeft),W-8,14);
+  }
+}
+
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+
+// input
+window.addEventListener('keydown',e=>{
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)) e.preventDefault();
+  if(e.repeat) return;
+  if(e.code==='ArrowLeft'||e.code==='KeyA') keys.left=true;
+  if(e.code==='ArrowRight'||e.code==='KeyD') keys.right=true;
+  if(e.code==='ArrowUp'||e.code==='KeyW'||e.code==='Space'){ keys.jump=true; jumpQueued=true; }
+  if(e.code==='ArrowDown'||e.code==='KeyS'){ keys.down=true; downQueued=true; }
+  if(e.code==='Enter'&&state!=='play') startGame();
+  if(e.code==='KeyR') startGame();
+});
+window.addEventListener('keyup',e=>{
+  if(e.code==='ArrowLeft'||e.code==='KeyA') keys.left=false;
+  if(e.code==='ArrowRight'||e.code==='KeyD') keys.right=false;
+  if(e.code==='ArrowUp'||e.code==='KeyW'||e.code==='Space') keys.jump=false;
+  if(e.code==='ArrowDown'||e.code==='KeyS') keys.down=false;
+});
+
+
+function startGame(){
+  try{ beep.ac && beep.ac.resume && beep.ac.resume(); }catch(e){}
+  resetRun(); startBtn.hidden=true; restartBtn.hidden=true; hud();
+}
+startBtn.onclick=startGame; restartBtn.onclick=startGame;
+cv.addEventListener('pointerdown',()=>{ if(state!=='play') startGame(); });
+
+L=buildLevel(1);
+loadLevel(1); state='title'; score=0; coinsGot=0; lives=3; finished=false; won=false; hud();
+loop();
+
+window.__boredSnapshot=()=>({slug:'brick-run',score:Math.max(0,Math.round(score)),coins:coinsGot|0,level:Math.min(3,Math.max(1,level|0)),finished:!!finished,won:!!won});
+</script>
+</body>
+</html>

@@ -29,6 +29,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "brick-run": {
+    "label": "Score",
+    "better": "high",
+    "max_value": 1000000
+  },
   "chess": {
     "label": "Computer wins in a session",
     "better": "high",
