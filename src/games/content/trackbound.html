@@ -129,7 +129,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
       <div id="medalRail"></div>
       <div id="hudSpeed"><b id="hudKmh">0</b><span>km/h</span></div>
       <div id="hudCenter"></div>
-      <div id="hudHint">W A S D / arrows · space handbrake · backspace respawn · R restart · esc pause</div>
+      <div id="hudHint">W A S D / arrows · space handbrake · backspace respawn · R restart · esc pause · M sound</div>
       <div id="pad">
         <button type="button" data-drive="left" aria-label="Steer left">◀</button>
         <button type="button" data-drive="right" aria-label="Steer right">▶</button>
@@ -173,6 +173,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
           <button id="pauseResume" type="button">Resume</button>
           <button id="pauseRestart" type="button">Restart</button>
           <button id="pauseGhost" type="button">Ghost: on</button>
+          <button id="pauseMute" type="button">Sound: on</button>
           <button id="pauseMenu" type="button">Menu</button>
         </div>
       </div>
@@ -254,7 +255,7 @@ const toLocal = (parent, worldPoint) => {
    (some embeds do) the same values are kept through localStorage; if both are
    blocked the game plays without saved data and never complains. */
 const DATA = 'bored.trackbound';
-const saved = { best: {}, medals: {}, ghost: true };
+const saved = { best: {}, medals: {}, ghost: true, mute: false };
 let db = null;
 
 function persist(name) {
@@ -621,6 +622,7 @@ const arcDef = (radius, sweep, dir, extra) => {
   const len = Math.abs(sweep) * radius;
   return Object.assign({
     len, hw: 6, samples: sweep > 1.8 ? 26 : 15, radius,
+    arcSweep: Math.abs(sweep), arcSide: dir,   // drives the corner-chevron paint
     curve: t => {
       const a = sweep * t;
       return {
@@ -637,6 +639,7 @@ const arcDef = (radius, sweep, dir, extra) => {
 const WALL_R = 18, WALL_BANK = 0.3;
 const wallDef = (dir, name) => ({
   name, len: Math.PI / 2 * WALL_R, hw: 6, samples: 28, radius: WALL_R, grip: 14,
+  arcSweep: Math.PI / 2, arcSide: dir,   // wall rides get corner chevrons too
   curve: t => {
     const a = (Math.PI / 2) * t;
     const f = [dir * Math.sin(a), 0, Math.cos(a)];
@@ -773,6 +776,27 @@ function emitBlock(road, scenery, entry, def, index, legs) {
     for (let i = 0; i < 4; i++) {
       const t = 0.16 + i * 0.18;
       paintQuad(t, t + 0.07, PALETTE.boost, 0.026);
+    }
+  }
+  // Corner chevrons: V arrows whose tips lean into the turn, painted through
+  // the whole of every sweeping block so the apex is announced from the entry.
+  if (def.arcSweep) {
+    const side = def.arcSide;
+    const inner = side * 0.9;
+    const outer = side * (hw - 2.3);
+    const wing = (tWing, tTip) => {
+      const fW = paintFrame(tWing), fT = paintFrame(tTip);
+      pushQuad(road,
+        madd(madd(fW.p, fW.x, inner - side * 0.5), fW.y, 0.03),
+        madd(madd(fT.p, fT.x, outer - side * 0.5), fT.y, 0.03),
+        madd(madd(fT.p, fT.x, outer + side * 0.5), fT.y, 0.03),
+        madd(madd(fW.p, fW.x, inner + side * 0.5), fW.y, 0.03), fW.y, PALETTE.kerb);
+    };
+    const marks = def.arcSweep > 1.8 ? 4 : 3;
+    for (let k = 0; k < marks; k++) {
+      const t = 0.18 + k * 0.22;
+      wing(t, t + 0.1);
+      wing(t + 0.2, t + 0.1);
     }
   }
   if (def.trigger === 'checkpoint' || def.trigger === 'finish') {
@@ -963,12 +987,15 @@ function buildTrack(typeIds, meta) {
     id: (meta && meta.id) || 'track',
     name: (meta && meta.name) || 'Track',
     author: (meta && meta.author) || 30000,
+    layout: layoutOf(typeIds),
     blocks: typeIds.slice(),
     mesh: road, scenery, triggers, checkpoints, finish,
     spawn: spawn || FRAME0, end: entry, chain, boxes,
     poles: 0
   };
 }
+
+const layoutOf = blocks => blocks.join('|');
 
 // True when two parts of the layout physically occupy the same space. Sampled
 // centre lines rather than bounding boxes: a hairpin's box overlaps the road it
@@ -994,31 +1021,38 @@ function trackFolds(track) {
 
 /* ── the campaign ─────────────────────────────────────────────────────────── */
 const CAMPAIGN = [
-  { id: 'paddock', name: 'Paddock', author: 10500,
-    blocks: ['start', 'straight', 'sprint', 'curveR', 'straight', 'curveR', 'straight',
-      'checkpoint', 'curveL', 'sprint', 'curveL', 'straight', 'finish'] },
-  { id: 'slipstream', name: 'Slipstream', author: 9500,
+  { id: 'paddock', name: 'Paddock', author: 14350,
+    blocks: ['start', 'sprint', 'curveR', 'straight', 'curveR', 'straight', 'checkpoint',
+      'curveL', 'sprint', 'curveL', 'straight', 'curveR', 'checkpoint', 'curveL',
+      'sprint', 'straight', 'finish'] },
+  { id: 'slipstream', name: 'Slipstream', author: 13550,
     blocks: ['start', 'sprint', 'sprint', 'boost', 'curveL', 'sprint', 'straight', 'checkpoint',
-      'curveR', 'sprint', 'boost', 'straight', 'finish'] },
-  { id: 'switchback', name: 'Switchback', author: 9900,
+      'curveR', 'sprint', 'curveR', 'boost', 'straight', 'checkpoint', 'curveL', 'sprint',
+      'straight', 'finish'] },
+  { id: 'switchback', name: 'Switchback', author: 16500,
     blocks: ['start', 'straight', 'curveL', 'straight', 'hairpinR', 'straight', 'checkpoint',
-      'curveR', 'straight', 'curveL', 'straight', 'finish'] },
-  { id: 'overpass', name: 'Overpass', author: 10400,
+      'curveR', 'sprint', 'wallL', 'hairpinR', 'straight', 'curveL', 'checkpoint', 'straight',
+      'curveR', 'sprint', 'finish'] },
+  { id: 'overpass', name: 'Overpass', author: 16150,
     blocks: ['start', 'sprint', 'up', 'straight', 'curveR', 'straight', 'down', 'checkpoint',
-      'straight', 'curveL', 'sprint', 'straight', 'finish'] },
-  { id: 'vertigo', name: 'Vertigo', author: 9400,
+      'straight', 'curveL', 'up', 'sprint', 'curveR', 'down', 'checkpoint', 'straight',
+      'curveL', 'sprint', 'finish'] },
+  { id: 'vertigo', name: 'Vertigo', author: 14900,
     blocks: ['start', 'sprint', 'boost', 'straight', 'wallR', 'straight', 'checkpoint', 'curveR',
-      'sprint', 'straight', 'curveL', 'straight', 'finish'] },
-  { id: 'dustbowl', name: 'Dust Bowl', author: 7900,
-    blocks: ['start', 'straight', 'dirt', 'straight', 'curveR', 'narrow', 'straight', 'checkpoint',
-      'curveL', 'dirt', 'straight', 'finish'] },
-  { id: 'kicker', name: 'Kicker', author: 9800,
-    blocks: ['start', 'sprint', 'kicker', 'curveR', 'down', 'checkpoint', 'straight', 'curveL',
-      'sprint', 'straight', 'boost', 'straight', 'finish'] },
-  { id: 'grandloop', name: 'Grand Loop', author: 15300,
+      'sprint', 'boost', 'straight', 'wallR', 'straight', 'curveL', 'checkpoint', 'wallL',
+      'sprint', 'curveL', 'straight', 'finish'] },
+  { id: 'dustbowl', name: 'Dust Bowl', author: 10750,
+    blocks: ['start', 'straight', 'dirt', 'straight', 'curveR', 'narrow', 'checkpoint', 'straight',
+      'curveL', 'dirt', 'narrow', 'checkpoint', 'curveL', 'dirt', 'straight', 'finish'] },
+  { id: 'kicker', name: 'Kicker', author: 14250,
+    blocks: ['start', 'sprint', 'kicker', 'curveR', 'sprint', 'down', 'checkpoint', 'straight',
+      'curveL', 'sprint', 'kicker', 'boost', 'straight', 'checkpoint', 'curveL', 'sprint',
+      'straight', 'finish'] },
+  { id: 'grandloop', name: 'Grand Loop', author: 18900,
     blocks: ['start', 'sprint', 'straight', 'curveR', 'up', 'straight', 'down', 'checkpoint',
-      'curveL', 'sprint', 'boost', 'straight', 'wallL', 'straight', 'curveL', 'dirt',
-      'straight', 'curveR', 'sprint', 'finish'] }
+      'curveL', 'sprint', 'boost', 'straight', 'wallL', 'straight', 'wallL', 'straight',
+      'checkpoint', 'curveR', 'dirt', 'straight', 'curveL', 'sprint', 'curveR', 'straight',
+      'finish'] }
 ];
 
 const MEDALS = [
@@ -1052,7 +1086,7 @@ function dailyTrack(seed) {
   for (let attempt = 0; attempt < 24; attempt++) {
     const random = mulberry32((seed >>> 0) + attempt * 977);
     const blocks = ['start'];
-    const legs = 4 + Math.floor(random() * 3);
+    const legs = 6 + Math.floor(random() * 3);
     for (let leg = 0; leg < legs; leg++) {
       const run = 1 + Math.floor(random() * 2);
       for (let i = 0; i < run; i++) blocks.push(choice[0][Math.floor(random() * choice[0].length)]);
@@ -1294,6 +1328,14 @@ function blip(frequency, length, volume, type) {
 function chime(notes) {
   notes.forEach((note, i) => setTimeout(() => blip(note, 0.18, 0.12, 'sine'), i * 90));
 }
+function toggleMute() {
+  saved.mute = !saved.mute;
+  sound.muted = saved.mute;
+  persist('mute');
+  if (sound.master) sound.master.gain.value = saved.mute ? 0 : 0.5;
+  const label = $('pauseMute');
+  if (label) label.textContent = 'Sound: ' + (saved.mute ? 'off' : 'on');
+}
 
 /* ── world and race state ─────────────────────────────────────────────────── */
 const keys = { gas: false, brake: false, left: false, right: false, handbrake: false };
@@ -1307,7 +1349,7 @@ let car = null;
 let current = { kind: 'campaign', index: 0, track: null };
 const race = {
   state: 'menu', t: 0, cp: 0, cpTotal: 0, finishedAt: null, medal: null,
-  respawn: null, record: [], recordClock: 0, best: null, ghost: null,
+  respawn: null, record: [], recordClock: 0, best: null, ghost: null, splits: [],
   ghostOn: saved.ghost !== false, message: '', messageUntil: 0,
   missing: 0, boostFlash: 0
 };
@@ -1345,8 +1387,11 @@ function useTrack(track) {
   race.missing = 0;
   race.boostFlash = 0;
   const best = saved.best[track.id];
-  race.best = best && Number.isFinite(best.ms) ? best : null;
+  // Ghosts only line up if the track still looks the way it did on that day.
+  const alive = best && Number.isFinite(best.ms) && (!best.layout || best.layout === layoutOf(track.blocks));
+  race.best = alive ? best : null;
   race.ghost = race.best && Array.isArray(race.best.ghost) ? race.best.ghost : null;
+  race.splits = [];
   rebuildRender();
   paintBest();
   paintMedals();
@@ -1387,6 +1432,8 @@ function finishRun() {
       ms,
       medal: race.medal,
       ghost: race.record.map(sample => sample.map(value => Math.round(value * 100) / 100)),
+      splits: race.splits.map(msSplit => Math.round(msSplit) || 0),
+      layout: world.layout,
       date: (window.__boredSeed && window.__boredSeed.date) || ''
     };
     persist('best');
@@ -1441,6 +1488,8 @@ function stepRace(dt, override) {
         if (!insideZone(gate.frame, gate.hw, gate.halfLen, car.p)) continue;
         race.cp = i + 1;
         race.respawn = { p: gate.frame.p.slice(), x: gate.frame.x.slice(), y: gate.frame.y.slice(), z: gate.frame.z.slice() };
+        race.splits[i] = Math.round(race.t * 1000);
+        paintSplit(race.cp, race.splits[i]);
         showMessage('checkpoint ' + race.cp + '/' + race.cpTotal, 0.9);
         blip(880 + race.cp * 60, 0.1, 0.11, 'triangle');
       }
@@ -1626,7 +1675,7 @@ function updateCamera(dt) {
     camera.p = mixv(camera.p, want, smooth(9, dt));
     camera.up = norm(mixv(camera.up, car.u, smooth(6.5, dt)));
     camera.target = add(add(car.p, mul(car.f, 6.2)), mul(car.u, 1.1));
-    camera.fov = 0.98 + Math.min(0.2, speed * 0.0032);
+    camera.fov = 0.94 + Math.min(0.26, speed * 0.0040);
     return;
   }
   const anchor = world.spawn.p;
@@ -1732,6 +1781,16 @@ const medalName = id => (MEDALS.find(medal => medal.id === id) || { name: 'No me
 function goldCount() {
   const stored = saved.medals;
   return CAMPAIGN.reduce((total, entry) => total + ((stored[entry.id] === 'gold' || stored[entry.id] === 'author') ? 1 : 0), 0);
+}
+
+function paintSplit(index, msMine) {
+  const node = $('hudDelta');
+  const target = race.best && race.best.splits && race.best.splits[index - 1];
+  if (!target || !Number.isFinite(target)) return;
+  const diff = msMine - target;
+  node.textContent = (diff <= 0 ? '−' : '+') + Math.abs(diff / 1000).toFixed(3) +
+    ' · cp ' + index + '/' + race.cpTotal;
+  node.className = diff <= 0 ? 'ahead' : 'behind';
 }
 
 function paintBest() {
@@ -1881,6 +1940,7 @@ function onKeyDown(event) {
   const lower = key.toLowerCase();
   if (event.target && event.target.tagName === 'INPUT') return;
   initAudio();
+  if (lower === 'm') { toggleMute(); event.preventDefault(); return; }
   if (lower === 'escape') { if (mode === 'race') togglePause(); event.preventDefault(); return; }
   if (mode === 'race' && paused) return;
   if (lower === 'r') { if (mode === 'race') { restartRace(); event.preventDefault(); } return; }
@@ -1995,6 +2055,7 @@ $('pauseGhost').addEventListener('click', () => {
   persist('ghost');
   $('pauseGhost').textContent = 'Ghost: ' + (race.ghostOn ? 'on' : 'off');
 });
+$('pauseMute').addEventListener('click', () => toggleMute());
 $('pauseMenu').addEventListener('click', () => openMenu());
 $('resRestart').addEventListener('click', () => restartRace());
 $('resNext').addEventListener('click', () => {
@@ -2015,9 +2076,10 @@ window.__test = {
   camera,
   current: () => current,
   mode: () => mode,
+  layoutOf,
   snapshot: () => window.__boredSnapshot(),
   startCampaign, startDaily, loadRace, restartRace, respawnCar, useTrack,
-  openMenu,
+  openMenu, toggleMute,
   render: () => { updateCamera(1 / 60); drawScene(1 / 60); }
 };
 
@@ -2033,11 +2095,21 @@ function boot() {
   startSaved(() => {
     race.ghostOn = saved.ghost !== false;
     $('pauseGhost').textContent = 'Ghost: ' + (race.ghostOn ? 'on' : 'off');
+    $('pauseMute').textContent = 'Sound: ' + (saved.mute ? 'off' : 'on');
     paintMedals();
+    // A layout can change between releases: a ghost made on yesterday's road
+    // would chase the wrong corners, so stale bests are dropped on load.
+    let pruned = 0;
+    for (const key of Object.keys(saved.best)) {
+      const entry = CAMPAIGN.find(item => item.id === key);
+      if (entry && saved.best[key].layout !== layoutOf(entry.blocks)) { delete saved.best[key]; pruned++; }
+    }
+    if (pruned) persist('best');
     if (world && race.state === 'ready') {
       // A track is already on screen: hand it its best time and ghost now.
       const best = saved.best[world.id];
-      race.best = best && Number.isFinite(best.ms) ? best : null;
+      const alive = best && Number.isFinite(best.ms) && (!best.layout || best.layout === layoutOf(world.blocks));
+      race.best = alive ? best : null;
       race.ghost = race.best && Array.isArray(race.best.ghost) ? race.best.ghost : null;
       paintBest();
     }

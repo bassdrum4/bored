@@ -240,6 +240,10 @@ test('Trackbound finishes a campaign track and scores it once', () => {
   const stored = JSON.parse(page.storage.get('bored.trackbound.best'));
   assert.ok(stored.paddock.ms > 0, 'the best time is kept');
   assert.ok(Array.isArray(stored.paddock.ghost) && stored.paddock.ghost.length > 4, 'a ghost is kept');
+  assert.equal(stored.paddock.layout, T.layoutOf(T.CAMPAIGN[0].blocks), 'the layout is stamped');
+  assert.ok(Array.isArray(stored.paddock.splits) && stored.paddock.splits.length === T.race.cpTotal,
+    'checkpoints splits are saved');
+  assert.ok(stored.paddock.splits.every(value => value > 0), 'splits are positive ms');
 });
 
 test('Trackbound medals are ordered and earned against the author time', () => {
@@ -304,13 +308,48 @@ test('Trackbound keeps bests, ghosts and medals in IndexedDB', async () => {
   // Opening the document again restores the best and ghost out of the database.
   const again = load({ idb: store });
   await again.flush(); await again.flush();
-  console.log('DEBUG saved.best keys:', Object.keys((again.sandbox.__test.snapshot, again.sandbox.__raceDebug && again.sandbox.__raceDebug()) || []));
   again.sandbox.__test.startCampaign(0);
-  console.log('DEBUG after start: best =', again.sandbox.__test.race.best && again.sandbox.__test.race.best.ms, 'mirror=', mirror.paddock.ms);
   const race = again.sandbox.__test.race;
   assert.ok(race.best && race.best.ms === mirror.paddock.ms, 'the best came back from the database');
   assert.ok(Array.isArray(race.ghost) && race.ghost.length > 4, 'the ghost came back too');
+  assert.ok(race.best.layout === again.sandbox.__test.layoutOf(again.sandbox.__test.CAMPAIGN[0].blocks),
+    'the layout stamp came back');
+  assert.ok(Array.isArray(race.best.splits) && race.best.splits.length === race.cpTotal,
+    'the splits came back too');
   assert.ok(again.sandbox.__test.snapshot().medals >= 1, 'the medal count loaded');
+});
+
+test('Trackbound drops bests made on an older track shape, and the mute sticks', async () => {
+  const probe = load();
+  const entry = probe.sandbox.__test.CAMPAIGN[0];
+  const layout = probe.sandbox.__test.layoutOf(entry.blocks);
+
+  // A best stamped with a layout that is not this campaign's layout is dead
+  // weight: it has to load without providing a ghost.
+  const staleStore = new Map([['best', { key: 'best', value: { [entry.id]: { ms: 8000, layout: 'start|finish' } } }]]);
+  const stale = load({ idb: staleStore });
+  await stale.flush(); await stale.flush();
+  stale.sandbox.__test.loadRace('campaign', 0);
+  assert.equal(stale.sandbox.__test.race.best, null, 'an out-of-date layout provides no best');
+  // And the loader pruned it from the mirror as well.
+  const staleMirror = JSON.parse(stale.storage.get('bored.trackbound.best') || '{}');
+  assert.equal(staleMirror[entry.id], undefined, 'the stale best was pruned');
+
+  // The same best, stamped for the real layout, drives again.
+  const ghost = [[0, 0, 0, 0, 0, 0, 1, 0, 1, 0], [0.5, 1, 0, 1, 0, 0, 1, 0, 1, 0]];
+  const liveStore = new Map([['best', { key: 'best', value: { [entry.id]: { ms: 12345, layout, ghost } } }]]);
+  const live = load({ idb: liveStore });
+  await live.flush(); await live.flush();
+  live.sandbox.__test.loadRace('campaign', 0);
+  const after = live.sandbox.__test.race;
+  assert.ok(after.best && after.best.ms === 12345, 'a matching layout keeps its best');
+  assert.ok(Array.isArray(after.ghost) && after.ghost.length === ghost.length, 'the ghost rides again');
+
+  // Mute is a preference: toggling it flips the label and the mirror.
+  assert.ok(live.element('pauseMute').textContent, 'Sound: on', 'sound is on by default');
+  live.sandbox.__test.toggleMute();
+  assert.equal(live.element('pauseMute').textContent, 'Sound: off', 'the pause button says so');
+  assert.equal(live.storage.get('bored.trackbound.mute'), 'true', 'the mute mirrors to storage');
 });
 
 test('Trackbound falls back to localStorage when the database is blocked', async () => {
