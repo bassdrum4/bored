@@ -274,7 +274,7 @@ section[id]{scroll-margin-top:20px}
 }
 .shelf-entry{position:relative;min-width:0}
 .shelf-entry .shelf-play{height:100%}
-.shelf-entry .shelf-copy{padding-right:42px}
+#recent .shelf-entry .shelf-copy{padding-right:42px}
 .shelf-entry .developer-note-toggle{top:8px;right:8px;width:28px;height:28px}
 @media(max-width:600px){
   .row .developer-note-toggle{top:7px;left:45px;right:auto;width:32px;height:32px}
