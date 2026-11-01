@@ -1373,13 +1373,13 @@ test('browser regressions', async t => {
         const frame = await (await page.$('#frame')).contentFrame();
         await frame.evaluate(() => {
           gameOver = true; row = 2;
-          // Five green tiles split across rows are not a solved word.
-          [getTile(0, 0), getTile(0, 1), getTile(0, 2), getTile(1, 0), getTile(1, 1)].forEach(tile => tile.classList.add('correct'));
+          // Appearance alone must never establish a finished solve.
+          for (let col = 0; col < 5; col++) getTile(1, col).classList.add('correct');
         });
         assert.equal(await frame.evaluate(() => __boredSnapshot().solved), false);
-        await frame.evaluate(() => { for (let col = 0; col < 5; col++) getTile(1, col).classList.add('correct'); });
+        await frame.evaluate(() => { solved = true; });
         assert.equal(await frame.evaluate(() => __boredSnapshot().solved), true);
-        await frame.evaluate(() => { gameOver = false; row = 0; });
+        await frame.evaluate(() => { gameOver = false; solved = false; row = 0; });
       }
       if (challenge.slug === 'minesweeper') {
         const frame = await (await page.$('#frame')).contentFrame();
