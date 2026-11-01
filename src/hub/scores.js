@@ -209,7 +209,12 @@ export function boardLeaders(rows) {
     if (!spec || !handle || !Number.isFinite(value) || value <= 0) continue;
     const held = leaders.get(spec.id);
     if (!held || (spec.lower ? value < held.value : value > held.value)) {
-      leaders.set(spec.id, { value, handle });
+      leaders.set(spec.id, { value, handle, handles: [handle] });
+    } else if (value === held.value && !held.handles.some(name => name.toLowerCase() === handle.toLowerCase())) {
+      // We cannot prove who first achieved an old tied score. Keep all
+      // verified co-leaders instead of accidentally rewarding alphabetical order.
+      held.handles.push(handle);
+      held.handles.sort((a, b) => a.localeCompare(b));
     }
   }
   return leaders;
