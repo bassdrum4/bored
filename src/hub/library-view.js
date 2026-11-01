@@ -66,7 +66,12 @@ function cardBest(slug) {
   const line = element('span', 'card-best');
   const { leader, top } = boardData(slug);
   const own = bestValue(spec);
-  if (leader) line.textContent = 'Best ' + formatScore(leader.value, spec) + ' · ' + leader.handle;
+  if (leader) {
+    const tied = leader.handles || [leader.handle];
+    line.textContent = 'Best ' + formatScore(leader.value, spec) + ' · ' +
+      (tied.length === 1 ? tied[0] : tied.length + ' tied leaders');
+    if (tied.length > 1) line.title = 'Tied: ' + tied.join(', ');
+  }
   else if (Number.isFinite(own) && own > 0) line.textContent = 'Your best ' + formatScore(own, spec);
   else line.textContent = 'No score yet';
   // One posted score is already named in the byline, so a one-row list would
