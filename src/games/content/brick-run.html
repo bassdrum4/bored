@@ -31,7 +31,7 @@
     <button id="start" type="button">Start</button>
     <button id="restart" type="button" hidden>Restart</button>
   </div>
-  <p>Arrows / A D move, Space jumps, Down enters pipes. Stomp foes, bump ? blocks, reach the flag.</p>
+  <p>Arrows / A D move, Space jumps, Down enters pipes. Each world hides one bonus room — its way out lands you further on.</p>
 </main>
 <script>
 'use strict';
@@ -63,33 +63,33 @@ function buildLevel(n){
     const g=emptyGrid(w); fillGround(g,gaps);
     g[7][14]=3; g[7][15]=4; g[7][16]=3; g[7][17]=5; g[7][18]=3;
     g[7][26]=4; g[4][32]=3; g[4][33]=3;
-    pipe(g,52,2); pipe(g,62,3);
+    pipe(g,52,2); pipe(g,70,2);
     g[7][57]=3; g[7][58]=4; g[7][59]=3;
     enemies=[[24,GROUND-1],[37,GROUND-1],[55,GROUND-1],[66,GROUND-1],[84,GROUND-1]];
     for(let x=20;x<=23;x++) coins.push([x,7]); for(let x=71;x<=74;x++) coins.push([x,6]);
     coins.push([32,3],[46,6],[47,6],[48,6]);
     stairs(g,104,4,1); g[GROUND-1][104+4]=2;
     const flagX=112; for(let r=3;r<=10;r++) g[r][flagX]=8; g[10][flagX+1]=2;
-    return {g,w,spawn:[2,GROUND-2],flagX,enemies,coins,pipes:[{x:52,h:2},{x:62,h:3}],warps:{52:62,62:52}};
+    return {g,w,spawn:[2,GROUND-2],flagX,enemies,coins,entry:{x:52,h:2},exit:{x:70,h:2}};
   }
   if(n===2){ w=148; gaps=[[18,19],[34,36],[58,60],[88,90],[118,120]];
     const g=emptyGrid(w); fillGround(g,gaps);
     g[7][12]=5; g[7][24]=3; g[7][25]=4; g[7][26]=3;
     g[6][42]=4; g[6][43]=3; g[4][48]=3; g[4][49]=4; g[4][50]=3;
-    pipe(g,30,2); pipe(g,54,3); pipe(g,66,2); pipe(g,96,4);
+    pipe(g,30,2); pipe(g,74,2);
     g[7][76]=3; g[7][77]=5; g[7][78]=3; g[4][82]=4;
     enemies=[[22,GROUND-1],[40,GROUND-1],[52,GROUND-1],[70,GROUND-1],[80,GROUND-1],[102,GROUND-1],[108,GROUND-1]];
     for(let x=33;x<=37;x++) coins.push([x,5]); for(let x=57;x<=61;x++) coins.push([x,5]);
     coins.push([48,3],[82,3],[100,6],[101,6],[102,6]);
     stairs(g,130,5,1);
     const flagX=138; for(let r=3;r<=10;r++) g[r][flagX]=8; g[10][flagX+1]=2;
-    return {g,w,spawn:[2,GROUND-2],flagX,enemies,coins,pipes:[{x:30,h:2},{x:54,h:3},{x:66,h:2},{x:96,h:4}],warps:{30:54,54:30,66:96,96:66}};
+    return {g,w,spawn:[2,GROUND-2],flagX,enemies,coins,entry:{x:30,h:2},exit:{x:74,h:2}};
   }
   w=168; gaps=[[14,16],[30,33],[52,54],[74,77],[100,103],[128,131]];
   const g=emptyGrid(w); fillGround(g,gaps);
   g[7][10]=4; g[7][20]=3; g[7][21]=5; g[7][22]=3;
   g[6][38]=3; g[6][39]=4; g[6][40]=3; g[4][44]=5;
-  pipe(g,26,2); pipe(g,48,3); pipe(g,64,4); pipe(g,92,2); pipe(g,112,3);
+  pipe(g,26,2); pipe(g,60,2);
   g[7][84]=3; g[7][85]=4; g[7][86]=3; g[4][106]=4; g[4][107]=3;
   enemies=[[18,GROUND-1],[36,GROUND-1],[56,GROUND-1],[68,GROUND-1],[86,GROUND-1],[96,GROUND-1],[116,GROUND-1],[122,GROUND-1]];
   for(let x=29;x<=34;x++) coins.push([x,5]); for(let x=73;x<=78;x++) coins.push([x,5]);
@@ -97,10 +97,30 @@ function buildLevel(n){
   coins.push([44,3],[106,3],[120,6],[121,6]);
   stairs(g,148,6,1);
   const flagX=157; for(let r=3;r<=10;r++) g[r][flagX]=8; g[10][flagX+1]=2;
-  return {g,w,spawn:[2,GROUND-2],flagX,enemies,coins,pipes:[{x:26,h:2},{x:48,h:3},{x:64,h:4},{x:92,h:2},{x:112,h:3}],warps:{26:48,48:26,64:112,112:64}};
+  return {g,w,spawn:[2,GROUND-2],flagX,enemies,coins,entry:{x:26,h:2},exit:{x:60,h:2}};
+}
+
+// Bonus room: one per world. The entry pipe drops you in on the left,
+// coins and platforms in the middle, and the exit pipe pops you back out
+// at the world's exit pipe, further along than you went in.
+function buildRoom(n, exitX, exitH){
+  const w=34, g=emptyGrid(w);
+  for(let x=0;x<w;x++){ g[GROUND][x]=1; g[GROUND+1][x]=1; g[GROUND+2][x]=1; }
+  for(let r=0;r<ROWS;r++){ g[r][0]=2; g[r][w-1]=2; }
+  const coins=[];
+  if(n===1){ g[7][8]=2; g[7][9]=2; g[7][10]=2; g[6][16]=2; g[6][17]=2; g[6][18]=2;
+    coins.push([8,6],[9,6],[10,6],[16,5],[17,5],[18,5],[13,8],[22,8]); }
+  else if(n===2){ g[7][6]=2; g[7][7]=2; g[6][12]=2; g[6][13]=2; g[6][14]=2; g[7][20]=2; g[7][21]=2;
+    coins.push([6,6],[7,6],[12,5],[13,5],[14,5],[20,6],[21,6],[24,8]); }
+  else { g[6][8]=2; g[6][9]=2; g[7][15]=2; g[7][16]=2; g[7][17]=2; g[6][23]=2;
+    coins.push([8,5],[9,5],[15,6],[16,6],[17,6],[23,5],[5,8],[27,8]); }
+  const ex=w-4;
+  for(let i=0;i<2;i++){ g[GROUND-1-i][ex]=7; g[GROUND-1-i][ex+1]=7; }
+  return {g,w,spawn:[2,2],coins,enemies:[],roomExitX:ex,exitDestX:exitX,exitH:exitH};
 }
 
 let state='title', level=1, L=null;
+let inRoom=false, savedOver=null;
 let score=0, coinsGot=0, lives=3, timeLeft=200, finished=false, won=false, levelJustFinished=false;
 let camX=0, shake=0;
 let player=null, foes=[], parts=[], pickups=[], floaters=[];
@@ -111,13 +131,35 @@ let jumpQueued=false, downQueued=false;
 // Per-run progress: taken coins, used ? blocks and broken bricks survive death.
 // resetRun() clears it, so Restart starts fully fresh.
 let runProgress=null;
-function freshProgress(){ return {1:{used:{},coins:{}},2:{used:{},coins:{}},3:{used:{},coins:{}}}; }
+function freshProgress(){ return {1:{used:{},coins:{},rooms:{}},2:{used:{},coins:{},rooms:{}},3:{used:{},coins:{},rooms:{}}}; }
 
 function tileAt(tx,ty){ if(tx<0) return 1; if(ty<0||ty>=ROWS) return 0; if(tx>=L.w) return 1; return L.g[ty][tx]; }
 function solidAt(tx,ty){ return SOLID.has(tileAt(tx,ty)); }
 
+function enterRoom(){
+  savedOver={L:L,foes:foes,pickups:pickups,camX:camX};
+  const R=buildRoom(level, L.exit.x, L.exit.h);
+  L=R; foes=[];
+  const prog=runProgress[level]; if(!prog.rooms) prog.rooms={};
+  pickups=R.coins.map(([tx,ty],i)=>({x:tx*TILE+4,y:ty*TILE+4,w:8,h:8,taken:!!prog.rooms[i],ph:Math.random()*6,room:true}));
+  player.x=R.spawn[0]*TILE; player.y=R.spawn[1]*TILE; player.vx=0; player.vy=0;
+  camX=0; inRoom=true; invuln=Math.max(invuln,20);
+  score+=50; beep(300,0.12); setTimeout(()=>beep(450,0.12),110);
+  floaters.push({x:player.x+6,y:player.y-8,txt:'BONUS',t:0});
+}
+function exitRoom(){
+  const dest=L.exitDestX, h=L.exitH;
+  L=savedOver.L; foes=savedOver.foes; pickups=savedOver.pickups;
+  player.x=dest*TILE+2; player.y=(GROUND-h)*TILE-player.h; player.vx=0; player.vy=0;
+  camX=Math.max(0,Math.min(player.x-W*0.38,L.w*TILE-W));
+  inRoom=false; savedOver=null; invuln=Math.max(invuln,30);
+  score+=50; beep(500,0.12); setTimeout(()=>beep(650,0.12),110);
+  floaters.push({x:player.x+6,y:player.y-8,txt:'BACK',t:0});
+}
+
 function loadLevel(n, keepScore){
   L=buildLevel(n);
+  inRoom=false; savedOver=null;
   if(!runProgress) runProgress=freshProgress();
   const prog=runProgress[n]||(runProgress[n]={used:{},coins:{}});
   // Re-apply collected progress so deaths keep coins / used ? / broken bricks.
@@ -222,29 +264,25 @@ function update(){
   if(coyote>0) coyote--;
   // fell
   if(p.y>H+40){ lives--; beep(110,0.4); if(lives<=0){ gameOver(false); return; } loadLevel(level,true); hud(); return; }
-  // pipe warp: press Down while standing on a pipe mouth
+  // pipes: Down on the entry mouth drops into the bonus room; Down on the
+  // room's pipe pops back out at the exit pipe, further along the world.
   if(downQueued){ downQueued=false;
-    if(p.onGround && L.pipes){
+    if(p.onGround){
       const feet=Math.floor((p.y+p.h+2)/TILE);
       const cxL=Math.floor((p.x+2)/TILE), cxR=Math.floor((p.x+p.w-2)/TILE);
       for(let tx=cxL;tx<=cxR;tx++){
         if(tileAt(tx,feet)===7 && tileAt(tx,feet-1)!==7){
-          // find which pipe this tile belongs to (left edge)
           let px=tileAt(tx-1,feet)===7?tx-1:tx;
-          const dest=L.warps && L.warps[px];
-          if(dest!=null){ p.x=dest*TILE+2; p.y=(GROUND-3)*TILE-p.h; p.vx=0; p.vy=0; invuln=Math.max(invuln,30);
-            score+=50; beep(300,0.12); setTimeout(()=>beep(500,0.12),110);
-            camX=Math.max(0,Math.min(p.x-W*0.38,L.w*TILE-W));
-            floaters.push({x:p.x+6,y:p.y-8,txt:'PIPE',t:0});
-          }
+          if(!inRoom && L.entry && px===L.entry.x){ enterRoom(); }
+          else if(inRoom && L.roomExitX!=null && px===L.roomExitX){ exitRoom(); }
           break;
         }
       }
     }
   }
-  // flag
-  const flagPx=L.flagX*TILE;
-  if(p.x+p.w>=flagPx && p.x<flagPx+24){
+  // flag (overworld only; rooms have no flagpole)
+  const flagPx=inRoom?-1:(L.flagX*TILE);
+  if(!inRoom && p.x+p.w>=flagPx && p.x<flagPx+24){
     // slide + bonus
     const hBonus=Math.max(0,Math.round((GROUND*TILE-p.y)/TILE))*50;
     const tBonus=Math.round(timeLeft)*10;
@@ -292,7 +330,7 @@ function update(){
   // coins
   for(const c of pickups){
     if(c.taken) continue; c.ph+=0.1;
-    if(p.x<c.x+8 && p.x+p.w>c.x && p.y<c.y+8 && p.y+p.h>c.y){ c.taken=true; if(runProgress){ const idx=pickups.indexOf(c); runProgress[level].coins[idx]=1; } score+=100; coinsGot++; beep(990,0.09); floaters.push({x:c.x,y:c.y-8,txt:'+100',t:0}); }
+    if(p.x<c.x+8 && p.x+p.w>c.x && p.y<c.y+8 && p.y+p.h>c.y){ c.taken=true; if(runProgress){ const idx=pickups.indexOf(c); if(c.room){ if(!runProgress[level].rooms) runProgress[level].rooms={}; runProgress[level].rooms[idx]=1; } else runProgress[level].coins[idx]=1; } score+=100; coinsGot++; beep(990,0.09); floaters.push({x:c.x,y:c.y-8,txt:'+100',t:0}); }
   }
   updateParts();
   for(const fl of floaters) fl.t++;
