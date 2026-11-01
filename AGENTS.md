@@ -117,7 +117,7 @@ It writes a playable starter, adds the slug to `ORDER` and `META`, records its m
 an SVG preview placeholder. Daily challenges remain opt-in because their goals need deliberate design. Then:
 
 ```bash
-npm run games:check           # mandatory offline contract validation
+npm run games:check           # catalog, score, preview and document validation
 npm run games:register        # give the shared board its score_rules row (--apply needs a key)
 npm test
 ```
@@ -127,16 +127,14 @@ assertions. What it still insists on:
 
 1. `src/games/content/<slug>.html`. It must be a complete document that works alone in a
    browser and is fetched into an iframe, so:
-   - **Network calls are allowed where the game needs one, and only there.** A game may call a
-     public, key-less API when the answer has to come from outside the document (Wordle asks
-     `api.datamuse.com` about a word its bundled list has never seen). The game must still
-     play with the call blocked: bundle the data that matters, treat a failed, slow or erroring
-     request as "no answer" instead of a lost turn, and never let a request decide a score. No
-     CDNs, webfonts, remote images, analytics, trackers, or API keys — only inline CSS/JS, canvas,
-     or emoji/text plus the endpoints the game declares. Every endpoint goes in `GAME_APIS` in
-     `tests/bored.test.cjs`; anything else off-site still fails the suite. The hub itself stays
-     offline and needs a connection only to download a game document the first time its card is
-     opened.
+   - **Online play is allowed.** A game may require APIs, a multiplayer server,
+     remote assets or CDN libraries. It should show a useful loading/error state
+     if those dependencies fail, and document its network requirements and
+     required services. Offline fallback is encouraged but **not required**.
+     Never embed secrets, private API keys or service-role credentials in the
+     published client. If a scored game relies on a remote result, define how
+     that result is validated before submitting scores. Browser tests check the
+     game's integration with Bored, not whether it works without internet.
    - No `localStorage`/`sessionStorage` unless wrapped in try/catch (embedded contexts throw).
      Key it under `bored.<slug>.…`. Persistence is optional; the hub owns real scores.
    - Fold on its own: no fixed width over ~360px, no page scroll that hides the board, and
