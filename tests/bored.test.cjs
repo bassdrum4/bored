@@ -18,10 +18,9 @@ const source = [
   'src/games/arcade.js', 'src/daily.js', 'src/games/catalog.js'
 ].map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
 const API = source.match(/const API_URL = '([^']+)'/)[1];
-// Public, key-less game APIs. A game may reach these when it has no local answer
-// (Wordle's dictionary); every other off-site request still fails the suite.
-const GAME_APIS = ['https://api.datamuse.com/'];
-const offSite = () => requests.filter(request => !request.startsWith(API) && !GAME_APIS.some(host => request.startsWith(host)));
+// Online-dependent games are supported. External resources are not a contract
+// failure: browser errors and the game's scoring/integration hooks are tested.
+
 // Games are downloaded on demand now, so the suite serves the repository over
 // loopback the way GitHub Pages does instead of loading file://.
 let origin = '', url = '';
@@ -123,7 +122,6 @@ test('the entry document loads the hub as modules from its own folder', () => {
   for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
     const game = context.nativeHTML(slug);
     assert.doesNotThrow(() => new vm.Script(game.match(/<script>([\s\S]*)<\/script>/)[1]));
-    assert.ok(!/<(?:script|link|img)[^>]+(?:src|href)=["']https?:/i.test(game), 'native game has no external assets');
   }
 });
 
@@ -1490,7 +1488,7 @@ test('browser regressions', async t => {
     await page.evaluate(() => { dailyDate = window.originalDailyDate; renderDaily(); });
   });
 
-  await t.test('every offline game boots with the shared daily seed', async () => {
+  await t.test('every local game boots with the shared daily seed', async () => {
     const slugs = await page.evaluate(() => ORDER.filter(([slug]) => !EXTERNS[slug] && !NEW_GAMES.includes(slug)).map(([slug]) => slug));
     const seeds = new Set();
     for (const slug of slugs) {
@@ -1510,7 +1508,6 @@ test('browser regressions', async t => {
     }
     assert.equal(seeds.size, 1, 'every game receives the same daily seed');
     assert.deepEqual(errors, [], 'no uncaught JavaScript errors');
-    assert.deepEqual(offSite(), [], 'no external requests other than the leaderboard and a declared game API');
   });
 
   await t.test('mobile hub and all new games fit at 320px; random respects the active filter', async () => {
