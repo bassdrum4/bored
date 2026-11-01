@@ -51,6 +51,28 @@ test('discovery reaches nothing off-site, keeps its controls, and fits small scr
     assert.ok(await page.evaluate(() => document.querySelector('#leaderboard').offsetTop < document.querySelector('#library').offsetTop));
   });
 
+  await t.test('creator notes appear on hover and through a touch-friendly button', async () => {
+    const slugs = await page.$eval('#grid .note-host', hosts => hosts.map(host => host.querySelector('.card').dataset.slug));
+    assert.deepEqual(slugs.sort(), ['block-blast', 'f-14', 'rooftop-snipers', 'trackbound', 'void-runner', 'wordle'].sort());
+    assert.ok(await page.$eval('#grid .developer-note-tip', tips => tips.every(tip => tip.textContent.startsWith('A note from the developer'))));
+    assert.match(await page.$eval('#developer-note-trackbound .developer-note-copy', tip => tip.textContent), /Brody/);
+    assert.equal(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'), null);
+    await page.hover('#grid .card[data-slug="block-blast"]');
+    assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'block');
+    await page.mouse.move(0, 0);
+    assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'none');
+
+    await page.setViewport({ width: 375, height: 800 });
+    await page.click('#grid .card[data-slug="void-runner"] ~ .developer-note-toggle');
+    assert.equal(await page.$eval('#developer-note-void-runner', tip => getComputedStyle(tip).display), 'block');
+    assert.equal(await page.$eval('#grid .card[data-slug="void-runner"] ~ .developer-note-toggle', node => node.getAttribute('aria-expanded')), 'true');
+    await page.click('#grid .card[data-slug="wordle"] ~ .developer-note-toggle');
+    assert.equal(await page.$eval('#grid .card[data-slug="void-runner"] ~ .developer-note-toggle', node => node.getAttribute('aria-expanded')), 'false');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.$eval('#grid .card[data-slug="wordle"] ~ .developer-note-toggle', node => node.getAttribute('aria-expanded')), 'false');
+    await page.setViewport({ width: 1366, height: 900 });
+  });
+
   await t.test('collections intersect with search and filters, and can be cleared', async () => {
     for (const [id, predicate] of [
       ['quick', 'quick'], ['friends', 'players'], ['relax', 'pace']
