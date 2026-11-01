@@ -317,7 +317,7 @@
           <option value="large">Whole vale &middot; five rivals</option>
         </select>
       </label>
-      <label class="field">Turn limit
+      <label class="field">Crownmoot
         <select id="opt-turns">
           <option value="30">30 turns</option>
           <option value="50" selected>50 turns</option>
@@ -670,14 +670,15 @@ function cityDefence(f, c) {
 }
 
 // Renown is what the board ranks: a single number that says how much vale your
-// banner actually holds. It only accrues from things that stay true.
+// banner actually holds. It only accrues from things that stay true, plus
+// moot standing earned as the Crownmoot nears (see crownmootTick).
 function renownOf(f) {
   const cities = ownCities(f);
   const pop = cities.reduce((n, c) => n + c.level, 0);
   const buildings = cities.reduce((n, c) => n + c.buildings.length, 0);
   const wonders = cities.reduce((n, c) => n + c.buildings.filter(b => b === 'wonder').length, 0);
   return cities.length * 8 + pop * 3 + f.techs.length * 4 + ownUnits(f).length +
-    buildings * 2 + wonders * 25;
+    buildings * 2 + wonders * 25 + (f.moot || 0);
 }
 
 function militaryStrength(f) {
@@ -1468,6 +1469,7 @@ function endPlayerTurn() {
   if (G.turn > G.maxTurns) {
     finishOnRenown();
   } else {
+    crownmootTick();
     beginTurn(player());
     if (G.turn % 5 === 0) log('Turn ' + G.turn + ' of ' + G.maxTurns + '.', 'turn');
   }
@@ -1475,6 +1477,25 @@ function endPlayerTurn() {
   recomputeVision();
   render();
   autosave();
+}
+
+// The Crownmoot: the turn limit as fiction. In the last ten turns every
+// capital held earns renown that grows as the choosing nears, so the endgame
+// accelerates instead of fizzling. Ten is inline, not a named constant,
+// because the suite runs sliced functions without their module neighbours.
+function crownmootTick() {
+  if (G.tut) return;
+  const left = G.maxTurns - G.turn + 1;
+  if (left > 10 || left < 1) return;
+  const weight = 11 - left;
+  for (const f of G.factions) {
+    if (!f.alive) continue;
+    const caps = G.cities.filter(c => c.capital && c.owner === f.i).length;
+    if (caps) f.moot = (f.moot || 0) + caps * weight;
+  }
+  if (left === 10) log('The Crownmoot is called. In ten turns the banners choose who wears the Ashcrown; every capital held earns renown until then.', 'turn');
+  if (left === 5) log('The Crownmoot convenes in five turns.', 'turn');
+  if (left === 1) log('The Crownmoot convenes next turn.', 'turn');
 }
 
 function endGame(won, kind, text) {
@@ -1492,9 +1513,9 @@ function finishOnRenown() {
   const best = ranked[0];
   const mine = renownOf(player());
   if (best && best.f.isPlayer) {
-    endGame(true, 'renown', 'The turn limit falls. ' + player().name + ' holds the vale with ' + mine + ' renown.');
+    endGame(true, 'renown', 'The Crownmoot convenes. ' + player().name + ' holds the vale with ' + mine + ' renown.');
   } else {
-    endGame(false, 'renown', 'The turn limit falls. ' + (best ? best.f.name : 'A rival') +
+    endGame(false, 'renown', 'The Crownmoot convenes. ' + (best ? best.f.name : 'A rival') +
       ' carries the vale with ' + (best ? best.score : 0) + ' renown.');
   }
 }
@@ -2382,7 +2403,7 @@ function renderBar() {
   // Drawn, not spelled: each resource is its own mark, its stock, its income.
   UI.resRow.innerHTML = items.map(key => {
     if (key === 'renown') {
-      return '<span class="res-item" title="Renown: cities, growth, lore, works">' + icon('renown', 15) +
+      return '<span class="res-item" title="Renown: cities, growth, lore, works, moot">' + icon('renown', 15) +
         '<span class="res-val">' + renownOf(f) + '</span></span>';
     }
     const inc = income[key] || 0;
@@ -2391,7 +2412,9 @@ function renderBar() {
       icon(key, 15) + '<span class="res-val">' + (f.res[key] || 0) + '</span>' +
       '<span class="res-inc ' + cls + '">' + (inc > 0 ? '+' : '') + inc + '</span></span>';
   }).join('');
-  UI.turnReadout.textContent = G.turn + '/' + G.maxTurns;
+  const mootLeft = !G.tut ? G.maxTurns - G.turn + 1 : -1;
+  UI.turnReadout.textContent = G.turn + '/' + G.maxTurns +
+    (mootLeft >= 1 && mootLeft <= 10 ? ' \u00b7 moot ' + mootLeft : '');
 }
 
 function renderLog() {
@@ -2771,8 +2794,9 @@ function showHelpModal() {
     'can reach the attacker strikes back, so Bows at two hexes are answered by nothing. Take a keep by breaking ' +
     'its health with a land unit.</p>' +
     '<p class="sec">Winning</p><p class="hint" style="margin-top:0">Hold every capital in the vale for domination, ' +
-    'or learn Ascendancy and raise the Grand Wonder. If the turn limit falls first, the banner with the most ' +
-    'renown carries the day. Renown counts cities, population, technologies, works and wonders.</p>' +
+    'or learn Ascendancy and raise the Grand Wonder. Otherwise the Crownmoot convenes at the turn limit and ' +
+    'the most renowned banner carries the day; in the last ten turns every capital held earns growing renown. ' +
+    'Renown counts cities, population, technologies, works, wonders and moot standing.</p>' +
     '<p class="sec">Keys</p><p class="hint" style="margin-top:0">Space ends the turn · T technologies · ' +
     'D council · N next idle banner · Esc closes a panel or clears the selection · ' +
     'drag to look around · scroll to zoom.</p>' +
