@@ -261,7 +261,7 @@ export function dailyResultCheck(id, result) {
 const DAILY_ADAPTERS = {
   tetris: { expression: '({lines:game.lines,score:game.score||0})' },
   snake: { closure: true, expression: '({apples:score})' },
-  wordle: { expression: '({guesses:row,solved:gameOver && Array.from({length:row},(_,r)=>[...document.querySelectorAll(".tile[data-row="+CSS.escape(String(r))+"]")].filter(t=>t.classList.contains("correct")).length===5).some(Boolean)})' },
+  wordle: { expression: '({guesses:row,solved:gameOver && solved})' },
   'space-invaders': { expression: '({waves:Math.max(0,lvN-1)+(st==="levelclear"?1:0),score:sc||0})' },
   simon: { closure: true, expression: '({rounds:Math.max(0,round-(state==="paused"?0:1))})' },
   breakout: { expression: '({layouts:currentLevel||0,score:score||0})' },
@@ -272,7 +272,7 @@ const DAILY_ADAPTERS = {
   minesweeper: { setup: 'let boredHints=0;const boredHint=game.getHint;game.getHint=function(...a){boredHints++;return boredHint.apply(this,a)};const boredInit=game.init;game.init=function(...a){boredHints=0;return boredInit.apply(this,a)};', expression: '({seconds:game.timer,won:game.state==="WON",standard:["beginner","intermediate","expert"].includes(game.difficulty),hints:boredHints})' },
   pong: { expression: '({points:score1||0,cpu:mode==="ai"})' },
   sumo: { expression: '({wins:p1.score||0,cpu:cpuMode===true})' },
-  poker: { expression: '({profit:human()?human().stack-G.settings.stack:0,handOver:G.phase==="handOver"})' },
+  poker: { expression: '(G.variant==="holdem"||G.variant==="draw"?{profit:human()?human().stack-G.settings.stack:0,handOver:G.phase==="handOver"}:{profit:0,handOver:false})' },
   tank: { setup: 'let boredCpuOnly=true;document.addEventListener("keydown",e=>{if(e.key.toLowerCase()==="e"&&!aiEnabled)boredCpuOnly=false});', expression: '((!aiEnabled&&(boredCpuOnly=false)),({wins:scores[0],cpu:aiEnabled&&boredCpuOnly}))' },
   'void-runner': { closure: true, expression: '({score})' },
   solitaire: { closure: true, expression: '({cards:G.foundations.reduce((n,p)=>n+p.length,0),moves:G.moves,won:won===true,seconds:won?Math.ceil(timerNow()/1000):0})' },

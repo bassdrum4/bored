@@ -29,6 +29,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "brick-run": {
+    "label": "Score",
+    "better": "high",
+    "max_value": 1000000
+  },
   "chess": {
     "label": "Computer wins in a session",
     "better": "high",
@@ -60,12 +65,12 @@
     "max_value": 1000000
   },
   "gun-mayhem": {
-    "label": "Rounds won",
+    "label": "Rounds won against CPU (endless mode)",
     "better": "high",
     "max_value": 99
   },
   "lava": {
-    "label": "Points",
+    "label": "Points scored against CPU (endless mode)",
     "better": "high",
     "max_value": 999
   },
@@ -169,6 +174,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "trackbound": {
+    "label": "Gold medals earned",
+    "better": "high",
+    "max_value": 99
+  },
   "transit-chaos": {
     "label": "Passengers delivered",
     "better": "high",
@@ -185,7 +195,7 @@
     "max_value": 10000000
   },
   "volletball": {
-    "label": "Points",
+    "label": "Points scored against CPU (endless mode)",
     "better": "high",
     "max_value": 999
   },

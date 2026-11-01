@@ -1096,6 +1096,7 @@ const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)].toUpperCase()
 let current = '';
 let row = 0;
 let gameOver = false;
+let solved = false;
 let checking = false;
 
 const board = document.getElementById('board');
@@ -1205,7 +1206,7 @@ async function submitGuess() {
   }
 
   setTimeout(() => {
-    if (current === answer) { gameOver = true; showMessage(getWinMessage(), 5000); bounceRow(); }
+    if (current === answer) { gameOver = true; solved = true; showMessage(getWinMessage(), 5000); bounceRow(); }
     else if (row >= 5) { gameOver = true; showMessage(answer, 8000); }
     row++; current = '';
   }, 5 * 150 + 100);

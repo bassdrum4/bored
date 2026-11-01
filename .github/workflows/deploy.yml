@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   deploy:
-    # Publish exactly the files from the committed main branch.
+    # Publish the main source tree after refreshing the generated changelog.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -31,7 +31,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          # The changelog generator needs complete history, not a shallow clone.
+          fetch-depth: 0
       - uses: actions/configure-pages@v5
+      - name: Regenerate changelog from main history
+        run: node scripts/changelog.mjs
       # The hub asks for game documents with this stamp in the query string, so
       # every push to main publishes new URLs instead of Pages' ten-minute cache.
       - name: Stamp the deploy with its commit

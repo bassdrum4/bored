@@ -88,6 +88,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  highScore("brick-run", "Brick Run", "points", { metric: "score", when: snapshot => snapshot.finished === true }),
   // Ashcrown ranks the renown a campaign actually finished with: a banner still
   // growing when the player walked away is not a result. Every finished campaign
   // holds at least one city, so the renown floor is real rather than arbitrary.
@@ -95,6 +96,10 @@ export const HIGH_SCORE_GAMES = [
     metric: 'renown', min: 1, max: 10000,
     when: snapshot => snapshot.finished === true
   }),
+  // Trackbound ranks the campaign, not one clock: gold medals are per track and
+  // only a finished run can earn one, so the board fills as the campaign falls
+  // rather than rewarding a single lucky lap on the shortest map.
+  highScore('trackbound', 'Trackbound', 'gold medals', { metric: 'medals', when: snapshot => snapshot.finished === true }),
   highScore("transit-chaos", "Transit Chaos", "passengers", { metric: "delivered", when: snapshot => snapshot.finished === true }),
   // Circuit ranks the whole three-lap race: the clock starts on the first
   // keypress and stops at the line, so a quick lap cannot offset a scrappy one.
@@ -178,9 +183,9 @@ export const HIGH_SCORE_GAMES = [
   }),
   highScore('lights-out', 'Lights Out', 'boards', { metric: 'cleared' }),
   highScore('commanders', 'Commanders', 'points', { metric: 'score' }),
-  highScore('lava', 'Lava', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
-  highScore('volletball', 'VolletBall', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
-  highScore('gun-mayhem', 'Gun Mayhem', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
+  highScore('lava', 'Lava', 'CPU points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
+  highScore('volletball', 'VolletBall', 'CPU points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
+  highScore('gun-mayhem', 'Gun Mayhem', 'CPU rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   highScore('shadow-net', 'shadow.net', 'files', { metric: 'files' }),
   highScore('asteroids', 'Asteroids', 'points', { metric: 'score' })
 ];
@@ -204,7 +209,12 @@ export function boardLeaders(rows) {
     if (!spec || !handle || !Number.isFinite(value) || value <= 0) continue;
     const held = leaders.get(spec.id);
     if (!held || (spec.lower ? value < held.value : value > held.value)) {
-      leaders.set(spec.id, { value, handle });
+      leaders.set(spec.id, { value, handle, handles: [handle] });
+    } else if (value === held.value && !held.handles.some(name => name.toLowerCase() === handle.toLowerCase())) {
+      // We cannot prove who first achieved an old tied score. Keep all
+      // verified co-leaders instead of accidentally rewarding alphabetical order.
+      held.handles.push(handle);
+      held.handles.sort((a, b) => a.localeCompare(b));
     }
   }
   return leaders;
