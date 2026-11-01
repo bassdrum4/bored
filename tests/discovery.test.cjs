@@ -57,7 +57,7 @@ test('discovery reaches nothing off-site, keeps its controls, and fits small scr
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('#grid .developer-note-tip')].every(tip => tip.textContent.startsWith('A note from the developer'))));
     assert.match(await page.$eval('#developer-note-trackbound .developer-note-copy', tip => tip.textContent), /Brody/);
     assert.equal(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'), null);
-    await page.hover('#grid .card[data-slug="block-blast"]');
+    await page.hover('#grid .note-host:has(.card[data-slug="block-blast"]) .developer-note-toggle');
     assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'block');
     await page.mouse.move(0, 0);
     assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'none');
