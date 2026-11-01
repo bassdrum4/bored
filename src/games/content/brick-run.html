@@ -8,11 +8,11 @@
   * { margin: 0; padding: 0; box-sizing: border-box }
   body { display: grid; place-items: center; min-height: 100vh; background: #f5f2ea; color: #191713;
          font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 0 }
-  main { width: min(360px, 94vw); text-align: center }
+  main { width: min(560px, 96vw); text-align: center }
   h1 { font-size: 11px; font-weight: 600; letter-spacing: .1em; margin-bottom: 8px; text-transform: uppercase }
   h1 span { color: #6b6558; font-weight: 400 }
   #wrap { border: 1px solid #d8d2c4; background: #fffdf7 }
-  canvas { display: block; width: 100%; height: auto; touch-action: none; background: #fffdf7 }
+  canvas { display: block; width: 100%; height: auto; touch-action: none; background: #fffdf7; image-rendering: pixelated }
 
   #row { display: flex; gap: 6px; margin-top: 6px }
   #start, #restart { flex: 1; font: inherit; font-size: 12px; border: 1px solid #191713; background: none;
@@ -228,7 +228,7 @@ function update(){
       const feet=Math.floor((p.y+p.h+2)/TILE);
       const cxL=Math.floor((p.x+2)/TILE), cxR=Math.floor((p.x+p.w-2)/TILE);
       for(let tx=cxL;tx<=cxR;tx++){
-        if(tileAt(tx,feet)===7 && tileAt(tx,feet-1)===7){
+        if(tileAt(tx,feet)===7 && tileAt(tx,feet-1)!==7){
           // find which pipe this tile belongs to (left edge)
           let px=tileAt(tx-1,feet)===7?tx-1:tx;
           const dest=L.warps && L.warps[px];
@@ -257,14 +257,15 @@ function update(){
   }
   // foes
   for(const f of foes){
-    if(f.dead){ f.dead--; continue; }
+    if(f.gone) continue;
+    if(f.dead){ f.dead--; if(f.dead<=0) f.gone=true; continue; }
     if(f.shroom){
       f.vy=Math.min(f.vy+0.3,7); f.hitWall=false; collideMove(f,false);
       if(f.hitWall) f.vx*=-1;
       if(Math.abs(f.x-p.x)<20 && Math.abs(f.y-p.y)<20){
-        if(overlap(p,f)){ f.dead=1; if(!p.big){ p.big=true; p.h=24; p.y-=10; } score+=500; beep(740,0.15); floaters.push({x:f.x,y:f.y-6,txt:'+500',t:0}); }
+        if(overlap(p,f)){ f.gone=true; if(!p.big){ p.big=true; p.h=24; p.y-=10; } score+=500; beep(740,0.15); floaters.push({x:f.x,y:f.y-6,txt:'+500',t:0}); }
       }
-      if(f.y>H+60) f.dead=1;
+      if(f.y>H+60) f.gone=true;
       continue;
     }
     if(f.x<camX-40||f.x>camX+W+40) continue;
@@ -281,7 +282,7 @@ function update(){
       const below=Math.floor((f.y+f.h+2)/TILE);
       if(f.onGround && !solidAt(ahead,below) && tileAt(ahead,below)!==8) f.vx*=-1;
     }
-    if(f.y>H+60){ f.dead=1; continue; }
+    if(f.y>H+60){ f.gone=true; continue; }
     if(overlap(p,f)){
       const stomp = p.vy>0.5 && (p.y+p.h)-f.y<10;
       if(stomp){ f.dead=25; score+=200; p.vy=-5.2; beep(600,0.1); floaters.push({x:f.x,y:f.y-6,txt:'+200',t:0}); }
@@ -361,7 +362,7 @@ function draw(){
     ctx.fillStyle='#7a5a17'; ctx.fillRect(c.x+3,c.y+2+bob,2,4);
   }
   // foes
-  for(const f of foes){ if(f.dead) { if(!f.shroom&&f.dead>0){ ctx.fillStyle='#7a5c3e'; ctx.fillRect(f.x,f.y+f.h-4,f.w,4); } continue; }
+  for(const f of foes){ if(f.gone) continue; if(f.dead) { ctx.fillStyle='#7a5c3e'; ctx.fillRect(f.x,f.y+f.h-4,f.w,4); continue; }
     if(f.x<camL||f.x>camR) continue;
     if(f.shroom){ ctx.fillStyle='#a33b2e'; ctx.fillRect(f.x,f.y,f.w,8); ctx.fillStyle='#fffdf7'; ctx.fillRect(f.x+2,f.y+2,3,3); ctx.fillRect(f.x+9,f.y+2,3,3);
       ctx.fillStyle='#e8dcc8'; ctx.fillRect(f.x,f.y+8,f.w,4); ctx.strokeStyle='#191713'; ctx.strokeRect(f.x+0.5,f.y+0.5,f.w-1,f.h-1); continue; }
