@@ -52,9 +52,9 @@ test('discovery reaches nothing off-site, keeps its controls, and fits small scr
   });
 
   await t.test('creator notes appear on hover and through a touch-friendly button', async () => {
-    const slugs = await page.$eval('#grid .note-host', hosts => hosts.map(host => host.querySelector('.card').dataset.slug));
+    const slugs = await page.evaluate(() => [...document.querySelectorAll('#grid .note-host')].map(host => host.querySelector('.card').dataset.slug));
     assert.deepEqual(slugs.sort(), ['block-blast', 'f-14', 'rooftop-snipers', 'trackbound', 'void-runner', 'wordle'].sort());
-    assert.ok(await page.$eval('#grid .developer-note-tip', tips => tips.every(tip => tip.textContent.startsWith('A note from the developer'))));
+    assert.ok(await page.evaluate(() => [...document.querySelectorAll('#grid .developer-note-tip')].every(tip => tip.textContent.startsWith('A note from the developer'))));
     assert.match(await page.$eval('#developer-note-trackbound .developer-note-copy', tip => tip.textContent), /Brody/);
     assert.equal(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'), null);
     await page.hover('#grid .card[data-slug="block-blast"]');
