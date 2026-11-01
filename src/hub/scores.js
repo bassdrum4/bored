@@ -183,9 +183,9 @@ export const HIGH_SCORE_GAMES = [
   }),
   highScore('lights-out', 'Lights Out', 'boards', { metric: 'cleared' }),
   highScore('commanders', 'Commanders', 'points', { metric: 'score' }),
-  highScore('lava', 'Lava', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
-  highScore('volletball', 'VolletBall', 'points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
-  highScore('gun-mayhem', 'Gun Mayhem', 'rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
+  highScore('lava', 'Lava', 'CPU points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
+  highScore('volletball', 'VolletBall', 'CPU points', { metric: 'points', when: snapshot => snapshot.cpu === true }),
+  highScore('gun-mayhem', 'Gun Mayhem', 'CPU rounds', { metric: 'wins', when: snapshot => snapshot.cpu === true }),
   highScore('shadow-net', 'shadow.net', 'files', { metric: 'files' }),
   highScore('asteroids', 'Asteroids', 'points', { metric: 'score' })
 ];
@@ -209,7 +209,12 @@ export function boardLeaders(rows) {
     if (!spec || !handle || !Number.isFinite(value) || value <= 0) continue;
     const held = leaders.get(spec.id);
     if (!held || (spec.lower ? value < held.value : value > held.value)) {
-      leaders.set(spec.id, { value, handle });
+      leaders.set(spec.id, { value, handle, handles: [handle] });
+    } else if (value === held.value && !held.handles.some(name => name.toLowerCase() === handle.toLowerCase())) {
+      // We cannot prove who first achieved an old tied score. Keep all
+      // verified co-leaders instead of accidentally rewarding alphabetical order.
+      held.handles.push(handle);
+      held.handles.sort((a, b) => a.localeCompare(b));
     }
   }
   return leaders;

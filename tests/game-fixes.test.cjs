@@ -236,3 +236,64 @@ test('Frogger only awards upward progress once per row per life', () => {
   ctx.moveFrog(0, -1);
   assert.equal(ctx.score, 10, 'a new run still rewards legitimate progress');
 });
+
+
+test('Sand cloner learns wind heading and emits live directional gusts', () => {
+  const html = load('src/games/content/sand.html');
+  const begin = html.indexOf('const CLONABLE = new Set(');
+  const end = html.indexOf('/* ── Destat ── */', begin);
+  assert.ok(begin >= 0 && end > begin);
+  const width = 10, height = 8, size = width * height;
+  const grid = new Uint8Array(size), gLife = new Uint8Array(size);
+  const gExtra = new Uint8Array(size), gMove = new Uint8Array(size);
+  const I = (x, y) => y * width + x;
+  const ids = {
+    EMPTY: 0, SAND: 1, WATER: 2, OIL: 6, ACID: 9, LAVA: 10, MUD: 14,
+    SALT: 16, GUNPOWDER: 15, DUST: 19, TAR: 20, FIRE: 4, SMOKE: 5,
+    STEAM: 8, ELECTRICITY: 22, GOLD: 13, COAL: 18, SODIUM: 23,
+    NITROGEN: 26, WIND: 38, CLONER: 27
+  };
+  const ctx = vm.createContext({
+    ...ids, grid, gLife, gExtra, gMove, windDirection: 1,
+    I, ok: (x, y) => x >= 0 && x < width && y >= 0 && y < height,
+    rnd: (min) => min
+  });
+  vm.runInContext(html.slice(begin, end), ctx);
+  grid[I(5, 3)] = ids.CLONER;
+  grid[I(4, 3)] = ids.WIND;
+  gExtra[I(4, 3)] = 7; // Gust heading: up.
+  ctx.updCloner(5, 3);
+  assert.equal(gExtra[I(5, 3)], ids.WIND, 'cloner memorizes wind as material');
+  assert.equal(gLife[I(5, 3)], 7, 'cloner memorizes original wind heading');
+  grid[I(4, 3)] = ids.EMPTY;
+  ctx.updCloner(5, 3);
+  for (const y of [2, 4]) {
+    assert.equal(grid[I(5, y)], ids.WIND, 'cloner emits above and below');
+    assert.equal(gExtra[I(5, y)], 7, 'new gust inherits the direction');
+    assert.ok(gLife[I(5, y)] > 1, 'new gust has enough lifetime to push matter');
+  }
+});
+
+test('Fluid exposes editable live solver parameters', () => {
+  const html = load('src/games/content/fluid.html');
+  const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  assert.doesNotThrow(() => new vm.Script(script));
+  for (const setting of ['SPLAT_FORCE', 'CURL', 'SPLAT_RADIUS', 'DYE_STRENGTH', 'DENSITY_DISSIPATION']) {
+    assert.match(html, new RegExp('data-setting="' + setting + '"'), setting + ' has a slider');
+  }
+  assert.match(html, /id="editor-toggle"/);
+  assert.match(html, /id="fluid-reset-settings"/);
+});
+
+test('Game card leaderboard reports co-leaders instead of choosing alphabetically', () => {
+  const source = load('src/hub/scores.js');
+  const ctx = vm.createContext({ LB_GAMES: [{ id: 'wordle', lower: true }] });
+  vm.runInContext(extractFunction(source, 'boardLeaders'), ctx);
+  const leaders = ctx.boardLeaders([
+    { game: 'wordle', handle: 'Zoe', value: 2 },
+    { game: 'wordle', handle: 'Adam', value: 2 },
+    { game: 'wordle', handle: 'Maya', value: 3 }
+  ]);
+  assert.equal(leaders.get('wordle').value, 2);
+  assert.deepEqual(Array.from(leaders.get('wordle').handles), ['Adam', 'Zoe']);
+});

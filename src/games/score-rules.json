@@ -65,12 +65,12 @@
     "max_value": 1000000
   },
   "gun-mayhem": {
-    "label": "Rounds won",
+    "label": "Rounds won against CPU (endless mode)",
     "better": "high",
     "max_value": 99
   },
   "lava": {
-    "label": "Points",
+    "label": "Points scored against CPU (endless mode)",
     "better": "high",
     "max_value": 999
   },
@@ -195,7 +195,7 @@
     "max_value": 10000000
   },
   "volletball": {
-    "label": "Points",
+    "label": "Points scored against CPU (endless mode)",
     "better": "high",
     "max_value": 999
   },
