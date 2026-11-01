@@ -2,13 +2,24 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 201,
-  "newest": "2026-10-31",
+  "count": 212,
+  "newest": "2026-11-01",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"056c6d2","date":"2026-11-01","author":"Codebuff","subject":"Brick Run: bonus rooms behind one entry pipe per world"},
+  {"sha":"dfa8616","date":"2026-11-01","author":"Codebuff","subject":"Brick Run: bigger display, working pipe warps, permanent kills"},
+  {"sha":"775e1f7","date":"2026-11-01","author":"Codebuff","subject":"Brick Run: keyboard platformer with warp pipes and persistent pickups"},
+  {"sha":"10cb27a","date":"2026-11-01","author":"bassdrum4","subject":"Trackbound: checkpoint split HUD, a sound toggle, corner chevrons and longer tracks"},
+  {"sha":"f6d2f5e","date":"2026-11-01","author":"Codebuff","subject":"Ashcrown: the turn limit becomes the Crownmoot"},
+  {"sha":"634f5c5","date":"2026-10-31","author":"Daniel Lowe","subject":"Automate changelog commits and allow network-dependent games"},
+  {"sha":"c8bf71b","date":"2026-10-31","author":"Daniel Lowe","subject":"Fix Bored player feedback: wind, fluid controls, scores and ties"},
+  {"sha":"d1954dc","date":"2026-10-31","author":"Codebuff","subject":"Ashcrown: tribute both ways, combat preview, idle banners"},
+  {"sha":"1211bb0","date":"2026-10-31","author":"Codebuff","subject":"Ashcrown: draw the interface and teach a playable tutorial"},
+  {"sha":"c7b44d8","date":"2026-10-31","author":"bassdrum4","subject":"Trackbound: a 3D time-trial racer"},
+  {"sha":"5a62910","date":"2026-10-31","author":"Daniel Lowe","subject":"Keep Bored's changelog current on every deploy","pr":47},
   {"sha":"5963270","date":"2026-10-31","author":"Daniel Lowe","subject":"Rename Poker library entry to Card Table","pr":46},
   {"sha":"c7930ec","date":"2026-10-31","author":"Daniel Lowe","subject":"Add Blackjack and Euchre modes to Poker","pr":45},
   {"sha":"4aad25a","date":"2026-10-31","author":"Daniel Lowe","subject":"Restore F-14 flight analytics in Bored dashboard"},
