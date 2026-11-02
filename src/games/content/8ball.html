@@ -1838,6 +1838,55 @@ async function saveOnlineShot(move){
 }
 if(online) restoreOnline();
 
+/* ── continue where you left off ─────────────────────────────────────────── */
+
+// Only a settled table on the shooter's turn is kept. A shot in flight is not
+// resumed, because its outcome belongs to the physics of that moment.
+const RESUME = window.__boredResume;
+function savedRun(){
+  if(online || state !== 'aim' || !mode) return null;
+  const left = balls.filter(b => b.alive).length;
+  if(left >= 16) return null;
+  return {
+    label:left + ' balls left \u00b7 ' + (mode === 'cpu' ? 'vs computer' : 'two players'),
+    state:{
+      balls:balls.filter(b => b.alive).map(b => ({ id:b.id, x:b.x, y:b.y })),
+      mode:mode, turn:turn, groups:groups.slice(),
+      openTable:openTable, breakShot:breakShot
+    }
+  };
+}
+function restoreRun(saved){
+  const run = saved && saved.state;
+  if(!run || !Array.isArray(run.balls) || !Array.isArray(run.groups)) return false;
+  const alive = new Map(run.balls.map(b => [b.id, b]));
+  balls = Array.from({ length:16 }, (_, id) => {
+    const position = alive.get(id);
+    return Object.assign({}, ball(id), position || {}, { vx:0, vy:0, alive:!!position });
+  });
+  mode = run.mode === 'cpu' ? 'cpu' : '2p';
+  turn = run.turn === 1 ? 1 : 0;
+  groups = run.groups.slice(0, 2);
+  while(groups.length < 2) groups.push(null);
+  openTable = !!run.openTable;
+  breakShot = !!run.breakShot;
+  firstHit = null;
+  pottedThisShot = [];
+  aimMode = aimLocked = dragSlider = false;
+  state = 'aim';
+  for(const id of ['menu','diff','over']) document.getElementById(id).classList.add('hidden');
+  const c = cue();
+  if(c) aimAngle = Math.atan2(PH/2-c.y, PW/2-c.x);
+  toast('Picking up where you left off', null, 2000);
+  draw();
+  return true;
+}
+if(RESUME){
+  const pending = RESUME.read();
+  if(pending) RESUME.ask(pending.label, () => { if(!restoreRun(pending)){ RESUME.clear(); } }, () => {});
+  RESUME.arm(savedRun);
+}
+
 // Bored's host uses this hook to distinguish successful loads from abandoned
 // iframe placeholders. Do not expose full online state or player details.
 window.__boredSnapshot = () => ({ slug: '8ball', finished: state === 'over' });

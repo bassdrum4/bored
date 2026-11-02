@@ -113,6 +113,7 @@ function pocket() {
   ball.x = hole.cup[0]; ball.y = hole.cup[1]; ball.vx = ball.vy = 0;
   moving = false; sunk = true; card.push(strokes - previous);
   finished = card.length === holes.length;
+  if (finished && window.__boredResume) window.__boredResume.clear();
   next.hidden = finished;
   const relative = strokes - totalPar;
   updateHud(finished ? 'Nine holes in ' + strokes + ' strokes. ' +
@@ -330,7 +331,7 @@ canvas.addEventListener('keydown', event => {
   else if (!event.repeat) putt(angle, power);
   updateHud();
 });
-document.querySelector('#restart').onclick = newRound;
+document.querySelector('#restart').onclick = () => { if (window.__boredResume) window.__boredResume.clear(); newRound(); };
 next.onclick = () => { advanceHole(); canvas.focus(); };
 document.querySelector('#pars').innerHTML += holes.map(hole => '<td>' + hole.par + '</td>').join('') + '<td>' + totalPar + '</td>';
 new ResizeObserver(() => {
@@ -341,7 +342,40 @@ new ResizeObserver(() => {
   ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
   draw();
 }).observe(document.querySelector('#stage'));
-newRound(); requestAnimationFrame(frame);
+/* ── continue where you left off ─────────────────────────────────────────── */
+
+const RESUME = window.__boredResume;
+
+// A round is resumed at the tee of the hole you were on, with your card intact:
+// the ball's exact position mid-roll is not worth restoring.
+function savedRound() {
+  if (finished || (!card.length && !strokes)) return null;
+  return {
+    label: 'Hole ' + (holeIndex + 1) + '/9 \u00b7 ' + strokes + (strokes === 1 ? ' stroke' : ' strokes'),
+    state: { holeIndex: holeIndex, strokes: strokes, card: card.slice() }
+  };
+}
+
+function restoreRound(saved) {
+  const round = saved && saved.state;
+  if (!round || !Array.isArray(round.card) || !Number.isInteger(round.holeIndex)) return false;
+  holeIndex = Math.max(0, Math.min(holes.length - 1, round.holeIndex));
+  strokes = Math.max(0, round.strokes | 0);
+  card = round.card.map(value => Math.max(0, value | 0)).slice(0, holes.length);
+  finished = card.length === holes.length;
+  loadHole();
+  updateHud('Picking up on hole ' + (holeIndex + 1) + '.');
+  return true;
+}
+
+if (!RESUME) newRound();
+else {
+  const saved = RESUME.read();
+  newRound();
+  if (saved) RESUME.ask(saved.label, () => { if (!restoreRound(saved)) { RESUME.clear(); newRound(); } }, newRound);
+  RESUME.arm(savedRound);
+}
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>

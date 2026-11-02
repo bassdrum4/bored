@@ -1033,6 +1033,7 @@ textarea.result[hidden] { display:none; }
   // day; after that a dive is cut fresh unless the player retries a seed.
   function dailyPlayed() { return readJSON('deep.dailyPlayed', '') === today(); }
   function newRun(mode, seed) {
+    if (window.__boredResume) window.__boredResume.clear();
     let next = mode || 'daily';
     if (!seed && next === 'daily' && dailyPlayed()) next = 'random';
     state.mode = next;
@@ -1061,6 +1062,7 @@ textarea.result[hidden] { display:none; }
   }
   function finish(won) {
     state.choosingRoute = false;
+    if (window.__boredResume) window.__boredResume.clear();
     $('routes').hidden = true;
     state.won = won;
     state.running = false;
@@ -1759,6 +1761,66 @@ textarea.result[hidden] { display:none; }
   $('titleBest');
   $('btnPotion').disabled = true;
   $('btnStairs').disabled = true;
+
+  /* ── continue where you left off ───────────────────────────────────────── */
+
+  // The whole dungeon is stored: the seed alone cannot rebuild it, because the
+  // player's kills and pickups have already changed the floor.
+  function savedRun() {
+    if (!state.running || state.finished || state.won || !state.turns) return null;
+    return {
+      label: 'Floor ' + state.depth + ' \u00b7 ' + state.hp + '/' + state.maxHp + ' HP',
+      state: {
+        game: Object.assign({}, state),
+        map: Array.from(map), seen: Array.from(seen), vis: Array.from(vis),
+        enemies: enemies.map(enemy => Object.assign({}, enemy)),
+        items: items.map(item => Object.assign({}, item)),
+        stairs: stairs ? Object.assign({}, stairs) : null,
+        px: px, py: py
+      }
+    };
+  }
+
+  function restoreRun(saved) {
+    const run = saved && saved.state;
+    if (!run || !run.game || !Array.isArray(run.map) || run.map.length !== MAP_W * MAP_H) return false;
+    Object.assign(state, run.game, {
+      running: true, finished: false, won: false, alive: true,
+      hurt: 0, shake: 0, flash: 0, choosingRoute: false
+    });
+    map = Uint8Array.from(run.map);
+    seen = Uint8Array.from(run.seen || []);
+    vis = Uint8Array.from(run.vis || []);
+    enemies = (run.enemies || []).map(enemy => Object.assign({}, enemy));
+    items = (run.items || []).map(item => Object.assign({}, item));
+    if (run.stairs) stairs = Object.assign({}, run.stairs);
+    px = Math.max(0, Math.min(MAP_W - 1, run.px | 0));
+    py = Math.max(0, Math.min(MAP_H - 1, run.py | 0));
+    rnd = mulberry32(hash(state.seed));
+    logs.length = 0;
+    view.x = clamp(px - VW / 2, 0, MAP_W - VW);
+    view.y = clamp(py - VH / 2, 0, MAP_H - VH);
+    $('title').hidden = true;
+    $('routes').hidden = true;
+    $('end').hidden = true;
+    $('endResult').hidden = true;
+    updateHUD();
+    computeFOV();
+    fit();
+    canvas.focus();
+    return true;
+  }
+
+  if (window.__boredResume) {
+    const resume = window.__boredResume;
+    const pending = resume.read();
+    if (pending) {
+      resume.ask(pending.label, function () {
+        if (!restoreRun(pending)) { resume.clear(); }
+      }, function () { /* the title screen behind the prompt is the fresh dungeon */ });
+      resume.arm(savedRun);
+    }
+  }
 
   // A small read-only surface for tests and for a future daily-challenge adapter.
   window.__deep = {

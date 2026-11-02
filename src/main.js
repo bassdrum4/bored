@@ -27,6 +27,7 @@ import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
+import { resumeScript } from './hub/resume.js';
 import { initVoice } from './hub/voice.js';
 import { setBo } from './hub/bo.js';
 
@@ -264,7 +265,9 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       if (multiplayer) html = multiplayer.document(html);
       let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
       gameFrame.removeAttribute('src');
-      gameFrame.srcdoc = injectHead(html, ANALYTICS_BRIDGE + head);
+      // The resume helper runs before the game's own script, so a game can offer a
+      // saved position while it wires itself up.
+      gameFrame.srcdoc = injectHead(html, resumeScript(slug) + ANALYTICS_BRIDGE + head);
       showHint(multiplayer
         ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player' : 'Your turn saves automatically · Esc returns to Bored Together'
         : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
@@ -341,6 +344,9 @@ function closeGame({ force = false } = {}) {
   hubRoot.inert = false;
   document.body.classList.remove('playing');
   enjoyment.maybePrompt(engagement);
+  // Store the position one last time before the frame is torn down; a game's own
+  // pagehide is not guaranteed to run after srcdoc is cleared.
+  try { gameFrame.contentWindow?.__boredResume?.flush?.(); } catch {}
   gameFrame.removeAttribute('src');
   gameFrame.srcdoc = '';
   activeSlug = null;

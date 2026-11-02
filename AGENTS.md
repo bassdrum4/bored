@@ -19,6 +19,7 @@ src/bo.svg               Bo the mascot: the only copy of the drawing, one <symbo
 src/favicon*.svg         flattened awake/asleep Bo for the tab icon; keep in step with bo.svg by hand
 src/hub/game-document.js  game HTML and seed injection
 src/hub/backend.js       Supabase request/session layer, score rules, auth helpers
+src/hub/resume.js        continue-where-you-left-off: one save per game, injected before the game script
 src/hub/cloud.js         player_state pull/push — the account follows the player across browsers
 src/hub/scores.js        score specs, best capture, sync, ranking
 src/hub/feedback.js      write-only feedback insert (anon key, no reads)

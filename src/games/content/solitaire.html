@@ -1684,7 +1684,12 @@ body{
     return arr;
   }
 
+  // The boot deal is the board a saved game will be offered over, so it must not
+  // wipe that save on the way in.
+  var booting = true;
+
   function newGame() {
+    if (!booting && window.__boredResume) window.__boredResume.clear();
     if (openModalEl) { openModalEl.hidden = true; openModalEl = null; }
     won = false;
     started = false;
@@ -1758,6 +1763,7 @@ body{
      ============================================================ */
   function winSequence() {
     won = true;
+    if (window.__boredResume) window.__boredResume.clear();
     timerStop();
     statStatus.textContent = 'Won';
     playWinAnimation(function () {
@@ -1894,13 +1900,98 @@ body{
     statTime.textContent = fmtTime(timerNow());
   }, 250);
 
+  /* ---- continue where you left off ---- */
+  function pileIds(pile) { return pile.map(function (card) { return card.id; }); }
+
+  function cardsById(list) {
+    var out = [];
+    for (var i = 0; i < (list || []).length; i++) {
+      var card = BY_ID[list[i]];
+      if (card) out.push(card);
+    }
+    return out;
+  }
+
+  function savedRun() {
+    if (won || !G.moves) return null;
+    var faceUp = [];
+    for (var i = 0; i < CARDS.length; i++) if (CARDS[i].faceUp) faceUp.push(CARDS[i].id);
+    return {
+      label: G.moves + (G.moves === 1 ? ' move' : ' moves') + ' \u00b7 ' + G.score + ' points',
+      state: {
+        stock: pileIds(G.stock), waste: pileIds(G.waste),
+        foundations: G.foundations.map(pileIds), tableau: G.tableau.map(pileIds),
+        faceUp: faceUp, score: G.score, moves: G.moves
+      }
+    };
+  }
+
+  function restoreRun(saved) {
+    var game = saved && saved.state;
+    if (!game || !Array.isArray(game.stock) || !Array.isArray(game.waste) || !Array.isArray(game.tableau)) return false;
+    var seen = {}, ok = true;
+    function fill(list) {
+      var cards = cardsById(list), out = [];
+      for (var i = 0; i < cards.length; i++) {
+        if (seen[cards[i].id]) { ok = false; return null; }
+        seen[cards[i].id] = true;
+        out.push(cards[i]);
+      }
+      return out;
+    }
+    var stock = fill(game.stock), waste = fill(game.waste);
+    var foundations = [], tableau = [];
+    if (!stock || !waste) return false;
+    for (var f = 0; f < 4; f++) { var pile = fill((game.foundations || [])[f]); if (!pile) return false; foundations.push(pile); }
+    for (var t = 0; t < 7; t++) { var col = fill((game.tableau || [])[t]); if (!col) return false; tableau.push(col); }
+    // Every card must be in exactly one pile, or the board is not this deck's.
+    for (var c = 0; c < CARDS.length; c++) if (!seen[CARDS[c].id]) return false;
+    if (!ok) return false;
+    var up = {};
+    for (var u = 0; u < (game.faceUp || []).length; u++) up[game.faceUp[u]] = true;
+    for (var i2 = 0; i2 < CARDS.length; i2++) CARDS[i2].faceUp = up[CARDS[i2].id] === true;
+
+    G.stock = stock; G.waste = waste; G.foundations = foundations; G.tableau = tableau;
+    for (var s = 0; s < stock.length; s++) stock[s].faceUp = false;
+    for (var w = 0; w < waste.length; w++) waste[w].faceUp = true;
+    foundations.forEach(function (p) { p.forEach(function (card) { card.faceUp = true; }); });
+    tableau.forEach(function (p) {
+      if (p.length) p[p.length - 1].faceUp = true;
+    });
+    G.score = Math.max(0, game.score | 0);
+    G.moves = Math.max(0, game.moves | 0);
+    won = false;
+    sel = null;
+    undoHistory = [];
+    layout();
+    render();
+    timerReset();
+    timerStart();
+    announce('Picking up where you left off');
+    return true;
+  }
+
   /* ---- boot ---- */
   buildBoard();
   layout();
   loadDrawPref();
   updateModeText();
   newGame();
-  openModal(modeModal);
+  if (window.__boredResume) {
+    var resume = window.__boredResume;
+    var pending = resume.read();
+    if (pending) {
+      resume.ask(pending.label, function () {
+        if (!restoreRun(pending)) { resume.clear(); newGame(); }
+      }, function () { newGame(); });
+    } else {
+      openModal(modeModal);
+    }
+    resume.arm(savedRun);
+  } else {
+    openModal(modeModal);
+  }
+  booting = false;
   window.setTimeout(function () { layout(); render(); }, 60);
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { layout(); render(); });

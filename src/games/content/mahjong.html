@@ -612,7 +612,7 @@ function setTutorial(on) {
   }
 }
 
-$('deal').onclick = () => setTutorial(false);
+$('deal').onclick = () => { if (window.__boredResume) window.__boredResume.clear(); setTutorial(false); };
 $('shuffle').onclick = shuffleRemaining;
 $('hint').onclick = showHint;
 $('tutorial-exit').onclick = () => setTutorial(false);
@@ -644,8 +644,55 @@ window.__test = {
 
 /* ── Start ───────────────────────────────────────────────────────────────── */
 
+/* ── continue where you left off ─────────────────────────────────────────── */
+
+const RESUME = window.__boredResume;
+
+// A deal is saved as the tiles' kinds and which ones are gone; the layout is
+// rebuilt by beginGame, so the coordinates always line up with the save.
+function savedRun() {
+  if (mode !== 'deal' || won || startedAt === null) return null;
+  return {
+    label: 'Pairs ' + pairs + '/' + (tiles.length / 2) + ' \u00b7 ' + left + ' tiles left',
+    state: {
+      tiles: tiles.map(tile => ({ layer: tile.layer, x: tile.x, y: tile.y, kind: tile.kind, gone: !!tile.gone })),
+      pairs: pairs, left: left, elapsedMs: Math.max(0, performance.now() - startedAt)
+    }
+  };
+}
+
+function restoreRun(saved) {
+  const game = saved && saved.state;
+  if (!game || !Array.isArray(game.tiles) || !game.tiles.length) return false;
+  beginGame(NORMAL_LAYERS, false);
+  const byPosition = new Map(game.tiles.map(tile => [tile.layer + ':' + tile.x + ':' + tile.y, tile]));
+  for (const tile of tiles) {
+    const match = byPosition.get(tile.layer + ':' + tile.x + ':' + tile.y);
+    if (!match || typeof match.kind !== 'string') continue;
+    tile.kind = match.kind;
+    tile.gone = match.gone === true;
+    faceTile(tile);
+  }
+  left = tiles.filter(tile => !tile.gone).length;
+  pairs = Math.max(0, Math.min(tiles.length / 2, game.pairs | 0));
+  won = left === 0 && tiles.length > 0;
+  startedAt = performance.now() - Math.max(0, game.elapsedMs | 0);
+  finishedAt = won ? performance.now() : null;
+  selected = null;
+  pairHint = [];
+  paint();
+  hudEl.textContent = hudText();
+  statusEl.textContent = 'Picking up where you left off.';
+  return true;
+}
+
 // The first deal of the visit is the shared daily board; later deals are fresh.
 beginGame(NORMAL_LAYERS, true);
+if (RESUME) {
+  const saved = RESUME.read();
+  if (saved) RESUME.ask(saved.label, () => { if (!restoreRun(saved)) { RESUME.clear(); setTutorial(false); } }, () => setTutorial(false));
+  RESUME.arm(savedRun);
+}
 statusEl.textContent = 'Match two free tiles of the same kind. A tile is free when nothing rests on it and its left or right side is open.';
 </script>
 </body>

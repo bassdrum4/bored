@@ -406,6 +406,7 @@ function settle() {
   const moves = legalMoves(state);
   if (!moves.length) {
     over = true;
+    if (window.__boredResume) window.__boredResume.clear();
     if (inCheck(state, state.turn)) {
       const whiteWon = state.turn === 'b';
       const humanWon = whiteWon && modeEl.value === 'computer';
@@ -486,8 +487,9 @@ function reset() {
   settle();
 }
 
-$('#new').onclick = reset;
-modeEl.onchange = reset;
+// Starting a new game is also how a saved position is discarded.
+$('#new').onclick = () => { if (window.__boredResume) window.__boredResume.clear(); reset(); };
+modeEl.onchange = () => { if (window.__boredResume) window.__boredResume.clear(); reset(); };
 
 window.__boredSnapshot = () => ({
   slug: 'chess',
@@ -530,7 +532,58 @@ window.__test = {
   }
 };
 
-settle();
+/* ── continue where you left off ─────────────────────────────────────────── */
+
+const RESUME = window.__boredResume;
+
+function savedRun() {
+  if (!plies || over) return null;
+  return {
+    label: 'Move ' + (Math.floor(plies / 2) + 1) + ' \u00b7 ' +
+      (modeEl.value === 'computer' ? 'vs computer' : 'two players'),
+    state: {
+      board: state.board.slice(), turn: state.turn,
+      castling: Object.assign({}, state.castling), ep: state.ep,
+      half: state.half, full: state.full,
+      mode: modeEl.value, plies: plies, wins: sessionWins
+    }
+  };
+}
+
+function restoreRun(saved) {
+  const game = saved && saved.state;
+  if (!game || !Array.isArray(game.board) || game.board.length !== 64) return false;
+  generation += 1;
+  thinking = false;
+  state = {
+    board: game.board.slice(), turn: game.turn === 'b' ? 'b' : 'w',
+    castling: Object.assign({ K: false, Q: false, k: false, q: false }, game.castling),
+    ep: Number.isInteger(game.ep) ? game.ep : -1,
+    half: Math.max(0, game.half | 0), full: Math.max(1, game.full | 0)
+  };
+  modeEl.value = game.mode === 'friend' ? 'friend' : 'computer';
+  plies = Math.max(0, game.plies | 0);
+  sessionWins = Math.max(0, game.wins | 0);
+  selected = -1;
+  targets = [];
+  lastMove = null;
+  over = false;
+  result = null;
+  settle();
+  return true;
+}
+
+if (!RESUME) settle();
+else {
+  const saved = RESUME.read();
+  settle();
+  if (saved) {
+    RESUME.ask(saved.label, () => {
+      if (!restoreRun(saved)) { RESUME.clear(); reset(); }
+    }, reset);
+  }
+  RESUME.arm(savedRun);
+}
 </script>
 </body>
 </html>

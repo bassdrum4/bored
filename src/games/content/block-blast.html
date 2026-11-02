@@ -424,6 +424,7 @@ function finishTurn() {
 function gameOver() {
   if (finished) return;
   finished = true;
+  if (window.__boredResume) window.__boredResume.clear();
   busy = false;
   selected = -1;
   clearPreview();
@@ -619,10 +620,48 @@ for (let i = 0; i < COUNT; i++) {
   cellEls.push(cell);
 }
 
-$('again').addEventListener('click', restart);
-deal();
-renderTray();
-paint();
+$('again').addEventListener('click', () => { if (window.__boredResume) window.__boredResume.clear(); restart(); });
+
+/* ── continue where you left off ─────────────────────────────────────────── */
+
+const RESUME = window.__boredResume;
+
+function savedRun() {
+  if (finished || (!score && !lines && !misses && !filledCells())) return null;
+  return {
+    label: score + ' points \u00b7 ' + lines + (lines === 1 ? ' line' : ' lines'),
+    state: {
+      board: Array.from(board),
+      tray: tray.map(piece => piece ? SHAPES.indexOf(piece) : -1),
+      score: score, lines: lines, combo: combo, misses: misses, cursor: cursor
+    }
+  };
+}
+
+function restoreRun(saved) {
+  const game = saved && saved.state;
+  if (!game || !Array.isArray(game.board) || game.board.length !== COUNT || !Array.isArray(game.tray)) return false;
+  board.set(game.board.map(value => value ? 1 : 0));
+  tray = game.tray.map(index => Number.isInteger(index) && SHAPES[index] ? SHAPES[index] : null);
+  score = Math.max(0, game.score | 0);
+  lines = Math.max(0, game.lines | 0);
+  combo = Math.max(0, game.combo | 0);
+  misses = Math.max(0, game.misses | 0);
+  cursor = Math.max(0, Math.min(COUNT - 1, game.cursor | 0));
+  finished = false; busy = false; selected = -1;
+  renderTray();
+  paint();
+  setStatus('Picking up where you left off.');
+  return true;
+}
+
+if (!RESUME) { deal(); renderTray(); paint(); }
+else {
+  const saved = RESUME.read();
+  deal(); renderTray(); paint();
+  if (saved) RESUME.ask(saved.label, () => { if (!restoreRun(saved)) { RESUME.clear(); restart(); } }, restart);
+  RESUME.arm(savedRun);
+}
 
 /* The hub reads this for high scores and the daily challenge. */
 window.__boredSnapshot = () => ({

@@ -243,7 +243,12 @@ let overchargeUntil, strikeArmed, seed;
 function reseed(value) { seed = value >>> 0; }
 function random() { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }
 
+// The boot reset lays out the new city every save is offered over, so it must
+// not wipe that save on the way in.
+let bootGuard = true;
+
 function reset() {
+  if (!bootGuard && window.__boredResume) window.__boredResume.clear();
   credits = START_CREDITS; integrity = START_CORE; wave = 0; cleared = 0; kills = 0; leaked = 0;
   over = false; victory = false; phase = 'build'; buildTimer = FIRST_BUILD; waveTime = 0;
   timeline = []; enemies = []; towers = []; shots = []; clock = 0; uiTimer = 0;
@@ -1148,8 +1153,57 @@ window.__boredSnapshot = () => ({
   won: victory === true
 });
 
-reset();
+/* ── continue where you left off ───────────────────────────────────────────── */
+
+// Only the lull between waves is saved. A wave in flight is a physics moment:
+// halfway through it there is no honest place to put the player back.
+function savedRun() {
+  if (over || victory || phase !== 'build') return null;
+  if (!wave && !towers.length) return null;
+  return {
+    label: 'Wave ' + Math.max(1, wave) + ' \u00b7 core ' + Math.max(0, integrity) + ' \u00b7 ' + credits + ' CR',
+    state: {
+      credits: credits, integrity: integrity, wave: wave, cleared: cleared,
+      kills: kills, leaked: leaked, buildTimer: buildTimer, waveMod: waveMod,
+      towers: towers.map(tower => Object.assign({}, tower))
+    }
+  };
+}
+
+function restoreRun(saved) {
+  const run = saved && saved.state;
+  if (!run || !Array.isArray(run.towers)) return false;
+  credits = Number(run.credits) || 0;
+  integrity = Number(run.integrity) || 0;
+  wave = Math.max(0, run.wave | 0);
+  cleared = Math.max(0, run.cleared | 0);
+  kills = Math.max(0, run.kills | 0);
+  leaked = Math.max(0, run.leaked | 0);
+  phase = 'build';
+  buildTimer = Number(run.buildTimer) > 0 ? Number(run.buildTimer) : FIRST_BUILD;
+  waveTime = 0;
+  waveMod = run.waveMod || null;
+  towers = run.towers.map(tower => Object.assign({}, tower));
+  timeline = []; enemies = []; shots = []; clock = 0; uiTimer = 0;
+  selected = null; selectedType = null; hover = null; paused = false; speed = 1;
+  laneCursor = 0; overchargeUntil = 0; strikeArmed = false;
+  over = false; victory = false;
+  for (const key of ABILITY_ORDER) ABILITIES[key].cd = 0;
+  refreshUi();
+  note('Picking up where you left off. Build, then start the next wave.');
+  return true;
+}
+
+const RESUME = window.__boredResume;
+if (!RESUME) reset();
+else {
+  const pending = RESUME.read();
+  reset();
+  if (pending) RESUME.ask(pending.label, () => { if (!restoreRun(pending)) { RESUME.clear(); reset(); } }, reset);
+  RESUME.arm(savedRun);
+}
 requestAnimationFrame(frame);
+bootGuard = false;
 </script>
 </body>
 </html>

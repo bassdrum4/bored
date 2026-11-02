@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Trackbound</title>
+<title>Trackmania</title>
 <style>
 :root{--paper:#f5f2ea;--ink:#191713;--dim:#6b6558;--rule:#d8d2c4;--accent:#b45309;--panel:#fffdf7}
 *{box-sizing:border-box}
@@ -200,7 +200,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 </div>
 <script>
 "use strict";
-/* Trackbound — a three dimensional time trial on modular blocks.
+/* Trackmania — a three dimensional time trial on modular blocks.
    Everything is in this document: geometry, a small WebGL renderer, a car that
    follows whatever surface it finds (including the inside of a loop), medals
    and ghosts. The hub talks to it through __boredSnapshot. */
@@ -666,6 +666,9 @@ const BLOCKS = {
   up: Object.assign(slopeDef(24, 18), { name: 'Climb' }),
   down: Object.assign(slopeDef(-24, 18), { name: 'Drop' }),
   kicker: Object.assign(slopeDef(30, 9, { samples: 8, wall: 0.5 }), { name: 'Kicker' }),
+  // The second kicker on the Kicker course lands at speed, so it takes the same
+  // ramp at a shallower angle: the launch is shorter and much easier to hold.
+  kicker2: Object.assign(slopeDef(18, 9, { samples: 8, wall: 0.5 }), { name: 'Kicker' }),
   wallL: wallDef(-1, 'Wall ride L'),
   wallR: wallDef(1, 'Wall ride R'),
   checkpoint: { name: 'Checkpoint', len: 16, hw: 6, samples: 8, trigger: 'checkpoint',
@@ -1113,7 +1116,7 @@ const CAMPAIGN = [
       'curveL', 'dirt', 'narrow', 'checkpoint', 'curveL', 'dirt', 'straight', 'finish'] },
   { id: 'kicker', name: 'Kicker', author: 14250,
     blocks: ['start', 'sprint', 'kicker', 'curveR', 'sprint', 'down', 'checkpoint', 'straight',
-      'curveL', 'sprint', 'kicker', 'boost', 'straight', 'checkpoint', 'curveL', 'sprint',
+      'curveL', 'sprint', 'kicker2', 'boost', 'straight', 'checkpoint', 'curveL', 'sprint',
       'straight', 'finish'] },
   { id: 'grandloop', name: 'Grand Loop', author: 18900,
     blocks: ['start', 'sprint', 'straight', 'curveR', 'up', 'straight', 'down', 'checkpoint',
@@ -1149,18 +1152,27 @@ function mulberry32(seed) {
   };
 }
 function dailyTrack(seed) {
-  const choice = [['straight', 'sprint'], ['curveL', 'curveR'], ['straight', 'boost', 'dirt', 'narrow'], ['up', 'down', 'straight']];
-  for (let attempt = 0; attempt < 24; attempt++) {
+  const run = ['straight', 'sprint'];
+  const corner = ['curveL', 'curveR'];
+  const extra = ['boost', 'dirt', 'narrow'];
+  for (let attempt = 0; attempt < 12; attempt++) {
     const random = mulberry32((seed >>> 0) + attempt * 977);
     const blocks = ['start'];
     const legs = 6 + Math.floor(random() * 3);
+    let lastCorner = '';
     for (let leg = 0; leg < legs; leg++) {
-      const run = 1 + Math.floor(random() * 2);
-      for (let i = 0; i < run; i++) blocks.push(choice[0][Math.floor(random() * choice[0].length)]);
-      blocks.push(choice[1][Math.floor(random() * 2)]);
+      const length = 1 + Math.floor(random() * 2);
+      for (let i = 0; i < length; i++) blocks.push(run[Math.floor(random() * run.length)]);
+      // The daily stays on the ground: no climb or drop blocks, so the ribbon is
+      // one continuous piece instead of sections floating at different heights.
+      // Corners alternate too, because repeated same-way turns spiral the track
+      // back over itself and the builder has to throw the whole layout away.
+      let turn = corner[Math.floor(random() * corner.length)];
+      if (turn === lastCorner) turn = turn === 'curveL' ? 'curveR' : 'curveL';
+      lastCorner = turn;
+      blocks.push(turn);
       if (leg % 2 === 1) blocks.push('checkpoint');
-      if (leg % 2 === 0 && random() < 0.5) blocks.push(choice[2][Math.floor(random() * choice[2].length)]);
-      if (random() < 0.4) blocks.push(choice[3][Math.floor(random() * choice[3].length)]);
+      if (leg % 2 === 0 && random() < 0.5) blocks.push(extra[Math.floor(random() * extra.length)]);
     }
     blocks.push('straight', 'finish');
     const track = buildTrack(blocks, { id: 'daily', name: 'Daily', author: 30000 });

@@ -1254,8 +1254,84 @@ setInterval(()=>{
 
 // --- INIT ---
 
-updateUI();
-bootSequence();
+/* ── continue where you left off ─────────────────────────────────────────── */
+
+// A session is the operator's standing amount: trace, credits, inventory and
+// which servers have been found and cracked. The scrollback is not saved; the
+// terminal reprints a single line so the screen is not confusingly blank.
+function savedRun(){
+  if(!state.booted || state.gameEnded || state.mode !== 'normal') return null;
+  if(state.discoveredServers.size <= 1 && !state.downloadCount && !state.completedMissions.length) return null;
+  return {
+    label:'trace ' + state.trace + '% \u00b7 ' + state.credits + ' CR \u00b7 mission ' + (state.missionIdx + 1),
+    state:{
+      connected:state.connected, currentDir:state.currentDir,
+      trace:state.trace, credits:state.credits,
+      inventory:state.inventory.slice(), downloaded:state.downloaded.slice(),
+      decrypted:state.decrypted.slice(), missionIdx:state.missionIdx,
+      completedMissions:state.completedMissions.slice(),
+      stealthBought:state.stealthBought, crackerV2Bought:state.crackerV2Bought,
+      decryptorBought:state.decryptorBought, downloadCount:state.downloadCount,
+      discovered:Array.from(state.discoveredServers), cracked:Array.from(state.crackedServers),
+      servers:Object.keys(SERVERS).reduce(function (out, name) {
+        out[name] = { discovered:!!SERVERS[name].discovered, cracked:!!SERVERS[name].cracked };
+        return out;
+      }, {})
+    }
+  };
+}
+
+function restoreRun(saved){
+  const run = saved && saved.state;
+  if(!run || !Array.isArray(run.discovered)) return false;
+  state.connected = run.connected || null;
+  state.currentDir = typeof run.currentDir === 'string' ? run.currentDir : '/home/ghost';
+  state.trace = Math.max(0, Math.min(100, run.trace | 0));
+  state.credits = Math.max(0, run.credits | 0);
+  state.inventory = Array.isArray(run.inventory) ? run.inventory.slice() : ['cracker_v1'];
+  state.downloaded = Array.isArray(run.downloaded) ? run.downloaded.slice() : [];
+  state.decrypted = Array.isArray(run.decrypted) ? run.decrypted.slice() : [];
+  state.missionIdx = Math.max(0, run.missionIdx | 0);
+  state.completedMissions = Array.isArray(run.completedMissions) ? run.completedMissions.slice() : [];
+  state.mode = 'normal';
+  state.crackState = null;
+  state.decryptState = null;
+  state.gameEnded = false;
+  state.booted = true;
+  state.stealthBought = !!run.stealthBought;
+  state.crackerV2Bought = !!run.crackerV2Bought;
+  state.decryptorBought = !!run.decryptorBought;
+  state.downloadCount = Math.max(0, run.downloadCount | 0);
+  state.discoveredServers = new Set(run.discovered.concat(['localhost']));
+  state.crackedServers = new Set((run.cracked || []).concat(['localhost']));
+  Object.keys(run.servers || {}).forEach(function (name) {
+    if(!SERVERS[name]) return;
+    SERVERS[name].discovered = !!run.servers[name].discovered;
+    SERVERS[name].cracked = !!run.servers[name].cracked;
+  });
+  output.innerHTML = '';
+  updateUI();
+  print('Session restored. Welcome back, operator.','c-success');
+  print('Type "missions" to check where you left off.\n','c-info');
+  inputEl.focus();
+  return true;
+}
+
+if(window.__boredResume){
+  const resume = window.__boredResume;
+  const pending = resume.read();
+  if(pending){
+    resume.ask(pending.label, function () { if(!restoreRun(pending)){ resume.clear(); bootSequence(); } }, function () { bootSequence(); });
+    resume.arm(savedRun);
+  } else {
+    updateUI();
+    bootSequence();
+    resume.arm(savedRun);
+  }
+} else {
+  updateUI();
+  bootSequence();
+}
 
 </script>
 </body>

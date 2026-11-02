@@ -101,12 +101,39 @@ function arcadeGame(kind) {
       if (seed !== null) rand = makeRand(seed);
       spawn(); spawn(); status.textContent = 'Your next high score starts here.'; draw();
     }
-    button('New game', reset);
+    // A saved board is this browser's game, never a Bored Together duel: a duel
+    // is dealt from the match seed and resumes from the server instead.
+    const RESUME = window.__boredResume;
+    // A fresh board (score 0) and a finished one are not worth resuming, and this
+    // also keeps the board sitting behind the prompt from replacing the save.
+    const resumeState = () => (seed !== null || score === 0 || !cells.some(Boolean) || !canMove())
+      ? null
+      : { label: 'Score ' + score + ' \u00b7 best tile ' + Math.max(...cells),
+          state: { cells: cells.slice(), score: score, won: won } };
+    function restoreRun(saved) {
+      const game = saved && saved.state;
+      if (!game || !Array.isArray(game.cells) || game.cells.length !== 16) return false;
+      cells = game.cells.map(value => Number(value) || 0);
+      score = Number(game.score) || 0;
+      won = game.won === true;
+      previous = null; undoUsed = false;
+      status.textContent = 'Picking up where you left off.';
+      draw();
+      return true;
+    }
+    button('New game', () => { if (RESUME) RESUME.clear(); reset(); });
     const undo = button('Undo', () => {
       if (!previous) return;
       ({ cells, score, won } = previous); previous = null; undoUsed = true; status.textContent = 'Move undone.'; draw();
     });
     const arrows = document.createElement('div'); arrows.className = 'arrows'; $('#app').appendChild(arrows);
+    if (!RESUME) reset();
+    else {
+      const saved = RESUME.read();
+      reset();
+      if (saved) RESUME.ask(saved.label, () => { if (!restoreRun(saved)) { RESUME.clear(); reset(); } }, reset);
+      RESUME.arm(resumeState);
+    }
     for (const [label, dir] of [['←', 'left'], ['↑', 'up'], ['↓', 'down'], ['→', 'right']]) {
       const el = button(label, () => move(dir), arrows); el.setAttribute('aria-label', 'Move ' + dir);
     }
@@ -122,7 +149,6 @@ function arcadeGame(kind) {
       const dx = e.clientX - touch[0], dy = e.clientY - touch[1]; touch = null;
       if (Math.max(Math.abs(dx), Math.abs(dy)) > 24) move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
     });
-    reset();
   }
 
   if (kind === 'memory') {
@@ -255,7 +281,32 @@ function arcadeGame(kind) {
       timer = setTimeout(() => { const col = chooseMove(cells); busy = false; drop(col); }, 260);
     }
     function reset() { clearTimeout(timer); cells = Array(42).fill(0); turn = 1; over = false; busy = false; status.textContent = 'Red goes first. Pick a column.'; draw(); }
-    mode.onchange = reset; button('New game', reset);
+    // A local game belongs to this browser; a Bored Together match resumes from
+    // the server, so it is never written here.
+    const RESUME = window.__boredResume;
+    const resumeState = () => (online || over || !cells.some(Boolean))
+      ? null
+      : { label: cells.filter(Boolean).length + ' discs \u00b7 ' + (turn === 1 ? 'red' : 'gold') + ' to move',
+          state: { cells: cells.slice(), turn: turn, mode: mode.value } };
+    function restoreRun(saved) {
+      const game = saved && saved.state;
+      if (!game || !Array.isArray(game.cells) || game.cells.length !== 42) return false;
+      cells = game.cells.map(value => Number(value) || 0);
+      turn = game.turn === 2 ? 2 : 1;
+      mode.value = game.mode === 'friend' ? 'friend' : 'computer';
+      over = false; busy = false;
+      clearTimeout(timer);
+      status.textContent = 'Picking up where you left off.';
+      draw();
+      // A resumed game against the computer can land on its turn.
+      if (mode.value === 'computer' && turn === 2) {
+        busy = true; draw();
+        timer = setTimeout(() => { busy = false; drop(chooseMove(cells)); }, 260);
+      }
+      return true;
+    }
+    mode.onchange = () => { if (RESUME) RESUME.clear(); reset(); };
+    button('New game', () => { if (RESUME) RESUME.clear(); reset(); });
     addEventListener('keydown', e => { if (/^[1-7]$/.test(e.key) && e.target.tagName !== 'SELECT') { e.preventDefault(); play(Number(e.key) - 1); } });
     function restoreOnline() {
       const match = online.context;
@@ -273,7 +324,13 @@ function arcadeGame(kind) {
       $('#actions').hidden = true;
       $('#instructions').textContent = 'Connect four horizontally, vertically, or diagonally. Use the buttons or keys 1–7. Your turn saves automatically.';
       restoreOnline();
-    } else reset();
+    } else if (!RESUME) reset();
+    else {
+      const saved = RESUME.read();
+      reset();
+      if (saved) RESUME.ask(saved.label, () => { if (!restoreRun(saved)) { RESUME.clear(); reset(); } }, reset);
+      RESUME.arm(resumeState);
+    }
   }
 
   if (kind === 'aim-lab') {

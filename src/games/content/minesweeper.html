@@ -544,6 +544,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
             restart() {
                 ui.hideOverlay();
+                if (window.__boredResume) window.__boredResume.clear();
                 this.init();
             }
 
@@ -838,6 +839,61 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         const game = new Game();
         window.game = game; // Make accessible for resize
         particles.init();
+
+        /* ── continue where you left off ─────────────────────────────────────── */
+
+        // Only a field in play is worth resuming; a custom size is not in CONFIG,
+        // so it is rebuilt from CONFIG dimensions instead of stored dimensions.
+        const RESUME = window.__boredResume;
+
+        function savedRun() {
+            if (game.state !== 'PLAYING' || game.isFirstClick || game.difficulty === 'custom') return null;
+            return {
+                label: game.difficulty + ' \u00b7 ' + game.revealedCount + ' cleared \u00b7 ' + game.timer + 's',
+                state: {
+                    difficulty: game.difficulty, timer: game.timer, minesLeft: game.minesLeft,
+                    revealedCount: game.revealedCount,
+                    cells: game.board.map(row => row.map(cell => [
+                        cell.isMine ? 1 : 0, cell.isRevealed ? 1 : 0,
+                        cell.isFlagged ? 1 : 0, cell.neighborMines
+                    ]))
+                }
+            };
+        }
+
+        function restoreRun(saved) {
+            const run = saved && saved.state;
+            if (!run || !Array.isArray(run.cells) || !CONFIG[run.difficulty] || run.difficulty === 'custom') return false;
+            game.setDifficulty(run.difficulty);
+            const cfg = CONFIG[run.difficulty];
+            if (run.cells.length !== cfg.h || !Array.isArray(run.cells[0]) || run.cells[0].length !== cfg.w) return false;
+            game.board = run.cells.map((row, y) => row.map((cell, x) => {
+                const fresh = new Cell(x, y);
+                fresh.isMine = cell[0] === 1;
+                fresh.isRevealed = cell[1] === 1;
+                fresh.isFlagged = cell[2] === 1;
+                fresh.neighborMines = Math.max(0, Number(cell[3]) || 0);
+                return fresh;
+            }));
+            game.isFirstClick = false;
+            game.state = 'PLAYING';
+            game.timer = Math.max(0, run.timer | 0);
+            game.minesLeft = Number.isFinite(run.minesLeft) ? run.minesLeft : game.mineCount;
+            game.revealedCount = Math.max(0, run.revealedCount | 0);
+            ui.renderBoard(game);
+            for (const row of game.board) for (const cell of row) {
+                if (cell.isRevealed || cell.isFlagged) ui.updateCell(cell);
+            }
+            game.updateStats();
+            game.startTimer();
+            return true;
+        }
+
+        if (RESUME) {
+            const saved = RESUME.read();
+            if (saved) RESUME.ask(saved.label, () => { if (!restoreRun(saved)) { RESUME.clear(); game.init(); } }, () => game.init());
+            RESUME.arm(savedRun);
+        }
 
         window.addEventListener('resize', () => ui.adjustScale(game));
 
