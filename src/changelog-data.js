@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 229,
+  "count": 230,
   "newest": "2026-11-02",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"36d545a","date":"2026-11-02","author":"PenguinV360","subject":"Enhance wall collision detection and audio feedback"},
   {"sha":"882bea3","date":"2026-11-02","author":"Codebuff","subject":"Solitaire Easy mode, Brick Run pipe freeze fix"},
   {"sha":"3d790d8","date":"2026-11-02","author":"Codebuff","subject":"Replace SVG preview placeholders with real gameplay screenshots"},
   {"sha":"1d7d3a8","date":"2026-11-02","author":"Claude","subject":"Bo everywhere: one shared drawing, five moods, four new placements"},
