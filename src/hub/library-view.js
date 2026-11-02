@@ -186,18 +186,15 @@ function renderCollections() {
   $('#collection-note').textContent = COLLECTIONS.find(entry => entry.id === state.collection).note;
 }
 
-// The shelf lists the NEW-badged games first, in badge order, then the rest of
-// the catalog. Keeping it derived means a game that falls off the badge simply
-// drops back into its catalog slot.
-function libraryOrder() {
-  const fresh = FRESH_GAMES.map(slug => ORDER.find(([id]) => id === slug)).filter(Boolean);
-  return [...fresh, ...ORDER.filter(([slug]) => !FRESH_GAMES.includes(slug))];
-}
+// The shelf keeps the catalog's own order: a game arrives at the front when it
+// is added and never moves again. The NEW badge marks recent arrivals on their
+// card instead of pulling them out of line, so the list cannot reshuffle under
+// the player while they are reading it.
 
 function renderLibrary() {
   const filter = searchInput.value.trim().toLowerCase();
   gameGrid.replaceChildren();
-  const shelf = libraryOrder();
+  const shelf = ORDER;
   state.visibleGames = shelf.filter(([slug, name]) => {
     const meta = META[slug];
     return (EXTERNS[slug] || PAYLOAD_SLUGS.includes(slug) || NEW_GAMES.includes(slug)) &&
