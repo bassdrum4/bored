@@ -275,7 +275,7 @@ const DAILY_ADAPTERS = {
   poker: { expression: '(G.variant==="holdem"||G.variant==="draw"?{profit:human()?human().stack-G.settings.stack:0,handOver:G.phase==="handOver"}:{profit:0,handOver:false})' },
   tank: { setup: 'let boredCpuOnly=true;document.addEventListener("keydown",e=>{if(e.key.toLowerCase()==="e"&&!aiEnabled)boredCpuOnly=false});', expression: '((!aiEnabled&&(boredCpuOnly=false)),({wins:scores[0],cpu:aiEnabled&&boredCpuOnly}))' },
   'void-runner': { closure: true, expression: '({score})' },
-  solitaire: { closure: true, expression: '({cards:G.foundations.reduce((n,p)=>n+p.length,0),moves:G.moves,won:won===true,seconds:won?Math.ceil(timerNow()/1000):0})' },
+  solitaire: { closure: true, expression: '({cards:G.foundations.reduce((n,p)=>n+p.length,0),moves:G.moves,won:won===true,seconds:won?Math.ceil(timerNow()/1000):0,draw:drawCount})' },
   commanders: { closure: true, expression: '({waves:Math.max(0,wn-1),score:P&&P.sc?P.sc:0})' },
   lava: { expression: '({points:sc?sc[0]:0,cpu:cpuMode===true})' },
   volletball: { expression: '({points:sc[0],cpu:cpuMode===true})' },

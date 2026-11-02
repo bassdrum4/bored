@@ -13,7 +13,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Solitaire — Classic Klondike</title>
-<meta name="description" content="Classic Klondike solitaire. Draw three, undo, timer and score.">
+<meta name="description" content="Classic Klondike solitaire. Easy draw-one or Hard draw-three, undo, timer and score.">
 <meta name="color-scheme" content="dark">
 <style>
 /* ============================================================
@@ -283,6 +283,17 @@ body{
 
 .win-stats{display:flex;gap:10px;margin:24px 0 0}
 .win-stats .cell{flex:1;border:1px solid rgba(23,33,29,0.2);border-radius:6px;padding:12px 8px;text-align:center}
+.mode-options{display:flex;gap:10px;margin-top:22px}
+.mode-btn{
+  flex:1;display:flex;flex-direction:column;gap:4px;align-items:flex-start;
+  background:transparent;color:var(--ink);
+  border:1px solid rgba(23,33,29,0.25);border-radius:6px;padding:14px;
+  font:inherit;text-align:left;cursor:pointer;
+}
+.mode-btn:hover{border-color:var(--voltage)}
+.mode-btn.picked{outline:2px solid var(--voltage);outline-offset:-1px}
+.mode-btn .mode-name{font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.2}
+.mode-btn .mode-sub{font-size:13px;color:rgba(23,33,29,0.65)}
 .win-stats .k{
   display:block;font-size:11px;font-weight:600;letter-spacing:.12em;
   text-transform:uppercase;color:rgba(23,33,29,0.55);
@@ -387,7 +398,7 @@ body{
   <header class="rail">
     <div class="brand">
       <h1>Solitaire</h1>
-      <span class="sub">Classic Klondike</span>
+      <span class="sub" id="brandSub">Classic Klondike</span>
     </div>
 
     <div class="stats" role="group" aria-label="Game statistics">
@@ -446,12 +457,12 @@ body{
       <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-close"></use></svg>
     </button>
     <h2 id="helpTitle">How to play</h2>
-    <p class="lead">Classic Klondike, draw three.</p>
+    <p class="lead" id="helpLead">Classic Klondike, draw three.</p>
     <ol class="rules">
       <li><span class="n">1</span><span>Build the four foundations from Ace to King by suit.</span></li>
       <li><span class="n">2</span><span>Build tableau piles in descending order and alternating colors.</span></li>
       <li><span class="n">3</span><span>Only a King can fill an empty tableau slot.</span></li>
-      <li><span class="n">4</span><span>Draw three cards from the stock. When the stock is empty, recycle the waste.</span></li>
+      <li><span class="n">4</span><span id="helpDrawRule">Draw three cards from the stock. When the stock is empty, recycle the waste.</span></li>
       <li><span class="n">5</span><span>Click or drag cards to move them. Undo restores the exact previous state.</span></li>
       <li><span class="n">6</span><span>Win when all four foundations reach the King.</span></li>
     </ol>
@@ -475,6 +486,24 @@ body{
     <div class="modal-actions">
       <button class="btn-primary" id="winNew">Deal again</button>
       <button class="btn-text" id="winClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ Mode picker ============ -->
+<div class="modal-backdrop" id="modeModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modeTitle">
+    <h2 id="modeTitle">New deal</h2>
+    <p class="lead">Pick your draw. Hard is the classic; Easy turns over one card at a time.</p>
+    <div class="mode-options">
+      <button class="mode-btn" id="modeEasy" type="button">
+        <span class="mode-name">Easy</span>
+        <span class="mode-sub">Draw one card</span>
+      </button>
+      <button class="mode-btn" id="modeHard" type="button">
+        <span class="mode-name">Hard</span>
+        <span class="mode-sub">Draw three cards</span>
+      </button>
     </div>
   </div>
 </div>
@@ -599,7 +628,8 @@ body{
   var btnUndo = $('#btnUndo'), btnNew = $('#btnNew'),
       btnHelp = $('#btnHelp'), btnScore = $('#btnScore');
 
-  var helpModal = $('#helpModal'), winModal = $('#winModal'), statsModal = $('#statsModal');
+  var helpModal = $('#helpModal'), winModal = $('#winModal'), statsModal = $('#statsModal'),
+      modeModal = $('#modeModal');
 
   var tableauPiles = [], foundationPiles = [];
 
@@ -669,6 +699,38 @@ body{
   var undoHistory = [];
   var sel = null;
   var won = false;
+  /* Easy draws one card at a time, Hard the classic three. Only Hard clears
+     can rank on the shared board. */
+  var drawCount = 3;
+  var DRAW_KEY = 'bored.solitaire.draw';
+  function loadDrawPref() {
+    try {
+      var v = window.localStorage.getItem(DRAW_KEY);
+      if (v === '1' || v === '3') drawCount = parseInt(v, 10);
+    } catch (err) {}
+  }
+  function saveDrawPref() {
+    try { window.localStorage.setItem(DRAW_KEY, String(drawCount)); } catch (err) {}
+  }
+  function drawWord() { return drawCount === 1 ? 'one' : 'three'; }
+  function updateModeText() {
+    var lead = $('#helpLead');
+    if (lead) lead.textContent = 'Classic Klondike, draw ' + drawWord() + '.';
+    var rule = $('#helpDrawRule');
+    if (rule) rule.textContent = 'Draw ' + drawWord() + ' card' + (drawCount === 1 ? '' : 's') +
+      ' from the stock. When the stock is empty, recycle the waste.';
+    var sub = $('#brandSub');
+    if (sub) sub.textContent = 'Classic Klondike \u00b7 ' + (drawCount === 1 ? 'Easy' : 'Hard');
+    var easy = $('#modeEasy'), hard = $('#modeHard');
+    if (easy) easy.classList.toggle('picked', drawCount === 1);
+    if (hard) hard.classList.toggle('picked', drawCount === 3);
+  }
+  function setMode(n) {
+    drawCount = (n === 1) ? 1 : 3;
+    saveDrawPref();
+    updateModeText();
+    newGame();
+  }
   var started = false;
   var openModalEl = null;
   var lastFocus = null;
@@ -749,7 +811,7 @@ body{
     }
 
     if (mode === 'waste') {
-      var visible = Math.min(3, n);
+      var visible = Math.min(drawCount, n);
       var fan = Math.round(CARD_W * 0.24);
       for (i = 0; i < n; i++) {
         c = cards[i]; e = c.el;
@@ -837,7 +899,7 @@ body{
     stockCountEl.textContent = sN ? String(sN) : '';
     if (sN === 0) stockPile.classList.add('is-empty'); else stockPile.classList.remove('is-empty');
     stockPile.setAttribute('aria-label', sN ?
-      'Stock, ' + sN + ' cards left, draw three cards' :
+      'Stock, ' + sN + ' cards left, draw ' + drawWord() + ' card' + (drawCount === 1 ? '' : 's') :
       'Stock empty, recycle the waste');
 
     for (var f = 0; f < 4; f++) {
@@ -923,7 +985,7 @@ body{
   function applyMove(m) {
     var i;
     if (m.type === 'draw') {
-      var n = Math.min(3, G.stock.length);
+      var n = Math.min(drawCount, G.stock.length);
       for (i = 0; i < n; i++) {
         var c = G.stock.pop();
         c.faceUp = true;
@@ -1061,7 +1123,7 @@ body{
     if (recycle) {
       for (var i = 0; i < G.waste.length; i++) ids.push(G.waste[i].id);
     } else {
-      var from = Math.max(0, G.stock.length - 3);
+      var from = Math.max(0, G.stock.length - drawCount);
       for (var j = from; j < G.stock.length; j++) ids.push(G.stock[j].id);
     }
     execute({
@@ -1589,6 +1651,8 @@ body{
     }
   }
 
+  $('#modeEasy').addEventListener('click', function () { setMode(1); });
+  $('#modeHard').addEventListener('click', function () { setMode(3); });
   $('#helpClose').addEventListener('click', closeModal);
   $('#helpCloseText').addEventListener('click', closeModal);
   $('#helpNew').addEventListener('click', function () { closeModal(); newGame(); });
@@ -1603,7 +1667,7 @@ body{
   btnUndo.addEventListener('click', function () { undo(); });
   btnNew.addEventListener('click', function () { newGame(); });
 
-  [helpModal, winModal, statsModal].forEach(function (m) {
+  [helpModal, winModal, statsModal, modeModal].forEach(function (m) {
     m.addEventListener('pointerdown', function (e) {
       if (e.target === m) closeModal();
     });
@@ -1833,7 +1897,10 @@ body{
   /* ---- boot ---- */
   buildBoard();
   layout();
+  loadDrawPref();
+  updateModeText();
   newGame();
+  openModal(modeModal);
   window.setTimeout(function () { layout(); render(); }, 60);
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function () { layout(); render(); });

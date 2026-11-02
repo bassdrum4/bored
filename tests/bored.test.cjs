@@ -1054,6 +1054,7 @@ test('browser regressions', async t => {
   await t.test('Solitaire sweeps up a drag that loses its ending instead of freezing a card', async () => {
     const frame = await openTitle('solitaire', 'Solitaire');
     await frame.waitForSelector('#pileStock');
+    await frame.click('#modeHard');
     await frame.click('#pileStock');
     await frame.click('#pileStock');
     const orphaned = await frame.evaluate(() => {

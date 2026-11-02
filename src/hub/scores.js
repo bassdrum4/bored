@@ -176,10 +176,11 @@ export const HIGH_SCORE_GAMES = [
   highScore('solitaire', 'Solitaire', 'seconds', {
     metric: 'seconds',
     lower: true,
-    when: snapshot => snapshot.won === true && snapshot.cards === 52 && snapshot.moves >= 52,
+    when: snapshot => snapshot.won === true && snapshot.cards === 52 && snapshot.moves >= 52 && snapshot.draw === 3,
     // Ignore implausible times and legacy scores from the pausable timer.
+    // Easy (draw-one) clears are practice and never rank.
     min: 20, max: 86400, key: 'bored.high.solitaire-wall-v4',
-    note: 'Fastest clear of all 52 cards'
+    note: 'Fastest Hard (draw three) clear of all 52 cards'
   }),
   highScore('lights-out', 'Lights Out', 'boards', { metric: 'cleared' }),
   highScore('commanders', 'Commanders', 'points', { metric: 'score' }),
