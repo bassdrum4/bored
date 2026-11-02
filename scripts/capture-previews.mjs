@@ -34,7 +34,9 @@ try {
   const starts = {
     deep: '#btnDaily', sumo: '#opt-cpu', 'aim-lab': '#actions button',
     'void-runner': '#screen-overlay', simon: '#btnStart', snake: '#start',
-    tank: '#m1', '8ball': '#btnCpu', tetris: '#start-btn'
+    tank: '#m1', '8ball': '#btnCpu', tetris: '#start-btn',
+    'brick-run': '#start', 'transit-chaos': '#start', ashcrown: '#btn-begin',
+    trackbound: '#btnDaily', chess: '#new', mahjong: '#deal'
   };
   const buttons = { pong: '1 PLAYER', 'gun-mayhem': '1 PLAYER vs CPU' };
   const keys = { commanders: 'Space', qbert: 'Space', frogger: 'Space', 'pac-man': 'Space',
@@ -68,6 +70,8 @@ try {
     if (slug === 'connect-four') {
       for (const key of ['1', '3', '2']) { await press(key); await new Promise(resolve => setTimeout(resolve, 400)); }
     }
+    if (slug === 'typing-test') for (const code of ['KeyT', 'KeyH', 'KeyE', 'Space', 'KeyQ', 'KeyU', 'KeyI', 'KeyC', 'KeyK']) await press(code);
+    if (slug === 'circuit') for (const code of ['ArrowUp', 'ArrowUp', 'ArrowLeft', 'ArrowUp']) await press(code);
     if (slug === 'sand') {
       const canvas = await frame.$('canvas');
       const box = await canvas?.boundingBox();
