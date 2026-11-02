@@ -1592,6 +1592,11 @@ test('browser regressions', async t => {
     await page.waitForFunction(() => document.querySelector('#claim-dialog')?.open === true);
     assert.equal(await text(page, '#claim-heading'), 'You scored 3 boards in Lights Out.');
     assert.match(await text(page, '#claim-blurb'), /make an account and it goes on the leaderboard/i);
+    // Bo reacts to the run: pleased by default, startled if it beat the posted leader. The drawing
+    // is the shared file, so the face is just which symbol the dialog points at.
+    const claimBo = await page.$eval('#claim-bo', el => ({ mood: el.dataset.mood, href: el.querySelector('use').getAttribute('href') }));
+    assert.ok(['pleased', 'surprised'].includes(claimBo.mood), 'score dialog Bo is ' + claimBo.mood);
+    assert.equal(claimBo.href, './bo.svg#' + claimBo.mood, 'the dialog points at the matching symbol');
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.pendingClaim') || 'null')), null,
       'showing the offer stores nothing; only choosing an account does');
     await page.click('#claim-signin');

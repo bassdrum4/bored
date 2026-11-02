@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<!-- Bo, the mascot. The only copy of the drawing: every placement on the site is
+     <svg class="bo"><use href="./bo.svg#MOOD"/></svg>, so a new face is one <symbol> here.
+     Colors come from the page's ink and red custom properties, with the same values as
+     fallbacks so the 404 page (which has no stylesheet) renders identically. No double
+     hyphens in this comment: XML forbids them and the browser drops the whole file.
+     The two favicons are flattened copies of "bored" and "asleep" and have to be kept by hand,
+     because a favicon cannot reference another file. -->
+<style>
+  .s{fill:var(--ink,#191713)}
+  .b,.e{fill:#fffdf7;stroke:var(--ink,#191713);stroke-width:2}
+  .e{stroke-width:1.5}
+  .k{fill:var(--ink,#191713)}
+  .l{fill:none;stroke:var(--ink,#191713);stroke-width:2;stroke-linecap:square;stroke-linejoin:miter}
+  .m{fill:var(--red,#b3261e)}
+</style>
+<defs>
+  <g id="frame">
+    <rect class="s" x="5" y="5" width="40" height="40"/>
+    <rect class="b" x="2" y="2" width="40" height="40"/>
+    <rect class="m" x="33" y="33" width="6" height="6"/>
+  </g>
+  <symbol id="bored" viewBox="0 0 48 48">
+    <use href="#frame"/>
+    <rect class="e" x="9" y="15" width="10" height="8"/><rect class="k" x="9" y="15" width="10" height="4"/><rect class="k" x="9" y="20" width="3" height="3"/>
+    <rect class="e" x="25" y="15" width="10" height="8"/><rect class="k" x="25" y="15" width="10" height="4"/><rect class="k" x="25" y="20" width="3" height="3"/>
+    <path class="l" d="M15 32h14"/>
+  </symbol>
+  <symbol id="asleep" viewBox="0 0 48 48">
+    <use href="#frame"/>
+    <path class="l" d="M9 21h10M25 21h10M19 32h6M32 9h6l-6 6h6"/>
+  </symbol>
+  <symbol id="pleased" viewBox="0 0 48 48">
+    <use href="#frame"/>
+    <path class="l" d="M9 23l5-6 5 6M25 23l5-6 5 6M15 30l3 4h8l3-4"/>
+  </symbol>
+  <symbol id="shrug" viewBox="0 0 48 48">
+    <use href="#frame"/>
+    <rect class="e" x="9" y="13" width="10" height="10"/><rect class="k" x="15" y="15" width="4" height="4"/>
+    <rect class="e" x="25" y="13" width="10" height="10"/><rect class="k" x="31" y="15" width="4" height="4"/>
+    <path class="l" d="M11 32h5l3-3 3 3h5"/>
+  </symbol>
+  <symbol id="surprised" viewBox="0 0 48 48">
+    <use href="#frame"/>
+    <rect class="e" x="9" y="11" width="10" height="12"/><rect class="k" x="12" y="15" width="4" height="4"/>
+    <rect class="e" x="25" y="11" width="10" height="12"/><rect class="k" x="28" y="15" width="4" height="4"/>
+    <rect class="k" x="17" y="29" width="7" height="8"/>
+  </symbol>
+</defs>
+</svg>

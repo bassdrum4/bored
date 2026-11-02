@@ -2,6 +2,8 @@
  * wordmark that changes between visits, and a rotating footer. Plain text only,
  * no network, no storage. `date` and `random` are parameters so a test can pin them. */
 
+import { setBo } from './bo.js';
+
 const LATE = [
   'Still up? Respect.',
   'It is very late. Pick something short.',
@@ -69,16 +71,30 @@ export function titleWhileAway() {
   return 'Bored. (come back)';
 }
 
+// The tab icon goes to sleep with the tab. These are flattened copies of Bo's faces.
+export const ICON_AWAKE = './favicon.svg';
+export const ICON_ASLEEP = './favicon-asleep.svg';
+
 export function initVoice({ date = () => new Date(), random = Math.random } = {}) {
   const intro = document.querySelector('.intro');
   if (intro) intro.textContent = introLine(date(), random);
-  const bo = document.querySelector('.bo');
-  if (bo) bo.dataset.mood = moodFor(date());
   const foot = document.querySelector('.foot > span:first-child');
   if (foot) foot.textContent = footerLine(random);
 
+  // Bo beside the intro: asleep in the small hours, bored otherwise, and pleased once
+  // today's daily is done. renderDaily flips the `completed` class on #daily, so watch it.
+  const bo = document.querySelector('#bo-intro');
+  const daily = document.querySelector('#daily');
+  const showMood = () => setBo(bo, daily?.classList.contains('completed') ? 'pleased' : moodFor(date()));
+  showMood();
+  if (daily && typeof MutationObserver === 'function') {
+    new MutationObserver(showMood).observe(daily, { attributes: true, attributeFilter: ['class'] });
+  }
+
   const home = document.title;
+  const icon = document.querySelector('link[rel="icon"]');
   document.addEventListener('visibilitychange', () => {
+    if (icon) icon.setAttribute('href', document.hidden ? ICON_ASLEEP : ICON_AWAKE);
     // Never touch the title while a game is on screen; it belongs to the game's tab.
     if (document.body.classList.contains('playing')) return;
     document.title = document.hidden ? titleWhileAway() : home;

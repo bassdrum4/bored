@@ -13,6 +13,10 @@ src/hub/library-view.js  game library, filters, preview cards and recent shelf
 src/hub/leaderboard-view.js  leaderboard rendering and fetching
 src/hub/account-ui.js  sign-in and profile dialogs
 src/hub/feedback-ui.js  feedback modal
+src/hub/voice.js         time-of-day greeting, rotating footer, tab title and favicon nudge
+src/hub/bo.js            points an <svg class="bo"> at one of Bo's moods (setBo / makeBo)
+src/bo.svg               Bo the mascot: the only copy of the drawing, one <symbol> per mood
+src/favicon*.svg         flattened awake/asleep Bo for the tab icon; keep in step with bo.svg by hand
 src/hub/game-document.js  game HTML and seed injection
 src/hub/backend.js       Supabase request/session layer, score rules, auth helpers
 src/hub/cloud.js         player_state pull/push — the account follows the player across browsers

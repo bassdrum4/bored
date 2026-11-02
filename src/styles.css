@@ -148,22 +148,18 @@ section[id]{scroll-margin-top:20px}
 .site-nav a{text-decoration:none;padding:10px 0}
 .site-nav a:hover{text-decoration:underline}
 .intro{margin-top:8px;font-style:italic}
-/* Bo, the mascot: ink on paper, square corners, one red square, no animation.
-   The intro line is what Bo says. The face follows state: asleep late at night
-   (set by voice.js), pleased once today's daily is done (pure CSS). */
+/* Bo, the mascot. The drawing is bo.svg; hub/bo.js picks the mood. Decorative only:
+   ink on paper, square corners, one red square, no animation. */
 .intro-row{display:flex;align-items:center;gap:14px;margin-top:12px}
 .intro-row .intro{margin-top:0}
-.bo{flex:0 0 auto;width:44px;height:44px;overflow:visible}
-.bo .shadow{fill:var(--ink)}
-.bo .body,.bo .eye{fill:#fffdf7;stroke:var(--ink);stroke-width:2}
-.bo .eye{stroke-width:1.5}
-.bo .ink{fill:var(--ink)}
-.bo .line{fill:none;stroke:var(--ink);stroke-width:2;stroke-linecap:square;stroke-linejoin:miter}
-.bo .mark{fill:var(--red)}
-.bo [data-face]{display:none}
-.bo[data-mood="bored"] [data-face="bored"],.bo[data-mood="asleep"] [data-face="asleep"]{display:inline}
-body:has(#daily.completed) .bo [data-face]{display:none}
-body:has(#daily.completed) .bo [data-face="pleased"]{display:inline}
+.bo{display:block;flex:0 0 auto;width:44px;height:44px}
+.bo-sm{width:34px;height:34px}
+/* An empty state is Bo plus one line. The box goes away with its text, which the hub hides. */
+.empty-note{display:flex;align-items:center;gap:14px}
+.empty-note:has(>[hidden]){display:none}
+.empty-note p{min-width:0}
+.dialog-head{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.dialog-head h2{margin:0}
 .together-open .masthead .intro-row{display:none}
 .sub{margin-top:8px}
 /* The account strip: a guest has one job, so Sign in carries the ink. */
@@ -301,7 +297,7 @@ body:has(#daily.completed) .bo [data-face="pleased"]{display:inline}
 }
 #leaderboard{margin-top:38px;border:0;border-top:3px double var(--ink);padding:24px 0 0}
 #leaderboard h2{font-family:var(--display);font-size:28px;margin:4px 0 16px}
-#empty{border:1px dashed var(--rule);margin-top:12px;padding:26px}
+.empty-boxed{border:1px dashed var(--rule);margin-top:12px;padding:20px 26px}
 dialog{margin:auto}
 @media(max-width:850px){
   .shelf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
