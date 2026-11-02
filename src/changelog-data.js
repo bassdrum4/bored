@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 238,
+  "count": 239,
   "newest": "2026-11-02",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c04ea54","date":"2026-11-02","author":"bassdrum4","subject":"Keep Basket Random's cover up until the real build arrives."},
   {"sha":"0b8230a","date":"2026-11-02","author":"bassdrum4","subject":"Add every developer note and unblock Basket Random's PLAY screen."},
   {"sha":"0cd4fe3","date":"2026-11-02","author":"bassdrum4","subject":"Ask for players and difficulty before chess begins."},
   {"sha":"8f61603","date":"2026-11-02","author":"bassdrum4","subject":"Add Basket Random as an offline two-player cabinet."},
