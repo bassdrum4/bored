@@ -148,6 +148,23 @@ section[id]{scroll-margin-top:20px}
 .site-nav a{text-decoration:none;padding:10px 0}
 .site-nav a:hover{text-decoration:underline}
 .intro{margin-top:8px;font-style:italic}
+/* Bo, the mascot: ink on paper, square corners, one red square, no animation.
+   The intro line is what Bo says. The face follows state: asleep late at night
+   (set by voice.js), pleased once today's daily is done (pure CSS). */
+.intro-row{display:flex;align-items:center;gap:14px;margin-top:12px}
+.intro-row .intro{margin-top:0}
+.bo{flex:0 0 auto;width:44px;height:44px;overflow:visible}
+.bo .shadow{fill:var(--ink)}
+.bo .body,.bo .eye{fill:#fffdf7;stroke:var(--ink);stroke-width:2}
+.bo .eye{stroke-width:1.5}
+.bo .ink{fill:var(--ink)}
+.bo .line{fill:none;stroke:var(--ink);stroke-width:2;stroke-linecap:square;stroke-linejoin:miter}
+.bo .mark{fill:var(--red)}
+.bo [data-face]{display:none}
+.bo[data-mood="bored"] [data-face="bored"],.bo[data-mood="asleep"] [data-face="asleep"]{display:inline}
+body:has(#daily.completed) .bo [data-face]{display:none}
+body:has(#daily.completed) .bo [data-face="pleased"]{display:inline}
+.together-open .masthead .intro-row{display:none}
 .sub{margin-top:8px}
 /* The account strip: a guest has one job, so Sign in carries the ink. */
 .masthead-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:18px;padding:12px 14px;

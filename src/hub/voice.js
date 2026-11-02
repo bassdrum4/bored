@@ -54,6 +54,12 @@ export function introLine(date = new Date(), random = Math.random) {
   return pick(greetingBucket(date), random);
 }
 
+// Bo's face: asleep in the small hours, bored the rest of the time. The page
+// swaps in a pleased face by itself once today's daily challenge is done.
+export function moodFor(date = new Date()) {
+  return greetingBucket(date) === LATE ? 'asleep' : 'bored';
+}
+
 export function footerLine(random = Math.random) {
   return pick(FOOTERS, random);
 }
@@ -66,6 +72,8 @@ export function titleWhileAway() {
 export function initVoice({ date = () => new Date(), random = Math.random } = {}) {
   const intro = document.querySelector('.intro');
   if (intro) intro.textContent = introLine(date(), random);
+  const bo = document.querySelector('.bo');
+  if (bo) bo.dataset.mood = moodFor(date());
   const foot = document.querySelector('.foot > span:first-child');
   if (foot) foot.textContent = footerLine(random);
 
