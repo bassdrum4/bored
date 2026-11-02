@@ -27,6 +27,7 @@ import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
+import { initVoice } from './hub/voice.js';
 
 // Keep the original console/test surface available from the bundled file. The
 // date wrapper also lets the offline Puppeteer suite pin a challenge date.
@@ -873,6 +874,7 @@ const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, ca
 window.addEventListener('bored:identity', () => { if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true }); });
 initAccount();
 initFeedback();
+initVoice();
 const analyticsToggle = $('#analytics-enabled');
 analyticsToggle.checked = analytics.enabled();
 analyticsToggle.onchange = () => analytics.setEnabled(analyticsToggle.checked);

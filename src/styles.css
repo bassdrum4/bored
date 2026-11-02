@@ -6,10 +6,10 @@
 body{background:var(--paper);color:var(--ink);min-height:100vh;
   font:17px/1.5 Georgia,"Times New Roman",serif;
   -webkit-font-smoothing:antialiased}
-::selection{background:var(--ink);color:var(--paper)}
+::selection{background:var(--red);color:var(--paper)}
 #hub{margin:0 auto}
 .masthead{border-bottom:3px double var(--ink);padding-bottom:16px}
-h1{font-size:clamp(40px,9vw,58px);font-weight:400;line-height:1;letter-spacing:-.015em}
+h1{font-size:clamp(44px,10vw,72px);font-weight:700;line-height:1;letter-spacing:-.04em}
 .sub{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
 .sub b{color:var(--ink);font-weight:600}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
@@ -146,11 +146,11 @@ section[id]{scroll-margin-top:20px}
 .site-nav{display:flex;flex-wrap:wrap;gap:22px;font:12px var(--mono)}
 .site-nav a{text-decoration:none;padding:10px 0}
 .site-nav a:hover{text-decoration:underline}
-.intro{margin-top:8px}
+.intro{margin-top:8px;font-style:italic}
 .sub{margin-top:8px}
 /* The account strip: a guest has one job, so Sign in carries the ink. */
 .masthead-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:18px;padding:12px 14px;
-  border:1px solid var(--rule);border-left:3px solid var(--ink);background:#fffdf7}
+  border:1px solid var(--rule);border-left:3px solid var(--red);background:#fffdf7}
 #account{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:10px;min-width:220px;
   font:11.5px/1.6 var(--mono);color:var(--dim)}
 #account-state{flex:1;min-width:190px}
@@ -172,7 +172,7 @@ section[id]{scroll-margin-top:20px}
 .section-note{font-size:15px;color:var(--dim)}
 .text-link,.text-button{font:11px/1.6 var(--mono);color:var(--ink)}
 .text-button{border:0;background:none;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:10px 0}
-#daily{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;align-items:center;margin:26px 0 0;padding:26px;border:1px solid var(--rule);border-top:3px solid var(--ink);border-left:1px solid var(--rule)}
+#daily{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;align-items:center;margin:26px 0 0;padding:26px;border:1px solid var(--rule);border-top:3px solid var(--red);border-left:1px solid var(--rule)}
 .daily-copy{min-width:0}
 .daily-kicker{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
 .daily-kicker .eyebrow{color:var(--red)}
@@ -229,7 +229,7 @@ section[id]{scroll-margin-top:20px}
 #sort{border:1px solid var(--rule);padding:8px}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
 .row{position:relative;min-width:0;border:1px solid var(--rule)}
-.row:hover{border-color:var(--ink)}
+.row:hover{border-color:var(--ink);box-shadow:4px 4px 0 var(--ink)}
 .row .card{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:0;gap:0;font:inherit;width:100%;min-width:0;border:0;border-radius:0;background:none;color:var(--ink);height:100%;text-align:left;cursor:pointer}
 .card:hover,.card:focus-visible{background:none;color:var(--ink)}
 .card:focus-visible,.shelf-play:focus-visible{outline:2px solid var(--red);outline-offset:4px}
@@ -248,7 +248,8 @@ section[id]{scroll-margin-top:20px}
 .card-best-tip-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:baseline}
 .card-best-tip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card-best-tip-value{color:var(--dim);white-space:nowrap}
-.badge{display:inline-block;vertical-align:middle;font-size:8px;margin-left:7px;line-height:1.3}
+.badge{display:inline-block;vertical-align:middle;font-size:8px;margin-left:7px;line-height:1.3;background:var(--red);color:var(--paper);border-color:var(--red);letter-spacing:.06em}
+#together-nav .badge{background:none;color:var(--red);border-color:currentColor}
 .star{position:absolute;top:10px;right:10px;width:36px;height:36px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);font-size:23px;line-height:1}
 .star:hover{border-color:var(--ink);background:var(--paper)}
 

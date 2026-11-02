@@ -30,7 +30,7 @@ async function submitFeedback(event) {
   const message = $('#feedback-text').value.trim();
   const email = $('#feedback-email').value.trim();
   const status = $('#feedback-status');
-  if (message.length < 4) { status.textContent = 'Tell us a little more first.'; return; }
+  if (message.length < 4) { status.textContent = 'Give me a little more to go on.'; return; }
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { status.textContent = 'That email does not look right.'; return; }
   feedbackBusy = true;
   $('#feedback-submit').disabled = true;
@@ -40,7 +40,7 @@ async function submitFeedback(event) {
     $('#feedback-text').value = '';
     closeFeedbackDialog();
     const button = $('#feedback-open');
-    button.textContent = 'Thanks — sent';
+    button.textContent = 'Got it. Thanks.';
     button.disabled = true;
     setTimeout(() => { button.textContent = 'Send feedback'; button.disabled = false; }, 4000);
   } catch (err) {

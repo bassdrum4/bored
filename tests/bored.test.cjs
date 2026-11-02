@@ -1583,7 +1583,7 @@ test('browser regressions', async t => {
     });
     // No account appears in the background, and the strip keeps calling them a guest.
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.session') || 'null')), null);
-    assert.equal(await text(page, '#account-state'), 'Playing as a guest. Scores stay in this browser.');
+    assert.equal(await text(page, '#account-state'), 'Playing as a guest. Your scores stay in this browser until you make an account.');
     assert.equal(await text(page, '#account-action'), 'Sign in');
     assert.equal(await page.$eval('#account-rename', el => el.hidden), true);
     assert.equal(await page.$eval('#account-action', el => el.classList.contains('primary')), true);
@@ -1591,7 +1591,7 @@ test('browser regressions', async t => {
     // Leaving the game names the run they just saved and offers an account for it.
     await page.waitForFunction(() => document.querySelector('#claim-dialog')?.open === true);
     assert.equal(await text(page, '#claim-heading'), 'You scored 3 boards in Lights Out.');
-    assert.match(await text(page, '#claim-blurb'), /sign in or create an account to add it to the leaderboard/i);
+    assert.match(await text(page, '#claim-blurb'), /make an account and it goes on the leaderboard/i);
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.pendingClaim') || 'null')), null,
       'showing the offer stores nothing; only choosing an account does');
     await page.click('#claim-signin');

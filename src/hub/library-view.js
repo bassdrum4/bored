@@ -264,8 +264,8 @@ function renderLibrary() {
 
   $('#empty').hidden = state.visibleGames.length > 0;
   $('#empty').textContent = state.category === 'Favorites' && !state.favorites.size
-    ? 'Your favorites live here. Tap a star beside any game to save it.'
-    : 'Nothing here. Try another search, category, or collection, or clear the filters.';
+    ? 'No favorites yet. Tap the star on any game and it lands here.'
+    : 'Nothing matches that. Try another search, or clear the filters and start over.';
   $('#results').textContent = state.visibleGames.length + ' of ' + ORDER.length + ' entries';
   $('#count').textContent = ORDER.length;
   const counts = (ORDER.length - Object.keys(EXTERNS).length) + ' offline / ' + Object.keys(EXTERNS).length + ' online extras';
