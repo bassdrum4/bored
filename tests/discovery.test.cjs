@@ -52,17 +52,24 @@ test('discovery keeps its controls and fits small screens', async t => {
   });
 
   await t.test('creator notes appear on hover and through a touch-friendly button', async () => {
+    const { DEVELOPER_NOTES } = await import('../src/games/developer-notes.js');
+    const { ORDER: CATALOG } = await import('../src/games/catalog.js');
+    assert.deepEqual(Object.keys(DEVELOPER_NOTES).filter(slug => !CATALOG.some(([id]) => id === slug)), [],
+      'every note names a catalog entry');
     const slugs = await page.evaluate(() => [...document.querySelectorAll('#grid .note-host')].map(host => host.querySelector('.card').dataset.slug));
-    assert.deepEqual(slugs.sort(), ['block-blast', 'f-14', 'rooftop-snipers', 'trackbound', 'void-runner', 'wordle'].sort());
+    assert.deepEqual(slugs.sort(), Object.keys(DEVELOPER_NOTES).sort(), 'every note has a card');
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('#grid .developer-note-tip')].every(tip => tip.textContent.startsWith('A note from the developer'))));
     assert.match(await page.$eval('#developer-note-trackbound .developer-note-copy', tip => tip.textContent), /Brody/);
     assert.equal(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'), null);
-    await page.hover('#grid .note-host:has(.card[data-slug="block-blast"]) .developer-note-toggle');
+    // Desktop rows open their note on hover, so the info button is phone-only.
+    assert.equal(await page.$eval('#grid .card[data-slug="block-blast"] ~ .developer-note-toggle', node => getComputedStyle(node).display), 'none');
+    await page.hover('#grid .note-host:has(.card[data-slug="block-blast"]) .card');
     assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'block');
     await page.mouse.move(0, 0);
     assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'none');
 
     await page.setViewport({ width: 375, height: 800 });
+    assert.notEqual(await page.$eval('#grid .card[data-slug="void-runner"] ~ .developer-note-toggle', node => getComputedStyle(node).display), 'none');
     await page.click('#grid .card[data-slug="void-runner"] ~ .developer-note-toggle');
     assert.equal(await page.$eval('#developer-note-void-runner', tip => getComputedStyle(tip).display), 'block');
     assert.equal(await page.$eval('#grid .card[data-slug="void-runner"] ~ .developer-note-toggle', node => node.getAttribute('aria-expanded')), 'true');

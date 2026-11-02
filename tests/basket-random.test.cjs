@@ -86,7 +86,7 @@ test('the vendored Construct 3 build is complete and stays offline', () => {
   for (const file of [
     'index.html', 'style.css', 'data.json', 'box2d.wasm', 'box2d.wasm.js',
     'scripts/main.js', 'scripts/c3runtime.js', 'scripts/supportcheck.js', 'scripts/offlineclient.js',
-    'scripts/dispatchworker.js', 'scripts/jobworker.js'
+    'scripts/dispatchworker.js', 'scripts/jobworker.js', 'patch/js/gd-sdk.js'
   ]) {
     assert.ok(fs.existsSync(path.join(vendor, file)), 'missing ' + file);
   }
@@ -101,6 +101,16 @@ test('the vendored Construct 3 build is complete and stays offline', () => {
   }
   assert.doesNotMatch(inner, /gameDistribution|azerion|eponesh|analytics/i, 'the host page SDKs stay out');
   assert.doesNotMatch(wrapper, /localStorage|sessionStorage/);
+
+  // The build still asks its old host for the GameDistribution SDK at startup.
+  // The local stub answers that request so PLAY's ad call cannot throw; it must
+  // never add a network dependency of its own.
+  assert.match(fs.readFileSync(path.join(vendor, 'scripts/c3runtime.js'), 'utf8'), /patch\/js\/gd-sdk\.js/);
+  const sdk = fs.readFileSync(path.join(vendor, 'patch/js/gd-sdk.js'), 'utf8');
+  assert.match(sdk, /window\.gdsdk\s*=/);
+  assert.match(sdk, /showAd\(/);
+  assert.match(sdk, /preloadAd\(/);
+  assert.doesNotMatch(sdk, /https?:|fetch\(|XMLHttpRequest/, 'the stub stays local');
 
   const art = fs.readdirSync(path.join(vendor, 'images')).length + fs.readdirSync(path.join(vendor, 'media')).length;
   assert.ok(art >= 40, 'the art and audio travel with the game');

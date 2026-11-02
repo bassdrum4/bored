@@ -271,13 +271,13 @@ section[id]{scroll-margin-top:20px}
 .note-host{position:relative}
 .note-host:hover,.note-host:focus-within,.note-host.note-open{z-index:6}
 .developer-note-toggle{position:absolute;top:10px;right:54px;z-index:2;width:36px;height:36px;
-  padding:0;border:1px solid var(--rule);background:var(--paper);color:var(--dim);
+  padding:0;border:1px solid var(--rule);background:var(--paper);color:var(--dim);opacity:.6;
   font:italic 16px Georgia,"Times New Roman",serif;cursor:pointer}
-.developer-note-toggle:hover,.developer-note-toggle:focus-visible{border-color:var(--ink);color:var(--ink)}
+.developer-note-toggle:hover,.developer-note-toggle:focus-visible{border-color:var(--dim);color:var(--ink);opacity:1}
 .developer-note-toggle:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .developer-note-tip{display:none;position:absolute;bottom:calc(100% + 8px);left:0;right:0;
-  z-index:8;padding:12px 14px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);
-  box-shadow:3px 3px 0 rgba(25,23,19,.18);text-align:left;pointer-events:none}
+  z-index:8;padding:11px 13px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);
+  box-shadow:2px 2px 0 rgba(25,23,19,.08);text-align:left;pointer-events:none}
 .developer-note-label{display:block;margin-bottom:6px;font:10px/1.5 var(--mono);color:var(--dim)}
 .developer-note-copy{display:block;font:14px/1.5 Georgia,"Times New Roman",serif;overflow-wrap:anywhere}
 .note-host.note-open>.developer-note-tip,
@@ -286,6 +286,10 @@ section[id]{scroll-margin-top:20px}
 .note-host>.developer-note-toggle:focus-visible~.developer-note-tip{display:block}
 @media(hover:hover) and (pointer:fine){
   .note-host:hover>.developer-note-tip{display:block}
+}
+@media(hover:hover) and (pointer:fine) and (min-width:601px){
+  /* The card explains itself on hover, so the phone-only info button stays out of the way. */
+  .developer-note-toggle{display:none}
 }
 .shelf-entry{position:relative;min-width:0}
 .shelf-entry .shelf-play{height:100%}
