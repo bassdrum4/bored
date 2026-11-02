@@ -11,7 +11,7 @@ export const DISCOVERY = {
   'typing-test': info('1–3 min', 'Focused', ['Keyboard'], { quick: true }),
   circuit: info('2–5 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true, players: '1 or 2 local' }),
   "fluid": info('Open-ended', 'Relaxing', ['Mouse', 'Touch']),
-  "signal-tower": info('20–35 min', 'Focused', ['Mouse', 'Touch']),
+  "signal-tower": info('Open-ended', 'Focused', ['Mouse', 'Touch']),
   'prism-duel': info('2–5 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true, players: '1 or 2 local' }),
   'rooftop-snipers': info('2–5 min', 'Competitive', ['Keyboard', 'Touch'], { quick: true, players: '2 local' }),
   'block-blast': info('2–5 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),

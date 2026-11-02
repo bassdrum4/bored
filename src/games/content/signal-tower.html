@@ -59,12 +59,12 @@
   <p id="note"></p>
 </main>
 <script>
-/* Signal Tower — a tower defence with six towers, nine threats and thirty waves.
+/* Signal Tower — a tower defence with six towers, nine threats, thirty set waves
+   and endless generated ones after them.
    Everything lives in this document: the hub fetches it into an iframe and reads
    window.__boredSnapshot() when the run ends. */
 
 const CELL = 32, COLS = 18, ROWS = 12, W = COLS * CELL, H = ROWS * CELL;
-const WAVES_TOTAL = 30;
 const START_CREDITS = 160, START_CORE = 20, MAX_CORE = 20;
 const FIRST_BUILD = 22, BUILD_SECONDS = 16, REPAIR_COST = 80;
 const STRIKE_DAMAGE = 150;
@@ -217,6 +217,35 @@ const WAVES = [
   { name:'Long Dark', hp:18.75, mod:'fog', units:[['cloak',10,0.6],['regen',6,0.9],['brute',6,1.0]] },
   { name:'The Last Haul', hp:20.00, boss:true, units:[['hauler',2,2.5],['brute',8,0.9],['flyer',8,0.6],['hive',4,1.2]] }
 ];
+const PREMADE_WAVES = WAVES.length;
+
+// Clearing the set table is not the end of the line: past it the field repeats
+// a late-game mix with more of everything. Health climbs 8% a wave, so a strong
+// line holds for a long time and then, honestly, does not.
+const ENDLESS_GROWTH = 1.08;
+const ENDLESS_TEMPLATES = [
+  { name:'Night Line', mod:'fog', units:[['cloak',10,0.6],['flyer',8,0.6],['brute',6,1.0]] },
+  { name:'Iron Tide', mod:'armour', units:[['brute',12,0.8],['hive',5,1.1],['grunt',14,0.35]] },
+  { name:'Dead Sprint', mod:'rush', units:[['runner',20,0.26],['swarm',18,0.22],['flyer',8,0.5]] },
+  { name:'The Haul', boss:true, units:[['hauler',2,2.4],['brute',10,0.8],['regen',6,0.9]] },
+  { name:'Mend the Veil', units:[['regen',8,0.9],['cloak',10,0.6],['hive',6,1.1]] },
+  { name:'The Grind', units:[['grunt',24,0.3],['brute',8,0.9],['flyer',10,0.55],['swarm',16,0.25]] }
+];
+
+function endlessPlan(number) {
+  const depth = number - PREMADE_WAVES;
+  const template = ENDLESS_TEMPLATES[(depth - 1) % ENDLESS_TEMPLATES.length];
+  const cycle = Math.floor((depth - 1) / ENDLESS_TEMPLATES.length);
+  const hp = Number((WAVES[PREMADE_WAVES - 1].hp * Math.pow(ENDLESS_GROWTH, depth)).toFixed(2));
+  const extra = 1 + cycle * 0.12;
+  const units = template.units.map(([type, count, gap]) => [type, Math.round(count * extra), gap]);
+  return { name: template.name + (cycle ? ' ' + (cycle + 1) : ''), hp, mod: template.mod, boss: template.boss === true, units };
+}
+
+function wavePlan(index) {
+  return index < PREMADE_WAVES ? WAVES[index] : endlessPlan(index + 1);
+}
+
 const MOD_LABEL = { fog:'fog', rush:'rush', armour:'plated' };
 const MOD_NOTE = {
   fog: 'fog on the field: every tower sees 20% less.',
@@ -458,14 +487,14 @@ function buildTimeline(plan) {
 }
 
 function startWave(early) {
-  if (over || phase === 'wave' || wave >= WAVES_TOTAL) return;
+  if (over || phase === 'wave') return;
   if (wave === 0) adoptSeed();
   if (early && phase === 'build') {
     const bonus = Math.floor(Math.max(0, buildTimer) * 2);
     if (bonus > 0) { credits += bonus; note('Wave sent early: +' + bonus + ' CR.'); }
   }
   wave++;
-  const plan = WAVES[wave - 1];
+  const plan = wavePlan(wave - 1);
   waveMod = plan.mod || null;
   timeline = buildTimeline(plan);
   waveTime = 0;
@@ -479,18 +508,19 @@ function endWave() {
   cleared = wave;
   const bonus = 18 + wave * 3;
   credits += bonus;
-  if (wave >= WAVES_TOTAL) { finish(true); return; }
   phase = 'build';
   buildTimer = BUILD_SECONDS;
   waveMod = null;
-  note('Wave ' + wave + ' held. +' + bonus + ' CR.');
+  note(wave === PREMADE_WAVES
+    ? 'All ' + PREMADE_WAVES + ' set waves held. The field does not stop now.'
+    : 'Wave ' + wave + ' held. +' + bonus + ' CR.');
   refreshUi();
 }
 
 function finish(won) {
   over = true; victory = won; phase = 'over';
   strikeArmed = false;
-  note(won ? 'Line held. All ' + WAVES_TOTAL + ' waves stopped.' : 'Overrun on wave ' + Math.max(1, wave) + '.');
+  note(won ? 'Line held. The set waves are behind you.' : 'Overrun on wave ' + Math.max(1, wave) + '.');
   refreshUi();
 }
 
@@ -710,18 +740,18 @@ function describe(plan) {
 }
 
 function forecastText() {
-  if (over) return victory ? 'line held · all waves stopped' : 'the line broke';
+  if (over) return victory ? 'line held' : 'the line broke';
   if (phase === 'wave') {
     const remaining = timeline.length + enemies.length;
     return 'wave ' + wave + ' · ' + remaining + ' left' + (waveMod ? ' · ' + MOD_LABEL[waveMod] : '');
   }
-  const plan = WAVES[wave];
-  if (!plan) return '';
-  return 'next · ' + describe(plan) + (plan.mod ? ' · ' + MOD_LABEL[plan.mod] : '');
+  const plan = wavePlan(wave);
+  return (wave >= PREMADE_WAVES ? 'endless · ' : 'next · ') + describe(plan) + (plan.mod ? ' · ' + MOD_LABEL[plan.mod] : '');
 }
 
 function refreshUi() {
-  $('hud').textContent = 'WAVE ' + Math.min(wave, WAVES_TOTAL) + '/' + WAVES_TOTAL +
+  const waveLabel = wave > PREMADE_WAVES ? wave + ' · ENDLESS' : Math.min(wave, PREMADE_WAVES) + '/' + PREMADE_WAVES;
+  $('hud').textContent = 'WAVE ' + waveLabel +
     ' · CORE ' + Math.max(0, integrity) + ' · ' + Math.max(0, Math.floor(credits)) + ' CR' +
     ' · ' + (paused ? 'PAUSED' : speed + '\u00d7');
   $('forecast').textContent = forecastText();
@@ -1103,7 +1133,9 @@ function drawOverlay() {
     ctx.fillText(victory ? 'LINE HELD' : 'OVERRUN', W / 2, H / 2 - 12);
     ctx.fillStyle = C.dim;
     ctx.font = '11px ' + MONO;
-    ctx.fillText(cleared + ' of ' + WAVES_TOTAL + ' waves · ' + kills + ' stopped · core ' + Math.max(0, integrity), W / 2, H / 2 + 8);
+    const tally = (cleared > PREMADE_WAVES ? cleared + ' waves · endless' : cleared + ' of ' + PREMADE_WAVES + ' waves') +
+      ' · ' + kills + ' stopped · core ' + Math.max(0, integrity);
+    ctx.fillText(tally, W / 2, H / 2 + 8);
     ctx.fillText('score ' + (cleared * 120 + kills * 6), W / 2, H / 2 + 26);
     ctx.textAlign = 'left';
   }
@@ -1144,7 +1176,7 @@ function frame(now) {
 window.__boredSnapshot = () => ({
   slug: 'signal-tower',
   waves: cleared,
-  wave: Math.min(wave, WAVES_TOTAL),
+  wave: wave,
   kills,
   leaked,
   integrity: Math.max(0, integrity || 0),

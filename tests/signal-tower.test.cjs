@@ -153,6 +153,29 @@ test('signal tower: every threat is deployed somewhere in the table', () => {
   assert.ok(report.mods.length >= 3, 'the field modifiers are used');
 });
 
+test('signal tower: the set waves end but the field keeps coming', () => {
+  const game = boot();
+  const report = game.run(`(() => {
+    const first = wavePlan(PREMADE_WAVES);
+    const later = wavePlan(PREMADE_WAVES + 23);
+    return { premade: PREMADE_WAVES, hp: first.hp, laterHp: later.hp,
+             units: first.units.length, laterUnits: later.units.length };
+  })()`);
+  assert.equal(report.premade, 30);
+  assert.ok(report.hp > 20, 'the first endless wave is heavier than the last set wave');
+  assert.ok(report.laterHp > report.hp, 'health keeps climbing');
+  assert.ok(report.units >= 2);
+  assert.ok(report.laterUnits >= report.units);
+
+  game.run('wave = PREMADE_WAVES; startWave(false)');
+  assert.equal(game.run('phase'), 'wave');
+  assert.ok(game.run('timeline.length') > 0, 'the endless wave spawns a schedule');
+
+  game.run('credits = 0; wave = PREMADE_WAVES; cleared = PREMADE_WAVES; phase = "wave"; timeline = []; enemies = []; endWave()');
+  assert.equal(game.run('over'), false, 'clearing the set waves does not end the run');
+  assert.equal(game.run('phase'), 'build');
+});
+
 test('signal tower: a funded line survives deep into the waves without throwing', () => {
   const game = boot();
   game.run('credits = 100000');

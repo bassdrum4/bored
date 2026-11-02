@@ -52,7 +52,8 @@
     width: 76%; height: 76%; background: none;
     border: 2px solid rgba(25, 23, 19, .45);
   }
-  .bar { display: flex; justify-content: center; gap: 8px; margin: 14px 0 8px }
+  .bar { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 14px 0 8px }
+  select[hidden] { display: none }
   button, select {
     font: 12px/1 var(--mono); background: none; color: var(--ink);
     border: 1px solid var(--hair); border-radius: 2px; padding: 9px 12px; cursor: pointer;
@@ -68,18 +69,23 @@
   <h1 id="hud">Move 1 &middot; vs computer</h1>
   <div id="board" aria-label="Chess board"></div>
   <div class="bar">
-    <select id="mode" aria-label="Opponent">
-      <option value="computer">Vs computer</option>
-      <option value="friend">Two players</option>
+    <select id="mode" aria-label="Players">
+      <option value="computer">1 player (CPU)</option>
+      <option value="friend">2 players</option>
+    </select>
+    <select id="level" aria-label="Difficulty">
+      <option value="easy">Easy</option>
+      <option value="medium" selected>Medium</option>
+      <option value="hard">Hard</option>
     </select>
     <button id="new" type="button">New game</button>
   </div>
   <p id="status" role="status" aria-live="polite">You are white. Tap a piece, then a square.</p>
-  <p id="hint">Pawns promote to a queen. The computer answers after you move.</p>
+  <p id="hint">Pawns promote to a queen. The difficulty is how far ahead the computer looks.</p>
 </main>
 <script>
 const $ = selector => document.querySelector(selector);
-const boardEl = $('#board'), hudEl = $('#hud'), statusEl = $('#status'), modeEl = $('#mode');
+const boardEl = $('#board'), hudEl = $('#hud'), statusEl = $('#status'), modeEl = $('#mode'), levelEl = $('#level');
 
 /* ── Board and pieces ────────────────────────────────────────────────────── */
 
@@ -351,13 +357,25 @@ function orderScore(state, move) {
   return (victim ? VALUE[typeOf(victim)] || 0 : 0) + (move.promo ? 800 : 0);
 }
 
-function chooseMove(state, depth) {
+// Depth is how many moves ahead every reply is searched; `slip` is the chance
+// the engine takes a legal move without scoring it, which is what makes the
+// lower levels beatable rather than merely shallow.
+const DIFFICULTY = {
+  easy:   { depth: 1, slip: 0.40 },
+  medium: { depth: 2, slip: 0.08 },
+  hard:   { depth: 3, slip: 0 }
+};
+
+function chooseMove(state, level) {
   const moves = legalMoves(state);
   if (!moves.length) return null;
+  if (level.slip && Math.random() < level.slip) {
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
   moves.sort((a, b) => orderScore(state, b) - orderScore(state, a));
   let bestScore = Infinity, best = [];
   for (const move of moves) {
-    const score = search(applyMove(state, move), depth - 1, -Infinity, Infinity);
+    const score = search(applyMove(state, move), level.depth - 1, -Infinity, Infinity);
     if (score < bestScore) { bestScore = score; best = [move]; }
     else if (score === bestScore) best.push(move);
   }
@@ -372,7 +390,9 @@ let over = false, result = null, plies = 0, sessionWins = 0;
 let thinking = false, generation = 0;
 
 function updateHud() {
-  const versus = modeEl.value === 'computer' ? 'vs computer' : 'two players';
+  const cpu = modeEl.value === 'computer';
+  const versus = cpu ? 'vs computer \u00b7 ' + levelEl.value : 'two players';
+  levelEl.hidden = !cpu;
   hudEl.textContent = 'Move ' + (Math.floor(plies / 2) + 1) + ' \u00b7 ' + versus +
     (sessionWins ? ' \u00b7 won ' + sessionWins : '');
 }
@@ -444,7 +464,7 @@ function scheduleComputer() {
   const token = ++generation;
   setTimeout(() => {
     if (token !== generation || over) { thinking = false; return; }
-    const move = chooseMove(state, 3);
+    const move = chooseMove(state, DIFFICULTY[levelEl.value] || DIFFICULTY.medium);
     thinking = false;
     if (!move || token !== generation) return;
     play(move);
@@ -545,7 +565,7 @@ function savedRun() {
       board: state.board.slice(), turn: state.turn,
       castling: Object.assign({}, state.castling), ep: state.ep,
       half: state.half, full: state.full,
-      mode: modeEl.value, plies: plies, wins: sessionWins
+      mode: modeEl.value, level: levelEl.value, plies: plies, wins: sessionWins
     }
   };
 }
@@ -562,6 +582,7 @@ function restoreRun(saved) {
     half: Math.max(0, game.half | 0), full: Math.max(1, game.full | 0)
   };
   modeEl.value = game.mode === 'friend' ? 'friend' : 'computer';
+  levelEl.value = DIFFICULTY[game.level] ? game.level : 'medium';
   plies = Math.max(0, game.plies | 0);
   sessionWins = Math.max(0, game.wins | 0);
   selected = -1;

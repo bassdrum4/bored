@@ -29,7 +29,7 @@ export const META = {
   "typing-test": ["Puzzle", "Thirty seconds, common words, and a keyboard that does not forgive a glance away."],
   "circuit": ["Arcade", "Three laps against the clock on four drawn circuits, or a second car on W A S D."],
   "fluid": ["Sandbox", "Drag to stir ink through a live fluid."],
-  "signal-tower": ["Strategy", "Thirty waves, six towers and threats that fly, plate up or hide. Hold the line."],
+  "signal-tower": ["Strategy", "Thirty set waves and then endless ones, six towers and threats that fly, plate up or hide. Hold the line."],
   "prism-duel": ["Strategy", "Place mirrors, bend a beam, burn the other core. The CPU plays too."],
   "rooftop-snipers": ["Arcade", "The original two-button rooftop duel. Jump, aim, and knock your rival off the roof."],
   "block-blast": ["Puzzle", "Drop blocks into an 8x8 grid and clear full lines."],
