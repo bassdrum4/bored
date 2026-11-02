@@ -2,13 +2,22 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 212,
+  "count": 221,
   "newest": "2026-11-01",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2c26b85","date":"2026-11-01","author":"Daniel Lowe","subject":"Hover the actual info control in creator notes browser test"},
+  {"sha":"ee82930","date":"2026-11-01","author":"Daniel Lowe","subject":"Evaluate creator-note node lists correctly in browser tests"},
+  {"sha":"abc705c","date":"2026-11-01","author":"Daniel Lowe","subject":"Fix creator notes test to evaluate selector collections"},
+  {"sha":"853c99b","date":"2026-11-01","author":"Daniel Lowe","subject":"Keep recent game notes clear of the info button"},
+  {"sha":"fc46c36","date":"2026-11-01","author":"Daniel Lowe","subject":"Cover creator notes hover, mobile toggles and dismissal"},
+  {"sha":"6e07b02","date":"2026-11-01","author":"Daniel Lowe","subject":"Style subtle hover notes and mobile info controls"},
+  {"sha":"904b042","date":"2026-11-01","author":"Daniel Lowe","subject":"Show creator notes on catalog and recent game cards"},
+  {"sha":"9311fb2","date":"2026-11-01","author":"Daniel Lowe","subject":"Document how to add personal game notes"},
+  {"sha":"9eea184","date":"2026-11-01","author":"Daniel Lowe","subject":"Add six first-person creator notes"},
   {"sha":"056c6d2","date":"2026-11-01","author":"Codebuff","subject":"Brick Run: bonus rooms behind one entry pipe per world"},
   {"sha":"dfa8616","date":"2026-11-01","author":"Codebuff","subject":"Brick Run: bigger display, working pipe warps, permanent kills"},
   {"sha":"775e1f7","date":"2026-11-01","author":"Codebuff","subject":"Brick Run: keyboard platformer with warp pipes and persistent pickups"},
