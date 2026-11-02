@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 221,
+  "count": 222,
   "newest": "2026-11-01",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"334a227","date":"2026-11-01","author":"Claude","subject":"Give the hub a voice: rewritten copy, time-aware greeting, bolder identity"},
   {"sha":"2c26b85","date":"2026-11-01","author":"Daniel Lowe","subject":"Hover the actual info control in creator notes browser test"},
   {"sha":"ee82930","date":"2026-11-01","author":"Daniel Lowe","subject":"Evaluate creator-note node lists correctly in browser tests"},
   {"sha":"abc705c","date":"2026-11-01","author":"Daniel Lowe","subject":"Fix creator notes test to evaluate selector collections"},
