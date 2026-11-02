@@ -239,8 +239,10 @@ chrome equally quiet:
 
 - Pick two or three colours and stay on them: a background, an ink, one accent. No gradients,
   glows, drop shadows on text, or neon-on-black "cyberpunk" palettes.
-- System fonts only (`ui-monospace, SFMono-Regular, Menlo, monospace` for numbers/HUD, system sans
-  elsewhere). No webfonts.
+- System fonts for numbers/HUD (`ui-monospace, SFMono-Regular, Menlo, monospace`) and body text.
+  The hub uses one webfont, Fraunces, for headings (`--display` in `styles.css`, with Georgia as the
+  fallback). Webfonts and other off-site requests are fine; the browser suites abort them, so
+  anything that depends on one must still look right in its fallback.
 - Borders are 1px. Corners are small (2–6px) or square. Buttons look like labels, not pills.
 - No emoji as UI, no starbursts, no "✨", no fake brand marks, no lorem-ipsum copy, no
   placeholder "Player" avatars.
