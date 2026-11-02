@@ -13,7 +13,7 @@ import {
 import {
   LB_GAMES, HIGH_SCORE_GAMES, accountStandings, rankPoints, boardGames,
   isLocalOnly, bestValue, formatScore, recordBest, scoreValue,
-  syncScores, onScoresPosted
+  syncScores, onScoresPosted, boardLeaders
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
 import { submitDailyResult } from './hub/daily-sync.js';
@@ -28,6 +28,7 @@ import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
 import { initVoice } from './hub/voice.js';
+import { setBo } from './hub/bo.js';
 
 // Keep the original console/test surface available from the bundled file. The
 // date wrapper also lets the offline Puppeteer suite pin a challenge date.
@@ -412,6 +413,11 @@ function offerClaim(claim, returnTo) {
   claimOffered = claim;
   claimReturnFocus = returnTo;
   $('#claim-heading').textContent = 'You scored ' + formatScore(claim.value, spec) + ' in ' + spec.name + '.';
+  // Bo is pleased with a new personal best, and startled when it beats the posted leader.
+  // The board may not have loaded yet, in which case there is no leader to beat.
+  const leader = boardLeaders(uiState.lbCache.get('overall')?.rows || []).get(claim.slug);
+  const beatsLeader = leader && (spec.lower ? claim.value < leader.value : claim.value > leader.value);
+  setBo($('#claim-bo'), beatsLeader ? 'surprised' : 'pleased');
   const dialog = $('#claim-dialog');
   if (!dialog.open) {
     if (dialog.showModal) dialog.showModal();
