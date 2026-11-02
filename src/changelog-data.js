@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 224,
+  "count": 226,
   "newest": "2026-11-01",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -35,6 +35,8 @@ export const CHANGELOG = [
   {"sha":"5963270","date":"2026-10-31","author":"Daniel Lowe","subject":"Rename Poker library entry to Card Table","pr":46},
   {"sha":"c7930ec","date":"2026-10-31","author":"Daniel Lowe","subject":"Add Blackjack and Euchre modes to Poker","pr":45},
   {"sha":"4aad25a","date":"2026-10-31","author":"Daniel Lowe","subject":"Restore F-14 flight analytics in Bored dashboard"},
+  {"sha":"d6bb423","date":"2026-10-30","author":"Daniel Lowe","subject":"Cover Wordle win animation after row advancement"},
+  {"sha":"7729e66","date":"2026-10-30","author":"Daniel Lowe","subject":"Fix Wordle win animation targeting the next row"},
   {"sha":"85687e1","date":"2026-10-30","author":"Codebuff","subject":"Add Ashcrown, a hex campaign against rival banners"},
   {"sha":"695aa1c","date":"2026-10-30","author":"Codebuff","subject":"Add a changelog page back-filled from the repository's commits"},
   {"sha":"f71a04e","date":"2026-10-30","author":"Codebuff","subject":"Hand-draw four circuits for the time trial, with a track picker"},
