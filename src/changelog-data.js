@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 234,
+  "count": 235,
   "newest": "2026-11-02",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"9b711be","date":"2026-11-02","author":"bassdrum4","subject":"Add a chess difficulty selector and endless Signal Tower waves."},
   {"sha":"2cb9bca","date":"2026-11-02","author":"Codebuff","subject":"Open the analytics dashboard on today's events by default"},
   {"sha":"1744cb7","date":"2026-11-02","author":"Codebuff","subject":"Save a game in progress, rename Trackbound to Trackmania, and fix its tracks"},
   {"sha":"8a54841","date":"2026-11-02","author":"PenguinV360","subject":"Update fmt.Println message from 'Hello' to 'Goodbye'"},
