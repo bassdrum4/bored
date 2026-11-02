@@ -268,7 +268,6 @@ function renderLibrary() {
   const counts = (ORDER.length - Object.keys(EXTERNS).length) + ' offline / ' + Object.keys(EXTERNS).length + ' online extras';
   $('#library-count').textContent = counts;
   $('#foot-count').textContent = counts;
-  $('#clear-filters').hidden = !filter && state.category === 'All' && state.collection === 'all';
   $('#random').disabled = !state.visibleGames.length;
 }
 

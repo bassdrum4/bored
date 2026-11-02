@@ -36,7 +36,8 @@ try {
     'void-runner': '#screen-overlay', simon: '#btnStart', snake: '#start',
     tank: '#m1', '8ball': '#btnCpu', tetris: '#start-btn',
     'brick-run': '#start', 'transit-chaos': '#start', ashcrown: '#btn-begin',
-    trackbound: '#btnDaily', chess: '#new', mahjong: '#deal'
+    trackbound: '#btnDaily', chess: '#new', mahjong: '#deal',
+    'basket-random': '#start'
   };
   const buttons = { pong: '1 PLAYER', 'gun-mayhem': '1 PLAYER vs CPU' };
   const keys = { commanders: 'Space', qbert: 'Space', frogger: 'Space', 'pac-man': 'Space',
@@ -84,6 +85,30 @@ try {
       }));
       await new Promise(resolve => setTimeout(resolve, 200));
     }
+    if (slug === 'basket-random') {
+      // The wrapper frames a vendored Construct build. Its cover lifts when the
+      // build loads, then the build shows its own PLAY screen inside a nested
+      // frame, so click that and let a possession start before shooting the court.
+      await frame.waitForFunction(() => document.querySelector('#cover').hidden === true, { timeout: 60000 });
+      // The engine ignores a click that lands while it is still booting, so give
+      // it a moment before the PLAY press and press again if it missed.
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const court = page.frames().find(candidate => candidate.url().includes('/basket-random/index.html'));
+      const canvas = await court?.$('canvas');
+      const box = await canvas?.boundingBox();
+      if (box) {
+        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        // The house splash rolls into a one-player / two-player choice on its
+        // own, and the menu wants a press on its arrow, not on the court.
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        await page.mouse.move(box.x + box.width * .25, box.y + box.height * .60);
+        await new Promise(resolve => setTimeout(resolve, 150));
+        await page.mouse.click(box.x + box.width * .25, box.y + box.height * .60);
+        await new Promise(resolve => setTimeout(resolve, 1800));
+        await page.mouse.click(box.x + box.width * .25, box.y + box.height * .68);
+        await new Promise(resolve => setTimeout(resolve, 2200));
+      }
+    }
     if (slug === 'sand') {
       const canvas = await frame.$('canvas');
       const box = await canvas?.boundingBox();
@@ -96,8 +121,11 @@ try {
     }
     await new Promise(resolve => setTimeout(resolve, ['memory', 'connect-four'].includes(slug) ? 60 : 1200));
     const candidates = await frame.$$('canvas, #board');
-    let target = null, area = 0;
-    for (const node of candidates) {
+    // Basket Random draws inside a nested frame, so there is no canvas to find
+    // here: shoot the wrapper's stage, which holds the framed court.
+    let target = slug === 'basket-random' ? await frame.$('#stage') : null;
+    let area = 0;
+    if (!target) for (const node of candidates) {
       const box = await node.boundingBox();
       if (box && box.width * box.height > area) { area = box.width * box.height; target = node; }
     }

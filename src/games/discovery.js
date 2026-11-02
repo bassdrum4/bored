@@ -77,9 +77,9 @@ export function inCollection(slug, collection) {
 // The locally captured WebP images ship beside this module, one per offline
 // game and named after its slug. They are ordinary files the page requests when
 // it builds a card, so the site needs no build step to carry them.
-// Newly scaffolded games start with an SVG placeholder; captured screenshots
-// remain WebP and can replace it later without changing the loader.
-export const PREVIEW_FALLBACKS = { 'basket-random': '.svg' };
+// A newly scaffolded game starts with an SVG placeholder and is listed here
+// until a real capture replaces it. Every game currently ships a WebP.
+export const PREVIEW_FALLBACKS = {};
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
   ORDER.filter(([slug]) => !EXTERNS[slug]).map(([slug]) => [slug, previewUrl(slug)]));
