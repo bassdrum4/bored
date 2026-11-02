@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 241,
+  "count": 242,
   "newest": "2026-11-02",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"a8f3701","date":"2026-11-02","author":"Codebuff","subject":"Keep the library in the order its games arrived."},
   {"sha":"89d39f0","date":"2026-11-02","author":"Codebuff","subject":"Keep Scrabble's squares square once tiles land."},
   {"sha":"6d5135e","date":"2026-11-02","author":"Codebuff","subject":"Add Scrabble with a computer opponent and local two-player play."},
   {"sha":"c04ea54","date":"2026-11-02","author":"bassdrum4","subject":"Keep Basket Random's cover up until the real build arrives."},
