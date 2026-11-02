@@ -179,12 +179,12 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   // shell, the crater and the damage from the stored shot.
   const aimAt = async (state, seat) => {
     const engine = await import('../src/games/tank-engine.js');
-    const world = engine.replay(state), tank = world.tanks[seat - 1], before = world.tanks[2 - seat].hp;
-    for (const angle of [45, 50, 40, 55, 35, 60, 30, 65, 25, 70, 20]) {
-      for (const power of [20, 18, 16, 14, 12, 10]) {
+    const world = engine.replay(state), before = world.tanks[2 - seat].hp;
+    for (let angle = 5; angle <= 85; angle++) {
+      for (let power = 1; power <= 24; power++) {
         try {
-          const out = engine.advance(state, { seat, x: tank.x, angle, power, weapon: 'standard' });
-          if (out.world.tanks[2 - seat].hp < before) return { angle, power, hp: out.world.tanks.map(t => t.hp), world: out.world };
+          const out = engine.advance(state, { seat, drive: 0, angle, power, weapon: 'standard' });
+          if (out.world.tanks[2 - seat].hp < before) return { angle, power, hp: out.world.tanks.map(t => t.hp) };
         } catch { /* try the next aim */ }
       }
     }

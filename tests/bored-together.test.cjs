@@ -142,29 +142,33 @@ test('Together production SQL: consent, directory, blocks, moves, duels and rete
     assert.ok(Number.isInteger(started.state.seed)&&started.state.seed>0,'the map seed comes from the server');
     assert.deepEqual(started.state.shots,[]);
     assert.equal((await call(db,b,'dashboard')).matches.some(m=>m.id===started.id),false,'an unplayed board stays private');
-    // The client's move envelope is what the dispatcher stores, exactly as the
-    // original game's bridge sends it.
+    // The rules version stamps at 2 on insert; the move envelope is the v2 shot:
+    // one signed ring drive, then angle/power/weapon. The referee stores the
+    // shot list and does not simulate the shell.
+    assert.equal(started.rules_version,2,'tank2 matches stamp at rules version 2');
     const shot=extra=>({match_id:started.id,version:started.version,request_id:randomUUID(),
-      move:{seat:1,x:144,angle:45,power:10,weapon:'standard',won:false,...extra}});
+      move:{seat:1,drive:0,angle:45,power:10,weapon:'standard',won:null,...extra}});
     await assert.rejects(call(db,a,'move',shot({angle:90})),/5 and 85/);
-    await assert.rejects(call(db,a,'move',shot({power:21})),/Power/);
-    await assert.rejects(call(db,a,'move',shot({weapon:'laser'})),/Unknown weapon/);
-    await assert.rejects(call(db,a,'move',shot({x:3})),/off the field/);
+    await assert.rejects(call(db,a,'move',shot({power:25})),/Power/);
+    await assert.rejects(call(db,a,'move',shot({weapon:'nuke'})),/Unknown weapon/);
+    await assert.rejects(call(db,a,'move',shot({drive:1.5})),/Drive along the box/);
+    await assert.rejects(call(db,a,'move',shot({drive:99999})),/around the world/);
+    await assert.rejects(call(db,a,'move',shot({won:3})),/Invalid result/);
     await assert.rejects(call(db,a,'move',shot({seat:2})),/Invalid shot/);
-    let m=await call(db,a,'move',shot({}));
+    let m=await call(db,a,'move',shot({drive:-120}));
     assert.equal(m.turn_user,b);assert.equal(m.state.shots.length,1);
-    assert.deepEqual(m.state.shots[0],{seat:1,x:144,angle:45,power:10,weapon:'standard'});
+    assert.deepEqual(m.state.shots[0],{seat:1,drive:-120,angle:45,power:10,weapon:'standard'},'the won claim never mixes into the shot list');
     assert.equal(m.state.seed,started.state.seed,'the battlefield seed survives the shot');
     const same=await call(db,b,'match',{match_id:m.id});assert.deepEqual(same.state.shots,m.state.shots);
     await assert.rejects(call(db,a,'move',shot({version:m.version})),/not your turn/);
-    // A reported kill completes the game for the player who reported it; the
+    // The mover's replay verdict (the winner seat) completes the match; the
     // opponent's replay is what can contradict that claim.
     const won=await call(db,b,'move',{match_id:m.id,version:m.version,request_id:randomUUID(),
-      move:{seat:2,x:700,angle:50,power:12,weapon:'standard',won:true}});
-    assert.equal(won.status,'completed');assert.equal(won.winner,b);assert.equal(won.reason,'Last tank standing');
+      move:{seat:2,drive:0,angle:50,power:12,weapon:'standard',won:2}});
+    assert.equal(won.status,'completed');assert.equal(won.winner,b);assert.equal(won.reason,'One box, one survivor');
     assert.equal(won.state.winner,2);assert.equal(won.state.shots.length,2);
     await assert.rejects(call(db,a,'move',{match_id:m.id,version:won.version,request_id:randomUUID(),
-      move:{seat:1,x:144,angle:45,power:10,weapon:'standard'}}),/not your turn|over/);
+      move:{seat:1,drive:0,angle:45,power:10,weapon:'standard'}}),/not your turn|over/);
     assert.deepEqual(await call(db,b,'delete',{match_id:m.id}),{ok:true});
     await call(db,e,'queue_join',{game:'tank2'});
     assert.deepEqual((await call(db,e,'dashboard')).queue,['tank2'],'the random queue offers it too');

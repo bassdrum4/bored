@@ -55,7 +55,7 @@ export const META = {
   pong: ['Arcade', 'The original rivalry'], asteroids: ['Arcade', 'Survive the asteroid field'],
   breakout: ['Arcade', 'Clear every brick'], tetris: ['Puzzle', 'Find the perfect fit'],
   minesweeper: ['Puzzle', 'Think before you click'], 'lights-out': ['Puzzle', 'Turn every light off'],
-  tank2: ['Arcade', 'Aim your artillery across the hills'],
+  tank2: ['Arcade', 'Artillery duels inside a drivable box'],
   'gun-mayhem': ['Arcade', 'Knock rivals off the platforms'], 'shadow-net': ['Strategy', 'Explore a fictional network through its terminal'],
   'f-14': ['Online', 'Flight simulator · internet required'],
   klang: ['Online', 'Music player · internet required']
@@ -126,7 +126,7 @@ export function loadGameDocument(slug) {
 export const TOGETHER_GAMES = Object.freeze({
   'connect-four': Object.freeze({ name: 'Connect Four', rulesVersion: 1, mode: 'turns', preview: 'connect-four', blurb: 'Seven columns. One good rivalry.' }),
   '8ball': Object.freeze({ name: '8 Ball Pool', rulesVersion: 1, mode: 'turns', preview: '8ball', blurb: 'Clear your group. Finish on the eight.' }),
-  tank2: Object.freeze({ name: 'Pastel Tanks', rulesVersion: 1, mode: 'turns', preview: 'tank2', blurb: 'One battlefield, one shot each. Mind the hills.' }),
+  tank2: Object.freeze({ name: 'Pastel Tanks', rulesVersion: 2, mode: 'turns', preview: 'tank2', blurb: 'One shot each inside a drivable box. Blast the sides out.' }),
   '2048': Object.freeze({ name: '2048', rulesVersion: 1, mode: 'duel', metric: 'score', unit: 'points', preview: '2048', blurb: 'Same board. Higher score wins.' }),
   mahjong: Object.freeze({ name: 'Mahjong', rulesVersion: 1, mode: 'duel', metric: 'pairs', unit: 'pairs', preview: 'mahjong', blurb: 'Same deal. Clear more pairs.' })
 });
