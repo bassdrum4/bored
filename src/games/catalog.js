@@ -7,18 +7,18 @@
 // in `src/games/content/` are the payloads: there is nothing extra to publish,
 // and editing a game updates it without rebuilding the hub.
 
-export const ORDER = [["brick-run", "Brick Run"], ["trackbound","Trackmania"],["ashcrown","Ashcrown"],["transit-chaos","Transit Chaos"],["typing-test","Typing Test"],["circuit","Circuit"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["lights-out","Lights Out"],["tank2","Tank2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
+export const ORDER = [["brick-run", "Brick Run"], ["trackbound","Trackmania"],["ashcrown","Ashcrown"],["transit-chaos","Transit Chaos"],["typing-test","Typing Test"],["circuit","Circuit"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["basket-random","Basket Random"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["lights-out","Lights Out"],["tank2","Tank2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://youtubeplayer.freebuff.app/player"};
 // Offline games with no board of their own: they still play, but the hub keeps
 // no best for them. 8 Ball, Sand and Eco are open-ended toys, so a "high score"
 // only invited comparing two unrelated afternoons.
 // Rooftop Snipers is the compiled original Unity export: it exposes no score API.
-export const UNSCORED_GAMES = ["fluid", "rooftop-snipers", "8ball", "eco", "sand"];
+export const UNSCORED_GAMES = ["fluid", "rooftop-snipers", "basket-random", "8ball", "eco", "sand"];
 export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
-export const FRESH_GAMES = ["brick-run", "trackbound", "ashcrown", "transit-chaos"];
+export const FRESH_GAMES = ["basket-random", "brick-run", "trackbound", "ashcrown"];
 ORDER.unshift(['2048', '2048'], ['memory', 'Memory'], ['connect-four', 'Connect Four'], ['aim-lab', 'Aim Lab']);
 ORDER.unshift(['deep', 'DEEP']);
 export const META = {
@@ -32,6 +32,7 @@ export const META = {
   "signal-tower": ["Strategy", "Thirty set waves and then endless ones, six towers and threats that fly, plate up or hide. Hold the line."],
   "prism-duel": ["Strategy", "Place mirrors, bend a beam, burn the other core. The CPU plays too."],
   "rooftop-snipers": ["Arcade", "The original two-button rooftop duel. Jump, aim, and knock your rival off the roof."],
+  "basket-random": ["Arcade", "Two players, one ball and a physics engine that keeps changing its mind."],
   "block-blast": ["Puzzle", "Drop blocks into an 8x8 grid and clear full lines."],
   "chess": ["Strategy", "Play the computer or a friend on an 8x8 board."],
   "mahjong": ["Puzzle", "The full 144-tile set: three suits, winds, dragons, flowers and seasons."],

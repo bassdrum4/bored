@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Basket Random</title>
+<!-- The game itself is the vendored Construct 3 build in ./basket-random/.
+     This document only frames it, so the hub can keep its iframe contract and
+     fetch the payload only when the card is opened. The original game is by
+     RHM Interactive; this copy follows the build published at
+     https://github.com/Unblocked-Games-786/Basket-Random (gh-pages). -->
+<style>
+  :root {
+    --paper: #f5f2ea;
+    --board: #fffdf7;
+    --ink: #191713;
+    --hair: #d8d2c4;
+    --dim: #6b6558;
+    --accent: #456653;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  html, body { height: 100%; overflow: hidden }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 13px/1.5 var(--sans); touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { height: 100%; height: 100dvh; display: grid; place-items: center; padding: 8px }
+  #stage {
+    position: relative; overflow: hidden; width: min(960px, 100%, calc((100dvh - 16px) * 290 / 190));
+    aspect-ratio: 290 / 190; border: 1px solid var(--hair); border-radius: 2px;
+    background: var(--board);
+  }
+  #game { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; background: var(--board) }
+  #game[hidden] { display: none }
+  #cover {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+    padding: 20px; text-align: center; background: var(--paper);
+  }
+  #cover[hidden] { display: none }
+  h1 { font: 600 15px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase }
+  p { max-width: 36ch; color: var(--dim) }
+  .keys { color: var(--ink); font: 12px/1.8 var(--mono) }
+  .keys b { font-weight: 600 }
+  button {
+    font: 12px/1 var(--mono); padding: 10px 14px; border: 1px solid var(--hair);
+    border-radius: 2px; background: none; color: inherit; cursor: pointer;
+  }
+  button:hover:enabled { border-color: var(--ink) }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+  button:disabled { color: var(--dim); cursor: default }
+  #status { min-height: 1.5em; font-size: 11px }
+  @media (max-height: 420px) {
+    #cover { gap: 6px; padding: 10px }
+    h1 { font-size: 13px }
+    #cover p { font-size: 11px }
+    #cover .keys { display: none }
+  }
+</style>
+</head>
+<body>
+<main>
+  <section id="stage" aria-label="Basket Random game">
+    <iframe id="game" title="Basket Random" allow="autoplay; fullscreen" scrolling="no" hidden></iframe>
+    <div id="cover">
+      <h1>Basket Random</h1>
+      <p class="keys"><b>W</b> jumps for the left player.<br><b>&uarr;</b> jumps for the right.</p>
+      <p>Two on one keyboard, one ball, and physics with a mind of its own.</p>
+      <button id="start" type="button">Start match</button>
+      <p id="status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+</main>
+<script>
+const frame = document.getElementById('game');
+const cover = document.getElementById('cover');
+const start = document.getElementById('start');
+const status = document.getElementById('status');
+
+let ready = false, started = false;
+
+// The hub drops this document into the hub page as a srcdoc frame, so a relative
+// address there resolves against the hub. Opened on its own, the same document
+// sits beside the vendored folder instead. Only one of the two exists.
+const embedded = location.href === 'about:srcdoc';
+const build = embedded ? 'games/content/basket-random/index.html' : 'basket-random/index.html';
+
+start.onclick = () => {
+  if (started) return;
+  started = true;
+  start.disabled = true;
+  status.textContent = 'Loading the field\u2026';
+  frame.hidden = false;
+  frame.src = new URL(build, document.baseURI).href;
+};
+
+frame.addEventListener('load', () => {
+  ready = true;
+  cover.hidden = true;
+  try { frame.contentWindow.focus(); } catch (error) { /* the frame may already be gone */ }
+});
+
+// The hub reads this: current state, integers and booleans, never null.
+// Basket Random has no score API, so this game keeps no leaderboard.
+window.__boredSnapshot = () => ({
+  slug: 'basket-random',
+  started: started,
+  loaded: ready,
+  finished: false
+});
+</script>
+</body>
+</html>

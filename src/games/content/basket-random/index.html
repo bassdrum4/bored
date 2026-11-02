@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Basket Random</title>
+<meta name="generator" content="Construct 3">
+<!-- Basket Random, Construct 3 export. Vendored from
+     https://github.com/Unblocked-Games-786/Basket-Random (branch gh-pages), which
+     attributes the original to RHM Interactive. Only the host-page scripts are
+     removed; the runtime, data and art are the export as published. -->
+<link rel="stylesheet" href="style.css">
+<style>
+  html, body { height: 100%; background: #e7f3ff }
+  body { overscroll-behavior: none }
+</style>
+<script>
+window.addEventListener("keydown", function (e) {
+  if ([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) e.preventDefault();
+}, false);
+</script>
+</head>
+<body style="overflow:hidden">
+<script src="box2d.wasm.js"></script>
+<noscript><p style="padding:16px;font-family:sans-serif">Basket Random needs JavaScript to run.</p></noscript>
+<script src="scripts/supportcheck.js"></script>
+<script src="scripts/offlineclient.js"></script>
+<script src="scripts/main.js"></script>
+</body>
+</html>
