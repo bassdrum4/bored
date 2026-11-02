@@ -54,7 +54,7 @@ function bootWrapper(href, baseURI) {
   };
   // The iframe carries the hidden attribute in the markup; the stub starts bare.
   document.getElementById('game').hidden = /<iframe[^>]*\shidden[\s>]/.test(wrapper);
-  const sandbox = { document, location: { href }, URL, console };
+  const sandbox = { document, location: { href }, URL, console, setTimeout: () => 0 };
   sandbox.window = sandbox;
   const context = vm.createContext(sandbox);
   vm.runInContext(wrapper.match(/<script>([\s\S]*?)<\/script>/)[1], context, { filename: 'basket-random.html' });
@@ -64,6 +64,10 @@ function bootWrapper(href, baseURI) {
 test('the wrapper starts the local build from the hub and from its own address', () => {
   // Inside the hub the document is a srcdoc frame, so its base is the hub page.
   const hub = bootWrapper('about:srcdoc', 'https://example.test/bored/index.html');
+  // The no-src iframe loads a blank placeholder whose load event can arrive after
+  // this script does; it must not lift the cover over an empty stage.
+  hub.node('game').listeners.load();
+  assert.equal(hub.node('cover').hidden, false, 'the placeholder load is not the game');
   assert.deepEqual({ ...hub.run('__boredSnapshot()') }, { slug: 'basket-random', started: false, loaded: false, finished: false });
   assert.equal(hub.node('game').hidden, true, 'the build is not fetched until the player starts');
   hub.node('start').onclick();

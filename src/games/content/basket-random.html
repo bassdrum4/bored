@@ -86,20 +86,46 @@ let ready = false, started = false;
 
 // The hub drops this document into the hub page as a srcdoc frame, so a relative
 // address there resolves against the hub. Opened on its own, the same document
-// sits beside the vendored folder instead. Only one of the two exists.
-const embedded = location.href === 'about:srcdoc';
-const build = embedded ? 'games/content/basket-random/index.html' : 'basket-random/index.html';
+// sits beside the vendored folder instead. Browsers disagree on what a srcdoc
+// frame reports for location.href, so decide from the base URLs instead.
+const bases = [document.baseURI];
+try { if (window.parent !== window) bases.push(window.parent.location.href); } catch (error) { /* cross-origin hub */ }
+bases.push(window.location.href);
+const standalone = bases.some(base => {
+  try { return new URL(base).pathname.endsWith('/basket-random.html'); } catch (error) { return false; }
+});
+const relative = (standalone ? 'basket-random' : 'games/content/basket-random') + '/index.html';
+
+function buildUrl() {
+  for (const base of bases) {
+    try { return new URL(relative, base).href; } catch (error) { /* try the next base */ }
+  }
+  return null;
+}
 
 start.onclick = () => {
   if (started) return;
+  const url = buildUrl();
+  if (!url) {
+    status.textContent = 'Could not find the game folder beside this page. Open it from the arcade.';
+    return;
+  }
   started = true;
   start.disabled = true;
   status.textContent = 'Loading the field\u2026';
   frame.hidden = false;
-  frame.src = new URL(build, document.baseURI).href;
+  frame.src = url;
+  // The first load is a few megabytes; say so instead of spinning forever.
+  setTimeout(() => { if (started && !ready) status.textContent = 'Still loading\u2026 the first load is a few megabytes.'; }, 12000);
 };
 
 frame.addEventListener('load', () => {
+  // An iframe with no src loads a blank document first, and that load event can
+  // arrive even after this script runs — while the real build is still on its
+  // way. Only a load of the actual game may lift the cover.
+  let blank = false;
+  try { if (frame.contentWindow) blank = frame.contentWindow.location.href === 'about:blank'; } catch (error) { /* opaque frame */ }
+  if (!started || !frame.src || blank) return;
   ready = true;
   cover.hidden = true;
   try { frame.contentWindow.focus(); } catch (error) { /* the frame may already be gone */ }
