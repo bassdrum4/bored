@@ -335,7 +335,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 { id: ELECTRICITY, name: 'Electricity', color: [255, 255, 100], key: 'h', cat: 'Gases', desc: 'Spark — charges water/gold, ignites materials' },
                 { id: NITROGEN, name: 'Nitrogen', color: [180, 220, 255], key: 'c', cat: 'Gases', desc: 'Cryogenic gas — freezes water/lava/mud, extinguishes fire' },
                 { id: WIND, name: 'Wind', color: [100, 190, 210], key: ',', cat: 'Gases', desc: 'Paint a breeze: gusts follow your drag direction and push smoke, dust, and water' },
-                { id: CLONER, name: 'Cloner', color: [130, 60, 200], key: 'v', cat: 'Tools', desc: 'Absorbs first falling particle it touches, emits clones above and below' },
+                { id: CLONER, name: 'Cloner', color: [130, 60, 200], key: 'v', cat: 'Tools', desc: 'Copies neighboring materials (including directed wind) above and below' },
                 { id: DESTAT, name: 'Destat', color: [60, 180, 120], key: 'z', cat: 'Tools', desc: 'Neutralizes electrified elements on contact — drains charged water, gold, and iron' },
                 { id: MITE, name: 'Mites', color: [215, 155, 85], key: '.', cat: 'Tools', desc: 'Tiny decomposers: crawl toward plants and crumbs, eat, multiply, and avoid fire or water' },
                 { id: EMPTY, name: 'Eraser', color: [50, 46, 40], key: 'x', cat: 'Tools', desc: 'Removes elements' },
@@ -814,14 +814,19 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             // gExtra[i] stores the element id it has learned (0=unlearned).
             // Once it learns an element, it tries to spawn one copy above (y-1) and one below (y+1) each tick.
             // Only clones elements with density < 10 (powders + liquids + gases that fall/flow).
-            const CLONABLE = new Set([SAND, WATER, OIL, ACID, LAVA, MUD, SALT, GUNPOWDER, DUST, TAR, FIRE, SMOKE, STEAM, ELECTRICITY, GOLD, COAL, SODIUM, NITROGEN]);
+            const CLONABLE = new Set([SAND, WATER, OIL, ACID, LAVA, MUD, SALT, GUNPOWDER, DUST, TAR, FIRE, SMOKE, STEAM, ELECTRICITY, GOLD, COAL, SODIUM, NITROGEN, WIND]);
             function updCloner(x, y) {
                 const i = I(x, y);
                 if (gExtra[i] === 0) {
                     for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
                         const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
                         const nt = grid[I(nx, ny)];
-                        if (CLONABLE.has(nt)) { gExtra[i] = nt; break; }
+                        if (CLONABLE.has(nt)) {
+                            gExtra[i] = nt;
+                            // A wind cloner remembers the gust's heading in its otherwise unused life byte.
+                            if (nt === WIND) gLife[i] = gExtra[I(nx, ny)] || windDirection;
+                            break;
+                        }
                     }
                     return;
                 }
@@ -834,6 +839,10 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                     else if (elem === ELECTRICITY) gLife[ni] = rnd(30, 50);
                     else if (elem === NITROGEN) gLife[ni] = rnd(80, 160);
                     else if (elem === COAL) gLife[ni] = 0;
+                    else if (elem === WIND) {
+                        gLife[ni] = rnd(65, 95);
+                        gExtra[ni] = gLife[i] || windDirection;
+                    }
                     else gLife[ni] = 0;
                     gMove[ni] = 1;
                 }
@@ -987,7 +996,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                     // mites blow readily, liquids only with a stronger gust.
                     const bx = nx + dx, by = ny + dy;
                     if (ok(bx, by) && grid[I(bx, by)] === EMPTY &&
-                        (WIND_BLOWN.has(target) || (WIND_LIQUIDS.has(target) && Math.random() < .28))) {
+                        (WIND_BLOWN.has(target) || (WIND_LIQUIDS.has(target) && Math.random() < .42))) {
                         moveTo(nx, ny, bx, by);
                         moveTo(x, y, nx, ny);
                         return;
@@ -1211,7 +1220,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 else if (t === STEAM) gLife[i] = rnd(30, 60);
                 else if (t === ELECTRICITY) gLife[i] = rnd(30, 50);
                 else if (t === NITROGEN) gLife[i] = rnd(80, 160);
-                else if (t === WIND) { gLife[i] = rnd(32, 55); gExtra[i] = windDirection; }
+                else if (t === WIND) { gLife[i] = rnd(55, 80); gExtra[i] = windDirection; }
                 else if (t === MITE) gLife[i] = rnd(60, 100);
                 else gLife[i] = 0;
             }

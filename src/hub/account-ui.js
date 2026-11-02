@@ -35,7 +35,7 @@ function renderAccount() {
     action.classList.remove('primary');
     rename.hidden = false;
   } else {
-    state.textContent = 'Playing as a guest. Scores stay in this browser.';
+    state.textContent = 'Playing as a guest. Your scores stay in this browser until you make an account.';
     action.textContent = 'Sign in';
     // Signing in is the one thing a guest has to find, so it carries the weight.
     action.classList.add('primary');

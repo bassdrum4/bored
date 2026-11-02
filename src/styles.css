@@ -1,15 +1,16 @@
 :root{
   --paper:#f5f2ea; --ink:#191713; --dim:#6b6558; --rule:#d8d2c4; --red:#b3261e;
   --mono:ui-monospace,"Cascadia Mono",Consolas,"Courier New",monospace;
+  --display:"Fraunces",Georgia,"Times New Roman",serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--paper);color:var(--ink);min-height:100vh;
   font:17px/1.5 Georgia,"Times New Roman",serif;
   -webkit-font-smoothing:antialiased}
-::selection{background:var(--ink);color:var(--paper)}
+::selection{background:var(--red);color:var(--paper)}
 #hub{margin:0 auto}
 .masthead{border-bottom:3px double var(--ink);padding-bottom:16px}
-h1{font-size:clamp(40px,9vw,58px);font-weight:400;line-height:1;letter-spacing:-.015em}
+h1{font-family:var(--display);font-size:clamp(44px,10vw,72px);font-weight:700;line-height:1;letter-spacing:-.04em}
 .sub{font-family:var(--mono);font-size:12.5px;color:var(--dim)}
 .sub b{color:var(--ink);font-weight:600}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
@@ -109,7 +110,7 @@ button:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-o
 #lb-empty{padding:12px 0;color:var(--dim);font-style:italic;font-size:14px}
 dialog{border:1px solid var(--ink);background:var(--paper);color:var(--ink);max-width:min(420px,calc(100vw - 32px));padding:22px;font:14px/1.5 Georgia,"Times New Roman",serif}
 dialog::backdrop{background:rgba(25,23,19,.55)}
-dialog h2{font-size:24px;font-weight:400;margin-bottom:4px}
+dialog h2{font-family:var(--display);font-size:24px;font-weight:400;margin-bottom:4px}
 #auth-blurb{font-size:13px;color:var(--dim);margin-bottom:14px}
 #claim-blurb{font-size:13px;color:var(--dim);margin-bottom:16px}
 #claim-signin{background:var(--ink);color:var(--paper);border-color:var(--ink)}
@@ -146,11 +147,24 @@ section[id]{scroll-margin-top:20px}
 .site-nav{display:flex;flex-wrap:wrap;gap:22px;font:12px var(--mono)}
 .site-nav a{text-decoration:none;padding:10px 0}
 .site-nav a:hover{text-decoration:underline}
-.intro{margin-top:8px}
+.intro{margin-top:8px;font-style:italic}
+/* Bo, the mascot. The drawing is bo.svg; hub/bo.js picks the mood. Decorative only:
+   ink on paper, square corners, one red square, no animation. */
+.intro-row{display:flex;align-items:center;gap:14px;margin-top:12px}
+.intro-row .intro{margin-top:0}
+.bo{display:block;flex:0 0 auto;width:44px;height:44px}
+.bo-sm{width:34px;height:34px}
+/* An empty state is Bo plus one line. The box goes away with its text, which the hub hides. */
+.empty-note{display:flex;align-items:center;gap:14px}
+.empty-note:has(>[hidden]){display:none}
+.empty-note p{min-width:0}
+.dialog-head{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+.dialog-head h2{margin:0}
+.together-open .masthead .intro-row{display:none}
 .sub{margin-top:8px}
 /* The account strip: a guest has one job, so Sign in carries the ink. */
 .masthead-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:18px;padding:12px 14px;
-  border:1px solid var(--rule);border-left:3px solid var(--ink);background:#fffdf7}
+  border:1px solid var(--rule);border-left:3px solid var(--red);background:#fffdf7}
 #account{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:10px;min-width:220px;
   font:11.5px/1.6 var(--mono);color:var(--dim)}
 #account-state{flex:1;min-width:190px}
@@ -167,19 +181,19 @@ section[id]{scroll-margin-top:20px}
 .side-action:disabled{cursor:default;color:var(--dim)}
 .eyebrow{font:10px/1.6 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
 .section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}
-.section-heading h2{font-size:28px;line-height:1.25;font-weight:400;margin-top:4px}
+.section-heading h2{font-family:var(--display);font-size:28px;line-height:1.25;font-weight:400;margin-top:4px}
 .section-aside{font:11px/1.7 var(--mono);color:var(--dim);text-align:right}
 .section-note{font-size:15px;color:var(--dim)}
 .text-link,.text-button{font:11px/1.6 var(--mono);color:var(--ink)}
 .text-button{border:0;background:none;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:10px 0}
-#daily{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;align-items:center;margin:26px 0 0;padding:26px;border:1px solid var(--rule);border-top:3px solid var(--ink);border-left:1px solid var(--rule)}
+#daily{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;align-items:center;margin:26px 0 0;padding:26px;border:1px solid var(--rule);border-top:3px solid var(--red);border-left:1px solid var(--rule)}
 .daily-copy{min-width:0}
 .daily-kicker{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
 .daily-kicker .eyebrow{color:var(--red)}
 #daily-state{font:10px/1.5 var(--mono);border:1px solid var(--rule);padding:3px 6px;white-space:nowrap}
 #daily.completed #daily-state{border-color:var(--ink)}
 #daily-date{font:9px/1.8 var(--mono);color:var(--dim);margin-bottom:8px}
-#daily h2{font-size:clamp(27px,3.3vw,36px);line-height:1.15;font-weight:400;margin:0 0 12px;text-wrap:balance}
+#daily h2{font-family:var(--display);font-size:clamp(27px,3.3vw,36px);line-height:1.15;font-weight:400;margin:0 0 12px;text-wrap:balance}
 #daily-goal{font-size:19px;line-height:1.5;margin:0 0 10px}
 .game-meta{display:block;font:11px/1.7 var(--mono);color:var(--dim)}
 .daily-actions{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 12px}
@@ -194,7 +208,7 @@ section[id]{scroll-margin-top:20px}
 .external-preview{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;font:10px var(--mono);letter-spacing:.1em;background:var(--rule);color:var(--dim)}
 .external-mark{font:48px Georgia,serif;color:var(--ink)}
 .shelf{margin:32px 0 0}
-#recent h2{font:28px/1.25 Georgia,"Times New Roman",serif;color:var(--ink);margin:4px 0 0}
+#recent h2{font:28px/1.25 var(--display);color:var(--ink);margin:4px 0 0}
 .shelf-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
 #recent-list{display:grid;gap:12px}
 .section-links{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:flex-end}
@@ -202,7 +216,7 @@ section[id]{scroll-margin-top:20px}
 .shelf-play{display:flex;flex-direction:column;min-width:0;width:100%;background:none;border:1px solid var(--rule);color:var(--ink);text-align:left;cursor:pointer;font:inherit}
 .shelf-play:hover{border-color:var(--ink)}
 .shelf-copy{display:block;padding:12px}
-.shelf-name{display:block;font:19px/1.3 Georgia,"Times New Roman",serif}
+.shelf-name{display:block;font:19px/1.3 var(--display)}
 .shelf-note{display:block;font:12px/1.6 var(--mono);color:var(--dim);margin-top:6px}
 #recent .shelf-play{flex-direction:row;align-items:center}
 #recent .game-preview{flex:0 0 64px;width:64px;align-self:stretch;aspect-ratio:auto;border:0;border-right:1px solid var(--rule)}
@@ -229,13 +243,13 @@ section[id]{scroll-margin-top:20px}
 #sort{border:1px solid var(--rule);padding:8px}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
 .row{position:relative;min-width:0;border:1px solid var(--rule)}
-.row:hover{border-color:var(--ink)}
+.row:hover{border-color:var(--ink);box-shadow:4px 4px 0 var(--ink)}
 .row .card{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:0;gap:0;font:inherit;width:100%;min-width:0;border:0;border-radius:0;background:none;color:var(--ink);height:100%;text-align:left;cursor:pointer}
 .card:hover,.card:focus-visible{background:none;color:var(--ink)}
 .card:focus-visible,.shelf-play:focus-visible{outline:2px solid var(--red);outline-offset:4px}
 .card .text{display:block;padding:16px}
 .card-category{display:block;font:9px/1.7 var(--mono);letter-spacing:.04em;color:var(--dim);margin-bottom:7px;padding-right:22px}
-.card .name{display:block;font:23px/1.3 Georgia,"Times New Roman",serif}
+.card .name{display:block;font:23px/1.3 var(--display)}
 .card .detail{display:block;font:15px/1.5 Georgia,"Times New Roman",serif;color:var(--dim);margin:6px 0 12px;min-height:45px}
 .card:hover .detail,.card:focus-visible .detail{color:var(--dim)}
 .card:hover .name,.shelf-play:hover .shelf-name{text-decoration:underline;text-underline-offset:4px}
@@ -248,12 +262,42 @@ section[id]{scroll-margin-top:20px}
 .card-best-tip-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:8px;align-items:baseline}
 .card-best-tip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card-best-tip-value{color:var(--dim);white-space:nowrap}
-.badge{display:inline-block;vertical-align:middle;font-size:8px;margin-left:7px;line-height:1.3}
+.badge{display:inline-block;vertical-align:middle;font-size:8px;margin-left:7px;line-height:1.3;background:var(--red);color:var(--paper);border-color:var(--red);letter-spacing:.06em}
+#together-nav .badge{background:none;color:var(--red);border-color:currentColor}
 .star{position:absolute;top:10px;right:10px;width:36px;height:36px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);font-size:23px;line-height:1}
 .star:hover{border-color:var(--ink);background:var(--paper)}
+
+/* Quiet, optional notes from the person who made the games. */
+.note-host{position:relative}
+.note-host:hover,.note-host:focus-within,.note-host.note-open{z-index:6}
+.developer-note-toggle{position:absolute;top:10px;right:54px;z-index:2;width:36px;height:36px;
+  padding:0;border:1px solid var(--rule);background:var(--paper);color:var(--dim);
+  font:italic 16px Georgia,"Times New Roman",serif;cursor:pointer}
+.developer-note-toggle:hover,.developer-note-toggle:focus-visible{border-color:var(--ink);color:var(--ink)}
+.developer-note-toggle:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.developer-note-tip{display:none;position:absolute;bottom:calc(100% + 8px);left:0;right:0;
+  z-index:8;padding:12px 14px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);
+  box-shadow:3px 3px 0 rgba(25,23,19,.18);text-align:left;pointer-events:none}
+.developer-note-label{display:block;margin-bottom:6px;font:10px/1.5 var(--mono);color:var(--dim)}
+.developer-note-copy{display:block;font:14px/1.5 Georgia,"Times New Roman",serif;overflow-wrap:anywhere}
+.note-host.note-open>.developer-note-tip,
+.note-host>.card:focus-visible~.developer-note-tip,
+.note-host>.shelf-play:focus-visible~.developer-note-tip,
+.note-host>.developer-note-toggle:focus-visible~.developer-note-tip{display:block}
+@media(hover:hover) and (pointer:fine){
+  .note-host:hover>.developer-note-tip{display:block}
+}
+.shelf-entry{position:relative;min-width:0}
+.shelf-entry .shelf-play{height:100%}
+#recent .shelf-entry .shelf-copy{padding-right:42px}
+.shelf-entry .developer-note-toggle{top:8px;right:8px;width:28px;height:28px}
+@media(max-width:600px){
+  .row .developer-note-toggle{top:7px;left:45px;right:auto;width:32px;height:32px}
+  .developer-note-tip{position:fixed;top:auto;bottom:16px;left:16px;right:16px;z-index:50}
+}
 #leaderboard{margin-top:38px;border:0;border-top:3px double var(--ink);padding:24px 0 0}
-#leaderboard h2{font-size:28px;margin:4px 0 16px}
-#empty{border:1px dashed var(--rule);margin-top:12px;padding:26px}
+#leaderboard h2{font-family:var(--display);font-size:28px;margin:4px 0 16px}
+.empty-boxed{border:1px dashed var(--rule);margin-top:12px;padding:20px 26px}
 dialog{margin:auto}
 @media(max-width:850px){
   .shelf-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -319,7 +363,7 @@ dialog{margin:auto}
 #together{padding-top:24px;scroll-margin-top:12px}
 #together>.section-heading{align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px}
 #together>.section-heading .eyebrow{display:none}
-#together h2{font-size:32px;font-weight:400}
+#together h2{font-family:var(--display);font-size:32px;font-weight:400}
 #together h3{font-size:24px;font-weight:400;margin-bottom:16px}
 #together h4{font-size:19px;font-weight:400;overflow-wrap:anywhere}
 #together-status{font:12px/1.6 var(--mono);color:var(--red);margin:12px 0}

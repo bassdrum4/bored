@@ -261,7 +261,7 @@ export function dailyResultCheck(id, result) {
 const DAILY_ADAPTERS = {
   tetris: { expression: '({lines:game.lines,score:game.score||0})' },
   snake: { closure: true, expression: '({apples:score})' },
-  wordle: { expression: '({guesses:row,solved:gameOver && Array.from({length:row},(_,r)=>[...document.querySelectorAll(".tile[data-row="+CSS.escape(String(r))+"]")].filter(t=>t.classList.contains("correct")).length===5).some(Boolean)})' },
+  wordle: { expression: '({guesses:row,solved:gameOver && solved})' },
   'space-invaders': { expression: '({waves:Math.max(0,lvN-1)+(st==="levelclear"?1:0),score:sc||0})' },
   simon: { closure: true, expression: '({rounds:Math.max(0,round-(state==="paused"?0:1))})' },
   breakout: { expression: '({layouts:currentLevel||0,score:score||0})' },

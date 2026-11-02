@@ -12,7 +12,7 @@ const REPO = 'https://github.com/bassdrum4/bored';
 const FIELD = '\x1f';
 
 const raw = execFileSync('git', [
-  'log', 'HEAD', '--no-merges', '--date=short',
+  'log', 'HEAD', '--no-merges', '--invert-grep', '--grep=^chore(changelog):', '--date=short',
   `--format=%h${FIELD}%ad${FIELD}%an${FIELD}%s`
 ], { cwd: root, encoding: 'utf8' });
 

@@ -20,6 +20,18 @@
               color:inherit;background:#111315;border:1px solid rgba(250,247,240,.5);
               border-radius:2px;padding:6px 9px;cursor:pointer}
   .bar button:hover{color:#e9e4d8;border-color:rgba(233,228,216,.6)}
+  .bar-actions{display:flex;gap:6px;pointer-events:auto}
+  .bar button[aria-expanded="true"]{background:#e9e4d8;color:#111315}
+  .editor-panel{position:absolute;top:52px;right:12px;width:min(256px,calc(100vw - 24px));
+    padding:14px;background:rgba(17,19,21,.96);border:1px solid rgba(233,228,216,.4);
+    color:#e9e4d8;z-index:3;line-height:1.4;box-shadow:0 6px 30px #0005}
+  .editor-panel[hidden]{display:none}
+  .editor-panel h2{font-size:12px;font-weight:600;letter-spacing:.12em;margin:0 0 12px}
+  .editor-panel label{display:flex;justify-content:space-between;gap:8px;margin:13px 0 4px}
+  .editor-panel output{font-variant-numeric:tabular-nums;color:#a8c5c4}
+  .editor-panel input{width:100%;accent-color:#a8c5c4;cursor:pointer}
+  .editor-panel button{font:inherit;color:inherit;background:transparent;border:1px solid #8d9394;
+    border-radius:2px;padding:6px 10px;margin-top:13px;cursor:pointer}
   #note{position:absolute;inset:0;display:grid;place-content:center;padding:28px;
         text-align:center;line-height:1.7;color:rgba(233,228,216,.55)}
   #note[hidden]{display:none}
@@ -28,7 +40,24 @@
 <body>
 <main>
   <canvas id="gl" aria-label="A fluid you can stir with the pointer"></canvas>
-  <div class="bar"><span id="hint">drag to stir</span><button id="clear" type="button">clear</button></div>
+  <div class="bar"><span id="hint">drag to stir</span><div class="bar-actions">
+    <button id="editor-toggle" type="button" aria-expanded="false" aria-controls="editor-panel">edit</button>
+    <button id="clear" type="button">clear</button>
+  </div></div>
+  <section id="editor-panel" class="editor-panel" hidden aria-label="Fluid editor">
+    <h2>FLUID SETTINGS</h2>
+    <label for="fluid-force">Stir strength <output for="fluid-force">3000</output></label>
+    <input id="fluid-force" type="range" min="500" max="6500" step="250" value="3000" data-setting="SPLAT_FORCE">
+    <label for="fluid-curl">Swirl <output for="fluid-curl">24</output></label>
+    <input id="fluid-curl" type="range" min="0" max="60" step="2" value="24" data-setting="CURL">
+    <label for="fluid-size">Brush size <output for="fluid-size">0.22</output></label>
+    <input id="fluid-size" type="range" min="0.06" max="0.6" step="0.02" value="0.22" data-setting="SPLAT_RADIUS">
+    <label for="fluid-ink">Ink amount <output for="fluid-ink">0.14</output></label>
+    <input id="fluid-ink" type="range" min="0.04" max="0.4" step="0.02" value="0.14" data-setting="DYE_STRENGTH">
+    <label for="fluid-fade">Ink dissipation <output for="fluid-fade">1.0</output></label>
+    <input id="fluid-fade" type="range" min="0.5" max="2" step="0.1" value="1.0" data-setting="DENSITY_DISSIPATION">
+    <button type="button" id="fluid-reset-settings">Reset settings</button>
+  </section>
   <div id="note" hidden></div>
 </main>
 <script>
@@ -38,6 +67,8 @@
   var canvas = document.getElementById('gl');
   var note = document.getElementById('note');
   var clearBtn = document.getElementById('clear');
+  var editorBtn = document.getElementById('editor-toggle');
+  var editorPanel = document.getElementById('editor-panel');
 
   /* Tuned for a small canvas: a coarse velocity grid carries the motion and a
      finer dye grid carries the colour, which is where the detail shows. */
@@ -58,6 +89,26 @@
     DYE_STRENGTH: 0.14
   };
 
+  // Editor changes solver parameters live; resetting does not erase a drawing.
+  var originalSettings = Object.assign({}, config);
+  editorBtn.addEventListener('click', function () {
+    editorPanel.hidden = !editorPanel.hidden;
+    editorBtn.setAttribute('aria-expanded', String(!editorPanel.hidden));
+  });
+  editorPanel.querySelectorAll('input[data-setting]').forEach(function (input) {
+    input.addEventListener('input', function () {
+      config[input.dataset.setting] = Number(input.value);
+      input.previousElementSibling.querySelector('output').value = input.value;
+    });
+  });
+  document.getElementById('fluid-reset-settings').addEventListener('click', function () {
+    Object.assign(config, originalSettings);
+    editorPanel.querySelectorAll('input[data-setting]').forEach(function (input) {
+      input.value = String(config[input.dataset.setting]);
+      input.previousElementSibling.querySelector('output').value = input.value;
+    });
+  });
+
   /* Four inks on a graphite ground. Each stroke picks one, so a swipe keeps its
      colour instead of turning muddy. */
   var INKS = [
@@ -74,6 +125,8 @@
     note.style.color = 'rgba(233,228,216,.6)';
     canvas.style.display = 'none';
     clearBtn.hidden = true;
+    editorBtn.hidden = true;
+    editorPanel.hidden = true;
   }
 
   var gl = canvas.getContext('webgl2', {

@@ -33,21 +33,8 @@ export function groupByDay(entries) {
 
 export function buildRow(entry) {
   const item = el('li', 'log-row');
-
-  const text = el('span', 'log-text');
-  text.append(el('span', 'log-subject', entry.subject));
-  if (entry.pr) {
-    const pr = el('a', 'log-pr', '#' + entry.pr);
-    pr.href = `${CHANGELOG_META.repo}/pull/${entry.pr}`;
-    pr.title = `Pull request #${entry.pr}`;
-    text.append(pr);
-  }
-
-  const sha = el('a', 'log-sha', entry.sha);
-  sha.href = `${CHANGELOG_META.repo}/commit/${entry.sha}`;
-  sha.title = `${entry.author}, ${entry.date}`;
-
-  item.append(text, sha);
+  // Present changes as a release history, without links to development tools.
+  item.append(el('span', 'log-subject', entry.subject));
   return item;
 }
 
@@ -78,9 +65,7 @@ function paint() {
 
   const note = document.getElementById('log-note');
   if (note) {
-    note.textContent = 'Newest first. Merges are folded into the work they carried, '
-      + 'so a line is a change and not bookkeeping. The short code links to the commit; '
-      + 'a #number links to the pull request it landed in.';
+    note.textContent = 'Newest first. Updates are grouped by date, with maintenance-only entries omitted.';
   }
 }
 

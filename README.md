@@ -1,7 +1,7 @@
 # Bored — an arcade in one folder
 
-**38 offline games and 2 online extras**, with no runtime dependencies, installs,
-or server. The site is the [`src/`](src/) folder itself: [`src/index.html`](src/index.html)
+**A collection of locally hosted games and online extras**, with no required installation
+or server for the hub itself. Individual games may require an internet connection. The site is the [`src/`](src/) folder itself: [`src/index.html`](src/index.html)
 loads the hub modules as plain ES modules, and the games are ordinary HTML in
 [`src/games/content/`](src/games/content). The page downloads a game the first
 time you open its card, and never before.
@@ -55,6 +55,7 @@ with `npm run test:rooftop`.
 | [`scripts/player-state.sql`](scripts/player-state.sql) | Creates the per-account `player_state` table — run it in the SQL editor |
 | [`vite.config.js`](vite.config.js) | Dev server (`src/` as root); there is no production build |
 | [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) | Publish `src/` on every push to `main` |
+| [`.github/workflows/changelog-commit.yml`](.github/workflows/changelog-commit.yml) | Automatically commit regenerated changelog history to `main` |
 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | Run browser and logic checks on pushes and pull requests |
 
 Adding a game? Read [`AGENTS.md`](AGENTS.md) first: it lists the three hooks
@@ -637,3 +638,18 @@ Supabase play_events table**; Bored intentionally skips creating a duplicate
 shell session for F-14. This preserves accurate playtime metrics while allowing
 the flight game to run on its own. For F-14, its own analytics opt-out also
 shares Bored's browser preference.
+
+## Online game policy
+
+Games are **not required to function offline**. They may depend on public APIs,
+multiplayer backends, CDNs, and externally hosted assets when those improve the
+experience. Explain dependencies in the game's description and handle failed
+requests cleanly. Never expose secret keys in client-side code. Bored's catalog,
+score adapters, snapshots, responsive controls, and validation requirements still
+apply. A local game document may use online services; the `EXTERNS` category is
+for games hosted entirely on another website.
+
+The changelog is generated from Git history on every publication and the
+`Commit changelog updates` GitHub Action also saves the generated
+`src/changelog-data.js` back to `main`. Bookkeeping commits are excluded
+from the changelog to avoid self-referential noise.

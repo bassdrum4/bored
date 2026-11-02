@@ -19,7 +19,7 @@ export function createEnjoymentUI({ analytics }) {
     event.preventDefault();
     if (sending) return;
     const rating = Number(new FormData(form).get('rating'));
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) { status.textContent = 'Choose a rating first.'; return; }
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) { status.textContent = 'Pick one first.'; return; }
     sending = true; status.textContent = 'Sending…';
     form.querySelector('button[type="submit"]').disabled = true;
     try {

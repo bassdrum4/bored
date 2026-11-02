@@ -10,7 +10,7 @@ const siteRoot = path.join(root, 'src');
 // Match bored.test.cjs: hosted Ubuntu also has a Chromium launcher whose sandbox
 // may be unavailable. Prefer the same working Google Chrome as the game suite.
 
-test('discovery reaches nothing off-site, keeps its controls, and fits small screens', async t => {
+test('discovery keeps its controls and fits small screens', async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
   const site = await serve(siteRoot);
@@ -49,6 +49,28 @@ test('discovery reaches nothing off-site, keeps its controls, and fits small scr
     assert.equal(await page.$eval('#recent-empty', e => e.hidden), false);
     // The board sits above the library now: it belongs to the top of the page.
     assert.ok(await page.evaluate(() => document.querySelector('#leaderboard').offsetTop < document.querySelector('#library').offsetTop));
+  });
+
+  await t.test('creator notes appear on hover and through a touch-friendly button', async () => {
+    const slugs = await page.evaluate(() => [...document.querySelectorAll('#grid .note-host')].map(host => host.querySelector('.card').dataset.slug));
+    assert.deepEqual(slugs.sort(), ['block-blast', 'f-14', 'rooftop-snipers', 'trackbound', 'void-runner', 'wordle'].sort());
+    assert.ok(await page.evaluate(() => [...document.querySelectorAll('#grid .developer-note-tip')].every(tip => tip.textContent.startsWith('A note from the developer'))));
+    assert.match(await page.$eval('#developer-note-trackbound .developer-note-copy', tip => tip.textContent), /Brody/);
+    assert.equal(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'), null);
+    await page.hover('#grid .note-host:has(.card[data-slug="block-blast"]) .developer-note-toggle');
+    assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'block');
+    await page.mouse.move(0, 0);
+    assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'none');
+
+    await page.setViewport({ width: 375, height: 800 });
+    await page.click('#grid .card[data-slug="void-runner"] ~ .developer-note-toggle');
+    assert.equal(await page.$eval('#developer-note-void-runner', tip => getComputedStyle(tip).display), 'block');
+    assert.equal(await page.$eval('#grid .card[data-slug="void-runner"] ~ .developer-note-toggle', node => node.getAttribute('aria-expanded')), 'true');
+    await page.click('#grid .card[data-slug="wordle"] ~ .developer-note-toggle');
+    assert.equal(await page.$eval('#grid .card[data-slug="void-runner"] ~ .developer-note-toggle', node => node.getAttribute('aria-expanded')), 'false');
+    await page.keyboard.press('Escape');
+    assert.equal(await page.$eval('#grid .card[data-slug="wordle"] ~ .developer-note-toggle', node => node.getAttribute('aria-expanded')), 'false');
+    await page.setViewport({ width: 1366, height: 900 });
   });
 
   await t.test('collections intersect with search and filters, and can be cleared', async () => {
@@ -134,8 +156,8 @@ test('discovery reaches nothing off-site, keeps its controls, and fits small scr
     assert.equal(await page.$eval('#hint', node => getComputedStyle(node).transitionDuration), '0s');
   });
   assert.deepEqual(errors, []);
-  // The hub may try its existing score API. Previews and discovery must add none.
-  assert.ok(requests.every(url => url.includes('.supabase.co/') || Object.values({f14:'https://bassdrum4.github.io/f-14-4/',klang:'https://youtubeplayer.freebuff.app/player'}).some(external => url.startsWith(external))), requests.join('\n'));
+  // Off-site requests (web fonts, the score API, embeds) are allowed. They are aborted
+  // above so the suite stays hermetic and the page falls back to its system fonts.
 });
 
 test('account UI and score sync still work through the redesigned hub (mock backend)', async t => {
@@ -157,6 +179,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
     // The arcade's own host serves the game documents; only the API is mocked.
     if (request.url().startsWith(site.origin)) return request.continue();
     const url = new URL(request.url()), method = request.method();
+    // Web fonts are allowed; the page just falls back to its system fonts here.
+    if (/(^|\.)(googleapis|gstatic)\.com$/.test(url.hostname)) return request.abort();
     const reply = body => request.respond({ status: 200, contentType: 'application/json', headers, body: JSON.stringify(body) });
     if (method === 'OPTIONS') return request.respond({ status: 204, headers });
     if (url.pathname === '/rest/v1/play_events' && method === 'POST') { activity.push(...[].concat(JSON.parse(request.postData()))); return reply(null); }

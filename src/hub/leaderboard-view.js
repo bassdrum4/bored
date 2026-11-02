@@ -55,7 +55,7 @@ function renderLeaderboard() {
     empty.textContent = 'Could not load rankings: ' + cached.error;
   } else if (!rows.length) {
     empty.hidden = false;
-    empty.textContent = cached ? 'No scores yet. Be the first.' : 'Loading rankings…';
+    empty.textContent = cached ? 'Nobody is on the board yet. Embarrassing. Be first.' : 'Loading rankings…';
   } else {
     empty.hidden = true;
   }

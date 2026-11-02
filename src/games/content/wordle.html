@@ -1096,6 +1096,7 @@ const answer = ANSWERS[Math.floor(Math.random() * ANSWERS.length)].toUpperCase()
 let current = '';
 let row = 0;
 let gameOver = false;
+let solved = false;
 let checking = false;
 
 const board = document.getElementById('board');
@@ -1205,7 +1206,7 @@ async function submitGuess() {
   }
 
   setTimeout(() => {
-    if (current === answer) { gameOver = true; showMessage(getWinMessage(), 5000); bounceRow(); }
+    if (current === answer) { gameOver = true; solved = true; showMessage(getWinMessage(), 5000); bounceRow(); }
     else if (row >= 5) { gameOver = true; showMessage(answer, 8000); }
     row++; current = '';
   }, 5 * 150 + 100);
@@ -1230,7 +1231,14 @@ function showMessage(text, duration = 1500) {
 }
 
 function shakeRow() { const r = board.children[row]; r.classList.add('shake'); setTimeout(() => r.classList.remove('shake'), 400); }
-function bounceRow() { for (let i = 0; i < 5; i++) setTimeout(() => getTile(row, i).classList.add('bounce'), i * 100); }
+function bounceRow() {
+  // The win handler advances `row` immediately after scheduling these timers.
+  // Keep the animation on the solved row, including the final (sixth) guess.
+  const winningRow = row;
+  for (let i = 0; i < 5; i++) {
+    setTimeout(() => getTile(winningRow, i)?.classList.add('bounce'), i * 100);
+  }
+}
 function getWinMessage() { return ['Genius','Magnificent','Impressive','Splendid','Great','Phew'][row] || 'Nice'; }
 
 document.addEventListener('keydown', e => {
