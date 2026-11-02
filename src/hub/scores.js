@@ -88,6 +88,14 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Scrabble ranks the points of a game played to the end against the computer;
+  // a two-player game is a shared table, not a score to post, so only CPU games
+  // qualify. The game asks for a player choice before the first tile is drawn.
+  highScore('scrabble', 'Scrabble', 'points', {
+    metric: 'points', min: 1, max: 2000,
+    when: snapshot => snapshot.finished === true && snapshot.cpu === true,
+    resumable: true
+  }),
   highScore("brick-run", "Brick Run", "points", { metric: "score", when: snapshot => snapshot.finished === true }),
   // Ashcrown ranks the renown a campaign actually finished with: a banner still
   // growing when the player walked away is not a result. Every finished campaign
