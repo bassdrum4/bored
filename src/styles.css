@@ -251,6 +251,35 @@ section[id]{scroll-margin-top:20px}
 .badge{display:inline-block;vertical-align:middle;font-size:8px;margin-left:7px;line-height:1.3}
 .star{position:absolute;top:10px;right:10px;width:36px;height:36px;border:1px solid var(--rule);background:var(--paper);color:var(--ink);font-size:23px;line-height:1}
 .star:hover{border-color:var(--ink);background:var(--paper)}
+
+/* Quiet, optional notes from the person who made the games. */
+.note-host{position:relative}
+.note-host:hover,.note-host:focus-within,.note-host.note-open{z-index:6}
+.developer-note-toggle{position:absolute;top:10px;right:54px;z-index:2;width:36px;height:36px;
+  padding:0;border:1px solid var(--rule);background:var(--paper);color:var(--dim);
+  font:italic 16px Georgia,"Times New Roman",serif;cursor:pointer}
+.developer-note-toggle:hover,.developer-note-toggle:focus-visible{border-color:var(--ink);color:var(--ink)}
+.developer-note-toggle:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.developer-note-tip{display:none;position:absolute;bottom:calc(100% + 8px);left:0;right:0;
+  z-index:8;padding:12px 14px;border:1px solid var(--ink);background:var(--paper);color:var(--ink);
+  box-shadow:3px 3px 0 rgba(25,23,19,.18);text-align:left;pointer-events:none}
+.developer-note-label{display:block;margin-bottom:6px;font:10px/1.5 var(--mono);color:var(--dim)}
+.developer-note-copy{display:block;font:14px/1.5 Georgia,"Times New Roman",serif;overflow-wrap:anywhere}
+.note-host.note-open>.developer-note-tip,
+.note-host>.card:focus-visible~.developer-note-tip,
+.note-host>.shelf-play:focus-visible~.developer-note-tip,
+.note-host>.developer-note-toggle:focus-visible~.developer-note-tip{display:block}
+@media(hover:hover) and (pointer:fine){
+  .note-host:hover>.developer-note-tip{display:block}
+}
+.shelf-entry{position:relative;min-width:0}
+.shelf-entry .shelf-play{height:100%}
+#recent .shelf-entry .shelf-copy{padding-right:42px}
+.shelf-entry .developer-note-toggle{top:8px;right:8px;width:28px;height:28px}
+@media(max-width:600px){
+  .row .developer-note-toggle{top:7px;left:45px;right:auto;width:32px;height:32px}
+  .developer-note-tip{position:fixed;top:auto;bottom:16px;left:16px;right:16px;z-index:50}
+}
 #leaderboard{margin-top:38px;border:0;border-top:3px double var(--ink);padding:24px 0 0}
 #leaderboard h2{font-size:28px;margin:4px 0 16px}
 #empty{border:1px dashed var(--rule);margin-top:12px;padding:26px}

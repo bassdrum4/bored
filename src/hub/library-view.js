@@ -1,5 +1,6 @@
 import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
 import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from '../games/discovery.js';
+import { DEVELOPER_NOTES } from '../games/developer-notes.js';
 import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scores.js';
 import { writeStored } from './store.js';
 
@@ -13,6 +14,52 @@ function element(tag, className, text) {
 }
 const searchInput = $('#q');
 const gameGrid = $('#grid');
+
+// These notes are separate from the regular game descriptions.
+function closeDeveloperNotes() {
+  document.querySelectorAll('.note-host.note-open').forEach(host => {
+    host.classList.remove('note-open');
+    host.querySelector('.developer-note-toggle')?.setAttribute('aria-expanded', 'false');
+  });
+}
+function addDeveloperNote(host, slug, name) {
+  const note = DEVELOPER_NOTES[slug];
+  if (!note) return;
+  host.classList.add('note-host');
+  const id = 'developer-note-' + slug + (host.classList.contains('shelf-entry') ? '-shelf' : '');
+  const toggle = element('button', 'developer-note-toggle', 'i');
+  toggle.type = 'button';
+  toggle.setAttribute('aria-label', 'Read developer note for ' + name);
+  toggle.setAttribute('aria-controls', id);
+  toggle.setAttribute('aria-expanded', 'false');
+  const tip = element('span', 'developer-note-tip');
+  tip.id = id;
+  tip.setAttribute('role', 'tooltip');
+  tip.append(element('span', 'developer-note-label', 'A note from the developer'),
+    element('span', 'developer-note-copy', note));
+  // Keep information and play as separate buttons, including on phones.
+  host.querySelector('.card, .shelf-play')?.setAttribute('aria-describedby', id);
+  toggle.onclick = () => {
+    const wasOpen = host.classList.contains('note-open');
+    closeDeveloperNotes();
+    if (!wasOpen) {
+      host.classList.add('note-open');
+      toggle.setAttribute('aria-expanded', 'true');
+    }
+  };
+  host.append(toggle, tip);
+}
+document.addEventListener('pointerdown', event => {
+  if (!event.target.closest('.developer-note-toggle')) closeDeveloperNotes();
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  const wasOpen = !!document.querySelector('.note-host.note-open');
+  closeDeveloperNotes();
+  if (wasOpen && document.activeElement?.classList.contains('developer-note-toggle')) {
+    document.activeElement.blur();
+  }
+});
 function previewFor(slug) {
   const preview = element('span', 'game-preview');
   preview.setAttribute('aria-hidden', 'true');
@@ -103,7 +150,11 @@ function shelfGame(slug, note) {
   text.append(element('span', 'shelf-name', name + '\u00a0↗'), element('span', 'shelf-note', note));
   button.appendChild(text);
   button.onclick = () => openGame(slug);
-  return button;
+  if (!DEVELOPER_NOTES[slug]) return button;
+  const wrapper = element('div', 'shelf-entry');
+  wrapper.appendChild(button);
+  addDeveloperNote(wrapper, slug, name);
+  return wrapper;
 }
 
 // One shelf, four cards. Recent games come first; favorites fill whatever room
@@ -207,6 +258,7 @@ function renderLibrary() {
       together.onclick = () => window.dispatchEvent(new CustomEvent('bored:together-open', { detail: { game: slug } }));
       row.append(together);
     }
+    addDeveloperNote(row, slug, name);
     gameGrid.appendChild(row);
   }
 
