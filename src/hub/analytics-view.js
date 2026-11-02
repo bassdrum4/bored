@@ -283,8 +283,11 @@ async function load() {
     $('#status').textContent = error.message || 'Could not load analytics. Try again.';
   } finally { loading = false; $('#refresh').disabled = false; }
 }
-$('#from').value = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
-$('#through').value = new Date().toISOString().slice(0, 10);
+// Open on today only: the dashboard loads the smallest useful slice first, and
+// both fields stay editable so any range up to the 90-day cap can be picked.
+const today = new Date().toISOString().slice(0, 10);
+$('#from').value = today;
+$('#through').value = today;
 ORDER.forEach(([id, name]) => $('#game').append(new Option(name, id)));
 $('#filters-form').onsubmit = event => { event.preventDefault(); void load(); };
 $('#refresh').onclick = () => void load();
