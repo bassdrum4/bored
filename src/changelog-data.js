@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 244,
+  "count": 245,
   "newest": "2026-11-02",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"cd22cf9","date":"2026-11-02","author":"Codebuff","subject":"Make Scrabble's easy computer easy and its grid even."},
   {"sha":"8d6873a","date":"2026-11-02","author":"Codebuff","subject":"List games in the order they arrived and finish the preview set."},
   {"sha":"6fe3058","date":"2026-11-02","author":"Codebuff","subject":"Give Scrabble a real preview and retire its placeholder."},
   {"sha":"a8f3701","date":"2026-11-02","author":"Codebuff","subject":"Keep the library in the order its games arrived."},
