@@ -345,12 +345,18 @@ test('browser regressions', async t => {
     }));
     assert.equal(await page.$$eval('.card', els => els.length), catalog.total);
     assert.equal(await text(page, '#count'), String(catalog.total));
-    // The NEW badge holds four games at most, and they sit at the top of the shelf.
+    // The NEW badge holds four games at most, and it marks them where they sit
+    // instead of moving them: the shelf stays in the order the games arrived.
     assert.ok(catalog.newest > 0 && catalog.newest <= 4, 'the NEW badge holds four games at most');
     assert.deepEqual(
-      await page.$$eval('.card', els => els.slice(0, 4).map(el => el.dataset.slug)),
-      catalog.fresh,
-      'new games are pinned to the top in badge order'
+      await page.$$eval('.card', els => els.map(el => el.dataset.slug)),
+      await page.evaluate(() => ORDER.map(([slug]) => slug)),
+      'the library lists games in catalog order'
+    );
+    assert.deepEqual(
+      await page.$$eval('.card', els => els.filter(el => el.querySelector('.badge')).map(el => el.dataset.slug).sort()),
+      catalog.fresh.slice().sort(),
+      'the NEW badge marks the newest arrivals in place'
     );
     await filter('New');
     assert.equal(await page.$$eval('.card', els => els.length), catalog.newest);

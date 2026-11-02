@@ -7,7 +7,12 @@
 // in `src/games/content/` are the payloads: there is nothing extra to publish,
 // and editing a game updates it without rebuilding the hub.
 
-export const ORDER = [["brick-run", "Brick Run"], ["trackbound","Trackmania"],["ashcrown","Ashcrown"],["transit-chaos","Transit Chaos"],["typing-test","Typing Test"],["circuit","Circuit"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["basket-random","Basket Random"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["lights-out","Lights Out"],["tank2","Tank2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
+// The shelf is the arcade's arrival log, newest first: games:add prepends a new
+// game, so the top entry is the most recent arrival and the bottom is the oldest.
+// Games that landed in the same commit keep the order they were written in. The
+// four games built into arcade.js predate every game document, so they stay at
+// the end instead of being hoisted over the games that came after them.
+export const ORDER = [["scrabble", "Scrabble"], ["basket-random", "Basket Random"], ["brick-run", "Brick Run"], ["trackbound", "Trackmania"], ["ashcrown", "Ashcrown"], ["typing-test", "Typing Test"], ["circuit", "Circuit"], ["transit-chaos", "Transit Chaos"], ["fluid", "Fluid"], ["signal-tower", "Signal Tower"], ["prism-duel", "Prism Duel"], ["rooftop-snipers", "Rooftop Snipers: Boring Edition"], ["block-blast", "Block Blast"], ["chess", "Chess"], ["mahjong", "Mahjong"], ["minigolf", "Minigolf"], ["lights-out", "Lights Out"], ["deep", "DEEP"], ["sumo", "SUMO"], ["sand", "Sand"], ["poker", "Card Table"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["klang", "Klang"], ["8ball", "8 Ball"], ["2048", "2048"], ["memory", "Memory"], ["connect-four", "Connect Four"], ["aim-lab", "Aim Lab"]];
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://youtubeplayer.freebuff.app/player"};
 // Offline games with no board of their own: they still play, but the hub keeps
 // no best for them. 8 Ball, Sand and Eco are open-ended toys, so a "high score"
@@ -18,10 +23,9 @@ export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
-export const FRESH_GAMES = ["basket-random", "brick-run", "trackbound", "ashcrown"];
-ORDER.unshift(['2048', '2048'], ['memory', 'Memory'], ['connect-four', 'Connect Four'], ['aim-lab', 'Aim Lab']);
-ORDER.unshift(['deep', 'DEEP']);
+export const FRESH_GAMES = ["scrabble", "basket-random", "brick-run", "trackbound"];
 export const META = {
+  "scrabble": ["Puzzle", "Fifteen squares a side, seven tiles in hand. Spell across the board against the computer or a friend."],
   "brick-run": ["Arcade", "Run, jump and stomp your way to the flagpole."],
   "trackbound": ["Arcade", "Modular time trial racing: banked corners, medals, ghosts and a daily track."],
   "ashcrown": ["Strategy", "Six banners, one shattered vale. Found cities, work the land, and out-think five rival lords on a hex map."],

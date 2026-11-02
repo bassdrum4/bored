@@ -124,6 +124,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "scrabble": {
+    "label": "Points in a finished game against the computer",
+    "better": "high",
+    "max_value": 2000
+  },
   "shadow-net": {
     "label": "Files downloaded",
     "better": "high",

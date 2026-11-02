@@ -2,13 +2,20 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 238,
+  "count": 245,
   "newest": "2026-11-02",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"cd22cf9","date":"2026-11-02","author":"Codebuff","subject":"Make Scrabble's easy computer easy and its grid even."},
+  {"sha":"8d6873a","date":"2026-11-02","author":"Codebuff","subject":"List games in the order they arrived and finish the preview set."},
+  {"sha":"6fe3058","date":"2026-11-02","author":"Codebuff","subject":"Give Scrabble a real preview and retire its placeholder."},
+  {"sha":"a8f3701","date":"2026-11-02","author":"Codebuff","subject":"Keep the library in the order its games arrived."},
+  {"sha":"89d39f0","date":"2026-11-02","author":"Codebuff","subject":"Keep Scrabble's squares square once tiles land."},
+  {"sha":"6d5135e","date":"2026-11-02","author":"Codebuff","subject":"Add Scrabble with a computer opponent and local two-player play."},
+  {"sha":"c04ea54","date":"2026-11-02","author":"bassdrum4","subject":"Keep Basket Random's cover up until the real build arrives."},
   {"sha":"0b8230a","date":"2026-11-02","author":"bassdrum4","subject":"Add every developer note and unblock Basket Random's PLAY screen."},
   {"sha":"0cd4fe3","date":"2026-11-02","author":"bassdrum4","subject":"Ask for players and difficulty before chess begins."},
   {"sha":"8f61603","date":"2026-11-02","author":"bassdrum4","subject":"Add Basket Random as an offline two-player cabinet."},

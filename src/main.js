@@ -759,15 +759,6 @@ const { escapeHtml, frameStandIn, injectHead, injectSeed } = createGameDocument(
 
 searchInput.addEventListener('input', renderLibrary);
 $('#sort').addEventListener('change', renderLibrary);
-$('#clear-filters').onclick = () => {
-  category = 'All';
-  collection = 'all';
-  searchInput.value = '';
-  for (const button of $('#filters').children) button.setAttribute('aria-pressed', String(button.dataset.filter === 'All'));
-  renderCollections();
-  renderLibrary();
-  searchInput.focus();
-};
 $('#favorites-all').onclick = () => {
   collection = 'all';
   category = 'Favorites';
