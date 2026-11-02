@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 223,
+  "count": 224,
   "newest": "2026-11-01",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"dfa4c68","date":"2026-11-01","author":"Claude","subject":"Add Bo, the mascot"},
   {"sha":"5ad90a2","date":"2026-11-01","author":"Claude","subject":"Allow webfonts: add Fraunces headings, relax the off-site request checks"},
   {"sha":"334a227","date":"2026-11-01","author":"Claude","subject":"Give the hub a voice: rewritten copy, time-aware greeting, bolder identity"},
   {"sha":"2c26b85","date":"2026-11-01","author":"Daniel Lowe","subject":"Hover the actual info control in creator notes browser test"},
