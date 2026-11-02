@@ -72,6 +72,18 @@ try {
     }
     if (slug === 'typing-test') for (const code of ['KeyT', 'KeyH', 'KeyE', 'Space', 'KeyQ', 'KeyU', 'KeyI', 'KeyC', 'KeyK']) await press(code);
     if (slug === 'circuit') for (const code of ['ArrowUp', 'ArrowUp', 'ArrowLeft', 'ArrowUp']) await press(code);
+    if (slug === 'scrabble') {
+      // The board sits behind the player-choice overlay, so put a plausible
+      // mid-game position on it instead of capturing the empty board.
+      await frame.evaluate(() => window.__test.load({
+        mode: 'computer', turn: 0, bag: [], scores: [42, 31],
+        board: { 82: 's', 83: 'p', 84: 'a', 85: 'r', 86: 'e',
+          98: 'g', 113: 'a', 128: 'm', 143: 'e',
+          112: 'c', 114: 't', 157: 'r', 158: 'a', 159: 'i', 160: 'n' },
+        racks: [['s', 'e', 'r', 'o', 'd', 'l', 'n'], ['a', 'b', 'c', 'd', 'e', 'f', 'g']]
+      }));
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
     if (slug === 'sand') {
       const canvas = await frame.$('canvas');
       const box = await canvas?.boundingBox();
