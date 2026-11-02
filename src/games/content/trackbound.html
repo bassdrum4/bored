@@ -687,7 +687,9 @@ function localCurveFrame(def, t) {
 function blockExit(def) { return localCurveFrame(def, 1); }
 
 // Bake one block into the road mesh (and its legs into the scenery mesh).
-function emitBlock(road, scenery, entry, def, index, legs) {
+// Wall collision panels go into `walls`; prevHw/nextHw are the neighbours'
+// half widths, used to cap wall ends where the road narrows.
+function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw) {
   legs = legs || [];      // callers that only want the geometry pass nothing
   const segments = def.samples || 12;
   const hw = def.hw || 6;
@@ -727,7 +729,7 @@ function emitBlock(road, scenery, entry, def, index, legs) {
     pushQuad(road, a.low[0], b.low[0], b.pts[0], a.pts[0], mul(a.w.x, -1), shade(PALETTE.wall, 0.8));
     pushQuad(road, a.low[5], a.pts[5], b.pts[5], b.low[5], a.w.x, shade(PALETTE.wall, 0.8));
 
-    // Low guide walls down both sides. These are also the walls the car hits.
+    // Low guide walls down both sides.
     if (wallH > 0.02) {
       const outer = 0.34;
       const aL = a.pts[0], bL = b.pts[0], aR = a.pts[5], bR = b.pts[5];
@@ -744,9 +746,45 @@ function emitBlock(road, scenery, entry, def, index, legs) {
       pushQuad(road, aRO, bRO, bRT, aRT, a.w.x, shade(wallColor, 0.82));
     }
 
+    // Collision panels: the inner face of each wall, one per segment. These
+    // are what the car's hitbox is tested against.
+    if (wallH > 0.02 && walls) {
+      const up = norm(add(a.w.y, b.w.y));
+      for (const side of [-1, 1]) {
+        const p0 = side < 0 ? a.pts[0] : a.pts[5];
+        const p1 = side < 0 ? b.pts[0] : b.pts[5];
+        const dir = sub(p1, p0);
+        const len = vlen(dir);
+        if (len < 1e-4) continue;
+        const t = mul(dir, 1 / len);
+        const n = mul(norm(cross(up, t)), -side);   // points back onto the road
+        walls.push({ a: p0, t, len, n, up, h: wallH });
+      }
+    }
+
     // legs down to the ground so elevated blocks are not floating slabs
     if (i % 4 === 0 && rows[i].w.y[1] > 0.5 && rows[i].w.p[1] > GROUND_Y + 5) {
       legs.push(rows[i].w.p);
+    }
+  }
+
+  // End caps where this block is narrower than its neighbour, so the wall end
+  // is solid instead of something you can slip past.
+  if (wallH > 0.02 && walls) {
+    const caps = [];
+    if (prevHw > hw + 0.1) caps.push([rows[0], -1, prevHw - hw]);
+    if (nextHw > hw + 0.1) caps.push([rows[segments], 1, nextHw - hw]);
+    for (const [row, facing, extra] of caps) {
+      for (const side of [-1, 1]) {
+        walls.push({
+          a: madd(row.w.p, row.w.x, side * (hw + 0.05)),
+          t: mul(row.w.x, side),
+          len: extra + 0.6,
+          n: mul(row.w.z, facing),
+          up: row.w.y,
+          h: Math.max(wallH, 0.95)
+        });
+      }
     }
   }
 
@@ -846,6 +884,31 @@ function indexMesh(mesh) {
   return mesh;
 }
 
+// Wall panels in the same spatial hash, padded so a query at the car's
+// centre finds every panel its hitbox could reach.
+function indexWalls(list) {
+  const grid = new Map();
+  const reach = 3.5;
+  list.forEach((seg, k) => {
+    const b = madd(seg.a, seg.t, seg.len);
+    const top = madd(seg.a, seg.up, seg.h);
+    const lo = [0, 0, 0], hi = [0, 0, 0];
+    for (let i = 0; i < 3; i++) {
+      lo[i] = Math.floor((Math.min(seg.a[i], b[i], top[i]) - reach) / CELL);
+      hi[i] = Math.floor((Math.max(seg.a[i], b[i], top[i]) + reach) / CELL);
+    }
+    for (let x = lo[0]; x <= hi[0]; x++)
+      for (let y = lo[1]; y <= hi[1]; y++)
+        for (let z = lo[2]; z <= hi[2]; z++) {
+          const key = x + ',' + y + ',' + z;
+          let cell = grid.get(key);
+          if (!cell) grid.set(key, cell = []);
+          cell.push(k);
+        }
+  });
+  return { list, grid };
+}
+
 // Möller–Trumbore, double sided: the inside of a loop is a valid surface.
 function raycast(mesh, origin, dir, maxT) {
   if (!mesh || !mesh.grid) return null;
@@ -900,11 +963,14 @@ function buildTrack(typeIds, meta) {
   let entry = FRAME0;
   let finish = null, spawn = null, travelled = 0;
   const legs = [];
+  const walls = [];
   for (let i = 0; i < typeIds.length; i++) {
     const def = BLOCKS[typeIds[i]];
     if (!def) continue;
     const exit = compose(entry, blockExit(def));
-    const box = emitBlock(road, scenery, entry, def, i, legs);
+    const prevDef = BLOCKS[typeIds[i - 1]], nextDef = BLOCKS[typeIds[i + 1]];
+    const box = emitBlock(road, scenery, entry, def, i, legs, walls,
+      prevDef ? (prevDef.hw || 6) : 0, nextDef ? (nextDef.hw || 6) : 0);
     boxes.push(box);
     if (def.trigger === 'checkpoint' || def.trigger === 'finish') {
       const gate = compose(entry, localCurveFrame(def, 0.2));
@@ -922,6 +988,7 @@ function buildTrack(typeIds, meta) {
     entry = exit;
   }
   indexMesh(road);
+  road.walls = indexWalls(walls);
 
   // Support legs, laid down now that the whole ribbon is indexed: a leg under
   // a crossing drops straight through the road below and must simply not
@@ -1131,6 +1198,7 @@ function makeCar(spawn) {
     boost: 0,
     grip: CAR.gripRoad,
     slip: 0,
+    impact: 0,
     contact: null
   };
 }
@@ -1236,21 +1304,67 @@ function stepCar(car, input, dt, mesh) {
   if (speed > CAR.cap) car.v = mul(car.v, CAR.cap / speed);
   car.p = madd(car.p, car.v, dt);
 
-  // Walls: four short horizontal probes, ignoring anything that is floor.
-  right = norm(cross(car.u, car.f));
-  const probes = [right, mul(right, -1), car.f, mul(car.f, -1)];
-  for (let i = 0; i < probes.length; i++) {
-    const dir = probes[i];
-    const origin = madd(car.p, car.u, 0.34);
-    const hit = raycast(mesh, origin, dir, 1.32);
-    if (!hit) continue;
-    if (Math.abs(dot(hit.n, car.u)) > 0.6) continue;
-    if (dot(hit.n, dir) > -0.05) continue;
-    car.p = madd(car.p, hit.n, 1.32 - hit.t + 0.02);
-    const into = dot(car.v, hit.n);
-    if (into < 0) car.v = madd(car.v, hit.n, -into * 1.2);
-  }
+  // Walls: the car's box against the wall panels laid down with the track.
+  collideWalls(car, mesh && mesh.walls);
   return car;
+}
+
+// The car's outline in its own plane: [right, forward]. Corners plus side
+// midpoints, so the inside wall of a tight corner can't poke between corners.
+const HITBOX = { low: 0.3, outline: [
+  [1.17, 1.82], [-1.17, 1.82], [1.17, -1.98], [-1.17, -1.98],
+  [1.17, 0.6], [-1.17, 0.6], [1.17, -0.7], [-1.17, -0.7],
+  [0, 1.82], [0, -1.98]
+] };
+
+function collideWalls(car, walls) {
+  car.impact = 0;
+  if (!walls) return;
+  const nearby = walls.grid.get(cellKey(car.p[0], car.p[1], car.p[2]));
+  if (!nearby) return;
+
+  for (let pass = 0; pass < 3; pass++) {
+    const right = norm(cross(car.u, car.f));
+    const base = madd(car.p, car.u, -HITBOX.low);   // wheel height, below every wall top
+    let deepest = 0, push = null;
+
+    for (const [sx, sz] of HITBOX.outline) {
+      const p = madd(madd(base, right, sx), car.f, sz);
+      // For each point, the shallowest way out wins (that's how you leave a wall end).
+      let pointDepth = Infinity, pointNormal = null;
+      for (const k of nearby) {
+        const seg = walls.list[k];
+        // A car whose centre sits behind this panel has gone over it; leave it alone.
+        if (dot(sub(car.p, seg.a), seg.n) < -0.15) continue;
+        const d = sub(p, seg.a);
+        const s = dot(d, seg.t);
+        if (s < -0.1 || s > seg.len + 0.1) continue;
+        const h = dot(d, seg.up);
+        if (h < -0.9 || h > seg.h + 0.25) continue;
+        const depth = -dot(d, seg.n);
+        if (depth > 0 && depth < 2.6 && depth < pointDepth) { pointDepth = depth; pointNormal = seg.n; }
+      }
+      if (pointNormal && pointDepth > deepest) { deepest = pointDepth; push = pointNormal; }
+    }
+    if (!push) break;
+
+    // Push out within the driving plane so a wall never lifts or sinks the car.
+    let n = sub(push, mul(car.u, dot(push, car.u)));
+    if (vlen(n) < 0.1) break;
+    n = norm(n);
+    car.p = madd(car.p, n, deepest + 0.01);
+
+    const into = dot(car.v, n);
+    if (into < 0) {
+      car.impact = Math.max(car.impact, -into);
+      const tangential = sub(car.v, mul(n, into));
+      const scrub = clamp(1 + into * 0.025, 0.55, 1);   // harder hits cost more speed
+      car.v = madd(mul(tangential, scrub), n, -into * 0.22);
+      // Turn the nose along the wall so a glancing hit slides instead of sticking.
+      const fn = dot(car.f, n);
+      if (fn < 0) car.f = norm(sub(car.f, mul(n, fn * clamp(-into * 0.04, 0, 0.6))));
+    }
+  }
 }
 
 /* ── audio: engine, tyres, gates, all synthesized ─────────────────────────── */
@@ -1351,7 +1465,7 @@ const race = {
   state: 'menu', t: 0, cp: 0, cpTotal: 0, finishedAt: null, medal: null,
   respawn: null, record: [], recordClock: 0, best: null, ghost: null, splits: [],
   ghostOn: saved.ghost !== false, message: '', messageUntil: 0,
-  missing: 0, boostFlash: 0
+  missing: 0, boostFlash: 0, thud: 0
 };
 let autopilot = null;
 
@@ -1386,6 +1500,7 @@ function useTrack(track) {
   race.recordClock = -1;
   race.missing = 0;
   race.boostFlash = 0;
+  race.thud = 0;
   const best = saved.best[track.id];
   // Ghosts only line up if the track still looks the way it did on that day.
   const alive = best && Number.isFinite(best.ms) && (!best.layout || best.layout === layoutOf(track.blocks));
@@ -1480,6 +1595,13 @@ function stepRace(dt, override) {
     }
     car.grip = surfaceGrip;
     stepCar(car, input, dt, world.mesh);
+
+    // A thud when the hitbox meets a wall hard enough to matter.
+    race.thud = Math.max(0, (race.thud || 0) - dt);
+    if (car.impact > 7 && race.thud === 0) {
+      blip(95 + car.impact * 2, 0.14, clamp(car.impact * 0.008, 0.05, 0.16), 'square');
+      race.thud = 0.18;
+    }
 
     if (race.state === 'running') {
       for (let i = 0; i < world.checkpoints.length; i++) {
@@ -2062,12 +2184,13 @@ $('resNext').addEventListener('click', () => {
   if (current.kind === 'campaign' && current.index < CAMPAIGN.length - 1) startCampaign(current.index + 1);
   else restartRace();
 });
+$('resMenu').addEventListener('click', () => openMenu());
 
 
 /* ── test surface: the suite drives the real functions, not copies ────────── */
 window.__test = {
-  CAMPAIGN, BLOCKS, CAR, MEDALS,
-  buildTrack, trackFolds, raycast, stepCar, makeCar, stepRace, compose, localCurveFrame,
+  CAMPAIGN, BLOCKS, CAR, MEDALS, HITBOX,
+  buildTrack, trackFolds, raycast, stepCar, collideWalls, makeCar, stepRace, compose, localCurveFrame,
   medalTimes, medalFor, dailyTrack, ghostAt, goldCount, centerline, nearestCenterline,
   car: () => car,
   world: () => world,
