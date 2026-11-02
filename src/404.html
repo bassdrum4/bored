@@ -8,6 +8,13 @@
 <style>
   body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f2ea;color:#191713;font:17px/1.5 Georgia,"Times New Roman",serif}
   main{max-width:420px;padding:32px 24px}
+  .bo{display:block;width:56px;height:56px;margin-bottom:16px;overflow:visible}
+  .bo .shadow{fill:#191713}
+  .bo .body,.bo .eye{fill:#fffdf7;stroke:#191713;stroke-width:2}
+  .bo .eye{stroke-width:1.5}
+  .bo .ink{fill:#191713}
+  .bo .line{fill:none;stroke:#191713;stroke-width:2;stroke-linecap:square}
+  .bo .mark{fill:#b3261e}
   h1{margin:0 0 12px;font-size:72px;font-weight:700;line-height:1;letter-spacing:-.04em}
   h1 span{color:#b3261e}
   p{margin:0 0 20px;font-style:italic;color:#6b6558}
@@ -17,6 +24,14 @@
 </head>
 <body>
 <main>
+  <svg class="bo" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+    <rect class="shadow" x="5" y="5" width="40" height="40"/>
+    <rect class="body" x="2" y="2" width="40" height="40"/>
+    <rect class="eye" x="9" y="15" width="10" height="8"/><rect class="ink" x="9" y="15" width="10" height="4"/><rect class="ink" x="9" y="20" width="3" height="3"/>
+    <rect class="eye" x="25" y="15" width="10" height="8"/><rect class="ink" x="25" y="15" width="10" height="4"/><rect class="ink" x="25" y="20" width="3" height="3"/>
+    <path class="line" d="M15 32h14"/>
+    <rect class="mark" x="33" y="33" width="6" height="6"/>
+  </svg>
   <h1>404<span>.</span></h1>
   <p>That page does not exist. Honestly, neither does your free period.</p>
   <a href="/bored/">Back to the games</a>

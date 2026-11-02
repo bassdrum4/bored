@@ -17,7 +17,25 @@
     <div class="masthead-top"><h1>Bored<span class="wordmark-dot">.</span></h1>
     <nav class="site-nav" aria-label="Sections"><a href="#daily">Daily</a><a href="#leaderboard">Leaderboard</a><a href="#library">Library</a><a href="./changelog.html">Changelog</a><a id="together-nav" href="#together">Bored Together <span id="together-badge" class="badge" hidden></span></a></nav></div>
     <p class="sub"><b id="count"></b> things to play &middot; in your browser </p>
-    <p class="intro">No ads, no homework. What are you playing today?</p>
+    <div class="intro-row">
+      <svg class="bo" data-mood="bored" viewBox="0 0 48 48" width="44" height="44" aria-hidden="true" focusable="false">
+        <rect class="shadow" x="5" y="5" width="40" height="40"/>
+        <rect class="body" x="2" y="2" width="40" height="40"/>
+        <g data-face="bored">
+          <rect class="eye" x="9" y="15" width="10" height="8"/><rect class="ink" x="9" y="15" width="10" height="4"/><rect class="ink" x="9" y="20" width="3" height="3"/>
+          <rect class="eye" x="25" y="15" width="10" height="8"/><rect class="ink" x="25" y="15" width="10" height="4"/><rect class="ink" x="25" y="20" width="3" height="3"/>
+          <path class="line" d="M15 32h14"/>
+        </g>
+        <g data-face="asleep">
+          <path class="line" d="M9 21h10M25 21h10M19 32h6M32 9h6l-6 6h6"/>
+        </g>
+        <g data-face="pleased">
+          <path class="line" d="M9 23l5-6 5 6M25 23l5-6 5 6M15 30l3 4h8l3-4"/>
+        </g>
+        <rect class="mark" x="33" y="33" width="6" height="6"/>
+      </svg>
+      <p class="intro">No ads, no homework. What are you playing today?</p>
+    </div>
     <div class="masthead-bar">
       <div id="account">
         <span id="account-state">Playing as a guest. </span>
