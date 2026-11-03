@@ -72,11 +72,18 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('#grid .developer-note-tip')].every(tip => tip.textContent.startsWith('A note from the developer'))));
     assert.match(await page.$eval('#developer-note-trackbound .developer-note-copy', tip => tip.textContent), /Brody/);
     assert.ok(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'));
-    // Desktop rows open their note on hover, so the info button is phone-only.
-    assert.equal(await page.$eval('#grid .card[data-slug="block-blast"] ~ .developer-note-toggle', node => node.hidden), false);
-    await page.hover('#grid .note-host:has(.card[data-slug="block-blast"]) .card');
+    // Headless Chrome may advertise no hover even with a desktop-width viewport.
+    // Test the device-appropriate interaction rather than assuming a fine pointer.
+    const canHover = await page.evaluate(() => matchMedia('(hover:hover) and (pointer:fine)').matches);
+    if (canHover) {
+      assert.equal(await page.$eval('#grid .card[data-slug="block-blast"] ~ .developer-note-toggle', node => getComputedStyle(node).display), 'none');
+      await page.hover('#grid .note-host:has(.card[data-slug="block-blast"]) .card');
+    } else {
+      await page.click('#grid .card[data-slug="block-blast"] ~ .developer-note-toggle');
+    }
     assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'block');
-    await page.mouse.move(0, 0);
+    if (canHover) await page.mouse.move(0, 0);
+    else await page.keyboard.press('Escape');
     assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'none');
 
     await page.setViewport({ width: 375, height: 800 });
