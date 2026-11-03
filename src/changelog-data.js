@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 268,
+  "count": 269,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"e7547ab","date":"2026-11-03","author":"Codebuff","subject":"Let a cloud preview whitelist its own hostname."},
   {"sha":"725fe19","date":"2026-11-03","author":"Codebuff","subject":"Draw Ashcrown's tech as an actual tree."},
   {"sha":"f146129","date":"2026-11-03","author":"Daniel Lowe","subject":"Keep announcement banner fixed at the top until dismissed"},
   {"sha":"5c292c6","date":"2026-11-03","author":"Daniel Lowe","subject":"Tank 2: one breakable box, void outside, and shootable interface","pr":69},
