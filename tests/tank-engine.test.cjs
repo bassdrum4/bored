@@ -1,9 +1,7 @@
-// Pastel Tanks runs version 2 rules: the box's edge is continuous, destructible
-// ground. Each wall carries a depth profile per pixel, so a shell digs a bowl,
-// tanks ride the profile (a dent sits them lower), and only a breach — depth
-// reaching the wall's thickness — opens a hole wide enough to fall through or
-// fly out of. These tests replay matches the way Bored Together does: a seed
-// plus a stored shot list, nothing else.
+// Tank 2: one destructible perimeter, independent rolling dirt, empty void
+// beyond a breach. Both clients reproduce every shot using the same seed.
+
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -60,22 +58,21 @@ test('the four walls meet at the corners to make one ring road', async () => {
   }
 });
 
-test('the floor starts as reproducible gentle hills with an empty interior', async () => {
-  const { opening, replay, depthAt, IW, IH, T, BX, BW, BY, BH, solidAt } = await engine();
-  const world = replay(opening(SEED));
-  const same = replay(opening(SEED));
+test('the floor is independent from all four destructible perimeter walls', async () => {
+  const { opening, replay, IW, IH, T, BX, BW, BY, BH, solidAt, floorDepthAt, depthAt } = await engine();
+  const world = replay(opening(SEED)), same = replay(opening(SEED));
   assert.deepEqual(world.depth.map(row => row.length), [IW, IH, IW, IH]);
-  assert.deepEqual(world.depth, same.depth, 'the seed makes the same terrain every time');
-  assert.ok(world.depth[2].every(d => d < -35 && d > -85), 'floor lies above the bottom border');
-  assert.ok(new Set(world.depth[2].map(d => Math.round(d))).size > 8, 'the floor is not flat');
-  assert.ok(world.depth[0].every(d => d === 0));
-  assert.ok(world.depth[1].every(d => d === 0));
-  assert.ok(world.depth[3].every(d => d === 0));
-  assert.deepEqual(world.blocks, [], 'no random blocks hang between the tanks');
-  assert.deepEqual(world.blockHoles, []);
-  const x = BX + BW / 2, floor = BY + BH - T + depthAt(world, 2, BX + BW - T - x);
-  assert.equal(solidAt(world, x, floor - 2), null);
-  assert.equal(solidAt(world, x, floor + 2).kind, 'wall', 'collision follows the real raised ground');
+  assert.deepEqual(world.floor, same.floor, 'ground is seeded and repeatable');
+  assert.ok(world.floor.every(d => d < -35 && d > -85), 'floor sits above the bottom wall');
+  assert.ok(new Set(world.floor.map(d => Math.round(d))).size > 8, 'the ground is wavy');
+  assert.ok(world.depth.every(row => row.every(d => d === 0)), 'box walls start undamaged');
+  assert.deepEqual(world.blocks, [], 'nothing floats in the arena');
+  const x = BX + BW / 2, y1 = BY + BH - T, floor = y1 + floorDepthAt(world, IW / 2);
+  assert.equal(solidAt(world, x, floor - 2), null, 'air above the interior ground');
+  assert.equal(solidAt(world, x, floor + 2).kind, 'ground', 'dirt is solid');
+  assert.equal(solidAt(world, x, y1).kind, 'wall', 'bottom wall is separate from the dirt');
+  assert.equal(depthAt(world, 2, IW / 2), 0, 'floor damage does not erase the perimeter');
+  assert.equal(solidAt(world, x, y1 + T + 5), null, 'there is no infinite terrain outside');
 });
 
 test('tank drives are clamped to the floor instead of wrapping up walls', async () => {
@@ -107,7 +104,8 @@ test('a shot list replays to the same ground every time', async () => {
   }
   const once = replay(state), twice = replay(JSON.parse(JSON.stringify(state)));
   assert.equal(JSON.stringify(once.tanks), JSON.stringify(twice.tanks), 'tanks replay identically');
-  assert.equal(JSON.stringify(once.depth), JSON.stringify(twice.depth), 'the dug ground replays identically');
+  assert.equal(JSON.stringify(once.depth), JSON.stringify(twice.depth), 'the wall damage replays identically');
+  assert.equal(JSON.stringify(once.floor), JSON.stringify(twice.floor), 'the floor damage replays identically');
   assert.equal(JSON.stringify(once.blockHoles), JSON.stringify(twice.blockHoles), 'block holes replay identically');
   assert.equal(JSON.stringify(once.trails), JSON.stringify(twice.trails), 'the flight replays identically');
   assert.ok(once.tanks[0].hp < 100 && once.tanks[1].hp < 100, 'both sides took real damage');
@@ -168,7 +166,7 @@ async function findDirect(state, seat) {
 }
 
 test('a direct hit soaks damage in and digs the ground behind the hull', async () => {
-  const { opening, replay, advance, guide, windOf, depthAt, ringPoint, T, MAXHP, supported } = await engine();
+  const { opening, replay, advance, guide, windOf, floorDepthAt, ringPoint, T, MAXHP, supported } = await engine();
   const state = opening(SEED);
   const world = replay(state);
   const shot = await findDirect(state, 1);
@@ -180,8 +178,8 @@ test('a direct hit soaks damage in and digs the ground behind the hull', async (
   assert.ok(result.world.tanks[1].hp < MAXHP && result.world.tanks[1].hp > 0, 'the enemy soaked real damage');
   assert.equal(result.world.tanks[0].hp, MAXHP, 'the shooter is untouched');
   const enemy = result.world.tanks[1];
-  const dug = depthAt(result.world, 2, ringPoint(enemy.s).along);
-  assert.ok(dug > depthAt(world, 2, ringPoint(enemy.s).along), 'every hull hit digs below the original ground');
+  const dug = floorDepthAt(result.world, ringPoint(enemy.s).along);
+  assert.ok(dug > floorDepthAt(world, ringPoint(enemy.s).along), 'every hull hit digs below the original ground');
   assert.ok(dug < T, 'one standard shell cannot break through the raised floor');
   assert.equal(supported(result.world, enemy), true, 'so the target is still standing');
   assert.equal(result.world.events.some(e => e.kind === 'hit' && e.seat === 2), true, 'the impact is on the record');
@@ -189,36 +187,38 @@ test('a direct hit soaks damage in and digs the ground behind the hull', async (
   assert.equal(result.world.winner, null);
 });
 
-test('craters lower a tank smoothly and repeated blasts can open a hole', async () => {
-  const { opening, replay, carveAt, depthAt, breached, supported, ringPoint, tankSurface, T, CARVE, BITE, solidAt } = await engine();
-  const world = replay(opening(4242)), tank = world.tanks[0];
-  const spot = ringPoint(tank.s), surface = tankSurface(world, tank);
-  const initial = depthAt(world, spot.wall, spot.along);
-  assert.ok(initial < 0, 'raised floor has a negative initial depth');
+test('repeated impacts tunnel through the floor without breaking the box wall', async () => {
+  const { opening, replay, carveAt, floorDepthAt, floorBreached, depthAt, supported, ringPoint, tankSurface, CARVE, BITE, solidAt } = await engine();
+  const world = replay(opening(4242)), tank = world.tanks[0], spot = ringPoint(tank.s);
+  const initial = floorDepthAt(world, spot.along), surface = tankSurface(world, tank);
+  assert.ok(initial < 0);
   carveAt(world, surface.x, surface.y, CARVE.standard, BITE.standard);
-  const first = depthAt(world, spot.wall, spot.along);
-  assert.ok(first > initial && first < T, 'one shell creates a depression, not a hole');
-  assert.ok(tankSurface(world, tank).y > surface.y, 'the tread moves down with the ground');
+  assert.ok(floorDepthAt(world, spot.along) > initial, 'shell digs a bowl');
+  assert.ok(tankSurface(world, tank).y > surface.y, 'tank sinks into its crater');
   assert.equal(supported(world, tank), true);
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 10; i++) {
     const crater = tankSurface(world, tank);
     carveAt(world, crater.x, crater.y, CARVE.standard, BITE.standard);
   }
-  assert.equal(breached(world, spot.wall, spot.along), true);
-  assert.equal(supported(world, tank), false);
-  assert.equal(solidAt(world, surface.x, surface.y + 20), null, 'a breach is a real opening');
+  assert.equal(floorBreached(world, spot.along), true, 'dirt is completely punctured');
+  assert.equal(supported(world, tank), false, 'tank loses footing');
+  assert.equal(solidAt(world, surface.x, surface.y + 20), null, 'soil hole is truly open');
+  assert.equal(depthAt(world, 2, spot.along), 0, 'the box bottom still blocks escape');
+  assert.equal(solidAt(world, surface.x, ringPoint(tank.s).y).kind, 'wall');
 });
 
-test('shots carve visibly into the left wall without deleting the whole boundary', async () => {
-  const { opening, replay, carveAt, depthAt, solidAt, BX, BY, BH, T, CARVE, BITE } = await engine();
+test('one perimeter line dents and eventually opens into empty space', async () => {
+  const { opening, replay, carveAt, depthAt, breached, solidAt, BX, BY, BH, T, CARVE, BITE } = await engine();
   const world = replay(opening(SEED));
-  const x = BX + T, y = BY + (BH / 2);
-  const along = BY + BH - T - y;
-  assert.equal(solidAt(world, x - 1, y).kind, 'wall', 'side wall initially blocks shots');
+  const x = BX + T, y = BY + BH / 2, along = BY + BH - T - y;
+  assert.equal(solidAt(world, x - 1, y).kind, 'wall');
   carveAt(world, x, y, CARVE.standard, BITE.standard);
-  assert.ok(depthAt(world, 3, along) > 0, 'left edge recedes at the hit');
-  assert.equal(solidAt(world, x - 1, y), null, 'the new dent has empty space');
-  assert.equal(solidAt(world, x - T + 1, y).kind, 'wall', 'a single light hit does not destroy all wall depth');
+  assert.ok(depthAt(world, 3, along) > 0, 'the edge moves back where hit');
+  assert.equal(solidAt(world, x - 1, y), null, 'the dent is empty');
+  assert.equal(solidAt(world, x - T + 1, y).kind, 'wall');
+  for (let i = 0; i < 4; i++) carveAt(world, x, y, CARVE.standard, BITE.standard);
+  assert.equal(breached(world, 3, along), true, 'repeated impacts punch through the only wall');
+  assert.equal(solidAt(world, x - T / 2, y), null, 'an escaped shot finds empty exterior');
 });
 
 test('powerups rest on whatever floor is left', async () => {
