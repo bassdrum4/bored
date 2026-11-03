@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 254,
+  "count": 255,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -13,6 +13,7 @@ export const CHANGELOG = [
   {"sha":"a10caa5","date":"2026-11-03","author":"Codebuff","subject":"Use Detroit calendar days for analytics date filters"},
   {"sha":"16344a3","date":"2026-11-03","author":"Codebuff","subject":"Rebuild Ashcrown's chrome around the map, and open up Trackbound's freeplay."},
   {"sha":"2b92f95","date":"2026-11-03","author":"bassdrum4","subject":"Rebuild Pastel Tanks around feel: instant play, live aim, paper box"},
+  {"sha":"f90de0d","date":"2026-11-02","author":"Daniel Lowe","subject":"Exclude development and administrator activity from Bored analytics","pr":60},
   {"sha":"9362c37","date":"2026-11-02","author":"Daniel Lowe","subject":"Add F-14 and Klang preview images"},
   {"sha":"f64b24f","date":"2026-11-02","author":"Daniel Lowe","subject":"Add Risk solo game with tactical CPU opponents","pr":59},
   {"sha":"684c88c","date":"2026-11-02","author":"PenguinV360","subject":"Update ashcrown.html"},
