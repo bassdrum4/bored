@@ -232,16 +232,17 @@ export function carveAt(world, x, y, r, bite) {
 
 /** A hole in the floor reveals the bottom wall; outside the walls is void. */
 export function solidAt(world, x, y) {
-  if (x >= X0 && x <= X1 && y <= Y1 && y >= floorYAt(world, x)) {
-    const along = X1 - x;
-    if (!floorBreached(world, along))
-      return { kind: 'ground', wall: 2, along, x, y: floorYAt(world, x) };
-  }
+  // The perimeter takes priority wherever it intersects the filled dirt.
   const band = wallAt(x, y);
   if (band && band.d <= T) {
     const spot = anchor(band.wall, x, y), d = depthAt(world, band.wall, spot.along);
     if (d < T - 1 && band.d >= d)
       return { kind: 'wall', wall: band.wall, along: spot.along, x: spot.x, y: spot.y };
+  }
+  if (x >= X0 && x <= X1 && y < Y1 && y >= floorYAt(world, x)) {
+    const along = X1 - x;
+    if (!floorBreached(world, along))
+      return { kind: 'ground', wall: 2, along, x, y: floorYAt(world, x) };
   }
   return null;
 }
