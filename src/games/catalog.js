@@ -104,14 +104,17 @@ function deployVersion() {
  * cache stores the promise, so opening two games at once still downloads each
  * document exactly once, and a failed download is forgotten so a retry works.
  */
-export function loadGameDocument(slug) {
+export function loadGameDocument(slug, variant = '') {
   if (!PAYLOAD_SLUGS.includes(slug)) {
     return Promise.reject(new Error(slug + ' has no game document.'));
   }
-  if (!payloads.has(slug)) {
-    payloads.set(slug, deployVersion()
+  // Preserve the existing version-2 shot replay for Bored Together matches.
+  // Solo/local Tank 2 uses a new, incompatible (by design) physics engine.
+  const payload = slug === 'tank2' && variant === 'together' ? 'tank2-online' : slug;
+  if (!payloads.has(payload)) {
+    payloads.set(payload, deployVersion()
       .then(version => {
-        const url = new URL(PAYLOAD_DIR + slug + '.html', document.baseURI);
+        const url = new URL(PAYLOAD_DIR + payload + '.html', document.baseURI);
         if (version) url.searchParams.set('v', version);
         return fetch(url);
       })
@@ -123,9 +126,9 @@ export function loadGameDocument(slug) {
         if (!/<html[\s>]/i.test(text)) throw new Error(slug + ' is not a complete document.');
         return text;
       })
-      .catch(error => { payloads.delete(slug); throw error; }));
+      .catch(error => { payloads.delete(payload); throw error; }));
   }
-  return payloads.get(slug);
+  return payloads.get(payload);
 }
 
 // Async rules are server-owned; the existing catalog slug stays the game identity.

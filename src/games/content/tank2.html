@@ -1,927 +1,718 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-(function () {
-  try { localStorage.getItem('__probe'); return; } catch (e) { }
-  const m = {};
-  const s = {
-    getItem: x => (Object.prototype.hasOwnProperty.call(m, x) ? m[x] : null),
-    setItem: (x, v) => { m[x] = String(v); },
-    removeItem: x => { delete m[x]; },
-    clear: () => { for (const k in m) delete m[k]; },
-    key: i => Object.keys(m)[i] || null
-  };
-  Object.defineProperty(s, 'length', { get: () => Object.keys(m).length });
-  try { Object.defineProperty(window, 'localStorage', { value: s, configurable: true }); } catch (e) { }
-  try { Object.defineProperty(window, 'sessionStorage', { value: s, configurable: true }); } catch (e) { }
-})();
-</script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Tank 2</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light" />
+<title>Tank 2 — everything is shootable</title>
 <style>
-  :root { --paper: #f5f2ea; --board: #fffdf7; --ink: #191713; --hair: #d8d2c4; --dim: #6b6558; --red: #b3261e; --green: #456653; }
-  * { box-sizing: border-box }
-  html, body { margin: 0; background: var(--paper); color: var(--ink);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace }
-  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-    min-height: 100vh; padding: 10px; user-select: none; -webkit-user-select: none; touch-action: manipulation }
-  header, footer { width: min(100%, 760px); display: flex; align-items: baseline; justify-content: space-between; gap: 10px }
-  h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .14em }
-  h1 span { color: var(--red) }
-  #hud { font-size: 12px; letter-spacing: .04em; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap }
-  #hud b { color: var(--ink); font-weight: 600 }
-  #hud .p1 { color: var(--red) } #hud .p2 { color: var(--green) }
-  canvas { display: block; width: min(100%, 760px); height: auto; aspect-ratio: 960/580;
-    border: 0; background: var(--paper); touch-action: none; cursor: crosshair }
-  footer { align-items: center; font-size: 11px; color: var(--dim); flex-wrap: wrap }
-  footer p { margin: 0; flex: 1 1 auto; min-width: 0 }
-  #acts { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end }
-  button { font: 600 11px ui-monospace, monospace; letter-spacing: .05em; border: 1px solid var(--ink); background: none;
-    color: inherit; border-radius: 3px; padding: 5px 8px; cursor: pointer; touch-action: manipulation }
-  button:active { background: var(--ink); color: var(--paper) }
-  button:disabled { border-color: var(--hair); color: var(--hair); cursor: default; background: none }
-  button.sel { background: var(--ink); color: var(--paper) }
-  #arms button { padding: 5px 6px; letter-spacing: .03em }
-  #arms b { font-weight: 600 }
-  #brand, #hud, #hint, #acts button { position: relative }
-  .shot-jolt { animation: shot-jolt .7s ease-out; }
-  .shot-jolt::after {
-    content: '✳'; pointer-events: none; position: absolute; right: -7px; top: -7px;
-    font-size: 12px; color: var(--red); animation: hole-fade 1.2s ease-out forwards;
-  }
-  @keyframes shot-jolt {
-    0% { transform: translate(0,0) rotate(0) }
-    20% { transform: translate(-4px,3px) rotate(-3deg) }
-    55% { transform: translate(3px,-2px) rotate(2deg) }
-    100% { transform: translate(0,0) rotate(0) }
-  }
-  @keyframes hole-fade { from {opacity:1} to {opacity:0} }
-  @media (prefers-reduced-motion: reduce) {
-    .shot-jolt, .shot-jolt::after { animation: none }
-  }
-  @media (max-width: 560px) { footer p { display: none } #acts { width: 100%; justify-content: center } }
+:root { --paper:#f4f1e9; --field:#fdfbf5; --ink:#292a27; --muted:#848176; --line:#d9d3c4; --red:#b93d33; --green:#447e65; --red-wash:#f4e5de; --green-wash:#e5eee4; --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; }
+*{box-sizing:border-box}html{background:var(--paper)}body{margin:0;color:var(--ink);background:var(--paper);font:12px/1.5 var(--mono);min-height:100vh;overflow-x:hidden}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}button:disabled{cursor:default;opacity:.38}
+#page {width:min(1120px, 100%);margin:0 auto;position:relative;padding:29px 24px 28px;isolation:isolate;min-height:760px}
+#scene{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+header,.statusbar,.arena-placeholder,.bottom-panel,footer,.end-screen{position:relative;z-index:3}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin:0 11px 23px;min-height:45px}
+.brand{display:flex;align-items:baseline;gap:15px;white-space:nowrap}.brand h1{font-family:Georgia,serif;font-size:22px;letter-spacing:.17em;font-weight:600;margin:-4px 0 0;line-height:1.2}.brand h1 span{display:inline-block;position:relative;transition:transform .22s}.brand h1 .period{color:var(--red)}.brand small{font-size:10px;letter-spacing:.05em;color:var(--muted)}
+.header-tools{display:flex;align-items:center;gap:17px;flex-wrap:wrap;justify-content:flex-end}.top-label{font-size:10px;color:var(--muted);white-space:nowrap}.wind{display:inline-flex;gap:7px;align-items:center;color:var(--ink)}.wind-arrow{display:inline-block;font-size:16px;transition:transform .2s}.toggle{padding:4px 7px;border:0;border-bottom:1px solid transparent;background:none;font-size:10px;letter-spacing:.03em}.toggle:hover,.toggle.selected{border-bottom-color:var(--ink)}
+.statusbar{margin:0 11px 12px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px}.side{display:flex;align-items:center;gap:11px;min-width:0}.side.right{justify-content:flex-end;flex-direction:row-reverse}.tank-mark{height:7px;width:13px;background:var(--red);border:1px solid #34312d;transform:skew(-12deg);flex-shrink:0}.right .tank-mark{background:var(--green)}.name{font-size:11px;letter-spacing:.09em;white-space:nowrap}.health-number{font-size:11px;min-width:27px;color:var(--muted)}.health-track{height:3px;width:clamp(45px,12vw,130px);background:var(--line);overflow:hidden}.health-fill{height:100%;background:var(--red);transition:width .4s}.right .health-fill{background:var(--green)}.right .health-track{transform:scaleX(-1)}.right .health-number{order:0}.turn-caption{white-space:nowrap;text-align:center;font-size:10px;letter-spacing:.11em;color:var(--muted)}
+.arena-placeholder{z-index:1;aspect-ratio:960 / 520;margin:0 11px;background:var(--field);overflow:visible;pointer-events:none}
+.bottom-panel{margin:14px 11px 0;display:grid;grid-template-columns: minmax(0,1fr) auto;column-gap:20px;row-gap:13px;align-items:start}.action-summary{display:flex;flex-wrap:wrap;column-gap:24px;row-gap:7px;min-width:0;align-items:baseline}.display-label{color:var(--muted);font-size:10px}.display-number{font-size:12px;font-weight:bold}.aim-display{display:flex;gap:7px;white-space:nowrap}.event-line{font-size:11px;color:#635e54;text-align:right;max-width:420px;min-height:16px;transition:opacity .2s}.weapon-list{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.weapon{background:transparent;border:1px solid var(--line);text-align:left;padding:10px 10px 9px;min-width:0;min-height:55px;transition:background .15s,border-color .15s,transform .15s;position:relative}.weapon:not(:disabled):hover{border-color:#756c5d;transform:translateY(-1px)}.weapon.active{border-color:var(--ink);background:#fffdf7;box-shadow:inset 0 -2px 0 var(--red)}.weapon.green-active{box-shadow:inset 0 -2px 0 var(--green)}.weapon .weapon-top{display:flex;align-items:center;justify-content:space-between;gap:4px}.weapon .weapon-title{font-size:11px;letter-spacing:.015em;white-space:nowrap}.weapon .weapon-key{font-size:10px;color:var(--muted)}.weapon .weapon-detail{display:block;font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+footer{margin:18px 11px 0;border-top:1px solid var(--line);padding-top:11px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;color:var(--muted);font-size:10px}footer .controls-info{max-width:750px}footer strong{font-weight:normal;color:var(--ink)}.seed{white-space:nowrap;text-align:right;font-size:9px;color:#aaa69a}
+.end-screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-30%);width:min(330px,82%);padding:28px 26px;text-align:center;background:rgba(253,251,245,.97);outline:1px solid var(--ink);box-shadow:6px 8px 0 rgba(42,40,35,.1);z-index:15;display:none}.end-screen.open{display:block}.end-screen h2{font-family:Georgia,serif;font-size:23px;font-weight:normal;letter-spacing:.04em;margin:7px 0 11px}.end-screen p{color:var(--muted);margin:0 0 23px}.solid-button{background:var(--ink);color:var(--field);border:1px solid var(--ink);padding:10px 19px;letter-spacing:.08em}.solid-button:hover{background:#484740}.small-tag{font-size:10px;color:var(--muted);letter-spacing:.16em}
+@keyframes rattle{0%,100%{transform:rotate(0) translateX(0)}20%{transform:rotate(5deg) translateX(3px)}48%{transform:rotate(-6deg) translateX(-2px)}75%{transform:rotate(3deg) translateX(2px)}}.rattle{animation:rattle .55s ease-in-out!important}.loose{animation:loose .8s cubic-bezier(.2,.8,.4,1) forwards!important}@keyframes loose{0%{transform:translate(0,0) rotate(0)}40%{transform:translate(1px,9px) rotate(-19deg)}100%{transform:translate(3px,15px) rotate(-29deg)}}
+@media(max-width:780px){#page{padding:17px 10px 22px;min-height:550px}header{margin:0 5px 15px;flex-direction:column;gap:12px}.brand h1{font-size:19px}.header-tools{justify-content:flex-start;gap:14px}.statusbar{margin:0 3px 8px;gap:5px}.health-track{width:45px}.side{gap:5px}.name{font-size:9px}.turn-caption{font-size:9px}.arena-placeholder{margin:0 3px}.bottom-panel{margin:12px 3px 0;grid-template-columns:1fr}.event-line{text-align:left;grid-row:2}.weapon-list{gap:4px}.weapon{padding:8px 5px;min-height:58px}.weapon .weapon-title{font-size:9px;white-space:normal;line-height:1.2}.weapon .weapon-detail{font-size:9px}footer{margin:15px 3px 0;flex-direction:column;gap:5px} .seed{text-align:left}}
+@media(max-width:470px){.brand small{display:none}.statusbar{grid-template-columns:1fr 1fr}.turn-caption{display:none}.side.right{justify-self:end}.health-track{width:36px}.weapon .weapon-key{font-size:9px}.weapon .weapon-detail{margin-top:6px}.bottom-panel{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.weapon, .wind-arrow, .health-fill{transition:none}}
 </style>
 </head>
 <body>
+<main id="page">
+<canvas id="scene" aria-hidden="true"></canvas>
 <header>
-  <h1 id="brand">TANK 2<span>.</span></h1>
-  <div id="hud"><span class="p1">RED</span> <b id="hp1">100</b> · <span class="p2">GREEN</span> <b id="hp2">100</b> <span id="wind">· wind 0</span></div>
-</header>
-<canvas id="c" width="960" height="580" aria-label="Artillery duel on rolling terrain enclosed by breakable walls"></canvas>
-<footer>
-  <p id="hint">Q/E or ,/. drive · WASD or arrows aim · space fires</p>
-  <div id="acts">
-    <div id="arms"></div>
-    <button id="mode" type="button">Two players</button>
+  <div class="brand"><h1 id="title"><span>T</span><span>A</span><span>N</span><span>K</span><span>&nbsp;</span><span>2</span><span class="period">.</span></h1><small>a small game about consequences</small></div>
+  <div class="header-tools">
+    <span class="top-label wind" id="windIndicator" title="Positive wind pushes projectiles to the right">WIND <span class="wind-arrow" id="windArrow">→</span><strong id="windValue">0</strong></span>
+    <button class="toggle selected" id="soloBtn" aria-pressed="true">SOLO</button><button class="toggle" id="twoBtn" aria-pressed="false">2 PLAYERS</button>
+    <button class="toggle" id="muteBtn" aria-pressed="false">SOUND ON</button><button class="toggle" id="restartBtn">↻ RESTART</button>
   </div>
+</header>
+<div class="statusbar">
+ <div class="side left" id="redHud"><span class="tank-mark"></span><span class="name" id="redName">RED · YOU</span><div class="health-track"><div class="health-fill" id="redHealth" style="width:100%"></div></div><span class="health-number" id="redHP">100</span></div>
+ <div class="turn-caption" id="turnCaption">RED TO FIRE · TURN 01</div>
+ <div class="side right" id="greenHud"><span class="tank-mark"></span><span class="name" id="greenName">GREEN · CPU</span><div class="health-track"><div class="health-fill" id="greenHealth" style="width:100%"></div></div><span class="health-number" id="greenHP">100</span></div>
+</div>
+<div class="arena-placeholder" id="arena" role="img" aria-label="A destructible rectangular arena containing a green and a red tank, rolling dirt, and one physical boundary wall. The battlefield is drawn on canvas."></div>
+<div class="bottom-panel">
+ <div class="action-summary" id="aimPanel"><span class="aim-display"><span class="display-label">ANGLE</span><span class="display-number" id="angleValue">46°</span></span><span class="aim-display"><span class="display-label">POWER</span><span class="display-number" id="powerValue">58%</span></span></div>
+ <div class="event-line" id="message" aria-live="polite">The border is not decorative.</div>
+ <div class="weapon-list" id="weapons">
+  <button class="weapon active" data-weapon="standard"><span class="weapon-top"><span class="weapon-title">Shell</span><span class="weapon-key">1</span></span><span class="weapon-detail" data-count="standard">∞ · reliable</span></button>
+  <button class="weapon" data-weapon="heavy"><span class="weapon-top"><span class="weapon-title">Heavy</span><span class="weapon-key">2</span></span><span class="weapon-detail" data-count="heavy">2 · demolition</span></button>
+  <button class="weapon" data-weapon="cluster"><span class="weapon-top"><span class="weapon-title">Cluster</span><span class="weapon-key">3</span></span><span class="weapon-detail" data-count="cluster">1 · airburst</span></button>
+  <button class="weapon" data-weapon="mine"><span class="weapon-top"><span class="weapon-title">Mine</span><span class="weapon-key">4</span></span><span class="weapon-detail" data-count="mine">1 · area denial</span></button>
+  <button class="weapon" data-weapon="ricochet"><span class="weapon-top"><span class="weapon-title">Ricochet</span><span class="weapon-key">5</span></span><span class="weapon-detail" data-count="ricochet">2 · bounce ×2</span></button>
+ </div>
+</div>
+<footer>
+  <div class="controls-info"><strong>RED</strong> A / D aim · W / S power + / − · Q / E drive freely · SPACE fire &nbsp; | &nbsp; <strong>GREEN</strong> ← / → aim left / right · ↑ / ↓ power + / − · , / . drive freely · ENTER fire &nbsp; | &nbsp; <strong>1–5</strong> weapons. Drive into a wall to climb.</div>
+  <div class="seed" id="seedLabel">SEED —</div>
 </footer>
-<script>'use strict';
-/* Tank 2: a single breakable boundary surrounding destructible rolling dirt.
- * Outside the box is empty; shots may escape and hit the page UI.
- * Tanks can only move across the interior ground, never the outer frame.
- * In Bored Together, both clients replay the same seed and moves. */
-
-const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
-const hud = { hp1: document.getElementById('hp1'), hp2: document.getElementById('hp2'),
-  wind: document.getElementById('wind') };
-const hintEl = document.getElementById('hint');
-const armsEl = document.getElementById('arms');
-const modeEl = document.getElementById('mode');
-const brandEl = document.getElementById('brand');
-let brandHits = 0;
-
-const C = { paper: '#f5f2ea', board: '#fffdf7', ink: '#191713', hair: '#d8d2c4', dim: '#6b6558',
-  red: '#b3261e', green: '#456653' };
-const COLOUR = { 1: C.red, 2: C.green };
-const ARMS = [['standard', '1'], ['heavy', '2'], ['cluster', '3'], ['mine', '4'], ['ricochet', '5']];
-const ARM_NAMES = { standard: 'STD', heavy: 'HVY', cluster: 'CLU', mine: 'MIN', ricochet: 'RIC' };
-
-/* Snapshot globals first: the daily adapter names these exactly. */
-let mode = 'TITLE', aiEnabled = false, sessionWins = 0;
-
-let engine = null, state = null, world = null, winner = null;
-let sel = 'standard', walk = 0, walkVel = 0, charge = null, chargeFrom = null;
-const aim = { 1: { angle: 45, power: 12 }, 2: { angle: 45, power: 12 } };
-const facing = { 1: -1, 2: 1 };
-const keys = new Set();
-let anim = null, sprigs = [], notes = [], shake = 0;
-let terrainLayer = { key: '', canvas: null };
-let aiPlan = null, aiTick = 0, overFor = 0, lastNow = 0;
-let pointer = null, settleT = 0;
-const seenTurn = { seat: 0, at: -1 };
-
-const bridge = window.__boredTogether || null;
-let online = null;
-
-const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const X0 = () => engine.BX + engine.T, X1 = () => engine.BX + engine.BW - engine.T;
-const Y0 = () => engine.BY + engine.T, Y1 = () => engine.BY + engine.BH - engine.T;
-const seatName = s => (online && online.names && online.names[s - 1]) || (s === 1 ? 'RED' : 'GREEN');
-/* Aim and effects work from the tank as it currently sits: down in a dent, or
- * on the box's edge where the ground is still whole. */
-const anchor = t => {
-  const p = engine.ringPoint(t.s);
-  const d = world ? engine.floorDepthAt(world, p.along) : 0;
-  return { x: p.x - p.nx * d + p.nx * 4, y: p.y - p.ny * d + p.ny * 4, p };
+<section class="end-screen" id="endScreen" aria-live="polite"><div class="small-tag">MATCH COMPLETE</div><h2 id="endHeading">Red wins.</h2><p id="endText">The battlefield has seen better days.</p><button class="solid-button" id="rematchBtn">REMATCH ↗</button></section>
+</main>
+<script>
+'use strict';
+// -- CORE BEGIN --
+const GW=960, GH=520, CELL=2, STEP=1/120, GRAVITY=298, TANK_R=13;
+const WEAPONS={
+ standard:{name:'Standard shell',speed:1,radius:48,damage:24,direct:4,shake:2.5},
+ heavy:{name:'Heavy shell',speed:.82,radius:64,damage:30,direct:5,shake:6},
+ cluster:{name:'Cluster shell',speed:1.04,radius:21,damage:15,direct:2,shake:1.3},
+ bomblet:{name:'Bomblet',speed:1,radius:23,damage:10,direct:0,shake:1.1},
+ mine:{name:'Mine',speed:.86,radius:58,damage:30,direct:4,shake:4},
+ ricochet:{name:'Ricochet',speed:1.09,radius:43,damage:24,direct:5,shake:2.8}
 };
+const PICKUPS=['heavy','cluster','mine','ricochet'];
+const clamp=(v,low,high)=>Math.min(high,Math.max(low,v));
+const len=(x,y)=>Math.hypot(x,y);
+class Random {
+ constructor(seed){this.state=(seed>>>0)||0x9e3779b9}
+ next(){let x=this.state;x^=x<<13;x^=x>>>17;x^=x<<5;this.state=x>>>0;return this.state/4294967296}
+ between(a,b){return a+(b-a)*this.next()}
+ index(n){return Math.floor(this.next()*n)}
+}
+class World {
+ constructor(seed){this.seed=seed>>>0;this.width=GW/CELL;this.height=GH/CELL;this.data=new Uint8Array(this.width*this.height);this.dirty=true;this.generate()}
+ idx(gx,gy){return gy*this.width+gx}
+ generate(){
+   let phase=(this.seed%997)/997;
+   for(let gx=0;gx<this.width;gx++){
+     const x=gx*CELL+1;
+     const ground=365+17*Math.sin(x*.009+phase)+12*Math.sin(x*.022+1.2)+6*Math.cos(x*.046+phase*2)-18*Math.exp(-Math.pow((x-480)/140,2));
+     for(let gy=0;gy<this.height;gy++){
+       const y=gy*CELL+1;
+       const wall=gx<3||gx>=this.width-3||gy<3||gy>=this.height-3;
+       this.data[this.idx(gx,gy)]=wall?2:(y>=ground?1:0);
+     }
+   }
+   this.dirty=true;
+ }
+ get(x,y){const gx=Math.floor(x/CELL),gy=Math.floor(y/CELL);return gx>=0&&gx<this.width&&gy>=0&&gy<this.height?this.data[this.idx(gx,gy)]:0}
+ solid(x,y){return this.get(x,y)!==0}
+ carve(cx,cy,r){
+   const minx=clamp(Math.floor((cx-r-5)/CELL),0,this.width-1),maxx=clamp(Math.ceil((cx+r+5)/CELL),0,this.width-1);
+   const miny=clamp(Math.floor((cy-r-5)/CELL),0,this.height-1),maxy=clamp(Math.ceil((cy+r+5)/CELL),0,this.height-1);
+   const phase=cx*.083+cy*.133+this.seed*.00001;let removed=0;
+   for(let gy=miny;gy<=maxy;gy++)for(let gx=minx;gx<=maxx;gx++){
+     const id=this.idx(gx,gy);if(!this.data[id])continue;
+     const dx=(gx+.5)*CELL-cx,dy=(gy+.5)*CELL-cy,a=Math.atan2(dy,dx);
+     const wobble=1+0.035*Math.sin(a*5+phase)+0.02*Math.sin(a*9-phase*2);
+     if(dx*dx+dy*dy<r*r*wobble*wobble){this.data[id]=0;removed++}
+   }
+   if(removed)this.dirty=true;
+   return removed;
+ }
+ nearest(x,y,max=31){
+   const loX=clamp(Math.floor((x-max)/CELL),0,this.width-1),hiX=clamp(Math.floor((x+max)/CELL),0,this.width-1);
+   const loY=clamp(Math.floor((y-max)/CELL),0,this.height-1),hiY=clamp(Math.floor((y+max)/CELL),0,this.height-1);
+   let best=max*max+1,bx=0,by=0;
+   for(let gy=loY;gy<=hiY;gy++)for(let gx=loX;gx<=hiX;gx++){
+     if(!this.data[this.idx(gx,gy)])continue;
+     const xx=(gx+.5)*CELL,yy=(gy+.5)*CELL,dd=(xx-x)**2+(yy-y)**2;
+     if(dd<best){best=dd;bx=xx;by=yy}
+   }
+   if(best>max*max)return null;
+   const d=Math.sqrt(best),nx=d>0.01?(x-bx)/d:0,ny=d>0.01?(y-by)/d:-1;
+   return {d,nx,ny,x:bx,y:by};
+ }
+ normalAt(x,y,vx,vy){
+   const k=7;
+   const gx=Number(this.solid(x-k,y))-Number(this.solid(x+k,y));
+   const gy=Number(this.solid(x,y-k))-Number(this.solid(x,y+k));
+   let d=len(gx,gy);
+   if(d>.01)return {x:gx/d,y:gy/d};
+   const v=len(vx,vy)||1;return {x:-vx/v,y:-vy/v};
+ }
+ // First solid near a tread. Search from ABOVE the wheels; terrain must genuinely exist.
+ // Starting below any overhead roof also keeps tunnels navigable.
+ surfaceNear(x,feet,stepUp=22,stepDown=42){
+   if(x<0||x>=GW)return null;
+   const top=Math.floor((feet-stepUp)/CELL)*CELL;
+   for(let y=top;y<=feet+stepDown;y+=CELL)if(this.solid(x,y))return y;
+   return null;
+ }
+ // Small three-point tread footprint: bumps can't snag the center, and a narrow
+ // hole won't drop a tank until there really is no ground beneath its treads.
+ contact(x,feet,stepUp=22,stepDown=42){
+   const left=this.surfaceNear(x-10,feet,stepUp,stepDown);
+   const middle=this.surfaceNear(x,feet,stepUp,stepDown);
+   const right=this.surfaceNear(x+10,feet,stepUp,stepDown);
+   const available=[left,middle,right].filter(v=>v!==null);
+   if(!available.length)return null;
+   const height=Math.min(...available);
+   const tilt=left!==null&&right!==null?clamp(Math.atan2(right-left,20),-.12,.12):0;
+   return {y:height-TANK_R-2,tilt,left,middle,right};
+ }
+ // First solid beneath the center; works with overhangs and excavated tunnels.
+ below(x,y,maxDrop=32){for(let dy=0;dy<=maxDrop;dy+=2)if(this.solid(x,y+dy))return y+dy;return null}
+ lineBlocked(ax,ay,bx,by){const n=Math.ceil(len(bx-ax,by-ay)/5);for(let i=2;i<n-2;i++){const t=i/n;if(this.solid(ax+(bx-ax)*t,ay+(by-ay)*t))return true}return false}
+ serialize(){return Array.from(this.data)}
+}
+function makeTank(id,world){
+ const x=id===0?145:815;
+ let y=100;
+ for(let py=100;py<GH-20;py+=2){if(world.solid(x,py)){y=py-TANK_R-2;break}}
+ return {id,x,y,vy:0,angle:id===0?46:134,power:67,hp:100,grounded:true,attach:'ground',tilt:0,normal:{x:0,y:-1},recoil:0,hitFlash:0,inventory:{standard:Infinity,heavy:2,cluster:1,mine:1,ricochet:2},weapon:'standard',facing:id===0?1:-1,fallMax:0};
+}
+function speedFor(power,kind){return (177+power*4.0)*(WEAPONS[kind].speed||1)}
+function newProjectile(t,kind){
+ const angle=t.angle*Math.PI/180,v=speedFor(t.power,kind),dx=Math.cos(angle),dy=-Math.sin(angle);
+ return {x:t.x+dx*23,y:t.y+dy*23,vx:dx*v,vy:dy*v,kind,owner:t.id,age:0,distance:0,bounces:0,split:false,escaped:false,trail:[]};
+}
+// Shared swept collision/integration logic for live projectiles and AI predictions.
+function advanceProjectile(p,world,tanks,wind,dt,skipFriendly=true){
+ const ox=p.x,oy=p.y;
+ p.vx+=wind*dt;p.vy+=GRAVITY*dt;
+ const nx=ox+p.vx*dt,ny=oy+p.vy*dt,dist=len(nx-ox,ny-oy),steps=Math.max(1,Math.ceil(dist/2.8));
+ for(let i=1;i<=steps;i++){
+   const xx=ox+(nx-ox)*i/steps,yy=oy+(ny-oy)*i/steps;
+   for(let j=0;j<tanks.length;j++){
+     const t=tanks[j];if(t.hp<=0)continue;
+     if(skipFriendly&&t.id===p.owner&&p.distance<37)continue;
+     if(len(xx-t.x,yy-t.y)<TANK_R+3){p.x=xx;p.y=yy;p.distance+=len(xx-ox,yy-oy);return {type:'tank',x:xx,y:yy,tank:t}}
+   }
+   if(world.solid(xx,yy)){
+     p.x=xx;p.y=yy;p.distance+=len(xx-ox,yy-oy);
+     return {type:'terrain',x:xx,y:yy,normal:world.normalAt(xx,yy,p.vx,p.vy)};
+   }
+ }
+ p.x=nx;p.y=ny;p.age+=dt;p.distance+=dist;
+ if(p.x<0||p.x>GW||p.y<0||p.y>GH)p.escaped=true;
+ return null;
+}
+function traceShot(t,kind,world,tanks,wind,limit=7.5){
+ const p=newProjectile(t,kind);let hit=null;const dt=STEP*2;let iterations=0;
+ while(p.age<limit&&iterations++<600){
+   hit=advanceProjectile(p,world,tanks,wind,dt);
+   if(hit){
+     if(kind==='ricochet'&&hit.type==='terrain'&&p.bounces<2){
+       const n=hit.normal,dot=p.vx*n.x+p.vy*n.y;
+       if(dot<0){p.vx-=1.76*dot*n.x;p.vy-=1.76*dot*n.y;p.x+=n.x*5;p.y+=n.y*5;p.bounces++;continue}
+     }
+     break;
+   }
+   if(p.x < -120||p.x>GW+120||p.y>GH+180||p.y<-300)break;
+ }
+ return {hit,p};
+}
+class TankGame {
+ constructor(seed,mode='solo',hooks={}){
+   this.seed=seed>>>0;this.rng=new Random(this.seed);this.world=new World(this.seed);
+   this.tanks=[makeTank(0,this.world),makeTank(1,this.world)];
+   this.mode=mode;this.hooks=hooks;this.turn=0;this.turnNumber=1;this.phase='aim';this.wind=this.rollWind();
+   this.projectiles=[];this.mines=[];this.drops=[];this.effects=[];this.particles=[];this.message='The border is not decorative.';
+   this.shotTimer=0;this.settleTimer=0;this.ai=null;this.winner=null;this.actions=[];this.lastBlast=null;
+ }
+ rollWind(){return Math.round(this.rng.between(-20,20))}
+ say(msg){this.message=msg;if(this.hooks.message)this.hooks.message(msg)}
+ sound(type){if(this.hooks.sound)this.hooks.sound(type)}
+ active(){return this.tanks[this.turn]}
+ isHuman(){return this.mode==='local'||this.turn===0}
+ canAct(id){return this.phase==='aim'&&this.turn===id&&this.isHuman()}
+ selectWeapon(kind){const t=this.active();if(!WEAPONS[kind]||kind==='bomblet'||!this.canAct(t.id))return false;if(!t.inventory[kind])return false;t.weapon=kind;return true}
+ changeAim(amount){const t=this.active();if(!this.canAct(t.id))return;t.angle=clamp(t.angle+amount,0,180)}
+ changePower(amount){const t=this.active();if(!this.canAct(t.id))return;t.power=clamp(t.power+amount,25,100)}
+ moveTank(t,dir,dt){
+   if(!dir||t.hp<=0)return;
+   const d=94*dt,oldX=t.x,oldY=t.y;
+   // Magnetic treads engage only the *actual* remaining wall. A blown-out
+   // patch breaks adhesion instead of becoming an invisible climbing surface.
+   if(t.attach==='right'||t.attach==='left'){
+     const side=t.attach==='right'?1:-1,wx=side>0?GW-5:5;
+     if(!this.world.solid(wx,t.y)){t.attach='air';t.grounded=false}
+     else {
+       const nextY=clamp(t.y-(dir===side?d:-d),23,GH-24);
+       if(this.world.solid(wx,nextY)){
+         t.y=nextY;t.x=side>0?GW-26:26;t.grounded=true;t.vy=0;
+         t.normal={x:-side,y:0};t.tilt=side*Math.PI/2;
+         if(t.y<=25&&this.world.solid(t.x,5)){
+           t.attach='ceiling';t.y=26;t.normal={x:0,y:1};t.tilt=Math.PI;
+         }
+       }else{t.attach='air';t.grounded=false}
+     }
+   } else if(t.attach==='ceiling'){
+     const nx=clamp(t.x+dir*d,25,GW-25);
+     if(this.world.solid(nx,5)){
+       t.x=nx;t.y=26;t.vy=0;t.grounded=true;t.normal={x:0,y:1};t.tilt=Math.PI;
+     }else{t.attach='air';t.grounded=false}
+   } else if(t.attach==='climb'){
+     // The same destructible collision cells provide traction on a crater lip.
+     // When the side is too steep for the wheels, treads climb its contour.
+     const near=this.world.nearest(t.x,t.y,TANK_R+11);
+     if(!near||near.nx*dir>-.12){t.attach='air';t.grounded=false}
+     else{
+       const nx=t.x+dir*d*Math.max(0,-near.ny);
+       const ny=t.y-d*Math.min(1.25,Math.max(.55,Math.abs(near.nx)*1.4));
+       const c=this.world.nearest(nx,ny,TANK_R+12);
+       if(c){
+         t.x=nx;t.y=ny;
+         if(c.d<TANK_R+2){t.x+=c.nx*(TANK_R+2-c.d);t.y+=c.ny*(TANK_R+2-c.d)}
+         t.grounded=true;t.vy=0;
+         const floor=this.world.contact(t.x,t.y+TANK_R+2);
+         if(c.ny<-.5&&floor&&Math.abs(floor.y-t.y)<10){t.attach='ground';t.y=floor.y}
+       }else{t.attach='air';t.grounded=false}
+     }
+   } else {
+     // Split large deltas into small physical steps; travel speed is constant
+     // and there is NO per-turn movement budget.
+     const count=Math.max(1,Math.ceil(d/2));
+     for(let i=0;i<count;i++){
+       const dx=dir*d/count,nx=clamp(t.x+dx,-60,GW+60);
+       if(nx>=GW-27&&dir>0&&this.world.solid(GW-5,t.y)){
+         t.attach='right';t.x=GW-26;t.vy=0;t.grounded=true;t.tilt=Math.PI/2;break;
+       }
+       if(nx<=27&&dir<0&&this.world.solid(5,t.y)){
+         t.attach='left';t.x=26;t.vy=0;t.grounded=true;t.tilt=-Math.PI/2;break;
+       }
+       if(t.attach==='ground'&&t.grounded){
+         const c=this.world.contact(nx,t.y+TANK_R+2);
+         // Only true near-vertical obstructions stop driving. Do not test the
+         // terrain at the old height: that makes even a gentle rise snag.
+         if(c&&c.y<t.y-15){
+           const near=this.world.nearest(t.x,t.y,TANK_R+10);
+           if(near&&near.nx*dir<-.3){t.attach='climb';t.grounded=true;t.vy=0}
+           break;
+         }
+         if(c&&c.y<=t.y+9){
+           t.x=nx;t.y=c.y;t.vy=0;t.grounded=true;t.attach='ground';
+           t.normal={x:0,y:-1};
+         }else{
+           t.x=nx;t.attach='air';t.grounded=false;
+         }
+       }else{
+         // Airborne tanks can grab an actual steep crater wall, rather than
+         // getting jammed against its underside by circle/terrain resolution.
+         const near=this.world.nearest(t.x,t.y,TANK_R+5);
+         if(near&&near.nx*dir<-.36&&near.d<=TANK_R+3){
+           t.attach='climb';t.grounded=true;t.vy=0;
+           break;
+         }
+         if(this.world.solid(nx,t.y)||this.world.solid(nx,t.y-8))break;
+         t.x=nx;
+       }
+     }
+   }
+   if(len(t.x-oldX,t.y-oldY)>.001&&this.hooks.tread)this.hooks.tread(t);
+   this.collectDrops(t);
+ }
+ updateTank(t,dt){
+   t.recoil=Math.max(0,t.recoil-dt*38);t.hitFlash=Math.max(0,t.hitFlash-dt*3.5);
+   if(t.hp<=0)return;
+   if(t.attach==='ceiling'&&!this.world.solid(t.x,5)){t.attach='air';t.grounded=false}
+   if(t.attach==='right'&&!this.world.solid(GW-5,t.y)){t.attach='air';t.grounded=false}
+   if(t.attach==='left'&&!this.world.solid(5,t.y)){t.attach='air';t.grounded=false}
+   if(t.attach==='ceiling'||t.attach==='left'||t.attach==='right')return;
+   if(t.attach==='climb'){
+     const near=this.world.nearest(t.x,t.y,TANK_R+8);
+     if(near&&near.d<=TANK_R+6){
+       const floor=this.world.contact(t.x,t.y+TANK_R+2);
+       if(near.ny<-.5&&floor&&Math.abs(floor.y-t.y)<10){t.attach='ground';t.y=floor.y}
+       else{t.vy=0;t.grounded=true;t.tilt+=clamp(-t.tilt,-dt*1.9,dt*1.9);return}
+     }else{t.attach='air';t.grounded=false}
+   }
+   const c=this.world.contact(t.x,t.y+TANK_R+2);
+   // Stable ground support uses the same 3 wheel probes as driving. A nearby
+   // lone pixel's normal no longer jerks the tank sideways or tilts it 25°.
+   if(t.attach==='ground'&&t.grounded&&c&&c.y>=t.y-16&&c.y<=t.y+10){
+     t.y=c.y;t.vy=0;t.normal={x:0,y:-1};
+     t.tilt+=clamp(c.tilt-t.tilt,-dt*1.9,dt*1.9);
+     return;
+   }
+   t.attach='air';t.grounded=false;
+   t.vy=clamp(t.vy+GRAVITY*dt,-400,690);
+   const oldY=t.y;
+   // Substep downward travel so falling tanks cannot skip thin ledges.
+   const n=Math.max(1,Math.ceil(Math.abs(t.vy*dt)/3));
+   for(let i=0;i<n;i++){
+     t.y+=t.vy*dt/n;
+     const hit=this.world.nearest(t.x,t.y,TANK_R+4);
+     if(hit&&hit.d<TANK_R+1){
+       t.x+=hit.nx*(TANK_R+1-hit.d);t.y+=hit.ny*(TANK_R+1-hit.d);
+       if(hit.ny<-.25&&t.vy>=0){
+         if(t.vy>155){this.damageTank(t,Math.round(clamp((t.vy-145)*.095,2,33)),'fall');this.makeDust(t.x,t.y+TANK_R,10)}
+         t.vy=0;t.grounded=true;t.attach='ground';
+         const landed=this.world.contact(t.x,t.y+TANK_R+2,15,14);
+         if(landed&&Math.abs(landed.y-t.y)<12)t.y=landed.y;
+         t.normal={x:0,y:-1};
+         break;
+       }else if(hit.ny>.4&&t.vy<0)t.vy=20;
+     }
+   }
+   if(t.attach==='air')t.tilt+=clamp(-t.tilt,-dt*1.3,dt*1.3);
+   else if(c)t.tilt+=clamp(c.tilt-t.tilt,-dt*1.9,dt*1.9);
+   if(t.y>GH+95||t.x< -90||t.x>GW+90)this.damageTank(t,100,'void');
+ }
+ damageTank(t,damage,cause){if(t.hp<=0||damage<=0)return;t.hp=Math.max(0,t.hp-damage);t.hitFlash=1;
+   if(t.hp===0){this.makeDust(t.x,t.y,22);this.say(cause==='void'?'The tank has left the premises.':cause==='fall'?'Gravity has won.':'One tank, fewer than before.');this.finish(t.id===0?1:0)}
+ }
+ shoot(id=this.turn,kind=null){
+   if(this.phase!=='aim'||this.turn!==id)return false;
+   const t=this.tanks[id],weapon=kind||t.weapon;
+   if(!WEAPONS[weapon]||weapon==='bomblet'||!t.inventory[weapon])return false;
+   if(Number.isFinite(t.inventory[weapon]))t.inventory[weapon]--;
+   const p=newProjectile(t,weapon);this.projectiles.push(p);t.recoil=7;
+   this.actions.push({
+     turn:this.turnNumber,player:id,angle:Math.round(t.angle*100)/100,power:Math.round(t.power*100)/100,
+     weapon,wind:this.wind,
+     launchPosition:{x:t.x,y:t.y,attachment:t.attach}, // enough to replay the shot after movement resolution
+     randomState:this.rng.state
+   });
+   this.phase='flight';this.shotTimer=0;this.settleTimer=0;this.sound(weapon);
+   this.say(weapon==='heavy'?'A persuasive argument.':weapon==='cluster'?'That seems excessive.':weapon==='mine'?'A problem for later.':weapon==='ricochet'?'Geometry is an accomplice.':'Shell away.');
+   return true;
+ }
+ ricochet(p,h){
+   if(h.type!=='terrain'||p.bounces>=2||p.kind!=='ricochet')return false;
+   const n=h.normal,dot=p.vx*n.x+p.vy*n.y;
+   if(dot>=-.01)return false;
+   p.vx=(p.vx-1.82*dot*n.x)*.84;p.vy=(p.vy-1.82*dot*n.y)*.84;
+   p.x+=n.x*5;p.y+=n.y*5;p.bounces++;
+   this.effects.push({kind:'spark',x:h.x,y:h.y,age:0,life:.34,size:19});this.makeDust(h.x,h.y,7);
+   this.sound('bounce');this.say('Calculated detour.');return true;
+ }
+ splitCluster(p){
+   const a=Math.atan2(p.vy,p.vx),base=len(p.vx,p.vy)*.78;
+   for(let i=-2;i<=2;i++){
+     const angle=a+i*.22;this.projectiles.push({x:p.x+i*2.3,y:p.y-3,vx:Math.cos(angle)*base,vy:Math.sin(angle)*base-35,kind:'bomblet',owner:p.owner,age:0,distance:40,bounces:0,split:true,escaped:p.escaped,trail:[]});
+   }
+   this.effects.push({kind:'spark',x:p.x,y:p.y,age:0,life:.3,size:24});this.sound('split');this.say('Five smaller problems.');
+ }
+ placeMine(p,h){
+   const n=h.normal||{x:0,y:-1};const x=h.x+n.x*9,y=h.y+n.y*9;
+   this.mines.push({x,y,vx:0,vy:0,owner:p.owner,age:0,armTurn:this.turnNumber+1,expires:this.turnNumber+5});
+   this.effects.push({kind:'spark',x,y,age:0,life:.35,size:15});this.sound('plant');
+ }
+ explode(x,y,kind,owner,directTank=null,depth=0){
+   const spec=WEAPONS[kind],r=spec.radius;
+   this.world.carve(x,y,r*.88);this.lastBlast={x,y,kind};
+   this.effects.push({kind:'blast',x,y,age:0,life:.58,size:r});
+   for(let i=0;i<Math.min(26,Math.round(r*.4));i++){
+     const a=this.rng.between(0,Math.PI*2),v=this.rng.between(40,165);
+     this.particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-35,life:this.rng.between(.35,.9),max:.9,kind:i%5===0?'spark':'dirt',size:this.rng.between(1.2,3)});
+   }
+   this.sound(kind==='heavy'?'heavyBoom':'boom');
+   if(this.hooks.shake)this.hooks.shake(spec.shake);
+   for(const t of this.tanks){if(t.hp<=0)continue;
+     const distance=Math.max(0,len(x-t.x,y-t.y)-TANK_R);
+     if(distance<r+6){const falloff=clamp(1-distance/(r+6),0,1);
+       let dmg=Math.round(spec.damage*(.18+.82*falloff));
+       if(t===directTank)dmg+=spec.direct;
+       if(this.world.lineBlocked(x,y,t.x,t.y))dmg=Math.round(dmg*.62);
+       this.damageTank(t,dmg,'blast');
+       if(t.hp>0&&falloff>.35){t.vy=Math.min(t.vy,-Math.min(175,115*falloff));if(t.attach!=='ground')t.attach='air'}
+     }
+   }
+   // Chain reactions are physical: mines within the blast radius detonate too.
+   if(depth<5){for(let i=this.mines.length-1;i>=0;i--){const m=this.mines[i];if(len(x-m.x,y-m.y)<r*.87){this.mines.splice(i,1);this.explode(m.x,m.y,'mine',m.owner,null,depth+1)}}}
+   for(let i=this.drops.length-1;i>=0;i--){if(len(x-this.drops[i].x,y-this.drops[i].y)<r*.7){const d=this.drops.splice(i,1)[0];const t=this.tanks[owner];if(t&&t.hp>0){t.inventory[d.type]++;this.say('Supply intercepted. '+d.type.toUpperCase()+' +1.')}}}
+ }
+ makeDust(x,y,n){for(let i=0;i<n;i++)this.particles.push({x,y,vx:this.rng.between(-50,50),vy:this.rng.between(-110,-15),life:this.rng.between(.3,.7),max:.7,kind:'dirt',size:this.rng.between(1,3)})}
+ spawnDrop(){if(this.drops.length>=2||this.phase==='gameover')return;const t=this.active();const x=clamp(t.x+(t.id===0?1:-1)*this.rng.between(55,112),65,GW-65),type=PICKUPS[this.rng.index(PICKUPS.length)];this.drops.push({x,y:43,vy:0,type,landed:false});this.say('SUPPLY DROP · '+type.toUpperCase())}
+ collectDrops(t){for(let i=this.drops.length-1;i>=0;i--){const d=this.drops[i];if(len(d.x-t.x,d.y-t.y)<32){t.inventory[d.type]++;this.drops.splice(i,1);this.say((t.id===0?'Red':'Green')+' collected '+d.type.toUpperCase()+' +1.');this.sound('pickup')}}}
+ updateDrops(dt){for(const d of this.drops){if(!d.landed){d.y+=76*dt;const bottom=d.y+7;if(this.world.solid(d.x,bottom+2)){d.y-=2;d.landed=true}}else if(!this.world.solid(d.x,d.y+8)){d.y+=Math.min(200*dt,5);d.landed=false}for(const t of this.tanks)if(t.hp>0)this.collectDrops(t)}}
+ updateMines(dt){for(let i=this.mines.length-1;i>=0;i--){const m=this.mines[i];m.age+=dt;if(!this.world.solid(m.x,m.y+9)){m.vy+=GRAVITY*dt;m.y+=Math.min(300,m.vy)*dt;if(this.world.solid(m.x,m.y+7)){m.y-=2;m.vy=0}}
+   const threat=this.tanks.some(t=>t.hp>0&&t.id!==m.owner&&len(t.x-m.x,t.y-m.y)<43);
+   if((this.turnNumber>=m.armTurn&&threat)||this.turnNumber>=m.expires){this.mines.splice(i,1);this.explode(m.x,m.y,'mine',m.owner);this.say('The mine remembered.')}}}
+ finish(winner){if(this.phase==='gameover')return;this.winner=winner;this.phase='gameover';this.ai=null;this.sound('win');if(this.hooks.end)this.hooks.end(winner)}
+ nextTurn(){
+   if(this.phase==='gameover')return;
+   this.turn=1-this.turn;this.turnNumber++;
+   const t=this.active();
+   // If a weapon is out, quietly fall back to reliable ammunition.
+   if(!t.inventory[t.weapon])t.weapon='standard';
+   this.wind=this.rollWind();this.phase='aim';this.shotTimer=0;this.settleTimer=0;
+   if(this.turnNumber%3===0)this.spawnDrop();
+   if(this.mode==='solo'&&this.turn===1)this.planAI();
+   else this.say((this.turn===0?'Red':'Green')+' to fire.');
+ }
+ planAI(){
+   this.phase='thinking';const plan=this.chooseAI();
+   this.ai={...plan,stage:'wait',time:.45};this.say('Green is considering the damage.');
+ }
+ chooseAI(){
+   const ai=this.tanks[1],enemy=this.tanks[0],moves=[-70,0,70],opts=[];
+   for(const dx of moves){
+     const clone={...ai,x:clamp(ai.x+dx,45,GW-45),y:ai.y};
+     const floor=this.world.below(clone.x,ai.y-20,75);if(floor!==null&&Math.abs((floor-TANK_R)-ai.y)<45)clone.y=floor-TANK_R-1;
+     const used=Math.abs(clone.x-ai.x);
+     const weapons=['standard',...PICKUPS.filter(w=>ai.inventory[w]>0)];
+     for(const kind of weapons){
+       for(let angle=15;angle<=175;angle+=6){
+         // Aim primarily toward the opponent, still allow back-bank ricochets.
+         if(angle<58&&kind!=='ricochet')continue;
+         for(let power=34;power<=99;power+=7){
+           clone.angle=angle;clone.power=power;
+           const tr=traceShot(clone,kind,this.world,[clone,enemy],this.wind);
+           const hit=tr.hit;
+           if(!hit)continue;
+           const d=Math.max(0,len(hit.x-enemy.x,hit.y-enemy.y)-TANK_R);
+           const spec=WEAPONS[kind];
+           let effectiveKind=kind==='cluster'?'bomblet':kind;
+           let radius=kind==='cluster'?73:spec.radius;
+           let damage=kind==='cluster'?27:spec.damage;
+           const projected=clamp(1-d/radius,0,1);
+           let score=damage*(.18+.82*projected)*(d<radius?1:0);
+           if(hit.type==='tank'&&hit.tank.id===0)score+=spec.direct+11;
+           if(d>radius){
+             // Terrain under the enemy is worth attacking, but less than a direct hit.
+             const underDist=len(hit.x-enemy.x,hit.y-(enemy.y+16));
+             if(underDist<spec.radius*1.7)score+=10*(1-underDist/(spec.radius*1.7));
+           }
+           if(kind==='mine'){score=score*.64+(d<120?6:0)}
+           if(kind==='ricochet'&&tr.p.bounces===0)score-=4;
+           if(kind==='heavy')score-=3; // conserve scarce supplies
+           if(kind==='cluster')score-=3;
+           if(used>0)score-=1.5+used*.018;
+           if(len(hit.x-clone.x,hit.y-clone.y)<spec.radius+35)score-=30;
+           if(tr.p.escaped)score-=15;
+           opts.push({score,kind,angle,power,moveX:clone.x});
+         }
+       }
+     }
+   }
+   opts.sort((a,b)=>b.score-a.score);
+   const best=opts[0]||{kind:'standard',angle:132,power:67,moveX:ai.x,score:0};
+   // Controlled imperfection. Ballistic search is real; the motor is not perfect.
+   return {...best,angle:clamp(best.angle+this.rng.between(-2.0,2.0),0,180),power:clamp(best.power+this.rng.between(-2.7,2.7),25,100)};
+ }
+ stepAI(dt){if(!this.ai||this.phase!=='thinking')return;const a=this.ai,t=this.tanks[1];a.time-=dt;
+   if(a.stage==='wait'&&a.time<=0){a.stage='move';a.time=2.1}
+   if(a.stage==='move'){
+     if(Math.abs(t.x-a.moveX)>3&&a.time>0)this.moveTank(t,Math.sign(a.moveX-t.x),dt);
+     else{a.stage='aim';a.time=.42;t.angle=a.angle;t.power=a.power;t.weapon=a.kind}
+     if(a.time<=0){a.stage='aim';a.time=.42;t.angle=a.angle;t.power=a.power;t.weapon=a.kind}
+   }else if(a.stage==='aim'&&a.time<=0){this.phase='aim';this.shoot(1,a.kind);this.ai=null}
+ }
+ tick(dt=STEP){
+   if(this.phase==='gameover'){this.updateFx(dt);return}
+   if(this.phase==='thinking')this.stepAI(dt);
+   for(const t of this.tanks)this.updateTank(t,dt);
+   this.updateMines(dt);this.updateDrops(dt);
+   if(this.phase==='flight'){
+     this.shotTimer+=dt;
+     for(let i=this.projectiles.length-1;i>=0;i--){
+       const p=this.projectiles[i];
+       const h=advanceProjectile(p,this.world,this.tanks,this.wind,dt);
+       if(!h&&p.kind==='cluster'&&!p.split&&p.age>.6&&p.vy>65){this.projectiles.splice(i,1);this.splitCluster(p);continue}
+       if(h){
+         if(this.ricochet(p,h))continue;
+         this.projectiles.splice(i,1);
+         if(p.kind==='mine')this.placeMine(p,h);
+         else if(p.kind==='cluster')this.splitCluster(p);
+         else this.explode(h.x,h.y,p.kind,p.owner,h.type==='tank'?h.tank:null);
+       }else{
+         if(p.escaped&&this.hooks.escape)this.hooks.escape(p);
+         if(p.age>11||p.x < -370||p.x>GW+370||p.y>GH+300||p.y < -430)this.projectiles.splice(i,1);
+         else if(this.projectiles.includes(p)&&this.shotTimer>12)this.projectiles.splice(i,1);
+       }
+       if(this.projectiles.includes(p)&&this.turnNumber%1===0){if(p.trail.length>16)p.trail.shift();p.trail.push([p.x,p.y])}
+     }
+     if(this.projectiles.length===0){this.settleTimer+=dt;
+       const moving=this.tanks.some(t=>!t.grounded&&t.hp>0&&t.vy>8);
+       if(this.settleTimer>(moving?2.1:.86))this.nextTurn();
+     }else this.settleTimer=0;
+   }
+   this.updateFx(dt);
+ }
+ updateFx(dt){
+   for(let i=this.effects.length-1;i>=0;i--){const e=this.effects[i];e.age+=dt;if(e.age>=e.life)this.effects.splice(i,1)}
+   for(let i=this.particles.length-1;i>=0;i--){const p=this.particles[i];p.life-=dt;p.vy+=GRAVITY*.32*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;
+     if(p.life<=0)this.particles.splice(i,1)}
+ }
+ snapshot(){return {
+   version:1,seed:this.seed,mode:this.mode,turn:this.turn,turnNumber:this.turnNumber,
+   phase:this.phase,wind:this.wind,randomState:this.rng.state,
+   tanks:this.tanks.map(t=>({...t,inventory:{...t.inventory},normal:{...t.normal}})),
+   mines:this.mines.map(m=>({...m})),drops:this.drops.map(d=>({...d})),
+   projectiles:this.projectiles.map(p=>({...p,trail:p.trail.slice()})),
+   actions:this.actions.map(a=>({...a})),terrain:Array.from(this.world.data)
+ }}
+}
+// -- CORE END --
 
-function spark(x, y, n, colour, spread) {
-  for (let i = 0; i < n; i++) {
-    const a = Math.random() * Math.PI * 2, s = (spread || 2.4) * (.4 + Math.random());
-    sprigs.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - .7, life: 1, decay: .035 + Math.random() * .03, colour });
-  }
+// -- BROWSER BEGIN --
+const page=document.getElementById('page'),arena=document.getElementById('arena'),canvas=document.getElementById('scene'),ctx=canvas.getContext('2d');
+const tempCanvas=document.createElement('canvas');tempCanvas.width=GW/CELL;tempCanvas.height=GH/CELL;const tc=tempCanvas.getContext('2d',{willReadFrequently:true});
+const $=id=>document.getElementById(id);
+let game=null,muted=false,audio=null,pressed=new Set(),accumulator=0,lastTime=0,shake=0,uiHitCooldown=0,drawScale=1,geo={x:0,y:0,scale:1};
+let messages=['THAT WAS THE MENU.','THAT IS NOT THE ENEMY.','THE WALL WAS HOLDING THINGS TOGETHER.','VERY GOOD. NOW THE BUTTON.','THE INTERFACE OBJECTS.'];
+function startAudio(){if(muted)return;try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume()}catch(e){}}
+function noiseSound(type){if(muted||!audio)return;const now=audio.currentTime;
+  const tone=(freq,rate,time,volume,wave='triangle')=>{const o=audio.createOscillator(),g=audio.createGain();o.type=wave;o.frequency.setValueAtTime(freq,now);o.frequency.exponentialRampToValueAtTime(Math.max(24,freq*rate),now+time);g.gain.setValueAtTime(Math.max(.0001,volume),now);g.gain.exponentialRampToValueAtTime(.0001,now+time);o.connect(g).connect(audio.destination);o.start(now);o.stop(now+time+.02)};
+  if(type==='bounce'){tone(920,.45,.14,.055,'sine');return}if(type==='pickup'||type==='win'){tone(580,1.45,.24,.06,'sine');if(type==='win')setTimeout(()=>tone(870,1.2,.36,.06,'sine'),110);return}
+  if(type==='plant'){tone(300,.55,.14,.04);return}
+  if(type==='split'){tone(740,.5,.12,.055);return}
+  if(type==='standard'||type==='heavy'||type==='cluster'||type==='mine'||type==='ricochet'){tone(type==='heavy'?165:260,.22,type==='heavy'?.32:.19,type==='heavy'?.13:.065,type==='ricochet'?'square':'triangle');return}
+  tone(type==='heavyBoom'?95:155,.20,type==='heavyBoom'?.52:.32,type==='heavyBoom'?.17:.09,'sawtooth');
 }
-function note(text, x, y, colour, size) { notes.push({ text, x, y, colour, size: size || 13, life: 1 }); }
-
-/* ── Match flow ─────────────────────────────────────────────────────────── */
-
-function reset() {
-  aim[1] = { angle: 45, power: 12 }; aim[2] = { angle: 45, power: 12 };
-  facing[1] = -1; facing[2] = 1;
-  sel = 'standard'; walk = 0; walkVel = 0; charge = chargeFrom = pointer = null;
-  aiPlan = null; aiTick = 0; anim = null; sprigs = []; notes = []; shake = 0;
-  lastNow = 0;
-  brandHits = 0;
-  brandEl.firstChild.textContent = 'TANK 2';
+function resize(){const r=page.getBoundingClientRect(),a=arena.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);
+  const w=Math.round(r.width*dpr),h=Math.round(r.height*dpr);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';ctx.setTransform(dpr,0,0,dpr,0,0);
+  geo={x:a.left-r.left,y:a.top-r.top,scale:a.width/GW,width:r.width,height:r.height};
 }
-function syncMode() {
-  if (!world) return mode = 'TITLE';
-  if (world.winner) return mode = 'OVER';
-  if (online) return mode = (online.canPlay() && state.turn === online.seat) ? 'AIM' : 'WAIT';
-  return mode = (aiEnabled && state.turn === 2) ? 'CPU' : 'AIM';
+function makeTexture(){if(!game)return;const w=game.world.width,h=game.world.height,data=game.world.data,out=tc.createImageData(w,h);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+   const id=y*w+x,v=data[id],b=id*4;if(!v)continue;
+   const edge=(x>0&&!data[id-1])||(x<w-1&&!data[id+1])||(y>0&&!data[id-w])||(y<h-1&&!data[id+w]);
+   if(v===2){const c=edge?44:72;out.data[b]=c;out.data[b+1]=c-2;out.data[b+2]=c-7;out.data[b+3]=255}
+   else{
+     let hash=Math.imul(x+1,374761393)^Math.imul(y+1,668265263);hash=Math.imul(hash^(hash>>>13),1274126177);const grain=((hash^(hash>>>16))>>>0)%11-5;
+     if(edge){out.data[b]=143;out.data[b+1]=133;out.data[b+2]=114}
+     else{out.data[b]=230+Math.floor(grain*.4);out.data[b+1]=220+Math.floor(grain*.35);out.data[b+2]=199+Math.floor(grain*.4)}
+     out.data[b+3]=255;
+   }
+ }
+ tc.putImageData(out,0,0);game.world.dirty=false;
 }
-function freshMatch(seed) {
-  const s = seed != null ? seed : ((engine && window.__boredSeed && (window.__boredSeed.seed >>> 0)) ||
-    (((Date.now() * 2654435761 + 1) >>> 0) || 1));
-  state = engine.opening(s);
-  world = engine.replay(state);
-  winner = null; overFor = 0;
-  reset();
-  syncMode();
-  paint(0);
+function drawTank(t,now){if(t.hp<=0)return;
+ ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.tilt);
+ const fill=t.id===0?'#b93d33':'#447e65';
+ // Chassis and two chunky little treads.
+ ctx.fillStyle='#34332d';ctx.beginPath();ctx.roundRect(-15,7,30,8,3);ctx.fill();
+ ctx.fillStyle='#fdfbf5';for(let i=-10;i<=10;i+=5){ctx.beginPath();ctx.arc(i,11,1.25,0,Math.PI*2);ctx.fill()}
+ ctx.fillStyle=fill;ctx.strokeStyle='#33312d';ctx.lineWidth=1.35;
+ ctx.beginPath();ctx.moveTo(-12,6);ctx.lineTo(-9,-4);ctx.lineTo(6,-7);ctx.lineTo(13,5);ctx.closePath();ctx.fill();ctx.stroke();
+ ctx.beginPath();ctx.arc(0,-4,5.7,Math.PI,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore();
+ // Turret rotation is independent of the slope of the hull.
+ ctx.save();ctx.translate(t.x,t.y-4);const a=-t.angle*Math.PI/180;
+ ctx.rotate(a);ctx.strokeStyle='#302e28';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(2-t.recoil,0);ctx.lineTo(22-t.recoil,0);ctx.stroke();
+ ctx.strokeStyle=t.id===0?'#e6b4a4':'#b9d5bc';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(6-t.recoil,-1.5);ctx.lineTo(19-t.recoil,-1.5);ctx.stroke();ctx.restore();
+ ctx.beginPath();ctx.arc(t.x,t.y-4,2.5,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();
+ if(t.hitFlash>0){ctx.save();ctx.globalAlpha=t.hitFlash*.42;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(t.x,t.y,17,0,Math.PI*2);ctx.fill();ctx.restore()}
+ // Very small HP pip, not a billboard.
+ const width=30;ctx.fillStyle='rgba(52,50,42,.17)';ctx.fillRect(t.x-width/2,t.y-30,width,2);ctx.fillStyle=fill;ctx.fillRect(t.x-width/2,t.y-30,width*t.hp/100,2);
 }
-function repaint(next, events) {
-  state = next;
-  world = engine.replay(state);
-  winner = state.winner || world.winner || null;
-  walk = 0; walkVel = 0; charge = chargeFrom = null;
-  if (winner) { syncMode(); overFor = 0; }
-  else syncMode();
-  if (events) aftermath(events);
-  seenTurn.seat = state.turn; seenTurn.at = performance.now();
-  paint(0);
+function drawTrajectory(t){if(!game||game.phase!=='aim'&&game.phase!=='thinking')return;
+ if(game.mode==='solo'&&game.turn===1)return;
+ const p=newProjectile(t,t.weapon);const positions=[];
+ for(let i=0;i<270;i++){
+   const h=advanceProjectile(p,game.world,game.tanks,game.wind,STEP*2);
+   if(i%7===0)positions.push([p.x,p.y]);
+   if(h||p.x< -100||p.x>GW+100||p.y>GH+150||p.y< -210)break;
+ }
+ ctx.save();ctx.fillStyle=t.id===0?'rgba(171,65,50,.43)':'rgba(58,111,82,.48)';
+ positions.slice(0,Math.ceil(positions.length*.88)).forEach(([x,y],i)=>{ctx.globalAlpha=.45+i/Math.max(1,positions.length)*.45;ctx.beginPath();ctx.arc(x,y,1.3,0,Math.PI*2);ctx.fill()});ctx.restore();
 }
-
-/* Controls belong to whoever is on: one seat drives with A/D, the other arrows,
- * and an online side only takes the wheel when the record says it is its turn. */
-function turnSeat() {
-  if (online) return online.seat;
-  if (aiEnabled && state && state.turn === 2) return 2;
-  return state ? state.turn : 1;
+function drawDrop(d,time){ctx.save();ctx.translate(d.x,d.y);ctx.strokeStyle='#665d48';ctx.lineWidth=1.1;ctx.fillStyle='#fff9eb';
+ if(!d.landed){ctx.setLineDash([2,3]);ctx.beginPath();ctx.arc(0,-13,12,Math.PI,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(-12,-13);ctx.lineTo(-8,-5);ctx.moveTo(12,-13);ctx.lineTo(8,-5);ctx.stroke()}
+ ctx.fillRect(-8,-5,16,13);ctx.strokeRect(-8,-5,16,13);ctx.fillStyle='#bd813e';ctx.fillRect(-2,-4,4,11);ctx.restore();}
+function drawMine(m,time){ctx.save();ctx.translate(m.x,m.y);ctx.strokeStyle='#2d2b27';ctx.fillStyle=m.owner===0?'#b93d33':'#447e65';ctx.lineWidth=1;ctx.beginPath();ctx.arc(0,0,6,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(-8,-2);ctx.lineTo(8,-2);ctx.moveTo(0,-8);ctx.lineTo(0,6);ctx.stroke();if(game.turnNumber>=m.armTurn&&Math.sin(time*8)>0){ctx.fillStyle='#fff4db';ctx.fillRect(-1,-2,2,2)}ctx.restore()}
+function drawEffects(){for(const e of game.effects){const f=e.age/e.life;ctx.save();
+ if(e.kind==='blast'){
+   ctx.strokeStyle=`rgba(177,95,65,${.55*(1-f)})`;ctx.lineWidth=(2.3-f*1.4);ctx.beginPath();ctx.arc(e.x,e.y,7+e.size*.77*f,0,Math.PI*2);ctx.stroke();
+   ctx.strokeStyle=`rgba(75,68,53,${.28*(1-f)})`;ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(e.x,e.y,4+e.size*f,0,Math.PI*2);ctx.stroke();
+   ctx.fillStyle=`rgba(223,158,105,${.17*(1-f)})`;ctx.beginPath();ctx.arc(e.x,e.y,6+e.size*.72*f,0,Math.PI*2);ctx.fill();
+ }else{ctx.strokeStyle=`rgba(212,125,72,${1-f})`;ctx.lineWidth=2*(1-f);ctx.beginPath();ctx.arc(e.x,e.y,e.size*f,0,Math.PI*2);ctx.stroke()}
+ ctx.restore()}
+ for(const p of game.particles){ctx.fillStyle=p.kind==='spark'?`rgba(197,117,63,${clamp(p.life/p.max,0,1)})`:`rgba(141,125,96,${clamp(p.life/p.max,0,1)})`;ctx.fillRect(p.x,p.y,p.size,p.size)}
 }
-function live() {
-  if (!world || world.winner) return false;
-  if (online) return mode === 'AIM' && online.canPlay() && state.turn === online.seat;
-  return mode === 'AIM' && !(aiEnabled && state.turn === 2);
+function drawWorld(time){if(!game)return;if(game.world.dirty)makeTexture();
+ ctx.clearRect(0,0,geo.width,geo.height);
+ ctx.save();if(shake>0.04){ctx.translate(Math.sin(time*101)*shake,Math.cos(time*119)*shake*.52);shake*=.89}else shake=0;
+ ctx.translate(geo.x,geo.y);ctx.scale(geo.scale,geo.scale);
+ // No decorative border: the grid is the single physical wall.
+ ctx.imageSmoothingEnabled=true;ctx.drawImage(tempCanvas,0,0,GW,GH);
+ drawTrajectory(game.active());
+ for(const d of game.drops)drawDrop(d,time);
+ for(const m of game.mines)drawMine(m,time);
+ for(const t of game.tanks)drawTank(t,time);
+ for(const p of game.projectiles){
+   ctx.save();ctx.strokeStyle=p.kind==='heavy'?'rgba(115,77,54,.35)':'rgba(85,79,65,.22)';ctx.lineWidth=p.kind==='heavy'?2:1;
+   ctx.beginPath();for(let i=0;i<p.trail.length;i++){let q=p.trail[i];if(i===0)ctx.moveTo(...q);else ctx.lineTo(...q)}ctx.stroke();
+   ctx.fillStyle=p.kind==='cluster'?'#b46d38':p.kind==='mine'?'#447e65':'#34302a';ctx.beginPath();ctx.arc(p.x,p.y,p.kind==='heavy'?4.4:p.kind==='bomblet'?2:3.2,0,Math.PI*2);ctx.fill();
+   ctx.restore();
+ }
+ drawEffects();ctx.restore();
 }
-function draft() {
-  if (!world || world.winner || anim) return null;
-  const seat = turnSeat(), a = aim[seat];
-  let weapon = sel;
-  if (weapon !== 'standard' && !(world.tanks[seat - 1].ammo[weapon] > 0)) { weapon = 'standard'; sel = 'standard'; }
-  return { seat, drive: Math.round(walk), angle: Math.round(a.angle), power: charging() ? Math.round(charge * 10) / 10 : Math.round(a.power * 10) / 10, weapon };
+function uiHit(p){if(uiHitCooldown>0)return;const r=page.getBoundingClientRect(),x=r.left+geo.x+p.x*geo.scale,y=r.top+geo.y+p.y*geo.scale;
+ const targets=[...document.querySelectorAll('#title span,#windIndicator,.toggle,.weapon,.controls-info,.event-line,.display-number,.seed')];
+ for(const element of targets){const b=element.getBoundingClientRect();if(x>=b.left-2&&x<=b.right+2&&y>=b.top-2&&y<=b.bottom+2){
+   uiHitCooldown=.85;
+   element.classList.remove('rattle','loose');void element.offsetWidth;
+   if(element.parentElement?.id==='title'){element.classList.add('loose');setTimeout(()=>element.classList.remove('loose'),2100)}
+   else{element.classList.add('rattle');setTimeout(()=>element.classList.remove('rattle'),600)}
+   if(p.owner!==undefined)game.say(messages[game.rng.index(messages.length)]);
+   game.effects.push({kind:'spark',x:p.x,y:p.y,age:0,life:.33,size:26});noiseSound('bounce');
+   const i=game.projectiles.indexOf(p);if(i>=0)game.projectiles.splice(i,1);break;
+ }}
 }
-function charging() { return charge !== null; }
-let pressAt = 0;
-function pressFire() {
-  if (!live() || charging()) return;
-  charge = chargeFrom = clampN(aim[turnSeat()].power, 2, engine.MAXPW);
-  pressAt = performance.now();
+function updateHUD(){if(!game)return;
+ const t=game.active();$('redHP').textContent=game.tanks[0].hp;$('greenHP').textContent=game.tanks[1].hp;
+ $('redHealth').style.width=game.tanks[0].hp+'%';$('greenHealth').style.width=game.tanks[1].hp+'%';
+ $('redName').textContent='RED · '+(game.mode==='solo'?'YOU':'P1');$('greenName').textContent='GREEN · '+(game.mode==='solo'?'CPU':'P2');
+ $('turnCaption').textContent=game.phase==='gameover'?'MATCH OVER':game.phase==='flight'?'SHELL IN FLIGHT':game.phase==='thinking'?'GREEN IS THINKING':(game.turn===0?'RED':'GREEN')+' TO FIRE · TURN '+String(game.turnNumber).padStart(2,'0');
+ $('angleValue').textContent=Math.round(t.angle)+'°';$('powerValue').textContent=Math.round(t.power)+'%';
+ $('windValue').textContent=(game.wind>0?'+':'')+game.wind;$('windArrow').textContent=game.wind===0?'·':game.wind>0?'→':'←';
+ $('message').textContent=game.message;
+ for(const b of document.querySelectorAll('.weapon')){
+   const w=b.dataset.weapon,n=t.inventory[w];b.disabled=!game.isHuman()||game.phase!=='aim'||!n;
+   b.classList.toggle('active',t.weapon===w);b.classList.toggle('green-active',t.weapon===w&&t.id===1);
+   const label=b.querySelector('[data-count]'),suffix={standard:'reliable',heavy:'demolition',cluster:'airburst',mine:'area denial',ricochet:'bounce ×2'}[w];label.textContent=(Number.isFinite(n)?n:'∞')+' · '+suffix;
+ }
+ $('soloBtn').classList.toggle('selected',game.mode==='solo');$('twoBtn').classList.toggle('selected',game.mode==='local');
+ $('soloBtn').setAttribute('aria-pressed',game.mode==='solo');$('twoBtn').setAttribute('aria-pressed',game.mode==='local');
+ $('seedLabel').textContent='SEED '+game.seed;
 }
-function releaseFire() {
-  if (!charging()) return;
-  const power = Math.max(chargeFrom === null ? 0 : chargeFrom, charge);
-  charge = chargeFrom = null;
-  if (!live()) return;
-  const shot = draft();
-  if (shot) { shot.power = Math.round(power * 10) / 10; fire(shot); }
+let sessionWins=0;
+// Native Bored score and daily-challenge adapter. This is per iframe/session.
+window.__boredSnapshot=()=>({slug:'tank2',won:sessionWins,cpu:!!game&&game.mode==='solo',started:!!game,finished:!!game&&game.phase==='gameover'});
+function setup(mode='solo',seed=null){
+ pressed.clear();$('endScreen').classList.remove('open');
+ const urlSeed=new URLSearchParams(location.search).get('seed');
+ const n=seed??(urlSeed?Number(urlSeed)>>>0:((Date.now()^Math.floor(Math.random()*0xffffffff))>>>0));
+ game=new TankGame(n,mode,{message:()=>{},sound:noiseSound,shake:v=>{shake=Math.min(6,shake+v)},escape:uiHit,end:w=>{
+   if(mode==='solo'&&w===0)sessionWins++;
+   $('endScreen').classList.add('open');$('endHeading').textContent=(w===0?'Red':'Green')+' wins.';
+   $('endText').textContent=game.tanks[1-w].hp<=0?'The arena is in a somewhat different condition now.':'A conclusion has been reached.';
+ }});
+ window.tank2=game;makeTexture();updateHUD();resize();
 }
-function tapFire() {
-  if (!live()) return;
-  const shot = draft();
-  if (shot) fire(shot);
+function humanInput(dt){if(!game||game.phase!=='aim'||!game.isHuman())return;
+ const t=game.active(),isRed=t.id===0;
+ // Red A / D adjust the barrel up / down. Green arrows track their
+ // screen directions: left aims more left (angle ↑), right aims more right.
+ const aimLeft=isRed?'KeyA':'ArrowLeft',aimRight=isRed?'KeyD':'ArrowRight';
+ const powerUp=isRed?'KeyW':'ArrowUp',powerDown=isRed?'KeyS':'ArrowDown';
+ const driveLeft=isRed?'KeyQ':'Comma',driveRight=isRed?'KeyE':'Period';
+ if(pressed.has(aimLeft))game.changeAim(46*dt);
+ if(pressed.has(aimRight))game.changeAim(-46*dt);
+ if(pressed.has(powerUp))game.changePower(41*dt);
+ if(pressed.has(powerDown))game.changePower(-41*dt);
+ const move=(pressed.has(driveRight)?1:0)-(pressed.has(driveLeft)?1:0);
+ if(move)game.moveTank(t,move,dt);
 }
-
-/* ── One shot: animate the exact trail the rules will replay ────────────── */
-
-function fire(shot) {
-  if (!shot || !state || world.winner || anim) return;
-  const before = engine.replay(state);
-  let out;
-  try { out = engine.advance(state, shot); }
-  catch (error) {
-    if (online) return bridge.error(error, () => { try { repaint(online.state()); } catch (e2) { } setTimeout(() => fire(shot), 30); });
-    note(error.message.toUpperCase().slice(0, 40), 480, 296, C.red, 12);
-    walk = 0; charge = chargeFrom = null; return;
-  }
-  const index = state.shots.length;
-  const fresh = out.world.trails.slice(before.trails.length);
-  const lens = fresh.map(t => t.length);
-  const total = lens.reduce((a, b) => a + b, 0);
-  const speed = Math.max(2, total / 90);           // one shell lands in about a second
-  let cursor = 0;
-  const items = fresh.map(t => { const start = cursor; cursor += t.length; return { trail: t, start, len: t.length }; });
-  const impact = out.world.bursts.find(b => b.at === index) || null;
-  anim = {
-    items, speed, total, frame: 0, pre: before, out, impact,
-    events: out.world.events.slice(before.events.length),
-    at: performance.now(), doneAt: 0
-  };
-  walk = 0; walkVel = 0; charge = chargeFrom = null;
-  mode = 'ANIM';
-  if (online) {
-    online.busy = true;
-    online.canonical = null;
-    online.job = online.submit({ seat: shot.seat, drive: shot.drive, angle: shot.angle, power: shot.power,
-      weapon: shot.weapon, won: out.next.winner || null }).then(c => { online.canonical = c; return c; });
-  }
-  paint(0);
-}
-function finishShot() {
-  if (!anim) return;
-  const done = anim;
-  anim = null;
-  if (online) {
-    if (!online.canonical) { anim = done; setTimeout(finishShot, 90); return; }
-    const canonical = online.canonical;
-    online.canonical = null; online.busy = false;
-    if (canonical) online.use(canonical);
-    repaint(canonical ? canonical.state : state, done.events);
-    bridge.finishTurn();
-    return;
-  }
-  if (done.out.next.winner === 1 && aiEnabled) sessionWins++;
-  repaint(done.out.next, done.events);
-}
-
-/* An escaping shell can mess with the surrounding UI, but only cosmetically.
- * Controls and health values remain fully usable and accurate. */
-function hitOutsideUI(ev) {
-  let element;
-  if (ev.wall === 0) element = ev.x < 550 ? brandEl : document.getElementById('hud');
-  else if (ev.wall === 1) element = document.getElementById('hud');
-  else if (ev.wall === 2) {
-    const buttons = Array.from(armsEl.querySelectorAll('button')).filter(b => !b.disabled);
-    element = ev.x > 640 ? modeEl : buttons[Math.floor(ev.x / 960 * buttons.length)] || hintEl;
-  } else element = ev.y < 280 ? brandEl : hintEl;
-
-  if (element === brandEl) {
-    const letters = 'TANK 2'.split('');
-    brandHits = Math.min(brandHits + 1, 4);
-    for (const i of [1, 3, 0, 4].slice(0, brandHits)) letters[i] = ' ';
-    brandEl.firstChild.textContent = letters.join('');
-  }
-  element.classList.remove('shot-jolt');
-  void element.offsetWidth; // restart the effect if another shell hits
-  element.classList.add('shot-jolt');
-  setTimeout(() => element.classList.remove('shot-jolt'), 1250);
-  note('THAT WAS THE MENU!', clampN(ev.x, 110, 850), clampN(ev.y, 90, 505), C.red, 12);
-}
-
-function aftermath(events) {
-  const tankAt = s => { const t = world.tanks[s - 1]; return t ? anchor(t) : { x: 480, y: 290 }; };
-  for (const ev of events) {
-    if (ev.kind === 'hit') {
-      shake = Math.max(shake, Math.min(4, ev.damage * .09));
-      spark(ev.x, ev.y, 8 + Math.min(12, ev.damage / 4), COLOUR[ev.seat]);
-      note('-' + ev.damage, ev.x, ev.y - 16, COLOUR[ev.seat]);
-    } else if (ev.kind === 'land') {
-      const at = tankAt(ev.seat);
-      spark(at.x, at.y, 10, C.hair);
-      note('-' + ev.damage, at.x, at.y - 18, COLOUR[ev.seat]);
-      shake = Math.max(shake, 2.5);
-    } else if (ev.kind === 'crash') {
-      note('BONK. THE FLOOR IS GONE', clampN(ev.x, 80, 880), clampN(ev.y - 28, 70, 540), C.red, 11);
-      shake = Math.max(shake, 3);
-    } else if (ev.kind === 'escape') {
-      hitOutsideUI(ev);
-    } else if (ev.kind === 'fell_out') {
-      note('FELL OUT', clampN(ev.x, 80, 880), clampN(ev.y - 10, 70, 540), COLOUR[ev.seat]);
-      shake = Math.max(shake, 3);
-    } else if (ev.kind === 'plant') {
-      spark(ev.x, ev.y, 4, C.red, 1.2);
-    }
-  }
-}
-
-/* ── Aiming ghost: the arc the rules would fly, drawn thin ──────────────── */
-
-let ghost = { key: '', value: null };
-function ghostWorld() {
-  const seat = turnSeat(), t = world.tanks[seat - 1], id = aim[seat];
-  const moved = { ...t, s: engine.driveS(t.s, walk), angle: id.angle, dir: facing[seat] };
-  return { ...world, tanks: seat === 1 ? [moved, world.tanks[1]] : [world.tanks[0], moved] };
-}
-function ghostPath() {
-  if (!live()) return null;
-  const seat = turnSeat(), id = aim[seat];
-  const key = [engine.driveS(world.tanks[seat - 1].s, walk), id.angle,
-    charging() ? charge : id.power, sel, world.shotCount, world.blockHoles.length].join('|');
-  if (ghost.key !== key) {
-    ghost.key = key;
-    let g = null;
-    try { g = engine.guide(ghostWorld(), seat, id.angle, charging() ? charge : id.power, sel); } catch (e) { g = null; }
-    ghost.value = g;
-  }
-  return ghost.value;
-}
-
-/* ── AI: the same rules, a little planning ──────────────────────────────── */
-
-function blast(x, y, c, weapon) {
-  const r = (engine.RANGE[weapon] || 6) + 12, pair = engine.DAMAGE[weapon] || [8, 26];
-  const d = Math.hypot(c.x - x, c.y - y);
-  if (d >= r) return 0;
-  return Math.round(pair[0] + (1 - d / r) * (pair[1] - pair[0]));
-}
-/* Would this blast finish digging out the ground under that tank? The engine
- * knows the depth it has already lost; add what the shell would take. */
-function dumpScore(view, x, y, weapon, seat) {
-  const t = view.tanks[seat - 1], p = engine.ringPoint(t.s);
-  let along;
-  if (p.wall === 0) along = clampN(x, X0(), X1()) - X0();
-  else if (p.wall === 1) along = clampN(y, Y0(), Y1()) - Y0();
-  else if (p.wall === 2) along = X1() - clampN(x, X0(), X1());
-  else along = Y1() - clampN(y, Y0(), Y1());
-  const near = Math.abs(along - p.along) <= (engine.CARVE[weapon] || 10) + 10;
-  if (!near) return 0;
-  return engine.floorDepthAt(view, along) + (engine.BITE[weapon] || 10) >= -6 ? 1 : 0;
-}
-function scoreShot(view, seat, angle, power, weapon) {
-  const g = engine.guide(view, seat, angle, power, weapon);
-  const h = g.hit, kind = typeof h === 'string' ? h : h.kind;
-  if (kind === 'out' || kind === 'stall') return -9;
-  if (kind === 'plant') {
-    const foe = anchor(view.tanks[2 - seat]), me = anchor(view.tanks[seat - 1]);
-    return 40 - Math.hypot(h.x - foe.x, h.y - foe.y) * .28 - Math.hypot(h.x - me.x, h.y - me.y) * .9;
-  }
-  let s = blast(h.x, h.y, anchor(view.tanks[2 - seat]), weapon) - blast(h.x, h.y, anchor(view.tanks[seat - 1]), weapon) * 1.25;
-  if (kind === 'block') s -= 6;
-  if (kind === 'tank' && h.seat === 2 - seat) s += 10;
-  if (kind === 'ground' || kind === 'wall' || kind === 'tank') {
-    if (dumpScore(view, h.x, h.y, weapon, 2 - seat)) s += 22;
-    if (dumpScore(view, h.x, h.y, weapon, seat)) s -= 32;
-  }
-  return s;
-}
-function movedWorld(view, seat, drive, angle) {
-  const t = view.tanks[seat - 1];
-  const moved = { ...t, s: engine.driveS(t.s, drive), dir: drive > 0 ? 1 : drive < 0 ? -1 : t.dir, angle, falling: null };
-  return { ...view, tanks: seat === 1 ? [moved, { ...view.tanks[1] }] : [{ ...view.tanks[0] }, moved] };
-}
-function supportAt(view, s) { return engine.supported(view, { s: engine.driveS(s, 0), falling: null, hp: 1 }); }
-
-function plan() {
-  const seat = 2, view = engine.replay(state), me = view.tanks[1];
-  const cands = [];
-  for (const weapon of engine.WEAPONS) {
-    if (weapon !== 'standard' && !(me.ammo[weapon] > 0)) continue;
-    for (let a = 5; a <= 85; a += 4) for (let p = 4; p <= 23; p += 4) {
-      cands.push({ drive: 0, angle: a, power: p, weapon, score: scoreShot(view, seat, a, p, weapon) });
-    }
-  }
-  cands.sort((a, b) => b.score - a.score);
-  let best = cands[0];
-  if (!best || best.score < 14) {
-    for (const drive of [-320, -190, -90, 90, 190, 320]) {
-      if (!supportAt(view, me.s + drive)) continue;
-      const travel = movedWorld(view, seat, drive, 45);
-      for (const weapon of ['standard', 'heavy', 'cluster', 'ricochet']) {
-        if (weapon !== 'standard' && !(me.ammo[weapon] > 0)) continue;
-        for (let a = 16; a <= 84; a += 8) for (let p = 9; p <= 23; p += 4) {
-          cands.push({ drive, angle: a, power: p, weapon, score: scoreShot(travel, seat, a, p, weapon) });
-        }
-      }
-    }
-    cands.sort((a, b) => b.score - a.score);
-    best = cands[0];
-  }
-  if (!best) return { seat, drive: 0, angle: 45, power: 12, weapon: 'standard' };
-  if (best.score < 60) {
-    const view2 = best.drive ? movedWorld(view, seat, best.drive, best.angle) : view;
-    for (let a = Math.max(5, best.angle - 3); a <= Math.min(85, best.angle + 3); a++) {
-      for (let p = Math.max(1, best.power - 2); p <= Math.min(24, best.power + 2); p += .5) {
-        const s = scoreShot(view2, seat, a, Math.round(p * 10) / 10, best.weapon);
-        if (s > best.score) best = { drive: best.drive, angle: a, power: Math.round(p * 10) / 10, weapon: best.weapon, score: s };
-      }
-    }
-  }
-  const shot = { seat, drive: best.drive, angle: clampN(Math.round(best.angle + (Math.random() - .5) * 2), 5, 85),
-    power: clampN(Math.round((best.power + (Math.random() - .5)) * 10) / 10, 1, 24), weapon: best.weapon };
-  return engine.validateShot(view, shot, seat) ? { seat, drive: 0, angle: 45, power: 12, weapon: 'standard' } : shot;
-}
-
-/* ── Input ──────────────────────────────────────────────────────────────── */
-
-// Q/E and ,/. move left/right. WASD and arrows adjust barrel and power.
-const DRIVE = { 1: ['KeyQ', 'KeyE'], 2: ['Comma', 'Period'] };
-const AIMKEY = { 1: ['KeyW', 'KeyS'], 2: ['ArrowUp', 'ArrowDown'] };
-const POWERKEY = { 1: ['KeyA', 'KeyD'], 2: ['ArrowLeft', 'ArrowRight'] };
-
-addEventListener('keydown', e => {
-  if (['Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
-  keys.add(e.code);
-  if (!engine || !world) return;
-  if (e.code === 'KeyR' && !online) { freshMatch(); return; }
-  if (mode === 'OVER') { if (overFor > 25 && (e.code === 'Space' || e.code === 'Enter')) freshMatch(); return; }
-  if (!live()) return;
-  const arm = { Digit1: 'standard', Digit2: 'heavy', Digit3: 'cluster', Digit4: 'mine', Digit5: 'ricochet' }[e.code];
-  if (arm) { pick(arm); return; }
-  if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) pressFire();
+window.addEventListener('keydown',ev=>{
+ const code=ev.code;const keys=['KeyA','KeyD','KeyW','KeyS','KeyQ','KeyE','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Comma','Period','Space','Enter','Digit1','Digit2','Digit3','Digit4','Digit5'];
+ if(keys.includes(code)){if(ev.target instanceof HTMLButtonElement&&code==='Enter'&&!(game&&game.mode==='local'&&game.turn===1&&game.phase==='aim'))return;ev.preventDefault()}
+ if(code==='KeyM'&&!ev.repeat){muted=!muted;$('muteBtn').textContent=muted?'SOUND OFF':'SOUND ON';$('muteBtn').setAttribute('aria-pressed',muted);if(!muted)startAudio()}
+ if(!game)return;
+ if(!ev.repeat&&keys.includes(code))startAudio();
+ if(!ev.repeat&&code.startsWith('Digit')){const n=Number(code.slice(5));if(n>=1&&n<=5)game.selectWeapon(['standard','heavy','cluster','mine','ricochet'][n-1])}
+ if(!ev.repeat&&((game.turn===0&&code==='Space')||(game.turn===1&&code==='Enter'&&game.mode==='local'))&&game.phase==='aim'){game.shoot()}
+ pressed.add(code);
 });
-addEventListener('keyup', e => {
-  keys.delete(e.code);
-  if (e.code === 'Space' || e.code === 'Enter') releaseFire();
-});
-addEventListener('blur', () => { keys.clear(); charge = chargeFrom = null; pointer = null; });
-
-function pick(arm) {
-  const t = world && world.tanks[turnSeat() - 1];
-  if (arm !== 'standard' && !(t && t.ammo[arm] > 0)) { note('NO ' + ARM_NAMES[arm] + ' SHELLS', 480, 296, C.red, 12); return; }
-  sel = arm; paint(0);
+window.addEventListener('keyup',ev=>pressed.delete(ev.code));window.addEventListener('blur',()=>pressed.clear());
+for(const b of document.querySelectorAll('.weapon'))b.addEventListener('click',()=>{startAudio();game.selectWeapon(b.dataset.weapon);updateHUD()});
+$('soloBtn').addEventListener('click',()=>{startAudio();setup('solo')});$('twoBtn').addEventListener('click',()=>{startAudio();setup('local')});
+$('muteBtn').addEventListener('click',()=>{muted=!muted;$('muteBtn').textContent=muted?'SOUND OFF':'SOUND ON';$('muteBtn').setAttribute('aria-pressed',muted);if(!muted)startAudio()});
+$('restartBtn').addEventListener('click',()=>{startAudio();setup(game.mode)});$('rematchBtn').addEventListener('click',()=>{startAudio();setup(game.mode)});
+window.addEventListener('resize',resize);
+let hudTime=0;
+function frame(ms){const now=ms/1000,dt=lastTime?Math.min(.045,now-lastTime):0;lastTime=now;accumulator=Math.min(.1,accumulator+dt);
+ let ticks=0;while(accumulator>=STEP&&ticks++<10){humanInput(STEP);if(game)game.tick(STEP);if(uiHitCooldown>0)uiHitCooldown=Math.max(0,uiHitCooldown-STEP);accumulator-=STEP}
+ if(game){resize();drawWorld(now);hudTime+=dt;if(hudTime>.08){updateHUD();hudTime=0}}
+ requestAnimationFrame(frame)
 }
-
-/* Pointer aiming is live: wherever the cursor sits relative to the tank sets the
- * angle and the pull-back distance sets the power, in the tank's own frame. A
- * tap fires; there is nothing to drag first. */
-function at(e) {
-  const r = canvas.getBoundingClientRect();
-  return { x: (e.clientX - r.left) * 960 / r.width, y: (e.clientY - r.top) * 580 / r.height };
-}
-function aimAt(p) {
-  const seat = turnSeat(), t = world.tanks[seat - 1];
-  const c = anchor(t), q = engine.ringPoint(t.s);
-  const dx = p.x - c.x, dy = p.y - c.y, len = Math.hypot(dx, dy);
-  if (len < 12) return;
-  const inward = (dx * q.nx + dy * q.ny) / len;
-  const along = (dx * q.tx + dy * q.ty) / len * (t.dir || 1);
-  let a = Math.atan2(along, Math.max(inward, .06)) * 180 / Math.PI;
-  if (a < 0) a = -a;
-  aim[seat].angle = clampN(Math.round(a), 5, 85);
-  aim[seat].power = Math.round(clampN(len / 24, 1, 24) * 10) / 10;
-}
-canvas.addEventListener('pointermove', e => {
-  // Keyboard aim must not be overwritten by an idle cursor.
-  if (!live() || !pointer) return;
-  pointer = at(e);
-  aimAt(pointer);
-});
-canvas.addEventListener('pointerdown', e => {
-  if (!engine || !world) return;
-  if (mode === 'OVER') { if (overFor > 25) freshMatch(); return; }
-  if (!live()) return;
-  e.preventDefault();
-  aimAt(at(e));
-  pointer = at(e);
-  if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
-});
-canvas.addEventListener('pointerup', e => {
-  if (!live() || !pointer) return;
-  aimAt(at(e));
-  pointer = null; // returning to keyboard control must not leave drag aiming armed
-  tapFire();
-});
-canvas.addEventListener('pointercancel', () => { pointer = null; });
-canvas.addEventListener('pointerleave', () => { pointer = null; });
-
-for (const [key] of ARMS) {
-  const b = document.createElement('button');
-  b.type = 'button'; b.dataset.arm = key;
-  b.addEventListener('click', () => pick(key));
-  armsEl.append(b);
-}
-modeEl.addEventListener('click', () => {
-  aiEnabled = !aiEnabled;
-  modeEl.textContent = aiEnabled ? 'Two players' : 'Solo vs AI';
-  freshMatch();
-});
-
-/* ── Per-frame step ─────────────────────────────────────────────────────── */
-
-function step(dt) {
-  shake *= Math.pow(.02, dt); if (shake < .05) shake = 0;
-  for (let i = sprigs.length - 1; i >= 0; i--) {
-    const s = sprigs[i];
-    s.x += s.vx; s.y += s.vy; s.vy += .07; s.life -= s.decay;
-    if (s.life <= 0) sprigs.splice(i, 1);
-  }
-  for (let i = notes.length - 1; i >= 0; i--) {
-    const n = notes[i]; n.y -= .4; n.life -= .012;
-    if (n.life <= 0) notes.splice(i, 1);
-  }
-  if (anim) {
-    anim.frame += dt * 60;
-    if (!anim.doneAt && anim.frame * anim.speed >= anim.total) anim.doneAt = performance.now();
-    if (anim.doneAt && performance.now() - anim.doneAt > (anim.impact ? 260 : 120)) finishShot();
-    return;
-  }
-  if (mode === 'OVER') overFor += dt * 60;
-  if (live()) {
-    const seat = turnSeat(), t = world.tanks[seat - 1];
-    let dir = 0;
-    if (keys.has(DRIVE[seat][0])) dir += 1; // increasing floor s moves left
-    if (keys.has(DRIVE[seat][1])) dir -= 1;
-    const target = dir * 250;
-    walkVel += (target - walkVel) * Math.min(1, dt * 14);
-    if (Math.abs(walkVel) < 3) walkVel = 0;
-    if (walkVel) {
-      walk = engine.driveS(t.s, walk + walkVel * dt) - t.s;
-      if (dir) facing[seat] = dir;
-      if (Math.random() < dt * 20) {
-        const p = engine.ringPoint(engine.driveS(t.s, walk));
-        spark(p.x, p.y, 1, C.hair, .8);
-      }
-    }
-    const a = aim[seat];
-    if (keys.has(AIMKEY[seat][0])) a.angle = clampN(a.angle - dt * 55, 5, 85);
-    if (keys.has(AIMKEY[seat][1])) a.angle = clampN(a.angle + dt * 55, 5, 85);
-    if (keys.has(POWERKEY[seat][0])) a.power = clampN(a.power - dt * 13, 1, engine.MAXPW);
-    if (keys.has(POWERKEY[seat][1])) a.power = clampN(a.power + dt * 13, 1, engine.MAXPW);
-    // a tap of the key fires the aimed power exactly; only a held key charges
-    if (charging() && performance.now() - pressAt > 140) charge = Math.min(engine.MAXPW, charge + dt * 18);
-  }
-  if (mode === 'CPU' && !world.winner) {
-    aiTick += dt * 60;
-    if (!aiPlan && aiTick > 12) { try { aiPlan = plan(); } catch (e) { aiPlan = { seat: 2, drive: 0, angle: 45, power: 12, weapon: 'standard' }; } }
-    if (aiPlan) {
-      const a = aim[2];
-      a.angle += (aiPlan.angle - a.angle) * Math.min(1, dt * 7);
-      a.power += (aiPlan.power - a.power) * Math.min(1, dt * 7);
-      if (aiTick > 52) { const shot = aiPlan; aiPlan = null; aiTick = 0; fire(shot); }
-    }
-  }
-}
-
-/* ── Painting ───────────────────────────────────────────────────────────── */
-
-/* One box boundary; the floor is a separate sheet of soil above the bottom.
- * The canvas border is deliberately absent: the game wall IS the only frame. */
-function terrainCanvas() {
-  if (!world) return null;
-  const key = world.seed + '|' + world.shotCount + '|' + world.blockHoles.length;
-  if (terrainLayer.key === key && terrainLayer.canvas) return terrainLayer.canvas;
-  const cv = terrainLayer.canvas || document.createElement('canvas');
-  cv.width = 960; cv.height = 580;
-  const g = cv.getContext('2d');
-  g.clearRect(0, 0, 960, 580);
-  const IW = engine.IW, IH = engine.IH, T = engine.T;
-  const X0 = engine.BX + T, X1 = engine.BX + engine.BW - T;
-  const Y1 = engine.BY + engine.BH - T;
-  const offsets = [0, IW, IW + IH, IW + IH + IW];
-  const floorY = x => engine.floorYAt(world, x);
-
-  // Only the soil beneath the floor is filled. Everything beyond the box
-  // (including the corners outside its wall) remains plain empty paper.
-  g.fillStyle = '#dcd4c0';
-  for (let x = X0; x < X1; x += 2) {
-    if (engine.floorBreached(world, X1 - x)) continue;
-    const y = floorY(x);
-    g.fillRect(x, y, 2, Math.max(0, Y1 - y));
-  }
-
-  g.lineJoin = 'round';
-  g.lineCap = 'round';
-  const strokeProfile = (wall, length, isFloor) => {
-    g.beginPath();
-    let begun = false;
-    for (let i = 0; i <= length; i++) {
-      const p = engine.ringPoint(offsets[wall] + i);
-      const d = isFloor ? engine.floorDepthAt(world, i) : engine.depthAt(world, wall, i);
-      if (isFloor ? engine.floorBreached(world, i) : d >= T - 1) {
-        begun = false;
-        continue;
-      }
-      const x = isFloor ? p.x : p.x - p.nx * d;
-      const y = isFloor ? Y1 + d : p.y - p.ny * d;
-      if (!begun) { g.moveTo(x, y); begun = true; }
-      else g.lineTo(x, y);
-    }
-    g.stroke();
-  };
-  g.lineWidth = 2.5;
-  g.strokeStyle = C.ink;
-  strokeProfile(0, IW, false); // ceiling
-  strokeProfile(1, IH, false); // right wall
-  strokeProfile(2, IW, false); // bottom perimeter (not the floor)
-  strokeProfile(3, IH, false); // left wall
-  strokeProfile(2, IW - 1, true); // separate rolling dirt
-  terrainLayer = { key, canvas: cv };
-  return cv;
-}
-
-function drawTerrain() {
-  const cv = terrainCanvas();
-  if (cv) ctx.drawImage(cv, 0, 0);
-}
-
-function drawTank(t, seat, isTurn) {
-  if (t.hp <= 0) return;
-  const s = engine.driveS(t.s, (isTurn && live() ? walk : 0));
-  const p = engine.ringPoint(s);
-  const surf = engine.tankSurface(world, { s });
-  const rot = [0, Math.PI / 2, Math.PI, -Math.PI / 2][p.wall];
-  const colour = COLOUR[seat];
-  const angle = (isTurn ? aim[seat].angle : (t.angle || 45)) * Math.PI / 180;
-  const dir = isTurn && live() ? facing[seat] : (t.dir || 1);
-  ctx.save();
-  ctx.translate(surf.x, surf.y);
-  ctx.rotate(rot);
-  // The tread rests on the rolling soil; the cannon points toward the opponent.
-  ctx.fillStyle = C.ink;
-  ctx.fillRect(-13, 0, 26, 6);
-  ctx.fillStyle = C.hair;
-  for (let i = 0; i < 6; i++) ctx.fillRect(-11 + i * 4, 1.8, 2.6, 2.4);
-  ctx.fillStyle = colour;
-  ctx.fillRect(-9.5, 6, 19, 8);
-  ctx.fillRect(-5, 11, 10, 5);
-  ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(0, 16);
-  const reach = 15 + Math.min(1, (isTurn && charging() ? charge : aim[seat].power) || 12 / 24) * 7;
-  ctx.lineTo(Math.sin(angle) * dir * reach, 16 + Math.cos(angle) * reach);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawGhost() {
-  const g = ghostPath();
-  if (!g || !g.trail || g.trail.length < 3) return;
-  ctx.save();
-  for (let i = 4; i < g.trail.length; i += 5) {
-    ctx.globalAlpha = Math.max(.04, .34 - (i / g.trail.length) * .26);
-    ctx.fillStyle = C.dim;
-    ctx.fillRect(g.trail[i].x - 1.2, g.trail[i].y - 1.2, 2.4, 2.4);
-  }
-  const h = g.hit;
-  if (h && typeof h !== 'string') {
-    ctx.globalAlpha = .5; ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(h.x, h.y, 7, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(h.x, h.y, 1.6, 0, Math.PI * 2); ctx.fillStyle = C.ink; ctx.fill();
-  }
-  ctx.restore();
-}
-
-function drawShell(shown, trail, colour) {
-  if (shown < 2) return;
-  for (let k = Math.max(0, shown - 26); k < shown; k++) {
-    ctx.globalAlpha = .1 + (k / shown) * .5;
-    ctx.fillStyle = colour;
-    const s = 2.6 - (shown - k) / 26;
-    ctx.fillRect(trail[k].x - s / 2, trail[k].y - s / 2, s, s);
-  }
-  const h = trail[Math.min(trail.length - 1, Math.max(0, shown - 1))];
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = C.ink;
-  ctx.beginPath(); ctx.arc(h.x, h.y, 2.4, 0, Math.PI * 2); ctx.fill();
-}
-
-function drawField(tanks, powerups, mines, trails, showGhost) {
-  drawTerrain();
-  for (const t of trails) {
-    for (let i = 0; i < t.length; i += 6) {
-      ctx.globalAlpha = .05 + (i / t.length) * .07;
-      ctx.fillStyle = C.ink;
-      ctx.fillRect(t[i].x - 1.1, t[i].y - 1.1, 2.2, 2.2);
-    }
-  }
-  ctx.globalAlpha = 1;
-  for (const pu of powerups) {
-    const meta = engine.POWERUPS.find(m => m.key === pu.key) || { sym: '?' };
-    ctx.fillStyle = C.board; ctx.fillRect(pu.x - 8, pu.y - 8, 16, 16);
-    ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.strokeRect(pu.x - 7.5, pu.y - 7.5, 15, 15);
-    ctx.fillStyle = C.ink; ctx.font = '600 10px ui-monospace, monospace'; ctx.textAlign = 'center';
-    ctx.fillText(meta.sym, pu.x, pu.y + 3.5); ctx.textAlign = 'left';
-  }
-  for (const m of mines) {
-    ctx.fillStyle = C.red; ctx.fillRect(m.x - 5, m.y - 2, 10, 4);
-    ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(m.x, m.y - 2); ctx.lineTo(m.x, m.y - 6); ctx.stroke();
-  }
-  tanks.forEach((t, i) => drawTank(t, i + 1, state.turn === i + 1 && !world.winner));
-  if (showGhost) drawGhost();
-}
-
-function drawCentre() {
-  const t = 22;
-  ctx.textAlign = 'center';
-  ctx.font = '600 12px ui-monospace, monospace';
-  ctx.fillStyle = C.dim;
-  const seat = online ? online.seat : turnSeat();
-  if (anim) {
-    ctx.fillStyle = C.ink;
-    ctx.fillText('SHELL AWAY', 480, t);
-  } else if (mode === 'WAIT') {
-    ctx.fillText('WAITING ON ' + seatName(3 - seat), 480, t);
-  } else if (mode === 'CPU') {
-    ctx.fillText(seatName(2) + ' TAKES AIM', 480, t);
-  } else if (mode === 'OVER') {
-    ctx.font = '600 15px ui-monospace, monospace';
-    ctx.fillStyle = winner && COLOUR[winner] ? COLOUR[winner] : C.ink;
-    ctx.fillText((winner ? seatName(winner) : 'NOBODY') + ' WINS', 480, t + 2);
-    ctx.font = '11px ui-monospace, monospace';
-    ctx.fillStyle = C.dim;
-    ctx.fillText(aiEnabled ? 'NEXT ROUND SHORTLY · R FOR A NEW MATCH' : 'SPACE OR TAP FOR THE NEXT ROUND', 480, t + 22);
-  } else if (mode === 'AIM' && live()) {
-    if (charging()) {
-      ctx.fillStyle = C.ink;
-      ctx.fillText('POWER ' + charge.toFixed(1), 480, t);
-    } else if (pointer) {
-      ctx.fillText('TAP TO FIRE', 480, t);
-    } else {
-      ctx.fillText('YOUR TURN · ' + seatName(turnSeat()), 480, t);
-    }
-  }
-  ctx.textAlign = 'left';
-}
-
-function paintHud() {
-  if (!world) return;
-  const [a, b] = world.tanks;
-  hud.hp1.textContent = Math.max(0, Math.round(a.hp));
-  hud.hp2.textContent = Math.max(0, Math.round(b.hp));
-  const w = state ? engine.windOf(state.seed, state.shots.length) : 0;
-  hud.wind.textContent = '· wind ' + Math.abs(Math.round(w * 1000)) + (w >= 0 ? ' →' : ' ←');
-  const seat = online ? online.seat : turnSeat();
-  const t = world.tanks[seat - 1] || a;
-  for (const [key] of ARMS) {
-    const btn = armsEl.querySelector('[data-arm="' + key + '"]');
-    if (!btn) continue;
-    const ammo = key === 'standard' ? '∞' : String(t.ammo[key] || 0);
-    btn.innerHTML = '<b>' + ARM_NAMES[key] + '</b> ' + ammo;
-    btn.disabled = key !== 'standard' && !(t.ammo[key] > 0);
-    btn.classList.toggle('sel', sel === key);
-  }
-  hintEl.textContent = state && state.turn === 2 && !world.winner && !online
-    ? 'Green is lining up · R restarts the match'
-    : 'Q/E (red) or ,/. (green) move · W/S or ↑/↓ barrel · A/D or ←/→ power · Space fire · 1-5 weapons';
-}
-
-function paint(dt) {
-  if (!engine) return;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = C.paper;
-  ctx.fillRect(0, 0, 960, 580);
-  if (shake) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  if (anim) {
-    drawField(anim.pre.tanks, anim.pre.powerups, anim.pre.mines,
-      world.trails.slice(0, world.trails.length - anim.items.length), false);
-    const pts = Math.max(0, anim.frame * anim.speed);
-    let impact = false;
-    for (const item of anim.items) {
-      if (pts <= item.start) continue;
-      const shown = Math.min(item.len, Math.floor(pts - item.start));
-      drawShell(shown, item.trail, C.ink);
-      if (shown >= item.len) impact = true;
-    }
-    if (impact && anim.impact) {
-      const age = clampN(((pts - anim.total) / 16), 0, 1);
-      ctx.strokeStyle = C.red; ctx.lineWidth = 1.4;
-      ctx.globalAlpha = 1 - age;
-      ctx.beginPath(); ctx.arc(anim.impact.x, anim.impact.y, 3 + (anim.impact.r || 10) * .8 * age, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
-    drawCentre();
-  } else if (mode === 'TITLE') {
-    // No placeholder viewport outline: only actual world geometry is drawn.
-    ctx.textAlign = 'center'; ctx.fillStyle = C.dim;
-    ctx.font = '600 12px ui-monospace, monospace';
-    ctx.fillText('READYING THE ARENA', 480, 288); ctx.textAlign = 'left';
-  } else {
-    drawField(world.tanks, world.powerups, world.mines, world.trails, true);
-    drawCentre();
-  }
-  for (const s of sprigs) {
-    ctx.globalAlpha = Math.max(0, s.life);
-    ctx.fillStyle = s.colour;
-    ctx.fillRect(s.x - 1.4, s.y - 1.4, 2.8, 2.8);
-  }
-  ctx.globalAlpha = 1;
-  for (const n of notes) {
-    ctx.globalAlpha = Math.max(0, Math.min(1, n.life * 1.5));
-    ctx.textAlign = 'center';
-    ctx.font = '600 ' + n.size + 'px ui-monospace, monospace';
-    ctx.fillStyle = n.colour;
-    ctx.fillText(n.text, clampN(n.x, 30, 930), clampN(n.y, 40, 560));
-  }
-  ctx.globalAlpha = 1; ctx.textAlign = 'left';
-  paintHud();
-}
-
-function frame(now) {
-  const dt = Math.min(.05, (now - lastNow) / 1000 || 0);
-  lastNow = now;
-  try { step(dt); paint(dt); } catch (e) { /* one bad frame must not stop the loop */ }
-  requestAnimationFrame(frame);
-}
-
-/* ── Bored Together ─────────────────────────────────────────────────────── */
-
-function startOnline() {
-  online = {
-    seat: bridge.context.seat === 2 ? 2 : 1,
-    names: Array.isArray(bridge.context.players) && bridge.context.players.length === 2
-      ? bridge.context.players.map(n => String(n).toUpperCase().slice(0, 12)) : null,
-    busy: false, canonical: null,
-    canPlay: () => !!bridge.context && bridge.context.canPlay && bridge.context.status === 'active',
-    submit: move => bridge.submit(move),
-    use: ctx2 => { bridge.context = ctx2; },
-    state: () => bridge.context.state
-  };
-  repaint(online.state());
-}
-
-/* ── Snapshot and probe surface ─────────────────────────────────────────── */
-
-window.__boredSnapshot = () => ({
-  slug: 'tank2',
-  won: Math.max(0, Math.round(sessionWins)),
-  cpu: aiEnabled === true,
-  started: mode !== 'TITLE' && !!state
-});
-
-window.__test = {
-  mode: () => mode,
-  state: () => (state ? { mode, turn: state.turn, power: aim[state.turn] && state.turn ? aim[state.turn].power : null,
-    online: !!bridge, seed: state.seed, shots: state.shots.length,
-    hp: world ? world.tanks.map(t => t.hp) : [] } : null),
-  world: () => world,
-  seed: () => (state ? state.seed : null),
-  hp: () => (world ? world.tanks.map(t => Math.round(t.hp)) : null),
-  terrain: () => {
-    if (!world) return null;
-    const original = engine.makeFloor(world.seed);
-    return {
-      wallDamage: Math.round(world.depth.reduce((n, row) => n + row.reduce((m, v) => m + v, 0), 0)),
-      soilRemoved: Math.round(world.floor.reduce((n, v, i) => n + (v - original[i]), 0)),
-      breaches: world.depth.reduce((n, row) => n + row.filter(v => v >= engine.T - 1).length, 0),
-      sinkholes: world.floor.filter(v => v >= -1).length,
-      holes: world.blockHoles.length
-    };
-  },
-  turn: () => (state ? state.turn : null),
-  wind: () => (state ? engine.windOf(state.seed, state.shots.length) : null),
-  start(ai) { aiEnabled = !!ai; freshMatch(); },
-  aim(angle, power) { const a = aim[turnSeat()]; if (a) { a.angle = angle; a.power = power; } },
-  drive(px) { walk = px; },
-  fireNow() { const shot = draft(); if (shot) fire(shot); },
-  fireShot(shot) {
-    fire({ seat: shot.seat || state.turn, drive: shot.drive | 0, angle: shot.angle || 45,
-      power: shot.power || 12, weapon: shot.weapon || 'standard' });
-  },
-  bestShot(seatIn) {
-    if (!state || world.winner) return null;
-    const s = seatIn || state.turn;
-    for (const weapon of engine.WEAPONS) {
-      if (weapon !== 'standard' && !(world.tanks[s - 1].ammo[weapon] > 0)) continue;
-      for (let a = 5; a <= 85; a++) for (let p = 1; p <= 24; p++) {
-        const g = engine.guide(world, s, a, p, weapon);
-        if (g.hit && g.hit.kind === 'tank' && g.hit.seat !== s) return { seat: s, drive: 0, angle: a, power: p, weapon };
-      }
-    }
-    return null;
-  },
-  skip() { if (anim) { anim.doneAt = performance.now() - 2000; } },
-  settle() { return new Promise(res => { const check = () => (anim ? setTimeout(check, 30) : res()); check(); }); },
-  tick(n) { for (let i = 0; i < (n || 1); i++) { try { step(1 / 60); } catch (e) { } } },
-  // perf: millisecond timings of one paint pass, for the smoothness check
-  cost() { const t = performance.now(); for (let i = 0; i < 20; i++) paint(0); return (performance.now() - t) / 20; }
-};
-
-/* ── Boot ───────────────────────────────────────────────────────────────── */
-
-(async function boot() {
-  let url = bridge && bridge.engineURL;
-  if (!url) {
-    try { url = new URL('../tank-engine.js', location.href).href; }
-    catch { url = new URL('./games/tank-engine.js', parent.location.href).href; }
-  }
-  try { engine = await import(url); }
-  catch (error) {
-    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, 960, 580);
-    ctx.fillStyle = C.red; ctx.font = '600 13px ui-monospace, monospace'; ctx.textAlign = 'center';
-    ctx.fillText('THE RULES FILE DID NOT LOAD', 480, 282);
-    ctx.fillStyle = C.dim; ctx.font = '12px ui-monospace, monospace';
-    ctx.fillText(String(error && error.message || error).slice(0, 80), 480, 306);
-    return;
-  }
-  modeEl.textContent = aiEnabled ? 'Two players' : 'Solo vs AI';
-  if (bridge) startOnline();
-  else { aiEnabled = true; freshMatch(); }
-  requestAnimationFrame(frame);
-})();
+setup();requestAnimationFrame(frame);
+// -- BROWSER END --
 </script>
 </body>
 </html>
