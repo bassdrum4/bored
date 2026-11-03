@@ -61,7 +61,7 @@
   .btn.primary:hover:not(:disabled) { background: #ded1ae }
 
   /* ── shell ───────────────────────────────────────────────────────────── */
-  #shell { display: grid; grid-template-columns: minmax(0, 1fr) 320px; grid-template-rows: 46px minmax(0, 1fr); height: 100% }
+  #shell { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr) auto; height: 100% }
   #bar {
     grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 0 12px;
     border-bottom: 1px solid var(--rule); background: var(--panel); min-width: 0;
@@ -82,13 +82,24 @@
   .zoom { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 4px; z-index: 5 }
   .zoom button { width: 30px; height: 30px; border: 1px solid var(--rule); border-radius: 3px; background: var(--panel); font: 15px/1 var(--font-data) }
   .zoom button:hover { border-color: var(--ink-2) }
-  #side { border-left: 1px solid var(--rule); background: var(--panel); display: flex; flex-direction: column; min-height: 0; min-width: 0 }
-  #side-scroll { overflow-y: auto; padding: 12px 12px 6px; flex: 1; min-height: 0 }
-  #log {
-    border-top: 1px solid var(--rule); padding: 8px 12px 10px; max-height: 140px; overflow-y: auto;
-    font-size: 11.5px; line-height: 1.5; color: var(--ink-2); background: var(--log-bg);
+  #dock {
+    border-top: 1px solid var(--rule); background: var(--panel); display: grid;
+    grid-template-columns: minmax(0, 1fr) 264px; max-height: 46vh; min-height: 0;
   }
-  #log .turn-mark { color: var(--ink-3); font-family: var(--font-data); font-size: 10px; letter-spacing: .06em }
+  #side-scroll { overflow-y: auto; padding: 9px 12px 12px; min-height: 0 }
+  #log-wrap { border-left: 1px solid var(--rule); background: var(--log-bg); display: flex; flex-direction: column; min-height: 0 }
+  .log-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px 4px;
+    font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+  }
+  #log { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 10px }
+  .log-row {
+    display: grid; grid-template-columns: 8px 17px minmax(0, 1fr); gap: 5px; align-items: baseline;
+    padding: 3px 0; font-size: 11px; line-height: 1.4; color: var(--ink-2); border-bottom: 1px dotted var(--rule-2);
+  }
+  .log-row:last-child { border-bottom: 0 }
+  .log-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--rule); align-self: center }
+  .log-turn { font-family: var(--font-data); font-size: 9.5px; color: var(--ink-3) }
 
   /* ── sidebar content ─────────────────────────────────────────────────── */
   .side-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px }
@@ -219,19 +230,120 @@
   #toast.show { opacity: .96 }
   @media (prefers-reduced-motion: reduce) { #toast { transition: none } }
 
+  /* dock pieces */
+  .dock-head { display: flex; align-items: center; gap: 9px; padding-bottom: 7px; border-bottom: 1px solid var(--rule-2); margin-bottom: 9px }
+  .dock-title { min-width: 0; flex: 1 }
+  .dock-title h2 { font-family: var(--font-display); font-size: 16px; font-weight: 600; line-height: 1.15; text-wrap: balance }
+  .dock-sub { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11px; color: var(--ink-3) }
+  .dock-acts { display: flex; align-items: center; gap: 4px; margin-left: auto }
+  .dock-body { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: flex-start }
+  .dock-col { min-width: 0; flex: 1 1 210px }
+  .dock-col.wide { flex: 1 1 260px }
+  .dock-label {
+    font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+    margin-bottom: 5px; display: flex; align-items: center; gap: 5px;
+  }
+  .dock-empty { font-size: 11.5px; color: var(--ink-3); padding: 2px 0 6px; max-width: 42ch }
+  /* instruments: a ring carries the comparison, the number confirms it */
+  .ring { display: block; overflow: visible }
+  .ring-track { fill: none; stroke: var(--rule-2); stroke-width: 3 }
+  .ring-fill { fill: none; stroke: currentColor; stroke-width: 3 }
+  .inst { display: flex; align-items: center; gap: 5px; color: var(--moss) }
+  .inst-dial { position: relative; display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; color: var(--moss) }
+  .inst-dial > * { grid-area: 1 / 1 }
+  .inst-dial .ico { color: var(--ink-2) }
+  .inst-text { display: flex; flex-direction: column; line-height: 1.05 }
+  .inst-text b { font-family: var(--font-data); font-size: 13px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums }
+  .inst-text em { font-style: normal; font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3) }
+  .inst.needs { color: var(--rust) }
+  .pips { display: inline-flex; gap: 2px; flex-wrap: wrap; max-width: 100px }
+  .pips i { width: 6px; height: 6px; border: 1px solid var(--rule); display: block }
+  .pips i.on { background: var(--moss); border-color: var(--moss) }
+  .icon-btn {
+    width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--rule);
+    border-radius: 3px; background: var(--panel); flex: 0 0 auto;
+  }
+  .icon-btn:hover:not(:disabled) { border-color: var(--ink-2); background: var(--panel-hi) }
+  .icon-btn.primary { border-color: var(--ink); background: var(--paper-2) }
+  /* order tiles: one icon, one cost, the explanation lives in the title */
+  .tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(102px, 1fr)); gap: 4px }
+  .tile {
+    display: grid; grid-template-columns: 34px minmax(0, 1fr); grid-template-rows: auto auto;
+    align-items: center; gap: 0 7px; border: 1px solid var(--rule); border-radius: 3px;
+    background: var(--panel); padding: 4px 7px; text-align: left; min-width: 0;
+  }
+  .tile:hover:not(:disabled) { border-color: var(--ink-2); background: var(--panel-hi) }
+  .tile.on { border-color: var(--ink); background: var(--paper-2) }
+  .tile:disabled { cursor: default }
+  .tile:disabled .tile-name, .tile:disabled .tile-ico, .tile:disabled .tile-badge { opacity: .42 }
+  .tile-ico { grid-row: 1 / 3; position: relative; display: grid; place-items: center; width: 34px; height: 34px; color: var(--moss) }
+  .tile-ico > * { grid-area: 1 / 1 }
+  .tile-ico .ico { color: var(--ink) }
+  .tile-name { font-size: 11.5px; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .tile-badge { font-family: var(--font-data); font-size: 9.5px; color: var(--ink-3) }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--rule); border-radius: 3px;
+    background: var(--panel); padding: 3px 6px; font-size: 11px; color: var(--ink-2);
+  }
+  .chip:hover:not(:disabled) { border-color: var(--ink-2); background: var(--panel-hi) }
+  .chip.on { border-color: var(--ink); color: var(--ink) }
+  .chip b { font-family: var(--font-data); font-weight: 500; color: var(--ink) }
+  .chip i { font-style: normal; font-family: var(--font-data); font-size: 10px; color: var(--ink-3) }
+  .chip-grid { display: flex; flex-wrap: wrap; gap: 4px; align-items: center }
+  /* standings as bars, not a table */
+  .bars { display: flex; flex-direction: column; gap: 5px }
+  .bar-row { display: grid; grid-template-columns: 8px minmax(48px, auto) 16px minmax(30px, 1fr) 26px; gap: 6px; align-items: center; font-size: 11.5px }
+  .bar-dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid rgba(36,28,18,.45); display: block }
+  .bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .bar-track { height: 7px; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 2px; overflow: hidden }
+  .bar-track > i { display: block; height: 100% }
+  .bar-val { font-family: var(--font-data); font-size: 10.5px; text-align: right; color: var(--ink-2) }
+  .rel { display: grid; place-items: center; color: var(--ink-3) }
+  .rel.war { color: var(--rust) }
+  .rel.peace { color: var(--moss) }
+  .bars.big .bar-row { grid-template-columns: 10px minmax(72px, auto) 20px minmax(40px, 1fr) 34px }
+  .council-line {
+    display: grid; grid-template-columns: 10px minmax(56px, 1fr) 16px minmax(40px, 1.2fr) 30px auto;
+    gap: 7px; align-items: center; padding: 6px 0; border-bottom: 1px dotted var(--rule-2); font-size: 12.5px;
+  }
+  .council-line i { font-style: normal; font-size: 9px; letter-spacing: .08em; color: var(--ink-3) }
+  .council-acts { display: flex; gap: 4px; justify-content: flex-end }
+  .offer-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px dotted var(--rule-2); font-size: 12.5px }
+  .offer-row .dock-acts { margin-left: auto }
+  /* the map inspector: details belong beside the hex you clicked */
+  #inspector {
+    position: absolute; z-index: 6; width: 196px; background: var(--panel);
+    border: 1px solid var(--ink); border-radius: 3px; padding: 7px 8px 8px;
+    box-shadow: 0 6px 16px rgba(36,28,18,.18);
+  }
+  .ins-head { display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 14px; font-weight: 600 }
+  .ins-head .ins-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .ins-head .dot { width: 9px; height: 9px }
+  .ins-gauges { display: flex; gap: 9px; margin: 6px 0 5px; align-items: flex-start }
+  .ins-gauge { display: flex; flex-direction: column; align-items: center; gap: 1px; color: var(--moss) }
+  .ins-gauge b { font-family: var(--font-data); font-size: 10.5px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums }
+  .ins-gauge em { font-style: normal; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3) }
+  .ins-acts { display: flex; gap: 4px; flex-wrap: wrap }
+  #turn-readout { display: flex; align-items: center; gap: 3px; font-family: var(--font-data); font-size: 12px; color: var(--ink-2) }
+  #turn-readout em { font-style: normal; color: var(--ink-3) }
+  .turn-dial { position: relative; display: grid; place-items: center; width: 26px; height: 26px; color: var(--ink-2) }
+  .turn-dial > * { grid-area: 1 / 1 }
   @media (max-width: 980px) {
-    #shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr) 300px }
-    #side { border-left: 0; border-top: 1px solid var(--rule) }
-    #log { max-height: 80px }
+    #dock { grid-template-columns: minmax(0, 1fr); max-height: 52vh }
+    #log-wrap { display: none }
     #bar { gap: 8px }
     .brand .who { display: none }
+    .dock-col.wide { flex: 1 1 100% }
   }
   @media (max-width: 620px) {
-    #stats .stat span { display: none }
+    #stats { gap: 9px }
+    .inst-text em { display: none }
+    .inst-dial, .inst-dial .ring { width: 28px; height: 28px }
     .bar-right .btn kbd { display: none }
     .bar-right .btn { padding: 5px 6px }
     #bar { padding: 0 6px }
     .seat { grid-template-columns: 14px minmax(0, 1fr) 92px }
+    #inspector { width: 168px }
   }
 </style>
 </head>
@@ -272,10 +384,14 @@
       <button type="button" data-act="zoom-out" aria-label="Zoom out">&minus;</button>
       <button type="button" data-act="zoom-fit" aria-label="Fit the map">&#9633;</button>
     </div>
+    <div id="inspector" hidden></div>
   </main>
-  <aside id="side">
+  <aside id="dock">
     <div id="side-scroll"></div>
-    <div id="log"></div>
+    <div id="log-wrap">
+      <div class="log-head"><span>History</span><button class="chip" type="button" id="log-toggle" data-act="log-toggle">All</button></div>
+      <div id="log"></div>
+    </div>
   </aside>
 </div>
 
@@ -1938,6 +2054,7 @@ function fitCamera() {
 function applyCamera() {
   if (!UI) return;
   UI.cam.setAttribute('transform', 'translate(' + cam.x.toFixed(1) + ' ' + cam.y.toFixed(1) + ') scale(' + cam.k.toFixed(3) + ')');
+  positionInspector();
 }
 function centreOn(x, y) {
   if (!UI || !G) return;
@@ -2108,6 +2225,7 @@ function clearBoard() {
 /* ── interface: shared pieces ──────────────────────────────────────────────── */
 
 let toastTimer = 0;
+let logOpen = false;
 function toast(message) {
   if (!UI) return;
   UI.toast.textContent = message;
@@ -2122,6 +2240,25 @@ const dot = (f, size) => '<span class="dot" style="background:' + f.light + ';bo
   (size ? ';width:' + size + 'px;height:' + size + 'px' : '') + '"></span>';
 const meter = (cls, part, whole) => '<div class="meter ' + cls + '"><i style="width:' +
   (clamp(whole > 0 ? part / whole : 0, 0, 1) * 100).toFixed(1) + '%"></i></div>';
+// One ring, two circle strokes: the fraction is the interface. The bar, the
+// dock tiles and the map inspector all read the same way, so a city's growth, a
+// unit's health and a build's progress look alike at a glance.
+const arc = (part, whole, size) => {
+  const box = size || 34, r = box / 2 - 3.5, c = 2 * Math.PI * r;
+  const fill = clamp(whole > 0 ? part / whole : 0, 0, 1);
+  return '<svg class="ring" width="' + box + '" height="' + box + '" viewBox="0 0 ' + box + ' ' + box + '" aria-hidden="true">' +
+    '<circle class="ring-track" cx="' + box / 2 + '" cy="' + box / 2 + '" r="' + r + '"/>' +
+    '<circle class="ring-fill" cx="' + box / 2 + '" cy="' + box / 2 + '" r="' + r + '" stroke-dasharray="' +
+    (c * fill).toFixed(1) + ' ' + (c + 1).toFixed(1) + '" transform="rotate(-90 ' + box / 2 + ' ' + box / 2 + ')"/></svg>';
+};
+const pips = (on, total) => '<span class="pips">' +
+  Array.from({ length: Math.max(total, 0) }, (x, i) => '<i' + (i < on ? ' class="on"' : '') + '></i>').join('') + '</span>';
+// The dial carries the comparison (my score against the leader), the number the
+// fact. Nothing here is a sentence.
+const instrument = (name, value, label, part, whole) =>
+  '<span class="inst"><span class="inst-dial">' + arc(part, whole, 34) + icon(name, 13) + '</span>' +
+  '<span class="inst-text"><b>' + value + '</b><em>' + label + '</em></span></span>';
+const statusChip = () => myTurn() ? '<span class="chip on">your move</span>' : '<span class="chip">waiting</span>';
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 const turnsText = t => (t === null ? '' : !isFinite(t) ? 'never at this rate' : plural(t, 'turn', 'turns'));
 
@@ -2141,6 +2278,7 @@ function render() {
     clearBoard();
     UI.sideScroll.innerHTML = '';
     UI.log.innerHTML = '';
+    if (UI.inspector) { UI.inspector.hidden = true; UI.inspector.innerHTML = ''; }
     renderBar();
     showHandoff();
     return;
@@ -2153,6 +2291,7 @@ function render() {
   renderBar();
   renderBoard();
   renderSide();
+  renderInspector();
   renderLog();
   UI.btnEnd.disabled = !myTurn();
   if (G.pending && UI.modalLayer.hidden) showPending();
@@ -2165,272 +2304,344 @@ function renderBar() {
   UI.bannerDot.style.borderColor = f.ink;
   UI.bannerName.textContent = f.name;
   UI.bannerWho.textContent = f.human ? (myTurn() ? 'your turn' : 'waiting') : 'CPU';
-  if (G.handoff) {
-    UI.stats.innerHTML = '';
-  } else {
-    const s = scoreParts(f.i);
-    const idle = myTurn() ? idleUnits(f.i).length + idleCities(f.i).length : 0;
-    UI.stats.innerHTML =
-      '<span class="stat">' + icon('crown', 14) + '<span>Score</span><b>' + s.total + '</b></span>' +
-      '<span class="stat">' + icon('city', 14) + '<span>Cities</span><b>' + s.cities + '</b></span>' +
-      '<span class="stat">' + icon('food', 14) + '<span>Pop</span><b>' + s.pop + '</b></span>' +
-      (idle ? '<span class="stat" style="color:var(--rust)"><span>Needs orders</span><b>' + idle + '</b></span>' : '');
+  const clock = '<span class="turn-dial">' + arc(G.turn, G.maxTurns || G.turn, 26) + '</span>' +
+    Math.max(1, G.turn) + (G.maxTurns ? '<em>/' + G.maxTurns + '</em>' : '');
+  UI.turnReadout.innerHTML = clock;
+  if (G.handoff) { UI.stats.innerHTML = ''; return; }
+  const s = scoreParts(f.i);
+  const alive = G.players.filter(p => p.alive);
+  const bestScore = Math.max(1, ...alive.map(p => scoreParts(p.i).total));
+  const allPop = Math.max(1, alive.reduce((n, p) => n + scoreParts(p.i).pop, 0));
+  const allCities = Math.max(1, alive.reduce((n, p) => n + scoreParts(p.i).cities, 0));
+  const idle = myTurn() ? idleUnits(f.i).length + idleCities(f.i).length : 0;
+  UI.stats.innerHTML =
+    instrument('crown', s.total, 'score', s.total, bestScore) +
+    instrument('city', s.cities, 'cities', s.cities, allCities) +
+    instrument('food', s.pop, 'pop', s.pop, allPop) +
+    (idle ? '<span class="inst needs" title="Units and cities waiting for orders"><span class="inst-dial">' +
+      pips(idle, Math.min(idle, 4)) + '</span><span class="inst-text"><b>' + idle + '</b><em>orders</em></span></span>' : '');
+}
+
+// The inspector floats beside the selected hex: the map is the interface, so
+// the details belong next to the thing you clicked instead of in a sidebar.
+function inspectorAnchor() {
+  const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+  const selCity = selection && selection.kind === 'city' ? cityById(selection.id) : null;
+  const spot = selUnit || selCity;
+  if (!spot) return null;
+  const [cx, cy] = hexCenter(spot.x, spot.y);
+  return { x: cam.x + cx * cam.k, y: cam.y + cy * cam.k };
+}
+
+function positionInspector() {
+  if (!UI || !UI.inspector || UI.inspector.hidden) return;
+  const anchor = inspectorAnchor();
+  if (!anchor) return;
+  const stage = UI.stage.getBoundingClientRect();
+  const width = UI.inspector.offsetWidth || 196, height = UI.inspector.offsetHeight || 120;
+  const reach = HEX_R * cam.k + 10;
+  let left = anchor.x + reach;
+  if (left + width > stage.width - 6) left = anchor.x - reach - width;
+  left = clamp(left, 6, Math.max(6, stage.width - width - 6));
+  const top = clamp(anchor.y - height / 2, 6, Math.max(6, stage.height - height - 6));
+  UI.inspector.style.left = left.toFixed(0) + 'px';
+  UI.inspector.style.top = top.toFixed(0) + 'px';
+}
+
+function renderInspector() {
+  if (!UI || !UI.inspector) return;
+  const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+  const selCity = selection && selection.kind === 'city' ? cityById(selection.id) : null;
+  if (!selUnit && !selCity) {
+    UI.inspector.hidden = true;
+    UI.inspector.innerHTML = '';
+    return;
   }
-  UI.turnReadout.textContent = 'Turn ' + Math.max(1, G.turn) + (G.maxTurns ? ' / ' + G.maxTurns : '');
+  let html = '';
+  if (selCity) {
+    const c = selCity, f = pl(c.owner);
+    const def = c.build ? itemDef(c.build) : null;
+    const need = growCost(c);
+    html = '<div class="ins-head">' + dot(f, 9) + '<span class="ins-name">' + esc(c.name) + '</span>' +
+      (c.capital ? '<span class="tag">cap</span>' : '') + '</div>' +
+      '<div class="ins-gauges">' +
+        '<span class="ins-gauge" style="color:var(--rust)">' + arc(c.hp, cityMaxHp(c), 30) + '<b>' + c.hp + '</b><em>hp</em></span>' +
+        '<span class="ins-gauge">' + arc(c.food, need, 30) + '<b>' + c.pop + '</b><em>pop</em></span>' +
+        (def ? '<span class="ins-gauge">' + arc(c.progress, def.cost, 30) + '<b>' +
+            (isFinite(turnsLeft(c)) ? turnsLeft(c) + 't' : '--') + '</b><em>build</em></span>'
+          : '<span class="ins-gauge">' + arc(0, 1, 30) + '<b>' + cityYields(c).net + '</b><em>food</em></span>') +
+      '</div>' +
+      '<div class="ins-acts">' +
+        '<button class="icon-btn" data-act="select-city:' + c.id + '" title="Open orders">' + icon('city', 14) + '</button>' +
+        '<button class="icon-btn" data-act="centre:' + c.x + ':' + c.y + '" title="Centre the map">' + icon('navigation', 14) + '</button>' +
+        '<button class="icon-btn" data-act="deselect" title="Close">' + icon('forest', 14) + '</button>' +
+      '</div>';
+  } else if (selUnit) {
+    const u = selUnit, f = pl(u.owner), def = UNITS[u.type], t = tileAt(u.x, u.y), y = tileYield(t);
+    html = '<div class="ins-head">' + dot(f, 9) + '<span class="ins-name">' + def.name + '</span>' +
+      (isEmbarked(u) ? '<span class="tag">sea</span>' : '') + '</div>' +
+      '<div class="ins-gauges">' +
+        (isMil(u.type) ? '<span class="ins-gauge" style="color:var(--rust)">' + arc(u.hp, 100, 30) + '<b>' + u.hp + '</b><em>hp</em></span>' : '') +
+        '<span class="ins-gauge">' + arc(u.mp, def.move, 30) + '<b>' + u.mp + '/' + def.move + '</b><em>moves</em></span>' +
+        '<span class="ins-gauge">' + arc(y.food, 4, 30) + '<b>' + y.food + '/' + y.prod + '</b><em>yield</em></span>' +
+      '</div>' +
+      '<div class="ins-acts">' +
+        '<button class="icon-btn" data-act="select-unit:' + u.id + '" title="Open orders">' + icon(u.type, 14) + '</button>' +
+        '<button class="icon-btn" data-act="centre:' + u.x + ':' + u.y + '" title="Centre the map">' + icon('navigation', 14) + '</button>' +
+        (u.owner === G.viewer && myTurn() && def.founds && !foundProblem(u) && u.mp > 0
+          ? '<button class="icon-btn primary" data-act="found" title="Found a city (F)">' + icon('city', 14) + '</button>' : '') +
+        '<button class="icon-btn" data-act="deselect" title="Close">' + icon('forest', 14) + '</button>' +
+      '</div>';
+  }
+  UI.inspector.innerHTML = html;
+  UI.inspector.hidden = false;
+  positionInspector();
 }
 
 function renderLog() {
+  if (!UI || !UI.log) return;
   const v = G.viewer;
-  const rows = G.log.filter(e => e.to === null || e.to === v).slice(-50).map(e =>
-    '<div' + (e.colour && e.colour !== 'turn' ? ' style="color:' + e.colour + '"' : '') + '>' +
-    '<span class="turn-mark">' + String(e.turn).padStart(2, '0') + '</span> ' + esc(e.text) + '</div>');
-  UI.log.innerHTML = rows.join('') || '<div class="faint">Nothing has happened yet.</div>';
+  const entries = G.log.filter(e => e.to === null || e.to === v);
+  const shown = logOpen ? entries.slice(-80) : entries.slice(-4);
+  UI.log.innerHTML = shown.length ? shown.map(e =>
+    '<div class="log-row"><i class="log-mark"' +
+    (e.colour && e.colour !== 'turn' ? ' style="background:' + e.colour + '"' : '') + '></i>' +
+    '<span class="log-turn">' + String(e.turn).padStart(2, '0') + '</span>' +
+    '<span class="log-text">' + esc(e.text) + '</span></div>').join('')
+    : '<p class="dock-empty">Nothing has happened yet.</p>';
+  if (UI.logToggle) UI.logToggle.textContent = logOpen ? 'Last' : 'All';
   UI.log.scrollTop = UI.log.scrollHeight;
 }
 
 /* ── interface: the side panel ─────────────────────────────────────────────── */
 
 function renderSide() {
-  if (selection && selection.kind === 'unit') {
-    const u = unitById(selection.id);
-    if (u) { UI.sideScroll.innerHTML = unitPanel(u); return; }
-  }
-  if (selection && selection.kind === 'city') {
-    const c = cityById(selection.id);
-    if (c) { UI.sideScroll.innerHTML = cityPanel(c); return; }
-  }
-  UI.sideScroll.innerHTML = realmPanel();
-}
-
-function buildLabel(c) {
-  if (!c.build) return 'Nothing';
-  const def = itemDef(c.build);
-  if (c.wait && c.build.id === 'settler' && c.pop < 2) return def.name + ', waiting for pop 2';
-  return def.name + ' · ' + turnsText(turnsLeft(c));
+  if (!UI) return;
+  const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+  const selCity = selection && selection.kind === 'city' ? cityById(selection.id) : null;
+  UI.sideScroll.innerHTML = selUnit ? unitPanel(selUnit) : selCity ? cityPanel(selCity) : realmPanel();
 }
 
 function realmPanel() {
   const f = viewerPlayer();
   if (!f) return '';
-  const s = scoreParts(f.i);
-  const cities = ownCities(f.i), units = ownUnits(f.i);
-  let html = '<div class="side-head">' + dot(f, 14) + '<h2>' + esc(f.name) + '</h2></div>' +
-    '<div class="side-sub">' + (myTurn() ? 'Your turn' : 'Waiting') + ' · turn ' + G.turn +
-    (G.maxTurns ? ' of ' + G.maxTurns : '') + '</div>' +
-    '<div class="kv"><span>Score</span><span>' + s.total + '</span></div>' +
-    '<div class="kv"><span>Cities × 5</span><span>' + s.cities * 5 + '</span></div>' +
-    '<div class="kv"><span>Pop</span><span>' + s.pop + '</span></div>' +
-    '<div class="kv"><span>Kills × 2</span><span>' + s.kills * 2 + '</span></div>';
-
-  if (myTurn()) {
-    const idle = idleUnits(f.i), lazy = idleCities(f.i);
-    if (idle.length || lazy.length) {
-      html += '<p class="sec">Needs orders</p><div class="list">';
-      if (idle.length) html += '<button class="row" data-act="next-unit">' + icon(idle[0].type, 14) +
-        '<span class="nm">' + plural(idle.length, 'unit has', 'units have') + ' moves left</span><span class="st">N</span></button>';
-      for (const c of lazy) html += '<button class="row" data-act="select-city:' + c.id + '">' + icon('city', 14) +
-        '<span class="nm">' + esc(c.name) + ' has nothing to build</span></button>';
-      html += '</div>';
-    }
+  const cities = ownCities(f.i);
+  const idle = myTurn() ? idleUnits(f.i) : [];
+  const lazy = myTurn() ? idleCities(f.i) : [];
+  let html = '<div class="dock-head">' +
+    '<span class="dock-flag">' + dot(f, 22) + '</span>' +
+    '<div class="dock-title"><h2>' + esc(f.name) + '</h2><div class="dock-sub">' + statusChip() +
+      '<span>turn ' + Math.max(1, G.turn) + (G.maxTurns ? ' / ' + G.maxTurns : '') + '</span></div></div>' +
+    '<div class="dock-acts">' +
+      '<button class="icon-btn" data-act="next-unit" title="Next idle unit (N)">' + icon('settler', 15) + '</button>' +
+      '<button class="icon-btn" data-act="council" title="Council (D)">' + icon('barracks', 15) + '</button>' +
+      '<button class="icon-btn" data-act="help" title="Rules (H)">' + icon('navigation', 15) + '</button>' +
+    '</div></div>' +
+    '<div class="dock-body">';
+  html += '<section class="dock-col"><p class="dock-label">Cities' + (lazy.length ? ' / ' + lazy.length + ' idle' : '') + '</p>' +
+    (cities.length ? '<div class="tile-grid">' + cities.map(cityTile).join('') + '</div>'
+      : '<p class="dock-empty">No cities yet. Select a settler and found one.</p>') + '</section>';
+  if (idle.length) {
+    html += '<section class="dock-col"><p class="dock-label">Needs orders</p><div class="chip-grid">' +
+      idle.slice(0, 14).map(u => '<button class="chip" data-act="select-unit:' + u.id + '" title="' + UNITS[u.type].name + '">' +
+        icon(u.type, 14) + '<i>' + u.mp + '</i></button>').join('') +
+      (idle.length > 14 ? '<span class="chip">+' + (idle.length - 14) + '</span>' : '') + '</div></section>';
   }
-
-  html += '<p class="sec">Cities</p>';
-  if (!cities.length) {
-    html += '<div class="hint" style="margin-top:0">No cities yet. Select your settler and press Found city.</div>';
-  } else {
-    html += '<div class="list">' + cities.map(c =>
-      '<button class="row" data-act="select-city:' + c.id + '">' + icon(c.capital ? 'crown' : 'city', 14) +
-      '<span class="nm">' + esc(c.name) + ' · ' + c.pop + '</span><span class="st">' + esc(buildLabel(c)) + '</span></button>').join('') + '</div>';
-  }
-
-  html += '<p class="sec">Units</p>';
-  if (!units.length) html += '<div class="hint" style="margin-top:0">No units.</div>';
-  else {
-    html += '<div class="list">' + units.map(u =>
-      '<button class="row" data-act="select-unit:' + u.id + '">' + icon(u.type, 14) +
-      '<span class="nm">' + UNITS[u.type].name + (isEmbarked(u) ? ' (at sea)' : '') + '</span><span class="st">' +
-      (isMil(u.type) ? u.hp + 'hp · ' : '') + u.mp + '/' + UNITS[u.type].move + ' moves</span></button>').join('') + '</div>';
-  }
-
-  html += '<p class="sec">Rivals</p><div class="list">';
-  for (const o of G.players) {
-    if (o.i === f.i) continue;
-    const war = atWar(f.i, o.i);
-    html += '<div class="row">' + dot(o) + '<span class="nm">' + esc(o.name) + (o.human ? '' : ' · CPU') + '</span>' +
-      (o.alive ? '<span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'war' : 'peace') + '</span>' : '<span class="tag">out</span>') +
-      '<span class="st">' + scoreParts(o.i).total + '</span></div>';
-  }
-  html += '</div><div class="actions"><button class="act" data-act="council">Council</button>' +
-    '<button class="act" data-act="help">Rules</button></div>' +
-    '<p class="hint">Click a unit, then a green hex to move. Red hexes are targets you can hit. Drag to look around; scroll or use the buttons to zoom.</p>';
-  return html;
+  html += '<section class="dock-col wide"><p class="dock-label">Standings</p><div class="bars">' + rivalBars(f) + '</div></section>';
+  return html + '</div>';
 }
 
-function buildRow(c, item, mine) {
+function cityTile(c) {
+  const def = c.build ? itemDef(c.build) : null;
+  const t = def ? turnsLeft(c) : null;
+  const note = def ? def.name + ' / ' + (isFinite(t) ? t + ' turns left' : 'a long time') : 'nothing queued';
+  return '<button class="tile" data-act="select-city:' + c.id + '" title="' +
+    esc(c.name + ' / ' + c.pop + ' pop / ' + note) + '">' +
+    '<span class="tile-ico">' + (def ? arc(c.progress, def.cost, 34) : arc(1, 1, 34)) +
+    icon(c.capital ? 'crown' : 'city', 15) + '</span>' +
+    '<span class="tile-name">' + esc(c.name) + '</span>' +
+    '<span class="tile-badge">' + pips(c.pop, Math.max(4, c.pop)) + '</span></button>';
+}
+
+function rivalBars(me) {
+  const best = Math.max(1, ...G.players.map(p => scoreParts(p.i).total));
+  return G.players.filter(o => o.i !== me.i).map(o => {
+    const s = scoreParts(o.i);
+    const war = atWar(me.i, o.i);
+    return '<div class="bar-row" title="' + esc(o.name + ' / ' + s.cities + ' cities / ' + s.pop + ' pop') + '">' +
+      '<span class="bar-dot" style="background:' + o.light + ';border-color:' + o.ink + '"></span>' +
+      '<span class="bar-name">' + esc(o.name) + (o.human ? '' : ' cpu') + '</span>' +
+      '<span class="rel ' + (!o.alive ? '' : war ? 'war' : 'peace') + '">' + icon(!o.alive ? 'city' : war ? 'warrior' : 'barracks', 12) + '</span>' +
+      '<span class="bar-track"><i style="width:' + (s.total / best * 100).toFixed(1) + '%;background:' + o.ink + '"></i></span>' +
+      '<span class="bar-val">' + s.total + '</span></div>';
+  }).join('');
+}
+
+function buildTile(c, item, mine) {
   const def = itemDef(item);
   const why = buildProblem(c, item);
   const on = sameItem(c.build, item);
   const t = turnsLeft(c, item);
-  let note = why;
-  if (!why && item.kind === 'unit' && item.id === 'settler' && c.pop < 2) note = 'Waits for pop 2 to finish';
+  const note = why || (item.kind === 'unit' && item.id === 'settler' && c.pop < 2 ? 'waits for pop 2' : '');
   const disabled = !mine || !!why;
-  return '<button class="build-row' + (on ? ' on' : '') + '" data-act="setbuild:' + c.id + ':' + item.kind + ':' + item.id + '"' +
-    (disabled ? ' disabled' : '') + ' title="' + esc(def.blurb) + '">' + icon(item.id, 15) +
-    '<span><span class="nm">' + def.name + '</span><span class="why">' + esc(note || def.blurb) + '</span></span>' +
-    '<span class="cost">' + def.cost + (why ? '' : ' · ' + (isFinite(t) ? t + 't' : '∞')) + '</span></button>';
+  return '<button class="tile' + (on ? ' on' : '') + '" data-act="setbuild:' + c.id + ':' + item.kind + ':' + item.id + '"' +
+    (disabled ? ' disabled' : '') + ' title="' +
+    esc(def.name + ' / ' + def.cost + ' production' + (note ? ' / ' + note : '') + ' / ' + def.blurb) + '">' +
+    '<span class="tile-ico">' + icon(item.id, 16) + '</span>' +
+    '<span class="tile-name">' + def.name + '</span>' +
+    '<span class="tile-badge">' + def.cost + (why ? '' : ' / ' + (isFinite(t) ? t + 't' : '--')) + '</span></button>';
 }
 
 function cityPanel(c) {
-  const v = G.viewer, f = pl(c.owner);
-  const mine = c.owner === v && myTurn();
-  const own = c.owner === v;
-  let html = '<div class="side-head">' + icon(c.capital ? 'crown' : 'city', 18) + '<h2>' + esc(c.name) + '</h2>' +
-    (c.capital ? '<span class="tag">capital</span>' : '') + '</div>' +
-    '<div class="side-sub">' + dot(f, 9) + ' ' + esc(f.name) + ' · pop ' + c.pop + '</div>' +
-    '<div class="kv"><span>Health</span><span>' + c.hp + ' / ' + cityMaxHp(c) + '</span></div>' + meter('hp', c.hp, cityMaxHp(c)) +
-    '<div class="kv"><span>Defense strength</span><span>' + cityStrength(c) + '</span></div>';
-
-  if (!own) {
-    const war = v !== null && atWar(v, c.owner);
-    html += '<div class="kv"><span>Walls</span><span>' + (c.buildings.includes('walls') ? 'yes' : 'no') + '</span></div>' +
-      '<p class="hint">' + (war ? 'You are at war with ' + esc(f.name) + '. Hit the city down to 0 HP, then step in with a melee unit to take it.'
-        : 'You are at peace with ' + esc(f.name) + '.') + '</p>';
-    if (!war && myTurn()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
-    html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
-    return html;
-  }
-
+  const v = G.viewer, f = pl(c.owner), own = c.owner === v;
+  const mine = own && myTurn();
   const y = cityYields(c), need = growCost(c);
-  html += '<p class="sec">' + icon('food', 12) + 'Food</p>' +
-    '<div class="kv"><span>Grown here</span><span>+' + y.food + '</span></div>' +
-    '<div class="kv"><span>Eaten (2 per pop, 1 per military unit)</span><span>−' + y.upkeep + '</span></div>' +
-    '<div class="kv"><span>Each turn</span><span style="color:' + (y.net < 0 ? 'var(--rust)' : 'var(--moss)') + '">' + (y.net >= 0 ? '+' : '') + y.net + '</span></div>' +
-    meter('food', c.food, need) +
-    '<div class="hint" style="margin-top:2px">' + (y.net < 0 ? 'Starving: its military units lose 10 HP each turn.'
-      : y.net === 0 ? 'Not growing.' : c.food + ' / ' + need + ' food · grows in ' + turnsText(Math.ceil((need - c.food) / y.net))) + '</div>';
+  const def = c.build ? itemDef(c.build) : null;
+  const t = def ? turnsLeft(c) : null;
+  let html = '<div class="dock-head">' +
+    '<span class="dock-flag">' + icon(c.capital ? 'crown' : 'city', 22) + '</span>' +
+    '<div class="dock-title"><h2>' + esc(c.name) + '</h2><div class="dock-sub">' + dot(f, 9) +
+      '<span>' + esc(f.name) + '</span><span>' + c.pop + ' pop</span>' +
+      (c.buildings.includes('walls') ? '<span class="tag">walls</span>' : '') +
+      (c.capital ? '<span class="tag">capital</span>' : '') + '</div></div>' +
+    '<div class="dock-acts">' + (own ? statusChip() : '') +
+      '<button class="icon-btn" data-act="centre:' + c.x + ':' + c.y + '" title="Show on map">' + icon('navigation', 15) + '</button>' +
+      '<button class="icon-btn" data-act="deselect" title="Back">' + icon('forest', 15) + '</button></div></div>' +
+    '<div class="dock-body">';
 
-  html += '<p class="sec">' + icon('prod', 12) + 'Production</p>' +
-    '<div class="kv"><span>Each turn</span><span>+' + y.prod + (c.buildings.includes('barracks') ? ' (×1.5 military)' : '') + '</span></div>';
-  if (c.build) {
-    const def = itemDef(c.build);
-    html += '<div class="kv"><span>Building ' + def.name + '</span><span>' + c.progress + ' / ' + def.cost + '</span></div>' +
-      meter('prod', c.progress, def.cost) + '<div class="hint" style="margin-top:2px">' + esc(buildLabel(c)) + '</div>';
-  } else {
-    html += '<div class="kv"><span>Building</span><span>nothing</span></div>' +
-      '<div class="hint" style="margin-top:2px">' + c.progress + ' production saved. Pick something below.</div>';
-  }
+  html += '<section class="dock-col" style="flex:0 0 auto"><p class="dock-label">Instruments</p><div class="chip-grid">' +
+    '<span class="chip">' + icon('food', 13) + '<b>' + (y.net >= 0 ? '+' : '') + y.net + '</b></span>' +
+    '<span class="chip">' + icon('prod', 13) + '<b>+' + y.prod + '</b></span>' +
+    '<span class="chip">' + icon('city', 13) + arc(c.hp, cityMaxHp(c), 18) + '<b>' + c.hp + '</b></span>' +
+    '<span class="chip">' + icon('food', 13) + arc(c.food, need, 18) + '<b>' + c.food + '/' + need + '</b></span>' +
+    '</div></section>';
 
-  if (mine) {
-    const shots = cityShootTargets(c).filter(s => visibleTo(s.unit.x, s.unit.y));
-    if (c.buildings.includes('walls') && !c.shot && shots.length) {
-      html += '<p class="sec">Shoot from the walls</p><div class="list">' + shots.map(s =>
-        '<button class="row" data-act="shoot:' + c.id + ':' + s.unit.id + '">' + icon(s.unit.type, 14) +
-        '<span class="nm">' + esc(pl(s.unit.owner).name) + ' ' + UNITS[s.unit.type].name.toLowerCase() + ' · ' + s.unit.hp + 'hp</span>' +
-        '<span class="st">~' + s.dmg + (s.kills ? ' · kills' : '') + '</span></button>').join('') + '</div>';
+  if (own) {
+    const queue = def
+      ? '<span class="chip on">' + icon(c.build.id, 14) + '<b>' + def.name + '</b>' +
+        arc(c.progress, def.cost, 18) + '<i>' + (isFinite(t) ? t + 't' : '--') + '</i></span>' +
+        (mine ? '<button class="chip" data-act="clearbuild:' + c.id + '" title="Stop building">' + icon('forest', 12) + 'stop</button>' : '')
+      : '<span class="dock-empty">' + (mine ? 'Nothing queued. Pick an order.' : 'Nothing queued.') + '</span>';
+    html += '<section class="dock-col wide"><p class="dock-label">Building</p><div class="chip-grid">' + queue + '</div></section>';
+    const shots = mine && c.buildings.includes('walls') && !c.shot
+      ? cityShootTargets(c).filter(s => visibleTo(s.unit.x, s.unit.y)) : [];
+    if (shots.length) {
+      html += '<section class="dock-col"><p class="dock-label">Walls</p><div class="chip-grid">' +
+        shots.map(s => '<button class="chip" data-act="shoot:' + c.id + ':' + s.unit.id + '">' +
+          icon(s.unit.type, 13) + esc(pl(s.unit.owner).name) + '<b>~' + s.dmg + '</b></button>').join('') +
+        '</div></section>';
     }
+    html += '<section class="dock-col wide"><p class="dock-label">Units</p><div class="tile-grid">' +
+      UNIT_ORDER.map(id => buildTile(c, { kind: 'unit', id }, mine)).join('') + '</div></section>';
+    html += '<section class="dock-col wide"><p class="dock-label">Buildings</p><div class="tile-grid">' +
+      Object.keys(BUILDINGS).map(id => buildTile(c, { kind: 'building', id }, mine)).join('') + '</div></section>';
+    html += '<section class="dock-col"><p class="dock-label">Projects</p><div class="tile-grid">' +
+      Object.keys(PROJECTS).map(id => buildTile(c, { kind: 'project', id }, mine)).join('') + '</div></section>';
+  } else {
+    const war = v !== null && atWar(v, c.owner);
+    html += '<section class="dock-col"><p class="dock-label">Diplomacy</p><div class="chip-grid">' +
+      (war ? '<span class="chip on">' + icon('warrior', 13) + 'at war</span>'
+        : (myTurn() ? '<button class="chip" data-act="war-ask:' + f.i + '">' + icon('warrior', 13) + 'declare war</button>'
+          : '<span class="chip">' + icon('barracks', 13) + 'at peace</span>')) + '</div></section>';
   }
-
-  html += '<p class="sec">Units</p><div class="build-list">' +
-    UNIT_ORDER.map(id => buildRow(c, { kind: 'unit', id }, mine)).join('') + '</div>';
-  html += '<p class="sec">Buildings</p><div class="build-list">' +
-    Object.keys(BUILDINGS).map(id => buildRow(c, { kind: 'building', id }, mine)).join('') + '</div>';
-  html += '<p class="sec">Projects</p><div class="build-list">' +
-    Object.keys(PROJECTS).map(id => buildRow(c, { kind: 'project', id }, mine)).join('') + '</div>';
-  if (mine && c.build) html += '<div class="actions"><button class="act" data-act="clearbuild:' + c.id + '">Stop building</button></div>';
 
   const here = unitsAt(c.x, c.y).filter(u => u.owner === v);
-  html += '<div class="actions">' + here.map(u => '<button class="act" data-act="select-unit:' + u.id + '">' + icon(u.type, 14) +
-    UNITS[u.type].name + ' here</button>').join('') +
-    '<button class="act" data-act="centre:' + c.x + ':' + c.y + '">Show on map</button>' +
-    '<button class="act" data-act="deselect">Back</button></div>';
-  return html;
+  if (here.length) {
+    html += '<section class="dock-col"><p class="dock-label">On this hex</p><div class="chip-grid">' +
+      here.map(u => '<button class="chip" data-act="select-unit:' + u.id + '">' + icon(u.type, 13) +
+        UNITS[u.type].name + '</button>').join('') + '</div></section>';
+  }
+  return html + '</div>';
 }
 
 function unitPanel(u) {
   const v = G.viewer, f = pl(u.owner), def = UNITS[u.type];
   const mine = u.owner === v && myTurn();
-  const t = tileAt(u.x, u.y);
-  const where = TERRAIN[t.t].name + (t.f ? ', ' + FEATURES[t.f].name.toLowerCase() : '') + (t.imp ? ', ' + IMPROVEMENTS[t.imp].name.toLowerCase() : '');
-  const home = u.home ? cityById(u.home) : null;
-  let html = '<div class="side-head">' + icon(u.type, 18) + '<h2>' + def.name + '</h2>' +
-    (isEmbarked(u) ? '<span class="tag">at sea</span>' : '') + '</div>' +
-    '<div class="side-sub">' + dot(f, 9) + ' ' + esc(f.name) + ' · ' + esc(where) + '</div>';
-  if (isMil(u.type)) {
-    html += '<div class="kv"><span>Health</span><span>' + u.hp + ' / 100</span></div>' + meter('hp', u.hp, 100) +
-      '<div class="kv"><span>Strength</span><span>' + def.str + (defStrength(u) !== def.str ? ' (defends at ' + defStrength(u) + ' here)' : '') + '</span></div>' +
-      (def.rs ? '<div class="kv"><span>Ranged</span><span>' + def.rs + ', range ' + def.range + '</span></div>' : '');
-  }
-  html += '<div class="kv"><span>Moves</span><span>' + u.mp + ' / ' + def.move + '</span></div>' +
-    (def.charges ? '<div class="kv"><span>Charges</span><span>' + u.charges + '</span></div>' : '') +
-    (isMil(u.type) && u.owner === v ? '<div class="kv"><span>Fed by</span><span>' + (home ? esc(home.name) : 'nobody (free)') + '</span></div>' : '') +
-    '<div class="hint">' + esc(def.blurb) + '</div>';
+  const t = tileAt(u.x, u.y), y = tileYield(t);
+  let html = '<div class="dock-head">' +
+    '<span class="dock-flag">' + icon(u.type, 22) + '</span>' +
+    '<div class="dock-title"><h2>' + def.name + '</h2><div class="dock-sub">' + dot(f, 9) +
+      '<span>' + esc(f.name) + '</span><span>' + esc(TERRAIN[t.t].name) +
+      (t.f ? ' / ' + FEATURES[t.f].name.toLowerCase() : '') + '</span>' +
+      (isEmbarked(u) ? '<span class="tag">at sea</span>' : '') + '</div></div>' +
+    '<div class="dock-acts">' + (u.owner === v ? statusChip() : '<span class="chip">rival</span>') +
+      '<button class="icon-btn" data-act="centre:' + u.x + ':' + u.y + '" title="Show on map">' + icon('navigation', 15) + '</button>' +
+      '<button class="icon-btn" data-act="deselect" title="Back">' + icon('forest', 15) + '</button></div></div>' +
+    '<div class="dock-body">';
 
-  if (u.owner !== v) {
-    const war = v !== null && atWar(v, u.owner);
-    html += '<p class="hint">' + (war ? 'You are at war with ' + esc(f.name) + '.' : 'You are at peace with ' + esc(f.name) + '. Declare war before you attack.') + '</p>';
-    if (!war && myTurn()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
-    html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
-    return html;
-  }
+  html += '<section class="dock-col" style="flex:0 0 auto"><p class="dock-label">Condition</p><div class="chip-grid">' +
+    (isMil(u.type) ? '<span class="chip">' + arc(u.hp, 100, 18) + '<b>' + u.hp + '</b></span>' +
+      '<span class="chip">' + icon('warrior', 13) + '<b>' + defStrength(u) + '</b></span>' +
+      (def.rs ? '<span class="chip">' + icon('archer', 13) + '<b>' + def.rs + '</b><i>r' + def.range + '</i></span>' : '') : '') +
+    '<span class="chip">' + arc(u.mp, def.move, 18) + '<b>' + u.mp + '/' + def.move + '</b></span>' +
+    (def.charges ? '<span class="chip">' + icon('builder', 13) + '<b>' + u.charges + '</b></span>' : '') +
+    '<span class="chip">' + icon('food', 13) + '<b>' + y.food + '</b><i>+' + y.prod + '</i></span>' +
+    '</div></section>';
 
   if (mine) {
-    html += '<p class="sec">Orders</p><div class="actions">';
+    const orders = [];
     if (def.founds) {
       const why = foundProblem(u);
-      html += '<button class="act' + (why ? '' : ' on') + '" data-act="found"' + (why || u.mp <= 0 ? ' disabled' : '') + '>' + icon('city', 14) + 'Found city<kbd>F</kbd></button>';
-      html += '</div>' + (why ? '<div class="hint">' + esc(why) + '.</div>' : u.mp <= 0 ? '<div class="hint">No moves left. Found it next turn.</div>' : '') + '<div class="actions">';
+      orders.push('<button class="tile' + (why ? '' : ' on') + '" data-act="found"' + (why || u.mp <= 0 ? ' disabled' : '') +
+        ' title="' + esc(why || 'Found a city here (F)') + '"><span class="tile-ico">' + icon('city', 16) + '</span>' +
+        '<span class="tile-name">Found city</span><span class="tile-badge">' +
+        (why ? 'blocked' : 'F') + '</span></button>');
     }
     if (u.type === 'builder') {
-      const opts = builderOptions(u);
-      if (!opts.length) html += '</div><div class="hint">Nothing to build on this tile. Move to a tile inside your borders.</div><div class="actions">';
-      for (const o of opts) {
+      for (const o of builderOptions(u)) {
         const id = o.act.startsWith('build:') ? o.act.slice(6) : o.act === 'chop' ? 'forest' : 'food';
-        html += '<button class="act" data-act="builder:' + o.act + '"' + (o.why ? ' disabled title="' + esc(o.why) + '"' : '') + '>' +
-          icon(id, 14) + esc(o.label) + '</button>';
-      }
-      const blocked = opts.find(o => o.why);
-      if (blocked) html += '</div><div class="hint">' + esc(blocked.why) + '.</div><div class="actions">';
-    }
-    html += '<button class="act" data-act="skip"' + (u.mp <= 0 ? ' disabled' : '') + '>Skip turn<kbd>S</kbd></button>' +
-      '<button class="act" data-act="disband-ask">Disband</button></div>';
-
-    if (isMil(u.type) && !u.acted && u.mp > 0) {
-      const targets = [];
-      const range = shoots(u.type) ? def.range : 1;
-      for (const o of G.units) {
-        if (o.owner !== u.owner && isMil(o.type) && hexDistance(u.x, u.y, o.x, o.y) <= range && visibleTo(o.x, o.y) && !cityAt(o.x, o.y)) {
-          const s = strikeInfo(u, o.x, o.y);
-          if (s) targets.push(s);
-        }
-      }
-      for (const c of G.cities) {
-        if (c.owner !== u.owner && hexDistance(u.x, u.y, c.x, c.y) <= range) {
-          const s = strikeInfo(u, c.x, c.y);
-          if (s) targets.push(s);
-        }
-      }
-      if (targets.length) {
-        html += '<p class="sec">Attack</p><div class="list">' + targets.map(s => {
-          const name = s.unit ? pl(s.unit.owner).name + ' ' + UNITS[s.unit.type].name.toLowerCase() + ' · ' + s.unit.hp + 'hp'
-            : s.city.name + ' · ' + s.city.hp + 'hp';
-          const out = s.capture ? 'take the city' : '~' + s.dmg + (s.kills ? ' · kills' : s.breaks ? ' · breaks it' : '') +
-            (s.back ? ' · you take ~' + s.back + (s.dies ? ' and die' : '') : '');
-          return '<button class="row" data-act="strike:' + s.x + ':' + s.y + '">' + icon(s.unit ? s.unit.type : 'city', 14) +
-            '<span class="nm">' + esc(name) + '</span><span class="st">' + out + '</span></button>';
-        }).join('') + '</div><div class="hint">Numbers are averages. Each hit rolls between 80% and 120%.</div>';
+        orders.push('<button class="tile" data-act="builder:' + o.act + '"' + (o.why ? ' disabled' : '') +
+          ' title="' + esc(o.why || o.label) + '"><span class="tile-ico">' + icon(id, 16) + '</span>' +
+          '<span class="tile-name">' + esc(o.label) + '</span><span class="tile-badge">' +
+          (o.why ? 'no' : '1') + '</span></button>');
       }
     }
+    orders.push('<button class="tile" data-act="skip"' + (u.mp <= 0 ? ' disabled' : '') + ' title="Skip this unit (S)">' +
+      '<span class="tile-ico">' + icon('navigation', 16) + '</span><span class="tile-name">Skip turn</span>' +
+      '<span class="tile-badge">S</span></button>');
+    orders.push('<button class="tile" data-act="disband-ask" title="Disband this unit">' +
+      '<span class="tile-ico">' + icon('forest', 16) + '</span><span class="tile-name">Disband</span>' +
+      '<span class="tile-badge">x</span></button>');
+    html += '<section class="dock-col"><p class="dock-label">Orders</p><div class="tile-grid">' + orders.join('') + '</div></section>';
   } else if (u.owner === v) {
-    html += '<p class="hint">Wait for your turn to give orders.</p>';
+    html += '<section class="dock-col"><p class="dock-label">Orders</p><p class="dock-empty">Give orders on your own turn.</p></section>';
+  }
+
+  if (mine && isMil(u.type) && !u.acted && u.mp > 0) {
+    const targets = [];
+    const range = shoots(u.type) ? def.range : 1;
+    for (const o of G.units) {
+      if (o.owner === u.owner || !isMil(o.type)) continue;
+      if (hexDistance(u.x, u.y, o.x, o.y) > range || !visibleTo(o.x, o.y) || cityAt(o.x, o.y)) continue;
+      const s = strikeInfo(u, o.x, o.y);
+      if (s) targets.push(s);
+    }
+    for (const c of G.cities) {
+      if (c.owner === u.owner || hexDistance(u.x, u.y, c.x, c.y) > range) continue;
+      const s = strikeInfo(u, c.x, c.y);
+      if (s) targets.push(s);
+    }
+    if (targets.length) {
+      html += '<section class="dock-col wide"><p class="dock-label">Attack / averages, 80-120% roll</p><div class="chip-grid">' +
+        targets.map(s => '<button class="chip" data-act="strike:' + s.x + ':' + s.y + '">' +
+          icon(s.unit ? s.unit.type : 'city', 13) + '<span>' +
+          esc(s.unit ? pl(s.unit.owner).name + ' ' + UNITS[s.unit.type].name.toLowerCase() : s.city.name) + '</span>' +
+          '<b>' + (s.capture ? 'take' : '~' + s.dmg) + '</b>' +
+          (s.kills ? '<i>kill</i>' : s.back ? '<i>-' + s.back + '</i>' : '') + '</button>').join('') +
+        '</div></section>';
+    }
   }
 
   const others = unitsAt(u.x, u.y).filter(o => o !== u && o.owner === v);
   const city = cityAt(u.x, u.y);
-  html += '<div class="actions">' + others.map(o => '<button class="act" data-act="select-unit:' + o.id + '">' + icon(o.type, 14) +
-    UNITS[o.type].name + ' here</button>').join('') +
-    (city && city.owner === v ? '<button class="act" data-act="select-city:' + city.id + '">' + icon('city', 14) + 'Open ' + esc(city.name) + '</button>' : '') +
-    '<button class="act" data-act="deselect">Back</button></div>';
-  return html;
+  if (others.length || (city && city.owner === v)) {
+    html += '<section class="dock-col"><p class="dock-label">Here too</p><div class="chip-grid">' +
+      others.map(o => '<button class="chip" data-act="select-unit:' + o.id + '">' + icon(o.type, 13) +
+        UNITS[o.type].name + '</button>').join('') +
+      (city && city.owner === v ? '<button class="chip" data-act="select-city:' + city.id + '">' + icon('city', 13) +
+        esc(city.name) + '</button>' : '') + '</div></section>';
+  }
+  return html + '</div>';
 }
 
 /* ── interface: modals and screens ─────────────────────────────────────────── */
@@ -2462,43 +2673,44 @@ function showHandoff() {
 }
 
 function showCouncil() {
-  const v = G.viewer, me = pl(v);
+  const v = G.viewer;
   const offers = G.offers.filter(o => o.to === v);
-  let html = modalHead('Council', 'War and peace with the other players');
+  const best = Math.max(1, ...G.players.map(o => scoreParts(o.i).total));
+  let html = modalHead('Council', 'War and peace');
   html += '<div class="modal-body">';
   if (offers.length) {
-    html += '<h3>Peace offers to you</h3>' + offers.map(o => {
+    html += '<h3>Peace offers</h3>' + offers.map(o => {
       const from = pl(o.from);
-      return '<div class="council-row"><div><div class="cn">' + dot(from) + esc(from.name) + ' <span class="tag peace">offers peace</span></div>' +
-        '<div class="cd">Sent on turn ' + o.turn + '. It lapses after 3 turns.</div></div><div class="ca">' +
-        (myTurn() ? '<button class="act" data-act="offer-accept:' + o.from + '">Accept</button><button class="act" data-act="offer-refuse:' + o.from + '">Refuse</button>' : '') +
-        '</div></div>';
+      return '<div class="offer-row">' + dot(from) + '<span>' + esc(from.name) + '</span>' +
+        '<span class="tag peace">turn ' + o.turn + '</span>' +
+        (myTurn() ? '<span class="dock-acts">' +
+          '<button class="icon-btn" data-act="offer-accept:' + o.from + '" title="Accept peace">' + icon('barracks', 14) + '</button>' +
+          '<button class="icon-btn" data-act="offer-refuse:' + o.from + '" title="Refuse">' + icon('warrior', 14) + '</button>' +
+          '</span>' : '') + '</div>';
     }).join('');
   }
-  html += '<h3>Players</h3>';
   for (const o of G.players) {
     if (o.i === v) continue;
-    const s = scoreParts(o.i);
-    if (!o.alive) {
-      html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(o.name) + ' <span class="tag">out</span></div></div><div></div></div>';
-      continue;
-    }
-    const war = atWar(v, o.i);
+    const s = scoreParts(o.i), war = atWar(v, o.i);
     const sent = G.offers.some(x => x.from === v && x.to === o.i);
-    const att = o.human ? null : G.attitude[o.i][v] || 0;
-    const mood = att === null ? '' : ' · ' + (att > 15 ? 'friendly' : att < -15 ? 'hostile' : 'wary') + ' toward you';
-    html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(o.name) +
-      ' <span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'at war' : 'at peace') + '</span>' +
-      (o.human ? '' : '<span class="tag">CPU</span>') + '</div>' +
-      '<div class="cd">' + plural(s.cities, 'city', 'cities') + ' · score ' + s.total + mood + '</div></div><div class="ca">';
-    if (myTurn()) {
-      if (war) html += sent ? '<span class="tag">offer sent</span>' : '<button class="act" data-act="peace:' + o.i + '">Offer peace</button>';
-      else html += '<button class="act warn" data-act="war-ask:' + o.i + '">Declare war</button>';
-    }
-    html += '</div></div>';
+    const mood = o.human ? 0 : (G.attitude[o.i][v] || 0);
+    const face = mood < -15 ? 'warrior' : 'barracks';
+    html += '<div class="council-line">' +
+      '<span class="bar-dot" style="background:' + o.light + ';border-color:' + o.ink + '"></span>' +
+      '<span class="bar-name">' + esc(o.name) + (o.human ? '' : ' <i>cpu</i>') + '</span>' +
+      '<span class="rel ' + (!o.alive ? '' : war ? 'war' : 'peace') + '" title="' +
+        (!o.alive ? 'out' : war ? 'at war' : 'at peace') + '">' +
+        icon(!o.alive ? 'city' : face, 13) + '</span>' +
+      '<span class="bar-track"><i style="width:' + (s.total / best * 100).toFixed(1) + '%;background:' + o.ink + '"></i></span>' +
+      '<span class="bar-val">' + s.total + '</span>' +
+      '<span class="council-acts">' + (!o.alive ? '<span class="tag">out</span>' :
+        myTurn() ? (war
+          ? (sent ? '<span class="tag">offer sent</span>'
+            : '<button class="icon-btn" data-act="peace:' + o.i + '" title="Offer peace">' + icon('barracks', 14) + '</button>')
+          : '<button class="icon-btn" data-act="war-ask:' + o.i + '" title="Declare war">' + icon('warrior', 14) + '</button>')
+        : '') + '</span></div>';
   }
-  html += '<p class="hint">Everyone starts at peace. You can only attack players you are at war with. A CPU player takes peace when it is losing, ' +
-    'tired of a long war, or busy with another war. Another human answers your offer on their own turn.</p></div>' +
+  html += '<p class="hint">You can only attack players you are at war with. A CPU takes peace when it is losing or busy with another war.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Close</button></div>';
   openModal(html);
 }
@@ -2585,12 +2797,22 @@ function showHelp() {
 function showEndModal() {
   UI.endShown = true;
   const w = G.over.winner !== null ? pl(G.over.winner) : null;
-  const rows = standings().map(({ f, s }) => '<tr><td>' + dot(f) + ' ' + esc(f.name) + (f.human ? '' : ' (CPU)') + (f.alive ? '' : ' · out') +
-    '</td><td class="n">' + s.cities + '</td><td class="n">' + s.pop + '</td><td class="n">' + s.kills + '</td><td class="n"><b>' + s.total + '</b></td></tr>').join('');
-  openModal(modalHead(w ? esc(w.name) + ' wins' : 'Game over', esc(G.over.why) + ' · turn ' + G.over.turn) +
-    '<div class="modal-body"><table class="standings"><thead><tr><th>Player</th><th class="n">Cities</th><th class="n">Pop</th><th class="n">Kills</th><th class="n">Score</th></tr></thead><tbody>' +
-    rows + '</tbody></table></div>' +
-    '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button><button class="btn primary" data-act="new">New game</button></div>');
+  const rows = standings();
+  const best = Math.max(1, ...rows.map(r => r.s.total));
+  const chart = rows.map(({ f, s }) =>
+    '<div class="bar-row" title="' + esc(f.name) + '">' +
+      '<span class="bar-dot" style="background:' + f.light + ';border-color:' + f.ink + '"></span>' +
+      '<span class="bar-name">' + esc(f.name) + (f.human ? '' : ' cpu') + (f.alive ? '' : ' out') + '</span>' +
+      '<span class="rel">' + icon(f.alive ? 'crown' : 'city', 12) + '</span>' +
+      '<span class="bar-track"><i style="width:' + (s.total / best * 100).toFixed(1) + '%;background:' + f.ink + '"></i></span>' +
+      '<span class="bar-val">' + s.total + '</span></div>').join('');
+  const chips = rows.map(({ f, s }) => '<span class="chip">' + dot(f, 9) +
+    '<b>' + s.cities + '</b><i>cities ' + s.pop + ' pop ' + s.kills + ' kills</i></span>').join('');
+  openModal(modalHead(w ? esc(w.name) + ' wins' : 'Game over', esc(G.over.why) + ' / turn ' + G.over.turn) +
+    '<div class="modal-body"><div class="bars big">' + chart + '</div>' +
+    '<div class="chip-grid" style="margin-top:10px">' + chips + '</div></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button>' +
+    '<button class="btn primary" data-act="new">New game</button></div>');
 }
 
 /* ── interface: what a click does ──────────────────────────────────────────── */
@@ -2657,6 +2879,7 @@ function onAction(act) {
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   switch (kind) {
     case 'close': closeModal(); break;
+    case 'log-toggle': logOpen = !logOpen; renderLog(); break;
     case 'council': if (!G.handoff) showCouncil(); break;
     case 'menu': if (!G.handoff) showMenu(); break;
     case 'help': showHelp(); break;
@@ -3072,6 +3295,7 @@ function boot(data) {
     layerSites: q('#layer-sites'), layerUnits: q('#layer-units'), layerFog: q('#layer-fog'), layerLabels: q('#layer-labels'),
     stats: q('#stats'), bannerDot: q('#banner-dot'), bannerName: q('#banner-name'), bannerWho: q('#banner-who'),
     turnReadout: q('#turn-readout'), btnEnd: q('#btn-end'), sideScroll: q('#side-scroll'), log: q('#log'),
+    inspector: q('#inspector'), logToggle: q('#log-toggle'),
     modalLayer: q('#modal-layer'), modal: q('#modal'), toast: q('#toast'),
     handoff: q('#handoff'), handoffDot: q('#handoff-dot'), handoffTurn: q('#handoff-turn'),
     handoffName: q('#handoff-name'), handoffNote: q('#handoff-note'),
