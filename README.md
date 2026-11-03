@@ -82,6 +82,29 @@ serve the repo root or `/docs`, neither of which is this folder.
 If you use Infisical for local secrets, `npm run dev:infisical` wraps the Vite
 server; see [INFISICAL.md](INFISICAL.md).
 
+## Keeping test and development traffic out of analytics
+
+Bored records player analytics **only on** `https://bassdrum4.github.io/bored/`.
+Local development (`npm run dev`), localhost/127.0.0.1, CI and copied/preview
+sites do not create visitor IDs, queue telemetry or send gameplay, visit or
+enjoyment-survey analytics to production. Scores, sign-in, feedback, and the
+games themselves are separate features and are unchanged.
+
+For manual QA on the published site, open
+`https://bassdrum4.github.io/bored/?bored_qa=1` **before testing**. That
+disables analytics for the entire browser-tab session, including subsequent
+navigation within that tab. Open a fresh tab without the flag for normal play.
+Don't use ordinary live Pages sessions for manual tests: a public static client
+cannot reliably distinguish an unmarked QA session from a genuine visitor.
+
+Signed-in members of `analytics_admins` are checked before client telemetry
+flushes. Their browsers are then quarantined persistently, including after
+sign-out. Supabase additionally rejects their authenticated writes to
+`play_events`, `product_events` and `enjoyment_feedback` using restrictive
+insert policies. A previously unrecognized, signed-out admin browser cannot
+be identified server-side until sign-in, so use the QA URL for its first visit.
+Browser tests should continue mocking analytics requests as defense in depth.
+
 ## Find something to play
 
 - Start with the featured **Daily challenge**, including its objective, verified
