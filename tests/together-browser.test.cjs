@@ -28,6 +28,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
       const url=new URL(req.url());
       const reply=(body,status=200)=>req.respond({status,headers:cors,contentType:'application/json',body:JSON.stringify(body)});
       if(req.method()==='OPTIONS')return req.respond({status:204,headers:cors});
+      if(/(^|\.)(googleapis|gstatic)\.com$/.test(url.hostname))return req.abort(); // Optional font; system-font fallback is expected.
       if(url.hostname!=='djdpttltfmwkofdrvkem.supabase.co'){unexpected.push(req.url());return req.abort();}
       const identity=req.headers().authorization?.replace('Bearer ','');
       if(url.pathname==='/functions/v1/together-pool') {
