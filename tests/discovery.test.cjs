@@ -156,7 +156,7 @@ test('discovery keeps its controls and fits small screens', async t => {
       q.value = '';
       q.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await page.type('#q', 'internet required');
+    await page.type('#q', 'f-14');
     assert.equal(await page.$eval('#random', button => button.disabled), false);
     await page.click('#random');
     assert.equal(await page.evaluate(() => document.querySelector('#player').hidden), true);
