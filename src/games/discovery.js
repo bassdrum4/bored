@@ -50,7 +50,7 @@ export const DISCOVERY = {
   tetris: info('3–10 min', 'Competitive', ['Keyboard']),
   minesweeper: info('2–10 min', 'Focused', ['Mouse', 'Touch']),
   'lights-out': info('1–5 min', 'Relaxing', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
-  tank2: info('5–10 min', 'Competitive', ['Keyboard', 'Touch'], { players: '2 local' }),
+  tank2: info('3–8 min', 'Competitive', ['Keyboard'], { players: '2 local' }),
   'gun-mayhem': info('3–10 min', 'Competitive', ['Keyboard'], { players: '2 local' }),
   'shadow-net': info('10–20 min', 'Focused', ['Keyboard', 'Mouse']),
   'f-14': info('5–20 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { players: 'Online multiplayer' }),

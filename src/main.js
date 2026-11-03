@@ -289,7 +289,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     // A blank white rectangle reads as "broken" while the document is in flight.
     gameFrame.srcdoc = native ? '' : frameStandIn('Loading ' + name + '…', 'Downloading the game.');
     if (native) paint(nativeHTML(slug));
-    else loadGameDocument(slug).then(paint).catch(fail);
+    else loadGameDocument(slug, multiplayer?.mode === 'turns' ? 'together' : '').then(paint).catch(fail);
   }
 
   playerPanel.hidden = false;

@@ -308,3 +308,26 @@ test('new games open on the floor facing each other with fresh kit', async () =>
   });
   assert.equal(world.powerups.length, 0, 'fresh worlds carry no mishaps');
 });
+
+test('Bored Tank 2 integration exposes an AI win snapshot and keeps online v2 isolated', () => {
+  const root = path.join(__dirname, '../src');
+  const solo = fs.readFileSync(path.join(root, 'games/content/tank2.html'), 'utf8');
+  const online = fs.readFileSync(path.join(root, 'games/content/tank2-online.html'), 'utf8');
+  const catalog = fs.readFileSync(path.join(root, 'games/catalog.js'), 'utf8');
+  const hub = fs.readFileSync(path.join(root, 'main.js'), 'utf8');
+  const daily = fs.readFileSync(path.join(root, 'daily.js'), 'utf8');
+  assert.match(solo, /window\.__boredSnapshot=/);
+  assert.match(solo, /if\(mode==='solo'&&w===0\)sessionWins\+\+/);
+  assert.match(solo, /won:sessionWins,cpu:!!game&&game\.mode==='solo'/);
+  assert.match(solo, /const powerUp=isRed\?'KeyW':'ArrowUp',powerDown=isRed\?'KeyS':'ArrowDown'/);
+  assert.match(solo, /there is NO per-turn movement budget/);
+  assert.doesNotMatch(solo, /__boredTogether/);
+  assert.match(online, /window\.__boredTogether/);
+  assert.match(online, /window\.__boredSnapshot/);
+  assert.match(catalog, /variant === 'together' \? 'tank2-online' : slug/);
+  assert.match(hub, /loadGameDocument\(slug, multiplayer\?\.mode === 'turns' \? 'together' : ''\)/);
+  assert.doesNotMatch(daily, /tank2: \{ expression:/);
+  const script = solo.match(/<script>([\s\S]*?)<\/script>/i);
+  assert.ok(script, 'standalone contains inline JS');
+  new (require('node:vm').Script)(script[1], { filename: 'tank2-standalone.js' });
+});
