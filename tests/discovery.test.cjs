@@ -38,6 +38,8 @@ test('discovery keeps its controls and fits small screens', async t => {
       assert.ok(game.meta.minutes && game.meta.pace && game.meta.inputs.length, game.slug);
       assert.ok(game.meta.inputs.every(input => ['Keyboard', 'Mouse', 'Touch'].includes(input)), game.slug);
       if (!game.online) assert.match(game.preview || '', new RegExp('/previews/' + game.slug + '\\.(?:webp|svg)$'), game.slug + ' has a preview asset');
+      if (['f-14', 'klang'].includes(game.slug))
+        assert.match(game.preview || '', new RegExp('/previews/' + game.slug + '\\.svg$'), game.slug + ' external card uses a local illustrated preview');
     }
     await page.$$eval('#grid img', images => images.forEach(image => image.loading = 'eager'));
     await page.waitForFunction(() => [...document.querySelectorAll('#grid img')].every(image => image.complete && image.naturalWidth > 0));

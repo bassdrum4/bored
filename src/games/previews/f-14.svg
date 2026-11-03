@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="240" viewBox="0 0 384 240" role="img" aria-label="F-14 Tomcat in flight above the ocean">
+<defs>
+  <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#7da8c5"/><stop offset="1" stop-color="#bdd3d9"/></linearGradient>
+  <linearGradient id="sea" x2="0" y2="1"><stop stop-color="#426c7b"/><stop offset="1" stop-color="#284956"/></linearGradient>
+  <linearGradient id="metal" x2="0" y2="1"><stop stop-color="#e2e6e2"/><stop offset=".6" stop-color="#9daeb2"/><stop offset="1" stop-color="#657983"/></linearGradient>
+</defs>
+<rect width="384" height="240" fill="url(#sky)"/>
+<path d="M0 82 34 78 80 83 118 80 173 84 220 81 274 84 318 80 384 85V96H0Z" fill="#d8e4e3" opacity=".8"/>
+<path d="M0 102 72 96 141 101 217 97 303 100 384 95V240H0Z" fill="url(#sea)"/>
+<g fill="none" stroke="#c7e2d5" opacity=".22" stroke-width="1.3">
+  <path d="M-20 125Q42 119 95 126T206 126T405 119"/><path d="M-20 163Q43 155 105 165T216 162T405 158"/><path d="M-20 204Q38 198 104 206T240 203T406 197"/>
+</g>
+<g opacity=".65" transform="translate(300 118) scale(.58)">
+  <path d="M-38 29 9 12 54 29 8 35Z" fill="#263d49"/>
+  <rect x="-4" y="-26" width="12" height="67" rx="2" fill="#384d58"/>
+  <path d="M-19 16 -42 42 5 31 52 42 28 16Z" fill="#435c67"/>
+</g>
+<ellipse cx="194" cy="182" rx="103" ry="37" fill="#152e39" opacity=".25"/>
+<g stroke="#526670" stroke-width="1.5" stroke-linejoin="round">
+  <path d="M166 148 51 182 42 198 160 182 175 191 178 214 191 217 195 191 212 191 216 217 231 214 234 189 248 181 344 198 333 179 233 146Z" fill="#899ba3"/>
+  <path d="M166 148 51 182 42 198 160 182 177 170Z" fill="#b3c2c4"/>
+  <path d="M233 146 333 179 344 198 248 181 216 170Z" fill="#b3c2c4"/>
+  <path d="M170 186 156 220 171 223 187 192Z" fill="#b8c5c6"/>
+  <path d="M218 192 237 223 253 220 233 186Z" fill="#b8c5c6"/>
+  <path d="M179 103 190 77Q201 65 212 77L223 103 238 175 223 204 182 204 166 175Z" fill="url(#metal)"/>
+  <path d="M190 78Q201 68 212 78L213 108Q202 113 190 108Z" fill="#c4d6d9"/>
+  <path d="M191 96 196 82 207 82 212 96 209 110 193 110Z" fill="#263f4e" stroke="#8ea5ad"/>
+  <path d="M185 147 180 207 193 216 194 164Z" fill="#617983"/>
+  <path d="M219 147 220 207 207 216 206 164Z" fill="#617983"/>
+  <path d="M177 165 166 185 183 195 189 177Z" fill="#d5dcd8"/>
+  <path d="M226 165 237 185 220 195 214 177Z" fill="#d5dcd8"/>
+  <path d="M186 195 185 229 196 229 196 195Z" fill="#586e78"/>
+  <path d="M208 195 208 229 219 229 218 195Z" fill="#586e78"/>
+</g>
+<g fill="#2c4653"><ellipse cx="191" cy="226" rx="6" ry="4"/><ellipse cx="213" cy="226" rx="6" ry="4"/></g>
+<g fill="none" stroke="#d2eadf" opacity=".83" stroke-width="1">
+  <path d="M18 25h31m-31 0v22M366 25h-31m31 0v22M18 216h31m-31 0v-22M366 216h-31m31 0v-22"/>
+  <path d="M152 112h18m45 0h18M193 51v14M193 118v14"/>
+  <circle cx="193" cy="112" r="21" stroke-dasharray="3 8" opacity=".75"/>
+  <path d="M28 116h31m-21-6v12M324 116h31m-10-6v12"/>
+</g>
+<g fill="#eff9ee" font-family="ui-monospace,Consolas,monospace" font-size="10" font-weight="700" letter-spacing="1">
+  <text x="20" y="19">F-14 TOMCAT</text><text x="261" y="19">FLIGHT SIM</text>
+  <text x="24" y="233" opacity=".85">ALT 12,480</text><text x="281" y="233" opacity=".85">IAS 385</text>
+</g>
+</svg>
