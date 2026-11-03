@@ -326,7 +326,7 @@ displayed points, waves, levels, wins, ships or other progress metric. 8 Ball,
 Sand and Eco stay off the board entirely: they are open-ended toys rather than
 runs with a finish line, so the hub keeps no best for them and their cards carry
 no score line.
-Connect Four and Tank2 count wins against the computer; Minigolf counts total
+Connect Four and Tank 2 count wins against the computer; Minigolf counts total
 strokes only after all nine holes are sunk. The two remote extras are excluded because the hub cannot inspect
 their cross-origin state. Scores are submitted by the browser, so this is a
 friendly board, not anti-cheat. Signing out keeps local bests intact.
