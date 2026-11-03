@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Risk world map preview">
+<rect width="640" height="360" fill="#061419"/>
+<g stroke="#132f36" stroke-width="1"><path d="M0 72H640M0 144H640M0 216H640M0 288H640M80 0V360M160 0V360M240 0V360M320 0V360M400 0V360M480 0V360M560 0V360" fill="none"/></g>
+<g stroke="#061419" stroke-width="4" stroke-linejoin="round">
+<path fill="#00a4b5" d="M41 89L86 53 163 64 220 88 210 133 183 151 170 179 137 188 130 164 91 154 58 128Z"/>
+<path fill="#037c8a" d="M156 187L206 177 241 209 228 239 218 285 190 325 166 275 174 237Z"/>
+<path fill="#f2b84f" d="M282 86L319 64 355 81 365 124 338 138 347 167 309 163 297 131 275 117Z"/>
+<path fill="#e59d33" d="M306 168L366 157 395 192 382 249 346 285 313 244 299 208Z"/>
+<path fill="#bd4960" d="M373 80L426 52 494 66 572 94 611 118 586 161 541 178 514 198 479 174 443 182 407 144 368 134Z"/>
+<path fill="#b43c50" d="M498 253L553 239 587 263 569 303 521 307 494 282Z"/>
+</g>
+<g fill="#f9f7e8" stroke="#062026" stroke-width="2">
+<circle cx="113" cy="110" r="13"/><circle cx="160" cy="129" r="13"/><circle cx="194" cy="240" r="13"/>
+<circle cx="323" cy="115" r="13"/><circle cx="345" cy="214" r="13"/>
+<circle cx="455" cy="123" r="13"/><circle cx="513" cy="128" r="13"/><circle cx="544" cy="281" r="13"/>
+</g>
+<rect x="17" y="13" width="182" height="47" rx="4" fill="#061419" stroke="#009fb0" stroke-width="2"/>
+<text x="31" y="45" fill="#e5f5f5" font-family="ui-monospace, monospace" font-weight="bold" font-size="29" letter-spacing="4">RISK</text>
+<text x="18" y="346" fill="#a6c2c4" font-size="15" font-family="ui-monospace, monospace">SOLO COMMAND  /  CONQUER THE MAP</text>
+</svg>
