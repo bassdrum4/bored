@@ -1,19 +1,8 @@
 /*
- * Pastel Tanks as rules rather than as a canvas. Rules version 2: the arena is
- * an arena with an uneven floor and destructible boundary walls.
- *
- * A Bored Together match stores only its seed and the shots that were fired.
- * Both players replay that list through this file, so the box, the hit points
- * and the winner are recomputed on each side instead of being reported by
- * whichever client moved. Everything here is deterministic: the wind comes from
- * the seed and the shot index, the power-up stream is a seeded function of the
- * same numbers, and nothing reads the clock, the DOM or Math.random.
- *
- * Tanks stay on the uneven bottom terrain. The ceiling and side walls are
- * boundaries that can be dented or broken by shots, but are never drivable.
- * The floor shares the same deterministic depth data as the walls, starting
- * with a seeded height profile above its base. Shells cut bowls into that
- * profile, leaving real openings when they dig all the way through.
+ * Tank 2: a single destructible arena boundary and separate rolling floor.
+ * The box's four edges are independent thin surfaces; the world outside the
+ * boundary is empty. Soil beneath the wavy floor extends to the bottom edge.
+ * Deterministic seed + shot replay is shared by local and online matches.
  */
 
 export const RULES = 2;
@@ -148,7 +137,7 @@ function anchor(wall, x, y) {
   return { x: X0, y: clamp(y, Y0, Y1), along: Y1 - clamp(y, Y0, Y1) };
 }
 
-/* ── Terrain: a depth profile per wall, plus blocks in the room ──────────── */
+/* ── Terrain: four wall profiles plus a separate interior soil profile ─── */
 
 /** How far the ground has been dug away at this spot, in pixels. */
 export function depthAt(world, wall, along) {
@@ -157,11 +146,17 @@ export function depthAt(world, wall, along) {
 }
 export const breached = (world, wall, along) => depthAt(world, wall, along) >= T - 1;
 
-/** The solid point a tank's treads rest on, already sunk into any dent. */
+/** The floor and the box's bottom edge are separate physical materials. */
+export function floorDepthAt(world, along) {
+  return world.floor[clamp(Math.round(along), 0, world.floor.length - 1)];
+}
+export const floorBreached = (world, along) => floorDepthAt(world, along) >= -1;
+export const floorYAt = (world, x) => Y1 + floorDepthAt(world, X1 - clamp(x, X0, X1));
+
 export function tankSurface(world, tank) {
-  const p = ringPoint(tank.s), d = depthAt(world, p.wall, p.along);
+  const p = ringPoint(tank.s), d = floorDepthAt(world, p.along);
   const half = TANK / 2 - 1;
-  return { p, d, x: p.x - p.nx * d, y: p.y - p.ny * d, cx: p.x - p.nx * d + p.nx * half, cy: p.y - p.ny * d + p.ny * half };
+  return { p, d, x: p.x, y: p.y + d, cx: p.x, cy: p.y + d - half };
 }
 
 // Keep the playing field open: the terrain and damaged outer walls are the cover.
@@ -210,49 +205,43 @@ function carveWall(world, wall, along, r, bite) {
   }
 }
 
-/** A blast: every wall and block the bowl can reach loses material. */
-export function carveAt(world, x, y, r, bite) {
-  for (let wall = 0; wall < 4; wall++) {
-    // The floor is raised above Y1: use its actual, possibly cratered surface
-    // rather than the hidden baseline to decide whether the blast reaches it.
-    const distance = wall === 2 && x >= X0 && x <= X1
-      ? Math.abs(y - (Y1 + depthAt(world, 2, X1 - x)))
-      : distToWall(wall, x, y);
-    if (distance > r) continue;
-    carveWall(world, wall, anchor(wall, x, y).along, r, bite);
-  }
-  for (const b of world.blocks) {
-    if (!circleHitsRect(x, y, r, b)) continue;
-    world.blockHoles.push({ x: round2(x), y: round2(y), r: round2(r) });
+/** A crater eats soil until it reaches the box's bottom wall. */
+function carveFloor(world, x, r, bite) {
+  const center = X1 - x;
+  const from = Math.max(0, Math.floor(center - r)), to = Math.min(IW - 1, Math.ceil(center + r));
+  for (let i = from; i <= to; i++) {
+    const q = (i - center) / r;
+    if (q <= -1 || q >= 1) continue;
+    const was = world.floor[i], now = Math.min(0, was + bite * (1 - q * q));
+    if (now <= was + .005) continue;
+    world.floor[i] = round2(now);
+    if (now >= -1 && was < -1) world.events.push({ kind: 'sinkhole', x: X1 - i, y: Y1 });
   }
 }
 
-/**
- * The first solid thing at this point, or null. A wall only counts above the
- * depth profile — inside a dug bowl a shell keeps flying — and a block stops
- * counting where it has been shot away.
- */
+/** Ground and perimeter damage are independent, but one blast may touch both. */
+export function carveAt(world, x, y, r, bite) {
+  if (x + r >= X0 && x - r <= X1) {
+    const fx = clamp(x, X0, X1);
+    if (Math.abs(y - floorYAt(world, fx)) <= r) carveFloor(world, fx, r, bite);
+  }
+  for (let wall = 0; wall < 4; wall++) {
+    if (distToWall(wall, x, y) <= r) carveWall(world, wall, anchor(wall, x, y).along, r, bite);
+  }
+}
+
+/** A hole in the floor reveals the bottom wall; outside the walls is void. */
 export function solidAt(world, x, y) {
-  // Terrain starts well *above* the base of the ring. A shell first contacts
-  // the actual ground surface; a breached column is empty all the way through.
-  if (x >= X0 && x <= X1) {
+  if (x >= X0 && x <= X1 && y <= Y1 && y >= floorYAt(world, x)) {
     const along = X1 - x;
-    const depth = depthAt(world, 2, along);
-    if (y >= Y1 + depth) {
-      return depth >= T - 1 ? null : { kind: 'wall', wall: 2, along, x, y: Y1 + depth };
-    }
+    if (!floorBreached(world, along))
+      return { kind: 'ground', wall: 2, along, x, y: floorYAt(world, x) };
   }
   const band = wallAt(x, y);
-  if (band && band.wall !== 2) {
-    const spot = anchor(band.wall, x, y);
-    const q = distToWall(band.wall, x, y);
-    const depth = depthAt(world, band.wall, spot.along);
-    if (depth < T - 1 && q >= depth) {
+  if (band && band.d <= T) {
+    const spot = anchor(band.wall, x, y), d = depthAt(world, band.wall, spot.along);
+    if (d < T - 1 && band.d >= d)
       return { kind: 'wall', wall: band.wall, along: spot.along, x: spot.x, y: spot.y };
-    }
-  }
-  for (const b of world.blocks) {
-    if (inBlock(b, x, y) && !blockHoleAt(world, x, y)) return { kind: 'block', x, y, block: b };
   }
   return null;
 }
@@ -286,7 +275,7 @@ export function supported(world, tank) {
   let run = 0, worst = 0;
   for (let o = -TANK / 2; o <= TANK / 2; o += 1) {
     const q = ringPoint(tank.s + o);
-    if (depthAt(world, q.wall, q.along) >= T - 1) { run++; if (run > worst) worst = run; }
+    if (floorBreached(world, q.along)) { run++; if (run > worst) worst = run; }
     else run = 0;
   }
   return worst < SUPPORTGAP;
@@ -473,8 +462,8 @@ function pickPowerup(rand) {
 function spawnPowerup(world, rand) {
   if (world.powerups.length >= MAXPU) return;
   const x = Math.round(X0 + 40 + rand() * (IW - 80));
-  const d = depthAt(world, 2, X1 - x);
-  if (d >= T - 4) { world.events.push({ kind: 'pu_out', x }); return; }
+  const d = floorDepthAt(world, X1 - x);
+  if (d >= -4) { world.events.push({ kind: 'pu_out', x }); return; }
   world.powerups.push({ x, y: Y1 + d - 12, key: pickPowerup(rand).key });
 }
 
@@ -490,7 +479,7 @@ function collect(world, tank, key, index) {
       let grounded = true;
       for (let o = -TANK / 2; o <= TANK / 2; o += 4) {
         const q = ringPoint(s + o);
-        if (breached(world, q.wall, q.along)) grounded = false;
+        if (floorBreached(world, q.along)) grounded = false;
       }
       if (grounded && supported(world, candidate)) { tank.s = s; tank.dir = 1; tank.angle = 45; break; }
     }
@@ -561,7 +550,8 @@ function worldFrom(state) {
   const seed = (state?.seed >>> 0) || 1;
   const world = {
     seed,
-    depth: LENS.map((len, wall) => wall === 2 ? makeFloor(seed) : new Array(len).fill(0)),
+    depth: LENS.map(len => new Array(len).fill(0)),
+    floor: makeFloor(seed),
     blocks: makeBlocks(seed),
     blockHoles: [],
     tanks: [makeTank(1), makeTank(2)],
@@ -635,7 +625,7 @@ function takeShot(world, shot, index) {
   }
   for (let i = world.powerups.length - 1; i >= 0; i--) {
     const pu = world.powerups[i];
-    if (breached(world, 2, X1 - pu.x)) {
+    if (floorBreached(world, X1 - pu.x)) {
       world.powerups.splice(i, 1);
       world.events.push({ kind: 'pu_out', x: pu.x });
     }
