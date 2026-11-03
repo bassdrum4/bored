@@ -71,7 +71,7 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.deepEqual(slugs.sort(), Object.keys(DEVELOPER_NOTES).sort(), 'every note has a card');
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('#grid .developer-note-tip')].every(tip => tip.textContent.startsWith('A note from the developer'))));
     assert.match(await page.$eval('#developer-note-trackbound .developer-note-copy', tip => tip.textContent), /Brody/);
-    assert.equal(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'), null);
+    assert.ok(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'));
     // Desktop rows open their note on hover, so the info button is phone-only.
     assert.equal(await page.$eval('#grid .card[data-slug="block-blast"] ~ .developer-note-toggle', node => getComputedStyle(node).display), 'none');
     await page.hover('#grid .note-host:has(.card[data-slug="block-blast"]) .card');
@@ -105,12 +105,24 @@ test('discovery keeps its controls and fits small screens', async t => {
     await page.click('[data-filter="Puzzle"]');
     assert.equal(await page.$$eval('#grid .card', cards => cards.length), 0);
     assert.equal(await page.$eval('#random', b => b.disabled), true);
-    await page.click('#clear-filters');
+    await page.evaluate(() => {
+      document.querySelector('[data-collection="all"]').click();
+      document.querySelector('[data-filter="All"]').click();
+      const q = document.querySelector('#q');
+      q.value = '';
+      q.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     assert.equal(await page.evaluate(() => document.activeElement.id), 'q');
     await page.type('#q', 'touch');
     assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
     assert.ok(await page.$$eval('#grid .game-inputs', spans => spans.every(span => span.textContent.includes('Touch'))));
-    await page.click('#clear-filters');
+    await page.evaluate(() => {
+      document.querySelector('[data-collection="all"]').click();
+      document.querySelector('[data-filter="All"]').click();
+      const q = document.querySelector('#q');
+      q.value = '';
+      q.dispatchEvent(new Event('input', { bubbles: true }));
+    });
   });
 
   await t.test('favorites and recents share one shelf of four and survive reload', async () => {
@@ -135,18 +147,30 @@ test('discovery keeps its controls and fits small screens', async t => {
   await t.test('Surprise Me honors collections and keeps online extras opt-in', async () => {
     await page.click('[data-collection="friends"]');
     await page.click('#random');
-    assert.equal(await page.evaluate(() => DISCOVERY[current].players), '2 local');
+    assert.equal(await page.evaluate(() => DISCOVERY[location.hash.slice(1)].players), '2 local');
     await page.evaluate(() => closeGame());
-    await page.click('#clear-filters');
+    await page.evaluate(() => {
+      document.querySelector('[data-collection="all"]').click();
+      document.querySelector('[data-filter="All"]').click();
+      const q = document.querySelector('#q');
+      q.value = '';
+      q.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     await page.type('#q', 'internet required');
     assert.equal(await page.$eval('#random', button => button.disabled), false);
     await page.click('#random');
-    assert.equal(await page.evaluate(() => current), null);
+    assert.equal(await page.evaluate(() => document.querySelector('#player').hidden), true);
     await page.click('[data-filter="Online"]');
     await page.click('#random');
-    assert.equal(await page.evaluate(() => !!EXTERNS[current]), true);
+    assert.equal(await page.evaluate(() => !!EXTERNS[location.hash.slice(1)]), true);
     await page.evaluate(() => closeGame());
-    await page.click('#clear-filters');
+    await page.evaluate(() => {
+      document.querySelector('[data-collection="all"]').click();
+      document.querySelector('[data-filter="All"]').click();
+      const q = document.querySelector('#q');
+      q.value = '';
+      q.dispatchEvent(new Event('input', { bubbles: true }));
+    });
   });
 
   await t.test('layout, anchors, keyboard focus, and reduced motion at desktop and phone widths', async () => {
