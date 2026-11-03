@@ -104,6 +104,7 @@ test('CPU completes a turn: reinforce, attack, award one card, fortify, finish',
   assert.equal(f.state.reserves,0);
   f.pump();
   assert.ok(f.actions.some(x=>x.startsWith('attack:')), 'CPU should attack a reachable weaker target');
+  assert.ok(f.actions.includes('attack:BORDER:EAST'),'CPU should push into territory behind its first conquest');
   assert.equal(f.actions.filter(x=>x.startsWith('card:')).length,1,'only one conquest card per turn');
   assert.ok(f.actions.includes('end'),'CPU should finish its turn');
   assert.equal(f.state._aiRunning,false,'CPU must clear the running guard');
@@ -125,6 +126,11 @@ test('CPU pursues a nearly completed continent and rejects suicidal assaults',()
   const chosen=vm.runInContext('riskCpuChooseAttack(1,3)',f.context);
   assert.equal(chosen.to,'LAST','finishing a continent outranks a random equal target');
   assert.notEqual(chosen.to,'FORT');
+  f.state.territories.HOME.armies=4;
+  assert.equal(vm.runInContext('riskCpuChooseAttack(1,1)',f.context),null,
+    'easy opponents hesitate more before attacking');
+  assert.ok(vm.runInContext('riskCpuChooseAttack(1,3)',f.context),
+    'hard opponents capitalize on modest advantages');
   f.state.territories.HOME.armies=2;
   assert.equal(vm.runInContext('riskCpuChooseAttack(1,2)',f.context),null,
     'avoid throwing a two-army stack into a stronger defense');
