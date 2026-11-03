@@ -191,6 +191,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 <span class="hud-label">Level</span>
                 <span id="level-val" class="hud-value">01</span>
             </div>
+            <div class="hud-item"><span class="hud-label">Chain</span><span id="chain-val" class="hud-value">x1</span></div>
             <div class="hud-item" style="align-items: flex-end;">
                 <span class="hud-label">Balls</span>
                 <span id="lives-val" class="hud-value">03</span>
@@ -211,7 +212,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             <div class="btn" onclick="handleStartClick()">START GAME</div>
         </div>
 
-        <div id="controls-hint">Mouse or Arrows to Move • Click or Space to Launch</div>
+        <div id="controls-hint">Mouse / Touch / Arrows • Click or Space to Launch • Chain bricks for bonuses</div>
     </div>
 
     <script>
@@ -273,6 +274,25 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 "I.HHHHHH.I",
                 "I........I",
                 "IIIIIIIIII"
+            ],
+            [
+                "..33..33..",
+                ".HHHHHHHH.",
+                "111..111..",
+                ".I.22.I.22",
+                "3333333333",
+                "...HHHH...",
+                "....44...."
+            ],
+            [
+                ".I......I.",
+                "HHHHHHHHHH",
+                "6666666666",
+                "..I.HH.I..",
+                "5555555555",
+                "HHH....HHH",
+                "4444444444",
+                ".I......I."
             ]
         ];
 
@@ -331,12 +351,19 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
         // Game State
         let paddle, balls, bricks, score, lives, currentLevel, state, running;
-        let powerUps, particles, effects, stickyBalls, shake;
-        let highScore = parseInt(localStorage.getItem('breakout_hi_pro') || '0');
+        let powerUps, particles, effects, stickyBalls, shake, chain;
+        let highScore = (() => { try { return Number(localStorage.getItem('bored.breakout.high') || localStorage.getItem('breakout_hi_pro')) || 0; } catch { return 0; } })();
+        function saveHighScore() {
+            if (score <= highScore) return;
+            highScore = score;
+            try { localStorage.setItem('bored.breakout.high', String(highScore)); } catch {}
+        }
+        function chainMultiplier() { return Math.min(4, 1 + Math.floor(Math.max(0, chain - 1) / 3)); }
         let keys = {};
 
         function init() {
             score = 0;
+            chain = 0;
             lives = 3;
             currentLevel = 0;
             state = 'ready';
@@ -397,6 +424,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             stickyBalls = [{ offsetX: 0 }];
             powerUps = [];
             effects = [];
+            chain = 0;
         }
 
         function createParticle(x, y, color) {
@@ -415,7 +443,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             if (audioCtx.state === 'suspended') audioCtx.resume();
             for (const sb of stickyBalls) {
                 let angle = (Math.random() * 0.4 - 0.2) - Math.PI / 2;
-                let spd = 4.5;
+                let spd = Math.min(6.2, 4.5 + currentLevel * 0.22);
                 balls.push({
                     x: paddle.x + paddle.w / 2 + sb.offsetX,
                     y: paddle.y - 8,
@@ -433,6 +461,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             document.getElementById('score-val').textContent = String(score).padStart(4, '0');
             document.getElementById('level-val').textContent = String(currentLevel + 1).padStart(2, '0');
             document.getElementById('lives-val').textContent = String(lives).padStart(2, '0');
+            document.getElementById('chain-val').textContent = 'x' + chainMultiplier();
             
             // Effects
             activeEffectsEl.innerHTML = '';
@@ -528,6 +557,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                         }
 
                         const hitPos = (b.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+                        chain = 0;
+                        updateHUD();
                         const angle = hitPos * (Math.PI / 3);
                         const speed = Math.sqrt(b.dx * b.dx + b.dy * b.dy);
                         b.dx = speed * Math.sin(angle);
@@ -546,7 +577,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                                 br.hits--;
                                 if (br.hits <= 0) {
                                     br.alive = false;
-                                    score += 10;
+                                    chain++;
+                                    score += 10 * chainMultiplier();
                                     shake = 5;
                                     updateHUD();
                                     SFX.brick(440 + br.y);
@@ -574,6 +606,12 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
                             if (min === dt || min === db) b.dy *= -1;
                             else b.dx *= -1;
+                            // Avoid slow horizontal loops and impossible-to-catch near-vertical shots.
+                            const speed = Math.hypot(b.dx, b.dy);
+                            if (speed > 0 && Math.abs(b.dy) < speed * 0.22) {
+                                b.dy = Math.sign(b.dy || 1) * speed * 0.22;
+                                b.dx = Math.sign(b.dx || 1) * Math.sqrt(speed * speed - b.dy * b.dy);
+                            }
                             
                             // Particles
                             for(let p=0; p<8; p++) particles.push(createParticle(b.x, b.y, br.color));
@@ -601,12 +639,16 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                     }
                 }
 
-                // Win check
+                // Level completion takes priority over losing the final ball.
                 if (bricks.every(br => !br.alive || br.type === 'I')) {
+                    score += 50 * (currentLevel + 1);
+                    saveHighScore();
                     currentLevel++;
                     SFX.win();
                     loadLevel(currentLevel);
-                    state = 'ready';
+                    if (state !== 'win') state = 'ready';
+                    updateHUD();
+                    return;
                 }
 
                 // Lose check
@@ -715,10 +757,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
         function gameOver() {
             state = 'gameover';
-            if (score > highScore) {
-                highScore = score;
-                localStorage.setItem('breakout_hi_pro', highScore);
-            }
+            saveHighScore();
             document.getElementById('overlay-title').textContent = 'GAME OVER';
             document.getElementById('overlay-sub').textContent = 'Try again?';
             document.getElementById('hi-score-val').textContent = highScore;
@@ -727,6 +766,8 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
         function winGame() {
             state = 'win';
+            saveHighScore();
+            document.getElementById('hi-score-val').textContent = highScore;
             document.getElementById('overlay-title').textContent = 'YOU WIN';
             document.getElementById('overlay-sub').textContent = 'Amazing work!';
             overlay.classList.remove('hidden');
@@ -768,11 +809,21 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
         document.addEventListener('visibilitychange', () => { if (document.hidden) for(const k in keys)keys[k]=false });
 
-        canvas.addEventListener('mousemove', e => {
+        function aimPaddle(clientX) {
             const rect = canvas.getBoundingClientRect();
-            const mx = (e.clientX - rect.left) * (W / rect.width);
-            paddle.x = mx - paddle.w / 2;
-            paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x));
+            const mx = (clientX - rect.left) * (W / rect.width);
+            paddle.x = Math.max(0, Math.min(W - paddle.w, mx - paddle.w / 2));
+        }
+        canvas.addEventListener('mousemove', e => aimPaddle(e.clientX));
+        canvas.style.touchAction = 'none';
+        canvas.addEventListener('pointerdown', e => {
+            if (e.pointerType !== 'mouse') {
+                aimPaddle(e.clientX);
+                if (overlay.classList.contains('hidden')) handleAction();
+            }
+        });
+        canvas.addEventListener('pointermove', e => {
+            if (e.pointerType !== 'mouse' && e.buttons) aimPaddle(e.clientX);
         });
 
         canvas.addEventListener('click', () => {
