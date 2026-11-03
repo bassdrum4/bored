@@ -28,10 +28,21 @@
   main { width: min(400px, 96vw); padding: 8px 4px 12px; text-align: center }
   h1 { font: 600 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase }
   #board {
+    position: relative;
     display: grid; grid-template-columns: repeat(15, minmax(0, 1fr));
     grid-template-rows: repeat(15, minmax(0, 1fr));
     width: min(360px, 92vw); aspect-ratio: 1; margin: 6px auto 0;
-    gap: 1px; background: var(--hair); border: 1px solid var(--hair); border-radius: 2px;
+    background: var(--tile); border: 1px solid var(--hair); border-radius: 2px;
+  }
+  /* Lines are drawn over the cells rather than as 1px gaps: a cell edge can land
+     mid-pixel at some window widths, and those gaps round to nothing, leaving
+     whole lines missing. A line every cell cannot fall out of step. */
+  #board::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--hair) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--hair) 1px, transparent 1px);
+    background-size: calc(100% / 15) calc(100% / 15);
   }
   .cell {
     position: relative; display: grid; place-items: center; min-width: 0; min-height: 0;
@@ -10197,7 +10208,15 @@ function generateMoves() {
   return moves;
 }
 
-const DIFFICULTY = { easy: 12, medium: 4, hard: 1 };
+// Every difficulty finds the same legal plays. What changes is which one it
+// settles on: easy works from the weak end of the list, where the two- and
+// three-letter answers sit, and only reaches a long word when the rack offers
+// nothing else. Medium takes a middling move and hard plays the best it sees.
+const DIFFICULTY = {
+  easy: [0.5, 1],
+  medium: [0.08, 0.4],
+  hard: [0, 0.05]
+};
 
 function scheduleComputer() {
   thinking = true;
@@ -10214,8 +10233,10 @@ function scheduleComputer() {
       return;
     }
     moves.sort((a, b) => b.points - a.points);
-    const depth = DIFFICULTY[level] || DIFFICULTY.medium;
-    const pool = moves.slice(0, Math.min(depth, moves.length));
+    const [weakest, strongest] = DIFFICULTY[level] || DIFFICULTY.medium;
+    const from = Math.floor(moves.length * weakest);
+    const to = Math.max(from + 1, Math.ceil(moves.length * strongest));
+    const pool = moves.slice(from, to);
     const move = pool[Math.floor(Math.random() * pool.length)];
     for (const placement of move.placements) {
       board[placement.index] = { letter: placement.letter, blank: placement.blank === true };
@@ -10350,7 +10371,8 @@ window.__test = {
     exchangeMode = false;
     marked.clear();
     passes = 0;
-    levelEl.value = position.level || 'hard';
+    level = DIFFICULTY[position.level] ? position.level : 'hard';
+    levelEl.value = level;
     modeEl.value = mode;
     syncChoices();
     setupEl.hidden = true;

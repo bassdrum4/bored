@@ -1,533 +1,876 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><script>(function(){try{localStorage.getItem('__probe');return}catch(e){}
-var m={};
-function k(i){return Object.keys(m)[i]||null}
-var s={getItem:function(x){return Object.prototype.hasOwnProperty.call(m,x)?m[x]:null},
-setItem:function(x,v){m[x]=String(v)},removeItem:function(x){delete m[x]},
-clear:function(){m={}},key:k};
-Object.defineProperty(s,'length',{get:function(){return Object.keys(m).length}});
-try{Object.defineProperty(window,'localStorage',{value:s,configurable:true});}catch(e){}
-try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}catch(e){}
-})();</script>
+<head>
+<script>
+(function () {
+  try { localStorage.getItem('__probe'); return; } catch (e) { }
+  const m = {};
+  const s = {
+    getItem: x => (Object.prototype.hasOwnProperty.call(m, x) ? m[x] : null),
+    setItem: (x, v) => { m[x] = String(v); },
+    removeItem: x => { delete m[x]; },
+    clear: () => { for (const k in m) delete m[k]; },
+    key: i => Object.keys(m)[i] || null
+  };
+  Object.defineProperty(s, 'length', { get: () => Object.keys(m).length });
+  try { Object.defineProperty(window, 'localStorage', { value: s, configurable: true }); } catch (e) { }
+  try { Object.defineProperty(window, 'sessionStorage', { value: s, configurable: true }); } catch (e) { }
+})();
+</script>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Pastel Tanks</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#2D2438;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
-canvas{display:block;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.35);cursor:pointer}
+  :root { --paper: #f5f2ea; --board: #fffdf7; --ink: #191713; --hair: #d8d2c4; --dim: #6b6558; --red: #b3261e; --green: #456653; }
+  * { box-sizing: border-box }
+  html, body { margin: 0; background: var(--paper); color: var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    min-height: 100vh; padding: 10px; user-select: none; -webkit-user-select: none; touch-action: manipulation }
+  header, footer { width: min(100%, 760px); display: flex; align-items: baseline; justify-content: space-between; gap: 10px }
+  h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .14em }
+  h1 span { color: var(--red) }
+  #hud { font-size: 12px; letter-spacing: .04em; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap }
+  #hud b { color: var(--ink); font-weight: 600 }
+  #hud .p1 { color: var(--green) } #hud .p2 { color: var(--red) }
+  canvas { display: block; width: min(100%, 760px); height: auto; aspect-ratio: 960/580; border: 1px solid var(--ink);
+    background: var(--board); touch-action: none; cursor: crosshair }
+  footer { align-items: center; font-size: 11px; color: var(--dim); flex-wrap: wrap }
+  footer p { margin: 0; flex: 1 1 auto; min-width: 0 }
+  #acts { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end }
+  button { font: 600 11px ui-monospace, monospace; letter-spacing: .05em; border: 1px solid var(--ink); background: none;
+    color: inherit; border-radius: 3px; padding: 5px 8px; cursor: pointer; touch-action: manipulation }
+  button:active { background: var(--ink); color: var(--paper) }
+  button:disabled { border-color: var(--hair); color: var(--hair); cursor: default; background: none }
+  button.sel { background: var(--ink); color: var(--paper) }
+  #arms button { padding: 5px 6px; letter-spacing: .03em }
+  #arms b { font-weight: 600 }
+  @media (max-width: 560px) { footer p { display: none } #acts { width: 100%; justify-content: center } }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<script>
-const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
-const W=960,H=540;canvas.width=W;canvas.height=H;
-function resize(){const s=Math.min(innerWidth/W,innerHeight/H)*0.95;canvas.style.width=W*s+'px';canvas.style.height=H*s+'px'}
-resize();addEventListener('resize',resize);
+<header>
+  <h1>PASTEL TANKS<span>.</span></h1>
+  <div id="hud"><span class="p1">LAVENDER</span> <b id="hp1">100</b> · <span class="p2">MINT</span> <b id="hp2">100</b> <span id="wind">· wind 0</span> <span id="fuel"></span></div>
+</header>
+<canvas id="c" width="960" height="580" aria-label="Artillery duel inside a box: drive the walls, blast the panels"></canvas>
+<footer>
+  <p id="hint">A/D or arrows drive · W/S or up/down aim · point and tap fires · space charges</p>
+  <div id="acts">
+    <div id="arms"></div>
+    <button id="mode" type="button">Two players</button>
+  </div>
+</footer>
+<script>'use strict';
+/* Pastel Tanks, rules version 2: an artillery duel inside a drivable box.
+ * tank-engine.js owns the model — four wall bands make one ring road, tanks drive
+ * it (walls, ceiling and upside-down floor included), shells fall with ordinary
+ * gravity, and a hole drops whatever stands over it. This document paints that
+ * world smoothly and turns input into a shot: offline it runs the shot itself,
+ * and under Bored Together every move is replayed from the stored list. */
 
-const PL={
-  skyT:'#D4BFE6',skyM:'#CCD6E8',skyB:'#C2E0BE',hill:'rgba(195,220,195,0.25)',
-  ter:'#8CC88A',terD:'#6BA869',terL:'#5A965A',terH:'rgba(255,255,255,0.18)',
-  rock:'#B5A6BB',rockL:'#A090A6',
-  t1:'#C4A7D7',t1d:'#A88BC5',t2:'#8ECFB0',t2d:'#6BAF91',
-  sh:'#F5E0A0',shG:'#FAF0CC',hSh:'#E8A860',hShG:'#F5D0A0',
-  cSh:'#DDA0DD',cShG:'#EECCF0',nSh:'#FF7B8E',nShG:'#FFB0C0',
-  exp:['#F0C4D4','#F5E6A3','#FFF0F0','#DDA0DD','#98FB98','#FFD1DC'],
-  hp1:'#C4A7D7',hp2:'#8ECFB0',hpBg:'rgba(255,255,255,0.2)',
-  fuel:'#88D8A0',fuelBg:'rgba(255,255,255,0.12)',
-  pw:'#F0D58E',pwBg:'rgba(255,255,255,0.15)',
-  tx:'#5A4A6A',txL:'#8A7A9A',w:'#FFFAF5',
-  cld:'rgba(255,255,255,0.2)',hud:'rgba(255,255,255,0.12)',
-  aA:'#F5E6A3',aI:'rgba(255,255,255,0.25)',aim:'#E88080',
-  shield:'#88C8E8',tele:'#D8A0F0',
-};
+const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+const hud = { hp1: document.getElementById('hp1'), hp2: document.getElementById('hp2'),
+  wind: document.getElementById('wind'), fuel: document.getElementById('fuel') };
+const hintEl = document.getElementById('hint');
+const armsEl = document.getElementById('arms');
+const modeEl = document.getElementById('mode');
 
-const G=0.1,MAXPW=20,PWSPD=0.3,MINPW=1,MAXPU=5,BEDY=H-25;
-const EXPR={standard:30,heavy:48,cluster:20,cluster_child:16,nuke:65};
-const MAXHP=100,FUELMAX=100,FUELCOST=0.25,MOVESP=1.5;
-const ASPD=0.8,TW=26,TH=12,TRH=5,TURR=6,BLEN=20,PWF=0.5;
-const AI_ERR_A=7,AI_ERR_P=2;
+const C = { paper: '#f5f2ea', board: '#fffdf7', ink: '#191713', hair: '#d8d2c4', dim: '#6b6558',
+  red: '#b3261e', green: '#456653' };
+const COLOUR = { 1: C.green, 2: C.red };
+const ARMS = [['standard', '1'], ['heavy', '2'], ['cluster', '3'], ['mine', '4'], ['ricochet', '5']];
+const ARM_NAMES = { standard: 'STD', heavy: 'HVY', cluster: 'CLU', mine: 'MIN', ricochet: 'RIC' };
 
-// ── Terrain ──
-const TERRAINS=[
-  {name:'Rolling Hills',fn:genHills},
-  {name:'Mountains',fn:genMountains},
-  {name:'Valley',fn:genValley},
-  {name:'Dunes',fn:genDunes},
-  {name:'Plateau',fn:genPlateau},
-];
-function genHills(){terrain=[];for(let x=0;x<W;x++){let h=H*.55+Math.sin(x*.002+1)*50+Math.sin(x*.009+2)*25+Math.sin(x*.025+.5)*12+Math.sin(x*.07+3)*6;terrain[x]=Math.max(H*.32,Math.min(BEDY-15,h))}}
-function genMountains(){terrain=[];for(let x=0;x<W;x++){let h=H*.48+Math.sin(x*.003)*65+Math.sin(x*.013+1)*32+Math.sin(x*.038+2)*16+Math.sin(x*.09+.5)*7;terrain[x]=Math.max(H*.15,Math.min(BEDY-15,h))}}
-function genValley(){terrain=[];for(let x=0;x<W;x++){const d=Math.abs(x-W/2)/(W/2);let h=H*.42+d*110+Math.sin(x*.01)*15+Math.sin(x*.035+1)*8;terrain[x]=Math.max(H*.3,Math.min(BEDY-15,h))}}
-function genDunes(){terrain=[];for(let x=0;x<W;x++){let h=H*.52+Math.sin(x*.004+.5)*35+Math.sin(x*.016+2)*18+Math.sin(x*.05+1)*8+Math.sin(x*.13)*3;terrain[x]=Math.max(H*.35,Math.min(BEDY-15,h))}}
-function genPlateau(){terrain=[];for(let x=0;x<W;x++){let h=H*.58;h-=Math.exp(-((x-W*.22)**2)/(2*85**2))*110;h-=Math.exp(-((x-W*.5)**2)/(2*70**2))*80;h-=Math.exp(-((x-W*.78)**2)/(2*85**2))*110;h+=Math.sin(x*.01)*8+Math.sin(x*.035)*4;terrain[x]=Math.max(H*.18,Math.min(BEDY-15,h))}}
+/* Snapshot globals first: the daily adapter names these exactly. */
+let mode = 'TITLE', aiEnabled = false, sessionWins = 0;
 
-// ── Powerups ──
-const PUTYPES=[
-  {name:'Heavy',sym:'H',col:'#E8A860',eff:'ammo',key:'heavy',amt:2,w:20},
-  {name:'Cluster',sym:'C',col:'#DDA0DD',eff:'ammo',key:'cluster',amt:2,w:16},
-  {name:'Nuke',sym:'N',col:'#FF7B8E',eff:'ammo',key:'nuke',amt:1,w:5},
-  {name:'Fuel',sym:'F',col:'#7ECDA0',eff:'fuel',key:'fuel',amt:35,w:18},
-  {name:'Heal',sym:'+',col:'#FFB5C5',eff:'heal',key:'heal',amt:25,w:13},
-  {name:'Shield',sym:'S',col:'#88C8E8',eff:'shield',key:'shield',amt:1,w:16},
-  {name:'Teleport',sym:'T',col:'#D8A0F0',eff:'teleport',key:'teleport',amt:1,w:10},
-];
-function pickPU(){const tot=PUTYPES.reduce((s,p)=>s+p.w,0);let r=Math.random()*tot;for(const p of PUTYPES){r-=p.w;if(r<=0)return p}return PUTYPES[0]}
+let engine = null, state = null, world = null, winner = null;
+let sel = 'standard', walk = 0, walkVel = 0, charge = null, chargeFrom = null;
+const aim = { 1: { angle: 45, power: 12 }, 2: { angle: 45, power: 12 } };
+const facing = { 1: -1, 2: 1 };
+const keys = new Set();
+let anim = null, sprigs = [], notes = [], shake = 0, crumble = [];
+let aiPlan = null, aiTick = 0, overFor = 0, lastNow = 0;
+let pointer = null, settleT = 0;
+const seenTurn = { seat: 0, at: -1 };
 
-// ── State ──
-let mode,terrain,tanks,proj,parts,popups,powerups,debris;
-let power,keys,winner,timer,shake,flashX,flashY,flashR,flashA;
-let overT,turnCnt,nextPU,selWeap,anyHit,nukeFlash,missed;
-let aiEnabled,aiTimer,aiTarget,deathTimer,deathWinner,terrainIdx,turn;
-// Rounds roll straight on against the AI, so the board counts the session.
-let sessionWins=0;
-// Bored Together: the match stores a seed and a shot list, and this document
-// replays both through the shared rules file instead of simulating on its own.
-let online=null,onlineAnim=null,onlineBusy=false;
-const clouds=Array.from({length:5},()=>({x:Math.random()*W,y:20+Math.random()*70,sc:.5+Math.random()*.7,sp:.08+Math.random()*.12}));
+const bridge = window.__boredTogether || null;
+let online = null;
 
-// ── Helpers ──
-function tY(x){return terrain[Math.max(0,Math.min(W-1,Math.round(x)))]}
-function fillRR(x,y,w,h,r){if(w<0)w=0;r=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();ctx.fill()}
-function crater(cx,cy,r){const l=Math.max(0,Math.floor(cx-r)),ri=Math.min(W-1,Math.ceil(cx+r));for(let x=l;x<=ri;x++){const dy=Math.sqrt(Math.max(0,r*r-(x-cx)**2));terrain[x]=Math.min(Math.max(terrain[x],cy+dy),BEDY)}}
+const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const X0 = () => engine.BX + engine.T, X1 = () => engine.BX + engine.BW - engine.T;
+const Y0 = () => engine.BY + engine.T, Y1 = () => engine.BY + engine.BH - engine.T;
+const seatName = s => (online && online.names && online.names[s - 1]) || (s === 1 ? 'LAVENDER' : 'MINT');
+const anchor = t => { const p = engine.ringPoint(t.s); return { x: p.x + p.nx * 4, y: p.y + p.ny * 4, p }; };
 
-// ── Tanks ──
-function mkTank(xp,pi){return{x:Math.round(W*xp),p:pi,hp:MAXHP,angle:45,fuel:FUELMAX,ammo:{heavy:0,cluster:0,nuke:0},shield:false}}
-function adjSpawn(){for(const t of tanks){let bx=t.x,bv=Infinity;for(let cx=t.x-60;cx<=t.x+60;cx++){if(cx<30||cx>W-30)continue;let v=0;for(let d=-8;d<=8;d++){v+=Math.abs(terrain[Math.max(0,Math.min(W-1,cx+d))]-terrain[Math.max(0,Math.min(W-1,cx))])}if(v<bv){bv=v;bx=cx}}t.x=bx}if(Math.abs(tanks[0].x-tanks[1].x)<120){tanks[0].x=Math.max(50,tanks[0].x-60);tanks[1].x=Math.min(W-50,tanks[1].x+60)}}
-
-// ── Powerup Logic ──
-function spawnPU(){if(powerups.length>=MAXPU)return;powerups.push({x:80+Math.random()*(W-160),y:-20,vy:1.5+Math.random()*.5,ty:pickPU(),gnd:false})}
-function updatePU(){for(let i=powerups.length-1;i>=0;i--){const p=powerups[i];if(!p.gnd){p.y+=p.vy;const gy=tY(p.x);if(p.y+8>=gy){p.y=gy-8;p.gnd=true}}else{for(const t of tanks){if(Math.abs(t.x-p.x)<TW/2+16){collectPU(t,p);powerups.splice(i,1);break}}}}}
-function collectPU(tank,pu){
-  const t=pu.ty,gy=tY(tank.x);
-  if(t.eff==='ammo'){tank.ammo[t.key]=(tank.ammo[t.key]||0)+t.amt;mkPopup(pu.x,gy-30,'+'+t.amt+' '+t.name+'!',t.col)}
-  else if(t.eff==='fuel'){tank.fuel=Math.min(FUELMAX,tank.fuel+t.amt);mkPopup(pu.x,gy-30,'+'+t.amt+' Fuel!',t.col)}
-  else if(t.eff==='heal'){tank.hp=Math.min(MAXHP,tank.hp+t.amt);mkPopup(pu.x,gy-30,'+'+t.amt+' HP!',t.col)}
-  else if(t.eff==='shield'){tank.shield=true;mkPopup(pu.x,gy-30,'Shield!',PL.shield)}
-  else if(t.eff==='teleport'){mkParts(tank.x,gy-20,15,PL.tele);let nx,att=0;do{nx=60+Math.random()*(W-120);att++}while(att<80&&(Math.abs(tY(nx)-tY(nx-10))>8||Math.abs(tY(nx)-tY(nx+10))>8));tank.x=nx;const ngy=tY(tank.x);mkParts(tank.x,ngy-20,15,PL.tele);mkPopup(tank.x,ngy-30,'Warped!',PL.tele)}
-  mkParts(pu.x,pu.y,8,t.col);
+function countHoles(w) { let n = 0; for (const row of w.panels) for (const v of row) if (!v) n++; return n; }
+function panelRect(wall, j) {
+  const len = engine.PANEL_LENS[wall];
+  if (wall === 0) return { x: X0() + j * len, y: engine.BY, w: len, h: engine.T };
+  if (wall === 1) return { x: X1(), y: Y0() + j * len, w: engine.T, h: len };
+  if (wall === 2) return { x: X1() - (j + 1) * len, y: Y1(), w: len, h: engine.T };
+  return { x: engine.BX, y: Y1() - (j + 1) * len, w: engine.T, h: len };
 }
 
-// ── Particles, Popups, Debris ──
-function mkParts(x,y,n,col){for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,sp=1+Math.random()*4;parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,life:1,dec:.015+Math.random()*.02,rad:2+Math.random()*4,col:col||PL.exp[Math.floor(Math.random()*PL.exp.length)]})}}
-function mkDust(x,y){for(let i=0;i<3;i++)parts.push({x:x+(Math.random()-.5)*10,y:y+Math.random()*3,vx:(Math.random()-.5)*1,vy:-.5-Math.random()*.5,life:.6,dec:.03,rad:2+Math.random()*2,col:'rgba(140,200,140,0.5)'})}
-function mkPopup(x,y,t,c){popups.push({x,y,t,c,life:1,vy:-.8})}
-function spawnDebris(tank){
-  const gy=tY(tank.x),cx=tank.x,cy=gy-TRH-TH/2;
-  const c1=tank.p===0?PL.t1:PL.t2,c2=tank.p===0?PL.t1d:PL.t2d;
-  for(let i=0;i<14;i++){const a=-Math.PI/2+(Math.random()-.5)*Math.PI*1.2,sp=2+Math.random()*6;
-    debris.push({x:cx+(Math.random()-.5)*TW,y:cy+(Math.random()-.5)*TH,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,rot:Math.random()*Math.PI*2,rotSpd:(Math.random()-.5)*.2,w:3+Math.random()*10,h:2+Math.random()*7,col:Math.random()>.5?c1:c2,life:1,dec:.007+Math.random()*.007})}
-  mkParts(cx,cy,60);mkParts(cx,cy,30,c1);shake=22;flashX=cx;flashY=cy;flashR=15;flashA=1;nukeFlash=.4;
+function spark(x, y, n, colour, spread) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = (spread || 2.4) * (.4 + Math.random());
+    sprigs.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - .7, life: 1, decay: .035 + Math.random() * .03, colour });
+  }
 }
-function updateDebris(){for(const d of debris){d.x+=d.vx;d.y+=d.vy;d.vy+=G*.7;d.rot+=d.rotSpd;d.life-=d.dec;const sx=Math.round(d.x);if(sx>=0&&sx<W&&d.y+d.h/2>=terrain[sx]){d.y=terrain[sx]-d.h/2;d.vy*=-.3;d.vx*=.7;d.rotSpd*=.5}if(d.y>BEDY){d.y=BEDY;d.vy*=-.2}}}
+function note(text, x, y, colour, size) { notes.push({ text, x, y, colour, size: size || 13, life: 1 }); }
 
-// ── Projectiles ──
-const WCOL={standard:{f:PL.sh,g:PL.shG},heavy:{f:PL.hSh,g:PL.hShG},cluster:{f:PL.cSh,g:PL.cShG},nuke:{f:PL.nSh,g:PL.nShG}};
-const WRAD={standard:4,heavy:5,cluster:4,nuke:6};
-function mkProj(tank,wp){const gy=tY(tank.x),ar=tank.angle*Math.PI/180,dir=tank.p===0?1:-1;const pivY=gy-TRH-TH;const tx=tank.x+dir*Math.cos(ar)*BLEN,ty=pivY-Math.sin(ar)*BLEN;const sp=Math.max(power,1)*PWF;const c=WCOL[wp]||WCOL.standard;return{x:tx,y:ty,vx:dir*Math.cos(ar)*sp,vy:-Math.sin(ar)*sp,type:wp,f:c.f,g:c.g,rad:WRAD[wp]||4,trail:[]}}
+/* ── Match flow ─────────────────────────────────────────────────────────── */
 
-// ── Explosions & Damage ──
-function explode(p){const{x,y,type}=p;const r=EXPR[type];crater(x,y,r);dealDmg(x,y,r,type);const pc=type==='nuke'?60:type==='heavy'?40:type==='cluster'?15:30;mkParts(x,y,pc);shake=Math.max(shake,type==='nuke'?25:type==='heavy'?14:type==='cluster'?6:8);flashX=x;flashY=y;flashR=type==='nuke'?15:5;flashA=type==='nuke'?1:.8;if(type==='nuke')nukeFlash=1;for(let i=powerups.length-1;i>=0;i--){const pu=powerups[i];if(Math.hypot(pu.x-x,pu.y-y)<r+8){mkParts(pu.x,pu.y,8,pu.ty.col);powerups.splice(i,1)}}if(type==='cluster')spawnChildren(x,y);anyHit=true}
-function spawnChildren(x,y){const sps=[{vx:-3.5,vy:-5},{vx:-2,vy:-6},{vx:-.5,vy:-6.5},{vx:.5,vy:-6.5},{vx:2,vy:-6},{vx:3.5,vy:-5}];for(const s of sps)proj.push({x,y,vx:s.vx+(Math.random()-.5)*.5,vy:s.vy+(Math.random()-.5)*.5,type:'cluster_child',f:PL.cSh,g:PL.cShG,rad:3,trail:[]})}
-function dealDmg(cx,cy,r,type){const bd={standard:20,heavy:30,cluster:10,cluster_child:8,nuke:40},md={standard:50,heavy:65,cluster:25,cluster_child:20,nuke:90};for(const t of tanks){const gy=tY(t.x),tcy=gy-TRH-TH/2;const d=Math.hypot(t.x-cx,tcy-cy);if(d<r+TW/2){let dmg=Math.round((bd[type]||20)+Math.max(0,1-d/(r+TW/2))*((md[type]||50)-(bd[type]||20)));if(t.shield){dmg=Math.min(15,dmg);t.shield=false;mkParts(t.x,gy-20,10,PL.shield);mkPopup(t.x,gy-40,'Shield!',PL.shield)}t.hp=Math.max(0,t.hp-dmg)}}}
-
-// ── AI ──
-function aiCalcShot(weapon){
-  const me=tanks[1],tgt=tanks[0],meGY=tY(me.x),tgtGY=tY(tgt.x);
-  const pivY=meGY-TRH-TH,tgtX=tgt.x,tgtY=tgtGY-TRH-TH/2;
-  const expR=EXPR[weapon]||EXPR.standard,hitZone=expR+TW/2+5;
-  let hits=[];
-  for(let ang=10;ang<=80;ang+=2){const aRad=ang*Math.PI/180,cosA=Math.cos(aRad),sinA=Math.sin(aRad);const tipX=me.x-cosA*BLEN,tipY=pivY-sinA*BLEN;
-    for(let pw=2;pw<=MAXPW;pw+=.5){const spd=pw*PWF;let vx=-cosA*spd,vy=-sinA*spd,px=tipX,py=tipY;
-      for(let f=0;f<180;f++){px+=vx;py+=vy;vy+=G;const sx=Math.round(px);if(sx>=0&&sx<W&&py>=terrain[sx]){const dist=Math.hypot(px-tgtX,py-tgtY);if(dist<hitZone)hits.push({ang,pw,dist});break}if(px<-20||px>W+20||py>BEDY+20)break}}}
-  hits.sort((a,b)=>a.dist-b.dist);
-  if(hits.length>0){const pick=hits[Math.floor(Math.random()*Math.min(8,hits.length))];return{angle:Math.max(5,Math.min(85,pick.ang+(Math.random()-.5)*AI_ERR_A*2)),power:Math.max(MINPW,Math.min(MAXPW,pick.pw+(Math.random()-.5)*AI_ERR_P*2))}}
-  return{angle:35+Math.random()*30,power:8+Math.random()*8};
+function reset() {
+  aim[1] = { angle: 45, power: 12 }; aim[2] = { angle: 45, power: 12 };
+  facing[1] = -1; facing[2] = 1;
+  sel = 'standard'; walk = 0; walkVel = 0; charge = chargeFrom = pointer = null;
+  aiPlan = null; aiTick = 0; anim = null; sprigs = []; notes = []; crumble = []; shake = 0;
+  lastNow = 0;
+}
+function syncMode() {
+  if (!world) return mode = 'TITLE';
+  if (world.winner) return mode = 'OVER';
+  if (online) return mode = (online.canPlay() && state.turn === online.seat) ? 'AIM' : 'WAIT';
+  return mode = (aiEnabled && state.turn === 2) ? 'CPU' : 'AIM';
+}
+function freshMatch(seed) {
+  const s = seed != null ? seed : ((engine && window.__boredSeed && (window.__boredSeed.seed >>> 0)) ||
+    (((Date.now() * 2654435761 + 1) >>> 0) || 1));
+  state = engine.opening(s);
+  world = engine.replay(state);
+  winner = null; overFor = 0;
+  reset();
+  syncMode();
+  paint(0);
+}
+function repaint(next, events) {
+  state = next;
+  world = engine.replay(state);
+  winner = state.winner || world.winner || null;
+  walk = 0; walkVel = 0; charge = chargeFrom = null;
+  if (winner) { syncMode(); overFor = 0; }
+  else syncMode();
+  if (events) aftermath(events);
+  seenTurn.seat = state.turn; seenTurn.at = performance.now();
+  paint(0);
 }
 
-// ── Aim Preview ──
-function aimDots(){const t=tanks[turn],gy=tY(t.x),ar=t.angle*Math.PI/180,dir=t.p===0?1:-1;const pivY=gy-TRH-TH;let px=t.x+dir*Math.cos(ar)*BLEN,py=pivY-Math.sin(ar)*BLEN;const sp=Math.max(power,3)*PWF;let vx=dir*Math.cos(ar)*sp,vy=-Math.sin(ar)*sp;const dots=[];for(let i=0;i<45;i++){px+=vx;py+=vy;vy+=G;if(px<0||px>W||py>BEDY)break;if(i%3===0)dots.push({x:px,y:py})}return dots}
+/* Controls belong to whoever is on: one seat drives with A/D, the other arrows,
+ * and an online side only takes the wheel when the record says it is its turn. */
+function turnSeat() {
+  if (online) return online.seat;
+  if (aiEnabled && state && state.turn === 2) return 2;
+  return state ? state.turn : 1;
+}
+function live() {
+  if (!world || world.winner) return false;
+  if (online) return mode === 'AIM' && online.canPlay() && state.turn === online.seat;
+  return mode === 'AIM' && !(aiEnabled && state.turn === 2);
+}
+function draft() {
+  if (!world || world.winner || anim) return null;
+  const seat = turnSeat(), a = aim[seat];
+  let weapon = sel;
+  if (weapon !== 'standard' && !(world.tanks[seat - 1].ammo[weapon] > 0)) { weapon = 'standard'; sel = 'standard'; }
+  return { seat, drive: Math.round(walk), angle: a.angle, power: charging() ? Math.round(charge * 10) / 10 : a.power, weapon };
+}
+function charging() { return charge !== null; }
+let pressAt = 0;
+function pressFire() {
+  if (!live() || charging()) return;
+  charge = chargeFrom = clampN(aim[turnSeat()].power, 2, engine.MAXPW);
+  pressAt = performance.now();
+}
+function releaseFire() {
+  if (!charging()) return;
+  const power = Math.max(chargeFrom === null ? 0 : chargeFrom, charge);
+  charge = chargeFrom = null;
+  if (!live()) return;
+  const shot = draft();
+  if (shot) { shot.power = Math.round(power * 10) / 10; fire(shot); }
+}
+function tapFire() {
+  if (!live()) return;
+  const shot = draft();
+  if (shot) fire(shot);
+}
 
-// ── Input ──
-// The title screen draws two buttons; make them clickable for touch players.
-canvas.addEventListener('click',e=>{
-  if(mode!=='TITLE')return;
-  const r=canvas.getBoundingClientRect();
-  const x=(e.clientX-r.left)*(W/r.width),y=(e.clientY-r.top)*(H/r.height);
-  if(Math.abs(x-W/2)>110)return;
-  if(y>=230&&y<=276){aiEnabled=true;startGame()}
-  else if(y>=295&&y<=341){aiEnabled=false;startGame()}
-});
+/* ── One shot: animate the exact trail the rules will replay ────────────── */
 
-addEventListener('keydown',e=>{
-  keys[e.code]=true;
-  if(e.key===','||e.key==='<')keys._cL=true;
-  if(e.key==='.'||e.key==='>')keys._cR=true;
-  const prevent=['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyW','KeyS','KeyA','KeyD','KeyQ','KeyE','Comma','Period','Enter','Digit1','Digit2','Digit3','Digit4'];
-  if(prevent.includes(e.code))e.preventDefault();
-
-  if(mode==='TITLE'){
-    if(e.code==='KeyT')terrainIdx=(terrainIdx+1)%TERRAINS.length;
-    if(e.code==='Digit1'||e.code==='Numpad1'){aiEnabled=true;startGame()}
-    if(e.code==='Digit2'||e.code==='Numpad2'){aiEnabled=false;startGame()}
+function fire(shot) {
+  if (!shot || !state || world.winner || anim) return;
+  const before = engine.replay(state);
+  let out;
+  try { out = engine.advance(state, shot); }
+  catch (error) {
+    if (online) return bridge.error(error, () => { try { repaint(online.state()); } catch (e2) { } setTimeout(() => fire(shot), 30); });
+    note(error.message.toUpperCase().slice(0, 40), 480, 296, C.red, 12);
+    walk = 0; charge = chargeFrom = null; return;
+  }
+  const index = state.shots.length;
+  const fresh = out.world.trails.slice(before.trails.length);
+  const lens = fresh.map(t => t.length);
+  const total = lens.reduce((a, b) => a + b, 0);
+  const speed = Math.max(2, total / 90);           // one shell lands in about a second
+  let cursor = 0;
+  const items = fresh.map(t => { const start = cursor; cursor += t.length; return { trail: t, start, len: t.length }; });
+  const impact = out.world.bursts.find(b => b.at === index) || null;
+  anim = {
+    items, speed, total, frame: 0, pre: before, out, impact,
+    crumble: crumbleFor(before.panels, out.world.panels),
+    events: out.world.events.slice(before.events.length),
+    at: performance.now(), doneAt: 0
+  };
+  walk = 0; walkVel = 0; charge = chargeFrom = null;
+  mode = 'ANIM';
+  if (online) {
+    online.busy = true;
+    online.canonical = null;
+    online.job = online.submit({ seat: shot.seat, drive: shot.drive, angle: shot.angle, power: shot.power,
+      weapon: shot.weapon, won: out.next.winner || null }).then(c => { online.canonical = c; return c; });
+  }
+  paint(0);
+}
+function crumbleFor(pre, post) {
+  const list = [];
+  for (let w = 0; w < 4; w++) for (let j = 0; j < post[w].length; j++) {
+    if (pre[w][j] && !post[w][j]) list.push({ wall: w, j, born: performance.now() });
+  }
+  return list;
+}
+function finishShot() {
+  if (!anim) return;
+  const done = anim;
+  anim = null;
+  if (online) {
+    if (!online.canonical) { anim = done; setTimeout(finishShot, 90); return; }
+    const canonical = online.canonical;
+    online.canonical = null; online.busy = false;
+    if (canonical) online.use(canonical);
+    repaint(canonical ? canonical.state : state, done.events);
+    bridge.finishTurn();
     return;
   }
-  if(mode==='OVER'&&e.code==='KeyR'){init();return}
-  if(mode!=='AIM')return;
-  if(!e.repeat){
-    const wm={Digit1:'standard',Digit2:'heavy',Digit3:'cluster',Digit4:'nuke'};
-    if(wm[e.code]){const w=wm[e.code],t=tanks[turn];if(w==='standard'||(t.ammo[w]&&t.ammo[w]>0))selWeap=w;else mkPopup(t.x,tY(t.x)-40,'No '+w+'!','#FF7B8E')}
-    if(online){if(e.code==='Space'||e.code==='Enter')fire()}
-    else{
-      if(e.code==='Space'&&turn===0)fire();
-      if(e.code==='Enter'&&turn===1&&!aiEnabled)fire();
+  if (done.out.next.winner === 1 && aiEnabled) sessionWins++;
+  repaint(done.out.next, done.events);
+}
+
+function aftermath(events) {
+  const tankAt = s => { const t = world.tanks[s - 1]; return t ? anchor(t) : { x: 480, y: 290 }; };
+  for (const ev of events) {
+    if (ev.kind === 'hit') {
+      shake = Math.max(shake, Math.min(4, ev.damage * .09));
+      spark(ev.x, ev.y, 8 + Math.min(12, ev.damage / 4), COLOUR[ev.seat]);
+      note('-' + ev.damage, ev.x, ev.y - 16, COLOUR[ev.seat]);
+    } else if (ev.kind === 'land') {
+      const at = tankAt(ev.seat);
+      spark(at.x, at.y, 10, C.hair);
+      note('-' + ev.damage, at.x, at.y - 18, COLOUR[ev.seat]);
+      shake = Math.max(shake, 2.5);
+    } else if (ev.kind === 'fell_out') {
+      note('FELL OUT', clampN(ev.x, 80, 880), clampN(ev.y - 10, 70, 540), COLOUR[ev.seat]);
+      shake = Math.max(shake, 3);
+    } else if (ev.kind === 'plant') {
+      spark(ev.x, ev.y, 4, C.red, 1.2);
     }
   }
+}
+
+/* ── Aiming ghost: the arc the rules would fly, drawn thin ──────────────── */
+
+let ghost = { key: '', value: null };
+function ghostWorld() {
+  const seat = turnSeat(), t = world.tanks[seat - 1], id = aim[seat];
+  const moved = { ...t, s: engine.wrapS(t.s + walk), angle: id.angle, dir: facing[seat] };
+  return { ...world, tanks: seat === 1 ? [moved, world.tanks[1]] : [world.tanks[0], moved] };
+}
+function ghostPath() {
+  if (!live()) return null;
+  const seat = turnSeat(), id = aim[seat];
+  const key = [engine.wrapS(world.tanks[seat - 1].s + walk), id.angle,
+    charging() ? charge : id.power, sel, world.panels.map(r => r.join('')).join(''), world.shotCount].join('|');
+  if (ghost.key !== key) {
+    ghost.key = key;
+    let g = null;
+    try { g = engine.guide(ghostWorld(), seat, id.angle, charging() ? charge : id.power, sel); } catch (e) { g = null; }
+    ghost.value = g;
+  }
+  return ghost.value;
+}
+
+/* ── AI: the same rules, a little planning ──────────────────────────────── */
+
+function blast(x, y, c, weapon) {
+  const r = (engine.RANGE[weapon] || 6) + 12, pair = engine.DAMAGE[weapon] || [8, 26];
+  const d = Math.hypot(c.x - x, c.y - y);
+  if (d >= r) return 0;
+  return Math.round(pair[0] + (1 - d / r) * (pair[1] - pair[0]));
+}
+function dumpScore(view, x, y, weapon, seat) {
+  const t = view.tanks[seat - 1], p = engine.ringPoint(t.s);
+  let d, along;
+  if (p.wall === 0) { d = Math.hypot(clampN(x, X0(), X1()) - x, y - Y0()); along = clampN(x, X0(), X1()) - X0(); }
+  else if (p.wall === 1) { d = Math.hypot(x - X1(), clampN(y, Y0(), Y1()) - y); along = clampN(y, Y0(), Y1()) - Y0(); }
+  else if (p.wall === 2) { d = Math.hypot(clampN(x, X0(), X1()) - x, y - Y1()); along = X1() - clampN(x, X0(), X1()); }
+  else { d = Math.hypot(x - X0(), clampN(y, Y0(), Y1()) - y); along = Y1() - clampN(y, Y0(), Y1()); }
+  const r = engine.CARVE[weapon] || 10;
+  if (d > r - 6) return 0;
+  return Math.abs(along - p.along) + 14 <= Math.sqrt(Math.max(0, r * r - d * d)) + 2 ? 1 : 0;
+}
+function scoreShot(view, seat, angle, power, weapon) {
+  const g = engine.guide(view, seat, angle, power, weapon);
+  const h = g.hit, kind = typeof h === 'string' ? h : h.kind;
+  if (kind === 'out' || kind === 'stall') return -9;
+  if (kind === 'plant') {
+    const foe = anchor(view.tanks[2 - seat]), me = anchor(view.tanks[seat - 1]);
+    return 40 - Math.hypot(h.x - foe.x, h.y - foe.y) * .28 - Math.hypot(h.x - me.x, h.y - me.y) * .9;
+  }
+  let s = blast(h.x, h.y, anchor(view.tanks[2 - seat]), weapon) - blast(h.x, h.y, anchor(view.tanks[seat - 1]), weapon) * 1.25;
+  if (kind === 'tank' && h.seat === 2 - seat) s += 10;
+  if (kind === 'wall' || kind === 'tank') {
+    if (dumpScore(view, h.x, h.y, weapon, 2 - seat)) s += 22;
+    if (dumpScore(view, h.x, h.y, weapon, seat)) s -= 32;
+  }
+  return s;
+}
+function movedWorld(view, seat, drive, angle) {
+  const t = view.tanks[seat - 1];
+  const moved = { ...t, s: engine.wrapS(t.s + drive), dir: drive > 0 ? 1 : -1, angle, falling: null };
+  return { ...view, tanks: seat === 1 ? [moved, { ...view.tanks[1] }] : [{ ...view.tanks[0] }, moved] };
+}
+function supportAt(view, s) { return engine.supported(view, { s: engine.wrapS(s), falling: null, hp: 1 }); }
+
+function plan() {
+  const seat = 2, view = engine.replay(state), me = view.tanks[1];
+  const cands = [];
+  for (const weapon of engine.WEAPONS) {
+    if (weapon !== 'standard' && !(me.ammo[weapon] > 0)) continue;
+    for (let a = 5; a <= 85; a += 4) for (let p = 4; p <= 23; p += 4) {
+      cands.push({ drive: 0, angle: a, power: p, weapon, score: scoreShot(view, seat, a, p, weapon) });
+    }
+  }
+  cands.sort((a, b) => b.score - a.score);
+  let best = cands[0];
+  if (!best || best.score < 14) {
+    for (const drive of [-320, -190, -90, 90, 190, 320]) {
+      if (engine.driveCost(me.s, drive) > engine.FUEL * .85 || !supportAt(view, me.s + drive)) continue;
+      const travel = movedWorld(view, seat, drive, 45);
+      for (const weapon of ['standard', 'heavy', 'cluster', 'ricochet']) {
+        if (weapon !== 'standard' && !(me.ammo[weapon] > 0)) continue;
+        for (let a = 16; a <= 84; a += 8) for (let p = 9; p <= 23; p += 4) {
+          cands.push({ drive, angle: a, power: p, weapon, score: scoreShot(travel, seat, a, p, weapon) });
+        }
+      }
+    }
+    cands.sort((a, b) => b.score - a.score);
+    best = cands[0];
+  }
+  if (!best) return { seat, drive: 0, angle: 45, power: 12, weapon: 'standard' };
+  if (best.score < 60) {
+    const view2 = best.drive ? movedWorld(view, seat, best.drive, best.angle) : view;
+    for (let a = Math.max(5, best.angle - 3); a <= Math.min(85, best.angle + 3); a++) {
+      for (let p = Math.max(1, best.power - 2); p <= Math.min(24, best.power + 2); p += .5) {
+        const s = scoreShot(view2, seat, a, Math.round(p * 10) / 10, best.weapon);
+        if (s > best.score) best = { drive: best.drive, angle: a, power: Math.round(p * 10) / 10, weapon: best.weapon, score: s };
+      }
+    }
+  }
+  const shot = { seat, drive: best.drive, angle: clampN(Math.round(best.angle + (Math.random() - .5) * 2), 5, 85),
+    power: clampN(Math.round((best.power + (Math.random() - .5)) * 10) / 10, 1, 24), weapon: best.weapon };
+  return engine.validateShot(view, shot, seat) ? { seat, drive: 0, angle: 45, power: 12, weapon: 'standard' } : shot;
+}
+
+/* ── Input ──────────────────────────────────────────────────────────────── */
+
+const DRIVE = { 1: ['KeyA', 'KeyD'], 2: ['ArrowLeft', 'ArrowRight'] };
+const AIMKEY = { 1: ['KeyW', 'KeyS'], 2: ['ArrowUp', 'ArrowDown'] };
+
+addEventListener('keydown', e => {
+  if (['Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  keys.add(e.code);
+  if (!engine || !world) return;
+  if (e.code === 'KeyR') { freshMatch(); return; }
+  if (mode === 'OVER') { if (overFor > 25 && (e.code === 'Space' || e.code === 'Enter')) freshMatch(); return; }
+  if (!live()) return;
+  const arm = { Digit1: 'standard', Digit2: 'heavy', Digit3: 'cluster', Digit4: 'mine', Digit5: 'ricochet' }[e.code];
+  if (arm) { pick(arm); return; }
+  if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) pressFire();
 });
-addEventListener('keyup',e=>{keys[e.code]=false;if(e.key===','||e.key==='<')keys._cL=false;if(e.key==='.'||e.key==='>')keys._cR=false});
-addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
-document.addEventListener('visibilitychange',()=>{if(document.hidden)for(const k in keys)keys[k]=false});
+addEventListener('keyup', e => {
+  keys.delete(e.code);
+  if (e.code === 'Space' || e.code === 'Enter') releaseFire();
+});
+addEventListener('blur', () => { keys.clear(); charge = chargeFrom = null; pointer = null; });
 
-// ── Fire ──
-function fire(){
-  if(online)return onlineFire();
-  const t=tanks[turn];let w=selWeap;if(w!=='standard'){if(!t.ammo[w]||t.ammo[w]<=0){w='standard'}else t.ammo[w]--}proj.push(mkProj(t,w));mode='FLY';anyHit=false}
+function pick(arm) {
+  const t = world && world.tanks[turnSeat() - 1];
+  if (arm !== 'standard' && !(t && t.ammo[arm] > 0)) { note('NO ' + ARM_NAMES[arm] + ' SHELLS', 480, 296, C.red, 12); return; }
+  sel = arm; paint(0);
+}
 
-// ── Update ──
-function update(){
-  if(onlineAnim&&onlineAnim.frame<onlineAnim.max)onlineAnim.frame++;
-  shake*=.9;if(shake<.3)shake=0;if(flashA>0){flashR+=3;flashA-=.06}if(nukeFlash>0)nukeFlash-=.025;
-  for(const c of clouds){c.x+=c.sp;if(c.x>W+80)c.x=-80}
-  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.04;p.life-=p.dec;if(p.life<=0)parts.splice(i,1)}
-  for(let i=popups.length-1;i>=0;i--){const p=popups[i];p.y+=p.vy;p.life-=.015;if(p.life<=0)popups.splice(i,1)}
-  updatePU();
+/* Pointer aiming is live: wherever the cursor sits relative to the tank sets the
+ * angle and the pull-back distance sets the power, in the tank's own frame. A
+ * tap fires; there is nothing to drag first. */
+function at(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * 960 / r.width, y: (e.clientY - r.top) * 580 / r.height };
+}
+function aimAt(p) {
+  const seat = turnSeat(), t = world.tanks[seat - 1];
+  const c = anchor(t), q = engine.ringPoint(t.s);
+  const dx = p.x - c.x, dy = p.y - c.y, len = Math.hypot(dx, dy);
+  if (len < 12) return;
+  const inward = (dx * q.nx + dy * q.ny) / len;
+  const along = (dx * q.tx + dy * q.ty) / len * (t.dir || 1);
+  let a = Math.atan2(along, Math.max(inward, .06)) * 180 / Math.PI;
+  if (a < 0) a = -a;
+  aim[seat].angle = clampN(Math.round(a), 5, 85);
+  aim[seat].power = Math.round(clampN(len / 24, 1, 24) * 10) / 10;
+}
+canvas.addEventListener('pointermove', e => {
+  if (!live()) { pointer = null; return; }
+  pointer = at(e);
+  aimAt(pointer);
+});
+canvas.addEventListener('pointerdown', e => {
+  if (!engine || !world) return;
+  if (mode === 'OVER') { if (overFor > 25) freshMatch(); return; }
+  if (!live()) return;
+  e.preventDefault();
+  aimAt(at(e));
+  pointer = at(e);
+});
+canvas.addEventListener('pointerup', e => {
+  if (!live() || !pointer) return;
+  aimAt(at(e));
+  tapFire();
+});
+canvas.addEventListener('pointerleave', () => { pointer = null; });
 
-  switch(mode){
-    case'AIM':{
-      const t=tanks[turn];let mov=false;
-      if(online){onlineAim(t);break}
-      if(t.p===0){
-        if(keys.KeyQ&&t.fuel>0){t.x=Math.max(20,t.x-MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
-        if(keys.KeyE&&t.fuel>0){t.x=Math.min(W-20,t.x+MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
-        if(keys.KeyA)t.angle=Math.min(85,t.angle+ASPD);
-        if(keys.KeyD)t.angle=Math.max(5,t.angle-ASPD);
-        if(keys.KeyW)power=Math.min(MAXPW,power+PWSPD);
-        if(keys.KeyS)power=Math.max(MINPW,power-PWSPD);
-      }else{
-        if((keys.Comma||keys._cL)&&t.fuel>0){t.x=Math.max(20,t.x-MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
-        if((keys.Period||keys._cR)&&t.fuel>0){t.x=Math.min(W-20,t.x+MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
-        if(keys.ArrowRight)t.angle=Math.min(85,t.angle+ASPD);
-        if(keys.ArrowLeft)t.angle=Math.max(5,t.angle-ASPD);
-        if(keys.ArrowUp)power=Math.min(MAXPW,power+PWSPD);
-        if(keys.ArrowDown)power=Math.max(MINPW,power-PWSPD);
-      }
-      if(mov)mkDust(t.x,tY(t.x));
-      break;
-    }
-    case'AI_THINK':{
-      aiTimer++;
-      if(aiTimer===5){
-        const me=tanks[1],roll=Math.random();
-        if(me.ammo.nuke>0&&roll<.08)selWeap='nuke';
-        else if(me.ammo.cluster>0&&roll<.2)selWeap='cluster';
-        else if(me.ammo.heavy>0&&roll<.35)selWeap='heavy';
-        else selWeap='standard';
-        aiTarget=aiCalcShot(selWeap);
-      }
-      if(aiTimer>=5&&aiTimer<55){const t=tanks[turn];t.angle+=(aiTarget.angle-t.angle)*.08;power+=(aiTarget.power-power)*.08}
-      if(aiTimer>=55)fire();
-      break;
-    }
-    case'FLY':{
-      for(let i=proj.length-1;i>=0;i--){const p=proj[i];p.x+=p.vx;p.y+=p.vy;p.vy+=G;p.trail.push({x:p.x,y:p.y});if(p.trail.length>15)p.trail.shift();if(p.x<-20||p.x>W+20||p.y>BEDY+50){proj.splice(i,1);continue}const sx=Math.round(p.x);if(sx>=0&&sx<W&&p.y>=terrain[sx]){explode(p);proj.splice(i,1);continue}let hit=false;for(const t of tanks){const gy=tY(t.x),tcy=gy-TRH-TH/2;if(Math.abs(p.x-t.x)<TW/2+5&&Math.abs(p.y-tcy)<TH/2+TRH+5){explode(p);proj.splice(i,1);hit=true;break}}if(hit)continue}
-      if(proj.length===0){if(anyHit){mode='BOOM';timer=30}else{missed=true;mode='SWITCH';timer=50}}
-      break;
-    }
-    case'BOOM':timer--;if(timer<=0){if(tanks[0].hp<=0||tanks[1].hp<=0){if(tanks[0].hp<=0)spawnDebris(tanks[0]);if(tanks[1].hp<=0)spawnDebris(tanks[1]);deathWinner=tanks[0].hp>tanks[1].hp?0:tanks[1].hp>tanks[0].hp?1:(turn===0?1:0);mode='DEATH';deathTimer=0}else{mode='SWITCH';timer=30}}break;
-    case'DEATH':deathTimer++;updateDebris();if(deathTimer>100){winner=deathWinner;mode='OVER';overT=0;if(winner===0)sessionWins++}break;
-    case'SWITCH':timer--;if(timer<=0){turn=1-turn;turnCnt++;power=5;selWeap='standard';missed=false;if(turnCnt>=nextPU&&powerups.length<MAXPU){spawnPU();nextPU=turnCnt+1+Math.floor(Math.random()*2);if(Math.random()<.35&&powerups.length<MAXPU)spawnPU()}mode=turn===1&&aiEnabled?'AI_THINK':'AIM';aiTimer=0}break;
-    case'OVER':overT++;if(aiEnabled&&!online&&overT>110)startGame(false);break;
+for (const [key] of ARMS) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.dataset.arm = key;
+  b.addEventListener('click', () => pick(key));
+  armsEl.append(b);
+}
+modeEl.addEventListener('click', () => {
+  aiEnabled = !aiEnabled;
+  modeEl.textContent = aiEnabled ? 'Two players' : 'Solo vs AI';
+  freshMatch();
+});
+
+/* ── Per-frame step ─────────────────────────────────────────────────────── */
+
+function step(dt) {
+  shake *= Math.pow(.02, dt); if (shake < .05) shake = 0;
+  for (let i = sprigs.length - 1; i >= 0; i--) {
+    const s = sprigs[i];
+    s.x += s.vx; s.y += s.vy; s.vy += .07; s.life -= s.decay;
+    if (s.life <= 0) sprigs.splice(i, 1);
   }
-}
-
-// ── Render ──
-function render(){
-  if(mode==='TITLE'){drawTitle();return}
-  ctx.save();if(shake>.5)ctx.translate((Math.random()-.5)*shake*2,(Math.random()-.5)*shake*2);
-  // Sky
-  const sg=ctx.createLinearGradient(0,0,0,H);sg.addColorStop(0,PL.skyT);sg.addColorStop(.45,PL.skyM);sg.addColorStop(1,PL.skyB);ctx.fillStyle=sg;ctx.fillRect(0,0,W,H);
-  // Hills bg
-  ctx.fillStyle=PL.hill;ctx.beginPath();ctx.moveTo(0,H);for(let x=0;x<=W;x+=4)ctx.lineTo(x,H*.48+Math.sin(x*.003+1)*40+Math.sin(x*.01+2)*15);ctx.lineTo(W,H);ctx.closePath();ctx.fill();
-  // Clouds
-  for(const c of clouds){ctx.fillStyle=PL.cld;ctx.beginPath();ctx.arc(c.x,c.y,18*c.sc,0,Math.PI*2);ctx.arc(c.x+14*c.sc,c.y-6*c.sc,13*c.sc,0,Math.PI*2);ctx.arc(c.x+28*c.sc,c.y-1*c.sc,15*c.sc,0,Math.PI*2);ctx.arc(c.x-8*c.sc,c.y+2*c.sc,10*c.sc,0,Math.PI*2);ctx.fill()}
-  // Terrain
-  const tg=ctx.createLinearGradient(0,H*.3,0,BEDY);tg.addColorStop(0,PL.ter);tg.addColorStop(1,PL.terD);ctx.beginPath();ctx.moveTo(0,terrain[0]);for(let x=1;x<W;x++)ctx.lineTo(x,terrain[x]);ctx.lineTo(W,BEDY);ctx.lineTo(0,BEDY);ctx.closePath();ctx.fillStyle=tg;ctx.fill();
-  ctx.strokeStyle=PL.terH;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,terrain[0]);for(let x=1;x<W;x++)ctx.lineTo(x,terrain[x]-1);ctx.stroke();
-  ctx.strokeStyle=PL.terL;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,terrain[0]);for(let x=1;x<W;x+=2)ctx.lineTo(x,terrain[x]);ctx.stroke();
-  ctx.strokeStyle=PL.terL;ctx.lineWidth=1;ctx.globalAlpha=.4;for(let x=3;x<W-3;x+=6){if(terrain[x]>=BEDY-2)continue;const y=terrain[x];ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-1,y-3-Math.sin(x*.7)*2);ctx.stroke();ctx.beginPath();ctx.moveTo(x+3,y);ctx.lineTo(x+4,y-2-Math.cos(x*1.3)*1.5);ctx.stroke()}ctx.globalAlpha=1;
-  // Bedrock
-  ctx.fillStyle=PL.rock;ctx.fillRect(0,BEDY,W,H-BEDY);ctx.strokeStyle=PL.rockL;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,BEDY);ctx.lineTo(W,BEDY);ctx.stroke();ctx.globalAlpha=.12;ctx.strokeStyle=PL.rockL;ctx.lineWidth=.5;for(let y=BEDY+5;y<H;y+=6){ctx.beginPath();for(let x=0;x<W;x+=20){ctx.moveTo(x,y);ctx.lineTo(x+10,y+(Math.sin(x+y)>0?2:-2))}ctx.stroke()}ctx.globalAlpha=1;
-  // Powerups
-  for(const p of powerups)drawPU(p);
-  // Aim dots
-  if(onlineAnim)drawOnlineAnim();
-  if(mode==='AIM'||mode==='AI_THINK'){const dots=aimDots();for(let i=0;i<dots.length;i++){ctx.globalAlpha=.45*(1-i/dots.length);ctx.fillStyle=PL.aim;ctx.beginPath();ctx.arc(dots[i].x,dots[i].y,2.5,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
-  // Tanks
-  for(let i=0;i<2;i++)drawTank(tanks[i],i===turn&&(mode==='AIM'||mode==='AI_THINK'));
-  // Trails
-  for(const p of proj){for(let i=0;i<p.trail.length;i++){ctx.globalAlpha=.15*(i/p.trail.length);ctx.fillStyle=p.g;ctx.beginPath();ctx.arc(p.trail[i].x,p.trail[i].y,3,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
-  // Projectiles
-  for(const p of proj){ctx.fillStyle=p.g;ctx.globalAlpha=.35;ctx.beginPath();ctx.arc(p.x,p.y,p.rad+3,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle=p.f;ctx.beginPath();ctx.arc(p.x,p.y,p.rad,0,Math.PI*2);ctx.fill()}
-  // Flash
-  if(flashA>0){ctx.globalAlpha=Math.max(0,flashA);ctx.fillStyle=PL.w;ctx.beginPath();ctx.arc(flashX,flashY,flashR,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1}
-  if(nukeFlash>0){ctx.globalAlpha=Math.max(0,nukeFlash*.6);ctx.fillStyle='#fff';ctx.fillRect(-50,-50,W+100,H+100);ctx.globalAlpha=1}
-  // Particles
-  for(const p of parts){ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.col;ctx.beginPath();ctx.arc(p.x,p.y,p.rad*Math.max(.2,p.life),0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
-  // Debris
-  for(const d of debris){ctx.save();ctx.translate(d.x,d.y);ctx.rotate(d.rot);ctx.globalAlpha=Math.max(0,d.life);ctx.fillStyle=d.col;ctx.fillRect(-d.w/2,-d.h/2,d.w,d.h);ctx.restore()}ctx.globalAlpha=1;
-  // Popups
-  for(const p of popups){ctx.globalAlpha=Math.max(0,p.life);ctx.font='600 14px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=p.c;ctx.fillText(p.t,p.x,p.y)}ctx.globalAlpha=1;
-  ctx.restore();drawHUD();
-}
-
-function drawPU(pu){
-  if(!pu.gnd){ctx.fillStyle='rgba(255,255,255,0.35)';ctx.beginPath();ctx.arc(pu.x,pu.y-14,10,Math.PI,0);ctx.fill();ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=.5;ctx.beginPath();ctx.moveTo(pu.x-8,pu.y-14);ctx.lineTo(pu.x-3,pu.y-2);ctx.moveTo(pu.x+8,pu.y-14);ctx.lineTo(pu.x+3,pu.y-2);ctx.stroke()}
-  const pulse=pu.gnd?1+Math.sin(Date.now()*.004)*.08:1,sz=10*pulse;
-  ctx.fillStyle=pu.ty.col;fillRR(pu.x-sz/2,pu.y-sz/2,sz,sz,2);
-  ctx.globalAlpha=.2+Math.sin(Date.now()*.003)*.1;ctx.fillStyle=pu.ty.col;ctx.beginPath();ctx.arc(pu.x,pu.y,14,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
-  ctx.font='600 8px Fredoka,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#fff';ctx.fillText(pu.ty.sym,pu.x,pu.y+.5);ctx.textBaseline='alphabetic';
-}
-
-function drawTank(tank,act){
-  const gy=tY(tank.x),x=tank.x,isP1=tank.p===0;
-  const bc=isP1?PL.t1:PL.t2,dc=isP1?PL.t1d:PL.t2d,dir=isP1?1:-1;
-  const ar=tank.angle*Math.PI/180,bt=gy-TRH-TH,dy=bt;
-  // Shield
-  if(tank.shield){ctx.strokeStyle=PL.shield;ctx.lineWidth=2;ctx.globalAlpha=.35+Math.sin(Date.now()*.005)*.1;ctx.beginPath();ctx.arc(x,dy+TH/2,TW/2+10,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=.08;ctx.fillStyle=PL.shield;ctx.fill();ctx.globalAlpha=1}
-  ctx.fillStyle=dc;fillRR(x-TW/2-2,gy-TRH,TW+4,TRH+2,3);
-  ctx.fillStyle=bc;fillRR(x-TW/2,bt,TW,TH,3);
-  ctx.fillStyle='rgba(255,255,255,0.15)';fillRR(x-TW/2+2,bt+2,TW-4,3,1);
-  ctx.fillStyle=bc;ctx.beginPath();ctx.arc(x,dy,TURR,Math.PI,0);ctx.fill();
-  const tipX=x+dir*Math.cos(ar)*BLEN,tipY=dy-Math.sin(ar)*BLEN;
-  ctx.strokeStyle=dc;ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,dy);ctx.lineTo(tipX,tipY);ctx.stroke();
-  ctx.strokeStyle=bc;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,dy);ctx.lineTo(tipX,tipY);ctx.stroke();
-  if(act){ctx.strokeStyle=PL.w;ctx.lineWidth=2;ctx.globalAlpha=.25+Math.sin(Date.now()*.005)*.1;ctx.beginPath();ctx.arc(x,dy,TURR+5,Math.PI,0,false);ctx.stroke();ctx.globalAlpha=1}
-  if(tank.hp<MAXHP&&tank.hp>0){ctx.font='500 10px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=PL.tx;ctx.globalAlpha=.7;ctx.fillText(tank.hp,x,bt-TURR-10);ctx.globalAlpha=1}
-}
-
-// ── HUD ──
-function drawHUD(){
-  ctx.fillStyle=PL.hud;fillRR(15,10,W-30,72,10);
-  const names=online?online.names:null;
-  const p1n=names?names[0]||'Lavender':'Lavender';
-  const p2n=names?names[1]||'Mint':aiEnabled?'Mint (AI)':'Mint';
-  drawHP(30,22,170,12,tanks[0].hp/MAXHP,PL.hp1,p1n);drawFuel(30,42,170,8,tanks[0].fuel/FUELMAX);
-  drawHP(W-200,22,170,12,tanks[1].hp/MAXHP,PL.hp2,p2n);drawFuel(W-200,42,170,8,tanks[1].fuel/FUELMAX);
-  ctx.textAlign='center';
-  if(mode!=='OVER'&&mode!=='DEATH'){
-    const tc=turn===0?PL.t1:PL.t2,tn=turn===0?p1n:p2n;
-    ctx.font='600 14px Fredoka,sans-serif';ctx.fillStyle=tc;
-    if(mode==='AI_THINK'){const dots='.'.repeat(Math.floor(aiTimer/12)%4);ctx.fillText('Thinking'+dots,W/2,28)}
-    else ctx.fillText(tn+"'s Turn",W/2,28);
-    const t=tanks[turn];
-    const wps=[{k:'standard',n:'Std',nm:'1'},{k:'heavy',n:'Hvy',nm:'2',a:t.ammo.heavy},{k:'cluster',n:'Clu',nm:'3',a:t.ammo.cluster},{k:'nuke',n:'Nuk',nm:'4',a:t.ammo.nuke}];
-    let ax=W/2-108;
-    for(const w of wps){const isA=selWeap===w.k,has=w.k==='standard'||(w.a&&w.a>0);if(isA){ctx.fillStyle='rgba(255,255,255,0.1)';fillRR(ax-20,37,42,16,4)}ctx.globalAlpha=has?(isA?1:.5):.25;ctx.font=isA?'600 11px Fredoka,sans-serif':'400 11px Fredoka,sans-serif';ctx.fillStyle=isA?PL.aA:PL.aI;ctx.fillText(w.k==='standard'?w.nm+':Std ∞':w.nm+':'+w.n+' ×'+(w.a||0),ax,49);ax+=54}ctx.globalAlpha=1;
-    if(mode==='AIM'||mode==='AI_THINK'){ctx.font='400 10px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.fillText(Math.round(tanks[turn].angle)+'°  |  Power: '+power.toFixed(1),W/2,62);const mx=W/2-40,my=66,mw=80,mh=5;ctx.fillStyle=PL.pwBg;fillRR(mx,my,mw,mh,2);ctx.fillStyle=PL.pw;fillRR(mx,my,Math.max(0,mw*(power/MAXPW)),mh,2)}
-    // Terrain name
-    ctx.font='400 10px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.3;ctx.fillText(TERRAINS[terrainIdx].name,W/2,H-22);ctx.globalAlpha=1;
+  for (let i = notes.length - 1; i >= 0; i--) {
+    const n = notes[i]; n.y -= .4; n.life -= .012;
+    if (n.life <= 0) notes.splice(i, 1);
   }
-  if(mode==='AIM'&&online){
-    ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.6;
-    ctx.fillText('Drive Q/E · Aim A/D or ←→ · Power W/S or ↑↓ · 1-4 weapon · Space fire',W/2,H-8);ctx.globalAlpha=1;
-  } else if(mode==='AIM'&&!aiEnabled){
-    const hint=turn===0?'Q/E Move  ·  A/D Aim  ·  W/S Power  ·  1-4 Weapon  ·  Space Fire'
-                      : ', . Move  ·  ← → Aim  ·  ↑ ↓ Power  ·  1-4 Weapon  ·  Enter Fire';
-    ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.6;ctx.fillText(hint,W/2,H-8);ctx.globalAlpha=1;
-  }
-  if(mode==='AIM'&&aiEnabled&&turn===0){
-    ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.6;ctx.fillText('Q/E Move  ·  A/D Aim  ·  W/S Power  ·  1-4 Weapon  ·  Space Fire',W/2,H-8);ctx.globalAlpha=1;
-  }
-  if(missed&&mode==='SWITCH'&&timer>15){ctx.globalAlpha=Math.min(1,(timer-15)/20);ctx.font='500 22px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=PL.txL;ctx.fillText('Miss!',W/2,H/2-40);ctx.globalAlpha=1}
-  if(mode==='OVER'){ctx.fillStyle='rgba(45,36,56,0.55)';ctx.fillRect(0,0,W,H);const a=Math.min(1,overT/30);const wn=online?(online.names[winner]||(winner===0?'Lavender':'Mint')):(winner===0?'Lavender':'Mint'),wc=winner===0?PL.t1:PL.t2;ctx.globalAlpha=a;ctx.font='700 48px Fredoka,sans-serif';ctx.textAlign='center';ctx.fillStyle=wc;ctx.fillText(wn+' Wins!',W/2,H/2-15);if(!online){ctx.font='400 18px Fredoka,sans-serif';ctx.fillStyle=PL.w;ctx.fillText(aiEnabled?'Next round':'Press R to play again',W/2,H/2+25)}ctx.globalAlpha=1}
-}
-
-function drawHP(x,y,w,h,r,col,lbl){ctx.fillStyle=PL.hpBg;fillRR(x,y,w,h,3);if(r>0){ctx.fillStyle=col;fillRR(x,y,Math.max(h,w*r),h,3)}ctx.font='600 11px Fredoka,sans-serif';ctx.textAlign='left';ctx.fillStyle=PL.tx;ctx.fillText(lbl+'  '+Math.round(r*MAXHP)+' HP',x+2,y-3)}
-function drawFuel(x,y,w,h,r){ctx.fillStyle=PL.fuelBg;fillRR(x,y,w,h,2);if(r>0){ctx.fillStyle=PL.fuel;fillRR(x,y,Math.max(h,w*r),h,2)}ctx.font='400 9px Fredoka,sans-serif';ctx.textAlign='left';ctx.fillStyle=PL.txL;ctx.fillText('Fuel '+Math.round(r*FUELMAX),x+w+5,y+h-1)}
-
-// ── Title Screen ──
-function drawTitle(){
-  const sg=ctx.createLinearGradient(0,0,0,H);sg.addColorStop(0,PL.skyT);sg.addColorStop(.45,PL.skyM);sg.addColorStop(1,PL.skyB);ctx.fillStyle=sg;ctx.fillRect(0,0,W,H);
-  ctx.fillStyle=PL.hill;ctx.beginPath();ctx.moveTo(0,H);for(let x=0;x<=W;x+=4)ctx.lineTo(x,H*.48+Math.sin(x*.003+1)*40+Math.sin(x*.01+2)*15);ctx.lineTo(W,H);ctx.closePath();ctx.fill();
-  for(const c of clouds){ctx.fillStyle=PL.cld;ctx.beginPath();ctx.arc(c.x,c.y,18*c.sc,0,Math.PI*2);ctx.arc(c.x+14*c.sc,c.y-6*c.sc,13*c.sc,0,Math.PI*2);ctx.arc(c.x+28*c.sc,c.y-1*c.sc,15*c.sc,0,Math.PI*2);ctx.arc(c.x-8*c.sc,c.y+2*c.sc,10*c.sc,0,Math.PI*2);ctx.fill()}
-
-  ctx.textAlign='center';ctx.font='700 52px Fredoka,sans-serif';ctx.fillStyle=PL.tx;ctx.fillText('Pastel Tanks',W/2,115);
-
-  // Terrain selector
-  ctx.fillStyle=PL.hud;fillRR(W/2-130,150,260,36,8);
-  ctx.font='400 15px Fredoka,sans-serif';ctx.fillStyle=PL.tx;
-  ctx.fillText('Terrain: '+TERRAINS[terrainIdx].name,W/2,174);
-  ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.5;
-  ctx.fillText('Press T to change',W/2,198);ctx.globalAlpha=1;
-
-  // 1 Player button
-  const bW=220,bH=46,b1Y=230,b2Y=295;
-  ctx.fillStyle=PL.t1;fillRR(W/2-bW/2,b1Y,bW,bH,10);
-  ctx.font='600 18px Fredoka,sans-serif';ctx.fillStyle='#fff';ctx.fillText('1 Player  (vs AI)',W/2,b1Y+30);
-  // 2 Players button
-  ctx.fillStyle=PL.t2;fillRR(W/2-bW/2,b2Y,bW,bH,10);
-  ctx.fillStyle='#fff';ctx.fillText('2 Players',W/2,b2Y+30);
-
-  // Controls
-  ctx.font='400 11px Fredoka,sans-serif';ctx.fillStyle=PL.txL;ctx.globalAlpha=.45;
-  ctx.fillText('P1: Q/E move  ·  A/D aim  ·  W/S power  ·  Space fire',W/2,380);
-  ctx.fillText('P2: ,/. move  ·  ← → aim  ·  ↑↓ power  ·  Enter fire',W/2,398);
-  ctx.fillText('1-4 select weapon  ·  Collect powerups by driving over them',W/2,416);
-  ctx.globalAlpha=1;
-
-  ctx.font='400 12px Fredoka,sans-serif';ctx.fillStyle=PL.tx;ctx.globalAlpha=.5;
-  ctx.fillText('Press 1 or 2 to start',W/2,460);ctx.globalAlpha=1;
-}
-
-// ── Init ──
-function startGame(fresh=true){
-  if(fresh)sessionWins=0;
-  TERRAINS[terrainIdx].fn();
-  tanks=[mkTank(.15,0),mkTank(.85,1)];adjSpawn();
-  proj=[];parts=[];popups=[];powerups=[];debris=[];
-  power=5;selWeap='standard';turn=0;mode='AIM';
-  winner=-1;shake=0;flashA=0;nukeFlash=0;missed=false;overT=0;turnCnt=0;deathTimer=0;deathWinner=0;
-  nextPU=1;anyHit=false;aiTimer=0;keys={};
-}
-
-function init(){mode='TITLE';terrainIdx=terrainIdx||0;keys={};debris=[];parts=[];popups=[];powerups=[];proj=[]}
-
-/* ── Bored Together ──────────────────────────────────────────────────────── */
-// The bridge arrives before this script does. It carries the match state (seed
-// and shots), the seat and the rules URL; nothing else is trusted from here.
-const together=window.__boredTogether;
-
-function onlineAim(t){
-  if(!online||!online.canPlay||onlineAnim)return;
-  let mov=false;
-  if((keys.KeyQ||keys.Comma||keys._cL)&&t.fuel>0){t.x=Math.max(20,t.x-MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
-  if((keys.KeyE||keys.Period||keys._cR)&&t.fuel>0){t.x=Math.min(W-20,t.x+MOVESP);t.fuel=Math.max(0,t.fuel-FUELCOST);mov=true}
-  if(keys.KeyA||keys.ArrowLeft)t.angle=Math.min(85,t.angle+ASPD);
-  if(keys.KeyD||keys.ArrowRight)t.angle=Math.max(5,t.angle-ASPD);
-  if(keys.KeyW||keys.ArrowUp)power=Math.min(MAXPW,power+PWSPD);
-  if(keys.KeyS||keys.ArrowDown)power=Math.max(MINPW,power-PWSPD);
-  if(mov)mkDust(t.x,tY(t.x));
-}
-
-function onlineTank(t,i){
-  return{x:t.x,p:i,hp:t.hp,angle:t.angle,fuel:t.fuel,shield:!!t.shield,
-    ammo:{heavy:t.ammo.heavy||0,cluster:t.ammo.cluster||0,nuke:t.ammo.nuke||0}};
-}
-
-// Everything on screen comes out of the stored shots. The saved battle is not
-// read directly: the seed and the shots are handed to the shared rules, and the
-// board, hit points and winner below are what that replay produced.
-function paintOnline(state){
-  const world=online.engine.replay(state);
-  terrain=Array.from(world.board);
-  tanks=world.tanks.map(onlineTank);
-  powerups=world.powerups.map(p=>({x:p.x,y:p.y,ty:PUTYPES.find(u=>u.key===p.key)||PUTYPES[0],gnd:true}));
-  proj=[];parts=[];popups=[];debris=[];
-  terrainIdx=world.layout;
-  turn=world.winner?0:(state.turn===2?1:0);
-  winner=world.winner?world.winner-1:-1;
-  overT=0;power=5;selWeap='standard';
-  online.state=state;online.world=world;
-  online.canPlay=!!online.context.canPlay&&!world.winner&&online.status==='active';
-  mode=world.winner?'OVER':(online.canPlay?'AIM':'WATCH');
-}
-
-// The arc that was just sent, drawn from the same simulation the opponent will
-// replay. Past shots are not animated: a load paints their result directly.
-function drawOnlineAnim(){
-  const{trails,bursts,frame}=onlineAnim;
-  for(const trail of trails){
-    const upto=Math.min(frame+1,trail.length);
-    for(let i=0;i<upto;i++){
-      ctx.globalAlpha=.15+.3*(i/upto);
-      ctx.fillStyle=trail.child?PL.cShG:PL.shG;
-      ctx.beginPath();ctx.arc(trail[i].x,trail[i].y,trail.child?2:3,0,Math.PI*2);ctx.fill();
-    }
-    if(upto<trail.length){
-      const head=trail[upto-1];
-      ctx.globalAlpha=1;ctx.fillStyle=trail.child?PL.cSh:PL.sh;
-      ctx.beginPath();ctx.arc(head.x,head.y,trail.child?3.5:5,0,Math.PI*2);ctx.fill();
-    }
-  }
-  for(const b of bursts){
-    const step=frame-b.at;
-    if(step<0)continue;
-    ctx.globalAlpha=Math.max(0,1-step/24);
-    ctx.fillStyle=b.type==='nuke'?'#fff':PL.exp[0];
-    ctx.beginPath();ctx.arc(b.x,b.y,Math.min(b.r,8+step*3),0,Math.PI*2);ctx.fill();
-  }
-  ctx.globalAlpha=1;
-}
-
-async function onlineFire(){
-  if(!online||!online.canPlay||onlineBusy||onlineAnim)return;
-  const seat=online.seat,t=tanks[seat-1];
-  const shot={seat,x:Math.round(t.x),angle:Math.round(t.angle),power:Math.round(power*10)/10,weapon:selWeap};
-  let result;
-  try{result=online.engine.advance(online.state,shot)}
-  catch(error){mkPopup(t.x,tY(t.x)-40,error.message,'#FF7B8E');return}
-  onlineBusy=true;
-  try{
-    const context=await together.submit({...shot,won:result.next.winner===seat});
-    online.context=context;online.status=context.status;
-    const longest=result.world.trails.reduce((n,trail)=>Math.max(n,trail.length),0);
-    onlineAnim={trails:result.world.trails,bursts:result.world.bursts,frame:0,max:longest+24};
-    setTimeout(()=>{
-      onlineAnim=null;onlineBusy=false;
-      paintOnline(context.state);
-      together.finishTurn();
-    },Math.max(320,Math.min(3200,longest*16)));
-  }catch(error){
-    onlineBusy=false;
-    together.error(error,()=>{onlineBusy=false;onlineFire()});
-  }
-}
-
-async function startOnline(){
-  const bridge=together.context;
-  online={engine:null,seat:bridge.seat===2?2:1,names:Array.isArray(bridge.players)?bridge.players:['Lavender','Mint'],
-    canPlay:false,status:bridge.status||'active',context:bridge,state:bridge.state,world:null};
-  try{online.engine=await import(together.engineURL)}
-  catch(error){
-    const note=document.createElement('p');
-    note.style.cssText='position:fixed;left:0;right:0;bottom:18px;text-align:center;font:14px system-ui;color:#fff';
-    note.textContent='This game could not load its rules. '+error.message;
-    document.body.append(note);
+  if (anim) {
+    anim.frame += dt * 60;
+    if (!anim.doneAt && anim.frame * anim.speed >= anim.total) anim.doneAt = performance.now();
+    if (anim.doneAt && performance.now() - anim.doneAt > (anim.impact ? 260 : 120)) finishShot();
     return;
   }
-  keys={};
-  paintOnline(bridge.state);
-  loop();
+  if (mode === 'OVER') overFor += dt * 60;
+  if (live()) {
+    const seat = turnSeat(), t = world.tanks[seat - 1];
+    let dir = 0;
+    if (keys.has(DRIVE[seat][0])) dir -= 1;
+    if (keys.has(DRIVE[seat][1])) dir += 1;
+    const target = dir * 250;
+    walkVel += (target - walkVel) * Math.min(1, dt * 14);
+    if (Math.abs(walkVel) < 3) walkVel = 0;
+    if (walkVel) {
+      const next = walk + walkVel * dt;
+      if (engine.driveCost(t.s, next) <= engine.FUEL) {
+        walk = next;
+        if (dir) facing[seat] = dir;
+        if (Math.random() < dt * 20) {
+          const p = engine.ringPoint(engine.wrapS(t.s + walk));
+          spark(p.x, p.y, 1, C.hair, .8);
+        }
+      } else { walkVel = 0; walk = walk * .9; }
+    }
+    const a = aim[seat];
+    if (keys.has(AIMKEY[seat][0])) a.angle = clampN(a.angle + dt * 55, 5, 85);
+    if (keys.has(AIMKEY[seat][1])) a.angle = clampN(a.angle - dt * 55, 5, 85);
+    // a tap of the key fires the aimed power exactly; only a held key charges
+    if (charging() && performance.now() - pressAt > 140) charge = Math.min(engine.MAXPW, charge + dt * 18);
+  }
+  if (mode === 'CPU' && !world.winner) {
+    aiTick += dt * 60;
+    if (!aiPlan && aiTick > 12) { try { aiPlan = plan(); } catch (e) { aiPlan = { seat: 2, drive: 0, angle: 45, power: 12, weapon: 'standard' }; } }
+    if (aiPlan) {
+      const a = aim[2];
+      a.angle += (aiPlan.angle - a.angle) * Math.min(1, dt * 7);
+      a.power += (aiPlan.power - a.power) * Math.min(1, dt * 7);
+      if (aiTick > 52) { const shot = aiPlan; aiPlan = null; aiTick = 0; fire(shot); }
+    }
+  }
+  while (crumble.length && performance.now() - crumble[0].born > 320) crumble.shift();
 }
 
-/* Small handle for the test suite; it only exposes what the board already shows. */
-window.__test={
-  state:()=>({mode,turn,power,online:!!online,
-    seed:online&&online.state?online.state.seed:null,
-    shots:online&&online.state&&Array.isArray(online.state.shots)?online.state.shots.length:0,
-    hp:tanks?tanks.map(t=>t.hp):[],x:tanks?tanks.map(t=>Math.round(t.x)):[],
-    angle:tanks?tanks.map(t=>Math.round(t.angle)):[],
-    terrain:tanks?tanks.map(t=>Math.round(tY(t.x))):[]}),
-  aim:(angle,pw)=>{if(tanks){tanks[turn].angle=angle;power=pw}},
-  fire:()=>fire()
+/* ── Painting ───────────────────────────────────────────────────────────── */
+
+function drawBox(panels) {
+  ctx.fillStyle = C.board; ctx.fillRect(engine.BX, engine.BY, engine.BW, engine.BH);
+  ctx.fillStyle = C.ink;
+  const t = engine.T;
+  for (const [x, y] of [[engine.BX, engine.BY], [engine.BX + engine.BW - t, engine.BY],
+    [engine.BX, engine.BY + engine.BH - t], [engine.BX + engine.BW - t, engine.BY + engine.BH - t]]) ctx.fillRect(x, y, t, t);
+  // panels are paper slabs with hairline seams, so the box reads as a room and
+  // not a picture frame; a destroyed one folds into the wall before vanishing
+  for (let w = 0; w < 4; w++) {
+    for (let j = 0; j < panels[w].length; j++) {
+      const r = panelRect(w, j);
+      if (panels[w][j]) {
+        ctx.fillStyle = '#efeade';
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = C.hair; ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (w % 2 === 0) { ctx.moveTo(r.x + r.w, r.y + 1); ctx.lineTo(r.x + r.w, r.y + r.h - 1); }
+        else { ctx.moveTo(r.x + 1, r.y + r.h); ctx.lineTo(r.x + r.w - 1, r.y + r.h); }
+        ctx.stroke();
+      } else {
+        const folding = crumble.find(c => c.wall === w && c.j === j);
+        if (folding) {
+          const age = clampN((performance.now() - folding.born) / 300, 0, 1);
+          const shrink = 1 - age;
+          ctx.save();
+          ctx.globalAlpha = 1 - age;
+          ctx.fillStyle = '#efeade';
+          if (w === 0) ctx.fillRect(r.x, r.y, r.w, r.h * shrink);
+          else if (w === 2) ctx.fillRect(r.x, r.y + r.h * (1 - shrink), r.w, r.h * shrink);
+          else if (w === 1) ctx.fillRect(r.x + r.w * (1 - shrink), r.y, r.w * shrink, r.h);
+          else ctx.fillRect(r.x, r.y, r.w * shrink, r.h);
+          ctx.restore();
+        }
+        ctx.strokeStyle = C.hair; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+        ctx.strokeRect(r.x + 2.5, r.y + 2.5, Math.max(1, r.w - 5), Math.max(1, r.h - 5));
+        ctx.setLineDash([]);
+      }
+    }
+  }
+  // the box's own outline: the ink edge a room drawn on paper would have
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
+  ctx.strokeRect(engine.BX + .5, engine.BY + .5, engine.BW - 1, engine.BH - 1);
+  ctx.strokeStyle = C.hair; ctx.lineWidth = 1;
+  ctx.strokeRect(engine.BX + engine.T + .5, engine.BY + engine.T + .5, engine.IW - 1, engine.IH - 1);
+}
+
+function drawReach(seat) {
+  // how far this turn's fuel goes, as a bracket on the ring
+  const t = world.tanks[seat - 1];
+  const span = engine.FUEL / engine.MOVECOST;
+  ctx.strokeStyle = C.hair; ctx.lineWidth = 1;
+  for (const dir of [-1, 1]) {
+    const end = engine.wrapS(t.s + dir * span);
+    const p = engine.ringPoint(end);
+    ctx.beginPath();
+    ctx.moveTo(p.x + p.nx * 5, p.y + p.ny * 5);
+    ctx.lineTo(p.x + p.nx * 11, p.y + p.ny * 11);
+    ctx.stroke();
+  }
+}
+
+function drawTank(t, seat, isTurn) {
+  const p = engine.ringPoint(t.s + (isTurn && live() ? walk : 0));
+  const rot = [0, Math.PI / 2, Math.PI, -Math.PI / 2][p.wall];
+  const colour = COLOUR[seat];
+  const angle = (isTurn ? aim[seat].angle : (t.angle || 45)) * Math.PI / 180;
+  const dir = isTurn && live() ? facing[seat] : (t.dir || 1);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(rot);
+  // treads sit on the wall; the hull hangs into the box, so the ceiling reads upside down
+  ctx.fillStyle = C.ink;
+  ctx.fillRect(-13, 0, 26, 6);
+  ctx.fillStyle = C.hair;
+  for (let i = 0; i < 6; i++) ctx.fillRect(-11 + i * 4, 1.8, 2.6, 2.4);
+  ctx.fillStyle = colour;
+  ctx.fillRect(-9.5, 6, 19, 8);
+  ctx.fillRect(-5, 11, 10, 5);
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 16);
+  const reach = 15 + Math.min(1, (isTurn && charging() ? charge : aim[seat].power) || 12 / 24) * 7;
+  ctx.lineTo(Math.sin(angle) * dir * reach, 16 + Math.cos(angle) * reach);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawGhost() {
+  const g = ghostPath();
+  if (!g || !g.trail || g.trail.length < 3) return;
+  ctx.save();
+  for (let i = 4; i < g.trail.length; i += 5) {
+    ctx.globalAlpha = Math.max(.04, .34 - (i / g.trail.length) * .26);
+    ctx.fillStyle = C.dim;
+    ctx.fillRect(g.trail[i].x - 1.2, g.trail[i].y - 1.2, 2.4, 2.4);
+  }
+  const h = g.hit;
+  if (h && typeof h !== 'string') {
+    ctx.globalAlpha = .5; ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(h.x, h.y, 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(h.x, h.y, 1.6, 0, Math.PI * 2); ctx.fillStyle = C.ink; ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawShell(shown, trail, colour) {
+  if (shown < 2) return;
+  for (let k = Math.max(0, shown - 26); k < shown; k++) {
+    ctx.globalAlpha = .1 + (k / shown) * .5;
+    ctx.fillStyle = colour;
+    const s = 2.6 - (shown - k) / 26;
+    ctx.fillRect(trail[k].x - s / 2, trail[k].y - s / 2, s, s);
+  }
+  const h = trail[Math.min(trail.length - 1, Math.max(0, shown - 1))];
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = C.ink;
+  ctx.beginPath(); ctx.arc(h.x, h.y, 2.4, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawField(panels, tanks, powerups, mines, trails, showGhost) {
+  drawBox(panels);
+  if (mode === 'AIM' && live() && showGhost) drawReach(turnSeat());
+  for (const t of trails) {
+    for (let i = 0; i < t.length; i += 6) {
+      ctx.globalAlpha = .05 + (i / t.length) * .07;
+      ctx.fillStyle = C.ink;
+      ctx.fillRect(t[i].x - 1.1, t[i].y - 1.1, 2.2, 2.2);
+    }
+  }
+  ctx.globalAlpha = 1;
+  for (const pu of powerups) {
+    const meta = engine.POWERUPS.find(m => m.key === pu.key) || { sym: '?' };
+    ctx.fillStyle = C.board; ctx.fillRect(pu.x - 8, pu.y - 8, 16, 16);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.strokeRect(pu.x - 7.5, pu.y - 7.5, 15, 15);
+    ctx.fillStyle = C.ink; ctx.font = '600 10px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(meta.sym, pu.x, pu.y + 3.5); ctx.textAlign = 'left';
+  }
+  for (const m of mines) {
+    ctx.fillStyle = C.red; ctx.fillRect(m.x - 5, m.y - 2, 10, 4);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(m.x, m.y - 2); ctx.lineTo(m.x, m.y - 6); ctx.stroke();
+  }
+  tanks.forEach((t, i) => drawTank(t, i + 1, state.turn === i + 1 && !world.winner));
+  if (showGhost) drawGhost();
+}
+
+function drawCentre() {
+  const t = 22;
+  ctx.textAlign = 'center';
+  ctx.font = '600 12px ui-monospace, monospace';
+  ctx.fillStyle = C.dim;
+  const seat = online ? online.seat : turnSeat();
+  if (anim) {
+    ctx.fillStyle = C.ink;
+    ctx.fillText('SHELL AWAY', 480, t);
+  } else if (mode === 'WAIT') {
+    ctx.fillText('WAITING ON ' + seatName(3 - seat), 480, t);
+  } else if (mode === 'CPU') {
+    ctx.fillText(seatName(2) + ' TAKES AIM', 480, t);
+  } else if (mode === 'OVER') {
+    ctx.font = '600 15px ui-monospace, monospace';
+    ctx.fillStyle = winner && COLOUR[winner] ? COLOUR[winner] : C.ink;
+    ctx.fillText((winner ? seatName(winner) : 'NOBODY') + ' WINS', 480, t + 2);
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = C.dim;
+    ctx.fillText(aiEnabled ? 'NEXT ROUND SHORTLY · R FOR A NEW MATCH' : 'SPACE OR TAP FOR THE NEXT ROUND', 480, t + 22);
+  } else if (mode === 'AIM' && live()) {
+    if (charging()) {
+      ctx.fillStyle = C.ink;
+      ctx.fillText('POWER ' + charge.toFixed(1), 480, t);
+    } else if (pointer) {
+      ctx.fillText('TAP TO FIRE', 480, t);
+    } else {
+      ctx.fillText('YOUR TURN · ' + seatName(turnSeat()), 480, t);
+    }
+  }
+  ctx.textAlign = 'left';
+}
+
+function paintHud() {
+  if (!world) return;
+  const [a, b] = world.tanks;
+  hud.hp1.textContent = Math.max(0, Math.round(a.hp));
+  hud.hp2.textContent = Math.max(0, Math.round(b.hp));
+  const w = state ? engine.windOf(state.seed, state.shots.length) : 0;
+  hud.wind.textContent = '· wind ' + Math.abs(Math.round(w * 1000)) + (w >= 0 ? ' →' : ' ←');
+  const seat = online ? online.seat : turnSeat();
+  let used = 0;
+  if (state && state.turn === seat && world && !world.winner) used = engine.driveCost(world.tanks[seat - 1].s, walk);
+  hud.fuel.textContent = '· fuel ' + Math.max(0, Math.round(100 - used / engine.FUEL * 100)) + '%';
+  const t = world.tanks[seat - 1] || a;
+  for (const [key] of ARMS) {
+    const btn = armsEl.querySelector('[data-arm="' + key + '"]');
+    if (!btn) continue;
+    const ammo = key === 'standard' ? '∞' : String(t.ammo[key] || 0);
+    btn.innerHTML = '<b>' + ARM_NAMES[key] + '</b> ' + ammo;
+    btn.disabled = key !== 'standard' && !(t.ammo[key] > 0);
+    btn.classList.toggle('sel', sel === key);
+  }
+  hintEl.textContent = state && state.turn === 2 && !world.winner && !online
+    ? 'Mint is lining up · R restarts the match'
+    : 'A/D or arrows drive · W/S or up/down aim · point and tap fires · space charges · R restarts · 1-5 shells';
+}
+
+function paint(dt) {
+  if (!engine) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = C.paper;
+  ctx.fillRect(0, 0, 960, 580);
+  if (shake) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  if (anim) {
+    drawField(anim.pre.panels, anim.pre.tanks, anim.pre.powerups, anim.pre.mines,
+      world.trails.slice(0, world.trails.length - anim.items.length), false);
+    const pts = Math.max(0, anim.frame * anim.speed);
+    let impact = false;
+    for (const item of anim.items) {
+      if (pts <= item.start) continue;
+      const shown = Math.min(item.len, Math.floor(pts - item.start));
+      drawShell(shown, item.trail, C.ink);
+      if (shown >= item.len) impact = true;
+    }
+    if (impact && anim.impact) {
+      const age = clampN(((pts - anim.total) / 16), 0, 1);
+      ctx.strokeStyle = C.red; ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 1 - age;
+      ctx.beginPath(); ctx.arc(anim.impact.x, anim.impact.y, 3 + (anim.impact.r || 10) * .8 * age, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    drawCentre();
+  } else if (mode === 'TITLE') {
+    ctx.fillStyle = C.board; ctx.fillRect(engine.BX, engine.BY, engine.BW, engine.BH);
+    ctx.strokeStyle = C.hair; ctx.strokeRect(engine.BX + .5, engine.BY + .5, engine.BW - 1, engine.BH - 1);
+    ctx.textAlign = 'center'; ctx.fillStyle = C.dim;
+    ctx.font = '600 12px ui-monospace, monospace';
+    ctx.fillText('BUILDING THE BOX', 480, 288); ctx.textAlign = 'left';
+  } else {
+    drawField(world.panels, world.tanks, world.powerups, world.mines, world.trails, true);
+    drawCentre();
+  }
+  for (const s of sprigs) {
+    ctx.globalAlpha = Math.max(0, s.life);
+    ctx.fillStyle = s.colour;
+    ctx.fillRect(s.x - 1.4, s.y - 1.4, 2.8, 2.8);
+  }
+  ctx.globalAlpha = 1;
+  for (const n of notes) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, n.life * 1.5));
+    ctx.textAlign = 'center';
+    ctx.font = '600 ' + n.size + 'px ui-monospace, monospace';
+    ctx.fillStyle = n.colour;
+    ctx.fillText(n.text, clampN(n.x, 30, 930), clampN(n.y, 40, 560));
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  paintHud();
+}
+
+function frame(now) {
+  const dt = Math.min(.05, (now - lastNow) / 1000 || 0);
+  lastNow = now;
+  try { step(dt); paint(dt); } catch (e) { /* one bad frame must not stop the loop */ }
+  requestAnimationFrame(frame);
+}
+
+/* ── Bored Together ─────────────────────────────────────────────────────── */
+
+function startOnline() {
+  online = {
+    seat: bridge.context.seat === 2 ? 2 : 1,
+    names: Array.isArray(bridge.context.players) && bridge.context.players.length === 2
+      ? bridge.context.players.map(n => String(n).toUpperCase().slice(0, 12)) : null,
+    busy: false, canonical: null,
+    canPlay: () => !!bridge.context && bridge.context.canPlay && bridge.context.status === 'active',
+    submit: move => bridge.submit(move),
+    use: ctx2 => { bridge.context = ctx2; },
+    state: () => bridge.context.state
+  };
+  repaint(online.state());
+}
+
+/* ── Snapshot and probe surface ─────────────────────────────────────────── */
+
+window.__boredSnapshot = () => ({
+  slug: 'tank2',
+  won: Math.max(0, Math.round(sessionWins)),
+  cpu: aiEnabled === true,
+  started: mode !== 'TITLE' && !!state
+});
+
+window.__test = {
+  mode: () => mode,
+  state: () => (state ? { mode, turn: state.turn, power: aim[state.turn] && state.turn ? aim[state.turn].power : null,
+    online: !!bridge, seed: state.seed, shots: state.shots.length,
+    hp: world ? world.tanks.map(t => t.hp) : [] } : null),
+  world: () => world,
+  seed: () => (state ? state.seed : null),
+  hp: () => (world ? world.tanks.map(t => Math.round(t.hp)) : null),
+  holes: () => (world ? countHoles(world) : null),
+  turn: () => (state ? state.turn : null),
+  wind: () => (state ? engine.windOf(state.seed, state.shots.length) : null),
+  start(ai) { aiEnabled = !!ai; freshMatch(); },
+  aim(angle, power) { const a = aim[turnSeat()]; if (a) { a.angle = angle; a.power = power; } },
+  drive(px) { walk = px; },
+  fireNow() { const shot = draft(); if (shot) fire(shot); },
+  fireShot(shot) {
+    fire({ seat: shot.seat || state.turn, drive: shot.drive | 0, angle: shot.angle || 45,
+      power: shot.power || 12, weapon: shot.weapon || 'standard' });
+  },
+  bestShot(seatIn) {
+    if (!state || world.winner) return null;
+    const s = seatIn || state.turn;
+    for (const weapon of engine.WEAPONS) {
+      if (weapon !== 'standard' && !(world.tanks[s - 1].ammo[weapon] > 0)) continue;
+      for (let a = 5; a <= 85; a++) for (let p = 1; p <= 24; p++) {
+        const g = engine.guide(world, s, a, p, weapon);
+        if (g.hit && g.hit.kind === 'tank' && g.hit.seat !== s) return { seat: s, drive: 0, angle: a, power: p, weapon };
+      }
+    }
+    return null;
+  },
+  skip() { if (anim) { anim.doneAt = performance.now() - 2000; } },
+  settle() { return new Promise(res => { const check = () => (anim ? setTimeout(check, 30) : res()); check(); }); },
+  tick(n) { for (let i = 0; i < (n || 1); i++) { try { step(1 / 60); } catch (e) { } } },
+  // perf: millisecond timings of one paint pass, for the smoothness check
+  cost() { const t = performance.now(); for (let i = 0; i < 20; i++) paint(0); return (performance.now() - t) / 20; }
 };
 
-// ── Loop ──
-function loop(){update();render();requestAnimationFrame(loop)}
-if(together)startOnline();
-else Promise.race([document.fonts.ready,new Promise(r=>setTimeout(r,2000))]).then(()=>{init();loop()});
+/* ── Boot ───────────────────────────────────────────────────────────────── */
+
+(async function boot() {
+  let url = bridge && bridge.engineURL;
+  if (!url) {
+    try { url = new URL('../tank-engine.js', location.href).href; }
+    catch { url = new URL('./games/tank-engine.js', parent.location.href).href; }
+  }
+  try { engine = await import(url); }
+  catch (error) {
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, 960, 580);
+    ctx.fillStyle = C.red; ctx.font = '600 13px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText('THE RULES FILE DID NOT LOAD', 480, 282);
+    ctx.fillStyle = C.dim; ctx.font = '12px ui-monospace, monospace';
+    ctx.fillText(String(error && error.message || error).slice(0, 80), 480, 306);
+    return;
+  }
+  modeEl.textContent = aiEnabled ? 'Two players' : 'Solo vs AI';
+  if (bridge) startOnline();
+  else { aiEnabled = true; freshMatch(); }
+  requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>

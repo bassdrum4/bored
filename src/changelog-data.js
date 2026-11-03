@@ -2,13 +2,19 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 243,
-  "newest": "2026-11-02",
+  "count": 249,
+  "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2b92f95","date":"2026-11-03","author":"bassdrum4","subject":"Rebuild Pastel Tanks around feel: instant play, live aim, paper box"},
+  {"sha":"684c88c","date":"2026-11-02","author":"PenguinV360","subject":"Update ashcrown.html"},
+  {"sha":"3b8f93e","date":"2026-11-02","author":"Daniel Lowe","subject":"update ashcrown?"},
+  {"sha":"435d8c2","date":"2026-11-02","author":"bassdrum4","subject":"Rework Pastel Tanks into the drivable box (rules v2)"},
+  {"sha":"cd22cf9","date":"2026-11-02","author":"Codebuff","subject":"Make Scrabble's easy computer easy and its grid even."},
+  {"sha":"8d6873a","date":"2026-11-02","author":"Codebuff","subject":"List games in the order they arrived and finish the preview set."},
   {"sha":"6fe3058","date":"2026-11-02","author":"Codebuff","subject":"Give Scrabble a real preview and retire its placeholder."},
   {"sha":"a8f3701","date":"2026-11-02","author":"Codebuff","subject":"Keep the library in the order its games arrived."},
   {"sha":"89d39f0","date":"2026-11-02","author":"Codebuff","subject":"Keep Scrabble's squares square once tiles land."},

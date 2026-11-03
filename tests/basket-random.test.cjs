@@ -33,8 +33,8 @@ test('basket random is a catalogued, local, unscored two-player game', async () 
   assert.equal(rules['basket-random'], undefined);
   assert.ok(!LB_GAMES.some(game => game.id === 'basket-random'));
   assert.ok(!CHALLENGES.some(game => game.slug === 'basket-random'));
-  assert.equal(PREVIEW_FALLBACKS['basket-random'], '.svg');
-  assert.ok(PREVIEWS['basket-random'].endsWith('/basket-random.svg'));
+  assert.equal(PREVIEW_FALLBACKS['basket-random'], undefined);
+  assert.ok(PREVIEWS['basket-random'].endsWith('/basket-random.webp'));
   assert.ok(fs.existsSync(new URL(PREVIEWS['basket-random'])));
   assert.match(fs.readFileSync(wrapperPath, 'utf8'), /<title>Basket Random<\/title>/);
 });
