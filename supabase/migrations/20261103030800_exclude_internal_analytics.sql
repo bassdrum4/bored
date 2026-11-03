@@ -1,25 +1,36 @@
--- Keep analytics administrators out of production event tables at the database
--- boundary, even if they use an old client, forge a request or bypass the
--- browser-side environment guard. RLS still allows ordinary anonymous guests
--- and signed-in non-admin players to record telemetry.
+-- Exclude authenticated analytics staff at the ingestion boundary. This
+-- migration is intentionally safe in the separate Bored Together test database,
+-- which has no analytics tables or analytics-admin helper.
 --
--- RESTRICTIVE policies combine with existing permissive ownership/append
--- policies. Keep read/admin access policies unchanged.
+-- A restrictive policy is ANDed with the existing permissive ownership policy.
+-- The old policy still permits ordinary anon visitors and non-admin accounts.
 begin;
+do $migration$
+begin
+  if to_regprocedure('public.is_analytics_admin()') is null then
+    return;
+  end if;
 
-drop policy if exists analytics_exclude_admin_insert on public.play_events;
-create policy analytics_exclude_admin_insert on public.play_events
-  as restrictive for insert to authenticated
-  with check (not (select public.is_analytics_admin()));
+  if to_regclass('public.play_events') is not null then
+    execute 'drop policy if exists analytics_exclude_admin_insert on public.play_events';
+    execute 'create policy analytics_exclude_admin_insert on public.play_events
+      as restrictive for insert to authenticated
+      with check (not (select public.is_analytics_admin()))';
+  end if;
 
-drop policy if exists analytics_exclude_admin_insert on public.product_events;
-create policy analytics_exclude_admin_insert on public.product_events
-  as restrictive for insert to authenticated
-  with check (not (select public.is_analytics_admin()));
+  if to_regclass('public.product_events') is not null then
+    execute 'drop policy if exists analytics_exclude_admin_insert on public.product_events';
+    execute 'create policy analytics_exclude_admin_insert on public.product_events
+      as restrictive for insert to authenticated
+      with check (not (select public.is_analytics_admin()))';
+  end if;
 
-drop policy if exists analytics_exclude_admin_insert on public.enjoyment_feedback;
-create policy analytics_exclude_admin_insert on public.enjoyment_feedback
-  as restrictive for insert to authenticated
-  with check (not (select public.is_analytics_admin()));
-
+  if to_regclass('public.enjoyment_feedback') is not null then
+    execute 'drop policy if exists analytics_exclude_admin_insert on public.enjoyment_feedback';
+    execute 'create policy analytics_exclude_admin_insert on public.enjoyment_feedback
+      as restrictive for insert to authenticated
+      with check (not (select public.is_analytics_admin()))';
+  end if;
+end
+$migration$;
 commit;
