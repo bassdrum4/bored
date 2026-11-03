@@ -229,6 +229,10 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   activeChallenge = challenge;
   const external = EXTERNS[slug];
   activeSlug = previousSlug = slug;
+  // Ordinary games have shareable URLs; multiplayer sessions remain private.
+  if (!multiplayer && location.hash !== '#' + slug) {
+    history.pushState(null, '', '#' + slug);
+  }
   const from = origin || document.activeElement;
   const launchSource = challenge ? 'daily' : from?.closest?.('#recent') ? 'recent' : from?.closest?.('#leaderboard') ? 'leaderboard' : from?.id === 'random' ? 'random' : from?.closest?.('#grid') ? 'library' : 'other';
   // F-14 now tracks its own genuine flight phases, actions, and mission
@@ -350,6 +354,10 @@ function closeGame({ force = false } = {}) {
   gameFrame.removeAttribute('src');
   gameFrame.srcdoc = '';
   activeSlug = null;
+  // Keep the URL aligned with the hub, including Escape and the Back button.
+  if (location.hash && ORDER.some(([id]) => '#' + id === location.hash)) {
+    history.replaceState(null, '', location.pathname + location.search);
+  }
   const together = activeTogether;
   activeTogether = null;
   if (together) together.dispose();
@@ -878,6 +886,22 @@ window.addEventListener('bored:identity', () => { if (activeTogether && !activeT
 initAccount();
 initFeedback();
 initVoice();
+
+// The hash is the game slug: /bored/#qbert. This also handles browser Back,
+// Forward, and links pasted into an already-open arcade tab.
+function syncGameFromHash() {
+  const slug = location.hash.slice(1);
+  const valid = ORDER.some(([id]) => id === slug);
+  if (valid) {
+    if (activeSlug !== slug) openGame(slug);
+  } else if (activeSlug && !activeTogether) {
+    closeGame();
+  }
+}
+addEventListener('hashchange', syncGameFromHash);
+addEventListener('popstate', syncGameFromHash);
+syncGameFromHash();
+
 const analyticsToggle = $('#analytics-enabled');
 const updateAnalyticsToggle = () => {
   analyticsToggle.checked = analytics.enabled();
