@@ -39,7 +39,8 @@ export function createAnnouncementsUI() {
   function render() {
     const now = Date.now();
     const visible = entries.filter(e => e.active && Date.parse(e.published_at) <= now &&
-      (!e.expires_at || Date.parse(e.expires_at) > now));
+      (!e.expires_at || Date.parse(e.expires_at) > now) &&
+      (e.audience === 'everyone' || (identity && (e.audience === 'registered' || e.recipient_id === identity))));
     const unread = visible.filter(e => !read(e));
     const count = $('announcement-count');
     count.hidden = !unread.length;
@@ -82,7 +83,7 @@ export function createAnnouncementsUI() {
     try {
       if (who && !(await freshSession())) throw Error('Session expired');
       const [messages, receipts] = await Promise.all([
-        request('/rest/v1/announcements?select=id,title,body,priority,link_url,active,created_at,published_at,expires_at&order=created_at.desc&limit=100',
+        request('/rest/v1/announcements?select=id,title,body,audience,recipient_id,priority,link_url,active,created_at,published_at,expires_at&order=created_at.desc&limit=100',
           { token: who ? undefined : ANON_TOKEN }),
         who ? request('/rest/v1/announcement_reads?select=announcement_id&limit=1000') : Promise.resolve([])
       ]);
