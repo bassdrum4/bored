@@ -171,7 +171,7 @@ function draft() {
   const seat = turnSeat(), a = aim[seat];
   let weapon = sel;
   if (weapon !== 'standard' && !(world.tanks[seat - 1].ammo[weapon] > 0)) { weapon = 'standard'; sel = 'standard'; }
-  return { seat, drive: Math.round(walk), angle: a.angle, power: charging() ? Math.round(charge * 10) / 10 : a.power, weapon };
+  return { seat, drive: Math.round(walk), angle: Math.round(a.angle), power: charging() ? Math.round(charge * 10) / 10 : Math.round(a.power * 10) / 10, weapon };
 }
 function charging() { return charge !== null; }
 let pressAt = 0;
@@ -565,7 +565,7 @@ function terrainCanvas() {
   strokeProfile(0, 0, IW);               // top boundary
   strokeProfile(1, 0, floorY(X1) - Y0);  // right boundary
   strokeProfile(3, Y1 - floorY(X0), IH); // left boundary
-  strokeProfile(2, 0, IW);               // raised, destructible ground
+  strokeProfile(2, 0, IW - 1);           // raised, destructible ground
   g.strokeStyle = C.hair;
   g.lineWidth = 1.5;
   g.beginPath();
