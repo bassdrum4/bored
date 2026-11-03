@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 263,
+  "count": 264,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"eb731ed","date":"2026-11-03","author":"Daniel Lowe","subject":"Fix Tank 2 rolling terrain, breakable walls and keyboard controls","pr":68},
   {"sha":"13dfb18","date":"2026-11-03","author":"bassdrum4","subject":"Make the box itself smooth destructible ground, not panels"},
   {"sha":"a10caa5","date":"2026-11-03","author":"Codebuff","subject":"Use Detroit calendar days for analytics date filters"},
   {"sha":"16344a3","date":"2026-11-03","author":"Codebuff","subject":"Rebuild Ashcrown's chrome around the map, and open up Trackbound's freeplay."},
