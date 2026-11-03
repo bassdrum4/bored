@@ -3370,29 +3370,81 @@
           "ENTER FREQUENCY TO BEGIN...";
         document.getElementById("freq-input").value = "";
       }
+      function riskReadSavedWar() {
+        try {
+          const data = JSON.parse(localStorage.getItem("bored.risk.autosave") || "null");
+          if (!data || !Array.isArray(data.players) || !data.players.length ||
+              !data.territories || Object.keys(data.territories).length < 40 ||
+              !["SETUP","REINFORCE","ATTACK","FORTIFY","GAME_OVER"].includes(data.phase)) return null;
+          return data;
+        } catch { return null; }
+      }
+      function riskUpdateIntro() {
+        const save = riskReadSavedWar();
+        const button = document.getElementById("risk-resume");
+        if (!button) return;
+        button.classList.toggle("hidden", !save || save.phase === "GAME_OVER");
+        if (save && save.phase !== "GAME_OVER") {
+          const you = save.players[0]?.name || "YOU", rivals = save.players.length - 1;
+          button.textContent = "CONTINUE " + you + " VS " + rivals + " CPU" + (rivals===1?"":"S");
+        }
+      }
       function startSinglePlayer() {
-        const name = document.getElementById("callsign-input").value.trim().toUpperCase() || "PLAYER";
-        myCallSign = name;
+        const raw = document.getElementById("callsign-input").value.trim().toUpperCase();
+        myCallSign = raw.replace(/[^A-Z0-9_-]/g,"").slice(0,10) || "YOU";
         isHost = true;
         myPlayerIndex = 0;
         currentGameId = null;
         state = createGameState();
         state.aiChatbotEnabled = false;
+        state.aiDifficulty = Math.max(1,Math.min(3,Number(document.getElementById("risk-difficulty").value)||2));
         state.players = [{
-          name, uid: "solo_human", alive: true, ready: false,
-          cards: [], stats: {}, isAI: false
+          name: myCallSign, uid:"solo_human", alive:true,ready:false,cards:[],stats:{},isAI:false
         }];
-        const count = Math.max(1, Math.min(5, Number(document.getElementById("bored-cpu-count")?.value || 3)));
-        for (let i = 0; i < count; i++) {
+        const count = Math.max(1,Math.min(5,Number(document.getElementById("bored-cpu-count").value)||3));
+        for (let i=0;i<count;i++) {
           state.players.push({
-            name: "CPU COMMANDER " + (i + 1), uid: "solo_ai_" + (i + 1),
-            alive: true, ready: true, cards: [], stats: {}, isAI: true
+            name:"CPU " + (i+1),uid:"solo_ai_"+(i+1),alive:true,ready:false,
+            cards:[],stats:{},isAI:true
           });
         }
-        showPage("difficulty-modal");
+        startGame();
+        if (!document.getElementById("risk-manual-setup").checked) {
+          for (let pid=0;pid<state.players.length;pid++) riskDistributeSetup(pid);
+          state.phase="REINFORCE";
+          state.turnIndex=0;
+          state.reserves=calculateReserves(0);
+          state.chat.push({name:"WAR REPORT",msg:"Your borders are ready. Reinforce, attack, then fortify."});
+          broadcastState();
+        } else {
+          state.chat.push({name:"WAR REPORT",msg:"Place starting armies or Auto-place, then press FINISH."});
+          broadcastState();
+        }
         requestAnimationFrame(drawLoop);
       }
-      
+      function riskAutoPlaceHuman() {
+        if (!isHost || myPlayerIndex!==0) return;
+        if (state.phase==="SETUP" && !state.players[0]?.ready) {
+          riskDistributeSetup(0);
+          broadcastState();
+        } else if (state.phase==="REINFORCE" && state.turnIndex===0 && state.reserves>0) {
+          saveHistory();
+          const options=Object.keys(state.territories).filter(n=>state.territories[n].owner===0);
+          let remaining=state.reserves;
+          while (remaining>0 && options.length) {
+            const best=options.map(n=>{
+              const enemy=(ADJ[n]||[]).filter(v=>state.territories[v]?.owner!==0);
+              const pressure=enemy.reduce((sum,v)=>sum+(state.territories[v]?.armies||0),0);
+              return {name:n,score:enemy.length*4+pressure-state.territories[n].armies*.5};
+            }).sort((a,b)=>b.score-a.score)[0];
+            state.territories[best.name].armies++;
+            remaining--;
+          }
+          state.reserves=remaining;
+          broadcastState();
+        }
+      }
+
       function openDifficultyModal() {
           showPage('difficulty-modal');
           setTimeout(() => {
@@ -3550,6 +3602,9 @@
         }
       }
       function loadFromLocal() {
+        isHost = true;
+        myPlayerIndex = 0;
+        currentGameId = null;
         try {
           const raw = localStorage.getItem("bored.risk.autosave");
           if (!raw) return systemAlert("NO LOCAL SAVE");
@@ -3575,6 +3630,8 @@
           state.historyStack = [];
           state.lastDice = { atk: [], def: [] };
           state._aiRunning = false;
+          state.aiChatbotEnabled = false;
+          myCallSign = state.players[0]?.name || "YOU";
           if (d.players) {
             d.players.forEach((p, i) => {
               if (state.players[i]) {
@@ -3585,6 +3642,7 @@
           }
           broadcastState();
           document.getElementById("overlay-layer").classList.add("hidden");
+          requestAnimationFrame(drawLoop);
           systemAlert("LOCAL SAVE LOADED", "success");
           if (state.players[state.turnIndex]?.isAI && state.phase !== "GAME_OVER")
             setTimeout(executeAITurn,250);
@@ -5350,7 +5408,7 @@
       }
 
       
-      function calculateReserves(pid) {
+      function calculateReserves(pid, consume = true) {
         let terrs = Object.values(state.territories).filter(
           (t) => t && t.owner === pid,
         );
@@ -5375,7 +5433,7 @@
             state.specialAbilities[pid].mobilize
           ) {
             base += state.specialAbilities[pid].mobilize;
-            state.specialAbilities[pid].mobilize = 0;
+            if (consume) state.specialAbilities[pid].mobilize = 0;
           }
         } catch (e) {}
         return base;
@@ -5835,6 +5893,21 @@
           }
         }
         document.getElementById("instruction-text").innerText = instr;
+        const help=document.getElementById("risk-turn-help");
+        const auto=document.getElementById("risk-auto-place");
+        const cpuTurn=state.players[state.turnIndex]?.isAI;
+        if (state.phase==="SETUP") help.textContent="Tap your territories to place starting armies, or choose Auto-place. Press FINISH to play.";
+        else if (cpuTurn) help.textContent="Computer commanders are taking their turns. Your turn is next.";
+        else if (state.phase==="REINFORCE") help.textContent="Tap a friendly territory to deploy armies, or choose Auto-place. Attack comes next.";
+        else if (state.phase==="ATTACK") help.textContent="Tap an army of 2+ then an adjacent enemy to roll dice. Repeat or end attacks.";
+        else if (state.phase==="FORTIFY") help.textContent="Optional: move armies between connected territories. Then end your turn.";
+        else help.textContent="Conquer every territory to win.";
+        const canAuto=myPlayerIndex===0 && isHost &&
+          ((state.phase==="SETUP" && state.setupPool?.[0]>0) ||
+          (state.phase==="REINFORCE" && state.turnIndex===0 && state.reserves>0));
+        auto.classList.toggle("hidden",!canAuto);
+        auto.textContent=state.phase==="SETUP"?"AUTO-PLACE STARTING ARMIES":"AUTO-PLACE REINFORCEMENTS";
+
         const sBody = document.getElementById("stats-body");
         sBody.innerHTML = state.players
           .map((p, i) => {
@@ -5845,7 +5918,7 @@
               .filter((t) => t && t.owner === i)
               .reduce((a, b) => a + b.armies, 0);
             const cards = p.cards ? p.cards.length : 0;
-            const income = calculateReserves(i);
+            const income = calculateReserves(i, false);
             return `
                 <div class="stats-row" style="${!p.alive ? "opacity:0.3" : ""}">
                     <span style="color:${P_COLORS[i]}" class="w-16 truncate">${p.name}</span>
@@ -6148,6 +6221,7 @@
         };
         reader.readAsText(file);
       }
+      window.addEventListener("DOMContentLoaded", riskUpdateIntro);
     </script>
     <script>
       // Ensure key functions are available on window for inline handlers
