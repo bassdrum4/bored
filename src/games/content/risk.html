@@ -5260,154 +5260,210 @@
           console.error("[SELFHEAL] selfHealPhaseIfNeeded failed:", e);
         }
       }
+      // Game board strategy. The CPU does not read hidden state or receive free
+      // armies; every decision uses the same territory, card and dice rules.
+      function riskContinentValue(pid, target) {
+        const loc = LOCS.find(l => l[2] === target);
+        if (!loc || !state.territories[target] || state.territories[target].owner === pid) return 0;
+        const group = LOCS.filter(l => l[3] === loc[3]).map(l => l[2]);
+        const held = group.filter(n => state.territories[n]?.owner === pid).length;
+        const missing = group.length - held;
+        if (!held) return .3;
+        const bonus = CONTINENTS[loc[3]]?.bonus || 0;
+        return bonus * (held / group.length) * 3 +
+          (missing === 1 ? bonus * 3 + 8 : 0);
+      }
+      function riskFrontAssessment(pid, name) {
+        const own = state.territories[name];
+        if (!own || own.owner !== pid) return -1e6;
+        const enemies = (ADJ[name] || []).filter(n => state.territories[n] && state.territories[n].owner !== pid);
+        if (!enemies.length) return -1e6;
+        const pressure = enemies.reduce((sum,n) => sum + state.territories[n].armies, 0);
+        const endangered = Math.max(0, pressure / enemies.length + 1 - own.armies);
+        let opportunity = -1e6;
+        for (const target of enemies) {
+          const opponent = state.territories[target];
+          const count = Object.values(state.territories).filter(t=>t.owner===opponent.owner).length;
+          const score = riskContinentValue(pid,target)*1.7 +
+            (count === 1 ? 15 : count <= 3 ? 5 : 0) +
+            9 - opponent.armies * 1.4 +
+            (opponent.armies === 1 ? 4 : 0);
+          opportunity = Math.max(opportunity,score);
+        }
+        // No point pouring 20 more troops into a front that already has 30.
+        const overstacked = Math.max(0,own.armies - pressure - 3);
+        return opportunity + Math.min(8, endangered * 1.7) +
+          Math.min(5, enemies.length * 1.3) - overstacked * 2.1;
+      }
+      function riskDistributeSetup(pid) {
+        const pool = Math.max(0, Number(state.setupPool?.[pid])||0);
+        if (!pool) { if (state.players[pid]) state.players[pid].ready=true; return; }
+        const owned = Object.keys(state.territories).filter(n=>state.territories[n].owner===pid);
+        if (!owned.length) return;
+        // Concentrate enough to launch a campaign but keep a secondary front.
+        const ranked = owned.map(n=>({n, score:riskFrontAssessment(pid,n)}))
+          .sort((a,b)=>b.score-a.score);
+        const first = ranked[0].n;
+        const second = ranked.length > 1 && ranked[1].score > -1e5 ? ranked[1].n : first;
+        const primary = Math.max(1, Math.round(pool * .66));
+        state.territories[first].armies += primary;
+        state.territories[second].armies += pool - primary;
+        state.setupPool[pid]=0;
+        state.players[pid].ready=true;
+      }
       function runAISetup() {
         if (!isHost || state.phase !== "SETUP") return;
-        if (state.players.some(p => !p.isAI && !p.ready)) return;
-        state.players.forEach((player, pid) => {
-          if (!player.isAI) return;
-          let pool = Math.max(0, state.setupPool[pid] || 0);
-          const owned = Object.keys(state.territories).filter(n => state.territories[n].owner === pid);
-          while (pool > 0 && owned.length) {
-            // Deploy towards contested borders rather than random interior positions.
-            const target = owned.map(n => {
-              const neighbors = (ADJ[n] || []).filter(v => state.territories[v]?.owner !== pid);
-              const pressure = neighbors.reduce((sum,v) => sum + (state.territories[v]?.armies || 0),0);
-              return {n,score:neighbors.length*8+pressure*1.3-state.territories[n].armies*.65+Math.random()*4};
-            }).sort((a,b) => b.score-a.score)[0].n;
-            state.territories[target].armies++;
-            pool--;
-          }
-          state.setupPool[pid] = pool;
-          player.ready = true;
-        });
+        if (state.players.some(p=>!p.isAI && !p.ready)) return;
+        state.players.forEach((p,i)=>{if(p.isAI) riskDistributeSetup(i)});
         broadcastState();
       }
-
-      // Local, deterministic rule-driven opponent. Harder modes take more risks,
-      // pursue continent bonuses, and consolidate armies at the real front.
+      function riskCpuChooseAttack(pid, difficulty) {
+        const ratio = difficulty === 1 ? 2.35 : difficulty === 3 ? 1.22 : 1.55;
+        let best = null;
+        const owned = Object.keys(state.territories).filter(n=>state.territories[n].owner===pid);
+        for (const from of owned) {
+          const source = state.territories[from];
+          if (source.armies < 3) continue;
+          const rivals = (ADJ[from] || []).filter(n=>state.territories[n] && state.territories[n].owner!==pid);
+          for (const to of rivals) {
+            const target = state.territories[to], available = source.armies-1;
+            const minimum = Math.max(2,Math.ceil(target.armies*ratio+(difficulty===1?1:0)));
+            if (available < minimum) continue;
+            const opponentCount = Object.values(state.territories).filter(t=>t.owner===target.owner).length;
+            const knockout = opponentCount===1 ? 20 : opponentCount<=3 ? 8 : 0;
+            const region = riskContinentValue(pid,to);
+            const advantage = available-target.armies;
+            // Prefer achievable conquests with territory bonuses. Evaluate again
+            // after each dice roll rather than rolling blindly until armies run out.
+            const score = region*2.2 + knockout +
+              (target.armies===1?5:0) +
+              advantage*1.35 - target.armies*1.2 +
+              (target.owner===0?2:0) -
+              Math.max(0, 4-available)*2;
+            if (!best || score>best.score) best={from,to,score};
+          }
+        }
+        return best;
+      }
+      function riskCpuChooseFortify(pid) {
+        const owned = Object.keys(state.territories).filter(n=>state.territories[n].owner===pid);
+        const frontier = owned.filter(n=>(ADJ[n]||[]).some(t=>state.territories[t]?.owner!==pid));
+        if (!frontier.length) return null;
+        // Any owned route is legal, not just immediately adjacent territories.
+        const targets=frontier.map(n=>({n,score:riskFrontAssessment(pid,n)}))
+          .sort((a,b)=>b.score-a.score);
+        let best=null;
+        for (const from of owned) {
+          const troops=state.territories[from].armies;
+          if (troops < 3) continue;
+          const enemies=(ADJ[from]||[]).filter(n=>state.territories[n]?.owner!==pid);
+          const defense=enemies.length
+            ? Math.max(1,Math.ceil(Math.max(...enemies.map(n=>state.territories[n].armies))*.8))
+            : 1;
+          const amount=troops-defense;
+          if (amount < 2) continue;
+          for (const target of targets) {
+            if (target.n===from || !isConnected(from,target.n,pid)) continue;
+            const sourcePriority=riskFrontAssessment(pid,from);
+            const margin=target.score-sourcePriority;
+            if (enemies.length && margin < 6) continue;
+            const score=amount*.5+margin;
+            if (!best || score>best.score) best={from,to:target.n,amount,score};
+          }
+        }
+        return best;
+      }
       function executeAITurn() {
         if (!isHost || state.phase === "GAME_OVER" || state._aiRunning) return;
-        const pid = state.turnIndex;
+        const pid=state.turnIndex;
         if (!state.players[pid]?.isAI) return;
-        state._aiRunning = true;
-        const diff = Math.max(1, Math.min(3, Number(state.aiDifficulty)||2));
-        const owned = () => Object.keys(state.territories).filter(n => state.territories[n].owner === pid);
-        const foes = n => (ADJ[n]||[]).filter(v => state.territories[v] && state.territories[v].owner !== pid);
-        const continentValue = n => {
-          const loc = LOCS.find(l=>l[2]===n);
-          if (!loc) return 0;
-          const group = LOCS.filter(l=>l[3]===loc[3]).map(l=>l[2]);
-          const already = group.filter(t=>state.territories[t]?.owner===pid).length;
-          const bonus = CONTINENTS[loc[3]]?.bonus || 0;
-          return (already / group.length) * bonus * 1.8 +
-            (already===group.length-1 ? bonus * 3 : 0);
-        };
-        const advance = (phase, ms) => {
-          broadcastState();
-          setTimeout(() => {
-            if (state.phase === "GAME_OVER" || state.turnIndex !== pid) {state._aiRunning=false;return;}
-            state.phase=phase;
-            state.historyStack=[];
+        const game=state, diff=Math.max(1,Math.min(3,Number(state.aiDifficulty)||2));
+        state._aiRunning=true;
+        const next=(delay,callback)=>{
+          setTimeout(()=>{
+            if(state!==game || state.turnIndex!==pid || state.phase==="GAME_OVER")return;
             state._aiRunning=false;
-            executeAITurn();
-          },ms);
+            callback();
+          },delay);
         };
-
-        if (state.phase === "REINFORCE") {
+        const report=(message)=>{
+          state.chat.push({name:"WAR REPORT",msg:message});
+          if(state.chat.length>100) state.chat=state.chat.slice(-100);
+        };
+        if (state.phase==="REINFORCE") {
           if (hasValidSet(state.players[pid].cards || [])) processTrade(pid);
-          let pool=Math.max(0,state.reserves);
-          while (pool > 0) {
-            const candidates=owned();
-            if (!candidates.length) break;
-            let best=null;
-            for (const n of candidates) {
-              const enemies=foes(n);
-              const t=state.territories[n];
-              const bestTarget=enemies.map(v => {
-                const enemy=state.territories[v];
-                return 5 + continentValue(v) +
-                  (t.armies>enemy.armies ? 7 : 0) -
-                  enemy.armies*1.4;
-              }).reduce((m,v)=>Math.max(m,v),0);
-              const enemyPressure=enemies.reduce((a,v)=>a+state.territories[v].armies,0);
-              const score=bestTarget+enemies.length*2.5+enemyPressure*.8-t.armies*.3+Math.random()*1.5;
-              if (!best || score>best.score) best={n,score};
-            }
-            state.territories[best.n].armies++;
-            pool--;
+          const pool=Math.max(0,state.reserves);
+          const fronts=Object.keys(state.territories)
+            .filter(n=>state.territories[n].owner===pid)
+            .map(n=>({n,score:riskFrontAssessment(pid,n)}))
+            .filter(c=>c.score>-1e5).sort((a,b)=>b.score-a.score);
+          if(fronts.length && pool>0) {
+            const focus=fronts[0].n;
+            const secondary=fronts.find(c=>c.n!==focus && c.score > fronts[0].score-12)?.n || focus;
+            const heavy=diff===1?.55:diff===2?.76:.86;
+            const first=Math.max(1,Math.round(pool*heavy));
+            state.territories[focus].armies+=first;
+            state.territories[secondary].armies+=pool-first;
+            report(state.players[pid].name+" reinforced "+focus+".");
+          } else if (pool>0) {
+            const fallback=Object.keys(state.territories).find(n=>state.territories[n].owner===pid);
+            if(fallback)state.territories[fallback].armies+=pool;
           }
-          state.reserves=pool;
-          advance("ATTACK",230);
+          state.reserves=0;
+          broadcastState();
+          next(210,()=>{
+            state.phase="ATTACK";
+            state._cpuCombatRemaining=diff===1?8:diff===2?38:65;
+            executeAITurn();
+          });
           return;
         }
-        if (state.phase === "ATTACK") {
-          const budget = diff===1 ? 6 : diff===2 ? 18 : 32;
-          const edge = diff===1 ? 2.7 : diff===2 ? 1.65 : 1.18;
-          let gained=false;
-          for(let turn=0;turn<budget && state.phase==="ATTACK";turn++) {
-            let best=null;
-            for(const from of owned()) {
-              const src=state.territories[from];
-              if(src.armies<2)continue;
-              for(const to of foes(from)) {
-                const target=state.territories[to];
-                if(!target || src.armies-1 < Math.max(2,target.armies*edge))continue;
-                const possibleKnockout=Object.values(state.territories).filter(t=>t.owner===target.owner).length===1;
-                const score=(src.armies-1-target.armies)*1.35+continentValue(to)*1.8 +
-                  (possibleKnockout?16:0)+(target.armies===1?3:0) -
-                  (foes(from).length>1 ? 1 : 0)+Math.random()*1.5;
-                if(!best || score>best.score)best={from,to,score};
-              }
+        if (state.phase==="ATTACK") {
+          if(!Number.isInteger(state._cpuCombatRemaining))state._cpuCombatRemaining=diff===1?8:diff===2?38:65;
+          // A few dice rolls per paint, so wars visibly progress but CPU turns
+          // don't lock up the browser for seconds with a tight synchronous loop.
+          let rounds=0;
+          while(rounds<4 && state._cpuCombatRemaining>0 && state.phase==="ATTACK") {
+            const attack=riskCpuChooseAttack(pid,diff);
+            if(!attack) {state._cpuCombatRemaining=0;break;}
+            const before=state.territories[attack.to].owner;
+            state.selected=attack.from;
+            resolveCombat(attack.from,attack.to);
+            rounds++;
+            state._cpuCombatRemaining--;
+            if(state.territories[attack.to].owner===pid && before!==pid) {
+              report(state.players[pid].name+" captured "+attack.to+" from "+state.players[before].name+".");
             }
-            if(!best)break;
-            const before=state.territories[best.to].owner;
-            state.selected=best.from;
-            resolveCombat(best.from,best.to);
-            if(state.territories[best.to].owner===pid && before!==pid)gained=true;
-            if(state.phase==="GAME_OVER")break;
           }
           state.selected=null;
-          state._aiRunning=false;
-          if(state.phase==="GAME_OVER"){broadcastState();return;}
-          if(gained || state.conqueredThisTurn) awardCard(pid);
-          state.phase="FORTIFY";
-          state.historyStack=[];
           broadcastState();
-          setTimeout(executeAITurn,350);
+          if(state.phase==="GAME_OVER"){state._aiRunning=false;return;}
+          if(state._cpuCombatRemaining>0) {
+            next(110,executeAITurn);
+          } else {
+            if(state.conqueredThisTurn)awardCard(pid);
+            state._cpuCombatRemaining=null;
+            state.phase="FORTIFY";
+            broadcastState();
+            next(250,executeAITurn);
+          }
           return;
         }
-        if (state.phase === "FORTIFY") {
-          const territories=owned();
-          const frontier=territories.filter(n=>foes(n).length>0);
-          const rear=territories.filter(n=>foes(n).length===0 && state.territories[n].armies>1)
-            .sort((a,b)=>state.territories[b].armies-state.territories[a].armies);
-          if(frontier.length && rear.length) {
-            for(const from of rear) {
-              const choices=frontier.filter(to=>isConnected(from,to,pid));
-              if(!choices.length)continue;
-              choices.sort((a,b)=>{
-                const pressure=n=>foes(n).reduce((sum,v)=>sum+state.territories[v].armies,0);
-                return (pressure(b)-state.territories[b].armies) -
-                       (pressure(a)-state.territories[a].armies);
-              });
-              const to=choices[0],move=Math.max(1,state.territories[from].armies-1);
-              state.territories[from].armies-=move;
-              state.territories[to].armies+=move;
-              state.fortified=true;
-              break;
-            }
+        if (state.phase==="FORTIFY") {
+          const move=riskCpuChooseFortify(pid);
+          if(move) {
+            state.territories[move.from].armies-=move.amount;
+            state.territories[move.to].armies+=move.amount;
+            state.fortified=true;
+            report(state.players[pid].name+" moved "+move.amount+" troops to "+move.to+".");
           }
           broadcastState();
-          setTimeout(()=>{
-            state._aiRunning=false;
-            if(state.phase!=="GAME_OVER" && state.turnIndex===pid)endTurn();
-          },260);
+          next(270,()=>endTurn());
           return;
         }
         state._aiRunning=false;
       }
 
-      
       function calculateReserves(pid, consume = true) {
         let terrs = Object.values(state.territories).filter(
           (t) => t && t.owner === pid,
