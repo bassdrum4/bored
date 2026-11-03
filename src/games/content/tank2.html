@@ -515,11 +515,9 @@ function step(dt) {
 
 /* ── Painting ───────────────────────────────────────────────────────────── */
 
-/* The ground is one continuous thing: four wall profiles between the box's
- * outer edge and the surface each shell has dug into it, plus the blocks in the
- * room. It is painted once into its own layer and blitted each frame, rebuilt
- * only when a shot changes it — which also keeps a dug bowl perfectly smooth at
- * any frame rate. */
+/* The floor is raised, gently uneven ground. The top and sides are separate
+ * damageable outlines, not a road that the tanks can drive along. Both are
+ * painted using the same depth profiles as the collision engine. */
 function terrainCanvas() {
   if (!world) return null;
   const key = world.seed + '|' + world.shotCount + '|' + world.blockHoles.length;
@@ -528,45 +526,52 @@ function terrainCanvas() {
   cv.width = 960; cv.height = 580;
   const g = cv.getContext('2d');
   g.clearRect(0, 0, 960, 580);
-  const BX = engine.BX, BY = engine.BY, BW = engine.BW, BH = engine.BH, T = engine.T;
-  const IW = engine.IW, IH = engine.IH, X0 = BX + T, X1 = BX + BW - T, Y0 = BY + T, Y1 = BY + BH - T;
-  const OFFS = [0, IW, IW + IH, IW + IH + IW];
-  const surf = (wall, i) => {
-    const p = engine.ringPoint(OFFS[wall] + i);
-    const d = engine.depthAt(world, wall, p.along);
-    return { x: p.x - p.nx * d, y: p.y - p.ny * d };
-  };
-  // one closed surface loop; the ground is the box's outer rectangle minus it,
-  // which keeps the corners solid and lets a bowl bite the edge anywhere
-  const inner = [];
-  for (let i = 0; i <= IW; i += 2) inner.push(surf(0, i));
-  for (let i = 2; i <= IH; i += 2) inner.push(surf(1, i));
-  for (let i = 2; i <= IW; i += 2) inner.push(surf(2, i));
-  for (let i = 2; i <= IH; i += 2) inner.push(surf(3, i));
-  const GROUND = '#dcd4c0';
-  g.fillStyle = GROUND;
+  const BX = engine.BX, BY = engine.BY, BW = engine.BW, BH = engine.BH;
+  const X0 = BX + engine.T, X1 = BX + BW - engine.T;
+  const Y0 = BY + engine.T, Y1 = BY + BH - engine.T;
+  const IW = engine.IW, IH = engine.IH, T = engine.T;
+  const offsets = [0, IW, IW + IH, IW + IH + IW];
+  const floorY = x => Y1 + engine.depthAt(world, 2, X1 - x);
+
+  // Solid earth is drawn below the actual terrain surface. A breach reaches
+  // the bottom and removes the strip of terrain at that x.
+  g.fillStyle = '#dcd4c0';
   g.beginPath();
-  g.rect(BX, BY, BW, BH);
-  g.moveTo(inner[0].x, inner[0].y);
-  for (let i = 1; i < inner.length; i++) g.lineTo(inner[i].x, inner[i].y);
+  g.moveTo(X0, Y1 + T);
+  g.lineTo(X0, floorY(X0));
+  for (let x = X0 + 2; x < X1; x += 2) g.lineTo(x, floorY(x));
+  g.lineTo(X1, floorY(X1));
+  g.lineTo(X1, Y1 + T);
   g.closePath();
-  g.fill('evenodd');
-  for (const b of world.blocks) g.fillRect(b.x, b.y, b.w, b.h);
-  // the box's own edge is ink; the ground inside it is paper with a hairline
-  g.strokeStyle = C.ink; g.lineWidth = 1;
-  g.strokeRect(BX + .5, BY + .5, BW - 1, BH - 1);
-  g.strokeStyle = C.ink; g.lineWidth = 1;
-  for (const b of world.blocks) g.strokeRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1);
+  g.fill();
+
+  g.strokeStyle = C.ink;
+  g.lineWidth = 3;
+  g.lineJoin = 'round';
+  g.lineCap = 'round';
+  const strokeProfile = (wall, first, last) => {
+    g.beginPath();
+    let begun = false;
+    for (let i = Math.ceil(first); i <= Math.floor(last); i += 2) {
+      const p = engine.ringPoint(offsets[wall] + i);
+      const d = engine.depthAt(world, wall, p.along);
+      if (d >= T - 1) { begun = false; continue; }
+      const x = p.x - p.nx * d, y = p.y - p.ny * d;
+      if (!begun) { g.moveTo(x, y); begun = true; }
+      else g.lineTo(x, y);
+    }
+    g.stroke();
+  };
+  strokeProfile(0, 0, IW);               // top boundary
+  strokeProfile(1, 0, floorY(X1) - Y0);  // right boundary
+  strokeProfile(3, Y1 - floorY(X0), IH); // left boundary
+  strokeProfile(2, 0, IW);               // raised, destructible ground
+  g.strokeStyle = C.hair;
+  g.lineWidth = 1.5;
   g.beginPath();
-  g.moveTo(inner[0].x, inner[0].y);
-  for (let i = 1; i < inner.length; i++) g.lineTo(inner[i].x, inner[i].y);
-  g.closePath(); g.stroke();
-  // a block loses its middle where shells went through
-  g.globalCompositeOperation = 'destination-out';
-  for (const c of world.blockHoles) { g.beginPath(); g.arc(c.x, c.y, c.r, 0, Math.PI * 2); g.fill(); }
-  g.globalCompositeOperation = 'source-atop';
-  for (const c of world.blockHoles) { g.beginPath(); g.arc(c.x, c.y, c.r, 0, Math.PI * 2); g.stroke(); }
-  g.globalCompositeOperation = 'source-over';
+  g.moveTo(X0, Y1 + T);
+  g.lineTo(X1, Y1 + T);
+  g.stroke();
   terrainLayer = { key, canvas: cv };
   return cv;
 }
