@@ -490,8 +490,10 @@ canvas.addEventListener('pointerdown', e => {
 canvas.addEventListener('pointerup', e => {
   if (!live() || !pointer) return;
   aimAt(at(e));
+  pointer = null; // returning to keyboard control must not leave drag aiming armed
   tapFire();
 });
+canvas.addEventListener('pointercancel', () => { pointer = null; });
 canvas.addEventListener('pointerleave', () => { pointer = null; });
 
 for (const [key] of ARMS) {
