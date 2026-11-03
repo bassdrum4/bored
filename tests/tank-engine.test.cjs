@@ -187,7 +187,7 @@ test('a direct hit soaks damage in and digs the ground behind the hull', async (
   assert.equal(result.world.winner, null);
 });
 
-test('repeated impacts tunnel through the floor without breaking the box wall', async () => {
+test('repeated impacts tunnel through soil and can also break the exposed bottom wall', async () => {
   const { opening, replay, carveAt, floorDepthAt, floorBreached, depthAt, supported, ringPoint, tankSurface, CARVE, BITE, solidAt } = await engine();
   const world = replay(opening(4242)), tank = world.tanks[0], spot = ringPoint(tank.s);
   const initial = floorDepthAt(world, spot.along), surface = tankSurface(world, tank);
@@ -196,6 +196,7 @@ test('repeated impacts tunnel through the floor without breaking the box wall', 
   assert.ok(floorDepthAt(world, spot.along) > initial, 'shell digs a bowl');
   assert.ok(tankSurface(world, tank).y > surface.y, 'tank sinks into its crater');
   assert.equal(supported(world, tank), true);
+  assert.equal(depthAt(world, 2, spot.along), 0, 'early craters leave the separate bottom wall intact');
   for (let i = 0; i < 10; i++) {
     const crater = tankSurface(world, tank);
     carveAt(world, crater.x, crater.y, CARVE.standard, BITE.standard);
@@ -203,8 +204,8 @@ test('repeated impacts tunnel through the floor without breaking the box wall', 
   assert.equal(floorBreached(world, spot.along), true, 'dirt is completely punctured');
   assert.equal(supported(world, tank), false, 'tank loses footing');
   assert.equal(solidAt(world, surface.x, surface.y + 20), null, 'soil hole is truly open');
-  assert.equal(depthAt(world, 2, spot.along), 0, 'the box bottom still blocks escape');
-  assert.equal(solidAt(world, surface.x, ringPoint(tank.s).y).kind, 'wall');
+  assert.ok(depthAt(world, 2, spot.along) > 0, 'once soil is thin, later blasts reach the bottom wall too');
+  assert.equal(solidAt(world, surface.x, ringPoint(tank.s).y), null, 'the fully broken bottom exposes the void');
 });
 
 test('one perimeter line dents and eventually opens into empty space', async () => {
