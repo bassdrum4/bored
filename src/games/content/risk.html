@@ -893,6 +893,43 @@
         display: none;
       }
     </style>
+    <style id="bored-risk-responsive">
+      /* Canvas uses 1000×750 world coordinates; CSS scales it independently. */
+      #worldCanvas {
+        display: block;
+        width: min(100%, calc((100dvh - 90px) * 4 / 3)) !important;
+        height: auto !important;
+        max-height: calc(100dvh - 90px);
+        aspect-ratio: 4 / 3;
+        object-fit: contain;
+        touch-action: manipulation;
+      }
+      .map-container { min-width: 0; padding: 3px; }
+      #diag-panel, #chat-input { display: none !important; }
+      #login-panel { width: min(400px, 94vw) !important; max-height: 90dvh; overflow-y: auto; }
+      @media (max-width: 920px) {
+        body { height: auto !important; min-height: 100dvh; overflow-y: auto !important; }
+        body > .flex-1.flex.overflow-hidden.flex-row-reverse {
+          flex-direction: column !important; overflow: visible !important; flex: none !important;
+        }
+        main.map-container { flex: none !important; height: auto !important; min-height: 280px; }
+        #worldCanvas { width: min(100%, 730px) !important; max-height: none; margin: auto; }
+        aside.w-80 {
+          width: 100% !important; padding: 8px !important;
+          display: grid !important; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 8px; flex: none !important;
+        }
+        aside.w-80 > * { min-width: 0; }
+        header { flex-wrap: wrap; gap: 8px; }
+      }
+      @media (max-width: 520px) {
+        aside.w-80 { grid-template-columns: 1fr; }
+        header .flex { flex-wrap: wrap; }
+        #active-player-name { font-size: 16px; }
+        #tooltip { width: min(230px, 65vw); }
+        .map-container { min-height: 240px !important; }
+      }
+    </style>
   </head>
   <body class="p-2 h-screen flex flex-col">
     <div id="custom-alert">SYSTEM ERROR</div>
@@ -1432,41 +1469,16 @@
       </div>
       <div class="flex gap-4 items-center">
         <button
-          onclick="exportSave()"
+          onclick="saveToLocal()"
           class="cyber-button px-3 py-1 text-xs border-green-500 text-green-400"
         >
           SAVE
         </button>
-        <button
-          onclick="saveToAccountPrompt()"
-          class="cyber-button px-3 py-1 text-xs border-blue-500 text-blue-300"
-        >
-          SAVE → ACCOUNT
-        </button>
-        <button
-          onclick="saveAndPassPrompt()"
-          class="cyber-button px-3 py-1 text-xs border-yellow-500 text-yellow-400"
-        >
-          SAVE & PASS
-        </button>
-        <button
-          onclick="openAccountModal()"
-          class="cyber-button px-3 py-1 text-xs border-blue-500 text-blue-300"
-        >
-          ACCOUNT
-        </button>
-        <button
-          onclick="showSavesModal()"
-          class="cyber-button px-3 py-1 text-xs border-cyan-500 text-cyan-300"
-        >
-          MY SAVES
-        </button>
-        <button
-          onclick="logoutAccount()"
-          class="cyber-button px-3 py-1 text-xs border-red-500 text-red-400"
-        >
-          LOGOUT
-        </button>
+        
+        
+        
+        
+        
         <div id="my-identity" class="text-sm font-bold">SPECTATOR</div>
       </div>
     </header>
@@ -1592,7 +1604,7 @@
         </div>
         <div class="cyber-panel p-2 h-64 flex flex-col overflow-hidden">
           <div class="text-xs text-cyan-600 border-b border-cyan-900 mb-1">
-            SECURE COMMS
+            WAR REPORTS
           </div>
           <div
             id="chat-history"
@@ -5588,12 +5600,12 @@
           console.error("drawLoop error", e);
         }
       }
-      canvas.addEventListener("mousedown", (e) => {
+      canvas.addEventListener("pointerdown", (e) => {
         if (state.phase === "LOBBY" || state.phase === "GAME_OVER") return;
         // Prevent clicks during AI turn
         if (
           state.players[state.turnIndex] &&
-          state.players[state.turnIndex].name === "AI COMMANDER"
+          state.players[state.turnIndex].isAI
         )
           return;
         const rect = canvas.getBoundingClientRect();
