@@ -132,7 +132,7 @@ export function loadGameDocument(slug) {
 export const TOGETHER_GAMES = Object.freeze({
   'connect-four': Object.freeze({ name: 'Connect Four', rulesVersion: 1, mode: 'turns', preview: 'connect-four', blurb: 'Seven columns. One good rivalry.' }),
   '8ball': Object.freeze({ name: '8 Ball Pool', rulesVersion: 1, mode: 'turns', preview: '8ball', blurb: 'Clear your group. Finish on the eight.' }),
-  tank2: Object.freeze({ name: 'Pastel Tanks', rulesVersion: 2, mode: 'turns', preview: 'tank2', blurb: 'One shot each inside a drivable box. Blast the sides out.' }),
+  tank2: Object.freeze({ name: 'Pastel Tanks', rulesVersion: 2, mode: 'turns', preview: 'tank2', blurb: 'One shot each across rolling ground. Carve the terrain and walls.' }),
   '2048': Object.freeze({ name: '2048', rulesVersion: 1, mode: 'duel', metric: 'score', unit: 'points', preview: '2048', blurb: 'Same board. Higher score wins.' }),
   mahjong: Object.freeze({ name: 'Mahjong', rulesVersion: 1, mode: 'duel', metric: 'pairs', unit: 'pairs', preview: 'mahjong', blurb: 'Same deal. Clear more pairs.' })
 });
