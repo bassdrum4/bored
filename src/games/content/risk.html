@@ -5432,6 +5432,23 @@
             rounds++;
             state._cpuCombatRemaining--;
             if(state.territories[attack.to].owner===pid && before!==pid) {
+              // A conquest is not a dead-end: Risk permits moving additional
+              // troops forward after the minimum dice move. Preserve a source
+              // garrison when other enemies still border it; push the rest
+              // toward enemies adjacent to the newly captured territory.
+              const source=state.territories[attack.from], captured=state.territories[attack.to];
+              const nextEnemies=(ADJ[attack.to]||[]).filter(n=>state.territories[n]?.owner!==pid);
+              const oldEnemies=(ADJ[attack.from]||[]).filter(n=>state.territories[n]?.owner!==pid);
+              if(nextEnemies.length && source.armies>2) {
+                const biggest=oldEnemies.reduce((m,n)=>Math.max(m,state.territories[n].armies),0);
+                const garrison=Math.max(1,Math.ceil(biggest*(diff===3?.8:1.0)));
+                const available=Math.max(0,source.armies-garrison);
+                const move=Math.min(available,Math.floor(available*(diff===1?.4:diff===2?.65:.82)));
+                if(move>0) {
+                  source.armies-=move;
+                  captured.armies+=move;
+                }
+              }
               report(state.players[pid].name+" captured "+attack.to+" from "+state.players[before].name+".");
             }
           }
