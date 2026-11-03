@@ -306,6 +306,6 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.click('#account-action');
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('guest'));
   assert.equal(await page.evaluate(() => localStorage.getItem('bored.session')), null);
-  assert.ok(activity.some(e => e.user_id === 'test-user' && e.game === 'lights-out'), 'signed-in telemetry uses the current account');
+  assert.equal(activity.length, 0, 'local CI must never record account gameplay telemetry');
   assert.deepEqual(unexpected, []);
 });
