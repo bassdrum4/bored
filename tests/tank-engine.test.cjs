@@ -200,7 +200,10 @@ test('craters lower a tank smoothly and repeated blasts can open a hole', async 
   assert.ok(first > initial && first < T, 'one shell creates a depression, not a hole');
   assert.ok(tankSurface(world, tank).y > surface.y, 'the tread moves down with the ground');
   assert.equal(supported(world, tank), true);
-  for (let i = 0; i < 9; i++) carveAt(world, surface.x, surface.y, CARVE.standard, BITE.standard);
+  for (let i = 0; i < 9; i++) {
+    const crater = tankSurface(world, tank);
+    carveAt(world, crater.x, crater.y, CARVE.standard, BITE.standard);
+  }
   assert.equal(breached(world, spot.wall, spot.along), true);
   assert.equal(supported(world, tank), false);
   assert.equal(solidAt(world, surface.x, surface.y + 20), null, 'a breach is a real opening');
