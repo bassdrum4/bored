@@ -84,7 +84,7 @@ export const CHALLENGES = [
   { slug: 'commanders', label: 'Fleet commander', goal: 'Clear {target} enemy waves in one run.', metric: 'waves', targets: [3, 5, 7], unit: 'waves cleared' },
   { slug: 'lava', label: 'The floor is yours', goal: 'Score {target} points as P1 against the CPU in one match.', metric: 'points', targets: [3, 4, 5], rule: 'cpu', unit: 'points' },
   { slug: 'volletball', label: 'Above the net', goal: 'Score {target} points as the left player against the CPU in one match.', metric: 'points', targets: [5, 7, 10], rule: 'cpu', unit: 'points' },
-  { slug: 'tank2', label: 'Ballistic victory', goal: 'Win a match as Lavender against Mint (AI).', metric: 'won', targets: [1, 1, 1], rule: 'cpu', unit: 'AI wins' },
+  { slug: 'tank2', label: 'Ballistic victory', goal: 'Win a match as Red against Green (AI).', metric: 'won', targets: [1, 1, 1], rule: 'cpu', unit: 'AI wins' },
   { slug: 'gun-mayhem', label: 'Last one standing', goal: 'Win {target} rounds as P1 in one-player mode against the CPU.', metric: 'wins', targets: [1, 2, 3], rule: 'cpu', unit: 'rounds won' },
   { slug: 'shadow-net', label: 'Data extraction', goal: 'Download {target} files from remote servers in one session.', metric: 'files', targets: [3, 4, 5], unit: 'files downloaded' },
   { slug: 'sand', label: 'Tiny world architect', goal: 'Keep {target} occupied cells and at least four different materials together.', metric: 'cells', targets: [250, 500, 750], rule: 'sand', unit: 'occupied cells' },
