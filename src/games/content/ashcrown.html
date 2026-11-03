@@ -47,7 +47,8 @@
   button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer }
   button:disabled { cursor: default; color: var(--ink-3) }
   button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px }
-  select, input[type="text"] {
+  input[type="number"] { width: 72px; font-variant-numeric: tabular-nums }
+  select, input[type="text"], input[type="number"] {
     font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--rule);
     border-radius: 3px; padding: 5px 7px; min-width: 0;
   }
@@ -160,38 +161,9 @@
   .table-wrap { overflow-x: auto }
 
   /* ── tech tree and civs ──────────────────────────────────────────────── */
-  .ttree-wrap { overflow: auto; padding-bottom: 4px }
-  .ttree { position: relative; transform-origin: 0 0 }
-  .tedges { position: absolute; left: 0; top: 0; pointer-events: none }
-  .tedges path { fill: none; stroke: var(--rule-2); stroke-width: 1 }
-  .tedges path.on { stroke: var(--moss); stroke-width: 1.5 }
-  .thub {
-    position: absolute; width: 132px; height: 132px; margin: -66px 0 0 -66px;
-    border: 1px dashed var(--rule); border-radius: 50%; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 1px; padding: 0 12px; text-align: center;
-  }
-  .thub .thk { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3) }
-  .thub strong { font-family: var(--font-display); font-size: 13px; font-weight: 600; line-height: 1.15 }
-  .thub .thv { font-family: var(--font-data); font-size: 10.5px; color: var(--ink-2) }
-  .tnode {
-    position: absolute; width: 96px; padding: 0; border: 0; background: none; display: flex;
-    flex-direction: column; align-items: center; gap: 2px; text-align: center; cursor: pointer;
-  }
-  .tnode:disabled { cursor: default }
-  .tcircle {
-    width: 72px; height: 72px; border-radius: 50%; border: 1px solid var(--rule); background: var(--panel);
-    display: grid; place-items: center; font-family: var(--font-data); font-size: 12px;
-    letter-spacing: .04em; color: var(--ink-2);
-  }
-  .tname { font-family: var(--font-display); font-size: 11.5px; font-weight: 600; line-height: 1.15 }
-  .tcost { font-family: var(--font-data); font-size: 9.5px; color: var(--ink-3) }
-  .tnode.known .tcircle { background: var(--paper-2); border-color: var(--rule-2) }
-  .tnode.known .tname::after { content: " \2713"; color: var(--moss) }
-  .tnode.ready .tcircle { border-color: var(--ink-3) }
-  .tnode.ready:hover .tcircle, .tnode.ready:focus-visible .tcircle { border-color: var(--ink); background: var(--panel-hi) }
-  .tnode.cur .tcircle { border-color: var(--ink); box-shadow: inset 0 0 0 3px var(--moss) }
-  .tnode.locked { opacity: .55 }
-  .tech-future { max-width: 360px }
+  .tech-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+  .tech-col { display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+  .tech-col h3 { margin: 0 0 2px !important }
   .tech {
     display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%;
     border: 1px solid var(--rule); border-radius: 3px; padding: 6px 8px; background: var(--panel);
@@ -273,6 +245,28 @@
   .sc-soft { fill: none; stroke: rgba(36,28,18,.2); stroke-width: 1 }
   .unit.spent { opacity: .55 }
 
+  /* ── coach: the tutorial and tips, one line at a time (from Ashcrown) ── */
+  #coach {
+    position: absolute; left: 14px; bottom: 14px; width: min(440px, calc(100% - 72px)); z-index: 6;
+    background: var(--panel); border: 1px solid var(--ink); border-radius: 4px; padding: 10px 13px 12px;
+    box-shadow: 0 8px 22px rgba(36,28,18,.16);
+  }
+  #coach .ttl {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    font: 10px/1 var(--font-data); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+  }
+  #coach p { font-size: 13px; line-height: 1.5; margin-top: 6px; font-family: var(--font-display) }
+  #coach .row { display: flex; align-items: center; gap: 6px; margin-top: 9px; flex-wrap: wrap }
+  #coach .row .act { font-size: 12px; padding: 5px 9px }
+  #coach .skip { font-size: 11px; color: var(--ink-3); text-decoration: underline; margin-left: auto }
+  #coach .skip:hover { color: var(--ink) }
+  .coach-target { outline: 2px solid var(--rust) !important; outline-offset: 2px; background: #f7e7d8 !important }
+  .coach-ring { fill: none; stroke: var(--rust); stroke-width: 2.4; stroke-dasharray: 5 4; pointer-events: none }
+  .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); cursor: pointer }
+  .check input { width: 15px; height: 15px; accent-color: var(--rust) }
+  .switches { gap: 18px; margin-top: 2px }
+  .act.switch b { font-family: var(--font-data); font-weight: 500; margin-left: auto; color: var(--ink-3) }
+
   #toast {
     position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
     background: var(--ink); color: var(--paper); font-size: 12.5px; padding: 7px 13px;
@@ -296,92 +290,15 @@
     #bar { padding: 0 6px }
     .seat { grid-template-columns: 14px minmax(0, 1fr) 92px }
     .seat select.civ { grid-column: 2 / -1; grid-row: 2 }
-    .civ-list { grid-template-columns: minmax(0, 1fr) }
+    .tech-grid, .civ-list { grid-template-columns: minmax(0, 1fr) }
   }
   @media (max-width: 460px) {
     #turn-readout { display: none }
     .bar-right { gap: 4px }
     #btn-tech kbd { display: none }
+    #coach { left: 8px; right: 48px; bottom: 8px; width: auto; padding: 8px 10px 9px }
+    #coach p { font-size: 12.5px; margin-top: 4px }
   }
-
-  /* ── chrome: map-first stage, instrument bar, bottom dock ──────────────── */
-  #shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr) auto }
-
-  #dock {
-    border-top: 1px solid var(--rule); background: var(--panel); display: grid;
-    grid-template-columns: minmax(0, 1fr) 264px; max-height: 46vh; min-height: 0;
-  }
-
-  #side-scroll { overflow-y: auto; padding: 9px 12px 12px; min-height: 0 }
-
-  #log-wrap { border-left: 1px solid var(--rule); background: var(--log-bg); display: flex; flex-direction: column; min-height: 0 }
-
-  .log-head {
-    display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px 4px;
-    font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
-  }
-
-  #log { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 10px }
-
-  .log-row {
-    display: grid; grid-template-columns: 8px 17px minmax(0, 1fr); gap: 5px; align-items: baseline;
-    padding: 3px 0; font-size: 11px; line-height: 1.4; color: var(--ink-2); border-bottom: 1px dotted var(--rule-2);
-  }
-
-  .log-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--rule); align-self: center }
-
-  .log-turn { font-family: var(--font-data); font-size: 9.5px; color: var(--ink-3) }
-
-  .dock-body { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: flex-start }
-
-  .dock-col { min-width: 0; flex: 1 1 210px }
-
-  .dock-label {
-    font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
-    margin-bottom: 5px; display: flex; align-items: center; gap: 5px;
-  }
-
-  .dock-empty { font-size: 11.5px; color: var(--ink-3); padding: 2px 0 6px; max-width: 42ch }
-
-  .ring { display: block; overflow: visible }
-
-  .ring-track { fill: none; stroke: var(--rule-2); stroke-width: 3 }
-
-  .ring-fill { fill: none; stroke: currentColor; stroke-width: 3 }
-
-  .inst { display: flex; align-items: center; gap: 5px; color: var(--moss) }
-
-  .inst-dial { position: relative; display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; color: var(--moss) }
-
-  .inst-text { display: flex; flex-direction: column; line-height: 1.05 }
-
-  .inst.needs { color: var(--rust) }
-
-  #inspector {
-    position: absolute; z-index: 6; width: 196px; background: var(--panel);
-    border: 1px solid var(--ink); border-radius: 3px; padding: 7px 8px 8px;
-    box-shadow: 0 6px 16px rgba(36,28,18,.18);
-  }
-
-  .ins-head { display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 14px; font-weight: 600 }
-
-  .ins-gauges { display: flex; gap: 9px; margin: 6px 0 5px; align-items: flex-start }
-
-  .ins-gauge { display: flex; flex-direction: column; align-items: center; gap: 1px; color: var(--moss) }
-
-  .ins-acts { display: flex; gap: 4px; flex-wrap: wrap }
-
-  .turn-dial { position: relative; display: grid; place-items: center; width: 26px; height: 26px; color: var(--ink-2) }
-  .dock-col.dock-id { flex: 1 1 230px }
-  @media (max-width: 900px) {
-    #dock { grid-template-columns: minmax(0, 1fr); max-height: 52vh }
-    #log-wrap { display: none }
-    .dock-col { flex: 1 1 100% }
-  }
-  @media (max-width: 620px) {
-    #inspector { width: 168px }
-  }
-
 </style>
 </head>
 <body>
@@ -422,14 +339,15 @@
       <button type="button" data-act="zoom-out" aria-label="Zoom out">&minus;</button>
       <button type="button" data-act="zoom-fit" aria-label="Fit the map">&#9633;</button>
     </div>
-    <div id="inspector" hidden></div>
-  </main>
-  <aside id="dock">
-    <div id="side-scroll"></div>
-    <div id="log-wrap">
-      <div class="log-head"><span>History</span><button class="chip" type="button" id="log-toggle">All</button></div>
-      <div id="log"></div>
+    <div id="coach" hidden role="status" aria-live="polite">
+      <div class="ttl"><span id="coach-tag">Tutorial</span><span id="coach-count"></span></div>
+      <p id="coach-say"></p>
+      <div class="row" id="coach-actions"></div>
     </div>
+  </main>
+  <aside id="side">
+    <div id="side-scroll"></div>
+    <div id="log"></div>
   </aside>
 </div>
 
@@ -463,16 +381,20 @@
       <label class="field" for="opt-map">Map
         <select id="opt-map"></select>
       </label>
+      <label class="field" for="opt-level">Difficulty
+        <select id="opt-level"></select>
+      </label>
       <label class="field" for="opt-turns">Turn limit
-        <select id="opt-turns">
-          <option value="60">60 turns</option>
-          <option value="100" selected>100 turns</option>
-          <option value="150">150 turns</option>
-          <option value="0">No limit</option>
-        </select>
+        <input type="number" id="opt-turns" value="100" min="0" max="500" step="10" inputmode="numeric" aria-describedby="turns-hint">
+        <span class="faint" id="turns-hint">0 = no limit</span>
       </label>
     </div>
+    <div class="start-row switches">
+      <label class="check" for="opt-tutorial"><input type="checkbox" id="opt-tutorial"> Tutorial</label>
+      <label class="check" for="opt-tips"><input type="checkbox" id="opt-tips" checked> Tips in my games</label>
+    </div>
     <p class="fine" id="map-note"></p>
+    <p class="fine" id="level-note" style="margin-top:2px"></p>
     <div class="start-row" style="margin-top:12px">
       <button class="btn primary" id="btn-begin" type="button">Start game</button>
       <button class="btn" id="btn-civs" type="button" data-act="civs">See all 16 civs</button>
@@ -758,6 +680,14 @@ const MAP_TYPES = {
   mirror:     { name: 'Mirror',     blurb: 'Both halves of the map are the same, turned around. Fairest with 2 or 4 players.' }
 };
 
+// Difficulty. On Deity every CPU gets Civ 6 style handicaps, scaled down
+// because production here also pays for research.
+const LEVELS = {
+  normal: { name: 'Normal', blurb: 'CPUs play by the same rules as you.' },
+  deity:  { name: 'Deity', prod: 1.4, food: 1.2, research: 1.25, combat: 4,
+            blurb: 'Every CPU gets +40% production, +20% food, +25% research and +4 combat strength, and goes to war far more readily.' }
+};
+
 const CITY_NAMES = [
   'Brakenford', 'Ashwell', 'Thornmouth', 'Coldharbour', 'Mirewatch', 'Dunmoor', 'Greyspire',
   'Saltmere', 'Hollowbeck', 'Stonecross', 'Woldham', 'Fenreach', 'Emberhold', 'Rooksbarrow',
@@ -821,6 +751,12 @@ function buildingFor(i, base) {
   return base;
 }
 const continentName = t => (t && t.k >= 0 && G.conts[t.k]) || '';
+const levelOf = () => LEVELS[G && G.level] || LEVELS.normal;
+// True for a CPU player in a Deity game: it gets the handicaps.
+function deityCpu(i) {
+  const f = pl(i);
+  return !!G && G.level === 'deity' && !!f && !f.human;
+}
 /* ── map generation ────────────────────────────────────────────────────────── */
 
 function quantile(values, q) {
@@ -1303,6 +1239,7 @@ function startGame(options) {
   const civs = assignCivs(seats, world.seed);
   G = {
     v: 2, seed: world.seed, rs: (world.seed ^ 0x9e3779b9) >>> 0, map: world.map,
+    level: LEVELS[options.level] ? options.level : 'normal',
     cols: world.cols, rows: world.rows, tiles: world.tiles, conts: world.conts,
     units: [], cities: [], players: [],
     dip: [], attitude: [], warSince: [], offers: [],
@@ -1316,7 +1253,7 @@ function startGame(options) {
     G.players.push({
       i, name: (seat.name || look.name).slice(0, 18), ink: look.ink, light: look.light,
       human: !!seat.human, alive: true, capital: null, capHome: -1, kills: 0, civ: civs[i],
-      techs: [], research: null, rp: 0, future: 0, horses: 0, iron: 0,
+      techs: [], research: null, rp: 0, future: 0, horses: 0, iron: 0, stance: {}, front: null,
       aggro: seat.human ? 1 : 0.6 + hash2(i, 3, world.seed) * 0.9
     });
     G.seen.push(new Array(G.cols * G.rows).fill(0));
@@ -1374,13 +1311,14 @@ const techPoints = f => f.techs.reduce((n, id) => n + TECHS[id].era * 2, 0) + f.
 
 // Research a turn: every city on Research gives all its production, and every
 // library gives 2 more on its own.
+// What one city adds to research a turn. Deity CPUs get +25% on top.
+function cityResearch(c, y) {
+  let n = c.buildings.includes('library') ? BUILDINGS.library.research : 0;
+  if (c.build && c.build.kind === 'research') n += (y || cityYields(c)).prod;
+  return deityCpu(c.owner) ? Math.round(n * LEVELS.deity.research) : n;
+}
 function researchRate(i) {
-  let n = 0;
-  for (const c of ownCities(i)) {
-    if (c.build && c.build.kind === 'research') n += cityYields(c).prod;
-    if (c.buildings.includes('library')) n += BUILDINGS.library.research;
-  }
-  return n;
+  return ownCities(i).reduce((n, c) => n + cityResearch(c), 0);
 }
 function researchTurns(i) {
   const f = pl(i);
@@ -1495,6 +1433,10 @@ function cityYields(c) {
   if (civIs(i, 'portugal') && f && f.capHome >= 0) {
     const here = tileAt(c.x, c.y).k;
     if (here >= 0 && here !== f.capHome) { food += 3; prod += 3; }
+  }
+  if (deityCpu(i)) {
+    food = Math.round(food * LEVELS.deity.food);
+    prod = Math.round(prod * LEVELS.deity.prod);
   }
   const army = G.units.filter(u => u.home === c.id && isMil(u.type) && !UNITS[u.type].noFood).length;
   const upkeep = 2 * c.pop + army;
@@ -1650,11 +1592,8 @@ function processCity(c) {
       if (u.hp <= 0) killUnit(u, null);
     }
   }
-  if (c.buildings.includes('library')) f.rp += BUILDINGS.library.research;
-  if (c.build && c.build.kind === 'research') {
-    f.rp += y.prod;
-    return;
-  }
+  f.rp += cityResearch(c, y);
+  if (c.build && c.build.kind === 'research') return;
   c.progress += y.prod;
   if (c.build) tryComplete(c);
 }
@@ -1939,6 +1878,7 @@ function sharedBonus(u) {
   else if (TERRAIN[t.t].water && !civIs(u.owner, 'norway')) s -= 10;
   if (t.f === 'forest' && civIs(u.owner, 'celts')) s += 5;
   if (def.hurtBonus && u.hp < 50) s += def.hurtBonus;
+  if (deityCpu(u.owner)) s += LEVELS.deity.combat;
   return s;
 }
 const isHorse = u => !!(u && UNITS[u.type].horse);
@@ -2152,20 +2092,19 @@ function makePeace(a, b) {
   log(pl(a).name + ' and ' + pl(b).name + ' make peace.', '#41602f', null);
 }
 
-function militaryStrength(i) {
-  return ownUnits(i).filter(u => isMil(u.type))
-    .reduce((n, u) => n + (UNITS[u.type].str + (UNITS[u.type].rs || 0) / 2) * u.hp / 100, 0) + ownCities(i).length * 8;
-}
-
 // How a CPU player answers a peace offer: losing, a long war, or a second war
-// all push it toward yes.
+// all push it toward yes. A CPU that is on the attack, or a warlike civ,
+// holds out longer.
 function aiWantsPeace(f, other) {
-  const ratio = militaryStrength(f.i) / Math.max(1, militaryStrength(other.i));
+  const ratio = aiPower(f, other);
   const since = G.warSince[f.i][other.i] || G.turn;
   const otherWars = G.players.filter(o => o.alive && o.i !== f.i && o.i !== other.i && atWar(f.i, o.i)).length;
   let score = (G.attitude[f.i][other.i] || 0) * 0.5 + (G.turn - since) * 1.5 + otherWars * 20;
   if (ratio < 0.8) score += 35;
   if (ratio > 1.3) score -= 30;
+  if (aiStance(f, other) === 'attack') score -= 20;
+  if (isWarlike(f)) score -= 10;
+  if (deityCpu(f.i)) score -= 15;
   if (G.turn - since < 5) score -= 25;
   return score > 15;
 }
@@ -2175,7 +2114,7 @@ function offerPeace(from, to) {
   if (!atWar(from, to)) return '';
   const target = pl(to);
   if (!target.human) {
-    if (aiWantsPeace(target, pl(from))) { makePeace(from, to); return 'accepted'; }
+    if (G.tut || aiWantsPeace(target, pl(from))) { makePeace(from, to); return 'accepted'; }
     changeAttitude(to, from, -4);
     log(target.name + ' refuses peace with ' + pl(from).name + ' for now.', target.ink, from);
     return 'refused';
@@ -2259,6 +2198,7 @@ function endGame(winner, why) {
 }
 
 function checkElimination() {
+  if (G.tut) return;   // the tutorial's raiders stay in the game until you're done
   for (const f of G.players) {
     if (!f.alive) continue;
     const cities = ownCities(f.i).length;
@@ -2272,7 +2212,7 @@ function checkElimination() {
 }
 
 function checkWin() {
-  if (!G || G.over) return;
+  if (!G || G.over || G.tut) return;
   const alive = G.players.filter(f => f.alive);
   if (alive.length === 1) { endGame(alive[0], 'Last player standing'); return; }
   if (!alive.length) { endGame(null, 'Nobody is left'); return; }
@@ -2334,6 +2274,7 @@ function advanceTurns() {
     G.cur = next;
     const f = pl(next);
     if (!f.alive) continue;
+    if (G.tut && !f.human) continue;   // the tutorial's raiders never take a turn
     beginPlayerTurn(next);
     checkWin();
     if (G.over || !f.alive) continue;
@@ -2414,6 +2355,81 @@ const byDistance = (u, list) => list.slice().sort((a, b) => hexDistance(u.x, u.y
 const nearestOwnCity = (f, u) => byDistance(u, ownCities(f.i))[0] || null;
 const waterMap = () => G.map === 'islands' || G.map === 'continents';
 const atWarCount = f => G.players.filter(o => o.alive && atWar(f.i, o.i)).length;
+
+/* ── sizing up a war ───────────────────────────────────────────────────────── */
+
+// Civs built for war: they attack with a smaller edge, keep a bigger army in
+// peacetime, and pick fights more often.
+const WARLIKE = ['zulu', 'mongol', 'ottoman', 'norway'];
+const isWarlike = f => WARLIKE.includes(f.civ);
+// The edge a CPU wants before it attacks, and how far that edge can slip before
+// it pulls back. The gap between the two stops it flip-flopping every turn.
+// On Deity every CPU needs a fifth less edge, so even a warlike civ attacks at
+// equal strength.
+const deityEdge = f => (deityCpu(f.i) ? 0.8 : 1);
+const attackEdge = f => (isWarlike(f) ? 1.25 : 1.6) * deityEdge(f);
+const holdEdge = f => (isWarlike(f) ? 1.0 : 1.3) * deityEdge(f);
+
+// Army strength as a CPU sees it: each unit's best number, scaled by its HP.
+function armyPower(i) {
+  return ownUnits(i).filter(u => isMil(u.type)).reduce((n, u) => {
+    const def = UNITS[u.type];
+    return n + Math.max(def.str, def.rs || 0) * u.hp / 100;
+  }, 0);
+}
+// How this CPU sizes up one rival: its army against the rival's, plus half of
+// any other army it is already fighting. Above 1 means it thinks it's stronger.
+function aiPower(f, o) {
+  let theirs = armyPower(o.i);
+  for (const e of G.players) if (e.alive && e.i !== o.i && e.i !== f.i && atWar(f.i, e.i)) theirs += armyPower(e.i) * 0.5;
+  return armyPower(f.i) / Math.max(10, theirs);
+}
+
+// Each war gets a stance, rethought every turn: 'attack' marches on the enemy's
+// cities, 'hold' defends its own land and leans toward peace.
+const aiStance = (f, o) => (f.stance && f.stance[o.i]) || 'hold';
+function aiUpdateStances(f) {
+  f.stance = f.stance || {};
+  for (const o of G.players) {
+    if (o.i === f.i || !o.alive || !atWar(f.i, o.i)) { delete f.stance[o.i]; continue; }
+    const was = f.stance[o.i] === 'attack';
+    f.stance[o.i] = aiPower(f, o) >= (was ? holdEdge(f) : attackEdge(f)) ? 'attack' : 'hold';
+  }
+}
+const aiAttacking = f => G.players.filter(o => o.alive && atWar(f.i, o.i) && aiStance(f, o) === 'attack');
+
+// When attacking, the whole army goes for one enemy city: the closest one it
+// can walk to, favouring weak walls, and it sticks with it unless another is
+// clearly closer. It gathers 3 hexes out, just beyond the city's arrows, until
+// enough units have arrived, then goes in together.
+let aiFronts = {};
+function aiPickFront(f) {
+  const foes = aiAttacking(f), mine = ownCities(f.i);
+  if (!foes.length || !mine.length) { f.front = null; return null; }
+  const ghost = { type: 'warrior', owner: f.i, x: mine[0].x, y: mine[0].y };
+  let best = null, bestV = Infinity;
+  for (const c of G.cities) {
+    if (!foes.some(o => o.i === c.owner)) continue;
+    const field = distanceField(ghost, c.x, c.y);
+    const d = Math.min(...mine.map(m => field[m.y * G.cols + m.x]));
+    if (!isFinite(d)) continue;
+    const v = d + c.hp / 40 - (c.id === f.front ? 3 : 0);
+    if (v < bestV) { bestV = v; best = c; }
+  }
+  if (!best) { f.front = null; return null; }
+  f.front = best.id;
+  const army = ownUnits(f.i).filter(u => isMil(u.type) && !isNaval(u.type) &&
+    !(cityAt(u.x, u.y) && cityAt(u.x, u.y).owner === f.i));
+  const near = army.filter(u => hexDistance(u.x, u.y, best.x, best.y) <= 3).length;
+  const need = clamp(2 + Math.floor(best.hp / 100), 2, Math.max(2, Math.ceil(army.length * 0.6)));
+  return { city: best, go: near >= need };
+}
+// Enemy units on this CPU's land or within 3 hexes of its cities.
+function aiThreats(f) {
+  const cities = ownCities(f.i);
+  return G.units.filter(o => isMil(o.type) && atWar(f.i, o.owner) &&
+    (tileAt(o.x, o.y).owner === f.i || cities.some(c => hexDistance(c.x, c.y, o.x, o.y) <= 3)));
+}
 
 function landTiles() {
   return G.tiles.filter(t => !TERRAIN[t.t].water && !TERRAIN[t.t].block).length;
@@ -2521,7 +2537,8 @@ function aiImprovable(f) {
   return G.tiles.filter(t => t.owner === f.i && aiTileWorth(f, t) > 0.5);
 }
 
-function aiPickSoldier(f, c, wars) {
+// mode: 'attack' adds siege, 'hold' leans on archers, '' is peacetime.
+function aiPickSoldier(f, c, mode) {
   const mine = ownUnits(f.i).filter(u => isMil(u.type) && !isNaval(u.type));
   const queued = ownCities(f.i).filter(o => o.build && o.build.kind === 'unit').map(o => o.build.id);
   const count = pred => mine.filter(u => pred(UNITS[u.type])).length + queued.filter(id => pred(UNITS[id])).length;
@@ -2538,9 +2555,9 @@ function aiPickSoldier(f, c, wars) {
     return id;
   };
   const siege = open('catapult');
-  if (wars && siege && count(d => d.kind === 'siege') < Math.min(Math.floor(mine.length / 4), ownCities(f.i).length + 1)) return siege;
+  if (mode === 'attack' && siege && count(d => d.kind === 'siege') < Math.min(Math.floor(mine.length / 4), ownCities(f.i).length + 1)) return siege;
   const bow = open('archer');
-  if (bow && count(d => d.kind === 'ranged') < Math.floor((mine.length + 1) / 3)) return bow;
+  if (bow && count(d => d.kind === 'ranged') < Math.floor((mine.length + 1) / (mode === 'hold' ? 2 : 3))) return bow;
   const melee = ['heavy', 'swordsman', 'horseman', 'spearman'].map(open).filter(Boolean);
   if (melee.length) return melee.length > 1 && roll() < 0.3 ? melee[1] : melee[0];
   return unitFor(f.i, 'warrior');
@@ -2558,13 +2575,21 @@ function aiChooseBuild(f, c, siteAvailable) {
   const settlers = units.filter(u => UNITS[u.type].founds).length + queued(d => !!d.founds);
   const builders = units.filter(u => UNITS[u.type].charges && !isMil(u.type)).length + queued(d => d.charges && d.kind === 'civ');
   const wars = atWarCount(f);
+  const mode = !wars ? '' : aiAttacking(f).length ? 'attack' : 'hold';
+  const warlike = isWarlike(f);
   const y = cityYields(c);
-  const wantArmy = wars ? cities.length * 2 + 2 : cities.length + 1;
+  // Army size: the minimum it builds before anything else, and the most it
+  // builds before spare production goes to research. Attacking wants the most;
+  // warlike civs keep a bigger army even in peacetime.
+  // On Deity every CPU keeps the bigger peacetime army too.
+  const n = cities.length, deity = deityCpu(f.i);
+  const wantArmy = mode === 'attack' ? n * 3 + 2 : wars ? n * 2 + 2 : n + 1 + (warlike ? 1 : 0) + (deity ? 1 : 0);
+  const maxArmy = mode === 'attack' ? n * 4 + 2 : wars ? n * 3 + 2 : n * 2 + 1 + (warlike ? n : 0) + (deity ? n : 0);
   const late = G.turn > (G.maxTurns || 200) * 0.7;
   const can = item => !buildProblem(c, item);
   const researching = cities.filter(o => o !== c && o.build && o.build.kind === 'research').length;
   const wantResearch = G.turn < 6 ? 0 : Math.max(1, Math.round(cities.length / 4));
-  const soldier = () => ({ kind: 'unit', id: aiPickSoldier(f, c, wars) });
+  const soldier = () => ({ kind: 'unit', id: aiPickSoldier(f, c, mode) });
 
   if (army < 2) return soldier();
   if (!late && settlers === 0 && siteAvailable && cities.length < aiCityTarget() && (!wars || army >= wantArmy) &&
@@ -2572,8 +2597,8 @@ function aiChooseBuild(f, c, siteAvailable) {
   if (army < wantArmy) return soldier();
   if (builders < Math.ceil(cities.length / 2) && aiImprovable(f).length > builders * 3) return U('builder');
   const enemyNear = G.cities.some(o => atWar(f.i, o.owner) && hexDistance(o.x, o.y, c.x, c.y) <= 8);
-  if ((enemyNear || c.capital) && can(B('walls'))) return B('walls');
-  if (enemyNear && can(B('fortress'))) return B('fortress');
+  if ((enemyNear || c.capital || mode === 'hold') && can(B('walls'))) return B('walls');
+  if ((enemyNear || mode === 'hold') && can(B('fortress'))) return B('fortress');
   if (can(B('library'))) return B('library');
   if (researching < wantResearch && (!wars || army >= wantArmy)) return R;
   if (y.net < 8 && can(B('granary'))) return B('granary');
@@ -2586,11 +2611,11 @@ function aiChooseBuild(f, c, siteAvailable) {
     if (can(big) && f.iron >= 10) return big;
     if (can(U('galley'))) return U('galley');
   }
-  if (wars && can(B('barracks')) && cities.filter(o => o.buildings.includes('barracks')).length < 2) return B('barracks');
+  if ((wars || warlike) && can(B('barracks')) && cities.filter(o => o.buildings.includes('barracks')).length < 2) return B('barracks');
   if (can(B('granary'))) return B('granary');
   if (can(B('workshop'))) return B('workshop');
   // Past this size, the city puts its production into research instead.
-  if (army < (wars ? cities.length * 3 + 3 : cities.length * 2 + 1)) return soldier();
+  if (army < maxArmy) return soldier();
   return R;
 }
 
@@ -2696,19 +2721,32 @@ function aiSoldier(f, u) {
   u.goal = null;
 
   if (wars.length) {
-    // Enemy units close by first, then the nearest enemy city it can reach.
-    const foes = G.units.filter(o => isMil(o.type) && atWar(f.i, o.owner) && hexDistance(u.x, u.y, o.x, o.y) <= 4);
-    let target = byDistance(u, foes)[0];
-    if (!target) {
-      const field = distanceField(u, u.x, u.y);
-      target = G.cities.filter(c => atWar(f.i, c.owner) && isFinite(field[c.y * G.cols + c.x]))
-        .sort((a, b) => (field[a.y * G.cols + a.x] - a.hp / 50) - (field[b.y * G.cols + b.x] - b.hp / 50))[0];
-    }
-    if (target) {
-      aiStep(u, target.x, target.y, shoots(u.type) ? UNITS[u.type].range : 1);
+    const reach = shoots(u.type) ? UNITS[u.type].range : 1;
+    // Enemy units on its land get hit first, whatever the stance.
+    const threat = byDistance(u, aiThreats(f).filter(o => hexDistance(u.x, u.y, o.x, o.y) <= 5))[0];
+    if (threat) {
+      aiStep(u, threat.x, threat.y, reach);
       aiTryStrike(f, u);
       return;
     }
+    const front = aiFronts[f.i];
+    if (front) {
+      // Attacking: clear enemy units in the way, then march on the front city.
+      const foe = byDistance(u, G.units.filter(o => isMil(o.type) && atWar(f.i, o.owner) &&
+        aiStance(f, pl(o.owner)) === 'attack' && hexDistance(u.x, u.y, o.x, o.y) <= 3))[0];
+      if (foe) {
+        aiStep(u, foe.x, foe.y, reach);
+        aiTryStrike(f, u);
+        return;
+      }
+      aiStep(u, front.city.x, front.city.y, front.go ? reach : 3);
+      aiTryStrike(f, u);
+      return;
+    }
+    // Holding: stay close to home, ready to defend.
+    const home = nearestOwnCity(f, u);
+    if (home && hexDistance(u.x, u.y, home.x, home.y) > 2) aiStep(u, home.x, home.y, 1);
+    return;
   }
   // At peace: stay within reach of home.
   const home = nearestOwnCity(f, u);
@@ -2728,10 +2766,16 @@ function aiShip(f, u) {
   if (atWarCount(f)) {
     const field = distanceField(u, u.x, u.y);
     const reach = t => isFinite(field[t.y * G.cols + t.x]);
-    const foes = G.units.filter(o => isMil(o.type) && atWar(f.i, o.owner) && reach(o) && field[o.y * G.cols + o.x] <= 12);
-    let target = foes.sort((a, b) => field[a.y * G.cols + a.x] - field[b.y * G.cols + b.x])[0];
-    if (!target) target = G.cities.filter(c => atWar(f.i, c.owner) && reach(c))
-      .sort((a, b) => field[a.y * G.cols + a.x] - field[b.y * G.cols + b.x])[0];
+    const cost = t => field[t.y * G.cols + t.x];
+    // Holding: only enemies near its own coast. Attacking: anything of the
+    // enemy's within a few turns, then the front city or another coastal one.
+    const attacking = aiAttacking(f).map(o => o.i);
+    const foes = aiThreats(f).filter(o => reach(o) && cost(o) <= 8).concat(G.units.filter(o => isMil(o.type) &&
+      attacking.includes(o.owner) && reach(o) && cost(o) <= 12));
+    let target = foes.sort((a, b) => cost(a) - cost(b))[0];
+    const front = aiFronts[f.i];
+    if (!target && front && reach(front.city)) target = front.city;
+    if (!target) target = G.cities.filter(c => attacking.includes(c.owner) && reach(c)).sort((a, b) => cost(a) - cost(b))[0];
     if (target) {
       aiStep(u, target.x, target.y, shoots(u.type) ? UNITS[u.type].range : 1);
       aiTryStrike(f, u);
@@ -2755,11 +2799,12 @@ function aiCanReach(f, o) {
 }
 
 function aiDiplomacy(f) {
+  // Deity CPUs look further for rivals and can start wars 5 turns sooner.
+  const deity = deityCpu(f.i);
   for (const o of G.players) {
     if (!o.alive || o.i === f.i) continue;
-    const near = ownCities(f.i).some(c => ownCities(o.i).some(d => hexDistance(c.x, c.y, d.x, d.y) <= 8));
+    const near = ownCities(f.i).some(c => ownCities(o.i).some(d => hexDistance(c.x, c.y, d.x, d.y) <= (deity ? 10 : 8)));
     changeAttitude(f.i, o.i, near ? -1 : 1);
-    const ratio = militaryStrength(f.i) / Math.max(1, militaryStrength(o.i));
     if (atWar(f.i, o.i)) {
       if (aiWantsPeace(f, o) && roll() < 0.35) {
         if (o.human) offerPeace(f.i, o.i);
@@ -2767,20 +2812,26 @@ function aiDiplomacy(f) {
       }
       continue;
     }
-    if (G.turn < 15 || !near) continue;
-    // Neighbours rub each other the wrong way. Each CPU has its own temper, and
-    // a stronger army makes war more tempting.
+    if (G.turn < (deity ? 10 : 15) || !near) continue;
+    // It only starts a war it thinks it can win: its army has to beat the
+    // rival's by its attack edge. Past that, neighbours rub each other the
+    // wrong way, each CPU has its own temper, a bigger edge tempts it more,
+    // and warlike civs are twice as quick to start something.
+    const ratio = aiPower(f, o);
+    if (ratio < attackEdge(f)) continue;
     const att = G.attitude[f.i][o.i] || 0;
-    const edge = ratio > 1.5 ? 2.5 : ratio > 1.15 ? 1.5 : ratio < 0.9 ? 0.3 : 1;
-    const odds = (att < -5 ? 0.05 : 0.015) * (f.aggro || 1) * edge;
+    const edge = ratio > attackEdge(f) * 1.4 ? 2 : 1;
+    const odds = (att < -5 ? 0.05 : 0.015) * (f.aggro || 1) * edge * (isWarlike(f) ? 2 : 1) * (deity ? 2 : 1);
     if (roll() < odds && aiCanReach(f, o)) declareWar(f.i, o.i);
   }
+  aiUpdateStances(f);
 }
 
 function aiTurn(f) {
   if (G.over || !f.alive) return;
   if (!f.research) f.research = aiPickTech(f);
   aiDiplomacy(f);
+  aiFronts[f.i] = aiPickFront(f);
   const settlerSite = (() => {
     const probe = ownUnits(f.i).find(u => UNITS[u.type].founds) || null;
     const from = ownCities(f.i)[0];
@@ -3101,6 +3152,12 @@ function renderBoard() {
     const [cx, cy] = hexCenter(selUnit.x, selUnit.y);
     overlay.push('<circle class="sel-ring" cx="' + cx + '" cy="' + cy + '" r="' + (HEX_R - 3) + '"/>');
   }
+  // The tutorial or a tip pointing at a hex.
+  const ring = coachAt();
+  if (ring && (watching || seenBy(viewer, ring[0], ring[1]))) {
+    const [kx, ky] = hexCenter(ring[0], ring[1]);
+    labels.push('<circle class="coach-ring" cx="' + kx.toFixed(1) + '" cy="' + ky.toFixed(1) + '" r="' + (HEX_R - 1) + '"/>');
+  }
 
   UI.layerTerrain.innerHTML = terrain.join('');
   UI.layerOwner.innerHTML = owner.join('');
@@ -3119,6 +3176,352 @@ function clearBoard() {
   for (const k of ['layerTerrain', 'layerOwner', 'layerCoast', 'layerMarks', 'layerBorder', 'layerOverlay', 'layerSites', 'layerUnits', 'layerFog', 'layerLabels']) {
     UI[k].innerHTML = '';
   }
+}
+/* ── preferences kept on this device ───────────────────────────────────────── */
+
+const PREFS_KEY = 'bored.civlite.prefs.v1';
+function readPrefs() {
+  try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') || {}; } catch (error) { return {}; }
+}
+function writePref(key, value) {
+  try {
+    const prefs = readPrefs();
+    prefs[key] = value;
+    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch (error) { /* storage blocked: the switch still works for this visit */ }
+}
+let tipsSwitch = null;   // this visit's setting when storage is blocked
+const tipsOn = () => (tipsSwitch !== null ? tipsSwitch : readPrefs().tips !== false);
+function setTips(on) { tipsSwitch = on; writePref('tips', on); }
+const tutorialDone = () => !!readPrefs().tutorialDone;
+
+/* ── the tutorial island ───────────────────────────────────────────────────── */
+
+// 12 × 8, drawn by hand. . water  S seafood  f flat  t forest  h hills
+// m mountain  w wheat  r horses  i iron hills  C your capital  O the raiders' camp
+const TUT_MAP = [
+  '............',
+  '.fhftfhftf..',
+  '.ftffmfhfff.',
+  '.tirfftffh..',
+  '.fwCffftfOf.',
+  '..S.........',
+  '............',
+  '............'
+];
+
+function buildTutorialIsland() {
+  const cols = 12, rows = 8;
+  const tiles = blankTiles(cols, rows);
+  let home = null, camp = null;
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const t = tiles[y * cols + x], ch = TUT_MAP[y][x];
+      if (ch === '.') continue;
+      if (ch === 'S') { t.f = 'seafood'; continue; }
+      t.t = ch === 'h' || ch === 'i' ? 'hill' : ch === 'm' ? 'mount' : 'flat';
+      t.f = { t: 'forest', w: 'wheat', r: 'horses', i: 'iron' }[ch] || null;
+      if (ch === 'C') home = [x, y];
+      if (ch === 'O') camp = [x, y];
+    }
+  }
+  shoreUp(tiles, cols, rows);
+  const conts = assignContinents(tiles, cols, rows, 7);
+  G = {
+    v: 2, seed: 7, rs: 0x2f6e2b1, map: 'pangaea', level: 'normal',
+    cols, rows, tiles, conts, units: [], cities: [], players: [],
+    dip: [['peace', 'peace'], ['peace', 'peace']], attitude: [[0, 0], [0, 0]], warSince: [[0, 0], [0, 0]], offers: [],
+    log: [], seen: [new Array(cols * rows).fill(1), new Array(cols * rows).fill(0)],
+    turn: 1, maxTurns: 0, cur: 0, viewer: 0, handoff: false, pending: null, over: null, watch: false,
+    nextUnit: 1, nextCity: 1, names: ['Roma', 'Cinderhold'],
+    tut: { step: 0, entered: false, closed: false, raider: null, camp: null }
+  };
+  const player = (i, name, civ, human, techs) => ({
+    i, name, ink: SEATS[i].ink, light: SEATS[i].light, human, alive: true, capital: null, capHome: -1, kills: 0, civ,
+    techs, research: null, rp: human ? 30 : 0, future: 0, horses: 0, iron: 0, stance: {}, front: null, aggro: 1
+  });
+  // You get Sailing and Archery for free, and 30 research banked for your first tech.
+  G.players.push(player(0, 'Rome', 'rome', true, ['sailing', 'archery']), player(1, 'Cinder Clan', 'celts', false, []));
+
+  // The raiders' camp: a small city with 30 HP and no walls, not a capital.
+  const founder = addUnit(G.players[1], 'settler', camp[0], camp[1], null);
+  const city = foundCity(founder);
+  city.capital = false;
+  city.hp = 30;
+  G.players[1].capital = null;
+  const raider = addUnit(G.players[1], 'warrior', camp[0], camp[1], city.id);
+  G.tut.camp = city.id;
+  G.tut.raider = raider.id;
+
+  addUnit(G.players[0], 'settler', home[0], home[1], null);
+  addUnit(G.players[0], 'warrior', home[0], home[1], null);
+  addUnit(G.players[0], 'archer', home[0] + 1, home[1], null);
+  G.log = [];
+  log('Rome lands on a small island. The Cinder Clan holds a camp to the east.', 'turn', null);
+  beginPlayerTurn(0);
+}
+
+function startTutorial() {
+  if (!UI) return;
+  writePref('tutorialDone', true);
+  buildTutorialIsland();
+  selection = null;
+  reachable = null;
+  UI.start.hidden = true;
+  UI.endShown = false;
+  closeModal();
+  cam.fitted = false;
+  render();
+  fitCamera();
+}
+
+/* ── the 14 steps ──────────────────────────────────────────────────────────── */
+
+const tutCap = () => G.cities.find(c => c.owner === 0 && c.capital) || null;
+const tutCamp = () => cityById(G.tut.camp);
+const tutRaider = () => unitById(G.tut.raider);
+const tutUnit = test => G.units.find(u => u.owner === 0 && test(u)) || null;
+const tutHorses = () => G.tiles.find(t => t.f === 'horses');
+const tutSpot = o => (o ? [o.x, o.y] : null);
+// Banked production, so the city can finish this the next turn.
+function tutBank(item) {
+  const c = tutCap();
+  if (c) c.progress = Math.max(c.progress, costOf(c, item));
+}
+// The raider walks out of the camp to 2 hexes from your capital, and the
+// Cinder Clan declares war.
+function tutRaid() {
+  const cap = tutCap(), camp = tutCamp();
+  let r = tutRaider();
+  if (!cap) return;
+  if (!r) {
+    r = addUnit(G.players[1], 'warrior', camp ? camp.x : cap.x, camp ? camp.y : cap.y, camp ? camp.id : null);
+    G.tut.raider = r.id;
+  }
+  const spots = G.tiles.filter(t => hexDistance(t.x, t.y, cap.x, cap.y) === 2 && !TERRAIN[t.t].water &&
+    !TERRAIN[t.t].block && !cityAt(t.x, t.y) && !unitsAt(t.x, t.y).length);
+  const to = camp ? spots.sort((a, b) => hexDistance(a.x, a.y, camp.x, camp.y) - hexDistance(b.x, b.y, camp.x, camp.y))[0] : spots[0];
+  if (to) { r.x = to.x; r.y = to.y; }
+  r.hp = 35;
+  declareWar(1, 0);
+}
+// Hand the camp over, as if it had been taken and kept.
+function tutTakeCamp() {
+  const c = tutCamp();
+  if (!c || c.owner === 0) return;
+  for (const o of unitsAt(c.x, c.y)) if (o.owner !== 0) removeUnit(o);
+  c.owner = 0;
+  c.buildings = c.buildings.filter(b => !DEFENCES.includes(b));
+  c.hp = 50;
+  c.build = null;
+  for (const t of G.tiles) if (t.city === c.id) t.owner = 0;
+  G.pending = null;
+  log('Rome takes ' + c.name + '.', pl(0).ink, null);
+}
+
+const TUT_STEPS = [
+  { say: 'Welcome to Civ Lite. You lead Rome. Select your <b>settler</b> on the flashing hex and press <b>Found city</b> (F).',
+    at: () => tutSpot(tutUnit(u => UNITS[u.type].founds)), el: '[data-act="found"]',
+    done: () => !!tutCap(),
+    skip: () => { const u = tutUnit(u => UNITS[u.type].founds); if (u) foundCity(u); } },
+  { say: 'Roma starts at pop 2 with a free Granary: that’s Rome’s ability. Now open the <b>tech tree</b> (T) and pick <b>Animal Husbandry</b>. You have 30 research banked.',
+    el: '#btn-tech, [data-act="research:husbandry"]',
+    done: () => pl(0).research === 'husbandry' || hasTech(0, 'husbandry'),
+    skip: () => setResearch(0, 'husbandry') },
+  { say: 'Cities build one thing at a time. Click Roma and set it to build a <b>Builder</b>. It has the production saved already.',
+    at: () => tutSpot(tutCap()), el: '[data-act$=":unit:builder"]',
+    enter: () => tutBank({ kind: 'unit', id: 'builder' }),
+    done: () => { const c = tutCap(); return !!c && (sameItem(c.build, { kind: 'unit', id: 'builder' }) || ownUnits(0).some(u => u.type === 'builder')); },
+    skip: () => { const c = tutCap(); if (c) setBuild(c, { kind: 'unit', id: 'builder' }); } },
+  { say: 'That’s a turn. Press <b>End turn</b> (Space). Next turn your builder is ready and you learn Animal Husbandry.',
+    el: '#btn-end', done: () => G.turn >= 2, skip: () => doEndTurn() },
+  { say: 'Builders improve tiles inside your borders. Select the builder and move it onto the <b>horses</b>.',
+    at: () => tutSpot(tutHorses()),
+    done: () => { const t = tutHorses(), b = tutUnit(u => u.type === 'builder'); return t.imp === 'pasture' || (!!b && b.x === t.x && b.y === t.y); },
+    skip: () => { const t = tutHorses(), b = tutUnit(u => u.type === 'builder'); if (b) { b.x = t.x; b.y = t.y; b.mp = Math.max(b.mp, 1); } } },
+  { say: 'Press <b>Pasture</b>. Each pasture on horses adds 2 horses a turn to your stockpile, and every horseman costs 10.',
+    el: '[data-act="builder:build:pasture"]',
+    done: () => tutHorses().imp === 'pasture',
+    skip: () => { tutHorses().imp = 'pasture'; } },
+  { say: 'Click <b>any hex</b> to see what it gives. The panel also names its continent: every map’s land is split into named continents.',
+    at: () => tutSpot(G.tiles.find(t => t.f === 'iron')),
+    done: () => !!selection && selection.kind === 'tile' },
+  { say: 'Click Roma and set it to <b>Research</b>. All its production goes into your tech each turn, and each Library adds 2 more. Pick a new tech too.',
+    at: () => tutSpot(tutCap()), el: '[data-act$=":research:research"], #btn-tech',
+    done: () => { const c = tutCap(); return !!c && !!c.build && c.build.kind === 'research'; },
+    skip: () => { const c = tutCap(); if (c) setBuild(c, { kind: 'research', id: 'research' }); } },
+  { say: 'Trouble! The Cinder Clan just declared war, and one of its raiders is in your fields. <b>Click the raider</b> to see how strong it is.',
+    enter: tutRaid, at: () => tutSpot(tutRaider()),
+    done: () => !tutRaider() || (!!selection && selection.kind === 'unit' && selection.id === G.tut.raider) },
+  { say: 'Select your warrior or archer and click the raider’s <b>red hex</b>. The numbers show what you deal and take. Units inside your own borders get +5.',
+    at: () => tutSpot(tutRaider()),
+    done: () => !tutRaider(),
+    skip: () => { const r = tutRaider(); if (r) killUnit(r, 0); } },
+  { say: 'Roma has production saved. Set it to build a <b>Galley</b>, end the turn, then sail the galley along the coast. Ships stay in shallow water until Navigation.',
+    at: () => tutSpot(tutCap()), el: '[data-act$=":unit:galley"], #btn-end',
+    enter: () => tutBank({ kind: 'unit', id: 'galley' }),
+    done: () => G.units.some(u => u.owner === 0 && isNaval(u.type) && !cityAt(u.x, u.y)),
+    skip: () => {
+      const c = tutCap(), at = c && neighbourList(c.x, c.y).find(([x, y]) => slotFree(x, y, 0, 'galley'));
+      if (at) addUnit(pl(0), 'galley', at[0], at[1], c.id);
+    } },
+  { say: 'Cinderhold, the Cinder Clan’s camp, has 30 HP and no walls. Hit it to 0 HP with your galley or soldiers, then attack it once more with a melee unit to <b>take it</b>.',
+    at: () => tutSpot(tutCamp()),
+    done: () => { const c = tutCamp(); return (!c || c.owner === 0) && !G.pending; },
+    skip: tutTakeCamp },
+  { say: 'You don’t have to fight forever. Open the <b>Council</b> (D) and offer the Cinder Clan peace.',
+    el: '#btn-council, [data-act^="peace:"]',
+    done: () => !atWar(0, 1), skip: () => makePeace(0, 1) },
+  { say: 'Last thing: your <b>score</b>, in the side panel. It’s 5 per city, 1 per pop, points per tech, and military strength ÷ 20. ' +
+      'The best score at the turn limit wins, or take every capital to win early.',
+    enter: () => { selection = null; }, el: '.score-box',
+    done: () => false, next: 'Finish' }
+];
+
+// Moves past every step that is already done, and runs a step's setup the
+// first time it comes up.
+function tutorialTick() {
+  if (!G || !G.tut) return;
+  for (let guard = 0; guard < 20 && G.tut.step < TUT_STEPS.length; guard++) {
+    const step = TUT_STEPS[G.tut.step];
+    if (!G.tut.entered) {
+      G.tut.entered = true;
+      if (step.enter) step.enter();
+    }
+    if (!step.done()) return;
+    G.tut.step++;
+    G.tut.entered = false;
+  }
+}
+// Next: does the step for you (where later steps need it), then moves on.
+function tutorialNext() {
+  if (!G || !G.tut || G.tut.step >= TUT_STEPS.length) return;
+  const at = G.tut.step, step = TUT_STEPS[at];
+  if (step.skip && !step.done()) step.skip();
+  if (G.tut.step === at) {
+    G.tut.step++;
+    G.tut.entered = false;
+  }
+}
+
+/* ── tips in real games ────────────────────────────────────────────────────── */
+
+// Each tip shows the first time its test finds something, once per player per
+// game. test(i) returns what it found (truthy) or nothing.
+const TIPS = [
+  { id: 'war', test: i => G.players.find(o => o.alive && atWar(i, o.i)),
+    say: (i, o) => 'You’re at war with ' + esc(o.name) + '. Your units get +5 inside your own borders. Offer peace in the Council (D) when you want out.',
+    el: '#btn-council' },
+  { id: 'starving', test: i => ownCities(i).find(c => cityYields(c).net < 0),
+    say: (i, c) => esc(c.name) + ' is starving: its military units lose 10 HP a turn. Grow more food there, or disband a unit it feeds.',
+    at: c => [c.x, c.y] },
+  { id: 'stock', test: i => ownCities(i).find(c => c.wait && c.build && c.build.kind === 'unit' && stockShort(pl(i), UNITS[c.build.id])),
+    say: (i, c) => esc(c.name) + ' is waiting for ' + esc(stockShort(pl(i), UNITS[c.build.id])) +
+      '. Each pasture on horses and each mine on iron inside your borders adds 2 a turn.',
+    at: c => [c.x, c.y] },
+  { id: 'tech', test: i => needsTech(i),
+    say: () => 'You aren’t researching anything. Press T and pick a tech. Research you earn meanwhile is banked, not lost.',
+    el: '#btn-tech' },
+  { id: 'idle', test: i => idleCities(i)[0],
+    say: (i, c) => esc(c.name) + ' has nothing to build, so its production is saved for later. Open it and pick something, or set it to Research.',
+    at: c => [c.x, c.y] },
+  { id: 'builder', test: i => ownUnits(i).find(u => UNITS[u.type].charges && !isMil(u.type)),
+    say: () => 'Builders improve tiles inside your borders: farms, mines, pastures and fishing boats. Each action uses one charge and happens at once.',
+    at: u => [u.x, u.y] },
+  { id: 'enemy-city', test: i => G.cities.find(c => c.owner !== i && visibleTo(c.x, c.y)),
+    say: (i, c) => 'That’s ' + esc(c.name) + ', a city of ' + esc(pl(c.owner).name) + '’s. Cities defend at 25 + 3 per pop. ' +
+      'At war, hit one to 0 HP, then take it with a melee unit.',
+    at: c => [c.x, c.y] },
+  { id: 'hurt', test: i => ownUnits(i).find(u => isMil(u.type) && u.hp < 100),
+    say: () => 'Hurt units heal 10 HP a turn when they don’t move or fight, or 20 inside your borders.',
+    at: u => [u.x, u.y] },
+  { id: 'embark', test: i => ownUnits(i).find(u => isEmbarked(u)),
+    say: i => 'That unit is on the water, or embarked. ' + (civIs(i, 'norway') ? 'Norway’s units skip the usual −10 in a fight.' :
+      'Embarked units fight at −10.') + ' Deep sea needs Navigation.',
+    at: u => [u.x, u.y] },
+  { id: 'future', test: i => techReady(i, 'future'),
+    say: () => 'You know every tech. Future Tech repeats forever and adds 4 to your score each time.',
+    el: '#btn-tech' },
+  { id: 'ten-left', test: () => G.maxTurns > 0 && G.maxTurns - G.turn <= 10,
+    say: () => '10 turns left. The best score at the turn limit wins: 5 per city, 1 per pop, tech points, and military strength ÷ 20.',
+    el: '.score-box' }
+];
+
+// The tip the current player should see now, if any: { tip, hit }.
+function currentTip() {
+  if (!G || G.tut || G.watch || !tipsOn() || !myTurn()) return null;
+  const i = G.viewer;
+  const seen = (G.tipsSeen && G.tipsSeen[i]) || [];
+  for (const tip of TIPS) {
+    if (seen.includes(tip.id)) continue;
+    const hit = tip.test(i);
+    if (hit) return { tip, hit };
+  }
+  return null;
+}
+function markTipSeen(id) {
+  if (!G || G.viewer === null) return;
+  G.tipsSeen = G.tipsSeen || {};
+  const list = G.tipsSeen[G.viewer] || (G.tipsSeen[G.viewer] = []);
+  if (!list.includes(id)) list.push(id);
+}
+
+/* ── the coach box (tutorial steps and tips share it) ──────────────────────── */
+
+// The hex the coach is pointing at, for the map's dashed ring.
+function coachAt() {
+  if (!G) return null;
+  if (G.tut) {
+    if (G.tut.closed || G.tut.step >= TUT_STEPS.length) return null;
+    const step = TUT_STEPS[G.tut.step];
+    return step.at ? step.at() : null;
+  }
+  const now = currentTip();
+  return now && now.tip.at ? now.tip.at(now.hit) : null;
+}
+
+const hasPage = () => typeof document !== 'undefined' && !!document.querySelectorAll;
+function clearCoachMarks() {
+  if (!hasPage()) return;
+  for (const el of document.querySelectorAll('.coach-target')) el.classList.remove('coach-target');
+}
+
+function renderCoach() {
+  if (!UI || !UI.coach) return;
+  clearCoachMarks();
+  let tag = '', count = '', say = '', actions = '', el = null;
+  if (G && G.tut && !G.tut.closed && !G.handoff) {
+    tag = 'Tutorial';
+    if (G.tut.step >= TUT_STEPS.length) {
+      count = 'done';
+      say = 'That’s the whole game: cities, techs, builders, stockpiles, war, ships, peace and score. Start a real game with friends or CPUs, or keep exploring this island.';
+      actions = '<button class="act on" data-act="tut-new">Start a real game</button>' +
+        '<button class="act" data-act="tut-close">Keep looking around</button>';
+    } else {
+      const step = TUT_STEPS[G.tut.step];
+      count = (G.tut.step + 1) + ' / ' + TUT_STEPS.length;
+      say = step.say;
+      el = step.el || null;
+      actions = '<button class="act" data-act="tut-next">' + (step.next || 'Next') + '</button>' +
+        '<button class="skip" data-act="tut-quit">Quit the tutorial</button>';
+    }
+  } else {
+    const now = G && !G.over ? currentTip() : null;
+    if (now) {
+      tag = 'Tip';
+      say = now.tip.say(G.viewer, now.hit);
+      el = now.tip.el || null;
+      actions = '<button class="act" data-act="tip-ok:' + now.tip.id + '">Got it</button>' +
+        '<button class="skip" data-act="tips-off">Turn tips off</button>';
+    }
+  }
+  if (!say) { UI.coach.hidden = true; return; }
+  UI.coach.hidden = false;
+  UI.coachTag.textContent = tag;
+  UI.coachCount.textContent = count;
+  UI.coachSay.innerHTML = say;
+  UI.coachActions.innerHTML = actions;
+  if (el && hasPage()) for (const node of document.querySelectorAll(el)) node.classList.add('coach-target');
 }
 /* ── interface: shared pieces ──────────────────────────────────────────────── */
 
@@ -3160,19 +3563,21 @@ function render() {
     UI.sideScroll.innerHTML = '';
     UI.log.innerHTML = '';
     renderBar();
+    renderCoach();
     showHandoff();
     return;
   }
   UI.handoff.hidden = true;
   refreshVision();
+  tutorialTick();
   validateSelection();
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   reachable = selUnit && selUnit.owner === G.viewer && myTurn() ? computeReachable(selUnit) : null;
   renderBar();
   renderBoard();
   renderSide();
-  renderInspector();
   renderLog();
+  renderCoach();
   UI.btnEnd.disabled = !myTurn();
   if (G.pending && UI.modalLayer.hidden) showPending();
   if (G.over && !UI.endShown) showEndModal();
@@ -3185,184 +3590,54 @@ function researchLabel(i) {
   return techName(f.research) + (t === null ? '' : ' · ' + (isFinite(t) ? t + 't' : '∞'));
 }
 
-
-/* ── chrome from the map-first rebuild ───────────────────────────────────── */
-
-const arc = (part, whole, size) => {
-  const box = size || 34, r = box / 2 - 3.5, c = 2 * Math.PI * r;
-  const fill = clamp(whole > 0 ? part / whole : 0, 0, 1);
-  return '<svg class="ring" width="' + box + '" height="' + box + '" viewBox="0 0 ' + box + ' ' + box + '" aria-hidden="true">' +
-    '<circle class="ring-track" cx="' + box / 2 + '" cy="' + box / 2 + '" r="' + r + '"/>' +
-    '<circle class="ring-fill" cx="' + box / 2 + '" cy="' + box / 2 + '" r="' + r + '" stroke-dasharray="' +
-    (c * fill).toFixed(1) + ' ' + (c + 1).toFixed(1) + '" transform="rotate(-90 ' + box / 2 + ' ' + box / 2 + ')"/></svg>';
-}
-
-const pips = (on, total) => '<span class="pips">' +
-  Array.from({ length: Math.max(total, 0) }, (x, i) => '<i' + (i < on ? ' class="on"' : '') + '></i>').join('') + '</span>';
-
-const instrument = (name, value, label, part, whole) =>
-  '<span class="inst"><span class="inst-dial">' + arc(part, whole, 34) + icon(name, 13) + '</span>' +
-  '<span class="inst-text"><b>' + value + '</b><em>' + label + '</em></span></span>';
-
-const statusChip = () => myTurn() ? '<span class="chip on">your move</span>' : '<span class="chip">waiting</span>';
-
-function inspectorAnchor() {
-  const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
-  const selCity = selection && selection.kind === 'city' ? cityById(selection.id) : null;
-  const spot = selUnit || selCity;
-  if (!spot) return null;
-  const [cx, cy] = hexCenter(spot.x, spot.y);
-  return { x: cam.x + cx * cam.k, y: cam.y + cy * cam.k };
-}
-
-function positionInspector() {
-  if (!UI || !UI.inspector || UI.inspector.hidden) return;
-  const anchor = inspectorAnchor();
-  if (!anchor) return;
-  const stage = UI.stage.getBoundingClientRect();
-  const width = UI.inspector.offsetWidth || 196, height = UI.inspector.offsetHeight || 120;
-  const reach = HEX_R * cam.k + 10;
-  let left = anchor.x + reach;
-  if (left + width > stage.width - 6) left = anchor.x - reach - width;
-  left = clamp(left, 6, Math.max(6, stage.width - width - 6));
-  const top = clamp(anchor.y - height / 2, 6, Math.max(6, stage.height - height - 6));
-  UI.inspector.style.left = left.toFixed(0) + 'px';
-  UI.inspector.style.top = top.toFixed(0) + 'px';
-}
-
-function renderInspector() {
-  if (!UI || !UI.inspector) return;
-  const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
-  const selCity = selection && selection.kind === 'city' ? cityById(selection.id) : null;
-  if (!selUnit && !selCity) {
-    UI.inspector.hidden = true;
-    UI.inspector.innerHTML = '';
-    return;
-  }
-  let html = '';
-  if (selCity) {
-    const c = selCity, f = pl(c.owner);
-    const def = c.build ? itemDef(c.build) : null;
-    const need = growCost(c);
-    html = '<div class="ins-head">' + dot(f, 9) + '<span class="ins-name">' + esc(c.name) + '</span>' +
-      (c.capital ? '<span class="tag">cap</span>' : '') + '</div>' +
-      '<div class="ins-gauges">' +
-        '<span class="ins-gauge" style="color:var(--rust)">' + arc(c.hp, cityMaxHp(c), 30) + '<b>' + c.hp + '</b><em>hp</em></span>' +
-        '<span class="ins-gauge">' + arc(c.food, need, 30) + '<b>' + c.pop + '</b><em>pop</em></span>' +
-        (def ? '<span class="ins-gauge">' + arc(c.progress, def.cost, 30) + '<b>' +
-            (isFinite(turnsLeft(c)) ? turnsLeft(c) + 't' : '--') + '</b><em>build</em></span>'
-          : '<span class="ins-gauge">' + arc(0, 1, 30) + '<b>' + cityYields(c).net + '</b><em>food</em></span>') +
-      '</div>' +
-      '<div class="ins-acts">' +
-        '<button class="icon-btn" data-act="select-city:' + c.id + '" title="Open orders">' + icon('city', 14) + '</button>' +
-        '<button class="icon-btn" data-act="centre:' + c.x + ':' + c.y + '" title="Centre the map">' + icon('navigation', 14) + '</button>' +
-        '<button class="icon-btn" data-act="deselect" title="Close">' + icon('forest', 14) + '</button>' +
-      '</div>';
-  } else if (selUnit) {
-    const u = selUnit, f = pl(u.owner), def = UNITS[u.type], t = tileAt(u.x, u.y), y = tileYield(t);
-    html = '<div class="ins-head">' + dot(f, 9) + '<span class="ins-name">' + def.name + '</span>' +
-      (isEmbarked(u) ? '<span class="tag">sea</span>' : '') + '</div>' +
-      '<div class="ins-gauges">' +
-        (isMil(u.type) ? '<span class="ins-gauge" style="color:var(--rust)">' + arc(u.hp, 100, 30) + '<b>' + u.hp + '</b><em>hp</em></span>' : '') +
-        '<span class="ins-gauge">' + arc(u.mp, def.move, 30) + '<b>' + u.mp + '/' + def.move + '</b><em>moves</em></span>' +
-        '<span class="ins-gauge">' + arc(y.food, 4, 30) + '<b>' + y.food + '/' + y.prod + '</b><em>yield</em></span>' +
-      '</div>' +
-      '<div class="ins-acts">' +
-        '<button class="icon-btn" data-act="select-unit:' + u.id + '" title="Open orders">' + icon(u.type, 14) + '</button>' +
-        '<button class="icon-btn" data-act="centre:' + u.x + ':' + u.y + '" title="Centre the map">' + icon('navigation', 14) + '</button>' +
-        (u.owner === G.viewer && myTurn() && def.founds && !foundProblem(u) && u.mp > 0
-          ? '<button class="icon-btn primary" data-act="found" title="Found a city (F)">' + icon('city', 14) + '</button>' : '') +
-        '<button class="icon-btn" data-act="deselect" title="Close">' + icon('forest', 14) + '</button>' +
-      '</div>';
-  }
-  UI.inspector.innerHTML = html;
-  UI.inspector.hidden = false;
-  positionInspector();
-}
-
 function renderBar() {
   const f = viewerPlayer() || pl(G.cur);
   UI.bannerDot.style.background = f.light;
   UI.bannerDot.style.borderColor = f.ink;
   UI.bannerName.textContent = f.name;
   UI.bannerWho.textContent = CIVS[f.civ].land + ' · ' + (f.human ? (myTurn() ? 'your turn' : 'waiting') : 'CPU');
-  const clock = '<span class="turn-dial">' + arc(G.turn, G.maxTurns || G.turn, 26) + '</span>' +
-    Math.max(1, G.turn) + (G.maxTurns ? '<em>/' + G.maxTurns + '</em>' : '');
-  UI.turnReadout.innerHTML = clock;
-  if (G.handoff) { UI.stats.innerHTML = ''; return; }
-  const s = scoreParts(f.i);
-  const alive = G.players.filter(p => p.alive);
-  const bestScore = Math.max(1, ...alive.map(p => scoreParts(p.i).total));
-  const allPop = Math.max(1, alive.reduce((n, p) => n + scoreParts(p.i).pop, 0));
-  const allCities = Math.max(1, alive.reduce((n, p) => n + scoreParts(p.i).cities, 0));
-  const idle = myTurn() ? idleUnits(f.i).length + idleCities(f.i).length + (needsTech(f.i) ? 1 : 0) : 0;
-  UI.stats.innerHTML =
-    instrument('crown', s.total, 'score', s.total, bestScore) +
-    instrument('city', s.cities, 'cities', s.cities, allCities) +
-    instrument('food', s.pop, 'pop', s.pop, allPop) +
-    '<button class="inst" data-act="tech" title="Tech tree (T)"><span class="inst-text"><b>' +
-      esc(researchLabel(f.i)) + '</b><em>tech</em></span></button>' +
-    '<span class="inst"><span class="inst-text"><b>' + f.horses + '</b><em>horses</em></span></span>' +
-    '<span class="inst"><span class="inst-text"><b>' + f.iron + '</b><em>iron</em></span></span>' +
-    (idle ? '<span class="inst needs" title="Units and cities waiting for orders"><span class="inst-dial">' +
-      pips(idle, Math.min(idle, 4)) + '</span><span class="inst-text"><b>' + idle + '</b><em>orders</em></span></span>' : '');
+  if (G.handoff) {
+    UI.stats.innerHTML = '';
+  } else {
+    const s = scoreParts(f.i);
+    const idle = myTurn() ? idleUnits(f.i).length + idleCities(f.i).length + (needsTech(f.i) ? 1 : 0) : 0;
+    UI.stats.innerHTML =
+      '<span class="stat">' + icon('crown', 14) + '<span>Score</span><b>' + s.total + '</b></span>' +
+      '<span class="stat">' + icon('city', 14) + '<span>Cities</span><b>' + s.cities + '</b></span>' +
+      '<span class="stat">' + icon('food', 14) + '<span>Pop</span><b>' + s.pop + '</b></span>' +
+      '<button class="stat link" data-act="tech">' + icon('tech', 14) + '<span>Tech</span><b>' + esc(researchLabel(f.i)) + '</b></button>' +
+      '<span class="stat">' + icon('horses', 14) + '<span>Horses</span><b>' + f.horses + '</b></span>' +
+      '<span class="stat">' + icon('iron', 14) + '<span>Iron</span><b>' + f.iron + '</b></span>' +
+      (idle ? '<span class="stat" style="color:var(--rust)"><span>Needs orders</span><b>' + idle + '</b></span>' : '');
+  }
+  UI.turnReadout.textContent = 'Turn ' + Math.max(1, G.turn) + (G.maxTurns ? ' / ' + G.maxTurns : '');
 }
 
-let logOpen = false;
-
 function renderLog() {
-  if (!UI || !UI.log) return;
   const v = G.viewer;
-  const entries = G.log.filter(e => e.to === null || e.to === v);
-  const shown = logOpen ? entries.slice(-80) : entries.slice(-4);
-  UI.log.innerHTML = shown.length ? shown.map(e =>
-    '<div class="log-row"><i class="log-mark"' +
-    (e.colour && e.colour !== 'turn' ? ' style="background:' + e.colour + '"' : '') + '></i>' +
-    '<span class="log-turn">' + String(e.turn).padStart(2, '0') + '</span>' +
-    '<span class="log-text">' + esc(e.text) + '</span></div>').join('')
-    : '<p class="dock-empty">Nothing has happened yet.</p>';
-  const toggle = document.getElementById('log-toggle');
-  if (toggle) toggle.textContent = logOpen ? 'Last' : 'All';
+  const rows = G.log.filter(e => e.to === null || e.to === v).slice(-50).map(e =>
+    '<div' + (e.colour && e.colour !== 'turn' ? ' style="color:' + e.colour + '"' : '') + '>' +
+    '<span class="turn-mark">' + String(e.turn).padStart(2, '0') + '</span> ' + esc(e.text) + '</div>');
+  UI.log.innerHTML = rows.join('') || '<div class="faint">Nothing has happened yet.</div>';
   UI.log.scrollTop = UI.log.scrollHeight;
 }
 
-document.getElementById('log-toggle')?.addEventListener('click', () => {
-  logOpen = !logOpen;
-  renderLog();
-});
-
-
 /* ── interface: the side panel ─────────────────────────────────────────────── */
 
-// The dock is a strip, not a sidebar: fold the panel's flat sections into columns
-// so a tall report reads left to right under the map.
-function dockColumns(html) {
-  const chunks = String(html).split('<p class="sec">');
-  const head = chunks.shift();
-  const cols = chunks.map(c => '<section class="dock-col"><p class="sec">' + c + '</section>');
-  return '<div class="dock-body">' +
-    '<section class="dock-col dock-id">' + head + '</section>' + cols.join('') + '</div>';
-}
-
-function sidePanelHTML() {
+function renderSide() {
   if (selection && selection.kind === 'unit') {
     const u = unitById(selection.id);
-    if (u) return unitPanel(u);
+    if (u) { UI.sideScroll.innerHTML = unitPanel(u); return; }
   }
   if (selection && selection.kind === 'city') {
     const c = cityById(selection.id);
-    if (c) return cityPanel(c);
+    if (c) { UI.sideScroll.innerHTML = cityPanel(c); return; }
   }
   if (selection && selection.kind === 'tile') {
-    return tilePanel(selection.x, selection.y);
+    UI.sideScroll.innerHTML = tilePanel(selection.x, selection.y);
+    return;
   }
-  return realmPanel();
-}
-
-function renderSide() {
-  const host = document.getElementById('side-scroll');
-  if (!host) return;
-  host.innerHTML = dockColumns(sidePanelHTML());
+  UI.sideScroll.innerHTML = realmPanel();
 }
 
 function buildLabel(c) {
@@ -3389,7 +3664,7 @@ function realmPanel() {
   const inc = stockIncome(f.i);
   let html = '<div class="side-head">' + dot(f, 14) + '<h2>' + esc(f.name) + '</h2></div>' +
     '<div class="side-sub">' + (myTurn() ? 'Your turn' : 'Waiting') + ' · turn ' + G.turn +
-    (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + '</div>' + civBlurb(f.civ);
+    (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name + '</div>' + civBlurb(f.civ);
 
   if (myTurn()) {
     const idle = idleUnits(f.i), lazy = idleCities(f.i);
@@ -3405,9 +3680,9 @@ function realmPanel() {
     }
   }
 
-  html += '<p class="sec">Score</p>' + kv('Total', '<b>' + s.total + '</b>') +
+  html += '<div class="score-box"><p class="sec">Score</p>' + kv('Total', '<b>' + s.total + '</b>') +
     kv('Cities × 5', s.cities * 5) + kv('Pop', s.pop) + kv('Tech', s.tech) +
-    kv('Military (' + s.army + ' strength ÷ 20)', s.mil);
+    kv('Military (' + s.army + ' strength ÷ 20)', s.mil) + '</div>';
 
   const rate = researchRate(f.i);
   html += '<p class="sec">' + icon('tech', 12) + 'Research</p>';
@@ -3693,6 +3968,7 @@ function openModal(html, size) {
   UI.modalLayer.hidden = false;
   const first = UI.modal.querySelector('.modal-foot .btn.primary') || UI.modal.querySelector('button');
   if (first) first.focus({ preventScroll: true });
+  renderCoach();
 }
 function closeModal() {
   UI.modalLayer.hidden = true;
@@ -3746,166 +4022,23 @@ function techCard(i, id) {
     (needs ? '<span class="tq">Needs ' + esc(needs) + '</span>' : '') + '</button>';
 }
 
-/* ── tech tree ─────────────────────────────────────────────────────────────── */
-
-const TT_START = 132;   // radius of the first ring, where the era-1 techs sit
-const TT_STEP = 118;    // between one ring and the next
-const TT_NODE = 72;     // node diameter, px
-const TT_PAD = 76;      // room for a node, its label and the rim
-
-// Ring per prerequisite depth, then a barycenter pass so each tech sits near the
-// techs that unlock it. Pure: the tech table and key order come in as arguments.
-function techRings(techs, order) {
-  const depth = {};
-  const visit = id => {
-    const t = techs[id];
-    if (depth[id] !== undefined) return depth[id];
-    depth[id] = 0;
-    if (t && t.needs.length) depth[id] = 1 + Math.max.apply(null, t.needs.map(visit));
-    return depth[id];
-  };
-  const rings = [];
-  for (const id of order) {
-    const d = visit(id);
-    if (!rings[d]) rings[d] = [];
-    rings[d].push(id);
-  }
-  for (let k = 1; k < rings.length; k++) {
-    const prev = rings[k - 1];
-    const bary = id => {
-      const at = techs[id].needs.map(n => prev.indexOf(n)).filter(n => n >= 0);
-      return at.length ? at.reduce((a, b) => a + b, 0) / at.length : 99;
-    };
-    rings[k] = rings[k].slice().sort((a, b) => bary(a) - bary(b));
-  }
-  return rings;
-}
-
-// Three letters inside the circle, so the map reads without a legend.
-function techGlyph(id) {
-  const name = id === 'future' ? FUTURE.name : (TECHS[id] ? TECHS[id].name : '');
-  return name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase();
-}
-
-// A small deterministic wobble, so a ring looks drawn rather than plotted.
-function techWobble(id) {
-  let h = 7;
-  for (let k = 0; k < id.length; k++) h = (h * 31 + id.charCodeAt(k)) % 1009;
-  return { turn: ((h % 21) / 20 - 0.5) * 0.12, push: ((h % 17) / 16 - 0.5) * 12 };
-}
-
-// Average of a set of angles as a vector, which stays sane across the 0/2π seam.
-function techHeading(angles) {
-  let x = 0, y = 0;
-  angles.forEach(a => { x += Math.cos(a); y += Math.sin(a); });
-  return angles.length ? Math.atan2(y, x) : -Math.PI / 2;
-}
-
-// One ring per depth, each ring centred on the techs it hangs from. Pure maths
-// with no DOM, so the shape can be checked on its own.
-function techLayout(techs, order) {
-  const rings = techRings(techs, order);
-  const node = {};
-  const nodes = [];
-  const size = 2 * (TT_START + (rings.length - 1) * TT_STEP + TT_PAD);
-  rings.forEach((ids, d) => {
-    const radius = TT_START + d * TT_STEP;
-    const parents = id => (techs[id].needs || []).map(n => node[n]).filter(Boolean).map(n => n.angle);
-    const anchor = d === 0 ? -Math.PI / 2 : techHeading(ids.map(id => techHeading(parents(id))));
-    const swing = id => {
-      const h = techHeading(parents(id));
-      return Math.atan2(Math.sin(h - anchor), Math.cos(h - anchor));
-    };
-    const sorted = d === 0 ? ids.slice() : ids.slice().sort((a, b) => swing(a) - swing(b));
-    const step = (2 * Math.PI) / sorted.length;
-    sorted.forEach((id, k) => {
-      const wob = techWobble(id);
-      const angle = anchor + (k - (sorted.length - 1) / 2) * step + wob.turn;
-      const r = radius + wob.push;
-      node[id] = {
-        id, depth: d, angle, radius: r,
-        x: size / 2 + r * Math.cos(angle), y: size / 2 + r * Math.sin(angle)
-      };
-      nodes.push(node[id]);
-    });
-  });
-  const edges = [];
-  nodes.forEach(n => (techs[n.id].needs || []).forEach(p => { if (node[p]) edges.push({ from: p, to: n.id }); }));
-  return { nodes, edges, size, byId: node };
-}
-
-function techTreeHTML(i) {
-  const f = pl(i), lay = techLayout(TECHS, TECH_ORDER), mid = lay.size / 2;
-  let html = '<div class="ttree-wrap"><div class="ttree" data-size="' + lay.size +
-    '" style="width:' + lay.size + 'px;height:' + lay.size + 'px">';
-  html += '<svg class="tedges" width="' + lay.size + '" height="' + lay.size + '" aria-hidden="true">';
-  lay.edges.forEach(e => {
-    const a = lay.byId[e.from], b = lay.byId[e.to];
-    const dx = b.x - a.x, dy = b.y - a.y, len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const rim = TT_NODE / 2 + 3;
-    html += '<path d="M' + Math.round(a.x + dx / len * rim) + ' ' + Math.round(a.y + dy / len * rim) +
-      'L' + Math.round(b.x - dx / len * rim) + ' ' + Math.round(b.y - dy / len * rim) + '"' +
-      (hasTech(i, e.from) ? ' class="on"' : '') + '/>';
-  });
-  html += '</svg>';
-  lay.nodes.forEach(n => {
-    const id = n.id, known = hasTech(i, id), cur = f.research === id, ready = techReady(i, id);
-    const state = known ? 'known' : cur ? 'cur' : ready ? 'ready' : 'locked';
-    const cost = techCost(i, id);
-    const status = known ? 'known' : cur ? Math.min(f.rp, cost) + ' / ' + cost : cost + ' rp';
-    const unlocks = techUnlocks(i, id).join(', ');
-    html += '<button class="tnode ' + state + '" data-act="research:' + id + '"' +
-      (ready && !cur && myTurn() ? '' : ' disabled') + ' title="' + esc(techName(id) + ' — ' + status + '. ' + unlocks) + '"' +
-      ' style="left:' + Math.round(n.x - 48) + 'px;top:' + Math.round(n.y - TT_NODE / 2) + 'px">' +
-      '<span class="tcircle">' + techGlyph(id) + '</span>' +
-      '<span class="tname">' + esc(techName(id)) + '</span>' +
-      '<span class="tcost">' + esc(status) + '</span></button>';
-  });
-  const turns = f.research ? researchTurns(i) : null;
-  const cost = f.research ? techCost(i, f.research) : 0;
-  html += '<div class="thub" style="left:' + mid + 'px;top:' + mid + 'px">' +
-    '<span class="thk">' + (f.research ? 'Researching' : 'Nothing picked') + '</span>' +
-    (f.research
-      ? '<strong>' + esc(techName(f.research)) + '</strong><span class="thv">' + Math.min(f.rp, cost) + ' / ' + cost +
-        (turns === null ? '' : ' · ' + (isFinite(turns) ? turns + 't' : '∞')) + '</span>'
-      : '<span class="thv">+' + researchRate(i) + ' a turn</span>') +
-    '</div>';
-  return html + '</div></div>';
-}
-
-// The drawing is laid out in its own pixels; shrink it to fit the dialog.
-function fitTechTree() {
-  if (!UI.modal) return;
-  const wrap = UI.modal.querySelector('.ttree-wrap');
-  const tree = wrap && wrap.querySelector('.ttree');
-  if (!tree) return;
-  const size = parseFloat(tree.getAttribute('data-size')) || 1;
-  const room = Math.max(240, wrap.clientWidth - 2);
-  const k = Math.min(1, room / size);
-  tree.style.transformOrigin = '0 0';
-  tree.style.transform = 'translateX(' + Math.max(0, (room - size * k) / 2) + 'px) scale(' + k + ')';
-  wrap.style.height = (size * k + 2) + 'px';
-  if (!fitTechTree.bound) {
-    fitTechTree.bound = true;
-    window.addEventListener('resize', () => { if (UI.modalKind === 'tech') fitTechTree(); });
-  }
-}
-
 function showTech() {
   const v = G.viewer;
   if (v === null) return;
   const f = pl(v), rate = researchRate(v);
   let html = modalHead('Tech tree', (f.research ? 'Researching ' + esc(techName(f.research)) : 'Nothing picked') + ' · +' + rate + ' a turn · ' + f.rp + ' banked');
-  html += '<div class="modal-body">' + techTreeHTML(v) +
-    '<h3 style="margin-top:16px">After the tree</h3><div class="tech-future">' + techCard(v, 'future') + '</div>' +
-    '<p class="hint">Each line points from a tech to the tech it unlocks. You research one at a time: ' +
-    'cities set to Research send all their production into it, and each Library adds 2 a turn on its own. ' +
+  html += '<div class="modal-body"><div class="tech-grid">';
+  for (const era of [1, 2, 3]) {
+    html += '<div class="tech-col"><h3>Era ' + era + ' · ' + (era * 2) + ' score each</h3>' +
+      TECH_ORDER.filter(id => TECHS[id].era === era).map(id => techCard(v, id)).join('') + '</div>';
+  }
+  html += '</div><h3 style="margin-top:14px">After the tree</h3>' + techCard(v, 'future') +
+    '<p class="hint">You research one tech at a time. Cities set to Research send all their production into it, and each Library adds 2 a turn on its own. ' +
     'Points carry over, so switching techs loses nothing.' + (civIs(v, 'uk') ? ' Your techs cost 25% less.' : '') +
     (civIs(v, 'portugal') ? ' Navigation costs you half.' : '') + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>';
   openModal(html, 'wide');
   UI.modalKind = 'tech';
-  fitTechTree();
 }
 
 function showCouncil() {
@@ -3973,6 +4106,7 @@ function showPending() {
 }
 
 function askEndTurn() {
+  if (G.tut) { doEndTurn(); return; }
   const v = G.viewer;
   const idle = idleUnits(v), lazy = idleCities(v), tech = needsTech(v);
   if (!idle.length && !lazy.length && !tech) { doEndTurn(); return; }
@@ -3989,13 +4123,17 @@ function askEndTurn() {
 }
 
 function showMenu() {
-  openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name) +
+  openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name) +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
     '<button class="act" data-act="civs">All 16 civs</button>' +
-    '<button class="act" data-act="save">Save now</button>' +
+    (G.tut ? '<button class="act switch" data-act="coach-toggle">Tutorial coach<b>' + (G.tut.closed ? 'off' : 'on') + '</b></button>'
+      : '<button class="act" data-act="tut-start">Play the tutorial</button>') +
+    '<button class="act switch" data-act="tips-toggle">Tips in my games<b>' + (tipsOn() ? 'on' : 'off') + '</b></button>' +
+    (G.tut ? '' : '<button class="act" data-act="save">Save now</button>') +
     '<button class="act warn" data-act="new-ask">Quit to the start screen</button></div>' +
-    '<p class="hint">The game saves itself on this device after every move and every turn.</p></div>' +
+    '<p class="hint">' + (G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.' :
+      'The game saves itself on this device after every move and every turn. Playing the tutorial keeps this save.') + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Back to the game</button></div>', true);
 }
 
@@ -4040,6 +4178,8 @@ function showHelp() {
     'Melee units take damage back; archers, catapults and warships don’t. Units inside their own borders get +5. Hills and forest give defenders +3. ' +
     'Spearmen get +10 against horse units; catapults get −15 against units. Units that don’t move or fight heal 10 HP, or 20 inside your borders.</p>' +
     '<h3>Taking cities</h3><p>Hit a city to 0 HP, then a melee unit takes it. Scouts can’t. Captured cities lose their walls and 1 pop. You can keep them or burn them; capitals can’t be burned.</p>' +
+    '<h3>Difficulty</h3><p>On Normal, CPUs play by the same rules as you. On Deity, every CPU gets +40% production, +20% food, +25% research and +4 combat strength. ' +
+    'It also needs a smaller edge before it attacks, starts wars sooner and holds out longer for peace.</p>' +
     '<h3>Maps and continents</h3><p>Pick Pangaea, Continents, Islands or Mirror at setup. Every map’s land is split into named continents, marked with thin dashed lines. Click a hex to see which one it’s on.</p>' +
     '<h3>Winning</h3><p>Hold every capital on the map, or have the highest score when the turn limit hits. Score is 5 per city, 1 per pop, 2, 4 or 6 per tech by era (4 per Future Tech), ' +
     'and 1 per 20 military strength. Older units count for less as the game goes on: era 1 slides to 25% and era 2 to 50% by the last turn.</p>' +
@@ -4123,10 +4263,33 @@ function onAction(act) {
   if (kind === 'zoom-out') { zoomBy(1 / 1.2); return; }
   if (kind === 'zoom-fit') { fitCamera(); return; }
   if (kind === 'civs') { showCivs(); return; }
+  if (kind === 'tut-start') { if (G && !G.tut) saveGame(); startTutorial(); return; }
+  if (kind === 'tips-toggle') {
+    setTips(!tipsOn());
+    if (UI.optTips) UI.optTips.checked = tipsOn();
+    toast('Tips ' + (tipsOn() ? 'on' : 'off') + '.');
+    if (G) { render(); showMenu(); }
+    return;
+  }
   if (!G) return;
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   switch (kind) {
     case 'close': closeModal(); break;
+    case 'tut-next': tutorialNext(); render(); break;
+    case 'tut-close': if (G.tut) { G.tut.closed = true; render(); } break;
+    case 'coach-toggle': if (G.tut) { G.tut.closed = !G.tut.closed; render(); showMenu(); } break;
+    case 'tut-quit':
+    case 'tut-new':
+      if (UI.optTutorial) UI.optTutorial.checked = false;
+      onAction('new');
+      break;
+    case 'tip-ok': markTipSeen(a); render(); break;
+    case 'tips-off':
+      setTips(false);
+      if (UI.optTips) UI.optTips.checked = false;
+      toast('Tips off. Turn them back on in the Menu.');
+      render();
+      break;
     case 'council': if (!G.handoff) showCouncil(); break;
     case 'tech': if (!G.handoff && G.viewer !== null) showTech(); break;
     case 'research':
@@ -4264,13 +4427,16 @@ function handleTileClick(x, y) {
   const v = G.viewer;
   const key = keyOf(x, y);
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
-  if (selUnit && selUnit.owner === v && myTurn() && visibleTo(x, y)) {
-    if (strikeInfo(selUnit, x, y)) { strikeAt(selUnit, x, y); return; }
-    const tgt = targetAt(selUnit, x, y);
-    if (tgt && tgt.peace !== undefined && hexDistance(selUnit.x, selUnit.y, x, y) <= (shoots(selUnit.type) ? UNITS[selUnit.type].range : 1)) {
-      toast('You are at peace with ' + pl(tgt.peace).name + '. Declare war in the Council first.');
-      return;
+  if (selUnit && selUnit.owner === v && myTurn()) {
+    if (visibleTo(x, y)) {
+      if (strikeInfo(selUnit, x, y)) { strikeAt(selUnit, x, y); return; }
+      const tgt = targetAt(selUnit, x, y);
+      if (tgt && tgt.peace !== undefined && hexDistance(selUnit.x, selUnit.y, x, y) <= (shoots(selUnit.type) ? UNITS[selUnit.type].range : 1)) {
+        toast('You are at peace with ' + pl(tgt.peace).name + '. Declare war in the Council first.');
+        return;
+      }
     }
+    // Every green hex works, even one past what your units can see right now.
     if (reachable && reachable.has(key)) {
       moveUnit(selUnit, x, y, reachable);
       afterAction();
@@ -4416,10 +4582,11 @@ function bindKeys() {
 const SAVE_KEY = 'bored.civlite.save.v2';
 
 function saveGame() {
-  if (!G || G.watch) return false;
+  if (!G || G.watch || G.tut) return false;
   if (G.over) { clearSave(); return false; }
   try {
-    const meta = G.players.map(p => p.name).join(' vs ') + ' · ' + MAP_TYPES[G.map].name.toLowerCase() + ' · turn ' + G.turn;
+    const meta = G.players.map(p => p.name).join(' vs ') + ' · ' + MAP_TYPES[G.map].name.toLowerCase() +
+      (G.level === 'deity' ? ' · deity' : '') + ' · turn ' + G.turn;
     localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 2, at: Date.now(), meta, state: G }));
     return true;
   } catch (error) {
@@ -4434,6 +4601,7 @@ function validState(state) {
   return !!state && state.v === 2 && Array.isArray(state.tiles) && Array.isArray(state.players) && state.players.length >= 2 &&
     Number.isFinite(state.cols) && Number.isFinite(state.rows) && state.tiles.length === state.cols * state.rows &&
     Array.isArray(state.units) && Array.isArray(state.cities) && Array.isArray(state.conts) && !!MAP_TYPES[state.map] &&
+    (!state.level || !!LEVELS[state.level]) &&
     state.players.every(p => CIVS[p.civ] && Array.isArray(p.techs)) && !state.over;
 }
 function readSave() {
@@ -4459,6 +4627,9 @@ function resumeState(state) {
   if (!G.handoff && G.viewer !== null) focusPlayer(G.viewer);
 }
 
+const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. <b>Space</b> ends your turn, ' +
+  '<b>N</b> jumps to the next unit that needs orders, <b>T</b> opens the tech tree, and <b>H</b> opens the rules.';
+
 /* ── the start screen ──────────────────────────────────────────────────────── */
 
 function buildStartScreen() {
@@ -4475,8 +4646,15 @@ function buildStartScreen() {
     '<div class="seat-note" id="seat-note-' + i + '"></div></div>').join('');
   UI.optMap.innerHTML = Object.keys(MAP_TYPES).map(id => '<option value="' + id + '"' + (id === 'pangaea' ? ' selected' : '') + '>' +
     MAP_TYPES[id].name + '</option>').join('');
+  UI.optLevel.innerHTML = Object.keys(LEVELS).map(id => '<option value="' + id + '">' + LEVELS[id].name + '</option>').join('');
   UI.optPlayers.onchange = refreshStart;
   UI.optMap.onchange = refreshStart;
+  UI.optLevel.onchange = refreshStart;
+  // The tutorial switch starts ticked for someone who has never played it.
+  UI.optTutorial.checked = !tutorialDone();
+  UI.optTips.checked = tipsOn();
+  UI.optTutorial.onchange = refreshStart;
+  UI.optTips.onchange = () => setTips(UI.optTips.checked);
   for (let i = 0; i < SEATS.length; i++) document.getElementById('seat-civ-' + i).onchange = refreshStart;
   UI.btnBegin.onclick = beginGame;
   UI.btnContinue.onclick = () => { const saved = readSave(); if (saved) resumeState(saved.state); };
@@ -4494,11 +4672,18 @@ function refreshStart() {
     } else note.textContent = 'A civ nobody else picked, drawn at random.';
   });
   UI.mapNote.textContent = MAP_TYPES[UI.optMap.value].blurb;
+  UI.levelNote.textContent = LEVELS[UI.optLevel.value].name + ': ' + LEVELS[UI.optLevel.value].blurb;
+  const tut = UI.optTutorial.checked;
+  UI.btnBegin.textContent = tut ? 'Start the tutorial' : 'Start game';
+  UI.startNote.innerHTML = tut
+    ? 'The tutorial is 14 short steps on a small island, playing Rome. The settings above wait for your next game. Untick <b>Tutorial</b> to skip it.'
+    : START_NOTE;
   const saved = readSave();
   UI.btnContinue.hidden = !saved;
   if (saved) UI.btnContinue.textContent = 'Continue · ' + (saved.meta || 'saved game');
 }
 function beginGame() {
+  if (UI.optTutorial.checked) { startTutorial(); return; }
   const n = Number(UI.optPlayers.value);
   const seats = [];
   for (let i = 0; i < n; i++) {
@@ -4513,8 +4698,15 @@ function beginGame() {
   const picked = seats.map(s => s.civ).filter(Boolean);
   const twice = picked.find((c, k) => picked.indexOf(c) !== k);
   if (twice) { toast('Two players picked ' + CIVS[twice].land + '. Each civ can only be picked once.'); return; }
+  // Turn limit: any whole number from 10 to 500, or 0 for no limit.
+  const turns = Number(UI.optTurns.value);
+  if (UI.optTurns.value.trim() === '' || !Number.isInteger(turns) || (turns !== 0 && (turns < 10 || turns > 500))) {
+    toast('Turn limit: a whole number from 10 to 500, or 0 for no limit.');
+    UI.optTurns.focus();
+    return;
+  }
   const seed = nextSeed();
-  const game = startGame({ seats, maxTurns: Number(UI.optTurns.value), seed, map: UI.optMap.value });
+  const game = startGame({ seats, maxTurns: turns, seed, map: UI.optMap.value, level: UI.optLevel.value });
   if (!game) { toast('That map didn’t work out. Try again.'); return; }
   gamesStarted++;
   UI.start.hidden = true;
@@ -4542,7 +4734,8 @@ const BORED_SLUG = 'ashcrown';
 if (typeof window !== 'undefined') {
   window.__boredSnapshot = function () {
     try {
-      const humans = G ? G.players.filter(p => p.human) : [];
+      const real = G && !G.tut ? G : null;
+      const humans = real ? real.players.filter(p => p.human) : [];
       const f = humans.sort((a, b) => scoreParts(b.i).total - scoreParts(a.i).total)[0] || null;
       const s = f ? scoreParts(f.i) : null;
       const winner = G && G.over && G.over.winner !== null ? pl(G.over.winner) : null;
@@ -4553,9 +4746,9 @@ if (typeof window !== 'undefined') {
         cities: s ? s.cities : 0,
         techs: f ? f.techs.length + f.future : 0,
         units: f ? ownUnits(f.i).length : 0,
-        turn: G ? G.turn : 0,
-        won: winner && winner.human ? 1 : 0,
-        finished: !!(G && G.over)
+        turn: real ? real.turn : 0,
+        won: real && winner && winner.human ? 1 : 0,
+        finished: !!(real && real.over)
       };
     } catch (error) {
       return { slug: BORED_SLUG, renown: 0, score: 0, cities: 0, techs: 0, units: 0, turn: 0, won: 0, finished: false };
@@ -4580,7 +4773,6 @@ function nextSeed() {
 function boot(data) {
   const q = s => document.querySelector(s);
   UI = {
-    inspector: document.getElementById('inspector'),
     stage: q('#stage'), map: q('#map'), cam: q('#cam'),
     layerTerrain: q('#layer-terrain'), layerOwner: q('#layer-owner'), layerCoast: q('#layer-coast'),
     layerMarks: q('#layer-marks'), layerBorder: q('#layer-border'), layerOverlay: q('#layer-overlay'),
@@ -4591,7 +4783,9 @@ function boot(data) {
     handoff: q('#handoff'), handoffDot: q('#handoff-dot'), handoffTurn: q('#handoff-turn'),
     handoffName: q('#handoff-name'), handoffNote: q('#handoff-note'),
     start: q('#start'), seats: q('#seats'), optPlayers: q('#opt-players'), optTurns: q('#opt-turns'), optMap: q('#opt-map'),
-    mapNote: q('#map-note'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), endShown: false, modalKind: null
+    optLevel: q('#opt-level'), mapNote: q('#map-note'), levelNote: q('#level-note'),
+    optTutorial: q('#opt-tutorial'), optTips: q('#opt-tips'), startNote: q('#start-note'),
+    coach: q('#coach'), coachTag: q('#coach-tag'), coachCount: q('#coach-count'), coachSay: q('#coach-say'), coachActions: q('#coach-actions'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), endShown: false, modalKind: null
   };
   buildStartScreen();
   bindMap();
