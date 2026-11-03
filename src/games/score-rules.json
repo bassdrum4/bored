@@ -124,6 +124,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "risk": {
+    "label": "Fewest human turns to conquer the world vs CPU",
+    "better": "low",
+    "max_value": 999
+  },
   "scrabble": {
     "label": "Points in a finished game against the computer",
     "better": "high",

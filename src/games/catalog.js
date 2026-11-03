@@ -10,9 +10,10 @@
 // The shelf is the arcade's arrival log, newest first: games:add prepends a new
 // game, so the top entry is the most recent arrival and the bottom is the oldest.
 // Games that landed in the same commit keep the order they were written in. The
-// four games built into arcade.js predate every game document, so they stay at
-// the end instead of being hoisted over the games that came after them.
-export const ORDER = [["scrabble", "Scrabble"], ["basket-random", "Basket Random"], ["brick-run", "Brick Run"], ["trackbound", "Trackmania"], ["ashcrown", "Ashcrown"], ["typing-test", "Typing Test"], ["circuit", "Circuit"], ["transit-chaos", "Transit Chaos"], ["fluid", "Fluid"], ["signal-tower", "Signal Tower"], ["prism-duel", "Prism Duel"], ["rooftop-snipers", "Rooftop Snipers: Boring Edition"], ["block-blast", "Block Blast"], ["chess", "Chess"], ["mahjong", "Mahjong"], ["minigolf", "Minigolf"], ["lights-out", "Lights Out"], ["deep", "DEEP"], ["sumo", "SUMO"], ["sand", "Sand"], ["poker", "Card Table"], ["wordle", "Wordle"], ["lava", "Lava"], ["volletball", "VolletBall"], ["solitaire", "Solitaire"], ["commanders", "Commanders"], ["eco", "Eco"], ["void-runner", "Void Runner"], ["qbert", "Q*bert"], ["simon", "Simon"], ["frogger", "Frogger"], ["pac-man", "Pac-man"], ["snake", "Snake"], ["tank", "Tank"], ["space-invaders", "Space Invaders"], ["pong", "Pong"], ["asteroids", "Asteroids"], ["breakout", "Breakout"], ["tetris", "Tetris"], ["minesweeper", "Minesweeper"], ["tank2", "Tank2"], ["gun-mayhem", "Gun Mayhem"], ["shadow-net", "shadow.net"], ["f-14", "F-14"], ["klang", "Klang"], ["8ball", "8 Ball"], ["2048", "2048"], ["memory", "Memory"], ["connect-four", "Connect Four"], ["aim-lab", "Aim Lab"]];
+// four native arcade.js games came after the initial documents but before DEEP.
+// Keep their original NEW-badge chronology (Aim Lab, Connect Four, Memory,
+// 2048) between DEEP and SUMO; NEW_GAMES identifies the implementation type.
+export const ORDER = [["risk","Risk"],["scrabble","Scrabble"],["basket-random","Basket Random"],["brick-run","Brick Run"],["trackbound","Trackmania"],["ashcrown","Ashcrown"],["typing-test","Typing Test"],["circuit","Circuit"],["transit-chaos","Transit Chaos"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["lights-out","Lights Out"],["deep","DEEP"],["aim-lab","Aim Lab"],["connect-four","Connect Four"],["memory","Memory"],["2048","2048"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["tank2","Tank 2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://youtubeplayer.freebuff.app/player"};
 // Offline games with no board of their own: they still play, but the hub keeps
 // no best for them. 8 Ball, Sand and Eco are open-ended toys, so a "high score"
@@ -23,8 +24,9 @@ export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
-export const FRESH_GAMES = ["scrabble", "basket-random", "brick-run", "trackbound"];
+export const FRESH_GAMES = ["risk", "scrabble", "basket-random", "brick-run"];
 export const META = {
+  "risk": ["Strategy", "Conquer the world against up to five computer commanders. Place troops, roll dice, defend borders, and claim continents."],
   "scrabble": ["Puzzle", "Fifteen squares a side, seven tiles in hand. Spell across the board against the computer or a friend."],
   "brick-run": ["Arcade", "Run, jump and stomp your way to the flagpole."],
   "trackbound": ["Arcade", "Modular time trial racing: medals, ghosts, a daily track and a procedural freeplay park."],
@@ -59,7 +61,7 @@ export const META = {
   pong: ['Arcade', 'The original rivalry'], asteroids: ['Arcade', 'Survive the asteroid field'],
   breakout: ['Arcade', 'Clear every brick'], tetris: ['Puzzle', 'Find the perfect fit'],
   minesweeper: ['Puzzle', 'Think before you click'], 'lights-out': ['Puzzle', 'Turn every light off'],
-  tank2: ['Arcade', 'Artillery duels inside a drivable box'],
+  tank2: ['Arcade', 'Artillery on a destructible rolling battlefield'],
   'gun-mayhem': ['Arcade', 'Knock rivals off the platforms'], 'shadow-net': ['Strategy', 'Explore a fictional network through its terminal'],
   'f-14': ['Online', 'Flight simulator · internet required'],
   klang: ['Online', 'Music player · internet required']
@@ -130,7 +132,7 @@ export function loadGameDocument(slug) {
 export const TOGETHER_GAMES = Object.freeze({
   'connect-four': Object.freeze({ name: 'Connect Four', rulesVersion: 1, mode: 'turns', preview: 'connect-four', blurb: 'Seven columns. One good rivalry.' }),
   '8ball': Object.freeze({ name: '8 Ball Pool', rulesVersion: 1, mode: 'turns', preview: '8ball', blurb: 'Clear your group. Finish on the eight.' }),
-  tank2: Object.freeze({ name: 'Pastel Tanks', rulesVersion: 2, mode: 'turns', preview: 'tank2', blurb: 'One shot each inside a drivable box. Blast the sides out.' }),
+  tank2: Object.freeze({ name: 'Tank 2', rulesVersion: 2, mode: 'turns', preview: 'tank2', blurb: 'One breakable box, two tanks, and nowhere safe to hide.' }),
   '2048': Object.freeze({ name: '2048', rulesVersion: 1, mode: 'duel', metric: 'score', unit: 'points', preview: '2048', blurb: 'Same board. Higher score wins.' }),
   mahjong: Object.freeze({ name: 'Mahjong', rulesVersion: 1, mode: 'duel', metric: 'pairs', unit: 'pairs', preview: 'mahjong', blurb: 'Same deal. Clear more pairs.' })
 });

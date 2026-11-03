@@ -1,7 +1,9 @@
 import { request, freshSession, getSession } from './backend.js';
+import { createAnnouncementAdmin } from './announcement-admin.js';
 import { ORDER } from '../games/catalog.js';
 import { summarizeEvents, summarizeEngagement, eventsCSV, excludeAdmins } from './analytics-data.js';
 const $ = selector => document.querySelector(selector);
+const announcementAdmin = createAnnouncementAdmin();
 let events = [], productEvents = [], surveyRows = [], togetherSummary = null, handles = {}, report = null, page = 0, loading = false, epoch = 0;
 const names = { ...Object.fromEntries(ORDER), 'f-14': 'F-14 Simulator' }, PAGE_SIZE = 40, MAX_EVENTS = 20000;
 const duration = ms => ms >= 3600000 ? (ms / 3600000).toFixed(1) + ' h' : ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
@@ -226,6 +228,7 @@ async function load() {
     const membership = await request('/rest/v1/analytics_admins?select=user_id&user_id=eq.' + user.user.id);
     if (!membership?.length) throw new Error('This account does not have analytics admin access.');
     authorized = true;
+    announcementAdmin.init();
     $('#access').hidden = true; $('#dashboard').hidden = false; $('#refresh').hidden = false;
     const start = detroitMidnight($('#from').value), end = detroitMidnight(shiftDay($('#through').value, 1));
     if (!Number.isFinite(+start) || !Number.isFinite(+end) || start >= end || end - start > 90 * 86400000) throw new Error('Choose a valid date range of at most 90 days.');

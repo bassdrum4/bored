@@ -24,6 +24,7 @@ import { createAccountUI } from './hub/account-ui.js';
 import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
+import { createAnnouncementsUI } from './hub/announcements-ui.js';
 import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
@@ -229,6 +230,10 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   activeChallenge = challenge;
   const external = EXTERNS[slug];
   activeSlug = previousSlug = slug;
+  // Ordinary games have shareable URLs; multiplayer sessions remain private.
+  if (!multiplayer && location.hash !== '#' + slug) {
+    history.pushState(null, '', '#' + slug);
+  }
   const from = origin || document.activeElement;
   const launchSource = challenge ? 'daily' : from?.closest?.('#recent') ? 'recent' : from?.closest?.('#leaderboard') ? 'leaderboard' : from?.id === 'random' ? 'random' : from?.closest?.('#grid') ? 'library' : 'other';
   // F-14 now tracks its own genuine flight phases, actions, and mission
@@ -350,6 +355,10 @@ function closeGame({ force = false } = {}) {
   gameFrame.removeAttribute('src');
   gameFrame.srcdoc = '';
   activeSlug = null;
+  // Keep the URL aligned with the hub, including Escape and the Back button.
+  if (location.hash && ORDER.some(([id]) => '#' + id === location.hash)) {
+    history.replaceState(null, '', location.pathname + location.search);
+  }
   const together = activeTogether;
   activeTogether = null;
   if (together) together.dispose();
@@ -750,6 +759,7 @@ const { renderAccount, openAuthDialog, initAccount } = createAccountUI({
 });
 
 const { initFeedback } = createFeedbackUI();
+const { initAnnouncements } = createAnnouncementsUI();
 
 
 
@@ -875,12 +885,37 @@ const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, ca
   openGame(match.game, null, document.querySelector('#together-nav'), player);
 } });
 window.addEventListener('bored:identity', () => { if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true }); });
+initAnnouncements();
 initAccount();
 initFeedback();
 initVoice();
+
+// The hash is the game slug: /bored/#qbert. This also handles browser Back,
+// Forward, and links pasted into an already-open arcade tab.
+function syncGameFromHash() {
+  const slug = location.hash.slice(1);
+  const valid = ORDER.some(([id]) => id === slug);
+  if (valid) {
+    if (activeSlug !== slug) openGame(slug);
+  } else if (activeSlug && !activeTogether) {
+    closeGame();
+  }
+}
+addEventListener('hashchange', syncGameFromHash);
+addEventListener('popstate', syncGameFromHash);
+syncGameFromHash();
+
 const analyticsToggle = $('#analytics-enabled');
-analyticsToggle.checked = analytics.enabled();
-analyticsToggle.onchange = () => analytics.setEnabled(analyticsToggle.checked);
+const updateAnalyticsToggle = () => {
+  analyticsToggle.checked = analytics.enabled();
+  analyticsToggle.disabled = !analytics.runtimeEligible();
+};
+updateAnalyticsToggle();
+analyticsToggle.onchange = () => {
+  analytics.setEnabled(analyticsToggle.checked);
+  updateAnalyticsToggle();
+};
+window.addEventListener('bored:analytics-disabled', updateAnalyticsToggle);
 
 // The original single-file hub exposed these globals; keep them for the test
 // suite and for anyone poking at the console.

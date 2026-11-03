@@ -2,15 +2,32 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 250,
+  "count": 267,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f146129","date":"2026-11-03","author":"Daniel Lowe","subject":"Keep announcement banner fixed at the top until dismissed"},
+  {"sha":"5c292c6","date":"2026-11-03","author":"Daniel Lowe","subject":"Tank 2: one breakable box, void outside, and shootable interface","pr":69},
+  {"sha":"578eba9","date":"2026-11-03","author":"Daniel Lowe","subject":"Add admin announcements and player notifications"},
+  {"sha":"eb731ed","date":"2026-11-03","author":"Daniel Lowe","subject":"Fix Tank 2 rolling terrain, breakable walls and keyboard controls","pr":68},
+  {"sha":"13dfb18","date":"2026-11-03","author":"bassdrum4","subject":"Make the box itself smooth destructible ground, not panels"},
   {"sha":"a10caa5","date":"2026-11-03","author":"Codebuff","subject":"Use Detroit calendar days for analytics date filters"},
+  {"sha":"16344a3","date":"2026-11-03","author":"Codebuff","subject":"Rebuild Ashcrown's chrome around the map, and open up Trackbound's freeplay."},
   {"sha":"2b92f95","date":"2026-11-03","author":"bassdrum4","subject":"Rebuild Pastel Tanks around feel: instant play, live aim, paper box"},
+  {"sha":"c8c0f9b","date":"2026-11-02","author":"Daniel Lowe","subject":"Test direct game hash navigation and close behavior"},
+  {"sha":"772053a","date":"2026-11-02","author":"Daniel Lowe","subject":"Risk: manual deployment and Shift-click five armies","pr":66},
+  {"sha":"c940f39","date":"2026-11-02","author":"Daniel Lowe","subject":"Add shareable hash links for games and history navigation"},
+  {"sha":"fb57509","date":"2026-11-02","author":"Daniel Lowe","subject":"Introduce connected diamond, zigzag, and fork Q*bert boards with shape-aware movement and enemies","pr":65},
+  {"sha":"5cb518c","date":"2026-11-02","author":"Daniel Lowe","subject":"Add Mahjong layout picker and expand Q*bert levels","pr":64},
+  {"sha":"253067b","date":"2026-11-02","author":"Daniel Lowe","subject":"Deepen Breakout with skill chains, new stages, touch aiming and progression fixes","pr":62},
+  {"sha":"f3a8ec2","date":"2026-11-02","author":"Daniel Lowe","subject":"Improve Risk solo flow and CPU strategy","pr":63},
+  {"sha":"da3fb5e","date":"2026-11-02","author":"Daniel Lowe","subject":"Place original Bored native games by creation date"},
+  {"sha":"f90de0d","date":"2026-11-02","author":"Daniel Lowe","subject":"Exclude development and administrator activity from Bored analytics","pr":60},
+  {"sha":"9362c37","date":"2026-11-02","author":"Daniel Lowe","subject":"Add F-14 and Klang preview images"},
+  {"sha":"f64b24f","date":"2026-11-02","author":"Daniel Lowe","subject":"Add Risk solo game with tactical CPU opponents","pr":59},
   {"sha":"684c88c","date":"2026-11-02","author":"PenguinV360","subject":"Update ashcrown.html"},
   {"sha":"3b8f93e","date":"2026-11-02","author":"Daniel Lowe","subject":"update ashcrown?"},
   {"sha":"435d8c2","date":"2026-11-02","author":"bassdrum4","subject":"Rework Pastel Tanks into the drivable box (rules v2)"},

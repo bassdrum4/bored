@@ -28,6 +28,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
       const url=new URL(req.url());
       const reply=(body,status=200)=>req.respond({status,headers:cors,contentType:'application/json',body:JSON.stringify(body)});
       if(req.method()==='OPTIONS')return req.respond({status:204,headers:cors});
+      if(/(^|\.)(googleapis|gstatic)\.com$/.test(url.hostname))return req.abort(); // Optional font; system-font fallback is expected.
       if(url.hostname!=='djdpttltfmwkofdrvkem.supabase.co'){unexpected.push(req.url());return req.abort();}
       const identity=req.headers().authorization?.replace('Bearer ','');
       if(url.pathname==='/functions/v1/together-pool') {
@@ -53,7 +54,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
       }
       if(url.pathname==='/rest/v1/profiles')return reply([{handle:handles[ids.indexOf(identity)]}]);
       if(url.pathname==='/auth/v1/logout')return reply(null);
-      if(['/rest/v1/score_rules','/rest/v1/leaderboard','/rest/v1/scores','/rest/v1/player_state','/rest/v1/daily_results','/rest/v1/play_events','/rest/v1/product_events','/rest/v1/enjoyment_feedback'].includes(url.pathname))return reply(req.method()==='GET'?[]:null);
+      if(['/rest/v1/announcements','/rest/v1/announcement_reads','/rest/v1/score_rules','/rest/v1/leaderboard','/rest/v1/scores','/rest/v1/player_state','/rest/v1/daily_results','/rest/v1/play_events','/rest/v1/product_events','/rest/v1/enjoyment_feedback'].includes(url.pathname))return reply(req.method()==='GET'?[]:null);
       unexpected.push(req.method()+' '+url.pathname);return req.abort();
     });
     await page.goto(site.url);await page.waitForFunction(()=>document.querySelectorAll('#grid .card').length>0);

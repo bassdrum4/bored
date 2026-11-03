@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" role="img" aria-label="Tank 2 arena with one destructible perimeter, interior rolling ground, and two opposing tanks">
+  <rect width="800" height="480" fill="#f5f2ea"/>
+  <text x="48" y="54" font-family="monospace" font-size="25" font-weight="700" letter-spacing="3" fill="#191713">TANK 2<tspan fill="#b3261e">.</tspan></text>
+  <text x="630" y="52" font-family="monospace" font-size="13" fill="#6b6558">RED · GREEN</text>
+  <!-- Only one perimeter: the destructible box IS the game boundary. -->
+  <path d="M52 90 H405 Q417 90 423 102 Q438 122 452 102 Q458 90 470 90 H748 V426 H52 V255 Q37 250 39 237 Q40 226 52 222 V90" fill="none" stroke="#191713" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- Soil exists inside the box, below the wavy floor; everything beyond the wall is empty. -->
+  <path d="M52 363 C84 353 111 359 142 352 S202 366 240 365 S310 356 354 360 S432 353 462 360 Q477 378 495 366 Q510 355 536 364 S603 359 639 358 S704 349 748 364 L748 426 L52 426 Z" fill="#ded7c6"/>
+  <path d="M52 363 C84 353 111 359 142 352 S202 366 240 365 S310 356 354 360 S432 353 462 360 Q477 378 495 366 Q510 355 536 364 S603 359 639 358 S704 349 748 364" fill="none" stroke="#191713" stroke-width="3"/>
+  <!-- Red tank. -->
+  <g transform="translate(178 349)">
+    <rect x="-15" y="-1" width="30" height="7" rx="2" fill="#191713"/>
+    <rect x="-11" y="-12" width="22" height="12" rx="2" fill="#b3261e" stroke="#191713" stroke-width="2"/>
+    <path d="M0 -11 L19 -38" stroke="#191713" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <!-- Green tank. -->
+  <g transform="translate(648 357)">
+    <rect x="-15" y="-1" width="30" height="7" rx="2" fill="#191713"/>
+    <rect x="-11" y="-12" width="22" height="12" rx="2" fill="#456653" stroke="#191713" stroke-width="2"/>
+    <path d="M0 -11 L-19 -38" stroke="#191713" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <path d="M196 308 Q400 90 630 318" fill="none" stroke="#7c756b" stroke-width="2" stroke-dasharray="2 12" opacity=".55"/>
+</svg>
