@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 270,
+  "count": 271,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"b756489","date":"2026-11-03","author":"PenguinV360","subject":"Update ashcrown.html"},
   {"sha":"64cc3d5","date":"2026-11-03","author":"Codebuff","subject":"Scatter the tech tree into rings instead of columns."},
   {"sha":"e7547ab","date":"2026-11-03","author":"Codebuff","subject":"Let a cloud preview whitelist its own hostname."},
   {"sha":"725fe19","date":"2026-11-03","author":"Codebuff","subject":"Draw Ashcrown's tech as an actual tree."},
