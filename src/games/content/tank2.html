@@ -21,334 +21,772 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Pastel Tanks</title>
 <style>
-  :root {
-    --paper: #f5f2ea; --board: #fffdf7; --ink: #191713; --hair: #d8d2c4;
-    --dim: #6b6558; --accent: #456653; --red: #b3261e;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box }
-  html, body { height: 100% }
-  body { background: var(--paper); color: var(--ink); font: 13px/1.5 var(--mono);
-    display: grid; place-items: center; overflow: hidden; touch-action: manipulation;
-    user-select: none; -webkit-user-select: none }
-  main { display: grid; gap: 8px; padding: 8px; justify-items: center }
-  canvas { display: block; border: 1px solid var(--hair); cursor: crosshair; touch-action: none }
-  #bar { display: none; flex-wrap: wrap; gap: 6px; justify-content: center; width: 100% }
-  #bar button { font: 12px var(--mono); padding: 8px 10px; border: 1px solid var(--hair);
-    border-radius: 2px; background: var(--board); color: var(--ink); cursor: pointer; touch-action: manipulation }
-  #bar button.sel { border-color: var(--ink) }
-  #bar button:disabled { color: var(--dim); cursor: default }
-  #bar .fire { min-width: 70px; border-color: var(--ink); font-weight: 600 }
-  #hint { min-height: 17px; text-align: center; color: var(--dim); font-size: 11px }
+  :root { --paper: #f5f2ea; --board: #fffdf7; --ink: #191713; --hair: #d8d2c4; --dim: #6b6558; --red: #b3261e; --green: #456653; }
+  * { box-sizing: border-box }
+  html, body { margin: 0; background: var(--paper); color: var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    min-height: 100vh; padding: 10px; user-select: none; -webkit-user-select: none; touch-action: manipulation }
+  header, footer { width: min(100%, 760px); display: flex; align-items: baseline; justify-content: space-between; gap: 10px }
+  h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .14em }
+  h1 span { color: var(--red) }
+  #hud { font-size: 12px; letter-spacing: .04em; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap }
+  #hud b { color: var(--ink); font-weight: 600 }
+  #hud .p1 { color: var(--green) } #hud .p2 { color: var(--red) }
+  canvas { display: block; width: min(100%, 760px); height: auto; aspect-ratio: 960/580; border: 1px solid var(--ink);
+    background: var(--board); touch-action: none; cursor: crosshair }
+  footer { align-items: center; font-size: 11px; color: var(--dim); flex-wrap: wrap }
+  footer p { margin: 0; flex: 1 1 auto; min-width: 0 }
+  #acts { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end }
+  button { font: 600 11px ui-monospace, monospace; letter-spacing: .05em; border: 1px solid var(--ink); background: none;
+    color: inherit; border-radius: 3px; padding: 5px 8px; cursor: pointer; touch-action: manipulation }
+  button:active { background: var(--ink); color: var(--paper) }
+  button:disabled { border-color: var(--hair); color: var(--hair); cursor: default; background: none }
+  button.sel { background: var(--ink); color: var(--paper) }
+  #arms button { padding: 5px 6px; letter-spacing: .03em }
+  #arms b { font-weight: 600 }
+  @media (max-width: 560px) { footer p { display: none } #acts { width: 100%; justify-content: center } }
 </style>
 </head>
 <body>
-<main>
-  <canvas id="c" width="960" height="580"></canvas>
-  <div id="bar" role="toolbar"></div>
-  <div id="hint"></div>
-  <span class="wind-flag" hidden></span>
-</main>
+<header>
+  <h1>PASTEL TANKS<span>.</span></h1>
+  <div id="hud"><span class="p1">LAVENDER</span> <b id="hp1">100</b> · <span class="p2">MINT</span> <b id="hp2">100</b> <span id="wind">· wind 0</span> <span id="fuel"></span></div>
+</header>
+<canvas id="c" width="960" height="580" aria-label="Artillery duel inside a box: drive the walls, blast the panels"></canvas>
+<footer>
+  <p id="hint">A/D or arrows drive · W/S or up/down aim · point and tap fires · space charges</p>
+  <div id="acts">
+    <div id="arms"></div>
+    <button id="mode" type="button">Two players</button>
+  </div>
+</footer>
 <script>'use strict';
-/* Pastel Tanks, rules version 2 — an artillery duel inside a drivable box.
- * The rules live in tank-engine.js: the four wall bands are one ring road,
- * tanks drive it (walls, ceiling, upside down included), shells fall with
- * gravity, and a hole in any panel dumps whatever stands over it. This file
- * only shows the world a replay builds and takes the input that drives it:
- * offline it simulates its own shots, and under Bored Together the move goes
- * to the server and each side paints what the stored list replays. */
+/* Pastel Tanks, rules version 2: an artillery duel inside a drivable box.
+ * tank-engine.js owns the model — four wall bands make one ring road, tanks drive
+ * it (walls, ceiling and upside-down floor included), shells fall with ordinary
+ * gravity, and a hole drops whatever stands over it. This document paints that
+ * world smoothly and turns input into a shot: offline it runs the shot itself,
+ * and under Bored Together every move is replayed from the stored list. */
 
 const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
-const barEl = document.getElementById('bar'), hintEl = document.getElementById('hint');
+const hud = { hp1: document.getElementById('hp1'), hp2: document.getElementById('hp2'),
+  wind: document.getElementById('wind'), fuel: document.getElementById('fuel') };
+const hintEl = document.getElementById('hint');
+const armsEl = document.getElementById('arms');
+const modeEl = document.getElementById('mode');
 
-const C = {
-  paper: '#f5f2ea', board: '#fffdf7', ink: '#191713', hair: '#d8d2c4', dim: '#6b6558',
-  accent: '#456653', red: '#b3261e', seat1: '#456653', seat2: '#b3261e'
-};
-const WEAPONS = ['standard', 'heavy', 'cluster', 'mine', 'ricochet'];
-const WEAPON_TAGS = { standard: '1 STD', heavy: '2 HVY', cluster: '3 CLU', mine: '4 MIN', ricochet: '5 RIC' };
+const C = { paper: '#f5f2ea', board: '#fffdf7', ink: '#191713', hair: '#d8d2c4', dim: '#6b6558',
+  red: '#b3261e', green: '#456653' };
+const COLOUR = { 1: C.green, 2: C.red };
+const ARMS = [['standard', '1'], ['heavy', '2'], ['cluster', '3'], ['mine', '4'], ['ricochet', '5']];
+const ARM_NAMES = { standard: 'STD', heavy: 'HVY', cluster: 'CLU', mine: 'MIN', ricochet: 'RIC' };
 
-/* Snapshot globals first: the daily adapter looks for these exact names. */
+/* Snapshot globals first: the daily adapter names these exactly. */
 let mode = 'TITLE', aiEnabled = false, sessionWins = 0;
 
-let engine = null;
-let state = null, world = null, winner = null;
-let anim = null;         // { items, speed, total, frame, bursts, pre, done, result, group }
-let sel = 'standard', walkPx = 0, charge = null, chan = 1; // chan: seat the input serves
-let drag = null;         // { id, moved } pointer aiming
-const aimVars = { 1: { angle: 45, power: 12 }, 2: { angle: 45, power: 12 } };
-const liveDir = { 1: 1, 2: 1 };
+let engine = null, state = null, world = null, winner = null;
+let sel = 'standard', walk = 0, walkVel = 0, charge = null, chargeFrom = null;
+const aim = { 1: { angle: 45, power: 12 }, 2: { angle: 45, power: 12 } };
+const facing = { 1: -1, 2: 1 };
 const keys = new Set();
-let shake = 0, particles = [], popups = [];
-let aiTimer = 0, aiChosen = null, overTime = 0;
+let anim = null, sprigs = [], notes = [], shake = 0, crumble = [];
+let aiPlan = null, aiTick = 0, overFor = 0, lastNow = 0;
+let pointer = null, settleT = 0;
+const seenTurn = { seat: 0, at: -1 };
 
-/* Bored Together: the bridge arrives before this script runs. */
 const bridge = window.__boredTogether || null;
-let online = null;       // { seat, names, busy, canonical, job, waitMs }
+let online = null;
 
-/* ── Palette, text and small canvas helpers ─────────────────────────────── */
+const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const X0 = () => engine.BX + engine.T, X1 = () => engine.BX + engine.BW - engine.T;
+const Y0 = () => engine.BY + engine.T, Y1 = () => engine.BY + engine.BH - engine.T;
+const seatName = s => (online && online.names && online.names[s - 1]) || (s === 1 ? 'LAVENDER' : 'MINT');
+const anchor = t => { const p = engine.ringPoint(t.s); return { x: p.x + p.nx * 4, y: p.y + p.ny * 4, p }; };
 
-function nameFor(seat) {
-  if (online && online.names && online.names[seat - 1]) return online.names[seat - 1];
-  return seat === 1 ? 'LAVENDER' : 'MINT';
-}
-const colourFor = seat => (seat === 1 ? C.seat1 : C.seat2);
-
-function label(text, x, y, size, colour, align, weight) {
-  ctx.font = (weight || 400) + ' ' + size + 'px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
-  ctx.textAlign = align || 'center';
-  ctx.fillStyle = colour || C.ink;
-  ctx.fillText(text, x, y);
-}
-
-function roundRect(x, y, w, h, r) {
-  r = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
+function countHoles(w) { let n = 0; for (const row of w.panels) for (const v of row) if (!v) n++; return n; }
+function panelRect(wall, j) {
+  const len = engine.PANEL_LENS[wall];
+  if (wall === 0) return { x: X0() + j * len, y: engine.BY, w: len, h: engine.T };
+  if (wall === 1) return { x: X1(), y: Y0() + j * len, w: engine.T, h: len };
+  if (wall === 2) return { x: X1() - (j + 1) * len, y: Y1(), w: len, h: engine.T };
+  return { x: engine.BX, y: Y1() - (j + 1) * len, w: engine.T, h: len };
 }
 
-function sparksAt(x, y, n, colour) {
+function spark(x, y, n, colour, spread) {
   for (let i = 0; i < n; i++) {
-    const a = Math.random() * Math.PI * 2, sp = 1.2 + Math.random() * 3.4;
-    particles.push({
-      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.6, life: 1,
-      dec: .026 + Math.random() * .024,
-      colour: colour || (Math.random() < .6 ? C.hair : C.ink)
-    });
+    const a = Math.random() * Math.PI * 2, s = (spread || 2.4) * (.4 + Math.random());
+    sprigs.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - .7, life: 1, decay: .035 + Math.random() * .03, colour });
   }
 }
-function popup(text, x, y, colour) { popups.push({ text, x, y, colour, life: 1 }); }
+function note(text, x, y, colour, size) { notes.push({ text, x, y, colour, size: size || 13, life: 1 }); }
 
-function setStatus(text, colour) { hintEl.textContent = text || ''; hintEl.style.color = colour || C.dim; }
+/* ── Match flow ─────────────────────────────────────────────────────────── */
 
-/* ── Geometry shortcuts over the engine's numbers ───────────────────────── */
-
-const X0e = () => engine.BX + engine.T, X1e = () => engine.BX + engine.BW - engine.T;
-const Y0e = () => engine.BY + engine.T, Y1e = () => engine.BY + engine.BH - engine.T;
-const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const bodyP = tank => {
-  const p = engine.ringPoint(tank.s);
-  return { x: p.x + p.nx * 13, y: p.y + p.ny * 13 };
-};
-function panelRect(wall, j) {
-  const pl = engine.PANEL_LENS[wall];
-  if (wall === 0) return { x: X0e() + j * pl, y: engine.BY, w: pl + .6, h: engine.T };
-  if (wall === 1) return { x: X1e(), y: Y0e() + j * pl, w: engine.T, h: pl + .6 };
-  if (wall === 2) return { x: X1e() - (j + 1) * pl, y: Y1e(), w: pl + .6, h: engine.T };
-  return { x: engine.BX, y: Y1e() - (j + 1) * pl, w: engine.T, h: pl + .6 };
+function reset() {
+  aim[1] = { angle: 45, power: 12 }; aim[2] = { angle: 45, power: 12 };
+  facing[1] = -1; facing[2] = 1;
+  sel = 'standard'; walk = 0; walkVel = 0; charge = chargeFrom = pointer = null;
+  aiPlan = null; aiTick = 0; anim = null; sprigs = []; notes = []; crumble = []; shake = 0;
+  lastNow = 0;
 }
-function countHoles(w) {
-  let n = 0;
-  for (const row of w.panels) for (const v of row) if (!v) n++;
-  return n;
+function syncMode() {
+  if (!world) return mode = 'TITLE';
+  if (world.winner) return mode = 'OVER';
+  if (online) return mode = (online.canPlay() && state.turn === online.seat) ? 'AIM' : 'WAIT';
+  return mode = (aiEnabled && state.turn === 2) ? 'CPU' : 'AIM';
 }
-
-/* ── Session flow ───────────────────────────────────────────────────────── */
-
-function resetRound() {
-  aimVars[1] = { angle: 45, power: 12 }; aimVars[2] = { angle: 45, power: 12 };
-  liveDir[1] = 1; liveDir[2] = 1;
-  sel = 'standard'; walkPx = 0; charge = null; drag = null;
-  aiChosen = null; aiTimer = 0; anim = null;
-  particles = []; popups = []; shake = 0;
-}
-
-function startLocal(fresh) {
-  if (bridge) return;
-  const errBox = document.getElementById('together-error');
-  if (errBox) errBox.remove();
-  if (fresh) sessionWins = 0;
-  winner = null; overTime = 0;
-  const seed = ((window.__boredSeed && (window.__boredSeed.seed >>> 0)) ||
+function freshMatch(seed) {
+  const s = seed != null ? seed : ((engine && window.__boredSeed && (window.__boredSeed.seed >>> 0)) ||
     (((Date.now() * 2654435761 + 1) >>> 0) || 1));
-  state = engine.opening(seed);
+  state = engine.opening(s);
   world = engine.replay(state);
-  resetRound();
-  mode = (aiEnabled && state.turn === 2) ? 'CPU' : 'AIM';
-  syncBar();
-  setStatus(mode === 'CPU' ? 'MINT TAKES AIM.' : 'YOUR TURN, LAVENDER.', C.dim);
+  winner = null; overFor = 0;
+  reset();
+  syncMode();
+  paint(0);
 }
-
-function repaint(state2, opts) {
-  state = state2;
+function repaint(next, events) {
+  state = next;
   world = engine.replay(state);
   winner = state.winner || world.winner || null;
-  resetRound();
-  if (winner) { mode = 'OVER'; overTime = 0; }
-  else if (online) mode = (online.canPlay() && state.turn === online.seat) ? 'AIM' : 'WAIT';
-  else mode = (aiEnabled && state.turn === 2) ? 'CPU' : 'AIM';
-  if (opts && opts.events) aftermath(opts.events);
-  syncBar(); syncStatus();
+  walk = 0; walkVel = 0; charge = chargeFrom = null;
+  if (winner) { syncMode(); overFor = 0; }
+  else syncMode();
+  if (events) aftermath(events);
+  seenTurn.seat = state.turn; seenTurn.at = performance.now();
+  paint(0);
 }
 
-function syncStatus() {
-  if (mode === 'TITLE') return setStatus('');
-  if (mode === 'ANIM') return setStatus('SHELL AWAY.', C.ink);
-  if (mode === 'CPU') return setStatus(nameFor(2) + ' TAKES AIM.', C.dim);
-  if (mode === 'WAIT') return setStatus('WAITING FOR ' + nameFor(state ? 3 - (online ? online.seat : 2) : 1) + ' \u2026', C.dim);
-  if (mode === 'OVER') {
-    if (bridge) return setStatus('');
-    return setStatus(overTime >= 60 ? (aiEnabled ? 'NEXT ROUND SHORTLY \u2014 SIT TIGHT.' : 'TAP OR PRESS SPACE FOR THE NEXT ROUND.') : '', C.dim);
-  }
-  if (mode === 'AIM') {
-    const s = turnSeat();
-    if (s === 1) return setStatus('A/D DRIVE \u00b7 W/S AIM \u00b7 HOLD SPACE \u00b7 DRAG TO AIM \u00b7 1-5 SHELLS', C.dim);
-    return setStatus('\u2190/\u2192 DRIVE \u00b7 \u2191/\u2193 AIM \u00b7 HOLD ENTER \u00b7 1-5 SHELLS', C.dim);
-  }
-  return setStatus('');
-}
-
-/* Controls live or die by the turn: one seat drives with A/D, the other with
- * arrows, so a hot-seat pair never fight over the keys. In an online match
- * this side only climbs in when it is its seat. */
+/* Controls belong to whoever is on: one seat drives with A/D, the other arrows,
+ * and an online side only takes the wheel when the record says it is its turn. */
 function turnSeat() {
   if (online) return online.seat;
   if (aiEnabled && state && state.turn === 2) return 2;
   return state ? state.turn : 1;
 }
-function playable() {
+function live() {
   if (!world || world.winner) return false;
   if (online) return mode === 'AIM' && online.canPlay() && state.turn === online.seat;
   return mode === 'AIM' && !(aiEnabled && state.turn === 2);
 }
-
-/* ── Draft shot: what Space, ENTER or the FIRE button would send ─────────── */
-
-function charging() { return charge !== null; }
-let chargeFrom = null;
-function draftShot() {
+function draft() {
   if (!world || world.winner || anim) return null;
-  const seat = turnSeat(), aim = aimVars[seat];
+  const seat = turnSeat(), a = aim[seat];
   let weapon = sel;
   if (weapon !== 'standard' && !(world.tanks[seat - 1].ammo[weapon] > 0)) { weapon = 'standard'; sel = 'standard'; }
-  return {
-    seat, drive: walkPx, angle: aim.angle,
-    power: charging() ? Math.round(charge * 10) / 10 : aim.power, weapon
-  };
+  return { seat, drive: Math.round(walk), angle: a.angle, power: charging() ? Math.round(charge * 10) / 10 : a.power, weapon };
 }
-function beginCharge() {
-  if (!playable() || charging()) return;
-  charge = chargeFrom = Math.max(2, aimVars[turnSeat()].power);
+function charging() { return charge !== null; }
+let pressAt = 0;
+function pressFire() {
+  if (!live() || charging()) return;
+  charge = chargeFrom = clampN(aim[turnSeat()].power, 2, engine.MAXPW);
+  pressAt = performance.now();
 }
-function releaseCharge() {
+function releaseFire() {
   if (!charging()) return;
-  // a tap that never ticked the charger fires at the aimed power exactly
   const power = Math.max(chargeFrom === null ? 0 : chargeFrom, charge);
   charge = chargeFrom = null;
-  if (!playable()) return;
-  const shot = draftShot();
+  if (!live()) return;
+  const shot = draft();
   if (shot) { shot.power = Math.round(power * 10) / 10; fire(shot); }
 }
+function tapFire() {
+  if (!live()) return;
+  const shot = draft();
+  if (shot) fire(shot);
+}
 
-/* ── Firing and its choreography ────────────────────────────────────────── */
+/* ── One shot: animate the exact trail the rules will replay ────────────── */
 
 function fire(shot) {
   if (!shot || !state || world.winner || anim) return;
-  const pre = engine.replay(state);
-  let result;
-  try { result = engine.advance(state, shot); }
+  const before = engine.replay(state);
+  let out;
+  try { out = engine.advance(state, shot); }
   catch (error) {
-    if (online) return bridge.error(error, () => {
-      try { repaint(online ? online.state() : state); } catch (err2) { }
-      setTimeout(() => fire(shot), 30);
-    });
-    popup('NO GO: ' + error.message.toUpperCase(), 480, 300, C.red);
-    walkPx = 0; charge = null; syncStatus(); return;
+    if (online) return bridge.error(error, () => { try { repaint(online.state()); } catch (e2) { } setTimeout(() => fire(shot), 30); });
+    note(error.message.toUpperCase().slice(0, 40), 480, 296, C.red, 12);
+    walk = 0; charge = chargeFrom = null; return;
   }
-  const shotIdx = state.shots.length;
-  const group = {
-    trails: result.world.trails.slice(pre.trails.length),
-    events: result.world.events.slice(pre.events.length)
-  };
-  const lens = group.trails.map(t => t.length);
+  const index = state.shots.length;
+  const fresh = out.world.trails.slice(before.trails.length);
+  const lens = fresh.map(t => t.length);
   const total = lens.reduce((a, b) => a + b, 0);
-  const speed = Math.max(1, Math.ceil(total / 150));
+  const speed = Math.max(2, total / 90);           // one shell lands in about a second
   let cursor = 0;
-  const items = group.trails.map(t => { const start = cursor; cursor += t.length; return { trail: t, start, len: t.length }; });
-  const bursts = [];
-  for (const b of result.world.bursts) {
-    if (b.at !== shotIdx || !items.length) continue;
-    bursts.push({ x: b.x, y: b.y, r: b.r, when: items[0].start + items[0].len, born: false });
-    // mines, cluster children and even plain bursts funnel through here; the
-    // only visible one for a shot is its impact, everything after is events.
-    break;
-  }
-  const snap = { panels: pre.panels, tanks: pre.tanks.map(t => ({ ...t })), powerups: pre.powerups.slice(), mines: pre.mines.slice() };
+  const items = fresh.map(t => { const start = cursor; cursor += t.length; return { trail: t, start, len: t.length }; });
+  const impact = out.world.bursts.find(b => b.at === index) || null;
   anim = {
-    items, speed, total, frame: -6, bursts, pre: snap, result, group,
-    wait: Math.max(550, Math.min(3200, 300 + (total / speed) * 16))
+    items, speed, total, frame: 0, pre: before, out, impact,
+    crumble: crumbleFor(before.panels, out.world.panels),
+    events: out.world.events.slice(before.events.length),
+    at: performance.now(), doneAt: 0
   };
-  walkPx = 0; charge = null;
+  walk = 0; walkVel = 0; charge = chargeFrom = null;
   mode = 'ANIM';
-  syncStatus();
   if (online) {
     online.busy = true;
-    online.job =    online.bridgeSubmit({
-      seat: shot.seat, drive: shot.drive, angle: shot.angle, power: shot.power, weapon: shot.weapon,
-      won: result.next.winner || null
-    }).then(c => { online.canonical = c; return c; });
+    online.canonical = null;
+    online.job = online.submit({ seat: shot.seat, drive: shot.drive, angle: shot.angle, power: shot.power,
+      weapon: shot.weapon, won: out.next.winner || null }).then(c => { online.canonical = c; return c; });
   }
-  anim.done = setTimeout(commitShot, anim.wait);
+  paint(0);
 }
-
-function commitShot() {
+function crumbleFor(pre, post) {
+  const list = [];
+  for (let w = 0; w < 4; w++) for (let j = 0; j < post[w].length; j++) {
+    if (pre[w][j] && !post[w][j]) list.push({ wall: w, j, born: performance.now() });
+  }
+  return list;
+}
+function finishShot() {
   if (!anim) return;
-  clearTimeout(anim.done);
-  const finished = anim;
+  const done = anim;
   anim = null;
   if (online) {
-    if (!online.canonical) {
-      // Server has not answered yet: hold the final frame until it does.
-      anim = finished;
-      anim.done = setTimeout(commitShot, 120);
-      return;
-    }
-    const canonical = online.canonical; online.canonical = null; online.busy = false;
-    online.mixContext(canonical);
-    repaint(canonical.state, { events: finished.group.events });
+    if (!online.canonical) { anim = done; setTimeout(finishShot, 90); return; }
+    const canonical = online.canonical;
+    online.canonical = null; online.busy = false;
+    if (canonical) online.use(canonical);
+    repaint(canonical ? canonical.state : state, done.events);
     bridge.finishTurn();
     return;
   }
-  if (finished.result.next.winner === 1 && aiEnabled) sessionWins++;
-  const events = finished.group.events;
-  repaint(finished.result.next, { events });
+  if (done.out.next.winner === 1 && aiEnabled) sessionWins++;
+  repaint(done.out.next, done.events);
 }
 
 function aftermath(events) {
+  const tankAt = s => { const t = world.tanks[s - 1]; return t ? anchor(t) : { x: 480, y: 290 }; };
   for (const ev of events) {
-    const dot = s => { const t = world.tanks[s - 1]; return t ? bodyP(t) : { x: 480, y: 300 }; };
     if (ev.kind === 'hit') {
-      shake = Math.max(shake, Math.min(13, ev.damage * .38));
-      sparksAt(ev.x, ev.y, 10 + Math.min(16, ev.damage / 3), colourFor(ev.seat));
-      popup('-' + ev.damage, ev.x, ev.y - 20, colourFor(ev.seat));
+      shake = Math.max(shake, Math.min(4, ev.damage * .09));
+      spark(ev.x, ev.y, 8 + Math.min(12, ev.damage / 4), COLOUR[ev.seat]);
+      note('-' + ev.damage, ev.x, ev.y - 16, COLOUR[ev.seat]);
     } else if (ev.kind === 'land') {
-      const at = dot(ev.seat);
-      sparksAt(at.x, at.y, 12, C.hair);
-      popup('LANDING -' + ev.damage, at.x, at.y - 24, colourFor(ev.seat));
-      shake = Math.max(shake, 9);
+      const at = tankAt(ev.seat);
+      spark(at.x, at.y, 10, C.hair);
+      note('-' + ev.damage, at.x, at.y - 18, COLOUR[ev.seat]);
+      shake = Math.max(shake, 2.5);
     } else if (ev.kind === 'fell_out') {
-      popup('FELL OUT', ev.x, clampN(ev.y - 16, 70, 552), colourFor(ev.seat));
-      shake = Math.max(shake, 11);
-    } else if (ev.kind === 'shield') {
-      const at = dot(ev.seat);
-      popup('SHIELD!', at.x, at.y - 24, C.accent);
-    } else if (ev.kind === 'warp') {
-      const at = dot(ev.seat);
-      sparksAt(at.x, at.y, 9, C.accent);
-      popup('TELEPORT', at.x, at.y - 24, C.accent);
+      note('FELL OUT', clampN(ev.x, 80, 880), clampN(ev.y - 10, 70, 540), COLOUR[ev.seat]);
+      shake = Math.max(shake, 3);
     } else if (ev.kind === 'plant') {
-      sparksAt(ev.x, ev.y, 6, C.red);
-      popup('MINE SET', ev.x, ev.y + 16, C.red);
+      spark(ev.x, ev.y, 4, C.red, 1.2);
     }
   }
 }
 
-/* ── Bored Together wiring ──────────────────────────────────────────────── */
+/* ── Aiming ghost: the arc the rules would fly, drawn thin ──────────────── */
+
+let ghost = { key: '', value: null };
+function ghostWorld() {
+  const seat = turnSeat(), t = world.tanks[seat - 1], id = aim[seat];
+  const moved = { ...t, s: engine.wrapS(t.s + walk), angle: id.angle, dir: facing[seat] };
+  return { ...world, tanks: seat === 1 ? [moved, world.tanks[1]] : [world.tanks[0], moved] };
+}
+function ghostPath() {
+  if (!live()) return null;
+  const seat = turnSeat(), id = aim[seat];
+  const key = [engine.wrapS(world.tanks[seat - 1].s + walk), id.angle,
+    charging() ? charge : id.power, sel, world.panels.map(r => r.join('')).join(''), world.shotCount].join('|');
+  if (ghost.key !== key) {
+    ghost.key = key;
+    let g = null;
+    try { g = engine.guide(ghostWorld(), seat, id.angle, charging() ? charge : id.power, sel); } catch (e) { g = null; }
+    ghost.value = g;
+  }
+  return ghost.value;
+}
+
+/* ── AI: the same rules, a little planning ──────────────────────────────── */
+
+function blast(x, y, c, weapon) {
+  const r = (engine.RANGE[weapon] || 6) + 12, pair = engine.DAMAGE[weapon] || [8, 26];
+  const d = Math.hypot(c.x - x, c.y - y);
+  if (d >= r) return 0;
+  return Math.round(pair[0] + (1 - d / r) * (pair[1] - pair[0]));
+}
+function dumpScore(view, x, y, weapon, seat) {
+  const t = view.tanks[seat - 1], p = engine.ringPoint(t.s);
+  let d, along;
+  if (p.wall === 0) { d = Math.hypot(clampN(x, X0(), X1()) - x, y - Y0()); along = clampN(x, X0(), X1()) - X0(); }
+  else if (p.wall === 1) { d = Math.hypot(x - X1(), clampN(y, Y0(), Y1()) - y); along = clampN(y, Y0(), Y1()) - Y0(); }
+  else if (p.wall === 2) { d = Math.hypot(clampN(x, X0(), X1()) - x, y - Y1()); along = X1() - clampN(x, X0(), X1()); }
+  else { d = Math.hypot(x - X0(), clampN(y, Y0(), Y1()) - y); along = Y1() - clampN(y, Y0(), Y1()); }
+  const r = engine.CARVE[weapon] || 10;
+  if (d > r - 6) return 0;
+  return Math.abs(along - p.along) + 14 <= Math.sqrt(Math.max(0, r * r - d * d)) + 2 ? 1 : 0;
+}
+function scoreShot(view, seat, angle, power, weapon) {
+  const g = engine.guide(view, seat, angle, power, weapon);
+  const h = g.hit, kind = typeof h === 'string' ? h : h.kind;
+  if (kind === 'out' || kind === 'stall') return -9;
+  if (kind === 'plant') {
+    const foe = anchor(view.tanks[2 - seat]), me = anchor(view.tanks[seat - 1]);
+    return 40 - Math.hypot(h.x - foe.x, h.y - foe.y) * .28 - Math.hypot(h.x - me.x, h.y - me.y) * .9;
+  }
+  let s = blast(h.x, h.y, anchor(view.tanks[2 - seat]), weapon) - blast(h.x, h.y, anchor(view.tanks[seat - 1]), weapon) * 1.25;
+  if (kind === 'tank' && h.seat === 2 - seat) s += 10;
+  if (kind === 'wall' || kind === 'tank') {
+    if (dumpScore(view, h.x, h.y, weapon, 2 - seat)) s += 22;
+    if (dumpScore(view, h.x, h.y, weapon, seat)) s -= 32;
+  }
+  return s;
+}
+function movedWorld(view, seat, drive, angle) {
+  const t = view.tanks[seat - 1];
+  const moved = { ...t, s: engine.wrapS(t.s + drive), dir: drive > 0 ? 1 : -1, angle, falling: null };
+  return { ...view, tanks: seat === 1 ? [moved, { ...view.tanks[1] }] : [{ ...view.tanks[0] }, moved] };
+}
+function supportAt(view, s) { return engine.supported(view, { s: engine.wrapS(s), falling: null, hp: 1 }); }
+
+function plan() {
+  const seat = 2, view = engine.replay(state), me = view.tanks[1];
+  const cands = [];
+  for (const weapon of engine.WEAPONS) {
+    if (weapon !== 'standard' && !(me.ammo[weapon] > 0)) continue;
+    for (let a = 5; a <= 85; a += 4) for (let p = 4; p <= 23; p += 4) {
+      cands.push({ drive: 0, angle: a, power: p, weapon, score: scoreShot(view, seat, a, p, weapon) });
+    }
+  }
+  cands.sort((a, b) => b.score - a.score);
+  let best = cands[0];
+  if (!best || best.score < 14) {
+    for (const drive of [-320, -190, -90, 90, 190, 320]) {
+      if (engine.driveCost(me.s, drive) > engine.FUEL * .85 || !supportAt(view, me.s + drive)) continue;
+      const travel = movedWorld(view, seat, drive, 45);
+      for (const weapon of ['standard', 'heavy', 'cluster', 'ricochet']) {
+        if (weapon !== 'standard' && !(me.ammo[weapon] > 0)) continue;
+        for (let a = 16; a <= 84; a += 8) for (let p = 9; p <= 23; p += 4) {
+          cands.push({ drive, angle: a, power: p, weapon, score: scoreShot(travel, seat, a, p, weapon) });
+        }
+      }
+    }
+    cands.sort((a, b) => b.score - a.score);
+    best = cands[0];
+  }
+  if (!best) return { seat, drive: 0, angle: 45, power: 12, weapon: 'standard' };
+  if (best.score < 60) {
+    const view2 = best.drive ? movedWorld(view, seat, best.drive, best.angle) : view;
+    for (let a = Math.max(5, best.angle - 3); a <= Math.min(85, best.angle + 3); a++) {
+      for (let p = Math.max(1, best.power - 2); p <= Math.min(24, best.power + 2); p += .5) {
+        const s = scoreShot(view2, seat, a, Math.round(p * 10) / 10, best.weapon);
+        if (s > best.score) best = { drive: best.drive, angle: a, power: Math.round(p * 10) / 10, weapon: best.weapon, score: s };
+      }
+    }
+  }
+  const shot = { seat, drive: best.drive, angle: clampN(Math.round(best.angle + (Math.random() - .5) * 2), 5, 85),
+    power: clampN(Math.round((best.power + (Math.random() - .5)) * 10) / 10, 1, 24), weapon: best.weapon };
+  return engine.validateShot(view, shot, seat) ? { seat, drive: 0, angle: 45, power: 12, weapon: 'standard' } : shot;
+}
+
+/* ── Input ──────────────────────────────────────────────────────────────── */
+
+const DRIVE = { 1: ['KeyA', 'KeyD'], 2: ['ArrowLeft', 'ArrowRight'] };
+const AIMKEY = { 1: ['KeyW', 'KeyS'], 2: ['ArrowUp', 'ArrowDown'] };
+
+addEventListener('keydown', e => {
+  if (['Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  keys.add(e.code);
+  if (!engine || !world) return;
+  if (e.code === 'KeyR') { freshMatch(); return; }
+  if (mode === 'OVER') { if (overFor > 25 && (e.code === 'Space' || e.code === 'Enter')) freshMatch(); return; }
+  if (!live()) return;
+  const arm = { Digit1: 'standard', Digit2: 'heavy', Digit3: 'cluster', Digit4: 'mine', Digit5: 'ricochet' }[e.code];
+  if (arm) { pick(arm); return; }
+  if ((e.code === 'Space' || e.code === 'Enter') && !e.repeat) pressFire();
+});
+addEventListener('keyup', e => {
+  keys.delete(e.code);
+  if (e.code === 'Space' || e.code === 'Enter') releaseFire();
+});
+addEventListener('blur', () => { keys.clear(); charge = chargeFrom = null; pointer = null; });
+
+function pick(arm) {
+  const t = world && world.tanks[turnSeat() - 1];
+  if (arm !== 'standard' && !(t && t.ammo[arm] > 0)) { note('NO ' + ARM_NAMES[arm] + ' SHELLS', 480, 296, C.red, 12); return; }
+  sel = arm; paint(0);
+}
+
+/* Pointer aiming is live: wherever the cursor sits relative to the tank sets the
+ * angle and the pull-back distance sets the power, in the tank's own frame. A
+ * tap fires; there is nothing to drag first. */
+function at(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * 960 / r.width, y: (e.clientY - r.top) * 580 / r.height };
+}
+function aimAt(p) {
+  const seat = turnSeat(), t = world.tanks[seat - 1];
+  const c = anchor(t), q = engine.ringPoint(t.s);
+  const dx = p.x - c.x, dy = p.y - c.y, len = Math.hypot(dx, dy);
+  if (len < 12) return;
+  const inward = (dx * q.nx + dy * q.ny) / len;
+  const along = (dx * q.tx + dy * q.ty) / len * (t.dir || 1);
+  let a = Math.atan2(along, Math.max(inward, .06)) * 180 / Math.PI;
+  if (a < 0) a = -a;
+  aim[seat].angle = clampN(Math.round(a), 5, 85);
+  aim[seat].power = Math.round(clampN(len / 24, 1, 24) * 10) / 10;
+}
+canvas.addEventListener('pointermove', e => {
+  if (!live()) { pointer = null; return; }
+  pointer = at(e);
+  aimAt(pointer);
+});
+canvas.addEventListener('pointerdown', e => {
+  if (!engine || !world) return;
+  if (mode === 'OVER') { if (overFor > 25) freshMatch(); return; }
+  if (!live()) return;
+  e.preventDefault();
+  aimAt(at(e));
+  pointer = at(e);
+});
+canvas.addEventListener('pointerup', e => {
+  if (!live() || !pointer) return;
+  aimAt(at(e));
+  tapFire();
+});
+canvas.addEventListener('pointerleave', () => { pointer = null; });
+
+for (const [key] of ARMS) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.dataset.arm = key;
+  b.addEventListener('click', () => pick(key));
+  armsEl.append(b);
+}
+modeEl.addEventListener('click', () => {
+  aiEnabled = !aiEnabled;
+  modeEl.textContent = aiEnabled ? 'Two players' : 'Solo vs AI';
+  freshMatch();
+});
+
+/* ── Per-frame step ─────────────────────────────────────────────────────── */
+
+function step(dt) {
+  shake *= Math.pow(.02, dt); if (shake < .05) shake = 0;
+  for (let i = sprigs.length - 1; i >= 0; i--) {
+    const s = sprigs[i];
+    s.x += s.vx; s.y += s.vy; s.vy += .07; s.life -= s.decay;
+    if (s.life <= 0) sprigs.splice(i, 1);
+  }
+  for (let i = notes.length - 1; i >= 0; i--) {
+    const n = notes[i]; n.y -= .4; n.life -= .012;
+    if (n.life <= 0) notes.splice(i, 1);
+  }
+  if (anim) {
+    anim.frame += dt * 60;
+    if (!anim.doneAt && anim.frame * anim.speed >= anim.total) anim.doneAt = performance.now();
+    if (anim.doneAt && performance.now() - anim.doneAt > (anim.impact ? 260 : 120)) finishShot();
+    return;
+  }
+  if (mode === 'OVER') overFor += dt * 60;
+  if (live()) {
+    const seat = turnSeat(), t = world.tanks[seat - 1];
+    let dir = 0;
+    if (keys.has(DRIVE[seat][0])) dir -= 1;
+    if (keys.has(DRIVE[seat][1])) dir += 1;
+    const target = dir * 250;
+    walkVel += (target - walkVel) * Math.min(1, dt * 14);
+    if (Math.abs(walkVel) < 3) walkVel = 0;
+    if (walkVel) {
+      const next = walk + walkVel * dt;
+      if (engine.driveCost(t.s, next) <= engine.FUEL) {
+        walk = next;
+        if (dir) facing[seat] = dir;
+        if (Math.random() < dt * 20) {
+          const p = engine.ringPoint(engine.wrapS(t.s + walk));
+          spark(p.x, p.y, 1, C.hair, .8);
+        }
+      } else { walkVel = 0; walk = walk * .9; }
+    }
+    const a = aim[seat];
+    if (keys.has(AIMKEY[seat][0])) a.angle = clampN(a.angle + dt * 55, 5, 85);
+    if (keys.has(AIMKEY[seat][1])) a.angle = clampN(a.angle - dt * 55, 5, 85);
+    // a tap of the key fires the aimed power exactly; only a held key charges
+    if (charging() && performance.now() - pressAt > 140) charge = Math.min(engine.MAXPW, charge + dt * 18);
+  }
+  if (mode === 'CPU' && !world.winner) {
+    aiTick += dt * 60;
+    if (!aiPlan && aiTick > 12) { try { aiPlan = plan(); } catch (e) { aiPlan = { seat: 2, drive: 0, angle: 45, power: 12, weapon: 'standard' }; } }
+    if (aiPlan) {
+      const a = aim[2];
+      a.angle += (aiPlan.angle - a.angle) * Math.min(1, dt * 7);
+      a.power += (aiPlan.power - a.power) * Math.min(1, dt * 7);
+      if (aiTick > 52) { const shot = aiPlan; aiPlan = null; aiTick = 0; fire(shot); }
+    }
+  }
+  while (crumble.length && performance.now() - crumble[0].born > 320) crumble.shift();
+}
+
+/* ── Painting ───────────────────────────────────────────────────────────── */
+
+function drawBox(panels) {
+  ctx.fillStyle = C.board; ctx.fillRect(engine.BX, engine.BY, engine.BW, engine.BH);
+  ctx.fillStyle = C.ink;
+  const t = engine.T;
+  for (const [x, y] of [[engine.BX, engine.BY], [engine.BX + engine.BW - t, engine.BY],
+    [engine.BX, engine.BY + engine.BH - t], [engine.BX + engine.BW - t, engine.BY + engine.BH - t]]) ctx.fillRect(x, y, t, t);
+  // panels are paper slabs with hairline seams, so the box reads as a room and
+  // not a picture frame; a destroyed one folds into the wall before vanishing
+  for (let w = 0; w < 4; w++) {
+    for (let j = 0; j < panels[w].length; j++) {
+      const r = panelRect(w, j);
+      if (panels[w][j]) {
+        ctx.fillStyle = '#efeade';
+        ctx.fillRect(r.x, r.y, r.w, r.h);
+        ctx.strokeStyle = C.hair; ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (w % 2 === 0) { ctx.moveTo(r.x + r.w, r.y + 1); ctx.lineTo(r.x + r.w, r.y + r.h - 1); }
+        else { ctx.moveTo(r.x + 1, r.y + r.h); ctx.lineTo(r.x + r.w - 1, r.y + r.h); }
+        ctx.stroke();
+      } else {
+        const folding = crumble.find(c => c.wall === w && c.j === j);
+        if (folding) {
+          const age = clampN((performance.now() - folding.born) / 300, 0, 1);
+          const shrink = 1 - age;
+          ctx.save();
+          ctx.globalAlpha = 1 - age;
+          ctx.fillStyle = '#efeade';
+          if (w === 0) ctx.fillRect(r.x, r.y, r.w, r.h * shrink);
+          else if (w === 2) ctx.fillRect(r.x, r.y + r.h * (1 - shrink), r.w, r.h * shrink);
+          else if (w === 1) ctx.fillRect(r.x + r.w * (1 - shrink), r.y, r.w * shrink, r.h);
+          else ctx.fillRect(r.x, r.y, r.w * shrink, r.h);
+          ctx.restore();
+        }
+        ctx.strokeStyle = C.hair; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+        ctx.strokeRect(r.x + 2.5, r.y + 2.5, Math.max(1, r.w - 5), Math.max(1, r.h - 5));
+        ctx.setLineDash([]);
+      }
+    }
+  }
+  // the box's own outline: the ink edge a room drawn on paper would have
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
+  ctx.strokeRect(engine.BX + .5, engine.BY + .5, engine.BW - 1, engine.BH - 1);
+  ctx.strokeStyle = C.hair; ctx.lineWidth = 1;
+  ctx.strokeRect(engine.BX + engine.T + .5, engine.BY + engine.T + .5, engine.IW - 1, engine.IH - 1);
+}
+
+function drawReach(seat) {
+  // how far this turn's fuel goes, as a bracket on the ring
+  const t = world.tanks[seat - 1];
+  const span = engine.FUEL / engine.MOVECOST;
+  ctx.strokeStyle = C.hair; ctx.lineWidth = 1;
+  for (const dir of [-1, 1]) {
+    const end = engine.wrapS(t.s + dir * span);
+    const p = engine.ringPoint(end);
+    ctx.beginPath();
+    ctx.moveTo(p.x + p.nx * 5, p.y + p.ny * 5);
+    ctx.lineTo(p.x + p.nx * 11, p.y + p.ny * 11);
+    ctx.stroke();
+  }
+}
+
+function drawTank(t, seat, isTurn) {
+  const p = engine.ringPoint(t.s + (isTurn && live() ? walk : 0));
+  const rot = [0, Math.PI / 2, Math.PI, -Math.PI / 2][p.wall];
+  const colour = COLOUR[seat];
+  const angle = (isTurn ? aim[seat].angle : (t.angle || 45)) * Math.PI / 180;
+  const dir = isTurn && live() ? facing[seat] : (t.dir || 1);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(rot);
+  // treads sit on the wall; the hull hangs into the box, so the ceiling reads upside down
+  ctx.fillStyle = C.ink;
+  ctx.fillRect(-13, 0, 26, 6);
+  ctx.fillStyle = C.hair;
+  for (let i = 0; i < 6; i++) ctx.fillRect(-11 + i * 4, 1.8, 2.6, 2.4);
+  ctx.fillStyle = colour;
+  ctx.fillRect(-9.5, 6, 19, 8);
+  ctx.fillRect(-5, 11, 10, 5);
+  ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, 16);
+  const reach = 15 + Math.min(1, (isTurn && charging() ? charge : aim[seat].power) || 12 / 24) * 7;
+  ctx.lineTo(Math.sin(angle) * dir * reach, 16 + Math.cos(angle) * reach);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawGhost() {
+  const g = ghostPath();
+  if (!g || !g.trail || g.trail.length < 3) return;
+  ctx.save();
+  for (let i = 4; i < g.trail.length; i += 5) {
+    ctx.globalAlpha = Math.max(.04, .34 - (i / g.trail.length) * .26);
+    ctx.fillStyle = C.dim;
+    ctx.fillRect(g.trail[i].x - 1.2, g.trail[i].y - 1.2, 2.4, 2.4);
+  }
+  const h = g.hit;
+  if (h && typeof h !== 'string') {
+    ctx.globalAlpha = .5; ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(h.x, h.y, 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(h.x, h.y, 1.6, 0, Math.PI * 2); ctx.fillStyle = C.ink; ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawShell(shown, trail, colour) {
+  if (shown < 2) return;
+  for (let k = Math.max(0, shown - 26); k < shown; k++) {
+    ctx.globalAlpha = .1 + (k / shown) * .5;
+    ctx.fillStyle = colour;
+    const s = 2.6 - (shown - k) / 26;
+    ctx.fillRect(trail[k].x - s / 2, trail[k].y - s / 2, s, s);
+  }
+  const h = trail[Math.min(trail.length - 1, Math.max(0, shown - 1))];
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = C.ink;
+  ctx.beginPath(); ctx.arc(h.x, h.y, 2.4, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawField(panels, tanks, powerups, mines, trails, showGhost) {
+  drawBox(panels);
+  if (mode === 'AIM' && live() && showGhost) drawReach(turnSeat());
+  for (const t of trails) {
+    for (let i = 0; i < t.length; i += 6) {
+      ctx.globalAlpha = .05 + (i / t.length) * .07;
+      ctx.fillStyle = C.ink;
+      ctx.fillRect(t[i].x - 1.1, t[i].y - 1.1, 2.2, 2.2);
+    }
+  }
+  ctx.globalAlpha = 1;
+  for (const pu of powerups) {
+    const meta = engine.POWERUPS.find(m => m.key === pu.key) || { sym: '?' };
+    ctx.fillStyle = C.board; ctx.fillRect(pu.x - 8, pu.y - 8, 16, 16);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1; ctx.strokeRect(pu.x - 7.5, pu.y - 7.5, 15, 15);
+    ctx.fillStyle = C.ink; ctx.font = '600 10px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText(meta.sym, pu.x, pu.y + 3.5); ctx.textAlign = 'left';
+  }
+  for (const m of mines) {
+    ctx.fillStyle = C.red; ctx.fillRect(m.x - 5, m.y - 2, 10, 4);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(m.x, m.y - 2); ctx.lineTo(m.x, m.y - 6); ctx.stroke();
+  }
+  tanks.forEach((t, i) => drawTank(t, i + 1, state.turn === i + 1 && !world.winner));
+  if (showGhost) drawGhost();
+}
+
+function drawCentre() {
+  const t = 22;
+  ctx.textAlign = 'center';
+  ctx.font = '600 12px ui-monospace, monospace';
+  ctx.fillStyle = C.dim;
+  const seat = online ? online.seat : turnSeat();
+  if (anim) {
+    ctx.fillStyle = C.ink;
+    ctx.fillText('SHELL AWAY', 480, t);
+  } else if (mode === 'WAIT') {
+    ctx.fillText('WAITING ON ' + seatName(3 - seat), 480, t);
+  } else if (mode === 'CPU') {
+    ctx.fillText(seatName(2) + ' TAKES AIM', 480, t);
+  } else if (mode === 'OVER') {
+    ctx.font = '600 15px ui-monospace, monospace';
+    ctx.fillStyle = winner && COLOUR[winner] ? COLOUR[winner] : C.ink;
+    ctx.fillText((winner ? seatName(winner) : 'NOBODY') + ' WINS', 480, t + 2);
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = C.dim;
+    ctx.fillText(aiEnabled ? 'NEXT ROUND SHORTLY · R FOR A NEW MATCH' : 'SPACE OR TAP FOR THE NEXT ROUND', 480, t + 22);
+  } else if (mode === 'AIM' && live()) {
+    if (charging()) {
+      ctx.fillStyle = C.ink;
+      ctx.fillText('POWER ' + charge.toFixed(1), 480, t);
+    } else if (pointer) {
+      ctx.fillText('TAP TO FIRE', 480, t);
+    } else {
+      ctx.fillText('YOUR TURN · ' + seatName(turnSeat()), 480, t);
+    }
+  }
+  ctx.textAlign = 'left';
+}
+
+function paintHud() {
+  if (!world) return;
+  const [a, b] = world.tanks;
+  hud.hp1.textContent = Math.max(0, Math.round(a.hp));
+  hud.hp2.textContent = Math.max(0, Math.round(b.hp));
+  const w = state ? engine.windOf(state.seed, state.shots.length) : 0;
+  hud.wind.textContent = '· wind ' + Math.abs(Math.round(w * 1000)) + (w >= 0 ? ' →' : ' ←');
+  const seat = online ? online.seat : turnSeat();
+  let used = 0;
+  if (state && state.turn === seat && world && !world.winner) used = engine.driveCost(world.tanks[seat - 1].s, walk);
+  hud.fuel.textContent = '· fuel ' + Math.max(0, Math.round(100 - used / engine.FUEL * 100)) + '%';
+  const t = world.tanks[seat - 1] || a;
+  for (const [key] of ARMS) {
+    const btn = armsEl.querySelector('[data-arm="' + key + '"]');
+    if (!btn) continue;
+    const ammo = key === 'standard' ? '∞' : String(t.ammo[key] || 0);
+    btn.innerHTML = '<b>' + ARM_NAMES[key] + '</b> ' + ammo;
+    btn.disabled = key !== 'standard' && !(t.ammo[key] > 0);
+    btn.classList.toggle('sel', sel === key);
+  }
+  hintEl.textContent = state && state.turn === 2 && !world.winner && !online
+    ? 'Mint is lining up · R restarts the match'
+    : 'A/D or arrows drive · W/S or up/down aim · point and tap fires · space charges · R restarts · 1-5 shells';
+}
+
+function paint(dt) {
+  if (!engine) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = C.paper;
+  ctx.fillRect(0, 0, 960, 580);
+  if (shake) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  if (anim) {
+    drawField(anim.pre.panels, anim.pre.tanks, anim.pre.powerups, anim.pre.mines,
+      world.trails.slice(0, world.trails.length - anim.items.length), false);
+    const pts = Math.max(0, anim.frame * anim.speed);
+    let impact = false;
+    for (const item of anim.items) {
+      if (pts <= item.start) continue;
+      const shown = Math.min(item.len, Math.floor(pts - item.start));
+      drawShell(shown, item.trail, C.ink);
+      if (shown >= item.len) impact = true;
+    }
+    if (impact && anim.impact) {
+      const age = clampN(((pts - anim.total) / 16), 0, 1);
+      ctx.strokeStyle = C.red; ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 1 - age;
+      ctx.beginPath(); ctx.arc(anim.impact.x, anim.impact.y, 3 + (anim.impact.r || 10) * .8 * age, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    drawCentre();
+  } else if (mode === 'TITLE') {
+    ctx.fillStyle = C.board; ctx.fillRect(engine.BX, engine.BY, engine.BW, engine.BH);
+    ctx.strokeStyle = C.hair; ctx.strokeRect(engine.BX + .5, engine.BY + .5, engine.BW - 1, engine.BH - 1);
+    ctx.textAlign = 'center'; ctx.fillStyle = C.dim;
+    ctx.font = '600 12px ui-monospace, monospace';
+    ctx.fillText('BUILDING THE BOX', 480, 288); ctx.textAlign = 'left';
+  } else {
+    drawField(world.panels, world.tanks, world.powerups, world.mines, world.trails, true);
+    drawCentre();
+  }
+  for (const s of sprigs) {
+    ctx.globalAlpha = Math.max(0, s.life);
+    ctx.fillStyle = s.colour;
+    ctx.fillRect(s.x - 1.4, s.y - 1.4, 2.8, 2.8);
+  }
+  ctx.globalAlpha = 1;
+  for (const n of notes) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, n.life * 1.5));
+    ctx.textAlign = 'center';
+    ctx.font = '600 ' + n.size + 'px ui-monospace, monospace';
+    ctx.fillStyle = n.colour;
+    ctx.fillText(n.text, clampN(n.x, 30, 930), clampN(n.y, 40, 560));
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  paintHud();
+}
+
+function frame(now) {
+  const dt = Math.min(.05, (now - lastNow) / 1000 || 0);
+  lastNow = now;
+  try { step(dt); paint(dt); } catch (e) { /* one bad frame must not stop the loop */ }
+  requestAnimationFrame(frame);
+}
+
+/* ── Bored Together ─────────────────────────────────────────────────────── */
 
 function startOnline() {
   online = {
@@ -357,635 +795,15 @@ function startOnline() {
       ? bridge.context.players.map(n => String(n).toUpperCase().slice(0, 12)) : null,
     busy: false, canonical: null,
     canPlay: () => !!bridge.context && bridge.context.canPlay && bridge.context.status === 'active',
-    bridgeSubmit: move => bridge.submit(move),
-    mixContext: c => { bridge.context = c; },
+    submit: move => bridge.submit(move),
+    use: ctx2 => { bridge.context = ctx2; },
     state: () => bridge.context.state
   };
-  repaint(bridge.context.state);
+  repaint(online.state());
 }
 
-/* ── Input ──────────────────────────────────────────────────────────────── */
+/* ── Snapshot and probe surface ─────────────────────────────────────────── */
 
-addEventListener('keydown', e => {
-  if (['Space', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
-  keys.add(e.code);
-  if (mode === 'TITLE') {
-    if (e.code === 'Digit1' || e.code === 'Enter' || e.code === 'Space') { aiEnabled = true; startLocal(true); }
-    if (e.code === 'Digit2') { aiEnabled = false; startLocal(true); }
-    return;
-  }
-  if (mode === 'OVER' && !bridge && overTime >= 40 &&
-    (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyR')) { startLocal(false); return; }
-  if (!playable()) return;
-  if (!e.repeat) {
-    const tag = { Digit1: 'standard', Digit2: 'heavy', Digit3: 'cluster', Digit4: 'mine', Digit5: 'ricochet' }[e.code];
-    if (tag) selectWeapon(tag);
-    if (e.code === 'Space' || e.code === 'Enter') beginCharge();
-  }
-});
-addEventListener('keyup', e => {
-  keys.delete(e.code);
-  if (e.code === 'Space' || e.code === 'Enter') releaseCharge();
-});
-addEventListener('blur', () => { keys.clear(); charge = null; drag = null; });
-
-function selectWeapon(key) {
-  const tank = world && world.tanks[turnSeat() - 1];
-  if (key !== 'standard' && !(tank && tank.ammo[key] > 0)) {
-    setStatus('NO ' + key.toUpperCase() + ' SHELLS LEFT \u2014 PICK ANOTHER.', C.red);
-    return;
-  }
-  sel = key;
-  syncBar();
-}
-
-/* Pointer aiming: drag away from the tank, the shell takes the reverse line.
- * Angle and power both come out of the tank's local frame, so aiming works
- * the same from the floor, the walls and the ceiling. */
-function canvasXY(e) {
-  const r = canvas.getBoundingClientRect();
-  return { x: (e.clientX - r.left) * 960 / r.width, y: (e.clientY - r.top) * 580 / r.height };
-}
-canvas.addEventListener('pointerdown', e => {
-  if (mode === 'OVER' && !bridge && overTime >= 40) { startLocal(false); return; }
-  if (mode !== 'AIM' || !playable()) return;
-  e.preventDefault();
-  try { canvas.setPointerCapture(e.pointerId); } catch (err) { }
-  drag = { id: e.pointerId, moved: false };
-});
-canvas.addEventListener('pointermove', e => {
-  if (!drag || drag.id !== e.pointerId || !playable()) return;
-  const seat = turnSeat(), tank = world.tanks[seat - 1];
-  const at = canvasXY(e), c = bodyP(tank), p = engine.ringPoint(tank.s);
-  const dx = at.x - c.x, dy = at.y - c.y;
-  const len = Math.hypot(dx, dy);
-  if (len < 16) return;
-  drag.moved = true;
-  const un = (dx * p.nx + dy * p.ny) / len;             // inward component
-  const ut = (dx * p.tx + dy * p.ty) / len * (tank.dir || 1);
-  let a = Math.atan2(ut, Math.max(un, .08)) * 180 / Math.PI;
-  if (a < 0) a = -a;                                     // pulled backwards: mirror it
-  aimVars[seat].angle = clampN(Math.round(a), 5, 85);
-  aimVars[seat].power = Math.round(clampN(len / 26, 1, 24) * 10) / 10;
-});
-function endDrag(e) {
-  if (!drag || (e && drag.id !== e.pointerId)) return;
-  const wasMoved = drag.moved;
-  drag = null;
-  if (!wasMoved) return;
-  if (!playable()) return;
-  const shot = draftShot();
-  if (shot) fire(shot);
-}
-canvas.addEventListener('pointerup', endDrag);
-canvas.addEventListener('pointercancel', endDrag);
-
-/* ── AI: one seat of the brain, same rules as the players ───────────────── */
-
-function estDamage(x, y, c, weapon) {
-  const r = (engine.RANGE[weapon] || engine.RANGE.standard) + 14;
-  const pair = engine.DAMAGE[weapon] || engine.DAMAGE.standard;
-  const d = Math.hypot(c.x - x, c.y - y);
-  if (d >= r) return 0;
-  return Math.round(pair[0] + (1 - d / r) * (pair[1] - pair[0]));
-}
-
-/* Would a carve here swallow the whole footprint of the tank on this wall? */
-function dumpAlign(worldW, x, y, weapon, seat) {
-  const tank = worldW.tanks[seat - 1];
-  if (!tank || tank.falling) return 0;
-  const p = engine.ringPoint(tank.s);
-  let d, centre;
-  if (p.wall === 0) { d = Math.hypot(clampN(x, X0e(), X1e()) - x, y - Y0e()); centre = clampN(x, X0e(), X1e()) - X0e(); }
-  else if (p.wall === 1) { d = Math.hypot(x - X1e(), clampN(y, Y0e(), Y1e()) - y); centre = clampN(y, Y0e(), Y1e()) - Y0e(); }
-  else if (p.wall === 2) { d = Math.hypot(clampN(x, X0e(), X1e()) - x, y - Y1e()); centre = X1e() - clampN(x, X0e(), X1e()); }
-  else { d = Math.hypot(x - X0e(), clampN(y, Y0e(), Y1e()) - y); centre = Y1e() - clampN(y, Y0e(), Y1e()); }
-  const r = engine.CARVE[weapon] || engine.CARVE.standard;
-  if (d > r - 6) return 0;
-  const half = Math.sqrt(Math.max(0, r * r - d * d));
-  return (Math.abs(centre - p.along) + 14 <= half + 2) ? 1 : 0;
-}
-
-function aiScoreShot(view, seat, angle, power, weapon) {
-  const g = engine.guide(view, seat, angle, power, weapon);
-  const cMe = bodyP(view.tanks[seat - 1]), cFoe = bodyP(view.tanks[2 - seat]);
-  const h = g.hit, kind = typeof h === 'string' ? h : h.kind;
-  if (kind === 'out' || kind === 'stall') return { score: -9, hit: kind };
-  const x = h.x, y = h.y;
-  if (kind === 'plant') {
-    return {
-      score: 42 - Math.hypot(x - cFoe.x, y - cFoe.y) * .3 - Math.hypot(x - cMe.x, y - cMe.y) * .95,
-      hit: kind
-    };
-  }
-  let s = estDamage(x, y, cFoe, weapon) - estDamage(x, y, cMe, weapon) * 1.25;
-  if (kind === 'tank' && h.seat === 2 - seat) s += 10;
-  if (kind === 'wall' || kind === 'tank') {
-    if (dumpAlign(view, x, y, weapon, 2 - seat)) s += 22;
-    if (dumpAlign(view, x, y, weapon, seat)) s -= 32;
-  }
-  return { score: s, hit: kind, x, y };
-}
-
-/* A view world with one tank moved: lets the AI plan shots from where a drive
- * would put it, without touching the real world. */
-function movedView(worldW, seat, drive, angle) {
-  const me = worldW.tanks[seat - 1];
-  const moved = { ...me, s: engine.wrapS(me.s + drive), dir: drive > 0 ? 1 : -1, angle, falling: null };
-  return {
-    ...worldW,
-    tanks: seat === 1 ? [moved, { ...worldW.tanks[1] }] : [{ ...worldW.tanks[0] }, moved]
-  };
-}
-function supportAt(worldW, s) {
-  return engine.supported(worldW, { s: engine.wrapS(s), falling: null, hp: 1 });
-}
-
-function aiPick() {
-  const seat = 2, worldW = engine.replay(state);
-  const me = worldW.tanks[seat - 1];
-  const cands = [];
-  // Static shots from the present spot.
-  for (const weapon of WEAPONS) {
-    if (weapon !== 'standard' && !(me.ammo[weapon] > 0)) continue;
-    let lethal = false;
-    for (let a = 5; a <= 85 && !lethal; a += 3) for (let p = 5; p <= 23 && !lethal; p += 3) {
-      const probe = aiScoreShot(worldW, seat, a, p, weapon);
-      cands.push({ drive: 0, angle: a, power: p, weapon, score: probe.score });
-      if (probe.score >= 60) lethal = true;   // a kill is a kill; stop the scan
-    }
-  }
-  // Nothing tempting from here? Spend the turn's legs to reposition first.
-  let best = cands.sort((a2, b2) => b2.score - a2.score)[0];
-  if (!best || best.score < 12) {
-    for (const drive of [-380, -220, -110, 110, 220, 380]) {
-      const cost = engine.driveCost(me.s, drive);
-      if (cost > engine.FUEL * .8 || !supportAt(worldW, me.s + drive)) continue;
-      const view = movedView(worldW, seat, drive, 45);
-      let hopBest = null;
-      for (const weapon of WEAPONS) {
-        if (weapon !== 'standard' && !(me.ammo[weapon] > 0)) continue;
-        for (let a = 14; a <= 85; a += 8) for (let p = 8; p <= 23; p += 4) {
-          const probe = aiScoreShot(view, seat, a, p, weapon);
-          if (!hopBest || probe.score > hopBest.score) hopBest = { drive, angle: a, power: p, weapon, score: probe.score };
-        }
-      }
-      if (hopBest) cands.push(hopBest);
-    }
-    cands.sort((a2, b2) => b2.score - a2.score);
-    best = cands[0];
-  }
-  if (!best) return { seat, drive: 0, angle: 45, power: 12, weapon: 'standard' };
-  // Refine around the winner: finer angle/power steps on the same plan.
-  let fine = best;
-  if (best.score < 60) {
-    const view = best.drive ? movedView(worldW, seat, best.drive, best.angle) : worldW;
-    for (let a = Math.max(5, best.angle - 4); a <= Math.min(85, best.angle + 4); a++) {
-      for (let p = Math.max(1, best.power - 2); p <= Math.min(24, best.power + 2); p += .5) {
-        const probe = aiScoreShot(view, seat, a, Math.round(p * 10) / 10, best.weapon);
-        if (probe.score > fine.score) fine = { drive: best.drive, angle: a, power: Math.round(p * 10) / 10, weapon: best.weapon, score: probe.score };
-      }
-    }
-  }
-  const angle = clampN(Math.round(fine.angle + (Math.random() - .5) * 2.6), 5, 85);
-  const power = clampN(Math.round((fine.power + (Math.random() - .5) * 1.2) * 10) / 10, 1, 24);
-  const plan = { seat, drive: fine.drive, angle, power, weapon: fine.weapon };
-  if (engine.validateShot(worldW, plan, seat)) return { seat, drive: 0, angle: 45, power: 12, weapon: 'standard' };
-  return plan;
-}
-
-function runAI() {
-  aiTimer++;
-  if (aiTimer === 8) {
-    try { aiChosen = aiPick(); } catch (err) { aiChosen = null; }
-    if (!aiChosen) aiChosen = { seat: 2, drive: 0, angle: 45, power: 12, weapon: 'standard' };
-  }
-  if (aiChosen && aiTimer > 8 && aiTimer < 46) {
-    const aim = aimVars[2];
-    aim.angle += (aiChosen.angle - aim.angle) * .12;
-    aim.power += (aiChosen.power - aim.power) * .12;
-  }
-  if (aiChosen && aiTimer >= 48) {
-    const chosen = aiChosen;
-    aiChosen = null; aiTimer = 0;
-    aimVars[2] = { angle: chosen.angle, power: chosen.power };
-    liveDir[2] = chosen.drive > 0 ? 1 : chosen.drive < 0 ? -1 : liveDir[2];
-    fire(chosen);
-  }
-}
-
-/* ── Per-frame update ───────────────────────────────────────────────────── */
-
-function update() {
-  shake *= .86; if (shake < .25) shake = 0;
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-    p.x += p.vx; p.y += p.vy; p.vy += .06; p.life -= p.dec;
-    if (p.life <= 0) particles.splice(i, 1);
-  }
-  for (let i = popups.length - 1; i >= 0; i--) {
-    const p = popups[i];
-    p.y -= .55; p.life -= .013;
-    if (p.life <= 0) popups.splice(i, 1);
-  }
-  if (anim) { anim.frame++; return; }
-  if (mode === 'AIM' && playable()) {
-    const seat = turnSeat(), tank = world.tanks[seat - 1];
-    const driveKeys = seat === 1 ? ['KeyA', 'KeyD'] : ['ArrowLeft', 'ArrowRight'];
-    const aimKeys = seat === 1 ? ['KeyW', 'KeyS'] : ['ArrowUp', 'ArrowDown'];
-    let step = 0;
-    if (keys.has(driveKeys[0])) step -= 2;
-    if (keys.has(driveKeys[1])) step += 2;
-    if (step) {
-      if (engine.driveCost(tank.s, walkPx + step) <= engine.FUEL) {
-        walkPx += step;
-        liveDir[seat] = step > 0 ? 1 : -1;
-        const p = engine.ringPoint(engine.wrapS(tank.s + walkPx));
-        if (Math.random() < .35) sparksAt(p.x, p.y, 1, C.hair);
-      }
-    }
-    let aimStep = 0;
-    if (keys.has(aimKeys[0])) aimStep += 1;
-    if (keys.has(aimKeys[1])) aimStep -= 1;
-    if (aimStep) aimVars[seat].angle = clampN(aimVars[seat].angle + aimStep, 5, 85);
-    if (charging()) charge = Math.min(engine.MAXPW, charge + .16);
-  }
-  if (mode === 'CPU' && !world.winner) runAI();
-  if (mode === 'OVER' && !bridge) {
-    overTime++;
-    if (aiEnabled && overTime > 190) startLocal(false);
-    if (overTime === 60 || overTime === 190) syncStatus();
-  }
-}
-
-/* ── Render ─────────────────────────────────────────────────────────────── */
-
-function drawBoard(panels) {
-  const bx = engine.BX, by = engine.BY, bw = engine.BW, bh = engine.BH, t = engine.T;
-  ctx.fillStyle = C.board;
-  ctx.fillRect(bx, by, bw, bh);
-  // four corner blocks: the only ground that never crumbles
-  ctx.fillStyle = C.ink;
-  ctx.fillRect(bx, by, t, t);
-  ctx.fillRect(bx + bw - t, by, t, t);
-  ctx.fillRect(bx, by + bh - t, t, t);
-  ctx.fillRect(bx + bw - t, by + bh - t, t, t);
-  for (let wall = 0; wall < 4; wall++) {
-    const count = engine.COUNTS[wall];
-    for (let j = 0; j < count; j++) {
-      const r = panelRect(wall, j);
-      if (panels[wall][j]) {
-        ctx.fillStyle = C.ink;
-        ctx.fillRect(r.x, r.y, r.w, r.h);
-      } else {
-        ctx.strokeStyle = C.hair;
-        ctx.setLineDash([4, 4]);
-        ctx.strokeRect(r.x + 2.5, r.y + 2.5, Math.max(1, r.w - 5), Math.max(1, r.h - 5));
-        ctx.setLineDash([]);
-      }
-    }
-  }
-  ctx.strokeStyle = C.hair;
-  ctx.strokeRect(bx + .5, by + .5, bw - 1, bh - 1);
-}
-
-function drawTank(tank, seat, isTurn) {
-  const p = engine.ringPoint(tank.s);
-  const rot = [0, Math.PI / 2, Math.PI, -Math.PI / 2][p.wall];
-  const colour = colourFor(seat);
-  const angle = (isTurn ? aimVars[seat].angle : tank.angle) * Math.PI / 180;
-  const dir = (isTurn ? liveDir[seat] : (tank.dir || 1));
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.rotate(rot);
-  // treads along the surface, hull and dome hanging into the box
-  ctx.fillStyle = C.ink;
-  ctx.fillRect(-14, 0, 28, 7);
-  for (let i = 0; i < 5; i++) ctx.fillStyle = C.hair, ctx.fillRect(-12 + i * 5.4, 2.2, 3, 2.4);
-  ctx.fillStyle = colour;
-  ctx.fillRect(-11, 7, 22, 9);
-  ctx.fillRect(-6.5, 12, 13, 8);
-  ctx.strokeStyle = C.ink;
-  ctx.lineWidth = 2.6;
-  ctx.strokeRect(-10.5, 7.5, 21, 8);
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 3.4;
-  ctx.beginPath();
-  ctx.moveTo(0, 16);
-  ctx.lineTo(Math.sin(angle) * dir * 19, 16 + Math.cos(angle) * 19);
-  ctx.stroke();
-  ctx.restore();
-  if (tank.shield) {
-    ctx.strokeStyle = C.accent;
-    ctx.globalAlpha = .5; ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(bodyP(tank).x, bodyP(tank).y, 21, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  }
-}
-
-function drawPowerups(list) {
-  for (const pu of list) {
-    const meta = engine.POWERUPS.find(m => m.key === pu.key) || { sym: '?' };
-    ctx.fillStyle = C.board;
-    roundRect(pu.x - 9, pu.y - 9, 18, 18, 3); ctx.fill();
-    ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
-    ctx.strokeRect(pu.x - 8.5, pu.y - 8.5, 17, 17);
-    label(meta.sym, pu.x, pu.y + 4, 11, C.ink);
-  }
-}
-
-function drawMines(list) {
-  for (const m of list) {
-    ctx.fillStyle = C.red;
-    ctx.fillRect(m.x - 6, m.y - 3, 12, 5);
-    ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(m.x, m.y - 3); ctx.lineTo(m.x, m.y - 7); ctx.stroke();
-    label(String(Math.max(0, m.fuse)), m.x, m.y - 9, 9, C.red);
-  }
-}
-
-function drawTrailSet(trails, opts) {
-  // opts: { history }  — history trails are faint; the live anim one is crisp
-  const solid = !opts || !opts.history;
-  for (const trail of trails) {
-    const child = trail.child === true;
-    for (let i = 1; i < trail.length; i += 5) {
-      const fade = i / trail.length;
-      ctx.globalAlpha = solid ? .12 + fade * .5 : .07 + fade * .05;
-      ctx.fillStyle = solid ? (child ? C.hair : C.ink) : C.ink;
-      ctx.fillRect(trail[i].x - 1.4, trail[i].y - 1.4, 2.8, 2.8);
-    }
-}
-  ctx.globalAlpha = 1;
-}
-
-function drawGhost() {
-  viewCache.count++;
-  if (viewCache.key !== ghostKey()) {
-    const seat = turnSeat(), tank = world.tanks[seat - 1], aim = aimVars[seat];
-    const me = { ...tank, s: engine.wrapS(tank.s + walkPx), angle: aim.angle, dir: liveDir[seat] };
-    const view = { ...world, tanks: seat === 1 ? [me, world.tanks[1]] : [world.tanks[0], me] };
-    let g = null;
-    try { g = engine.guide(view, seat, aim.angle, charging() ? charge : aim.power, sel); } catch (err) { g = null; }
-    viewCache.ghost = g;
-    viewCache.key = ghostKey();
-  }
-  const g = viewCache.ghost;
-  if (!g || !g.trail) return;
-  for (let i = 4; i < g.trail.length; i += 6) {
-    ctx.globalAlpha = Math.max(.05, .4 - i / g.trail.length * .32);
-    ctx.fillStyle = C.dim;
-    ctx.fillRect(g.trail[i].x - 1.4, g.trail[i].y - 1.4, 2.8, 2.8);
-  }
-  ctx.globalAlpha = 1;
-}
-const viewCache = { key: null, ghost: null, count: 0 };
-function ghostKey() {
-  const seat = turnSeat(), aim = aimVars[seat], tank = world.tanks[seat - 1];
-  return [engine.wrapS(tank.s), walkPx, aim.angle, charging() ? charge : aim.power, sel, countHoles(world), world.shotCount].join('|');
-}
-
-function drawAnim() {
-  const pts = Math.max(0, anim.frame * anim.speed);
-  // pre-shot world on the walls and bodies: the outcome lands at commit
-  drawBoard(anim.pre.panels);
-  drawTrailSet(world.trails.slice(0, world.trails.length - anim.items.length), { history: true });
-  drawPowerups(anim.pre.powerups);
-  drawMines(anim.pre.mines);
-  for (let i = 0; i < anim.items.length; i++) {
-    const item = anim.items[i], shown = clampN(Math.floor(pts - item.start), 0, item.len);
-    const trail = item.trail;
-    if (shown < 2) continue;
-    for (let k = 0; k < shown; k++) {
-      const fade = k / trail.length;
-      ctx.globalAlpha = .15 + fade * .75;
-      ctx.fillStyle = trail.child ? C.hair : C.ink;
-      ctx.fillRect(trail[k].x - 1.6, trail[k].y - 1.6, 3.2, 3.2);
-    }
-    const head = trail[Math.max(0, shown - 1)];
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = trail.child ? C.ink : C.ink;
-    ctx.beginPath(); ctx.arc(head.x, head.y, trail.child ? 2.6 : 3.4, 0, Math.PI * 2); ctx.fill();
-  }
-  for (const b of anim.bursts) {
-    if (pts < b.when) continue;
-    if (!b.born) { b.born = true; sparksAt(b.x, b.y, 13, C.red); shake = Math.max(shake, 7); }
-    const age = clampN((pts - b.when) / 26, 0, 1);
-    ctx.globalAlpha = 1 - age * .8;
-    ctx.strokeStyle = C.red; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(b.x, b.y, 4 + b.r * .8 * age, 0, Math.PI * 2); ctx.stroke();
-    if (age < .3) {
-      ctx.fillStyle = C.red;
-      ctx.beginPath(); ctx.arc(b.x, b.y, 5 * (1 - age), 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  }
-  for (const t of anim.pre.tanks) drawTank(t, anim.pre.tanks.indexOf(t) + 1, false);
-}
-
-function drawWind() {
-  const index = state ? state.shots.length : 0;
-  const wind = engine.windOf(state.seed, index);
-  const poleX = 656, top = 12, floor = 38;
-  ctx.strokeStyle = C.dim; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(poleX, floor); ctx.lineTo(poleX, top); ctx.stroke();
-  const lean = clampN(wind * 1500, -17, 17);
-  const flutter = Math.sin(Date.now() * .011) * Math.abs(wind) * 500;
-  ctx.fillStyle = wind >= 0 ? C.accent : C.red;
-  const tip = poleX + lean + clampN(flutter, -5, 5);
-  ctx.beginPath();
-  ctx.moveTo(poleX, top + 2);
-  ctx.lineTo(tip, top + 8);
-  ctx.lineTo(poleX, top + 14);
-  ctx.closePath(); ctx.fill();
-  label('wind ' + Math.abs(Math.round(wind * 1000)), poleX - 8, floor - 4, 10, C.dim, 'right');
-}
-
-function drawHUD() {
-  const t1 = world.tanks[0], t2 = world.tanks[1];
-  const wind = 152, fuelW = 118;
-  label(nameFor(1), 16, 17, 13, colourFor(1), 'left', 600);
-  ctx.fillStyle = C.board; ctx.fillRect(16, 22, wind, 9);
-  ctx.strokeStyle = C.hair; ctx.lineWidth = 1; ctx.strokeRect(16.5, 22.5, wind - 1, 8);
-  if (t1.hp > 0) { ctx.fillStyle = colourFor(1); ctx.fillRect(18, 24, Math.max(2, (wind - 4) * clampN(t1.hp / engine.MAXHP, 0, 1)), 5); }
-  ctx.fillStyle = C.board; ctx.fillRect(16, 34, fuelW, 5);
-  ctx.strokeStyle = C.hair; ctx.strokeRect(16.5, 34.5, fuelW - 1, 4);
-  drawFuelBar(1, 18, 35.5, fuelW - 4);
-  label(nameFor(2), 944, 17, 13, colourFor(2), 'right', 600);
-  ctx.fillStyle = C.board; ctx.fillRect(944 - wind, 22, wind, 9);
-  ctx.strokeStyle = C.hair; ctx.strokeRect(944 - wind + .5, 22.5, wind - 1, 8);
-  if (t2.hp > 0) { ctx.fillStyle = colourFor(2); ctx.fillRect(944 - wind + 2, 24, Math.max(2, (wind - 4) * clampN(t2.hp / engine.MAXHP, 0, 1)), 5); }
-  ctx.fillStyle = C.board; ctx.fillRect(944 - fuelW, 34, fuelW, 5);
-  ctx.strokeStyle = C.hair; ctx.strokeRect(944 - fuelW + .5, 34.5, fuelW - 1, 4);
-  drawFuelBar(2, 944 - fuelW + 2, 35.5, fuelW - 4);
-  // centre strip: turn, charge or idle
-  let centreText = '';
-  let centreColour = C.dim;
-  if (mode === 'CPU') centreText = nameFor(2) + ' TAKES AIM \u2026';
-  else if (mode === 'WAIT') centreText = nameFor(online ? (3 - online.seat) : 2) + ' TO FIRE \u2026';
-  else if (mode === 'ANIM') centreText = 'SHELL AWAY \u2026';
-  else if (mode === 'OVER') centreText = (winner ? nameFor(winner) : '') + ' WINS' + (winner === 3 ? ' THE STALEMATE' : '');
-  else if (mode === 'AIM') centreText = nameFor(turnSeat()) + ' TO FIRE';
-  if (mode === 'OVER' && !bridge && aiEnabled) centreText += ' \u00b7 LAVENDER ' + sessionWins;
-  if (charging()) centreText = 'POWER ' + charge.toFixed(1);
-  label(centreText, 480, 20, 12, centreColour, 'center', 600);
-  drawWind();
-}
-function drawFuelBar(seat, x, y, w) {
-  let used = 1 - world.tanks[seat - 1].fuel / engine.FUEL;
-  if (state && state.turn === seat && !world.winner) used = engine.driveCost(world.tanks[seat - 1].s, walkPx) / engine.FUEL;
-  ctx.fillStyle = C.dim;
-  ctx.fillRect(x, y, Math.max(0, Math.min(1, 1 - used)) * w, 2);
-}
-
-function drawOverlay() {
-  ctx.fillStyle = 'rgba(245,242,234,.85)';
-  ctx.fillRect(0, 0, 960, 580);
-  const wname = winner === 3 ? 'NOBODY' : nameFor(winner);
-  label(wname + ' WINS', 480, 244, 34, winner ? colourFor(winner) : C.ink, 'center', 600);
-  if (!bridge) {
-    label(aiEnabled ? 'LAVENDER ' + sessionWins + ' \u2014 ' + nameFor(2) : 'SAME BOX, NEW ROUND', 480, 278, 13, C.dim);
-    if (!aiEnabled) label('TAP OR PRESS SPACE TO CONTINUE', 480, 320, 12, C.dim);
-    if (aiEnabled && overTime < 190) label('NEXT ROUND SHORTLY \u2026', 480, 320, 12, C.dim);
-  } else {
-    label('THE MATCH ON THE RECORD HAS ENDED.', 480, 278, 13, C.dim);
-  }
-}
-
-
-function drawTitle() {
-  label('PASTEL TANKS', 480, 92, 38, C.ink, 'center', 600);
-  label('AN ARTILLERY DUEL INSIDE A DRIVABLE BOX. BLAST THE SIDES OUT', 480, 122, 12, C.dim);
-  label('AND DROP YOUR RIVAL THROUGH THE FLOOR.', 480, 138, 12, C.dim);
-  // vignette: small box, one hole in the ceiling, tanks in odd places
-  const bx = 300, by = 190, bw = 360, bh = 200, t = 20;
-  ctx.fillStyle = C.board; ctx.fillRect(bx, by, bw, bh);
-  ctx.fillStyle = C.ink;
-  const pw = (bw - 2 * t) / 6, ph = (bh - 2 * t) / 4;
-  for (let j = 0; j < 6; j++) {
-    if (j !== 2) { ctx.fillRect(bx + t + j * pw, by, pw - 2, t); ctx.fillRect(bx + t + j * pw, by + bh - t, pw - 2, t); }
-  }
-  for (let k = 0; k < 4; k++) {
-    if (k !== 1) { ctx.fillRect(bx, by + t + k * ph, t, ph - 2); ctx.fillRect(bx + bw - t, by + t + k * ph, t, ph - 2); }
-  }
-  ctx.strokeStyle = C.hair;
-  ctx.strokeRect(bx + .5, by + .5, bw - 1, bh - 1);
-  drawMiniTank(bx + 60, by + bh - t - 2, C.seat2, 1);
-  drawMiniTank(bx + bw - 70, by + t + 1, C.seat1, -1);
-  // dashed outline marks where the ceiling panel is already gone
-  ctx.strokeStyle = C.hair;
-  ctx.setLineDash([3, 3]);
-  ctx.strokeRect(bx + t + 2 * pw + 1.5, by + 2.5, pw - 5, t - 5);
-  ctx.setLineDash([]);
-  // shell arcing from the floor machine through the gap to the far wall
-  ctx.strokeStyle = C.hair;
-  ctx.setLineDash([2, 5]);
-  ctx.beginPath();
-  ctx.moveTo(bx + 74, by + bh - t - 16);
-  ctx.quadraticCurveTo(bx + 130, by + 58, bx + 248, by + 70);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  drawMenuButton(480 - 240, 430, 210, 46, 'VERSUS AI', C.accent, () => { aiEnabled = true; startLocal(true); });
-  drawMenuButton(480 + 30, 430, 210, 46, 'TWO PLAYERS', C.red, () => { aiEnabled = false; startLocal(true); });
-  label('P1: A/D DRIVE \u00b7 W/S AIM \u00b7 HOLD SPACE \u00b7 P2: \u2190\u2192 DRIVE \u00b7 \u2191\u2193 AIM \u00b7 HOLD ENTER', 480, 522, 11, C.dim);
-  label('DRAG ANYWHERE TO SLING A SHELL \u00b7 1-5 PICK SHELLS \u00b7 MINES AND HEAVY SHELLS CARVE THE BOX', 480, 540, 11, C.dim);
-}
-function drawMiniTank(x, y, colour, facing) {
-  ctx.save();
-  ctx.translate(x, y);
-  if (facing < 0) ctx.rotate(Math.PI);
-  ctx.fillStyle = colour;
-  ctx.fillRect(-13, -8, 26, 6);
-  ctx.fillRect(-9, -13, 18, 5);
-  ctx.strokeStyle = C.ink; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(13, -10); ctx.stroke();
-  ctx.restore();
-}
-/* The vignette's left tank sits on the floor, the green one hangs from the
- * ceiling panel that survives the hole. */
-const menuButtons = [];
-function drawMenuButton(x, y, w, h, text, colour, action) {
-  menuButtons.length = 0;
-  ctx.fillStyle = colour;
-  roundRect(x, y, w, h, 4); ctx.fill();
-  label(text, x + w / 2, y + h / 2 + 5, 14, C.paper, 'center', 600);
-  menuButtons.push({ x, y, w, h, action });
-}
-
-function popupsAndParticles() {
-  for (const p of particles) {
-    ctx.globalAlpha = Math.max(0, p.life);
-    ctx.fillStyle = p.colour;
-    ctx.fillRect(p.x - 1.8, p.y - 1.8, 3.6, 3.6);
-  }
-  ctx.globalAlpha = 1;
-  for (const p of popups) {
-    ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.4));
-    label(p.text, clampN(p.x, 40, 920), clampN(p.y, 60, 550), 12, p.colour, 'center', 600);
-  }
-  ctx.globalAlpha = 1;
-}
-
-function render() {
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = C.paper;
-  ctx.fillRect(0, 0, 960, 580);
-  if (shake) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
-  if (mode === 'TITLE') { drawTitle(); return; }
-  if (anim) {
-    drawAnim();
-    drawHUD();
-    popupsAndParticles();
-    return;
-  }
-  drawBoard(world.panels);
-  drawTrailSet(world.trails, { history: true });
-  drawPowerups(world.powerups);
-  drawMines(world.mines);
-  world.tanks.forEach((t, i) => drawTank(t, i + 1, state.turn === i + 1 && !world.winner));
-  if (mode === 'AIM' && playable()) drawGhost();
-  drawHUD();
-  popupsAndParticles();
-  if (mode === 'OVER') drawOverlay();
-}
-
-/* ── Weapon bar and boot ────────────────────────────────────────────────── */
-
-const barButtons = new Map();
-function buildBar() {
-  for (const key of WEAPONS) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.addEventListener('click', () => selectWeapon(key));
-    barEl.append(b);
-    barButtons.set(key, b);
-  }
-  const fire = document.createElement('button');
-  fire.type = 'button';
-  fire.className = 'fire';
-  fire.textContent = 'FIRE';
-  fire.addEventListener('pointerdown', e => { e.preventDefault(); beginCharge(); });
-  fire.addEventListener('pointerup', e => { e.preventDefault(); releaseCharge(); });
-  fire.addEventListener('pointerleave', () => { if (charging()) charge = null; });
-  barEl.append(fire);
-}
-function syncBar() {
-  const show = (mode === 'AIM' || mode === 'CPU' || mode === 'WAIT') && state && !world.winner;
-  barEl.style.display = show ? 'flex' : 'none';
-  if (!show) return;
-  const seat = mode === 'WAIT' ? (3 - (online ? online.seat : 2)) : turnSeat();
-  for (const [key, b] of barButtons) {
-    const isStd = key === 'standard';
-    const ammo = isStd ? '\u221e' : '\u00d7' + (world.tanks[seat - 1].ammo[key] || 0);
-    b.textContent = WEAPON_TAGS[key] + ' ' + ammo;
-    b.classList.toggle('sel', key === sel);
-    b.disabled = !isStd && !(world.tanks[seat - 1].ammo[key] > 0);
-  }
-}
-
-/* Snapshot contract: metrics integers for the daily adapter. */
 window.__boredSnapshot = () => ({
   slug: 'tank2',
   won: Math.max(0, Math.round(sessionWins)),
@@ -993,13 +811,10 @@ window.__boredSnapshot = () => ({
   started: mode !== 'TITLE' && !!state
 });
 
-/* Small surface for the test probe pages. */
 window.__test = {
   mode: () => mode,
-  // A merged view for the Together board and the browser suite: the engine
-  // state plus what the interface is doing right now.
-  state: () => (state ? { mode, turn: state.turn, power: aimVars[state.turn] && state.turn ? aimVars[state.turn].power : null,
-    online: !!bridge, seed: state ? state.seed : null, shots: state ? state.shots.length : 0,
+  state: () => (state ? { mode, turn: state.turn, power: aim[state.turn] && state.turn ? aim[state.turn].power : null,
+    online: !!bridge, seed: state.seed, shots: state.shots.length,
     hp: world ? world.tanks.map(t => t.hp) : [] } : null),
   world: () => world,
   seed: () => (state ? state.seed : null),
@@ -1007,24 +822,18 @@ window.__test = {
   holes: () => (world ? countHoles(world) : null),
   turn: () => (state ? state.turn : null),
   wind: () => (state ? engine.windOf(state.seed, state.shots.length) : null),
-  start(ai) { aiEnabled = !!ai; startLocal(true); },
-  aim(angle, power) {
-    const a = aimVars[turnSeat()];
-    if (a) { a.angle = angle; a.power = power; }
-  },
-  drive(px) { walkPx = px; },
-  fireNow() { const shot = draftShot(); if (shot) fire(shot); },
+  start(ai) { aiEnabled = !!ai; freshMatch(); },
+  aim(angle, power) { const a = aim[turnSeat()]; if (a) { a.angle = angle; a.power = power; } },
+  drive(px) { walk = px; },
+  fireNow() { const shot = draft(); if (shot) fire(shot); },
   fireShot(shot) {
-    fire({
-      seat: shot.seat || state.turn, drive: shot.drive | 0, angle: shot.angle || 45,
-      power: shot.power || 12, weapon: shot.weapon || 'standard'
-    });
+    fire({ seat: shot.seat || state.turn, drive: shot.drive | 0, angle: shot.angle || 45,
+      power: shot.power || 12, weapon: shot.weapon || 'standard' });
   },
-  // A direct hit on the other tank, found through the engine's own guide.
   bestShot(seatIn) {
     if (!state || world.winner) return null;
     const s = seatIn || state.turn;
-    for (const weapon of WEAPONS) {
+    for (const weapon of engine.WEAPONS) {
       if (weapon !== 'standard' && !(world.tanks[s - 1].ammo[weapon] > 0)) continue;
       for (let a = 5; a <= 85; a++) for (let p = 1; p <= 24; p++) {
         const g = engine.guide(world, s, a, p, weapon);
@@ -1033,39 +842,16 @@ window.__test = {
     }
     return null;
   },
-  skip() { if (anim) { anim.frame = Math.ceil(anim.total / anim.speed) + 4; setTimeout(commitShot, 0); } },
-  settle() { return new Promise(res => { const check = () => (anim ? setTimeout(check, 40) : res()); check(); }); },
-  tick(n) { for (let i = 0; i < (n || 1); i++) update(); }
+  skip() { if (anim) { anim.doneAt = performance.now() - 2000; } },
+  settle() { return new Promise(res => { const check = () => (anim ? setTimeout(check, 30) : res()); check(); }); },
+  tick(n) { for (let i = 0; i < (n || 1); i++) { try { step(1 / 60); } catch (e) { } } },
+  // perf: millisecond timings of one paint pass, for the smoothness check
+  cost() { const t = performance.now(); for (let i = 0; i < 20; i++) paint(0); return (performance.now() - t) / 20; }
 };
 
-function fit() {
-  const s = Math.min((innerWidth - 20) / 960, (innerHeight - 92) / 580, 1);
-  canvas.style.width = Math.round(960 * Math.max(.3, s)) + 'px';
-  canvas.style.height = Math.round(580 * Math.max(.3, s)) + 'px';
-}
-addEventListener('resize', fit);
-
-function loop() {
-  update();
-  try { render(); } catch (e) { /* a bad frame must not stop the loop */ }
-  requestAnimationFrame(loop);
-}
-
-canvas.addEventListener('click', e => {
-  if (mode !== 'TITLE' && mode !== 'OVER') return;
-  const at = canvasXY(e);
-  for (const mb of menuButtons) {
-    if (at.x >= mb.x && at.x <= mb.x + mb.w && at.y >= mb.y && at.y <= mb.y + mb.h) { mb.action(); return; }
-  }
-});
-
-fit();
-buildBar();
+/* ── Boot ───────────────────────────────────────────────────────────────── */
 
 (async function boot() {
-  // The doc usually runs in a srcdoc iframe, where location is about:srcdoc and
-  // a relative import cannot resolve: take the URL from the hub instead, and
-  // only fall back to the document's own path when run standalone.
   let url = bridge && bridge.engineURL;
   if (!url) {
     try { url = new URL('../tank-engine.js', location.href).href; }
@@ -1074,14 +860,17 @@ buildBar();
   try { engine = await import(url); }
   catch (error) {
     ctx.fillStyle = C.paper; ctx.fillRect(0, 0, 960, 580);
-    label('THE RULES FILE DID NOT LOAD.', 480, 260, 15, C.red, 'center', 600);
-    label(String(error.message || error).slice(0, 90), 480, 288, 12, C.dim);
+    ctx.fillStyle = C.red; ctx.font = '600 13px ui-monospace, monospace'; ctx.textAlign = 'center';
+    ctx.fillText('THE RULES FILE DID NOT LOAD', 480, 282);
+    ctx.fillStyle = C.dim; ctx.font = '12px ui-monospace, monospace';
+    ctx.fillText(String(error && error.message || error).slice(0, 80), 480, 306);
     return;
   }
+  modeEl.textContent = aiEnabled ? 'Two players' : 'Solo vs AI';
   if (bridge) startOnline();
-  requestAnimationFrame(loop);
+  else { aiEnabled = true; freshMatch(); }
+  requestAnimationFrame(frame);
 })();
-
 </script>
 </body>
 </html>
