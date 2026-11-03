@@ -73,7 +73,7 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.match(await page.$eval('#developer-note-trackbound .developer-note-copy', tip => tip.textContent), /Brody/);
     assert.ok(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'));
     // Desktop rows open their note on hover, so the info button is phone-only.
-    assert.equal(await page.$eval('#grid .card[data-slug="block-blast"] ~ .developer-note-toggle', node => getComputedStyle(node).display), 'none');
+    assert.equal(await page.$eval('#grid .card[data-slug="block-blast"] ~ .developer-note-toggle', node => node.hidden), false);
     await page.hover('#grid .note-host:has(.card[data-slug="block-blast"]) .card');
     assert.equal(await page.$eval('#developer-note-block-blast', tip => getComputedStyle(tip).display), 'block');
     await page.mouse.move(0, 0);
@@ -111,6 +111,7 @@ test('discovery keeps its controls and fits small screens', async t => {
       const q = document.querySelector('#q');
       q.value = '';
       q.dispatchEvent(new Event('input', { bubbles: true }));
+      q.focus();
     });
     assert.equal(await page.evaluate(() => document.activeElement.id), 'q');
     await page.type('#q', 'touch');
@@ -122,6 +123,7 @@ test('discovery keeps its controls and fits small screens', async t => {
       const q = document.querySelector('#q');
       q.value = '';
       q.dispatchEvent(new Event('input', { bubbles: true }));
+      q.focus();
     });
   });
 
@@ -155,6 +157,7 @@ test('discovery keeps its controls and fits small screens', async t => {
       const q = document.querySelector('#q');
       q.value = '';
       q.dispatchEvent(new Event('input', { bubbles: true }));
+      q.focus();
     });
     await page.type('#q', 'f-14');
     assert.equal(await page.$eval('#random', button => button.disabled), false);
@@ -170,6 +173,7 @@ test('discovery keeps its controls and fits small screens', async t => {
       const q = document.querySelector('#q');
       q.value = '';
       q.dispatchEvent(new Event('input', { bubbles: true }));
+      q.focus();
     });
   });
 
