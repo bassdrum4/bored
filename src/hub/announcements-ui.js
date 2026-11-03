@@ -85,7 +85,7 @@ export function createAnnouncementsUI() {
       const [messages, receipts] = await Promise.all([
         request('/rest/v1/announcements?select=id,title,body,audience,recipient_id,priority,link_url,active,created_at,published_at,expires_at&order=created_at.desc&limit=100',
           { token: who ? undefined : ANON_TOKEN }),
-        who ? request('/rest/v1/announcement_reads?select=announcement_id&limit=1000') : Promise.resolve([])
+        who ? request('/rest/v1/announcement_reads?select=announcement_id&user_id=eq.' + encodeURIComponent(who) + '&limit=1000') : Promise.resolve([])
       ]);
       if (seq !== generation || current() !== who) return;
       entries = messages || [];
