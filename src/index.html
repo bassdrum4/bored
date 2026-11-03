@@ -30,10 +30,12 @@
         <button id="account-action" type="button">Sign in</button>
         <button id="account-rename" type="button" hidden>Change name</button>
       </div>
-      <button id="feedback-open" class="side-action" type="button">Send feedback</button>
+      <button id="announcement-toggle" class="side-action" type="button" aria-label="Announcements" aria-haspopup="dialog" aria-controls="announcement-dialog">Announcements <span id="announcement-count" class="badge" hidden></span></button>
+       <button id="feedback-open" class="side-action" type="button">Send feedback</button>
     </div>
 
   </header>
+  <section id="announcement-banner" class="announcement-banner" aria-label="Latest announcement" hidden></section>
   <p id="together-home" class="bt-home" hidden><a id="together-home-link" href="#together"></a></p>
   <section id="together" aria-labelledby="together-heading" hidden>
     <div class="section-heading"><div><p class="eyebrow">Bored / Together</p><h2 id="together-heading">Bored Together</h2></div>
@@ -106,6 +108,11 @@
   <footer class="foot"><span>have fun. stay a while.</span><span id="foot-count"></span></footer>
 </main>
 
+<dialog id="announcement-dialog" class="announcements-dialog" aria-labelledby="announcement-heading">
+  <div class="announcement-dialog-head"><h2 id="announcement-heading">Announcements</h2><button type="button" class="action" id="announcement-close">Close</button></div>
+  <p id="announcement-status" role="status"></p>
+  <div id="announcement-list"></div>
+</dialog>
 <dialog id="auth-dialog" aria-labelledby="auth-title">
   <form id="auth-form" novalidate>
     <h2 id="auth-title">Sign in</h2>
