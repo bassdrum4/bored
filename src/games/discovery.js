@@ -78,8 +78,9 @@ export function inCollection(slug, collection) {
 // game and named after its slug. They are ordinary files the page requests when
 // it builds a card, so the site needs no build step to carry them.
 // A newly scaffolded game starts with an SVG placeholder and is listed here
-// until a real capture replaces it. Every game currently ships a WebP.
-export const PREVIEW_FALLBACKS = {};
+// until a real capture replaces it. External F-14 and Klang use compact,
+// self-hosted illustrated SVG previews rather than an ONLINE EXTRA placeholder.
+export const PREVIEW_FALLBACKS = { 'f-14': '.svg', klang: '.svg' };
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
-  ORDER.filter(([slug]) => !EXTERNS[slug]).map(([slug]) => [slug, previewUrl(slug)]));
+  ORDER.filter(([slug]) => !EXTERNS[slug] || PREVIEW_FALLBACKS[slug]).map(([slug]) => [slug, previewUrl(slug)]));
