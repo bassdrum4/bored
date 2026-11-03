@@ -51,9 +51,9 @@
 <body>
 <header>
   <h1>PASTEL TANKS<span>.</span></h1>
-  <div id="hud"><span class="p1">LAVENDER</span> <b id="hp1">100</b> · <span class="p2">MINT</span> <b id="hp2">100</b> <span id="wind">· wind 0</span> <span id="fuel"></span></div>
+  <div id="hud"><span class="p1">LAVENDER</span> <b id="hp1">100</b> · <span class="p2">MINT</span> <b id="hp2">100</b> <span id="wind">· wind 0</span></div>
 </header>
-<canvas id="c" width="960" height="580" aria-label="Artillery duel inside a box: drive the walls, blast the panels"></canvas>
+<canvas id="c" width="960" height="580" aria-label="Artillery duel in a box: drive the walls, blow holes in the ground"></canvas>
 <footer>
   <p id="hint">A/D or arrows drive · W/S or up/down aim · point and tap fires · space charges</p>
   <div id="acts">
@@ -63,15 +63,16 @@
 </footer>
 <script>'use strict';
 /* Pastel Tanks, rules version 2: an artillery duel inside a drivable box.
- * tank-engine.js owns the model — four wall bands make one ring road, tanks drive
- * it (walls, ceiling and upside-down floor included), shells fall with ordinary
- * gravity, and a hole drops whatever stands over it. This document paints that
- * world smoothly and turns input into a shot: offline it runs the shot itself,
- * and under Bored Together every move is replayed from the stored list. */
+ * tank-engine.js owns the model — the box's edge is continuous, destructible
+ * ground with a depth profile per wall, so every shell digs a bowl and only a
+ * breach drops a tank. Tanks ride that profile, walls and ceiling included.
+ * This document paints the ground smoothly and turns input into a shot:
+ * offline it runs the shot itself, and under Bored Together every move is
+ * replayed from the stored list. */
 
 const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
 const hud = { hp1: document.getElementById('hp1'), hp2: document.getElementById('hp2'),
-  wind: document.getElementById('wind'), fuel: document.getElementById('fuel') };
+  wind: document.getElementById('wind') };
 const hintEl = document.getElementById('hint');
 const armsEl = document.getElementById('arms');
 const modeEl = document.getElementById('mode');
@@ -90,7 +91,8 @@ let sel = 'standard', walk = 0, walkVel = 0, charge = null, chargeFrom = null;
 const aim = { 1: { angle: 45, power: 12 }, 2: { angle: 45, power: 12 } };
 const facing = { 1: -1, 2: 1 };
 const keys = new Set();
-let anim = null, sprigs = [], notes = [], shake = 0, crumble = [];
+let anim = null, sprigs = [], notes = [], shake = 0;
+let terrainLayer = { key: '', canvas: null };
 let aiPlan = null, aiTick = 0, overFor = 0, lastNow = 0;
 let pointer = null, settleT = 0;
 const seenTurn = { seat: 0, at: -1 };
@@ -102,16 +104,13 @@ const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const X0 = () => engine.BX + engine.T, X1 = () => engine.BX + engine.BW - engine.T;
 const Y0 = () => engine.BY + engine.T, Y1 = () => engine.BY + engine.BH - engine.T;
 const seatName = s => (online && online.names && online.names[s - 1]) || (s === 1 ? 'LAVENDER' : 'MINT');
-const anchor = t => { const p = engine.ringPoint(t.s); return { x: p.x + p.nx * 4, y: p.y + p.ny * 4, p }; };
-
-function countHoles(w) { let n = 0; for (const row of w.panels) for (const v of row) if (!v) n++; return n; }
-function panelRect(wall, j) {
-  const len = engine.PANEL_LENS[wall];
-  if (wall === 0) return { x: X0() + j * len, y: engine.BY, w: len, h: engine.T };
-  if (wall === 1) return { x: X1(), y: Y0() + j * len, w: engine.T, h: len };
-  if (wall === 2) return { x: X1() - (j + 1) * len, y: Y1(), w: len, h: engine.T };
-  return { x: engine.BX, y: Y1() - (j + 1) * len, w: engine.T, h: len };
-}
+/* Aim and effects work from the tank as it currently sits: down in a dent, or
+ * on the box's edge where the ground is still whole. */
+const anchor = t => {
+  const p = engine.ringPoint(t.s);
+  const d = world ? engine.depthAt(world, p.wall, p.along) : 0;
+  return { x: p.x - p.nx * d + p.nx * 4, y: p.y - p.ny * d + p.ny * 4, p };
+};
 
 function spark(x, y, n, colour, spread) {
   for (let i = 0; i < n; i++) {
@@ -127,7 +126,7 @@ function reset() {
   aim[1] = { angle: 45, power: 12 }; aim[2] = { angle: 45, power: 12 };
   facing[1] = -1; facing[2] = 1;
   sel = 'standard'; walk = 0; walkVel = 0; charge = chargeFrom = pointer = null;
-  aiPlan = null; aiTick = 0; anim = null; sprigs = []; notes = []; crumble = []; shake = 0;
+  aiPlan = null; aiTick = 0; anim = null; sprigs = []; notes = []; shake = 0;
   lastNow = 0;
 }
 function syncMode() {
@@ -220,7 +219,6 @@ function fire(shot) {
   const impact = out.world.bursts.find(b => b.at === index) || null;
   anim = {
     items, speed, total, frame: 0, pre: before, out, impact,
-    crumble: crumbleFor(before.panels, out.world.panels),
     events: out.world.events.slice(before.events.length),
     at: performance.now(), doneAt: 0
   };
@@ -233,13 +231,6 @@ function fire(shot) {
       weapon: shot.weapon, won: out.next.winner || null }).then(c => { online.canonical = c; return c; });
   }
   paint(0);
-}
-function crumbleFor(pre, post) {
-  const list = [];
-  for (let w = 0; w < 4; w++) for (let j = 0; j < post[w].length; j++) {
-    if (pre[w][j] && !post[w][j]) list.push({ wall: w, j, born: performance.now() });
-  }
-  return list;
 }
 function finishShot() {
   if (!anim) return;
@@ -291,7 +282,7 @@ function ghostPath() {
   if (!live()) return null;
   const seat = turnSeat(), id = aim[seat];
   const key = [engine.wrapS(world.tanks[seat - 1].s + walk), id.angle,
-    charging() ? charge : id.power, sel, world.panels.map(r => r.join('')).join(''), world.shotCount].join('|');
+    charging() ? charge : id.power, sel, world.shotCount, world.blockHoles.length].join('|');
   if (ghost.key !== key) {
     ghost.key = key;
     let g = null;
@@ -309,16 +300,18 @@ function blast(x, y, c, weapon) {
   if (d >= r) return 0;
   return Math.round(pair[0] + (1 - d / r) * (pair[1] - pair[0]));
 }
+/* Would this blast finish digging out the ground under that tank? The engine
+ * knows the depth it has already lost; add what the shell would take. */
 function dumpScore(view, x, y, weapon, seat) {
   const t = view.tanks[seat - 1], p = engine.ringPoint(t.s);
-  let d, along;
-  if (p.wall === 0) { d = Math.hypot(clampN(x, X0(), X1()) - x, y - Y0()); along = clampN(x, X0(), X1()) - X0(); }
-  else if (p.wall === 1) { d = Math.hypot(x - X1(), clampN(y, Y0(), Y1()) - y); along = clampN(y, Y0(), Y1()) - Y0(); }
-  else if (p.wall === 2) { d = Math.hypot(clampN(x, X0(), X1()) - x, y - Y1()); along = X1() - clampN(x, X0(), X1()); }
-  else { d = Math.hypot(x - X0(), clampN(y, Y0(), Y1()) - y); along = Y1() - clampN(y, Y0(), Y1()); }
-  const r = engine.CARVE[weapon] || 10;
-  if (d > r - 6) return 0;
-  return Math.abs(along - p.along) + 14 <= Math.sqrt(Math.max(0, r * r - d * d)) + 2 ? 1 : 0;
+  let along;
+  if (p.wall === 0) along = clampN(x, X0(), X1()) - X0();
+  else if (p.wall === 1) along = clampN(y, Y0(), Y1()) - Y0();
+  else if (p.wall === 2) along = X1() - clampN(x, X0(), X1());
+  else along = Y1() - clampN(y, Y0(), Y1());
+  const near = Math.abs(along - p.along) <= (engine.CARVE[weapon] || 10) + 10;
+  if (!near) return 0;
+  return engine.depthAt(view, p.wall, along) + (engine.BITE[weapon] || 10) >= engine.T - 6 ? 1 : 0;
 }
 function scoreShot(view, seat, angle, power, weapon) {
   const g = engine.guide(view, seat, angle, power, weapon);
@@ -329,6 +322,7 @@ function scoreShot(view, seat, angle, power, weapon) {
     return 40 - Math.hypot(h.x - foe.x, h.y - foe.y) * .28 - Math.hypot(h.x - me.x, h.y - me.y) * .9;
   }
   let s = blast(h.x, h.y, anchor(view.tanks[2 - seat]), weapon) - blast(h.x, h.y, anchor(view.tanks[seat - 1]), weapon) * 1.25;
+  if (kind === 'block') s -= 6;
   if (kind === 'tank' && h.seat === 2 - seat) s += 10;
   if (kind === 'wall' || kind === 'tank') {
     if (dumpScore(view, h.x, h.y, weapon, 2 - seat)) s += 22;
@@ -356,7 +350,7 @@ function plan() {
   let best = cands[0];
   if (!best || best.score < 14) {
     for (const drive of [-320, -190, -90, 90, 190, 320]) {
-      if (engine.driveCost(me.s, drive) > engine.FUEL * .85 || !supportAt(view, me.s + drive)) continue;
+      if (!supportAt(view, me.s + drive)) continue;
       const travel = movedWorld(view, seat, drive, 45);
       for (const weapon of ['standard', 'heavy', 'cluster', 'ricochet']) {
         if (weapon !== 'standard' && !(me.ammo[weapon] > 0)) continue;
@@ -491,15 +485,12 @@ function step(dt) {
     walkVel += (target - walkVel) * Math.min(1, dt * 14);
     if (Math.abs(walkVel) < 3) walkVel = 0;
     if (walkVel) {
-      const next = walk + walkVel * dt;
-      if (engine.driveCost(t.s, next) <= engine.FUEL) {
-        walk = next;
-        if (dir) facing[seat] = dir;
-        if (Math.random() < dt * 20) {
-          const p = engine.ringPoint(engine.wrapS(t.s + walk));
-          spark(p.x, p.y, 1, C.hair, .8);
-        }
-      } else { walkVel = 0; walk = walk * .9; }
+      walk = clampN(walk + walkVel * dt, -engine.RING, engine.RING);
+      if (dir) facing[seat] = dir;
+      if (Math.random() < dt * 20) {
+        const p = engine.ringPoint(engine.wrapS(t.s + walk));
+        spark(p.x, p.y, 1, C.hair, .8);
+      }
     }
     const a = aim[seat];
     if (keys.has(AIMKEY[seat][0])) a.angle = clampN(a.angle + dt * 55, 5, 85);
@@ -517,80 +508,83 @@ function step(dt) {
       if (aiTick > 52) { const shot = aiPlan; aiPlan = null; aiTick = 0; fire(shot); }
     }
   }
-  while (crumble.length && performance.now() - crumble[0].born > 320) crumble.shift();
 }
 
 /* ── Painting ───────────────────────────────────────────────────────────── */
 
-function drawBox(panels) {
-  ctx.fillStyle = C.board; ctx.fillRect(engine.BX, engine.BY, engine.BW, engine.BH);
-  ctx.fillStyle = C.ink;
-  const t = engine.T;
-  for (const [x, y] of [[engine.BX, engine.BY], [engine.BX + engine.BW - t, engine.BY],
-    [engine.BX, engine.BY + engine.BH - t], [engine.BX + engine.BW - t, engine.BY + engine.BH - t]]) ctx.fillRect(x, y, t, t);
-  // panels are paper slabs with hairline seams, so the box reads as a room and
-  // not a picture frame; a destroyed one folds into the wall before vanishing
-  for (let w = 0; w < 4; w++) {
-    for (let j = 0; j < panels[w].length; j++) {
-      const r = panelRect(w, j);
-      if (panels[w][j]) {
-        ctx.fillStyle = '#efeade';
-        ctx.fillRect(r.x, r.y, r.w, r.h);
-        ctx.strokeStyle = C.hair; ctx.lineWidth = 1;
-        ctx.beginPath();
-        if (w % 2 === 0) { ctx.moveTo(r.x + r.w, r.y + 1); ctx.lineTo(r.x + r.w, r.y + r.h - 1); }
-        else { ctx.moveTo(r.x + 1, r.y + r.h); ctx.lineTo(r.x + r.w - 1, r.y + r.h); }
-        ctx.stroke();
-      } else {
-        const folding = crumble.find(c => c.wall === w && c.j === j);
-        if (folding) {
-          const age = clampN((performance.now() - folding.born) / 300, 0, 1);
-          const shrink = 1 - age;
-          ctx.save();
-          ctx.globalAlpha = 1 - age;
-          ctx.fillStyle = '#efeade';
-          if (w === 0) ctx.fillRect(r.x, r.y, r.w, r.h * shrink);
-          else if (w === 2) ctx.fillRect(r.x, r.y + r.h * (1 - shrink), r.w, r.h * shrink);
-          else if (w === 1) ctx.fillRect(r.x + r.w * (1 - shrink), r.y, r.w * shrink, r.h);
-          else ctx.fillRect(r.x, r.y, r.w * shrink, r.h);
-          ctx.restore();
-        }
-        ctx.strokeStyle = C.hair; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
-        ctx.strokeRect(r.x + 2.5, r.y + 2.5, Math.max(1, r.w - 5), Math.max(1, r.h - 5));
-        ctx.setLineDash([]);
-      }
-    }
-  }
-  // the box's own outline: the ink edge a room drawn on paper would have
-  ctx.strokeStyle = C.ink; ctx.lineWidth = 1;
-  ctx.strokeRect(engine.BX + .5, engine.BY + .5, engine.BW - 1, engine.BH - 1);
-  ctx.strokeStyle = C.hair; ctx.lineWidth = 1;
-  ctx.strokeRect(engine.BX + engine.T + .5, engine.BY + engine.T + .5, engine.IW - 1, engine.IH - 1);
+/* The ground is one continuous thing: four wall profiles between the box's
+ * outer edge and the surface each shell has dug into it, plus the blocks in the
+ * room. It is painted once into its own layer and blitted each frame, rebuilt
+ * only when a shot changes it — which also keeps a dug bowl perfectly smooth at
+ * any frame rate. */
+function terrainCanvas() {
+  if (!world) return null;
+  const key = world.seed + '|' + world.shotCount + '|' + world.blockHoles.length;
+  if (terrainLayer.key === key && terrainLayer.canvas) return terrainLayer.canvas;
+  const cv = terrainLayer.canvas || document.createElement('canvas');
+  cv.width = 960; cv.height = 580;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, 960, 580);
+  const BX = engine.BX, BY = engine.BY, BW = engine.BW, BH = engine.BH, T = engine.T;
+  const IW = engine.IW, IH = engine.IH, X0 = BX + T, X1 = BX + BW - T, Y0 = BY + T, Y1 = BY + BH - T;
+  const OFFS = [0, IW, IW + IH, IW + IH + IW];
+  const surf = (wall, i) => {
+    const p = engine.ringPoint(OFFS[wall] + i);
+    const d = engine.depthAt(world, wall, p.along);
+    return { x: p.x - p.nx * d, y: p.y - p.ny * d };
+  };
+  // one closed surface loop; the ground is the box's outer rectangle minus it,
+  // which keeps the corners solid and lets a bowl bite the edge anywhere
+  const inner = [];
+  for (let i = 0; i <= IW; i += 2) inner.push(surf(0, i));
+  for (let i = 2; i <= IH; i += 2) inner.push(surf(1, i));
+  for (let i = 2; i <= IW; i += 2) inner.push(surf(2, i));
+  for (let i = 2; i <= IH; i += 2) inner.push(surf(3, i));
+  const GROUND = '#dcd4c0';
+  g.fillStyle = GROUND;
+  g.beginPath();
+  g.rect(BX, BY, BW, BH);
+  g.moveTo(inner[0].x, inner[0].y);
+  for (let i = 1; i < inner.length; i++) g.lineTo(inner[i].x, inner[i].y);
+  g.closePath();
+  g.fill('evenodd');
+  for (const b of world.blocks) g.fillRect(b.x, b.y, b.w, b.h);
+  // the box's own edge is ink; the ground inside it is paper with a hairline
+  g.strokeStyle = C.ink; g.lineWidth = 1;
+  g.strokeRect(BX + .5, BY + .5, BW - 1, BH - 1);
+  g.strokeStyle = C.ink; g.lineWidth = 1;
+  for (const b of world.blocks) g.strokeRect(b.x + .5, b.y + .5, b.w - 1, b.h - 1);
+  g.beginPath();
+  g.moveTo(inner[0].x, inner[0].y);
+  for (let i = 1; i < inner.length; i++) g.lineTo(inner[i].x, inner[i].y);
+  g.closePath(); g.stroke();
+  // a block loses its middle where shells went through
+  g.globalCompositeOperation = 'destination-out';
+  for (const c of world.blockHoles) { g.beginPath(); g.arc(c.x, c.y, c.r, 0, Math.PI * 2); g.fill(); }
+  g.globalCompositeOperation = 'source-atop';
+  for (const c of world.blockHoles) { g.beginPath(); g.arc(c.x, c.y, c.r, 0, Math.PI * 2); g.stroke(); }
+  g.globalCompositeOperation = 'source-over';
+  terrainLayer = { key, canvas: cv };
+  return cv;
 }
 
-function drawReach(seat) {
-  // how far this turn's fuel goes, as a bracket on the ring
-  const t = world.tanks[seat - 1];
-  const span = engine.FUEL / engine.MOVECOST;
-  ctx.strokeStyle = C.hair; ctx.lineWidth = 1;
-  for (const dir of [-1, 1]) {
-    const end = engine.wrapS(t.s + dir * span);
-    const p = engine.ringPoint(end);
-    ctx.beginPath();
-    ctx.moveTo(p.x + p.nx * 5, p.y + p.ny * 5);
-    ctx.lineTo(p.x + p.nx * 11, p.y + p.ny * 11);
-    ctx.stroke();
-  }
+function drawTerrain() {
+  ctx.fillStyle = C.board; ctx.fillRect(engine.BX, engine.BY, engine.BW, engine.BH);
+  const cv = terrainCanvas();
+  if (cv) ctx.drawImage(cv, 0, 0);
 }
 
 function drawTank(t, seat, isTurn) {
-  const p = engine.ringPoint(t.s + (isTurn && live() ? walk : 0));
+  if (t.hp <= 0) return;
+  const s = engine.wrapS(t.s + (isTurn && live() ? walk : 0));
+  const p = engine.ringPoint(s);
+  const surf = engine.tankSurface(world, { s });
   const rot = [0, Math.PI / 2, Math.PI, -Math.PI / 2][p.wall];
   const colour = COLOUR[seat];
   const angle = (isTurn ? aim[seat].angle : (t.angle || 45)) * Math.PI / 180;
   const dir = isTurn && live() ? facing[seat] : (t.dir || 1);
   ctx.save();
-  ctx.translate(p.x, p.y);
+  ctx.translate(surf.x, surf.y);
   ctx.rotate(rot);
   // treads sit on the wall; the hull hangs into the box, so the ceiling reads upside down
   ctx.fillStyle = C.ink;
@@ -641,9 +635,8 @@ function drawShell(shown, trail, colour) {
   ctx.beginPath(); ctx.arc(h.x, h.y, 2.4, 0, Math.PI * 2); ctx.fill();
 }
 
-function drawField(panels, tanks, powerups, mines, trails, showGhost) {
-  drawBox(panels);
-  if (mode === 'AIM' && live() && showGhost) drawReach(turnSeat());
+function drawField(tanks, powerups, mines, trails, showGhost) {
+  drawTerrain();
   for (const t of trails) {
     for (let i = 0; i < t.length; i += 6) {
       ctx.globalAlpha = .05 + (i / t.length) * .07;
@@ -709,9 +702,6 @@ function paintHud() {
   const w = state ? engine.windOf(state.seed, state.shots.length) : 0;
   hud.wind.textContent = '· wind ' + Math.abs(Math.round(w * 1000)) + (w >= 0 ? ' →' : ' ←');
   const seat = online ? online.seat : turnSeat();
-  let used = 0;
-  if (state && state.turn === seat && world && !world.winner) used = engine.driveCost(world.tanks[seat - 1].s, walk);
-  hud.fuel.textContent = '· fuel ' + Math.max(0, Math.round(100 - used / engine.FUEL * 100)) + '%';
   const t = world.tanks[seat - 1] || a;
   for (const [key] of ARMS) {
     const btn = armsEl.querySelector('[data-arm="' + key + '"]');
@@ -734,7 +724,7 @@ function paint(dt) {
   if (shake) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   if (anim) {
-    drawField(anim.pre.panels, anim.pre.tanks, anim.pre.powerups, anim.pre.mines,
+    drawField(anim.pre.tanks, anim.pre.powerups, anim.pre.mines,
       world.trails.slice(0, world.trails.length - anim.items.length), false);
     const pts = Math.max(0, anim.frame * anim.speed);
     let impact = false;
@@ -759,7 +749,7 @@ function paint(dt) {
     ctx.font = '600 12px ui-monospace, monospace';
     ctx.fillText('BUILDING THE BOX', 480, 288); ctx.textAlign = 'left';
   } else {
-    drawField(world.panels, world.tanks, world.powerups, world.mines, world.trails, true);
+    drawField(world.tanks, world.powerups, world.mines, world.trails, true);
     drawCentre();
   }
   for (const s of sprigs) {
@@ -819,7 +809,11 @@ window.__test = {
   world: () => world,
   seed: () => (state ? state.seed : null),
   hp: () => (world ? world.tanks.map(t => Math.round(t.hp)) : null),
-  holes: () => (world ? countHoles(world) : null),
+  terrain: () => (world ? {
+    dug: Math.round(world.depth.reduce((n, row) => n + row.reduce((m, v) => m + v, 0), 0)),
+    breaches: world.depth.reduce((n, row) => n + row.filter(v => v >= engine.T - 1).length, 0),
+    holes: world.blockHoles.length
+  } : null),
   turn: () => (state ? state.turn : null),
   wind: () => (state ? engine.windOf(state.seed, state.shots.length) : null),
   start(ai) { aiEnabled = !!ai; freshMatch(); },

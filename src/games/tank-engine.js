@@ -1,6 +1,6 @@
 /*
  * Pastel Tanks as rules rather than as a canvas. Rules version 2: the arena is
- * a box.
+ * a box, and the box is the ground.
  *
  * A Bored Together match stores only its seed and the shots that were fired.
  * Both players replay that list through this file, so the box, the hit points
@@ -9,11 +9,13 @@
  * the seed and the shot index, the power-up stream is a seeded function of the
  * same numbers, and nothing reads the clock, the DOM or Math.random.
  *
- * The arena is a box on the page's own paper: four destructible wall bands
- * whose inner edges form one ring road. Tanks drive that ring — floor, walls,
- * ceiling, upside down across the top — while every shell falls towards the
- * true floor under gravity. A hole in the box does what holes do: shells leave
- * through it and tanks standing over one fall.
+ * The four walls are continuous ground, not tiles. Each one carries a depth
+ * profile — a number per pixel along its inner edge — so a shell digs a smooth
+ * bowl instead of deleting a panel. Tanks drive the profile: a dent is a place
+ * they sit lower in, and only a breach (depth reaching the wall's full
+ * thickness) opens a hole wide enough for a tank to drop through or a shell to
+ * fly out of. A few destructible blocks hang in the middle of the room, so the
+ * field between the tanks blocks and bends fire.
  */
 
 export const RULES = 2;
@@ -26,12 +28,10 @@ export const IW = BW - 2 * T;       // interior width  (888)
 export const IH = BH - 2 * T;       // interior height (476)
 const X0 = BX + T, X1 = BX + BW - T, Y0 = BY + T, Y1 = BY + BH - T;
 
-/* The ring road is built from panel segments along each wall. */
-export const COUNTS = [32, 16, 32, 16];              // top, right, bottom, left
+/* The ring road is the box's inner edge: top, right, bottom, left. */
 const LENS = [IW, IH, IW, IH];
-export const PANEL_LENS = LENS.map((len, w) => len / COUNTS[w]);
 const OFFS = [0, IW, IW + IH, IW + IH + IW];
-export const RING = OFFS[3] + LENS[3];
+export const RING = 2 * IW + 2 * IH;
 
 /* ── Physics and kit ─────────────────────────────────────────────────────── */
 
@@ -40,9 +40,7 @@ export const PWSPD = 0.55;          // power becomes launch speed
 export const MINPW = 1, MAXPW = 24;
 export const MAXHP = 100;
 export const TANK = 28, BLEN = 18;  // treads span, barrel length
-export const FUEL = 150;            // drive budget per turn, in fuel units
-export const MOVECOST = 0.3;        // fuel per pixel driven
-export const CORNERCOST = 24;       // extra for turning around a box corner
+export const SUPPORTGAP = 12;       // open ground under the treads that drops a tank
 export const MAXPU = 4;
 
 export const WEAPONS = Object.freeze(['standard', 'heavy', 'cluster', 'mine', 'ricochet']);
@@ -52,10 +50,15 @@ export const WEAPON_NAMES = Object.freeze({
 export const RANGE = Object.freeze({
   standard: 26, heavy: 36, cluster: 20, cluster_child: 14, mine: 40, ricochet: 26
 });
-/* Blasts mark walls wider or narrower than they hurt: dumping a tank through
- * the floor takes a wide carve (heavy, mines), a plain shell just perforates. */
+/* CARVE is the radius of the bowl along the wall; BITE is how deep it digs, in
+ * pixels of the 26 thick wall. A standard shell dents about half way, a heavy
+ * shell or a mine goes through, and repeated shells on one spot add up until
+ * the ground gives. */
 export const CARVE = Object.freeze({
-  standard: 10, heavy: 28, cluster: 10, cluster_child: 8, mine: 34, ricochet: 14
+  standard: 14, heavy: 30, cluster: 12, cluster_child: 10, mine: 36, ricochet: 16
+});
+export const BITE = Object.freeze({
+  standard: 13, heavy: 34, cluster: 10, cluster_child: 9, mine: 38, ricochet: 15
 });
 export const DAMAGE = Object.freeze({
   standard: [18, 40], heavy: [34, 62], cluster: [10, 20], cluster_child: [6, 14],
@@ -112,8 +115,7 @@ export function ringPoint(s) {
 export const wrapS = s => ((Math.round(s) % RING) + RING) % RING;
 const sAt = (wall, along) => OFFS[wall] + Math.max(0, Math.min(LENS[wall], along));
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const panelLen = wall => PANEL_LENS[wall];
-const panelAt = (wall, along) => clamp(Math.floor(along / panelLen(wall)), 0, COUNTS[wall] - 1);
+const round2 = v => Math.round(v * 100) / 100;
 
 /** Distance from a point to a wall's inner surface line segment. */
 function distToWall(wall, x, y) {
@@ -146,6 +148,94 @@ function anchor(wall, x, y) {
   return { x: X0, y: clamp(y, Y0, Y1), along: Y1 - clamp(y, Y0, Y1) };
 }
 
+/* ── Terrain: a depth profile per wall, plus blocks in the room ──────────── */
+
+/** How far the ground has been dug away at this spot, in pixels. */
+export function depthAt(world, wall, along) {
+  const arr = world.depth[wall];
+  return arr[clamp(Math.round(along), 0, arr.length - 1)];
+}
+export const breached = (world, wall, along) => depthAt(world, wall, along) >= T - 1;
+
+/** The solid point a tank's treads rest on, already sunk into any dent. */
+export function tankSurface(world, tank) {
+  const p = ringPoint(tank.s), d = depthAt(world, p.wall, p.along);
+  const half = TANK / 2 - 1;
+  return { p, d, x: p.x - p.nx * d, y: p.y - p.ny * d, cx: p.x - p.nx * d + p.nx * half, cy: p.y - p.ny * d + p.ny * half };
+}
+
+export function makeBlocks(seed) {
+  const rand = random((seed ^ 0x51ED2701) >>> 0);
+  return [0, 1].map(i => {
+    const w = 88 + Math.round(rand() * 70), h = 22 + Math.round(rand() * 16);
+    const x = i === 0
+      ? Math.round(X0 + 110 + rand() * 110)
+      : Math.round(X1 - 120 - w - rand() * 110);
+    const y = Math.round(Y0 + 128 + rand() * (IH - 300 - h));
+    return { x, y, w, h };
+  });
+}
+function inBlock(b, x, y) { return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h; }
+function blockHoleAt(world, x, y) {
+  for (const c of world.blockHoles) if (Math.hypot(c.x - x, c.y - y) <= c.r) return true;
+  return false;
+}
+const circleHitsRect = (x, y, r, b) => {
+  const nx = clamp(x, b.x, b.x + b.w), ny = clamp(y, b.y, b.y + b.h);
+  return Math.hypot(nx - x, ny - y) <= r;
+};
+
+/** Dig a smooth bowl into one wall's profile, centred at `along`. */
+function carveWall(world, wall, along, r, bite) {
+  const arr = world.depth[wall], last = arr.length - 1;
+  const from = Math.max(0, Math.floor(along - r)), to = Math.min(last, Math.ceil(along + r));
+  for (let i = from; i <= to; i++) {
+    const q = (i - along) / r;
+    if (q <= -1 || q >= 1) continue;
+    const gain = bite * (1 - q * q);
+    if (gain <= 0.01) continue;
+    const was = arr[i], now = Math.min(T, was + gain);
+    if (now <= was + 0.005) continue;
+    arr[i] = round2(now);
+    if (now >= T - 1 && was < T - 1) {
+      const p = ringPoint(sAt(wall, i));
+      world.events.push({ kind: 'breach', wall, along: i, x: p.x, y: p.y });
+    }
+  }
+}
+
+/** A blast: every wall and block the bowl can reach loses material. */
+export function carveAt(world, x, y, r, bite) {
+  for (let wall = 0; wall < 4; wall++) {
+    if (distToWall(wall, x, y) > r) continue;
+    carveWall(world, wall, anchor(wall, x, y).along, r, bite);
+  }
+  for (const b of world.blocks) {
+    if (!circleHitsRect(x, y, r, b)) continue;
+    world.blockHoles.push({ x: round2(x), y: round2(y), r: round2(r) });
+  }
+}
+
+/**
+ * The first solid thing at this point, or null. A wall only counts above the
+ * depth profile — inside a dug bowl a shell keeps flying — and a block stops
+ * counting where it has been shot away.
+ */
+export function solidAt(world, x, y) {
+  const band = wallAt(x, y);
+  if (band) {
+    const spot = anchor(band.wall, x, y);
+    const q = distToWall(band.wall, x, y);
+    if (q >= depthAt(world, band.wall, spot.along)) {
+      return { kind: 'wall', wall: band.wall, along: spot.along, x: spot.x, y: spot.y };
+    }
+  }
+  for (const b of world.blocks) {
+    if (inBlock(b, x, y) && !blockHoleAt(world, x, y)) return { kind: 'block', x, y, block: b };
+  }
+  return null;
+}
+
 /* ── Tanks and bodies ────────────────────────────────────────────────────── */
 
 export function makeTank(seat) {
@@ -155,55 +245,36 @@ export function makeTank(seat) {
   return {
     s: sAt(2, along), dir: seat === 1 ? -1 : 1, hp: MAXHP, angle: 45,
     shield: false, ammo: { heavy: 0, cluster: 0, mine: 0, ricochet: 0 },
-    fuel: FUEL, falling: null
+    falling: null
   };
 }
 
-function bodyCentre(tank) {
-  const p = ringPoint(tank.s), half = TANK / 2 - 1;
-  return { x: p.x + p.nx * half, y: p.y + p.ny * half };
+function bodyCentre(world, tank) {
+  if (tank.falling) return tank.falling;
+  const surf = tankSurface(world, tank);
+  return { x: surf.cx, y: surf.cy };
 }
 
 /**
- * True while some intact panel still sits under the treads. A tank only
- * tumbles when its whole footprint is gone — one perforated panel next to it
- * is a hole shells can escape through, not a broken floor.
+ * True while the ground under the treads is still ground. A dent is fine — the
+ * tank simply sits lower — but a breach wider than a few pixels is a hole, and
+ * a hole is where tanks fall out of the box.
  */
 export function supported(world, tank) {
   if (tank.falling) return false;
-  const p = ringPoint(tank.s), half = TANK / 2;
-  const first = panelAt(p.wall, Math.max(0, p.along - half));
-  const last = panelAt(p.wall, Math.min(p.len, p.along + half));
-  for (let j = first; j <= last; j++) if (world.panels[p.wall][j]) return true;
-  return false;
+  let run = 0, worst = 0;
+  for (let o = -TANK / 2; o <= TANK / 2; o += 1) {
+    const q = ringPoint(tank.s + o);
+    if (depthAt(world, q.wall, q.along) >= T - 1) { run++; if (run > worst) worst = run; }
+    else run = 0;
+  }
+  return worst < SUPPORTGAP;
 }
 
 /* ── Damage, carving, mines ──────────────────────────────────────────────── */
 
-function carve(world, x, y, r) {
-  for (let wall = 0; wall < 4; wall++) {
-    const d = distToWall(wall, x, y);
-    if (d > r) continue;
-    const half = Math.sqrt(Math.max(0, r * r - d * d));
-    // Project the blast onto the wall's own `along` axis, which runs left→right
-    // on the top but right→left on the bottom, and top→bottom on the right.
-    const centre = wall === 0 ? (clamp(x, X0, X1) - X0)
-      : wall === 1 ? (clamp(y, Y0, Y1) - Y0)
-      : wall === 2 ? (X1 - clamp(x, X0, X1))
-      : (Y1 - clamp(y, Y0, Y1));
-    const first = panelAt(wall, Math.max(0, centre - half));
-    const last = panelAt(wall, Math.min(LENS[wall], centre + half));
-    for (let j = first; j <= last; j++) {
-      if (world.panels[wall][j]) {
-        world.panels[wall][j] = 0;
-        world.events.push({ kind: 'carve', wall, panel: j });
-      }
-    }
-  }
-}
-
 /**
- * A burst: carve wall panels, damage tanks at their body centres, sweep loose
+ * A burst: dig the ground, damage tanks at their body centres, sweep loose
  * things. `type` picks the radius and damage envelope; cluster leaves children
  * for the caller to fly.
  */
@@ -211,9 +282,9 @@ function burst(world, x, y, type, index, live) {
   const r = RANGE[type] || RANGE.standard;
   const [low, high] = DAMAGE[type] || DAMAGE.standard;
   if (live) {
-    carve(world, x, y, CARVE[type] || CARVE.standard);
+    carveAt(world, x, y, CARVE[type] || CARVE.standard, BITE[type] || BITE.standard);
     for (const tank of world.tanks) {
-      const c = tank.falling || bodyCentre(tank);
+      const c = bodyCentre(world, tank);
       const d = Math.hypot(c.x - x, c.y - y);
       if (d >= r + TANK / 2) continue;
       let hit = Math.round(low + Math.max(0, 1 - d / (r + TANK / 2)) * (high - low));
@@ -246,6 +317,19 @@ function burst(world, x, y, type, index, live) {
 
 /* ── Flight ──────────────────────────────────────────────────────────────── */
 
+function reflect(world, x, y, vx, vy, hit) {
+  if (hit.kind === 'wall') {
+    if (hit.wall === 0 || hit.wall === 2) { vy = -vy; y += hit.wall === 0 ? 3 : -3; }
+    else { vx = -vx; x += hit.wall === 1 ? -3 : 3; }
+  } else {
+    const b = hit.block;
+    const dx = Math.min(x - b.x, b.x + b.w - x), dy = Math.min(y - b.y, b.y + b.h - y);
+    if (dx < dy) { vx = -vx; x += x < b.x + b.w / 2 ? -3 : 3; }
+    else { vy = -vy; y += y < b.y + b.h / 2 ? -3 : 3; }
+  }
+  return { vx, vy, x, y };
+}
+
 /**
  * One projectile with wind and gravity. `live` mutates the world; a dry run
  * only reports where it ends, which is what the aiming ghost and the AI want.
@@ -262,40 +346,45 @@ function flight(world, muzzle, vx, vy, type, index, live, owner) {
     let struck = null;
     for (const tank of world.tanks) {
       if (tank === owner && step < 10) continue;
-      const c = tank.falling || bodyCentre(tank);
+      const c = bodyCentre(world, tank);
       if (Math.hypot(c.x - x, c.y - y) <= TANK / 2 + 5) { struck = tank; break; }
     }
     if (struck) {
-      if (live) burst(world, x, y, type === 'mine' ? 'mine' : type, index, true);
+      if (live) {
+        // Every hit also digs at the ground behind the hull, so a duel slowly
+        // eats the footing out from under whoever keeps getting hit.
+        const surf = tankSurface(world, struck);
+        carveAt(world, surf.x, surf.y, (CARVE[type] || CARVE.standard) * .7, (BITE[type] || BITE.standard) * .45);
+        burst(world, x, y, type === 'mine' ? 'mine' : type, index, true);
+      }
       return { trail, outcome: { kind: 'tank', seat: world.tanks.indexOf(struck) + 1 } };
     }
-    const band = wallAt(x, y);
-    if (!band) continue;
-    const spot = anchor(band.wall, x, y);
-    if (world.panels[band.wall][panelAt(band.wall, spot.along)] === 1) {
-      if (type === 'mine') {
-        const p = ringPoint(sAt(band.wall, spot.along));
-        const plant = { x: p.x + p.nx * 10, y: p.y + p.ny * 10 };
-        if (live) {
-          world.mines.push({ x: plant.x, y: plant.y, seat: index < 0 ? 1 : ownerSeat(world, owner), fuse: 2 });
-          world.events.push({ kind: 'plant', x: plant.x, y: plant.y });
-        }
-        return { trail, outcome: { kind: 'plant', ...plant } };
+    const solid = solidAt(world, x, y);
+    if (!solid) continue;
+    if (type === 'mine' && solid.kind === 'wall') {
+      const p = ringPoint(sAt(solid.wall, solid.along));
+      const d = depthAt(world, solid.wall, solid.along);
+      const plant = { x: p.x - p.nx * d + p.nx * 10, y: p.y - p.ny * d + p.ny * 10 };
+      if (live) {
+        world.mines.push({ x: plant.x, y: plant.y, seat: index < 0 ? 1 : ownerSeat(world, owner), fuse: 2 });
+        world.events.push({ kind: 'plant', x: plant.x, y: plant.y });
       }
-      if (type === 'ricochet' && bounces < 2) {
-        bounces++;
-        speed *= 0.85;
-        // Reflect off this panel and slip a couple of pixels back inside so
-        // the shell cannot hit the same wall again by coincidence.
-        if (band.wall === 0 || band.wall === 2) { vy = -vy; y += band.wall === 0 ? 2 : -2; }
-        else { vx = -vx; x += band.wall === 1 ? -2 : 2; }
-        vx = vx / Math.hypot(vx, vy) * speed; vy = vy / Math.hypot(vx, vy) * speed;
-        if (live) world.events.push({ kind: 'bounce', x: spot.x, y: spot.y });
-        continue;
-      }
-      if (live) burst(world, x, y, type, index, true);
-      return { trail, outcome: { kind: 'wall', x, y, wall: band.wall, along: spot.along } };
+      return { trail, outcome: { kind: 'plant', ...plant } };
     }
+    if (type === 'ricochet' && bounces < 2) {
+      bounces++;
+      speed *= 0.85;
+      const turned = reflect(world, x, y, vx, vy, solid);
+      x = turned.x; y = turned.y;
+      const len = Math.hypot(turned.vx, turned.vy) || 1;
+      vx = turned.vx / len * speed; vy = turned.vy / len * speed;
+      if (live) world.events.push({ kind: 'bounce', x: solid.x, y: solid.y });
+      continue;
+    }
+    if (live) burst(world, x, y, type, index, true);
+    return { trail, outcome: solid.kind === 'wall'
+      ? { kind: 'wall', x, y, wall: solid.wall, along: solid.along }
+      : { kind: 'block', x, y } };
   }
   return { trail, outcome: 'stall' };
 }
@@ -320,7 +409,9 @@ function ownerSeat(world, tank) {
  */
 export function guide(world, seat, angle, power, weapon) {
   const tank = world.tanks[seat - 1];
-  const muzzle = muzzleOf(tank);
+  // the ghost must leave from where this shot would leave from, not from the
+  // barrel angle of the last turn
+  const muzzle = muzzleOf(world, { ...tank, angle });
   const speed = Math.max(MINPW, power) * PWSPD;
   const a = angle * Math.PI / 180;
   const n = normalAt(tank.s), t = tangentAt(tank.s);
@@ -338,14 +429,13 @@ function tangentAt(s) {
   const p = ringPoint(s);
   return { x: p.tx, y: p.ty };
 }
-function muzzleOf(tank) {
-  const p = ringPoint(tank.s);
+function muzzleOf(world, tank) {
+  const surf = tankSurface(world, tank);
   const a = tank.angle * Math.PI / 180;
   const n = normalAt(tank.s), t = tangentAt(tank.s);
-  const half = TANK / 2 - 1;
   return {
-    x: p.x + p.nx * half + (n.x * Math.cos(a) + t.x * Math.sin(a) * tank.dir) * BLEN,
-    y: p.y + p.ny * half + (n.y * Math.cos(a) + t.y * Math.sin(a) * tank.dir) * BLEN
+    x: surf.x + n.x * (TANK / 2 - 1) + (n.x * Math.cos(a) + t.x * Math.sin(a) * tank.dir) * BLEN,
+    y: surf.y + n.y * (TANK / 2 - 1) + (n.y * Math.cos(a) + t.y * Math.sin(a) * tank.dir) * BLEN
   };
 }
 
@@ -362,8 +452,9 @@ function pickPowerup(rand) {
 function spawnPowerup(world, rand) {
   if (world.powerups.length >= MAXPU) return;
   const x = Math.round(X0 + 40 + rand() * (IW - 80));
-  if (world.panels[2][panelAt(2, X1 - x)] !== 1) { world.events.push({ kind: 'pu_out', x }); return; }
-  world.powerups.push({ x, y: Y1 - 12, key: pickPowerup(rand).key });
+  const d = depthAt(world, 2, X1 - x);
+  if (d >= T - 4) { world.events.push({ kind: 'pu_out', x }); return; }
+  world.powerups.push({ x, y: Y1 + d - 12, key: pickPowerup(rand).key });
 }
 
 function collect(world, tank, key, index) {
@@ -373,12 +464,14 @@ function collect(world, tank, key, index) {
   else if (key === 'teleport') {
     const rand = stream(world.seed, index * 13 + 5);
     for (let tries = 0; tries < 80; tries++) {
-      const s = Math.floor(rand() * RING), p = ringPoint(s);
-      let intact = true;
-      for (let j = panelAt(p.wall, Math.max(0, p.along - TANK / 2)); j <= panelAt(p.wall, Math.min(p.len, p.along + TANK / 2)); j++) {
-        if (!world.panels[p.wall][j]) intact = false;
+      const s = Math.floor(rand() * RING);
+      const candidate = { s, falling: null, world };
+      let grounded = true;
+      for (let o = -TANK / 2; o <= TANK / 2; o += 4) {
+        const q = ringPoint(s + o);
+        if (breached(world, q.wall, q.along)) grounded = false;
       }
-      if (intact) { tank.s = s; tank.dir = 1; tank.angle = 45; break; }
+      if (grounded && supported(world, candidate)) { tank.s = s; tank.dir = 1; tank.angle = 45; break; }
     }
     world.events.push({ kind: 'warp', seat });
   } else {
@@ -390,11 +483,11 @@ function collect(world, tank, key, index) {
 
 /* ── Falling ─────────────────────────────────────────────────────────────── */
 
-/** When a tank's floor is gone it drops straight down and lands, or leaves. */
+/** When the ground under a tank is gone it drops straight down and lands, or leaves. */
 function fallFrom(world, tank) {
-  const c = bodyCentre(tank);
-  const startY = c.y;
-  let { x, y, vy = 0.4 } = c;
+  const surf = tankSurface(world, tank);
+  const startY = surf.cy;
+  let x = surf.cx, y = surf.cy, vy = 0.4;
   for (let step = 0; step < 2000; step++) {
     vy += G; y += vy;
     if (y > H + 40 || x < -40 || x > W + 40) {
@@ -402,9 +495,16 @@ function fallFrom(world, tank) {
       world.events.push({ kind: 'fell_out', seat: world.tanks.indexOf(tank) + 1, x, y });
       return;
     }
-    if (y >= Y1 && x >= X0 && x <= X1) {
+    // a block in the way breaks under the weight instead of holding the tank
+    for (const b of world.blocks) {
+      if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h && !blockHoleAt(world, x, y)) {
+        world.blockHoles.push({ x: round2(x), y: round2(b.y + b.h / 2), r: 20 });
+        world.events.push({ kind: 'crush', x, y });
+      }
+    }
+    if (y >= Y1) {
       const along = X1 - x;
-      if (world.panels[2][panelAt(2, along)] === 1) {
+      if (along >= 0 && along <= IW && depthAt(world, 2, along) < T - 4) {
         tank.s = sAt(2, along); tank.dir = 1; tank.angle = 45;
         let dmg = Math.min(45, Math.round((y - startY) / 22) * 7);
         if (tank.shield) { dmg = Math.min(15, dmg); tank.shield = false; world.events.push({ kind: 'shield', seat: world.tanks.indexOf(tank) + 1 }); }
@@ -421,26 +521,13 @@ function fallFrom(world, tank) {
 }
 
 function sweepPowerups(world, tank) {
-  const c = bodyCentre(tank);
+  const c = tankSurface(world, tank);
   for (let i = world.powerups.length - 1; i >= 0; i--) {
-    if (Math.hypot(world.powerups[i].x - c.x, world.powerups[i].y - c.y) <= 26) {
+    if (Math.hypot(world.powerups[i].x - c.cx, world.powerups[i].y - c.cy) <= 26) {
       collect(world, tank, world.powerups[i].key, world.shotCount);
       world.powerups.splice(i, 1);
     }
   }
-}
-
-/* ── Driving ─────────────────────────────────────────────────────────────── */
-
-export function driveCost(s, drive) {
-  const from = wrapS(s), to = wrapS(s + drive);
-  const abs = Math.abs(Math.round(drive));
-  let corners = 0;
-  for (let step = 0; step < abs; step++) {
-    const a = ringPoint(from + Math.sign(drive) * step), b = ringPoint(from + Math.sign(drive) * (step + 1));
-    if (a.wall !== b.wall) corners++;
-  }
-  return abs * MOVECOST + corners * CORNERCOST;
 }
 
 /* ── World and replay ────────────────────────────────────────────────────── */
@@ -451,14 +538,17 @@ export function opening(seed) {
 
 function worldFrom(state) {
   const seed = (state?.seed >>> 0) || 1;
-  const panels = [0, 1, 2, 3].map((w) => new Array(COUNTS[w]).fill(1));
-  return {
-    seed, panels,
+  const world = {
+    seed,
+    depth: LENS.map(len => new Array(len).fill(0)),
+    blocks: makeBlocks(seed),
+    blockHoles: [],
     tanks: [makeTank(1), makeTank(2)],
     powerups: [], mines: [], nextPU: 2,
     turn: 1, winner: null, shotCount: 0,
     trails: [], bursts: [], events: []
   };
+  return world;
 }
 
 export function validateShot(world, shot, seat) {
@@ -468,14 +558,12 @@ export function validateShot(world, shot, seat) {
   if (world.turn !== seat) return 'It is not your turn.';
   const drive = Number(shot.drive);
   if (!Number.isFinite(drive) || Math.round(drive) !== drive || Math.abs(drive) > RING) return 'Drive along the box, not around the world.';
-  const tank = world.tanks[seat - 1];
-  if (driveCost(tank.s, drive) > FUEL + 1e-9) return 'Not enough fuel to drive there.';
   const angle = Number(shot.angle);
   if (!Number.isFinite(angle) || Math.round(angle) !== angle || angle < 5 || angle > 85) return 'Aim between 5 and 85 degrees.';
   const power = Number(shot.power);
   if (!Number.isFinite(power) || power < MINPW || power > MAXPW) return 'Power is between 1 and 24.';
   if (!WEAPONS.includes(shot.weapon)) return 'Unknown weapon.';
-  if (shot.weapon !== 'standard' && !(tank.ammo[shot.weapon] > 0)) return 'No ' + shot.weapon + ' shells left.';
+  if (shot.weapon !== 'standard' && !(world.tanks[seat - 1].ammo[shot.weapon] > 0)) return 'No ' + shot.weapon + ' shells left.';
   return null;
 }
 
@@ -484,17 +572,15 @@ function takeShot(world, shot, index) {
   const tank = world.tanks[seat - 1];
   world.shotCount = index;
   tank.dir = shot.drive > 0 ? 1 : shot.drive < 0 ? -1 : tank.dir;
-  const cost = driveCost(tank.s, shot.drive);
-  tank.fuel = Math.max(0, FUEL - cost);
   tank.s = wrapS(tank.s + shot.drive);
   tank.angle = shot.angle;
   sweepPowerups(world, tank);
-  // Driving onto one's own hole is a whole turn: the fall eats it.
+  // Driving onto a hole is a whole turn: the fall eats it.
   if (!supported(world, tank)) fallFrom(world, tank);
 
   if (supported(world, tank)) {
     if (shot.weapon !== 'standard') tank.ammo[shot.weapon] = Math.max(0, tank.ammo[shot.weapon] - 1);
-    const muzzle = muzzleOf(tank), a = shot.angle * Math.PI / 180;
+    const muzzle = muzzleOf(world, tank), a = shot.angle * Math.PI / 180;
     const n = normalAt(tank.s), t = tangentAt(tank.s);
     const speed = shot.power * PWSPD;
     const vx = (n.x * Math.cos(a) + t.x * Math.sin(a) * tank.dir) * speed;
@@ -522,13 +608,13 @@ function takeShot(world, shot, index) {
     }
   }
 
-  // Anyone standing over a hole now — shooter included — drops.
+  // Anyone left standing over a breach — shooter included — drops.
   for (const tank of world.tanks) {
     if (tank.hp > 0 && !supported(world, tank)) fallFrom(world, tank);
   }
   for (let i = world.powerups.length - 1; i >= 0; i--) {
     const pu = world.powerups[i];
-    if (world.panels[2][panelAt(2, X1 - pu.x)] !== 1) {
+    if (breached(world, 2, X1 - pu.x)) {
       world.powerups.splice(i, 1);
       world.events.push({ kind: 'pu_out', x: pu.x });
     }
