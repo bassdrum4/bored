@@ -858,15 +858,17 @@ window.__test = {
   world: () => world,
   seed: () => (state ? state.seed : null),
   hp: () => (world ? world.tanks.map(t => Math.round(t.hp)) : null),
-  terrain: () => (world ? {
-    // Keep wall and soil destruction separate so browser probes can tell
-    // whether a shot reached the surrounding box or only the interior dirt.
-    wallDamage: Math.round(world.depth.reduce((n, row) => n + row.reduce((m, v) => m + v, 0), 0)),
-    soilRemoved: Math.round(world.floor.reduce((n, v, i) => n + (v - engine.makeFloor(world.seed)[i]), 0)),
-    breaches: world.depth.reduce((n, row) => n + row.filter(v => v >= engine.T - 1).length, 0),
-    sinkholes: world.floor.filter(v => v >= -1).length,
-    holes: world.blockHoles.length
-  } : null),
+  terrain: () => {
+    if (!world) return null;
+    const original = engine.makeFloor(world.seed);
+    return {
+      wallDamage: Math.round(world.depth.reduce((n, row) => n + row.reduce((m, v) => m + v, 0), 0)),
+      soilRemoved: Math.round(world.floor.reduce((n, v, i) => n + (v - original[i]), 0)),
+      breaches: world.depth.reduce((n, row) => n + row.filter(v => v >= engine.T - 1).length, 0),
+      sinkholes: world.floor.filter(v => v >= -1).length,
+      holes: world.blockHoles.length
+    };
+  },
   turn: () => (state ? state.turn : null),
   wind: () => (state ? engine.windOf(state.seed, state.shots.length) : null),
   start(ai) { aiEnabled = !!ai; freshMatch(); },
