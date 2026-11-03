@@ -1,6 +1,6 @@
 /*
  * Pastel Tanks as rules rather than as a canvas. Rules version 2: the arena is
- * a box, and the box is the ground.
+ * an arena with an uneven floor and destructible boundary walls.
  *
  * A Bored Together match stores only its seed and the shots that were fired.
  * Both players replay that list through this file, so the box, the hit points
@@ -9,13 +9,11 @@
  * the seed and the shot index, the power-up stream is a seeded function of the
  * same numbers, and nothing reads the clock, the DOM or Math.random.
  *
- * The four walls are continuous ground, not tiles. Each one carries a depth
- * profile — a number per pixel along its inner edge — so a shell digs a smooth
- * bowl instead of deleting a panel. Tanks drive the profile: a dent is a place
- * they sit lower in, and only a breach (depth reaching the wall's full
- * thickness) opens a hole wide enough for a tank to drop through or a shell to
- * fly out of. A few destructible blocks hang in the middle of the room, so the
- * field between the tanks blocks and bends fire.
+ * Tanks stay on the uneven bottom terrain. The ceiling and side walls are
+ * boundaries that can be dented or broken by shots, but are never drivable.
+ * The floor shares the same deterministic depth data as the walls, starting
+ * with a seeded height profile above its base. Shells cut bowls into that
+ * profile, leaving real openings when they dig all the way through.
  */
 
 export const RULES = 2;
@@ -113,6 +111,8 @@ export function ringPoint(s) {
   }
 }
 export const wrapS = s => ((Math.round(s) % RING) + RING) % RING;
+// A tank can move across the floor, but never climb the side walls or ceiling.
+export const driveS = (s, distance) => clamp(Math.round(s + distance), OFFS[2] + TANK, OFFS[3] - TANK);
 const sAt = (wall, along) => OFFS[wall] + Math.max(0, Math.min(LENS[wall], along));
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const round2 = v => Math.round(v * 100) / 100;
@@ -164,17 +164,23 @@ export function tankSurface(world, tank) {
   return { p, d, x: p.x - p.nx * d, y: p.y - p.ny * d, cx: p.x - p.nx * d + p.nx * half, cy: p.y - p.ny * d + p.ny * half };
 }
 
-export function makeBlocks(seed) {
-  const rand = random((seed ^ 0x51ED2701) >>> 0);
-  return [0, 1].map(i => {
-    const w = 88 + Math.round(rand() * 70), h = 22 + Math.round(rand() * 16);
-    const x = i === 0
-      ? Math.round(X0 + 110 + rand() * 110)
-      : Math.round(X1 - 120 - w - rand() * 110);
-    const y = Math.round(Y0 + 128 + rand() * (IH - 300 - h));
-    return { x, y, w, h };
+// Keep the playing field open: the terrain and damaged outer walls are the cover.
+export function makeBlocks() { return []; }
+
+// The initial floor sits above the bottom of the frame, with smooth, seeded
+// undulations. Negative depth is raised ground; blasting increases depth.
+export function makeFloor(seed) {
+  const rand = random((seed ^ 0x6A12B405) >>> 0);
+  const phase = rand() * Math.PI * 2, phase2 = rand() * Math.PI * 2;
+  return Array.from({ length: IW }, (_, i) => {
+    const x = i / IW;
+    const height = 57 + 7.5 * Math.sin(x * Math.PI * 3 + phase)
+      + 4.5 * Math.sin(x * Math.PI * 7 + phase2)
+      + 2 * Math.sin(x * Math.PI * 13 + phase);
+    return -round2(height);
   });
 }
+
 function inBlock(b, x, y) { return x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h; }
 function blockHoleAt(world, x, y) {
   for (const c of world.blockHoles) if (Math.hypot(c.x - x, c.y - y) <= c.r) return true;
@@ -207,7 +213,12 @@ function carveWall(world, wall, along, r, bite) {
 /** A blast: every wall and block the bowl can reach loses material. */
 export function carveAt(world, x, y, r, bite) {
   for (let wall = 0; wall < 4; wall++) {
-    if (distToWall(wall, x, y) > r) continue;
+    // The floor is raised above Y1: use its actual, possibly cratered surface
+    // rather than the hidden baseline to decide whether the blast reaches it.
+    const distance = wall === 2 && x >= X0 && x <= X1
+      ? Math.abs(y - (Y1 + depthAt(world, 2, X1 - x)))
+      : distToWall(wall, x, y);
+    if (distance > r) continue;
     carveWall(world, wall, anchor(wall, x, y).along, r, bite);
   }
   for (const b of world.blocks) {
@@ -222,11 +233,21 @@ export function carveAt(world, x, y, r, bite) {
  * counting where it has been shot away.
  */
 export function solidAt(world, x, y) {
+  // Terrain starts well *above* the base of the ring. A shell first contacts
+  // the actual ground surface; a breached column is empty all the way through.
+  if (x >= X0 && x <= X1) {
+    const along = X1 - x;
+    const depth = depthAt(world, 2, along);
+    if (y >= Y1 + depth) {
+      return depth >= T - 1 ? null : { kind: 'wall', wall: 2, along, x, y: Y1 + depth };
+    }
+  }
   const band = wallAt(x, y);
-  if (band) {
+  if (band && band.wall !== 2) {
     const spot = anchor(band.wall, x, y);
     const q = distToWall(band.wall, x, y);
-    if (q >= depthAt(world, band.wall, spot.along)) {
+    const depth = depthAt(world, band.wall, spot.along);
+    if (depth < T - 1 && q >= depth) {
       return { kind: 'wall', wall: band.wall, along: spot.along, x: spot.x, y: spot.y };
     }
   }
@@ -464,7 +485,7 @@ function collect(world, tank, key, index) {
   else if (key === 'teleport') {
     const rand = stream(world.seed, index * 13 + 5);
     for (let tries = 0; tries < 80; tries++) {
-      const s = Math.floor(rand() * RING);
+      const s = OFFS[2] + TANK + Math.floor(rand() * (IW - 2 * TANK));
       const candidate = { s, falling: null, world };
       let grounded = true;
       for (let o = -TANK / 2; o <= TANK / 2; o += 4) {
@@ -502,9 +523,9 @@ function fallFrom(world, tank) {
         world.events.push({ kind: 'crush', x, y });
       }
     }
-    if (y >= Y1) {
-      const along = X1 - x;
-      if (along >= 0 && along <= IW && depthAt(world, 2, along) < T - 4) {
+    const along = X1 - x;
+    if (along >= 0 && along <= IW && y >= Y1 + depthAt(world, 2, along) - TANK / 2) {
+      if (depthAt(world, 2, along) < T - 4) {
         tank.s = sAt(2, along); tank.dir = 1; tank.angle = 45;
         let dmg = Math.min(45, Math.round((y - startY) / 22) * 7);
         if (tank.shield) { dmg = Math.min(15, dmg); tank.shield = false; world.events.push({ kind: 'shield', seat: world.tanks.indexOf(tank) + 1 }); }
@@ -540,7 +561,7 @@ function worldFrom(state) {
   const seed = (state?.seed >>> 0) || 1;
   const world = {
     seed,
-    depth: LENS.map(len => new Array(len).fill(0)),
+    depth: LENS.map((len, wall) => wall === 2 ? makeFloor(seed) : new Array(len).fill(0)),
     blocks: makeBlocks(seed),
     blockHoles: [],
     tanks: [makeTank(1), makeTank(2)],
@@ -557,7 +578,7 @@ export function validateShot(world, shot, seat) {
   if (seat !== 1 && seat !== 2) return 'Unknown player.';
   if (world.turn !== seat) return 'It is not your turn.';
   const drive = Number(shot.drive);
-  if (!Number.isFinite(drive) || Math.round(drive) !== drive || Math.abs(drive) > RING) return 'Drive along the box, not around the world.';
+  if (!Number.isFinite(drive) || Math.round(drive) !== drive || Math.abs(drive) > IW) return 'Drive across the floor, not beyond the walls.';
   const angle = Number(shot.angle);
   if (!Number.isFinite(angle) || Math.round(angle) !== angle || angle < 5 || angle > 85) return 'Aim between 5 and 85 degrees.';
   const power = Number(shot.power);
@@ -572,7 +593,7 @@ function takeShot(world, shot, index) {
   const tank = world.tanks[seat - 1];
   world.shotCount = index;
   tank.dir = shot.drive > 0 ? 1 : shot.drive < 0 ? -1 : tank.dir;
-  tank.s = wrapS(tank.s + shot.drive);
+  tank.s = driveS(tank.s, shot.drive);
   tank.angle = shot.angle;
   sweepPowerups(world, tank);
   // Driving onto a hole is a whole turn: the fall eats it.
