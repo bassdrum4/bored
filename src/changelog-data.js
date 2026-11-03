@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 250,
+  "count": 251,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"a10caa5","date":"2026-11-03","author":"Codebuff","subject":"Use Detroit calendar days for analytics date filters"},
+  {"sha":"16344a3","date":"2026-11-03","author":"Codebuff","subject":"Rebuild Ashcrown's chrome around the map, and open up Trackbound's freeplay."},
   {"sha":"2b92f95","date":"2026-11-03","author":"bassdrum4","subject":"Rebuild Pastel Tanks around feel: instant play, live aim, paper box"},
   {"sha":"684c88c","date":"2026-11-02","author":"PenguinV360","subject":"Update ashcrown.html"},
   {"sha":"3b8f93e","date":"2026-11-02","author":"Daniel Lowe","subject":"update ashcrown?"},
