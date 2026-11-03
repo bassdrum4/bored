@@ -894,6 +894,27 @@
       }
     </style>
     <style id="bored-risk-responsive">
+      .risk-intro { width:min(450px,94vw); max-height:92dvh; overflow-y:auto; text-align:left; padding:26px; border-color:#277786; }
+      .risk-kicker { font:600 11px ui-monospace,monospace;letter-spacing:.2em;color:#60c8d1;margin-bottom:7px; }
+      .risk-intro h1 {color:#f7f3e4;font:700 clamp(24px,5vw,34px) Orbitron,ui-monospace,monospace;line-height:1.25;margin-bottom:9px;text-transform:none;}
+      .risk-subtitle {color:#9fbcc0;font:14px/1.5 ui-monospace,monospace;text-transform:none;margin-bottom:22px;}
+      .risk-intro label:not(.risk-checkbox) {display:block;font:600 11px ui-monospace,monospace;color:#a1cfd3;letter-spacing:.05em;margin:0 0 7px;}
+      .risk-optional {color:#6d999c;font-weight:400;}
+      .risk-field {display:block;width:100%;min-width:0;border:1px solid #24616b;background:#06171c;color:#f5e4a9;border-radius:4px;font:14px ui-monospace,monospace;padding:11px;margin-bottom:17px;text-transform:none;}
+      .risk-intro-grid {display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+      .risk-checkbox {display:flex;align-items:center;gap:9px;color:#bad0d0;font:12px ui-monospace,monospace;margin:2px 0 18px;text-transform:none;cursor:pointer;}
+      .risk-checkbox input {accent-color:#d8b360;width:16px;height:16px;}
+      .risk-primary,.risk-secondary {width:100%;padding:13px;font:700 13px Orbitron,ui-monospace,monospace;letter-spacing:.02em;border-radius:4px;}
+      .risk-primary {background:#e3b74c;color:#071014;border-color:#e3b74c;}
+      .risk-primary:hover {background:#ffe39b;color:#071014;}
+      .risk-secondary {margin-top:9px;border-color:#3b8791;}
+      .risk-how {margin-top:18px;color:#9ec5c9;font:12px/1.65 ui-monospace,monospace;text-transform:none;}
+      .risk-how summary {cursor:pointer;color:#b8dade;}
+      .risk-how p {margin-top:8px;}
+      #risk-turn-help {font:12px/1.45 ui-monospace,monospace;color:#aec6c6;text-transform:none;margin:8px 0 0;}
+      #risk-auto-place {margin-top:8px;width:100%;padding:8px;font:12px ui-monospace,monospace;}
+      @media(max-width:420px){.risk-intro{padding:17px}.risk-intro-grid{grid-template-columns:1fr;gap:0}}
+
       /* Canvas uses 1000×750 world coordinates; CSS scales it independently. */
       #worldCanvas {
         display: block;
@@ -934,52 +955,34 @@
   <body class="p-2 h-screen flex flex-col">
     <div id="custom-alert">SYSTEM ERROR</div>
     <div id="overlay-layer">
-      <div id="login-panel" class="cyber-panel p-8 w-[400px] text-center">
-        <button
-          class="back-button-nav absolute top-4 left-4 cyber-button px-3 py-1 text-sm border-cyan-500 text-cyan-300"
-          onclick="goBack()"
-          style="display: none"
-        >
-          ← BACK
-        </button>
-        <h1 class="text-4xl font-bold mb-2 text-white font-orbitron">
-          GLOBAL COMMAND
-        </h1>
-        <div class="text-xs text-cyan-400 mb-4">A WORLD TO CONQUER. YOU AGAINST THE COMPUTER.</div>
-        <input
-          id="callsign-input"
-          type="text"
-          placeholder="ENTER CALLSIGN"
-          class="bg-black border border-cyan-700 p-3 w-full text-center text-xl text-yellow-500 outline-none mb-3 uppercase"
-          maxlength="10"
-        />
-        <div class="flex gap-2 mb-4">
-          
-          
-          <button
-            onclick="loadFromLocal()"
-            class="cyber-button flex-1 px-3 py-2 text-sm border-green-500 text-green-400"
-          >
-            RESUME
-          </button>
+      <div id="login-panel" class="cyber-panel risk-intro">
+        <div class="risk-kicker">RISK / SOLO CONQUEST</div>
+        <h1>Conquer the world.</h1>
+        <p class="risk-subtitle">Forty-two territories. One commander. Rivals who fight back.</p>
+        <label for="callsign-input">Your commander name <span class="risk-optional">(optional)</span></label>
+        <input id="callsign-input" maxlength="10" autocomplete="off" value="YOU" class="risk-field" aria-label="Your commander name" />
+        <div class="risk-intro-grid">
+          <div><label for="bored-cpu-count">Opponents</label>
+            <select id="bored-cpu-count" class="risk-field">
+              <option value="1">1 · Duel</option><option value="2">2 · Shorter war</option>
+              <option value="3" selected>3 · Classic</option><option value="4">4 · Crowded</option>
+              <option value="5">5 · Chaos</option>
+            </select></div>
+          <div><label for="risk-difficulty">CPU difficulty</label>
+            <select id="risk-difficulty" class="risk-field">
+              <option value="1">Easy · Learning</option><option value="2" selected>Normal · Strategic</option>
+              <option value="3">Hard · Ruthless</option>
+            </select></div>
         </div>
-        <div class="flex flex-col gap-2">
-          <label for="bored-cpu-count" class="text-xs text-cyan-400 block text-left mb-1">COMPUTER COMMANDERS</label>
-          <select id="bored-cpu-count" class="bg-black border border-cyan-700 text-yellow-500 p-2 mb-3 w-full" aria-label="Computer opponents">
-            <option value="1">1 opponent · Duel</option>
-            <option value="2">2 opponents</option>
-            <option value="3" selected>3 opponents · Classic</option>
-            <option value="4">4 opponents</option>
-            <option value="5">5 opponents</option>
-          </select>
-          <button
-            onclick="startSinglePlayer()"
-            class="cyber-button py-3 text-lg font-bold border-yellow-500 text-yellow-500"
-          >
-            SOLO WAR
-          </button>
-          
-        </div>
+        <label class="risk-checkbox"><input type="checkbox" id="risk-manual-setup" />Place my starting armies manually</label>
+        <button type="button" onclick="startSinglePlayer()" id="risk-new-game" class="cyber-button risk-primary">START CONQUEST</button>
+        <button type="button" onclick="loadFromLocal()" id="risk-resume" class="cyber-button risk-secondary hidden">CONTINUE SAVED WAR</button>
+        <details class="risk-how"><summary>How to play</summary>
+          <p><b>1. Reinforce:</b> place armies on your territories (or Auto-place).<br />
+          <b>2. Attack:</b> choose a territory with 2+ armies, then an adjacent enemy. Each click rolls dice.<br />
+          <b>3. Fortify:</b> move armies between connected territories, then end your turn.<br />
+          Hold continents for bonus armies. Conquer the world to win.</p>
+        </details>
       </div>
       <div
         id="lobby-panel"
@@ -1580,12 +1583,9 @@
           >
             END PHASE
           </button>
-          <div
-            id="instruction-text"
-            class="instruction-glow text-center text-sm"
-          >
-            WAITING...
-          </div>
+          <div id="instruction-text" class="instruction-glow text-center text-sm">WAITING...</div>
+          <p id="risk-turn-help" aria-live="polite"></p>
+          <button type="button" id="risk-auto-place" onclick="riskAutoPlaceHuman()" class="cyber-button hidden">AUTO-PLACE ARMIES</button>
         </div>
         <div class="cyber-panel p-2 flex flex-col justify-between">
           <div class="text-xs text-cyan-600 border-b border-cyan-900 mb-1">
