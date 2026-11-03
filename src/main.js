@@ -879,8 +879,16 @@ initAccount();
 initFeedback();
 initVoice();
 const analyticsToggle = $('#analytics-enabled');
-analyticsToggle.checked = analytics.enabled();
-analyticsToggle.onchange = () => analytics.setEnabled(analyticsToggle.checked);
+const updateAnalyticsToggle = () => {
+  analyticsToggle.checked = analytics.enabled();
+  analyticsToggle.disabled = !analytics.runtimeEligible();
+};
+updateAnalyticsToggle();
+analyticsToggle.onchange = () => {
+  analytics.setEnabled(analyticsToggle.checked);
+  updateAnalyticsToggle();
+};
+window.addEventListener('bored:analytics-disabled', updateAnalyticsToggle);
 
 // The original single-file hub exposed these globals; keep them for the test
 // suite and for anyone poking at the console.
