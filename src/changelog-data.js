@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 272,
+  "count": 273,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"99b21e2","date":"2026-11-03","author":"Claude","subject":"Civ Lite v3: research revamp, science victory, up to 8 players."},
   {"sha":"7f38263","date":"2026-11-03","author":"Claude","subject":"Give each Civ Lite civ its own colors, Civ 6 style."},
   {"sha":"b756489","date":"2026-11-03","author":"PenguinV360","subject":"Update ashcrown.html"},
   {"sha":"64cc3d5","date":"2026-11-03","author":"Codebuff","subject":"Scatter the tech tree into rings instead of columns."},
