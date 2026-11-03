@@ -24,6 +24,20 @@ test('active time excludes hidden, idle, unfocused, paused, loading and clock sl
   ], null), [{ id:'2', user_id:null, kind:'visit' }]);
 });
 
+test('only production Pages tracks, and QA URLs disable an entire session', async () => {
+  const { isProductionTelemetryUrl } = await import('../src/hub/analytics.js');
+  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored/'), true);
+  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored/index.html'), true);
+  assert.equal(isProductionTelemetryUrl('http://bassdrum4.github.io/bored/'), false);
+  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored-test/'), false);
+  assert.equal(isProductionTelemetryUrl('https://preview.example.org/bored/'), false);
+  assert.equal(isProductionTelemetryUrl('http://localhost:3000/'), false);
+  assert.equal(isProductionTelemetryUrl('http://127.0.0.1:3000/'), false);
+  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored/?bored_qa=1'), false);
+  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored/', true), false);
+  assert.equal(isProductionTelemetryUrl('not a URL'), false);
+});
+
 test('retention cohorts, meaningful play, and returning visitor calculations', async () => {
   const { summarizeEngagement, excludeAdmins } = await import('../src/hub/analytics-data.js');
   const make = (day, session, kind, active=0, details={}) => ({
@@ -126,19 +140,16 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   await page.evaluate(() => closeGame());
   await page.waitForFunction(() => document.querySelector('#player').hidden);
   await new Promise(r => setTimeout(r, 200));
-  assert.equal(writes.filter(e => e.kind === 'start').length,1);
-  assert.equal(writes.filter(e => e.kind === 'end').length,1);
-  assert.ok(writes.find(e => e.kind === 'end').visible_ms > 0);
-  assert.equal(writes[0].user_id, null);
-  assert.ok(writes.every(e => e.session_id === writes[0].session_id));
+  // This local browser suite must not record visits, starts, checkpoints or
+  // game errors in production, even with the user's preference initially on.
+  assert.equal(writes.length, 0);
   if (await page.$eval('#claim-dialog', n => n.open)) await page.click('#claim-cancel');
   await page.click('.activity-notice summary');
-  const before = writes.length;
-  await page.click('#analytics-enabled');
   assert.equal(await page.$eval('#analytics-enabled', n => n.checked), false);
+  assert.equal(await page.$eval('#analytics-enabled', n => n.disabled), true);
   await page.evaluate(() => { openGame('memory'); closeGame(); });
   await new Promise(r => setTimeout(r,100));
-  assert.equal(writes.length,before);
+  assert.equal(writes.length, 0);
   await page.goto(site.origin + '/analytics.html');
   await page.waitForFunction(() => !document.querySelector('#access').hidden);
   assert.equal(await page.$eval('#dashboard', n => n.hidden),true);

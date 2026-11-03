@@ -6,6 +6,29 @@ export const ANALYTICS_BRIDGE = '<script>addEventListener("error",function(){par
 
 export const ANALYTICS_PREFERENCE = 'bored.analytics.enabled';
 export const VISITOR_KEY = 'bored.analytics.visitor';
+const QA_SESSION_KEY = 'bored.analytics.qa-session';
+const STAFF_BROWSER_KEY = 'bored.analytics.staff-browser';
+
+// The shipped GitHub Pages site is the only source of genuine Bored telemetry.
+// Local servers, CI, preview deployments and copies of the source never write
+// to the production analytics tables. This is a client guard; the database also
+// rejects authenticated analytics administrators.
+export function isProductionTelemetryUrl(href, qa = false) {
+  try {
+    const url = new URL(href);
+    return !qa && url.protocol === 'https:' && url.hostname === 'bassdrum4.github.io' &&
+      /^\/bored(?:\/|$)/.test(url.pathname) && !url.searchParams.has('bored_qa');
+  } catch { return false; }
+}
+
+function qaSession() {
+  let fromUrl = false;
+  try { fromUrl = new URL(location.href).searchParams.has('bored_qa'); } catch {}
+  try {
+    if (fromUrl) sessionStorage.setItem(QA_SESSION_KEY, '1');
+    return fromUrl || sessionStorage.getItem(QA_SESSION_KEY) === '1';
+  } catch { return fromUrl; }
+}
 // This identifies one browser, not a real person. Never create it on opt-out.
 export function getVisitorId() {
   if (readStored(ANALYTICS_PREFERENCE, true) === false) return null;
@@ -40,14 +63,52 @@ export function timeSlice(previous, now, lastInput, { visible, focused, ready, p
 
 export function createAnalytics({ frame, snapshot, score, paused = () => false, isLower = () => false, now = () => performance.now() }) {
   let enabled = readStored(ANALYTICS_PREFERENCE, true) !== false;
+  const production = isProductionTelemetryUrl(location.href, qaSession());
+  let staffBrowser = readStored(STAFF_BROWSER_KEY, false) === true;
+  const canRecord = () => enabled && production && !staffBrowser;
   let run = null, last = now(), lastInput = -Infinity, pending = [], busy = false;
-  let visitor = enabled ? getVisitorId() : null;
+  let visitor = canRecord() ? getVisitorId() : null;
   let detach = () => {}, lastFlush = now(), flushTimer = null;
+  let checkedAccount = null, adminCheck = null;
   const scheduleFlush = () => {
     if (flushTimer) return;
     flushTimer = setTimeout(() => { flushTimer = null; void flush(); }, 1200);
   };
   const owner = () => getSession()?.user?.id || null;
+  // Fail closed for signed-in accounts until their current identity is checked.
+  // The hub may queue events meanwhile, but no bytes reach Supabase beforehand.
+  // The database separately enforces the admin denial even if client code is
+  // outdated or a developer sends a request directly.
+  async function accountMayRecord() {
+    const id = owner();
+    if (!id) return true;
+    if (checkedAccount === id) return true;
+    if (adminCheck?.id === id) return adminCheck.promise;
+    const job = (async () => {
+      const session = await freshSession();
+      if (session?.user?.id !== id) return false;
+      const rows = await request('/rest/v1/analytics_admins?select=user_id&user_id=eq.' + encodeURIComponent(id),
+        { token: session.access_token });
+      if (owner() !== id) return false;
+      if (Array.isArray(rows) && rows.some(row => row.user_id === id)) {
+        // Quarantine this browser even after sign-out, so subsequent guest
+        // testing on the same machine cannot pollute anonymized metrics.
+        staffBrowser = true;
+        writeStored(STAFF_BROWSER_KEY, true);
+        pending = [];
+        run = null;
+        detach(); detach = () => {};
+        window.dispatchEvent(new Event('bored:analytics-disabled'));
+        return false;
+      }
+      checkedAccount = id;
+      return true;
+    })().catch(() => false).finally(() => {
+      if (adminCheck?.id === id) adminCheck = null;
+    });
+    adminCheck = { id, promise: job };
+    return job;
+  }
   const input = () => { lastInput = now(); };
   // Only an input inside the game's iframe proves engagement. Hub buttons,
   // menu keys and feedback dialogs must never count as playing the game.
@@ -74,7 +135,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     last = time;
   }
   function emit(kind, details = {}) {
-    if (!enabled || !run) return;
+    if (!canRecord() || !run) return;
     sample();
     const current = run.ready ? snapshot(run.game) : null;
     const valid = current?.slug === run.game ? current : null;
@@ -89,10 +150,11 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     if (pending.length > 200) pending.splice(0, pending.length - 200);
   }
   async function flush(keepalive = false) {
-    if (busy || !pending.length || !enabled) return;
+    if (busy || !pending.length || !canRecord()) return;
     busy = true;
     let delivered = false;
     try {
+      if (!(await accountMayRecord()) || !canRecord()) return;
       const id = owner();
       // A former user's tokens are not retained and their records never become the next user's.
       pending = pending.filter(event => event.user_id === null || event.user_id === id);
@@ -169,7 +231,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   }
   function start(game, context = {}) {
     end('switch');
-    if (!enabled || (game === 'f-14' && context.external)) return;
+    if (!canRecord() || (game === 'f-14' && context.external)) return;
     last = now(); lastInput = -Infinity;
     run = { id: uuid(), user: owner(), game, context, active: 0, totalActive: 0, visible: 0, ready: false, interacted: false, everFinished: false, opened: now() };
     emit('start');
@@ -222,7 +284,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   document.addEventListener('keydown', input, { passive: true });
   function track(kind, { game = null, match_id = null } = {}) {
     const allowed = ['visit','bt_view','bt_enroll','bt_challenge','bt_random','bt_open','bt_move','bt_complete','bt_rematch','bt_delete','bt_leave'];
-    if (!enabled || !allowed.includes(kind)) return;
+    if (!canRecord() || !allowed.includes(kind)) return;
     const safeGame = typeof game === 'string' && /^[a-z0-9][a-z0-9-]{0,49}$/.test(game) ? game : null;
     const safeMatch = typeof match_id === 'string' && /^[0-9a-f-]{36}$/i.test(match_id) ? match_id : null;
     pending.push({ _table: 'product_events', id: uuid(), user_id: owner(),
@@ -239,11 +301,12 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       if (kind === 'error' && run && (run.errors = (run.errors || 0) + 1) > 5) return;
       emit(kind, details); void flush();
     },
-    enabled: () => enabled,
+    enabled: () => canRecord(),
+    runtimeEligible: () => production && !staffBrowser,
     setEnabled(value) {
       if (!value) { run = null; pending = []; clearTimeout(flushTimer); flushTimer = null; detach(); visitor = null; removeStored(VISITOR_KEY); }
       enabled = !!value; writeStored(ANALYTICS_PREFERENCE, enabled);
-      if (enabled && !visitor) { visitor = getVisitorId(); track('visit'); }
+      if (canRecord() && !visitor) { visitor = getVisitorId(); track('visit'); }
     },
     // Used by isolated tests; the app creates one tracker for its lifetime.
     dispose() { clearInterval(tick); clearTimeout(flushTimer); detach(); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', leave); window.removeEventListener('pageshow', resume); }
