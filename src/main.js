@@ -24,6 +24,7 @@ import { createAccountUI } from './hub/account-ui.js';
 import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
+import { createAnnouncementsUI } from './hub/announcements-ui.js';
 import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
@@ -758,6 +759,7 @@ const { renderAccount, openAuthDialog, initAccount } = createAccountUI({
 });
 
 const { initFeedback } = createFeedbackUI();
+const { initAnnouncements } = createAnnouncementsUI();
 
 
 
@@ -883,6 +885,7 @@ const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, ca
   openGame(match.game, null, document.querySelector('#together-nav'), player);
 } });
 window.addEventListener('bored:identity', () => { if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true }); });
+initAnnouncements();
 initAccount();
 initFeedback();
 initVoice();
