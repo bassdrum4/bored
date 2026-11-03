@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 265,
+  "count": 266,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"5c292c6","date":"2026-11-03","author":"Daniel Lowe","subject":"Tank 2: one breakable box, void outside, and shootable interface","pr":69},
   {"sha":"578eba9","date":"2026-11-03","author":"Daniel Lowe","subject":"Add admin announcements and player notifications"},
   {"sha":"eb731ed","date":"2026-11-03","author":"Daniel Lowe","subject":"Fix Tank 2 rolling terrain, breakable walls and keyboard controls","pr":68},
   {"sha":"13dfb18","date":"2026-11-03","author":"bassdrum4","subject":"Make the box itself smooth destructible ground, not panels"},
