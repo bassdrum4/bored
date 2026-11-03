@@ -328,7 +328,7 @@ function burst(world, x, y, type, index, live) {
 /* ── Flight ──────────────────────────────────────────────────────────────── */
 
 function reflect(world, x, y, vx, vy, hit) {
-  if (hit.kind === 'wall') {
+  if (hit.kind === 'wall' || hit.kind === 'ground') {
     if (hit.wall === 0 || hit.wall === 2) { vy = -vy; y += hit.wall === 0 ? 3 : -3; }
     else { vx = -vx; x += hit.wall === 1 ? -3 : 3; }
   } else {
@@ -346,7 +346,7 @@ function reflect(world, x, y, vx, vy, hit) {
  */
 function flight(world, muzzle, vx, vy, type, index, live, owner) {
   const trail = [{ x: muzzle.x, y: muzzle.y }];
-  let { x, y } = muzzle, bounces = 0, speed = Math.hypot(vx, vy);
+  let { x, y } = muzzle, bounces = 0, speed = Math.hypot(vx, vy), escaped = false;
   const wind = windOf(world.seed, index);
   for (let step = 0; step < 1100; step++) {
     vx += wind; vy += G;
@@ -370,11 +370,24 @@ function flight(world, muzzle, vx, vy, type, index, live, owner) {
       return { trail, outcome: { kind: 'tank', seat: world.tanks.indexOf(struck) + 1 } };
     }
     const solid = solidAt(world, x, y);
-    if (!solid) continue;
-    if (type === 'mine' && solid.kind === 'wall') {
-      const p = ringPoint(sAt(solid.wall, solid.along));
-      const d = depthAt(world, solid.wall, solid.along);
-      const plant = { x: p.x - p.nx * d + p.nx * 10, y: p.y - p.ny * d + p.ny * 10 };
+    if (!solid) {
+      if (!escaped && (x < X0 || x > X1 || y < Y0 || y > Y1)) {
+        escaped = true;
+        if (live) {
+          const wall = y < Y0 ? 0 : x > X1 ? 1 : y > Y1 ? 2 : 3;
+          world.events.push({ kind: 'escape', wall, x: round2(x), y: round2(y) });
+        }
+      }
+      continue;
+    }
+    if (type === 'mine' && (solid.kind === 'wall' || solid.kind === 'ground')) {
+      const plant = solid.kind === 'ground'
+        ? { x: solid.x, y: solid.y - 10 }
+        : (() => {
+          const p = ringPoint(sAt(solid.wall, solid.along));
+          const d = depthAt(world, solid.wall, solid.along);
+          return { x: p.x - p.nx * d + p.nx * 10, y: p.y - p.ny * d + p.ny * 10 };
+        })();
       if (live) {
         world.mines.push({ x: plant.x, y: plant.y, seat: index < 0 ? 1 : ownerSeat(world, owner), fuse: 2 });
         world.events.push({ kind: 'plant', x: plant.x, y: plant.y });
@@ -392,9 +405,7 @@ function flight(world, muzzle, vx, vy, type, index, live, owner) {
       continue;
     }
     if (live) burst(world, x, y, type, index, true);
-    return { trail, outcome: solid.kind === 'wall'
-      ? { kind: 'wall', x, y, wall: solid.wall, along: solid.along }
-      : { kind: 'block', x, y } };
+    return { trail, outcome: { kind: solid.kind, x, y, wall: solid.wall, along: solid.along } };
   }
   return { trail, outcome: 'stall' };
 }
@@ -513,8 +524,8 @@ function fallFrom(world, tank) {
       }
     }
     const along = X1 - x;
-    if (along >= 0 && along <= IW && y >= Y1 + depthAt(world, 2, along) - TANK / 2) {
-      if (depthAt(world, 2, along) < T - 4) {
+    if (along >= 0 && along < IW && y >= Y1 + floorDepthAt(world, along) - TANK / 2) {
+      if (!floorBreached(world, along)) {
         tank.s = sAt(2, along); tank.dir = 1; tank.angle = 45;
         let dmg = Math.min(45, Math.round((y - startY) / 22) * 7);
         if (tank.shield) { dmg = Math.min(15, dmg); tank.shield = false; world.events.push({ kind: 'shield', seat: world.tanks.indexOf(tank) + 1 }); }
@@ -524,6 +535,13 @@ function fallFrom(world, tank) {
         sweepPowerups(world, tank);
         return;
       }
+    }
+    if (y >= Y1 - TANK / 2 && along >= 0 && along < IW && !breached(world, 2, along)) {
+      // A tank that falls through soil hits the box's bottom unless that
+      // boundary has also been broken open. It cannot drive on the boundary.
+      tank.hp = 0;
+      world.events.push({ kind: 'crash', seat: world.tanks.indexOf(tank) + 1, x, y });
+      return;
     }
   }
   tank.hp = 0;
