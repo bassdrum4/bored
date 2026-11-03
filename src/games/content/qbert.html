@@ -90,6 +90,18 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         const PR = 12, ER = 10;
 
         let ROWS = 7, PY = 146;
+        // '#' is a playable cube; '.' is empty air. Every shape has a connected
+        // path from its top, using the same four diagonal hops as classic Q*bert.
+        const BOARD_SHAPES = {
+            diamond: ['#', '##', '###', '####', '.###.', '..##..', '...#...'],
+            zigzag: ['#', '##', '###', '.###', '..###', '...###', '....###'],
+            fork: ['#', '##', '###', '#..#', '##.##', '######', '#######']
+        };
+        let boardMask = null;
+        const onCube = (r, c) => r >= 0 && r < ROWS && c >= 0 && c <= r
+            && (!boardMask || boardMask[r]?.[c] === '#');
+        const makeGrid = () => Array.from({ length: ROWS }, (_, r) =>
+            Array.from({ length: r + 1 }, (_, c) => onCube(r, c) ? 0 : null));
 
         // A taller pyramid sits higher so every level is centred on the same band.
         function setBoard(rows) {
@@ -120,15 +132,15 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             { name: 'First Steps', rows: 5, paint: [P.blue, P.yellow], discs: 4, spawn: 3.4, speed: 1.00, types: ['red'] },
             { name: 'Two-Way Traffic', rows: 6, paint: [P.blue, P.yellow], discs: 4, spawn: 3.0, speed: 1.00, types: ['red', 'egg'] },
             { name: 'Double Dip', rows: 6, paint: [P.blue, P.purple, P.yellow], discs: 4, spawn: 2.7, speed: 1.05, types: ['red', 'egg'] },
-            { name: 'Slick Work', rows: 7, paint: [P.green, P.orange], discs: 4, spawn: 2.4, speed: 1.05, types: ['red', 'slick', 'sam'] },
+            { name: 'Slick Work', rows: 7, shape: 'diamond', paint: [P.green, P.orange], discs: 4, spawn: 2.4, speed: 1.05, types: ['red', 'slick', 'sam'] },
             { name: 'Coily Nest', rows: 7, paint: [P.blue, P.yellow], discs: 3, spawn: 2.1, speed: 1.10, types: ['red', 'egg', 'slick'] },
-            { name: 'Triple Play', rows: 7, paint: [P.blue, P.yellow, P.purple, P.green], discs: 3, spawn: 1.9, speed: 1.15, types: ALL_TYPES },
+            { name: 'Triple Play', rows: 7, shape: 'zigzag', paint: [P.blue, P.yellow, P.purple, P.green], discs: 3, spawn: 1.9, speed: 1.15, types: ALL_TYPES },
             { name: 'The Gauntlet', rows: 7, paint: [P.orange, P.teal], discs: 2, spawn: 1.5, speed: 1.25, types: ALL_TYPES },
             { name: 'Last Hop', rows: 7, paint: [P.purple, P.yellow, P.blue], discs: 2, spawn: 1.25, speed: 1.35, types: ALL_TYPES },
-            { name: 'Colour Thief', rows: 6, paint: [P.teal, P.orange], discs: 3, spawn: 2.0, speed: 1.15, types: ['slick', 'sam', 'red'], revert: true },
+            { name: 'Colour Thief', rows: 7, shape: 'fork', paint: [P.teal, P.orange], discs: 3, spawn: 2.0, speed: 1.15, types: ['slick', 'sam', 'red'], revert: true },
             { name: 'Coily Rush', rows: 7, paint: [P.yellow, P.blue, P.green], discs: 3, spawn: 1.7, speed: 1.25, types: ['egg', 'red'] },
-            { name: 'Unstable Pyramid', rows: 7, paint: [P.purple, P.teal], discs: 2, spawn: 1.75, speed: 1.30, types: ALL_TYPES, revert: true },
-            { name: 'Rainbow Summit', rows: 7, paint: [P.blue, P.yellow, P.purple, P.orange], discs: 2, spawn: 1.4, speed: 1.40, types: ALL_TYPES }
+            { name: 'Unstable Pyramid', rows: 7, shape: 'diamond', paint: [P.purple, P.teal], discs: 2, spawn: 1.75, speed: 1.30, types: ALL_TYPES, revert: true },
+            { name: 'Rainbow Summit', rows: 7, shape: 'zigzag', paint: [P.blue, P.yellow, P.purple, P.orange], discs: 2, spawn: 1.4, speed: 1.40, types: ALL_TYPES }
         ];
 
         const ENDLESS_PAINTS = [
@@ -190,7 +202,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             let n = 0;
             for (let r = 0; r < ROWS; r++)
                 for (let c = 0; c <= r; c++)
-                    if (grid[r][c] < curRound) n++;
+                    if (onCube(r, c) && grid[r][c] < curRound) n++;
             return n;
         }
 
@@ -203,9 +215,10 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             state = 'title'; tmr = 0; paused = false;
             score = 0; lives = 3; gameLvl = 1; nextExtraLife = 8000; streak = 0;
             setBoard(7);
+            boardMask = null;
             paint = [P.blue, P.yellow];
             maxRounds = 1; curRound = 1; banner = '';
-            grid = Array.from({ length: ROWS }, (_, r) => Array(r + 1).fill(0));
+            grid = makeGrid();
             pl = null; enemies = []; discs = [];
             jmp = null; dth = null; ride = null;
             particles = []; pops = [];
@@ -219,6 +232,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         function startLevel() {
             const def = levelDefFor(gameLvl);
             setBoard(def.rows);
+            boardMask = def.shape ? BOARD_SHAPES[def.shape] : null;
             paint = def.paint;
             maxRounds = Math.min(3, paint.length - 1);
             curRound = 1;
@@ -226,7 +240,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             enemySpeed = def.speed;
             spawnTypes = def.types;
             revertingTiles = !!def.revert;
-            grid = Array.from({ length: ROWS }, (_, r) => Array(r + 1).fill(0));
+            grid = makeGrid();
             pl = { r: 0, c: 0, x: 0, y: 0 };
             jmp = null; dth = null; ride = null;
             enemies = []; particles = []; pops = [];
@@ -251,7 +265,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 row,
                 active: true,
                 respawnTmr: 0
-            }));
+            })).filter(d => onCube(d.row, d.side === 'left' ? 0 : d.row));
         }
 
         function discVisualPos(d) {
@@ -274,7 +288,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             if (state !== 'playing' || paused || jmp || dth || ride) return;
             const nr = pl.r + dr, nc = pl.c + dc;
 
-            if (nr < 0 || nr >= ROWS || nc < 0 || nc > nr) {
+            if (!onCube(nr, nc)) {
                 // Off the pyramid: is there a disc on this side of this row?
                 if (dr === -1) {
                     let ds = null;
@@ -439,6 +453,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
 
             const type = pool[Math.floor(Math.random() * pool.length)];
             const c = Math.random() < 0.5 ? 0 : 1;
+            if (!onCube(1, c)) return;
             const p = gp(1, c);
             enemies.push({
                 type, r: 1, c,
@@ -476,7 +491,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                     } else {
                         nr = e.r + 1;
                         nc = e.c + e.dir;
-                        if (nr >= ROWS || nc < 0 || nc > nr) {
+                        if (!onCube(nr, nc)) {
                             // An egg that runs out of room at the bottom hatches there
                             // and starts hunting instead of falling away.
                             if (e.type === 'egg' && e.r >= ROWS - 1) { hatch(e); continue; }
@@ -518,7 +533,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 { r: e.r - 1, c: e.c - 1 }, { r: e.r - 1, c: e.c },
                 { r: e.r + 1, c: e.c }, { r: e.r + 1, c: e.c + 1 }
             ];
-            const valid = moves.filter(m => m.r >= 0 && m.r < ROWS && m.c >= 0 && m.c <= m.r);
+            const valid = moves.filter(m => onCube(m.r, m.c));
             if (!valid.length) return null;
             if (Math.random() < 0.12) return valid[Math.floor(Math.random() * valid.length)];
             let best = null, bd = Infinity;
@@ -671,6 +686,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             if (!grid) return;
             for (let r = 0; r < ROWS; r++)
                 for (let c = 0; c <= r; c++) {
+                    if (!onCube(r, c)) continue;
                     const p = gp(r, c);
                     const col = paint[Math.min(grid[r][c], paint.length - 1)];
                     drawCube(p.x, p.y, col.t, col.l, col.r);
