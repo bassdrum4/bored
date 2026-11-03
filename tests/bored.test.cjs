@@ -695,7 +695,7 @@ test('browser regressions', async t => {
     assert.match(await text(frame, '#stats'), /Hits 0 \/ Accuracy 0% \/ 20s/);
     assert.equal(await frame.evaluate(() => window.__boredSnapshot().finished), false);
     await close();
-    assert.equal(await page.$$eval('#recent-list button', els => els.length), 4);
+    assert.equal(await page.evaluate(() => document.querySelectorAll('#recent-list .shelf-play').length), 4);
   });
 
   await t.test('DEEP cuts one dungeon per day, descends five floors, and the Warden seals the Core', async () => {
