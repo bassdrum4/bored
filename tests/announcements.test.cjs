@@ -43,11 +43,44 @@ test('public announcement renders safely, persists guest dismissal and never tra
   assert.equal(await page.$eval('#announcement-banner h3', node => node.textContent), '<script>not HTML</script>');
   assert.equal(await page.$('#announcement-banner script'), null, 'title is text, never HTML');
   assert.equal(await page.$eval('#announcement-count', node => node.textContent), '1');
-  await page.click('#announcement-toggle');
-  assert.ok(await page.$eval('#announcement-dialog', d => d.open));
-  await page.click('#announcement-list button');
-  assert.equal(await page.$eval('#announcement-banner', element => element.hidden), true);
+
+  // The announcement is a viewport-fixed overlay, not part of the scrolled page.
+  const initial = await page.$eval('#announcement-banner', banner => ({
+    top: banner.getBoundingClientRect().top,
+    width: banner.getBoundingClientRect().width,
+    position: getComputedStyle(banner).position,
+    background: getComputedStyle(banner).backgroundColor
+  }));
+  assert.equal(initial.position, 'fixed');
+  assert.ok(initial.top >= 0 && initial.top <= 20);
+    const pageColor = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  assert.notEqual(initial.background, pageColor, 'banner contrasts with the page');
+  await page.evaluate(() => window.scrollTo(0, 750));
+  await page.waitForFunction(() => window.scrollY > 200);
+  assert.ok(Math.abs(await page.$eval('#announcement-banner', banner => banner.getBoundingClientRect().top) - initial.top) <= 1,
+    'banner stays in place while scrolling');
+
+  // Starting a full-screen game hides the overlay without marking it as read.
+  await page.evaluate(() => openGame('memory'));
+  await page.waitForFunction(() => document.body.classList.contains('playing'));
+  assert.equal(await page.$eval('#announcement-banner', banner => getComputedStyle(banner).display), 'none');
+  await page.evaluate(() => closeGame());
+  assert.equal(await page.$eval('#announcement-banner', banner => banner.hidden), false);
+
+  await page.setViewport({ width: 375, height: 700 });
+  const mobile = await page.$eval('#announcement-banner', banner => ({
+    left: banner.getBoundingClientRect().left, right: banner.getBoundingClientRect().right,
+    top: banner.getBoundingClientRect().top
+  }));
+  assert.ok(mobile.left >= 0 && mobile.right <= 375 && mobile.top >= 0, 'mobile banner fits the viewport');
+
+  // Reading details, or following the game link, does not silently dismiss it.
+  await page.click('#announcement-banner .announcement-actions button');
+  assert.equal(await page.$eval('#announcement-dialog', d => d.open), true);
   await page.click('#announcement-close');
+  assert.equal(await page.$eval('#announcement-banner', banner => banner.hidden), false);
+  await page.click('#announcement-banner .announcement-dismiss');
+  assert.equal(await page.$eval('#announcement-banner', banner => banner.hidden), true);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.getElementById('announcement-status').textContent === '');
   assert.equal(await page.$eval('#announcement-banner', element => element.hidden), true);

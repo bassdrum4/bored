@@ -19,19 +19,34 @@ export function createAnnouncementsUI() {
 
   function card(item, banner = false) {
     const article = make('article', undefined, 'announcement-card' + (item.priority === 'important' ? ' announcement-important' : ''));
+    if (banner) article.append(make('p', 'FROM BORED / NEW MESSAGE', 'announcement-eyebrow'));
     article.append(make('h3', item.title), make('p', item.body));
     const actions = make('div', undefined, 'announcement-actions');
     if (item.link_url && /^#[a-z0-9][a-z0-9-]{0,49}$/.test(item.link_url)) {
       const link = make('a', 'Play →');
       link.href = item.link_url;
-      link.onclick = () => { void acknowledge(item); $('announcement-dialog').close(); };
+      link.onclick = () => {
+        if ($('announcement-dialog').open) $('announcement-dialog').close();
+      };
       actions.append(link);
     }
+    if (banner) {
+      const details = make('button', 'Read more');
+      details.type = 'button';
+      details.onclick = () => $('announcement-dialog').showModal();
+      actions.append(details);
+    }
     if (!read(item)) {
-      const dismiss = make('button', banner ? 'Dismiss' : 'Mark read');
+      const dismiss = make('button', banner ? '×' : 'Mark read',
+        banner ? 'announcement-dismiss' : '');
       dismiss.type = 'button';
+      if (banner) {
+        dismiss.setAttribute('aria-label', 'Dismiss announcement: ' + item.title);
+        dismiss.title = 'Dismiss announcement';
+      }
       dismiss.onclick = () => void acknowledge(item);
-      actions.append(dismiss);
+      if (banner) article.append(dismiss);
+      else actions.append(dismiss);
     }
     if (actions.childNodes.length) article.append(actions);
     return article;
