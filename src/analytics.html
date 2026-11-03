@@ -18,7 +18,7 @@
 </form>
 <p class="analytics-note">Activity from analytics admin accounts is excluded from every total, chart, table and export. Active time: game visible, focused, menu closed, with input in the last 60 seconds. Visible time includes idle play. Times are sampled; unfinished sessions may be missing their last 30 seconds. Remote games report presence only, since their internal input and scores are inaccessible.</p>
 <div id="totals" class="analytics-totals"></div>
-<nav class="analytics-tabs" aria-label="Analytics views"><button type="button" data-view="overview" aria-pressed="true">Overview</button><button type="button" data-view="engagement" aria-pressed="false">Enjoyment & retention</button><button type="button" data-view="players" aria-pressed="false">Players</button><button type="button" data-view="sessions" aria-pressed="false">Sessions & errors</button></nav>
+<nav class="analytics-tabs" aria-label="Analytics views"><button type="button" data-view="overview" aria-pressed="true">Overview</button><button type="button" data-view="engagement" aria-pressed="false">Enjoyment & retention</button><button type="button" data-view="players" aria-pressed="false">Players</button><button type="button" data-view="sessions" aria-pressed="false">Sessions & errors</button><button type="button" data-view="announcements" aria-pressed="false">Announcements</button></nav>
 <section id="overview-view"><div class="analytics-charts"><section><h2>Active time by game</h2><div id="game-chart"></div></section><section><h2>Daily active time</h2><div id="day-chart"></div></section><section><h2>Discovery source</h2><div id="source-chart"></div></section><section><h2>Device & embed</h2><div id="device-chart"></div></section><section><h2>Daily challenge vs free play</h2><div id="mode-chart"></div></section><section><h2>Time of day · Detroit</h2><div id="hour-chart"></div></section></div><h2>Game breakdown</h2><div id="games-table"></div>
 <section id="f14-section">
   <h2>F-14 · flight analytics</h2>
@@ -42,5 +42,26 @@
 </section>
 <section id="players-view" hidden><h2>Player activity</h2><p>Choose a player to see their games and sessions. Repeat accounts played on at least two Detroit calendar days within the selected range. Guests cannot be counted as unique people.</p><div id="players-table"></div><section id="player-detail" hidden><button id="clear-person" type="button">Show all players</button><h2 id="player-heading"></h2><div id="player-games"></div></section></section>
 <section id="sessions-view" hidden><h2>Sessions & errors</h2><label><input id="errors-only" type="checkbox"> Only sessions with errors</label><p id="session-note"></p><div id="sessions-table"></div><div class="analytics-pagination"><button id="previous" type="button">Previous</button><span id="page-label"></span><button id="next" type="button">Next</button></div><details id="session-detail" hidden><summary id="session-heading">Session detail</summary><pre id="session-json"></pre></details></section>
+<section id="announcements-view" hidden>
+  <h2>Announcements</h2>
+  <p class="analytics-note">Messages are delivered inside Bored the next time someone visits. Normal messages do not interrupt games. Guests can receive public messages; messages to specific users require an account.</p>
+  <form id="announcement-form" class="announcement-form">
+    <label>Title <input id="announcement-title" type="text" minlength="3" maxlength="100" required placeholder="New game: Risk!"></label>
+    <label>Message <textarea id="announcement-body" rows="4" maxlength="1000" required placeholder="Tell players what's new."></textarea></label>
+    <div class="announcement-form-row">
+      <label>Audience <select id="announcement-audience"><option value="everyone">Everyone (including guests)</option><option value="registered">Registered accounts</option><option value="selected">Specific accounts</option></select></label>
+      <label>Importance <select id="announcement-priority"><option value="normal">Normal</option><option value="important">Important</option></select></label>
+      <label>Expires <select id="announcement-expiry"><option value="1">After 1 day</option><option value="7" selected>After 7 days</option><option value="30">After 30 days</option><option value="never">Never</option></select></label>
+    </div>
+    <label id="announcement-recipients-row" hidden>Recipients (Ctrl/Cmd-click to select multiple)
+      <select id="announcement-recipients" multiple size="7" aria-label="Specific account recipients"></select>
+    </label>
+    <label>Link to a game (optional) <input id="announcement-link" type="text" pattern="#[a-z0-9][a-z0-9-]{0,49}" placeholder="#risk"></label>
+    <button id="announcement-send" type="submit">Publish announcement</button>
+    <p id="announcement-admin-status" role="status" aria-live="polite"></p>
+  </form>
+  <div class="announcement-history-head"><h3>Sent announcements</h3><button id="announcement-refresh" type="button" class="action">Refresh</button></div>
+  <div id="announcement-admin-list"></div>
+</section>
 <details class="analytics-definitions"><summary>Coverage and measurement</summary><p>Collection begins with this release. Old scores cannot reconstruct past play time. Launches include retries; a session ends on restart, switching games, closing, leaving the page or changing account. “No end received” can mean still playing, a crash, network loss or a closed browser, not proven abandonment. Sessions crossing the selected range are partial. Refresh is manual. Charts and date filters use Detroit time. Guest browser IDs are persistent only from the new tracking release onward, and can be erased by opting out. They cannot identify people across devices or private browsing.</p><p>Client-reported telemetry is useful for product decisions, not anti-cheat or proof of attendance. Opt-outs, blocked requests and outages reduce coverage. Retries are held in memory for this page only. Reports read at most 20,000 events per request and explicitly report a limit; narrow the date range when reached.</p></details>
 </div></main><script type="module" src="./hub/analytics-view.js"></script></body></html>
