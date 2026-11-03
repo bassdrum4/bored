@@ -126,7 +126,7 @@ it. The hub polls the game's `__boredSnapshot()` and sends the run itself the
 moment the game reports `finished`, so a completed run is never lost to a
 forgotten send.
 
-**Pastel Tanks** is a `turns` game without a server-side simulation, because the
+**Tank 2** is a `turns` game without a server-side simulation, because the
 game itself is already turn-based. A match stores one seed — which picks one of
 the original's five hand-shaped maps plus a phase — and the list of shots. A
 shot is `{seat, x, angle, power, weapon, won}`: where the tank drove, how it
