@@ -160,9 +160,14 @@
   .table-wrap { overflow-x: auto }
 
   /* ── tech tree and civs ──────────────────────────────────────────────── */
-  .tech-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
-  .tech-col { display: flex; flex-direction: column; gap: 6px; min-width: 0 }
-  .tech-col h3 { margin: 0 0 2px !important }
+  .ttree-wrap { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px }
+  .ttree { position: relative; min-width: 1px }
+  .tcol-head { position: absolute; top: 0; width: 160px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3) }
+  .tnode { position: absolute; width: 160px; z-index: 1 }
+  .tnode .tech { height: 100% }
+  .tedges { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible }
+  .tedges path { fill: none; stroke: var(--rule-2); stroke-width: 1 }
+  .tedges path.on { stroke: var(--moss); stroke-width: 1.5 }
   .tech {
     display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%;
     border: 1px solid var(--rule); border-radius: 3px; padding: 6px 8px; background: var(--panel);
@@ -267,7 +272,7 @@
     #bar { padding: 0 6px }
     .seat { grid-template-columns: 14px minmax(0, 1fr) 92px }
     .seat select.civ { grid-column: 2 / -1; grid-row: 2 }
-    .tech-grid, .civ-list { grid-template-columns: minmax(0, 1fr) }
+    .civ-list { grid-template-columns: minmax(0, 1fr) }
   }
   @media (max-width: 460px) {
     #turn-readout { display: none }
@@ -3717,23 +3722,135 @@ function techCard(i, id) {
     (needs ? '<span class="tq">Needs ' + esc(needs) + '</span>' : '') + '</button>';
 }
 
+/* ── tech tree ─────────────────────────────────────────────────────────────── */
+
+const TT_NODE = 160;   // node width, px — the tree measures itself against this
+const TT_GAP = 52;     // space between columns, where the connector lines run
+const TT_HEAD = 22;    // room for the era labels above the first row
+const TT_ROW = 10;     // gap between two cards in a column
+
+// Column per prerequisite depth, then a barycenter pass so each tech sits near
+// the techs that unlock it. Pure: the tech table and key order come in as
+// arguments so this can be read and tested on its own.
+function techColumns(techs, order) {
+  const depth = {};
+  const visit = id => {
+    const t = techs[id];
+    if (depth[id] !== undefined) return depth[id];
+    depth[id] = 0;
+    if (t && t.needs.length) depth[id] = 1 + Math.max.apply(null, t.needs.map(visit));
+    return depth[id];
+  };
+  const cols = [];
+  for (const id of order) {
+    const d = visit(id);
+    if (!cols[d]) cols[d] = [];
+    cols[d].push(id);
+  }
+  for (let k = 1; k < cols.length; k++) {
+    const prev = cols[k - 1];
+    const bary = id => {
+      const at = techs[id].needs.map(n => prev.indexOf(n)).filter(n => n >= 0);
+      return at.length ? at.reduce((a, b) => a + b, 0) / at.length : 99;
+    };
+    cols[k] = cols[k].slice().sort((a, b) => bary(a) - bary(b));
+  }
+  return cols;
+}
+
+function techTreeHTML(i) {
+  const cols = techColumns(TECHS, TECH_ORDER);
+  // Future Tech is the root above the finished tree: it hangs off every tech in
+  // the last column and repeats forever.
+  const root = cols[cols.length - 1].slice();
+  const all = cols.concat([['future']]);
+  let html = '<div class="ttree-wrap"><div class="ttree">';
+  all.forEach((ids, c) => {
+    const x = c * (TT_NODE + TT_GAP);
+    let label;
+    if (ids.length === 1 && ids[0] === 'future') label = 'After the tree · ' + FUTURE.points + ' score each';
+    else {
+      const eras = ids.map(id => TECHS[id].era);
+      const lo = Math.min.apply(null, eras), hi = Math.max.apply(null, eras);
+      label = 'Era ' + lo + (hi > lo ? '–' + hi : '') + ' · ' + lo * 2 + ' score each';
+    }
+    html += '<div class="tcol-head" style="left:' + x + 'px">' + label + '</div>';
+    ids.forEach(id => {
+      const needs = id === 'future' ? root : TECHS[id].needs;
+      const known = id !== 'future' && hasTech(i, id) ? 1 : 0;
+      html += '<div class="tnode" data-col="' + c + '" data-id="' + id + '" data-known="' + known +
+        '" data-needs="' + needs.join(' ') + '" style="left:' + x + 'px">' + techCard(i, id) + '</div>';
+    });
+  });
+  html += '<svg class="tedges" aria-hidden="true"></svg></div></div>';
+  return html;
+}
+
+// Cards are measured once they are in the document, so their real heights set
+// the row positions and the connector lines land on the card edges.
+function layoutTechTree() {
+  if (!UI.modal) return;
+  const tree = UI.modal.querySelector('.ttree');
+  if (!tree) return;
+  const nodes = Array.prototype.slice.call(tree.querySelectorAll('.tnode'));
+  const byId = {};
+  const cols = {};
+  let width = 0;
+  nodes.forEach(n => {
+    byId[n.getAttribute('data-id')] = n;
+    const c = n.getAttribute('data-col');
+    if (!cols[c]) cols[c] = [];
+    cols[c].push(n);
+    width = Math.max(width, n.offsetLeft + n.offsetWidth);
+  });
+  let height = TT_HEAD;
+  Object.keys(cols).forEach(c => {
+    let y = TT_HEAD;
+    cols[c].forEach(n => {
+      n.style.top = y + 'px';
+      y += n.offsetHeight + TT_ROW;
+    });
+    height = Math.max(height, y - TT_ROW);
+  });
+  tree.style.height = height + 'px';
+  tree.style.width = width + 'px';
+  let d = '';
+  nodes.forEach(child => {
+    const needs = (child.getAttribute('data-needs') || '').split(' ').filter(Boolean);
+    needs.forEach(id => {
+      const parent = byId[id];
+      if (!parent) return;
+      const x1 = parent.offsetLeft + parent.offsetWidth, y1 = parent.offsetTop + parent.offsetHeight / 2;
+      const x2 = child.offsetLeft, y2 = child.offsetTop + child.offsetHeight / 2;
+      const k = Math.max(16, (x2 - x1) / 2);
+      d += '<path d="M' + x1 + ' ' + y1 + 'C' + (x1 + k) + ' ' + y1 + ',' + (x2 - k) + ' ' + y2 + ',' + x2 + ' ' + y2 + '"' +
+        (parent.getAttribute('data-known') === '1' ? ' class="on"' : '') + '/>';
+    });
+  });
+  const svg = tree.querySelector('.tedges');
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', height);
+  svg.innerHTML = d;
+  if (!layoutTechTree.bound) {
+    layoutTechTree.bound = true;
+    window.addEventListener('resize', () => { if (UI.modalKind === 'tech') layoutTechTree(); });
+  }
+}
+
 function showTech() {
   const v = G.viewer;
   if (v === null) return;
   const f = pl(v), rate = researchRate(v);
   let html = modalHead('Tech tree', (f.research ? 'Researching ' + esc(techName(f.research)) : 'Nothing picked') + ' · +' + rate + ' a turn · ' + f.rp + ' banked');
-  html += '<div class="modal-body"><div class="tech-grid">';
-  for (const era of [1, 2, 3]) {
-    html += '<div class="tech-col"><h3>Era ' + era + ' · ' + (era * 2) + ' score each</h3>' +
-      TECH_ORDER.filter(id => TECHS[id].era === era).map(id => techCard(v, id)).join('') + '</div>';
-  }
-  html += '</div><h3 style="margin-top:14px">After the tree</h3>' + techCard(v, 'future') +
-    '<p class="hint">You research one tech at a time. Cities set to Research send all their production into it, and each Library adds 2 a turn on its own. ' +
+  html += '<div class="modal-body">' + techTreeHTML(v) +
+    '<p class="hint" style="margin-top:12px">Each line points from a tech to the tech it unlocks. You research one at a time: ' +
+    'cities set to Research send all their production into it, and each Library adds 2 a turn on its own. ' +
     'Points carry over, so switching techs loses nothing.' + (civIs(v, 'uk') ? ' Your techs cost 25% less.' : '') +
     (civIs(v, 'portugal') ? ' Navigation costs you half.' : '') + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>';
   openModal(html, 'wide');
   UI.modalKind = 'tech';
+  layoutTechTree();
 }
 
 function showCouncil() {
