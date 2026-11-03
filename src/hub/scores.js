@@ -88,6 +88,13 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // A fair Risk result requires winning the entire world against the CPU;
+  // territories held mid-game and unfinished wars never enter the leaderboard.
+  highScore('risk', 'Risk', 'turns', {
+    metric: 'turns', lower: true, min: 1, max: 999,
+    when: snapshot => snapshot.cpu === true && snapshot.won === true && snapshot.finished === true,
+    key: 'bored.high.risk-turns-v1'
+  }),
   // Scrabble ranks the points of a game played to the end against the computer;
   // a two-player game is a shared table, not a score to post, so only CPU games
   // qualify. The game asks for a player choice before the first tile is drawn.
