@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 251,
+  "count": 252,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"13dfb18","date":"2026-11-03","author":"bassdrum4","subject":"Make the box itself smooth destructible ground, not panels"},
   {"sha":"a10caa5","date":"2026-11-03","author":"Codebuff","subject":"Use Detroit calendar days for analytics date filters"},
   {"sha":"16344a3","date":"2026-11-03","author":"Codebuff","subject":"Rebuild Ashcrown's chrome around the map, and open up Trackbound's freeplay."},
   {"sha":"2b92f95","date":"2026-11-03","author":"bassdrum4","subject":"Rebuild Pastel Tanks around feel: instant play, live aim, paper box"},
