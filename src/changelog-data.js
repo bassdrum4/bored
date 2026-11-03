@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 273,
+  "count": 274,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f02a950","date":"2026-11-03","author":"Daniel Lowe","subject":"Integrate standalone Tank 2 with Bored while preserving online matches","pr":73},
   {"sha":"99b21e2","date":"2026-11-03","author":"Claude","subject":"Civ Lite v3: research revamp, science victory, up to 8 players."},
   {"sha":"7f38263","date":"2026-11-03","author":"Claude","subject":"Give each Civ Lite civ its own colors, Civ 6 style."},
   {"sha":"b756489","date":"2026-11-03","author":"PenguinV360","subject":"Update ashcrown.html"},
