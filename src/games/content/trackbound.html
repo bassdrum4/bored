@@ -47,6 +47,9 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
   letter-spacing:.12em;opacity:0;transition:opacity .18s ease}
 #hudCenter.show{opacity:1}
 #hudHint{position:absolute;left:14px;bottom:12px;font-size:10px;letter-spacing:.05em;opacity:.72;max-width:52%}
+#hudTrick{position:absolute;right:14px;bottom:58px;font-size:11px;letter-spacing:.09em;opacity:0;
+  transition:opacity .12s ease;font-variant-numeric:tabular-nums;text-align:right}
+#hudTrick.show{opacity:.94}
 #medalRail{position:absolute;right:14px;top:58px;display:flex;flex-direction:column;gap:4px;
   font-size:10px;letter-spacing:.08em;text-align:right;opacity:.9}
 #medalRail .m{display:flex;gap:6px;align-items:center;justify-content:flex-end}
@@ -128,6 +131,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
       <div id="hudSplit"><span id="hudBest">—</span><span id="hudDelta"></span></div>
       <div id="medalRail"></div>
       <div id="hudSpeed"><b id="hudKmh">0</b><span>km/h</span></div>
+      <div id="hudTrick"></div>
       <div id="hudCenter"></div>
       <div id="hudHint">W A S D / arrows · space handbrake · backspace respawn · R restart · esc pause · M sound</div>
       <div id="pad">
@@ -148,7 +152,10 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
           <div>
             <h3>Campaign</h3>
             <ol id="trackList" class="list"></ol>
-            <div class="row"><button id="btnDaily" type="button">Daily track</button></div>
+            <div class="row">
+              <button id="btnDaily" type="button">Daily track</button>
+              <button id="btnFreeplay" type="button">Freeplay park</button>
+            </div>
           </div>
           <div>
             <h3>Controls</h3>
@@ -172,6 +179,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
         <div class="row">
           <button id="pauseResume" type="button">Resume</button>
           <button id="pauseRestart" type="button">Restart</button>
+          <button id="pauseNewPark" type="button" hidden>New park</button>
           <button id="pauseGhost" type="button">Ghost: on</button>
           <button id="pauseMute" type="button">Sound: on</button>
           <button id="pauseMenu" type="button">Menu</button>
@@ -652,6 +660,41 @@ const wallDef = (dir, name) => ({
   }
 });
 
+/* Freeplay furniture: wide road with low rails, so the car has room to move
+   around on the surface instead of being threaded between walls. Everything
+   here returns to a level, straight exit, which is what lets a stunt park close
+   on itself and be lapped. */
+const paveDef = (len, hw, name, extra) => Object.assign({
+  name, len, hw, samples: 9, wall: 0.55,
+  curve: t => ({ p: [0, 0, len * t], f: [0, 0, 1], u: [0, 1, 0] })
+}, extra || {});
+// A sine crest (waves: 1) or a run of rollers (waves: 2). The frame tilts with
+// the slope, so the wheels follow the brow and the car lifts off past the top.
+const waveDef = (height, len, waves, name) => ({
+  name, len, hw: 9, samples: 26, wall: 0.55,
+  curve: t => {
+    const w = waves * Math.PI;
+    const rise = height * w * Math.sin(2 * w * t);
+    return {
+      p: [0, height * (1 - Math.cos(2 * w * t)) / 2, len * t],
+      f: norm([0, rise, len]),
+      u: norm([0, len, -rise])
+    };
+  }
+});
+// A wide banked right-hander: the surface rolls into the apex and back to level
+// at the exit, so four of them can join four equal sides into a closed loop.
+const bowlDef = dir => ({
+  name: dir > 0 ? 'Bowl R' : 'Bowl L', len: Math.PI / 2 * 26, hw: 10, samples: 30, radius: 26,
+  arcSweep: Math.PI / 2, arcSide: dir,
+  curve: t => {
+    const a = (Math.PI / 2) * t;
+    const f = [dir * Math.sin(a), 0, Math.cos(a)];
+    const roll = -dir * 0.26 * Math.sin(Math.PI * t);
+    return { p: [dir * (26 - 26 * Math.cos(a)), 0, 26 * Math.sin(a)], f, u: rot([0, 1, 0], f, roll) };
+  }
+});
+
 const BLOCKS = {
   start: { name: 'Start', len: 16, hw: 6, samples: 10, start: true,
     curve: t => ({ p: [0, 0, 16 * t], f: [0, 0, 1], u: [0, 1, 0] }) },
@@ -678,9 +721,19 @@ const BLOCKS = {
   boost: { name: 'Boost', len: 16, hw: 6, samples: 8, boost: true, paint: PALETTE.boost,
     curve: t => ({ p: [0, 0, 16 * t], f: [0, 0, 1], u: [0, 1, 0] }) },
   dirt: { name: 'Dirt', len: 18, hw: 6.4, samples: 9, grip: 4.4, paint: PALETTE.dirt, top: PALETTE.dirt,
-    curve: t => ({ p: [0, 0, 18 * t], f: [0, 0, 1], u: [0, 1, 0] }) },
-  narrow: { name: 'Narrow', len: 16, hw: 3.9, samples: 9,
-    curve: t => ({ p: [0, 0, 16 * t], f: [0, 0, 1], u: [0, 1, 0] }) }
+    curve: t => ({ p: [0, 0, 18 * t], f: [0, 0, 1], u: [0, 1, 0] }) },  narrow: { name: 'Narrow', len: 16, hw: 3.9, samples: 9,
+    curve: t => ({ p: [0, 0, 16 * t], f: [0, 0, 1], u: [0, 1, 0] })
+  },
+  // Freeplay park pieces.
+  grid: paveDef(18, 9, 'Grid', { samples: 10, start: true, wall: 0.6 }),
+  run: paveDef(24, 9, 'Run'),
+  pad: paveDef(20, 9, 'Pad', { samples: 8, boost: true, paint: PALETTE.boost }),
+  loose: paveDef(22, 9.6, 'Loose', { grip: 4.4, paint: PALETTE.dirt, top: PALETTE.dirt }),
+  crest: waveDef(2.2, 20, 1, 'Crest'),
+  launch: waveDef(4.6, 24, 1, 'Launch'),
+  rollers: waveDef(1.9, 30, 2, 'Rollers'),
+  bowlR: bowlDef(1),
+  bowlL: bowlDef(-1)
 };
 
 function localCurveFrame(def, t) {
@@ -1181,6 +1234,138 @@ function dailyTrack(seed) {
   return buildTrack(CAMPAIGN[0].blocks, CAMPAIGN[0]);
 }
 
+/* ── freeplay: an open procedural world ─────────────────────────────────────
+   No ribbon and no rails. This is a heightfield the car drives anywhere on,
+   with kickers and platforms to launch off. The terrain mesh is also what the
+   wheels raycast against, so every slope you can see is a slope you can land
+   on, and the raised rim is the edge of the field. */
+
+const PARK_HALF = 200;     // the field is 400 units across
+const PARK_STEP = 5;       // terrain grid spacing
+const PARK_EDGE = 58;      // the raised rim that keeps the car in
+
+// Integer hash in [0,1): the same seed makes the same hills everywhere.
+function parkHash(x, z, seed) {
+  let h = Math.imul(x | 0, 374761393) ^ Math.imul(z | 0, 668265263) ^ Math.imul(seed | 0, 1442695041);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+function parkNoise(x, z, seed, scale) {
+  const fx = x / scale, fz = z / scale;
+  const x0 = Math.floor(fx), z0 = Math.floor(fz);
+  const tx = fx - x0, tz = fz - z0;
+  const sx = tx * tx * (3 - 2 * tx), sz = tz * tz * (3 - 2 * tz);
+  const a = parkHash(x0, z0, seed), b = parkHash(x0 + 1, z0, seed);
+  const c = parkHash(x0, z0 + 1, seed), d = parkHash(x0 + 1, z0 + 1, seed);
+  return (a + (b - a) * sx) * (1 - sz) + (c + (d - c) * sx) * sz;
+}
+
+// Rolling ground with a flat apron at the spawn and a steep rim at the edge.
+function parkHeight(x, z, seed) {
+  const d = Math.hypot(x, z);
+  const open = clamp((d - 16) / 36, 0.16, 1);
+  const rim = clamp((d - (PARK_HALF - PARK_EDGE)) / PARK_EDGE, 0, 1);
+  const base = (parkNoise(x, z, seed, 64) * 9 + parkNoise(x + 41, z - 27, seed + 9, 24) * 3.1 +
+    parkNoise(x - 17, z + 63, seed + 21, 12) * 1.1 - 6.4) * open;
+  return base + rim * rim * 34;
+}
+
+// A kicker: a ramp with a lip, sunk into the ground so it never floats. Faces
+// are wound outward so the back faces stay culled.
+function pushKicker(mesh, x, z, yaw, width, length, rise, ground, color) {
+  const f = [Math.sin(yaw), 0, Math.cos(yaw)];
+  const r = [Math.cos(yaw), 0, -Math.sin(yaw)];
+  const pt = (side, along, y) => [x + f[0] * along + r[0] * side, y, z + f[2] * along + r[2] * side];
+  const hw = width / 2;
+  const lowL = pt(-hw, 0, ground), lowR = pt(hw, 0, ground);
+  const lipL = pt(-hw, length, ground + rise), lipR = pt(hw, length, ground + rise);
+  const backL = pt(-hw, length, ground - 2.4), backR = pt(hw, length, ground - 2.4);
+  const face = (a, b, c, tone) => pushTri(mesh, a, b, c, norm(cross(sub(b, a), sub(c, a))), tone);
+  const n = norm(cross(sub(lipL, lowL), sub(lipR, lowL)));
+  pushQuad(mesh, lowL, lipL, lipR, lowR, n, color);
+  face(lowL, backL, lipL, shade(color, 0.78));
+  face(lowR, lipR, backR, shade(color, 0.78));
+  pushQuad(mesh, backL, lipL, lipR, backR, norm(cross(sub(lipL, backL), sub(lipR, backL))), shade(color, 0.66));
+}
+
+function freeplayWorld(seed) {
+  const s = (seed >>> 0) || 1;
+  const random = mulberry32(s);
+  const mesh = meshNew(), scenery = meshNew();
+  const cells = Math.round(PARK_HALF * 2 / PARK_STEP);
+  const heights = [];
+  for (let ix = 0; ix <= cells; ix++) {
+    heights[ix] = new Float64Array(cells + 1);
+    for (let iz = 0; iz <= cells; iz++) {
+      heights[ix][iz] = parkHeight(-PARK_HALF + ix * PARK_STEP, -PARK_HALF + iz * PARK_STEP, s);
+    }
+  }
+
+  const grass = [0.41, 0.48, 0.31], dust = [0.57, 0.53, 0.4], rock = [0.5, 0.48, 0.45];
+  for (let ix = 0; ix < cells; ix++) {
+    for (let iz = 0; iz < cells; iz++) {
+      const x0 = -PARK_HALF + ix * PARK_STEP, z0 = -PARK_HALF + iz * PARK_STEP;
+      const x1 = x0 + PARK_STEP, z1 = z0 + PARK_STEP;
+      const h00 = heights[ix][iz], h10 = heights[ix + 1][iz];
+      const h01 = heights[ix][iz + 1], h11 = heights[ix + 1][iz + 1];
+      const a = [x0, h00, z0], b = [x0, h01, z1], c = [x1, h11, z1], d = [x1, h10, z0];
+      const slope = Math.max(Math.abs(h10 - h00), Math.abs(h01 - h00)) / PARK_STEP;
+      const tone = slope > 0.8 ? rock : slope > 0.4 ? dust : grass;
+      const color = shade(tone, 0.9 + parkHash(ix, iz, s) * 0.18);
+      pushQuad(mesh, a, b, c, d, norm(cross(sub(b, a), sub(c, a))), color);
+    }
+  }
+
+  // Kickers: the things you go looking for. Placed only on ground flat enough
+  // for a ramp to sit on, so none of them float or sink out of sight.
+  const ramp = [0.64, 0.53, 0.37];
+  let placed = 0;
+  for (let tries = 0; tries < 320 && placed < 26; tries++) {
+    const angle = random() * TAU, radius = 30 + random() * (PARK_HALF - 66);
+    const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
+    const width = 9 + random() * 5, length = 12 + random() * 7, rise = 3 + random() * 2.6;
+    const around = [
+      parkHeight(x, z, s), parkHeight(x + 8, z, s), parkHeight(x - 8, z, s),
+      parkHeight(x, z + 8, s), parkHeight(x, z - 8, s)
+    ];
+    const ground = Math.min.apply(null, around);
+    if (Math.max.apply(null, around) - ground > 2.2) continue;
+    pushKicker(mesh, x, z, random() * TAU, width, length, rise, ground, shade(ramp, 0.92 + random() * 0.16));
+    placed += 1;
+  }
+
+  // Platforms: something to clear, or to land on top of.
+  for (let i = 0; i < 9; i++) {
+    const angle = random() * TAU, radius = 55 + random() * 105;
+    const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
+    const w = 7 + random() * 5, l = 7 + random() * 5, h = 2.4 + random() * 2.4;
+    pushBox(mesh, FRAME0, [x, parkHeight(x, z, s) + h / 2 - 1.4, z], [w / 2, h / 2 + 1.4, l / 2], shade(rock, 0.95));
+  }
+
+  // Rocks and brush on the rim, out of the driving area, to frame the view.
+  for (let i = 0; i < 130; i++) {
+    const angle = random() * TAU, radius = PARK_HALF - 46 + random() * 42;
+    const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
+    const ground = parkHeight(x, z, s);
+    if (random() < 0.55) {
+      pushCone(scenery, [x, ground, z], 1.4 + random() * 3.4, 1.6 + random() * 2.6, shade(rock, 0.8 + random() * 0.4));
+    } else {
+      pushBox(scenery, FRAME0, [x, ground + 1.4, z], [0.16, 1.4, 0.16], [0.42, 0.33, 0.24]);
+      pushCone(scenery, [x, ground + 1.4, z], 3 + random() * 2.6, 1.8 + random() * 1.6, shade(grass, 0.9 + random() * 0.3));
+    }
+  }
+
+  indexMesh(mesh);
+  indexMesh(scenery);
+  const spawn = frame([0, parkHeight(0, 0, s) + 0.1, 0], [0, 0, 1], [0, 1, 0]);
+  return {
+    id: 'freeplay', name: 'Freeplay', author: 0, layout: 'open', blocks: [], ramps: placed,
+    mesh, scenery, triggers: [], checkpoints: [], finish: null,
+    spawn, end: spawn, chain: [], boxes: []
+  };
+}
+
 /* ── the car ──────────────────────────────────────────────────────────────── */
 const CAR = {
   ride: 0.62,
@@ -1196,7 +1381,8 @@ const CAR = {
   gripDrift: 1.8,
   gravity: 41,
   steer: 2.45,
-  drag: 0.10
+  drag: 0.10,
+  stick: 0.06
 };
 
 function makeCar(spawn) {
@@ -1241,16 +1427,27 @@ function stepCar(car, input, dt, mesh) {
 
   if (hitCount > 0) {
     const n = norm(normalSum);
-    // Sit the chassis exactly ride height above the surface it found.
-    car.p = madd(car.p, car.u, -(distance / hitCount - CAR.ride));
-    const toward = smooth(17, dt);
-    const up2 = norm(mixv(car.u, n, toward));
-    let f2 = sub(car.f, mul(up2, dot(car.f, up2)));
-    if (vlen(f2) < 0.05) f2 = cross(cross(up2, car.f), up2);
-    car.u = up2;
-    car.f = norm(f2);
-    car.grounded = true;
-    car.airTime = 0;
+    // How far the surface has fallen away since the last step, against how far
+    // gravity could have pulled the car down in that step. A road that drops
+    // faster than that is a crest, not a rail: keep the momentum and fly.
+    const gap = distance / hitCount - CAR.ride;
+    const fall = Math.max(0, -dot(car.v, car.u)) * dt + 0.5 * CAR.gravity * dt * dt + CAR.stick;
+    if (gap > fall) {
+      car.grounded = false;
+      car.airTime += dt;
+      car.launch = gap;
+    } else {
+      // Sit the chassis exactly ride height above the surface it found.
+      car.p = madd(car.p, car.u, -gap);
+      const toward = smooth(17, dt);
+      const up2 = norm(mixv(car.u, n, toward));
+      let f2 = sub(car.f, mul(up2, dot(car.f, up2)));
+      if (vlen(f2) < 0.05) f2 = cross(cross(up2, car.f), up2);
+      car.u = up2;
+      car.f = norm(f2);
+      car.grounded = true;
+      car.airTime = 0;
+    }
   } else {
     car.grounded = false;
     car.airTime += dt;
@@ -1473,11 +1670,13 @@ const readInput = () => ({
 let world = null;
 let car = null;
 let current = { kind: 'campaign', index: 0, track: null };
+const isFreeplay = () => current.kind === 'freeplay';
 const race = {
   state: 'menu', t: 0, cp: 0, cpTotal: 0, finishedAt: null, medal: null,
   respawn: null, record: [], recordClock: 0, best: null, ghost: null, splits: [],
   ghostOn: saved.ghost !== false, message: '', messageUntil: 0,
-  missing: 0, boostFlash: 0, thud: 0
+  missing: 0, boostFlash: 0, thud: 0,
+  tricks: 0, points: 0, air: 0, spinDeg: 0, flipDeg: 0, bestAir: 0, safeClock: 0
 };
 let autopilot = null;
 
@@ -1494,6 +1693,10 @@ function loadRace(kind, value) {
     track.name = 'Daily';
     track.author = 32000;
     current = { kind: 'daily', index: 0, track };
+  } else if (kind === 'freeplay') {
+    const seed = Number.isFinite(value) ? (value >>> 0) : ((Math.random() * 0xFFFFFFFF) >>> 0);
+    track = freeplayWorld(seed);
+    current = { kind: 'freeplay', index: 0, seed, track };
   }
   useTrack(track);
 }
@@ -1513,6 +1716,13 @@ function useTrack(track) {
   race.missing = 0;
   race.boostFlash = 0;
   race.thud = 0;
+  race.tricks = 0;
+  race.points = 0;
+  race.air = 0;
+  race.spinDeg = 0;
+  race.flipDeg = 0;
+  race.bestAir = 0;
+  race.safeClock = 0;
   const best = saved.best[track.id];
   // Ghosts only line up if the track still looks the way it did on that day.
   const alive = best && Number.isFinite(best.ms) && (!best.layout || best.layout === layoutOf(track.blocks));
@@ -1522,7 +1732,8 @@ function useTrack(track) {
   rebuildRender();
   paintBest();
   paintMedals();
-  $('barTrack').textContent = track.name + ' · ' + track.blocks.length + ' blocks';
+  $('barTrack').textContent = track.name + ' · ' +
+    (isFreeplay() ? 'open world' : track.blocks.length + ' blocks');
   $('btnMenu').hidden = false;
   setScreens();
   showMessage('press W to start', 4);
@@ -1537,7 +1748,64 @@ function respawnCar() {
   car.grounded = true;
   car.airTime = 0;
   car.boost = 0;
+  if (isFreeplay()) {
+    race.air = 0;
+    race.spinDeg = 0;
+    race.flipDeg = 0;
+    race.safeClock = 1.2;
+  }
   showMessage('respawn', 0.8);
+}
+
+// Signed rotation from one heading to another around an axis, in radians.
+function signedAngle(from, to, axis) {
+  return Math.atan2(dot(cross(from, to), axis), dot(from, to));
+}
+
+/* Freeplay is about the air. Every jump is measured — how long the wheels were
+   off the road, how far the car spun or flipped — so a crest becomes a trick
+   instead of a wobble, and the last patch of road is remembered for respawns. */
+function trackTricks(dt, wasGrounded, fPrev, uPrev) {
+  if (car.grounded) {
+    if (!wasGrounded && race.air > 0.32) {
+      const spin = Math.abs(race.spinDeg), flip = Math.abs(race.flipDeg);
+      const points = Math.round(race.air * 12) + Math.floor(spin / 90) * 6 + Math.floor(flip / 90) * 8;
+      let name = 'AIR';
+      if (spin >= 250 && flip >= 250) name = 'CORK';
+      else if (flip >= 250) name = 'FLIP';
+      else if (spin >= 250) name = 'SPIN';
+      else if (race.air >= 1.4) name = 'BIG AIR';
+      if (points >= 4) {
+        race.tricks += 1;
+        race.points += points;
+        race.bestAir = Math.max(race.bestAir, race.air);
+        showMessage(name + ' +' + points, 1.1);
+        blip(520 + Math.min(420, points * 8), 0.12, 0.1, 'triangle');
+        paintBest();
+      }
+    }
+    race.air = 0;
+    race.spinDeg = 0;
+    race.flipDeg = 0;
+  } else {
+    race.air += dt;
+    const yaw = signedAngle(fPrev, car.f, uPrev) * 180 / Math.PI;
+    const pitch = signedAngle(fPrev, car.f, norm(cross(uPrev, fPrev))) * 180 / Math.PI;
+    if (Math.abs(yaw) > 0.6) race.spinDeg += yaw;
+    if (Math.abs(pitch) > 0.6) race.flipDeg += pitch;
+  }
+  // Remember the last bit of road we were happy on: a fall puts us back there
+  // instead of back at the grid, which is what makes the park worth wandering.
+  race.safeClock -= dt;
+  if (car.grounded && race.air < 0.05 && vlen(car.v) > 3 && race.safeClock <= 0) {
+    race.safeClock = 0.7;
+    race.respawn = {
+      p: madd(car.p, car.u, -CAR.ride),
+      x: norm(cross(car.u, car.f)),
+      y: car.u.slice(),
+      z: car.f.slice()
+    };
+  }
 }
 
 function insideZone(frame, hw, halfLen, point) {
@@ -1606,7 +1874,10 @@ function stepRace(dt, override) {
       if (insideZone(zone.frame, zone.hw, zone.halfLen, car.p)) surfaceGrip = zone.grip || surfaceGrip;
     }
     car.grip = surfaceGrip;
+    const wasGrounded = car.grounded;
+    const fPrev = car.f.slice(), uPrev = car.u.slice();
     stepCar(car, input, dt, world.mesh);
+    if (isFreeplay()) trackTricks(dt, wasGrounded, fPrev, uPrev);
 
     // A thud when the hitbox meets a wall hard enough to matter.
     race.thud = Math.max(0, (race.thud || 0) - dt);
@@ -1643,7 +1914,7 @@ function stepRace(dt, override) {
         }
       }
       // ghost sampling at 20 Hz is plenty for a smooth playback and a small record
-      if (race.t - race.recordClock >= 0.05) {
+      if (!isFreeplay() && race.t - race.recordClock >= 0.05) {
         race.recordClock = race.t;
         race.record.push([race.t, car.p[0], car.p[1], car.p[2],
           car.f[0], car.f[1], car.f[2], car.u[0], car.u[1], car.u[2]]);
@@ -1652,7 +1923,7 @@ function stepRace(dt, override) {
       if (car.p[1] < GROUND_Y - 0.5) {
         showMessage('off track', 0.8);
         respawnCar();
-      } else if (car.airTime > 4.5) {
+      } else if (car.airTime > (isFreeplay() ? 9 : 4.5)) {
         respawnCar();
       }
     }
@@ -1928,6 +2199,11 @@ function paintSplit(index, msMine) {
 }
 
 function paintBest() {
+  if (isFreeplay()) {
+    $('hudBest').textContent = 'BEST AIR ' + (race.bestAir || 0).toFixed(2) + 's';
+    $('hudDelta').textContent = '';
+    return;
+  }
   $('hudBest').textContent = race.best ? 'BEST ' + clock(race.best.ms) : 'BEST —';
   if (race.state === 'finished' && race.previousBest) {
     const diff = Math.round(race.finishedAt * 1000) - race.previousBest;
@@ -1943,6 +2219,9 @@ function paintMedals() {
   const rail = $('medalRail');
   if (!rail || !world) return;
   rail.replaceChildren();
+  // A freeplay park has no author time, so medals would all read 0.000.
+  rail.hidden = isFreeplay();
+  if (isFreeplay()) return;
   for (const medal of medalTimes(world.author)) {
     const row = el('div', 'm ' + medal.id);
     row.appendChild(el('span', '', clock(medal.ms)));
@@ -1954,8 +2233,19 @@ function paintMedals() {
 function paintHud() {
   if (!car) return;
   $('hudTime').textContent = race.state === 'finished' ? clock((race.finishedAt || 0) * 1000) : clock(race.t * 1000);
-  $('hudCP').textContent = 'CP ' + race.cp + ' / ' + race.cpTotal;
   $('hudKmh').textContent = Math.round(vlen(car.v) * 3.6);
+  if (isFreeplay()) {
+    $('hudCP').textContent = 'TRICKS ' + race.tricks + ' · ' + race.points + ' PTS';
+    const spin = Math.abs(race.spinDeg), flip = Math.abs(race.flipDeg);
+    const live = car.grounded ? '' : 'AIR ' + race.air.toFixed(1) + 's · ' +
+      (flip >= spin ? 'FLIP ' : 'SPIN ') + Math.round(Math.max(spin, flip)) + '°';
+    $('hudTrick').textContent = live;
+    $('hudTrick').className = live ? 'show' : '';
+    return;
+  }
+  $('hudCP').textContent = 'CP ' + race.cp + ' / ' + race.cpTotal;
+  $('hudTrick').textContent = '';
+  $('hudTrick').className = '';
 }
 
 /* ── screens ──────────────────────────────────────────────────────────────── */
@@ -1968,6 +2258,7 @@ function setScreens() {
   $('screenResult').hidden = !(mode === 'race' && race.state === 'finished');
   $('hud').hidden = mode !== 'race';
   $('btnMenu').hidden = mode !== 'race';
+  $('pauseNewPark').hidden = !isFreeplay();
 }
 
 function el(tag, className, text) {
@@ -2052,8 +2343,16 @@ function startDaily() {
   loadRace('daily');
   setScreens();
 }
+function startFreeplay(seed) {
+  mode = 'race';
+  paused = false;
+  const value = Number.isFinite(seed) ? seed : ((Math.random() * 0xFFFFFFFF) >>> 0);
+  loadRace('freeplay', value);
+  setScreens();
+}
 function restartRace() {
   if (current.kind === 'campaign') loadRace('campaign', current.index);
+  else if (current.kind === 'freeplay') loadRace('freeplay', current.seed);
   else loadRace('daily');
   paused = false;
   setScreens();
@@ -2154,6 +2453,9 @@ window.__boredSnapshot = () => ({
   seconds: race.state === 'finished' && race.finishedAt ? Math.round(race.finishedAt) : 0,
   track: world ? String(world.id) : '',
   daily: !!(world && world.id === 'daily'),
+  freeplay: isFreeplay(),
+  tricks: race.tricks | 0,
+  airMs: Math.round((race.bestAir || 0) * 1000),
   checkpoints: race.cp,
   checkpointTotal: race.cpTotal
 });
@@ -2181,6 +2483,14 @@ for (const pad of document.querySelectorAll('[data-drive]')) {
 
 $('btnMenu').addEventListener('click', () => openMenu());
 $('btnDaily').addEventListener('click', () => startDaily());
+$('btnFreeplay').addEventListener('click', () => startFreeplay());
+$('pauseNewPark').addEventListener('click', () => {
+  if (!isFreeplay()) return;
+  mode = 'race';
+  paused = false;
+  loadRace('freeplay', (Math.random() * 0xFFFFFFFF) >>> 0);
+  setScreens();
+});
 $('pauseResume').addEventListener('click', () => togglePause());
 $('pauseRestart').addEventListener('click', () => restartRace());
 $('pauseGhost').addEventListener('click', () => {
@@ -2214,6 +2524,7 @@ window.__test = {
   layoutOf,
   snapshot: () => window.__boredSnapshot(),
   startCampaign, startDaily, loadRace, restartRace, respawnCar, useTrack,
+  startFreeplay, freeplayWorld, parkHeight, isFreeplay, trackTricks, signedAngle,
   openMenu, toggleMute,
   render: () => { updateCamera(1 / 60); drawScene(1 / 60); }
 };

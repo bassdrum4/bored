@@ -407,3 +407,45 @@ test('Trackbound respawn puts the car back on the last checkpoint', () => {
   const toSpawn = Math.hypot(car.p[0] - T.world().spawn.p[0], car.p[1] - T.world().spawn.p[1], car.p[2] - T.world().spawn.p[2]);
   assert.ok(toCheckpoint < 30 || toSpawn < 30, 'it respawned at a checkpoint or the start');
 });
+
+test('Trackbound freeplay is an open procedural world, not a ribbon', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const world = T.freeplayWorld(4242);
+  assert.equal(world.finish, null, 'no finish line out here');
+  assert.equal(world.checkpoints.length, 0, 'no checkpoints');
+  assert.equal(world.chain.length, 0, 'no road ribbon');
+  assert.equal(world.blocks.length, 0, 'no blocks');
+  assert.ok(world.mesh.tris.length > 6000, 'the ground is a real surface');
+  assert.ok(world.ramps >= 6, 'the world has kickers to launch off (' + world.ramps + ')');
+  assert.equal(T.freeplayWorld(4242).mesh.tris.length, world.mesh.tris.length, 'the seed decides the world');
+  assert.notEqual(T.parkHeight(40, 40, 4242), T.parkHeight(40, 40, 99), 'another seed is another landscape');
+
+  const spawn = world.spawn.p;
+  const floor = T.raycast(world.mesh, [spawn[0], spawn[1] + 6, spawn[2]], [0, -1, 0], 14);
+  assert.ok(floor, 'there is ground under the spawn');
+  assert.ok(floor.n[1] > 0.7, 'the spawn is on drivable ground');
+
+  T.startFreeplay(4242);
+  const start = T.car().p.slice();
+  for (let step = 0; step < 120 * 6; step++) T.stepRace(1 / 120, { gas: true });
+  assert.equal(T.race.state, 'running', 'freeplay keeps running');
+  assert.equal(page.sandbox.__boredSnapshot().freeplay, true);
+  assert.equal(page.sandbox.__boredSnapshot().finished, false);
+  assert.ok(Math.hypot(T.car().p[0] - start[0], T.car().p[2] - start[2]) > 20, 'the car drove away');
+  assert.ok(T.car().p[1] > -20, 'it stayed in the world');
+});
+
+test('Trackbound lets the car leave the ground when the road drops away', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  // Flat, then a 24 degree drop: the crest has to be a launch, not glue.
+  T.useTrack(T.buildTrack(['start', 'sprint', 'straight', 'straight', 'down', 'straight', 'finish'],
+    { id: 'crest', name: 'Crest', author: 9000 }));
+  let air = 0;
+  for (let step = 0; step < 120 * 6; step++) {
+    T.stepRace(1 / 120, { gas: true });
+    air = Math.max(air, T.car().airTime);
+  }
+  assert.ok(air > 0.08, 'the crest threw the car (' + air.toFixed(2) + 's)');
+});

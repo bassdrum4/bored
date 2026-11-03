@@ -74,7 +74,7 @@
   .stat { display: flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 12px; color: var(--ink-2) }
   .stat b { font-family: var(--font-data); font-size: 13px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums }
   .bar-right { display: flex; align-items: center; gap: 6px; margin-left: auto }
-  .bar-right .btn { padding: 5px 8px; font-size: 12px }
+  .bar-right .btn { padding: 5px 8px; font-size: 12px; white-space: nowrap }
   #turn-readout { font-size: 11px; white-space: nowrap }
   #stage { position: relative; overflow: hidden; background: var(--paper); min-width: 0 }
   #map { display: block; width: 100%; height: 100%; cursor: grab; user-select: none; touch-action: none }
@@ -131,13 +131,14 @@
   .row .st { font-family: var(--font-data); font-size: 10.5px; color: var(--ink-3); white-space: nowrap }
 
   /* ── modals ──────────────────────────────────────────────────────────── */
-  #modal-layer { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; padding: 24px; z-index: 20 }
+  #modal-layer { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; padding: 24px; z-index: 35 }
   .modal {
     background: var(--panel); border: 1px solid var(--ink); border-radius: 4px;
     width: min(620px, 94vw); max-height: min(84vh, 760px); display: flex; flex-direction: column;
     box-shadow: 0 18px 40px rgba(36,28,18,.22);
   }
   .modal.narrow { width: min(440px, 94vw) }
+  .modal.wide { width: min(880px, 96vw) }
   .modal-head { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--rule) }
   .modal-head h2 { font-family: var(--font-display); font-size: 17px; font-weight: 600 }
   .modal-head .sub { font-size: 11.5px; color: var(--ink-3); flex: 1 }
@@ -156,6 +157,36 @@
   .standings td { padding: 5px 6px; border-bottom: 1px dotted var(--rule-2); font-variant-numeric: tabular-nums }
   .standings td.n { font-family: var(--font-data); text-align: right }
   .standings th.n { text-align: right }
+  .table-wrap { overflow-x: auto }
+
+  /* ── tech tree and civs ──────────────────────────────────────────────── */
+  .tech-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+  .tech-col { display: flex; flex-direction: column; gap: 6px; min-width: 0 }
+  .tech-col h3 { margin: 0 0 2px !important }
+  .tech {
+    display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%;
+    border: 1px solid var(--rule); border-radius: 3px; padding: 6px 8px; background: var(--panel);
+  }
+  .tech:disabled { color: var(--ink); cursor: default }
+  .tech .tn { font-family: var(--font-display); font-size: 13.5px; font-weight: 600 }
+  .tech .tc { font-family: var(--font-data); font-size: 10.5px; color: var(--ink-3) }
+  .tech .tu { font-size: 11px; color: var(--ink-2); line-height: 1.4 }
+  .tech .tq { font-size: 10.5px; color: var(--rust) }
+  .tech .meter { margin: 3px 0 }
+  .tech.known { background: var(--paper-2); border-color: var(--rule-2) }
+  .tech.known .tn::after { content: " \2713"; color: var(--moss) }
+  .tech.cur { border-color: var(--ink); box-shadow: inset 3px 0 0 var(--moss) }
+  .tech.ready { border-color: var(--ink-3) }
+  .tech.ready:hover:not(:disabled) { border-color: var(--ink); background: var(--panel-hi) }
+  .tech.locked { opacity: .6 }
+  .civ-card { border: 1px solid var(--rule-2); border-radius: 3px; padding: 7px 9px; background: var(--panel-hi); margin-bottom: 4px }
+  .civ-card.taken { border-color: var(--ink-3) }
+  .civ-name { font-family: var(--font-display); font-size: 13.5px; font-weight: 600; display: flex; gap: 6px; align-items: center; flex-wrap: wrap }
+  .civ-line { font-size: 11.5px; color: var(--ink-2); line-height: 1.45; margin-top: 2px }
+  .civ-line b { color: var(--ink); font-weight: 600 }
+  .civ-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px }
+  .stat.link { cursor: pointer; border-bottom: 1px dotted var(--rule) }
+  .stat.link:hover { color: var(--rust) }
 
   /* ── full screens: setup and handoff ─────────────────────────────────── */
   .screen {
@@ -172,9 +203,10 @@
   .lede { font-family: var(--font-display); font-size: 15px; color: var(--ink-2); max-width: 52ch; line-height: 1.55 }
   .seats { display: flex; flex-direction: column; gap: 6px; margin: 18px 0 14px }
   .seat {
-    display: grid; grid-template-columns: 16px minmax(0, 1fr) 110px; gap: 10px; align-items: center;
+    display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, 220px) 92px; gap: 6px 10px; align-items: center;
     border: 1px solid var(--rule); border-radius: 3px; padding: 8px 10px; background: var(--panel);
   }
+  .seat-note { grid-column: 2 / -1; font-size: 11px; color: var(--ink-3); line-height: 1.4 }
   .seat[hidden] { display: none }
   .seat .dot { width: 14px; height: 14px }
   .seat input { width: 100% }
@@ -202,6 +234,8 @@
   .threat { fill: rgba(147,64,29,.2); stroke: rgba(147,64,29,.7); stroke-width: 1; pointer-events: none }
   .worked { fill: rgba(65,96,47,.12); pointer-events: none }
   .sel-ring { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none }
+  .sel-hex { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-dasharray: 3 3; pointer-events: none }
+  .cont { fill: none; stroke: rgba(36,28,18,.42); stroke-width: 1; stroke-dasharray: 2.5 2.5; pointer-events: none }
   .label { font: 10px/1 var(--font-data); pointer-events: none; letter-spacing: .03em }
   #layer-coast, #layer-marks, #layer-border, #layer-sites, #layer-units, #layer-overlay,
   #layer-fog, #layer-labels, #layer-owner { pointer-events: none }
@@ -232,7 +266,93 @@
     .bar-right .btn { padding: 5px 6px }
     #bar { padding: 0 6px }
     .seat { grid-template-columns: 14px minmax(0, 1fr) 92px }
+    .seat select.civ { grid-column: 2 / -1; grid-row: 2 }
+    .tech-grid, .civ-list { grid-template-columns: minmax(0, 1fr) }
   }
+  @media (max-width: 460px) {
+    #turn-readout { display: none }
+    .bar-right { gap: 4px }
+    #btn-tech kbd { display: none }
+  }
+
+  /* ── chrome: map-first stage, instrument bar, bottom dock ──────────────── */
+  #shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr) auto }
+
+  #dock {
+    border-top: 1px solid var(--rule); background: var(--panel); display: grid;
+    grid-template-columns: minmax(0, 1fr) 264px; max-height: 46vh; min-height: 0;
+  }
+
+  #side-scroll { overflow-y: auto; padding: 9px 12px 12px; min-height: 0 }
+
+  #log-wrap { border-left: 1px solid var(--rule); background: var(--log-bg); display: flex; flex-direction: column; min-height: 0 }
+
+  .log-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px 4px;
+    font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+  }
+
+  #log { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 10px }
+
+  .log-row {
+    display: grid; grid-template-columns: 8px 17px minmax(0, 1fr); gap: 5px; align-items: baseline;
+    padding: 3px 0; font-size: 11px; line-height: 1.4; color: var(--ink-2); border-bottom: 1px dotted var(--rule-2);
+  }
+
+  .log-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--rule); align-self: center }
+
+  .log-turn { font-family: var(--font-data); font-size: 9.5px; color: var(--ink-3) }
+
+  .dock-body { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: flex-start }
+
+  .dock-col { min-width: 0; flex: 1 1 210px }
+
+  .dock-label {
+    font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+    margin-bottom: 5px; display: flex; align-items: center; gap: 5px;
+  }
+
+  .dock-empty { font-size: 11.5px; color: var(--ink-3); padding: 2px 0 6px; max-width: 42ch }
+
+  .ring { display: block; overflow: visible }
+
+  .ring-track { fill: none; stroke: var(--rule-2); stroke-width: 3 }
+
+  .ring-fill { fill: none; stroke: currentColor; stroke-width: 3 }
+
+  .inst { display: flex; align-items: center; gap: 5px; color: var(--moss) }
+
+  .inst-dial { position: relative; display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; color: var(--moss) }
+
+  .inst-text { display: flex; flex-direction: column; line-height: 1.05 }
+
+  .inst.needs { color: var(--rust) }
+
+  #inspector {
+    position: absolute; z-index: 6; width: 196px; background: var(--panel);
+    border: 1px solid var(--ink); border-radius: 3px; padding: 7px 8px 8px;
+    box-shadow: 0 6px 16px rgba(36,28,18,.18);
+  }
+
+  .ins-head { display: flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 14px; font-weight: 600 }
+
+  .ins-gauges { display: flex; gap: 9px; margin: 6px 0 5px; align-items: flex-start }
+
+  .ins-gauge { display: flex; flex-direction: column; align-items: center; gap: 1px; color: var(--moss) }
+
+  .ins-acts { display: flex; gap: 4px; flex-wrap: wrap }
+
+  .turn-dial { position: relative; display: grid; place-items: center; width: 26px; height: 26px; color: var(--ink-2) }
+  .dock-col.dock-id { flex: 1 1 230px }
+  @media (max-width: 900px) {
+    #dock { grid-template-columns: minmax(0, 1fr); max-height: 52vh }
+    #log-wrap { display: none }
+    .dock-col { flex: 1 1 100% }
+  }
+  @media (max-width: 620px) {
+    #inspector { width: 168px }
+  }
+
 </style>
 </head>
 <body>
@@ -247,6 +367,7 @@
     <div id="stats"></div>
     <div class="bar-right">
       <span id="turn-readout" class="mono faint"></span>
+      <button class="btn" id="btn-tech" type="button" data-act="tech">Tech<kbd>T</kbd></button>
       <button class="btn" id="btn-council" type="button" data-act="council">Council<kbd>D</kbd></button>
       <button class="btn" id="btn-menu" type="button" data-act="menu">Menu</button>
       <button class="btn primary" id="btn-end" type="button" data-act="end">End turn<kbd>space</kbd></button>
@@ -272,10 +393,14 @@
       <button type="button" data-act="zoom-out" aria-label="Zoom out">&minus;</button>
       <button type="button" data-act="zoom-fit" aria-label="Fit the map">&#9633;</button>
     </div>
+    <div id="inspector" hidden></div>
   </main>
-  <aside id="side">
+  <aside id="dock">
     <div id="side-scroll"></div>
-    <div id="log"></div>
+    <div id="log-wrap">
+      <div class="log-head"><span>History</span><button class="chip" type="button" id="log-toggle">All</button></div>
+      <div id="log"></div>
+    </div>
   </aside>
 </div>
 
@@ -296,7 +421,7 @@
   <div class="start-inner">
     <p class="eyebrow">a hex strategy game for friends</p>
     <h1>Civ Lite</h1>
-    <p class="lede">Found cities, grow them, and fight over a random map. Pass one device around, add CPU players if you're short a friend, and capture every capital or lead on score when the turns run out.</p>
+    <p class="lede">Pick a civ, found cities, research a tech tree, and fight over a random map. Pass one device around, add CPU players if you're short a friend, and capture every capital or lead on score when the turns run out.</p>
     <div class="seats" id="seats"></div>
     <div class="start-row">
       <label class="field" for="opt-players">Players
@@ -305,6 +430,9 @@
           <option value="3">3</option>
           <option value="4">4</option>
         </select>
+      </label>
+      <label class="field" for="opt-map">Map
+        <select id="opt-map"></select>
       </label>
       <label class="field" for="opt-turns">Turn limit
         <select id="opt-turns">
@@ -315,20 +443,23 @@
         </select>
       </label>
     </div>
+    <p class="fine" id="map-note"></p>
     <div class="start-row" style="margin-top:12px">
       <button class="btn primary" id="btn-begin" type="button">Start game</button>
+      <button class="btn" id="btn-civs" type="button" data-act="civs">See all 16 civs</button>
       <button class="btn" id="btn-continue" type="button" hidden>Continue saved game</button>
     </div>
-    <p class="fine" id="start-note">Everyone starts with a settler and a warrior. The map is new every game. <b>Space</b> ends your turn, <b>N</b> jumps to the next unit that needs orders, and <b>H</b> opens the rules.</p>
+    <p class="fine" id="start-note">Everyone starts with a settler and a warrior, at peace. No two players share a civ. <b>Space</b> ends your turn, <b>N</b> jumps to the next unit that needs orders, <b>T</b> opens the tech tree, and <b>H</b> opens the rules.</p>
   </div>
 </div>
 <script>
 "use strict";
 /* ───────────────────────────────────────────────────────────────────────────
-   Civ Lite: a pass-and-play hex strategy game for 2 to 4 players.
+   Civ Lite v2: a pass-and-play hex strategy game for 2 to 4 players.
    Built on Ashcrown's hex grid, noise map generator, SVG board and interface.
    The rules follow the Civ Lite design doc: per-city food and production,
-   100 HP units, Civ-style combat, builders, war and peace, fog of war.
+   a 15-tech tree paid for with production, horse and iron stockpiles, ships,
+   16 civs, 4 map types with named continents, Civ-style combat, fog of war.
    Everything lives in this one file: no fonts, images or network calls.
    ─────────────────────────────────────────────────────────────────────────── */
 
@@ -425,43 +556,163 @@ const FEATURES = {
   iron:    { name: 'Iron',    food: 0, prod: 1, strategic: true }
 };
 
+// Terrace farms and stepwells work out their yields in tileYield.
 const IMPROVEMENTS = {
-  farm:    { name: 'Farm',          food: 1, prod: 0, ok: t => t.t === 'flat' && (!t.f || t.f === 'wheat') },
-  mine:    { name: 'Mine',          food: 0, prod: 1, ok: t => (t.t === 'hill' && !t.f) || t.f === 'iron' },
-  pasture: { name: 'Pasture',       food: 0, prod: 1, ok: t => t.f === 'horses' },
-  boats:   { name: 'Fishing boats', food: 1, prod: 0, ok: t => t.f === 'seafood' }
+  farm:     { name: 'Farm',          food: 1, ok: t => t.t === 'flat' && (!t.f || t.f === 'wheat') },
+  mine:     { name: 'Mine',          prod: 1, tech: 'mining', ok: t => (t.t === 'hill' && !t.f) || t.f === 'iron' },
+  pasture:  { name: 'Pasture',       prod: 1, tech: 'husbandry', ok: t => t.f === 'horses' },
+  boats:    { name: 'Fishing boats', food: 1, tech: 'sailing', ok: t => t.f === 'seafood' },
+  terrace:  { name: 'Terrace farm',  civ: 'inca', ok: t => t.t === 'mount',
+              blurb: '+2 food, and +1 more for each touching mountain, up to +2.' },
+  stepwell: { name: 'Stepwell',      civ: 'india', ok: t => t.t === 'flat' && (!t.f || t.f === 'wheat'),
+              blurb: '+1 food, and +1 more next to a farm.' },
+  polder:   { name: 'Polder',        civ: 'dutch', food: 1, prod: 1, ok: t => t.t === 'shallow',
+              blurb: '+1 food and +1 production on shallow water.' }
 };
+
+// Techs cost production by era. Future Tech repeats after the last one.
+const TECH_COST = { 1: 30, 2: 70, 3: 120 };
+const TECHS = {
+  mining:       { name: 'Mining',           era: 1, needs: [] },
+  husbandry:    { name: 'Animal Husbandry', era: 1, needs: [] },
+  pottery:      { name: 'Pottery',          era: 1, needs: [] },
+  archery:      { name: 'Archery',          era: 1, needs: [] },
+  sailing:      { name: 'Sailing',          era: 1, needs: [] },
+  bronze:       { name: 'Bronze Working',   era: 2, needs: ['mining'] },
+  masonry:      { name: 'Masonry',          era: 2, needs: ['mining'] },
+  riding:       { name: 'Horseback Riding', era: 2, needs: ['husbandry'] },
+  writing:      { name: 'Writing',          era: 2, needs: ['pottery'] },
+  ironworking:  { name: 'Iron Working',     era: 3, needs: ['bronze'] },
+  construction: { name: 'Construction',     era: 3, needs: ['masonry'] },
+  stirrups:     { name: 'Stirrups',         era: 3, needs: ['riding', 'bronze'] },
+  math:         { name: 'Mathematics',      era: 3, needs: ['writing', 'archery'] },
+  shipbuilding: { name: 'Shipbuilding',     era: 3, needs: ['sailing', 'bronze'] },
+  navigation:   { name: 'Navigation',       era: 3, needs: ['sailing', 'writing'],
+                  blurb: 'Every unit can enter deep sea, settlers and builders included' }
+};
+const TECH_ORDER = Object.keys(TECHS);
+const FUTURE = { name: 'Future Tech', cost: 150, points: 4 };
 
 const UNITS = {
   settler:   { name: 'Settler',   kind: 'civ',    cost: 40, move: 2, founds: true,
                blurb: 'Founds a city. Costs 1 pop, so the city must be pop 2 or more.' },
   builder:   { name: 'Builder',   kind: 'civ',    cost: 25, move: 2, charges: 3,
                blurb: 'Improves tiles inside your borders. 3 charges, each one instant.' },
-  warrior:   { name: 'Warrior',   kind: 'melee',  str: 20, cost: 20, move: 2,
+  scout:     { name: 'Scout',     kind: 'recon',  era: 1, str: 10, cost: 15, move: 3, sight: 3, rough: true, noCapture: true,
+               blurb: 'Sees 3 hexes. Hills and forest cost it 1 move. Can’t take cities.' },
+  warrior:   { name: 'Warrior',   kind: 'melee',  era: 1, str: 20, cost: 20, move: 2,
                blurb: 'Cheap and early.' },
-  spearman:  { name: 'Spearman',  kind: 'melee',  str: 25, cost: 30, move: 2, vsHorse: 10,
-               blurb: '+10 strength against horsemen.' },
-  swordsman: { name: 'Swordsman', kind: 'melee',  str: 35, cost: 45, move: 2, needs: 'iron',
-               blurb: 'Needs a mine on iron inside the city’s borders.' },
-  horseman:  { name: 'Horseman',  kind: 'melee',  str: 36, cost: 40, move: 4, needs: 'horses',
-               blurb: 'Needs a pasture on horses inside the city’s borders.' },
-  archer:    { name: 'Archer',    kind: 'ranged', str: 15, rs: 25, range: 2, cost: 30, move: 2,
+  spearman:  { name: 'Spearman',  kind: 'melee',  era: 2, str: 25, cost: 30, move: 2, tech: 'bronze', vsHorse: 10,
+               blurb: '+10 strength against horse units.' },
+  archer:    { name: 'Archer',    kind: 'ranged', era: 1, str: 15, rs: 25, range: 2, cost: 30, move: 2, tech: 'archery',
                blurb: 'Shoots from 2 hexes and takes no damage back. Weak in melee.' },
-  catapult:  { name: 'Catapult',  kind: 'siege',  str: 23, rs: 35, range: 2, cost: 60, move: 2, vsUnits: -15,
-               blurb: 'Built for cities: −15 when shooting units.' }
+  horseman:  { name: 'Horseman',  kind: 'melee',  era: 2, str: 36, cost: 40, move: 4, tech: 'riding', horse: true, res: { horses: 10 },
+               blurb: 'Fast. Takes 10 horses from your stockpile when it finishes.' },
+  swordsman: { name: 'Swordsman', kind: 'melee',  era: 3, str: 35, cost: 45, move: 2, tech: 'ironworking', res: { iron: 10 },
+               blurb: 'Takes 10 iron from your stockpile when it finishes.' },
+  heavy:     { name: 'Heavy horseman', kind: 'melee', era: 3, str: 44, cost: 60, move: 3, tech: 'stirrups', horse: true,
+               res: { horses: 10, iron: 10 }, blurb: 'Takes 10 horses and 10 iron when it finishes.' },
+  catapult:  { name: 'Catapult',  kind: 'siege',  era: 3, str: 23, rs: 35, range: 2, cost: 60, move: 2, tech: 'math', vsUnits: -15,
+               blurb: 'Built for cities: −15 when shooting units.' },
+  galley:    { name: 'Galley',    kind: 'melee',  naval: true, era: 1, str: 30, cost: 35, move: 3, tech: 'sailing',
+               blurb: 'Coastal cities only. Stays on water, hits anything next to it, and can take coastal cities.' },
+  warship:   { name: 'Warship',   kind: 'ranged', naval: true, era: 3, str: 20, rs: 25, range: 1, cost: 60, move: 3,
+               tech: 'shipbuilding', res: { iron: 10 }, blurb: 'Coastal cities only. Shoots anything next to the water. Takes 10 iron.' }
 };
-const UNIT_ORDER = ['settler', 'builder', 'warrior', 'spearman', 'archer', 'horseman', 'swordsman', 'catapult'];
+// Each civ's unique unit copies the unit it replaces (same tech and cost) and
+// changes what the design doc says it changes.
+function variant(base, civ, extra) {
+  return Object.assign({}, UNITS[base], { civ, replaces: base, icon: UNITS[base].icon || base }, extra);
+}
+UNITS.terracotta = variant('warrior', 'qin', { name: 'Terracotta Warrior', str: 22, noFood: true,
+  blurb: 'Replaces the warrior. 22 strength, and it eats no food.' });
+UNITS.ironclad = variant('warship', 'uk', { name: 'Ironclad', str: 30, rs: 30, range: 2,
+  blurb: 'Replaces the warship. 30 strength, 30 ranged, range 2. Takes 10 iron.' });
+UNITS.longship = variant('galley', 'norway', { name: 'Longship', move: 4, seaHeal: 20,
+  blurb: 'Replaces the galley. 4 moves, and it heals 20 HP a turn on water when it doesn’t attack.' });
+UNITS.pioneer = variant('settler', 'usa', { name: 'Pioneer', move: 3,
+  blurb: 'Replaces the settler. 3 moves.' });
+UNITS.legion = variant('swordsman', 'rome', { name: 'Legion', charges: 1,
+  blurb: 'Replaces the swordsman. Can build one improvement like a builder. Takes 10 iron.' });
+UNITS.keshig = variant('horseman', 'mongol', { name: 'Keshig', kind: 'ranged', str: 25, rs: 25, range: 2, move: 3,
+  blurb: 'Replaces the horseman. Horse archer: 25 ranged, range 2. Takes 10 horses.' });
+UNITS.chariot = variant('archer', 'egypt', { name: 'Chariot Archer', move: 3,
+  blurb: 'Replaces the archer. 3 moves.' });
+UNITS.impi = variant('spearman', 'zulu', { name: 'Impi', str: 30,
+  blurb: 'Replaces the spearman. 30 strength, +10 against horse units.' });
+UNITS.samurai = variant('swordsman', 'japan', { name: 'Samurai', hurtBonus: 10,
+  blurb: 'Replaces the swordsman. +10 strength while under 50 HP. Takes 10 iron.' });
+UNITS.bombard = variant('catapult', 'ottoman', { name: 'Great Bombard', rs: 40,
+  blurb: 'Replaces the catapult. 40 ranged. −15 when shooting units.' });
+UNITS.woodsman = variant('builder', 'celts', { name: 'Woodsman', plants: true,
+  blurb: 'Replaces the builder. Can also plant a forest on empty flat land or hills for 1 charge.' });
+UNITS.nau = variant('galley', 'portugal', { name: 'Nau', str: 35, move: 4,
+  blurb: 'Replaces the galley. 35 strength and 4 moves.' });
+
+const UNIT_ORDER = ['settler', 'builder', 'scout', 'warrior', 'spearman', 'archer', 'horseman', 'swordsman', 'heavy',
+  'catapult', 'galley', 'warship'];
 
 const BUILDINGS = {
-  walls:    { name: 'Walls',    cost: 40, blurb: '+100 city HP, and the city can shoot (25 ranged, range 2).' },
-  granary:  { name: 'Granary',  cost: 30, food: 2, blurb: '+2 food.' },
-  workshop: { name: 'Workshop', cost: 40, prod: 2, blurb: '+2 production.' },
-  barracks: { name: 'Barracks', cost: 40, blurb: 'Military units build 50% faster.' },
-  harbor:   { name: 'Harbor',   cost: 50, coastal: true, blurb: 'Coastal cities only. +1 food on every shallow water tile.' }
+  walls:    { name: 'Walls',    cost: 40, tech: 'masonry', hp: 100, shot: 25,
+              blurb: '+100 city HP, and the city can shoot (25 ranged, range 2).' },
+  castle:   { name: 'Castle',   cost: 40, tech: 'masonry', hp: 150, shot: 30, prod: 2, civ: 'france', replaces: 'walls',
+              blurb: 'Replaces walls. +150 city HP, the city shoots at 30, and +2 production.' },
+  fortress: { name: 'Fortress', cost: 60, tech: 'construction', hp: 100, shot: 30, needsWalls: true,
+              blurb: 'Needs walls. +100 more city HP, and the city shoots at 30.' },
+  granary:  { name: 'Granary',  cost: 30, tech: 'pottery', food: 2, blurb: '+2 food.' },
+  library:  { name: 'Library',  cost: 40, tech: 'writing', research: 2,
+              blurb: '+2 research a turn toward your tech, without using production.' },
+  workshop: { name: 'Workshop', cost: 40, tech: 'construction', blurb: '+1 production per 3 pop.' },
+  barracks: { name: 'Barracks', cost: 40, tech: 'bronze', blurb: 'Land military units cost 25% less here.' },
+  harbor:   { name: 'Harbor',   cost: 40, tech: 'sailing', coastal: true,
+              blurb: 'Coastal cities only. +1 food on every shallow water tile, and ships cost 25% less here.' }
 };
-const PROJECTS = {
-  navigation: { name: 'Navigation', cost: 60, blurb: 'Once per player: your military units can enter deep sea.' }
+const BUILDING_ORDER = ['walls', 'fortress', 'granary', 'library', 'workshop', 'barracks', 'harbor'];
+
+// A city's Research build sends all of its production into the current tech.
+const RESEARCH = { name: 'Research', cost: 0, blurb: 'Put this city’s production into your current tech, every turn.' };
+
+const CIVS = {
+  qin:      { leader: 'Qin Shi Huang', land: 'China', focus: 'Production', unique: 'terracotta',
+              ability: 'Every city gets +1 production per 2 pop.' },
+  uk:       { leader: 'Victoria', land: 'UK', focus: 'Research', unique: 'ironclad',
+              ability: 'Techs cost 25% less.' },
+  inca:     { leader: 'Pachacuti', land: 'Inca', focus: 'Mountains', unique: 'terrace',
+              ability: 'Units cross mountains for 2 moves, and cities claim mountains like normal land.' },
+  norway:   { leader: 'Harald Hardrada', land: 'Norway', focus: 'Naval', unique: 'longship',
+              ability: 'Ships get +5 strength, and land units skip the −10 embark penalty.' },
+  india:    { leader: 'Gandhi', land: 'India', focus: 'Food', unique: 'stepwell',
+              ability: 'Growing costs 10% less food.' },
+  usa:      { leader: 'Teddy Roosevelt', land: 'USA', focus: 'Builders', unique: 'pioneer',
+              ability: 'Builders cost half and get 4 charges, chopping gives 30 production, and farms and mines give +1 more.' },
+  rome:     { leader: 'Julius Caesar', land: 'Rome', focus: 'Expansion', unique: 'legion',
+              ability: 'Settlers don’t cost pop, and new cities start at pop 2 with a free Granary.' },
+  mongol:   { leader: 'Genghis Khan', land: 'Mongolia', focus: 'Cavalry', unique: 'keshig',
+              ability: 'Horse units get +1 move, and pastures give +3 horses a turn.' },
+  egypt:    { leader: 'Cleopatra', land: 'Egypt', focus: 'Buildings', unique: 'chariot',
+              ability: 'Buildings cost half, and each city gets +1 production for every 2 buildings in it.' },
+  zulu:     { leader: 'Shaka', land: 'Zulu', focus: 'Combat', unique: 'impi',
+              ability: 'Military units cost 20% less, and units that win a fight heal 15 HP.' },
+  japan:    { leader: 'Oda Nobunaga', land: 'Japan', focus: 'Coast', unique: 'samurai',
+              ability: 'Shallow water tiles in your borders give +1 production.' },
+  france:   { leader: 'Joan of Arc', land: 'France', focus: 'Defense', unique: 'castle',
+              ability: 'Walls cost half, and cities heal 30 HP a turn instead of 20.' },
+  ottoman:  { leader: 'Mehmed II', land: 'Ottomans', focus: 'Siege', unique: 'bombard',
+              ability: 'Catapults get +5 against cities and build 50% faster.' },
+  dutch:    { leader: 'William of Orange', land: 'Netherlands', focus: 'Water', unique: 'polder',
+              ability: 'Harbors cost half and also give +2 production.' },
+  celts:    { leader: 'Boudica', land: 'Celts', focus: 'Forests', unique: 'woodsman',
+              ability: 'Cities get +1 food for every 2 forest tiles they own, and your units get +5 strength in forest.' },
+  portugal: { leader: 'Henry the Navigator', land: 'Portugal', focus: 'Colonies', unique: 'nau',
+              ability: 'Cities on a different continent from your capital get +3 food and +3 production, and Navigation costs half.' }
 };
+const CIV_ORDER = Object.keys(CIVS);
+const civTitle = id => (CIVS[id] ? CIVS[id].leader + '’s ' + CIVS[id].land : '');
+// The civ's unique, whatever kind of thing it is: { name, blurb }.
+function civUnique(id) {
+  const key = CIVS[id] && CIVS[id].unique;
+  return UNITS[key] || BUILDINGS[key] || IMPROVEMENTS[key] || null;
+}
 
 const SEATS = [
   { name: 'Red',   ink: '#8f3c1a', light: '#c98a62' },
@@ -471,6 +722,12 @@ const SEATS = [
 ];
 
 const MAP_SIZES = { 2: { cols: 20, rows: 14 }, 3: { cols: 24, rows: 16 }, 4: { cols: 28, rows: 18 } };
+const MAP_TYPES = {
+  pangaea:    { name: 'Pangaea',    blurb: 'One big landmass ringed by sea.' },
+  continents: { name: 'Continents', blurb: 'Two landmasses split by deep sea. Crossing takes Navigation.', big: true },
+  islands:    { name: 'Islands',    blurb: 'Many small islands, one per player. Shallow channels are open from turn 1.', big: true },
+  mirror:     { name: 'Mirror',     blurb: 'Both halves of the map are the same, turned around. Fairest with 2 or 4 players.' }
+};
 
 const CITY_NAMES = [
   'Brakenford', 'Ashwell', 'Thornmouth', 'Coldharbour', 'Mirewatch', 'Dunmoor', 'Greyspire',
@@ -480,12 +737,18 @@ const CITY_NAMES = [
   'Marrowgate', 'Yarrow', 'Coldeave', 'Ironbrook', 'Elmspire', 'Hallowfen', 'Redmere',
   'Oxbridge', 'Westholm', 'Gullhaven', 'Highcairn', 'Lowmarch', 'Starling', 'Brightwater'
 ];
+// Named after Earth's ancient supercontinents and lost lands, as Civ 6 does.
+const CONTINENT_NAMES = [
+  'Laurasia', 'Gondwana', 'Rodinia', 'Columbia', 'Kenorland', 'Nuna', 'Vaalbara', 'Pannotia',
+  'Avalonia', 'Baltica', 'Laurentia', 'Zealandia', 'Kalahari', 'Sahul', 'Arctica', 'Atlantica',
+  'Cimmeria', 'Amazonia', 'Kerguelen', 'Lemuria', 'Hyperborea', 'Siberia', 'Congo', 'Ur'
+];
 
 /* ── the game state and how to look things up in it ────────────────────────── */
 
 let G = null;          // the game in progress (saved whole)
 let UI = null;         // element references, filled in by boot()
-let selection = null;  // { kind: 'unit' | 'city', id }
+let selection = null;  // { kind: 'unit' | 'city' | 'tile', id } (tiles carry x and y)
 let reachable = null;  // Map "x,y" -> movement spent, for the selected unit
 let VIS = null;        // what the current viewer can see right now (not saved)
 
@@ -497,68 +760,110 @@ const cityById = id => G.cities.find(c => c.id === id) || null;
 const cityAt = (x, y) => G.cities.find(c => c.x === x && c.y === y) || null;
 const unitsAt = (x, y) => G.units.filter(u => u.x === x && u.y === y);
 const isMil = type => UNITS[type].kind !== 'civ';
+const isNaval = type => !!UNITS[type].naval;
 const shoots = type => !!UNITS[type].rs;
+const iconOf = type => (UNITS[type] && UNITS[type].icon) || type;
 const milAt = (x, y) => G.units.find(u => u.x === x && u.y === y && isMil(u.type)) || null;
 const civAt = (x, y) => G.units.find(u => u.x === x && u.y === y && !isMil(u.type)) || null;
 const ownCities = i => G.cities.filter(c => c.owner === i);
 const ownUnits = i => G.units.filter(u => u.owner === i);
 const atWar = (a, b) => a !== b && a !== null && b !== null && G.dip[a][b] === 'war';
-const isEmbarked = u => !!TERRAIN[tileAt(u.x, u.y).t].water;
+const isEmbarked = u => !isNaval(u.type) && !!TERRAIN[tileAt(u.x, u.y).t].water;
 const isCoastal = c => neighbourList(c.x, c.y).some(([x, y]) => {
   const t = tileAt(x, y);
   return t && TERRAIN[t.t].water;
 });
 const visibleTo = (x, y) => !VIS || !!VIS[y * G.cols + x];
 const seenBy = (i, x, y) => !!G.seen[i][y * G.cols + x];
+
+const civOf = i => (pl(i) ? pl(i).civ : null);
+const civIs = (i, id) => civOf(i) === id;
+const hasTech = (i, id) => !!pl(i) && pl(i).techs.includes(id);
+const hasWalls = c => c.buildings.includes('walls') || c.buildings.includes('castle');
+// The player's own version of a base unit or building, when their civ replaces it.
+function unitFor(i, base) {
+  const civ = civOf(i);
+  for (const id in UNITS) if (UNITS[id].replaces === base && UNITS[id].civ === civ) return id;
+  return base;
+}
+function buildingFor(i, base) {
+  const civ = civOf(i);
+  for (const id in BUILDINGS) if (BUILDINGS[id].replaces === base && BUILDINGS[id].civ === civ) return id;
+  return base;
+}
+const continentName = t => (t && t.k >= 0 && G.conts[t.k]) || '';
 /* ── map generation ────────────────────────────────────────────────────────── */
 
 function quantile(values, q) {
-  const sorted = values.slice().sort((a, b) => a - b);
+  const sorted = Array.from(values).sort((a, b) => a - b);
   return sorted[clamp(Math.round(q * (sorted.length - 1)), 0, sorted.length - 1)];
 }
 
-// Ashcrown's noise generator with Civ Lite's five terrains. Elevation falls off
-// toward the edges so every map is one big landmass ringed by sea, with lakes,
-// bays and the odd offshore island.
-function buildTerrain(seed, cols, rows) {
-  const elevation = [], moisture = [];
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      const dx = (x / (cols - 1) - 0.5) * 2, dy = (y / (rows - 1) - 0.5) * 2;
-      const edge = Math.pow(Math.max(Math.abs(dx), Math.abs(dy)), 3) * 0.42 + (dx * dx + dy * dy) * 0.08;
-      elevation.push(fbm(x, y, seed, 5.2, 3) - edge);
-      moisture.push(fbm(x + 31, y + 17, seed ^ 0x5bf03635, 3.6, 3));
-    }
-  }
-  const seaLine = quantile(elevation, 0.34);
-  const hillLine = quantile(elevation, 0.80);
-  const peakLine = quantile(elevation, 0.935);
-  const landMoist = moisture.filter((m, i) => elevation[i] >= seaLine && elevation[i] <= peakLine);
-  const woodLine = quantile(landMoist, 0.64);
+function mapSize(count, type) {
+  const s = MAP_SIZES[count] || MAP_SIZES[2];
+  if (!MAP_TYPES[type] || !MAP_TYPES[type].big) return { cols: s.cols, rows: s.rows };
+  // About 20% more tiles for the water maps.
+  return { cols: Math.round(s.cols * 1.095), rows: Math.round(s.rows * 1.095) };
+}
 
+function blankTiles(cols, rows) {
   const tiles = [];
   for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) tiles.push({ x, y, t: 'deep', f: null, imp: null, owner: null, city: null, k: -1 });
+  }
+  return tiles;
+}
+
+// Ashcrown's noise with an edge falloff: shape(x, y) says how far the ground
+// sinks at that spot, so land gathers where shape is small.
+function noiseFields(seed, cols, rows, shape) {
+  const elevation = new Float64Array(cols * rows), moisture = new Float64Array(cols * rows);
+  for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      const i = y * cols + x, e = elevation[i];
-      let t = 'flat';
-      if (e < seaLine) t = 'deep';
-      else if (e > peakLine) t = 'mount';
-      else if (e > hillLine) t = 'hill';
-      const f = (t === 'flat' || t === 'hill') && moisture[i] > woodLine ? 'forest' : null;
-      tiles.push({ x, y, t, f, imp: null, owner: null, city: null });
+      elevation[y * cols + x] = fbm(x, y, seed, 5.2, 3) - shape(x, y);
+      moisture[y * cols + x] = fbm(x + 31, y + 17, seed ^ 0x5bf03635, 3.6, 3);
     }
   }
+  return { elevation, moisture };
+}
+function falloff(dx, dy) {
+  return Math.pow(Math.max(Math.abs(dx), Math.abs(dy)), 3) * 0.42 + (dx * dx + dy * dy) * 0.08;
+}
 
-  // Water next to land is shallow; open sea is deep. Small lakes come out
-  // shallow because every lake tile touches land.
+// The top `share` of the allowed tiles by elevation become land. Of that land,
+// the top 30% are hills or mountains and the top 10% mountains; the wettest
+// 36% of the rest grows forest.
+function raiseLand(tiles, fields, share, allowed, peakShare) {
+  const idx = [];
+  for (let i = 0; i < tiles.length; i++) if (!allowed || allowed[i]) idx.push(i);
+  const elev = idx.map(i => fields.elevation[i]);
+  const seaLine = quantile(elev, 1 - share);
+  const land = idx.filter(i => fields.elevation[i] >= seaLine);
+  const landElev = land.map(i => fields.elevation[i]);
+  const hillLine = quantile(landElev, 0.70);
+  const peakLine = quantile(landElev, 1 - (peakShare === undefined ? 0.10 : peakShare));
+  const wet = land.filter(i => fields.elevation[i] <= peakLine).map(i => fields.moisture[i]);
+  const woodLine = quantile(wet, 0.64);
+  for (const tile of tiles) tile.t = 'deep';
+  for (const i of land) {
+    const tile = tiles[i], e = fields.elevation[i];
+    tile.t = e > peakLine ? 'mount' : e > hillLine ? 'hill' : 'flat';
+    tile.f = (tile.t === 'flat' || tile.t === 'hill') && fields.moisture[i] > woodLine ? 'forest' : null;
+  }
+}
+
+// Water next to land is shallow; open sea is deep. Small lakes come out
+// shallow because every lake tile touches land.
+function shoreUp(tiles, cols, rows) {
   for (const tile of tiles) {
     if (tile.t !== 'deep') continue;
     const touches = neighbourList(tile.x, tile.y).some(([nx, ny]) =>
       nx >= 0 && ny >= 0 && nx < cols && ny < rows && !TERRAIN[tiles[ny * cols + nx].t].water);
     if (touches) tile.t = 'shallow';
   }
+}
 
-  // Bonus and strategic resources.
+function scatterResources(tiles, seed) {
   for (const tile of tiles) {
     if (tile.f) continue;
     const r = hash2(tile.x, tile.y, seed + 991);
@@ -572,12 +877,132 @@ function buildTerrain(seed, cols, rows) {
       if (r < 0.15) tile.f = 'seafood';
     }
   }
-  return tiles;
+}
+
+// The tile at (x, y) turned 180° around the map's centre. With an even number
+// of rows this is an exact point reflection of the hex grid.
+const mirrorIndex = (tiles, i) => tiles.length - 1 - i;
+function mirrorHalf(tiles, fields) {
+  for (let i = 0; i < tiles.length / 2; i++) {
+    const a = tiles[i], b = tiles[mirrorIndex(tiles, i)];
+    for (const k of fields) b[k] = a[k];
+  }
+}
+
+// Pangaea and Mirror: one big landmass ringed by sea, lakes, bays and the odd
+// offshore island. Mirror copies the top half onto the bottom, turned around.
+function landTerrain(seed, cols, rows, mirror) {
+  const tiles = blankTiles(cols, rows);
+  const fields = noiseFields(seed, cols, rows, (x, y) =>
+    falloff((x / (cols - 1) - 0.5) * 2, (y / (rows - 1) - 0.5) * 2));
+  raiseLand(tiles, fields, 0.66, null);
+  if (mirror) mirrorHalf(tiles, ['t', 'f']);
+  shoreUp(tiles, cols, rows);
+  scatterResources(tiles, seed);
+  if (mirror) mirrorHalf(tiles, ['f']);
+  return { tiles };
+}
+
+// Continents: a wandering line down the middle, one hex per row and each
+// touching the next, so nothing slips past it. Everything within 2 hexes of
+// the line stays sea, which leaves at least 3 hexes of deep water between the
+// two landmasses.
+function continentTerrain(seed, cols, rows) {
+  const line = [];
+  let lx = Math.floor(cols / 2);
+  line[0] = lx;
+  for (let y = 1; y < rows; y++) {
+    const want = cols / 2 + (noise(3, y, seed + 77, 4) - 0.5) * cols * 0.2;
+    const options = NEIGHBOURS[(y - 1) & 1].filter(([, dy]) => dy === 1).map(([dx]) => lx + dx)
+      .filter(x => x >= 4 && x <= cols - 5);
+    lx = options.sort((a, b) => Math.abs(a - want) - Math.abs(b - want))[0];
+    if (lx === undefined) lx = line[y - 1];
+    line[y] = lx;
+  }
+  const lineGap = (x, y) => {
+    let best = Infinity;
+    for (let ly = Math.max(0, y - 3); ly <= Math.min(rows - 1, y + 3); ly++) best = Math.min(best, hexDistance(x, y, line[ly], ly));
+    return best;
+  };
+  const tiles = blankTiles(cols, rows);
+  const side = new Int8Array(cols * rows), allowed = new Uint8Array(cols * rows);
+  for (const t of tiles) {
+    const i = t.y * cols + t.x;
+    side[i] = t.x < line[t.y] ? 0 : 1;
+    allowed[i] = lineGap(t.x, t.y) > 2 ? 1 : 0;
+  }
+  // Each half gets its own falloff, so each grows one landmass of its own.
+  const fields = noiseFields(seed, cols, rows, (x, y) => {
+    const mid = line[y];
+    const lo = side[y * cols + x] === 0 ? 0 : mid, hi = side[y * cols + x] === 0 ? mid : cols - 1;
+    const dx = ((x - lo) / Math.max(1, hi - lo) - 0.5) * 2;
+    return falloff(dx, (y / (rows - 1) - 0.5) * 2) * 0.9;
+  });
+  raiseLand(tiles, fields, 0.6, allowed);
+  shoreUp(tiles, cols, rows);
+  scatterResources(tiles, seed);
+  return { tiles, side };
+}
+
+// Islands: islands of 15 to 40 land tiles grown one at a time from scattered
+// seeds, kept at least 2 water hexes apart, until about 35% of the map is land.
+function islandTerrain(seed, cols, rows) {
+  const tiles = blankTiles(cols, rows);
+  const island = new Int32Array(cols * rows).fill(-1);
+  const target = Math.round(0.35 * tiles.length);
+  const near = (x, y, r, test) => {
+    for (let yy = Math.max(0, y - r); yy <= Math.min(rows - 1, y + r); yy++) {
+      for (let xx = Math.max(0, x - r - 1); xx <= Math.min(cols - 1, x + r + 1); xx++) {
+        if (hexDistance(x, y, xx, yy) <= r && test(yy * cols + xx)) return true;
+      }
+    }
+    return false;
+  };
+  let land = 0, id = 0;
+  for (let attempt = 0; attempt < 500 && land < target; attempt++) {
+    const sx = 2 + Math.floor(hash2(attempt, 1, seed) * (cols - 4));
+    const sy = 2 + Math.floor(hash2(attempt, 2, seed) * (rows - 4));
+    if (near(sx, sy, 3, j => island[j] >= 0)) continue;
+    const size = 15 + Math.floor(hash2(attempt, 3, seed) * 26);
+    const grown = [sy * cols + sx];
+    island[grown[0]] = id;
+    const frontier = new Map();
+    const offer = (x, y) => {
+      if (x < 1 || y < 1 || x > cols - 2 || y > rows - 2) return;
+      const j = y * cols + x;
+      if (island[j] >= 0 || frontier.has(j)) return;
+      // Rounder islands: closer tiles come first, with a little noise.
+      frontier.set(j, hexDistance(sx, sy, x, y) + hash2(x, y, seed + id * 31) * 2.2);
+    };
+    for (const [nx, ny] of neighbourList(sx, sy)) offer(nx, ny);
+    while (grown.length < size && frontier.size) {
+      let pick = -1, best = Infinity;
+      for (const [j, v] of frontier) if (v < best) { best = v; pick = j; }
+      frontier.delete(pick);
+      const px = pick % cols, py = Math.floor(pick / cols);
+      if (near(px, py, 2, j => island[j] >= 0 && island[j] !== id)) continue;
+      island[pick] = id;
+      grown.push(pick);
+      for (const [nx, ny] of neighbourList(px, py)) offer(nx, ny);
+    }
+    if (grown.length < 12) {
+      for (const j of grown) island[j] = -1;
+      continue;
+    }
+    land += grown.length;
+    id++;
+  }
+  const fields = noiseFields(seed, cols, rows, () => 0);
+  const allowed = new Uint8Array(cols * rows);
+  for (let i = 0; i < tiles.length; i++) allowed[i] = island[i] >= 0 ? 1 : 0;
+  raiseLand(tiles, fields, 1, allowed, 0.05);
+  shoreUp(tiles, cols, rows);
+  scatterResources(tiles, seed);
+  return { tiles, island, islands: id };
 }
 
 // Land and shallow water a unit can cross without Navigation, grouped into
-// connected regions. Starting spots all come from the biggest one, so nobody
-// needs a boat to reach a rival.
+// connected regions.
 function crossableRegions(tiles, cols, rows) {
   const region = new Int32Array(tiles.length).fill(-1);
   const sizes = [];
@@ -603,6 +1028,50 @@ function crossableRegions(tiles, cols, rows) {
     sizes.push(land);
   }
   return { region, sizes };
+}
+
+// Every map's land splits into named continents, like Civ 6, whether or not
+// water separates them: about one per 40 land tiles and at least 3. Seeds go
+// as far from each other as they can, then each continent grows through land
+// from its seed. Islands no seed's growth reaches join the nearest seed.
+function assignContinents(tiles, cols, rows, seed) {
+  const land = tiles.filter(t => !TERRAIN[t.t].water);
+  if (!land.length) return [];
+  const count = Math.min(CONTINENT_NAMES.length, Math.max(3, Math.round(land.length / 40)));
+  const seeds = [land.slice().sort((a, b) => hash2(a.x, a.y, seed + 5) - hash2(b.x, b.y, seed + 5))[0]];
+  while (seeds.length < count) {
+    let best = null, bestD = -1;
+    for (const t of land) {
+      const d = Math.min(...seeds.map(s => hexDistance(s.x, s.y, t.x, t.y))) + hash2(t.x, t.y, seed + 6) * 0.5;
+      if (d > bestD) { bestD = d; best = t; }
+    }
+    seeds.push(best);
+  }
+  for (const t of tiles) t.k = -1;
+  const queue = [];
+  seeds.forEach((s, id) => { s.k = id; queue.push(s); });
+  for (let head = 0; head < queue.length; head++) {
+    const cur = queue[head];
+    for (const [nx, ny] of neighbourList(cur.x, cur.y)) {
+      if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+      const n = tiles[ny * cols + nx];
+      if (n.k >= 0 || TERRAIN[n.t].water) continue;
+      n.k = cur.k;
+      queue.push(n);
+    }
+  }
+  for (const t of land) {
+    if (t.k >= 0) continue;
+    let best = 0, bestD = Infinity;
+    seeds.forEach((s, id) => { const d = hexDistance(s.x, s.y, t.x, t.y); if (d < bestD) { bestD = d; best = id; } });
+    t.k = best;
+  }
+  const names = CONTINENT_NAMES.slice();
+  for (let i = names.length - 1; i > 0; i--) {
+    const j = Math.floor(hash2(i, 11, seed) * (i + 1));
+    [names[i], names[j]] = [names[j], names[i]];
+  }
+  return names.slice(0, count);
 }
 
 function startScore(tiles, cols, rows, x, y) {
@@ -638,47 +1107,131 @@ function seedStart(tiles, cols, rows, sx, sy, seed) {
   }
 }
 
-function generateWorld(seed, count) {
-  const size = MAP_SIZES[count] || MAP_SIZES[2];
-  // Try a few seeds until the map has room for everyone on one landmass.
-  for (let attempt = 0; attempt < 12; attempt++) {
-    const s = (seed + attempt * 7919) >>> 0;
-    const { cols, rows } = size;
-    const tiles = buildTerrain(s, cols, rows);
-    const { region, sizes } = crossableRegions(tiles, cols, rows);
-    const main = sizes.indexOf(Math.max(...sizes));
-    const candidates = [];
-    for (const t of tiles) {
-      if (region[t.y * cols + t.x] !== main) continue;
-      if (t.x < 2 || t.y < 2 || t.x > cols - 3 || t.y > rows - 3) continue;
-      const score = startScore(tiles, cols, rows, t.x, t.y);
-      if (score > 0 && !t.f) candidates.push({ x: t.x, y: t.y, score });
+// Picks the next start from pool: the spot farthest from the starts already
+// chosen, with a nudge toward continents nobody has yet and toward good land.
+function farthestStart(pool, starts) {
+  let best = null, bestV = -Infinity;
+  for (const c of pool) {
+    if (starts.some(s => s.x === c.x && s.y === c.y)) continue;
+    const gap = starts.length ? Math.min(...starts.map(s => hexDistance(s.x, s.y, c.x, c.y))) : 0;
+    const fresh = starts.length && !starts.some(s => s.k === c.k) ? 3 : 0;
+    const v = gap + fresh + c.score * 0.05;
+    if (v > bestV) { bestV = v; best = c; }
+  }
+  return best;
+}
+function minGap(starts) {
+  let gap = Infinity;
+  for (let a = 0; a < starts.length; a++) {
+    for (let b = a + 1; b < starts.length; b++) gap = Math.min(gap, hexDistance(starts[a].x, starts[a].y, starts[b].x, starts[b].y));
+  }
+  return gap;
+}
+
+// Returns the start spots for this map type, or null when the map can't seat
+// everyone fairly. Each start is { x, y, score, k }.
+function chooseStarts(made, cols, rows, seed, count, type) {
+  const tiles = made.tiles;
+  const { region, sizes } = crossableRegions(tiles, cols, rows);
+  const spot = t => ({ x: t.x, y: t.y, k: t.k, score: startScore(tiles, cols, rows, t.x, t.y) });
+  const usable = tiles.filter(t => !t.f && t.x >= 2 && t.y >= 2 && t.x <= cols - 3 && t.y <= rows - 3)
+    .map(t => Object.assign(spot(t), { i: t.y * cols + t.x })).filter(c => c.score > 0);
+  const rank = list => list.sort((a, b) => b.score - a.score || hash2(a.x, a.y, seed) - hash2(b.x, b.y, seed));
+  const best = (list, share) => rank(list).slice(0, Math.max(count * 6, Math.ceil(list.length * share)));
+
+  if (type === 'islands') {
+    // Each player gets an island of their own, as far apart as they come.
+    const byIsland = new Map();
+    for (const c of usable) {
+      const id = made.island[c.i];
+      if (id < 0) continue;
+      const cur = byIsland.get(id);
+      if (!cur || c.score > cur.score) byIsland.set(id, c);
     }
-    if (candidates.length < count) continue;
-    const minGap = count === 2 ? 8 : 7;
+    const islandSize = id => made.island.reduce((n, v) => n + (v === id ? 1 : 0), 0);
+    const pool = [...byIsland.entries()].filter(([id]) => islandSize(id) >= 18).map(([, c]) => c);
+    if (pool.length < count) return null;
+    const starts = [rank(pool.slice())[0]];
+    while (starts.length < count) starts.push(farthestStart(pool, starts));
+    return minGap(starts) >= 6 ? starts : null;
+  }
+
+  const main = sizes.indexOf(Math.max(...sizes));
+  if (type === 'continents') {
+    // Players alternate between the two landmasses, each on its biggest region.
+    const pools = [0, 1].map(s => {
+      const own = usable.filter(c => made.side[c.i] === s);
+      const counts = new Map();
+      for (const c of own) counts.set(region[c.i], (counts.get(region[c.i]) || 0) + 1);
+      const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+      return top ? best(own.filter(c => region[c.i] === top[0]), 0.6) : [];
+    });
+    if (pools[0].length < Math.ceil(count / 2) || pools[1].length < Math.floor(count / 2)) return null;
+    const starts = [pools[0].reduce((a, c) => (c.x + c.y * 0.3 < a.x + a.y * 0.3 ? c : a), pools[0][0])];
+    while (starts.length < count) starts.push(farthestStart(pools[starts.length % 2], starts));
+    if (starts.some(s => !s)) return null;
+    return minGap(starts) >= (count === 2 ? 8 : 6) ? starts : null;
+  }
+
+  const pool = best(usable.filter(c => region[c.i] === main), 0.6);
+  if (pool.length < count) return null;
+  if (type === 'mirror') {
+    // Starts come in mirrored pairs: one in the top half, its twin turned around.
+    const half = pool.filter(c => c.i < tiles.length / 2);
+    const twin = c => { const t = tiles[mirrorIndex(tiles, c.i)]; return Object.assign(spot(t), { i: mirrorIndex(tiles, c.i), twin: true }); };
+    if (!half.length) return null;
     const starts = [];
-    // First start: a good spot near one end of the land. Then each next start
-    // is the good spot farthest from the ones already chosen.
-    candidates.sort((a, b) => b.score - a.score || hash2(a.x, a.y, s) - hash2(b.x, b.y, s));
-    const pool = candidates.slice(0, Math.max(count * 6, Math.ceil(candidates.length * 0.6)));
-    const anchor = pool.reduce((best, c) => (c.x + c.y * 0.3 < best.x + best.y * 0.3 ? c : best), pool[0]);
-    starts.push(anchor);
-    while (starts.length < count) {
-      let best = null, bestGap = -1;
-      for (const c of pool) {
-        const gap = Math.min(...starts.map(st => hexDistance(st.x, st.y, c.x, c.y)));
-        const value = gap + c.score * 0.05;
-        if (value > bestGap) { bestGap = value; best = c; }
+    const first = half.reduce((a, c) => {
+      const v = hexDistance(c.x, c.y, tiles[mirrorIndex(tiles, c.i)].x, tiles[mirrorIndex(tiles, c.i)].y) + c.score * 0.1;
+      return v > a.v ? { c, v } : a;
+    }, { c: null, v: -1 }).c;
+    starts.push(first, twin(first));
+    if (count > 2) {
+      let pick = null, bestV = -1;
+      for (const c of half) {
+        const m = twin(c);
+        const gap = Math.min(...starts.map(s => Math.min(hexDistance(s.x, s.y, c.x, c.y), hexDistance(s.x, s.y, m.x, m.y))),
+          hexDistance(c.x, c.y, m.x, m.y));
+        const v = gap + c.score * 0.05;
+        if (v > bestV) { bestV = v; pick = c; }
       }
-      starts.push(best);
+      starts.push(pick, twin(pick));
     }
-    const gaps = [];
-    for (let a = 0; a < starts.length; a++) {
-      for (let b = a + 1; b < starts.length; b++) gaps.push(hexDistance(starts[a].x, starts[a].y, starts[b].x, starts[b].y));
+    const out = starts.slice(0, count);
+    return minGap(out) >= (count === 2 ? 8 : 6) ? out : null;
+  }
+
+  // Pangaea: a good spot near one end of the land, then each next start as far
+  // as possible from the ones already chosen.
+  const starts = [pool.reduce((a, c) => (c.x + c.y * 0.3 < a.x + a.y * 0.3 ? c : a), pool[0])];
+  while (starts.length < count) starts.push(farthestStart(pool, starts));
+  return minGap(starts) >= (count === 2 ? 8 : 7) ? starts : null;
+}
+
+function generateWorld(seed, count, type) {
+  const kind = MAP_TYPES[type] ? type : 'pangaea';
+  const { cols, rows } = mapSize(count, kind);
+  // Try a few seeds until the map has room for everyone.
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const s = (seed + attempt * 7919) >>> 0;
+    const made = kind === 'islands' ? islandTerrain(s, cols, rows)
+      : kind === 'continents' ? continentTerrain(s, cols, rows)
+        : landTerrain(s, cols, rows, kind === 'mirror');
+    const conts = assignContinents(made.tiles, cols, rows, s);
+    const starts = chooseStarts(made, cols, rows, s, count, kind);
+    if (!starts) continue;
+    const tiles = made.tiles;
+    for (const st of starts) if (!st.twin) seedStart(tiles, cols, rows, st.x, st.y, s);
+    if (kind === 'mirror') {
+      // Copy each seeded neighbourhood onto its twin so both stay identical.
+      for (const st of starts) {
+        if (st.twin) continue;
+        for (const t of tiles) {
+          if (hexDistance(st.x, st.y, t.x, t.y) <= 3) tiles[mirrorIndex(tiles, t.y * cols + t.x)].f = t.f;
+        }
+      }
     }
-    if (Math.min(...gaps) < minGap && attempt < 11) continue;
-    for (const st of starts) seedStart(tiles, cols, rows, st.x, st.y, s);
-    return { cols, rows, tiles, starts, seed: s };
+    return { cols, rows, tiles, starts, seed: s, conts, map: kind };
   }
   return null;
 }
@@ -694,16 +1247,34 @@ function shuffledNames(seed) {
   return out;
 }
 
-// seats: [{ name, human }]. Returns the new game, sitting at the first player's turn.
+// Seats that asked for a civ get it; Random seats (and any repeat) draw from
+// the civs nobody picked, so no two players share one.
+function assignCivs(seats, seed) {
+  const used = new Set();
+  const out = seats.map(s => {
+    if (s.civ && CIVS[s.civ] && !used.has(s.civ)) { used.add(s.civ); return s.civ; }
+    return null;
+  });
+  const free = CIV_ORDER.filter(id => !used.has(id));
+  for (let i = free.length - 1; i > 0; i--) {
+    const j = Math.floor(hash2(i, 13, seed) * (i + 1));
+    [free[i], free[j]] = [free[j], free[i]];
+  }
+  return out.map(c => c || free.pop());
+}
+
+// seats: [{ name, human, civ }]. Returns the new game, sitting at the first player's turn.
 function startGame(options) {
   const seats = options.seats.slice(0, 4);
   const seed = options.seed >>> 0;
-  const world = generateWorld(seed, seats.length);
+  const type = MAP_TYPES[options.map] ? options.map : 'pangaea';
+  const world = generateWorld(seed, seats.length, type);
   if (!world) return null;
   const n = seats.length;
+  const civs = assignCivs(seats, world.seed);
   G = {
-    v: 1, seed: world.seed, rs: (world.seed ^ 0x9e3779b9) >>> 0,
-    cols: world.cols, rows: world.rows, tiles: world.tiles,
+    v: 2, seed: world.seed, rs: (world.seed ^ 0x9e3779b9) >>> 0, map: world.map,
+    cols: world.cols, rows: world.rows, tiles: world.tiles, conts: world.conts,
     units: [], cities: [], players: [],
     dip: [], attitude: [], warSince: [], offers: [],
     log: [], seen: [],
@@ -715,7 +1286,8 @@ function startGame(options) {
     const look = SEATS[i];
     G.players.push({
       i, name: (seat.name || look.name).slice(0, 18), ink: look.ink, light: look.light,
-      human: !!seat.human, alive: true, capital: null, kills: 0, navigation: false,
+      human: !!seat.human, alive: true, capital: null, capHome: -1, kills: 0, civ: civs[i],
+      techs: [], research: null, rp: 0, future: 0, horses: 0, iron: 0,
       aggro: seat.human ? 1 : 0.6 + hash2(i, 3, world.seed) * 0.9
     });
     G.seen.push(new Array(G.cols * G.rows).fill(0));
@@ -725,10 +1297,11 @@ function startGame(options) {
     for (let b = 0; b < n; b++) { G.dip[a][b] = 'peace'; G.attitude[a][b] = 0; G.warSince[a][b] = 0; }
   }
   world.starts.forEach((st, i) => {
-    addUnit(G.players[i], 'settler', st.x, st.y, null);
-    addUnit(G.players[i], 'warrior', st.x, st.y, null);
+    addUnit(G.players[i], unitFor(i, 'settler'), st.x, st.y, null);
+    addUnit(G.players[i], unitFor(i, 'warrior'), st.x, st.y, null);
   });
-  log('A new map. ' + G.players.map(p => p.name).join(', ') + ' set out to found their capitals.', 'turn', null);
+  log('A new ' + MAP_TYPES[G.map].name.toLowerCase() + ' map. ' + G.players.map(p => p.name + ' (' + CIVS[p.civ].land + ')').join(', ') +
+    ' set out to found their capitals.', 'turn', null);
   advanceTurns();
   return G;
 }
@@ -741,86 +1314,227 @@ function log(text, colour, to) {
   if (G.log.length > 500) G.log.splice(0, G.log.length - 500);
 }
 
+/* ── techs and research ────────────────────────────────────────────────────── */
+
+const techName = id => (id === 'future' ? FUTURE.name : TECHS[id] ? TECHS[id].name : '');
+function techCost(i, id) {
+  if (id === 'future') return FUTURE.cost;
+  let cost = TECH_COST[TECHS[id].era];
+  if (civIs(i, 'uk')) cost *= 0.75;
+  if (civIs(i, 'portugal') && id === 'navigation') cost *= 0.5;
+  return Math.round(cost);
+}
+// Ready to research: not known yet, and every tech it needs is known. Future
+// Tech opens once the whole tree is done.
+function techReady(i, id) {
+  if (id === 'future') return TECH_ORDER.every(t => hasTech(i, t));
+  const t = TECHS[id];
+  return !!t && !hasTech(i, id) && t.needs.every(n => hasTech(i, n));
+}
+function researchChoices(i) {
+  const out = TECH_ORDER.filter(id => techReady(i, id));
+  if (techReady(i, 'future')) out.push('future');
+  return out;
+}
+function setResearch(i, id) {
+  if (!techReady(i, id)) return false;
+  pl(i).research = id;
+  return true;
+}
+const techPoints = f => f.techs.reduce((n, id) => n + TECHS[id].era * 2, 0) + f.future * FUTURE.points;
+
+// Research a turn: every city on Research gives all its production, and every
+// library gives 2 more on its own.
+function researchRate(i) {
+  let n = 0;
+  for (const c of ownCities(i)) {
+    if (c.build && c.build.kind === 'research') n += cityYields(c).prod;
+    if (c.buildings.includes('library')) n += BUILDINGS.library.research;
+  }
+  return n;
+}
+function researchTurns(i) {
+  const f = pl(i);
+  if (!f.research) return null;
+  const left = techCost(i, f.research) - f.rp;
+  if (left <= 0) return 1;
+  const rate = researchRate(i);
+  return rate > 0 ? Math.ceil(left / rate) : Infinity;
+}
+
+// Research points pile up in one pool, so nothing is lost between techs. A CPU
+// picks its next tech at once; a human picks from the tech tree.
+function processResearch(f) {
+  for (let guard = 0; guard < 30; guard++) {
+    if (!f.research && !f.human) f.research = aiPickTech(f);
+    if (!f.research) return;
+    const cost = techCost(f.i, f.research);
+    if (f.rp < cost) return;
+    f.rp -= cost;
+    if (f.research === 'future') {
+      f.future += 1;
+      log(f.name + ' finishes Future Tech ' + f.future + '.', f.ink, f.i);
+    } else {
+      f.techs.push(f.research);
+      log(f.name + ' learns ' + techName(f.research) + '.', f.ink, f.i);
+      f.research = null;
+    }
+  }
+}
+
+/* ── horses and iron ───────────────────────────────────────────────────────── */
+
+const STOCK_CAP = 30;
+function stockIncome(i) {
+  let horses = 0, iron = 0;
+  for (const t of G.tiles) {
+    if (t.owner !== i || !t.imp) continue;
+    if (t.f === 'horses' && t.imp === 'pasture') horses += civIs(i, 'mongol') ? 3 : 2;
+    if (t.f === 'iron' && t.imp === 'mine') iron += 2;
+  }
+  return { horses, iron };
+}
+function gatherStock(f) {
+  const inc = stockIncome(f.i);
+  f.horses = Math.min(STOCK_CAP, f.horses + inc.horses);
+  f.iron = Math.min(STOCK_CAP, f.iron + inc.iron);
+}
+// '' when the stockpile covers this unit; otherwise what it is short of.
+function stockShort(f, def) {
+  const need = def.res;
+  if (!need) return '';
+  const out = [];
+  if (need.horses && f.horses < need.horses) out.push(need.horses + ' horses (you have ' + f.horses + ')');
+  if (need.iron && f.iron < need.iron) out.push(need.iron + ' iron (you have ' + f.iron + ')');
+  return out.join(' and ');
+}
+
 /* ── tiles and cities ──────────────────────────────────────────────────────── */
 
-function tileYield(t) {
-  const ter = TERRAIN[t.t], fea = t.f ? FEATURES[t.f] : null, imp = t.imp ? IMPROVEMENTS[t.imp] : null;
-  return {
-    food: ter.food + (fea ? fea.food : 0) + (imp ? imp.food : 0),
-    prod: ter.prod + (fea ? fea.prod : 0) + (imp ? imp.prod : 0)
-  };
+// What a tile gives the player who works it.
+function tileYield(t, owner) {
+  const who = owner === undefined ? t.owner : owner;
+  const ter = TERRAIN[t.t], fea = t.f ? FEATURES[t.f] : null;
+  let food = ter.food + (fea ? fea.food : 0), prod = ter.prod + (fea ? fea.prod : 0);
+  if (t.imp) {
+    const imp = IMPROVEMENTS[t.imp];
+    if (t.imp === 'terrace') {
+      const hills = neighbourList(t.x, t.y).filter(([x, y]) => { const n = tileAt(x, y); return n && n.t === 'mount'; }).length;
+      food += 2 + Math.min(2, hills);
+    } else if (t.imp === 'stepwell') {
+      const farm = neighbourList(t.x, t.y).some(([x, y]) => { const n = tileAt(x, y); return n && n.imp === 'farm'; });
+      food += 1 + (farm ? 1 : 0);
+    } else {
+      food += imp.food || 0;
+      prod += imp.prod || 0;
+    }
+    if (civIs(who, 'usa')) {
+      if (t.imp === 'farm') food += 1;
+      if (t.imp === 'mine') prod += 1;
+    }
+  }
+  return { food, prod };
 }
 const cityTiles = c => G.tiles.filter(t => t.city === c.id);
 
 // Every tile inside the borders is worked. The city center always gives 2 and 2.
 function cityYields(c) {
-  let food = 0, prod = 0;
-  const harbor = c.buildings.includes('harbor');
+  const i = c.owner, f = pl(i);
+  let food = 0, prod = 0, shallow = 0, forests = 0;
   for (const t of cityTiles(c)) {
     if (t.x === c.x && t.y === c.y) { food += 2; prod += 2; continue; }
-    const y = tileYield(t);
+    const y = tileYield(t, i);
     food += y.food;
     prod += y.prod;
-    if (harbor && t.t === 'shallow') food += 1;
+    if (t.t === 'shallow') shallow++;
+    if (t.f === 'forest') forests++;
   }
+  if (c.buildings.includes('harbor')) {
+    food += shallow;
+    if (civIs(i, 'dutch')) prod += 2;
+  }
+  if (civIs(i, 'japan')) prod += shallow;
+  if (civIs(i, 'celts')) food += Math.floor(forests / 2);
   for (const b of c.buildings) {
     const def = BUILDINGS[b];
     food += def.food || 0;
     prod += def.prod || 0;
   }
-  const army = G.units.filter(u => u.home === c.id && isMil(u.type)).length;
+  if (c.buildings.includes('workshop')) prod += Math.floor(c.pop / 3);
+  if (civIs(i, 'qin')) prod += Math.floor(c.pop / 2);
+  if (civIs(i, 'egypt')) prod += Math.floor(c.buildings.length / 2);
+  if (civIs(i, 'portugal') && f && f.capHome >= 0) {
+    const here = tileAt(c.x, c.y).k;
+    if (here >= 0 && here !== f.capHome) { food += 3; prod += 3; }
+  }
+  const army = G.units.filter(u => u.home === c.id && isMil(u.type) && !UNITS[u.type].noFood).length;
   const upkeep = 2 * c.pop + army;
   return { food, prod, upkeep, army, net: food - upkeep };
 }
-const growCost = c => 15 + 8 * c.pop;
-const cityMaxHp = c => 100 + (c.buildings.includes('walls') ? 100 : 0);
+const growCost = c => {
+  const base = 15 + 8 * c.pop;
+  return civIs(c.owner, 'india') ? Math.floor(base * 0.9) : base;
+};
+const cityMaxHp = c => 100 + c.buildings.reduce((n, b) => n + (BUILDINGS[b].hp || 0), 0);
+const cityShot = c => c.buildings.reduce((n, b) => Math.max(n, BUILDINGS[b].shot || 0), 0);
 
-// A city defends at 20 + 2 per pop, or with its garrison's strength + 3 if that is higher.
+// A city defends at 25 + 3 per pop, or with its garrison's strength + 5 if that is higher.
 function cityStrength(c) {
-  let s = 20 + 2 * c.pop;
+  let s = 25 + 3 * c.pop;
   const g = milAt(c.x, c.y);
-  if (g && g.owner === c.owner) s = Math.max(s, UNITS[g.type].str + 3);
+  if (g && g.owner === c.owner) s = Math.max(s, UNITS[g.type].str + 5);
   return s;
-}
-function hasStrategic(c, res) {
-  const imp = res === 'iron' ? 'mine' : 'pasture';
-  return cityTiles(c).some(t => t.f === res && t.imp === imp);
 }
 
 function itemDef(item) {
   if (!item) return null;
-  return item.kind === 'unit' ? UNITS[item.id] : item.kind === 'building' ? BUILDINGS[item.id] : PROJECTS[item.id];
+  if (item.kind === 'research') return RESEARCH;
+  return item.kind === 'unit' ? UNITS[item.id] || null : BUILDINGS[item.id] || null;
 }
 const sameItem = (a, b) => !!a && !!b && a.kind === b.kind && a.id === b.id;
+
+// What this item costs in this city, after every discount.
+function costOf(c, item) {
+  const def = itemDef(item);
+  if (!def || item.kind === 'research') return 0;
+  const i = c.owner;
+  let cost = def.cost;
+  if (item.kind === 'unit') {
+    if (def.charges && !isMil(item.id) && civIs(i, 'usa')) cost *= 0.5;
+    if (isMil(item.id)) {
+      if (civIs(i, 'zulu')) cost *= 0.8;
+      if (def.naval ? c.buildings.includes('harbor') : c.buildings.includes('barracks')) cost *= 0.75;
+      if (def.kind === 'siege' && civIs(i, 'ottoman')) cost /= 1.5;
+    }
+  } else {
+    if (civIs(i, 'egypt')) cost *= 0.5;
+    else if ((item.id === 'walls' || item.id === 'castle') && civIs(i, 'france')) cost *= 0.5;
+    else if (item.id === 'harbor' && civIs(i, 'dutch')) cost *= 0.5;
+  }
+  return Math.max(1, Math.round(cost));
+}
 
 // '' when the city may build it; otherwise the reason it can't.
 function buildProblem(c, item) {
   const def = itemDef(item);
   if (!def) return 'Unknown';
-  if (item.kind === 'unit') {
-    if (def.needs === 'iron' && !hasStrategic(c, 'iron')) return 'Needs a mine on iron in this city';
-    if (def.needs === 'horses' && !hasStrategic(c, 'horses')) return 'Needs a pasture on horses in this city';
-    return '';
-  }
-  if (item.kind === 'building') {
-    if (c.buildings.includes(item.id)) return 'Built';
-    if (def.coastal && !isCoastal(c)) return 'Coastal cities only';
-    return '';
-  }
-  if (pl(c.owner).navigation) return 'Done';
-  if (G.cities.some(o => o !== c && o.owner === c.owner && o.build && sameItem(o.build, item))) return 'Another city is on it';
+  if (item.kind === 'research') return '';
+  const i = c.owner, civ = civOf(i);
+  if (def.civ && def.civ !== civ) return 'Only ' + civTitle(def.civ);
+  const own = item.kind === 'unit' ? unitFor(i, item.id) : buildingFor(i, item.id);
+  if (own !== item.id) return 'Replaced by your ' + itemDef({ kind: item.kind, id: own }).name;
+  if (item.kind === 'building' && c.buildings.includes(item.id)) return 'Built';
+  if (def.tech && !hasTech(i, def.tech)) return 'Needs ' + techName(def.tech);
+  if ((def.naval || def.coastal) && !isCoastal(c)) return 'Coastal cities only';
+  if (def.needsWalls && !hasWalls(c)) return 'Needs walls first';
   return '';
 }
 
-function prodFor(c, item, base) {
-  if (item && item.kind === 'unit' && isMil(item.id) && c.buildings.includes('barracks')) return Math.round(base * 1.5);
-  return base;
-}
 function turnsLeft(c, item) {
   const target = item || c.build;
-  if (!target) return null;
-  const rate = prodFor(c, target, cityYields(c).prod);
-  const left = itemDef(target).cost - c.progress;
+  if (!target || target.kind === 'research') return null;
+  const rate = cityYields(c).prod;
+  const left = costOf(c, target) - c.progress;
   if (left <= 0) return 1;
   return rate > 0 ? Math.ceil(left / rate) : Infinity;
 }
@@ -832,31 +1546,37 @@ function setBuild(c, item) {
   return true;
 }
 
-function slotFree(x, y, owner, mil) {
+function slotFree(x, y, owner, type) {
   const t = tileAt(x, y);
-  if (!t || TERRAIN[t.t].water || TERRAIN[t.t].block) return false;
+  if (!t) return false;
+  const naval = isNaval(type);
+  if (naval ? !(TERRAIN[t.t].water || (cityAt(x, y) && cityAt(x, y).owner === owner)) : TERRAIN[t.t].water || TERRAIN[t.t].block) return false;
+  if (naval && TERRAIN[t.t].deep && !hasTech(owner, 'navigation')) return false;
   const city = cityAt(x, y);
   if (city && city.owner !== owner) return false;
+  const mil = isMil(type);
   for (const o of unitsAt(x, y)) {
     if (o.owner !== owner) return false;
     if (isMil(o.type) === mil) return false;
   }
   return true;
 }
+// Land units appear in the city or beside it; ships in the city or on the water next to it.
 function spawnSpot(c, type) {
-  const mil = isMil(type);
-  if (slotFree(c.x, c.y, c.owner, mil)) return [c.x, c.y];
-  const ring = neighbourList(c.x, c.y).filter(([x, y]) => slotFree(x, y, c.owner, mil));
+  if (slotFree(c.x, c.y, c.owner, type)) return [c.x, c.y];
+  const ring = neighbourList(c.x, c.y).filter(([x, y]) => slotFree(x, y, c.owner, type));
   ring.sort((a, b) => (tileAt(b[0], b[1]).owner === c.owner) - (tileAt(a[0], a[1]).owner === c.owner));
   return ring[0] || null;
 }
 
 function claimTile(t, c) { t.owner = c.owner; t.city = c.id; }
+// Only the Inca claim mountains.
+const canClaim = (t, c) => t.owner === null && (t.t !== 'mount' || civIs(c.owner, 'inca'));
 function claimStartRing(c) {
   claimTile(tileAt(c.x, c.y), c);
   for (const [x, y] of neighbourList(c.x, c.y)) {
     const t = tileAt(x, y);
-    if (t && t.owner === null) claimTile(t, c);
+    if (t && canClaim(t, c)) claimTile(t, c);
   }
 }
 // A new pop claims the best unowned hex touching the borders, up to 3 hexes out.
@@ -865,9 +1585,9 @@ function claimNextHex(c) {
   for (const t of cityTiles(c)) {
     for (const [x, y] of neighbourList(t.x, t.y)) {
       const n = tileAt(x, y);
-      if (!n || n.owner !== null || hexDistance(c.x, c.y, x, y) > 3) continue;
-      const yy = tileYield(n);
-      const score = yy.food + yy.prod + (n.f && n.f !== 'forest' ? 0.6 : 0) +
+      if (!n || !canClaim(n, c) || hexDistance(c.x, c.y, x, y) > 3) continue;
+      const yy = tileYield(n, c.owner);
+      const score = yy.food + yy.prod + (n.f && n.f !== 'forest' ? 0.6 : 0) + (n.t === 'mount' ? 2.5 : 0) +
         (TERRAIN[n.t].deep ? -0.5 : 0) + hash2(x, y, G.seed) * 0.1;
       if (score > bestScore) { bestScore = score; best = n; }
     }
@@ -879,7 +1599,7 @@ function claimNextHex(c) {
 // One owner's city at the start of that owner's turn: heal, eat, grow, build.
 function processCity(c) {
   const f = pl(c.owner);
-  if (!c.hit) c.hp = Math.min(cityMaxHp(c), c.hp + 20);
+  if (!c.hit) c.hp = Math.min(cityMaxHp(c), c.hp + (civIs(f.i, 'france') ? 30 : 20));
   c.hit = false;
   c.shot = false;
   const y = cityYields(c);
@@ -893,7 +1613,7 @@ function processCity(c) {
       log(c.name + ' grows to pop ' + c.pop + '.', f.ink, f.i);
     }
   } else {
-    const army = G.units.filter(u => u.home === c.id && isMil(u.type));
+    const army = G.units.filter(u => u.home === c.id && isMil(u.type) && !UNITS[u.type].noFood);
     log(c.name + ' is starving. Its ' + army.length + ' military ' + (army.length === 1 ? 'unit loses' : 'units lose') +
       ' 10 HP.', '#93401d', f.i);
     for (const u of army) {
@@ -901,13 +1621,19 @@ function processCity(c) {
       if (u.hp <= 0) killUnit(u, null);
     }
   }
-  c.progress += prodFor(c, c.build, y.prod);
+  if (c.buildings.includes('library')) f.rp += BUILDINGS.library.research;
+  if (c.build && c.build.kind === 'research') {
+    f.rp += y.prod;
+    return;
+  }
+  c.progress += y.prod;
   if (c.build) tryComplete(c);
 }
 
 function tryComplete(c) {
   const f = pl(c.owner), item = c.build, def = itemDef(item);
-  if (c.progress < def.cost) return;
+  const cost = costOf(c, item);
+  if (c.progress < cost) return;
   const why = buildProblem(c, item);
   if (why) {
     log(c.name + ' can’t finish ' + def.name + ': ' + why.toLowerCase() + '.', '#93401d', f.i);
@@ -915,8 +1641,15 @@ function tryComplete(c) {
     return;
   }
   if (item.kind === 'unit') {
-    if (item.id === 'settler' && c.pop < 2) {
-      if (!c.wait) log(c.name + ' has a settler ready and is waiting to reach pop 2.', f.ink, f.i);
+    const rome = civIs(f.i, 'rome');
+    if (def.founds && !rome && c.pop < 2) {
+      if (!c.wait) log(c.name + ' has a ' + def.name.toLowerCase() + ' ready and is waiting to reach pop 2.', f.ink, f.i);
+      c.wait = true;
+      return;
+    }
+    const short = stockShort(f, def);
+    if (short) {
+      if (!c.wait) log(c.name + ' has a ' + def.name.toLowerCase() + ' ready and is waiting for ' + short + '.', f.ink, f.i);
       c.wait = true;
       return;
     }
@@ -926,16 +1659,17 @@ function tryComplete(c) {
       c.wait = true;
       return;
     }
-    c.progress -= def.cost;
-    if (item.id === 'settler') c.pop -= 1;
+    c.progress -= cost;
+    if (def.founds && !rome) c.pop -= 1;
+    if (def.res) {
+      f.horses -= def.res.horses || 0;
+      f.iron -= def.res.iron || 0;
+    }
     addUnit(f, item.id, spot[0], spot[1], c.id);
-  } else if (item.kind === 'building') {
-    c.progress -= def.cost;
-    c.buildings.push(item.id);
-    if (item.id === 'walls') c.hp += 100;
   } else {
-    c.progress -= def.cost;
-    f.navigation = true;
+    c.progress -= cost;
+    c.buildings.push(item.id);
+    c.hp += def.hp || 0;
   }
   log(c.name + ' finished ' + def.name + '.', f.ink, f.i);
   c.build = null;
@@ -948,6 +1682,7 @@ function foundProblem(u) {
   if (!UNITS[u.type].founds) return 'Only settlers found cities';
   const t = tileAt(u.x, u.y);
   if (TERRAIN[t.t].water) return 'Cities go on land';
+  if (TERRAIN[t.t].block) return 'Not on mountains';
   if (t.owner !== null && t.owner !== u.owner) return 'That land belongs to ' + pl(t.owner).name;
   const near = G.cities.find(c => hexDistance(c.x, c.y, u.x, u.y) < 4);
   if (near) return 'Too close to ' + near.name + '. Cities need 4 hexes between centers';
@@ -957,14 +1692,16 @@ function foundProblem(u) {
 function foundCity(u) {
   if (foundProblem(u)) return null;
   const f = pl(u.owner);
+  const rome = civIs(f.i, 'rome');
   const c = {
     id: 'c' + G.nextCity++, x: u.x, y: u.y, name: G.names.pop() || 'City ' + G.nextCity,
-    owner: f.i, founder: f.i, pop: 1, food: 0, progress: 0, build: null, buildings: [],
+    owner: f.i, founder: f.i, pop: rome ? 2 : 1, food: 0, progress: 0, build: null, buildings: rome ? ['granary'] : [],
     hp: 100, hit: false, shot: false, capital: false, wait: false
   };
-  if (f.capital === null) { c.capital = true; f.capital = c.id; }
+  if (f.capital === null) { c.capital = true; f.capital = c.id; f.capHome = tileAt(c.x, c.y).k; }
   G.cities.push(c);
   claimStartRing(c);
+  if (rome) claimNextHex(c);
   removeUnit(u);
   for (const o of ownUnits(f.i)) if (isMil(o.type) && !o.home) o.home = c.id;
   log(f.name + ' founds ' + c.name + (c.capital ? ' as its capital' : '') + '.', f.ink, null);
@@ -973,24 +1710,42 @@ function foundCity(u) {
 
 /* ── builders ──────────────────────────────────────────────────────────────── */
 
-// Each option: { act, label, why } where why is '' when the builder can do it now.
+// The improvements this player could put on this tile once a builder stands there.
+function improvementsFor(i, t) {
+  const civ = civOf(i);
+  return Object.keys(IMPROVEMENTS).filter(id => {
+    const imp = IMPROVEMENTS[id];
+    return (!imp.civ || imp.civ === civ) && imp.ok(t);
+  });
+}
+
+// Each option: { act, label, why } where why is '' when the unit can do it now.
+// Builders and woodsmen have every option; a legion can only build.
 function builderOptions(u) {
-  if (u.type !== 'builder') return [];
+  const def = UNITS[u.type];
+  if (!def.charges || !(u.charges > 0)) return [];
   const t = tileAt(u.x, u.y);
   const out = [];
   let base = '';
   if (u.acted || u.mp <= 0) base = 'No moves left this turn';
   else if (t.owner !== u.owner) base = 'Only inside your borders';
   else if (cityAt(u.x, u.y)) base = 'Not on a city';
-  for (const id of Object.keys(IMPROVEMENTS)) {
+  for (const id of improvementsFor(u.owner, t)) {
     const imp = IMPROVEMENTS[id];
-    if (!imp.ok(t)) continue;
-    const why = base || (t.imp === id ? 'Already here' : t.imp ? 'This tile already has ' + IMPROVEMENTS[t.imp].name.toLowerCase() : '');
-    out.push({ act: 'build:' + id, label: imp.name, why });
+    let why = base;
+    if (!why && imp.tech && !hasTech(u.owner, imp.tech)) why = 'Needs ' + techName(imp.tech);
+    if (!why && t.imp === id) why = 'Already here';
+    const label = imp.name + (t.imp && t.imp !== id ? ' (replaces ' + IMPROVEMENTS[t.imp].name.toLowerCase() + ')' : '');
+    out.push({ act: 'build:' + id, label, why });
   }
-  if (t.f === 'forest') out.push({ act: 'chop', label: 'Chop forest (+20 production)', why: base });
+  if (isMil(u.type)) return out;
+  const chop = civIs(u.owner, 'usa') ? 30 : 20;
+  if (t.f === 'forest') out.push({ act: 'chop', label: 'Chop forest (+' + chop + ' production)', why: base });
   if (t.f === 'wheat' || t.f === 'seafood') {
     out.push({ act: 'harvest', label: 'Harvest ' + FEATURES[t.f].name.toLowerCase() + ' (+20 food)', why: base });
+  }
+  if (def.plants && (t.t === 'flat' || t.t === 'hill') && !t.f) {
+    out.push({ act: 'plant', label: 'Plant forest', why: base || (t.imp ? 'Clear the ' + IMPROVEMENTS[t.imp].name.toLowerCase() + ' first' : '') });
   }
   return out;
 }
@@ -999,28 +1754,33 @@ function builderAct(u, act) {
   const opt = builderOptions(u).find(o => o.act === act);
   if (!opt || opt.why) return false;
   const t = tileAt(u.x, u.y), f = pl(u.owner), c = cityById(t.city);
+  const who = UNITS[u.type].name;
   if (act.startsWith('build:')) {
     t.imp = act.slice(6);
-    log('A builder makes ' + IMPROVEMENTS[t.imp].name.toLowerCase() + (c ? ' for ' + c.name : '') + '.', f.ink, f.i);
+    log('A ' + who.toLowerCase() + ' makes ' + IMPROVEMENTS[t.imp].name.toLowerCase() + (c ? ' for ' + c.name : '') + '.', f.ink, f.i);
   } else if (act === 'chop') {
+    const gain = civIs(f.i, 'usa') ? 30 : 20;
     t.f = null;
     if (t.imp && !IMPROVEMENTS[t.imp].ok(t)) t.imp = null;
-    if (c) c.progress += 20;
-    log('A builder chops a forest: +20 production' + (c ? ' in ' + c.name : '') + '.', f.ink, f.i);
+    if (c) c.progress += gain;
+    log('A ' + who.toLowerCase() + ' chops a forest: +' + gain + ' production' + (c ? ' in ' + c.name : '') + '.', f.ink, f.i);
   } else if (act === 'harvest') {
     const what = FEATURES[t.f].name.toLowerCase();
     t.f = null;
     if (t.imp && !IMPROVEMENTS[t.imp].ok(t)) t.imp = null;
     if (c) c.food += 20;
-    log('A builder harvests ' + what + ': +20 food' + (c ? ' in ' + c.name : '') + '.', f.ink, f.i);
+    log('A ' + who.toLowerCase() + ' harvests ' + what + ': +20 food' + (c ? ' in ' + c.name : '') + '.', f.ink, f.i);
+  } else if (act === 'plant') {
+    t.f = 'forest';
+    log('A ' + who.toLowerCase() + ' plants a forest' + (c ? ' for ' + c.name : '') + '.', f.ink, f.i);
   }
   u.charges -= 1;
   u.mp = 0;
   u.acted = true;
   u.moved = true;
-  if (u.charges <= 0) {
+  if (u.charges <= 0 && !isMil(u.type)) {
     removeUnit(u);
-    log('A builder used its last charge.', f.ink, f.i);
+    log('A ' + who.toLowerCase() + ' used its last charge.', f.ink, f.i);
   }
   return true;
 }
@@ -1029,7 +1789,8 @@ function builderAct(u, act) {
 
 function addUnit(f, type, x, y, home) {
   const u = { id: 'u' + G.nextUnit++, type, owner: f.i, x, y, hp: 100, mp: 0, acted: false, moved: false, home: home || null };
-  if (UNITS[type].charges) u.charges = UNITS[type].charges;
+  const def = UNITS[type];
+  if (def.charges) u.charges = def.charges + (!isMil(type) && civIs(f.i, 'usa') ? 1 : 0);
   G.units.push(u);
   return u;
 }
@@ -1049,15 +1810,21 @@ function killUnit(u, killer) {
   }
 }
 
+const unitMove = u => UNITS[u.type].move + (UNITS[u.type].horse && civIs(u.owner, 'mongol') ? 1 : 0);
+
 function moveCost(u, x, y) {
   const t = tileAt(x, y);
   if (!t) return Infinity;
-  const ter = TERRAIN[t.t];
-  if (ter.block) return Infinity;
-  if (ter.water) {
-    if (ter.deep && !(isMil(u.type) && pl(u.owner).navigation)) return Infinity;
-    return 1;
+  const ter = TERRAIN[t.t], def = UNITS[u.type];
+  if (def.naval) {
+    // Ships stay on water, and can sit in their own cities.
+    if (ter.water) return ter.deep && !hasTech(u.owner, 'navigation') ? Infinity : 1;
+    const c = cityAt(x, y);
+    return c && c.owner === u.owner ? 1 : Infinity;
   }
+  if (ter.block) return civIs(u.owner, 'inca') ? 2 : Infinity;
+  if (ter.water) return ter.deep && !hasTech(u.owner, 'navigation') ? Infinity : 1;
+  if (def.rough) return 1;
   return t.f === 'forest' ? Math.max(ter.cost, FEATURES.forest.cost) : ter.cost;
 }
 // Moving through a tile: no foreign units and no foreign city on it.
@@ -1134,25 +1901,37 @@ function moveUnit(u, x, y, reach) {
 // Civ 6's damage curve: 30 at equal strength, scaled by e^(0.04 × the gap).
 const damageFor = (a, d, r) => Math.max(1, Math.round(30 * Math.exp(0.04 * (a - d)) * r));
 
+// Bonuses that apply whether the unit attacks or defends.
+function sharedBonus(u) {
+  const def = UNITS[u.type], t = tileAt(u.x, u.y);
+  let s = 0;
+  if (t.owner === u.owner) s += 5;
+  if (def.naval) { if (civIs(u.owner, 'norway')) s += 5; }
+  else if (TERRAIN[t.t].water && !civIs(u.owner, 'norway')) s -= 10;
+  if (t.f === 'forest' && civIs(u.owner, 'celts')) s += 5;
+  if (def.hurtBonus && u.hp < 50) s += def.hurtBonus;
+  return s;
+}
+const isHorse = u => !!(u && UNITS[u.type].horse);
+
 function defStrength(u, attacker) {
   const def = UNITS[u.type], t = tileAt(u.x, u.y);
-  let s = def.str;
-  if (TERRAIN[t.t].water) s -= 10;
-  else {
+  let s = def.str + sharedBonus(u);
+  if (!TERRAIN[t.t].water) {
     s += TERRAIN[t.t].def;
     if (t.f === 'forest') s += FEATURES.forest.def;
   }
-  if (def.vsHorse && attacker && attacker.type === 'horseman') s += def.vsHorse;
+  if (def.vsHorse && isHorse(attacker)) s += def.vsHorse;
   return s;
 }
 function atkStrength(u, target) {
   const def = UNITS[u.type];
-  let s = shoots(u.type) ? def.rs : def.str;
-  if (isEmbarked(u)) s -= 10;
+  let s = (shoots(u.type) ? def.rs : def.str) + sharedBonus(u);
   if (target.unit) {
-    if (def.vsHorse && target.unit.type === 'horseman') s += def.vsHorse;
+    if (def.vsHorse && isHorse(target.unit)) s += def.vsHorse;
     if (def.vsUnits) s += def.vsUnits;
   }
+  if (target.city && def.kind === 'siege' && civIs(u.owner, 'ottoman')) s += 5;
   return s;
 }
 
@@ -1182,7 +1961,7 @@ function strikeInfo(u, x, y) {
     return { x, y, unit: tgt.unit, a, d, dmg, back, kills: dmg >= tgt.unit.hp, dies: back >= u.hp };
   }
   const c = tgt.city;
-  if (c.hp <= 0) return ranged ? null : { x, y, city: c, capture: true, a, d: 0, dmg: 0, back: 0 };
+  if (c.hp <= 0) return ranged || UNITS[u.type].noCapture ? null : { x, y, city: c, capture: true, a, d: 0, dmg: 0, back: 0 };
   const d = cityStrength(c);
   const dmg = damageFor(a, d, 1), back = ranged ? 0 : damageFor(d, a, 1);
   return { x, y, city: c, a, d, dmg, back, breaks: dmg >= c.hp, dies: back >= u.hp };
@@ -1202,6 +1981,8 @@ function attack(u, x, y) {
   const ranged = shoots(u.type);
   const r1 = 0.8 + roll() * 0.4, r2 = 0.8 + roll() * 0.4;
   const dmg = damageFor(info.a, info.d, r1), back = ranged ? 0 : damageFor(info.d, info.a, r2);
+  // Zulu units that win a fight heal 15 HP.
+  const win = () => { if (civIs(u.owner, 'zulu') && G.units.includes(u)) u.hp = Math.min(100, u.hp + 15); };
   if (info.unit) {
     const t = info.unit, tf = pl(t.owner);
     t.hp -= dmg;
@@ -1219,6 +2000,7 @@ function attack(u, x, y) {
       u.x = x;
       u.y = y;
     }
+    if (killed) win();
     return { dmg, back, killed };
   }
   const c = info.city, cf = pl(c.owner);
@@ -1230,8 +2012,9 @@ function attack(u, x, y) {
   log(text, f.ink, f.i);
   log(text, f.ink, cf.i);
   if (u.hp <= 0) { killUnit(u, c.owner); return { dmg, back, died: true }; }
-  if (c.hp <= 0 && !ranged) {
+  if (c.hp <= 0 && !ranged && !UNITS[u.type].noCapture) {
     captureCity(c, u);
+    win();
     return { dmg, back, captured: true };
   }
   return { dmg, back };
@@ -1239,9 +2022,10 @@ function attack(u, x, y) {
 
 // A city with walls shoots once per turn at an enemy within 2 hexes.
 function cityShotInfo(c, o) {
-  if (!c.buildings.includes('walls') || c.shot || c.owner === null) return null;
+  const power = cityShot(c);
+  if (!power || c.shot || c.owner === null) return null;
   if (!isMil(o.type) || !atWar(c.owner, o.owner) || hexDistance(c.x, c.y, o.x, o.y) > 2) return null;
-  const dmg = damageFor(25, defStrength(o, null), 1);
+  const dmg = damageFor(power, defStrength(o, null), 1);
   return { unit: o, dmg, kills: dmg >= o.hp };
 }
 function cityShootTargets(c) {
@@ -1250,7 +2034,7 @@ function cityShootTargets(c) {
 function cityShoot(c, o) {
   const info = cityShotInfo(c, o);
   if (!info) return null;
-  const dmg = damageFor(25, defStrength(o, null), 0.8 + roll() * 0.4);
+  const dmg = damageFor(cityShot(c), defStrength(o, null), 0.8 + roll() * 0.4);
   c.shot = true;
   o.hp -= dmg;
   const f = pl(c.owner), of = pl(o.owner);
@@ -1272,6 +2056,7 @@ function rehome(cityId) {
   }
 }
 
+const DEFENCES = ['walls', 'castle', 'fortress'];
 function captureCity(c, u) {
   const prev = c.owner, f = pl(u.owner), pf = pl(prev);
   for (const o of G.units.filter(o => o.x === c.x && o.y === c.y && o.owner !== u.owner)) {
@@ -1279,7 +2064,7 @@ function captureCity(c, u) {
     else captureCivilian(o, u);
   }
   c.owner = f.i;
-  c.buildings = c.buildings.filter(b => b !== 'walls');
+  c.buildings = c.buildings.filter(b => !DEFENCES.includes(b));
   c.pop = Math.max(1, c.pop - 1);
   c.hp = 50;
   c.food = 0;
@@ -1385,8 +2170,8 @@ function answerOffer(to, from, accept) {
 
 /* ── vision ────────────────────────────────────────────────────────────────── */
 
-// Units see 2 hexes, cities 3, and you always see your own land. Anything seen
-// once stays drawn on the map, dimmed, after it falls out of sight.
+// Units see 2 hexes (scouts 3), cities 3, and you always see your own land.
+// Anything seen once stays drawn on the map, dimmed, after it falls out of sight.
 function computeVision(i) {
   const vis = new Uint8Array(G.cols * G.rows);
   const mark = (cx, cy, r) => {
@@ -1396,7 +2181,7 @@ function computeVision(i) {
       }
     }
   };
-  for (const u of ownUnits(i)) mark(u.x, u.y, 2);
+  for (const u of ownUnits(i)) mark(u.x, u.y, UNITS[u.type].sight || 2);
   for (const c of ownCities(i)) mark(c.x, c.y, 3);
   for (const t of G.tiles) if (t.owner === i) vis[t.y * G.cols + t.x] = 1;
   const seen = G.seen[i];
@@ -1409,11 +2194,29 @@ function refreshVision() {
 
 /* ── scoring and the end ───────────────────────────────────────────────────── */
 
+// Older units count for less as the game goes on: era 1 slides from full value
+// at 30% of the turn limit to a quarter by the end, era 2 from 60% to half.
+// With no limit, the slide runs as if the limit were 100.
+function eraWeight(era) {
+  const p = clamp(G.turn / (G.maxTurns || 100), 0, 1);
+  if (era === 1) return p <= 0.3 ? 1 : 1 - 0.75 * (p - 0.3) / 0.7;
+  if (era === 2) return p <= 0.6 ? 1 : 1 - 0.5 * (p - 0.6) / 0.4;
+  return 1;
+}
+// Total era-weighted strength, counting each unit's best number.
+function militaryWeight(i) {
+  return ownUnits(i).filter(u => isMil(u.type)).reduce((n, u) => {
+    const def = UNITS[u.type];
+    return n + Math.max(def.str, def.rs || 0) * eraWeight(def.era || 1);
+  }, 0);
+}
 function scoreParts(i) {
   const cities = ownCities(i);
   const pop = cities.reduce((n, c) => n + c.pop, 0);
-  const kills = pl(i).kills;
-  return { cities: cities.length, pop, kills, total: cities.length * 5 + pop + kills * 2 };
+  const tech = techPoints(pl(i));
+  const army = militaryWeight(i);
+  const mil = Math.round(army / 20);
+  return { cities: cities.length, pop, tech, army: Math.round(army), mil, kills: pl(i).kills, total: cities.length * 5 + pop + tech + mil };
 }
 function standings() {
   return G.players.map(f => ({ f, s: scoreParts(f.i) }))
@@ -1430,7 +2233,7 @@ function checkElimination() {
   for (const f of G.players) {
     if (!f.alive) continue;
     const cities = ownCities(f.i).length;
-    const settlers = ownUnits(f.i).filter(u => u.type === 'settler').length;
+    const settlers = ownUnits(f.i).filter(u => UNITS[u.type].founds).length;
     if (cities || settlers) continue;
     f.alive = false;
     for (const u of ownUnits(f.i)) removeUnit(u);
@@ -1463,10 +2266,13 @@ function finishOnScore() {
 /* ── the turn cycle ────────────────────────────────────────────────────────── */
 
 function beginPlayerTurn(i) {
+  const f = pl(i);
   G.offers = G.offers.filter(o => o.to !== i || G.turn - o.turn <= 3);
+  gatherStock(f);
   for (const c of ownCities(i)) processCity(c);
+  processResearch(f);
   for (const u of ownUnits(i)) {
-    u.mp = UNITS[u.type].move;
+    u.mp = unitMove(u);
     u.acted = false;
     u.moved = false;
   }
@@ -1474,10 +2280,13 @@ function beginPlayerTurn(i) {
 }
 
 // Units that neither moved nor fought this turn heal: 10 HP, or 20 at home.
+// Longships heal 20 on water even after moving, as long as they didn't attack.
 function restUnits(i) {
   for (const u of ownUnits(i)) {
-    if (u.moved || u.acted || u.hp >= 100) continue;
-    const t = tileAt(u.x, u.y);
+    if (u.hp >= 100) continue;
+    const def = UNITS[u.type], t = tileAt(u.x, u.y);
+    if (def.seaHeal && TERRAIN[t.t].water && !u.acted) { u.hp = Math.min(100, u.hp + def.seaHeal); continue; }
+    if (u.moved || u.acted) continue;
     u.hp = Math.min(100, u.hp + (t.owner === i ? 20 : 10));
   }
 }
@@ -1522,6 +2331,7 @@ function endCurrentTurn() {
 
 const idleUnits = i => ownUnits(i).filter(u => u.mp > 0 && !u.acted);
 const idleCities = i => ownCities(i).filter(c => !c.build);
+const needsTech = i => !pl(i).research && researchChoices(i).length > 0;
 /* ── CPU players ───────────────────────────────────────────────────────────── */
 
 // A CPU player follows the same rules as everyone else. For now it sees the
@@ -1571,8 +2381,10 @@ function aiStep(u, tx, ty, keep) {
   return moveUnit(u, best[0], best[1], reach);
 }
 
-const nearestOwnCity = (f, u) => ownCities(f.i)
-  .sort((a, b) => hexDistance(u.x, u.y, a.x, a.y) - hexDistance(u.x, u.y, b.x, b.y))[0] || null;
+const byDistance = (u, list) => list.slice().sort((a, b) => hexDistance(u.x, u.y, a.x, a.y) - hexDistance(u.x, u.y, b.x, b.y));
+const nearestOwnCity = (f, u) => byDistance(u, ownCities(f.i))[0] || null;
+const waterMap = () => G.map === 'islands' || G.map === 'continents';
+const atWarCount = f => G.players.filter(o => o.alive && atWar(f.i, o.i)).length;
 
 function landTiles() {
   return G.tiles.filter(t => !TERRAIN[t.t].water && !TERRAIN[t.t].block).length;
@@ -1589,9 +2401,11 @@ function siteScore(f, x, y) {
     const n = tileAt(nx, ny);
     if (!n) { s -= 1; continue; }
     if (n.owner !== null && n.owner !== f.i) { s -= 0.5; continue; }
-    const y2 = tileYield(n);
+    const y2 = tileYield(n, f.i);
     s += y2.food + y2.prod + (n.f && n.f !== 'forest' ? 1 : 0);
+    if (n.t === 'mount' && f.civ === 'inca') s += 2;
   }
+  if (f.civ === 'portugal' && f.capHome >= 0 && t.k >= 0 && t.k !== f.capHome) s += 4;
   return s;
 }
 
@@ -1611,51 +2425,147 @@ function aiFindSite(f, u) {
   return best;
 }
 
+/* ── research ──────────────────────────────────────────────────────────────── */
+
+// Scores every tech this player can start and takes the best: cheap techs that
+// unlock what its land and its civ want come first.
+function aiPickTech(f) {
+  const opts = researchChoices(f.i);
+  if (opts.length <= 1) return opts[0] || null;
+  const own = G.tiles.filter(t => t.owner === f.i);
+  const has = r => own.some(t => t.f === r);
+  const coastal = ownCities(f.i).some(isCoastal);
+  const water = waterMap();
+  const wars = atWarCount(f) > 0;
+  const base = {
+    mining: 10, husbandry: 5, pottery: 8, archery: 6, sailing: 2, bronze: 9, masonry: 6, riding: 5, writing: 8,
+    ironworking: 7, construction: 7, stirrups: 5, math: 5, shipbuilding: 1, navigation: 2, future: 0
+  };
+  const bonus = {
+    husbandry: has('horses') ? 5 : 0, riding: has('horses') ? 4 : 0, ironworking: has('iron') ? 4 : 0,
+    sailing: (coastal ? 2 : 0) + (water ? 6 : 0) + (has('seafood') ? 3 : 0),
+    shipbuilding: water && coastal ? 5 : 0, navigation: water ? 9 : G.turn > 50 ? 3 : 0,
+    archery: wars ? 4 : 0, bronze: wars ? 3 : 0, math: wars ? 3 : 0, masonry: wars ? 3 : 0
+  };
+  const flavour = {
+    uk: { writing: 4, math: 2 }, mongol: { husbandry: 6, riding: 6 }, norway: { sailing: 6, shipbuilding: 4 },
+    portugal: { sailing: 5, navigation: 6 }, dutch: { sailing: 6 }, japan: { sailing: 4, ironworking: 3 },
+    ottoman: { math: 6 }, france: { masonry: 5, construction: 3 }, egypt: { pottery: 3, masonry: 3, archery: 3 },
+    inca: { pottery: 3 }, india: { pottery: 4 }, zulu: { bronze: 4 }, rome: { ironworking: 4, masonry: 2 },
+    celts: { mining: 2 }, qin: { masonry: 2 }, usa: { mining: 3 }
+  }[f.civ] || {};
+  let best = null, bestV = -Infinity;
+  for (const id of opts) {
+    const v = (base[id] || 0) + (bonus[id] || 0) + (flavour[id] || 0) - techCost(f.i, id) / 40 +
+      hash2(f.i, TECH_ORDER.indexOf(id), G.seed) * 1.5;
+    if (v > bestV) { bestV = v; best = id; }
+  }
+  return best;
+}
+
+/* ── what each city builds ─────────────────────────────────────────────────── */
+
+// The best improvement for a tile, judged by how much it adds.
+function aiImpGain(i, t, id) {
+  const before = tileYield(t, i);
+  const keepImp = t.imp, keepF = t.f;
+  if (id === 'plant') t.f = 'forest'; else t.imp = id;
+  const after = tileYield(t, i);
+  t.imp = keepImp;
+  t.f = keepF;
+  let gain = (after.food - before.food) * 1.1 + (after.prod - before.prod);
+  if ((id === 'pasture' && t.f === 'horses') || (id === 'mine' && t.f === 'iron')) gain += 2;
+  if (id === 'plant') gain += civIs(i, 'celts') ? 0.5 : 0;
+  return gain;
+}
+function aiTileWorth(f, t) {
+  if (t.imp || cityAt(t.x, t.y)) return 0;
+  let best = 0;
+  for (const id of improvementsFor(f.i, t)) {
+    const tech = IMPROVEMENTS[id].tech;
+    if (tech && !hasTech(f.i, tech)) continue;
+    best = Math.max(best, aiImpGain(f.i, t, id));
+  }
+  return best;
+}
 function aiImprovable(f) {
-  return G.tiles.filter(t => t.owner === f.i && !t.imp && !cityAt(t.x, t.y) &&
-    Object.values(IMPROVEMENTS).some(imp => imp.ok(t)));
+  return G.tiles.filter(t => t.owner === f.i && aiTileWorth(f, t) > 0.5);
 }
 
 function aiPickSoldier(f, c, wars) {
-  const mine = ownUnits(f.i).filter(u => isMil(u.type));
-  const count = t => mine.filter(u => u.type === t).length + ownCities(f.i).filter(o => o.build && o.build.id === t).length;
-  if (wars && count('catapult') < Math.min(Math.floor(mine.length / 4), ownCities(f.i).length + 1)) return 'catapult';
-  if (count('archer') < Math.floor((mine.length + 1) / 3)) return 'archer';
-  if (hasStrategic(c, 'iron') && roll() < 0.7) return 'swordsman';
-  if (hasStrategic(c, 'horses') && roll() < 0.6) return 'horseman';
-  return G.turn < 12 ? 'warrior' : 'spearman';
+  const mine = ownUnits(f.i).filter(u => isMil(u.type) && !isNaval(u.type));
+  const queued = ownCities(f.i).filter(o => o.build && o.build.kind === 'unit').map(o => o.build.id);
+  const count = pred => mine.filter(u => pred(UNITS[u.type])).length + queued.filter(id => pred(UNITS[id])).length;
+  const reserved = { horses: 0, iron: 0 };
+  for (const id of queued) {
+    const r = UNITS[id].res;
+    if (r) { reserved.horses += r.horses || 0; reserved.iron += r.iron || 0; }
+  }
+  const open = base => {
+    const id = unitFor(f.i, base);
+    if (buildProblem(c, { kind: 'unit', id })) return null;
+    const r = UNITS[id].res;
+    if (r && ((r.horses || 0) > f.horses - reserved.horses || (r.iron || 0) > f.iron - reserved.iron)) return null;
+    return id;
+  };
+  const siege = open('catapult');
+  if (wars && siege && count(d => d.kind === 'siege') < Math.min(Math.floor(mine.length / 4), ownCities(f.i).length + 1)) return siege;
+  const bow = open('archer');
+  if (bow && count(d => d.kind === 'ranged') < Math.floor((mine.length + 1) / 3)) return bow;
+  const melee = ['heavy', 'swordsman', 'horseman', 'spearman'].map(open).filter(Boolean);
+  if (melee.length) return melee.length > 1 && roll() < 0.3 ? melee[1] : melee[0];
+  return unitFor(f.i, 'warrior');
 }
 
 function aiChooseBuild(f, c, siteAvailable) {
-  const U = id => ({ kind: 'unit', id }), B = id => ({ kind: 'building', id });
+  const U = base => ({ kind: 'unit', id: unitFor(f.i, base) });
+  const B = base => ({ kind: 'building', id: buildingFor(f.i, base) });
+  const R = { kind: 'research', id: 'research' };
   const cities = ownCities(f.i), units = ownUnits(f.i);
-  const queued = id => cities.filter(o => o.build && o.build.id === id).length;
-  const army = units.filter(u => isMil(u.type)).length + cities.filter(o => o.build && o.build.kind === 'unit' && isMil(o.build.id)).length;
-  const settlers = units.filter(u => u.type === 'settler').length + queued('settler');
-  const builders = units.filter(u => u.type === 'builder').length + queued('builder');
-  const wars = G.players.filter(o => o.alive && atWar(f.i, o.i)).length;
+  const queued = pred => cities.filter(o => o.build && o.build.kind === 'unit' && pred(UNITS[o.build.id])).length;
+  const isArmy = d => d.kind !== 'civ' && !d.naval;
+  const army = units.filter(u => isArmy(UNITS[u.type])).length + queued(isArmy);
+  const ships = units.filter(u => isNaval(u.type)).length + queued(d => !!d.naval);
+  const settlers = units.filter(u => UNITS[u.type].founds).length + queued(d => !!d.founds);
+  const builders = units.filter(u => UNITS[u.type].charges && !isMil(u.type)).length + queued(d => d.charges && d.kind === 'civ');
+  const wars = atWarCount(f);
   const y = cityYields(c);
   const wantArmy = wars ? cities.length * 2 + 2 : cities.length + 1;
   const late = G.turn > (G.maxTurns || 200) * 0.7;
   const can = item => !buildProblem(c, item);
+  const researching = cities.filter(o => o !== c && o.build && o.build.kind === 'research').length;
+  const wantResearch = G.turn < 6 ? 0 : Math.max(1, Math.round(cities.length / 4));
+  const soldier = () => ({ kind: 'unit', id: aiPickSoldier(f, c, wars) });
 
-  if (army < 2) return U(aiPickSoldier(f, c, wars));
-  if (!late && settlers === 0 && siteAvailable && cities.length < aiCityTarget() &&
-      (!wars || army >= wantArmy) && (c.pop >= 2 || y.net >= 6)) return U('settler');
-  if (army < wantArmy) return U(aiPickSoldier(f, c, wars));
+  if (army < 2) return soldier();
+  if (!late && settlers === 0 && siteAvailable && cities.length < aiCityTarget() && (!wars || army >= wantArmy) &&
+      (civIs(f.i, 'rome') || c.pop >= 2 || y.net >= 6)) return U('settler');
+  if (army < wantArmy) return soldier();
   if (builders < Math.ceil(cities.length / 2) && aiImprovable(f).length > builders * 3) return U('builder');
   const enemyNear = G.cities.some(o => atWar(f.i, o.owner) && hexDistance(o.x, o.y, c.x, c.y) <= 8);
   if ((enemyNear || c.capital) && can(B('walls'))) return B('walls');
+  if (enemyNear && can(B('fortress'))) return B('fortress');
+  if (can(B('library'))) return B('library');
+  if (researching < wantResearch && (!wars || army >= wantArmy)) return R;
   if (y.net < 8 && can(B('granary'))) return B('granary');
-  if (can(B('workshop'))) return B('workshop');
+  if (can(B('workshop')) && c.pop >= 3) return B('workshop');
   if (can(B('harbor')) && cityTiles(c).filter(t => t.t === 'shallow').length >= 3) return B('harbor');
-  if (wars && can(B('barracks'))) return B('barracks');
+  const coastal = cities.filter(isCoastal).length;
+  const shipCap = isCoastal(c) ? (waterMap() ? Math.ceil(coastal / 2) : wars ? 1 : 0) : 0;
+  if (ships < shipCap) {
+    const big = U('warship');
+    if (can(big) && f.iron >= 10) return big;
+    if (can(U('galley'))) return U('galley');
+  }
+  if (wars && can(B('barracks')) && cities.filter(o => o.buildings.includes('barracks')).length < 2) return B('barracks');
   if (can(B('granary'))) return B('granary');
-  if (G.turn > 45 && c.capital && can({ kind: 'project', id: 'navigation' })) return { kind: 'project', id: 'navigation' };
-  // Past this size, the city saves its production instead of growing the army.
-  if (army < (wars ? cities.length * 3 + 3 : cities.length * 2 + 1)) return U(aiPickSoldier(f, c, wars));
-  return null;
+  if (can(B('workshop'))) return B('workshop');
+  // Past this size, the city puts its production into research instead.
+  if (army < (wars ? cities.length * 3 + 3 : cities.length * 2 + 1)) return soldier();
+  return R;
 }
+
+/* ── what each unit does ───────────────────────────────────────────────────── */
 
 function aiTryStrike(f, u) {
   if (!isMil(u.type) || u.acted || u.mp <= 0) return false;
@@ -1695,23 +2605,29 @@ function aiSettler(f, u) {
 }
 
 function aiBestImprovement(u) {
-  const order = ['build:pasture', 'build:mine', 'build:boats', 'build:farm'];
-  const opts = builderOptions(u).filter(o => !o.why && order.includes(o.act));
-  opts.sort((a, b) => order.indexOf(a.act) - order.indexOf(b.act));
-  return opts.length ? opts[0].act : null;
+  const t = tileAt(u.x, u.y);
+  if (t.imp) return null;
+  let best = null, bestG = 0.5;
+  for (const o of builderOptions(u)) {
+    if (o.why) continue;
+    const id = o.act.startsWith('build:') ? o.act.slice(6) : o.act === 'plant' ? 'plant' : null;
+    if (!id || (id === 'plant' && t.t !== 'hill')) continue;
+    const g = aiImpGain(u.owner, t, id);
+    if (g > bestG) { bestG = g; best = o.act; }
+  }
+  return best;
 }
 
 function aiBuilder(f, u) {
   const here = aiBestImprovement(u);
   if (here) { builderAct(u, here); return; }
-  const others = G.units.filter(o => o !== u && o.owner === f.i && o.type === 'builder' && o.goal);
+  const others = G.units.filter(o => o !== u && o.owner === f.i && UNITS[o.type].charges && o.goal);
   let best = null, bestV = Infinity;
   for (const t of aiImprovable(f)) {
     if (others.some(o => o.goal[0] === t.x && o.goal[1] === t.y)) continue;
     if (!isFinite(moveCost(u, t.x, t.y))) continue;
     if (G.units.some(o => o !== u && o.x === t.x && o.y === t.y && (o.owner !== f.i || !isMil(o.type)))) continue;
-    const bonus = t.f === 'horses' || t.f === 'iron' ? 4 : t.f ? 2 : 0;
-    const v = hexDistance(u.x, u.y, t.x, t.y) - bonus;
+    const v = hexDistance(u.x, u.y, t.x, t.y) - aiTileWorth(f, t) * 1.5;
     if (v < bestV) { bestV = v; best = t; }
   }
   if (!best) { u.goal = null; return; }
@@ -1727,6 +2643,11 @@ function aiSoldier(f, u) {
   const garrison = onCity && onCity.owner === f.i;
   const wars = G.players.filter(o => o.alive && atWar(f.i, o.i));
 
+  // A legion at peace spends its one charge where it stands.
+  if (u.charges > 0 && !wars.length) {
+    const act = aiBestImprovement(u);
+    if (act) { builderAct(u, act); return; }
+  }
   // Hurt units go home or rest where they stand.
   if (u.hp < 45) {
     if (garrison) return;
@@ -1736,9 +2657,8 @@ function aiSoldier(f, u) {
   }
   // Every city keeps one unit at home.
   if (garrison) return;
-  const empty = ownCities(f.i).filter(c => !milAt(c.x, c.y) && !G.units.some(o => o !== u && o.owner === f.i && o.goal &&
-    o.goal[0] === c.x && o.goal[1] === c.y && isMil(o.type)))
-    .sort((a, b) => hexDistance(u.x, u.y, a.x, a.y) - hexDistance(u.x, u.y, b.x, b.y))[0];
+  const empty = byDistance(u, ownCities(f.i).filter(c => !milAt(c.x, c.y) && !G.units.some(o => o !== u && o.owner === f.i &&
+    o.goal && o.goal[0] === c.x && o.goal[1] === c.y && isMil(o.type))))[0];
   if (empty && hexDistance(u.x, u.y, empty.x, empty.y) <= 8) {
     u.goal = [empty.x, empty.y];
     aiStep(u, empty.x, empty.y, 0);
@@ -1747,15 +2667,16 @@ function aiSoldier(f, u) {
   u.goal = null;
 
   if (wars.length) {
-    // Enemy units close by first, then the nearest enemy city.
+    // Enemy units close by first, then the nearest enemy city it can reach.
     const foes = G.units.filter(o => isMil(o.type) && atWar(f.i, o.owner) && hexDistance(u.x, u.y, o.x, o.y) <= 4);
-    let target = foes.sort((a, b) => hexDistance(u.x, u.y, a.x, a.y) - hexDistance(u.x, u.y, b.x, b.y))[0];
+    let target = byDistance(u, foes)[0];
     if (!target) {
-      target = G.cities.filter(c => atWar(f.i, c.owner))
-        .sort((a, b) => (hexDistance(u.x, u.y, a.x, a.y) - a.hp / 50) - (hexDistance(u.x, u.y, b.x, b.y) - b.hp / 50))[0];
+      const field = distanceField(u, u.x, u.y);
+      target = G.cities.filter(c => atWar(f.i, c.owner) && isFinite(field[c.y * G.cols + c.x]))
+        .sort((a, b) => (field[a.y * G.cols + a.x] - a.hp / 50) - (field[b.y * G.cols + b.x] - b.hp / 50))[0];
     }
     if (target) {
-      aiStep(u, target.x, target.y, shoots(u.type) ? 2 : 1);
+      aiStep(u, target.x, target.y, shoots(u.type) ? UNITS[u.type].range : 1);
       aiTryStrike(f, u);
       return;
     }
@@ -1765,9 +2686,43 @@ function aiSoldier(f, u) {
   if (home && hexDistance(u.x, u.y, home.x, home.y) > 3) aiStep(u, home.x, home.y, 2);
 }
 
+// Ships hunt enemy units on or beside the water, then coastal cities, and
+// otherwise wait off their home coast, out of the city so a garrison fits.
+function aiShip(f, u) {
+  if (aiTryStrike(f, u)) return;
+  const ports = ownCities(f.i).filter(isCoastal);
+  const port = byDistance(u, ports)[0] || null;
+  if (u.hp < 45) {
+    if (port && (u.x !== port.x || u.y !== port.y) && !milAt(port.x, port.y)) aiStep(u, port.x, port.y, 0);
+    return;
+  }
+  if (atWarCount(f)) {
+    const field = distanceField(u, u.x, u.y);
+    const reach = t => isFinite(field[t.y * G.cols + t.x]);
+    const foes = G.units.filter(o => isMil(o.type) && atWar(f.i, o.owner) && reach(o) && field[o.y * G.cols + o.x] <= 12);
+    let target = foes.sort((a, b) => field[a.y * G.cols + a.x] - field[b.y * G.cols + b.x])[0];
+    if (!target) target = G.cities.filter(c => atWar(f.i, c.owner) && reach(c))
+      .sort((a, b) => field[a.y * G.cols + a.x] - field[b.y * G.cols + b.x])[0];
+    if (target) {
+      aiStep(u, target.x, target.y, shoots(u.type) ? UNITS[u.type].range : 1);
+      aiTryStrike(f, u);
+      return;
+    }
+  }
+  if (port && (hexDistance(u.x, u.y, port.x, port.y) > 3 || (u.x === port.x && u.y === port.y))) aiStep(u, port.x, port.y, 1);
+}
+
 function aiCityShoot(f, c) {
   const options = cityShootTargets(c).sort((a, b) => (b.kills - a.kills) || (b.dmg - a.dmg));
   if (options.length) cityShoot(c, options[0].unit);
+}
+
+// Can this player's land units walk (or wade) to the other player's cities?
+function aiCanReach(f, o) {
+  const from = ownCities(f.i)[0], to = ownCities(o.i)[0];
+  if (!from || !to) return false;
+  const field = distanceField({ type: 'warrior', owner: f.i, x: from.x, y: from.y }, to.x, to.y);
+  return isFinite(field[from.y * G.cols + from.x]);
 }
 
 function aiDiplomacy(f) {
@@ -1789,30 +2744,33 @@ function aiDiplomacy(f) {
     const att = G.attitude[f.i][o.i] || 0;
     const edge = ratio > 1.5 ? 2.5 : ratio > 1.15 ? 1.5 : ratio < 0.9 ? 0.3 : 1;
     const odds = (att < -5 ? 0.05 : 0.015) * (f.aggro || 1) * edge;
-    if (roll() < odds) declareWar(f.i, o.i);
+    if (roll() < odds && aiCanReach(f, o)) declareWar(f.i, o.i);
   }
 }
 
 function aiTurn(f) {
   if (G.over || !f.alive) return;
+  if (!f.research) f.research = aiPickTech(f);
   aiDiplomacy(f);
   const settlerSite = (() => {
-    const probe = ownUnits(f.i)[0] || null;
+    const probe = ownUnits(f.i).find(u => UNITS[u.type].founds) || null;
     const from = ownCities(f.i)[0];
     if (!from) return true;
-    const ghost = { type: 'settler', owner: f.i, x: from.x, y: from.y };
-    return !!aiFindSite(f, probe && probe.type === 'settler' ? probe : ghost);
+    const ghost = { type: unitFor(f.i, 'settler'), owner: f.i, x: from.x, y: from.y };
+    return !!aiFindSite(f, probe || ghost);
   })();
+  // Research never finishes, so those cities think again every turn.
+  for (const c of ownCities(f.i)) if (c.build && c.build.kind === 'research') c.build = null;
   for (const c of ownCities(f.i)) if (!c.build) setBuild(c, aiChooseBuild(f, c, settlerSite));
   for (const c of ownCities(f.i)) aiCityShoot(f, c);
-  const rank = { settler: 0, builder: 1 };
-  const order = ownUnits(f.i).sort((a, b) => (rank[a.type] ?? 2) - (rank[b.type] ?? 2) ||
-    (shoots(b.type) - shoots(a.type)));
+  const rank = u => (UNITS[u.type].founds ? 0 : !isMil(u.type) ? 1 : 2);
+  const order = ownUnits(f.i).sort((a, b) => rank(a) - rank(b) || (shoots(b.type) - shoots(a.type)));
   for (const u of order) {
     if (G.over) return;
     if (!G.units.includes(u) || u.owner !== f.i) continue;
-    if (u.type === 'settler') aiSettler(f, u);
-    else if (u.type === 'builder') aiBuilder(f, u);
+    if (UNITS[u.type].founds) aiSettler(f, u);
+    else if (!isMil(u.type)) aiBuilder(f, u);
+    else if (isNaval(u.type)) aiShip(f, u);
     else aiSoldier(f, u);
   }
 }
@@ -1837,7 +2795,19 @@ const MARK = {
   horseman: 'M-6 8 H6|M-4 8 C-4 3 -2 1 -3 -2 C-4 -5 -1 -8 2 -8 L6 -4 L4 -2 L1 -3 C2 1 4 3 4 8',
   archer: 'M-4 -8 C5 -4 5 4 -4 8|M-4 -8 V8|M-4 0 H7|M4 -2.5 L7 0 L4 2.5',
   catapult: 'M-8 5 H7|M-8 5 a2.2 2.2 0 1 0 4.4 0|M2.4 5 a2.2 2.2 0 1 0 4.4 0|M-5 4 L5 -6|M5 -6 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0',
+  scout: 'M-8 0 C-4 -6 4 -6 8 0 C4 6 -4 6 -8 0 Z|M0 0 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0',
+  heavy: 'M-6 8 H6|M-4 8 C-4 3 -2 1 -3 -2 C-4 -5 -1 -8 2 -8 L6 -4 L4 -2 L1 -3 C2 1 4 3 4 8|M-2 -3 L-8 -9',
+  galley: 'M-8 0 H8 L5 5 H-5 Z|M-4 5 L-6 8|M0 5 V8|M4 5 L6 8|M0 0 V-8|M0 -8 L5 -4 H0',
+  warship: 'M-8 1 H8 L5 6 H-5 Z|M-3 1 V-8|M3 1 V-6|M-3 -8 L1 -5.5 H-3|M3 -6 L7 -3.5 H3',
   walls: 'M-8 6 V-3 H-5 V-6 H-2 V-3 H2 V-6 H5 V-3 H8 V6 Z|M-8 1 H8',
+  castle: 'M-8 7 V-2 H-5 V-5 H-2 V-2 H2 V-5 H5 V-2 H8 V7 Z|M-2 7 V3 H2 V7|M0 -5 V-9 L4 -7.5 L0 -6',
+  fortress: 'M-8 8 V-1 L-5 -4 V-8 H5 V-4 L8 -1 V8 Z|M-2 8 V3 H2 V8|M-5 -4 H5',
+  library: 'M0 -5 C-3 -7 -6 -7 -8 -6 V6 C-6 5 -3 5 0 7 C3 5 6 5 8 6 V-6 C6 -7 3 -7 0 -5 Z|M0 -5 V7',
+  tech: 'M-3 -8 H3|M-2 -8 V-2 L-7 6 C-7.5 7.5 -6.5 8 -5 8 H5 C6.5 8 7.5 7.5 7 6 L2 -2 V-8|M-4.6 3 H4.6',
+  terrace: 'M-8 7 H8|M-8 7 V3 H-4 V-1 H0 V-5 H4 V-8|M-8 3 H8|M-4 -1 H8',
+  stepwell: 'M-8 -6 H8 L4 7 H-4 Z|M-6 -2 H6|M-5 2 H5',
+  polder: 'M-8 7 H8|M0 7 V-1|M0 -1 L-5 -6|M0 -1 L5 -6|M0 -1 L-5 4|M0 -1 L5 4',
+  plant: 'M0 8 V-1|M0 -1 C-5 -1 -6 -5 -6 -8 C-2 -8 0 -5 0 -1|M0 2 C4 2 6 -1 6 -4 C3 -4 0 -2 0 2',
   granary: 'M-5 8 V-2 L0 -8 L5 -2 V8 Z|M-2 8 V4 H2 V8|M-5 0 H5',
   workshop: 'M-6 -4 H6 V-1 H2 L0 3 H4 V5 H-4 V3 H-2 L-4 -1 H-6 Z',
   barracks: 'M0 -8 L6 -5 V1 C6 5 3 7 0 9 C-3 7 -6 5 -6 1 V-5 Z|M0 -4 V7',
@@ -1853,7 +2823,9 @@ const SOLID = {
   settler: 'M-5 -8 H5 L2 -5 L5 -2 H-5 Z',
   spearman: 'M-3 -4 L0 -9 L3 -4 Z',
   warrior: 'M1 -4 C2 -8 7 -9 8 -7 C9 -5 6 -1 3 -1 Z',
-  navigation: 'M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z'
+  navigation: 'M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z',
+  galley: 'M0 -8 L5 -4 H0 Z',
+  warship: 'M-3 -8 L1 -5.5 H-3 Z M3 -6 L7 -3.5 H3 Z'
 };
 
 function markBody(name) {
@@ -1972,19 +2944,23 @@ function unitMarkup(u, cx, cy, viewer) {
   const civilianBeside = mil ? false : !!milAt(u.x, u.y);
   const ux = civilianBeside ? cx + 11 : cx, uy = civilianBeside ? cy + 9 : cy;
   const parts = [];
+  const naval = isNaval(u.type);
   if (isEmbarked(u)) {
     parts.push('<path d="M' + (ux - 12) + ' ' + (uy + 9) + ' H' + (ux + 12) + ' L' + (ux + 8) + ' ' + (uy + 14) + ' H' + (ux - 8) + ' Z" fill="#7d6b4f" stroke="' + f.ink + '" stroke-width="1"/>');
   }
   if (mil) {
-    parts.push('<path d="M' + (cx - 11) + ' ' + (cy - 13) + ' h22 v21 h-22 z" fill="' + f.light + '" stroke="' + f.ink + '" stroke-width="2"/>');
-    parts.push(markOnMap(u.type, cx, cy - 2.5, 0.88, '#241c12', 2.1));
+    // Ships get a badge with a rounded keel; land units a square one.
+    parts.push(naval
+      ? '<path d="M' + (cx - 12) + ' ' + (cy - 13) + ' h24 v12 q0 9 -12 9 q-12 0 -12 -9 z" fill="' + f.light + '" stroke="' + f.ink + '" stroke-width="2"/>'
+      : '<path d="M' + (cx - 11) + ' ' + (cy - 13) + ' h22 v21 h-22 z" fill="' + f.light + '" stroke="' + f.ink + '" stroke-width="2"/>');
+    parts.push(markOnMap(iconOf(u.type), cx, cy - 2.5, 0.88, '#241c12', 2.1));
     const portion = clamp(u.hp / 100, 0, 1);
     parts.push('<line x1="' + (cx - 9) + '" y1="' + (cy + 11.5) + '" x2="' + (cx + 9) + '" y2="' + (cy + 11.5) + '" stroke="rgba(36,28,18,.3)" stroke-width="2.6" stroke-linecap="round"/>');
     parts.push('<line x1="' + (cx - 9) + '" y1="' + (cy + 11.5) + '" x2="' + (cx - 9 + 18 * portion).toFixed(1) + '" y2="' + (cy + 11.5) + '" stroke="' + (portion > 0.5 ? '#41602f' : '#93401d') + '" stroke-width="2.6" stroke-linecap="round"/>');
   } else {
     const r = civilianBeside ? 8 : 11;
     parts.push('<circle cx="' + ux + '" cy="' + uy + '" r="' + r + '" fill="' + f.light + '" stroke="' + f.ink + '" stroke-width="1.8"/>');
-    parts.push(markOnMap(u.type, ux, uy, civilianBeside ? 0.62 : 0.85, '#241c12', 2));
+    parts.push(markOnMap(iconOf(u.type), ux, uy, civilianBeside ? 0.62 : 0.85, '#241c12', 2));
   }
   if (mine && u.mp > 0 && !u.acted) {
     const tx = mil ? cx : ux, ty = mil ? cy - 18 : uy - (civilianBeside ? 12 : 15);
@@ -1996,7 +2972,7 @@ function unitMarkup(u, cx, cy, viewer) {
 function cityMarkup(c, cx, cy, known) {
   const f = pl(c.owner), ink = f.ink, light = f.light;
   const portion = clamp(c.hp / cityMaxHp(c), 0, 1);
-  const walls = c.buildings.includes('walls');
+  const walls = hasWalls(c), fortress = c.buildings.includes('fortress');
   const out = [];
   out.push('<path d="M' + (cx - 12) + ' ' + (cy + 1) + ' H' + (cx + 12) + ' V' + (cy + 9) + ' H' + (cx - 12) + ' Z" fill="' + light + '" stroke="' + ink + '" stroke-width="1.3"/>');
   out.push('<path d="M' + (cx - 12) + ' ' + (cy + 1) + ' V' + (cy - 4) + ' H' + (cx - 7) + ' V' + (cy + 1) + ' M' + (cx - 4) + ' ' + (cy + 1) + ' V' + (cy - 6) + ' H' + (cx + 2) + ' V' + (cy + 1) +
@@ -2004,6 +2980,7 @@ function cityMarkup(c, cx, cy, known) {
   out.push('<path d="M' + (cx - 1) + ' ' + (cy - 6) + ' V' + (cy - 17) + ' M' + (cx - 1) + ' ' + (cy - 17) + ' h9 l-2.5 3 2.5 3 h-9" fill="' + ink + '" stroke="' + ink + '" stroke-width="1"/>');
   if (c.capital) out.push('<path d="M' + (cx - 9) + ' ' + (cy - 12) + ' l2 -3 2 3 2 -3 2 3 z" fill="' + ink + '"/>');
   if (walls) out.push('<path d="M' + (cx - 15) + ' ' + (cy + 11) + ' H' + (cx + 15) + '" stroke="' + ink + '" stroke-width="2.4"/>');
+  if (fortress) out.push('<path d="M' + (cx - 15) + ' ' + (cy + 11) + ' V' + (cy + 3) + ' M' + (cx + 15) + ' ' + (cy + 11) + ' V' + (cy + 3) + '" stroke="' + ink + '" stroke-width="2.4"/>');
   out.push('<rect x="' + (cx - 12) + '" y="' + (cy + 13) + '" width="24" height="3" fill="rgba(36,28,18,.2)"/>');
   out.push('<rect x="' + (cx - 12) + '" y="' + (cy + 13) + '" width="' + (24 * portion).toFixed(1) + '" height="3" fill="' + ink + '"/>');
   return '<g>' + out.join('') + '</g>';
@@ -2044,7 +3021,13 @@ function renderBoard() {
     if (!TERRAIN[tile.t].water) {
       neighbourList(x, y).forEach(([nx, ny], dir) => {
         const n = tileAt(nx, ny);
-        if (n && !TERRAIN[n.t].water) return;
+        if (n && !TERRAIN[n.t].water) {
+          // A thin dashed line where one continent meets the next. Each edge is drawn once.
+          if (n.k !== tile.k && dir < 3 && (watching || seenBy(viewer, nx, ny))) {
+            coast.push('<path class="cont" d="' + edgePath(cx, cy, HEX_R - 1.2, dir) + '"/>');
+          }
+          return;
+        }
         coast.push('<path class="coast" d="' + edgePath(cx, cy, HEX_R - 1.2, dir) + '"/>');
       });
     }
@@ -2061,6 +3044,9 @@ function renderBoard() {
     if (mySelUnit && visible && strikeInfo(mySelUnit, x, y)) overlay.push('<path class="threat" d="' + d + '"/>');
     if (shotTargets.has(key) && visible) overlay.push('<path class="threat" d="' + d + '"/>');
     if (selCity && tile.city === selCity.id) overlay.push('<path class="worked" d="' + d + '"/>');
+    if (selection && selection.kind === 'tile' && selection.x === x && selection.y === y) {
+      overlay.push('<path class="sel-hex" d="' + polyPath(hexCorners(cx, cy, HEX_R - 3)) + '"/>');
+    }
     if (!visible) fog.push('<path class="fog dim" d="' + d + '"/>');
   }
 
@@ -2124,14 +3110,17 @@ const meter = (cls, part, whole) => '<div class="meter ' + cls + '"><i style="wi
   (clamp(whole > 0 ? part / whole : 0, 0, 1) * 100).toFixed(1) + '%"></i></div>';
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
 const turnsText = t => (t === null ? '' : !isFinite(t) ? 'never at this rate' : plural(t, 'turn', 'turns'));
+const kv = (k, v, style) => '<div class="kv"><span>' + k + '</span><span' + (style ? ' style="' + style + '"' : '') + '>' + v + '</span></div>';
 
 function validateSelection() {
   if (!selection) return;
   if (selection.kind === 'unit') {
     const u = unitById(selection.id);
     if (!u || (u.owner !== G.viewer && !visibleTo(u.x, u.y))) { selection = null; reachable = null; }
-  } else if (!cityById(selection.id)) {
-    selection = null;
+  } else if (selection.kind === 'city') {
+    if (!cityById(selection.id)) selection = null;
+  } else if (selection.kind === 'tile') {
+    if (!tileAt(selection.x, selection.y)) selection = null;
   }
 }
 
@@ -2153,10 +3142,113 @@ function render() {
   renderBar();
   renderBoard();
   renderSide();
+  renderInspector();
   renderLog();
   UI.btnEnd.disabled = !myTurn();
   if (G.pending && UI.modalLayer.hidden) showPending();
   if (G.over && !UI.endShown) showEndModal();
+}
+
+function researchLabel(i) {
+  const f = pl(i);
+  if (!f.research) return researchChoices(i).length ? 'pick a tech' : 'all done';
+  const t = researchTurns(i);
+  return techName(f.research) + (t === null ? '' : ' · ' + (isFinite(t) ? t + 't' : '∞'));
+}
+
+
+/* ── chrome from the map-first rebuild ───────────────────────────────────── */
+
+const arc = (part, whole, size) => {
+  const box = size || 34, r = box / 2 - 3.5, c = 2 * Math.PI * r;
+  const fill = clamp(whole > 0 ? part / whole : 0, 0, 1);
+  return '<svg class="ring" width="' + box + '" height="' + box + '" viewBox="0 0 ' + box + ' ' + box + '" aria-hidden="true">' +
+    '<circle class="ring-track" cx="' + box / 2 + '" cy="' + box / 2 + '" r="' + r + '"/>' +
+    '<circle class="ring-fill" cx="' + box / 2 + '" cy="' + box / 2 + '" r="' + r + '" stroke-dasharray="' +
+    (c * fill).toFixed(1) + ' ' + (c + 1).toFixed(1) + '" transform="rotate(-90 ' + box / 2 + ' ' + box / 2 + ')"/></svg>';
+}
+
+const pips = (on, total) => '<span class="pips">' +
+  Array.from({ length: Math.max(total, 0) }, (x, i) => '<i' + (i < on ? ' class="on"' : '') + '></i>').join('') + '</span>';
+
+const instrument = (name, value, label, part, whole) =>
+  '<span class="inst"><span class="inst-dial">' + arc(part, whole, 34) + icon(name, 13) + '</span>' +
+  '<span class="inst-text"><b>' + value + '</b><em>' + label + '</em></span></span>';
+
+const statusChip = () => myTurn() ? '<span class="chip on">your move</span>' : '<span class="chip">waiting</span>';
+
+function inspectorAnchor() {
+  const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+  const selCity = selection && selection.kind === 'city' ? cityById(selection.id) : null;
+  const spot = selUnit || selCity;
+  if (!spot) return null;
+  const [cx, cy] = hexCenter(spot.x, spot.y);
+  return { x: cam.x + cx * cam.k, y: cam.y + cy * cam.k };
+}
+
+function positionInspector() {
+  if (!UI || !UI.inspector || UI.inspector.hidden) return;
+  const anchor = inspectorAnchor();
+  if (!anchor) return;
+  const stage = UI.stage.getBoundingClientRect();
+  const width = UI.inspector.offsetWidth || 196, height = UI.inspector.offsetHeight || 120;
+  const reach = HEX_R * cam.k + 10;
+  let left = anchor.x + reach;
+  if (left + width > stage.width - 6) left = anchor.x - reach - width;
+  left = clamp(left, 6, Math.max(6, stage.width - width - 6));
+  const top = clamp(anchor.y - height / 2, 6, Math.max(6, stage.height - height - 6));
+  UI.inspector.style.left = left.toFixed(0) + 'px';
+  UI.inspector.style.top = top.toFixed(0) + 'px';
+}
+
+function renderInspector() {
+  if (!UI || !UI.inspector) return;
+  const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+  const selCity = selection && selection.kind === 'city' ? cityById(selection.id) : null;
+  if (!selUnit && !selCity) {
+    UI.inspector.hidden = true;
+    UI.inspector.innerHTML = '';
+    return;
+  }
+  let html = '';
+  if (selCity) {
+    const c = selCity, f = pl(c.owner);
+    const def = c.build ? itemDef(c.build) : null;
+    const need = growCost(c);
+    html = '<div class="ins-head">' + dot(f, 9) + '<span class="ins-name">' + esc(c.name) + '</span>' +
+      (c.capital ? '<span class="tag">cap</span>' : '') + '</div>' +
+      '<div class="ins-gauges">' +
+        '<span class="ins-gauge" style="color:var(--rust)">' + arc(c.hp, cityMaxHp(c), 30) + '<b>' + c.hp + '</b><em>hp</em></span>' +
+        '<span class="ins-gauge">' + arc(c.food, need, 30) + '<b>' + c.pop + '</b><em>pop</em></span>' +
+        (def ? '<span class="ins-gauge">' + arc(c.progress, def.cost, 30) + '<b>' +
+            (isFinite(turnsLeft(c)) ? turnsLeft(c) + 't' : '--') + '</b><em>build</em></span>'
+          : '<span class="ins-gauge">' + arc(0, 1, 30) + '<b>' + cityYields(c).net + '</b><em>food</em></span>') +
+      '</div>' +
+      '<div class="ins-acts">' +
+        '<button class="icon-btn" data-act="select-city:' + c.id + '" title="Open orders">' + icon('city', 14) + '</button>' +
+        '<button class="icon-btn" data-act="centre:' + c.x + ':' + c.y + '" title="Centre the map">' + icon('navigation', 14) + '</button>' +
+        '<button class="icon-btn" data-act="deselect" title="Close">' + icon('forest', 14) + '</button>' +
+      '</div>';
+  } else if (selUnit) {
+    const u = selUnit, f = pl(u.owner), def = UNITS[u.type], t = tileAt(u.x, u.y), y = tileYield(t);
+    html = '<div class="ins-head">' + dot(f, 9) + '<span class="ins-name">' + def.name + '</span>' +
+      (isEmbarked(u) ? '<span class="tag">sea</span>' : '') + '</div>' +
+      '<div class="ins-gauges">' +
+        (isMil(u.type) ? '<span class="ins-gauge" style="color:var(--rust)">' + arc(u.hp, 100, 30) + '<b>' + u.hp + '</b><em>hp</em></span>' : '') +
+        '<span class="ins-gauge">' + arc(u.mp, def.move, 30) + '<b>' + u.mp + '/' + def.move + '</b><em>moves</em></span>' +
+        '<span class="ins-gauge">' + arc(y.food, 4, 30) + '<b>' + y.food + '/' + y.prod + '</b><em>yield</em></span>' +
+      '</div>' +
+      '<div class="ins-acts">' +
+        '<button class="icon-btn" data-act="select-unit:' + u.id + '" title="Open orders">' + icon(u.type, 14) + '</button>' +
+        '<button class="icon-btn" data-act="centre:' + u.x + ':' + u.y + '" title="Centre the map">' + icon('navigation', 14) + '</button>' +
+        (u.owner === G.viewer && myTurn() && def.founds && !foundProblem(u) && u.mp > 0
+          ? '<button class="icon-btn primary" data-act="found" title="Found a city (F)">' + icon('city', 14) + '</button>' : '') +
+        '<button class="icon-btn" data-act="deselect" title="Close">' + icon('forest', 14) + '</button>' +
+      '</div>';
+  }
+  UI.inspector.innerHTML = html;
+  UI.inspector.hidden = false;
+  positionInspector();
 }
 
 function renderBar() {
@@ -2164,49 +3256,100 @@ function renderBar() {
   UI.bannerDot.style.background = f.light;
   UI.bannerDot.style.borderColor = f.ink;
   UI.bannerName.textContent = f.name;
-  UI.bannerWho.textContent = f.human ? (myTurn() ? 'your turn' : 'waiting') : 'CPU';
-  if (G.handoff) {
-    UI.stats.innerHTML = '';
-  } else {
-    const s = scoreParts(f.i);
-    const idle = myTurn() ? idleUnits(f.i).length + idleCities(f.i).length : 0;
-    UI.stats.innerHTML =
-      '<span class="stat">' + icon('crown', 14) + '<span>Score</span><b>' + s.total + '</b></span>' +
-      '<span class="stat">' + icon('city', 14) + '<span>Cities</span><b>' + s.cities + '</b></span>' +
-      '<span class="stat">' + icon('food', 14) + '<span>Pop</span><b>' + s.pop + '</b></span>' +
-      (idle ? '<span class="stat" style="color:var(--rust)"><span>Needs orders</span><b>' + idle + '</b></span>' : '');
-  }
-  UI.turnReadout.textContent = 'Turn ' + Math.max(1, G.turn) + (G.maxTurns ? ' / ' + G.maxTurns : '');
+  UI.bannerWho.textContent = CIVS[f.civ].land + ' · ' + (f.human ? (myTurn() ? 'your turn' : 'waiting') : 'CPU');
+  const clock = '<span class="turn-dial">' + arc(G.turn, G.maxTurns || G.turn, 26) + '</span>' +
+    Math.max(1, G.turn) + (G.maxTurns ? '<em>/' + G.maxTurns + '</em>' : '');
+  UI.turnReadout.innerHTML = clock;
+  if (G.handoff) { UI.stats.innerHTML = ''; return; }
+  const s = scoreParts(f.i);
+  const alive = G.players.filter(p => p.alive);
+  const bestScore = Math.max(1, ...alive.map(p => scoreParts(p.i).total));
+  const allPop = Math.max(1, alive.reduce((n, p) => n + scoreParts(p.i).pop, 0));
+  const allCities = Math.max(1, alive.reduce((n, p) => n + scoreParts(p.i).cities, 0));
+  const idle = myTurn() ? idleUnits(f.i).length + idleCities(f.i).length + (needsTech(f.i) ? 1 : 0) : 0;
+  UI.stats.innerHTML =
+    instrument('crown', s.total, 'score', s.total, bestScore) +
+    instrument('city', s.cities, 'cities', s.cities, allCities) +
+    instrument('food', s.pop, 'pop', s.pop, allPop) +
+    '<button class="inst" data-act="tech" title="Tech tree (T)"><span class="inst-text"><b>' +
+      esc(researchLabel(f.i)) + '</b><em>tech</em></span></button>' +
+    '<span class="inst"><span class="inst-text"><b>' + f.horses + '</b><em>horses</em></span></span>' +
+    '<span class="inst"><span class="inst-text"><b>' + f.iron + '</b><em>iron</em></span></span>' +
+    (idle ? '<span class="inst needs" title="Units and cities waiting for orders"><span class="inst-dial">' +
+      pips(idle, Math.min(idle, 4)) + '</span><span class="inst-text"><b>' + idle + '</b><em>orders</em></span></span>' : '');
 }
 
+let logOpen = false;
+
 function renderLog() {
+  if (!UI || !UI.log) return;
   const v = G.viewer;
-  const rows = G.log.filter(e => e.to === null || e.to === v).slice(-50).map(e =>
-    '<div' + (e.colour && e.colour !== 'turn' ? ' style="color:' + e.colour + '"' : '') + '>' +
-    '<span class="turn-mark">' + String(e.turn).padStart(2, '0') + '</span> ' + esc(e.text) + '</div>');
-  UI.log.innerHTML = rows.join('') || '<div class="faint">Nothing has happened yet.</div>';
+  const entries = G.log.filter(e => e.to === null || e.to === v);
+  const shown = logOpen ? entries.slice(-80) : entries.slice(-4);
+  UI.log.innerHTML = shown.length ? shown.map(e =>
+    '<div class="log-row"><i class="log-mark"' +
+    (e.colour && e.colour !== 'turn' ? ' style="background:' + e.colour + '"' : '') + '></i>' +
+    '<span class="log-turn">' + String(e.turn).padStart(2, '0') + '</span>' +
+    '<span class="log-text">' + esc(e.text) + '</span></div>').join('')
+    : '<p class="dock-empty">Nothing has happened yet.</p>';
+  const toggle = document.getElementById('log-toggle');
+  if (toggle) toggle.textContent = logOpen ? 'Last' : 'All';
   UI.log.scrollTop = UI.log.scrollHeight;
 }
 
+document.getElementById('log-toggle')?.addEventListener('click', () => {
+  logOpen = !logOpen;
+  renderLog();
+});
+
+
 /* ── interface: the side panel ─────────────────────────────────────────────── */
 
-function renderSide() {
+// The dock is a strip, not a sidebar: fold the panel's flat sections into columns
+// so a tall report reads left to right under the map.
+function dockColumns(html) {
+  const chunks = String(html).split('<p class="sec">');
+  const head = chunks.shift();
+  const cols = chunks.map(c => '<section class="dock-col"><p class="sec">' + c + '</section>');
+  return '<div class="dock-body">' +
+    '<section class="dock-col dock-id">' + head + '</section>' + cols.join('') + '</div>';
+}
+
+function sidePanelHTML() {
   if (selection && selection.kind === 'unit') {
     const u = unitById(selection.id);
-    if (u) { UI.sideScroll.innerHTML = unitPanel(u); return; }
+    if (u) return unitPanel(u);
   }
   if (selection && selection.kind === 'city') {
     const c = cityById(selection.id);
-    if (c) { UI.sideScroll.innerHTML = cityPanel(c); return; }
+    if (c) return cityPanel(c);
   }
-  UI.sideScroll.innerHTML = realmPanel();
+  if (selection && selection.kind === 'tile') {
+    return tilePanel(selection.x, selection.y);
+  }
+  return realmPanel();
+}
+
+function renderSide() {
+  const host = document.getElementById('side-scroll');
+  if (!host) return;
+  host.innerHTML = dockColumns(sidePanelHTML());
 }
 
 function buildLabel(c) {
   if (!c.build) return 'Nothing';
   const def = itemDef(c.build);
-  if (c.wait && c.build.id === 'settler' && c.pop < 2) return def.name + ', waiting for pop 2';
+  if (c.build.kind === 'research') return 'Research · +' + cityYields(c).prod + ' a turn';
+  if (c.wait && def.founds && c.pop < 2 && !civIs(c.owner, 'rome')) return def.name + ', waiting for pop 2';
+  if (c.wait && stockShort(pl(c.owner), def)) return def.name + ', waiting for ' + (def.res.iron && pl(c.owner).iron < def.res.iron ? 'iron' : 'horses');
   return def.name + ' · ' + turnsText(turnsLeft(c));
+}
+
+function civBlurb(id, short) {
+  const civ = CIVS[id], u = civUnique(id);
+  return '<div class="civ-card"><div class="civ-name">' + esc(civTitle(id)) + ' <span class="tag">' + esc(civ.focus) + '</span></div>' +
+    '<div class="civ-line">' + esc(civ.ability) + '</div>' +
+    (short ? '' : '<div class="civ-line"><b>' + esc(u.name) + '.</b> ' + esc(u.blurb) + '</div>') + '</div>';
 }
 
 function realmPanel() {
@@ -2214,25 +3357,45 @@ function realmPanel() {
   if (!f) return '';
   const s = scoreParts(f.i);
   const cities = ownCities(f.i), units = ownUnits(f.i);
+  const inc = stockIncome(f.i);
   let html = '<div class="side-head">' + dot(f, 14) + '<h2>' + esc(f.name) + '</h2></div>' +
     '<div class="side-sub">' + (myTurn() ? 'Your turn' : 'Waiting') + ' · turn ' + G.turn +
-    (G.maxTurns ? ' of ' + G.maxTurns : '') + '</div>' +
-    '<div class="kv"><span>Score</span><span>' + s.total + '</span></div>' +
-    '<div class="kv"><span>Cities × 5</span><span>' + s.cities * 5 + '</span></div>' +
-    '<div class="kv"><span>Pop</span><span>' + s.pop + '</span></div>' +
-    '<div class="kv"><span>Kills × 2</span><span>' + s.kills * 2 + '</span></div>';
+    (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + '</div>' + civBlurb(f.civ);
 
   if (myTurn()) {
     const idle = idleUnits(f.i), lazy = idleCities(f.i);
-    if (idle.length || lazy.length) {
+    if (idle.length || lazy.length || needsTech(f.i)) {
       html += '<p class="sec">Needs orders</p><div class="list">';
-      if (idle.length) html += '<button class="row" data-act="next-unit">' + icon(idle[0].type, 14) +
+      if (needsTech(f.i)) html += '<button class="row" data-act="tech">' + icon('tech', 14) +
+        '<span class="nm">Pick your next tech</span><span class="st">T</span></button>';
+      if (idle.length) html += '<button class="row" data-act="next-unit">' + icon(iconOf(idle[0].type), 14) +
         '<span class="nm">' + plural(idle.length, 'unit has', 'units have') + ' moves left</span><span class="st">N</span></button>';
       for (const c of lazy) html += '<button class="row" data-act="select-city:' + c.id + '">' + icon('city', 14) +
         '<span class="nm">' + esc(c.name) + ' has nothing to build</span></button>';
       html += '</div>';
     }
   }
+
+  html += '<p class="sec">Score</p>' + kv('Total', '<b>' + s.total + '</b>') +
+    kv('Cities × 5', s.cities * 5) + kv('Pop', s.pop) + kv('Tech', s.tech) +
+    kv('Military (' + s.army + ' strength ÷ 20)', s.mil);
+
+  const rate = researchRate(f.i);
+  html += '<p class="sec">' + icon('tech', 12) + 'Research</p>';
+  if (f.research) {
+    const cost = techCost(f.i, f.research);
+    html += kv(esc(techName(f.research)), Math.min(f.rp, cost) + ' / ' + cost) + meter('prod', f.rp, cost) +
+      '<div class="hint" style="margin-top:2px">+' + rate + ' a turn · ' + esc(turnsText(researchTurns(f.i)) || '') + '</div>';
+  } else {
+    html += '<div class="hint" style="margin-top:0">' + (researchChoices(f.i).length ? 'Nothing picked. ' + f.rp + ' research banked.' : 'Every tech is done.') + '</div>';
+  }
+  if (!rate) html += '<div class="hint">No research coming in. Set a city to Research, or build a Library.</div>';
+  html += '<div class="actions"><button class="act" data-act="tech">' + icon('tech', 14) + 'Tech tree<kbd>T</kbd></button></div>';
+
+  html += '<p class="sec">Stockpiles</p>' +
+    kv(icon('horses', 12) + ' Horses', f.horses + ' / ' + STOCK_CAP + (inc.horses ? ' · +' + inc.horses : '')) +
+    kv(icon('iron', 12) + ' Iron', f.iron + ' / ' + STOCK_CAP + (inc.iron ? ' · +' + inc.iron : '')) +
+    (inc.horses || inc.iron ? '' : '<div class="hint">Pastures on horses and mines on iron fill these, 2 a turn each.</div>');
 
   html += '<p class="sec">Cities</p>';
   if (!cities.length) {
@@ -2247,22 +3410,22 @@ function realmPanel() {
   if (!units.length) html += '<div class="hint" style="margin-top:0">No units.</div>';
   else {
     html += '<div class="list">' + units.map(u =>
-      '<button class="row" data-act="select-unit:' + u.id + '">' + icon(u.type, 14) +
+      '<button class="row" data-act="select-unit:' + u.id + '">' + icon(iconOf(u.type), 14) +
       '<span class="nm">' + UNITS[u.type].name + (isEmbarked(u) ? ' (at sea)' : '') + '</span><span class="st">' +
-      (isMil(u.type) ? u.hp + 'hp · ' : '') + u.mp + '/' + UNITS[u.type].move + ' moves</span></button>').join('') + '</div>';
+      (isMil(u.type) ? u.hp + 'hp · ' : '') + u.mp + '/' + unitMove(u) + ' moves</span></button>').join('') + '</div>';
   }
 
   html += '<p class="sec">Rivals</p><div class="list">';
   for (const o of G.players) {
     if (o.i === f.i) continue;
     const war = atWar(f.i, o.i);
-    html += '<div class="row">' + dot(o) + '<span class="nm">' + esc(o.name) + (o.human ? '' : ' · CPU') + '</span>' +
+    html += '<div class="row">' + dot(o) + '<span class="nm">' + esc(o.name) + ' · ' + esc(CIVS[o.civ].land) + (o.human ? '' : ' · CPU') + '</span>' +
       (o.alive ? '<span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'war' : 'peace') + '</span>' : '<span class="tag">out</span>') +
       '<span class="st">' + scoreParts(o.i).total + '</span></div>';
   }
   html += '</div><div class="actions"><button class="act" data-act="council">Council</button>' +
     '<button class="act" data-act="help">Rules</button></div>' +
-    '<p class="hint">Click a unit, then a green hex to move. Red hexes are targets you can hit. Drag to look around; scroll or use the buttons to zoom.</p>';
+    '<p class="hint">Click a unit, then a green hex to move. Red hexes are targets you can hit. Click any hex to see what’s on it. Drag to look around; scroll or use the buttons to zoom.</p>';
   return html;
 }
 
@@ -2270,30 +3433,45 @@ function buildRow(c, item, mine) {
   const def = itemDef(item);
   const why = buildProblem(c, item);
   const on = sameItem(c.build, item);
-  const t = turnsLeft(c, item);
   let note = why;
-  if (!why && item.kind === 'unit' && item.id === 'settler' && c.pop < 2) note = 'Waits for pop 2 to finish';
+  if (!why && item.kind === 'unit' && def.founds && c.pop < 2 && !civIs(c.owner, 'rome')) note = 'Waits for pop 2 to finish';
+  if (!why && item.kind === 'unit' && def.res) {
+    const need = [def.res.horses ? def.res.horses + ' horses' : '', def.res.iron ? def.res.iron + ' iron' : ''].filter(Boolean).join(' + ');
+    note = 'Takes ' + need + (stockShort(pl(c.owner), def) ? ' (you have ' + pl(c.owner).horses + ' horses, ' + pl(c.owner).iron + ' iron)' : '');
+  }
   const disabled = !mine || !!why;
+  const cost = costOf(c, item), t = turnsLeft(c, item);
   return '<button class="build-row' + (on ? ' on' : '') + '" data-act="setbuild:' + c.id + ':' + item.kind + ':' + item.id + '"' +
-    (disabled ? ' disabled' : '') + ' title="' + esc(def.blurb) + '">' + icon(item.id, 15) +
+    (disabled ? ' disabled' : '') + ' title="' + esc(def.blurb) + '">' + icon(item.kind === 'unit' ? iconOf(item.id) : item.id, 15) +
     '<span><span class="nm">' + def.name + '</span><span class="why">' + esc(note || def.blurb) + '</span></span>' +
-    '<span class="cost">' + def.cost + (why ? '' : ' · ' + (isFinite(t) ? t + 't' : '∞')) + '</span></button>';
+    '<span class="cost">' + cost + (why ? '' : ' · ' + (isFinite(t) ? t + 't' : '∞')) + '</span></button>';
+}
+
+function researchRow(c, mine) {
+  const f = pl(c.owner), on = c.build && c.build.kind === 'research';
+  const what = f.research ? 'All ' + cityYields(c).prod + ' production goes to ' + techName(f.research) + ', every turn.'
+    : 'All its production goes into research. Pick a tech in the tech tree.';
+  return '<button class="build-row' + (on ? ' on' : '') + '" data-act="setbuild:' + c.id + ':research:research"' + (mine ? '' : ' disabled') + '>' +
+    icon('tech', 15) + '<span><span class="nm">Research</span><span class="why">' + esc(what) + '</span></span>' +
+    '<span class="cost">+' + cityYields(c).prod + '</span></button>';
 }
 
 function cityPanel(c) {
   const v = G.viewer, f = pl(c.owner);
   const mine = c.owner === v && myTurn();
   const own = c.owner === v;
+  const cont = continentName(tileAt(c.x, c.y));
   let html = '<div class="side-head">' + icon(c.capital ? 'crown' : 'city', 18) + '<h2>' + esc(c.name) + '</h2>' +
     (c.capital ? '<span class="tag">capital</span>' : '') + '</div>' +
-    '<div class="side-sub">' + dot(f, 9) + ' ' + esc(f.name) + ' · pop ' + c.pop + '</div>' +
-    '<div class="kv"><span>Health</span><span>' + c.hp + ' / ' + cityMaxHp(c) + '</span></div>' + meter('hp', c.hp, cityMaxHp(c)) +
-    '<div class="kv"><span>Defense strength</span><span>' + cityStrength(c) + '</span></div>';
+    '<div class="side-sub">' + dot(f, 9) + ' ' + esc(f.name) + ' · ' + esc(CIVS[f.civ].land) + ' · pop ' + c.pop + (cont ? ' · ' + esc(cont) : '') + '</div>' +
+    kv('Health', c.hp + ' / ' + cityMaxHp(c)) + meter('hp', c.hp, cityMaxHp(c)) +
+    kv('Defense strength', cityStrength(c)) +
+    (cityShot(c) ? kv('Shoots', cityShot(c) + ', range 2') : '');
 
   if (!own) {
     const war = v !== null && atWar(v, c.owner);
-    html += '<div class="kv"><span>Walls</span><span>' + (c.buildings.includes('walls') ? 'yes' : 'no') + '</span></div>' +
-      '<p class="hint">' + (war ? 'You are at war with ' + esc(f.name) + '. Hit the city down to 0 HP, then step in with a melee unit to take it.'
+    html += kv('Walls', hasWalls(c) ? 'yes' : 'no') +
+      '<p class="hint">' + (war ? 'You are at war with ' + esc(f.name) + '. Hit the city down to 0 HP, then step in with a melee unit or galley to take it.'
         : 'You are at peace with ' + esc(f.name) + '.') + '</p>';
     if (!war && myTurn()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
     html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
@@ -2302,46 +3480,89 @@ function cityPanel(c) {
 
   const y = cityYields(c), need = growCost(c);
   html += '<p class="sec">' + icon('food', 12) + 'Food</p>' +
-    '<div class="kv"><span>Grown here</span><span>+' + y.food + '</span></div>' +
-    '<div class="kv"><span>Eaten (2 per pop, 1 per military unit)</span><span>−' + y.upkeep + '</span></div>' +
-    '<div class="kv"><span>Each turn</span><span style="color:' + (y.net < 0 ? 'var(--rust)' : 'var(--moss)') + '">' + (y.net >= 0 ? '+' : '') + y.net + '</span></div>' +
+    kv('Grown here', '+' + y.food) +
+    kv('Eaten (2 per pop, 1 per military unit)', '−' + y.upkeep) +
+    kv('Each turn', (y.net >= 0 ? '+' : '') + y.net, 'color:' + (y.net < 0 ? 'var(--rust)' : 'var(--moss)')) +
     meter('food', c.food, need) +
     '<div class="hint" style="margin-top:2px">' + (y.net < 0 ? 'Starving: its military units lose 10 HP each turn.'
       : y.net === 0 ? 'Not growing.' : c.food + ' / ' + need + ' food · grows in ' + turnsText(Math.ceil((need - c.food) / y.net))) + '</div>';
 
-  html += '<p class="sec">' + icon('prod', 12) + 'Production</p>' +
-    '<div class="kv"><span>Each turn</span><span>+' + y.prod + (c.buildings.includes('barracks') ? ' (×1.5 military)' : '') + '</span></div>';
-  if (c.build) {
-    const def = itemDef(c.build);
-    html += '<div class="kv"><span>Building ' + def.name + '</span><span>' + c.progress + ' / ' + def.cost + '</span></div>' +
-      meter('prod', c.progress, def.cost) + '<div class="hint" style="margin-top:2px">' + esc(buildLabel(c)) + '</div>';
+  html += '<p class="sec">' + icon('prod', 12) + 'Production</p>' + kv('Each turn', '+' + y.prod);
+  if (c.build && c.build.kind === 'research') {
+    html += kv('Researching', esc(f.research ? techName(f.research) : 'nothing picked')) +
+      '<div class="hint" style="margin-top:2px">' + c.progress + ' production saved for the next thing you build.</div>';
+  } else if (c.build) {
+    const def = itemDef(c.build), cost = costOf(c, c.build);
+    html += kv('Building ' + def.name, c.progress + ' / ' + cost) +
+      meter('prod', c.progress, cost) + '<div class="hint" style="margin-top:2px">' + esc(buildLabel(c)) + '</div>';
   } else {
-    html += '<div class="kv"><span>Building</span><span>nothing</span></div>' +
+    html += kv('Building', 'nothing') +
       '<div class="hint" style="margin-top:2px">' + c.progress + ' production saved. Pick something below.</div>';
   }
+  if (c.buildings.length) html += kv('Has', c.buildings.map(b => BUILDINGS[b].name).join(', '));
 
   if (mine) {
     const shots = cityShootTargets(c).filter(s => visibleTo(s.unit.x, s.unit.y));
-    if (c.buildings.includes('walls') && !c.shot && shots.length) {
+    if (cityShot(c) && !c.shot && shots.length) {
       html += '<p class="sec">Shoot from the walls</p><div class="list">' + shots.map(s =>
-        '<button class="row" data-act="shoot:' + c.id + ':' + s.unit.id + '">' + icon(s.unit.type, 14) +
+        '<button class="row" data-act="shoot:' + c.id + ':' + s.unit.id + '">' + icon(iconOf(s.unit.type), 14) +
         '<span class="nm">' + esc(pl(s.unit.owner).name) + ' ' + UNITS[s.unit.type].name.toLowerCase() + ' · ' + s.unit.hp + 'hp</span>' +
         '<span class="st">~' + s.dmg + (s.kills ? ' · kills' : '') + '</span></button>').join('') + '</div>';
     }
   }
 
+  html += '<p class="sec">Research</p><div class="build-list">' + researchRow(c, mine) + '</div>';
+  const roster = UNIT_ORDER.map(base => unitFor(c.owner, base));
+  const open = roster.filter(id => !buildProblem(c, { kind: 'unit', id }));
+  const shut = roster.filter(id => buildProblem(c, { kind: 'unit', id }));
   html += '<p class="sec">Units</p><div class="build-list">' +
-    UNIT_ORDER.map(id => buildRow(c, { kind: 'unit', id }, mine)).join('') + '</div>';
-  html += '<p class="sec">Buildings</p><div class="build-list">' +
-    Object.keys(BUILDINGS).map(id => buildRow(c, { kind: 'building', id }, mine)).join('') + '</div>';
-  html += '<p class="sec">Projects</p><div class="build-list">' +
-    Object.keys(PROJECTS).map(id => buildRow(c, { kind: 'project', id }, mine)).join('') + '</div>';
+    open.concat(shut).map(id => buildRow(c, { kind: 'unit', id }, mine)).join('') + '</div>';
+  const blds = BUILDING_ORDER.map(base => buildingFor(c.owner, base)).filter(id => !c.buildings.includes(id));
+  if (blds.length) {
+    html += '<p class="sec">Buildings</p><div class="build-list">' +
+      blds.map(id => buildRow(c, { kind: 'building', id }, mine)).join('') + '</div>';
+  }
   if (mine && c.build) html += '<div class="actions"><button class="act" data-act="clearbuild:' + c.id + '">Stop building</button></div>';
 
   const here = unitsAt(c.x, c.y).filter(u => u.owner === v);
-  html += '<div class="actions">' + here.map(u => '<button class="act" data-act="select-unit:' + u.id + '">' + icon(u.type, 14) +
+  html += '<div class="actions">' + here.map(u => '<button class="act" data-act="select-unit:' + u.id + '">' + icon(iconOf(u.type), 14) +
     UNITS[u.type].name + ' here</button>').join('') +
     '<button class="act" data-act="centre:' + c.x + ':' + c.y + '">Show on map</button>' +
+    '<button class="act" data-act="deselect">Back</button></div>';
+  return html;
+}
+
+function whereText(t) {
+  return TERRAIN[t.t].name + (t.f ? ', ' + FEATURES[t.f].name.toLowerCase() : '') +
+    (t.imp ? ', ' + IMPROVEMENTS[t.imp].name.toLowerCase() : '');
+}
+
+function tilePanel(x, y) {
+  const t = tileAt(x, y), v = G.viewer;
+  if (!G.watch && v !== null && !seenBy(v, x, y)) {
+    return '<div class="side-head"><h2>Unexplored</h2></div><p class="hint">Nobody you know has been here. Send a unit to look.</p>' +
+      '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
+  }
+  const ter = TERRAIN[t.t];
+  const who = t.owner !== null ? t.owner : v;
+  const city = cityAt(x, y);
+  const yy = city ? { food: 2, prod: 2 } : tileYield(t, who);
+  const cont = continentName(t);
+  const owner = t.owner !== null ? pl(t.owner) : null;
+  const worker = t.city ? cityById(t.city) : null;
+  let html = '<div class="side-head"><h2>' + esc(ter.name) + '</h2></div>' +
+    '<div class="side-sub">' + esc(cont ? cont : ter.water ? 'Open water' : '') + '</div>' +
+    (t.f ? kv('Feature', FEATURES[t.f].name) : '') +
+    (t.imp ? kv('Improvement', IMPROVEMENTS[t.imp].name) : '') +
+    kv(icon('food', 12) + ' Food', yy.food) + kv(icon('prod', 12) + ' Production', yy.prod) +
+    kv('Move cost', ter.block ? 'impassable' + (v !== null && civIs(v, 'inca') ? ' (2 for you)' : '') :
+      ter.deep ? '1, after Navigation' : ter.water ? '1, embarked' : t.f === 'forest' ? 2 : ter.cost) +
+    (!ter.water && (ter.def || t.f === 'forest') ? kv('Defense bonus', '+' + (ter.def + (t.f === 'forest' ? FEATURES.forest.def : 0))) : '') +
+    kv('Owner', owner ? dot(owner, 9) + ' ' + esc(owner.name) + (worker ? ' · ' + esc(worker.name) : '') : 'nobody');
+  if (t.f === 'horses' || t.f === 'iron') {
+    html += '<div class="hint">' + (t.f === 'horses' ? 'A pasture here adds 2 horses a turn to its owner’s stockpile.' : 'A mine here adds 2 iron a turn to its owner’s stockpile.') + '</div>';
+  }
+  html += '<div class="actions">' + (city ? '<button class="act" data-act="select-city:' + city.id + '">' + icon('city', 14) + 'Open ' + esc(city.name) + '</button>' : '') +
     '<button class="act" data-act="deselect">Back</button></div>';
   return html;
 }
@@ -2350,19 +3571,21 @@ function unitPanel(u) {
   const v = G.viewer, f = pl(u.owner), def = UNITS[u.type];
   const mine = u.owner === v && myTurn();
   const t = tileAt(u.x, u.y);
-  const where = TERRAIN[t.t].name + (t.f ? ', ' + FEATURES[t.f].name.toLowerCase() : '') + (t.imp ? ', ' + IMPROVEMENTS[t.imp].name.toLowerCase() : '');
+  const cont = continentName(t);
   const home = u.home ? cityById(u.home) : null;
-  let html = '<div class="side-head">' + icon(u.type, 18) + '<h2>' + def.name + '</h2>' +
+  let html = '<div class="side-head">' + icon(iconOf(u.type), 18) + '<h2>' + def.name + '</h2>' +
     (isEmbarked(u) ? '<span class="tag">at sea</span>' : '') + '</div>' +
-    '<div class="side-sub">' + dot(f, 9) + ' ' + esc(f.name) + ' · ' + esc(where) + '</div>';
+    '<div class="side-sub">' + dot(f, 9) + ' ' + esc(f.name) + ' · ' + esc(whereText(t)) + (cont ? ' · ' + esc(cont) : '') + '</div>';
   if (isMil(u.type)) {
-    html += '<div class="kv"><span>Health</span><span>' + u.hp + ' / 100</span></div>' + meter('hp', u.hp, 100) +
-      '<div class="kv"><span>Strength</span><span>' + def.str + (defStrength(u) !== def.str ? ' (defends at ' + defStrength(u) + ' here)' : '') + '</span></div>' +
-      (def.rs ? '<div class="kv"><span>Ranged</span><span>' + def.rs + ', range ' + def.range + '</span></div>' : '');
+    const ds = defStrength(u);
+    html += kv('Health', u.hp + ' / 100') + meter('hp', u.hp, 100) +
+      kv('Strength', def.str + (ds !== def.str ? ' (defends at ' + ds + ' here)' : '')) +
+      (def.rs ? kv('Ranged', def.rs + ', range ' + def.range) : '') +
+      kv('Era', (def.era || 1) + ' · counts ' + Math.round(eraWeight(def.era || 1) * 100) + '% for score');
   }
-  html += '<div class="kv"><span>Moves</span><span>' + u.mp + ' / ' + def.move + '</span></div>' +
-    (def.charges ? '<div class="kv"><span>Charges</span><span>' + u.charges + '</span></div>' : '') +
-    (isMil(u.type) && u.owner === v ? '<div class="kv"><span>Fed by</span><span>' + (home ? esc(home.name) : 'nobody (free)') + '</span></div>' : '') +
+  html += kv('Moves', u.mp + ' / ' + unitMove(u)) +
+    (def.charges ? kv('Charges', u.charges) : '') +
+    (isMil(u.type) && u.owner === v ? kv('Fed by', def.noFood ? 'nobody (eats no food)' : home ? esc(home.name) : 'nobody (free)') : '') +
     '<div class="hint">' + esc(def.blurb) + '</div>';
 
   if (u.owner !== v) {
@@ -2380,11 +3603,11 @@ function unitPanel(u) {
       html += '<button class="act' + (why ? '' : ' on') + '" data-act="found"' + (why || u.mp <= 0 ? ' disabled' : '') + '>' + icon('city', 14) + 'Found city<kbd>F</kbd></button>';
       html += '</div>' + (why ? '<div class="hint">' + esc(why) + '.</div>' : u.mp <= 0 ? '<div class="hint">No moves left. Found it next turn.</div>' : '') + '<div class="actions">';
     }
-    if (u.type === 'builder') {
+    if (def.charges && u.charges > 0) {
       const opts = builderOptions(u);
       if (!opts.length) html += '</div><div class="hint">Nothing to build on this tile. Move to a tile inside your borders.</div><div class="actions">';
       for (const o of opts) {
-        const id = o.act.startsWith('build:') ? o.act.slice(6) : o.act === 'chop' ? 'forest' : 'food';
+        const id = o.act.startsWith('build:') ? o.act.slice(6) : o.act === 'chop' ? 'forest' : o.act === 'plant' ? 'plant' : 'food';
         html += '<button class="act" data-act="builder:' + o.act + '"' + (o.why ? ' disabled title="' + esc(o.why) + '"' : '') + '>' +
           icon(id, 14) + esc(o.label) + '</button>';
       }
@@ -2415,7 +3638,7 @@ function unitPanel(u) {
             : s.city.name + ' · ' + s.city.hp + 'hp';
           const out = s.capture ? 'take the city' : '~' + s.dmg + (s.kills ? ' · kills' : s.breaks ? ' · breaks it' : '') +
             (s.back ? ' · you take ~' + s.back + (s.dies ? ' and die' : '') : '');
-          return '<button class="row" data-act="strike:' + s.x + ':' + s.y + '">' + icon(s.unit ? s.unit.type : 'city', 14) +
+          return '<button class="row" data-act="strike:' + s.x + ':' + s.y + '">' + icon(s.unit ? iconOf(s.unit.type) : 'city', 14) +
             '<span class="nm">' + esc(name) + '</span><span class="st">' + out + '</span></button>';
         }).join('') + '</div><div class="hint">Numbers are averages. Each hit rolls between 80% and 120%.</div>';
       }
@@ -2426,7 +3649,7 @@ function unitPanel(u) {
 
   const others = unitsAt(u.x, u.y).filter(o => o !== u && o.owner === v);
   const city = cityAt(u.x, u.y);
-  html += '<div class="actions">' + others.map(o => '<button class="act" data-act="select-unit:' + o.id + '">' + icon(o.type, 14) +
+  html += '<div class="actions">' + others.map(o => '<button class="act" data-act="select-unit:' + o.id + '">' + icon(iconOf(o.type), 14) +
     UNITS[o.type].name + ' here</button>').join('') +
     (city && city.owner === v ? '<button class="act" data-act="select-city:' + city.id + '">' + icon('city', 14) + 'Open ' + esc(city.name) + '</button>' : '') +
     '<button class="act" data-act="deselect">Back</button></div>';
@@ -2435,8 +3658,8 @@ function unitPanel(u) {
 
 /* ── interface: modals and screens ─────────────────────────────────────────── */
 
-function openModal(html, narrow) {
-  UI.modal.className = 'modal' + (narrow ? ' narrow' : '');
+function openModal(html, size) {
+  UI.modal.className = 'modal' + (size === true ? ' narrow' : size ? ' ' + size : '');
   UI.modal.innerHTML = html;
   UI.modalLayer.hidden = false;
   const first = UI.modal.querySelector('.modal-foot .btn.primary') || UI.modal.querySelector('button');
@@ -2445,6 +3668,7 @@ function openModal(html, narrow) {
 function closeModal() {
   UI.modalLayer.hidden = true;
   UI.modal.innerHTML = '';
+  UI.modalKind = null;
 }
 const modalHead = (title, sub) => '<div class="modal-head"><h2>' + title + '</h2><span class="sub">' + (sub || '') +
   '</span><button class="x" data-act="close" aria-label="Close">&times;</button></div>';
@@ -2454,15 +3678,66 @@ function showHandoff() {
   UI.handoff.hidden = false;
   UI.handoffDot.style.background = f.light;
   UI.handoffDot.style.borderColor = f.ink;
-  UI.handoffTurn.textContent = 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '');
+  UI.handoffTurn.textContent = 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + civTitle(f.civ);
   UI.handoffName.textContent = f.name + '’s turn';
   const offers = G.offers.filter(o => o.to === f.i).length;
   UI.handoffNote.textContent = 'Pass the device to ' + f.name + '. Everyone else, look away.' +
     (offers ? ' ' + plural(offers, 'peace offer is', 'peace offers are') + ' waiting in the Council.' : '');
 }
 
+// What learning a tech lets this player do, in plain words.
+function techUnlocks(i, id) {
+  const out = [];
+  for (const base of UNIT_ORDER) { const uid = unitFor(i, base); if (UNITS[uid].tech === id) out.push(UNITS[uid].name); }
+  for (const base of BUILDING_ORDER) { const bid = buildingFor(i, base); if (BUILDINGS[bid].tech === id) out.push(BUILDINGS[bid].name); }
+  for (const imp in IMPROVEMENTS) {
+    const d = IMPROVEMENTS[imp];
+    if (d.tech === id && (!d.civ || d.civ === civOf(i))) out.push(d.name);
+  }
+  if (TECHS[id] && TECHS[id].blurb) out.push(TECHS[id].blurb);
+  return out;
+}
+
+function techCard(i, id) {
+  const f = pl(i);
+  const known = id !== 'future' && hasTech(i, id);
+  const cur = f.research === id;
+  const ready = techReady(i, id);
+  const state = known ? 'known' : cur ? 'cur' : ready ? 'ready' : 'locked';
+  const cost = techCost(i, id);
+  const t = TECHS[id];
+  const unlocks = id === 'future' ? ['+4 score each time. Repeats forever.'] : techUnlocks(i, id);
+  const needs = t && !known && !ready ? t.needs.filter(n => !hasTech(i, n)).map(techName).join(' and ') : '';
+  const status = known ? 'known' : cur ? Math.min(f.rp, cost) + ' / ' + cost + ' · ' + turnsText(researchTurns(i)) : cost + ' research';
+  return '<button class="tech ' + state + '" data-act="research:' + id + '"' + (ready && !cur && myTurn() ? '' : ' disabled') + '>' +
+    '<span class="tn">' + esc(techName(id)) + (id === 'future' && f.future ? ' · ' + f.future + ' done' : '') + '</span>' +
+    '<span class="tc">' + esc(status) + '</span>' +
+    (cur ? meter('prod', f.rp, cost) : '') +
+    '<span class="tu">' + esc(unlocks.join(', ')) + '</span>' +
+    (needs ? '<span class="tq">Needs ' + esc(needs) + '</span>' : '') + '</button>';
+}
+
+function showTech() {
+  const v = G.viewer;
+  if (v === null) return;
+  const f = pl(v), rate = researchRate(v);
+  let html = modalHead('Tech tree', (f.research ? 'Researching ' + esc(techName(f.research)) : 'Nothing picked') + ' · +' + rate + ' a turn · ' + f.rp + ' banked');
+  html += '<div class="modal-body"><div class="tech-grid">';
+  for (const era of [1, 2, 3]) {
+    html += '<div class="tech-col"><h3>Era ' + era + ' · ' + (era * 2) + ' score each</h3>' +
+      TECH_ORDER.filter(id => TECHS[id].era === era).map(id => techCard(v, id)).join('') + '</div>';
+  }
+  html += '</div><h3 style="margin-top:14px">After the tree</h3>' + techCard(v, 'future') +
+    '<p class="hint">You research one tech at a time. Cities set to Research send all their production into it, and each Library adds 2 a turn on its own. ' +
+    'Points carry over, so switching techs loses nothing.' + (civIs(v, 'uk') ? ' Your techs cost 25% less.' : '') +
+    (civIs(v, 'portugal') ? ' Navigation costs you half.' : '') + '</p></div>' +
+    '<div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>';
+  openModal(html, 'wide');
+  UI.modalKind = 'tech';
+}
+
 function showCouncil() {
-  const v = G.viewer, me = pl(v);
+  const v = G.viewer;
   const offers = G.offers.filter(o => o.to === v);
   let html = modalHead('Council', 'War and peace with the other players');
   html += '<div class="modal-body">';
@@ -2490,7 +3765,8 @@ function showCouncil() {
     html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(o.name) +
       ' <span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'at war' : 'at peace') + '</span>' +
       (o.human ? '' : '<span class="tag">CPU</span>') + '</div>' +
-      '<div class="cd">' + plural(s.cities, 'city', 'cities') + ' · score ' + s.total + mood + '</div></div><div class="ca">';
+      '<div class="cd">' + esc(civTitle(o.civ)) + ' · ' + plural(s.cities, 'city', 'cities') + ' · ' + plural(o.techs.length, 'tech', 'techs') +
+      ' · score ' + s.total + mood + '</div></div><div class="ca">';
     if (myTurn()) {
       if (war) html += sent ? '<span class="tag">offer sent</span>' : '<button class="act" data-act="peace:' + o.i + '">Offer peace</button>';
       else html += '<button class="act warn" data-act="war-ask:' + o.i + '">Declare war</button>';
@@ -2526,10 +3802,11 @@ function showPending() {
 
 function askEndTurn() {
   const v = G.viewer;
-  const idle = idleUnits(v), lazy = idleCities(v);
-  if (!idle.length && !lazy.length) { doEndTurn(); return; }
-  const rows = idle.slice(0, 8).map(u => '<button class="row" data-act="select-unit:' + u.id + '">' + icon(u.type, 14) +
-    '<span class="nm">' + UNITS[u.type].name + '</span><span class="st">' + u.mp + ' moves left</span></button>').join('') +
+  const idle = idleUnits(v), lazy = idleCities(v), tech = needsTech(v);
+  if (!idle.length && !lazy.length && !tech) { doEndTurn(); return; }
+  const rows = (tech ? '<button class="row" data-act="tech">' + icon('tech', 14) + '<span class="nm">No tech picked</span><span class="st">research is banked</span></button>' : '') +
+    idle.slice(0, 8).map(u => '<button class="row" data-act="select-unit:' + u.id + '">' + icon(iconOf(u.type), 14) +
+      '<span class="nm">' + UNITS[u.type].name + '</span><span class="st">' + u.mp + ' moves left</span></button>').join('') +
     lazy.map(c => '<button class="row" data-act="select-city:' + c.id + '">' + icon('city', 14) +
       '<span class="nm">' + esc(c.name) + '</span><span class="st">nothing to build</span></button>').join('');
   openModal(modalHead('Some things need orders') + '<div class="modal-body"><div class="list">' + rows + '</div>' +
@@ -2540,13 +3817,21 @@ function askEndTurn() {
 }
 
 function showMenu() {
-  openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '')) +
+  openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name) +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
+    '<button class="act" data-act="civs">All 16 civs</button>' +
     '<button class="act" data-act="save">Save now</button>' +
     '<button class="act warn" data-act="new-ask">Quit to the start screen</button></div>' +
     '<p class="hint">The game saves itself on this device after every move and every turn.</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Back to the game</button></div>', true);
+}
+
+function showCivs() {
+  const taken = G ? G.players.map(p => p.civ) : [];
+  openModal(modalHead('Civs', 'Each has one ability and one unique') + '<div class="modal-body"><div class="civ-list">' +
+    CIV_ORDER.map(id => civBlurb(id).replace('<div class="civ-card">', '<div class="civ-card' + (taken.includes(id) ? ' taken' : '') + '">')).join('') +
+    '</div></div><div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>', 'wide');
 }
 
 function askNewGame() {
@@ -2559,7 +3844,7 @@ function askDisband() {
   const u = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   if (!u) return;
   openModal(modalHead('Disband this ' + UNITS[u.type].name.toLowerCase() + '?') +
-    '<div class="modal-body"><p>It leaves the map for good' + (isMil(u.type) ? ' and stops eating food' : '') + '.</p></div>' +
+    '<div class="modal-body"><p>It leaves the map for good' + (isMil(u.type) && !UNITS[u.type].noFood ? ' and stops eating food' : '') + '.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Keep it</button><button class="btn primary" data-act="disband">Disband</button></div>', true);
 }
 
@@ -2567,29 +3852,40 @@ function showHelp() {
   openModal(modalHead('How to play', 'The whole rulebook on one page') + '<div class="modal-body">' +
     '<h3>A turn</h3><p>Each city grows food and production from every tile inside its borders. Each pop eats 2 food and each military unit eats 1 from its home city. ' +
     'Spare food grows the city (15 + 8 × pop to grow), and each new pop claims one more hex. Production goes into whatever the city is building, one thing at a time.</p>' +
+    '<h3>Research</h3><p>You research one tech at a time. Set a city’s build to Research and all its production goes into your tech; each Library adds 2 a turn on its own. ' +
+    'Era 1 techs cost 30, era 2 cost 70 and era 3 cost 120. Warriors, scouts, settlers, builders, farms, chopping and harvesting need no tech. Press T for the tree.</p>' +
+    '<h3>Horses and iron</h3><p>Each pasture on horses and each mine on iron adds 2 to your stockpile a turn, up to 30. Horsemen take 10 horses, swordsmen and warships 10 iron, ' +
+    'and heavy horsemen 10 of each, paid when they finish. If you’re short, the city waits.</p>' +
     '<h3>Cities</h3><p>Settlers found cities on land at least 4 hexes from any other city. Settlers cost 1 pop, so the city needs pop 2. ' +
-    'If a city’s food goes negative, its military units lose 10 HP a turn. Cities heal 20 HP a turn when nobody attacked them.</p>' +
-    '<h3>Builders</h3><p>3 charges, each one instant, inside your borders only: farms on flat land and wheat, mines on hills and iron, pastures on horses, fishing boats on seafood. ' +
-    'Chop a forest for 20 production or harvest wheat or seafood for 20 food. A mine on iron unlocks swordsmen; a pasture on horses unlocks horsemen.</p>' +
-    '<h3>Moving</h3><p>Hills and forest cost 2 moves, mountains are impassable. Land units can step onto shallow water; only military units with Navigation can enter deep sea. ' +
+    'If a city’s food goes negative, its military units lose 10 HP a turn. Cities heal 20 HP a turn when nobody attacked them, and defend at 25 + 3 per pop, or their garrison + 5.</p>' +
+    '<h3>Builders</h3><p>3 charges, each one instant, inside your borders only: farms on flat land and wheat, mines on hills and iron (Mining), pastures on horses (Animal Husbandry), ' +
+    'fishing boats on seafood (Sailing). Chop a forest for 20 production or harvest wheat or seafood for 20 food. Builders can wade onto shallow water to reach seafood.</p>' +
+    '<h3>Moving</h3><p>Hills and forest cost 2 moves, mountains are impassable. Land units can step onto shallow water; deep sea needs Navigation. ' +
     'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Walking onto an enemy civilian standing alone captures it.</p>' +
+    '<h3>Ships</h3><p>Galleys and warships come from coastal cities and stay on water, in shallow water until Navigation. They hit anything next to the water, a galley can take a coastal city, ' +
+    'and they never take the embark penalty.</p>' +
     '<h3>Fighting</h3><p>Every unit has 100 HP. Damage is 30 × e^(0.04 × strength gap), rolled between 80% and 120%. ' +
-    'Melee units take damage back; archers and catapults don’t. Hills and forest give defenders +3. Spearmen get +10 against horsemen; catapults get −15 against units. ' +
-    'Units that don’t move or fight heal 10 HP, or 20 inside your borders.</p>' +
-    '<h3>Taking cities</h3><p>Hit a city to 0 HP, then a melee unit takes it. Captured cities lose their walls and 1 pop. You can keep them or burn them; capitals can’t be burned.</p>' +
-    '<h3>Winning</h3><p>Hold every capital on the map, or have the highest score when the turn limit hits. Score is 5 per city, 1 per pop and 2 per enemy unit destroyed.</p>' +
-    '<h3>Keys</h3><p>Space ends the turn · N next unit · F found city · S skip · D council · H rules · Esc closes or deselects.</p>' +
-    '</div><div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>');
+    'Melee units take damage back; archers, catapults and warships don’t. Units inside their own borders get +5. Hills and forest give defenders +3. ' +
+    'Spearmen get +10 against horse units; catapults get −15 against units. Units that don’t move or fight heal 10 HP, or 20 inside your borders.</p>' +
+    '<h3>Taking cities</h3><p>Hit a city to 0 HP, then a melee unit takes it. Scouts can’t. Captured cities lose their walls and 1 pop. You can keep them or burn them; capitals can’t be burned.</p>' +
+    '<h3>Maps and continents</h3><p>Pick Pangaea, Continents, Islands or Mirror at setup. Every map’s land is split into named continents, marked with thin dashed lines. Click a hex to see which one it’s on.</p>' +
+    '<h3>Winning</h3><p>Hold every capital on the map, or have the highest score when the turn limit hits. Score is 5 per city, 1 per pop, 2, 4 or 6 per tech by era (4 per Future Tech), ' +
+    'and 1 per 20 military strength. Older units count for less as the game goes on: era 1 slides to 25% and era 2 to 50% by the last turn.</p>' +
+    '<h3>Keys</h3><p>Space ends the turn · N next unit · F found city · S skip · T tech · D council · H rules · Esc closes or deselects.</p>' +
+    '</div><div class="modal-foot"><button class="btn" data-act="civs">All 16 civs</button><button class="btn primary" data-act="close">Close</button></div>');
 }
 
 function showEndModal() {
   UI.endShown = true;
   const w = G.over.winner !== null ? pl(G.over.winner) : null;
-  const rows = standings().map(({ f, s }) => '<tr><td>' + dot(f) + ' ' + esc(f.name) + (f.human ? '' : ' (CPU)') + (f.alive ? '' : ' · out') +
-    '</td><td class="n">' + s.cities + '</td><td class="n">' + s.pop + '</td><td class="n">' + s.kills + '</td><td class="n"><b>' + s.total + '</b></td></tr>').join('');
+  const rows = standings().map(({ f, s }) => '<tr><td>' + dot(f) + ' ' + esc(f.name) + ' <span class="faint">' + esc(CIVS[f.civ].land) + '</span>' +
+    (f.human ? '' : ' (CPU)') + (f.alive ? '' : ' · out') +
+    '</td><td class="n">' + s.cities + '</td><td class="n">' + s.pop + '</td><td class="n">' + s.tech + '</td><td class="n">' + s.mil +
+    '</td><td class="n"><b>' + s.total + '</b></td></tr>').join('');
   openModal(modalHead(w ? esc(w.name) + ' wins' : 'Game over', esc(G.over.why) + ' · turn ' + G.over.turn) +
-    '<div class="modal-body"><table class="standings"><thead><tr><th>Player</th><th class="n">Cities</th><th class="n">Pop</th><th class="n">Kills</th><th class="n">Score</th></tr></thead><tbody>' +
-    rows + '</tbody></table></div>' +
+    '<div class="modal-body"><div class="table-wrap"><table class="standings"><thead><tr><th>Player</th><th class="n">Cities</th><th class="n">Pop</th>' +
+    '<th class="n">Tech</th><th class="n">Military</th><th class="n">Score</th></tr></thead><tbody>' +
+    rows + '</tbody></table></div><p class="hint">Score is cities × 5 + pop + tech points + military strength ÷ 20.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button><button class="btn primary" data-act="new">New game</button></div>');
 }
 
@@ -2631,6 +3927,7 @@ function doEndTurn() {
     toast('Turn ' + G.turn);
     const offers = G.offers.filter(o => o.to === G.viewer).length;
     if (offers) toast(plural(offers, 'peace offer is', 'peace offers are') + ' waiting in the Council.');
+    else if (needsTech(G.viewer)) toast('Pick your next tech. Press T.');
   }
 }
 
@@ -2653,11 +3950,21 @@ function onAction(act) {
   if (kind === 'zoom-in') { zoomBy(1.2); return; }
   if (kind === 'zoom-out') { zoomBy(1 / 1.2); return; }
   if (kind === 'zoom-fit') { fitCamera(); return; }
+  if (kind === 'civs') { showCivs(); return; }
   if (!G) return;
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   switch (kind) {
     case 'close': closeModal(); break;
     case 'council': if (!G.handoff) showCouncil(); break;
+    case 'tech': if (!G.handoff && G.viewer !== null) showTech(); break;
+    case 'research':
+      if (myTurn() && setResearch(G.viewer, a)) {
+        toast('Researching ' + techName(a) + '.');
+        render();
+        autosave();
+        showTech();
+      }
+      break;
     case 'menu': if (!G.handoff) showMenu(); break;
     case 'help': showHelp(); break;
     case 'end': if (myTurn()) askEndTurn(); break;
@@ -2670,6 +3977,7 @@ function onAction(act) {
       focusPlayer(G.viewer);
       autosave();
       if (G.offers.some(o => o.to === G.viewer)) toast('A peace offer is waiting in the Council.');
+      else if (needsTech(G.viewer)) toast('Pick your next tech. Press T.');
       break;
     case 'next-unit': {
       if (!myTurn()) break;
@@ -2697,7 +4005,11 @@ function onAction(act) {
     case 'centre': centreOn(Number(a), Number(b)); break;
     case 'setbuild': {
       const c = cityById(a);
-      if (c && c.owner === G.viewer && myTurn() && setBuild(c, { kind: b, id: parts[3] })) { render(); autosave(); }
+      if (c && c.owner === G.viewer && myTurn() && setBuild(c, { kind: b, id: parts[3] })) {
+        render();
+        autosave();
+        if (b === 'research' && !pl(G.viewer).research) toast('Now pick a tech for it. Press T.');
+      }
       break;
     }
     case 'clearbuild': {
@@ -2793,7 +4105,7 @@ function handleTileClick(x, y) {
       return;
     }
   }
-  const seen = seenBy(v, x, y), visible = visibleTo(x, y);
+  const seen = G.watch || seenBy(v, x, y), visible = visibleTo(x, y);
   const mine = unitsAt(x, y).filter(u => u.owner === v);
   const foreign = visible ? unitsAt(x, y).filter(u => u.owner !== v) : [];
   const city = seen ? cityAt(x, y) : null;
@@ -2802,7 +4114,7 @@ function handleTileClick(x, y) {
       const other = mine.find(u => u !== selUnit);
       if (other) { selectUnit(other); return; }
       if (city) { selectCity(city); return; }
-      selection = null; render(); return;
+      selection = { kind: 'tile', x, y }; render(); return;
     }
     if (selection && selection.kind === 'city' && city && selection.id === city.id) { selectUnit(mine[0]); return; }
     const ready = mine.filter(u => u.mp > 0 && !u.acted).sort((p, q) => isMil(q.type) - isMil(p.type));
@@ -2813,7 +4125,10 @@ function handleTileClick(x, y) {
   }
   if (city) { selectCity(city); return; }
   if (foreign.length) { selectUnit(foreign.find(u => isMil(u.type)) || foreign[0]); return; }
-  if (selection) { selection = null; render(); }
+  // Anything else: show what's on the hex. A second click clears it.
+  if (selection && selection.kind === 'tile' && selection.x === x && selection.y === y) { selection = null; render(); return; }
+  selection = { kind: 'tile', x, y };
+  render();
 }
 
 function bindMap() {
@@ -2908,11 +4223,15 @@ function bindKeys() {
       if (event.key === 'Enter') onAction('handoff-go');
       return;
     }
-    if (!UI.modalLayer.hidden) return;
     const key = event.key.toLowerCase();
+    if (!UI.modalLayer.hidden) {
+      if (key === 't' && UI.modalKind === 'tech') closeModal();
+      return;
+    }
     if (event.code === 'Space') { event.preventDefault(); onAction('end'); }
     else if (key === 'n') onAction('next-unit');
     else if (key === 'd') onAction('council');
+    else if (key === 't') onAction('tech');
     else if (key === 'h') onAction('help');
     else if (key === 'm') onAction('menu');
     else if (key === 'f') onAction('found');
@@ -2922,14 +4241,14 @@ function bindKeys() {
 
 /* ── saving ────────────────────────────────────────────────────────────────── */
 
-const SAVE_KEY = 'bored.civlite.save.v1';
+const SAVE_KEY = 'bored.civlite.save.v2';
 
 function saveGame() {
   if (!G || G.watch) return false;
   if (G.over) { clearSave(); return false; }
   try {
-    const meta = G.players.map(p => p.name).join(' vs ') + ' · turn ' + G.turn;
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, at: Date.now(), meta, state: G }));
+    const meta = G.players.map(p => p.name).join(' vs ') + ' · ' + MAP_TYPES[G.map].name.toLowerCase() + ' · turn ' + G.turn;
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 2, at: Date.now(), meta, state: G }));
     return true;
   } catch (error) {
     return false;
@@ -2940,9 +4259,10 @@ function clearSave() {
 }
 function autosave() { saveGame(); }
 function validState(state) {
-  return !!state && state.v === 1 && Array.isArray(state.tiles) && Array.isArray(state.players) && state.players.length >= 2 &&
+  return !!state && state.v === 2 && Array.isArray(state.tiles) && Array.isArray(state.players) && state.players.length >= 2 &&
     Number.isFinite(state.cols) && Number.isFinite(state.rows) && state.tiles.length === state.cols * state.rows &&
-    Array.isArray(state.units) && Array.isArray(state.cities) && !state.over;
+    Array.isArray(state.units) && Array.isArray(state.cities) && Array.isArray(state.conts) && !!MAP_TYPES[state.map] &&
+    state.players.every(p => CIVS[p.civ] && Array.isArray(p.techs)) && !state.over;
 }
 function readSave() {
   try {
@@ -2970,21 +4290,38 @@ function resumeState(state) {
 /* ── the start screen ──────────────────────────────────────────────────────── */
 
 function buildStartScreen() {
+  const civOptions = '<option value="random">Random civ</option>' +
+    CIV_ORDER.map(id => '<option value="' + id + '">' + esc(civTitle(id)) + '</option>').join('');
   UI.seats.innerHTML = SEATS.map((s, i) =>
     '<div class="seat" id="seat-' + i + '">' +
     '<span class="dot" style="background:' + s.light + ';border-color:' + s.ink + '"></span>' +
     '<input type="text" id="seat-name-' + i + '" value="' + s.name + '" maxlength="18" aria-label="Player ' + (i + 1) + ' name">' +
+    '<select class="civ" id="seat-civ-' + i + '" aria-label="Player ' + (i + 1) + ' civ">' + civOptions + '</select>' +
     '<select id="seat-type-' + i + '" aria-label="Player ' + (i + 1) + ' is human or CPU">' +
     '<option value="human"' + (i < 2 ? ' selected' : '') + '>Human</option>' +
-    '<option value="cpu"' + (i >= 2 ? ' selected' : '') + '>CPU</option></select></div>').join('');
+    '<option value="cpu"' + (i >= 2 ? ' selected' : '') + '>CPU</option></select>' +
+    '<div class="seat-note" id="seat-note-' + i + '"></div></div>').join('');
+  UI.optMap.innerHTML = Object.keys(MAP_TYPES).map(id => '<option value="' + id + '"' + (id === 'pangaea' ? ' selected' : '') + '>' +
+    MAP_TYPES[id].name + '</option>').join('');
   UI.optPlayers.onchange = refreshStart;
+  UI.optMap.onchange = refreshStart;
+  for (let i = 0; i < SEATS.length; i++) document.getElementById('seat-civ-' + i).onchange = refreshStart;
   UI.btnBegin.onclick = beginGame;
   UI.btnContinue.onclick = () => { const saved = readSave(); if (saved) resumeState(saved.state); };
   refreshStart();
 }
 function refreshStart() {
   const n = Number(UI.optPlayers.value);
-  SEATS.forEach((s, i) => { document.getElementById('seat-' + i).hidden = i >= n; });
+  SEATS.forEach((s, i) => {
+    document.getElementById('seat-' + i).hidden = i >= n;
+    const civ = document.getElementById('seat-civ-' + i).value;
+    const note = document.getElementById('seat-note-' + i);
+    if (CIVS[civ]) {
+      const u = civUnique(civ);
+      note.textContent = CIVS[civ].ability + ' Unique: ' + u.name + '.';
+    } else note.textContent = 'A civ nobody else picked, drawn at random.';
+  });
+  UI.mapNote.textContent = MAP_TYPES[UI.optMap.value].blurb;
   const saved = readSave();
   UI.btnContinue.hidden = !saved;
   if (saved) UI.btnContinue.textContent = 'Continue · ' + (saved.meta || 'saved game');
@@ -2993,14 +4330,19 @@ function beginGame() {
   const n = Number(UI.optPlayers.value);
   const seats = [];
   for (let i = 0; i < n; i++) {
+    const civ = document.getElementById('seat-civ-' + i).value;
     seats.push({
       name: (document.getElementById('seat-name-' + i).value || SEATS[i].name).trim() || SEATS[i].name,
-      human: document.getElementById('seat-type-' + i).value === 'human'
+      human: document.getElementById('seat-type-' + i).value === 'human',
+      civ: CIVS[civ] ? civ : null
     });
   }
   if (!seats.some(s => s.human)) { toast('At least one player has to be human.'); return; }
+  const picked = seats.map(s => s.civ).filter(Boolean);
+  const twice = picked.find((c, k) => picked.indexOf(c) !== k);
+  if (twice) { toast('Two players picked ' + CIVS[twice].land + '. Each civ can only be picked once.'); return; }
   const seed = nextSeed();
-  const game = startGame({ seats, maxTurns: Number(UI.optTurns.value), seed });
+  const game = startGame({ seats, maxTurns: Number(UI.optTurns.value), seed, map: UI.optMap.value });
   if (!game) { toast('That map didn’t work out. Try again.'); return; }
   gamesStarted++;
   UI.start.hidden = true;
@@ -3037,7 +4379,7 @@ if (typeof window !== 'undefined') {
         renown: s ? s.total : 0,
         score: s ? s.total : 0,
         cities: s ? s.cities : 0,
-        techs: f && f.navigation ? 1 : 0,
+        techs: f ? f.techs.length + f.future : 0,
         units: f ? ownUnits(f.i).length : 0,
         turn: G ? G.turn : 0,
         won: winner && winner.human ? 1 : 0,
@@ -3066,6 +4408,7 @@ function nextSeed() {
 function boot(data) {
   const q = s => document.querySelector(s);
   UI = {
+    inspector: document.getElementById('inspector'),
     stage: q('#stage'), map: q('#map'), cam: q('#cam'),
     layerTerrain: q('#layer-terrain'), layerOwner: q('#layer-owner'), layerCoast: q('#layer-coast'),
     layerMarks: q('#layer-marks'), layerBorder: q('#layer-border'), layerOverlay: q('#layer-overlay'),
@@ -3075,8 +4418,8 @@ function boot(data) {
     modalLayer: q('#modal-layer'), modal: q('#modal'), toast: q('#toast'),
     handoff: q('#handoff'), handoffDot: q('#handoff-dot'), handoffTurn: q('#handoff-turn'),
     handoffName: q('#handoff-name'), handoffNote: q('#handoff-note'),
-    start: q('#start'), seats: q('#seats'), optPlayers: q('#opt-players'), optTurns: q('#opt-turns'),
-    btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), endShown: false
+    start: q('#start'), seats: q('#seats'), optPlayers: q('#opt-players'), optTurns: q('#opt-turns'), optMap: q('#opt-map'),
+    mapNote: q('#map-note'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), endShown: false, modalKind: null
   };
   buildStartScreen();
   bindMap();

@@ -27,7 +27,7 @@ export const FRESH_GAMES = ["scrabble", "basket-random", "brick-run", "trackboun
 export const META = {
   "scrabble": ["Puzzle", "Fifteen squares a side, seven tiles in hand. Spell across the board against the computer or a friend."],
   "brick-run": ["Arcade", "Run, jump and stomp your way to the flagpole."],
-  "trackbound": ["Arcade", "Modular time trial racing: banked corners, medals, ghosts and a daily track."],
+  "trackbound": ["Arcade", "Modular time trial racing: medals, ghosts, a daily track and a procedural freeplay park."],
   "ashcrown": ["Strategy", "Six banners, one shattered vale. Found cities, work the land, and out-think five rival lords on a hex map."],
   "transit-chaos": ["Strategy", "Draw subway lines, move passengers, and keep a growing city from gridlock."],
   "typing-test": ["Puzzle", "Thirty seconds, common words, and a keyboard that does not forgive a glance away."],
