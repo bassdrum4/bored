@@ -28,7 +28,13 @@ test('public announcement renders safely, persists guest dismissal and never tra
   page.on('request', req => {
     if (req.url().startsWith(site.origin)) return req.continue();
     if (req.url().includes('.supabase.co/rest/v1/announcements?')) {
-      return req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(sent) });
+      const headers = {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET,OPTIONS',
+        'access-control-allow-headers': 'apikey,authorization,content-type'
+      };
+      if (req.method() === 'OPTIONS') return req.respond({ status: 204, headers });
+      return req.respond({ status: 200, contentType: 'application/json', headers, body: JSON.stringify(sent) });
     }
     return req.abort();
   });
