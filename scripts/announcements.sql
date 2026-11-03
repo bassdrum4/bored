@@ -24,18 +24,18 @@ alter table public.announcements enable row level security;
 revoke all on public.announcements from anon, authenticated;
 grant select on public.announcements to anon, authenticated;
 grant insert, update on public.announcements to authenticated;
-create policy "players see eligible active announcements" on public.announcements
-for select to anon, authenticated using (
-  (select public.is_analytics_admin())
-  or (
-    active and published_at <= now() and (expires_at is null or expires_at > now())
-    and (
-      audience = 'everyone'
-      or ((select auth.uid()) is not null and audience = 'registered')
-      or ((select auth.uid()) = recipient_id and audience = 'selected')
-    )
-  )
+create policy "guests read public announcements" on public.announcements
+for select to anon using (
+  active and published_at <= now() and (expires_at is null or expires_at > now())
+  and audience = 'everyone'
 );
+create policy "members read their announcements" on public.announcements
+for select to authenticated using (
+  active and published_at <= now() and (expires_at is null or expires_at > now())
+  and (audience in ('everyone','registered') or recipient_id = (select auth.uid()))
+);
+create policy "admins read announcement history" on public.announcements
+for select to authenticated using ((select public.is_analytics_admin()));
 create policy "admins publish announcements" on public.announcements
 for insert to authenticated with check (
   (select public.is_analytics_admin()) and created_by = (select auth.uid())
