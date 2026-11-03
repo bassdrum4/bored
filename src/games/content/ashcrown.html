@@ -624,37 +624,53 @@ const BUILDING_ORDER = ['walls', 'fortress', 'granary', 'library', 'workshop', '
 const RESEARCH = { name: 'Research', cost: 0, blurb: 'Put this city’s production into your current tech, every turn.' };
 
 const CIVS = {
-  qin:      { leader: 'Qin Shi Huang', land: 'China', focus: 'Production', unique: 'terracotta',
+  qin:      { leader: 'Qin Shi Huang', land: 'China', focus: 'Production', colors: [['#0f6656', '#5fbfa3'], ['#7a5a00', '#e6c34a']],
+              unique: 'terracotta',
               ability: 'Every city gets +1 production per 2 pop.' },
-  uk:       { leader: 'Victoria', land: 'UK', focus: 'Research', unique: 'ironclad',
+  uk:       { leader: 'Victoria', land: 'UK', focus: 'Research', colors: [['#8c1c24', '#d4676c'], ['#1b2f63', '#7d8fc8']],
+              unique: 'ironclad',
               ability: 'Techs cost 25% less.' },
-  inca:     { leader: 'Pachacuti', land: 'Inca', focus: 'Mountains', unique: 'terrace',
+  inca:     { leader: 'Pachacuti', land: 'Inca', focus: 'Mountains', colors: [['#8a3a12', '#dd8c5c'], ['#0e6470', '#5cb8c4']],
+              unique: 'terrace',
               ability: 'Units cross mountains for 2 moves, and cities claim mountains like normal land.' },
-  norway:   { leader: 'Harald Hardrada', land: 'Norway', focus: 'Naval', unique: 'longship',
+  norway:   { leader: 'Harald Hardrada', land: 'Norway', focus: 'Naval', colors: [['#2c3e55', '#93a7c1'], ['#7d1a2a', '#c96878']],
+              unique: 'longship',
               ability: 'Ships get +5 strength, and land units skip the −10 embark penalty.' },
-  india:    { leader: 'Gandhi', land: 'India', focus: 'Food', unique: 'stepwell',
+  india:    { leader: 'Gandhi', land: 'India', focus: 'Food', colors: [['#2e6b2a', '#80c06e'], ['#8f5208', '#f0ae4e']],
+              unique: 'stepwell',
               ability: 'Growing costs 10% less food.' },
-  usa:      { leader: 'Teddy Roosevelt', land: 'USA', focus: 'Builders', unique: 'pioneer',
+  usa:      { leader: 'Teddy Roosevelt', land: 'USA', focus: 'Builders', colors: [['#1b2f63', '#7d8fc8'], ['#8c1c24', '#d4676c']],
+              unique: 'pioneer',
               ability: 'Builders cost half and get 4 charges, chopping gives 30 production, and farms and mines give +1 more.' },
-  rome:     { leader: 'Julius Caesar', land: 'Rome', focus: 'Expansion', unique: 'legion',
+  rome:     { leader: 'Julius Caesar', land: 'Rome', focus: 'Expansion', colors: [['#5a2a82', '#a98bd0'], ['#7a5a00', '#dcc050']],
+              unique: 'legion',
               ability: 'Settlers don’t cost pop, and new cities start at pop 2 with a free Granary.' },
-  mongol:   { leader: 'Genghis Khan', land: 'Mongolia', focus: 'Cavalry', unique: 'keshig',
+  mongol:   { leader: 'Genghis Khan', land: 'Mongolia', focus: 'Cavalry', colors: [['#155a8a', '#6fb2e2'], ['#6b4a22', '#c9a77a']],
+              unique: 'keshig',
               ability: 'Horse units get +1 move, and pastures give +3 horses a turn.' },
-  egypt:    { leader: 'Cleopatra', land: 'Egypt', focus: 'Buildings', unique: 'chariot',
+  egypt:    { leader: 'Cleopatra', land: 'Egypt', focus: 'Buildings', colors: [['#7a5a00', '#dcc050'], ['#1d3f8a', '#7a98dc']],
+              unique: 'chariot',
               ability: 'Buildings cost half, and each city gets +1 production for every 2 buildings in it.' },
-  zulu:     { leader: 'Shaka', land: 'Zulu', focus: 'Combat', unique: 'impi',
+  zulu:     { leader: 'Shaka', land: 'Zulu', focus: 'Combat', colors: [['#4b3320', '#a88660'], ['#2f2f2f', '#9c968c']],
+              unique: 'impi',
               ability: 'Military units cost 20% less, and units that win a fight heal 15 HP.' },
-  japan:    { leader: 'Oda Nobunaga', land: 'Japan', focus: 'Coast', unique: 'samurai',
+  japan:    { leader: 'Oda Nobunaga', land: 'Japan', focus: 'Coast', colors: [['#8a1f55', '#d887b0'], ['#8c1c24', '#d4676c']],
+              unique: 'samurai',
               ability: 'Shallow water tiles in your borders give +1 production.' },
-  france:   { leader: 'Joan of Arc', land: 'France', focus: 'Defense', unique: 'castle',
+  france:   { leader: 'Joan of Arc', land: 'France', focus: 'Defense', colors: [['#4a4a4a', '#c9c4bb'], ['#1d3f8a', '#7a98dc']],
+              unique: 'castle',
               ability: 'Walls cost half, and cities heal 30 HP a turn instead of 20.' },
-  ottoman:  { leader: 'Mehmed II', land: 'Ottomans', focus: 'Siege', unique: 'bombard',
+  ottoman:  { leader: 'Mehmed II', land: 'Ottomans', focus: 'Siege', colors: [['#0d5d6b', '#4fa9b8'], ['#135f36', '#5fb07d']],
+              unique: 'bombard',
               ability: 'Catapults get +5 against cities and build 50% faster.' },
-  dutch:    { leader: 'William of Orange', land: 'Netherlands', focus: 'Water', unique: 'polder',
+  dutch:    { leader: 'William of Orange', land: 'Netherlands', focus: 'Water', colors: [['#9c4a00', '#f39c3f'], ['#1d3f8a', '#7a98dc']],
+              unique: 'polder',
               ability: 'Harbors cost half and also give +2 production.' },
-  celts:    { leader: 'Boudica', land: 'Celts', focus: 'Forests', unique: 'woodsman',
+  celts:    { leader: 'Boudica', land: 'Celts', focus: 'Forests', colors: [['#4f5a12', '#a9b35a'], ['#2e6b2a', '#80c06e']],
+              unique: 'woodsman',
               ability: 'Cities get +1 food for every 2 forest tiles they own, and your units get +5 strength in forest.' },
-  portugal: { leader: 'Henry the Navigator', land: 'Portugal', focus: 'Colonies', unique: 'nau',
+  portugal: { leader: 'Henry the Navigator', land: 'Portugal', focus: 'Colonies', colors: [['#6b1d2a', '#b86a78'], ['#0d4f8f', '#5d9fe0']],
+              unique: 'nau',
               ability: 'Cities on a different continent from your capital get +3 food and +3 production, and Navigation costs half.' }
 };
 const CIV_ORDER = Object.keys(CIVS);
@@ -665,12 +681,37 @@ function civUnique(id) {
   return UNITS[key] || BUILDINGS[key] || IMPROVEMENTS[key] || null;
 }
 
-const SEATS = [
-  { name: 'Red',   ink: '#8f3c1a', light: '#c98a62' },
-  { name: 'Blue',  ink: '#1e5560', light: '#6d9ca3' },
-  { name: 'Green', ink: '#3f5c2d', light: '#87a26c' },
-  { name: 'Gold',  ink: '#7d5d0e', light: '#c3a54d' }
-];
+const SEATS = [{ name: 'Player 1' }, { name: 'Player 2' }, { name: 'Player 3' }, { name: 'Player 4' }];
+
+// Each civ wears its own colors, [ink, light]: its first set, or its second
+// when an earlier seat's colors look too alike (Civ 6's jersey system). If both
+// clash, the player takes the first spare that doesn't.
+const SPARE_COLORS = [['#8f3c1a', '#c98a62'], ['#1e5560', '#6d9ca3'], ['#3f5c2d', '#87a26c'],
+  ['#7d5d0e', '#c3a54d'], ['#5a2a82', '#a98bd0'], ['#3d3d3d', '#b5b0a6']];
+function colorLab(hexColor) {
+  const lin = c => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const [r, g, b] = [1, 3, 5].map(i => lin(parseInt(hexColor.slice(i, i + 2), 16) / 255));
+  const f = t => (t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116);
+  const x = f((r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047), y = f(r * 0.2126 + g * 0.7152 + b * 0.0722);
+  const z = f((r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883);
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
+}
+function colorGap(a, b) {
+  const p = colorLab(a), q = colorLab(b);
+  return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+}
+// Too alike: fills under 22 apart or inks under 16 apart (CIE76 color difference).
+const colorsClash = (a, b) => colorGap(a[1], b[1]) < 22 || colorGap(a[0], b[0]) < 16;
+// civs: civ ids in seat order (null for a seat still on Random). Returns [ink, light] per seat.
+function assignColors(civs) {
+  const out = [];
+  for (const id of civs) {
+    if (!CIVS[id]) { out.push(null); continue; }
+    const taken = out.filter(Boolean);
+    out.push(CIVS[id].colors.concat(SPARE_COLORS).find(c => !taken.some(t => colorsClash(t, c))) || CIVS[id].colors[0]);
+  }
+  return out;
+}
 
 const MAP_SIZES = { 2: { cols: 20, rows: 14 }, 3: { cols: 24, rows: 16 }, 4: { cols: 28, rows: 18 } };
 const MAP_TYPES = {
@@ -1237,6 +1278,7 @@ function startGame(options) {
   if (!world) return null;
   const n = seats.length;
   const civs = assignCivs(seats, world.seed);
+  const colors = assignColors(civs);
   G = {
     v: 2, seed: world.seed, rs: (world.seed ^ 0x9e3779b9) >>> 0, map: world.map,
     level: LEVELS[options.level] ? options.level : 'normal',
@@ -1249,9 +1291,8 @@ function startGame(options) {
     nextUnit: 1, nextCity: 1, names: shuffledNames(world.seed)
   };
   seats.forEach((seat, i) => {
-    const look = SEATS[i];
     G.players.push({
-      i, name: (seat.name || look.name).slice(0, 18), ink: look.ink, light: look.light,
+      i, name: (seat.name || SEATS[i].name).slice(0, 18), ink: colors[i][0], light: colors[i][1],
       human: !!seat.human, alive: true, capital: null, capHome: -1, kills: 0, civ: civs[i],
       techs: [], research: null, rp: 0, future: 0, horses: 0, iron: 0, stance: {}, front: null,
       aggro: seat.human ? 1 : 0.6 + hash2(i, 3, world.seed) * 0.9
@@ -3236,8 +3277,9 @@ function buildTutorialIsland() {
     nextUnit: 1, nextCity: 1, names: ['Roma', 'Cinderhold'],
     tut: { step: 0, entered: false, closed: false, raider: null, camp: null }
   };
+  const colors = assignColors(['rome', 'celts']);
   const player = (i, name, civ, human, techs) => ({
-    i, name, ink: SEATS[i].ink, light: SEATS[i].light, human, alive: true, capital: null, capHome: -1, kills: 0, civ,
+    i, name, ink: colors[i][0], light: colors[i][1], human, alive: true, capital: null, capHome: -1, kills: 0, civ,
     techs, research: null, rp: human ? 30 : 0, future: 0, horses: 0, iron: 0, stance: {}, front: null, aggro: 1
   });
   // You get Sailing and Archery for free, and 30 research banked for your first tech.
@@ -3651,7 +3693,8 @@ function buildLabel(c) {
 
 function civBlurb(id, short) {
   const civ = CIVS[id], u = civUnique(id);
-  return '<div class="civ-card"><div class="civ-name">' + esc(civTitle(id)) + ' <span class="tag">' + esc(civ.focus) + '</span></div>' +
+  const [ink, light] = civ.colors[0];
+  return '<div class="civ-card"><div class="civ-name">' + dot({ ink, light }, 12) + esc(civTitle(id)) + ' <span class="tag">' + esc(civ.focus) + '</span></div>' +
     '<div class="civ-line">' + esc(civ.ability) + '</div>' +
     (short ? '' : '<div class="civ-line"><b>' + esc(u.name) + '.</b> ' + esc(u.blurb) + '</div>') + '</div>';
 }
@@ -4637,7 +4680,7 @@ function buildStartScreen() {
     CIV_ORDER.map(id => '<option value="' + id + '">' + esc(civTitle(id)) + '</option>').join('');
   UI.seats.innerHTML = SEATS.map((s, i) =>
     '<div class="seat" id="seat-' + i + '">' +
-    '<span class="dot" style="background:' + s.light + ';border-color:' + s.ink + '"></span>' +
+    '<span class="dot" id="seat-dot-' + i + '"></span>' +
     '<input type="text" id="seat-name-' + i + '" value="' + s.name + '" maxlength="18" aria-label="Player ' + (i + 1) + ' name">' +
     '<select class="civ" id="seat-civ-' + i + '" aria-label="Player ' + (i + 1) + ' civ">' + civOptions + '</select>' +
     '<select id="seat-type-' + i + '" aria-label="Player ' + (i + 1) + ' is human or CPU">' +
@@ -4662,6 +4705,16 @@ function buildStartScreen() {
 }
 function refreshStart() {
   const n = Number(UI.optPlayers.value);
+  // Each seat's dot shows the colors its civ will wear, alternates included.
+  const picked = SEATS.map((s, i) => (i < n ? document.getElementById('seat-civ-' + i).value : null));
+  const colors = assignColors(picked.map(c => (CIVS[c] ? c : null)));
+  SEATS.forEach((s, i) => {
+    const dotEl = document.getElementById('seat-dot-' + i), c = colors[i];
+    dotEl.style.background = c ? c[1] : 'transparent';
+    dotEl.style.borderColor = c ? c[0] : 'var(--ink-3)';
+    dotEl.style.borderStyle = c ? 'solid' : 'dashed';
+    dotEl.title = c ? civTitle(picked[i]) + '’s colors' : 'Colors come with the civ';
+  });
   SEATS.forEach((s, i) => {
     document.getElementById('seat-' + i).hidden = i >= n;
     const civ = document.getElementById('seat-civ-' + i).value;
