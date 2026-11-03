@@ -67,6 +67,7 @@
 <body>
 <main>
   <h1 id="hud">Pairs 0 / 72 &middot; Left 144</h1>
+  <div class="bar"><label for="layout">Layout</label><select id="layout" aria-label="Mahjong layout"><option value="turtle">Turtle · Classic</option><option value="fortress">Fortress · Tall</option><option value="bridge">Bridge · Wide</option></select></div>
   <div id="board" aria-label="Mahjong board"></div>
   <div class="bar">
     <button id="deal" type="button">New deal</button>
@@ -110,6 +111,18 @@ const NORMAL_LAYERS = [
 
 // Twelve tiles in two layers: enough to explain free sides and matching without
 // the size of a full board.
+// Each full layout contains exactly 144 spots. Layers share one coordinate grid.
+const FORTRESS_LAYERS = [
+  { rows: Array(10).fill('##########'), dy: 0 },
+  { rows: Array(4).fill('.########.'), dy: 3 },
+  { rows: Array(3).fill('...####...'), dy: 4 }
+];
+const BRIDGE_LAYERS = [
+  { rows: Array(8).fill('############'), dy: 0 },
+  { rows: Array(4).fill('..########..'), dy: 2 },
+  { rows: Array(4).fill('....####....'), dy: 2 }
+];
+const LAYOUTS = Object.freeze({ turtle: NORMAL_LAYERS, fortress: FORTRESS_LAYERS, bridge: BRIDGE_LAYERS });
 const TUTORIAL_LAYERS = [
   { rows: ['####', '####'], dy: 0 },
   { rows: ['.##.', '.##.'], dy: 0 }
@@ -253,6 +266,10 @@ function dailySeed() {
 let tiles = [], byKey = new Map(), selected = null, pairHint = [];
 let pairs = 0, left = 0, won = false, mode = 'deal', step = 0, depth = 4;
 let startedAt = null, finishedAt = null;
+let activeLayout = 'turtle';
+const layoutSelect = $('layout');
+const lockedLayout = !!window.__boredSeed?.match;
+if (lockedLayout) { layoutSelect.value = 'turtle'; layoutSelect.disabled = true; layoutSelect.title = 'Bored Together uses the same Turtle board for both players'; }
 let minX = 0, maxX = 9, minY = 0, maxY = 5;
 
 function beginGame(layers, seeded) {
@@ -607,11 +624,13 @@ function setTutorial(on) {
   } else {
     // In a Bored Together duel the opening board is the match's, and a re-deal
     // replays it rather than handing that player an easier arrangement.
-    beginGame(NORMAL_LAYERS, !!window.__boredSeed?.match);
+    activeLayout = lockedLayout ? 'turtle' : layoutSelect.value;
+    beginGame(LAYOUTS[activeLayout], lockedLayout);
     statusEl.textContent = 'Match two free tiles of the same kind. Three suits, four winds, three dragons, flowers and seasons.';
   }
 }
 
+layoutSelect.onchange = () => { if (lockedLayout) return; if (window.__boredResume) window.__boredResume.clear(); setTutorial(false); };
 $('deal').onclick = () => { if (window.__boredResume) window.__boredResume.clear(); setTutorial(false); };
 $('shuffle').onclick = shuffleRemaining;
 $('hint').onclick = showHint;
@@ -634,7 +653,7 @@ window.__test = {
       layer: tile.layer, x: tile.x, y: tile.y, kind: tile.kind,
       gone: tile.gone, free: !tile.gone && isFree(tile)
     })),
-    pairs: pairs, left: left, won: won, tutorial: mode === 'tutorial', step: step
+    pairs: pairs, left: left, won: won, layout: activeLayout, tutorial: mode === 'tutorial', step: step
   }),
   choose: index => choose(tiles[index]),
   hint: showHint,
@@ -656,7 +675,7 @@ function savedRun() {
     label: 'Pairs ' + pairs + '/' + (tiles.length / 2) + ' \u00b7 ' + left + ' tiles left',
     state: {
       tiles: tiles.map(tile => ({ layer: tile.layer, x: tile.x, y: tile.y, kind: tile.kind, gone: !!tile.gone })),
-      pairs: pairs, left: left, elapsedMs: Math.max(0, performance.now() - startedAt)
+      layout: activeLayout, pairs: pairs, left: left, elapsedMs: Math.max(0, performance.now() - startedAt)
     }
   };
 }
@@ -664,7 +683,14 @@ function savedRun() {
 function restoreRun(saved) {
   const game = saved && saved.state;
   if (!game || !Array.isArray(game.tiles) || !game.tiles.length) return false;
-  beginGame(NORMAL_LAYERS, false);
+  const restoredLayout = !lockedLayout && Object.prototype.hasOwnProperty.call(LAYOUTS, game.layout) ? game.layout : 'turtle';
+  const expected = layoutSpots(LAYOUTS[restoredLayout]);
+  if (game.tiles.length !== expected.length) return false;
+  const savedPositions = new Set(game.tiles.map(tile => key(tile.layer, tile.x, tile.y)));
+  if (expected.some(tile => !savedPositions.has(key(tile.layer, tile.x, tile.y)))) return false;
+  activeLayout = restoredLayout;
+  layoutSelect.value = restoredLayout;
+  beginGame(LAYOUTS[restoredLayout], false);
   const byPosition = new Map(game.tiles.map(tile => [tile.layer + ':' + tile.x + ':' + tile.y, tile]));
   for (const tile of tiles) {
     const match = byPosition.get(tile.layer + ':' + tile.x + ':' + tile.y);
@@ -687,7 +713,7 @@ function restoreRun(saved) {
 }
 
 // The first deal of the visit is the shared daily board; later deals are fresh.
-beginGame(NORMAL_LAYERS, true);
+beginGame(LAYOUTS[activeLayout], true);
 if (RESUME) {
   const saved = RESUME.read();
   if (saved) RESUME.ask(saved.label, () => { if (!restoreRun(saved)) { RESUME.clear(); setTutorial(false); } }, () => setTutorial(false));

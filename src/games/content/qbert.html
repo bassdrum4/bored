@@ -124,7 +124,11 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             { name: 'Coily Nest', rows: 7, paint: [P.blue, P.yellow], discs: 3, spawn: 2.1, speed: 1.10, types: ['red', 'egg', 'slick'] },
             { name: 'Triple Play', rows: 7, paint: [P.blue, P.yellow, P.purple, P.green], discs: 3, spawn: 1.9, speed: 1.15, types: ALL_TYPES },
             { name: 'The Gauntlet', rows: 7, paint: [P.orange, P.teal], discs: 2, spawn: 1.5, speed: 1.25, types: ALL_TYPES },
-            { name: 'Last Hop', rows: 7, paint: [P.purple, P.yellow, P.blue], discs: 2, spawn: 1.25, speed: 1.35, types: ALL_TYPES }
+            { name: 'Last Hop', rows: 7, paint: [P.purple, P.yellow, P.blue], discs: 2, spawn: 1.25, speed: 1.35, types: ALL_TYPES },
+            { name: 'Colour Thief', rows: 6, paint: [P.teal, P.orange], discs: 3, spawn: 2.0, speed: 1.15, types: ['slick', 'sam', 'red'], revert: true },
+            { name: 'Coily Rush', rows: 7, paint: [P.yellow, P.blue, P.green], discs: 3, spawn: 1.7, speed: 1.25, types: ['egg', 'red'] },
+            { name: 'Unstable Pyramid', rows: 7, paint: [P.purple, P.teal], discs: 2, spawn: 1.75, speed: 1.30, types: ALL_TYPES, revert: true },
+            { name: 'Rainbow Summit', rows: 7, paint: [P.blue, P.yellow, P.purple, P.orange], discs: 2, spawn: 1.4, speed: 1.40, types: ALL_TYPES }
         ];
 
         const ENDLESS_PAINTS = [
@@ -159,6 +163,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
         let score, lives, gameLvl, paint, curRound, maxRounds, streak;
         let eTmr, lastT = 0, nextExtraLife = 8000, paused = false, banner = '';
         let spawnEvery = 3, enemySpeed = 1, spawnTypes = ['red'];
+        let revertingTiles = false;
         let particles = [], pops = [];
 
         // ═══════════════════ SMALL HELPERS ═══════════════════
@@ -220,6 +225,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             spawnEvery = def.spawn;
             enemySpeed = def.speed;
             spawnTypes = def.types;
+            revertingTiles = !!def.revert;
             grid = Array.from({ length: ROWS }, (_, r) => Array(r + 1).fill(0));
             pl = { r: 0, c: 0, x: 0, y: 0 };
             jmp = null; dth = null; ride = null;
@@ -300,6 +306,14 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
                 const col = paint[Math.min(grid[pl.r][pl.c], paint.length - 1)];
                 emitParticles(p.x, p.y + CH, col.t);
                 snd(480 + Math.min(streak, 14) * 20, 0.06);
+            } else if (revertingTiles && grid[pl.r][pl.c] > 0) {
+                // Later arcade-style stages punish revisiting completed cubes.
+                grid[pl.r][pl.c]--;
+                streak = 0;
+                const col = paint[grid[pl.r][pl.c]];
+                emitParticles(p.x, p.y + CH, col.t);
+                addPop(p.x, p.y, 'REVERT', '#ff8899');
+                snd(200, 0.06);
             } else {
                 snd(330, 0.04);
             }
@@ -1000,7 +1014,7 @@ try{Object.defineProperty(window,'sessionStorage',{value:s,configurable:true});}
             if (state === 'title') drawTitle();
             if (state === 'ready') {
                 drawMsg(banner || ('LEVEL ' + gameLvl), '#ffcc00', 250, curRound > 1 ? 18 : 22);
-                if (curRound === 1) drawMsg('HOP THE ' + ROWS + '-ROW PYRAMID', '#8f8fb8', 282, 9);
+                if (curRound === 1) drawMsg(revertingTiles ? 'WATCH OUT: FINISHED CUBES REVERT' : 'HOP THE ' + ROWS + '-ROW PYRAMID', '#8f8fb8', 282, 9);
             }
             if (state === 'win') drawMsg('LEVEL CLEAR!', '#7dffa0', 250, 22);
             if (state === 'gameover') {
