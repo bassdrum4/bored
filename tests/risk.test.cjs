@@ -71,13 +71,16 @@ function cpuFixture(overrides={}) {
   return {state,actions,queue,context,pump};
 }
 
-test('Risk solo onboarding uses one screen with optional manual placement',()=>{
+test('Risk solo onboarding starts with manual deployment and no Auto-place',()=>{
   assert.match(html, /id="risk-difficulty"/);
   assert.match(html, /id="bored-cpu-count"/);
-  assert.match(html, /id="risk-manual-setup"/);
   assert.match(html, /id="risk-resume"/);
-  assert.match(html, /id="risk-auto-place"/);
+  assert.doesNotMatch(html, /id="risk-auto-place"/);
+  assert.doesNotMatch(html, /id="risk-manual-setup"/);
+  assert.doesNotMatch(html, /riskAutoPlaceHuman/);
   assert.match(html, /function riskReadSavedWar\(/);
+  assert.match(html, /count: e\.shiftKey \? 5 : 1/);
+  assert.match(html, /Shift-click/);
   assert.doesNotMatch(html, /<script src="https:\/\/www\.gstatic\.com\/firebasejs\//);
   assert.doesNotMatch(html, /onclick="enterLobby\(true\)"/);
   assert.match(html, /bored\.risk\.autosave/);
@@ -150,7 +153,7 @@ test('Risk only scores finished human world conquest',()=>{
   assert.match(html, /Object\.values\(state\.territories \|\| \{\}\)\.every\(t => t\.owner === 0\)/);
 });
 
-test('Risk opens into a real turn and resumes as the human in Chrome',async t=>{
+test('Risk starts with manual placement; pointer Shift-click puts 5 armies and respects pool cap',async t=>{
   const puppeteer=require('puppeteer-core');
   const {serve}=require('./serve.cjs');
   const executablePath=[process.env.CHROME_PATH,'/usr/bin/google-chrome','/usr/bin/chromium']
@@ -166,30 +169,92 @@ test('Risk opens into a real turn and resumes as the human in Chrome',async t=>{
   await page.setRequestInterception(true);
   page.on('request',r=>r.url().startsWith(site.origin)?r.continue():r.abort());
   await page.goto(site.origin+'/games/content/risk.html',{waitUntil:'domcontentloaded'});
-  const ready=await page.evaluate(()=>{
+
+  const initial=await page.evaluate(()=>{
     document.getElementById('callsign-input').value='TEST';
     document.getElementById('bored-cpu-count').value='1';
     document.getElementById('risk-difficulty').value='3';
     startSinglePlayer();
-    return {phase:state.phase,turn:state.turnIndex,players:state.players.length,
-      troops:Object.values(state.territories).reduce((sum,t)=>sum+t.armies,0),
-      hidden:document.getElementById('overlay-layer').classList.contains('hidden')};
+    return {
+      phase:state.phase,turn:state.turnIndex,players:state.players.length,
+      pool:state.setupPool[0],cpuPool:state.setupPool[1],
+      hidden:document.getElementById('overlay-layer').classList.contains('hidden'),
+      autoButton:document.getElementById('risk-auto-place')
+    };
   });
-  assert.equal(ready.phase,'REINFORCE','one click should skip tedious setup');
-  assert.equal(ready.turn,0);
-  assert.equal(ready.players,2);
-  assert.ok(ready.troops>=80,'both sides should start with complete armies');
-  assert.equal(ready.hidden,true);
+  assert.equal(initial.phase,'SETUP','humans manually place their starting armies');
+  assert.equal(initial.turn,-1,'setup phase has no active combat player');
+  assert.equal(initial.players,2);
+  assert.ok(initial.pool>=16,'human starts with armies still to place');
+  assert.ok(initial.cpuPool>=16,'CPU deployment remains independent');
+  assert.equal(initial.hidden,true);
+  assert.equal(initial.autoButton,null);
+
+  // Use actual PointerEvents on the rendered map: this verifies that
+  // Shift reaches the command handler, rather than merely testing a helper.
+  const placed=await page.evaluate(()=>{
+    const loc=LOCS.find((item,i)=>state.territories[item[2]].owner===0 &&
+      !LOCS.slice(0,i).some(prev=>Math.hypot((item[0]-prev[0])*10,(item[1]-prev[1])*7.5)<25));
+    if (!loc) throw Error('No unambiguous human map position');
+    const map=document.getElementById('worldCanvas');
+    const rect=map.getBoundingClientRect();
+    if (!rect.width || !rect.height) throw Error('World map has no dimensions');
+    const click=(shift)=>{
+      map.dispatchEvent(new PointerEvent('pointerdown',{
+        bubbles:true, shiftKey:shift, pointerType:'mouse', button:0,
+        clientX:rect.left+loc[0]*rect.width/100,
+        clientY:rect.top+loc[1]*rect.height/100
+      }));
+    };
+    const start=state.setupPool[0], prior=state.territories[loc[2]].armies;
+    click(true);
+    const afterShift={pool:state.setupPool[0],troops:state.territories[loc[2]].armies};
+    click(false);
+    const afterNormal={pool:state.setupPool[0],troops:state.territories[loc[2]].armies};
+    // Shift-click should consume only the remaining amount on the last move.
+    while(state.setupPool[0]>0) click(true);
+    return {
+      start, prior, afterShift, afterNormal, finalPool:state.setupPool[0],
+      total:state.territories[loc[2]].armies-prior,
+      finishEnabled:!document.getElementById('nextBtn').disabled
+    };
+  });
+  assert.equal(placed.afterShift.pool,placed.start-5);
+  assert.equal(placed.afterShift.troops,placed.prior+5);
+  assert.equal(placed.afterNormal.pool,placed.start-6);
+  assert.equal(placed.afterNormal.troops,placed.prior+6);
+  assert.equal(placed.finalPool,0);
+  assert.equal(placed.total,placed.start,'final Shift-click cannot overspend');
+  assert.equal(placed.finishEnabled,true);
+  const setupComplete=await page.evaluate(()=>{
+    nextPhase();
+    return {
+      phase:state.phase,turn:state.turnIndex,
+      cpuReady:state.players[1].ready,cpuPool:state.setupPool[1],
+      reserves:state.reserves
+    };
+  });
+  assert.equal(setupComplete.phase,'REINFORCE');
+  assert.equal(setupComplete.turn,0);
+  assert.equal(setupComplete.cpuReady,true,'CPU still deploys its starting troops');
+  assert.equal(setupComplete.cpuPool,0);
+  assert.ok(setupComplete.reserves>0);
+
+  const reinforcements=await page.evaluate(()=>{
+    const territory=Object.keys(state.territories).find(n=>state.territories[n].owner===0);
+    const start=state.reserves, before=state.territories[territory].armies;
+    processAction({type:'CLICK',target:territory,count:5},0);
+    return {start,now:state.reserves,troops:state.territories[territory].armies-before};
+  });
+  assert.equal(reinforcements.now,Math.max(0,reinforcements.start-5));
+  assert.equal(reinforcements.troops,Math.min(5,reinforcements.start),
+    'reinforcement placement is clamped to remaining reserve');
   const stage=await page.evaluate(()=>{
-    const info=document.getElementById('risk-turn-help').textContent;
-    const army=document.getElementById('risk-auto-place');
-    army.click();
-    const remaining=state.reserves;
+    const territory=Object.keys(state.territories).find(n=>state.territories[n].owner===0);
+    while(state.reserves>0)processAction({type:'CLICK',target:territory,count:5},0);
     nextPhase();nextPhase();nextPhase();
-    return {info,remaining,turn:state.turnIndex};
+    return {turn:state.turnIndex};
   });
-  assert.match(stage.info,/friendly territory|reinforce/i);
-  assert.equal(stage.remaining,0,'Auto-place consumes remaining human reinforcements');
   assert.equal(stage.turn,1,'CPU gets the next turn');
   await page.waitForFunction(()=>state.phase==='REINFORCE' && state.turnIndex===0,{timeout:15000});
   await page.evaluate(()=>saveToLocal());
@@ -208,22 +273,4 @@ test('Risk opens into a real turn and resumes as the human in Chrome',async t=>{
   assert.equal(resumed.game.slug,'risk');
   assert.equal(resumed.game.won,false);
   assert.deepEqual(errors.filter(e=>!/Failed to load resource|Network error/i.test(e)),[]);
-  // Deliberate manual setup must remain reachable for players who prefer it.
-  await page.evaluate(()=>{
-    document.getElementById('overlay-layer').classList.remove('hidden');
-    document.getElementById('risk-manual-setup').checked=true;
-    startSinglePlayer();
-  });
-  const manual=await page.evaluate(()=>({
-    phase:state.phase,setup:state.setupPool[0],
-    auto:!document.getElementById('risk-auto-place').classList.contains('hidden')
-  }));
-  assert.equal(manual.phase,'SETUP');
-  assert.ok(manual.setup>0);
-  assert.equal(manual.auto,true);
-  await page.evaluate(()=>{
-    riskAutoPlaceHuman();
-    nextPhase();
-  });
-  await page.waitForFunction(()=>state.phase==='REINFORCE' && state.turnIndex===0,{timeout:5000});
 });

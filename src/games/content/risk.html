@@ -898,12 +898,11 @@
       .risk-kicker { font:600 11px ui-monospace,monospace;letter-spacing:.2em;color:#60c8d1;margin-bottom:7px; }
       .risk-intro h1 {color:#f7f3e4;font:700 clamp(24px,5vw,34px) Orbitron,ui-monospace,monospace;line-height:1.25;margin-bottom:9px;text-transform:none;}
       .risk-subtitle {color:#9fbcc0;font:14px/1.5 ui-monospace,monospace;text-transform:none;margin-bottom:22px;}
-      .risk-intro label:not(.risk-checkbox) {display:block;font:600 11px ui-monospace,monospace;color:#a1cfd3;letter-spacing:.05em;margin:0 0 7px;}
+      .risk-intro label {display:block;font:600 11px ui-monospace,monospace;color:#a1cfd3;letter-spacing:.05em;margin:0 0 7px;}
       .risk-optional {color:#6d999c;font-weight:400;}
       .risk-field {display:block;width:100%;min-width:0;border:1px solid #24616b;background:#06171c;color:#f5e4a9;border-radius:4px;font:14px ui-monospace,monospace;padding:11px;margin-bottom:17px;text-transform:none;}
       .risk-intro-grid {display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-      .risk-checkbox {display:flex;align-items:center;gap:9px;color:#bad0d0;font:12px ui-monospace,monospace;margin:2px 0 18px;text-transform:none;cursor:pointer;}
-      .risk-checkbox input {accent-color:#d8b360;width:16px;height:16px;}
+      .risk-shortcut {font:12px/1.5 ui-monospace,monospace;color:#a8c8ca;margin:10px 0 0;text-transform:none;}
       .risk-primary,.risk-secondary {width:100%;padding:13px;font:700 13px Orbitron,ui-monospace,monospace;letter-spacing:.02em;border-radius:4px;}
       .risk-primary {background:#e3b74c;color:#071014;border-color:#e3b74c;}
       .risk-primary:hover {background:#ffe39b;color:#071014;}
@@ -912,7 +911,6 @@
       .risk-how summary {cursor:pointer;color:#b8dade;}
       .risk-how p {margin-top:8px;}
       #risk-turn-help {font:12px/1.45 ui-monospace,monospace;color:#aec6c6;text-transform:none;margin:8px 0 0;}
-      #risk-auto-place {margin-top:8px;width:100%;padding:8px;font:12px ui-monospace,monospace;}
       @media(max-width:420px){.risk-intro{padding:17px}.risk-intro-grid{grid-template-columns:1fr;gap:0}}
 
       /* Canvas uses 1000×750 world coordinates; CSS scales it independently. */
@@ -974,11 +972,11 @@
               <option value="3">Hard · Ruthless</option>
             </select></div>
         </div>
-        <label class="risk-checkbox"><input type="checkbox" id="risk-manual-setup" />Place my starting armies manually</label>
         <button type="button" onclick="startSinglePlayer()" id="risk-new-game" class="cyber-button risk-primary">START CONQUEST</button>
+        <p class="risk-shortcut">Place armies yourself: click for 1, Shift-click for up to 5.</p>
         <button type="button" onclick="loadFromLocal()" id="risk-resume" class="cyber-button risk-secondary hidden">CONTINUE SAVED WAR</button>
         <details class="risk-how"><summary>How to play</summary>
-          <p><b>1. Reinforce:</b> place armies on your territories (or Auto-place).<br />
+          <p><b>1. Deploy:</b> click your territories to place 1 army, or Shift-click to place up to 5. This works during setup and reinforcement.<br />
           <b>2. Attack:</b> choose a territory with 2+ armies, then an adjacent enemy. Each click rolls dice.<br />
           <b>3. Fortify:</b> move armies between connected territories, then end your turn.<br />
           Hold continents for bonus armies. Conquer the world to win.</p>
@@ -1585,7 +1583,6 @@
           </button>
           <div id="instruction-text" class="instruction-glow text-center text-sm">WAITING...</div>
           <p id="risk-turn-help" aria-live="polite"></p>
-          <button type="button" id="risk-auto-place" onclick="riskAutoPlaceHuman()" class="cyber-button hidden">AUTO-PLACE ARMIES</button>
         </div>
         <div class="cyber-panel p-2 flex flex-col justify-between">
           <div class="text-xs text-cyan-600 border-b border-cyan-900 mb-1">
@@ -3409,40 +3406,14 @@
           });
         }
         startGame();
-        if (!document.getElementById("risk-manual-setup").checked) {
-          for (let pid=0;pid<state.players.length;pid++) riskDistributeSetup(pid);
-          state.phase="REINFORCE";
-          state.turnIndex=0;
-          state.reserves=calculateReserves(0);
-          state.chat.push({name:"WAR REPORT",msg:"Your borders are ready. Reinforce, attack, then fortify."});
-          broadcastState();
-        } else {
-          state.chat.push({name:"WAR REPORT",msg:"Place starting armies or Auto-place, then press FINISH."});
-          broadcastState();
-        }
+        // Humans place their own starting armies; the existing setup READY
+        // action deploys the computer opponents once the human is finished.
+        state.chat.push({
+          name:"WAR REPORT",
+          msg:"Place your starting armies. Click for 1 or Shift-click for up to 5; press FINISH when ready."
+        });
+        broadcastState();
         requestAnimationFrame(drawLoop);
-      }
-      function riskAutoPlaceHuman() {
-        if (!isHost || myPlayerIndex!==0) return;
-        if (state.phase==="SETUP" && !state.players[0]?.ready) {
-          riskDistributeSetup(0);
-          broadcastState();
-        } else if (state.phase==="REINFORCE" && state.turnIndex===0 && state.reserves>0) {
-          saveHistory();
-          const options=Object.keys(state.territories).filter(n=>state.territories[n].owner===0);
-          let remaining=state.reserves;
-          while (remaining>0 && options.length) {
-            const best=options.map(n=>{
-              const enemy=(ADJ[n]||[]).filter(v=>state.territories[v]?.owner!==0);
-              const pressure=enemy.reduce((sum,v)=>sum+(state.territories[v]?.armies||0),0);
-              return {name:n,score:enemy.length*4+pressure-state.territories[n].armies*.5};
-            }).sort((a,b)=>b.score-a.score)[0];
-            state.territories[best.name].armies++;
-            remaining--;
-          }
-          state.reserves=remaining;
-          broadcastState();
-        }
       }
 
       function openDifficultyModal() {
@@ -4753,28 +4724,30 @@
         } else if (state.phase === "SETUP") {
           if (action.type === "CLICK") {
             const t = state.territories[action.target];
-            if (t.owner === pIndex && state.setupPool[pIndex] > 0) {
+            if (t && t.owner === pIndex && state.setupPool[pIndex] > 0) {
+              const amount = Math.min(action.count === 5 ? 5 : 1, state.setupPool[pIndex]);
               saveHistory();
-              t.armies++;
-              state.setupPool[pIndex]--;
+              t.armies += amount;
+              state.setupPool[pIndex] -= amount;
               try {
                 ensureStats(pIndex);
                 state.players[pIndex].stats.armiesPlacedThisTurn =
-                  (state.players[pIndex].stats.armiesPlacedThisTurn || 0) + 1;
+                  (state.players[pIndex].stats.armiesPlacedThisTurn || 0) + amount;
               } catch (e) {}
             }
           }
         } else if (pIndex === state.turnIndex) {
           if (state.phase === "REINFORCE" && action.type === "CLICK") {
             const t = state.territories[action.target];
-            if (t.owner === pIndex && state.reserves > 0) {
+            if (t && t.owner === pIndex && state.reserves > 0) {
+              const amount = Math.min(action.count === 5 ? 5 : 1, state.reserves);
               saveHistory();
-              t.armies++;
-              state.reserves--;
+              t.armies += amount;
+              state.reserves -= amount;
               try {
                 ensureStats(pIndex);
                 state.players[pIndex].stats.armiesPlacedThisTurn =
-                  (state.players[pIndex].stats.armiesPlacedThisTurn || 0) + 1;
+                  (state.players[pIndex].stats.armiesPlacedThisTurn || 0) + amount;
               } catch (e) {}
             }
           } else if (state.phase === "ATTACK" && action.type === "CLICK")
@@ -5791,7 +5764,7 @@
             }
             return;
           }
-          const action = { type: "CLICK", target: hit[2] };
+          const action = { type: "CLICK", target: hit[2], count: e.shiftKey ? 5 : 1 };
           if (isHost) {
             processAction(action, myPlayerIndex);
             broadcastState(); // Sync to clients
@@ -5967,19 +5940,13 @@
         }
         document.getElementById("instruction-text").innerText = instr;
         const help=document.getElementById("risk-turn-help");
-        const auto=document.getElementById("risk-auto-place");
         const cpuTurn=state.players[state.turnIndex]?.isAI;
-        if (state.phase==="SETUP") help.textContent="Tap your territories to place starting armies, or choose Auto-place. Press FINISH to play.";
+        if (state.phase==="SETUP") help.textContent="Click your territories to place 1 army, or Shift-click for up to 5. Press FINISH when all are placed.";
         else if (cpuTurn) help.textContent="Computer commanders are taking their turns. Your turn is next.";
-        else if (state.phase==="REINFORCE") help.textContent="Tap a friendly territory to deploy armies, or choose Auto-place. Attack comes next.";
+        else if (state.phase==="REINFORCE") help.textContent="Click a friendly territory to place 1 army, or Shift-click for up to 5. Attack comes next.";
         else if (state.phase==="ATTACK") help.textContent="Tap an army of 2+ then an adjacent enemy to roll dice. Repeat or end attacks.";
         else if (state.phase==="FORTIFY") help.textContent="Optional: move armies between connected territories. Then end your turn.";
         else help.textContent="Conquer every territory to win.";
-        const canAuto=myPlayerIndex===0 && isHost &&
-          ((state.phase==="SETUP" && state.setupPool?.[0]>0) ||
-          (state.phase==="REINFORCE" && state.turnIndex===0 && state.reserves>0));
-        auto.classList.toggle("hidden",!canAuto);
-        auto.textContent=state.phase==="SETUP"?"AUTO-PLACE STARTING ARMIES":"AUTO-PLACE REINFORCEMENTS";
 
         const sBody = document.getElementById("stats-body");
         sBody.innerHTML = state.players
