@@ -61,7 +61,7 @@ export const META = {
   pong: ['Arcade', 'The original rivalry'], asteroids: ['Arcade', 'Survive the asteroid field'],
   breakout: ['Arcade', 'Clear every brick'], tetris: ['Puzzle', 'Find the perfect fit'],
   minesweeper: ['Puzzle', 'Think before you click'], 'lights-out': ['Puzzle', 'Turn every light off'],
-  tank2: ['Arcade', 'Artillery duels inside a drivable box'],
+  tank2: ['Arcade', 'Artillery on a destructible rolling battlefield'],
   'gun-mayhem': ['Arcade', 'Knock rivals off the platforms'], 'shadow-net': ['Strategy', 'Explore a fictional network through its terminal'],
   'f-14': ['Online', 'Flight simulator · internet required'],
   klang: ['Online', 'Music player · internet required']
