@@ -6,6 +6,27 @@ let events = [], productEvents = [], surveyRows = [], togetherSummary = null, ha
 const names = { ...Object.fromEntries(ORDER), 'f-14': 'F-14 Simulator' }, PAGE_SIZE = 40, MAX_EVENTS = 20000;
 const duration = ms => ms >= 3600000 ? (ms / 3600000).toFixed(1) + ' h' : ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
 const dateTime = iso => new Date(iso).toLocaleString([], { timeZone: 'America/Detroit', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+// Date filters are Detroit calendar days even though timestamps are stored in UTC.
+const DETROIT = 'America/Detroit';
+const detroitDay = date => new Intl.DateTimeFormat('en-CA', { timeZone: DETROIT, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+const shiftDay = (day, days) => { const d = new Date(day + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); };
+function detroitOffset(ts) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: DETROIT, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    .formatToParts(new Date(ts)).map(part => [part.type, part.value]));
+  return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second) - Math.floor(ts / 1000) * 1000;
+}
+// Midnight in Detroit for a YYYY-MM-DD day, as an instant, honoring EST/EDT.
+function detroitMidnight(day) {
+  const base = Date.parse(day + 'T00:00:00Z');
+  let ts = base;
+  for (let i = 0; i < 3; i++) {
+    const next = base - detroitOffset(ts);
+    if (next === ts) break;
+    ts = next;
+  }
+  return new Date(ts);
+}
 function el(tag, text) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; return n; }
 function table(target, columns, rows) {
   const wrapper = el('div'); wrapper.className = 'analytics-table-wrap';
@@ -35,7 +56,7 @@ function renderEngagement(rows) {
   const selected = $('#person').value;
   const products = productEvents.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
   const feedback = surveyRows.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
-  const data = summarizeEngagement(rows, products, feedback, new Date($('#through').value + 'T23:59:59Z'));
+  const data = summarizeEngagement(rows, products, feedback, new Date(detroitMidnight(shiftDay($('#through').value, 1)) - 1));
   const percent = (numerator, denominator) => denominator ? Math.round(numerator / denominator * 100) + '%' : 'Not enough history';
   const stats = [
     ['Visitors with an ID', data.uniqueVisitors], ['Meaningful sessions', data.meaningful],
@@ -206,8 +227,7 @@ async function load() {
     if (!membership?.length) throw new Error('This account does not have analytics admin access.');
     authorized = true;
     $('#access').hidden = true; $('#dashboard').hidden = false; $('#refresh').hidden = false;
-    const start = new Date($('#from').value + 'T00:00:00Z'), end = new Date($('#through').value + 'T00:00:00Z');
-    end.setUTCDate(end.getUTCDate() + 1);
+    const start = detroitMidnight($('#from').value), end = detroitMidnight(shiftDay($('#through').value, 1));
     if (!Number.isFinite(+start) || !Number.isFinite(+end) || start >= end || end - start > 90 * 86400000) throw new Error('Choose a valid date range of at most 90 days.');
     $('#status').textContent = 'Loading activity…';
     const base = '/rest/v1/play_events?select=*&received_at=gte.' + start.toISOString() + '&received_at=lt.' + end.toISOString() +
@@ -285,7 +305,7 @@ async function load() {
 }
 // Open on today only: the dashboard loads the smallest useful slice first, and
 // both fields stay editable so any range up to the 90-day cap can be picked.
-const today = new Date().toISOString().slice(0, 10);
+const today = detroitDay(new Date());
 $('#from').value = today;
 $('#through').value = today;
 ORDER.forEach(([id, name]) => $('#game').append(new Option(name, id)));
