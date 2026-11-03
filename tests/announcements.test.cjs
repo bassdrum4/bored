@@ -20,7 +20,7 @@ test('public announcement renders safely, persists guest dismissal and never tra
   page.on('pageerror', err => errors.push(err.message));
   const sent = [{
     id: 'announcement-test-1', title: '<script>not HTML</script>',
-    body: 'Risk is available now.', priority: 'normal', link_url: '#risk',
+    body: 'Risk is available now.', audience: 'everyone', recipient_id: null, priority: 'normal', link_url: '#risk',
     active: true, published_at: new Date(Date.now() - 5000).toISOString(),
     created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 86400000).toISOString()
   }];
