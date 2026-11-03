@@ -160,14 +160,38 @@
   .table-wrap { overflow-x: auto }
 
   /* ── tech tree and civs ──────────────────────────────────────────────── */
-  .ttree-wrap { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px }
-  .ttree { position: relative; min-width: 1px }
-  .tcol-head { position: absolute; top: 0; width: 160px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3) }
-  .tnode { position: absolute; width: 160px; z-index: 1 }
-  .tnode .tech { height: 100% }
-  .tedges { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible }
+  .ttree-wrap { overflow: auto; padding-bottom: 4px }
+  .ttree { position: relative; transform-origin: 0 0 }
+  .tedges { position: absolute; left: 0; top: 0; pointer-events: none }
   .tedges path { fill: none; stroke: var(--rule-2); stroke-width: 1 }
   .tedges path.on { stroke: var(--moss); stroke-width: 1.5 }
+  .thub {
+    position: absolute; width: 132px; height: 132px; margin: -66px 0 0 -66px;
+    border: 1px dashed var(--rule); border-radius: 50%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1px; padding: 0 12px; text-align: center;
+  }
+  .thub .thk { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3) }
+  .thub strong { font-family: var(--font-display); font-size: 13px; font-weight: 600; line-height: 1.15 }
+  .thub .thv { font-family: var(--font-data); font-size: 10.5px; color: var(--ink-2) }
+  .tnode {
+    position: absolute; width: 96px; padding: 0; border: 0; background: none; display: flex;
+    flex-direction: column; align-items: center; gap: 2px; text-align: center; cursor: pointer;
+  }
+  .tnode:disabled { cursor: default }
+  .tcircle {
+    width: 72px; height: 72px; border-radius: 50%; border: 1px solid var(--rule); background: var(--panel);
+    display: grid; place-items: center; font-family: var(--font-data); font-size: 12px;
+    letter-spacing: .04em; color: var(--ink-2);
+  }
+  .tname { font-family: var(--font-display); font-size: 11.5px; font-weight: 600; line-height: 1.15 }
+  .tcost { font-family: var(--font-data); font-size: 9.5px; color: var(--ink-3) }
+  .tnode.known .tcircle { background: var(--paper-2); border-color: var(--rule-2) }
+  .tnode.known .tname::after { content: " \2713"; color: var(--moss) }
+  .tnode.ready .tcircle { border-color: var(--ink-3) }
+  .tnode.ready:hover .tcircle, .tnode.ready:focus-visible .tcircle { border-color: var(--ink); background: var(--panel-hi) }
+  .tnode.cur .tcircle { border-color: var(--ink); box-shadow: inset 0 0 0 3px var(--moss) }
+  .tnode.locked { opacity: .55 }
+  .tech-future { max-width: 360px }
   .tech {
     display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%;
     border: 1px solid var(--rule); border-radius: 3px; padding: 6px 8px; background: var(--panel);
@@ -3724,15 +3748,14 @@ function techCard(i, id) {
 
 /* ── tech tree ─────────────────────────────────────────────────────────────── */
 
-const TT_NODE = 160;   // node width, px — the tree measures itself against this
-const TT_GAP = 52;     // space between columns, where the connector lines run
-const TT_HEAD = 22;    // room for the era labels above the first row
-const TT_ROW = 10;     // gap between two cards in a column
+const TT_START = 132;   // radius of the first ring, where the era-1 techs sit
+const TT_STEP = 118;    // between one ring and the next
+const TT_NODE = 72;     // node diameter, px
+const TT_PAD = 76;      // room for a node, its label and the rim
 
-// Column per prerequisite depth, then a barycenter pass so each tech sits near
-// the techs that unlock it. Pure: the tech table and key order come in as
-// arguments so this can be read and tested on its own.
-function techColumns(techs, order) {
+// Ring per prerequisite depth, then a barycenter pass so each tech sits near the
+// techs that unlock it. Pure: the tech table and key order come in as arguments.
+function techRings(techs, order) {
   const depth = {};
   const visit = id => {
     const t = techs[id];
@@ -3741,99 +3764,130 @@ function techColumns(techs, order) {
     if (t && t.needs.length) depth[id] = 1 + Math.max.apply(null, t.needs.map(visit));
     return depth[id];
   };
-  const cols = [];
+  const rings = [];
   for (const id of order) {
     const d = visit(id);
-    if (!cols[d]) cols[d] = [];
-    cols[d].push(id);
+    if (!rings[d]) rings[d] = [];
+    rings[d].push(id);
   }
-  for (let k = 1; k < cols.length; k++) {
-    const prev = cols[k - 1];
+  for (let k = 1; k < rings.length; k++) {
+    const prev = rings[k - 1];
     const bary = id => {
       const at = techs[id].needs.map(n => prev.indexOf(n)).filter(n => n >= 0);
       return at.length ? at.reduce((a, b) => a + b, 0) / at.length : 99;
     };
-    cols[k] = cols[k].slice().sort((a, b) => bary(a) - bary(b));
+    rings[k] = rings[k].slice().sort((a, b) => bary(a) - bary(b));
   }
-  return cols;
+  return rings;
+}
+
+// Three letters inside the circle, so the map reads without a legend.
+function techGlyph(id) {
+  const name = id === 'future' ? FUTURE.name : (TECHS[id] ? TECHS[id].name : '');
+  return name.replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase();
+}
+
+// A small deterministic wobble, so a ring looks drawn rather than plotted.
+function techWobble(id) {
+  let h = 7;
+  for (let k = 0; k < id.length; k++) h = (h * 31 + id.charCodeAt(k)) % 1009;
+  return { turn: ((h % 21) / 20 - 0.5) * 0.12, push: ((h % 17) / 16 - 0.5) * 12 };
+}
+
+// Average of a set of angles as a vector, which stays sane across the 0/2π seam.
+function techHeading(angles) {
+  let x = 0, y = 0;
+  angles.forEach(a => { x += Math.cos(a); y += Math.sin(a); });
+  return angles.length ? Math.atan2(y, x) : -Math.PI / 2;
+}
+
+// One ring per depth, each ring centred on the techs it hangs from. Pure maths
+// with no DOM, so the shape can be checked on its own.
+function techLayout(techs, order) {
+  const rings = techRings(techs, order);
+  const node = {};
+  const nodes = [];
+  const size = 2 * (TT_START + (rings.length - 1) * TT_STEP + TT_PAD);
+  rings.forEach((ids, d) => {
+    const radius = TT_START + d * TT_STEP;
+    const parents = id => (techs[id].needs || []).map(n => node[n]).filter(Boolean).map(n => n.angle);
+    const anchor = d === 0 ? -Math.PI / 2 : techHeading(ids.map(id => techHeading(parents(id))));
+    const swing = id => {
+      const h = techHeading(parents(id));
+      return Math.atan2(Math.sin(h - anchor), Math.cos(h - anchor));
+    };
+    const sorted = d === 0 ? ids.slice() : ids.slice().sort((a, b) => swing(a) - swing(b));
+    const step = (2 * Math.PI) / sorted.length;
+    sorted.forEach((id, k) => {
+      const wob = techWobble(id);
+      const angle = anchor + (k - (sorted.length - 1) / 2) * step + wob.turn;
+      const r = radius + wob.push;
+      node[id] = {
+        id, depth: d, angle, radius: r,
+        x: size / 2 + r * Math.cos(angle), y: size / 2 + r * Math.sin(angle)
+      };
+      nodes.push(node[id]);
+    });
+  });
+  const edges = [];
+  nodes.forEach(n => (techs[n.id].needs || []).forEach(p => { if (node[p]) edges.push({ from: p, to: n.id }); }));
+  return { nodes, edges, size, byId: node };
 }
 
 function techTreeHTML(i) {
-  const cols = techColumns(TECHS, TECH_ORDER);
-  // Future Tech is the root above the finished tree: it hangs off every tech in
-  // the last column and repeats forever.
-  const root = cols[cols.length - 1].slice();
-  const all = cols.concat([['future']]);
-  let html = '<div class="ttree-wrap"><div class="ttree">';
-  all.forEach((ids, c) => {
-    const x = c * (TT_NODE + TT_GAP);
-    let label;
-    if (ids.length === 1 && ids[0] === 'future') label = 'After the tree · ' + FUTURE.points + ' score each';
-    else {
-      const eras = ids.map(id => TECHS[id].era);
-      const lo = Math.min.apply(null, eras), hi = Math.max.apply(null, eras);
-      label = 'Era ' + lo + (hi > lo ? '–' + hi : '') + ' · ' + lo * 2 + ' score each';
-    }
-    html += '<div class="tcol-head" style="left:' + x + 'px">' + label + '</div>';
-    ids.forEach(id => {
-      const needs = id === 'future' ? root : TECHS[id].needs;
-      const known = id !== 'future' && hasTech(i, id) ? 1 : 0;
-      html += '<div class="tnode" data-col="' + c + '" data-id="' + id + '" data-known="' + known +
-        '" data-needs="' + needs.join(' ') + '" style="left:' + x + 'px">' + techCard(i, id) + '</div>';
-    });
+  const f = pl(i), lay = techLayout(TECHS, TECH_ORDER), mid = lay.size / 2;
+  let html = '<div class="ttree-wrap"><div class="ttree" data-size="' + lay.size +
+    '" style="width:' + lay.size + 'px;height:' + lay.size + 'px">';
+  html += '<svg class="tedges" width="' + lay.size + '" height="' + lay.size + '" aria-hidden="true">';
+  lay.edges.forEach(e => {
+    const a = lay.byId[e.from], b = lay.byId[e.to];
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const rim = TT_NODE / 2 + 3;
+    html += '<path d="M' + Math.round(a.x + dx / len * rim) + ' ' + Math.round(a.y + dy / len * rim) +
+      'L' + Math.round(b.x - dx / len * rim) + ' ' + Math.round(b.y - dy / len * rim) + '"' +
+      (hasTech(i, e.from) ? ' class="on"' : '') + '/>';
   });
-  html += '<svg class="tedges" aria-hidden="true"></svg></div></div>';
-  return html;
+  html += '</svg>';
+  lay.nodes.forEach(n => {
+    const id = n.id, known = hasTech(i, id), cur = f.research === id, ready = techReady(i, id);
+    const state = known ? 'known' : cur ? 'cur' : ready ? 'ready' : 'locked';
+    const cost = techCost(i, id);
+    const status = known ? 'known' : cur ? Math.min(f.rp, cost) + ' / ' + cost : cost + ' rp';
+    const unlocks = techUnlocks(i, id).join(', ');
+    html += '<button class="tnode ' + state + '" data-act="research:' + id + '"' +
+      (ready && !cur && myTurn() ? '' : ' disabled') + ' title="' + esc(techName(id) + ' — ' + status + '. ' + unlocks) + '"' +
+      ' style="left:' + Math.round(n.x - 48) + 'px;top:' + Math.round(n.y - TT_NODE / 2) + 'px">' +
+      '<span class="tcircle">' + techGlyph(id) + '</span>' +
+      '<span class="tname">' + esc(techName(id)) + '</span>' +
+      '<span class="tcost">' + esc(status) + '</span></button>';
+  });
+  const turns = f.research ? researchTurns(i) : null;
+  const cost = f.research ? techCost(i, f.research) : 0;
+  html += '<div class="thub" style="left:' + mid + 'px;top:' + mid + 'px">' +
+    '<span class="thk">' + (f.research ? 'Researching' : 'Nothing picked') + '</span>' +
+    (f.research
+      ? '<strong>' + esc(techName(f.research)) + '</strong><span class="thv">' + Math.min(f.rp, cost) + ' / ' + cost +
+        (turns === null ? '' : ' · ' + (isFinite(turns) ? turns + 't' : '∞')) + '</span>'
+      : '<span class="thv">+' + researchRate(i) + ' a turn</span>') +
+    '</div>';
+  return html + '</div></div>';
 }
 
-// Cards are measured once they are in the document, so their real heights set
-// the row positions and the connector lines land on the card edges.
-function layoutTechTree() {
+// The drawing is laid out in its own pixels; shrink it to fit the dialog.
+function fitTechTree() {
   if (!UI.modal) return;
-  const tree = UI.modal.querySelector('.ttree');
+  const wrap = UI.modal.querySelector('.ttree-wrap');
+  const tree = wrap && wrap.querySelector('.ttree');
   if (!tree) return;
-  const nodes = Array.prototype.slice.call(tree.querySelectorAll('.tnode'));
-  const byId = {};
-  const cols = {};
-  let width = 0;
-  nodes.forEach(n => {
-    byId[n.getAttribute('data-id')] = n;
-    const c = n.getAttribute('data-col');
-    if (!cols[c]) cols[c] = [];
-    cols[c].push(n);
-    width = Math.max(width, n.offsetLeft + n.offsetWidth);
-  });
-  let height = TT_HEAD;
-  Object.keys(cols).forEach(c => {
-    let y = TT_HEAD;
-    cols[c].forEach(n => {
-      n.style.top = y + 'px';
-      y += n.offsetHeight + TT_ROW;
-    });
-    height = Math.max(height, y - TT_ROW);
-  });
-  tree.style.height = height + 'px';
-  tree.style.width = width + 'px';
-  let d = '';
-  nodes.forEach(child => {
-    const needs = (child.getAttribute('data-needs') || '').split(' ').filter(Boolean);
-    needs.forEach(id => {
-      const parent = byId[id];
-      if (!parent) return;
-      const x1 = parent.offsetLeft + parent.offsetWidth, y1 = parent.offsetTop + parent.offsetHeight / 2;
-      const x2 = child.offsetLeft, y2 = child.offsetTop + child.offsetHeight / 2;
-      const k = Math.max(16, (x2 - x1) / 2);
-      d += '<path d="M' + x1 + ' ' + y1 + 'C' + (x1 + k) + ' ' + y1 + ',' + (x2 - k) + ' ' + y2 + ',' + x2 + ' ' + y2 + '"' +
-        (parent.getAttribute('data-known') === '1' ? ' class="on"' : '') + '/>';
-    });
-  });
-  const svg = tree.querySelector('.tedges');
-  svg.setAttribute('width', width);
-  svg.setAttribute('height', height);
-  svg.innerHTML = d;
-  if (!layoutTechTree.bound) {
-    layoutTechTree.bound = true;
-    window.addEventListener('resize', () => { if (UI.modalKind === 'tech') layoutTechTree(); });
+  const size = parseFloat(tree.getAttribute('data-size')) || 1;
+  const room = Math.max(240, wrap.clientWidth - 2);
+  const k = Math.min(1, room / size);
+  tree.style.transformOrigin = '0 0';
+  tree.style.transform = 'translateX(' + Math.max(0, (room - size * k) / 2) + 'px) scale(' + k + ')';
+  wrap.style.height = (size * k + 2) + 'px';
+  if (!fitTechTree.bound) {
+    fitTechTree.bound = true;
+    window.addEventListener('resize', () => { if (UI.modalKind === 'tech') fitTechTree(); });
   }
 }
 
@@ -3843,14 +3897,15 @@ function showTech() {
   const f = pl(v), rate = researchRate(v);
   let html = modalHead('Tech tree', (f.research ? 'Researching ' + esc(techName(f.research)) : 'Nothing picked') + ' · +' + rate + ' a turn · ' + f.rp + ' banked');
   html += '<div class="modal-body">' + techTreeHTML(v) +
-    '<p class="hint" style="margin-top:12px">Each line points from a tech to the tech it unlocks. You research one at a time: ' +
+    '<h3 style="margin-top:16px">After the tree</h3><div class="tech-future">' + techCard(v, 'future') + '</div>' +
+    '<p class="hint">Each line points from a tech to the tech it unlocks. You research one at a time: ' +
     'cities set to Research send all their production into it, and each Library adds 2 a turn on its own. ' +
     'Points carry over, so switching techs loses nothing.' + (civIs(v, 'uk') ? ' Your techs cost 25% less.' : '') +
     (civIs(v, 'portugal') ? ' Navigation costs you half.' : '') + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>';
   openModal(html, 'wide');
   UI.modalKind = 'tech';
-  layoutTechTree();
+  fitTechTree();
 }
 
 function showCouncil() {
