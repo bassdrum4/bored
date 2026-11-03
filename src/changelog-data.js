@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 259,
+  "count": 260,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -13,6 +13,7 @@ export const CHANGELOG = [
   {"sha":"a10caa5","date":"2026-11-03","author":"Codebuff","subject":"Use Detroit calendar days for analytics date filters"},
   {"sha":"16344a3","date":"2026-11-03","author":"Codebuff","subject":"Rebuild Ashcrown's chrome around the map, and open up Trackbound's freeplay."},
   {"sha":"2b92f95","date":"2026-11-03","author":"bassdrum4","subject":"Rebuild Pastel Tanks around feel: instant play, live aim, paper box"},
+  {"sha":"fb57509","date":"2026-11-02","author":"Daniel Lowe","subject":"Introduce connected diamond, zigzag, and fork Q*bert boards with shape-aware movement and enemies","pr":65},
   {"sha":"5cb518c","date":"2026-11-02","author":"Daniel Lowe","subject":"Add Mahjong layout picker and expand Q*bert levels","pr":64},
   {"sha":"253067b","date":"2026-11-02","author":"Daniel Lowe","subject":"Deepen Breakout with skill chains, new stages, touch aiming and progression fixes","pr":62},
   {"sha":"f3a8ec2","date":"2026-11-02","author":"Daniel Lowe","subject":"Improve Risk solo flow and CPU strategy","pr":63},
