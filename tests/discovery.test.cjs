@@ -10,6 +10,15 @@ const siteRoot = path.join(root, 'src');
 // Match bored.test.cjs: hosted Ubuntu also has a Chromium launcher whose sandbox
 // may be unavailable. Prefer the same working Google Chrome as the game suite.
 
+test('original native arcade games retain their historical catalog positions', async () => {
+  const { ORDER } = await import('../src/games/catalog.js');
+  const slugs = ORDER.map(([slug]) => slug);
+  const deep = slugs.indexOf('deep');
+  assert.ok(deep >= 0, 'DEEP anchors the original native release block');
+  assert.deepEqual(slugs.slice(deep + 1, deep + 5), ['aim-lab', 'connect-four', 'memory', '2048']);
+  assert.equal(slugs[deep + 5], 'sumo', 'older original games follow the native block');
+});
+
 test('discovery keeps its controls and fits small screens', async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
