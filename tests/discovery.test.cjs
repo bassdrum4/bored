@@ -58,8 +58,9 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.ok(Buffer.byteLength(shell) < 40 * 1024, 'the shell stays a small document');
     assert.ok(!/import\.meta\.(?:glob|env)/.test(fs.readFileSync(path.join(siteRoot, 'main.js'), 'utf8')), 'the hub runs unbundled');
     assert.equal(await page.$eval('#recent-empty', e => e.hidden), false);
-    // The board sits above the library now: it belongs to the top of the page.
-    assert.ok(await page.evaluate(() => document.querySelector('#leaderboard').offsetTop < document.querySelector('#library').offsetTop));
+    // The full library is on Home beneath Jump Back In; the leaderboard is a separate view.
+    assert.ok(await page.evaluate(() => document.querySelector('#library').offsetTop > document.querySelector('#recent').offsetTop));
+    assert.equal(await page.$eval('#leaderboard', el => el.hidden), true);
   });
 
   await t.test('creator notes appear on hover and through a touch-friendly button', async () => {
@@ -184,6 +185,39 @@ test('discovery keeps its controls and fits small screens', async t => {
     });
   });
 
+  await t.test('page navigation and device-local settings work without disrupting the library', async () => {
+    await page.click('#leaderboard-nav');
+    assert.equal(await page.$eval('#leaderboard', el => el.hidden), false);
+    assert.equal(await page.$eval('#library', el => el.hidden), true);
+    assert.equal(new URL(page.url()).hash, '#leaderboard');
+
+    await page.click('#settings-nav');
+    assert.equal(await page.$eval('#settings', el => el.hidden), false);
+    await page.select('#setting-theme', 'dark');
+    await page.select('#setting-density', 'compact');
+    await page.click('#setting-descriptions');
+    await page.click('#setting-reduced-motion');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.descriptions), 'hidden');
+
+    await page.reload();
+    await page.waitForSelector('#settings:not([hidden])');
+    assert.equal(await page.$eval('#setting-theme', el => el.value), 'dark');
+    assert.equal(await page.$eval('#setting-density', el => el.value), 'compact');
+    assert.equal(await page.$eval('#setting-descriptions', el => el.checked), false);
+    assert.equal(await page.$eval('#setting-reduced-motion', el => el.checked), true);
+    await page.click('#settings-reset');
+    assert.equal(await page.$eval('#setting-theme', el => el.value), 'system');
+    assert.equal(await page.$eval('#setting-descriptions', el => el.checked), true);
+    await page.click('#home-nav');
+    assert.equal(await page.$eval('#daily', el => el.hidden), false);
+    assert.equal(await page.$eval('#library', el => el.hidden), false);
+    await page.click('#library-nav');
+    assert.equal(new URL(page.url()).hash, '#library');
+    assert.equal(await page.$eval('#library', el => el.hidden), false);
+    await page.click('#home-nav');
+  });
+
   await t.test('layout, anchors, keyboard focus, and reduced motion at desktop and phone widths', async () => {
     const shots = path.join(root, '_build', 'discovery');
     fs.mkdirSync(shots, { recursive: true });
@@ -195,7 +229,7 @@ test('discovery keeps its controls and fits small screens', async t => {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow at ' + width);
       const targets = await page.$$eval('#daily-play,#collections button,#filters button,#grid .star,#random', nodes => nodes.map(node => ({ label: node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })));
       assert.ok(targets.every(box => box.width >= 30 && box.height >= 30), 'usable control sizes at ' + width);
-      const regions = await page.$$eval('#daily,#recent,#leaderboard,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
+      const regions = await page.$eval('#daily,#recent,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
       assert.ok(regions.every((region, index) => !index || region.top >= regions[index - 1].top + regions[index - 1].height), 'sections do not overlap');
     }
     await page.evaluate(() => document.querySelector('.skip-link').focus());
