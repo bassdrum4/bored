@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 281,
+  "count": 282,
   "newest": "2026-11-04",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"d382d6a","date":"2026-11-04","author":"Codebuff","subject":"Add Ashcrown to the daily rotation and promote it for one day"},
   {"sha":"182632c","date":"2026-11-04","author":"Claude","subject":"Civ Lite: real city names by civ and real wonder names."},
   {"sha":"55fd454","date":"2026-11-04","author":"Claude","subject":"Civ Lite: improvement art pass and redrawn icons."},
   {"sha":"789a1e0","date":"2026-11-04","author":"Daniel Lowe","subject":"Keep Bored permanently light and remove dark-theme setting"},
