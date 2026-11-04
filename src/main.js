@@ -30,6 +30,8 @@ import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
 import { resumeScript } from './hub/resume.js';
 import { initVoice } from './hub/voice.js';
+import { initPreferences } from './hub/preferences.js';
+import { createHubNavigation } from './hub/navigation.js';
 import { setBo } from './hub/bo.js';
 
 // Keep the original console/test surface available from the bundled file. The
@@ -890,6 +892,21 @@ initAccount();
 initFeedback();
 initVoice();
 
+const navigation = createHubNavigation({
+  togetherUI,
+  onLeaderboard: () => loadLeaderboard(true)
+});
+
+function clearFavoriteGames() {
+  const now = Date.now();
+  for (const slug of favorites) favoriteEvents[slug] = { saved: false, at: now };
+  favorites.clear();
+  writeStored('bored.favoriteEvents', favoriteEvents);
+  saveLibrary();
+  renderRecent();
+  renderLibrary();
+}
+
 // The hash is the game slug: /bored/#qbert. This also handles browser Back,
 // Forward, and links pasted into an already-open arcade tab.
 function syncGameFromHash() {
@@ -900,6 +917,7 @@ function syncGameFromHash() {
   } else if (activeSlug && !activeTogether) {
     closeGame();
   }
+  navigation.syncFromHash();
 }
 addEventListener('hashchange', syncGameFromHash);
 addEventListener('popstate', syncGameFromHash);
@@ -916,6 +934,10 @@ analyticsToggle.onchange = () => {
   updateAnalyticsToggle();
 };
 window.addEventListener('bored:analytics-disabled', updateAnalyticsToggle);
+initPreferences({
+  clearFavorites: clearFavoriteGames,
+  resetAnalytics: () => { analytics.setEnabled(true); updateAnalyticsToggle(); }
+});
 
 // The original single-file hub exposed these globals; keep them for the test
 // suite and for anyone poking at the console.
