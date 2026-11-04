@@ -229,7 +229,7 @@ test('discovery keeps its controls and fits small screens', async t => {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow at ' + width);
       const targets = await page.$$eval('#daily-play,#collections button,#filters button,#grid .star,#random', nodes => nodes.map(node => ({ label: node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })));
       assert.ok(targets.every(box => box.width >= 30 && box.height >= 30), 'usable control sizes at ' + width);
-      const regions = await page.$eval('#daily,#recent,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
+      const regions = await page.$$eval('#daily,#recent,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
       assert.ok(regions.every((region, index) => !index || region.top >= regions[index - 1].top + regions[index - 1].height), 'sections do not overlap');
     }
     await page.evaluate(() => document.querySelector('.skip-link').focus());
