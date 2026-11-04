@@ -1,0 +1,345 @@
+/* Keep the spacious navigation/layout of the redesign, but use Bored's original
+   paper, ink, red pencil, Fraunces headings and monospace details.
+   The pre-redesign styles.css remains the source of truth for cards and games. */
+
+/* Desktop width and navigation. */
+#hub {
+  width: 100%;
+  max-width: 1760px;
+  padding: 38px clamp(20px, 3.4vw, 58px) 70px;
+}
+.masthead { border-bottom: 3px double var(--ink); padding-bottom: 16px; }
+.masthead-top { align-items: center; gap: 20px; }
+.masthead-top h1 { font-size: clamp(44px, 5vw, 72px); }
+.site-nav { margin-left: auto; gap: clamp(10px, 1.6vw, 24px); font: 12px/1.5 var(--mono); }
+.site-nav a:not(#together-nav) {
+  padding: 10px 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.site-nav a:not(#together-nav):hover,
+.site-nav a:not(#together-nav):focus-visible { text-decoration: underline; }
+.site-nav a:not(#together-nav)[aria-current="page"] {
+  border-bottom-color: var(--red);
+  color: var(--red);
+  text-decoration: none;
+}
+.site-nav #together-nav { white-space: nowrap; }
+.sub { display: block; }
+.intro-row { display: flex; margin-top: 12px; }
+.masthead-bar { background: #fffdf7; }
+body[data-bored-view="leaderboard"] .intro-row,
+body[data-bored-view="settings"] .intro-row,
+body[data-bored-view="together"] .intro-row { display: none; }
+body[data-bored-view="leaderboard"] .masthead-bar,
+body[data-bored-view="settings"] .masthead-bar,
+body[data-bored-view="together"] .masthead-bar { margin-top: 17px; }
+body[data-bored-view="leaderboard"] #together-home,
+body[data-bored-view="settings"] #together-home,
+body[data-bored-view="together"] #together-home { display: none!important; }
+
+/* Existing old-style sections stay in the same order and occupy more width. */
+#daily { margin-top: 26px; }
+#recent { margin-top: 32px; }
+#recent .shelf-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+#library { margin-top: 38px; border-top: 3px double var(--ink); padding-top: 24px; }
+.grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 17px; }
+.row { min-width: 0; }
+.row .card { height: 100%; }
+#leaderboard {
+  min-height: 45vh;
+  border-top: 3px double var(--ink);
+  padding-top: 24px;
+  margin: 30px 0 36px;
+}
+#leaderboard h2 { font-family: var(--display); font-size: clamp(30px, 3.4vw, 45px); }
+#leaderboard #lb-list { max-width: 1100px; }
+#together { padding-top: 24px; }
+#together .section-heading .eyebrow { display: block; }
+#together h2 { font-size: clamp(30px, 3.5vw, 45px); }
+
+/* Settings: real paper UI, not a dashboard of rounded app cards. */
+#settings { min-height: 48vh; margin: 32px 0 45px; }
+.settings-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 25px;
+  padding-bottom: 22px;
+  border-bottom: 3px double var(--ink);
+}
+.settings-intro h2 {
+  margin: 5px 0 9px;
+  font: 400 clamp(34px, 4vw, 52px)/1.15 var(--display);
+}
+.settings-intro p:not(.eyebrow) { font-size: 15px; line-height: 1.55; color: var(--dim); }
+.settings-local-note {
+  flex: none;
+  margin-top: 18px;
+  padding: 6px 9px;
+  border: 1px solid var(--rule);
+  color: var(--dim);
+  font: 10px/1.6 var(--mono);
+}
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, .8fr);
+  gap: 26px;
+  align-items: start;
+}
+.settings-panels { display: grid; gap: 26px; min-width: 0; }
+.settings-panel, .settings-aside {
+  min-width: 0;
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--red);
+}
+.settings-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 23px 24px 18px;
+  border-bottom: 1px solid var(--rule);
+}
+.settings-panel-header h3 {
+  font: 400 29px/1.2 var(--display);
+  margin: 0 0 4px;
+}
+.settings-panel-header p { font-size: 13px; color: var(--dim); }
+.settings-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font: 24px Georgia, serif;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 21px 24px;
+  border-bottom: 1px solid var(--rule);
+}
+.settings-row:last-child { border-bottom: 0; }
+.settings-row > div { flex: 1; min-width: 0; }
+.settings-row label { font: 600 13px/1.5 var(--mono); }
+.settings-row p { font-size: 13px; color: var(--dim); margin-top: 3px; }
+.settings-row select {
+  flex: 0 0 auto;
+  max-width: 46%;
+  min-width: 144px;
+  padding: 9px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 12px/1.5 var(--mono);
+}
+.settings-row select:hover, .settings-row select:focus-visible { border-color: var(--ink); }
+.settings-checkbox {
+  flex: none;
+  appearance: none;
+  width: 44px;
+  height: 25px;
+  margin: 0;
+  position: relative;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--rule);
+  cursor: pointer;
+}
+.settings-checkbox::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  transition: transform .14s;
+}
+.settings-checkbox:checked { background: var(--ink); border-color: var(--ink); }
+.settings-checkbox:checked::after { transform: translateX(19px); background: var(--paper); }
+.settings-checkbox:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+.settings-sidebar { display: grid; gap: 24px; }
+.settings-aside { padding: 22px; }
+.settings-aside h3 { margin: 9px 0 10px; font: 400 23px/1.24 var(--display); }
+.settings-aside > p:not(.eyebrow) { font-size: 13px; line-height: 1.7; color: var(--dim); }
+.settings-aside .settings-saved { margin-top: 16px; color: var(--red)!important; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.settings-actions .action {
+  border-radius: 0;
+  padding: 9px 12px;
+  font: 11px var(--mono);
+  background: transparent;
+  color: var(--ink);
+}
+.settings-actions .action:hover { border-color: var(--ink); }
+.foot { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+
+/* Preserve the working local appearance preferences. */
+html[data-density="compact"] .grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 11px; }
+html[data-density="compact"] .card .text { padding: 12px; }
+html[data-density="compact"] .card .name { font-size: 19px; }
+html[data-density="compact"] .card .detail { min-height: 0; font-size: 13px; }
+html[data-descriptions="hidden"] .card .detail { display: none; }
+html[data-reduce-motion="true"] *,
+html[data-reduce-motion="true"] *::before,
+html[data-reduce-motion="true"] *::after {
+  animation: none!important;
+  transition: none!important;
+  scroll-behavior: auto!important;
+}
+
+/* Dark mode uses the same ink-and-paper design language rather than green panels. */
+html[data-theme="dark"] {
+  --paper: #24211d;
+  --ink: #f1eae0;
+  --dim: #b7a99a;
+  --rule: #534b43;
+  --red: #f19182;
+}
+html[data-theme="dark"] body { background: var(--paper); color: var(--ink); }
+html[data-theme="dark"] .masthead-bar {
+  background: #2e2924; color: var(--ink); border-color: var(--rule);
+}
+html[data-theme="dark"] #account button,
+html[data-theme="dark"] .side-action,
+html[data-theme="dark"] .action,
+html[data-theme="dark"] #q,
+html[data-theme="dark"] #sort,
+html[data-theme="dark"] .filter,
+html[data-theme="dark"] .collection,
+html[data-theme="dark"] .star,
+html[data-theme="dark"] .settings-row select {
+  color: var(--ink); background: var(--paper); border-color: var(--rule);
+}
+html[data-theme="dark"] #account button.primary,
+html[data-theme="dark"] #random,
+html[data-theme="dark"] .primary-action,
+html[data-theme="dark"] .filter[aria-pressed="true"] {
+  background: var(--ink); color: var(--paper); border-color: var(--ink);
+}
+html[data-theme="dark"] .collection[aria-pressed="true"] { color: var(--red); border-color: var(--red); }
+html[data-theme="dark"] .site-nav #together-nav {
+  background: #382f27; border-color: var(--rule); color: var(--red);
+}
+html[data-theme="dark"] .site-nav #together-nav[aria-current="page"] {
+  background: var(--ink); color: var(--paper); border-color: var(--ink);
+}
+html[data-theme="dark"] .game-preview { background: #403b35; }
+html[data-theme="dark"] .game-preview img { filter: saturate(.8) brightness(.82); }
+html[data-theme="dark"] .card .detail,
+html[data-theme="dark"] .game-meta,
+html[data-theme="dark"] .game-inputs,
+html[data-theme="dark"] .card-best { color: var(--dim); }
+html[data-theme="dark"] .card .text,
+html[data-theme="dark"] .shelf-play,
+html[data-theme="dark"] .row,
+html[data-theme="dark"] #daily,
+html[data-theme="dark"] .settings-panel,
+html[data-theme="dark"] .settings-aside { background: var(--paper); color: var(--ink); }
+html[data-theme="dark"] dialog,
+html[data-theme="dark"] #player-actions {
+  background: var(--paper); color: var(--ink); border-color: var(--ink);
+}
+html[data-theme="dark"] dialog input,
+html[data-theme="dark"] dialog textarea { background: #302b26; color: var(--ink); border-color: var(--rule); }
+html[data-theme="dark"] .badge { color: var(--red); background: transparent; border-color: var(--red); }
+html[data-theme="dark"] #hint,
+html[data-theme="dark"] #menu-toggle { background: var(--paper); color: var(--ink); }
+html[data-theme="dark"] .settings-checkbox { background: var(--rule); }
+html[data-theme="dark"] .settings-checkbox:checked { background: var(--ink); }
+
+/* The new wide grid scales down, without losing the original card treatment. */
+@media (max-width: 1380px) {
+  .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  html[data-density="compact"] .grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+@media (max-width: 1060px) {
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-density="compact"] .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .settings-layout { grid-template-columns: minmax(0, 1fr) minmax(240px, .7fr); }
+}
+@media (max-width: 850px) {
+  #hub { padding: 30px 23px 65px; }
+  .masthead-top { gap: 12px; }
+  .site-nav { gap: 10px; }
+  .site-nav a:not(#together-nav) { padding: 8px 0; }
+  #recent .shelf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  #hub { padding: 24px 16px 106px; }
+  .masthead-top h1 { font-size: 46px; }
+  .site-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+    padding: 4px 6px calc(5px + env(safe-area-inset-bottom, 0px));
+    border-top: 3px double var(--ink);
+    background: var(--paper);
+    box-shadow: 0 -3px 12px #00000010;
+  }
+  .site-nav a:not(#together-nav), .site-nav #together-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 43px;
+    padding: 7px 4px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink);
+    font: 9px/1.3 var(--mono);
+    white-space: normal;
+    text-align: center;
+  }
+  .site-nav a:not(#together-nav)[aria-current="page"],
+  .site-nav #together-nav[aria-current="page"] {
+    color: var(--red);
+    border-bottom: 2px solid var(--red);
+    background: transparent;
+  }
+  .site-nav #together-nav .badge { position: absolute; margin: -30px 0 0 50px; }
+  html[data-theme="dark"] .site-nav #together-nav,
+  html[data-theme="dark"] .site-nav #together-nav[aria-current="page"] {
+    background: transparent; border: 0; color: var(--red);
+  }
+  .grid, html[data-density="compact"] .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+  .row .card { flex-direction: column; }
+  .row .game-preview { width: 100%; flex: 0 0 auto; aspect-ratio: 8/5; border: 0; border-bottom: 1px solid var(--rule); }
+  .card .text, html[data-density="compact"] .card .text { padding: 12px; }
+  .card .name { font-size: 19px; }
+  .card .detail, html[data-density="compact"] .card .detail { font-size: 13px; min-height: 0; }
+  .star { top: 8px; right: 8px; left: auto; width: 31px; height: 31px; }
+  #leaderboard, #settings { min-height: 55vh; }
+  .settings-intro { flex-wrap: wrap; }
+  .settings-local-note { margin-top: 0; }
+}
+@media (max-width: 410px) {
+  .card .name { font-size: 17px; }
+  .card .detail { font-size: 12px; }
+  .card .game-meta, .game-inputs { font-size: 9px; }
+  .search-row { flex-wrap: wrap; }
+  .search-row #q { flex-basis: 100%; }
+  #random { flex: 1; }
+  .settings-row { padding: 16px 14px; gap: 12px; }
+  .settings-panel-header, .settings-aside { padding: 19px 15px; }
+  .settings-row select { min-width: 114px; padding: 8px 6px; font-size: 11px; }
+  .settings-row label { font-size: 11px; }
+  .settings-row p { font-size: 12px; }
+}
