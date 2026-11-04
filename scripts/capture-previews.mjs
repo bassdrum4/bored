@@ -50,6 +50,21 @@ try {
     await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.body?.childElementCount > 0);
     const frame = await (await page.$('#frame')).contentFrame();
     await new Promise(resolve => setTimeout(resolve, 150));
+    // Ashcrown turns its tutorial on until one is finished, and the card wants
+    // the board, not a twelve-step overlay on top of it. One human against CPUs
+    // also skips the handoff screen, which is for passing a device around.
+    if (slug === 'ashcrown') await frame.evaluate(() => {
+      const tutorial = document.querySelector('#opt-tutorial');
+      if (tutorial) tutorial.checked = false;
+      const humans = document.querySelector('#opt-humans');
+      const cpus = document.querySelector('#opt-cpus');
+      if (humans && cpus) {
+        humans.value = '1';
+        humans.dispatchEvent(new Event('change'));
+        cpus.value = '3';
+        cpus.dispatchEvent(new Event('change'));
+      }
+    });
     if (starts[slug] && await frame.$(starts[slug])) {
       try { await frame.click(starts[slug]); } catch {}
     }
@@ -61,6 +76,24 @@ try {
       await frame.evaluate(({ code, key }) => document.dispatchEvent(new KeyboardEvent('keyup', { code, key, bubbles: true })), { code, key });
     }
     if (keys[slug]) await press(keys[slug]);
+    if (slug === 'ashcrown') {
+      // Give the CPUs a couple of turns so the card is not one settler on an
+      // empty map. Ending a turn with units still idle asks for confirmation,
+      // and the closing tip sits over the corner, so both are cleared before
+      // the shot.
+      for (let turn = 0; turn < 3; turn++) {
+        await press('Space');
+        await frame.evaluate(() => document.querySelector('[data-act="end-confirm"]')?.click());
+        await new Promise(resolve => setTimeout(resolve, 900));
+      }
+      await frame.evaluate(() => {
+        document.querySelector('#modal [data-act="close"]')?.click();
+        for (const id of ['#coach', '#toast']) {
+          const bubble = document.querySelector(id);
+          if (bubble) bubble.hidden = true;
+        }
+      });
+    }
     if (slug === 'snake') await press('ArrowRight');
     if (slug === 'minigolf') await frame.evaluate(() => { holeIndex = 4; loadHole(); });
     if (slug === '2048') for (const key of ['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowDown']) await press(key);

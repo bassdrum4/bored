@@ -94,7 +94,11 @@ export const CHALLENGES = [
   { slug: 'block-blast', label: 'Blast radius', goal: 'Clear {target} lines in one run.', metric: 'lines', targets: [6, 10, 14], unit: 'lines' },
   { slug: 'deep', label: 'Deep pockets', goal: 'Reach {target} points in one descent.', metric: 'score', targets: [1200, 2000, 3000], unit: 'points' },
   { slug: 'circuit', label: 'Clean race', goal: 'Finish the three-lap race in under {target} seconds on the day\u2019s circuit.', metric: 'seconds', targets: [42, 36, 30], rule: 'race', unit: 'seconds' },
-  { slug: 'typing-test', label: 'Home row', goal: 'Type {target} words per minute with 95% accuracy or better.', metric: 'wpm', targets: [35, 45, 55], rule: 'typing', unit: 'words per minute' }
+  { slug: 'typing-test', label: 'Home row', goal: 'Type {target} words per minute with 95% accuracy or better.', metric: 'wpm', targets: [35, 45, 55], rule: 'typing', unit: 'words per minute' },
+  // Renown is the game's own tally for a banner (cities, population, tech and
+  // army), so the goal is reached mid-campaign by growing one, and the hardest
+  // step asks for more than a couple of cities' worth.
+  { slug: 'ashcrown', label: 'Banner rising', goal: 'Grow one banner to {target} renown in a single campaign.', metric: 'renown', targets: [150, 300, 450], unit: 'renown' }
 ];
 // Frozen v3 calendar lineup; future additions must make a new schedule version
 // instead of silently moving previously published daily challenges.
@@ -144,7 +148,20 @@ const DAILY_V2_COUNT = 35;
 // starts the day after this release and is never applied retroactively.
 const DAILY_SCHEDULE_V4 = Object.freeze([...DAILY_SCHEDULE_V3, 'circuit', 'typing-test']);
 const DAILY_SCHEDULE_V4_START = Date.parse('2026-10-31T00:00:00Z') / 86400000;
+// V5 adds Ashcrown. A schedule version starts its own calendar rather than
+// extending the previous cycle in place: days already published keep their
+// game, and the new calendar's opening week is checked against the seven days
+// the old version actually played instead of a historic placeholder.
+const DAILY_SCHEDULE_V5 = Object.freeze([...DAILY_SCHEDULE_V4, 'ashcrown']);
+const DAILY_SCHEDULE_V5_START = Date.parse('2026-11-05T00:00:00Z') / 86400000;
 const DAILY_SCHEDULE_START = Date.parse('2026-10-28T00:00:00Z') / 86400000;
+// A one-day promotion plays its game instead of the calendar's on that date and
+// changes nothing else. The calendar itself is untouched, so the next day
+// resumes the rotation, and a completion earned before the promotion still
+// validates from the date and game stored in its id.
+const DAILY_FEATURED = Object.freeze({
+  '2026-11-04': Object.freeze({ slug: 'ashcrown', target: 75 })
+});
 
 export function dailyChallenge(date) {
   const day = Math.floor(Date.parse(date + 'T00:00:00Z') / 86400000);
@@ -156,10 +173,11 @@ export function dailyChallenge(date) {
     const target = definition.targets[circuit];
     return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v2:' + date + ':' + definition.slug };
   }
-  const schedule = day < DAILY_SCHEDULE_V4_START ? DAILY_SCHEDULE_V3 : DAILY_SCHEDULE_V4;
-  const version = day < DAILY_SCHEDULE_V4_START ? 3 : 4;
+  const v5 = day >= DAILY_SCHEDULE_V5_START;
+  const schedule = v5 ? DAILY_SCHEDULE_V5 : day < DAILY_SCHEDULE_V4_START ? DAILY_SCHEDULE_V3 : DAILY_SCHEDULE_V4;
+  const version = v5 ? 5 : day < DAILY_SCHEDULE_V4_START ? 3 : 4;
   const size = schedule.length;
-  const offset = day - DAILY_SCHEDULE_START;
+  const offset = day - (v5 ? DAILY_SCHEDULE_V5_START : DAILY_SCHEDULE_START);
   const cycleNumber = Math.floor(offset / size);
   let previous = [];
   // Deterministic seeded order per cycle: each game once per circuit.
@@ -173,16 +191,26 @@ export function dailyChallenge(date) {
       const j = state % (i + 1);
       [order[i], order[j]] = [order[j], order[i]];
     }
-    const recent = cycle ? previous.slice(-7) : Array.from({ length: 7 }, (_, i) => {
-      const historicDay = DAILY_SCHEDULE_START - 7 + i;
-      return CHALLENGES[((historicDay % DAILY_V2_COUNT) + DAILY_V2_COUNT) % DAILY_V2_COUNT].slug;
-    });
+    const recent = cycle ? previous.slice(-7) : v5
+      // Look back at the days v4 really published rather than a stand-in.
+      ? Array.from({ length: 7 }, (_, i) =>
+          dailyChallenge(new Date((DAILY_SCHEDULE_V5_START - 7 + i) * 86400000).toISOString().slice(0, 10)).slug)
+      : Array.from({ length: 7 }, (_, i) => {
+          const historicDay = DAILY_SCHEDULE_START - 7 + i;
+          return CHALLENGES[((historicDay % DAILY_V2_COUNT) + DAILY_V2_COUNT) % DAILY_V2_COUNT].slug;
+        });
     for (let i = 0; i < 7 && i < size; i++) {
       if (!recent.includes(order[i])) continue;
       const j = order.findIndex((slug, index) => index >= 7 && !recent.includes(slug));
       if (j >= 0) [order[i], order[j]] = [order[j], order[i]];
     }
     previous = order;
+  }
+  const featured = DAILY_FEATURED[date];
+  const feature = featured && CHALLENGES.find(item => item.slug === featured.slug);
+  if (feature) {
+    const target = Number.isFinite(featured.target) ? featured.target : feature.targets[0];
+    return { ...feature, date, target, goal: feature.goal.replace('{target}', target), id: 'v' + version + ':' + date + ':' + feature.slug };
   }
   const slug = previous[offset % size];
   const definition = CHALLENGES.find(item => item.slug === slug);

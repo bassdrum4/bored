@@ -161,7 +161,7 @@ test('a streak counts consecutive completed days and survives an outstanding tod
 });
 
 test('the daily rotation covers every challenge game, changes targets, and uses Eastern Time', () => {
-  const { dailyDate, dailyChallenge, CHALLENGES } = challengeRules();
+  const { dailyDate, dailyChallenge, dailyResultCheck, CHALLENGES } = challengeRules();
   assert.equal(dailyDate(new Date('2026-10-09T00:30:00+02:00')), '2026-10-08');
   // The day turns at midnight in Detroit, not UTC: in summer (EDT, UTC-4)
   // 03:30Z is still the previous evening and 04:30Z is already the next day.
@@ -172,15 +172,23 @@ test('the daily rotation covers every challenge game, changes targets, and uses 
   assert.equal(dailyDate(new Date('2026-01-10T05:30:00Z')), '2026-01-10');
   // The spring-forward morning still produces one date per Detroit day.
   assert.equal(dailyDate(new Date('2026-03-08T06:30:00Z')), '2026-03-08');
-  // The v4 rotation begins partway through the first v3 circuit.
-  // Test a complete 37-day circuit after the transition, not a mixed partial cycle.
-  const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 11, 4 + n)).toISOString().slice(0, 10)));
+  // The v5 calendar starts on 2026-11-05 and runs circuits of its own size, so
+  // the first complete v5 circuit begins 2026-12-13. Test that whole circuit
+  // after the transition, not a mixed partial cycle.
+  const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 11, 13 + n)).toISOString().slice(0, 10)));
   assert.equal(new Set(rotation.map(c => c.slug)).size, CHALLENGES.length);
   assert.ok(rotation.every(c => !c.goal.includes('{target}')));
   assert.deepEqual(JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))), JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))));
   assert.notEqual(dailyChallenge('2026-10-08').slug, dailyChallenge('2026-10-09').slug);
   assert.match(dailyChallenge('2026-10-27').id, /^v2:/, 'old challenges keep their IDs');
   assert.match(dailyChallenge('2026-10-28').id, /^v3:/, 'new calendar uses versioned IDs');
+  // A one-day promotion takes its date without touching the calendar: the next
+  // day goes back to the rotation, and a run completed before it still counts.
+  assert.equal(dailyChallenge('2026-11-04').slug, 'ashcrown', 'the promotion takes its date');
+  assert.equal(dailyChallenge('2026-11-04').id, 'v4:2026-11-04:ashcrown', 'the promotion keeps the day');
+  assert.match(dailyChallenge('2026-11-05').id, /^v5:/, 'the calendar resumes the next day');
+  const promoted = { id: 'v4:2026-11-04:sand', snapshot: { slug: 'sand', cells: 250, materials: 4 } };
+  assert.equal(dailyResultCheck(promoted.id, promoted).complete, true, 'a completion from before the promotion still counts');
   // No repeats within a circuit or across its boundaries, even years later.
   const calendar = Array.from({ length: 200 }, (_, n) =>
     dailyChallenge(new Date(Date.UTC(2026, 9, 21 + n)).toISOString().slice(0, 10)).slug);
@@ -191,9 +199,15 @@ test('the daily rotation covers every challenge game, changes targets, and uses 
         i === 10) continue;
     assert.ok(!calendar.slice(i - 7, i).includes(calendar[i]), 'no repeat in seven days at day ' + i);
   }
-  const tetris = dailyChallenge(dateFor('tetris'));
-  const later = new Date(Date.parse(tetris.date + 'T00:00:00Z') + rotation.length * 86400000).toISOString().slice(0, 10);
-  assert.notEqual(tetris.target, dailyChallenge(later).target);
+  // Targets step through a game's own list once per circuit, so the same game
+  // must not carry the same target in the next circuit of the calendar.
+  const tetrisDays = [];
+  for (let n = 0; n < rotation.length * 2 && tetrisDays.length < 2; n++) {
+    const challenge = dailyChallenge(new Date(Date.UTC(2026, 11, 13 + n)).toISOString().slice(0, 10));
+    if (challenge.slug === 'tetris') tetrisDays.push(challenge);
+  }
+  assert.equal(tetrisDays.length, 2, 'tetris is dealt once per circuit');
+  assert.notEqual(tetrisDays[0].target, tetrisDays[1].target);
 });
 test('a saved completion keeps its day when a goal is retuned or the calendar version changes', () => {
   const { dailyChallenge, dailyCheck, dailyResultCheck, parseDailyId, CHALLENGES } = challengeRules();
@@ -205,7 +219,9 @@ test('a saved completion keeps its day when a goal is retuned or the calendar ve
     const challenge = dailyChallenge(date);
     const definition = CHALLENGES.find(item => item.slug === challenge.slug);
     const easiest = Math.min(...definition.targets);
-    if (!challenge.rule && challenge.target !== easiest) found = { date, challenge, easiest };
+    // Needs a published target above the game's easiest one: a promotion can
+    // set a bar below it, and the run below has to have missed today's bar.
+    if (!challenge.rule && challenge.target > easiest) found = { date, challenge, easiest };
   }
   assert.ok(found, 'the calendar publishes a retuned target');
   const snapshot = { slug: found.challenge.slug, [found.challenge.metric]: found.easiest };
