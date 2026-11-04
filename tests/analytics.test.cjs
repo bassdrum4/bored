@@ -144,7 +144,7 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   // game errors in production, even with the user's preference initially on.
   assert.equal(writes.length, 0);
   if (await page.$eval('#claim-dialog', n => n.open)) await page.click('#claim-cancel');
-  await page.click('.activity-notice summary');
+  await page.click('#settings-nav');
   assert.equal(await page.$eval('#analytics-enabled', n => n.checked), false);
   assert.equal(await page.$eval('#analytics-enabled', n => n.disabled), true);
   await page.evaluate(() => { openGame('memory'); closeGame(); });
