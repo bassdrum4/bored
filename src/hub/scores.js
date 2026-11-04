@@ -138,16 +138,6 @@ export const HIGH_SCORE_GAMES = [
   // Signal Tower keeps the waves already cleared, so leaving mid-defence still
   // keeps what the line has held. A run that never clears wave one saves nothing.
   highScore("signal-tower", "Signal Tower", "waves", { metric: "waves", resumable: true }),
-  // Prism Duel ranks the fewest of your own turns it took to burn the CPU's
-  // core across the session; a two-player duel is unranked, so the spec only
-  // reads a win the CPU was actually sitting across the board for. The turns
-  // beat the old win counter, which could not tell a two-turn kill from a
-  // twenty-turn grind, so the stored best starts a fresh key.
-  highScore('prism-duel', 'Prism Duel', 'turns', {
-    metric: 'turns', lower: true, min: 1, max: 999,
-    when: snapshot => snapshot.cpu === true && snapshot.won === true,
-    key: 'bored.high.prism-duel-turns-v1'
-  }),
   // Block Blast counts the score of a run that ended with no piece left to place.
   highScore('block-blast', 'Block Blast', 'points', { metric: 'score', when: snapshot => snapshot.finished === true, resumable: true }),
   // Chess counts the human's wins against the computer in a session, like Connect Four.
@@ -361,24 +351,19 @@ export async function syncScores() {
   // for the rule list instead of guessing at it.
   if (!rulesLoaded() && !(await loadRules())) return false;
   const submittedKey = 'bored.submitted.' + session.user.id;
+  // The value the server last confirmed for each board. submit_score keeps the
+  // better of the submitted and stored value atomically, so the accepted value
+  // remembered here is enough to skip a game: reading the whole scores table
+  // back first only avoids the occasional no-op RPC and costs a request on
+  // every sync.
   const submitted = readStored(submittedKey, {}) || {};
-  const serverValues = new Map();
   try {
     if (!(await ensureProfile()) || getSession()?.user?.id !== session.user.id) return false;
-    const rows = await request('/rest/v1/scores?select=game,value&user_id=eq.' + encodeURIComponent(session.user.id));
-    if (getSession()?.user?.id !== session.user.id) return false;
-    for (const row of rows || []) {
-      const value = Number(row.value);
-      if (Number.isFinite(value)) {
-        serverValues.set(row.game, value);
-        submitted[row.game] = value;
-      }
-    }
-    writeStored(submittedKey, submitted);
   } catch (err) {
     return { error: err };
   }
   let posted = false;
+  const accepted = [];
   for (const game of LB_GAMES) {
     if (isLocalOnly(game.id)) continue;
     let score = bestValue(game);
@@ -390,8 +375,9 @@ export async function syncScores() {
     // the same bounds at upload time as when capturing new gameplay.
     if (score <= 0 || (Number.isFinite(game.min) && score < game.min) ||
         (Number.isFinite(ceiling) && score > ceiling)) continue;
-    const previous = serverValues.get(game.id);
-    if (previous != null && (game.lower ? score >= previous : score <= previous)) continue;
+    const previous = Number(submitted[game.id]);
+    if (Number.isFinite(previous) && previous > 0 &&
+        (game.lower ? score >= previous : score <= previous)) continue;
     if (getSession()?.user?.id !== session.user.id) return false;
     try {
       // The server applies score rules and atomically keeps the personal best.
@@ -400,11 +386,12 @@ export async function syncScores() {
         method: 'POST', body: { p_game: game.id, p_value: score }
       });
       if (getSession()?.user?.id !== session.user.id) return false;
-      const accepted = Number(stored);
-      if (!Number.isFinite(accepted)) return { error: new Error('Invalid score confirmation') };
-      submitted[game.id] = accepted;
+      const best = Number(stored);
+      if (!Number.isFinite(best)) return { error: new Error('Invalid score confirmation') };
+      submitted[game.id] = best;
+      accepted.push({ game: game.id, value: best });
       writeStored(submittedKey, submitted);
-      if (accepted === score) posted = true;
+      if (best === score) posted = true;
     } catch (err) {
       // A missing rule row means this game cannot post; every other game can.
       if (err.status !== 401 && err.code !== '23503' && !/foreign key/i.test(err.message || '')) {
@@ -412,6 +399,6 @@ export async function syncScores() {
       }
     }
   }
-  if (posted) postedListener();
+  if (posted) postedListener({ rows: accepted });
   return { posted };
 }
