@@ -779,7 +779,7 @@ const CIVS = {
               ability: 'Techs cost 25% less.' },
   inca:     { leader: 'Pachacuti', land: 'Inca', focus: 'Mountains', colors: [['#8a3a12', '#dd8c5c'], ['#0e6470', '#5cb8c4']],
               unique: 'terrace',
-              ability: 'Units cross mountains for 2 moves, and cities claim mountains like normal land. Natural wonders are off limits: no claiming, no terraces, and the Giant’s Stair blocks them too.' },
+              ability: 'Units cross mountains for 2 moves, and cities claim mountains like normal land. Natural wonders are off limits: no claiming, no terraces, and the Giant’s Causeway blocks them too.' },
   norway:   { leader: 'Harald Hardrada', land: 'Norway', focus: 'Naval', colors: [['#2c3e55', '#93a7c1'], ['#7d1a2a', '#c96878']],
               unique: 'longship',
               ability: 'Ships get +5 strength, and land units skip the −10 embark penalty.' },
@@ -894,6 +894,7 @@ const LEVELS = {
             blurb: 'Every CPU gets +40% production, +20% food, +25% research and +4 combat strength, and goes to war far more readily.' }
 };
 
+// Made-up names: the fallback once a civ has used up its own list.
 const CITY_NAMES = [
   'Brakenford', 'Ashwell', 'Thornmouth', 'Coldharbour', 'Mirewatch', 'Dunmoor', 'Greyspire',
   'Saltmere', 'Hollowbeck', 'Stonecross', 'Woldham', 'Fenreach', 'Emberhold', 'Rooksbarrow',
@@ -902,6 +903,27 @@ const CITY_NAMES = [
   'Marrowgate', 'Yarrow', 'Coldeave', 'Ironbrook', 'Elmspire', 'Hallowfen', 'Redmere',
   'Oxbridge', 'Westholm', 'Gullhaven', 'Highcairn', 'Lowmarch', 'Starling', 'Brightwater'
 ];
+// Each civ's own cities, like Civ 6: the first is always the capital; later
+// cities pick from the next 10 unused names, the higher on the list the likelier.
+// When a civ runs out, it falls back to the made-up names above.
+const CIV_CITIES = {
+  qin:      ['Xi’an', 'Beijing', 'Nanjing', 'Luoyang', 'Kaifeng', 'Hangzhou', 'Guangzhou', 'Shanghai', 'Chengdu', 'Suzhou', 'Wuhan', 'Tianjin', 'Changsha', 'Kunming', 'Shenyang', 'Dunhuang'],
+  uk:       ['London', 'York', 'Nottingham', 'Hastings', 'Canterbury', 'Coventry', 'Bristol', 'Oxford', 'Cambridge', 'Liverpool', 'Manchester', 'Plymouth', 'Newcastle', 'Leeds', 'Birmingham', 'Dover'],
+  inca:     ['Cusco', 'Machu Picchu', 'Quito', 'Ollantaytambo', 'Vilcabamba', 'Cajamarca', 'Huanuco', 'Tumbes', 'Pisac', 'Arequipa', 'Chan Chan', 'Tiwanaku', 'Pachacamac', 'Tumibamba', 'Vitcos', 'Jauja'],
+  norway:   ['Nidaros', 'Oslo', 'Bergen', 'Stavanger', 'Kaupang', 'Tønsberg', 'Kristiansand', 'Tromsø', 'Hamar', 'Ålesund', 'Sarpsborg', 'Skien', 'Drammen', 'Bodø', 'Molde', 'Narvik'],
+  india:    ['Delhi', 'Mumbai', 'Varanasi', 'Kolkata', 'Chennai', 'Agra', 'Jaipur', 'Pataliputra', 'Hyderabad', 'Bangalore', 'Ahmedabad', 'Lucknow', 'Mysore', 'Pune', 'Amritsar', 'Madurai'],
+  usa:      ['Washington', 'New York', 'Boston', 'Philadelphia', 'Baltimore', 'Chicago', 'Atlanta', 'New Orleans', 'San Francisco', 'Los Angeles', 'Seattle', 'Detroit', 'Denver', 'Houston', 'Miami', 'St. Louis'],
+  rome:     ['Rome', 'Antium', 'Cumae', 'Neapolis', 'Ravenna', 'Capua', 'Ostia', 'Pompeii', 'Mediolanum', 'Verona', 'Tarentum', 'Brundisium', 'Aquileia', 'Florentia', 'Arretium', 'Placentia'],
+  mongol:   ['Karakorum', 'Beshbalik', 'Turfan', 'Ulaanbaatar', 'Khovd', 'Uliastai', 'Erdenet', 'Darkhan', 'Choibalsan', 'Murun', 'Olgii', 'Bayankhongor', 'Sukhbaatar', 'Mandalgovi', 'Arvaikheer', 'Zuunmod'],
+  egypt:    ['Alexandria', 'Thebes', 'Memphis', 'Giza', 'Heliopolis', 'Abydos', 'Aswan', 'Amarna', 'Edfu', 'Faiyum', 'Sais', 'Tanis', 'Bubastis', 'Avaris', 'Hermopolis', 'Elephantine'],
+  zulu:     ['Ulundi', 'Ondini', 'Isandlwana', 'Nongoma', 'Eshowe', 'Durban', 'Ladysmith', 'Pietermaritzburg', 'Vryheid', 'Melmoth', 'Empangeni', 'Nkandla', 'Mahlabatini', 'Mtubatuba', 'Richards Bay', 'KwaDukuza'],
+  japan:    ['Kyoto', 'Osaka', 'Edo', 'Nara', 'Kamakura', 'Nagoya', 'Kobe', 'Hiroshima', 'Nagasaki', 'Sendai', 'Fukuoka', 'Kanazawa', 'Himeji', 'Yokohama', 'Sapporo', 'Hakodate'],
+  france:   ['Paris', 'Orléans', 'Lyon', 'Marseille', 'Reims', 'Rouen', 'Bordeaux', 'Toulouse', 'Nantes', 'Strasbourg', 'Avignon', 'Dijon', 'Tours', 'Chartres', 'Lille', 'Nice'],
+  ottoman:  ['Istanbul', 'Bursa', 'Edirne', 'Ankara', 'Konya', 'Izmir', 'Trabzon', 'Aleppo', 'Adana', 'Sivas', 'Erzurum', 'Kayseri', 'Antalya', 'Sinop', 'Manisa', 'Gallipoli'],
+  dutch:    ['Amsterdam', 'Rotterdam', 'The Hague', 'Utrecht', 'Leiden', 'Haarlem', 'Delft', 'Groningen', 'Middelburg', 'Dordrecht', 'Maastricht', 'Nijmegen', 'Breda', 'Arnhem', 'Zwolle', 'Eindhoven'],
+  celts:    ['Edinburgh', 'Dublin', 'Cardiff', 'Glasgow', 'Cork', 'Aberdeen', 'Inverness', 'Galway', 'Swansea', 'Armagh', 'Kildare', 'Stirling', 'Perth', 'Dundee', 'Bangor', 'Kilkenny'],
+  portugal: ['Lisbon', 'Porto', 'Coimbra', 'Sagres', 'Braga', 'Évora', 'Faro', 'Lagos', 'Guimarães', 'Aveiro', 'Setúbal', 'Funchal', 'Ponta Delgada', 'Viseu', 'Leiria', 'Tomar']
+};
 // Named after Earth's ancient supercontinents and lost lands, as Civ 6 does.
 const CONTINENT_NAMES = [
   'Laurasia', 'Gondwana', 'Rodinia', 'Columbia', 'Kenorland', 'Nuna', 'Vaalbara', 'Pannotia',
@@ -1464,6 +1486,7 @@ function startGame(options) {
     victory: { conquest: !options.victory || options.victory.conquest !== false, science: !options.victory || options.victory.science !== false }
   };
   applyTree(G.tree);
+  applyPeakName(G);
   seats.forEach((seat, i) => {
     G.players.push({
       // A CPU nobody named plays as its civ's leader, like Civ 6.
@@ -1938,12 +1961,38 @@ function foundProblem(u) {
   return '';
 }
 
+// Like Civ 6: the first city is the capital's name; each later one picks from
+// the next 10 unused names on the civ's list, weighted 10, 9, ... 1 so the
+// famous ones tend to come first. Names never repeat in a game, burned
+// cities included. Out of names: the made-up pool, then "City n".
+function cityNameFor(f) {
+  if (G.tut) return G.names.pop() || 'City ' + G.nextCity;
+  G.usedNames = G.usedNames || [];
+  const taken = new Set(G.cities.map(c => c.name).concat(G.usedNames));
+  const list = CIV_CITIES[f.civ] || [];
+  let name = null;
+  if (f.capital === null && list[0] && !taken.has(list[0])) name = list[0];
+  else {
+    const next = list.slice(1).filter(n => !taken.has(n)).slice(0, 10);
+    if (next.length) {
+      const weights = next.map((n, k) => 10 - k), total = weights.reduce((a, b) => a + b, 0);
+      let roll = hash2(G.nextCity, f.i * 31 + G.turn, G.seed + 1301) * total;
+      name = next[next.length - 1];
+      for (let k = 0; k < next.length; k++) { roll -= weights[k]; if (roll < 0) { name = next[k]; break; } }
+    }
+  }
+  while (!name && G.names.length) { const n = G.names.pop(); if (!taken.has(n)) name = n; }
+  name = name || 'City ' + G.nextCity;
+  G.usedNames.push(name);
+  return name;
+}
+
 function foundCity(u) {
   if (foundProblem(u)) return null;
   const f = pl(u.owner);
   const rome = civIs(f.i, 'rome');
   const c = {
-    id: 'c' + G.nextCity++, x: u.x, y: u.y, name: G.names.pop() || 'City ' + G.nextCity,
+    id: 'c' + G.nextCity++, x: u.x, y: u.y, name: cityNameFor(f),
     owner: f.i, founder: f.i, pop: rome ? 2 : 1, food: 0, progress: 0, build: null, buildings: rome ? ['granary'] : [],
     hp: 100, hit: false, shot: false, capital: false, wait: false
   };
@@ -3075,7 +3124,7 @@ function aiSoldier(f, u) {
     if (home && hexDistance(u.x, u.y, home.x, home.y) > 2) aiStep(u, home.x, home.y, 1);
     return;
   }
-  // At peace: drink from the Everspring or climb the Giant's Stair if it's
+  // At peace: bathe at Pamukkale or climb the Giant's Causeway if it's
   // close, otherwise stay within reach of home.
   if (aiWonderTrip(f, u)) return;
   const home = nearestOwnCity(f, u);
@@ -3239,8 +3288,8 @@ const SCI = {
   observatory: 2,      // +2 more when the city touches a mountain
   researchShare: 1 / 3, // a city on Research turns this share of its production into science
   geyser: 2,           // a geyser tile inside your borders
-  reef: 3,             // the Glass Reef tile itself
-  peak: 0,             // Starfall Peak is plain mountain; nobody claims it
+  reef: 3,             // each Great Barrier Reef hex
+  peak: 0,             // the famous mountain is plain mountains; nobody claims it
   peakNext: 2,         // every land tile touching the peak
   eureka: 0.5,         // share knocked off a boosted tech
   voyage: 6,           // turns the Grand Expedition is at sea: faster, but it needs a Harbor
@@ -3252,7 +3301,7 @@ const SCI = {
   fortressHp: 50,
   peakClaim: false,
   warWonders: true,
-  springHeal: 10,        // Everspring: HP a turn, anywhere
+  springHeal: 10,        // Pamukkale: HP a turn, anywhere
   springAfterFight: true, // ...even on a turn the unit attacked
   wonderMax: { small: 3, standard: 4, large: 5, huge: 5 },   // a wonder covers 1 to this many tiles
   geyserRate: 0.03,    // share of flat, hill and shallow tiles with a geyser
@@ -3293,8 +3342,16 @@ BUILDING_ORDER.push('university', 'observatory');
 // it adds 2 a turn to a third stockpile, like iron.
 FEATURES.gunpowder = { name: 'Gunpowder', food: 0, prod: 0, strategic: true, hidden: 'firearms' };
 FEATURES.geyser = { name: 'Geyser', food: 0, prod: 0 };
-FEATURES.reef = { name: 'Glass Reef', food: 1, prod: 0, wonder: true };
-FEATURES.peak = { name: 'Starfall Peak', food: 0, prod: 0, wonder: true };
+FEATURES.reef = { name: 'Great Barrier Reef', food: 1, prod: 0, wonder: true };
+// The mountain wonder is one famous mountain, drawn fresh each game.
+const PEAK_NAMES = ['Mount Everest', 'Kilimanjaro', 'Matterhorn', 'Mount Fuji', 'Mount Olympus', 'Denali'];
+FEATURES.peak = { name: PEAK_NAMES[0], food: 0, prod: 0, wonder: true };
+const peakNameFor = seed => PEAK_NAMES[Math.floor(hash2(5, 9, (seed >>> 0) + 7717) * PEAK_NAMES.length)];
+// Sets this game's mountain name; older saves get one from their seed.
+function applyPeakName(state) {
+  if (!PEAK_NAMES.includes(state.peakName)) state.peakName = peakNameFor(state.seed);
+  FEATURES.peak.name = state.peakName;
+}
 IMPROVEMENTS.mine.ok = t => (t.t === 'hill' && !t.f) || t.f === 'iron' || t.f === 'gunpowder';
 const seesFeature = (t, i) => !(t.f && FEATURES[t.f] && FEATURES[t.f].hidden && !(i !== null && i !== undefined && hasTech(i, FEATURES[t.f].hidden)));
 const touchesMountain = c => neighbourList(c.x, c.y).some(([x, y]) => { const n = tileAt(x, y); return n && n.t === 'mount'; });
@@ -3408,8 +3465,8 @@ function scatterScience(tiles, seed, mirror) {
 // 4 hexes from every start, the four spread well apart, and no player the
 // nearest to more than their share of them. The reef and the peak then grow
 // to 1–3, 1–4 or 1–5 tiles by map size, in any joined shape.
-FEATURES.spring = { name: 'Everspring', food: 2, prod: 0, wonder: true };
-FEATURES.stair = { name: 'Giant’s Stair', food: 0, prod: 0, wonder: true };
+FEATURES.spring = { name: 'Pamukkale', food: 2, prod: 0, wonder: true };
+FEATURES.stair = { name: 'Giant’s Causeway', food: 0, prod: 0, wonder: true };
 const WONDERS = ['reef', 'peak', 'spring', 'stair'];
 function placeWonders(tiles, starts, seed, size) {
   const most = SCI.wonderMax[size] || 3;
@@ -3485,16 +3542,16 @@ function placeWonders(tiles, starts, seed, size) {
 
 /* ── the war wonders ── */
 
-// Everspring, like Civ's Fountain of Youth: a land unit that steps onto it
+// Pamukkale, like Civ's Fountain of Youth: a land unit that steps onto it
 // heals 10 HP every turn from then on, wherever it is and whatever it did.
-// Giant's Stair, like Civ's Giant's Causeway: impassable rock; a land unit that
+// Giant's Causeway, as in Civ: impassable basalt; a land unit that
 // steps beside it fights at +5 from then on.
 function touchWonders(u) {
   if (!isMil(u.type) || isNaval(u.type)) return;
   const t = tileAt(u.x, u.y);
-  if (t.f === 'spring' && !u.blessed) { u.blessed = true; log('A ' + UNITS[u.type].name.toLowerCase() + ' drinks from the Everspring: it heals 10 HP a turn from now on.', pl(u.owner).ink, u.owner); }
+  if (t.f === 'spring' && !u.blessed) { u.blessed = true; log('A ' + UNITS[u.type].name.toLowerCase() + ' bathes in the springs of Pamukkale: it heals 10 HP a turn from now on.', pl(u.owner).ink, u.owner); }
   if (!u.giant && neighbourList(u.x, u.y).some(([x, y]) => { const n = tileAt(x, y); return n && n.f === 'stair'; })) {
-    u.giant = true; log('A ' + UNITS[u.type].name.toLowerCase() + ' climbs the Giant’s Stair: +5 strength from now on.', pl(u.owner).ink, u.owner);
+    u.giant = true; log('A ' + UNITS[u.type].name.toLowerCase() + ' climbs the Giant’s Causeway: +5 strength from now on.', pl(u.owner).ink, u.owner);
   }
 }
 
@@ -3629,6 +3686,7 @@ function prepareState(state) {
   for (const t of state.tiles) if (t.f === 'gunpowder' && t.t !== 'flat' && t.t !== 'hill') t.f = null;
   state.v = 3;
   applyTree(state.tree);
+  applyPeakName(state);
   return state;
 }
 /* ── drawn marks ───────────────────────────────────────────────────────────── */
@@ -3647,7 +3705,7 @@ const MARK = {
   geyser: 'M-5 8 H5|M0 8 V1|M0 1 C-4 -2 -3 -6 0 -9 C3 -6 4 -2 0 1',
   // ── wonders ──
   reef: 'M0 8 V-1|M0 3 L-5 -2 V-7|M0 0 L5 -4 V-8|M-5 -2 L-8 -4|M5 -4 L8 -2',
-  peak: 'M-8 7 L-2 -2 L1 2 L4 -3 L8 7 Z|M4 -9 V-5|M2 -7 H6',
+  peak: 'M-8 7 L-2 -2 L1 2 L4 -3 L8 7 Z|M-4 1.5 L-2 -2 L0 1.5|M4 -3 V-9 L7.5 -7.5 L4 -6',
   spring: 'M-8 5 C-8 9 8 9 8 5 C8 2 -8 2 -8 5 Z|M0 4 V-5|M0 -5 C-3 -8 -6 -6 -6 -2|M0 -5 C3 -8 6 -6 6 -2',
   stair: 'M-8 8 V2 H-3 V8|M-3 8 V-2 H2 V8|M2 8 V-7 H7 V8',
   // ── improvements ──
@@ -3825,12 +3883,13 @@ const WONDER_ART = {
     return out;
   },
   peak() {
-    const star = sP('M0 -6 L1.8 -2 L6 -1.8 L2.6 0.9 L3.8 5.2 L0 2.8 L-3.8 5.2 L-2.6 0.9 L-6 -1.8 L-1.8 -2 Z', { fill: '#ffd84a', stroke: '#8a6a12', 'stroke-width': 0.8 });
-    return sPoly('-24,20 -8,-14 0,-4 9,-22 26,20', lined('#7d766f', 1.3)) +
-      sPoly('-8,-14 -13,-4 -8,-7 -4,-2 0,-4', lined(ART.snow, 0.9)) + sPoly('9,-22 4,-11 9,-14 13,-9 16,-13', lined(ART.snow, 0.9)) +
-      sEll(13, 14, 7, 2.6, lined('#f2a03a', 0.9)) + sMove('w', 'twinkle', sEll(13, 14, 4, 1.4, { fill: '#ffe08a' })) +
-      sP('M-22 -24 L4 -25', { stroke: ART.gold2, 'stroke-width': 2.4, 'stroke-linecap': 'round' }) +
-      sAt(9, -25, sMove('w', 'pulse', star));
+    // A famous summit above a drifting band of cloud.
+    const cloud = sEll(-13, 5, 9, 3.2, lined('#ffffff', 0.8)) + sEll(-3, 3, 7, 3, lined('#ffffff', 0.8)) + sEll(16, 7, 8, 3, lined('#ffffff', 0.8));
+    return sPoly('-25,20 -10,-8 -3,-2 6,-24 26,20', lined('#7d766f', 1.3)) +
+      sP('M6 -24 L9.5 -6 L13 20', { fill: 'none', stroke: '#5f5953', 'stroke-width': 1.1 }) +
+      sPoly('6,-24 -0.1,-9 3,-12 6,-8 9,-12 13.3,-8', lined(ART.snow, 0.9)) +
+      sPoly('-10,-8 -12.7,-3 -10,-5 -7.5,-3.2 -5.3,-4', lined(ART.snow, 0.9)) +
+      sMove('w', 'swim', cloud);
   },
   spring() {
     const drops = [[-6, -10], [6, -11], [-3, -16], [4, -17]].map(([x, y], k) => sMove('w', 'twinkle', sCirc(x, y, 1.6, { fill: '#bfeaff', stroke: '#2f7fb0', 'stroke-width': 0.6 }), k * 0.5)).join('');
@@ -4103,7 +4162,7 @@ function unitMarkup(u, cx, cy, viewer) {
       ? '<path d="M' + (cx - 12) + ' ' + (cy - 13) + ' h24 v12 q0 9 -12 9 q-12 0 -12 -9 z" fill="' + f.light + '" stroke="' + f.ink + '" stroke-width="2"/>'
       : '<path d="M' + (cx - 11) + ' ' + (cy - 13) + ' h22 v21 h-22 z" fill="' + f.light + '" stroke="' + f.ink + '" stroke-width="2"/>');
     parts.push(markOnMap(iconOf(u.type), cx, cy - 2.5, 0.88, '#241c12', 2.1));
-    // War wonder gifts: a blue drop (Everspring), a grey step (Giant's Stair).
+    // War wonder gifts: a blue drop (Pamukkale), a grey +5 (Giant's Causeway).
     if (u.blessed) parts.push(sAt(cx - 12, cy - 13, sP('M0 -4 C-3 0 -3.4 2 -3.4 2.6 A3.4 3.4 0 0 0 3.4 2.6 C3.4 2 3 0 0 -4 Z', { fill: '#4fb4e0', stroke: '#241c12', 'stroke-width': 0.9 })));
     if (u.giant) parts.push(sAt(cx + 12, cy - 13, sCirc(0, 0, 4, { fill: '#6b6762', stroke: '#241c12', 'stroke-width': 0.9 }) +
       '<text x="0" y="2.3" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">+5</text>'));
@@ -4334,7 +4393,7 @@ function buildTutorialIsland() {
     dip: [['peace', 'peace'], ['peace', 'peace']], attitude: [[0, 0], [0, 0]], warSince: [[0, 0], [0, 0]], offers: [],
     log: [], seen: [new Array(cols * rows).fill(1), new Array(cols * rows).fill(0)],
     turn: 1, maxTurns: 0, cur: 0, viewer: 0, handoff: false, pending: null, over: null, watch: false,
-    nextUnit: 1, nextCity: 1, names: ['Roma', 'Cinderhold'],
+    nextUnit: 1, nextCity: 1, names: ['Rome', 'Cinderhold'],
     tut: { step: 0, entered: false, closed: false, raider: null, camp: null }
   };
   const colors = assignColors(['rome', 'celts']);
@@ -4429,11 +4488,11 @@ const TUT_STEPS = [
     at: () => tutSpot(tutUnit(u => UNITS[u.type].founds)), el: '[data-act="found"]',
     done: () => !!tutCap(),
     skip: () => { const u = tutUnit(u => UNITS[u.type].founds); if (u) foundCity(u); } },
-  { say: 'Roma starts at pop 2 with a free Granary: that’s Rome’s ability. Now open the <b>tech tree</b> (T) and pick <b>Animal Husbandry</b>. You have 40 research banked.',
+  { say: 'Your capital, Rome, starts at pop 2 with a free Granary: that’s Rome’s ability. Now open the <b>tech tree</b> (T) and pick <b>Animal Husbandry</b>. You have 40 research banked.',
     el: '#btn-tech, [data-act="research:husbandry"]',
     done: () => pl(0).research === 'husbandry' || hasTech(0, 'husbandry'),
     skip: () => setResearch(0, 'husbandry') },
-  { say: 'Cities build one thing at a time. Click Roma and set it to build a <b>Builder</b>. It has the production saved already.',
+  { say: 'Cities build one thing at a time. Click Rome and set it to build a <b>Builder</b>. It has the production saved already.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":unit:builder"]',
     enter: () => tutBank({ kind: 'unit', id: 'builder' }),
     done: () => { const c = tutCap(); return !!c && (sameItem(c.build, { kind: 'unit', id: 'builder' }) || ownUnits(0).some(u => u.type === 'builder')); },
@@ -4451,7 +4510,7 @@ const TUT_STEPS = [
   { say: 'Click <b>any hex</b> to see what it gives. The panel also names its continent: every map’s land is split into named continents.',
     at: () => tutSpot(G.tiles.find(t => t.f === 'iron')),
     done: () => !!selection && selection.kind === 'tile' },
-  { say: 'Every city makes science from its pop, and Libraries add more. Click Roma and set it to <b>Research</b>: a third of its production goes into your tech as well, which is handy when there’s nothing better to build. Pick a new tech too.',
+  { say: 'Every city makes science from its pop, and Libraries add more. Click Rome and set it to <b>Research</b>: a third of its production goes into your tech as well, which is handy when there’s nothing better to build. Pick a new tech too.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":research:research"], #btn-tech',
     done: () => { const c = tutCap(); return !!c && !!c.build && c.build.kind === 'research'; },
     skip: () => { const c = tutCap(); if (c) setBuild(c, { kind: 'research', id: 'research' }); } },
@@ -4462,7 +4521,7 @@ const TUT_STEPS = [
     at: () => tutSpot(tutRaider()),
     done: () => !tutRaider(),
     skip: () => { const r = tutRaider(); if (r) killUnit(r, 0); } },
-  { say: 'Roma has production saved. Set it to build a <b>Galley</b>, end the turn, then sail the galley along the coast. Ships stay in shallow water until Navigation.',
+  { say: 'Rome has production saved. Set it to build a <b>Galley</b>, end the turn, then sail the galley along the coast. Ships stay in shallow water until Navigation.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":unit:galley"], #btn-end',
     enter: () => tutBank({ kind: 'unit', id: 'galley' }),
     done: () => G.units.some(u => u.owner === 0 && isNaval(u.type) && !cityAt(u.x, u.y)),
@@ -5164,11 +5223,11 @@ function tilePanel(x, y) {
     geyser: 'A geyser: +2 science to whoever’s borders it’s in. It can’t be harvested.',
     reef: 'A natural wonder: +3 science and +1 food to whoever’s borders it’s in.',
     peak: 'A natural wonder of plain mountains, like Civ’s: nobody claims it, but every land hex beside it gives +' + SCI.peakNext + ' science.',
-    spring: 'A natural wonder, like Civ’s Fountain of Youth: a land military unit that steps in heals 10 HP every turn for the rest of the game, even after moving or fighting.',
-    stair: 'A natural wonder, like Civ’s Giant’s Causeway: nobody can enter it, but a land military unit that steps beside it fights at +5 for the rest of the game.'
+    spring: 'A natural wonder: hot springs people have bathed in to heal for 2,000 years. Like Civ’s Fountain of Youth, a land military unit that steps in heals 10 HP every turn for the rest of the game, even after moving or fighting.',
+    stair: 'A natural wonder of basalt columns, as in Civ: nobody can enter it, but a land military unit that steps beside it fights at +5 for the rest of the game.'
   }[t.f];
   if (note && (G.watch || seesFeature(t, v))) html += '<div class="hint">' + note + '</div>';
-  else if (!t.f && nextToPeak(t)) html += '<div class="hint">Next to Starfall Peak: +' + SCI.peakNext + ' science.</div>';
+  else if (!t.f && nextToPeak(t)) html += '<div class="hint">Next to ' + esc(FEATURES.peak.name) + ': +' + SCI.peakNext + ' science.</div>';
   html += '<div class="actions">' + (city ? '<button class="act" data-act="select-city:' + city.id + '">' + icon('city', 14) + 'Open ' + esc(city.name) + '</button>' : '') +
     '<button class="act" data-act="deselect">Back</button></div>';
   return html;
@@ -5194,8 +5253,8 @@ function unitPanel(u) {
     (def.charges ? kv('Charges', u.charges) : '') +
     (isMil(u.type) && u.owner === v ? kv('Fed by', def.noFood ? 'nobody (eats no food)' : home ? esc(home.name) : 'nobody (free)') : '') +
     '<div class="hint">' + esc(def.blurb) + '</div>' +
-    (u.blessed ? '<div class="hint" style="color:var(--sea)">Drank from the Everspring: heals 10 HP every turn, wherever it is.</div>' : '') +
-    (u.giant ? '<div class="hint" style="color:var(--sea)">Climbed the Giant’s Stair: +5 strength for good.</div>' : '') +
+    (u.blessed ? '<div class="hint" style="color:var(--sea)">Bathed at Pamukkale: heals 10 HP every turn, wherever it is.</div>' : '') +
+    (u.giant ? '<div class="hint" style="color:var(--sea)">Climbed the Giant’s Causeway: +5 strength for good.</div>' : '') +
     (u.pinned && u.owner === v ? '<div class="hint" style="color:var(--rust)">Stopped by an enemy’s zone of control. It can still attack this turn.</div>' : '');
 
   if (u.owner !== v) {
@@ -5654,7 +5713,7 @@ function showHelp() {
     '<h3>A turn</h3><p>Each city grows food and production from every tile inside its borders. Each pop eats 2 food and each military unit eats 1 from its home city. ' +
     'Spare food grows the city (15 + 8 × pop to grow), and each new pop claims one more hex. Production goes into whatever the city is building, one thing at a time.</p>' +
     '<h3>Science</h3><p>Every city makes science: +1 per 2 pop, your capital +2, a Library +2 (+3 after Printing), a University +3, an Observatory +2 (+4 next to a mountain). ' +
-    'Geysers give +2 on their hex and the Glass Reef +3 on each of its hexes. Starfall Peak is plain mountains, but every land hex beside it gives +2. A city with nothing better to do can go on Research and turn a third of its production into science. ' +
+    'Geysers give +2 on their hex and the Great Barrier Reef +3 on each of its hexes. Each map’s famous mountain is plain mountains, but every land hex beside it gives +2. A city with nothing better to do can go on Research and turn a third of its production into science. ' +
     'Techs cost 40, 100, 180 and 300 by era. Seven major techs have a eureka: do the thing on its card and it costs half. Press T for the tree, then click any tech to head for it: what it needs gets queued first.</p>' +
     '<h3>Era 4 is shuffled</h3><p>Like Civ’s Tech Shuffle, the six era 4 techs keep what they unlock, but what each one needs is dealt fresh every game, the same for everyone. ' +
     'An era 4 tech shows as “?” until you know a tech it needs or earn its eureka.</p>' +
@@ -5680,8 +5739,8 @@ function showHelp() {
     '<h3>Maps and continents</h3><p>Pick Pangaea, Continents, Islands or Mirror, and a size: Small, Standard, Large or Huge, built for 2, 4, 6 and 8 players. ' +
     'Every map’s land is split into named continents, marked with thin dashed lines.</p>' +
     '<h3>Natural wonders</h3><p>Each map has four, dropped at random but at least 3 hexes from every start, well apart, and never more than your share of them closest to you. ' +
-    'The Glass Reef (shallow water, +3 science a hex) and Starfall Peak (mountains, +2 science on every land hex beside it) cover 1 to 3 hexes on Small maps, up to 4 on Standard and 5 on Large and Huge. ' +
-    'The Everspring (like Civ’s Fountain of Youth): a land military unit that steps in heals 10 HP every turn for good. The Giant’s Stair (like Civ’s Giant’s Causeway) can’t be entered, but a land military unit that steps beside it gets +5 strength for good. ' +
+    'The Great Barrier Reef (shallow water, +3 science a hex) and one famous mountain, a different one each game: Mount Everest, Kilimanjaro, the Matterhorn, Mount Fuji, Mount Olympus or Denali (+2 science on every land hex beside it). Both cover 1 to 3 hexes on Small maps, up to 4 on Standard and 5 on Large and Huge. ' +
+    'Pamukkale, the Turkish hot springs people have bathed in to heal for 2,000 years, works like Civ’s Fountain of Youth: a land military unit that steps in heals 10 HP every turn for good. The Giant’s Causeway, as in Civ, can’t be entered, but a land military unit that steps beside it gets +5 strength for good. ' +
     'Nobody founds cities, builds or claims mountains on a wonder, the Inca included.</p>' +
     '<h3>Winning</h3><p><b>Conquest:</b> hold every capital on the map. <b>Science:</b> finish Star Charts and the Royal Academy, then send out the Grand Expedition by sea (coastal city with a Harbor) ' +
     'or the Grand Caravan by land (any city). If it gets home after its trip, you win; take its home city to stop it, and while that city is under half HP the trip waits. Every Future Tech you finish on the way cuts a turn. ' +
