@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 275,
+  "count": 276,
   "newest": "2026-11-03",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"4f4d47a","date":"2026-11-03","author":"Daniel Lowe","subject":"Add Wallbound, an original ninja physics puzzle"},
   {"sha":"c778ec6","date":"2026-11-03","author":"Claude","subject":"Civ Lite 3.1: bold tile art, four natural wonders, leader names."},
   {"sha":"f02a950","date":"2026-11-03","author":"Daniel Lowe","subject":"Integrate standalone Tank 2 with Bored while preserving online matches","pr":73},
   {"sha":"99b21e2","date":"2026-11-03","author":"Claude","subject":"Civ Lite v3: research revamp, science victory, up to 8 players."},
