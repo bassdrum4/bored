@@ -177,6 +177,13 @@ p.airtime+=dt;p.vy=Math.min(1100,p.vy+GRAVITY*dt);
 p.x+=p.vx*dt;p.y+=p.vy*dt;p.angle+=p.vx*dt*.002;
 if(p.trail.length===0||len(p.x-p.trail[p.trail.length-1][0],p.y-p.trail[p.trail.length-1][1])>18)p.trail.push([p.x,p.y]);
 if(p.trail.length>17)p.trail.shift();
+// Resolve flying hits before landing on the same platform. A clean landing
+// on an enemy must defeat them, not turn into an accidental death.
+for(const rival of enemies){
+if(rival.dead||len(p.x-rival.x,p.y-rival.y)>=R+15||len(p.vx,p.vy)<=150)continue;
+rival.dead=true;burst(rival.x,rival.y,"#eee5cc",17);beep(320,.06,"triangle");
+p.vx*=.88;p.vy*=.88;updateHud();
+}
 for(const b of blocks){
 if(b.dead)continue;
 const c=collision(p.x,p.y,b);if(!c)continue;
