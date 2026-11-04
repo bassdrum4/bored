@@ -209,6 +209,11 @@
     "better": "high",
     "max_value": 999
   },
+  "wallbound": {
+    "label": "Total stars across completed stages",
+    "better": "high",
+    "max_value": 60
+  },
   "wordle": {
     "label": "Guesses to solve",
     "better": "low",
