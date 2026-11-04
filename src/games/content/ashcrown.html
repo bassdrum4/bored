@@ -304,7 +304,7 @@
 
   /* ── map svg ─────────────────────────────────────────────────────────── */
   .hex { cursor: pointer }
-  .hex .fill { stroke: rgba(36,28,18,.16); stroke-width: .6 }
+  .hex .fill { stroke: rgba(42,33,22,.5); stroke-width: 1 }
   .coast { fill: none; stroke: rgba(36,28,18,.62); stroke-width: 1.6; stroke-linecap: round; pointer-events: none }
   .fog { pointer-events: none }
   .fog.unk { fill: #e4d9bd }
@@ -319,7 +319,43 @@
   .cont { fill: none; stroke: rgba(36,28,18,.42); stroke-width: 1; stroke-dasharray: 2.5 2.5; pointer-events: none }
   .label { font: 10px/1 var(--font-data); pointer-events: none; letter-spacing: .03em }
   #layer-coast, #layer-marks, #layer-border, #layer-sites, #layer-units, #layer-overlay,
-  #layer-fog, #layer-labels, #layer-owner { pointer-events: none }
+  #layer-fog, #layer-labels, #layer-owner, #layer-waves { pointer-events: none }
+
+  /* ── map animation ───────────────────────────────────────────────────
+     Every moving part runs off one clock (--clock, set on each redraw) so a
+     redraw doesn't restart it. w = wonders, f = features, a = everything else;
+     the Animation setting (data-anim on #map) stops them by group. */
+  #map { --clock: 0s }
+  .an { animation-delay: var(--clock); animation-iteration-count: infinite; animation-timing-function: ease-in-out;
+        transform-box: fill-box; transform-origin: center }
+  .an.drift { animation-name: drift; animation-duration: 6s }
+  .an.steam { animation-name: steam; animation-duration: 3s }
+  .an.sway { animation-name: sway; animation-duration: 5s; transform-origin: 50% 100% }
+  .an.wind { animation-name: wind; animation-duration: 5s; transform-origin: 50% 100% }
+  .an.twinkle { animation-name: twinkle; animation-duration: 2s }
+  .an.pulse { animation-name: pulse; animation-duration: 2s }
+  .an.swim { animation-name: swim; animation-duration: 4s }
+  .an.spin { animation-name: spin; animation-duration: 6s; animation-timing-function: linear }
+  .an.ripple { animation-name: ripple; animation-duration: 3s; animation-timing-function: ease-out }
+  .an.flag { animation-name: flag; animation-duration: 2s; transform-origin: 0 50% }
+  .an.bob { animation-name: bob; animation-duration: 1.5s }
+  @keyframes drift { 0%, 100% { transform: translateX(0) } 50% { transform: translateX(2.5px) } }
+  @keyframes steam { 0%, 100% { transform: translateY(0); opacity: 1 } 50% { transform: translateY(-4px); opacity: .7 } }
+  @keyframes sway { 0%, 100% { transform: rotate(-2.5deg) } 50% { transform: rotate(2.5deg) } }
+  @keyframes wind { 0%, 100% { transform: skewX(-3deg) } 50% { transform: skewX(3deg) } }
+  @keyframes twinkle { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+  @keyframes pulse { 0%, 100% { transform: scale(1) } 50% { transform: scale(1.3) } }
+  @keyframes swim { 0%, 100% { transform: translateX(-1.5px) } 50% { transform: translateX(1.5px) } }
+  @keyframes spin { to { transform: rotate(360deg) } }
+  @keyframes ripple { 0% { transform: scale(.4); opacity: .9 } 100% { transform: scale(1.25); opacity: 0 } }
+  @keyframes flag { 0%, 100% { transform: skewY(0) scaleX(1) } 50% { transform: skewY(-9deg) scaleX(.88) } }
+  @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
+  #map[data-anim="none"] .an, #map[data-anim="wonders"] .an:not(.w), #map[data-anim="features"] .an.a { animation: none }
+
+  /* building cards in the city panel */
+  .bcards { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px }
+  .bcard { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 64px; padding: 4px 2px 5px;
+           background: #f8f1e0; border: 1px solid #c6b694; border-radius: 6px; font-size: 10.5px; color: var(--ink-2); text-align: center; line-height: 1.2 }
   .sc { fill: none; stroke: rgba(36,28,18,.34); stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round }
   .scf { fill: rgba(36,28,18,.20); stroke: rgba(36,28,18,.42); stroke-width: .9; stroke-linejoin: round }
   .sc-soft { fill: none; stroke: rgba(36,28,18,.2); stroke-width: 1 }
@@ -415,6 +451,7 @@
     <svg id="map" xmlns="http://www.w3.org/2000/svg" aria-label="Game map">
       <g id="cam">
         <g id="layer-terrain"></g>
+        <g id="layer-waves" class="an a drift"></g>
         <g id="layer-owner"></g>
         <g id="layer-coast"></g>
         <g id="layer-marks"></g>
@@ -601,11 +638,11 @@ const polyPath = points => 'M' + points.map(p => p[0].toFixed(1) + ' ' + p[1].to
 /* ── the rules as data (numbers match the design doc) ──────────────────────── */
 
 const TERRAIN = {
-  flat:    { name: 'Flat',          fill: '#d3c992', food: 2, prod: 1, cost: 1, def: 0 },
-  hill:    { name: 'Hills',         fill: '#c2b086', food: 1, prod: 2, cost: 2, def: 3 },
-  mount:   { name: 'Mountains',     fill: '#a89b84', food: 0, prod: 0, cost: Infinity, def: 0, block: true },
-  shallow: { name: 'Shallow water', fill: '#c6dad2', food: 2, prod: 0, cost: 1, def: 0, water: true },
-  deep:    { name: 'Deep sea',      fill: '#a7bfbc', food: 0, prod: 0, cost: 1, def: 0, water: true, deep: true }
+  flat:    { name: 'Flat',          fill: '#b5cb5e', food: 2, prod: 1, cost: 1, def: 0 },
+  hill:    { name: 'Hills',         fill: '#d1a65a', food: 1, prod: 2, cost: 2, def: 3 },
+  mount:   { name: 'Mountains',     fill: '#c4bcb0', food: 0, prod: 0, cost: Infinity, def: 0, block: true },
+  shallow: { name: 'Shallow water', fill: '#78c9cb', food: 2, prod: 0, cost: 1, def: 0, water: true },
+  deep:    { name: 'Deep sea',      fill: '#3b86ab', food: 0, prod: 0, cost: 1, def: 0, water: true, deep: true }
 };
 
 // One feature or resource per tile, on top of its terrain.
@@ -742,7 +779,7 @@ const CIVS = {
               ability: 'Techs cost 25% less.' },
   inca:     { leader: 'Pachacuti', land: 'Inca', focus: 'Mountains', colors: [['#8a3a12', '#dd8c5c'], ['#0e6470', '#5cb8c4']],
               unique: 'terrace',
-              ability: 'Units cross mountains for 2 moves, and cities claim mountains like normal land.' },
+              ability: 'Units cross mountains for 2 moves, and cities claim mountains like normal land. Natural wonders are off limits: no claiming, no terraces, and the Giant’s Stair blocks them too.' },
   norway:   { leader: 'Harald Hardrada', land: 'Norway', focus: 'Naval', colors: [['#2c3e55', '#93a7c1'], ['#7d1a2a', '#c96878']],
               unique: 'longship',
               ability: 'Ships get +5 strength, and land units skip the −10 embark penalty.' },
@@ -784,7 +821,17 @@ const CIVS = {
               ability: 'Cities on a different continent from your capital get +3 food and +3 production, and Navigation costs half.' }
 };
 const CIV_ORDER = Object.keys(CIVS);
-const civTitle = id => (CIVS[id] ? CIVS[id].leader + '’s ' + CIVS[id].land : '');
+// Names the way Civ 6 does: "Gandhi of India", "Victoria of the UK", and a
+// comma when the name already has an "of": "William of Orange, Netherlands".
+const THE_LANDS = ['uk', 'usa', 'ottoman', 'celts', 'zulu', 'inca', 'dutch'];
+function styledName(name, id) {
+  if (!CIVS[id]) return name;
+  return / of /.test(name) ? name + ', ' + CIVS[id].land : name + ' of ' + (THE_LANDS.includes(id) ? 'the ' : '') + CIVS[id].land;
+}
+const civTitle = id => (CIVS[id] ? styledName(CIVS[id].leader, id) : '');
+// The long form, for the Council, the history, the realm and the end screen.
+// Tight spots (top bar, handoff, start screen) use just the name.
+const fullName = f => styledName(f.name, f.civ);
 // The civ's unique, whatever kind of thing it is: { name, blurb }.
 function civUnique(id) {
   const key = CIVS[id] && CIVS[id].unique;
@@ -1350,7 +1397,7 @@ function generateWorld(seed, count, type, size) {
     const tiles = made.tiles;
     for (const st of starts) if (!st.twin) seedStart(tiles, cols, rows, st.x, st.y, s);
     scatterScience(tiles, s, kind === 'mirror');
-    placeWonders(tiles, starts, s);
+    placeWonders(tiles, starts, s, MAP_SIZES[size] ? size : sizeFor(count));
     if (kind === 'mirror') {
       // Copy each seeded neighbourhood onto its twin so both stay identical.
       for (const st of starts) {
@@ -1419,7 +1466,8 @@ function startGame(options) {
   applyTree(G.tree);
   seats.forEach((seat, i) => {
     G.players.push({
-      i, name: (seat.name || SEATS[i].name).slice(0, 18), ink: colors[i][0], light: colors[i][1],
+      // A CPU nobody named plays as its civ's leader, like Civ 6.
+      i, name: seat.name ? seat.name.slice(0, 18) : seat.human ? SEATS[i].name : CIVS[civs[i]].leader, ink: colors[i][0], light: colors[i][1],
       human: !!seat.human, alive: true, capital: null, capHome: -1, kills: 0, civ: civs[i],
       techs: [], research: null, queue: [], boost: {}, proj: {}, voyage: null, met: false, gunpowder: 0, rp: 0, future: 0, horses: 0, iron: 0, stance: {}, front: null,
       aggro: seat.human ? 1 : 0.6 + hash2(i, 3, world.seed) * 0.9
@@ -1434,7 +1482,7 @@ function startGame(options) {
     addUnit(G.players[i], unitFor(i, 'settler'), st.x, st.y, null);
     addUnit(G.players[i], unitFor(i, 'warrior'), st.x, st.y, null);
   });
-  log('A new ' + MAP_TYPES[G.map].name.toLowerCase() + ' map. ' + G.players.map(p => p.name + ' (' + CIVS[p.civ].land + ')').join(', ') +
+  log('A new ' + MAP_TYPES[G.map].name.toLowerCase() + ' map. ' + G.players.map(fullName).join(', ') +
     ' set out to found their capitals.', 'turn', null);
   advanceTurns();
   return G;
@@ -1547,12 +1595,12 @@ function processResearch(f) {
     f.rp -= cost;
     if (f.research === 'future') {
       f.future += 1;
-      log(f.name + ' finishes Future Tech ' + f.future + '.', f.ink, f.i);
+      log(fullName(f) + ' finishes Future Tech ' + f.future + '.', f.ink, f.i);
       // Like Civ's last techs, each Future Tech finished on the way cuts a turn off the trip.
       if (f.voyage) f.voyage.left = Math.max(1, f.voyage.left - 1);
     } else {
       f.techs.push(f.research);
-      log(f.name + ' learns ' + techName(f.research) + '.', f.ink, f.i);
+      log(fullName(f) + ' learns ' + techName(f.research) + '.', f.ink, f.i);
       f.research = nextQueued(f);
     }
   }
@@ -1765,7 +1813,8 @@ function spawnSpot(c, type) {
 
 function claimTile(t, c) { t.owner = c.owner; t.city = c.id; }
 // Only the Inca claim mountains.
-const canClaim = (t, c) => t.owner === null && (t.t !== 'mount' || t.f === 'peak' || civIs(c.owner, 'inca'));
+// Only the Inca claim mountains, and nobody claims a wonder's mountain.
+const canClaim = (t, c) => t.owner === null && (t.t !== 'mount' || (civIs(c.owner, 'inca') && !(t.f && FEATURES[t.f].wonder)));
 function claimStartRing(c) {
   claimTile(tileAt(c.x, c.y), c);
   for (const [x, y] of neighbourList(c.x, c.y)) {
@@ -1882,6 +1931,7 @@ function foundProblem(u) {
   const t = tileAt(u.x, u.y);
   if (TERRAIN[t.t].water) return 'Cities go on land';
   if (TERRAIN[t.t].block) return 'Not on mountains';
+  if (t.f && FEATURES[t.f].wonder) return 'Not on a natural wonder';
   if (t.owner !== null && t.owner !== u.owner) return 'That land belongs to ' + pl(t.owner).name;
   const near = G.cities.find(c => hexDistance(c.x, c.y, u.x, u.y) < 4);
   if (near) return 'Too close to ' + near.name + '. Cities need 4 hexes between centers';
@@ -1903,7 +1953,7 @@ function foundCity(u) {
   if (rome) claimNextHex(c);
   removeUnit(u);
   for (const o of ownUnits(f.i)) if (isMil(o.type) && !o.home) o.home = c.id;
-  log(f.name + ' founds ' + c.name + (c.capital ? ' as its capital' : '') + '.', f.ink, null);
+  log(fullName(f) + ' founds ' + c.name + (c.capital ? ' as its capital' : '') + '.', f.ink, null);
   return c;
 }
 
@@ -1912,6 +1962,7 @@ function foundCity(u) {
 // The improvements this player could put on this tile once a builder stands there.
 function improvementsFor(i, t) {
   const civ = civOf(i);
+  if (t.f && FEATURES[t.f].wonder) return [];
   const view = seesFeature(t, i) ? t : Object.assign({}, t, { f: null });
   return Object.keys(IMPROVEMENTS).filter(id => {
     const imp = IMPROVEMENTS[id];
@@ -2004,7 +2055,7 @@ function killUnit(u, killer) {
   const f = pl(u.owner);
   if (killer !== null && killer !== undefined) {
     pl(killer).kills += 1;
-    log(pl(killer).name + ' destroys a ' + f.name + ' ' + UNITS[u.type].name.toLowerCase() + '.', pl(killer).ink, null);
+    log(fullName(pl(killer)) + ' destroys a ' + f.name + ' ' + UNITS[u.type].name.toLowerCase() + '.', pl(killer).ink, null);
   } else {
     log('A ' + UNITS[u.type].name.toLowerCase() + ' starves to death.', '#93401d', f.i);
   }
@@ -2022,7 +2073,7 @@ function moveCost(u, x, y) {
     const c = cityAt(x, y);
     return c && c.owner === u.owner ? 1 : Infinity;
   }
-  if (ter.block) return civIs(u.owner, 'inca') ? 2 : Infinity;
+  if (ter.block) return civIs(u.owner, 'inca') && t.f !== 'stair' ? 2 : Infinity;
   if (ter.water) return ter.deep && !hasTech(u.owner, 'navigation') ? Infinity : 1;
   if (def.rough) return 1;
   return t.f === 'forest' ? Math.max(ter.cost, FEATURES.forest.cost) : ter.cost;
@@ -2097,6 +2148,7 @@ function moveUnit(u, x, y, reach) {
   u.moved = true;
   const zoc = zocFor(u);
   if (zoc && zoc.has(keyOf(x, y))) u.pinned = true;
+  if (SCI.warWonders) touchWonders(u);
   return true;
 }
 
@@ -2114,6 +2166,7 @@ function sharedBonus(u) {
   else if (TERRAIN[t.t].water && !civIs(u.owner, 'norway')) s -= 10;
   if (t.f === 'forest' && civIs(u.owner, 'celts')) s += 5;
   if (def.hurtBonus && u.hp < 50) s += def.hurtBonus;
+  if (u.giant && SCI.warWonders) s += 5;
   if (deityCpu(u.owner)) s += LEVELS.deity.combat;
   return s;
 }
@@ -2287,7 +2340,7 @@ function captureCity(c, u) {
   u.acted = true;
   rehome(c.id);
   changeAttitude(prev, f.i, -30);
-  log(f.name + ' captures ' + c.name + (c.capital ? ', ' + pf.name + '’s capital,' : '') + ' from ' + pf.name + '.', f.ink, null);
+  log(fullName(f) + ' captures ' + c.name + (c.capital ? ', ' + pf.name + '’s capital,' : '') + ' from ' + fullName(pf) + '.', f.ink, null);
   if (f.human && !c.capital) G.pending = { kind: 'capture', city: c.id };
   checkElimination();
   checkWin();
@@ -2301,7 +2354,7 @@ function burnCity(c) {
   for (const t of G.tiles) if (t.city === c.id) { t.city = null; t.owner = null; }
   rehome(c.id);
   G.cities = G.cities.filter(o => o !== c);
-  log(f.name + ' burns ' + c.name + ' to the ground.', f.ink, null);
+  log(fullName(f) + ' burns ' + c.name + ' to the ground.', f.ink, null);
   checkElimination();
   checkWin();
   return true;
@@ -2319,7 +2372,7 @@ function declareWar(a, b) {
   G.warSince[a][b] = G.warSince[b][a] = G.turn;
   changeAttitude(b, a, -30);
   G.offers = G.offers.filter(o => !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
-  log(pl(a).name + ' declares war on ' + pl(b).name + '.', '#93401d', null);
+  log(fullName(pl(a)) + ' declares war on ' + fullName(pl(b)) + '.', '#93401d', null);
 }
 function makePeace(a, b) {
   if (!atWar(a, b)) return;
@@ -2327,7 +2380,7 @@ function makePeace(a, b) {
   changeAttitude(a, b, 10);
   changeAttitude(b, a, 10);
   G.offers = G.offers.filter(o => !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
-  log(pl(a).name + ' and ' + pl(b).name + ' make peace.', '#41602f', null);
+  log(fullName(pl(a)) + ' and ' + fullName(pl(b)) + ' make peace.', '#41602f', null);
 }
 
 // How a CPU player answers a peace offer: losing, a long war, or a second war
@@ -2354,12 +2407,12 @@ function offerPeace(from, to) {
   if (!target.human) {
     if (G.tut || aiWantsPeace(target, pl(from))) { makePeace(from, to); return 'accepted'; }
     changeAttitude(to, from, -4);
-    log(target.name + ' refuses peace with ' + pl(from).name + ' for now.', target.ink, from);
+    log(fullName(target) + ' refuses peace with ' + fullName(pl(from)) + ' for now.', target.ink, from);
     return 'refused';
   }
   if (G.offers.some(o => o.from === from && o.to === to)) return 'sent';
   G.offers.push({ from, to, turn: G.turn });
-  log(pl(from).name + ' offers peace. Answer in the Council.', pl(from).ink, to);
+  log(fullName(pl(from)) + ' offers peace. Answer in the Council.', pl(from).ink, to);
   return 'sent';
 }
 function answerOffer(to, from, accept) {
@@ -2369,7 +2422,7 @@ function answerOffer(to, from, accept) {
   if (accept) makePeace(to, from);
   else {
     changeAttitude(from, to, -6);
-    log(pl(to).name + ' refuses your peace offer.', pl(to).ink, from);
+    log(fullName(pl(to)) + ' refuses your peace offer.', pl(to).ink, from);
   }
   return true;
 }
@@ -2432,7 +2485,7 @@ function standings() {
 function endGame(winner, why) {
   if (G.over) return;
   G.over = { winner: winner ? winner.i : null, why, turn: G.turn };
-  log(winner ? winner.name + ' wins. ' + why + '.' : why + '.', winner ? winner.ink : 'turn', null);
+  log(winner ? fullName(winner) + ' wins. ' + why + '.' : why + '.', winner ? winner.ink : 'turn', null);
 }
 
 function checkElimination() {
@@ -2445,7 +2498,7 @@ function checkElimination() {
     f.alive = false;
     for (const u of ownUnits(f.i)) removeUnit(u);
     G.offers = G.offers.filter(o => o.from !== f.i && o.to !== f.i);
-    log(f.name + ' is out of the game.', f.ink, null);
+    log(fullName(f) + ' is out of the game.', f.ink, null);
   }
 }
 
@@ -2497,6 +2550,7 @@ function restUnits(i) {
     if (u.hp >= 100) continue;
     const def = UNITS[u.type], t = tileAt(u.x, u.y);
     if (def.seaHeal && TERRAIN[t.t].water && !u.acted) { u.hp = Math.min(100, u.hp + def.seaHeal); continue; }
+    if (u.blessed && SCI.warWonders && (SCI.springAfterFight || !u.acted)) { u.hp = Math.min(100, u.hp + SCI.springHeal); if (u.moved || u.acted) continue; }
     if (u.moved || u.acted) continue;
     u.hp = Math.min(100, u.hp + (t.owner === i ? 20 : 10));
   }
@@ -2683,7 +2737,7 @@ const aiCityTarget = () => clamp(Math.round(landTiles() / G.players.length / 20)
 
 function siteScore(f, x, y) {
   const t = tileAt(x, y);
-  if (!t || TERRAIN[t.t].water || TERRAIN[t.t].block) return -1;
+  if (!t || TERRAIN[t.t].water || TERRAIN[t.t].block || (t.f && FEATURES[t.f].wonder)) return -1;
   if (t.owner !== null && t.owner !== f.i) return -1;
   if (G.cities.some(c => hexDistance(c.x, c.y, x, y) < 4)) return -1;
   let s = 0;
@@ -3015,12 +3069,15 @@ function aiSoldier(f, u) {
       aiTryStrike(f, u);
       return;
     }
-    // Holding: stay close to home, ready to defend.
+    // Holding: stay close to home, ready to defend, unless a war wonder is near.
+    if (aiWonderTrip(f, u)) return;
     const home = nearestOwnCity(f, u);
     if (home && hexDistance(u.x, u.y, home.x, home.y) > 2) aiStep(u, home.x, home.y, 1);
     return;
   }
-  // At peace: stay within reach of home.
+  // At peace: drink from the Everspring or climb the Giant's Stair if it's
+  // close, otherwise stay within reach of home.
+  if (aiWonderTrip(f, u)) return;
   const home = nearestOwnCity(f, u);
   if (home && hexDistance(u.x, u.y, home.x, home.y) > 3) aiStep(u, home.x, home.y, 2);
 }
@@ -3153,6 +3210,23 @@ function aiTrip(f) {
   const coastal = ownCities(f.i).some(isCoastal);
   return coastal && SCI.voyage < SCI.trek ? 'expedition' : 'caravan';
 }
+// A unit without a war wonder's gift walks to one within 8 hexes.
+function aiWonderTrip(f, u) {
+  if (!SCI.warWonders || isNaval(u.type) || (u.blessed && u.giant)) return false;
+  let best = null, bestD = 9;
+  for (const t of G.tiles) {
+    if (t.f === 'spring' && !u.blessed) {
+      const d = hexDistance(u.x, u.y, t.x, t.y);
+      if (d < bestD && (t.owner === null || t.owner === f.i || !atWar(f.i, t.owner))) { bestD = d; best = [t.x, t.y, 0]; }
+    }
+    if (t.f === 'stair' && !u.giant) {
+      const d = hexDistance(u.x, u.y, t.x, t.y) - 1;
+      if (d < bestD) { bestD = d; best = [t.x, t.y, 1]; }
+    }
+  }
+  if (!best || bestD <= 0) return false;
+  return aiStep(u, best[0], best[1], best[2]) || false;
+}
 /* ── research, era 4 and the science victory (v3) ──────────────────────────── */
 
 // The numbers behind the research revamp, tuned with CPU test games so the
@@ -3166,8 +3240,8 @@ const SCI = {
   researchShare: 1 / 3, // a city on Research turns this share of its production into science
   geyser: 2,           // a geyser tile inside your borders
   reef: 3,             // the Glass Reef tile itself
-  peak: 3,             // the Starfall Peak tile itself (any city may claim it)
-  peakNext: 1,         // every land tile touching the peak
+  peak: 0,             // Starfall Peak is plain mountain; nobody claims it
+  peakNext: 2,         // every land tile touching the peak
   eureka: 0.5,         // share knocked off a boosted tech
   voyage: 6,           // turns the Grand Expedition is at sea: faster, but it needs a Harbor
   trek: 8,             // turns the Grand Caravan is on the road, from any city
@@ -3176,6 +3250,11 @@ const SCI = {
   popStrCap: 21,       // most defense a city gets from its pop (3 a pop)
   cityHeal: 10,        // HP a city heals a turn when it wasn't hit (France 20)
   fortressHp: 50,
+  peakClaim: false,
+  warWonders: true,
+  springHeal: 10,        // Everspring: HP a turn, anywhere
+  springAfterFight: true, // ...even on a turn the unit attacked
+  wonderMax: { small: 3, standard: 4, large: 5, huge: 5 },   // a wonder covers 1 to this many tiles
   geyserRate: 0.03,    // share of flat, hill and shallow tiles with a geyser
   gunpowderFlat: 0.03, // and with gunpowder underneath
   gunpowderHill: 0.06
@@ -3317,7 +3396,7 @@ function scatterScience(tiles, seed, mirror) {
     const r = hash2(t.x, t.y, seed + 4421);
     let f = null;
     if ((t.t === 'flat' || t.t === 'hill' || t.t === 'shallow') && r < SCI.geyserRate) f = 'geyser';
-    else if (r < SCI.geyserRate + (t.t === 'hill' ? SCI.gunpowderHill : t.t === 'flat' ? SCI.gunpowderFlat : 0)) f = 'gunpowder';
+    else if ((t.t === 'flat' || t.t === 'hill') && r < SCI.geyserRate + (t.t === 'hill' ? SCI.gunpowderHill : SCI.gunpowderFlat)) f = 'gunpowder';
     if (!f) continue;
     t.f = f;
     const twin = mirror ? tiles[tiles.length - 1 - k] : null;
@@ -3325,25 +3404,98 @@ function scatterScience(tiles, seed, mirror) {
   }
 }
 
-// One reef and one peak a map, each as close to even between the starts as the
-// map allows and at least 4 hexes from everyone, so nobody starts on one.
-function placeWonders(tiles, starts, seed) {
-  const spot = ok => {
-    let best = null, bestV = Infinity;
-    for (const t of tiles) {
-      if (!ok(t)) continue;
-      const d = starts.map(s => hexDistance(s.x, s.y, t.x, t.y));
-      if (Math.min(...d) < 4) continue;
-      const v = Math.max(...d) - Math.min(...d) + Math.min(...d) * 0.05 + hash2(t.x, t.y, seed + 77) * 0.5;
-      if (v < bestV) { bestV = v; best = t; }
+// Four natural wonders a map, dropped more or less at random: each at least
+// 4 hexes from every start, the four spread well apart, and no player the
+// nearest to more than their share of them. The reef and the peak then grow
+// to 1–3, 1–4 or 1–5 tiles by map size, in any joined shape.
+FEATURES.spring = { name: 'Everspring', food: 2, prod: 0, wonder: true };
+FEATURES.stair = { name: 'Giant’s Stair', food: 0, prod: 0, wonder: true };
+const WONDERS = ['reef', 'peak', 'spring', 'stair'];
+function placeWonders(tiles, starts, seed, size) {
+  const most = SCI.wonderMax[size] || 3;
+  const cols = Math.max(...tiles.map(t => t.x)) + 1, rows = tiles.length / cols;
+  const at = (x, y) => (x < 0 || y < 0 || x >= cols ? null : tiles[y * cols + x] || null);
+  const kinds = [
+    { id: 'reef', ok: t => t.t === 'shallow' && (!t.f || t.f === 'seafood' || t.f === 'geyser'), grow: true },
+    { id: 'peak', ok: t => (t.t === 'mount' || t.t === 'hill') && (!t.f || t.f === 'forest'), grow: true, mount: true },
+    { id: 'spring', ok: t => t.t === 'flat' && (!t.f || t.f === 'wheat') },
+    { id: 'stair', ok: t => (t.t === 'hill' || t.t === 'flat') && (!t.f || t.f === 'forest') && openAround(t) >= 5, mount: true }
+  ];
+  const openAround = t => neighbourList(t.x, t.y).filter(([x, y]) => { const n = at(x, y); return n && !TERRAIN[n.t].water && !TERRAIN[n.t].block; }).length;
+  const fromStarts = t => Math.min(...starts.map(s => hexDistance(s.x, s.y, t.x, t.y)));
+  const pools = kinds.map(k => tiles.filter(t => k.ok(t) && fromStarts(t) >= 4));
+  const share = Math.ceil(kinds.length / starts.length);
+  // A wonder grows from its first tile into a joined shape of 1..most tiles.
+  const grow = (k, idx, first, taken) => {
+    const group = [first];
+    if (!k.grow) return group;
+    const want = 1 + Math.floor(hash2(first.x, first.y, seed + 301 + idx) * most);
+    for (let n = 1; n < want; n++) {
+      const next = [];
+      for (const g of group) for (const [nx, ny] of neighbourList(g.x, g.y)) {
+        const t = at(nx, ny);
+        if (t && k.ok(t) && fromStarts(t) >= 3 && !group.includes(t) && !next.includes(t) && !taken.has(t)) next.push(t);
+      }
+      if (!next.length) break;
+      group.push(next[Math.floor(hash2(first.x + n, first.y, seed + 401 + idx) * next.length)]);
     }
-    return best;
+    return group;
   };
-  const reef = spot(t => t.t === 'shallow' && (!t.f || t.f === 'seafood' || t.f === 'geyser'));
-  if (reef) reef.f = 'reef';
-  let peak = spot(t => t.t === 'mount');
-  if (!peak) { peak = spot(t => t.t === 'hill' && !t.f); if (peak) peak.t = 'mount'; }
-  if (peak) peak.f = 'peak';
+  // Who gets to a wonder first: the one start strictly closest to any of its tiles.
+  const closest = group => {
+    const d = starts.map(s => Math.min(...group.map(t => hexDistance(s.x, s.y, t.x, t.y)))), m = Math.min(...d);
+    return d.filter(v => v === m).length > 1 ? -1 : d.indexOf(m);
+  };
+  let apart = Math.max(5, Math.round(Math.sqrt(cols * rows) / 3));
+  // Try random sets; take the first that is spread and fair, else the best seen.
+  let pick = null, best = null, bestScore = -Infinity;
+  for (let tries = 0; tries < 600 && !pick; tries++) {
+    if (tries && tries % 100 === 0) apart = Math.max(3, apart - 1);
+    const taken = new Set(), groups = [];
+    kinds.forEach((k, idx) => {
+      const pool = pools[idx];
+      if (!pool.length) return groups.push(null);
+      const first = pool[Math.floor(hash2(tries, idx, seed + 919) * pool.length)];
+      if (taken.has(first)) return groups.push(null);
+      const g = grow(k, idx, first, taken);
+      g.forEach(t => taken.add(t));
+      groups.push(g);
+    });
+    const placed = groups.filter(Boolean);
+    let gap = placed.length < groups.filter((g, i) => pools[i].length).length ? 0 : 99;
+    for (let a = 0; a < placed.length; a++) for (let b = a + 1; b < placed.length; b++) {
+      for (const p of placed[a]) for (const q of placed[b]) gap = Math.min(gap, hexDistance(p.x, p.y, q.x, q.y));
+    }
+    const count = starts.map(() => 0);
+    for (const g of placed) { const n = closest(g); if (n >= 0) count[n]++; }
+    const extra = Math.max(0, Math.max(...count) - share);
+    if (gap >= apart && !extra) pick = groups;
+    const score = Math.min(gap, apart) - extra * 10;
+    if (score > bestScore) { bestScore = score; best = groups; }
+  }
+  (pick || best).forEach((group, idx) => {
+    if (!group) return;
+    for (const t of group) {
+      t.f = kinds[idx].id;
+      t.imp = null;
+      if (kinds[idx].mount) t.t = 'mount';
+    }
+  });
+}
+
+/* ── the war wonders ── */
+
+// Everspring, like Civ's Fountain of Youth: a land unit that steps onto it
+// heals 10 HP every turn from then on, wherever it is and whatever it did.
+// Giant's Stair, like Civ's Giant's Causeway: impassable rock; a land unit that
+// steps beside it fights at +5 from then on.
+function touchWonders(u) {
+  if (!isMil(u.type) || isNaval(u.type)) return;
+  const t = tileAt(u.x, u.y);
+  if (t.f === 'spring' && !u.blessed) { u.blessed = true; log('A ' + UNITS[u.type].name.toLowerCase() + ' drinks from the Everspring: it heals 10 HP a turn from now on.', pl(u.owner).ink, u.owner); }
+  if (!u.giant && neighbourList(u.x, u.y).some(([x, y]) => { const n = tileAt(x, y); return n && n.f === 'stair'; })) {
+    u.giant = true; log('A ' + UNITS[u.type].name.toLowerCase() + ' climbs the Giant’s Stair: +5 strength from now on.', pl(u.owner).ink, u.owner);
+  }
 }
 
 /* ── eurekas: half off the major techs ── */
@@ -3395,11 +3547,11 @@ function finishProject(c, id) {
   f.proj = f.proj || {};
   if (PROJECTS[id].last) {
     f.voyage = { kind: id, city: c.id, left: SCI[PROJECTS[id].trip], from: G.turn };
-    log(f.name + ' sends out the ' + PROJECTS[id].name + ' from ' + c.name + '. It wins if it gets back in ' +
+    log(fullName(f) + ' sends out the ' + PROJECTS[id].name + ' from ' + c.name + '. It wins if it gets back in ' +
       plural2(f.voyage.left, 'turn') + '. Take ' + c.name + ', or keep it under half HP, to stop it.', f.ink, null);
   } else {
     f.proj[id] = true;
-    log(f.name + ' finishes ' + PROJECTS[id].name + '.', f.ink, null);
+    log(fullName(f) + ' finishes ' + PROJECTS[id].name + '.', f.ink, null);
   }
 }
 const plural2 = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
@@ -3412,12 +3564,12 @@ function tickVoyage(f) {
   if (!v) return;
   const c = cityById(v.city), name = PROJECTS[v.kind].name;
   if (!c || c.owner !== f.i) {
-    log(f.name + '’s ' + name + ' is lost: its home city fell.', f.ink, null);
+    log(fullName(f) + '’s ' + name + ' is lost: its home city fell.', f.ink, null);
     f.voyage = null;
     return;
   }
   if (tripStalled(f)) {
-    log(f.name + '’s ' + name + ' waits: ' + c.name + ' is under siege.', f.ink, null);
+    log(fullName(f) + '’s ' + name + ' waits: ' + c.name + ' is under siege.', f.ink, null);
     return;
   }
   v.left -= 1;
@@ -3473,6 +3625,8 @@ function prepareState(state) {
     f.gunpowder = f.gunpowder || 0;
     f.queue = f.queue || [];
   }
+  // Older maps could hide gunpowder under the sea or a mountain; clear it.
+  for (const t of state.tiles) if (t.f === 'gunpowder' && t.t !== 'flat' && t.t !== 'hill') t.f = null;
   state.v = 3;
   applyTree(state.tree);
   return state;
@@ -3525,6 +3679,8 @@ const MARK = {
   gunpowder: 'M-5 -7 H5 C7 -3 7 3 5 7 H-5 C-7 3 -7 -3 -5 -7 Z|M-6 -2.5 H6|M-6 2.5 H6',
   reef: 'M0 8 V-1|M0 3 L-5 -2 V-7|M0 0 L5 -4 V-8|M-5 -2 L-8 -4|M5 -4 L8 -2',
   peak: 'M-8 7 L-2 -2 L1 2 L4 -3 L8 7 Z|M4 -9 V-5|M2 -7 H6',
+  spring: 'M-8 5 C-8 9 8 9 8 5 C8 2 -8 2 -8 5 Z|M0 4 V-5|M0 -5 C-3 -8 -6 -6 -6 -2|M0 -5 C3 -8 6 -6 6 -2',
+  stair: 'M-8 8 V2 H-3 V8|M-3 8 V-2 H2 V8|M2 8 V-7 H7 V8',
   university: 'M-8 -3 L0 -8 L8 -3 Z|M-6 -3 V6|M-2 -3 V6|M2 -3 V6|M6 -3 V6|M-8 7 H8',
   observatory: 'M-7 7 V1 A7 7 0 0 1 7 1 V7 Z|M1 -3 L6 -8',
   musketman: 'M-7 7 L5 -5|M5 -5 L8 -8|M-4 6 L-6 4|M-1 1 L1 3',
@@ -3561,48 +3717,224 @@ function markOnMap(name, cx, cy, scale, ink, width) {
     solid + strokes + '</g>';
 }
 
-/* ── ground, drawn per tile ────────────────────────────────────────────────── */
+/* ── tile art ──────────────────────────────────────────────────────────────── */
 
-function tileScenery(tile, cx, cy) {
-  const wobble = hash2(tile.x, tile.y, G.seed + 17);
-  const j = n => (wobble - 0.5) * n;
-  const out = [];
-  const put = (d, dx, dy, scale, cls) => {
-    const body = d.split('|').map(part => '<path class="' + (cls || 'sc') + '" d="' + part + '"/>').join('');
-    out.push('<g transform="translate(' + (cx + dx + j(3)).toFixed(1) + ' ' + (cy + dy + j(3)).toFixed(1) +
-      ') scale(' + scale + ')">' + body + '</g>');
-  };
-  if (tile.f === 'forest') {
-    put('M0 -7 L5 0 H-5 Z|M0 0 V4', -7, 3, 1, 'scf');
-    put('M0 -7 L5 0 H-5 Z|M0 0 V4', 5, -2, 1.15, 'scf');
-    put('M0 -7 L5 0 H-5 Z|M0 0 V4', 1, 8, 0.85, 'scf');
-    if (tile.t === 'hill') put('M-9 4 Q-4 -6 1 4', -6, -8, 0.7);
-    return out.join('');
+// Bold, colorful hexes. Every drawing sits in a radius-30 hex around (0, 0)
+// and the board moves it into place. Moving parts carry the class "an" plus
+// w (wonders), f (features) or a (everything else), so the Animation setting
+// can stop them by group without redrawing.
+const ART = {
+  ink: '#2a2116', flat2: '#93ad3f', hill2: '#b0853b', mount: '#8a837d', mount2: '#7a736d', snow: '#fbfaf6',
+  shallow2: '#e9fbfb', deep2: '#9fd0e6', gold: '#c9971c', gold2: '#f4d26b', stone: '#a9a197', stone2: '#7e776e'
+};
+const svgAttrs = o => Object.keys(o).map(k => ' ' + k + '="' + o[k] + '"').join('');
+const sP = (d, o) => '<path d="' + d + '"' + svgAttrs(o || {}) + '/>';
+const sPoly = (pts, o) => '<polygon points="' + pts + '"' + svgAttrs(o || {}) + '/>';
+const sEll = (cx, cy, rx, ry, o) => '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '"' + svgAttrs(o || {}) + '/>';
+const sCirc = (cx, cy, r, o) => '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '"' + svgAttrs(o || {}) + '/>';
+const sAt = (x, y, inner, scale) => '<g transform="translate(' + x + ' ' + y + ')' + (scale ? ' scale(' + scale + ')' : '') + '">' + inner + '</g>';
+// A moving part: kind is w, f or a; move names the keyframes; lag shifts its phase.
+const sMove = (kind, move, inner, lag) => '<g class="an ' + kind + ' ' + move + '"' +
+  (lag ? ' style="animation-delay:calc(var(--clock) - ' + lag.toFixed(2) + 's)"' : '') + '>' + inner + '</g>';
+const lined = (fill, w) => ({ fill, stroke: ART.ink, 'stroke-width': w || 1, 'stroke-linejoin': 'round' });
+const hexPoints = r => [0, 1, 2, 3, 4, 5].map(i => {
+  const a = Math.PI / 180 * (60 * i - 30);
+  return (r * Math.cos(a)).toFixed(1) + ',' + (r * Math.sin(a)).toFixed(1);
+}).join(' ');
+const bump = y => sP('M-26 ' + (18 + y) + ' Q0 ' + (-14 + y) + ' 26 ' + (18 + y) + ' Z', lined(ART.hill2, 1.2));
+
+// Plain ground: grass tufts, hill humps, snowy peaks.
+const GROUND = {
+  flat: () => sP('M-16 12 l2 -4 l2 4 M8 16 l2 -4 l2 4 M-4 -14 l2 -4 l2 4 M14 -6 l2 -4 l2 4', { fill: 'none', stroke: ART.flat2, 'stroke-width': 1.6, 'stroke-linecap': 'round' }),
+  hill: () => sP('M-24 16 Q-12 -6 0 14 Z', lined(ART.hill2, 1.2)) + sP('M-4 18 Q10 -8 24 16 Z', lined(ART.hill2, 1.2)),
+  mount: () => sPoly('-24,18 -6,-16 12,18', lined(ART.mount, 1.2)) + sPoly('-6,-16 -12,-5 -6,-8 -1,-4', lined(ART.snow, 0.8)) +
+    sPoly('2,18 14,-6 26,18', lined(ART.mount2, 1.2)) + sPoly('14,-6 10,1 14,-1 17,2', lined(ART.snow, 0.8))
+};
+
+// Features. hill: the hills variant (iron, forest, gunpowder, geyser).
+const FEATURE_ART = {
+  wheat() {
+    let out = sP('M-22 12 Q0 6 22 12 M-24 22 Q0 16 24 22', { fill: 'none', stroke: '#7e8f2e', 'stroke-width': 1.4 });
+    const stalks = [[-15, 8], [-6, 4], [3, 8], [12, 3], [-10, 20], [0, 18], [10, 20]].map(([x, y]) =>
+      sP('M' + x + ' ' + y + ' v-12', { stroke: '#8a6d16', 'stroke-width': 1.6 }) + sEll(x, y - 14, 2.6, 5.2, lined('#f6c31e', 0.9))).join('');
+    return out + sMove('f', 'wind', stalks);
+  },
+  horses() {
+    const body = sEll(0, 0, 10, 5, lined('#8b5a2b')) + sP('M7 -2 L12 -11 L17 -10 L15 -5 L10 1 Z', lined('#8b5a2b')) +
+      sP('M-7 3 V12 M-3 4 V12 M4 4 V12 M8 3 V12', { fill: 'none', stroke: ART.ink, 'stroke-width': 1.8 }) +
+      sP('M11 -9 l2 -3', { stroke: '#3d2410', 'stroke-width': 2 });
+    const tail = sMove('f', 'sway', sP('M-10 -1 q-5 2 -4 8', { fill: 'none', stroke: ART.ink, 'stroke-width': 1.8 }));  // one moving part a tile
+    return sP('M-24 14 H24 M-24 20 H24 M-18 10 V24 M0 10 V24 M18 10 V24', { fill: 'none', stroke: '#7a4e22', 'stroke-width': 1.8 }) +
+      sAt(-4, -2, body + tail);
+  },
+  iron(hill) {
+    const y = hill ? -4 : 6;
+    return (hill ? bump(2) : '') +
+      sPoly('-14,' + (y + 8) + ' -7,' + (y - 6) + ' 4,' + (y - 4) + ' 8,' + (y + 8), lined('#a24d2a')) +
+      sPoly('3,' + (y + 10) + ' 10,' + (y - 2) + ' 19,' + (y + 2) + ' 17,' + (y + 11), lined('#c0643a')) +
+      sMove('f', 'twinkle', sP('M-9 ' + (y + 2) + ' l6 -4 M8 ' + (y + 4) + ' l6 -3', { stroke: '#f0a07a', 'stroke-width': 1.6, 'stroke-linecap': 'round' }));
+  },
+  forest(hill, water, seed) {
+    const trees = hill ? [[-12, 4, 0.9], [2, -6, 1.1], [14, 6, 0.85]] : [[-14, 8, 1], [2, 0, 1.2], [16, 10, 0.9], [-4, 18, 0.8]];
+    const wood = trees.map(([x, y, s]) => sP('M' + x + ' ' + y + ' v' + 6 * s, { stroke: '#5b3a1a', 'stroke-width': 2 }) +
+      sPoly((x - 8 * s) + ',' + y + ' ' + x + ',' + (y - 12 * s) + ' ' + (x + 8 * s) + ',' + y, lined('#2f7a3a')) +
+      sPoly((x - 6 * s) + ',' + (y - 7 * s) + ' ' + x + ',' + (y - 18 * s) + ' ' + (x + 6 * s) + ',' + (y - 7 * s), lined('#3f9a48'))).join('');
+    return (hill ? bump(4) : '') + sMove('f', 'wind', wood, (seed * 5) % 5);
+  },
+  geyser(hill, water) {
+    const y = hill ? -2 : 4;
+    let out = hill ? bump(6) : '';
+    if (water) out += sEll(0, y + 14, 14, 4, { fill: 'none', stroke: ART.shallow2, 'stroke-width': 1.6 });
+    else out += sEll(0, y + 15, 15, 4, lined('#5fb6d6', 0.9)) + sP('M-10 ' + (y + 15) + ' L-4 ' + (y + 4) + ' H4 L10 ' + (y + 15) + ' Z', lined('#d9c9a4'));
+    out += sP('M0 ' + (y + 4) + ' C-2 ' + (y - 4) + ' 2 ' + (y - 10) + ' 0 ' + (y - 16), { fill: 'none', stroke: '#2f9fd0', 'stroke-width': 3, 'stroke-linecap': 'round' });
+    const puffs = [[0, 0, 6], [-7, 3, 4.5], [7, 2, 4.5], [-3, -6, 4], [4, -6, 4]].map(([cx, cy, r]) => sCirc(cx, cy, r, lined('#ffffff', 0.9))).join('');
+    return out + sAt(0, y - 19, sMove('f', 'steam', puffs));
+  },
+  gunpowder(hill) {
+    const y = hill ? -4 : 6;
+    let out = (hill ? bump(4) : '') + sP('M-18 ' + (y + 8) + ' Q-13 ' + (y - 4) + ' -2 ' + (y - 2) + ' Q8 ' + (y - 7) + ' 16 ' + y + ' Q22 ' + (y + 6) + ' 14 ' + (y + 11) + ' Q0 ' + (y + 15) + ' -14 ' + (y + 13) + ' Z', lined('#3d3530'));
+    const grains = [[-10, 4], [-1, 2], [9, 4], [3, 9], [-6, 10]].map(([x, yy]) =>
+      sPoly([[x, y + yy - 3], [x + 2.4, y + yy], [x, y + yy + 3], [x - 2.4, y + yy]].join(' '), { fill: '#fffdf6', stroke: '#99aaaa', 'stroke-width': 0.5 })).join('');
+    return out + sMove('f', 'twinkle', grains);
+  },
+  seafood() {
+    const fish = (x, y, s, flip) => sAt(x, y, '<g transform="scale(' + (flip ? -s : s) + ' ' + s + ')">' +
+      sEll(0, 0, 10, 5, lined('#f08a3c', 1.1)) + sP('M9 0 L16 -5 L16 5 Z', lined('#f08a3c', 1.1)) + sCirc(-5, -1, 1.3, { fill: ART.ink }) + '</g>');
+    return sMove('f', 'swim', fish(-4, -6, 1, false) + fish(9, 9, 0.75, true)) + sP('M-20 16 A6 6 0 0 1 -8 16 Z', lined('#fbe3c9'));
   }
-  switch (tile.t) {
-    case 'hill':
-      put('M-9 4 Q-4 -6 1 4|M-1 4 Q4 -1 9 4', 0, 0, 1);
-      put('M-4 1 h3 M1 2 h2', 0, 0, 1, 'sc-soft');
-      break;
-    case 'mount':
-      put('M0 -10 L9 7 H-9 Z', 0, 0, 1, 'scf');
-      put('M-3 -3 L0 -8 L3 -3', 0, 0, 1);
-      break;
-    case 'flat':
-      put('M-3 3 V-2 M0 3 V-3 M3 3 V-2', -6, 2, 0.9);
-      put('M-9 1 H9', 2, 7, 0.8, 'sc-soft');
-      break;
-    case 'shallow':
-      put('M-8 -2 q4 -4 8 0 t8 0', 0, 0, 1);
-      put('M-8 3 q4 -4 8 0 t8 0', 0, 2, 0.85, 'sc-soft');
-      break;
-    case 'deep':
-      put('M-8 -1 q4 -4 8 0 t8 0', 0, 0, 1, 'sc-soft');
-      put('M-8 5 q4 -4 8 0 t8 0', 3, 2, 0.9, 'sc-soft');
-      break;
+};
+
+// Natural wonders: the same drawing on every hex of the wonder, gold-ringed.
+const WONDER_ART = {
+  reef() {
+    let out = sP('M-22 18 Q-14 4 -6 8 Q2 -8 10 2 Q18 -10 24 10', { fill: 'none', stroke: '#1f6f6a', 'stroke-width': 4.5, 'stroke-linecap': 'round' }) +
+      sP('M-6 8 V-4 M10 2 L6 -10 M10 2 L16 -6 M-16 10 L-20 -2', { fill: 'none', stroke: '#2a8a84', 'stroke-width': 2.6, 'stroke-linecap': 'round' });
+    [[-6, -8], [6, -14], [17, -10], [-20, -6], [18, 14], [-8, 16], [2, 10]].forEach(([x, y], k) => {
+      out += sMove('w', 'twinkle', sPoly((x - 3.5) + ',' + (y + 3.5) + ' ' + x + ',' + (y - 5.5) + ' ' + (x + 3.5) + ',' + (y + 3.5), { fill: '#d9fbf7', stroke: '#1f6f6a', 'stroke-width': 1 }), k * 0.29);
+    });
+    return out;
+  },
+  peak() {
+    const star = sP('M0 -6 L1.8 -2 L6 -1.8 L2.6 0.9 L3.8 5.2 L0 2.8 L-3.8 5.2 L-2.6 0.9 L-6 -1.8 L-1.8 -2 Z', { fill: '#ffd84a', stroke: '#8a6a12', 'stroke-width': 0.8 });
+    return sPoly('-24,20 -8,-14 0,-4 9,-22 26,20', lined('#7d766f', 1.3)) +
+      sPoly('-8,-14 -13,-4 -8,-7 -4,-2 0,-4', lined(ART.snow, 0.9)) + sPoly('9,-22 4,-11 9,-14 13,-9 16,-13', lined(ART.snow, 0.9)) +
+      sEll(13, 14, 7, 2.6, lined('#f2a03a', 0.9)) + sMove('w', 'twinkle', sEll(13, 14, 4, 1.4, { fill: '#ffe08a' })) +
+      sP('M-22 -24 L4 -25', { stroke: ART.gold2, 'stroke-width': 2.4, 'stroke-linecap': 'round' }) +
+      sAt(9, -25, sMove('w', 'pulse', star));
+  },
+  spring() {
+    const drops = [[-6, -10], [6, -11], [-3, -16], [4, -17]].map(([x, y], k) => sMove('w', 'twinkle', sCirc(x, y, 1.6, { fill: '#bfeaff', stroke: '#2f7fb0', 'stroke-width': 0.6 }), k * 0.5)).join('');
+    return sP('M-20 18 l2 -4 l2 4 M16 18 l2 -4 l2 4 M-22 -6 l2 -4 l2 4', { fill: 'none', stroke: ART.flat2, 'stroke-width': 1.6, 'stroke-linecap': 'round' }) +
+      sEll(0, 8, 19, 9, lined('#c9bfa8', 1.2)) + sEll(0, 7, 15, 6.5, lined('#4fb4e0', 1)) +
+      sMove('w', 'ripple', sEll(0, 7, 12, 5, { fill: 'none', stroke: '#e9fbff', 'stroke-width': 1.4 })) +
+      sMove('w', 'ripple', sEll(0, 7, 12, 5, { fill: 'none', stroke: '#e9fbff', 'stroke-width': 1.4 }), 1.5) +
+      sP('M0 6 V-12', { stroke: '#2f9fd0', 'stroke-width': 2.6, 'stroke-linecap': 'round' }) +
+      sP('M0 -12 C-4 -16 -9 -14 -10 -6 M0 -12 C4 -16 9 -14 10 -6', { fill: 'none', stroke: '#6cc7f0', 'stroke-width': 1.8, 'stroke-linecap': 'round' }) + drops +
+      sCirc(-14, -14, 2.2, { fill: '#f28ab2', stroke: ART.ink, 'stroke-width': 0.6 }) + sCirc(17, -4, 2.2, { fill: '#f6e05e', stroke: ART.ink, 'stroke-width': 0.6 });
+  },
+  stair() {
+    // Basalt columns stepping up, like the Giant's Causeway.
+    let out = sP('M-26 18 Q0 8 26 18 L22 22 H-22 Z', lined(ART.mount2, 1));
+    [[-17, 14, 8], [-8, 9, 14], [1, 4, 20], [10, -1, 26], [19, 5, 18]].forEach(([x, top, h], k) => {
+      const w = 4.6, base = top + h;
+      out += sP('M' + (x - w) + ' ' + top + ' V' + base + ' H' + (x + w) + ' V' + top + ' Z', lined(k % 2 ? '#4a4744' : '#57534f', 1)) +
+        sPoly((x - w) + ',' + top + ' ' + (x - w / 2) + ',' + (top - 2.4) + ' ' + (x + w / 2) + ',' + (top - 2.4) + ' ' + (x + w) + ',' + top + ' ' +
+          (x + w / 2) + ',' + (top + 2.4) + ' ' + (x - w / 2) + ',' + (top + 2.4), lined('#8c8780', 0.9));
+    });
+    return out + sMove('w', 'twinkle', sP('M8 -4 l4 0 M-1 1 l4 0', { stroke: '#ffffff', 'stroke-width': 1.2, 'stroke-linecap': 'round' }));
   }
-  return out.join('');
+};
+
+// Improvements, drawn over the ground in place of the feature they sit on.
+const IMPROVEMENT_ART = {
+  farm: () => [0, 1, 2, 3].map(k => sP('M-22 ' + (-10 + k * 8) + ' L22 ' + (-14 + k * 8), { stroke: k % 2 ? '#7a5a2e' : '#e8c440', 'stroke-width': 4.5, 'stroke-linecap': 'round' })).join(''),
+  mine: () => bump(2) + sP('M-8 14 V2 Q0 -8 8 2 V14 Z', lined('#2c241c', 1.1)) +
+    sP('M-10 14 V0 M10 14 V0 M-11 0 H11', { fill: 'none', stroke: '#8a6232', 'stroke-width': 2.4 }) +
+    sP('M-18 22 L18 22 M-16 26 L16 26', { stroke: '#6b6b6b', 'stroke-width': 1.4 }),
+  pasture: () => sEll(0, 6, 22, 13, { fill: '#a8c95a', stroke: '#7a4e22', 'stroke-width': 2.2, 'stroke-dasharray': '5 3' }) +
+    sMove('a', 'bob', sP('M-6 6 q3 -6 9 -4 q6 0 8 4 M-4 9 v6 M8 9 v6', lined('#f4efe4', 1.1))),
+  boats: () => sMove('a', 'bob', sP('M-14 6 H14 L9 13 H-9 Z', lined('#9b5c2b', 1.1)) + sP('M0 6 V-14 M0 -14 L11 2 H0', lined('#fffaf0', 1.1))),
+  terrace: () => [0, 1, 2, 3].map(k => sP('M' + (-22 + k * 5) + ' ' + (18 - k * 9) + ' H' + (22 - k * 5) + ' V' + (12 - k * 9) + ' H' + (-22 + k * 5) + ' Z', lined(k % 2 ? '#6fae3c' : '#8dc24e'))).join(''),
+  stepwell: () => [[18, '#d8b98a'], [13, '#c9a46c'], [8, '#b88f55'], [4, '#3d9cc8']].map(([q, c]) => '<rect x="' + -q + '" y="' + (4 - q) + '" width="' + q * 2 + '" height="' + q * 2 + '"' + svgAttrs(lined(c)) + '/>').join(''),
+  polder: () => sP('M-24 10 H24 M-24 16 H24', { stroke: '#3b86ab', 'stroke-width': 2 }) + sP('M-2 10 V-6 H4 V10', lined('#c9bfa8', 1.1)) +
+    sAt(1, -8, sMove('a', 'spin', sP('M0 0 L-10 -10 M0 0 L10 -10 M0 0 L10 10 M0 0 L-10 10', { stroke: ART.ink, 'stroke-width': 2.2, 'stroke-linecap': 'round' })))
+};
+
+// City buildings, for the city panel's cards (walls, castle and fortress are
+// also drawn on the city's own hex).
+const BUILDING_ART = {
+  walls: () => sP('M-20 14 V-2 H-14 V-8 H-8 V-2 H-2 V-8 H4 V-2 H10 V-8 H16 V-2 H20 V14 Z', lined(ART.stone, 1.2)) + sP('M-20 5 H20 M-8 5 V14 M8 5 V14', { stroke: ART.stone2, 'stroke-width': 1 }),
+  castle: () => sP('M-18 16 V-4 H-12 V-10 H-6 V-4 H6 V-10 H12 V-4 H18 V16 Z', lined('#b9b1a6', 1.2)) + sP('M-4 16 V6 Q0 2 4 6 V16 Z', { fill: '#3d3127' }) +
+    sP('M0 -4 V-18 L9 -15 L0 -12', lined('#2c5aa8')),
+  fortress: () => sPoly('0,-18 6,-7 18,-7 9,2 13,15 0,8 -13,15 -9,2 -18,-7 -6,-7', lined('#9a9389', 1.2)) + sCirc(0, 0, 4, { fill: '#5b5249' }),
+  granary: () => sP('M-12 16 V-2 L0 -14 L12 -2 V16 Z', lined('#c0542c', 1.2)) + sP('M-4 16 V6 H4 V16', { fill: '#5b2c16' }) + sEll(15, 13, 5, 3, lined('#f6c31e', 0.8)),
+  library: () => sP('M-18 -4 L0 -14 L18 -4 Z', lined('#e8dcc0', 1.1)) + '<rect x="-16" y="-4" width="32" height="18"' + svgAttrs(lined('#f4ecd8', 1.1)) + '/>' +
+    [[-10, '#b5452e'], [-5, '#2f6db0'], [0, '#3f9a48'], [5, '#c9971c'], [10, '#7a4ea0']].map(([x, c]) => '<rect x="' + (x - 2) + '" y="0" width="4" height="11"' + svgAttrs(lined(c, 0.6)) + '/>').join(''),
+  workshop: () => sCirc(-4, 0, 9, { fill: '#9aa3ab', stroke: ART.ink, 'stroke-width': 1.2, 'stroke-dasharray': '3 1.5' }) + sCirc(-4, 0, 3.5, lined('#efe6d1')) +
+    sP('M6 14 L16 -4 M12 -8 L20 -2', { stroke: '#6b4a24', 'stroke-width': 3, 'stroke-linecap': 'round' }),
+  barracks: () => sP('M-18 14 L0 -12 L18 14 Z', lined('#c4703a', 1.2)) + sP('M0 14 L-4 4 H4 Z', { fill: '#4a2a14' }) + sP('M0 -12 V-20 L8 -17 L0 -14', lined('#b5452e')),
+  harbor: () => '<rect x="-20" y="6" width="40" height="10" fill="#78c9cb"/>' + sP('M-18 6 H8 M-14 6 V16 M-4 6 V16 M4 6 V16', { stroke: '#7a4e22', 'stroke-width': 2.4 }) +
+    sP('M12 6 V-14 L20 -10 M12 -14 L2 -8', { fill: 'none', stroke: ART.ink, 'stroke-width': 1.6 }),
+  university: () => sP('M-18 -2 L0 -14 L18 -2 Z', lined('#8a2b2b', 1.1)) + '<rect x="-16" y="-2" width="32" height="16"' + svgAttrs(lined('#f4ecd8', 1.1)) + '/>' +
+    [-11, -4, 4, 11].map(x => sP('M' + x + ' 0 V12', { stroke: ART.ink, 'stroke-width': 1.6 })).join('') + sP('M-6 -16 L0 -19 L6 -16 L0 -13 Z', { fill: ART.ink }),
+  observatory: () => '<rect x="-14" y="2" width="28" height="12"' + svgAttrs(lined('#e8dcc0', 1.1)) + '/>' + sP('M-14 2 A14 14 0 0 1 14 2 Z', lined('#d6dde4', 1.1)) +
+    sP('M2 -4 L14 -16', { stroke: '#2c5aa8', 'stroke-width': 3.5, 'stroke-linecap': 'round' }) + sP('M-1 -11 V2', { stroke: ART.ink, 'stroke-width': 1 }) +
+    sP('M18 -22 l1.2 -3 l1.2 3 l3 1.2 l-3 1.2 l-1.2 3 l-1.2 -3 l-3 -1.2 Z', { fill: ART.gold2, stroke: ART.gold, 'stroke-width': 0.6 })
+};
+// A small card for the city panel.
+function buildingCard(id) {
+  const draw = BUILDING_ART[id] || BUILDING_ART[BUILDINGS[id] && BUILDINGS[id].replaces];
+  return '<span class="bcard"><svg viewBox="-24 -24 48 46" width="44" height="42" aria-hidden="true">' + (draw ? draw() : '') + '</svg>' +
+    '<span>' + esc(BUILDINGS[id].name) + '</span></span>';
 }
+
+// Everything drawn on one known tile, in hex-local coordinates: ground,
+// feature or improvement, wonder ring and badge.
+function tileArt(tile, showFeature, onCity) {
+  const f = showFeature ? tile.f : null;
+  const def = f ? FEATURES[f] : null;
+  const imp = !onCity && tile.imp && IMPROVEMENT_ART[tile.imp] ? tile.imp : null;
+  const flip = hash2(tile.x, tile.y, G.seed + 17) < 0.5 ? ' transform="scale(-1 1)"' : '';
+  let ground = '', top = '', badge = '';
+  if (def && def.wonder) {
+    top = WONDER_ART[f]() + sPoly(hexPoints(HEX_R - 1.6), { fill: 'none', stroke: ART.gold, 'stroke-width': 2.6 }) +
+      sPoly(hexPoints(HEX_R - 4.6), { fill: 'none', stroke: ART.gold2, 'stroke-width': 1 });
+    badge = sAt(12, -13, sCirc(0, 0, 7.6, { fill: '#f6e7b8', stroke: '#8a6a12', 'stroke-width': 1.5 }) + markOnMap(f, 0, 0, 0.55, ART.ink, 2.4));
+    return top + badge;
+  }
+  const drawn = onCity ? null : imp ? 'imp' : f && FEATURE_ART[f] ? 'feature' : null;
+  // Hills under a drawing lose their two humps (the drawing brings its own
+  // bump); a terrace replaces the peaks it's cut into.
+  const plain = tile.t === 'hill' ? !drawn : tile.t === 'mount' ? imp !== 'terrace' : true;
+  if (GROUND[tile.t] && plain) ground = '<g' + flip + '>' + GROUND[tile.t]() + '</g>';
+  if (drawn === 'imp') top = IMPROVEMENT_ART[imp]();
+  else if (drawn === 'feature') top = '<g' + (f === 'forest' ? flip : '') + '>' + FEATURE_ART[f](tile.t === 'hill', TERRAIN[tile.t].water, hash2(tile.x, tile.y, 3)) + '</g>';
+  if (f && !onCity) {
+    badge = sAt(12, -13, sCirc(0, 0, 6.8, { fill: '#fffaf0', stroke: ART.ink, 'stroke-width': 1.2 }) + markOnMap(f, 0, 0, 0.5, ART.ink, 2.4));
+  }
+  return ground + top + badge;
+}
+// Waves go on their own layer, which drifts as one piece.
+function tileWaves(tile) {
+  if (!TERRAIN[tile.t].water || (tile.f && FEATURES[tile.f].wonder) || tile.imp === 'polder') return '';
+  return sP('M-18 -8 q4 -3 8 0 t8 0 M2 10 q4 -3 8 0 t8 0', { fill: 'none', stroke: tile.t === 'deep' ? ART.deep2 : ART.shallow2, 'stroke-width': 1.6, 'stroke-linecap': 'round' });
+}
+
+/* ── animation setting ── */
+
+// none, wonders, features (wonders + features) or all. Starts at none for
+// anyone whose device asks for reduced motion.
+const ANIM_LEVELS = { none: 'Off', wonders: 'Wonders only', features: 'Wonders + features', all: 'Everything' };
+function animLevel() {
+  const saved = readPrefs().anim;
+  if (ANIM_LEVELS[saved]) return saved;
+  const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return still ? 'none' : 'all';
+}
+let animSwitch = null;   // this visit's setting when storage is blocked
+const currentAnim = () => animSwitch || animLevel();
+function setAnim(level) { animSwitch = level; writePref('anim', level); applyAnim(); }
+function applyAnim() { if (UI && UI.map) UI.map.setAttribute('data-anim', currentAnim()); }
 
 /* ── the board ─────────────────────────────────────────────────────────────── */
 
@@ -3670,6 +4002,10 @@ function unitMarkup(u, cx, cy, viewer) {
       ? '<path d="M' + (cx - 12) + ' ' + (cy - 13) + ' h24 v12 q0 9 -12 9 q-12 0 -12 -9 z" fill="' + f.light + '" stroke="' + f.ink + '" stroke-width="2"/>'
       : '<path d="M' + (cx - 11) + ' ' + (cy - 13) + ' h22 v21 h-22 z" fill="' + f.light + '" stroke="' + f.ink + '" stroke-width="2"/>');
     parts.push(markOnMap(iconOf(u.type), cx, cy - 2.5, 0.88, '#241c12', 2.1));
+    // War wonder gifts: a blue drop (Everspring), a grey step (Giant's Stair).
+    if (u.blessed) parts.push(sAt(cx - 12, cy - 13, sP('M0 -4 C-3 0 -3.4 2 -3.4 2.6 A3.4 3.4 0 0 0 3.4 2.6 C3.4 2 3 0 0 -4 Z', { fill: '#4fb4e0', stroke: '#241c12', 'stroke-width': 0.9 })));
+    if (u.giant) parts.push(sAt(cx + 12, cy - 13, sCirc(0, 0, 4, { fill: '#6b6762', stroke: '#241c12', 'stroke-width': 0.9 }) +
+      '<text x="0" y="2.3" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">+5</text>'));
     const portion = clamp(u.hp / 100, 0, 1);
     parts.push('<line x1="' + (cx - 9) + '" y1="' + (cy + 11.5) + '" x2="' + (cx + 9) + '" y2="' + (cy + 11.5) + '" stroke="rgba(36,28,18,.3)" stroke-width="2.6" stroke-linecap="round"/>');
     parts.push('<line x1="' + (cx - 9) + '" y1="' + (cy + 11.5) + '" x2="' + (cx - 9 + 18 * portion).toFixed(1) + '" y2="' + (cy + 11.5) + '" stroke="' + (portion > 0.5 ? '#41602f' : '#93401d') + '" stroke-width="2.6" stroke-linecap="round"/>');
@@ -3680,33 +4016,48 @@ function unitMarkup(u, cx, cy, viewer) {
   }
   if (mine && u.mp > 0 && !u.acted) {
     const tx = mil ? cx : ux, ty = mil ? cy - 18 : uy - (civilianBeside ? 12 : 15);
-    parts.push('<path d="M' + tx + ' ' + ty + ' l3 3 -3 3 -3 -3 z" fill="#f7f0df" stroke="#241c12" stroke-width="1"/>');
+    parts.push(sMove('a', 'bob', '<path d="M' + tx + ' ' + ty + ' l3 3 -3 3 -3 -3 z" fill="#f7f0df" stroke="#241c12" stroke-width="1"/>'));
   }
   return '<g class="unit' + (spent ? ' spent' : '') + '">' + parts.join('') + '</g>';
 }
 
-function cityMarkup(c, cx, cy, known) {
+// A town in the owner's colors. Walls, a castle or a fortress show on the hex.
+function cityMarkup(c, cx, cy) {
   const f = pl(c.owner), ink = f.ink, light = f.light;
   const portion = clamp(c.hp / cityMaxHp(c), 0, 1);
-  const walls = hasWalls(c), fortress = c.buildings.includes('fortress');
-  const out = [];
-  out.push('<path d="M' + (cx - 12) + ' ' + (cy + 1) + ' H' + (cx + 12) + ' V' + (cy + 9) + ' H' + (cx - 12) + ' Z" fill="' + light + '" stroke="' + ink + '" stroke-width="1.3"/>');
-  out.push('<path d="M' + (cx - 12) + ' ' + (cy + 1) + ' V' + (cy - 4) + ' H' + (cx - 7) + ' V' + (cy + 1) + ' M' + (cx - 4) + ' ' + (cy + 1) + ' V' + (cy - 6) + ' H' + (cx + 2) + ' V' + (cy + 1) +
-    ' M' + (cx + 5) + ' ' + (cy + 1) + ' V' + (cy - 4) + ' H' + (cx + 10) + ' V' + (cy + 1) + '" fill="' + light + '" stroke="' + ink + '" stroke-width="1.3"/>');
-  out.push('<path d="M' + (cx - 1) + ' ' + (cy - 6) + ' V' + (cy - 17) + ' M' + (cx - 1) + ' ' + (cy - 17) + ' h9 l-2.5 3 2.5 3 h-9" fill="' + ink + '" stroke="' + ink + '" stroke-width="1"/>');
-  if (c.capital) out.push('<path d="M' + (cx - 9) + ' ' + (cy - 12) + ' l2 -3 2 3 2 -3 2 3 z" fill="' + ink + '"/>');
-  if (walls) out.push('<path d="M' + (cx - 15) + ' ' + (cy + 11) + ' H' + (cx + 15) + '" stroke="' + ink + '" stroke-width="2.4"/>');
-  if (fortress) out.push('<path d="M' + (cx - 15) + ' ' + (cy + 11) + ' V' + (cy + 3) + ' M' + (cx + 15) + ' ' + (cy + 11) + ' V' + (cy + 3) + '" stroke="' + ink + '" stroke-width="2.4"/>');
-  out.push('<rect x="' + (cx - 12) + '" y="' + (cy + 13) + '" width="24" height="3" fill="rgba(36,28,18,.2)"/>');
-  out.push('<rect x="' + (cx - 12) + '" y="' + (cy + 13) + '" width="' + (24 * portion).toFixed(1) + '" height="3" fill="' + ink + '"/>');
-  return '<g>' + out.join('') + '</g>';
+  const castle = c.buildings.includes('castle'), walls = hasWalls(c), fortress = c.buildings.includes('fortress');
+  const house = (x, y, w, h) => sP('M' + (x - w) + ' ' + y + ' V' + (y - h) + ' H' + (x + w) + ' V' + y + ' Z', { fill: light, stroke: ink, 'stroke-width': 1.2 }) +
+    sPoly((x - w - 1.5) + ',' + (y - h) + ' ' + x + ',' + (y - h - w - 1) + ' ' + (x + w + 1.5) + ',' + (y - h), { fill: ink, stroke: ink, 'stroke-width': 1, 'stroke-linejoin': 'round' }) +
+    sP('M' + (x - 1.4) + ' ' + y + ' V' + (y - 3.4) + ' H' + (x + 1.4) + ' V' + y, { fill: ART.ink });
+  let out = '';
+  if (fortress) out += sPoly('0,-27 8,-12 25,-11 12,1 17,18 0,10 -17,18 -12,1 -25,-11 -8,-12', lined('#9a9389', 1.2));
+  out += house(-11, 8, 6, 8) + house(11, 8, 6, 8) +
+    sP('M-4.5 8 V-10 H4.5 V8 Z', { fill: light, stroke: ink, 'stroke-width': 1.3 }) +
+    sP('M-5.5 -10 V-13 H-3 V-11 H-1 V-13 H1 V-11 H3 V-13 H5.5 V-10 Z', { fill: ink }) +
+    sP('M0 -13 V-24', { stroke: ART.ink, 'stroke-width': 1.3 }) +
+    sMove('a', 'flag', sP('M0 -24 H9 L6.5 -21 L9 -18 H0 Z', { fill: ink, stroke: ART.ink, 'stroke-width': 0.8 }), c.id * 0.31);
+  if (c.capital) out += sP('M-17 -6 L-15 -11 L-12.5 -7 L-10 -11 L-8 -6 Z', { fill: ART.gold2, stroke: ART.ink, 'stroke-width': 0.9, 'stroke-linejoin': 'round' });
+  if (castle) {
+    out += sP('M-21 17 V7 H-17 V4 H-13 V7 H-9 V4 H-5 V7 H5 V4 H9 V7 H13 V4 H17 V7 H21 V17 Z', lined('#b9b1a6', 1.1)) +
+      sP('M-23 17 V1 H-16 V17 Z M16 17 V1 H23 V17 Z', lined('#b9b1a6', 1.1)) + sP('M-4 17 V11 Q0 7 4 11 V17 Z', { fill: '#3d3127' });
+  } else if (walls) {
+    out += sP('M-21 17 V8 H-17 V5 H-13 V8 H-9 V5 H-5 V8 H-1 V5 H3 V8 H7 V5 H11 V8 H15 V5 H19 V8 H21 V17 Z', lined(ART.stone, 1.1)) +
+      sP('M-21 12.5 H21', { stroke: ART.stone2, 'stroke-width': 0.9 });
+  } else {
+    out += sP('M-20 13 H20', { stroke: ink, 'stroke-width': 1.2, opacity: 0.5 });
+  }
+  out += '<rect x="-12" y="19" width="24" height="3" fill="rgba(36,28,18,.25)"/>' +
+    '<rect x="-12" y="19" width="' + (24 * portion).toFixed(1) + '" height="3" fill="' + ink + '"/>';
+  return sAt(cx.toFixed(1), cy.toFixed(1), out);
 }
 
 function renderBoard() {
   if (!UI || !G) return;
   const viewer = G.viewer;
   const watching = G.watch || viewer === null;
-  const terrain = [], owner = [], coast = [], marks = [], border = [], overlay = [], sites = [], unitsOut = [], fog = [], labels = [];
+  const terrain = [], waves = [], owner = [], coast = [], marks = [], border = [], overlay = [], sites = [], unitsOut = [], fog = [], labels = [];
+  const cityHex = new Set(G.cities.map(c => keyOf(c.x, c.y)));
+  const wonderHexes = {};   // each wonder's name shows once, on one of its known hexes
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   const selCity = selection && selection.kind === 'city' ? cityById(selection.id) : null;
   const mySelUnit = selUnit && selUnit.owner === viewer && viewer === G.cur ? selUnit : null;
@@ -3749,24 +4100,13 @@ function renderBoard() {
         coast.push('<path class="coast" d="' + edgePath(cx, cy, HEX_R - 1.2, dir) + '"/>');
       });
     }
-    marks.push(tileScenery(tile, cx, cy));
-    // Gunpowder only shows to someone who knows Firearms. Wonders get a gold
-    // ring and their name.
-    if (tile.f && tile.f !== 'forest' && (watching || seesFeature(tile, viewer))) {
-      const wonder = FEATURES[tile.f].wonder;
-      marks.push('<circle cx="' + (cx + 12).toFixed(1) + '" cy="' + (cy - 11).toFixed(1) + '" r="' + (wonder ? 9.4 : 7.6) + '" fill="' + (wonder ? '#f6e7b8' : '#f7f0df') +
-        '" stroke="' + (wonder ? '#8a6a12' : 'rgba(36,28,18,.45)') + '" stroke-width="' + (wonder ? 1.6 : 0.8) + '"/>' +
-        markOnMap(tile.f, cx + 12, cy - 11, wonder ? 0.72 : 0.62, 'rgba(36,28,18,.85)', 2.2));
-      if (wonder) {
-        const name = FEATURES[tile.f].name, w = name.length * 5.4 + 8;
-        labels.push('<rect x="' + (cx - w / 2).toFixed(1) + '" y="' + (cy + 15).toFixed(1) + '" width="' + w.toFixed(1) + '" height="11" rx="2" fill="#f6e7b8" stroke="#8a6a12" stroke-width=".7" opacity=".95"/>' +
-          '<text class="label wonder" x="' + cx.toFixed(1) + '" y="' + (cy + 23).toFixed(1) + '" text-anchor="middle" fill="#5a4508">' + esc(name) + '</text>');
-      }
-    }
-    if (tile.imp) {
-      marks.push('<circle cx="' + (cx - 12).toFixed(1) + '" cy="' + (cy + 10).toFixed(1) + '" r="7" fill="#e6d9ba" stroke="rgba(36,28,18,.5)" stroke-width=".8"/>' +
-        markOnMap(tile.imp, cx - 12, cy + 10, 0.55, 'rgba(36,28,18,.85)', 2.2));
-    }
+    // Gunpowder only shows to someone who knows Firearms.
+    const showF = !!tile.f && (watching || seesFeature(tile, viewer));
+    const at = 'translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')';
+    marks.push('<g transform="' + at + '">' + tileArt(tile, showF, cityHex.has(key)) + '</g>');
+    const wave = tileWaves(tile);
+    if (wave) waves.push('<g transform="' + at + '">' + wave + '</g>');
+    if (showF && FEATURES[tile.f].wonder) (wonderHexes[tile.f] = wonderHexes[tile.f] || []).push(tile);
     if (mySelUnit && reachable && reachable.has(key)) overlay.push('<path class="reach' + (selZoc && selZoc.has(key) ? ' stop' : '') + '" d="' + d + '"/>');
     if (mySelUnit && visible && strikeInfo(mySelUnit, x, y)) overlay.push('<path class="threat" d="' + d + '"/>');
     if (shotTargets.has(key) && visible) overlay.push('<path class="threat" d="' + d + '"/>');
@@ -3789,6 +4129,16 @@ function renderBoard() {
     if (selCity && selCity.id === c.id) overlay.push('<circle class="sel-ring" cx="' + cx + '" cy="' + (cy - 2) + '" r="19"/>');
   }
 
+  // Wonder names go on the hex whose label clashes with the fewest city names.
+  for (const id in wonderHexes) {
+    const clash = t => G.cities.filter(c => Math.abs(c.y - t.y) <= 1 && hexDistance(c.x, c.y, t.x, t.y) <= 2).length;
+    const t = wonderHexes[id].reduce((a, b) => (clash(b) < clash(a) ? b : a));
+    const [cx, cy] = hexCenter(t.x, t.y);
+    const name = FEATURES[id].name, w = name.length * 5.4 + 8;
+    labels.push('<rect x="' + (cx - w / 2).toFixed(1) + '" y="' + (cy + 15).toFixed(1) + '" width="' + w.toFixed(1) + '" height="11" rx="2" fill="#f6e7b8" stroke="#8a6a12" stroke-width=".7" opacity=".95"/>' +
+      '<text class="label wonder" x="' + cx.toFixed(1) + '" y="' + (cy + 23).toFixed(1) + '" text-anchor="middle" fill="#5a4508">' + esc(name) + '</text>');
+  }
+
   const ordered = G.units.slice().sort((a, b) => isMil(b.type) - isMil(a.type));
   for (const u of ordered) {
     if (!watching && !visibleTo(u.x, u.y)) continue;
@@ -3806,7 +4156,10 @@ function renderBoard() {
     labels.push('<circle class="coach-ring" cx="' + kx.toFixed(1) + '" cy="' + ky.toFixed(1) + '" r="' + (HEX_R - 1) + '"/>');
   }
 
+  // Animations keep their phase across redraws: every one is timed off this clock.
+  UI.map.style.setProperty('--clock', (-(Date.now() / 1000) % 60).toFixed(2) + 's');
   UI.layerTerrain.innerHTML = terrain.join('');
+  UI.layerWaves.innerHTML = waves.join('');
   UI.layerOwner.innerHTML = owner.join('');
   UI.layerCoast.innerHTML = coast.join('');
   UI.layerMarks.innerHTML = marks.join('');
@@ -3820,7 +4173,7 @@ function renderBoard() {
 
 function clearBoard() {
   if (!UI) return;
-  for (const k of ['layerTerrain', 'layerOwner', 'layerCoast', 'layerMarks', 'layerBorder', 'layerOverlay', 'layerSites', 'layerUnits', 'layerFog', 'layerLabels']) {
+  for (const k of ['layerTerrain', 'layerWaves', 'layerOwner', 'layerCoast', 'layerMarks', 'layerBorder', 'layerOverlay', 'layerSites', 'layerUnits', 'layerFog', 'layerLabels']) {
     UI[k].innerHTML = '';
   }
 }
@@ -4481,7 +4834,7 @@ function realmPanel() {
   const s = scoreParts(f.i);
   const cities = ownCities(f.i), units = ownUnits(f.i);
   const inc = stockIncome(f.i);
-  let html = '<div class="side-head">' + dot(f, 14) + '<h2>' + esc(f.name) + '</h2></div>' +
+  let html = '<div class="side-head">' + dot(f, 14) + '<h2>' + esc(fullName(f)) + '</h2></div>' +
     '<div class="side-sub">' + (myTurn() ? 'Your turn' : 'Waiting') + ' · turn ' + G.turn +
     (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name + '</div>' + civBlurb(f.civ);
 
@@ -4549,7 +4902,7 @@ function realmPanel() {
   for (const o of G.players) {
     if (o.i === f.i) continue;
     const war = atWar(f.i, o.i);
-    html += '<div class="row">' + dot(o) + '<span class="nm">' + esc(o.name) + ' · ' + esc(CIVS[o.civ].land) + (o.human ? '' : ' · CPU') + '</span>' +
+    html += '<div class="row">' + dot(o) + '<span class="nm">' + esc(fullName(o)) + (o.human ? '' : ' · CPU') + '</span>' +
       (o.alive ? '<span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'war' : 'peace') + '</span>' : '<span class="tag">out</span>') +
       '<span class="st">' + scoreParts(o.i).total + '</span></div>';
   }
@@ -4630,7 +4983,7 @@ function cityPanel(c) {
     html += kv('Building', 'nothing') +
       '<div class="hint" style="margin-top:2px">' + c.progress + ' production saved. Pick something below.</div>';
   }
-  if (c.buildings.length) html += kv('Has', c.buildings.map(b => BUILDINGS[b].name).join(', '));
+  if (c.buildings.length) html += '<p class="sec">Buildings here</p><div class="bcards">' + c.buildings.map(buildingCard).join('') + '</div>';
   const sp = y.sp, share = c.build && c.build.kind === 'research' ? Math.floor(y.prod * SCI.researchShare + 1e-9) : 0;
   html += '<p class="sec">' + icon('tech', 12) + 'Science</p>' + kv('Each turn', '+' + cityResearch(c, y)) +
     '<div class="hint" style="margin-top:2px">' + ['+' + sp.pop + ' from pop', sp.cap ? '+' + sp.cap + ' capital' : '', sp.bld ? '+' + sp.bld + ' buildings' : '',
@@ -4709,10 +5062,12 @@ function tilePanel(x, y) {
     gunpowder: 'A mine here adds 2 gunpowder a turn to its owner’s stockpile.',
     geyser: 'A geyser: +2 science to whoever’s borders it’s in. It can’t be harvested.',
     reef: 'A natural wonder: +3 science and +1 food to whoever’s borders it’s in.',
-    peak: 'A natural wonder: +3 science, and +1 science on every land hex beside it. Any city can claim it, even though it’s a mountain.'
+    peak: 'A natural wonder of plain mountains, like Civ’s: nobody claims it, but every land hex beside it gives +' + SCI.peakNext + ' science.',
+    spring: 'A natural wonder, like Civ’s Fountain of Youth: a land military unit that steps in heals 10 HP every turn for the rest of the game, even after moving or fighting.',
+    stair: 'A natural wonder, like Civ’s Giant’s Causeway: nobody can enter it, but a land military unit that steps beside it fights at +5 for the rest of the game.'
   }[t.f];
   if (note && (G.watch || seesFeature(t, v))) html += '<div class="hint">' + note + '</div>';
-  else if (!t.f && nextToPeak(t)) html += '<div class="hint">Next to Starfall Peak: +1 science.</div>';
+  else if (!t.f && nextToPeak(t)) html += '<div class="hint">Next to Starfall Peak: +' + SCI.peakNext + ' science.</div>';
   html += '<div class="actions">' + (city ? '<button class="act" data-act="select-city:' + city.id + '">' + icon('city', 14) + 'Open ' + esc(city.name) + '</button>' : '') +
     '<button class="act" data-act="deselect">Back</button></div>';
   return html;
@@ -4738,6 +5093,8 @@ function unitPanel(u) {
     (def.charges ? kv('Charges', u.charges) : '') +
     (isMil(u.type) && u.owner === v ? kv('Fed by', def.noFood ? 'nobody (eats no food)' : home ? esc(home.name) : 'nobody (free)') : '') +
     '<div class="hint">' + esc(def.blurb) + '</div>' +
+    (u.blessed ? '<div class="hint" style="color:var(--sea)">Drank from the Everspring: heals 10 HP every turn, wherever it is.</div>' : '') +
+    (u.giant ? '<div class="hint" style="color:var(--sea)">Climbed the Giant’s Stair: +5 strength for good.</div>' : '') +
     (u.pinned && u.owner === v ? '<div class="hint" style="color:var(--rust)">Stopped by an enemy’s zone of control. It can still attack this turn.</div>' : '');
 
   if (u.owner !== v) {
@@ -5092,17 +5449,17 @@ function showCouncil() {
     if (o.i === v) continue;
     const s = scoreParts(o.i);
     if (!o.alive) {
-      html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(o.name) + ' <span class="tag">out</span></div></div><div></div></div>';
+      html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(fullName(o)) + ' <span class="tag">out</span></div></div><div></div></div>';
       continue;
     }
     const war = atWar(v, o.i);
     const sent = G.offers.some(x => x.from === v && x.to === o.i);
     const att = o.human ? null : G.attitude[o.i][v] || 0;
     const mood = att === null ? '' : ' · ' + (att > 15 ? 'friendly' : att < -15 ? 'hostile' : 'wary') + ' toward you';
-    html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(o.name) +
+    html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(fullName(o)) +
       ' <span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'at war' : 'at peace') + '</span>' +
       (o.human ? '' : '<span class="tag">CPU</span>') + '</div>' +
-      '<div class="cd">' + esc(civTitle(o.civ)) + ' · ' + plural(s.cities, 'city', 'cities') + ' · ' + plural(o.techs.length, 'tech', 'techs') +
+      '<div class="cd">' + esc(CIVS[o.civ].focus) + ' · ' + plural(s.cities, 'city', 'cities') + ' · ' + plural(o.techs.length, 'tech', 'techs') +
       ' · score ' + s.total + mood + '</div>' + (scienceOn() ? '<div class="cd">' + esc(raceLine(o.i)) + '</div>' : '') + '</div><div class="ca">';
     if (myTurn()) {
       if (war) html += sent ? '<span class="tag">offer sent</span>' : '<button class="act" data-act="peace:' + o.i + '">Offer peace</button>';
@@ -5118,7 +5475,7 @@ function showCouncil() {
 
 function askWar(i) {
   const o = pl(i);
-  openModal(modalHead('Declare war on ' + esc(o.name) + '?') +
+  openModal(modalHead('Declare war on ' + esc(fullName(o)) + '?') +
     '<div class="modal-body"><p>Your units can attack theirs right away, and theirs can attack yours on their turn. ' +
     'Peace needs both sides to agree.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Stay at peace</button>' +
@@ -5162,6 +5519,7 @@ function showMenu() {
     (G.tut ? '<button class="act switch" data-act="coach-toggle">Tutorial coach<b>' + (G.tut.closed ? 'off' : 'on') + '</b></button>'
       : '<button class="act" data-act="tut-start">Play the tutorial</button>') +
     '<button class="act switch" data-act="tips-toggle">Tips in my games<b>' + (tipsOn() ? 'on' : 'off') + '</b></button>' +
+    '<button class="act switch" data-act="anim-next">Animation<b>' + ANIM_LEVELS[currentAnim()] + '</b></button>' +
     (G.tut ? '' : '<button class="act" data-act="save">Save now</button>') +
     '<button class="act warn" data-act="new-ask">Quit to the start screen</button></div>' +
     '<p class="hint">' + (G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.' :
@@ -5195,7 +5553,7 @@ function showHelp() {
     '<h3>A turn</h3><p>Each city grows food and production from every tile inside its borders. Each pop eats 2 food and each military unit eats 1 from its home city. ' +
     'Spare food grows the city (15 + 8 × pop to grow), and each new pop claims one more hex. Production goes into whatever the city is building, one thing at a time.</p>' +
     '<h3>Science</h3><p>Every city makes science: +1 per 2 pop, your capital +2, a Library +2 (+3 after Printing), a University +3, an Observatory +2 (+4 next to a mountain). ' +
-    'Geysers give +2 on their hex; the Glass Reef gives +3, and Starfall Peak +3 plus +1 on every land hex beside it. A city with nothing better to do can go on Research and turn a third of its production into science. ' +
+    'Geysers give +2 on their hex and the Glass Reef +3 on each of its hexes. Starfall Peak is plain mountains, but every land hex beside it gives +2. A city with nothing better to do can go on Research and turn a third of its production into science. ' +
     'Techs cost 40, 100, 180 and 300 by era. Seven major techs have a eureka: do the thing on its card and it costs half. Press T for the tree, then click any tech to head for it: what it needs gets queued first.</p>' +
     '<h3>Era 4 is shuffled</h3><p>Like Civ’s Tech Shuffle, the six era 4 techs keep what they unlock, but what each one needs is dealt fresh every game, the same for everyone. ' +
     'An era 4 tech shows as “?” until you know a tech it needs or earn its eureka.</p>' +
@@ -5219,23 +5577,27 @@ function showHelp() {
     '<h3>Difficulty</h3><p>On Normal, CPUs play by the same rules as you. On Deity, every CPU gets +40% production, +20% food, +25% research and +4 combat strength. ' +
     'It also needs a smaller edge before it attacks, starts wars sooner and holds out longer for peace.</p>' +
     '<h3>Maps and continents</h3><p>Pick Pangaea, Continents, Islands or Mirror, and a size: Small, Standard, Large or Huge, built for 2, 4, 6 and 8 players. ' +
-    'Every map’s land is split into named continents, marked with thin dashed lines. Each map has one Glass Reef and one Starfall Peak, as even between the starts as it allows.</p>' +
+    'Every map’s land is split into named continents, marked with thin dashed lines.</p>' +
+    '<h3>Natural wonders</h3><p>Each map has four, dropped at random but at least 3 hexes from every start, well apart, and never more than your share of them closest to you. ' +
+    'The Glass Reef (shallow water, +3 science a hex) and Starfall Peak (mountains, +2 science on every land hex beside it) cover 1 to 3 hexes on Small maps, up to 4 on Standard and 5 on Large and Huge. ' +
+    'The Everspring (like Civ’s Fountain of Youth): a land military unit that steps in heals 10 HP every turn for good. The Giant’s Stair (like Civ’s Giant’s Causeway) can’t be entered, but a land military unit that steps beside it gets +5 strength for good. ' +
+    'Nobody founds cities, builds or claims mountains on a wonder, the Inca included.</p>' +
     '<h3>Winning</h3><p><b>Conquest:</b> hold every capital on the map. <b>Science:</b> finish Star Charts and the Royal Academy, then send out the Grand Expedition by sea (coastal city with a Harbor) ' +
     'or the Grand Caravan by land (any city). If it gets home after its trip, you win; take its home city to stop it, and while that city is under half HP the trip waits. Every Future Tech you finish on the way cuts a turn. ' +
     '<b>Score:</b> the highest score when the turn limit hits: 5 per city, 1 per pop, 2, 4, 6 or 8 per tech by era (2 per Future Tech), and 1 per 20 military strength. ' +
     'Older units count for less as the game goes on. Conquest and science can be switched off at setup.</p>' +
-    '<h3>Keys</h3><p>Space ends the turn · N next unit · F found city · S skip · T tech · R realm · D council · H rules · Esc closes or deselects.</p>' +
+    '<h3>Keys</h3><p>Space ends the turn · N next unit · F found city · S skip · T tech · R realm · D council · H rules · Esc closes or deselects. The Menu’s Animation switch runs through off, wonders only, wonders + features, and everything.</p>' +
     '</div><div class="modal-foot"><button class="btn" data-act="civs">All 16 civs</button><button class="btn primary" data-act="close">Close</button></div>');
 }
 
 function showEndModal() {
   UI.endShown = true;
   const w = G.over.winner !== null ? pl(G.over.winner) : null;
-  const rows = standings().map(({ f, s }) => '<tr><td>' + dot(f) + ' ' + esc(f.name) + ' <span class="faint">' + esc(CIVS[f.civ].land) + '</span>' +
+  const rows = standings().map(({ f, s }) => '<tr><td>' + dot(f) + ' ' + esc(fullName(f)) +
     (f.human ? '' : ' (CPU)') + (f.alive ? '' : ' · out') +
     '</td><td class="n">' + s.cities + '</td><td class="n">' + s.pop + '</td><td class="n">' + s.tech + '</td><td class="n">' + s.mil +
     '</td><td class="n"><b>' + s.total + '</b></td></tr>').join('');
-  openModal(modalHead(w ? esc(w.name) + ' wins' : 'Game over', esc(G.over.why) + ' · turn ' + G.over.turn) +
+  openModal(modalHead(w ? esc(fullName(w)) + ' wins' : 'Game over', esc(G.over.why) + ' · turn ' + G.over.turn) +
     '<div class="modal-body"><div class="table-wrap"><table class="standings"><thead><tr><th>Player</th><th class="n">Cities</th><th class="n">Pop</th>' +
     '<th class="n">Tech</th><th class="n">Military</th><th class="n">Score</th></tr></thead><tbody>' +
     rows + '</tbody></table></div><p class="hint">Score is cities × 5 + pop + tech points + military strength ÷ 20.</p></div>' +
@@ -5305,6 +5667,14 @@ function onAction(act) {
   if (kind === 'zoom-fit') { fitCamera(); return; }
   if (kind === 'civs') { showCivs(); return; }
   if (kind === 'tut-start') { if (G && !G.tut) saveGame(); startTutorial(); return; }
+  if (kind === 'anim-next') {
+    // Off, wonders only, wonders + features, everything, and round again.
+    const order = Object.keys(ANIM_LEVELS);
+    setAnim(order[(order.indexOf(currentAnim()) + 1) % order.length]);
+    toast('Animation: ' + ANIM_LEVELS[currentAnim()].toLowerCase() + '.');
+    if (G) showMenu();
+    return;
+  }
   if (kind === 'tips-toggle') {
     setTips(!tipsOn());
     if (UI.optTips) UI.optTips.checked = tipsOn();
@@ -5739,7 +6109,6 @@ function refreshStart() {
   // Each seat's dot shows the colors its civ will wear, alternates included.
   const picked = SEATS.map((s, i) => (i < n ? document.getElementById('seat-civ-' + i).value : null));
   const colors = assignColors(picked.map(c => (CIVS[c] ? c : null)));
-  let cpuNo = 0;
   SEATS.forEach((s, i) => {
     const dotEl = document.getElementById('seat-dot-' + i), c = colors[i];
     dotEl.style.background = c ? c[1] : 'transparent';
@@ -5751,9 +6120,9 @@ function refreshStart() {
     seat.classList.toggle('cpu', !human);
     document.getElementById('seat-who-' + i).textContent = human ? 'Human' : 'CPU';
     const name = document.getElementById('seat-name-' + i);
-    if (!human) cpuNo++;
-    if (!name.dataset.edited) name.value = human ? SEATS[i].name : 'CPU ' + cpuNo;
     const civ = document.getElementById('seat-civ-' + i).value;
+    // CPUs play as their civ's leader unless you name them.
+    if (!name.dataset.edited) name.value = human ? SEATS[i].name : CIVS[civ] ? CIVS[civ].leader : 'Random leader';
     const note = document.getElementById('seat-note-' + i);
     if (CIVS[civ]) {
       const u = civUnique(civ);
@@ -5781,9 +6150,10 @@ function beginGame() {
   const seats = [];
   for (let i = 0; i < n; i++) {
     const civ = document.getElementById('seat-civ-' + i).value;
-    const fallback = i < humans ? SEATS[i].name : 'CPU ' + (i - humans + 1);
+    const field = document.getElementById('seat-name-' + i), typed = field.value.trim();
     seats.push({
-      name: (document.getElementById('seat-name-' + i).value || fallback).trim() || fallback,
+      // An unnamed CPU gets its leader's name once its civ is dealt.
+      name: i < humans ? typed || SEATS[i].name : field.dataset.edited && typed ? typed : null,
       human: i < humans,
       civ: CIVS[civ] ? civ : null
     });
@@ -5874,7 +6244,7 @@ function boot(data) {
   UI = {
     stage: q('#stage'), map: q('#map'), cam: q('#cam'), panel: q('#panel'), grip: q('#panel-grip'), btnNeeds: q('#btn-needs'),
     logToggle: q('#log-toggle'), sheetOpen: false, swiped: false,
-    layerTerrain: q('#layer-terrain'), layerOwner: q('#layer-owner'), layerCoast: q('#layer-coast'),
+    layerTerrain: q('#layer-terrain'), layerWaves: q('#layer-waves'), layerOwner: q('#layer-owner'), layerCoast: q('#layer-coast'),
     layerMarks: q('#layer-marks'), layerBorder: q('#layer-border'), layerOverlay: q('#layer-overlay'),
     layerSites: q('#layer-sites'), layerUnits: q('#layer-units'), layerFog: q('#layer-fog'), layerLabels: q('#layer-labels'),
     stats: q('#stats'), bannerDot: q('#banner-dot'), bannerName: q('#banner-name'), bannerWho: q('#banner-who'),
@@ -5888,6 +6258,7 @@ function boot(data) {
     optTutorial: q('#opt-tutorial'), optTips: q('#opt-tips'), startNote: q('#start-note'),
     coach: q('#coach'), coachTag: q('#coach-tag'), coachCount: q('#coach-count'), coachSay: q('#coach-say'), coachActions: q('#coach-actions'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), endShown: false, modalKind: null
   };
+  applyAnim();
   buildStartScreen();
   bindMap();
   bindKeys();
