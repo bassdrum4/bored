@@ -3636,68 +3636,78 @@ function prepareState(state) {
 // Small flat drawings in a 20x20 box around the origin: strokes in MARK, one
 // filled accent in SOLID. Shared by the map and the side panel.
 const MARK = {
-  wheat: 'M0 8 V0|M0 0 L-4 -4|M0 0 L4 -4|M0 4 L-4 0|M0 4 L4 0|M0 -3 V-8',
+  // ── resources ──
+  wheat: 'M0 9 V-9|M0 -5 L-3.5 -8|M0 -5 L3.5 -8|M0 -1 L-3.5 -4|M0 -1 L3.5 -4|M0 3 L-3.5 0|M0 3 L3.5 0',
   seafood: 'M-7 0 C-3 -5 3 -5 6 0 C3 5 -3 5 -7 0 Z|M6 0 L9 -3 V3 Z',
   horses: 'M-6 7 V0 A6 6 0 0 1 6 0 V7|M-8 7 H-4|M4 7 H8',
-  iron: 'M-7 -5 C-3 -8.5 3 -8.5 7 -5|M0 -6 L-4 7|M-6 7 H-2',
-  farm: 'M-7 -2 L7 -6|M-7 2 L7 -2|M-7 6 L7 2',
-  mine: 'M-7 7 V0 A7 7 0 0 1 7 0 V7 Z|M-2.5 7 V3 H2.5 V7',
-  pasture: 'M-8 -2 H8|M-8 3 H8|M-5 -6 V7|M0 -6 V7|M5 -6 V7',
-  boats: 'M-7 3 H7 L5 7 H-5 Z|M0 3 V-7|M0 -7 L6 -2 H0',
-  settler: 'M-5 8 V-8|M-7 8 H-1|M-5 -8 H5 L2 -5 L5 -2 H-5',
-  builder: 'M-6 7 L2 -1|M-1 -6 L4 -9 L8 -5 L5 -2 Z',
-  warrior: 'M-6 7 L3 -2|M1 -4 C2 -8 7 -9 8 -7 C9 -5 6 -1 3 -1 Z',
-  spearman: 'M0 8 V-8|M-3 4 H3|M-3 -4 L0 -9 L3 -4 Z',
-  swordsman: 'M0 -9 L2 -4 V3 H-2 V-4 Z|M-5 3 H5|M0 3 V8',
-  horseman: 'M-6 8 H6|M-4 8 C-4 3 -2 1 -3 -2 C-4 -5 -1 -8 2 -8 L6 -4 L4 -2 L1 -3 C2 1 4 3 4 8',
-  archer: 'M-4 -8 C5 -4 5 4 -4 8|M-4 -8 V8|M-4 0 H7|M4 -2.5 L7 0 L4 2.5',
-  catapult: 'M-8 5 H7|M-8 5 a2.2 2.2 0 1 0 4.4 0|M2.4 5 a2.2 2.2 0 1 0 4.4 0|M-5 4 L5 -6|M5 -6 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0',
-  scout: 'M-8 0 C-4 -6 4 -6 8 0 C4 6 -4 6 -8 0 Z|M0 0 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0',
-  heavy: 'M-6 8 H6|M-4 8 C-4 3 -2 1 -3 -2 C-4 -5 -1 -8 2 -8 L6 -4 L4 -2 L1 -3 C2 1 4 3 4 8|M-2 -3 L-8 -9',
-  galley: 'M-8 0 H8 L5 5 H-5 Z|M-4 5 L-6 8|M0 5 V8|M4 5 L6 8|M0 0 V-8|M0 -8 L5 -4 H0',
-  warship: 'M-8 1 H8 L5 6 H-5 Z|M-3 1 V-8|M3 1 V-6|M-3 -8 L1 -5.5 H-3|M3 -6 L7 -3.5 H3',
-  walls: 'M-8 6 V-3 H-5 V-6 H-2 V-3 H2 V-6 H5 V-3 H8 V6 Z|M-8 1 H8',
-  castle: 'M-8 7 V-2 H-5 V-5 H-2 V-2 H2 V-5 H5 V-2 H8 V7 Z|M-2 7 V3 H2 V7|M0 -5 V-9 L4 -7.5 L0 -6',
-  fortress: 'M-8 8 V-1 L-5 -4 V-8 H5 V-4 L8 -1 V8 Z|M-2 8 V3 H2 V8|M-5 -4 H5',
-  library: 'M0 -5 C-3 -7 -6 -7 -8 -6 V6 C-6 5 -3 5 0 7 C3 5 6 5 8 6 V-6 C6 -7 3 -7 0 -5 Z|M0 -5 V7',
-  tech: 'M-3 -8 H3|M-2 -8 V-2 L-7 6 C-7.5 7.5 -6.5 8 -5 8 H5 C6.5 8 7.5 7.5 7 6 L2 -2 V-8|M-4.6 3 H4.6',
-  terrace: 'M-8 7 H8|M-8 7 V3 H-4 V-1 H0 V-5 H4 V-8|M-8 3 H8|M-4 -1 H8',
-  stepwell: 'M-8 -6 H8 L4 7 H-4 Z|M-6 -2 H6|M-5 2 H5',
-  polder: 'M-8 7 H8|M0 7 V-1|M0 -1 L-5 -6|M0 -1 L5 -6|M0 -1 L-5 4|M0 -1 L5 4',
-  plant: 'M0 8 V-1|M0 -1 C-5 -1 -6 -5 -6 -8 C-2 -8 0 -5 0 -1|M0 2 C4 2 6 -1 6 -4 C3 -4 0 -2 0 2',
-  granary: 'M-5 8 V-2 L0 -8 L5 -2 V8 Z|M-2 8 V4 H2 V8|M-5 0 H5',
-  workshop: 'M-6 -4 H6 V-1 H2 L0 3 H4 V5 H-4 V3 H-2 L-4 -1 H-6 Z',
-  barracks: 'M0 -8 L6 -5 V1 C6 5 3 7 0 9 C-3 7 -6 5 -6 1 V-5 Z|M0 -4 V7',
-  harbor: 'M0 -5 V8|M-4 -2 H4|M-7 2 C-7 8 7 8 7 2|M0 -8 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0',
-  navigation: 'M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z',
-  city: 'M-4 8 V-2 H-6 V-7 H-3 V-4 H-1 V-7 H1 V-4 H3 V-7 H6 V-2 H4 V8 Z|M-1 8 V4 H1 V8',
-  crown: 'M-7 6 H7|M-7 6 L-8 -3 L-4 1 L0 -7 L4 1 L8 -3 L7 6',
-  food: 'M0 8 V0|M0 0 C-4.6 -2 -5 -8 0 -8 C5 -8 4.6 -2 0 0 Z|M0 3 L-3 1|M0 5 L3 3',
-  prod: 'M-6 -4 H6 V-1 H2 L0 3 H4 V5 H-4 V3 H-2 L-4 -1 H-6 Z',
-  forest: 'M-5 8 V-2|M-8 -2 L-5 -9 L-2 -2 Z|M3 8 V-1|M0 -1 L3 -8 L6 -1 Z',
-  geyser: 'M-5 8 H5|M0 8 V1|M0 1 C-4 -2 -3 -6 0 -9 C3 -6 4 -2 0 1|M-5 -2 L-8 -5|M5 -2 L8 -5',
+  iron: 'M-8 -2 L-4 -6 H8 L4 -2 Z|M-8 -2 H4 V6 H-8 Z|M4 -2 L8 -6 V2 L4 6',
   gunpowder: 'M-5 -7 H5 C7 -3 7 3 5 7 H-5 C-7 3 -7 -3 -5 -7 Z|M-6 -2.5 H6|M-6 2.5 H6',
+  // ── features ──
+  forest: 'M-5 8 V-2|M-8 -2 L-5 -9 L-2 -2 Z|M3 8 V-1|M0 -1 L3 -8 L6 -1 Z',
+  geyser: 'M-5 8 H5|M0 8 V1|M0 1 C-4 -2 -3 -6 0 -9 C3 -6 4 -2 0 1',
+  // ── wonders ──
   reef: 'M0 8 V-1|M0 3 L-5 -2 V-7|M0 0 L5 -4 V-8|M-5 -2 L-8 -4|M5 -4 L8 -2',
   peak: 'M-8 7 L-2 -2 L1 2 L4 -3 L8 7 Z|M4 -9 V-5|M2 -7 H6',
   spring: 'M-8 5 C-8 9 8 9 8 5 C8 2 -8 2 -8 5 Z|M0 4 V-5|M0 -5 C-3 -8 -6 -6 -6 -2|M0 -5 C3 -8 6 -6 6 -2',
   stair: 'M-8 8 V2 H-3 V8|M-3 8 V-2 H2 V8|M2 8 V-7 H7 V8',
+  // ── improvements ──
+  farm: 'M-8 0 L8 -4 M-8 4 L8 0 M-8 8 L8 4|M0 -2 V-9|M0 -6 L-2.5 -8.5|M0 -6 L2.5 -8.5',
+  mine: 'M-7 7 V0 A7 7 0 0 1 7 0 V7 Z|M-2.5 7 V3 H2.5 V7',
+  pasture: 'M-8 -2 H8|M-8 3 H8|M-5 -6 V7|M0 -6 V7|M5 -6 V7',
+  boats: 'M-7 3 H7 L5 7 H-5 Z|M0 3 V-7|M0 -7 L6 -2 H0',
+  terrace: 'M-9 7 V3 H-4 V7 M-4 7 V-1 H1 V7 M1 7 V-5 H6|M1 -5 H6|M3.5 -8 V-10',
+  stepwell: 'M-8 -6 H8 L4 7 H-4 Z|M-6 -2 H6|M-5 2 H5',
+  polder: 'M-8 7 H8|M0 7 V-1|M0 -1 L-5 -6|M0 -1 L5 -6|M0 -1 L-5 4|M0 -1 L5 4',
+  plant: 'M0 8 V-1|M0 -1 C-5 -1 -6 -5 -6 -8 C-2 -8 0 -5 0 -1|M0 2 C4 2 6 -1 6 -4 C3 -4 0 -2 0 2',
+  // ── units, drawn like Civ 6's roster: wagon, hammer, eye, club, spear, sword, bow, horse ──
+  settler: 'M-6 2 V-2 Q-6 -7 0 -7 Q6 -7 6 -2 V2 Z|M-8 2 H8|M-4 5 m-2.1 0 a2.1 2.1 0 1 0 4.2 0 a2.1 2.1 0 1 0 -4.2 0|M4 5 m-2.1 0 a2.1 2.1 0 1 0 4.2 0 a2.1 2.1 0 1 0 -4.2 0|M-8 3 L-11 6',
+  builder: 'M-6 7 L2 -1|M-1 -6 L4 -9 L8 -5 L5 -2 Z',
+  scout: 'M-8 0 C-4 -6 4 -6 8 0 C4 6 -4 6 -8 0 Z',
+  warrior: 'M-7 8 L1.5 0',
+  spearman: 'M0 8 V-8|M-3 4 H3|M-3 -4 L0 -9 L3 -4 Z',
+  swordsman: 'M-5 3 H5|M0 3 V8',
+  horseman: 'M-6 8 H6|M-4 8 C-4 3 -2 1 -3 -2 C-4 -5 -1 -8 2 -8 L6 -4 L4 -2 L1 -3 C2 1 4 3 4 8',
+  archer: 'M-4 -8 C5 -4 5 4 -4 8|M-4 -8 V8|M-4 0 H7|M4 -2.5 L7 0 L4 2.5',
+  heavy: 'M-6 8 H6|M-4 8 C-4 3 -2 1 -3 -2 C-4 -5 -1 -8 2 -8 L6 -4 L4 -2 L1 -3 C2 1 4 3 4 8|M-2 -3 L-8 -9',
+  catapult: 'M-8 5 H7|M-8 5 a2.2 2.2 0 1 0 4.4 0|M2.4 5 a2.2 2.2 0 1 0 4.4 0|M-5 4 L5 -6|M5 -6 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0',
+  galley: 'M-8 0 H8 L5 5 H-5 Z|M-4 5 L-6 8|M0 5 V8|M4 5 L6 8|M0 0 V-8',
+  warship: 'M-8 1 H8 L5 6 H-5 Z|M-3 1 V-8|M3 1 V-6|M3 -6 L7 -3.5 H3',
+  musketman: 'M-3 3 L8 -8|M-3 3 L-6 8.5|M0.5 -0.5 L2 1',
+  cannon: 'M-7 1 L6 -4 L7 -1 L-6 4 Z|M-3 6 m-2.5 0 a2.5 2.5 0 1 0 5 0 a2.5 2.5 0 1 0 -5 0',
+  battleship: 'M-9 2 H9 L6 7 H-6 Z|M-4 2 V-2 H0 V2|M3 -3 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0|M4.5 -4.5 L9 -9|M-7 2 V-0.5 H-5.5 V2',
+  // ── buildings ──
+  walls: 'M-8 6 V-3 H-5 V-6 H-2 V-3 H2 V-6 H5 V-3 H8 V6 Z|M-8 1 H8',
+  castle: 'M-8 7 V-2 H-5 V-5 H-2 V-2 H2 V-5 H5 V-2 H8 V7 Z|M-2 7 V3 H2 V7|M0 -5 V-9 L4 -7.5 L0 -6',
+  fortress: 'M-8 8 V-1 L-5 -4 V-8 H5 V-4 L8 -1 V8 Z|M-2 8 V3 H2 V8|M-5 -4 H5',
+  granary: 'M-5 8 V-2 L0 -8 L5 -2 V8 Z|M-2 8 V4 H2 V8|M-5 0 H5',
+  library: 'M0 -5 C-3 -7 -6 -7 -8 -6 V6 C-6 5 -3 5 0 7 C3 5 6 5 8 6 V-6 C6 -7 3 -7 0 -5 Z|M0 -5 V7',
+  workshop: 'M-8 -3 H3 C5.5 -3 7.5 -4.5 8.5 -6.5 M8.5 -6.5 C8 -3 6 -0.5 3 -0.5 H1 V2 H4 V5 H-6 V2 H-3 V-0.5 H-8 Z',
+  barracks: 'M0 -8 L6 -5 V1 C6 5 3 7 0 9 C-3 7 -6 5 -6 1 V-5 Z|M0 -4 V7',
+  harbor: 'M0 -5 V8|M-4 -2 H4|M-7 2 C-7 8 7 8 7 2|M0 -8 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0',
   university: 'M-8 -3 L0 -8 L8 -3 Z|M-6 -3 V6|M-2 -3 V6|M2 -3 V6|M6 -3 V6|M-8 7 H8',
   observatory: 'M-7 7 V1 A7 7 0 0 1 7 1 V7 Z|M1 -3 L6 -8',
-  musketman: 'M-7 7 L5 -5|M5 -5 L8 -8|M-4 6 L-6 4|M-1 1 L1 3',
-  cannon: 'M-7 1 L6 -4 L7 -1 L-6 4 Z|M-3 6 m-2.5 0 a2.5 2.5 0 1 0 5 0 a2.5 2.5 0 1 0 -5 0',
-  battleship: 'M-8 2 H8 L5 7 H-5 Z|M-4 2 V-2 H3 V2|M3 -1 L8 -3',
+  // ── yields, projects and UI ──
+  tech: 'M-3 -8 H3|M-2 -8 V-2 L-7 6 C-7.5 7.5 -6.5 8 -5 8 H5 C6.5 8 7.5 7.5 7 6 L2 -2 V-8|M-4.6 3 H4.6',
+  navigation: 'M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z',
+  city: 'M-4 8 V-2 H-6 V-7 H-3 V-4 H-1 V-7 H1 V-4 H3 V-7 H6 V-2 H4 V8 Z|M-1 8 V4 H1 V8',
+  crown: 'M-7 6 H7|M-7 6 L-8 -3 L-4 1 L0 -7 L4 1 L8 -3 L7 6',
+  food: 'M0 8 V0|M0 0 C-4.6 -2 -5 -8 0 -8 C5 -8 4.6 -2 0 0 Z|M0 3 L-3 1|M0 5 L3 3',
+  prod: 'M0 -4.4 V-7.2 M3.1 -3.1 L5.1 -5.1 M4.4 0 H7.2 M3.1 3.1 L5.1 5.1 M0 4.4 V7.2 M-3.1 3.1 L-5.1 5.1 M-4.4 0 H-7.2 M-3.1 -3.1 L-5.1 -5.1|M0 0 m-4.4 0 a4.4 4.4 0 1 0 8.8 0 a4.4 4.4 0 1 0 -8.8 0',
   charts: 'M0 -8 L1.8 -3 L7 -3 L3 0 L4.5 5 L0 2 L-4.5 5 L-3 0 L-7 -3 L-1.8 -3 Z',
-  academy: 'M-8 -2 L0 -6 L8 -2 L0 2 Z|M-5 0 V5 C-2 7 2 7 5 5 V0|M8 -2 V4',
+  academy: 'M-6 -2 A6 6 0 0 1 6 -2 M-8 -2 H8|M-5 -2 V6|M0 -2 V6|M5 -2 V6|M-9 6 H9',
   expedition: 'M-8 2 H8 L5 7 H-5 Z|M-2 2 V-8|M3 2 V-6|M-2 -8 L-7 -2 H-2|M3 -6 L7 -1 H3',
   caravan: 'M-8 2 H6 V-3 C6 -7 -8 -7 -8 -3 Z|M-5 6 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0|M3 6 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0|M6 0 L9 0'
 };
 const SOLID = {
-  settler: 'M-5 -8 H5 L2 -5 L5 -2 H-5 Z',
+  scout: 'M0 0 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 Z',
+  warrior: 'M1.5 0 C-0.5 -1.5 -0.8 -4.8 1.8 -5.9 C4.3 -7 6.6 -5.2 6.1 -2.6 C5.6 -0.2 3 1.2 1.5 0 Z',
   spearman: 'M-3 -4 L0 -9 L3 -4 Z',
-  warrior: 'M1 -4 C2 -8 7 -9 8 -7 C9 -5 6 -1 3 -1 Z',
+  swordsman: 'M0 -9 L2 -4 V3 H-2 V-4 Z',
+  seafood: 'M-4 -1 m-1 0 a1 1 0 1 0 2 0 a1 1 0 1 0 -2 0 Z',
+  prod: 'M0 0 m-1.5 0 a1.5 1.5 0 1 0 3 0 a1.5 1.5 0 1 0 -3 0 Z',
   navigation: 'M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z',
   galley: 'M0 -8 L5 -4 H0 Z',
-  warship: 'M-3 -8 L1 -5.5 H-3 Z M3 -6 L7 -3.5 H3 Z'
+  warship: 'M-3 -8 L1 -5.5 H-3 Z'
 };
 
 function markBody(name) {
@@ -3847,13 +3857,102 @@ const WONDER_ART = {
 
 // Improvements, drawn over the ground in place of the feature they sit on.
 const IMPROVEMENT_ART = {
-  farm: () => [0, 1, 2, 3].map(k => sP('M-22 ' + (-10 + k * 8) + ' L22 ' + (-14 + k * 8), { stroke: k % 2 ? '#7a5a2e' : '#e8c440', 'stroke-width': 4.5, 'stroke-linecap': 'round' })).join(''),
-  mine: () => bump(2) + sP('M-8 14 V2 Q0 -8 8 2 V14 Z', lined('#2c241c', 1.1)) +
-    sP('M-10 14 V0 M10 14 V0 M-11 0 H11', { fill: 'none', stroke: '#8a6232', 'stroke-width': 2.4 }) +
-    sP('M-18 22 L18 22 M-16 26 L16 26', { stroke: '#6b6b6b', 'stroke-width': 1.4 }),
-  pasture: () => sEll(0, 6, 22, 13, { fill: '#a8c95a', stroke: '#7a4e22', 'stroke-width': 2.2, 'stroke-dasharray': '5 3' }) +
-    sMove('a', 'bob', sP('M-6 6 q3 -6 9 -4 q6 0 8 4 M-4 9 v6 M8 9 v6', lined('#f4efe4', 1.1))),
-  boats: () => sMove('a', 'bob', sP('M-14 6 H14 L9 13 H-9 Z', lined('#9b5c2b', 1.1)) + sP('M0 6 V-14 M0 -14 L11 2 H0', lined('#fffaf0', 1.1))),
+  // The farm: tilled furrows and a scarecrow. On wheat it's golden and ripe;
+  // on bare flat it's green shoots — two looks, no badge needed.
+  farm(_hill, res) {
+    // Same drawing as before, but each layer is one path (furrows, stalks,
+    // heads, shoots) instead of one element per crop: farms are the most
+    // common improvement, and fewer elements keep big maps quick to redraw.
+    const ripe = res === 'wheat', e = k => -6 + k * 7;
+    const furrows = sP([0, 1, 2, 3].map(k => 'M-22 ' + e(k) + ' Q0 ' + (e(k) - 6) + ' 22 ' + e(k)).join(' '),
+      { fill: 'none', stroke: '#7a5a2e', 'stroke-width': 2 });
+    const spots = [];
+    [0, 1, 2, 3].forEach(k => spots.push([-13, e(k) - 2], [-3, e(k) - 3], [7, e(k) - 3]));
+    const crops = ripe
+      ? sP(spots.map(([x, y]) => 'M' + x + ' ' + y + ' v-6').join(' '), { stroke: '#8a6d16', 'stroke-width': 1.3 }) +
+        sP(spots.map(([x, y]) => 'M' + (x - 2) + ' ' + (y - 8) + ' a2 3.6 0 1 0 4 0 a2 3.6 0 1 0 -4 0').join(' '),
+          { fill: '#f6c31e', stroke: '#8a6d16', 'stroke-width': 0.7 })
+      : sP(spots.map(([x, y]) => 'M' + x + ' ' + y + ' l-2.4 -4.5 M' + x + ' ' + y + ' l2.4 -4.5 M' + x + ' ' + y + ' v-5.5').join(' '),
+          { fill: 'none', stroke: '#5d9c3f', 'stroke-width': 1.3, 'stroke-linecap': 'round' });
+    return furrows + sMove('a', 'wind', crops) +
+      sP('M17 -9 V9 M12.5 -5 H21.5', { stroke: '#6b4a24', 'stroke-width': 1.7 }) +
+      sPoly('14,-4 17,3.5 20,-4', lined('#b5452e', 0.9)) +
+      sCirc(17, -11, 2.1, lined('#f4efe4', 0.9));
+  },
+  // Five mine looks, one per place a mine can go, so it tells you what it
+  // digs up without the badge: props, lintel and a loaded cart waiting on
+  // its rails on plain hills; rust-red ore piles and a hoist wheel for iron;
+  // powder kegs and sparkling grains for gunpowder. Flat mines skip the hill
+  // bump and sit lower and wider. The glints or grains are the one animated
+  // part, on the "a" layer.
+  mine(hill, res) {
+    const w = hill ? 8 : 10, top = hill ? 2 : 6, arch = hill ? -8 : -3, base = hill ? 14 : 16;
+    let out = (hill ? bump(2) : '') +
+      sP('M' + -w + ' ' + base + ' V' + top + ' Q0 ' + arch + ' ' + w + ' ' + top + ' V' + base + ' Z', lined('#2c241c', 1.1)) +
+      sP('M' + (-w - 2) + ' ' + base + ' V' + (top - 2) + ' M' + (w + 2) + ' ' + base + ' V' + (top - 2),
+        { fill: 'none', stroke: '#8a6232', 'stroke-width': 2.4 });
+    if (!res) {
+      // Plain hills mine: a lintel over the props, and a loaded cart waiting
+      // on sleepers out front.
+      out += sP('M' + (-w - 3) + ' ' + (top - 2) + ' H' + (w + 3), { fill: 'none', stroke: '#8a6232', 'stroke-width': 2.4 }) +
+        sP('M-18 22 L18 22 M-16 26 L16 26', { stroke: '#6b6b6b', 'stroke-width': 1.4 }) +
+        sP('M-13 22.5 V25.5 M-6 22.5 V25.5 M1 22.5 V25.5', { stroke: '#6b6b6b', 'stroke-width': 1.1 }) +
+        sP('M6 14 Q9 9.5 12 13 Q13.5 10 17 14 Z', lined('#6e6862', 0.9)) +
+        sP('M9 12 l3 -2 M12.5 12.5 l3 -2', { stroke: '#c9c4bc', 'stroke-width': 1.1, 'stroke-linecap': 'round' }) +
+        sPoly('5,14 18,14 16,21 7,21', lined('#8a6232', 1.1)) +
+        sCirc(9.5, 20.9, 2, lined('#2c241c', 0.9)) + sCirc(14.5, 20.9, 2, lined('#2c241c', 0.9));
+    } else if (res === 'iron') {
+      // Iron: rust-red ore on both slopes and a hoist wheel in place of the lintel.
+      out += sP('M' + (-w - 2) + ' ' + (top - 2) + ' L0 ' + (arch - 5) + ' L' + (w + 2) + ' ' + (top - 2),
+          { fill: 'none', stroke: '#6b4a24', 'stroke-width': 2 }) +
+        sCirc(0, arch - 5, 2.6, lined('#8a6232', 1)) +
+        sPoly('-20,17 -14,4 -6,9 -9,17', lined('#a24d2a')) +
+        sPoly('6,18 12,6 20,11 19,19', lined('#c0643a')) +
+        sMove('a', 'twinkle', sP('M-14 9 l5 -3 M10 12 l5 -3', { stroke: '#f0a07a', 'stroke-width': 1.6, 'stroke-linecap': 'round' }));
+    } else {
+      // Gunpowder: kegs stacked beside the entrance, grains sparkling in front.
+      const keg = (x, y) => sP('M' + (x - 4) + ' ' + (y - 6) + ' Q' + (x - 6) + ' ' + y + ' ' + (x - 4) + ' ' + (y + 6) +
+          ' H' + (x + 4) + ' Q' + (x + 6) + ' ' + y + ' ' + (x + 4) + ' ' + (y - 6) + ' Z', lined('#5f4932', 1)) +
+        sP('M' + (x - 5.4) + ' ' + (y - 2) + ' H' + (x + 5.4) + ' M' + (x - 5.4) + ' ' + (y + 2) + ' H' + (x + 5.4),
+          { stroke: '#2a2116', 'stroke-width': 1.1 });
+      out += keg(hill ? -15 : -16, hill ? 12 : 14) + keg(hill ? 14 : 16, hill ? 13 : 15) +
+        sMove('a', 'twinkle', [[-6, 17], [1, 19], [7, 16], [-1, 21]].map(([x, y]) =>
+          sPoly((x - 2.4) + ',' + y + ' ' + x + ',' + (y - 3) + ' ' + (x + 2.4) + ',' + y + ' ' + x + ',' + (y + 3),
+            { fill: '#fffdf6', stroke: '#99aaaa', 'stroke-width': 0.5 })).join(''));
+    }
+    return out;
+  },
+  // The pasture: a real post-and-rail paddock with the horse inside (same
+  // horse as the horses feature) and a hay bale by the rails; the horse's
+  // tail is the one moving part.
+  pasture() {
+    const horse = sAt(0, -5, '<g transform="scale(0.95)">' +
+      sEll(0, 0, 10, 5, lined('#8b5a2b')) +
+      sP('M7 -2 L12 -11 L17 -10 L15 -5 L10 1 Z', lined('#8b5a2b')) +
+      sP('M11 -9 l2 -3', { stroke: '#3d2410', 'stroke-width': 2 }) +
+      sP('M-7 3 V12 M-3 4 V12 M4 4 V12 M8 3 V12', { fill: 'none', stroke: ART.ink, 'stroke-width': 1.8 }) +
+      sMove('a', 'sway', sP('M-10 -1 q-5 2 -4 8', { fill: 'none', stroke: ART.ink, 'stroke-width': 1.8 })) + '</g>');
+    const rail = y => sP('M-21 ' + y + ' Q0 ' + (y + 4) + ' 21 ' + y, { fill: 'none', stroke: '#9b5c2b', 'stroke-width': 1.5 });
+    const post = (x, dip) => sP('M' + x + ' ' + (4 + dip) + ' V' + (13.5 + dip), { stroke: '#7a4e22', 'stroke-width': 2 });
+    const bale = sCirc(-15, 8, 3.8, lined('#e8c440', 0.9)) +
+      sP('M-18.2 6.8 Q-15 5.8 -11.8 6.8 M-18.4 9.4 Q-15 10.4 -11.6 9.4', { fill: 'none', stroke: '#8a6d16', 'stroke-width': 0.9 });
+    return sEll(0, 5, 21, 10, { fill: '#9fc257' }) + horse + bale +
+      rail(4) + rail(8) + rail(12) + post(-21, 0) + post(-10.5, 1.5) + post(0, 2) + post(10.5, 1.5) + post(21, 0);
+  },
+  // The fishing boat: curved hull with a gunwale, gaff sail and pennant, and
+  // a hand line with a float off the stern. The whole boat bobs.
+  boats() {
+    const hull = sP('M-15 6 Q-8 8 0 8 Q8 8 15 6 L11 13 Q0 16 -11 13 Z', lined('#9b5c2b', 1.1)) +
+      sP('M-15 6 Q0 10 15 6', { fill: 'none', stroke: '#7a4e22', 'stroke-width': 1.2 });
+    const rig = sP('M0 7 V-13', { stroke: '#6b4a24', 'stroke-width': 1.8 }) +
+      sP('M1 -12 Q10 -8 9 3 L1 3 Z', lined('#fffaf0', 1)) +
+      sP('M0 -13 L8 -11 L0 -9 Z', lined('#b5452e', 0.9)) +
+      sP('M-1 3 H9', { stroke: '#6b4a24', 'stroke-width': 1.2 });
+    const line = sP('M-12 7 L-17 -3', { stroke: '#6b4a24', 'stroke-width': 1.4 }) +
+      sP('M-17 -3 Q-20 5 -15 10', { fill: 'none', stroke: ART.ink, 'stroke-width': 0.9 }) +
+      sCirc(-15, 10, 1.4, lined('#b5452e', 0.7));
+    return sMove('a', 'bob', hull + rig + line);
+  },
   terrace: () => [0, 1, 2, 3].map(k => sP('M' + (-22 + k * 5) + ' ' + (18 - k * 9) + ' H' + (22 - k * 5) + ' V' + (12 - k * 9) + ' H' + (-22 + k * 5) + ' Z', lined(k % 2 ? '#6fae3c' : '#8dc24e'))).join(''),
   stepwell: () => [[18, '#d8b98a'], [13, '#c9a46c'], [8, '#b88f55'], [4, '#3d9cc8']].map(([q, c]) => '<rect x="' + -q + '" y="' + (4 - q) + '" width="' + q * 2 + '" height="' + q * 2 + '"' + svgAttrs(lined(c)) + '/>').join(''),
   polder: () => sP('M-24 10 H24 M-24 16 H24', { stroke: '#3b86ab', 'stroke-width': 2 }) + sP('M-2 10 V-6 H4 V10', lined('#c9bfa8', 1.1)) +
@@ -3907,7 +4006,9 @@ function tileArt(tile, showFeature, onCity) {
   // bump); a terrace replaces the peaks it's cut into.
   const plain = tile.t === 'hill' ? !drawn : tile.t === 'mount' ? imp !== 'terrace' : true;
   if (GROUND[tile.t] && plain) ground = '<g' + flip + '>' + GROUND[tile.t]() + '</g>';
-  if (drawn === 'imp') top = IMPROVEMENT_ART[imp]();
+  // Pass the feature this viewer can see, so a mine on gunpowder doesn't
+  // show its kegs to someone without Firearms.
+  if (drawn === 'imp') top = IMPROVEMENT_ART[imp](tile.t === 'hill', f);
   else if (drawn === 'feature') top = '<g' + (f === 'forest' ? flip : '') + '>' + FEATURE_ART[f](tile.t === 'hill', TERRAIN[tile.t].water, hash2(tile.x, tile.y, 3)) + '</g>';
   if (f && !onCity) {
     badge = sAt(12, -13, sCirc(0, 0, 6.8, { fill: '#fffaf0', stroke: ART.ink, 'stroke-width': 1.2 }) + markOnMap(f, 0, 0, 0.5, ART.ink, 2.4));
