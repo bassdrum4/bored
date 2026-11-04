@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 277,
-  "newest": "2026-11-03",
+  "count": 278,
+  "newest": "2026-11-04",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"84e4d44","date":"2026-11-04","author":"Daniel Lowe","subject":"Restore Bored's paper design with the wide multi-page layout"},
   {"sha":"7d7f20c","date":"2026-11-03","author":"Daniel Lowe","subject":"Redesign Bored hub with wide game library, subpages, and settings"},
   {"sha":"4f4d47a","date":"2026-11-03","author":"Daniel Lowe","subject":"Add Wallbound, an original ninja physics puzzle"},
   {"sha":"c778ec6","date":"2026-11-03","author":"Claude","subject":"Civ Lite 3.1: bold tile art, four natural wonders, leader names."},
