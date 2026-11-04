@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 284,
+  "count": 285,
   "newest": "2026-11-04",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2e4b7c7","date":"2026-11-04","author":"bassdrum4","subject":"Fit the games to the window and smooth Tank 2, Sticky Ninja and Ashcrown"},
   {"sha":"dc0b6f2","date":"2026-11-04","author":"Codebuff","subject":"Cut redundant Supabase reads and take Prism Duel off the board"},
   {"sha":"2939eaf","date":"2026-11-04","author":"Claude","subject":"Civ Lite 3.3: Civ 6 style marches and buildings on their own hexes."},
   {"sha":"d382d6a","date":"2026-11-04","author":"Codebuff","subject":"Add Ashcrown to the daily rotation and promote it for one day"},
