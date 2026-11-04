@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 279,
+  "count": 280,
   "newest": "2026-11-04",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"55fd454","date":"2026-11-04","author":"Claude","subject":"Civ Lite: improvement art pass and redrawn icons."},
   {"sha":"789a1e0","date":"2026-11-04","author":"Daniel Lowe","subject":"Keep Bored permanently light and remove dark-theme setting"},
   {"sha":"84e4d44","date":"2026-11-04","author":"Daniel Lowe","subject":"Restore Bored's paper design with the wide multi-page layout"},
   {"sha":"7d7f20c","date":"2026-11-03","author":"Daniel Lowe","subject":"Redesign Bored hub with wide game library, subpages, and settings"},
