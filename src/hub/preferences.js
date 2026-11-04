@@ -2,7 +2,6 @@ import { readStored, writeStored, removeStored } from './store.js';
 
 const STORAGE_KEY = 'bored.ui.preferences';
 const DEFAULTS = Object.freeze({
-  theme: 'system',
   density: 'comfortable',
   descriptions: true,
   reducedMotion: false
@@ -12,7 +11,6 @@ const $ = id => document.getElementById(id);
 function normalize(saved) {
   if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return { ...DEFAULTS };
   return {
-    theme: ['system', 'light', 'dark'].includes(saved.theme) ? saved.theme : DEFAULTS.theme,
     density: ['comfortable', 'compact'].includes(saved.density) ? saved.density : DEFAULTS.density,
     descriptions: typeof saved.descriptions === 'boolean' ? saved.descriptions : DEFAULTS.descriptions,
     reducedMotion: typeof saved.reducedMotion === 'boolean' ? saved.reducedMotion : DEFAULTS.reducedMotion
@@ -21,22 +19,24 @@ function normalize(saved) {
 
 // Deliberately device-local: account/cloud state stores favorites, scores and saves separately.
 export function initPreferences({ clearFavorites, resetAnalytics }) {
-  let settings = normalize(readStored(STORAGE_KEY));
-  const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+  const stored = readStored(STORAGE_KEY);
+  let settings = normalize(stored);
+  // Migrate legacy theme selections. Bored always uses its light paper palette.
+  if (stored && typeof stored === 'object' && 'theme' in stored) {
+    writeStored(STORAGE_KEY, settings);
+  }
   const status = $('settings-saved');
 
   function apply() {
-    const mode = settings.theme === 'system' ? (systemDark.matches ? 'dark' : 'light') : settings.theme;
-    document.documentElement.dataset.theme = mode;
+    document.documentElement.dataset.theme = 'light';
     document.documentElement.dataset.density = settings.density;
     document.documentElement.dataset.descriptions = settings.descriptions ? 'shown' : 'hidden';
     document.documentElement.dataset.reduceMotion = settings.reducedMotion ? 'true' : 'false';
-    document.documentElement.style.colorScheme = mode;
+    document.documentElement.style.colorScheme = 'light';
     const themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor) themeColor.content = mode === 'dark' ? '#24211d' : '#f5f2ea';
+    if (themeColor) themeColor.content = '#f5f2ea';
   }
   function sync() {
-    $('setting-theme').value = settings.theme;
     $('setting-density').value = settings.density;
     $('setting-descriptions').checked = settings.descriptions;
     $('setting-reduced-motion').checked = settings.reducedMotion;
@@ -52,7 +52,6 @@ export function initPreferences({ clearFavorites, resetAnalytics }) {
     persist();
   }
 
-  $('setting-theme').addEventListener('change', event => change('theme', event.target.value));
   $('setting-density').addEventListener('change', event => change('density', event.target.value));
   $('setting-descriptions').addEventListener('change', event => change('descriptions', event.target.checked));
   $('setting-reduced-motion').addEventListener('change', event => change('reducedMotion', event.target.checked));
@@ -70,10 +69,6 @@ export function initPreferences({ clearFavorites, resetAnalytics }) {
     clearFavorites();
     status.textContent = 'Favorites cleared. Your scores and saved games are untouched.';
   });
-  if (systemDark.addEventListener) systemDark.addEventListener('change', () => {
-    if (settings.theme === 'system') apply();
-  });
-
   apply();
   sync();
   return { get: () => ({ ...settings }) };

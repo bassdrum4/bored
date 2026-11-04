@@ -198,65 +198,8 @@ html[data-reduce-motion="true"] *::after {
   scroll-behavior: auto!important;
 }
 
-/* Dark mode uses the same ink-and-paper design language rather than green panels. */
-html[data-theme="dark"] {
-  --paper: #24211d;
-  --ink: #f1eae0;
-  --dim: #b7a99a;
-  --rule: #534b43;
-  --red: #f19182;
-}
-html[data-theme="dark"] body { background: var(--paper); color: var(--ink); }
-html[data-theme="dark"] .masthead-bar {
-  background: #2e2924; color: var(--ink); border-color: var(--rule);
-}
-html[data-theme="dark"] #account button,
-html[data-theme="dark"] .side-action,
-html[data-theme="dark"] .action,
-html[data-theme="dark"] #q,
-html[data-theme="dark"] #sort,
-html[data-theme="dark"] .filter,
-html[data-theme="dark"] .collection,
-html[data-theme="dark"] .star,
-html[data-theme="dark"] .settings-row select {
-  color: var(--ink); background: var(--paper); border-color: var(--rule);
-}
-html[data-theme="dark"] #account button.primary,
-html[data-theme="dark"] #random,
-html[data-theme="dark"] .primary-action,
-html[data-theme="dark"] .filter[aria-pressed="true"] {
-  background: var(--ink); color: var(--paper); border-color: var(--ink);
-}
-html[data-theme="dark"] .collection[aria-pressed="true"] { color: var(--red); border-color: var(--red); }
-html[data-theme="dark"] .site-nav #together-nav {
-  background: #382f27; border-color: var(--rule); color: var(--red);
-}
-html[data-theme="dark"] .site-nav #together-nav[aria-current="page"] {
-  background: var(--ink); color: var(--paper); border-color: var(--ink);
-}
-html[data-theme="dark"] .game-preview { background: #403b35; }
-html[data-theme="dark"] .game-preview img { filter: saturate(.8) brightness(.82); }
-html[data-theme="dark"] .card .detail,
-html[data-theme="dark"] .game-meta,
-html[data-theme="dark"] .game-inputs,
-html[data-theme="dark"] .card-best { color: var(--dim); }
-html[data-theme="dark"] .card .text,
-html[data-theme="dark"] .shelf-play,
-html[data-theme="dark"] .row,
-html[data-theme="dark"] #daily,
-html[data-theme="dark"] .settings-panel,
-html[data-theme="dark"] .settings-aside { background: var(--paper); color: var(--ink); }
-html[data-theme="dark"] dialog,
-html[data-theme="dark"] #player-actions {
-  background: var(--paper); color: var(--ink); border-color: var(--ink);
-}
-html[data-theme="dark"] dialog input,
-html[data-theme="dark"] dialog textarea { background: #302b26; color: var(--ink); border-color: var(--rule); }
-html[data-theme="dark"] .badge { color: var(--red); background: transparent; border-color: var(--red); }
-html[data-theme="dark"] #hint,
-html[data-theme="dark"] #menu-toggle { background: var(--paper); color: var(--ink); }
-html[data-theme="dark"] .settings-checkbox { background: var(--rule); }
-html[data-theme="dark"] .settings-checkbox:checked { background: var(--ink); }
+/* This site uses the light paper palette on every device. */
+:root { color-scheme: light; }
 
 /* The new wide grid scales down, without losing the original card treatment. */
 @media (max-width: 1380px) {
@@ -315,10 +258,6 @@ html[data-theme="dark"] .settings-checkbox:checked { background: var(--ink); }
     background: transparent;
   }
   .site-nav #together-nav .badge { position: absolute; margin: -30px 0 0 50px; }
-  html[data-theme="dark"] .site-nav #together-nav,
-  html[data-theme="dark"] .site-nav #together-nav[aria-current="page"] {
-    background: transparent; border: 0; color: var(--red);
-  }
   .grid, html[data-density="compact"] .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
   .row .card { flex-direction: column; }
   .row .game-preview { width: 100%; flex: 0 0 auto; aspect-ratio: 8/5; border: 0; border-bottom: 1px solid var(--rule); }
