@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="Why do your schoolwork?">
-<meta name="theme-color" content="#f5f2ea">
+<meta name="theme-color" content="#f7f5ef">
 <title>Bored</title>
 <link rel="icon" type="image/svg+xml" href="./favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&amp;family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
 <link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./hub/redesign.css">
 </head>
 <body>
 
@@ -18,11 +19,21 @@
 <main id="hub">
   <header class="masthead">
     <div class="masthead-top"><h1>Bored<span class="wordmark-dot">.</span></h1>
-    <nav class="site-nav" aria-label="Sections"><a href="#daily">Daily</a><a href="#leaderboard">Leaderboard</a><a href="#library">Library</a><a href="./changelog.html">Changelog</a><a id="together-nav" href="#together">Bored Together <span id="together-badge" class="badge" hidden></span></a></nav></div>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a id="home-nav" class="nav-link" href="#home">Home</a>
+      <a id="library-nav" class="nav-link" href="#library">All Games</a>
+      <a id="leaderboard-nav" class="nav-link" href="#leaderboard">Leaderboards</a>
+      <a id="together-nav" class="nav-link" href="#together">Bored Together <span id="together-badge" class="badge" hidden></span></a>
+      <a id="settings-nav" class="nav-link" href="#settings">Settings</a>
+    </nav></div>
     <p class="sub"><b id="count"></b> things to play &middot; in your browser </p>
-    <div class="intro-row">
+    <div class="masthead-hero">
+      <div class="hero-copy">
+        <p class="eyebrow">YOUR LITTLE CORNER OF THE INTERNET</p>
+        <h2>Bored<span class="wordmark-dot">?</span> Perfect.</h2>
+        <p class="intro">A bunch of games, no big commitment. Pick something and see where the afternoon goes.</p>
+      </div>
       <svg class="bo" id="bo-intro" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg>
-      <p class="intro">No ads, no homework. What are you playing today?</p>
     </div>
     <div class="masthead-bar">
       <div id="account">
@@ -39,7 +50,7 @@
   <p id="together-home" class="bt-home" hidden><a id="together-home-link" href="#together"></a></p>
   <section id="together" aria-labelledby="together-heading" hidden>
     <div class="section-heading"><div><p class="eyebrow">Bored / Together</p><h2 id="together-heading">Bored Together</h2></div>
-    <div class="bt-actions"><button id="together-refresh" class="action" type="button">Refresh</button><button id="together-back" class="action" type="button">Game library</button></div></div>
+    <div class="bt-actions"><button id="together-refresh" class="action" type="button">Refresh</button><button id="together-back" class="action" type="button">All Games</button></div></div>
     <p id="together-status" role="status" aria-live="polite"></p>
     <div id="together-content"></div>
   </section>
@@ -64,19 +75,8 @@
     <p id="recent-empty" class="section-note">Nothing here yet. Play something and it shows up here.</p></div>
     <div id="recent-list" class="shelf-grid"></div>
   </section>
-  <section id="leaderboard" aria-labelledby="leaderboard-heading">
-    <p class="eyebrow">03 / A little friendly competition</p>
-    <h2 id="leaderboard-heading">Leaderboard</h2>
-    <div class="lb-bar">
-      <button id="lb-refresh" class="action" type="button">Refresh</button>
-    </div>
-    <p id="lb-note">Ranked by points: 5 for a first place in a game, down to 1 for fifth.</p>
-    <ol id="lb-list"></ol>
-    <p id="lb-empty" hidden></p>
-    <p id="lb-mine"></p>
-  </section>
   <section id="library" aria-labelledby="library-heading" tabindex="-1">
-    <div class="section-heading"><div><p class="eyebrow">04 / Find your next game</p><h2 id="library-heading">The game library</h2></div><span id="library-count" class="section-aside"></span></div>
+    <div class="section-heading"><div><p class="eyebrow">03 / The whole collection</p><h2 id="library-heading">All Games<span class="wordmark-dot">.</span></h2></div><span id="library-count" class="section-aside"></span></div>
     <nav id="collections" aria-label="Discovery collections"></nav>
     <p id="collection-note" class="section-note"></p>
   <div class="tools">
@@ -104,8 +104,60 @@
   <p id="empty" hidden></p></div>
   </section>
 
-  <details class="activity-notice"><summary>Gameplay analytics</summary><p>Bored records important things about gameplay for the me, please keep it enabled, I just added it for privacy reasons.</p><label><input id="analytics-enabled" type="checkbox" checked> Share gameplay activity</label> · <a href="./analytics.html">Admin analytics</a></details>
-  <footer class="foot"><span>have fun. stay a while.</span><span id="foot-count"></span></footer>
+  <section id="leaderboard" aria-labelledby="leaderboard-heading">
+    <p class="eyebrow">A little friendly competition</p>
+    <h2 id="leaderboard-heading">Leaderboard</h2>
+    <div class="lb-bar">
+      <button id="lb-refresh" class="action" type="button">Refresh</button>
+    </div>
+    <p id="lb-note">Ranked by points: 5 for a first place in a game, down to 1 for fifth.</p>
+    <ol id="lb-list"></ol>
+    <p id="lb-empty" hidden></p>
+    <p id="lb-mine"></p>
+  </section>
+  <section id="settings" class="settings-page" aria-labelledby="settings-heading" hidden>
+    <div class="settings-intro">
+      <div><p class="eyebrow">A few things your way</p><h2 id="settings-heading">Settings<span class="wordmark-dot">.</span></h2>
+      <p>Just the useful stuff. No account required, and no settings maze.</p></div>
+      <span class="settings-local-note">Saved on this device</span>
+    </div>
+    <div class="settings-layout">
+      <div class="settings-panels">
+        <section class="settings-panel" aria-labelledby="appearance-heading">
+          <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">◐</span><div>
+            <h3 id="appearance-heading">Appearance</h3><p>Make Bored comfortable to look at.</p>
+          </div></div>
+          <div class="settings-row"><div><label for="setting-theme">Theme</label><p>Use your device's theme, or choose one.</p></div>
+            <select id="setting-theme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+          <div class="settings-row"><div><label for="setting-density">Game card size</label><p>Fit more games on screen with compact cards.</p></div>
+            <select id="setting-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
+          <div class="settings-row"><div><label for="setting-descriptions">Show game descriptions</label><p>Keep short summaries below game titles.</p></div>
+            <input id="setting-descriptions" class="settings-checkbox" type="checkbox" checked></div>
+        </section>
+        <section class="settings-panel" aria-labelledby="comfort-heading">
+          <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">✳</span><div>
+            <h3 id="comfort-heading">Comfort &amp; privacy</h3><p>A couple of things worth controlling.</p>
+          </div></div>
+          <div class="settings-row"><div><label for="setting-reduced-motion">Reduce animations</label><p>Remove hover movement and unnecessary transitions.</p></div>
+            <input id="setting-reduced-motion" class="settings-checkbox" type="checkbox"></div>
+          <div class="settings-row"><div><label for="analytics-enabled">Share gameplay analytics</label><p>Help improve Bored using gameplay events. Turn it off anytime.</p></div>
+            <input id="analytics-enabled" class="settings-checkbox" type="checkbox" checked></div>
+        </section>
+      </div>
+      <aside class="settings-sidebar">
+        <div class="settings-aside"><p class="eyebrow">Just this browser</p><h3>Nothing to sign in for.</h3>
+          <p>These appearance and privacy preferences are saved in local storage on this device. They don't sync across devices.</p>
+          <p id="settings-saved" class="settings-saved" role="status" aria-live="polite">Your changes save automatically.</p>
+        </div>
+        <div class="settings-aside"><p class="eyebrow">Start fresh</p><h3>Clear local preferences</h3>
+          <p>Clear your saved favorite games or restore your display settings to their defaults. Neither action deletes your account or scores.</p>
+          <div class="settings-actions"><button type="button" id="settings-clear-favorites" class="action">Clear favorites</button>
+          <button type="button" id="settings-reset" class="action">Reset settings</button></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+  <footer class="foot"><span>have fun. stay a while.</span><span><a href="./analytics.html">Admin analytics</a> · <a href="./changelog.html">Changelog</a> · <span id="foot-count"></span></span></footer>
 </main>
 
 <dialog id="announcement-dialog" class="announcements-dialog" aria-labelledby="announcement-heading">

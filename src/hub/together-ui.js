@@ -389,5 +389,5 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   // badge refresh costs far fewer Auth and database requests on the Free tier.
   setInterval(() => { if (!document.hidden && hasIdentity()) refresh(); }, 15000);
   resetIdentity(); refresh(); if (location.hash === '#together') open();
-  return { open, refresh, checkInvites };
+  return { open, close, refresh, checkInvites };
 }

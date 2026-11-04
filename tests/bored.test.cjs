@@ -1616,8 +1616,10 @@ test('browser regressions', async t => {
       'choosing an account remembers which run was offered'
     );
     await page.click('#auth-cancel');
-    // The board keeps not pointing at them either.
+    // The board is now on its own page and still keeps not pointing at them.
+    await page.click('#leaderboard-nav');
     await page.click('#lb-refresh');
+    await page.click('#home-nav');
     await page.waitForFunction(() => document.querySelector('#lb-note').textContent.includes('Players ranked'));
     assert.doesNotMatch(await text(page, '#lb-mine'), /Your account/);
     assert.doesNotMatch(await text(page, '#lb-list'), /\(you\)/);
