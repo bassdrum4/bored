@@ -30,7 +30,7 @@
   }
   * { margin: 0; padding: 0; box-sizing: border-box }
   [hidden] { display: none !important }
-  html, body { height: 100% }
+  html, body { height: 100%; height: 100dvh; overflow: hidden }
   body {
     background: var(--paper);
     color: var(--ink);
@@ -268,20 +268,25 @@
   /* ── full screens: setup and handoff ─────────────────────────────────── */
   .screen {
     position: fixed; inset: 0; z-index: 30; background: var(--paper); display: grid; place-items: center;
-    padding-block: 22px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
     overflow-y: auto;
   }
-  .start-inner { width: min(680px, 100%); padding: 4px 0 10px }
+  .start-inner { width: min(680px, 100%); padding: 2px 0 4px }
+  @media (min-width: 900px) {
+    .start-inner { width: min(860px, 100%) }
+    .seats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) }
+    .seat { grid-template-columns: 16px minmax(0, 1fr) minmax(0, 140px) 78px }
+  }
   .eyebrow { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3) }
   .start-inner h1, .handoff-inner h1 {
-    font-family: var(--font-display); font-size: clamp(34px, 7vw, 54px); font-weight: 600; letter-spacing: -.01em;
-    line-height: 1.05; margin: 6px 0 10px; text-wrap: balance;
+    font-family: var(--font-display); font-size: clamp(28px, 5.2vw, 42px); font-weight: 600; letter-spacing: -.01em;
+    line-height: 1.05; margin: 4px 0 8px; text-wrap: balance;
   }
-  .lede { font-family: var(--font-display); font-size: 15px; color: var(--ink-2); max-width: 52ch; line-height: 1.55 }
-  .seats { display: flex; flex-direction: column; gap: 6px; margin: 18px 0 14px }
+  .lede { font-family: var(--font-display); font-size: 14px; color: var(--ink-2); max-width: 58ch; line-height: 1.5 }
+  .seats { display: flex; flex-direction: column; gap: 5px; margin: 11px 0 9px }
   .seat {
-    display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, 220px) 92px; gap: 6px 10px; align-items: center;
-    border: 1px solid var(--rule); border-radius: 3px; padding: 8px 10px; background: var(--panel);
+    display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, 220px) 92px; gap: 4px 10px; align-items: center;
+    border: 1px solid var(--rule); border-radius: 3px; padding: 6px 9px; background: var(--panel);
   }
   .seat-note { grid-column: 2 / -1; font-size: 11px; color: var(--ink-3); line-height: 1.4 }
   .seat .who { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); text-align: right }
@@ -289,9 +294,9 @@
   .seat[hidden] { display: none }
   .seat .dot { width: 14px; height: 14px }
   .seat input { width: 100% }
-  .start-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px }
+  .start-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px }
   .field { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2) }
-  .fine { font-size: 11.5px; color: var(--ink-3); margin-top: 12px; line-height: 1.6; max-width: 62ch }
+  .fine { font-size: 11px; color: var(--ink-3); margin-top: 8px; line-height: 1.5; max-width: 68ch }
   .fine b { color: var(--ink-2); font-weight: 600 }
   .handoff-inner { width: min(520px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px }
   .handoff-inner .banner { width: 54px; height: 54px; border-radius: 50%; border: 2px solid var(--ink); margin-bottom: 4px }
@@ -952,6 +957,7 @@ let reachable = null;  // Map "x,y" -> movement spent, for the selected unit
 let VIS = null;        // what the current viewer can see right now (not saved)
 let hover = null;      // the hex under the pointer, for move previews (not saved)
 let preview = null;    // the path preview for that hex (not saved)
+let marchPlan = null;  // a spent unit waiting for a march hex picked from its panel (not saved)
 let placing = null;    // { city, item } while a player picks a hex for a building (not saved)
 
 const keyOf = (x, y) => x + ',' + y;
@@ -4723,7 +4729,10 @@ function refreshPreview() {
   preview = null;
   if (G && !G.over && !G.handoff && hover && myTurn() && !placing) {
     const u = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
-    if (u && u.owner === G.viewer && (hover[0] !== u.x || hover[1] !== u.y)) {
+    // A unit that has spent its turn gets no route line on hover: it has to be
+    // given a march from its panel first.
+    const canRoute = u && (u.mp > 0 && !u.acted || marchPlan === u.id);
+    if (u && canRoute && u.owner === G.viewer && (hover[0] !== u.x || hover[1] !== u.y)) {
       const seen = G.seen[G.viewer];
       if (seen[hover[1] * G.cols + hover[0]]) {
         const paths = computePaths(u);
@@ -5700,8 +5709,12 @@ function unitPanel(u) {
       if (blocked) html += '</div><div class="hint">' + esc(blocked.why) + '.</div><div class="actions">';
     }
     if (u.path) html += '<button class="act" data-act="clearpath">Cancel march</button>';
+    if (!u.path && (u.mp <= 0 || u.acted)) html += '<button class="act' + (marchPlan === u.id ? ' on' : '') + '" data-act="march-plan">' +
+      (marchPlan === u.id ? 'Cancel march orders' : 'Give march orders') + '</button>';
     html += '<button class="act" data-act="skip"' + (u.mp <= 0 ? ' disabled' : '') + '>Skip turn<kbd>S</kbd></button>' +
       '<button class="act" data-act="disband-ask">Disband</button></div>';
+
+    if (marchPlan === u.id) html += '<div class="hint">Click a hex you have seen: the unit sets off next turn and keeps walking at the start of each turn.</div>';
 
     if (isMil(u.type) && !u.acted && u.mp > 0) {
       const targets = [];
@@ -6147,7 +6160,7 @@ function showHelp() {
     '<h3>Moving</h3><p>Hills and forest cost 2 moves, mountains are impassable. Land units can step onto shallow water; deep sea needs Navigation. ' +
     'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Walking onto an enemy civilian standing alone captures it.</p>' +
     '<h3>Longer marches</h3><p>With a unit selected, click any hex you have seen, even turns away: the unit walks as far as it can this turn and keeps going at the start of each turn until it arrives. ' +
-    'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off.</p>' +
+    'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off. A unit that has already used its moves can still be sent somewhere: Give march orders in its panel, then pick the hex, and it sets off next turn.</p>' +
     '<h3>Zone of control</h3><p>Like Civ: at war, every hex next to an enemy military unit or city is in its zone of control (land units cover land, ships cover water, cities both). ' +
     'Stepping into one ends your move there, though you can still attack. Horse units ride straight through.</p>' +
     '<h3>Ships</h3><p>Galleys, warships and battleships come from coastal cities and stay on water, in shallow water until Navigation. They hit anything next to the water, a galley can take a coastal city, ' +
@@ -6190,10 +6203,12 @@ function showEndModal() {
 
 function selectUnit(u) {
   selection = { kind: 'unit', id: u.id };
+  if (marchPlan !== u.id) marchPlan = null;
   render();
 }
 function selectCity(c) {
   selection = { kind: 'city', id: c.id };
+  marchPlan = null;
   render();
 }
 function afterAction() {
@@ -6217,6 +6232,7 @@ function doEndTurn() {
   selection = null;
   reachable = null;
   placing = null;
+  marchPlan = null;
   const before = G.viewer;
   endCurrentTurn();
   autosave();
@@ -6334,7 +6350,7 @@ function onAction(act) {
       if (c) { closeModal(); selection = { kind: 'city', id: c.id }; centreOn(c.x, c.y); render(); }
       break;
     }
-    case 'deselect': selection = null; placing = null; render(); break;
+    case 'deselect': selection = null; placing = null; marchPlan = null; render(); break;
     case 'realm':
       if (G.handoff || G.viewer === null) break;
       closeModal();
@@ -6371,8 +6387,17 @@ function onAction(act) {
     case 'place-yes': confirmPlot(a, b, Number(parts[3]), Number(parts[4])); break;
     case 'place-no': closeModal(); render(); break;
     case 'clearpath':
-      if (selUnit && selUnit.owner === G.viewer && myTurn()) { selUnit.path = null; render(); autosave(); }
+      if (selUnit && selUnit.owner === G.viewer && myTurn()) { selUnit.path = null; marchPlan = null; render(); autosave(); }
       break;
+    case 'march-plan': {
+      // Out of orders this turn: queue a route for the turns ahead.
+      if (selUnit && selUnit.owner === G.viewer && myTurn() && !selUnit.path) {
+        marchPlan = marchPlan === selUnit.id ? null : selUnit.id;
+        if (marchPlan) toast('Click a hex you have seen: the march starts next turn.');
+        render();
+      }
+      break;
+    }
     case 'clearbuild': {
       const c = cityById(a);
       if (c && c.owner === G.viewer && myTurn()) { setBuild(c, null); render(); autosave(); }
@@ -6402,7 +6427,7 @@ function onAction(act) {
       break;
     }
     case 'skip':
-      if (selUnit && selUnit.owner === G.viewer && myTurn()) { selUnit.mp = 0; selection = null; afterAction(); }
+      if (selUnit && selUnit.owner === G.viewer && myTurn()) { selUnit.mp = 0; selection = null; marchPlan = null; afterAction(); }
       break;
     case 'disband-ask': askDisband(); break;
     case 'disband':
@@ -6444,6 +6469,7 @@ function onAction(act) {
       placing = null;
       hover = null;
       preview = null;
+      marchPlan = null;
       UI.handoff.hidden = true;
       UI.start.hidden = false;
       refreshStart();
@@ -6459,30 +6485,38 @@ function handleTileClick(x, y) {
   if (placing) { placeClick(x, y); return; }
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   if (selUnit && selUnit.owner === v && myTurn()) {
-    if (visibleTo(x, y)) {
-      if (strikeInfo(selUnit, x, y)) { strikeAt(selUnit, x, y); return; }
-      const tgt = targetAt(selUnit, x, y);
-      if (tgt && tgt.peace !== undefined && hexDistance(selUnit.x, selUnit.y, x, y) <= (shoots(selUnit.type) ? UNITS[selUnit.type].range : 1)) {
-        toast('You are at peace with ' + pl(tgt.peace).name + '. Declare war in the Council first.');
-        return;
+    const planning = marchPlan === selUnit.id;
+    const spent = selUnit.mp <= 0 || selUnit.acted;
+    if (spent && !planning) {
+      // It has done everything it can this turn: no march from the map.
+      marchPlan = null;
+    } else {
+      if (!planning && visibleTo(x, y)) {
+        if (strikeInfo(selUnit, x, y)) { strikeAt(selUnit, x, y); return; }
+        const tgt = targetAt(selUnit, x, y);
+        if (tgt && tgt.peace !== undefined && hexDistance(selUnit.x, selUnit.y, x, y) <= (shoots(selUnit.type) ? UNITS[selUnit.type].range : 1)) {
+          toast('You are at peace with ' + pl(tgt.peace).name + '. Declare war in the Council first.');
+          return;
+        }
       }
-    }
-    // Every green hex works, even one past what your units can see right now.
-    if (reachable && reachable.has(key)) {
-      moveUnit(selUnit, x, y, reachable);
-      afterAction();
-      return;
-    }
-    // Too far to reach this turn: queue a multi-turn route, Civ 6 style.
-    // Clicking the destination again takes the orders back off.
-    if (seenBy(v, x, y)) {
-      if (selUnit.path && selUnit.path.to[0] === x && selUnit.path.to[1] === y) {
-        selUnit.path = null;
-        toast('Orders canceled.');
+      // Every green hex works, even one past what your units can see right now.
+      if (!planning && reachable && reachable.has(key)) {
+        moveUnit(selUnit, x, y, reachable);
         afterAction();
         return;
       }
-      if (beginPath(selUnit, x, y)) { afterAction(); return; }
+      // Too far to reach this turn: queue a multi-turn route, Civ 6 style.
+      // Clicking the destination again takes the orders back off.
+      if (seenBy(v, x, y)) {
+        if (selUnit.path && selUnit.path.to[0] === x && selUnit.path.to[1] === y) {
+          selUnit.path = null;
+          marchPlan = null;
+          toast('Orders canceled.');
+          afterAction();
+          return;
+        }
+        if (beginPath(selUnit, x, y)) { marchPlan = null; afterAction(); return; }
+      }
     }
   }
   const seen = G.watch || seenBy(v, x, y), visible = visibleTo(x, y);
@@ -6606,6 +6640,7 @@ function bindKeys() {
     if (event.key === 'Escape') {
       if (!UI.modalLayer.hidden) { if (!G.pending) closeModal(); }
       else if (placing) { placing = null; render(); }
+      else if (marchPlan) { marchPlan = null; refreshPreview(); render(); }
       else if (selection) { selection = null; render(); }
       return;
     }

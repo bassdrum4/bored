@@ -4,28 +4,28 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>Wallbound</title>
+<title>Sticky Ninja</title>
 <style>
 :root{--paper:#f5f1e8;--ink:#262a30;--muted:#75766f;--line:#d3cbbc;--red:#ac5546;--gold:#c69741}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font:13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font:13px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace}body{overflow:hidden}
 button{font:inherit;color:inherit;background:transparent;border:1px solid var(--line);padding:8px 12px;cursor:pointer}
 button:hover,button:focus-visible{border-color:var(--ink);outline:none}
 button:disabled{opacity:.35;cursor:default}
-#app{max-width:1200px;margin:auto;padding:18px 18px 24px}
-header{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;margin-bottom:10px}
+#app{max-width:1200px;height:100dvh;margin:auto;padding:16px 18px 14px;display:flex;flex-direction:column}
+header{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;margin-bottom:7px}
 h1{font:normal 30px/1 Georgia,serif;letter-spacing:-.035em;margin:0}
 #subtitle{color:var(--muted);font-size:11px}
-#hud{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;justify-content:space-between;margin-bottom:9px}
+#hud{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;justify-content:space-between;margin-bottom:7px}
 #stats{display:flex;gap:16px;flex-wrap:wrap;font-size:11px}
 #stats strong{color:var(--red);font-size:13px}
 #tools{display:flex;gap:6px;flex-wrap:wrap}
-#stage{position:relative;width:100%;overflow:hidden;border:1px solid #51493d;background:#eee5d4;line-height:0}
-canvas{display:block;width:100%;height:auto;aspect-ratio:960/560;touch-action:none;cursor:grab}
+#stage{position:relative;width:100%;flex:1 1 auto;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid #51493d;background:#eee5d4;line-height:0}
+canvas{display:block;flex:0 0 auto;touch-action:none;cursor:grab}
 canvas.aim{cursor:crosshair}
 #overlay{position:absolute;inset:0;background:rgba(245,241,232,.90);display:flex;justify-content:center;align-items:center;padding:20px;line-height:1.4}
 #overlay[hidden]{display:none}
-.panel{background:#fbf8f0;border:1px solid #b9ad9c;box-shadow:6px 6px 0 rgba(38,42,48,.09);padding:24px;max-width:480px;width:100%;text-align:center}
+.panel{background:#fbf8f0;border:1px solid #b9ad9c;box-shadow:6px 6px 0 rgba(38,42,48,.09);padding:24px;max-width:480px;max-height:100%;overflow:auto;width:100%;text-align:center}
 .panel h2{margin:0 0 8px;font:normal 28px Georgia,serif}
 .panel p{color:#64665f;margin:9px auto 18px;max-width:350px}
 .panel .big{font:28px Georgia,serif;color:var(--red);margin:10px auto}
@@ -35,28 +35,31 @@ canvas.aim{cursor:crosshair}
 #grid button{padding:11px 2px;font-size:12px}
 #grid button.selected{background:var(--ink);color:white}
 #grid button small{display:block;color:var(--gold);font-size:9px;margin-top:2px}
-footer{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-size:11px}
+footer{display:flex;gap:10px;justify-content:space-between;flex-wrap:wrap;margin-top:8px;color:var(--muted);font-size:11px}
 #tip{max-width:730px}
 @media(max-width:620px){#app{padding:12px 8px}h1{font-size:24px}#subtitle{width:100%}#hud{gap:8px}#stats{gap:10px}button{padding:7px 8px}.panel{padding:14px}#grid{grid-template-columns:repeat(4,1fr)}footer{font-size:10px}}
 </style>
 </head>
 <body>
 <div id="app">
-<header><h1>Wallbound</h1><span id="subtitle">A little ninja. A lot of questionable landings.</span></header>
+<header><h1>Sticky Ninja</h1><span id="subtitle">A little ninja. A lot of questionable landings.</span></header>
 <div id="hud">
 <div id="stats"><span>STAGE <strong id="levelText">01 / 20</strong></span><span>JUMPS <strong id="jumpText">0</strong></span><span>IDEAL <strong id="parText">2</strong></span><span>RIVALS <strong id="enemyText">0</strong></span></div>
 <div id="tools"><button id="levelsBtn">Stages</button><button id="restartBtn" title="Restart this stage (R)">Restart ↺</button><button id="soundBtn" aria-pressed="true">Sound on</button></div>
 </div>
-<div id="stage"><canvas id="game" aria-label="Wallbound physics puzzle game: drag away from the ninja to aim, release to jump"></canvas>
+<div id="stage"><canvas id="game" aria-label="Sticky Ninja physics puzzle game: drag away from the ninja to aim, release to jump"></canvas>
 <div id="overlay" hidden><div class="panel" id="panel"></div></div></div>
-<footer><span id="tip">Drag backward from your ninja to aim. Release to leap. Defeat rivals to open the gate.</span><span>Drag empty space to look around · R restart · Esc stages</span></footer>
+<footer><span id="tip">Drag backward from your ninja to aim. Release to leap. Defeat rivals to open the gate.</span><span>Grab it mid-flight to relaunch · Drag empty space to look around · R restart</span></footer>
 </div>
 <script>
 "use strict";
 (() => {
 const W=960,H=560,R=15,GRAVITY=780,MAX_PULL=112,POWER=9.0,DT=1/120;
 const canvas=document.getElementById("game"),ctx=canvas.getContext("2d"),overlay=document.getElementById("overlay"),panel=document.getElementById("panel");
-const $=id=>document.getElementById(id);
+const $=id=>document.getElementById(id),stage=$("stage");
+// The stage takes whatever height the window leaves, and the 960×560 board is
+// letterboxed inside it so the whole game always fits without scrolling.
+function fitCanvas(){const box=stage.getBoundingClientRect();const scale=Math.max(.2,Math.min(box.width/W,box.height/H));canvas.style.width=(W*scale)+"px";canvas.style.height=(H*scale)+"px";}
 const s=(x,y,w,h,type="sticky")=>({x,y,w,h,type});
 const e=(x,y)=>({x,y});
 const l=(name,ideal,width,start,exit,blocks,enemies=[],treasure=[])=>({name,ideal,width,start,exit,blocks,enemies,treasure});
@@ -228,7 +231,9 @@ canvas.addEventListener("pointerdown",ev=>{
 if(!overlay.hidden||finished||player.dead)return;
 ev.preventDefault();canvas.setPointerCapture(ev.pointerId);
 const q=pointer(ev);
-if(player.anchored&&len(q.x-player.x,q.y-player.y)<R+30){
+// Grab the ninja whether it is parked or still flying: a second pull
+// relaunches it before it lands.
+if(len(q.x-player.x,q.y-player.y)<R+30){
 drag={type:"aim",startX:q.x,startY:q.y,x:q.x,y:q.y,id:ev.pointerId};canvas.classList.add("aim");
 }else drag={type:"pan",startX:q.x,startCam:cam,x:q.x,id:ev.pointerId};
 });
@@ -241,7 +246,7 @@ cam=clamp(drag.startCam-delta,0,LEVELS[levelIndex].width-W);}
 });
 function release(ev){
 if(!drag||drag.id!==ev.pointerId)return;
-if(drag.type==="aim"&&player.anchored&&!player.dead){
+if(drag.type==="aim"&&!player.dead){
 const pull=getPull(),mag=len(pull.x,pull.y);
 if(mag>=9){player.vx=pull.x*POWER;player.vy=pull.y*POWER;player.anchored=false;player.airtime=0;player.trail=[];jumps++;beep(260+mag*2,.05);updateHud();}
 }
@@ -357,6 +362,7 @@ ctx.fillStyle="#55514a";ctx.font="12px ui-monospace,monospace";ctx.fillText(Stri
 if(remaining()>0){ctx.fillStyle="#a85647";ctx.font="11px ui-monospace,monospace";ctx.textAlign="right";ctx.fillText("GATE LOCKED · "+remaining()+" RIVALS",W-18,32);ctx.textAlign="left";}
 }
 function frame(t){if(!last)last=t;acc+=Math.min(.05,(t-last)/1000);last=t;while(acc>=DT){tick(DT);acc-=DT;}render();requestAnimationFrame(frame);}
+fitCanvas();window.addEventListener("resize",fitCanvas);if(window.ResizeObserver)new ResizeObserver(fitCanvas).observe(stage);
 reset(0);requestAnimationFrame(frame);
 })();
 </script>

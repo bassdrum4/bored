@@ -89,7 +89,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 
 export const HIGH_SCORE_GAMES = [
   // The leaderboard measures the sum of best stars earned over all 20 stages (up to 60).
-  highScore('wallbound', 'Wallbound', 'stars', { metric: 'medals', min: 1, max: 60, when: snapshot => snapshot.finished === true }),
+  highScore('wallbound', 'Sticky Ninja', 'stars', { metric: 'medals', min: 1, max: 60, when: snapshot => snapshot.finished === true }),
   // A fair Risk result requires winning the entire world against the CPU;
   // territories held mid-game and unfinished wars never enter the leaderboard.
   highScore('risk', 'Risk', 'turns', {
