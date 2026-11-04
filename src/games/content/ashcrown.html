@@ -316,10 +316,17 @@
   .worked { fill: rgba(65,96,47,.12); pointer-events: none }
   .sel-ring { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 4 3; pointer-events: none }
   .sel-hex { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-dasharray: 3 3; pointer-events: none }
+  .plot { fill: rgba(255,248,225,.42); stroke: var(--ink); stroke-width: 2; stroke-dasharray: 5 3; pointer-events: none }
+  .plot.cur { fill: rgba(147,64,29,.18); stroke: var(--rust) }
+  .pathline { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 6 4; stroke-linecap: round; stroke-linejoin: round; opacity: .8; pointer-events: none }
+  .pathline.ghost { stroke: var(--ink-2); stroke-width: 1.4; stroke-dasharray: 2 4; opacity: .6 }
+  .pathdot { fill: var(--panel); stroke: var(--ink); stroke-width: 1.5; pointer-events: none }
+  .pathlabel { font: 10px/1 var(--font-data); fill: var(--ink); pointer-events: none }
+  .pathlabel-bg { fill: var(--panel); stroke: var(--rule); stroke-width: .8; opacity: .95 }
   .cont { fill: none; stroke: rgba(36,28,18,.42); stroke-width: 1; stroke-dasharray: 2.5 2.5; pointer-events: none }
   .label { font: 10px/1 var(--font-data); pointer-events: none; letter-spacing: .03em }
   #layer-coast, #layer-marks, #layer-border, #layer-sites, #layer-units, #layer-overlay,
-  #layer-fog, #layer-labels, #layer-owner, #layer-waves { pointer-events: none }
+  #layer-path, #layer-fog, #layer-labels, #layer-owner, #layer-waves { pointer-events: none }
 
   /* ── map animation ───────────────────────────────────────────────────
      Every moving part runs off one clock (--clock, set on each redraw) so a
@@ -459,6 +466,7 @@
         <g id="layer-overlay"></g>
         <g id="layer-sites"></g>
         <g id="layer-units"></g>
+        <g id="layer-path"></g>
         <g id="layer-fog"></g>
         <g id="layer-labels"></g>
       </g>
@@ -559,6 +567,10 @@
    a 15-tech tree paid for with production, horse and iron stockpiles, ships,
    16 civs, 4 map types with named continents, Civ-style combat, fog of war.
    Everything lives in this one file: no fonts, images or network calls.
+   Later additions: Civ 6 style move queues (click a hex turns away and the
+   unit marches there over the coming turns), and buildings that each stand
+   on their own hex inside the city's borders, erasing whatever feature was
+   on that hex — but never the terrain — when they finish.
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* ── small utilities ───────────────────────────────────────────────────────── */
@@ -938,6 +950,9 @@ let UI = null;         // element references, filled in by boot()
 let selection = null;  // { kind: 'unit' | 'city' | 'tile', id } (tiles carry x and y)
 let reachable = null;  // Map "x,y" -> movement spent, for the selected unit
 let VIS = null;        // what the current viewer can see right now (not saved)
+let hover = null;      // the hex under the pointer, for move previews (not saved)
+let preview = null;    // the path preview for that hex (not saved)
+let placing = null;    // { city, item } while a player picks a hex for a building (not saved)
 
 const keyOf = (x, y) => x + ',' + y;
 const tileAt = (x, y) => (x < 0 || y < 0 || x >= G.cols || y >= G.rows ? null : G.tiles[y * G.cols + x]);
@@ -1728,7 +1743,7 @@ function cityYields(c) {
   const sp = { cap: c.capital ? SCI.capital : 0, pop: Math.floor(c.pop * SCI.perPop),
     bld: (c.buildings.includes('library') ? SCI.library + (hasTech(i, 'printing') ? 1 : 0) : 0) +
       (c.buildings.includes('university') ? SCI.university : 0) +
-      (c.buildings.includes('observatory') ? SCI.observatory * (touchesMountain(c) ? 2 : 1) : 0), tiles: tsci };
+      (c.buildings.includes('observatory') ? SCI.observatory * (observatoryPeak(c) ? 2 : 1) : 0), tiles: tsci };
   return { food, prod, upkeep, army, net: food - upkeep, sci: sp.cap + sp.pop + sp.bld + sp.tiles, sp };
 }
 const growCost = c => {
@@ -1776,6 +1791,87 @@ function costOf(c, item) {
   return Math.max(1, Math.round(cost));
 }
 
+/* ── buildings on their own hexes ──────────────────────────────────────────── */
+
+// Like Civ 6 districts: walls, a castle and a fortress stand on the city center;
+// every other building takes its own hex in the city's borders, which the
+// player picks. A harbor goes on shallow water, the rest on flat land or hills.
+// Finishing the building clears that hex's feature and improvement; the
+// terrain stays.
+const onCenter = id => id === 'walls' || id === 'castle' || id === 'fortress' || (BUILDINGS[id] && BUILDINGS[id].replaces === 'walls');
+const needsPlot = id => !!BUILDINGS[id] && !onCenter(id);
+
+// Which building holds this hex, across every city: { city, id } or null.
+function plotAt(x, y) {
+  for (const c of G.cities) {
+    if (!c.plot) continue;
+    for (const id in c.plot) {
+      const s = c.plot[id];
+      if (s && s[0] === x && s[1] === y) return { city: c, id };
+    }
+  }
+  return null;
+}
+
+// '' when this building may stand on this hex of this city; else why not.
+function plotProblem(c, t, id) {
+  if (!t || t.city !== c.id) return 'Pick a hex inside ' + c.name + '’s borders.';
+  if (t.x === c.x && t.y === c.y) return 'The city fills its own hex.';
+  if (t.f && FEATURES[t.f].wonder) return 'Not on a natural wonder.';
+  if (id === 'harbor') { if (t.t !== 'shallow') return 'A harbor goes on shallow water.'; }
+  else if (TERRAIN[t.t].water) return 'Buildings go on land (a harbor goes on shallow water).';
+  else if (TERRAIN[t.t].block) return 'Not on mountains.';
+  const held = plotAt(t.x, t.y);
+  if (held && !(held.city === c && held.id === id)) {
+    return held.city === c ? 'The ' + BUILDINGS[held.id].name.toLowerCase() + ' has that hex.' : 'That hex belongs to ' + held.city.name + '.';
+  }
+  return '';
+}
+const plotOk = (c, t, id) => !plotProblem(c, t, id);
+const nextToMountain = (x, y) => neighbourList(x, y).some(([nx, ny]) => { const n = tileAt(nx, ny); return n && n.t === 'mount'; });
+
+// The best free hex for this building, for CPUs and free buildings: the one
+// that loses least when it's cleared (what its feature and improvement give
+// now), sparing horses, iron, gunpowder and geysers most of all. keep: avoid
+// any feature at all if there's a choice.
+function freePlot(c, id, keep) {
+  let best = null, bestScore = -Infinity;
+  for (const t of cityTiles(c)) {
+    if (!plotOk(c, t, id)) continue;
+    const now = tileYield(t, c.owner), bare = tileYield(Object.assign({}, t, { f: null, imp: null }), c.owner);
+    const loss = (now.food - bare.food) + (now.prod - bare.prod) + (tileSci(t) - tileSci(Object.assign({}, t, { f: null })));
+    let score = -3 * loss;
+    if (t.f && (FEATURES[t.f].strategic || t.f === 'geyser' || t.f === 'gunpowder')) score -= 8;
+    if (t.f) score -= keep ? 20 : 1;
+    if (t.imp) score -= 2;
+    if (id === 'observatory' && nextToMountain(t.x, t.y)) score += 6;
+    score += 0.1 * (bare.food + bare.prod) + hash2(t.x, t.y, G.seed) * 0.3;
+    if (score > bestScore) { bestScore = score; best = t; }
+  }
+  return best;
+}
+
+// The building's crew clears its hex: feature and improvement go, terrain stays.
+function clearPlot(c, id) {
+  const s = c.plot && c.plot[id];
+  const t = s && tileAt(s[0], s[1]);
+  if (!t) return;
+  if (t.f && !FEATURES[t.f].wonder) t.f = null;
+  t.imp = null;
+}
+
+// Old saves and free buildings: give every off-center building a hex.
+function placeMissingPlots(c, clear) {
+  c.plot = c.plot || {};
+  for (const id of c.buildings) {
+    if (!needsPlot(id) || c.plot[id]) continue;
+    const t = freePlot(c, id, true);
+    if (!t) continue;
+    c.plot[id] = [t.x, t.y];
+    if (clear) clearPlot(c, id);
+  }
+}
+
 // '' when the city may build it; otherwise the reason it can't.
 function buildProblem(c, item) {
   const def = itemDef(item);
@@ -1787,6 +1883,9 @@ function buildProblem(c, item) {
   const own = item.kind === 'unit' ? unitFor(i, item.id) : buildingFor(i, item.id);
   if (own !== item.id) return 'Replaced by your ' + itemDef({ kind: item.kind, id: own }).name;
   if (item.kind === 'building' && c.buildings.includes(item.id)) return 'Built';
+  if (item.kind === 'building' && needsPlot(item.id) && !(c.plot && c.plot[item.id]) && !freePlot(c, item.id)) {
+    return item.id === 'harbor' ? 'No free shallow water in its borders' : 'No free hex in its borders';
+  }
   if (def.tech && !hasTech(i, def.tech)) return 'Needs ' + techName(def.tech);
   if (def.tech2 && !hasTech(i, def.tech2)) return 'Needs ' + techName(def.tech2);
   if ((def.naval || def.coastal) && !isCoastal(c)) return 'Coastal cities only';
@@ -1806,6 +1905,16 @@ function turnsLeft(c, item) {
 
 function setBuild(c, item) {
   if (item && buildProblem(c, item)) return false;
+  if (item && item.kind === 'building' && needsPlot(item.id)) {
+    c.plot = c.plot || {};
+    if (!c.plot[item.id]) {
+      // CPUs pick their own hex; humans click one in the city panel flow.
+      if (pl(c.owner).human) return false;
+      const spot = freePlot(c, item.id);
+      if (!spot) return false;
+      c.plot[item.id] = [spot.x, spot.y];
+    }
+  }
   c.build = item ? { kind: item.kind, id: item.id } : null;
   c.wait = false;
   return true;
@@ -1941,6 +2050,7 @@ function tryComplete(c) {
     c.progress -= cost;
     c.buildings.push(item.id);
     c.hp += def.hp || 0;
+    if (needsPlot(item.id)) clearPlot(c, item.id);
   }
   log(c.name + ' finished ' + def.name + '.', f.ink, f.i);
   c.build = null;
@@ -1994,12 +2104,13 @@ function foundCity(u) {
   const c = {
     id: 'c' + G.nextCity++, x: u.x, y: u.y, name: cityNameFor(f),
     owner: f.i, founder: f.i, pop: rome ? 2 : 1, food: 0, progress: 0, build: null, buildings: rome ? ['granary'] : [],
-    hp: 100, hit: false, shot: false, capital: false, wait: false
+    plot: {}, hp: 100, hit: false, shot: false, capital: false, wait: false
   };
   if (f.capital === null) { c.capital = true; f.capital = c.id; f.capHome = tileAt(c.x, c.y).k; }
   G.cities.push(c);
   claimStartRing(c);
   if (rome) claimNextHex(c);
+  if (rome) placeMissingPlots(c, true);   // Rome's free granary takes a hex too
   removeUnit(u);
   for (const o of ownUnits(f.i)) if (isMil(o.type) && !o.home) o.home = c.id;
   log(fullName(f) + ' founds ' + c.name + (c.capital ? ' as its capital' : '') + '.', f.ink, null);
@@ -2030,6 +2141,7 @@ function builderOptions(u) {
   if (u.acted || u.mp <= 0) base = 'No moves left this turn';
   else if (t.owner !== u.owner) base = 'Only inside your borders';
   else if (cityAt(u.x, u.y)) base = 'Not on a city';
+  else if (plotAt(u.x, u.y)) base = 'A building stands here';
   for (const id of improvementsFor(u.owner, t)) {
     const imp = IMPROVEMENTS[id];
     let why = base;
@@ -2181,6 +2293,7 @@ function captureCivilian(o, by) {
   const from = pl(o.owner), to = pl(by.owner);
   o.owner = by.owner;
   o.home = null;
+  o.path = null;
   o.mp = 0;
   o.acted = true;
   log(to.name + ' captures a ' + from.name + ' ' + UNITS[o.type].name.toLowerCase() + '.', to.ink, null);
@@ -2195,9 +2308,153 @@ function moveUnit(u, x, y, reach) {
   u.y = y;
   u.mp = Math.max(0, u.mp - cost);
   u.moved = true;
+  u.path = null;   // a hand-steered move takes the unit off its queued route
   const zoc = zocFor(u);
   if (zoc && zoc.has(keyOf(x, y))) u.pinned = true;
   if (SCI.warWonders) touchWonders(u);
+  return true;
+}
+
+/* ── multi-turn paths, Civ 6 style ─────────────────────────────────────────── */
+
+// Every hex this unit could reach given unlimited turns: the cost to each and
+// the hex before it on the cheapest road. Humans only route over land they
+// have seen. Hexes a unit may enter but not pass through (a lone enemy
+// civilian worth capturing) can only sit at the end of a route.
+function computePaths(u) {
+  const home = keyOf(u.x, u.y);
+  const best = new Map([[home, 0]]);
+  const prev = new Map();
+  const stopOnly = new Set();
+  const seen = !G.watch && pl(u.owner).human ? G.seen[u.owner] : null;
+  const queue = [[u.x, u.y, 0]];
+  while (queue.length) {
+    const [x, y, spent] = queue.shift();
+    if (spent > best.get(keyOf(x, y))) continue;
+    for (const [nx, ny] of neighbourList(x, y)) {
+      if (!tileAt(nx, ny)) continue;
+      if (seen && !seen[ny * G.cols + nx]) continue;
+      const cost = moveCost(u, nx, ny);
+      if (!isFinite(cost)) continue;
+      const pass = canPass(u, nx, ny);
+      if (!pass && !canStop(u, nx, ny)) continue;
+      const total = spent + cost;
+      const k = keyOf(nx, ny);
+      if (best.has(k) && best.get(k) <= total) continue;
+      best.set(k, total);
+      prev.set(k, keyOf(x, y));
+      if (!pass) stopOnly.add(k);
+      else queue.push([nx, ny, total]);
+    }
+  }
+  return { best, prev, stopOnly };
+}
+
+// The hexes a route walks through, next first, destination last. null when
+// there is no road at all.
+function pathTo(paths, u, tx, ty) {
+  const end = keyOf(tx, ty), home = keyOf(u.x, u.y);
+  if (!paths.best.has(end)) return null;
+  const steps = [];
+  let k = end;
+  while (k && k !== home) {
+    if (paths.stopOnly.has(k) && k !== end) return null;
+    steps.unshift(k.split(',').map(Number));
+    k = paths.prev.get(k);
+  }
+  return steps;
+}
+
+// How many turns a route takes, counting this turn's remaining moves first.
+// Stepping into an enemy's zone of control ends the turn there, like a
+// single move does.
+function pathTurns(u, steps, firstMp) {
+  if (!steps || !steps.length) return 1;
+  const zoc = zocFor(u);
+  let turns = 1, mp = firstMp === undefined ? unitMove(u) : Math.max(0, firstMp);
+  if (mp <= 0) { turns = 2; mp = unitMove(u); }
+  for (let i = 0; i < steps.length; i++) {
+    const cost = moveCost(u, steps[i][0], steps[i][1]);
+    if (!isFinite(cost)) return Infinity;
+    if (cost > mp) { turns++; mp = unitMove(u); }
+    mp -= cost;
+    if (i < steps.length - 1 && zoc && zoc.has(keyOf(steps[i][0], steps[i][1]))) { turns++; mp = unitMove(u); }
+  }
+  return turns;
+}
+
+// One hex along a queued path. 'move' went through, 'wait' is out of moves,
+// 'block' means the road is shut (a new enemy, a friend parked on it).
+function stepUnit(u, x, y, final) {
+  const cost = moveCost(u, x, y);
+  if (!isFinite(cost) || (!canPass(u, x, y) && !(final && canStop(u, x, y)))) return 'block';
+  if (cost > u.mp) return 'wait';
+  for (const o of G.units.filter(o => o.x === x && o.y === y && o.owner !== u.owner)) captureCivilian(o, u);
+  u.x = x;
+  u.y = y;
+  u.mp = Math.max(0, u.mp - cost);
+  u.moved = true;
+  const zoc = zocFor(u);
+  if (zoc && zoc.has(keyOf(x, y))) u.pinned = true;
+  if (SCI.warWonders) touchWonders(u);
+  return 'move';
+}
+
+// Enemy soldiers (someone you're at war with) within sight: 2 hexes.
+const enemiesInSight = u => G.units.filter(o => o.owner !== u.owner && isMil(o.type) && atWar(o.owner, u.owner) &&
+  hexDistance(o.x, o.y, u.x, u.y) <= 2).map(o => o.id);
+// A new one, not there when the march was ordered or last checked.
+function newEnemyInSight(u) {
+  const now = enemiesInSight(u), known = u.path.seen || [];
+  const fresh = now.some(id => !known.includes(id));
+  u.path.seen = known.concat(now.filter(id => !known.includes(id)));
+  return fresh;
+}
+
+// Walk the queued path as far as this turn allows. Running out of moves or
+// hitting an enemy's zone of control pauses it for the turn. Like Civ 6, an
+// enemy coming into sight (one it hadn't seen) calls the march off; a road shut
+// by something else (a friend parked on it, a new city) gets one reroute
+// before the march is called off.
+function runPath(u) {
+  const f = pl(u.owner);
+  const halt = why => {
+    u.path = null;
+    log('A ' + UNITS[u.type].name.toLowerCase() + ' stopped its march: ' + why + '.', f.ink, u.owner);
+    if (u.owner === G.viewer && myTurn()) toast('March stopped: ' + why + '.');
+  };
+  let rerouted = false;
+  while (u.path && u.path.steps.length) {
+    if (newEnemyInSight(u)) { halt('an enemy is in sight'); return; }
+    const [x, y] = u.path.steps[0];
+    const step = stepUnit(u, x, y, u.path.steps.length === 1);
+    if (step === 'block') {
+      const steps = rerouted ? null : pathTo(computePaths(u), u, u.path.to[0], u.path.to[1]);
+      if (!steps || !steps.length) { halt('the way is blocked'); return; }
+      u.path.steps = steps;
+      rerouted = true;
+      continue;
+    }
+    if (step === 'wait') return;
+    u.path.steps.shift();
+    if (u.pinned || u.mp <= 0) break;
+  }
+  if (u.path && !u.path.steps.length) u.path = null;
+  else if (u.path && newEnemyInSight(u)) halt('an enemy is in sight');
+}
+
+// Click a hex several turns away: queue the route and set off down it.
+function beginPath(u, x, y) {
+  const paths = computePaths(u);
+  if (!paths.best.has(keyOf(x, y))) return false;
+  const steps = pathTo(paths, u, x, y);
+  if (!steps || !steps.length) return false;
+  const turns = pathTurns(u, steps, u.mp);
+  u.path = { to: [x, y], steps, seen: enemiesInSight(u) };
+  if (!u.pinned) runPath(u);
+  if (u.path && u.path.steps.length && isFinite(turns)) {
+    toast('Heading out: about ' + plural(turns, 'turn', 'turns') + ' to arrive.');
+  }
   return true;
 }
 
@@ -2308,6 +2565,7 @@ function attack(u, x, y) {
       for (const o of G.units.filter(o => o.x === x && o.y === y && o.owner !== u.owner)) captureCivilian(o, u);
       u.x = x;
       u.y = y;
+      u.path = null;
     }
     if (killed) win();
     return { dmg, back, killed };
@@ -2387,6 +2645,7 @@ function captureCity(c, u) {
   u.y = c.y;
   u.mp = 0;
   u.acted = true;
+  u.path = null;
   rehome(c.id);
   changeAttitude(prev, f.i, -30);
   log(fullName(f) + ' captures ' + c.name + (c.capital ? ', ' + pf.name + '’s capital,' : '') + ' from ' + fullName(pf) + '.', f.ink, null);
@@ -2589,6 +2848,8 @@ function beginPlayerTurn(i) {
     u.acted = false;
     u.moved = false;
   }
+  // Queued marches keep going at the start of the turn, Civ 6 style.
+  for (const u of ownUnits(i)) if (u.path) runPath(u);
   checkElimination();
 }
 
@@ -2644,7 +2905,7 @@ function endCurrentTurn() {
   advanceTurns();
 }
 
-const idleUnits = i => ownUnits(i).filter(u => u.mp > 0 && !u.acted);
+const idleUnits = i => ownUnits(i).filter(u => u.mp > 0 && !u.acted && !u.path);
 const idleCities = i => ownCities(i).filter(c => !c.build);
 const needsTech = i => !pl(i).research && researchChoices(i).length > 0;
 /* ── CPU players ───────────────────────────────────────────────────────────── */
@@ -2882,7 +3143,7 @@ function aiImpGain(i, t, id) {
   return gain;
 }
 function aiTileWorth(f, t) {
-  if (t.imp || cityAt(t.x, t.y)) return 0;
+  if (t.imp || cityAt(t.x, t.y) || plotAt(t.x, t.y)) return 0;
   let best = 0;
   for (const id of improvementsFor(f.i, t)) {
     const tech = IMPROVEMENTS[id].tech;
@@ -2973,7 +3234,7 @@ function aiChooseBuild(f, c, siteAvailable) {
     if (needPort && isCoastal(c) && can(B('harbor')) && aiBestCity(f, 'expedition') === c) return B('harbor');
   }
   if (can(B('university'))) return B('university');
-  if (can(B('observatory')) && (touchesMountain(c) || aiScience(f))) return B('observatory');
+  if (can(B('observatory')) && (cityTiles(c).some(t => plotOk(c, t, 'observatory') && nextToMountain(t.x, t.y)) || aiScience(f))) return B('observatory');
   if (y.net < 8 && can(B('granary'))) return B('granary');
   if (can(B('workshop')) && c.pop >= 3) return B('workshop');
   if (can(B('harbor')) && cityTiles(c).filter(t => t.t === 'shallow').length >= 3) return B('harbor');
@@ -3335,7 +3596,7 @@ UNITS.battleship = { name: 'Battleship', kind: 'siege', naval: true, era: 4, str
 UNIT_ORDER.push('musketman', 'cannon', 'battleship');
 BUILDINGS.university = { name: 'University', cost: 70, tech: 'education', needsLibrary: true, blurb: 'Needs a Library. +3 science.' };
 BUILDINGS.observatory = { name: 'Observatory', cost: 70, tech: 'astronomy',
-  blurb: '+2 science, or +4 if the city center touches a mountain.' };
+  blurb: '+2 science, or +4 if its hex touches a mountain.' };
 BUILDING_ORDER.push('university', 'observatory');
 
 // Gunpowder lies hidden in the ground until you learn Firearms; then a mine on
@@ -3355,6 +3616,9 @@ function applyPeakName(state) {
 IMPROVEMENTS.mine.ok = t => (t.t === 'hill' && !t.f) || t.f === 'iron' || t.f === 'gunpowder';
 const seesFeature = (t, i) => !(t.f && FEATURES[t.f] && FEATURES[t.f].hidden && !(i !== null && i !== undefined && hasTech(i, FEATURES[t.f].hidden)));
 const touchesMountain = c => neighbourList(c.x, c.y).some(([x, y]) => { const n = tileAt(x, y); return n && n.t === 'mount'; });
+// An observatory doubles when its own hex touches a mountain (the city center,
+// for one built before buildings had hexes).
+const observatoryPeak = c => (c.plot && c.plot.observatory ? nextToMountain(c.plot.observatory[0], c.plot.observatory[1]) : touchesMountain(c));
 
 // The science victory. Star Charts and the Royal Academy sit on two random era
 // 4 techs; the last step, by sea or by land, on the deepest one.
@@ -3684,6 +3948,7 @@ function prepareState(state) {
   }
   // Older maps could hide gunpowder under the sea or a mountain; clear it.
   for (const t of state.tiles) if (t.f === 'gunpowder' && t.t !== 'flat' && t.t !== 'hill') t.f = null;
+  for (const c of state.cities) c.plot = c.plot || {};
   state.v = 3;
   applyTree(state.tree);
   applyPeakName(state);
@@ -4225,6 +4490,18 @@ function renderBoard() {
   const shotTargets = mySelCity ? new Set(cityShootTargets(mySelCity).map(s => keyOf(s.unit.x, s.unit.y))) : new Set();
   // Reachable hexes inside an enemy zone of control: the move ends there.
   const selZoc = mySelUnit && reachable ? zocFor(mySelUnit) : null;
+  // Buildings sit on their own hexes: solid once built, dashed while queued.
+  const plots = new Map();
+  for (const c of G.cities) {
+    if (!c.plot) continue;
+    for (const id in c.plot) {
+      const s = c.plot[id];
+      const done = c.buildings.includes(id);
+      // Others only see a building once it stands; plans stay private.
+      if (s && (done || watching || c.owner === viewer)) plots.set(keyOf(s[0], s[1]), { id, done });
+    }
+  }
+  const pc = placing ? cityById(placing.city) : null;
 
   for (const tile of G.tiles) {
     const { x, y } = tile;
@@ -4264,10 +4541,24 @@ function renderBoard() {
     const showF = !!tile.f && (watching || seesFeature(tile, viewer));
     const at = 'translate(' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ')';
     marks.push('<g transform="' + at + '">' + tileArt(tile, showF, cityHex.has(key)) + '</g>');
+    // A building's own hex: its full drawing once built; while it's queued, a
+    // faded drawing inside a dashed outline, over whatever is still there.
+    const plot = plots.get(key);
+    if (plot && BUILDING_ART[plot.id]) {
+      marks.push('<g transform="' + at + '">' + (plot.done ? '' :
+        '<polygon points="' + hexPoints(HEX_R - 4) + '" fill="rgba(255,250,240,.35)" stroke="#2a2116" stroke-width="1.2" stroke-dasharray="4 3"/>') +
+        '<g transform="translate(0 2) scale(' + (plot.done ? 0.95 : 0.7) + ')"' + (plot.done ? '' : ' opacity=".6"') + '>' +
+        BUILDING_ART[plot.id]() + '</g></g>');
+    }
     const wave = tileWaves(tile);
     if (wave) waves.push('<g transform="' + at + '">' + wave + '</g>');
     if (showF && FEATURES[tile.f].wonder) (wonderHexes[tile.f] = wonderHexes[tile.f] || []).push(tile);
     if (mySelUnit && reachable && reachable.has(key)) overlay.push('<path class="reach' + (selZoc && selZoc.has(key) ? ' stop' : '') + '" d="' + d + '"/>');
+    if (pc && tile.city === placing.city) {
+      const s = pc.plot && pc.plot[placing.item.id];
+      const cur = !!s && s[0] === x && s[1] === y;
+      if (cur || plotOk(pc, tile, placing.item.id)) overlay.push('<path class="plot' + (cur ? ' cur' : '') + '" d="' + d + '"/>');
+    }
     if (mySelUnit && visible && strikeInfo(mySelUnit, x, y)) overlay.push('<path class="threat" d="' + d + '"/>');
     if (shotTargets.has(key) && visible) overlay.push('<path class="threat" d="' + d + '"/>');
     if (selCity && tile.city === selCity.id) overlay.push('<path class="worked" d="' + d + '"/>');
@@ -4333,10 +4624,117 @@ function renderBoard() {
 
 function clearBoard() {
   if (!UI) return;
-  for (const k of ['layerTerrain', 'layerWaves', 'layerOwner', 'layerCoast', 'layerMarks', 'layerBorder', 'layerOverlay', 'layerSites', 'layerUnits', 'layerFog', 'layerLabels']) {
+  for (const k of ['layerTerrain', 'layerWaves', 'layerOwner', 'layerCoast', 'layerMarks', 'layerBorder', 'layerOverlay', 'layerSites', 'layerUnits', 'layerPath', 'layerFog', 'layerLabels']) {
     UI[k].innerHTML = '';
   }
 }
+/* ── picking a hex for a building, and path previews ───────────────────── */
+
+// What a building on this hex would erase, as this viewer sees it, or ''.
+function plotLoss(t, viewer) {
+  const bits = [];
+  if (t.f && seesFeature(t, viewer) && !FEATURES[t.f].wonder) {
+    const d = FEATURES[t.f], buff = [d.food ? '+' + d.food + ' food' : '', d.prod ? '+' + d.prod + ' production' : '',
+      t.f === 'geyser' ? '+' + SCI.geyser + ' science' : '', d.def ? '+' + d.def + ' defense' : '',
+      d.strategic || t.f === 'gunpowder' ? 'its stockpile income once mined' : ''].filter(Boolean);
+    bits.push('the ' + d.name.toLowerCase() + (buff.length ? ' (' + buff.join(', ') + ')' : ''));
+  }
+  if (t.imp) bits.push('the ' + IMPROVEMENTS[t.imp].name.toLowerCase());
+  return bits.join(' and ');
+}
+// Put the building on its hex and queue it.
+function confirmPlot(cityId, id, x, y) {
+  const c = cityById(cityId);
+  placing = null;
+  closeModal();
+  if (!c || c.owner !== G.viewer || !myTurn() || !plotOk(c, tileAt(x, y), id)) { render(); return; }
+  c.plot = c.plot || {};
+  const before = c.plot[id];
+  c.plot[id] = [x, y];
+  if (setBuild(c, { kind: 'building', id })) toast(BUILDINGS[id].name + ' queued on its own hex.');
+  else if (before) c.plot[id] = before; else delete c.plot[id];
+  afterAction();
+}
+function askPlot(c, id, x, y) {
+  const loss = plotLoss(tileAt(x, y), G.viewer);
+  openModal(modalHead('Clear this hex for the ' + esc(BUILDINGS[id].name) + '?') +
+    '<div class="modal-body"><p>When the ' + esc(BUILDINGS[id].name.toLowerCase()) + ' is finished, ' + esc(loss) +
+    ' on this hex will be removed for good, and the hex loses what ' + (loss.includes(' and ') ? 'they' : 'it') + ' gave. The terrain stays.</p></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="place-no">Pick another hex</button>' +
+    '<button class="btn primary" data-act="place-yes:' + c.id + ':' + id + ':' + x + ':' + y + '">Build here</button></div>', true);
+}
+
+// A click on the map while a building waits for its hex.
+function placeClick(x, y) {
+  const c = cityById(placing.city);
+  if (!c || c.owner !== G.viewer || !myTurn()) { placing = null; render(); return; }
+  const t = tileAt(x, y);
+  if (t && t.city === c.id && plotOk(c, t, placing.item.id)) {
+    // A feature or improvement on the hex: ask first, since it goes for good.
+    if (plotLoss(t, G.viewer)) { askPlot(c, placing.item.id, x, y); return; }
+    confirmPlot(c.id, placing.item.id, x, y);
+    return;
+  }
+  if (t && t.city === c.id) { toast(plotProblem(c, t, placing.item.id)); return; }
+  placing = null;   // clicked outside the borders: stop placing
+  render();
+}
+
+function pathLineGeo(points, cls) {
+  const d = 'M' + points.map(([x, y]) => { const [cx, cy] = hexCenter(x, y); return cx.toFixed(1) + ' ' + cy.toFixed(1); }).join('L');
+  return '<path class="' + cls + '" d="' + d + '"/>';
+}
+
+// The march lines: committed routes for this player's units, plus the preview
+// for the hex under the pointer. This layer redraws on its own, so hovering
+// never rebuilds the whole board.
+function renderPathLayer() {
+  if (!UI || !UI.layerPath) return;
+  const out = [];
+  if (G && !G.over && G.viewer !== null) {
+    for (const u of G.units) {
+      if (!u.path || u.owner !== G.viewer) continue;
+      if (!G.watch && !visibleTo(u.x, u.y)) continue;
+      const sel = selection && selection.kind === 'unit' && selection.id === u.id;
+      if (sel) out.push(pathLineGeo([[u.x, u.y]].concat(u.path.steps), 'pathline ghost'));
+      const [dx, dy] = hexCenter(u.path.to[0], u.path.to[1]);
+      out.push('<circle class="pathdot" cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="' + (sel ? 5 : 3.5) + '"' + (sel ? '' : ' opacity=".8"') + '/>');
+    }
+  }
+  if (preview && selection && selection.kind === 'unit' && preview.unit === selection.id) {
+    const u = unitById(preview.unit);
+    if (u) {
+      const last = preview.steps[preview.steps.length - 1];
+      out.push(pathLineGeo([[u.x, u.y]].concat(preview.steps), 'pathline'));
+      const [dx, dy] = hexCenter(last[0], last[1]);
+      out.push('<circle class="pathdot" cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="5.5"/>');
+      const label = preview.turns <= 1 ? 'this turn' : plural(preview.turns, 'turn', 'turns');
+      const w = label.length * 6 + 12;
+      out.push('<rect class="pathlabel-bg" x="' + (dx - w / 2).toFixed(1) + '" y="' + (dy - 31).toFixed(1) + '" width="' + w + '" height="13" rx="2"/>' +
+        '<text class="pathlabel" x="' + dx.toFixed(1) + '" y="' + (dy - 21.5).toFixed(1) + '" text-anchor="middle">' + label + '</text>');
+    }
+  }
+  UI.layerPath.innerHTML = out.join('');
+}
+
+// Recompute the hovered path preview (one Dijkstra over the seen hexes) and
+// redraw the path layer.
+function refreshPreview() {
+  preview = null;
+  if (G && !G.over && !G.handoff && hover && myTurn() && !placing) {
+    const u = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+    if (u && u.owner === G.viewer && (hover[0] !== u.x || hover[1] !== u.y)) {
+      const seen = G.seen[G.viewer];
+      if (seen[hover[1] * G.cols + hover[0]]) {
+        const paths = computePaths(u);
+        const steps = pathTo(paths, u, hover[0], hover[1]);
+        if (steps) preview = { unit: u.id, steps, turns: pathTurns(u, steps, u.mp) };
+      }
+    }
+  }
+  renderPathLayer();
+}
+
 /* ── preferences kept on this device ───────────────────────────────────────── */
 
 const PREFS_KEY = 'bored.civlite.prefs.v1';
@@ -4622,6 +5020,9 @@ const TIPS = [
   { id: 'future', test: i => techReady(i, 'future'),
     say: () => 'You know every tech. Future Tech repeats forever: +2 score each time, and each one finished while your trip is out cuts a turn off it.',
     el: '#btn-tech' },
+  { id: 'buildings', test: i => ownCities(i).some(c => c.build && c.build.kind === 'building'),
+    say: (i, c) => esc(c.name) + ' is raising a building. Walls stand on the city center; every other building gets its own hex in the borders, which you pick when you queue it. The feature on that hex goes when the building is done; the terrain stays.',
+    el: '#panel' },
   { id: 'ten-left', test: () => G.maxTurns > 0 && G.maxTurns - G.turn <= 10,
     say: () => '10 turns left. The best score at the turn limit wins: 5 per city, 1 per pop, tech points, and military strength ÷ 20.',
     el: '.score-box, #stat-score' }
@@ -4762,6 +5163,7 @@ function render() {
   reachable = selUnit && selUnit.owner === G.viewer && myTurn() ? computeReachable(selUnit) : null;
   renderBar();
   renderBoard();
+  refreshPreview();
   renderSide();
   renderNeeds();
   renderLog();
@@ -5068,7 +5470,7 @@ function realmPanel() {
   }
   html += '</div><div class="actions"><button class="act" data-act="council">Council</button>' +
     '<button class="act" data-act="help">Rules</button></div>' +
-    '<p class="hint">Click a unit, then a green hex to move. Red hexes are targets you can hit. Click any hex to see what’s on it. Drag to look around; scroll or use the buttons to zoom.</p>';
+    '<p class="hint">Click a unit, then a green hex to move — or a far hex to march there over several turns. Red hexes are targets you can hit. Click any hex to see what’s on it. Drag to look around; scroll or use the buttons to zoom.</p>';
   return html;
 }
 
@@ -5077,6 +5479,11 @@ function buildRow(c, item, mine) {
   const why = buildProblem(c, item);
   const on = sameItem(c.build, item);
   let note = why;
+  if (item.kind === 'building' && !why) {
+    note = !needsPlot(item.id) ? 'Stands on the city center'
+      : c.plot && c.plot[item.id] ? 'Has its hex: anything on it goes when it’s built'
+      : 'Click, then pick a ' + (item.id === 'harbor' ? 'shallow water' : 'free land') + ' hex in the borders';
+  }
   if (!why && item.kind === 'unit' && def.founds && c.pop < 2 && !civIs(c.owner, 'rome')) note = 'Waits for pop 2 to finish';
   if (!why && item.kind === 'unit' && def.res) {
     const need = [def.res.horses ? def.res.horses + ' horses' : '', def.res.iron ? def.res.iron + ' iron' : ''].filter(Boolean).join(' + ');
@@ -5178,6 +5585,11 @@ function cityPanel(c) {
     html += '<p class="sec">Buildings</p><div class="build-list">' +
       blds.map(id => buildRow(c, { kind: 'building', id }, mine)).join('') + '</div>';
   }
+  if (placing && placing.city === c.id) {
+    html += '<p class="sec">Placing ' + esc(BUILDINGS[placing.item.id].name) + '</p>' +
+      '<div class="hint">Pick an outlined hex: ' + (placing.item.id === 'harbor' ? 'shallow water' : 'flat land or hills') + ' in the borders. If it has a feature or an improvement, you’ll be asked first: they go for good when the building is finished. The terrain stays.</div>' +
+      '<div class="actions"><button class="act" data-act="cancel-place">Stop placing</button></div>';
+  }
   if (mine && c.build) html += '<div class="actions"><button class="act" data-act="clearbuild:' + c.id + '">Stop building</button></div>';
 
   const here = unitsAt(c.x, c.y).filter(u => u.owner === v);
@@ -5210,6 +5622,8 @@ function tilePanel(x, y) {
     '<div class="side-sub">' + esc(cont ? cont : ter.water ? 'Open water' : '') + '</div>' +
     (t.f && (G.watch || seesFeature(t, v)) ? kv('Feature', FEATURES[t.f].name) : '') +
     (t.imp ? kv('Improvement', IMPROVEMENTS[t.imp].name) : '') +
+    (() => { const p = plotAt(x, y); return p && (p.city.buildings.includes(p.id) || p.city.owner === v || G.watch)
+      ? kv('Building', esc(BUILDINGS[p.id].name) + (p.city.buildings.includes(p.id) ? '' : ' (planned)') + ' · ' + esc(p.city.name)) : ''; })() +
     (tileSci(t) ? kv(icon('tech', 12) + ' Science', '+' + tileSci(t)) : '') +
     kv(icon('food', 12) + ' Food', yy.food) + kv(icon('prod', 12) + ' Production', yy.prod) +
     kv('Move cost', ter.block ? 'impassable' + (v !== null && civIs(v, 'inca') ? ' (2 for you)' : '') :
@@ -5255,7 +5669,9 @@ function unitPanel(u) {
     '<div class="hint">' + esc(def.blurb) + '</div>' +
     (u.blessed ? '<div class="hint" style="color:var(--sea)">Bathed at Pamukkale: heals 10 HP every turn, wherever it is.</div>' : '') +
     (u.giant ? '<div class="hint" style="color:var(--sea)">Climbed the Giant’s Causeway: +5 strength for good.</div>' : '') +
-    (u.pinned && u.owner === v ? '<div class="hint" style="color:var(--rust)">Stopped by an enemy’s zone of control. It can still attack this turn.</div>' : '');
+    (u.pinned && u.owner === v ? '<div class="hint" style="color:var(--rust)">Stopped by an enemy’s zone of control. It can still attack this turn.</div>' : '') +
+    (u.path && isFinite(pathTurns(u, u.path.steps, u.mp)) ? '<div class="hint">Marching to a hex about ' +
+      plural(Math.max(1, pathTurns(u, u.path.steps, u.mp)), 'turn', 'turns') + ' out. It walks on at the start of each turn; click its destination again to call it off.</div>' : '');
 
   if (u.owner !== v) {
     const war = v !== null && atWar(v, u.owner);
@@ -5283,6 +5699,7 @@ function unitPanel(u) {
       const blocked = opts.find(o => o.why);
       if (blocked) html += '</div><div class="hint">' + esc(blocked.why) + '.</div><div class="actions">';
     }
+    if (u.path) html += '<button class="act" data-act="clearpath">Cancel march</button>';
     html += '<button class="act" data-act="skip"' + (u.mp <= 0 ? ' disabled' : '') + '>Skip turn<kbd>S</kbd></button>' +
       '<button class="act" data-act="disband-ask">Disband</button></div>';
 
@@ -5722,10 +6139,15 @@ function showHelp() {
     '<h3>Cities</h3><p>Settlers found cities on land at least 4 hexes from any other city. Settlers cost 1 pop, so the city needs pop 2. ' +
     'If a city’s food goes negative, its military units lose 10 HP a turn. Cities heal 10 HP a turn when nobody attacked them (France 20), and not at all while ringed by enemies. ' +
     'They defend at 25 + 3 per pop (at most +21), or their garrison + 5.</p>' +
+    '<h3>Buildings on hexes</h3><p>Like Civ 6’s districts. Walls, the castle and the fortress stand on the city center. Every other building takes its own hex inside that city’s borders, and you pick it: queue the building, then click one of the outlined hexes. ' +
+    'A harbor goes on shallow water; the rest go on flat land or hills, never on mountains, natural wonders or another building’s hex. An observatory gives +4 instead of +2 when its hex touches a mountain. ' +
+    'When the building is finished, the feature and improvement on its hex are removed for good (you’re asked first), along with what they gave; the terrain stays. CPU cities pick their own hexes.</p>' +
     '<h3>Builders</h3><p>3 charges, each one instant, inside your borders only: farms on flat land and wheat, mines on hills and iron (Mining), pastures on horses (Animal Husbandry), ' +
     'fishing boats on seafood (Sailing). Chop a forest for 20 production or harvest wheat or seafood for 20 food. Builders can wade onto shallow water to reach seafood.</p>' +
     '<h3>Moving</h3><p>Hills and forest cost 2 moves, mountains are impassable. Land units can step onto shallow water; deep sea needs Navigation. ' +
     'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Walking onto an enemy civilian standing alone captures it.</p>' +
+    '<h3>Longer marches</h3><p>With a unit selected, click any hex you have seen, even turns away: the unit walks as far as it can this turn and keeps going at the start of each turn until it arrives. ' +
+    'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off.</p>' +
     '<h3>Zone of control</h3><p>Like Civ: at war, every hex next to an enemy military unit or city is in its zone of control (land units cover land, ships cover water, cities both). ' +
     'Stepping into one ends your move there, though you can still attack. Horse units ride straight through.</p>' +
     '<h3>Ships</h3><p>Galleys, warships and battleships come from coastal cities and stay on water, in shallow water until Navigation. They hit anything next to the water, a galley can take a coastal city, ' +
@@ -5794,6 +6216,7 @@ function doEndTurn() {
   closeModal();
   selection = null;
   reachable = null;
+  placing = null;
   const before = G.viewer;
   endCurrentTurn();
   autosave();
@@ -5911,7 +6334,7 @@ function onAction(act) {
       if (c) { closeModal(); selection = { kind: 'city', id: c.id }; centreOn(c.x, c.y); render(); }
       break;
     }
-    case 'deselect': selection = null; render(); break;
+    case 'deselect': selection = null; placing = null; render(); break;
     case 'realm':
       if (G.handoff || G.viewer === null) break;
       closeModal();
@@ -5925,13 +6348,31 @@ function onAction(act) {
     case 'centre': centreOn(Number(a), Number(b)); break;
     case 'setbuild': {
       const c = cityById(a);
-      if (c && c.owner === G.viewer && myTurn() && setBuild(c, { kind: b, id: parts[3] })) {
-        render();
-        autosave();
-        if (b === 'research' && !pl(G.viewer).research) toast('Now pick a tech for it. Press T.');
+      if (c && c.owner === G.viewer && myTurn()) {
+        const item = { kind: b, id: parts[3] };
+        // Buildings off the city center wait for the player to pick a hex.
+        if (item.kind === 'building' && needsPlot(item.id) && !buildProblem(c, item)) {
+          placing = { city: c.id, item };
+          if (UI.sheetOpen) setSheet(false);
+          centreOn(c.x, c.y);
+          toast('Pick a hex for the ' + BUILDINGS[item.id].name.toLowerCase() + ' (the outlined ones).');
+          render();
+          break;
+        }
+        if (setBuild(c, item)) {
+          render();
+          autosave();
+          if (b === 'research' && !pl(G.viewer).research) toast('Now pick a tech for it. Press T.');
+        }
       }
       break;
     }
+    case 'cancel-place': placing = null; render(); break;
+    case 'place-yes': confirmPlot(a, b, Number(parts[3]), Number(parts[4])); break;
+    case 'place-no': closeModal(); render(); break;
+    case 'clearpath':
+      if (selUnit && selUnit.owner === G.viewer && myTurn()) { selUnit.path = null; render(); autosave(); }
+      break;
     case 'clearbuild': {
       const c = cityById(a);
       if (c && c.owner === G.viewer && myTurn()) { setBuild(c, null); render(); autosave(); }
@@ -6000,6 +6441,9 @@ function onAction(act) {
       G = null;
       selection = null;
       reachable = null;
+      placing = null;
+      hover = null;
+      preview = null;
       UI.handoff.hidden = true;
       UI.start.hidden = false;
       refreshStart();
@@ -6011,6 +6455,8 @@ function handleTileClick(x, y) {
   if (!G || G.over || G.handoff) return;
   const v = G.viewer;
   const key = keyOf(x, y);
+  // Picking a hex for a building comes before everything else.
+  if (placing) { placeClick(x, y); return; }
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   if (selUnit && selUnit.owner === v && myTurn()) {
     if (visibleTo(x, y)) {
@@ -6026,6 +6472,17 @@ function handleTileClick(x, y) {
       moveUnit(selUnit, x, y, reachable);
       afterAction();
       return;
+    }
+    // Too far to reach this turn: queue a multi-turn route, Civ 6 style.
+    // Clicking the destination again takes the orders back off.
+    if (seenBy(v, x, y)) {
+      if (selUnit.path && selUnit.path.to[0] === x && selUnit.path.to[1] === y) {
+        selUnit.path = null;
+        toast('Orders canceled.');
+        afterAction();
+        return;
+      }
+      if (beginPath(selUnit, x, y)) { afterAction(); return; }
     }
   }
   const seen = G.watch || seenBy(v, x, y), visible = visibleTo(x, y);
@@ -6087,6 +6544,14 @@ function bindMap() {
       applyCamera();
       return;
     }
+    if (!drag && !pinch) {
+      const hexEl = event.target.closest ? event.target.closest('[data-tile]') : null;
+      const next = hexEl ? hexEl.getAttribute('data-tile').split(',').map(Number) : null;
+      if ((next && !hover) || (!next && hover) || (next && hover && (next[0] !== hover[0] || next[1] !== hover[1]))) {
+        hover = next;
+        refreshPreview();
+      }
+    }
     if (!drag) return;
     const dx = event.clientX - drag.x, dy = event.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 5) drag.moved = true;
@@ -6113,6 +6578,7 @@ function bindMap() {
     }
   };
   svg.addEventListener('pointerup', release);
+  svg.addEventListener('pointerleave', () => { if (hover) { hover = null; refreshPreview(); } });
   svg.addEventListener('pointercancel', event => {
     pointers.delete(event.pointerId);
     pinch = null;
@@ -6139,6 +6605,7 @@ function bindKeys() {
     if (!G || !UI.start.hidden) return;
     if (event.key === 'Escape') {
       if (!UI.modalLayer.hidden) { if (!G.pending) closeModal(); }
+      else if (placing) { placing = null; render(); }
       else if (selection) { selection = null; render(); }
       return;
     }
@@ -6202,6 +6669,7 @@ function readSave() {
 }
 function resumeState(state) {
   G = prepareState(state);
+  for (const c of G.cities) placeMissingPlots(c, false);   // saves from before buildings had hexes
   selection = null;
   reachable = null;
   UI.endShown = false;
@@ -6406,7 +6874,7 @@ function boot(data) {
     logToggle: q('#log-toggle'), sheetOpen: false, swiped: false,
     layerTerrain: q('#layer-terrain'), layerWaves: q('#layer-waves'), layerOwner: q('#layer-owner'), layerCoast: q('#layer-coast'),
     layerMarks: q('#layer-marks'), layerBorder: q('#layer-border'), layerOverlay: q('#layer-overlay'),
-    layerSites: q('#layer-sites'), layerUnits: q('#layer-units'), layerFog: q('#layer-fog'), layerLabels: q('#layer-labels'),
+    layerSites: q('#layer-sites'), layerUnits: q('#layer-units'), layerPath: q('#layer-path'), layerFog: q('#layer-fog'), layerLabels: q('#layer-labels'),
     stats: q('#stats'), bannerDot: q('#banner-dot'), bannerName: q('#banner-name'), bannerWho: q('#banner-who'),
     turnReadout: q('#turn-readout'), btnEnd: q('#btn-end'), sideScroll: q('#side-scroll'), log: q('#log'),
     modalLayer: q('#modal-layer'), modal: q('#modal'), toast: q('#toast'),
