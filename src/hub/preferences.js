@@ -33,7 +33,7 @@ export function initPreferences({ clearFavorites, resetAnalytics }) {
     document.documentElement.dataset.reduceMotion = settings.reducedMotion ? 'true' : 'false';
     document.documentElement.style.colorScheme = mode;
     const themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor) themeColor.content = mode === 'dark' ? '#202a23' : '#f7f5ef';
+    if (themeColor) themeColor.content = mode === 'dark' ? '#24211d' : '#f5f2ea';
   }
   function sync() {
     $('setting-theme').value = settings.theme;
