@@ -204,7 +204,7 @@ function explode(x,y,r,own){
     emitP(x,y,'#FF4400',22,7,28);emitP(x,y,'#FFD700',16,5,22);emitP(x,y,'#FF8800',12,4,32);
     shake.i=Math.min(shake.i+10,18);
     pls.forEach(p=>{
-        if(!p.alive||p.respT>0||p.idx===own)return;
+        if(!p.alive||p.respT>0||p.idx===own||p.inv>0)return;
         const dx=p.x+p.w/2-x,dy=p.y+p.h/2-y,d=Math.sqrt(dx*dx+dy*dy);
         if(d<r){const f=1-d/r,km=kbMult(p.dmg);
             p.vx+=dx/Math.max(d,1)*13*f*km;p.vy+=dy/Math.max(d,1)*13*f*km-4*f*km;
@@ -523,7 +523,11 @@ function update(){
 
         p.vy+=GRAV*dt;
         p.vx*=Math.pow(FRIC,dt);
-        if(Math.abs(p.vx)>MSPD)p.vx=Math.sign(p.vx)*MSPD;
+        // Running speed is bounded by acceleration and friction alone (about 4.3),
+        // so this ceiling is only a safety net. Clamping to MSPD here used to trim
+        // every knockback back to a walk, which made "more damage = more knockback"
+        // untrue for anything heavier than a pistol.
+        if(Math.abs(p.vx)>18)p.vx=Math.sign(p.vx)*18;
         if(p.vy>18)p.vy=18;if(p.vy<-18)p.vy=-18;
         if(Math.abs(p.vx)<.08)p.vx=0;
 
@@ -565,31 +569,42 @@ function update(){
     // Bullets
     for(let i=buls.length-1;i>=0;i--){
         const b=buls[i];
-        b.x+=b.vx*dt;b.y+=b.vy*dt;b.l-=dt;
-        if(gt%2===0)parts.push({x:b.x,y:b.y,vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,l:7,ml:7,c:b.cl,s:b.sz*.35});
+        b.l-=dt;
+        // A sniper round covers 26px a frame while a thin platform is 14px and a
+        // body 26px, so a single point test let fast shots pass straight through.
+        // Sweep the step in small slices and test each one instead.
+        const stepLen=Math.hypot(b.vx,b.vy)*dt;
+        const slices=Math.max(1,Math.ceil(stepLen/8));
         let hit=false;
-        platfs.forEach(pl=>{
-            if(b.x>pl.x&&b.x<pl.x+pl.w&&b.y>pl.y&&b.y<pl.y+pl.h){
-                hit=true;if(b.expl)explode(b.x,b.y,b.er,b.own);else emitP(b.x,b.y,b.cl,5,2,9);
-            }
-        });
-        if(!hit)pls.forEach(p=>{
-            if(!p.alive||p.respT>0||p.idx===b.own||p.inv>0)return;
-            if(b.x>p.x&&b.x<p.x+p.w&&b.y>p.y&&b.y<p.y+p.h){
-                hit=true;
-                if(b.expl){explode(b.x,b.y,b.er,b.own);}
-                else{
-                    const km=kbMult(p.dmg);
-                    const dir=b.vx>0?1:(b.vx<0?-1:(pls[b.own]?pls[b.own].face:1));
-                    p.vx+=dir*b.kb*km;
-                    p.vy-=b.kb*.3*km;
-                    p.dmg+=Math.round(b.dm);p.inv=8;snd('hit');
-                    emitDir(b.x,b.y,dir,-.5,b.cl,8,3);
-                    shake.i=Math.min(shake.i+b.kb*km*.15,8);
-                    emitP(p.x+p.w/2,p.y+p.h/2,'#ffffff',2,1,4);
+        for(let s=0;s<slices&&!hit;s++){
+            b.x+=b.vx*dt/slices;b.y+=b.vy*dt/slices;
+            if(s===0&&gt%2===0)parts.push({x:b.x,y:b.y,vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,l:7,ml:7,c:b.cl,s:b.sz*.35});
+            for(const pl of platfs){
+                if(b.x>pl.x&&b.x<pl.x+pl.w&&b.y>pl.y&&b.y<pl.y+pl.h){
+                    hit=true;if(b.expl)explode(b.x,b.y,b.er,b.own);else emitP(b.x,b.y,b.cl,5,2,9);
+                    break;
                 }
             }
-        });
+            if(hit)break;
+            for(const p of pls){
+                if(!p.alive||p.respT>0||p.idx===b.own||p.inv>0)continue;
+                if(b.x>p.x&&b.x<p.x+p.w&&b.y>p.y&&b.y<p.y+p.h){
+                    hit=true;
+                    if(b.expl){explode(b.x,b.y,b.er,b.own);}
+                    else{
+                        const km=kbMult(p.dmg);
+                        const dir=b.vx>0?1:(b.vx<0?-1:(pls[b.own]?pls[b.own].face:1));
+                        p.vx+=dir*b.kb*km;
+                        p.vy-=b.kb*.3*km;
+                        p.dmg+=Math.round(b.dm);p.inv=8;snd('hit');
+                        emitDir(b.x,b.y,dir,-.5,b.cl,8,3);
+                        shake.i=Math.min(shake.i+b.kb*km*.15,8);
+                        emitP(p.x+p.w/2,p.y+p.h/2,'#ffffff',2,1,4);
+                    }
+                    break;
+                }
+            }
+        }
         if(hit||b.l<=0||b.x<-60||b.x>W+60||b.y<-60||b.y>H+60)buls.splice(i,1);
     }
 
