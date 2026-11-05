@@ -712,23 +712,34 @@ const tunnelDef = { name: 'Tunnel', len: TUNNEL_LEN, hw: 6, samples: 20, wall: 4
 // Rollers: two short crests in the space of a straight, so the car skips along
 // instead of settling.
 const whoopsDef = Object.assign(waveDef(2.1, 16, 2, 'Whoops'), { hw: 6, samples: 22 });
-// A vertical loop. The road climbs, turns over and comes down, drifting forward
-// as it does so the exit sits past the entry instead of on top of it. The
+// A vertical loop laid as a helix: the road climbs, turns over and comes down
+// while sliding sideways, so the exit sits clear of the entrance instead of on
+// top of it and the climbing face is seen at an angle rather than head-on. The
 // surface normal always points at the inside of the loop, so the car is pressed
-// into the road for the whole turn.
-const LOOP_R = 11, LOOP_DRIFT = 20;
-const LOOP_LEN = Math.sqrt(Math.pow(2 * Math.PI * LOOP_R, 2) + LOOP_DRIFT * LOOP_DRIFT);
+// into the road for the whole turn. The sideways slide eases in and out, which
+// keeps the entry and exit tangents pointing straight down the track.
+const LOOP_R = 11, LOOP_DRIFT = 18, LOOP_SIDE = 26;
+const loopPoint = t => {
+  const a = TAU * t;
+  const ease = t * t * (3 - 2 * t);
+  return [LOOP_SIDE * ease, LOOP_R * (1 - Math.cos(a)), LOOP_R * Math.sin(a) + LOOP_DRIFT * t];
+};
+const LOOP_LEN = (() => {
+  let total = 0, previous = loopPoint(0);
+  for (let i = 1; i <= 96; i++) {
+    const point = loopPoint(i / 96);
+    total += Math.hypot(point[0] - previous[0], point[1] - previous[1], point[2] - previous[2]);
+    previous = point;
+  }
+  return total;
+})();
 const loopDef = {
-  name: 'Loop', len: LOOP_LEN, hw: 6, samples: 72, wall: 0.9,
+  name: 'Loop', len: LOOP_LEN, hw: 6, samples: 78, wall: 0.9,
   curve: t => {
     const a = TAU * t;
     const u = [0, Math.cos(a), -Math.sin(a)];
-    const tangent = norm([0, Math.sin(a) * TAU * LOOP_R, Math.cos(a) * TAU * LOOP_R + LOOP_DRIFT]);
-    return {
-      p: [0, LOOP_R * (1 - Math.cos(a)), LOOP_R * Math.sin(a) + LOOP_DRIFT * t],
-      f: norm(sub(tangent, mul(u, dot(tangent, u)))),
-      u
-    };
+    const tangent = [LOOP_SIDE * 6 * t * (1 - t), Math.sin(a) * TAU * LOOP_R, Math.cos(a) * TAU * LOOP_R + LOOP_DRIFT];
+    return { p: loopPoint(t), f: norm(sub(tangent, mul(u, dot(tangent, u)))), u };
   }
 };
 
