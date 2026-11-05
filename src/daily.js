@@ -85,7 +85,7 @@ export const CHALLENGES = [
   { slug: 'lava', label: 'The floor is yours', goal: 'Score {target} points as P1 against the CPU in one match.', metric: 'points', targets: [3, 4, 5], rule: 'cpu', unit: 'points' },
   { slug: 'volletball', label: 'Above the net', goal: 'Score {target} points as the left player against the CPU in one match.', metric: 'points', targets: [5, 7, 10], rule: 'cpu', unit: 'points' },
   { slug: 'tank2', label: 'Ballistic victory', goal: 'Win a match as Red against Green (AI).', metric: 'won', targets: [1, 1, 1], rule: 'cpu', unit: 'AI wins' },
-  { slug: 'gun-mayhem', label: 'Last one standing', goal: 'Win {target} rounds as P1 in one-player mode against the CPU.', metric: 'wins', targets: [1, 2, 3], rule: 'cpu', unit: 'rounds won' },
+  { slug: 'gun-mayhem', label: 'Last one standing', goal: 'Win {target} matches as P1 in one-player mode against the CPU.', metric: 'wins', targets: [1, 2, 3], rule: 'cpu', unit: 'matches won' },
   { slug: 'shadow-net', label: 'Data extraction', goal: 'Download {target} files from remote servers in one session.', metric: 'files', targets: [3, 4, 5], unit: 'files downloaded' },
   { slug: 'sand', label: 'Tiny world architect', goal: 'Keep {target} occupied cells and at least four different materials together.', metric: 'cells', targets: [250, 500, 750], rule: 'sand', unit: 'occupied cells' },
   { slug: 'eco', label: 'Thriving ecosystem', goal: 'After 60 simulation seconds, sustain {target} plants, 20 herbivores, and 3 predators together.', metric: 'plants', targets: [150, 175, 200], rule: 'eco', unit: 'plants' },
