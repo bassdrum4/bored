@@ -5956,10 +5956,12 @@ function tutorialSkipChapter() {
 // Each tip shows the first time its test finds something, once per player per
 // game. test(i) returns what it found (truthy) or nothing.
 const TIPS = [
-  { id: 'rival-trip', test: i => scienceOn() && G.players.find(o => o.alive && o.i !== i && o.voyage),
+  // A voyage whose home city has been burned has no port left to reach, so it is
+  // neither a threat to point at nor one worth describing.
+  { id: 'rival-trip', test: i => scienceOn() && G.players.find(o => o.alive && o.i !== i && o.voyage && cityById(o.voyage.city)),
     say: (i, o) => esc(o.name) + '’s ' + esc(PROJECTS[o.voyage.kind].name) + ' is on its way: if it gets home in ' + plural(o.voyage.left, 'turn', 'turns') +
-      ', they win. Take ' + esc(cityById(o.voyage.city).name) + ' to stop it, or keep it under half HP so the trip waits.',
-    at: o => { const c = cityById(o.voyage.city); return [c.x, c.y]; } },
+      ', they win. Take ' + esc((cityById(o.voyage.city) || {}).name || 'its home city') + ' to stop it, or keep it under half HP so the trip waits.',
+    at: o => { const c = cityById(o.voyage.city); return c ? [c.x, c.y] : null; } },
   { id: 'zoc', test: i => ownUnits(i).find(u => u.pinned),
     say: () => 'That unit stepped into an enemy’s zone of control (the dashed yellow hexes), so its move ended there. It can still attack. Horse units ride straight through.',
     at: u => [u.x, u.y] },
@@ -6043,13 +6045,17 @@ function markTipSeen(id) {
 // The hex the coach is pointing at, for the map's dashed ring.
 function coachAt() {
   if (!G) return null;
-  if (G.tut) {
-    if (G.tut.closed || G.tut.step >= TUT_STEPS.length) return null;
-    const step = TUT_STEPS[G.tut.step];
-    return step.at ? step.at() : null;
-  }
-  const now = currentTip();
-  return now && now.tip.at ? now.tip.at(now.hit) : null;
+  // A coach mark is decoration: a tip or tutorial step that cannot find its hex
+  // must never take the board's render down with it.
+  try {
+    if (G.tut) {
+      if (G.tut.closed || G.tut.step >= TUT_STEPS.length) return null;
+      const step = TUT_STEPS[G.tut.step];
+      return step.at ? step.at() : null;
+    }
+    const now = currentTip();
+    return now && now.tip.at ? now.tip.at(now.hit) : null;
+  } catch (error) { return null; }
 }
 
 const hasPage = () => typeof document !== 'undefined' && !!document.querySelectorAll;
@@ -6084,7 +6090,8 @@ function renderCoach() {
     const now = G && !G.over ? currentTip() : null;
     if (now) {
       tag = 'Tip';
-      say = now.tip.say(G.viewer, now.hit);
+      try { say = now.tip.say(G.viewer, now.hit); }
+      catch (error) { say = ''; }
       el = now.tip.el || null;
       actions = '<button class="act" data-act="tip-ok:' + now.tip.id + '">Got it</button>' +
         '<button class="skip" data-act="tips-off">Turn tips off</button>';
