@@ -203,8 +203,14 @@ remembered map, so the layout is explored rather than revealed. Enemies path to
 you with a breadth-first flow field instead of greedy steps, which means corners
 and dead ends actually matter.
 
-Floors one to four end at a staircase that restores a little health. Floor five
-holds **The Warden** and the Vault Core: stepping on the Core while the Warden
+Floors one to four end at a staircase landing: rest once to recover vitality, or
+open the stair-market and spend gold on flasks, blades, plate and extra vitality,
+buying as many as the purse allows. The stall keeps its plain goods at every
+landing and adds stronger, dearer stock the deeper you are — a greater draught
+from the second landing, a runed whetstone from the third, a warded aegis from
+the fourth. Then choose the way down — a sheltered
+passage recovers more health, an unquiet one carries more enemies and treasure.
+Floor five holds **The Warden** and the Vault Core: stepping on the Core while the Warden
 lives only tells you it is sealed, so the boss cannot be skipped. Score combines
 gold, kills, depth, and a clear bonus, and the best descent is saved locally and
 submitted to the shared leaderboard like every other game.

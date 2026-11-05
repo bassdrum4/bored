@@ -168,6 +168,40 @@ canvas { display:block; image-rendering:auto; touch-action:none; }
 .route-choices small { display:block; font-size:10px; font-family:ui-monospace,monospace; font-weight:400;
   letter-spacing:0; text-transform:none; margin-top:5px; color:var(--muted); }
 .route-choices .btn:hover small { color:inherit; }
+.landing-meta {
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  font-size:10px; letter-spacing:.16em; color:var(--muted); text-transform:uppercase;
+}
+.landing-meta b { font-family:'Rajdhani',sans-serif; font-size:14px; letter-spacing:.04em; color:var(--gold); }
+
+/* ── Stair-market ── */
+.shop-gold { font-size:10px; letter-spacing:.18em; color:var(--muted); text-transform:uppercase; }
+.shop-gold b { font-family:'Rajdhani',sans-serif; font-size:18px; letter-spacing:.03em; color:var(--gold); }
+.shop-list { display:flex; flex-direction:column; gap:6px; width:100%; max-width:440px; }
+.shop-item {
+  display:flex; align-items:center; gap:10px;
+  border:1px solid var(--line); border-radius:4px;
+  background:rgba(16,23,36,.72); padding:7px 9px; text-align:left;
+}
+.shop-item[hidden] { display:none; }
+.shop-copy { flex:1 1 auto; min-width:0; }
+.shop-name {
+  display:block; font-family:'Rajdhani',sans-serif; font-weight:700;
+  font-size:12.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--text);
+}
+.shop-desc { display:block; font-size:10px; line-height:1.45; color:var(--muted); margin-top:1px; }
+.shop-item .buy {
+  flex:0 0 auto; font-family:'Rajdhani',sans-serif; font-weight:700;
+  font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  padding:6px 10px; border-radius:4px; cursor:pointer;
+  border:1px solid var(--acc-dim); background:rgba(94,234,212,.1); color:var(--acc);
+}
+.shop-item .buy:hover { background:var(--acc); color:#04100e; }
+.shop-item .buy b { color:var(--gold); font-weight:700; }
+.shop-item .buy:hover b { color:#3d2a05; }
+.shop-item .buy[disabled] { opacity:.4; cursor:default; }
+.shop-item .buy[disabled]:hover { background:rgba(94,234,212,.1); color:var(--acc); }
+.shop-item .buy[disabled]:hover b { color:var(--gold); }
 
 /* ── End screen ── */
 .endword {
@@ -308,8 +342,19 @@ textarea.result[hidden] { display:none; }
 
     <div class="overlay" id="routes" hidden role="dialog" aria-modal="true" aria-labelledby="routesTitle">
       <div class="kicker">At the staircase</div>
-      <div class="endword" id="routesTitle">THE WAY SPLITS</div>
-      <p class="blurb">Choose your next descent. Safer passages preserve your strength; dangerous ones hold more treasure.</p>
+      <div class="endword" id="routesTitle">THE LANDING</div>
+      <p class="blurb">Catch your breath or spend what you have carried, then choose the way down.</p>
+      <div class="landing-meta">
+        <span><b id="landGold">0</b> gold</span><span>·</span><span><b id="landHp">20/20</b> vitality</span>
+      </div>
+      <div class="route-choices">
+        <button class="btn" id="btnRest" type="button">Rest
+          <small>Recover 6 vitality · once per landing</small>
+        </button>
+        <button class="btn" id="btnShop" type="button">Open the shop
+          <small>Spend gold on flasks and gear · better stock deeper down</small>
+        </button>
+      </div>
       <div class="route-choices">
         <button class="btn" id="btnSafeRoute" type="button">1 · Sheltered path
           <small>Recover 6 HP · 1 fewer enemy and gold cache</small>
@@ -319,6 +364,15 @@ textarea.result[hidden] { display:none; }
         </button>
       </div>
       <button class="btn ghost small" id="btnCancelRoute" type="button">Back to dungeon · Esc</button>
+    </div>
+
+    <div class="overlay" id="shop" hidden role="dialog" aria-modal="true" aria-labelledby="shopTitle">
+      <div class="kicker">The stair-market</div>
+      <div class="endword" id="shopTitle">COIN &amp; CINDER</div>
+      <p class="blurb">A hooded trader waits on the landing. Buy one thing or twenty, as long as the purse holds — and the deeper you come, the stronger the stock.</p>
+      <div class="shop-gold">Gold <b id="shopGold">0</b></div>
+      <div class="shop-list" id="shopList"></div>
+      <button class="btn ghost small" id="btnShopBack" type="button">Back to the landing · Esc</button>
     </div>
 
     <div class="overlay" id="end" hidden>
@@ -446,7 +500,9 @@ textarea.result[hidden] { display:none; }
   const state = {
     mode: 'daily', seed: '', seedCode: '',
     depth: 1, hp: 20, maxHp: 20, atk: 3, def: 0,
-    gold: 0, potions: 1, kills: 0, turns: 0,
+    gold: 0, earned: 0, potions: 1, kills: 0, turns: 0,
+    rested: false, shopping: false,
+    shopBought: { flask: 0, atk: 0, def: 0, hp: 0, hp2: 0, atk2: 0, def2: 0 },
     alive: true, won: false, running: false,
     hurt: 0, shake: 0, flash: 0,
     face: { x: 0, y: 1 }, lunge: { x: 0, y: 0, t: 0 },
@@ -711,7 +767,9 @@ textarea.result[hidden] { display:none; }
   // Only earned progress counts. Turns include waiting and backtracking and
   // must never generate points; keep a minimum of 1 for completed attempts.
   function liveScore() {
-    return Math.max(1, Math.round(state.gold + state.kills * 12 + (state.depth - 1) * 200));
+    // Gold spent in the stair-market still counts as earned progress.
+    const earned = Number.isFinite(state.earned) ? state.earned : state.gold;
+    return Math.max(1, Math.round(earned + state.kills * 12 + (state.depth - 1) * 200));
   }
   function updateHUD() {
     const pct = Math.max(0, state.hp) / state.maxHp * 100;
@@ -730,7 +788,7 @@ textarea.result[hidden] { display:none; }
     const btn = $('btnStairs');
     btn.disabled = !onStairs;
     btn.classList.toggle('ready', onStairs);
-    btn.textContent = state.depth >= FLOORS ? (wardenAlive() ? 'Sealed' : 'Claim') : 'Choose path';
+    btn.textContent = state.depth >= FLOORS ? (wardenAlive() ? 'Sealed' : 'Claim') : 'Stairway';
     btn.disabled = !onStairs || state.choosingRoute || (state.depth >= FLOORS && wardenAlive());
   }
 
@@ -780,6 +838,7 @@ textarea.result[hidden] { display:none; }
     if (enemy.hp <= 0) {
       state.kills++;
       state.gold += TYPES[enemy.type].gold;
+      state.earned += TYPES[enemy.type].gold;
       burst(enemy.x + 0.5, enemy.y + 0.5, TYPES[enemy.type].color, 16, 1.4);
       floatText(enemy.x, enemy.y - 0.2, '+' + TYPES[enemy.type].gold, '#f6c46a');
       sfx('kill');
@@ -819,6 +878,7 @@ textarea.result[hidden] { display:none; }
     if (!item) return;
     if (item.kind === 'gold') {
       state.gold += item.value;
+      state.earned += item.value;
       floatText(px, py - 0.2, '+' + item.value, '#f6c46a');
       burst(px + 0.5, py + 0.5, '#f6c46a', 5, 0.7);
       items = items.filter(it => it !== item);
@@ -853,7 +913,7 @@ textarea.result[hidden] { display:none; }
   }
 
   function usePotion() {
-    if (!state.running || !state.alive || state.choosingRoute) return;
+    if (!state.running || !state.alive || state.choosingRoute || state.shopping) return;
     if (state.potions <= 0) { sfx('deny'); log('No flasks left.', 'bad'); return; }
     if (state.hp >= state.maxHp) { sfx('deny'); log('You are already whole.', ''); return; }
     state.potions--;
@@ -864,6 +924,176 @@ textarea.result[hidden] { display:none; }
     log('You drink. Warmth returns.', 'good');
     state.turns++;
     afterTurn();
+  }
+
+  /* ─────────────────────────── landing: rest & shop ─────────────────────────── */
+  // The stall grows with the descent: the four plain goods are always on the
+  // shelf, and each deeper landing adds stronger stock at a dearer price. Prices
+  // also climb with how much of that upgrade you already own, so a deep purse
+  // buys a lot without trivialising the run.
+  const SHOP_ITEMS = [
+    { id: 'flask', depth: 1, name: 'Emberlight flask', desc: 'One more flask. Q drinks it for 8 vitality.' },
+    { id: 'atk', depth: 1, name: 'Whetstone', desc: 'Attack +1, stacking with every stone you buy.' },
+    { id: 'def', depth: 1, name: 'Aegis plate', desc: 'Defence +1. Every point blunts enemy blows.' },
+    { id: 'hp', depth: 1, name: 'Vital draught', desc: 'Max vitality +4, and heals the 4 on the spot.' },
+    { id: 'hp2', depth: 2, name: 'Greater draught', desc: 'Max vitality +8, and heals the 8 on the spot.' },
+    { id: 'atk2', depth: 3, name: 'Runed whetstone', desc: 'Attack +2 from one stone. Dear, and worth it.' },
+    { id: 'def2', depth: 4, name: 'Warded aegis', desc: 'Defence +2 from one plate, for the Warden below.' }
+  ];
+  const SHOP_KEYS = ['1', '2', '3', '4', '5', '6', '7'];
+
+  function shopStock() {
+    return SHOP_ITEMS.filter(item => state.depth >= item.depth);
+  }
+
+  function shopPrice(id) {
+    const bought = state.shopBought || {};
+    if (id === 'flask') return 10 + state.depth * 2;
+    if (id === 'atk') return 34 + (bought.atk || 0) * 16;
+    if (id === 'def') return 28 + (bought.def || 0) * 14;
+    if (id === 'hp') return 24 + (bought.hp || 0) * 12;
+    if (id === 'hp2') return 58 + (bought.hp2 || 0) * 26;
+    if (id === 'atk2') return 72 + (bought.atk2 || 0) * 30;
+    if (id === 'def2') return 64 + (bought.def2 || 0) * 28;
+    return Infinity;
+  }
+
+  function buildShop() {
+    const list = $('shopList');
+    if (!list) return;
+    list.replaceChildren();
+    for (const item of SHOP_ITEMS) {
+      const row = document.createElement('div');
+      row.className = 'shop-item';
+      row.dataset.item = item.id;
+      row.hidden = true; // shown by updateShop when this landing carries it
+      const copy = document.createElement('div');
+      copy.className = 'shop-copy';
+      const name = document.createElement('span');
+      name.className = 'shop-name';
+      name.textContent = item.name;
+      const desc = document.createElement('span');
+      desc.className = 'shop-desc';
+      desc.textContent = item.desc;
+      copy.append(name, desc);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'buy';
+      button.dataset.buy = item.id;
+      button.append('Buy ');
+      const price = document.createElement('b');
+      button.append(price);
+      row.append(copy, button);
+      list.append(row);
+    }
+  }
+
+  function updateLanding() {
+    $('landGold').textContent = state.gold;
+    $('landHp').textContent = Math.max(0, state.hp) + '/' + state.maxHp;
+    $('btnRest').disabled = state.rested === true || state.hp >= state.maxHp;
+  }
+
+  function updateShop() {
+    const list = $('shopList');
+    if (!list) return;
+    $('shopGold').textContent = state.gold;
+    const stock = shopStock();
+    for (const item of SHOP_ITEMS) {
+      const button = list.querySelector('[data-buy="' + item.id + '"]');
+      if (!button) continue;
+      const row = button.closest('.shop-item');
+      const inStock = stock.includes(item);
+      if (row) row.hidden = !inStock;
+      const price = shopPrice(item.id);
+      button.querySelector('b').textContent = price;
+      button.disabled = !inStock || !state.running || state.gold < price;
+      button.setAttribute('aria-label', item.name + ' · ' + price + ' gold');
+    }
+  }
+
+  function restAtLanding() {
+    if (!state.running || !state.alive || !state.choosingRoute || state.shopping) return false;
+    if (state.rested) { sfx('deny'); log('You have already rested on these steps.', ''); return false; }
+    if (state.hp >= state.maxHp) { sfx('deny'); log('You are already whole.', ''); return false; }
+    state.rested = true;
+    state.hp = Math.min(state.maxHp, state.hp + 6);
+    burst(px + 0.5, py + 0.5, '#7ee787', 8, 0.7);
+    sfx('potion');
+    log('You rest against the stairwell. +6 vitality.', 'good');
+    updateLanding();
+    updateHUD();
+    return true;
+  }
+
+  function openShop() {
+    if (!state.running || !state.alive || !state.choosingRoute || state.shopping) return;
+    state.shopping = true;
+    $('routes').hidden = true;
+    $('shop').hidden = false;
+    updateShop();
+    const stock = shopStock();
+    const first = stock.length ? $('shopList').querySelector('[data-buy="' + stock[0].id + '"]') : null;
+    if (first) first.focus();
+  }
+
+  function closeShop() {
+    if (!state.shopping) return;
+    state.shopping = false;
+    $('shop').hidden = true;
+    $('routes').hidden = false;
+    updateLanding();
+    $('btnShop').focus();
+  }
+
+  function buy(id) {
+    if (!state.running || !state.alive || !state.choosingRoute || !state.shopping) return false;
+    if (!shopStock().some(item => item.id === id)) return false;
+    const price = shopPrice(id);
+    if (state.gold < price) {
+      sfx('deny');
+      log('Not enough gold for that.', 'bad');
+      updateShop(); // keep the stall honest about what the purse can cover
+      return false;
+    }
+    if (!state.shopBought) state.shopBought = { flask: 0, atk: 0, def: 0, hp: 0, hp2: 0, atk2: 0, def2: 0 };
+    state.gold -= price;
+    state.shopBought[id] = (state.shopBought[id] || 0) + 1;
+    if (id === 'flask') {
+      state.potions++;
+      sfx('potion');
+      log('Bought an emberlight flask.', 'good');
+    } else if (id === 'atk') {
+      state.atk++;
+      sfx('sword');
+      log('The whetstone bites. Attack +1.', 'good');
+    } else if (id === 'def') {
+      state.def++;
+      sfx('sword');
+      log('Aegis plate clicks shut. Defence +1.', 'good');
+    } else if (id === 'hp') {
+      state.maxHp += 4;
+      state.hp = Math.min(state.maxHp, state.hp + 4);
+      sfx('potion');
+      log('A vital draught. Max vitality +4.', 'good');
+    } else if (id === 'hp2') {
+      state.maxHp += 8;
+      state.hp = Math.min(state.maxHp, state.hp + 8);
+      sfx('potion');
+      log('A greater draught. Max vitality +8.', 'good');
+    } else if (id === 'atk2') {
+      state.atk += 2;
+      sfx('sword');
+      log('The runed whetstone bites. Attack +2.', 'good');
+    } else if (id === 'def2') {
+      state.def += 2;
+      sfx('sword');
+      log('The warded aegis clicks shut. Defence +2.', 'good');
+    }
+    updateShop();
+    updateLanding();
+    updateHUD();
+    return true;
   }
 
   function afterTurn() {
@@ -952,7 +1182,7 @@ textarea.result[hidden] { display:none; }
 
   /* ─────────────────────────── actions ─────────────────────────── */
   function move(dx, dy) {
-    if (!state.running || !state.alive || state.choosingRoute) return;
+    if (!state.running || !state.alive || state.choosingRoute || state.shopping) return;
     state.face = { x: dx, y: dy };
     const nx = px + dx, ny = py + dy;
     if (wallAt(nx, ny)) { bump(); sfx('deny'); return; }
@@ -968,12 +1198,12 @@ textarea.result[hidden] { display:none; }
     afterTurn();
   }
   function waitTurn() {
-    if (!state.running || !state.alive || state.choosingRoute) return;
+    if (!state.running || !state.alive || state.choosingRoute || state.shopping) return;
     state.turns++;
     afterTurn();
   }
   function useStairs() {
-    if (!state.running || !state.alive || state.choosingRoute) return;
+    if (!state.running || !state.alive || state.choosingRoute || state.shopping) return;
     if (px !== stairs.x || py !== stairs.y) { sfx('deny'); log('No stairs beneath you.', ''); return; }
     if (state.depth >= FLOORS) {
       if (wardenAlive()) { sfx('deny'); log('The Warden must fall first.', 'bad'); return; }
@@ -981,23 +1211,28 @@ textarea.result[hidden] { display:none; }
       return;
     }
     state.choosingRoute = true;
+    state.rested = false;
     $('routes').hidden = false;
+    updateLanding();
     updateHUD();
-    $('btnSafeRoute').focus();
+    $('btnRest').focus();
   }
   function cancelRoute() {
-    if (!state.choosingRoute) return;
+    if (!state.choosingRoute || state.shopping) return;
     state.choosingRoute = false;
     $('routes').hidden = true;
     updateHUD();
     $('btnStairs').focus();
   }
   function chooseRoute(route) {
-    if (!state.running || !state.alive || !state.choosingRoute ||
+    if (!state.running || !state.alive || !state.choosingRoute || state.shopping ||
         (route !== 'safe' && route !== 'risky')) return;
     const profile = routeProfile(route);
     state.choosingRoute = false;
+    state.shopping = false;
+    state.rested = false;
     $('routes').hidden = true;
+    $('shop').hidden = true;
     state.route = route;
     state.depth++;
     state.hp = Math.min(state.maxHp, state.hp + profile.heal);
@@ -1043,7 +1278,9 @@ textarea.result[hidden] { display:none; }
     rnd = mulberry32(hash(state.seed));
     Object.assign(state, {
       depth: 1, hp: 20, maxHp: 20, atk: 3, def: 0,
-      gold: 0, potions: 1, kills: 0, turns: 0,
+      gold: 0, earned: 0, potions: 1, kills: 0, turns: 0,
+      rested: false, shopping: false,
+      shopBought: { flask: 0, atk: 0, def: 0, hp: 0, hp2: 0, atk2: 0, def2: 0 },
       alive: true, won: false, running: true, finished: false, finalScore: 0,
       hurt: 0, shake: 0, sealed: false, cause: '', route: 'normal', choosingRoute: false
     });
@@ -1053,6 +1290,7 @@ textarea.result[hidden] { display:none; }
     view.y = clamp(py - VH / 2, 0, MAP_H - VH);
     $('title').hidden = true;
     $('routes').hidden = true;
+    $('shop').hidden = true;
     $('end').hidden = true;
     $('endResult').hidden = true;
     updateHUD();
@@ -1062,8 +1300,10 @@ textarea.result[hidden] { display:none; }
   }
   function finish(won) {
     state.choosingRoute = false;
+    state.shopping = false;
     if (window.__boredResume) window.__boredResume.clear();
     $('routes').hidden = true;
+    $('shop').hidden = true;
     state.won = won;
     state.running = false;
     const score = liveScore() + (won ? 1500 : 0);
@@ -1136,13 +1376,21 @@ textarea.result[hidden] { display:none; }
   addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const key = e.key.toLowerCase();
+    if (state.shopping) {
+      // Number keys buy from the market; nothing here costs a turn.
+      const slot = SHOP_KEYS.indexOf(key);
+      const stock = shopStock();
+      if (slot >= 0 && stock[slot]) { e.preventDefault(); buy(stock[slot].id); }
+      else if (key === 'escape') { e.preventDefault(); closeShop(); }
+      return;
+    }
     if (state.choosingRoute) {
-      if (key === '1' || key === '2' || key === 'escape') {
-        e.preventDefault();
-        if (key === 'escape') cancelRoute();
-        else chooseRoute(key === '1' ? 'safe' : 'risky');
-      }
-      return; // Moving or waiting must not advance turns under the route dialog.
+      if (key === 'escape') { e.preventDefault(); cancelRoute(); }
+      else if (key === '1') { e.preventDefault(); chooseRoute('safe'); }
+      else if (key === '2') { e.preventDefault(); chooseRoute('risky'); }
+      else if (key === 'r') { e.preventDefault(); restAtLanding(); }
+      else if (key === 'b' || key === '3') { e.preventDefault(); openShop(); }
+      return; // Moving or waiting must not advance turns under the landing dialog.
     }
     if (KEY_MOVE[key]) {
       e.preventDefault();
@@ -1166,6 +1414,13 @@ textarea.result[hidden] { display:none; }
   $('btnMute').onclick = toggleMute;
   $('btnPotion').onclick = usePotion;
   $('btnStairs').onclick = useStairs;
+  $('btnRest').onclick = restAtLanding;
+  $('btnShop').onclick = openShop;
+  $('btnShopBack').onclick = closeShop;
+  $('shopList').addEventListener('click', e => {
+    const button = e.target.closest('[data-buy]');
+    if (button) buy(button.dataset.buy);
+  });
   $('btnSafeRoute').onclick = () => chooseRoute('safe');
   $('btnRiskyRoute').onclick = () => chooseRoute('risky');
   $('btnCancelRoute').onclick = cancelRoute;
@@ -1755,6 +2010,8 @@ textarea.result[hidden] { display:none; }
   view.x = clamp(px - VW / 2, 0, MAP_W - VW);
   view.y = clamp(py - VH / 2, 0, MAP_H - VH);
   updateHUD();
+  buildShop();
+  updateShop();
   showTitleMeta();
   fit();
   setTimeout(fit, 60);
@@ -1786,8 +2043,10 @@ textarea.result[hidden] { display:none; }
     if (!run || !run.game || !Array.isArray(run.map) || run.map.length !== MAP_W * MAP_H) return false;
     Object.assign(state, run.game, {
       running: true, finished: false, won: false, alive: true,
-      hurt: 0, shake: 0, flash: 0, choosingRoute: false
+      hurt: 0, shake: 0, flash: 0, choosingRoute: false, shopping: false
     });
+    if (!Number.isFinite(state.earned)) state.earned = Number(state.gold) || 0;
+    if (!state.shopBought) state.shopBought = { flask: 0, atk: 0, def: 0, hp: 0, hp2: 0, atk2: 0, def2: 0 };
     map = Uint8Array.from(run.map);
     seen = Uint8Array.from(run.seen || []);
     vis = Uint8Array.from(run.vis || []);
@@ -1802,6 +2061,7 @@ textarea.result[hidden] { display:none; }
     view.y = clamp(py - VH / 2, 0, MAP_H - VH);
     $('title').hidden = true;
     $('routes').hidden = true;
+    $('shop').hidden = true;
     $('end').hidden = true;
     $('endResult').hidden = true;
     updateHUD();
@@ -1835,6 +2095,7 @@ textarea.result[hidden] { display:none; }
     start: newRun,
     finish,
     move, useStairs, chooseRoute, cancelRoute, usePotion, waitTurn, computeFOV, fit,
+    restAtLanding, openShop, closeShop, buy, shopPrice, shopStock,
     setPos(x, y) { px = x; py = y; computeFOV(); updateHUD(); },
     score: liveScore
   };

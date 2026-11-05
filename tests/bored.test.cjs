@@ -794,6 +794,112 @@ test('browser regressions', async t => {
 
     await frame.evaluate(() => __deep.start('daily', 'route-regression-seed'));
     assert.equal(await frame.evaluate(() => __deep.state.route), 'normal', 'a new run clears previous route modifiers');
+
+    // The landing heals once, and the stair-market sells as much as the gold allows.
+    const landing = await frame.evaluate(() => {
+      __deep.start('random', 'shop-regression-seed');
+      Object.assign(__deep.state, { hp: 4, gold: 200, potions: 1 });
+      __deep.setPos(__deep.stairs.x, __deep.stairs.y);
+      __deep.useStairs();
+      const rest = __deep.restAtLanding();
+      const healed = __deep.state.hp;
+      const restedAgain = __deep.restAtLanding();
+      __deep.openShop();
+      const shopOpen = !document.querySelector('#shop').hidden && document.querySelector('#routes').hidden;
+      const firstPrice = __deep.shopPrice('atk');
+      const bought = [__deep.buy('atk'), __deep.buy('atk')];
+      const atk = __deep.state.atk;
+      const secondPrice = __deep.shopPrice('atk');
+      const boughtFlask = __deep.buy('flask');
+      const goldAfter = __deep.state.gold;
+      __deep.state.gold = 0;
+      const broke = __deep.buy('atk');
+      const brokeDisabled = document.querySelector('[data-buy="atk"]').disabled;
+      __deep.state.gold = 500;
+      const many = [1, 2, 3].map(() => __deep.buy('flask')).every(Boolean);
+      __deep.closeShop();
+      const closed = document.querySelector('#shop').hidden && !document.querySelector('#routes').hidden;
+      const potions = __deep.state.potions;
+      __deep.cancelRoute();
+      return { rest, healed, restedAgain, shopOpen, firstPrice, bought, atk, secondPrice,
+        boughtFlask, goldAfter, broke, brokeDisabled, many, closed, potions, gold: __deep.state.gold };
+    });
+    assert.equal(landing.rest, true, 'resting at the landing heals');
+    assert.equal(landing.healed, 10, 'a rest recovers 6 vitality');
+    assert.equal(landing.restedAgain, false, 'the landing only lets you rest once');
+    assert.equal(landing.shopOpen, true, 'the shop opens from the landing');
+    assert.deepEqual(landing.bought, [true, true], 'the shop sells the same upgrade again and again');
+    assert.equal(landing.atk, 5, 'two whetstones raise attack by two');
+    assert.ok(landing.secondPrice > landing.firstPrice, 'stacked upgrades cost more');
+    assert.equal(landing.boughtFlask, true, 'flasks are for sale');
+    assert.equal(landing.broke, false, 'the shop refuses a purchase the purse cannot cover');
+    assert.equal(landing.brokeDisabled, true, 'unaffordable goods are disabled');
+    assert.equal(landing.many, true, 'as many purchases as the gold allows');
+    assert.equal(landing.potions, 5, 'every flask bought lands in the pack');
+    assert.equal(landing.goldAfter, 104, 'the first flask is taken out of the purse');
+    assert.equal(landing.gold, 464, 'three more flasks cost their posted price');
+    assert.equal(landing.closed, true, 'leaving the shop returns to the landing');
+
+    // Deeper landings carry stronger, dearer stock than the first-floor stall.
+    const stock = await frame.evaluate(() => {
+      __deep.start('random', 'deep-stock-seed');
+      Object.assign(__deep.state, { gold: 400, hp: 6, maxHp: 20 });
+      __deep.setPos(__deep.stairs.x, __deep.stairs.y);
+      __deep.useStairs();
+      const shelf = () => [...document.querySelectorAll('#shopList .shop-item')]
+        .filter(row => !row.hidden)
+        .map(row => row.querySelector('[data-buy]').dataset.buy);
+      const atDepth = depth => {
+        __deep.state.depth = depth;
+        __deep.openShop();
+        const ids = shelf();
+        __deep.closeShop();
+        return ids;
+      };
+      const first = atDepth(1);
+      const second = atDepth(2);
+      const third = atDepth(3);
+      const fourth = atDepth(4);
+      __deep.state.depth = 1;
+      __deep.openShop();
+      const shallowRefusal = __deep.buy('atk2');
+      __deep.closeShop();
+      const baseAtk = __deep.shopPrice('atk');
+      const baseHp = __deep.shopPrice('hp');
+      const baseDef = __deep.shopPrice('def');
+      __deep.state.depth = 3;
+      __deep.state.gold = 400;
+      __deep.openShop();
+      const deepAtk = __deep.shopPrice('atk2');
+      const deepBought = __deep.buy('atk2');
+      const attack = __deep.state.atk;
+      __deep.closeShop();
+      __deep.state.depth = 2;
+      __deep.state.gold = 400;
+      __deep.openShop();
+      const deepHp = __deep.shopPrice('hp2');
+      const draughtBought = __deep.buy('hp2');
+      const maxHp = __deep.state.maxHp;
+      __deep.closeShop();
+      const deepDef = __deep.shopPrice('def2');
+      __deep.cancelRoute();
+      return { first, second, third, fourth, shallowRefusal, baseAtk, baseHp, baseDef,
+        deepAtk, deepBought, attack, deepHp, draughtBought, maxHp, deepDef };
+    });
+    assert.deepEqual(stock.first, ['flask', 'atk', 'def', 'hp'], 'a first-floor stall sells the plain four');
+    assert.deepEqual(stock.second, ['flask', 'atk', 'def', 'hp', 'hp2'], 'the second landing adds a greater draught');
+    assert.deepEqual(stock.third.slice(-1), ['atk2'], 'the third landing adds a runed whetstone');
+    assert.deepEqual(stock.fourth.slice(-1), ['def2'], 'the fourth landing adds a warded aegis');
+    assert.equal(stock.fourth.length, stock.first.length + 3, 'deeper landings stock more goods');
+    assert.equal(stock.shallowRefusal, false, 'deeper stock cannot be bought from a shallow landing');
+    assert.equal(stock.deepBought, true, 'the runed whetstone sells at depth three');
+    assert.equal(stock.attack, 5, 'the runed whetstone raises attack by two');
+    assert.ok(stock.deepAtk > stock.baseAtk, 'the runed whetstone costs more than a plain one');
+    assert.equal(stock.draughtBought, true, 'the greater draught sells at depth two');
+    assert.equal(stock.maxHp, 28, 'the greater draught raises the cap by eight');
+    assert.ok(stock.deepHp > stock.baseHp, 'the greater draught costs more than the vital draught');
+    assert.ok(stock.deepDef > stock.baseDef, 'the warded aegis costs more than an aegis plate');
+    assert.deepEqual(await frame.evaluate(() => __deep.shopStock().map(item => item.id)), ['flask', 'atk', 'def', 'hp']);
     let depth = 1;
     while (depth < 5) {
       const route = depth % 2 ? 'safe' : 'risky';
