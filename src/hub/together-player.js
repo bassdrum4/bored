@@ -9,9 +9,11 @@ export const TOGETHER_ADAPTERS = Object.freeze({
   '8ball': { rulesVersion: 1, action: 'pool_move', mode: 'turns', engine: 'pool-engine.js' },
   // Tanks stores its seed and the shots fired; both clients replay them through
   // the same rules file, so the move on the wire is an angle, not a result.
-  'tank2': { rulesVersion: 2, action: 'move', mode: 'turns', engine: 'tank-engine.js' },
+  'tank2': { rulesVersion: 3, action: 'move', mode: 'turns' },
   '2048': { rulesVersion: 1, action: 'submit_run', mode: 'duel', metric: 'score' },
-  mahjong: { rulesVersion: 1, action: 'submit_run', mode: 'duel', metric: 'pairs' }
+  mahjong: { rulesVersion: 1, action: 'submit_run', mode: 'duel', metric: 'pairs' },
+  // A campaign is handed over turn by turn; the board travels with the move.
+  ashcrown: { rulesVersion: 1, action: 'move', mode: 'turns' }
 });
 
 // Serialized into the ORIGINAL document before its script runs. No tokens,

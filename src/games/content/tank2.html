@@ -676,6 +676,7 @@ function setup(mode='solo',seed=null){
  window.tank2=game;makeTexture();updateHUD();resize();
 }
 function humanInput(dt){if(!game||game.phase!=='aim'||!game.isHuman())return;
+ if(online&&game.turn!==onlineSeat-1)return;
  const t=game.active(),isRed=t.id===0;
  // Red A / D adjust the barrel up / down. Green arrows track their
  // screen directions: left aims more left (angle ↑), right aims more right.
@@ -708,10 +709,74 @@ window.addEventListener('resize',resize);
 let hudTime=0;
 function frame(ms){const now=ms/1000,dt=lastTime?Math.min(.045,now-lastTime):0;lastTime=now;accumulator=Math.min(.1,accumulator+dt);
  let ticks=0;while(accumulator>=STEP&&ticks++<10){humanInput(STEP);if(game)game.tick(STEP);if(uiHitCooldown>0)uiHitCooldown=Math.max(0,uiHitCooldown-STEP);accumulator-=STEP}
+ if(game&&onlineShot&&!onlineSent)onlineFinish();
  if(game){resize();drawWorld(now);hudTime+=dt;if(hudTime>.08){updateHUD();hudTime=0}}
  requestAnimationFrame(frame)
 }
-setup();requestAnimationFrame(frame);
+
+/* ── Bored Together ─────────────────────────────────────────────────────────
+ * The live engine plays the match. The server keeps the seed and each exact
+ * shot (aim, power, weapon, launch point, random state, wind); both clients
+ * rebuild the same battle from that list, so neither side is watching a copy.
+ */
+const online = (() => { try { return window.__boredTogether || null; } catch (error) { return null; } })();
+let onlineSeat = 0, onlineShot = null, onlineSent = false;
+function replayShot(shot) {
+  const id = Number(shot.seat) - 1, t = game && game.tanks[id];
+  if (!t) return;
+  const at = shot.at || {};
+  if (Number.isFinite(Number(at.x)) && Number.isFinite(Number(at.y))) {
+    t.x = Number(at.x); t.y = Number(at.y); t.attach = at.attach || 'ground';
+    t.vy = 0; t.grounded = t.attach !== 'air';
+  }
+  t.angle = clamp(Number(shot.angle) || t.angle, 0, 180);
+  t.power = clamp(Number(shot.power) || t.power, 25, 100);
+  if (WEAPONS[shot.weapon]) t.weapon = shot.weapon;
+  if (Number.isFinite(Number(shot.rng))) game.rng.state = Number(shot.rng);
+  game.wind = Number(shot.wind) || 0;
+  game.turn = id; game.phase = 'aim';
+  TankGame.prototype.shoot.call(game, id, t.weapon);
+  for (let guard = 0; guard < 20000 && game.phase !== 'aim' && game.phase !== 'gameover'; guard++) game.tick(STEP);
+}
+function onlineStart() {
+  const ctx = online.context || {}, state = ctx.state || {};
+  onlineSeat = Number(ctx.seat) || 1;
+  game = new TankGame((Number(state.seed) >>> 0) || 1, 'local', {
+    message: () => {}, sound: noiseSound, shake: v => { shake = Math.min(6, shake + v); }, escape: uiHit,
+    end: () => {}                       // the server owns the result, not this screen
+  });
+  const shots = Array.isArray(state.shots) ? state.shots : [];
+  for (const shot of shots) replayShot(shot);
+  game.turnNumber = shots.length + 1;
+  game.turn = clamp((Number(state.turn) || 1) - 1, 0, 1);
+  game.winner = state.winner ? Number(state.winner) - 1 : null;
+  game.phase = state.winner ? 'gameover' : 'aim';
+  const fire = game.shoot.bind(game), pick = game.selectWeapon.bind(game);
+  game.shoot = (id = game.turn, kind = null) => {
+    if (game.turn !== onlineSeat - 1 || game.phase !== 'aim') return false;
+    if (!fire(id, kind)) return false;
+    const action = game.actions[game.actions.length - 1];
+    onlineShot = { seat: onlineSeat, angle: action.angle, power: action.power, weapon: action.weapon,
+      at: action.launchPosition, rng: action.randomState, wind: action.wind };
+    return true;
+  };
+  game.selectWeapon = kind => (game.turn === onlineSeat - 1 ? pick(kind) : false);
+  $('soloBtn').disabled = $('twoBtn').disabled = true;
+  window.tank2 = game; makeTexture(); updateHUD(); resize();
+}
+// One shell per turn: send it once it has landed, then hand the turn over.
+function onlineFinish() {
+  if (!onlineShot || onlineSent || !game) return;
+  if (game.phase !== 'aim' && game.phase !== 'gameover') return;
+  if (game.projectiles.length) return;
+  onlineSent = true;
+  const won = game.phase === 'gameover' && game.winner != null ? game.winner + 1 : null;
+  online.submit({ ...onlineShot, won }).then(() => online.finishTurn()).catch(error => {
+    onlineSent = false; online.error(error, onlineFinish);
+  });
+}
+
+if(online)onlineStart();else setup();requestAnimationFrame(frame);
 // -- BROWSER END --
 </script>
 </body>

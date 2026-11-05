@@ -22,8 +22,9 @@
     <nav class="site-nav" aria-label="Main navigation">
       <a id="home-nav" class="nav-link" href="#home">Home</a>
       <a id="library-nav" class="nav-link" href="#library">All Games</a>
-      <a id="leaderboard-nav" class="nav-link" href="#leaderboard">Leaderboards</a>
+      <a id="leaderboard-nav" class="nav-link" href="#leaderboard">Leaderboard</a>
       <a id="together-nav" class="nav-link" href="#together">Bored Together <span id="together-badge" class="badge" hidden></span></a>
+      <a id="changelog-nav" class="nav-link" href="./changelog.html">Changelog</a>
       <a id="settings-nav" class="nav-link" href="#settings">Settings</a>
     </nav></div>
     <p class="sub"><b id="count"></b> things to play &middot; in your browser </p>
@@ -73,8 +74,6 @@
   </section>
   <section id="library" aria-labelledby="library-heading" tabindex="-1">
     <div class="section-heading"><div><p class="eyebrow">03 / The whole collection</p><h2 id="library-heading">All Games<span class="wordmark-dot">.</span></h2></div><span id="library-count" class="section-aside"></span></div>
-    <nav id="collections" aria-label="Discovery collections"></nav>
-    <p id="collection-note" class="section-note"></p>
   <div class="tools">
     <div class="search-row">
       <label class="sr-only" for="q">Search the game library</label><input id="q" type="search" placeholder="Search games. Try &quot;chess&quot; or &quot;puzzle&quot;" autocomplete="off" aria-label="Find a game or a category" aria-controls="grid">
@@ -151,7 +150,7 @@
       </aside>
     </div>
   </section>
-  <footer class="foot"><span>have fun. stay a while.</span><span><a href="./analytics.html">Admin analytics</a> · <a href="./changelog.html">Changelog</a> · <span id="foot-count"></span></span></footer>
+  <footer class="foot"><span>have fun. stay a while.</span><span><a id="admin-analytics-link" href="./analytics.html" hidden>Admin analytics · </a><span id="foot-count"></span></span></footer>
 </main>
 
 <dialog id="announcement-dialog" class="announcements-dialog" aria-labelledby="announcement-heading">
@@ -237,7 +236,7 @@
       <button id="resume" type="button" role="menuitem"><span>Resume</span></button>
       <button id="restart" type="button" role="menuitem" aria-label="Restart current game"><span>Restart</span><kbd>Shift+R</kbd></button>
       <button id="back" type="button" role="menuitem"><span>&#8249; All games</span></button>
-      <p class="menu-note">Esc closes this menu. Press Esc again to leave.</p>
+      <p class="menu-note">Esc closes this menu. Press Esc again to go home.</p>
     </div>
   </div>
   <div id="hint" role="status">Click the game to control it</div>
@@ -248,6 +247,7 @@
   </div>
   <iframe id="frame" title="game" allow="autoplay; fullscreen; gamepad; clipboard-write; encrypted-media; picture-in-picture"></iframe>
 </div>
+<script type="module" src="./hub/watchdog.js"></script>
 <script type="module" src="./main.js"></script>
 </body>
 </html>

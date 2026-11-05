@@ -6,7 +6,12 @@
 <meta name="description" content="Every change the Bored arcade has been given, newest first.">
 <meta name="theme-color" content="#f5f2ea">
 <title>Changelog · Bored</title>
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
 <link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./hub/paper-layout.css">
 <link rel="stylesheet" href="./changelog.css">
 </head>
 <body>
@@ -15,9 +20,17 @@
 <main id="hub">
   <header class="masthead">
     <div class="masthead-top"><h1><a class="wordmark-home" href="./index.html">Bored<span class="wordmark-dot">.</span></a></h1>
-    <nav class="site-nav" aria-label="Sections"><a href="./index.html#daily">Daily</a><a href="./index.html#leaderboard">Leaderboard</a><a href="./index.html#library">Library</a><a href="./changelog.html" aria-current="page">Changelog</a></nav></div>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a class="nav-link" href="./index.html#home">Home</a>
+      <a class="nav-link" href="./index.html#library">All Games</a>
+      <a class="nav-link" href="./index.html#leaderboard">Leaderboard</a>
+      <a id="together-nav" class="nav-link" href="./index.html#together">Bored Together</a>
+      <a class="nav-link" href="./changelog.html" aria-current="page">Changelog</a>
+      <a class="nav-link" href="./index.html#settings">Settings</a>
+    </nav></div>
     <p class="sub"><b id="log-count"></b> changes to main &middot; newest first</p>
-    <p class="intro">A running history of updates to the arcade.</p>
+    <div class="intro-row"><svg class="bo" id="bo-intro" data-mood="bored" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><use href="./bo.svg#bored"/></svg>
+      <p class="intro">A running history of updates to the arcade.</p></div>
   </header>
 
   <section id="log-section" aria-labelledby="log-heading">
@@ -27,7 +40,7 @@
     <div id="log"></div>
   </section>
 
-  <footer class="foot"><span>have fun. stay a while.</span><a href="./index.html">Back to the games &#8599;</a></footer>
+  <footer class="foot"><span>have fun. stay a while.</span><span><a href="./index.html#library">Back to the games &#8599;</a></span></footer>
 </main>
 
 <script type="module" src="./changelog.js"></script>

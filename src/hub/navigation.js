@@ -69,5 +69,12 @@ export function createHubNavigation({ togetherUI, onLeaderboard }) {
       if (!PAGES.has(view)) setView('home');
     }
   }
-  return { setView, syncFromHash, navigate };
+  // Escape's destination: the hub's own page, without stacking another history
+  // entry for every press.
+  function goHome() {
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+    setView('home', { scroll: true });
+  }
+
+  return { setView, syncFromHash, navigate, goHome };
 }

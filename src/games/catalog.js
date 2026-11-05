@@ -105,13 +105,13 @@ function deployVersion() {
  * cache stores the promise, so opening two games at once still downloads each
  * document exactly once, and a failed download is forgotten so a retry works.
  */
-export function loadGameDocument(slug, variant = '') {
+export function loadGameDocument(slug) {
   if (!PAYLOAD_SLUGS.includes(slug)) {
     return Promise.reject(new Error(slug + ' has no game document.'));
   }
-  // Preserve the existing version-2 shot replay for Bored Together matches.
-  // Solo/local Tank 2 uses a new, incompatible (by design) physics engine.
-  const payload = slug === 'tank2' && variant === 'together' ? 'tank2-online' : slug;
+  // Bored Together always opens the same document the library opens, so a game
+  // update reaches both. A per-mode copy is how players ended up on an old build.
+  const payload = slug;
   if (!payloads.has(payload)) {
     payloads.set(payload, deployVersion()
       .then(version => {
@@ -136,7 +136,8 @@ export function loadGameDocument(slug, variant = '') {
 export const TOGETHER_GAMES = Object.freeze({
   'connect-four': Object.freeze({ name: 'Connect Four', rulesVersion: 1, mode: 'turns', preview: 'connect-four', blurb: 'Seven columns. One good rivalry.' }),
   '8ball': Object.freeze({ name: '8 Ball Pool', rulesVersion: 1, mode: 'turns', preview: '8ball', blurb: 'Clear your group. Finish on the eight.' }),
-  tank2: Object.freeze({ name: 'Tank 2', rulesVersion: 2, mode: 'turns', preview: 'tank2', blurb: 'One breakable box, two tanks, and nowhere safe to hide.' }),
+  tank2: Object.freeze({ name: 'Tank 2', rulesVersion: 3, mode: 'turns', preview: 'tank2', blurb: 'One breakable box, two tanks, and nowhere safe to hide.' }),
+  ashcrown: Object.freeze({ name: 'Ashcrown', rulesVersion: 1, mode: 'turns', preview: 'ashcrown', blurb: 'One valley, two players, a turn each.' }),
   '2048': Object.freeze({ name: '2048', rulesVersion: 1, mode: 'duel', metric: 'score', unit: 'points', preview: '2048', blurb: 'Same board. Higher score wins.' }),
   mahjong: Object.freeze({ name: 'Mahjong', rulesVersion: 1, mode: 'duel', metric: 'pairs', unit: 'pairs', preview: 'mahjong', blurb: 'Same deal. Clear more pairs.' })
 });

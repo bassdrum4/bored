@@ -99,22 +99,18 @@ test('discovery keeps its controls and fits small screens', async t => {
     await page.setViewport({ width: 1366, height: 900 });
   });
 
-  await t.test('collections intersect with search and filters, and can be cleared', async () => {
-    for (const [id, predicate] of [
-      ['quick', 'quick'], ['friends', 'players'], ['relax', 'pace']
-    ]) {
-      await page.click('[data-collection="' + id + '"]');
-      assert.equal(await page.evaluate(() => document.activeElement.dataset.collection), id, 'collection keeps keyboard focus');
-      const actual = await page.$$eval('#grid .card', cards => cards.map(card => card.dataset.slug));
-      const expected = await page.evaluate(kind => ORDER.filter(([slug]) => kind === 'quick' ? DISCOVERY[slug].quick : kind === 'players' ? DISCOVERY[slug].players === '2 local' : DISCOVERY[slug].pace === 'Relaxing').map(([slug]) => slug), predicate);
-      assert.deepEqual(actual.sort(), expected.sort());
-    }
-    await page.click('[data-collection="friends"]');
+  await t.test('one filter row under the search box narrows the grid', async () => {
+    assert.equal(await page.$('#collections'), null, 'the duplicate row above the search box is gone');
+    assert.ok(await page.$('#filters'), 'the filter row below the search box stays');
     await page.click('[data-filter="Puzzle"]');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.filter), 'Puzzle', 'the filter keeps keyboard focus');
+    const actual = await page.$$eval('#grid .card', cards => cards.map(card => card.dataset.slug));
+    const expected = await page.evaluate(() => ORDER.filter(([slug]) => META[slug][0] === 'Puzzle').map(([slug]) => slug));
+    assert.deepEqual(actual.sort(), expected.sort());
+    await page.click('[data-filter="Favorites"]');
     assert.equal(await page.$$eval('#grid .card', cards => cards.length), 0);
     assert.equal(await page.$eval('#random', b => b.disabled), true);
     await page.evaluate(() => {
-      document.querySelector('[data-collection="all"]').click();
       document.querySelector('[data-filter="All"]').click();
       const q = document.querySelector('#q');
       q.value = '';
@@ -126,7 +122,6 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
     assert.ok(await page.$$eval('#grid .game-inputs', spans => spans.every(span => span.textContent.includes('Touch'))));
     await page.evaluate(() => {
-      document.querySelector('[data-collection="all"]').click();
       document.querySelector('[data-filter="All"]').click();
       const q = document.querySelector('#q');
       q.value = '';
@@ -154,13 +149,11 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.equal(await page.$$eval('#recent-list [data-slug="memory"]', nodes => nodes.length), 0);
   });
 
-  await t.test('Surprise Me honors collections and keeps online extras opt-in', async () => {
-    await page.click('[data-collection="friends"]');
+  await t.test('Surprise Me keeps online extras opt-in', async () => {
     await page.click('#random');
-    assert.equal(await page.evaluate(() => DISCOVERY[location.hash.slice(1)].players), '2 local');
+    assert.equal(await page.evaluate(() => !!EXTERNS[location.hash.slice(1)]), false, 'a random pick stays offline');
     await page.evaluate(() => closeGame());
     await page.evaluate(() => {
-      document.querySelector('[data-collection="all"]').click();
       document.querySelector('[data-filter="All"]').click();
       const q = document.querySelector('#q');
       q.value = '';
@@ -176,7 +169,6 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.equal(await page.evaluate(() => !!EXTERNS[location.hash.slice(1)]), true);
     await page.evaluate(() => closeGame());
     await page.evaluate(() => {
-      document.querySelector('[data-collection="all"]').click();
       document.querySelector('[data-filter="All"]').click();
       const q = document.querySelector('#q');
       q.value = '';
@@ -239,7 +231,7 @@ test('discovery keeps its controls and fits small screens', async t => {
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: path.join(shots, 'home-' + width + '.png'), fullPage: true });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow at ' + width);
-      const targets = await page.$$eval('#daily-play,#collections button,#filters button,#grid .star,#random', nodes => nodes.map(node => ({ label: node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })));
+      const targets = await page.$$eval('#daily-play,#filters button,#grid .star,#random', nodes => nodes.map(node => ({ label: node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })));
       assert.ok(targets.every(box => box.width >= 30 && box.height >= 30), 'usable control sizes at ' + width);
       const regions = await page.$$eval('#daily,#recent,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
       assert.ok(regions.every((region, index) => !index || region.top >= regions[index - 1].top + regions[index - 1].height), 'sections do not overlap');
@@ -315,6 +307,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
       const board = [...rows.map(row => ({ ...row, handle: 'tester' })), { game: 'lights-out', handle: 'rival', value: 9 }];
       return reply(board.filter(row => !url.searchParams.get('game') || url.searchParams.get('game') === 'eq.' + row.game));
     }
+    if (url.pathname === '/rest/v1/daily_leaderboard') return reply([]);
     if (url.pathname === '/rest/v1/feedback' && method === 'POST') { notes.push(JSON.parse(request.postData())); return reply(null); }
     if (url.pathname === '/auth/v1/logout') return reply(null);
     unexpected.push(method + ' ' + url.pathname);

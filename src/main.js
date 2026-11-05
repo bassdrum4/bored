@@ -78,7 +78,6 @@ let loadToken = 0;
 const dailyResults = new Map();
 
 let category = 'All';
-let collection = 'all';
 let visibleGames = [];
 let favorites = new Set();
 let recentGames = [];
@@ -97,7 +96,6 @@ let claimReturnFocus = null;
 // Main owns mutable state; view modules read/write through these accessors.
 const uiState = {
   get category() { return category; }, set category(v) { category = v; },
-  get collection() { return collection; }, set collection(v) { collection = v; },
   get visibleGames() { return visibleGames; }, set visibleGames(v) { visibleGames = v; },
   get favorites() { return favorites; }, set favorites(v) { favorites = v; },
   get recentGames() { return recentGames; }, set recentGames(v) { recentGames = v; },
@@ -124,7 +122,7 @@ function saveLibrary() {
   requestCloudPush();
 }
 
-const { previewFor, gameMeta, renderRecent, renderCollections, renderLibrary, showLibraryMessage } =
+const { previewFor, gameMeta, renderRecent, renderLibrary, showLibraryMessage } =
   createLibraryView({ state: uiState, openGame, saveLibrary });
 
 /* ── Player: opening, closing, restarting, fullscreen ─────────────────────── */
@@ -291,7 +289,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     // A blank white rectangle reads as "broken" while the document is in flight.
     gameFrame.srcdoc = native ? '' : frameStandIn('Loading ' + name + '…', 'Downloading the game.');
     if (native) paint(nativeHTML(slug));
-    else loadGameDocument(slug, multiplayer?.mode === 'turns' ? 'together' : '').then(paint).catch(fail);
+    else loadGameDocument(slug).then(paint).catch(fail);
   }
 
   playerPanel.hidden = false;
@@ -772,11 +770,9 @@ const { escapeHtml, frameStandIn, injectHead, injectSeed } = createGameDocument(
 searchInput.addEventListener('input', renderLibrary);
 $('#sort').addEventListener('change', renderLibrary);
 $('#favorites-all').onclick = () => {
-  collection = 'all';
   category = 'Favorites';
   searchInput.value = '';
   for (const button of $('#filters').children) button.setAttribute('aria-pressed', String(button.dataset.filter === 'Favorites'));
-  renderCollections();
   renderLibrary();
   $('#filters [data-filter="Favorites"]').focus();
 };
@@ -860,7 +856,10 @@ addEventListener('keydown', event => {
   if (event.key === 'Escape') {
     if (!menuPanel.hidden) { event.preventDefault(); closeMenu({ returnFocus: true }); }
     else if (fullscreenElement()) { event.preventDefault(); leaveFullscreen(); }
-    else if (activeSlug && Date.now() - leftFullscreenAt > 500) closeGame();
+    // Leaving a game and leaving a page both end at the hub's home. A duel asks
+    // to send the run first, and that prompt must stay on its own view.
+    else if (activeSlug && Date.now() - leftFullscreenAt > 500) { closeGame(); if (!activeSlug) navigation.goHome(); }
+    else if (!activeSlug) navigation.goHome();
   } else if (activeSlug && !typing && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
     if (event.key === 'R' || event.key === 'r') { event.preventDefault(); restartGame(); }
     else if (event.key === 'F' || event.key === 'f') { event.preventDefault(); toggleFullscreen(); }
@@ -876,12 +875,22 @@ setInterval(() => {
 addEventListener('focus', renderDaily);
 setInterval(renderDaily, 60000);
 
-activatePlayerStorage(activePlayerId() ? 'user:' + activePlayerId() : 'guest');
-loadLibrary();
-renderDaily();
-renderRecent();
-renderCollections();
-renderLibrary();
+// Boot paints the hub once, synchronously, from whatever is already stored.
+// These calls used to share one stack: a single bad stored value threw here and
+// left the page on its static shell - no games, no leaderboard - until a reload.
+// Isolate each step so the rest of the page still paints without it.
+function bootStep(label, run) {
+  try { run(); } catch (error) { console.error('Bored: ' + label + ' did not render.', error); }
+}
+bootStep('player storage', () => activatePlayerStorage(activePlayerId() ? 'user:' + activePlayerId() : 'guest'));
+bootStep('library state', loadLibrary);
+bootStep('daily challenge', renderDaily);
+bootStep('recent shelf', renderRecent);
+bootStep('game library', renderLibrary);
+// The shell's watchdog reads this. It also clears the watchdog's one retry so a
+// later reload can recover from a fresh load failure.
+window.__boredHubReady = true;
+try { sessionStorage.removeItem('bored.boot-retry'); } catch {}
 const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, callbacks) {
   const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });
   openGame(match.game, null, document.querySelector('#together-nav'), player);
@@ -896,6 +905,18 @@ const navigation = createHubNavigation({
   togetherUI,
   onLeaderboard: () => loadLeaderboard(true)
 });
+
+// The admin page keeps its own server-side check; this only stops the link from
+// advertising itself to everyone else in the footer.
+const ADMIN_EMAIL = 'danilowe28@midlandps.org';
+function renderAdminLink() {
+  const link = $('#admin-analytics-link');
+  if (!link) return;
+  const email = hasIdentity() ? String(getSession()?.user?.email || '').trim().toLowerCase() : '';
+  link.hidden = email !== ADMIN_EMAIL;
+}
+window.addEventListener('bored:identity', renderAdminLink);
+renderAdminLink();
 
 function clearFavoriteGames() {
   const now = Date.now();

@@ -1,7 +1,8 @@
 /* The changelog is a reading page: the hub's masthead and gutters, then one
    narrow column. A day, then its changes — no cards, no badges. */
 .wordmark-home{text-decoration:none}
-.site-nav a[aria-current="page"]{text-decoration:underline;text-underline-offset:4px}
+/* The nav treatment (including the current page) comes from the hub's
+   paper-layout.css, so this page wears the same controls as the arcade. */
 
 #log-heading{font-size:clamp(28px,5vw,36px);font-weight:400;line-height:1.1;margin-bottom:8px}
 .log-note{max-width:62ch;margin-bottom:16px;font:11px/1.8 var(--mono);color:var(--dim)}

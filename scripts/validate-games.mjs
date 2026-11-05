@@ -77,17 +77,7 @@ for (const [id, spec] of specs) {
 for (const id of challenges) check(!online.has(id), id + ': daily challenge needs a local game');
 const legacyFiles = (await import('node:fs')).readdirSync(join(root, 'src/games/content'))
   .filter(file => file.endsWith('.html')).map(file => file.slice(0, -5));
-// These are deliberate alternate documents for catalog entries, never new games.
-const auxiliaryDocuments = { 'tank2-online': 'tank2' };
-for (const [variant, parent] of Object.entries(auxiliaryDocuments)) {
-  check(PAYLOAD_SLUGS.includes(parent), variant + ': parent game is not registered');
-  const file = join(root, 'src/games/content', variant + '.html');
-  check(existsSync(file), variant + ': missing online renderer');
-  if (existsSync(file)) check(readFileSync(file, 'utf8').includes('__boredTogether'),
-    variant + ': missing Bored Together integration');
-}
-for (const id of legacyFiles) check(PAYLOAD_SLUGS.includes(id) || Object.hasOwn(auxiliaryDocuments, id),
-  id + ': orphan HTML game (not registered)');
+for (const id of legacyFiles) check(PAYLOAD_SLUGS.includes(id), id + ': orphan HTML game (not registered)');
 
 if (errors.length) {
   console.error('Game contract failed (' + errors.length + '):\n' + errors.map(e => '  - ' + e).join('\n'));

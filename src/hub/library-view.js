@@ -1,5 +1,5 @@
 import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
-import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from '../games/discovery.js';
+import { DISCOVERY, PREVIEWS } from '../games/discovery.js';
 import { DEVELOPER_NOTES } from '../games/developer-notes.js';
 import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scores.js';
 import { writeStored } from './store.js';
@@ -173,19 +173,6 @@ function renderRecent() {
   $('#recent-empty').hidden = shown.length > 0;
 }
 
-function renderCollections() {
-  if (!$('#collections').children.length) $('#collections').replaceChildren(...COLLECTIONS.map(entry => {
-    const button = element('button', 'collection', entry.name);
-    button.type = 'button';
-    button.dataset.collection = entry.id;
-    button.setAttribute('aria-pressed', String(state.collection === entry.id));
-    button.onclick = () => { state.collection = entry.id; renderCollections(); renderLibrary(); };
-    return button;
-  }));
-  for (const button of $('#collections').children) button.setAttribute('aria-pressed', String(button.dataset.collection === state.collection));
-  $('#collection-note').textContent = COLLECTIONS.find(entry => entry.id === state.collection).note;
-}
-
 // The shelf keeps the catalog's own order: a game arrives at the front when it
 // is added and never moves again. The NEW badge marks recent arrivals on their
 // card instead of pulling them out of line, so the list cannot reshuffle under
@@ -198,7 +185,6 @@ function renderLibrary() {
   state.visibleGames = shelf.filter(([slug, name]) => {
     const meta = META[slug];
     return (EXTERNS[slug] || PAYLOAD_SLUGS.includes(slug) || NEW_GAMES.includes(slug)) &&
-      inCollection(slug, state.collection) &&
       (!filter || [name, slug, ...meta, gameMeta(slug), ...DISCOVERY[slug].inputs].join(' ').toLowerCase().includes(filter)) &&
       (state.category === 'All' || (state.category === 'New' ? FRESH_GAMES.includes(slug) :
         state.category === 'Favorites' ? state.favorites.has(slug) : meta[0] === state.category));
@@ -276,5 +262,5 @@ function showLibraryMessage() {
 }
 
 
-return { previewFor, gameMeta, renderRecent, renderCollections, renderLibrary, showLibraryMessage };
+return { previewFor, gameMeta, renderRecent, renderLibrary, showLibraryMessage };
 }

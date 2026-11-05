@@ -1,6 +1,7 @@
 import { hasIdentity, getSession, ensureProfile } from './backend.js';
 import { togetherRPC, inviteRPC, CONSENT_VERSION } from './together-api.js';
 import { TOGETHER_GAMES } from '../games/catalog.js';
+import { PREVIEWS } from '../games/discovery.js';
 import { TOGETHER_ADAPTERS } from './together-player.js';
 import { readStored, writeStored, removeStored } from './store.js';
 
@@ -195,9 +196,10 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     }
     host.append(more);
   }
-  function picker() {
+  function picker(host = content) {
     const box = node('section', undefined, 'bt-start');
     box.setAttribute('aria-label', flow === 'challenge' ? 'Start a game' : 'Play random');
+    box.append(node('p', flow === 'random' ? 'Find a random partner' : 'Choose a partner', 'eyebrow'));
     const label = node('label', 'Choose a game ', 'bt-game-picker'), select = node('select'); select.id = 'bt-game-select';
     for (const [slug, game] of Object.entries(TOGETHER_GAMES)) {
       if (!TOGETHER_ADAPTERS[slug]) continue;
@@ -259,7 +261,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
       box.append(outside);
     }
     box.append(button('Cancel', () => { flow = null; people = null; render(); }));
-    content.append(box);
+    host.append(box);
   }
   function valueText(m, seat) {
     const raw = m.state?.plays?.[seat];
@@ -285,13 +287,42 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     if (turn) return valueText(m, theirs) ? 'Your run · beat ' + valueText(m, theirs) : 'Your run';
     return valueText(m, mine) ? 'Their run · you sent ' + valueText(m, mine) : 'Their run';
   }
+  // One game's own art, used by the hero, the starter tiles and the match
+  // cards, so a game is identifiable before its name is read.
+  function gamePreview(slug, className) {
+    const host = node('span', undefined, className);
+    host.setAttribute('aria-hidden', 'true');
+    if (PREVIEWS[slug]) {
+      const image = node('img');
+      image.src = PREVIEWS[slug];
+      image.alt = '';
+      image.width = 384;
+      image.height = 240;
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      host.append(image);
+    } else {
+      host.classList.add('bt-art-empty');
+      host.append(node('span', (TOGETHER_GAMES[slug]?.name || slug).slice(0, 2).toUpperCase(), 'bt-art-mark'));
+    }
+    return host;
+  }
   function matchRow(m, host) {
     const duel = m.mode === 'duel';
     const turn = m.status === 'active' && m.turn_user === owner;
-    const row = node('article', undefined, 'bt-match-row' + (turn ? ' bt-ready' : ''));
+    const row = node('article', undefined, 'bt-match-row bt-match-card' + (turn ? ' bt-ready' : ''));
     row.dataset.matchId = m.id;
     const copy = node('div', undefined, 'bt-match-copy');
-    copy.append(node('h4', name(m.game) + ' · ' + (m.opponent?.handle || 'Former member')),
+    // The state is a chip on the title line, so a card says whose move it is
+    // before the sentence under it is read.
+    const head = node('div', undefined, 'bt-match-head');
+    head.append(node('h4', name(m.game)),
+      node('span',
+        m.status === 'completed' ? (m.winner === owner ? 'Won' : m.winner ? 'Lost' : 'Draw')
+          : turn ? 'Your turn' : 'Their turn',
+        'bt-chip' + (turn ? ' bt-chip-turn' : '')));
+    copy.append(head,
+      node('p', 'with ' + (m.opponent?.handle || 'Former member'), 'bt-opponent'),
       node('p', duel ? runLine(m, turn)
         : m.status === 'active' ? (turn ? 'Your turn' : 'Their turn')
         : m.winner === owner ? 'You won' : m.winner ? 'You lost' : 'Draw', 'bt-caption'));
@@ -308,12 +339,65 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
       else status.textContent = 'They already started the rematch.';
     }));
     overflow(actions, m);
-    row.append(copy, actions); host.append(row);
+    row.append(gamePreview(m.game, 'bt-match-art'), copy, actions);
+    host.append(row);
   }
   function dashboard() {
-    const start = node('div', undefined, 'bt-start-actions');
+    const open = data.matches.filter(m => m.status === 'active');
+    const yours = open.filter(m => m.turn_user === owner);
+    const waiting = open.filter(m => m.turn_user !== owner);
+    // Keep rematches close to the finished game, without a history page or records.
+    const completed = data.matches.filter(m => m.status === 'completed').slice(0, 3);
+
+    // The lobby's front door: the game that is actually waiting on you.
+    if (yours.length) {
+      const match = yours[0];
+      const duel = match.mode === 'duel';
+      const hero = node('section', undefined, 'bt-hero');
+      hero.setAttribute('aria-label', 'Your move');
+      const copy = node('div', undefined, 'bt-hero-copy');
+      copy.append(node('p', 'Your move', 'eyebrow'),
+        node('h3', name(match.game), 'bt-hero-title'),
+        node('p', 'with ' + (match.opponent?.handle || 'your opponent'), 'bt-opponent'),
+        node('p', duel ? runLine(match, true) : 'The turn is yours.', 'bt-hero-line'),
+        node('p', yours.length > 1 ? (yours.length - 1) + ' more waiting below.' : 'Take it when you are ready.', 'bt-caption'));
+      hero.append(gamePreview(match.game, 'bt-hero-art'), copy,
+        button(duel ? 'Play run' : 'Play turn', () => launch(match.id), true));
+      content.append(hero);
+    } else if (waiting.length) {
+      content.append(node('p', waiting.length === 1
+        ? 'Nothing waiting on you. Their turn.'
+        : 'Nothing waiting on you. ' + waiting.length + ' games are with them.', 'bt-hero-quiet'));
+    }
+
+    const start = node('section', undefined, 'bt-start-panel');
+    start.append(node('p', 'Start something', 'eyebrow'),
+      node('h3', 'Start a game'),
+      node('p', 'Pick a game, then a partner. Your first turn is saved and sent, so they have something waiting the next time they open Bored.', 'bt-caption'));
+    // Once a game is chosen the picker takes over below, so there is only ever
+    // one game control on screen.
+    if (!flow) {
+      const grid = node('div', undefined, 'bt-game-grid');
+      grid.setAttribute('role', 'group');
+      grid.setAttribute('aria-label', 'Choose a game');
+      for (const [slug, game] of Object.entries(TOGETHER_GAMES)) {
+        if (!TOGETHER_ADAPTERS[slug]) continue;
+        const option = node('button', undefined, 'bt-game-option');
+        option.type = 'button';
+        option.id = 'bt-game-' + slug;
+        option.dataset.game = slug;
+        option.setAttribute('aria-pressed', String(slug === selectedGame));
+        option.append(gamePreview(game.preview || slug, 'bt-game-art'),
+          node('span', game.name, 'bt-game-name'),
+          node('span', game.mode === 'duel' ? 'One run each' : 'Take turns', 'bt-game-mode'));
+        option.onclick = () => { selectedGame = slug; render(); };
+        grid.append(option);
+      }
+      start.append(grid);
+    }
+    const actions = node('div', undefined, 'bt-start-actions');
     // The member list is only fetched when the picker is opened.
-    start.append(button('Start a Game', async () => {
+    actions.append(button('Start a Game', async () => {
       people = await togetherRPC('people');
       // A list that failed to load must not read as "nobody to invite": the
       // endpoint is easy to miss when a deployment lands before its SQL does.
@@ -327,16 +411,33 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
       flow = 'challenge'; render(); $('#bt-game-select')?.focus();
     }, true),
       button('Play Random', () => { flow = 'random'; people = null; render(); $('#bt-game-select')?.focus(); }));
-    overflow(start, null); content.append(start);
-    if (flow) picker();
-    const games = node('section'); games.id = 'bt-your-games'; games.append(node('h3', 'Your Games'));
-    const attention = m => m.status === 'active' && m.turn_user === owner ? 0 : m.status === 'completed' ? 2 : 1;
-    const open = data.matches.filter(m => m.status === 'active');
-    // Keep rematches close to the finished game, without a history page or records.
-    const completed = data.matches.filter(m => m.status === 'completed').slice(0, 3);
-    const matches = [...open, ...completed].sort((a, b) => attention(a) - attention(b));
-    if (!matches.length && !data.queue.length) games.append(node('p', 'No games yet. Start one above.', 'bt-caption'));
-    for (const match of matches) matchRow(match, games);
+    overflow(actions, null);
+    if (!flow) start.append(actions);
+    // The picker lives inside the starter, so choosing a game never pushes the
+    // page down into a second, unrelated-looking box.
+    if (flow) picker(start);
+    content.append(start);
+    const games = node('section'); games.id = 'bt-your-games'; games.append(node('h3', 'Your games'));
+    const counts = [];
+    if (yours.length) counts.push(yours.length + ' waiting on you');
+    if (waiting.length) counts.push(waiting.length + ' with them');
+    if (counts.length) games.append(node('p', counts.join(' · '), 'bt-caption'));
+    if (!open.length && !completed.length && !data.queue.length) {
+      games.append(node('p', 'No games yet. Start one above.', 'bt-caption'));
+    }
+    // Ongoing games are separated by whose move it is; a finished game stays
+    // nearby for a rematch but never leads the list.
+    const group = (title, note, list) => {
+      if (!list.length) return;
+      games.append(node('h4', title, 'bt-group'));
+      if (note) games.append(node('p', note, 'bt-caption bt-group-note'));
+      for (const match of list) matchRow(match, games);
+    };
+    group('Your move · ' + yours.length, yours.length === 1
+      ? 'Take your turn whenever you are ready.' : 'Every one of these is waiting on you.', yours);
+    group('Waiting on them · ' + waiting.length, waiting.length === 1
+      ? 'Their turn. Nothing to do until they play.' : 'Their turns. Nothing to do until they play.', waiting);
+    group('Finished', null, completed);
     for (const game of data.queue) {
       const row = node('div', undefined, 'bt-match-row');
       row.append(node('p', 'Finding an opponent · ' + name(game)), button('Cancel search', () => togetherRPC('queue_cancel', { game })));
