@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 286,
+  "count": 287,
   "newest": "2026-11-05",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"288f9af","date":"2026-11-05","author":"Codebuff","subject":"Serve Bored Together from the live games, with Ashcrown as a real two-player campaign."},
+  {"sha":"5f8647f","date":"2026-11-04","author":"PenguinV360","subject":"Update ashcrown.html"},
   {"sha":"2e4b7c7","date":"2026-11-04","author":"bassdrum4","subject":"Fit the games to the window and smooth Tank 2, Sticky Ninja and Ashcrown"},
   {"sha":"dc0b6f2","date":"2026-11-04","author":"Codebuff","subject":"Cut redundant Supabase reads and take Prism Duel off the board"},
   {"sha":"2939eaf","date":"2026-11-04","author":"Claude","subject":"Civ Lite 3.3: Civ 6 style marches and buildings on their own hexes."},
