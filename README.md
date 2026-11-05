@@ -428,7 +428,7 @@ where needed on `file://`.
 These use an ordinary iframe pointing to their own servers and **require internet**:
 
 - **F-14** → `https://bassdrum4.github.io/f-14-4/` — flight simulator
-- **Klang** → `https://youtubeplayer.freebuff.app/player` — music player;
+- **Klang** → `https://site-c34c9896e1dc43759ac9d67d703052cd.freebuff.page/` — music player;
   signed-out visitors may see its sign-in screen
 
 Their availability, sign-in requirements, and framing policies belong to the
