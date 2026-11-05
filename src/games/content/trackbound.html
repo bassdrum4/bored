@@ -110,6 +110,10 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 .medalTable i{font-style:normal;font-size:10px;color:var(--dim)}
 .result .row{margin-top:14px}
 
+#comboBar{position:absolute;left:50%;transform:translateX(-50%);bottom:72px;width:190px;height:3px;
+  background:rgba(26,25,22,.16);display:none}
+#comboBar.show{display:block}
+#comboBar i{display:block;height:100%;width:0;background:var(--ink)}
 #noGl{position:absolute;inset:0;display:grid;place-items:center;padding:18px;text-align:center;
   background:var(--paper);font-size:12px;color:var(--dim)}
 </style>
@@ -132,8 +136,9 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
       <div id="medalRail"></div>
       <div id="hudSpeed"><b id="hudKmh">0</b><span>km/h</span></div>
       <div id="hudTrick"></div>
+      <div id="comboBar"><i></i></div>
       <div id="hudCenter"></div>
-      <div id="hudHint">W A S D / arrows · space handbrake · backspace respawn · R restart · esc pause · M sound</div>
+      <div id="hudHint">W A S D / arrows · space handbrake · backspace respawn · R restart · N new park · esc pause · M sound</div>
       <div id="pad">
         <button type="button" data-drive="left" aria-label="Steer left">◀</button>
         <button type="button" data-drive="right" aria-label="Steer right">▶</button>
@@ -263,7 +268,7 @@ const toLocal = (parent, worldPoint) => {
    (some embeds do) the same values are kept through localStorage; if both are
    blocked the game plays without saved data and never complains. */
 const DATA = 'bored.trackbound';
-const saved = { best: {}, medals: {}, ghost: true, mute: false, freeplay: null };
+const saved = { best: {}, medals: {}, ghost: true, mute: false, freeplay: null, trackPoints: {} };
 let db = null;
 
 function persist(name) {
@@ -278,7 +283,7 @@ function startSaved(onLoaded) {
   // Lift data a previous build kept in localStorage, then prefer what the
   // database holds. Saved tracks are gone, so that key can go too.
   try {
-    for (const name of ['best', 'medals', 'ghost', 'freeplay']) {
+    for (const name of ['best', 'medals', 'ghost', 'freeplay', 'trackPoints']) {
       const raw = localStorage.getItem(DATA + '.' + name);
       if (raw) { const parsed = JSON.parse(raw); if (parsed) saved[name] = parsed; }
     }
@@ -1111,9 +1116,13 @@ function buildTrack(typeIds, meta) {
   let finish = null, spawn = null, travelled = 0;
   const legs = [];
   const walls = [];
+  const open = !!(meta && meta.open);
   for (let i = 0; i < typeIds.length; i++) {
-    const def = BLOCKS[typeIds[i]];
-    if (!def) continue;
+    const source = BLOCKS[typeIds[i]];
+    if (!source) continue;
+    // An open track has no guide walls at all: nothing keeps the car on the
+    // ribbon, so the trick points banked in the air are part of the run.
+    const def = open ? Object.assign({}, source, { wall: 0 }) : source;
     const exit = compose(entry, blockExit(def));
     const prevDef = BLOCKS[typeIds[i - 1]], nextDef = BLOCKS[typeIds[i + 1]];
     const box = emitBlock(road, scenery, entry, def, i, legs, walls,
@@ -1205,6 +1214,7 @@ function buildTrack(typeIds, meta) {
     blocks: typeIds.slice(),
     mesh: road, scenery, triggers, checkpoints, finish,
     spawn: spawn || FRAME0, end: entry, chain, boxes,
+    open,
     poles: 0
   };
 }
@@ -1247,7 +1257,7 @@ const CAMPAIGN = [
     blocks: ['start', 'straight', 'curveL', 'straight', 'hairpinR', 'straight', 'checkpoint',
       'curveR', 'sprint', 'wallL', 'hairpinR', 'straight', 'curveL', 'checkpoint', 'straight',
       'curveR', 'sprint', 'finish'] },
-  { id: 'overpass', name: 'Overpass', author: 16150,
+  { id: 'overpass', name: 'Overpass', author: 16150, open: true,
     blocks: ['start', 'sprint', 'up', 'straight', 'curveR', 'straight', 'down', 'checkpoint',
       'straight', 'curveL', 'up', 'sprint', 'curveR', 'down', 'checkpoint', 'straight',
       'curveL', 'sprint', 'finish'] },
@@ -1258,11 +1268,11 @@ const CAMPAIGN = [
   { id: 'dustbowl', name: 'Dust Bowl', author: 10750,
     blocks: ['start', 'straight', 'dirt', 'straight', 'curveR', 'narrow', 'checkpoint', 'straight',
       'curveL', 'dirt', 'narrow', 'checkpoint', 'curveL', 'dirt', 'straight', 'finish'] },
-  { id: 'kicker', name: 'Kicker', author: 14250,
+  { id: 'kicker', name: 'Kicker', author: 14250, open: true,
     blocks: ['start', 'sprint', 'kicker', 'curveR', 'sprint', 'down', 'checkpoint', 'straight',
       'curveL', 'sprint', 'kicker2', 'boost', 'straight', 'checkpoint', 'curveL', 'sprint',
       'straight', 'finish'] },
-  { id: 'grandloop', name: 'Grand Loop', author: 18900,
+  { id: 'grandloop', name: 'Grand Loop', author: 18900, open: true,
     blocks: ['start', 'sprint', 'straight', 'curveR', 'up', 'straight', 'down', 'checkpoint',
       'curveL', 'sprint', 'boost', 'straight', 'wallL', 'straight', 'wallL', 'straight',
       'checkpoint', 'curveR', 'dirt', 'straight', 'curveL', 'sprint', 'curveR', 'straight',
@@ -1312,6 +1322,16 @@ function medalFor(author, ms) {
   // The fastest threshold the run beats is the medal it earns.
   for (const medal of medalTimes(author)) if (ms <= medal.ms) return medal.id;
   return null;
+}
+
+/* A medal is worth points, so the career adds up instead of counting golds and
+   throwing the rest away: author 4, gold 3, silver 2, bronze 1 across the
+   campaign. The three wall-free tracks bank trick points on top of that, kept
+   per track so a run can be chased for its own score. */
+const MEDAL_POINTS = { author: 4, gold: 3, silver: 2, bronze: 1 };
+const medalPoints = id => MEDAL_POINTS[id] || 0;
+function careerPoints() {
+  return CAMPAIGN.reduce((total, entry) => total + medalPoints(saved.medals[entry.id]), 0);
 }
 
 /* ── daily track: seeded, and regenerated if it would fold into itself ────── */
@@ -1517,6 +1537,14 @@ function freeplayWorld(seed) {
   const bootX = Math.sin(bootAngle) * 54, bootZ = Math.cos(bootAngle) * 54;
   pushKicker(mesh, bootX, bootZ, bootAngle, 18, 26, 6.4, parkHeight(bootX, bootZ, s), shade(ramp, 1.1));
   remember({ x: bootX, z: bootZ });
+
+  // The big one: a longer, steeper booter out past the first landmark, so there
+  // is somewhere to spend the speed the park gives you.
+  const mega = freeplaySpot(random, s, 96, PARK_HALF - 78, 20);
+  if (mega) {
+    pushKicker(mesh, mega.x, mega.z, random() * TAU, 26, 22, 9.5, mega.ground, shade(ramp, 0.86));
+    remember(mega);
+  }
 
   // Kickers, on ground flat enough for a ramp to sit on.
   for (let tries = 0, count = 0; tries < 240 && count < 12; tries++) {
@@ -1916,7 +1944,7 @@ const race = {
   ghostOn: saved.ghost !== false, message: '', messageUntil: 0,
   missing: 0, boostFlash: 0, thud: 0,
   tricks: 0, points: 0, air: 0, spinDeg: 0, flipDeg: 0, bestAir: 0, safeClock: 0,
-  combo: 1, comboClock: 0, bestTrick: 0, lastPoints: 0
+  combo: 1, comboClock: 0, bestTrick: 0, lastPoints: 0, stuck: 0
 };
 let autopilot = null;
 
@@ -1967,6 +1995,7 @@ function useTrack(track) {
   race.flipDeg = 0;
   race.bestAir = 0;
   race.safeClock = 0;
+  race.stuck = 0;
   const best = saved.best[track.id];
   // Ghosts only line up if the track still looks the way it did on that day.
   const alive = best && Number.isFinite(best.ms) && (!best.layout || best.layout === layoutOf(track.blocks));
@@ -2019,14 +2048,29 @@ function freeplayBest() {
   return (saved.freeplay && saved.freeplay.best) || 0;
 }
 
-function bankFreeplay() {
-  if (race.points <= freeplayBest()) return false;
-  saved.freeplay = {
-    best: race.points, tricks: race.tricks, bestTrick: race.bestTrick,
-    air: Math.round((race.bestAir || 0) * 1000),
-    date: (window.__boredSeed && window.__boredSeed.date) || ''
-  };
-  persist('freeplay');
+function runBest() {
+  if (isFreeplay()) return freeplayBest();
+  if (!world) return 0;
+  return (saved.trackPoints && saved.trackPoints[world.id]) || 0;
+}
+
+function bankScore() {
+  if (isFreeplay()) {
+    if (race.points <= freeplayBest()) return false;
+    saved.freeplay = {
+      best: race.points, tricks: race.tricks, bestTrick: race.bestTrick,
+      air: Math.round((race.bestAir || 0) * 1000),
+      date: (window.__boredSeed && window.__boredSeed.date) || ''
+    };
+    persist('freeplay');
+    paintBest();
+    return true;
+  }
+  if (!world || !world.open) return false;
+  if (!saved.trackPoints) saved.trackPoints = {};
+  if (race.points <= (saved.trackPoints[world.id] || 0)) return false;
+  saved.trackPoints[world.id] = race.points;
+  persist('trackPoints');
   paintBest();
   return true;
 }
@@ -2066,7 +2110,7 @@ function landFreeplay() {
   race.comboClock = COMBO_WINDOW;
   showMessage(name + ' +' + points + (multiplier > 1 ? ' ×' + multiplier : ''), 1.15);
   blip(480 + Math.min(480, points * 5), 0.12, 0.1, 'triangle');
-  bankFreeplay();
+  bankScore();
 }
 
 function trackTricks(dt, wasGrounded, fPrev, uPrev) {
@@ -2086,6 +2130,14 @@ function trackTricks(dt, wasGrounded, fPrev, uPrev) {
   if (race.combo > 1) {
     race.comboClock -= dt;
     if (race.comboClock <= 0) { race.combo = 1; race.comboClock = 0; }
+  }
+  // Wedged on a flank, nose into a wall, nothing moving: give it a moment and
+  // put the car back on the last good road instead of waiting for a keypress.
+  if (race.state === 'running' && car.grounded && vlen(car.v) < 0.8) {
+    race.stuck += dt;
+    if (race.stuck > 3.2) { race.stuck = 0; respawnCar(); showMessage('unwedged', 0.7); }
+  } else {
+    race.stuck = 0;
   }
   // Remember the last bit of road we were happy on: a fall puts us back there
   // instead of back at the grid, which is what makes the park worth wandering.
@@ -2109,8 +2161,8 @@ function insideZone(frame, hw, halfLen, point) {
 function finishRun() {
   race.state = 'finished';
   race.finishedAt = race.t;
-  race.medal = medalFor(world.author, race.t * 1000);
   const ms = Math.round(race.t * 1000);
+  race.medal = medalFor(world.author, ms);
   const bests = saved.best;
   const previous = bests[world.id];
   const isBest = !previous || ms < previous.ms;
@@ -2121,6 +2173,7 @@ function finishRun() {
       medal: race.medal,
       ghost: race.record.map(sample => sample.map(value => Math.round(value * 100) / 100)),
       splits: race.splits.map(msSplit => Math.round(msSplit) || 0),
+      pts: race.points,
       layout: world.layout,
       date: (window.__boredSeed && window.__boredSeed.date) || ''
     };
@@ -2170,9 +2223,9 @@ function stepRace(dt, override) {
     const wasGrounded = car.grounded;
     const fPrev = car.f.slice(), uPrev = car.u.slice();
     stepCar(car, input, dt, world.mesh);
-    if (isFreeplay()) {
+    if (isFreeplay() || world.open) {
       trackTricks(dt, wasGrounded, fPrev, uPrev);
-      if (car.impact > 13 && race.combo > 1) bailed('into the wall');
+      if (isFreeplay() && car.impact > 13 && race.combo > 1) bailed('into the wall');
     }
 
     // A thud when the hitbox meets a wall hard enough to matter.
@@ -2503,6 +2556,11 @@ function paintBest() {
     $('hudDelta').textContent = '';
     return;
   }
+  if (world && world.open) {
+    $('hudBest').textContent = 'BEST ' + runBest() + ' PTS';
+    $('hudDelta').textContent = '';
+    return;
+  }
   $('hudBest').textContent = race.best ? 'BEST ' + clock(race.best.ms) : 'BEST —';
   if (race.state === 'finished' && race.previousBest) {
     const diff = Math.round(race.finishedAt * 1000) - race.previousBest;
@@ -2521,27 +2579,44 @@ function paintMedals() {
   // A freeplay park has no author time, so medals would all read 0.000.
   rail.hidden = isFreeplay();
   if (isFreeplay()) return;
-  for (const medal of medalTimes(world.author)) {
-    const row = el('div', 'm ' + medal.id);
-    row.appendChild(el('span', '', clock(medal.ms)));
+  const rows = medalTimes(world.author).map(medal => ({ id: medal.id, label: clock(medal.ms) }));
+  for (const entry of rows) {
+    const row = el('div', 'm ' + entry.id);
+    row.appendChild(el('span', '', entry.label));
     row.appendChild(el('i', ''));
     rail.appendChild(row);
   }
 }
 
+function paintComboBar() {
+  const bar = $('comboBar');
+  if (!bar) return;
+  const live = (isFreeplay() || (world && world.open)) && race.combo > 1 && race.state !== 'finished';
+  bar.classList.toggle('show', !!live);
+  bar.firstElementChild.style.width = live
+    ? Math.max(0, Math.min(1, race.comboClock / COMBO_WINDOW)) * 100 + '%'
+    : '0%';
+}
+
 function paintHud() {
   if (!car) return;
+  paintComboBar();
   $('hudTime').textContent = race.state === 'finished' ? clock((race.finishedAt || 0) * 1000) : clock(race.t * 1000);
   $('hudKmh').textContent = Math.round(vlen(car.v) * 3.6);
-  if (isFreeplay()) {
-    $('hudTime').textContent = String(race.points || 0);
-    $('hudCP').textContent = 'TRICKS ' + race.tricks +
-      (race.combo > 1 ? ' · COMBO ×' + race.combo : '') + ' · BEST ' + freeplayBest();
+  if (isFreeplay() || (world && world.open)) {
     const spin = Math.abs(race.spinDeg), flip = Math.abs(race.flipDeg);
     const live = car.grounded ? '' : 'AIR ' + race.air.toFixed(1) + 's · ' +
       (flip >= spin ? 'FLIP ' : 'SPIN ') + Math.round(Math.max(spin, flip)) + '°';
     $('hudTrick').textContent = live;
     $('hudTrick').className = live ? 'show' : '';
+    $('hudTime').textContent = String(race.points || 0);
+    if (isFreeplay()) {
+      $('hudCP').textContent = 'TRICKS ' + race.tricks +
+        (race.combo > 1 ? ' · COMBO ×' + race.combo : '') + ' · BEST ' + freeplayBest();
+    } else {
+      $('hudCP').textContent = 'TIME ' + clock(race.t * 1000) + ' · CP ' + race.cp + ' / ' + race.cpTotal +
+        (race.combo > 1 ? ' · COMBO ×' + race.combo : '');
+    }
     return;
   }
   $('hudCP').textContent = 'CP ' + race.cp + ' / ' + race.cpTotal;
@@ -2580,35 +2655,43 @@ function refreshMenu() {
     const button = el('button');
     button.type = 'button';
     button.appendChild(el('span', 'no', String(index + 1).padStart(2, '0')));
-    button.appendChild(el('span', '', entry.name));
+    button.appendChild(el('span', '', entry.name + (entry.open ? ' · open' : '')));
     const dots = el('span', 'med');
     const rank = RANK[storedMedals[entry.id]] || 0;
     ['bronze', 'silver', 'gold'].forEach((medal, slot) => dots.appendChild(el('i', rank >= slot + 1 ? medal : '')));
     button.appendChild(dots);
-    button.appendChild(el('span', 'time', bests[entry.id] ? clock(bests[entry.id].ms) : '—'));
+    const points = (saved.trackPoints || {})[entry.id] || 0;
+    button.appendChild(el('span', 'time', entry.open
+      ? (points ? points + ' pts' : '—')
+      : bests[entry.id] ? clock(bests[entry.id].ms) : '—'));
     button.addEventListener('click', () => startCampaign(index));
     li.appendChild(button);
     list.appendChild(li);
   });
 
   const golds = goldCount();
-  $('menuNote').textContent = golds + ' gold medal' + (golds === 1 ? '' : 's') + ' · ' +
+  const points = careerPoints();
+  $('menuNote').textContent = points + ' point' + (points === 1 ? '' : 's') + ' · ' +
+    golds + ' gold medal' + (golds === 1 ? '' : 's') + ' · ' +
     Object.keys(bests).length + ' personal best' + (Object.keys(bests).length === 1 ? '' : 's');
 }
 
 function showResult(isBest, ms) {
   $('resTitle').textContent = isBest ? 'New personal best' : 'Track clear';
-  $('resTrack').textContent = world.name + ' · ' + world.blocks.length + ' blocks';
-  $('resTime').textContent = clock(ms);
-  $('resMedal').textContent = medalName(race.medal);
+  $('resTrack').textContent = world.name + ' · ' + world.blocks.length + ' blocks' +
+    (world.open ? ' · no walls · ' + clock(ms) : '') + ' · ' + careerPoints() + ' pts career';
+  $('resTime').textContent = world.open ? (race.points | 0) + ' pts' : clock(ms);
+  $('resMedal').textContent = medalName(race.medal) + (race.medal ? ' · +' + medalPoints(race.medal) : '');
   $('resDot').className = 'dot ' + (race.medal || '');
   // A saved best can be missing on a slower run: a layout change prunes the
   // old record, and the result screen must not read through it.
-  $('resBest').textContent = isBest
-    ? 'Ghost saved for this track.'
-    : race.best
-      ? 'Best ' + clock(race.best.ms) + ' · ' + (race.ghostOn ? 'ghost on' : 'ghost off')
-      : 'Best on this layout is still unset.';
+  $('resBest').textContent = world.open
+    ? (isBest ? 'Point record saved for this track.' : 'Best ' + runBest() + ' pts on this track.')
+    : isBest
+      ? 'Ghost saved for this track.'
+      : race.best
+        ? 'Best ' + clock(race.best.ms) + ' · ' + (race.ghostOn ? 'ghost on' : 'ghost off')
+        : 'Best on this layout is still unset.';
   const board = $('resBoard');
   board.replaceChildren();
   for (const medal of medalTimes(world.author)) {
@@ -2683,6 +2766,7 @@ function onKeyDown(event) {
   if (lower === 'escape') { if (mode === 'race') togglePause(); event.preventDefault(); return; }
   if (mode === 'race' && paused) return;
   if (lower === 'r') { if (mode === 'race') { restartRace(); event.preventDefault(); } return; }
+  if (lower === 'n' && mode === 'race' && isFreeplay()) { startFreeplay(); event.preventDefault(); return; }
   if (lower === 'backspace') {
     if (mode === 'race' && (race.state === 'running' || race.state === 'ready')) respawnCar();
     event.preventDefault();
@@ -2754,6 +2838,9 @@ function nearestCenterline(point, track) {
 window.__boredSnapshot = () => ({
   slug: 'trackbound',
   medals: goldCount(),
+  points: careerPoints(),
+  runPoints: race.points | 0,
+  open: !!(world && world.open),
   finished: race.state === 'finished',
   timeMs: race.state === 'finished' && race.finishedAt ? Math.round(race.finishedAt * 1000) : 0,
   seconds: race.state === 'finished' && race.finishedAt ? Math.round(race.finishedAt) : 0,
@@ -2833,7 +2920,7 @@ window.__test = {
   snapshot: () => window.__boredSnapshot(),
   startCampaign, startDaily, loadRace, restartRace, respawnCar, useTrack,
   startFreeplay, freeplayWorld, parkHeight, isFreeplay, trackTricks, signedAngle,
-  landFreeplay, bailed, freeplayBest,
+  landFreeplay, bailed, freeplayBest, runBest, careerPoints,
   openMenu, toggleMute,
   render: () => { updateCamera(1 / 60); drawScene(1 / 60); }
 };

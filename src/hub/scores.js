@@ -113,10 +113,11 @@ export const HIGH_SCORE_GAMES = [
     metric: 'renown', min: 1, max: 10000,
     when: snapshot => snapshot.finished === true
   }),
-  // Trackbound ranks the campaign, not one clock: gold medals are per track and
-  // only a finished run can earn one, so the board fills as the campaign falls
-  // rather than rewarding a single lucky lap on the shortest map.
-  highScore('trackbound', 'Trackmania', 'gold medals', { metric: 'medals', when: snapshot => snapshot.finished === true }),
+  // Trackbound ranks the career, not one clock: every medal is worth points
+  // (author 4, gold 3, silver 2, bronze 1), and only a finished run earns one,
+  // so the board fills as the campaign falls rather than rewarding a single
+  // lucky lap on the shortest map.
+  highScore('trackbound', 'Trackmania', 'points', { metric: 'points', when: snapshot => snapshot.finished === true }),
   highScore("transit-chaos", "Transit Chaos", "passengers", { metric: "delivered", when: snapshot => snapshot.finished === true }),
   // Circuit ranks the whole three-lap race: the clock starts on the first
   // keypress and stops at the line, so a quick lap cannot offset a scrappy one.
