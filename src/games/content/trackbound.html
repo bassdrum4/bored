@@ -2188,6 +2188,13 @@ function finishRun() {
     const order = m => m ? MEDALS.findIndex(medal => medal.id === m) : 99;
     if (order(race.medal) < order(saved.medals[world.id])) { saved.medals[world.id] = race.medal; persist('medals'); }
   }
+  // A clean lap that never leaves the ground has no trick points to bank, which
+  // would leave a finished open track reading "no score" in the campaign list.
+  // Finishing pays a small floor; tricks still dwarf it, and a closed track is
+  // ranked on time so it needs nothing. Kept inside the function because the
+  // suite slices function bodies out of this file.
+  const OPEN_FINISH_POINTS = 10;
+  if (world.open) race.points = Math.max(race.points, OPEN_FINISH_POINTS);
   // The line can be crossed while still carrying trick points, so bank them now.
   bankScore();
   chime(isBest ? [523, 659, 784, 1046] : [440, 523, 659]);
