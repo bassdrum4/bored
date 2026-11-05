@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 301,
+  "count": 302,
   "newest": "2026-11-05",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"9b4a91b","date":"2026-11-05","author":"Codebuff","subject":"Give DEEP's staircase a rest stop and a depth-stocked market"},
   {"sha":"9e92bc2","date":"2026-11-05","author":"Codebuff","subject":"Move the game menu waffle to the top-left"},
   {"sha":"876b2ef","date":"2026-11-05","author":"Codebuff","subject":"Bank a score for finishing a wall-free Trackbound track"},
   {"sha":"d3730bf","date":"2026-11-05","author":"Codebuff","subject":"Count Klang's visible time without depending on window focus"},
