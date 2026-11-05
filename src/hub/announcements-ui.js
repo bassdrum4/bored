@@ -12,7 +12,7 @@ export function createAnnouncementsUI() {
   const guestKey = 'bored.announcements.guestReads';
   const stored = readStored(guestKey, []);
   const guestReads = new Set(Array.isArray(stored) ? stored : []);
-  let entries = [], accountReads = new Set(), generation = 0;
+  let entries = [], accountReads = new Set(), generation = 0, refreshedAt = 0;
   let identity = hasIdentity() ? getSession()?.user?.id : null;
   const current = () => hasIdentity() ? getSession()?.user?.id : null;
   const read = item => (identity ? accountReads : guestReads).has(item.id);
@@ -93,7 +93,11 @@ export function createAnnouncementsUI() {
       }
     }
   }
-  async function refresh() {
+  // Coming back to the tab is not a reason to re-read the list: coalesce focus
+  // refreshes so tabbing in and out cannot spend a request each time.
+  async function refresh({ force = false } = {}) {
+    if (!force && Date.now() - refreshedAt < 60000) return;
+    refreshedAt = Date.now();
     const seq = ++generation, who = current();
     try {
       if (who && !(await freshSession())) throw Error('Session expired');
@@ -128,11 +132,11 @@ export function createAnnouncementsUI() {
       entries = [];
       accountReads.clear();
       render();
-      void refresh();
+      void refresh({ force: true });
     });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });
     setInterval(() => { if (!document.hidden) void refresh(); }, 120000);
-    void refresh();
+    void refresh({ force: true });
   }
   return { initAnnouncements };
 }

@@ -627,7 +627,25 @@ function syncSavedDailyResults() {
   }
 }
 
-onScoresPosted(() => {
+onScoresPosted(result => {
+  const cached = lbCache.get('overall');
+  const handle = getHandle();
+  const rows = result?.rows;
+  // The accepted values are already in hand, so fold them into the cached board
+  // instead of re-reading every score row the server just confirmed.
+  if (rows?.length && cached?.rows?.length && !cached.error && handle && hasIdentity()) {
+    const own = new Map(cached.rows.map(row =>
+      [row.game + '|' + String(row.handle || '').toLowerCase(), row]));
+    for (const { game, value } of rows) {
+      const row = own.get(game + '|' + handle.toLowerCase());
+      if (row) row.value = value;
+      else cached.rows.push({ game, handle, value });
+    }
+    cached.at = Date.now();
+    renderAccount();
+    renderLeaderboard();
+    return;
+  }
   lbCache.clear();
   renderAccount();
   renderLeaderboard();

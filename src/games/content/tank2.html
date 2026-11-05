@@ -7,20 +7,20 @@
 <title>Tank 2 — everything is shootable</title>
 <style>
 :root { --paper:#f4f1e9; --field:#fdfbf5; --ink:#292a27; --muted:#848176; --line:#d9d3c4; --red:#b93d33; --green:#447e65; --red-wash:#f4e5de; --green-wash:#e5eee4; --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace; }
-*{box-sizing:border-box}html{background:var(--paper)}body{margin:0;color:var(--ink);background:var(--paper);font:12px/1.5 var(--mono);min-height:100vh;overflow-x:hidden}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}button:disabled{cursor:default;opacity:.38}
-#page {width:min(1120px, 100%);margin:0 auto;position:relative;padding:29px 24px 28px;isolation:isolate;min-height:760px}
+*{box-sizing:border-box}html{background:var(--field)}body{margin:0;color:var(--ink);background:var(--field);font:12px/1.5 var(--mono);min-height:100vh;overflow-x:hidden}button{font:inherit;color:inherit;cursor:pointer}button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}button:disabled{cursor:default;opacity:.38}
+#page {width:100%;height:100dvh;margin:0;position:relative;padding:18px 0 14px;isolation:isolate;display:flex;flex-direction:column}
 #scene{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
 header,.statusbar,.arena-placeholder,.bottom-panel,footer,.end-screen{position:relative;z-index:3}
-header{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin:0 11px 23px;min-height:45px}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:22px;margin:0 11px 17px;min-height:0;flex:0 0 auto}
 .brand{display:flex;align-items:baseline;gap:15px;white-space:nowrap}.brand h1{font-family:Georgia,serif;font-size:22px;letter-spacing:.17em;font-weight:600;margin:-4px 0 0;line-height:1.2}.brand h1 span{display:inline-block;position:relative;transition:transform .22s}.brand h1 .period{color:var(--red)}.brand small{font-size:10px;letter-spacing:.05em;color:var(--muted)}
 .header-tools{display:flex;align-items:center;gap:17px;flex-wrap:wrap;justify-content:flex-end}.top-label{font-size:10px;color:var(--muted);white-space:nowrap}.wind{display:inline-flex;gap:7px;align-items:center;color:var(--ink)}.wind-arrow{display:inline-block;font-size:16px;transition:transform .2s}.toggle{padding:4px 7px;border:0;border-bottom:1px solid transparent;background:none;font-size:10px;letter-spacing:.03em}.toggle:hover,.toggle.selected{border-bottom-color:var(--ink)}
-.statusbar{margin:0 11px 12px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px}.side{display:flex;align-items:center;gap:11px;min-width:0}.side.right{justify-content:flex-end;flex-direction:row-reverse}.tank-mark{height:7px;width:13px;background:var(--red);border:1px solid #34312d;transform:skew(-12deg);flex-shrink:0}.right .tank-mark{background:var(--green)}.name{font-size:11px;letter-spacing:.09em;white-space:nowrap}.health-number{font-size:11px;min-width:27px;color:var(--muted)}.health-track{height:3px;width:clamp(45px,12vw,130px);background:var(--line);overflow:hidden}.health-fill{height:100%;background:var(--red);transition:width .4s}.right .health-fill{background:var(--green)}.right .health-track{transform:scaleX(-1)}.right .health-number{order:0}.turn-caption{white-space:nowrap;text-align:center;font-size:10px;letter-spacing:.11em;color:var(--muted)}
-.arena-placeholder{z-index:1;aspect-ratio:960 / 520;margin:0 11px;background:var(--field);overflow:visible;pointer-events:none}
-.bottom-panel{margin:14px 11px 0;display:grid;grid-template-columns: minmax(0,1fr) auto;column-gap:20px;row-gap:13px;align-items:start}.action-summary{display:flex;flex-wrap:wrap;column-gap:24px;row-gap:7px;min-width:0;align-items:baseline}.display-label{color:var(--muted);font-size:10px}.display-number{font-size:12px;font-weight:bold}.aim-display{display:flex;gap:7px;white-space:nowrap}.event-line{font-size:11px;color:#635e54;text-align:right;max-width:420px;min-height:16px;transition:opacity .2s}.weapon-list{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.weapon{background:transparent;border:1px solid var(--line);text-align:left;padding:10px 10px 9px;min-width:0;min-height:55px;transition:background .15s,border-color .15s,transform .15s;position:relative}.weapon:not(:disabled):hover{border-color:#756c5d;transform:translateY(-1px)}.weapon.active{border-color:var(--ink);background:#fffdf7;box-shadow:inset 0 -2px 0 var(--red)}.weapon.green-active{box-shadow:inset 0 -2px 0 var(--green)}.weapon .weapon-top{display:flex;align-items:center;justify-content:space-between;gap:4px}.weapon .weapon-title{font-size:11px;letter-spacing:.015em;white-space:nowrap}.weapon .weapon-key{font-size:10px;color:var(--muted)}.weapon .weapon-detail{display:block;font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-footer{margin:18px 11px 0;border-top:1px solid var(--line);padding-top:11px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;color:var(--muted);font-size:10px}footer .controls-info{max-width:750px}footer strong{font-weight:normal;color:var(--ink)}.seed{white-space:nowrap;text-align:right;font-size:9px;color:#aaa69a}
+.statusbar{margin:0 11px 10px;display:grid;flex:0 0 auto;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px}.side{display:flex;align-items:center;gap:11px;min-width:0}.side.right{justify-content:flex-end;flex-direction:row-reverse}.tank-mark{height:7px;width:13px;background:var(--red);border:1px solid #34312d;transform:skew(-12deg);flex-shrink:0}.right .tank-mark{background:var(--green)}.name{font-size:11px;letter-spacing:.09em;white-space:nowrap}.health-number{font-size:11px;min-width:27px;color:var(--muted)}.health-track{height:3px;width:clamp(45px,12vw,130px);background:var(--line);overflow:hidden}.health-fill{height:100%;background:var(--red);transition:width .4s}.right .health-fill{background:var(--green)}.right .health-track{transform:scaleX(-1)}.right .health-number{order:0}.turn-caption{white-space:nowrap;text-align:center;font-size:10px;letter-spacing:.11em;color:var(--muted)}
+.arena-placeholder{z-index:1;flex:1 1 auto;min-height:130px;margin:0;background:var(--field);overflow:hidden;pointer-events:none}
+.bottom-panel{margin:12px 11px 0;display:grid;flex:0 0 auto;grid-template-columns: minmax(0,1fr) auto;column-gap:20px;row-gap:13px;align-items:start}.action-summary{display:flex;flex-wrap:wrap;column-gap:24px;row-gap:7px;min-width:0;align-items:baseline}.display-label{color:var(--muted);font-size:10px}.display-number{font-size:12px;font-weight:bold}.aim-display{display:flex;gap:7px;white-space:nowrap}.event-line{font-size:11px;color:#635e54;text-align:right;max-width:420px;min-height:16px;transition:opacity .2s}.weapon-list{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.weapon{background:transparent;border:1px solid var(--line);text-align:left;padding:10px 10px 9px;min-width:0;min-height:55px;transition:background .15s,border-color .15s,transform .15s;position:relative}.weapon:not(:disabled):hover{border-color:#756c5d;transform:translateY(-1px)}.weapon.active{border-color:var(--ink);background:#fffdf7;box-shadow:inset 0 -2px 0 var(--red)}.weapon.green-active{box-shadow:inset 0 -2px 0 var(--green)}.weapon .weapon-top{display:flex;align-items:center;justify-content:space-between;gap:4px}.weapon .weapon-title{font-size:11px;letter-spacing:.015em;white-space:nowrap}.weapon .weapon-key{font-size:10px;color:var(--muted)}.weapon .weapon-detail{display:block;font-size:10px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+footer{margin:12px 11px 0;border-top:1px solid var(--line);padding-top:9px;flex:0 0 auto;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;color:var(--muted);font-size:10px}footer .controls-info{max-width:750px}footer strong{font-weight:normal;color:var(--ink)}.seed{white-space:nowrap;text-align:right;font-size:9px;color:#aaa69a}
 .end-screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-30%);width:min(330px,82%);padding:28px 26px;text-align:center;background:rgba(253,251,245,.97);outline:1px solid var(--ink);box-shadow:6px 8px 0 rgba(42,40,35,.1);z-index:15;display:none}.end-screen.open{display:block}.end-screen h2{font-family:Georgia,serif;font-size:23px;font-weight:normal;letter-spacing:.04em;margin:7px 0 11px}.end-screen p{color:var(--muted);margin:0 0 23px}.solid-button{background:var(--ink);color:var(--field);border:1px solid var(--ink);padding:10px 19px;letter-spacing:.08em}.solid-button:hover{background:#484740}.small-tag{font-size:10px;color:var(--muted);letter-spacing:.16em}
 @keyframes rattle{0%,100%{transform:rotate(0) translateX(0)}20%{transform:rotate(5deg) translateX(3px)}48%{transform:rotate(-6deg) translateX(-2px)}75%{transform:rotate(3deg) translateX(2px)}}.rattle{animation:rattle .55s ease-in-out!important}.loose{animation:loose .8s cubic-bezier(.2,.8,.4,1) forwards!important}@keyframes loose{0%{transform:translate(0,0) rotate(0)}40%{transform:translate(1px,9px) rotate(-19deg)}100%{transform:translate(3px,15px) rotate(-29deg)}}
-@media(max-width:780px){#page{padding:17px 10px 22px;min-height:550px}header{margin:0 5px 15px;flex-direction:column;gap:12px}.brand h1{font-size:19px}.header-tools{justify-content:flex-start;gap:14px}.statusbar{margin:0 3px 8px;gap:5px}.health-track{width:45px}.side{gap:5px}.name{font-size:9px}.turn-caption{font-size:9px}.arena-placeholder{margin:0 3px}.bottom-panel{margin:12px 3px 0;grid-template-columns:1fr}.event-line{text-align:left;grid-row:2}.weapon-list{gap:4px}.weapon{padding:8px 5px;min-height:58px}.weapon .weapon-title{font-size:9px;white-space:normal;line-height:1.2}.weapon .weapon-detail{font-size:9px}footer{margin:15px 3px 0;flex-direction:column;gap:5px} .seed{text-align:left}}
+@media(max-width:780px){#page{padding:12px 0 12px}header{margin:0 5px 15px;flex-direction:column;gap:12px}.brand h1{font-size:19px}.header-tools{justify-content:flex-start;gap:14px}.statusbar{margin:0 3px 8px;gap:5px}.health-track{width:45px}.side{gap:5px}.name{font-size:9px}.turn-caption{font-size:9px}.arena-placeholder{margin:0}.bottom-panel{margin:12px 3px 0;grid-template-columns:1fr}.event-line{text-align:left;grid-row:2}.weapon-list{gap:4px}.weapon{padding:8px 5px;min-height:58px}.weapon .weapon-title{font-size:9px;white-space:normal;line-height:1.2}.weapon .weapon-detail{font-size:9px}footer{margin:15px 3px 0;flex-direction:column;gap:5px} .seed{text-align:left}}
 @media(max-width:470px){.brand small{display:none}.statusbar{grid-template-columns:1fr 1fr}.turn-caption{display:none}.side.right{justify-self:end}.health-track{width:36px}.weapon .weapon-key{font-size:9px}.weapon .weapon-detail{margin-top:6px}.bottom-panel{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.weapon, .wind-arrow, .health-fill{transition:none}}
 </style>
@@ -62,7 +62,10 @@ footer{margin:18px 11px 0;border-top:1px solid var(--line);padding-top:11px;disp
 <script>
 'use strict';
 // -- CORE BEGIN --
-const GW=960, GH=520, CELL=2, STEP=1/120, GRAVITY=298, TANK_R=13;
+let GW=960; // widened at runtime so the arena can fill the page
+// A match needs one world for both players, so it does not follow the viewport.
+const ONLINE_GW=1120;
+const GH=520, CELL=2, STEP=1/120, GRAVITY=298, TANK_R=13;
 const WEAPONS={
  standard:{name:'Standard shell',speed:1,radius:48,damage:24,direct:4,shake:2.5},
  heavy:{name:'Heavy shell',speed:.82,radius:64,damage:30,direct:5,shake:6},
@@ -87,7 +90,7 @@ class World {
    let phase=(this.seed%997)/997;
    for(let gx=0;gx<this.width;gx++){
      const x=gx*CELL+1;
-     const ground=365+17*Math.sin(x*.009+phase)+12*Math.sin(x*.022+1.2)+6*Math.cos(x*.046+phase*2)-18*Math.exp(-Math.pow((x-480)/140,2));
+     const ground=365+17*Math.sin(x*.009+phase)+12*Math.sin(x*.022+1.2)+6*Math.cos(x*.046+phase*2)-18*Math.exp(-Math.pow((x-this.width*CELL/2)/140,2));
      for(let gy=0;gy<this.height;gy++){
        const y=gy*CELL+1;
        const wall=gx<3||gx>=this.width-3||gy<3||gy>=this.height-3;
@@ -158,7 +161,7 @@ class World {
  serialize(){return Array.from(this.data)}
 }
 function makeTank(id,world){
- const x=id===0?145:815;
+ const x=id===0?Math.round(GW*.16):Math.round(GW*.84);
  let y=100;
  for(let py=100;py<GH-20;py+=2){if(world.solid(x,py)){y=py-TANK_R-2;break}}
  return {id,x,y,vy:0,angle:id===0?46:134,power:67,hp:100,grounded:true,attach:'ground',tilt:0,normal:{x:0,y:-1},recoil:0,hitFlash:0,inventory:{standard:Infinity,heavy:2,cluster:1,mine:1,ricochet:2},weapon:'standard',facing:id===0?1:-1,fallMax:0};
@@ -233,10 +236,8 @@ class TankGame {
        const nextY=clamp(t.y-(dir===side?d:-d),23,GH-24);
        if(this.world.solid(wx,nextY)){
          t.y=nextY;t.x=side>0?GW-26:26;t.grounded=true;t.vy=0;
-         t.normal={x:-side,y:0};t.tilt=side*Math.PI/2;
-         if(t.y<=25&&this.world.solid(t.x,5)){
-           t.attach='ceiling';t.y=26;t.normal={x:0,y:1};t.tilt=Math.PI;
-         }
+         // Treads sit against the wall, not on the far side of it.
+         t.normal={x:-side,y:0};t.tilt=-side*Math.PI/2;t.wallDown=dir!==side;
        }else{t.attach='air';t.grounded=false}
      }
    } else if(t.attach==='ceiling'){
@@ -245,28 +246,36 @@ class TankGame {
        t.x=nx;t.y=26;t.vy=0;t.grounded=true;t.normal={x:0,y:1};t.tilt=Math.PI;
      }else{t.attach='air';t.grounded=false}
    } else if(t.attach==='climb'){
-     // The same destructible collision cells provide traction on a crater lip.
-     // When the side is too steep for the wheels, treads climb its contour.
-     const near=this.world.nearest(t.x,t.y,TANK_R+11);
-     if(!near||near.nx*dir>-.12){t.attach='air';t.grounded=false}
+     // Treads on a steep face walk up it instead of hovering beside it: rise
+     // hugging the wall until the ground ahead is level with the hull, then
+     // drive onto the top. A ceiling overhead simply ends the climb.
+     const face=this.world.nearest(t.x,t.y,TANK_R+10);
+     if(!face||face.nx*dir>-.12){t.attach='air';t.grounded=false}
      else{
-       const nx=t.x+dir*d*Math.max(0,-near.ny);
-       const ny=t.y-d*Math.min(1.25,Math.max(.55,Math.abs(near.nx)*1.4));
-       const c=this.world.nearest(nx,ny,TANK_R+12);
-       if(c){
-         t.x=nx;t.y=ny;
-         if(c.d<TANK_R+2){t.x+=c.nx*(TANK_R+2-c.d);t.y+=c.ny*(TANK_R+2-c.d)}
-         t.grounded=true;t.vy=0;
-         const floor=this.world.contact(t.x,t.y+TANK_R+2);
-         if(c.ny<-.5&&floor&&Math.abs(floor.y-t.y)<10){t.attach='ground';t.y=floor.y}
-       }else{t.attach='air';t.grounded=false}
+       const aheadX=clamp(t.x+dir*11,1,GW-1);
+       const top=this.world.contact(aheadX,t.y+TANK_R+2);
+       const head=this.world.solid(t.x,t.y-TANK_R-1);
+       if(top&&top.y>=t.y-14&&top.y<=t.y+9){
+         // The treads have cleared the lip: drive onto it.
+         t.x=clamp(t.x+dir*d,TANK_R,GW-TANK_R);t.y=top.y;t.vy=0;t.grounded=true;
+         t.attach='ground';t.normal={x:0,y:-1};
+       }else if(head){
+         // No room above: the climb stops here, treads still on the wall.
+         t.vy=0;t.grounded=true;
+       }else{
+         t.y=Math.max(TANK_R+4,t.y-d*.9);
+         t.x=clamp(t.x+dir*d*.3,TANK_R,GW-TANK_R);
+         t.vy=0;t.grounded=true;
+         const hug=this.world.nearest(t.x,t.y,TANK_R+3);
+         if(hug&&hug.d<TANK_R+1){t.x+=hug.nx*(TANK_R+1-hug.d);t.y+=hug.ny*(TANK_R+1-hug.d)}
+       }
      }
    } else {
      // Split large deltas into small physical steps; travel speed is constant
      // and there is NO per-turn movement budget.
      const count=Math.max(1,Math.ceil(d/2));
      for(let i=0;i<count;i++){
-       const dx=dir*d/count,nx=clamp(t.x+dx,-60,GW+60);
+       const dx=dir*d/count,nx=clamp(t.x+dx,TANK_R,GW-TANK_R);
        if(nx>=GW-27&&dir>0&&this.world.solid(GW-5,t.y)){
          t.attach='right';t.x=GW-26;t.vy=0;t.grounded=true;t.tilt=Math.PI/2;break;
        }
@@ -310,7 +319,16 @@ class TankGame {
    if(t.attach==='ceiling'&&!this.world.solid(t.x,5)){t.attach='air';t.grounded=false}
    if(t.attach==='right'&&!this.world.solid(GW-5,t.y)){t.attach='air';t.grounded=false}
    if(t.attach==='left'&&!this.world.solid(5,t.y)){t.attach='air';t.grounded=false}
-   if(t.attach==='ceiling'||t.attach==='left'||t.attach==='right')return;
+   if(t.attach==='left'||t.attach==='right'){
+     // Driving down the wall steps off onto the floor instead of sinking into
+     // the bottom corner.
+     if(t.wallDown){
+       const floor=this.world.contact(t.x,t.y+TANK_R+2,10,10);
+       if(floor&&floor.y>=t.y&&floor.y<=t.y+TANK_R){t.y=floor.y;t.attach='ground';t.grounded=true;t.vy=0;t.tilt=0;t.normal={x:0,y:-1}}
+     }
+     return;
+   }
+   if(t.attach==='ceiling')return;
    if(t.attach==='climb'){
      const near=this.world.nearest(t.x,t.y,TANK_R+8);
      if(near&&near.d<=TANK_R+6){
@@ -528,6 +546,19 @@ class TankGame {
    for(let i=this.particles.length-1;i>=0;i--){const p=this.particles[i];p.life-=dt;p.vy+=GRAVITY*.32*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;
      if(p.life<=0)this.particles.splice(i,1)}
  }
+ resizeWorld(){
+   const old=this.world,ow=old.width,next=new World(this.seed),w=next.width,h=next.height;
+   for(let y=3;y<h-3;y++)for(let x=3;x<w-3;x++){
+     const sx=3+Math.floor((x-3)*(ow-6)/Math.max(1,w-6));
+     if(sx>=3&&sx<ow-3)next.data[next.idx(x,y)]=old.data[old.idx(sx,y)];
+   }
+   this.world=next;
+   const inside=v=>clamp(v,TANK_R+8,GW-TANK_R-8);
+   for(const t of this.tanks){t.x=inside(t.x);if(t.attach==='left'||t.attach==='right')t.attach='air'}
+   for(const p of this.projectiles)p.x=inside(p.x);
+   for(const m of this.mines)m.x=inside(m.x);
+   for(const d of this.drops)d.x=inside(d.x);
+ }
  snapshot(){return {
    version:1,seed:this.seed,mode:this.mode,turn:this.turn,turnNumber:this.turnNumber,
    phase:this.phase,wind:this.wind,randomState:this.rng.state,
@@ -556,9 +587,17 @@ function noiseSound(type){if(muted||!audio)return;const now=audio.currentTime;
 }
 function resize(){const r=page.getBoundingClientRect(),a=arena.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);
   const w=Math.round(r.width*dpr),h=Math.round(r.height*dpr);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';ctx.setTransform(dpr,0,0,dpr,0,0);
-  geo={x:a.left-r.left,y:a.top-r.top,scale:a.width/GW,width:r.width,height:r.height};
+  // The arena is the whole page area. Instead of letterboxing a fixed board,
+  // the world grows to the viewport at the current scale, so every visible
+  // pixel is drivable ground and nothing is hidden at a margin.
+  const scale=a.height>80?a.height/GH:1;
+  const worldWidth=window.__boredTogether?ONLINE_GW:Math.max(360,Math.round(a.width/scale));
+  if(worldWidth!==GW){GW=worldWidth;if(game)game.resizeWorld()}
+  geo={x:a.left-r.left,y:a.top-r.top,scale,width:r.width,height:r.height};
 }
-function makeTexture(){if(!game)return;const w=game.world.width,h=game.world.height,data=game.world.data,out=tc.createImageData(w,h);
+function makeTexture(){if(!game)return;const w=game.world.width,h=game.world.height,data=game.world.data;
+ if(tempCanvas.width!==w||tempCanvas.height!==h){tempCanvas.width=w;tempCanvas.height=h}
+ const out=tc.createImageData(w,h);
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
    const id=y*w+x,v=data[id],b=id*4;if(!v)continue;
    const edge=(x>0&&!data[id-1])||(x<w-1&&!data[id+1])||(y>0&&!data[id-w])||(y<h-1&&!data[id+w]);
@@ -721,10 +760,24 @@ function frame(ms){const now=ms/1000,dt=lastTime?Math.min(.045,now-lastTime):0;l
  */
 const online = (() => { try { return window.__boredTogether || null; } catch (error) { return null; } })();
 let onlineSeat = 0, onlineShot = null, onlineSent = false;
+function hullState(t) {
+  return { x: +t.x.toFixed(3), y: +t.y.toFixed(3), angle: +t.angle.toFixed(3), power: +t.power.toFixed(3),
+    hp: t.hp, vy: +(t.vy || 0).toFixed(3), attach: t.attach, grounded: !!t.grounded };
+}
 function replayShot(shot) {
   const id = Number(shot.seat) - 1, t = game && game.tanks[id];
   if (!t) return;
   const at = shot.at || {};
+  // Both hulls travel with the shot: between turns each screen settles its own
+  // ground, and a couple of pixels there is a different hit.
+  if (Array.isArray(at.hulls)) at.hulls.forEach((h, i) => {
+    const hull = game.tanks[i]; if (!hull || !h) return;
+    for (const key of ['x', 'y', 'angle', 'power', 'hp', 'vy']) {
+      const value = Number(h[key]); if (Number.isFinite(value)) hull[key] = value;
+    }
+    if (typeof h.attach === 'string') hull.attach = h.attach;
+    hull.grounded = h.grounded !== false && hull.attach !== 'air';
+  });
   if (Number.isFinite(Number(at.x)) && Number.isFinite(Number(at.y))) {
     t.x = Number(at.x); t.y = Number(at.y); t.attach = at.attach || 'ground';
     t.vy = 0; t.grounded = t.attach !== 'air';
@@ -741,6 +794,7 @@ function replayShot(shot) {
 function onlineStart() {
   const ctx = online.context || {}, state = ctx.state || {};
   onlineSeat = Number(ctx.seat) || 1;
+  GW = ONLINE_GW;
   game = new TankGame((Number(state.seed) >>> 0) || 1, 'local', {
     message: () => {}, sound: noiseSound, shake: v => { shake = Math.min(6, shake + v); }, escape: uiHit,
     end: () => {}                       // the server owns the result, not this screen
@@ -754,10 +808,11 @@ function onlineStart() {
   const fire = game.shoot.bind(game), pick = game.selectWeapon.bind(game);
   game.shoot = (id = game.turn, kind = null) => {
     if (game.turn !== onlineSeat - 1 || game.phase !== 'aim') return false;
+    const hulls = game.tanks.map(hullState);
     if (!fire(id, kind)) return false;
     const action = game.actions[game.actions.length - 1];
     onlineShot = { seat: onlineSeat, angle: action.angle, power: action.power, weapon: action.weapon,
-      at: action.launchPosition, rng: action.randomState, wind: action.wind };
+      at: { ...action.launchPosition, hulls }, rng: action.randomState, wind: action.wind };
     return true;
   };
   game.selectWeapon = kind => (game.turn === onlineSeat - 1 ? pick(kind) : false);

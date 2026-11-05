@@ -114,11 +114,6 @@
     "better": "high",
     "max_value": 999
   },
-  "prism-duel": {
-    "label": "Fewest turns to burn the CPU core",
-    "better": "low",
-    "max_value": 999
-  },
   "qbert": {
     "label": "Score",
     "better": "high",

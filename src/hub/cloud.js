@@ -69,9 +69,23 @@ function sameSession(id) {
   return getSession()?.user?.id === id;
 }
 
+// The row version this page last read or wrote. A save then needs one
+// conditional PATCH instead of a read followed by a write; a PATCH that returns
+// no rows is exactly the signal that another device wrote first, and only then
+// do we re-read and merge.
+let known = null;
+
+function remember(id, row) {
+  // A missing row is worth remembering too: the next save can POST directly and
+  // fall back to a read only when another device created the row first.
+  known = id ? { id, updatedAt: row?.updated_at || null, data: object(row?.data) } : null;
+}
+
 async function currentRow(id) {
   const rows = await request(TABLE + '?select=data,updated_at&user_id=eq.' + encodeURIComponent(id));
-  return rows?.[0] || null;
+  const row = rows?.[0] || null;
+  remember(id, row);
+  return row;
 }
 
 export async function pullPlayerState() {
@@ -87,7 +101,10 @@ export async function pushPlayerState(incoming) {
   const id = session.user.id;
   for (let attempt = 0; attempt < 8; attempt++) {
     if (!sameSession(id)) return null;
-    const row = await currentRow(id);
+    const cached = known?.id === id ? known : null;
+    const row = cached
+      ? (cached.updatedAt ? { updated_at: cached.updatedAt, data: cached.data } : null)
+      : await currentRow(id);
     if (!sameSession(id)) return null;
     const data = mergeCloudState(row?.data, incoming);
     const body = { data, updated_at: new Date().toISOString() };
@@ -100,18 +117,21 @@ export async function pushPlayerState(incoming) {
         result = await request(TABLE +
           '?user_id=eq.' + encodeURIComponent(id) +
           '&updated_at=eq.' + encodeURIComponent(row.updated_at) +
-          '&select=data', {
+          '&select=data,updated_at', {
           method: 'PATCH', body, prefer: 'return=representation'
         });
-        if (!result?.length) continue;
+        if (!result?.length) { known = null; continue; }
       } else {
-        result = await request(TABLE + '?select=data', {
+        result = await request(TABLE + '?select=data,updated_at', {
           method: 'POST', body: { ...body, user_id: id },
           prefer: 'return=representation'
         });
       }
-      return sameSession(id) ? (result?.[0]?.data || data) : null;
+      const saved = result?.[0];
+      remember(id, { data: saved?.data || data, updated_at: saved?.updated_at || body.updated_at });
+      return sameSession(id) ? (saved?.data || data) : null;
     } catch (error) {
+      known = null;
       if (!row && error.status === 409) continue; // concurrent first insert
       throw error;
     }

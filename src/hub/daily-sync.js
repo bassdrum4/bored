@@ -4,9 +4,24 @@
 // The server accepts a first submission per user/challenge for a future
 // cross-account board, but a snapshot alone is not proof of a legitimate run.
 import { dailyResultCheck } from '../daily.js';
+import { readStored, writeStored } from './store.js';
 import { backendReady, freshSession, getSession, request, ensureProfile } from './backend.js';
 
-const sent = new Set();
+// Challenge ids the server has already accepted for this account, so a page
+// load does not replay every stored completion as another no-op write. Keyed by
+// account because the daily row belongs to the account, not the browser.
+const SYNC_KEY = 'bored.syncedDaily.';
+const SYNC_LIMIT = 240;
+const confirmed = new Map();
+
+function confirmedFor(userId) {
+  const held = confirmed.get(userId);
+  if (held) return held;
+  const stored = readStored(SYNC_KEY + userId, []);
+  const ids = new Set(Array.isArray(stored) ? stored.filter(id => typeof id === 'string') : []);
+  confirmed.set(userId, ids);
+  return ids;
+}
 
 // Extracting the date here makes a subtle escaped-regex failure testable.
 export function dailyResultDate(id) {
@@ -19,8 +34,8 @@ export async function submitDailyResult(result) {
   if (!result?.id || !result.snapshot || !backendReady()) return false;
   const session = getSession();
   if (!session || !(await freshSession()) || getSession()?.user?.id !== session.user.id) return false;
-  const key = session.user.id + ':' + result.id;
-  if (sent.has(key)) return true;
+  const ids = confirmedFor(session.user.id);
+  if (ids.has(result.id)) return true;
   try {
     if (!(await ensureProfile()) || getSession()?.user?.id !== session.user.id) return false;
     const date = dailyResultDate(result.id);
@@ -35,7 +50,8 @@ export async function submitDailyResult(result) {
       body: { p_challenge: result.id, p_value: value, p_snapshot: result.snapshot }
     });
     if (getSession()?.user?.id !== session.user.id) return false;
-    sent.add(key);
+    ids.add(result.id);
+    writeStored(SYNC_KEY + session.user.id, [...ids].slice(-SYNC_LIMIT));
     return true;
   } catch {
     return false;
