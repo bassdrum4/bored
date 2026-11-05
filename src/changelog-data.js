@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 300,
+  "count": 301,
   "newest": "2026-11-05",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"9e92bc2","date":"2026-11-05","author":"Codebuff","subject":"Move the game menu waffle to the top-left"},
   {"sha":"876b2ef","date":"2026-11-05","author":"Codebuff","subject":"Bank a score for finishing a wall-free Trackbound track"},
   {"sha":"d3730bf","date":"2026-11-05","author":"Codebuff","subject":"Count Klang's visible time without depending on window focus"},
   {"sha":"05e8a76","date":"2026-11-05","author":"Codebuff","subject":"Point Klang at its published site and record external playtime"},
