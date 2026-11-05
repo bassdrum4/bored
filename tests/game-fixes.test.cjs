@@ -320,3 +320,45 @@ test('Wordle win animation keeps the winning row after the guess counter advance
     assert.deepEqual(animated, Array.from({ length: 5 }, (_, col) => [winningRow, col, 'bounce']));
   }
 });
+
+test('Ashcrown never writes the solo save during a Bored Together match', () => {
+  // A match hands the whole board to the server, so its turns must not write
+  // (or clear) the campaign slot the single-player game keeps on this device.
+  const html = load('src/games/content/ashcrown.html');
+  const keyLiteral = html.match(/const SAVE_KEY = ('[^']+');/)[1];
+  const slot = keyLiteral.slice(1, -1);
+  const solo = JSON.stringify({ v: 4, meta: 'lost campaign', state: { v: 4 } });
+  const store = new Map([[slot, solo]]);
+  const writes = [];
+  const ctx = vm.createContext({
+    localStorage: {
+      getItem: key => store.has(key) ? store.get(key) : null,
+      setItem: (key, value) => { writes.push(key); store.set(key, value); },
+      removeItem: key => { writes.push(key); store.delete(key); }
+    },
+    MAP_TYPES: { pangaea: { name: 'Pangaea' } },
+    G: { watch: false, tut: false, over: null, map: 'pangaea', level: 'normal', turn: 4,
+      players: [{ name: 'Rome' }, { name: 'Carthage' }] }
+  });
+  vm.runInContext('const SAVE_KEY = ' + keyLiteral + '; var online = null;' +
+    ['saveGame', 'clearSave', 'autosave'].map(name => extractFunction(html, name)).join('\n'), ctx);
+  assert.equal(ctx.saveGame(), true, 'solo play still saves');
+  const soloSave = store.get(slot);
+  assert.notEqual(soloSave, solo, 'solo play rewrites its own slot');
+  writes.length = 0;
+  ctx.online = { submit() {}, finishTurn() {} };
+  ctx.G.turn = 9;
+  assert.equal(ctx.saveGame(), false, 'a match never saves');
+  ctx.autosave();
+  ctx.G.over = { winner: 0 };
+  assert.equal(ctx.saveGame(), false, 'a finished match never clears the slot either');
+  ctx.autosave();
+  assert.deepEqual(writes, [], 'the match touches storage not at all');
+  assert.equal(store.get(slot), soloSave, 'the solo campaign survives the match');
+  ctx.online = null;
+  ctx.G.over = null;
+  ctx.saveGame();
+  ctx.G.over = { winner: 0 };
+  assert.equal(ctx.saveGame(), false);
+  assert.equal(store.has(slot), false, 'a finished solo game still clears its own slot');
+});

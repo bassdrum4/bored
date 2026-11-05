@@ -7213,6 +7213,9 @@ function askEndTurn() {
 }
 
 function showMenu() {
+  const howSaved = online ? 'Bored Together keeps this match on the server, not on this device, so your solo campaign is left alone.'
+    : G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.'
+    : 'The game saves itself on this device after every move and every turn. Playing the tutorial keeps this save.';
   openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name) +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
@@ -7221,10 +7224,9 @@ function showMenu() {
       : '<button class="act" data-act="tut-start">Play the tutorial</button>') +
     '<button class="act switch" data-act="tips-toggle">Tips in my games<b>' + (tipsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="anim-next">Animation<b>' + ANIM_LEVELS[currentAnim()] + '</b></button>' +
-    (G.tut ? '' : '<button class="act" data-act="save">Save now</button>') +
+    (G.tut || online ? '' : '<button class="act" data-act="save">Save now</button>') +
     '<button class="act warn" data-act="new-ask">Quit to the start screen</button></div>' +
-    '<p class="hint">' + (G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.' :
-      'The game saves itself on this device after every move and every turn. Playing the tutorial keeps this save.') + '</p></div>' +
+    '<p class="hint">' + howSaved + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Back to the game</button></div>', true);
 }
 
@@ -7910,6 +7912,9 @@ function bindKeys() {
 const SAVE_KEY = 'bored.civlite.save.v2';
 
 function saveGame() {
+  // A Bored Together match lives on the server and in the match document, not
+  // in this device's slot: it must never write over (or clear) a solo campaign.
+  if (online) return false;
   if (!G || G.watch || G.tut) return false;
   if (G.over) { clearSave(); return false; }
   try {
@@ -7924,7 +7929,7 @@ function saveGame() {
 function clearSave() {
   try { localStorage.removeItem(SAVE_KEY); } catch (error) { /* storage blocked */ }
 }
-function autosave() { if (!online) saveGame(); }
+function autosave() { saveGame(); }
 function validState(state) {
   return !!state && (state.v === 2 || state.v === 3 || state.v === 4) && Array.isArray(state.tiles) && Array.isArray(state.players) && state.players.length >= 2 &&
     Number.isFinite(state.cols) && Number.isFinite(state.rows) && state.tiles.length === state.cols * state.rows &&
