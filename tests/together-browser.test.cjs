@@ -191,7 +191,9 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
     const game = window.tank2;
     game.tanks[0].angle = 55; game.tanks[0].power = 80;
     game.shoot();
-    for (let i = 0; i < 8000 && game.phase !== 'aim' && game.phase !== 'gameover'; i++) game.tick(1 / 60);
+    // The engine's own step: replay and the live frame loop both tick at STEP,
+    // and a different timestep lands shells a pixel apart.
+    for (let i = 0; i < 8000 && game.phase !== 'aim' && game.phase !== 'gameover'; i++) game.tick(STEP);
     return { hp: game.tanks.map(t => t.hp), at: { x: game.tanks[0].x, y: game.tanks[0].y } };
   });
   await a.waitForFunction(() => document.querySelector('#player').hidden, { timeout: 20000 });
@@ -208,7 +210,9 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
     const game = window.tank2;
     game.tanks[1].angle = 125; game.tanks[1].power = 80;
     game.shoot();
-    for (let i = 0; i < 8000 && game.phase !== 'aim' && game.phase !== 'gameover'; i++) game.tick(1 / 60);
+    // The engine's own step: replay and the live frame loop both tick at STEP,
+    // and a different timestep lands shells a pixel apart.
+    for (let i = 0; i < 8000 && game.phase !== 'aim' && game.phase !== 'gameover'; i++) game.tick(STEP);
     return { hp: game.tanks.map(t => t.hp), at: { x: game.tanks[1].x, y: game.tanks[1].y } };
   });
   await b.waitForFunction(() => document.querySelector('#player').hidden, { timeout: 20000 });

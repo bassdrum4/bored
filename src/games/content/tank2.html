@@ -761,8 +761,10 @@ function frame(ms){const now=ms/1000,dt=lastTime?Math.min(.045,now-lastTime):0;l
 const online = (() => { try { return window.__boredTogether || null; } catch (error) { return null; } })();
 let onlineSeat = 0, onlineShot = null, onlineSent = false;
 function hullState(t) {
-  return { x: +t.x.toFixed(3), y: +t.y.toFixed(3), angle: +t.angle.toFixed(3), power: +t.power.toFixed(3),
-    hp: t.hp, vy: +(t.vy || 0).toFixed(3), attach: t.attach, grounded: !!t.grounded };
+  // Full precision: rounding a hull is enough to move an explosion one tank-width
+  // and change the damage by a point on the far side.
+  return { x: t.x, y: t.y, angle: t.angle, power: t.power,
+    hp: t.hp, vy: t.vy || 0, attach: t.attach, grounded: !!t.grounded };
 }
 function replayShot(shot) {
   const id = Number(shot.seat) - 1, t = game && game.tanks[id];
@@ -782,8 +784,12 @@ function replayShot(shot) {
     t.x = Number(at.x); t.y = Number(at.y); t.attach = at.attach || 'ground';
     t.vy = 0; t.grounded = t.attach !== 'air';
   }
-  t.angle = clamp(Number(shot.angle) || t.angle, 0, 180);
-  t.power = clamp(Number(shot.power) || t.power, 25, 100);
+  // The hulls carry the exact aim; the wire rounds it to two decimals, and a
+  // fraction of a degree is a different impact point.
+  if (!Array.isArray(at.hulls)) {
+    t.angle = clamp(Number(shot.angle) || t.angle, 0, 180);
+    t.power = clamp(Number(shot.power) || t.power, 25, 100);
+  }
   if (WEAPONS[shot.weapon]) t.weapon = shot.weapon;
   if (Number.isFinite(Number(shot.rng))) game.rng.state = Number(shot.rng);
   game.wind = Number(shot.wind) || 0;
