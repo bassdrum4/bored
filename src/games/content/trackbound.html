@@ -695,6 +695,43 @@ const bowlDef = dir => ({
   }
 });
 
+// New-route pieces. Ice and the tunnel are exactly as long as a straight, so a
+// layout that swaps one in keeps the shape it was designed with.
+// Sheet ice: grip low enough that the car keeps sliding after the wheel is
+// straight, so the next corner has to be set up before entering it, and long
+// enough that the slide has to be held rather than dabbed at.
+const ICE_LEN = 32;
+const iceDef = { name: 'Ice', len: ICE_LEN, hw: 6.4, samples: 22, grip: 1.05,
+  paint: [0.6, 0.7, 0.79], top: [0.77, 0.84, 0.9],
+  curve: t => ({ p: [0, 0, ICE_LEN * t], f: [0, 0, 1], u: [0, 1, 0] }) };
+// A tunnel: the road runs between tall walls and under a roof, so it arrives as
+// a lit bore rather than a straight with a view.
+const TUNNEL_LEN = 32;
+const tunnelDef = { name: 'Tunnel', len: TUNNEL_LEN, hw: 6, samples: 20, wall: 4.6, ceiling: true,
+  curve: t => ({ p: [0, 0, TUNNEL_LEN * t], f: [0, 0, 1], u: [0, 1, 0] }) };
+// Rollers: two short crests in the space of a straight, so the car skips along
+// instead of settling.
+const whoopsDef = Object.assign(waveDef(2.1, 16, 2, 'Whoops'), { hw: 6, samples: 22 });
+// A vertical loop. The road climbs, turns over and comes down, drifting forward
+// as it does so the exit sits past the entry instead of on top of it. The
+// surface normal always points at the inside of the loop, so the car is pressed
+// into the road for the whole turn.
+const LOOP_R = 11, LOOP_DRIFT = 20;
+const LOOP_LEN = Math.sqrt(Math.pow(2 * Math.PI * LOOP_R, 2) + LOOP_DRIFT * LOOP_DRIFT);
+const loopDef = {
+  name: 'Loop', len: LOOP_LEN, hw: 6, samples: 72, wall: 0.9,
+  curve: t => {
+    const a = TAU * t;
+    const u = [0, Math.cos(a), -Math.sin(a)];
+    const tangent = norm([0, Math.sin(a) * TAU * LOOP_R, Math.cos(a) * TAU * LOOP_R + LOOP_DRIFT]);
+    return {
+      p: [0, LOOP_R * (1 - Math.cos(a)), LOOP_R * Math.sin(a) + LOOP_DRIFT * t],
+      f: norm(sub(tangent, mul(u, dot(tangent, u)))),
+      u
+    };
+  }
+};
+
 const BLOCKS = {
   start: { name: 'Start', len: 16, hw: 6, samples: 10, start: true,
     curve: t => ({ p: [0, 0, 16 * t], f: [0, 0, 1], u: [0, 1, 0] }) },
@@ -720,6 +757,12 @@ const BLOCKS = {
     curve: t => ({ p: [0, 0, 18 * t], f: [0, 0, 1], u: [0, 1, 0] }) },
   boost: { name: 'Boost', len: 16, hw: 6, samples: 8, boost: true, paint: PALETTE.boost,
     curve: t => ({ p: [0, 0, 16 * t], f: [0, 0, 1], u: [0, 1, 0] }) },
+  // New-route features: ice, a roofed tunnel, two crests in one straight and a
+  // full vertical loop.
+  ice: iceDef,
+  tunnel: tunnelDef,
+  whoops: whoopsDef,
+  loop: loopDef,
   dirt: { name: 'Dirt', len: 18, hw: 6.4, samples: 9, grip: 4.4, paint: PALETTE.dirt, top: PALETTE.dirt,
     curve: t => ({ p: [0, 0, 18 * t], f: [0, 0, 1], u: [0, 1, 0] }) },  narrow: { name: 'Narrow', len: 16, hw: 3.9, samples: 9,
     curve: t => ({ p: [0, 0, 16 * t], f: [0, 0, 1], u: [0, 1, 0] })
@@ -793,13 +836,37 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
       const aRT = madd(aR, a.w.y, wallH), bRT = madd(bR, b.w.y, wallH);
       const aLO = madd(aLT, a.w.x, -outer), bLO = madd(bLT, b.w.x, -outer);
       const aRO = madd(aRT, a.w.x, outer), bRO = madd(bRT, b.w.x, outer);
-      const wallColor = def.paint ? shade(def.paint, 1.02) : PALETTE.wall;
+      const wallColor = def.paint ? shade(def.paint, 1.02) : def.ceiling ? shade(PALETTE.wall, 0.62) : PALETTE.wall;
       pushQuad(road, aL, aLT, bLT, bL, a.w.x, wallColor);
       pushQuad(road, aLT, aLO, bLO, bLT, a.w.y, shade(wallColor, 1.05));
       pushQuad(road, aLO, bLO, bLT, aLT, mul(a.w.x, -1), shade(wallColor, 0.82));
       pushQuad(road, aR, bR, bRT, aRT, mul(a.w.x, -1), wallColor);
       pushQuad(road, aRT, aRO, bRO, bRT, a.w.y, shade(wallColor, 1.05));
       pushQuad(road, aRO, bRO, bRT, aRT, a.w.x, shade(wallColor, 0.82));
+    }
+
+    // A tunnel closes over the road: a dark ceiling on the wall tops with a pale
+    // strip down the crown and ribs every few segments, so it reads as a lit
+    // bore from the outside and a roof from inside.
+    if (def.ceiling) {
+      const aLT = madd(a.pts[0], a.w.y, wallH), aRT = madd(a.pts[5], a.w.y, wallH);
+      const bLT = madd(b.pts[0], b.w.y, wallH), bRT = madd(b.pts[5], b.w.y, wallH);
+      const aMid = mul(add(aLT, aRT), 0.5), bMid = mul(add(bLT, bRT), 0.5);
+      const down = mul(a.w.y, -1);
+      const roof = shade(PALETTE.wall, 0.5 + (i % 2) * 0.035);
+      pushQuad(road, aLT, bLT, bMid, aMid, down, roof);
+      pushQuad(road, aMid, bMid, bRT, aRT, down, roof);
+      // the outside of the roof, so the tunnel is a solid casing from above
+      const aLT2 = madd(aLT, a.w.y, 0.12), bLT2 = madd(bLT, b.w.y, 0.12);
+      const aRT2 = madd(aRT, a.w.y, 0.12), bRT2 = madd(bRT, b.w.y, 0.12);
+      const aMid2 = madd(aMid, a.w.y, 0.12), bMid2 = madd(bMid, b.w.y, 0.12);
+      pushQuad(road, aLT2, bLT2, bMid2, aMid2, a.w.y, shade(PALETTE.wall, 0.7));
+      pushQuad(road, aMid2, bMid2, bRT2, aRT2, a.w.y, shade(PALETTE.wall, 0.7));
+      pushQuad(road,
+        madd(aMid, a.w.y, -0.02), madd(bMid, b.w.y, -0.02),
+        madd(madd(bMid, b.w.x, 1.1), b.w.y, -0.02), madd(madd(aMid, a.w.x, 1.1), a.w.y, -0.02),
+        down, shade(PALETTE.line, 0.72));
+      if (i % 3 === 0) pushBox(road, a.w, madd(aMid, a.w.y, -0.2), [hw, 0.18, 0.24], shade(PALETTE.wall, 0.38));
     }
 
     // Collision panels: the inner face of each wall, one per segment. These
@@ -821,6 +888,19 @@ function emitBlock(road, scenery, entry, def, index, legs, walls, prevHw, nextHw
     // legs down to the ground so elevated blocks are not floating slabs
     if (i % 4 === 0 && rows[i].w.y[1] > 0.5 && rows[i].w.p[1] > GROUND_Y + 5) {
       legs.push(rows[i].w.p);
+    }
+  }
+
+  // Tunnel mouths: a dark frame around each end, so the bore reads as a portal
+  // cut into the ground rather than a roof floating over the road.
+  if (def.ceiling) {
+    for (const row of [rows[0], rows[segments]]) {
+      const frame = row.w;
+      const top = madd(frame.p, frame.y, wallH + 0.3);
+      pushBox(road, frame, top, [hw + 1.2, 0.62, 0.7], shade(PALETTE.wall, 0.38));
+      for (const side of [-1, 1]) {
+        pushBox(road, frame, madd(madd(frame.p, frame.x, side * (hw + 0.45)), frame.y, wallH / 2), [0.62, wallH / 2 + 0.3, 0.7], shade(PALETTE.wall, 0.38));
+      }
     }
   }
 
@@ -1175,14 +1255,43 @@ const CAMPAIGN = [
     blocks: ['start', 'sprint', 'straight', 'curveR', 'up', 'straight', 'down', 'checkpoint',
       'curveL', 'sprint', 'boost', 'straight', 'wallL', 'straight', 'wallL', 'straight',
       'checkpoint', 'curveR', 'dirt', 'straight', 'curveL', 'sprint', 'curveR', 'straight',
-      'finish'] }
+      'finish'] },
+  // The rest of the campaign: longer routes that mix the first eight pieces
+  // with the new ones (ice, tunnels, rollers and the steeper dive), so a lap is
+  // not just more of the same road. Author times use the same clean-line
+  // benchmark, so a medal means the same thing here as it does on Paddock.
+  { id: 'serpentine', name: 'Serpentine', author: 23500,
+    blocks: ['start', 'sprint', 'curveR', 'tunnel', 'curveL', 'hairpinR', 'straight',
+      'checkpoint', 'sprint', 'boost', 'wallL', 'straight', 'curveL', 'curveR', 'whoops',
+      'hairpinL', 'checkpoint', 'sprint', 'curveR', 'straight', 'curveL', 'narrow', 'curveR',
+      'checkpoint', 'sprint', 'boost', 'straight', 'finish'] },
+  { id: 'highline', name: 'Highline', author: 39500,
+    blocks: ['start', 'sprint', 'up', 'curveL', 'up', 'whoops', 'down', 'straight',
+      'checkpoint', 'straight', 'curveR', 'up', 'sprint', 'straight', 'curveL', 'straight',
+      'checkpoint', 'curveR', 'straight', 'tunnel', 'down', 'curveL', 'sprint', 'finish'] },
+  { id: 'foundry', name: 'Foundry', author: 18650,
+    blocks: ['start', 'tunnel', 'boost', 'narrow', 'curveR', 'straight', 'narrow',
+      'checkpoint', 'ice', 'boost', 'hairpinL', 'straight', 'curveR', 'narrow', 'boost',
+      'checkpoint', 'curveL', 'straight', 'curveR', 'sprint', 'boost', 'narrow', 'checkpoint',
+      'tunnel', 'curveL', 'sprint', 'finish'] },
+  { id: 'horizon', name: 'Horizon', author: 24900,
+    blocks: ['start', 'sprint', 'straight', 'curveR', 'ice', 'curveL', 'checkpoint', 'boost',
+      'straight', 'curveR', 'up', 'tunnel', 'straight', 'curveL', 'checkpoint', 'straight',
+      'straight', 'curveL', 'sprint', 'wallR', 'straight', 'checkpoint', 'curveR', 'hairpinL',
+      'whoops', 'curveR', 'boost', 'sprint', 'checkpoint', 'straight', 'curveL', 'finish'] },
+  { id: 'longway', name: 'The Long Way', author: 26700,
+    blocks: ['start', 'sprint', 'straight', 'curveR', 'sprint', 'curveL', 'checkpoint',
+      'tunnel', 'straight', 'curveR', 'hairpinL', 'sprint', 'checkpoint', 'boost', 'straight',
+      'curveL', 'up', 'straight', 'down', 'curveR', 'checkpoint', 'wallL', 'straight', 'wallR',
+      'curveL', 'checkpoint', 'ice', 'straight', 'boost', 'loop', 'straight', 'curveR',
+      'sprint', 'finish'] }
 ];
 
 const MEDALS = [
   { id: 'author', name: 'Author', factor: 1.0 },
-  { id: 'gold', name: 'Gold', factor: 1.14 },
-  { id: 'silver', name: 'Silver', factor: 1.32 },
-  { id: 'bronze', name: 'Bronze', factor: 1.58 }
+  { id: 'gold', name: 'Gold', factor: 1.05 },
+  { id: 'silver', name: 'Silver', factor: 1.16 },
+  { id: 'bronze', name: 'Bronze', factor: 1.30 }
 ];
 function medalTimes(author) {
   return MEDALS.map(medal => ({ id: medal.id, name: medal.name, ms: Math.round(author * medal.factor) }));
@@ -2300,9 +2409,13 @@ function showResult(isBest, ms) {
   $('resTime').textContent = clock(ms);
   $('resMedal').textContent = medalName(race.medal);
   $('resDot').className = 'dot ' + (race.medal || '');
+  // A saved best can be missing on a slower run: a layout change prunes the
+  // old record, and the result screen must not read through it.
   $('resBest').textContent = isBest
     ? 'Ghost saved for this track.'
-    : 'Best ' + clock(race.best.ms) + ' · ' + (race.ghostOn ? 'ghost on' : 'ghost off');
+    : race.best
+      ? 'Best ' + clock(race.best.ms) + ' · ' + (race.ghostOn ? 'ghost on' : 'ghost off')
+      : 'Best on this layout is still unset.';
   const board = $('resBoard');
   board.replaceChildren();
   for (const medal of medalTimes(world.author)) {

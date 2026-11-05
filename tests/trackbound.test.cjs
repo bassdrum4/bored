@@ -186,7 +186,9 @@ function autopilot(page, index) {
 test('Trackbound builds every campaign track as a solid, unfolded ribbon', () => {
   const page = load();
   const T = page.sandbox.__test;
-  assert.equal(T.CAMPAIGN.length, 8, 'eight campaign tracks');
+  assert.ok(T.CAMPAIGN.length >= 8, 'the original campaign tracks are still there');
+  assert.equal(new Set(T.CAMPAIGN.map(entry => entry.id)).size, T.CAMPAIGN.length,
+    'every campaign track has its own id');
   for (const entry of T.CAMPAIGN) {
     const track = T.buildTrack(entry.blocks, entry);
     assert.ok(track.mesh.tris.length > 0, entry.id + ' has road triangles');
