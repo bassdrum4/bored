@@ -184,6 +184,15 @@ canvas { display:block; image-rendering:auto; touch-action:none; }
   background:rgba(16,23,36,.72); padding:7px 9px; text-align:left;
 }
 .shop-item[hidden] { display:none; }
+.shop-key {
+  flex:0 0 12px; text-align:center;
+  font-family:'Share Tech Mono',monospace; font-size:10px; color:#5d6c83;
+}
+.shop-tier {
+  font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
+  color:#5d6c83; padding-top:2px;
+}
+.shop-tier[hidden] { display:none; }
 .shop-copy { flex:1 1 auto; min-width:0; }
 .shop-name {
   display:block; font-family:'Rajdhani',sans-serif; font-weight:700;
@@ -312,6 +321,8 @@ textarea.result[hidden] { display:none; }
       <div class="stat"><span>Floor</span><b id="sDepth">1/5</b></div>
       <div class="stat gold"><span>Gold</span><b id="sGold">0</b></div>
       <div class="stat pot"><span>Flasks</span><b id="sPotions">1</b></div>
+      <div class="stat"><span>Blade</span><b id="sAtk">3</b></div>
+      <div class="stat"><span>Plate</span><b id="sDef">0</b></div>
       <div class="stat"><span>Slain</span><b id="sKills">0</b></div>
       <div class="stat"><span>Score</span><b id="sScore">0</b></div>
     </div>
@@ -336,7 +347,8 @@ textarea.result[hidden] { display:none; }
       <div class="titlebest" id="titleBest"></div>
       <div class="keys">
         <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows move · <kbd>space</kbd> waits<br>
-        <kbd>Q</kbd> drinks a flask · <kbd>&gt;</kbd> or <kbd>enter</kbd> takes the stairs
+        <kbd>Q</kbd> drinks a flask · <kbd>&gt;</kbd> or <kbd>enter</kbd> takes the stairs<br>
+        At a landing: <kbd>R</kbd> rests · <kbd>B</kbd> opens the shop · <kbd>1</kbd>/<kbd>2</kbd> pick a path
       </div>
     </div>
 
@@ -349,7 +361,7 @@ textarea.result[hidden] { display:none; }
       </div>
       <div class="route-choices">
         <button class="btn" id="btnRest" type="button">Rest
-          <small>Recover 6 vitality · once per landing</small>
+          <small>Recover 6 vitality · the landing gives 8</small>
         </button>
         <button class="btn" id="btnShop" type="button">Open the shop
           <small>Spend gold on flasks and gear · better stock deeper down</small>
@@ -357,7 +369,7 @@ textarea.result[hidden] { display:none; }
       </div>
       <div class="route-choices">
         <button class="btn" id="btnSafeRoute" type="button">1 · Sheltered path
-          <small>Recover 6 HP · 1 fewer enemy and gold cache</small>
+          <small>Recover up to 6 HP · shares the landing's 8 · 1 fewer enemy and cache</small>
         </button>
         <button class="btn hot" id="btnRiskyRoute" type="button">2 · Unquiet path
           <small>Recover 1 HP · 3 extra enemies and 2 gold caches</small>
@@ -432,6 +444,7 @@ textarea.result[hidden] { display:none; }
     stalker: { name: 'Stalker',   hp: 8,  atk: 3, gold: 8,  color: '#f0a35e', glow: '#7a4b1d' },
     bone:    { name: 'Bone Knight', hp: 13, atk: 4, gold: 12, color: '#d8dce6', glow: '#5a6072' },
     wraith:  { name: 'Wraith',    hp: 9,  atk: 5, gold: 16, color: '#b48cff', glow: '#4a2f7a', fast: true },
+    watcher: { name: 'Lantern Watcher', hp: 7, atk: 4, gold: 14, color: '#f6c46a', glow: '#7a5a13', ranged: true },
     warden:  { name: 'The Warden', hp: 46, atk: 7, gold: 90, color: '#ff5d73', glow: '#6b1626', boss: true }
   };
 
@@ -501,7 +514,7 @@ textarea.result[hidden] { display:none; }
     mode: 'daily', seed: '', seedCode: '',
     depth: 1, hp: 20, maxHp: 20, atk: 3, def: 0,
     gold: 0, earned: 0, potions: 1, kills: 0, turns: 0,
-    rested: false, shopping: false,
+    rested: false, landingHeal: 0, shopping: false,
     shopBought: { flask: 0, atk: 0, def: 0, hp: 0, hp2: 0, atk2: 0, def2: 0 },
     alive: true, won: false, running: false,
     hurt: 0, shake: 0, flash: 0,
@@ -562,15 +575,15 @@ textarea.result[hidden] { display:none; }
     return {
       type, x, y, rx: x, ry: y,
       hp: def.hp, maxHp: def.hp, atk: def.atk,
-      flash: 0, bob: Math.random() * 6.28, deadT: 0
+      flash: 0, bob: Math.random() * 6.28, deadT: 0, windup: 0
     };
   }
   function enemyWeights(depth) {
     if (depth <= 1) return ['crawler', 'crawler', 'crawler', 'stalker'];
     if (depth === 2) return ['crawler', 'stalker', 'stalker', 'bone'];
-    if (depth === 3) return ['stalker', 'bone', 'bone', 'wraith'];
-    if (depth === 4) return ['bone', 'bone', 'wraith', 'wraith'];
-    return ['wraith', 'bone', 'wraith'];
+    if (depth === 3) return ['stalker', 'bone', 'watcher', 'wraith'];
+    if (depth === 4) return ['bone', 'watcher', 'wraith', 'wraith'];
+    return ['wraith', 'watcher', 'bone'];
   }
   // Choices affect only the following floor. Normal is the original first-floor mix.
   function routeProfile(route) {
@@ -780,6 +793,8 @@ textarea.result[hidden] { display:none; }
     $('sDepth').textContent = state.depth + '/' + FLOORS;
     $('sGold').textContent = state.gold;
     $('sPotions').textContent = state.potions;
+    $('sAtk').textContent = state.atk;
+    $('sDef').textContent = state.def;
     $('sKills').textContent = state.kills;
     $('sScore').textContent = state.running || state.turns ? liveScore() : 0;
     $('potionN').textContent = state.potions;
@@ -962,11 +977,22 @@ textarea.result[hidden] { display:none; }
     const list = $('shopList');
     if (!list) return;
     list.replaceChildren();
+    let tier = null;
     for (const item of SHOP_ITEMS) {
+      if (item.depth > 1 && !tier) {
+        tier = document.createElement('div');
+        tier.className = 'shop-tier';
+        tier.id = 'shopTier';
+        tier.textContent = 'Deeper stock';
+        tier.hidden = true; // shown by updateShop when a landing carries it
+        list.append(tier);
+      }
       const row = document.createElement('div');
       row.className = 'shop-item';
       row.dataset.item = item.id;
       row.hidden = true; // shown by updateShop when this landing carries it
+      const slot = document.createElement('span');
+      slot.className = 'shop-key';
       const copy = document.createElement('div');
       copy.className = 'shop-copy';
       const name = document.createElement('span');
@@ -983,7 +1009,7 @@ textarea.result[hidden] { display:none; }
       button.append('Buy ');
       const price = document.createElement('b');
       button.append(price);
-      row.append(copy, button);
+      row.append(slot, copy, button);
       list.append(row);
     }
   }
@@ -999,12 +1025,18 @@ textarea.result[hidden] { display:none; }
     if (!list) return;
     $('shopGold').textContent = state.gold;
     const stock = shopStock();
+    const tier = $('shopTier');
+    if (tier) tier.hidden = stock.length <= 4;
     for (const item of SHOP_ITEMS) {
       const button = list.querySelector('[data-buy="' + item.id + '"]');
       if (!button) continue;
       const row = button.closest('.shop-item');
       const inStock = stock.includes(item);
       if (row) row.hidden = !inStock;
+      if (row) {
+        const slot = row.querySelector('.shop-key');
+        if (slot) slot.textContent = inStock ? String(stock.indexOf(item) + 1) : '';
+      }
       const price = shopPrice(item.id);
       button.querySelector('b').textContent = price;
       button.disabled = !inStock || !state.running || state.gold < price;
@@ -1016,11 +1048,16 @@ textarea.result[hidden] { display:none; }
     if (!state.running || !state.alive || !state.choosingRoute || state.shopping) return false;
     if (state.rested) { sfx('deny'); log('You have already rested on these steps.', ''); return false; }
     if (state.hp >= state.maxHp) { sfx('deny'); log('You are already whole.', ''); return false; }
+    // One landing gives back at most 8 vitality, shared with the path down.
+    const room = 8 - (state.landingHeal || 0);
+    if (room <= 0) { sfx('deny'); log('This landing has no more rest to give.', ''); return false; }
+    const before = state.hp;
     state.rested = true;
-    state.hp = Math.min(state.maxHp, state.hp + 6);
+    state.hp = Math.min(state.maxHp, state.hp + Math.min(6, room));
+    state.landingHeal = (state.landingHeal || 0) + (state.hp - before);
     burst(px + 0.5, py + 0.5, '#7ee787', 8, 0.7);
     sfx('potion');
-    log('You rest against the stairwell. +6 vitality.', 'good');
+    log('You rest against the stairwell. +' + (state.hp - before) + ' vitality.', 'good');
     updateLanding();
     updateHUD();
     return true;
@@ -1122,6 +1159,22 @@ textarea.result[hidden] { display:none; }
     return dist;
   }
 
+  // A clear shot is a straight line with no wall in the way: the Lantern
+  // Watcher fires down corridors, so breaking line of sight is the counter.
+  function clearShot(x0, y0, x1, y1) {
+    const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+    const stepX = x0 < x1 ? 1 : -1, stepY = y0 < y1 ? 1 : -1;
+    let err = dx - dy, x = x0, y = y0, guard = 0;
+    while (guard++ < 128) {
+      if (x === x1 && y === y1) return true;
+      if (!(x === x0 && y === y0) && !floorAt(x, y)) return false;
+      const e2 = err * 2;
+      if (e2 > -dy) { err -= dy; x += stepX; }
+      if (e2 < dx) { err += dx; y += stepY; }
+    }
+    return false;
+  }
+
   const DIRS = [[0, -1], [-1, 0], [1, 0], [0, 1]];
 
   function enemiesTurn() {
@@ -1140,12 +1193,39 @@ textarea.result[hidden] { display:none; }
   function enemyAct(enemy, dist) {
     const type = TYPES[enemy.type];
     const adjacent = Math.abs(enemy.x - px) + Math.abs(enemy.y - py) <= 1;
+    if (type.boss) {
+      const reach = Math.max(Math.abs(enemy.x - px), Math.abs(enemy.y - py));
+      if (enemy.windup > 0) {
+        // The telegraphed blow lands on the next turn, so stepping clear turns
+        // the Warden's biggest hit into wasted stone.
+        enemy.windup = 0;
+        if (reach <= 2) {
+          const dmg = Math.max(2, enemy.atk + 3 - state.def);
+          state.shake = Math.min(14, state.shake + 6);
+          hurtPlayer(dmg, enemy.type);
+          log('The Warden brings its fist down for ' + dmg + '.', 'bad');
+        } else {
+          log('The Warden\'s fist cracks the floor where you stood.', '');
+          sfx('deny');
+        }
+        return;
+      }
+      if (reach <= 2 && state.turns % 3 === 0) {
+        enemy.windup = 1;
+        enemy.bob = Math.random() * 6.28;
+        log('The Warden raises a fist. Get clear.', 'bad');
+        sfx('deny');
+        return;
+      }
+    }
     if (adjacent) {
       // Face the player and strike.
       enemy.bob = Math.random() * 6.28;
-      const dmg = Math.max(1, enemy.atk + ri(3) - 1 - state.def);
+      const raw = Math.max(1, enemy.atk + ri(3) - 1);
+      const dmg = Math.max(1, raw - state.def);
       hurtPlayer(dmg, enemy.type);
-      log(type.name + ' hits you for ' + dmg + '.', 'bad');
+      log(type.name + ' hits you for ' + dmg +
+        (state.def ? ' (' + raw + ' − ' + state.def + ' plate)' : '') + '.', 'bad');
       return;
     }
     const cell = idx(enemy.x, enemy.y);
@@ -1154,6 +1234,19 @@ textarea.result[hidden] { display:none; }
       // Remembered only: shuffle about so the floor still feels inhabited.
       if (rnd() < 0.18) wander(enemy);
       return;
+    }
+    if (type.ranged) {
+      const reach = Math.abs(enemy.x - px) + Math.abs(enemy.y - py);
+      if (reach >= 2 && reach <= 7 && clearShot(enemy.x, enemy.y, px, py)) {
+        enemy.bob = Math.random() * 6.28;
+        const raw = Math.max(1, enemy.atk + ri(2) - 1);
+        const dmg = Math.max(1, raw - state.def);
+        burst(px + 0.5, py + 0.5, type.color, 8, 0.8);
+        hurtPlayer(dmg, enemy.type);
+        log(type.name + ' fires down the corridor for ' + dmg +
+          (state.def ? ' (' + raw + ' − ' + state.def + ' plate)' : '') + '.', 'bad');
+        return;
+      }
     }
     const here = dist[cell];
     if (here < 0 || here > 13) return;
@@ -1212,6 +1305,7 @@ textarea.result[hidden] { display:none; }
     }
     state.choosingRoute = true;
     state.rested = false;
+    state.landingHeal = 0;
     $('routes').hidden = false;
     updateLanding();
     updateHUD();
@@ -1235,7 +1329,12 @@ textarea.result[hidden] { display:none; }
     $('shop').hidden = true;
     state.route = route;
     state.depth++;
-    state.hp = Math.min(state.maxHp, state.hp + profile.heal);
+    // The rest at the landing and the path's own healing share one allowance,
+    // so a full heal means giving something up rather than doubling up.
+    const room = Math.max(0, 8 - (state.landingHeal || 0));
+    const before = state.hp;
+    state.hp = Math.min(state.maxHp, state.hp + Math.min(profile.heal, room));
+    state.landingHeal = (state.landingHeal || 0) + (state.hp - before);
     state.sealed = false;
     buildFloor(state.depth);
     state.turns++;
@@ -1279,7 +1378,7 @@ textarea.result[hidden] { display:none; }
     Object.assign(state, {
       depth: 1, hp: 20, maxHp: 20, atk: 3, def: 0,
       gold: 0, earned: 0, potions: 1, kills: 0, turns: 0,
-      rested: false, shopping: false,
+      rested: false, landingHeal: 0, shopping: false,
       shopBought: { flask: 0, atk: 0, def: 0, hp: 0, hp2: 0, atk2: 0, def2: 0 },
       alive: true, won: false, running: true, finished: false, finalScore: 0,
       hurt: 0, shake: 0, sealed: false, cause: '', route: 'normal', choosingRoute: false
@@ -1306,7 +1405,10 @@ textarea.result[hidden] { display:none; }
     $('shop').hidden = true;
     state.won = won;
     state.running = false;
-    const score = liveScore() + (won ? 1500 : 0);
+    // The Core pays out half of what you carried down, so gear bought at the
+    // stair-market is a real trade against the board instead of free power.
+    const banked = won ? Math.floor(state.gold / 2) : 0;
+    const score = liveScore() + (won ? 1500 : 0) + banked;
     // Remember the score the run actually ended on: the clear bonus lives here,
     // not in the live HUD number, so the hub must read this instead.
     state.finished = true;
@@ -1330,7 +1432,8 @@ textarea.result[hidden] { display:none; }
     word.textContent = won ? 'CORE CLAIMED' : 'YOU DIED';
     word.className = 'endword ' + (won ? 'win' : 'lose');
     $('endSub').textContent = won
-      ? 'Floor ' + state.depth + ' of ' + FLOORS + ' cleared in ' + state.turns + ' turns.'
+      ? 'Floor ' + state.depth + ' of ' + FLOORS + ' cleared in ' + state.turns +
+        ' turns · ' + banked + ' gold banked.'
       : state.cause + (state.mode === 'daily' ? ' Try today\'s dungeon again.' : '');
     $('endScore').textContent = score;
     $('endDepth').textContent = state.depth + '/' + FLOORS;
@@ -1345,7 +1448,8 @@ textarea.result[hidden] { display:none; }
     $('endResult').value =
       'DEEP · ' + state.seed + ' · seed ' + state.seedCode + '\n' +
       (won ? '✓ Vault Core claimed on floor ' + state.depth : '✗ Fell on floor ' + state.depth) +
-      ' · ' + state.kills + ' slain · ' + state.gold + ' gold\n' +
+      ' · ' + state.kills + ' slain · ' + state.gold + ' gold' +
+      (won ? ' (' + banked + ' banked)' : '') + '\n' +
       'Score ' + score + (state.mode === 'daily' && daily.streak > 1 ? ' · daily streak ' + daily.streak : '') + '\n' +
       'https://bassdrum4.github.io/bored/';
     showTitleMeta();
@@ -1742,6 +1846,17 @@ textarea.result[hidden] { display:none; }
     ctx.fillStyle = aura;
     ctx.fillRect(-18, -18, 36, 36);
 
+    // A raised fist is worth seeing: the ring marks the turn you must leave.
+    if (enemy.windup > 0) {
+      ctx.strokeStyle = '#ff5d73';
+      ctx.globalAlpha = 0.45 + Math.sin(now / 90) * 0.3;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 24, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
     ctx.fillStyle = def.color;
     if (enemy.type === 'crawler') {
       ctx.beginPath();
@@ -1776,6 +1891,20 @@ textarea.result[hidden] { display:none; }
       ctx.quadraticCurveTo(-2, 3, -6, 7);
       ctx.quadraticCurveTo(-9, -3, 0, -11);
       ctx.fill();
+    } else if (enemy.type === 'watcher') {
+      // A hooded lamp: the body is the lantern, the core is what fires.
+      ctx.beginPath();
+      ctx.moveTo(0, -12);
+      ctx.lineTo(7, 0);
+      ctx.lineTo(0, 11);
+      ctx.lineTo(-7, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ffe9b0';
+      ctx.beginPath();
+      ctx.arc(0, -1, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = def.color;
     } else {
       // The Warden
       ctx.fillRect(-11, -11, 22, 21);
@@ -2096,6 +2225,8 @@ textarea.result[hidden] { display:none; }
     finish,
     move, useStairs, chooseRoute, cancelRoute, usePotion, waitTurn, computeFOV, fit,
     restAtLanding, openShop, closeShop, buy, shopPrice, shopStock,
+    types: TYPES, enemyWeights, clearShot, enemiesTurn,
+    pos() { return { x: px, y: py }; },
     setPos(x, y) { px = x; py = y; computeFOV(); updateHUD(); },
     score: liveScore
   };

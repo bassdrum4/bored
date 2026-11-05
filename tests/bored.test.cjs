@@ -900,6 +900,36 @@ test('browser regressions', async t => {
     assert.ok(stock.deepHp > stock.baseHp, 'the greater draught costs more than the vital draught');
     assert.ok(stock.deepDef > stock.baseDef, 'the warded aegis costs more than an aegis plate');
     assert.deepEqual(await frame.evaluate(() => __deep.shopStock().map(item => item.id)), ['flask', 'atk', 'def', 'hp']);
+
+    // One landing shares a single healing allowance between rest and the path.
+    const heals = await frame.evaluate(() => {
+      __deep.start('random', 'heal-cap-seed');
+      Object.assign(__deep.state, { hp: 2, maxHp: 20, gold: 0 });
+      __deep.setPos(__deep.stairs.x, __deep.stairs.y);
+      __deep.useStairs();
+      const rest = __deep.restAtLanding();
+      const afterRest = __deep.state.hp;
+      const allowance = __deep.state.landingHeal;
+      __deep.chooseRoute('safe');
+      return { rest, afterRest, allowance, afterRoute: __deep.state.hp };
+    });
+    assert.equal(heals.rest, true, 'resting at a landing still heals');
+    assert.equal(heals.afterRest, 8, 'a rest gives its 6 vitality');
+    assert.equal(heals.allowance, 6, 'the landing records what it has already given');
+    assert.equal(heals.afterRoute, 10, 'the sheltered path only tops the landing up to 8');
+
+    // The roster grows teeth by depth, including an enemy that shoots.
+    const beasts = await frame.evaluate(() => ({
+      watcher: { ranged: __deep.types.watcher.ranged, name: __deep.types.watcher.name },
+      boss: __deep.types.warden.boss,
+      d1: __deep.enemyWeights(1), d2: __deep.enemyWeights(2),
+      d3: __deep.enemyWeights(3), d4: __deep.enemyWeights(4), d5: __deep.enemyWeights(5)
+    }));
+    assert.equal(beasts.watcher.ranged, true, 'the Lantern Watcher is a ranged enemy');
+    assert.ok(!beasts.d1.includes('watcher') && !beasts.d2.includes('watcher'), 'watchers stay off the first floors');
+    assert.ok(beasts.d3.includes('watcher') && beasts.d4.includes('watcher') && beasts.d5.includes('watcher'),
+      'watchers hold the deeper floors');
+    assert.equal(beasts.boss, true, 'the Warden is still the boss');
     let depth = 1;
     while (depth < 5) {
       const route = depth % 2 ? 'safe' : 'risky';
@@ -934,7 +964,7 @@ test('browser regressions', async t => {
       const inTo = dirs.find(([dx, dy]) => __deep.map[(core.y + dy) * 44 + (core.x + dx)] === 1);
       __deep.setPos(core.x + inTo[0], core.y + inTo[1]);
       __deep.move(-inTo[0], -inTo[1]);
-      return { won: __deep.state.won, kills: __deep.state.kills, score: __deep.score() };
+      return { won: __deep.state.won, kills: __deep.state.kills, score: __deep.score(), gold: __deep.state.gold };
     });
     assert.equal(victory.kills, 1);
     assert.equal(victory.won, true);
@@ -953,6 +983,8 @@ test('browser regressions', async t => {
     assert.equal(reported.snap.finished, true, 'a cleared run is finished');
     assert.equal(stored.score, endScore, 'the saved best matches the end screen');
     assert.ok(endScore - reported.live >= 1500, 'the reported score carries the clear bonus the live HUD omits');
+    assert.equal(endScore, reported.live + 1500 + Math.floor(victory.gold / 2),
+      'the cleared Core banks half of the gold still carried');
 
     // A death on the first floor still has to save: the earned-progress score
     // has a minimum of 1, so a finished run is never dropped for zero. Clear the older best

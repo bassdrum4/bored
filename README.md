@@ -208,12 +208,18 @@ open the stair-market and spend gold on flasks, blades, plate and extra vitality
 buying as many as the purse allows. The stall keeps its plain goods at every
 landing and adds stronger, dearer stock the deeper you are — a greater draught
 from the second landing, a runed whetstone from the third, a warded aegis from
-the fourth. Then choose the way down — a sheltered
-passage recovers more health, an unquiet one carries more enemies and treasure.
-Floor five holds **The Warden** and the Vault Core: stepping on the Core while the Warden
-lives only tells you it is sealed, so the boss cannot be skipped. Score combines
-gold, kills, depth, and a clear bonus, and the best descent is saved locally and
-submitted to the shared leaderboard like every other game.
+the fourth. A landing gives back at most eight vitality in total, shared between
+the rest and the path you take, so healing is a choice. Then choose the way down
+— a sheltered passage recovers more health, an unquiet one carries more enemies
+and treasure. From the third floor a **Lantern Watcher** fires down any clear
+line of sight, so a corridor is no longer free ground. Floor five holds **The
+Warden** and the Vault Core: stepping on the Core while the Warden lives only
+tells you it is sealed, so the boss cannot be skipped, and every third turn it
+raises a fist — the blow lands a turn later, so stepping clear wastes it. Score
+combines gold, kills, depth, and a clear bonus, and half of the gold still
+carried down is banked at the Core, which is what makes a purchase at the market
+a real trade: gear now, or points at the end. The best descent is saved locally
+and submitted to the shared leaderboard like every other game.
 
 Controls are arrows/WASD/hjkl, space to wait, `Q` to drink a flask, and `>`
 or Enter to take the stairs. On touch screens a d-pad, swipe gestures, and
