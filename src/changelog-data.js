@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 297,
+  "count": 298,
   "newest": "2026-11-05",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"05e8a76","date":"2026-11-05","author":"Codebuff","subject":"Point Klang at its published site and record external playtime"},
   {"sha":"b9e9c4e","date":"2026-11-05","author":"Codebuff","subject":"Count wall-free trick runs in Trackbound's career score"},
   {"sha":"523786c","date":"2026-11-05","author":"Codebuff","subject":"Score Trackbound by points and open up three tracks"},
   {"sha":"625a41c","date":"2026-11-05","author":"Codebuff","subject":"Keep a Bored Together match out of the resume save"},
