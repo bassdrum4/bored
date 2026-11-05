@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 302,
+  "count": 303,
   "newest": "2026-11-05",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1768b76","date":"2026-11-05","author":"Codebuff","subject":"Stop a burned voyage's home port from breaking Ashcrown's board"},
   {"sha":"9b4a91b","date":"2026-11-05","author":"Codebuff","subject":"Give DEEP's staircase a rest stop and a depth-stocked market"},
   {"sha":"9e92bc2","date":"2026-11-05","author":"Codebuff","subject":"Move the game menu waffle to the top-left"},
   {"sha":"876b2ef","date":"2026-11-05","author":"Codebuff","subject":"Bank a score for finishing a wall-free Trackbound track"},
