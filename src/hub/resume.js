@@ -104,9 +104,22 @@ window.__boredResume = (function (slug) {
 })(__SLUG__);
 `;
 
+// A Bored Together document is the same game running the match's own board,
+// which belongs to the server and the other player. It still gets a helper, so
+// the game's "continue where you left off?" wiring can run untouched, but every
+// method is inert: nothing is read from, written to or offered out of this
+// device's save for that game.
+const INERT = `
+window.__boredResume = (function () {
+  function noop() {}
+  function nothing() { return null; }
+  function refused() { return false; }
+  return { read: nothing, save: refused, clear: noop, arm: noop, ask: noop, flush: refused, hide: noop };
+})();`;
+
 /** The resume helper as a script tag for one game document. */
-export function resumeScript(slug) {
-  return '<scr' + 'ipt>' +
-    HELPER.replace('__KEY__', KEY_PREFIX).replace('__SLUG__', JSON.stringify(String(slug))) +
+export function resumeScript(slug, options = {}) {
+  return '<scr' + 'ipt>' + (options.online ? INERT :
+    HELPER.replace('__KEY__', KEY_PREFIX).replace('__SLUG__', JSON.stringify(String(slug)))) +
     '</scr' + 'ipt>';
 }

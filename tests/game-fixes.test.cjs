@@ -362,3 +362,54 @@ test('Ashcrown never writes the solo save during a Bored Together match', () => 
   assert.equal(ctx.saveGame(), false);
   assert.equal(store.has(slot), false, 'a finished solo game still clears its own slot');
 });
+
+test('A Bored Together document gets an inert continue-where-you-left-off helper', async () => {
+  // The match document is the same game, so its resume wiring still runs. A
+  // together board belongs to the server: it must not be written to this
+  // device's slot for the game, nor offered back as a solo run afterwards.
+  const { resumeScript } = await import('../src/hub/resume.js');
+  const code = tag => {
+    assert.ok(tag.startsWith('<script>') && tag.endsWith('</script>'), 'a helper is one script tag');
+    return tag.slice('<script>'.length, -'</script>'.length);
+  };
+  const soloSlot = 'bored.resume.8ball';
+  const solo = JSON.stringify({ v: 1, at: 1, label: 'Rack 3 \u00b7 solo', state: { solo: true } });
+  function run(tag) {
+    const store = new Map([[soloSlot, solo]]);
+    const touched = [], timers = [], listeners = [];
+    const context = vm.createContext({
+      localStorage: {
+        getItem: key => { touched.push('get ' + key); return store.has(key) ? store.get(key) : null; },
+        setItem: (key, value) => { touched.push('set ' + key); store.set(key, value); },
+        removeItem: key => { touched.push('remove ' + key); store.delete(key); }
+      },
+      setInterval: fn => { timers.push(fn); return timers.length; },
+      clearInterval: () => {},
+      addEventListener: type => listeners.push(type),
+      document: { visibilityState: 'visible', createElement: () => { throw new Error('the continue prompt was drawn'); } }
+    });
+    context.window = context;
+    vm.runInContext(code(tag), context);
+    return { helper: context.__boredResume, store, touched, timers, listeners };
+  }
+
+  const match = run(resumeScript('8ball', { online: true }));
+  assert.equal(match.helper.read(), null, 'a match offers no saved run');
+  assert.equal(match.helper.save({ match: true }, 'Match'), false, 'a match never saves');
+  match.helper.arm(() => ({ label: 'Match', state: { match: true } }));
+  assert.equal(match.helper.flush(), false, 'a match never flushes');
+  match.helper.clear();
+  match.helper.ask('Match', () => {}, () => {});
+  assert.deepEqual(match.touched, [], 'the match never reads or writes the slot');
+  assert.deepEqual(match.timers, [], 'the match arms no autosave');
+  assert.deepEqual(match.listeners, [], 'the match adds no pagehide or visibility listeners');
+  assert.equal(match.store.get(soloSlot), solo, 'the solo run survives the match');
+
+  const single = run(resumeScript('8ball'));
+  assert.equal(single.helper.read().label, 'Rack 3 \u00b7 solo', 'solo play still finds its own save');
+  assert.equal(single.helper.save({ solo: 2 }, 'Rack 9'), true, 'solo play still saves');
+  single.helper.arm(() => ({ label: 'Rack 12', state: { solo: 3 } }));
+  assert.equal(single.timers.length, 1, 'solo play still arms its autosave');
+  assert.equal(single.helper.flush(), true);
+  assert.equal(JSON.parse(single.store.get(soloSlot)).label, 'Rack 12', 'solo autosave still writes');
+});

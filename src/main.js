@@ -272,7 +272,9 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       gameFrame.removeAttribute('src');
       // The resume helper runs before the game's own script, so a game can offer a
       // saved position while it wires itself up.
-      gameFrame.srcdoc = injectHead(html, resumeScript(slug) + ANALYTICS_BRIDGE + head);
+      // A match keeps its position on the server, so its document gets an inert
+      // helper and never touches this device's saved run for the game.
+      gameFrame.srcdoc = injectHead(html, resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head);
       showHint(multiplayer
         ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player' : 'Your turn saves automatically · Esc returns to Bored Together'
         : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
