@@ -128,11 +128,12 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       const slice = timeSlice(last, time, lastInput, {
         visible: !document.hidden, focused: document.hasFocus() && !run.context.external, ready: run.ready, paused: paused()
       });
-      // A cross-origin game cannot be watched for input, so a foreground tab with
-      // the game on screen is the only engagement signal it can offer, and that is
-      // how a music player is used. Local games keep the stricter input-driven
-      // clock above; this only fills the zero that external games used to post.
-      if (run.context.external && run.ready && !document.hidden && document.hasFocus() && !paused()) {
+      // A cross-origin game cannot be watched for input, and focus sits inside its
+      // frame rather than this document, so a visible tab with the game on screen
+      // is the only engagement signal it can offer -- which is how a music player
+      // is used. Local games keep the stricter input-driven clock above; this only
+      // fills the zero that external games used to post.
+      if (run.context.external && run.ready && !document.hidden && !paused()) {
         slice.activeMs = Math.max(slice.activeMs, Math.min(2000, Math.max(0, time - last)));
       }
       run.active += slice.activeMs;
