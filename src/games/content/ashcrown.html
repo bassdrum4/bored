@@ -30,7 +30,7 @@
   }
   * { margin: 0; padding: 0; box-sizing: border-box }
   [hidden] { display: none !important }
-  html, body { height: 100%; height: 100dvh; overflow: hidden }
+  html, body { height: 100% }
   body {
     background: var(--paper);
     color: var(--ink);
@@ -210,6 +210,12 @@
   .council-row .cn { display: flex; align-items: center; gap: 7px; font-family: var(--font-display); font-size: 14px; flex-wrap: wrap }
   .council-row .cd { font-size: 11.5px; color: var(--ink-2); margin-top: 3px }
   .council-row .ca { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end }
+  .tform { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 10px; align-items: center; margin: 8px 0 4px }
+  .tform label { font-size: 12px; color: var(--ink-2) }
+  .tform select, .tform input { max-width: 100% }
+  .tquote { margin: 8px 0 2px; padding: 8px 10px; border: 1px solid var(--rule-2); border-radius: 4px; background: rgba(255,250,240,.6); font-size: 12.5px; line-height: 1.45 }
+  .tquote.bad { border-color: var(--rust); color: var(--rust) }
+  .tquote.good { border-color: var(--moss); color: var(--moss) }
   .standings { width: 100%; border-collapse: collapse; font-size: 12.5px }
   .standings th { text-align: left; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; padding: 4px 6px; border-bottom: 1px solid var(--rule) }
   .standings td { padding: 5px 6px; border-bottom: 1px dotted var(--rule-2); font-variant-numeric: tabular-nums }
@@ -268,25 +274,20 @@
   /* ── full screens: setup and handoff ─────────────────────────────────── */
   .screen {
     position: fixed; inset: 0; z-index: 30; background: var(--paper); display: grid; place-items: center;
-    padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 22px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
     overflow-y: auto;
   }
-  .start-inner { width: min(680px, 100%); padding: 2px 0 4px }
-  @media (min-width: 900px) {
-    .start-inner { width: min(860px, 100%) }
-    .seats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) }
-    .seat { grid-template-columns: 16px minmax(0, 1fr) minmax(0, 140px) 78px }
-  }
+  .start-inner { width: min(680px, 100%); padding: 4px 0 10px }
   .eyebrow { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3) }
   .start-inner h1, .handoff-inner h1 {
-    font-family: var(--font-display); font-size: clamp(28px, 5.2vw, 42px); font-weight: 600; letter-spacing: -.01em;
-    line-height: 1.05; margin: 4px 0 8px; text-wrap: balance;
+    font-family: var(--font-display); font-size: clamp(34px, 7vw, 54px); font-weight: 600; letter-spacing: -.01em;
+    line-height: 1.05; margin: 6px 0 10px; text-wrap: balance;
   }
-  .lede { font-family: var(--font-display); font-size: 14px; color: var(--ink-2); max-width: 58ch; line-height: 1.5 }
-  .seats { display: flex; flex-direction: column; gap: 5px; margin: 11px 0 9px }
+  .lede { font-family: var(--font-display); font-size: 15px; color: var(--ink-2); max-width: 52ch; line-height: 1.55 }
+  .seats { display: flex; flex-direction: column; gap: 6px; margin: 18px 0 14px }
   .seat {
-    display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, 220px) 92px; gap: 4px 10px; align-items: center;
-    border: 1px solid var(--rule); border-radius: 3px; padding: 6px 9px; background: var(--panel);
+    display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, 220px) 92px; gap: 6px 10px; align-items: center;
+    border: 1px solid var(--rule); border-radius: 3px; padding: 8px 10px; background: var(--panel);
   }
   .seat-note { grid-column: 2 / -1; font-size: 11px; color: var(--ink-3); line-height: 1.4 }
   .seat .who { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); text-align: right }
@@ -294,9 +295,9 @@
   .seat[hidden] { display: none }
   .seat .dot { width: 14px; height: 14px }
   .seat input { width: 100% }
-  .start-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px }
+  .start-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px }
   .field { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2) }
-  .fine { font-size: 11px; color: var(--ink-3); margin-top: 8px; line-height: 1.5; max-width: 68ch }
+  .fine { font-size: 11.5px; color: var(--ink-3); margin-top: 12px; line-height: 1.6; max-width: 62ch }
   .fine b { color: var(--ink-2); font-weight: 600 }
   .handoff-inner { width: min(520px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px }
   .handoff-inner .banner { width: 54px; height: 54px; border-radius: 50%; border: 2px solid var(--ink); margin-bottom: 4px }
@@ -316,6 +317,7 @@
   .fog.dim { fill: #e9dfc6; opacity: .6 }
   .reach { fill: rgba(65,96,47,.17); stroke: rgba(36,28,18,.3); stroke-width: .8; pointer-events: none }
   .reach.stop { fill: rgba(176,128,24,.2); stroke: rgba(138,106,18,.8); stroke-dasharray: 3 2.5 }
+  .reach.war { fill: rgba(147,64,29,.22); stroke: rgba(147,64,29,.9); stroke-dasharray: 2 2.5 }
   .label.wonder { font-size: 8.5px; font-style: italic }
   .threat { fill: rgba(147,64,29,.2); stroke: rgba(147,64,29,.7); stroke-width: 1; pointer-events: none }
   .worked { fill: rgba(65,96,47,.12); pointer-events: none }
@@ -364,6 +366,15 @@
   @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
   #map[data-anim="none"] .an, #map[data-anim="wonders"] .an:not(.w), #map[data-anim="features"] .an.a { animation: none }
 
+  /* the wonder popup: a still picture, no motion */
+  .still .an { animation: none }
+  .wonder-card { display: flex; gap: 16px; align-items: center }
+  .wonder-card svg { flex: none; width: 112px; height: 124px }
+  .wonder-card .wtxt { min-width: 0 }
+  .wonder-card .wkind { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px }
+  .wonder-card p { max-width: 38ch }
+  @media (max-width: 460px) { .wonder-card { flex-direction: column; align-items: flex-start } }
+
   /* building cards in the city panel */
   .bcards { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px }
   .bcard { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 64px; padding: 4px 2px 5px;
@@ -388,6 +399,7 @@
   #coach .row .act { font-size: 12px; padding: 5px 9px }
   #coach .skip { font-size: 11px; color: var(--ink-3); text-decoration: underline; margin-left: auto }
   #coach .skip:hover { color: var(--ink) }
+  #coach .skip + .skip { margin-left: 10px }
   .coach-target { outline: 2px solid var(--rust) !important; outline-offset: 2px; background: #f7e7d8 !important }
   .coach-ring { fill: none; stroke: var(--rust); stroke-width: 2.4; stroke-dasharray: 5 4; pointer-events: none }
   .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); cursor: pointer }
@@ -446,7 +458,7 @@
 
 <div id="shell">
   <header id="bar">
-    <button class="brand" id="btn-realm" type="button" data-act="realm" title="Your realm: score, cities, units and rivals (R)">
+    <button class="brand" id="btn-realm" type="button" data-act="realm" title="Your realm: score, cities, units and rivals (F1)">
       <span class="dot" id="banner-dot"></span>
       <b id="banner-name">Civ Lite</b>
       <span class="who" id="banner-who"></span>
@@ -492,7 +504,7 @@
     </div>
     <div id="end-wrap">
       <button class="needs" id="btn-needs" type="button" hidden></button>
-      <button class="btn primary" id="btn-end" type="button" data-act="end">End turn<kbd>space</kbd></button>
+      <button class="btn primary" id="btn-end" type="button" data-act="end">End turn<kbd>enter</kbd></button>
     </div>
     <div id="coach" hidden role="status" aria-live="polite">
       <div class="ttl"><span id="coach-tag">Tutorial</span><span id="coach-count"></span></div>
@@ -537,6 +549,9 @@
       <label class="field" for="opt-level">Difficulty
         <select id="opt-level"></select>
       </label>
+      <label class="field" for="opt-close">Borders close
+        <select id="opt-close"></select>
+      </label>
       <label class="field" for="opt-turns">Turn limit
         <input type="number" id="opt-turns" value="100" min="0" max="500" step="10" inputmode="numeric" aria-describedby="turns-hint">
         <span class="faint" id="turns-hint">0 = no limit</span>
@@ -549,12 +564,14 @@
       <span class="faint" style="font-size:11.5px">Score wins when the turn limit hits.</span>
     </div>
     <div class="start-row switches">
+      <label class="check" for="opt-wrap"><input type="checkbox" id="opt-wrap"> Map wraps west to east</label>
       <label class="check" for="opt-tutorial"><input type="checkbox" id="opt-tutorial"> Tutorial</label>
       <label class="check" for="opt-tips"><input type="checkbox" id="opt-tips" checked> Tips in my games</label>
     </div>
     <p class="fine" id="map-note"></p>
     <p class="fine" id="size-note" style="margin-top:2px"></p>
     <p class="fine" id="level-note" style="margin-top:2px"></p>
+    <p class="fine" id="close-note" style="margin-top:2px"></p>
     <div class="start-row" style="margin-top:12px">
       <button class="btn primary" id="btn-begin" type="button">Start game</button>
       <button class="btn" id="btn-civs" type="button" data-act="civs">See all 16 civs</button>
@@ -590,19 +607,24 @@ function hash2(x, y, seed) {
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
-function noise(x, y, seed, scale) {
+// period: for a map that wraps west to east, the width the noise repeats over,
+// so the terrain meets itself cleanly at the seam.
+function noise(x, y, seed, scale, period) {
+  let cells = 0;
+  if (period) { cells = Math.max(1, Math.round(period / scale)); scale = period / cells; }
   const fx = x / scale, fy = y / scale;
   const x0 = Math.floor(fx), y0 = Math.floor(fy);
   const tx = fx - x0, ty = fy - y0;
   const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
-  const a = hash2(x0, y0, seed), b = hash2(x0 + 1, y0, seed);
-  const c = hash2(x0, y0 + 1, seed), d = hash2(x0 + 1, y0 + 1, seed);
+  const xa = cells ? ((x0 % cells) + cells) % cells : x0, xb = cells ? (((x0 + 1) % cells) + cells) % cells : x0 + 1;
+  const a = hash2(xa, y0, seed), b = hash2(xb, y0, seed);
+  const c = hash2(xa, y0 + 1, seed), d = hash2(xb, y0 + 1, seed);
   return (a + (b - a) * sx) * (1 - sy) + (c + (d - c) * sx) * sy;
 }
-function fbm(x, y, seed, scale, octaves) {
+function fbm(x, y, seed, scale, octaves, period) {
   let value = 0, weight = 1, total = 0, size = scale;
   for (let i = 0; i < octaves; i++) {
-    value += noise(x, y, seed + i * 977, size) * weight;
+    value += noise(x, y, seed + i * 977, size, period) * weight;
     total += weight;
     weight *= 0.5;
     size *= 0.48;
@@ -633,13 +655,26 @@ const NEIGHBOURS = [
 // The two hex corners shared with the neighbour in each of those directions.
 const EDGE_CORNERS = [[0, 1], [5, 0], [4, 5], [3, 4], [2, 3], [1, 2]];
 
+// How many columns the map is, when it wraps west to east; 0 when it doesn't.
+// Set whenever a map is made or a game is loaded, and read by every helper below
+// so that the seam between the last column and the first is just another edge.
+let WRAP_W = 0;
+const wrapX = x => (WRAP_W ? ((x % WRAP_W) + WRAP_W) % WRAP_W : x);
 function neighbourList(x, y) {
-  return NEIGHBOURS[y & 1].map(([dx, dy]) => [x + dx, y + dy]);
+  const out = NEIGHBOURS[y & 1].map(([dx, dy]) => [x + dx, y + dy]);
+  if (WRAP_W) for (const p of out) p[0] = (p[0] + WRAP_W) % WRAP_W;
+  return out;
 }
 function hexDistance(ax, ay, bx, by) {
   const aq = ax - (ay - (ay & 1)) / 2, bq = bx - (by - (by & 1)) / 2;
-  const dq = aq - bq, dr = ay - by;
-  return Math.max(Math.abs(dq), Math.abs(dr), Math.abs(dq + dr));
+  const dr = ay - by;
+  let dq = aq - bq;
+  let best = Math.max(Math.abs(dq), Math.abs(dr), Math.abs(dq + dr));
+  if (WRAP_W) {
+    // The same trip the other way round the world.
+    for (const d of [dq - WRAP_W, dq + WRAP_W]) best = Math.min(best, Math.max(Math.abs(d), Math.abs(dr), Math.abs(d + dr)));
+  }
+  return best;
 }
 const hexCenter = (x, y) => [HEX_W * (x + 0.5 * (y & 1)) + HEX_W / 2, HEX_V * y + HEX_R];
 function hexCorners(cx, cy, r) {
@@ -773,19 +808,47 @@ const BUILDINGS = {
   castle:   { name: 'Castle',   cost: 40, tech: 'masonry', hp: 150, shot: 30, prod: 2, civ: 'france', replaces: 'walls',
               blurb: 'Replaces walls. +150 city HP, the city shoots at 30, and +2 production.' },
   fortress: { name: 'Fortress', cost: 60, tech: 'construction', hp: 100, shot: 30, needsWalls: true,
-              blurb: 'Needs walls. +100 more city HP, and the city shoots at 30.' },
-  granary:  { name: 'Granary',  cost: 30, tech: 'pottery', food: 2, blurb: '+2 food.' },
+              blurb: 'Upgrades the walls: +100 more city HP, and the city shoots at 30. Stands on the city center.' },
+  granary:  { name: 'Granary',  cost: 30, tech: 'pottery', food: 2, blurb: '+2 food. Stands on the city center.' },
   library:  { name: 'Library',  cost: 40, tech: 'writing', research: 2,
-              blurb: '+2 research a turn toward your tech, without using production.' },
+              blurb: '+2 research a turn toward your tech, without using production. It also unlocks the Research build in this city.' },
   workshop: { name: 'Workshop', cost: 40, tech: 'construction', blurb: '+1 production per 3 pop.' },
   barracks: { name: 'Barracks', cost: 40, tech: 'bronze', blurb: 'Land military units cost 25% less here.' },
   harbor:   { name: 'Harbor',   cost: 40, tech: 'sailing', coastal: true,
               blurb: 'Coastal cities only. +1 food on every shallow water tile, and ships cost 25% less here.' }
 };
-const BUILDING_ORDER = ['walls', 'fortress', 'granary', 'library', 'workshop', 'barracks', 'harbor'];
+// Upgrade tiers (v4). A tier needs the building under it, and stands on that
+// building's hex (the Granary's, on the city center); it takes no hex of its own.
+// The University and Observatory, further down, are the Library's tiers 2 and 3.
+BUILDINGS.watermill = { name: 'Water Mill', cost: 55, tech: 'construction', needs: 'granary', food: 2, prod: 1,
+  blurb: 'Upgrades the Granary: +2 food and +1 production more. Stands on the city center.' };
+BUILDINGS.foundry = { name: 'Foundry', cost: 60, tech: 'ironworking', needs: 'workshop', prod: 2,
+  blurb: 'Upgrades the Workshop: +2 production, and +1 more per 3 pop.' };
+BUILDINGS.armory = { name: 'Armory', cost: 60, tech: 'stirrups', needs: 'barracks',
+  blurb: 'Upgrades the Barracks: land military units built here start as veterans, +5 strength for good.' };
+BUILDINGS.shipyard = { name: 'Shipyard', cost: 60, tech: 'shipbuilding', needs: 'harbor', coastal: true,
+  blurb: 'Upgrades the Harbor: +1 production for every 2 shallow water tiles in the borders, and ships built here start as veterans, +5 strength for good.' };
+const BUILDING_ORDER = ['walls', 'fortress', 'granary', 'watermill', 'library', 'workshop', 'foundry', 'barracks', 'armory', 'harbor', 'shipyard'];
+// The building a tier stands on: its base, all the way down.
+function baseOf(id) {
+  for (let k = 0; k < 6 && BUILDINGS[id] && BUILDINGS[id].needs; k++) id = BUILDINGS[id].needs;
+  return id;
+}
+function tierDepth(id) {
+  let n = 0;
+  for (let k = 0; k < 6 && BUILDINGS[id] && BUILDINGS[id].needs; k++) { id = BUILDINGS[id].needs; n++; }
+  return n;
+}
+// The tier stacked highest on a building in this city, or the building itself.
+function topTier(c, base) {
+  let best = base;
+  for (const id of c.buildings) if (id !== base && baseOf(id) === base && tierDepth(id) > tierDepth(best)) best = id;
+  return best;
+}
 
-// A city's Research build sends all of its production into the current tech.
-const RESEARCH = { name: 'Research', cost: 0, blurb: 'Put this city’s production into your current tech, every turn.' };
+// A city's Research build sends a share of its production into the current tech.
+// It unlocks once the city has a Library (v4), like Civ's Campus Research Grants.
+const RESEARCH = { name: 'Research', cost: 0, blurb: 'Put a share of this city’s production into your current tech, every turn. Needs a Library in the city.' };
 
 const CIVS = {
   qin:      { leader: 'Qin Shi Huang', land: 'China', focus: 'Production', colors: [['#0f6656', '#5fbfa3'], ['#7a5a00', '#e6c34a']],
@@ -957,11 +1020,13 @@ let reachable = null;  // Map "x,y" -> movement spent, for the selected unit
 let VIS = null;        // what the current viewer can see right now (not saved)
 let hover = null;      // the hex under the pointer, for move previews (not saved)
 let preview = null;    // the path preview for that hex (not saved)
-let marchPlan = null;  // a spent unit waiting for a march hex picked from its panel (not saved)
 let placing = null;    // { city, item } while a player picks a hex for a building (not saved)
 
 const keyOf = (x, y) => x + ',' + y;
-const tileAt = (x, y) => (x < 0 || y < 0 || x >= G.cols || y >= G.rows ? null : G.tiles[y * G.cols + x]);
+const tileAt = (x, y) => {
+  if (WRAP_W) x = wrapX(x);
+  return x < 0 || y < 0 || x >= G.cols || y >= G.rows ? null : G.tiles[y * G.cols + x];
+};
 const pl = i => (i === null || i === undefined ? null : G.players[i]);
 const unitById = id => G.units.find(u => u.id === id) || null;
 const cityById = id => G.cities.find(c => c.id === id) || null;
@@ -1030,39 +1095,63 @@ function blankTiles(cols, rows) {
 
 // Ashcrown's noise with an edge falloff: shape(x, y) says how far the ground
 // sinks at that spot, so land gathers where shape is small.
-function noiseFields(seed, cols, rows, shape) {
-  const elevation = new Float64Array(cols * rows), moisture = new Float64Array(cols * rows);
+// Besides elevation and moisture, three fields spread the rough ground out
+// (v4): a ridge field for thin mountain ranges, and smaller-scale fields for
+// hill and forest patches. wrap makes every field repeat across the seam.
+function noiseFields(seed, cols, rows, shape, wrap) {
+  const n = cols * rows, period = wrap ? cols : 0;
+  const elevation = new Float64Array(n), moisture = new Float64Array(n), ridge = new Float64Array(n),
+    hilly = new Float64Array(n), wood = new Float64Array(n);
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
-      elevation[y * cols + x] = fbm(x, y, seed, 5.2, 3) - shape(x, y);
-      moisture[y * cols + x] = fbm(x + 31, y + 17, seed ^ 0x5bf03635, 3.6, 3);
+      const i = y * cols + x;
+      elevation[i] = fbm(x, y, seed, 5.2, 3, period) - shape(x, y);
+      moisture[i] = fbm(x + 31, y + 17, seed ^ 0x5bf03635, 3.6, 3, period);
+      // Ridged noise: high only along the line where the base noise crosses 0.5, which makes a thin chain.
+      ridge[i] = 1 - Math.abs(2 * fbm(x + 7, y + 53, seed ^ 0x2545f491, 6.5, 2, period) - 1);
+      hilly[i] = fbm(x + 101, y + 11, seed ^ 0x1b873593, 2.6, 2, period);
+      wood[i] = fbm(x + 61, y + 29, seed ^ 0x7feb352d, 2.2, 2, period);
     }
   }
-  return { elevation, moisture };
+  return { elevation, moisture, ridge, hilly, wood };
 }
 function falloff(dx, dy) {
   return Math.pow(Math.max(Math.abs(dx), Math.abs(dy)), 3) * 0.42 + (dx * dx + dy * dy) * 0.08;
 }
 
-// The top `share` of the allowed tiles by elevation become land. Of that land,
-// the top 30% are hills or mountains and the top 10% mountains; the wettest
-// 36% of the rest grows forest.
-function raiseLand(tiles, fields, share, allowed, peakShare) {
+// The top `share` of the allowed tiles by elevation become land. Then (v4):
+// about 5% of that land is mountains, strung out in thin ranges along ridges
+// and leaning a little toward high ground; about 17% is hills, in small
+// patches, with extra foothills beside the mountains; and the wettest third of
+// the flat land and hills grows forest in small stands.
+function raiseLand(tiles, fields, share, allowed, peakShare, cols) {
   const idx = [];
   for (let i = 0; i < tiles.length; i++) if (!allowed || allowed[i]) idx.push(i);
   const elev = idx.map(i => fields.elevation[i]);
   const seaLine = quantile(elev, 1 - share);
   const land = idx.filter(i => fields.elevation[i] >= seaLine);
   const landElev = land.map(i => fields.elevation[i]);
-  const hillLine = quantile(landElev, 0.70);
-  const peakLine = quantile(landElev, 1 - (peakShare === undefined ? 0.10 : peakShare));
-  const wet = land.filter(i => fields.elevation[i] <= peakLine).map(i => fields.moisture[i]);
-  const woodLine = quantile(wet, 0.64);
+  const rank = new Map();
+  land.slice().sort((a, b) => fields.elevation[a] - fields.elevation[b]).forEach((i, k) => rank.set(i, k / Math.max(1, land.length - 1)));
+  const mountScore = i => fields.ridge[i] + 0.35 * rank.get(i);
+  const mountLine = quantile(land.map(mountScore), 1 - (peakShare === undefined ? 0.05 : peakShare));
   for (const tile of tiles) tile.t = 'deep';
+  const mount = new Set(land.filter(i => mountScore(i) >= mountLine));
+  const W = cols || Math.max(...tiles.map(t => t.x)) + 1;
+  const foot = i => {
+    const t = tiles[i];
+    return neighbourList(t.x, t.y).some(([x, y]) => mount.has(y * W + x));
+  };
+  const hillScore = i => fields.hilly[i] + (foot(i) ? 0.22 : 0);
+  const rest = land.filter(i => !mount.has(i));
+  const hillLine = quantile(rest.map(hillScore), 0.83);
+  const wet = rest.map(i => fields.wood[i] + 0.35 * fields.moisture[i]);
+  const woodLine = quantile(wet, 0.67);
   for (const i of land) {
-    const tile = tiles[i], e = fields.elevation[i];
-    tile.t = e > peakLine ? 'mount' : e > hillLine ? 'hill' : 'flat';
-    tile.f = (tile.t === 'flat' || tile.t === 'hill') && fields.moisture[i] > woodLine ? 'forest' : null;
+    const tile = tiles[i];
+    if (mount.has(i)) { tile.t = 'mount'; tile.f = null; continue; }
+    tile.t = hillScore(i) >= hillLine ? 'hill' : 'flat';
+    tile.f = fields.wood[i] + 0.35 * fields.moisture[i] > woodLine ? 'forest' : null;
   }
 }
 
@@ -1105,11 +1194,12 @@ function mirrorHalf(tiles, fields) {
 
 // Pangaea and Mirror: one big landmass ringed by sea, lakes, bays and the odd
 // offshore island. Mirror copies the top half onto the bottom, turned around.
-function landTerrain(seed, cols, rows, mirror) {
+function landTerrain(seed, cols, rows, mirror, wrap) {
   const tiles = blankTiles(cols, rows);
+  // On a wrapping map the land may come a little closer to the seam.
   const fields = noiseFields(seed, cols, rows, (x, y) =>
-    falloff((x / (cols - 1) - 0.5) * 2, (y / (rows - 1) - 0.5) * 2));
-  raiseLand(tiles, fields, 0.66, null);
+    falloff((x / (cols - 1) - 0.5) * 2 * (wrap ? 0.85 : 1), (y / (rows - 1) - 0.5) * 2), wrap);
+  raiseLand(tiles, fields, 0.66, null, undefined, cols);
   if (mirror) mirrorHalf(tiles, ['t', 'f']);
   shoreUp(tiles, cols, rows);
   scatterResources(tiles, seed);
@@ -1121,7 +1211,7 @@ function landTerrain(seed, cols, rows, mirror) {
 // touching the next, so nothing slips past it. Everything within 2 hexes of
 // the line stays sea, which leaves at least 3 hexes of deep water between the
 // two landmasses.
-function continentTerrain(seed, cols, rows) {
+function continentTerrain(seed, cols, rows, wrap) {
   const line = [];
   let lx = Math.floor(cols / 2);
   line[0] = lx;
@@ -1144,6 +1234,8 @@ function continentTerrain(seed, cols, rows) {
     const i = t.y * cols + t.x;
     side[i] = t.x < line[t.y] ? 0 : 1;
     allowed[i] = lineGap(t.x, t.y) > 2 ? 1 : 0;
+    // On a wrapping map the seam is a second dividing sea, so the landmasses keep clear of it too.
+    if (wrap && (t.x <= 1 || t.x >= cols - 2)) allowed[i] = 0;
   }
   // Each half gets its own falloff, so each grows one landmass of its own.
   const fields = noiseFields(seed, cols, rows, (x, y) => {
@@ -1151,8 +1243,8 @@ function continentTerrain(seed, cols, rows) {
     const lo = side[y * cols + x] === 0 ? 0 : mid, hi = side[y * cols + x] === 0 ? mid : cols - 1;
     const dx = ((x - lo) / Math.max(1, hi - lo) - 0.5) * 2;
     return falloff(dx, (y / (rows - 1) - 0.5) * 2) * 0.9;
-  });
-  raiseLand(tiles, fields, 0.6, allowed);
+  }, wrap);
+  raiseLand(tiles, fields, 0.6, allowed, undefined, cols);
   shoreUp(tiles, cols, rows);
   scatterResources(tiles, seed);
   return { tiles, side };
@@ -1160,13 +1252,15 @@ function continentTerrain(seed, cols, rows) {
 
 // Islands: islands of 15 to 40 land tiles grown one at a time from scattered
 // seeds, kept at least 2 water hexes apart, until about 35% of the map is land.
-function islandTerrain(seed, cols, rows) {
+function islandTerrain(seed, cols, rows, wrap) {
   const tiles = blankTiles(cols, rows);
   const island = new Int32Array(cols * rows).fill(-1);
   const target = Math.round(0.35 * tiles.length);
   const near = (x, y, r, test) => {
     for (let yy = Math.max(0, y - r); yy <= Math.min(rows - 1, y + r); yy++) {
-      for (let xx = Math.max(0, x - r - 1); xx <= Math.min(cols - 1, x + r + 1); xx++) {
+      for (let x0 = x - r - 1; x0 <= x + r + 1; x0++) {
+        const xx = wrap ? ((x0 % cols) + cols) % cols : x0;
+        if (xx < 0 || xx >= cols) continue;
         if (hexDistance(x, y, xx, yy) <= r && test(yy * cols + xx)) return true;
       }
     }
@@ -1206,10 +1300,10 @@ function islandTerrain(seed, cols, rows) {
     land += grown.length;
     id++;
   }
-  const fields = noiseFields(seed, cols, rows, () => 0);
+  const fields = noiseFields(seed, cols, rows, () => 0, wrap);
   const allowed = new Uint8Array(cols * rows);
   for (let i = 0; i < tiles.length; i++) allowed[i] = island[i] >= 0 ? 1 : 0;
-  raiseLand(tiles, fields, 1, allowed, 0.05);
+  raiseLand(tiles, fields, 1, allowed, 0.03, cols);
   shoreUp(tiles, cols, rows);
   scatterResources(tiles, seed);
   return { tiles, island, islands: id };
@@ -1425,15 +1519,16 @@ function chooseStarts(made, cols, rows, seed, count, type, slack) {
   return gapOk(starts, count === 2 ? 8 : count <= 4 ? 7 : 6) ? starts : null;
 }
 
-function generateWorld(seed, count, type, size) {
+function generateWorld(seed, count, type, size, wrap) {
   const kind = MAP_TYPES[type] ? type : 'pangaea';
   const { cols, rows } = mapSize(MAP_SIZES[size] ? size : sizeFor(count), kind);
+  WRAP_W = wrap ? cols : 0;
   // Try a few seeds until the map has room for everyone.
   for (let attempt = 0; attempt < 24; attempt++) {
     const s = (seed + attempt * 7919) >>> 0;
-    const made = kind === 'islands' ? islandTerrain(s, cols, rows)
-      : kind === 'continents' ? continentTerrain(s, cols, rows)
-        : landTerrain(s, cols, rows, kind === 'mirror');
+    const made = kind === 'islands' ? islandTerrain(s, cols, rows, !!wrap)
+      : kind === 'continents' ? continentTerrain(s, cols, rows, !!wrap)
+        : landTerrain(s, cols, rows, kind === 'mirror', !!wrap);
     const conts = assignContinents(made.tiles, cols, rows, s);
     const starts = chooseStarts(made, cols, rows, s, count, kind, Math.floor(attempt / 6));
     if (!starts) continue;
@@ -1483,37 +1578,22 @@ function assignCivs(seats, seed) {
 }
 
 // seats: [{ name, human, civ }]. Returns the new game, sitting at the first player's turn.
-/* ── Bored Together ─────────────────────────────────────────────────────────
- * Two people, one valley: every turn ends by handing the whole board to the
- * server, which stores it and passes it to whoever is due next. Neither side
- * runs a private campaign or a CPU stand-in.
- */
-let online = null, onlineSent = false;
-function onlineSubmit() {
-  if (!online || onlineSent || !G) return;
-  onlineSent = true;
-  // Only the winner's own client claims the win. A losing final turn still
-  // hands the board over, so the other side can open it and close the match.
-  const seat = Number(online.seat) || 1;
-  const winner = G.over && Number.isInteger(G.over.winner) && G.over.winner === seat - 1 ? seat : null;
-  online.submit({ board: G, turn: G.turn, winner })
-    .then(() => online.finishTurn())
-    .catch(error => { onlineSent = false; online.error(error, onlineSubmit); });
-}
-
 function startGame(options) {
   const seats = options.seats.slice(0, MAX_PLAYERS);
   const seed = options.seed >>> 0;
   const type = MAP_TYPES[options.map] ? options.map : 'pangaea';
   const size = MAP_SIZES[options.size] ? options.size : sizeFor(seats.length);
-  const world = generateWorld(seed, seats.length, type, size);
+  const wrap = !!options.wrap;
+  const world = generateWorld(seed, seats.length, type, size, wrap);
   if (!world) return null;
   const n = seats.length;
   const civs = assignCivs(seats, world.seed);
   const colors = assignColors(civs);
   G = {
-    v: 3, size, seed: world.seed, rs: (world.seed ^ 0x9e3779b9) >>> 0, map: world.map,
+    v: 4, size, seed: world.seed, rs: (world.seed ^ 0x9e3779b9) >>> 0, map: world.map,
     level: LEVELS[options.level] ? options.level : 'normal',
+    wrap, closeTurn: options.closeTurn === undefined ? DEFAULT_CLOSE_TURN : Math.max(0, options.closeTurn | 0),
+    open: [], deals: [], nextDeal: 1,
     cols: world.cols, rows: world.rows, tiles: world.tiles, conts: world.conts,
     units: [], cities: [], players: [],
     dip: [], attitude: [], warSince: [], offers: [],
@@ -1752,6 +1832,8 @@ function cityYields(c) {
     prod += def.prod || 0;
   }
   if (c.buildings.includes('workshop')) prod += Math.floor(c.pop / 3);
+  if (c.buildings.includes('foundry')) prod += Math.floor(c.pop / 3);
+  if (c.buildings.includes('shipyard')) prod += Math.floor(shallow / 2);
   if (civIs(i, 'qin')) prod += Math.floor(c.pop / 2);
   if (civIs(i, 'egypt')) prod += Math.floor(c.buildings.length / 2);
   if (civIs(i, 'portugal') && f && f.capHome >= 0) {
@@ -1787,6 +1869,11 @@ function cityStrength(c) {
 
 function itemDef(item) {
   if (!item) return null;
+  if (item.kind === 'road') {
+    const d = cityById(item.id);
+    return { name: 'Road to ' + (d ? d.name : 'a lost city'), cost: 0, road: true,
+      blurb: 'Paves the cheapest land route between the two cities. Units move over paved hexes at half cost.' };
+  }
   if (item.kind === 'research') return RESEARCH;
   if (item.kind === 'project') return PROJECTS[item.id] || null;
   return item.kind === 'unit' ? UNITS[item.id] || null : BUILDINGS[item.id] || null;
@@ -1797,6 +1884,10 @@ const sameItem = (a, b) => !!a && !!b && a.kind === b.kind && a.id === b.id;
 function costOf(c, item) {
   const def = itemDef(item);
   if (!def || item.kind === 'research') return 0;
+  if (item.kind === 'road') {
+    const d = cityById(item.id), r = d && d.owner === c.owner ? roadRoute(c, d) : null;
+    return Math.max(1, r ? r.cost : 1);
+  }
   const i = c.owner;
   let cost = def.cost;
   if (item.kind === 'project') return def.cost;
@@ -1822,8 +1913,13 @@ function costOf(c, item) {
 // player picks. A harbor goes on shallow water, the rest on flat land or hills.
 // Finishing the building clears that hex's feature and improvement; the
 // terrain stays.
-const onCenter = id => id === 'walls' || id === 'castle' || id === 'fortress' || (BUILDINGS[id] && BUILDINGS[id].replaces === 'walls');
-const needsPlot = id => !!BUILDINGS[id] && !onCenter(id);
+// v4: the Granary stands on the city center too, like Civ, and so does its tier.
+// A tier (University, Foundry, ...) shares the hex of the building it upgrades.
+const onCenter = id => {
+  const b = baseOf(id);
+  return b === 'walls' || b === 'castle' || b === 'fortress' || b === 'granary' || (BUILDINGS[b] && BUILDINGS[b].replaces === 'walls');
+};
+const needsPlot = id => !!BUILDINGS[id] && !BUILDINGS[id].needs && !onCenter(id);
 
 // Which building holds this hex, across every city: { city, id } or null.
 function plotAt(x, y) {
@@ -1868,14 +1964,15 @@ function freePlot(c, id, keep) {
     if (t.f && (FEATURES[t.f].strategic || t.f === 'geyser' || t.f === 'gunpowder')) score -= 8;
     if (t.f) score -= keep ? 20 : 1;
     if (t.imp) score -= 2;
-    if (id === 'observatory' && nextToMountain(t.x, t.y)) score += 6;
+    if (id === 'library' && nextToMountain(t.x, t.y)) score += 6;   // its Observatory tier doubles there
     score += 0.1 * (bare.food + bare.prod) + hash2(t.x, t.y, G.seed) * 0.3;
     if (score > bestScore) { bestScore = score; best = t; }
   }
   return best;
 }
 
-// The building's crew clears its hex: feature and improvement go, terrain stays.
+// The building's crew clears its hex the moment it is planned (v4): feature and
+// improvement go, terrain stays.
 function clearPlot(c, id) {
   const s = c.plot && c.plot[id];
   const t = s && tileAt(s[0], s[1]);
@@ -1896,12 +1993,119 @@ function placeMissingPlots(c, clear) {
   }
 }
 
+/* ── roads (v4) ────────────────────────────────────────────────────────────── */
+
+// There are no traders, so players pave roads from city to city, HOI4 railroad
+// style: a city builds "Road to X" as one project that costs production for
+// every hex not yet paved, and the whole route turns to road when it is done.
+// Needs Masonry. Faster movement is the only bonus: a unit spends ROAD_STEP
+// moves going from one road hex to the next. Anyone's units may use any road.
+const ROAD_STEP = 0.5;
+const ROAD_COST = { flat: 4, rough: 6 };   // production per unpaved hex; hills and forest are rough
+const roadCache = new Map();
+
+// The cheapest land route from city c to city d over land that belongs to c's
+// owner or to nobody, never over mountains, wonders or other cities.
+// Returns { tiles, cost }: the hexes between the cities, and the production the
+// unpaved ones still need. null when there is no way.
+function roadRoute(c, d) {
+  const memo = c.id + '>' + d.id;
+  if (roadCache.has(memo)) return roadCache.get(memo);
+  const owner = c.owner, start = keyOf(c.x, c.y), goal = keyOf(d.x, d.y);
+  const best = new Map([[start, 0]]), prev = new Map(), heap = [[0, c.x, c.y]];
+  const push = item => {
+    heap.push(item);
+    for (let k = heap.length - 1; k > 0;) {
+      const up = (k - 1) >> 1;
+      if (heap[up][0] <= heap[k][0]) break;
+      [heap[up], heap[k]] = [heap[k], heap[up]];
+      k = up;
+    }
+  };
+  const pop = () => {
+    const top = heap[0], last = heap.pop();
+    if (heap.length) {
+      heap[0] = last;
+      for (let k = 0; ;) {
+        let m = k;
+        for (const j of [2 * k + 1, 2 * k + 2]) if (j < heap.length && heap[j][0] < heap[m][0]) m = j;
+        if (m === k) break;
+        [heap[m], heap[k]] = [heap[k], heap[m]];
+        k = m;
+      }
+    }
+    return top;
+  };
+  let found = false;
+  while (heap.length) {
+    const [dist, x, y] = pop();
+    const k = keyOf(x, y);
+    if (dist > best.get(k)) continue;
+    if (k === goal) { found = true; break; }
+    for (const [nx, ny] of neighbourList(x, y)) {
+      const t = tileAt(nx, ny);
+      if (!t) continue;
+      const nk = keyOf(nx, ny);
+      const isGoal = nk === goal;
+      if (!isGoal) {
+        if (TERRAIN[t.t].water || TERRAIN[t.t].block || (t.f && FEATURES[t.f].wonder)) continue;
+        if (t.owner !== null && t.owner !== owner) continue;
+        if (cityAt(nx, ny)) continue;
+      }
+      const w = isGoal || t.road ? 0.01 : (t.t === 'hill' || t.f === 'forest' ? ROAD_COST.rough : ROAD_COST.flat) + 0.01;
+      const total = dist + w;
+      if (best.has(nk) && best.get(nk) <= total) continue;
+      best.set(nk, total);
+      prev.set(nk, k);
+      push([total, nx, ny]);
+    }
+  }
+  let out = null;
+  if (found) {
+    const tiles = [];
+    for (let k = prev.get(goal); k && k !== start; k = prev.get(k)) tiles.unshift(tileAt(...k.split(',').map(Number)));
+    const cost = tiles.reduce((n, t) => n + (t.road ? 0 : (t.t === 'hill' || t.f === 'forest' ? ROAD_COST.rough : ROAD_COST.flat)), 0);
+    out = { tiles, cost };
+  }
+  roadCache.set(memo, out);
+  return out;
+}
+function roadProblem(c, targetId) {
+  const d = cityById(targetId);
+  if (!hasTech(c.owner, 'masonry')) return 'Needs ' + techName('masonry');
+  if (!d || d.owner !== c.owner || d === c) return 'Pick one of your other cities';
+  const r = roadRoute(c, d);
+  if (!r) return 'No land route through your land';
+  if (!r.cost) return 'Already connected';
+  return '';
+}
+function finishRoad(c, targetId, cost) {
+  roadCache.clear();
+  const d = cityById(targetId), r = d && d.owner === c.owner ? roadRoute(c, d) : null;
+  if (!r || !r.cost) {
+    log(c.name + ' can’t finish its road: the way is gone.', '#93401d', c.owner);
+    c.build = null;
+    return false;
+  }
+  c.progress -= cost;
+  for (const t of r.tiles) t.road = true;
+  roadCache.clear();
+  return true;
+}
+// Roads to every other city of c's owner that c could pave, cheapest first.
+function roadChoices(c) {
+  if (!hasTech(c.owner, 'masonry')) return [];
+  return ownCities(c.owner).filter(d => d !== c).map(d => ({ d, r: roadRoute(c, d) }))
+    .filter(o => o.r).sort((a, b) => a.r.cost - b.r.cost || hexDistance(c.x, c.y, a.d.x, a.d.y) - hexDistance(c.x, c.y, b.d.x, b.d.y));
+}
+
 // '' when the city may build it; otherwise the reason it can't.
 function buildProblem(c, item) {
   const def = itemDef(item);
   if (!def) return 'Unknown';
-  if (item.kind === 'research') return '';
+  if (item.kind === 'research') return c.buildings.includes('library') ? '' : 'Needs a Library first';
   if (item.kind === 'project') return projectProblem(c, item.id);
+  if (item.kind === 'road') return roadProblem(c, item.id);
   const i = c.owner, civ = civOf(i);
   if (def.civ && def.civ !== civ) return 'Only ' + civTitle(def.civ);
   const own = item.kind === 'unit' ? unitFor(i, item.id) : buildingFor(i, item.id);
@@ -1914,7 +2118,7 @@ function buildProblem(c, item) {
   if (def.tech2 && !hasTech(i, def.tech2)) return 'Needs ' + techName(def.tech2);
   if ((def.naval || def.coastal) && !isCoastal(c)) return 'Coastal cities only';
   if (def.needsWalls && !hasWalls(c)) return 'Needs walls first';
-  if (def.needsLibrary && !c.buildings.includes('library')) return 'Needs a Library first';
+  if (def.needs && !c.buildings.includes(def.needs)) return 'Needs a ' + BUILDINGS[def.needs].name + ' first';
   return '';
 }
 
@@ -1937,6 +2141,7 @@ function setBuild(c, item) {
       const spot = freePlot(c, item.id);
       if (!spot) return false;
       c.plot[item.id] = [spot.x, spot.y];
+      clearPlot(c, item.id);   // v4: the hex is cleared the moment it is planned
     }
   }
   c.build = item ? { kind: item.kind, id: item.id } : null;
@@ -1967,7 +2172,7 @@ function spawnSpot(c, type) {
   return ring[0] || null;
 }
 
-function claimTile(t, c) { t.owner = c.owner; t.city = c.id; }
+function claimTile(t, c) { t.owner = c.owner; t.city = c.id; roadCache.clear(); }
 // Only the Inca claim mountains.
 // Only the Inca claim mountains, and nobody claims a wonder's mountain.
 const canClaim = (t, c) => t.owner === null && (t.t !== 'mount' || (civIs(c.owner, 'inca') && !(t.f && FEATURES[t.f].wonder)));
@@ -2069,7 +2274,11 @@ function tryComplete(c) {
       f.iron -= def.res.iron || 0;
       f.gunpowder = (f.gunpowder || 0) - (def.res.gunpowder || 0);
     }
-    addUnit(f, item.id, spot[0], spot[1], c.id);
+    const made = addUnit(f, item.id, spot[0], spot[1], c.id);
+    // An Armory trains land veterans, a Shipyard sea ones: +5 strength for good.
+    if (isMil(item.id) && (def.naval ? c.buildings.includes('shipyard') : c.buildings.includes('armory'))) made.vet = true;
+  } else if (item.kind === 'road') {
+    if (!finishRoad(c, item.id, cost)) return;
   } else {
     c.progress -= cost;
     c.buildings.push(item.id);
@@ -2132,6 +2341,7 @@ function foundCity(u) {
   };
   if (f.capital === null) { c.capital = true; f.capital = c.id; f.capHome = tileAt(c.x, c.y).k; }
   G.cities.push(c);
+  tileAt(c.x, c.y).road = true;   // a city is always on the road network
   claimStartRing(c);
   if (rome) claimNextHex(c);
   if (rome) placeMissingPlots(c, true);   // Rome's free granary takes a hex too
@@ -2248,7 +2458,14 @@ function killUnit(u, killer) {
 
 const unitMove = u => UNITS[u.type].move + (UNITS[u.type].horse && civIs(u.owner, 'mongol') ? 1 : 0);
 
-function moveCost(u, x, y) {
+// Roads: going from one paved hex to the next costs ROAD_STEP, if that is less.
+function moveCost(u, x, y, fx, fy) {
+  const base = terrainCost(u, x, y);
+  if (fx === undefined || !isFinite(base) || base <= ROAD_STEP || UNITS[u.type].naval) return base;
+  const t = tileAt(x, y), f = tileAt(fx, fy);
+  return t && f && t.road && f.road && !TERRAIN[t.t].water ? ROAD_STEP : base;
+}
+function terrainCost(u, x, y) {
   const t = tileAt(x, y);
   if (!t) return Infinity;
   const ter = TERRAIN[t.t], def = UNITS[u.type];
@@ -2286,9 +2503,14 @@ function canStop(u, x, y) {
   return true;
 }
 
+// out.war holds the hexes of closed land a human may step onto at the price of
+// war (a confirm box asks first). CPUs never cross closed borders by accident:
+// a CPU at war with someone already walks their land freely.
 function computeReachable(u) {
   const out = new Map();
+  out.war = new Set();
   if (u.mp <= 0 || u.pinned) return out;
+  const human = !G.watch && pl(u.owner).human;
   const zoc = zocFor(u);
   const startKey = keyOf(u.x, u.y);
   const best = new Map([[startKey, 0]]);
@@ -2298,12 +2520,19 @@ function computeReachable(u) {
     if (spent > best.get(keyOf(x, y))) continue;
     for (const [nx, ny] of neighbourList(x, y)) {
       if (!tileAt(nx, ny)) continue;
-      const total = spent + moveCost(u, nx, ny);
+      const total = spent + moveCost(u, nx, ny, x, y);
       if (!isFinite(total) || total > u.mp) continue;
       const k = keyOf(nx, ny);
       if (best.has(k) && best.get(k) <= total) continue;
       const pass = canPass(u, nx, ny), stop = canStop(u, nx, ny);
       if (!pass && !stop) continue;
+      if (closedOwner(u.owner, nx, ny) >= 0) {
+        if (!human || !stop) continue;
+        best.set(k, total);
+        out.set(k, total);
+        out.war.add(k);
+        continue;
+      }
       best.set(k, total);
       if (stop && k !== startKey) out.set(k, total);
       // Stepping into an enemy's zone of control ends the move there.
@@ -2327,9 +2556,14 @@ function moveUnit(u, x, y, reach) {
   const map = reach || computeReachable(u);
   const cost = map.get(keyOf(x, y));
   if (cost === undefined) return false;
+  // Walking onto closed land is the declaration of war.
+  const closed = closedOwner(u.owner, x, y);
+  if (closed >= 0) declareWar(u.owner, closed);
   for (const o of G.units.filter(o => o.x === x && o.y === y && o.owner !== u.owner)) captureCivilian(o, u);
   u.x = x;
   u.y = y;
+  u.fort = false;
+  u.sleep = false;
   u.mp = Math.max(0, u.mp - cost);
   u.moved = true;
   u.path = null;   // a hand-steered move takes the unit off its queued route
@@ -2358,8 +2592,9 @@ function computePaths(u) {
     for (const [nx, ny] of neighbourList(x, y)) {
       if (!tileAt(nx, ny)) continue;
       if (seen && !seen[ny * G.cols + nx]) continue;
-      const cost = moveCost(u, nx, ny);
+      const cost = moveCost(u, nx, ny, x, y);
       if (!isFinite(cost)) continue;
+      if (closedOwner(u.owner, nx, ny) >= 0) continue;   // routes go around closed land
       const pass = canPass(u, nx, ny);
       if (!pass && !canStop(u, nx, ny)) continue;
       const total = spent + cost;
@@ -2398,7 +2633,8 @@ function pathTurns(u, steps, firstMp) {
   let turns = 1, mp = firstMp === undefined ? unitMove(u) : Math.max(0, firstMp);
   if (mp <= 0) { turns = 2; mp = unitMove(u); }
   for (let i = 0; i < steps.length; i++) {
-    const cost = moveCost(u, steps[i][0], steps[i][1]);
+    const from = i ? steps[i - 1] : [u.x, u.y];
+    const cost = moveCost(u, steps[i][0], steps[i][1], from[0], from[1]);
     if (!isFinite(cost)) return Infinity;
     if (cost > mp) { turns++; mp = unitMove(u); }
     mp -= cost;
@@ -2410,12 +2646,15 @@ function pathTurns(u, steps, firstMp) {
 // One hex along a queued path. 'move' went through, 'wait' is out of moves,
 // 'block' means the road is shut (a new enemy, a friend parked on it).
 function stepUnit(u, x, y, final) {
-  const cost = moveCost(u, x, y);
+  const cost = moveCost(u, x, y, u.x, u.y);
   if (!isFinite(cost) || (!canPass(u, x, y) && !(final && canStop(u, x, y)))) return 'block';
+  if (closedOwner(u.owner, x, y) >= 0) return 'block';   // borders closed since the march was ordered
   if (cost > u.mp) return 'wait';
   for (const o of G.units.filter(o => o.x === x && o.y === y && o.owner !== u.owner)) captureCivilian(o, u);
   u.x = x;
   u.y = y;
+  u.fort = false;
+  u.sleep = false;
   u.mp = Math.max(0, u.mp - cost);
   u.moved = true;
   const zoc = zocFor(u);
@@ -2497,6 +2736,7 @@ function sharedBonus(u) {
   if (t.f === 'forest' && civIs(u.owner, 'celts')) s += 5;
   if (def.hurtBonus && u.hp < 50) s += def.hurtBonus;
   if (u.giant && SCI.warWonders) s += 5;
+  if (u.vet) s += 5;
   if (deityCpu(u.owner)) s += LEVELS.deity.combat;
   return s;
 }
@@ -2510,6 +2750,7 @@ function defStrength(u, attacker) {
     if (t.f === 'forest') s += FEATURES.forest.def;
   }
   if (def.vsHorse && isHorse(attacker)) s += def.vsHorse;
+  if (u.fort) s += 3;   // v4: dug in
   return s;
 }
 function atkStrength(u, target) {
@@ -2563,6 +2804,8 @@ function attack(u, x, y) {
   const f = pl(u.owner);
   u.acted = true;
   u.moved = true;
+  u.fort = false;
+  u.sleep = false;
   u.mp = 0;
   if (info.capture) {
     captureCity(info.city, u);
@@ -2705,6 +2948,8 @@ function declareWar(a, b) {
   changeAttitude(b, a, -30);
   G.offers = G.offers.filter(o => !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
   log(fullName(pl(a)) + ' declares war on ' + fullName(pl(b)) + '.', '#93401d', null);
+  G.open = (G.open || []).filter(o => !((o.a === a && o.b === b) || (o.a === b && o.b === a)));
+  settleDealsOnWar(a, b);
 }
 function makePeace(a, b) {
   if (!atWar(a, b)) return;
@@ -2742,21 +2987,308 @@ function offerPeace(from, to) {
     log(fullName(target) + ' refuses peace with ' + fullName(pl(from)) + ' for now.', target.ink, from);
     return 'refused';
   }
-  if (G.offers.some(o => o.from === from && o.to === to)) return 'sent';
-  G.offers.push({ from, to, turn: G.turn });
+  if (G.offers.some(o => o.from === from && o.to === to && (o.kind || 'peace') === 'peace')) return 'sent';
+  G.offers.push({ id: newOfferId(), kind: 'peace', from, to, turn: G.turn });
   log(fullName(pl(from)) + ' offers peace. Answer in the Council.', pl(from).ink, to);
   return 'sent';
 }
-function answerOffer(to, from, accept) {
-  const offer = G.offers.find(o => o.from === from && o.to === to);
+const newOfferId = () => 'o' + (G.nextOffer = (G.nextOffer || 0) + 1);
+// A human answers an offer waiting for them in the Council: peace, an
+// open-borders deal or a trade.
+function answerOffer(to, id, accept) {
+  const offer = G.offers.find(o => o.id === id && o.to === to);
   if (!offer) return false;
   G.offers = G.offers.filter(o => o !== offer);
-  if (accept) makePeace(to, from);
-  else {
-    changeAttitude(from, to, -6);
-    log(fullName(pl(to)) + ' refuses your peace offer.', pl(to).ink, from);
+  const from = offer.from, kind = offer.kind || 'peace';
+  if (kind === 'peace') {
+    if (accept) makePeace(to, from);
+    else {
+      changeAttitude(from, to, -6);
+      log(fullName(pl(to)) + ' refuses your peace offer.', pl(to).ink, from);
+    }
+  } else if (kind === 'borders') {
+    if (accept && !atWar(to, from)) openBorders(to, from);
+    else log(fullName(pl(to)) + ' turns down your open-borders deal.', pl(to).ink, from);
+  } else if (kind === 'trade') {
+    const why = accept ? tradeProblem(offer.deal) : '';
+    if (accept && !why && !atWar(to, from)) {
+      makeDeal(offer.deal);
+    } else {
+      log(fullName(pl(to)) + ' turns down your trade' + (why ? ' (' + why.toLowerCase() + ')' : '') + '.', pl(to).ink, from);
+    }
   }
   return true;
+}
+
+/* ── closed borders and open-borders deals (v4) ────────────────────────────── */
+
+// From this turn on, every player's land is closed to the others. Walking into
+// it (a unit on a hex someone else owns, ships on their waters too) without an
+// open-borders deal means war: the one who steps in is the one who declares it.
+// Units caught inside when the borders close are moved out at the start of
+// their owner's turn. Open-borders deals come from the Council and last 30 turns.
+const DEFAULT_CLOSE_TURN = 30;
+const OPEN_TURNS = 30;
+const bordersClosed = () => !!G.closeTurn && G.turn >= G.closeTurn && !G.tut;
+function openBetween(a, b) {
+  return (G.open || []).some(o => G.turn < o.until && ((o.a === a && o.b === b) || (o.a === b && o.b === a)));
+}
+// The player whose closed land this is for player i, or -1 when i may stand there.
+function closedOwner(i, x, y) {
+  if (!bordersClosed()) return -1;
+  const t = tileAt(x, y);
+  if (!t || t.owner === null || t.owner === i) return -1;
+  const o = pl(t.owner);
+  if (!o || !o.alive || atWar(i, t.owner) || openBetween(i, t.owner)) return -1;
+  return t.owner;
+}
+function openBorders(a, b) {
+  G.open = (G.open || []).filter(o => !((o.a === a && o.b === b) || (o.a === b && o.b === a)));
+  G.open.push({ a, b, until: G.turn + OPEN_TURNS });
+  changeAttitude(a, b, 4);
+  changeAttitude(b, a, 4);
+  log(fullName(pl(a)) + ' and ' + fullName(pl(b)) + ' open their borders to each other for ' + OPEN_TURNS + ' turns.', '#41602f', null);
+}
+// Would this CPU open its borders to that player? Not to someone it dislikes.
+function aiAcceptsOpen(f, other) {
+  return !atWar(f.i, other.i) && (G.attitude[f.i][other.i] || 0) > -8 && aiStance(f, other) !== 'attack';
+}
+// Asks another player for an open-borders deal. Returns 'accepted', 'refused' or 'sent'.
+function proposeOpen(from, to) {
+  if (atWar(from, to) || openBetween(from, to)) return '';
+  const target = pl(to);
+  if (!target.human) {
+    if (aiAcceptsOpen(target, pl(from))) { openBorders(from, to); return 'accepted'; }
+    changeAttitude(to, from, -2);
+    return 'refused';
+  }
+  if (G.offers.some(o => o.from === from && o.to === to && o.kind === 'borders')) return 'sent';
+  G.offers.push({ id: newOfferId(), kind: 'borders', from, to, turn: G.turn });
+  log(fullName(pl(from)) + ' asks for open borders. Answer in the Council.', pl(from).ink, to);
+  return 'sent';
+}
+// Where a unit standing on closed land goes: the nearest hex that is open to it.
+function ejectSpot(u) {
+  let best = null, bestV = Infinity;
+  for (const t of G.tiles) {
+    const d = hexDistance(u.x, u.y, t.x, t.y);
+    if (d < 1 || d > 9 || closedOwner(u.owner, t.x, t.y) >= 0) continue;
+    if (!isFinite(terrainCost(u, t.x, t.y)) || !canStop(u, t.x, t.y)) continue;
+    const v = d + hash2(t.x, t.y, G.seed + u.owner) * 0.4;
+    if (v < bestV) { bestV = v; best = [t.x, t.y]; }
+  }
+  return best;
+}
+function ejectTrespassers(i) {
+  for (const u of ownUnits(i)) {
+    const who = closedOwner(i, u.x, u.y);
+    if (who < 0) continue;
+    const spot = ejectSpot(u);
+    if (!spot) continue;
+    u.x = spot[0];
+    u.y = spot[1];
+    u.path = null;
+    log('Your ' + UNITS[u.type].name.toLowerCase() + ' was moved out of ' + pl(who).name + '’s land: the borders are closed.', pl(i).ink, i);
+  }
+}
+// Start of a round: news when the borders close, and expired deals lapse.
+function bordersNewRound() {
+  if (G.closeTurn && G.turn === G.closeTurn && !G.tut) {
+    log('The borders close. Stepping onto another player’s land without an open-borders deal means war.', 'turn', null);
+  }
+  const lapsed = (G.open || []).filter(o => G.turn >= o.until);
+  if (lapsed.length) {
+    G.open = G.open.filter(o => G.turn < o.until);
+    for (const o of lapsed) log('The open-borders deal between ' + fullName(pl(o.a)) + ' and ' + fullName(pl(o.b)) + ' has run out.', '#7a6d57', null);
+  }
+}
+
+/* ── trading, HOI4 style (v4) ──────────────────────────────────────────────── */
+
+// There is no gold, so production is the money. A deal sells horses, iron or
+// gunpowder: the resource changes hands at once, and the buyer pays production
+// in one go or in installments (5 a turn for 10 turns, say). A deal can't be
+// cancelled except by war. If the buyer starts the war, everything still owed is
+// paid on the spot; if the seller starts it, the buyer stops paying. Nobody
+// trades production for production. A one-time payment, or one installment, can't
+// be more than the buyer's most productive city makes in a turn.
+const TRADE_RES = ['horses', 'iron', 'gunpowder'];
+const TRADE_BASE = { horses: 1.5, iron: 1.5, gunpowder: 2.2 };   // production one unit is worth on an even market
+const TRADE_STEP = 5;
+const TRADE_MAX_TURNS = 12;
+const tradeResName = res => ({ horses: 'horses', iron: 'iron', gunpowder: 'gunpowder' }[res]);
+
+function maxPay(i) {
+  return Math.max(0, ...ownCities(i).map(c => cityYields(c).prod));
+}
+// What a player wants of a resource: what its queued units will take, plus one
+// more unit's worth if it has the tech to use it.
+function resNeed(i, res) {
+  let need = 0;
+  for (const c of ownCities(i)) {
+    const r = c.build && c.build.kind === 'unit' && UNITS[c.build.id].res;
+    if (r && r[res]) need += r[res];
+  }
+  const usable = Object.keys(UNITS).some(id => UNITS[id].res && UNITS[id].res[res] && hasTech(i, UNITS[id].tech) &&
+    (!UNITS[id].tech2 || hasTech(i, UNITS[id].tech2)));
+  return need + (usable ? 12 : 0);
+}
+// What it has, counting a few turns of income.
+const resSupply = (i, res) => (pl(i)[res] || 0) + stockIncome(i)[res] * 6;
+// Supply and demand. The seller asks more the more it will want the resource
+// itself; the buyer bids more the shorter it is.
+function tradeAsk(seller, res, qty, instal) {
+  const scarcity = clamp((resNeed(seller, res) + 4) / Math.max(4, resSupply(seller, res) - qty), 0.4, 3);
+  return Math.max(1, Math.ceil(qty * TRADE_BASE[res] * scarcity * (instal ? 1.1 : 1)));
+}
+function tradeBid(buyer, res, qty) {
+  const scarcity = clamp((resNeed(buyer, res) + 4) / Math.max(4, resSupply(buyer, res)), 0.3, 3);
+  return Math.floor(qty * TRADE_BASE[res] * scarcity);
+}
+// A deal: { seller, buyer, res, qty, total, turns } with turns = 1 for one go.
+function tradeProblem(d) {
+  const s = pl(d.seller), b = pl(d.buyer);
+  if (!s || !b || !s.alive || !b.alive || d.seller === d.buyer) return 'Not a deal';
+  if (atWar(d.seller, d.buyer)) return 'At war';
+  if (!TRADE_RES.includes(d.res)) return 'Not for trade';
+  if (!(d.qty > 0) || d.qty % TRADE_STEP) return 'Quantities go in fives';
+  if ((s[d.res] || 0) < d.qty) return fullName(s) + ' has only ' + (s[d.res] || 0) + ' ' + d.res;
+  if ((b[d.res] || 0) + d.qty > STOCK_CAP) return fullName(b) + ' can only hold ' + Math.max(0, STOCK_CAP - (b[d.res] || 0)) + ' more ' + d.res;
+  if (!(d.total > 0) || d.total !== Math.floor(d.total)) return 'Name a price in whole production';
+  if (!(d.turns >= 1) || d.turns > TRADE_MAX_TURNS) return 'Up to ' + TRADE_MAX_TURNS + ' turns';
+  const per = Math.ceil(d.total / d.turns), cap = maxPay(d.buyer);
+  if (per > cap) return d.turns === 1 ? 'A one-time payment can’t top ' + cap + ' production (' + pl(d.buyer).name + '’s best city makes ' + cap + ' a turn)'
+    : 'A payment a turn can’t top ' + cap + ' production (' + pl(d.buyer).name + '’s best city makes ' + cap + ' a turn)';
+  return '';
+}
+// Takes production from the payer's cities, the most productive first, and
+// gives it to the receiver's most productive city. Saved production can dip
+// below zero: the city simply has to earn it back.
+function payProduction(from, to, amount) {
+  if (amount <= 0) return;
+  const byProd = i => ownCities(i).map(c => ({ c, p: cityYields(c).prod })).sort((a, b) => b.p - a.p).map(o => o.c);
+  const payers = byProd(from), takers = byProd(to);
+  if (!payers.length || !takers.length) return;
+  let left = amount;
+  for (const c of payers) {
+    const share = Math.min(left, Math.max(1, cityYields(c).prod));
+    c.progress -= share;
+    left -= share;
+    if (left <= 0) break;
+  }
+  if (left > 0) payers[0].progress -= left;
+  takers[0].progress += amount;
+}
+function makeDeal(d) {
+  const s = pl(d.seller), b = pl(d.buyer);
+  s[d.res] = (s[d.res] || 0) - d.qty;
+  b[d.res] = Math.min(STOCK_CAP, (b[d.res] || 0) + d.qty);
+  const what = d.qty + ' ' + d.res;
+  if (d.turns <= 1) {
+    payProduction(d.buyer, d.seller, d.total);
+    log(fullName(b) + ' buys ' + what + ' from ' + fullName(s) + ' for ' + d.total + ' production.', b.ink, null);
+  } else {
+    const per = Math.ceil(d.total / d.turns);
+    G.deals = G.deals || [];
+    G.deals.push({ id: 'd' + (G.nextDeal = (G.nextDeal || 0) + 1), seller: d.seller, buyer: d.buyer, res: d.res, qty: d.qty,
+      owed: d.total, per, left: d.turns, total: d.total, turn: G.turn });
+    log(fullName(b) + ' buys ' + what + ' from ' + fullName(s) + ': ' + per + ' production a turn for ' + d.turns + ' turns.', b.ink, null);
+  }
+}
+// At the start of the buyer's turn, before its cities build: this turn's installment.
+function payInstallments(i) {
+  for (const d of (G.deals || []).slice()) {
+    if (d.buyer !== i) continue;
+    const amount = Math.min(d.per, d.owed);
+    payProduction(d.buyer, d.seller, amount);
+    d.owed -= amount;
+    d.left -= 1;
+    if (d.left <= 0 || d.owed <= 0) {
+      G.deals = G.deals.filter(o => o !== d);
+      log('The last installment for ' + d.qty + ' ' + d.res + ' goes to ' + pl(d.seller).name + '.', pl(i).ink, i);
+    }
+  }
+}
+// War ends every deal between the two: a buyer that starts it pays what is
+// still owed on the spot; a seller that starts it stops the payments.
+function settleDealsOnWar(a, b) {
+  for (const d of (G.deals || []).slice()) {
+    if (!((d.buyer === a && d.seller === b) || (d.buyer === b && d.seller === a))) continue;
+    G.deals = G.deals.filter(o => o !== d);
+    if (d.buyer === a) {
+      payProduction(d.buyer, d.seller, d.owed);
+      log(fullName(pl(a)) + ' declares war and pays the ' + d.owed + ' production still owed to ' + fullName(pl(b)) + ' on the spot.', '#93401d', null);
+    } else {
+      log(fullName(pl(b)) + ' stops paying ' + fullName(pl(a)) + ' for the ' + d.res + ': the seller went to war.', '#93401d', null);
+    }
+  }
+  G.offers = G.offers.filter(o => o.kind !== 'trade' || !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
+}
+function dropDealsOf(i) {
+  G.deals = (G.deals || []).filter(d => d.buyer !== i && d.seller !== i);
+}
+
+// How a CPU answers a deal (as the seller or the buyer, whichever it is).
+// Returns { ok, why, ask, bid }: ask is the least a CPU seller takes, bid the most a CPU buyer pays.
+function aiTradeView(f, d) {
+  const instal = d.turns > 1;
+  const ask = tradeAsk(d.seller, d.res, d.qty, instal), bid = tradeBid(d.buyer, d.res, d.qty);
+  const other = d.seller === f.i ? d.buyer : d.seller;
+  if ((G.attitude[f.i][other] || 0) < -20) return { ok: false, why: 'doesn’t trust you enough to deal', ask, bid };
+  if (d.seller === f.i) {
+    if (d.total < ask) return { ok: false, why: 'wants at least ' + ask + ' production for ' + d.qty + ' ' + d.res, ask, bid };
+    // It keeps enough for what it is building.
+    const left = (pl(f.i)[d.res] || 0) - d.qty;
+    if (left < Math.min(10, resNeed(f.i, d.res) - 12)) return { ok: false, why: 'needs its ' + d.res + ' for its own units', ask, bid };
+  } else if (d.total > bid) {
+    return { ok: false, why: 'would pay at most ' + bid + ' production for ' + d.qty + ' ' + d.res, ask, bid };
+  }
+  return { ok: true, why: '', ask, bid };
+}
+// A human proposes a deal to another player. 'accepted', 'refused' or 'sent'.
+function proposeTrade(d) {
+  const why = tradeProblem(d);
+  if (why) return { result: 'error', why };
+  const from = d.proposer, to = d.proposer === d.seller ? d.buyer : d.seller, target = pl(to);
+  if (!target.human) {
+    const view = aiTradeView(target, d);
+    if (view.ok) { makeDeal(d); return { result: 'accepted' }; }
+    changeAttitude(to, from, -1);
+    return { result: 'refused', why: view.why };
+  }
+  if (G.offers.some(o => o.kind === 'trade' && o.from === from && o.to === to)) return { result: 'sent' };
+  G.offers.push({ id: newOfferId(), kind: 'trade', from, to, turn: G.turn, deal: d });
+  log(fullName(pl(from)) + ' proposes a trade. Answer in the Council.', pl(from).ink, to);
+  return { result: 'sent' };
+}
+// CPUs short of a resource they want shop around among the other CPUs. Humans
+// start their own deals.
+function aiTrade(f) {
+  if (G.turn < 8 || roll() > 0.25) return;
+  for (const res of TRADE_RES) {
+    if (res === 'gunpowder' && !hasTech(f.i, 'firearms')) continue;
+    const have = f[res] || 0;
+    if (resNeed(f.i, res) < 10 || have >= 10) continue;
+    const qty = 10;
+    if (have + qty > STOCK_CAP) continue;
+    let best = null;
+    for (const o of G.players) {
+      if (o.i === f.i || !o.alive || o.human || atWar(f.i, o.i)) continue;
+      const d0 = { seller: o.i, buyer: f.i, res, qty, total: 1, turns: 1 };
+      if ((o[res] || 0) < qty + 10) continue;
+      const ask = tradeAsk(o.i, res, qty, true), bid = tradeBid(f.i, res, qty);
+      if (ask > bid) continue;
+      if (!best || ask < best.ask) best = { o, ask, bid, d0 };
+    }
+    if (!best) continue;
+    const price = Math.ceil((best.ask + best.bid) / 2);
+    const cap = Math.max(1, maxPay(f.i));
+    const turns = clamp(Math.ceil(price / cap), 1, TRADE_MAX_TURNS);
+    if (Math.ceil(price / turns) > cap) continue;
+    const deal = { seller: best.o.i, buyer: f.i, res, qty, total: price, turns };
+    if (tradeProblem(deal)) continue;
+    if (aiTradeView(best.o, deal).ok && aiTradeView(f, deal).ok) { makeDeal(deal); return; }
+  }
 }
 
 /* ── vision ────────────────────────────────────────────────────────────────── */
@@ -2767,7 +3299,9 @@ function computeVision(i) {
   const vis = new Uint8Array(G.cols * G.rows);
   const mark = (cx, cy, r) => {
     for (let y = Math.max(0, cy - r); y <= Math.min(G.rows - 1, cy + r); y++) {
-      for (let x = Math.max(0, cx - r - 1); x <= Math.min(G.cols - 1, cx + r + 1); x++) {
+      for (let x0 = cx - r - 1; x0 <= cx + r + 1; x0++) {
+        const x = wrapX(x0);
+        if (x < 0 || x >= G.cols) continue;
         if (hexDistance(cx, cy, x, y) <= r) vis[y * G.cols + x] = 1;
       }
     }
@@ -2781,6 +3315,7 @@ function computeVision(i) {
 }
 function refreshVision() {
   VIS = G && G.viewer !== null && !G.watch ? computeVision(G.viewer) : null;
+  if (VIS && pl(G.viewer).human) noticeWonders(G.viewer);
 }
 
 /* ── scoring and the end ───────────────────────────────────────────────────── */
@@ -2818,7 +3353,6 @@ function endGame(winner, why) {
   if (G.over) return;
   G.over = { winner: winner ? winner.i : null, why, turn: G.turn };
   log(winner ? fullName(winner) + ' wins. ' + why + '.' : why + '.', winner ? winner.ink : 'turn', null);
-  if (online) onlineSubmit();
 }
 
 function checkElimination() {
@@ -2831,6 +3365,8 @@ function checkElimination() {
     f.alive = false;
     for (const u of ownUnits(f.i)) removeUnit(u);
     G.offers = G.offers.filter(o => o.from !== f.i && o.to !== f.i);
+    G.open = (G.open || []).filter(o => o.a !== f.i && o.b !== f.i);
+    dropDealsOf(f.i);
     log(fullName(f) + ' is out of the game.', f.ink, null);
   }
 }
@@ -2863,6 +3399,8 @@ function beginPlayerTurn(i) {
   const f = pl(i);
   G.offers = G.offers.filter(o => o.to !== i || G.turn - o.turn <= 3);
   gatherStock(f);
+  ejectTrespassers(i);
+  payInstallments(i);
   for (const c of ownCities(i)) processCity(c);
   checkEurekas(f);
   processResearch(f);
@@ -2873,6 +3411,7 @@ function beginPlayerTurn(i) {
     u.acted = false;
     u.moved = false;
   }
+  for (const u of ownUnits(i)) if (u.sleep && enemiesInSight(u).length) u.sleep = false;
   // Queued marches keep going at the start of the turn, Civ 6 style.
   for (const u of ownUnits(i)) if (u.path) runPath(u);
   checkElimination();
@@ -2901,6 +3440,7 @@ function advanceTurns() {
       G.turn += 1;
       if (G.maxTurns && G.turn > G.maxTurns) { finishOnScore(); return; }
       if (G.turn > 1 && G.turn % 10 === 0) log('Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + '.', 'turn', null);
+      bordersNewRound();
     }
     G.cur = next;
     const f = pl(next);
@@ -2930,7 +3470,7 @@ function endCurrentTurn() {
   advanceTurns();
 }
 
-const idleUnits = i => ownUnits(i).filter(u => u.mp > 0 && !u.acted && !u.path);
+const idleUnits = i => ownUnits(i).filter(u => u.mp > 0 && !u.acted && !u.path && !u.fort && !u.sleep);
 const idleCities = i => ownCities(i).filter(c => !c.build);
 const needsTech = i => !pl(i).research && researchChoices(i).length > 0;
 /* ── CPU players ───────────────────────────────────────────────────────────── */
@@ -2939,7 +3479,9 @@ const needsTech = i => !pl(i).research && researchChoices(i).length > 0;
 // whole map; fog only applies to the humans at the keyboard.
 
 // Movement cost from every tile to (tx, ty) for this unit's kind of movement.
-function distanceField(u, tx, ty) {
+// foe: a player this unit is about to be at war with. Their land is no wall, since
+// the declaration opens it; everyone else's closed land is.
+function distanceField(u, tx, ty, foe) {
   const dist = new Float64Array(G.cols * G.rows).fill(Infinity);
   dist[ty * G.cols + tx] = 0;
   const queue = [[tx, ty]];
@@ -2949,6 +3491,10 @@ function distanceField(u, tx, ty) {
     const base = dist[y * G.cols + x];
     const enter = moveCost(u, x, y);
     if (!isFinite(enter) && !(x === tx && y === ty)) continue;
+    if (!(x === tx && y === ty)) {   // CPUs route around closed land
+      const shut = closedOwner(u.owner, x, y);
+      if (shut >= 0 && shut !== foe) continue;
+    }
     const step = isFinite(enter) ? enter : 1;
     for (const [nx, ny] of neighbourList(x, y)) {
       if (!tileAt(nx, ny)) continue;
@@ -3259,10 +3805,13 @@ function aiChooseBuild(f, c, siteAvailable) {
     if (needPort && isCoastal(c) && can(B('harbor')) && aiBestCity(f, 'expedition') === c) return B('harbor');
   }
   if (can(B('university'))) return B('university');
-  if (can(B('observatory')) && (cityTiles(c).some(t => plotOk(c, t, 'observatory') && nextToMountain(t.x, t.y)) || aiScience(f))) return B('observatory');
+  if (can(B('observatory')) && (observatoryPeak(c) || aiScience(f))) return B('observatory');
   if (y.net < 8 && can(B('granary'))) return B('granary');
+  if (y.net < 8 && c.pop >= 3 && can(B('watermill'))) return B('watermill');
   if (can(B('workshop')) && c.pop >= 3) return B('workshop');
+  if (c.pop >= 4 && can(B('foundry'))) return B('foundry');
   if (can(B('harbor')) && cityTiles(c).filter(t => t.t === 'shallow').length >= 3) return B('harbor');
+  if (waterMap() && cityTiles(c).filter(t => t.t === 'shallow').length >= 4 && can(B('shipyard'))) return B('shipyard');
   const coastal = cities.filter(isCoastal).length;
   const shipCap = isCoastal(c) ? (waterMap() ? Math.ceil(coastal / 2) : wars ? 1 : 0) : 0;
   if (ships < shipCap) {
@@ -3273,11 +3822,20 @@ function aiChooseBuild(f, c, siteAvailable) {
     if (can(U('galley'))) return U('galley');
   }
   if ((wars || warlike) && can(B('barracks')) && cities.filter(o => o.buildings.includes('barracks')).length < 2) return B('barracks');
+  if ((wars || warlike) && c.pop >= 4 && can(B('armory')) && cities.filter(o => o.buildings.includes('armory')).length < 2) return B('armory');
   if (can(B('granary'))) return B('granary');
+  if (can(B('watermill'))) return B('watermill');
   if (can(B('workshop'))) return B('workshop');
-  // Past this size, the city puts its production into research instead.
+  if (can(B('foundry'))) return B('foundry');
+  // Roads between neighbouring cities, one at a time, in quiet times.
+  if (!wars && G.turn > 25 && y.prod >= 4 && !cities.some(o => o.build && o.build.kind === 'road')) {
+    const road = roadChoices(c).find(o => o.r.cost > 0 && o.r.cost <= 36 && hexDistance(c.x, c.y, o.d.x, o.d.y) <= 7);
+    if (road) return { kind: 'road', id: road.d.id };
+  }
+  // Past this size, the city puts its production into research instead (once it has a Library).
   if (army < maxArmy) return soldier();
-  return R;
+  if (can(R)) return R;
+  return soldier();
 }
 
 /* ── what each unit does ───────────────────────────────────────────────────── */
@@ -3458,7 +4016,7 @@ function aiCityShoot(f, c) {
 function aiCanReach(f, o) {
   const from = ownCities(f.i)[0], to = ownCities(o.i)[0];
   if (!from || !to) return false;
-  const field = distanceField({ type: 'warrior', owner: f.i, x: from.x, y: from.y }, to.x, to.y);
+  const field = distanceField({ type: 'warrior', owner: f.i, x: from.x, y: from.y }, to.x, to.y, o.i);
   return isFinite(field[from.y * G.cols + from.x]);
 }
 
@@ -3480,6 +4038,11 @@ function aiDiplomacy(f) {
       }
       continue;
     }
+    // Neighbours at peace trade open borders once the borders close.
+    if (bordersClosed() && !openBetween(f.i, o.i)) {
+      const mood = G.attitude[f.i][o.i] || 0;
+      if (mood > 2 && roll() < (o.human ? 0.03 : 0.08)) proposeOpen(f.i, o.i);
+    }
     if (G.turn < (deity ? 10 : 15) || !near) continue;
     // It only starts a war it thinks it can win: its army has to beat the
     // rival's by its attack edge. Past that, neighbours rub each other the
@@ -3499,6 +4062,7 @@ function aiTurn(f) {
   if (G.over || !f.alive) return;
   if (!f.research) f.research = aiPickTech(f);
   aiDiplomacy(f);
+  aiTrade(f);
   aiFronts[f.i] = aiPickFront(f);
   const settlerSite = (() => {
     const probe = ownUnits(f.i).find(u => UNITS[u.type].founds) || null;
@@ -3619,10 +4183,11 @@ UNITS.battleship = { name: 'Battleship', kind: 'siege', naval: true, era: 4, str
   tech: 'cartography', tech2: 'firearms', vsUnits: -10, res: { iron: 10, gunpowder: 10 },
   blurb: 'Coastal cities only. Needs Cartography and Firearms. Shoots from 2 hexes at 50, −10 against units. Can’t take cities. Takes 10 iron and 10 gunpowder.' };
 UNIT_ORDER.push('musketman', 'cannon', 'battleship');
-BUILDINGS.university = { name: 'University', cost: 70, tech: 'education', needsLibrary: true, blurb: 'Needs a Library. +3 science.' };
-BUILDINGS.observatory = { name: 'Observatory', cost: 70, tech: 'astronomy',
-  blurb: '+2 science, or +4 if its hex touches a mountain.' };
-BUILDING_ORDER.push('university', 'observatory');
+BUILDINGS.university = { name: 'University', cost: 70, tech: 'education', needs: 'library',
+  blurb: 'Upgrades the Library: +3 science. Stands on the Library’s hex.' };
+BUILDINGS.observatory = { name: 'Observatory', cost: 70, tech: 'astronomy', needs: 'university',
+  blurb: 'The Library’s third tier: +2 science, or +4 if the Library’s hex touches a mountain.' };
+BUILDING_ORDER.splice(BUILDING_ORDER.indexOf('workshop'), 0, 'university', 'observatory');
 
 // Gunpowder lies hidden in the ground until you learn Firearms; then a mine on
 // it adds 2 a turn to a third stockpile, like iron.
@@ -3641,9 +4206,9 @@ function applyPeakName(state) {
 IMPROVEMENTS.mine.ok = t => (t.t === 'hill' && !t.f) || t.f === 'iron' || t.f === 'gunpowder';
 const seesFeature = (t, i) => !(t.f && FEATURES[t.f] && FEATURES[t.f].hidden && !(i !== null && i !== undefined && hasTech(i, FEATURES[t.f].hidden)));
 const touchesMountain = c => neighbourList(c.x, c.y).some(([x, y]) => { const n = tileAt(x, y); return n && n.t === 'mount'; });
-// An observatory doubles when its own hex touches a mountain (the city center,
-// for one built before buildings had hexes).
-const observatoryPeak = c => (c.plot && c.plot.observatory ? nextToMountain(c.plot.observatory[0], c.plot.observatory[1]) : touchesMountain(c));
+// An observatory doubles when the Library's hex under it touches a mountain (the
+// city center, for one built before buildings had hexes).
+const observatoryPeak = c => (c.plot && c.plot.library ? nextToMountain(c.plot.library[0], c.plot.library[1]) : touchesMountain(c));
 
 // The science victory. Star Charts and the Royal Academy sit on two random era
 // 4 techs; the last step, by sea or by land, on the deepest one.
@@ -3844,6 +4409,72 @@ function touchWonders(u) {
   }
 }
 
+/* ── finding a natural wonder (v4.1) ── */
+
+// What each wonder is and does, for the tile panel and the discovery popup.
+function wonderKind(id) {
+  return { reef: 'Science wonder · shallow sea', peak: 'Science wonder · mountains', spring: 'War wonder · flat land', stair: 'War wonder · impassable' }[id] || 'Natural wonder';
+}
+function wonderNote(id) {
+  return {
+    reef: 'A natural wonder: +3 science and +1 food to whoever’s borders it’s in.',
+    peak: 'A natural wonder of plain mountains, like Civ’s: nobody claims it, but every land hex beside it gives +' + SCI.peakNext + ' science.',
+    spring: 'A natural wonder: hot springs people have bathed in to heal for 2,000 years. Like Civ’s Fountain of Youth, a land military unit that steps in heals 10 HP every turn for the rest of the game, even after moving or fighting.',
+    stair: 'A natural wonder of basalt columns, as in Civ: nobody can enter it, but a land military unit that steps beside it fights at +5 for the rest of the game.'
+  }[id] || '';
+}
+// Every hex of each wonder, worked out once per game.
+let WONDER_TILES = null, WONDER_TILES_FOR = null;
+function wonderTiles() {
+  if (WONDER_TILES_FOR !== G) {
+    WONDER_TILES_FOR = G;
+    WONDER_TILES = {};
+    for (const t of G.tiles) if (t.f && FEATURES[t.f] && FEATURES[t.f].wonder) (WONDER_TILES[t.f] = WONDER_TILES[t.f] || []).push(t);
+  }
+  return WONDER_TILES;
+}
+// The first time one of a human player's explored hexes belongs to a wonder,
+// it goes in the history and in the queue for the popup. Once per wonder per player.
+function noticeWonders(i) {
+  if (!G.wonderFound) G.wonderFound = {};
+  const found = G.wonderFound[i] || (G.wonderFound[i] = []);
+  const seen = G.seen[i], groups = wonderTiles();
+  for (const id in groups) {
+    if (found.includes(id) || !groups[id].some(t => seen[t.y * G.cols + t.x])) continue;
+    found.push(id);
+    log(pl(i).name + ' discovers ' + FEATURES[id].name + '.', pl(i).ink, i);
+    (G.wonderNews = G.wonderNews || []).push({ i, id });
+  }
+}
+// The popup, like Civ's: a still picture, what the wonder is and what it does.
+function showWonderNews() {
+  if (!G.wonderNews || !G.wonderNews.length || !myTurn()) return;
+  const k = G.wonderNews.findIndex(n => n.i === G.viewer);
+  if (k < 0) return;
+  const id = G.wonderNews.splice(k, 1)[0].id;
+  const def = FEATURES[id], tiles = wonderTiles()[id] || [];
+  const base = TERRAIN[tiles[0] ? tiles[0].t : 'flat'].fill;
+  const art = '<svg class="still" viewBox="-32 -34 64 68" aria-hidden="true">' +
+    sPoly(hexPoints(HEX_R - 1.2), { fill: base, stroke: ART.ink, 'stroke-width': 1.4, 'stroke-linejoin': 'round' }) +
+    WONDER_ART[id]() + sPoly(hexPoints(HEX_R - 1.6), { fill: 'none', stroke: ART.gold, 'stroke-width': 2.6 }) +
+    sPoly(hexPoints(HEX_R - 4.6), { fill: 'none', stroke: ART.gold2, 'stroke-width': 1 }) + '</svg>';
+  openModal(modalHead(esc(def.name), 'Natural wonder discovered') +
+    '<div class="modal-body"><div class="wonder-card">' + art + '<div class="wtxt"><div class="wkind">' + esc(wonderKind(id)) + '</div>' +
+    '<p>' + wonderNote(id) + '</p>' +
+    (tiles.length > 1 ? '<p class="hint">It covers ' + tiles.length + ' hexes.</p>' : '') + '</div></div></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="wonder-look:' + id + '">Show me</button>' +
+    '<button class="btn primary" data-act="close">Got it</button></div>', true);
+  UI.modalKind = 'wonder';
+}
+// Show me: centres the map on the wonder and opens its tile.
+function lookAtWonder(id) {
+  const tiles = (wonderTiles()[id] || []).filter(t => seenBy(G.viewer, t.x, t.y));
+  const t = tiles.find(n => visibleTo(n.x, n.y)) || tiles[0];
+  closeModal();
+  if (t) { selection = { kind: 'tile', x: t.x, y: t.y }; render(); centreOn(t.x, t.y); }
+  else render();
+}
+
 /* ── eurekas: half off the major techs ── */
 
 const EUREKAS = {
@@ -3974,7 +4605,46 @@ function prepareState(state) {
   // Older maps could hide gunpowder under the sea or a mountain; clear it.
   for (const t of state.tiles) if (t.f === 'gunpowder' && t.t !== 'flat' && t.t !== 'hill') t.f = null;
   for (const c of state.cities) c.plot = c.plot || {};
-  state.v = 3;
+  // v4: older games keep open borders and a flat map; trade, roads and tiers start empty.
+  if (state.wrap === undefined) state.wrap = false;
+  if (state.closeTurn === undefined) state.closeTurn = 0;
+  state.open = state.open || [];
+  state.deals = state.deals || [];
+  state.nextDeal = state.nextDeal || 1;
+  state.nextOffer = state.nextOffer || 0;
+  for (const o of state.offers || []) {
+    if (!o.kind) o.kind = 'peace';
+    if (!o.id) o.id = 'o' + (++state.nextOffer);
+  }
+  for (const c of state.cities) {
+    // The University and Observatory now share the Library's hex, and the Granary is on the center.
+    delete c.plot.university;
+    delete c.plot.observatory;
+    delete c.plot.granary;
+    // Research needs a Library in the city.
+    if (c.build && c.build.kind === 'research' && !c.buildings.includes('library')) c.build = null;
+    const t = state.tiles[c.y * state.cols + c.x];
+    if (t) t.road = true;
+  }
+  for (const u of state.units) {
+    if (u.fort === undefined) u.fort = false;
+    if (u.sleep === undefined) u.sleep = false;
+  }
+  // v4.1: old games count the wonders already explored as found, so no popup rains down on a loaded save.
+  if (!state.wonderFound) {
+    state.wonderFound = {};
+    for (const f of state.players) {
+      if (!f.human || !state.seen || !state.seen[f.i]) continue;
+      state.wonderFound[f.i] = [];
+      for (const t of state.tiles) {
+        if (t.f && FEATURES[t.f] && FEATURES[t.f].wonder && state.seen[f.i][t.y * state.cols + t.x] && !state.wonderFound[f.i].includes(t.f)) state.wonderFound[f.i].push(t.f);
+      }
+    }
+  }
+  state.wonderNews = state.wonderNews || [];
+  state.v = 4;
+  WRAP_W = state.wrap ? state.cols : 0;
+  roadCache.clear();
   applyTree(state.tree);
   applyPeakName(state);
   return state;
@@ -4034,6 +4704,11 @@ const MARK = {
   harbor: 'M0 -5 V8|M-4 -2 H4|M-7 2 C-7 8 7 8 7 2|M0 -8 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0',
   university: 'M-8 -3 L0 -8 L8 -3 Z|M-6 -3 V6|M-2 -3 V6|M2 -3 V6|M6 -3 V6|M-8 7 H8',
   observatory: 'M-7 7 V1 A7 7 0 0 1 7 1 V7 Z|M1 -3 L6 -8',
+  watermill: 'M0 0 m-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0|M0 -6 V6|M-6 0 H6|M-4.2 -4.2 L4.2 4.2|M4.2 -4.2 L-4.2 4.2|M-9 8.5 H9',
+  foundry: 'M-7 -3 H7 L5 7 H-5 Z|M-3.5 -3 V-8|M3.5 -3 V-8|M-9 7 H9|M0 0 V4',
+  armory: 'M-6 -7 L6 7|M6 -7 L-6 7|M-8 -4 L-4 -8|M8 -4 L4 -8|M-8 4 L-6 6|M8 4 L6 6',
+  shipyard: 'M-8 4 H8 L5 8 H-5 Z|M-4 4 V-2 H4 V4|M0 -2 V-8 L5 -5.5 H0|M-9 8.5 H9',
+  road: 'M-3.5 9 L-2 -9|M3.5 9 L2 -9|M0 7 V4|M0 0.5 V-2.5|M0 -6 V-7',
   // ── yields, projects and UI ──
   tech: 'M-3 -8 H3|M-2 -8 V-2 L-7 6 C-7.5 7.5 -6.5 8 -5 8 H5 C6.5 8 7.5 7.5 7 6 L2 -2 V-8|M-4.6 3 H4.6',
   navigation: 'M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z',
@@ -4329,6 +5004,19 @@ const BUILDING_ART = {
     sP('M2 -4 L14 -16', { stroke: '#2c5aa8', 'stroke-width': 3.5, 'stroke-linecap': 'round' }) + sP('M-1 -11 V2', { stroke: ART.ink, 'stroke-width': 1 }) +
     sP('M18 -22 l1.2 -3 l1.2 3 l3 1.2 l-3 1.2 l-1.2 3 l-1.2 -3 l-3 -1.2 Z', { fill: ART.gold2, stroke: ART.gold, 'stroke-width': 0.6 })
 };
+// v4 tiers. Each stacks on the base building's hex and redraws it.
+Object.assign(BUILDING_ART, {
+  watermill: () => '<rect x="-14" y="0" width="22" height="14"' + svgAttrs(lined('#e8dcc0', 1.1)) + '/>' + sP('M-16 0 L-3 -11 L10 0 Z', lined('#a8613a', 1.1)) +
+    sCirc(13, 5, 9, { fill: 'none', stroke: '#6b4a24', 'stroke-width': 2.2 }) + sP('M13 -4 V14 M4 5 H22 M6.6 -1.4 L19.4 11.4 M19.4 -1.4 L6.6 11.4', { stroke: '#6b4a24', 'stroke-width': 1.6 }) +
+    sP('M2 16 q3 -2 6 0 t6 0 t6 0', { fill: 'none', stroke: '#4aa3c6', 'stroke-width': 1.8, 'stroke-linecap': 'round' }),
+  foundry: () => '<rect x="-16" y="0" width="32" height="14"' + svgAttrs(lined('#9a9389', 1.1)) + '/>' + sP('M-16 0 L-8 -9 H8 L16 0 Z', lined('#6e665c', 1.1)) +
+    '<rect x="6" y="-18" width="6" height="12"' + svgAttrs(lined('#7a5a40', 1)) + '/>' + sP('M-6 14 V7 Q0 1 6 7 V14 Z', { fill: '#e8742a', stroke: ART.ink, 'stroke-width': 1 }) +
+    sCirc(9, -22, 3, { fill: 'rgba(110,102,92,.55)' }),
+  armory: () => '<rect x="-16" y="-3" width="32" height="17"' + svgAttrs(lined('#c9c0b0', 1.1)) + '/>' + sP('M-18 -3 L0 -14 L18 -3 Z', lined('#8a2b2b', 1.1)) +
+    sP('M-5 4 H5 V9 Q5 13 0 14.5 Q-5 13 -5 9 Z', lined('#2f6db0', 1)) + sP('M-12 3 L-8 12 M-8 3 L-12 12', { stroke: ART.ink, 'stroke-width': 1.4 }) + sP('M8 3 L12 12 M12 3 L8 12', { stroke: ART.ink, 'stroke-width': 1.4 }),
+  shipyard: () => '<rect x="-20" y="8" width="40" height="8" fill="#78c9cb"/>' + sP('M-16 8 H16 L11 14 H-11 Z', lined('#a8613a', 1.1)) + sP('M-8 8 V-6 M0 8 V-10 M8 8 V-6', { stroke: '#6b4a24', 'stroke-width': 1.6 }) +
+    sP('M-10 -6 H10 M-4 -10 H4', { stroke: '#6b4a24', 'stroke-width': 1.6 }) + sP('M0 -10 V-18 L7 -15 H0', lined('#b5452e', 0.9))
+});
 // A small card for the city panel.
 function buildingCard(id) {
   const draw = BUILDING_ART[id] || BUILDING_ART[BUILDINGS[id] && BUILDINGS[id].replaces];
@@ -4392,13 +5080,34 @@ const cam = { x: 0, y: 0, k: 1, fitted: false };
 
 function boardMetrics() {
   if (!G) return { width: 1, height: 1 };
-  return { width: HEX_W * (G.cols + 0.5) + 8, height: HEX_V * (G.rows - 1) + HEX_R * 2 + 8 };
+  return { width: WRAP_W ? HEX_W * WRAP_W : HEX_W * (G.cols + 0.5) + 8, height: HEX_V * (G.rows - 1) + HEX_R * 2 + 8 };
+}
+// A wrapping map is drawn three times side by side, so the seam never shows.
+// The view keeps its centre inside the middle copy, and zooming out stops where
+// the three copies still cover the screen.
+const wrapSpan = () => (WRAP_W ? HEX_W * WRAP_W : 0);
+function tripled(html) {
+  const w = wrapSpan();
+  if (!w || !html) return html;
+  return '<g transform="translate(' + (-w).toFixed(1) + ' 0)">' + html + '</g>' + html +
+    '<g transform="translate(' + w.toFixed(1) + ' 0)">' + html + '</g>';
+}
+function minZoom() {
+  if (!UI || !G || !WRAP_W) return 0.25;
+  const stage = UI.stage.getBoundingClientRect();
+  return Math.max(0.25, stage.width / (wrapSpan() * 2));
+}
+function wrapCamera() {
+  if (!WRAP_W || !UI) return;
+  const stage = UI.stage.getBoundingClientRect();
+  const span = wrapSpan() * cam.k;
+  if (span > 0) cam.x += Math.floor((stage.width / 2 - cam.x) / span) * span;
 }
 function fitCamera() {
   if (!UI || !G) return;
   const stage = UI.stage.getBoundingClientRect();
   const { width, height } = boardMetrics();
-  const k = clamp(Math.min(stage.width / width, stage.height / height) * 0.97, 0.25, 1.8);
+  const k = clamp(Math.min(stage.width / width, stage.height / height) * 0.97, minZoom(), 1.8);
   cam.k = k;
   cam.x = (stage.width - width * k) / 2;
   cam.y = (stage.height - height * k) / 2;
@@ -4407,6 +5116,7 @@ function fitCamera() {
 }
 function applyCamera() {
   if (!UI) return;
+  wrapCamera();
   UI.cam.setAttribute('transform', 'translate(' + cam.x.toFixed(1) + ' ' + cam.y.toFixed(1) + ') scale(' + cam.k.toFixed(3) + ')');
 }
 function centreOn(x, y) {
@@ -4422,7 +5132,7 @@ function zoomBy(factor) {
   const stage = UI.stage.getBoundingClientRect();
   const px = stage.width / 2, py = stage.height / 2;
   const wx = (px - cam.x) / cam.k, wy = (py - cam.y) / cam.k;
-  cam.k = clamp(cam.k * factor, 0.25, 2.6);
+  cam.k = clamp(cam.k * factor, minZoom(), 2.6);
   cam.x = px - wx * cam.k;
   cam.y = py - wy * cam.k;
   applyCamera();
@@ -4456,6 +5166,10 @@ function unitMarkup(u, cx, cy, viewer) {
     if (u.blessed) parts.push(sAt(cx - 12, cy - 13, sP('M0 -4 C-3 0 -3.4 2 -3.4 2.6 A3.4 3.4 0 0 0 3.4 2.6 C3.4 2 3 0 0 -4 Z', { fill: '#4fb4e0', stroke: '#241c12', 'stroke-width': 0.9 })));
     if (u.giant) parts.push(sAt(cx + 12, cy - 13, sCirc(0, 0, 4, { fill: '#6b6762', stroke: '#241c12', 'stroke-width': 0.9 }) +
       '<text x="0" y="2.3" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">+5</text>'));
+    // v4: a gold star for a veteran (Armory or Shipyard), a shield while fortified, a z asleep.
+    if (u.vet) parts.push(sAt(cx + 12, cy + 7, '<path d="M0 -5 L1.5 -1.6 L5.2 -1.4 L2.4 1 L3.3 4.6 L0 2.7 L-3.3 4.6 L-2.4 1 L-5.2 -1.4 L-1.5 -1.6 Z" fill="#f6c31e" stroke="#241c12" stroke-width=".9" stroke-linejoin="round"/>'));
+    if (u.fort) parts.push(sAt(cx - 12, cy + 6, '<path d="M-4.5 -5 H4.5 V1 C4.5 4 2 5.5 0 6.5 C-2 5.5 -4.5 4 -4.5 1 Z" fill="#e8dcc0" stroke="#241c12" stroke-width="1"/>'));
+    else if (u.sleep) parts.push(sAt(cx - 12, cy + 6, '<text x="0" y="3" text-anchor="middle" font-size="9" font-weight="700" fill="#241c12">z</text>'));
     const portion = clamp(u.hp / 100, 0, 1);
     parts.push('<line x1="' + (cx - 9) + '" y1="' + (cy + 11.5) + '" x2="' + (cx + 9) + '" y2="' + (cy + 11.5) + '" stroke="rgba(36,28,18,.3)" stroke-width="2.6" stroke-linecap="round"/>');
     parts.push('<line x1="' + (cx - 9) + '" y1="' + (cy + 11.5) + '" x2="' + (cx - 9 + 18 * portion).toFixed(1) + '" y2="' + (cy + 11.5) + '" stroke="' + (portion > 0.5 ? '#41602f' : '#93401d') + '" stroke-width="2.6" stroke-linecap="round"/>');
@@ -4506,6 +5220,8 @@ function renderBoard() {
   const viewer = G.viewer;
   const watching = G.watch || viewer === null;
   const terrain = [], waves = [], owner = [], coast = [], marks = [], border = [], overlay = [], sites = [], unitsOut = [], fog = [], labels = [];
+  const roadCase = [], roadTop = [], plotMarks = [];
+  const routeTiles = selCityRoute();
   const cityHex = new Set(G.cities.map(c => keyOf(c.x, c.y)));
   const wonderHexes = {};   // each wonder's name shows once, on one of its known hexes
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
@@ -4523,7 +5239,7 @@ function renderBoard() {
       const s = c.plot[id];
       const done = c.buildings.includes(id);
       // Others only see a building once it stands; plans stay private.
-      if (s && (done || watching || c.owner === viewer)) plots.set(keyOf(s[0], s[1]), { id, done });
+      if (s && (done || watching || c.owner === viewer)) plots.set(keyOf(s[0], s[1]), { id: done ? topTier(c, id) : id, done });
     }
   }
   const pc = placing ? cityById(placing.city) : null;
@@ -4569,8 +5285,19 @@ function renderBoard() {
     // A building's own hex: its full drawing once built; while it's queued, a
     // faded drawing inside a dashed outline, over whatever is still there.
     const plot = plots.get(key);
+    if (tile.road) {
+      // A road is two half-segments per link, one from each hex, so the seam of a wrapping map needs no special care.
+      neighbourList(x, y).forEach(([nx, ny], dir) => {
+        const n = tileAt(nx, ny);
+        if (!n || !n.road || !(watching || seenBy(viewer, nx, ny))) return;
+        const ex = cx + ROAD_VEC[dir][0] * HEX_W * 0.5, ey = cy + ROAD_VEC[dir][1] * HEX_V * 0.5;
+        const seg = 'M' + cx.toFixed(1) + ' ' + cy.toFixed(1) + 'L' + ex.toFixed(1) + ' ' + ey.toFixed(1);
+        roadCase.push('<path d="' + seg + '"/>');
+        roadTop.push('<path d="' + seg + '"/>');
+      });
+    }
     if (plot && BUILDING_ART[plot.id]) {
-      marks.push('<g transform="' + at + '">' + (plot.done ? '' :
+      plotMarks.push('<g transform="' + at + '">' + (plot.done ? '' :
         '<polygon points="' + hexPoints(HEX_R - 4) + '" fill="rgba(255,250,240,.35)" stroke="#2a2116" stroke-width="1.2" stroke-dasharray="4 3"/>') +
         '<g transform="translate(0 2) scale(' + (plot.done ? 0.95 : 0.7) + ')"' + (plot.done ? '' : ' opacity=".6"') + '>' +
         BUILDING_ART[plot.id]() + '</g></g>');
@@ -4578,7 +5305,10 @@ function renderBoard() {
     const wave = tileWaves(tile);
     if (wave) waves.push('<g transform="' + at + '">' + wave + '</g>');
     if (showF && FEATURES[tile.f].wonder) (wonderHexes[tile.f] = wonderHexes[tile.f] || []).push(tile);
-    if (mySelUnit && reachable && reachable.has(key)) overlay.push('<path class="reach' + (selZoc && selZoc.has(key) ? ' stop' : '') + '" d="' + d + '"/>');
+    if (mySelUnit && reachable && reachable.has(key)) {
+      overlay.push('<path class="reach' + (reachable.war && reachable.war.has(key) ? ' war' : selZoc && selZoc.has(key) ? ' stop' : '') + '" d="' + d + '"/>');
+    }
+    if (routeTiles && routeTiles.has(key)) overlay.push('<path class="plot" d="' + d + '"/>');
     if (pc && tile.city === placing.city) {
       const s = pc.plot && pc.plot[placing.item.id];
       const cur = !!s && s[0] === x && s[1] === y;
@@ -4634,17 +5364,29 @@ function renderBoard() {
 
   // Animations keep their phase across redraws: every one is timed off this clock.
   UI.map.style.setProperty('--clock', (-(Date.now() / 1000) % 60).toFixed(2) + 's');
-  UI.layerTerrain.innerHTML = terrain.join('');
-  UI.layerWaves.innerHTML = waves.join('');
-  UI.layerOwner.innerHTML = owner.join('');
-  UI.layerCoast.innerHTML = coast.join('');
-  UI.layerMarks.innerHTML = marks.join('');
-  UI.layerBorder.innerHTML = border.join('');
-  UI.layerOverlay.innerHTML = overlay.join('');
-  UI.layerSites.innerHTML = sites.join('');
-  UI.layerUnits.innerHTML = unitsOut.join('');
-  UI.layerFog.innerHTML = fog.join('');
-  UI.layerLabels.innerHTML = labels.join('');
+  const roads = roadCase.length ? '<g class="road-case" fill="none" stroke="#6b4a24" stroke-width="6.4" stroke-linecap="round" opacity=".5">' + roadCase.join('') + '</g>' +
+    '<g class="road-top" fill="none" stroke="#ead9ab" stroke-width="3.4" stroke-linecap="round">' + roadTop.join('') + '</g>' : '';
+  UI.layerTerrain.innerHTML = tripled(terrain.join(''));
+  UI.layerWaves.innerHTML = tripled(waves.join(''));
+  UI.layerOwner.innerHTML = tripled(owner.join(''));
+  UI.layerCoast.innerHTML = tripled(coast.join(''));
+  UI.layerMarks.innerHTML = tripled(marks.join('') + roads + plotMarks.join(''));
+  UI.layerBorder.innerHTML = tripled(border.join(''));
+  UI.layerOverlay.innerHTML = tripled(overlay.join(''));
+  UI.layerSites.innerHTML = tripled(sites.join(''));
+  UI.layerUnits.innerHTML = tripled(unitsOut.join(''));
+  UI.layerFog.innerHTML = tripled(fog.join(''));
+  UI.layerLabels.innerHTML = tripled(labels.join(''));
+}
+// Centre-to-centre steps to the six neighbours, in hex widths and row heights.
+const ROAD_VEC = [[1, 0], [0.5, -1], [-0.5, -1], [-1, 0], [-0.5, 1], [0.5, 1]];
+// The hexes still to pave when the selected city is building a road.
+function selCityRoute() {
+  if (!selection || selection.kind !== 'city') return null;
+  const c = cityById(selection.id);
+  if (!c || c.owner !== G.viewer || !c.build || c.build.kind !== 'road') return null;
+  const d = cityById(c.build.id), r = d && d.owner === c.owner ? roadRoute(c, d) : null;
+  return r ? new Set(r.tiles.filter(t => !t.road).map(t => keyOf(t.x, t.y))) : null;
 }
 
 function clearBoard() {
@@ -4676,15 +5418,17 @@ function confirmPlot(cityId, id, x, y) {
   c.plot = c.plot || {};
   const before = c.plot[id];
   c.plot[id] = [x, y];
-  if (setBuild(c, { kind: 'building', id })) toast(BUILDINGS[id].name + ' queued on its own hex.');
-  else if (before) c.plot[id] = before; else delete c.plot[id];
+  if (setBuild(c, { kind: 'building', id })) {
+    if (!before || before[0] !== x || before[1] !== y) clearPlot(c, id);   // v4: gone right away
+    toast(BUILDINGS[id].name + ' queued on its own hex.');
+  } else if (before) c.plot[id] = before; else delete c.plot[id];
   afterAction();
 }
 function askPlot(c, id, x, y) {
   const loss = plotLoss(tileAt(x, y), G.viewer);
   openModal(modalHead('Clear this hex for the ' + esc(BUILDINGS[id].name) + '?') +
-    '<div class="modal-body"><p>When the ' + esc(BUILDINGS[id].name.toLowerCase()) + ' is finished, ' + esc(loss) +
-    ' on this hex will be removed for good, and the hex loses what ' + (loss.includes(' and ') ? 'they' : 'it') + ' gave. The terrain stays.</p></div>' +
+    '<div class="modal-body"><p>' + esc(loss.charAt(0).toUpperCase() + loss.slice(1)) +
+    ' on this hex will be removed right away, and the hex loses what ' + (loss.includes(' and ') ? 'they' : 'it') + ' gave, even if you change your mind later. The terrain stays.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="place-no">Pick another hex</button>' +
     '<button class="btn primary" data-act="place-yes:' + c.id + ':' + id + ':' + x + ':' + y + '">Build here</button></div>', true);
 }
@@ -4705,8 +5449,24 @@ function placeClick(x, y) {
   render();
 }
 
+// Screen points for a run of hexes. On a wrapping map each hop picks the copy of
+// the next hex nearest the last, so a route over the seam stays one short line.
+function linePoints(points) {
+  const span = wrapSpan();
+  let prev = null, off = 0;
+  return points.map(([x, y]) => {
+    const [cx, cy] = hexCenter(x, y);
+    let px = cx + off;
+    if (span && prev !== null) {
+      while (px - prev > span / 2) { off -= span; px -= span; }
+      while (prev - px > span / 2) { off += span; px += span; }
+    }
+    prev = px;
+    return [px, cy];
+  });
+}
 function pathLineGeo(points, cls) {
-  const d = 'M' + points.map(([x, y]) => { const [cx, cy] = hexCenter(x, y); return cx.toFixed(1) + ' ' + cy.toFixed(1); }).join('L');
+  const d = 'M' + linePoints(points).map(([px, py]) => px.toFixed(1) + ' ' + py.toFixed(1)).join('L');
   return '<path class="' + cls + '" d="' + d + '"/>';
 }
 
@@ -4721,8 +5481,9 @@ function renderPathLayer() {
       if (!u.path || u.owner !== G.viewer) continue;
       if (!G.watch && !visibleTo(u.x, u.y)) continue;
       const sel = selection && selection.kind === 'unit' && selection.id === u.id;
+      const line = linePoints([[u.x, u.y]].concat(u.path.steps));
       if (sel) out.push(pathLineGeo([[u.x, u.y]].concat(u.path.steps), 'pathline ghost'));
-      const [dx, dy] = hexCenter(u.path.to[0], u.path.to[1]);
+      const [dx, dy] = line[line.length - 1];
       out.push('<circle class="pathdot" cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="' + (sel ? 5 : 3.5) + '"' + (sel ? '' : ' opacity=".8"') + '/>');
     }
   }
@@ -4731,7 +5492,8 @@ function renderPathLayer() {
     if (u) {
       const last = preview.steps[preview.steps.length - 1];
       out.push(pathLineGeo([[u.x, u.y]].concat(preview.steps), 'pathline'));
-      const [dx, dy] = hexCenter(last[0], last[1]);
+      const line = linePoints([[u.x, u.y]].concat(preview.steps));
+      const [dx, dy] = line[line.length - 1];
       out.push('<circle class="pathdot" cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="5.5"/>');
       const label = preview.turns <= 1 ? 'this turn' : plural(preview.turns, 'turn', 'turns');
       const w = label.length * 6 + 12;
@@ -4739,7 +5501,7 @@ function renderPathLayer() {
         '<text class="pathlabel" x="' + dx.toFixed(1) + '" y="' + (dy - 21.5).toFixed(1) + '" text-anchor="middle">' + label + '</text>');
     }
   }
-  UI.layerPath.innerHTML = out.join('');
+  UI.layerPath.innerHTML = tripled(out.join(''));
 }
 
 // Recompute the hovered path preview (one Dijkstra over the seen hexes) and
@@ -4748,10 +5510,7 @@ function refreshPreview() {
   preview = null;
   if (G && !G.over && !G.handoff && hover && myTurn() && !placing) {
     const u = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
-    // A unit that has spent its turn gets no route line on hover: it has to be
-    // given a march from its panel first.
-    const canRoute = u && (u.mp > 0 && !u.acted || marchPlan === u.id);
-    if (u && canRoute && u.owner === G.viewer && (hover[0] !== u.x || hover[1] !== u.y)) {
+    if (u && u.owner === G.viewer && (hover[0] !== u.x || hover[1] !== u.y)) {
       const seen = G.seen[G.viewer];
       if (seen[hover[1] * G.cols + hover[0]]) {
         const paths = computePaths(u);
@@ -4783,43 +5542,65 @@ const tutorialDone = () => !!readPrefs().tutorialDone;
 
 /* ── the tutorial island ───────────────────────────────────────────────────── */
 
-// 12 × 8, drawn by hand. . water  S seafood  f flat  t forest  h hills
-// m mountain  w wheat  r horses  i iron hills  C your capital  O the raiders' camp
+// 14 × 11, drawn by hand. . water  S seafood  f flat  t forest  h hills  m mountain
+// w wheat  r horses  i iron hills  C your capital  O the raiders' camp
+// P Pamukkale (hidden)  R the Great Barrier Reef (hidden)
 const TUT_MAP = [
-  '............',
-  '.fhftfhftf..',
-  '.ftffmfhfff.',
-  '.tirfftffh..',
-  '.fwCffftfOf.',
-  '..S.........',
-  '............',
-  '............'
+  '..............',
+  '..hfmthff.....',
+  '..fthPfmfh....',
+  '.fhfffftffh...',
+  '.ftfhffhtffff.',
+  '.fffffhfffhff.',
+  '..fffihfffO...',
+  '..fwCrffffff..',
+  '....S.........',
+  '.........R....',
+  '..............'
 ];
 
 function buildTutorialIsland() {
-  const cols = 12, rows = 8;
+  const cols = TUT_MAP[0].length, rows = TUT_MAP.length;
   const tiles = blankTiles(cols, rows);
   let home = null, camp = null;
+  const spots = {};
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const t = tiles[y * cols + x], ch = TUT_MAP[y][x];
       if (ch === '.') continue;
       if (ch === 'S') { t.f = 'seafood'; continue; }
+      if (ch === 'R') { t.t = 'shallow'; t.f = 'reef'; spots.reef = [x, y]; continue; }
       t.t = ch === 'h' || ch === 'i' ? 'hill' : ch === 'm' ? 'mount' : 'flat';
-      t.f = { t: 'forest', w: 'wheat', r: 'horses', i: 'iron' }[ch] || null;
+      t.f = { t: 'forest', w: 'wheat', r: 'horses', i: 'iron', P: 'spring' }[ch] || null;
+      if (ch === 'P') spots.spring = [x, y];
       if (ch === 'C') home = [x, y];
       if (ch === 'O') camp = [x, y];
     }
   }
   shoreUp(tiles, cols, rows);
+  // The reef sits two hexes out to sea: shallow water all round it, so a galley can get there.
+  for (const [nx, ny] of neighbourList(spots.reef[0], spots.reef[1])) {
+    const n = tiles[ny * cols + nx];
+    if (n && TERRAIN[n.t].water) n.t = 'shallow';
+  }
   const conts = assignContinents(tiles, cols, rows, 7);
+  WRAP_W = 0;
+  roadCache.clear();
+  // Everything is explored except the ground around the two wonders, which the
+  // tutorial has you find.
+  const seen0 = new Array(cols * rows).fill(1);
+  for (const id in spots) {
+    const [wx, wy] = spots[id];
+    for (const t of tiles) if (hexDistance(t.x, t.y, wx, wy) <= 1) seen0[t.y * cols + t.x] = 0;
+  }
   G = {
-    v: 3, seed: 7, rs: 0x2f6e2b1, map: 'pangaea', level: 'normal', size: 'small', victory: { conquest: true, science: true },
+    v: 4, seed: 7, rs: 0x2f6e2b1, map: 'pangaea', level: 'normal', size: 'small', victory: { conquest: true, science: true },
+    wrap: false, closeTurn: 0, open: [], deals: [], nextDeal: 1, nextOffer: 0,
     cols, rows, tiles, conts, units: [], cities: [], players: [],
     dip: [['peace', 'peace'], ['peace', 'peace']], attitude: [[0, 0], [0, 0]], warSince: [[0, 0], [0, 0]], offers: [],
-    log: [], seen: [new Array(cols * rows).fill(1), new Array(cols * rows).fill(0)],
+    log: [], seen: [seen0, new Array(cols * rows).fill(0)],
     turn: 1, maxTurns: 0, cur: 0, viewer: 0, handoff: false, pending: null, over: null, watch: false,
-    nextUnit: 1, nextCity: 1, names: ['Rome', 'Cinderhold'],
+    nextUnit: 1, nextCity: 1, names: ['Rome', 'Cinderhold'], wonderFound: {}, wonderNews: [],
     tut: { step: 0, entered: false, closed: false, raider: null, camp: null }
   };
   const colors = assignColors(['rome', 'celts']);
@@ -4847,7 +5628,7 @@ function buildTutorialIsland() {
   addUnit(G.players[0], 'warrior', home[0], home[1], null);
   addUnit(G.players[0], 'archer', home[0] + 1, home[1], null);
   G.log = [];
-  log('Rome lands on a small island. The Cinder Clan holds a camp to the east.', 'turn', null);
+  log('Rome lands on an island. The Cinder Clan holds a camp to the east.', 'turn', null);
   beginPlayerTurn(0);
 }
 
@@ -4865,7 +5646,7 @@ function startTutorial() {
   fitCamera();
 }
 
-/* ── the 14 steps ──────────────────────────────────────────────────────────── */
+/* ── the steps, in chapters ────────────────────────────────────────────────── */
 
 const tutCap = () => G.cities.find(c => c.owner === 0 && c.capital) || null;
 const tutCamp = () => cityById(G.tut.camp);
@@ -4873,10 +5654,31 @@ const tutRaider = () => unitById(G.tut.raider);
 const tutUnit = test => G.units.find(u => u.owner === 0 && test(u)) || null;
 const tutHorses = () => G.tiles.find(t => t.f === 'horses');
 const tutSpot = o => (o ? [o.x, o.y] : null);
+const tutWonder = id => G.tiles.find(t => t.f === id) || null;
+const tutFound = id => !!(G.wonderFound && G.wonderFound[0] && G.wonderFound[0].includes(id));
+const tutSoldier = () => tutUnit(u => isMil(u.type) && !isNaval(u.type));
 // Banked production, so the city can finish this the next turn.
 function tutBank(item) {
   const c = tutCap();
   if (c) c.progress = Math.max(c.progress, costOf(c, item));
+}
+// A hex you have explored, two from the wonder and nearest your capital: close
+// enough to see it, and it's the hex to head for.
+function tutApproach(id, water) {
+  const w = tutWonder(id), cap = tutCap();
+  if (!w) return null;
+  const near = G.tiles.filter(t => hexDistance(t.x, t.y, w.x, w.y) === 2 && G.seen[0][t.y * G.cols + t.x] &&
+    (water ? TERRAIN[t.t].water && !TERRAIN[t.t].deep : !TERRAIN[t.t].water && !TERRAIN[t.t].block));
+  const from = cap || { x: w.x, y: w.y };
+  near.sort((a, b) => hexDistance(a.x, a.y, from.x, from.y) - hexDistance(b.x, b.y, from.x, from.y));
+  return tutSpot(near[0]);
+}
+// Skipping a discovery: its hex is explored and the popup follows.
+function tutReveal(id) {
+  const w = tutWonder(id);
+  if (!w) return;
+  for (const t of G.tiles) if (hexDistance(t.x, t.y, w.x, w.y) <= 1) G.seen[0][t.y * G.cols + t.x] = 1;
+  noticeWonders(0);
 }
 // The raider walks out of the camp to 2 hexes from your capital, and the
 // Cinder Clan declares war.
@@ -4906,48 +5708,126 @@ function tutTakeCamp() {
   c.build = null;
   for (const t of G.tiles) if (t.city === c.id) t.owner = 0;
   G.pending = null;
+  roadCache.clear();
   log('Rome takes ' + c.name + '.', pl(0).ink, null);
 }
+// Queues a building on a hex of its own, as a click would.
+function tutQueue(id) {
+  const c = tutCap();
+  if (!c) return;
+  if (needsPlot(id) && !(c.plot && c.plot[id])) {
+    c.plot = c.plot || {};
+    const t = freePlot(c, id);
+    if (t) { c.plot[id] = [t.x, t.y]; clearPlot(c, id); }
+  }
+  setBuild(c, { kind: 'building', id });
+}
+const tutBuilding = id => { const c = tutCap(); return !!c && c.buildings.includes(id); };
+const tutQueued = id => { const c = tutCap(); return !!c && (c.buildings.includes(id) || (!!c.build && c.build.kind === 'building' && c.build.id === id)); };
 
 const TUT_STEPS = [
-  { say: 'Welcome to Civ Lite. You lead Rome. Select your <b>settler</b> on the flashing hex and press <b>Found city</b> (F).',
+  // ── First city ──
+  { ch: 'First city',
+    say: 'Welcome to Civ Lite. You lead Rome. Select your <b>settler</b> on the flashing hex and press <b>Found city</b> (B).',
     at: () => tutSpot(tutUnit(u => UNITS[u.type].founds)), el: '[data-act="found"]',
     done: () => !!tutCap(),
     skip: () => { const u = tutUnit(u => UNITS[u.type].founds); if (u) foundCity(u); } },
-  { say: 'Your capital, Rome, starts at pop 2 with a free Granary: that’s Rome’s ability. Now open the <b>tech tree</b> (T) and pick <b>Animal Husbandry</b>. You have 40 research banked.',
+  { ch: 'First city',
+    say: 'Your capital, Rome, starts at pop 2 with a free Granary: that’s Rome’s ability. Now open the <b>tech tree</b> (T) and pick <b>Animal Husbandry</b>. You have 40 research banked. ' +
+      'Units and buildings stay hidden until you learn the tech that unlocks them, as in Civ.',
     el: '#btn-tech, [data-act="research:husbandry"]',
     done: () => pl(0).research === 'husbandry' || hasTech(0, 'husbandry'),
     skip: () => setResearch(0, 'husbandry') },
-  { say: 'Cities build one thing at a time. Click Rome and set it to build a <b>Builder</b>. It has the production saved already.',
+  { ch: 'First city',
+    say: 'Cities build one thing at a time. Click Rome and set it to build a <b>Builder</b>. It has the production saved already.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":unit:builder"]',
     enter: () => tutBank({ kind: 'unit', id: 'builder' }),
     done: () => { const c = tutCap(); return !!c && (sameItem(c.build, { kind: 'unit', id: 'builder' }) || ownUnits(0).some(u => u.type === 'builder')); },
     skip: () => { const c = tutCap(); if (c) setBuild(c, { kind: 'unit', id: 'builder' }); } },
-  { say: 'That’s a turn. Press <b>End turn</b> (Space). Next turn your builder is ready and you learn Animal Husbandry.',
+  { ch: 'First city',
+    say: 'That’s a turn. Click <b>End turn</b>, bottom right. Next turn your builder is ready and you learn Animal Husbandry. (Enter jumps to the next unit that needs orders, and ends the turn once none do.)',
     el: '#btn-end', done: () => G.turn >= 2, skip: () => doEndTurn() },
-  { say: 'Builders improve tiles inside your borders. Select the builder and move it onto the <b>horses</b>.',
+
+  // ── The land ──
+  { ch: 'The land',
+    say: 'Builders improve tiles inside your borders. Select the builder and <b>right-click</b> the horses to send it there. Left-click works too, for touch screens.',
     at: () => tutSpot(tutHorses()),
     done: () => { const t = tutHorses(), b = tutUnit(u => u.type === 'builder'); return t.imp === 'pasture' || (!!b && b.x === t.x && b.y === t.y); },
     skip: () => { const t = tutHorses(), b = tutUnit(u => u.type === 'builder'); if (b) { b.x = t.x; b.y = t.y; b.mp = Math.max(b.mp, 1); } } },
-  { say: 'Press <b>Pasture</b>. Each pasture on horses adds 2 horses a turn to your stockpile, and every horseman costs 10.',
+  { ch: 'The land',
+    say: 'Press <b>Pasture</b>. Each pasture on horses adds 2 horses a turn to your stockpile, and every horseman costs 10. Iron works the same way with a mine.',
     el: '[data-act="builder:build:pasture"]',
     done: () => tutHorses().imp === 'pasture',
     skip: () => { tutHorses().imp = 'pasture'; } },
-  { say: 'Click <b>any hex</b> to see what it gives. The panel also names its continent: every map’s land is split into named continents.',
+  { ch: 'The land',
+    say: 'Click <b>any hex</b> to see what it gives. The panel also names its continent: every map’s land is split into named continents.',
     at: () => tutSpot(G.tiles.find(t => t.f === 'iron')),
     done: () => !!selection && selection.kind === 'tile' },
-  { say: 'Every city makes science from its pop, and Libraries add more. Click Rome and set it to <b>Research</b>: a third of its production goes into your tech as well, which is handy when there’s nothing better to build. Pick a new tech too.',
-    at: () => tutSpot(tutCap()), el: '[data-act$=":research:research"], #btn-tech',
-    done: () => { const c = tutCap(); return !!c && !!c.build && c.build.kind === 'research'; },
-    skip: () => { const c = tutCap(); if (c) setBuild(c, { kind: 'research', id: 'research' }); } },
-  { say: 'Trouble! The Cinder Clan just declared war, and one of its raiders is in your fields. <b>Click the raider</b> to see how strong it is.',
+
+  // ── Buildings and upgrades ──
+  { ch: 'Buildings',
+    say: 'A <b>Library</b> adds science and unlocks the <b>Research</b> build, which turns a third of a city’s production into your tech. You’ve just learned Writing. ' +
+      'Click Rome, choose <b>Library</b>, then click a free hex in your borders: every building but Walls and the Granary gets a hex of its own, and whatever grows there is cleared. ' +
+      'The production is saved, so click <b>End turn</b> and it’s built.',
+    at: () => tutSpot(tutCap()), el: '[data-act$=":building:library"], #btn-end',
+    enter: () => {
+      if (!hasTech(0, 'writing')) pl(0).techs.push('writing');
+      tutBank({ kind: 'building', id: 'library' });
+    },
+    done: () => tutBuilding('library'),
+    skip: () => {
+      if (!tutQueued('library')) tutQueue('library');
+      if (!tutBuilding('library')) doEndTurn();
+    } },
+  { ch: 'Buildings',
+    say: 'Your Library stands. You’ve now learned Education, so click Rome and build a <b>University</b>. It <b>upgrades</b> the Library right where it stands: +3 science, and no new hex.',
+    at: () => tutSpot(tutCap()), el: '[data-act$=":building:university"]',
+    enter: () => {
+      if (!hasTech(0, 'education')) pl(0).techs.push('education');
+      tutBank({ kind: 'building', id: 'university' });
+    },
+    done: () => tutQueued('university'),
+    skip: () => { const c = tutCap(); if (c && !tutQueued('university')) setBuild(c, { kind: 'building', id: 'university' }); } },
+  { ch: 'Buildings', next: 'Next',
+    say: 'Every upgrade stacks on the building below it: <b>Granary → Water Mill</b>, <b>Library → University → Observatory</b>, <b>Workshop → Foundry</b>, ' +
+      '<b>Barracks → Armory</b> and <b>Harbor → Shipyard</b> (they train veteran soldiers and ships), and <b>Walls → Fortress</b>. None of them takes another hex. ' +
+      'The hexes your buildings cover are what a science win really costs.',
+    at: () => tutSpot(tutCap()), done: () => false },
+
+  // ── Wonders ──
+  { ch: 'Wonders',
+    say: 'Every map has four natural <b>wonders</b>, hidden until a unit sees one. One is hiding north of Rome. Send your warrior to the flashing hex: click it, and the walk takes a few turns. ' +
+      'A popup tells you the moment you find a wonder.',
+    at: () => tutApproach('spring', false),
+    done: () => tutFound('spring'),
+    skip: () => tutReveal('spring') },
+  { ch: 'Wonders',
+    say: 'That’s <b>Pamukkale</b>. Like Civ’s Fountain of Youth, a land soldier who steps in heals 10 HP every turn from then on, even after a fight. <b>Walk a soldier onto it.</b>',
+    at: () => tutSpot(tutWonder('spring')),
+    done: () => ownUnits(0).some(u => u.blessed),
+    skip: () => {
+      const u = tutSoldier(), w = tutWonder('spring');
+      if (u && w) { u.x = w.x; u.y = w.y; touchWonders(u); }
+    } },
+  { ch: 'Wonders', next: 'Next',
+    say: 'The Giant’s Causeway is the other war wonder: nobody can enter it, but a soldier beside it fights at +5 for good. The other two pay in science: the <b>Great Barrier Reef</b> gives +3 science and +1 food on each hex inside your borders, ' +
+      'and the <b>famous mountain</b> gives +2 science on every land hex beside it. Nobody can build on a wonder, so you win one by growing your borders over it. You’ll meet the Reef at sea.',
+    at: () => tutSpot(tutWonder('spring')), done: () => false },
+
+  // ── War ──
+  { ch: 'War',
+    say: 'Trouble! The Cinder Clan just declared war, and one of its raiders is in your fields. <b>Click the raider</b> to see how strong it is.',
     enter: tutRaid, at: () => tutSpot(tutRaider()),
     done: () => !tutRaider() || (!!selection && selection.kind === 'unit' && selection.id === G.tut.raider) },
-  { say: 'Select your warrior or archer and click the raider’s <b>red hex</b>. The numbers show what you deal and take. Units inside your own borders get +5.',
+  { ch: 'War',
+    say: 'Select your archer or warrior and click the raider’s <b>red hex</b>. The numbers show what you deal and take. Units inside your own borders get +5, and <b>F</b> fortifies a unit for +3 defense.',
     at: () => tutSpot(tutRaider()),
     done: () => !tutRaider(),
     skip: () => { const r = tutRaider(); if (r) killUnit(r, 0); } },
-  { say: 'Rome has production saved. Set it to build a <b>Galley</b>, end the turn, then sail the galley along the coast. Ships stay in shallow water until Navigation.',
+
+  // ── Sea and conquest ──
+  { ch: 'Sea and conquest',
+    say: 'Rome has production saved. Set it to build a <b>Galley</b>, end the turn, then sail it out. Ships stay in shallow water until Navigation.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":unit:galley"], #btn-end',
     enter: () => tutBank({ kind: 'unit', id: 'galley' }),
     done: () => G.units.some(u => u.owner === 0 && isNaval(u.type) && !cityAt(u.x, u.y)),
@@ -4955,24 +5835,67 @@ const TUT_STEPS = [
       const c = tutCap(), at = c && neighbourList(c.x, c.y).find(([x, y]) => slotFree(x, y, 0, 'galley'));
       if (at) addUnit(pl(0), 'galley', at[0], at[1], c.id);
     } },
-  { say: 'Cinderhold, the Cinder Clan’s camp, has 30 HP and no walls. Hit it to 0 HP with your galley or soldiers, then attack it once more with a melee unit to <b>take it</b>.',
+  { ch: 'Sea and conquest',
+    say: 'There’s a wonder out in the water to the south-east. Sail the galley to the flashing hex to see the <b>Great Barrier Reef</b>.',
+    at: () => tutApproach('reef', true),
+    done: () => tutFound('reef'),
+    skip: () => tutReveal('reef') },
+  { ch: 'Sea and conquest',
+    say: 'Cinderhold, the Cinder Clan’s camp, has 30 HP and no walls. Hit it to 0 HP with your galley or soldiers, then attack it once more with a melee unit to <b>take it</b>, and keep it.',
     at: () => tutSpot(tutCamp()),
     done: () => { const c = tutCamp(); return (!c || c.owner === 0) && !G.pending; },
     skip: tutTakeCamp },
-  { say: 'You don’t have to fight forever. Open the <b>Council</b> (D) and offer the Cinder Clan peace.',
+
+  // ── Roads, peace and trade ──
+  { ch: 'Roads and trade',
+    say: 'Cinderhold is yours. You’ve just learned Masonry, which lets a city build a <b>road</b> to another of your cities. Click Rome and choose <b>Road to Cinderhold</b>. ' +
+      'It costs production by the hex, and units move along paved hexes at half cost. That’s all a road does.',
+    at: () => tutSpot(tutCap()), el: '[data-act*=":road:"]',
+    enter: () => {
+      if (!hasTech(0, 'masonry')) pl(0).techs.push('masonry');
+      roadCache.clear();
+      const c = tutCap(), camp = tutCamp();
+      if (c && camp && camp.owner === 0) tutBank({ kind: 'road', id: camp.id });
+    },
+    done: () => {
+      const c = tutCap(), camp = tutCamp();
+      return !c || !camp || camp.owner !== 0 || (!!c.build && c.build.kind === 'road') || roadChoices(c).every(o => o.r.tiles.every(t => t.road));
+    },
+    skip: () => { const c = tutCap(), camp = tutCamp(); if (c && camp && camp.owner === 0) setBuild(c, { kind: 'road', id: camp.id }); } },
+  { ch: 'Roads and trade',
+    say: 'You don’t have to fight forever. Open the <b>Council</b> (D) and offer the Cinder Clan peace.',
     el: '#btn-council, [data-act^="peace:"]',
     done: () => !atWar(0, 1), skip: () => makePeace(0, 1) },
-  { say: 'Last thing: your <b>score</b>. Click it in the top bar (or press R) any time to open your realm. It’s 5 per city, 1 per pop, points per tech, and military strength ÷ 20. ' +
-      'The best score at the turn limit wins, or take every capital to win early.',
+  { ch: 'Roads and trade', next: 'Next',
+    say: 'At peace, the Council also offers <b>Trade</b>. Horses, iron and gunpowder change hands at once; the buyer pays in production, in one go or in installments, and never more in one go than their best city makes in a turn. ' +
+      'Only war ends a deal. If the buyer starts it, everything owed is paid on the spot; if the seller does, the payments stop.',
+    el: '#btn-council', done: () => false },
+  { ch: 'Roads and trade', next: 'Next',
+    say: 'One more thing real games add: on a turn you choose at setup, borders <b>close</b>. After that, stepping onto another civ’s land without an open-borders deal means war, with a confirm box first, and your units already inside are moved out. ' +
+      'Ask for open borders in the Council. They last 30 turns.',
+    el: '#btn-council', done: () => false },
+
+  // ── Winning ──
+  { ch: 'Winning', next: 'Next',
+    say: 'There are three ways to win. The first is <b>score</b>: click it in the top bar (or press F1) any time. It’s 5 per city, 1 per pop, 2, 4, 6 or 8 per tech by era, and military strength ÷ 20. ' +
+      'The best score when the turn limit hits wins.',
     enter: () => { selection = { kind: 'realm' }; }, el: '.score-box, #stat-score',
-    done: () => false, next: 'Finish' }
+    done: () => false },
+  { ch: 'Winning', next: 'Next',
+    say: 'The second is <b>conquest</b>: hold every enemy capital. A city taken is yours to keep or burn, but a capital can’t be burned. Cities hold out at 25 + 3 per pop, and walls and fortresses add to that.',
+    at: () => tutSpot(tutCamp()), done: () => false },
+  { ch: 'Winning', next: 'Finish',
+    say: 'The third is <b>science</b>. Finish <b>Star Charts</b> and the <b>Royal Academy</b>, then send out the <b>Grand Expedition</b> (by sea, from a city with a Harbor) or the <b>Grand Caravan</b> (by land, from any city). ' +
+      'If it gets home, you win. Take its home city to stop it: under half HP, the trip waits. Conquest and science can each be switched off at setup.',
+    enter: () => { selection = { kind: 'realm' }; }, el: '.sci-block',
+    done: () => false }
 ];
 
 // Moves past every step that is already done, and runs a step's setup the
 // first time it comes up.
 function tutorialTick() {
   if (!G || !G.tut) return;
-  for (let guard = 0; guard < 20 && G.tut.step < TUT_STEPS.length; guard++) {
+  for (let guard = 0; guard < 40 && G.tut.step < TUT_STEPS.length; guard++) {
     const step = TUT_STEPS[G.tut.step];
     if (!G.tut.entered) {
       G.tut.entered = true;
@@ -4987,11 +5910,21 @@ function tutorialTick() {
 function tutorialNext() {
   if (!G || !G.tut || G.tut.step >= TUT_STEPS.length) return;
   const at = G.tut.step, step = TUT_STEPS[at];
+  if (!G.tut.entered) {
+    G.tut.entered = true;
+    if (step.enter) step.enter();
+  }
   if (step.skip && !step.done()) step.skip();
   if (G.tut.step === at) {
     G.tut.step++;
     G.tut.entered = false;
   }
+}
+// Skip chapter: Next, over and over, until the chapter changes.
+function tutorialSkipChapter() {
+  if (!G || !G.tut || G.tut.step >= TUT_STEPS.length) return;
+  const ch = TUT_STEPS[G.tut.step].ch;
+  for (let guard = 0; guard < 40 && G.tut.step < TUT_STEPS.length && TUT_STEPS[G.tut.step].ch === ch; guard++) tutorialNext();
 }
 
 /* ── tips in real games ────────────────────────────────────────────────────── */
@@ -5006,6 +5939,12 @@ const TIPS = [
   { id: 'zoc', test: i => ownUnits(i).find(u => u.pinned),
     say: () => 'That unit stepped into an enemy’s zone of control (the dashed yellow hexes), so its move ended there. It can still attack. Horse units ride straight through.',
     at: u => [u.x, u.y] },
+  { id: 'closing', test: i => G.closeTurn && !G.tut && G.turn >= G.closeTurn - 3 && G.turn < G.closeTurn,
+    say: () => 'The borders close on turn ' + G.closeTurn + '. After that, stepping onto another player’s land without an open-borders deal means war, and units still inside are moved out. Ask for open borders in the Council (D).',
+    el: '#btn-council' },
+  { id: 'roads', test: i => hasTech(i, 'masonry') && ownCities(i).length >= 2 && roadChoices(ownCities(i)[0]).some(o => o.r.cost > 0),
+    say: () => 'Masonry lets a city build a road to another of your cities. It costs production by the hex, and units move along paved hexes at half cost. Pick one under Roads in the city panel.',
+    at: () => { const c = ownCities(G.viewer)[0]; return [c.x, c.y]; } },
   { id: 'war', test: i => G.players.find(o => o.alive && atWar(i, o.i)),
     say: (i, o) => 'You’re at war with ' + esc(o.name) + '. Your units get +5 inside your own borders. Offer peace in the Council (D) when you want out.',
     el: '#btn-council' },
@@ -5103,15 +6042,18 @@ function renderCoach() {
     tag = 'Tutorial';
     if (G.tut.step >= TUT_STEPS.length) {
       count = 'done';
-      say = 'That’s the whole game: cities, techs, builders, stockpiles, war, ships, peace and score. Start a real game with friends or CPUs, or keep exploring this island.';
+      say = 'That’s the whole game: cities, techs, builders, buildings and their upgrades, wonders, war, ships, roads, peace and trade, and the three ways to win. ' +
+        'Start a real game with friends or CPUs, or keep exploring this island.';
       actions = '<button class="act on" data-act="tut-new">Start a real game</button>' +
         '<button class="act" data-act="tut-close">Keep looking around</button>';
     } else {
       const step = TUT_STEPS[G.tut.step];
+      tag = 'Tutorial · ' + step.ch;
       count = (G.tut.step + 1) + ' / ' + TUT_STEPS.length;
       say = step.say;
       el = step.el || null;
       actions = '<button class="act" data-act="tut-next">' + (step.next || 'Next') + '</button>' +
+        '<button class="skip" data-act="tut-chapter">Skip chapter</button>' +
         '<button class="skip" data-act="tut-quit">Quit the tutorial</button>';
     }
   } else {
@@ -5198,6 +6140,7 @@ function render() {
   renderCoach();
   UI.btnEnd.disabled = !myTurn();
   if (G.pending && UI.modalLayer.hidden) showPending();
+  else if (UI.modalLayer.hidden && !G.over) showWonderNews();
   if (G.over && !UI.endShown) showEndModal();
 }
 
@@ -5226,7 +6169,7 @@ function renderBar() {
   const stock = (name, have, gain) => '<span class="stat opt" title="' + name + ': stockpile, cap and gain a turn">' + icon(name.toLowerCase(), 14) +
     '<b>' + have + '</b><span class="of">/' + STOCK_CAP + '</span>' + (gain ? '<span class="d">+' + gain + '</span>' : '') + '</span>';
   UI.stats.innerHTML =
-    '<button class="stat" id="stat-score" data-act="realm" title="Score. Click for your realm (R)">' + icon('crown', 14) + '<b>' + s.total + '</b></button>' +
+    '<button class="stat" id="stat-score" data-act="realm" title="Score. Click for your realm (F1)">' + icon('crown', 14) + '<b>' + s.total + '</b></button>' +
     '<span class="stat mid" title="Cities">' + icon('city', 14) + '<b>' + s.cities + '</b></span>' +
     '<span class="stat opt" title="Population">' + icon('food', 14) + '<b>' + s.pop + '</b></span>' +
     '<button class="stat mid' + (f.research && rate ? '' : ' bad') + '" data-act="tech" title="' +
@@ -5460,7 +6403,7 @@ function realmPanel() {
   if (boosts.length) html += kv('Eurekas waiting', esc(boosts.map(techName).join(', ')));
   html += '<div class="actions"><button class="act" data-act="tech">' + icon('tech', 14) + 'Tech tree<kbd>T</kbd></button></div>';
 
-  if (scienceOn()) html += '<p class="sec">' + icon('expedition', 12) + 'Science victory</p>' + raceHTML(f.i, true);
+  if (scienceOn()) html += '<p class="sec" data-col="sci-block">' + icon('expedition', 12) + 'Science victory</p>' + raceHTML(f.i, true);
 
   const powder = hasTech(f.i, 'firearms');
   html += '<p class="sec">Stockpiles</p>' +
@@ -5502,11 +6445,19 @@ function realmPanel() {
   return html;
 }
 
+// Hidden until researched, like Civ: a unit or building whose tech you don't have yet isn't listed at all.
+const unlockedFor = (i, def) => !!def && (!def.tech || hasTech(i, def.tech)) && (!def.tech2 || hasTech(i, def.tech2));
+
 function buildRow(c, item, mine) {
   const def = itemDef(item);
   const why = buildProblem(c, item);
   const on = sameItem(c.build, item);
   let note = why;
+  if (item.kind === 'road' && !why) {
+    const r = roadRoute(c, cityById(item.id));
+    const open = r ? r.tiles.filter(t => !t.road).length : 0;
+    note = plural(open, 'hex', 'hexes') + ' to pave. Units cross paved hexes at half cost';
+  }
   if (item.kind === 'building' && !why) {
     note = !needsPlot(item.id) ? 'Stands on the city center'
       : c.plot && c.plot[item.id] ? 'Has its hex: anything on it goes when it’s built'
@@ -5520,7 +6471,7 @@ function buildRow(c, item, mine) {
   const disabled = !mine || !!why;
   const cost = costOf(c, item), t = turnsLeft(c, item);
   return '<button class="build-row' + (on ? ' on' : '') + '" data-act="setbuild:' + c.id + ':' + item.kind + ':' + item.id + '"' +
-    (disabled ? ' disabled' : '') + ' title="' + esc(def.blurb) + '">' + icon(item.kind === 'unit' ? iconOf(item.id) : item.id, 15) +
+    (disabled ? ' disabled' : '') + ' title="' + esc(def.blurb) + '">' + icon(item.kind === 'unit' ? iconOf(item.id) : item.kind === 'road' ? 'road' : item.id, 15) +
     '<span><span class="nm">' + def.name + '</span><span class="why">' + esc(note || def.blurb) + '</span></span>' +
     '<span class="cost">' + cost + (why ? '' : ' · ' + (isFinite(t) ? t + 't' : '∞')) + '</span></button>';
 }
@@ -5528,9 +6479,10 @@ function buildRow(c, item, mine) {
 function researchRow(c, mine) {
   const f = pl(c.owner), on = c.build && c.build.kind === 'research';
   const share = Math.floor(cityYields(c).prod * SCI.researchShare + 1e-9);
-  const what = (f.research ? 'A third of its production, +' + share + ', goes to ' + techName(f.research) + ' on top of its science.'
+  const why = buildProblem(c, { kind: 'research', id: 'research' });
+  const what = why ? why + ': build one in this city to unlock it.' : (f.research ? 'A third of its production, +' + share + ', goes to ' + techName(f.research) + ' on top of its science.'
     : 'A third of its production goes into research. Pick a tech in the tech tree.') + ' Use it when there’s nothing better to build.';
-  return '<button class="build-row' + (on ? ' on' : '') + '" data-act="setbuild:' + c.id + ':research:research"' + (mine ? '' : ' disabled') + '>' +
+  return '<button class="build-row' + (on ? ' on' : '') + '" data-act="setbuild:' + c.id + ':research:research"' + (mine && !why ? '' : ' disabled') + '>' +
     icon('tech', 15) + '<span><span class="nm">Research</span><span class="why">' + esc(what) + '</span></span>' +
     '<span class="cost">+' + share + '</span></button>';
 }
@@ -5603,19 +6555,25 @@ function cityPanel(c) {
     const open = PROJECT_ORDER.filter(id => hasTech(c.owner, PROJECTS[id].tech) && !(STEPS.includes(id) && projectDone(c.owner, id)));
     if (open.length) html += '<p class="sec">Science victory</p><div class="build-list">' + open.map(id => buildRow(c, { kind: 'project', id }, mine)).join('') + '</div>';
   }
-  const roster = UNIT_ORDER.map(base => unitFor(c.owner, base));
+  const roster = UNIT_ORDER.map(base => unitFor(c.owner, base)).filter(id => unlockedFor(c.owner, UNITS[id]));
   const open = roster.filter(id => !buildProblem(c, { kind: 'unit', id }));
   const shut = roster.filter(id => buildProblem(c, { kind: 'unit', id }));
   html += '<p class="sec">Units</p><div class="build-list">' +
     open.concat(shut).map(id => buildRow(c, { kind: 'unit', id }, mine)).join('') + '</div>';
-  const blds = BUILDING_ORDER.map(base => buildingFor(c.owner, base)).filter(id => !c.buildings.includes(id));
+  const blds = BUILDING_ORDER.map(base => buildingFor(c.owner, base))
+    .filter(id => !c.buildings.includes(id) && unlockedFor(c.owner, BUILDINGS[id]));
   if (blds.length) {
     html += '<p class="sec">Buildings</p><div class="build-list">' +
       blds.map(id => buildRow(c, { kind: 'building', id }, mine)).join('') + '</div>';
   }
+  const roads = roadChoices(c).filter(o => o.r.cost > 0).slice(0, 6);
+  if (roads.length) {
+    html += '<p class="sec">' + icon('road', 12) + 'Roads</p><div class="build-list">' +
+      roads.map(o => buildRow(c, { kind: 'road', id: o.d.id }, mine)).join('') + '</div>';
+  }
   if (placing && placing.city === c.id) {
     html += '<p class="sec">Placing ' + esc(BUILDINGS[placing.item.id].name) + '</p>' +
-      '<div class="hint">Pick an outlined hex: ' + (placing.item.id === 'harbor' ? 'shallow water' : 'flat land or hills') + ' in the borders. If it has a feature or an improvement, you’ll be asked first: they go for good when the building is finished. The terrain stays.</div>' +
+      '<div class="hint">Pick an outlined hex: ' + (placing.item.id === 'harbor' ? 'shallow water' : 'flat land or hills') + ' in the borders. If it has a feature or an improvement, you’ll be asked first: they go for good the moment you pick the hex, and builders can’t touch it after. The terrain stays.</div>' +
       '<div class="actions"><button class="act" data-act="cancel-place">Stop placing</button></div>';
   }
   if (mine && c.build) html += '<div class="actions"><button class="act" data-act="clearbuild:' + c.id + '">Stop building</button></div>';
@@ -5656,6 +6614,7 @@ function tilePanel(x, y) {
     kv(icon('food', 12) + ' Food', yy.food) + kv(icon('prod', 12) + ' Production', yy.prod) +
     kv('Move cost', ter.block ? 'impassable' + (v !== null && civIs(v, 'inca') ? ' (2 for you)' : '') :
       ter.deep ? '1, after Navigation' : ter.water ? '1, embarked' : t.f === 'forest' ? 2 : ter.cost) +
+    (t.road ? kv('Road', 'paved: ' + ROAD_STEP + ' to move along it') : '') +
     (!ter.water && (ter.def || t.f === 'forest') ? kv('Defense bonus', '+' + (ter.def + (t.f === 'forest' ? FEATURES.forest.def : 0))) : '') +
     kv('Owner', owner ? dot(owner, 9) + ' ' + esc(owner.name) + (worker ? ' · ' + esc(worker.name) : '') : 'nobody');
   const note = {
@@ -5663,11 +6622,13 @@ function tilePanel(x, y) {
     iron: 'A mine here adds 2 iron a turn to its owner’s stockpile.',
     gunpowder: 'A mine here adds 2 gunpowder a turn to its owner’s stockpile.',
     geyser: 'A geyser: +2 science to whoever’s borders it’s in. It can’t be harvested.',
-    reef: 'A natural wonder: +3 science and +1 food to whoever’s borders it’s in.',
-    peak: 'A natural wonder of plain mountains, like Civ’s: nobody claims it, but every land hex beside it gives +' + SCI.peakNext + ' science.',
-    spring: 'A natural wonder: hot springs people have bathed in to heal for 2,000 years. Like Civ’s Fountain of Youth, a land military unit that steps in heals 10 HP every turn for the rest of the game, even after moving or fighting.',
-    stair: 'A natural wonder of basalt columns, as in Civ: nobody can enter it, but a land military unit that steps beside it fights at +5 for the rest of the game.'
+    reef: wonderNote('reef'), peak: wonderNote('peak'), spring: wonderNote('spring'), stair: wonderNote('stair')
   }[t.f];
+  if (v !== null && !G.watch && closedOwner(v, x, y) >= 0) {
+    html += '<div class="hint" style="color:var(--rust)">Closed to you: stepping here means war with ' + esc(pl(closedOwner(v, x, y)).name) + '. Ask for open borders in the Council to pass in peace.</div>';
+  } else if (v !== null && !G.watch && t.owner !== null && t.owner !== v && openBetween(v, t.owner)) {
+    html += '<div class="hint">Open to you: ' + esc(pl(t.owner).name) + ' agreed to open borders.</div>';
+  }
   if (note && (G.watch || seesFeature(t, v))) html += '<div class="hint">' + note + '</div>';
   else if (!t.f && nextToPeak(t)) html += '<div class="hint">Next to ' + esc(FEATURES.peak.name) + ': +' + SCI.peakNext + ' science.</div>';
   html += '<div class="actions">' + (city ? '<button class="act" data-act="select-city:' + city.id + '">' + icon('city', 14) + 'Open ' + esc(city.name) + '</button>' : '') +
@@ -5695,6 +6656,8 @@ function unitPanel(u) {
     (def.charges ? kv('Charges', u.charges) : '') +
     (isMil(u.type) && u.owner === v ? kv('Fed by', def.noFood ? 'nobody (eats no food)' : home ? esc(home.name) : 'nobody (free)') : '') +
     '<div class="hint">' + esc(def.blurb) + '</div>' +
+    (u.vet ? '<div class="hint" style="color:var(--gold, #8a6a12)">Veteran: trained in an ' + (def.naval ? 'Shipyard' : 'Armory') + ', +5 strength for good.</div>' : '') +
+    (u.fort ? '<div class="hint">Fortified: +3 defense. Moving or attacking ends it.</div>' : u.sleep ? '<div class="hint">Asleep. It wakes when an enemy comes in sight, and the next-unit key skips it.</div>' : '') +
     (u.blessed ? '<div class="hint" style="color:var(--sea)">Bathed at Pamukkale: heals 10 HP every turn, wherever it is.</div>' : '') +
     (u.giant ? '<div class="hint" style="color:var(--sea)">Climbed the Giant’s Causeway: +5 strength for good.</div>' : '') +
     (u.pinned && u.owner === v ? '<div class="hint" style="color:var(--rust)">Stopped by an enemy’s zone of control. It can still attack this turn.</div>' : '') +
@@ -5713,7 +6676,7 @@ function unitPanel(u) {
     html += '<p class="sec">Orders</p><div class="actions">';
     if (def.founds) {
       const why = foundProblem(u);
-      html += '<button class="act' + (why ? '' : ' on') + '" data-act="found"' + (why || u.mp <= 0 ? ' disabled' : '') + '>' + icon('city', 14) + 'Found city<kbd>F</kbd></button>';
+      html += '<button class="act' + (why ? '' : ' on') + '" data-act="found"' + (why || u.mp <= 0 ? ' disabled' : '') + '>' + icon('city', 14) + 'Found city<kbd>B</kbd></button>';
       html += '</div>' + (why ? '<div class="hint">' + esc(why) + '.</div>' : u.mp <= 0 ? '<div class="hint">No moves left. Found it next turn.</div>' : '') + '<div class="actions">';
     }
     if (def.charges && u.charges > 0) {
@@ -5728,12 +6691,10 @@ function unitPanel(u) {
       if (blocked) html += '</div><div class="hint">' + esc(blocked.why) + '.</div><div class="actions">';
     }
     if (u.path) html += '<button class="act" data-act="clearpath">Cancel march</button>';
-    if (!u.path && (u.mp <= 0 || u.acted)) html += '<button class="act' + (marchPlan === u.id ? ' on' : '') + '" data-act="march-plan">' +
-      (marchPlan === u.id ? 'Cancel march orders' : 'Give march orders') + '</button>';
-    html += '<button class="act" data-act="skip"' + (u.mp <= 0 ? ' disabled' : '') + '>Skip turn<kbd>S</kbd></button>' +
-      '<button class="act" data-act="disband-ask">Disband</button></div>';
-
-    if (marchPlan === u.id) html += '<div class="hint">Click a hex you have seen: the unit sets off next turn and keeps walking at the start of each turn.</div>';
+    if (isMil(u.type)) html += '<button class="act' + (u.fort ? ' on' : '') + '" data-act="fortify"' + (u.fort ? ' disabled' : '') + '>Fortify<kbd>F</kbd></button>';
+    html += '<button class="act" data-act="sleep"' + (u.sleep ? ' disabled' : '') + '>Sleep<kbd>Z</kbd></button>' +
+      '<button class="act" data-act="skip"' + (u.mp <= 0 ? ' disabled' : '') + '>Skip turn<kbd>space</kbd></button>' +
+      '<button class="act" data-act="disband-ask">Disband<kbd>del</kbd></button></div>';
 
     if (isMil(u.type) && !u.acted && u.mp > 0) {
       const targets = [];
@@ -5782,6 +6743,7 @@ function openModal(html, size) {
   UI.modalLayer.hidden = false;
   const first = UI.modal.querySelector('.modal-foot .btn.primary') || UI.modal.querySelector('button');
   if (first) first.focus({ preventScroll: true });
+  if (G && G.tut) tutorialTick();
   renderCoach();
 }
 function closeModal() {
@@ -5802,7 +6764,7 @@ function showHandoff() {
   UI.handoffName.textContent = f.name + '’s turn';
   const offers = G.offers.filter(o => o.to === f.i).length;
   UI.handoffNote.textContent = 'Pass the device to ' + f.name + '. Everyone else, look away.' +
-    (offers ? ' ' + plural(offers, 'peace offer is', 'peace offers are') + ' waiting in the Council.' : '');
+    (offers ? ' ' + plural(offers, 'offer is', 'offers are') + ' waiting in the Council.' : '');
 }
 
 // What learning a tech lets this player do, in plain words.
@@ -6039,18 +7001,49 @@ function raceLine(i) {
   return 'Science: ' + done + ' of 2 projects done' + (building ? ', building ' + PROJECTS[building.build.id].name + ' in ' + building.name : '') + '.';
 }
 
+const offerText = o => {
+  const from = pl(o.from);
+  if (o.kind === 'borders') return { tag: 'asks for open borders', cls: 'peace', note: 'Both of you may walk the other’s land for ' + OPEN_TURNS + ' turns. Sent on turn ' + o.turn + '. It lapses after 3 turns.' };
+  if (o.kind === 'trade') {
+    const d = o.deal, per = Math.ceil(d.total / d.turns);
+    return { tag: 'proposes a trade', cls: 'peace', note: esc(dealLine(d, G.viewer)) + ' Sent on turn ' + o.turn + '. It lapses after 3 turns.' + (tradeProblem(d) ? ' <b>Can’t be done right now: ' + esc(tradeProblem(d).toLowerCase()) + '.</b>' : '') };
+  }
+  return { tag: 'offers peace', cls: 'peace', note: 'Sent on turn ' + o.turn + '. It lapses after 3 turns.' };
+};
+// "You sell 10 iron to Rome for 20 production, 5 a turn for 4 turns."
+function dealLine(d, me) {
+  const per = Math.ceil(d.total / d.turns);
+  const other = pl(d.seller === me ? d.buyer : d.seller);
+  const who = d.seller === me ? 'You sell ' : d.buyer === me ? 'You buy ' : fullName(pl(d.buyer)) + ' buys ';
+  const prep = d.seller === me ? ' to ' : ' from ';
+  return who + d.qty + ' ' + d.res + (d.seller === me || d.buyer === me ? prep + other.name : ' from ' + pl(d.seller).name) +
+    ' for ' + d.total + ' production' + (d.turns > 1 ? ', ' + per + ' a turn for ' + d.turns + ' turns.' : ', paid at once.');
+}
+const closeNote = () => !G.closeTurn || G.tut ? 'Borders never close in this game.'
+  : bordersClosed() ? 'Borders are closed. Stepping onto another player’s land without an open-borders deal means war.'
+  : 'Borders close on turn ' + G.closeTurn + ' (' + plural(G.closeTurn - G.turn, 'turn', 'turns') + ' from now). After that, stepping onto another player’s land without an open-borders deal means war.';
+
 function showCouncil() {
+  UI.modalKind = null;
   const v = G.viewer;
   const offers = G.offers.filter(o => o.to === v);
-  let html = modalHead('Council', 'War and peace with the other players');
+  let html = modalHead('Council', 'War, peace, borders and trade');
   html += '<div class="modal-body">';
   if (offers.length) {
-    html += '<h3>Peace offers to you</h3>' + offers.map(o => {
-      const from = pl(o.from);
-      return '<div class="council-row"><div><div class="cn">' + dot(from) + esc(from.name) + ' <span class="tag peace">offers peace</span></div>' +
-        '<div class="cd">Sent on turn ' + o.turn + '. It lapses after 3 turns.</div></div><div class="ca">' +
-        (myTurn() ? '<button class="act" data-act="offer-accept:' + o.from + '">Accept</button><button class="act" data-act="offer-refuse:' + o.from + '">Refuse</button>' : '') +
+    html += '<h3>Offers to you</h3>' + offers.map(o => {
+      const from = pl(o.from), t = offerText(o);
+      return '<div class="council-row"><div><div class="cn">' + dot(from) + esc(from.name) + ' <span class="tag ' + t.cls + '">' + t.tag + '</span></div>' +
+        '<div class="cd">' + t.note + '</div></div><div class="ca">' +
+        (myTurn() ? '<button class="act" data-act="offer-accept:' + o.id + '">Accept</button><button class="act" data-act="offer-refuse:' + o.id + '">Refuse</button>' : '') +
         '</div></div>';
+    }).join('');
+  }
+  const mine = (G.deals || []).filter(d => d.buyer === v || d.seller === v);
+  if (mine.length) {
+    html += '<h3>Deals running</h3>' + mine.map(d => {
+      const per = d.per, other = pl(d.seller === v ? d.buyer : d.seller);
+      return '<div class="council-row"><div><div class="cn">' + dot(other) + esc(other.name) + ' <span class="tag">' + (d.seller === v ? 'you sell ' : 'you buy ') + d.qty + ' ' + d.res + '</span></div>' +
+        '<div class="cd">' + (d.buyer === v ? 'You pay ' : 'They pay ') + per + ' production a turn, ' + plural(d.left, 'turn', 'turns') + ' left (' + d.owed + ' still owed). Only war ends a deal.</div></div><div></div></div>';
     }).join('');
   }
   html += '<h3>Players</h3>';
@@ -6062,24 +7055,98 @@ function showCouncil() {
       continue;
     }
     const war = atWar(v, o.i);
-    const sent = G.offers.some(x => x.from === v && x.to === o.i);
+    const sent = G.offers.some(x => x.from === v && x.to === o.i && (x.kind || 'peace') === 'peace');
+    const sentBorders = G.offers.some(x => x.from === v && x.to === o.i && x.kind === 'borders');
     const att = o.human ? null : G.attitude[o.i][v] || 0;
     const mood = att === null ? '' : ' · ' + (att > 15 ? 'friendly' : att < -15 ? 'hostile' : 'wary') + ' toward you';
+    const dealUntil = (G.open || []).find(d => G.turn < d.until && ((d.a === v && d.b === o.i) || (d.a === o.i && d.b === v)));
     html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(fullName(o)) +
       ' <span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'at war' : 'at peace') + '</span>' +
+      (dealUntil ? '<span class="tag peace">borders open to turn ' + (dealUntil.until - 1) + '</span>' : '') +
       (o.human ? '' : '<span class="tag">CPU</span>') + '</div>' +
       '<div class="cd">' + esc(CIVS[o.civ].focus) + ' · ' + plural(s.cities, 'city', 'cities') + ' · ' + plural(o.techs.length, 'tech', 'techs') +
       ' · score ' + s.total + mood + '</div>' + (scienceOn() ? '<div class="cd">' + esc(raceLine(o.i)) + '</div>' : '') + '</div><div class="ca">';
     if (myTurn()) {
       if (war) html += sent ? '<span class="tag">offer sent</span>' : '<button class="act" data-act="peace:' + o.i + '">Offer peace</button>';
-      else html += '<button class="act warn" data-act="war-ask:' + o.i + '">Declare war</button>';
+      else {
+        if (!dealUntil && G.closeTurn && !G.tut) html += sentBorders ? '<span class="tag">borders offer sent</span>' : '<button class="act" data-act="open-ask:' + o.i + '">Open borders</button>';
+        html += '<button class="act" data-act="trade-ask:' + o.i + '">Trade</button>';
+        html += '<button class="act warn" data-act="war-ask:' + o.i + '">Declare war</button>';
+      }
     }
     html += '</div></div>';
   }
-  html += '<p class="hint">Everyone starts at peace. You can only attack players you are at war with. A CPU player takes peace when it is losing, ' +
-    'tired of a long war, or busy with another war. Another human answers your offer on their own turn.</p></div>' +
+  html += '<p class="hint">' + esc(closeNote()) + ' Open-borders deals last ' + OPEN_TURNS + ' turns, and units caught on land that closes to them are moved out. </p>' +
+    '<p class="hint">Everyone starts at peace. You can only attack players you are at war with. A CPU player takes peace when it is losing, ' +
+    'tired of a long war, or busy with another war. Another human answers your offer on their own turn.</p>' +
+    '<p class="hint"><b>Trade.</b> Horses, iron and gunpowder change hands at once. The buyer pays in production, in one go or in installments, and only war ends a deal. ' +
+    'If the buyer starts the war, what it still owes is paid on the spot; if the seller does, the payments stop. Nobody trades production for production, and one payment can never top what the payer’s best city makes in a turn.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Close</button></div>';
   openModal(html);
+}
+
+// The trade form: what you buy or sell, how much, the price, and how it is paid.
+function showTrade(i, keep) {
+  const v = G.viewer, o = pl(i), me = pl(v);
+  const resOpts = TRADE_RES.filter(r => r !== 'gunpowder' || hasTech(v, 'firearms'));
+  const sel = (id, opts, cur) => '<select id="' + id + '">' + opts.map(([val, label]) => '<option value="' + val + '"' + (String(val) === String(cur) ? ' selected' : '') + '>' + label + '</option>').join('') + '</select>';
+  const f = keep || { dir: 'buy', res: resOpts[0], qty: 10, turns: 1, total: 0 };
+  const turnOpts = [[1, 'All at once']].concat([2, 3, 4, 5, 6, 8, 10, 12].map(n => [n, 'Over ' + n + ' turns']));
+  UI.modalKind = 'trade';
+  openModal(modalHead('Trade with ' + esc(o.name), 'Whatever you agree is final, and only war ends it') +
+    '<div class="modal-body"><div class="hint" style="margin-top:0">You have ' + me.horses + ' horses, ' + me.iron + ' iron' + (hasTech(v, 'firearms') ? ', ' + (me.gunpowder || 0) + ' gunpowder' : '') +
+    '. ' + esc(o.name) + ' has ' + o.horses + ' horses, ' + o.iron + ' iron' + (hasTech(i, 'firearms') ? ', ' + (o.gunpowder || 0) + ' gunpowder' : '') + '.</div>' +
+    '<div class="tform" data-with="' + i + '">' +
+    '<label for="tr-dir">I</label>' + sel('tr-dir', [['buy', 'buy from ' + esc(o.name)], ['sell', 'sell to ' + esc(o.name)]], f.dir) +
+    '<label for="tr-res">Resource</label>' + sel('tr-res', resOpts.map(r => [r, r]), f.res) +
+    '<label for="tr-qty">Amount</label>' + sel('tr-qty', [5, 10, 15, 20, 25, 30].map(n => [n, String(n)]), f.qty) +
+    '<label for="tr-turns">Paid</label>' + sel('tr-turns', turnOpts, f.turns) +
+    '<label for="tr-price">Price</label><span><input type="number" id="tr-price" min="1" step="1" value="' + (f.total || '') + '"> production in all</span></div>' +
+    '<div class="tquote" id="tr-quote"></div>' +
+    '<div class="actions"><button class="act" data-act="trade-fair:' + i + '">Use their price</button></div>' +
+    '<div class="hint">One payment, or one installment, can’t top what the payer’s best city makes in a turn: ' + maxPay(v) + ' for you, ' + maxPay(i) + ' for ' + esc(o.name) + '.</div></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="council">Back to the Council</button>' +
+    '<button class="btn primary" data-act="trade-send:' + i + '">Propose</button></div>', true);
+  refreshTradeForm(!f.total);
+}
+function readTradeForm() {
+  const m = UI.modal, form = m && m.querySelector('.tform');
+  if (!form) return null;
+  const i = Number(form.getAttribute('data-with')), v = G.viewer, dir = m.querySelector('#tr-dir').value;
+  return {
+    other: i, dir, proposer: v,
+    seller: dir === 'sell' ? v : i, buyer: dir === 'sell' ? i : v,
+    res: m.querySelector('#tr-res').value, qty: Number(m.querySelector('#tr-qty').value),
+    turns: Number(m.querySelector('#tr-turns').value), total: Math.floor(Number(m.querySelector('#tr-price').value) || 0)
+  };
+}
+// A fair price for the form's deal: what a CPU would ask or bid, or the middle when the other side is human.
+function fairPrice(d) {
+  const instal = d.turns > 1, ask = tradeAsk(d.seller, d.res, d.qty, instal), bid = tradeBid(d.buyer, d.res, d.qty);
+  const cpuSeller = !pl(d.seller).human, cpuBuyer = !pl(d.buyer).human;
+  if (cpuSeller && !cpuBuyer) return ask;
+  if (cpuBuyer && !cpuSeller) return Math.max(1, bid);
+  return Math.max(1, Math.round((ask + Math.max(1, bid)) / 2));
+}
+function refreshTradeForm(setPrice) {
+  const d = readTradeForm();
+  if (!d) return;
+  const m = UI.modal, box = m.querySelector('#tr-quote'), price = m.querySelector('#tr-price');
+  if (setPrice) { d.total = fairPrice(d); price.value = d.total; }
+  const why = tradeProblem(d);
+  let cls = '', text;
+  if (why) { cls = 'bad'; text = why + '.'; }
+  else {
+    text = dealLine(d, G.viewer);
+    const other = pl(d.other);
+    if (!other.human) {
+      const view = aiTradeView(other, d);
+      if (view.ok) { cls = 'good'; text += ' ' + other.name + ' would take it.'; }
+      else { cls = 'bad'; text += ' ' + other.name + ' ' + view.why + '.'; }
+    } else text += ' ' + other.name + ' answers in the Council on their turn.';
+  }
+  box.className = 'tquote ' + cls;
+  box.textContent = text;
 }
 
 function askWar(i) {
@@ -6161,8 +7228,8 @@ function showHelp() {
   openModal(modalHead('How to play', 'The whole rulebook on one page') + '<div class="modal-body">' +
     '<h3>A turn</h3><p>Each city grows food and production from every tile inside its borders. Each pop eats 2 food and each military unit eats 1 from its home city. ' +
     'Spare food grows the city (15 + 8 × pop to grow), and each new pop claims one more hex. Production goes into whatever the city is building, one thing at a time.</p>' +
-    '<h3>Science</h3><p>Every city makes science: +1 per 2 pop, your capital +2, a Library +2 (+3 after Printing), a University +3, an Observatory +2 (+4 next to a mountain). ' +
-    'Geysers give +2 on their hex and the Great Barrier Reef +3 on each of its hexes. Each map’s famous mountain is plain mountains, but every land hex beside it gives +2. A city with nothing better to do can go on Research and turn a third of its production into science. ' +
+    '<h3>Science</h3><p>Every city makes science: +1 per 2 pop, your capital +2, a Library +2 (+3 after Printing), a University +3, an Observatory +2 (+4 if the Library’s hex is next to a mountain). ' +
+    'Geysers give +2 on their hex and the Great Barrier Reef +3 on each of its hexes. Each map’s famous mountain is plain mountains, but every land hex beside it gives +2. A city with a Library and nothing better to do can go on Research and turn a third of its production into science. ' +
     'Techs cost 40, 100, 180 and 300 by era. Seven major techs have a eureka: do the thing on its card and it costs half. Press T for the tree, then click any tech to head for it: what it needs gets queued first.</p>' +
     '<h3>Era 4 is shuffled</h3><p>Like Civ’s Tech Shuffle, the six era 4 techs keep what they unlock, but what each one needs is dealt fresh every game, the same for everyone. ' +
     'An era 4 tech shows as “?” until you know a tech it needs or earn its eureka.</p>' +
@@ -6171,36 +7238,46 @@ function showHelp() {
     '<h3>Cities</h3><p>Settlers found cities on land at least 4 hexes from any other city. Settlers cost 1 pop, so the city needs pop 2. ' +
     'If a city’s food goes negative, its military units lose 10 HP a turn. Cities heal 10 HP a turn when nobody attacked them (France 20), and not at all while ringed by enemies. ' +
     'They defend at 25 + 3 per pop (at most +21), or their garrison + 5.</p>' +
-    '<h3>Buildings on hexes</h3><p>Like Civ 6’s districts. Walls, the castle and the fortress stand on the city center. Every other building takes its own hex inside that city’s borders, and you pick it: queue the building, then click one of the outlined hexes. ' +
-    'A harbor goes on shallow water; the rest go on flat land or hills, never on mountains, natural wonders or another building’s hex. An observatory gives +4 instead of +2 when its hex touches a mountain. ' +
-    'When the building is finished, the feature and improvement on its hex are removed for good (you’re asked first), along with what they gave; the terrain stays. CPU cities pick their own hexes.</p>' +
+    '<h3>Buildings on hexes</h3><p>Like Civ 6’s districts. Walls, the castle, the fortress and the Granary stand on the city center. Every other building takes its own hex inside that city’s borders, and you pick it: queue the building, then click one of the outlined hexes. ' +
+    'A harbor goes on shallow water; the rest go on flat land or hills, never on mountains, natural wonders or another building’s hex. ' +
+    'The moment you pick the hex, its feature and improvement are removed for good (you’re asked first), along with what they gave, and builders can’t touch it again; the terrain stays. CPU cities pick their own hexes.</p>' +
+    '<h3>Upgrade tiers</h3><p>A building can be upgraded in place, on the same hex: Granary → Water Mill (+2 food, +1 production), Library → University → Observatory, Workshop → Foundry (+2 production, +1 more per 3 pop), ' +
+    'Barracks → Armory and Harbor → Shipyard (units built there start as veterans, +5 strength for good; the Shipyard also gives +1 production per 2 shallow tiles), Walls → Fortress. ' +
+    'A unit or building stays hidden in a city’s list until you know the tech for it.</p>' +
+    '<h3>Roads</h3><p>With Masonry a city can build a road to another of your cities, over land that is yours or nobody’s: 4 production per flat hex, 6 per hill or forest hex, never over mountains. ' +
+    'Units move along paved hexes for half a move a hex. That is all a road does.</p>' +
+    '<h3>Borders and the Council</h3><p>From the turn set at the start (30 by default), every player’s land is closed to the others. Stepping onto it without an open-borders deal means war, and you are asked first. ' +
+    'Units caught inside when the borders close are moved out at the start of their turn. Ask for open borders in the Council: a deal lasts ' + OPEN_TURNS + ' turns.</p>' +
+    '<h3>Trading</h3><p>Horses, iron and gunpowder can be bought and sold in the Council, for production. The resource changes hands at once; the buyer pays in one go or in installments (5 a turn for 10 turns, say). ' +
+    'Only war cancels a deal: if the buyer starts it, everything still owed is paid on the spot; if the seller does, the payments stop. Production never trades for production, and a payment can’t top what the payer’s best city makes in a turn. CPUs price by supply and demand.</p>' +
     '<h3>Builders</h3><p>3 charges, each one instant, inside your borders only: farms on flat land and wheat, mines on hills and iron (Mining), pastures on horses (Animal Husbandry), ' +
     'fishing boats on seafood (Sailing). Chop a forest for 20 production or harvest wheat or seafood for 20 food. Builders can wade onto shallow water to reach seafood.</p>' +
-    '<h3>Moving</h3><p>Hills and forest cost 2 moves, mountains are impassable. Land units can step onto shallow water; deep sea needs Navigation. ' +
+    '<h3>Moving</h3><p>Hills and forest cost 2 moves, mountains are impassable, and a paved road hex costs half a move. Land units can step onto shallow water; deep sea needs Navigation. ' +
     'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Walking onto an enemy civilian standing alone captures it.</p>' +
     '<h3>Longer marches</h3><p>With a unit selected, click any hex you have seen, even turns away: the unit walks as far as it can this turn and keeps going at the start of each turn until it arrives. ' +
-    'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off. A unit that has already used its moves can still be sent somewhere: Give march orders in its panel, then pick the hex, and it sets off next turn.</p>' +
+    'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off.</p>' +
     '<h3>Zone of control</h3><p>Like Civ: at war, every hex next to an enemy military unit or city is in its zone of control (land units cover land, ships cover water, cities both). ' +
     'Stepping into one ends your move there, though you can still attack. Horse units ride straight through.</p>' +
     '<h3>Ships</h3><p>Galleys, warships and battleships come from coastal cities and stay on water, in shallow water until Navigation. They hit anything next to the water, a galley can take a coastal city, ' +
     'and they never take the embark penalty. Battleships shell cities from 2 hexes out but can’t take them, except Norway’s, which board a port at 0 HP.</p>' +
     '<h3>Fighting</h3><p>Every unit has 100 HP. Damage is 30 × e^(0.04 × strength gap), rolled between 80% and 120%. ' +
     'Melee units take damage back; archers, catapults and warships don’t. Units inside their own borders get +5. Hills and forest give defenders +3. ' +
-    'Spearmen get +10 against horse units; catapults and cannons get −15 against units. Units that don’t move or fight heal 10 HP, or 20 inside your borders.</p>' +
+    'Spearmen get +10 against horse units; catapults and cannons get −15 against units. Units that don’t move or fight heal 10 HP, or 20 inside your borders. A fortified unit gets +3 defense until it moves or attacks.</p>' +
     '<h3>Taking cities</h3><p>Hit a city to 0 HP, then a melee unit takes it. Scouts can’t. Captured cities lose their walls and 1 pop. You can keep them or burn them; capitals can’t be burned.</p>' +
     '<h3>Difficulty</h3><p>On Normal, CPUs play by the same rules as you. On Deity, every CPU gets +40% production, +20% food, +25% research and +4 combat strength. ' +
     'It also needs a smaller edge before it attacks, starts wars sooner and holds out longer for peace.</p>' +
     '<h3>Maps and continents</h3><p>Pick Pangaea, Continents, Islands or Mirror, and a size: Small, Standard, Large or Huge, built for 2, 4, 6 and 8 players. ' +
-    'Every map’s land is split into named continents, marked with thin dashed lines.</p>' +
+    'Every map’s land is split into named continents, marked with thin dashed lines. Tick “Map wraps west to east” to join the west and east edges: a unit can walk off one side and appear on the other.</p>' +
     '<h3>Natural wonders</h3><p>Each map has four, dropped at random but at least 3 hexes from every start, well apart, and never more than your share of them closest to you. ' +
     'The Great Barrier Reef (shallow water, +3 science a hex) and one famous mountain, a different one each game: Mount Everest, Kilimanjaro, the Matterhorn, Mount Fuji, Mount Olympus or Denali (+2 science on every land hex beside it). Both cover 1 to 3 hexes on Small maps, up to 4 on Standard and 5 on Large and Huge. ' +
     'Pamukkale, the Turkish hot springs people have bathed in to heal for 2,000 years, works like Civ’s Fountain of Youth: a land military unit that steps in heals 10 HP every turn for good. The Giant’s Causeway, as in Civ, can’t be entered, but a land military unit that steps beside it gets +5 strength for good. ' +
-    'Nobody founds cities, builds or claims mountains on a wonder, the Inca included.</p>' +
+    'Nobody founds cities, builds or claims mountains on a wonder, the Inca included. The first time you see one, a popup says what it is and what it does, and the history keeps a line about it.</p>' +
     '<h3>Winning</h3><p><b>Conquest:</b> hold every capital on the map. <b>Science:</b> finish Star Charts and the Royal Academy, then send out the Grand Expedition by sea (coastal city with a Harbor) ' +
     'or the Grand Caravan by land (any city). If it gets home after its trip, you win; take its home city to stop it, and while that city is under half HP the trip waits. Every Future Tech you finish on the way cuts a turn. ' +
     '<b>Score:</b> the highest score when the turn limit hits: 5 per city, 1 per pop, 2, 4, 6 or 8 per tech by era (2 per Future Tech), and 1 per 20 military strength. ' +
     'Older units count for less as the game goes on. Conquest and science can be switched off at setup.</p>' +
-    '<h3>Keys</h3><p>Space ends the turn · N next unit · F found city · S skip · T tech · R realm · D council · H rules · Esc closes or deselects. The Menu’s Animation switch runs through off, wonders only, wonders + features, and everything.</p>' +
+    '<h3>Keys</h3><p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
+    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. The Menu’s Animation switch runs through off, wonders only, wonders + features, and everything.</p>' +
     '</div><div class="modal-foot"><button class="btn" data-act="civs">All 16 civs</button><button class="btn primary" data-act="close">Close</button></div>');
 }
 
@@ -6222,12 +7299,10 @@ function showEndModal() {
 
 function selectUnit(u) {
   selection = { kind: 'unit', id: u.id };
-  if (marchPlan !== u.id) marchPlan = null;
   render();
 }
 function selectCity(c) {
   selection = { kind: 'city', id: c.id };
-  marchPlan = null;
   render();
 }
 function afterAction() {
@@ -6251,16 +7326,14 @@ function doEndTurn() {
   selection = null;
   reachable = null;
   placing = null;
-  marchPlan = null;
   const before = G.viewer;
   endCurrentTurn();
   autosave();
   render();
-  if (online) { onlineSubmit(); return; }
   if (!G.handoff && !G.over && G.viewer === before) {
     toast('Turn ' + G.turn);
     const offers = G.offers.filter(o => o.to === G.viewer).length;
-    if (offers) toast(plural(offers, 'peace offer is', 'peace offers are') + ' waiting in the Council.');
+    if (offers) toast(plural(offers, 'offer is', 'offers are') + ' waiting in the Council.');
     else if (needsTech(G.viewer)) toast('Pick your next tech. Press T.');
   }
 }
@@ -6301,12 +7374,14 @@ function onAction(act) {
     if (G) { render(); showMenu(); }
     return;
   }
-  if (!G) return;
+  if (!G) { if (kind === 'close') closeModal(); return; }
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   switch (kind) {
-    case 'close': closeModal(); break;
+    case 'close': closeModal(); if (G.wonderNews && G.wonderNews.length) render(); break;
+    case 'wonder-look': lookAtWonder(a); break;
     case 'log-toggle': logOpen = !logOpen; renderLog(); break;
     case 'tut-next': tutorialNext(); render(); break;
+    case 'tut-chapter': tutorialSkipChapter(); render(); break;
     case 'tut-close': if (G.tut) { G.tut.closed = true; render(); } break;
     case 'coach-toggle': if (G.tut) { G.tut.closed = !G.tut.closed; render(); showMenu(); } break;
     case 'tut-quit':
@@ -6345,7 +7420,7 @@ function onAction(act) {
       render();
       focusPlayer(G.viewer);
       autosave();
-      if (G.offers.some(o => o.to === G.viewer)) toast('A peace offer is waiting in the Council.');
+      if (G.offers.some(o => o.to === G.viewer)) toast('An offer is waiting in the Council.');
       else if (needsTech(G.viewer)) toast('Pick your next tech. Press T.');
       break;
     case 'next-unit': {
@@ -6370,7 +7445,7 @@ function onAction(act) {
       if (c) { closeModal(); selection = { kind: 'city', id: c.id }; centreOn(c.x, c.y); render(); }
       break;
     }
-    case 'deselect': selection = null; placing = null; marchPlan = null; render(); break;
+    case 'deselect': selection = null; placing = null; render(); break;
     case 'realm':
       if (G.handoff || G.viewer === null) break;
       closeModal();
@@ -6407,17 +7482,8 @@ function onAction(act) {
     case 'place-yes': confirmPlot(a, b, Number(parts[3]), Number(parts[4])); break;
     case 'place-no': closeModal(); render(); break;
     case 'clearpath':
-      if (selUnit && selUnit.owner === G.viewer && myTurn()) { selUnit.path = null; marchPlan = null; render(); autosave(); }
+      if (selUnit && selUnit.owner === G.viewer && myTurn()) { selUnit.path = null; render(); autosave(); }
       break;
-    case 'march-plan': {
-      // Out of orders this turn: queue a route for the turns ahead.
-      if (selUnit && selUnit.owner === G.viewer && myTurn() && !selUnit.path) {
-        marchPlan = marchPlan === selUnit.id ? null : selUnit.id;
-        if (marchPlan) toast('Click a hex you have seen: the march starts next turn.');
-        render();
-      }
-      break;
-    }
     case 'clearbuild': {
       const c = cityById(a);
       if (c && c.owner === G.viewer && myTurn()) { setBuild(c, null); render(); autosave(); }
@@ -6447,8 +7513,49 @@ function onAction(act) {
       break;
     }
     case 'skip':
-      if (selUnit && selUnit.owner === G.viewer && myTurn()) { selUnit.mp = 0; selection = null; marchPlan = null; afterAction(); }
+      if (selUnit && selUnit.owner === G.viewer && myTurn()) { selUnit.mp = 0; selection = null; afterAction(); }
       break;
+    case 'fortify':
+      if (selUnit && selUnit.owner === G.viewer && myTurn() && isMil(selUnit.type)) {
+        selUnit.fort = true;
+        selUnit.sleep = false;
+        selUnit.path = null;
+        selUnit.mp = 0;
+        selection = null;
+        toast('Fortified: +3 defense until it moves.');
+        afterAction();
+      }
+      break;
+    case 'sleep':
+      if (selUnit && selUnit.owner === G.viewer && myTurn()) {
+        selUnit.sleep = true;
+        selUnit.fort = false;
+        selUnit.path = null;
+        selUnit.mp = 0;
+        selection = null;
+        toast('Asleep. It wakes when an enemy comes in sight.');
+        afterAction();
+      }
+      break;
+    case 'next-action': {
+      if (!myTurn()) break;
+      const v = G.viewer, idle = idleUnits(v), lazy = idleCities(v);
+      if (idle.length) onAction('next-unit');
+      else if (lazy.length) onAction('select-city:' + lazy[0].id);
+      else if (needsTech(v)) showTech();
+      else askEndTurn();
+      break;
+    }
+    case 'enter-war': {
+      const u = unitById(a);
+      if (u && u.owner === G.viewer && myTurn()) {
+        closeModal();
+        const reach = computeReachable(u);
+        if (reach.has(keyOf(Number(b), Number(parts[3])))) moveUnit(u, Number(b), Number(parts[3]), reach);
+        afterAction();
+      }
+      break;
+    }
     case 'disband-ask': askDisband(); break;
     case 'disband':
       if (selUnit && selUnit.owner === G.viewer && myTurn()) { closeModal(); removeUnit(selUnit); selection = null; afterAction(); }
@@ -6468,8 +7575,34 @@ function onAction(act) {
     }
     case 'offer-accept':
     case 'offer-refuse':
-      if (myTurn()) { answerOffer(G.viewer, Number(a), kind === 'offer-accept'); afterAction(); showCouncil(); }
+      if (myTurn()) { answerOffer(G.viewer, a, kind === 'offer-accept'); afterAction(); showCouncil(); }
       break;
+    case 'open-ask':
+      if (myTurn()) {
+        const r = proposeOpen(G.viewer, Number(a));
+        const name = pl(Number(a)).name;
+        toast(r === 'accepted' ? name + ' agrees: borders open for ' + OPEN_TURNS + ' turns.' : r === 'refused' ? name + ' says no to open borders for now.' : r === 'sent' ? 'Offer sent. ' + name + ' answers on their turn.' : 'Nothing to open.');
+        afterAction();
+        showCouncil();
+      }
+      break;
+    case 'trade-ask': if (myTurn()) showTrade(Number(a)); break;
+    case 'trade-fair': {
+      const d = readTradeForm();
+      if (d) { UI.modal.querySelector('#tr-price').value = fairPrice(d); refreshTradeForm(false); }
+      break;
+    }
+    case 'trade-send': {
+      const d = myTurn() ? readTradeForm() : null;
+      if (!d) break;
+      const r = proposeTrade(d);
+      if (r.result === 'error') { refreshTradeForm(false); toast(r.why + '.'); break; }
+      const name = pl(d.other).name;
+      toast(r.result === 'accepted' ? name + ' agrees. Done.' : r.result === 'refused' ? name + ' ' + r.why + '.' : 'Offer sent. ' + name + ' answers on their turn.');
+      afterAction();
+      if (r.result === 'refused') { showTrade(d.other, d); refreshTradeForm(false); } else showCouncil();
+      break;
+    }
     case 'keep': G.pending = null; closeModal(); afterAction(); break;
     case 'burn': {
       const c = G.pending ? cityById(G.pending.city) : null;
@@ -6489,12 +7622,59 @@ function onAction(act) {
       placing = null;
       hover = null;
       preview = null;
-      marchPlan = null;
       UI.handoff.hidden = true;
       UI.start.hidden = false;
       refreshStart();
       break;
   }
+}
+
+// Orders for the selected unit on a hex: strike it, step onto it, or march
+// toward it. Left-click and right-click both come here. false when the hex
+// isn't an order at all (a plain click then selects what's on it).
+function orderUnit(selUnit, x, y) {
+  const v = G.viewer, key = keyOf(x, y);
+  if (visibleTo(x, y)) {
+    if (strikeInfo(selUnit, x, y)) { strikeAt(selUnit, x, y); return true; }
+    const tgt = targetAt(selUnit, x, y);
+    if (tgt && tgt.peace !== undefined && hexDistance(selUnit.x, selUnit.y, x, y) <= (shoots(selUnit.type) ? UNITS[selUnit.type].range : 1)) {
+      toast('You are at peace with ' + pl(tgt.peace).name + '. Declare war in the Council first.');
+      return true;
+    }
+  }
+  // Every green hex works, even one past what your units can see right now.
+  if (reachable && reachable.has(key)) {
+    // Closed land: stepping in is a declaration of war, so ask first.
+    if (reachable.war && reachable.war.has(key)) { askEnterWar(selUnit, x, y); return true; }
+    moveUnit(selUnit, x, y, reachable);
+    afterAction();
+    return true;
+  }
+  if (closedOwner(selUnit.owner, x, y) >= 0) {
+    toast(pl(closedOwner(selUnit.owner, x, y)).name + '’s land is closed. Open borders in the Council, or step in from beside it to declare war.');
+    return true;
+  }
+  // Too far to reach this turn: queue a multi-turn route, Civ 6 style.
+  // Clicking the destination again takes the orders back off.
+  if (seenBy(v, x, y)) {
+    if (selUnit.path && selUnit.path.to[0] === x && selUnit.path.to[1] === y) {
+      selUnit.path = null;
+      toast('Orders canceled.');
+      afterAction();
+      return true;
+    }
+    if (beginPath(selUnit, x, y)) { afterAction(); return true; }
+  }
+  return false;
+}
+function askEnterWar(u, x, y) {
+  const who = pl(closedOwner(u.owner, x, y));
+  openModal(modalHead('Step onto ' + esc(who.name) + '’s land?') +
+    '<div class="modal-body"><p>The borders are closed. Stepping onto ' + esc(fullName(who)) + '’s land means <b>war with them, starting now</b>. ' +
+    'Their units can hit yours back, and you can make peace only if they agree.</p>' +
+    '<p class="hint">To pass in peace, ask for open borders in the Council first.</p></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Stay out</button>' +
+    '<button class="btn primary" data-act="enter-war:' + u.id + ':' + x + ':' + y + '">Declare war and go in</button></div>', true);
 }
 
 function handleTileClick(x, y) {
@@ -6504,41 +7684,7 @@ function handleTileClick(x, y) {
   // Picking a hex for a building comes before everything else.
   if (placing) { placeClick(x, y); return; }
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
-  if (selUnit && selUnit.owner === v && myTurn()) {
-    const planning = marchPlan === selUnit.id;
-    const spent = selUnit.mp <= 0 || selUnit.acted;
-    if (spent && !planning) {
-      // It has done everything it can this turn: no march from the map.
-      marchPlan = null;
-    } else {
-      if (!planning && visibleTo(x, y)) {
-        if (strikeInfo(selUnit, x, y)) { strikeAt(selUnit, x, y); return; }
-        const tgt = targetAt(selUnit, x, y);
-        if (tgt && tgt.peace !== undefined && hexDistance(selUnit.x, selUnit.y, x, y) <= (shoots(selUnit.type) ? UNITS[selUnit.type].range : 1)) {
-          toast('You are at peace with ' + pl(tgt.peace).name + '. Declare war in the Council first.');
-          return;
-        }
-      }
-      // Every green hex works, even one past what your units can see right now.
-      if (!planning && reachable && reachable.has(key)) {
-        moveUnit(selUnit, x, y, reachable);
-        afterAction();
-        return;
-      }
-      // Too far to reach this turn: queue a multi-turn route, Civ 6 style.
-      // Clicking the destination again takes the orders back off.
-      if (seenBy(v, x, y)) {
-        if (selUnit.path && selUnit.path.to[0] === x && selUnit.path.to[1] === y) {
-          selUnit.path = null;
-          marchPlan = null;
-          toast('Orders canceled.');
-          afterAction();
-          return;
-        }
-        if (beginPath(selUnit, x, y)) { marchPlan = null; afterAction(); return; }
-      }
-    }
-  }
+  if (selUnit && selUnit.owner === v && myTurn() && orderUnit(selUnit, x, y)) return;
   const seen = G.watch || seenBy(v, x, y), visible = visibleTo(x, y);
   const mine = unitsAt(x, y).filter(u => u.owner === v);
   const foreign = visible ? unitsAt(x, y).filter(u => u.owner !== v) : [];
@@ -6590,7 +7736,7 @@ function bindMap() {
       const [p, q] = [...pointers.values()];
       const rect = UI.stage.getBoundingClientRect();
       const mx = pinch.mx - rect.left, my = pinch.my - rect.top;
-      const k = clamp(pinch.k * Math.hypot(p.x - q.x, p.y - q.y) / Math.max(1, pinch.dist), 0.25, 2.6);
+      const k = clamp(pinch.k * Math.hypot(p.x - q.x, p.y - q.y) / Math.max(1, pinch.dist), minZoom(), 2.6);
       const wx = (mx - pinch.camX) / pinch.k, wy = (my - pinch.camY) / pinch.k;
       cam.k = k;
       cam.x = mx - wx * k;
@@ -6632,6 +7778,19 @@ function bindMap() {
     }
   };
   svg.addEventListener('pointerup', release);
+  // Civ 6: right-click orders the selected unit there. With nothing to order, it cancels hex-picking.
+  svg.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    if (!G || G.over || G.handoff || !myTurn()) return;
+    if (placing) { placing = null; render(); return; }
+    const element = document.elementFromPoint(event.clientX, event.clientY);
+    const hex = element && element.closest ? element.closest('[data-tile]') : null;
+    const u = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+    if (!hex || !u || u.owner !== G.viewer) return;
+    const [x, y] = hex.getAttribute('data-tile').split(',').map(Number);
+    if (x === u.x && y === u.y) return;
+    if (!orderUnit(u, x, y)) toast('Can’t go there.');
+  });
   svg.addEventListener('pointerleave', () => { if (hover) { hover = null; refreshPreview(); } });
   svg.addEventListener('pointercancel', event => {
     pointers.delete(event.pointerId);
@@ -6645,23 +7804,26 @@ function bindMap() {
     const rect = UI.stage.getBoundingClientRect();
     const px = event.clientX - rect.left, py = event.clientY - rect.top;
     const wx = (px - cam.x) / cam.k, wy = (py - cam.y) / cam.k;
-    cam.k = clamp(cam.k * (event.deltaY < 0 ? 1.12 : 1 / 1.12), 0.25, 2.6);
+    cam.k = clamp(cam.k * (event.deltaY < 0 ? 1.12 : 1 / 1.12), minZoom(), 2.6);
     cam.x = px - wx * cam.k;
     cam.y = py - wy * cam.k;
     applyCamera();
   }, { passive: false });
 }
 
+// Civ 6's keys: Enter next action (or end turn), Space skips the selected unit, B founds a city,
+// F fortifies, Z sleeps, Delete disbands, T tech tree, F1 rankings (the realm), F9 rules.
 function bindKeys() {
   document.addEventListener('keydown', event => {
     const tag = event.target && event.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (!G || !UI.start.hidden) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === 'Escape') {
-      if (!UI.modalLayer.hidden) { if (!G.pending) closeModal(); }
+      if (!UI.modalLayer.hidden) { if (!G.pending) onAction('close'); }
       else if (placing) { placing = null; render(); }
-      else if (marchPlan) { marchPlan = null; refreshPreview(); render(); }
       else if (selection) { selection = null; render(); }
+      else if (!G.handoff) onAction('menu');
       return;
     }
     if (G.handoff) {
@@ -6673,14 +7835,30 @@ function bindKeys() {
       if (key === 't' && UI.modalKind === 'tech') closeModal();
       return;
     }
-    if (event.code === 'Space') { event.preventDefault(); onAction('end'); }
+    const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+    const own = !!selUnit && selUnit.owner === G.viewer && myTurn();
+    if (event.key === 'Enter') { event.preventDefault(); onAction('next-action'); }
+    else if (event.code === 'Space') { event.preventDefault(); onAction(own ? 'skip' : 'next-action'); }
+    else if (event.key === 'F1') { event.preventDefault(); onAction('realm'); }
+    else if (event.key === 'F9') { event.preventDefault(); onAction('help'); }
+    else if (event.key === 'Delete' || event.key === 'Backspace') { if (own) { event.preventDefault(); onAction('disband-ask'); } }
+    else if (event.key.startsWith('Arrow')) {
+      event.preventDefault();
+      const step = event.shiftKey ? 220 : 90;
+      if (event.key === 'ArrowLeft') cam.x += step;
+      else if (event.key === 'ArrowRight') cam.x -= step;
+      else if (event.key === 'ArrowUp') cam.y += step;
+      else cam.y -= step;
+      applyCamera();
+    }
+    else if (key === 'b') onAction('found');
+    else if (key === 'f') onAction('fortify');
+    else if (key === 'z') onAction('sleep');
     else if (key === 'n') onAction('next-unit');
     else if (key === 'd') onAction('council');
     else if (key === 'r') onAction('realm');
     else if (key === 't') onAction('tech');
     else if (key === 'h') onAction('help');
-    else if (key === 'm') onAction('menu');
-    else if (key === 'f') onAction('found');
     else if (key === 's') onAction('skip');
   });
 }
@@ -6695,7 +7873,7 @@ function saveGame() {
   try {
     const meta = G.players.map(p => p.name).join(' vs ') + ' · ' + MAP_TYPES[G.map].name.toLowerCase() +
       (G.level === 'deity' ? ' · deity' : '') + ' · turn ' + G.turn;
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 3, at: Date.now(), meta, state: G }));
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 4, at: Date.now(), meta, state: G }));
     return true;
   } catch (error) {
     return false;
@@ -6704,9 +7882,9 @@ function saveGame() {
 function clearSave() {
   try { localStorage.removeItem(SAVE_KEY); } catch (error) { /* storage blocked */ }
 }
-function autosave() { if (!online) saveGame(); }
+function autosave() { saveGame(); }
 function validState(state) {
-  return !!state && (state.v === 2 || state.v === 3) && Array.isArray(state.tiles) && Array.isArray(state.players) && state.players.length >= 2 &&
+  return !!state && (state.v === 2 || state.v === 3 || state.v === 4) && Array.isArray(state.tiles) && Array.isArray(state.players) && state.players.length >= 2 &&
     Number.isFinite(state.cols) && Number.isFinite(state.rows) && state.tiles.length === state.cols * state.rows &&
     Array.isArray(state.units) && Array.isArray(state.cities) && Array.isArray(state.conts) && !!MAP_TYPES[state.map] &&
     (!state.level || !!LEVELS[state.level]) &&
@@ -6736,8 +7914,8 @@ function resumeState(state) {
   if (!G.handoff && G.viewer !== null) focusPlayer(G.viewer);
 }
 
-const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. <b>Space</b> ends your turn, ' +
-  '<b>N</b> jumps to the next unit that needs orders, <b>T</b> opens the tech tree, <b>R</b> opens your realm, and <b>H</b> opens the rules.';
+const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
+  '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
 
 /* ── the start screen ──────────────────────────────────────────────────────── */
 
@@ -6759,6 +7937,8 @@ function buildStartScreen() {
   UI.optSize.innerHTML = '<option value="auto">Fits the players</option>' + Object.keys(MAP_SIZES).map(id =>
     '<option value="' + id + '">' + MAP_SIZES[id].name + ' (' + MAP_SIZES[id].players + ')</option>').join('');
   UI.optLevel.innerHTML = Object.keys(LEVELS).map(id => '<option value="' + id + '">' + LEVELS[id].name + '</option>').join('');
+  UI.optClose.innerHTML = CLOSE_CHOICES.map(n => '<option value="' + n + '"' + (n === DEFAULT_CLOSE_TURN ? ' selected' : '') + '>' + (n ? 'Turn ' + n : 'Never') + '</option>').join('');
+  UI.optClose.onchange = refreshStart;
   UI.optHumans.onchange = () => fitCounts('humans');
   UI.optCpus.onchange = () => fitCounts('cpus');
   UI.optMap.onchange = refreshStart;
@@ -6786,6 +7966,7 @@ function fitCounts(changed) {
   UI.optCpus.value = String(c);
   refreshStart();
 }
+const CLOSE_CHOICES = [20, 30, 40, 60, 0];
 const seatCounts = () => ({ humans: Number(UI.optHumans.value), cpus: Number(UI.optCpus.value) });
 function refreshStart() {
   const { humans, cpus } = seatCounts(), n = humans + cpus;
@@ -6817,10 +7998,13 @@ function refreshStart() {
   UI.sizeNote.textContent = MAP_SIZES[size].name + ' map, ' + MAP_SIZES[size].cols + ' × ' + MAP_SIZES[size].rows + ', built for ' +
     MAP_SIZES[size].players + ' players' + (n > MAP_SIZES[size].players ? '. That’s crowded for ' + n + '.' : n < MAP_SIZES[size].players / 2 ? '. Plenty of room for ' + n + '.' : '.');
   UI.levelNote.textContent = LEVELS[UI.optLevel.value].name + ': ' + LEVELS[UI.optLevel.value].blurb;
+  const close = Number(UI.optClose.value);
+  UI.closeNote.textContent = close ? 'From turn ' + close + ', every player’s land is closed to the others: stepping onto it without an open-borders deal (made in the Council) means war.'
+    : 'Borders stay open all game: anyone can walk anywhere.';
   const tut = UI.optTutorial.checked;
   UI.btnBegin.textContent = tut ? 'Start the tutorial' : 'Start game';
   UI.startNote.innerHTML = tut
-    ? 'The tutorial is 14 short steps on a small island, playing Rome. The settings above wait for your next game. Untick <b>Tutorial</b> to skip it.'
+    ? 'The tutorial is ' + TUT_STEPS.length + ' short steps in 8 chapters on a small island, playing Rome. The settings above wait for your next game. Untick <b>Tutorial</b> to skip it.'
     : START_NOTE;
   const saved = readSave();
   UI.btnContinue.hidden = !saved;
@@ -6858,6 +8042,7 @@ function beginGame() {
   const seed = nextSeed();
   const game = startGame({ seats, maxTurns: turns, seed, map: UI.optMap.value, level: UI.optLevel.value,
     size: UI.optSize.value === 'auto' ? sizeFor(n) : UI.optSize.value,
+    wrap: UI.optWrap.checked, closeTurn: Number(UI.optClose.value),
     victory: { conquest: UI.optConquest.checked, science: UI.optScience.checked } });
   if (!game) { toast('That map didn’t work out. Try again, or pick a bigger size.'); return; }
   gamesStarted++;
@@ -6937,7 +8122,7 @@ function boot(data) {
     handoffName: q('#handoff-name'), handoffNote: q('#handoff-note'),
     start: q('#start'), seats: q('#seats'), optHumans: q('#opt-humans'), optCpus: q('#opt-cpus'), optSize: q('#opt-size'), sizeNote: q('#size-note'),
     optConquest: q('#opt-conquest'), optScience: q('#opt-science'), optTurns: q('#opt-turns'), optMap: q('#opt-map'),
-    optLevel: q('#opt-level'), mapNote: q('#map-note'), levelNote: q('#level-note'),
+    optLevel: q('#opt-level'), mapNote: q('#map-note'), levelNote: q('#level-note'), optClose: q('#opt-close'), optWrap: q('#opt-wrap'), closeNote: q('#close-note'),
     optTutorial: q('#opt-tutorial'), optTips: q('#opt-tips'), startNote: q('#start-note'),
     coach: q('#coach'), coachTag: q('#coach-tag'), coachCount: q('#coach-count'), coachSay: q('#coach-say'), coachActions: q('#coach-actions'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), endShown: false, modalKind: null
   };
@@ -6951,8 +8136,12 @@ function boot(data) {
     onAction(button.getAttribute('data-act'));
   });
   UI.modalLayer.addEventListener('click', event => {
-    if (event.target === UI.modalLayer && !(G && G.pending)) closeModal();
+    if (event.target === UI.modalLayer && !(G && G.pending)) onAction('close');
   });
+  // The trade form reprices itself as you change it; touching the price keeps your number.
+  const tradeInput = event => { if (UI.modalKind === 'trade' && G) refreshTradeForm(!!event.target && event.target.id !== 'tr-price'); };
+  UI.modal.addEventListener('input', tradeInput);
+  UI.modal.addEventListener('change', tradeInput);
   window.addEventListener('resize', () => {
     if (G && cam.fitted) applyCamera();
     layoutPanel();
@@ -6979,49 +8168,11 @@ function boot(data) {
       window.claude.hot.snapshot(() => ({ state: G ? JSON.stringify(G) : null }));
     }
   } catch (error) { /* no viewer hook */ }
-  // A solo campaign save must never stand in for a Bored Together match.
-  let embedded = null;
-  try { embedded = window.__boredTogether || null; } catch (error) { /* not embedded */ }
-  if (data && data.state && !embedded) {
+  if (data && data.state) {
     try {
       const state = JSON.parse(data.state);
       if (validState(state)) resumeState(state);
     } catch (error) { /* start fresh */ }
-  }
-  // Bored Together: resume the board the previous turn handed over, or open a
-  // fresh two-human valley from the match seed. The start screen would let the
-  // two players choose different maps, so it stays out of the way.
-  online = embedded;
-  if (online && !G) {
-    const ctx = online.context || {}, room = ctx.state || {};
-    const seat = Number(ctx.seat) || 1;
-    const names = Array.isArray(ctx.players) ? ctx.players : [];
-    UI.start.hidden = true;
-    if (room.board) {
-      G = prepareState(room.board);
-    } else {
-      startGame({
-        seats: [{ name: names[0] || 'Player one', human: true, civ: null },
-                { name: names[1] || 'Player two', human: true, civ: null }],
-        maxTurns: 50, seed: (Number(room.seed) >>> 0) || 1, map: 'pangaea', level: 'normal',
-        victory: { conquest: true, science: true }
-      });
-    }
-    if (G) {
-      gamesStarted++;
-      G.handoff = false;
-      G.viewer = seat - 1;
-      G.cur = seat - 1;
-      G.endShown = false;
-      selection = null;
-      reachable = null;
-      closeModal();
-      cam.fitted = false;
-      render();
-      fitCamera();
-      focusPlayer(seat - 1);
-      if (G.over && G.over.winner === seat - 1) onlineSubmit();
-    }
   }
 }
 
