@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 293,
+  "count": 294,
   "newest": "2026-11-05",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2f292a9","date":"2026-11-05","author":"Codebuff","subject":"Keep a Bored Together match out of Ashcrown's solo save slot"},
   {"sha":"abbdba7","date":"2026-11-05","author":"Codebuff","subject":"Rebuild the freeplay park and turn tricks into a combo score"},
   {"sha":"d315325","date":"2026-11-05","author":"Codebuff","subject":"Give Highline boosts and make the new author times earn the medal"},
   {"sha":"ea5dbb9","date":"2026-11-05","author":"Codebuff","subject":"Slide the Trackbound loop sideways so the entrance and exit clear each other"},
