@@ -1326,12 +1326,15 @@ function medalFor(author, ms) {
 
 /* A medal is worth points, so the career adds up instead of counting golds and
    throwing the rest away: author 4, gold 3, silver 2, bronze 1 across the
-   campaign. The three wall-free tracks bank trick points on top of that, kept
-   per track so a run can be chased for its own score. */
+   campaign. The three wall-free tracks also bank their best trick run, kept per
+   track, and that trick score is part of the career too: an open track is still
+   worth racing for its air after its medal is already gold. */
 const MEDAL_POINTS = { author: 4, gold: 3, silver: 2, bronze: 1 };
 const medalPoints = id => MEDAL_POINTS[id] || 0;
+const trickPoints = id => (saved.trackPoints && saved.trackPoints[id]) || 0;
 function careerPoints() {
-  return CAMPAIGN.reduce((total, entry) => total + medalPoints(saved.medals[entry.id]), 0);
+  return CAMPAIGN.reduce((total, entry) =>
+    total + medalPoints(saved.medals[entry.id]) + (entry.open ? trickPoints(entry.id) : 0), 0);
 }
 
 /* ── daily track: seeded, and regenerated if it would fold into itself ────── */
@@ -2051,7 +2054,7 @@ function freeplayBest() {
 function runBest() {
   if (isFreeplay()) return freeplayBest();
   if (!world) return 0;
-  return (saved.trackPoints && saved.trackPoints[world.id]) || 0;
+  return trickPoints(world.id);
 }
 
 function bankScore() {
@@ -2185,6 +2188,8 @@ function finishRun() {
     const order = m => m ? MEDALS.findIndex(medal => medal.id === m) : 99;
     if (order(race.medal) < order(saved.medals[world.id])) { saved.medals[world.id] = race.medal; persist('medals'); }
   }
+  // The line can be crossed while still carrying trick points, so bank them now.
+  bankScore();
   chime(isBest ? [523, 659, 784, 1046] : [440, 523, 659]);
   paintBest();
   paintMedals();
