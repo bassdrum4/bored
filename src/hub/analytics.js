@@ -281,7 +281,13 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
       const value = score(run.game, state);
       if (value > 0 && (!run.best || (isLower(run.game) ? value < run.best : value > run.best))) run.best = value;
       const finished = !!(state?.finished || state?.won || state?.solved || state?.handOver);
-      if (finished && !run.finished) { run.everFinished = true; emit('checkpoint', { round_finished: true }); void flush(); }
+      if (finished && !run.finished) {
+        run.everFinished = true;
+        emit('checkpoint', { round_finished: true });
+        track('game_result', { game: run.game, surface: 'game',
+          result: state?.won || state?.solved ? 'win' : 'finished' });
+        void flush();
+      }
       if (run) run.finished = finished;
     }
     if (run && !run.ready && !run.context.external) ready();
@@ -300,14 +306,35 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   window.addEventListener('online', () => void flush());
   document.addEventListener('pointerdown', input, { passive: true });
   document.addEventListener('keydown', input, { passive: true });
-  function track(kind, { game = null, match_id = null } = {}) {
-    const allowed = ['visit','bt_view','bt_enroll','bt_challenge','bt_random','bt_open','bt_move','bt_complete','bt_rematch','bt_delete','bt_leave'];
+  // Product telemetry is deliberately categorical. Never send search text,
+  // raw keystrokes, URLs, arbitrary game state, or announcement contents.
+  function track(kind, payload = {}) {
+    const allowed = ['visit','bt_view','bt_enroll','bt_challenge','bt_random','bt_open','bt_move','bt_complete','bt_rematch','bt_delete','bt_leave',
+      'card_impression','library_action','favorite_change','save_action','announcement_impression','announcement_click',
+      'game_result','game_friction','help_open','tutorial_step'];
     if (!canRecord() || !allowed.includes(kind)) return;
+    const { game = null, match_id = null, announcement_id = null } = payload || {};
     const safeGame = typeof game === 'string' && /^[a-z0-9][a-z0-9-]{0,49}$/.test(game) ? game : null;
-    const safeMatch = typeof match_id === 'string' && /^[0-9a-f-]{36}$/i.test(match_id) ? match_id : null;
+    const isUuid = value => typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value);
+    const details = {};
+    if (isUuid(match_id)) details.match_id = match_id;
+    if (isUuid(announcement_id)) details.announcement_id = announcement_id;
+    const fields = {
+      surface: ['library','recent','announcement','game','settings','menu','daily','leaderboard','together'],
+      action: ['filter','sort','search','add','remove','clear','save','resume','click','dismiss','open'],
+      result: ['win','loss','draw','finished','completed','unknown'],
+      phase: ['loading','onboarding','playing','finishing','controls','setup'],
+      issue: ['no_input','invalid_action','stalled','load_failed','other'],
+      category: ['All','New','Favorites','Arcade','Puzzle','Strategy','Sandbox','Online']
+    };
+    for (const [key, choices] of Object.entries(fields)) {
+      if (choices.includes(payload?.[key])) details[key] = payload[key];
+    }
+    if (Number.isInteger(payload?.position) && payload.position >= 0 && payload.position < 100) details.position = payload.position;
+    if (Number.isInteger(payload?.results) && payload.results >= 0 && payload.results <= 100) details.results = payload.results;
+    if (Number.isInteger(payload?.step) && payload.step >= 0 && payload.step <= 100) details.step = payload.step;
     pending.push({ _table: 'product_events', id: uuid(), user_id: owner(),
-      visitor_id: visitor, kind, game: safeGame,
-      details: safeMatch ? { match_id: safeMatch } : {} });
+      visitor_id: visitor, kind, game: safeGame, details });
     if (pending.length > 200) pending.splice(0, pending.length - 200);
     scheduleFlush();
   }
@@ -317,6 +344,8 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     visitorId: () => enabled ? visitor : null,
     event(kind, details) {
       if (kind === 'error' && run && (run.errors = (run.errors || 0) + 1) > 5) return;
+      // Safe error classification, never stack traces or raw error text.
+      if (kind === 'error') details = { ...details, phase: run?.ready ? 'playing' : 'loading' };
       emit(kind, details); void flush();
     },
     enabled: () => canRecord(),
