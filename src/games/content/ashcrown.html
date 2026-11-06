@@ -780,9 +780,9 @@ const UNITS = {
   catapult:  { name: 'Catapult',  kind: 'siege',  era: 3, str: 23, rs: 35, range: 2, cost: 60, move: 2, tech: 'math', vsUnits: -15,
                blurb: 'Built for cities: −15 when shooting units.' },
   galley:    { name: 'Galley',    kind: 'melee',  naval: true, era: 1, str: 30, cost: 35, move: 3, tech: 'sailing',
-               blurb: 'Coastal cities only. Stays on water, hits anything next to it, and can take coastal cities.' },
+               blurb: 'Coastal cities only. Launches onto the water beside its city, hits anything next to it, and can’t take cities.' },
   warship:   { name: 'Warship',   kind: 'ranged', naval: true, era: 3, str: 20, rs: 25, range: 1, cost: 60, move: 3,
-               tech: 'shipbuilding', res: { iron: 10 }, blurb: 'Coastal cities only. Shoots anything next to the water. Takes 10 iron.' }
+               tech: 'shipbuilding', res: { iron: 10 }, blurb: 'Coastal cities only. Shoots anything next to the water. Can’t take cities. Takes 10 iron.' }
 };
 // Each civ's unique unit copies the unit it replaces (same tech and cost) and
 // changes what the design doc says it changes.
@@ -877,7 +877,7 @@ const CIVS = {
               ability: 'Units cross mountains for 2 moves, and cities claim mountains like normal land. Natural wonders are off limits: no claiming, no terraces, and the Giant’s Causeway blocks them too.' },
   norway:   { leader: 'Harald Hardrada', land: 'Norway', focus: 'Naval', colors: [['#2c3e55', '#93a7c1'], ['#7d1a2a', '#c96878']],
               unique: 'longship',
-              ability: 'Ships get +5 strength, and land units skip the −10 embark penalty.' },
+              ability: 'Ships get +5 strength and can take a port at 0 HP, which no other ships can. Land units skip the −10 embark penalty.' },
   india:    { leader: 'Gandhi', land: 'India', focus: 'Food', colors: [['#2e6b2a', '#80c06e'], ['#8f5208', '#f0ae4e']],
               unique: 'stepwell',
               ability: 'Growing costs 10% less food.' },
@@ -2198,12 +2198,15 @@ function slotFree(x, y, owner, type) {
   }
   return true;
 }
-// Land units appear in the city or beside it; ships in the city or on the water next to it.
+// Land units appear in the city or beside it. Ships are launched, as in Civ 6: they
+// appear on a water hex next to the city, and only dock in it when that water is full.
 function spawnSpot(c, type) {
-  if (slotFree(c.x, c.y, c.owner, type)) return [c.x, c.y];
+  const naval = isNaval(type);
+  if (!naval && slotFree(c.x, c.y, c.owner, type)) return [c.x, c.y];
   const ring = neighbourList(c.x, c.y).filter(([x, y]) => slotFree(x, y, c.owner, type));
   ring.sort((a, b) => (tileAt(b[0], b[1]).owner === c.owner) - (tileAt(a[0], a[1]).owner === c.owner));
-  return ring[0] || null;
+  if (ring[0]) return ring[0];
+  return naval && slotFree(c.x, c.y, c.owner, type) ? [c.x, c.y] : null;
 }
 
 function claimTile(t, c) { t.owner = c.owner; t.city = c.id; roadCache.clear(); }
@@ -2297,7 +2300,7 @@ function tryComplete(c) {
     }
     const spot = spawnSpot(c, item.id);
     if (!spot) {
-      if (!c.wait) log(c.name + ' has no room for its new ' + def.name.toLowerCase() + '. Move a unit off the city.', '#93401d', f.i);
+      if (!c.wait) log(c.name + ' has no room for its new ' + def.name.toLowerCase() + '. Move ' + (def.naval ? 'a ship off the water beside it' : 'a unit off the city') + '.', '#93401d', f.i);
       c.wait = true;
       return;
     }
@@ -2821,6 +2824,13 @@ function targetAt(u, x, y) {
 }
 
 // What an attack would do at an average roll. null when it isn't possible now.
+// Only a melee land unit takes a city: a ship can pound a port but not walk in.
+// Norway's ships are the exception and board a port that is already at 0 HP.
+function canTakeCity(u) {
+  if (UNITS[u.type].noCapture) return false;
+  return isNaval(u.type) ? civIs(u.owner, 'norway') : !shoots(u.type);
+}
+
 function strikeInfo(u, x, y) {
   if (!isMil(u.type) || u.acted || u.mp <= 0) return null;
   const tgt = targetAt(u, x, y);
@@ -2835,9 +2845,7 @@ function strikeInfo(u, x, y) {
     return { x, y, unit: tgt.unit, a, d, dmg, back, kills: dmg >= tgt.unit.hp, dies: back >= u.hp };
   }
   const c = tgt.city;
-  // Norway's ships board a broken port; every other ranged unit can't take cities.
-  const boards = ranged && isNaval(u.type) && civIs(u.owner, 'norway') && dist === 1;
-  if (c.hp <= 0) return (ranged && !boards) || UNITS[u.type].noCapture ? null : { x, y, city: c, capture: true, a, d: 0, dmg: 0, back: 0 };
+  if (c.hp <= 0) return canTakeCity(u) && (!ranged || dist === 1) ? { x, y, city: c, capture: true, a, d: 0, dmg: 0, back: 0 } : null;
   const d = cityStrength(c);
   const dmg = damageFor(a, d, 1), back = ranged ? 0 : damageFor(d, a, 1);
   return { x, y, city: c, a, d, dmg, back, breaks: dmg >= c.hp, dies: back >= u.hp };
@@ -2891,7 +2899,7 @@ function attack(u, x, y) {
   log(text, f.ink, f.i);
   log(text, f.ink, cf.i);
   if (u.hp <= 0) { killUnit(u, c.owner); return { dmg, back, died: true }; }
-  if (c.hp <= 0 && !ranged && !UNITS[u.type].noCapture) {
+  if (c.hp <= 0 && !ranged && canTakeCity(u)) {
     captureCity(c, u);
     win();
     return { dmg, back, captured: true };
@@ -6183,13 +6191,20 @@ const TUT_STEPS = [
 
   // ── Sea and conquest ──
   { ch: 'Sea and conquest',
-    say: 'Rome has production saved. Pick a <b>Galley</b> from its list, end the turn, then sail it out. Ships stay in shallow water until Navigation.',
+    say: 'Rome has production saved. Pick a <b>Galley</b> from its list and end the turn. Ships launch onto the water beside their city, and stay in shallow water until Navigation.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":unit:galley"], #btn-end',
     enter: () => tutBank({ kind: 'unit', id: 'galley' }),
     done: () => G.units.some(u => u.owner === 0 && isNaval(u.type) && !cityAt(u.x, u.y)),
     skip: () => {
-      const c = tutCap(), at = c && neighbourList(c.x, c.y).find(([x, y]) => slotFree(x, y, 0, 'galley'));
-      if (at) addUnit(pl(0), 'galley', at[0], at[1], c.id);
+      // One galley is the lesson: use the one already built (even if it is docked in
+      // Rome) and drop any galley still queued, so Next never leaves two.
+      const c = tutCap();
+      if (!c) return;
+      if (c.build && c.build.id === 'galley') c.build = null;
+      const at = neighbourList(c.x, c.y).find(([x, y]) => slotFree(x, y, 0, 'galley'));
+      if (!at) return;
+      const have = G.units.find(u => u.owner === 0 && isNaval(u.type));
+      if (have) { have.x = at[0]; have.y = at[1]; } else addUnit(pl(0), 'galley', at[0], at[1], c.id);
     } },
   { ch: 'Sea and conquest',
     say: 'There’s a wonder out in the water to the south-east. Select the galley and right-click the flashing hex to see the <b>Great Barrier Reef</b>.',
@@ -6197,7 +6212,7 @@ const TUT_STEPS = [
     done: () => tutFound('reef'),
     skip: () => tutReveal('reef') },
   { ch: 'Sea and conquest',
-    say: 'Cinderhold, the Cinder Clan’s camp, has 30 health and no walls. Hit it down to 0 with your galley or soldiers, then attack it once more with a <b>melee</b> unit (one that fights up close, like your warrior) to <b>take it</b>. Then keep it.',
+    say: 'Cinderhold, the Cinder Clan’s camp, has 30 health and no walls. Hit it down to 0 with your galley or soldiers, then walk in with a <b>melee</b> land unit (one that fights up close, like your warrior) to <b>take it</b>. A ship can batter a city but can’t take it. Then keep it.',
     at: () => tutSpot(tutCamp()),
     done: () => { const c = tutCamp(); return (!c || c.owner === 0) && !G.pending; },
     skip: tutTakeCamp },
@@ -6878,7 +6893,7 @@ function cityPanel(c) {
   if (!own) {
     const war = v !== null && atWar(v, c.owner);
     html += kv('Walls', hasWalls(c) ? 'yes' : 'no') +
-      '<p class="hint">' + (war ? 'You are at war with ' + esc(f.name) + '. Hit the city down to 0 HP, then step in with a melee unit or galley to take it.'
+      '<p class="hint">' + (war ? 'You are at war with ' + esc(f.name) + '. Hit the city down to 0 HP, then step in with a melee land unit to take it. Ships can batter it but can’t take it' + (civIs(v, 'norway') ? ', unless they’re Norway’s' : '') + '.'
         : 'You are at peace with ' + esc(f.name) + '.') + '</p>';
     if (!war && myTurn()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
     html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
@@ -7341,6 +7356,13 @@ function techDetail(i, id) {
     (gains.length ? 'Unlocks ' + esc(gains.join(', ')) + '.' : '') + (blurb ? ' ' + esc(blurb) + '.' : '') + esc(eu) + esc(trip);
 }
 
+// The tech a tree card stands for, or null. A hidden era 4 card is a plain <div>
+// with no data-act (nothing to research yet), so hovering it must not read one.
+function techCardId(card) {
+  const act = card && card.getAttribute ? card.getAttribute('data-act') : null;
+  return act && act.indexOf('research:') === 0 ? act.slice(9) : null;
+}
+
 function showTech() {
   const v = G.viewer;
   if (v === null) return;
@@ -7366,7 +7388,8 @@ function showTech() {
   const detail = UI.modal.querySelector('.tdetail');
   const show = event => {
     const card = event.target.closest && event.target.closest('.tcard');
-    if (card && detail) detail.innerHTML = techDetail(v, card.getAttribute('data-act').slice(9));
+    const id = techCardId(card);
+    if (id && detail) detail.innerHTML = techDetail(v, id);
   };
   wrap.addEventListener('mouseover', show);
   wrap.addEventListener('focusin', show);
@@ -7641,8 +7664,8 @@ function showHelp() {
     'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off.</p>' +
     '<h3>Zone of control</h3><p>Like Civ: at war, every hex next to an enemy military unit or city is in its zone of control (land units cover land, ships cover water, cities both). ' +
     'Stepping into one ends your move there, though you can still attack. Horse units ride straight through.</p>' +
-    '<h3>Ships</h3><p>Galleys, warships and battleships come from coastal cities and stay on water, in shallow water until Navigation. They hit anything next to the water, a galley can take a coastal city, ' +
-    'and they never take the embark penalty. Battleships shell cities from 2 hexes out but can’t take them, except Norway’s, which board a port at 0 HP.</p>' +
+    '<h3>Ships</h3><p>Galleys, warships and battleships come from coastal cities. A new ship launches onto the water beside its city (it only docks inside when that water is full), and it stays on water, in shallow water until Navigation. They hit anything next to the water ' +
+    'and never take the embark penalty. A ship can batter a city, and battleships shell cities from 2 hexes out, but only a melee land unit can take one. Norway’s ships are the exception: they board a port at 0 HP.</p>' +
     '<h3>Fighting</h3><p>Every unit has 100 HP. Damage is 30 × e^(0.04 × strength gap), rolled between 80% and 120%. ' +
     'Melee units take damage back; archers, catapults and warships don’t. Units inside their own borders get +5. Hills and forest give defenders +3. ' +
     'Spearmen get +10 against horse units; catapults and cannons get −15 against units. Units that don’t move or fight heal 10 HP, or 20 inside your borders. A fortified unit gets +3 defense until it moves or attacks.</p>' +

@@ -413,3 +413,97 @@ test('A Bored Together document gets an inert continue-where-you-left-off helper
   assert.equal(single.helper.flush(), true);
   assert.equal(JSON.parse(single.store.get(soloSlot)).label, 'Rack 12', 'solo autosave still writes');
 });
+
+test('Ashcrown\'s tech tree can be hovered anywhere, hidden era 4 cards included', () => {
+  // A hidden era 4 card is a plain <div> with no data-act, and the tree reads the
+  // hovered card on every mouseover. Slicing that missing attribute threw on each
+  // mouse move across a "?" card, and the hub counts every such throw as a
+  // runtime error.
+  const html = load('src/games/content/ashcrown.html');
+  const hiddenCard = html.match(/'<div class="tcard hidden"[^']*'/);
+  assert.ok(hiddenCard, 'the tree still draws hidden cards');
+  assert.ok(!hiddenCard[0].includes('data-act'), 'a hidden card has no data-act to read');
+  const ctx = vm.createContext({});
+  vm.runInContext(extractFunction(html, 'techCardId'), ctx);
+  const card = act => ({ getAttribute: name => (name === 'data-act' ? act : null) });
+  assert.equal(ctx.techCardId(card('research:masonry')), 'masonry', 'a tech card names its tech');
+  assert.equal(ctx.techCardId(card(null)), null, 'a hidden card names nothing');
+  assert.equal(ctx.techCardId(card('close')), null, 'a card that does something else names no tech');
+  assert.equal(ctx.techCardId(null), null, 'the pointer is not over a card');
+  const tech = extractFunction(html, 'showTech');
+  assert.ok(tech.includes('techCardId(card)'), 'hover and focus go through the guarded reader');
+  assert.ok(!/getAttribute\('data-act'\)\.slice/.test(tech), 'the tree never slices an attribute that can be missing');
+});
+
+test('Ashcrown\'s coach mark can never take the board\'s render down', () => {
+  // A tip or tutorial step that cannot find its hex used to throw out of
+  // renderBoard on every render (a rival's voyage whose home port was burned).
+  const html = load('src/games/content/ashcrown.html');
+  const boom = () => { throw new TypeError('Cannot read properties of null (reading \'x\')'); };
+  const ctx = vm.createContext({
+    G: { tut: null }, TUT_STEPS: [{ at: boom }],
+    currentTip: () => ({ tip: { at: boom }, hit: {} })
+  });
+  vm.runInContext(extractFunction(html, 'coachAt'), ctx);
+  assert.equal(ctx.coachAt(), null, 'a tip that throws points at nothing');
+  ctx.G.tut = { closed: false, step: 0 };
+  assert.equal(ctx.coachAt(), null, 'a tutorial step that throws points at nothing');
+  ctx.G = null;
+  assert.equal(ctx.coachAt(), null, 'no game, no coach mark');
+  const tip = html.match(/\{ id: 'rival-trip', test:[^\n]*/);
+  assert.ok(tip, 'the rival voyage tip exists');
+  assert.ok(/cityById\(o\.voyage\.city\)/.test(tip[0]), 'it only fires while the voyage\'s home city still stands');
+});
+
+test('Ashcrown ships can batter a city but never take it, except Norway\'s', () => {
+  // Like Civ 6, only a melee land unit walks into a broken city. A galley used to
+  // finish off and take a coastal city (the tutorial even taught it).
+  const html = load('src/games/content/ashcrown.html');
+  const ctx = vm.createContext({
+    UNITS: {
+      warrior: { kind: 'melee' }, archer: { kind: 'ranged', rs: 20 }, scout: { kind: 'recon', noCapture: true },
+      galley: { kind: 'melee', naval: true }, warship: { kind: 'ranged', naval: true, rs: 25 }
+    },
+    civIs: (owner, id) => owner === 'norse' && id === 'norway'
+  });
+  vm.runInContext([html.match(/const isNaval = [^\n]+/)[0], html.match(/const shoots = [^\n]+/)[0],
+    extractFunction(html, 'canTakeCity')].join('\n'), ctx);
+  const can = (type, owner = 'rome') => ctx.canTakeCity({ type, owner });
+  assert.equal(can('warrior'), true, 'melee land units take cities');
+  assert.equal(can('archer'), false, 'ranged land units do not');
+  assert.equal(can('scout'), false, 'scouts do not');
+  assert.equal(can('galley'), false, 'a galley cannot walk into a port');
+  assert.equal(can('warship'), false, 'nor can a warship');
+  assert.equal(can('galley', 'norse'), true, 'Norway\'s ships keep their boarding perk');
+  assert.equal(can('warship', 'norse'), true);
+  assert.ok(extractFunction(html, 'strikeInfo').includes('canTakeCity(u)'), 'a broken port is taken through canTakeCity');
+  assert.ok(extractFunction(html, 'attack').includes('canTakeCity(u)'), 'so is the hit that breaks it');
+  assert.ok(!/can take (a )?coastal cit/.test(html), 'no card says a galley can take a coastal city');
+  assert.ok(!/melee unit or galley/.test(html), 'the city panel does not send a galley in');
+});
+
+test('Ashcrown launches new ships onto the water beside their city', () => {
+  // Civ 6: a built ship appears on a water hex next to the city, not inside it. It
+  // only docks when every water hex there is taken. Land units are unchanged.
+  const html = load('src/games/content/ashcrown.html');
+  const open = { ship: new Set(), land: new Set() };
+  const ctx = vm.createContext({
+    UNITS: { galley: { naval: true }, warrior: {} },
+    neighbourList: () => [[5, 4], [6, 4], [4, 5]],
+    tileAt: () => ({ owner: 0 }),
+    slotFree: (x, y, owner, type) => (ctx.UNITS[type].naval ? open.ship : open.land).has(x + ',' + y)
+  });
+  vm.runInContext(html.match(/const isNaval = [^\n]+/)[0] + '\n' + extractFunction(html, 'spawnSpot'), ctx);
+  const city = { x: 5, y: 5, owner: 0 };
+  const spot = type => ctx.spawnSpot(city, type);
+  open.ship = new Set(['5,5', '5,4', '6,4']);
+  assert.ok(['5,4', '6,4'].includes(String(spot('galley'))), 'a galley takes a water hex, not the city');
+  open.ship = new Set(['5,5']);
+  assert.equal(String(spot('galley')), '5,5', 'with the water full it docks in the city');
+  open.ship = new Set();
+  assert.equal(spot('galley'), null, 'no water and no berth: production waits');
+  open.land = new Set(['5,5', '4,5']);
+  assert.equal(String(spot('warrior')), '5,5', 'a land unit still appears in the city');
+  open.land = new Set(['4,5']);
+  assert.equal(String(spot('warrior')), '4,5', 'or beside it when the city is occupied');
+});
