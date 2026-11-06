@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 326,
+  "count": 327,
   "newest": "2026-11-06",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"dcf0995","date":"2026-11-06","author":"Claude","subject":"Civ Lite: redraw the warrior icon as a wooden club"},
   {"sha":"df41548","date":"2026-11-06","author":"Buffy","subject":"Serve Minecraft from its own repository"},
   {"sha":"f0db58d","date":"2026-11-06","author":"Codebuff","subject":"Ship EaglercraftX 1.8 as Minecraft: Bored Edition"},
   {"sha":"3f34553","date":"2026-11-06","author":"Codebuff","subject":"Fix Tank 2 terrain striping on odd world widths"},
