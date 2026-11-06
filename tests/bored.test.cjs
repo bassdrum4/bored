@@ -930,6 +930,7 @@ test('browser regressions', async t => {
     assert.ok(beasts.d3.includes('watcher') && beasts.d4.includes('watcher') && beasts.d5.includes('watcher'),
       'watchers hold the deeper floors');
     assert.equal(beasts.boss, true, 'the Warden is still the boss');
+    await frame.evaluate(() => __deep.start('random', 'floor-traversal-seed'));
     let depth = 1;
     while (depth < 5) {
       const route = depth % 2 ? 'safe' : 'risky';
