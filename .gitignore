@@ -15,3 +15,6 @@ dist/
 
 # Supabase CLI cache is local tooling state.
 supabase/.temp/
+
+# Eaglercraft client source trees: build locally, never deployed
+eaglercraft-src/

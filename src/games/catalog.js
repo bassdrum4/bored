@@ -26,7 +26,7 @@ export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // arcade.js), so do not use one for the other.
 export const FRESH_GAMES = ["eaglecraft", "wallbound", "risk", "scrabble"];
 export const META = {
-  "eaglecraft": ["Sandbox", "Mine, build and survive a 1.5.2 world, alone or online."],
+  "eaglecraft": ["Sandbox", "Mine, build and survive a 1.8 world, alone or online."],
   "wallbound": ["Arcade", "Pull back and launch a little ninja. Stick to walls, ricochet off springs, break glass and clear 20 stages."],
   "risk": ["Strategy", "Conquer the world against up to five computer commanders. Place troops, roll dice, defend borders, and claim continents."],
   "scrabble": ["Puzzle", "Fifteen squares a side, seven tiles in hand. Spell across the board against the computer or a friend."],
