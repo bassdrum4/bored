@@ -128,7 +128,18 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
     if (req.url().startsWith(site.origin)) return req.continue();
     if (req.method() === 'OPTIONS') return req.respond({ status:204, headers });
     if (req.url().includes('/play_events') && req.method() === 'POST') { writes.push(...[].concat(JSON.parse(req.postData()))); return req.respond({ status:201, headers, body:'' }); }
-    const body = req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/rpc/analytics_f14_events') ? flightAvailable ? flightFixture : [] : req.url().includes('/play_events') ? req.url().includes('game=eq.f-14') ? [] : fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
+    const aggregateFixture = {
+      totals: { launches:3,meaningful:1,browsers:2,active_ms:25000,error_sessions:1 },
+      games: [{ game:'snake',launches:2,sessions:2,meaningful:1,browsers:1,active_ms:20000,median_active_ms:10000,errors:0 }],
+      sources: [{ source:'library',launches:2,meaningful:1,active_ms:20000 }],
+      ui_events: [{ kind:'card_impression',game:'snake',surface:'library',action_name:null,events:2,browsers:2 }],
+      site: { visits:5,browsers:2 }
+    };
+    const cohortFixture = [{ first_day:'2026-10-29',cohort:2,d1_returned:1,d7_returned:null,
+      next_school:'2026-10-30',school_returned:1 }];
+    const body = req.url().includes('/rpc/analytics_rollup_v1') ? aggregateFixture :
+      req.url().includes('/rpc/analytics_retention_cohorts_v1') ? cohortFixture :
+      req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/rpc/analytics_f14_events') ? flightAvailable ? flightFixture : [] : req.url().includes('/play_events') ? req.url().includes('game=eq.f-14') ? [] : fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
     return req.respond({status:200, headers, contentType:'application/json', body:JSON.stringify(body)});
   });
   await page.goto(site.url);
@@ -166,6 +177,11 @@ test('browser collects real iframe sessions; opt-out, admin denial, filtering, e
   assert.equal(await page.$$eval('#engagement-kpis .analytics-stat', nodes => nodes.length), 8);
   assert.match(await page.$eval('#engagement-together', n => n.textContent), /Organic matches/);
   assert.match(await page.$eval('#engagement-feedback', n => n.textContent), /Responses/);
+  await page.click('[data-view="history"]');
+  assert.match(await page.$eval('#history-totals', n => n.textContent), /Game launches/);
+  assert.match(await page.$eval('#history-games', n => n.textContent), /snake/i);
+  assert.match(await page.$eval('#history-ui', n => n.textContent), /card_impression/);
+  assert.match(await page.$eval('#history-cohorts', n => n.textContent), /2026-10-30/);
   await page.click('[data-view="overview"]');
   assert.equal(await page.$eval('#games-table tbody',n=>n.children.length),2);
   assert.doesNotMatch(await page.$eval('#players-table',n=>n.textContent), /Daniel/);

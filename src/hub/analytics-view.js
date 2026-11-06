@@ -4,7 +4,7 @@ import { ORDER } from '../games/catalog.js';
 import { summarizeEvents, summarizeEngagement, eventsCSV, excludeAdmins } from './analytics-data.js';
 const $ = selector => document.querySelector(selector);
 const announcementAdmin = createAnnouncementAdmin();
-let events = [], productEvents = [], surveyRows = [], togetherSummary = null, handles = {}, report = null, page = 0, loading = false, epoch = 0;
+let events = [], productEvents = [], surveyRows = [], togetherSummary = null, aggregateSummary = null, aggregateCohorts = [], handles = {}, report = null, page = 0, loading = false, epoch = 0;
 const names = { ...Object.fromEntries(ORDER), 'f-14': 'F-14 Simulator' }, PAGE_SIZE = 40, MAX_EVENTS = 20000;
 const duration = ms => ms >= 3600000 ? (ms / 3600000).toFixed(1) + ' h' : ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
 const dateTime = iso => new Date(iso).toLocaleString([], { timeZone: 'America/Detroit', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -168,6 +168,48 @@ function renderF14(rows) {
   table('#f14-outcomes', ['Outcome','Sorties'],
     outcomes.map(s => [s.id,s.count]));
 }
+function renderHistory() {
+  const totals = aggregateSummary?.totals;
+  if (!totals) {
+    $('#history-totals').replaceChildren(el('p', 'Aggregated history is unavailable.'));
+    for (const id of ['#history-games','#history-sources','#history-ui','#history-cohorts'])
+      $(id).replaceChildren(el('p', 'No aggregate data available.'));
+    return;
+  }
+  const items = [
+    ['Game launches', totals.launches], ['Meaningful sessions', totals.meaningful],
+    ['Tracked browsers', totals.browsers], ['Active game time', duration(totals.active_ms)],
+    ['Error sessions', totals.error_sessions], ['Site visits', aggregateSummary.site?.visits || 0]
+  ];
+  $('#history-totals').replaceChildren(...items.map(([name, value]) => {
+    const n = el('div'); n.className = 'analytics-stat';
+    n.append(el('strong', value), el('span', name)); return n;
+  }));
+  const percentage = (numerator, denominator) =>
+    denominator ? Math.round(numerator * 100 / denominator) + '%' : '—';
+  const gameRows = (aggregateSummary.games || []).map(g => [
+    names[g.game] || g.game, g.launches, g.meaningful,
+    percentage(g.meaningful,g.sessions), g.browsers, duration(g.active_ms),
+    duration(g.median_active_ms), g.errors
+  ]);
+  table('#history-games', ['Game','Launches','Meaningful','Meaningful rate','Browser IDs','Active time','Median active','Errors'], gameRows);
+  table('#history-sources', ['Launch source','Launches','Meaningful','Active time'],
+    (aggregateSummary.sources || []).map(r => [r.source,r.launches,r.meaningful,duration(r.active_ms)]));
+  const actions = (aggregateSummary.ui_events || [])
+    .filter(e => e.kind !== 'visit')
+    .sort((a,b) => b.events-a.events || a.kind.localeCompare(b.kind))
+    .slice(0,100);
+  table('#history-ui',['Event','Game','Surface','Action','Count','Browser IDs'], actions.map(e => [
+    e.kind, names[e.game] || e.game || '—',e.surface || '—',e.action_name || '—',e.events,e.browsers
+  ]));
+  table('#history-cohorts',['First visit','Browsers','D1 returns','D7 returns','Next school day','School-day returns'],
+    aggregateCohorts.map(c => [c.first_day,c.cohort,
+      c.d1_returned == null ? 'Not mature' : c.d1_returned + ' (' + percentage(c.d1_returned,c.cohort) + ')',
+      c.d7_returned == null ? 'Not mature' : c.d7_returned + ' (' + percentage(c.d7_returned,c.cohort) + ')',
+      c.next_school || '—',
+      c.school_returned == null ? 'Not mature' : c.school_returned + ' (' + percentage(c.school_returned,c.cohort) + ')'
+    ]));
+}
 function render() {
   const selected = $('#person').value;
   const rows = events.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
@@ -268,13 +310,17 @@ async function load() {
       }
     }
     // Independent visit/survey events do not inflate game-session totals.
-    const [productLoaded,feedbackLoaded,authoritativeTogether] = await Promise.all([
+    const [productLoaded,feedbackLoaded,authoritativeTogether,serverRollup,serverCohorts] = await Promise.all([
       request('/rest/v1/product_events?select=*&received_at=gte.' + start.toISOString() +
         '&received_at=lt.' + end.toISOString() + '&order=received_at.asc&limit=20000'),
       request('/rest/v1/enjoyment_feedback?select=*&created_at=gte.' + start.toISOString() +
         '&created_at=lt.' + end.toISOString() + '&order=created_at.asc&limit=20000'),
       request('/rest/v1/rpc/analytics_together_summary',{method:'POST',
-        body:{p_from:start.toISOString(),p_to:end.toISOString()}})
+        body:{p_from:start.toISOString(),p_to:end.toISOString()}}),
+      request('/rest/v1/rpc/analytics_rollup_v1',{method:'POST',
+        body:{p_from:start.toISOString(),p_to:end.toISOString()}}).catch(() => null),
+      request('/rest/v1/rpc/analytics_retention_cohorts_v1',{method:'POST',
+        body:{p_from:start.toISOString(),p_to:end.toISOString()}}).catch(() => [])
     ]);
     const profiles = await request('/rest/v1/profiles?select=id,handle&order=id&limit=1000');
     // Admin accounts are staff, not players: their events never enter a report.
@@ -288,20 +334,22 @@ async function load() {
     productEvents = productLoaded.filter(e => allowed.has(e));
     surveyRows = feedbackLoaded.filter(e => allowed.has(e));
     togetherSummary = authoritativeTogether;
+    aggregateSummary = serverRollup;
+    aggregateCohorts = Array.isArray(serverCohorts) ? serverCohorts : [];
     const excluded = loaded.length + flightLoaded.length - events.length;
     const previous = $('#person').value;
     $('#person').replaceChildren(new Option('All players', ''), new Option('Unidentified guests', 'guest'),
       ...[...new Set(events.map(e => e.user_id).filter(Boolean))].map(id => new Option(handles[id] || id.slice(0, 8), id)));
     $('#person').value = [...$('#person').options].some(o => o.value === previous) ? previous : '';
-    page = 0; render();
+    page = 0; render(); renderHistory();
     const emptyReason = events.length ? '' : loaded.length + flightLoaded.length
       ? ' · Player report is empty because every recorded event in this selection was staff/admin activity.'
       : ' · No telemetry was received in this selection.';
-    $('#status').textContent = (capped ? 'EVENT LIMIT REACHED — showing at most 20,000 events per source. Narrow the date range. ' : '') +
+    $('#status').textContent = (capped ? 'DETAILED SESSION LIMIT REACHED — the Funnels & history tab still uses complete server-side summaries. Narrow the date range for individual sessions. ' : '') +
       events.length.toLocaleString() + ' player events loaded · refreshed ' + dateTime(cutoff) + emptyReason +
       (excluded ? ' · ' + excluded.toLocaleString() + ' staff/admin events recorded and excluded' : '');
   } catch (error) {
-    events = []; productEvents = []; surveyRows = []; togetherSummary = null; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
+    events = []; productEvents = []; surveyRows = []; togetherSummary = null; aggregateSummary = null; aggregateCohorts = []; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
     if (authorized) render();
     $('#status').textContent = error.message || 'Could not load analytics. Try again.';
   } finally { loading = false; $('#refresh').disabled = false; }

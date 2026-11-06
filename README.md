@@ -623,6 +623,31 @@ the authenticated `together-pool` Edge function. See
 `npm test` includes isolated production-SQL tests, the original-game bridge and
 two-account browser flows; CI also checks races on disposable PostgreSQL 17.
 
+## Discovery funnels and server-side analytics
+
+The admin [Gameplay analytics](src/analytics.html) now includes **Funnels & history**.
+It requests read-only `analytics_rollup_v1` and
+`analytics_retention_cohorts_v1` RPCs, with explicit analytics-admin identity
+checks and restricted `EXECUTE` privileges. The server summarizes complete
+date ranges without sending every 60-second checkpoint to the browser.
+Detailed session inspection remains available and retains its 20,000-row limit.
+
+The shared collector records **categorical** library and favorites actions,
+one card impression per visible game/surface during a page visit (at least
+50% on screen for 750 ms), announcement banner visibility and clickthroughs,
+and completed-round signals. It does not store search terms, mouse paths,
+keyboard input, announcement message text, stack traces, or arbitrary user strings.
+Games may optionally emit `postMessage({type:'bored:analytics',kind:'help_open'})`
+or `game_friction`, `tutorial_step`, and `save_action` with allowed enum
+values; only same-origin active game frames are accepted. Individual game
+instrumentation is not required for the generic counters to work.
+
+School-day cohort returns skip weekends and dates in the private
+`analytics_non_school_dates` table. November 3, 2026 is seeded as a school
+closure. Add future closures through an authorized database migration. Calendar
+D1/D7 and school-day retention are separate metrics, based on browser IDs
+rather than verified people, and immature cohorts are labeled as such.
+
 ## Enjoyment and retention analytics
 
 The admin-only [Gameplay analytics](src/analytics.html) now includes an **Enjoyment & retention**

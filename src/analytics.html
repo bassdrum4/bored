@@ -18,7 +18,7 @@
 </form>
 <p class="analytics-note">Activity from analytics admin accounts is excluded from every total, chart, table and export. Active time: game visible, focused, menu closed, with input in the last 60 seconds. Visible time includes idle play. Times are sampled; unfinished sessions may be missing their last 30 seconds. Remote games report presence only, since their internal input and scores are inaccessible.</p>
 <div id="totals" class="analytics-totals"></div>
-<nav class="analytics-tabs" aria-label="Analytics views"><button type="button" data-view="overview" aria-pressed="true">Overview</button><button type="button" data-view="engagement" aria-pressed="false">Enjoyment & retention</button><button type="button" data-view="players" aria-pressed="false">Players</button><button type="button" data-view="sessions" aria-pressed="false">Sessions & errors</button><button type="button" data-view="announcements" aria-pressed="false">Announcements</button></nav>
+<nav class="analytics-tabs" aria-label="Analytics views"><button type="button" data-view="overview" aria-pressed="true">Overview</button><button type="button" data-view="engagement" aria-pressed="false">Enjoyment & retention</button><button type="button" data-view="history" aria-pressed="false">Funnels & history</button><button type="button" data-view="players" aria-pressed="false">Players</button><button type="button" data-view="sessions" aria-pressed="false">Sessions & errors</button><button type="button" data-view="announcements" aria-pressed="false">Announcements</button></nav>
 <section id="overview-view"><div class="analytics-charts"><section><h2>Active time by game</h2><div id="game-chart"></div></section><section><h2>Daily active time</h2><div id="day-chart"></div></section><section><h2>Discovery source</h2><div id="source-chart"></div></section><section><h2>Device & embed</h2><div id="device-chart"></div></section><section><h2>Daily challenge vs free play</h2><div id="mode-chart"></div></section><section><h2>Time of day · Detroit</h2><div id="hour-chart"></div></section></div><h2>Game breakdown</h2><div id="games-table"></div>
 <section id="f14-section">
   <h2>F-14 · flight analytics</h2>
@@ -39,6 +39,19 @@
   <h2>Bored Together · authoritative server records</h2><div id="engagement-together"></div>
   <h2>Enjoyment survey</h2><div id="engagement-feedback"></div><h3>Recent voluntary comments</h3><div id="engagement-comments"></div>
   <p class="analytics-note">Multiplayer summary covers all players and games in the selected date range, independent of player or game filters. Admin-involved matches are separated from organic matches.</p>
+</section>
+<section id="history-view" hidden>
+  <h2>Full-history summaries</h2>
+  <p class="analytics-note">Aggregated securely in Supabase over the entire selected date range. These summaries are not limited by the 20,000-event detailed-session cap. They always cover all non-admin players and games, independent of the optional game/player detail filters. Browser IDs are not unique people.</p>
+  <div id="history-totals" class="analytics-totals"></div>
+  <h3>Game launch → meaningful play</h3><div id="history-games"></div>
+  <h3>Discovery sources</h3><div id="history-sources"></div>
+  <h3>New discovery and engagement events</h3>
+  <p class="analytics-note">Card impressions are counted only after visibility; search terms and raw user input are never stored. New events appear as the updated client is deployed and real players use it.</p>
+  <div id="history-ui"></div>
+  <h3>First-visit retention cohorts</h3>
+  <p class="analytics-note">D1 and D7 are exact calendar-day returns. Next school day skips weekends and known closed dates, including November 3, 2026. A dash means the cohort is not mature. These are browser return estimates, not app-install retention.</p>
+  <div id="history-cohorts"></div>
 </section>
 <section id="players-view" hidden><h2>Player activity</h2><p>Choose a player to see their games and sessions. Repeat accounts played on at least two Detroit calendar days within the selected range. Guests cannot be counted as unique people.</p><div id="players-table"></div><section id="player-detail" hidden><button id="clear-person" type="button">Show all players</button><h2 id="player-heading"></h2><div id="player-games"></div></section></section>
 <section id="sessions-view" hidden><h2>Sessions & errors</h2><label><input id="errors-only" type="checkbox"> Only sessions with errors</label><p id="session-note"></p><div id="sessions-table"></div><div class="analytics-pagination"><button id="previous" type="button">Previous</button><span id="page-label"></span><button id="next" type="button">Next</button></div><details id="session-detail" hidden><summary id="session-heading">Session detail</summary><pre id="session-json"></pre></details></section>

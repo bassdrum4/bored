@@ -123,7 +123,8 @@ function saveLibrary() {
 }
 
 const { previewFor, gameMeta, renderRecent, renderLibrary, showLibraryMessage } =
-  createLibraryView({ state: uiState, openGame, saveLibrary });
+  createLibraryView({ state: uiState, openGame, saveLibrary,
+    track: (kind, details) => analytics.track(kind, details) });
 
 /* ── Player: opening, closing, restarting, fullscreen ─────────────────────── */
 
@@ -779,7 +780,9 @@ const { renderAccount, openAuthDialog, initAccount } = createAccountUI({
 });
 
 const { initFeedback } = createFeedbackUI();
-const { initAnnouncements } = createAnnouncementsUI();
+const { initAnnouncements } = createAnnouncementsUI({
+  track: (kind, details) => analytics.track(kind, details)
+});
 
 
 
@@ -787,10 +790,23 @@ const { escapeHtml, frameStandIn, injectHead, injectSeed } = createGameDocument(
 
 /* ── Wiring ───────────────────────────────────────────────────────────────── */
 
-searchInput.addEventListener('input', renderLibrary);
-$('#sort').addEventListener('change', renderLibrary);
+let analyticsSearchTimer = null;
+searchInput.addEventListener('input', () => {
+  renderLibrary();
+  clearTimeout(analyticsSearchTimer);
+  analyticsSearchTimer = setTimeout(() => {
+    analytics.track('library_action', { surface: 'library', action: 'search',
+      results: visibleGames.length, category });
+  }, 700);
+});
+$('#sort').addEventListener('change', () => {
+  renderLibrary();
+  analytics.track('library_action', { surface: 'library', action: 'sort',
+    results: visibleGames.length, category });
+});
 $('#favorites-all').onclick = () => {
   category = 'Favorites';
+  analytics.track('library_action', { surface: 'library', action: 'filter', category });
   searchInput.value = '';
   for (const button of $('#filters').children) button.setAttribute('aria-pressed', String(button.dataset.filter === 'Favorites'));
   renderLibrary();
@@ -800,6 +816,7 @@ $('#filters').addEventListener('click', event => {
   const button = event.target.closest('[data-filter]');
   if (!button) return;
   category = button.dataset.filter;
+  analytics.track('library_action', { surface: 'library', action: 'filter', category });
   for (const el of $('#filters').children) el.setAttribute('aria-pressed', String(el === button));
   renderLibrary();
 });
@@ -860,6 +877,18 @@ addEventListener('message', event => {
   switch (event.data?.type) {
     case 'bored:close':
       if (fullscreenElement()) leaveFullscreen(); else closeGame();
+      break;
+    case 'bored:analytics':
+      // Only first-party game frames may report optional, categorical events.
+      // The collector discards all unrecognized fields and free-form text.
+      if (event.origin === location.origin &&
+          ['game_friction','help_open','tutorial_step','save_action'].includes(event.data?.kind)) {
+        analytics.track(event.data.kind, {
+          game: activeSlug, surface: 'game',
+          phase: event.data.phase, issue: event.data.issue,
+          step: event.data.step, action: event.data.action
+        });
+      }
       break;
     case 'bored:runtime-error': analytics.event('error', { code: 'runtime' }); break;
     case 'bored:restart': restartGame(); break;
@@ -939,6 +968,7 @@ window.addEventListener('bored:identity', renderAdminLink);
 renderAdminLink();
 
 function clearFavoriteGames() {
+  analytics.track('save_action', { surface: 'settings', action: 'clear' });
   const now = Date.now();
   for (const slug of favorites) favoriteEvents[slug] = { saved: false, at: now };
   favorites.clear();
