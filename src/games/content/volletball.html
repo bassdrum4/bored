@@ -150,6 +150,10 @@ const GRAV_BALL = 0.07;
 const BALL_R = 12, PL_R = 19;
 const JUMP = -10;
 const P_ACC = 0.92, P_FRIC = 0.82, P_MAX = 4.4;  // friction drags toward a 4.19 px/frame top speed
+// The CPU covers the same court with a faster step and a harder swing. The ball
+// and the human paddles keep their own constants: only the far side is tuned, so
+// the computer closes on a rally and ends it instead of trading soft returns.
+const CPU_ACC = P_ACC * 1.8, CPU_MAX = P_MAX * 1.55;
 const B_MAX = 8, B_E = 1.05, B_DRAG = 0.996;  // a slower ball: the cap and the live bounce both drop
 const WIN = 7;
 
@@ -209,7 +213,7 @@ function reset() {
 function driveCpu() {
   if (st !== 'play' && st !== 'serve') { aiTargetX = NET_X + 150; aiDir = 0; aiJump = false; return; }
   if (aiTick-- <= 0) {
-    aiTick = 4;
+    aiTick = 3;
     let tx = NET_X + 160, ty = GROUND - PL_R;
     if (ball.x > NET_X || ball.vx > 0.4) {
       let x = ball.x, y = ball.y, vx = ball.vx, vy = ball.vy, t = 0;
@@ -221,19 +225,22 @@ function driveCpu() {
       }
       tx = x; ty = y;
       // A little slop so clean angles still beat it.
-      if (ball.vx !== 0) tx += (Math.random() - 0.5) * 18;
+      if (ball.vx !== 0) tx += (Math.random() - 0.5) * 12;
     }
     aiTargetX = Math.max(NET_X + 50, Math.min(WALL_R - 30, tx));
-    aiDir = aiTargetX - p2.x > 12 ? 1 : aiTargetX - p2.x < -12 ? -1 : 0;
-    aiJump = p2.gnd && ball.x > NET_X - 60 && ball.y < p2.y - 10 && ty < GROUND - PL_R - 8 && Math.abs(ball.x - p2.x) < 90;
+    aiDir = aiTargetX - p2.x > 8 ? 1 : aiTargetX - p2.x < -8 ? -1 : 0;
+    aiJump = p2.gnd && ball.x > NET_X - 150 && ball.y < p2.y - 10 && ty < GROUND - PL_R - 8 && Math.abs(ball.x - p2.x) < 120;
   }
 }
 
 function moveP(p, up, l, r, side) {
-  if (keys[l]) p.vx -= P_ACC;
-  if (keys[r]) p.vx += P_ACC;
+  const cpu = cpuMode && side === 1;
+  const acc = cpu ? CPU_ACC : P_ACC;
+  const top = cpu ? CPU_MAX : P_MAX;
+  if (keys[l]) p.vx -= acc;
+  if (keys[r]) p.vx += acc;
   p.vx *= P_FRIC;
-  p.vx = Math.max(-P_MAX, Math.min(P_MAX, p.vx));
+  p.vx = Math.max(-top, Math.min(top, p.vx));
 
   if (keys[up] && p.gnd && !p.jh) {
     p.vy = JUMP; p.gnd = false; p.jh = true;
@@ -272,8 +279,16 @@ function hitP(pl, idx) {
       ball.vy += upBoost;
       ball.vx += pl.vx * 0.35;
       ball.vy += pl.vy * 0.15;
+      // The CPU swings for the half of the court the human is not standing on,
+      // and swings harder than the human can, so a rally resolves into a point.
+      const cpu = cpuMode && idx === 1;
+      if (cpu) {
+        ball.vx += (p1.x < NET_X / 2 ? 1 : -1) * 1.15;
+        ball.vy += 0.2;
+      }
       const sp = Math.hypot(ball.vx, ball.vy);
-      if (sp > B_MAX) { ball.vx = ball.vx / sp * B_MAX; ball.vy = ball.vy / sp * B_MAX; }
+      const cap = cpu ? B_MAX * 1.25 : B_MAX;
+      if (sp > cap) { ball.vx = ball.vx / sp * cap; ball.vy = ball.vy / sp * cap; }
       lastHit = idx;
       spark(ball.x, ball.y, pl.c, 10, 3.5);
     }
