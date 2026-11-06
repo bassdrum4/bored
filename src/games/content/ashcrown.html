@@ -223,6 +223,24 @@
   .standings th.n { text-align: right }
   .table-wrap { overflow-x: auto }
 
+  /* ── save slots ──────────────────────────────────────────────────────── */
+  .slots { display: flex; flex-direction: column; gap: 5px }
+  .slot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--rule); border-radius: 3px; padding: 7px 9px; background: var(--panel) }
+  .slot.empty { background: transparent; border-style: dashed }
+  .slot.empty .slot-name { color: var(--ink-3) }
+  .slot.ask { border-color: var(--ink); background: var(--paper-2) }
+  .slot-main { min-width: 0 }
+  .slot-name { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .slot-meta { display: block; font-size: 10.5px; color: var(--ink-3); line-height: 1.45; overflow-wrap: anywhere }
+  .slot-acts { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: flex-end }
+  .slot-acts .btn { padding: 4px 9px; font-size: 12px }
+  .slot-q { font-size: 11.5px; color: var(--ink-2); max-width: 24ch; text-align: right }
+  @media (max-width: 520px) {
+    .slot { grid-template-columns: minmax(0, 1fr) }
+    .slot-acts { justify-content: flex-start }
+    .slot-q { max-width: none; text-align: left; flex-basis: 100% }
+  }
+
   /* ── tech tree and civs ──────────────────────────────────────────────── */
   /* the tech tree, Civ style: era columns, prereqs on the left */
   .ttree-wrap { overflow-x: auto; overflow-y: hidden; padding: 8px 0 6px; -webkit-overflow-scrolling: touch }
@@ -591,6 +609,7 @@
       <button class="btn primary" id="btn-begin" type="button">Start game</button>
       <button class="btn" id="btn-civs" type="button" data-act="civs">See all 16 civs</button>
       <button class="btn" id="btn-continue" type="button" hidden>Continue saved game</button>
+      <button class="btn" id="btn-load" type="button" data-act="slots:load" hidden>Load game</button>
     </div>
     <p class="fine" id="start-note">Everyone starts with a settler and a warrior, at peace. No two players share a civ. <b>Space</b> ends your turn, <b>N</b> jumps to the next unit that needs orders, <b>T</b> opens the tech tree, <b>R</b> opens your realm, and <b>H</b> opens the rules.</p>
   </div>
@@ -7593,7 +7612,7 @@ function askEndTurn() {
 function showMenu() {
   const howSaved = online ? 'Bored Together keeps this match on the server, not on this device, so your solo campaign is left alone.'
     : G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.'
-    : 'The game saves itself on this device after every move and every turn. Playing the tutorial keeps this save.';
+    : 'The game saves itself on this device after every move (the Autosave) and keeps the start of your last three turns. Save game keeps a copy under a name you pick. Playing the tutorial keeps your saves.';
   openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name) +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
@@ -7603,7 +7622,10 @@ function showMenu() {
     '<button class="act switch" data-act="tips-toggle">Tips in my games<b>' + (tipsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="popups-toggle">Event popups<b>' + (popupsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="anim-next">Animation<b>' + ANIM_LEVELS[currentAnim()] + '</b></button>' +
-    (G.tut || online ? '' : '<button class="act" data-act="save">Save now</button>') +
+    (G.tut || online || G.over ? '' : '<button class="act" data-act="slots:save">Save game</button>') +
+    (G.tut || online || G.over || !currentSlot || !slotHead(currentSlot) ? '' :
+      '<button class="act" data-act="save">Save to “' + esc(slotHead(currentSlot).name || 'Saved game') + '”<kbd>Ctrl+S</kbd></button>') +
+    (online ? '' : '<button class="act" data-act="slots:load">Load game</button>') +
     '<button class="act warn" data-act="new-ask">Quit to the start screen</button></div>' +
     '<p class="hint">' + howSaved + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Back to the game</button></div>', true);
@@ -7618,7 +7640,7 @@ function showCivs() {
 
 function askNewGame() {
   openModal(modalHead('Leave this game?') +
-    '<div class="modal-body"><p>It stays saved on this device, so you can come back to it from the start screen until a new game replaces it.</p></div>' +
+    '<div class="modal-body"><p>Its autosave stays on this device, so you can come back from the start screen (Continue or Load game) until a new game replaces it. Games you saved to a slot stay put.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Stay</button><button class="btn primary" data-act="new">Go to the start screen</button></div>', true);
 }
 
@@ -7688,7 +7710,7 @@ function showHelp() {
     'The Realm panel lists them all. Other cards warn you when someone declares war on you, takes one of your cities or launches a science trip, and when the borders close. ' +
     'Turn Event popups off in the Menu and the points still count.</p>' +
     '<h3>Keys</h3><p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
-    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. The Menu’s Animation switch runs through off, wonders only, wonders + features, and everything.</p>' +
+    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. The Menu’s Animation switch runs through off, wonders only, wonders + features, and everything.</p>' +
     '</div><div class="modal-foot"><button class="btn" data-act="civs">All 16 civs</button><button class="btn primary" data-act="close">Close</button></div>');
 }
 
@@ -7753,10 +7775,11 @@ function doEndTurn() {
   selection = null;
   reachable = null;
   placing = null;
-  const before = G.viewer;
+  const before = G.viewer, turnBefore = G.turn;
   endCurrentTurn();
   if (online) { showTurnComplete(); onlineSubmit(); return; }
   autosave();
+  if (G.turn !== turnBefore) rollTurnSave();
   render();
   if (!G.handoff && !G.over && G.viewer === before) {
     toast('Turn ' + G.turn);
@@ -7786,6 +7809,7 @@ function onAction(act) {
   if (kind === 'zoom-out') { zoomBy(1 / 1.2); return; }
   if (kind === 'zoom-fit') { fitCamera(); return; }
   if (kind === 'civs') { showCivs(); return; }
+  if (kind === 'slots' || kind.startsWith('slot-')) { slotAction(kind, a, b); return; }
   if (kind === 'tut-start') { if (G && !G.tut) saveGame(); startTutorial(); return; }
   if (kind === 'anim-next') {
     // Off, wonders only, wonders + features, everything, and round again.
@@ -8049,11 +8073,12 @@ function onAction(act) {
       afterAction();
       break;
     }
-    case 'save': toast(saveGame() ? 'Saved on this device.' : 'Couldn’t save here. This browser blocks storage.'); closeModal(); break;
+    case 'save': closeModal(); quickSave(); break;
     case 'new-ask': askNewGame(); break;
     case 'new':
       closeModal();
       G = null;
+      currentSlot = null;
       selection = null;
       reachable = null;
       placing = null;
@@ -8261,7 +8286,13 @@ function bindKeys() {
   document.addEventListener('keydown', event => {
     const tag = event.target && event.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (event.key === 'Escape' && UI.modalKind === 'slots' && !UI.modalLayer.hidden) { onAction('close'); return; }
     if (!G || !UI.start.hidden) return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 's') {
+      event.preventDefault();   // not the browser's "save page"
+      if (!G.handoff && UI.modalLayer.hidden) onAction('save');
+      return;
+    }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.key === 'Escape') {
       if (!UI.modalLayer.hidden) { if (!G.pending) onAction('close'); }
@@ -8309,27 +8340,33 @@ function bindKeys() {
 
 /* ── saving ────────────────────────────────────────────────────────────────── */
 
-const SAVE_KEY = 'bored.civlite.save.v2';
+// Like Civ: eight saves you name and keep, the autosave of the game in front of you, and
+// the autosaves from the starts of your last three turns. Every save is one storage key,
+// so it is written whole or not at all: a full or blocked browser never leaves half a save,
+// and a failed write never touches another slot. A slot holds a one-line header, a newline,
+// then the game (JSON never contains a raw newline), so listing slots never parses a game.
+const SLOT_PREFIX = 'bored.civlite.slot.';
+const OLD_SAVE_KEY = 'bored.civlite.save.v2';   // before slots there was one save; it becomes the autosave
+const MANUAL_IDS = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8'];
+const TURN_IDS = ['t1', 't2', 't3'];
+const SLOT_IDS = ['auto'].concat(TURN_IDS, MANUAL_IDS);
+let currentSlot = null;   // the named slot this game was last saved to or loaded from
+let slotDirty = true;     // played since it was last put in a named slot, or started
+let slotMode = 'load', slotAsk = null, slotDraft = null;   // the Save / Load screen
 
-function saveGame() {
-  // A Bored Together match lives on the server and in the match document, not
-  // in this device's slot: it must never write over (or clear) a solo campaign.
-  if (online) return false;
-  if (!G || G.watch || G.tut) return false;
-  if (G.over) { clearSave(); return false; }
-  try {
-    const meta = G.players.map(p => p.name).join(' vs ') + ' · ' + MAP_TYPES[G.map].name.toLowerCase() +
-      (G.level === 'deity' ? ' · deity' : '') + ' · turn ' + G.turn;
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 4, at: Date.now(), meta, state: G }));
-    return true;
-  } catch (error) {
-    return false;
-  }
+function slotKind(id) { return id === 'auto' ? 'auto' : TURN_IDS.includes(id) ? 'turn' : MANUAL_IDS.includes(id) ? 'manual' : null; }
+function describeSave(state) {
+  return state.players.map(p => p.name).join(' vs ') + ' · ' + MAP_TYPES[state.map].name.toLowerCase() +
+    (state.level === 'deity' ? ' · deity' : '') + ' · turn ' + state.turn;
 }
-function clearSave() {
-  try { localStorage.removeItem(SAVE_KEY); } catch (error) { /* storage blocked */ }
+function defaultSaveName(state) {
+  const f = state.players.find(p => p.human) || state.players[0];
+  return (CIVS[f.civ] ? CIVS[f.civ].land : f.name) + ', turn ' + state.turn;
 }
-function autosave() { saveGame(); }
+function cleanSaveName(text) { return String(text || '').replace(/\s+/g, ' ').trim().slice(0, 28); }
+function slotHeader(kind, state, name, at) {
+  return { v: 1, at: at || Date.now(), kind, name: name || '', meta: describeSave(state), turn: state.turn, seed: state.seed };
+}
 function validState(state) {
   return !!state && (state.v === 2 || state.v === 3 || state.v === 4) && Array.isArray(state.tiles) && Array.isArray(state.players) && state.players.length >= 2 &&
     Number.isFinite(state.cols) && Number.isFinite(state.rows) && state.tiles.length === state.cols * state.rows &&
@@ -8337,16 +8374,225 @@ function validState(state) {
     (!state.level || !!LEVELS[state.level]) &&
     state.players.every(p => CIVS[p.civ] && Array.isArray(p.techs)) && !state.over;
 }
-function readSave() {
+function slotHead(id) {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && validState(parsed.state) ? parsed : null;
+    const raw = localStorage.getItem(SLOT_PREFIX + id);
+    const cut = raw ? raw.indexOf('\n') : -1;
+    if (cut < 1) return null;
+    const head = JSON.parse(raw.slice(0, cut));
+    return head && head.v === 1 && Number.isFinite(head.at) ? head : null;
   } catch (error) {
     return null;
   }
 }
+function slotRead(id) {
+  try {
+    const raw = localStorage.getItem(SLOT_PREFIX + id);
+    const cut = raw ? raw.indexOf('\n') : -1;
+    if (cut < 1) return null;
+    const head = JSON.parse(raw.slice(0, cut)), state = JSON.parse(raw.slice(cut + 1));
+    return head && validState(state) ? { id, head, state } : null;
+  } catch (error) {
+    return null;
+  }
+}
+function slotRemove(id) {
+  try { localStorage.removeItem(SLOT_PREFIX + id); } catch (error) { /* storage blocked */ }
+}
+function slotWrite(id, head, state) {
+  let raw;
+  try { raw = JSON.stringify(head) + '\n' + JSON.stringify(state); } catch (error) { return false; }
+  const put = () => { try { localStorage.setItem(SLOT_PREFIX + id, raw); return true; } catch (error) { return false; } };
+  if (put()) return true;
+  // No room. The turn autosaves are the one thing worth giving up for a save that was
+  // asked for, oldest first. A named save or the autosave is never traded away.
+  if (slotKind(id) === 'turn') return false;
+  const old = TURN_IDS.map(t => ({ t, head: slotHead(t) })).filter(x => x.head).sort((a, b) => a.head.at - b.head.at);
+  for (const x of old) { slotRemove(x.t); if (put()) return true; }
+  return false;
+}
+// Before slots there was a single save. It becomes the autosave, unless an autosave made
+// since is newer; the old key goes only once its game is safely somewhere else.
+function moveOldSave() {
+  // A Bored Together match never touches this device's saves, not even to tidy them. (This runs while
+  // the start screen is built, before the game has worked out that it is inside a match.)
+  try { if (online || window.__boredTogether) return; } catch (error) { /* not in a page */ }
+  try {
+    const raw = localStorage.getItem(OLD_SAVE_KEY);
+    if (!raw) return;
+    const old = JSON.parse(raw);
+    if (!old || !validState(old.state)) return;
+    const have = slotHead('auto'), at = Number.isFinite(old.at) ? old.at : Date.now();
+    if (have && have.at >= at) { localStorage.removeItem(OLD_SAVE_KEY); return; }
+    if (slotWrite('auto', slotHeader('auto', old.state, '', at), old.state)) localStorage.removeItem(OLD_SAVE_KEY);
+  } catch (error) { /* leave the old save where it is */ }
+}
+// Every slot that holds a game, with its header.
+function slotList() {
+  moveOldSave();
+  return SLOT_IDS.map(id => ({ id, head: slotHead(id) })).filter(s => s.head);
+}
+
+function saveGame() {
+  // A Bored Together match lives on the server and in the match document, not
+  // in this device's slots: it must never write over (or clear) a solo campaign.
+  if (online) return false;
+  if (!G || G.watch || G.tut) return false;
+  if (G.over) { clearSave(); return false; }
+  return slotWrite('auto', slotHeader('auto', G), G);
+}
+// A finished game has nothing to continue. The turn autosaves stay, so a loss can be undone.
+function clearSave() { slotRemove('auto'); }
+// Everything a player does comes through here; leaving the page calls saveGame itself.
+function autosave() { slotDirty = true; saveGame(); }
+// The start of a new turn goes in the oldest of the three turn autosaves.
+function rollTurnSave() {
+  if (online || !G || G.watch || G.tut || G.over) return false;
+  const slots = TURN_IDS.map(id => ({ id, head: slotHead(id) }));
+  const target = slots.find(s => !s.head) || slots.reduce((a, b) => (a.head.at <= b.head.at ? a : b));
+  return slotWrite(target.id, slotHeader('turn', G), G);
+}
+
+// Why this game can't be saved right now, or null.
+function whyNotSave() {
+  if (online) return 'Bored Together keeps this match on the server, so there is nothing to save here.';
+  if (!G || G.watch) return 'There is no game to save.';
+  if (G.tut) return 'The tutorial isn’t saved.';
+  if (G.over) return 'This game is over, so there is nothing to save.';
+  return null;
+}
+function saveToSlot(id, name) {
+  const why = whyNotSave();
+  if (why) return { ok: false, text: why };
+  if (slotKind(id) !== 'manual') return { ok: false, text: 'That isn’t a save slot.' };
+  const clean = cleanSaveName(name) || defaultSaveName(G);
+  if (!slotWrite(id, slotHeader('manual', G, clean), G)) {
+    return { ok: false, text: 'Couldn’t save. This browser has no room left for saves, or blocks storage. Delete a save you don’t need and try again.' };
+  }
+  currentSlot = id;
+  slotDirty = false;
+  return { ok: true, name: clean };
+}
+// Ctrl+S and "Save to …": write over the slot this game came from or was last saved to.
+function quickSave() {
+  const why = whyNotSave();
+  if (why) { toast(why); return; }
+  const head = currentSlot ? slotHead(currentSlot) : null;
+  if (!head) { currentSlot = null; slotAction('slots', 'save'); return; }
+  const r = saveToSlot(currentSlot, head.name);
+  toast(r.ok ? 'Saved “' + r.name + '”.' : r.text);
+}
+function loadSlot(id) {
+  if (online) return false;
+  const s = slotRead(id);
+  if (!s) return false;
+  resumeState(s.state);
+  currentSlot = slotKind(id) === 'manual' ? id : null;
+  slotDirty = currentSlot === null;
+  saveGame();   // the autosave is always the game on screen
+  return true;
+}
+
+function agoText(at, now) {
+  const secs = Math.max(0, Math.round(((now || Date.now()) - at) / 1000));
+  if (secs < 45) return 'just now';
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return mins + ' min ago';
+  const hours = Math.round(mins / 60);
+  if (hours < 36) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
+  const days = Math.round(hours / 24);
+  return days < 45 ? days + ' days ago' : new Date(at).toLocaleDateString();
+}
+const readSlotName = () => { const field = document.getElementById('slot-name'); return field ? field.value : slotDraft; };
+
+// The Save / Load screen. Saving lists the eight named slots; loading lists the named
+// saves that exist, then the autosaves. Replacing, deleting, and loading over a game
+// that sits in no slot each ask once, on the row itself.
+function showSlots(mode) {
+  if (online) { toast('Bored Together keeps this match on the server, so there are no saves to manage here.'); return; }
+  if (mode === 'save') { const why = whyNotSave(); if (why) { toast(why); return; } }
+  slotMode = mode === 'save' ? 'save' : 'load';
+  const saving = slotMode === 'save', now = Date.now(), heads = {};
+  for (const s of slotList()) heads[s.id] = s.head;
+  const draft = slotDraft !== null ? slotDraft : saving ? defaultSaveName(G) : '';
+  const row = id => {
+    const head = heads[id], kind = slotKind(id);
+    if (!head && !(saving && kind === 'manual')) return '';
+    const ask = slotAsk && slotAsk.id === id ? slotAsk.kind : null;
+    const title = kind === 'manual' ? (head ? head.name || 'Saved game' : 'Empty slot')
+      : kind === 'auto' ? 'Autosave' : 'Start of turn ' + head.turn;
+    const detail = head ? esc(head.meta) + ' · ' + agoText(head.at, now) : 'Slot ' + id.slice(1);
+    let acts = '';
+    if (ask) {
+      const question = ask === 'overwrite' ? 'Replace this save?' : ask === 'delete' ? 'Delete this save?' : 'This replaces the game you’re playing, which isn’t in a slot.';
+      const yes = ask === 'overwrite' ? ['slot-save', 'Replace'] : ask === 'delete' ? ['slot-del', 'Delete'] : ['slot-load', 'Load anyway'];
+      acts = '<span class="slot-q">' + question + '</span><button class="btn primary" data-act="' + yes[0] + ':' + id + '">' + yes[1] +
+        '</button><button class="btn" data-act="slot-no">Cancel</button>';
+    } else if (saving) {
+      acts = '<button class="btn primary" data-act="slot-save:' + id + '">' + (head ? 'Overwrite' : 'Save here') + '</button>';
+    } else {
+      acts = '<button class="btn primary" data-act="slot-load:' + id + '">Load</button>' +
+        (kind === 'manual' ? '<button class="btn" data-act="slot-ask:delete:' + id + '">Delete</button>' : '');
+    }
+    return '<div class="slot' + (head ? '' : ' empty') + (ask ? ' ask' : '') + '" data-slot="' + id + '"><div class="slot-main"><span class="slot-name">' +
+      esc(title) + '</span><span class="slot-meta">' + detail + '</span></div><div class="slot-acts">' + acts + '</div></div>';
+  };
+  const named = MANUAL_IDS.map(row).join('');
+  const byNewest = TURN_IDS.slice().sort((a, b) => (heads[b] ? heads[b].at : 0) - (heads[a] ? heads[a].at : 0));
+  const autos = ['auto'].concat(byNewest).map(row).join('');
+  openModal(modalHead(saving ? 'Save game' : 'Load game', saving ? 'Turn ' + G.turn + ' · pick a slot' : '') +
+    '<div class="modal-body">' +
+    (saving ? '<div class="tform"><label for="slot-name">Name</label><input type="text" id="slot-name" maxlength="28" value="' + esc(draft) +
+      '" autocomplete="off" spellcheck="false"></div>' : '') +
+    '<h3>Your saves</h3>' +
+    (named ? '<div class="slots">' + named + '</div>' : '<p class="hint">Nothing saved yet. Use Save game in the Menu, or press Ctrl+S in a game, to keep one.</p>') +
+    (saving ? '' : '<h3>Autosaves</h3>' + (autos ? '<div class="slots">' + autos + '</div>' : '<p class="hint">Autosaves appear once you start a game.</p>')) +
+    '<p class="hint">' + (saving
+      ? 'Saves stay on this device, in this browser. The game also saves itself after every move, and keeps the start of your last three turns under Load game.'
+      : 'Autosave is the game you were last playing. The turn autosaves are the starts of your last three turns, for going back.') + '</p></div>' +
+    '<div class="modal-foot"><button class="btn primary" data-act="close">Done</button></div>');
+  UI.modalKind = 'slots';
+  const field = UI.modal.querySelector('#slot-name');
+  if (field && window.matchMedia && window.matchMedia('(pointer: fine)').matches) field.focus({ preventScroll: true });
+}
+function slotAction(kind, a, b) {
+  if (online) return;
+  if (kind === 'slots') { slotAsk = null; slotDraft = null; showSlots(a === 'save' ? 'save' : 'load'); return; }
+  if (kind === 'slot-no') { slotAsk = null; showSlots(slotMode); return; }
+  if (kind === 'slot-ask') { slotDraft = slotMode === 'save' ? readSlotName() : null; slotAsk = { kind: a, id: b }; showSlots(slotMode); return; }
+  const id = a;
+  if (kind === 'slot-save') {
+    if (!G || !MANUAL_IDS.includes(id)) return;
+    const name = readSlotName();
+    if (slotHead(id) && !(slotAsk && slotAsk.kind === 'overwrite' && slotAsk.id === id)) {
+      slotDraft = name;
+      slotAsk = { kind: 'overwrite', id };
+      showSlots('save');
+      return;
+    }
+    const r = saveToSlot(id, name);
+    slotAsk = null;
+    if (r.ok) { slotDraft = null; closeModal(); toast('Saved “' + r.name + '”.'); }
+    else { toast(r.text); showSlots('save'); }
+    return;
+  }
+  if (kind === 'slot-load') {
+    // Loading replaces the game on screen. Only a game that sits in no named slot needs asking about.
+    const replaces = !!G && !G.tut && !G.over && slotDirty;
+    if (replaces && !(slotAsk && slotAsk.kind === 'load' && slotAsk.id === id)) { slotAsk = { kind: 'load', id }; showSlots('load'); return; }
+    slotAsk = null;
+    if (!loadSlot(id)) { toast('That save can’t be opened.'); showSlots('load'); return; }
+    toast('Loaded.');
+    return;
+  }
+  if (kind === 'slot-del') {
+    slotAsk = null;
+    if (slotKind(id) === 'manual') slotRemove(id);
+    if (currentSlot === id) currentSlot = null;
+    showSlots('load');
+  }
+}
+
 function resumeState(state) {
   G = prepareState(state);
   for (const c of G.cities) placeMissingPlots(c, false);   // saves from before buildings had hexes
@@ -8401,7 +8647,7 @@ function buildStartScreen() {
     document.getElementById('seat-name-' + i).oninput = event => { event.target.dataset.edited = '1'; };
   }
   UI.btnBegin.onclick = beginGame;
-  UI.btnContinue.onclick = () => { const saved = readSave(); if (saved) resumeState(saved.state); };
+  UI.btnContinue.onclick = () => { if (!loadSlot('auto')) { toast('That save can’t be opened.'); refreshStart(); } };
   refreshStart();
 }
 // 2 to 8 players in all: changing one count trims the other to fit.
@@ -8453,9 +8699,11 @@ function refreshStart() {
   UI.startNote.innerHTML = tut
     ? 'The tutorial is ' + TUT_STEPS.length + ' short steps in 8 chapters on a small island, playing Rome. The settings above wait for your next game. Untick <b>Tutorial</b> to skip it.'
     : START_NOTE;
-  const saved = readSave();
-  UI.btnContinue.hidden = !saved;
-  if (saved) UI.btnContinue.textContent = 'Continue · ' + (saved.meta || 'saved game');
+  // Continue is the autosave: the game you were last playing. Load game opens every save.
+  const slots = slotList(), auto = slots.find(s => s.id === 'auto');
+  UI.btnContinue.hidden = !auto;
+  if (auto) UI.btnContinue.textContent = 'Continue · ' + (auto.head.meta || 'saved game');
+  UI.btnLoad.hidden = !slots.length;
 }
 function beginGame() {
   if (UI.optTutorial.checked) { startTutorial(); return; }
@@ -8502,6 +8750,8 @@ function beginGame() {
   render();
   fitCamera();
   if (!G.handoff) focusPlayer(G.viewer);
+  currentSlot = null;
+  slotDirty = false;
   saveGame();
 }
 
@@ -8571,7 +8821,7 @@ function boot(data) {
     optConquest: q('#opt-conquest'), optScience: q('#opt-science'), optTurns: q('#opt-turns'), optMap: q('#opt-map'),
     optLevel: q('#opt-level'), mapNote: q('#map-note'), levelNote: q('#level-note'), optClose: q('#opt-close'), optWrap: q('#opt-wrap'), closeNote: q('#close-note'),
     optTutorial: q('#opt-tutorial'), optTips: q('#opt-tips'), startNote: q('#start-note'),
-    coach: q('#coach'), coachTag: q('#coach-tag'), coachCount: q('#coach-count'), coachSay: q('#coach-say'), coachActions: q('#coach-actions'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), endShown: false, modalKind: null
+    coach: q('#coach'), coachTag: q('#coach-tag'), coachCount: q('#coach-count'), coachSay: q('#coach-say'), coachActions: q('#coach-actions'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), btnLoad: q('#btn-load'), endShown: false, modalKind: null
   };
   applyAnim();
   buildStartScreen();
@@ -8589,6 +8839,16 @@ function boot(data) {
   const tradeInput = event => { if (UI.modalKind === 'trade' && G) refreshTradeForm(!!event.target && event.target.id !== 'tr-price'); };
   UI.modal.addEventListener('input', tradeInput);
   UI.modal.addEventListener('change', tradeInput);
+  // The Save screen's name box: Enter saves to this game's slot (or the first empty one), Esc closes.
+  UI.modal.addEventListener('keydown', event => {
+    if (UI.modalKind !== 'slots' || !event.target || event.target.id !== 'slot-name') return;
+    if (event.key === 'Escape') { event.preventDefault(); onAction('close'); return; }
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const slot = currentSlot && slotHead(currentSlot) ? currentSlot : MANUAL_IDS.find(id => !slotHead(id));
+    if (slot) slotAction('slot-save', slot);
+    else toast('Every slot is full. Pick one to overwrite.');
+  });
   window.addEventListener('resize', () => {
     if (G && cam.fitted) applyCamera();
     layoutPanel();
@@ -8606,8 +8866,8 @@ function boot(data) {
     else if (UI.sheetOpen) setSheet(false);
     else { selection = null; render(); }
   });
-  window.addEventListener('pagehide', autosave);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autosave(); });
+  window.addEventListener('pagehide', saveGame);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveGame(); });
 
   // When this page is republished while open, carry the game across.
   try {

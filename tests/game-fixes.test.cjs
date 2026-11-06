@@ -321,46 +321,227 @@ test('Wordle win animation keeps the winning row after the guess counter advance
   }
 });
 
-test('Ashcrown never writes the solo save during a Bored Together match', () => {
-  // A match hands the whole board to the server, so its turns must not write
-  // (or clear) the campaign slot the single-player game keeps on this device.
+// ── Ashcrown save slots ────────────────────────────────────────────────────────────────────────────
+// The slot storage functions run exactly as shipped, against an in-memory localStorage that can be
+// made small, blocked or corrupt.
+function slotRig(options = {}) {
   const html = load('src/games/content/ashcrown.html');
-  const keyLiteral = html.match(/const SAVE_KEY = ('[^']+');/)[1];
-  const slot = keyLiteral.slice(1, -1);
-  const solo = JSON.stringify({ v: 4, meta: 'lost campaign', state: { v: 4 } });
-  const store = new Map([[slot, solo]]);
-  const writes = [];
-  const ctx = vm.createContext({
-    localStorage: {
-      getItem: key => store.has(key) ? store.get(key) : null,
-      setItem: (key, value) => { writes.push(key); store.set(key, value); },
-      removeItem: key => { writes.push(key); store.delete(key); }
+  const quota = options.quota || Infinity;
+  const store = new Map();
+  const log = [];
+  let clock = 1_000_000;
+  const used = () => [...store].reduce((n, [k, v]) => n + k.length + v.length, 0);
+  const localStorage = {
+    getItem: key => { if (options.blocked) throw new Error('blocked'); return store.has(key) ? store.get(key) : null; },
+    setItem: (key, value) => {
+      if (options.blocked) throw new Error('blocked');
+      const next = used() - (store.has(key) ? key.length + store.get(key).length : 0) + key.length + String(value).length;
+      if (next > quota) { log.push('refused ' + key); throw new Error('QuotaExceededError'); }
+      log.push('set ' + key); store.set(key, String(value));
     },
+    removeItem: key => { if (options.blocked) throw new Error('blocked'); log.push('remove ' + key); store.delete(key); }
+  };
+  class FakeDate extends Date { static now() { return clock; } }
+  const ctx = vm.createContext({
+    localStorage, Date: FakeDate, JSON, Number, Array, String, Math,
     MAP_TYPES: { pangaea: { name: 'Pangaea' } },
-    G: { watch: false, tut: false, over: null, map: 'pangaea', level: 'normal', turn: 4,
-      players: [{ name: 'Rome' }, { name: 'Carthage' }] }
+    CIVS: { rome: { land: 'Rome' }, carthage: { land: 'Carthage' } },
+    LEVELS: { normal: {}, deity: {} },
+    toast: () => {}, slotAction: () => {}, closeModal: () => {},
+    G: null
   });
-  vm.runInContext('const SAVE_KEY = ' + keyLiteral + '; var online = null;' +
-    ['saveGame', 'clearSave', 'autosave'].map(name => extractFunction(html, name)).join('\n'), ctx);
-  assert.equal(ctx.saveGame(), true, 'solo play still saves');
-  const soloSave = store.get(slot);
-  assert.notEqual(soloSave, solo, 'solo play rewrites its own slot');
-  writes.length = 0;
-  ctx.online = { submit() {}, finishTurn() {} };
-  ctx.G.turn = 9;
-  assert.equal(ctx.saveGame(), false, 'a match never saves');
-  ctx.autosave();
-  ctx.G.over = { winner: 0 };
-  assert.equal(ctx.saveGame(), false, 'a finished match never clears the slot either');
-  ctx.autosave();
-  assert.deepEqual(writes, [], 'the match touches storage not at all');
-  assert.equal(store.get(slot), soloSave, 'the solo campaign survives the match');
-  ctx.online = null;
-  ctx.G.over = null;
-  ctx.saveGame();
-  ctx.G.over = { winner: 0 };
-  assert.equal(ctx.saveGame(), false);
-  assert.equal(store.has(slot), false, 'a finished solo game still clears its own slot');
+  const prelude = html.match(/const SLOT_PREFIX[\s\S]*?let slotMode[^\n]*\n/)[0];
+  const names = ['slotKind', 'describeSave', 'defaultSaveName', 'cleanSaveName', 'slotHeader', 'validState', 'slotHead', 'slotRead',
+    'slotRemove', 'slotWrite', 'moveOldSave', 'slotList', 'saveGame', 'clearSave', 'autosave', 'rollTurnSave', 'whyNotSave',
+    'saveToSlot', 'quickSave', 'loadSlot', 'agoText'];
+  vm.runInContext('var online = null;\n' + prelude +
+    'function resumeState(state) { G = state; resumed.push(state); }\nvar resumed = [];\n' +
+    names.map(name => extractFunction(html, name)).join('\n'), ctx);
+  const game = (extra = {}) => ({
+    v: 4, cols: 2, rows: 2, tiles: [{}, {}, {}, {}], units: [], cities: [], conts: [], map: 'pangaea', level: 'normal',
+    players: [{ name: 'Marcus', civ: 'rome', human: true, techs: [] }, { name: 'Dido', civ: 'carthage', human: false, techs: [] }],
+    turn: 4, seed: 77, over: null, ...extra
+  });
+  const read = key => (store.has(key) ? store.get(key) : null);
+  const ids = () => Array.from(vm.runInContext('slotList()', ctx), s => s.id);
+  const head = id => { const raw = read('bored.civlite.slot.' + id); return raw ? JSON.parse(raw.slice(0, raw.indexOf('\n'))) : null; };
+  return { ctx, store, log, game, read, head, used, ids, tick: ms => { clock += ms; return clock; }, now: () => clock,
+    get: expr => vm.runInContext(expr, ctx) };
+}
+
+test('Ashcrown keeps the autosave, three turn autosaves and eight named saves in separate slots', () => {
+  const r = slotRig();
+  r.ctx.G = r.game();
+  assert.equal(r.ctx.saveGame(), true);
+  assert.deepEqual([...r.store.keys()], ['bored.civlite.slot.auto']);
+  assert.equal(r.head('auto').meta, 'Marcus vs Dido · pangaea · turn 4');
+  // The turn autosaves fill three slots, then the oldest is replaced.
+  for (let turn = 5; turn <= 8; turn++) { r.tick(1000); r.ctx.G.turn = turn; assert.equal(r.ctx.rollTurnSave(), true); }
+  const turns = ['t1', 't2', 't3'].map(id => r.head(id).turn).sort();
+  assert.deepEqual(turns, [6, 7, 8], 'the last three turns are kept, turn 5 was rolled out');
+  // A named save is cleaned, lands in its own slot and marks the game as safely in a slot.
+  r.tick(1000);
+  const saved = r.ctx.saveToSlot('m3', '   Before   the   war \n');
+  assert.deepEqual({ ok: saved.ok, name: saved.name }, { ok: true, name: 'Before the war' });
+  assert.equal(r.head('m3').name, 'Before the war');
+  assert.equal(r.get('currentSlot'), 'm3');
+  assert.equal(r.get('slotDirty'), false);
+  r.ctx.autosave();
+  assert.equal(r.get('slotDirty'), true, 'playing on makes it unsaved again');
+  assert.equal(r.ctx.saveToSlot('m3', '').name, 'Rome, turn 8', 'an empty name falls back to "<civ>, turn N"');
+  assert.equal(r.ctx.saveToSlot('m3', 'x'.repeat(80)).name.length, 28, 'names are capped');
+  for (const bad of ['auto', 't1', 'm9', '../x', undefined]) assert.equal(r.ctx.saveToSlot(bad, 'no').ok, false, 'not a named slot: ' + bad);
+  // Listing reads headers only and sees every slot that holds a game.
+  assert.deepEqual(r.ids().sort(), ['auto', 'm3', 't1', 't2', 't3']);
+  // Loading puts the slot's exact game on screen and makes it the autosave.
+  r.ctx.G = r.game({ turn: 40 });
+  assert.equal(r.ctx.loadSlot('m3'), true);
+  assert.equal(r.ctx.G.turn, 8);
+  assert.equal(r.head('auto').turn, 8, 'the autosave is the game on screen');
+  assert.equal(r.ctx.loadSlot('m4'), false, 'an empty slot does not load');
+});
+
+test('Ashcrown never loses a save to a full or broken browser', () => {
+  const probe = slotRig();
+  probe.ctx.G = probe.game({ pad: 'x'.repeat(4000) });
+  probe.ctx.saveGame();
+  const one = probe.used();   // what one save costs in this browser, key and header included
+  // Room for three saves and not a fourth: the autosave, two named saves, and whatever turn autosaves squeeze in.
+  const r = slotRig({ quota: one * 3 + 120 });
+  r.ctx.G = r.game({ pad: 'x'.repeat(4000) });
+  assert.equal(r.ctx.saveGame(), true);
+  for (const turn of [5, 6, 7]) { r.tick(1000); r.ctx.G.turn = turn; r.ctx.rollTurnSave(); }
+  const roll = [r.head('t1'), r.head('t2'), r.head('t3')].filter(Boolean).length;
+  assert.ok(roll >= 1, 'some turn autosaves fit');
+  // Named saves push the turn autosaves out, oldest first. They never push each other, or the autosave, out.
+  r.tick(1000); assert.equal(r.ctx.saveToSlot('m1', 'One').ok, true);
+  r.tick(1000); assert.equal(r.ctx.saveToSlot('m2', 'Two').ok, true);
+  assert.ok(r.head('m1') && r.head('m2') && r.head('auto'));
+  r.tick(1000);
+  const third = r.ctx.saveToSlot('m3', 'Three');
+  assert.equal(third.ok, false, 'with nothing left to give up, the save is refused');
+  assert.match(third.text, /no room/);
+  assert.equal(r.head('m1').name, 'One');
+  assert.equal(r.head('m2').name, 'Two');
+  assert.ok(r.head('auto'), 'the autosave survived');
+  assert.equal(r.head('m3'), null, 'no half-written slot');
+  assert.equal(r.get('currentSlot'), 'm2', 'a refused save does not change which slot the game belongs to');
+  // Overwriting a slot with something that no longer fits keeps the old save whole.
+  r.ctx.G.pad = 'y'.repeat(9000);
+  const before = r.read('bored.civlite.slot.m1');
+  assert.equal(r.ctx.saveToSlot('m1', 'Bigger').ok, false);
+  assert.equal(r.read('bored.civlite.slot.m1'), before, 'the old save is untouched');
+  // Storage that throws on everything never throws back.
+  const blocked = slotRig({ blocked: true });
+  blocked.ctx.G = blocked.game();
+  assert.equal(blocked.ctx.saveGame(), false);
+  assert.equal(blocked.ctx.rollTurnSave(), false);
+  assert.equal(blocked.ctx.saveToSlot('m1', 'x').ok, false);
+  assert.deepEqual(blocked.ids(), []);
+  assert.equal(blocked.ctx.loadSlot('auto'), false);
+  assert.doesNotThrow(() => blocked.ctx.clearSave());
+});
+
+test('Ashcrown moves the single save from before slots into the autosave, losing nothing', () => {
+  const OLD = 'bored.civlite.save.v2';
+  const r = slotRig();
+  const old = { v: 4, at: 500, meta: 'Marcus vs Dido · pangaea · turn 31', state: r.game({ turn: 31 }) };
+  r.store.set(OLD, JSON.stringify(old));
+  assert.deepEqual(r.ids(), ['auto'], 'the old save shows up as the autosave');
+  assert.equal(r.head('auto').turn, 31);
+  assert.equal(r.head('auto').at, 500, 'with its own time');
+  assert.equal(r.store.has(OLD), false, 'and the old key goes once it is safe');
+  assert.equal(r.ctx.loadSlot('auto'), true);
+  assert.equal(r.ctx.G.turn, 31);
+  // An autosave made since is newer: it wins, and the stale key is dropped.
+  const newer = slotRig();
+  newer.ctx.G = newer.game({ turn: 50 }); newer.tick(10_000); newer.ctx.saveGame();
+  newer.store.set(OLD, JSON.stringify({ ...old, at: 5 }));
+  newer.ctx.slotList();
+  assert.equal(newer.head('auto').turn, 50);
+  assert.equal(newer.store.has(OLD), false);
+  // Something unreadable is left exactly where it is, and nothing throws.
+  for (const junk of ['{not json', '{"v":4,"state":{"v":9}}', 'null']) {
+    const odd = slotRig();
+    odd.store.set(OLD, junk);
+    assert.doesNotThrow(() => odd.ctx.slotList());
+    assert.equal(odd.store.get(OLD), junk, 'left alone: ' + junk);
+    assert.equal(odd.head('auto'), null);
+  }
+  // A move that cannot be written keeps the old key, so the game is still on the device.
+  const tiny = slotRig({ quota: 400 });
+  tiny.store.set(OLD, JSON.stringify(old));
+  tiny.ctx.slotList();
+  assert.equal(tiny.store.has(OLD), true, 'not removed when the copy did not fit');
+});
+
+test('Ashcrown slots: a damaged slot is skipped, a finished game clears only its autosave', () => {
+  const r = slotRig();
+  r.ctx.G = r.game();
+  r.ctx.saveGame(); r.tick(1000); r.ctx.rollTurnSave(); r.tick(1000); r.ctx.saveToSlot('m1', 'Keep me');
+  r.store.set('bored.civlite.slot.m2', 'no newline at all');
+  r.store.set('bored.civlite.slot.m4', '{"v":1,"at":1,"name":"x"}\n{broken');
+  r.store.set('bored.civlite.slot.m5', '{"v":7,"at":1}\n{}');
+  r.store.set('bored.civlite.slot.m6', JSON.stringify({ v: 1, at: 1, name: 'Bad game' }) + '\n' + JSON.stringify({ v: 4, tiles: [] }));
+  const listed = r.ids();
+  assert.ok(['m2', 'm5'].every(id => !listed.includes(id)), 'unreadable headers are not listed: ' + listed);
+  for (const id of ['m4', 'm6']) assert.equal(r.ctx.loadSlot(id), false, id + ' has a header but no playable game');
+  // Game over: the autosave goes (nothing to continue), the turn autosaves and named saves stay.
+  r.ctx.G = r.game({ over: { winner: 0, turn: 9 } });
+  assert.equal(r.ctx.saveGame(), false);
+  assert.equal(r.head('auto'), null);
+  assert.ok(r.head('t1') && r.head('m1'), 'a loss can still be undone from a turn autosave or a named save');
+  assert.match(r.ctx.whyNotSave(), /over/);
+  assert.equal(r.ctx.saveToSlot('m2', 'late').ok, false);
+  // The tutorial and watch mode are never saved.
+  for (const flag of [{ tut: {} }, { watch: true }]) {
+    const t = slotRig(); t.ctx.G = t.game(flag);
+    assert.equal(t.ctx.saveGame(), false); assert.equal(t.ctx.rollTurnSave(), false); assert.equal(t.ctx.saveToSlot('m1', 'x').ok, false);
+    assert.equal(t.store.size, 0, 'nothing written for ' + Object.keys(flag));
+  }
+});
+
+test('Ashcrown never touches its save slots during a Bored Together match', () => {
+  // A match hands the whole board to the server, so it must not write, clear or load over
+  // the campaign slots this device keeps for the single-player game.
+  const r = slotRig();
+  r.ctx.G = r.game({ turn: 12 });
+  r.ctx.saveGame(); r.tick(1000); r.ctx.rollTurnSave(); r.tick(1000); r.ctx.saveToSlot('m1', 'Campaign');
+  const before = new Map(r.store);
+  r.log.length = 0;
+  r.ctx.online = { submit() {}, finishTurn() {} };
+  r.ctx.G = r.game({ turn: 3 });
+  assert.equal(r.ctx.saveGame(), false, 'a match never saves');
+  r.ctx.autosave();
+  assert.equal(r.ctx.rollTurnSave(), false);
+  assert.equal(r.ctx.saveToSlot('m2', 'Nope').ok, false);
+  assert.equal(r.ctx.loadSlot('m1'), false, 'and never loads a campaign over the match');
+  r.ctx.G.over = { winner: 0 };
+  assert.equal(r.ctx.saveGame(), false, 'a finished match never clears the autosave either');
+  assert.deepEqual(r.log, [], 'the match touches storage not at all');
+  assert.deepEqual([...r.store], [...before], 'the campaign survives the match');
+});
+
+test('Ashcrown routes slot clicks before the no-game guard, so Load works from the start screen', () => {
+  const html = load('src/games/content/ashcrown.html');
+  const body = extractFunction(html, 'onAction');
+  const slots = body.indexOf("kind.startsWith('slot-')");
+  const guard = body.indexOf('if (!G) {');
+  assert.ok(slots > 0 && guard > 0 && slots < guard, 'slot actions come before "if (!G)"');
+  assert.match(html, /id="btn-load"[^>]*data-act="slots:load"/, 'the start screen has a Load game button');
+  assert.match(html, /addEventListener\('pagehide', saveGame\)/, 'leaving the page saves without marking the game changed');
+});
+
+test('Ashcrown shows how long ago a save was made', () => {
+  const r = slotRig();
+  const ago = (ms, now = 10 * 86400_000) => r.ctx.agoText(now - ms, now);
+  assert.equal(ago(5_000), 'just now');
+  assert.equal(ago(3 * 60_000), '3 min ago');
+  assert.equal(ago(60 * 60_000), '1 hour ago');
+  assert.equal(ago(5 * 3600_000), '5 hours ago');
+  assert.equal(ago(3 * 86400_000), '3 days ago');
+  assert.match(ago(0, 10 * 86400_000 - 0) , /just now/);
+  assert.match(r.ctx.agoText(0, 400 * 86400_000), /\d/, 'a very old save shows a date');
 });
 
 test('A Bored Together document gets an inert continue-where-you-left-off helper', async () => {
