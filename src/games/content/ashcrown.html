@@ -192,11 +192,11 @@
   #modal-layer { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; padding: 24px; z-index: 35 }
   .modal {
     background: var(--panel); border: 1px solid var(--ink); border-radius: 4px;
-    width: min(620px, 94vw); max-height: min(84vh, 760px); display: flex; flex-direction: column;
+    width: min(620px, 100%); max-height: min(84vh, 760px); display: flex; flex-direction: column;
     box-shadow: 0 18px 40px rgba(36,28,18,.22);
   }
-  .modal.narrow { width: min(440px, 94vw) }
-  .modal.wide { width: min(880px, 96vw) }
+  .modal.narrow { width: min(440px, 100%) }
+  .modal.wide { width: min(880px, 100%) }
   .modal-head { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--rule) }
   .modal-head h2 { font-family: var(--font-display); font-size: 17px; font-weight: 600 }
   .modal-head .sub { font-size: 11.5px; color: var(--ink-3); flex: 1 }
@@ -225,19 +225,23 @@
 
   /* ── save slots ──────────────────────────────────────────────────────── */
   .slots { display: flex; flex-direction: column; gap: 5px }
-  .slot { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--rule); border-radius: 3px; padding: 7px 9px; background: var(--panel) }
+  .slot { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 8px 10px; align-items: center; border: 1px solid var(--rule); border-radius: 3px; padding: 7px 9px; background: var(--panel) }
+  .slot-medal { width: 36px; height: 38px; display: block }
+  .slot-medal .pop-art, .fe-item .mi-medal .pop-art { display: block; width: 36px; height: 38px; overflow: visible }
+  .slot-medal .wring, .slot-medal .glint, .mi-medal .wring, .mi-medal .glint { display: none }
   .slot.empty { background: transparent; border-style: dashed }
   .slot.empty .slot-name { color: var(--ink-3) }
   .slot.ask { border-color: var(--ink); background: var(--paper-2) }
   .slot-main { min-width: 0 }
   .slot-name { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-  .slot-meta { display: block; font-size: 10.5px; color: var(--ink-3); line-height: 1.45; overflow-wrap: anywhere }
+  .slot-meta { display: block; font-size: 10.5px; color: var(--ink-3); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .slot-when { display: block; font-size: 10.5px; color: var(--ink-3); line-height: 1.45 }
   .slot-acts { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: flex-end }
   .slot-acts .btn { padding: 4px 9px; font-size: 12px }
   .slot-q { font-size: 11.5px; color: var(--ink-2); max-width: 24ch; text-align: right }
   @media (max-width: 520px) {
-    .slot { grid-template-columns: minmax(0, 1fr) }
-    .slot-acts { justify-content: flex-start }
+    .slot { grid-template-columns: 36px minmax(0, 1fr) }
+    .slot-acts { grid-column: 1 / -1; justify-content: flex-start }
     .slot-q { max-width: none; text-align: left; flex-basis: 100% }
   }
 
@@ -340,6 +344,10 @@
   .fe-item:hover::before, .fe-item:focus-visible::before { background: var(--rust) }
   .fe-item .mi { font-family: var(--font-display); font-size: 21px; font-weight: 600; line-height: 1.25 }
   .fe-item .mi-sub { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-3); line-height: 1.4 }
+  .fe-item.has-medal { grid-template-columns: 36px minmax(0, 1fr) auto; column-gap: 12px; align-items: center }
+  .fe-item.has-medal .mi-medal { grid-row: 1 / span 3; width: 36px; height: 38px; display: block }
+  .fe-item.has-medal .mi, .fe-item.has-medal .mi-sub { grid-column: 2 / -1; min-width: 0 }
+  .fe-item .mi-sub.ell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
   .fe-item.primary .mi { color: var(--rust) }
   .mi-tag {
     align-self: center; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--rust);
@@ -635,7 +643,7 @@
       <h1>Civ Lite</h1>
       <p class="lede">Pick a civ, found cities, research a tech tree, and fight over a random map. Pass one device around for up to 8 players, fill the table with CPUs, and win by taking every capital, by science, or on score when the turns run out.</p>
       <nav class="fe-menu" id="title-menu" aria-label="Main menu">
-        <button class="fe-item" id="btn-continue" type="button" hidden><span class="mi">Continue</span><span class="mi-sub" id="continue-sub"></span></button>
+        <button class="fe-item has-medal" id="btn-continue" type="button" hidden><span class="mi-medal" id="continue-medal" aria-hidden="true"></span><span class="mi">Continue</span><span class="mi-sub ell" id="continue-sub"></span><span class="mi-sub ell" id="continue-detail"></span></button>
         <button class="fe-item" id="btn-new" type="button" data-act="title-new"><span class="mi">New game</span><span class="mi-sub">Choose the players, the map and the rules</span></button>
         <button class="fe-item" id="btn-load" type="button" data-act="slots:load" hidden><span class="mi">Load game</span><span class="mi-sub" id="load-sub"></span></button>
         <button class="fe-item" id="btn-tutorial" type="button" data-act="tut-start"><span class="mi">Tutorial</span><span class="mi-tag" id="tut-tag">New here? Start here</span><span class="mi-sub" id="tut-sub"></span></button>
@@ -974,52 +982,52 @@ const RESEARCH = { name: 'Research', cost: 0, blurb: 'Put a share of this city�
 
 const CIVS = {
   qin:      { leader: 'Qin Shi Huang', land: 'China', focus: 'Production', colors: [['#0f6656', '#5fbfa3'], ['#7a5a00', '#e6c34a']],
-              unique: 'terracotta',
+              unique: 'terracotta', hello: 'China greets you. Let us trade, and build something that lasts.',
               ability: 'Every city gets +1 production per 2 pop.' },
   uk:       { leader: 'Victoria', land: 'UK', focus: 'Research', colors: [['#8c1c24', '#d4676c'], ['#1b2f63', '#7d8fc8']],
-              unique: 'ironclad',
+              unique: 'ironclad', hello: 'The UK greets you. Knowledge shared is knowledge doubled.',
               ability: 'Techs cost 25% less.' },
   inca:     { leader: 'Pachacuti', land: 'Inca', focus: 'Mountains', colors: [['#8a3a12', '#dd8c5c'], ['#0e6470', '#5cb8c4']],
-              unique: 'terrace',
+              unique: 'terrace', hello: 'The Inca welcome you. The mountains have room for friends.',
               ability: 'Units cross mountains for 2 moves, and cities claim mountains like normal land. Natural wonders are off limits: no claiming, no terraces, and the Giant’s Causeway blocks them too.' },
   norway:   { leader: 'Harald Hardrada', land: 'Norway', focus: 'Naval', colors: [['#2c3e55', '#93a7c1'], ['#7d1a2a', '#c96878']],
-              unique: 'longship',
+              unique: 'longship', hello: 'Norway greets you. Our ships have sailed far to find new friends.',
               ability: 'Ships get +5 strength and can take a port at 0 HP, which no other ships can. Land units skip the −10 embark penalty.' },
   india:    { leader: 'Gandhi', land: 'India', focus: 'Food', colors: [['#2e6b2a', '#80c06e'], ['#8f5208', '#f0ae4e']],
-              unique: 'stepwell',
+              unique: 'stepwell', hello: 'India welcomes you, traveler. Our table is always set for guests.',
               ability: 'Growing costs 10% less food.' },
   usa:      { leader: 'Teddy Roosevelt', land: 'USA', focus: 'Builders', colors: [['#1b2f63', '#7d8fc8'], ['#8c1c24', '#d4676c']],
-              unique: 'pioneer',
+              unique: 'pioneer', hello: 'The USA greets you. There is room out here for good neighbors.',
               ability: 'Builders cost half and get 4 charges, chopping gives 30 production, and farms and mines give +1 more.' },
   rome:     { leader: 'Julius Caesar', land: 'Rome', focus: 'Expansion', colors: [['#5a2a82', '#a98bd0'], ['#7a5a00', '#dcc050']],
-              unique: 'legion',
+              unique: 'legion', hello: 'Rome greets you. May our roads one day meet as friends.',
               ability: 'Settlers don’t cost pop, and new cities start at pop 2 with a free Granary.' },
   mongol:   { leader: 'Genghis Khan', land: 'Mongolia', focus: 'Cavalry', colors: [['#155a8a', '#6fb2e2'], ['#6b4a22', '#c9a77a']],
-              unique: 'keshig',
+              unique: 'keshig', hello: 'The Mongols greet you. Ride beside us, and the steppe is yours too.',
               ability: 'Horse units get +1 move, and pastures give +3 horses a turn.' },
   egypt:    { leader: 'Cleopatra', land: 'Egypt', focus: 'Buildings', colors: [['#7a5a00', '#dcc050'], ['#1d3f8a', '#7a98dc']],
-              unique: 'chariot',
+              unique: 'chariot', hello: 'Egypt welcomes you. The river gives, and we gladly share.',
               ability: 'Buildings cost half, and each city gets +1 production for every 2 buildings in it.' },
   zulu:     { leader: 'Shaka', land: 'Zulu', focus: 'Combat', colors: [['#4b3320', '#a88660'], ['#2f2f2f', '#9c968c']],
-              unique: 'impi',
+              unique: 'impi', hello: 'The Zulu greet you. A strong friend is worth a hundred spears.',
               ability: 'Military units cost 20% less, and units that win a fight heal 15 HP.' },
   japan:    { leader: 'Oda Nobunaga', land: 'Japan', focus: 'Coast', colors: [['#8a1f55', '#d887b0'], ['#8c1c24', '#d4676c']],
-              unique: 'samurai',
+              unique: 'samurai', hello: 'Japan welcomes you. We honor guests, and we expect honor in return.',
               ability: 'Shallow water tiles in your borders give +1 production.' },
   france:   { leader: 'Joan of Arc', land: 'France', focus: 'Defense', colors: [['#4a4a4a', '#c9c4bb'], ['#1d3f8a', '#7a98dc']],
-              unique: 'castle',
+              unique: 'castle', hello: 'France greets you. Let us hold the peace, and hold it well.',
               ability: 'Walls cost half, and cities heal 30 HP a turn instead of 20.' },
   ottoman:  { leader: 'Mehmed II', land: 'Ottomans', focus: 'Siege', colors: [['#0d5d6b', '#4fa9b8'], ['#135f36', '#5fb07d']],
-              unique: 'bombard',
+              unique: 'bombard', hello: 'The Ottomans welcome you. Our gates are open to honest friends.',
               ability: 'Catapults get +5 against cities and build 50% faster.' },
   dutch:    { leader: 'William of Orange', land: 'Netherlands', focus: 'Water', colors: [['#9c4a00', '#f39c3f'], ['#1d3f8a', '#7a98dc']],
-              unique: 'polder',
+              unique: 'polder', hello: 'The Dutch greet you. Good water, good trade and good neighbors.',
               ability: 'Harbors cost half and also give +2 production.' },
   celts:    { leader: 'Boudica', land: 'Celts', focus: 'Forests', colors: [['#4f5a12', '#a9b35a'], ['#2e6b2a', '#80c06e']],
-              unique: 'woodsman',
+              unique: 'woodsman', hello: 'The Celts welcome you. Walk our woods in peace, friend.',
               ability: 'Cities get +1 food for every 2 forest tiles they own, and your units get +5 strength in forest.' },
   portugal: { leader: 'Henry the Navigator', land: 'Portugal', focus: 'Colonies', colors: [['#6b1d2a', '#b86a78'], ['#0d4f8f', '#5d9fe0']],
-              unique: 'nau',
+              unique: 'nau', hello: 'Portugal greets you. We sailed far to find new friends.',
               ability: 'Cities on a different continent from your capital get +3 food and +3 production, and Navigation costs half.' }
 };
 const CIV_ORDER = Object.keys(CIVS);
@@ -1034,6 +1042,25 @@ const civTitle = id => (CIVS[id] ? styledName(CIVS[id].leader, id) : '');
 // The long form, for the Council, the history, the realm and the end screen.
 // Tight spots (top bar, handoff, start screen) use just the name.
 const fullName = f => styledName(f.name, f.civ);
+
+/* ── who knows whom (v4.5: first contact, like Civ 6) ── */
+
+// Nobody is known until their land, a city or a unit comes into sight. Meeting is mutual and
+// permanent. A game with no G.met (an older save, a bare test board) counts as everyone met.
+const UNMET = 'Unmet player';
+const hasMet = (a, b) => a === b || !G.met || !!(G.met[a] && G.met[a][b]);
+// What the player at the screen may call player i: the name once they have met, else "Unmet player".
+// short is the leader's name alone. Nobody at the screen (a CPU-only game), or a finished game, shows every name.
+const knows = (viewer, i) => !!G.over || viewer === null || viewer === undefined || hasMet(viewer, i);
+function knownName(viewer, i, short) {
+  const f = pl(i);
+  if (!f) return '';
+  return knows(viewer, i) ? (short ? f.name : fullName(f)) : UNMET;
+}
+// Log lines are shared by everyone at the table, so a name is stored as a marker and turned into
+// text for whoever reads the line. Older saves keep the names they already hold.
+const nameMark = (f, short) => '' + (short ? 'n' : 'p') + f.i + '';
+const logText = (text, viewer) => String(text).replace(/([pn])(\d+)/g, (all, kind, i) => knownName(viewer, Number(i), kind === 'n'));
 // The civ's unique, whatever kind of thing it is: { name, blurb }.
 function civUnique(id) {
   const key = CIVS[id] && CIVS[id].unique;
@@ -1736,7 +1763,7 @@ function startGame(options) {
     open: [], deals: [], nextDeal: 1,
     cols: world.cols, rows: world.rows, tiles: world.tiles, conts: world.conts,
     units: [], cities: [], players: [],
-    dip: [], attitude: [], warSince: [], offers: [],
+    dip: [], attitude: [], warSince: [], met: [], offers: [],
     log: [], seen: [], news: [], firsts: {},
     turn: 0, maxTurns: options.maxTurns || 0, cur: n - 1, viewer: null,
     handoff: false, pending: null, over: null, watch: !!options.watch,
@@ -1757,14 +1784,14 @@ function startGame(options) {
     G.seen.push(new Array(G.cols * G.rows).fill(0));
   });
   for (let a = 0; a < n; a++) {
-    G.dip[a] = []; G.attitude[a] = []; G.warSince[a] = [];
-    for (let b = 0; b < n; b++) { G.dip[a][b] = 'peace'; G.attitude[a][b] = 0; G.warSince[a][b] = 0; }
+    G.dip[a] = []; G.attitude[a] = []; G.warSince[a] = []; G.met[a] = [];
+    for (let b = 0; b < n; b++) { G.dip[a][b] = 'peace'; G.attitude[a][b] = 0; G.warSince[a][b] = 0; G.met[a][b] = a === b; }
   }
   world.starts.forEach((st, i) => {
     addUnit(G.players[i], unitFor(i, 'settler'), st.x, st.y, null);
     addUnit(G.players[i], unitFor(i, 'warrior'), st.x, st.y, null);
   });
-  log('A new ' + MAP_TYPES[G.map].name.toLowerCase() + ' map. ' + G.players.map(fullName).join(', ') +
+  log('A new ' + MAP_TYPES[G.map].name.toLowerCase() + ' map. ' + G.players.map(f => nameMark(f)).join(', ') +
     ' set out to found their capitals.', 'turn', null);
   advanceTurns();
   return G;
@@ -2442,7 +2469,7 @@ function foundProblem(u) {
   if (TERRAIN[t.t].water) return 'Cities go on land';
   if (TERRAIN[t.t].block) return 'Not on mountains';
   if (t.f && FEATURES[t.f].wonder) return 'Not on a natural wonder';
-  if (t.owner !== null && t.owner !== u.owner) return 'That land belongs to ' + pl(t.owner).name;
+  if (t.owner !== null && t.owner !== u.owner) return 'That land belongs to ' + knownName(u.owner, t.owner, true);
   const near = G.cities.find(c => hexDistance(c.x, c.y, u.x, u.y) < 4);
   if (near) return 'Too close to ' + near.name + '. Cities need 4 hexes between centers';
   return '';
@@ -2491,7 +2518,8 @@ function foundCity(u) {
   if (rome) placeMissingPlots(c, true);   // Rome's free granary takes a hex too
   removeUnit(u);
   for (const o of ownUnits(f.i)) if (isMil(o.type) && !o.home) o.home = c.id;
-  log(fullName(f) + ' founds ' + c.name + (c.capital ? ' as its capital' : '') + '.', f.ink, null);
+  log(nameMark(f) + ' founds ' + c.name + (c.capital ? ' as its capital' : '') + '.', f.ink, null);
+  checkContacts(f.i);
   return c;
 }
 
@@ -2595,7 +2623,7 @@ function killUnit(u, killer) {
   if (killer !== null && killer !== undefined) {
     pl(killer).kills += 1;
     awardMoment(killer, 'blood');
-    log(fullName(pl(killer)) + ' destroys a ' + f.name + ' ' + UNITS[u.type].name.toLowerCase() + '.', pl(killer).ink, null);
+    log(nameMark(pl(killer)) + ' destroys a ' + nameMark(f, true) + ' ' + UNITS[u.type].name.toLowerCase() + '.', pl(killer).ink, null);
   } else {
     log('A ' + UNITS[u.type].name.toLowerCase() + ' starves to death.', '#93401d', f.i);
   }
@@ -2671,8 +2699,9 @@ function computeReachable(u) {
       if (best.has(k) && best.get(k) <= total) continue;
       const pass = canPass(u, nx, ny), stop = canStop(u, nx, ny);
       if (!pass && !stop) continue;
-      if (closedOwner(u.owner, nx, ny) >= 0) {
-        if (!human || !stop) continue;
+      const shut = closedOwner(u.owner, nx, ny);
+      if (shut >= 0) {
+        if (!human || !stop || !hasMet(u.owner, shut)) continue;
         best.set(k, total);
         out.set(k, total);
         out.war.add(k);
@@ -2694,15 +2723,16 @@ function captureCivilian(o, by) {
   o.path = null;
   o.mp = 0;
   o.acted = true;
-  log(to.name + ' captures a ' + from.name + ' ' + UNITS[o.type].name.toLowerCase() + '.', to.ink, null);
+  log(nameMark(to, true) + ' captures a ' + nameMark(from, true) + ' ' + UNITS[o.type].name.toLowerCase() + '.', to.ink, null);
 }
 
 function moveUnit(u, x, y, reach) {
   const map = reach || computeReachable(u);
   const cost = map.get(keyOf(x, y));
   if (cost === undefined) return false;
-  // Walking onto closed land is the declaration of war.
+  // Walking onto closed land is the declaration of war, which needs a civ you have met.
   const closed = closedOwner(u.owner, x, y);
+  if (closed >= 0 && !hasMet(u.owner, closed)) return false;
   if (closed >= 0) declareWar(u.owner, closed);
   for (const o of G.units.filter(o => o.x === x && o.y === y && o.owner !== u.owner)) captureCivilian(o, u);
   u.x = x;
@@ -2715,6 +2745,7 @@ function moveUnit(u, x, y, reach) {
   const zoc = zocFor(u);
   if (zoc && zoc.has(keyOf(x, y))) u.pinned = true;
   if (SCI.warWonders) touchWonders(u);
+  checkContacts(u.owner);
   return true;
 }
 
@@ -2815,6 +2846,7 @@ function stepUnit(u, x, y, final) {
   const zoc = zocFor(u);
   if (zoc && zoc.has(keyOf(x, y))) u.pinned = true;
   if (SCI.warWonders) touchWonders(u);
+  checkContacts(u.owner);
   return 'move';
 }
 
@@ -3075,7 +3107,7 @@ function captureCity(c, u) {
   u.path = null;
   rehome(c.id);
   changeAttitude(prev, f.i, -30);
-  log(fullName(f) + ' captures ' + c.name + (c.capital ? ', ' + pf.name + '’s capital,' : '') + ' from ' + fullName(pf) + '.', f.ink, null);
+  log(nameMark(f) + ' captures ' + c.name + (c.capital ? ', ' + nameMark(pf, true) + '’s capital,' : '') + ' from ' + nameMark(pf) + '.', f.ink, null);
   for (const id of (c.capital ? ['capital', 'conquest'] : c.founder === f.i ? ['retake', 'conquest'] : ['conquest'])) if (awardMoment(f.i, id)) break;
   pushNews({ i: prev, kind: 'alert', type: 'lost', by: f.i, city: c.name, at: [c.x, c.y] });
   if (f.human && !c.capital) G.pending = { kind: 'capture', city: c.id };
@@ -3091,7 +3123,7 @@ function burnCity(c) {
   for (const t of G.tiles) if (t.city === c.id) { t.city = null; t.owner = null; }
   rehome(c.id);
   G.cities = G.cities.filter(o => o !== c);
-  log(fullName(f) + ' burns ' + c.name + ' to the ground.', f.ink, null);
+  log(nameMark(f) + ' burns ' + c.name + ' to the ground.', f.ink, null);
   checkElimination();
   checkWin();
   return true;
@@ -3104,15 +3136,16 @@ function changeAttitude(a, b, delta) {
   G.attitude[a][b] = clamp((G.attitude[a][b] || 0) + delta, -100, 50);
 }
 function declareWar(a, b) {
-  if (a === b || atWar(a, b)) return;
+  if (a === b || atWar(a, b) || !hasMet(a, b)) return false;
   G.dip[a][b] = G.dip[b][a] = 'war';
   G.warSince[a][b] = G.warSince[b][a] = G.turn;
   changeAttitude(b, a, -30);
   G.offers = G.offers.filter(o => !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
-  log(fullName(pl(a)) + ' declares war on ' + fullName(pl(b)) + '.', '#93401d', null);
+  log(nameMark(pl(a)) + ' declares war on ' + nameMark(pl(b)) + '.', '#93401d', null);
   pushNews({ i: b, kind: 'alert', type: 'war', by: a });
   G.open = (G.open || []).filter(o => !((o.a === a && o.b === b) || (o.a === b && o.b === a)));
   settleDealsOnWar(a, b);
+  return true;
 }
 function makePeace(a, b) {
   if (!atWar(a, b)) return;
@@ -3120,7 +3153,7 @@ function makePeace(a, b) {
   changeAttitude(a, b, 10);
   changeAttitude(b, a, 10);
   G.offers = G.offers.filter(o => !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
-  log(fullName(pl(a)) + ' and ' + fullName(pl(b)) + ' make peace.', '#41602f', null);
+  log(nameMark(pl(a)) + ' and ' + nameMark(pl(b)) + ' make peace.', '#41602f', null);
   awardMoment(a, 'peace');
   awardMoment(b, 'peace');
 }
@@ -3144,7 +3177,7 @@ function aiWantsPeace(f, other) {
 
 // Returns 'accepted', 'refused', 'sent' (waiting on a human) or ''.
 function offerPeace(from, to) {
-  if (!atWar(from, to)) return '';
+  if (!atWar(from, to) || !hasMet(from, to)) return '';
   const target = pl(to);
   if (!target.human) {
     if (G.tut || aiWantsPeace(target, pl(from))) { makePeace(from, to); return 'accepted'; }
@@ -3208,11 +3241,12 @@ function closedOwner(i, x, y) {
   return t.owner;
 }
 function openBorders(a, b) {
+  if (!hasMet(a, b)) return;
   G.open = (G.open || []).filter(o => !((o.a === a && o.b === b) || (o.a === b && o.b === a)));
   G.open.push({ a, b, until: G.turn + OPEN_TURNS });
   changeAttitude(a, b, 4);
   changeAttitude(b, a, 4);
-  log(fullName(pl(a)) + ' and ' + fullName(pl(b)) + ' open their borders to each other for ' + OPEN_TURNS + ' turns.', '#41602f', null);
+  log(nameMark(pl(a)) + ' and ' + nameMark(pl(b)) + ' open their borders to each other for ' + OPEN_TURNS + ' turns.', '#41602f', null);
   awardMoment(a, 'borders');
   awardMoment(b, 'borders');
 }
@@ -3222,7 +3256,7 @@ function aiAcceptsOpen(f, other) {
 }
 // Asks another player for an open-borders deal. Returns 'accepted', 'refused' or 'sent'.
 function proposeOpen(from, to) {
-  if (atWar(from, to) || openBetween(from, to)) return '';
+  if (atWar(from, to) || openBetween(from, to) || !hasMet(from, to)) return '';
   const target = pl(to);
   if (!target.human) {
     if (aiAcceptsOpen(target, pl(from))) { openBorders(from, to); return 'accepted'; }
@@ -3255,7 +3289,7 @@ function ejectTrespassers(i) {
     u.x = spot[0];
     u.y = spot[1];
     u.path = null;
-    log('Your ' + UNITS[u.type].name.toLowerCase() + ' was moved out of ' + pl(who).name + '’s land: the borders are closed.', pl(i).ink, i);
+    log('Your ' + UNITS[u.type].name.toLowerCase() + ' was moved out of ' + nameMark(pl(who), true) + '’s land: the borders are closed.', pl(i).ink, i);
   }
 }
 // A hex holds 1 soldier and 1 civilian, like Civ 6. The move rules already keep it
@@ -3284,7 +3318,7 @@ function bordersNewRound() {
   const lapsed = (G.open || []).filter(o => G.turn >= o.until);
   if (lapsed.length) {
     G.open = G.open.filter(o => G.turn < o.until);
-    for (const o of lapsed) log('The open-borders deal between ' + fullName(pl(o.a)) + ' and ' + fullName(pl(o.b)) + ' has run out.', '#7a6d57', null);
+    for (const o of lapsed) log('The open-borders deal between ' + nameMark(pl(o.a)) + ' and ' + nameMark(pl(o.b)) + ' has run out.', '#7a6d57', null);
   }
 }
 
@@ -3335,6 +3369,7 @@ function tradeProblem(d) {
   const s = pl(d.seller), b = pl(d.buyer);
   if (!s || !b || !s.alive || !b.alive || d.seller === d.buyer) return 'Not a deal';
   if (atWar(d.seller, d.buyer)) return 'At war';
+  if (!hasMet(d.seller, d.buyer)) return 'You haven’t met';
   if (!TRADE_RES.includes(d.res)) return 'Not for trade';
   if (!(d.qty > 0) || d.qty % TRADE_STEP) return 'Quantities go in fives';
   if ((s[d.res] || 0) < d.qty) return fullName(s) + ' has only ' + (s[d.res] || 0) + ' ' + d.res;
@@ -3373,13 +3408,13 @@ function makeDeal(d) {
   awardMoment(d.buyer, 'trade');
   if (d.turns <= 1) {
     payProduction(d.buyer, d.seller, d.total);
-    log(fullName(b) + ' buys ' + what + ' from ' + fullName(s) + ' for ' + d.total + ' production.', b.ink, null);
+    log(nameMark(b) + ' buys ' + what + ' from ' + nameMark(s) + ' for ' + d.total + ' production.', b.ink, null);
   } else {
     const per = Math.ceil(d.total / d.turns);
     G.deals = G.deals || [];
     G.deals.push({ id: 'd' + (G.nextDeal = (G.nextDeal || 0) + 1), seller: d.seller, buyer: d.buyer, res: d.res, qty: d.qty,
       owed: d.total, per, left: d.turns, total: d.total, turn: G.turn });
-    log(fullName(b) + ' buys ' + what + ' from ' + fullName(s) + ': ' + per + ' production a turn for ' + d.turns + ' turns.', b.ink, null);
+    log(nameMark(b) + ' buys ' + what + ' from ' + nameMark(s) + ': ' + per + ' production a turn for ' + d.turns + ' turns.', b.ink, null);
   }
 }
 // At the start of the buyer's turn, before its cities build: this turn's installment.
@@ -3404,9 +3439,9 @@ function settleDealsOnWar(a, b) {
     G.deals = G.deals.filter(o => o !== d);
     if (d.buyer === a) {
       payProduction(d.buyer, d.seller, d.owed);
-      log(fullName(pl(a)) + ' declares war and pays the ' + d.owed + ' production still owed to ' + fullName(pl(b)) + ' on the spot.', '#93401d', null);
+      log(nameMark(pl(a)) + ' declares war and pays the ' + d.owed + ' production still owed to ' + nameMark(pl(b)) + ' on the spot.', '#93401d', null);
     } else {
-      log(fullName(pl(b)) + ' stops paying ' + fullName(pl(a)) + ' for the ' + d.res + ': the seller went to war.', '#93401d', null);
+      log(nameMark(pl(b)) + ' stops paying ' + nameMark(pl(a)) + ' for the ' + d.res + ': the seller went to war.', '#93401d', null);
     }
   }
   G.offers = G.offers.filter(o => o.kind !== 'trade' || !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
@@ -3460,7 +3495,7 @@ function aiTrade(f) {
     if (have + qty > STOCK_CAP) continue;
     let best = null;
     for (const o of G.players) {
-      if (o.i === f.i || !o.alive || o.human || atWar(f.i, o.i)) continue;
+      if (o.i === f.i || !o.alive || o.human || atWar(f.i, o.i) || !hasMet(f.i, o.i)) continue;
       const d0 = { seller: o.i, buyer: f.i, res, qty, total: 1, turns: 1 };
       if ((o[res] || 0) < qty + 10) continue;
       const ask = tradeAsk(o.i, res, qty, true), bid = tradeBid(f.i, res, qty);
@@ -3482,7 +3517,7 @@ function aiTrade(f) {
 
 // Units see 2 hexes (scouts 3), cities 3, and you always see your own land.
 // Anything seen once stays drawn on the map, dimmed, after it falls out of sight.
-function computeVision(i) {
+function sightOf(i) {
   const vis = new Uint8Array(G.cols * G.rows);
   const mark = (cx, cy, r) => {
     for (let y = Math.max(0, cy - r); y <= Math.min(G.rows - 1, cy + r); y++) {
@@ -3495,6 +3530,10 @@ function computeVision(i) {
   };
   for (const u of ownUnits(i)) mark(u.x, u.y, UNITS[u.type].sight || 2);
   for (const c of ownCities(i)) mark(c.x, c.y, 3);
+  return vis;
+}
+function computeVision(i) {
+  const vis = sightOf(i);
   for (const t of G.tiles) if (t.owner === i) vis[t.y * G.cols + t.x] = 1;
   const seen = G.seen[i];
   for (let k = 0; k < vis.length; k++) if (vis[k]) seen[k] = 1;
@@ -3502,7 +3541,43 @@ function computeVision(i) {
 }
 function refreshVision() {
   VIS = G && G.viewer !== null && !G.watch ? computeVision(G.viewer) : null;
-  if (VIS && pl(G.viewer).human) { noticeWonders(G.viewer); checkMoments(G.viewer); }
+  if (VIS && pl(G.viewer).human) { checkContacts(G.viewer); noticeWonders(G.viewer); checkMoments(G.viewer); }
+}
+
+/* ── first contact (v4.5) ── */
+
+// Does this sight map (from sightOf) cover anything of player b's: a unit, a city or a hex b owns?
+function seesAnyOf(vis, b) {
+  const at = o => vis[o.y * G.cols + o.x] === 1;
+  return G.units.some(u => u.owner === b && at(u)) || G.cities.some(c => c.owner === b && at(c)) || G.tiles.some(t => t.owner === b && at(t));
+}
+// Player i meets everyone whose units, cities or land i can see, and everyone who can see
+// i's. The sight is the fog's own: units 2 hexes (scouts 3), cities 3. CPUs use it too,
+// without building a fog. Called after every move and every new city, and at the start of
+// every turn.
+function checkContacts(i) {
+  if (!G || G.over || G.tut || !G.met) return;
+  const f = pl(i);
+  if (!f || !f.alive) return;
+  const others = G.players.filter(o => o.alive && o.i !== i && !hasMet(i, o.i));
+  if (!others.length) return;
+  const mine = sightOf(i);
+  for (const o of others) if (seesAnyOf(mine, o.i) || seesAnyOf(sightOf(o.i), i)) meet(i, o.i);
+}
+// Two players meet, both ways, for good. Each human gets one card (with the era points of
+// the First contact moment folded in) and a line in their history.
+function meet(a, b) {
+  if (a === b || !G.met || hasMet(a, b)) return;
+  G.met[a][b] = G.met[b][a] = true;
+  const pair = [[a, b], [b, a]];
+  for (const [x, y] of pair) pl(x).met = true;
+  for (const [x, y] of pair) {
+    const f = pl(x);
+    const m = awardMoment(x, 'contact', undefined, false);
+    if (!f.human) continue;
+    log('You meet ' + nameMark(pl(y)) + '.', f.ink, x);
+    pushNews({ i: x, kind: 'meet', other: y, pts: m ? m.pts : 0, first: m ? m.first : false });
+  }
 }
 
 /* ── scoring and the end ───────────────────────────────────────────────────── */
@@ -3540,7 +3615,7 @@ function standings() {
 function endGame(winner, why) {
   if (G.over) return;
   G.over = { winner: winner ? winner.i : null, why, turn: G.turn };
-  log(winner ? fullName(winner) + ' wins. ' + why + '.' : why + '.', winner ? winner.ink : 'turn', null);
+  log(winner ? nameMark(winner) + ' wins. ' + why + '.' : why + '.', winner ? winner.ink : 'turn', null);
   if (online) onlineSubmit();
 }
 
@@ -3556,7 +3631,7 @@ function checkElimination() {
     G.offers = G.offers.filter(o => o.from !== f.i && o.to !== f.i);
     G.open = (G.open || []).filter(o => o.a !== f.i && o.b !== f.i);
     dropDealsOf(f.i);
-    log(fullName(f) + ' is out of the game.', f.ink, null);
+    log(nameMark(f) + ' is out of the game.', f.ink, null);
   }
 }
 
@@ -3586,6 +3661,7 @@ function finishOnScore() {
 
 function beginPlayerTurn(i) {
   const f = pl(i);
+  checkContacts(i);
   G.offers = G.offers.filter(o => o.to !== i || G.turn - o.turn <= 3);
   gatherStock(f);
   ejectTrespassers(i);
@@ -4220,7 +4296,7 @@ function aiDiplomacy(f) {
   // Deity CPUs look further for rivals and can start wars 5 turns sooner.
   const deity = deityCpu(f.i);
   for (const o of G.players) {
-    if (!o.alive || o.i === f.i) continue;
+    if (!o.alive || o.i === f.i || !hasMet(f.i, o.i)) continue;   // no war, peace, borders or mood toward a stranger
     const near = ownCities(f.i).some(c => ownCities(o.i).some(d => hexDistance(c.x, c.y, d.x, d.y) <= (deity ? 10 : 8)));
     changeAttitude(f.i, o.i, near ? -1 : 1);
     // Someone's fleet is at sea, or about to sail: stop them.
@@ -4706,7 +4782,7 @@ function awardMoment(i, id, key, news) {
   if (G.quiet) return null;
   const pts = def.pts * (first ? 2 : 1);
   f.eraPts = (f.eraPts || 0) + pts;
-  log(fullName(f) + ': ' + def.title(key) + '. +' + pts + ' era ' + (pts === 1 ? 'point' : 'points') + (first ? ', first in the world.' : '.'),
+  log(nameMark(f) + ': ' + def.title(key) + '. +' + pts + ' era ' + (pts === 1 ? 'point' : 'points') + (first ? ', first in the world.' : '.'),
     f.ink, first ? null : i);
   if (news !== false && f.human) pushNews({ i, kind: 'moment', id, key, pts, first });
   return { pts, first };
@@ -4775,6 +4851,12 @@ function wonderArt(id) {
   return popFrame(TERRAIN[tiles[0] ? tiles[0].t : 'flat'].fill, WONDER_ART[id](), '', wonderFx(id));
 }
 const NEWS_ICON = { war: 'warrior', lost: 'city', trip: 'expedition', close: 'walls' };
+// A civ's own medallion for the first-contact card: its colors, and the mark of its unique.
+function civMedal(civ, light, ink) {
+  const key = CIVS[civ] && CIVS[civ].unique, own = UNITS[key] ? iconOf(key) : key;
+  const mark = MARK[own] ? own : MARK[key] ? key : 'crown';
+  return popFrame(light, markOnMap(mark, 0, 0, 1.55, ink, 2.1), '', '');
+}
 function medalArt(icon, tone) {
   return popFrame(tone === 'alert' ? '#f3dccd' : '#f6e7b8', markOnMap(icon, 0, 0, 1.55, '#241c12', 2.1), tone, '');
 }
@@ -4801,8 +4883,18 @@ function showNews() {
     text = '<p>' + esc(def.say(n.key)) + '</p>' +
       (n.first ? '<p class="moment">First in the world: double points.</p>' : '<p class="hint">Every civ earns this once. The first in the world gets double.</p>') +
       '<p class="hint">Era points count in your Score.</p>';
+  } else if (n.kind === 'meet') {
+    // First contact, like Civ 6: their colors, their greeting, and what stands between you.
+    const o = pl(n.other), cap = o.capital ? cityById(o.capital) : null;
+    title = CIVS[o.civ].land; sub = 'First contact · ' + esc(fullName(o)); kind = 'First contact'; art = civMedal(o.civ, o.light, o.ink);
+    text = '<p>“' + esc(CIVS[o.civ].hello) + '”</p>' +
+      '<p>' + (cap && seenBy(G.viewer, cap.x, cap.y) ? 'Their capital is ' + esc(cap.name) + '. ' : '') +
+      (atWar(G.viewer, o.i) ? 'You’re at war.' : 'You’re at peace.') +
+      (G.closeTurn && !G.tut && G.turn < G.closeTurn ? ' Their borders close on turn ' + G.closeTurn + '.' : '') + '</p>' +
+      (n.pts ? '<p class="moment">Historic moment: ' + pts(n.pts) + (n.first ? ', double for being first in the world' : '') + '.</p>' : '');
+    go = '<button class="btn" data-act="council">Open Council</button>';
   } else {
-    const by = n.by === undefined ? null : pl(n.by), who = by ? esc(fullName(by)) : '';
+    const by = n.by === undefined ? null : pl(n.by), who = by ? esc(knownName(G.viewer, by.i)) : '';
     kind = 'News'; art = medalArt(NEWS_ICON[n.type], 'alert');
     if (n.type === 'war') {
       title = 'War!'; sub = who + ' declares war';
@@ -4874,11 +4966,8 @@ const EUREKAS = {
   firearms:    { say: 'Build a Fortress',   test: f => ownCities(f.i).some(c => c.buildings.includes('fortress')) }
 };
 function metSomeone(f) {
-  if (f.met) return true;
-  const mine = ownUnits(f.i).map(u => [u.x, u.y, UNITS[u.type].sight || 2]).concat(ownCities(f.i).map(c => [c.x, c.y, 3]));
-  const theirs = G.units.filter(u => u.owner !== f.i).map(u => [u.x, u.y]).concat(G.cities.filter(c => c.owner !== f.i).map(c => [c.x, c.y]));
-  f.met = theirs.some(([x, y]) => mine.some(([a, b, r]) => hexDistance(a, b, x, y) <= r));
-  return f.met;
+  if (!G.met) return !!f.met;
+  return G.players.some(o => o.i !== f.i && hasMet(f.i, o.i));
 }
 function checkEurekas(f) {
   f.boost = f.boost || {};
@@ -4911,7 +5000,7 @@ function finishProject(c, id) {
   f.proj = f.proj || {};
   if (PROJECTS[id].last) {
     f.voyage = { kind: id, city: c.id, left: SCI[PROJECTS[id].trip], from: G.turn };
-    log(fullName(f) + ' sends out the ' + PROJECTS[id].name + ' from ' + c.name + '. It wins if it gets back in ' +
+    log(nameMark(f) + ' sends out the ' + PROJECTS[id].name + ' from ' + c.name + '. It wins if it gets back in ' +
       plural2(f.voyage.left, 'turn') + '. Take ' + c.name + ', or keep it under half HP, to stop it.', f.ink, null);
     awardMoment(c.owner, 'voyage', id);
     for (const o of G.players) {
@@ -4919,7 +5008,7 @@ function finishProject(c, id) {
     }
   } else {
     f.proj[id] = true;
-    log(fullName(f) + ' finishes ' + PROJECTS[id].name + '.', f.ink, null);
+    log(nameMark(f) + ' finishes ' + PROJECTS[id].name + '.', f.ink, null);
     awardMoment(c.owner, 'step', id);
   }
 }
@@ -4933,12 +5022,12 @@ function tickVoyage(f) {
   if (!v) return;
   const c = cityById(v.city), name = PROJECTS[v.kind].name;
   if (!c || c.owner !== f.i) {
-    log(fullName(f) + '’s ' + name + ' is lost: its home city fell.', f.ink, null);
+    log(nameMark(f) + '’s ' + name + ' is lost: its home city fell.', f.ink, null);
     f.voyage = null;
     return;
   }
   if (tripStalled(f)) {
-    log(fullName(f) + '’s ' + name + ' waits: ' + c.name + ' is under siege.', f.ink, null);
+    log(nameMark(f) + '’s ' + name + ' waits: ' + c.name + ' is under siege.', f.ink, null);
     return;
   }
   v.left -= 1;
@@ -5041,6 +5130,13 @@ function prepareState(state) {
   for (const n of state.wonderNews || []) state.news.push({ i: n.i, kind: 'wonder', id: n.id, pts: 0, first: false });
   delete state.wonderNews;
   for (const f of state.players) { f.moments = f.moments || []; f.eraPts = f.eraPts || 0; }
+  // v4.5: first contact. A game from before it has no record of who met whom, so everyone counts as
+  // met: no cards, no era points, and nothing a player was in the middle of changes. A player who
+  // had met nobody yet gets the First contact moment marked as earned, for no points.
+  if (!state.met) {
+    state.met = state.players.map(() => state.players.map(() => true));
+    if (!state.settling) for (const f of state.players) if (!f.moments.includes('contact')) f.moments.push('contact');
+  }
   state.v = 4;
   WRAP_W = state.wrap ? state.cols : 0;
   roadCache.clear();
@@ -6014,7 +6110,7 @@ function buildTutorialIsland() {
     v: 4, seed: 7, rs: 0x2f6e2b1, map: 'pangaea', level: 'normal', size: 'small', victory: { conquest: true, science: true },
     wrap: false, closeTurn: 0, open: [], deals: [], nextDeal: 1, nextOffer: 0,
     cols, rows, tiles, conts, units: [], cities: [], players: [],
-    dip: [['peace', 'peace'], ['peace', 'peace']], attitude: [[0, 0], [0, 0]], warSince: [[0, 0], [0, 0]], offers: [],
+    dip: [['peace', 'peace'], ['peace', 'peace']], attitude: [[0, 0], [0, 0]], warSince: [[0, 0], [0, 0]], met: [[true, true], [true, true]], offers: [],
     log: [], seen: [seen0, new Array(cols * rows).fill(0)],
     turn: 1, maxTurns: 0, cur: 0, viewer: 0, handoff: false, pending: null, over: null, watch: false,
     nextUnit: 1, nextCity: 1, names: ['Rome', 'Cinderhold'], wonderFound: {}, news: [], firsts: {},
@@ -6424,7 +6520,7 @@ const TIPS = [
   // A voyage whose home city has been burned has no port left to reach, so it is
   // neither a threat to point at nor one worth describing.
   { id: 'rival-trip', test: i => scienceOn() && G.players.find(o => o.alive && o.i !== i && o.voyage && cityById(o.voyage.city)),
-    say: (i, o) => esc(o.name) + '’s ' + esc(PROJECTS[o.voyage.kind].name) + ' is on its way: if it gets home in ' + plural(o.voyage.left, 'turn', 'turns') +
+    say: (i, o) => esc(knownName(i, o.i, true)) + '’s ' + esc(PROJECTS[o.voyage.kind].name) + ' is on its way: if it gets home in ' + plural(o.voyage.left, 'turn', 'turns') +
       ', they win. Take ' + esc((cityById(o.voyage.city) || {}).name || 'its home city') + ' to stop it, or keep it under half HP so the trip waits.',
     at: o => { const c = cityById(o.voyage.city); return c ? [c.x, c.y] : null; } },
   { id: 'zoc', test: i => ownUnits(i).find(u => u.pinned),
@@ -6437,7 +6533,7 @@ const TIPS = [
     say: () => 'Masonry lets a city build a road to another of your cities. It costs production by the hex, and units move along paved hexes at half cost. Pick one under Roads in the city panel.',
     at: () => { const c = ownCities(G.viewer)[0]; return [c.x, c.y]; } },
   { id: 'war', test: i => G.players.find(o => o.alive && atWar(i, o.i)),
-    say: (i, o) => 'You’re at war with ' + esc(o.name) + '. Your units get +5 inside your own borders. Offer peace in the Council (D) when you want out.',
+    say: (i, o) => 'You’re at war with ' + esc(knownName(i, o.i, true)) + '. Your units get +5 inside your own borders. Offer peace in the Council (D) when you want out.',
     el: '#btn-council' },
   { id: 'starving', test: i => ownCities(i).find(c => cityYields(c).net < 0),
     say: (i, c) => esc(c.name) + ' is starving: its military units lose 10 HP a turn. Grow more food there, or disband a unit it feeds.',
@@ -6465,7 +6561,7 @@ const TIPS = [
     say: () => 'Builders improve tiles inside your borders: farms, mines, pastures and fishing boats. Each action uses one charge and happens at once.',
     at: u => [u.x, u.y] },
   { id: 'enemy-city', test: i => G.cities.find(c => c.owner !== i && visibleTo(c.x, c.y)),
-    say: (i, c) => 'That’s ' + esc(c.name) + ', a city of ' + esc(pl(c.owner).name) + '’s. Cities defend at 25 + 3 per pop, up to 46. ' +
+    say: (i, c) => 'That’s ' + esc(c.name) + ', a city of ' + esc(knownName(i, c.owner, true)) + '’s. Cities defend at 25 + 3 per pop, up to 46. ' +
       'At war, hit one to 0 HP, then take it with a melee unit.',
     at: c => [c.x, c.y] },
   { id: 'hurt', test: i => ownUnits(i).find(u => isMil(u.type) && u.hp < 100),
@@ -6588,6 +6684,8 @@ const myTurn = () => !!G && !G.over && !G.handoff && !onlineSent && G.viewer !==
 const viewerPlayer = () => (G && G.viewer !== null ? pl(G.viewer) : null);
 const dot = (f, size) => '<span class="dot" style="background:' + f.light + ';border-color:' + f.ink +
   (size ? ';width:' + size + 'px;height:' + size + 'px' : '') + '"></span>';
+// A rival's dot in their colors once you have met them, grey before.
+const dotFor = (viewer, f, size) => dot(knows(viewer, f.i) ? f : { light: '#cfc8bb', ink: '#8d8577' }, size);
 const meter = (cls, part, whole) => '<div class="meter ' + cls + '"><i style="width:' +
   (clamp(whole > 0 ? part / whole : 0, 0, 1) * 100).toFixed(1) + '%"></i></div>';
 const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
@@ -6705,7 +6803,7 @@ function renderLog() {
     '<div class="log-row"><i class="log-mark"' +
     (e.colour && e.colour !== 'turn' ? ' style="background:' + e.colour + '"' : '') + '></i>' +
     '<span class="log-turn">' + String(e.turn).padStart(2, '0') + '</span>' +
-    '<span class="log-text">' + esc(e.text) + '</span></div>').join('')
+    '<span class="log-text">' + esc(logText(e.text, v)) + '</span></div>').join('')
     : '<p class="dock-empty">Nothing has happened yet.</p>';
   if (UI.logToggle) UI.logToggle.textContent = logOpen ? 'Last' : 'All';
   UI.log.scrollTop = UI.log.scrollHeight;
@@ -6932,6 +7030,10 @@ function realmPanel() {
   html += '<p class="sec">Rivals</p><div class="list">';
   for (const o of G.players) {
     if (o.i === f.i) continue;
+    if (!knows(f.i, o.i)) {
+      html += '<div class="row">' + dotFor(f.i, o) + '<span class="nm">' + UNMET + '</span><span class="tag">unmet</span><span class="st">–</span></div>';
+      continue;
+    }
     const war = atWar(f.i, o.i);
     html += '<div class="row">' + dot(o) + '<span class="nm">' + esc(fullName(o)) + (o.human ? '' : ' · CPU') + '</span>' +
       (o.alive ? '<span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'war' : 'peace') + '</span>' : '<span class="tag">out</span>') +
@@ -6992,7 +7094,7 @@ function cityPanel(c) {
   const cont = continentName(tileAt(c.x, c.y));
   let html = '<div class="side-head">' + icon(c.capital ? 'crown' : 'city', 18) + '<h2>' + esc(c.name) + '</h2>' +
     (c.capital ? '<span class="tag">capital</span>' : '') + '</div>' +
-    '<div class="side-sub">' + dot(f, 9) + ' ' + esc(f.name) + ' · ' + esc(CIVS[f.civ].land) + ' · pop ' + c.pop + (cont ? ' · ' + esc(cont) : '') + '</div>' +
+    '<div class="side-sub">' + dotFor(v, f, 9) + ' ' + esc(knownName(v, f.i, true)) + (knows(v, f.i) ? ' · ' + esc(CIVS[f.civ].land) : '') + ' · pop ' + c.pop + (cont ? ' · ' + esc(cont) : '') + '</div>' +
     kv('Health', c.hp + ' / ' + cityMaxHp(c)) + meter('hp', c.hp, cityMaxHp(c)) +
     kv('Defense strength', cityStrength(c)) +
     (cityShot(c) ? kv('Shoots', cityShot(c) + ', range 2') : '');
@@ -7000,8 +7102,8 @@ function cityPanel(c) {
   if (!own) {
     const war = v !== null && atWar(v, c.owner);
     html += kv('Walls', hasWalls(c) ? 'yes' : 'no') +
-      '<p class="hint">' + (war ? 'You are at war with ' + esc(f.name) + '. Hit the city down to 0 HP, then step in with a melee land unit to take it. Ships can batter it but can’t take it' + (civIs(v, 'norway') ? ', unless they’re Norway’s' : '') + '.'
-        : 'You are at peace with ' + esc(f.name) + '.') + '</p>';
+      '<p class="hint">' + (war ? 'You are at war with ' + esc(knownName(v, f.i, true)) + '. Hit the city down to 0 HP, then step in with a melee land unit to take it. Ships can batter it but can’t take it' + (civIs(v, 'norway') ? ', unless they’re Norway’s' : '') + '.'
+        : 'You are at peace with ' + esc(knownName(v, f.i, true)) + '.') + '</p>';
     if (!war && myTurn()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
     html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
     return html;
@@ -7043,7 +7145,7 @@ function cityPanel(c) {
     if (cityShot(c) && !c.shot && shots.length) {
       html += '<p class="sec">Shoot from the walls</p><div class="list">' + shots.map(s =>
         '<button class="row" data-act="shoot:' + c.id + ':' + s.unit.id + '">' + icon(iconOf(s.unit.type), 14) +
-        '<span class="nm">' + esc(pl(s.unit.owner).name) + ' ' + UNITS[s.unit.type].name.toLowerCase() + ' · ' + s.unit.hp + 'hp</span>' +
+        '<span class="nm">' + esc(knownName(G.viewer, s.unit.owner, true)) + ' ' + UNITS[s.unit.type].name.toLowerCase() + ' · ' + s.unit.hp + 'hp</span>' +
         '<span class="st">~' + s.dmg + (s.kills ? ' · kills' : '') + '</span></button>').join('') + '</div>';
     }
   }
@@ -7114,7 +7216,7 @@ function tilePanel(x, y) {
       ter.deep ? '1, after Navigation' : ter.water ? '1, embarked' : t.f === 'forest' ? 2 : ter.cost) +
     (t.road ? kv('Road', 'paved: ' + ROAD_STEP + ' to move along it') : '') +
     (!ter.water && (ter.def || t.f === 'forest') ? kv('Defense bonus', '+' + (ter.def + (t.f === 'forest' ? FEATURES.forest.def : 0))) : '') +
-    kv('Owner', owner ? dot(owner, 9) + ' ' + esc(owner.name) + (worker ? ' · ' + esc(worker.name) : '') : 'nobody');
+    kv('Owner', owner ? dotFor(G.viewer, owner, 9) + ' ' + esc(knownName(G.viewer, owner.i, true)) + (worker ? ' · ' + esc(worker.name) : '') : 'nobody');
   const note = {
     horses: 'A pasture here adds 2 horses a turn to its owner’s stockpile.',
     iron: 'A mine here adds 2 iron a turn to its owner’s stockpile.',
@@ -7123,9 +7225,9 @@ function tilePanel(x, y) {
     reef: wonderNote('reef'), peak: wonderNote('peak'), spring: wonderNote('spring'), stair: wonderNote('stair')
   }[t.f];
   if (v !== null && !G.watch && closedOwner(v, x, y) >= 0) {
-    html += '<div class="hint" style="color:var(--rust)">Closed to you: stepping here means war with ' + esc(pl(closedOwner(v, x, y)).name) + '. Ask for open borders in the Council to pass in peace.</div>';
+    html += '<div class="hint" style="color:var(--rust)">Closed to you: stepping here means war with ' + esc(knownName(v, closedOwner(v, x, y), true)) + '. Ask for open borders in the Council to pass in peace.</div>';
   } else if (v !== null && !G.watch && t.owner !== null && t.owner !== v && openBetween(v, t.owner)) {
-    html += '<div class="hint">Open to you: ' + esc(pl(t.owner).name) + ' agreed to open borders.</div>';
+    html += '<div class="hint">Open to you: ' + esc(knownName(v, t.owner, true)) + ' agreed to open borders.</div>';
   }
   if (note && (G.watch || seesFeature(t, v))) html += '<div class="hint">' + note + '</div>';
   else if (!t.f && nextToPeak(t)) html += '<div class="hint">Next to ' + esc(FEATURES.peak.name) + ': +' + SCI.peakNext + ' science.</div>';
@@ -7142,7 +7244,7 @@ function unitPanel(u) {
   const home = u.home ? cityById(u.home) : null;
   let html = '<div class="side-head">' + icon(iconOf(u.type), 18) + '<h2>' + def.name + '</h2>' +
     (isEmbarked(u) ? '<span class="tag">at sea</span>' : '') + '</div>' +
-    '<div class="side-sub">' + dot(f, 9) + ' ' + esc(f.name) + ' · ' + esc(whereText(t)) + (cont ? ' · ' + esc(cont) : '') + '</div>';
+    '<div class="side-sub">' + dotFor(v, f, 9) + ' ' + esc(knownName(v, f.i, true)) + ' · ' + esc(whereText(t)) + (cont ? ' · ' + esc(cont) : '') + '</div>';
   const stack = unitsAt(u.x, u.y).filter(o => o.owner === u.owner);
   if (u.owner === v && stack.length > 1) {
     html += '<p class="sec">' + stack.length + ' units on this hex</p><div class="actions stack">' + stack.map(o =>
@@ -7170,7 +7272,7 @@ function unitPanel(u) {
 
   if (u.owner !== v) {
     const war = v !== null && atWar(v, u.owner);
-    html += '<p class="hint">' + (war ? 'You are at war with ' + esc(f.name) + '.' : 'You are at peace with ' + esc(f.name) + '. Declare war before you attack.') + '</p>';
+    html += '<p class="hint">' + (war ? 'You are at war with ' + esc(knownName(v, f.i, true)) + '.' : 'You are at peace with ' + esc(knownName(v, f.i, true)) + '. Declare war before you attack.') + '</p>';
     if (!war && myTurn()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
     html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
     return html;
@@ -7217,7 +7319,7 @@ function unitPanel(u) {
       }
       if (targets.length) {
         html += '<p class="sec">Attack</p><div class="list">' + targets.map(s => {
-          const name = s.unit ? pl(s.unit.owner).name + ' ' + UNITS[s.unit.type].name.toLowerCase() + ' · ' + s.unit.hp + 'hp'
+          const name = s.unit ? knownName(G.viewer, s.unit.owner, true) + ' ' + UNITS[s.unit.type].name.toLowerCase() + ' · ' + s.unit.hp + 'hp'
             : s.city.name + ' · ' + s.city.hp + 'hp';
           const out = s.capture ? 'take the city' : '~' + s.dmg + (s.kills ? ' · kills' : s.breaks ? ' · breaks it' : '') +
             (s.back ? ' · you take ~' + s.back + (s.dies ? ' and die' : '') : '');
@@ -7557,8 +7659,10 @@ function showCouncil() {
     }).join('');
   }
   html += '<h3>Players</h3>';
-  for (const o of G.players) {
-    if (o.i === v) continue;
+  // Only civs you have met are here. Offers and deals can only come from them.
+  const metHere = G.players.filter(o => o.i !== v && hasMet(v, o.i));
+  if (!metHere.length) html += '<p class="hint" style="margin-top:0">You haven’t met anyone yet. Explore to find other civs.</p>';
+  for (const o of metHere) {
     const s = scoreParts(o.i);
     if (!o.alive) {
       html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(fullName(o)) + ' <span class="tag">out</span></div></div><div></div></div>';
@@ -7762,6 +7866,9 @@ function showHelp() {
     'A unit or building stays hidden in a city’s list until you know the tech for it.</p>' +
     '<h3>Roads</h3><p>With Masonry a city can build a road to another of your cities, over land that is yours or nobody’s: 4 production per flat hex, 6 per hill or forest hex, never over mountains. ' +
     'Units move along paved hexes for half a move a hex. That is all a road does.</p>' +
+    '<h3>First contact</h3><p>Like Civ 6, you don’t know a civ until you meet it. You meet when one of your units or cities sees one of theirs, or any land they own (or when theirs sees yours): meeting is always mutual, and a card introduces them. ' +
+    'Until then they show as <b>Unmet player</b> with a grey dot, they are missing from your Council, and you can’t declare war on them, trade with them or ask them for borders. A march never walks onto an unmet civ’s closed land: it stops on the hex before. ' +
+    'Everyone you meet starts at peace. CPUs follow the same rules.</p>' +
     '<h3>Borders and the Council</h3><p>From the turn set at the start (30 by default), every player’s land is closed to the others. Stepping onto it without an open-borders deal means war, and you are asked first. ' +
     'Units caught inside when the borders close are moved out at the start of their turn. Ask for open borders in the Council: a deal lasts ' + OPEN_TURNS + ' turns.</p>' +
     '<h3>Trading</h3><p>Horses, iron and gunpowder can be bought and sold in the Council, for production. The resource changes hands at once; the buyer pays in one go or in installments (5 a turn for 10 turns, say). ' +
@@ -8111,12 +8218,13 @@ function onAction(act) {
       break;
     case 'war-ask': if (myTurn()) askWar(Number(a)); break;
     case 'war':
-      if (myTurn()) { declareWar(G.viewer, Number(a)); closeModal(); toast('War with ' + pl(Number(a)).name + '.'); afterAction(); }
+      if (myTurn()) { const ok = declareWar(G.viewer, Number(a)); closeModal(); if (ok) toast('War with ' + pl(Number(a)).name + '.'); afterAction(); }
       break;
     case 'peace': {
       if (!myTurn()) break;
       const r = offerPeace(G.viewer, Number(a));
-      const name = pl(Number(a)).name;
+      const name = knownName(G.viewer, Number(a), true);
+      if (r === '') break;   // not at war with them, or not met: nothing was offered
       toast(r === 'accepted' ? name + ' accepts peace.' : r === 'refused' ? name + ' refuses peace for now.' : 'Offer sent. ' + name + ' answers on their turn.');
       afterAction();
       showCouncil();
@@ -8190,7 +8298,7 @@ function orderUnit(selUnit, x, y) {
     if (strikeInfo(selUnit, x, y)) { strikeAt(selUnit, x, y); return true; }
     const tgt = targetAt(selUnit, x, y);
     if (tgt && tgt.peace !== undefined && hexDistance(selUnit.x, selUnit.y, x, y) <= (shoots(selUnit.type) ? UNITS[selUnit.type].range : 1)) {
-      toast('You are at peace with ' + pl(tgt.peace).name + '. Declare war in the Council first.');
+      toast('You are at peace with ' + knownName(G.viewer, tgt.peace, true) + '. Declare war in the Council first.');
       return true;
     }
   }
@@ -8203,7 +8311,7 @@ function orderUnit(selUnit, x, y) {
     return true;
   }
   if (closedOwner(selUnit.owner, x, y) >= 0) {
-    toast(pl(closedOwner(selUnit.owner, x, y)).name + '’s land is closed. Open borders in the Council, or step in from beside it to declare war.');
+    toast(knownName(selUnit.owner, closedOwner(selUnit.owner, x, y), true) + '’s land is closed. Open borders in the Council, or step in from beside it to declare war.');
     return true;
   }
   // Too far to reach this turn: queue a multi-turn route, Civ 6 style.
@@ -8221,8 +8329,8 @@ function orderUnit(selUnit, x, y) {
 }
 function askEnterWar(u, x, y) {
   const who = pl(closedOwner(u.owner, x, y));
-  openModal(modalHead('Step onto ' + esc(who.name) + '’s land?') +
-    '<div class="modal-body"><p>The borders are closed. Stepping onto ' + esc(fullName(who)) + '’s land means <b>war with them, starting now</b>. ' +
+  openModal(modalHead('Step onto ' + esc(knownName(G.viewer, who.i, true)) + '’s land?') +
+    '<div class="modal-body"><p>The borders are closed. Stepping onto ' + esc(knownName(G.viewer, who.i)) + '’s land means <b>war with them, starting now</b>. ' +
     'Their units can hit yours back, and you can make peace only if they agree.</p>' +
     '<p class="hint">To pass in peace, ask for open borders in the Council first.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Stay out</button>' +
@@ -8446,17 +8554,65 @@ let slotDirty = true;     // played since it was last put in a named slot, or st
 let slotMode = 'load', slotAsk = null, slotDraft = null;   // the Save / Load screen
 
 function slotKind(id) { return id === 'auto' ? 'auto' : TURN_IDS.includes(id) ? 'turn' : MANUAL_IDS.includes(id) ? 'manual' : null; }
+// A save names the humans and never the CPUs: no CPU civ or leader appears in a name, a detail
+// line or a Load row. The era is the furthest any human has reached.
+function humansOf(state) {
+  const h = state.players.filter(p => p.human);
+  return h.length ? h : state.players.slice(0, 1);
+}
+function sizeOfState(state) {
+  return state.size || (state.cols >= 40 ? 'huge' : state.cols >= 34 ? 'large' : state.cols >= 26 ? 'standard' : 'small');
+}
+// The highest era of anything the player knows, 1 (Ancient) with nothing known.
+function eraOfPlayer(f) {
+  let era = 1;
+  for (const id of f.techs || []) if (TECHS[id] && TECHS[id].era > era) era = TECHS[id].era;
+  for (const k of f.moments || []) if (k.indexOf('era:') === 0) era = Math.max(era, Number(k.slice(4)) || 1);
+  return Math.min(era, 4);
+}
+function saveEra(state) {
+  return ERA_NAMES[Math.max(...humansOf(state).map(eraOfPlayer))];
+}
+// A save's score for one player by the game's own rules, which read G: the save stands in as G for a moment.
+function scoreOfState(state, i) {
+  const keep = G;
+  try {
+    G = state;
+    if (state.players[i].future === undefined) state.players[i].future = 0;
+    const total = scoreParts(i).total;
+    return Number.isFinite(total) ? total : 0;
+  } catch (error) {
+    return 0;
+  } finally {
+    G = keep;
+  }
+}
+// "China + 3 CPUs · Standard Pangaea · Deity · 6 cities · Score 84". With two or more humans there is
+// no single realm to count, so the cities and the score are left out.
 function describeSave(state) {
-  return state.players.map(p => p.name).join(' vs ') + ' · ' + MAP_TYPES[state.map].name.toLowerCase() +
-    (state.level === 'deity' ? ' · deity' : '') + ' · turn ' + state.turn;
+  const humans = humansOf(state), cpus = state.players.length - humans.length;
+  const size = (MAP_SIZES[sizeOfState(state)] || MAP_SIZES.standard).name, level = (LEVELS[state.level] || LEVELS.normal).name;
+  let text = humans.map(p => CIVS[p.civ].land).join(', ') + (cpus ? ' + ' + plural(cpus, 'CPU', 'CPUs') : '') +
+    ' · ' + size + ' ' + MAP_TYPES[state.map].name + ' · ' + level;
+  if (humans.length === 1) {
+    text += ' · ' + plural(state.cities.filter(c => c.owner === humans[0].i).length, 'city', 'cities') + ' · Score ' + scoreOfState(state, humans[0].i);
+  }
+  return text;
 }
+// "Qin Shi Huang · Medieval · Turn 42", or "Qin Shi Huang & Oda Nobunaga · Medieval · Turn 42".
 function defaultSaveName(state) {
-  const f = state.players.find(p => p.human) || state.players[0];
-  return (CIVS[f.civ] ? CIVS[f.civ].land : f.name) + ', turn ' + state.turn;
+  return humansOf(state).map(f => CIVS[f.civ].leader).join(' & ') + ' · ' + saveEra(state) + ' · Turn ' + state.turn;
 }
-function cleanSaveName(text) { return String(text || '').replace(/\s+/g, ' ').trim().slice(0, 28); }
+function autoSaveName(state) {
+  return 'Autosave · Turn ' + state.turn;
+}
+function cleanSaveName(text) { return String(text || '').replace(/\s+/g, ' ').trim().slice(0, 60); }
+// The header is everything a list row needs, so a list never parses a game: mv 2 adds the first
+// human's civ and colors (for the medallion) and the era.
 function slotHeader(kind, state, name, at) {
-  return { v: 1, at: at || Date.now(), kind, name: name || '', meta: describeSave(state), turn: state.turn, seed: state.seed };
+  const f = humansOf(state)[0];
+  return { v: 1, mv: 2, at: at || Date.now(), kind, name: kind === 'manual' ? name || '' : autoSaveName(state), meta: describeSave(state),
+    turn: state.turn, seed: state.seed, civ: f.civ, color: f.light, ink: f.ink, era: saveEra(state) };
 }
 function validState(state) {
   return !!state && (state.v === 2 || state.v === 3 || state.v === 4) && Array.isArray(state.tiles) && Array.isArray(state.players) && state.players.length >= 2 &&
@@ -8518,10 +8674,31 @@ function moveOldSave() {
     if (slotWrite('auto', slotHeader('auto', old.state, '', at), old.state)) localStorage.removeItem(OLD_SAVE_KEY);
   } catch (error) { /* leave the old save where it is */ }
 }
+// A slot saved before v4.5 has a plain header. When a list shows it, its name (unless the player typed
+// one), details, civ, colors and era are rebuilt from the game inside it, and the header is written back
+// as mv 2 so that happens once. An old name equal to the old default, "<land>, turn <n>", was never typed.
+function upgradeHead(id, head) {
+  if (head.mv === 2) return head;
+  try {
+    const raw = localStorage.getItem(SLOT_PREFIX + id), cut = raw ? raw.indexOf('\n') : -1;
+    if (cut < 1) return head;
+    const state = JSON.parse(raw.slice(cut + 1));
+    if (!validState(state)) return head;
+    const f = humansOf(state)[0], kind = slotKind(id);
+    const oldDefault = (CIVS[f.civ] ? CIVS[f.civ].land : f.name) + ', turn ' + state.turn;
+    const typed = kind === 'manual' && !!head.name && head.name !== oldDefault;
+    const next = Object.assign({}, head, { mv: 2, name: kind === 'manual' ? (typed ? head.name : defaultSaveName(state)) : autoSaveName(state),
+      meta: describeSave(state), civ: f.civ, color: f.light, ink: f.ink, era: saveEra(state) });
+    try { localStorage.setItem(SLOT_PREFIX + id, JSON.stringify(next) + '\n' + raw.slice(cut + 1)); } catch (error) { /* full or blocked: it shows rebuilt anyway */ }
+    return next;
+  } catch (error) {
+    return head;
+  }
+}
 // Every slot that holds a game, with its header.
 function slotList() {
   moveOldSave();
-  return SLOT_IDS.map(id => ({ id, head: slotHead(id) })).filter(s => s.head);
+  return SLOT_IDS.map(id => ({ id, head: slotHead(id) })).filter(s => s.head).map(s => ({ id: s.id, head: upgradeHead(s.id, s.head) }));
 }
 
 function saveGame() {
@@ -8584,15 +8761,26 @@ function loadSlot(id) {
   return true;
 }
 
+// "just now", "5 minutes ago", "2 hours ago", "yesterday", "3 days ago", then a short date like "Nov 2"
+// after a week (with the year when it isn't this one). Worked out each time a screen opens.
 function agoText(at, now) {
-  const secs = Math.max(0, Math.round(((now || Date.now()) - at) / 1000));
-  if (secs < 45) return 'just now';
-  const mins = Math.round(secs / 60);
-  if (mins < 60) return mins + ' min ago';
-  const hours = Math.round(mins / 60);
-  if (hours < 36) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
-  const days = Math.round(hours / 24);
-  return days < 45 ? days + ' days ago' : new Date(at).toLocaleDateString();
+  const here = now || Date.now(), secs = Math.max(0, Math.floor((here - at) / 1000));
+  if (secs < 60) return 'just now';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return plural(mins, 'minute', 'minutes') + ' ago';
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return plural(hours, 'hour', 'hours') + ' ago';
+  const days = Math.floor(hours / 24);
+  if (days < 2) return 'yesterday';
+  if (days < 7) return days + ' days ago';
+  const then = new Date(at), sameYear = then.getFullYear() === new Date(here).getFullYear();
+  return then.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+// The little hexagon on a list row: the first human's colors and their civ's mark, like the event cards.
+function slotMedal(head) {
+  if (!head) return '<svg class="pop-art" viewBox="-38 -40 76 80" aria-hidden="true"><polygon points="' + hexPoints(HEX_R - 1.2) +
+    '" fill="none" stroke="#a8a090" stroke-width="1.6" stroke-dasharray="4 3"/></svg>';
+  return civMedal(head.civ, head.color || '#cfc8bb', head.ink || '#241c12');
 }
 const readSlotName = () => { const field = document.getElementById('slot-name'); return field ? field.value : slotDraft; };
 
@@ -8610,9 +8798,8 @@ function showSlots(mode) {
     const head = heads[id], kind = slotKind(id);
     if (!head && !(saving && kind === 'manual')) return '';
     const ask = slotAsk && slotAsk.id === id ? slotAsk.kind : null;
-    const title = kind === 'manual' ? (head ? head.name || 'Saved game' : 'Empty slot')
-      : kind === 'auto' ? 'Autosave' : 'Start of turn ' + head.turn;
-    const detail = head ? esc(head.meta) + ' · ' + agoText(head.at, now) : 'Slot ' + id.slice(1);
+    const title = kind === 'manual' ? (head ? head.name || 'Saved game' : 'Empty slot') : head.name || 'Autosave · Turn ' + head.turn;
+    const detail = head ? esc(head.meta) : 'Slot ' + id.slice(1);
     let acts = '';
     if (ask) {
       const question = ask === 'overwrite' ? 'Replace this save?' : ask === 'delete' ? 'Delete this save?' : 'This replaces the game you’re playing, which isn’t in a slot.';
@@ -8625,15 +8812,16 @@ function showSlots(mode) {
       acts = '<button class="btn primary" data-act="slot-load:' + id + '">Load</button>' +
         (kind === 'manual' ? '<button class="btn" data-act="slot-ask:delete:' + id + '">Delete</button>' : '');
     }
-    return '<div class="slot' + (head ? '' : ' empty') + (ask ? ' ask' : '') + '" data-slot="' + id + '"><div class="slot-main"><span class="slot-name">' +
-      esc(title) + '</span><span class="slot-meta">' + detail + '</span></div><div class="slot-acts">' + acts + '</div></div>';
+    return '<div class="slot' + (head ? '' : ' empty') + (ask ? ' ask' : '') + '" data-slot="' + id + '"><span class="slot-medal">' + slotMedal(head) +
+      '</span><div class="slot-main"><span class="slot-name" title="' + esc(title) + '">' + esc(title) + '</span><span class="slot-meta" title="' + (head ? esc(head.meta) : '') + '">' + detail +
+      '</span>' + (head ? '<span class="slot-when">' + agoText(head.at, now) + '</span>' : '') + '</div><div class="slot-acts">' + acts + '</div></div>';
   };
   const named = MANUAL_IDS.map(row).join('');
   const byNewest = TURN_IDS.slice().sort((a, b) => (heads[b] ? heads[b].at : 0) - (heads[a] ? heads[a].at : 0));
   const autos = ['auto'].concat(byNewest).map(row).join('');
   openModal(modalHead(saving ? 'Save game' : 'Load game', saving ? 'Turn ' + G.turn + ' · pick a slot' : '') +
     '<div class="modal-body">' +
-    (saving ? '<div class="tform"><label for="slot-name">Name</label><input type="text" id="slot-name" maxlength="28" value="' + esc(draft) +
+    (saving ? '<div class="tform"><label for="slot-name">Name</label><input type="text" id="slot-name" maxlength="60" value="' + esc(draft) +
       '" autocomplete="off" spellcheck="false"></div>' : '') +
     '<h3>Your saves</h3>' +
     (named ? '<div class="slots">' + named + '</div>' : '<p class="hint">Nothing saved yet. Use Save game in the Menu, or press Ctrl+S in a game, to keep one.</p>') +
@@ -8700,7 +8888,7 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '4.4';
+const VERSION = '4.5';
 
 /* ── the front end: a title screen, then game setup (like Civ 6) ───────────── */
 
@@ -8780,7 +8968,9 @@ function refreshTitle() {
   const slots = online ? [] : slotList(), auto = slots.find(s => s.id === 'auto');
   const named = slots.filter(s => slotKind(s.id) === 'manual').length;
   UI.btnContinue.hidden = !auto;
-  document.getElementById('continue-sub').textContent = auto ? (auto.head.meta || 'Saved game') + ' · ' + agoText(auto.head.at) : '';
+  document.getElementById('continue-sub').textContent = auto ? (auto.head.name || 'Autosave · Turn ' + auto.head.turn) + ' · ' + agoText(auto.head.at) : '';
+  document.getElementById('continue-detail').textContent = auto ? auto.head.meta || '' : '';
+  document.getElementById('continue-medal').innerHTML = auto ? slotMedal(auto.head) : '';
   UI.btnLoad.hidden = !slots.length;
   document.getElementById('load-sub').textContent = named ? plural(named, 'named save', 'named saves') + ' and your autosaves' : 'Your autosaves';
   UI.btnContinue.classList.toggle('primary', !!auto);

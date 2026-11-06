@@ -344,22 +344,29 @@ function slotRig(options = {}) {
   class FakeDate extends Date { static now() { return clock; } }
   const ctx = vm.createContext({
     localStorage, Date: FakeDate, JSON, Number, Array, String, Math,
-    MAP_TYPES: { pangaea: { name: 'Pangaea' } },
-    CIVS: { rome: { land: 'Rome' }, carthage: { land: 'Carthage' } },
-    LEVELS: { normal: {}, deity: {} },
+    MAP_TYPES: { pangaea: { name: 'Pangaea' }, islands: { name: 'Islands' } },
+    MAP_SIZES: { small: { name: 'Small' }, standard: { name: 'Standard' }, huge: { name: 'Huge' } },
+    CIVS: { rome: { land: 'Rome', leader: 'Julius Caesar' }, carthage: { land: 'Carthage', leader: 'Hannibal' }, qin: { land: 'China', leader: 'Qin Shi Huang' },
+      japan: { land: 'Japan', leader: 'Oda Nobunaga' }, inca: { land: 'Inca', leader: 'Pachacuti' } },
+    LEVELS: { normal: { name: 'Normal' }, deity: { name: 'Deity' } },
+    TECHS: { pottery: { era: 1 }, bronze: { era: 1 }, writing: { era: 2 }, stirrups: { era: 3 }, firearms: { era: 4 } },
+    ERA_NAMES: { 1: 'Ancient', 2: 'Classical', 3: 'Medieval', 4: 'Renaissance' },
+    plural: (n, one, many) => n + ' ' + (n === 1 ? one : many),
+    scoreParts: () => ({ total: 84 }),
     toast: () => {}, slotAction: () => {}, closeModal: () => {},
     G: null
   });
   const prelude = html.match(/const SLOT_PREFIX[\s\S]*?let slotMode[^\n]*\n/)[0];
-  const names = ['slotKind', 'describeSave', 'defaultSaveName', 'cleanSaveName', 'slotHeader', 'validState', 'slotHead', 'slotRead',
-    'slotRemove', 'slotWrite', 'moveOldSave', 'slotList', 'saveGame', 'clearSave', 'autosave', 'rollTurnSave', 'whyNotSave',
-    'saveToSlot', 'quickSave', 'loadSlot', 'agoText'];
+  const names = ['slotKind', 'humansOf', 'sizeOfState', 'eraOfPlayer', 'saveEra', 'scoreOfState', 'describeSave', 'defaultSaveName', 'autoSaveName',
+    'cleanSaveName', 'slotHeader', 'validState', 'slotHead', 'slotRead', 'upgradeHead', 'slotRemove', 'slotWrite', 'moveOldSave', 'slotList',
+    'saveGame', 'clearSave', 'autosave', 'rollTurnSave', 'whyNotSave', 'saveToSlot', 'quickSave', 'loadSlot', 'agoText'];
   vm.runInContext('var online = null;\n' + prelude +
     'function resumeState(state) { G = state; resumed.push(state); }\nvar resumed = [];\n' +
     names.map(name => extractFunction(html, name)).join('\n'), ctx);
   const game = (extra = {}) => ({
-    v: 4, cols: 2, rows: 2, tiles: [{}, {}, {}, {}], units: [], cities: [], conts: [], map: 'pangaea', level: 'normal',
-    players: [{ name: 'Marcus', civ: 'rome', human: true, techs: [] }, { name: 'Dido', civ: 'carthage', human: false, techs: [] }],
+    v: 4, cols: 2, rows: 2, tiles: [{}, {}, {}, {}], units: [], cities: [{ owner: 0 }], conts: [], map: 'pangaea', level: 'normal', size: 'standard',
+    players: [{ i: 0, name: 'Marcus', civ: 'rome', human: true, techs: [], light: '#aa88cc', ink: '#5a2a82' },
+      { i: 1, name: 'Dido', civ: 'carthage', human: false, techs: [], light: '#cccccc', ink: '#444444' }],
     turn: 4, seed: 77, over: null, ...extra
   });
   const read = key => (store.has(key) ? store.get(key) : null);
@@ -374,7 +381,9 @@ test('Ashcrown keeps the autosave, three turn autosaves and eight named saves in
   r.ctx.G = r.game();
   assert.equal(r.ctx.saveGame(), true);
   assert.deepEqual([...r.store.keys()], ['bored.civlite.slot.auto']);
-  assert.equal(r.head('auto').meta, 'Marcus vs Dido · pangaea · turn 4');
+  assert.equal(r.head('auto').meta, 'Rome + 1 CPU · Standard Pangaea · Normal · 1 city · Score 84');
+  assert.equal(r.head('auto').name, 'Autosave · Turn 4');
+  assert.deepEqual({ mv: r.head('auto').mv, civ: r.head('auto').civ, color: r.head('auto').color, era: r.head('auto').era }, { mv: 2, civ: 'rome', color: '#aa88cc', era: 'Ancient' });
   // The turn autosaves fill three slots, then the oldest is replaced.
   for (let turn = 5; turn <= 8; turn++) { r.tick(1000); r.ctx.G.turn = turn; assert.equal(r.ctx.rollTurnSave(), true); }
   const turns = ['t1', 't2', 't3'].map(id => r.head(id).turn).sort();
@@ -388,8 +397,8 @@ test('Ashcrown keeps the autosave, three turn autosaves and eight named saves in
   assert.equal(r.get('slotDirty'), false);
   r.ctx.autosave();
   assert.equal(r.get('slotDirty'), true, 'playing on makes it unsaved again');
-  assert.equal(r.ctx.saveToSlot('m3', '').name, 'Rome, turn 8', 'an empty name falls back to "<civ>, turn N"');
-  assert.equal(r.ctx.saveToSlot('m3', 'x'.repeat(80)).name.length, 28, 'names are capped');
+  assert.equal(r.ctx.saveToSlot('m3', '').name, 'Julius Caesar · Ancient · Turn 8', 'an empty name falls back to "<leader> · <era> · Turn N"');
+  assert.equal(r.ctx.saveToSlot('m3', 'x'.repeat(80)).name.length, 60, 'names are capped');
   for (const bad of ['auto', 't1', 'm9', '../x', undefined]) assert.equal(r.ctx.saveToSlot(bad, 'no').ok, false, 'not a named slot: ' + bad);
   // Listing reads headers only and sees every slot that holds a game.
   assert.deepEqual(r.ids().sort(), ['auto', 'm3', 't1', 't2', 't3']);
@@ -536,12 +545,21 @@ test('Ashcrown shows how long ago a save was made', () => {
   const r = slotRig();
   const ago = (ms, now = 10 * 86400_000) => r.ctx.agoText(now - ms, now);
   assert.equal(ago(5_000), 'just now');
-  assert.equal(ago(3 * 60_000), '3 min ago');
+  assert.equal(ago(59_000), 'just now');
+  assert.equal(ago(60_000), '1 minute ago');
+  assert.equal(ago(5 * 60_000), '5 minutes ago');
   assert.equal(ago(60 * 60_000), '1 hour ago');
-  assert.equal(ago(5 * 3600_000), '5 hours ago');
+  assert.equal(ago(2 * 3600_000), '2 hours ago');
+  assert.equal(ago(23 * 3600_000), '23 hours ago');
+  assert.equal(ago(30 * 3600_000), 'yesterday');
   assert.equal(ago(3 * 86400_000), '3 days ago');
-  assert.match(ago(0, 10 * 86400_000 - 0) , /just now/);
-  assert.match(r.ctx.agoText(0, 400 * 86400_000), /\d/, 'a very old save shows a date');
+  assert.equal(ago(6 * 86400_000 + 23 * 3600_000), '6 days ago');
+  // After a week it is a short date, with the year only when it is not this year.
+  const now = Date.UTC(2026, 10, 6, 12);
+  assert.equal(r.ctx.agoText(Date.UTC(2026, 9, 29, 12), now), 'Oct 29');
+  assert.equal(r.ctx.agoText(Date.UTC(2026, 10, 2, 12) - 5 * 86400_000, now), 'Oct 28');
+  assert.equal(r.ctx.agoText(Date.UTC(2025, 10, 2, 12), now), 'Nov 2, 2025');
+  assert.equal(r.ctx.agoText(now + 5000, now), 'just now', 'a clock that ran backwards never shows a negative time');
 });
 
 // v4.4: a title screen, then game setup.
@@ -669,7 +687,8 @@ test('Ashcrown\'s title shows Continue and Load game from the saves, and never r
   const r = slotRig();
   const html = r.get('1') && load('src/games/content/ashcrown.html');
   const mk = (extra = {}) => ({ hidden: false, textContent: '', classList: { on: {}, toggle(name, on) { this.on[name] = !!on; } }, ...extra });
-  const els = { 'continue-sub': mk(), 'load-sub': mk(), 'tut-tag': mk(), 'tut-sub': mk() };
+  const els = { 'continue-sub': mk(), 'continue-detail': mk(), 'continue-medal': mk({ innerHTML: '' }), 'load-sub': mk(), 'tut-tag': mk(), 'tut-sub': mk() };
+  r.ctx.slotMedal = head => '<svg data-civ="' + head.civ + '"></svg>';
   r.ctx.document = { getElementById: id => els[id] };
   r.ctx.UI = { btnContinue: mk(), btnLoad: mk(), btnNew: mk() };
   r.ctx.tutorialDone = () => false;
@@ -690,7 +709,9 @@ test('Ashcrown\'s title shows Continue and Load game from the saves, and never r
   r.ctx.tutorialDone = () => true;
   r.ctx.refreshTitle();
   assert.equal(r.ctx.UI.btnContinue.hidden, false);
-  assert.equal(els['continue-sub'].textContent, 'Marcus vs Dido · pangaea · turn 4 · 5 min ago');
+  assert.equal(els['continue-sub'].textContent, 'Autosave · Turn 4 · 5 minutes ago');
+  assert.equal(els['continue-detail'].textContent, 'Rome + 1 CPU · Standard Pangaea · Normal · 1 city · Score 84');
+  assert.equal(els['continue-medal'].innerHTML, '<svg data-civ="rome"></svg>', 'the medallion is the first human’s civ');
   assert.equal(r.ctx.UI.btnContinue.classList.on.primary, true);
   assert.equal(r.ctx.UI.btnNew.classList.on.primary, false);
   assert.equal(r.ctx.UI.btnLoad.hidden, false);
@@ -850,4 +871,481 @@ test('Ashcrown launches new ships onto the water beside their city', () => {
   assert.equal(String(spot('warrior')), '5,5', 'a land unit still appears in the city');
   open.land = new Set(['4,5']);
   assert.equal(String(spot('warrior')), '4,5', 'or beside it when the city is occupied');
+});
+
+/* ── Ashcrown 4.5: first contact ─────────────────────────────────────────────
+   These run the whole game script in a bare VM (no page). The script only boots when a
+   document exists, so it just defines its functions; the tests drive them directly. */
+
+function civRig(seats, { seed = 12345, map = 'pangaea', flat = true, closeTurn = 30, level = 'normal' } = {}) {
+  const html = load('src/games/content/ashcrown.html');
+  const script = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
+  const store = new Map();
+  const ctx = vm.createContext({
+    localStorage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) }
+  });
+  vm.runInContext(script, ctx);
+  const run = code => vm.runInContext(code, ctx);
+  const modals = [], toasts = [];
+  ctx.openModal = html => { modals.push(html); };
+  ctx.closeModal = ctx.render = () => {};
+  ctx.toast = text => { toasts.push(text); };
+  run('UI = { modalKind: null }');
+  ctx.seats = seats;
+  run('startGame({ seats, seed: ' + seed + ', map: "' + map + '", level: "' + level + '", closeTurn: ' + closeTurn + ' })');
+  const r = {
+    ctx, run, modals, toasts, store,
+    get G() { return run('G'); },
+    // A level sandbox: all land, nobody on it, nobody met, every moment unspent.
+    sandbox() {
+      run(`for (const t of G.tiles) { t.t = 'flat'; t.f = null; t.imp = null; t.owner = null; t.city = null; t.k = 0; t.road = false; }
+        G.units.length = 0; G.cities.length = 0; G.log.length = 0; G.news.length = 0; G.offers.length = 0; G.deals.length = 0; G.open.length = 0; G.firsts = {};
+        for (const f of G.players) { f.capital = null; f.capHome = -1; f.met = false; f.moments = []; f.eraPts = 0; }
+        for (const a of G.players) for (const b of G.players) { G.met[a.i][b.i] = a.i === b.i; G.dip[a.i][b.i] = 'peace'; }
+        G.turn = 5; G.cur = 0; G.viewer = 0; G.handoff = false; G.seen = G.players.map(() => new Array(G.cols * G.rows).fill(0));`);
+    },
+    unit(owner, type, x, y) { ctx.args = [owner, type, x, y]; return run('addUnit(pl(args[0]), unitFor(args[0], args[1]), args[2], args[3], null)'); },
+    own(owner, x, y) { run('tileAt(' + x + ', ' + y + ').owner = ' + owner); },
+    met: (a, b) => run('G.met[' + a + '][' + b + ']'),
+    news: (i, kind) => run('G.news.filter(n => n.i === ' + i + (kind ? ' && n.kind === "' + kind + '"' : '') + ')'),
+    say: (i, kind) => run('G.news.filter(n => n.i === ' + i + ' && n.kind === "' + kind + '").length')
+  };
+  run('G.handoff = false');   // the screen that passes the device is not under test
+  if (flat) r.sandbox();
+  return r;
+}
+const FOUR = [{ name: 'Ann', human: true }, { name: 'Ben', human: true }, { name: '', human: false }, { name: '', human: false }];
+
+test('Ashcrown 4.5: a new four-player game starts with nobody met, and the Council lists only who you have met', () => {
+  const r = civRig(FOUR, { flat: false });
+  const n = r.run('G.players.length');
+  for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) assert.equal(r.met(a, b), a === b, 'met[' + a + '][' + b + ']');
+  assert.equal(r.run('G.players.every(f => f.met === false)'), true);
+  assert.equal(r.run('hasMet(0, 2)'), false);
+  assert.equal(r.run('metSomeone(pl(0))'), false);
+  r.run('showCouncil()');
+  const html = r.modals.at(-1);
+  assert.ok(html.includes('You haven’t met anyone yet. Explore to find other civs.'), 'the empty Council says so');
+  assert.ok(!html.includes('data-act="war-ask:'), 'no war button for a stranger');
+  for (const i of [1, 2, 3]) {
+    assert.ok(!html.includes(r.run('CIVS[pl(' + i + ').civ].land')), 'the Council hides civ ' + i);
+    assert.ok(!html.includes(r.run('CIVS[pl(' + i + ').civ].leader')), 'and its leader');
+  }
+  // Meeting one civ puts exactly that civ in the Council.
+  r.run('meet(0, 2)');
+  r.run('showCouncil()');
+  const after = r.modals.at(-1);
+  assert.ok(after.includes(r.run('CIVS[pl(2).civ].land')) && !after.includes('You haven’t met anyone'));
+  assert.ok(!after.includes(r.run('CIVS[pl(3).civ].land')), 'still hides the one not met');
+  assert.ok(after.includes('data-act="war-ask:2"') && !after.includes('data-act="war-ask:3"'));
+});
+
+test('Ashcrown 4.5: coming into sight of a unit, a city or land sets met both ways, queues one card per human, and pays contact once', () => {
+  // Unit sees unit: Ann's warrior walks to two hexes from Ben's.
+  let r = civRig(FOUR);
+  const ben = r.unit(1, 'warrior', 10, 5), ann = r.unit(0, 'warrior', 6, 5);
+  r.run('G.units.forEach(u => { u.mp = 2; })');
+  r.run('checkContacts(0); checkContacts(1)');
+  assert.equal(r.met(0, 1), false, 'four hexes apart is out of sight');
+  assert.equal(r.run('moveUnit(units.ann, 7, 5)'.replace('units.ann', 'G.units.find(u => u.id === "' + ann.id + '")')), true);
+  assert.equal(r.met(0, 1), false, 'three hexes is still out of sight');
+  r.run('G.units.find(u => u.id === "' + ann.id + '").mp = 2');
+  assert.equal(r.run('moveUnit(G.units.find(u => u.id === "' + ann.id + '"), 8, 5)'), true);
+  assert.equal(r.met(0, 1), true);
+  assert.equal(r.met(1, 0), true, 'meeting is mutual');
+  assert.equal(r.say(0, 'meet'), 1, 'Ann gets one card');
+  assert.equal(r.say(1, 'meet'), 1, 'Ben gets one card, though it was Ann who moved');
+  assert.equal(r.news(0, 'meet')[0].other, 1);
+  assert.equal(r.news(1, 'meet')[0].other, 0);
+  assert.equal(r.say(0, 'moment') + r.say(1, 'moment'), 0, 'the contact moment is folded into the card, not a second card');
+  assert.ok(r.news(0, 'meet')[0].pts > 0 && r.news(1, 'meet')[0].pts > 0, 'the card carries the era points');
+  assert.equal(r.run('G.players.filter(f => f.met).length'), 2, 'the old flag follows');
+  assert.equal(r.run('metSomeone(pl(0)) && metSomeone(pl(1)) && !metSomeone(pl(2))'), true);
+  // Paid once: more sight, more checks and a second meet() change nothing.
+  const eras = r.run('[pl(0).eraPts, pl(1).eraPts]');
+  r.run('checkContacts(0); checkContacts(1); meet(0, 1); meet(1, 0); checkMoments(0); checkMoments(1)');
+  assert.deepEqual(r.run('[pl(0).eraPts, pl(1).eraPts]'), eras);
+  assert.equal(r.say(0, 'meet') + r.say(1, 'meet'), 2, 'no second card');
+  assert.equal(r.run('pl(0).moments.filter(m => m === "contact").length'), 1);
+  assert.equal(r.run('G.log.filter(e => /You meet/.test(e.text)).length'), 2, 'one history line for each human');
+  // Their card is shown on their own turn, in their colors, and names the civ.
+  r.run('G.news.length = 0; G.news.push({ i: 0, kind: "meet", other: 1, pts: 2, first: true }); showNews()');
+  const card = r.modals.at(-1);
+  assert.ok(card.includes('First contact') && card.includes(r.run('CIVS[pl(1).civ].land')) && card.includes(r.run('fullName(pl(1))')));
+  assert.ok(card.includes('data-act="council"') && card.includes('Open Council') && card.includes('Got it'));
+  assert.ok(card.includes(r.run('CIVS[pl(1).civ].hello')), 'their greeting');
+  assert.ok(card.includes('You’re at peace.') && card.includes('Their borders close on turn 30.'));
+  assert.ok(!card.includes('Their capital is'), 'no capital line when none is in sight');
+
+  // Unit sees a city: Ann's scout-less warrior comes within three hexes of Ben's city.
+  r = civRig(FOUR);
+  r.unit(1, 'settler', 12, 5); r.run('foundCity(G.units[0])');
+  assert.equal(r.run('G.cities.length'), 1);
+  const w = r.unit(0, 'warrior', 7, 5);
+  r.run('checkContacts(0)');
+  assert.equal(r.met(0, 1), false, 'five hexes from the city is out of sight');
+  r.run('G.units.find(u => u.id === "' + w.id + '").x = 9; checkContacts(0)');
+  assert.equal(r.met(0, 1), true, 'three hexes from the city, two from its border: met');
+
+  // A city sees a unit, from the other side: Ben founds a city beside Ann's lone warrior.
+  r = civRig(FOUR);
+  r.unit(0, 'warrior', 5, 5);
+  r.unit(1, 'settler', 8, 5);
+  r.run('foundCity(G.units.find(u => u.owner === 1))');
+  assert.equal(r.met(0, 1), true, 'the new city sees Ann\'s warrior, and the founding checks for it');
+  assert.equal(r.say(0, 'meet') + r.say(1, 'meet'), 2);
+
+  // Land alone counts: nothing of Ben's stands there, only a hex he owns.
+  r = civRig(FOUR);
+  r.own(1, 12, 5);
+  r.unit(0, 'warrior', 10, 5);
+  r.run('checkContacts(0)');
+  assert.equal(r.met(0, 1), true, 'an owned hex within two hexes');
+  assert.equal(r.met(0, 2), false, 'nobody else is met');
+  assert.equal(r.met(2, 1), false);
+
+  // Meeting is mutual even when only one side can see: Ann's scout sees three hexes, Ben's warrior two.
+  r = civRig(FOUR);
+  r.unit(0, 'scout', 7, 5); r.unit(1, 'warrior', 10, 5);
+  r.run('checkContacts(1)');
+  assert.equal(r.met(1, 0) && r.met(0, 1), true, 'Ben cannot see the scout, but the scout sees him, and he is introduced when he checks');
+  assert.equal(r.say(0, 'meet') + r.say(1, 'meet'), 2);
+
+  // CPUs meet each other too, and the card goes to humans only.
+  r = civRig(FOUR);
+  r.unit(2, 'warrior', 5, 5); r.unit(3, 'warrior', 7, 5);
+  r.run('checkContacts(2)');
+  assert.equal(r.met(2, 3) && r.met(3, 2), true);
+  assert.equal(r.run('G.news.length'), 0, 'no card for a CPU');
+  assert.equal(r.run('G.log.filter(e => (e.to === 2 || e.to === 3) && /You meet/.test(e.text)).length'), 0, 'and no "You meet" line written to a CPU');
+  assert.equal(r.run('pl(2).moments.includes("contact") && pl(3).moments.includes("contact")'), true, 'but they earn the moment');
+
+  // With event cards off, there is no card, and the history line stays.
+  r = civRig(FOUR);
+  r.run('popupsSwitch = false');
+  r.unit(0, 'warrior', 5, 5); r.unit(1, 'warrior', 7, 5);
+  r.run('checkContacts(0)');
+  assert.equal(r.met(0, 1), true);
+  assert.equal(r.run('G.news.length'), 0);
+  assert.equal(r.run('G.log.filter(e => e.to === 0 && /You meet/.test(e.text)).length'), 1);
+});
+
+test('Ashcrown 4.5: war, peace, trade and borders are refused toward a civ you have not met, for humans and CPUs', () => {
+  const r = civRig(FOUR);
+  // A human toward a CPU, and toward another human.
+  for (const other of [2, 1]) {
+    assert.equal(r.run('declareWar(0, ' + other + ')'), false, 'no war on a stranger');
+    assert.equal(r.run('atWar(0, ' + other + ')'), false);
+    r.run('G.dip[0][' + other + '] = G.dip[' + other + '][0] = "war"');   // even if the books somehow say war
+    assert.equal(r.run('offerPeace(0, ' + other + ')'), '', 'no peace offer to a stranger');
+    assert.equal(r.run('G.offers.length'), 0);
+    r.run('G.dip[0][' + other + '] = G.dip[' + other + '][0] = "peace"');
+    assert.equal(r.run('proposeOpen(0, ' + other + ')'), '', 'no open-borders request to a stranger');
+    r.run('openBorders(0, ' + other + ')');
+    assert.equal(r.run('G.open.length'), 0);
+    const deal = '{ seller: ' + other + ', buyer: 0, res: "horses", qty: 10, total: 5, turns: 1 }';
+    r.run('pl(' + other + ').horses = 40');
+    assert.equal(r.run('tradeProblem(' + deal + ')'), 'You haven’t met');
+    assert.equal(r.run('proposeTrade(Object.assign(' + deal + ', { proposer: 0 })).result'), 'error');
+    assert.equal(r.run('G.deals.length + G.offers.length'), 0);
+  }
+  assert.equal(r.run('G.log.length + G.news.length'), 0, 'refusals leave no trace');
+  // Once they meet, the same calls work.
+  r.run('meet(0, 2)');
+  assert.notEqual(r.run('tradeProblem({ seller: 2, buyer: 0, res: "horses", qty: 10, total: 5, turns: 1 })'), 'You haven’t met', 'a deal gets past the met test');
+  assert.equal(r.run('proposeOpen(0, 2)'), 'accepted');
+  assert.equal(r.run('declareWar(0, 2)'), true);
+  assert.equal(r.run('declareWar(0, 2)'), false, 'a second declaration is not a war');
+  assert.ok(['accepted', 'refused'].includes(r.run('offerPeace(0, 2)')), 'the CPU answers a peace offer from a civ it has met (a fresh war is usually refused)');
+  assert.equal(r.run('declareWar(0, 0)'), false);
+
+  // A CPU toward a CPU it has not met: none of its diplomacy reaches them.
+  const cpu = civRig(FOUR);
+  cpu.ctx.roll = () => 0;                               // every chance comes up
+  cpu.run('G.turn = 40; G.cur = 2');
+  cpu.unit(2, 'settler', 3, 5); cpu.run('foundCity(G.units[0])');
+  cpu.unit(3, 'settler', 9, 5); cpu.run('foundCity(G.units.find(u => u.owner === 3))');
+  assert.equal(cpu.met(2, 3), false, 'six hexes apart: close enough to rival each other, too far to see');
+  for (let k = 0; k < 4; k++) cpu.unit(2, 'warrior', 3, 5);   // an army its neighbour has no match for
+  const wars = () => cpu.run('G.players.map(f => G.players.map(o => atWar(f.i, o.i) ? 1 : 0).join("")).join("")');
+  cpu.run('aiDiplomacy(pl(2)); aiDiplomacy(pl(3))');
+  assert.equal(cpu.run('atWar(2, 3)'), false, 'it will not attack a stranger');
+  cpu.run('pl(3).voyage = { kind: "expedition" }');
+  cpu.run('aiDiplomacy(pl(2))');
+  assert.equal(cpu.run('atWar(2, 3)'), false, 'not even a stranger sailing for the win');
+  assert.equal(cpu.run('G.attitude[2][3]'), 0, 'and it has no mood toward them');
+  cpu.run('G.dip[2][3] = G.dip[3][2] = "war"');           // forced, to prove it cannot ask them for peace either
+  assert.equal(cpu.run('offerPeace(2, 3)'), '');
+  cpu.run('G.dip[2][3] = G.dip[3][2] = "peace"; pl(3).voyage = null');
+  assert.equal(cpu.run('proposeOpen(2, 3)'), '');
+  // The positive control: the same board, once they have met, starts the war it was waiting to start.
+  cpu.run('meet(2, 3)');
+  cpu.run('aiDiplomacy(pl(2))');
+  assert.equal(cpu.run('atWar(2, 3)'), true, 'met: the CPU is free to attack');
+  assert.ok(wars().includes('1'));
+
+  // CPU borders request: a mood above 2 and closed borders send it to ask a neighbour it knows, never a stranger.
+  const open = civRig(FOUR);
+  open.ctx.roll = () => 0;
+  open.run('G.turn = 40; G.cur = 2');
+  open.unit(2, 'settler', 3, 5); open.run('foundCity(G.units[0])');
+  open.unit(3, 'settler', 13, 5); open.run('foundCity(G.units.find(u => u.owner === 3))');
+  open.run('G.attitude[2][3] = 10');
+  open.run('aiDiplomacy(pl(2))');
+  assert.equal(open.run('G.open.length'), 0, 'no borders request to a stranger');
+  open.run('meet(2, 3); G.attitude[2][3] = 10');
+  open.run('aiDiplomacy(pl(2))');
+  assert.equal(open.run('G.open.length'), 1, 'a civ it has met gets one');
+
+  // CPU trade: a CPU short of horses buys from a CPU that has them, but only one it has met.
+  const trade = civRig(FOUR);
+  trade.ctx.roll = () => 0;
+  trade.ctx.maxPay = () => 100;
+  trade.run('G.turn = 40; G.cur = 2; var dealt = 0; var was = makeDeal; makeDeal = d => { dealt++; return was(d); };');
+  trade.unit(2, 'settler', 3, 5); trade.run('foundCity(G.units[0])');
+  trade.unit(3, 'settler', 9, 5); trade.run('foundCity(G.units.find(u => u.owner === 3))');
+  trade.run('pl(2).techs.push("riding"); pl(3).horses = 40');
+  trade.run('aiTrade(pl(2))');
+  assert.equal(trade.run('dealt'), 0, 'no deal with a stranger');
+  trade.run('meet(2, 3)');
+  trade.run('aiTrade(pl(2))');
+  assert.equal(trade.run('dealt'), 1, 'the same shop, once they have met');
+});
+
+test('Ashcrown 4.5: a queued march toward an unmet civ\'s closed land stops on the hex before it, and no war starts', () => {
+  const r = civRig(FOUR);
+  r.run('G.turn = 35');    // the borders closed on turn 30
+  assert.equal(r.run('bordersClosed()'), true);
+  // Ben owns a wall of land, columns 9 to 11, the whole height of the map: there is no way around it.
+  for (let y = 0; y < r.run('G.rows'); y++) for (let x = 9; x <= 11; x++) r.own(1, x, y);
+  const u = r.unit(0, 'warrior', 2, 5);
+  r.run('var W = G.units.find(u => u.id === "' + u.id + '"); W.mp = 40');
+  r.run('W.path = { to: [14, 5], steps: [[3, 5], [4, 5], [5, 5], [6, 5], [7, 5], [8, 5], [9, 5], [10, 5], [11, 5], [12, 5], [13, 5], [14, 5]], seen: [] }; runPath(W)');
+  assert.equal(r.run('W.x'), 8, 'it stopped on the last hex before the border');
+  assert.equal(r.run('W.path'), null, 'the march is called off');
+  assert.equal(r.run('atWar(0, 1)'), false, 'and nobody declared war');
+  assert.equal(r.run('G.dip[0][1] + G.dip[1][0]'), 'peacepeace');
+  assert.equal(r.met(0, 1), true, 'seeing their land is what introduces you');
+  assert.equal(r.say(0, 'meet'), 1, 'the card comes up');
+  assert.equal(r.run('G.news.filter(n => n.kind === "alert").length'), 0, 'no war card');
+  assert.ok(r.run('G.log.some(e => /stopped its march/.test(e.text))'));
+  // The stranger rule itself: standing at the border without having met, a step in is refused outright.
+  const r2 = civRig(FOUR);
+  r2.run('G.turn = 35');
+  r2.own(1, 6, 5);
+  const v = r2.unit(0, 'warrior', 5, 5);
+  r2.run('var V = G.units.find(u => u.id === "' + v.id + '"); V.mp = 2');
+  assert.equal(r2.met(0, 1), false, 'sight has not been checked: this is the guard on its own');
+  assert.equal(r2.run('moveUnit(V, 6, 5)'), false, 'a step onto an unmet civ\'s land is refused');
+  assert.equal(r2.run('computeReachable(V).has("6,5")'), false, 'it is not even offered as a green hex');
+  assert.equal(r2.run('atWar(0, 1) || V.x !== 5'), false);
+  assert.equal(r2.run('moveUnit(V, 6, 5, new Map([["6,5", 1]]))'), false, 'and a reach map that wrongly offers it does not open the door');
+  // Met, the usual closed-border step is offered again, and it is the one that declares the war.
+  r2.run('meet(0, 1)');
+  assert.equal(r2.run('moveUnit(V, 6, 5)'), true);
+  assert.equal(r2.run('atWar(0, 1)'), true);
+  // A CPU's units honour it too.
+  const r3 = civRig(FOUR);
+  r3.run('G.turn = 35');
+  r3.own(3, 6, 5);
+  const c = r3.unit(2, 'warrior', 5, 5);
+  r3.run('var C = G.units.find(u => u.id === "' + c.id + '"); C.mp = 2');
+  assert.equal(r3.run('computeReachable(C).has("6,5")'), false);
+  assert.equal(r3.run('moveUnit(C, 6, 5)'), false);
+  assert.equal(r3.run('atWar(2, 3)'), false);
+});
+
+test('Ashcrown 4.5: in pass-and-play each player sees "Unmet player" for civs they have not met, in the Council, the log and the score list', () => {
+  const r = civRig(FOUR, { flat: false });
+  // Ann (0) has met the civ at seat 2; Ben (1) has met nobody. Two CPUs fight, in view of Ann only.
+  r.run('meet(0, 2); meet(2, 3); declareWar(2, 3)');
+  r.run('G.news.length = 0; UI.log = { innerHTML: "" }');
+  const name = (i, what) => r.run(what === 'land' ? 'CIVS[pl(' + i + ').civ].land' : what === 'leader' ? 'CIVS[pl(' + i + ').civ].leader' : 'pl(' + i + ').name');
+  const seesOf = viewer => {
+    r.run('G.viewer = ' + viewer + '; G.cur = ' + viewer + '; G.handoff = false; renderLog()');
+    const council = (r.run('showCouncil()'), r.modals.at(-1));
+    return { log: r.run('UI.log.innerHTML'), council, realm: r.run('realmPanel()') };
+  };
+  // Ben has met nobody.
+  const ben = seesOf(1);
+  assert.ok(ben.council.includes('You haven’t met anyone yet. Explore to find other civs.'));
+  for (const i of [0, 2, 3]) {
+    for (const what of ['land', 'leader', 'name']) {
+      const n = name(i, what);
+      assert.ok(!ben.council.includes(n), 'Ben\'s Council hides ' + what + ' of ' + i + ': ' + n);
+      assert.ok(!ben.log.includes(n), 'Ben\'s log hides ' + what + ' of ' + i + ': ' + n);
+      assert.ok(!ben.realm.includes(n), 'Ben\'s score list hides ' + what + ' of ' + i + ': ' + n);
+    }
+  }
+  assert.ok(ben.log.includes('Unmet player'), 'the shared lines read "Unmet player" for him');
+  assert.equal((ben.realm.match(/Unmet player/g) || []).length, 3, 'one row for each of the three rivals');
+  assert.equal((ben.realm.match(/class="tag">unmet</g) || []).length, 3);
+  assert.ok(ben.realm.includes('#cfc8bb'), 'with a grey dot');
+  // Ann has met seat 2 (who has also met seat 3), not Ben.
+  const ann = seesOf(0);
+  assert.ok(ann.council.includes(name(2, 'land')), 'Ann\'s Council lists the civ she has met');
+  assert.ok(!ann.council.includes(name(3, 'land')) && !ann.council.includes(name(1, 'land')), 'and only that civ');
+  assert.ok(ann.log.includes(r.run('fullName(pl(2))')), 'her log names the civ she knows');
+  assert.ok(ann.log.includes('Unmet player'), 'and still hides the one she does not: the war was declared on seat 3');
+  assert.ok(!ann.log.includes(r.run('fullName(pl(3))')) && !ann.log.includes(name(3, 'land')));
+  assert.ok(ann.realm.includes(r.run('fullName(pl(2))')) && !ann.realm.includes(r.run('fullName(pl(3))')));
+  assert.equal((ann.realm.match(/Unmet player/g) || []).length, 2);
+  // The helper, directly.
+  assert.equal(r.run('knownName(1, 2)'), 'Unmet player');
+  assert.equal(r.run('knownName(0, 2)'), r.run('fullName(pl(2))'));
+  assert.equal(r.run('knownName(0, 2, true)'), r.run('pl(2).name'));
+  assert.equal(r.run('knownName(1, 1)'), r.run('fullName(pl(1))'), 'you always know yourself');
+  assert.equal(r.run('knownName(null, 3)'), r.run('fullName(pl(3))'), 'no viewer, no hiding');
+  // When the game ends, everyone is named.
+  r.run('G.over = { winner: 0, why: "test", turn: 9 }');
+  assert.equal(r.run('knownName(1, 3)'), r.run('fullName(pl(3))'));
+  assert.ok(!r.run('logText(G.log[0].text, 1)').includes('Unmet player'), 'the old lines read in full');
+  // The war card to a human names the aggressor only if met.
+  r.run('G.over = null; G.news.length = 0; G.viewer = 1; G.cur = 1');
+  r.run('G.news.push({ i: 1, kind: "alert", type: "war", by: 3 }); showNews()');
+  assert.ok(r.modals.at(-1).includes('Unmet player declares war') && !r.modals.at(-1).includes(name(3, 'land')));
+});
+
+test('Ashcrown 4.5: a game saved before first contact loads with everyone met, no cards, and plays on', () => {
+  const r = civRig(FOUR, { flat: false });
+  // Play a few turns as 4.4 would have, then store the game without a met matrix, as 4.4 saved it.
+  for (let k = 0; k < 6; k++) { r.run('G.handoff = false; endCurrentTurn(); G.handoff = false; endCurrentTurn()'); }
+  const turn = r.run('G.turn');
+  const eras = r.run('G.players.map(f => f.eraPts || 0)');
+  const old = JSON.parse(r.run('JSON.stringify(G)'));
+  delete old.met;
+  for (const f of old.players) f.met = false;
+  old.news = [];
+  r.ctx.save44 = JSON.stringify(old);
+  r.run('G = prepareState(JSON.parse(save44)); G.handoff = false');
+  const n = r.run('G.players.length');
+  for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) assert.equal(r.met(a, b), true, 'met[' + a + '][' + b + ']');
+  assert.equal(r.run('G.news.length'), 0, 'no card');
+  assert.deepEqual(r.run('G.players.map(f => f.eraPts || 0)'), eras, 'no era points');
+  assert.equal(r.run('G.players.every(f => f.moments.includes("contact"))'), true, 'the contact moment counts as already earned');
+  r.run('showCouncil()');
+  assert.ok(r.modals.at(-1).includes(r.run('CIVS[pl(2).civ].land')) && !r.modals.at(-1).includes('haven’t met'), 'the Council lists everyone');
+  assert.equal(r.run('knownName(0, 3)'), r.run('fullName(pl(3))'));
+  // It plays on: more rounds, no throw, no first-contact cards, nobody un-met.
+  for (let k = 0; k < 10; k++) r.run('G.handoff = false; endCurrentTurn(); G.handoff = false; endCurrentTurn()');
+  assert.ok(r.run('G.turn') > turn, 'the turns went on');
+  assert.equal(r.run('G.news.filter(n => n.kind === "meet").length'), 0);
+  assert.equal(r.run('G.met.every(row => row.every(Boolean))'), true);
+  // A save that already has a met matrix keeps it.
+  const mixed = JSON.parse(r.run('JSON.stringify(G)'));
+  mixed.met = mixed.players.map((f, a) => mixed.players.map((g, b) => a === b));
+  r.ctx.mixed = JSON.stringify(mixed);
+  r.run('G = prepareState(JSON.parse(mixed))');
+  assert.equal(r.met(0, 2), false, 'a 4.5 save is not overwritten');
+});
+
+test('Ashcrown 4.5: the tutorial starts with everyone met and runs start to finish', () => {
+  const r = civRig(FOUR, { flat: false });
+  r.run('buildTutorialIsland()');
+  assert.equal(r.run('JSON.stringify(G.met)'), '[[true,true],[true,true]]');
+  assert.equal(r.run('hasMet(0, 1) && hasMet(1, 0)'), true);
+  assert.equal(r.run('knownName(0, 1)'), r.run('fullName(pl(1))'), 'the Cinder Clan is named in the tutorial');
+  const steps = r.run('TUT_STEPS.length');
+  let council = false;
+  for (let k = 0; k < steps + 5 && r.run('G.tut.step < TUT_STEPS.length'); k++) {
+    if (/offer the Cinder Clan peace/.test(r.run('TUT_STEPS[G.tut.step].say').replace(/<[^>]+>/g, ''))) {
+      // The step that sends you to the Council: the Cinder Clan is listed, at war, with its peace button.
+      r.run('showCouncil()');
+      const html = r.modals.at(-1);
+      assert.ok(html.includes('Cinder') && html.includes('data-act="peace:1"'), 'the Council offers the Cinder Clan peace');
+      assert.ok(!html.includes('haven’t met'));
+      council = true;
+    }
+    r.run('tutorialNext()');
+    assert.equal(r.run('G.met.every(row => row.every(Boolean))'), true, 'step ' + k + ' keeps everyone met');
+    assert.equal(r.run('G.news.filter(n => n.kind === "meet").length'), 0, 'no first-contact card in the tutorial');
+  }
+  assert.equal(r.run('G.tut.step'), steps, 'every step ran');
+  assert.ok(council, 'the Council step was reached');
+  assert.equal(r.run('atWar(0, 1)'), false, 'the Cinder Clan made peace');
+});
+
+test('Ashcrown 4.5: save names use the human leaders and era, the detail line counts the realm, and no CPU civ is ever named', () => {
+  const seats = [{ name: 'Ann', human: true, civ: 'qin' }, { name: '', human: false }, { name: '', human: false }, { name: '', human: false }];
+  const r = civRig(seats, { level: 'deity' });
+  // Six cities for the human, spread along one row of the level map.
+  for (const x of [2, 6, 10, 14, 18, 22]) { r.unit(0, 'settler', x, 5); r.run('foundCity(G.units.find(u => u.owner === 0 && UNITS[u.type].founds))'); }
+  assert.equal(r.run('ownCities(0).length'), 6);
+  r.run('G.turn = 42; pl(0).techs.push("ironworking")');
+  assert.equal(r.run('defaultSaveName(G)'), 'Qin Shi Huang · Medieval · Turn 42');
+  const total = r.run('scoreParts(0).total');
+  assert.equal(r.run('describeSave(G)'), 'China + 3 CPUs · Standard Pangaea · Deity · 6 cities · Score ' + total);
+  assert.equal(r.run('autoSaveName(G)'), 'Autosave · Turn 42');
+  // Written for real: the autosave, a turn autosave and a manual save with no typed name.
+  r.run('saveGame(); rollTurnSave(); saveToSlot("m1", "")');
+  const head = id => JSON.parse(r.store.get('bored.civlite.slot.' + id).split('\n')[0]);
+  assert.equal(head('auto').name, 'Autosave · Turn 42');
+  assert.equal(head('t1').name, 'Autosave · Turn 42');
+  assert.equal(head('m1').name, 'Qin Shi Huang · Medieval · Turn 42');
+  assert.equal(head('m1').meta, 'China + 3 CPUs · Standard Pangaea · Deity · 6 cities · Score ' + total);
+  assert.deepEqual({ mv: head('m1').mv, civ: head('m1').civ, color: head('m1').color, ink: head('m1').ink, era: head('m1').era },
+    { mv: 2, civ: 'qin', color: r.run('pl(0).light'), ink: r.run('pl(0).ink'), era: 'Medieval' });
+  const cpuNames = [];
+  for (const i of [1, 2, 3]) cpuNames.push(r.run('CIVS[pl(' + i + ').civ].land'), r.run('CIVS[pl(' + i + ').civ].leader'), r.run('fullName(pl(' + i + '))'), r.run('pl(' + i + ').name'));
+  for (const id of ['auto', 't1', 'm1']) {
+    const text = r.store.get('bored.civlite.slot.' + id).split('\n')[0];
+    for (const n of cpuNames) assert.ok(!text.includes(n), 'the ' + id + ' header never names ' + n);
+  }
+  // One human against one CPU, and two humans with none.
+  const duel = civRig([{ name: 'Ann', human: true, civ: 'qin' }, { name: '', human: false }]);
+  assert.equal(duel.run('describeSave(G)'), 'China + 1 CPU · Small Pangaea · Normal · 0 cities · Score ' + duel.run('scoreParts(0).total'));
+  const pair = civRig([{ name: 'Ann', human: true, civ: 'qin' }, { name: 'Ben', human: true, civ: 'japan' }]);
+  pair.run('G.turn = 42; pl(0).techs.push("ironworking"); pl(1).techs.push("writing")');
+  assert.equal(pair.run('defaultSaveName(G)'), 'Qin Shi Huang & Oda Nobunaga · Medieval · Turn 42');
+  assert.equal(pair.run('describeSave(G)'), 'China, Japan · Small Pangaea · Normal', 'two humans: no cities, no score, and no CPUs to count');
+  pair.run('pl(1).techs.push("firearms")');
+  assert.equal(pair.run('defaultSaveName(G)'), 'Qin Shi Huang & Oda Nobunaga · Renaissance · Turn 42', 'the furthest era any human has reached');
+  const mixed = civRig([{ name: 'Ann', human: true, civ: 'qin' }, { name: 'Ben', human: true, civ: 'japan' }, { name: '', human: false }, { name: '', human: false }]);
+  assert.equal(mixed.run('describeSave(G)'), 'China, Japan + 2 CPUs · Standard Pangaea · Normal');
+  // A header from before 4.5 is rebuilt once, and a name the player typed stays.
+  const state = r.run('JSON.stringify(G)');
+  const old = (name, extra = {}) => JSON.stringify(Object.assign({ v: 1, at: 1700000000000, kind: 'manual', name, meta: 'Rome · Standard · Normal', turn: 42, seed: 7 }, extra)) + '\n' + state;
+  const key = id => 'bored.civlite.slot.' + id;
+  r.store.clear();
+  r.store.set(key('m1'), old('My epic war'));
+  r.store.set(key('m2'), old('China, turn 42'));
+  r.store.set(key('m3'), old(''));
+  r.store.set(key('auto'), old('Autosave', { kind: 'auto' }));
+  const set = r.ctx.localStorage.setItem; let writes = 0;
+  r.ctx.localStorage.setItem = (k, v) => { writes++; return set(k, v); };
+  const rows = Object.fromEntries(Array.from(r.run('slotList()'), s => [s.id, s.head]));
+  assert.equal(rows.m1.name, 'My epic war', 'a typed name survives');
+  assert.equal(rows.m2.name, 'Qin Shi Huang · Medieval · Turn 42', 'the old default, "<land>, turn <n>", counts as untyped');
+  assert.equal(rows.m3.name, 'Qin Shi Huang · Medieval · Turn 42');
+  assert.equal(rows.auto.name, 'Autosave · Turn 42');
+  for (const id of ['m1', 'm2', 'm3', 'auto']) {
+    assert.equal(rows[id].mv, 2, id + ' is marked rebuilt');
+    assert.equal(rows[id].civ, 'qin');
+    assert.equal(rows[id].era, 'Medieval');
+    assert.equal(rows[id].meta, 'China + 3 CPUs · Standard Pangaea · Deity · 6 cities · Score ' + total);
+    assert.equal(head(id).mv, 2, id + ' was written back');
+  }
+  assert.equal(head('m1').name, 'My epic war');
+  assert.equal(r.store.get(key('m1')).split('\n')[1], state, 'the game itself is untouched');
+  assert.equal(writes, 4, 'one write for each old header');
+  r.run('slotList()');
+  assert.equal(writes, 4, 'rebuilt once, not every time the screen opens');
+  // A full or blocked browser still lists the row, rebuilt.
+  r.store.set(key('m4'), old('Old and unlucky'));
+  r.ctx.localStorage.setItem = () => { throw new Error('full'); };
+  const m4 = Array.from(r.run('slotList()')).find(s => s.id === 'm4');
+  assert.equal(m4.head.mv, 2);
+  assert.equal(m4.head.name, 'Old and unlucky');
+});
+
+test('Ashcrown 4.5: every civ has a short greeting for its first-contact card', () => {
+  const r = civRig(FOUR, { flat: false });
+  const hellos = r.run('Object.keys(CIVS).map(id => [id, CIVS[id].hello])');
+  assert.equal(hellos.length, 16);
+  for (const [id, hello] of hellos) {
+    assert.equal(typeof hello, 'string', id + ' has a hello');
+    assert.ok(hello.trim().split(/\s+/).length < 15, id + ' greets in under 15 words: ' + hello);
+    assert.ok(/[.!]$/.test(hello) && !/[“”"]/.test(hello), id + ' is a plain sentence without quote marks (the card adds them)');
+  }
+  assert.equal(new Set(hellos.map(h => h[1])).size, 16, 'no two civs greet alike');
 });
