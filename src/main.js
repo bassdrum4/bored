@@ -878,6 +878,18 @@ addEventListener('message', event => {
     case 'bored:close':
       if (fullscreenElement()) leaveFullscreen(); else closeGame();
       break;
+    case 'bored:analytics':
+      // Only first-party game frames may report optional, categorical events.
+      // The collector discards all unrecognized fields and free-form text.
+      if (event.origin === location.origin &&
+          ['game_friction','help_open','tutorial_step','save_action'].includes(event.data?.kind)) {
+        analytics.track(event.data.kind, {
+          game: activeSlug, surface: 'game',
+          phase: event.data.phase, issue: event.data.issue,
+          step: event.data.step, action: event.data.action
+        });
+      }
+      break;
     case 'bored:runtime-error': analytics.event('error', { code: 'runtime' }); break;
     case 'bored:restart': restartGame(); break;
     case 'bored:fullscreen': toggleFullscreen(); break;
