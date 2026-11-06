@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 307,
+  "count": 308,
   "newest": "2026-11-06",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"2d80990","date":"2026-11-06","author":"Codebuff","subject":"Say when a Bored Together turn is waiting, even off the list"},
+  {"sha":"aa8c38f","date":"2026-11-05","author":"Daniel Lowe","subject":"Improve Bored analytics with server summaries and discovery tracking","pr":83},
   {"sha":"5b8c0dd","date":"2026-11-05","author":"Codebuff","subject":"Settle a Gun Mayhem match on hearts instead of round wins"},
   {"sha":"082ebaf","date":"2026-11-05","author":"Codebuff","subject":"Charge for DEEP's rest stops and give gold a reason to matter"},
   {"sha":"ba89cdd","date":"2026-11-05","author":"Codebuff","subject":"Make Gun Mayhem's knockback and fast shots behave as advertised"},
