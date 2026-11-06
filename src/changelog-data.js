@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 327,
+  "count": 328,
   "newest": "2026-11-06",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"6f6000a","date":"2026-11-06","author":"Claude","subject":"Civ Lite 4.5: first contact like Civ 6, and better save names"},
   {"sha":"dcf0995","date":"2026-11-06","author":"Claude","subject":"Civ Lite: redraw the warrior icon as a wooden club"},
   {"sha":"df41548","date":"2026-11-06","author":"Buffy","subject":"Serve Minecraft from its own repository"},
   {"sha":"f0db58d","date":"2026-11-06","author":"Codebuff","subject":"Ship EaglercraftX 1.8 as Minecraft: Bored Edition"},
