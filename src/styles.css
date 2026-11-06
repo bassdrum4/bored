@@ -449,6 +449,26 @@ dialog{margin:auto}
 .bt-more[open]>details{max-width:260px}
 .bt-home{padding:12px 0;border-bottom:1px solid var(--rule);font:12px/1.6 var(--mono)}
 .bt-home a{color:var(--red)}
+/* A waiting game in the corner: fixed, quiet, and never over a game or the list. */
+.bt-notice{position:fixed;right:16px;bottom:16px;z-index:45;width:min(320px,calc(100vw - 32px));
+  border:1px solid var(--ink);border-left:4px solid var(--red);background:#fffdf7;
+  padding:14px 16px;box-shadow:4px 4px 0 rgba(25,23,19,.12);font:12px/1.6 var(--mono)}
+.bt-notice[hidden]{display:none}
+.bt-notice .eyebrow{color:var(--red)}
+.bt-notice-title{margin:2px 0 0;font:19px/1.3 var(--display)}
+.bt-notice-note{margin:4px 0 12px;font-size:11.5px;line-height:1.6;color:var(--dim)}
+.bt-notice-actions{display:flex;align-items:center;gap:8px}
+.bt-notice-actions button{background:none;border:1px solid var(--rule);color:var(--ink);
+  min-height:34px;padding:7px 12px;font:11px var(--mono);cursor:pointer}
+.bt-notice-actions button:hover{border-color:var(--ink)}
+#together-notice-open{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+#together-notice-open:hover{background:var(--red);border-color:var(--red)}
+#together-notice-close{margin-left:auto;border-color:transparent;color:var(--dim)}
+#together-notice-close:hover{border-color:var(--rule);color:var(--ink)}
+body.playing .bt-notice,.together-open .bt-notice{display:none}
+/* The nav becomes a fixed bottom bar at 700px; the note sits above it. */
+@media(max-width:700px){.bt-notice{left:12px;right:12px;width:auto;
+  bottom:calc(64px + env(safe-area-inset-bottom,0px))}}
 .row.has-together .card{height:calc(100% - 38px)}
 .catalog-together{display:block;height:38px;width:100%;background:transparent;border:0;border-top:1px solid var(--rule);font:11px var(--mono);color:var(--red);text-align:left;padding:8px 16px;cursor:pointer}
 .catalog-together:hover{background:var(--ink);color:var(--paper)}

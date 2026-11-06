@@ -11,6 +11,9 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   let owner = null, data = null, visible = false, busy = false, generation = 0, flight = null;
   let lastRefresh = 0;
   let flow = null, selectedGame = 'connect-four', people = null, outsiders = null, outsidersError = '';
+  // The one corner note: dismissed stays dismissed for that set of games, so it
+  // can only reappear when something new is actually waiting.
+  let noticeDismissed = '';
   // An invite is an ordinary game for later: the recipient has not joined yet.
   const invited = new Map();
   let invite = null, inviteAccepted = false, inviteBusy = false;
@@ -36,16 +39,39 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     if (dialog.close) dialog.close(); else dialog.removeAttribute('open');
   }
   function updateBadge() {
-    const count = data?.enrolled ? data.matches.filter(m => m.status === 'active' && m.turn_user === owner).length : 0;
+    const waiting = data?.enrolled ? data.matches.filter(m => m.status === 'active' && m.turn_user === owner) : [];
+    const count = waiting.length;
     $('#together-badge').hidden = !count; $('#together-badge').textContent = String(count);
     $('#together-home').hidden = !count;
     $('#together-home-link').textContent = count + (count === 1 ? ' game needs' : ' games need') + ' your attention →';
+    updateNotice(waiting);
+  }
+  // Somewhere other than the nav, on whatever page you are on. A challenge that
+  // was never sent is still your move, so it is worth naming here.
+  function updateNotice(waiting) {
+    const notice = $('#together-notice');
+    if (!notice) return;
+    const key = waiting.map(m => m.id).sort().join(',');
+    if (!key || key === noticeDismissed) { notice.hidden = true; return; }
+    const first = waiting[0], unsent = first.revealed_at == null;
+    const title = waiting.length === 1
+      ? (unsent ? 'Not sent yet' : 'Your turn in ' + name(first.game))
+      : waiting.length + ' games waiting on you';
+    const note = waiting.length > 1
+      ? 'Bored Together · take a turn when you have a minute.'
+      : unsent ? 'Play your first turn and it goes to ' + (first.opponent?.handle || 'them') + '.'
+        : 'with ' + (first.opponent?.handle || 'your opponent');
+    const titleEl = $('#together-notice-title'), noteEl = $('#together-notice-note');
+    if (titleEl.textContent !== title) titleEl.textContent = title;
+    if (noteEl.textContent !== note) noteEl.textContent = note;
+    notice.hidden = false;
   }
   function resetIdentity() {
     const next = hasIdentity() ? getSession()?.user?.id : null;
     if (owner === next) return;
     owner = next; generation++; flight = null; busy = false; lastRefresh = 0; root.removeAttribute('aria-busy');
     data = flow = people = outsiders = null; outsidersError = ''; invited.clear(); status.textContent = '';
+    noticeDismissed = '';
     invite = null; inviteAccepted = false;
     if (inviteDialog?.open) dialogClose(inviteDialog);
     updateBadge(); render();
@@ -310,6 +336,9 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   function matchRow(m, host) {
     const duel = m.mode === 'duel';
     const turn = m.status === 'active' && m.turn_user === owner;
+    // Until the first turn is saved the opponent cannot see this game at all,
+    // so the challenger's row has to say that instead of "Your turn".
+    const unsent = turn && m.revealed_at == null;
     const row = node('article', undefined, 'bt-match-row bt-match-card' + (turn ? ' bt-ready' : ''));
     row.dataset.matchId = m.id;
     const copy = node('div', undefined, 'bt-match-copy');
@@ -319,15 +348,17 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     head.append(node('h4', name(m.game)),
       node('span',
         m.status === 'completed' ? (m.winner === owner ? 'Won' : m.winner ? 'Lost' : 'Draw')
-          : turn ? 'Your turn' : 'Their turn',
+          : unsent ? 'Not sent' : turn ? 'Your turn' : 'Their turn',
         'bt-chip' + (turn ? ' bt-chip-turn' : '')));
     copy.append(head,
       node('p', 'with ' + (m.opponent?.handle || 'Former member'), 'bt-opponent'),
       node('p', duel ? runLine(m, turn)
-        : m.status === 'active' ? (turn ? 'Your turn' : 'Their turn')
+        : m.status === 'active' ? (unsent
+          ? 'Play your first turn to send it. Unplayed games are cleared after 7 days.'
+          : turn ? 'Your turn' : 'Their turn')
         : m.winner === owner ? 'You won' : m.winner ? 'You lost' : 'Draw', 'bt-caption'));
     const actions = node('div', undefined, 'bt-actions');
-    if (m.status === 'active' && turn) actions.append(button(duel ? 'Play run' : 'Play turn', () => launch(m.id), true));
+    if (m.status === 'active' && turn) actions.append(button(unsent ? 'Play first turn' : duel ? 'Play run' : 'Play turn', () => launch(m.id), true));
     // Watching the board you are waiting on is harmless in a turn game; a duel
     // has nothing to look at once your run is in.
     else if (m.status === 'active' && !duel) actions.append(button('Open', () => launch(m.id)));
@@ -353,16 +384,20 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     if (yours.length) {
       const match = yours[0];
       const duel = match.mode === 'duel';
+      const unsent = match.revealed_at == null;
       const hero = node('section', undefined, 'bt-hero');
-      hero.setAttribute('aria-label', 'Your move');
+      hero.setAttribute('aria-label', unsent ? 'Not sent yet' : 'Your move');
       const copy = node('div', undefined, 'bt-hero-copy');
-      copy.append(node('p', 'Your move', 'eyebrow'),
+      copy.append(node('p', unsent ? 'Not sent yet' : 'Your move', 'eyebrow'),
         node('h3', name(match.game), 'bt-hero-title'),
         node('p', 'with ' + (match.opponent?.handle || 'your opponent'), 'bt-opponent'),
-        node('p', duel ? runLine(match, true) : 'The turn is yours.', 'bt-hero-line'),
-        node('p', yours.length > 1 ? (yours.length - 1) + ' more waiting below.' : 'Take it when you are ready.', 'bt-caption'));
+        node('p', duel ? runLine(match, true)
+          : unsent ? 'Play your first turn and it goes to ' + (match.opponent?.handle || 'them') + '.'
+          : 'The turn is yours.', 'bt-hero-line'),
+        node('p', unsent ? 'An unplayed game is cleared after 7 days.'
+          : yours.length > 1 ? (yours.length - 1) + ' more waiting below.' : 'Take it when you are ready.', 'bt-caption'));
       hero.append(gamePreview(match.game, 'bt-hero-art'), copy,
-        button(duel ? 'Play run' : 'Play turn', () => launch(match.id), true));
+        button(unsent ? 'Play first turn' : duel ? 'Play run' : 'Play turn', () => launch(match.id), true));
       content.append(hero);
     } else if (waiting.length) {
       content.append(node('p', waiting.length === 1
@@ -467,6 +502,12 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     document.body.classList.remove('together-open'); $('#together-nav').removeAttribute('aria-current');
     for (const el of document.querySelectorAll('#daily,#recent,#leaderboard,#library,.activity-notice')) el.hidden = false;
   }
+  $('#together-notice-open')?.addEventListener('click', () => open());
+  $('#together-notice-close')?.addEventListener('click', () => {
+    noticeDismissed = (data?.enrolled ? data.matches : [])
+      .filter(m => m.status === 'active' && m.turn_user === owner).map(m => m.id).sort().join(',');
+    $('#together-notice').hidden = true;
+  });
   $('#together-nav').onclick = e => { e.preventDefault(); open(); };
   $('#together-home-link').onclick = e => { e.preventDefault(); open(); };
   $('#together-refresh').onclick = () => run(() => refresh(true));
