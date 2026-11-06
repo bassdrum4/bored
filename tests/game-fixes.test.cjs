@@ -544,6 +544,169 @@ test('Ashcrown shows how long ago a save was made', () => {
   assert.match(r.ctx.agoText(0, 400 * 86400_000), /\d/, 'a very old save shows a date');
 });
 
+// v4.4: a title screen, then game setup.
+function frontRig() {
+  const html = load('src/games/content/ashcrown.html');
+  const log = [];
+  const doc = { activeElement: null, els: {}, getElementById(id) { return this.els[id] || (this.els[id] = { id, value: '', dataset: {}, hidden: false, textContent: '' }); } };
+  const ctx = vm.createContext({ Array, Number, String, Math, JSON, document: doc, G: null, online: null,
+    closeModal: () => { ctx.UI.modalLayer.hidden = true; log.push('closeModal'); },
+    showPane: name => log.push('pane:' + name), showOptions: () => log.push('options'), showMenu: () => log.push('menu'),
+    refreshStart: () => log.push('refreshStart'), toast: message => log.push('toast:' + message),
+    SEATS: Array.from({ length: 8 }, (x, i) => ({ name: 'Player ' + (i + 1) })), DEFAULT_CLOSE_TURN: 30 });
+  vm.runInContext(['frontKeys', 'resetSetup', 'redoSwitches'].map(name => extractFunction(html, name)).join('\n'), ctx);
+  return { html, ctx, doc, log };
+}
+const keyEvent = (key, extra = {}) => ({ key, ctrlKey: false, metaKey: false, altKey: false, preventDefault() { this.prevented = true; }, ...extra });
+
+test('Ashcrown opens on a title menu, and setup holds every game option', () => {
+  const html = load('src/games/content/ashcrown.html');
+  // Bored Together's browser test waits for #start to hide, so it stays the one overlay for both screens.
+  const start = html.match(/<div id="start" class="screen">[\s\S]*?\n<script>/)[0];
+  const title = start.slice(start.indexOf('id="pane-title"'), start.indexOf('id="pane-setup"'));
+  const setup = start.slice(start.indexOf('id="pane-setup"'));
+  const order = ['btn-continue', 'btn-new', 'btn-load', 'btn-tutorial', 'btn-civs', 'btn-help', 'btn-options'];
+  const at = order.map(id => title.indexOf('id="' + id + '"'));
+  assert.ok(at.every(n => n > 0) && at.every((n, i) => !i || n > at[i - 1]), 'title menu: Continue, New game, Load game, Tutorial, Civs, How to play, Options');
+  for (const [id, act] of [['btn-new', 'title-new'], ['btn-load', 'slots:load'], ['btn-tutorial', 'tut-start'], ['btn-civs', 'civs'], ['btn-help', 'help'], ['btn-options', 'options']]) {
+    assert.match(title, new RegExp('id="' + id + '"[^>]*data-act="' + act + '"'), id + ' runs ' + act);
+  }
+  assert.match(title, /id="btn-continue"[^>]*hidden/, 'Continue is hidden until there is an autosave');
+  for (const id of ['opt-humans', 'opt-cpus', 'opt-level', 'opt-close', 'opt-turns', 'opt-map', 'opt-size', 'opt-wrap', 'opt-conquest', 'opt-science', 'btn-begin', 'seats']) {
+    assert.ok(setup.includes('id="' + id + '"'), 'setup has #' + id);
+    assert.ok(!title.includes('id="' + id + '"'), '#' + id + ' is not on the title');
+  }
+  assert.match(setup, /id="btn-back"[^>]*data-act="title-back"/);
+  assert.match(setup, /id="btn-reset"[^>]*data-act="setup-reset"/);
+  assert.ok(!/opt-tutorial|opt-tips/.test(html), 'the Tutorial and Tips tick boxes moved out of setup (to the menu and Options)');
+});
+
+test('Ashcrown routes the title screen\'s actions before the no-game guard, and each exit goes where it says', () => {
+  const html = load('src/games/content/ashcrown.html');
+  const body = extractFunction(html, 'onAction');
+  const guard = body.indexOf('if (!G) {');
+  for (const kind of ['civs', 'help', 'options', 'title-new', 'title-back', 'setup-reset', 'tut-start']) {
+    const spot = body.indexOf("kind === '" + kind + "'");
+    assert.ok(spot > 0 && spot < guard, kind + ' works with no game running');
+  }
+  assert.match(body, /case 'tut-quit': onAction\('new'\); break;/, 'quitting the tutorial returns to the title');
+  assert.match(body, /case 'tut-new': onAction\('new-setup'\); break;/, '"Start a real game" opens setup');
+  assert.match(body, /showPane\(kind === 'new-setup' \? 'setup' : 'title'\)/, 'quitting a game lands on the title');
+  assert.match(html, /data-act="new-setup">New game<\/button>/, 'New game after a finished game opens setup');
+  assert.match(html, /data-act="new-ask">Quit to the main menu</, 'the Menu says main menu');
+});
+
+test('Ashcrown\'s title screen keys: arrows walk the menu and wrap, Esc closes a window or steps back', () => {
+  const r = frontRig();
+  const mk = id => ({ id, focus() { r.doc.activeElement = this; } });
+  const items = ['btn-new', 'btn-tutorial', 'btn-help'].map(mk);
+  r.ctx.UI = { modalLayer: { hidden: true }, paneSetup: { hidden: true }, paneTitle: { hidden: false }, titleMenu: { querySelectorAll: () => items } };
+  const press = (key, extra) => { const e = keyEvent(key, extra); r.ctx.frontKeys(e); return e; };
+  const focused = () => (r.doc.activeElement ? r.doc.activeElement.id : null);
+  assert.equal(press('ArrowDown').prevented, true);
+  assert.equal(focused(), 'btn-new', 'nothing focused yet: Down starts at the top');
+  press('ArrowDown'); press('ArrowDown');
+  assert.equal(focused(), 'btn-help');
+  press('ArrowDown');
+  assert.equal(focused(), 'btn-new', 'Down wraps to the top');
+  press('ArrowUp');
+  assert.equal(focused(), 'btn-help', 'Up wraps to the bottom');
+  press('ArrowDown', { ctrlKey: true });
+  assert.equal(focused(), 'btn-help', 'Ctrl+arrow is left to the browser');
+  // Esc: a window first, then step back from setup, and on the title itself nothing.
+  r.ctx.UI.modalLayer.hidden = false;
+  press('ArrowDown');
+  assert.equal(focused(), 'btn-help', 'arrows do nothing while a window is open');
+  press('Escape');
+  assert.deepEqual(r.log, ['closeModal'], 'Esc closes the open window');
+  r.log.length = 0;
+  r.ctx.UI.paneTitle.hidden = true; r.ctx.UI.paneSetup.hidden = false;
+  press('Escape');
+  assert.deepEqual(r.log, ['pane:title'], 'Esc steps back from setup');
+  r.log.length = 0;
+  r.ctx.UI.paneTitle.hidden = false; r.ctx.UI.paneSetup.hidden = true;
+  press('Escape');
+  assert.deepEqual(r.log, [], 'Esc on the title does nothing');
+});
+
+test('Ashcrown\'s Reset to defaults puts every setup choice back, names and civs included', () => {
+  const r = frontRig();
+  r.ctx.UI = { optHumans: { value: '5' }, optCpus: { value: '3' }, optMap: { value: 'islands' }, optSize: { value: 'huge' },
+    optLevel: { value: 'deity', selectedIndex: 1 }, optClose: { value: '60' }, optTurns: { value: '7' },
+    optConquest: { checked: false }, optScience: { checked: false }, optWrap: { checked: true } };
+  for (let i = 0; i < 8; i++) {
+    r.doc.getElementById('seat-civ-' + i).value = 'rome';
+    Object.assign(r.doc.getElementById('seat-name-' + i), { value: 'Zed', dataset: { edited: '1' } });
+  }
+  r.ctx.resetSetup();
+  const u = r.ctx.UI;
+  assert.deepEqual([u.optHumans.value, u.optCpus.value, u.optMap.value, u.optSize.value, u.optLevel.selectedIndex, u.optClose.value, u.optTurns.value],
+    ['2', '0', 'pangaea', 'auto', 0, '30', '100']);
+  assert.deepEqual([u.optConquest.checked, u.optScience.checked, u.optWrap.checked], [true, true, false]);
+  for (let i = 0; i < 8; i++) {
+    const civ = r.doc.getElementById('seat-civ-' + i), name = r.doc.getElementById('seat-name-' + i);
+    assert.equal(civ.value, 'random');
+    assert.equal(name.value, 'Player ' + (i + 1));
+    assert.equal(name.dataset.edited, undefined, 'a typed name no longer counts as typed');
+  }
+  assert.ok(r.log.includes('refreshStart') && r.log.some(l => l.startsWith('toast:')), 'the screen redraws and says so');
+});
+
+test('Ashcrown\'s Options window redraws itself, and the in-game Menu redraws itself', () => {
+  const r = frontRig();
+  r.ctx.UI = { modalKind: 'options' };
+  r.ctx.redoSwitches();
+  assert.deepEqual(r.log, ['options'], 'Options redraws with no game running');
+  r.log.length = 0; r.ctx.UI.modalKind = null; r.ctx.G = {};
+  r.ctx.redoSwitches();
+  assert.deepEqual(r.log, ['menu'], 'the Menu redraws during a game');
+  r.log.length = 0; r.ctx.G = null;
+  r.ctx.redoSwitches();
+  assert.deepEqual(r.log, [], 'neither open: nothing to redraw (and no crash)');
+});
+
+test('Ashcrown\'s title shows Continue and Load game from the saves, and never reads them during a Bored Together match', () => {
+  const r = slotRig();
+  const html = r.get('1') && load('src/games/content/ashcrown.html');
+  const mk = (extra = {}) => ({ hidden: false, textContent: '', classList: { on: {}, toggle(name, on) { this.on[name] = !!on; } }, ...extra });
+  const els = { 'continue-sub': mk(), 'load-sub': mk(), 'tut-tag': mk(), 'tut-sub': mk() };
+  r.ctx.document = { getElementById: id => els[id] };
+  r.ctx.UI = { btnContinue: mk(), btnLoad: mk(), btnNew: mk() };
+  r.ctx.tutorialDone = () => false;
+  r.ctx.TUT_STEPS = new Array(7).fill(0);
+  r.ctx.plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+  vm.runInContext(extractFunction(html, 'refreshTitle'), r.ctx);
+  // Nothing saved: only New game.
+  r.ctx.refreshTitle();
+  assert.equal(r.ctx.UI.btnContinue.hidden, true);
+  assert.equal(r.ctx.UI.btnLoad.hidden, true);
+  assert.equal(r.ctx.UI.btnNew.classList.on.primary, true, 'New game is the highlighted item');
+  assert.equal(els['tut-tag'].hidden, false, 'the Tutorial is flagged as the place to start');
+  assert.equal(els['tut-sub'].textContent, '7 short steps on a small island, playing Rome');
+  // An autosave: Continue names the game and when, and takes the highlight.
+  r.ctx.G = r.game();
+  assert.equal(r.ctx.saveGame(), true);
+  r.tick(5 * 60_000);
+  r.ctx.tutorialDone = () => true;
+  r.ctx.refreshTitle();
+  assert.equal(r.ctx.UI.btnContinue.hidden, false);
+  assert.equal(els['continue-sub'].textContent, 'Marcus vs Dido · pangaea · turn 4 · 5 min ago');
+  assert.equal(r.ctx.UI.btnContinue.classList.on.primary, true);
+  assert.equal(r.ctx.UI.btnNew.classList.on.primary, false);
+  assert.equal(r.ctx.UI.btnLoad.hidden, false);
+  assert.equal(els['load-sub'].textContent, 'Your autosaves');
+  assert.equal(els['tut-tag'].hidden, true, 'the flag goes once the tutorial has been played');
+  r.ctx.saveToSlot('m1', 'Before the war');
+  r.ctx.refreshTitle();
+  assert.equal(els['load-sub'].textContent, '1 named save and your autosaves');
+  // A Bored Together match: the title never looks at the solo saves.
+  r.ctx.online = {};
+  r.ctx.slotList = () => { throw new Error('read the solo saves during a match'); };
+  r.ctx.refreshTitle();
+  assert.equal(r.ctx.UI.btnContinue.hidden, true);
+  assert.equal(r.ctx.UI.btnLoad.hidden, true);
+});
+
 test('A Bored Together document gets an inert continue-where-you-left-off helper', async () => {
   // The match document is the same game, so its resume wiring still runs. A
   // together board belongs to the server: it must not be written to this
