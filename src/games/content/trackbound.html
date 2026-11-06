@@ -2016,22 +2016,11 @@ function stepCar(car, input, dt, mesh) {
     car.slip = 0;
     car.v = add(car.v, mul([0, -CAR.gravity, 0], dt));
     car.v = mul(car.v, 1 - 0.02 * dt);
-    // Air control: yaw with the steering only. Pitching on the throttle used
-    // to spin the chassis past vertical on a long jump, and once its up vector
-    // pointed at the sky no wheel could read a landing, so the car fell
-    // through the ground. Pitch is now explicit input, capped short of that.
-    const upWorld = [0, 1, 0];
-    const yaw = -steer * 2.05 * dt;
-    let f = rot(car.f, car.u, yaw);
-    let u = car.u;
-    const pitch = clamp(input.pitch || 0, -1, 1) * 1.5 * dt;
-    if (pitch) {
-      const axis = norm(cross(u, f));
-      const turnF = rot(f, axis, pitch), turnU = rot(u, axis, pitch);
-      if (dot(turnU, upWorld) > 0.16 || dot(turnU, upWorld) > dot(u, upWorld)) { f = turnF; u = turnU; }
-    }
-    car.f = norm(f);
-    car.u = norm(sub(u, mul(car.f, dot(u, car.f))));
+    // In the air the chassis holds the attitude it left the ramp with. Air
+    // steering used to yaw it, and throttle or brake could pitch it past
+    // vertical, which spun a jump for no reason and left no wheel able to read
+    // a landing. Steering and throttle only bite again on the ground, so a
+    // jump is a clean arc.
     car.boost = Math.max(0, car.boost - dt);
   }
 
