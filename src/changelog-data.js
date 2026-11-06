@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 324,
+  "count": 325,
   "newest": "2026-11-06",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f0db58d","date":"2026-11-06","author":"Codebuff","subject":"Ship EaglercraftX 1.8 as Minecraft: Bored Edition"},
   {"sha":"3f34553","date":"2026-11-06","author":"Codebuff","subject":"Fix Tank 2 terrain striping on odd world widths"},
   {"sha":"7511bc8","date":"2026-11-06","author":"Codebuff","subject":"VolletBall: quicker, more aggressive CPU"},
   {"sha":"18524d2","date":"2026-11-06","author":"Codebuff","subject":"Add Minecraft: Bored Edition to the library"},
