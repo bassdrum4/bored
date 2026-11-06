@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 311,
+  "count": 312,
   "newest": "2026-11-06",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"a519795","date":"2026-11-06","author":"PenguinV360","subject":"Implement online game submission and state handling"},
   {"sha":"77eb0c1","date":"2026-11-06","author":"PenguinV360","subject":"Enhance movement logic with passOnly tracking"},
   {"sha":"67e8e82","date":"2026-11-06","author":"PenguinV360","subject":"Enhance movement logic with passOnly tracking"},
   {"sha":"39b5da6","date":"2026-11-06","author":"PenguinV360","subject":"Update v4.2 ashcrown.html"},
