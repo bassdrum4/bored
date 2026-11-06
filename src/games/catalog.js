@@ -30,7 +30,7 @@ export const META = {
   "risk": ["Strategy", "Conquer the world against up to five computer commanders. Place troops, roll dice, defend borders, and claim continents."],
   "scrabble": ["Puzzle", "Fifteen squares a side, seven tiles in hand. Spell across the board against the computer or a friend."],
   "brick-run": ["Arcade", "Run, jump and stomp your way to the flagpole."],
-  "trackbound": ["Arcade", "Modular time trial racing: medals, ghosts, a daily track and a procedural freeplay park."],
+  "trackbound": ["Arcade", "Modular time trial racing: medals, ghosts, a daily track, and a procedural stunt park full of gold rings."],
   "ashcrown": ["Strategy", "Six banners, one shattered vale. Found cities, work the land, and out-think five rival lords on a hex map."],
   "transit-chaos": ["Strategy", "Draw subway lines, move passengers, and keep a growing city from gridlock."],
   "typing-test": ["Puzzle", "Thirty seconds, common words, and a keyboard that does not forgive a glance away."],
