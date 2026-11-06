@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 319,
+  "count": 320,
   "newest": "2026-11-06",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"89b7011","date":"2026-11-06","author":"Claude","subject":"Civ Lite v4.4: a title screen, then game setup"},
   {"sha":"7f5bdf5","date":"2026-11-06","author":"Claude","subject":"Civ Lite v4.3: save slots"},
   {"sha":"a38e0fb","date":"2026-11-06","author":"Claude","subject":"Keep the Together directory budget test off the minute boundary"},
   {"sha":"8eb8d32","date":"2026-11-06","author":"Claude","subject":"Fix Ashcrown's tech-tree hover error and keep ships on the water (v4.2.3)"},
