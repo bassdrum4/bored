@@ -2016,11 +2016,24 @@ function stepCar(car, input, dt, mesh) {
     car.slip = 0;
     car.v = add(car.v, mul([0, -CAR.gravity, 0], dt));
     car.v = mul(car.v, 1 - 0.02 * dt);
-    // In the air the chassis holds the attitude it left the ramp with. Air
-    // steering used to yaw it, and throttle or brake could pitch it past
-    // vertical, which spun a jump for no reason and left no wheel able to read
-    // a landing. Steering and throttle only bite again on the ground, so a
-    // jump is a clean arc.
+    // Air control levels the chassis, it does not steer it: the heading is
+    // locked, while the pitch and bank it took off the ramp unwind toward the
+    // horizon so the car straightens out and lands square. Yaw and pitch used
+    // to be on the stick, which spun a jump for no reason and, once the up
+    // vector pointed at the sky, left no wheel able to read a landing.
+    const upWorld = [0, 1, 0];
+    const level = 1 - Math.exp(-6 * dt);
+    const u = norm(add(mul(car.u, 1 - level), mul(upWorld, level)));
+    // The nose comes down (or up) at the same rate as the bank, so the car
+    // straightens out over a few tenths of a second instead of snapping level.
+    let flat = [car.f[0], 0, car.f[2]];
+    // A car climbing straight up has no horizontal heading left to keep; it
+    // levels from whatever forward direction is still square to its new up.
+    if (vlen(flat) < 0.08) flat = sub(car.f, mul(u, dot(car.f, u)));
+    flat = norm(flat);
+    const f = norm(add(mul(car.f, 1 - level), mul(flat, level)));
+    car.f = norm(sub(f, mul(u, dot(f, u))));
+    car.u = u;
     car.boost = Math.max(0, car.boost - dt);
   }
 
