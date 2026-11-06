@@ -2601,6 +2601,7 @@ function computePaths(u) {
   const best = new Map([[home, 0]]);
   const prev = new Map();
   const stopOnly = new Set();
+  const passOnly = new Set();   // a friend of the same kind stands there: walk through, never end on it
   const seen = !G.watch && pl(u.owner).human ? G.seen[u.owner] : null;
   const queue = [[u.x, u.y, 0]];
   while (queue.length) {
@@ -2612,8 +2613,8 @@ function computePaths(u) {
       const cost = moveCost(u, nx, ny, x, y);
       if (!isFinite(cost)) continue;
       if (closedOwner(u.owner, nx, ny) >= 0) continue;   // routes go around closed land
-      const pass = canPass(u, nx, ny);
-      if (!pass && !canStop(u, nx, ny)) continue;
+      const pass = canPass(u, nx, ny), stop = canStop(u, nx, ny);
+      if (!pass && !stop) continue;
       const total = spent + cost;
       const k = keyOf(nx, ny);
       if (best.has(k) && best.get(k) <= total) continue;
@@ -2621,16 +2622,17 @@ function computePaths(u) {
       prev.set(k, keyOf(x, y));
       if (!pass) stopOnly.add(k);
       else queue.push([nx, ny, total]);
+      if (stop) passOnly.delete(k); else passOnly.add(k);
     }
   }
-  return { best, prev, stopOnly };
+  return { best, prev, stopOnly, passOnly };
 }
 
 // The hexes a route walks through, next first, destination last. null when
 // there is no road at all.
 function pathTo(paths, u, tx, ty) {
   const end = keyOf(tx, ty), home = keyOf(u.x, u.y);
-  if (!paths.best.has(end)) return null;
+  if (!paths.best.has(end) || paths.passOnly.has(end)) return null;
   const steps = [];
   let k = end;
   while (k && k !== home) {
@@ -2664,9 +2666,17 @@ function pathTurns(u, steps, firstMp) {
 // 'block' means the road is shut (a new enemy, a friend parked on it).
 function stepUnit(u, x, y, final) {
   const cost = moveCost(u, x, y, u.x, u.y);
-  if (!isFinite(cost) || (!canPass(u, x, y) && !(final && canStop(u, x, y)))) return 'block';
+  // The last hex must be one the unit may end on: a hex holds 1 soldier and 1 civilian.
+  if (!isFinite(cost) || (final ? !canStop(u, x, y) : !canPass(u, x, y))) return 'block';
   if (closedOwner(u.owner, x, y) >= 0) return 'block';   // borders closed since the march was ordered
   if (cost > u.mp) return 'wait';
+  // Not the last hex, but the unit would end its turn there (out of moves, or pinned by
+  // a zone of control) beside a friend of the same kind: wait here instead. A unit that
+  // already has all its moves can't do better, so that road is shut.
+  if (!final && !canStop(u, x, y)) {
+    const zoc = zocFor(u);
+    if (u.mp - cost <= 0 || (zoc && zoc.has(keyOf(x, y)))) return u.mp >= unitMove(u) ? 'block' : 'wait';
+  }
   for (const o of G.units.filter(o => o.x === x && o.y === y && o.owner !== u.owner)) captureCivilian(o, u);
   u.x = x;
   u.y = y;
@@ -3115,6 +3125,23 @@ function ejectTrespassers(i) {
     log('Your ' + UNITS[u.type].name.toLowerCase() + ' was moved out of ' + pl(who).name + '’s land: the borders are closed.', pl(i).ink, i);
   }
 }
+// A hex holds 1 soldier and 1 civilian, like Civ 6. The move rules already keep it
+// that way; this is the safety net. If two of a player's units of the same kind ever
+// share a hex, the newer one steps aside to the nearest hex that is free for it.
+function unstack(i) {
+  const taken = new Set();
+  for (const u of ownUnits(i)) {
+    const k = keyOf(u.x, u.y) + (isMil(u.type) ? 'm' : 'c');
+    if (!taken.has(k)) { taken.add(k); continue; }
+    const spot = ejectSpot(u);
+    if (!spot) continue;
+    u.x = spot[0];
+    u.y = spot[1];
+    u.path = null;
+    taken.add(keyOf(u.x, u.y) + (isMil(u.type) ? 'm' : 'c'));
+    log('Your ' + UNITS[u.type].name.toLowerCase() + ' stepped aside: a hex holds one ' + (isMil(u.type) ? 'soldier' : 'civilian') + '.', pl(i).ink, i);
+  }
+}
 // Start of a round: news when the borders close, and expired deals lapse.
 function bordersNewRound() {
   if (G.closeTurn && G.turn === G.closeTurn && !G.tut) {
@@ -3428,6 +3455,7 @@ function beginPlayerTurn(i) {
   G.offers = G.offers.filter(o => o.to !== i || G.turn - o.turn <= 3);
   gatherStock(f);
   ejectTrespassers(i);
+  unstack(i);
   payInstallments(i);
   for (const c of ownCities(i)) processCity(c);
   checkEurekas(f);
@@ -5851,7 +5879,7 @@ function buildTutorialIsland() {
     log: [], seen: [seen0, new Array(cols * rows).fill(0)],
     turn: 1, maxTurns: 0, cur: 0, viewer: 0, handoff: false, pending: null, over: null, watch: false,
     nextUnit: 1, nextCity: 1, names: ['Rome', 'Cinderhold'], wonderFound: {}, news: [], firsts: {},
-    tut: { step: 0, entered: false, closed: false, raider: null, camp: null, stack: null }
+    tut: { step: 0, entered: false, closed: false, raider: null, camp: null, warrior: null, archer: null }
   };
   const colors = assignColors(['rome', 'celts']);
   const player = (i, name, civ, human, techs) => ({
@@ -5874,12 +5902,17 @@ function buildTutorialIsland() {
   G.tut.camp = city.id;
   G.tut.raider = raider.id;
 
-  // The settler stands alone, so the first click is unambiguous. The warrior and
-  // archer share the hex to the north, which is where the tutorial teaches stacks.
-  G.tut.stack = [home[0], home[1] - 1];
+  // The settler stands alone, so the first click is unambiguous. The warrior and the
+  // archer each have a hex of their own: a hex holds one soldier, like Civ 6.
+  G.tut.warrior = [home[0], home[1] - 1];
+  // Not on the horses, which the builder visits later.
+  const free = neighbourList(home[0], home[1]).filter(([x, y]) => (x !== G.tut.warrior[0] || y !== G.tut.warrior[1]) &&
+    !TERRAIN[tileAt(x, y).t].water && !TERRAIN[tileAt(x, y).t].block)
+    .sort((p, q) => (tileAt(p[0], p[1]).f === 'horses') - (tileAt(q[0], q[1]).f === 'horses') || (!!tileAt(p[0], p[1]).f) - (!!tileAt(q[0], q[1]).f));
+  G.tut.archer = free[0];
   addUnit(G.players[0], 'settler', home[0], home[1], null);
-  addUnit(G.players[0], 'warrior', G.tut.stack[0], G.tut.stack[1], null);
-  addUnit(G.players[0], 'archer', G.tut.stack[0], G.tut.stack[1], null);
+  addUnit(G.players[0], 'warrior', G.tut.warrior[0], G.tut.warrior[1], null);
+  addUnit(G.players[0], 'archer', G.tut.archer[0], G.tut.archer[1], null);
   G.log = [];
   log('Rome lands on an island. The Cinder Clan holds a camp to the east.', 'turn', null);
   beginPlayerTurn(0);
@@ -5980,14 +6013,14 @@ const tutQueued = id => { const c = tutCap(); return !!c && (c.buildings.include
 
 const tutSelected = () => (selection && selection.kind === 'unit' ? unitById(selection.id) : null);
 const tutPick = test => { const u = tutUnit(test); if (u) selection = { kind: 'unit', id: u.id }; };
-// A plain hex two steps north of the soldiers' hex: the warrior's first trip.
+// A plain hex two steps north of the warrior's hex: the warrior's first trip.
 function tutGoal() {
-  const [sx, sy] = G.tut.stack || [0, 0];
+  const [sx, sy] = G.tut.warrior || [0, 0];
   const c = G.tiles.filter(t => hexDistance(t.x, t.y, sx, sy) === 2 && t.t === 'flat' && !t.f && t.y < sy &&
     G.seen[0][t.y * G.cols + t.x] && !cityAt(t.x, t.y)).sort((a, b) => a.y - b.y || a.x - b.x);
   return c.length ? [c[0].x, c[0].y] : null;
 }
-const tutOffStack = u => !!u && !!G.tut.stack && (u.x !== G.tut.stack[0] || u.y !== G.tut.stack[1]);
+const tutMoved = u => !!u && !!G.tut.warrior && (u.x !== G.tut.warrior[0] || u.y !== G.tut.warrior[1]);
 
 const TUT_STEPS = [
   // ── The basics ──
@@ -6013,17 +6046,17 @@ const TUT_STEPS = [
       '<b>Pop</b> is how many people live there. Rome starts at pop 2 with a free Granary: that is Rome’s special ability.',
     at: () => tutSpot(tutCap()), done: () => false },
   { ch: 'The basics',
-    say: 'Two soldiers stand on the <b>flashing hex</b>: a <b>warrior</b> and an <b>archer</b>. Several units can share one hex, and a small <b>number</b> on the hex tells you how many. ' +
-      'Click the hex, then pick the <b>archer</b> from the buttons at the top of the panel.',
-    at: () => G.tut.stack,
+    say: 'Two soldiers stand beside Rome: a <b>warrior</b> and an <b>archer</b>. Click the <b>flashing hex</b> to select the archer. ' +
+      'A hex holds only one soldier, but a soldier and a civilian (a settler or builder) can share one. When two units share a hex, a small <b>number</b> shows and the panel lets you pick between them.',
+    at: () => G.tut.archer,
     done: () => { const u = tutSelected(); return !!u && u.type === 'archer'; },
     skip: () => tutPick(u => u.type === 'archer') },
   { ch: 'The basics',
-    say: 'Now the <b>warrior</b>. Pick it from the panel (or click the hex again to switch units), then <b>right-click</b> the flashing hex to send it there. On a touch screen, tap the hex. ' +
+    say: 'Now the <b>warrior</b>. Click it, then <b>right-click</b> the flashing hex to send it there. On a touch screen, tap the hex. ' +
       'A unit can only go as far as its moves allow.',
     enter: () => { G.tut.goal = tutGoal(); },
-    at: () => G.tut.goal || null,
-    done: () => tutOffStack(tutUnit(u => u.type === 'warrior')),
+    at: () => { const s = tutSelected(); return s && s.type === 'warrior' ? (G.tut.goal || null) : G.tut.warrior; },
+    done: () => tutMoved(tutUnit(u => u.type === 'warrior')),
     skip: () => {
       const w = tutUnit(u => u.type === 'warrior'), g = G.tut.goal || tutGoal();
       if (w && g) { w.x = g[0]; w.y = g[1]; w.mp = Math.max(0, w.mp - 2); }
@@ -6049,7 +6082,7 @@ const TUT_STEPS = [
 
   // ── The land ──
   { ch: 'The land',
-    say: 'Builders improve hexes inside your borders. Select your <b>builder</b> in Rome (if it shares a hex, pick it from the panel), then <b>right-click</b> the flashing hex of <b>horses</b> to send it there.',
+    say: 'Builders improve hexes inside your borders. Select your <b>builder</b> in Rome (if a soldier stands there too, pick the builder from the panel), then <b>right-click</b> the flashing hex of <b>horses</b> to send it there.',
     at: () => tutSpot(tutHorses()),
     done: () => { const t = tutHorses(), b = tutUnit(u => u.type === 'builder'); return t.imp === 'pasture' || (!!b && b.x === t.x && b.y === t.y); },
     skip: () => { const t = tutHorses(), b = tutUnit(u => u.type === 'builder'); if (b) { b.x = t.x; b.y = t.y; b.mp = Math.max(b.mp, 1); } } },
@@ -6118,7 +6151,7 @@ const TUT_STEPS = [
     enter: tutRaid, at: () => tutSpot(tutRaider()),
     done: () => !tutRaider() || (!!selection && selection.kind === 'unit' && selection.id === G.tut.raider) },
   { ch: 'War',
-    say: 'Select your archer or warrior (pick it in the panel if they share a hex), then click the raider’s <b>red hex</b> to attack. The numbers show what you deal and what you take back. ' +
+    say: 'Select your archer or warrior, then click the raider’s <b>red hex</b> to attack. The numbers show what you deal and what you take back. ' +
       'Units inside your own borders get +5, and <b>F</b> fortifies a unit for +3 defense.',
     at: () => tutSpot(tutRaider()),
     done: () => !tutRaider(),
