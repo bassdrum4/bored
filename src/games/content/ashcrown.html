@@ -295,16 +295,15 @@
     padding-block: 22px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
     overflow-y: auto;
   }
-  .start-inner { width: min(680px, 100%); padding: 4px 0 10px }
   .eyebrow { font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3) }
-  .start-inner h1, .handoff-inner h1 {
+  .title-inner h1, .handoff-inner h1 {
     font-family: var(--font-display); font-size: clamp(34px, 7vw, 54px); font-weight: 600; letter-spacing: -.01em;
     line-height: 1.05; margin: 6px 0 10px; text-wrap: balance;
   }
   .lede { font-family: var(--font-display); font-size: 15px; color: var(--ink-2); max-width: 52ch; line-height: 1.55 }
-  .seats { display: flex; flex-direction: column; gap: 6px; margin: 18px 0 14px }
+  .seats { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 0 }
   .seat {
-    display: grid; grid-template-columns: 16px minmax(0, 1fr) minmax(0, 220px) 92px; gap: 6px 10px; align-items: center;
+    display: grid; grid-template-columns: 14px minmax(0, 1fr) minmax(0, 190px) 58px; gap: 6px 10px; align-items: center;
     border: 1px solid var(--rule); border-radius: 3px; padding: 8px 10px; background: var(--panel);
   }
   .seat-note { grid-column: 2 / -1; font-size: 11px; color: var(--ink-3); line-height: 1.4 }
@@ -317,6 +316,74 @@
   .field { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2) }
   .fine { font-size: 11.5px; color: var(--ink-3); margin-top: 12px; line-height: 1.6; max-width: 62ch }
   .fine b { color: var(--ink-2); font-weight: 600 }
+
+  /* ── the front end: a title screen, then game setup ──────────────────── */
+  #start { display: block; padding: 0; place-items: stretch }
+  .fe-pane {
+    position: relative; min-height: 100%; display: flex; flex-direction: column; justify-content: center;
+    padding-block: 22px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .title-art {
+    position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: .66;
+    -webkit-mask-image: linear-gradient(to right, transparent 36%, rgba(0, 0, 0, .55) 58%, #000 96%);
+            mask-image: linear-gradient(to right, transparent 36%, rgba(0, 0, 0, .55) 58%, #000 96%);
+  }
+  .title-inner { position: relative; width: min(450px, 100%); margin-left: clamp(0px, 9vw, 140px) }
+  .title-inner h1 { font-size: clamp(46px, 9vw, 74px); margin: 6px 0 12px }
+  .fe-menu { display: flex; flex-direction: column; margin: 24px 0 14px; border-top: 1px solid var(--rule) }
+  .fe-item {
+    position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 1px 12px;
+    text-align: left; width: 100%; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--rule-2);
+  }
+  .fe-item::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 2px; background: transparent }
+  .fe-item:hover, .fe-item:focus-visible { background: var(--panel); outline: 0 }
+  .fe-item:hover::before, .fe-item:focus-visible::before { background: var(--rust) }
+  .fe-item .mi { font-family: var(--font-display); font-size: 21px; font-weight: 600; line-height: 1.25 }
+  .fe-item .mi-sub { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-3); line-height: 1.4 }
+  .fe-item.primary .mi { color: var(--rust) }
+  .mi-tag {
+    align-self: center; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--rust);
+    border: 1px solid var(--rust); border-radius: 2px; padding: 1px 5px; white-space: nowrap;
+  }
+  #title-foot { margin-top: 6px }
+
+  .setup-inner { width: min(1040px, 100%); margin-inline: auto; display: flex; flex-direction: column }
+  .setup-head h2 { font-family: var(--font-display); font-size: clamp(28px, 5vw, 38px); font-weight: 600; letter-spacing: -.01em; margin: 4px 0 0 }
+  .setup-grid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 16px }
+  .setup-col { display: flex; flex-direction: column; gap: 14px; min-width: 0 }
+  .fe-card { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: 12px 14px 8px; min-width: 0 }
+  .fe-card h3 { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; margin-bottom: 2px }
+  .fe-card .seat { background: var(--panel-hi) }
+  .fe-card .seats { margin-bottom: 6px }
+  .fe-opt {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 190px); gap: 3px 14px; align-items: center;
+    padding: 9px 0; border-bottom: 1px dotted var(--rule-2);
+  }
+  .fe-opt:last-child { border-bottom: 0 }
+  .fe-opt > label { font-size: 13px; color: var(--ink) }
+  .fe-opt select, .fe-opt input[type="number"] { width: 100% }
+  .fe-opt input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--rust); justify-self: end }
+  .fe-opt .fe-note { grid-column: 1 / -1; font-size: 11.5px; color: var(--ink-3); line-height: 1.45; max-width: 60ch }
+  .setup-foot {
+    position: sticky; bottom: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 16px;
+    padding: 10px 0 max(10px, env(safe-area-inset-bottom, 0px)); background: var(--paper); border-top: 1px solid var(--rule);
+  }
+  .setup-foot .grow { flex: 1 1 140px; min-width: 0; font-size: 11.5px; color: var(--ink-3); line-height: 1.4 }
+  #btn-begin { padding: 9px 22px; font-size: 14px }
+  #start-note { margin-top: 14px }
+  @media (max-width: 860px) {
+    .setup-grid { grid-template-columns: minmax(0, 1fr) }
+    .setup-col { display: contents }
+    .fe-players { order: 1 } .fe-game { order: 2 } .fe-map { order: 3 } .fe-victory { order: 4 }
+    .title-art { opacity: .38; -webkit-mask-image: linear-gradient(to bottom, #000, transparent 72%); mask-image: linear-gradient(to bottom, #000, transparent 72%) }
+    .title-inner { margin-left: 0 }
+  }
+  @media (max-width: 520px) {
+    .fe-item .mi { font-size: 19px }
+    .fe-opt { grid-template-columns: minmax(0, 1fr) minmax(0, 150px) }
+    .setup-foot .grow { order: 3; flex-basis: 100% }
+    .setup-foot #btn-begin { flex: 1 1 auto }
+  }
   .handoff-inner { width: min(520px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px }
   .handoff-inner .banner { width: 54px; height: 54px; border-radius: 50%; border: 2px solid var(--ink); margin-bottom: 4px }
   .handoff-inner .btn { margin-top: 14px; padding: 9px 18px; font-size: 14px }
@@ -561,58 +628,79 @@
 </div>
 
 <div id="start" class="screen">
-  <div class="start-inner">
-    <p class="eyebrow">a hex strategy game for friends</p>
-    <h1>Civ Lite</h1>
-    <p class="lede">Pick a civ, found cities, research a tech tree, and fight over a random map. Pass one device around for up to 8 players, fill the table with CPUs, and win by taking every capital, by science, or on score when the turns run out.</p>
-    <div class="seats" id="seats"></div>
-    <div class="start-row">
-      <label class="field" for="opt-humans">Players
-        <select id="opt-humans"></select>
-      </label>
-      <label class="field" for="opt-cpus">CPUs
-        <select id="opt-cpus"></select>
-      </label>
-      <label class="field" for="opt-map">Map
-        <select id="opt-map"></select>
-      </label>
-      <label class="field" for="opt-size">Size
-        <select id="opt-size"></select>
-      </label>
-      <label class="field" for="opt-level">Difficulty
-        <select id="opt-level"></select>
-      </label>
-      <label class="field" for="opt-close">Borders close
-        <select id="opt-close"></select>
-      </label>
-      <label class="field" for="opt-turns">Turn limit
-        <input type="number" id="opt-turns" value="100" min="0" max="500" step="10" inputmode="numeric" aria-describedby="turns-hint">
-        <span class="faint" id="turns-hint">0 = no limit</span>
-      </label>
+  <section id="pane-title" class="fe-pane" aria-label="Main menu">
+    <svg id="title-art" class="title-art" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div class="title-inner">
+      <p class="eyebrow">a hex strategy game for friends</p>
+      <h1>Civ Lite</h1>
+      <p class="lede">Pick a civ, found cities, research a tech tree, and fight over a random map. Pass one device around for up to 8 players, fill the table with CPUs, and win by taking every capital, by science, or on score when the turns run out.</p>
+      <nav class="fe-menu" id="title-menu" aria-label="Main menu">
+        <button class="fe-item" id="btn-continue" type="button" hidden><span class="mi">Continue</span><span class="mi-sub" id="continue-sub"></span></button>
+        <button class="fe-item" id="btn-new" type="button" data-act="title-new"><span class="mi">New game</span><span class="mi-sub">Choose the players, the map and the rules</span></button>
+        <button class="fe-item" id="btn-load" type="button" data-act="slots:load" hidden><span class="mi">Load game</span><span class="mi-sub" id="load-sub"></span></button>
+        <button class="fe-item" id="btn-tutorial" type="button" data-act="tut-start"><span class="mi">Tutorial</span><span class="mi-tag" id="tut-tag">New here? Start here</span><span class="mi-sub" id="tut-sub"></span></button>
+        <button class="fe-item" id="btn-civs" type="button" data-act="civs"><span class="mi">Civs</span><span class="mi-sub">All 16, with what each one does</span></button>
+        <button class="fe-item" id="btn-help" type="button" data-act="help"><span class="mi">How to play</span><span class="mi-sub">The whole rulebook on one page</span></button>
+        <button class="fe-item" id="btn-options" type="button" data-act="options"><span class="mi">Options</span><span class="mi-sub">Tips, event popups and animation</span></button>
+      </nav>
+      <p class="fine" id="title-foot">Civ Lite <span id="title-ver"></span> · one device, 1 to 8 players</p>
     </div>
-    <div class="start-row switches">
-      <span class="field">Win by</span>
-      <label class="check" for="opt-conquest"><input type="checkbox" id="opt-conquest" checked> Conquest</label>
-      <label class="check" for="opt-science"><input type="checkbox" id="opt-science" checked> Science</label>
-      <span class="faint" style="font-size:11.5px">Score wins when the turn limit hits.</span>
+  </section>
+
+  <section id="pane-setup" class="fe-pane" aria-label="Game setup" hidden>
+    <div class="setup-inner">
+      <header class="setup-head">
+        <p class="eyebrow">New game</p>
+        <h2>Game setup</h2>
+      </header>
+      <div class="setup-grid">
+        <div class="setup-col">
+          <section class="fe-card fe-players" aria-label="Players">
+            <h3>Players</h3>
+            <div class="fe-opt"><label for="opt-humans">Human players</label><select id="opt-humans"></select></div>
+            <div class="fe-opt"><label for="opt-cpus">CPU players</label><select id="opt-cpus"></select>
+              <p class="fe-note">2 to 8 in all. Humans take their turns one after another on this device; CPUs play on their own.</p></div>
+            <div class="seats" id="seats"></div>
+          </section>
+          <section class="fe-card fe-victory" aria-label="Victory">
+            <h3>Victory</h3>
+            <div class="fe-opt"><label for="opt-conquest">Conquest</label><input type="checkbox" id="opt-conquest" checked>
+              <p class="fe-note">Hold every capital on the map.</p></div>
+            <div class="fe-opt"><label for="opt-science">Science</label><input type="checkbox" id="opt-science" checked>
+              <p class="fe-note">Send the Grand Expedition or the Grand Caravan home. How to play has the details.</p></div>
+          </section>
+        </div>
+        <div class="setup-col">
+          <section class="fe-card fe-game" aria-label="Game">
+            <h3>Game</h3>
+            <div class="fe-opt"><label for="opt-level">Difficulty</label><select id="opt-level"></select>
+              <p class="fe-note" id="level-note"></p></div>
+            <div class="fe-opt"><label for="opt-close">Borders close</label><select id="opt-close"></select>
+              <p class="fe-note" id="close-note"></p></div>
+            <div class="fe-opt"><label for="opt-turns">Turn limit</label>
+              <input type="number" id="opt-turns" value="100" min="0" max="500" step="10" inputmode="numeric" aria-describedby="turns-hint">
+              <p class="fe-note" id="turns-hint">A whole number from 10 to 500, or 0 for no limit. When the limit hits, the highest score wins.</p></div>
+          </section>
+          <section class="fe-card fe-map" aria-label="Map">
+            <h3>Map</h3>
+            <div class="fe-opt"><label for="opt-map">Type</label><select id="opt-map"></select>
+              <p class="fe-note" id="map-note"></p></div>
+            <div class="fe-opt"><label for="opt-size">Size</label><select id="opt-size"></select>
+              <p class="fe-note" id="size-note"></p></div>
+            <div class="fe-opt"><label for="opt-wrap">Wraps west to east</label><input type="checkbox" id="opt-wrap">
+              <p class="fe-note">Joins the west and east edges: a unit can walk off one side and appear on the other.</p></div>
+          </section>
+        </div>
+      </div>
+      <p class="fine" id="start-note"></p>
+      <footer class="setup-foot">
+        <button class="btn" id="btn-back" type="button" data-act="title-back">Back</button>
+        <button class="btn" id="btn-reset" type="button" data-act="setup-reset">Reset to defaults</button>
+        <span class="grow" id="setup-note"></span>
+        <button class="btn primary" id="btn-begin" type="button">Start game</button>
+      </footer>
     </div>
-    <div class="start-row switches">
-      <label class="check" for="opt-wrap"><input type="checkbox" id="opt-wrap"> Map wraps west to east</label>
-      <label class="check" for="opt-tutorial"><input type="checkbox" id="opt-tutorial"> Tutorial</label>
-      <label class="check" for="opt-tips"><input type="checkbox" id="opt-tips" checked> Tips in my games</label>
-    </div>
-    <p class="fine" id="map-note"></p>
-    <p class="fine" id="size-note" style="margin-top:2px"></p>
-    <p class="fine" id="level-note" style="margin-top:2px"></p>
-    <p class="fine" id="close-note" style="margin-top:2px"></p>
-    <div class="start-row" style="margin-top:12px">
-      <button class="btn primary" id="btn-begin" type="button">Start game</button>
-      <button class="btn" id="btn-civs" type="button" data-act="civs">See all 16 civs</button>
-      <button class="btn" id="btn-continue" type="button" hidden>Continue saved game</button>
-      <button class="btn" id="btn-load" type="button" data-act="slots:load" hidden>Load game</button>
-    </div>
-    <p class="fine" id="start-note">Everyone starts with a settler and a warrior, at peace. No two players share a civ. <b>Space</b> ends your turn, <b>N</b> jumps to the next unit that needs orders, <b>T</b> opens the tech tree, <b>R</b> opens your realm, and <b>H</b> opens the rules.</p>
-  </div>
+  </section>
 </div>
 <script>
 "use strict";
@@ -7626,7 +7714,7 @@ function showMenu() {
     (G.tut || online || G.over || !currentSlot || !slotHead(currentSlot) ? '' :
       '<button class="act" data-act="save">Save to “' + esc(slotHead(currentSlot).name || 'Saved game') + '”<kbd>Ctrl+S</kbd></button>') +
     (online ? '' : '<button class="act" data-act="slots:load">Load game</button>') +
-    '<button class="act warn" data-act="new-ask">Quit to the start screen</button></div>' +
+    '<button class="act warn" data-act="new-ask">Quit to the main menu</button></div>' +
     '<p class="hint">' + howSaved + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Back to the game</button></div>', true);
 }
@@ -7640,8 +7728,8 @@ function showCivs() {
 
 function askNewGame() {
   openModal(modalHead('Leave this game?') +
-    '<div class="modal-body"><p>Its autosave stays on this device, so you can come back from the start screen (Continue or Load game) until a new game replaces it. Games you saved to a slot stay put.</p></div>' +
-    '<div class="modal-foot"><button class="btn" data-act="close">Stay</button><button class="btn primary" data-act="new">Go to the start screen</button></div>', true);
+    '<div class="modal-body"><p>Its autosave stays on this device, so you can come back from the main menu (Continue or Load game) until a new game replaces it. Games you saved to a slot stay put.</p></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Stay</button><button class="btn primary" data-act="new">Go to the main menu</button></div>', true);
 }
 
 function askDisband() {
@@ -7708,9 +7796,9 @@ function showHelp() {
     'seeing a natural wonder, a city on a new continent, first contact, first blood, taking a city or a capital (or winning one back), making peace, an open-borders or trade deal, ' +
     'a first road, a city of pop 8, five cities, a University, each new era, each science step, and sending out the last trip. Every civ earns each one once, and the first civ in the world to earn it gets double. ' +
     'The Realm panel lists them all. Other cards warn you when someone declares war on you, takes one of your cities or launches a science trip, and when the borders close. ' +
-    'Turn Event popups off in the Menu and the points still count.</p>' +
+    'Turn Event popups off in Options (or the Menu) and the points still count.</p>' +
     '<h3>Keys</h3><p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
-    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. The Menu’s Animation switch runs through off, wonders only, wonders + features, and everything.</p>' +
+    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
     '</div><div class="modal-foot"><button class="btn" data-act="civs">All 16 civs</button><button class="btn primary" data-act="close">Close</button></div>');
 }
 
@@ -7725,7 +7813,7 @@ function showEndModal() {
     '<div class="modal-body"><div class="table-wrap"><table class="standings"><thead><tr><th>Player</th><th class="n">Cities</th><th class="n">Pop</th>' +
     '<th class="n">Tech</th><th class="n">Era</th><th class="n">Military</th><th class="n">Score</th></tr></thead><tbody>' +
     rows + '</tbody></table></div><p class="hint">Score is cities × 5 + pop + tech points + era points + military strength ÷ 20.</p></div>' +
-    '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button><button class="btn primary" data-act="new">New game</button></div>');
+    '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button><button class="btn primary" data-act="new-setup">New game</button></div>');
 }
 
 /* ── interface: what a click does ──────────────────────────────────────────── */
@@ -7809,6 +7897,11 @@ function onAction(act) {
   if (kind === 'zoom-out') { zoomBy(1 / 1.2); return; }
   if (kind === 'zoom-fit') { fitCamera(); return; }
   if (kind === 'civs') { showCivs(); return; }
+  if (kind === 'help') { showHelp(); return; }
+  if (kind === 'options') { showOptions(); return; }
+  if (kind === 'title-new') { showPane('setup'); return; }
+  if (kind === 'title-back') { showPane('title'); return; }
+  if (kind === 'setup-reset') { resetSetup(); return; }
   if (kind === 'slots' || kind.startsWith('slot-')) { slotAction(kind, a, b); return; }
   if (kind === 'tut-start') { if (G && !G.tut) saveGame(); startTutorial(); return; }
   if (kind === 'anim-next') {
@@ -7816,20 +7909,20 @@ function onAction(act) {
     const order = Object.keys(ANIM_LEVELS);
     setAnim(order[(order.indexOf(currentAnim()) + 1) % order.length]);
     toast('Animation: ' + ANIM_LEVELS[currentAnim()].toLowerCase() + '.');
-    if (G) showMenu();
+    redoSwitches();
     return;
   }
   if (kind === 'popups-toggle') {
     setPopups(!popupsOn());
     toast('Event popups ' + (popupsOn() ? 'on' : 'off') + '. The points still count.');
-    if (G) showMenu();
+    redoSwitches();
     return;
   }
   if (kind === 'tips-toggle') {
     setTips(!tipsOn());
-    if (UI.optTips) UI.optTips.checked = tipsOn();
     toast('Tips ' + (tipsOn() ? 'on' : 'off') + '.');
-    if (G) { render(); showMenu(); }
+    if (G) render();
+    redoSwitches();
     return;
   }
   if (!G) { if (kind === 'close') closeModal(); return; }
@@ -7845,15 +7938,11 @@ function onAction(act) {
     case 'tut-chapter': tutorialSkipChapter(); render(); break;
     case 'tut-close': if (G.tut) { G.tut.closed = true; render(); } break;
     case 'coach-toggle': if (G.tut) { G.tut.closed = !G.tut.closed; render(); showMenu(); } break;
-    case 'tut-quit':
-    case 'tut-new':
-      if (UI.optTutorial) UI.optTutorial.checked = false;
-      onAction('new');
-      break;
+    case 'tut-quit': onAction('new'); break;
+    case 'tut-new': onAction('new-setup'); break;
     case 'tip-ok': markTipSeen(a); render(); break;
     case 'tips-off':
       setTips(false);
-      if (UI.optTips) UI.optTips.checked = false;
       toast('Tips off. Turn them back on in the Menu.');
       render();
       break;
@@ -7871,7 +7960,6 @@ function onAction(act) {
       }
       break;
     case 'menu': if (!G.handoff) showMenu(); break;
-    case 'help': showHelp(); break;
     case 'end': if (myTurn()) askEndTurn(); break;
     case 'end-confirm': if (myTurn()) doEndTurn(); break;
     case 'handoff-go':
@@ -8076,6 +8164,7 @@ function onAction(act) {
     case 'save': closeModal(); quickSave(); break;
     case 'new-ask': askNewGame(); break;
     case 'new':
+    case 'new-setup':
       closeModal();
       G = null;
       currentSlot = null;
@@ -8085,8 +8174,9 @@ function onAction(act) {
       hover = null;
       preview = null;
       UI.handoff.hidden = true;
+      UI.toast.classList.remove('show');   // a game's last message does not follow you to the menu
       UI.start.hidden = false;
-      refreshStart();
+      showPane(kind === 'new-setup' ? 'setup' : 'title');
       break;
   }
 }
@@ -8287,6 +8377,7 @@ function bindKeys() {
     const tag = event.target && event.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (event.key === 'Escape' && UI.modalKind === 'slots' && !UI.modalLayer.hidden) { onAction('close'); return; }
+    if (UI.start && !UI.start.hidden) { frontKeys(event); return; }
     if (!G || !UI.start.hidden) return;
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 's') {
       event.preventDefault();   // not the browser's "save page"
@@ -8609,8 +8700,32 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
+const VERSION = '4.4';
 
-/* ── the start screen ──────────────────────────────────────────────────────── */
+/* ── the front end: a title screen, then game setup (like Civ 6) ───────────── */
+
+// A faded hex map behind the title, in the game's own terrain colors and noise. It is drawn once
+// per visit from a throwaway seed. The game's dice, seeds and saves are never touched.
+function drawTitleArt() {
+  const svg = document.getElementById('title-art');
+  if (!svg) return;
+  const R = 30, w = Math.sqrt(3) * R, v = 1.5 * R, cols = 26, rows = 22;
+  const seed = Math.floor(Math.random() * 1e9);
+  const paths = { deep: '', shallow: '', flat: '', hill: '', mount: '' };
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const n = fbm(x, y, seed, 6, 3);
+      const t = n < 0.4 ? 'deep' : n < 0.47 ? 'shallow' : n < 0.62 ? 'flat' : n < 0.72 ? 'hill' : 'mount';
+      const c = hexCenter(x, y);
+      paths[t] += polyPath(hexCorners(c[0], c[1], R - 0.8));
+    }
+  }
+  // Cropped to where every row has hexes, so the edges come out straight.
+  svg.setAttribute('viewBox', '0 ' + (R / 2) + ' ' + Math.round(w * cols) + ' ' + Math.round(v * (rows - 1) + R));
+  svg.setAttribute('preserveAspectRatio', 'xMaxYMid slice');
+  svg.innerHTML = Object.keys(paths).map(t =>
+    '<path d="' + paths[t] + '" fill="' + TERRAIN[t].fill + '" stroke="rgba(42,33,22,.35)" stroke-width="1"/>').join('');
+}
 
 function buildStartScreen() {
   const civOptions = '<option value="random">Random civ</option>' +
@@ -8637,18 +8752,41 @@ function buildStartScreen() {
   UI.optMap.onchange = refreshStart;
   UI.optSize.onchange = refreshStart;
   UI.optLevel.onchange = refreshStart;
-  // The tutorial switch starts ticked for someone who has never played it.
-  UI.optTutorial.checked = !tutorialDone();
-  UI.optTips.checked = tipsOn();
-  UI.optTutorial.onchange = refreshStart;
-  UI.optTips.onchange = () => setTips(UI.optTips.checked);
   for (let i = 0; i < SEATS.length; i++) {
     document.getElementById('seat-civ-' + i).onchange = refreshStart;
     document.getElementById('seat-name-' + i).oninput = event => { event.target.dataset.edited = '1'; };
   }
   UI.btnBegin.onclick = beginGame;
-  UI.btnContinue.onclick = () => { if (!loadSlot('auto')) { toast('That save can’t be opened.'); refreshStart(); } };
+  UI.btnContinue.onclick = () => { if (!loadSlot('auto')) { toast('That save can’t be opened.'); refreshTitle(); } };
+  document.getElementById('title-ver').textContent = 'v' + VERSION;
   refreshStart();
+  drawTitleArt();
+  showPane('title');
+}
+// Two screens share the start overlay: the title menu, and game setup behind New game.
+function showPane(name) {
+  UI.paneTitle.hidden = name !== 'title';
+  UI.paneSetup.hidden = name !== 'setup';
+  UI.start.scrollTop = 0;
+  if (name === 'title') {
+    refreshTitle();
+    const first = UI.titleMenu.querySelector('.fe-item:not([hidden])');
+    if (first && UI.modalLayer.hidden) first.focus({ preventScroll: true });
+  } else refreshStart();
+}
+// Continue is the autosave: the game you were last playing. Load game opens every save. A Bored
+// Together match never looks at the solo saves, even from here.
+function refreshTitle() {
+  const slots = online ? [] : slotList(), auto = slots.find(s => s.id === 'auto');
+  const named = slots.filter(s => slotKind(s.id) === 'manual').length;
+  UI.btnContinue.hidden = !auto;
+  document.getElementById('continue-sub').textContent = auto ? (auto.head.meta || 'Saved game') + ' · ' + agoText(auto.head.at) : '';
+  UI.btnLoad.hidden = !slots.length;
+  document.getElementById('load-sub').textContent = named ? plural(named, 'named save', 'named saves') + ' and your autosaves' : 'Your autosaves';
+  UI.btnContinue.classList.toggle('primary', !!auto);
+  UI.btnNew.classList.toggle('primary', !auto);
+  document.getElementById('tut-tag').hidden = tutorialDone();
+  document.getElementById('tut-sub').textContent = TUT_STEPS.length + ' short steps on a small island, playing Rome';
 }
 // 2 to 8 players in all: changing one count trims the other to fit.
 function fitCounts(changed) {
@@ -8690,23 +8828,72 @@ function refreshStart() {
   UI.mapNote.textContent = MAP_TYPES[UI.optMap.value].blurb + (UI.optMap.value === 'mirror' && n % 2 ? ' With an odd number of players one start has no twin.' : '');
   UI.sizeNote.textContent = MAP_SIZES[size].name + ' map, ' + MAP_SIZES[size].cols + ' × ' + MAP_SIZES[size].rows + ', built for ' +
     MAP_SIZES[size].players + ' players' + (n > MAP_SIZES[size].players ? '. That’s crowded for ' + n + '.' : n < MAP_SIZES[size].players / 2 ? '. Plenty of room for ' + n + '.' : '.');
-  UI.levelNote.textContent = LEVELS[UI.optLevel.value].name + ': ' + LEVELS[UI.optLevel.value].blurb;
+  UI.levelNote.textContent = LEVELS[UI.optLevel.value].blurb;
   const close = Number(UI.optClose.value);
   UI.closeNote.textContent = close ? 'From turn ' + close + ', every player’s land is closed to the others: stepping onto it without an open-borders deal (made in the Council) means war.'
     : 'Borders stay open all game: anyone can walk anywhere.';
-  const tut = UI.optTutorial.checked;
-  UI.btnBegin.textContent = tut ? 'Start the tutorial' : 'Start game';
-  UI.startNote.innerHTML = tut
-    ? 'The tutorial is ' + TUT_STEPS.length + ' short steps in 8 chapters on a small island, playing Rome. The settings above wait for your next game. Untick <b>Tutorial</b> to skip it.'
-    : START_NOTE;
-  // Continue is the autosave: the game you were last playing. Load game opens every save.
-  const slots = slotList(), auto = slots.find(s => s.id === 'auto');
-  UI.btnContinue.hidden = !auto;
-  if (auto) UI.btnContinue.textContent = 'Continue · ' + (auto.head.meta || 'saved game');
-  UI.btnLoad.hidden = !slots.length;
+  UI.startNote.innerHTML = START_NOTE;
+  // Starting a game takes over the Autosave, so say so; named saves are never touched.
+  const auto = online ? null : slotList().find(s => s.id === 'auto');
+  UI.setupNote.textContent = auto ? 'Starting a game replaces your Autosave. Games you saved to a slot are kept.' : '';
+}
+// Back to the way a fresh visit starts: two humans, Pangaea, Normal, borders close on turn 30.
+function resetSetup() {
+  UI.optHumans.value = '2';
+  UI.optCpus.value = '0';
+  UI.optMap.value = 'pangaea';
+  UI.optSize.value = 'auto';
+  UI.optLevel.selectedIndex = 0;
+  UI.optClose.value = String(DEFAULT_CLOSE_TURN);
+  UI.optTurns.value = '100';
+  UI.optConquest.checked = true;
+  UI.optScience.checked = true;
+  UI.optWrap.checked = false;
+  SEATS.forEach((s, i) => {
+    document.getElementById('seat-civ-' + i).value = 'random';
+    const name = document.getElementById('seat-name-' + i);
+    delete name.dataset.edited;
+    name.value = s.name;
+  });
+  refreshStart();
+  toast('Back to the default setup.');
+}
+// The three switches that live on this device: in Options here, and in the in-game Menu.
+function showOptions() {
+  const row = (act, label, value) => '<button class="act switch" data-act="' + act + '">' + label + '<b>' + value + '</b></button>';
+  openModal(modalHead('Options', 'Kept on this device') +
+    '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
+    row('tips-toggle', 'Tips in my games', tipsOn() ? 'on' : 'off') +
+    row('popups-toggle', 'Event popups', popupsOn() ? 'on' : 'off') +
+    row('anim-next', 'Animation', ANIM_LEVELS[currentAnim()]) + '</div>' +
+    '<p class="hint">Tips are short hints that appear over the map as you play. Event popups are the cards for wonders, Historic moments and news; the points count either way. Animation sets how much of the map moves.</p></div>' +
+    '<div class="modal-foot"><button class="btn primary" data-act="close">Done</button></div>', true);
+  UI.modalKind = 'options';
+}
+function redoSwitches() {
+  if (UI.modalKind === 'options') showOptions();
+  else if (G) showMenu();
+}
+// Keys on the title and setup screens: Esc closes a window, or steps back from setup; the arrow
+// keys move down the title menu.
+function frontKeys(event) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const modalOpen = !UI.modalLayer.hidden;
+  if (event.key === 'Escape') {
+    if (modalOpen) closeModal();
+    else if (!UI.paneSetup.hidden) showPane('title');
+    return;
+  }
+  if (modalOpen || UI.paneTitle.hidden) return;
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  const items = Array.from(UI.titleMenu.querySelectorAll('.fe-item:not([hidden])'));
+  if (!items.length) return;
+  event.preventDefault();
+  const at = items.indexOf(document.activeElement);
+  const next = event.key === 'ArrowDown' ? (at + 1) % items.length : at <= 0 ? items.length - 1 : at - 1;
+  items[next].focus({ preventScroll: true });
 }
 function beginGame() {
-  if (UI.optTutorial.checked) { startTutorial(); return; }
   const { humans, cpus } = seatCounts(), n = humans + cpus;
   if (n < 2 || n > MAX_PLAYERS || humans < 1) { toast('Pick 1 to 8 players and enough CPUs to make 2 to 8 in all.'); return; }
   const seats = [];
@@ -8820,7 +9007,7 @@ function boot(data) {
     start: q('#start'), seats: q('#seats'), optHumans: q('#opt-humans'), optCpus: q('#opt-cpus'), optSize: q('#opt-size'), sizeNote: q('#size-note'),
     optConquest: q('#opt-conquest'), optScience: q('#opt-science'), optTurns: q('#opt-turns'), optMap: q('#opt-map'),
     optLevel: q('#opt-level'), mapNote: q('#map-note'), levelNote: q('#level-note'), optClose: q('#opt-close'), optWrap: q('#opt-wrap'), closeNote: q('#close-note'),
-    optTutorial: q('#opt-tutorial'), optTips: q('#opt-tips'), startNote: q('#start-note'),
+    startNote: q('#start-note'), setupNote: q('#setup-note'), paneTitle: q('#pane-title'), paneSetup: q('#pane-setup'), titleMenu: q('#title-menu'), btnNew: q('#btn-new'),
     coach: q('#coach'), coachTag: q('#coach-tag'), coachCount: q('#coach-count'), coachSay: q('#coach-say'), coachActions: q('#coach-actions'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), btnLoad: q('#btn-load'), endShown: false, modalKind: null
   };
   applyAnim();
