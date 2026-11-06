@@ -899,7 +899,7 @@ test('browser regressions', async t => {
     assert.equal(stock.maxHp, 28, 'the greater draught raises the cap by eight');
     assert.ok(stock.deepHp > stock.baseHp, 'the greater draught costs more than the vital draught');
     assert.ok(stock.deepDef > stock.baseDef, 'the warded aegis costs more than an aegis plate');
-    assert.deepEqual(await frame.evaluate(() => __deep.shopStock().map(item => item.id)), ['flask', 'atk', 'def', 'hp']);
+    assert.deepEqual(await frame.evaluate(() => { __deep.state.depth = 1; return __deep.shopStock().map(item => item.id); }), ['flask', 'atk', 'def', 'hp']);
 
     // One landing shares a single healing allowance between rest and the path.
     const heals = await frame.evaluate(() => {
