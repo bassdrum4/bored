@@ -366,14 +366,29 @@
   @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
   #map[data-anim="none"] .an, #map[data-anim="wonders"] .an:not(.w), #map[data-anim="features"] .an.a { animation: none }
 
-  /* the wonder popup: a still picture, no motion */
-  .still .an { animation: none }
-  .wonder-card { display: flex; gap: 16px; align-items: center }
-  .wonder-card svg { flex: none; width: 112px; height: 124px }
+  /* the popup cards (wonders, historic moments, news). Moving unless Animation is Off. */
+  .wonder-card { display: flex; gap: 16px; align-items: center; --clock: 0s }
+  .wonder-card .pop-art { flex: none; width: 132px; height: 140px; overflow: visible }
   .wonder-card .wtxt { min-width: 0 }
   .wonder-card .wkind { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px }
   .wonder-card p { max-width: 38ch }
+  .wonder-card p + p { margin-top: 6px }
+  .wonder-card .moment { font-weight: 700; color: var(--rust) }
+  .wonder-card .wring { opacity: 0; transform-box: fill-box; transform-origin: center }
+  .wonder-card .rise, .wonder-card .fall { opacity: 0; transform-box: fill-box; transform-origin: center }
+  .wonder-card.moving .pop-art { animation: popin .6s cubic-bezier(.2, .9, .3, 1.25) both }
+  .wonder-card.moving .wring { animation: wring 2.6s ease-out infinite }
+  .wonder-card.moving .wring.b { animation-delay: 1.3s }
+  .wonder-card.moving .glint { animation: twinkle 1.8s ease-in-out infinite }
+  .wonder-card.moving .rise { animation: rise 2.8s ease-in infinite }
+  .wonder-card.moving .fall { animation: fall 3.2s linear infinite }
+  .wonder-card.still .an { animation: none }
+  @keyframes popin { from { transform: scale(.55); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+  @keyframes wring { 0% { transform: scale(.9); opacity: .9 } 100% { transform: scale(1.32); opacity: 0 } }
+  @keyframes rise { 0% { transform: translateY(0); opacity: 0 } 20% { opacity: .9 } 100% { transform: translateY(-16px); opacity: 0 } }
+  @keyframes fall { 0% { transform: translateY(0); opacity: 0 } 15% { opacity: .9 } 100% { transform: translateY(18px); opacity: 0 } }
   @media (max-width: 460px) { .wonder-card { flex-direction: column; align-items: flex-start } }
+  .stackbadge text { font: 700 8px/1 var(--font-data); fill: #f7f0df; text-anchor: middle }
 
   /* building cards in the city panel */
   .bcards { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px }
@@ -1578,24 +1593,6 @@ function assignCivs(seats, seed) {
 }
 
 // seats: [{ name, human, civ }]. Returns the new game, sitting at the first player's turn.
-/* ── Bored Together ─────────────────────────────────────────────────────────
- * Two people, one valley: every turn ends by handing the whole board to the
- * server, which stores it and passes it to whoever is due next. Neither side
- * runs a private campaign or a CPU stand-in.
- */
-let online = null, onlineSent = false;
-function onlineSubmit() {
-  if (!online || onlineSent || !G) return;
-  onlineSent = true;
-  // Only the winner's own client claims the win. A losing final turn still
-  // hands the board over, so the other side can open it and close the match.
-  const seat = Number(online.seat) || 1;
-  const winner = G.over && Number.isInteger(G.over.winner) && G.over.winner === seat - 1 ? seat : null;
-  online.submit({ board: G, turn: G.turn, winner })
-    .then(() => online.finishTurn())
-    .catch(error => { onlineSent = false; online.error(error, onlineSubmit); });
-}
-
 function startGame(options) {
   const seats = options.seats.slice(0, MAX_PLAYERS);
   const seed = options.seed >>> 0;
@@ -1615,7 +1612,7 @@ function startGame(options) {
     cols: world.cols, rows: world.rows, tiles: world.tiles, conts: world.conts,
     units: [], cities: [], players: [],
     dip: [], attitude: [], warSince: [], offers: [],
-    log: [], seen: [],
+    log: [], seen: [], news: [], firsts: {},
     turn: 0, maxTurns: options.maxTurns || 0, cur: n - 1, viewer: null,
     handoff: false, pending: null, over: null, watch: !!options.watch,
     nextUnit: 1, nextCity: 1, names: shuffledNames(world.seed),
@@ -2108,6 +2105,7 @@ function finishRoad(c, targetId, cost) {
   c.progress -= cost;
   for (const t of r.tiles) t.road = true;
   roadCache.clear();
+  awardMoment(c.owner, 'road');
   return true;
 }
 // Roads to every other city of c's owner that c could pave, cheapest first.
@@ -2468,6 +2466,7 @@ function killUnit(u, killer) {
   const f = pl(u.owner);
   if (killer !== null && killer !== undefined) {
     pl(killer).kills += 1;
+    awardMoment(killer, 'blood');
     log(fullName(pl(killer)) + ' destroys a ' + f.name + ' ' + UNITS[u.type].name.toLowerCase() + '.', pl(killer).ink, null);
   } else {
     log('A ' + UNITS[u.type].name.toLowerCase() + ' starves to death.', '#93401d', f.i);
@@ -2934,6 +2933,8 @@ function captureCity(c, u) {
   rehome(c.id);
   changeAttitude(prev, f.i, -30);
   log(fullName(f) + ' captures ' + c.name + (c.capital ? ', ' + pf.name + '’s capital,' : '') + ' from ' + fullName(pf) + '.', f.ink, null);
+  for (const id of (c.capital ? ['capital', 'conquest'] : c.founder === f.i ? ['retake', 'conquest'] : ['conquest'])) if (awardMoment(f.i, id)) break;
+  pushNews({ i: prev, kind: 'alert', type: 'lost', by: f.i, city: c.name, at: [c.x, c.y] });
   if (f.human && !c.capital) G.pending = { kind: 'capture', city: c.id };
   checkElimination();
   checkWin();
@@ -2966,6 +2967,7 @@ function declareWar(a, b) {
   changeAttitude(b, a, -30);
   G.offers = G.offers.filter(o => !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
   log(fullName(pl(a)) + ' declares war on ' + fullName(pl(b)) + '.', '#93401d', null);
+  pushNews({ i: b, kind: 'alert', type: 'war', by: a });
   G.open = (G.open || []).filter(o => !((o.a === a && o.b === b) || (o.a === b && o.b === a)));
   settleDealsOnWar(a, b);
 }
@@ -2976,6 +2978,8 @@ function makePeace(a, b) {
   changeAttitude(b, a, 10);
   G.offers = G.offers.filter(o => !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
   log(fullName(pl(a)) + ' and ' + fullName(pl(b)) + ' make peace.', '#41602f', null);
+  awardMoment(a, 'peace');
+  awardMoment(b, 'peace');
 }
 
 // How a CPU player answers a peace offer: losing, a long war, or a second war
@@ -3066,6 +3070,8 @@ function openBorders(a, b) {
   changeAttitude(a, b, 4);
   changeAttitude(b, a, 4);
   log(fullName(pl(a)) + ' and ' + fullName(pl(b)) + ' open their borders to each other for ' + OPEN_TURNS + ' turns.', '#41602f', null);
+  awardMoment(a, 'borders');
+  awardMoment(b, 'borders');
 }
 // Would this CPU open its borders to that player? Not to someone it dislikes.
 function aiAcceptsOpen(f, other) {
@@ -3113,6 +3119,7 @@ function ejectTrespassers(i) {
 function bordersNewRound() {
   if (G.closeTurn && G.turn === G.closeTurn && !G.tut) {
     log('The borders close. Stepping onto another player’s land without an open-borders deal means war.', 'turn', null);
+    for (const o of G.players) pushNews({ i: o.i, kind: 'alert', type: 'close' });
   }
   const lapsed = (G.open || []).filter(o => G.turn >= o.until);
   if (lapsed.length) {
@@ -3202,6 +3209,8 @@ function makeDeal(d) {
   s[d.res] = (s[d.res] || 0) - d.qty;
   b[d.res] = Math.min(STOCK_CAP, (b[d.res] || 0) + d.qty);
   const what = d.qty + ' ' + d.res;
+  awardMoment(d.seller, 'trade');
+  awardMoment(d.buyer, 'trade');
   if (d.turns <= 1) {
     payProduction(d.buyer, d.seller, d.total);
     log(fullName(b) + ' buys ' + what + ' from ' + fullName(s) + ' for ' + d.total + ' production.', b.ink, null);
@@ -3333,7 +3342,7 @@ function computeVision(i) {
 }
 function refreshVision() {
   VIS = G && G.viewer !== null && !G.watch ? computeVision(G.viewer) : null;
-  if (VIS && pl(G.viewer).human) noticeWonders(G.viewer);
+  if (VIS && pl(G.viewer).human) { noticeWonders(G.viewer); checkMoments(G.viewer); }
 }
 
 /* ── scoring and the end ───────────────────────────────────────────────────── */
@@ -3360,7 +3369,8 @@ function scoreParts(i) {
   const tech = techPoints(pl(i));
   const army = militaryWeight(i);
   const mil = Math.round(army / 20);
-  return { cities: cities.length, pop, tech, army: Math.round(army), mil, kills: pl(i).kills, total: cities.length * 5 + pop + tech + mil };
+  const era = pl(i).eraPts || 0;
+  return { cities: cities.length, pop, tech, era, army: Math.round(army), mil, kills: pl(i).kills, total: cities.length * 5 + pop + tech + era + mil };
 }
 function standings() {
   return G.players.map(f => ({ f, s: scoreParts(f.i) }))
@@ -3371,7 +3381,6 @@ function endGame(winner, why) {
   if (G.over) return;
   G.over = { winner: winner ? winner.i : null, why, turn: G.turn };
   log(winner ? fullName(winner) + ' wins. ' + why + '.' : why + '.', winner ? winner.ink : 'turn', null);
-  if (online) onlineSubmit();
 }
 
 function checkElimination() {
@@ -3423,6 +3432,7 @@ function beginPlayerTurn(i) {
   for (const c of ownCities(i)) processCity(c);
   checkEurekas(f);
   processResearch(f);
+  checkMoments(i);
   tickVoyage(f);
   for (const u of ownUnits(i)) {
     u.mp = unitMove(u);
@@ -3474,11 +3484,6 @@ function advanceTurns() {
       checkElimination();
       checkWin();
       continue;
-    }
-    if (online) {
-      // Bored Together sends the valley to the other device; this screen is done.
-      G.handoff = false;
-      return;
     }
     const humans = G.players.filter(p => p.alive && p.human).length;
     G.handoff = humans > 1;
@@ -4467,36 +4472,227 @@ function noticeWonders(i) {
     if (found.includes(id) || !groups[id].some(t => seen[t.y * G.cols + t.x])) continue;
     found.push(id);
     log(pl(i).name + ' discovers ' + FEATURES[id].name + '.', pl(i).ink, i);
-    (G.wonderNews = G.wonderNews || []).push({ i, id });
+    const m = awardMoment(i, 'wonder', id, false);
+    pushNews({ i, kind: 'wonder', id, pts: m ? m.pts : 0, first: m ? m.first : false });
   }
 }
-// The popup, like Civ's: a still picture, what the wonder is and what it does.
-function showWonderNews() {
-  if (!G.wonderNews || !G.wonderNews.length || !myTurn()) return;
-  const k = G.wonderNews.findIndex(n => n.i === G.viewer);
+
+/* ── Historic moments and event popups (v4.2) ── */
+
+// Like Civ 6's era score: one-time milestones that each pay a few era points
+// into the Score. Every player earns each one once, and the first civ in the
+// world to earn it gets double. Wonders, continents, eras, science steps and
+// trips are one moment per wonder, continent, era or project.
+const ERA_NAMES = { 1: 'Ancient', 2: 'Classical', 3: 'Medieval', 4: 'Renaissance' };
+const MOMENTS = {
+  wonder:     { pts: 1, icon: 'reef', group: 'Natural wonders found', count: () => Object.keys(wonderTiles()).length,
+                title: k => 'Wonder found: ' + FEATURES[k].name, say: () => 'You were the first of your people to see it.' },
+  continent:  { pts: 1, icon: 'galley', group: 'Cities on a new continent', count: () => Math.max(1, G.conts.length - 1),
+                title: () => 'A new continent', say: k => 'You hold a city on ' + (G.conts[k] || 'a new continent') + '. Far-off cities spread your borders.' },
+  contact:    { pts: 1, icon: 'navigation', group: 'First contact',
+                title: () => 'First contact', say: () => 'You met another civ. Open the Council (D) to deal with them.' },
+  blood:      { pts: 1, icon: 'warrior', group: 'First blood',
+                title: () => 'First blood', say: () => 'You destroyed an enemy unit.' },
+  conquest:   { pts: 2, icon: 'city', group: 'First city taken',
+                title: () => 'City taken', say: () => 'You captured an enemy city. Keep it or burn it.' },
+  capital:    { pts: 3, icon: 'crown', group: 'First capital taken',
+                title: () => 'A capital falls', say: () => 'You captured an enemy capital. Hold every capital to win by conquest.' },
+  retake:     { pts: 2, icon: 'walls', group: 'First city won back',
+                title: () => 'Liberated', say: () => 'You took back a city you founded.' },
+  peace:      { pts: 1, icon: 'harbor', group: 'First peace',
+                title: () => 'Peace made', say: () => 'A war ended at the table.' },
+  borders:    { pts: 1, icon: 'caravan', group: 'First open borders',
+                title: () => 'Open borders', say: () => 'Your first open-borders deal. It lasts ' + OPEN_TURNS + ' turns.' },
+  trade:      { pts: 1, icon: 'horses', group: 'First trade deal',
+                title: () => 'First trade', say: () => 'Your first trade deal.' },
+  road:       { pts: 1, icon: 'road', group: 'First road',
+                title: () => 'Paved the way', say: () => 'Your first road. Units move along it at half cost.' },
+  pop8:       { pts: 1, icon: 'city', group: 'A city of pop 8',
+                title: () => 'A great city', say: () => 'One of your cities reached pop 8.' },
+  cities5:    { pts: 1, icon: 'castle', group: 'Five cities',
+                title: () => 'A growing realm', say: () => 'You own five cities.' },
+  university: { pts: 1, icon: 'university', group: 'First University',
+                title: () => 'Seat of learning', say: () => 'Your first University.' },
+  era:        { pts: 2, icon: 'tech', group: 'New eras', count: () => 3,
+                title: k => ERA_NAMES[k] + ' era', say: k => 'You learned your first ' + ERA_NAMES[k] + ' era tech.' },
+  step:       { pts: 2, icon: 'charts', group: 'Science steps', count: () => STEPS.length,
+                title: k => PROJECTS[k].name + ' done', say: () => 'One step closer to a science victory.' },
+  voyage:     { pts: 3, icon: 'expedition', group: 'The last step sent out', count: () => TRIPS.length,
+                title: k => PROJECTS[k].name + ' sets out', say: () => 'If it gets home, you win. Keep its home city safe.' }
+};
+const momentKey = (id, key) => (key === undefined ? id : id + ':' + key);
+
+// Earns a moment for player i, once. Returns { pts, first } when it was new, else null.
+// Humans get a card (news = false when the caller makes its own, as a wonder does).
+function awardMoment(i, id, key, news) {
+  const def = MOMENTS[id], f = pl(i);
+  if (!def || !f || !f.alive) return null;
+  if (G.tut && id !== 'wonder') return null;
+  const k = momentKey(id, key);
+  f.moments = f.moments || [];
+  if (f.moments.includes(k)) return null;
+  G.firsts = G.firsts || {};
+  const first = G.firsts[k] === undefined;
+  if (first) G.firsts[k] = i;
+  f.moments.push(k);
+  // An older save counts what is already true without paying for it.
+  if (G.quiet) return null;
+  const pts = def.pts * (first ? 2 : 1);
+  f.eraPts = (f.eraPts || 0) + pts;
+  log(fullName(f) + ': ' + def.title(key) + '. +' + pts + ' era ' + (pts === 1 ? 'point' : 'points') + (first ? ', first in the world.' : '.'),
+    f.ink, first ? null : i);
+  if (news !== false && f.human) pushNews({ i, kind: 'moment', id, key, pts, first });
+  return { pts, first };
+}
+
+// Queues a card for a human player. Wonders always show; the Menu switch
+// turns the others off. The tutorial only ever shows wonders.
+function pushNews(n) {
+  const f = pl(n.i);
+  if (!G || G.over || !f || !f.human || !f.alive) return;
+  if (n.kind !== 'wonder' && (G.tut || !popupsOn())) return;
+  (G.news = G.news || []).push(n);
+}
+
+// The moments that follow from how things stand, checked at the start of each
+// turn and as a human plays.
+function checkMoments(i) {
+  if (!G || G.over || G.tut) return;
+  if (G.settling) settleMoments();
+  const f = pl(i);
+  if (!f || !f.alive) return;
+  if (metSomeone(f)) awardMoment(i, 'contact');
+  const cities = ownCities(i);
+  for (const c of cities) {
+    const k = tileAt(c.x, c.y).k;
+    if (k >= 0 && k !== f.capHome) awardMoment(i, 'continent', k);
+    if (c.pop >= 8) awardMoment(i, 'pop8');
+    if (c.buildings.includes('university')) awardMoment(i, 'university');
+  }
+  if (cities.length >= 5) awardMoment(i, 'cities5');
+  for (const e of new Set(f.techs.map(t => TECHS[t].era))) if (e >= 2) awardMoment(i, 'era', e);
+}
+// A save from before v4.2: whatever is already true is marked earned, for no points and no popups.
+function settleMoments() {
+  G.settling = false;
+  G.quiet = true;
+  for (const f of G.players) if (f.alive) checkMoments(f.i);
+  G.quiet = false;
+}
+
+// A card's picture: a hex medallion in gold (or rust for bad news), with a
+// glow that pulses and glints that twinkle when the card moves.
+const GLINTS = [[-32, -22, 0], [32, -14, 0.6], [-30, 24, 1.1], [30, 28, 0.3]];
+function popFrame(face, inner, tone, fx) {
+  const rim = tone === 'alert' ? '#93401d' : ART.gold, rim2 = tone === 'alert' ? '#d98a62' : ART.gold2;
+  const ring = cls => '<polygon class="wring' + cls + '" points="' + hexPoints(HEX_R) + '" fill="none" stroke="' + rim2 + '" stroke-width="1.6"/>';
+  const glints = GLINTS.map(([x, y, d]) => '<g class="glint" style="animation-delay:' + d + 's" transform="translate(' + x + ' ' + y + ')">' +
+    '<path d="M0 -4.5 L1.2 -1.2 L4.5 0 L1.2 1.2 L0 4.5 L-1.2 1.2 L-4.5 0 L-1.2 -1.2 Z" fill="' + rim2 + '" stroke="' + ART.ink + '" stroke-width=".6"/></g>').join('');
+  return '<svg class="pop-art" viewBox="-38 -40 76 80" aria-hidden="true">' + ring('') + ring(' b') +
+    sPoly(hexPoints(HEX_R - 1.2), { fill: face, stroke: ART.ink, 'stroke-width': 1.4, 'stroke-linejoin': 'round' }) +
+    inner + (fx || '') + sPoly(hexPoints(HEX_R - 1.6), { fill: 'none', stroke: rim, 'stroke-width': 2.6 }) +
+    sPoly(hexPoints(HEX_R - 4.6), { fill: 'none', stroke: rim2, 'stroke-width': 1 }) + glints + '</svg>';
+}
+// What drifts around each wonder in its popup, beyond the wonder's own motion.
+function wonderFx(id) {
+  const bits = (list, fill, cls) => list.map(([x, y, r, d]) => '<g class="' + cls + '" style="animation-delay:' + d + 's">' +
+    sCirc(x, y, r, { fill, opacity: 0.85 }) + '</g>').join('');
+  if (id === 'reef') return bits([[-14, 16, 1.6, 0], [3, 18, 1.2, 0.9], [15, 14, 1.8, 1.7], [-4, 20, 1.1, 2.2]], '#e9fbfb', 'rise');
+  if (id === 'spring') return bits([[-6, 2, 2.6, 0], [5, 4, 2.2, 1], [0, 0, 3, 1.9]], '#ffffff', 'rise');
+  if (id === 'peak') return bits([[-16, -24, 1.2, 0], [-3, -28, 1, 0.8], [10, -26, 1.3, 1.6], [19, -20, 1, 2.3]], '#ffffff', 'fall');
+  if (id === 'stair') return bits([[-9, -2, 1.2, 0], [7, -8, 1.4, 1.2], [15, 0, 1, 0.6]], '#f4d26b', 'glint');
+  return '';
+}
+function wonderArt(id) {
+  const tiles = wonderTiles()[id] || [];
+  return popFrame(TERRAIN[tiles[0] ? tiles[0].t : 'flat'].fill, WONDER_ART[id](), '', wonderFx(id));
+}
+const NEWS_ICON = { war: 'warrior', lost: 'city', trip: 'expedition', close: 'walls' };
+function medalArt(icon, tone) {
+  return popFrame(tone === 'alert' ? '#f3dccd' : '#f6e7b8', markOnMap(icon, 0, 0, 1.55, '#241c12', 2.1), tone, '');
+}
+
+// The popup, like Civ's: one card at a time for the player at the screen.
+function showNews() {
+  if (!G || G.over || !G.news || !G.news.length || !myTurn()) return;
+  const k = G.news.findIndex(n => n.i === G.viewer);
   if (k < 0) return;
-  const id = G.wonderNews.splice(k, 1)[0].id;
-  const def = FEATURES[id], tiles = wonderTiles()[id] || [];
-  const base = TERRAIN[tiles[0] ? tiles[0].t : 'flat'].fill;
-  const art = '<svg class="still" viewBox="-32 -34 64 68" aria-hidden="true">' +
-    sPoly(hexPoints(HEX_R - 1.2), { fill: base, stroke: ART.ink, 'stroke-width': 1.4, 'stroke-linejoin': 'round' }) +
-    WONDER_ART[id]() + sPoly(hexPoints(HEX_R - 1.6), { fill: 'none', stroke: ART.gold, 'stroke-width': 2.6 }) +
-    sPoly(hexPoints(HEX_R - 4.6), { fill: 'none', stroke: ART.gold2, 'stroke-width': 1 }) + '</svg>';
-  openModal(modalHead(esc(def.name), 'Natural wonder discovered') +
-    '<div class="modal-body"><div class="wonder-card">' + art + '<div class="wtxt"><div class="wkind">' + esc(wonderKind(id)) + '</div>' +
-    '<p>' + wonderNote(id) + '</p>' +
-    (tiles.length > 1 ? '<p class="hint">It covers ' + tiles.length + ' hexes.</p>' : '') + '</div></div></div>' +
-    '<div class="modal-foot"><button class="btn" data-act="wonder-look:' + id + '">Show me</button>' +
+  const n = G.news.splice(k, 1)[0];
+  const more = G.news.filter(m => m.i === G.viewer).length;
+  const moving = currentAnim() !== 'none';
+  const pts = p => '+' + p + ' era ' + (p === 1 ? 'point' : 'points');
+  let title = '', sub = '', art = '', kind = '', text = '', go = '';
+  if (n.kind === 'wonder') {
+    const tiles = wonderTiles()[n.id] || [];
+    title = FEATURES[n.id].name; sub = 'Natural wonder discovered'; kind = wonderKind(n.id); art = wonderArt(n.id);
+    text = '<p>' + wonderNote(n.id) + '</p>' + (tiles.length > 1 ? '<p class="hint">It covers ' + tiles.length + ' hexes.</p>' : '') +
+      (n.pts ? '<p class="moment">Historic moment: ' + pts(n.pts) + (n.first ? ', double for being first in the world' : '') + '.</p>' : '');
+    go = '<button class="btn" data-act="wonder-look:' + n.id + '">Show me</button>';
+  } else if (n.kind === 'moment') {
+    const def = MOMENTS[n.id];
+    title = def.title(n.key); sub = 'Historic moment · ' + pts(n.pts); kind = 'Historic moment'; art = medalArt(def.icon, '');
+    text = '<p>' + esc(def.say(n.key)) + '</p>' +
+      (n.first ? '<p class="moment">First in the world: double points.</p>' : '<p class="hint">Every civ earns this once. The first in the world gets double.</p>') +
+      '<p class="hint">Era points count in your Score.</p>';
+  } else {
+    const by = n.by === undefined ? null : pl(n.by), who = by ? esc(fullName(by)) : '';
+    kind = 'News'; art = medalArt(NEWS_ICON[n.type], 'alert');
+    if (n.type === 'war') {
+      title = 'War!'; sub = who + ' declares war';
+      text = '<p><b>' + who + '</b> has declared war on you. Your units fight at +5 inside your own borders. Offer peace in the Council (D) when you want out.</p>';
+      go = '<button class="btn" data-act="council">Open Council</button>';
+    } else if (n.type === 'lost') {
+      title = esc(n.city) + ' has fallen'; sub = who + ' took a city';
+      text = '<p><b>' + who + '</b> captured ' + esc(n.city) + '. Take it back with a melee unit, or make peace.</p>';
+      go = '<button class="btn" data-act="news-look:' + n.at[0] + ':' + n.at[1] + '">Show me</button>';
+    } else if (n.type === 'trip') {
+      title = PROJECTS[n.trip].name + ' sets out'; sub = who + ' is racing you';
+      text = '<p><b>' + who + '</b> sent out the ' + PROJECTS[n.trip].name + ' from ' + esc(n.cityName) + '. It wins if it gets home in ' + plural2(n.left, 'turn') +
+        '. Take ' + esc(n.cityName) + ', or keep it under half HP, to stop it.</p>';
+      go = '<button class="btn" data-act="news-look:' + n.at[0] + ':' + n.at[1] + '">Show me</button>';
+    } else {
+      title = 'The borders close'; sub = 'Turn ' + G.turn;
+      text = '<p>From now on, stepping onto another player’s land without an open-borders deal means war, and units still inside were moved out. Ask for open borders in the Council (D).</p>';
+      go = '<button class="btn" data-act="council">Open Council</button>';
+    }
+  }
+  openModal(modalHead(n.kind === 'alert' ? title : esc(title), sub) +
+    '<div class="modal-body"><div class="wonder-card ' + (moving ? 'moving' : 'still') + '">' + art +
+    '<div class="wtxt"><div class="wkind">' + esc(kind) + '</div>' + text + '</div></div></div>' +
+    '<div class="modal-foot">' + (more ? '<button class="btn" data-act="news-skip">Skip the other ' + more + '</button>' : '') + go +
     '<button class="btn primary" data-act="close">Got it</button></div>', true);
-  UI.modalKind = 'wonder';
+  UI.modalKind = n.kind === 'wonder' ? 'wonder' : 'news';
 }
 // Show me: centres the map on the wonder and opens its tile.
 function lookAtWonder(id) {
   const tiles = (wonderTiles()[id] || []).filter(t => seenBy(G.viewer, t.x, t.y));
   const t = tiles.find(n => visibleTo(n.x, n.y)) || tiles[0];
+  lookAtSpot(t ? t.x : -1, t ? t.y : -1);
+}
+function lookAtSpot(x, y) {
   closeModal();
-  if (t) { selection = { kind: 'tile', x: t.x, y: t.y }; render(); centreOn(t.x, t.y); }
+  if (tileAt(x, y)) { selection = { kind: 'tile', x, y }; render(); centreOn(x, y); }
   else render();
+}
+
+// Every moment, what it pays and what this player has earned.
+function showMoments() {
+  const f = viewerPlayer();
+  if (!f) return;
+  const got = f.moments || [], firsts = G.firsts || {};
+  const rows = Object.keys(MOMENTS).map(id => {
+    const def = MOMENTS[id], mine = got.filter(k => k === id || k.indexOf(id + ':') === 0);
+    const total = def.count ? def.count() : 1;
+    const paid = mine.reduce((n, k) => n + def.pts * (firsts[k] === f.i ? 2 : 1), 0);
+    return '<tr><td>' + esc(def.group) + '</td><td class="n">' + mine.length + ' / ' + total + '</td><td class="n">' + def.pts + ' · ' + def.pts * 2 +
+      ' first</td><td class="n"><b>' + paid + '</b></td></tr>';
+  }).join('');
+  openModal(modalHead('Historic moments', esc(fullName(f)) + ' · ' + (f.eraPts || 0) + ' era points') +
+    '<div class="modal-body"><div class="table-wrap"><table class="standings"><thead><tr><th>Moment</th><th class="n">Earned</th><th class="n">Worth</th>' +
+    '<th class="n">Yours</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<p class="hint">Each moment pays once per player, and double to the first civ in the world to earn it. Era points count in your Score. ' +
+    'Event popups can be turned off in the Menu; the points still count.</p></div>' +
+    '<div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>');
 }
 
 /* ── eurekas: half off the major techs ── */
@@ -4550,9 +4746,14 @@ function finishProject(c, id) {
     f.voyage = { kind: id, city: c.id, left: SCI[PROJECTS[id].trip], from: G.turn };
     log(fullName(f) + ' sends out the ' + PROJECTS[id].name + ' from ' + c.name + '. It wins if it gets back in ' +
       plural2(f.voyage.left, 'turn') + '. Take ' + c.name + ', or keep it under half HP, to stop it.', f.ink, null);
+    awardMoment(c.owner, 'voyage', id);
+    for (const o of G.players) {
+      if (o.i !== f.i) pushNews({ i: o.i, kind: 'alert', type: 'trip', by: f.i, trip: id, cityName: c.name, left: f.voyage.left, at: [c.x, c.y] });
+    }
   } else {
     f.proj[id] = true;
     log(fullName(f) + ' finishes ' + PROJECTS[id].name + '.', f.ink, null);
+    awardMoment(c.owner, 'step', id);
   }
 }
 const plural2 = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
@@ -4665,7 +4866,14 @@ function prepareState(state) {
       }
     }
   }
-  state.wonderNews = state.wonderNews || [];
+  // v4.2: the popup queue holds every kind of card, so a v4.1 wonder queue moves over.
+  // A save with no moments yet counts what is already true without paying for it.
+  state.settling = !state.firsts;
+  state.firsts = state.firsts || {};
+  state.news = state.news || [];
+  for (const n of state.wonderNews || []) state.news.push({ i: n.i, kind: 'wonder', id: n.id, pts: 0, first: false });
+  delete state.wonderNews;
+  for (const f of state.players) { f.moments = f.moments || []; f.eraPts = f.eraPts || 0; }
   state.v = 4;
   WRAP_W = state.wrap ? state.cols : 0;
   roadCache.clear();
@@ -5370,10 +5578,25 @@ function renderBoard() {
   }
 
   const ordered = G.units.slice().sort((a, b) => isMil(b.type) - isMil(a.type));
+  // In a stack, the selected unit is drawn on top, so what you see is what you picked.
+  if (selUnit) {
+    const at = ordered.indexOf(selUnit);
+    if (at >= 0) { ordered.splice(at, 1); ordered.push(selUnit); }
+  }
+  const stacks = new Map();
   for (const u of ordered) {
     if (!watching && !visibleTo(u.x, u.y)) continue;
     const [cx, cy] = hexCenter(u.x, u.y);
     unitsOut.push(unitMarkup(u, cx, cy, viewer));
+    const at = u.x + ',' + u.y;
+    stacks.set(at, (stacks.get(at) || 0) + 1);
+  }
+  // A number on any hex that holds more than one unit.
+  for (const [at, n] of stacks) {
+    if (n < 2) continue;
+    const [sx, sy] = at.split(',').map(Number), [bx, by] = hexCenter(sx, sy);
+    unitsOut.push('<g class="stackbadge"><circle cx="' + (bx + 14).toFixed(1) + '" cy="' + (by - 15).toFixed(1) + '" r="6.5" fill="#241c12" stroke="#f7f0df" stroke-width="1.2"/>' +
+      '<text x="' + (bx + 14).toFixed(1) + '" y="' + (by - 12.3).toFixed(1) + '">' + n + '</text></g>');
   }
   if (selUnit && (watching || visibleTo(selUnit.x, selUnit.y))) {
     const [cx, cy] = hexCenter(selUnit.x, selUnit.y);
@@ -5563,6 +5786,9 @@ let tipsSwitch = null;   // this visit's setting when storage is blocked
 const tipsOn = () => (tipsSwitch !== null ? tipsSwitch : readPrefs().tips !== false);
 function setTips(on) { tipsSwitch = on; writePref('tips', on); }
 const tutorialDone = () => !!readPrefs().tutorialDone;
+let popupsSwitch = null;   // this visit's setting when storage is blocked
+const popupsOn = () => (popupsSwitch !== null ? popupsSwitch : readPrefs().popups !== false);
+function setPopups(on) { popupsSwitch = on; writePref('popups', on); }
 
 /* ── the tutorial island ───────────────────────────────────────────────────── */
 
@@ -5624,8 +5850,8 @@ function buildTutorialIsland() {
     dip: [['peace', 'peace'], ['peace', 'peace']], attitude: [[0, 0], [0, 0]], warSince: [[0, 0], [0, 0]], offers: [],
     log: [], seen: [seen0, new Array(cols * rows).fill(0)],
     turn: 1, maxTurns: 0, cur: 0, viewer: 0, handoff: false, pending: null, over: null, watch: false,
-    nextUnit: 1, nextCity: 1, names: ['Rome', 'Cinderhold'], wonderFound: {}, wonderNews: [],
-    tut: { step: 0, entered: false, closed: false, raider: null, camp: null }
+    nextUnit: 1, nextCity: 1, names: ['Rome', 'Cinderhold'], wonderFound: {}, news: [], firsts: {},
+    tut: { step: 0, entered: false, closed: false, raider: null, camp: null, stack: null }
   };
   const colors = assignColors(['rome', 'celts']);
   const player = (i, name, civ, human, techs) => ({
@@ -5648,9 +5874,12 @@ function buildTutorialIsland() {
   G.tut.camp = city.id;
   G.tut.raider = raider.id;
 
+  // The settler stands alone, so the first click is unambiguous. The warrior and
+  // archer share the hex to the north, which is where the tutorial teaches stacks.
+  G.tut.stack = [home[0], home[1] - 1];
   addUnit(G.players[0], 'settler', home[0], home[1], null);
-  addUnit(G.players[0], 'warrior', home[0], home[1], null);
-  addUnit(G.players[0], 'archer', home[0] + 1, home[1], null);
+  addUnit(G.players[0], 'warrior', G.tut.stack[0], G.tut.stack[1], null);
+  addUnit(G.players[0], 'archer', G.tut.stack[0], G.tut.stack[1], null);
   G.log = [];
   log('Rome lands on an island. The Cinder Clan holds a camp to the east.', 'turn', null);
   beginPlayerTurn(0);
@@ -5749,32 +5978,78 @@ function tutQueue(id) {
 const tutBuilding = id => { const c = tutCap(); return !!c && c.buildings.includes(id); };
 const tutQueued = id => { const c = tutCap(); return !!c && (c.buildings.includes(id) || (!!c.build && c.build.kind === 'building' && c.build.id === id)); };
 
+const tutSelected = () => (selection && selection.kind === 'unit' ? unitById(selection.id) : null);
+const tutPick = test => { const u = tutUnit(test); if (u) selection = { kind: 'unit', id: u.id }; };
+// A plain hex two steps north of the soldiers' hex: the warrior's first trip.
+function tutGoal() {
+  const [sx, sy] = G.tut.stack || [0, 0];
+  const c = G.tiles.filter(t => hexDistance(t.x, t.y, sx, sy) === 2 && t.t === 'flat' && !t.f && t.y < sy &&
+    G.seen[0][t.y * G.cols + t.x] && !cityAt(t.x, t.y)).sort((a, b) => a.y - b.y || a.x - b.x);
+  return c.length ? [c[0].x, c[0].y] : null;
+}
+const tutOffStack = u => !!u && !!G.tut.stack && (u.x !== G.tut.stack[0] || u.y !== G.tut.stack[1]);
+
 const TUT_STEPS = [
-  // ── First city ──
-  { ch: 'First city',
-    say: 'Welcome to Civ Lite. You lead Rome. Select your <b>settler</b> on the flashing hex and press <b>Found city</b> (B).',
+  // ── The basics ──
+  { ch: 'The basics', next: 'Next',
+    say: 'Welcome to <b>Civ Lite</b>! You lead <b>Rome</b> on a small island. You will found cities, learn techs, build an army and try to win. ' +
+      'This lesson is hands-on: press <b>Next</b> after a note, or just do what it asks. The map is made of <b>hexes</b>, and the dark ones are unexplored. You only see what your units and cities can see.',
+    done: () => false },
+  { ch: 'The basics', next: 'Next',
+    say: 'To look around, <b>drag</b> the map with the mouse or a finger. <b>Scroll</b> or <b>pinch</b> to zoom, or use the zoom buttons. Try it, then press Next.',
+    done: () => false },
+  { ch: 'The basics',
+    say: 'Click the <b>flashing hex</b>. The unit standing there is your <b>settler</b>. A panel opens with its name, its <b>moves</b> (how far it can go this turn) and the orders it can take.',
+    at: () => tutSpot(tutUnit(u => UNITS[u.type].founds)),
+    done: () => { const u = tutSelected(); return !!u && u.owner === 0 && !!UNITS[u.type].founds; },
+    skip: () => tutPick(u => UNITS[u.type].founds) },
+  { ch: 'The basics',
+    say: 'A settler turns into a city. Press <b>Found city</b> in the panel (or the B key).',
     at: () => tutSpot(tutUnit(u => UNITS[u.type].founds)), el: '[data-act="found"]',
     done: () => !!tutCap(),
     skip: () => { const u = tutUnit(u => UNITS[u.type].founds); if (u) foundCity(u); } },
-  { ch: 'First city',
-    say: 'Your capital, Rome, starts at pop 2 with a free Granary: that’s Rome’s ability. Now open the <b>tech tree</b> (T) and pick <b>Animal Husbandry</b>. You have 40 research banked. ' +
-      'Units and buildings stay hidden until you learn the tech that unlocks them, as in Civ.',
+  { ch: 'The basics', next: 'Next',
+    say: 'That’s <b>Rome</b>, your capital. A city makes <b>food</b> (it grows), <b>production</b> (it builds things) and <b>science</b> (it researches techs) from the hexes inside its borders, the land within the colored line. ' +
+      '<b>Pop</b> is how many people live there. Rome starts at pop 2 with a free Granary: that is Rome’s special ability.',
+    at: () => tutSpot(tutCap()), done: () => false },
+  { ch: 'The basics',
+    say: 'Two soldiers stand on the <b>flashing hex</b>: a <b>warrior</b> and an <b>archer</b>. Several units can share one hex, and a small <b>number</b> on the hex tells you how many. ' +
+      'Click the hex, then pick the <b>archer</b> from the buttons at the top of the panel.',
+    at: () => G.tut.stack,
+    done: () => { const u = tutSelected(); return !!u && u.type === 'archer'; },
+    skip: () => tutPick(u => u.type === 'archer') },
+  { ch: 'The basics',
+    say: 'Now the <b>warrior</b>. Pick it from the panel (or click the hex again to switch units), then <b>right-click</b> the flashing hex to send it there. On a touch screen, tap the hex. ' +
+      'A unit can only go as far as its moves allow.',
+    enter: () => { G.tut.goal = tutGoal(); },
+    at: () => G.tut.goal || null,
+    done: () => tutOffStack(tutUnit(u => u.type === 'warrior')),
+    skip: () => {
+      const w = tutUnit(u => u.type === 'warrior'), g = G.tut.goal || tutGoal();
+      if (w && g) { w.x = g[0]; w.y = g[1]; w.mp = Math.max(0, w.mp - 2); }
+    } },
+
+  // ── Your city ──
+  { ch: 'Your city',
+    say: 'Time to research. Open the <b>tech tree</b> (press T) and pick <b>Animal Husbandry</b>. A tech unlocks new units, buildings and abilities, and they stay hidden until you learn it. ' +
+      'You have 40 science saved, so it finishes next turn.',
     el: '#btn-tech, [data-act="research:husbandry"]',
     done: () => pl(0).research === 'husbandry' || hasTech(0, 'husbandry'),
     skip: () => setResearch(0, 'husbandry') },
-  { ch: 'First city',
-    say: 'Cities build one thing at a time. Click Rome and set it to build a <b>Builder</b>. It has the production saved already.',
+  { ch: 'Your city',
+    say: 'A city builds one thing at a time. Click <b>Rome</b> and pick a <b>Builder</b> from its list. The production is already saved up, so it will be ready next turn.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":unit:builder"]',
     enter: () => tutBank({ kind: 'unit', id: 'builder' }),
     done: () => { const c = tutCap(); return !!c && (sameItem(c.build, { kind: 'unit', id: 'builder' }) || ownUnits(0).some(u => u.type === 'builder')); },
     skip: () => { const c = tutCap(); if (c) setBuild(c, { kind: 'unit', id: 'builder' }); } },
-  { ch: 'First city',
-    say: 'That’s a turn. Click <b>End turn</b>, bottom right. Next turn your builder is ready and you learn Animal Husbandry. (Enter jumps to the next unit that needs orders, and ends the turn once none do.)',
+  { ch: 'Your city',
+    say: 'That’s all for this turn. Press <b>End turn</b>, bottom right. A turn is one round of moves; then everyone else takes theirs. Next turn your builder is ready and you learn Animal Husbandry. ' +
+      '(The Enter key jumps to the next unit that needs orders, and ends the turn once none do.)',
     el: '#btn-end', done: () => G.turn >= 2, skip: () => doEndTurn() },
 
   // ── The land ──
   { ch: 'The land',
-    say: 'Builders improve tiles inside your borders. Select the builder and <b>right-click</b> the horses to send it there. Left-click works too, for touch screens.',
+    say: 'Builders improve hexes inside your borders. Select your <b>builder</b> in Rome (if it shares a hex, pick it from the panel), then <b>right-click</b> the flashing hex of <b>horses</b> to send it there.',
     at: () => tutSpot(tutHorses()),
     done: () => { const t = tutHorses(), b = tutUnit(u => u.type === 'builder'); return t.imp === 'pasture' || (!!b && b.x === t.x && b.y === t.y); },
     skip: () => { const t = tutHorses(), b = tutUnit(u => u.type === 'builder'); if (b) { b.x = t.x; b.y = t.y; b.mp = Math.max(b.mp, 1); } } },
@@ -5784,15 +6059,14 @@ const TUT_STEPS = [
     done: () => tutHorses().imp === 'pasture',
     skip: () => { tutHorses().imp = 'pasture'; } },
   { ch: 'The land',
-    say: 'Click <b>any hex</b> to see what it gives. The panel also names its continent: every map’s land is split into named continents.',
+    say: 'Click <b>any hex</b> to see what it gives you: food, production and science. The panel also names its continent, because every map’s land is split into named continents.',
     at: () => tutSpot(G.tiles.find(t => t.f === 'iron')),
     done: () => !!selection && selection.kind === 'tile' },
 
   // ── Buildings and upgrades ──
   { ch: 'Buildings',
-    say: 'A <b>Library</b> adds science and unlocks the <b>Research</b> build, which turns a third of a city’s production into your tech. You’ve just learned Writing. ' +
-      'Click Rome, choose <b>Library</b>, then click a free hex in your borders: every building but Walls and the Granary gets a hex of its own, and whatever grows there is cleared. ' +
-      'The production is saved, so click <b>End turn</b> and it’s built.',
+    say: 'A <b>Library</b> adds science and unlocks the <b>Research</b> build. You just learned Writing, which unlocks it. Click <b>Rome</b>, choose <b>Library</b>, then click a free hex inside your borders. ' +
+      'Most buildings take a hex of their own, and whatever grows there is cleared. The production is saved, so click <b>End turn</b> and it’s built.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":building:library"], #btn-end',
     enter: () => {
       if (!hasTech(0, 'writing')) pl(0).techs.push('writing');
@@ -5804,7 +6078,7 @@ const TUT_STEPS = [
       if (!tutBuilding('library')) doEndTurn();
     } },
   { ch: 'Buildings',
-    say: 'Your Library stands. You’ve now learned Education, so click Rome and build a <b>University</b>. It <b>upgrades</b> the Library right where it stands: +3 science, and no new hex.',
+    say: 'Your Library stands. You also learned Education, so click Rome and build a <b>University</b>. It <b>upgrades</b> the Library right where it stands: +3 science, and no new hex.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":building:university"]',
     enter: () => {
       if (!hasTech(0, 'education')) pl(0).techs.push('education');
@@ -5820,13 +6094,13 @@ const TUT_STEPS = [
 
   // ── Wonders ──
   { ch: 'Wonders',
-    say: 'Every map has four natural <b>wonders</b>, hidden until a unit sees one. One is hiding north of Rome. Send your warrior to the flashing hex: click it, and the walk takes a few turns. ' +
-      'A popup tells you the moment you find a wonder.',
+    say: 'Every map hides four natural <b>wonders</b>. One is north of Rome. Select your <b>warrior</b> and right-click the flashing hex to walk there, which takes a few turns. ' +
+      'A card pops up the moment you find a wonder, like in Civ.',
     at: () => tutApproach('spring', false),
     done: () => tutFound('spring'),
     skip: () => tutReveal('spring') },
   { ch: 'Wonders',
-    say: 'That’s <b>Pamukkale</b>. Like Civ’s Fountain of Youth, a land soldier who steps in heals 10 HP every turn from then on, even after a fight. <b>Walk a soldier onto it.</b>',
+    say: 'That’s <b>Pamukkale</b>, hot springs that heal. A land soldier who steps onto it heals 10 health every turn from then on, even after a fight. <b>Walk a soldier onto it.</b>',
     at: () => tutSpot(tutWonder('spring')),
     done: () => ownUnits(0).some(u => u.blessed),
     skip: () => {
@@ -5840,18 +6114,19 @@ const TUT_STEPS = [
 
   // ── War ──
   { ch: 'War',
-    say: 'Trouble! The Cinder Clan just declared war, and one of its raiders is in your fields. <b>Click the raider</b> to see how strong it is.',
+    say: 'Trouble! The Cinder Clan declared war, and one of its raiders walked into your fields. <b>Click the raider</b> to see how strong it is. Strength is the number that decides who wins a fight.',
     enter: tutRaid, at: () => tutSpot(tutRaider()),
     done: () => !tutRaider() || (!!selection && selection.kind === 'unit' && selection.id === G.tut.raider) },
   { ch: 'War',
-    say: 'Select your archer or warrior and click the raider’s <b>red hex</b>. The numbers show what you deal and take. Units inside your own borders get +5, and <b>F</b> fortifies a unit for +3 defense.',
+    say: 'Select your archer or warrior (pick it in the panel if they share a hex), then click the raider’s <b>red hex</b> to attack. The numbers show what you deal and what you take back. ' +
+      'Units inside your own borders get +5, and <b>F</b> fortifies a unit for +3 defense.',
     at: () => tutSpot(tutRaider()),
     done: () => !tutRaider(),
     skip: () => { const r = tutRaider(); if (r) killUnit(r, 0); } },
 
   // ── Sea and conquest ──
   { ch: 'Sea and conquest',
-    say: 'Rome has production saved. Set it to build a <b>Galley</b>, end the turn, then sail it out. Ships stay in shallow water until Navigation.',
+    say: 'Rome has production saved. Pick a <b>Galley</b> from its list, end the turn, then sail it out. Ships stay in shallow water until Navigation.',
     at: () => tutSpot(tutCap()), el: '[data-act$=":unit:galley"], #btn-end',
     enter: () => tutBank({ kind: 'unit', id: 'galley' }),
     done: () => G.units.some(u => u.owner === 0 && isNaval(u.type) && !cityAt(u.x, u.y)),
@@ -5860,19 +6135,19 @@ const TUT_STEPS = [
       if (at) addUnit(pl(0), 'galley', at[0], at[1], c.id);
     } },
   { ch: 'Sea and conquest',
-    say: 'There’s a wonder out in the water to the south-east. Sail the galley to the flashing hex to see the <b>Great Barrier Reef</b>.',
+    say: 'There’s a wonder out in the water to the south-east. Select the galley and right-click the flashing hex to see the <b>Great Barrier Reef</b>.',
     at: () => tutApproach('reef', true),
     done: () => tutFound('reef'),
     skip: () => tutReveal('reef') },
   { ch: 'Sea and conquest',
-    say: 'Cinderhold, the Cinder Clan’s camp, has 30 HP and no walls. Hit it to 0 HP with your galley or soldiers, then attack it once more with a melee unit to <b>take it</b>, and keep it.',
+    say: 'Cinderhold, the Cinder Clan’s camp, has 30 health and no walls. Hit it down to 0 with your galley or soldiers, then attack it once more with a <b>melee</b> unit (one that fights up close, like your warrior) to <b>take it</b>. Then keep it.',
     at: () => tutSpot(tutCamp()),
     done: () => { const c = tutCamp(); return (!c || c.owner === 0) && !G.pending; },
     skip: tutTakeCamp },
 
   // ── Roads, peace and trade ──
   { ch: 'Roads and trade',
-    say: 'Cinderhold is yours. You’ve just learned Masonry, which lets a city build a <b>road</b> to another of your cities. Click Rome and choose <b>Road to Cinderhold</b>. ' +
+    say: 'Cinderhold is yours. You just learned Masonry, which lets a city build a <b>road</b> to another of your cities. Click <b>Rome</b> and choose <b>Road to Cinderhold</b>. ' +
       'It costs production by the hex, and units move along paved hexes at half cost. That’s all a road does.',
     at: () => tutSpot(tutCap()), el: '[data-act*=":road:"]',
     enter: () => {
@@ -5899,9 +6174,20 @@ const TUT_STEPS = [
       'Ask for open borders in the Council. They last 30 turns.',
     el: '#btn-council', done: () => false },
 
+  // ── History ──
+  { ch: 'History', next: 'Next',
+    say: 'Big moments pay <b>era points</b>, like in Civ 6. The first time you reach a milestone, a card pops up and the points go into your score: a wonder, a first capture, a first road, a new era, and more. ' +
+      'The wonders you found already paid some. The first civ in the world to reach a moment gets double. Open <b>Historic moments</b> in this panel to see them all.',
+    enter: () => { selection = { kind: 'realm' }; }, el: '[data-act="moments"]',
+    done: () => false },
+  { ch: 'History', next: 'Next',
+    say: 'Other cards are warnings: someone declares war on you, takes one of your cities, launches a science trip, or the borders close. ' +
+      'If cards get in the way, turn <b>Event popups</b> off in the Menu. The points still count, and the history log keeps every line.',
+    done: () => false },
+
   // ── Winning ──
   { ch: 'Winning', next: 'Next',
-    say: 'There are three ways to win. The first is <b>score</b>: click it in the top bar (or press F1) any time. It’s 5 per city, 1 per pop, 2, 4, 6 or 8 per tech by era, and military strength ÷ 20. ' +
+    say: 'There are three ways to win. The first is <b>score</b>: click it in the top bar (or press F1) any time. It’s 5 per city, 1 per pop, 2, 4, 6 or 8 per tech by era, era points from Historic moments, and military strength ÷ 20. ' +
       'The best score when the turn limit hits wins.',
     enter: () => { selection = { kind: 'realm' }; }, el: '.score-box, #stat-score',
     done: () => false },
@@ -5910,7 +6196,7 @@ const TUT_STEPS = [
     at: () => tutSpot(tutCamp()), done: () => false },
   { ch: 'Winning', next: 'Finish',
     say: 'The third is <b>science</b>. Finish <b>Star Charts</b> and the <b>Royal Academy</b>, then send out the <b>Grand Expedition</b> (by sea, from a city with a Harbor) or the <b>Grand Caravan</b> (by land, from any city). ' +
-      'If it gets home, you win. Take its home city to stop it: under half HP, the trip waits. Conquest and science can each be switched off at setup.',
+      'If it gets home, you win. Take its home city to stop it: under half health, the trip waits. Conquest and science can each be switched off at setup.',
     enter: () => { selection = { kind: 'realm' }; }, el: '.sci-block',
     done: () => false }
 ];
@@ -5919,7 +6205,7 @@ const TUT_STEPS = [
 // first time it comes up.
 function tutorialTick() {
   if (!G || !G.tut) return;
-  for (let guard = 0; guard < 40 && G.tut.step < TUT_STEPS.length; guard++) {
+  for (let guard = 0; guard < 90 && G.tut.step < TUT_STEPS.length; guard++) {
     const step = TUT_STEPS[G.tut.step];
     if (!G.tut.entered) {
       G.tut.entered = true;
@@ -5948,7 +6234,7 @@ function tutorialNext() {
 function tutorialSkipChapter() {
   if (!G || !G.tut || G.tut.step >= TUT_STEPS.length) return;
   const ch = TUT_STEPS[G.tut.step].ch;
-  for (let guard = 0; guard < 40 && G.tut.step < TUT_STEPS.length && TUT_STEPS[G.tut.step].ch === ch; guard++) tutorialNext();
+  for (let guard = 0; guard < 90 && G.tut.step < TUT_STEPS.length && TUT_STEPS[G.tut.step].ch === ch; guard++) tutorialNext();
 }
 
 /* ── tips in real games ────────────────────────────────────────────────────── */
@@ -5956,12 +6242,10 @@ function tutorialSkipChapter() {
 // Each tip shows the first time its test finds something, once per player per
 // game. test(i) returns what it found (truthy) or nothing.
 const TIPS = [
-  // A voyage whose home city has been burned has no port left to reach, so it is
-  // neither a threat to point at nor one worth describing.
-  { id: 'rival-trip', test: i => scienceOn() && G.players.find(o => o.alive && o.i !== i && o.voyage && cityById(o.voyage.city)),
+  { id: 'rival-trip', test: i => scienceOn() && G.players.find(o => o.alive && o.i !== i && o.voyage),
     say: (i, o) => esc(o.name) + '’s ' + esc(PROJECTS[o.voyage.kind].name) + ' is on its way: if it gets home in ' + plural(o.voyage.left, 'turn', 'turns') +
-      ', they win. Take ' + esc((cityById(o.voyage.city) || {}).name || 'its home city') + ' to stop it, or keep it under half HP so the trip waits.',
-    at: o => { const c = cityById(o.voyage.city); return c ? [c.x, c.y] : null; } },
+      ', they win. Take ' + esc(cityById(o.voyage.city).name) + ' to stop it, or keep it under half HP so the trip waits.',
+    at: o => { const c = cityById(o.voyage.city); return [c.x, c.y]; } },
   { id: 'zoc', test: i => ownUnits(i).find(u => u.pinned),
     say: () => 'That unit stepped into an enemy’s zone of control (the dashed yellow hexes), so its move ended there. It can still attack. Horse units ride straight through.',
     at: u => [u.x, u.y] },
@@ -6017,7 +6301,7 @@ const TIPS = [
     say: (i, c) => esc(c.name) + ' is raising a building. Walls stand on the city center; every other building gets its own hex in the borders, which you pick when you queue it. The feature on that hex goes when the building is done; the terrain stays.',
     el: '#panel' },
   { id: 'ten-left', test: () => G.maxTurns > 0 && G.maxTurns - G.turn <= 10,
-    say: () => '10 turns left. The best score at the turn limit wins: 5 per city, 1 per pop, tech points, and military strength ÷ 20.',
+    say: () => '10 turns left. The best score at the turn limit wins: 5 per city, 1 per pop, tech points, era points, and military strength ÷ 20.',
     el: '.score-box, #stat-score' }
 ];
 
@@ -6045,17 +6329,13 @@ function markTipSeen(id) {
 // The hex the coach is pointing at, for the map's dashed ring.
 function coachAt() {
   if (!G) return null;
-  // A coach mark is decoration: a tip or tutorial step that cannot find its hex
-  // must never take the board's render down with it.
-  try {
-    if (G.tut) {
-      if (G.tut.closed || G.tut.step >= TUT_STEPS.length) return null;
-      const step = TUT_STEPS[G.tut.step];
-      return step.at ? step.at() : null;
-    }
-    const now = currentTip();
-    return now && now.tip.at ? now.tip.at(now.hit) : null;
-  } catch (error) { return null; }
+  if (G.tut) {
+    if (G.tut.closed || G.tut.step >= TUT_STEPS.length) return null;
+    const step = TUT_STEPS[G.tut.step];
+    return step.at ? step.at() : null;
+  }
+  const now = currentTip();
+  return now && now.tip.at ? now.tip.at(now.hit) : null;
 }
 
 const hasPage = () => typeof document !== 'undefined' && !!document.querySelectorAll;
@@ -6072,7 +6352,7 @@ function renderCoach() {
     tag = 'Tutorial';
     if (G.tut.step >= TUT_STEPS.length) {
       count = 'done';
-      say = 'That’s the whole game: cities, techs, builders, buildings and their upgrades, wonders, war, ships, roads, peace and trade, and the three ways to win. ' +
+      say = 'That’s the whole game: cities, techs, builders, buildings and their upgrades, wonders, war, ships, roads, peace and trade, Historic moments, and the three ways to win. ' +
         'Start a real game with friends or CPUs, or keep exploring this island.';
       actions = '<button class="act on" data-act="tut-new">Start a real game</button>' +
         '<button class="act" data-act="tut-close">Keep looking around</button>';
@@ -6090,8 +6370,7 @@ function renderCoach() {
     const now = G && !G.over ? currentTip() : null;
     if (now) {
       tag = 'Tip';
-      try { say = now.tip.say(G.viewer, now.hit); }
-      catch (error) { say = ''; }
+      say = now.tip.say(G.viewer, now.hit);
       el = now.tip.el || null;
       actions = '<button class="act" data-act="tip-ok:' + now.tip.id + '">Got it</button>' +
         '<button class="skip" data-act="tips-off">Turn tips off</button>';
@@ -6119,7 +6398,7 @@ function toast(message) {
   toastTimer = setTimeout(() => UI.toast.classList.remove('show'), 2400);
 }
 
-const myTurn = () => !!G && !G.over && !G.handoff && !onlineSent && G.viewer !== null && G.cur === G.viewer;
+const myTurn = () => !!G && !G.over && !G.handoff && G.viewer !== null && G.cur === G.viewer;
 const viewerPlayer = () => (G && G.viewer !== null ? pl(G.viewer) : null);
 const dot = (f, size) => '<span class="dot" style="background:' + f.light + ';border-color:' + f.ink +
   (size ? ';width:' + size + 'px;height:' + size + 'px' : '') + '"></span>';
@@ -6143,7 +6422,6 @@ function validateSelection() {
 
 function render() {
   if (!UI || !G) return;
-  if (online && onlineSent) return;
   if (G.handoff) {
     clearBoard();
     UI.sideScroll.innerHTML = '';
@@ -6172,7 +6450,7 @@ function render() {
   renderCoach();
   UI.btnEnd.disabled = !myTurn();
   if (G.pending && UI.modalLayer.hidden) showPending();
-  else if (UI.modalLayer.hidden && !G.over) showWonderNews();
+  else if (UI.modalLayer.hidden && !G.over) showNews();
   if (G.over && !UI.endShown) showEndModal();
 }
 
@@ -6418,8 +6696,9 @@ function realmPanel() {
   }
 
   html += '<p class="sec" data-col="score-box">Score</p>' + kv('Total', '<b>' + s.total + '</b>') +
-    kv('Cities × 5', s.cities * 5) + kv('Pop', s.pop) + kv('Tech', s.tech) +
-    kv('Military (' + s.army + ' strength ÷ 20)', s.mil);
+    kv('Cities × 5', s.cities * 5) + kv('Pop', s.pop) + kv('Tech', s.tech) + kv('Era points', s.era) +
+    kv('Military (' + s.army + ' strength ÷ 20)', s.mil) +
+    '<div class="actions"><button class="act" data-act="moments">Historic moments</button></div>';
 
   const rate = researchRate(f.i);
   html += '<p class="sec">' + icon('tech', 12) + 'Research</p>';
@@ -6677,6 +6956,12 @@ function unitPanel(u) {
   let html = '<div class="side-head">' + icon(iconOf(u.type), 18) + '<h2>' + def.name + '</h2>' +
     (isEmbarked(u) ? '<span class="tag">at sea</span>' : '') + '</div>' +
     '<div class="side-sub">' + dot(f, 9) + ' ' + esc(f.name) + ' · ' + esc(whereText(t)) + (cont ? ' · ' + esc(cont) : '') + '</div>';
+  const stack = unitsAt(u.x, u.y).filter(o => o.owner === u.owner);
+  if (u.owner === v && stack.length > 1) {
+    html += '<p class="sec">' + stack.length + ' units on this hex</p><div class="actions stack">' + stack.map(o =>
+      '<button class="act' + (o === u ? ' on' : '') + '" data-act="select-unit:' + o.id + '">' + icon(iconOf(o.type), 14) + UNITS[o.type].name + '</button>').join('') +
+      '</div><div class="hint">Pick which one gets orders. Clicking the hex again switches too.</div>';
+  }
   if (isMil(u.type)) {
     const ds = defStrength(u);
     html += kv('Health', u.hp + ' / 100') + meter('hp', u.hp, 100) +
@@ -6758,10 +7043,8 @@ function unitPanel(u) {
     html += '<p class="hint">Wait for your turn to give orders.</p>';
   }
 
-  const others = unitsAt(u.x, u.y).filter(o => o !== u && o.owner === v);
   const city = cityAt(u.x, u.y);
-  html += '<div class="actions">' + others.map(o => '<button class="act" data-act="select-unit:' + o.id + '">' + icon(iconOf(o.type), 14) +
-    UNITS[o.type].name + ' here</button>').join('') +
+  html += '<div class="actions">' +
     (city && city.owner === v ? '<button class="act" data-act="select-city:' + city.id + '">' + icon('city', 14) + 'Open ' + esc(city.name) + '</button>' : '') +
     '<button class="act" data-act="deselect">Back</button></div>';
   return html;
@@ -7220,9 +7503,6 @@ function askEndTurn() {
 }
 
 function showMenu() {
-  const howSaved = online ? 'Bored Together keeps this match on the server, not on this device, so your solo campaign is left alone.'
-    : G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.'
-    : 'The game saves itself on this device after every move and every turn. Playing the tutorial keeps this save.';
   openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name) +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
@@ -7230,10 +7510,12 @@ function showMenu() {
     (G.tut ? '<button class="act switch" data-act="coach-toggle">Tutorial coach<b>' + (G.tut.closed ? 'off' : 'on') + '</b></button>'
       : '<button class="act" data-act="tut-start">Play the tutorial</button>') +
     '<button class="act switch" data-act="tips-toggle">Tips in my games<b>' + (tipsOn() ? 'on' : 'off') + '</b></button>' +
+    '<button class="act switch" data-act="popups-toggle">Event popups<b>' + (popupsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="anim-next">Animation<b>' + ANIM_LEVELS[currentAnim()] + '</b></button>' +
-    (G.tut || online ? '' : '<button class="act" data-act="save">Save now</button>') +
+    (G.tut ? '' : '<button class="act" data-act="save">Save now</button>') +
     '<button class="act warn" data-act="new-ask">Quit to the start screen</button></div>' +
-    '<p class="hint">' + howSaved + '</p></div>' +
+    '<p class="hint">' + (G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.' :
+      'The game saves itself on this device after every move and every turn. Playing the tutorial keeps this save.') + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Back to the game</button></div>', true);
 }
 
@@ -7308,10 +7590,15 @@ function showHelp() {
     'Nobody founds cities, builds or claims mountains on a wonder, the Inca included. The first time you see one, a popup says what it is and what it does, and the history keeps a line about it.</p>' +
     '<h3>Winning</h3><p><b>Conquest:</b> hold every capital on the map. <b>Science:</b> finish Star Charts and the Royal Academy, then send out the Grand Expedition by sea (coastal city with a Harbor) ' +
     'or the Grand Caravan by land (any city). If it gets home after its trip, you win; take its home city to stop it, and while that city is under half HP the trip waits. Every Future Tech you finish on the way cuts a turn. ' +
-    '<b>Score:</b> the highest score when the turn limit hits: 5 per city, 1 per pop, 2, 4, 6 or 8 per tech by era (2 per Future Tech), and 1 per 20 military strength. ' +
+    '<b>Score:</b> the highest score when the turn limit hits: 5 per city, 1 per pop, 2, 4, 6 or 8 per tech by era (2 per Future Tech), era points from Historic moments, and 1 per 20 military strength. ' +
     'Older units count for less as the game goes on. Conquest and science can be switched off at setup.</p>' +
+    '<h3>Historic moments</h3><p>Like Civ 6’s era score. Reaching a milestone for the first time pops up a card and pays 1 to 3 era points into your Score: ' +
+    'seeing a natural wonder, a city on a new continent, first contact, first blood, taking a city or a capital (or winning one back), making peace, an open-borders or trade deal, ' +
+    'a first road, a city of pop 8, five cities, a University, each new era, each science step, and sending out the last trip. Every civ earns each one once, and the first civ in the world to earn it gets double. ' +
+    'The Realm panel lists them all. Other cards warn you when someone declares war on you, takes one of your cities or launches a science trip, and when the borders close. ' +
+    'Turn Event popups off in the Menu and the points still count.</p>' +
     '<h3>Keys</h3><p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
-    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. The Menu’s Animation switch runs through off, wonders only, wonders + features, and everything.</p>' +
+    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. The Menu’s Animation switch runs through off, wonders only, wonders + features, and everything.</p>' +
     '</div><div class="modal-foot"><button class="btn" data-act="civs">All 16 civs</button><button class="btn primary" data-act="close">Close</button></div>');
 }
 
@@ -7320,12 +7607,12 @@ function showEndModal() {
   const w = G.over.winner !== null ? pl(G.over.winner) : null;
   const rows = standings().map(({ f, s }) => '<tr><td>' + dot(f) + ' ' + esc(fullName(f)) +
     (f.human ? '' : ' (CPU)') + (f.alive ? '' : ' · out') +
-    '</td><td class="n">' + s.cities + '</td><td class="n">' + s.pop + '</td><td class="n">' + s.tech + '</td><td class="n">' + s.mil +
+    '</td><td class="n">' + s.cities + '</td><td class="n">' + s.pop + '</td><td class="n">' + s.tech + '</td><td class="n">' + s.era + '</td><td class="n">' + s.mil +
     '</td><td class="n"><b>' + s.total + '</b></td></tr>').join('');
   openModal(modalHead(w ? esc(fullName(w)) + ' wins' : 'Game over', esc(G.over.why) + ' · turn ' + G.over.turn) +
     '<div class="modal-body"><div class="table-wrap"><table class="standings"><thead><tr><th>Player</th><th class="n">Cities</th><th class="n">Pop</th>' +
-    '<th class="n">Tech</th><th class="n">Military</th><th class="n">Score</th></tr></thead><tbody>' +
-    rows + '</tbody></table></div><p class="hint">Score is cities × 5 + pop + tech points + military strength ÷ 20.</p></div>' +
+    '<th class="n">Tech</th><th class="n">Era</th><th class="n">Military</th><th class="n">Score</th></tr></thead><tbody>' +
+    rows + '</tbody></table></div><p class="hint">Score is cities × 5 + pop + tech points + era points + military strength ÷ 20.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button><button class="btn primary" data-act="new">New game</button></div>');
 }
 
@@ -7355,30 +7642,13 @@ function focusPlayer(i) {
   centreOn(spot.x, spot.y);
 }
 
-// The frame closes as soon as the server has the board; this is what the player
-// sees while that happens, instead of the next seat's board on the wrong device.
-function showTurnComplete() {
-  if (!UI || !UI.handoff) return;
-  const next = G && G.players[G.cur];
-  const other = next && next.human ? next.name : 'the other player';
-  if (next) { UI.handoffDot.style.background = next.light; UI.handoffDot.style.borderColor = next.ink; }
-  UI.handoffTurn.textContent = 'Turn ' + (G ? G.turn : '') + (G && G.maxTurns ? ' of ' + G.maxTurns : '');
-  UI.handoffName.textContent = 'Turn complete';
-  UI.handoffNote.textContent = 'Sending the valley to ' + other + '.';
-  const go = document.getElementById('btn-handoff');
-  if (go) go.hidden = true;
-  UI.handoff.hidden = false;
-}
-
 function doEndTurn() {
-  if (online && onlineSent) return;
   closeModal();
   selection = null;
   reachable = null;
   placing = null;
   const before = G.viewer;
   endCurrentTurn();
-  if (online) { showTurnComplete(); onlineSubmit(); return; }
   autosave();
   render();
   if (!G.handoff && !G.over && G.viewer === before) {
@@ -7418,6 +7688,12 @@ function onAction(act) {
     if (G) showMenu();
     return;
   }
+  if (kind === 'popups-toggle') {
+    setPopups(!popupsOn());
+    toast('Event popups ' + (popupsOn() ? 'on' : 'off') + '. The points still count.');
+    if (G) showMenu();
+    return;
+  }
   if (kind === 'tips-toggle') {
     setTips(!tipsOn());
     if (UI.optTips) UI.optTips.checked = tipsOn();
@@ -7428,7 +7704,10 @@ function onAction(act) {
   if (!G) { if (kind === 'close') closeModal(); return; }
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
   switch (kind) {
-    case 'close': closeModal(); if (G.wonderNews && G.wonderNews.length) render(); break;
+    case 'close': closeModal(); if (G.news && G.news.length) render(); break;
+    case 'news-skip': G.news = (G.news || []).filter(m => m.i !== G.viewer); closeModal(); render(); break;
+    case 'news-look': lookAtSpot(Number(a), Number(b)); break;
+    case 'moments': showMoments(); break;
     case 'wonder-look': lookAtWonder(a); break;
     case 'log-toggle': logOpen = !logOpen; renderLog(); break;
     case 'tut-next': tutorialNext(); render(); break;
@@ -7748,8 +8027,15 @@ function handleTileClick(x, y) {
       selection = { kind: 'tile', x, y }; render(); return;
     }
     if (selection && selection.kind === 'city' && city && selection.id === city.id) { selectUnit(mine[0]); return; }
-    const ready = mine.filter(u => u.mp > 0 && !u.acted).sort((p, q) => isMil(q.type) - isMil(p.type));
-    if (ready.length) { selectUnit(ready[0]); return; }
+    // Soldiers first, but before the first city the settler is the one to pick.
+    const noCity = !ownCities(v).length;
+    const ready = mine.filter(u => u.mp > 0 && !u.acted).sort((p, q) =>
+      (noCity ? !!UNITS[q.type].founds - !!UNITS[p.type].founds : 0) || isMil(q.type) - isMil(p.type));
+    if (ready.length) {
+      if (mine.length > 1) toast(UNITS[ready[0].type].name + ' selected. ' + mine.length + ' units share this hex: pick another in the panel, or click the hex again.');
+      selectUnit(ready[0]);
+      return;
+    }
     if (city && city.owner === v) { selectCity(city); return; }
     selectUnit(mine[0]);
     return;
@@ -7919,9 +8205,6 @@ function bindKeys() {
 const SAVE_KEY = 'bored.civlite.save.v2';
 
 function saveGame() {
-  // A Bored Together match lives on the server and in the match document, not
-  // in this device's slot: it must never write over (or clear) a solo campaign.
-  if (online) return false;
   if (!G || G.watch || G.tut) return false;
   if (G.over) { clearSave(); return false; }
   try {
@@ -8222,49 +8505,11 @@ function boot(data) {
       window.claude.hot.snapshot(() => ({ state: G ? JSON.stringify(G) : null }));
     }
   } catch (error) { /* no viewer hook */ }
-  // A solo campaign save must never stand in for a Bored Together match.
-  let embedded = null;
-  try { embedded = window.__boredTogether || null; } catch (error) { /* not embedded */ }
-  if (data && data.state && !embedded) {
+  if (data && data.state) {
     try {
       const state = JSON.parse(data.state);
       if (validState(state)) resumeState(state);
     } catch (error) { /* start fresh */ }
-  }
-  // Bored Together: resume the board the previous turn handed over, or open a
-  // fresh two-human valley from the match seed. The start screen would let the
-  // two players choose different maps, so it stays out of the way.
-  online = embedded;
-  if (online && !G) {
-    const ctx = online.context || {}, room = ctx.state || {};
-    const seat = Number(ctx.seat) || 1;
-    const names = Array.isArray(ctx.players) ? ctx.players : [];
-    UI.start.hidden = true;
-    if (room.board) {
-      G = prepareState(room.board);
-    } else {
-      startGame({
-        seats: [{ name: names[0] || 'Player one', human: true, civ: null },
-                { name: names[1] || 'Player two', human: true, civ: null }],
-        maxTurns: 50, seed: (Number(room.seed) >>> 0) || 1, map: 'pangaea', level: 'normal',
-        victory: { conquest: true, science: true }
-      });
-    }
-    if (G) {
-      gamesStarted++;
-      G.handoff = false;
-      G.viewer = seat - 1;
-      G.cur = seat - 1;
-      G.endShown = false;
-      selection = null;
-      reachable = null;
-      closeModal();
-      cam.fitted = false;
-      render();
-      fitCamera();
-      focusPlayer(seat - 1);
-      if (G.over && G.over.winner === seat - 1) onlineSubmit();
-    }
   }
 }
 
