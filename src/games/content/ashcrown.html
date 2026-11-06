@@ -1593,6 +1593,24 @@ function assignCivs(seats, seed) {
 }
 
 // seats: [{ name, human, civ }]. Returns the new game, sitting at the first player's turn.
+/* ── Bored Together ─────────────────────────────────────────────────────────
+ * Two people, one valley: every turn ends by handing the whole board to the
+ * server, which stores it and passes it to whoever is due next. Neither side
+ * runs a private campaign or a CPU stand-in.
+ */
+let online = null, onlineSent = false;
+function onlineSubmit() {
+  if (!online || onlineSent || !G) return;
+  onlineSent = true;
+  // Only the winner's own client claims the win. A losing final turn still
+  // hands the board over, so the other side can open it and close the match.
+  const seat = Number(online.seat) || 1;
+  const winner = G.over && Number.isInteger(G.over.winner) && G.over.winner === seat - 1 ? seat : null;
+  online.submit({ board: G, turn: G.turn, winner })
+    .then(() => online.finishTurn())
+    .catch(error => { onlineSent = false; online.error(error, onlineSubmit); });
+}
+
 function startGame(options) {
   const seats = options.seats.slice(0, MAX_PLAYERS);
   const seed = options.seed >>> 0;
@@ -3408,6 +3426,7 @@ function endGame(winner, why) {
   if (G.over) return;
   G.over = { winner: winner ? winner.i : null, why, turn: G.turn };
   log(winner ? fullName(winner) + ' wins. ' + why + '.' : why + '.', winner ? winner.ink : 'turn', null);
+  if (online) onlineSubmit();
 }
 
 function checkElimination() {
@@ -3512,6 +3531,11 @@ function advanceTurns() {
       checkElimination();
       checkWin();
       continue;
+    }
+    if (online) {
+      // Bored Together sends the valley to the other device; this screen is done.
+      G.handoff = false;
+      return;
     }
     const humans = G.players.filter(p => p.alive && p.human).length;
     G.handoff = humans > 1;
@@ -6275,10 +6299,12 @@ function tutorialSkipChapter() {
 // Each tip shows the first time its test finds something, once per player per
 // game. test(i) returns what it found (truthy) or nothing.
 const TIPS = [
-  { id: 'rival-trip', test: i => scienceOn() && G.players.find(o => o.alive && o.i !== i && o.voyage),
+  // A voyage whose home city has been burned has no port left to reach, so it is
+  // neither a threat to point at nor one worth describing.
+  { id: 'rival-trip', test: i => scienceOn() && G.players.find(o => o.alive && o.i !== i && o.voyage && cityById(o.voyage.city)),
     say: (i, o) => esc(o.name) + '’s ' + esc(PROJECTS[o.voyage.kind].name) + ' is on its way: if it gets home in ' + plural(o.voyage.left, 'turn', 'turns') +
-      ', they win. Take ' + esc(cityById(o.voyage.city).name) + ' to stop it, or keep it under half HP so the trip waits.',
-    at: o => { const c = cityById(o.voyage.city); return [c.x, c.y]; } },
+      ', they win. Take ' + esc((cityById(o.voyage.city) || {}).name || 'its home city') + ' to stop it, or keep it under half HP so the trip waits.',
+    at: o => { const c = cityById(o.voyage.city); return c ? [c.x, c.y] : null; } },
   { id: 'zoc', test: i => ownUnits(i).find(u => u.pinned),
     say: () => 'That unit stepped into an enemy’s zone of control (the dashed yellow hexes), so its move ended there. It can still attack. Horse units ride straight through.',
     at: u => [u.x, u.y] },
@@ -6362,13 +6388,17 @@ function markTipSeen(id) {
 // The hex the coach is pointing at, for the map's dashed ring.
 function coachAt() {
   if (!G) return null;
-  if (G.tut) {
-    if (G.tut.closed || G.tut.step >= TUT_STEPS.length) return null;
-    const step = TUT_STEPS[G.tut.step];
-    return step.at ? step.at() : null;
-  }
-  const now = currentTip();
-  return now && now.tip.at ? now.tip.at(now.hit) : null;
+  // A coach mark is decoration: a tip or tutorial step that cannot find its hex
+  // must never take the board's render down with it.
+  try {
+    if (G.tut) {
+      if (G.tut.closed || G.tut.step >= TUT_STEPS.length) return null;
+      const step = TUT_STEPS[G.tut.step];
+      return step.at ? step.at() : null;
+    }
+    const now = currentTip();
+    return now && now.tip.at ? now.tip.at(now.hit) : null;
+  } catch (error) { return null; }
 }
 
 const hasPage = () => typeof document !== 'undefined' && !!document.querySelectorAll;
@@ -6403,7 +6433,8 @@ function renderCoach() {
     const now = G && !G.over ? currentTip() : null;
     if (now) {
       tag = 'Tip';
-      say = now.tip.say(G.viewer, now.hit);
+      try { say = now.tip.say(G.viewer, now.hit); }
+      catch (error) { say = ''; }
       el = now.tip.el || null;
       actions = '<button class="act" data-act="tip-ok:' + now.tip.id + '">Got it</button>' +
         '<button class="skip" data-act="tips-off">Turn tips off</button>';
@@ -6431,7 +6462,7 @@ function toast(message) {
   toastTimer = setTimeout(() => UI.toast.classList.remove('show'), 2400);
 }
 
-const myTurn = () => !!G && !G.over && !G.handoff && G.viewer !== null && G.cur === G.viewer;
+const myTurn = () => !!G && !G.over && !G.handoff && !onlineSent && G.viewer !== null && G.cur === G.viewer;
 const viewerPlayer = () => (G && G.viewer !== null ? pl(G.viewer) : null);
 const dot = (f, size) => '<span class="dot" style="background:' + f.light + ';border-color:' + f.ink +
   (size ? ';width:' + size + 'px;height:' + size + 'px' : '') + '"></span>';
@@ -6455,6 +6486,7 @@ function validateSelection() {
 
 function render() {
   if (!UI || !G) return;
+  if (online && onlineSent) return;
   if (G.handoff) {
     clearBoard();
     UI.sideScroll.innerHTML = '';
@@ -7536,6 +7568,9 @@ function askEndTurn() {
 }
 
 function showMenu() {
+  const howSaved = online ? 'Bored Together keeps this match on the server, not on this device, so your solo campaign is left alone.'
+    : G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.'
+    : 'The game saves itself on this device after every move and every turn. Playing the tutorial keeps this save.';
   openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name) +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
@@ -7545,10 +7580,9 @@ function showMenu() {
     '<button class="act switch" data-act="tips-toggle">Tips in my games<b>' + (tipsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="popups-toggle">Event popups<b>' + (popupsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="anim-next">Animation<b>' + ANIM_LEVELS[currentAnim()] + '</b></button>' +
-    (G.tut ? '' : '<button class="act" data-act="save">Save now</button>') +
+    (G.tut || online ? '' : '<button class="act" data-act="save">Save now</button>') +
     '<button class="act warn" data-act="new-ask">Quit to the start screen</button></div>' +
-    '<p class="hint">' + (G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.' :
-      'The game saves itself on this device after every move and every turn. Playing the tutorial keeps this save.') + '</p></div>' +
+    '<p class="hint">' + howSaved + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Back to the game</button></div>', true);
 }
 
@@ -7675,13 +7709,30 @@ function focusPlayer(i) {
   centreOn(spot.x, spot.y);
 }
 
+// The frame closes as soon as the server has the board; this is what the player
+// sees while that happens, instead of the next seat's board on the wrong device.
+function showTurnComplete() {
+  if (!UI || !UI.handoff) return;
+  const next = G && G.players[G.cur];
+  const other = next && next.human ? next.name : 'the other player';
+  if (next) { UI.handoffDot.style.background = next.light; UI.handoffDot.style.borderColor = next.ink; }
+  UI.handoffTurn.textContent = 'Turn ' + (G ? G.turn : '') + (G && G.maxTurns ? ' of ' + G.maxTurns : '');
+  UI.handoffName.textContent = 'Turn complete';
+  UI.handoffNote.textContent = 'Sending the valley to ' + other + '.';
+  const go = document.getElementById('btn-handoff');
+  if (go) go.hidden = true;
+  UI.handoff.hidden = false;
+}
+
 function doEndTurn() {
+  if (online && onlineSent) return;
   closeModal();
   selection = null;
   reachable = null;
   placing = null;
   const before = G.viewer;
   endCurrentTurn();
+  if (online) { showTurnComplete(); onlineSubmit(); return; }
   autosave();
   render();
   if (!G.handoff && !G.over && G.viewer === before) {
@@ -8238,6 +8289,9 @@ function bindKeys() {
 const SAVE_KEY = 'bored.civlite.save.v2';
 
 function saveGame() {
+  // A Bored Together match lives on the server and in the match document, not
+  // in this device's slot: it must never write over (or clear) a solo campaign.
+  if (online) return false;
   if (!G || G.watch || G.tut) return false;
   if (G.over) { clearSave(); return false; }
   try {
@@ -8538,11 +8592,49 @@ function boot(data) {
       window.claude.hot.snapshot(() => ({ state: G ? JSON.stringify(G) : null }));
     }
   } catch (error) { /* no viewer hook */ }
-  if (data && data.state) {
+  // A solo campaign save must never stand in for a Bored Together match.
+  let embedded = null;
+  try { embedded = window.__boredTogether || null; } catch (error) { /* not embedded */ }
+  if (data && data.state && !embedded) {
     try {
       const state = JSON.parse(data.state);
       if (validState(state)) resumeState(state);
     } catch (error) { /* start fresh */ }
+  }
+  // Bored Together: resume the board the previous turn handed over, or open a
+  // fresh two-human valley from the match seed. The start screen would let the
+  // two players choose different maps, so it stays out of the way.
+  online = embedded;
+  if (online && !G) {
+    const ctx = online.context || {}, room = ctx.state || {};
+    const seat = Number(ctx.seat) || 1;
+    const names = Array.isArray(ctx.players) ? ctx.players : [];
+    UI.start.hidden = true;
+    if (room.board) {
+      G = prepareState(room.board);
+    } else {
+      startGame({
+        seats: [{ name: names[0] || 'Player one', human: true, civ: null },
+                { name: names[1] || 'Player two', human: true, civ: null }],
+        maxTurns: 50, seed: (Number(room.seed) >>> 0) || 1, map: 'pangaea', level: 'normal',
+        victory: { conquest: true, science: true }
+      });
+    }
+    if (G) {
+      gamesStarted++;
+      G.handoff = false;
+      G.viewer = seat - 1;
+      G.cur = seat - 1;
+      G.endShown = false;
+      selection = null;
+      reachable = null;
+      closeModal();
+      cam.fitted = false;
+      render();
+      fitCamera();
+      focusPlayer(seat - 1);
+      if (G.over && G.over.winner === seat - 1) onlineSubmit();
+    }
   }
 }
 
