@@ -2,13 +2,16 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 320,
+  "count": 323,
   "newest": "2026-11-06",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"7511bc8","date":"2026-11-06","author":"Codebuff","subject":"VolletBall: quicker, more aggressive CPU"},
+  {"sha":"18524d2","date":"2026-11-06","author":"Codebuff","subject":"Add Minecraft: Bored Edition to the library"},
+  {"sha":"f627d22","date":"2026-11-06","author":"Codebuff","subject":"ci: pin both jobs to ubuntu-24.04"},
   {"sha":"89b7011","date":"2026-11-06","author":"Claude","subject":"Civ Lite v4.4: a title screen, then game setup"},
   {"sha":"7f5bdf5","date":"2026-11-06","author":"Claude","subject":"Civ Lite v4.3: save slots"},
   {"sha":"a38e0fb","date":"2026-11-06","author":"Claude","subject":"Keep the Together directory budget test off the minute boundary"},
