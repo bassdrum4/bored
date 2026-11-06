@@ -109,7 +109,7 @@ export const HIGH_SCORE_GAMES = [
   // Ashcrown ranks the renown a campaign actually finished with: a banner still
   // growing when the player walked away is not a result. Every finished campaign
   // holds at least one city, so the renown floor is real rather than arbitrary.
-  highScore('ashcrown', 'Ashcrown', 'renown', {
+  highScore('ashcrown', 'Civ Lite', 'renown', {
     metric: 'renown', min: 1, max: 10000,
     when: snapshot => snapshot.finished === true
   }),
