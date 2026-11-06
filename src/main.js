@@ -1,5 +1,5 @@
 import {
-  ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, loadGameDocument
+  ORDER, EXTERNS, EXTERN_TABS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, loadGameDocument
 } from './games/catalog.js';
 import { DISCOVERY, COLLECTIONS, PREVIEWS, inCollection } from './games/discovery.js';
 import { nativeHTML } from './games/arcade.js';
@@ -210,6 +210,13 @@ async function toggleFullscreen() {
 let activeTogether = null;
 function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (!ORDER.some(([id]) => id === slug)) return;
+  // An online extra that sends frame-ancestors 'self' cannot play in the
+  // frame, so it gets its own tab rather than a blank one.
+  if (EXTERN_TABS.includes(slug)) {
+    const opened = window.open(EXTERNS[slug], '_blank', 'noopener');
+    showHint(opened ? 'Opened in a new tab' : 'This site opens in its own tab: ' + EXTERNS[slug]);
+    return;
+  }
   if (!activeSlug) {
     const from = origin || document.activeElement;
     // A caller that hands over the control it was launched from (the board's

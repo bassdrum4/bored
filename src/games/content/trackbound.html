@@ -1426,17 +1426,28 @@ function parkHeight(x, z, seed) {
   return (hills + crater) * open + rim * rim * 46;
 }
 
-// A kicker: a ramp with a lip, sunk into the ground so it never floats. Faces
-// are wound outward so the back faces stay culled.
-function pushKicker(mesh, x, z, yaw, width, length, rise, ground, color) {
+// A kicker: a ramp with a lip, sunk into the ground so it never floats. The
+// entry edge drops to the lowest ground under it and the tail digs into the
+// hill behind it, so a ramp laid across a slope has no gap underneath and no
+// open side to drive through. Faces are wound outward so the back stays culled.
+function pushKicker(mesh, x, z, yaw, width, length, rise, ground, color, heightAt, walls) {
   const f = [Math.sin(yaw), 0, Math.cos(yaw)];
   const r = [Math.cos(yaw), 0, -Math.sin(yaw)];
   const pt = (side, along, y) => [x + f[0] * along + r[0] * side, y, z + f[2] * along + r[2] * side];
   const hw = width / 2;
-  const lowL = pt(-hw, 0, ground), lowR = pt(hw, 0, ground);
-  const lipL = pt(-hw, length, ground + rise), lipR = pt(hw, length, ground + rise);
+  const floorAt = (side, along) => {
+    if (!heightAt) return ground;
+    const q = pt(side, along, 0);
+    return Math.min(heightAt(q[0], q[2]), ground);
+  };
+  const lowGround = Math.min(floorAt(-hw, 0), floorAt(hw, 0));
+  // A lip that would sit under rising ground is lifted clear of it.
+  const lipGround = Math.max(lowGround + rise, floorAt(-hw, length) + 0.8, floorAt(hw, length) + 0.8);
   const tail = length * 1.6;
-  const backL = pt(-hw, tail, ground), backR = pt(hw, tail, ground);
+  const backGround = Math.min(floorAt(-hw, tail), floorAt(hw, tail)) - 1.2;
+  const lowL = pt(-hw, 0, lowGround), lowR = pt(hw, 0, lowGround);
+  const lipL = pt(-hw, length, lipGround), lipR = pt(hw, length, lipGround);
+  const backL = pt(-hw, tail, backGround), backR = pt(hw, tail, backGround);
   const face = (a, b, c, tone) => pushTri(mesh, a, b, c, norm(cross(sub(b, a), sub(c, a))), tone);
   const up = [0, 1, 0];
   const n = norm(cross(sub(lipL, lowL), sub(lipR, lowL)));
@@ -1448,17 +1459,43 @@ function pushKicker(mesh, x, z, yaw, width, length, rise, ground, color) {
   pushQuad(mesh, lipL, backL, backR, lipR, dot(bn, up) < 0 ? mul(bn, -1) : bn, shade(color, 0.8));
   face(lowL, lipL, backL, shade(color, 0.7));
   face(lowR, backR, lipR, shade(color, 0.7));
+
+  // The flanks are solid from the ground up to just under the deck, split into
+  // panels so the wall top follows the slope. A car driving at the side at
+  // ground level is stopped; a car riding the deck never catches on them.
+  if (walls) {
+    const steps = 4;
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < steps; k++) {
+        const s0 = length * k / steps, s1 = length * (k + 1) / steps;
+        const deck = lowGround + (lipGround - lowGround) * (s0 + s1) / (2 * length);
+        const h = deck - lowGround - 1.35;
+        if (h < 0.2) continue;
+        walls.push({
+          a: pt(side * hw, s0, lowGround), t: f, len: s1 - s0,
+          n: norm([r[0] * side, 0, r[2] * side]), up: [0, 1, 0], h
+        });
+      }
+    }
+  }
+  return { lipY: lipGround, ground: lowGround };
 }
 
 // A plateau with sloped flanks: something to climb onto and launch off, and
 // there is no vertical face to drive straight through.
-function pushMesa(mesh, x, z, width, length, top, ground, color) {
+function pushMesa(mesh, x, z, width, length, top, ground, color, heightAt) {
   const hw = width / 2, hl = length / 2, spread = top + 3.4;
-  const topY = ground + top, baseY = ground - 1.2;
   const up = [0, 1, 0];
-  const top4 = [[x - hw, topY, z - hl], [x - hw, topY, z + hl], [x + hw, topY, z + hl], [x + hw, topY, z - hl]];
-  const base4 = [[x - hw - spread, baseY, z - hl - spread], [x - hw - spread, baseY, z + hl + spread],
-    [x + hw + spread, baseY, z + hl + spread], [x + hw + spread, baseY, z - hl - spread]];
+  const topPlan = [[x - hw, z - hl], [x - hw, z + hl], [x + hw, z + hl], [x + hw, z - hl]];
+  const basePlan = [[x - hw - spread, z - hl - spread], [x - hw - spread, z + hl + spread],
+    [x + hw + spread, z + hl + spread], [x + hw + spread, z - hl - spread]];
+  let topY = ground + top, baseY = ground - 1.2;
+  if (heightAt) {
+    for (const [px, pz] of topPlan) topY = Math.max(topY, heightAt(px, pz) + 0.7);
+    for (const [px, pz] of basePlan) baseY = Math.min(baseY, heightAt(px, pz) - 0.8);
+  }
+  const top4 = topPlan.map(([px, pz]) => [px, topY, pz]);
+  const base4 = basePlan.map(([px, pz]) => [px, baseY, pz]);
   pushQuad(mesh, top4[0], top4[1], top4[2], top4[3], up, color);
   for (let i = 0; i < 4; i++) {
     const j = (i + 1) % 4;
@@ -1552,12 +1589,30 @@ function pushRing(mesh, ring, next) {
   }
 }
 
+// Four panels around a footprint. Trees, piers and posts live in the scenery
+// mesh, which the wheels never raycast, so without this they are drawings you
+// can drive straight through.
+function pushWallBox(walls, x, z, y, half, height) {
+  if (!walls || height <= 0.2) return;
+  const up = [0, 1, 0];
+  for (let k = 0; k < 4; k++) {
+    const yaw = k * Math.PI / 2;
+    const n = [Math.cos(yaw), 0, Math.sin(yaw)];
+    const t = [-n[2], 0, n[0]];
+    walls.push({
+      a: [x + n[0] * half - t[0] * half, y, z + n[2] * half - t[2] * half],
+      t, len: half * 2, n, up, h: height
+    });
+  }
+}
+
 // A concrete arch: two piers and a beam, tall enough to fly through.
-function pushArch(scenery, x, z, yaw, span, height, ground, color) {
+function pushArch(scenery, walls, x, z, yaw, span, height, ground, color) {
   const f = frame([x, ground, z], [Math.sin(yaw), 0, Math.cos(yaw)], [0, 1, 0]);
   const at = (side, y) => add(add(f.p, mul(f.x, side * span / 2)), mul(f.y, y));
   for (const side of [-1, 1]) {
     pushBox(scenery, f, at(side, height / 2), [0.9, height / 2, 0.9], shade(color, 0.94));
+    pushWallBox(walls, x + f.x[0] * side * span / 2, z + f.x[2] * side * span / 2, ground, 1.0, height);
   }
   pushBox(scenery, f, at(0, height + 0.8), [span / 2 + 1.6, 0.85, 1.15], color);
   pushBox(scenery, f, at(0, height + 1.5), [span / 2 + 0.5, 0.14, 1.2], shade(color, 1.14));
@@ -1566,6 +1621,7 @@ function pushArch(scenery, x, z, yaw, span, height, ground, color) {
 function freeplayWorld(seed) {
   const s = (seed >>> 0) || 1;
   const random = mulberry32(s);
+  const heightAt = (x, z) => parkHeight(x, z, s);
   const mesh = meshNew(), scenery = meshNew();
   const triggers = [], placed = [], rings = [], walls = [];
   const cells = Math.round(PARK_HALF * 2 / PARK_STEP);
@@ -1606,17 +1662,18 @@ function freeplayWorld(seed) {
   // they are meant to hit.
   const launchZ = 30, launchLen = 28, launchRise = 15;
   const launchGround = parkHeight(0, launchZ, s);
-  pushKicker(mesh, 0, launchZ, 0, 23, launchLen, launchRise, launchGround, shade(ramp, 1.08));
+  const launchRamp = pushKicker(mesh, 0, launchZ, 0, 23, launchLen, launchRise, launchGround,
+    shade(ramp, 1.08), heightAt, walls);
   const runUp = frame([0, parkHeight(0, launchZ - 17, s), launchZ - 17], [0, 0, 1], [0, 1, 0]);
   pushPad(mesh, runUp, PALETTE.boost);
   triggers.push({ type: 'boost', frame: runUp, hw: 5, halfLen: 8 });
   const archZ = launchZ + launchLen + 5;
-  pushArch(scenery, 0, archZ, 0, 34, 22, parkHeight(0, archZ, s), shade(concrete, 1.02));
+  pushArch(scenery, walls, 0, archZ, 0, 34, 22, parkHeight(0, archZ, s), shade(concrete, 1.02));
   remember(0, launchZ);
   remember(0, launchZ - 17);
 
   const lipZ = launchZ + launchLen, lipY = launchGround + launchRise;
-  const mouthY = Math.max(lipY + 8, parkHeight(0, lipZ + 30, s) + 10);
+  const mouthY = Math.max(launchRamp.lipY + 8, parkHeight(0, lipZ + 30, s) + 10);
   rings.push({ p: [0, mouthY, lipZ + 30], axis: [0, 0, 1], r: 7.4, got: false });
 
   // The loop: the one place the car goes upside down, so it gets a ring of its
@@ -1627,6 +1684,7 @@ function freeplayWorld(seed) {
     const spot = parkSpot(random, s, 92, PARK_HALF - 92, 34, 3);
     if (!spot || spot.spread > 2.4) continue;
     if (Math.hypot(spot.x, spot.z - launchZ) < 78) continue;
+    if (Math.hypot(spot.x, spot.z - (lipZ + 30)) < 62) continue;   // the launcher's gate
     loopSpot = spot;
   }
   if (!loopSpot) loopSpot = parkSpot(random, s, 80, PARK_HALF - 80, 30, 12) ||
@@ -1661,6 +1719,25 @@ function freeplayWorld(seed) {
   const loopMid = compose(loopEntry, localCurveFrame(parkLoop, 0.5));
   rings.push({ p: madd(loopMid.p, loopMid.y, 0.9), axis: loopMid.z, r: 4.6, got: false });
 
+  // The loop runs from its entry to its exit, 26 across and 18 deep, so a
+  // single centre point is not its footprint. Everything else must clear the
+  // whole segment: the loop's own body plus the width of what is being placed.
+  const loopExit = compose(loopEntry, localCurveFrame(parkLoop, 1));
+  const loopSeg = { ax: loopEntry.p[0], az: loopEntry.p[2], bx: loopExit.p[0], bz: loopExit.p[2] };
+  const loopDist = (x, z) => {
+    const vx = loopSeg.bx - loopSeg.ax, vz = loopSeg.bz - loopSeg.az;
+    const t = clamp(((x - loopSeg.ax) * vx + (z - loopSeg.az) * vz) / (vx * vx + vz * vz || 1), 0, 1);
+    return Math.hypot(x - (loopSeg.ax + vx * t), z - (loopSeg.az + vz * t));
+  };
+  const loopClear = (x, z, gap) => loopDist(x, z) >= gap;
+  // A route ramp is a 16-long kicker with its gate another 28 past the lip, so
+  // the whole 44-unit corridor has to miss the loop, not just the ramp base.
+  const rampClear = (x, z, fx, fz) => {
+    let best = Infinity;
+    for (let s = 0; s <= 46; s += 6) best = Math.min(best, loopDist(x + fx * s, z + fz * s));
+    return best >= 34;
+  };
+
   // The route: a ring in every slot around the field, each with a steep kicker
   // and a boost pad on its run-up so the gate can actually be flown through.
   // Slots alternate between an inner and an outer ring and leave the strip in
@@ -1671,52 +1748,76 @@ function freeplayWorld(seed) {
   for (let i = 0; i < routeSlots; i++) {
     const angle = Math.PI / 2 + 0.575 + (i / (routeSlots - 1)) * routeArc;
     const radius = 82 + (i % 2) * 34;
-    let spot = null;
+    let spot = null, yaw = -angle, hasRamp = true;
     for (const shift of [0, 0.2, -0.2, 0.4, -0.4]) {
       const slot = angle + shift, reach = radius + (random() - 0.5) * 8;
       const x = Math.cos(slot) * reach, z = Math.sin(slot) * reach;
       if (!insideField(x, z, 58)) continue;
-      if (Math.hypot(x - loopSpot.x, z - loopSpot.z) < 52) continue;
+      if (!loopClear(x, z, 56)) continue;
       const found = parkNear(random, x, z, s, 15);
       if (!found) continue;
       if (!placed.every(p => Math.hypot(p[0] - found.x, p[1] - found.z) > 30)) continue;
-      spot = found;
+      const dir = -angle + (random() - 0.5) * 0.5;
+      if (!rampClear(found.x, found.z, Math.sin(dir), Math.cos(dir))) continue;
+      spot = found; yaw = dir;
       break;
     }
+    // A slot the loop or another building has crowded out searches a wider
+    // arc before it gives up on a ramp. Placing the kicker at the raw slot was
+    // what used to drop ramps across the loop.
+    for (let k = 0; k < 36 && !spot; k++) {
+      const a2 = angle + (k % 2 ? 1 : -1) * (0.22 + 0.11 * k);
+      const r2 = radius + (random() - 0.5) * 30;
+      const x = Math.cos(a2) * r2, z = Math.sin(a2) * r2;
+      if (!insideField(x, z, 58) || !loopClear(x, z, 56)) continue;
+      if (!placed.every(p => Math.hypot(p[0] - x, p[1] - z) > 30)) continue;
+      const found = parkNear(random, x, z, s, 15);
+      if (!found) continue;
+      const dir = Math.atan2(found.x, found.z) + (random() - 0.5) * 0.4;
+      if (!rampClear(found.x, found.z, Math.sin(dir), Math.cos(dir))) continue;
+      spot = found; yaw = dir;
+    }
     if (!spot) {
+      // Still nothing: hang the gate alone, facing out of the loop's way.
       const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
       spot = { x, z, ground: parkHeight(x, z, s) };
+      yaw = Math.atan2(x, z);
+      hasRamp = false;
     }
-    const yaw = -angle + (random() - 0.5) * 0.5;
     const forward = [Math.sin(yaw), 0, Math.cos(yaw)];
     const length = 16, rise = 9.5;
-    pushKicker(mesh, spot.x, spot.z, yaw, 15, length, rise, spot.ground, shade(ramp, 0.92 + random() * 0.18));
+    const kicker = hasRamp
+      ? pushKicker(mesh, spot.x, spot.z, yaw, 15, length, rise, spot.ground,
+        shade(ramp, 0.92 + random() * 0.18), heightAt, walls)
+      : { lipY: spot.ground };
     const lipX = spot.x + forward[0] * length, lipZ2 = spot.z + forward[2] * length;
     const ringX = lipX + forward[0] * 28, ringZ = lipZ2 + forward[2] * 28;
     // Height comes from the ramp lip and the ground under the gate, so an
     // uphill landing never swallows the hoop.
-    const ringY = Math.max(spot.ground + rise + 7, parkHeight(ringX, ringZ, s) + 8.5);
+    const ringY = Math.max(kicker.lipY + 7, parkHeight(ringX, ringZ, s) + 8.5);
     rings.push({ p: [ringX, ringY, ringZ], axis: forward, r: 6.8, got: false });
-    const boostX = spot.x - forward[0] * 15, boostZ = spot.z - forward[2] * 15;
-    const boostFrame = frame([boostX, parkHeight(boostX, boostZ, s), boostZ], forward, [0, 1, 0]);
-    pushPad(mesh, boostFrame, PALETTE.boost);
-    triggers.push({ type: 'boost', frame: boostFrame, hw: 5, halfLen: 8 });
+    if (hasRamp) {
+      const boostX = spot.x - forward[0] * 15, boostZ = spot.z - forward[2] * 15;
+      const boostFrame = frame([boostX, parkHeight(boostX, boostZ, s), boostZ], forward, [0, 1, 0]);
+      pushPad(mesh, boostFrame, PALETTE.boost);
+      triggers.push({ type: 'boost', frame: boostFrame, hw: 5, halfLen: 8 });
+    }
     remember(spot.x, spot.z);
   }
 
   // Mesas: something to land on after a jump.
   for (let tries = 0, count = 0; tries < 90 && count < 3; tries++) {
     const spot = parkSpot(random, s, 52, PARK_HALF - 82, 12, 8);
-    if (!spot || !clearOf(spot.x, spot.z, 40)) continue;
+    if (!spot || !clearOf(spot.x, spot.z, 40) || !loopClear(spot.x, spot.z, 46)) continue;
     pushMesa(mesh, spot.x, spot.z, 13 + random() * 8, 13 + random() * 8,
-      3.4 + random() * 3.2, spot.ground, shade(concrete, 0.96));
+      3.4 + random() * 3.2, spot.ground, shade(concrete, 0.96), heightAt);
     remember(spot.x, spot.z); count += 1;
   }
 
   // Ice rinks: long slides with almost no grip, laid on the flattest ground.
   for (let tries = 0, count = 0; tries < 70 && count < 2; tries++) {
     const spot = parkSpot(random, s, 40, PARK_HALF - 92, 6, 6);
-    if (!spot || !clearOf(spot.x, spot.z, 32)) continue;
+    if (!spot || !clearOf(spot.x, spot.z, 32) || !loopClear(spot.x, spot.z, 34)) continue;
     const radius = 12 + random() * 5;
     pushIce(mesh, spot.x, spot.z, radius, spot.ground, shade([0.72, 0.8, 0.89], 0.96));
     triggers.push({ type: 'surface', grip: 1.3, hw: radius, halfLen: radius,
@@ -1727,20 +1828,22 @@ function freeplayWorld(seed) {
   // Loose kickers, for when the player would rather find their own line.
   for (let tries = 0, count = 0; tries < 60 && count < 6; tries++) {
     const spot = parkSpot(random, s, 44, PARK_HALF - 78, 12, 8);
-    if (!spot || !clearOf(spot.x, spot.z, 30)) continue;
+    if (!spot || !clearOf(spot.x, spot.z, 30) || !loopClear(spot.x, spot.z, 44)) continue;
     pushKicker(mesh, spot.x, spot.z, random() * TAU, 12 + random() * 6,
-      13 + random() * 7, 6 + random() * 4, spot.ground, shade(ramp, 0.9 + random() * 0.2));
+      13 + random() * 7, 6 + random() * 4, spot.ground, shade(ramp, 0.9 + random() * 0.2),
+      heightAt, walls);
     remember(spot.x, spot.z); count += 1;
   }
 
   // Rhythm strips: three kickers in a line, spaced so the ramps do not overlap.
   for (let strip = 0, tries = 0; strip < 2 && tries < 50; tries++) {
     const spot = parkSpot(random, s, 52, PARK_HALF - 96, 22, 8);
-    if (!spot || !clearOf(spot.x, spot.z, 40)) continue;
+    if (!spot || !clearOf(spot.x, spot.z, 40) || !loopClear(spot.x, spot.z, 60)) continue;
     const yaw = random() * TAU, forward = [Math.sin(yaw), 0, Math.cos(yaw)];
     for (let i = 0; i < 3; i++) {
       const x = spot.x + forward[0] * i * 26, z = spot.z + forward[2] * i * 26;
-      pushKicker(mesh, x, z, yaw, 11, 9, 5 + i * 1.2, parkHeight(x, z, s), shade(ramp, 0.98));
+      pushKicker(mesh, x, z, yaw, 11, 9, 5 + i * 1.2, parkHeight(x, z, s), shade(ramp, 0.98),
+        heightAt, walls);
     }
     remember(spot.x, spot.z); strip += 1;
   }
@@ -1750,8 +1853,8 @@ function freeplayWorld(seed) {
   for (let i = 0; i < 3; i++) {
     const angle = random() * TAU, radius = 70 + random() * 80;
     const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
-    if (!insideField(x, z, 50)) continue;
-    pushArch(scenery, x, z, random() * TAU, 24 + random() * 14, 15 + random() * 9,
+    if (!insideField(x, z, 50) || !loopClear(x, z, 40)) continue;
+    pushArch(scenery, walls, x, z, random() * TAU, 24 + random() * 14, 15 + random() * 9,
       parkHeight(x, z, s), shade(concrete, 0.9 + random() * 0.2));
   }
 
@@ -1761,10 +1864,14 @@ function freeplayWorld(seed) {
     const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
     const ground = parkHeight(x, z, s);
     if (random() < 0.55) {
-      pushCone(scenery, [x, ground, z], 1.4 + random() * 3.4, 1.6 + random() * 2.6, shade([0.5, 0.48, 0.45], 0.8 + random() * 0.4));
+      const tall = 1.4 + random() * 3.4, wide = 1.6 + random() * 2.6;
+      pushCone(scenery, [x, ground, z], tall, wide, shade([0.5, 0.48, 0.45], 0.8 + random() * 0.4));
+      pushWallBox(walls, x, z, ground, wide * 0.62, tall * 0.66);
     } else {
+      const trunkH = 3 + random() * 2.6, crownR = 1.8 + random() * 1.6;
       pushBox(scenery, FRAME0, [x, ground + 1.4, z], [0.16, 1.4, 0.16], [0.42, 0.33, 0.24]);
-      pushCone(scenery, [x, ground + 1.4, z], 3 + random() * 2.6, 1.8 + random() * 1.6, shade([0.41, 0.48, 0.31], 0.9 + random() * 0.3));
+      pushCone(scenery, [x, ground + 1.4, z], trunkH, crownR, shade([0.41, 0.48, 0.31], 0.9 + random() * 0.3));
+      pushWallBox(walls, x, z, ground, 0.5, 2.8);
     }
   }
 
@@ -1774,7 +1881,9 @@ function freeplayWorld(seed) {
   const spawn = frame([0, parkHeight(0, 0, s) + 0.1, 0], [0, 0, 1], [0, 1, 0]);
   return {
     id: 'freeplay', name: 'Freeplay', author: 0, layout: 'open', blocks: [],
-    ramps: placed.length, mesh, scenery, rings, ringMesh: ringMeshFor(rings),
+    ramps: placed.length, spots: placed.slice(),
+    loop: { a: [loopEntry.p[0], loopEntry.p[2]], b: [loopExit.p[0], loopExit.p[2]] },
+    mesh, scenery, rings, ringMesh: ringMeshFor(rings),
     triggers, checkpoints: [], finish: null, spawn, end: spawn, chain: [], boxes: []
   };
 }
@@ -1907,15 +2016,19 @@ function stepCar(car, input, dt, mesh) {
     car.slip = 0;
     car.v = add(car.v, mul([0, -CAR.gravity, 0], dt));
     car.v = mul(car.v, 1 - 0.02 * dt);
-    // Air control: yaw with the steering, pitch with throttle and brake.
+    // Air control: yaw with the steering only. Pitching on the throttle used
+    // to spin the chassis past vertical on a long jump, and once its up vector
+    // pointed at the sky no wheel could read a landing, so the car fell
+    // through the ground. Pitch is now explicit input, capped short of that.
+    const upWorld = [0, 1, 0];
     const yaw = -steer * 2.05 * dt;
     let f = rot(car.f, car.u, yaw);
     let u = car.u;
-    const pitch = clamp((gas ? 1 : 0) - (brake ? 1 : 0) + (input.pitch || 0), -1, 1) * 1.5 * dt;
+    const pitch = clamp(input.pitch || 0, -1, 1) * 1.5 * dt;
     if (pitch) {
       const axis = norm(cross(u, f));
-      f = rot(f, axis, pitch);
-      u = rot(u, axis, pitch);
+      const turnF = rot(f, axis, pitch), turnU = rot(u, axis, pitch);
+      if (dot(turnU, upWorld) > 0.16 || dot(turnU, upWorld) > dot(u, upWorld)) { f = turnF; u = turnU; }
     }
     car.f = norm(f);
     car.u = norm(sub(u, mul(car.f, dot(u, car.f))));
@@ -1926,9 +2039,32 @@ function stepCar(car, input, dt, mesh) {
   if (speed > CAR.cap) car.v = mul(car.v, CAR.cap / speed);
   car.p = madd(car.p, car.v, dt);
 
+  catchFall(car, mesh);
   // Walls: the car's box against the wall panels laid down with the track.
   collideWalls(car, mesh && mesh.walls);
   return car;
+}
+
+// The floor gets the last word. A car that has tipped past what its wheels can
+// read, or been shoved under the mesh, is set back down on the surface with its
+// wheels square to it, instead of dropping out of the park.
+function catchFall(car, mesh) {
+  if (!mesh || !mesh.grid || car.grounded) return;
+  const up = [0, 1, 0];
+  const hit = raycast(mesh, madd(car.p, up, 3.2), [0, -1, 0], 9.5);
+  if (!hit || dot(hit.n, up) < 0.25) return;      // a wall face is not a floor
+  const floor = hit.p[1] + CAR.ride;
+  if (car.p[1] > floor + 0.3) return;             // still flying over it
+  car.p = [car.p[0], floor, car.p[2]];
+  const drop = dot(car.v, up);
+  if (drop < 0) car.v = sub(car.v, mul(up, drop));
+  car.u = hit.n;
+  let f = sub(car.f, mul(car.u, dot(car.f, car.u)));
+  if (vlen(f) < 0.05) f = cross(cross(car.u, [0, 0, 1]), car.u);
+  car.f = norm(f);
+  car.grounded = true;
+  car.airTime = 0;
+  car.launch = 0;
 }
 
 // The car's outline in its own plane: [right, forward]. Corners plus side

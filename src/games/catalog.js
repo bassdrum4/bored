@@ -13,8 +13,11 @@
 // four native arcade.js games came after the initial documents but before DEEP.
 // Keep their original NEW-badge chronology (Aim Lab, Connect Four, Memory,
 // 2048) between DEEP and SUMO; NEW_GAMES identifies the implementation type.
-export const ORDER = [["wallbound","Sticky Ninja"],["risk","Risk"],["scrabble","Scrabble"],["basket-random","Basket Random"],["brick-run","Brick Run"],["trackbound","Trackmania"],["ashcrown","Ashcrown"],["typing-test","Typing Test"],["circuit","Circuit"],["transit-chaos","Transit Chaos"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["lights-out","Lights Out"],["deep","DEEP"],["aim-lab","Aim Lab"],["connect-four","Connect Four"],["memory","Memory"],["2048","2048"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["tank2","Tank 2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
-export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://site-c34c9896e1dc43759ac9d67d703052cd.freebuff.page/"};
+export const ORDER = [["krillion","Krillion"],["wallbound","Sticky Ninja"],["risk","Risk"],["scrabble","Scrabble"],["basket-random","Basket Random"],["brick-run","Brick Run"],["trackbound","Trackmania"],["ashcrown","Ashcrown"],["typing-test","Typing Test"],["circuit","Circuit"],["transit-chaos","Transit Chaos"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["lights-out","Lights Out"],["deep","DEEP"],["aim-lab","Aim Lab"],["connect-four","Connect Four"],["memory","Memory"],["2048","2048"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["tank2","Tank 2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
+// Some hosts refuse to be framed (frame-ancestors 'self'), and an iframe
+// would just sit blank. Those open in their own tab instead.
+export const EXTERN_TABS = ["krillion"];
+export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://site-c34c9896e1dc43759ac9d67d703052cd.freebuff.page/", "krillion": "https://krillion.io/"};
 // Offline games with no board of their own: they still play, but the hub keeps
 // no best for them. 8 Ball, Sand and Eco are open-ended toys, so a "high score"
 // only invited comparing two unrelated afternoons.
@@ -24,8 +27,9 @@ export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
-export const FRESH_GAMES = ["wallbound", "risk", "scrabble", "basket-random"];
+export const FRESH_GAMES = ["krillion", "wallbound", "risk", "scrabble"];
 export const META = {
+  "krillion": ["Puzzle", "Seven prompts a day, the same for everyone. Rare answers sink you deeper, obvious ones barely count. A temporary extra, here for a short stay."],
   "wallbound": ["Arcade", "Pull back and launch a little ninja. Stick to walls, ricochet off springs, break glass and clear 20 stages."],
   "risk": ["Strategy", "Conquer the world against up to five computer commanders. Place troops, roll dice, defend borders, and claim continents."],
   "scrabble": ["Puzzle", "Fifteen squares a side, seven tiles in hand. Spell across the board against the computer or a friend."],
