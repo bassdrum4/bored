@@ -1,7 +1,7 @@
 import { request, freshSession, getSession, hasIdentity, ANON_TOKEN } from './backend.js';
 import { readStored, writeStored } from './store.js';
 
-export function createAnnouncementsUI() {
+export function createAnnouncementsUI({ track = () => {} } = {}) {
   const $ = id => document.getElementById(id);
   const make = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -13,6 +13,7 @@ export function createAnnouncementsUI() {
   const stored = readStored(guestKey, []);
   const guestReads = new Set(Array.isArray(stored) ? stored : []);
   let entries = [], accountReads = new Set(), generation = 0, refreshedAt = 0;
+  const seenBannerImpressions = new Set();
   let identity = hasIdentity() ? getSession()?.user?.id : null;
   const current = () => hasIdentity() ? getSession()?.user?.id : null;
   const read = item => (identity ? accountReads : guestReads).has(item.id);
@@ -26,6 +27,7 @@ export function createAnnouncementsUI() {
       const link = make('a', 'Play →');
       link.href = item.link_url;
       link.onclick = () => {
+        track('announcement_click', { surface: 'announcement', action: 'click', announcement_id: item.id });
         if ($('announcement-dialog').open) $('announcement-dialog').close();
       };
       actions.append(link);
@@ -64,6 +66,10 @@ export function createAnnouncementsUI() {
     const banner = $('announcement-banner');
     banner.replaceChildren(...unread.slice(0, 1).map(e => card(e, true)));
     banner.hidden = !unread.length;
+    if (!document.hidden && unread.length && !seenBannerImpressions.has(unread[0].id)) {
+      seenBannerImpressions.add(unread[0].id);
+      track('announcement_impression', { surface: 'announcement', announcement_id: unread[0].id });
+    }
     const list = $('announcement-list');
     list.replaceChildren(...visible.map(e => card(e)));
     if (!visible.length) list.append(make('p', 'No announcements right now.'));
