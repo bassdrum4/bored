@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="240" viewBox="0 0 384 240">
+  <rect width="384" height="240" fill="#f5f2ea"/>
+  <rect x="12" y="12" width="360" height="216" rx="12" fill="#fffdf7" stroke="#d8d2c4"/>
+  <g stroke="#191713" stroke-opacity=".14" stroke-width="1">
+    <path d="M192 54 260 88 192 122 124 88Z" fill="#8fa07a"/>
+    <path d="M124 88 192 122v-2l-68-34Z" fill="#6f7f5c"/>
+    <path d="M260 88 192 122v-2l68-34Z" fill="#7c8d68"/>
+    <path d="M124 88v26l68 34v-26Z" fill="#a98b63"/>
+    <path d="M260 88v26l-68 34v-26Z" fill="#96795a"/>
+    <path d="M148 150 216 184 148 218 80 184Z" fill="#8fa07a"/>
+    <path d="M80 184 148 218v-2l-68-34Z" fill="#6f7f5c"/>
+    <path d="M216 184 148 218v-2l68-34Z" fill="#7c8d68"/>
+    <path d="M216 150 284 184 216 218 148 184Z" fill="#8fa07a"/>
+    <path d="M148 184 216 218v-2l-68-34Z" fill="#6f7f5c"/>
+    <path d="M284 184 216 218v-2l68-34Z" fill="#7c8d68"/>
+  </g>
+  <text x="192" y="42" text-anchor="middle" font-family="monospace" font-size="13" letter-spacing="2" fill="#6b6558">EAGLECRAFT</text>
+</svg>
