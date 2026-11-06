@@ -281,6 +281,11 @@ test('Together production SQL: consent, directory, blocks, moves, duels and rete
     await db.query('select bored_together.cleanup()');await assert.rejects(call(db,a,'match',{match_id:m.id}),/unavailable/);
   });
   await t.test('the directory has its own server-enforced budget',async()=>{
+    // The budget is a clock-aligned 60 s window. If the 31 calls straddle a minute
+    // boundary they fall into two windows and the 31st is correctly allowed, which
+    // failed this test about 1 run in 500 (run #334). Start just after a boundary.
+    const left=60-(Date.now()/1000)%60;
+    if(left<5)await new Promise(r=>setTimeout(r,(left+0.5)*1000));
     await db.query("delete from bored_together.limits where user_id=$1",[e]);
     for(let n=0;n<30;n++)await call(db,e,'people');
     await assert.rejects(call(db,e,'people'),/Too many/);
