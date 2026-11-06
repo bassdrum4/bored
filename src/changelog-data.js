@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 314,
+  "count": 315,
   "newest": "2026-11-06",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"86e2e2a","date":"2026-11-06","author":"Codebuff","subject":"Hold the car's attitude in the air, drop the Krillion extra"},
   {"sha":"eee5bfa","date":"2026-11-06","author":"Codebuff","subject":"Fix the freeplay park's collision and clear the loop, add Krillion"},
   {"sha":"47f65cf","date":"2026-11-06","author":"Codebuff","subject":"Rebuild Trackmania freeplay as a stunt park with ring course"},
   {"sha":"a519795","date":"2026-11-06","author":"PenguinV360","subject":"Implement online game submission and state handling"},
