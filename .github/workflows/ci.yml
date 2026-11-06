@@ -12,7 +12,9 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned to the current LTS image: `ubuntu-latest` is mid-rollout to 26.04
+    # (Oct 19 – Nov 19, 2026), and browser runs flip between images otherwise.
+    runs-on: ubuntu-24.04
     # Headless Chrome startup can occasionally fail; fail rather than hang.
     timeout-minutes: 10
     steps:
@@ -27,7 +29,7 @@ jobs:
         run: npm test
 
   together-postgres:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     services:
       postgres:
