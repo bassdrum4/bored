@@ -4,7 +4,7 @@ import { DEVELOPER_NOTES } from '../games/developer-notes.js';
 import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scores.js';
 import { writeStored } from './store.js';
 
-export function createLibraryView({ state, openGame, saveLibrary }) {
+export function createLibraryView({ state, openGame, saveLibrary, track = () => {} }) {
 const $ = selector => document.querySelector(selector);
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -14,6 +14,41 @@ function element(tag, className, text) {
 }
 const searchInput = $('#q');
 const gameGrid = $('#grid');
+
+// Measure genuine card visibility, not catalog rendering or search results.
+// One 750ms impression per game/surface per page view. No scroll paths or text.
+const seenImpressions = new Set();
+const impressionObservers = new Map();
+function watchImpressions(nodes, surface) {
+  impressionObservers.get(surface)?.disconnect();
+  if (typeof IntersectionObserver !== 'function') return;
+  const observer = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting || entry.intersectionRatio < 0.5 || document.hidden) continue;
+      const node = entry.target, slug = node.dataset.slug;
+      const key = surface + ':' + slug;
+      if (!slug || seenImpressions.has(key) || node.dataset.pendingImpression) continue;
+      node.dataset.pendingImpression = '1';
+      setTimeout(() => {
+        delete node.dataset.pendingImpression;
+        if (!node.isConnected || document.hidden || seenImpressions.has(key)) return;
+        const rect = node.getBoundingClientRect();
+        const visibleWidth = Math.max(0, Math.min(rect.right, innerWidth) - Math.max(rect.left, 0));
+        const visibleHeight = Math.max(0, Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0));
+        if (visibleWidth * visibleHeight < rect.width * rect.height * 0.5) return;
+        seenImpressions.add(key);
+        track('card_impression', { game: slug, surface,
+          position: Math.max(0, Math.min(99, Number(node.dataset.position) || 0)) });
+        observer.unobserve(node);
+      }, 750);
+    }
+  }, { threshold: [0.5] });
+  nodes.forEach((node, index) => {
+    node.dataset.position = String(index + 1);
+    observer.observe(node);
+  });
+  impressionObservers.set(surface, observer);
+}
 
 // These notes are separate from the regular game descriptions.
 function closeDeveloperNotes() {
@@ -168,6 +203,7 @@ function renderRecent() {
     (EXTERNS[slug] ? 'Online extra · ' : '') + (state.recentGames.includes(slug)
       ? (state.favorites.has(slug) ? 'Favorite · Recently played' : 'Recently played')
       : 'Favorite'))));
+  watchImpressions([...$('#recent-list').querySelectorAll('.shelf-play')], 'recent');
   $('#favorites-all').hidden = !state.favorites.size;
   $('#favorites-all').textContent = 'Browse ' + state.favorites.size + (state.favorites.size === 1 ? ' favorite' : ' favorites') + ' →';
   $('#recent-empty').hidden = shown.length > 0;
@@ -221,6 +257,7 @@ function renderLibrary() {
       if (state.favorites.has(slug)) state.favorites.delete(slug);
       else state.favorites.add(slug);
       state.favoriteEvents[slug] = { saved: state.favorites.has(slug), at: Date.now() };
+      track('favorite_change', { game: slug, surface: 'library', action: state.favorites.has(slug) ? 'add' : 'remove' });
       writeStored('bored.favoriteEvents', state.favoriteEvents);
       saveLibrary();
       updateStar();
@@ -245,6 +282,7 @@ function renderLibrary() {
     gameGrid.appendChild(row);
   }
 
+  watchImpressions([...gameGrid.querySelectorAll('.card')], 'library');
   $('#empty').hidden = state.visibleGames.length > 0;
   $('#empty').textContent = state.category === 'Favorites' && !state.favorites.size
     ? 'No favorites yet. Tap the star on any game and it lands here.'
