@@ -16,14 +16,14 @@ create index if not exists product_events_kind_time_idx
   on public.product_events(kind,received_at);
 
 create table if not exists public.analytics_non_school_dates (
-  day date primary key,
+  calendar_date date primary key,
   label text not null check (char_length(label) between 1 and 100)
 );
 alter table public.analytics_non_school_dates enable row level security;
 revoke all on public.analytics_non_school_dates from public,anon,authenticated;
-insert into public.analytics_non_school_dates(day,label)
+insert into public.analytics_non_school_dates(calendar_date,label)
 values ('2026-11-03','No school')
-on conflict (day) do nothing;
+on conflict (calendar_date) do nothing;
 
 create or replace function public.analytics_rollup_v1(
   p_from timestamptz, p_to timestamptz
@@ -103,8 +103,8 @@ begin
         coalesce(round(percentile_cont(0.5) within group(order by active_ms))::bigint,0) median_active_ms
       from sessions group by game
     ) g),'[]'::jsonb),
-    'days',coalesce((select jsonb_agg(to_jsonb(d) order by d.day) from (
-      select (first_at at time zone 'America/Detroit')::date day,
+    'days',coalesce((select jsonb_agg(to_jsonb(d) order by d.activity_date) from (
+      select (first_at at time zone 'America/Detroit')::date AS activity_date,
         count(*) filter(where started) launches,count(*) filter(where active_ms>=60000 or finished) meaningful,
         coalesce(sum(active_ms),0) active_ms,
         count(distinct visitor_key) browsers
@@ -117,7 +117,7 @@ begin
       from sessions group by 1
     ) s),'[]'::jsonb),
     'ui_events',coalesce((select jsonb_agg(to_jsonb(e) order by e.events desc) from (
-      select kind,game,details->>'surface' surface,details->>'action' action,
+      select kind,game,details->>'surface' surface,details->>'action' AS action_name,
         count(*) events,count(distinct visitor_id) browsers
       from clean_ui group by 1,2,3,4
     ) e),'[]'::jsonb),
@@ -170,7 +170,7 @@ begin
       (select min((f.first_day + g.n)::date) from generate_series(1,14) g(n)
         where extract(isodow from (f.first_day + g.n)::date) <= 5
           and not exists (select 1 from public.analytics_non_school_dates h
-            where h.day=(f.first_day + g.n)::date)) as next_school
+            where h.calendar_date=(f.first_day + g.n)::date)) as next_school
       from first_visits f
     where f.first_day >= (p_from at time zone 'America/Detroit')::date
       and f.first_day < (p_to at time zone 'America/Detroit')::date
