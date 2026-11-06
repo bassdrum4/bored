@@ -84,7 +84,11 @@ class Random {
  index(n){return Math.floor(this.next()*n)}
 }
 class World {
- constructor(seed){this.seed=seed>>>0;this.width=GW/CELL;this.height=GH/CELL;this.data=new Uint8Array(this.width*this.height);this.dirty=true;this.generate()}
+ constructor(seed){this.seed=seed>>>0;
+   // The grid width must be a whole number of cells: idx() multiplies it, and a
+   // fractional width writes to Uint8Array indices that do not exist, which
+   // silently shears the terrain into diagonal stripes.
+   this.width=Math.max(1,Math.round(GW/CELL));this.height=Math.max(1,Math.round(GH/CELL));this.data=new Uint8Array(this.width*this.height);this.dirty=true;this.generate()}
  idx(gx,gy){return gy*this.width+gx}
  generate(){
    let phase=(this.seed%997)/997;
@@ -572,7 +576,7 @@ class TankGame {
 
 // -- BROWSER BEGIN --
 const page=document.getElementById('page'),arena=document.getElementById('arena'),canvas=document.getElementById('scene'),ctx=canvas.getContext('2d');
-const tempCanvas=document.createElement('canvas');tempCanvas.width=GW/CELL;tempCanvas.height=GH/CELL;const tc=tempCanvas.getContext('2d',{willReadFrequently:true});
+const tempCanvas=document.createElement('canvas');tempCanvas.width=Math.round(GW/CELL);tempCanvas.height=Math.round(GH/CELL);const tc=tempCanvas.getContext('2d',{willReadFrequently:true});
 const $=id=>document.getElementById(id);
 let game=null,muted=false,audio=null,pressed=new Set(),accumulator=0,lastTime=0,shake=0,uiHitCooldown=0,drawScale=1,geo={x:0,y:0,scale:1};
 let messages=['THAT WAS THE MENU.','THAT IS NOT THE ENEMY.','THE WALL WAS HOLDING THINGS TOGETHER.','VERY GOOD. NOW THE BUTTON.','THE INTERFACE OBJECTS.'];
@@ -591,7 +595,10 @@ function resize(){const r=page.getBoundingClientRect(),a=arena.getBoundingClient
   // the world grows to the viewport at the current scale, so every visible
   // pixel is drivable ground and nothing is hidden at a margin.
   const scale=a.height>80?a.height/GH:1;
-  const worldWidth=window.__boredTogether?ONLINE_GW:Math.max(360,Math.round(a.width/scale));
+  // Snap the world to whole cells: GW/CELL has to be an integer or the
+  // destructible grid shears (see the World constructor).
+  const rawWidth=window.__boredTogether?ONLINE_GW:Math.max(360,Math.round(a.width/scale));
+  const worldWidth=Math.max(CELL,rawWidth-rawWidth%CELL);
   if(worldWidth!==GW){GW=worldWidth;if(game)game.resizeWorld()}
   geo={x:a.left-r.left,y:a.top-r.top,scale,width:r.width,height:r.height};
 }
