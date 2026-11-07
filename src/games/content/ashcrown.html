@@ -423,6 +423,8 @@
   .pathdot { fill: var(--panel); stroke: var(--ink); stroke-width: 1.5; pointer-events: none }
   .pathlabel { font: 10px/1 var(--font-data); fill: var(--ink); pointer-events: none }
   .pathlabel-bg { fill: var(--panel); stroke: var(--rule); stroke-width: .8; opacity: .95 }
+  .pathlabel-bg.war { stroke: var(--rust) }
+  .pathlabel.war { fill: var(--rust) }
   .cont { fill: none; stroke: rgba(36,28,18,.42); stroke-width: 1; stroke-dasharray: 2.5 2.5; pointer-events: none }
   .label { font: 10px/1 var(--font-data); pointer-events: none; letter-spacing: .03em }
   #layer-coast, #layer-marks, #layer-border, #layer-sites, #layer-units, #layer-overlay,
@@ -1060,7 +1062,11 @@ function knownName(viewer, i, short) {
 // Log lines are shared by everyone at the table, so a name is stored as a marker and turned into
 // text for whoever reads the line. Older saves keep the names they already hold.
 const nameMark = (f, short) => '' + (short ? 'n' : 'p') + f.i + '';
-const logText = (text, viewer) => String(text).replace(/([pn])(\d+)/g, (all, kind, i) => knownName(viewer, Number(i), kind === 'n'));
+// The civ's own name for a line like "Japan captured a China settler": the land, or "Unmet player".
+const civMark = f => 'c' + f.i + '';
+const knownLand = (viewer, i) => (pl(i) && knows(viewer, i) ? CIVS[pl(i).civ].land : UNMET);
+const logText = (text, viewer) => String(text).replace(/([pnc])(\d+)/g, (all, kind, i) =>
+  kind === 'c' ? knownLand(viewer, Number(i)) : knownName(viewer, Number(i), kind === 'n'));
 // The civ's unique, whatever kind of thing it is: { name, blurb }.
 function civUnique(id) {
   const key = CIVS[id] && CIVS[id].unique;
@@ -2607,11 +2613,12 @@ function builderAct(u, act) {
 
 function addUnit(f, type, x, y, home) {
   const u = { id: 'u' + G.nextUnit++, type, owner: f.i, x, y, hp: 100, mp: 0, acted: false, moved: false, home: home || null };
-  const def = UNITS[type];
-  if (def.charges) u.charges = def.charges + (!isMil(type) && civIs(f.i, 'usa') ? 1 : 0);
+  if (UNITS[type].charges) u.charges = chargesFor(f.i, type);
   G.units.push(u);
   return u;
 }
+// What a fresh builder of this kind holds: its charges, and one more for the USA.
+const chargesFor = (i, type) => (UNITS[type].charges || 0) + (UNITS[type].charges && !isMil(type) && civIs(i, 'usa') ? 1 : 0);
 function removeUnit(u) {
   const i = G.units.indexOf(u);
   if (i >= 0) G.units.splice(i, 1);
@@ -2659,19 +2666,20 @@ function canPass(u, x, y) {
   if (c && c.owner !== u.owner) return false;
   return !G.units.some(o => o.x === x && o.y === y && o.owner !== u.owner);
 }
-// Ending a move on a tile: 1 military and 1 civilian per tile. A military unit
-// may end on an enemy civilian standing alone, which captures it.
-function canStop(u, x, y) {
+// Ending a move on a tile: 1 military and 1 civilian per tile. A land military
+// unit may end on an enemy civilian standing alone, which captures it (ships can't).
+// foe: a player to treat as an enemy, to ask what an order would do at war with them.
+function canStop(u, x, y, foe) {
   const c = cityAt(x, y);
   if (c && c.owner !== u.owner) return false;
-  const mil = isMil(u.type);
+  const mil = isMil(u.type), land = mil && !isNaval(u.type);
   for (const o of G.units) {
     if (o.x !== x || o.y !== y || o.id === u.id) continue;
     if (o.owner === u.owner) {
       if (isMil(o.type) === mil) return false;
       continue;
     }
-    if (!(mil && !isMil(o.type) && atWar(u.owner, o.owner))) return false;
+    if (!(land && !isMil(o.type) && (atWar(u.owner, o.owner) || o.owner === foe))) return false;
   }
   return true;
 }
@@ -2679,12 +2687,13 @@ function canStop(u, x, y) {
 // out.war holds the hexes of closed land a human may step onto at the price of
 // war (a confirm box asks first). CPUs never cross closed borders by accident:
 // a CPU at war with someone already walks their land freely.
-function computeReachable(u) {
+// foe: a player to treat as an enemy, the way an order would play out once war is declared on them.
+function computeReachable(u, foe) {
   const out = new Map();
   out.war = new Set();
   if (u.mp <= 0 || u.pinned) return out;
   const human = !G.watch && pl(u.owner).human;
-  const zoc = zocFor(u);
+  const zoc = zocFor(u, foe);
   const startKey = keyOf(u.x, u.y);
   const best = new Map([[startKey, 0]]);
   const queue = [[u.x, u.y, 0]];
@@ -2697,9 +2706,10 @@ function computeReachable(u) {
       if (!isFinite(total) || total > u.mp) continue;
       const k = keyOf(nx, ny);
       if (best.has(k) && best.get(k) <= total) continue;
-      const pass = canPass(u, nx, ny), stop = canStop(u, nx, ny);
+      const pass = canPass(u, nx, ny), stop = canStop(u, nx, ny, foe);
       if (!pass && !stop) continue;
-      const shut = closedOwner(u.owner, nx, ny);
+      let shut = closedOwner(u.owner, nx, ny);
+      if (shut === foe) shut = -1;   // their land is no wall once the war is on
       if (shut >= 0) {
         if (!human || !stop || !hasMet(u.owner, shut)) continue;
         best.set(k, total);
@@ -2716,14 +2726,31 @@ function computeReachable(u) {
   return out;
 }
 
+// A soldier takes a civilian standing alone. A settler (or Pioneer) comes over as a builder of
+// the captor's own kind with that kind's full charges; a builder keeps the charges it has left,
+// up to what the captor's kind holds. The captor uses up its moves, and the loser gets a card.
 function captureCivilian(o, by) {
-  const from = pl(o.owner), to = pl(by.owner);
+  const from = pl(o.owner), to = pl(by.owner), was = o.type;
+  const near = byDistance(o, ownCities(from.i))[0] || null;
+  const at = [o.x, o.y];
   o.owner = by.owner;
   o.home = null;
   o.path = null;
+  o.goal = null;
+  o.fort = false;
+  o.sleep = false;
+  o.pinned = false;
+  if (!isMil(was) && (UNITS[was].founds || UNITS[was].charges)) {
+    o.type = unitFor(to.i, 'builder');
+    const max = chargesFor(to.i, o.type);
+    o.charges = UNITS[was].founds || !(o.charges > 0) ? max : Math.min(o.charges, max);
+  }
   o.mp = 0;
   o.acted = true;
-  log(nameMark(to, true) + ' captures a ' + nameMark(from, true) + ' ' + UNITS[o.type].name.toLowerCase() + '.', to.ink, null);
+  by.mp = 0;
+  log(civMark(to) + ' captured a ' + civMark(from) + ' ' + UNITS[was].name.toLowerCase() +
+    (o.type !== was ? ' (now a ' + UNITS[o.type].name.toLowerCase() + ').' : '.'), to.ink, null);
+  pushNews({ i: from.i, kind: 'captured', unit: was, by: to.i, at, near: near ? near.name : '' });
 }
 
 function moveUnit(u, x, y, reach) {
@@ -2755,7 +2782,7 @@ function moveUnit(u, x, y, reach) {
 // the hex before it on the cheapest road. Humans only route over land they
 // have seen. Hexes a unit may enter but not pass through (a lone enemy
 // civilian worth capturing) can only sit at the end of a route.
-function computePaths(u) {
+function computePaths(u, foe) {
   const home = keyOf(u.x, u.y);
   const best = new Map([[home, 0]]);
   const prev = new Map();
@@ -2771,8 +2798,9 @@ function computePaths(u) {
       if (seen && !seen[ny * G.cols + nx]) continue;
       const cost = moveCost(u, nx, ny, x, y);
       if (!isFinite(cost)) continue;
-      if (closedOwner(u.owner, nx, ny) >= 0) continue;   // routes go around closed land
-      const pass = canPass(u, nx, ny), stop = canStop(u, nx, ny);
+      const shut = closedOwner(u.owner, nx, ny);
+      if (shut >= 0 && shut !== foe) continue;   // routes go around closed land
+      const pass = canPass(u, nx, ny), stop = canStop(u, nx, ny, foe);
       if (!pass && !stop) continue;
       const total = spent + cost;
       const k = keyOf(nx, ny);
@@ -2952,13 +2980,14 @@ function atkStrength(u, target) {
 }
 
 // What sits on a tile from this unit's point of view: something to fight,
-// something it is at peace with, or nothing.
-function targetAt(u, x, y) {
+// something it is at peace with, or nothing. foe: a player to treat as an enemy.
+function targetAt(u, x, y, foe) {
   if (!isMil(u.type)) return null;
+  const war = o => atWar(u.owner, o) || o === foe;
   const c = cityAt(x, y);
-  if (c && c.owner !== u.owner) return atWar(u.owner, c.owner) ? { city: c } : { peace: c.owner };
+  if (c && c.owner !== u.owner) return war(c.owner) ? { city: c } : { peace: c.owner };
   const enemy = G.units.find(o => o.x === x && o.y === y && o.owner !== u.owner && isMil(o.type));
-  if (enemy) return atWar(u.owner, enemy.owner) ? { unit: enemy } : { peace: enemy.owner };
+  if (enemy) return war(enemy.owner) ? { unit: enemy } : { peace: enemy.owner };
   return null;
 }
 
@@ -2970,9 +2999,9 @@ function canTakeCity(u) {
   return isNaval(u.type) ? civIs(u.owner, 'norway') : !shoots(u.type);
 }
 
-function strikeInfo(u, x, y) {
+function strikeInfo(u, x, y, foe) {
   if (!isMil(u.type) || u.acted || u.mp <= 0) return null;
-  const tgt = targetAt(u, x, y);
+  const tgt = targetAt(u, x, y, foe);
   if (!tgt || tgt.peace !== undefined) return null;
   const dist = hexDistance(u.x, u.y, x, y);
   const ranged = shoots(u.type);
@@ -3742,7 +3771,15 @@ function endCurrentTurn() {
   advanceTurns();
 }
 
-const idleUnits = i => ownUnits(i).filter(u => u.mp > 0 && !u.acted && !u.path && !u.fort && !u.sleep);
+// A march with steps left. Such a unit walks on by itself at the start of each turn.
+const marching = u => !!(u && u.path && u.path.steps && u.path.steps.length);
+// Units that still need orders: moves left, and not marching, fortified or asleep.
+const idleUnits = i => ownUnits(i).filter(u => u.mp > 0 && !u.acted && !marching(u) && !u.fort && !u.sleep);
+// The unit "next unit" goes to: the idle one after this one, wrapping round (the first when this one isn't idle).
+function nextIdle(i, from) {
+  const idle = idleUnits(i);
+  return idle.length ? idle[(from ? idle.indexOf(from) + 1 : 0) % idle.length] : null;
+}
 const idleCities = i => ownCities(i).filter(c => !c.build);
 const needsTech = i => !pl(i).research && researchChoices(i).length > 0;
 /* ── CPU players ───────────────────────────────────────────────────────────── */
@@ -4182,6 +4219,22 @@ function aiBuilder(f, u) {
   if (now) builderAct(u, now);
 }
 
+// At war, a soldier that can walk onto a lone enemy civilian this turn takes it, settlers first,
+// unless it would end the turn beside an enemy soldier stronger than itself. Ships never do.
+function aiTryCapture(f, u) {
+  if (!isMil(u.type) || isNaval(u.type) || u.mp <= 0 || u.pinned) return false;
+  const power = o => Math.max(UNITS[o.type].str, UNITS[o.type].rs || 0) * o.hp / 100;
+  const reach = computeReachable(u);
+  let best = null, bestV = -Infinity;
+  for (const o of G.units) {
+    if (o.owner === f.i || isMil(o.type) || !atWar(f.i, o.owner) || !reach.has(keyOf(o.x, o.y)) || !lonePrey(u, o.x, o.y)) continue;
+    const feared = G.units.some(e => e.owner !== f.i && isMil(e.type) && atWar(f.i, e.owner) && hexDistance(e.x, e.y, o.x, o.y) <= 1 && power(e) > power(u));
+    const v = (UNITS[o.type].founds ? 100 : 50) - reach.get(keyOf(o.x, o.y));
+    if (!feared && v > bestV) { bestV = v; best = o; }
+  }
+  return !!best && moveUnit(u, best.x, best.y, reach);
+}
+
 function aiSoldier(f, u) {
   if (aiTryStrike(f, u)) return;
   const onCity = cityAt(u.x, u.y);
@@ -4202,6 +4255,7 @@ function aiSoldier(f, u) {
   }
   // Every city keeps one unit at home.
   if (garrison) return;
+  if (aiTryCapture(f, u)) return;
   const empty = byDistance(u, ownCities(f.i).filter(c => !milAt(c.x, c.y) && !G.units.some(o => o !== u && o.owner === f.i &&
     o.goal && o.goal[0] === c.x && o.goal[1] === c.y && isMil(o.type))))[0];
   if (empty && hexDistance(u.x, u.y, empty.x, empty.y) <= 8) {
@@ -4893,6 +4947,12 @@ function showNews() {
       (G.closeTurn && !G.tut && G.turn < G.closeTurn ? ' Their borders close on turn ' + G.closeTurn + '.' : '') + '</p>' +
       (n.pts ? '<p class="moment">Historic moment: ' + pts(n.pts) + (n.first ? ', double for being first in the world' : '') + '.</p>' : '');
     go = '<button class="btn" data-act="council">Open Council</button>';
+  } else if (n.kind === 'captured') {
+    // A soldier took one of your civilians. The war card's look, with the civilian on it.
+    const name = UNITS[n.unit].name;
+    title = name + ' captured'; sub = esc(knownLand(G.viewer, n.by)); kind = 'News'; art = medalArt(iconOf(n.unit), 'alert');
+    text = '<p><b>' + esc(knownName(G.viewer, n.by)) + '</b> captured your ' + esc(name.toLowerCase()) + (n.near ? ' near ' + esc(n.near) : '') + '.</p>';
+    go = '<button class="btn" data-act="news-look:' + n.at[0] + ':' + n.at[1] + '">Show me</button>';
   } else {
     const by = n.by === undefined ? null : pl(n.by), who = by ? esc(knownName(G.viewer, by.i)) : '';
     kind = 'News'; art = medalArt(NEWS_ICON[n.type], 'alert');
@@ -5040,7 +5100,7 @@ function tickVoyage(f) {
 // anyone it is at war with. Land units only claim land hexes and ships only
 // water; a city claims both. Horse units ride straight through. null when
 // there's nothing in the way.
-function zocFor(u) {
+function zocFor(u, foe) {
   if (UNITS[u.type].horse) return null;
   let set = null;
   const add = (x, y, water) => {
@@ -5050,11 +5110,12 @@ function zocFor(u) {
       (set = set || new Set()).add(keyOf(nx, ny));
     }
   };
+  const foes = o => atWar(u.owner, o) || o === foe;
   for (const o of G.units) {
-    if (o.owner === u.owner || !isMil(o.type) || !atWar(u.owner, o.owner)) continue;
+    if (o.owner === u.owner || !isMil(o.type) || !foes(o.owner)) continue;
     add(o.x, o.y, !!UNITS[o.type].naval);
   }
-  for (const c of G.cities) if (c.owner !== u.owner && atWar(u.owner, c.owner)) add(c.x, c.y, null);
+  for (const c of G.cities) if (c.owner !== u.owner && foes(c.owner)) add(c.x, c.y, null);
   return set;
 }
 // Ringed: every hex around the city is held or covered by its enemies, so it
@@ -5998,17 +6059,21 @@ function renderPathLayer() {
     }
   }
   if (preview && selection && selection.kind === 'unit' && preview.unit === selection.id) {
-    const u = unitById(preview.unit);
+    const u = unitById(preview.unit), cap = preview.cap;
     if (u) {
-      const last = preview.steps[preview.steps.length - 1];
-      out.push(pathLineGeo([[u.x, u.y]].concat(preview.steps), 'pathline'));
-      const line = linePoints([[u.x, u.y]].concat(preview.steps));
-      const [dx, dy] = line[line.length - 1];
-      out.push('<circle class="pathdot" cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="5.5"/>');
-      const label = preview.turns <= 1 ? 'this turn' : plural(preview.turns, 'turn', 'turns');
-      const w = label.length * 6 + 12;
-      out.push('<rect class="pathlabel-bg" x="' + (dx - w / 2).toFixed(1) + '" y="' + (dy - 31).toFixed(1) + '" width="' + w + '" height="13" rx="2"/>' +
-        '<text class="pathlabel" x="' + dx.toFixed(1) + '" y="' + (dy - 21.5).toFixed(1) + '" text-anchor="middle">' + label + '</text>');
+      const pts = [[u.x, u.y]].concat(preview.steps);
+      const line = linePoints(pts);
+      const [dx, dy] = preview.steps.length ? line[line.length - 1] : hexCenter(cap.x, cap.y);
+      if (preview.steps.length) {
+        out.push(pathLineGeo(pts, 'pathline'));
+        out.push('<circle class="pathdot" cx="' + dx.toFixed(1) + '" cy="' + dy.toFixed(1) + '" r="5.5"/>');
+      }
+      // A civilian this soldier could capture is marked like something to attack.
+      if (cap) out.push('<path class="threat" d="' + polyPath(hexCorners(dx, dy, HEX_R - 3)) + '"/>');
+      const label = cap ? cap.label : preview.turns <= 1 ? 'this turn' : plural(preview.turns, 'turn', 'turns');
+      const w = label.length * 6 + 12, war = cap ? ' war' : '';
+      out.push('<rect class="pathlabel-bg' + war + '" x="' + (dx - w / 2).toFixed(1) + '" y="' + (dy - 31).toFixed(1) + '" width="' + w + '" height="13" rx="2"/>' +
+        '<text class="pathlabel' + war + '" x="' + dx.toFixed(1) + '" y="' + (dy - 21.5).toFixed(1) + '" text-anchor="middle">' + esc(label) + '</text>');
     }
   }
   UI.layerPath.innerHTML = tripled(out.join(''));
@@ -6023,9 +6088,20 @@ function refreshPreview() {
     if (u && u.owner === G.viewer && (hover[0] !== u.x || hover[1] !== u.y)) {
       const seen = G.seen[G.viewer];
       if (seen[hover[1] * G.cols + hover[0]]) {
-        const paths = computePaths(u);
-        const steps = pathTo(paths, u, hover[0], hover[1]);
-        if (steps) preview = { unit: u.id, steps, turns: pathTurns(u, steps, u.mp) };
+        const [x, y] = hover;
+        // A civilian standing alone that this soldier could capture. At peace that has to be a walk
+        // this turn, and the label says it means war.
+        let prey = visibleTo(x, y) ? lonePrey(u, x, y) : null;
+        if (prey && !hasMet(u.owner, prey.owner)) prey = null;
+        const peace = !!prey && !atWar(u.owner, prey.owner);
+        if (peace && !captureAt(u, x, y)) prey = null;
+        const steps = pathTo(computePaths(u, prey && peace ? prey.owner : undefined), u, x, y);
+        if (prey && !peace && !steps) prey = null;
+        const turns = steps ? pathTurns(u, steps, u.mp) : 1;
+        if (steps || prey) {
+          preview = { unit: u.id, steps: steps || [], turns, cap: prey ? { x, y, label: 'Capture ' + UNITS[prey.type].name +
+            (peace ? ' (means war)' : turns > 1 ? ' · ' + plural(turns, 'turn', 'turns') : '') } : null };
+        }
       }
     }
   }
@@ -6052,6 +6128,10 @@ const tutorialDone = () => !!readPrefs().tutorialDone;
 let popupsSwitch = null;   // this visit's setting when storage is blocked
 const popupsOn = () => (popupsSwitch !== null ? popupsSwitch : readPrefs().popups !== false);
 function setPopups(on) { popupsSwitch = on; writePref('popups', on); }
+// After an order uses up a unit's turn: jump to the next unit that needs orders (on), or let go (off).
+let jumpSwitch = null;   // this visit's setting when storage is blocked
+const jumpOn = () => (jumpSwitch !== null ? jumpSwitch : readPrefs().jump !== false);
+function setJump(on) { jumpSwitch = on; writePref('jump', on); }
 
 /* ── the tutorial island ───────────────────────────────────────────────────── */
 
@@ -7766,8 +7846,7 @@ function refreshTradeForm(setPrice) {
 function askWar(i) {
   const o = pl(i);
   openModal(modalHead('Declare war on ' + esc(fullName(o)) + '?') +
-    '<div class="modal-body"><p>Your units can attack theirs right away, and theirs can attack yours on their turn. ' +
-    'Peace needs both sides to agree.</p></div>' +
+    '<div class="modal-body"><p>' + WAR_NOTE + '</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Stay at peace</button>' +
     '<button class="btn primary" data-act="war:' + i + '">Declare war</button></div>', true);
 }
@@ -7813,6 +7892,7 @@ function showMenu() {
       : '<button class="act" data-act="tut-start">Play the tutorial</button>') +
     '<button class="act switch" data-act="tips-toggle">Tips in my games<b>' + (tipsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="popups-toggle">Event popups<b>' + (popupsOn() ? 'on' : 'off') + '</b></button>' +
+    '<button class="act switch" data-act="jump-toggle">Jump to the next unit after orders<b>' + (jumpOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="anim-next">Animation<b>' + ANIM_LEVELS[currentAnim()] + '</b></button>' +
     (G.tut || online || G.over ? '' : '<button class="act" data-act="slots:save">Save game</button>') +
     (G.tut || online || G.over || !currentSlot || !slotHead(currentSlot) ? '' :
@@ -7871,12 +7951,14 @@ function showHelp() {
     'Everyone you meet starts at peace. CPUs follow the same rules.</p>' +
     '<h3>Borders and the Council</h3><p>From the turn set at the start (30 by default), every player’s land is closed to the others. Stepping onto it without an open-borders deal means war, and you are asked first. ' +
     'Units caught inside when the borders close are moved out at the start of their turn. Ask for open borders in the Council: a deal lasts ' + OPEN_TURNS + ' turns.</p>' +
+    '<h3>Declaring war with an order</h3><p>You don’t have to go to the Council. Order a soldier to attack another player’s unit or city, or to walk onto a civilian of theirs, while you are at peace, and you are asked first: “Declare war on …?”. Say yes and war starts, then the order is carried out; say no and nothing changes. A target too far away this turn never asks, and a civ you haven’t met can’t be targeted.</p>' +
     '<h3>Trading</h3><p>Horses, iron and gunpowder can be bought and sold in the Council, for production. The resource changes hands at once; the buyer pays in one go or in installments (5 a turn for 10 turns, say). ' +
     'Only war cancels a deal: if the buyer starts it, everything still owed is paid on the spot; if the seller does, the payments stop. Production never trades for production, and a payment can’t top what the payer’s best city makes in a turn. CPUs price by supply and demand.</p>' +
     '<h3>Builders</h3><p>3 charges, each one instant, inside your borders only: farms on flat land and wheat, mines on hills and iron (Mining), pastures on horses (Animal Husbandry), ' +
     'fishing boats on seafood (Sailing). Chop a forest for 20 production or harvest wheat or seafood for 20 food. Builders can wade onto shallow water to reach seafood.</p>' +
     '<h3>Moving</h3><p>Hills and forest cost 2 moves, mountains are impassable, and a paved road hex costs half a move. Land units can step onto shallow water; deep sea needs Navigation. ' +
-    'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Walking onto an enemy civilian standing alone captures it.</p>' +
+    'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Any land soldier (melee, ranged, scout or siege) captures an enemy civilian standing alone by walking onto it; ships can’t. A captured settler comes over as a builder of your own kind, a captured builder keeps the charges it has left (up to what yours holds), and the soldier uses up its moves. ' +
+    'The player who lost it gets a card.</p>' +
     '<h3>Longer marches</h3><p>With a unit selected, click any hex you have seen, even turns away: the unit walks as far as it can this turn and keeps going at the start of each turn until it arrives. ' +
     'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off.</p>' +
     '<h3>Zone of control</h3><p>Like Civ: at war, every hex next to an enemy military unit or city is in its zone of control (land units cover land, ships cover water, cities both). ' +
@@ -7905,7 +7987,7 @@ function showHelp() {
     'The Realm panel lists them all. Other cards warn you when someone declares war on you, takes one of your cities or launches a science trip, and when the borders close. ' +
     'Turn Event popups off in Options (or the Menu) and the points still count.</p>' +
     '<h3>Keys</h3><p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
-    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
+    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
     '</div><div class="modal-foot"><button class="btn" data-act="civs">All 16 civs</button><button class="btn primary" data-act="close">Close</button></div>');
 }
 
@@ -7938,6 +8020,27 @@ function afterAction() {
   checkWin();
   render();
   autosave();
+}
+// A unit that has finished its orders (gone, marching, or out of moves) lets go of the selection:
+// to the next unit that needs orders, or to nothing when the setting is off or nobody does.
+// A unit with moves left and no march stays selected, like Civ 6. This never opens a city, the
+// tech tree or the end-turn box; Enter still does that. Nothing here moves on its own clock:
+// the game has no move or attack animation to wait for, so the jump is immediate.
+function doneWithUnit(u) {
+  if (!G || !u) return;
+  if (selection && !(selection.kind === 'unit' && selection.id === u.id)) return;   // the player looked elsewhere
+  if (G.units.includes(u) && u.mp > 0 && !marching(u)) return;
+  selection = null;
+  reachable = null;
+  const next = jumpOn() && myTurn() ? nextIdle(G.viewer, u) : null;
+  if (!next) return;
+  selection = { kind: 'unit', id: next.id };
+  centreOn(next.x, next.y);
+}
+// An order went through: hand the selection on if the unit is done, then redraw and save.
+function afterOrder(u) {
+  doneWithUnit(u);
+  afterAction();
 }
 function focusPlayer(i) {
   const f = pl(i);
@@ -7993,7 +8096,7 @@ function strikeAt(u, x, y) {
   else if (result.killed) toast('Destroyed it. You took ' + result.back + '.');
   else toast('Hit for ' + result.dmg + (result.back ? ', took ' + result.back : '') + '.');
   if (!unitById(u.id)) selection = null;
-  afterAction();
+  afterOrder(u);
 }
 
 function onAction(act) {
@@ -8029,6 +8132,12 @@ function onAction(act) {
     setTips(!tipsOn());
     toast('Tips ' + (tipsOn() ? 'on' : 'off') + '.');
     if (G) render();
+    redoSwitches();
+    return;
+  }
+  if (kind === 'jump-toggle') {
+    setJump(!jumpOn());
+    toast(jumpOn() ? 'After orders, the next unit is selected.' : 'After orders, nothing is selected.');
     redoSwitches();
     return;
   }
@@ -8081,10 +8190,8 @@ function onAction(act) {
       break;
     case 'next-unit': {
       if (!myTurn()) break;
-      const idle = idleUnits(G.viewer);
-      if (!idle.length) { toast('Every unit has used its moves.'); break; }
-      const at = selUnit ? idle.indexOf(selUnit) : -1;
-      const u = idle[(at + 1) % idle.length];
+      const u = nextIdle(G.viewer, selUnit);
+      if (!u) { toast('Every unit has used its moves.'); break; }
       closeModal();
       selection = { kind: 'unit', id: u.id };
       centreOn(u.x, u.y);
@@ -8208,6 +8315,21 @@ function onAction(act) {
         closeModal();
         const reach = computeReachable(u);
         if (reach.has(keyOf(Number(b), Number(parts[3])))) moveUnit(u, Number(b), Number(parts[3]), reach);
+        afterOrder(u);
+      }
+      break;
+    }
+    case 'order-war': {
+      // The prompt for an order on someone you are at peace with: declare war as the Council does,
+      // then carry the order out as it would go at war.
+      const u = unitById(a);
+      if (u && u.owner === G.viewer && myTurn()) {
+        closeModal();
+        const x = Number(b), y = Number(parts[3]), war = warOrder(u, x, y);
+        if (war && declareWar(u.owner, war.foe)) {
+          reachable = computeReachable(u);
+          if (orderUnit(u, x, y)) break;
+        }
         afterAction();
       }
       break;
@@ -8296,9 +8418,12 @@ function orderUnit(selUnit, x, y) {
   const v = G.viewer, key = keyOf(x, y);
   if (visibleTo(x, y)) {
     if (strikeInfo(selUnit, x, y)) { strikeAt(selUnit, x, y); return true; }
+    // At peace with whoever is there: if the order would be legal at war, ask before declaring it.
+    const war = warOrder(selUnit, x, y);
+    if (war) { askDeclareWar(selUnit, x, y, war); return true; }
     const tgt = targetAt(selUnit, x, y);
     if (tgt && tgt.peace !== undefined && hexDistance(selUnit.x, selUnit.y, x, y) <= (shoots(selUnit.type) ? UNITS[selUnit.type].range : 1)) {
-      toast('You are at peace with ' + knownName(G.viewer, tgt.peace, true) + '. Declare war in the Council first.');
+      toast('You are at peace with ' + knownName(G.viewer, tgt.peace, true) + '.');   // war would not make this order legal
       return true;
     }
   }
@@ -8306,8 +8431,12 @@ function orderUnit(selUnit, x, y) {
   if (reachable && reachable.has(key)) {
     // Closed land: stepping in is a declaration of war, so ask first.
     if (reachable.war && reachable.war.has(key)) { askEnterWar(selUnit, x, y); return true; }
+    const prey = unitsAt(x, y).find(o => o.owner !== selUnit.owner && !isMil(o.type)), was = prey ? prey.type : null;
     moveUnit(selUnit, x, y, reachable);
-    afterAction();
+    if (prey && prey.owner === selUnit.owner) {
+      toast('Captured a ' + UNITS[was].name.toLowerCase() + (prey.type !== was ? ', now a ' + UNITS[prey.type].name.toLowerCase() : '') + '.');
+    }
+    afterOrder(selUnit);
     return true;
   }
   if (closedOwner(selUnit.owner, x, y) >= 0) {
@@ -8323,9 +8452,53 @@ function orderUnit(selUnit, x, y) {
       afterAction();
       return true;
     }
-    if (beginPath(selUnit, x, y)) { afterAction(); return true; }
+    if (beginPath(selUnit, x, y)) { afterOrder(selUnit); return true; }
   }
   return false;
+}
+
+// Something of a player you are at peace with, on a hex this unit was just ordered to, where the
+// order would be legal if you were at war with them: an attack or strike in range, or a walk onto a
+// civilian standing alone (a capture). { foe, verb, say } for the prompt, else null.
+function warOrder(u, x, y) {
+  if (!isMil(u.type)) return null;
+  const tgt = targetAt(u, x, y);
+  let foe, verb = 'attack', say;
+  if (tgt && tgt.peace !== undefined) {
+    foe = tgt.peace;
+    const info = strikeInfo(u, x, y, foe);
+    if (!info) return null;
+    if (info.city) { verb = info.capture ? 'capture' : 'attack'; say = info.city.name; }
+    else say = 'their ' + UNITS[info.unit.type].name;
+  } else if (!tgt) {
+    const prey = captureAt(u, x, y);
+    if (!prey || atWar(u.owner, prey.owner)) return null;
+    foe = prey.owner; verb = 'capture'; say = 'their ' + UNITS[prey.type].name;
+  } else return null;
+  if (!hasMet(u.owner, foe)) return null;
+  return { foe, verb, say: (verb === 'capture' ? 'Capturing ' : 'Attacking ') + say };
+}
+// A civilian standing alone on a hex (no soldier of theirs, no city), when u is a land soldier. Ships can't capture.
+function lonePrey(u, x, y) {
+  if (!isMil(u.type) || isNaval(u.type) || cityAt(x, y)) return null;
+  const here = unitsAt(x, y).filter(o => o.owner !== u.owner);
+  return here.length === 1 && !isMil(here[0].type) ? here[0] : null;
+}
+// A lone civilian this soldier could walk onto this turn and capture, if it were at war with its owner.
+function captureAt(u, x, y) {
+  const prey = lonePrey(u, x, y);
+  return prey && computeReachable(u, prey.owner).has(keyOf(x, y)) ? prey : null;
+}
+// What the Council says declaring war does. The order prompt says the same.
+const WAR_NOTE = 'Your units can attack theirs right away, and theirs can attack yours on their turn. Peace needs both sides to agree.';
+function askDeclareWar(u, x, y, war) {
+  const o = pl(war.foe), civ = CIVS[o.civ];
+  const land = knows(G.viewer, o.i) ? (THE_LANDS.includes(o.civ) ? 'the ' : '') + civ.land : UNMET;
+  openModal(modalHead('Declare war on ' + esc(land) + '?') +
+    '<div class="modal-body"><p>' + esc(war.say) + ' means <b>war with ' + esc(knownName(G.viewer, o.i)) + ', starting now</b>.</p>' +
+    '<p>' + WAR_NOTE + '</p></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Stay at peace</button>' +
+    '<button class="btn primary" data-act="order-war:' + u.id + ':' + x + ':' + y + '">Declare war and ' + war.verb + '</button></div>', true);
 }
 function askEnterWar(u, x, y) {
   const who = pl(closedOwner(u.owner, x, y));
@@ -9048,15 +9221,17 @@ function resetSetup() {
   refreshStart();
   toast('Back to the default setup.');
 }
-// The three switches that live on this device: in Options here, and in the in-game Menu.
+// The switches that live on this device: in Options here, and in the in-game Menu.
 function showOptions() {
   const row = (act, label, value) => '<button class="act switch" data-act="' + act + '">' + label + '<b>' + value + '</b></button>';
   openModal(modalHead('Options', 'Kept on this device') +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     row('tips-toggle', 'Tips in my games', tipsOn() ? 'on' : 'off') +
     row('popups-toggle', 'Event popups', popupsOn() ? 'on' : 'off') +
+    row('jump-toggle', 'Jump to the next unit after orders', jumpOn() ? 'on' : 'off') +
     row('anim-next', 'Animation', ANIM_LEVELS[currentAnim()]) + '</div>' +
-    '<p class="hint">Tips are short hints that appear over the map as you play. Event popups are the cards for wonders, Historic moments and news; the points count either way. Animation sets how much of the map moves.</p></div>' +
+    '<p class="hint">Tips are short hints that appear over the map as you play. Event popups are the cards for wonders, Historic moments and news; the points count either way. ' +
+    'When a unit has used up its turn, the next unit that needs orders is selected for you; switched off, nothing is selected. Animation sets how much of the map moves.</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Done</button></div>', true);
   UI.modalKind = 'options';
 }
