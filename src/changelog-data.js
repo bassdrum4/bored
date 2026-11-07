@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 332,
+  "count": 333,
   "newest": "2026-11-07",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"7d16e4d","date":"2026-11-07","author":"Claude","subject":"Civ Lite 4.6.1: a What's new screen with patch notes"},
   {"sha":"154ef42","date":"2026-11-07","author":"Claude","subject":"Civ Lite 4.6: Early Empire closes borders per civ, and embassies"},
   {"sha":"a053e34","date":"2026-11-06","author":"Claude","subject":"Civ Lite: a captured settler stays a settler, a builder stays a builder"},
   {"sha":"339c141","date":"2026-11-06","author":"Claude","subject":"feat(civ-lite): next unit after orders, declare-war prompt, finished captures"},
