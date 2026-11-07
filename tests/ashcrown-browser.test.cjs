@@ -255,3 +255,99 @@ test('Ashcrown orders: a real right-click on their unit at peace asks first, and
   assert.equal(done.sel, ids.a, 'and on to the archer');
   assert.deepEqual(errors, []);
 });
+
+/* ── 4.6: Early Empire on the tech screen, and an embassy from the city panel to the Council ─────── */
+
+for (const width of [1000, 400, 320]) {
+  test('Ashcrown 4.6: the tech tree shows Early Empire, and a real click path builds an embassy and shows it in the Council (' + width + 'px)', async t => {
+    const { page, errors } = await open(t, width);
+    await page.evaluate(`(() => {
+      setTips(false);
+      startGame({ seats: ${ORDER_SEATS}, seed: 77, map: 'pangaea', level: 'chieftain' });
+      UI.start.hidden = true;
+      G.handoff = false;
+      for (const i of [0, 1]) foundCity(G.units.find(o => o.owner === i && UNITS[o.type].founds));
+      G.units = G.units.filter(u => u.owner !== 0 || !UNITS[u.type].founds);
+      pl(0).techs.push('pottery');
+      G.met[0][1] = G.met[1][0] = true;
+      G.attitude[1][0] = 0;
+      G.news.length = 0; G.log.length = 0;
+      window.mine = G.cities.find(c => c.owner === 0);
+      selection = { kind: 'city', id: mine.id }; render();
+    })()`);
+    const visible = sel => page.evaluate(s => { const e = document.querySelector(s); return !!e && e.getClientRects().length > 0; }, sel);
+    const modal = () => page.evaluate('(() => { const m = document.querySelector(".modal"); return m && m.offsetParent !== null ? m.textContent : ""; })()');
+    const embassyItem = '[data-act^="setbuild:"][data-act$=":embassy:new"]';
+
+    // The tech screen: Early Empire is a card of its own, Writing needs it, nothing leaves the screen.
+    await page.evaluate('showTech()');
+    assert.ok(await visible('[data-act="research:earlyempire"]'), 'Early Empire has a card');
+    const card = await page.$eval('[data-act="research:earlyempire"]', e => e.textContent);
+    assert.match(card, /Early Empire/);
+    assert.equal(await page.evaluate(`techCost(0, 'earlyempire')`), 25, 'costs 25');
+    const lines = await page.evaluate(() => ({
+      writing: !!document.querySelector('[data-act="research:writing"]'),
+      needs: TECHS.writing.needs.slice(), era1: TECH_ORDER.filter(id => TECHS[id].era === 1 && !TECHS[id].needs.length).length,
+    }));
+    assert.deepEqual(lines.needs, ['pottery', 'earlyempire']);
+    assert.ok(lines.writing);
+    // (The wide tech modal is measured off-screen in this rig on v4.5 as well, so it is not part of the fit check.)
+    await page.evaluate('closeModal()');
+
+    // Before Writing there is no Embassy item at all.
+    assert.equal(await visible(embassyItem), false, 'no Embassy before Writing');
+    await page.evaluate(`pl(0).techs.push('earlyempire', 'writing'); render()`);
+    assert.ok(await visible(embassyItem), 'the Embassy item is in the build list once Writing is known');
+    assert.match(await page.$eval(embassyItem, e => e.textContent), /Embassy/);
+
+    // The Council hint before anything is built.
+    await page.evaluate('showCouncil()');
+    assert.match(await modal(), /Build an Embassy in one of your cities to ask them\./);
+    assert.deepEqual(await page.evaluate(fits), [], 'the Council fits');
+    await page.evaluate('closeModal()');
+
+    // Click the item: the box opens, Cancel changes nothing.
+    const build = () => page.evaluate('JSON.stringify([mine.build, mine.progress, G.offers, G.attitude[1][0]])');
+    const before = await build();
+    await page.click(embassyItem);
+    const land = await page.evaluate(() => CIVS[pl(1).civ].land);
+    assert.match(await modal(), new RegExp('Send an embassy from ' + (await page.evaluate('mine.name')) + ' to…'));
+    assert.ok((await modal()).includes(land), 'the Celts are listed');
+    assert.deepEqual(await page.evaluate(fits), [], 'the civ box fits');
+    await page.click('.modal-foot .btn');
+    assert.equal(await modal(), '', 'Cancel closed it');
+    assert.equal(await build(), before, 'and changed nothing');
+
+    // Ask them: a CPU at attitude 0 says yes.
+    await page.click(embassyItem);
+    await page.click('[data-act^="embassy-pick:"]');
+    assert.ok((await modal()).includes(land + ' agrees.'));
+    assert.ok((await modal()).includes('starts building the embassy.'));
+    assert.deepEqual(await page.evaluate(fits), [], 'the answer fits');
+    await page.click('.modal-foot .btn.primary');
+    assert.equal(await modal(), '');
+    assert.deepEqual(await page.evaluate('JSON.parse(JSON.stringify(mine.build))'), { kind: 'embassy', id: 1 });
+    assert.equal(await page.evaluate('G.attitude[1][0]'), 2);
+    assert.ok(await page.evaluate('document.body.innerText.includes("Embassy to ' + land + '")'), 'the city shows "Embassy to ' + land + '"');
+
+    // Being built: the Council says where.
+    await page.evaluate('showCouncil()');
+    assert.ok((await modal()).includes('Embassy being built in ' + (await page.evaluate('mine.name')) + '.'));
+    await page.evaluate('closeModal()');
+
+    // Finish it. The toast, the tag, the capital, the button.
+    await page.evaluate('mine.progress = 30; tryComplete(mine); render()');
+    assert.equal(await page.evaluate('G.embassies.length'), 1);
+    assert.equal(await page.evaluate('noticeFor(0).startsWith("Embassy opened in ")'), true);
+    await page.evaluate('showCouncil()');
+    const text = await modal();
+    assert.match(text, /embassy/);
+    assert.match(text, /Embassy: capital .+ · \d+ cit/);
+    assert.deepEqual(await page.evaluate(fits), [], 'the Council with an embassy fits');
+    assert.ok(await visible('[data-act="embassy-look:1"]'), 'Show capital is there');
+    await page.click('[data-act="embassy-look:1"]');
+    assert.deepEqual(await page.evaluate('JSON.parse(JSON.stringify(selection))'), await page.evaluate(`({ kind: 'tile', x: cityById(pl(1).capital).x, y: cityById(pl(1).capital).y })`));
+    assert.equal(await page.evaluate('seenBy(0, cityById(pl(1).capital).x, cityById(pl(1).capital).y)'), true, 'their capital is on the map');
+    assert.deepEqual(errors, []);
+  });
+}

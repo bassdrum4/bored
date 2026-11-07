@@ -685,7 +685,7 @@
             <h3>Game</h3>
             <div class="fe-opt"><label for="opt-level">Difficulty</label><select id="opt-level"></select>
               <p class="fe-note" id="level-note"></p></div>
-            <div class="fe-opt"><label for="opt-close">Borders close</label><select id="opt-close"></select>
+            <div class="fe-opt"><label for="opt-close">Borders</label><select id="opt-close"></select>
               <p class="fe-note" id="close-note"></p></div>
             <div class="fe-opt"><label for="opt-turns">Turn limit</label>
               <input type="number" id="opt-turns" value="100" min="0" max="500" step="10" inputmode="numeric" aria-describedby="turns-hint">
@@ -860,10 +860,12 @@ const TECHS = {
   pottery:      { name: 'Pottery',          era: 1, needs: [] },
   archery:      { name: 'Archery',          era: 1, needs: [] },
   sailing:      { name: 'Sailing',          era: 1, needs: [] },
+  earlyempire:  { name: 'Early Empire',     era: 1, needs: [], cost: 25,
+                  blurb: 'Closes your borders: other civs need an open-borders deal, or a war, to enter your land' },
   bronze:       { name: 'Bronze Working',   era: 2, needs: ['mining'] },
   masonry:      { name: 'Masonry',          era: 2, needs: ['mining'] },
   riding:       { name: 'Horseback Riding', era: 2, needs: ['husbandry'] },
-  writing:      { name: 'Writing',          era: 2, needs: ['pottery'] },
+  writing:      { name: 'Writing',          era: 2, needs: ['pottery', 'earlyempire'] },
   ironworking:  { name: 'Iron Working',     era: 3, needs: ['bronze'] },
   construction: { name: 'Construction',     era: 3, needs: ['masonry'] },
   stirrups:     { name: 'Stirrups',         era: 3, needs: ['riding', 'bronze'] },
@@ -1765,8 +1767,8 @@ function startGame(options) {
   G = {
     v: 4, size, seed: world.seed, rs: (world.seed ^ 0x9e3779b9) >>> 0, map: world.map,
     level: LEVELS[options.level] ? options.level : 'normal',
-    wrap, closeTurn: options.closeTurn === undefined ? DEFAULT_CLOSE_TURN : Math.max(0, options.closeTurn | 0),
-    open: [], deals: [], nextDeal: 1,
+    wrap, borders: options.borders === 'never' ? 'never' : 'tech',
+    open: [], deals: [], nextDeal: 1, embassies: [],
     cols: world.cols, rows: world.rows, tiles: world.tiles, conts: world.conts,
     units: [], cities: [], players: [],
     dip: [], attitude: [], warSince: [], met: [], offers: [],
@@ -1810,13 +1812,30 @@ function log(text, colour, to) {
   G.log.push({ turn: G.turn, text, colour: colour || null, to: to === undefined ? null : to });
   if (G.log.length > 500) G.log.splice(0, G.log.length - 500);
 }
+// A short note for a player, shown as a toast when their turn starts (things happen
+// while another player has the device, so a toast then would be read by the wrong eyes).
+function tell(i, text) {
+  const f = pl(i);
+  if (!f || !f.human) return;
+  (f.notes = f.notes || []).push(text);
+}
+// What the toast says as player i's turn starts: their notes, then an offer or a tech waiting.
+function noticeFor(i) {
+  const f = pl(i);
+  if (!f) return '';
+  const parts = (f.notes || []).splice(0);
+  const offers = G.offers.filter(o => o.to === i).length;
+  if (offers) parts.push(plural(offers, 'offer is', 'offers are') + ' waiting in the Council.');
+  else if (needsTech(i)) parts.push('Pick your next tech. Press T.');
+  return parts.join(' ');
+}
 
 /* ── techs and research ────────────────────────────────────────────────────── */
 
 const techName = id => (id === 'future' ? FUTURE.name : TECHS[id] ? TECHS[id].name : '');
 function techCost(i, id) {
   if (id === 'future') return Math.round(TECH_COST[4] * (civIs(i, 'uk') ? 0.75 : 1));
-  let cost = TECH_COST[TECHS[id].era];
+  let cost = TECHS[id].cost || TECH_COST[TECHS[id].era];
   if (pl(i).boost && pl(i).boost[id]) cost *= 1 - SCI.eureka;
   if (civIs(i, 'uk')) cost *= 0.75;
   if (civIs(i, 'portugal') && id === 'navigation') cost *= 0.5;
@@ -1914,8 +1933,10 @@ function processResearch(f) {
       // Like Civ's last techs, each Future Tech finished on the way cuts a turn off the trip.
       if (f.voyage) f.voyage.left = Math.max(1, f.voyage.left - 1);
     } else {
-      f.techs.push(f.research);
-      log(fullName(f) + ' learns ' + techName(f.research) + '.', f.ink, f.i);
+      const learned = f.research;
+      f.techs.push(learned);
+      log(fullName(f) + ' learns ' + techName(learned) + '.', f.ink, f.i);
+      if (learned === 'earlyempire') bordersClose(f);
       f.research = nextQueued(f);
     }
   }
@@ -2048,6 +2069,11 @@ function itemDef(item) {
       blurb: 'Paves the cheapest land route between the two cities. Units move over paved hexes at half cost.' };
   }
   if (item.kind === 'research') return RESEARCH;
+  if (item.kind === 'embassy') {
+    const o = item.id === 'new' ? null : pl(item.id);
+    return { name: o ? 'Embassy to ' + landName(o) : 'Embassy', cost: EMBASSY_COST, embassy: true,
+      blurb: 'Ask a civ you’ve met for an embassy. If they agree, their capital shows on your map.' };
+  }
   if (item.kind === 'project') return PROJECTS[item.id] || null;
   return item.kind === 'unit' ? UNITS[item.id] || null : BUILDINGS[item.id] || null;
 }
@@ -2057,6 +2083,7 @@ const sameItem = (a, b) => !!a && !!b && a.kind === b.kind && a.id === b.id;
 function costOf(c, item) {
   const def = itemDef(item);
   if (!def || item.kind === 'research') return 0;
+  if (item.kind === 'embassy') return EMBASSY_COST;
   if (item.kind === 'road') {
     const d = cityById(item.id), r = d && d.owner === c.owner ? roadRoute(c, d) : null;
     return Math.max(1, r ? r.cost : 1);
@@ -2280,6 +2307,7 @@ function buildProblem(c, item) {
   if (item.kind === 'research') return c.buildings.includes('library') ? '' : 'Needs a Library first';
   if (item.kind === 'project') return projectProblem(c, item.id);
   if (item.kind === 'road') return roadProblem(c, item.id);
+  if (item.kind === 'embassy') return embassyProblem(c, item);
   const i = c.owner, civ = civOf(i);
   if (def.civ && def.civ !== civ) return 'Only ' + civTitle(def.civ);
   const own = item.kind === 'unit' ? unitFor(i, item.id) : buildingFor(i, item.id);
@@ -2306,6 +2334,7 @@ function turnsLeft(c, item) {
 }
 
 function setBuild(c, item) {
+  if (item && item.kind === 'embassy' && item.id === 'new') return false;   // the list item opens a box to pick a civ
   if (item && buildProblem(c, item)) return false;
   if (item && item.kind === 'building' && needsPlot(item.id)) {
     c.plot = c.plot || {};
@@ -2318,6 +2347,7 @@ function setBuild(c, item) {
       clearPlot(c, item.id);   // v4: the hex is cleared the moment it is planned
     }
   }
+  dropAsk(c);
   c.build = item ? { kind: item.kind, id: item.id } : null;
   c.wait = false;
   return true;
@@ -2415,6 +2445,7 @@ function tryComplete(c) {
   const why = buildProblem(c, item);
   if (why) {
     log(c.name + ' can’t finish ' + def.name + ': ' + why.toLowerCase() + '.', '#93401d', f.i);
+    dropAsk(c);
     c.build = null;
     return;
   }
@@ -2456,6 +2487,15 @@ function tryComplete(c) {
     if (isMil(item.id) && (def.naval ? c.buildings.includes('shipyard') : c.buildings.includes('armory'))) made.vet = true;
   } else if (item.kind === 'road') {
     if (!finishRoad(c, item.id, cost)) return;
+  } else if (item.kind === 'embassy') {
+    // A human still has to answer: the project sits at full production until they do.
+    if (item.ask) {
+      if (!c.wait) log(c.name + ' has its embassy to ' + civMark(pl(item.id)) + ' ready and is waiting for their answer.', f.ink, f.i);
+      c.wait = true;
+      return;
+    }
+    c.progress -= cost;
+    openEmbassy(c, item.id);
   } else {
     c.progress -= cost;
     c.buildings.push(item.id);
@@ -3171,6 +3211,8 @@ function declareWar(a, b) {
   G.dip[a][b] = G.dip[b][a] = 'war';
   G.warSince[a][b] = G.warSince[b][a] = G.turn;
   changeAttitude(b, a, -30);
+  cancelEmbassyBuilds(a, b, 'war');
+  cancelEmbassyBuilds(b, a, 'war');
   G.offers = G.offers.filter(o => !((o.from === a && o.to === b) || (o.from === b && o.to === a)));
   log(nameMark(pl(a)) + ' declares war on ' + nameMark(pl(b)) + '.', '#93401d', null);
   pushNews({ i: b, kind: 'alert', type: 'war', by: a });
@@ -3238,6 +3280,8 @@ function answerOffer(to, id, accept) {
   } else if (kind === 'borders') {
     if (accept && !atWar(to, from)) openBorders(to, from);
     else log(fullName(pl(to)) + ' turns down your open-borders deal.', pl(to).ink, from);
+  } else if (kind === 'embassy') {
+    answerEmbassy(offer, accept);
   } else if (kind === 'trade') {
     const why = accept ? tradeProblem(offer.deal) : '';
     if (accept && !why && !atWar(to, from)) {
@@ -3251,24 +3295,26 @@ function answerOffer(to, id, accept) {
 
 /* ── closed borders and open-borders deals (v4) ────────────────────────────── */
 
-// From this turn on, every player's land is closed to the others. Walking into
-// it (a unit on a hex someone else owns, ships on their waters too) without an
-// open-borders deal means war: the one who steps in is the one who declares it.
-// Units caught inside when the borders close are moved out at the start of
-// their owner's turn. Open-borders deals come from the Council and last 30 turns.
-const DEFAULT_CLOSE_TURN = 30;
+// A civ's land closes to the others the moment that civ learns Early Empire, a cheap
+// first tech. Walking into closed land (a unit on a hex that civ owns, ships on its
+// waters too) without an open-borders deal means war: the one who steps in is the
+// one who declares it. Units caught inside when it closes are moved out at the start
+// of their owner's next turn. Open-borders deals come from the Council and last 30
+// turns. A game can switch this off for everyone (G.borders is 'never').
 const OPEN_TURNS = 30;
-const bordersClosed = () => !!G.closeTurn && G.turn >= G.closeTurn && !G.tut;
+const bordersNever = () => G.borders === 'never' || !!G.tut;
+// Is this civ's land closed to the others? Only once it knows Early Empire.
+const landClosed = owner => !bordersNever() && hasTech(owner, 'earlyempire');
 function openBetween(a, b) {
   return (G.open || []).some(o => G.turn < o.until && ((o.a === a && o.b === b) || (o.a === b && o.b === a)));
 }
 // The player whose closed land this is for player i, or -1 when i may stand there.
 function closedOwner(i, x, y) {
-  if (!bordersClosed()) return -1;
+  if (bordersNever()) return -1;
   const t = tileAt(x, y);
   if (!t || t.owner === null || t.owner === i) return -1;
   const o = pl(t.owner);
-  if (!o || !o.alive || atWar(i, t.owner) || openBetween(i, t.owner)) return -1;
+  if (!o || !o.alive || !hasTech(t.owner, 'earlyempire') || atWar(i, t.owner) || openBetween(i, t.owner)) return -1;
   return t.owner;
 }
 function openBorders(a, b) {
@@ -3340,17 +3386,148 @@ function unstack(i) {
     log('Your ' + UNITS[u.type].name.toLowerCase() + ' stepped aside: a hex holds one ' + (isMil(u.type) ? 'soldier' : 'civilian') + '.', pl(i).ink, i);
   }
 }
-// Start of a round: news when the borders close, and expired deals lapse.
-function bordersNewRound() {
-  if (G.closeTurn && G.turn === G.closeTurn && !G.tut) {
-    log('The borders close. Stepping onto another player’s land without an open-borders deal means war.', 'turn', null);
-    for (const o of G.players) pushNews({ i: o.i, kind: 'alert', type: 'close' });
+// A civ just learned Early Empire. Its land is closed from now on. Every human who has
+// met it gets a card, the civ itself a note for its next turn; units of others still on
+// its land are moved out when their owners' turns begin (ejectTrespassers).
+function bordersClose(f) {
+  if (bordersNever()) return;
+  log(civMark(f) + '’s borders are closed.', f.ink, null);
+  for (const o of G.players) {
+    if (o.i !== f.i && o.human && o.alive && hasMet(o.i, f.i)) pushNews({ i: o.i, kind: 'alert', type: 'close', by: f.i });
   }
+  tell(f.i, 'Your borders are closed. Other civs need an open-borders deal to come in.');
+}
+// Start of a round: expired open-borders deals lapse.
+function bordersNewRound() {
   const lapsed = (G.open || []).filter(o => G.turn >= o.until);
   if (lapsed.length) {
     G.open = G.open.filter(o => G.turn < o.until);
     for (const o of lapsed) log('The open-borders deal between ' + nameMark(pl(o.a)) + ' and ' + nameMark(pl(o.b)) + ' has run out.', '#7a6d57', null);
   }
+}
+
+/* ── embassies (v4.6) ─────────────────────────────────────────────────────── */
+
+// Once you know Writing, a city can build an Embassy: you pick a civ you have met, it answers at
+// once, and if it agrees the city builds "Embassy to <civ>" for 30 production. When it is built,
+// that civ's capital and every hex within 2 of it are marked on your map (remembered hexes, not
+// live vision). It lasts for good unless the civ is eliminated. A CPU answers from how it feels
+// about you; a human answers in the Council on their turn, and the city holds until they do.
+const EMBASSY_COST = 30;
+const EMBASSY_RADIUS = 2;
+const hasEmbassy = (a, b) => (G.embassies || []).some(e => e.from === a && e.to === b);
+// Who this city's build is an embassy to, or -1.
+const embassyTo = c => (c.build && c.build.kind === 'embassy' && c.build.id !== 'new' ? c.build.id : -1);
+const landName = f => CIVS[f.civ].land;
+// A CPU says yes on the same terms as an open-borders deal.
+const aiAcceptsEmbassy = (f, other) => aiAcceptsOpen(f, other);
+// Who city c could send an embassy to: met, alive, at peace, no embassy yet, and none already being built.
+function embassyTargets(c) {
+  const i = c.owner, mine = ownCities(i);
+  return G.players.filter(o => o.i !== i && o.alive && hasMet(i, o.i) && !atWar(i, o.i) && !hasEmbassy(i, o.i) &&
+    !mine.some(d => embassyTo(d) === o.i));
+}
+// '' when the city may build it; otherwise the reason it can't. 'new' is the item in the build list.
+function embassyProblem(c, item) {
+  if (!hasTech(c.owner, 'writing')) return 'Needs ' + techName('writing');
+  if (item.id === 'new') return embassyTargets(c).length ? '' : 'No civ to send one to';
+  const o = pl(item.id);
+  if (!o || !o.alive) return 'They are out of the game';
+  if (atWar(c.owner, item.id)) return 'At war with them';
+  if (hasEmbassy(c.owner, item.id)) return 'Already open';
+  return '';
+}
+// A pending request goes away with the project that made it.
+function dropAsk(c) {
+  if (c.build && c.build.ask) G.offers = G.offers.filter(o => o.id !== c.build.ask);
+}
+// Asks civ `to` for an embassy from city c. 'yes' and 'no' are a CPU's answer; 'sent' means a human
+// answers in the Council, and the city starts building and waits. '' when it can't be asked.
+function askEmbassy(c, to) {
+  const from = c.owner, f = pl(from), target = pl(to);
+  if (!target || !embassyTargets(c).includes(target)) return '';
+  if (!target.human) {
+    if (!aiAcceptsEmbassy(target, f)) return 'no';
+    // A yes warms a CPU up once per civ: asking again after a cancel gains nothing.
+    f.asked = f.asked || [];
+    if (!f.asked.includes(to)) { f.asked.push(to); changeAttitude(to, from, 2); }
+    dropAsk(c);
+    c.build = { kind: 'embassy', id: to };
+    c.wait = false;
+    log(nameMark(target) + ' agrees to an embassy from ' + nameMark(f) + '.', f.ink, null);
+    return 'yes';
+  }
+  dropAsk(c);
+  const offer = { id: newOfferId(), kind: 'embassy', from, to, turn: G.turn, city: c.id };
+  G.offers.push(offer);
+  c.build = { kind: 'embassy', id: to, ask: offer.id };
+  c.wait = false;
+  log(fullName(f) + ' asks for an embassy. Answer in the Council.', f.ink, to);
+  return 'sent';
+}
+// The project stops and its production stays in the city, like a road's. note: a message for the
+// owner's next turn.
+function cancelEmbassy(c, why, note) {
+  const o = pl(embassyTo(c));
+  dropAsk(c);
+  c.build = null;
+  c.wait = false;
+  log('The embassy to ' + civMark(o) + ' was cancelled: ' + why + '. ' + c.name + ' keeps its production.', '#93401d', c.owner);
+  if (note) tell(c.owner, note(landName(o), c.name));
+}
+// Every one of owner's cities building an embassy to `target` stops (war, or the civ is gone).
+function cancelEmbassyBuilds(owner, target, why) {
+  for (const c of ownCities(owner)) if (embassyTo(c) === target) cancelEmbassy(c, why);
+}
+// The city that asked, when the request is still the one it is waiting on.
+function askingCity(offer) {
+  const c = cityById(offer.city);
+  return c && c.owner === offer.from && c.build && c.build.kind === 'embassy' && c.build.ask === offer.id ? c : null;
+}
+// A human's answer to an embassy request (from answerOffer).
+function answerEmbassy(offer, accept) {
+  const c = askingCity(offer), to = offer.to, from = offer.from;
+  if (!c) return;
+  if (accept && !atWar(to, from)) {
+    delete c.build.ask;
+    c.wait = false;
+    log(nameMark(pl(to)) + ' agrees to an embassy from ' + nameMark(pl(from)) + '.', pl(to).ink, null);
+    tell(from, landName(pl(to)) + ' agrees. ' + c.name + ' carries on with the embassy.');
+  } else {
+    log(fullName(pl(to)) + ' turns down your embassy.', pl(to).ink, from);
+    cancelEmbassy(c, 'they said no', (land, city) => land + ' turned down your embassy. ' + city + ' keeps its production.');
+  }
+}
+// Offers wait 3 turns for an answer. A request that lapses stops the project it started.
+function expireOffers(i) {
+  const lapsed = G.offers.filter(o => o.to === i && G.turn - o.turn > 3);
+  if (!lapsed.length) return;
+  G.offers = G.offers.filter(o => !lapsed.includes(o));
+  for (const o of lapsed) {
+    const c = o.kind === 'embassy' ? askingCity(o) : null;
+    if (c) cancelEmbassy(c, 'no answer', (land, city) => land + ' never answered your embassy request. ' + city + ' keeps its production.');
+  }
+}
+// Marks civ `to`'s capital and the hexes around it as seen by `from`.
+function revealCapital(from, to) {
+  const o = pl(to), cap = o && o.capital ? cityById(o.capital) : null;
+  if (!cap) return;
+  const seen = G.seen[from];
+  for (const t of G.tiles) if (hexDistance(cap.x, cap.y, t.x, t.y) <= EMBASSY_RADIUS) seen[t.y * G.cols + t.x] = 1;
+}
+// At the start of a turn: a capital that has changed is marked again.
+function revealEmbassies(i) {
+  for (const e of G.embassies || []) if (e.from === i) revealCapital(i, e.to);
+}
+// The city finished it: the embassy is open.
+function openEmbassy(c, to) {
+  const from = c.owner, f = pl(from), o = pl(to);
+  (G.embassies = G.embassies || []).push({ from, to, turn: G.turn });
+  revealCapital(from, to);
+  if (!o.human) changeAttitude(to, from, 5);
+  log(nameMark(f) + ' opens an embassy with ' + nameMark(o) + '.', f.ink, null);
+  const cap = o.capital ? cityById(o.capital) : null;
+  tell(from, 'Embassy opened in ' + (cap ? cap.name : landName(o)) + '. Their capital is now on your map.');
 }
 
 /* ── trading, HOI4 style (v4) ──────────────────────────────────────────────── */
@@ -3659,6 +3836,8 @@ function checkElimination() {
     if (cities || settlers) continue;
     f.alive = false;
     for (const u of ownUnits(f.i)) removeUnit(u);
+    for (const o of G.players) if (o.i !== f.i) cancelEmbassyBuilds(o.i, f.i, 'they are out of the game');
+    G.embassies = (G.embassies || []).filter(e => e.from !== f.i && e.to !== f.i);
     G.offers = G.offers.filter(o => o.from !== f.i && o.to !== f.i);
     G.open = (G.open || []).filter(o => o.a !== f.i && o.b !== f.i);
     dropDealsOf(f.i);
@@ -3693,7 +3872,8 @@ function finishOnScore() {
 function beginPlayerTurn(i) {
   const f = pl(i);
   checkContacts(i);
-  G.offers = G.offers.filter(o => o.to !== i || G.turn - o.turn <= 3);
+  expireOffers(i);
+  revealEmbassies(i);
   gatherStock(f);
   ejectTrespassers(i);
   unstack(i);
@@ -3965,16 +4145,27 @@ function aiFindSite(f, u) {
 
 // Scores every tech this player can start and takes the best: cheap techs that
 // unlock what its land and its civ want come first.
+// Is a war wonder (one that gives units a gift) inside this civ's borders, or within 3 hexes of one of its cities?
+function warWonderNear(f) {
+  const groups = wonderTiles(), cities = ownCities(f.i);
+  return ['spring', 'stair'].some(id => (groups[id] || []).some(t => t.owner === f.i || cities.some(c => hexDistance(c.x, c.y, t.x, t.y) <= 3)));
+}
 function aiPickTech(f) {
   const opts = researchChoices(f.i);
   if (opts.length <= 1) return opts[0] || null;
+  // The first pick waits for a first city: its land (and any war wonder near it) shapes the pick, and
+  // nothing is lost, since research points come from cities.
+  if (!f.techs.length && !ownCities(f.i).length) return null;
+  // Early Empire closes its land to the others: in its first three techs, and first when a war wonder
+  // is close by, so nobody else gets there before it.
+  if (opts.includes('earlyempire') && (f.techs.length >= 2 || (!bordersNever() && SCI.warWonders && warWonderNear(f)))) return 'earlyempire';
   const own = G.tiles.filter(t => t.owner === f.i);
   const has = r => own.some(t => t.f === r);
   const coastal = ownCities(f.i).some(isCoastal);
   const water = waterMap();
   const wars = atWarCount(f) > 0;
   const base = {
-    mining: 10, husbandry: 5, pottery: 8, archery: 6, sailing: 2, bronze: 9, masonry: 6, riding: 5, writing: 8,
+    mining: 10, husbandry: 5, pottery: 8, archery: 6, sailing: 2, earlyempire: 7, bronze: 9, masonry: 6, riding: 5, writing: 8,
     ironworking: 7, construction: 7, stirrups: 5, math: 5, shipbuilding: 1, navigation: 2, future: 0,
     education: 9, printing: 5, astronomy: 5, firearms: 7, cartography: 4, physics: 5
   };
@@ -4366,8 +4557,8 @@ function aiDiplomacy(f) {
       }
       continue;
     }
-    // Neighbours at peace trade open borders once the borders close.
-    if (bordersClosed() && !openBetween(f.i, o.i)) {
+    // Neighbours at peace trade open borders once either one's borders are closed.
+    if ((landClosed(f.i) || landClosed(o.i)) && !openBetween(f.i, o.i)) {
       const mood = G.attitude[f.i][o.i] || 0;
       if (mood > 2 && roll() < (o.human ? 0.03 : 0.08)) proposeOpen(f.i, o.i);
     }
@@ -4946,7 +5137,7 @@ function showNews() {
     text = '<p>“' + esc(CIVS[o.civ].hello) + '”</p>' +
       '<p>' + (cap && seenBy(G.viewer, cap.x, cap.y) ? 'Their capital is ' + esc(cap.name) + '. ' : '') +
       (atWar(G.viewer, o.i) ? 'You’re at war.' : 'You’re at peace.') +
-      (G.closeTurn && !G.tut && G.turn < G.closeTurn ? ' Their borders close on turn ' + G.closeTurn + '.' : '') + '</p>' +
+      (bordersNever() ? '' : landClosed(o.i) ? ' Their borders are closed.' : ' Their borders are open.') + '</p>' +
       (n.pts ? '<p class="moment">Historic moment: ' + pts(n.pts) + (n.first ? ', double for being first in the world' : '') + '.</p>' : '');
     go = '<button class="btn" data-act="council">Open Council</button>';
   } else if (n.kind === 'captured') {
@@ -4972,8 +5163,8 @@ function showNews() {
         '. Take ' + esc(n.cityName) + ', or keep it under half HP, to stop it.</p>';
       go = '<button class="btn" data-act="news-look:' + n.at[0] + ':' + n.at[1] + '">Show me</button>';
     } else {
-      title = 'The borders close'; sub = 'Turn ' + G.turn;
-      text = '<p>From now on, stepping onto another player’s land without an open-borders deal means war, and units still inside were moved out. Ask for open borders in the Council (D).</p>';
+      title = esc(knownLand(G.viewer, n.by)) + '’s borders are closed'; sub = 'Turn ' + G.turn;
+      text = '<p>Stepping onto their land without an open-borders deal means war. Ask for open borders in the Council.</p>';
       go = '<button class="btn" data-act="council">Open Council</button>';
     }
   }
@@ -5151,7 +5342,6 @@ function prepareState(state) {
   for (const c of state.cities) c.plot = c.plot || {};
   // v4: older games keep open borders and a flat map; trade, roads and tiers start empty.
   if (state.wrap === undefined) state.wrap = false;
-  if (state.closeTurn === undefined) state.closeTurn = 0;
   state.open = state.open || [];
   state.deals = state.deals || [];
   state.nextDeal = state.nextDeal || 1;
@@ -5200,6 +5390,21 @@ function prepareState(state) {
     state.met = state.players.map(() => state.players.map(() => true));
     if (!state.settling) for (const f of state.players) if (!f.moments.includes('contact')) f.moments.push('contact');
   }
+  // v4.6: borders close for one civ at a time, when it learns Early Empire. A save from before it
+  // remembers the old global close turn. Past it, every living player knows Early Empire (no cards, no
+  // era points, since the borders were already closed); before it, nobody does yet; never stays never.
+  // A player who already knew Writing keeps it, and one with Writing queued gets Early Empire first.
+  if (state.borders === undefined) {
+    const closeTurn = state.closeTurn | 0;
+    state.borders = closeTurn > 0 ? 'tech' : 'never';
+    for (const f of state.players) {
+      if (closeTurn > 0 && state.turn >= closeTurn && f.alive && !f.techs.includes('earlyempire')) f.techs.push('earlyempire');
+      const w = f.queue.indexOf('writing');
+      if (w >= 0 && !f.techs.includes('earlyempire') && !f.queue.includes('earlyempire') && f.research !== 'earlyempire') f.queue.splice(w, 0, 'earlyempire');
+    }
+  }
+  delete state.closeTurn;
+  state.embassies = state.embassies || [];
   state.v = 4;
   WRAP_W = state.wrap ? state.cols : 0;
   roadCache.clear();
@@ -5277,7 +5482,8 @@ const MARK = {
   charts: 'M0 -8 L1.8 -3 L7 -3 L3 0 L4.5 5 L0 2 L-4.5 5 L-3 0 L-7 -3 L-1.8 -3 Z',
   academy: 'M-6 -2 A6 6 0 0 1 6 -2 M-8 -2 H8|M-5 -2 V6|M0 -2 V6|M5 -2 V6|M-9 6 H9',
   expedition: 'M-8 2 H8 L5 7 H-5 Z|M-2 2 V-8|M3 2 V-6|M-2 -8 L-7 -2 H-2|M3 -6 L7 -1 H3',
-  caravan: 'M-8 2 H6 V-3 C6 -7 -8 -7 -8 -3 Z|M-5 6 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0|M3 6 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0|M6 0 L9 0'
+  caravan: 'M-8 2 H6 V-3 C6 -7 -8 -7 -8 -3 Z|M-5 6 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0|M3 6 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0|M6 0 L9 0',
+  embassy: 'M-5 9 V-8|M-5 -8 H6 L3 -4 L6 0 H-5'
 };
 const SOLID = {
   scout: 'M0 0 m-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0 Z',
@@ -6190,7 +6396,7 @@ function buildTutorialIsland() {
   }
   G = {
     v: 4, seed: 7, rs: 0x2f6e2b1, map: 'pangaea', level: 'normal', size: 'small', victory: { conquest: true, science: true },
-    wrap: false, closeTurn: 0, open: [], deals: [], nextDeal: 1, nextOffer: 0,
+    wrap: false, borders: 'never', embassies: [], open: [], deals: [], nextDeal: 1, nextOffer: 0,
     cols, rows, tiles, conts, units: [], cities: [], players: [],
     dip: [['peace', 'peace'], ['peace', 'peace']], attitude: [[0, 0], [0, 0]], warSince: [[0, 0], [0, 0]], met: [[true, true], [true, true]], offers: [],
     log: [], seen: [seen0, new Array(cols * rows).fill(0)],
@@ -6527,8 +6733,8 @@ const TUT_STEPS = [
       'Only war ends a deal. If the buyer starts it, everything owed is paid on the spot; if the seller does, the payments stop.',
     el: '#btn-council', done: () => false },
   { ch: 'Roads and trade', next: 'Next',
-    say: 'One more thing real games add: on a turn you choose at setup, borders <b>close</b>. After that, stepping onto another civ’s land without an open-borders deal means war, with a confirm box first, and your units already inside are moved out. ' +
-      'Ask for open borders in the Council. They last 30 turns.',
+    say: 'One more thing real games add: <b>Early Empire</b>, a cheap first tech that closes your borders. Once a civ knows it, stepping onto its land without an open-borders deal means war, with a confirm box first, and units already inside are moved out. ' +
+      'Ask for open borders in the Council. They last 30 turns. Nothing closes on this island, so you can walk anywhere here.',
     el: '#btn-council', done: () => false },
 
   // ── History ──
@@ -6538,7 +6744,7 @@ const TUT_STEPS = [
     enter: () => { selection = { kind: 'realm' }; }, el: '[data-act="moments"]',
     done: () => false },
   { ch: 'History', next: 'Next',
-    say: 'Other cards are warnings: someone declares war on you, takes one of your cities, launches a science trip, or the borders close. ' +
+    say: 'Other cards are warnings: someone declares war on you, takes one of your cities, launches a science trip, or a civ you have met closes its borders. ' +
       'If cards get in the way, turn <b>Event popups</b> off in the Menu. The points still count, and the history log keeps every line.',
     done: () => false },
 
@@ -6608,9 +6814,13 @@ const TIPS = [
   { id: 'zoc', test: i => ownUnits(i).find(u => u.pinned),
     say: () => 'That unit stepped into an enemy’s zone of control (the dashed yellow hexes), so its move ended there. It can still attack. Horse units ride straight through.',
     at: u => [u.x, u.y] },
-  { id: 'closing', test: i => G.closeTurn && !G.tut && G.turn >= G.closeTurn - 3 && G.turn < G.closeTurn,
-    say: () => 'The borders close on turn ' + G.closeTurn + '. After that, stepping onto another player’s land without an open-borders deal means war, and units still inside are moved out. Ask for open borders in the Council (D).',
-    el: '#btn-council' },
+  { id: 'closing',
+    test: i => !bordersNever() && !hasTech(i, 'earlyempire') &&
+      G.units.find(u => u.owner !== i && pl(u.owner).alive && hasMet(i, u.owner) && !atWar(i, u.owner) && visibleTo(u.x, u.y) && tileAt(u.x, u.y).owner === i),
+    say: (i, u) => esc(knownName(i, u.owner, true)) + '’s ' + esc(UNITS[u.type].name.toLowerCase()) + ' is standing on your land. Early Empire is a cheap tech that closes your borders: ' +
+      'other civs then need an open-borders deal to come in, and stepping in without one means war. Press T to research it.',
+    at: u => [u.x, u.y],
+    el: '#btn-tech' },
   { id: 'roads', test: i => hasTech(i, 'masonry') && ownCities(i).length >= 2 && roadChoices(ownCities(i)[0]).some(o => o.r.cost > 0),
     say: () => 'Masonry lets a city build a road to another of your cities. It costs production by the hex, and units move along paved hexes at half cost. Pick one under Roads in the city panel.',
     at: () => { const c = ownCities(G.viewer)[0]; return [c.x, c.y]; } },
@@ -6759,7 +6969,7 @@ function toast(message) {
   UI.toast.style.top = coach && coach.width && coach.left < innerWidth / 2 + 260 ? Math.round(coach.bottom + 8) + 'px' : '';
   UI.toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => UI.toast.classList.remove('show'), 2400);
+  toastTimer = setTimeout(() => UI.toast.classList.remove('show'), Math.max(2400, 1200 + message.length * 45));
 }
 
 const myTurn = () => !!G && !G.over && !G.handoff && !onlineSent && G.viewer !== null && G.cur === G.viewer;
@@ -6987,6 +7197,7 @@ function buildLabel(c) {
   if (!c.build) return 'Nothing';
   const def = itemDef(c.build);
   if (c.build.kind === 'research') return 'Research · +' + cityYields(c).prod + ' a turn';
+  if (c.build.kind === 'embassy' && c.build.ask) return def.name + ' (waiting for their answer)';
   if (c.wait && def.founds && c.pop < 2 && !civIs(c.owner, 'rome')) return def.name + ', waiting for pop 2';
   if (c.wait && stockShort(pl(c.owner), def)) return def.name + ', waiting for ' + (def.res.iron && pl(c.owner).iron < def.res.iron ? 'iron' : 'horses');
   return def.name + ' · ' + turnsText(turnsLeft(c));
@@ -7145,6 +7356,7 @@ function buildRow(c, item, mine) {
       : c.plot && c.plot[item.id] ? 'Has its hex: anything on it goes when it’s built'
       : 'Click, then pick a ' + (item.id === 'harbor' ? 'shallow water' : 'free land') + ' hex in the borders';
   }
+  if (!why && item.kind === 'embassy') note = embassyTargets(c).length === 1 ? 'One civ to ask' : 'Pick which of ' + embassyTargets(c).length + ' civs to ask';
   if (!why && item.kind === 'unit' && def.founds && c.pop < 2 && !civIs(c.owner, 'rome')) note = 'Waits for pop 2 to finish';
   if (!why && item.kind === 'unit' && def.res) {
     const need = [def.res.horses ? def.res.horses + ' horses' : '', def.res.iron ? def.res.iron + ' iron' : ''].filter(Boolean).join(' + ');
@@ -7153,7 +7365,7 @@ function buildRow(c, item, mine) {
   const disabled = !mine || !!why;
   const cost = costOf(c, item), t = turnsLeft(c, item);
   return '<button class="build-row' + (on ? ' on' : '') + '" data-act="setbuild:' + c.id + ':' + item.kind + ':' + item.id + '"' +
-    (disabled ? ' disabled' : '') + ' title="' + esc(def.blurb) + '">' + icon(item.kind === 'unit' ? iconOf(item.id) : item.kind === 'road' ? 'road' : item.id, 15) +
+    (disabled ? ' disabled' : '') + ' title="' + esc(def.blurb) + '">' + icon(item.kind === 'unit' ? iconOf(item.id) : item.kind === 'road' ? 'road' : item.kind === 'embassy' ? 'embassy' : item.id, 15) +
     '<span><span class="nm">' + def.name + '</span><span class="why">' + esc(note || def.blurb) + '</span></span>' +
     '<span class="cost">' + cost + (why ? '' : ' · ' + (isFinite(t) ? t + 't' : '∞')) + '</span></button>';
 }
@@ -7252,6 +7464,9 @@ function cityPanel(c) {
   if (roads.length) {
     html += '<p class="sec">' + icon('road', 12) + 'Roads</p><div class="build-list">' +
       roads.map(o => buildRow(c, { kind: 'road', id: o.d.id }, mine)).join('') + '</div>';
+  }
+  if (own && !G.tut && hasTech(c.owner, 'writing')) {
+    html += '<p class="sec">' + icon('embassy', 12) + 'Embassy</p><div class="build-list">' + buildRow(c, { kind: 'embassy', id: 'new' }, mine) + '</div>';
   }
   if (placing && placing.city === c.id) {
     html += '<p class="sec">Placing ' + esc(BUILDINGS[placing.item.id].name) + '</p>' +
@@ -7453,6 +7668,11 @@ function showHandoff() {
     (offers ? ' ' + plural(offers, 'offer is', 'offers are') + ' waiting in the Council.' : '');
 }
 
+// The extra line a tech shows. Early Empire says so when this game never closes borders.
+function techBlurb(id) {
+  if (id === 'earlyempire' && bordersNever()) return 'Closes nothing in this game, because borders never close. Writing still needs it';
+  return (TECHS[id] && TECHS[id].blurb) || '';
+}
 // What learning a tech lets this player do, in plain words.
 function techUnlocks(i, id) {
   const out = [];
@@ -7462,12 +7682,13 @@ function techUnlocks(i, id) {
     const d = IMPROVEMENTS[imp];
     if (d.tech === id && (!d.civ || d.civ === civOf(i))) out.push(d.name);
   }
-  if (TECHS[id] && TECHS[id].blurb) out.push(TECHS[id].blurb);
+  if (techBlurb(id)) out.push(techBlurb(id));
   return out;
 }
 
 // What a tech gives you, as {name, mark} pairs for the cards.
 const TECH_GAIN = {
+  writing:    { name: 'Embassy', mark: 'embassy' },
   navigation: { name: 'Deep sea for all', mark: 'navigation' },
   printing:   { name: 'Libraries +1 science', mark: 'library' },
   firearms:   { name: 'Shows gunpowder', mark: 'gunpowder' }
@@ -7489,6 +7710,7 @@ function techGains(i, id) {
     const d = IMPROVEMENTS[imp];
     if (d.tech === id && (!d.civ || d.civ === civOf(i))) out.push({ name: d.name, mark: markFor(imp, imp) });
   }
+  if (id === 'earlyempire') out.push({ name: bordersNever() ? 'Closes nothing here' : 'Closes your borders', mark: 'walls' });
   if (TECH_GAIN[id]) out.push(TECH_GAIN[id]);
   if (scienceOn()) for (const p of projectsOn(id)) out.push({ name: PROJECTS[p].name, mark: p });
   return out;
@@ -7505,9 +7727,9 @@ const TT_TOP = 26;   // room for the era labels
 // is dealt fresh each game, so its columns (one per step of depth) and rows
 // are worked out from what each tech needs.
 const TECH_ROW = {
-  mining: 0.5, husbandry: 2, pottery: 3, archery: 4, sailing: 5,
+  mining: 0.5, husbandry: 2, pottery: 3, earlyempire: 4, archery: 5, sailing: 6,
   bronze: 0, masonry: 1, riding: 2, writing: 3,
-  ironworking: 0, construction: 1, stirrups: 2, navigation: 3, math: 4, shipbuilding: 5
+  ironworking: 0, construction: 1, stirrups: 2, navigation: 3, math: 5, shipbuilding: 6
 };
 let techGridCache = null;
 function techGrid() {
@@ -7570,7 +7792,13 @@ function techTurns(i, id) {
 }
 const shortTurns = t => (isFinite(t) ? t + 't' : '∞');
 const techPlan = f => [f.research].concat(f.queue || []).filter(Boolean);
-const eraCost = (i, era) => Math.round(TECH_COST[era] * (civIs(i, 'uk') ? 0.75 : 1));
+// The era's research cost for the tree header: one number, or a range when a tech has its own cost.
+function eraCost(i, era) {
+  const k = civIs(i, 'uk') ? 0.75 : 1;
+  const costs = TECH_ORDER.filter(id => TECHS[id].era === era).map(id => Math.round((TECHS[id].cost || TECH_COST[era]) * k));
+  const lo = Math.min(...costs), hi = Math.max(...costs);
+  return lo === hi ? lo + ' rp each' : lo + '–' + hi + ' rp';
+}
 
 function techCardHTML(i, id) {
   const f = pl(i), at = techSpot(id), q = f.queue || [];
@@ -7607,7 +7835,7 @@ function techTreeHTML(i) {
   const height = Math.max(...all.map(id => techSpot(id).y)) + TT_H + 10;
   let html = '<div class="ttree-wrap"><div class="ttree" style="width:' + width + 'px;height:' + height + 'px">';
   [1, 2, 3, 4].forEach(era => {
-    html += '<span class="tera" style="left:' + (era - 1) * (TT_W + TT_GAP) + 'px">Era ' + era + ' · ' + eraCost(i, era) + ' rp each' +
+    html += '<span class="tera" style="left:' + (era - 1) * (TT_W + TT_GAP) + 'px">Era ' + era + ' · ' + eraCost(i, era) +
       (era === 4 ? ' · shuffled this game' : '') + '</span>';
   });
   html += '<span class="tera" style="left:' + techSpot('future').x + 'px">After the tree</span>';
@@ -7632,7 +7860,7 @@ function techDetail(i, id) {
   if (!techVisible(i, id)) return '<b>?</b> · A hidden era 4 tech. It shows once you know a tech it needs, or earn its eureka.';
   const q = f.queue || [];
   const known = id !== 'future' && hasTech(i, id);
-  const blurb = TECHS[id] && TECHS[id].blurb;
+  const blurb = techBlurb(id);
   const gains = id === 'future' ? ['+' + FUTURE.points + ' score each time, and it repeats forever'] : techGains(i, id).map(g => g.name);
   let status;
   if (known) status = 'known';
@@ -7698,6 +7926,10 @@ function raceLine(i) {
 const offerText = o => {
   const from = pl(o.from);
   if (o.kind === 'borders') return { tag: 'asks for open borders', cls: 'peace', note: 'Both of you may walk the other’s land for ' + OPEN_TURNS + ' turns. Sent on turn ' + o.turn + '. It lapses after 3 turns.' };
+  if (o.kind === 'embassy') {
+    const c = cityById(o.city);
+    return { tag: 'asks for an embassy', cls: 'peace', note: 'If you agree, ' + (c ? esc(c.name) + ' builds' : 'they build') + ' an embassy, and your capital shows on their map. Sent on turn ' + o.turn + '. It lapses after 3 turns.' };
+  }
   if (o.kind === 'trade') {
     const d = o.deal, per = Math.ceil(d.total / d.turns);
     return { tag: 'proposes a trade', cls: 'peace', note: esc(dealLine(d, G.viewer)) + ' Sent on turn ' + o.turn + '. It lapses after 3 turns.' + (tradeProblem(d) ? ' <b>Can’t be done right now: ' + esc(tradeProblem(d).toLowerCase()) + '.</b>' : '') };
@@ -7713,9 +7945,9 @@ function dealLine(d, me) {
   return who + d.qty + ' ' + d.res + (d.seller === me || d.buyer === me ? prep + other.name : ' from ' + pl(d.seller).name) +
     ' for ' + d.total + ' production' + (d.turns > 1 ? ', ' + per + ' a turn for ' + d.turns + ' turns.' : ', paid at once.');
 }
-const closeNote = () => !G.closeTurn || G.tut ? 'Borders never close in this game.'
-  : bordersClosed() ? 'Borders are closed. Stepping onto another player’s land without an open-borders deal means war.'
-  : 'Borders close on turn ' + G.closeTurn + ' (' + plural(G.closeTurn - G.turn, 'turn', 'turns') + ' from now). After that, stepping onto another player’s land without an open-borders deal means war.';
+const closeNote = () => bordersNever() ? 'Borders never close in this game.'
+  : hasTech(G.viewer, 'earlyempire') ? 'Your borders are closed.'
+  : 'Research Early Empire to close your borders.';
 
 function showCouncil() {
   UI.modalKind = null;
@@ -7756,29 +7988,58 @@ function showCouncil() {
     const att = o.human ? null : G.attitude[o.i][v] || 0;
     const mood = att === null ? '' : ' · ' + (att > 15 ? 'friendly' : att < -15 ? 'hostile' : 'wary') + ' toward you';
     const dealUntil = (G.open || []).find(d => G.turn < d.until && ((d.a === v && d.b === o.i) || (d.a === o.i && d.b === v)));
+    const embassy = hasEmbassy(v, o.i), cap = embassy && o.capital ? cityById(o.capital) : null;
+    const building = ownCities(v).find(d => embassyTo(d) === o.i);
     html += '<div class="council-row"><div><div class="cn">' + dot(o) + esc(fullName(o)) +
       ' <span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'at war' : 'at peace') + '</span>' +
       (dealUntil ? '<span class="tag peace">borders open to turn ' + (dealUntil.until - 1) + '</span>' : '') +
+      (embassy ? '<span class="tag peace">embassy</span>' : '') +
       (o.human ? '' : '<span class="tag">CPU</span>') + '</div>' +
       '<div class="cd">' + esc(CIVS[o.civ].focus) + ' · ' + plural(s.cities, 'city', 'cities') + ' · ' + plural(o.techs.length, 'tech', 'techs') +
-      ' · score ' + s.total + mood + '</div>' + (scienceOn() ? '<div class="cd">' + esc(raceLine(o.i)) + '</div>' : '') + '</div><div class="ca">';
+      ' · score ' + s.total + mood + '</div>' + (scienceOn() ? '<div class="cd">' + esc(raceLine(o.i)) + '</div>' : '') +
+      (embassy ? '<div class="cd">Embassy: capital ' + (cap ? esc(cap.name) : 'unknown') + ' · ' + plural(s.cities, 'city', 'cities') + '.</div>'
+        : building ? '<div class="cd">Embassy being built in ' + esc(building.name) + (building.build.ask ? ', waiting for their answer' : '') + '.</div>'
+        : hasTech(v, 'writing') && !G.tut ? '<div class="cd">Build an Embassy in one of your cities to ask them.</div>' : '') + '</div><div class="ca">';
+    if (cap) html += '<button class="act" data-act="embassy-look:' + o.i + '">Show capital</button>';
     if (myTurn()) {
       if (war) html += sent ? '<span class="tag">offer sent</span>' : '<button class="act" data-act="peace:' + o.i + '">Offer peace</button>';
       else {
-        if (!dealUntil && G.closeTurn && !G.tut) html += sentBorders ? '<span class="tag">borders offer sent</span>' : '<button class="act" data-act="open-ask:' + o.i + '">Open borders</button>';
+        if (!dealUntil && !bordersNever() && (landClosed(o.i) || landClosed(v))) html += sentBorders ? '<span class="tag">borders offer sent</span>' : '<button class="act" data-act="open-ask:' + o.i + '">Open borders</button>';
         html += '<button class="act" data-act="trade-ask:' + o.i + '">Trade</button>';
         html += '<button class="act warn" data-act="war-ask:' + o.i + '">Declare war</button>';
       }
     }
     html += '</div></div>';
   }
-  html += '<p class="hint">' + esc(closeNote()) + ' Open-borders deals last ' + OPEN_TURNS + ' turns, and units caught on land that closes to them are moved out. </p>' +
+  html += '<p class="hint">' + esc(closeNote()) + (bordersNever() ? '' : ' Stepping onto the land of a civ whose borders are closed, without an open-borders deal, means war, and units caught inside are moved out. ' +
+    'Open-borders deals last ' + OPEN_TURNS + ' turns.') + '</p>' +
     '<p class="hint">Everyone starts at peace. You can only attack players you are at war with. A CPU player takes peace when it is losing, ' +
     'tired of a long war, or busy with another war. Another human answers your offer on their own turn.</p>' +
     '<p class="hint"><b>Trade.</b> Horses, iron and gunpowder change hands at once. The buyer pays in production, in one go or in installments, and only war ends a deal. ' +
     'If the buyer starts the war, what it still owes is paid on the spot; if the seller does, the payments stop. Nobody trades production for production, and one payment can never top what the payer’s best city makes in a turn.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Close</button></div>';
   openModal(html);
+}
+
+// The box that opens from the Embassy item: which civ to ask. With a result it shows the answer instead.
+function showEmbassy(c, result) {
+  UI.modalKind = 'embassy';
+  let body, foot;
+  if (result) {
+    const o = pl(result.to), land = esc(landName(o));
+    body = result.r === 'yes' ? '<p><b>' + land + ' agrees.</b> ' + esc(c.name) + ' starts building the embassy.</p>'
+      : result.r === 'sent' ? '<p><b>' + land + '</b> answers in the Council on their turn. ' + esc(c.name) + ' starts building the embassy and holds it at full production until they do.</p>'
+      : '<p><b>' + land + ' won’t let you.</b> They don’t trust you enough yet.</p>';
+    foot = (result.r === 'no' ? '<button class="btn" data-act="embassy-back:' + c.id + '">Back</button>' : '') +
+      '<button class="btn primary" data-act="close">' + (result.r === 'no' ? 'Close' : 'Done') + '</button>';
+  } else {
+    const rows = embassyTargets(c).map(o => '<div class="council-row"><div><div class="cn">' + dot(o) + '<b>' + esc(landName(o)) + '</b> · ' + esc(o.name) + '</div></div>' +
+      '<div class="ca"><button class="act" data-act="embassy-pick:' + c.id + ':' + o.i + '">Ask</button></div></div>').join('');
+    body = rows || '<p class="hint">No civ to send one to.</p>';
+    foot = '<button class="btn" data-act="close">Cancel</button>';
+  }
+  openModal(modalHead('Send an embassy from ' + esc(c.name) + ' to…', result ? '' : 'Costs ' + EMBASSY_COST + ' production') +
+    '<div class="modal-body">' + body + '</div><div class="modal-foot">' + foot + '</div>');
 }
 
 // The trade form: what you buy or sell, how much, the price, and how it is paid.
@@ -7932,7 +8193,7 @@ function showHelp() {
     'Spare food grows the city (15 + 8 × pop to grow), and each new pop claims one more hex. Production goes into whatever the city is building, one thing at a time.</p>' +
     '<h3>Science</h3><p>Every city makes science: +1 per 2 pop, your capital +2, a Library +2 (+3 after Printing), a University +3, an Observatory +2 (+4 if the Library’s hex is next to a mountain). ' +
     'Geysers give +2 on their hex and the Great Barrier Reef +3 on each of its hexes. Each map’s famous mountain is plain mountains, but every land hex beside it gives +2. A city with a Library and nothing better to do can go on Research and turn a third of its production into science. ' +
-    'Techs cost 40, 100, 180 and 300 by era. Seven major techs have a eureka: do the thing on its card and it costs half. Press T for the tree, then click any tech to head for it: what it needs gets queued first.</p>' +
+    'Techs cost 40, 100, 180 and 300 by era, except Early Empire, which costs 25. Seven major techs have a eureka: do the thing on its card and it costs half. Press T for the tree, then click any tech to head for it: what it needs gets queued first.</p>' +
     '<h3>Era 4 is shuffled</h3><p>Like Civ’s Tech Shuffle, the six era 4 techs keep what they unlock, but what each one needs is dealt fresh every game, the same for everyone. ' +
     'An era 4 tech shows as “?” until you know a tech it needs or earn its eureka.</p>' +
     '<h3>Horses, iron and gunpowder</h3><p>Each pasture on horses and each mine on iron adds 2 to your stockpile a turn, up to 30. Gunpowder stays hidden in the ground until you learn Firearms; then mine it the same way. ' +
@@ -7951,8 +8212,15 @@ function showHelp() {
     '<h3>First contact</h3><p>Like Civ 6, you don’t know a civ until you meet it. You meet when one of your units or cities sees one of theirs, or any land they own (or when theirs sees yours): meeting is always mutual, and a card introduces them. ' +
     'Until then they show as <b>Unmet player</b> with a grey dot, they are missing from your Council, and you can’t declare war on them, trade with them or ask them for borders. A march never walks onto an unmet civ’s closed land: it stops on the hex before. ' +
     'Everyone you meet starts at peace. CPUs follow the same rules.</p>' +
-    '<h3>Borders and the Council</h3><p>From the turn set at the start (30 by default), every player’s land is closed to the others. Stepping onto it without an open-borders deal means war, and you are asked first. ' +
-    'Units caught inside when the borders close are moved out at the start of their turn. Ask for open borders in the Council: a deal lasts ' + OPEN_TURNS + ' turns.</p>' +
+    '<h3>Borders and the Council</h3><p>A civ’s land closes the moment it learns <b>Early Empire</b>, a cheap era 1 tech (25 research) that Writing needs. Until then its land is open to everyone. ' +
+    'Once it is closed, stepping onto it without an open-borders deal means war, and you are asked first. Only the civ that knows Early Empire closes: yours can stay open while theirs is closed. ' +
+    'Units caught inside when a civ closes are moved out at the start of their owner’s turn. Every human who has met that civ gets a card, and you get a note when it is yours. ' +
+    'Ask for open borders in the Council: a deal lasts ' + OPEN_TURNS + ' turns. A game can be set up so borders never close; Early Empire can still be researched, but it closes nothing.</p>' +
+    '<h3>Embassies</h3><p>Once you know Writing, every city can build an <b>Embassy</b> (30 production). Pick it, then pick a civ you have met that is at peace with you, has no embassy with you yet and is not already getting one from another of your cities. ' +
+    'They answer at once. A CPU says yes unless it is at war with you, dislikes you or is about to attack you: a yes gives +2 attitude and the city starts building “Embassy to …”, a no changes nothing and you can ask another civ. ' +
+    'Another human answers in the Council on their turn: the city holds at full production until they do, and a refusal or a lapsed offer cancels it, saving the production for the next thing you build. ' +
+    'War with them, or their elimination, cancels it the same way. When it finishes, their capital and every hex within 2 of it are marked on your map, dimmed like any hex you have seen but not live vision, and a CPU likes you 5 more. ' +
+    'If their capital moves, the new one is marked at the start of your turn. An embassy survives war and peace; only their elimination ends it. The Council shows it, with a Show capital button.</p>' +
     '<h3>Declaring war with an order</h3><p>You don’t have to go to the Council. Order a soldier to attack another player’s unit or city, or to walk onto a civilian of theirs, while you are at peace, and you are asked first: “Declare war on …?”. Say yes and war starts, then the order is carried out; say no and nothing changes. A target too far away this turn never asks, and a civ you haven’t met can’t be targeted.</p>' +
     '<h3>Trading</h3><p>Horses, iron and gunpowder can be bought and sold in the Council, for production. The resource changes hands at once; the buyer pays in one go or in installments (5 a turn for 10 turns, say). ' +
     'Only war cancels a deal: if the buyer starts it, everything still owed is paid on the spot; if the seller does, the payments stop. Production never trades for production, and a payment can’t top what the payer’s best city makes in a turn. CPUs price by supply and demand.</p>' +
@@ -7986,7 +8254,7 @@ function showHelp() {
     '<h3>Historic moments</h3><p>Like Civ 6’s era score. Reaching a milestone for the first time pops up a card and pays 1 to 3 era points into your Score: ' +
     'seeing a natural wonder, a city on a new continent, first contact, first blood, taking a city or a capital (or winning one back), making peace, an open-borders or trade deal, ' +
     'a first road, a city of pop 8, five cities, a University, each new era, each science step, and sending out the last trip. Every civ earns each one once, and the first civ in the world to earn it gets double. ' +
-    'The Realm panel lists them all. Other cards warn you when someone declares war on you, takes one of your cities or launches a science trip, and when the borders close. ' +
+    'The Realm panel lists them all. Other cards warn you when someone declares war on you, takes one of your cities or launches a science trip, and when a civ you have met closes its borders. ' +
     'Turn Event popups off in Options (or the Menu) and the points still count.</p>' +
     '<h3>Keys</h3><p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
     '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
@@ -8082,10 +8350,7 @@ function doEndTurn() {
   if (G.turn !== turnBefore) rollTurnSave();
   render();
   if (!G.handoff && !G.over && G.viewer === before) {
-    toast('Turn ' + G.turn);
-    const offers = G.offers.filter(o => o.to === G.viewer).length;
-    if (offers) toast(plural(offers, 'offer is', 'offers are') + ' waiting in the Council.');
-    else if (needsTech(G.viewer)) toast('Pick your next tech. Press T.');
+    toast(noticeFor(G.viewer) || 'Turn ' + G.turn);
   }
 }
 
@@ -8187,8 +8452,7 @@ function onAction(act) {
       render();
       focusPlayer(G.viewer);
       autosave();
-      if (G.offers.some(o => o.to === G.viewer)) toast('An offer is waiting in the Council.');
-      else if (needsTech(G.viewer)) toast('Pick your next tech. Press T.');
+      { const note = noticeFor(G.viewer); if (note) toast(note); }
       break;
     case 'next-unit': {
       if (!myTurn()) break;
@@ -8226,6 +8490,8 @@ function onAction(act) {
       const c = cityById(a);
       if (c && c.owner === G.viewer && myTurn()) {
         const item = { kind: b, id: parts[3] };
+        // The Embassy item opens a box to pick which civ to ask.
+        if (item.kind === 'embassy') { if (!buildProblem(c, item)) showEmbassy(c); break; }
         // Buildings off the city center wait for the player to pick a hex.
         if (item.kind === 'building' && needsPlot(item.id) && !buildProblem(c, item)) {
           placing = { city: c.id, item };
@@ -8241,6 +8507,20 @@ function onAction(act) {
           if (b === 'research' && !pl(G.viewer).research) toast('Now pick a tech for it. Press T.');
         }
       }
+      break;
+    }
+    case 'embassy-pick': {
+      const c = cityById(a), to = Number(b);
+      if (c && c.owner === G.viewer && myTurn()) {
+        const r = askEmbassy(c, to);
+        if (r) { render(); autosave(); showEmbassy(c, { to, r }); }
+      }
+      break;
+    }
+    case 'embassy-back': { const c = cityById(a); if (c && c.owner === G.viewer && myTurn()) showEmbassy(c); break; }
+    case 'embassy-look': {
+      const o = pl(Number(a)), cap = o && o.capital ? cityById(o.capital) : null;
+      if (cap && hasEmbassy(G.viewer, o.i)) lookAtSpot(cap.x, cap.y);
       break;
     }
     case 'cancel-place': placing = null; render(); break;
@@ -8505,7 +8785,7 @@ function askDeclareWar(u, x, y, war) {
 function askEnterWar(u, x, y) {
   const who = pl(closedOwner(u.owner, x, y));
   openModal(modalHead('Step onto ' + esc(knownName(G.viewer, who.i, true)) + '’s land?') +
-    '<div class="modal-body"><p>The borders are closed. Stepping onto ' + esc(knownName(G.viewer, who.i)) + '’s land means <b>war with them, starting now</b>. ' +
+    '<div class="modal-body"><p>Their borders are closed. Stepping onto ' + esc(knownName(G.viewer, who.i)) + '’s land means <b>war with them, starting now</b>. ' +
     'Their units can hit yours back, and you can make peace only if they agree.</p>' +
     '<p class="hint">To pass in peace, ask for open borders in the Council first.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Stay out</button>' +
@@ -9063,7 +9343,7 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '4.5';
+const VERSION = '4.6';
 
 /* ── the front end: a title screen, then game setup (like Civ 6) ───────────── */
 
@@ -9108,7 +9388,7 @@ function buildStartScreen() {
   UI.optSize.innerHTML = '<option value="auto">Fits the players</option>' + Object.keys(MAP_SIZES).map(id =>
     '<option value="' + id + '">' + MAP_SIZES[id].name + ' (' + MAP_SIZES[id].players + ')</option>').join('');
   UI.optLevel.innerHTML = Object.keys(LEVELS).map(id => '<option value="' + id + '">' + LEVELS[id].name + '</option>').join('');
-  UI.optClose.innerHTML = CLOSE_CHOICES.map(n => '<option value="' + n + '"' + (n === DEFAULT_CLOSE_TURN ? ' selected' : '') + '>' + (n ? 'Turn ' + n : 'Never') + '</option>').join('');
+  UI.optClose.innerHTML = BORDER_CHOICES.map(b => '<option value="' + b.id + '"' + (b.id === DEFAULT_BORDERS ? ' selected' : '') + '>' + b.name + '</option>').join('');
   UI.optClose.onchange = refreshStart;
   UI.optHumans.onchange = () => fitCounts('humans');
   UI.optCpus.onchange = () => fitCounts('cpus');
@@ -9162,7 +9442,8 @@ function fitCounts(changed) {
   UI.optCpus.value = String(c);
   refreshStart();
 }
-const CLOSE_CHOICES = [20, 30, 40, 60, 0];
+const BORDER_CHOICES = [{ id: 'tech', name: 'Close with Early Empire' }, { id: 'never', name: 'Never close' }];
+const DEFAULT_BORDERS = 'tech';
 const seatCounts = () => ({ humans: Number(UI.optHumans.value), cpus: Number(UI.optCpus.value) });
 function refreshStart() {
   const { humans, cpus } = seatCounts(), n = humans + cpus;
@@ -9194,22 +9475,21 @@ function refreshStart() {
   UI.sizeNote.textContent = MAP_SIZES[size].name + ' map, ' + MAP_SIZES[size].cols + ' × ' + MAP_SIZES[size].rows + ', built for ' +
     MAP_SIZES[size].players + ' players' + (n > MAP_SIZES[size].players ? '. That’s crowded for ' + n + '.' : n < MAP_SIZES[size].players / 2 ? '. Plenty of room for ' + n + '.' : '.');
   UI.levelNote.textContent = LEVELS[UI.optLevel.value].blurb;
-  const close = Number(UI.optClose.value);
-  UI.closeNote.textContent = close ? 'From turn ' + close + ', every player’s land is closed to the others: stepping onto it without an open-borders deal (made in the Council) means war.'
-    : 'Borders stay open all game: anyone can walk anywhere.';
+  UI.closeNote.textContent = UI.optClose.value === 'never' ? 'Borders stay open all game: anyone can walk anywhere. Early Empire can still be researched, but it closes nothing.'
+    : 'A civ’s land closes to the others when it researches Early Empire, a cheap first tech: stepping onto it without an open-borders deal (made in the Council) means war.';
   UI.startNote.innerHTML = START_NOTE;
   // Starting a game takes over the Autosave, so say so; named saves are never touched.
   const auto = online ? null : slotList().find(s => s.id === 'auto');
   UI.setupNote.textContent = auto ? 'Starting a game replaces your Autosave. Games you saved to a slot are kept.' : '';
 }
-// Back to the way a fresh visit starts: two humans, Pangaea, Normal, borders close on turn 30.
+// Back to the way a fresh visit starts: two humans, Pangaea, Normal, borders close with Early Empire.
 function resetSetup() {
   UI.optHumans.value = '2';
   UI.optCpus.value = '0';
   UI.optMap.value = 'pangaea';
   UI.optSize.value = 'auto';
   UI.optLevel.selectedIndex = 0;
-  UI.optClose.value = String(DEFAULT_CLOSE_TURN);
+  UI.optClose.value = DEFAULT_BORDERS;
   UI.optTurns.value = '100';
   UI.optConquest.checked = true;
   UI.optScience.checked = true;
@@ -9291,7 +9571,7 @@ function beginGame() {
   const seed = nextSeed();
   const game = startGame({ seats, maxTurns: turns, seed, map: UI.optMap.value, level: UI.optLevel.value,
     size: UI.optSize.value === 'auto' ? sizeFor(n) : UI.optSize.value,
-    wrap: UI.optWrap.checked, closeTurn: Number(UI.optClose.value),
+    wrap: UI.optWrap.checked, borders: UI.optClose.value === 'never' ? 'never' : 'tech',
     victory: { conquest: UI.optConquest.checked, science: UI.optScience.checked } });
   if (!game) { toast('That map didn’t work out. Try again, or pick a bigger size.'); return; }
   gamesStarted++;
@@ -9470,6 +9750,7 @@ function boot(data) {
       render();
       fitCamera();
       focusPlayer(seat - 1);
+      { const note = noticeFor(seat - 1); if (note) toast(note); }
       if (G.over && G.over.winner === seat - 1) onlineSubmit();
     }
   }
