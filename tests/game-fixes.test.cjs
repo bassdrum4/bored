@@ -1600,7 +1600,7 @@ test('Ashcrown orders: the same prompt for a city and for a lone civilian, which
   r.act('order-war:' + b.id + ':6:5');
   assert.equal(r.at(0, 1), true, 'war');
   assert.equal(r.get(prey, 'u.owner'), 0, 'captured');
-  assert.equal(r.get(prey, 'u.type'), r.run('unitFor(0, "builder")'), 'as a builder');
+  assert.equal(r.get(prey, 'u.type'), r.run('unitFor(0, "settler")'), 'still a settler');
   assert.equal(r.get(b, 'u.x') + ',' + r.get(b, 'u.y'), '6,5', 'the soldier stands where it stood');
   assert.equal(r.get(b, 'u.mp'), 0, 'and used up its moves');
   assert.equal(r.sel(), spare.id, 'on to the next unit');
@@ -1763,13 +1763,13 @@ test('Ashcrown orders: ships can\'t capture, and soldiers of every kind that wal
   }
 });
 
-test('Ashcrown orders: a captured settler becomes the captor\'s builder type, a captured builder keeps its charges up to that type\'s maximum', () => {
+test('Ashcrown orders: a captured settler stays a settler and a captured builder stays a builder, as the captor\'s own kind, keeping its charges up to that kind\'s maximum', () => {
   // [captor civ, victim civ, victim unit, charges before, type after, charges after]
   const cases = [
-    ['celts', 'rome', 'settler', null, 'woodsman', 3],
-    ['usa', 'rome', 'settler', null, 'builder', 4],
-    ['rome', 'rome', 'settler', null, 'builder', 3],
-    ['celts', 'usa', 'settler', null, 'woodsman', 3],   // a Pioneer
+    ['celts', 'rome', 'settler', null, 'settler', null],
+    ['usa', 'rome', 'settler', null, 'pioneer', null],   // the USA's own settler
+    ['rome', 'rome', 'settler', null, 'settler', null],
+    ['celts', 'usa', 'settler', null, 'settler', null],  // a Pioneer comes over as a plain settler
     ['usa', 'rome', 'builder', 1, 'builder', 1],
     ['rome', 'rome', 'builder', 2, 'builder', 2],
     ['celts', 'usa', 'builder', 4, 'woodsman', 3],       // a 4-charge American builder, capped at the Woodsman's 3
@@ -1788,9 +1788,9 @@ test('Ashcrown orders: a captured settler becomes the captor\'s builder type, a 
     const label = captor + ' takes ' + victim + ' ' + was + (charges === null ? '' : ' (' + charges + ' left)');
     assert.equal(r.get(prey, 'u.owner'), 0, label);
     assert.equal(r.get(prey, 'u.type'), type, label + ': becomes a ' + type);
-    assert.equal(r.get(prey, 'u.charges'), left, label + ': ' + left + ' charges');
+    assert.equal(r.get(prey, 'u.charges === undefined ? null : u.charges'), left, label + ': ' + left + ' charges');
     assert.equal(r.get(by, 'u.mp'), 0, label + ': the soldier uses up its moves');
-    assert.equal(r.get(prey, 'u.mp'), 0, 'the new builder waits a turn');
+    assert.equal(r.get(prey, 'u.mp'), 0, 'the captured unit waits a turn');
     const land = id => r.run('CIVS["' + id + '"].land');
     const line = r.logs(0).at(-1);
     assert.equal(line, land(captor) + ' captured a ' + land(victim) + ' ' + was + (wasType !== type ? ' (now a ' + r.get(prey, 'UNITS[u.type].name.toLowerCase()') + ').' : '.'), label + ': the history line');
@@ -1890,11 +1890,11 @@ test('Ashcrown orders: a CPU at war captures a lone settler next to its soldier,
   r.ready();
   r.run('aiSoldier(pl(2), unitById("' + mine.id + '"))');
   assert.equal(r.get(settler, 'u.owner'), 2, 'the settler is taken, though the builder was as close');
-  assert.equal(r.get(settler, 'u.type'), r.run('unitFor(2, "builder")'), 'as a builder');
+  assert.equal(r.get(settler, 'u.type'), r.run('unitFor(2, "settler")'), 'still a settler');
   assert.equal(r.get(builder, 'u.owner'), 0, 'the builder waits for another day');
   assert.equal(r.get(mine, 'u.mp'), 0);
   assert.equal(r.news(0, 'captured').length, 1, 'and the human who lost it is told');
-  assert.ok(r.logs(0).some(t => / captured a .* settler \(now a builder\)\.$/.test(t)));
+  assert.ok(r.logs(0).some(t => / captured a .* settler( \(now a \w+\))?\.$/.test(t)));
   // A builder alone is taken too.
   const q = ordersRig();
   q.war(0, 2);
