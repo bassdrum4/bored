@@ -355,6 +355,15 @@
   }
   #title-foot { margin-top: 6px }
 
+  .notes { min-width: 0 }
+  .notes .notes-now, .notes summary { font-family: var(--font-display); font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink) }
+  .notes .notes-now { margin: 0 0 6px }
+  .notes-list { margin: 0 0 4px; padding-left: 18px; font-size: 12.5px; color: var(--ink-2); line-height: 1.45 }
+  .notes-list li { margin-bottom: 4px; overflow-wrap: anywhere }
+  .notes-old { border-top: 1px solid var(--rule); margin-top: 10px; padding-top: 8px }
+  .notes-old summary { cursor: pointer; font-size: 13.5px; margin-bottom: 6px; overflow-wrap: anywhere }
+  .notes-old:not([open]) summary { margin-bottom: 0 }
+
   .setup-inner { width: min(1040px, 100%); margin-inline: auto; display: flex; flex-direction: column }
   .setup-head h2 { font-family: var(--font-display); font-size: clamp(28px, 5vw, 38px); font-weight: 600; letter-spacing: -.01em; margin: 4px 0 0 }
   .setup-grid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 16px }
@@ -651,6 +660,7 @@
         <button class="fe-item" id="btn-tutorial" type="button" data-act="tut-start"><span class="mi">Tutorial</span><span class="mi-tag" id="tut-tag">New here? Start here</span><span class="mi-sub" id="tut-sub"></span></button>
         <button class="fe-item" id="btn-civs" type="button" data-act="civs"><span class="mi">Civs</span><span class="mi-sub">All 16, with what each one does</span></button>
         <button class="fe-item" id="btn-help" type="button" data-act="help"><span class="mi">How to play</span><span class="mi-sub">The whole rulebook on one page</span></button>
+        <button class="fe-item" id="btn-notes" type="button" data-act="whats-new"><span class="mi">What’s new</span><span class="mi-tag" id="notes-tag" hidden>New</span><span class="mi-sub">Patch notes for every update</span></button>
         <button class="fe-item" id="btn-options" type="button" data-act="options"><span class="mi">Options</span><span class="mi-sub">Tips, event popups and animation</span></button>
       </nav>
       <p class="fine" id="title-foot">Civ Lite <span id="title-ver"></span> · one device, 1 to 8 players</p>
@@ -6340,6 +6350,15 @@ function setPopups(on) { popupsSwitch = on; writePref('popups', on); }
 let jumpSwitch = null;   // this visit's setting when storage is blocked
 const jumpOn = () => (jumpSwitch !== null ? jumpSwitch : readPrefs().jump !== false);
 function setJump(on) { jumpSwitch = on; writePref('jump', on); }
+// The What’s new screen: the version whose notes this device has opened.
+let notesSwitch = null;   // this visit's value when storage is blocked
+function notesNew() { return (notesSwitch !== null ? notesSwitch : readPrefs().notesSeen) !== VERSION; }
+function markNotesSeen() { notesSwitch = VERSION; writePref('notesSeen', VERSION); }
+// Someone with no prefs and no saves is new here and has missed nothing, so the notes start out seen.
+function firstVisitNotes() {
+  if (Object.keys(readPrefs()).length || slotList().length) return;
+  markNotesSeen();
+}
 
 /* ── the tutorial island ───────────────────────────────────────────────────── */
 
@@ -8150,6 +8169,7 @@ function showMenu() {
   openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name) +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
+    '<button class="act" data-act="whats-new">What’s new</button>' +
     '<button class="act" data-act="civs">All 16 civs</button>' +
     (G.tut ? '<button class="act switch" data-act="coach-toggle">Tutorial coach<b>' + (G.tut.closed ? 'off' : 'on') + '</b></button>'
       : '<button class="act" data-act="tut-start">Play the tutorial</button>') +
@@ -8375,6 +8395,7 @@ function onAction(act) {
   if (kind === 'zoom-fit') { fitCamera(); return; }
   if (kind === 'civs') { showCivs(); return; }
   if (kind === 'help') { showHelp(); return; }
+  if (kind === 'whats-new') { showWhatsNew(); return; }
   if (kind === 'options') { showOptions(); return; }
   if (kind === 'title-new') { showPane('setup'); return; }
   if (kind === 'title-back') { showPane('title'); return; }
@@ -9343,7 +9364,69 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '4.6';
+const VERSION = '4.6.1';
+// Patch notes for the What’s new screen, newest first: a version, a date and one plain line per change.
+const CHANGELOG = [
+  { v: '4.6.1', date: 'Nov 7', notes: [
+    'A What’s new screen: patch notes for every update, on the title screen and in the Menu.'
+  ] },
+  { v: '4.6', date: 'Nov 7', notes: [
+    'Early Empire: a cheap new tech (25) that closes your borders. Each civ closes its own land when it learns it.',
+    'Game setup: borders close with Early Empire, or never.',
+    'Writing now needs Early Empire.',
+    'Embassies: pick Embassy in a city, choose a civ, and they say yes or no. Once it’s built, their capital shows on your map.',
+    'CPUs research Early Empire early, sooner if a war wonder is near them.'
+  ] },
+  { v: '4.5 orders', date: 'Nov 6', notes: [
+    'When a unit has used up its turn, the next unit that needs orders is picked for you. Turn it off in Options.',
+    'Attacking someone you’re at peace with asks “Declare war?” first.',
+    'Any land soldier can capture a lone settler or builder. It stays a settler or builder, as your own kind.',
+    'You get a card when one of your units is captured, and CPUs capture too.'
+  ] },
+  { v: '4.5', date: 'Nov 6', notes: [
+    'First contact, like Civ 6: other civs show as Unmet player until you meet them, with a card when you do.',
+    'The Council only lists civs you’ve met.',
+    'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.',
+    'The warrior carries a proper club.'
+  ] },
+  { v: '4.4', date: 'Nov 6', notes: [
+    'A Civ 6 style title screen.',
+    'Everything about starting a game moved to a Game setup screen behind New game.'
+  ] },
+  { v: '4.3', date: 'Nov 6', notes: [
+    'Save slots: 8 named saves, an autosave and the last 3 turns.',
+    'Save and Load screens, and Ctrl+S.'
+  ] },
+  { v: '4.2.1–4.2.3', date: 'Nov 6', notes: [
+    'A hex never holds two soldiers.',
+    'Ships launch onto the water beside their city and can’t take cities, except Norway’s.',
+    'Two error fixes.'
+  ] },
+  { v: '4.2', date: 'Nov 6', notes: [
+    'Historic moments earn era points toward your score.',
+    'Cards for the big events, and an animated wonder card.',
+    'A new 33-step tutorial for first-timers.'
+  ] },
+  { v: '4.1', date: 'Nov 6', notes: [
+    'A popup when you find a natural wonder.',
+    'A longer tutorial.'
+  ] },
+  { v: '4.0', date: 'Nov 4', notes: [
+    'Units and buildings you haven’t researched stay hidden.',
+    'Roads between your cities.',
+    'Borders close, and stepping in without an open-borders deal means war.',
+    'Trade horses, iron and gunpowder for production.',
+    'The map can wrap from west to east.',
+    'Buildings upgrade in tiers.',
+    'Terrain is more spread out, and the keys follow Civ 6.'
+  ] },
+  { v: 'Before 4.0', date: 'Nov 3–4', notes: [
+    '3.3: marches over several turns, and buildings on their own hexes.',
+    '3.2: real city and wonder names.',
+    '3.1: bold tile art, natural wonders and leader names.',
+    '3.0: a research revamp, a science victory, and up to 8 players.'
+  ] }
+];
 
 /* ── the front end: a title screen, then game setup (like Civ 6) ───────────── */
 
@@ -9402,6 +9485,7 @@ function buildStartScreen() {
   UI.btnBegin.onclick = beginGame;
   UI.btnContinue.onclick = () => { if (!loadSlot('auto')) { toast('That save can’t be opened.'); refreshTitle(); } };
   document.getElementById('title-ver').textContent = 'v' + VERSION;
+  firstVisitNotes();
   refreshStart();
   drawTitleArt();
   showPane('title');
@@ -9431,8 +9515,10 @@ function refreshTitle() {
   UI.btnContinue.classList.toggle('primary', !!auto);
   UI.btnNew.classList.toggle('primary', !auto);
   document.getElementById('tut-tag').hidden = tutorialDone();
+  refreshNotesTag();
   document.getElementById('tut-sub').textContent = TUT_STEPS.length + ' short steps on a small island, playing Rome';
 }
+function refreshNotesTag() { document.getElementById('notes-tag').hidden = !notesNew(); }
 // 2 to 8 players in all: changing one count trims the other to fit.
 function fitCounts(changed) {
   let h = Number(UI.optHumans.value), c = Number(UI.optCpus.value);
@@ -9502,6 +9588,18 @@ function resetSetup() {
   });
   refreshStart();
   toast('Back to the default setup.');
+}
+// Patch notes: the newest entry open, every older one folded away. Opening it marks the notes as seen.
+function showWhatsNew() {
+  markNotesSeen();
+  refreshNotesTag();
+  const bullets = e => '<ul class="notes-list">' + e.notes.map(n => '<li>' + esc(n) + '</li>').join('') + '</ul>';
+  const title = e => esc(e.v) + ' · ' + esc(e.date);
+  openModal(modalHead('What’s new', 'Civ Lite ' + VERSION) +
+    '<div class="modal-body notes"><h3 class="notes-now">' + title(CHANGELOG[0]) + '</h3>' + bullets(CHANGELOG[0]) +
+    CHANGELOG.slice(1).map(e => '<details class="notes-old"><summary>' + title(e) + '</summary>' + bullets(e) + '</details>').join('') +
+    '</div><div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>', true);
+  UI.modalKind = 'notes';
 }
 // The switches that live on this device: in Options here, and in the in-game Menu.
 function showOptions() {

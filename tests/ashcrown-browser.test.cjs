@@ -351,3 +351,91 @@ for (const width of [1000, 400, 320]) {
     assert.deepEqual(errors, []);
   });
 }
+
+/* ── 4.6.1: What’s new, from the title screen and from the Menu ───────────── */
+
+for (const width of [400, 320]) {
+  test('Ashcrown 4.6.1: What’s new opens from the title screen and from the Menu, newest entry open, older ones folded, no sideways scroll (' + width + 'px)', async t => {
+    const { page, errors } = await open(t, width);
+    const PREFS = 'bored.civlite.prefs.v1';
+    const visible = sel => page.evaluate(s => { const e = document.querySelector(s); return !!e && e.getClientRects().length > 0 && !e.hidden; }, sel);
+    const prefs = () => page.evaluate(k => JSON.parse(localStorage.getItem(k) || '{}'), PREFS);
+    const modalText = () => page.evaluate('(() => { const m = document.querySelector(".modal"); return m && m.offsetParent !== null ? m.textContent : ""; })()');
+    // The notes screen as it should look when first opened.
+    const checkOpenScreen = async label => {
+      assert.match(await modalText(), /What’s new\s*Civ Lite 4\.6\.1/, label + ': head and sub');
+      assert.equal(await page.$eval('.modal .notes-now', e => e.textContent), '4.6.1 · Nov 7', label + ': the newest entry is open at the top');
+      assert.ok((await page.$eval('.modal .notes-now + .notes-list', e => e.textContent)).startsWith('A What’s new screen'));
+      const folds = await page.$$eval('.modal details.notes-old', ds => ds.map(d => ({ open: d.open, summary: d.querySelector('summary').textContent })));
+      assert.equal(folds.length, 10, label + ': ten older entries');
+      assert.ok(folds.every(f => !f.open), label + ': all folded');
+      assert.deepEqual(folds.slice(0, 2).map(f => f.summary), ['4.6 · Nov 7', '4.5 orders · Nov 6']);
+      assert.equal(folds.at(-1).summary, 'Before 4.0 · Nov 3–4');
+      assert.deepEqual(await page.evaluate(fits), [], label + ': fits');
+    };
+
+    // A first visit (no prefs, no saves) is quiet: no New tag, and the Tutorial's tag is the only one.
+    assert.equal(await visible('#notes-tag'), false, 'no New tag on a first visit');
+    assert.equal(await visible('#tut-tag'), true, 'the Tutorial still says where to start');
+    assert.equal((await prefs()).notesSeen, '4.6.1', 'the notes were quietly marked seen');
+
+    // Someone who has played before and has not read these notes: the tag shows, styled like the Tutorial's.
+    await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ tips: true, notesSeen: '4.6' })), PREFS);
+    await page.reload();
+    await page.waitForSelector('#btn-new', { visible: true });
+    assert.equal(await visible('#notes-tag'), true, 'New shows when the notes have not been opened');
+    assert.equal(await page.$eval('#notes-tag', e => e.textContent), 'New');
+    const same = await page.evaluate(() => {
+      const a = getComputedStyle(document.getElementById('notes-tag')), b = getComputedStyle(document.getElementById('tut-tag'));
+      return ['color', 'borderTopColor', 'fontSize', 'textTransform'].every(k => a[k] === b[k]);
+    });
+    assert.equal(same, true, 'styled like the Tutorial’s tag');
+    const order = await page.$$eval('#title-menu .fe-item:not([hidden]) .mi', els => els.map(e => e.textContent));
+    assert.deepEqual(order.slice(-3), ['How to play', 'What’s new', 'Options'], 'after How to play, before Options');
+    assert.equal(await page.$eval('#btn-notes .mi-sub', e => e.textContent), 'Patch notes for every update');
+
+    // Open it with a real click on the title screen.
+    await page.click('#btn-notes');
+    await checkOpenScreen('title');
+    assert.equal(await visible('#notes-tag'), false, 'opening the screen takes the tag off');
+    assert.equal((await prefs()).notesSeen, '4.6.1');
+    // A real click on an older entry opens it, and only that one.
+    await page.click('.modal details.notes-old summary');
+    assert.deepEqual(await page.$$eval('.modal details.notes-old', ds => ds.map(d => d.open).slice(0, 3)), [true, false, false]);
+    assert.ok((await page.$eval('.modal details.notes-old[open]', e => e.textContent)).includes('Early Empire: a cheap new tech (25)'));
+    // Everything open: still no sideways scroll, and the list scrolls inside the box with Close in reach.
+    await page.evaluate(() => document.querySelectorAll('.modal details').forEach(d => { d.open = true; }));
+    assert.deepEqual(await page.evaluate(fits), [], 'all entries open: fits');
+    const box = await page.evaluate(() => {
+      const m = document.querySelector('.modal'), body = m.querySelector('.modal-body'), foot = m.querySelector('.modal-foot .btn').getBoundingClientRect(), r = m.getBoundingClientRect();
+      const before = body.scrollTop;
+      body.scrollTop = body.scrollHeight;
+      return { sideways: body.scrollWidth > body.clientWidth + 1, scrolls: body.scrollHeight > body.clientHeight, moved: body.scrollTop > before, overflowY: getComputedStyle(body).overflowY,
+        inside: r.top >= -0.5 && r.bottom <= innerHeight + 0.5, close: foot.bottom <= innerHeight + 0.5 && foot.top >= 0, page: document.documentElement.scrollWidth <= document.documentElement.clientWidth };
+    });
+    assert.deepEqual(box, { sideways: false, scrolls: true, moved: true, overflowY: 'auto', inside: true, close: true, page: true });
+    // Close with the real button; the tag stays gone, also after a reload.
+    await page.click('.modal-foot .btn.primary');
+    assert.equal(await modalText(), '');
+    assert.equal(await visible('#notes-tag'), false);
+    await page.reload();
+    await page.waitForSelector('#btn-new', { visible: true });
+    assert.equal(await visible('#notes-tag'), false, 'still seen after a reload');
+
+    // From the Menu in a game: the same screen, folded the same way, and no tag.
+    await page.evaluate(`(() => {
+      setTips(false);
+      startGame({ seats: ${SEATS}, seed: 4242, map: 'pangaea', level: 'normal' });
+      UI.start.hidden = true; G.handoff = false;
+      render();
+    })()`);
+    await page.click('#btn-menu');
+    assert.match(await modalText(), /Menu/);
+    assert.equal(await page.$$eval('.modal .mi-tag', els => els.length), 0, 'no tag in the Menu');
+    await page.click('.modal [data-act="whats-new"]');
+    await checkOpenScreen('menu');
+    await page.click('.modal-foot .btn.primary');
+    assert.equal(await modalText(), '');
+    assert.deepEqual(errors, []);
+  });
+}

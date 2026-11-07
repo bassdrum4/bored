@@ -583,10 +583,10 @@ test('Ashcrown opens on a title menu, and setup holds every game option', () => 
   const start = html.match(/<div id="start" class="screen">[\s\S]*?\n<script>/)[0];
   const title = start.slice(start.indexOf('id="pane-title"'), start.indexOf('id="pane-setup"'));
   const setup = start.slice(start.indexOf('id="pane-setup"'));
-  const order = ['btn-continue', 'btn-new', 'btn-load', 'btn-tutorial', 'btn-civs', 'btn-help', 'btn-options'];
+  const order = ['btn-continue', 'btn-new', 'btn-load', 'btn-tutorial', 'btn-civs', 'btn-help', 'btn-notes', 'btn-options'];
   const at = order.map(id => title.indexOf('id="' + id + '"'));
-  assert.ok(at.every(n => n > 0) && at.every((n, i) => !i || n > at[i - 1]), 'title menu: Continue, New game, Load game, Tutorial, Civs, How to play, Options');
-  for (const [id, act] of [['btn-new', 'title-new'], ['btn-load', 'slots:load'], ['btn-tutorial', 'tut-start'], ['btn-civs', 'civs'], ['btn-help', 'help'], ['btn-options', 'options']]) {
+  assert.ok(at.every(n => n > 0) && at.every((n, i) => !i || n > at[i - 1]), 'title menu: Continue, New game, Load game, Tutorial, Civs, How to play, What’s new, Options');
+  for (const [id, act] of [['btn-new', 'title-new'], ['btn-load', 'slots:load'], ['btn-tutorial', 'tut-start'], ['btn-civs', 'civs'], ['btn-help', 'help'], ['btn-notes', 'whats-new'], ['btn-options', 'options']]) {
     assert.match(title, new RegExp('id="' + id + '"[^>]*data-act="' + act + '"'), id + ' runs ' + act);
   }
   assert.match(title, /id="btn-continue"[^>]*hidden/, 'Continue is hidden until there is an autosave');
@@ -603,7 +603,7 @@ test('Ashcrown routes the title screen\'s actions before the no-game guard, and 
   const html = load('src/games/content/ashcrown.html');
   const body = extractFunction(html, 'onAction');
   const guard = body.indexOf('if (!G) {');
-  for (const kind of ['civs', 'help', 'options', 'title-new', 'title-back', 'setup-reset', 'tut-start']) {
+  for (const kind of ['civs', 'help', 'whats-new', 'options', 'title-new', 'title-back', 'setup-reset', 'tut-start']) {
     const spot = body.indexOf("kind === '" + kind + "'");
     assert.ok(spot > 0 && spot < guard, kind + ' works with no game running');
   }
@@ -687,7 +687,8 @@ test('Ashcrown\'s title shows Continue and Load game from the saves, and never r
   const r = slotRig();
   const html = r.get('1') && load('src/games/content/ashcrown.html');
   const mk = (extra = {}) => ({ hidden: false, textContent: '', classList: { on: {}, toggle(name, on) { this.on[name] = !!on; } }, ...extra });
-  const els = { 'continue-sub': mk(), 'continue-detail': mk(), 'continue-medal': mk({ innerHTML: '' }), 'load-sub': mk(), 'tut-tag': mk(), 'tut-sub': mk() };
+  const els = { 'continue-sub': mk(), 'continue-detail': mk(), 'continue-medal': mk({ innerHTML: '' }), 'load-sub': mk(), 'tut-tag': mk(), 'tut-sub': mk(), 'notes-tag': mk() };
+  r.ctx.refreshNotesTag = () => {};   // the What’s new tag has its own test
   r.ctx.slotMedal = head => '<svg data-civ="' + head.civ + '"></svg>';
   r.ctx.document = { getElementById: id => els[id] };
   r.ctx.UI = { btnContinue: mk(), btnLoad: mk(), btnNew: mk() };
@@ -2592,4 +2593,121 @@ test('Ashcrown 4.6: the Council shows the embassy tag, the capital name and city
   none.run('showCouncil()');
   none.act('embassy-look:2');
   assert.equal(none.camera.length, 0, 'no embassy, no look');
+});
+
+/* ── 4.6.1: the What’s new screen ──────────────────────────────────────────── */
+
+const NOTES_PREFS = 'bored.civlite.prefs.v1';
+// civRig runs the whole game script on real functions; this adds the few page elements the title code writes to.
+function notesRig() {
+  const r = civRig(FOUR);
+  const els = {};
+  for (const id of ['continue-sub', 'continue-detail', 'continue-medal', 'load-sub', 'tut-tag', 'tut-sub', 'notes-tag']) els[id] = { hidden: false, textContent: '', innerHTML: '' };
+  r.ctx.document = { getElementById: id => els[id] };
+  const btn = () => ({ hidden: false, classList: { toggle() {} } });
+  r.ctx.btns = [btn(), btn(), btn()];
+  r.run('UI = { modalKind: null, btnContinue: btns[0], btnLoad: btns[1], btnNew: btns[2] }');
+  r.els = els;
+  r.title = () => { r.run('refreshTitle()'); return { notes: !els['notes-tag'].hidden, tutorial: !els['tut-tag'].hidden }; };
+  r.prefs = () => JSON.parse(r.store.get(NOTES_PREFS) || '{}');
+  return r;
+}
+
+test('Ashcrown 4.6.1: the changelog is newest first, its newest entry is this version, and every entry has a date and notes', () => {
+  const r = civRig(FOUR);
+  const log = jsonOf(r, 'CHANGELOG');
+  assert.equal(r.run('VERSION'), '4.6.1');
+  assert.equal(log[0].v, r.run('VERSION'), 'the newest entry is the current version');
+  assert.deepEqual(log.map(e => [e.v, e.date, e.notes.length]), [
+    ['4.6.1', 'Nov 7', 1], ['4.6', 'Nov 7', 5], ['4.5 orders', 'Nov 6', 4], ['4.5', 'Nov 6', 4], ['4.4', 'Nov 6', 2], ['4.3', 'Nov 6', 2],
+    ['4.2.1–4.2.3', 'Nov 6', 3], ['4.2', 'Nov 6', 3], ['4.1', 'Nov 6', 2], ['4.0', 'Nov 4', 7], ['Before 4.0', 'Nov 3–4', 4]
+  ], 'the entries, in order, with their dates and how many notes each has');
+  for (const e of log) {
+    assert.ok(e.v && e.date && e.notes.length >= 1, 'entry ' + e.v + ' has a version, a date and a note');
+    for (const n of e.notes) assert.ok(typeof n === 'string' && n.length > 0 && !/["']/.test(n), 'notes use typographic quotes: ' + n);
+  }
+  assert.equal(log[0].notes[0], 'A What’s new screen: patch notes for every update, on the title screen and in the Menu.');
+  assert.equal(log[2].notes[1], 'Attacking someone you’re at peace with asks “Declare war?” first.');
+  assert.equal(log[3].notes[2], 'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.');
+  assert.equal(log[10].notes[3], '3.0: a research revamp, a science victory, and up to 8 players.');
+});
+
+test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a first visit, and a new version brings it back', () => {
+  const r = notesRig();
+  // Someone who has played before (prefs exist) but has not opened these notes: the tag shows, next to the Tutorial's.
+  r.store.set(NOTES_PREFS, JSON.stringify({ tips: false, tutorialDone: false }));
+  assert.deepEqual(r.title(), { notes: true, tutorial: true });
+  assert.equal(r.run('notesNew()'), true);
+  // Opening the screen stores the version and takes the tag off at once.
+  r.run('showWhatsNew()');
+  assert.equal(r.prefs().notesSeen, '4.6.1', 'stored under the prefs key through writePref');
+  assert.equal(r.prefs().tips, false, 'the other prefs are left alone');
+  assert.equal(r.els['notes-tag'].hidden, true, 'the tag is gone behind the open screen');
+  assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'and stays gone');
+  assert.equal(r.run('notesNew()'), false);
+  // An older stored version brings it back (that is what a new release does).
+  r.store.set(NOTES_PREFS, JSON.stringify({ notesSeen: '4.6' }));
+  r.run('notesSwitch = null');
+  assert.deepEqual(r.title(), { notes: true, tutorial: true });
+  // The old localStorage keys are untouched: nothing else was written.
+  assert.deepEqual([...r.store.keys()].filter(k => k !== NOTES_PREFS), [], 'only the prefs key holds anything');
+});
+
+test('Ashcrown 4.6.1: a first visit (no prefs and no saves) starts with the notes seen, so the Tutorial is the only tag', () => {
+  let r = notesRig();
+  r.run('firstVisitNotes()');
+  assert.equal(r.prefs().notesSeen, '4.6.1');
+  assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'no New tag, and the Tutorial tag stays');
+  // Prefs but no saves, or saves but no prefs: not new here, so the tag shows.
+  r = notesRig();
+  r.store.set(NOTES_PREFS, JSON.stringify({ popups: true }));
+  r.run('firstVisitNotes()');
+  assert.equal(r.prefs().notesSeen, undefined, 'a device with prefs is not a first visit');
+  assert.equal(r.title().notes, true);
+  r = notesRig();
+  r.run('G.watch = false; G.tut = null; saveGame()');
+  assert.equal(r.run('slotList().length') > 0, true, 'the game wrote an autosave');
+  r.run('firstVisitNotes()');
+  assert.equal(r.store.has(NOTES_PREFS), false, 'a device with a save is not a first visit and nothing is written');
+  assert.equal(r.title().notes, true);
+  // Storage blocked: nothing throws, and the tag still goes for this visit once the notes are opened.
+  r = notesRig();
+  r.ctx.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); }, removeItem() { throw new Error('blocked'); } };
+  assert.doesNotThrow(() => r.run('firstVisitNotes()'));
+  assert.equal(r.run('notesNew()'), false, 'blocked storage looks like a first visit: no tag this visit');
+  r.run('notesSwitch = null');                       // as if this visit had started on a version that was not seen
+  assert.equal(r.run('notesNew()'), true, 'nothing could be kept');
+  r.run('refreshNotesTag()');
+  assert.equal(r.els['notes-tag'].hidden, false);
+  assert.doesNotThrow(() => r.run('showWhatsNew()'));
+  assert.equal(r.els['notes-tag'].hidden, true);
+  assert.equal(r.run('notesNew()'), false, 'seen for this visit');
+});
+
+test('Ashcrown 4.6.1: the What’s new screen opens the newest entry, folds every older one, and the Menu has the same button', () => {
+  const r = notesRig();
+  r.run('showWhatsNew()');
+  const html = r.modals.at(-1);
+  assert.match(html, /<h2>What’s new<\/h2><span class="sub">Civ Lite 4\.6\.1<\/span>/, 'head and sub');
+  assert.equal(r.run('UI.modalKind'), 'notes');
+  assert.ok(html.includes('<h3 class="notes-now">4.6.1 · Nov 7</h3>'), 'the newest entry is open at the top as version · date');
+  assert.ok(html.includes('<li>A What’s new screen: patch notes for every update, on the title screen and in the Menu.</li>'));
+  const details = html.match(/<details[^>]*>/g) || [];
+  assert.equal(details.length, 10, 'every older entry is a details element');
+  assert.ok(details.every(d => d === '<details class="notes-old">'), 'all of them closed');
+  assert.ok(html.includes('<summary>4.6 · Nov 7</summary>') && html.includes('<summary>Before 4.0 · Nov 3–4</summary>') && html.includes('<summary>4.2.1–4.2.3 · Nov 6</summary>'));
+  assert.ok(html.indexOf('<summary>4.6 · Nov 7</summary>') < html.indexOf('<summary>4.5 · Nov 6</summary>') && html.indexOf('<summary>4.5 · Nov 6</summary>') < html.indexOf('<summary>Before 4.0'), 'newest first');
+  assert.equal((html.match(/<li>/g) || []).length, 1 + 5 + 4 + 4 + 2 + 2 + 3 + 3 + 2 + 7 + 4, 'every note is listed once');
+  assert.ok(html.includes('Attacking someone you’re at peace with asks “Declare war?” first.'));
+  assert.match(html, /<div class="modal-foot"><button class="btn primary" data-act="close">Close<\/button><\/div>/, 'a Close button at the bottom');
+  // The in-game Menu opens the same screen and shows no tag.
+  r.run('showMenu()');
+  const menu = r.modals.at(-1);
+  assert.ok(menu.includes('<button class="act" data-act="whats-new">What’s new</button>'), 'the Menu has the button');
+  assert.ok(menu.indexOf('data-act="help">How to play') < menu.indexOf('data-act="whats-new"') && menu.indexOf('data-act="whats-new"') < menu.indexOf('data-act="civs"'), 'next to How to play');
+  assert.ok(!/class="mi-tag"|class="tag/.test(menu.slice(menu.indexOf('data-act="whats-new"'), menu.indexOf('data-act="civs"'))), 'no tag in the Menu');
+  const before = r.modals.length;
+  r.run('onAction("whats-new")');
+  assert.equal(r.modals.length, before + 1);
+  assert.equal(r.modals.at(-1), html, 'the Menu button opens the same screen');
 });
