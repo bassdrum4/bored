@@ -2726,9 +2726,9 @@ function computeReachable(u, foe) {
   return out;
 }
 
-// A soldier takes a civilian standing alone. A settler (or Pioneer) comes over as a builder of
-// the captor's own kind with that kind's full charges; a builder keeps the charges it has left,
-// up to what the captor's kind holds. The captor uses up its moves, and the loser gets a card.
+// A soldier takes a civilian standing alone. A settler stays a settler and a builder stays a builder,
+// each as the captor's own kind (so a Pioneer comes over as the captor's settler); a builder keeps the
+// charges it has left, up to what the captor's kind holds. The captor uses up its moves, and the loser gets a card.
 function captureCivilian(o, by) {
   const from = pl(o.owner), to = pl(by.owner), was = o.type;
   const near = byDistance(o, ownCities(from.i))[0] || null;
@@ -2741,9 +2741,11 @@ function captureCivilian(o, by) {
   o.sleep = false;
   o.pinned = false;
   if (!isMil(was) && (UNITS[was].founds || UNITS[was].charges)) {
-    o.type = unitFor(to.i, 'builder');
-    const max = chargesFor(to.i, o.type);
-    o.charges = UNITS[was].founds || !(o.charges > 0) ? max : Math.min(o.charges, max);
+    o.type = unitFor(to.i, UNITS[was].founds ? 'settler' : 'builder');
+    if (UNITS[o.type].charges) {
+      const max = chargesFor(to.i, o.type);
+      o.charges = o.charges > 0 ? Math.min(o.charges, max) : max;
+    } else delete o.charges;
   }
   o.mp = 0;
   o.acted = true;
@@ -7957,7 +7959,7 @@ function showHelp() {
     '<h3>Builders</h3><p>3 charges, each one instant, inside your borders only: farms on flat land and wheat, mines on hills and iron (Mining), pastures on horses (Animal Husbandry), ' +
     'fishing boats on seafood (Sailing). Chop a forest for 20 production or harvest wheat or seafood for 20 food. Builders can wade onto shallow water to reach seafood.</p>' +
     '<h3>Moving</h3><p>Hills and forest cost 2 moves, mountains are impassable, and a paved road hex costs half a move. Land units can step onto shallow water; deep sea needs Navigation. ' +
-    'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Any land soldier (melee, ranged, scout or siege) captures an enemy civilian standing alone by walking onto it; ships can’t. A captured settler comes over as a builder of your own kind, a captured builder keeps the charges it has left (up to what yours holds), and the soldier uses up its moves. ' +
+    'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Any land soldier (melee, ranged, scout or siege) captures an enemy civilian standing alone by walking onto it; ships can’t. A captured settler stays a settler and a captured builder stays a builder, each as your own kind; a builder keeps the charges it has left (up to what yours holds), and the soldier uses up its moves. ' +
     'The player who lost it gets a card.</p>' +
     '<h3>Longer marches</h3><p>With a unit selected, click any hex you have seen, even turns away: the unit walks as far as it can this turn and keeps going at the start of each turn until it arrives. ' +
     'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off.</p>' +
