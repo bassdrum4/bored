@@ -571,7 +571,7 @@ function frontRig() {
     closeModal: () => { ctx.UI.modalLayer.hidden = true; log.push('closeModal'); },
     showPane: name => log.push('pane:' + name), showOptions: () => log.push('options'), showMenu: () => log.push('menu'),
     refreshStart: () => log.push('refreshStart'), toast: message => log.push('toast:' + message),
-    SEATS: Array.from({ length: 8 }, (x, i) => ({ name: 'Player ' + (i + 1) })), DEFAULT_CLOSE_TURN: 30 });
+    SEATS: Array.from({ length: 8 }, (x, i) => ({ name: 'Player ' + (i + 1) })), DEFAULT_BORDERS: 'tech' });
   vm.runInContext(['frontKeys', 'resetSetup', 'redoSwitches'].map(name => extractFunction(html, name)).join('\n'), ctx);
   return { html, ctx, doc, log };
 }
@@ -650,7 +650,7 @@ test('Ashcrown\'s title screen keys: arrows walk the menu and wrap, Esc closes a
 test('Ashcrown\'s Reset to defaults puts every setup choice back, names and civs included', () => {
   const r = frontRig();
   r.ctx.UI = { optHumans: { value: '5' }, optCpus: { value: '3' }, optMap: { value: 'islands' }, optSize: { value: 'huge' },
-    optLevel: { value: 'deity', selectedIndex: 1 }, optClose: { value: '60' }, optTurns: { value: '7' },
+    optLevel: { value: 'deity', selectedIndex: 1 }, optClose: { value: 'never' }, optTurns: { value: '7' },
     optConquest: { checked: false }, optScience: { checked: false }, optWrap: { checked: true } };
   for (let i = 0; i < 8; i++) {
     r.doc.getElementById('seat-civ-' + i).value = 'rome';
@@ -659,7 +659,7 @@ test('Ashcrown\'s Reset to defaults puts every setup choice back, names and civs
   r.ctx.resetSetup();
   const u = r.ctx.UI;
   assert.deepEqual([u.optHumans.value, u.optCpus.value, u.optMap.value, u.optSize.value, u.optLevel.selectedIndex, u.optClose.value, u.optTurns.value],
-    ['2', '0', 'pangaea', 'auto', 0, '30', '100']);
+    ['2', '0', 'pangaea', 'auto', 0, 'tech', '100']);
   assert.deepEqual([u.optConquest.checked, u.optScience.checked, u.optWrap.checked], [true, true, false]);
   for (let i = 0; i < 8; i++) {
     const civ = r.doc.getElementById('seat-civ-' + i), name = r.doc.getElementById('seat-name-' + i);
@@ -877,7 +877,7 @@ test('Ashcrown launches new ships onto the water beside their city', () => {
    These run the whole game script in a bare VM (no page). The script only boots when a
    document exists, so it just defines its functions; the tests drive them directly. */
 
-function civRig(seats, { seed = 12345, map = 'pangaea', flat = true, closeTurn = 30, level = 'normal' } = {}) {
+function civRig(seats, { seed = 12345, map = 'pangaea', flat = true, borders = 'tech', level = 'normal' } = {}) {
   const html = load('src/games/content/ashcrown.html');
   const script = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
   const store = new Map();
@@ -892,15 +892,15 @@ function civRig(seats, { seed = 12345, map = 'pangaea', flat = true, closeTurn =
   ctx.toast = text => { toasts.push(text); };
   run('UI = { modalKind: null }');
   ctx.seats = seats;
-  run('startGame({ seats, seed: ' + seed + ', map: "' + map + '", level: "' + level + '", closeTurn: ' + closeTurn + ' })');
+  run('startGame({ seats, seed: ' + seed + ', map: "' + map + '", level: "' + level + '", borders: "' + borders + '" })');
   const r = {
     ctx, run, modals, toasts, store,
     get G() { return run('G'); },
     // A level sandbox: all land, nobody on it, nobody met, every moment unspent.
     sandbox() {
       run(`for (const t of G.tiles) { t.t = 'flat'; t.f = null; t.imp = null; t.owner = null; t.city = null; t.k = 0; t.road = false; }
-        G.units.length = 0; G.cities.length = 0; G.log.length = 0; G.news.length = 0; G.offers.length = 0; G.deals.length = 0; G.open.length = 0; G.firsts = {};
-        for (const f of G.players) { f.capital = null; f.capHome = -1; f.met = false; f.moments = []; f.eraPts = 0; }
+        G.units.length = 0; G.cities.length = 0; G.log.length = 0; G.news.length = 0; G.offers.length = 0; G.deals.length = 0; G.open.length = 0; G.embassies.length = 0; G.firsts = {};
+        for (const f of G.players) { f.capital = null; f.capHome = -1; f.met = false; f.moments = []; f.eraPts = 0; f.notes = []; f.asked = []; }
         for (const a of G.players) for (const b of G.players) { G.met[a.i][b.i] = a.i === b.i; G.dip[a.i][b.i] = 'peace'; }
         G.turn = 5; G.cur = 0; G.viewer = 0; G.handoff = false; G.seen = G.players.map(() => new Array(G.cols * G.rows).fill(0));`);
     },
@@ -974,7 +974,9 @@ test('Ashcrown 4.5: coming into sight of a unit, a city or land sets met both wa
   assert.ok(card.includes('First contact') && card.includes(r.run('CIVS[pl(1).civ].land')) && card.includes(r.run('fullName(pl(1))')));
   assert.ok(card.includes('data-act="council"') && card.includes('Open Council') && card.includes('Got it'));
   assert.ok(card.includes(r.run('CIVS[pl(1).civ].hello')), 'their greeting');
-  assert.ok(card.includes('You’re at peace.') && card.includes('Their borders close on turn 30.'));
+  assert.ok(card.includes('You’re at peace.') && card.includes('Their borders are open.'), 'before Early Empire their borders are open');
+  r.run('pl(1).techs.push("earlyempire"); G.news.length = 0; G.news.push({ i: 0, kind: "meet", other: 1, pts: 2, first: true }); showNews()');
+  assert.ok(r.modals.at(-1).includes('Their borders are closed.'), 'after it they are closed');
   assert.ok(!card.includes('Their capital is'), 'no capital line when none is in sight');
 
   // Unit sees a city: Ann's scout-less warrior comes within three hexes of Ben's city.
@@ -1087,7 +1089,7 @@ test('Ashcrown 4.5: war, peace, trade and borders are refused toward a civ you h
   // CPU borders request: a mood above 2 and closed borders send it to ask a neighbour it knows, never a stranger.
   const open = civRig(FOUR);
   open.ctx.roll = () => 0;
-  open.run('G.turn = 40; G.cur = 2');
+  open.run('G.turn = 40; G.cur = 2; pl(3).techs.push("earlyempire")');
   open.unit(2, 'settler', 3, 5); open.run('foundCity(G.units[0])');
   open.unit(3, 'settler', 13, 5); open.run('foundCity(G.units.find(u => u.owner === 3))');
   open.run('G.attitude[2][3] = 10');
@@ -1114,8 +1116,8 @@ test('Ashcrown 4.5: war, peace, trade and borders are refused toward a civ you h
 
 test('Ashcrown 4.5: a queued march toward an unmet civ\'s closed land stops on the hex before it, and no war starts', () => {
   const r = civRig(FOUR);
-  r.run('G.turn = 35');    // the borders closed on turn 30
-  assert.equal(r.run('bordersClosed()'), true);
+  r.run('pl(1).techs.push("earlyempire")');    // Ben's borders are closed
+  assert.equal(r.run('landClosed(1)'), true);
   // Ben owns a wall of land, columns 9 to 11, the whole height of the map: there is no way around it.
   for (let y = 0; y < r.run('G.rows'); y++) for (let x = 9; x <= 11; x++) r.own(1, x, y);
   const u = r.unit(0, 'warrior', 2, 5);
@@ -1131,7 +1133,7 @@ test('Ashcrown 4.5: a queued march toward an unmet civ\'s closed land stops on t
   assert.ok(r.run('G.log.some(e => /stopped its march/.test(e.text))'));
   // The stranger rule itself: standing at the border without having met, a step in is refused outright.
   const r2 = civRig(FOUR);
-  r2.run('G.turn = 35');
+  r2.run('pl(1).techs.push("earlyempire")');
   r2.own(1, 6, 5);
   const v = r2.unit(0, 'warrior', 5, 5);
   r2.run('var V = G.units.find(u => u.id === "' + v.id + '"); V.mp = 2');
@@ -1146,7 +1148,7 @@ test('Ashcrown 4.5: a queued march toward an unmet civ\'s closed land stops on t
   assert.equal(r2.run('atWar(0, 1)'), true);
   // A CPU's units honour it too.
   const r3 = civRig(FOUR);
-  r3.run('G.turn = 35');
+  r3.run('pl(3).techs.push("earlyempire")');
   r3.own(3, 6, 5);
   const c = r3.unit(2, 'warrior', 5, 5);
   r3.run('var C = G.units.find(u => u.id === "' + c.id + '"); C.mp = 2');
@@ -1974,4 +1976,620 @@ test('Ashcrown orders: the tutorial still runs start to finish, with the warrior
   assert.ok(sent, 'the warrior step was reached');
   r.run('while (G.tut.step < TUT_STEPS.length) tutorialNext()');
   assert.equal(r.run('G.tut.step'), steps, 'every step ran');
+});
+
+/* ── Ashcrown 4.6: Early Empire closes a civ's borders, and embassies show their capital ──
+   Same bare-VM rigs as above. */
+
+const jsonOf = (r, code) => JSON.parse(r.run('JSON.stringify(' + code + ')'));
+const logLines = (r, viewer) => Array.from(r.run('G.log'), e => r.run('logText(' + JSON.stringify(e.text) + ', ' + viewer + ')'));
+const SEVEN = [{ name: 'Ann', human: true }, { name: 'Ben', human: true }, ...Array.from({ length: 5 }, () => ({ name: '', human: false }))];
+
+test('Ashcrown 4.6: Early Empire costs 25, is an era 1 tech with no prerequisite, and Writing needs it and Pottery', () => {
+  const r = ordersRig();
+  const t = jsonOf(r, 'TECHS.earlyempire');
+  assert.equal(t.name, 'Early Empire');
+  assert.equal(t.era, 1);
+  assert.deepEqual(t.needs, []);
+  assert.equal(r.run('techCost(0, "earlyempire")'), 25);
+  assert.equal(r.run('TECH_COST[1]'), 40, 'the era price is untouched');
+  assert.equal(r.run('techCost(0, "mining")'), 40, 'every other era 1 tech still costs it');
+  assert.ok(t.blurb.startsWith('Closes your borders: other civs need an open-borders deal, or a war, to enter your land'));
+  // Research list: there from the start, and Writing needs both Pottery and Early Empire.
+  assert.ok(jsonOf(r, 'researchChoices(0)').includes('earlyempire'));
+  r.run('pl(0).techs = ["pottery"]');
+  assert.equal(r.run('techReady(0, "writing")'), false, 'Pottery alone is not enough');
+  assert.ok(!jsonOf(r, 'researchChoices(0)').includes('writing'));
+  r.run('pl(0).techs = ["earlyempire"]');
+  assert.equal(r.run('techReady(0, "writing")'), false, 'nor is Early Empire alone');
+  r.run('pl(0).techs = ["pottery", "earlyempire"]');
+  assert.equal(r.run('techReady(0, "writing")'), true);
+  assert.ok(jsonOf(r, 'researchChoices(0)').includes('writing'));
+  assert.deepEqual(jsonOf(r, 'techPath(1, "writing")').sort(), ['earlyempire', 'pottery', 'writing'], 'heading for Writing queues both');
+  assert.ok(jsonOf(r, 'techPath(1, "navigation")').includes('earlyempire'), 'and so does everything past Writing');
+  // The tree: its own card in the first column, a line into Writing beside Pottery's, no two cards on one spot.
+  assert.equal(jsonOf(r, 'techSpot("earlyempire")').col, 0);
+  const spots = jsonOf(r, 'TECH_ORDER.concat("future").map(id => techSpot(id).x + "," + techSpot(id).y)');
+  assert.equal(new Set(spots).size, spots.length, 'every tech card has a spot of its own');
+  assert.deepEqual(jsonOf(r, 'techEdges(0).filter(e => e.to === "writing").map(e => e.from).sort()'), ['earlyempire', 'pottery']);
+  const tree = r.run('techTreeHTML(0)');
+  assert.ok(tree.includes('data-act="research:earlyempire"') && tree.includes('Early Empire'), 'the tree draws it');
+  assert.ok(tree.includes('Era 1 · 25–40 rp'), 'the era header tells the cost range');
+  assert.ok(tree.includes('Era 2 · 100 rp each'), 'and the other eras their one price');
+  // Score: it counts like any era 1 tech (2 points).
+  r.run('pl(0).techs = []');
+  const none = r.run('scoreParts(0).total');
+  r.run('pl(0).techs = ["earlyempire"]');
+  assert.equal(r.run('scoreParts(0).total') - none, 2);
+  assert.equal(r.run('techPoints(pl(0))'), r.run('(pl(0).techs = ["mining"], techPoints(pl(0)))'), 'the same as Mining');
+  // UK's discount reaches it like every tech.
+  r.run('pl(0).civ = "uk"');
+  assert.equal(r.run('techCost(0, "earlyempire")'), 19);
+});
+
+test('Ashcrown 4.6: before Early Empire others walk onto your land; after it they are moved out, asked first, and a deal or a war lets them in', () => {
+  const r = ordersRig();
+  r.meetOnly(0, 1);
+  for (const x of [8, 9, 10]) for (const y of [4, 5, 6]) r.own(0, x, y);   // Rome's land
+  r.seat(1);
+  // Before: Ben steps in freely. No prompt, no war.
+  const early = r.unit(1, 'warrior', 7, 5);
+  r.ready(); r.pick(early);
+  const boxes = r.modals.length;
+  assert.equal(r.run('closedOwner(1, 8, 5)'), -1);
+  assert.equal(r.order(early, 8, 5), true);
+  assert.equal(r.get(early, 'u.x'), 8, 'he walked in');
+  assert.equal(r.at(0, 1), false);
+  assert.equal(r.modals.length, boxes, 'nothing asked');
+  // Rome learns Early Empire. His warrior is still there, until his turn starts.
+  r.run('pl(0).research = "earlyempire"; pl(0).rp = 100; processResearch(pl(0))');
+  assert.equal(r.run('hasTech(0, "earlyempire")'), true);
+  assert.equal(r.run('closedOwner(1, 8, 5)'), 0, 'closedOwner names Rome for Ben');
+  assert.equal(r.run('closedOwner(0, 8, 5)'), -1, 'and never for Rome on its own land');
+  assert.equal(r.get(early, 'u.x'), 8, 'nothing moves until his turn');
+  r.run('beginPlayerTurn(1)');
+  assert.notEqual(r.run('tileAt(' + r.get(early, 'u.x') + ', ' + r.get(early, 'u.y') + ').owner'), 0, 'at the start of his turn he is moved out');
+  assert.ok(logLines(r, 1).some(l => /was moved out of .*’s land: the borders are closed/.test(l)), 'with a line saying so');
+  // Stepping in now asks first, and only a yes declares war.
+  const late = r.unit(1, 'warrior', 7, 4);
+  r.ready(); r.pick(late);
+  assert.equal(r.order(late, 8, 4), true);
+  assert.ok(r.modals.at(-1).includes('Declare war and go in') && r.modals.at(-1).includes('Their borders are closed.'), 'the question comes up');
+  assert.equal(r.get(late, 'u.x'), 7, 'he has not moved');
+  assert.equal(r.at(0, 1), false, 'and nobody is at war yet');
+  r.act('enter-war:' + late.id + ':8:4');
+  assert.equal(r.at(0, 1), true, 'yes is the declaration');
+  assert.equal(r.get(late, 'u.x'), 8);
+  // An open-borders deal lets him in without asking.
+  const deal = ordersRig();
+  deal.meetOnly(0, 1);
+  for (const x of [8, 9]) deal.own(0, x, 5);
+  deal.run('pl(0).techs.push("earlyempire"); openBorders(0, 1)');
+  assert.equal(deal.run('closedOwner(1, 8, 5)'), -1, 'a deal opens it');
+  deal.seat(1);
+  const guest = deal.unit(1, 'warrior', 7, 5);
+  deal.ready(); deal.pick(guest);
+  assert.equal(deal.order(guest, 8, 5), true);
+  assert.equal(deal.get(guest, 'u.x'), 8);
+  assert.equal(deal.at(0, 1), false);
+  // So does a war: closed land is no wall to an enemy.
+  const war = ordersRig();
+  war.war(0, 1);
+  war.own(0, 8, 5);
+  war.run('pl(0).techs.push("earlyempire")');
+  assert.equal(war.run('closedOwner(1, 8, 5)'), -1);
+});
+
+test('Ashcrown 4.6: only the civ that knows Early Empire is closed, and "never" closes nothing', () => {
+  const r = ordersRig();
+  r.meetOnly(0, 1);
+  r.own(0, 4, 5); r.own(1, 9, 5);
+  r.run('pl(0).techs.push("earlyempire")');
+  assert.equal(r.run('closedOwner(1, 4, 5)'), 0, 'Rome knows it: its land is closed to the Celts');
+  assert.equal(r.run('closedOwner(0, 9, 5)'), -1, 'the Celts do not: their land stays open to Rome');
+  r.run('pl(1).techs.push("earlyempire")');
+  assert.equal(r.run('closedOwner(0, 9, 5)'), 1, 'once they learn it, theirs closes too');
+  assert.equal(r.run('G.borders'), 'tech', 'the default setting');
+  // The "never" setting: the tech can be learned and closes nothing.
+  const never = ordersRig({ borders: 'never' });
+  assert.equal(never.run('G.borders'), 'never');
+  never.meetOnly(0, 1);
+  never.own(0, 4, 5);
+  never.run('pl(0).research = "earlyempire"; pl(0).rp = 100; processResearch(pl(0))');
+  assert.equal(never.run('hasTech(0, "earlyempire")'), true, 'it can still be researched');
+  assert.equal(never.run('closedOwner(1, 4, 5)'), -1, 'and closes nothing');
+  assert.equal(never.run('landClosed(0)'), false);
+  assert.equal(never.say(1, 'alert') + never.say(0, 'alert'), 0, 'no card');
+  assert.equal(never.run('pl(0).notes.length'), 0, 'no note');
+  assert.ok(!logLines(never, 1).some(l => /borders are closed/.test(l)), 'no line in the history');
+  assert.ok(never.run('techBlurb("earlyempire")').startsWith('Closes nothing in this game'), 'its blurb says so in this game');
+  assert.ok(never.run('techDetail(0, "earlyempire")').includes('Closes nothing in this game'));
+  assert.ok(ordersRig().run('techDetail(0, "earlyempire")').includes('Closes your borders'), 'and the normal one otherwise');
+});
+
+test('Ashcrown 4.6: learning Early Empire sends one card to each human who has met that civ, none to the rest, and a note to the civ itself', () => {
+  const r = ordersRig();
+  r.meetOnly(0, 2);                                   // Ann has met the civ at seat 2; Ben has not
+  r.run('pl(2).research = "earlyempire"; pl(2).rp = 100; processResearch(pl(2))');
+  assert.equal(r.say(0, 'alert'), 1, 'Ann gets a card');
+  assert.equal(r.say(1, 'alert'), 0, 'Ben, who has not met them, gets nothing');
+  const card = jsonOf(r, 'G.news.filter(n => n.i === 0)')[0];
+  assert.equal(card.type, 'close');
+  assert.equal(card.by, 2);
+  r.seat(0);
+  r.run('showNews()');
+  const html = r.modals.at(-1);
+  const land = r.run('CIVS[pl(2).civ].land');
+  assert.ok(html.includes(land + '’s borders are closed'), 'titled with the civ: ' + land);
+  assert.ok(html.includes('Stepping onto their land without an open-borders deal means war. Ask for open borders in the Council.'));
+  assert.ok(html.includes('data-act="council"'), 'with a button to the Council');
+  // The history line carries a name marker: Ann reads the civ, Ben reads "Unmet player".
+  assert.ok(logLines(r, 0).includes(land + '’s borders are closed.'));
+  assert.ok(logLines(r, 1).includes('Unmet player’s borders are closed.'));
+  // A human learning it gets the note for their next turn, shown when it starts.
+  r.run('pl(0).research = "earlyempire"; pl(0).rp = 100; processResearch(pl(0))');
+  assert.deepEqual(jsonOf(r, 'pl(0).notes'), ['Your borders are closed. Other civs need an open-borders deal to come in.']);
+  r.run('G.handoff = true; G.viewer = 0; G.cur = 0; UI.handoff = { hidden: false }');
+  r.toasts.length = 0;
+  r.act('handoff-go');
+  assert.ok(r.toasts.some(t => t.startsWith('Your borders are closed. Other civs need an open-borders deal to come in.')), 'a toast as their turn starts: ' + r.toasts.join(' | '));
+  assert.equal(r.run('pl(0).notes.length'), 0, 'shown once');
+  // A CPU learning it makes no note for itself.
+  assert.equal(r.run('pl(3).research = "earlyempire"; pl(3).rp = 100; processResearch(pl(3)); (pl(3).notes || []).length'), 0);
+});
+
+test('Ashcrown 4.6: a CPU picks Early Empire first when a war wonder is near its city, and otherwise within its first three techs', () => {
+  const pick = (setup) => {
+    const r = civRig(FOUR);
+    r.ctx.checkElimination = () => {}; r.ctx.checkWin = () => {};
+    r.unit(2, 'settler', 6, 5); r.run('foundCity(G.units.find(u => u.owner === 2))');
+    r.run('WONDER_TILES_FOR = null');
+    if (setup) setup(r);
+    return r;
+  };
+  // Pamukkale three hexes from the city: first.
+  let r = pick(x => x.run('tileAt(9, 5).f = "spring"; WONDER_TILES_FOR = null'));
+  assert.equal(r.run('hexDistance(6, 5, 9, 5)'), 3);
+  assert.equal(r.run('aiPickTech(pl(2))'), 'earlyempire', 'a spring three hexes out');
+  // The Giant's Causeway counts too, and so does a wonder inside its borders.
+  r = pick(x => x.run('tileAt(8, 4).f = "stair"; WONDER_TILES_FOR = null'));
+  assert.equal(r.run('aiPickTech(pl(2))'), 'earlyempire', 'a causeway close by');
+  // Four hexes out is not near enough, and the science wonders give no gift.
+  r = pick(x => x.run('tileAt(10, 5).f = "spring"; tileAt(5, 5).f = "reef"; WONDER_TILES_FOR = null'));
+  assert.equal(r.run('hexDistance(6, 5, 10, 5)'), 4);
+  assert.notEqual(r.run('aiPickTech(pl(2))'), 'earlyempire', 'too far, and a reef is no war wonder');
+  // With a war wonder near but borders that never close, there is no rush.
+  r = civRig(FOUR, { borders: 'never' });
+  r.ctx.checkElimination = () => {}; r.ctx.checkWin = () => {};
+  r.unit(2, 'settler', 6, 5); r.run('foundCity(G.units.find(u => u.owner === 2)); tileAt(9, 5).f = "spring"; WONDER_TILES_FOR = null');
+  assert.notEqual(r.run('aiPickTech(pl(2))'), 'earlyempire');
+  // No wonder: it comes within the first three techs, for every seed and civ we try.
+  for (const seed of [1, 7, 12345, 99, 2024]) {
+    const q = civRig(FOUR, { seed });
+    q.ctx.checkElimination = () => {}; q.ctx.checkWin = () => {};
+    q.unit(2, 'settler', 6, 5); q.run('foundCity(G.units.find(u => u.owner === 2)); WONDER_TILES_FOR = null');
+    const order = [];
+    for (let k = 0; k < 3; k++) { const id = q.run('aiPickTech(pl(2))'); order.push(id); q.run('pl(2).techs.push("' + id + '")'); }
+    assert.ok(order.includes('earlyempire'), 'seed ' + seed + ' picked ' + order.join(', '));
+  }
+  // The very first pick waits for a first city (research points come from cities), so a wonder near it can count.
+  const lone = civRig(FOUR);
+  assert.equal(lone.run('aiPickTech(pl(2))'), null, 'nothing to pick before it has a city');
+});
+
+test('Ashcrown 4.6: an old save converts: past the old close turn everyone has Early Empire, before it nobody, never stays never, and Writing is kept', () => {
+  const fresh = civRig(FOUR, { flat: false });
+  const make = (closeTurn, turn, tweak) => {
+    const s = JSON.parse(fresh.run('JSON.stringify(G)'));
+    delete s.borders; delete s.embassies;
+    if (closeTurn !== undefined) s.closeTurn = closeTurn;
+    s.turn = turn;
+    s.players[0].techs = ['pottery', 'writing'];
+    s.players[1].techs = ['mining'];
+    s.players[1].queue = ['writing', 'math'];
+    s.players[2].techs = [];
+    s.players[3].techs = ['archery'];
+    s.players[3].alive = false;
+    if (tweak) tweak(s);
+    return s;
+  };
+  const convert = s => { fresh.ctx.__s = s; fresh.run('prepareState(__s)'); return s; };
+  const knows = (s, i) => s.players[i].techs.includes('earlyempire');
+  // Past the old close turn: the borders were already closed, so every living player has it. No cards, no points.
+  let s = make(30, 35);
+  const eraBefore = s.players.map(p => p.eraPts || 0), newsBefore = s.news.length, momentsBefore = s.players.map(p => (p.moments || []).length);
+  convert(s);
+  assert.equal(s.borders, 'tech');
+  assert.equal(s.closeTurn, undefined, 'closeTurn is dropped');
+  assert.deepEqual([0, 1, 2].map(i => knows(s, i)), [true, true, true], 'every living player');
+  assert.equal(knows(s, 3), false, 'but not a player who is out');
+  assert.equal(s.news.length, newsBefore, 'no cards');
+  assert.deepEqual(s.players.map(p => p.eraPts || 0), eraBefore, 'no era points');
+  assert.deepEqual(s.players.map(p => (p.moments || []).length), momentsBefore, 'no moments');
+  assert.ok(s.players[0].techs.includes('writing') && s.players[0].techs.includes('pottery'), 'Writing stays');
+  assert.equal(s.embassies.length, 0, 'and the embassy list starts empty');
+  // Exactly on the turn counts as closed, like the old rule.
+  assert.equal(knows(convert(make(30, 30)), 2), true);
+  // Not reached yet: nobody has it, and the borders will close with the tech.
+  s = convert(make(30, 20));
+  assert.equal(s.borders, 'tech');
+  assert.deepEqual([0, 1, 2, 3].map(i => knows(s, i)), [false, false, false, false]);
+  assert.ok(s.players[0].techs.includes('writing'), 'a player who knew Writing keeps it, with no Early Empire');
+  assert.deepEqual(s.players[1].queue, ['earlyempire', 'writing', 'math'], 'a queued Writing gets Early Empire ahead of it');
+  // Never closing stays never.
+  s = convert(make(0, 90));
+  assert.equal(s.borders, 'never');
+  assert.deepEqual([0, 1, 2].map(i => knows(s, i)), [false, false, false]);
+  assert.ok(s.players[0].techs.includes('writing'));
+  s = convert(make(undefined, 90, x => { delete x.closeTurn; }));
+  assert.equal(s.borders, 'never', 'a save older than closeTurn too');
+  // A save that already has the setting is left alone, and a stray closeTurn goes.
+  s = make(30, 35, x => { x.borders = 'never'; });
+  convert(s);
+  assert.equal(s.borders, 'never');
+  assert.equal(knows(s, 2), false);
+  assert.equal(s.closeTurn, undefined);
+  // The converted game plays: closed land follows the tech.
+  fresh.ctx.__s = convert(make(30, 35));
+  fresh.run('G = __s');
+  fresh.run('G.tiles[0].owner = 0');
+  assert.equal(fresh.run('closedOwner(1, G.tiles[0].x, G.tiles[0].y)'), 0);
+});
+
+test('Ashcrown 4.6: the tutorial still runs start to finish, closes nothing, and teaches Early Empire', () => {
+  const r = civRig(FOUR, { flat: false });
+  r.ctx.centreOn = () => {};
+  r.run('buildTutorialIsland()');
+  r.run('G.seen[0].fill(1)');
+  assert.equal(r.run('G.borders'), 'never');
+  const steps = r.run('TUT_STEPS.length');
+  const says = jsonOf(r, 'TUT_STEPS.map(s => s.say)').join(' ');
+  assert.ok(/Early Empire/.test(says), 'a step explains it');
+  assert.ok(!/on a turn you choose|borders close on turn/i.test(says), 'no step talks about a close turn');
+  for (let k = 0; k < steps + 5 && r.run('G.tut.step < TUT_STEPS.length'); k++) {
+    r.run('tutorialNext()');
+    // However the CPU's tech stands, nothing closes in the tutorial.
+    if (k === 3) r.run('G.players[1].techs.push("earlyempire")');
+    assert.equal(r.run('G.tiles.every(t => closedOwner(0, t.x, t.y) === -1)'), true, 'step ' + k + ': no land is closed');
+  }
+  assert.equal(r.run('G.tut.step'), steps, 'every step ran');
+  assert.equal(r.run('hasTech(0, "writing")'), true, 'the library lesson gave Writing');
+  // The tutorial teaches no embassies: no Embassy item in the city panel.
+  r.run('G.viewer = 0; G.cur = 0; G.handoff = false');
+  const cap = r.run('tutCap()');
+  assert.ok(cap, 'a capital');
+  assert.ok(!r.run('cityPanel(tutCap())').includes(':embassy:new'), 'no Embassy row in the tutorial');
+});
+
+function embRig(seats = FOUR, opts) {
+  const r = civRig(seats, opts);
+  r.camera = [];
+  r.ctx.centreOn = (x, y) => { r.camera.push([x, y]); };
+  r.ctx.checkElimination = () => {};          // the sandbox has no cities, which would knock everyone out
+  r.ctx.checkWin = () => {};
+  r.ctx.roll = () => 0.5;
+  r.run('pl(0).civ = "rome"; pl(0).techs.push("writing")');
+  r.meetOnly = (a, b) => r.run('G.met[' + a + '][' + b + '] = G.met[' + b + '][' + a + '] = true');
+  r.war = (a, b) => { r.meetOnly(a, b); r.run('G.dip[' + a + '][' + b + '] = G.dip[' + b + '][' + a + '] = "war"'); };
+  r.city = (owner, x, y) => {
+    const s = r.unit(owner, 'settler', x, y);
+    r.run('foundCity(unitById("' + s.id + '"))');
+    return r.run('cityAt(' + x + ', ' + y + ')');
+  };
+  r.act = code => r.run('onAction("' + code + '")');
+  r.ask = (c, to) => r.run('askEmbassy(cityById("' + c.id + '"), ' + to + ')');
+  r.item = 'setbuild:%:embassy:new';
+  r.panel = c => r.run('cityPanel(cityById("' + c.id + '"))');
+  r.land = i => r.run('CIVS[pl(' + i + ').civ].land');
+  return r;
+}
+const embassyRow = html => (html.match(/<button class="build-row[^>]*data-act="setbuild:[^"]*:embassy:new"[^>]*>[\s\S]*?<\/button>/) || [''])[0];
+
+test('Ashcrown 4.6: no Embassy item before Writing; after it the item is greyed with its reason until a civ qualifies', () => {
+  const r = embRig();
+  r.run('pl(0).techs = []');
+  const c = r.city(0, 3, 5);
+  r.city(2, 14, 5);
+  assert.equal(r.run('buildProblem(cityById("' + c.id + '"), { kind: "embassy", id: "new" })'), 'Needs Writing');
+  assert.equal(embassyRow(r.panel(c)), '', 'no Embassy row in the build list before Writing');
+  r.run('pl(0).techs.push("writing")');
+  // Writing, but nobody met: greyed out, with the reason.
+  let row = embassyRow(r.panel(c));
+  assert.ok(row.includes('>Embassy<') && row.includes('disabled') && row.includes('No civ to send one to'), 'greyed out: ' + row);
+  assert.ok(row.includes('Ask a civ you’ve met for an embassy. If they agree, their capital shows on your map.'), 'the blurb');
+  assert.ok(row.includes('>30<'), 'it costs 30');
+  const boxes = r.modals.length;
+  r.act('setbuild:' + c.id + ':embassy:new');
+  assert.equal(r.modals.length, boxes, 'a greyed item opens nothing');
+  assert.equal(r.run('cityById("' + c.id + '").build'), null);
+  // At war with the only civ met: still nobody to send one to. An embassy already open: the same.
+  r.war(0, 2);
+  assert.ok(embassyRow(r.panel(c)).includes('disabled'), 'at war');
+  r.run('makePeace(0, 2)');
+  r.run('G.embassies.push({ from: 0, to: 2, turn: 1 })');
+  assert.ok(embassyRow(r.panel(c)).includes('disabled'), 'an embassy already open');
+  // Once a civ qualifies the row is live, and picking it opens the box.
+  r.run('G.embassies.length = 0');
+  row = embassyRow(r.panel(c));
+  assert.ok(!row.includes('disabled') && row.includes('One civ to ask'), 'a civ is met and at peace: ' + row);
+  r.act('setbuild:' + c.id + ':embassy:new');
+  assert.ok(r.modals.at(-1).includes('Send an embassy from ' + c.name + ' to…'));
+  assert.equal(r.run('cityById("' + c.id + '").build'), null, 'opening the box builds nothing yet');
+  // Other players' cities and the tutorial never show it.
+  assert.equal(embassyRow(r.run('(G.viewer = 1, cityPanel(cityById("' + c.id + '")))')), '', 'not in someone else\'s city panel');
+});
+
+test('Ashcrown 4.6: the civ box lists only civs that qualify, and Cancel changes nothing', () => {
+  const r = embRig(SEVEN);
+  const a = r.city(0, 3, 5), b = r.city(0, 3, 9);
+  r.meetOnly(0, 1);                                              // qualifies
+  r.war(0, 2);                                                   // at war
+  r.meetOnly(0, 3); r.run('G.embassies.push({ from: 0, to: 3, turn: 1 })');   // embassy already open
+  r.meetOnly(0, 4); r.run('cityById("' + b.id + '").build = { kind: "embassy", id: 4 }');   // being built in another city
+  /* civ 5 is never met */
+  r.meetOnly(0, 6);                                              // qualifies
+  r.act('setbuild:' + a.id + ':embassy:new');
+  const html = r.modals.at(-1);
+  const rows = [...html.matchAll(/embassy-pick:c\d+:(\d+)/g)].map(m => Number(m[1]));
+  assert.deepEqual(rows, [1, 6], 'only the met civs at peace with no embassy and none being built');
+  assert.ok(html.includes('Send an embassy from ' + a.name + ' to…'));
+  for (const i of [1, 6]) assert.ok(html.includes(r.land(i)) && html.includes(r.run('pl(' + i + ').name')), 'row ' + i + ' shows the name and the leader');
+  assert.ok(html.includes('dot'), 'and their dot');
+  for (const i of [2, 3, 4, 5]) assert.ok(!html.includes('embassy-pick:' + a.id + ':' + i), 'civ ' + i + ' is not offered');
+  assert.ok(html.includes('data-act="close">Cancel</button>'));
+  // The other city can still ask 1 and 6, but not 4 (it is already building that one itself).
+  r.act('close');
+  r.act('setbuild:' + b.id + ':embassy:new');
+  assert.deepEqual([...r.modals.at(-1).matchAll(/embassy-pick:c\d+:(\d+)/g)].map(m => Number(m[1])), [1, 6]);
+  // Cancel changes nothing.
+  r.act('setbuild:' + a.id + ':embassy:new');
+  const snap = () => r.run('JSON.stringify([G.offers, G.attitude, G.embassies, G.cities.map(c => [c.build, c.progress, c.wait]), pl(0).asked, G.log.length])');
+  const before = snap();
+  r.act('close');
+  assert.equal(snap(), before);
+});
+
+test('Ashcrown 4.6: a CPU that likes you says yes (the build starts, +2, a log line); one that does not says no, the city is unchanged and Back returns to the list', () => {
+  const r = embRig();
+  const c = r.city(0, 3, 5);
+  r.city(2, 14, 5);
+  r.meetOnly(0, 2); r.meetOnly(0, 3);
+  r.run('G.attitude[2][0] = 0; G.attitude[3][0] = -10');
+  const land2 = r.land(2), land3 = r.land(3);
+  r.act('setbuild:' + c.id + ':embassy:new');
+  r.act('embassy-pick:' + c.id + ':2');
+  const yes = r.modals.at(-1);
+  assert.ok(yes.includes(land2 + ' agrees.') && yes.includes(c.name + ' starts building the embassy.'), 'the box shows the answer: ' + yes);
+  assert.ok(!yes.includes('embassy-pick:'), 'instead of the list');
+  assert.deepEqual(jsonOf(r, 'cityById("' + c.id + '").build'), { kind: 'embassy', id: 2 }, 'the build starts');
+  assert.equal(r.run('buildLabel(cityById("' + c.id + '")).startsWith("Embassy to ' + land2 + ' · ")'), true, 'as "Embassy to <civ>"');
+  assert.equal(r.run('G.attitude[2][0]'), 2, '+2 toward you');
+  assert.ok(logLines(r, 0).some(l => l.includes(land2) && /agrees to an embassy from/.test(l)), 'a log line');
+  assert.equal(r.run('costOf(cityById("' + c.id + '"), cityById("' + c.id + '").build)'), 30);
+  // A CPU that does not trust you says no. The city stays as it was.
+  r.run('setBuild(cityById("' + c.id + '"), null)');
+  const was = r.run('JSON.stringify([cityById("' + c.id + '").build, cityById("' + c.id + '").progress, G.offers, G.attitude[3][0]])');
+  r.act('setbuild:' + c.id + ':embassy:new');
+  r.act('embassy-pick:' + c.id + ':3');
+  const no = r.modals.at(-1);
+  assert.ok(no.includes(land3 + ' won’t let you.') && no.includes('They don’t trust you enough yet.'), 'the refusal: ' + no);
+  assert.ok(no.includes('data-act="embassy-back:' + c.id + '">Back</button>') && no.includes('data-act="close">Close</button>'), 'Back and Close');
+  assert.equal(r.run('JSON.stringify([cityById("' + c.id + '").build, cityById("' + c.id + '").progress, G.offers, G.attitude[3][0]])'), was, 'nothing changed');
+  r.act('embassy-back:' + c.id);
+  assert.ok(r.modals.at(-1).includes('embassy-pick:' + c.id + ':3') && r.modals.at(-1).includes('embassy-pick:' + c.id + ':2'), 'Back is the list again');
+  // The test is aiAcceptsOpen's: not at war, attitude above -8, and not about to attack.
+  const html = load('src/games/content/ashcrown.html');
+  assert.ok(/aiAcceptsEmbassy = \(f, other\) => aiAcceptsOpen\(f, other\)/.test(html), 'reused, not copied');
+  const t = att => { r.run('G.attitude[3][0] = ' + att + '; pl(3).stance = {}'); return r.ask(r.run('cityById("' + c.id + '")'), 3); };
+  assert.equal(t(-8), 'no', '-8 is not above -8');
+  assert.equal(r.run('G.attitude[3][0]'), -8);
+  assert.equal(t(-7), 'yes');
+  r.run('setBuild(cityById("' + c.id + '"), null); G.attitude[3][0] = 10; pl(3).stance = { 0: "attack" }');
+  assert.equal(r.ask(r.run('cityById("' + c.id + '")'), 3), 'no', 'a civ about to attack you refuses');
+  // Asking again after cancelling warms them up only once.
+  r.run('pl(3).stance = {}; G.attitude[3][0] = 0');
+  assert.equal(r.ask(r.run('cityById("' + c.id + '")'), 3), 'yes');
+  const warmed = r.run('G.attitude[3][0]');
+  r.run('setBuild(cityById("' + c.id + '"), null)');
+  assert.equal(r.ask(r.run('cityById("' + c.id + '")'), 3), 'yes');
+  assert.equal(r.run('G.attitude[3][0]'), warmed, 'no second +2 for the same civ');
+});
+
+test('Ashcrown 4.6: an embassy to a human starts waiting and sends a request; Accept lets it finish, Refuse or a lapse cancels it and keeps the production', () => {
+  const r = embRig();
+  const c = r.city(0, 3, 5);
+  r.city(1, 14, 5);
+  r.meetOnly(0, 1);
+  const cid = c.id, city = () => r.run('cityById("' + cid + '")');
+  r.act('setbuild:' + cid + ':embassy:new');
+  r.act('embassy-pick:' + cid + ':1');
+  assert.ok(r.modals.at(-1).includes(r.land(1) + '</b> answers in the Council on their turn.'), 'the box says so');
+  assert.equal(city().build.kind, 'embassy');
+  assert.equal(city().build.id, 1);
+  assert.ok(r.run('buildLabel(cityById("' + cid + '"))').startsWith('Embassy to ' + r.land(1) + ' (waiting for their answer)'), 'waiting for their answer');
+  const offers = jsonOf(r, 'G.offers');
+  assert.equal(offers.length, 1);
+  assert.deepEqual([offers[0].kind, offers[0].from, offers[0].to, offers[0].city], ['embassy', 0, 1, cid]);
+  assert.equal(city().build.ask, offers[0].id);
+  assert.equal(r.run('G.attitude[1][0]'), 0, 'a human has no mood to change');
+  // The other human sees it in the Council on their turn.
+  r.run('G.viewer = 1; G.cur = 1');
+  r.run('showCouncil()');
+  const council = r.modals.at(-1);
+  assert.ok(council.includes('asks for an embassy') && council.includes('offer-accept:' + offers[0].id) && council.includes('offer-refuse:' + offers[0].id));
+  r.run('G.viewer = 0; G.cur = 0');
+  // It cannot finish while waiting, however much production piles up.
+  r.run('cityById("' + cid + '").progress = 99');
+  r.run('tryComplete(cityById("' + cid + '")); tryComplete(cityById("' + cid + '"))');
+  assert.equal(r.run('G.embassies.length'), 0, 'not finished');
+  assert.equal(city().build.kind, 'embassy', 'still on it');
+  assert.equal(city().wait, true, 'and holding');
+  r.run('processCity(cityById("' + cid + '"))');
+  assert.equal(r.run('G.embassies.length'), 0, 'a turn of production changes nothing');
+  assert.ok(city().progress >= 99);
+  // Accept: the project carries on, and finishes.
+  r.run('G.viewer = 1; G.cur = 1');
+  r.act('offer-accept:' + offers[0].id);
+  r.run('G.viewer = 0; G.cur = 0');
+  assert.equal(r.run('G.offers.length'), 0);
+  assert.equal(city().build.ask, undefined, 'no longer waiting');
+  assert.ok(r.run('buildLabel(cityById("' + cid + '"))').startsWith('Embassy to ' + r.land(1) + ' · '));
+  const stock = city().progress;
+  r.run('tryComplete(cityById("' + cid + '"))');
+  assert.deepEqual(jsonOf(r, 'G.embassies'), [{ from: 0, to: 1, turn: 5 }], 'now it is built');
+  assert.equal(city().build, null);
+  assert.equal(city().progress, stock - 30, 'what was over carries on');
+
+  // Refuse: the project cancels, the production stays, and a toast waits for the next turn.
+  const q = embRig();
+  const d = q.city(0, 3, 5); q.city(1, 14, 5); q.meetOnly(0, 1);
+  q.ask(d, 1);
+  q.run('cityById("' + d.id + '").progress = 17');
+  const offer = jsonOf(q, 'G.offers')[0];
+  q.run('answerOffer(1, "' + offer.id + '", false)');
+  assert.equal(q.run('cityById("' + d.id + '").build'), null, 'cancelled');
+  assert.equal(q.run('cityById("' + d.id + '").progress'), 17, 'production kept, like a road');
+  assert.equal(q.run('G.embassies.length'), 0);
+  assert.equal(q.run('G.offers.length'), 0);
+  assert.equal(q.run('noticeFor(0)').startsWith(q.land(1) + ' turned down your embassy. ' + d.name + ' keeps its production.'), true, 'a note for their next turn');
+  q.run('processCity(cityById("' + d.id + '"))');
+  assert.equal(q.run('G.embassies.length'), 0, 'it can no longer finish');
+
+  // A request nobody answers lapses after three turns and cancels it the same way.
+  const w = embRig();
+  const e = w.city(0, 3, 5); w.city(1, 14, 5); w.meetOnly(0, 1);
+  w.ask(e, 1);
+  w.run('cityById("' + e.id + '").progress = 21');
+  w.run('G.turn += 3; beginPlayerTurn(1)');
+  assert.equal(w.run('G.offers.length'), 1, 'three turns is still in time');
+  w.run('G.turn += 1; beginPlayerTurn(1)');
+  assert.equal(w.run('G.offers.length'), 0, 'the fourth lapses it');
+  assert.equal(w.run('cityById("' + e.id + '").build'), null);
+  assert.equal(w.run('cityById("' + e.id + '").progress'), 21);
+  assert.ok(w.run('noticeFor(0)').includes('never answered your embassy request'), 'with a note');
+  // Choosing something else while waiting withdraws the request.
+  const x = embRig();
+  const f = x.city(0, 3, 5); x.city(1, 14, 5); x.meetOnly(0, 1);
+  x.ask(f, 1);
+  x.run('setBuild(cityById("' + f.id + '"), { kind: "unit", id: "warrior" })');
+  assert.equal(x.run('G.offers.length'), 0, 'the request goes with the project');
+});
+
+test('Ashcrown 4.6: building an embassy: 30 production, war or elimination cancels it and keeps the production, finishing marks their capital and raises attitude by 5', () => {
+  const r = embRig();
+  r.run('pl(0).civ = "egypt"');                                   // Egypt halves building costs, but not this
+  const c = r.city(0, 3, 5), capital = r.city(2, 14, 5);
+  r.meetOnly(0, 2);
+  r.run('G.attitude[2][0] = 0');
+  r.ask(c, 2);
+  assert.equal(r.run('costOf(cityById("' + c.id + '"), cityById("' + c.id + '").build)'), 30, '30 production, discounts do not touch it');
+  assert.equal(r.run('itemDef(cityById("' + c.id + '").build).name'), 'Embassy to ' + r.land(2));
+  // War mid-build: cancelled, production kept.
+  r.run('cityById("' + c.id + '").progress = 12');
+  r.run('declareWar(0, 2)');
+  assert.equal(r.run('cityById("' + c.id + '").build'), null, 'war cancels it');
+  assert.equal(r.run('cityById("' + c.id + '").progress'), 12, 'and the production carries over');
+  assert.ok(logLines(r, 0).some(l => /embassy to .* was cancelled: war/.test(l)));
+  r.run('makePeace(0, 2)');
+  // Relations dropping after they agreed does not cancel it.
+  r.run('G.attitude[2][0] = 0; G.turn = 8');
+  assert.equal(r.ask(c, 2), 'yes');
+  r.run('G.attitude[2][0] = -60');
+  r.run('cityById("' + c.id + '").progress = 30; tryComplete(cityById("' + c.id + '"))');
+  assert.deepEqual(jsonOf(r, 'G.embassies'), [{ from: 0, to: 2, turn: 8 }], 'it finished although they now dislike you');
+  assert.equal(r.run('G.attitude[2][0]'), -55, '+5 toward you');
+  assert.equal(r.run('cityById("' + c.id + '").build'), null);
+  assert.ok(logLines(r, 0).some(l => l.includes('opens an embassy with') && l.includes(r.run('fullName(pl(2))'))), 'a log line');
+  assert.equal(r.run('noticeFor(0)').startsWith('Embassy opened in ' + capital.name + '. Their capital is now on your map.'), true, 'and a toast for their next turn');
+  // Their capital and every hex within 2 of it are seen, dimmed and remembered: nothing else is.
+  const near = jsonOf(r, 'G.tiles.filter(t => hexDistance(14, 5, t.x, t.y) <= 2).map(t => t.y * G.cols + t.x)');
+  const seen = jsonOf(r, 'G.seen[0].map((v, k) => v ? k : -1).filter(k => k >= 0)');
+  assert.deepEqual(seen.sort((p, q) => p - q), near.sort((p, q) => p - q), 'radius 2 around the capital');
+  assert.equal(r.run('seenBy(0, 14, 5)'), true);
+  assert.equal(r.run('seenBy(0, 17, 5)'), false, 'three hexes out is not');
+  assert.equal(r.run('G.units.length'), 0, 'no unit came with it');
+  // It survives war and peace.
+  r.run('declareWar(0, 2)');
+  assert.equal(r.run('hasEmbassy(0, 2)'), true, 'war');
+  r.run('makePeace(0, 2)');
+  assert.equal(r.run('hasEmbassy(0, 2)'), true, 'and peace');
+  // A capital that moves is revealed again at the start of your turn.
+  const second = r.city(2, 20, 8);
+  r.run('pl(2).capital = "' + second.id + '"; G.seen[0].fill(0)');
+  r.run('beginPlayerTurn(0)');
+  assert.equal(r.run('seenBy(0, 20, 8)'), true, 'the new capital is on the map');
+  assert.equal(r.run('seenBy(0, 14, 5)'), false, 'the old one is not marked again');
+  const near2 = jsonOf(r, 'G.tiles.filter(t => hexDistance(20, 8, t.x, t.y) <= 2).map(t => t.y * G.cols + t.x)');
+  assert.ok(near2.every(k => r.run('G.seen[0][' + k + ']')), 'all of its radius');
+});
+
+test('Ashcrown 4.6: an embassy is lost only when its civ is eliminated, and an eliminated civ cancels the builds aimed at it', () => {
+  const r = civRig(FOUR);
+  r.ctx.centreOn = () => {}; r.ctx.roll = () => 0.5;
+  r.run('pl(0).civ = "rome"; pl(0).techs.push("writing")');
+  const own = r.unit(0, 'settler', 3, 5); r.run('foundCity(unitById("' + own.id + '"))');
+  const mine = r.run('cityAt(3, 5)');
+  const theirs = r.unit(2, 'settler', 14, 5); r.run('foundCity(unitById("' + theirs.id + '"))');
+  const other = r.unit(3, 'settler', 20, 5); r.run('foundCity(unitById("' + other.id + '"))');
+  const mate = r.unit(1, 'settler', 3, 9); r.run('foundCity(unitById("' + mate.id + '"))');
+  for (const b of [2, 3]) r.run('G.met[0][' + b + '] = G.met[' + b + '][0] = true');
+  r.run('G.attitude[2][0] = 0; G.attitude[3][0] = 0');
+  r.run('G.embassies.push({ from: 0, to: 3, turn: 2 })');
+  r.run('askEmbassy(cityAt(3, 5), 2)');
+  assert.equal(r.run('cityAt(3, 5).build.id'), 2);
+  // Civ 2 loses its only city: eliminated. The project aimed at it stops; the embassy to civ 3 stays.
+  r.run('cityAt(14, 5).owner = 3');
+  r.run('cityAt(3, 5).progress = 14; checkElimination()');
+  assert.equal(r.run('pl(2).alive'), false);
+  assert.equal(r.run('cityAt(3, 5).build'), null, 'cancelled');
+  assert.equal(r.run('cityAt(3, 5).progress'), 14, 'production kept');
+  assert.equal(r.run('pl(3).alive'), true);
+  assert.deepEqual(jsonOf(r, 'G.embassies'), [{ from: 0, to: 3, turn: 2 }], 'the embassy to a living civ stays');
+  // Now civ 3 goes too: that embassy is lost.
+  r.run('G.cities.filter(c => c.owner === 3).forEach(c => { c.owner = 0; }); G.units.filter(u => u.owner === 3).forEach(removeUnit); checkElimination()');
+  assert.equal(r.run('pl(3).alive'), false);
+  assert.equal(r.run('G.embassies.length'), 0, 'lost with its civ');
+});
+
+test('Ashcrown 4.6: the Council shows the embassy tag, the capital name and city count, a Show capital button, what is being built, and the hint after Writing', () => {
+  const r = embRig();
+  const c = r.city(0, 3, 5);
+  const cap = r.city(2, 14, 5); r.city(2, 14, 9);
+  r.meetOnly(0, 2);
+  // Writing but nothing yet: the hint.
+  r.run('showCouncil()');
+  let html = r.modals.at(-1);
+  assert.ok(html.includes('Build an Embassy in one of your cities to ask them.'), 'the hint');
+  assert.ok(!html.includes('embassy-look') && !html.includes('>embassy<'));
+  // Before Writing there is no hint.
+  r.run('pl(0).techs = []; showCouncil()');
+  assert.ok(!r.modals.at(-1).includes('Build an Embassy'), 'no hint before Writing');
+  r.run('pl(0).techs.push("writing")');
+  // Being built.
+  r.run('G.attitude[2][0] = 0');
+  r.ask(c, 2);
+  r.run('showCouncil()');
+  html = r.modals.at(-1);
+  assert.ok(html.includes('Embassy being built in ' + c.name + '.'), 'being built: ' + html.match(/Embassy being[^<]*/));
+  assert.ok(!html.includes('Build an Embassy in one of your cities'), 'the hint goes');
+  // Built: the tag, the capital and the count, the button.
+  r.run('cityById("' + c.id + '").progress = 30; tryComplete(cityById("' + c.id + '"))');
+  r.run('showCouncil()');
+  html = r.modals.at(-1);
+  assert.ok(html.includes('<span class="tag peace">embassy</span>'), 'the tag');
+  assert.ok(html.includes('Embassy: capital ' + cap.name + ' · 2 cities.'), 'capital and city count');
+  assert.ok(html.includes('data-act="embassy-look:2">Show capital</button>'), 'the button');
+  assert.ok(!html.includes('Embassy being built'));
+  // Show capital centers the map on it.
+  r.act('embassy-look:2');
+  assert.deepEqual(r.camera.at(-1), [14, 5], 'the camera goes to their capital');
+  assert.deepEqual(jsonOf(r, 'selection'), { kind: 'tile', x: 14, y: 5 });
+  // The button shows even when it is not your turn, and never for a civ without an embassy.
+  r.run('G.cur = 1; showCouncil()');
+  assert.ok(r.modals.at(-1).includes('embassy-look:2'));
+  const none = embRig();
+  none.city(0, 3, 5); none.city(2, 14, 5); none.meetOnly(0, 2);
+  none.run('showCouncil()');
+  none.act('embassy-look:2');
+  assert.equal(none.camera.length, 0, 'no embassy, no look');
 });
