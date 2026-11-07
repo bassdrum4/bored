@@ -1349,3 +1349,629 @@ test('Ashcrown 4.5: every civ has a short greeting for its first-contact card', 
   }
   assert.equal(new Set(hellos.map(h => h[1])).size, 16, 'no two civs greet alike');
 });
+
+/* ── Ashcrown orders: auto unit cycling, the declare-war prompt and captures ──
+   Same bare-VM rig as above. Real right-clicks are in tests/ashcrown-browser.test.cjs. */
+
+function ordersRig(opts) {
+  const r = civRig(FOUR, opts);
+  const camera = [];
+  r.ctx.centreOn = (x, y) => { camera.push([x, y]); };   // there is no stage to measure
+  r.ctx.checkElimination = () => {};                     // the sandbox has no cities, which would knock everyone out
+  r.ctx.checkWin = () => {};
+  r.camera = camera;
+  r.run('G.seen.forEach(s => s.fill(1))');
+  r.run("pl(0).civ = 'rome'; pl(1).civ = 'celts'; pl(2).civ = 'qin'; pl(3).civ = 'japan'");
+  r.ready = () => r.run('G.units.forEach(u => { u.mp = unitMove(u); u.acted = false; u.moved = false; u.pinned = false; })');
+  r.pick = u => r.run('selection = { kind: "unit", id: "' + u.id + '" }; reachable = computeReachable(unitById("' + u.id + '"))');
+  r.sel = () => r.run('selection && selection.kind === "unit" ? selection.id : null');
+  r.order = (u, x, y) => r.run('orderUnit(unitById("' + u.id + '"), ' + x + ', ' + y + ')');
+  r.get = (u, expr) => r.run('(u => ' + expr + ')(unitById("' + u.id + '"))');
+  r.meetOnly = (a, b) => r.run('G.met[' + a + '][' + b + '] = G.met[' + b + '][' + a + '] = true');
+  r.war = (a, b) => { r.meetOnly(a, b); r.run('G.dip[' + a + '][' + b + '] = G.dip[' + b + '][' + a + '] = "war"'); };
+  r.at = (a, b) => r.run('atWar(' + a + ', ' + b + ')');
+  r.act = code => r.run('onAction("' + code + '")');
+  r.city = (owner, x, y) => {
+    const s = r.unit(owner, 'settler', x, y);
+    r.run('foundCity(unitById("' + s.id + '"))');
+    return r.run('cityAt(' + x + ', ' + y + ')');
+  };
+  r.seat = i => r.run('G.viewer = G.cur = ' + i);
+  r.logs = (to = 0) => Array.from(r.run('G.log'), e => r.run('logText(' + JSON.stringify(e.text) + ', ' + to + ')'));
+  r.ctx.roll = () => 0.5;
+  return r;
+}
+
+test('Ashcrown orders: a right-click order that uses up a unit\'s turn moves the selection on, or clears it', () => {
+  let r = ordersRig();
+  const a = r.unit(0, 'warrior', 4, 5), b = r.unit(0, 'archer', 4, 8);
+  r.ready(); r.pick(a);
+  assert.equal(r.run('jumpOn()'), true, 'on by default');
+  assert.equal(r.order(a, 10, 5), true, 'a hex three turns away is an order');
+  assert.equal(r.run('marching(unitById("' + a.id + '"))'), true, 'it queued a march');
+  assert.ok(r.get(a, 'u.x') > 4, 'and walked the first leg');
+  assert.equal(r.sel(), b.id, 'the next idle unit is selected');
+  assert.equal(JSON.stringify(r.camera.at(-1)), '[4,8]', 'and the camera goes to it');
+  assert.equal(r.run('idleUnits(0).some(u => u.id === "' + a.id + '")'), false, 'a marching unit is not idle');
+  // Nobody else needs orders: the selection clears, and nothing else opens.
+  r = ordersRig();
+  const solo = r.unit(0, 'warrior', 4, 5);
+  r.ready(); r.pick(solo);
+  const opened = r.modals.length;
+  assert.equal(r.order(solo, 10, 5), true);
+  assert.equal(r.sel(), null, 'no other unit to go to');
+  assert.equal(r.modals.length, opened, 'no city, tech tree or end-turn box opens by itself');
+  // A move that spends every move also hands on, with no march.
+  r = ordersRig();
+  const c = r.unit(0, 'warrior', 4, 5), d = r.unit(0, 'warrior', 4, 9);
+  r.ready(); r.pick(c);
+  assert.equal(r.order(c, 6, 5), true);
+  assert.equal(r.get(c, 'u.mp'), 0);
+  assert.equal(r.get(c, 'marching(u)'), false);
+  assert.equal(r.sel(), d.id);
+});
+
+test('Ashcrown orders: a unit with moves left and no march stays selected', () => {
+  const r = ordersRig();
+  const a = r.unit(0, 'warrior', 4, 5), b = r.unit(0, 'archer', 4, 8);
+  r.ready(); r.pick(a);
+  assert.equal(r.order(a, 5, 5), true, 'one step');
+  assert.equal(r.get(a, 'u.mp'), 1, 'one move left');
+  assert.equal(r.sel(), a.id, 'still the selected unit, like Civ 6');
+  assert.equal(r.camera.length, 0, 'the camera stays put');
+  assert.equal(r.order(a, 6, 5), true, 'it can go on');
+  assert.equal(r.sel(), b.id, 'out of moves now: on to the next');
+  void b;
+});
+
+test('Ashcrown orders: a melee attack that ends at 0 moves moves on, and so does a unit that dies', () => {
+  let r = ordersRig();
+  r.war(0, 2);
+  let a = r.unit(0, 'warrior', 4, 5);
+  r.unit(2, 'warrior', 5, 5);
+  let b = r.unit(0, 'archer', 4, 8);
+  r.ready(); r.pick(a);
+  assert.equal(r.order(a, 5, 5), true, 'the attack is an order');
+  assert.equal(r.get(a, 'u.mp'), 0, 'it used up its moves');
+  assert.equal(r.sel(), b.id, 'on to the next unit');
+  // It dies in the attack: still on to the next, and the dead unit is not selected.
+  r = ordersRig();
+  r.war(0, 2);
+  a = r.unit(0, 'warrior', 4, 5);
+  r.unit(2, 'heavy', 5, 5);
+  b = r.unit(0, 'archer', 4, 8);
+  r.ready(); r.pick(a);
+  r.run('unitById("' + a.id + '").hp = 1');
+  assert.equal(r.order(a, 5, 5), true);
+  assert.equal(r.run('unitById("' + a.id + '")'), null, 'the warrior died');
+  assert.equal(r.sel(), b.id, 'the selection moves on from a dead unit');
+  // A ranged strike too.
+  r = ordersRig();
+  r.war(0, 2);
+  a = r.unit(0, 'archer', 4, 5);
+  r.unit(2, 'warrior', 6, 5);
+  b = r.unit(0, 'warrior', 4, 8);
+  r.ready(); r.pick(a);
+  assert.equal(r.order(a, 6, 5), true);
+  assert.equal(r.sel(), b.id);
+  // The panel's Attack button goes through the same hand-on.
+  r = ordersRig();
+  r.war(0, 2);
+  a = r.unit(0, 'warrior', 4, 5);
+  r.unit(2, 'warrior', 5, 5);
+  b = r.unit(0, 'archer', 4, 8);
+  r.ready(); r.pick(a);
+  r.act('strike:5:5');
+  assert.equal(r.sel(), b.id);
+});
+
+test('Ashcrown orders: with the jump switched off a done unit is deselected, and the switch lives in Options and the Menu', () => {
+  const r = ordersRig();
+  const a = r.unit(0, 'warrior', 4, 5), b = r.unit(0, 'archer', 4, 8);
+  r.ready();
+  assert.equal(r.run('readPrefs().jump'), undefined, 'nothing stored until it is changed');
+  r.act('jump-toggle');
+  assert.equal(r.run('jumpOn()'), false);
+  assert.equal(JSON.parse(r.store.get('bored.civlite.prefs.v1')).jump, false, 'kept with the other switches, under the same key');
+  assert.match(r.toasts.at(-1), /nothing is selected/);
+  r.pick(a);
+  assert.equal(r.order(a, 10, 5), true);
+  assert.equal(r.sel(), null, 'deselected, not moved on');
+  assert.equal(r.run('reachable'), null, 'no green hexes left for a stray right-click to use');
+  assert.equal(r.camera.length, 0);
+  // A unit with moves left still stays selected when the switch is off.
+  r.ready(); r.pick(b);
+  assert.equal(r.order(b, 4, 9), true);
+  assert.equal(r.sel(), b.id);
+  // The same switch, next to the event popups, in Options and in the Menu.
+  for (const show of ['showOptions()', 'showMenu()']) {
+    r.run(show);
+    const html = r.modals.at(-1);
+    const [p, j, an] = ['popups-toggle', 'jump-toggle', 'anim-next'].map(k => html.indexOf('data-act="' + k + '"'));
+    assert.ok(p >= 0 && p < j && j < an, show + ': the jump switch follows the event popups');
+    assert.ok(html.includes('Jump to the next unit after orders<b>off</b>'), show + ' shows its state');
+  }
+  r.act('jump-toggle');
+  assert.equal(r.run('jumpOn()'), true);
+  assert.ok(r.modals.at(-1).includes('Jump to the next unit after orders<b>on</b>'), 'and redraws itself');
+  // It works from the title screen, with no game running.
+  r.run('G = null');
+  r.act('jump-toggle');
+  assert.equal(r.run('jumpOn()'), false);
+});
+
+test('Ashcrown orders: right-clicking a march\'s destination still cancels it, and idleUnits skips what is done', () => {
+  const r = ordersRig();
+  const a = r.unit(0, 'warrior', 4, 5), b = r.unit(0, 'archer', 4, 8);
+  r.ready(); r.pick(a);
+  r.order(a, 10, 5);
+  assert.equal(r.get(a, 'marching(u)'), true);
+  r.pick(a);   // click the marching unit to select it again
+  const sel = r.sel();
+  assert.equal(r.order(a, 10, 5), true, 'right-clicking the destination');
+  assert.equal(r.get(a, 'u.path'), null, 'takes the orders back off');
+  assert.equal(r.toasts.at(-1), 'Orders canceled.');
+  assert.equal(r.sel(), sel, 'and leaves it selected, so it can be sent somewhere else');
+  void b;
+  // idleUnits: moves left, and not marching, fortified or asleep.
+  const q = ordersRig();
+  const idle = q.unit(0, 'warrior', 3, 3), march = q.unit(0, 'warrior', 3, 5), spent = q.unit(0, 'warrior', 3, 7),
+    fort = q.unit(0, 'warrior', 3, 9), sleep = q.unit(0, 'warrior', 3, 11), emptyPath = q.unit(0, 'warrior', 3, 13);
+  q.ready();
+  q.run('unitById("' + march.id + '").path = { to: [9, 5], steps: [[4, 5], [5, 5]], seen: [] }');
+  q.run('unitById("' + spent.id + '").mp = 0');
+  q.run('unitById("' + fort.id + '").fort = true');
+  q.run('unitById("' + sleep.id + '").sleep = true');
+  q.run('unitById("' + emptyPath.id + '").path = { to: [3, 13], steps: [], seen: [] }');
+  assert.equal(JSON.stringify(q.run('idleUnits(0).map(u => u.id)')), JSON.stringify([idle.id, emptyPath.id]),
+    'only the unit that needs orders (a march with no steps left is no march)');
+  assert.equal(q.run('nextIdle(0, unitById("' + idle.id + '")).id'), emptyPath.id, 'next unit goes round the idle ones');
+  assert.equal(q.run('nextIdle(0, unitById("' + emptyPath.id + '")).id'), idle.id, 'and wraps');
+  assert.equal(q.run('nextIdle(0, unitById("' + spent.id + '")).id'), idle.id, 'from a unit that is done, to the first idle one');
+});
+
+// The prompt, for a unit, a city and a lone civilian, from either seat of a pass-and-play game.
+for (const seat of [0, 1]) {
+  const me = seat, them = 1 - seat;
+  test('Ashcrown orders: at peace, ordering a soldier onto their unit asks first and changes nothing until you confirm (seat ' + me + ')', () => {
+    const r = ordersRig();
+    r.seat(me); r.meetOnly(0, 1);
+    const a = r.unit(me, 'warrior', 4, 5), foe = r.unit(them, 'warrior', 5, 5), spare = r.unit(me, 'archer', 4, 8);
+    r.ready(); r.pick(a);
+    const state = () => r.run('JSON.stringify([G.log.length, G.dip, G.attitude, G.news.length, G.units.map(u => [u.id, u.x, u.y, u.hp, u.mp, u.owner])])');
+    const before = state();
+    assert.equal(r.order(a, 5, 5), true);
+    const html = r.modals.at(-1);
+    const land = r.run('CIVS[pl(' + them + ').civ].land'), the = r.run('THE_LANDS.includes(pl(' + them + ').civ)') ? 'the ' : '';
+    assert.ok(html.includes('Declare war on ' + the + land + '?'), 'the title names their civ');
+    assert.ok(html.includes('Attacking their Warrior means <b>war with ' + r.run('fullName(pl(' + them + '))') + ', starting now</b>.'), 'the body says what you do and with whom');
+    r.run('askWar(' + them + ')');
+    const council = r.modals.at(-1);
+    assert.ok(council.includes(r.run('WAR_NOTE')) && html.includes(r.run('WAR_NOTE')), 'the same consequences the Council gives');
+    assert.ok(html.includes('Stay at peace') && html.includes('Declare war and attack'));
+    assert.ok(html.includes('data-act="order-war:' + a.id + ':5:5"'));
+    assert.equal(state(), before, 'nothing happened yet: no war, no log line, no damage, nobody moved');
+    // Stay at peace: the box closes and that is all.
+    r.act('close');
+    assert.equal(r.at(0, 1), false);
+    assert.equal(state(), before);
+    // Confirm: war as the Council declares it, then the attack, then on to the next unit.
+    const att = r.run('G.attitude[' + them + '][' + me + ']');
+    r.act('order-war:' + a.id + ':5:5');
+    assert.equal(r.at(0, 1), true, 'war');
+    assert.equal(r.run('G.attitude[' + them + '][' + me + ']'), Math.max(-100, att - 30), 'their attitude drops as it does from the Council');
+    assert.equal(r.logs(me).filter(t => / declares war on /.test(t)).length, 1, 'one declaration in the history');
+    const card = r.news(them, 'alert').filter(n => n.type === 'war');
+    assert.equal(card.length, 1, 'and one war card for the player it was declared on');
+    assert.equal(card[0].by, me);
+    assert.ok(r.get(foe, 'u.hp') < 100, 'the attack happened');
+    assert.equal(r.get(a, 'u.mp'), 0);
+    assert.equal(r.sel(), spare.id, 'and the selection moved on');
+  });
+}
+
+test('Ashcrown orders: the same prompt for a city and for a lone civilian, which is captured on confirm', () => {
+  let r = ordersRig();
+  r.meetOnly(0, 1);
+  const city = r.city(1, 5, 5), name = city.name, a = r.unit(0, 'warrior', 4, 5);
+  r.ready(); r.pick(a);
+  assert.equal(r.order(a, 5, 5), true);
+  assert.ok(r.modals.at(-1).includes('Attacking ' + name + ' means <b>war with '), 'a city is named, not "their"');
+  assert.equal(r.at(0, 1), false);
+  assert.equal(r.run('cityAt(5, 5).hp'), 100, 'untouched until you confirm');
+  r.act('order-war:' + a.id + ':5:5');
+  assert.equal(r.at(0, 1), true);
+  assert.ok(r.run('cityAt(5, 5).hp') < 100, 'the city was hit');
+
+  // A lone settler two hexes away: a walk this turn, so the prompt says capture.
+  r = ordersRig();
+  r.meetOnly(0, 1);
+  const prey = r.unit(1, 'settler', 6, 5), b = r.unit(0, 'warrior', 4, 5), spare = r.unit(0, 'archer', 4, 8);
+  r.ready(); r.pick(b);
+  assert.equal(r.order(b, 6, 5), true);
+  const html = r.modals.at(-1);
+  assert.ok(html.includes('Capturing their Settler means <b>war with '), html);
+  assert.ok(html.includes('Declare war and capture'));
+  assert.equal(r.get(prey, 'u.owner'), 1, 'still theirs');
+  assert.equal(r.at(0, 1), false);
+  assert.equal(r.get(b, 'u.x'), 4, 'nobody moved');
+  r.act('close');
+  assert.equal(r.get(prey, 'u.owner'), 1, 'Stay at peace leaves it alone');
+  r.act('order-war:' + b.id + ':6:5');
+  assert.equal(r.at(0, 1), true, 'war');
+  assert.equal(r.get(prey, 'u.owner'), 0, 'captured');
+  assert.equal(r.get(prey, 'u.type'), r.run('unitFor(0, "builder")'), 'as a builder');
+  assert.equal(r.get(b, 'u.x') + ',' + r.get(b, 'u.y'), '6,5', 'the soldier stands where it stood');
+  assert.equal(r.get(b, 'u.mp'), 0, 'and used up its moves');
+  assert.equal(r.sel(), spare.id, 'on to the next unit');
+  assert.equal(r.news(1, 'captured').length, 1, 'one capture card for the player who lost it');
+  assert.equal(r.news(1, 'alert').filter(n => n.type === 'war').length, 1, 'beside the war card');
+});
+
+test('Ashcrown orders: an order that would not be legal at war never asks and never declares it', () => {
+  const r = ordersRig();
+  r.meetOnly(0, 1);
+  const a = r.unit(0, 'warrior', 4, 5), archer = r.unit(0, 'archer', 7, 5);
+  r.unit(1, 'warrior', 12, 5);                // far off
+  r.unit(1, 'settler', 12, 8);                // a civilian far off
+  r.unit(1, 'warrior', 10, 5);                // three hexes from the archer: out of its range of 2
+  r.ready();
+  const quiet = (u, x, y, why) => {
+    r.pick(u);
+    const modals = r.modals.length;
+    assert.equal(r.order(u, x, y), false, why + ': not an order, so a click only inspects it');
+    assert.equal(r.modals.length, modals, why + ': no prompt');
+    assert.equal(r.at(0, 1), false, why + ': no war');
+  };
+  quiet(a, 12, 5, 'a unit far away');
+  quiet(a, 12, 8, 'a civilian too far to walk onto this turn');
+  quiet(archer, 10, 5, 'out of an archer\'s range');
+  // The same civilian, one hex inside what a walk can reach, does ask.
+  r.run('unitById("' + a.id + '").x = 10; unitById("' + a.id + '").y = 8');
+  r.ready(); r.pick(a);
+  assert.equal(r.order(a, 12, 8), true, 'two hexes: a capture this turn');
+  assert.ok(r.modals.at(-1).includes('Capturing their Settler'));
+  r.act('close');
+  assert.equal(r.at(0, 1), false);
+  // No moves left, or a civ you have not met: no prompt either, and the toast no longer sends you to the Council.
+  const b = r.unit(0, 'warrior', 4, 9), foe = r.unit(1, 'warrior', 5, 9);
+  r.ready(); r.pick(b);
+  r.run('unitById("' + b.id + '").mp = 0');
+  const modals = r.modals.length;
+  assert.equal(r.order(b, 5, 9), true, 'adjacent, but it has no moves: the toast says why');
+  assert.match(r.toasts.at(-1), /^You are at peace with .+\.$/);
+  assert.ok(!/Council/.test(r.toasts.at(-1)));
+  r.ready();
+  r.run('G.met[0][1] = G.met[1][0] = false');
+  assert.equal(r.order(b, 5, 9), true);
+  assert.equal(r.toasts.at(-1), 'You are at peace with Unmet player.', 'an unmet civ is left as it was');
+  assert.equal(r.modals.length, modals, 'no prompt for a stranger');
+  assert.equal(r.run('declareWar(0, 1)'), false);
+  void foe;
+  // A far-off hex that is just ground still plans a march, as before.
+  r.meetOnly(0, 1); r.ready(); r.pick(a);
+  assert.equal(r.order(a, 10, 14), true);
+  assert.equal(r.get(a, 'marching(u)'), true);
+  assert.equal(r.at(0, 1), false);
+  // The old toast is gone from the file.
+  assert.ok(!/Declare war in the Council first/.test(load('src/games/content/ashcrown.html')));
+});
+
+test('Ashcrown orders: ranged units, ships and siege use the same prompt', () => {
+  const r = ordersRig();
+  r.meetOnly(0, 1);
+  // Archer, two hexes from a warrior.
+  let archer = r.unit(0, 'archer', 4, 5);
+  const target = r.unit(1, 'warrior', 6, 5);
+  r.ready(); r.pick(archer);
+  assert.equal(r.order(archer, 6, 5), true);
+  assert.ok(r.modals.at(-1).includes('Attacking their Warrior') && r.modals.at(-1).includes('Declare war and attack'));
+  assert.equal(r.at(0, 1), false);
+  r.act('order-war:' + archer.id + ':6:5');
+  assert.equal(r.at(0, 1), true);
+  assert.ok(r.get(target, 'u.hp') < 100, 'the archer shot');
+  assert.equal(r.get(archer, 'u.hp'), 100, 'and took nothing back');
+  // A galley beside a warrior wading in the shallows.
+  const q = ordersRig();
+  q.meetOnly(0, 1);
+  q.run(`for (const [x, y] of [[5, 5], [6, 5]]) tileAt(x, y).t = 'shallow'`);
+  const galley = q.unit(0, 'galley', 5, 5), wader = q.unit(1, 'warrior', 6, 5);
+  q.ready(); q.pick(galley);
+  assert.equal(q.order(galley, 6, 5), true);
+  assert.ok(q.modals.at(-1).includes('Attacking their Warrior'));
+  q.act('order-war:' + galley.id + ':6:5');
+  assert.equal(q.at(0, 1), true);
+  assert.ok(q.get(wader, 'u.hp') < 100, 'the ship hit it');
+  // A catapult, two hexes from a city.
+  const s = ordersRig();
+  s.meetOnly(0, 1);
+  const city = s.city(1, 6, 5), cat = s.unit(0, 'catapult', 4, 5);
+  s.ready(); s.pick(cat);
+  assert.equal(s.order(cat, 6, 5), true);
+  assert.ok(s.modals.at(-1).includes('Attacking ' + city.name));
+  s.act('order-war:' + cat.id + ':6:5');
+  assert.ok(s.run('cityAt(6, 5).hp') < 100, 'the siege engine hit the city');
+  void archer;
+});
+
+test('Ashcrown orders: an enemy zone of control blocks a capture the prompt would have promised', () => {
+  // The way to the settler runs through a hex beside their soldier, which ends the move there.
+  // The question is asked as if at war, so it must not offer a war that cannot finish the job.
+  const r = ordersRig();
+  r.meetOnly(0, 1);
+  const a = r.unit(0, 'warrior', 4, 5), prey = r.unit(1, 'settler', 6, 5);
+  const guard = r.run('neighbourList(5, 5).find(([x, y]) => (x !== 4 || y !== 5) && (x !== 6 || y !== 5) && hexDistance(x, y, 6, 5) > 1)');
+  r.unit(1, 'warrior', guard[0], guard[1]);
+  r.ready();
+  const A = 'unitById("' + a.id + '")';
+  assert.equal(r.run('captureAt(' + A + ', 6, 5)'), null, 'not reachable once the war is on');
+  assert.equal(r.run('computeReachable(' + A + ', 1).has("6,5")'), false);
+  r.pick(a);
+  assert.equal(r.order(a, 6, 5), false, 'so no prompt');
+  assert.equal(r.at(0, 1), false);
+  // And without the soldier it is a capture.
+  r.run('G.units = G.units.filter(u => u.owner !== 1 || u.type === "settler")');
+  assert.equal(r.run('captureAt(' + A + ', 6, 5)').id, prey.id);
+});
+
+test('Ashcrown orders: targetAt, strikeInfo, canStop and computeReachable can treat one player as an enemy', () => {
+  const r = ordersRig();
+  r.meetOnly(0, 1); r.meetOnly(0, 2);
+  const a = r.unit(0, 'warrior', 4, 5);
+  r.unit(1, 'warrior', 5, 5);
+  r.city(2, 4, 8);
+  r.unit(1, 'settler', 3, 5);
+  r.ready();
+  const A = 'unitById("' + a.id + '")';
+  assert.equal(JSON.stringify(r.run('targetAt(' + A + ', 5, 5)')), '{"peace":1}', 'at peace: a peace target');
+  assert.equal(r.run('targetAt(' + A + ', 5, 5, 1).unit.owner'), 1, 'asked as an enemy: a unit to fight');
+  assert.equal(JSON.stringify(r.run('targetAt(' + A + ', 5, 5, 2)')), '{"peace":1}', 'someone else\'s enmity changes nothing');
+  assert.equal(r.run('strikeInfo(' + A + ', 5, 5)'), null);
+  assert.ok(r.run('strikeInfo(' + A + ', 5, 5, 1)').dmg > 0);
+  assert.equal(r.run('canStop(' + A + ', 3, 5)'), false, 'a civilian of someone at peace blocks the hex');
+  assert.equal(r.run('canStop(' + A + ', 3, 5, 1)'), true, 'but would be captured at war');
+  assert.equal(r.run('canStop(' + A + ', 3, 5, 2)'), false);
+  assert.equal(r.run('computeReachable(' + A + ').has("3,5")'), false);
+  assert.equal(r.run('computeReachable(' + A + ', 1).has("3,5")'), true);
+  // The question changes nothing: still at peace, nothing moved.
+  assert.equal(r.at(0, 1), false);
+  assert.equal(r.get(a, 'u.mp'), 2);
+});
+
+test('Ashcrown orders: ships can\'t capture, and soldiers of every kind that walk can', () => {
+  const r = ordersRig();
+  r.war(0, 1);
+  r.run(`for (const [x, y] of [[5, 5], [6, 5]]) tileAt(x, y).t = 'shallow'`);
+  const galley = r.unit(0, 'galley', 5, 5), prey = r.unit(1, 'settler', 6, 5);
+  r.ready();
+  const G1 = 'unitById("' + galley.id + '")';
+  assert.equal(r.run('canStop(' + G1 + ', 6, 5)'), false, 'a ship can\'t end on a civilian');
+  assert.equal(r.run('computeReachable(' + G1 + ').has("6,5")'), false);
+  assert.equal(r.run('moveUnit(' + G1 + ', 6, 5)'), false);
+  assert.equal(r.run('captureAt(' + G1 + ', 6, 5)'), null);
+  assert.equal(r.run('warOrder(' + G1 + ', 6, 5)'), null);
+  assert.equal(r.get(prey, 'u.owner'), 1, 'still theirs');
+  // Positive control: a warrior on the shore takes it.
+  for (const type of ['warrior', 'archer', 'scout', 'catapult']) {
+    const q = ordersRig();
+    q.war(0, 1);
+    q.run(`for (const [x, y] of [[5, 5], [6, 5]]) tileAt(x, y).t = 'shallow'`);
+    const s = q.unit(0, type, 4, 5), p = q.unit(1, 'settler', 6, 5);
+    q.ready();
+    assert.equal(q.run('moveUnit(unitById("' + s.id + '"), 6, 5)'), true, type + ' walks onto it');
+    assert.equal(q.get(p, 'u.owner'), 0, type + ' captured it');
+  }
+});
+
+test('Ashcrown orders: a captured settler becomes the captor\'s builder type, a captured builder keeps its charges up to that type\'s maximum', () => {
+  // [captor civ, victim civ, victim unit, charges before, type after, charges after]
+  const cases = [
+    ['celts', 'rome', 'settler', null, 'woodsman', 3],
+    ['usa', 'rome', 'settler', null, 'builder', 4],
+    ['rome', 'rome', 'settler', null, 'builder', 3],
+    ['celts', 'usa', 'settler', null, 'woodsman', 3],   // a Pioneer
+    ['usa', 'rome', 'builder', 1, 'builder', 1],
+    ['rome', 'rome', 'builder', 2, 'builder', 2],
+    ['celts', 'usa', 'builder', 4, 'woodsman', 3],       // a 4-charge American builder, capped at the Woodsman's 3
+    ['usa', 'celts', 'builder', 2, 'builder', 2],        // a Woodsman with 2 left
+    ['usa', 'celts', 'builder', 3, 'builder', 3]
+  ];
+  for (const [captor, victim, base, charges, type, left] of cases) {
+    const r = ordersRig();
+    r.run('pl(0).civ = "' + captor + '"; pl(1).civ = "' + victim + '"');
+    r.war(0, 1);
+    const prey = r.unit(1, base, 5, 5), by = r.unit(0, 'warrior', 4, 5);
+    if (charges !== null) r.run('unitById("' + prey.id + '").charges = ' + charges);
+    r.ready();
+    const was = r.get(prey, 'UNITS[u.type].name.toLowerCase()'), wasType = r.get(prey, 'u.type');
+    assert.equal(r.run('moveUnit(unitById("' + by.id + '"), 5, 5)'), true);
+    const label = captor + ' takes ' + victim + ' ' + was + (charges === null ? '' : ' (' + charges + ' left)');
+    assert.equal(r.get(prey, 'u.owner'), 0, label);
+    assert.equal(r.get(prey, 'u.type'), type, label + ': becomes a ' + type);
+    assert.equal(r.get(prey, 'u.charges'), left, label + ': ' + left + ' charges');
+    assert.equal(r.get(by, 'u.mp'), 0, label + ': the soldier uses up its moves');
+    assert.equal(r.get(prey, 'u.mp'), 0, 'the new builder waits a turn');
+    const land = id => r.run('CIVS["' + id + '"].land');
+    const line = r.logs(0).at(-1);
+    assert.equal(line, land(captor) + ' captured a ' + land(victim) + ' ' + was + (wasType !== type ? ' (now a ' + r.get(prey, 'UNITS[u.type].name.toLowerCase()') + ').' : '.'), label + ': the history line');
+  }
+  // The Pioneer is a settler and a Woodsman a builder, so the cases above cover both; Legion is a soldier and is never captured.
+  const r = ordersRig();
+  r.war(0, 1);
+  r.unit(1, 'swordsman', 5, 5); r.unit(0, 'warrior', 4, 5); r.ready();
+  assert.equal(r.run('G.units.filter(u => u.owner === 1).length'), 1);
+  assert.equal(r.run('computeReachable(G.units.find(u => u.owner === 0)).has("5,5")'), false, 'a soldier is fought, not captured');
+});
+
+test('Ashcrown orders: the player who loses a unit gets one "captured" card, and the log line shows either way', () => {
+  const r = ordersRig();
+  r.war(0, 1);
+  const home = r.city(1, 9, 9), prey = r.unit(1, 'settler', 5, 5), by = r.unit(0, 'warrior', 4, 5);
+  r.ready();
+  r.run('moveUnit(unitById("' + by.id + '"), 5, 5)');
+  const cards = r.news(1, 'captured');
+  assert.equal(cards.length, 1, 'one card');
+  assert.equal(r.news(0, 'captured').length, 0, 'none for the one who took it');
+  assert.equal(cards[0].unit, 'settler');
+  assert.equal(cards[0].near, home.name, 'the nearest of their cities');
+  assert.equal(JSON.stringify(cards[0].at), '[5,5]');
+  // On their turn the card reads like the war card: title, civ, text, Show me and Got it.
+  r.seat(1);
+  r.run('G.news = G.news.filter(n => n.kind === "captured"); showNews()');
+  const html = r.modals.at(-1);
+  const who = r.run('fullName(pl(0))');
+  assert.ok(html.includes('Settler captured'), 'title');
+  assert.ok(html.includes(r.run('CIVS[pl(0).civ].land')), 'sub: their civ');
+  assert.ok(html.includes('<b>' + who + '</b> captured your settler near ' + home.name + '.'), html);
+  assert.ok(html.includes('data-act="news-look:5:5"') && html.includes('Show me') && html.includes('Got it'));
+  assert.ok(html.includes('wonder-card'), 'a card with art, like the war card');
+  // Show me centres on the hex.
+  r.act('news-look:5:5');
+  assert.equal(r.run('JSON.stringify(selection)'), '{"kind":"tile","x":5,"y":5}');
+  assert.equal(JSON.stringify(r.camera.at(-1)), '[5,5]');
+  // A pioneer shows as itself, a builder as a builder.
+  assert.ok(r.log0 === undefined);
+  // Cards off: no card, but the history line is always there.
+  const q = ordersRig();
+  q.war(0, 1);
+  q.run('setPopups(false)');
+  const p2 = q.unit(1, 'builder', 5, 5), b2 = q.unit(0, 'warrior', 4, 5);
+  q.ready();
+  q.run('moveUnit(unitById("' + b2.id + '"), 5, 5)');
+  assert.equal(q.news(1, 'captured').length, 0, 'the setting is respected');
+  assert.ok(q.logs(0).some(t => / captured a Celts woodsman \(now a builder\)\.$/.test(t)), 'the log line still shows');
+  void p2;
+  // A CPU that loses a unit gets no card to show.
+  const c = ordersRig();
+  c.war(0, 2);
+  c.unit(2, 'settler', 5, 5); const b3 = c.unit(0, 'warrior', 4, 5); c.ready();
+  c.run('moveUnit(unitById("' + b3.id + '"), 5, 5)');
+  assert.equal(c.news(2, 'captured').length, 0);
+});
+
+test('Ashcrown orders: the hover preview says "Capture <unit>", and "(means war)" at peace', () => {
+  const r = ordersRig();
+  r.run('UI.layerPath = { innerHTML: "" }');
+  r.meetOnly(0, 1);
+  const a = r.unit(0, 'warrior', 4, 5), ship = r.unit(0, 'galley', 3, 5);
+  const prey = r.unit(1, 'settler', 6, 5);
+  r.unit(1, 'builder', 12, 5);
+  r.run('tileAt(3, 5).t = "shallow"');
+  r.ready(); r.pick(a);
+  const hover = (x, y) => { r.run('hover = [' + x + ', ' + y + ']; refreshPreview()'); return r.run('preview'); };
+  const layer = () => r.run('UI.layerPath.innerHTML');
+  let p = hover(6, 5);
+  assert.equal(p.cap.label, 'Capture Settler (means war)', 'at peace, within a walk this turn');
+  assert.ok(/class="pathlabel-bg war"/.test(layer()) && /class="threat"/.test(layer()) && layer().includes('Capture Settler (means war)'), 'drawn like an attack: a red hex and a red label');
+  assert.equal(hover(12, 5), null, 'at peace, too far to take this turn: no preview of a capture');
+  r.war(0, 1);
+  assert.equal(hover(6, 5).cap.label, 'Capture Settler', 'at war it is just a capture');
+  assert.ok(!layer().includes('means war'));
+  p = hover(12, 5);
+  assert.ok(/^Capture Woodsman · \d+ turns$/.test(p.cap.label), 'a longer way says how long: ' + p.cap.label);
+  p = hover(5, 5);
+  assert.equal(p.cap, null, 'an empty hex is the plain path preview');
+  assert.ok(layer().includes('this turn'));
+  // A ship and a civilian of its own: no capture label.
+  r.pick(ship);
+  assert.equal(hover(6, 5), null, 'a ship has nothing to capture');
+  r.pick(a);
+  void prey;
+  // Ordinary move previews are unchanged.
+  r.run('selection = null');
+  assert.equal(hover(5, 5), null);
+});
+
+test('Ashcrown orders: a CPU at war captures a lone settler next to its soldier, settlers first, unless a stronger enemy stands beside it', () => {
+  const r = ordersRig();
+  r.war(0, 2);
+  const mine = r.unit(2, 'warrior', 5, 5);
+  const builder = r.unit(0, 'builder', 5, 7), settler = r.unit(0, 'settler', 6, 5);
+  r.ready();
+  r.run('aiSoldier(pl(2), unitById("' + mine.id + '"))');
+  assert.equal(r.get(settler, 'u.owner'), 2, 'the settler is taken, though the builder was as close');
+  assert.equal(r.get(settler, 'u.type'), r.run('unitFor(2, "builder")'), 'as a builder');
+  assert.equal(r.get(builder, 'u.owner'), 0, 'the builder waits for another day');
+  assert.equal(r.get(mine, 'u.mp'), 0);
+  assert.equal(r.news(0, 'captured').length, 1, 'and the human who lost it is told');
+  assert.ok(r.logs(0).some(t => / captured a .* settler \(now a builder\)\.$/.test(t)));
+  // A builder alone is taken too.
+  const q = ordersRig();
+  q.war(0, 2);
+  const w = q.unit(2, 'warrior', 5, 5), b = q.unit(0, 'builder', 6, 5);
+  q.ready();
+  q.run('aiSoldier(pl(2), unitById("' + w.id + '"))');
+  assert.equal(q.get(b, 'u.owner'), 2);
+  // Unless it would end the turn beside a stronger enemy soldier.
+  const s = ordersRig();
+  s.war(0, 2);
+  const x = s.unit(2, 'warrior', 5, 5), p = s.unit(0, 'settler', 6, 5);
+  const [gx, gy] = s.run('neighbourList(6, 5).find(([x, y]) => x !== 5 || y !== 5)');
+  s.unit(0, 'heavy', gx, gy);
+  s.ready();
+  s.run('aiSoldier(pl(2), unitById("' + x.id + '"))');
+  assert.equal(s.get(p, 'u.owner'), 0, 'a heavy horseman beside it is too strong a neighbour');
+  // A weaker neighbour is no reason to hold back.
+  s.run('G.units.find(u => u.type === "heavy").type = "scout"; G.units.find(u => u.id === "' + x.id + '").mp = 2');
+  s.run('aiSoldier(pl(2), unitById("' + x.id + '"))');
+  assert.equal(s.get(p, 'u.owner'), 2, 'a scout is weaker than a warrior');
+  // At peace nothing is taken, and a ship never tries.
+  const t = ordersRig();
+  t.meetOnly(0, 2);
+  const pw = t.unit(2, 'warrior', 5, 5), ps = t.unit(0, 'settler', 6, 5);
+  t.ready();
+  t.run('aiSoldier(pl(2), unitById("' + pw.id + '"))');
+  assert.equal(t.get(ps, 'u.owner'), 0, 'at peace the CPU never uses the prompt, or war');
+  assert.equal(t.at(0, 2), false);
+  t.war(0, 2);
+  t.run('tileAt(5, 5).t = "shallow"; tileAt(6, 5).t = "shallow"');
+  const ship = t.unit(2, 'galley', 5, 6);
+  t.run('tileAt(5, 6).t = "shallow"');
+  t.ready();
+  assert.equal(t.run('aiTryCapture(pl(2), unitById("' + ship.id + '"))'), false, 'a ship never captures');
+});
+
+test('Ashcrown orders: a lone civilian that is reached on a march is captured the same way', () => {
+  const r = ordersRig();
+  r.war(0, 1);
+  const prey = r.unit(1, 'settler', 8, 5), a = r.unit(0, 'warrior', 4, 5), b = r.unit(0, 'archer', 4, 8);
+  r.ready(); r.pick(a);
+  assert.equal(r.order(a, 8, 5), true, 'a march to the settler');
+  assert.equal(r.sel(), b.id);
+  r.run('beginPlayerTurn(0)');   // it walks on at the start of the turn
+  assert.equal(r.get(prey, 'u.owner'), 0, 'taken when the march arrives');
+  assert.equal(r.get(a, 'u.mp'), 0);
+  assert.equal(r.news(1, 'captured').length, 1);
+});
+
+test('Ashcrown orders: the tutorial still runs start to finish, with the warrior sent by a real order', () => {
+  const r = civRig(FOUR, { flat: false });
+  const camera = [];
+  r.ctx.centreOn = (x, y) => { camera.push([x, y]); };
+  r.run('buildTutorialIsland()');
+  r.run('G.seen[0].fill(1)');
+  const steps = r.run('TUT_STEPS.length');
+  let sent = false;
+  for (let k = 0; k < steps + 5 && r.run('G.tut.step < TUT_STEPS.length'); k++) {
+    if (/Now the warrior/.test(r.run('TUT_STEPS[G.tut.step].say').replace(/<[^>]+>/g, ''))) {
+      // The lesson as written: select the warrior, then right-click the flashing hex.
+      r.run('tutorialTick()');
+      const at = r.run('G.tut.step'), goal = r.run('G.tut.goal');
+      assert.ok(goal, 'the lesson picked a flashing hex');
+      const w = r.run('tutUnit(u => u.type === "warrior")');
+      r.run('G.units.forEach(u => { u.mp = unitMove(u); })');
+      r.run('selection = { kind: "unit", id: "' + w.id + '" }; reachable = computeReachable(unitById("' + w.id + '"))');
+      assert.equal(r.run('orderUnit(unitById("' + w.id + '"), ' + goal[0] + ', ' + goal[1] + ')'), true);
+      assert.equal(r.run('unitById("' + w.id + '").mp'), 0, 'two moves, two hexes');
+      const next = r.run('selection && selection.id');
+      assert.ok(next && next !== w.id, 'the selection went on to a unit that still needs orders');
+      assert.equal(JSON.stringify(camera.at(-1)), JSON.stringify(r.run('(u => [u.x, u.y])(unitById("' + next + '"))')), 'and the camera with it');
+      r.run('tutorialTick()');
+      assert.ok(r.run('G.tut.step') > at, 'the lesson saw the warrior arrive and moved on by itself');
+      sent = true;
+    } else r.run('tutorialNext()');
+  }
+  assert.ok(sent, 'the warrior step was reached');
+  r.run('while (G.tut.step < TUT_STEPS.length) tutorialNext()');
+  assert.equal(r.run('G.tut.step'), steps, 'every step ran');
+});

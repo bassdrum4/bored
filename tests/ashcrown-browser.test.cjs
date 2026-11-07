@@ -139,3 +139,119 @@ test('Ashcrown 4.5: a player who has met nobody sees no other civ named anywhere
   assert.ok(!council.includes(await page.evaluate(() => CIVS[pl(3).civ].land)), 'the one not met still is not');
   assert.deepEqual(errors, []);
 });
+
+/* ── orders with a real mouse: right-clicks on real hexes ─────────────────────── */
+
+const ORDER_SEATS = '[{ name: "Ann", human: true, civ: "rome" }, { name: "", human: false, civ: "celts" }, { name: "", human: false, civ: "qin" }, { name: "", human: false, civ: "japan" }]';
+
+// A level game: all flat land, nobody on it, Ann has met the Celts, and every hex is in sight.
+async function orderGame(t) {
+  const ctx = await open(t, 1000);
+  await ctx.page.setViewport({ width: 1000, height: 800, deviceScaleFactor: 1 });
+  await ctx.page.evaluate(`(() => {
+    setTips(false);
+    startGame({ seats: ${ORDER_SEATS}, seed: 77, map: 'pangaea', level: 'chieftain' });
+    UI.start.hidden = true;                                           // the title pane covers the board until a game is begun from it
+    window.checkElimination = () => {}; window.checkWin = () => {};   // no cities on a level board
+    for (const t of G.tiles) { t.t = 'flat'; t.f = null; t.imp = null; t.owner = null; t.city = null; t.k = 0; t.road = false; }
+    G.units.length = 0; G.cities.length = 0; G.log.length = 0; G.news.length = 0; G.offers.length = 0; G.deals.length = 0; G.open.length = 0;
+    for (const a of G.players) for (const b of G.players) { G.met[a.i][b.i] = a.i === b.i; G.dip[a.i][b.i] = 'peace'; }
+    G.met[0][1] = G.met[1][0] = true;
+    awardMoment(0, 'contact'); G.news.length = 0;                       // already paid, so no card covers the board
+    G.seen.forEach(s => s.fill(1));
+    window.add = (owner, type, x, y) => addUnit(pl(owner), unitFor(owner, type), x, y, null);
+    window.pick = u => { selection = { kind: 'unit', id: u.id }; reachable = computeReachable(u); };
+  })()`);
+  return ctx;
+}
+// Show the hexes around (x, y) and put the camera there.
+const look = (page, x, y) => page.evaluate(`(() => { G.units.forEach(u => { u.mp = unitMove(u); u.acted = false; }); refreshVision(); centreOn(${x}, ${y}); render(); })()`);
+// Right-click the middle of a hex with the real mouse. Returns false if the hex is not on screen.
+async function rightClick(page, x, y) {
+  const at = await page.evaluate(`(() => {
+    const el = document.querySelector('[data-tile="${x},${y}"]');
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    if (!r.width || r.left <= 0 || r.right >= innerWidth || r.top <= 0 || r.bottom >= innerHeight) return null;
+    const px = r.left + r.width / 2, py = r.top + r.height / 2, top = document.elementFromPoint(px, py);
+    return top && top.closest('[data-tile]') === el ? [px, py] : null;   // nothing else (a panel, a box) is in the way
+  })()`);
+  assert.ok(at, 'hex ' + x + ',' + y + ' is on screen and clickable');
+  await page.mouse.click(at[0], at[1], { button: 'right' });
+  return true;
+}
+
+test('Ashcrown orders: real right-clicks queue a march and hand on to the next unit, cancel it, and respect the switch', async t => {
+  const { page, errors } = await orderGame(t);
+  const ids = await page.evaluate(`(() => {
+    const w = add(0, 'warrior', 8, 8), a = add(0, 'archer', 8, 10);
+    return { w: w.id, a: a.id };
+  })()`);
+  await look(page, 10, 8);
+  await page.evaluate(`pick(unitById('${ids.w}')); render()`);
+  // Three turns away: a march, and the selection goes to the archer, with the camera.
+  await rightClick(page, 14, 8);
+  const after = await page.evaluate(`(() => { const w = unitById('${ids.w}'); return { steps: w.path ? w.path.steps.length : 0, x: w.x, mp: w.mp, sel: selection && selection.id }; })()`);
+  assert.ok(after.steps > 0 && after.x > 8, 'a march was queued and the first leg walked: ' + JSON.stringify(after));
+  assert.equal(after.mp, 0);
+  assert.equal(after.sel, ids.a, 'the archer is selected');
+  const onScreen = await page.evaluate(`(() => { const r = document.querySelector('[data-tile="8,10"]').getBoundingClientRect(); return r.left > 0 && r.right < innerWidth && r.top > 0 && r.bottom < innerHeight; })()`);
+  assert.ok(onScreen, 'and the camera shows it');
+  assert.equal(await page.evaluate('document.querySelector(".modal") ? document.querySelector(".modal").textContent : ""'), '', 'no city, tech tree or end-turn box opened by itself');
+  // Pick the marching warrior again and right-click its destination: the march is taken back off, and it stays selected.
+  const dest = await page.evaluate(`unitById('${ids.w}').path.to`);
+  await look(page, dest[0] - 3, dest[1]);
+  await page.evaluate(`pick(unitById('${ids.w}')); render()`);
+  await rightClick(page, dest[0], dest[1]);
+  const canceled = await page.evaluate(`(() => { const w = unitById('${ids.w}'); return { path: w.path, sel: selection && selection.id }; })()`);
+  assert.equal(canceled.path, null, 'orders canceled');
+  assert.equal(canceled.sel, ids.w, 'and the unit stays selected');
+  // With the switch off, a done unit is deselected, and a second right-click does nothing to it.
+  await page.evaluate('setJump(false)');
+  await look(page, 10, 8);
+  await page.evaluate(`pick(unitById('${ids.w}')); render()`);
+  await rightClick(page, dest[0], dest[1]);
+  const off = await page.evaluate(`(() => { const w = unitById('${ids.w}'); return { steps: w.path ? w.path.steps.length : 0, sel: selection, to: w.path && w.path.to }; })()`);
+  assert.ok(off.steps > 0, 'the march was queued again');
+  assert.equal(off.sel, null, 'nothing is selected');
+  await rightClick(page, dest[0], dest[1]);   // a stray second right-click
+  const still = await page.evaluate(`(() => { const w = unitById('${ids.w}'); return w.path ? w.path.to : null; })()`);
+  assert.deepEqual(still, off.to, 'the second right-click did not cancel or change the march');
+  assert.deepEqual(errors, []);
+});
+
+test('Ashcrown orders: a real right-click on their unit at peace asks first, and nothing changes until you say so', async t => {
+  const { page, errors } = await orderGame(t);
+  const ids = await page.evaluate(`(() => {
+    const w = add(0, 'warrior', 8, 8), a = add(0, 'archer', 8, 10), f = add(1, 'warrior', 9, 8), far = add(1, 'warrior', 14, 8);
+    return { w: w.id, a: a.id, f: f.id, far: far.id };
+  })()`);
+  await look(page, 10, 8);
+  await page.evaluate(`pick(unitById('${ids.w}')); render()`);
+  const modal = () => page.evaluate('(() => { const m = document.querySelector(".modal"); return m && m.offsetParent !== null ? m.textContent : ""; })()');
+  const world = () => page.evaluate(`JSON.stringify([atWar(0, 1), unitById('${ids.f}').hp, unitById('${ids.w}').hp, unitById('${ids.w}').mp, G.log.length, G.dip])`);
+  const before = await world();
+  await rightClick(page, 9, 8);
+  const text = await modal();
+  assert.match(text, /Declare war on the Celts\?/);
+  assert.match(text, /Attacking their Warrior means war with .+, starting now/);
+  assert.equal(await world(), before, 'nothing changed yet');
+  // Stay at peace: the real button.
+  await page.click('.modal-foot .btn:not(.primary)');
+  assert.equal(await modal(), '', 'the box closed');
+  assert.equal(await world(), before, 'still at peace, nothing happened');
+  // Out of range of anything: a right-click on their far-off unit opens no box and declares no war.
+  await rightClick(page, 14, 8);
+  assert.equal(await modal(), '', 'no prompt for a target out of reach');
+  assert.equal(await world(), before, 'and no war');
+  // Declare war and attack: the real button.
+  await page.evaluate(`pick(unitById('${ids.w}')); render()`);
+  await rightClick(page, 9, 8);
+  await page.click('.modal-foot .btn.primary');
+  const done = await page.evaluate(`({ war: atWar(0, 1), foe: unitById('${ids.f}').hp, mp: unitById('${ids.w}').mp, sel: selection && selection.id })`);
+  assert.equal(done.war, true, 'war');
+  assert.ok(done.foe < 100, 'the attack happened');
+  assert.equal(done.mp, 0);
+  assert.equal(done.sel, ids.a, 'and on to the archer');
+  assert.deepEqual(errors, []);
+});
