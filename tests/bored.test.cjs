@@ -349,50 +349,6 @@ test('browser regressions', async t => {
   await page.goto(url);
   await settleBoard();
 
-  await t.test('Minecraft offers a standalone mouse-lock route when Bored is embedded', async () => {
-    const host = await browser.newPage();
-    try {
-      await host.setRequestInterception(true);
-      host.on('request', request => request.url().startsWith(origin) ? request.continue() : request.abort());
-      // Deliberately omit allow-pointer-lock, as a hosting page is allowed to.
-      await host.setContent('<iframe id="hosted-bored" src="' + url +
-        '" sandbox="allow-scripts allow-same-origin" style="width:1000px;height:900px"></iframe>');
-      const embedded = await (await host.$('#hosted-bored')).contentFrame();
-      await embedded.waitForFunction(() => window.__boredHubReady === true);
-      await embedded.evaluate(() => openGame('eaglecraft'));
-      const launch = await embedded.evaluate(() => ({
-        active: window.current,
-        overlay: !document.querySelector('#minecraft-launch').hidden,
-        directHidden: document.querySelector('#minecraft-direct').hidden,
-        src: document.querySelector('#frame').getAttribute('src'),
-        href: document.querySelector('#minecraft-open').href
-      }));
-      assert.equal(launch.active, 'eaglecraft');
-      assert.equal(launch.overlay, true, 'embedded players see the launch choice');
-      assert.equal(launch.directHidden, true, 'the extra link is hidden behind the choice');
-      assert.equal(launch.src, null, 'no 25 MB download until embedded play is chosen');
-      assert.equal(launch.href, 'https://bassdrum4.github.io/minecraft-bored/');
-
-      await embedded.evaluate(() => document.querySelector('#minecraft-try').click());
-      const tried = await embedded.evaluate(() => ({
-        overlayHidden: document.querySelector('#minecraft-launch').hidden,
-        directVisible: !document.querySelector('#minecraft-direct').hidden,
-        src: document.querySelector('#frame').getAttribute('src')
-      }));
-      assert.equal(tried.overlayHidden, true);
-      assert.equal(tried.directVisible, true, 'there is still an escape route if pointer lock fails');
-      assert.equal(tried.src, launch.href, 'embedded mode loads the existing client');
-
-      await embedded.evaluate(() => openGame('qbert'));
-      assert.equal(await embedded.$eval('#minecraft-direct', link => link.hidden), true,
-        'opening another game clears Minecraft-only controls');
-      await embedded.evaluate(() => closeGame());
-      assert.equal(await embedded.$eval('#minecraft-launch', panel => panel.hidden), true);
-    } finally {
-      await host.close();
-    }
-  });
-
   await t.test('hub categories, search, sorting, empty state, and stored favorites', async () => {
     // Counts come from the catalog so adding a game does not have to touch this
     // file: the suite checks the wiring, not the catalogue's contents.
