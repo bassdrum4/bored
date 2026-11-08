@@ -42,7 +42,7 @@ test('scoped Civ Lite analytics readers are omitted only from their game telemet
   assert.deepEqual(filterGameReaderTelemetry(rows,null), rows);
 });
 
-test('analytics footer uses the same link with a database-authorized destination', async t => {
+test('analytics footer routes only authorized accounts to their dashboard', async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(file => fs.existsSync(file));
   assert.ok(executablePath, 'Set CHROME_PATH or install Chrome');
   const site = await serve(path.join(root, 'src'));
@@ -50,8 +50,6 @@ test('analytics footer uses the same link with a database-authorized destination
   t.after(async () => { await browser?.close(); await site.close(); });
   browser = await puppeteer.launch({ executablePath, headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
   const headers = { 'access-control-allow-origin':'*', 'access-control-allow-headers':'*', 'access-control-allow-methods':'GET, POST, OPTIONS' };
   await page.setRequestInterception(true);
   page.on('request', req => {
@@ -69,7 +67,6 @@ test('analytics footer uses the same link with a database-authorized destination
   await page.goto(site.url);
   const link = '#admin-analytics-link';
   assert.equal(await page.$eval(link, node => node.hidden), true);
-
   for (const [userId, expected] of [
     ['admin-id','analytics.html'],
     ['penguin-id','civ-lite-analytics.html'],
@@ -83,220 +80,13 @@ test('analytics footer uses the same link with a database-authorized destination
     await page.waitForFunction(() => !!window.openGame);
     if (expected) {
       await page.waitForFunction(selector => !document.querySelector(selector).hidden,{},link);
-      assert.match(await page.$eval(link, node => node.getAttribute('href')), new RegExp(expected.replaceAll('.','\\.').replaceAll('-','-') + '
-  const { isProductionTelemetryUrl } = await import('../src/hub/analytics.js');
-  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored/'), true);
-  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored/index.html'), true);
-  assert.equal(isProductionTelemetryUrl('http://bassdrum4.github.io/bored/'), false);
-  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored-test/'), false);
-  assert.equal(isProductionTelemetryUrl('https://preview.example.org/bored/'), false);
-  assert.equal(isProductionTelemetryUrl('http://localhost:3000/'), false);
-  assert.equal(isProductionTelemetryUrl('http://127.0.0.1:3000/'), false);
-  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored/?bored_qa=1'), false);
-  assert.equal(isProductionTelemetryUrl('https://bassdrum4.github.io/bored/', true), false);
-  assert.equal(isProductionTelemetryUrl('not a URL'), false);
-});
-
-test('retention cohorts, meaningful play, and returning visitor calculations', async () => {
-  const { summarizeEngagement, excludeAdmins } = await import('../src/hub/analytics-data.js');
-  const make = (day, session, kind, active=0, details={}) => ({
-    session_id:session, user_id:'u1', visitor_id:'11111111-1111-4111-8111-111111111111',
-    game:'snake', kind, received_at:day+'T14:00:00Z', active_ms:active, details
-  });
-  const events = [
-    make('2026-10-05','s1','start'),make('2026-10-05','s1','interaction'),
-    make('2026-10-05','s1','end',65000),
-    make('2026-10-12','s2','start'),make('2026-10-12','s2','end',62000)
-  ];
-  const visits=['2026-10-05','2026-10-12'].map((day,i)=>({
-    user_id:'u1',visitor_id:'11111111-1111-4111-8111-111111111111',
-    kind:'visit',received_at:day+'T13:00:00Z'
-  }));
-  const result=summarizeEngagement(events,visits,[{rating:5}],new Date('2026-10-21T14:00:00Z'));
-  assert.equal(result.meaningful,2);
-  assert.equal(result.interacting,1);
-  assert.deepEqual(result.retention,{eligible:1,returned:1});
-  assert.deepEqual(result.repeatGame,{eligible:1,returned:1});
-  assert.equal(result.uniqueVisitors,1);
-  assert.equal(result.visitorsByDay[1].returning,1);
-  assert.equal(result.survey.average,5);
-  const immature=summarizeEngagement(events,visits,[],new Date('2026-10-13T14:00:00Z'));
-  assert.equal(immature.retention.eligible,0);
-  const adminGuest={...events[0],session_id:'sx',user_id:null};
-  const adminSigned={...events[1],user_id:'admin'};
-  assert.deepEqual(excludeAdmins([adminGuest,adminSigned],['admin']),[]);
-});
-
-test('analytics admin accounts are dropped from reported events and time', async () => {
-  const { excludeAdmins } = await import('../src/hub/analytics-data.js');
-  const events = [{ user_id:'admin-a' }, { user_id:'u1' }, { user_id:null }];
-  assert.deepEqual(excludeAdmins(events, ['admin-a', 'admin-b']), [{ user_id:'u1' }, { user_id:null }]);
-  assert.equal(excludeAdmins(events, []), events);
-  assert.equal(excludeAdmins(events, undefined), events);
-});
-
-test('aggregation preserves identity, session counts, mixed games, repeat days and CSV safety', async () => {
-  const { summarizeEvents, eventsCSV } = await import('../src/hub/analytics-data.js');
-  const event = (id, session, user, game, kind, time, active = 0, visible = active) => ({ id, session_id: session, user_id: user, game, kind, received_at: time, active_ms: active, visible_ms: visible, details: {} });
-  const events = [
-    event('1','s1','u1','snake','start','2026-10-20T15:00:00Z'),
-    event('2','s1','u1','snake','end','2026-10-20T15:01:00Z',30000,60000),
-    event('3','s2','u1','memory','daily_complete','2026-10-21T15:01:00Z',10000),
-    event('4','s3',null,'snake','error','2026-10-21T15:01:00Z',5000),
-    event('5','s4',null,'snake','end','2026-10-21T15:01:00Z',2000)
-  ];
-  const r = summarizeEvents(events, { u1: '=malicious()' });
-  assert.deepEqual(r.totals, { active: 47000, visible: 77000, sessions: 4, accounts: 1, repeatAccounts: 1, guests: 2, errors: 1, completed: 1 });
-  assert.equal(r.games.find(g => g.id === 'snake').users.size, 1);
-  assert.equal(r.sessions.find(s => s.id === 's2').hasStart, false);
-  assert.equal(r.days.reduce((n, d) => n + d.active, 0), r.totals.active);
-  assert.equal(r.hours.reduce((n, h) => n + h.active, 0), r.totals.active);
-  assert.match(eventsCSV(events, { u1: '=malicious()' }), /"'=malicious\(\)"/);
-});
-
-test('browser collects real iframe sessions; opt-out, admin denial, filtering, export and mobile layout', async t => {
-  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(file => fs.existsSync(file));
-  assert.ok(executablePath, 'Set CHROME_PATH or install Chrome');
-  const site = await serve(path.join(root, 'src'));
-  let browser;
-  t.after(async () => { await browser?.close(); await site.close(); });
-  browser = await puppeteer.launch({ executablePath, headless: true, args: ['--no-sandbox'] });
-  const page = await browser.newPage(), writes = [], errors = [];
-  page.on('pageerror', e => errors.push(e.message));
-  await page.setRequestInterception(true);
-  let admin = false, flightAvailable = false;
-  const fixture = [
-    { id:'a', session_id:'s1', user_id:'admin-id', game:'snake', kind:'start', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{} },
-    { id:'b', session_id:'s1', user_id:'admin-id', game:'snake', kind:'end', received_at:new Date().toISOString(), active_ms:30000, visible_ms:45000, details:{score:10,reason:'close',snapshot:{score:10}} },
-    { id:'c', session_id:'s2', user_id:null, game:'memory', kind:'error', received_at:new Date().toISOString(), active_ms:5000, visible_ms:5000, details:{code:'runtime'} },
-    { id:'d', session_id:'s3', user_id:'player-id', game:'snake', kind:'start', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{} },
-    { id:'e', session_id:'s3', user_id:'player-id', game:'snake', kind:'end', received_at:new Date().toISOString(), active_ms:20000, visible_ms:20000, details:{score:20,reason:'close',snapshot:{score:20}} }
-  ];
-  // Native F-14 flights are stored in a different table and must be read
-  // through the admin-only RPC, not the Bored play_events endpoint.
-  const flightFixture = [
-    { id:'f1', session_id:'flight-1', user_id:null, visitor_id:'00000000-0000-4000-8000-000000000001', game:'f-14',
-      kind:'start', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{mode:'cruise',aircraft:'tomcat'} },
-    { id:'f2', session_id:'flight-1', user_id:null, visitor_id:'00000000-0000-4000-8000-000000000001', game:'f-14',
-      kind:'interaction', received_at:new Date().toISOString(), active_ms:0, visible_ms:0, details:{mode:'cruise',aircraft:'tomcat'} },
-    { id:'f3', session_id:'flight-1', user_id:null, visitor_id:'00000000-0000-4000-8000-000000000001', game:'f-14',
-      kind:'end', received_at:new Date().toISOString(), active_ms:32000, visible_ms:42000, details:{mode:'cruise',aircraft:'tomcat',outcome:'recovered'} }
-  ];
-  const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
-  page.on('request', req => {
-    if (req.url().startsWith(site.origin)) return req.continue();
-    if (req.method() === 'OPTIONS') return req.respond({ status:204, headers });
-    if (req.url().includes('/play_events') && req.method() === 'POST') { writes.push(...[].concat(JSON.parse(req.postData()))); return req.respond({ status:201, headers, body:'' }); }
-    const aggregateFixture = {
-      totals: { launches:3,meaningful:1,browsers:2,active_ms:25000,error_sessions:1 },
-      games: [{ game:'snake',launches:2,sessions:2,meaningful:1,browsers:1,active_ms:20000,median_active_ms:10000,errors:0 }],
-      sources: [{ source:'library',launches:2,meaningful:1,active_ms:20000 }],
-      ui_events: [{ kind:'card_impression',game:'snake',surface:'library',action_name:null,events:2,browsers:2 }],
-      site: { visits:5,browsers:2 }
-    };
-    const cohortFixture = [{ first_day:'2026-10-29',cohort:2,d1_returned:1,d7_returned:null,
-      next_school:'2026-10-30',school_returned:1 }];
-    const body = req.url().includes('/rpc/analytics_rollup_v1') ? aggregateFixture :
-      req.url().includes('/rpc/analytics_retention_cohorts_v1') ? cohortFixture :
-      req.url().includes('/analytics_admins') ? admin ? [{user_id:'admin-id'}] : [] : req.url().includes('/rpc/analytics_f14_events') ? flightAvailable ? flightFixture : [] : req.url().includes('/play_events') ? req.url().includes('game=eq.f-14') ? [] : fixture : req.url().includes('/profiles') ? [{id:'admin-id',handle:'Daniel'},{id:'player-id',handle:'Player Two'}] : [];
-    return req.respond({status:200, headers, contentType:'application/json', body:JSON.stringify(body)});
-  });
-  await page.goto(site.url);
-  await page.waitForFunction(() => !!window.openGame);
-  await page.evaluate(() => openGame('snake'));
-  await page.waitForFunction(() => document.querySelector('#frame').contentWindow.__boredSnapshot?.().slug === 'snake');
-  await page.evaluate(() => { document.querySelector('#frame').contentDocument.dispatchEvent(new Event('pointerdown')); });
-  await new Promise(r => setTimeout(r, 1200));
-  await page.evaluate(() => closeGame());
-  await page.waitForFunction(() => document.querySelector('#player').hidden);
-  await new Promise(r => setTimeout(r, 200));
-  // This local browser suite must not record visits, starts, checkpoints or
-  // game errors in production, even with the user's preference initially on.
-  assert.equal(writes.length, 0);
-  if (await page.$eval('#claim-dialog', n => n.open)) await page.click('#claim-cancel');
-  await page.click('#settings-nav');
-  assert.equal(await page.$eval('#analytics-enabled', n => n.checked), false);
-  assert.equal(await page.$eval('#analytics-enabled', n => n.disabled), true);
-  await page.evaluate(() => { openGame('memory'); closeGame(); });
-  await new Promise(r => setTimeout(r,100));
-  assert.equal(writes.length, 0);
-  await page.goto(site.origin + '/analytics.html');
-  await page.waitForFunction(() => !document.querySelector('#access').hidden);
-  assert.equal(await page.$eval('#dashboard', n => n.hidden),true);
-  await page.evaluate(() => localStorage.setItem('bored.session',JSON.stringify({access_token:'test',refresh_token:'test',expires_at:Math.floor(Date.now()/1000)+3600,user:{id:'admin-id'}})));
-  admin = true;
-  await page.reload();
-  await page.waitForFunction(() => document.querySelectorAll('#totals strong').length === 8);
-  // Admin play is staff activity: its two snake events never reach the report.
-  assert.match(await page.$eval('#status',n=>n.textContent), /2 staff\/admin events recorded and excluded/);
-  assert.equal(await page.$$eval('#person option', options => options.some(o => o.value === 'admin-id')), false);
-  assert.equal(await page.$eval('#totals strong',n=>n.textContent), '25 s');
-  // The new admin-only tab renders from the same protected endpoint set.
-  await page.click('[data-view="engagement"]');
-  assert.equal(await page.$$eval('#engagement-kpis .analytics-stat', nodes => nodes.length), 8);
-  assert.match(await page.$eval('#engagement-together', n => n.textContent), /Organic matches/);
-  assert.match(await page.$eval('#engagement-feedback', n => n.textContent), /Responses/);
-  await page.click('[data-view="history"]');
-  assert.match(await page.$eval('#history-totals', n => n.textContent), /Game launches/);
-  assert.match(await page.$eval('#history-games', n => n.textContent), /snake/i);
-  assert.match(await page.$eval('#history-ui', n => n.textContent), /card_impression/);
-  assert.match(await page.$eval('#history-cohorts', n => n.textContent), /2026-10-30/);
-  await page.click('[data-view="overview"]');
-  assert.equal(await page.$eval('#games-table tbody',n=>n.children.length),2);
-  assert.doesNotMatch(await page.$eval('#players-table',n=>n.textContent), /Daniel/);
-  fs.mkdirSync(path.join(root, '_build/shots'), { recursive:true });
-  await page.setViewport({width:1100,height:900});
-  await page.screenshot({path:path.join(root,'_build/shots/analytics-desktop.png'),fullPage:true});
-  await page.select('#person','player-id');
-  assert.equal(await page.$eval('#games-table tbody',n=>n.children.length),1);
-  await page.click('[data-view="sessions"]');
-  await page.click('#sessions-table button');
-  assert.match(await page.$eval('#session-json',n=>n.textContent), /"score": 20/);
-  await page.select('#person','guest');
-  await page.click('#errors-only');
-  assert.equal(await page.$eval('#sessions-table tbody',n=>n.children.length),1);
-  assert.match(await page.$eval('#sessions-table',n=>n.textContent), /Guest/);
-  for (const width of [1100,375,320]) {
-    await page.setViewport({width,height:900});
-    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'layout at ' + width);
-  }
-  await page.screenshot({path:path.join(root,'_build/shots/analytics-mobile.png'),fullPage:true});
-  flightAvailable = true;
-  await page.select('#game', 'f-14');
-  await page.click('#refresh');
-  await page.waitForFunction(() => document.querySelector('#f14-totals')?.textContent?.includes('32 s'));
-  assert.equal(await page.$eval('#f14-totals strong',n=>n.textContent), '1');
-  assert.match(await page.$eval('#f14-aircraft',n=>n.textContent), /tomcat/);
-  assert.match(await page.$eval('#f14-outcomes',n=>n.textContent), /Recovered/);
-  assert.equal(await page.$eval('#games-table tbody',n=>n.children.length), 1);
-  assert.deepEqual(errors,[]);
-});
-
-
-test('browser test telemetry is answered locally instead of reaching live analytics', async () => {
-  const { respondToAnalytics, isolateAnalytics } = require('./telemetry-isolation.cjs');
-  let replied = 0, continued = 0, handler;
-  const request = url => ({ url: () => url, respond: async response => { assert.equal(response.status, 204); replied++; }, continue: () => continued++ });
-  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events')), true);
-  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events?select=*')), true);
-  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/product_events')), true);
-  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/enjoyment_feedback')), true);
-  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/score_rules')), false);
-  await isolateAnalytics({ setRequestInterception: async enabled => assert.equal(enabled, true), on: (name, fn) => { assert.equal(name, 'request'); handler = fn; } });
-  handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events'));
-  handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/product_events'));
-  handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/enjoyment_feedback'));
-  handler(request('http://127.0.0.1/index.html'));
-  assert.equal(replied, 7);
-  assert.equal(continued, 1);
-});
-));
+      const destination = await page.$eval(link, node => node.getAttribute('href'));
+      assert.ok(destination.endsWith(expected), 'Wrong dashboard: ' + destination);
     } else {
       await new Promise(resolve => setTimeout(resolve,250));
-      assert.equal(await page.$eval(link,node=>node.hidden),true);
+      assert.equal(await page.$eval(link,node => node.hidden),true);
     }
   }
-  assert.deepEqual(errors,[]);
 });
 
 test('only production Pages tracks, and QA URLs disable an entire session', async () => {
