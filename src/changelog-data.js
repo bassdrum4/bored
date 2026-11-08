@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 352,
+  "count": 353,
   "newest": "2026-11-07",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"a29e4ed","date":"2026-11-07","author":"Daniel Lowe","subject":"Tag enjoyment ratings by game and skip Civ Lite reader sessions"},
   {"sha":"276b856","date":"2026-11-07","author":"Daniel Lowe","subject":"Exclude Civ Lite reader telemetry client-side while preserving other games"},
   {"sha":"f7cc94c","date":"2026-11-07","author":"Daniel Lowe","subject":"Keep analytics button hidden until account permissions resolve"},
   {"sha":"fc35ba2","date":"2026-11-07","author":"Daniel Lowe","subject":"Route Bored analytics footer link by scoped account permissions"},
