@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 357,
+  "count": 358,
   "newest": "2026-11-08",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"40c37ff","date":"2026-11-08","author":"bassdrum4","subject":"Add Minecraft developer note"},
+  {"sha":"65bd5c2","date":"2026-11-07","author":"Daniel Lowe","subject":"Make Civ Lite RLS migration safe for isolated multiplayer test databases"},
   {"sha":"f545584","date":"2026-11-07","author":"Daniel Lowe","subject":"Repair analytics test insertion and cover scoped roles"},
   {"sha":"5d84f0c","date":"2026-11-07","author":"Daniel Lowe","subject":"Test role-based analytics routing and Civ Lite-only telemetry filtering"},
   {"sha":"fbd71b3","date":"2026-11-07","author":"Daniel Lowe","subject":"Make Blocklook full-viewport with O-key settings overlay"},
