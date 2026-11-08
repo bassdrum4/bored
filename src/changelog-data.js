@@ -2,13 +2,17 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 335,
+  "count": 339,
   "newest": "2026-11-07",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c28dbb4","date":"2026-11-07","author":"Daniel Lowe","subject":"Revert Minecraft pointer-lock launch changes from PR #95"},
+  {"sha":"d273e32","date":"2026-11-07","author":"Daniel Lowe","subject":"Revert Minecraft pointer-lock launch changes from PR #95"},
+  {"sha":"3ae1c2c","date":"2026-11-07","author":"Daniel Lowe","subject":"Revert Minecraft pointer-lock launch changes from PR #95"},
+  {"sha":"ea679b9","date":"2026-11-07","author":"Daniel Lowe","subject":"Revert Minecraft pointer-lock launch changes from PR #95"},
   {"sha":"42fd64b","date":"2026-11-07","author":"Daniel Lowe","subject":"Fix Minecraft mouse-lock fallback in embedded Bored"},
   {"sha":"a0bb9c6","date":"2026-11-07","author":"Daniel Lowe","subject":"Delete INFISICAL.md"},
   {"sha":"7d16e4d","date":"2026-11-07","author":"Claude","subject":"Civ Lite 4.6.1: a What's new screen with patch notes"},
