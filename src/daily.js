@@ -100,6 +100,10 @@ export const CHALLENGES = [
   // step asks for more than a couple of cities' worth.
   { slug: 'ashcrown', label: 'Banner rising', goal: 'Grow one banner to {target} renown in a single campaign.', metric: 'renown', targets: [150, 300, 450], unit: 'renown' }
 ];
+// Preserve the original v2 order, including retired Cup Pong, for historical IDs.
+// Do not add the retired game to the playable CHALLENGES catalog.
+const LEGACY_CUP_PONG = Object.freeze({ slug: 'cup-pong', label: 'Steady hand', goal: 'Sink {target} cups in one run before the third miss.', metric: 'cups', targets: [6, 9, 12], unit: 'cups sunk' });
+const DAILY_V2_CHALLENGES = Object.freeze([...CHALLENGES.slice(0, 34), LEGACY_CUP_PONG, CHALLENGES[34]]);
 // Frozen v3 calendar lineup; future additions must make a new schedule version
 // instead of silently moving previously published daily challenges.
 const DAILY_SCHEDULE_V3 = Object.freeze([
@@ -137,16 +141,17 @@ const DAILY_SCHEDULE_V3 = Object.freeze([
   'mahjong',
   'chess',
   'block-blast',
+  'cup-pong',
   'deep'
 ]);
 // CHALLENGES is append-only, and the v2 rotation that ran before the calendar
 // shipped was cut from the first 35 entries. Pinning that count keeps already
 // played days where they were when new games are appended.
-const DAILY_V2_COUNT = 35;
+const DAILY_V2_COUNT = DAILY_V2_CHALLENGES.length;
 // V4 adds the games built after the frozen v3 calendar. Days already played
 // keep their v3 game, so no published challenge moves; the larger calendar
 // starts the day after this release and is never applied retroactively.
-const DAILY_SCHEDULE_V4 = Object.freeze([...DAILY_SCHEDULE_V3, 'circuit', 'typing-test']);
+const DAILY_SCHEDULE_V4 = Object.freeze([...DAILY_SCHEDULE_V3.filter(slug => slug !== 'cup-pong'), 'circuit', 'typing-test']);
 const DAILY_SCHEDULE_V4_START = Date.parse('2026-10-31T00:00:00Z') / 86400000;
 // V5 adds Ashcrown. A schedule version starts its own calendar rather than
 // extending the previous cycle in place: days already published keep their
@@ -168,7 +173,7 @@ export function dailyChallenge(date) {
   if (day < DAILY_SCHEDULE_START) {
     // Preserve old completions/streaks under their original v2 IDs.
     const index = ((day % DAILY_V2_COUNT) + DAILY_V2_COUNT) % DAILY_V2_COUNT;
-    const definition = CHALLENGES[index];
+    const definition = DAILY_V2_CHALLENGES[index];
     const circuit = ((Math.floor(day / DAILY_V2_COUNT) % 3) + 3) % 3;
     const target = definition.targets[circuit];
     return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v2:' + date + ':' + definition.slug };
@@ -197,7 +202,7 @@ export function dailyChallenge(date) {
           dailyChallenge(new Date((DAILY_SCHEDULE_V5_START - 7 + i) * 86400000).toISOString().slice(0, 10)).slug)
       : Array.from({ length: 7 }, (_, i) => {
           const historicDay = DAILY_SCHEDULE_START - 7 + i;
-          return CHALLENGES[((historicDay % DAILY_V2_COUNT) + DAILY_V2_COUNT) % DAILY_V2_COUNT].slug;
+          return DAILY_V2_CHALLENGES[((historicDay % DAILY_V2_COUNT) + DAILY_V2_COUNT) % DAILY_V2_COUNT].slug;
         });
     for (let i = 0; i < 7 && i < size; i++) {
       if (!recent.includes(order[i])) continue;
