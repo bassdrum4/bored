@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 354,
+  "count": 355,
   "newest": "2026-11-07",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"5d84f0c","date":"2026-11-07","author":"Daniel Lowe","subject":"Test role-based analytics routing and Civ Lite-only telemetry filtering"},
   {"sha":"fbd71b3","date":"2026-11-07","author":"Daniel Lowe","subject":"Make Blocklook full-viewport with O-key settings overlay"},
   {"sha":"a29e4ed","date":"2026-11-07","author":"Daniel Lowe","subject":"Tag enjoyment ratings by game and skip Civ Lite reader sessions"},
   {"sha":"276b856","date":"2026-11-07","author":"Daniel Lowe","subject":"Exclude Civ Lite reader telemetry client-side while preserving other games"},
