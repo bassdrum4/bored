@@ -26,6 +26,7 @@ import { createTogetherPlayer } from './hub/together-player.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnnouncementsUI } from './hub/announcements-ui.js';
 import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
+import { getAnalyticsAccess } from './hub/analytics-access.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
 import { resumeScript } from './hub/resume.js';
@@ -955,17 +956,28 @@ const navigation = createHubNavigation({
   onLeaderboard: () => loadLeaderboard(true)
 });
 
-// The admin page keeps its own server-side check; this only stops the link from
-// advertising itself to everyone else in the footer.
-const ADMIN_EMAIL = 'danilowe28@midlandps.org';
-function renderAdminLink() {
+// The same footer link routes to the dashboard this account may actually use.
+// RLS protects the data; the link never relies on an email or editable handle.
+let analyticsLinkEpoch = 0;
+async function renderAnalyticsLink() {
   const link = $('#admin-analytics-link');
   if (!link) return;
-  const email = hasIdentity() ? String(getSession()?.user?.email || '').trim().toLowerCase() : '';
-  link.hidden = email !== ADMIN_EMAIL;
+  const epoch = ++analyticsLinkEpoch;
+  link.hidden = true;
+  if (!hasIdentity()) return;
+  try {
+    const access = await getAnalyticsAccess();
+    if (epoch !== analyticsLinkEpoch || getSession()?.user?.id !== access.userId) return;
+    if (access.kind !== 'admin' && access.kind !== 'civ-lite') return;
+    link.href = access.kind === 'admin' ? './analytics.html' : './civ-lite-analytics.html';
+    link.textContent = access.kind === 'admin' ? 'Admin analytics · ' : 'Civ Lite analytics · ';
+    link.hidden = false;
+  } catch {
+    // No verified permission means no link, including on a failed network call.
+  }
 }
-window.addEventListener('bored:identity', renderAdminLink);
-renderAdminLink();
+window.addEventListener('bored:identity', () => void renderAnalyticsLink());
+void renderAnalyticsLink();
 
 function clearFavoriteGames() {
   analytics.track('save_action', { surface: 'settings', action: 'clear' });
