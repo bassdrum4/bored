@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 360,
+  "count": 361,
   "newest": "2026-11-08",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"4e3e269","date":"2026-11-08","author":"Claude","subject":"Civ Lite 4.6.2: a contents list for How to play"},
   {"sha":"40c37ff","date":"2026-11-08","author":"bassdrum4","subject":"Add Minecraft developer note"},
   {"sha":"b63f497","date":"2026-11-07","author":"Daniel Lowe","subject":"Remove Minecraft and temporary Blocklook experiment from Bored"},
   {"sha":"ce385a4","date":"2026-11-07","author":"Daniel Lowe","subject":"Teach account browser mock the new analytics entitlement reads"},
