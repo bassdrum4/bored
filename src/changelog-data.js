@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 343,
+  "count": 345,
   "newest": "2026-11-07",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"93ae105","date":"2026-11-07","author":"Daniel Lowe","subject":"Publish Civ Lite analytics page for game maintainers"},
+  {"sha":"f1f4a28","date":"2026-11-07","author":"Daniel Lowe","subject":"Add scoped Civ Lite read-only analytics frontend"},
   {"sha":"b23bc8d","date":"2026-11-07","author":"Daniel Lowe","subject":"Add strictly scoped Civ Lite analytics reader permissions"},
   {"sha":"1821f08","date":"2026-11-07","author":"Daniel Lowe","subject":"Remove temporary mouse lock diagnostics site"},
   {"sha":"0fd07bc","date":"2026-11-07","author":"Daniel Lowe","subject":"Keep diagnostics available in nested pointer-lock frame"},
