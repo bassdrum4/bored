@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 359,
+  "count": 360,
   "newest": "2026-11-08",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"40c37ff","date":"2026-11-08","author":"bassdrum4","subject":"Add Minecraft developer note"},
+  {"sha":"b63f497","date":"2026-11-07","author":"Daniel Lowe","subject":"Remove Minecraft and temporary Blocklook experiment from Bored"},
   {"sha":"ce385a4","date":"2026-11-07","author":"Daniel Lowe","subject":"Teach account browser mock the new analytics entitlement reads"},
   {"sha":"65bd5c2","date":"2026-11-07","author":"Daniel Lowe","subject":"Make Civ Lite RLS migration safe for isolated multiplayer test databases"},
   {"sha":"f545584","date":"2026-11-07","author":"Daniel Lowe","subject":"Repair analytics test insertion and cover scoped roles"},
