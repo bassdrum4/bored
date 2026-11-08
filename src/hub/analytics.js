@@ -1,5 +1,6 @@
 import { request, getSession, freshSession, refreshSession, ANON_TOKEN } from './backend.js';
 import { readStored, writeStored, removeStored } from './store.js';
+import { getAnalyticsAccess, isSuppressedGame, filterGameReaderTelemetry } from './analytics-access.js';
 
 // Installed before game scripts so startup failures are observed too. No error text is sent.
 export const ANALYTICS_BRIDGE = '<script>addEventListener("error",function(){parent.postMessage({type:"bored:runtime-error"},"*")});addEventListener("unhandledrejection",function(){parent.postMessage({type:"bored:runtime-error"},"*")});<\/script>';
@@ -69,12 +70,14 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   let run = null, last = now(), lastInput = -Infinity, pending = [], busy = false;
   let visitor = canRecord() ? getVisitorId() : null;
   let detach = () => {}, lastFlush = now(), flushTimer = null;
-  let checkedAccount = null, adminCheck = null;
+  let checkedAccount = null, adminCheck = null, scopedReaderId = null;
   const scheduleFlush = () => {
     if (flushTimer) return;
     flushTimer = setTimeout(() => { flushTimer = null; void flush(); }, 1200);
   };
   const owner = () => getSession()?.user?.id || null;
+  const suppressGame = game => scopedReaderId !== null && scopedReaderId === owner() &&
+    isSuppressedGame('civ-lite', game);
   // Fail closed for signed-in accounts until their current identity is checked.
   // The hub may queue events meanwhile, but no bytes reach Supabase beforehand.
   // The database separately enforces the admin denial even if client code is
@@ -85,14 +88,10 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     if (checkedAccount === id) return true;
     if (adminCheck?.id === id) return adminCheck.promise;
     const job = (async () => {
-      const session = await freshSession();
-      if (session?.user?.id !== id) return false;
-      const rows = await request('/rest/v1/analytics_admins?select=user_id&user_id=eq.' + encodeURIComponent(id),
-        { token: session.access_token });
-      if (owner() !== id) return false;
-      if (Array.isArray(rows) && rows.some(row => row.user_id === id)) {
-        // Quarantine this browser even after sign-out, so subsequent guest
-        // testing on the same machine cannot pollute anonymized metrics.
+      const access = await getAnalyticsAccess();
+      if (owner() !== id || access.userId !== id) return false;
+      if (access.kind === 'admin') {
+        // Site-wide admins remain excluded from ALL analytics, even after logout.
         staffBrowser = true;
         writeStored(STAFF_BROWSER_KEY, true);
         pending = [];
@@ -100,6 +99,14 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
         detach(); detach = () => {};
         window.dispatchEvent(new Event('bored:analytics-disabled'));
         return false;
+      }
+      // Scoped readers are still ordinary players in every other game. Purge
+      // already queued Civ Lite events before the first network write.
+      scopedReaderId = access.kind === 'civ-lite' ? id : null;
+      pending = filterGameReaderTelemetry(pending, access.kind);
+      if (suppressGame(run?.game)) {
+        run = null;
+        detach(); detach = () => {};
       }
       checkedAccount = id;
       return true;
@@ -143,7 +150,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     last = time;
   }
   function emit(kind, details = {}) {
-    if (!canRecord() || !run) return;
+    if (!canRecord() || !run || suppressGame(run.game)) return;
     sample();
     const current = run.ready ? snapshot(run.game) : null;
     const valid = current?.slug === run.game ? current : null;
@@ -239,7 +246,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   }
   function start(game, context = {}) {
     end('switch');
-    if (!canRecord() || (game === 'f-14' && context.external)) return;
+    if (!canRecord() || suppressGame(game) || (game === 'f-14' && context.external)) return;
     last = now(); lastInput = -Infinity;
     run = { id: uuid(), user: owner(), game, context, active: 0, totalActive: 0, visible: 0, ready: false, interacted: false, everFinished: false, opened: now() };
     emit('start');
@@ -315,6 +322,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
     if (!canRecord() || !allowed.includes(kind)) return;
     const { game = null, match_id = null, announcement_id = null } = payload || {};
     const safeGame = typeof game === 'string' && /^[a-z0-9][a-z0-9-]{0,49}$/.test(game) ? game : null;
+    if (suppressGame(safeGame)) return;
     const isUuid = value => typeof value === 'string' && /^[0-9a-f-]{36}$/i.test(value);
     const details = {};
     if (isUuid(match_id)) details.match_id = match_id;
@@ -342,6 +350,7 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   return {
     start, end, ready, track,
     visitorId: () => enabled ? visitor : null,
+    isGameSuppressed: suppressGame,
     event(kind, details) {
       if (kind === 'error' && run && (run.errors = (run.errors || 0) + 1) > 5) return;
       // Safe error classification, never stack traces or raw error text.
