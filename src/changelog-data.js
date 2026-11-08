@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 356,
-  "newest": "2026-11-07",
+  "count": 357,
+  "newest": "2026-11-08",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"40c37ff","date":"2026-11-08","author":"bassdrum4","subject":"Add Minecraft developer note"},
   {"sha":"f545584","date":"2026-11-07","author":"Daniel Lowe","subject":"Repair analytics test insertion and cover scoped roles"},
   {"sha":"5d84f0c","date":"2026-11-07","author":"Daniel Lowe","subject":"Test role-based analytics routing and Civ Lite-only telemetry filtering"},
   {"sha":"fbd71b3","date":"2026-11-07","author":"Daniel Lowe","subject":"Make Blocklook full-viewport with O-key settings overlay"},
