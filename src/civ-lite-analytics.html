@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Civ Lite analytics · Bored</title>
+  <link rel="stylesheet" href="./styles.css"><link rel="stylesheet" href="./analytics.css">
+</head>
+<body><main class="analytics-page">
+  <header class="analytics-header">
+    <div><a href="./index.html">← Bored</a><h1>Civ Lite analytics</h1></div>
+    <button id="refresh" type="button" hidden>Refresh</button>
+  </header>
+  <p id="status" role="status" aria-live="polite">Checking access…</p>
+  <section id="access" hidden>
+    <h2>Game analytics permission required</h2>
+    <p>Sign in to Bored with an account that has been granted Civ Lite analytics access. This page does not provide access to other games or site administration.</p>
+    <a href="./index.html">Back to Bored to sign in</a>
+  </section>
+  <div id="dashboard" hidden>
+    <form id="filters" class="analytics-filters">
+      <label>From (Detroit)<input id="from" type="date" required></label>
+      <label>Through (Detroit)<input id="through" type="date" required></label>
+      <button type="submit">Apply</button>
+    </form>
+    <p class="analytics-note">Read-only activity for Civ Lite (Ashcrown) only. Dates use Detroit time. Staff activity is excluded. Player counts estimate distinct accounts or browsers, not necessarily people. Opt-outs, blocked analytics, and missing final events reduce coverage.</p>
+    <div id="totals" class="analytics-totals"></div>
+    <div class="analytics-charts">
+      <section><h2>Daily activity</h2><div id="daily"></div></section>
+      <section><h2>How players started</h2><div id="sources"></div></section>
+      <section><h2>Gameplay events</h2><div id="actions"></div></section>
+      <section><h2>Discovery and multiplayer</h2><div id="discovery"></div></section>
+    </div>
+    <p class="analytics-note">Active time is sampled while a player is engaged; visible time includes idle play. Session totals are based on recorded events, not guaranteed complete rounds. No individual player identities or raw events are exposed by this report.</p>
+  </div>
+</main><script type="module" src="./hub/civ-lite-analytics.js"></script></body>
+</html>
