@@ -2616,20 +2616,21 @@ function notesRig() {
 test('Ashcrown 4.6.1: the changelog is newest first, its newest entry is this version, and every entry has a date and notes', () => {
   const r = civRig(FOUR);
   const log = jsonOf(r, 'CHANGELOG');
-  assert.equal(r.run('VERSION'), '4.6.1');
+  assert.equal(r.run('VERSION'), '4.6.2');
   assert.equal(log[0].v, r.run('VERSION'), 'the newest entry is the current version');
   assert.deepEqual(log.map(e => [e.v, e.date, e.notes.length]), [
-    ['4.6.1', 'Nov 7', 1], ['4.6', 'Nov 7', 5], ['4.5 orders', 'Nov 6', 4], ['4.5', 'Nov 6', 4], ['4.4', 'Nov 6', 2], ['4.3', 'Nov 6', 2],
+    ['4.6.2', 'Nov 8', 1], ['4.6.1', 'Nov 7', 1], ['4.6', 'Nov 7', 5], ['4.5 orders', 'Nov 6', 4], ['4.5', 'Nov 6', 4], ['4.4', 'Nov 6', 2], ['4.3', 'Nov 6', 2],
     ['4.2.1–4.2.3', 'Nov 6', 3], ['4.2', 'Nov 6', 3], ['4.1', 'Nov 6', 2], ['4.0', 'Nov 4', 7], ['Before 4.0', 'Nov 3–4', 4]
   ], 'the entries, in order, with their dates and how many notes each has');
   for (const e of log) {
     assert.ok(e.v && e.date && e.notes.length >= 1, 'entry ' + e.v + ' has a version, a date and a note');
     for (const n of e.notes) assert.ok(typeof n === 'string' && n.length > 0 && !/["']/.test(n), 'notes use typographic quotes: ' + n);
   }
-  assert.equal(log[0].notes[0], 'A What’s new screen: patch notes for every update, on the title screen and in the Menu.');
-  assert.equal(log[2].notes[1], 'Attacking someone you’re at peace with asks “Declare war?” first.');
-  assert.equal(log[3].notes[2], 'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.');
-  assert.equal(log[10].notes[3], '3.0: a research revamp, a science victory, and up to 8 players.');
+  assert.equal(log[0].notes[0], 'How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.');
+  assert.equal(log[1].notes[0], 'A What’s new screen: patch notes for every update, on the title screen and in the Menu.');
+  assert.equal(log[3].notes[1], 'Attacking someone you’re at peace with asks “Declare war?” first.');
+  assert.equal(log[4].notes[2], 'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.');
+  assert.equal(log[11].notes[3], '3.0: a research revamp, a science victory, and up to 8 players.');
 });
 
 test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a first visit, and a new version brings it back', () => {
@@ -2640,7 +2641,7 @@ test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a f
   assert.equal(r.run('notesNew()'), true);
   // Opening the screen stores the version and takes the tag off at once.
   r.run('showWhatsNew()');
-  assert.equal(r.prefs().notesSeen, '4.6.1', 'stored under the prefs key through writePref');
+  assert.equal(r.prefs().notesSeen, '4.6.2', 'stored under the prefs key through writePref');
   assert.equal(r.prefs().tips, false, 'the other prefs are left alone');
   assert.equal(r.els['notes-tag'].hidden, true, 'the tag is gone behind the open screen');
   assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'and stays gone');
@@ -2656,7 +2657,7 @@ test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a f
 test('Ashcrown 4.6.1: a first visit (no prefs and no saves) starts with the notes seen, so the Tutorial is the only tag', () => {
   let r = notesRig();
   r.run('firstVisitNotes()');
-  assert.equal(r.prefs().notesSeen, '4.6.1');
+  assert.equal(r.prefs().notesSeen, '4.6.2');
   assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'no New tag, and the Tutorial tag stays');
   // Prefs but no saves, or saves but no prefs: not new here, so the tag shows.
   r = notesRig();
@@ -2688,16 +2689,17 @@ test('Ashcrown 4.6.1: the What’s new screen opens the newest entry, folds ever
   const r = notesRig();
   r.run('showWhatsNew()');
   const html = r.modals.at(-1);
-  assert.match(html, /<h2>What’s new<\/h2><span class="sub">Civ Lite 4\.6\.1<\/span>/, 'head and sub');
+  assert.match(html, /<h2>What’s new<\/h2><span class="sub">Civ Lite 4\.6\.2<\/span>/, 'head and sub');
   assert.equal(r.run('UI.modalKind'), 'notes');
-  assert.ok(html.includes('<h3 class="notes-now">4.6.1 · Nov 7</h3>'), 'the newest entry is open at the top as version · date');
+  assert.ok(html.includes('<h3 class="notes-now">4.6.2 · Nov 8</h3>'), 'the newest entry is open at the top as version · date');
+  assert.ok(html.includes('<li>How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.</li>'));
   assert.ok(html.includes('<li>A What’s new screen: patch notes for every update, on the title screen and in the Menu.</li>'));
   const details = html.match(/<details[^>]*>/g) || [];
-  assert.equal(details.length, 10, 'every older entry is a details element');
+  assert.equal(details.length, 11, 'every older entry is a details element');
   assert.ok(details.every(d => d === '<details class="notes-old">'), 'all of them closed');
-  assert.ok(html.includes('<summary>4.6 · Nov 7</summary>') && html.includes('<summary>Before 4.0 · Nov 3–4</summary>') && html.includes('<summary>4.2.1–4.2.3 · Nov 6</summary>'));
+  assert.ok(html.includes('<summary>4.6.1 · Nov 7</summary>') && html.includes('<summary>4.6 · Nov 7</summary>') && html.includes('<summary>Before 4.0 · Nov 3–4</summary>') && html.includes('<summary>4.2.1–4.2.3 · Nov 6</summary>'));
   assert.ok(html.indexOf('<summary>4.6 · Nov 7</summary>') < html.indexOf('<summary>4.5 · Nov 6</summary>') && html.indexOf('<summary>4.5 · Nov 6</summary>') < html.indexOf('<summary>Before 4.0'), 'newest first');
-  assert.equal((html.match(/<li>/g) || []).length, 1 + 5 + 4 + 4 + 2 + 2 + 3 + 3 + 2 + 7 + 4, 'every note is listed once');
+  assert.equal((html.match(/<li>/g) || []).length, 1 + 1 + 5 + 4 + 4 + 2 + 2 + 3 + 3 + 2 + 7 + 4, 'every note is listed once');
   assert.ok(html.includes('Attacking someone you’re at peace with asks “Declare war?” first.'));
   assert.match(html, /<div class="modal-foot"><button class="btn primary" data-act="close">Close<\/button><\/div>/, 'a Close button at the bottom');
   // The in-game Menu opens the same screen and shows no tag.
@@ -2710,4 +2712,180 @@ test('Ashcrown 4.6.1: the What’s new screen opens the newest entry, folds ever
   r.run('onAction("whats-new")');
   assert.equal(r.modals.length, before + 1);
   assert.equal(r.modals.at(-1), html, 'the Menu button opens the same screen');
+});
+
+/* ── 4.6.2: How to play has a contents list ────────────────────────────────── */
+
+const HELP_GROUPS = [
+  ['Basics', ['turn', 'cities', 'hex-buildings', 'tiers', 'roads', 'builders']],
+  ['Science and resources', ['science', 'era4', 'resources']],
+  ['Units and moving', ['moving', 'marches', 'zoc', 'ships']],
+  ['War', ['fighting', 'taking-cities', 'declaring-war']],
+  ['Diplomacy', ['first-contact', 'borders', 'embassies', 'trading']],
+  ['The world', ['maps', 'wonders', 'difficulty']],
+  ['Winning', ['winning', 'moments']],
+  ['Controls', ['keys']]
+];
+// civRig plus a stand-in for the few page elements How to play touches: the text pane and a heading per section.
+const plain = o => JSON.parse(JSON.stringify(o));
+function helpRig() {
+  const r = embRig();
+  const ids = jsonOf(r, 'helpSections().map(s => s.id)');
+  const pane = { scrollTop: 0, scrollHeight: 9000, clientHeight: 500, scrolls: [], scrollTo(o) { this.scrolls.push(o); } };
+  const focused = [];
+  const sec = id => ({ offsetTop: ids.indexOf(id) * 300 + 40, querySelector: () => ({ focus: o => focused.push([id, o]) }) });
+  r.els = { 'help-text': pane, 'help-search': { value: '' }, 'help-list': { innerHTML: '', querySelectorAll: () => [] }, 'help-toc': { classList: { contains: () => false, toggle() {} } } };
+  r.ctx.document = { getElementById: id => (id.startsWith('help-sec-') ? sec(id.slice(9)) : r.els[id] || null), querySelector: () => null };
+  r.sizes = [];
+  r.ctx.openModal = (html, size) => { r.modals.push(html); r.sizes.push(size); };
+  r.pane = pane;
+  r.focused = focused;
+  r.top = id => ids.indexOf(id) * 300 + 40 - 8;
+  r.run('UI = { modalKind: null, coach: { hidden: true }, coachTag: {}, coachCount: {}, coachSay: {}, coachActions: {} }');
+  return r;
+}
+
+test('Ashcrown 4.6.2: How to play is one list of sections, grouped, and the old text is only reordered', () => {
+  const r = helpRig();
+  const secs = jsonOf(r, 'helpSections()');
+  assert.equal(r.run('VERSION'), '4.6.2');
+  assert.equal(secs.length, 26);
+  assert.equal(new Set(secs.map(s => s.id)).size, 26, 'ids are unique');
+  assert.deepEqual([...new Set(secs.map(s => s.group))], HELP_GROUPS.map(g => g[0]), 'the groups, in order');
+  for (const [group, ids] of HELP_GROUPS) assert.deepEqual(secs.filter(s => s.group === group).map(s => s.id), ids, group);
+  assert.deepEqual(secs.filter(s => ['turn', 'era4', 'declaring-war', 'borders', 'maps', 'moments'].includes(s.id)).map(s => s.title),
+    ['A turn', 'Era 4 is shuffled', 'Declaring war with an order', 'Borders and the Council', 'Maps and continents', 'Historic moments']);
+  for (const s of secs) {
+    assert.ok(s.title && s.html.startsWith('<p>') && s.html.endsWith('</p>'), s.id + ' has a title and its paragraph');
+    assert.ok(!/<h[1-6]/.test(s.html), s.id + ' leaves the heading to the page');
+  }
+  assert.ok(secs.find(s => s.id === 'keys').html.startsWith('<p>Like Civ 6: <b>right-click</b> sends the selected unit'), 'text kept as it was');
+  assert.ok(secs.find(s => s.id === 'embassies').html.includes('<b>Embassy</b> (30 production)'));
+});
+
+test('Ashcrown 4.6.2: the page lists every group and section, and showHelp(id) opens at that section', () => {
+  const r = helpRig();
+  r.run('showHelp()');
+  const html = r.modals.at(-1);
+  assert.equal(r.sizes.at(-1), 'wide help', 'a wide modal with the help class');
+  assert.equal(r.run('UI.modalKind'), 'help');
+  assert.match(html, /<h2>How to play<\/h2>/);
+  assert.ok(html.includes('data-act="help-contents"') && html.includes('>Contents</button>'), 'the Contents button for narrow screens');
+  assert.ok(html.includes('id="help-search"') && html.includes('placeholder="Search the rules"'), 'the search box');
+  assert.deepEqual((html.match(/<h2 class="help-group">[^<]*/g) || []).map(h => h.replace(/<[^>]*>/, '')), HELP_GROUPS.map(g => g[0]), 'a heading above each group of text');
+  assert.deepEqual((html.match(/<div class="help-label">[^<]*/g) || []).map(h => h.replace(/<[^>]*>/, '')), HELP_GROUPS.map(g => g[0]), 'and a small label in the contents');
+  const all = HELP_GROUPS.flatMap(g => g[1]);
+  assert.deepEqual((html.match(/<section class="help-sec" id="help-sec-[^"]*"><h3 tabindex="-1">/g) || []).map(s => s.match(/help-sec-([^"]*)/)[1]), all, 'every section, headed so focus can land on it');
+  assert.deepEqual((html.match(/data-act="help-go:[^"]*"/g) || []).map(s => s.slice(18, -1)), all, 'a link for each');
+  assert.equal(r.pane.scrolls.length, 0, 'no id, no jump');
+  assert.equal(html.match(/class="help-link on"/g).length, 1, 'one link is marked: the first section');
+  assert.ok(html.includes('class="help-link on" type="button" data-act="help-go:turn"'));
+  // An id opens straight at the section: instant, heading focused. An unknown id just opens it.
+  r.run('showHelp("borders")');
+  assert.deepEqual(plain(r.pane.scrolls.at(-1)), { top: r.top('borders'), behavior: 'auto' });
+  assert.equal(r.focused.at(-1)[0], 'borders');
+  assert.deepEqual(plain(r.focused.at(-1)[1]), { preventScroll: true });
+  assert.equal(r.run('UI.helpCur'), 'borders');
+  const jumps = r.pane.scrolls.length;
+  r.run('showHelp("nope")');
+  assert.equal(r.pane.scrolls.length, jumps);
+  // The menu items still open it with no id.
+  r.run('onAction("help")');
+  assert.equal(r.pane.scrolls.length, jumps);
+  assert.equal(r.run('UI.helpCur'), 'turn');
+});
+
+test('Ashcrown 4.6.2: a jump is smooth unless Animation is off, and the heading takes focus', () => {
+  const r = helpRig();
+  r.run('showHelp()');
+  r.act('help-go:ships');
+  assert.deepEqual(plain(r.pane.scrolls.at(-1)), { top: r.top('ships'), behavior: 'smooth' });
+  assert.deepEqual(r.focused.at(-1)[0], 'ships');
+  assert.equal(r.run('UI.helpCur'), 'ships', 'marked at once');
+  r.run('setAnim("none")');
+  r.act('help-go:keys');
+  assert.deepEqual(plain(r.pane.scrolls.at(-1)), { top: r.top('keys'), behavior: 'auto' }, 'instant with Animation off');
+  assert.equal(r.run('UI.helpAim'), null);
+  // The last section can always be brought to the top: the target never goes past the end of the text.
+  r.pane.scrollHeight = 5000;
+  r.act('help-go:keys');
+  assert.equal(r.pane.scrolls.at(-1).top, 4500, 'clamped to the end of the pane');
+});
+
+test('Ashcrown 4.6.2: search matches the title or the text, every word, any case, and a group with no match is hidden', () => {
+  const r = helpRig();
+  const ids = q => jsonOf(r, 'helpMatches(' + JSON.stringify(q) + ').map(s => s.id)');
+  assert.equal(ids('').length, 26, 'an empty search is everything');
+  assert.deepEqual(ids('zone control'), ['zoc'], 'two words, both needed');
+  assert.deepEqual(ids('ZONE'), ids('zone'), 'case does not matter');
+  assert.ok(ids('zone').includes('zoc'));
+  assert.deepEqual(ids('borders').filter(x => x === 'borders'), ['borders'], 'a title word');
+  const text = ids('horse');
+  assert.ok(text.includes('resources') && text.includes('fighting') && text.includes('trading'), 'a word in the text finds the section: ' + text);
+  assert.ok(!text.includes('keys') && !text.includes('maps'));
+  assert.deepEqual(ids('<b>'), [], 'tags are not text');
+  assert.deepEqual(ids('xyzzy'), []);
+  // The list keeps the page's order, shows only groups that still have a match, and marks the section being read.
+  r.run('UI.helpCur = "trading"');
+  const list = r.run('helpListHtml(helpMatches("embassy"))');
+  assert.deepEqual((list.match(/<div class="help-label">[^<]*/g) || []).map(h => h.replace(/<[^>]*>/, '')), ['Diplomacy']);
+  assert.ok(!list.includes('help-go:turn'), 'sections with no match are gone');
+  assert.ok(list.includes('data-act="help-go:embassies"'));
+  assert.ok(!list.includes('help-link on'), 'the section being read is not in this list, so nothing is marked');
+  const full = r.run('helpListHtml(helpSections())');
+  assert.ok(full.includes('<button class="help-link on" type="button" data-act="help-go:trading" aria-current="location">Trading</button>'));
+  assert.equal(full.match(/aria-current/g).length, 1);
+  assert.equal(r.run('helpListHtml(helpMatches("xyzzy"))'), '<p class="help-none">No section mentions that.</p>');
+  // Typing filters the list in place.
+  r.els['help-list'].innerHTML = '';
+  r.run('helpFilter("horse")');
+  assert.deepEqual((r.els['help-list'].innerHTML.match(/help-go:[a-z0-9-]+/g) || []).map(s => s.slice(8)), text);
+});
+
+test('Ashcrown 4.6.2: Enter jumps to the first match, Escape clears the search and the next Escape is left to close', () => {
+  const r = helpRig();
+  r.run('showHelp()');
+  const box = r.els['help-search'];
+  const key = (k, target) => { const e = { key: k, target, prevented: false, stopped: false, preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } }; r.ctx.ev = e; r.run('helpKey(ev)'); return e; };
+  box.value = 'horse';
+  key('Enter', box);
+  assert.equal(r.focused.at(-1)[0], 'builders', 'the first match in page order');
+  assert.equal(r.pane.scrolls.at(-1).top, r.top('builders'));
+  box.value = 'xyzzy';
+  const n = r.pane.scrolls.length;
+  key('Enter', box);
+  box.value = '   ';
+  key('Enter', box);
+  assert.equal(r.pane.scrolls.length, n, 'nothing to jump to');
+  // Escape: first the search is cleared and the whole contents is back.
+  box.value = 'horse';
+  r.els['help-list'].innerHTML = 'filtered';
+  const first = key('Escape', box);
+  assert.equal(box.value, '');
+  assert.equal(first.prevented && first.stopped, true, 'handled: the modal stays open');
+  assert.equal((r.els['help-list'].innerHTML.match(/help-go:/g) || []).length, 26, 'the contents is whole again');
+  assert.equal(r.run('helpEscape()'), false, 'the second Escape is not ours: it closes the modal');
+});
+
+test('Ashcrown 4.6.2: the closing tip links to How borders work, and nothing else gets a link', () => {
+  const r = helpRig();
+  assert.deepEqual(jsonOf(r, 'TIPS.filter(t => t.help).map(t => [t.id, t.help, t.helpLabel])'), [['closing', 'borders', 'How borders work']]);
+  r.city(0, 3, 5);
+  r.unit(1, 'warrior', 4, 5);
+  r.meetOnly(0, 1);
+  r.run('pl(0).techs = pl(0).techs.filter(t => t !== "earlyempire")');
+  assert.equal(r.run('currentTip() && currentTip().tip.id'), 'closing', 'a stranger on your land brings the tip up');
+  r.run('renderCoach()');
+  const actions = r.run('UI.coachActions.innerHTML');
+  assert.ok(actions.includes('<button class="act" data-act="help:borders">How borders work</button>'), 'the link');
+  assert.ok(actions.indexOf('data-act="tip-ok:closing"') < actions.indexOf('data-act="help:borders"') && actions.indexOf('data-act="help:borders"') < actions.indexOf('data-act="tips-off"'), 'between Got it and Turn tips off');
+  assert.ok(r.run('UI.coachSay.innerHTML').includes('Early Empire is a cheap tech that closes your borders'), 'the tip text is unchanged');
+  // The button opens How to play at Borders and the Council. It also works from the title screen, where there is no game.
+  r.act('help:borders');
+  assert.deepEqual(plain(r.pane.scrolls.at(-1)), { top: r.top('borders'), behavior: 'auto' }, 'it opens right there');
+  assert.equal(r.run('UI.helpCur'), 'borders');
+  assert.equal(r.run('UI.modalKind'), 'help');
+  r.run('G = null');
+  r.act('help:keys');
+  assert.equal(r.focused.at(-1)[0], 'keys');
 });

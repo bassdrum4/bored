@@ -205,6 +205,32 @@
   .modal-body h3:first-child { margin-top: 0 }
   .modal-body p { font-size: 12.5px; color: var(--ink-2); max-width: 62ch; margin-bottom: 6px }
   .modal-foot { padding: 10px 16px; border-top: 1px solid var(--rule); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap }
+
+  /* How to play: a contents list beside the text, or over it on a narrow screen. Only the text pane scrolls. */
+  .modal.help { height: min(84vh, 760px) }
+  .modal.help .modal-body.help-body { padding: 0; overflow: hidden; flex: 1; min-height: 0; display: flex; flex-direction: column }
+  .help-bar { flex: none; padding: 8px 16px; border-bottom: 1px solid var(--rule) }
+  .help-main { flex: 1; min-height: 0; position: relative; display: flex }
+  .help-text { flex: 1 1 0; min-width: 0; overflow-y: auto; position: relative; padding: 14px 16px 18px }
+  .help-text h2.help-group { font-family: var(--font-display); font-size: 17px; font-weight: 600; margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--rule) }
+  .help-text h2.help-group:first-child { margin-top: 0 }
+  .help-sec { margin-bottom: 14px; overflow-wrap: anywhere }
+  .help-sec:last-child { min-height: 100% }
+  .help-text h3 { margin-top: 0; scroll-margin-top: 8px }
+  .help-text h3:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px }
+  .help-toc { display: none; flex-direction: column; min-height: 0; background: var(--panel) }
+  .help-toc.open { display: flex; position: absolute; inset: 0; z-index: 2 }
+  .help-search { margin: 10px 12px 6px; width: calc(100% - 24px); min-width: 0; font: inherit; font-size: 13px; color: var(--ink); background: var(--panel-hi); border: 1px solid var(--rule); border-radius: 3px; padding: 5px 7px }
+  .help-list { flex: 1; min-height: 0; overflow-y: auto; position: relative; padding: 2px 12px 14px }
+  .help-label { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin: 12px 0 3px }
+  .help-link { display: block; width: 100%; text-align: left; font-size: 12.5px; color: var(--ink-2); padding: 4px 8px; border-left: 2px solid transparent; overflow-wrap: anywhere }
+  .help-link:hover { color: var(--rust) }
+  .help-link.on { color: var(--ink); font-weight: 600; border-left-color: var(--rust); background: var(--paper) }
+  .help-none { font-size: 12.5px; color: var(--ink-3); margin: 12px 4px }
+  @media (min-width: 720px) {
+    .help-bar { display: none }
+    .help-toc, .help-toc.open { display: flex; position: static; flex: none; width: 210px; border-right: 1px solid var(--rule) }
+  }
   .x { margin-left: auto; font-size: 18px; line-height: 1; padding: 0 2px; color: var(--ink-2) }
   .council-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--rule-2); align-items: center }
   .council-row .cn { display: flex; align-items: center; gap: 7px; font-family: var(--font-display); font-size: 14px; flex-wrap: wrap }
@@ -6839,7 +6865,7 @@ const TIPS = [
     say: (i, u) => esc(knownName(i, u.owner, true)) + '’s ' + esc(UNITS[u.type].name.toLowerCase()) + ' is standing on your land. Early Empire is a cheap tech that closes your borders: ' +
       'other civs then need an open-borders deal to come in, and stepping in without one means war. Press T to research it.',
     at: u => [u.x, u.y],
-    el: '#btn-tech' },
+    el: '#btn-tech', help: 'borders', helpLabel: 'How borders work' },
   { id: 'roads', test: i => hasTech(i, 'masonry') && ownCities(i).length >= 2 && roadChoices(ownCities(i)[0]).some(o => o.r.cost > 0),
     say: () => 'Masonry lets a city build a road to another of your cities. It costs production by the hex, and units move along paved hexes at half cost. Pick one under Roads in the city panel.',
     at: () => { const c = ownCities(G.viewer)[0]; return [c.x, c.y]; } },
@@ -6966,6 +6992,7 @@ function renderCoach() {
       catch (error) { say = ''; }
       el = now.tip.el || null;
       actions = '<button class="act" data-act="tip-ok:' + now.tip.id + '">Got it</button>' +
+        (now.tip.help ? '<button class="act" data-act="help:' + now.tip.help + '">' + now.tip.helpLabel + '</button>' : '') +
         '<button class="skip" data-act="tips-off">Turn tips off</button>';
     }
   }
@@ -8207,78 +8234,226 @@ function askDisband() {
     '<div class="modal-foot"><button class="btn" data-act="close">Keep it</button><button class="btn primary" data-act="disband">Disband</button></div>', true);
 }
 
-function showHelp() {
-  openModal(modalHead('How to play', 'The whole rulebook on one page') + '<div class="modal-body">' +
-    '<h3>A turn</h3><p>Each city grows food and production from every tile inside its borders. Each pop eats 2 food and each military unit eats 1 from its home city. ' +
-    'Spare food grows the city (15 + 8 × pop to grow), and each new pop claims one more hex. Production goes into whatever the city is building, one thing at a time.</p>' +
-    '<h3>Science</h3><p>Every city makes science: +1 per 2 pop, your capital +2, a Library +2 (+3 after Printing), a University +3, an Observatory +2 (+4 if the Library’s hex is next to a mountain). ' +
-    'Geysers give +2 on their hex and the Great Barrier Reef +3 on each of its hexes. Each map’s famous mountain is plain mountains, but every land hex beside it gives +2. A city with a Library and nothing better to do can go on Research and turn a third of its production into science. ' +
-    'Techs cost 40, 100, 180 and 300 by era, except Early Empire, which costs 25. Seven major techs have a eureka: do the thing on its card and it costs half. Press T for the tree, then click any tech to head for it: what it needs gets queued first.</p>' +
-    '<h3>Era 4 is shuffled</h3><p>Like Civ’s Tech Shuffle, the six era 4 techs keep what they unlock, but what each one needs is dealt fresh every game, the same for everyone. ' +
-    'An era 4 tech shows as “?” until you know a tech it needs or earn its eureka.</p>' +
-    '<h3>Horses, iron and gunpowder</h3><p>Each pasture on horses and each mine on iron adds 2 to your stockpile a turn, up to 30. Gunpowder stays hidden in the ground until you learn Firearms; then mine it the same way. ' +
-    'Horsemen take 10 horses, swordsmen and warships 10 iron, heavy horsemen 10 of each, musketmen and cannons 10 gunpowder, and battleships 10 iron and 10 gunpowder, paid when they finish. If you’re short, the city waits.</p>' +
-    '<h3>Cities</h3><p>Settlers found cities on land at least 4 hexes from any other city. Settlers cost 1 pop, so the city needs pop 2. ' +
-    'If a city’s food goes negative, its military units lose 10 HP a turn. Cities heal 10 HP a turn when nobody attacked them (France 20), and not at all while ringed by enemies. ' +
-    'They defend at 25 + 3 per pop (at most +21), or their garrison + 5.</p>' +
-    '<h3>Buildings on hexes</h3><p>Like Civ 6’s districts. Walls, the castle, the fortress and the Granary stand on the city center. Every other building takes its own hex inside that city’s borders, and you pick it: queue the building, then click one of the outlined hexes. ' +
-    'A harbor goes on shallow water; the rest go on flat land or hills, never on mountains, natural wonders or another building’s hex. ' +
-    'The moment you pick the hex, its feature and improvement are removed for good (you’re asked first), along with what they gave, and builders can’t touch it again; the terrain stays. CPU cities pick their own hexes.</p>' +
-    '<h3>Upgrade tiers</h3><p>A building can be upgraded in place, on the same hex: Granary → Water Mill (+2 food, +1 production), Library → University → Observatory, Workshop → Foundry (+2 production, +1 more per 3 pop), ' +
-    'Barracks → Armory and Harbor → Shipyard (units built there start as veterans, +5 strength for good; the Shipyard also gives +1 production per 2 shallow tiles), Walls → Fortress. ' +
-    'A unit or building stays hidden in a city’s list until you know the tech for it.</p>' +
-    '<h3>Roads</h3><p>With Masonry a city can build a road to another of your cities, over land that is yours or nobody’s: 4 production per flat hex, 6 per hill or forest hex, never over mountains. ' +
-    'Units move along paved hexes for half a move a hex. That is all a road does.</p>' +
-    '<h3>First contact</h3><p>Like Civ 6, you don’t know a civ until you meet it. You meet when one of your units or cities sees one of theirs, or any land they own (or when theirs sees yours): meeting is always mutual, and a card introduces them. ' +
-    'Until then they show as <b>Unmet player</b> with a grey dot, they are missing from your Council, and you can’t declare war on them, trade with them or ask them for borders. A march never walks onto an unmet civ’s closed land: it stops on the hex before. ' +
-    'Everyone you meet starts at peace. CPUs follow the same rules.</p>' +
-    '<h3>Borders and the Council</h3><p>A civ’s land closes the moment it learns <b>Early Empire</b>, a cheap era 1 tech (25 research) that Writing needs. Until then its land is open to everyone. ' +
-    'Once it is closed, stepping onto it without an open-borders deal means war, and you are asked first. Only the civ that knows Early Empire closes: yours can stay open while theirs is closed. ' +
-    'Units caught inside when a civ closes are moved out at the start of their owner’s turn. Every human who has met that civ gets a card, and you get a note when it is yours. ' +
-    'Ask for open borders in the Council: a deal lasts ' + OPEN_TURNS + ' turns. A game can be set up so borders never close; Early Empire can still be researched, but it closes nothing.</p>' +
-    '<h3>Embassies</h3><p>Once you know Writing, every city can build an <b>Embassy</b> (30 production). Pick it, then pick a civ you have met that is at peace with you, has no embassy with you yet and is not already getting one from another of your cities. ' +
-    'They answer at once. A CPU says yes unless it is at war with you, dislikes you or is about to attack you: a yes gives +2 attitude and the city starts building “Embassy to …”, a no changes nothing and you can ask another civ. ' +
-    'Another human answers in the Council on their turn: the city holds at full production until they do, and a refusal or a lapsed offer cancels it, saving the production for the next thing you build. ' +
-    'War with them, or their elimination, cancels it the same way. When it finishes, their capital and every hex within 2 of it are marked on your map, dimmed like any hex you have seen but not live vision, and a CPU likes you 5 more. ' +
-    'If their capital moves, the new one is marked at the start of your turn. An embassy survives war and peace; only their elimination ends it. The Council shows it, with a Show capital button.</p>' +
-    '<h3>Declaring war with an order</h3><p>You don’t have to go to the Council. Order a soldier to attack another player’s unit or city, or to walk onto a civilian of theirs, while you are at peace, and you are asked first: “Declare war on …?”. Say yes and war starts, then the order is carried out; say no and nothing changes. A target too far away this turn never asks, and a civ you haven’t met can’t be targeted.</p>' +
-    '<h3>Trading</h3><p>Horses, iron and gunpowder can be bought and sold in the Council, for production. The resource changes hands at once; the buyer pays in one go or in installments (5 a turn for 10 turns, say). ' +
-    'Only war cancels a deal: if the buyer starts it, everything still owed is paid on the spot; if the seller does, the payments stop. Production never trades for production, and a payment can’t top what the payer’s best city makes in a turn. CPUs price by supply and demand.</p>' +
-    '<h3>Builders</h3><p>3 charges, each one instant, inside your borders only: farms on flat land and wheat, mines on hills and iron (Mining), pastures on horses (Animal Husbandry), ' +
-    'fishing boats on seafood (Sailing). Chop a forest for 20 production or harvest wheat or seafood for 20 food. Builders can wade onto shallow water to reach seafood.</p>' +
-    '<h3>Moving</h3><p>Hills and forest cost 2 moves, mountains are impassable, and a paved road hex costs half a move. Land units can step onto shallow water; deep sea needs Navigation. ' +
-    'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Any land soldier (melee, ranged, scout or siege) captures an enemy civilian standing alone by walking onto it; ships can’t. A captured settler stays a settler and a captured builder stays a builder, each as your own kind; a builder keeps the charges it has left (up to what yours holds), and the soldier uses up its moves. ' +
-    'The player who lost it gets a card.</p>' +
-    '<h3>Longer marches</h3><p>With a unit selected, click any hex you have seen, even turns away: the unit walks as far as it can this turn and keeps going at the start of each turn until it arrives. ' +
-    'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off.</p>' +
-    '<h3>Zone of control</h3><p>Like Civ: at war, every hex next to an enemy military unit or city is in its zone of control (land units cover land, ships cover water, cities both). ' +
-    'Stepping into one ends your move there, though you can still attack. Horse units ride straight through.</p>' +
-    '<h3>Ships</h3><p>Galleys, warships and battleships come from coastal cities. A new ship launches onto the water beside its city (it only docks inside when that water is full), and it stays on water, in shallow water until Navigation. They hit anything next to the water ' +
-    'and never take the embark penalty. A ship can batter a city, and battleships shell cities from 2 hexes out, but only a melee land unit can take one. Norway’s ships are the exception: they board a port at 0 HP.</p>' +
-    '<h3>Fighting</h3><p>Every unit has 100 HP. Damage is 30 × e^(0.04 × strength gap), rolled between 80% and 120%. ' +
-    'Melee units take damage back; archers, catapults and warships don’t. Units inside their own borders get +5. Hills and forest give defenders +3. ' +
-    'Spearmen get +10 against horse units; catapults and cannons get −15 against units. Units that don’t move or fight heal 10 HP, or 20 inside your borders. A fortified unit gets +3 defense until it moves or attacks.</p>' +
-    '<h3>Taking cities</h3><p>Hit a city to 0 HP, then a melee unit takes it. Scouts can’t. Captured cities lose their walls and 1 pop. You can keep them or burn them; capitals can’t be burned.</p>' +
-    '<h3>Difficulty</h3><p>On Normal, CPUs play by the same rules as you. On Deity, every CPU gets +40% production, +20% food, +25% research and +4 combat strength. ' +
-    'It also needs a smaller edge before it attacks, starts wars sooner and holds out longer for peace.</p>' +
-    '<h3>Maps and continents</h3><p>Pick Pangaea, Continents, Islands or Mirror, and a size: Small, Standard, Large or Huge, built for 2, 4, 6 and 8 players. ' +
-    'Every map’s land is split into named continents, marked with thin dashed lines. Tick “Map wraps west to east” to join the west and east edges: a unit can walk off one side and appear on the other.</p>' +
-    '<h3>Natural wonders</h3><p>Each map has four, dropped at random but at least 3 hexes from every start, well apart, and never more than your share of them closest to you. ' +
-    'The Great Barrier Reef (shallow water, +3 science a hex) and one famous mountain, a different one each game: Mount Everest, Kilimanjaro, the Matterhorn, Mount Fuji, Mount Olympus or Denali (+2 science on every land hex beside it). Both cover 1 to 3 hexes on Small maps, up to 4 on Standard and 5 on Large and Huge. ' +
-    'Pamukkale, the Turkish hot springs people have bathed in to heal for 2,000 years, works like Civ’s Fountain of Youth: a land military unit that steps in heals 10 HP every turn for good. The Giant’s Causeway, as in Civ, can’t be entered, but a land military unit that steps beside it gets +5 strength for good. ' +
-    'Nobody founds cities, builds or claims mountains on a wonder, the Inca included. The first time you see one, a popup says what it is and what it does, and the history keeps a line about it.</p>' +
-    '<h3>Winning</h3><p><b>Conquest:</b> hold every capital on the map. <b>Science:</b> finish Star Charts and the Royal Academy, then send out the Grand Expedition by sea (coastal city with a Harbor) ' +
-    'or the Grand Caravan by land (any city). If it gets home after its trip, you win; take its home city to stop it, and while that city is under half HP the trip waits. Every Future Tech you finish on the way cuts a turn. ' +
-    '<b>Score:</b> the highest score when the turn limit hits: 5 per city, 1 per pop, 2, 4, 6 or 8 per tech by era (2 per Future Tech), era points from Historic moments, and 1 per 20 military strength. ' +
-    'Older units count for less as the game goes on. Conquest and science can be switched off at setup.</p>' +
-    '<h3>Historic moments</h3><p>Like Civ 6’s era score. Reaching a milestone for the first time pops up a card and pays 1 to 3 era points into your Score: ' +
-    'seeing a natural wonder, a city on a new continent, first contact, first blood, taking a city or a capital (or winning one back), making peace, an open-borders or trade deal, ' +
-    'a first road, a city of pop 8, five cities, a University, each new era, each science step, and sending out the last trip. Every civ earns each one once, and the first civ in the world to earn it gets double. ' +
-    'The Realm panel lists them all. Other cards warn you when someone declares war on you, takes one of your cities or launches a science trip, and when a civ you have met closes its borders. ' +
-    'Turn Event popups off in Options (or the Menu) and the points still count.</p>' +
-    '<h3>Keys</h3><p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
-    '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
-    '</div><div class="modal-foot"><button class="btn" data-act="civs">All 16 civs</button><button class="btn primary" data-act="close">Close</button></div>');
+// How to play, as one list of sections: the contents, the search and the text all read from it, in this order.
+function helpSections() {
+  return [
+    { id: 'turn', group: 'Basics', title: 'A turn', html:
+      '<p>Each city grows food and production from every tile inside its borders. Each pop eats 2 food and each military unit eats 1 from its home city. ' +
+      'Spare food grows the city (15 + 8 × pop to grow), and each new pop claims one more hex. Production goes into whatever the city is building, one thing at a time.</p>' },
+    { id: 'cities', group: 'Basics', title: 'Cities', html:
+      '<p>Settlers found cities on land at least 4 hexes from any other city. Settlers cost 1 pop, so the city needs pop 2. ' +
+      'If a city’s food goes negative, its military units lose 10 HP a turn. Cities heal 10 HP a turn when nobody attacked them (France 20), and not at all while ringed by enemies. ' +
+      'They defend at 25 + 3 per pop (at most +21), or their garrison + 5.</p>' },
+    { id: 'hex-buildings', group: 'Basics', title: 'Buildings on hexes', html:
+      '<p>Like Civ 6’s districts. Walls, the castle, the fortress and the Granary stand on the city center. Every other building takes its own hex inside that city’s borders, and you pick it: queue the building, then click one of the outlined hexes. ' +
+      'A harbor goes on shallow water; the rest go on flat land or hills, never on mountains, natural wonders or another building’s hex. ' +
+      'The moment you pick the hex, its feature and improvement are removed for good (you’re asked first), along with what they gave, and builders can’t touch it again; the terrain stays. CPU cities pick their own hexes.</p>' },
+    { id: 'tiers', group: 'Basics', title: 'Upgrade tiers', html:
+      '<p>A building can be upgraded in place, on the same hex: Granary → Water Mill (+2 food, +1 production), Library → University → Observatory, Workshop → Foundry (+2 production, +1 more per 3 pop), ' +
+      'Barracks → Armory and Harbor → Shipyard (units built there start as veterans, +5 strength for good; the Shipyard also gives +1 production per 2 shallow tiles), Walls → Fortress. ' +
+      'A unit or building stays hidden in a city’s list until you know the tech for it.</p>' },
+    { id: 'roads', group: 'Basics', title: 'Roads', html:
+      '<p>With Masonry a city can build a road to another of your cities, over land that is yours or nobody’s: 4 production per flat hex, 6 per hill or forest hex, never over mountains. ' +
+      'Units move along paved hexes for half a move a hex. That is all a road does.</p>' },
+    { id: 'builders', group: 'Basics', title: 'Builders', html:
+      '<p>3 charges, each one instant, inside your borders only: farms on flat land and wheat, mines on hills and iron (Mining), pastures on horses (Animal Husbandry), ' +
+      'fishing boats on seafood (Sailing). Chop a forest for 20 production or harvest wheat or seafood for 20 food. Builders can wade onto shallow water to reach seafood.</p>' },
+    { id: 'science', group: 'Science and resources', title: 'Science', html:
+      '<p>Every city makes science: +1 per 2 pop, your capital +2, a Library +2 (+3 after Printing), a University +3, an Observatory +2 (+4 if the Library’s hex is next to a mountain). ' +
+      'Geysers give +2 on their hex and the Great Barrier Reef +3 on each of its hexes. Each map’s famous mountain is plain mountains, but every land hex beside it gives +2. A city with a Library and nothing better to do can go on Research and turn a third of its production into science. ' +
+      'Techs cost 40, 100, 180 and 300 by era, except Early Empire, which costs 25. Seven major techs have a eureka: do the thing on its card and it costs half. Press T for the tree, then click any tech to head for it: what it needs gets queued first.</p>' },
+    { id: 'era4', group: 'Science and resources', title: 'Era 4 is shuffled', html:
+      '<p>Like Civ’s Tech Shuffle, the six era 4 techs keep what they unlock, but what each one needs is dealt fresh every game, the same for everyone. ' +
+      'An era 4 tech shows as “?” until you know a tech it needs or earn its eureka.</p>' },
+    { id: 'resources', group: 'Science and resources', title: 'Horses, iron and gunpowder', html:
+      '<p>Each pasture on horses and each mine on iron adds 2 to your stockpile a turn, up to 30. Gunpowder stays hidden in the ground until you learn Firearms; then mine it the same way. ' +
+      'Horsemen take 10 horses, swordsmen and warships 10 iron, heavy horsemen 10 of each, musketmen and cannons 10 gunpowder, and battleships 10 iron and 10 gunpowder, paid when they finish. If you’re short, the city waits.</p>' },
+    { id: 'moving', group: 'Units and moving', title: 'Moving', html:
+      '<p>Hills and forest cost 2 moves, mountains are impassable, and a paved road hex costs half a move. Land units can step onto shallow water; deep sea needs Navigation. ' +
+      'Embarked units fight at −10. A hex holds 1 military unit and 1 civilian. Any land soldier (melee, ranged, scout or siege) captures an enemy civilian standing alone by walking onto it; ships can’t. A captured settler stays a settler and a captured builder stays a builder, each as your own kind; a builder keeps the charges it has left (up to what yours holds), and the soldier uses up its moves. ' +
+      'The player who lost it gets a card.</p>' },
+    { id: 'marches', group: 'Units and moving', title: 'Longer marches', html:
+      '<p>With a unit selected, click any hex you have seen, even turns away: the unit walks as far as it can this turn and keeps going at the start of each turn until it arrives. ' +
+      'Hover to preview the road and the turn count. Click the destination again to cancel, or use Cancel march in the unit panel. A blocked road — a new enemy, a friend parked on the path — calls the march off.</p>' },
+    { id: 'zoc', group: 'Units and moving', title: 'Zone of control', html:
+      '<p>Like Civ: at war, every hex next to an enemy military unit or city is in its zone of control (land units cover land, ships cover water, cities both). ' +
+      'Stepping into one ends your move there, though you can still attack. Horse units ride straight through.</p>' },
+    { id: 'ships', group: 'Units and moving', title: 'Ships', html:
+      '<p>Galleys, warships and battleships come from coastal cities. A new ship launches onto the water beside its city (it only docks inside when that water is full), and it stays on water, in shallow water until Navigation. They hit anything next to the water ' +
+      'and never take the embark penalty. A ship can batter a city, and battleships shell cities from 2 hexes out, but only a melee land unit can take one. Norway’s ships are the exception: they board a port at 0 HP.</p>' },
+    { id: 'fighting', group: 'War', title: 'Fighting', html:
+      '<p>Every unit has 100 HP. Damage is 30 × e^(0.04 × strength gap), rolled between 80% and 120%. ' +
+      'Melee units take damage back; archers, catapults and warships don’t. Units inside their own borders get +5. Hills and forest give defenders +3. ' +
+      'Spearmen get +10 against horse units; catapults and cannons get −15 against units. Units that don’t move or fight heal 10 HP, or 20 inside your borders. A fortified unit gets +3 defense until it moves or attacks.</p>' },
+    { id: 'taking-cities', group: 'War', title: 'Taking cities', html:
+      '<p>Hit a city to 0 HP, then a melee unit takes it. Scouts can’t. Captured cities lose their walls and 1 pop. You can keep them or burn them; capitals can’t be burned.</p>' },
+    { id: 'declaring-war', group: 'War', title: 'Declaring war with an order', html:
+      '<p>You don’t have to go to the Council. Order a soldier to attack another player’s unit or city, or to walk onto a civilian of theirs, while you are at peace, and you are asked first: “Declare war on …?”. Say yes and war starts, then the order is carried out; say no and nothing changes. A target too far away this turn never asks, and a civ you haven’t met can’t be targeted.</p>' },
+    { id: 'first-contact', group: 'Diplomacy', title: 'First contact', html:
+      '<p>Like Civ 6, you don’t know a civ until you meet it. You meet when one of your units or cities sees one of theirs, or any land they own (or when theirs sees yours): meeting is always mutual, and a card introduces them. ' +
+      'Until then they show as <b>Unmet player</b> with a grey dot, they are missing from your Council, and you can’t declare war on them, trade with them or ask them for borders. A march never walks onto an unmet civ’s closed land: it stops on the hex before. ' +
+      'Everyone you meet starts at peace. CPUs follow the same rules.</p>' },
+    { id: 'borders', group: 'Diplomacy', title: 'Borders and the Council', html:
+      '<p>A civ’s land closes the moment it learns <b>Early Empire</b>, a cheap era 1 tech (25 research) that Writing needs. Until then its land is open to everyone. ' +
+      'Once it is closed, stepping onto it without an open-borders deal means war, and you are asked first. Only the civ that knows Early Empire closes: yours can stay open while theirs is closed. ' +
+      'Units caught inside when a civ closes are moved out at the start of their owner’s turn. Every human who has met that civ gets a card, and you get a note when it is yours. ' +
+      'Ask for open borders in the Council: a deal lasts ' + OPEN_TURNS + ' turns. A game can be set up so borders never close; Early Empire can still be researched, but it closes nothing.</p>' },
+    { id: 'embassies', group: 'Diplomacy', title: 'Embassies', html:
+      '<p>Once you know Writing, every city can build an <b>Embassy</b> (30 production). Pick it, then pick a civ you have met that is at peace with you, has no embassy with you yet and is not already getting one from another of your cities. ' +
+      'They answer at once. A CPU says yes unless it is at war with you, dislikes you or is about to attack you: a yes gives +2 attitude and the city starts building “Embassy to …”, a no changes nothing and you can ask another civ. ' +
+      'Another human answers in the Council on their turn: the city holds at full production until they do, and a refusal or a lapsed offer cancels it, saving the production for the next thing you build. ' +
+      'War with them, or their elimination, cancels it the same way. When it finishes, their capital and every hex within 2 of it are marked on your map, dimmed like any hex you have seen but not live vision, and a CPU likes you 5 more. ' +
+      'If their capital moves, the new one is marked at the start of your turn. An embassy survives war and peace; only their elimination ends it. The Council shows it, with a Show capital button.</p>' },
+    { id: 'trading', group: 'Diplomacy', title: 'Trading', html:
+      '<p>Horses, iron and gunpowder can be bought and sold in the Council, for production. The resource changes hands at once; the buyer pays in one go or in installments (5 a turn for 10 turns, say). ' +
+      'Only war cancels a deal: if the buyer starts it, everything still owed is paid on the spot; if the seller does, the payments stop. Production never trades for production, and a payment can’t top what the payer’s best city makes in a turn. CPUs price by supply and demand.</p>' },
+    { id: 'maps', group: 'The world', title: 'Maps and continents', html:
+      '<p>Pick Pangaea, Continents, Islands or Mirror, and a size: Small, Standard, Large or Huge, built for 2, 4, 6 and 8 players. ' +
+      'Every map’s land is split into named continents, marked with thin dashed lines. Tick “Map wraps west to east” to join the west and east edges: a unit can walk off one side and appear on the other.</p>' },
+    { id: 'wonders', group: 'The world', title: 'Natural wonders', html:
+      '<p>Each map has four, dropped at random but at least 3 hexes from every start, well apart, and never more than your share of them closest to you. ' +
+      'The Great Barrier Reef (shallow water, +3 science a hex) and one famous mountain, a different one each game: Mount Everest, Kilimanjaro, the Matterhorn, Mount Fuji, Mount Olympus or Denali (+2 science on every land hex beside it). Both cover 1 to 3 hexes on Small maps, up to 4 on Standard and 5 on Large and Huge. ' +
+      'Pamukkale, the Turkish hot springs people have bathed in to heal for 2,000 years, works like Civ’s Fountain of Youth: a land military unit that steps in heals 10 HP every turn for good. The Giant’s Causeway, as in Civ, can’t be entered, but a land military unit that steps beside it gets +5 strength for good. ' +
+      'Nobody founds cities, builds or claims mountains on a wonder, the Inca included. The first time you see one, a popup says what it is and what it does, and the history keeps a line about it.</p>' },
+    { id: 'difficulty', group: 'The world', title: 'Difficulty', html:
+      '<p>On Normal, CPUs play by the same rules as you. On Deity, every CPU gets +40% production, +20% food, +25% research and +4 combat strength. ' +
+      'It also needs a smaller edge before it attacks, starts wars sooner and holds out longer for peace.</p>' },
+    { id: 'winning', group: 'Winning', title: 'Winning', html:
+      '<p><b>Conquest:</b> hold every capital on the map. <b>Science:</b> finish Star Charts and the Royal Academy, then send out the Grand Expedition by sea (coastal city with a Harbor) ' +
+      'or the Grand Caravan by land (any city). If it gets home after its trip, you win; take its home city to stop it, and while that city is under half HP the trip waits. Every Future Tech you finish on the way cuts a turn. ' +
+      '<b>Score:</b> the highest score when the turn limit hits: 5 per city, 1 per pop, 2, 4, 6 or 8 per tech by era (2 per Future Tech), era points from Historic moments, and 1 per 20 military strength. ' +
+      'Older units count for less as the game goes on. Conquest and science can be switched off at setup.</p>' },
+    { id: 'moments', group: 'Winning', title: 'Historic moments', html:
+      '<p>Like Civ 6’s era score. Reaching a milestone for the first time pops up a card and pays 1 to 3 era points into your Score: ' +
+      'seeing a natural wonder, a city on a new continent, first contact, first blood, taking a city or a capital (or winning one back), making peace, an open-borders or trade deal, ' +
+      'a first road, a city of pop 8, five cities, a University, each new era, each science step, and sending out the last trip. Every civ earns each one once, and the first civ in the world to earn it gets double. ' +
+      'The Realm panel lists them all. Other cards warn you when someone declares war on you, takes one of your cities or launches a science trip, and when a civ you have met closes its borders. ' +
+      'Turn Event popups off in Options (or the Menu) and the points still count.</p>' },
+    { id: 'keys', group: 'Controls', title: 'Keys', html:
+      '<p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
+      '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' },
+  ];
+}
+
+// What a search matches: the title and the text of a section, without its tags, every word of the query.
+function helpMatches(query) {
+  const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  return helpSections().filter(s => {
+    const text = (s.title + ' ' + s.html.replace(/<[^>]*>/g, ' ')).toLowerCase();
+    return words.every(w => text.includes(w));
+  });
+}
+// The contents: each group's name as a small label, its sections as links, the section being read marked.
+function helpListHtml(secs) {
+  if (!secs.length) return '<p class="help-none">No section mentions that.</p>';
+  let html = '', group = null;
+  for (const s of secs) {
+    if (s.group !== group) {
+      if (group !== null) html += '</div>';
+      group = s.group;
+      html += '<div class="help-grp"><div class="help-label">' + esc(group) + '</div>';
+    }
+    const here = s.id === UI.helpCur;
+    html += '<button class="help-link' + (here ? ' on' : '') + '" type="button" data-act="help-go:' + s.id + '"' + (here ? ' aria-current="location"' : '') + '>' + esc(s.title) + '</button>';
+  }
+  return html + '</div>';
+}
+// How to play. A section id opens it right there.
+function showHelp(id) {
+  const secs = helpSections();
+  let text = '', group = null;
+  for (const s of secs) {
+    if (s.group !== group) { group = s.group; text += '<h2 class="help-group">' + esc(group) + '</h2>'; }
+    text += '<section class="help-sec" id="help-sec-' + s.id + '"><h3 tabindex="-1">' + esc(s.title) + '</h3>' + s.html + '</section>';
+  }
+  UI.helpCur = secs[0].id;
+  UI.helpAim = null;
+  openModal(modalHead('How to play', 'The whole rulebook on one page') + '<div class="modal-body help-body">' +
+    '<div class="help-bar"><button class="btn" type="button" data-act="help-contents" aria-expanded="false" aria-controls="help-toc">Contents</button></div>' +
+    '<div class="help-main"><nav class="help-toc" id="help-toc" aria-label="Contents">' +
+    '<input class="help-search" id="help-search" type="search" placeholder="Search the rules" aria-label="Search the rules" autocomplete="off">' +
+    '<div class="help-list" id="help-list">' + helpListHtml(secs) + '</div></nav>' +
+    '<div class="help-text" id="help-text">' + text + '</div></div></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="civs">All 16 civs</button><button class="btn primary" data-act="close">Close</button></div>', 'wide help');
+  UI.modalKind = 'help';
+  if (id && secs.some(s => s.id === id)) helpGo(id, true);
+}
+// Mark the section being read in the contents, and keep that link in view.
+function helpMark(id) {
+  UI.helpCur = id;
+  const list = document.getElementById('help-list');
+  if (!list) return;
+  for (const link of list.querySelectorAll('.help-link')) {
+    const here = link.getAttribute('data-act') === 'help-go:' + id;
+    link.classList.toggle('on', here);
+    if (here) {
+      link.setAttribute('aria-current', 'location');
+      if (link.offsetTop < list.scrollTop) list.scrollTop = Math.max(0, link.offsetTop - 28);
+      else if (link.offsetTop + link.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = link.offsetTop + link.offsetHeight - list.clientHeight + 8;
+    } else link.removeAttribute('aria-current');
+  }
+}
+// Scroll the text so a section's heading sits at the top, and move focus to it. Smooth unless Animation is off.
+function helpGo(id, instant) {
+  const pane = document.getElementById('help-text'), sec = pane && document.getElementById('help-sec-' + id);
+  if (!sec) return;
+  helpContents(false);
+  const top = Math.max(0, Math.min(sec.offsetTop - 8, pane.scrollHeight - pane.clientHeight)), smooth = !instant && currentAnim() !== 'none';
+  UI.helpAim = smooth ? { id: id, top: top, until: Date.now() + 1500 } : null;   // the smooth scroll passes other sections on its way: leave the mark alone until it lands
+  helpMark(id);
+  pane.scrollTo({ top: top, behavior: smooth ? 'smooth' : 'auto' });
+  sec.querySelector('h3').focus({ preventScroll: true });
+}
+// On a narrow screen the contents list opens over the text.
+function helpContents(open) {
+  const toc = document.getElementById('help-toc'), button = document.querySelector('[data-act="help-contents"]');
+  if (!toc) return;
+  const on = open === undefined ? !toc.classList.contains('open') : open;
+  toc.classList.toggle('open', on);
+  if (button) button.setAttribute('aria-expanded', on ? 'true' : 'false');
+}
+function helpFilter(query) {
+  const list = document.getElementById('help-list');
+  if (list) list.innerHTML = helpListHtml(helpMatches(query));
+}
+// While the text scrolls, the section at its top is the one marked in the contents.
+function helpWhere() {
+  const pane = document.getElementById('help-text');
+  if (!pane) return;
+  const aim = UI.helpAim;
+  if (aim) {
+    if (Math.abs(pane.scrollTop - aim.top) < 2) { UI.helpAim = null; return; }
+    if (Date.now() < aim.until) return;
+    UI.helpAim = null;
+  }
+  const all = pane.querySelectorAll('.help-sec');
+  let cur = all[0].id.slice(9);   // above the first heading, the first section is the one being read
+  for (const sec of all) {
+    if (sec.offsetTop - 16 > pane.scrollTop + 1) break;
+    cur = sec.id.slice(9);
+  }
+  if (cur !== UI.helpCur) helpMark(cur);
+}
+// Esc in How to play: first the search is cleared, then Esc closes as usual.
+function helpEscape() {
+  const box = document.getElementById('help-search');
+  if (!box || !box.value) return false;
+  box.value = '';
+  helpFilter('');
+  return true;
+}
+// Enter in the search box jumps to the first match.
+function helpKey(event) {
+  const box = document.getElementById('help-search');
+  if (!box) return;
+  if (event.key === 'Enter' && event.target === box) {
+    event.preventDefault();
+    const first = box.value.trim() ? helpMatches(box.value)[0] : null;
+    if (first) helpGo(first.id);
+  } else if (event.key === 'Escape') {
+    if (helpEscape()) { event.preventDefault(); event.stopPropagation(); }
+    else if (event.target === box) { event.preventDefault(); if (!(G && G.pending)) onAction('close'); }
+  }
 }
 
 function showEndModal() {
@@ -8394,7 +8569,9 @@ function onAction(act) {
   if (kind === 'zoom-out') { zoomBy(1 / 1.2); return; }
   if (kind === 'zoom-fit') { fitCamera(); return; }
   if (kind === 'civs') { showCivs(); return; }
-  if (kind === 'help') { showHelp(); return; }
+  if (kind === 'help') { showHelp(a); return; }
+  if (kind === 'help-go') { helpGo(a); return; }
+  if (kind === 'help-contents') { helpContents(); return; }
   if (kind === 'whats-new') { showWhatsNew(); return; }
   if (kind === 'options') { showOptions(); return; }
   if (kind === 'title-new') { showPane('setup'); return; }
@@ -8958,6 +9135,7 @@ function bindMap() {
 // F fortifies, Z sleeps, Delete disbands, T tech tree, F1 rankings (the realm), F9 rules.
 function bindKeys() {
   document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && UI.modalKind === 'help' && !UI.modalLayer.hidden && helpEscape()) { event.preventDefault(); return; }
     const tag = event.target && event.target.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (event.key === 'Escape' && UI.modalKind === 'slots' && !UI.modalLayer.hidden) { onAction('close'); return; }
@@ -9364,9 +9542,12 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '4.6.1';
+const VERSION = '4.6.2';
 // Patch notes for the What’s new screen, newest first: a version, a date and one plain line per change.
 const CHANGELOG = [
+  { v: '4.6.2', date: 'Nov 8', notes: [
+    'How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.'
+  ] },
   { v: '4.6.1', date: 'Nov 7', notes: [
     'A What’s new screen: patch notes for every update, on the title screen and in the Menu.'
   ] },
@@ -9771,8 +9952,12 @@ function boot(data) {
   const tradeInput = event => { if (UI.modalKind === 'trade' && G) refreshTradeForm(!!event.target && event.target.id !== 'tr-price'); };
   UI.modal.addEventListener('input', tradeInput);
   UI.modal.addEventListener('change', tradeInput);
+  // How to play: the search box filters the contents, and the section at the top of the text is marked as it scrolls.
+  UI.modal.addEventListener('input', event => { if (UI.modalKind === 'help' && event.target.id === 'help-search') helpFilter(event.target.value); });
+  UI.modal.addEventListener('scroll', event => { if (UI.modalKind === 'help' && event.target.id === 'help-text') helpWhere(); }, true);
   // The Save screen's name box: Enter saves to this game's slot (or the first empty one), Esc closes.
   UI.modal.addEventListener('keydown', event => {
+    if (UI.modalKind === 'help') { helpKey(event); return; }
     if (UI.modalKind !== 'slots' || !event.target || event.target.id !== 'slot-name') return;
     if (event.key === 'Escape') { event.preventDefault(); onAction('close'); return; }
     if (event.key !== 'Enter') return;
