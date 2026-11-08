@@ -19,29 +19,6 @@ h1{font-family:var(--display);font-size:clamp(44px,10vw,72px);font-weight:700;li
   font-family:var(--mono);font-size:12px;line-height:1.7;color:var(--dim)}
 #player{position:fixed;inset:0;z-index:50;background:#000}
 #frame{width:100%;height:100%;border:0;display:block;background:#000}
-/* An outer embed (for example Google Sites) may forbid pointer lock. Give
-   Minecraft a usable standalone route without hiding other games' controls. */
-#minecraft-launch{position:fixed;inset:0;z-index:55;display:grid;place-items:center;
-  padding:24px;background:#111;color:var(--ink)}
-.minecraft-launch-card{width:min(500px,100%);padding:28px;background:var(--paper);
-  border:2px solid var(--ink);box-shadow:8px 8px 0 #444}
-.minecraft-launch-label{font:11px/1.5 var(--mono);color:var(--red);text-transform:uppercase;
-  letter-spacing:.06em;margin-bottom:14px}
-.minecraft-launch-card h2{font:normal clamp(25px,5vw,35px)/1.15 var(--display);margin-bottom:14px}
-.minecraft-launch-card>p:not(.minecraft-launch-label){font:15px/1.55 Georgia,"Times New Roman",serif}
-.minecraft-launch-actions{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 12px}
-.minecraft-launch-actions a,.minecraft-launch-actions button{padding:11px 14px;border:1px solid var(--ink);
-  border-radius:0;font:12px/1.4 var(--mono);text-decoration:none;cursor:pointer}
-.minecraft-launch-actions a{background:var(--ink);color:var(--paper)}
-.minecraft-launch-actions button{background:var(--paper);color:var(--ink)}
-.minecraft-launch-actions a:hover,.minecraft-launch-actions a:focus-visible,
-.minecraft-launch-actions button:hover,.minecraft-launch-actions button:focus-visible{
-  outline:2px solid var(--red);outline-offset:2px}
-.minecraft-launch-card .minecraft-launch-note{font:11px/1.5 var(--mono)!important;color:var(--dim)}
-#minecraft-direct{position:fixed;right:14px;top:14px;z-index:60;
-  max-width:calc(100vw - 85px);padding:12px;background:var(--paper);color:var(--ink);
-  border:1px solid var(--ink);text-decoration:none;font:11px/1.5 var(--mono)}
-#minecraft-direct:hover,#minecraft-direct:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 #duel-finish{position:fixed;left:0;right:0;bottom:0;z-index:65;display:flex;gap:16px;align-items:center;
   justify-content:center;flex-wrap:wrap;padding:14px 18px;background:var(--paper);color:var(--ink);border-top:2px solid var(--ink)}
 #duel-finish p{margin:0;font:13px/1.5 system-ui}
