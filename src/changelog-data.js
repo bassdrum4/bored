@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 342,
+  "count": 343,
   "newest": "2026-11-07",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"b23bc8d","date":"2026-11-07","author":"Daniel Lowe","subject":"Add strictly scoped Civ Lite analytics reader permissions"},
   {"sha":"1821f08","date":"2026-11-07","author":"Daniel Lowe","subject":"Remove temporary mouse lock diagnostics site"},
   {"sha":"0fd07bc","date":"2026-11-07","author":"Daniel Lowe","subject":"Keep diagnostics available in nested pointer-lock frame"},
   {"sha":"160260a","date":"2026-11-07","author":"Daniel Lowe","subject":"Add isolated Google Sites pointer lock diagnostic lab"},
