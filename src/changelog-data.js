@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 347,
+  "count": 348,
   "newest": "2026-11-07",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"95d4f23","date":"2026-11-07","author":"Daniel Lowe","subject":"Enforce per-game Civ Lite analytics exclusions and own-role visibility"},
   {"sha":"f63912d","date":"2026-11-07","author":"Daniel Lowe","subject":"Fix Blocklook false WebGL error with software Canvas 2D fallback"},
   {"sha":"500f545","date":"2026-11-07","author":"Daniel Lowe","subject":"Add independent voxel mouse-look test game for Google Sites embeds"},
   {"sha":"93ae105","date":"2026-11-07","author":"Daniel Lowe","subject":"Publish Civ Lite analytics page for game maintainers"},
