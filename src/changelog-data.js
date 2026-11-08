@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 339,
+  "count": 340,
   "newest": "2026-11-07",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"160260a","date":"2026-11-07","author":"Daniel Lowe","subject":"Add isolated Google Sites pointer lock diagnostic lab"},
   {"sha":"c28dbb4","date":"2026-11-07","author":"Daniel Lowe","subject":"Revert Minecraft pointer-lock launch changes from PR #95"},
   {"sha":"d273e32","date":"2026-11-07","author":"Daniel Lowe","subject":"Revert Minecraft pointer-lock launch changes from PR #95"},
   {"sha":"3ae1c2c","date":"2026-11-07","author":"Daniel Lowe","subject":"Revert Minecraft pointer-lock launch changes from PR #95"},
