@@ -42,17 +42,23 @@ article{font-size:12px;line-height:1.55;margin:10px 0;color:#c5d2e2}.key{display
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id),game=$('game'),canvas=$('view'),hud=$('hud');
-const gl=canvas.getContext('webgl',{antialias:true,alpha:false,powerPreference:'high-performance'});
-if(!gl){hud.textContent='This browser does not support WebGL. The test needs WebGL enabled.';return}
+let gl=null,ctx2d=null,webglReason='Unavailable',buffer=null,u=null,softwareFaces=[];
+canvas.addEventListener('webglcontextcreationerror',e=>{webglReason=e.statusMessage||'WebGL context creation rejected'});
+try {gl=canvas.getContext('webgl',{antialias:true,alpha:false})||canvas.getContext('experimental-webgl',{antialias:true,alpha:false})}catch(e){webglReason=e.name+': '+e.message}
+if(!gl){try{ctx2d=canvas.getContext('2d',{alpha:false})}catch(e){webglReason+='; Canvas 2D: '+e.message}}
+if(!gl&&!ctx2d){hud.textContent='Both WebGL and Canvas 2D are unavailable in this frame: '+webglReason;return}
+if(gl){
 const vs='attribute vec3 aPos;attribute vec3 aColor;uniform vec3 uEye,uForward,uRight,uUp;uniform float uTan,uAspect;varying vec3 vColor;varying float vDistance;void main(){vec3 v=aPos-uEye;float x=dot(v,uRight),y=dot(v,uUp),z=dot(v,uForward);float n=0.08,f=85.0;gl_Position=vec4(x/(uTan*uAspect),y/uTan,z*(f+n)/(f-n)-2.0*f*n/(f-n),z);vColor=aColor;vDistance=max(0.0,z);}';
 const fs='precision mediump float;varying vec3 vColor;varying float vDistance;void main(){float fog=clamp((vDistance-12.0)/45.0,0.0,0.88);vec3 c=mix(vColor,vec3(0.65,0.79,0.94),fog);gl_FragColor=vec4(c,1.0);}';
 function makeShader(type,src){let s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s}
 const prog=gl.createProgram();gl.attachShader(prog,makeShader(gl.VERTEX_SHADER,vs));gl.attachShader(prog,makeShader(gl.FRAGMENT_SHADER,fs));gl.linkProgram(prog);
 if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){hud.textContent='Shader error: '+gl.getProgramInfoLog(prog);return}
 gl.useProgram(prog);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.clearColor(.65,.79,.94,1);
-const attrPos=gl.getAttribLocation(prog,'aPos'),attrColor=gl.getAttribLocation(prog,'aColor'),u={eye:gl.getUniformLocation(prog,'uEye'),forward:gl.getUniformLocation(prog,'uForward'),right:gl.getUniformLocation(prog,'uRight'),up:gl.getUniformLocation(prog,'uUp'),tan:gl.getUniformLocation(prog,'uTan'),aspect:gl.getUniformLocation(prog,'uAspect')};
+const attrPos=gl.getAttribLocation(prog,'aPos'),attrColor=gl.getAttribLocation(prog,'aColor');u={eye:gl.getUniformLocation(prog,'uEye'),forward:gl.getUniformLocation(prog,'uForward'),right:gl.getUniformLocation(prog,'uRight'),up:gl.getUniformLocation(prog,'uUp'),tan:gl.getUniformLocation(prog,'uTan'),aspect:gl.getUniformLocation(prog,'uAspect')};
 gl.uniform1f(u.tan,Math.tan(76*Math.PI/360));
-const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.enableVertexAttribArray(attrPos);gl.enableVertexAttribArray(attrColor);gl.vertexAttribPointer(attrPos,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(attrColor,3,gl.FLOAT,false,24,12);
+buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.enableVertexAttribArray(attrPos);gl.enableVertexAttribArray(attrColor);gl.vertexAttribPointer(attrPos,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(attrColor,3,gl.FLOAT,false,24,12);
+}
+const backend=gl?'WebGL':'Canvas 2D (software)';
 let vertexCount=0,world=new Map(),seed=749121,placed=0,broken=0;
 const color={grass:[.42,.7,.29],dirt:[.52,.36,.23],stone:[.58,.59,.60],wood:[.57,.36,.19],leaves:[.25,.55,.22],gold:[.93,.65,.20],red:[.85,.26,.22],blue:[.28,.48,.78]};
 const faces=[
@@ -73,8 +79,10 @@ if(rnd(x*7,z*11)>.982&&Math.abs(x)<16&&Math.abs(z)<16){for(let y=h;y<h+4;y++)wor
 for(let yy=h+2;yy<=h+5;yy++)for(let xx=-2;xx<=2;xx++)for(let zz=-2;zz<=2;zz++)if(Math.abs(xx)+Math.abs(zz)+(yy===h+5?1:0)<5&&!has(x+xx,yy,z+zz))world.set(key(x+xx,yy,z+zz),'leaves')}}
 for(let y=3;y<10;y++){world.set(key(-10,y,-10),'red');world.set(key(10,y,-10),'blue');world.set(key(-10,y,10),'gold')}
 rebuild()}
-function rebuild(){const out=[];for(const [str,type] of world){let [x,y,z]=str.split(',').map(Number),c=color[type]||color.stone;for(const f of faces){if(has(x+f.d[0],y+f.d[1],z+f.d[2]))continue;const shade=f.shade*(1+0.055*(rnd(x+f.d[0]*13,z+f.d[2]*13)-.5)),rgb=c.map(v=>Math.min(1,v*shade)),verts=f.a;for(let j of [0,1,2,0,2,3]){let v=verts[j];out.push(x+v[0],y+v[1],z+v[2],rgb[0],rgb[1],rgb[2])}}}
-gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(out),gl.STATIC_DRAW);vertexCount=out.length/6}
+function rebuild(){const out=[];softwareFaces=[];for(const [str,type] of world){let [x,y,z]=str.split(',').map(Number),c=color[type]||color.stone;for(const f of faces){if(has(x+f.d[0],y+f.d[1],z+f.d[2]))continue;const shade=f.shade*(1+0.055*(rnd(x+f.d[0]*13,z+f.d[2]*13)-.5)),rgb=c.map(v=>Math.min(1,v*shade)),verts=f.a;
+if(ctx2d)softwareFaces.push({v:verts.map(p=>[x+p[0],y+p[1],z+p[2]]),cx:x+.5,cy:y+.5,cz:z+.5,n:f.d,rgb});
+for(let j of [0,1,2,0,2,3]){let v=verts[j];out.push(x+v[0],y+v[1],z+v[2],rgb[0],rgb[1],rgb[2])}}}
+if(gl){gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(out),gl.STATIC_DRAW)}vertexCount=out.length/6}
 function topAt(x,z){let xx=Math.floor(x),zz=Math.floor(z);for(let y=16;y>=0;y--)if(has(xx,y,zz))return y+1;return -10}
 const camera={x:0,z:0,feet:4,yaw:0,pitch:0,velocityY:0,ground:true};
 function spawn(){camera.x=0;camera.z=0;camera.feet=topAt(0,0);camera.yaw=.8;camera.pitch=.04;camera.velocityY=0;camera.ground=true;notify('You are in the block world. Move the mouse to look.')}
@@ -119,9 +127,35 @@ edgeYaw=right*right-left*left;edgePitch=edgeVertical?(bottom*bottom-top*top):0;
 const rate=maxTurn*Math.PI/180;camera.yaw+=edgeYaw*rate*dt;camera.pitch=clamp(camera.pitch+edgePitch*rate*.6*dt,-1.53,1.53)}
 $('edgeL').style.opacity=edgeYaw<0?.25+Math.abs(edgeYaw)*2.7:'.10';$('edgeR').style.opacity=edgeYaw>0?.25+Math.abs(edgeYaw)*2.7:'.10';$('edgeT').style.opacity=edgePitch<0?.25+Math.abs(edgePitch)*2.7:'.10';$('edgeB').style.opacity=edgePitch>0?.25+Math.abs(edgePitch)*2.7:'.10';
 }
-function render(now){let dt=Math.min(.047,Math.max(.001,(now-lastTime)/1000));lastTime=now;fps=fps*.93+(1/dt)*.07;update(dt);const box=game.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,1.7),w=Math.max(1,Math.floor(box.width*dpr)),h=Math.max(1,Math.floor(box.height*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h)}
-gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);let b=basis();gl.uniform3f(u.eye,camera.x,camera.feet+1.62,camera.z);gl.uniform3fv(u.forward,b.forward);gl.uniform3fv(u.right,b.right);gl.uniform3fv(u.up,b.up);gl.uniform1f(u.aspect,w/h);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.drawArrays(gl.TRIANGLES,0,vertexCount);
-selectedHit=hitBlock();hud.textContent='BLOCKLOOK  •  '+Math.round(fps)+' FPS\nXYZ '+camera.x.toFixed(1)+' / '+(camera.feet+1.62).toFixed(1)+' / '+camera.z.toFixed(1)+'\nYaw '+((camera.yaw*180/Math.PI)%360).toFixed(1)+'°   Pitch '+(camera.pitch*180/Math.PI).toFixed(1)+'°\nSelected '+selected+'   Broken '+broken+'   Placed '+placed+'\n'+(selectedHit?'Looking at '+selectedHit.type:'Look at a block');
+
+function paintSoftware(w,h,b){
+const eye=[camera.x,camera.feet+1.62,camera.z],near=.08,tan=Math.tan(76*Math.PI/360),aspect=w/h;
+ctx2d.fillStyle='#a6caef';ctx2d.fillRect(0,0,w,h);
+const draw=[];
+function dot(v,u){return v[0]*u[0]+v[1]*u[1]+v[2]*u[2]}
+for(const face of softwareFaces){
+const dx=face.cx-eye[0],dy=face.cy-eye[1],dz=face.cz-eye[2];
+if(dx*dx+dz*dz>27*27)continue;
+if(face.n[0]*-dx+face.n[1]*-dy+face.n[2]*-dz<=0)continue;
+const projected=face.v.map(v=>{const rel=[v[0]-eye[0],v[1]-eye[1],v[2]-eye[2]];return {x:dot(rel,b.right),y:dot(rel,b.up),z:dot(rel,b.forward)}});
+if(projected.every(p=>p.z<=near))continue;
+let clipped=[];
+for(let i=0;i<projected.length;i++){const a=projected[i],p=projected[(i+projected.length-1)%projected.length],inA=a.z>=near,inP=p.z>=near;if(inA!==inP){const t=(near-p.z)/(a.z-p.z);clipped.push({x:p.x+(a.x-p.x)*t,y:p.y+(a.y-p.y)*t,z:near})}if(inA)clipped.push(a)}
+if(clipped.length<3)continue;
+const pts=clipped.map(p=>[w*.5+(p.x/(p.z*tan*aspect))*(w*.5),h*.5-(p.y/(p.z*tan))*(h*.5)]);
+if(pts.every(p=>p[0]<0)||pts.every(p=>p[0]>w)||pts.every(p=>p[1]<0)||pts.every(p=>p[1]>h))continue;
+const z=clipped.reduce((s,p)=>s+p.z,0)/clipped.length,fog=Math.max(0,Math.min(.84,(z-10)/39));
+const rgb=face.rgb.map((a,i)=>Math.round(255*(a*(1-fog)+[.65,.79,.94][i]*fog)));
+draw.push({pts,depth:z,color:'rgb('+rgb.join(',')+')'})
+}
+draw.sort((a,b)=>b.depth-a.depth);
+for(const f of draw){ctx2d.fillStyle=f.color;ctx2d.beginPath();ctx2d.moveTo(f.pts[0][0],f.pts[0][1]);for(let i=1;i<f.pts.length;i++)ctx2d.lineTo(f.pts[i][0],f.pts[i][1]);ctx2d.closePath();ctx2d.fill()}
+}
+
+function render(now){let dt=Math.min(.047,Math.max(.001,(now-lastTime)/1000));lastTime=now;fps=fps*.93+(1/dt)*.07;update(dt);const box=game.getBoundingClientRect(),dpr=gl?Math.min(window.devicePixelRatio||1,1.7):Math.min(window.devicePixelRatio||1,1),w=Math.max(1,Math.floor(box.width*dpr)),h=Math.max(1,Math.floor(box.height*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;if(gl)gl.viewport(0,0,w,h)}
+let b=basis();if(gl){gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.uniform3f(u.eye,camera.x,camera.feet+1.62,camera.z);gl.uniform3fv(u.forward,b.forward);gl.uniform3fv(u.right,b.right);gl.uniform3fv(u.up,b.up);gl.uniform1f(u.aspect,w/h);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.drawArrays(gl.TRIANGLES,0,vertexCount)}
+else paintSoftware(w,h,b);
+selectedHit=hitBlock();hud.textContent='BLOCKLOOK  •  '+backend+'  •  '+Math.round(fps)+' FPS\nXYZ '+camera.x.toFixed(1)+' / '+(camera.feet+1.62).toFixed(1)+' / '+camera.z.toFixed(1)+'\nYaw '+((camera.yaw*180/Math.PI)%360).toFixed(1)+'°   Pitch '+(camera.pitch*180/Math.PI).toFixed(1)+'°\nSelected '+selected+'   Broken '+broken+'   Placed '+placed+'\n'+(selectedHit?'Looking at '+selectedHit.type:'Look at a block');
 $('corner').textContent=(active?'Mouse active':'Move mouse over world')+(edgeYaw||edgePitch?' • EDGE TURNING':'')+' • '+mode+' mode';
 requestAnimationFrame(render)}
 $('mode').addEventListener('change',e=>{mode=e.target.value;prev=null;dragging=false;updateMode()});function updateMode(){$('modeExplanation').textContent={hybrid:'Move naturally; hold at orange edges to keep turning. No clicks needed.',drag:'Hold right mouse button and drag for camera movement. Cursor still has physical limits.',edge:'Only orange edges rotate the camera, like a joystick.',keyboard:'Mouse does not rotate. Use Q/E to turn and R/F to look vertically.'}[mode];$('game').style.cursor=mode==='keyboard'?'default':'none'}
@@ -131,7 +165,7 @@ $('edgeSpeed').oninput=e=>{maxTurn=Number(e.target.value);$('speedLabel').textCo
 $('edgePitch').onchange=e=>edgeVertical=e.target.checked;
 $('showZones').onchange=e=>document.querySelectorAll('.edge').forEach(n=>n.style.visibility=e.target.checked?'visible':'hidden');
 $('respawn').onclick=spawn;$('reset').onclick=()=>{seed=(seed+Math.floor(Math.random()*1e7))|0;makeWorld();spawn()};
-makeWorld();spawn();updateMode();requestAnimationFrame(render);
+makeWorld();spawn();updateMode();$('diagnostic').textContent=backend+' renderer active. '+(gl?'':'WebGL context was denied or unavailable in this frame; switched automatically to Canvas 2D. '+webglReason);requestAnimationFrame(render);
 })();
 </script>
 </body></html>
