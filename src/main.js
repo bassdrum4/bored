@@ -53,8 +53,6 @@ const playerPanel = $('#player');
 const gameFrame = $('#frame');
 const menuButton = $('#menu-toggle');
 const menuPanel = $('#player-actions');
-const minecraftLaunch = $('#minecraft-launch');
-const minecraftDirect = $('#minecraft-direct');
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -252,23 +250,11 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   $('#hint').hidden = !!challenge;
   if (challenge) $('#challenge-progress').textContent = challenge.goal;
   hubRoot.inert = true;
-  minecraftLaunch.hidden = true;
-  minecraftDirect.hidden = slug !== 'eaglecraft';
 
   if (external) {
     gameFrame.removeAttribute('srcdoc');
-    if (slug === 'eaglecraft' && isEmbedded()) {
-      // Sandboxed ancestors can deny pointer lock to every nested iframe.
-      // Don't download 25 MB of Minecraft until the player explicitly opts
-      // into embedded mode; a standalone tab avoids the ancestor restriction.
-      gameFrame.removeAttribute('src');
-      minecraftLaunch.hidden = false;
-      minecraftDirect.hidden = true;
-      showHint('Mouse capture may be blocked here · open Minecraft in a new tab');
-    } else {
-      gameFrame.src = external;
-      showHint('Internet required · use All games to return');
-    }
+    gameFrame.src = external;
+    showHint('Internet required · use All games to return');
   } else {
     const native = NEW_GAMES.includes(slug);
     const token = ++loadToken;
@@ -319,7 +305,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   // from the game itself: a drag begun in the first frame would be cancelled by
   // the blur, which loses the putt (Minigolf drops a drag on window blur).
   focusTimer = setTimeout(() => {
-    if (activeSlug === slug && menuPanel.hidden && minecraftLaunch.hidden && document.activeElement !== gameFrame) gameFrame.focus();
+    if (activeSlug === slug && menuPanel.hidden && document.activeElement !== gameFrame) gameFrame.focus();
   }, 60);
 }
 
@@ -363,8 +349,6 @@ function closeGame({ force = false } = {}) {
   clearTimeout(focusTimer);
   if (fullscreenElement()) leaveFullscreen();
   playerPanel.hidden = true;
-  minecraftLaunch.hidden = true;
-  minecraftDirect.hidden = true;
   hubRoot.inert = false;
   document.body.classList.remove('playing');
   enjoyment.maybePrompt(engagement);
@@ -853,16 +837,6 @@ $('#duel-send').onclick = async () => {
 };
 $('#duel-cancel').onclick = () => hideDuelFinish();
 $('#resume').onclick = () => { closeMenu(); gameFrame.focus(); };
-$('#minecraft-open').href = EXTERNS.eaglecraft;
-minecraftDirect.href = EXTERNS.eaglecraft;
-$('#minecraft-try').onclick = () => {
-  if (activeSlug !== 'eaglecraft') return;
-  minecraftLaunch.hidden = true;
-  minecraftDirect.hidden = false;
-  gameFrame.src = EXTERNS.eaglecraft;
-  gameFrame.focus();
-  showHint('Click to capture the mouse · open in a new tab if it stays visible');
-};
 $('#restart').onclick = restartGame;
 $('#daily-play').onclick = () => {
   const challenge = dailyChallenge(challengeDate());
