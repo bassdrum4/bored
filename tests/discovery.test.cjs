@@ -279,6 +279,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
     if (url.pathname === '/rest/v1/rpc/bt_rpc') return reply({ enrolled: false });
     if (url.pathname === '/rest/v1/rpc/bt_invite_rpc') return reply({ enrolled: false, invites: [] });
     if (url.pathname === '/rest/v1/announcements' || url.pathname === '/rest/v1/announcement_reads') return reply([]);
+    // Role checks are expected on sign-in; this ordinary tester has no analytics access.
+    if (url.pathname === '/rest/v1/analytics_admins' || url.pathname === '/rest/v1/game_analytics_readers') return reply([]);
     if (url.pathname === '/rest/v1/score_rules') return reply(rules);
     if (url.pathname === '/auth/v1/token') return reply({ access_token: 'mock-access', refresh_token: 'mock-refresh', expires_in: 3600, user: { id: 'test-user', email: 'tester@example.test' } });
     if (url.pathname === '/rest/v1/profiles') return reply([{ handle: 'tester' }]);
