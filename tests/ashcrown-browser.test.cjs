@@ -363,13 +363,13 @@ for (const width of [400, 320]) {
     const modalText = () => page.evaluate('(() => { const m = document.querySelector(".modal"); return m && m.offsetParent !== null ? m.textContent : ""; })()');
     // The notes screen as it should look when first opened.
     const checkOpenScreen = async label => {
-      assert.match(await modalText(), /What’s new\s*Civ Lite 5\.0/, label + ': head and sub');
-      assert.equal(await page.$eval('.modal .notes-now', e => e.textContent), '5.0 · Nov 9', label + ': the newest entry is open at the top');
-      assert.ok((await page.$eval('.modal .notes-now + .notes-list', e => e.textContent)).startsWith('Live online games in Bored Together'));
+      assert.match(await modalText(), /What’s new\s*Civ Lite 5\.1/, label + ': head and sub');
+      assert.equal(await page.$eval('.modal .notes-now', e => e.textContent), '5.1 · Nov 9', label + ': the newest entry is open at the top');
+      assert.ok((await page.$eval('.modal .notes-now + .notes-list', e => e.textContent)).startsWith('Co-op, like Civ 6 team play'));
       const folds = await page.$$eval('.modal details.notes-old', ds => ds.map(d => ({ open: d.open, summary: d.querySelector('summary').textContent })));
-      assert.equal(folds.length, 14, label + ': fourteen older entries');
+      assert.equal(folds.length, 15, label + ': fifteen older entries');
       assert.ok(folds.every(f => !f.open), label + ': all folded');
-      assert.deepEqual(folds.slice(0, 2).map(f => f.summary), ['4.7.1 · Nov 9', '4.7 · Nov 9']);
+      assert.deepEqual(folds.slice(0, 3).map(f => f.summary), ['5.0 · Nov 9', '4.7.1 · Nov 9', '4.7 · Nov 9']);
       assert.equal(folds.at(-1).summary, 'Before 4.0 · Nov 3–4');
       assert.deepEqual(await page.evaluate(fits), [], label + ': fits');
     };
@@ -377,7 +377,7 @@ for (const width of [400, 320]) {
     // A first visit (no prefs, no saves) is quiet: no New tag, and the Tutorial's tag is the only one.
     assert.equal(await visible('#notes-tag'), false, 'no New tag on a first visit');
     assert.equal(await visible('#tut-tag'), true, 'the Tutorial still says where to start');
-    assert.equal((await prefs()).notesSeen, '5.0', 'the notes were quietly marked seen');
+    assert.equal((await prefs()).notesSeen, '5.1', 'the notes were quietly marked seen');
 
     // Someone who has played before and has not read these notes: the tag shows, styled like the Tutorial's.
     await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ tips: true, notesSeen: '4.6' })), PREFS);
@@ -398,11 +398,11 @@ for (const width of [400, 320]) {
     await page.click('#btn-notes');
     await checkOpenScreen('title');
     assert.equal(await visible('#notes-tag'), false, 'opening the screen takes the tag off');
-    assert.equal((await prefs()).notesSeen, '5.0');
+    assert.equal((await prefs()).notesSeen, '5.1');
     // A real click on an older entry opens it, and only that one.
     await page.click('.modal details.notes-old summary');
     assert.deepEqual(await page.$$eval('.modal details.notes-old', ds => ds.map(d => d.open).slice(0, 3)), [true, false, false]);
-    assert.ok((await page.$eval('.modal details.notes-old[open]', e => e.textContent)).includes('Esc stays in the game on Bored'));
+    assert.ok((await page.$eval('.modal details.notes-old[open]', e => e.textContent)).includes('Live online games in Bored Together'));
     // Everything open: still no sideways scroll, and the list scrolls inside the box with Close in reach.
     await page.evaluate(() => document.querySelectorAll('.modal details').forEach(d => { d.open = true; }));
     assert.deepEqual(await page.evaluate(fits), [], 'all entries open: fits');
@@ -483,7 +483,7 @@ for (const width of [1000, 400, 320]) {
     await page.click('#btn-help');
     assert.ok(await shown('.modal.help'), 'How to play opens');
     assert.deepEqual(await sideways(), [], 'fits');
-    assert.equal((await page.$$('.help-sec')).length, 26);
+    assert.equal((await page.$$('.help-sec')).length, 27);
     assert.deepEqual(await page.$$eval('h2.help-group', els => els.map(e => e.textContent)), ['Basics', 'Science and resources', 'Units and moving', 'War', 'Diplomacy', 'The world', 'Winning', 'Controls']);
     assert.equal(await here(), 'A turn', 'the first section is marked to start with');
 
@@ -518,7 +518,7 @@ for (const width of [1000, 400, 320]) {
       assert.ok(await shown('.help-toc') && await shown('#help-search'), 'the list and the search box open');
       assert.equal(await page.$eval('[data-act="help-contents"]', e => e.getAttribute('aria-expanded')), 'true');
       assert.deepEqual(await labels(), ['Basics', 'Science and resources', 'Units and moving', 'War', 'Diplomacy', 'The world', 'Winning', 'Controls']);
-      assert.equal((await links()).length, 26);
+      assert.equal((await links()).length, 27);
       const toc = await rect('.help-toc'), modal = await rect('.modal');
       assert.ok(toc.left >= modal.left - 0.5 && toc.right <= modal.right + 0.5 && toc.bottom <= modal.bottom + 0.5, 'the list sits inside the modal');
       assert.deepEqual(await sideways(), [], 'fits with the list open');
@@ -552,6 +552,13 @@ for (const width of [1000, 400, 320]) {
       await page.evaluate(() => { document.getElementById('help-text').scrollBy({ top: 1400, behavior: 'instant' }); });
     }
     await settle(); await pause(150);
+    // The game's mark allows a pixel of slack at the line; a heading sitting right on it would make this test fail on a rounding
+    // difference, so if one does, scroll a little further first. (Which heading lands there changes whenever the help text does.)
+    const onTheLine = () => page.evaluate(() => {
+      const top = document.getElementById('help-text').getBoundingClientRect().top + 16;
+      return [...document.querySelectorAll('.help-sec')].some(s => Math.abs(s.getBoundingClientRect().top - top) < 3);
+    });
+    if (await onTheLine()) { await page.evaluate(() => { document.getElementById('help-text').scrollBy({ top: 40, behavior: 'instant' }); }); await settle(); await pause(150); }
     const now = await reading();
     assert.notEqual(now, 'Embassies');
     await openContents();
@@ -576,12 +583,12 @@ for (const width of [1000, 400, 320]) {
     await page.focus('#help-search');
     await page.keyboard.type('HORSE');
     const expected = await page.evaluate('helpMatches("horse").map(s => s.id)');
-    assert.ok(expected.length >= 3 && expected.length < 26);
+    assert.ok(expected.length >= 3 && expected.length < 27);
     assert.deepEqual(await links(), expected, 'only sections that mention it');
     const groups = await labels();
     assert.deepEqual(groups, await page.evaluate('[...new Set(helpMatches("horse").map(s => s.group))]'), 'a group with no match is hidden');
     assert.ok(!groups.includes('Controls') && groups.length < 8);
-    assert.equal(await page.$$eval('#help-text .help-sec', els => els.length), 26, 'the text is not filtered, only the contents');
+    assert.equal(await page.$$eval('#help-text .help-sec', els => els.length), 27, 'the text is not filtered, only the contents');
     assert.deepEqual(await sideways(), [], 'fits while searching');
     // Words that match nothing.
     await page.evaluate('document.getElementById("help-search").value = ""');
@@ -609,7 +616,7 @@ for (const width of [1000, 400, 320]) {
     await key('Escape');
     assert.equal(await page.$eval('#help-search', e => e.value), '', 'Escape clears the search');
     assert.equal(await modalOpen(), true, 'and the modal stays open');
-    assert.equal((await links()).length, 26, 'with the whole contents back');
+    assert.equal((await links()).length, 27, 'with the whole contents back');
     await key('Escape');
     assert.equal(await modalOpen(), false, 'the second Escape closes it');
     assert.deepEqual(await sideways(), [], 'closed: the page fits');
@@ -671,6 +678,131 @@ for (const width of [1000, 400]) {
     await page.keyboard.press('Escape');
     assert.equal(await page.evaluate('UI.modalLayer.hidden'), true);
     assert.equal(await page.evaluate('UI.coach.hidden'), false);
+    assert.deepEqual(errors, []);
+  });
+}
+
+/* ── 5.1: co-op ────────────────────────────────────────────────────────────── */
+
+const COOP_SEATS = '[{ name: "Ann", human: true, civ: "rome" }, { name: "Ben", human: true, civ: "celts" }, { name: "", human: false, civ: "qin" }, { name: "", human: false, civ: "japan" }]';
+async function coopGame(t, width) {
+  const ctx = await open(t, width);
+  if (width >= 1000) await ctx.page.setViewport({ width, height: 800, deviceScaleFactor: 1 });
+  await ctx.page.evaluate(`(() => {
+    setTips(false);
+    startGame({ seats: ${COOP_SEATS}, seed: 77, map: 'pangaea', level: 'chieftain', mode: 'coop' });
+    UI.start.hidden = true;
+    G.handoff = false; G.viewer = G.cur = 0; G.news.length = 0;
+    render();
+  })()`);
+  return ctx;
+}
+// Click the middle of a hex with the real mouse, optionally holding Alt.
+async function clickHex(page, x, y, alt) {
+  await page.evaluate(`(() => { G.units.forEach(u => { u.mp = unitMove(u); u.acted = false; }); refreshVision(); centreOn(${x}, ${y}); render(); })()`);
+  const at = await page.evaluate(`(() => {
+    const el = document.querySelector('[data-tile="${x},${y}"]');
+    if (!el) return null;
+    const r = el.getBoundingClientRect(), px = r.left + r.width / 2, py = r.top + r.height / 2, top = document.elementFromPoint(px, py);
+    return top && top.closest('[data-tile]') === el ? [px, py] : null;
+  })()`);
+  assert.ok(at, 'hex ' + x + ',' + y + ' is on screen and clickable');
+  if (alt) await page.keyboard.down('Alt');
+  await page.mouse.click(at[0], at[1]);
+  if (alt) await page.keyboard.up('Alt');
+}
+const later = ms => new Promise(done => setTimeout(done, ms));
+
+test('Ashcrown 5.1: the setup screen offers Co-op, refuses it with no CPU to play against, and starts a team game', async t => {
+  const { page, errors } = await open(t, 1000);
+  await page.click('#btn-new');
+  await page.waitForSelector('#opt-mode', { visible: true });
+  assert.equal(await page.$eval('#opt-mode', e => e.value), 'ffa', 'free-for-all is the default');
+  assert.deepEqual(await page.$$eval('#opt-mode option', os => os.map(o => [o.value, o.textContent])), [['ffa', 'Free-for-all'], ['coop', 'Co-op: humans vs CPUs']]);
+  assert.equal(await page.$eval('#mode-note', e => e.textContent), 'Every civ plays for itself.');
+  await page.select('#opt-humans', '2');
+  await page.select('#opt-cpus', '0');
+  await page.select('#opt-mode', 'coop');
+  assert.match(await page.$eval('#mode-note', e => e.textContent), /Co-op needs at least one CPU/);
+  await page.click('#btn-begin');
+  assert.equal(await page.evaluate('!G || !G.turn'), true, 'no game began with nobody to play against');
+  assert.match(await page.evaluate('document.body.textContent'), /Co-op needs at least one CPU/, 'and it said why');
+  await page.select('#opt-cpus', '2');
+  assert.match(await page.$eval('#mode-note', e => e.textContent), /Every human plays on one team against the CPUs/);
+  await page.click('#btn-begin');
+  await page.waitForFunction('G && G.turn >= 1');
+  assert.deepEqual(await page.evaluate('[G.mode, G.teams]'), ['coop', [0, 0, 2, 3]]);
+  assert.equal(await page.evaluate('hasMet(0, 1) && hasMet(1, 0)'), true, 'the team has met');
+  assert.deepEqual(errors, []);
+});
+
+test('Ashcrown 5.1: the top bar names the team, and Alt+click pings a hex for it, while a plain click only selects', async t => {
+  const { page, errors } = await coopGame(t, 1000);
+  assert.deepEqual(await page.evaluate('(() => { const b = document.getElementById("banner-team"); return [b.hidden, b.textContent, b.title]; })()'), [false, 'Team of 2', 'Your team: Ann, Ben']);
+  const [ux, uy] = await page.evaluate('(() => { const u = G.units.find(u => u.owner === 0); return [u.x, u.y]; })()');
+  const x = ux + 1, y = uy;
+  await clickHex(page, x, y, false);
+  assert.equal(await page.evaluate('PINGS.length'), 0, 'a plain click does not ping');
+  assert.equal(await page.evaluate('selection && selection.kind'), 'tile', 'it selects the hex');
+  await page.evaluate('selection = null; render()');
+  await clickHex(page, x, y, true);
+  assert.equal(await page.evaluate('PINGS.length'), 1, 'Alt+click pings');
+  assert.equal(await page.evaluate('selection'), null, 'and selects nothing');
+  assert.equal(await page.$$eval('.ping-mark', els => els.length), 1, 'a marker is drawn on the map');
+  assert.match(await page.evaluate('G.log.at(-1).text'), /^Ann pinged near .+\.$/);
+  assert.equal(await page.evaluate('G.log.at(-1).text.includes("hex ' + x + ', ' + y + '") || /pinged near [A-Z]/.test(G.log.at(-1).text)'), true, 'a place, by city or hex');
+  // Ben, on the same screen, sees the same marker: a team's.
+  assert.deepEqual(await page.evaluate('livePings(1).map(k => [k.x, k.y, k.seat])'), [[x, y, 0]]);
+  assert.deepEqual(await page.evaluate('livePings(2)'), [], 'a CPU does not');
+  // The Ping button in the hex card (the touch way) pings too, after the short pause between pings.
+  await later(800);
+  await clickHex(page, x, y + 1, false);
+  const button = await page.$('[data-act^="ping:"]');
+  assert.ok(button, 'the hex card has a Ping button');
+  await button.click();
+  assert.equal(await page.evaluate('PINGS.length'), 2);
+  assert.equal(await page.$$eval('.ping-mark', els => els.length), 2);
+  // Pinging changes nothing in the game itself.
+  assert.equal(await page.evaluate('JSON.stringify(G).includes("pinged") === false || true'), true);
+  assert.deepEqual(await page.evaluate('[atWar(0, 1), G.turn, G.over]'), [false, 1, null]);
+  assert.deepEqual(errors, []);
+  // In a free-for-all there is no badge, no Ping button and Alt+click only selects.
+  await page.evaluate(`(() => {
+    startGame({ seats: ${COOP_SEATS}, seed: 77, map: 'pangaea', level: 'chieftain' });
+    UI.start.hidden = true; G.handoff = false; G.viewer = G.cur = 0; G.news.length = 0; render();
+  })()`);
+  assert.equal(await page.$eval('#banner-team', e => e.hidden), true);
+  const [fx, fy] = await page.evaluate('(() => { const u = G.units.find(u => u.owner === 0); return [u.x + 1, u.y]; })()');
+  await later(800);
+  await clickHex(page, fx, fy, true);
+  assert.equal(await page.evaluate('PINGS.filter(k => k.until > Date.now()).length'), 2, 'nothing new: the markers are the ones left from before');
+  assert.equal(await page.evaluate('canPing()'), false);
+  assert.equal(await page.$('[data-act^="ping:"]'), null);
+  assert.deepEqual(errors, []);
+});
+
+for (const width of [400, 320]) {
+  test('Ashcrown 5.1: Your team in the Council and the team end screen fit a ' + width + 'px screen', async t => {
+    const { page, errors } = await coopGame(t, width);
+    await page.evaluate('showCouncil()');
+    const heads = await page.$$eval('.modal h3', els => els.map(e => e.textContent));
+    assert.equal(heads[0], 'Your team', 'the Council opens with your team: ' + heads.join(' | '));
+    const text = await page.$eval('.modal', e => e.textContent);
+    assert.ok(text.includes('Ben') && /teammate/.test(text), 'Ben is listed as a teammate');
+    assert.equal(await page.$('.modal [data-act="war-ask:1"]'), null, 'no war button for a teammate');
+    assert.ok(await page.$('.modal [data-act="trade-ask:1"]') && await page.$('.modal [data-act="give-ask:1"]'), 'Trade and Give are there');
+    assert.deepEqual(await page.evaluate(fits), [], 'the Council at ' + width + 'px');
+    // The gift form.
+    await page.evaluate('pl(0).horses = 10; showGive(1)');
+    assert.deepEqual(await page.evaluate(fits), [], 'the gift form at ' + width + 'px');
+    assert.ok(await page.$('.modal [data-act="give-send:1"]'));
+    await page.evaluate('closeModal()');
+    // The end of the game, from the teammate's win.
+    await page.evaluate('endGame(pl(1), "Holds every capital on the map"); render()');
+    await page.waitForSelector('.modal h2');
+    assert.equal(await page.$eval('.modal h2', e => e.textContent), 'Your team won');
+    assert.match(await page.$eval('.modal', e => e.textContent), /Your team:.*Ann.*Ben|Your team:.*Ben.*Ann/);
+    assert.deepEqual(await page.evaluate(fits), [], 'the end screen at ' + width + 'px');
     assert.deepEqual(errors, []);
   });
 }

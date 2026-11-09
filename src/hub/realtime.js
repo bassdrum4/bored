@@ -9,7 +9,7 @@
 //     topic: 'live-<game id>',
 //     changes: [{ event: 'INSERT', schema: 'bored_live', table: 'actions', filter: 'game_id=eq.<game id>' }],
 //     getToken: async () => accessToken,
-//     onChange: record => {},            // one row, as the database has it
+//     onChange: (record, change) => {},  // one row, as the database has it, and the change it came in (change.table says which)
 //     onState: (open, reason) => {}      // true once the server has accepted the subscription
 //   });
 //   channel.close();
@@ -81,7 +81,7 @@ export function subscribeChanges(options) {
     if (m.event === 'postgres_changes') {
       const data = m.payload && m.payload.data;
       if (data && data.type === 'INSERT' && data.record && typeof data.record === 'object') {
-        try { onChange(data.record); } catch (error) { /* a listener's problem */ }
+        try { onChange(data.record, data); } catch (error) { /* a listener's problem */ }
       }
     } else if (m.event === 'phx_error' || m.event === 'phx_close') down('The channel closed.');
     else if (m.event === 'system' && m.payload && m.payload.status === 'error') down(m.payload.message || 'The subscription failed.');

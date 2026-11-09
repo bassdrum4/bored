@@ -189,7 +189,7 @@
   .row .st { font-family: var(--font-data); font-size: 10.5px; color: var(--ink-3); white-space: nowrap }
 
   /* ── modals ──────────────────────────────────────────────────────────── */
-  #modal-layer { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; padding: 24px; z-index: 35 }
+  #modal-layer { position: fixed; inset: 0; background: var(--scrim); display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 24px; z-index: 35 }
   .modal {
     background: var(--panel); border: 1px solid var(--ink); border-radius: 4px;
     width: min(620px, 100%); max-height: min(84vh, 760px); display: flex; flex-direction: column;
@@ -548,6 +548,12 @@
   #coach .skip + .skip { margin-left: 10px }
   .coach-target { outline: 2px solid var(--rust) !important; outline-offset: 2px; background: #f7e7d8 !important }
   .coach-ring { fill: none; stroke: var(--rust); stroke-width: 2.4; stroke-dasharray: 5 4; pointer-events: none }
+  .ping-mark { pointer-events: none }
+  .ping-mark .ping-ring { fill: none; stroke-width: 3 }
+  .ping-mark .ping-dot { stroke: #fff9e8; stroke-width: 1.4 }
+  .ping-mark .ping-wave { fill: none; stroke-width: 2; transform-box: fill-box; transform-origin: center }
+  @keyframes pingwave { 0% { transform: scale(.45); opacity: .95 } 100% { transform: scale(1.7); opacity: 0 } }
+  #map:not([data-anim="none"]) .ping-wave { animation: pingwave 1.5s ease-out infinite }
   .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); cursor: pointer }
   .check input { width: 15px; height: 15px; accent-color: var(--rust) }
   .switches { gap: 18px; margin-top: 2px }
@@ -624,6 +630,7 @@
       <span class="dot" id="banner-dot"></span>
       <b id="banner-name">Civ Lite</b>
       <span class="who" id="banner-who"></span>
+      <span class="tag peace" id="banner-team" hidden></span>
     </button>
     <div id="stats"></div>
     <div class="bar-right">
@@ -725,6 +732,8 @@
             <div class="fe-opt solo-only"><label for="opt-humans">Human players</label><select id="opt-humans"></select></div>
             <div class="fe-opt"><label for="opt-cpus">CPU players</label><select id="opt-cpus"></select>
               <p class="fe-note" id="cpus-note">2 to 8 in all. Humans take their turns one after another on this device; CPUs play on their own.</p></div>
+            <div class="fe-opt"><label for="opt-mode">Mode</label><select id="opt-mode"><option value="ffa">Free-for-all</option><option value="coop">Co-op: humans vs CPUs</option></select>
+              <p class="fe-note" id="mode-note"></p></div>
             <div class="fe-opt live-only" hidden><label for="opt-unjoined">Seats nobody joins</label><select id="opt-unjoined"><option value="cpu">Become CPUs</option><option value="drop">Are dropped</option></select>
               <p class="fe-note">Friends you invited who have not joined when you start.</p></div>
             <div class="seats" id="seats"></div>
@@ -1271,6 +1280,23 @@ const civAt = (x, y) => G.units.find(u => u.x === x && u.y === y && !isMil(u.typ
 const ownCities = i => G.cities.filter(c => c.owner === i);
 const ownUnits = i => G.units.filter(u => u.owner === i);
 const atWar = (a, b) => a !== b && a !== null && b !== null && G.dip[a][b] === 'war';
+
+/* ── teams (v5.1: co-op, the humans against the CPUs) ── */
+
+// G.teams holds one team number per seat. Free-for-all gives every seat its own number (its seat index), and a
+// game from before 5.1 has no array at all, which reads the same. In co-op every human seat shares team
+// number of the first human seat and each CPU keeps its own.
+const teamOf = i => (G && G.teams && Number.isInteger(G.teams[i]) ? G.teams[i] : i);
+const sameTeam = (a, b) => a !== null && b !== null && a !== undefined && b !== undefined && teamOf(a) === teamOf(b);
+const teammates = i => G.players.filter(f => f.i !== i && sameTeam(f.i, i)).map(f => f.i);
+const coopOn = () => !!G && G.mode === 'coop';
+// The team numbers for a table of seats ({ human }) and a mode. Co-op needs a human and a CPU; with only
+// humans or only CPUs it is a free-for-all.
+function teamsFor(seats, mode) {
+  const first = seats.findIndex(s => s.human);
+  const coop = mode === 'coop' && first >= 0 && seats.some(s => !s.human);
+  return { mode: coop ? 'coop' : 'ffa', teams: seats.map((s, i) => (coop && s.human ? first : i)) };
+}
 const isEmbarked = u => !isNaval(u.type) && !!TERRAIN[tileAt(u.x, u.y).t].water;
 const isCoastal = c => neighbourList(c.x, c.y).some(([x, y]) => {
   const t = tileAt(x, y);
@@ -1846,11 +1872,12 @@ function startGame(options) {
   const n = seats.length;
   const civs = assignCivs(seats, world.seed);
   const colors = assignColors(civs);
+  const table = teamsFor(seats, options.mode);
   G = {
     v: 4, size, seed: world.seed, rs: (world.seed ^ 0x9e3779b9) >>> 0, map: world.map,
     level: LEVELS[options.level] ? options.level : 'normal',
     wrap, borders: options.borders === 'never' ? 'never' : 'tech',
-    open: [], deals: [], nextDeal: 1, embassies: [],
+    open: [], deals: [], nextDeal: 1, embassies: [], mode: table.mode, teams: table.teams,
     cols: world.cols, rows: world.rows, tiles: world.tiles, conts: world.conts,
     units: [], cities: [], players: [],
     dip: [], attitude: [], warSince: [], met: [], offers: [],
@@ -1876,7 +1903,7 @@ function startGame(options) {
   });
   for (let a = 0; a < n; a++) {
     G.dip[a] = []; G.attitude[a] = []; G.warSince[a] = []; G.met[a] = [];
-    for (let b = 0; b < n; b++) { G.dip[a][b] = 'peace'; G.attitude[a][b] = 0; G.warSince[a][b] = 0; G.met[a][b] = a === b; }
+    for (let b = 0; b < n; b++) { G.dip[a][b] = 'peace'; G.attitude[a][b] = 0; G.warSince[a][b] = 0; G.met[a][b] = a === b || sameTeam(a, b); }
   }
   world.starts.forEach((st, i) => {
     addUnit(G.players[i], unitFor(i, 'settler'), st.x, st.y, null);
@@ -3336,7 +3363,7 @@ function changeAttitude(a, b, delta) {
   G.attitude[a][b] = clamp((G.attitude[a][b] || 0) + delta, -100, 50);
 }
 function declareWar(a, b) {
-  if (a === b || atWar(a, b) || !hasMet(a, b)) return false;
+  if (a === b || atWar(a, b) || !hasMet(a, b) || sameTeam(a, b)) return false;   // v5.1: teammates stay at peace
   G.dip[a][b] = G.dip[b][a] = 'war';
   G.warSince[a][b] = G.warSince[b][a] = G.turn;
   changeAttitude(b, a, -30);
@@ -3436,13 +3463,14 @@ const bordersNever = () => G.borders === 'never' || !!G.tut;
 // Is this civ's land closed to the others? Only once it knows Early Empire.
 const landClosed = owner => !bordersNever() && hasTech(owner, 'earlyempire');
 function openBetween(a, b) {
+  if (a !== b && sameTeam(a, b)) return true;   // v5.1: teammates' land is always open to each other
   return (G.open || []).some(o => G.turn < o.until && ((o.a === a && o.b === b) || (o.a === b && o.b === a)));
 }
 // The player whose closed land this is for player i, or -1 when i may stand there.
 function closedOwner(i, x, y) {
   if (bordersNever()) return -1;
   const t = tileAt(x, y);
-  if (!t || t.owner === null || t.owner === i) return -1;
+  if (!t || t.owner === null || t.owner === i || sameTeam(i, t.owner)) return -1;
   const o = pl(t.owner);
   if (!o || !o.alive || !hasTech(t.owner, 'earlyempire') || atWar(i, t.owner) || openBetween(i, t.owner)) return -1;
   return t.owner;
@@ -3554,7 +3582,7 @@ const aiAcceptsEmbassy = (f, other) => aiAcceptsOpen(f, other);
 // Who city c could send an embassy to: met, alive, at peace, no embassy yet, and none already being built.
 function embassyTargets(c) {
   const i = c.owner, mine = ownCities(i);
-  return G.players.filter(o => o.i !== i && o.alive && hasMet(i, o.i) && !atWar(i, o.i) && !hasEmbassy(i, o.i) &&
+  return G.players.filter(o => o.i !== i && !sameTeam(i, o.i) && o.alive && hasMet(i, o.i) && !atWar(i, o.i) && !hasEmbassy(i, o.i) &&
     !mine.some(d => embassyTo(d) === o.i));
 }
 // '' when the city may build it; otherwise the reason it can't. 'new' is the item in the build list.
@@ -3642,8 +3670,8 @@ function expireOffers(i) {
 function revealCapital(from, to) {
   const o = pl(to), cap = o && o.capital ? cityById(o.capital) : null;
   if (!cap) return;
-  const seen = G.seen[from];
-  for (const t of G.tiles) if (hexDistance(cap.x, cap.y, t.x, t.y) <= EMBASSY_RADIUS) seen[t.y * G.cols + t.x] = 1;
+  const team = [from].concat(teammates(from));
+  for (const t of G.tiles) if (hexDistance(cap.x, cap.y, t.x, t.y) <= EMBASSY_RADIUS) for (const j of team) G.seen[j][t.y * G.cols + t.x] = 1;
 }
 // At the start of a turn: a capital that has changed is marked again.
 function revealEmbassies(i) {
@@ -3754,6 +3782,28 @@ function makeDeal(d) {
       owed: d.total, per, left: d.turns, total: d.total, turn: G.turn });
     log(nameMark(b) + ' buys ' + what + ' from ' + nameMark(s) + ': ' + per + ' production a turn for ' + d.turns + ' turns.', b.ink, null);
   }
+}
+// v5.1: teammates give each other horses, iron or gunpowder for nothing, at once. Same fives and the same
+// stockpile cap as a trade. Returns '' when it went through, else why it did not.
+function giveProblem(from, to, res, qty) {
+  const a = pl(from), b = pl(to);
+  if (!a || !b || !a.alive || !b.alive || from === to) return 'Not a gift';
+  if (!sameTeam(from, to)) return 'Only teammates give for nothing';
+  if (!TRADE_RES.includes(res)) return 'Not a gift';
+  if (!Number.isInteger(qty) || qty <= 0 || qty % TRADE_STEP) return 'Gifts go in fives';
+  if ((a[res] || 0) < qty) return fullName(a) + ' has only ' + (a[res] || 0) + ' ' + res;
+  if ((b[res] || 0) + qty > STOCK_CAP) return fullName(b) + ' can only hold ' + Math.max(0, STOCK_CAP - (b[res] || 0)) + ' more ' + res;
+  return '';
+}
+function giveResource(from, to, res, qty) {
+  const why = giveProblem(from, to, res, qty);
+  if (why) return why;
+  const a = pl(from), b = pl(to);
+  a[res] = (a[res] || 0) - qty;
+  b[res] = Math.min(STOCK_CAP, (b[res] || 0) + qty);
+  log(nameMark(a) + ' gives ' + nameMark(b) + ' ' + qty + ' ' + res + '.', a.ink, null);
+  tell(to, a.name + ' gave you ' + qty + ' ' + res + '.');
+  return '';
 }
 // At the start of the buyer's turn, before its cities build: this turn's installment.
 function payInstallments(i) {
@@ -3866,15 +3916,22 @@ function sightOf(i) {
       }
     }
   };
-  for (const u of ownUnits(i)) mark(u.x, u.y, UNITS[u.type].sight || 2);
-  for (const c of ownCities(i)) mark(c.x, c.y, 3);
+  // v5.1: teammates see for each other, so a unit or a city of the team lights the hexes around it for everyone on it.
+  for (const j of [i].concat(teammates(i))) {
+    for (const u of ownUnits(j)) mark(u.x, u.y, UNITS[u.type].sight || 2);
+    for (const c of ownCities(j)) mark(c.x, c.y, 3);
+  }
   return vis;
 }
 function computeVision(i) {
   const vis = sightOf(i);
-  for (const t of G.tiles) if (t.owner === i) vis[t.y * G.cols + t.x] = 1;
-  const seen = G.seen[i];
-  for (let k = 0; k < vis.length; k++) if (vis[k]) seen[k] = 1;
+  const team = [i].concat(teammates(i));
+  for (const t of G.tiles) if (team.includes(t.owner)) vis[t.y * G.cols + t.x] = 1;
+  // The team shares one map: what any teammate sees is drawn for every teammate.
+  for (const j of team) {
+    const seen = G.seen[j];
+    for (let k = 0; k < vis.length; k++) if (vis[k]) seen[k] = 1;
+  }
   return vis;
 }
 function refreshVision() {
@@ -3901,8 +3958,12 @@ function checkContacts(i) {
   if (!f || !f.alive) return;
   const others = G.players.filter(o => o.alive && o.i !== i && !hasMet(i, o.i));
   if (!others.length) return;
-  const mine = sightOf(i);
-  for (const o of others) if (seesAnyOf(mine, o.i) || seesAnyOf(sightOf(o.i), i)) meet(i, o.i);
+  const mine = sightOf(i), team = [i].concat(teammates(i));
+  // Meeting is the team's: whoever sees a stranger, or is seen by one, brings every teammate along.
+  for (const o of others) {
+    if (!(seesAnyOf(mine, o.i) || team.some(j => seesAnyOf(sightOf(o.i), j)))) continue;
+    for (const j of team) meet(j, o.i);
+  }
 }
 // Two players meet, both ways, for good. Each human gets one card (with the era points of
 // the First contact moment folded in) and a line in their history.
@@ -3955,7 +4016,11 @@ function standings() {
 function endGame(winner, why) {
   if (G.over) return;
   G.over = { winner: winner ? winner.i : null, why, turn: G.turn };
-  log(winner ? nameMark(winner) + ' wins. ' + why + '.' : why + '.', winner ? winner.ink : 'turn', null);
+  // v5.1: in co-op the winner's whole team wins with them. A game without teams keeps the old shape.
+  const crew = winner && coopOn() ? [winner.i].concat(teammates(winner.i)).sort((a, b) => a - b) : null;
+  if (crew) { G.over.team = teamOf(winner.i); G.over.members = crew; }
+  log(crew && crew.length > 1 ? crew.map(i => nameMark(pl(i))).join(' and ') + ' win together. ' + why + '.'
+    : winner ? nameMark(winner) + ' wins. ' + why + '.' : why + '.', winner ? winner.ink : 'turn', null);
   if (online) onlineSubmit();
 }
 
@@ -3982,15 +4047,18 @@ function checkWin() {
   const alive = G.players.filter(f => f.alive);
   if (alive.length === 1) { endGame(alive[0], 'Last player standing'); return; }
   if (!alive.length) { endGame(null, 'Nobody is left'); return; }
+  // v5.1: everyone left is on one team, so the team stands. The best score among them is named.
+  if (alive.every(f => sameTeam(f.i, alive[0].i))) { endGame(standings()[0].f, 'Last team standing'); return; }
   if (!G.watch && !alive.some(f => f.human || (G.live && G.live.away[f.i]))) {
     endGame(standings()[0].f, 'Every human player is out, so the top score takes it');
     return;
   }
   const caps = G.cities.filter(c => c.capital);
   if (G.victory && !G.victory.conquest) return;
-  if (caps.length >= 2 && caps.every(c => c.owner === caps[0].owner) &&
-      alive.every(f => f.i === caps[0].owner || f.capital !== null)) {
-    endGame(pl(caps[0].owner), 'Holds every capital on the map');
+  // v5.1: capitals held by teammates count as held together, so the team conquers when every capital is its own.
+  if (caps.length >= 2 && caps.every(c => sameTeam(c.owner, caps[0].owner)) &&
+      alive.every(f => sameTeam(f.i, caps[0].owner) || f.capital !== null)) {
+    endGame(pl(caps[0].owner), coopOn() && alive.some(f => f.i !== caps[0].owner && sameTeam(f.i, caps[0].owner)) ? 'The team holds every capital on the map' : 'Holds every capital on the map');
   }
 }
 
@@ -4105,8 +4173,6 @@ function liveInit(seats, timer) {
   return {
     v: 1,
     timer: [60, 120, 300].includes(timer) ? timer : 0,   // seconds a round lasts; 0 is no timer
-    // One team per seat. In this version team = seat; a co-op version can group seats without changing the format.
-    teams: seats.map((s, i) => (Number.isInteger(s.team) ? s.team : i)),
     humans: seats.map((s, i) => (s.human ? i : -1)).filter(i => i >= 0),   // the seats people sit in, whoever plays them now
     human0: [],       // the humans a round began with: it waits for them
     done: [],         // per seat: has ended its turn this round
@@ -4365,6 +4431,12 @@ const LIVE_TALK = {
     };
     LIVE.result = proposeTrade(d);
     return LIVE.result.result !== 'error';
+  },
+  'gift': (s, a) => {
+    if (!liveSeat(a.to) || typeof a.res !== 'string') return false;
+    const why = giveResource(s, a.to, a.res, a.qty);
+    LIVE.result = { why };
+    return !why;
   },
   'keep': s => { delete G.live.pend[s]; return true; },
   'burn': s => {
@@ -5768,7 +5840,7 @@ const EUREKAS = {
 };
 function metSomeone(f) {
   if (!G.met) return !!f.met;
-  return G.players.some(o => o.i !== f.i && hasMet(f.i, o.i));
+  return G.players.some(o => o.i !== f.i && !sameTeam(f.i, o.i) && hasMet(f.i, o.i));   // v5.1: a teammate is not first contact
 }
 function checkEurekas(f) {
   f.boost = f.boost || {};
@@ -5953,6 +6025,11 @@ function prepareState(state) {
   }
   delete state.closeTurn;
   state.embassies = state.embassies || [];
+  // v5.1: teams. A game from before them is a free-for-all, one team per seat. (A 5.0 live game kept a
+  // teams list inside live; it was always one per seat, so it goes.)
+  state.mode = state.mode === 'coop' ? 'coop' : 'ffa';
+  if (!Array.isArray(state.teams) || state.teams.length !== state.players.length) state.teams = state.players.map((f, i) => i);
+  if (state.live) delete state.live.teams;
   state.v = 4;
   WRAP_W = state.wrap ? state.cols : 0;
   roadCache.clear();
@@ -6689,6 +6766,14 @@ function renderBoard() {
     labels.push('<circle class="coach-ring" cx="' + kx.toFixed(1) + '" cy="' + ky.toFixed(1) + '" r="' + (HEX_R - 1) + '"/>');
   }
 
+  // v5.1: a teammate's ping, a ring on the hex for a few seconds.
+  for (const k of livePings(viewer)) {
+    const [px, py] = hexCenter(k.x, k.y), ink = pl(k.seat) ? pl(k.seat).ink : '#93401d';
+    labels.push('<g class="ping-mark"><circle class="ping-wave" cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="' + (HEX_R - 1) + '" stroke="' + ink + '"/>' +
+      '<circle class="ping-ring" cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="' + (HEX_R - 3) + '" stroke="' + ink + '"/>' +
+      '<circle class="ping-dot" cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="4.5" fill="' + ink + '"/></g>');
+  }
+
   // Animations keep their phase across redraws: every one is timed off this clock.
   UI.map.style.setProperty('--clock', (-(Date.now() / 1000) % 60).toFixed(2) + 's');
   const roads = roadCase.length ? '<g class="road-case" fill="none" stroke="#6b4a24" stroke-width="6.4" stroke-linecap="round" opacity=".5">' + roadCase.join('') + '</g>' +
@@ -6852,7 +6937,7 @@ function refreshPreview() {
         // A civilian standing alone that this soldier could capture. At peace that has to be a walk
         // this turn, and the label says it means war.
         let prey = visibleTo(x, y) ? lonePrey(u, x, y) : null;
-        if (prey && !hasMet(u.owner, prey.owner)) prey = null;
+        if (prey && (!hasMet(u.owner, prey.owner) || sameTeam(u.owner, prey.owner))) prey = null;   // v5.1: a teammate's civilian is never prey
         const peace = !!prey && !atWar(u.owner, prey.owner);
         if (peace && !captureAt(u, x, y)) prey = null;
         const steps = pathTo(computePaths(u, prey && peace ? prey.owner : undefined), u, x, y);
@@ -6900,6 +6985,86 @@ function markNotesSeen() { notesSwitch = VERSION; writePref('notesSeen', VERSION
 function firstVisitNotes() {
   if (Object.keys(readPrefs()).length || slotList().length) return;
   markNotesSeen();
+}
+
+// A soft blip when a teammate pings. Off here, and nothing plays.
+let soundSwitch = null;   // this visit's setting when storage is blocked
+const soundOn = () => (soundSwitch !== null ? soundSwitch : readPrefs().sound !== false);
+function setSound(on) { soundSwitch = on; writePref('sound', on); }
+
+/* ── map pings (v5.1: co-op) ───────────────────────────────────────────────── */
+
+// A ping marks a hex for the whole team for 10 seconds. It is never part of the game: it does not enter G, the
+// action log or the hash, so it cannot change a game or desync one. A live game carries it as its own message.
+const PING_MS = 10000;
+let PINGS = [];   // { x, y, seat, until }: this screen's markers
+let pingAt = 0;   // when this screen last sent one
+let pingAudio = null;
+const canPing = () => !!G && !G.over && !G.handoff && !G.watch && G.viewer !== null && !!pl(G.viewer) && pl(G.viewer).human && coopOn() && teammates(G.viewer).length > 0;
+// The markers still showing for this viewer: their team's, not yet expired.
+function livePings(viewer) {
+  const now = Date.now();
+  PINGS = PINGS.filter(k => k.until > now);
+  return viewer === null || viewer === undefined ? [] : PINGS.filter(k => sameTeam(viewer, k.seat));
+}
+// Where the log says a ping was: the nearest city the viewer has seen within 3 hexes, else the hex.
+function pingPlace(x, y) {
+  let best = null, bestD = 4;
+  for (const c of G.cities) {
+    if (!seenBy(G.viewer, c.x, c.y)) continue;
+    const d = hexDistance(c.x, c.y, x, y);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best ? best.name : 'hex ' + x + ', ' + y;
+}
+function pingSound() {
+  if (!soundOn()) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    pingAudio = pingAudio || new Ctx();
+    if (pingAudio.state === 'suspended') pingAudio.resume();
+    const t = pingAudio.currentTime, osc = pingAudio.createOscillator(), gain = pingAudio.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(620, t);
+    osc.frequency.exponentialRampToValueAtTime(880, t + 0.12);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.07, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    osc.connect(gain);
+    gain.connect(pingAudio.destination);
+    osc.start(t);
+    osc.stop(t + 0.4);
+  } catch (error) { /* no audio here: the marker still shows */ }
+}
+// Puts a ping on this screen: the marker, a line in the log, a blip when it is a teammate's.
+function showPing(seat, x, y) {
+  const f = pl(seat);
+  if (!f) return;
+  PINGS = PINGS.filter(k => !(k.seat === seat && k.x === x && k.y === y));
+  PINGS.push({ x, y, seat, until: Date.now() + PING_MS });
+  // A live game's log is this device's own (it is outside the hash); a shared screen's log is everyone's, and everyone is a teammate.
+  log(f.name + ' pinged near ' + pingPlace(x, y) + '.', f.ink, G.live ? G.viewer : null);
+  if (seat !== G.viewer) pingSound();
+  setTimeout(() => { if (G) render(); }, PING_MS + 60);
+  render();
+}
+// The player pings a hex: Alt+click, or the Ping button in the hex card.
+function pingHex(x, y) {
+  if (!canPing() || !Number.isInteger(x) || !Number.isInteger(y) || !tileAt(x, y)) return false;
+  const now = Date.now();
+  if (now - pingAt < 700) return false;
+  pingAt = now;
+  showPing(G.viewer, x, y);
+  if (G.live && LIVE.net) LIVE.net.call('ping', { x, y }).catch(error => toast(liveWords(error)));
+  return true;
+}
+// A teammate's ping from the hub. Checked like anything from the network, then shown and forgotten.
+function livePing(m) {
+  if (!G || !G.live || LIVE.replay || !canPing()) return;
+  const seat = m.seat, x = m.x, y = m.y;
+  if (!liveSeat(seat) || seat === G.viewer || !sameTeam(seat, G.viewer) || !Number.isInteger(x) || !Number.isInteger(y) || !tileAt(x, y)) return;
+  showPing(seat, x, y);
 }
 
 /* ── the tutorial island ───────────────────────────────────────────────────── */
@@ -7377,7 +7542,7 @@ const TIPS = [
     at: u => [u.x, u.y] },
   { id: 'closing',
     test: i => !bordersNever() && !hasTech(i, 'earlyempire') &&
-      G.units.find(u => u.owner !== i && pl(u.owner).alive && hasMet(i, u.owner) && !atWar(i, u.owner) && visibleTo(u.x, u.y) && tileAt(u.x, u.y).owner === i),
+      G.units.find(u => u.owner !== i && !sameTeam(i, u.owner) && pl(u.owner).alive && hasMet(i, u.owner) && !atWar(i, u.owner) && visibleTo(u.x, u.y) && tileAt(u.x, u.y).owner === i),
     say: (i, u) => esc(knownName(i, u.owner, true)) + '’s ' + esc(UNITS[u.type].name.toLowerCase()) + ' is standing on your land. Early Empire is a cheap tech that closes your borders: ' +
       'other civs then need an open-borders deal to come in, and stepping in without one means war. Press T to research it.',
     at: u => [u.x, u.y],
@@ -7413,7 +7578,7 @@ const TIPS = [
   { id: 'builder', test: i => ownUnits(i).find(u => UNITS[u.type].charges && !isMil(u.type)),
     say: () => 'Builders improve tiles inside your borders: farms, mines, pastures and fishing boats. Each action uses one charge and happens at once.',
     at: u => [u.x, u.y] },
-  { id: 'enemy-city', test: i => G.cities.find(c => c.owner !== i && visibleTo(c.x, c.y)),
+  { id: 'enemy-city', test: i => G.cities.find(c => c.owner !== i && !sameTeam(i, c.owner) && visibleTo(c.x, c.y)),
     say: (i, c) => 'That’s ' + esc(c.name) + ', a city of ' + esc(knownName(i, c.owner, true)) + '’s. Cities defend at 25 + 3 per pop, up to 46. ' +
       'At war, hit one to 0 HP, then take it with a melee unit.',
     at: c => [c.x, c.y] },
@@ -7614,6 +7779,13 @@ function renderBar() {
   UI.bannerDot.style.borderColor = f.ink;
   UI.bannerName.textContent = f.name;
   UI.bannerWho.textContent = CIVS[f.civ].land + ' · ' + (f.human ? (myTurn() ? 'your turn' : G.live && G.live.done[f.i] ? 'turn ended' : 'waiting') : 'CPU');
+  // v5.1: a badge when you play on a team.
+  const mates = coopOn() ? teammates(f.i) : [];
+  if (UI.bannerTeam) {
+    UI.bannerTeam.hidden = !mates.length;
+    UI.bannerTeam.textContent = mates.length ? 'Team of ' + (mates.length + 1) : '';
+    UI.bannerTeam.title = mates.length ? 'Your team: ' + [f.i].concat(mates).map(j => pl(j).name).join(', ') : '';
+  }
   UI.turnReadout.innerHTML = (G.live ? 'Round ' : 'Turn ') + '<b>' + Math.max(1, G.turn) + '</b>' + (G.maxTurns ? '<em>/' + G.maxTurns + '</em>' : '');
   renderLiveStrip();
   if (G.handoff) { UI.stats.innerHTML = ''; return; }
@@ -7826,6 +7998,13 @@ function realmPanel() {
   let html = '<div class="side-head">' + dot(f, 14) + '<h2>' + esc(fullName(f)) + '</h2></div>' +
     '<div class="side-sub">' + (myTurn() ? 'Your turn' : 'Waiting') + ' · turn ' + G.turn +
     (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name + '</div>' + civBlurb(f.civ);
+  // v5.1: your team first, then the rest of the realm.
+  const mates = coopOn() ? teammates(f.i).map(pl) : [];
+  if (mates.length) {
+    html += '<p class="sec">Your team</p><div class="list">' + mates.map(o => '<div class="row">' + dot(o) + '<span class="nm">' + esc(fullName(o)) + (o.human ? '' : ' · CPU') +
+      '<small class="war-line">' + (o.alive ? plural(scoreParts(o.i).cities, 'city', 'cities') : 'out, still watching') + '</small></span>' +
+      '<span class="tag peace">team</span><span class="st">' + scoreParts(o.i).total + '</span></div>').join('') + '</div>';
+  }
   const milCount = units.filter(u => isMil(u.type)).length, free = armyFree(f.i);
   let upkeepNow = 0;
   for (const n of upkeepCharges(f.i).values()) upkeepNow += n;
@@ -7894,7 +8073,7 @@ function realmPanel() {
 
   html += '<p class="sec">Rivals</p><div class="list">';
   for (const o of G.players) {
-    if (o.i === f.i) continue;
+    if (o.i === f.i || mates.some(m => m.i === o.i)) continue;
     if (!knows(f.i, o.i)) {
       html += '<div class="row">' + dotFor(f.i, o) + '<span class="nm">' + UNMET + '</span><span class="tag">unmet</span><span class="st">–</span></div>';
       continue;
@@ -7971,8 +8150,9 @@ function cityPanel(c) {
     const war = v !== null && atWar(v, c.owner);
     html += kv('Walls', hasWalls(c) ? 'yes' : 'no') +
       '<p class="hint">' + (war ? 'You are at war with ' + esc(knownName(v, f.i, true)) + '. Hit the city down to 0 HP, then step in with a melee land unit to take it. Ships can batter it but can’t take it' + (civIs(v, 'norway') ? ', unless they’re Norway’s' : '') + '.'
+        : v !== null && sameTeam(v, f.i) ? esc(knownName(v, f.i, true)) + ' is on your team. Their cities are theirs to hold.'
         : 'You are at peace with ' + esc(knownName(v, f.i, true)) + '.') + '</p>';
-    if (!war && canTalk()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
+    if (!war && canTalk() && !(v !== null && sameTeam(v, f.i))) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
     html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
     return html;
   }
@@ -8098,12 +8278,15 @@ function tilePanel(x, y) {
   }[t.f];
   if (v !== null && !G.watch && closedOwner(v, x, y) >= 0) {
     html += '<div class="hint" style="color:var(--rust)">Closed to you: stepping here means war with ' + esc(knownName(v, closedOwner(v, x, y), true)) + '. Ask for open borders in the Council to pass in peace.</div>';
+  } else if (v !== null && !G.watch && t.owner !== null && t.owner !== v && sameTeam(v, t.owner)) {
+    html += '<div class="hint">Your teammate’s land: always open to you.</div>';
   } else if (v !== null && !G.watch && t.owner !== null && t.owner !== v && openBetween(v, t.owner)) {
     html += '<div class="hint">Open to you: ' + esc(knownName(v, t.owner, true)) + ' agreed to open borders.</div>';
   }
   if (note && (G.watch || seesFeature(t, v))) html += '<div class="hint">' + note + '</div>';
   else if (!t.f && nextToPeak(t)) html += '<div class="hint">Next to ' + esc(FEATURES.peak.name) + ': +' + SCI.peakNext + ' science.</div>';
   html += '<div class="actions">' + (city ? '<button class="act" data-act="select-city:' + city.id + '">' + icon('city', 14) + 'Open ' + esc(city.name) + '</button>' : '') +
+    (canPing() ? '<button class="act" data-act="ping:' + x + ':' + y + '" title="Mark this hex for your team for 10 seconds (Alt+click)">Ping</button>' : '') +
     '<button class="act" data-act="deselect">Back</button></div>';
   return html;
 }
@@ -8144,8 +8327,10 @@ function unitPanel(u) {
 
   if (u.owner !== v) {
     const war = v !== null && atWar(v, u.owner);
-    html += '<p class="hint">' + (war ? 'You are at war with ' + esc(knownName(v, f.i, true)) + '.' : 'You are at peace with ' + esc(knownName(v, f.i, true)) + '. Declare war before you attack.') + '</p>';
-    if (!war && canTalk()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
+    const mate = v !== null && sameTeam(v, u.owner);
+    html += '<p class="hint">' + (war ? 'You are at war with ' + esc(knownName(v, f.i, true)) + '.' : mate ? esc(knownName(v, f.i, true)) + ' is on your team.'
+      : 'You are at peace with ' + esc(knownName(v, f.i, true)) + '. Declare war before you attack.') + '</p>';
+    if (!war && !mate && canTalk()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
     html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
     return html;
   }
@@ -8548,6 +8733,7 @@ function showCouncil() {
   const offers = G.offers.filter(o => o.to === v);
   let html = modalHead('Council', 'War, peace, borders and trade');
   html += '<div class="modal-body">';
+  html += teamSection(v);
   if (offers.length) {
     html += '<h3>Offers to you</h3>' + offers.map(o => {
       const from = pl(o.from), t = offerText(o);
@@ -8571,8 +8757,8 @@ function showCouncil() {
     : '<p class="hint" style="margin-top:0">No wars between civs you know.</p>');
   html += '<h3>Players</h3>';
   // Only civs you have met are here. Offers and deals can only come from them.
-  const metHere = G.players.filter(o => o.i !== v && hasMet(v, o.i));
-  if (!metHere.length) html += '<p class="hint" style="margin-top:0">You haven’t met anyone yet. Explore to find other civs.</p>';
+  const metHere = G.players.filter(o => o.i !== v && !sameTeam(v, o.i) && hasMet(v, o.i));
+  if (!metHere.length) html += '<p class="hint" style="margin-top:0">' + (coopOn() ? 'You haven’t met any CPU civs yet. Explore to find them.' : 'You haven’t met anyone yet. Explore to find other civs.') + '</p>';
   for (const o of metHere) {
     const s = scoreParts(o.i);
     if (!o.alive) {
@@ -8616,6 +8802,62 @@ function showCouncil() {
     'If the buyer starts the war, what it still owes is paid on the spot; if the seller does, the payments stop. Nobody trades production for production, and one payment can never top what the payer’s best city makes in a turn.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Close</button></div>';
   openModal(html);
+}
+
+// v5.1: the team's rows, first in the Council. No war, peace or borders here: teammates are at peace with open
+// borders for good. Trade works as with anyone, and Give sends horses, iron or gunpowder for nothing.
+function teamSection(v) {
+  const mates = coopOn() ? teammates(v).map(pl) : [];
+  if (!mates.length) return '';
+  let html = '<h3>Your team</h3>' + mates.map(o => {
+    const s = scoreParts(o.i);
+    if (!o.alive) return '<div class="council-row"><div><div class="cn">' + dot(o) + esc(fullName(o)) + ' <span class="tag">out</span><span class="tag peace">teammate</span></div>' +
+      '<div class="cd">Still watching with the team’s vision.</div></div><div></div></div>';
+    const stock = o.horses + ' horses, ' + o.iron + ' iron' + (hasTech(o.i, 'firearms') ? ', ' + (o.gunpowder || 0) + ' gunpowder' : '');
+    return '<div class="council-row"><div><div class="cn">' + dot(o) + esc(fullName(o)) + ' <span class="tag peace">teammate</span>' +
+      (o.human ? '' : '<span class="tag">CPU</span>') + '</div>' +
+      '<div class="cd">' + plural(s.cities, 'city', 'cities') + ' · ' + plural(o.techs.length, 'tech', 'techs') + ' · score ' + s.total + '</div>' +
+      '<div class="cd">' + esc(stock) + '</div></div><div class="ca">' +
+      (canTalk() ? '<button class="act" data-act="trade-ask:' + o.i + '">Trade</button><button class="act" data-act="give-ask:' + o.i + '">Give</button>' : '') +
+      '</div></div>';
+  }).join('');
+  html += '<p class="hint">One team against the CPUs: a shared map, open borders, no wars between you. If any of you wins, you all win. ' +
+    'At the turn limit your team’s best score counts: now ' + teamBest(v) + '.</p>';
+  return html;
+}
+// The best score on player i's team: what stands for the team when the turns run out.
+function teamBest(i) {
+  return Math.max(...[i].concat(teammates(i)).map(j => scoreParts(j).total));
+}
+// The gift form: what to send a teammate, and how much.
+function showGive(i, keep) {
+  const v = G.viewer, o = pl(i), me = pl(v);
+  const resOpts = TRADE_RES.filter(r => r !== 'gunpowder' || hasTech(v, 'firearms'));
+  const f = keep || { res: resOpts[0], qty: 5 };
+  const sel = (id, opts, cur) => '<select id="' + id + '">' + opts.map(([val, label]) => '<option value="' + val + '"' + (String(val) === String(cur) ? ' selected' : '') + '>' + label + '</option>').join('') + '</select>';
+  UI.modalKind = 'give';
+  openModal(modalHead('Give to ' + esc(o.name), 'For nothing, at once') +
+    '<div class="modal-body"><div class="hint" style="margin-top:0">You have ' + me.horses + ' horses, ' + me.iron + ' iron' + (hasTech(v, 'firearms') ? ', ' + (me.gunpowder || 0) + ' gunpowder' : '') +
+    '. ' + esc(o.name) + ' has ' + o.horses + ' horses, ' + o.iron + ' iron' + (hasTech(i, 'firearms') ? ', ' + (o.gunpowder || 0) + ' gunpowder' : '') + '.</div>' +
+    '<div class="tform" data-with="' + i + '">' +
+    '<label for="gv-res">Resource</label>' + sel('gv-res', resOpts.map(r => [r, r]), f.res) +
+    '<label for="gv-qty">Amount</label>' + sel('gv-qty', [5, 10, 15, 20, 25, 30].map(n => [n, String(n)]), f.qty) + '</div>' +
+    '<div class="tquote" id="gv-quote"></div></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="council">Back to the Council</button>' +
+    '<button class="btn primary" data-act="give-send:' + i + '">Give</button></div>', true);
+  refreshGiveForm();
+}
+function readGiveForm() {
+  const m = UI.modal, form = m && m.querySelector('.tform');
+  if (!form || !m.querySelector('#gv-res')) return null;
+  return { to: Number(form.getAttribute('data-with')), res: m.querySelector('#gv-res').value, qty: Number(m.querySelector('#gv-qty').value) };
+}
+function refreshGiveForm() {
+  const d = readGiveForm();
+  if (!d) return;
+  const box = UI.modal.querySelector('#gv-quote'), why = giveProblem(G.viewer, d.to, d.res, d.qty);
+  box.className = 'tquote' + (why ? ' bad' : '');
+  box.textContent = why ? why + '.' : 'You give ' + pl(d.to).name + ' ' + d.qty + ' ' + d.res + ' for nothing.';
 }
 
 // The box that opens from the Embassy item: which civ to ask. With a result it shows the answer instead.
@@ -8756,6 +8998,7 @@ function showMenu() {
     '<button class="act switch" data-act="tips-toggle">Tips in my games<b>' + (tipsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="popups-toggle">Event popups<b>' + (popupsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="jump-toggle">Jump to the next unit after orders<b>' + (jumpOn() ? 'on' : 'off') + '</b></button>' +
+    (coopOn() ? '<button class="act switch" data-act="sound-toggle">Ping sound<b>' + (soundOn() ? 'on' : 'off') + '</b></button>' : '') +
     '<button class="act switch" data-act="anim-next">Animation<b>' + ANIM_LEVELS[currentAnim()] + '</b></button>' +
     (G.tut || online || G.over || G.live ? '' : '<button class="act" data-act="slots:save">Save game</button>') +
     (G.tut || online || G.over || G.live || !currentSlot || !slotHead(currentSlot) ? '' :
@@ -8864,6 +9107,15 @@ function helpSections() {
     { id: 'trading', group: 'Diplomacy', title: 'Trading', html:
       '<p>Horses, iron and gunpowder can be bought and sold in the Council, for production. The resource changes hands at once; the buyer pays in one go or in installments (5 a turn for 10 turns, say). ' +
       'Only war cancels a deal: if the buyer starts it, everything still owed is paid on the spot; if the seller does, the payments stop. Production never trades for production, and a payment can’t top what the payer’s best city makes in a turn. CPUs price by supply and demand.</p>' },
+    { id: 'coop', group: 'Diplomacy', title: 'Co-op', html:
+      '<p>In game setup, Mode can be <b>Co-op: humans vs CPUs</b>, like Civ 6’s team play. Every human is on one team and each CPU plays for itself. It needs at least one human and one CPU, and works in live games and with several humans on one device. ' +
+      'Teammates have met from turn 1, are always at peace, never close their land to each other, can’t attack, capture or take from each other, and never pin each other’s units in place. ' +
+      'They share one map: whatever any of you sees, all of you see. The Council’s <b>Your team</b> section comes first, with Trade and Give: a gift of horses, iron or gunpowder costs nothing and lands at once, in fives, up to the stockpile cap. ' +
+      'CPUs treat every human separately: a war with one of you is not a war with all of you.</p>' +
+      '<p><b>Winning together.</b> If any teammate wins, by any victory, the whole team wins. Conquest means every capital on the map is held by your team. When the turn limit hits, your team wins if its best score is the highest in the game. ' +
+      'A teammate whose civ falls stays in as a spectator with the team’s map, and the team only loses when all of you are out. The end screen says “Your team won” or “Your team lost” and lists every teammate.</p>' +
+      '<p><b>Pings.</b> Alt+click a hex, or press Ping in its card (on a touch screen), to mark it for your team for 10 seconds, with a soft sound if Ping sound is on and a line in the log. ' +
+      'A ping is never part of the game: it does not change anything and does not go in the saved game or the live game’s record.</p>' },
     { id: 'maps', group: 'The world', title: 'Maps and continents', html:
       '<p>Pick Pangaea, Continents, Islands or Mirror, and a size: Small, Standard, Large or Huge, built for 2, 4, 6 and 8 players. ' +
       'Every map’s land is split into named continents, marked with thin dashed lines. Tick “Map wraps west to east” to join the west and east edges: a unit can walk off one side and appear on the other.</p>' },
@@ -9020,8 +9272,15 @@ function showEndModal() {
     (f.human ? '' : ' (CPU)') + (f.alive ? '' : ' · out') +
     '</td><td class="n">' + s.cities + '</td><td class="n">' + s.pop + '</td><td class="n">' + s.tech + '</td><td class="n">' + s.era + '</td><td class="n">' + s.mil +
     '</td><td class="n"><b>' + s.total + '</b></td></tr>').join('');
-  openModal(modalHead(w ? esc(fullName(w)) + ' wins' : 'Game over', esc(G.over.why) + ' · turn ' + G.over.turn) +
-    '<div class="modal-body"><div class="table-wrap"><table class="standings"><thead><tr><th>Player</th><th class="n">Cities</th><th class="n">Pop</th>' +
+  // v5.1: in co-op the team wins or loses together, and the end screen lists every teammate.
+  const seat = G.viewer !== null && pl(G.viewer) ? G.viewer : (G.players.find(f => f.human) || { i: 0 }).i;
+  const crew = coopOn() ? [seat].concat(teammates(seat)).sort((a, b) => a - b).map(pl) : [];
+  const together = crew.length > 1 ? '<p class="hint" style="margin-top:0"><b>Your team:</b> ' +
+    crew.map(f => dot(f) + ' ' + esc(fullName(f)) + (f.alive ? '' : ' (out)')).join(' · ') + '</p>' : '';
+  const title = coopOn() && crew.length ? (w && sameTeam(w.i, seat) ? 'Your team won' : 'Your team lost')
+    : w ? esc(fullName(w)) + ' wins' : 'Game over';
+  openModal(modalHead(title, esc(G.over.why) + ' · turn ' + G.over.turn) +
+    '<div class="modal-body">' + together + '<div class="table-wrap"><table class="standings"><thead><tr><th>Player</th><th class="n">Cities</th><th class="n">Pop</th>' +
     '<th class="n">Tech</th><th class="n">Era</th><th class="n">Military</th><th class="n">Score</th></tr></thead><tbody>' +
     rows + '</tbody></table></div><p class="hint">Score is cities × 5 + pop + tech points + era points + military strength ÷ 20.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button>' +
@@ -9150,6 +9409,7 @@ function onAction(act) {
   if (kind === 'help-contents') { helpContents(); return; }
   if (kind === 'whats-new') { showWhatsNew(); return; }
   if (kind === 'leave-bored') { leaveBored(); return; }
+  if (kind === 'ping') { pingHex(Number(a), Number(b)); return; }
   if (kind === 'options') { showOptions(); return; }
   if (kind === 'title-new') { showPane('setup'); return; }
   if (kind === 'title-back') { showPane('title'); return; }
@@ -9176,6 +9436,12 @@ function onAction(act) {
     setTips(!tipsOn());
     toast('Tips ' + (tipsOn() ? 'on' : 'off') + '.');
     if (G) render();
+    redoSwitches();
+    return;
+  }
+  if (kind === 'sound-toggle') {
+    setSound(!soundOn());
+    toast('Ping sound ' + (soundOn() ? 'on' : 'off') + '.');
     redoSwitches();
     return;
   }
@@ -9442,6 +9708,17 @@ function onAction(act) {
       if (r.result === 'refused') { showTrade(d.other, d); refreshTradeForm(false); } else showCouncil();
       break;
     }
+    case 'give-ask': if (myTurn()) showGive(Number(a)); break;
+    case 'give-send': {
+      const d = myTurn() ? readGiveForm() : null;
+      if (!d) break;
+      const why = giveResource(G.viewer, d.to, d.res, d.qty);
+      if (why) { refreshGiveForm(); toast(why + '.'); break; }
+      toast('Gave ' + d.qty + ' ' + d.res + ' to ' + pl(d.to).name + '.');
+      afterAction();
+      showCouncil();
+      break;
+    }
     case 'keep': G.pending = null; closeModal(); afterAction(); break;
     case 'burn': {
       const c = G.pending ? cityById(G.pending.city) : null;
@@ -9483,7 +9760,7 @@ function orderUnit(selUnit, x, y) {
     if (war) { askDeclareWar(selUnit, x, y, war); return true; }
     const tgt = targetAt(selUnit, x, y);
     if (tgt && tgt.peace !== undefined && hexDistance(selUnit.x, selUnit.y, x, y) <= (shoots(selUnit.type) ? UNITS[selUnit.type].range : 1)) {
-      toast('You are at peace with ' + knownName(G.viewer, tgt.peace, true) + '.');   // war would not make this order legal
+      toast(sameTeam(G.viewer, tgt.peace) ? knownName(G.viewer, tgt.peace, true) + ' is on your team.' : 'You are at peace with ' + knownName(G.viewer, tgt.peace, true) + '.');   // war would not make this order legal
       return true;
     }
   }
@@ -9545,7 +9822,7 @@ function warOrder(u, x, y) {
     if (!prey || atWar(u.owner, prey.owner)) return null;
     foe = prey.owner; verb = 'capture'; say = 'their ' + UNITS[prey.type].name;
   } else return null;
-  if (!hasMet(u.owner, foe)) return null;
+  if (!hasMet(u.owner, foe) || sameTeam(u.owner, foe)) return null;   // v5.1: teammates are never asked about
   return { foe, verb, say: (verb === 'capture' ? 'Capturing ' : 'Attacking ') + say };
 }
 // A civilian standing alone on a hex (no soldier of theirs, no city), when u is a land soldier. Ships can't capture.
@@ -9683,7 +9960,8 @@ function bindMap() {
       const hex = element && element.closest ? element.closest('[data-tile]') : null;
       if (hex) {
         const [x, y] = hex.getAttribute('data-tile').split(',').map(Number);
-        handleTileClick(x, y);
+        if (event.altKey && canPing()) pingHex(x, y);   // v5.1: Alt+click pings in co-op
+        else handleTileClick(x, y);
       }
     }
   };
@@ -10133,9 +10411,14 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '5.0';
+const VERSION = '5.1';
 // Patch notes for the What’s new screen, newest first: a version, a date and one plain line per change.
 const CHANGELOG = [
+  { v: '5.1', date: 'Nov 9', notes: [
+    'Co-op, like Civ 6 team play: pick “Co-op: humans vs CPUs” in game setup, in live games and on one device. Every human is on one team against the CPUs.',
+    'Teammates share one map and always have open borders. They can’t go to war with each other, and they trade or give each other horses, iron and gunpowder.',
+    'The team wins and loses together: if any of you wins, you all win. Alt+click a hex (or press Ping in its card) to mark it for your team for 10 seconds.'
+  ] },
   { v: '5.0', date: 'Nov 9', notes: [
     'Live online games in Bored Together: 2 to 4 friends plus CPUs in one game at the same time.',
     'Dynamic turns like Civ 6: everyone moves at once, and players at war with each other take turns.',
@@ -10262,6 +10545,7 @@ function buildStartScreen() {
   UI.optTimer.innerHTML = [[0, 'Off'], [60, '60 seconds'], [120, '2 minutes'], [300, '5 minutes']].map(t => '<option value="' + t[0] + '">' + t[1] + '</option>').join('');
   UI.optClose.onchange = refreshStart;
   UI.optHumans.onchange = () => fitCounts('humans');
+  UI.optMode.onchange = refreshStart;
   UI.optCpus.onchange = () => fitCounts('cpus');
   UI.optMap.onchange = refreshStart;
   UI.optSize.onchange = refreshStart;
@@ -10310,6 +10594,10 @@ function refreshTitle() {
 }
 function refreshNotesTag() { document.getElementById('notes-tag').hidden = !notesNew(); }
 // 2 to 8 players in all: changing one count trims the other to fit.
+// Co-op needs somebody on the team and somebody to play against.
+function coopProblem(humans, cpus) {
+  return humans < 1 ? 'Co-op needs at least one human.' : cpus < 1 ? 'Co-op needs at least one CPU. Add one above.' : '';
+}
 function fitCounts(changed) {
   if (LIVE.net) { refreshStart(); return; }
   let h = Number(UI.optHumans.value), c = Number(UI.optCpus.value);
@@ -10358,6 +10646,8 @@ function refreshStart() {
   UI.closeNote.textContent = UI.optClose.value === 'never' ? 'Borders stay open all game: anyone can walk anywhere. Early Empire can still be researched, but it closes nothing.'
     : 'A civ’s land closes to the others when it researches Early Empire, a cheap first tech: stepping onto it without an open-borders deal (made in the Council) means war.';
   UI.startNote.innerHTML = START_NOTE;
+  UI.modeNote.textContent = coopProblem(humans, cpus) && UI.optMode.value === 'coop' ? coopProblem(humans, cpus)
+    : UI.optMode.value === 'coop' ? 'Every human plays on one team against the CPUs. Needs at least one human and one CPU.' : 'Every civ plays for itself.';
   if (LIVE.net) return;   // the room writes its own note
   // Starting a game takes over the Autosave, so say so; named saves are never touched.
   const auto = online ? null : slotList().find(s => s.id === 'auto');
@@ -10367,6 +10657,7 @@ function refreshStart() {
 function resetSetup() {
   UI.optHumans.value = '2';
   UI.optCpus.value = '0';
+  UI.optMode.value = 'ffa';
   UI.optMap.value = 'pangaea';
   UI.optSize.value = 'auto';
   UI.optLevel.selectedIndex = 0;
@@ -10404,6 +10695,7 @@ function showOptions() {
     row('tips-toggle', 'Tips in my games', tipsOn() ? 'on' : 'off') +
     row('popups-toggle', 'Event popups', popupsOn() ? 'on' : 'off') +
     row('jump-toggle', 'Jump to the next unit after orders', jumpOn() ? 'on' : 'off') +
+    row('sound-toggle', 'Ping sound (co-op)', soundOn() ? 'on' : 'off') +
     row('anim-next', 'Animation', ANIM_LEVELS[currentAnim()]) + '</div>' +
     '<p class="hint">Tips are short hints that appear over the map as you play. Event popups are the cards for wonders, Historic moments and news; the points count either way. ' +
     'When a unit has used up its turn, the next unit that needs orders is selected for you; switched off, nothing is selected. Animation sets how much of the map moves.</p></div>' +
@@ -10447,6 +10739,7 @@ function beginGame() {
       civ: CIVS[civ] ? civ : null
     });
   }
+  if (UI.optMode.value === 'coop' && coopProblem(humans, cpus)) { toast(coopProblem(humans, cpus)); return; }
   const picked = seats.map(s => s.civ).filter(Boolean);
   const twice = picked.find((c, k) => picked.indexOf(c) !== k);
   if (twice) { toast('Two players picked ' + CIVS[twice].land + '. Each civ can only be picked once.'); return; }
@@ -10464,7 +10757,7 @@ function beginGame() {
   const seed = nextSeed();
   const game = startGame({ seats, maxTurns: turns, seed, map: UI.optMap.value, level: UI.optLevel.value,
     size: UI.optSize.value === 'auto' ? sizeFor(n) : UI.optSize.value,
-    wrap: UI.optWrap.checked, borders: UI.optClose.value === 'never' ? 'never' : 'tech',
+    wrap: UI.optWrap.checked, borders: UI.optClose.value === 'never' ? 'never' : 'tech', mode: UI.optMode.value,
     victory: { conquest: UI.optConquest.checked, science: UI.optScience.checked } });
   if (!game) { toast('That map didn’t work out. Try again, or pick a bigger size.'); return; }
   gamesStarted++;
@@ -10623,6 +10916,7 @@ function liveEvent(m) {
     else LIVE.early.push(...(m.actions || []));   // the game is still opening: keep them for when it has
   }
   else if (m.event === 'presence') livePresence(m);
+  else if (m.event === 'ping') livePing(m);
   else if (m.event === 'game') {
     LIVE.game = m.game;
     if (G && G.live) return;
@@ -10845,6 +11139,18 @@ function liveUi(kind, act, parts, selUnit) {
       });
       return true;
     }
+    case 'give-ask': if (canTalk()) showGive(Number(a)); return true;
+    case 'give-send': {
+      const d = canTalk() ? readGiveForm() : null;
+      if (!d) return true;
+      liveSend('gift', { to: d.to, res: d.res, qty: d.qty }, (ok, r) => {
+        if (!ok) { showGive(d.to, d); toast(r && r.why ? r.why + '.' : 'That gift did not go through.'); return; }
+        toast('Gave ' + d.qty + ' ' + d.res + ' to ' + pl(d.to).name + '.');
+        afterAction();
+        showCouncil();
+      });
+      return true;
+    }
     case 'keep': liveSend('keep', {}, () => { closeModal(); afterAction(); }); return true;
     case 'burn': liveSend('burn', {}, () => { closeModal(); selection = null; afterAction(); }); return true;
     case 'handoff-go': return true;
@@ -10875,21 +11181,26 @@ function liveLeave() {
 
 const LIVE_STATE = { invited: 'Invited', joined: 'Joined', ready: 'Ready', left: 'Left' };
 const liveCounts = () => ({ humans: LIVE.game ? LIVE.game.seats.filter(s => s.state !== 'left').length : 2, cpus: Number(UI.optCpus.value) || 0 });
-const liveLobbyControls = () => [UI.optCpus, UI.optMap, UI.optSize, UI.optLevel, UI.optClose, UI.optTurns, UI.optConquest, UI.optScience, UI.optWrap, UI.optTimer, UI.optUnjoined];
+const liveLobbyControls = () => [UI.optCpus, UI.optMode, UI.optMap, UI.optSize, UI.optLevel, UI.optClose, UI.optTurns, UI.optConquest, UI.optScience, UI.optWrap, UI.optTimer, UI.optUnjoined];
 
 // The room's setup, as the server stores it.
 function liveLobbyConfig() {
-  return {
+  return liveLobbyWithMode({
     map: UI.optMap.value, size: UI.optSize.value, level: UI.optLevel.value, borders: UI.optClose.value === 'never' ? 'never' : 'tech',
     turns: Number(UI.optTurns.value), cpus: Number(UI.optCpus.value), timer: Number(UI.optTimer.value), wrap: UI.optWrap.checked,
     conquest: UI.optConquest.checked, science: UI.optScience.checked, unjoined: UI.optUnjoined.value
-  };
+  });
+}
+// Sent only when it is co-op, so a free-for-all room is stored exactly as it was before 5.1.
+function liveLobbyWithMode(cfg) {
+  if (UI.optMode.value === 'coop') cfg.mode = 'coop';
+  return cfg;
 }
 function liveLobbyFill(cfg) {
   LIVE.filling = true;
   const pick = (el, v) => { if (v !== undefined && v !== null && [...el.options].some(o => o.value === String(v))) el.value = String(v); };
   pick(UI.optMap, cfg.map); pick(UI.optSize, cfg.size); pick(UI.optLevel, cfg.level);
-  pick(UI.optClose, cfg.borders); pick(UI.optTimer, cfg.timer); pick(UI.optUnjoined, cfg.unjoined);
+  pick(UI.optClose, cfg.borders); pick(UI.optTimer, cfg.timer); pick(UI.optUnjoined, cfg.unjoined); pick(UI.optMode, cfg.mode === 'coop' ? 'coop' : 'ffa');
   if (Number.isInteger(cfg.turns)) UI.optTurns.value = String(cfg.turns);
   if (typeof cfg.wrap === 'boolean') UI.optWrap.checked = cfg.wrap;
   if (typeof cfg.conquest === 'boolean') UI.optConquest.checked = cfg.conquest;
@@ -11004,6 +11315,14 @@ function liveStartPressed() {
     UI.optTurns.focus();
     return;
   }
+  if (cfg.mode === 'coop') {
+    // Seats nobody joins become CPUs unless the host dropped them, so they count as CPUs here.
+    const seats = LIVE.game ? LIVE.game.seats : [];
+    const humans = seats.filter(x => x.state === 'joined' || x.state === 'ready').length;
+    const cpus = cfg.cpus + (cfg.unjoined === 'drop' ? 0 : seats.filter(x => x.state === 'invited').length);
+    const why = coopProblem(humans, cpus);
+    if (why) { toast(why.replace('Add one above.', 'Add one, or let seats nobody joins become CPUs.')); return; }
+  }
   UI.btnBegin.disabled = true;
   // The setup the host sees is the setup that starts: send it first, then start.
   LIVE.net.call('lobby', { config: cfg }).then(() => LIVE.net.call('start', {})).then(() => LIVE.net.call('hello', {})).then(liveHello)
@@ -11030,7 +11349,7 @@ function liveHello(info) {
 function liveEnter(info) {
   if (G && G.live) return;   // already in: a second answer from the hub changes nothing
   const g = info.game, start = g.start || {}, o = start.options || {};
-  const seats = (start.seats || []).map(s => ({ name: s.handle || '', human: s.kind === 'human', civ: s.civ || null, team: s.team }));
+  const seats = (start.seats || []).map(s => ({ name: s.handle || '', human: s.kind === 'human', civ: s.civ || null }));
   LIVE.applied = 0;
   LIVE.finished = false;
   LIVE.last.clear();
@@ -11042,7 +11361,8 @@ function liveEnter(info) {
   } else {
     const game = startGame({
       seats, maxTurns: o.turns || 0, seed: o.seed, map: o.map, level: o.level, size: o.size, wrap: !!o.wrap, borders: o.borders,
-      victory: { conquest: o.conquest !== false, science: o.science !== false }, timer: o.timer, live: true
+      victory: { conquest: o.conquest !== false, science: o.science !== false }, timer: o.timer, live: true,
+      mode: g.config && g.config.mode === 'coop' ? 'coop' : 'ffa'   // the room's setup is frozen once it starts
     });
     if (!game) { liveFail('That map did not work out. Ask the host to start again.'); return; }
     G.viewer = g.me;
@@ -11100,12 +11420,12 @@ function boot(data) {
     layerMarks: q('#layer-marks'), layerBorder: q('#layer-border'), layerOverlay: q('#layer-overlay'),
     layerSites: q('#layer-sites'), layerUnits: q('#layer-units'), layerPath: q('#layer-path'), layerFog: q('#layer-fog'), layerLabels: q('#layer-labels'),
     liveStrip: q('#live-strip'), liveNet: q('#live-net'), optTimer: q('#opt-timer'), optUnjoined: q('#opt-unjoined'), btnReady: q('#btn-ready'), btnBack: q('#btn-back'),
-    stats: q('#stats'), bannerDot: q('#banner-dot'), bannerName: q('#banner-name'), bannerWho: q('#banner-who'),
+    stats: q('#stats'), bannerDot: q('#banner-dot'), bannerName: q('#banner-name'), bannerWho: q('#banner-who'), bannerTeam: q('#banner-team'),
     turnReadout: q('#turn-readout'), btnEnd: q('#btn-end'), sideScroll: q('#side-scroll'), log: q('#log'),
     modalLayer: q('#modal-layer'), modal: q('#modal'), toast: q('#toast'),
     handoff: q('#handoff'), handoffDot: q('#handoff-dot'), handoffTurn: q('#handoff-turn'),
     handoffName: q('#handoff-name'), handoffNote: q('#handoff-note'),
-    start: q('#start'), seats: q('#seats'), optHumans: q('#opt-humans'), optCpus: q('#opt-cpus'), optSize: q('#opt-size'), sizeNote: q('#size-note'),
+    start: q('#start'), seats: q('#seats'), optHumans: q('#opt-humans'), optCpus: q('#opt-cpus'), optMode: q('#opt-mode'), modeNote: q('#mode-note'), optSize: q('#opt-size'), sizeNote: q('#size-note'),
     optConquest: q('#opt-conquest'), optScience: q('#opt-science'), optTurns: q('#opt-turns'), optMap: q('#opt-map'),
     optLevel: q('#opt-level'), mapNote: q('#map-note'), levelNote: q('#level-note'), optClose: q('#opt-close'), optWrap: q('#opt-wrap'), closeNote: q('#close-note'),
     startNote: q('#start-note'), setupNote: q('#setup-note'), paneTitle: q('#pane-title'), paneSetup: q('#pane-setup'), titleMenu: q('#title-menu'), btnNew: q('#btn-new'),
@@ -11124,7 +11444,10 @@ function boot(data) {
     if (event.target === UI.modalLayer && !(G && G.pending)) onAction('close');
   });
   // The trade form reprices itself as you change it; touching the price keeps your number.
-  const tradeInput = event => { if (UI.modalKind === 'trade' && G) refreshTradeForm(!!event.target && event.target.id !== 'tr-price'); };
+  const tradeInput = event => {
+    if (UI.modalKind === 'trade' && G) refreshTradeForm(!!event.target && event.target.id !== 'tr-price');
+    else if (UI.modalKind === 'give' && G) refreshGiveForm();
+  };
   UI.modal.addEventListener('input', tradeInput);
   UI.modal.addEventListener('change', tradeInput);
   // How to play: the search box filters the contents, and the section at the top of the text is marked as it scrolls.

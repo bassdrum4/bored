@@ -29,7 +29,7 @@ function room(extra = {}) {
     config: { cpus: 1 }, start: null, host: OWNER,
     seats: [{ seat: 0, user: OWNER, handle: 'Me', state: 'joined', civ: null, controller: 'human', online: true, away: 0 },
             { seat: 1, user: 'user-friend', handle: 'Friend', state: 'invited', civ: null, controller: 'human', online: true, away: 3 }],
-    fail: [], lose: 0, latency: 0
+    fail: [], lose: 0, latency: 0, pings: [], pingHead: 0
   }, extra);
   const game = () => ({ id: r.id, game: 'ashcrown', host: r.host, status: r.status, config: r.config, start: r.start, timer: r.timer, head: r.head,
     round: r.round, round_age: 1, winner: r.winner == null ? null : r.winner, me: 0, seats: r.seats.map(s => Object.assign({}, s)),
@@ -53,6 +53,8 @@ function room(extra = {}) {
       case 'sync': case 'heartbeat': return sync(args.after || 0, action === 'heartbeat' ? 0 : args.limit || 500);
       case 'load': return { snapshot: r.snapshot };
       case 'snapshot': r.snapshot = r.snapshot || { round: args.round, seq: args.seq, hash: args.hash, state: args.state }; return { stored: true };
+      case 'ping': { const p = { id: ++r.pingHead, seat: 0, x: args.x, y: args.y }; r.pings.push(p); return { id: p.id }; }
+      case 'pings': return { pings: r.pings.filter(p => p.id > (args.after || 0)), head: r.pingHead };
       case 'report': return { ok: true, desync: !!r.desync };
       case 'finish': r.status = 'completed'; r.winner = args.winner; return game();
       case 'send': {
@@ -399,4 +401,83 @@ test('only a live game can be opened live', async () => {
   assert.throws(() => createLivePlayer({ game: { id: 'x', game: 'chess' }, owner: OWNER, frame: {}, close() {}, onExit() {}, reload() {}, notify() {} }), /not available live/);
   assert.equal(LIVE_DEFAULTS.timer, 0);
   assert.equal(LIVE_DEFAULTS.unjoined, 'cpu');
+});
+
+// 5.1 co-op map pings: not actions, so they never enter the log, and a room that is not co-op has none.
+const pingsHeard = s => s.events.filter(e => e.event === 'ping').map(e => [e.seat, e.x, e.y]);
+
+test('co-op pings, polled: a late screen does not replay old ones, new ones arrive once, and the log is left alone', async t => {
+  const r = room({ status: 'active', config: { cpus: 1, mode: 'coop' } });
+  r.pings.push({ id: 1, seat: 1, x: 2, y: 2 }); r.pingHead = 1;   // from before this screen opened
+  const s = await session(t, r);
+  await s.call('hello', {});
+  await until(() => r.calls.some(c => c.action === 'pings'), 2000, 'the first poll');
+  await wait(60);
+  assert.deepEqual(pingsHeard(s), [], 'a ping from before the screen opened is not shown late');
+  assert.deepEqual(r.calls.find(c => c.action === 'pings').args, { id: 'room-1' }, 'the first read only learns where the pings stand');
+  r.pings.push({ id: 2, seat: 1, x: 5, y: 6 }, { id: 3, seat: 1, x: 7, y: 1 }); r.pingHead = 3;
+  await until(() => pingsHeard(s).length === 2, 2000, 'the new pings');
+  assert.deepEqual(pingsHeard(s), [[1, 5, 6], [1, 7, 1]], 'in order');
+  await wait(80);
+  assert.deepEqual(r.calls.filter(c => c.action === 'pings').pop().args, { id: 'room-1', after: 3 }, 'and each poll asks only for what is after the last one');
+  assert.equal(pingsHeard(s).length, 2, 'not twice');
+  assert.deepEqual(s.log(), [], 'the action log saw nothing');
+  assert.equal(r.head, 0);
+  // A failed poll is only tried again.
+  r.fail.push({ message: 'Failed to fetch' });
+  r.pings.push({ id: 4, seat: 1, x: 9, y: 9 }); r.pingHead = 4;
+  await until(() => pingsHeard(s).length === 3, 2000, 'a ping after a failed poll');
+});
+
+test('co-op pings, by Realtime: the pings table is asked for, rows route by table, duplicates drop, and a healthy socket means no polling', async t => {
+  const r = room({ status: 'active', config: { cpus: 1, mode: 'coop' } });
+  const sock = socket();
+  const s = await session(t, r, { sock });
+  await s.call('hello', {});
+  assert.deepEqual(sock.options.changes.map(c => c.table), ['actions', 'pings']);
+  assert.ok(sock.options.changes.every(c => c.schema === 'bored_live' && c.filter === 'game_id=eq.room-1'));
+  sock.open();
+  await wait(30);
+  const polls = () => r.calls.filter(c => c.action === 'pings').length;
+  const base = polls();
+  const a = r.add(1, 'x');
+  sock.onChange(Object.assign({ game_id: r.id, request_id: 'q' }, a), { table: 'actions' });
+  sock.onChange({ id: 10, game_id: r.id, seat: 1, x: 3, y: 4, at: 'now' }, { table: 'pings' });
+  sock.onChange({ id: 10, game_id: r.id, seat: 1, x: 3, y: 4, at: 'now' }, { table: 'pings' });
+  sock.onChange({ id: '11', game_id: r.id, seat: '1', x: '8', y: '2' }, { table: 'pings' });
+  sock.onChange({ id: 9, seat: 1, x: 1, y: 1 }, { table: 'pings' });
+  await until(() => pingsHeard(s).length === 2, 2000, 'both pings');
+  assert.deepEqual(pingsHeard(s), [[1, 3, 4], [1, 8, 2]], 'once each, in order, strings from the wire made numbers, an older id ignored');
+  await until(() => s.log().length === 1, 2000, 'the action');
+  assert.deepEqual(s.log(), [1], 'a row of the actions table still goes to the log, and a ping row never does');
+  await wait(80);
+  assert.equal(polls(), base, 'no polling while the socket is up');
+  for (const bad of [null, {}, { id: 'x' }, { id: 12, seat: 'a', x: 1, y: 1 }, { id: 13, seat: 1, x: 1.5, y: 1 }]) sock.onChange(bad, { table: 'pings' });
+  assert.equal(pingsHeard(s).length, 2, 'rows that are not pings are dropped');
+  sock.down();
+  r.pings.push({ id: 14, seat: 1, x: 6, y: 6 }); r.pingHead = 14;
+  await until(() => pingsHeard(s).length === 3, 2000, 'polling takes over when the socket is down');
+});
+
+test('co-op pings: a room that is not co-op has no pings and asks for none; a ping call is checked before it leaves', async t => {
+  const r = room({ status: 'active', config: { cpus: 1 } });
+  const sock = socket();
+  const s = await session(t, r, { sock });
+  await s.call('hello', {});
+  assert.deepEqual(sock.options.changes.map(c => c.table), ['actions'], 'only the log');
+  sock.open(); sock.down();
+  await wait(80);
+  assert.equal(r.calls.filter(c => c.action === 'pings').length, 0, 'no polling for pings');
+  await assert.rejects(s.call('ping', { x: 3, y: 3 }), /co-op games/);
+  assert.equal(r.calls.filter(c => c.action === 'ping').length, 0);
+  sock.onChange({ id: 5, seat: 1, x: 3, y: 3 }, { table: 'pings' });
+  assert.deepEqual(pingsHeard(s), []);
+  // In a co-op room: the call goes through, with whole numbers on the map only.
+  const c = room({ status: 'active', config: { cpus: 1, mode: 'coop' } });
+  const t2 = await session(t, c);
+  await t2.call('hello', {});
+  assert.deepEqual(await t2.call('ping', { x: 4, y: 9 }), { id: 1 });
+  assert.deepEqual(c.calls.find(x => x.action === 'ping').args, { id: 'room-1', x: 4, y: 9 });
+  for (const bad of [{ x: -1, y: 1 }, { x: 1, y: 300 }, { x: 1.5, y: 1 }, { x: 'a', y: 1 }, {}]) await assert.rejects(t2.call('ping', bad), /Nothing to ping/);
+  assert.equal(c.calls.filter(x => x.action === 'ping').length, 1, 'bad ones never reached the server');
 });

@@ -373,8 +373,115 @@ test('a seat the humans left is not "every human out": the game goes on', () => 
   assert.equal(q(rm, 'G.live.away[0]'), true);
 });
 
-test('teams: one per seat, stored from the start so a co-op version can group seats', () => {
+test('teams: G holds one team number per seat, one per seat in a free-for-all, and live no longer keeps its own list', () => {
   const rm = room({ ...BASE, seats: table(2, 2), seed: 1 }, [0]);
-  assert.deepEqual(q(rm, 'G.live.teams'), [0, 1, 2, 3]);
+  assert.deepEqual(q(rm, 'G.teams'), [0, 1, 2, 3]);
+  assert.equal(q(rm, 'G.mode'), 'ffa');
+  assert.equal(q(rm, 'G.live.teams'), undefined);
   assert.deepEqual(q(rm, 'G.live.humans'), [0, 1]);
+});
+
+// 5.1 co-op: the humans are one team against the CPUs.
+test('co-op: both devices agree through a team game, a war on a teammate is refused, gifts land on both, and the map is shared', () => {
+  const rm = room({ ...BASE, seats: table(2, 2), seed: 5151, mode: 'coop' }, [0, 1]);
+  assert.deepEqual(q(rm, 'G.teams'), [0, 0, 2, 3]);
+  assert.equal(q(rm, 'G.mode'), 'coop');
+  assert.equal(q(rm, 'hasMet(0, 1) && hasMet(1, 0)'), true, 'teammates have met from the first turn');
+  assert.equal(q(rm, 'hasMet(0, 2) || hasMet(1, 3)'), false);
+  rm.agree('at the start');
+  // A war on a teammate is refused on every device, and changes nothing.
+  const before = rm.agree();
+  assert.equal(rm.send({ seat: 0, type: 'war', args: { to: 1 } }), false);
+  assert.equal(rm.send({ seat: 1, type: 'war', args: { to: 0 } }), false);
+  assert.equal(q(rm, 'atWar(0, 1) || atWar(1, 0)'), false);
+  assert.equal(rm.agree('after the refused wars'), before, 'a refused action leaves the game as it was');
+  // Gifts: horses, iron and gunpowder, in fives, between teammates only, the same on both devices.
+  rm.fixture('pl(0).horses = 20; pl(0).iron = 10; pl(1).horses = 0; pl(1).iron = 0; pl(1).gunpowder = 0; pl(0).gunpowder = 5;');
+  assert.equal(rm.send({ seat: 0, type: 'gift', args: { to: 1, res: 'horses', qty: 5 } }), true);
+  assert.equal(rm.send({ seat: 0, type: 'gift', args: { to: 1, res: 'gunpowder', qty: 5 } }), true);
+  assert.equal(rm.send({ seat: 0, type: 'gift', args: { to: 1, res: 'horses', qty: 3 } }), false, 'not in fives');
+  assert.equal(rm.send({ seat: 0, type: 'gift', args: { to: 1, res: 'iron', qty: 15 } }), false, 'more than the stockpile');
+  assert.equal(rm.send({ seat: 0, type: 'gift', args: { to: 2, res: 'iron', qty: 5 } }), false, 'a CPU is not a teammate');
+  assert.equal(rm.send({ seat: 0, type: 'gift', args: { to: 0, res: 'iron', qty: 5 } }), false, 'not to yourself');
+  assert.equal(rm.send({ seat: 0, type: 'gift', args: { to: 1, res: 'gold', qty: 5 } }), false, 'only the three resources');
+  assert.equal(rm.send({ seat: 1, type: 'gift', args: { to: 0 } }), false, 'a gift with nothing in it');
+  assert.equal(rm.send({ seat: 1, type: 'gift', args: { to: 0, res: '__proto__', qty: 5 } }), false);
+  for (const d of rm.devices) assert.deepEqual(d.json('[pl(0).horses, pl(1).horses, pl(0).gunpowder, pl(1).gunpowder]'), [15, 5, 0, 5], 'both devices moved the same fives');
+  rm.agree('after the gifts');
+  // A war with a CPU is one player's, not the team's.
+  assert.equal(rm.send({ seat: 0, type: 'war', args: { to: 2 } }), false, 'not before they have met');
+  rm.fixture('meet(0, 2); meet(1, 2)');
+  assert.equal(rm.send({ seat: 0, type: 'war', args: { to: 2 } }), true);
+  assert.equal(q(rm, 'atWar(0, 2) && !atWar(1, 2)'), true);
+  assert.equal(rm.agree('after the war'), rm.agree());
+  // Play on: a bot plays both humans, the devices must agree at every round, nobody ever fights a teammate,
+  // and the two seats keep one map.
+  const b = bot(rm, 51);
+  let last = q(rm, 'G.turn'), rounds = 0;
+  for (let step = 0; step < 4000 && q(rm, 'G.turn') <= 18 && !q(rm, 'G.over'); step++) {
+    const acting = q(rm, 'G.live.human0.filter(liveCanAct)');
+    if (!acting.length) break;
+    const seat = b.pick(acting);
+    b.play(seat);
+    b.noise(rm.ref);
+    end(rm, seat);
+    const now = q(rm, 'G.turn');
+    if (now !== last) {
+      rm.agree('at the start of round ' + now);
+      assert.equal(q(rm, 'atWar(0, 1) || atWar(1, 0)'), false, 'never at war with each other');
+      rounds++;
+      last = now;
+    }
+  }
+  assert.ok(rounds >= 15, 'ran ' + rounds + ' rounds');
+  rm.agree('at the end');
+  assert.deepEqual(q(rm, 'G.seen[0]'), q(rm, 'G.seen[1]'), 'one shared map');
+  assert.ok(q(rm, 'G.cities.filter(c => c.owner < 2).length') >= 2, 'the team founded cities');
+  assert.equal(q(rm, 'G.dip[0][1] !== "war" && G.dip[1][0] !== "war"'), true);
+  for (const d of rm.devices) assert.deepEqual(d.errors().filter(e => !/constructor|__proto__/.test(e)), []);
+});
+
+test('co-op: a ping is a marker on a screen, never part of the game: not in G, the log or the hash', () => {
+  const rm = room({ ...BASE, seats: table(2, 2), seed: 77, mode: 'coop' }, [0, 1]);
+  for (const d of rm.devices) { d.ctx.setTimeout = () => 0; d.run('Date.now = Date.now'); }
+  const [ann, ben] = rm.devices;
+  const h = rm.agree('at the start');
+  const logLen = rm.log.length;
+  const state = JSON.stringify(ann.G);
+  // Ann pings her own screen, Ben's arrives at hers as a message.
+  assert.equal(ann.run('canPing()'), true, 'co-op, a human, a teammate');
+  assert.equal(ann.run('pingHex(5, 5)'), true);
+  assert.equal(ann.run('pingHex(6, 6)'), false, 'a second ping inside 0.7 s is turned away');
+  assert.equal(ann.run('PINGS.length'), 1);
+  assert.deepEqual(ann.json('livePings(0).map(k => [k.x, k.y, k.seat])'), [[5, 5, 0]]);
+  assert.deepEqual(ann.json('livePings(1).map(k => [k.x, k.y, k.seat])'), [[5, 5, 0]], 'her teammate would see it');
+  assert.deepEqual(ann.json('livePings(2)'), [], 'a CPU never sees it');
+  ann.run('livePing({ seat: 1, x: 7, y: 6 })');
+  assert.equal(ann.run('PINGS.length'), 2, 'Ben’s ping shows on Ann’s screen');
+  assert.ok(ann.run('G.log.at(-1).text').includes(' pinged near '), 'with a line in her own log');
+  ann.run('livePing({ seat: 1, x: 7, y: 6 })');
+  assert.equal(ann.run('PINGS.length'), 2, 'the same spot again replaces the marker');
+  // What a network could send that must be ignored.
+  for (const bad of ['{ seat: 0, x: 3, y: 3 }', '{ seat: 2, x: 3, y: 3 }', '{ seat: 9, x: 3, y: 3 }', '{ seat: 1, x: -1, y: 3 }', '{ seat: 1, x: 3.5, y: 3 }', '{ seat: 1, x: "3", y: 3 }', '{ seat: 1, x: 9999, y: 9999 }', '{}', 'null'.replace('null', '{ seat: "__proto__" }')])
+    ann.run('livePing(' + bad + ')');
+  assert.equal(ann.run('PINGS.length'), 2, 'a ping from myself, a CPU, nobody or off the map is dropped');
+  // Nothing in the game moved.
+  assert.equal(ann.hash(), h, 'the hash did not change');
+  assert.equal(ben.hash(), h, 'and Ben’s screen knows nothing');
+  assert.equal(rm.log.length, logLen, 'no action went into the log');
+  assert.equal(JSON.stringify(ann.G).includes('PINGS'), false);
+  const after = JSON.parse(JSON.stringify(ann.G));
+  delete after.log; delete after.news;
+  const was = JSON.parse(state);
+  delete was.log; delete was.news;
+  assert.deepEqual(after, was, 'G is the same apart from this screen’s own log');
+  // Not in a free-for-all, not for a spectator, not once it is over.
+  const ffa = room({ ...BASE, seats: table(2, 2), seed: 77 }, [0, 1]);
+  ffa.devices[0].ctx.setTimeout = () => 0;
+  assert.equal(ffa.devices[0].run('canPing()'), false);
+  assert.equal(ffa.devices[0].run('pingHex(5, 5)'), false);
+  ffa.devices[0].run('livePing({ seat: 1, x: 7, y: 6 })');
+  assert.equal(ffa.devices[0].run('PINGS.length'), 0);
+  ann.run('G.over = { winner: 0, why: "x", turn: 1 }');
+  assert.equal(ann.run('canPing()'), false, 'not after the game');
 });
