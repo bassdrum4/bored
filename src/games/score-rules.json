@@ -179,6 +179,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "ticket-to-ride": {
+    "label": "Victory points in a finished game vs CPU",
+    "better": "high",
+    "max_value": 500
+  },
   "trackbound": {
     "label": "Career points",
     "better": "high",

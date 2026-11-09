@@ -4,6 +4,7 @@ import { ORDER, EXTERNS } from './catalog.js';
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
 export const DISCOVERY = {
+  "ticket-to-ride": info('20–40 min', 'Turn-based', ['Mouse', 'Touch'], { players: '1 vs CPU' }),
   wallbound: info("3–10 min", "Focused", ["Mouse", "Touch"], { quick: true }),
   risk: info('20–45 min', 'Turn-based', ['Mouse', 'Touch'], { players: '1 vs CPU' }),
   "scrabble": info('15–30 min', 'Turn-based', ['Mouse', 'Touch'], { players: '1 or 2 local' }),

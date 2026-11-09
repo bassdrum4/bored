@@ -88,6 +88,13 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // A Ticket to Ride result is the final total of a finished game against the
+  // CPU, after destination tickets and the longest-path bonus. An abandoned
+  // board is only part of a score, so it never posts.
+  highScore('ticket-to-ride', 'Ticket to Ride', 'points', {
+    metric: 'points', min: 1, max: 500,
+    when: snapshot => snapshot.finished === true && snapshot.cpu === true
+  }),
   // The leaderboard measures the sum of best stars earned over all 20 stages (up to 60).
   highScore('wallbound', 'Sticky Ninja', 'stars', { metric: 'medals', min: 1, max: 60, when: snapshot => snapshot.finished === true }),
   // A fair Risk result requires winning the entire world against the CPU;
