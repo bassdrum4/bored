@@ -25,7 +25,7 @@ import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnnouncementsUI } from './hub/announcements-ui.js';
-import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
+import { createAnalytics, ANALYTICS_BRIDGE, runtimeErrorMetadata } from './hub/analytics.js';
 import { getAnalyticsAccess } from './hub/analytics-access.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
@@ -898,7 +898,7 @@ addEventListener('message', event => {
         });
       }
       break;
-    case 'bored:runtime-error': analytics.event('error', { code: 'runtime' }); break;
+    case 'bored:runtime-error': analytics.event('error', runtimeErrorMetadata(event.data)); break;
     case 'bored:restart': restartGame(); break;
     case 'bored:fullscreen': toggleFullscreen(); break;
     case 'bored:menuclose': closeMenu(); break;
