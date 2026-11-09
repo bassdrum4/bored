@@ -6421,6 +6421,7 @@ function readPrefs() {
   try { return JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') || {}; } catch (error) { return {}; }
 }
 function writePref(key, value) {
+  if (inMatch()) return;
   try {
     const prefs = readPrefs();
     prefs[key] = value;
@@ -9296,6 +9297,13 @@ function bindKeys() {
 // then the game (JSON never contains a raw newline), so listing slots never parses a game.
 const SLOT_PREFIX = 'bored.civlite.slot.';
 const OLD_SAVE_KEY = 'bored.civlite.save.v2';   // before slots there was one save; it becomes the autosave
+// A Bored Together match lives on the server, not in this device's slots, so
+// every save primitive below refuses while one is open. Guarding the primitives
+// rather than each caller means no path (an autosave, a header upgrade, a menu
+// action) can write over or clear a solo campaign.
+function inMatch() {
+  try { return !!(online || window.__boredTogether); } catch (error) { return !!online; }
+}
 const MANUAL_IDS = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8'];
 const TURN_IDS = ['t1', 't2', 't3'];
 const SLOT_IDS = ['auto'].concat(TURN_IDS, MANUAL_IDS);
@@ -9394,9 +9402,11 @@ function slotRead(id) {
   }
 }
 function slotRemove(id) {
+  if (inMatch()) return;
   try { localStorage.removeItem(SLOT_PREFIX + id); } catch (error) { /* storage blocked */ }
 }
 function slotWrite(id, head, state) {
+  if (inMatch()) return false;
   let raw;
   try { raw = JSON.stringify(head) + '\n' + JSON.stringify(state); } catch (error) { return false; }
   const put = () => { try { localStorage.setItem(SLOT_PREFIX + id, raw); return true; } catch (error) { return false; } };
@@ -9413,7 +9423,7 @@ function slotWrite(id, head, state) {
 function moveOldSave() {
   // A Bored Together match never touches this device's saves, not even to tidy them. (This runs while
   // the start screen is built, before the game has worked out that it is inside a match.)
-  try { if (online || window.__boredTogether) return; } catch (error) { /* not in a page */ }
+  if (inMatch()) return;
   try {
     const raw = localStorage.getItem(OLD_SAVE_KEY);
     if (!raw) return;
@@ -9428,7 +9438,7 @@ function moveOldSave() {
 // one), details, civ, colors and era are rebuilt from the game inside it, and the header is written back
 // as mv 2 so that happens once. An old name equal to the old default, "<land>, turn <n>", was never typed.
 function upgradeHead(id, head) {
-  if (head.mv === 2) return head;
+  if (head.mv === 2 || inMatch()) return head;
   try {
     const raw = localStorage.getItem(SLOT_PREFIX + id), cut = raw ? raw.indexOf('\n') : -1;
     if (cut < 1) return head;

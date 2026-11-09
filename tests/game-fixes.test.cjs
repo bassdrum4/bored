@@ -527,6 +527,11 @@ test('Ashcrown never touches its save slots during a Bored Together match', () =
   assert.equal(r.ctx.loadSlot('m1'), false, 'and never loads a campaign over the match');
   r.ctx.G.over = { winner: 0 };
   assert.equal(r.ctx.saveGame(), false, 'a finished match never clears the autosave either');
+  // The primitives themselves refuse, so a path that forgets its own guard (a
+  // header upgrade, a slot menu action) still cannot reach the store.
+  assert.equal(r.ctx.slotWrite('m1', { v: 1, at: 1 }, r.ctx.G), false, 'a match cannot write a slot');
+  r.ctx.slotRemove('auto');
+  assert.deepEqual(r.ctx.upgradeHead('m1', { v: 1, at: 1 }), { v: 1, at: 1 }, 'a match does not upgrade a saved header');
   assert.deepEqual(r.log, [], 'the match touches storage not at all');
   assert.deepEqual([...r.store], [...before], 'the campaign survives the match');
 });
@@ -3006,4 +3011,30 @@ test('Ashcrown 4.7: the Council and the realm panel show who is at war with whom
   assert.ok(html.includes('<h3>Wars</h3>') && html.includes('China') && html.includes('Since turn'), 'the Wars list');
   assert.ok(html.includes('At war with: Japan'), 'and the line on China’s row');
   assert.ok(r.run('realmPanel()').includes('At war with: China'), 'the realm panel too');
+});
+
+
+test('A Bored Together match never writes the arcade best a solo game reads', () => {
+  // 2048 (a duel) and the native arcade games keep their best in `bored.best.*`,
+  // which the solo game and the hub high score both read. A match is somebody
+  // else's run: it must not replace that key in either match mode.
+  const source = load('src/games/arcade.js');
+  const store = new Map();
+  const context = vm.createContext({
+    localStorage: {
+      getItem: key => (store.has(key) ? store.get(key) : null),
+      setItem: (key, value) => store.set(key, String(value))
+    },
+    window: {}
+  });
+  vm.runInContext(extractFunction(source, 'inMatch') + '\n' + extractFunction(source, 'write'), context);
+  context.write('2048', 12);
+  assert.equal(store.get('bored.best.2048'), '12', 'solo play keeps its best');
+  context.window.__boredTogether = { context: {} };
+  context.write('2048', 40);
+  assert.equal(store.get('bored.best.2048'), '12', 'a turns match never overwrites it');
+  context.window.__boredTogether = null;
+  context.window.__boredSeed = { seed: 7, match: true };
+  context.write('2048', 99);
+  assert.equal(store.get('bored.best.2048'), '12', 'a duel never overwrites it');
 });
