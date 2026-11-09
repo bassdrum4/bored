@@ -232,6 +232,7 @@
     .help-toc, .help-toc.open { display: flex; position: static; flex: none; width: 210px; border-right: 1px solid var(--rule) }
   }
   .x { margin-left: auto; font-size: 18px; line-height: 1; padding: 0 2px; color: var(--ink-2) }
+  .war-line { display: block; font-size: 10.5px; color: var(--ink-3); line-height: 1.35 }
   .council-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--rule-2); align-items: center }
   .council-row .cn { display: flex; align-items: center; gap: 7px; font-family: var(--font-display); font-size: 14px; flex-wrap: wrap }
   .council-row .cd { font-size: 11.5px; color: var(--ink-2); margin-top: 3px }
@@ -943,8 +944,8 @@ const UNITS = {
                blurb: 'Improves tiles inside your borders. 3 charges, each one instant.' },
   scout:     { name: 'Scout',     kind: 'recon',  era: 1, str: 10, cost: 15, move: 3, sight: 3, rough: true, noCapture: true,
                blurb: 'Sees 3 hexes. Hills and forest cost it 1 move. Can’t take cities.' },
-  warrior:   { name: 'Warrior',   kind: 'melee',  era: 1, str: 20, cost: 20, move: 2,
-               blurb: 'Cheap and early.' },
+  warrior:   { name: 'Warrior',   kind: 'melee',  era: 1, str: 20, cost: 30, move: 2, obsolete: 'ironworking',
+               blurb: 'Cheap and early. Can’t be built once you know Iron Working.' },
   spearman:  { name: 'Spearman',  kind: 'melee',  era: 2, str: 25, cost: 30, move: 2, tech: 'bronze', vsHorse: 10,
                blurb: '+10 strength against horse units.' },
   archer:    { name: 'Archer',    kind: 'ranged', era: 1, str: 15, rs: 25, range: 2, cost: 30, move: 2, tech: 'archery',
@@ -2078,6 +2079,25 @@ function tileYield(t, owner) {
 const cityTiles = c => G.tiles.filter(t => t.city === c.id);
 
 // Every tile inside the borders is worked. The city center always gives 2 and 2.
+// Army upkeep (v4.7): a civ supports 2 military units per city for free (2 at least). Every unit
+// beyond that costs 1 production a turn, charged to its home city (or the capital), the most
+// expensive units first and then by id, so every screen agrees. Returns city id -> units charged.
+const ARMY_FREE_PER_CITY = 2;
+function armyFree(i) { return Math.max(2, ARMY_FREE_PER_CITY * ownCities(i).length); }
+function upkeepCharges(i) {
+  const out = new Map();
+  const mil = G.units.filter(u => u.owner === i && isMil(u.type));
+  const extra = mil.length - armyFree(i);
+  if (extra <= 0) return out;
+  const f = pl(i), cap = f && f.capital ? cityById(f.capital) : null;
+  const order = mil.slice().sort((a, b) => (UNITS[b.type].cost - UNITS[a.type].cost) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  for (const u of order.slice(0, extra)) {
+    const home = u.home ? cityById(u.home) : null;
+    const c = home && home.owner === i ? home : cap && cap.owner === i ? cap : ownCities(i)[0];
+    if (c) out.set(c.id, (out.get(c.id) || 0) + 1);
+  }
+  return out;
+}
 function cityYields(c) {
   const i = c.owner, f = pl(i);
   let food = 0, prod = 0, shallow = 0, forests = 0, tsci = 0;
@@ -2114,13 +2134,15 @@ function cityYields(c) {
     food = Math.round(food * LEVELS.deity.food);
     prod = Math.round(prod * LEVELS.deity.prod);
   }
+  const armyCost = Math.min(prod, upkeepCharges(i).get(c.id) || 0);
+  prod -= armyCost;
   const army = G.units.filter(u => u.home === c.id && isMil(u.type) && !UNITS[u.type].noFood).length;
   const upkeep = 2 * c.pop + army;
   const sp = { cap: c.capital ? SCI.capital : 0, pop: Math.floor(c.pop * SCI.perPop),
     bld: (c.buildings.includes('library') ? SCI.library + (hasTech(i, 'printing') ? 1 : 0) : 0) +
       (c.buildings.includes('university') ? SCI.university : 0) +
       (c.buildings.includes('observatory') ? SCI.observatory * (observatoryPeak(c) ? 2 : 1) : 0), tiles: tsci };
-  return { food, prod, upkeep, army, net: food - upkeep, sci: sp.cap + sp.pop + sp.bld + sp.tiles, sp };
+  return { food, prod, upkeep, army, armyCost, net: food - upkeep, sci: sp.cap + sp.pop + sp.bld + sp.tiles, sp };
 }
 const growCost = c => {
   const base = 15 + 8 * c.pop;
@@ -2394,6 +2416,7 @@ function buildProblem(c, item) {
   }
   if (def.tech && !hasTech(i, def.tech)) return 'Needs ' + techName(def.tech);
   if (def.tech2 && !hasTech(i, def.tech2)) return 'Needs ' + techName(def.tech2);
+  if (def.obsolete && hasTech(i, def.obsolete)) return 'Obsolete after ' + techName(def.obsolete);
   if ((def.naval || def.coastal) && !isCoastal(c)) return 'Coastal cities only';
   if (def.needsWalls && !hasWalls(c)) return 'Needs walls first';
   if (def.needs && !c.buildings.includes(def.needs)) return 'Needs a ' + BUILDINGS[def.needs].name + ' first';
@@ -3241,8 +3264,18 @@ function rehome(cityId) {
 }
 
 const DEFENCES = ['walls', 'castle', 'fortress'];
+// v4.7: the turn a city last changed hands between two players, for spotting a war that goes nowhere.
+const pairKey = (a, b) => Math.min(a, b) + ':' + Math.max(a, b);
+function noteTake(a, b) { (G.lastTake = G.lastTake || {})[pairKey(a, b)] = G.turn; }
+// At war for 20 turns or more with no city changing hands between them since the war began.
+function stalemate(a, b) {
+  if (!atWar(a, b)) return false;
+  const since = Math.max(G.warSince[a][b] || 0, (G.lastTake || {})[pairKey(a, b)] || 0);
+  return G.turn - since >= 20;
+}
 function captureCity(c, u) {
   const prev = c.owner, f = pl(u.owner), pf = pl(prev);
+  noteTake(prev, f.i);
   for (const o of G.units.filter(o => o.x === c.x && o.y === c.y && o.owner !== u.owner)) {
     if (isMil(o.type)) killUnit(o, u.owner);
     else captureCivilian(o, u);
@@ -3332,6 +3365,7 @@ function aiWantsPeace(f, other) {
   if (isWarlike(f)) score -= 10;
   if (deityCpu(f.i)) score -= 15;
   if (G.turn - since < 5) score -= 25;
+  if (stalemate(f.i, other.i)) score += 60;   // v4.7: a war that goes nowhere ends
   return score > 15;
 }
 
@@ -4576,9 +4610,23 @@ function aiPickFront(f) {
   f.front = best.id;
   const army = ownUnits(f.i).filter(u => isMil(u.type) && !isNaval(u.type) &&
     !(cityAt(u.x, u.y) && cityAt(u.x, u.y).owner === f.i));
-  const near = army.filter(u => hexDistance(u.x, u.y, best.x, best.y) <= 3).length;
-  const need = clamp(2 + Math.floor(best.hp / 100), 2, Math.max(2, Math.ceil(army.length * 0.6)));
-  return { city: best, go: rush || near >= need };
+  return { city: best, go: rush || aiReadyFor(f, best, army) };
+}
+// v4.7: a CPU only goes in when it is clearly stronger. Its soldiers within 3 hexes of the city must
+// add up (strength x health, ranged units at ranged strength) to 1.5 times what holds the city: the
+// city's strength for every 100 HP it has, plus the soldiers on it and next to it. Once it can build
+// archers or siege, at least one must be in the group. Until then the army waits 3 hexes out.
+const aiUnitPower = u => Math.max(UNITS[u.type].str || 0, UNITS[u.type].rs || 0) * u.hp / 100;
+function aiReadyFor(f, c, army) {
+  const near = army.filter(u => hexDistance(u.x, u.y, c.x, c.y) <= 3);
+  if (!near.length) return false;
+  const mine = near.reduce((n, u) => n + aiUnitPower(u), 0);
+  const guards = G.units.filter(o => o.owner === c.owner && isMil(o.type) && hexDistance(o.x, o.y, c.x, c.y) <= 1)
+    .reduce((n, o) => n + aiUnitPower(o), 0);
+  const hold = cityStrength(c) * Math.max(1, c.hp / 100) + guards;
+  if (mine < 1.5 * hold) return false;
+  const canBack = ['archer', 'catapult', 'cannon'].some(b => unlockedFor(f.i, UNITS[unitFor(f.i, b)]));
+  return !canBack || near.some(u => shoots(u.type));
 }
 // Enemy units on this CPU's land or within 3 hexes of its cities.
 function aiThreats(f) {
@@ -4738,7 +4786,7 @@ function aiPickSoldier(f, c, mode) {
   if (bow && count(d => d.kind === 'ranged') < Math.floor((mine.length + 1) / (mode === 'hold' ? 2 : 3))) return bow;
   const melee = ['musketman', 'heavy', 'swordsman', 'horseman', 'spearman'].map(open).filter(Boolean);
   if (melee.length) return melee.length > 1 && roll() < 0.3 ? melee[1] : melee[0];
-  return unitFor(f.i, 'warrior');
+  return open('warrior') || open('archer') || unitFor(f.i, 'warrior');
 }
 
 function aiChooseBuild(f, c, siteAvailable) {
@@ -4759,10 +4807,11 @@ function aiChooseBuild(f, c, siteAvailable) {
   // Army size: the minimum it builds before anything else, and the most it
   // builds before spare production goes to research. Attacking wants the most;
   // warlike civs keep a bigger army even in peacetime.
-  // On Deity every CPU keeps the bigger peacetime army too.
-  const n = cities.length, deity = deityCpu(f.i);
-  const wantArmy = (mode === 'attack' ? n * 3 + 2 : wars ? n * 2 + 2 : n + 1 + (warlike ? 1 : 0) + (deity ? 1 : 0)) + (f.voyage ? n + 2 : 0);
-  const maxArmy = mode === 'attack' ? n * 4 + 2 : wars ? n * 3 + 2 : n * 2 + 1 + (warlike ? n : 0) + (deity ? n : 0);
+  const n = cities.length;
+  // v4.7: smaller armies (upkeep makes big ones cost production), and Deity adds no extra soldiers:
+  // its bonus production goes into whatever comes next.
+  const wantArmy = (mode === 'attack' ? n * 2 + 2 : wars ? n * 2 + 1 : n + 1 + (warlike ? 1 : 0)) + (f.voyage ? n + 2 : 0);
+  const maxArmy = mode === 'attack' ? n * 3 + 2 : wars ? n * 2 + 2 : n * 2 + (warlike ? 1 : 0);
   const late = G.turn > (G.maxTurns || 200) * 0.7;
   const can = item => !buildProblem(c, item);
   const researching = cities.filter(o => o !== c && o.build && o.build.kind === 'research').length;
@@ -4822,7 +4871,11 @@ function aiChooseBuild(f, c, siteAvailable) {
   // Past this size, the city puts its production into research instead (once it has a Library).
   if (army < maxArmy) return soldier();
   if (can(R)) return R;
-  return soldier();
+  // v4.7: a full army builds no more soldiers. The city builds a builder or a building it can use,
+  // or waits and thinks again next turn (before, this was one more soldier every time).
+  if (builders < cities.length && can(U('builder'))) return U('builder');
+  for (const b of ['walls', 'granary', 'watermill', 'workshop', 'harbor']) if (can(B(b))) return B(b);
+  return null;
 }
 
 /* ── what each unit does ───────────────────────────────────────────────────── */
@@ -5036,7 +5089,7 @@ function aiDiplomacy(f) {
     if (racing && !atWar(f.i, o.i) && aiCanReach(f, o) && roll() < (o.voyage ? 0.7 : 0.4)) { declareWar(f.i, o.i); continue; }
     if (atWar(f.i, o.i)) {
       if (aiRacing(o)) continue;
-      if (aiWantsPeace(f, o) && roll() < 0.35) {
+      if (aiWantsPeace(f, o) && roll() < (stalemate(f.i, o.i) ? 0.8 : 0.35)) {
         if (o.human) offerPeace(f.i, o.i);
         else if (aiWantsPeace(o, f)) makePeace(f.i, o.i);
       }
@@ -7764,6 +7817,10 @@ function realmPanel() {
   let html = '<div class="side-head">' + dot(f, 14) + '<h2>' + esc(fullName(f)) + '</h2></div>' +
     '<div class="side-sub">' + (myTurn() ? 'Your turn' : 'Waiting') + ' · turn ' + G.turn +
     (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name + '</div>' + civBlurb(f.civ);
+  const milCount = units.filter(u => isMil(u.type)).length, free = armyFree(f.i);
+  let upkeepNow = 0;
+  for (const n of upkeepCharges(f.i).values()) upkeepNow += n;
+  html += '<p class="hint">Army: ' + plural(milCount, 'unit', 'units') + ', ' + free + ' free' + (upkeepNow ? ', upkeep ' + upkeepNow + ' production a turn' : '') + '.</p>';
 
   if (myTurn()) {
     const idle = idleUnits(f.i), lazy = idleCities(f.i);
@@ -7834,7 +7891,8 @@ function realmPanel() {
       continue;
     }
     const war = atWar(f.i, o.i);
-    html += '<div class="row">' + dot(o) + '<span class="nm">' + esc(fullName(o)) + (o.human ? '' : ' · CPU') + '</span>' +
+    html += '<div class="row">' + dot(o) + '<span class="nm">' + esc(fullName(o)) + (o.human ? '' : ' · CPU') +
+      (o.alive ? '<small class="war-line">' + esc(warLine(f.i, o)) + '</small>' : '') + '</span>' +
       (o.alive ? '<span class="tag ' + (war ? 'war' : 'peace') + '">' + (war ? 'war' : 'peace') + '</span>' : '<span class="tag">out</span>') +
       '<span class="st">' + scoreParts(o.i).total + '</span></div>';
   }
@@ -7845,7 +7903,8 @@ function realmPanel() {
 }
 
 // Hidden until researched, like Civ: a unit or building whose tech you don't have yet isn't listed at all.
-const unlockedFor = (i, def) => !!def && (!def.tech || hasTech(i, def.tech)) && (!def.tech2 || hasTech(i, def.tech2));
+const unlockedFor = (i, def) => !!def && (!def.tech || hasTech(i, def.tech)) && (!def.tech2 || hasTech(i, def.tech2)) &&
+  (!def.obsolete || !hasTech(i, def.obsolete));
 
 function buildRow(c, item, mine) {
   const def = itemDef(item);
@@ -7918,7 +7977,8 @@ function cityPanel(c) {
     '<div class="hint" style="margin-top:2px">' + (y.net < 0 ? 'Starving: its military units lose 10 HP each turn.'
       : y.net === 0 ? 'Not growing.' : c.food + ' / ' + need + ' food · grows in ' + turnsText(Math.ceil((need - c.food) / y.net))) + '</div>';
 
-  html += '<p class="sec">' + icon('prod', 12) + 'Production</p>' + kv('Each turn', '+' + y.prod);
+  html += '<p class="sec">' + icon('prod', 12) + 'Production</p>' + kv('Each turn', '+' + y.prod) +
+    (y.armyCost ? kv('Army upkeep', '−' + y.armyCost, 'color:var(--rust)') : '');
   if (c.build && c.build.kind === 'research') {
     html += kv('Researching', esc(f.research ? techName(f.research) : 'nothing picked')) +
       '<div class="hint" style="margin-top:2px">' + c.progress + ' production saved for the next thing you build.</div>';
@@ -8455,6 +8515,24 @@ const closeNote = () => bordersNever() ? 'Borders never close in this game.'
   : hasTech(G.viewer, 'earlyempire') ? 'Your borders are closed.'
   : 'Research Early Empire to close your borders.';
 
+// v4.7, like Civ: who is at war with whom, as the viewer may know it. Civs the viewer has met are
+// named; the rest are only counted.
+function warLine(viewer, o) {
+  const foes = G.players.filter(p => p.alive && p.i !== o.i && atWar(o.i, p.i));
+  if (!foes.length) return 'At peace with everyone';
+  const known = foes.filter(p => knows(viewer, p.i)).map(p => (p.i === viewer ? 'you' : landName(p)));
+  const hidden = foes.length - known.length;
+  return 'At war with: ' + known.join(', ') + (hidden ? (known.length ? ' and ' : '') + plural(hidden, 'civ you haven’t met', 'civs you haven’t met') : '');
+}
+// Every war between two civs the viewer knows (themselves included), oldest first.
+function warsList(viewer) {
+  const out = [];
+  for (const a of G.players) for (const b of G.players) {
+    if (a.i >= b.i || !a.alive || !b.alive || !atWar(a.i, b.i) || !knows(viewer, a.i) || !knows(viewer, b.i)) continue;
+    out.push({ a, b, since: G.warSince[a.i][b.i] || 0 });
+  }
+  return out.sort((x, y) => x.since - y.since || x.a.i - y.a.i || x.b.i - y.b.i);
+}
 function showCouncil() {
   UI.modalKind = null;
   const v = G.viewer;
@@ -8478,6 +8556,10 @@ function showCouncil() {
         '<div class="cd">' + (d.buyer === v ? 'You pay ' : 'They pay ') + per + ' production a turn, ' + plural(d.left, 'turn', 'turns') + ' left (' + d.owed + ' still owed). Only war ends a deal.</div></div><div></div></div>';
     }).join('');
   }
+  const wars = warsList(v);
+  html += '<h3>Wars</h3>' + (wars.length ? wars.map(w => '<div class="council-row"><div><div class="cn">' + dot(w.a) + esc(w.a.i === v ? 'You' : landName(w.a)) +
+    ' <span class="tag war">vs</span> ' + dot(w.b) + esc(w.b.i === v ? 'you' : landName(w.b)) + '</div><div class="cd">Since turn ' + w.since + '</div></div><div></div></div>').join('')
+    : '<p class="hint" style="margin-top:0">No wars between civs you know.</p>');
   html += '<h3>Players</h3>';
   // Only civs you have met are here. Offers and deals can only come from them.
   const metHere = G.players.filter(o => o.i !== v && hasMet(v, o.i));
@@ -8502,7 +8584,7 @@ function showCouncil() {
       (embassy ? '<span class="tag peace">embassy</span>' : '') +
       (o.human ? '' : '<span class="tag">CPU</span>') + '</div>' +
       '<div class="cd">' + esc(CIVS[o.civ].focus) + ' · ' + plural(s.cities, 'city', 'cities') + ' · ' + plural(o.techs.length, 'tech', 'techs') +
-      ' · score ' + s.total + mood + '</div>' + (scienceOn() ? '<div class="cd">' + esc(raceLine(o.i)) + '</div>' : '') +
+      ' · score ' + s.total + mood + '</div>' + '<div class="cd">' + esc(warLine(v, o)) + '</div>' + (scienceOn() ? '<div class="cd">' + esc(raceLine(o.i)) + '</div>' : '') +
       (embassy ? '<div class="cd">Embassy: capital ' + (cap ? esc(cap.name) : 'unknown') + ' · ' + plural(s.cities, 'city', 'cities') + '.</div>'
         : building ? '<div class="cd">Embassy being built in ' + esc(building.name) + (building.build.ask ? ', waiting for their answer' : '') + '.</div>'
         : hasTech(v, 'writing') && !G.tut ? '<div class="cd">Build an Embassy in one of your cities to ask them.</div>' : '') + '</div><div class="ca">';
@@ -8746,7 +8828,9 @@ function helpSections() {
     { id: 'fighting', group: 'War', title: 'Fighting', html:
       '<p>Every unit has 100 HP. Damage is 30 × e^(0.04 × strength gap), rolled between 80% and 120%. ' +
       'Melee units take damage back; archers, catapults and warships don’t. Units inside their own borders get +5. Hills and forest give defenders +3. ' +
-      'Spearmen get +10 against horse units; catapults and cannons get −15 against units. Units that don’t move or fight heal 10 HP, or 20 inside your borders. A fortified unit gets +3 defense until it moves or attacks.</p>' },
+      'Spearmen get +10 against horse units; catapults and cannons get −15 against units. Units that don’t move or fight heal 10 HP, or 20 inside your borders. A fortified unit gets +3 defense until it moves or attacks.</p>' +
+      '<p><b>Army upkeep.</b> Each civ supports 2 military units per city for free (2 at least). Every unit beyond that costs 1 production a turn from its home city (or your capital), shown in the city panel. ' +
+      'Warriors cost 30 and can’t be built once you know Iron Working.</p>' },
     { id: 'taking-cities', group: 'War', title: 'Taking cities', html:
       '<p>Hit a city to 0 HP, then a melee unit takes it. Scouts can’t. Captured cities lose their walls and 1 pop. You can keep them or burn them; capitals can’t be burned.</p>' },
     { id: 'declaring-war', group: 'War', title: 'Declaring war with an order', html:
@@ -8759,7 +8843,8 @@ function helpSections() {
       '<p>A civ’s land closes the moment it learns <b>Early Empire</b>, a cheap era 1 tech (25 research) that Writing needs. Until then its land is open to everyone. ' +
       'Once it is closed, stepping onto it without an open-borders deal means war, and you are asked first. Only the civ that knows Early Empire closes: yours can stay open while theirs is closed. ' +
       'Units caught inside when a civ closes are moved out at the start of their owner’s turn. Every human who has met that civ gets a card, and you get a note when it is yours. ' +
-      'Ask for open borders in the Council: a deal lasts ' + OPEN_TURNS + ' turns. A game can be set up so borders never close; Early Empire can still be researched, but it closes nothing.</p>' },
+      'Ask for open borders in the Council: a deal lasts ' + OPEN_TURNS + ' turns. A game can be set up so borders never close; Early Empire can still be researched, but it closes nothing. ' +
+      'The Council’s Wars list shows every war between civs you have met, and each civ’s row says who it is at war with.</p>' },
     { id: 'embassies', group: 'Diplomacy', title: 'Embassies', html:
       '<p>Once you know Writing, every city can build an <b>Embassy</b> (30 production). Pick it, then pick a civ you have met that is at peace with you, has no embassy with you yet and is not already getting one from another of your cities. ' +
       'They answer at once. A CPU says yes unless it is at war with you, dislikes you or is about to attack you: a yes gives +2 attitude and the city starts building “Embassy to …”, a no changes nothing and you can ask another civ. ' +
@@ -10045,6 +10130,12 @@ const CHANGELOG = [
     'Dynamic turns like Civ 6: everyone moves at once, and players at war with each other take turns.',
     'An optional turn timer.',
     'Leave and come back any time: a CPU plays your civ while you’re gone.'
+  ] },
+  { v: '4.7', date: 'Nov 9', notes: [
+    'Army upkeep: 2 soldiers per city are free, and each extra one costs its city 1 production a turn.',
+    'Warriors cost 30 and can’t be built after Iron Working.',
+    'CPUs keep smaller armies, only attack when they’re clearly stronger, and make peace when a war goes nowhere.',
+    'The Council and the realm panel show who is at war with whom.'
   ] },
   { v: '4.6.2', date: 'Nov 8', notes: [
     'How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.'

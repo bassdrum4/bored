@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 361,
-  "newest": "2026-11-08",
+  "count": 362,
+  "newest": "2026-11-09",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"7ba9625","date":"2026-11-09","author":"Claude","subject":"Civ Lite 4.7: army upkeep, no more warrior spam, wars that end, and who is at war"},
   {"sha":"4e3e269","date":"2026-11-08","author":"Claude","subject":"Civ Lite 4.6.2: a contents list for How to play"},
   {"sha":"40c37ff","date":"2026-11-08","author":"bassdrum4","subject":"Add Minecraft developer note"},
   {"sha":"b63f497","date":"2026-11-07","author":"Daniel Lowe","subject":"Remove Minecraft and temporary Blocklook experiment from Bored"},
