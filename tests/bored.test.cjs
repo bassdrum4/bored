@@ -490,6 +490,63 @@ test('browser regressions', async t => {
     await close();
   });
 
+  await t.test('Civ Lite keeps Esc for itself on Bored, Back to Bored leaves, and every other game still closes on Esc', async () => {
+    const shown = () => page.$eval('#player', el => !el.hidden);
+    const settle = () => new Promise(resolve => setTimeout(resolve, 400));
+    await page.evaluate(() => openGame('ashcrown'));
+    await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#title-menu .fe-item'), { polling: 50 });
+    let frame = await (await page.$('#frame')).contentFrame();
+    assert.equal(await page.$eval('#hint', el => el.textContent),
+      'Click or tap to play · Esc is the game’s own key · Menu → Back to Bored leaves · Shift+R restarts · Shift+F fullscreen');
+    assert.equal(await frame.$eval('#btn-leave', el => !el.hidden && el.querySelector('.mi-sub').textContent),
+      'Esc stays in the game; this goes back to the arcade', 'the title screen ends with Back to Bored when the game is on Bored');
+    assert.equal(await frame.$eval('#title-menu .fe-item:last-child', el => el.id), 'btn-leave', 'and it is the last item');
+    // Esc with the game focused: Bored does not close it.
+    await frame.focus('#btn-new');
+    await page.keyboard.press('Escape');
+    await settle();
+    assert.equal(await shown(), true, 'Esc does not leave Civ Lite');
+    // Esc with the focus on Bored's own page (the Menu button): it does not close it either.
+    await page.focus('#menu-toggle');
+    await page.keyboard.press('Escape');
+    await settle();
+    assert.equal(await shown(), true, 'Esc on the hub side does not leave it either');
+    // The game's own Esc still works: from setup it steps back to the title.
+    await frame.click('#btn-new');
+    await frame.waitForFunction(() => !document.querySelector('#pane-setup').hidden);
+    await frame.focus('#opt-turns');
+    await frame.evaluate(() => document.activeElement.blur());
+    await page.keyboard.press('Escape');
+    await frame.waitForFunction(() => document.querySelector('#pane-setup').hidden && !document.querySelector('#pane-title').hidden);
+    assert.equal(await shown(), true);
+    // Back to Bored on the title screen closes the game.
+    await frame.click('#btn-leave');
+    await page.waitForFunction(() => document.querySelector('#player').hidden);
+    // In a game, Esc deselects and then opens the Menu, which has Back to Bored after What's new.
+    await page.evaluate(() => openGame('ashcrown'));
+    await page.waitForFunction(() => document.querySelector('#frame').contentDocument?.querySelector('#title-menu .fe-item'), { polling: 50 });
+    frame = await (await page.$('#frame')).contentFrame();
+    await frame.click('#btn-new');
+    await frame.waitForFunction(() => !document.querySelector('#pane-setup').hidden);
+    await frame.select('#opt-humans', '1');
+    await frame.select('#opt-cpus', '1');
+    await frame.click('#btn-begin');
+    await frame.waitForFunction(() => document.querySelector('#start').hidden && document.querySelector('#modal-layer').hidden, { polling: 50 });
+    await frame.focus('body');
+    await page.keyboard.press('Escape');
+    await frame.waitForFunction(() => !document.querySelector('#modal-layer').hidden && document.querySelector('.modal h2').textContent === 'Menu', { polling: 50 });
+    assert.equal(await shown(), true, 'Esc opened the Menu instead of leaving');
+    assert.deepEqual(await frame.$$eval('.modal .actions .act', els => els.slice(0, 3).map(e => e.textContent)), ['How to play', 'What’s new', 'Back to Bored']);
+    await frame.evaluate(() => [...document.querySelectorAll('.modal .act')].find(e => e.textContent === 'Back to Bored').click());
+    await page.waitForFunction(() => document.querySelector('#player').hidden);
+    // Every other game keeps the shortcut.
+    frame = await open('2048');
+    assert.match(await page.$eval('#hint', el => el.textContent), /Esc leaves/);
+    await frame.click('#title');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('#player').hidden);
+  });
+
   await t.test('Minigolf pointer and keyboard putts, cancellation, mobile layout and completed-round scoring', async () => {
     const frame = await openTitle('minigolf', 'Minigolf');
     await frame.waitForSelector('#course');
