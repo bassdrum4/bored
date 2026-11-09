@@ -2616,21 +2616,22 @@ function notesRig() {
 test('Ashcrown 4.6.1: the changelog is newest first, its newest entry is this version, and every entry has a date and notes', () => {
   const r = civRig(FOUR);
   const log = jsonOf(r, 'CHANGELOG');
-  assert.equal(r.run('VERSION'), '4.6.2');
+  assert.equal(r.run('VERSION'), '4.7');
   assert.equal(log[0].v, r.run('VERSION'), 'the newest entry is the current version');
   assert.deepEqual(log.map(e => [e.v, e.date, e.notes.length]), [
-    ['4.6.2', 'Nov 8', 1], ['4.6.1', 'Nov 7', 1], ['4.6', 'Nov 7', 5], ['4.5 orders', 'Nov 6', 4], ['4.5', 'Nov 6', 4], ['4.4', 'Nov 6', 2], ['4.3', 'Nov 6', 2],
+    ['4.7', 'Nov 9', 4], ['4.6.2', 'Nov 8', 1], ['4.6.1', 'Nov 7', 1], ['4.6', 'Nov 7', 5], ['4.5 orders', 'Nov 6', 4], ['4.5', 'Nov 6', 4], ['4.4', 'Nov 6', 2], ['4.3', 'Nov 6', 2],
     ['4.2.1–4.2.3', 'Nov 6', 3], ['4.2', 'Nov 6', 3], ['4.1', 'Nov 6', 2], ['4.0', 'Nov 4', 7], ['Before 4.0', 'Nov 3–4', 4]
   ], 'the entries, in order, with their dates and how many notes each has');
   for (const e of log) {
     assert.ok(e.v && e.date && e.notes.length >= 1, 'entry ' + e.v + ' has a version, a date and a note');
     for (const n of e.notes) assert.ok(typeof n === 'string' && n.length > 0 && !/["']/.test(n), 'notes use typographic quotes: ' + n);
   }
-  assert.equal(log[0].notes[0], 'How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.');
-  assert.equal(log[1].notes[0], 'A What’s new screen: patch notes for every update, on the title screen and in the Menu.');
-  assert.equal(log[3].notes[1], 'Attacking someone you’re at peace with asks “Declare war?” first.');
-  assert.equal(log[4].notes[2], 'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.');
-  assert.equal(log[11].notes[3], '3.0: a research revamp, a science victory, and up to 8 players.');
+  assert.equal(log[0].notes[0], 'Army upkeep: 2 soldiers per city are free, and each extra one costs its city 1 production a turn.');
+  assert.equal(log[1].notes[0], 'How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.');
+  assert.equal(log[2].notes[0], 'A What’s new screen: patch notes for every update, on the title screen and in the Menu.');
+  assert.equal(log[4].notes[1], 'Attacking someone you’re at peace with asks “Declare war?” first.');
+  assert.equal(log[5].notes[2], 'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.');
+  assert.equal(log[12].notes[3], '3.0: a research revamp, a science victory, and up to 8 players.');
 });
 
 test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a first visit, and a new version brings it back', () => {
@@ -2641,7 +2642,7 @@ test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a f
   assert.equal(r.run('notesNew()'), true);
   // Opening the screen stores the version and takes the tag off at once.
   r.run('showWhatsNew()');
-  assert.equal(r.prefs().notesSeen, '4.6.2', 'stored under the prefs key through writePref');
+  assert.equal(r.prefs().notesSeen, '4.7', 'stored under the prefs key through writePref');
   assert.equal(r.prefs().tips, false, 'the other prefs are left alone');
   assert.equal(r.els['notes-tag'].hidden, true, 'the tag is gone behind the open screen');
   assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'and stays gone');
@@ -2657,7 +2658,7 @@ test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a f
 test('Ashcrown 4.6.1: a first visit (no prefs and no saves) starts with the notes seen, so the Tutorial is the only tag', () => {
   let r = notesRig();
   r.run('firstVisitNotes()');
-  assert.equal(r.prefs().notesSeen, '4.6.2');
+  assert.equal(r.prefs().notesSeen, '4.7');
   assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'no New tag, and the Tutorial tag stays');
   // Prefs but no saves, or saves but no prefs: not new here, so the tag shows.
   r = notesRig();
@@ -2689,17 +2690,17 @@ test('Ashcrown 4.6.1: the What’s new screen opens the newest entry, folds ever
   const r = notesRig();
   r.run('showWhatsNew()');
   const html = r.modals.at(-1);
-  assert.match(html, /<h2>What’s new<\/h2><span class="sub">Civ Lite 4\.6\.2<\/span>/, 'head and sub');
+  assert.match(html, /<h2>What’s new<\/h2><span class="sub">Civ Lite 4\.7<\/span>/, 'head and sub');
   assert.equal(r.run('UI.modalKind'), 'notes');
-  assert.ok(html.includes('<h3 class="notes-now">4.6.2 · Nov 8</h3>'), 'the newest entry is open at the top as version · date');
+  assert.ok(html.includes('<h3 class="notes-now">4.7 · Nov 9</h3>'), 'the newest entry is open at the top as version · date');
   assert.ok(html.includes('<li>How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.</li>'));
   assert.ok(html.includes('<li>A What’s new screen: patch notes for every update, on the title screen and in the Menu.</li>'));
   const details = html.match(/<details[^>]*>/g) || [];
-  assert.equal(details.length, 11, 'every older entry is a details element');
+  assert.equal(details.length, 12, 'every older entry is a details element');
   assert.ok(details.every(d => d === '<details class="notes-old">'), 'all of them closed');
   assert.ok(html.includes('<summary>4.6.1 · Nov 7</summary>') && html.includes('<summary>4.6 · Nov 7</summary>') && html.includes('<summary>Before 4.0 · Nov 3–4</summary>') && html.includes('<summary>4.2.1–4.2.3 · Nov 6</summary>'));
   assert.ok(html.indexOf('<summary>4.6 · Nov 7</summary>') < html.indexOf('<summary>4.5 · Nov 6</summary>') && html.indexOf('<summary>4.5 · Nov 6</summary>') < html.indexOf('<summary>Before 4.0'), 'newest first');
-  assert.equal((html.match(/<li>/g) || []).length, 1 + 1 + 5 + 4 + 4 + 2 + 2 + 3 + 3 + 2 + 7 + 4, 'every note is listed once');
+  assert.equal((html.match(/<li>/g) || []).length, 4 + 1 + 1 + 5 + 4 + 4 + 2 + 2 + 3 + 3 + 2 + 7 + 4, 'every note is listed once');
   assert.ok(html.includes('Attacking someone you’re at peace with asks “Declare war?” first.'));
   assert.match(html, /<div class="modal-foot"><button class="btn primary" data-act="close">Close<\/button><\/div>/, 'a Close button at the bottom');
   // The in-game Menu opens the same screen and shows no tag.
@@ -2748,7 +2749,7 @@ function helpRig() {
 test('Ashcrown 4.6.2: How to play is one list of sections, grouped, and the old text is only reordered', () => {
   const r = helpRig();
   const secs = jsonOf(r, 'helpSections()');
-  assert.equal(r.run('VERSION'), '4.6.2');
+  assert.equal(r.run('VERSION'), '4.7');
   assert.equal(secs.length, 26);
   assert.equal(new Set(secs.map(s => s.id)).size, 26, 'ids are unique');
   assert.deepEqual([...new Set(secs.map(s => s.group))], HELP_GROUPS.map(g => g[0]), 'the groups, in order');
@@ -2888,4 +2889,84 @@ test('Ashcrown 4.6.2: the closing tip links to How borders work, and nothing els
   r.run('G = null');
   r.act('help:keys');
   assert.equal(r.focused.at(-1)[0], 'keys');
+});
+
+/* ── 4.7: army upkeep, obsolete warriors, CPUs that attack with a plan, stalemates, who is at war ── */
+
+test('Ashcrown 4.7: 2 soldiers per city are free, and each extra one costs its home city 1 production, never below 0', () => {
+  const r = ordersRig();
+  const a = r.city(0, 4, 5), b = r.city(0, 10, 9);
+  for (let k = 0; k < 4; k++) r.unit(0, 'warrior', 5 + k, 6);
+  assert.equal(r.run('armyFree(0)'), 4);
+  assert.equal(r.run('upkeepCharges(0).size'), 0, '4 soldiers for 2 cities cost nothing');
+  r.unit(0, 'warrior', 5, 7); r.unit(0, 'warrior', 6, 7);
+  const charged = r.run('[...upkeepCharges(0).values()].reduce((n, k) => n + k, 0)');
+  assert.equal(charged, 2, '6 soldiers for 2 cities: 2 pay');
+  const cost = r.run('cityYields(cityAt(4, 5)).armyCost + cityYields(cityAt(10, 9)).armyCost');
+  assert.equal(cost, 2, 'and the cities pay it in production');
+  assert.ok(r.run('cityYields(cityAt(4, 5)).prod') >= 0 && r.run('cityYields(cityAt(10, 9)).prod') >= 0, 'never below 0');
+  assert.ok(r.run('realmPanel()').includes('Army: 6 units, 4 free, upkeep 2 production a turn.'), 'the realm panel says so');
+  void a; void b;
+});
+
+test('Ashcrown 4.7: warriors cost 30 and are not offered once you know Iron Working', () => {
+  const r = ordersRig();
+  r.city(0, 4, 5);
+  assert.equal(r.run('UNITS.warrior.cost'), 30);
+  assert.equal(r.run('UNITS.terracotta.cost'), 30, 'the Terracotta Warrior follows the warrior');
+  assert.equal(r.run('buildProblem(cityAt(4, 5), { kind: "unit", id: "warrior" })'), '');
+  r.run('pl(0).techs.push("mining", "bronze", "ironworking")');
+  assert.equal(r.run('buildProblem(cityAt(4, 5), { kind: "unit", id: "warrior" })'), 'Obsolete after Iron Working');
+  assert.equal(r.run('unlockedFor(0, UNITS.warrior)'), false, 'so the build list hides it');
+  assert.equal(r.run('unlockedFor(0, UNITS.spearman)'), true);
+});
+
+test('Ashcrown 4.7: a CPU only goes for a city when its force nearby is clearly stronger, with archers once it can build them', () => {
+  const r = ordersRig();
+  r.city(1, 10, 5);
+  r.war(3, 1);
+  const ready = () => r.run('aiReadyFor(pl(3), cityAt(10, 5), ownUnits(3).filter(u => isMil(u.type)))');
+  r.unit(3, 'warrior', 8, 5); r.unit(3, 'warrior', 8, 6);
+  assert.equal(r.run('cityStrength(cityAt(10, 5))'), 28);
+  assert.equal(ready(), false, '40 strength against a city holding 28: not enough');
+  r.unit(3, 'warrior', 8, 4);
+  assert.equal(ready(), true, '60 is at least 1.5 times 28');
+  r.run('pl(3).techs.push("archery")');
+  assert.equal(ready(), false, 'once it can build archers, one must come');
+  r.unit(3, 'archer', 7, 5);
+  assert.equal(ready(), true);
+  r.unit(1, 'swordsman', 11, 5);
+  assert.equal(ready(), false, 'a swordsman next to the city counts too: 85 against 1.5 times 63');
+});
+
+test('Ashcrown 4.7: 20 turns of war with no city changing hands is a stalemate, and the CPU wants peace', () => {
+  const r = ordersRig();
+  r.war(2, 3);
+  r.run('G.turn = 40; G.warSince[2][3] = G.warSince[3][2] = 30');
+  assert.equal(r.run('stalemate(2, 3)'), false, '10 turns is not yet');
+  r.run('G.warSince[2][3] = G.warSince[3][2] = 20');
+  assert.equal(r.run('stalemate(2, 3)'), true, '20 turns with nothing taken');
+  assert.equal(r.run('aiWantsPeace(pl(2), pl(3))'), true);
+  r.run('noteTake(3, 2)');
+  assert.equal(r.run('stalemate(2, 3)'), false, 'a city that just changed hands resets it');
+  assert.equal(r.run('stalemate(0, 1)'), false, 'at peace is never a stalemate');
+});
+
+test('Ashcrown 4.7: the Council and the realm panel show who is at war with whom, without naming civs you have not met', () => {
+  const r = ordersRig();
+  r.run('G.met = G.players.map(a => G.players.map(b => a.i === b.i))');
+  r.war(2, 3);
+  r.meetOnly(0, 2);
+  r.seat(0);
+  assert.equal(r.run('warLine(0, pl(2))'), 'At war with: 1 civ you haven’t met');
+  assert.equal(r.run('warsList(0).length'), 0, 'a war with a civ you have not met is not listed');
+  r.meetOnly(0, 3);
+  assert.equal(r.run('warLine(0, pl(2))'), 'At war with: Japan');
+  assert.equal(r.run('warLine(0, pl(1))'), 'At peace with everyone');
+  assert.equal(r.run('warsList(0).map(w => w.a.i + "-" + w.b.i).join()'), '2-3');
+  r.run('showCouncil()');
+  const html = r.modals.at(-1);
+  assert.ok(html.includes('<h3>Wars</h3>') && html.includes('China') && html.includes('Since turn'), 'the Wars list');
+  assert.ok(html.includes('At war with: Japan'), 'and the line on China’s row');
+  assert.ok(r.run('realmPanel()').includes('At war with: China'), 'the realm panel too');
 });

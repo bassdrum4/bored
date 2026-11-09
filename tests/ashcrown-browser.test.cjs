@@ -363,13 +363,13 @@ for (const width of [400, 320]) {
     const modalText = () => page.evaluate('(() => { const m = document.querySelector(".modal"); return m && m.offsetParent !== null ? m.textContent : ""; })()');
     // The notes screen as it should look when first opened.
     const checkOpenScreen = async label => {
-      assert.match(await modalText(), /What’s new\s*Civ Lite 4\.6\.2/, label + ': head and sub');
-      assert.equal(await page.$eval('.modal .notes-now', e => e.textContent), '4.6.2 · Nov 8', label + ': the newest entry is open at the top');
-      assert.ok((await page.$eval('.modal .notes-now + .notes-list', e => e.textContent)).startsWith('How to play has a contents list'));
+      assert.match(await modalText(), /What’s new\s*Civ Lite 4\.7/, label + ': head and sub');
+      assert.equal(await page.$eval('.modal .notes-now', e => e.textContent), '4.7 · Nov 9', label + ': the newest entry is open at the top');
+      assert.ok((await page.$eval('.modal .notes-now + .notes-list', e => e.textContent)).startsWith('Army upkeep: 2 soldiers per city are free'));
       const folds = await page.$$eval('.modal details.notes-old', ds => ds.map(d => ({ open: d.open, summary: d.querySelector('summary').textContent })));
-      assert.equal(folds.length, 11, label + ': eleven older entries');
+      assert.equal(folds.length, 12, label + ': twelve older entries');
       assert.ok(folds.every(f => !f.open), label + ': all folded');
-      assert.deepEqual(folds.slice(0, 2).map(f => f.summary), ['4.6.1 · Nov 7', '4.6 · Nov 7']);
+      assert.deepEqual(folds.slice(0, 2).map(f => f.summary), ['4.6.2 · Nov 8', '4.6.1 · Nov 7']);
       assert.equal(folds.at(-1).summary, 'Before 4.0 · Nov 3–4');
       assert.deepEqual(await page.evaluate(fits), [], label + ': fits');
     };
@@ -377,7 +377,7 @@ for (const width of [400, 320]) {
     // A first visit (no prefs, no saves) is quiet: no New tag, and the Tutorial's tag is the only one.
     assert.equal(await visible('#notes-tag'), false, 'no New tag on a first visit');
     assert.equal(await visible('#tut-tag'), true, 'the Tutorial still says where to start');
-    assert.equal((await prefs()).notesSeen, '4.6.2', 'the notes were quietly marked seen');
+    assert.equal((await prefs()).notesSeen, '4.7', 'the notes were quietly marked seen');
 
     // Someone who has played before and has not read these notes: the tag shows, styled like the Tutorial's.
     await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ tips: true, notesSeen: '4.6' })), PREFS);
@@ -398,11 +398,11 @@ for (const width of [400, 320]) {
     await page.click('#btn-notes');
     await checkOpenScreen('title');
     assert.equal(await visible('#notes-tag'), false, 'opening the screen takes the tag off');
-    assert.equal((await prefs()).notesSeen, '4.6.2');
+    assert.equal((await prefs()).notesSeen, '4.7');
     // A real click on an older entry opens it, and only that one.
     await page.click('.modal details.notes-old summary');
     assert.deepEqual(await page.$$eval('.modal details.notes-old', ds => ds.map(d => d.open).slice(0, 3)), [true, false, false]);
-    assert.ok((await page.$eval('.modal details.notes-old[open]', e => e.textContent)).includes('A What’s new screen: patch notes'));
+    assert.ok((await page.$eval('.modal details.notes-old[open]', e => e.textContent)).includes('How to play has a contents list'));
     // Everything open: still no sideways scroll, and the list scrolls inside the box with Close in reach.
     await page.evaluate(() => document.querySelectorAll('.modal details').forEach(d => { d.open = true; }));
     assert.deepEqual(await page.evaluate(fits), [], 'all entries open: fits');
