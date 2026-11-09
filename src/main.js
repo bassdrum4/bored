@@ -43,6 +43,10 @@ function challengeDate(...args) {
 }
 if (typeof window !== 'undefined') window.dailyDate = defaultDailyDate;
 
+// Games that use Esc themselves: Bored leaves its Esc-closes-the-game shortcut out of their document (the
+// game has its own Back to Bored button, in its Menu and on its title screen). Every other game still closes on Esc.
+const OWNS_ESCAPE = new Set(['ashcrown']);
+
 /* ── DOM handles ──────────────────────────────────────────────────────────── */
 
 const $ = selector => document.querySelector(selector);
@@ -271,18 +275,20 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       // overwrite it and let a re-deal reroll the shared board.
       html = multiplayer?.mode === 'duel' ? html : injectSeed(html);
       if (multiplayer) html = multiplayer.document(html);
-      let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
+      let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};' + (OWNS_ESCAPE.has(slug) ? '' : 'if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}') + 'if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
       gameFrame.removeAttribute('src');
       // The resume helper runs before the game's own script, so a game can offer a
       // saved position while it wires itself up.
       // A match keeps its position on the server, so its document gets an inert
       // helper and never touches this device's saved run for the game.
       gameFrame.srcdoc = injectHead(html, resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head);
+      const ownsEsc = OWNS_ESCAPE.has(slug);
       showHint(multiplayer
         ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player'
-          : multiplayer.mode === 'live' ? 'Live game · Esc returns to Bored Together and the game keeps going'
-          : 'Your turn saves automatically · Esc returns to Bored Together'
-        : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
+          : multiplayer.mode === 'live' ? 'Live game · leave from the game’s Menu (it keeps going)'
+          : ownsEsc ? 'Your turn saves automatically · Menu → Back to Bored returns to Bored Together' : 'Your turn saves automatically · Esc returns to Bored Together'
+        : ownsEsc ? 'Click or tap to play · Esc is the game’s own key · Menu → Back to Bored leaves · Shift+R restarts · Shift+F fullscreen'
+          : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
     };
     const fail = () => {
       if (token !== loadToken) return;
@@ -911,6 +917,7 @@ addEventListener('keydown', event => {
     else if (fullscreenElement()) { event.preventDefault(); leaveFullscreen(); }
     // Leaving a game and leaving a page both end at the hub's home. A duel asks
     // to send the run first, and that prompt must stay on its own view.
+    else if (activeSlug && OWNS_ESCAPE.has(activeSlug)) gameFrame.focus();   // the game's own Esc: back into it, never out
     else if (activeSlug && Date.now() - leftFullscreenAt > 500) { closeGame(); if (!activeSlug) navigation.goHome(); }
     else if (!activeSlug) navigation.goHome();
   } else if (activeSlug && !typing && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {

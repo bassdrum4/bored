@@ -153,9 +153,12 @@ test('a move on one screen shows on the other at once, and ending turns moves th
 test('the Menu: no Save or Load, and "Leave game (it keeps going)"; leaving hands the civ to a CPU for everyone', async t => {
   const { live, pages } = await started(t, { cpus: 1 });
   const [ann, ben] = pages;
+  // On Bored the game is in a frame; a live game still has one way out, so Back to Bored is not offered.
+  await ann.evaluate('embedded = () => true');
   await ann.evaluate('onAction("menu")');
   const labels = await ann.$$eval('#modal .act', els => els.map(e => e.textContent));
   assert.ok(labels.some(l => l.startsWith('Leave game (it keeps going)')), labels.join(' | '));
+  assert.ok(!labels.some(l => /Back to Bored/.test(l)), 'no second way out in a live game: ' + labels.join(' | '));
   assert.ok(!labels.some(l => /Save|Load|tutorial|Quit to the main menu/i.test(l)), labels.join(' | '));
   assert.equal(await ann.evaluate('slotList().length'), 0);
   // The game never writes to the local slots.
