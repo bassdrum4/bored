@@ -72,6 +72,7 @@ export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reloa
   let game = null, delivered = null, head = 0, stopped = false, active = false, socketOpen = false, realtime = null;
   let syncing = null, again = false, lobbyTimer = 0, fallbackTimer = 0, beatTimer = 0;
   let online = true, failures = 0, seats = '', seatsAt = 0, reloads = [];
+  let pingHead = null, pinging = null;   // co-op map pings: the newest one heard, and a poll under way
   const buffer = new Map();
 
   const tell = event => { if (!stopped) { try { emit(event); } catch (error) { /* the page's problem */ } } };
@@ -170,6 +171,33 @@ export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reloa
     } catch (error) { /* the next one tries again */ }
   }
 
+  // Map pings are not game actions and never touch the log. They come in over Realtime, or by polling when there is no
+  // socket, and go to the page as they are. Only co-op rooms have them.
+  const coop = () => !!(game && game.config && game.config.mode === 'coop');
+  function hearPing(r) {
+    if (!r || !Number.isInteger(Number(r.id)) || !coop()) return;
+    const id = Number(r.id);
+    if (pingHead !== null && id <= pingHead) return;
+    pingHead = id;
+    const seat = Number(r.seat), x = Number(r.x), y = Number(r.y);
+    if (Number.isInteger(seat) && Number.isInteger(x) && Number.isInteger(y)) tell({ event: 'ping', seat, x, y });
+  }
+  // The first read only learns where the pings stand, so a ping from before this screen opened is not shown late.
+  function pollPings() {
+    if (pinging || stopped || !coop()) return pinging;
+    pinging = (async () => {
+      try {
+        const first = pingHead === null;
+        const r = await api('pings', first ? {} : { after: pingHead });
+        if (stopped) return;
+        if (first) { pingHead = Number(r.head) || 0; return; }
+        for (const p of r.pings || []) hearPing(p);
+      } catch (error) { /* the next poll tries again */ }
+      finally { pinging = null; }
+    })();
+    return pinging;
+  }
+
   // The room is running: listen for new actions, and keep poking the server so the others know we are here.
   function activate() {
     if (active || stopped) return;
@@ -178,13 +206,14 @@ export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reloa
     if (subscribe) {
       realtime = subscribe({
         topic: 'live-' + id,
-        changes: [{ event: 'INSERT', schema: 'bored_live', table: 'actions', filter: 'game_id=eq.' + id }],
-        onChange: record => ingest([record]),
+        changes: [{ event: 'INSERT', schema: 'bored_live', table: 'actions', filter: 'game_id=eq.' + id }].concat(
+          coop() ? [{ event: 'INSERT', schema: 'bored_live', table: 'pings', filter: 'game_id=eq.' + id }] : []),
+        onChange: (record, change) => (change && change.table === 'pings' ? hearPing(record) : ingest([record])),
         onState: open => { socketOpen = open; if (open) catchUp(); }
       });
     }
     // Without a socket the log is read once a second; with one it is only the heartbeat's check that nothing slipped by.
-    fallbackTimer = repeat(() => { if (!socketOpen) catchUp(); }, every.fallback);
+    fallbackTimer = repeat(() => { if (!socketOpen) { catchUp(); pollPings(); } }, every.fallback);
     beatTimer = repeat(heartbeat, every.heartbeat);
   }
   // The game has ended or been cancelled: nothing more will come.
@@ -292,6 +321,12 @@ export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reloa
       case 'start': { const g = await api('start', {}); setGame(g, false); return g; }
       case 'leave': { const g = await api('leave_lobby', {}); setGame(g, false); return g; }
       case 'send': return send(p);
+      case 'ping': {
+        if (!coop()) throw new Error('Pings are for co-op games.');
+        const x = Number(p.x), y = Number(p.y);
+        if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x > 255 || y > 255) throw new Error('Nothing to ping.');
+        return api('ping', { x, y });
+      }
       case 'report': return api('report', { round: p.round, hash: p.hash });
       case 'snapshot': return api('snapshot', { round: p.round, seq: p.seq, hash: p.hash, state: p.state });
       case 'finish': { const g = await api('finish', { winner: p.winner, why: p.why }); settle(); return g; }

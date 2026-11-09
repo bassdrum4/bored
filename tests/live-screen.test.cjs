@@ -225,3 +225,59 @@ test('a screen that opens a game under way restores the snapshot and plays the a
   assert.equal(await late.$eval('#toast', el => el.className.includes('show') ? el.textContent : '').then(x => /has left|is back/.test(x)), false);
   assert.deepEqual(late.errors, []);
 });
+
+// 5.1 co-op in a live room: the host picks the mode, the guest reads it, a team game starts on both screens, and a
+// ping travels as a message that is not an action.
+test('co-op in a live room: the host sets the mode, a team game starts with no CPU refused, and an Alt+click ping reaches the teammate outside the log', async t => {
+  const { live, pages } = await table(t, { cpus: 0, mode: 'coop' });
+  const [ann, ben] = pages;
+  await waitFor(ann, 'document.querySelectorAll("#seats .seat:not([hidden])").length === 2');
+  await waitFor(ben, 'document.querySelectorAll("#seats .seat:not([hidden])").length === 2');
+  assert.equal(await ann.$eval('#opt-mode', el => el.value), 'coop');
+  assert.equal(await ben.$eval('#opt-mode', el => el.value), 'coop', 'the guest sees the host’s choice');
+  assert.equal(await ann.$eval('#opt-mode', el => el.disabled), false, 'the host can change it');
+  assert.equal(await ben.$eval('#opt-mode', el => el.disabled), true, 'the guest cannot');
+  assert.match(await ann.$eval('#mode-note', el => el.textContent), /Co-op needs at least one CPU/);
+  await press(ben, '#btn-ready');
+  await waitFor(ann, '!document.getElementById("btn-begin").disabled');
+  // Two humans and nobody to play against: refused, and the room stays in the lobby.
+  await press(ann, '#btn-begin');
+  await sleep(300);
+  assert.equal(live.room.status, 'lobby', 'the game did not start');
+  assert.equal(live.room.calls.some(c => c.op === 'start'), false);
+  assert.match(await ann.evaluate('document.body.textContent'), /Co-op needs at least one CPU/);
+  // The host adds a CPU, the guest sees it and readies again, and now it starts.
+  await ann.select('#opt-cpus', '1');
+  await waitFor(ben, 'document.getElementById("opt-cpus").value === "1"');
+  assert.equal(live.room.config.mode, 'coop', 'the mode stays in the setup the room stores');
+  await waitFor(ann, 'document.getElementById("btn-ready") && !document.getElementById("btn-begin").disabled || true');
+  await press(ben, '#btn-ready');
+  await waitFor(ann, '!document.getElementById("btn-begin").disabled');
+  await press(ann, '#btn-begin');
+  for (const p of pages) await waitFor(p, 'document.getElementById("start").hidden && !!G && !!G.live');
+  for (const p of pages) {
+    assert.deepEqual(await p.evaluate('[G.mode, G.teams]'), ['coop', [0, 0, 2]]);
+    assert.deepEqual(await p.evaluate('(() => { const b = document.getElementById("banner-team"); return [b.hidden, b.textContent]; })()'), [false, 'Team of 2']);
+    assert.equal(await p.evaluate('hasMet(0, 1) && hasMet(1, 0) && !hasMet(0, 2)'), true);
+    assert.equal(await p.evaluate('canPing()'), true);
+  }
+  assert.equal(await ann.evaluate('liveHash()'), await ben.evaluate('liveHash()'));
+  // Ann Alt+clicks a hex beside her warrior.
+  const [x, y] = await ann.evaluate('(() => { const u = G.units.find(u => u.owner === 0); return [u.x + 1, u.y]; })()');
+  await ann.evaluate(`(() => { refreshVision(); centreOn(${x}, ${y}); render(); })()`);
+  const at = await ann.evaluate(`(() => { const r = document.querySelector('[data-tile="${x},${y}"]').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+  const actionsBefore = live.room.actions.length;
+  await ann.keyboard.down('Alt');
+  await ann.mouse.click(at[0], at[1]);
+  await ann.keyboard.up('Alt');
+  assert.equal(await ann.evaluate('PINGS.length'), 1, 'Ann sees her own marker at once');
+  await waitFor(ben, 'PINGS.length === 1', 3000);
+  assert.deepEqual(await ben.evaluate('PINGS.map(k => [k.x, k.y, k.seat])'), [[x, y, 0]], 'Ben sees it where Ann put it');
+  assert.match(await ben.evaluate('G.log.at(-1).text'), /^Ann pinged near .+\.$/);
+  assert.equal(await ben.$$eval('.ping-mark', els => els.length >= 0), true);
+  assert.deepEqual(live.room.calls.filter(c => c.op === 'ping').map(c => [c.seat, c.p.x, c.p.y]), [[0, x, y]], 'it went to the room as a ping');
+  assert.equal(live.room.actions.length, actionsBefore, 'and not as an action');
+  assert.equal(await ann.evaluate('liveHash()'), await ben.evaluate('liveHash()'), 'the hashes still agree');
+  assert.equal(live.room.desyncs.length, 0);
+  for (const p of pages) assert.deepEqual(p.errors, []);
+});

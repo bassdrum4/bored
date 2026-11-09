@@ -7,7 +7,7 @@ function createRoom(handles, config) {
   const room = {
     status: 'lobby', config: Object.assign({ map: 'pangaea', size: 'small', level: 'normal', borders: 'tech', turns: 100, cpus: 1, timer: 0, wrap: false, conquest: true, science: true, unjoined: 'cpu' }, config || {}),
     seats: handles.map((handle, i) => ({ seat: i, handle, state: i === 0 ? 'joined' : 'invited', civ: null, controller: 'human', online: true, away: 0, team: i })),
-    start: null, head: 0, round: 1, actions: [], snapshots: new Map(), hashes: new Map(), desyncs: [], pages: new Map(), calls: [], exits: [], reloads: []
+    start: null, head: 0, round: 1, actions: [], snapshots: new Map(), hashes: new Map(), desyncs: [], pages: new Map(), calls: [], exits: [], reloads: [], pings: []
   };
   const timer = () => room.config.timer || 0;
   const json = seat => ({
@@ -78,6 +78,15 @@ function createRoom(handles, config) {
       // The sender gets its answer, and every page (its own too) gets the action, a moment apart as on a real network.
       setTimeout(() => push({ event: 'actions', actions: [action] }), 5);
       return { seq: action.seq, duplicate: false, head: room.head };
+    }
+    // 5.1: a map ping goes to the other seats as its own message. It is not an action and never enters the log.
+    if (op === 'ping') {
+      if (room.status !== 'active') throw new Error('This game is not running.');
+      if (room.config.mode !== 'coop') throw new Error('Pings are for co-op games.');
+      if (!Number.isInteger(p.x) || !Number.isInteger(p.y)) throw new Error('Invalid request.');
+      room.pings.push({ seat, x: p.x, y: p.y });
+      for (const [other] of room.pages) if (other !== seat) setTimeout(() => push({ event: 'ping', seat, x: p.x, y: p.y }, other), 5);
+      return { id: room.pings.length };
     }
     if (op === 'report') {
       const key = p.round + ':' + seat;

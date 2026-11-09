@@ -274,6 +274,81 @@ async function functional(t,env) {
     await env.admin("delete from bored_live.games where host=$1",[D]);
   });
 
+  await t.test('co-op: the mode setup is checked, and pings reach seated players of a co-op room only, never the action log',async()=>{
+    await rejects(env.rpc(A,'create',{game:'ashcrown',invite:[B],config:{mode:'teams'}}),/Invalid setup/);
+    await rejects(env.rpc(A,'create',{game:'ashcrown',invite:[B],config:{mode:3}}),/Invalid setup/);
+    await rejects(env.rpc(A,'create',{game:'ashcrown',invite:[B],config:{mode:null}}),/Invalid setup/);
+    const lobby=await env.rpc(A,'create',{game:'ashcrown',invite:[B],config:{map:'pangaea',mode:'coop'}});
+    assert.equal((await env.admin('select config from bored_live.games where id=$1',[lobby.id]))[0].config.mode,'coop','the setup keeps the mode');
+    await rejects(env.rpc(A,'ping',{id:lobby.id,x:3,y:3}),/not running/);
+    await env.rpc(A,'leave_lobby',{id:lobby.id});
+    const ffa=await env.rpc(A,'create',{game:'ashcrown',invite:[B,C],config:{map:'pangaea',cpus:1,mode:'ffa'}});
+    await env.rpc(B,'join',{id:ffa.id}); await env.rpc(C,'join',{id:ffa.id});
+    await env.rpc(B,'lobby_set',{id:ffa.id,ready:true,civ:'ember'}); await env.rpc(C,'lobby_set',{id:ffa.id,ready:true,civ:'tide'});
+    await env.rpc(A,'start',{id:ffa.id});
+    await rejects(env.rpc(A,'ping',{id:ffa.id,x:3,y:3}),/Pings are for co-op games/);
+    await rejects(env.rpc(A,'pings',{id:ffa.id}),/Pings are for co-op games/);
+    await env.rpc(A,'leave',{id:ffa.id}).catch(()=>{});
+    await env.admin("update bored_live.games set status='completed' where id=$1",[ffa.id]);
+
+    const g=await startedGame(env,{mode:'coop'});
+    const id=g.id;
+    assert.equal(g.config.mode,'coop','the room hands the mode to every client');
+    const before=await env.rpc(A,'sync',{id,after:0});
+    const mine=await env.rpc(A,'ping',{id,x:4,y:7});
+    assert.ok(Number(mine.id)>0);
+    const theirs=await env.rpc(C,'ping',{id,x:12,y:2});
+    assert.ok(Number(theirs.id)>Number(mine.id));
+    // A teammate reads them by polling, in order, from where they left off, with the seat from the caller.
+    const seen=await env.rpc(B,'pings',{id});
+    assert.deepEqual(seen.pings.map(p=>[p.seat,p.x,p.y]),[[0,4,7],[2,12,2]]);
+    assert.equal(Number(seen.head),Number(theirs.id));
+    assert.deepEqual((await env.rpc(B,'pings',{id,after:Number(mine.id)})).pings.map(p=>[p.seat,p.x,p.y]),[[2,12,2]]);
+    assert.deepEqual((await env.rpc(B,'pings',{id,after:Number(theirs.id)})).pings,[]);
+    // A ping is not an action: the log, the round and the hashes are exactly as they were.
+    const after=await env.rpc(A,'sync',{id,after:0});
+    assert.deepEqual([after.head,after.round,(after.actions||[]).length],[before.head,before.round,(before.actions||[]).length]);
+    assert.equal((await env.admin('select count(*)::int n from bored_live.actions where game_id=$1',[id]))[0].n,0);
+    assert.equal((await env.admin('select count(*)::int n from bored_live.hashes where game_id=$1',[id]))[0].n,0);
+    // Bad input and wrong callers.
+    for(const bad of [{x:-1,y:3},{x:'3',y:3},{x:3},{y:3},{x:256,y:3},{x:3,y:1000},{x:1.5,y:3},{x:null,y:3},{x:[3],y:3},{}])
+      await rejects(env.rpc(A,'ping',{id,...bad}),/Invalid request/);
+    await rejects(env.rpc(A,'pings',{id,after:-1}),/Invalid request/);
+    await rejects(env.rpc(A,'pings',{id,after:'1'}),/Invalid request/);
+    await rejects(env.rpc(A,'ping',{x:3,y:3}),/Invalid request/);
+    await rejects(env.rpc(A,'ping',{id:'not-a-uuid',x:3,y:3}),/Invalid request/);
+    await rejects(env.rpc(A,'ping',{id:randomUUID(),x:3,y:3}),/not found/);
+    await rejects(env.rpc(E,'ping',{id,x:3,y:3}),/not in this game/);
+    await rejects(env.rpc(E,'pings',{id}),/not in this game/);
+    await rejects(env.rpc(F,'ping',{id,x:3,y:3}),/Join Bored Together first/);
+    await rejects(env.rpc(ANON,'ping',{id,x:3,y:3}),/Sign in to your Bored account/);
+    await rejects(env.rpc(null,'ping',{id,x:3,y:3}),/permission denied/);
+    // Old pings: not served after fifteen seconds, and dropped as a new one comes in after a minute.
+    await env.admin("update bored_live.pings set at=now()-interval '20 seconds' where game_id=$1",[id]);
+    assert.deepEqual((await env.rpc(B,'pings',{id})).pings,[]);
+    await env.admin("update bored_live.pings set at=now()-interval '2 minutes' where game_id=$1",[id]);
+    await env.rpc(B,'ping',{id,x:1,y:1});
+    assert.deepEqual((await env.admin('select seat,x,y from bored_live.pings where game_id=$1 order by id',[id])).map(r=>[r.seat,r.x,r.y]),[[1,1,1]]);
+    // A seated player's direct read (Realtime reads as the subscriber); nobody else's, and no writes at all.
+    assert.equal((await env.asUser(B,'select id from bored_live.pings where game_id=$1',[id])).length,1);
+    assert.equal((await env.asUser(E,'select id from bored_live.pings where game_id=$1',[id])).length,0);
+    await rejects(env.asUser(null,'select id from bored_live.pings'),/permission denied/);
+    await rejects(env.asUser(B,'insert into bored_live.pings(game_id,seat,x,y) values($1,1,1,1)',[id]),/permission denied/);
+    await rejects(env.asUser(B,'update bored_live.pings set x=2'),/permission denied/);
+    await rejects(env.asUser(B,'delete from bored_live.pings'),/permission denied/);
+    await rejects(env.asUser(null,"select bored_live.ping_api('ping',jsonb_build_object('id',$1::text,'x',1,'y',1))",[id]),/permission denied/);
+    // Pings are rate limited on their own, far below the action limit.
+    let sent=0,limited=false;
+    try { for(;sent<30;sent++) await env.rpc(A,'ping',{id,x:2,y:2}); } catch(error) { limited=/Too many requests/.test(error.message); }
+    assert.ok(limited&&sent>=6&&sent<=16,'stopped after '+sent);   // eight a window, and A pinged once above
+    await env.admin("delete from bored_together.limits where bucket like 'live%'");
+    // Ending the game takes its pings with it when the room is cleaned up.
+    await env.rpc(B,'finish',{id,winner:1,why:'Conquest'});
+    await rejects(env.rpc(A,'ping',{id,x:3,y:3}),/not running/);
+    await env.admin("delete from bored_live.games where id=$1",[id]);
+    assert.equal((await env.admin('select count(*)::int n from bored_live.pings where game_id=$1',[id]))[0].n,0);
+  });
+
   await t.test('nothing outside the RPC is open: tables, other users rows, and the schema',async()=>{
     const g=await startedGame(env);
     const id=g.id;
@@ -289,7 +364,7 @@ async function functional(t,env) {
     await rejects(env.asUser(B,'select bored_live.cleanup()'),/permission denied/);
     await rejects(env.asUser(null,"select bored_live.api('list','{}'::jsonb)"),/permission denied/);
     const rls=await env.admin("select relname,relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='bored_live' and relkind='r' order by relname");
-    assert.deepEqual(rls.map(r=>r.relname),['actions','desyncs','games','hashes','presence','seats','snapshots']);
+    assert.deepEqual(rls.map(r=>r.relname),['actions','desyncs','games','hashes','pings','presence','seats','snapshots']);
     assert.ok(rls.every(r=>r.relrowsecurity===true));
   });
 
@@ -376,4 +451,16 @@ test('the live migration is purely additive',()=>{
   assert.ok(!/alter\s+table\s+bored_together/i.test(sql),'the async tables are untouched');
   assert.ok(!/(create|replace)\s+function\s+(public\.bt_rpc|bored_together\.api)/i.test(sql),'the async API is untouched');
   assert.match(sql,/create function public\.bt_live_rpc/);
+});
+
+test('the co-op migration only adds: a new table and function, a wider setup check, the same entry point',()=>{
+  const sql=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261109150000_together_live_coop.sql'),'utf8');
+  assert.ok(!/\b(drop|truncate)\s+(table|schema|function)/i.test(sql),'no drops');
+  assert.deepEqual([...sql.matchAll(/alter\s+table\s+([\w.]+)/gi)].map(m=>m[1]),['bored_live.pings'],'no existing table is altered, only the new one');
+  assert.ok(!/(create|replace)\s+function\s+bored_live\.api\b/i.test(sql),'the action API is not replaced, so migration order does not matter');
+  assert.ok(!/(create|replace)\s+function\s+(public\.bt_rpc|bored_together\.api)/i.test(sql),'the async API is untouched');
+  assert.deepEqual([...sql.matchAll(/create or replace function ([\w.]+)/gi)].map(m=>m[1]).sort(),['bored_live.clean_config','public.bt_live_rpc']);
+  assert.match(sql,/create function bored_live\.ping_api/);
+  assert.match(sql,/create table bored_live\.pings/);
+  assert.match(sql,/function public\.bt_live_rpc\(action text,args jsonb default '\{\}'\) returns jsonb/);
 });
