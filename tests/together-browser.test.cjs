@@ -52,6 +52,14 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
         serial=pending.catch(()=>{});
         try{const result=await pending;if(action==='move'&&lostReplies.delete(identity))return req.abort('internetdisconnected');return reply(result);}catch(e){return reply({message:e.message,code:e.code},400);}
       }
+      // A signed-in player checks dashboard roles on entry. These are RLS-scoped,
+      // read-only membership queries, not unexpected multiplayer traffic.
+      if(url.pathname==='/rest/v1/analytics_admins'||url.pathname==='/rest/v1/game_analytics_readers') {
+        assert.equal(req.method(),'GET','analytics roles are read-only');
+        assert.equal(url.searchParams.get('user_id'),'eq.'+identity,'analytics roles are scoped to this account');
+        if(url.pathname==='/rest/v1/game_analytics_readers')assert.equal(url.searchParams.get('game'),'eq.ashcrown');
+        return reply([]);
+      }
       if(url.pathname==='/rest/v1/profiles')return reply([{handle:handles[ids.indexOf(identity)]}]);
       if(url.pathname==='/auth/v1/logout')return reply(null);
       if(['/rest/v1/announcements','/rest/v1/announcement_reads','/rest/v1/score_rules','/rest/v1/leaderboard','/rest/v1/daily_leaderboard','/rest/v1/scores','/rest/v1/player_state','/rest/v1/daily_results','/rest/v1/play_events','/rest/v1/product_events','/rest/v1/enjoyment_feedback'].includes(url.pathname))return reply(req.method()==='GET'?[]:null);
