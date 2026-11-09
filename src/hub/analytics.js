@@ -2,8 +2,37 @@ import { request, getSession, freshSession, refreshSession, ANON_TOKEN } from '.
 import { readStored, writeStored, removeStored } from './store.js';
 import { getAnalyticsAccess, isSuppressedGame, filterGameReaderTelemetry } from './analytics-access.js';
 
-// Installed before game scripts so startup failures are observed too. No error text is sent.
-export const ANALYTICS_BRIDGE = '<script>addEventListener("error",function(){parent.postMessage({type:"bored:runtime-error"},"*")});addEventListener("unhandledrejection",function(){parent.postMessage({type:"bored:runtime-error"},"*")});<\/script>';
+// Installed before the game scripts, so even startup exceptions have useful
+// location/type information. Never post messages, stack traces, URLs or game data.
+export const ANALYTICS_BRIDGE = `<script>
+(function () {
+  function report(kind, error, line, column) {
+    parent.postMessage({ type: 'bored:runtime-error', kind: kind,
+      error_name: error && typeof error.name === 'string' ? error.name : 'Unknown',
+      line: Number.isInteger(line) ? line : 0,
+      column: Number.isInteger(column) ? column : 0 }, '*');
+  }
+  addEventListener('error', function (event) {
+    report('exception', event.error, event.lineno, event.colno);
+  });
+  addEventListener('unhandledrejection', function (event) {
+    report('rejection', event.reason, 0, 0);
+  });
+})();
+</script>`;
+
+// Explicitly allowlist all exception metadata before placing it in telemetry.
+// This keeps the debugging signal but cannot leak user-entered text or URLs.
+export function runtimeErrorMetadata(data) {
+  const names = ['Error', 'TypeError', 'ReferenceError', 'SyntaxError', 'RangeError', 'URIError', 'EvalError'];
+  const coordinate = value => Number.isInteger(value) && value > 0 && value <= 100000 ? value : 0;
+  return {
+    code: 'runtime',
+    error_kind: data?.kind === 'rejection' ? 'rejection' : 'exception',
+    error_name: names.includes(data?.error_name) ? data.error_name : 'Unknown',
+    line: coordinate(data?.line), column: coordinate(data?.column)
+  };
+}
 
 export const ANALYTICS_PREFERENCE = 'bored.analytics.enabled';
 export const VISITOR_KEY = 'bored.analytics.visitor';
