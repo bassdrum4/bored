@@ -220,6 +220,101 @@ inactive active matches after 30 days (no clock-based winner), and terminal
 matches/moves after 90 days. Daily cleanup can lag nominal cutoffs by up to a
 day.
 
+## Live games (Civ Lite 5.0)
+
+A live game is 2 to 4 members plus CPUs playing the same Civ Lite game at the same time. It is separate from the
+turn-by-turn matches above: its own tables (schema `bored_live`), its own endpoint (`public.bt_live_rpc`) and its own
+hub files. Solo games, pass and play, save slots and the async two-player Ashcrown match are unchanged.
+
+**Start.** Bored Together → *Start a live game* → pick 1 to 3 members from the directory → *Open lobby*. The game opens on
+its own Game setup screen in a live version: the host sets map, size, CPUs (8 civs in all), difficulty, borders, turn
+limit, victories, the turn timer (off, 60, 120 or 300 seconds) and what happens to seats nobody joins. Each invited
+member sees *Invited* in Your Games and joins from there. Joiners see the setup read-only except their own civ and
+*Ready*; changing the setup asks everyone to be ready again. The host starts once every joined member is ready.
+Invitations are limited to members, because a live room needs everyone present: the "not in Bored Together yet" list
+of the turn-based games is not offered.
+
+**One ordered log (lockstep).** Every state-changing command is an action `{ seat, type, args }` in plain JSON. The
+client sends it; the server gives it the next number for that game and stores it, and does not simulate it. Every
+screen receives the actions in order and applies them through the same rule functions, so the same seed plus the same
+actions gives the same game everywhere. A player's own action takes effect only when it comes back in order. CPUs are not
+actions: each screen runs the CPU turns itself from the seeded random generator, at the same point of every round.
+
+- The server appends under a per-game row lock (`head + 1`, so sequence numbers have no gaps), is idempotent by
+  `request_id` (a retry gets the same number back and is not counted against the rate limit), checks that the seat
+  belongs to the caller, and rate-limits (300 actions a minute, 900 calls a minute, 20 new games an hour).
+- Delivery is Supabase Realtime on `bored_live.actions` (the hub's own small client in `src/hub/realtime.js`, the
+  Phoenix protocol over the browser's WebSocket, nothing to load). While the socket is down the log is read once a
+  second with `sync`. While it is up a heartbeat every 10 seconds also checks that no action was missed. A screen holds
+  a later action until the earlier ones have arrived, and asks the server for a missing one.
+- At the start of every round each screen reports a hash of the game. A hash that disagrees with another screen's is
+  recorded in `bored_live.desyncs` and that screen reloads from the newest snapshot and the log after it (at most three
+  times in two minutes). The hash covers the whole game except what each screen shows only to itself.
+- At each round start the lowest-seated human who is online uploads a snapshot (first writer wins, the last three are
+  kept). Opening or rejoining a game loads the newest snapshot and replays the actions after it.
+
+**What replay needs from the rules.** Rule code never calls `Math.random()` or `Date.now()` (it uses `roll()`, the
+seeded generator), avoids functions that differ between engines (`Math.exp` and `Math.pow` are written out), and does
+not depend on the order of an object's keys: a snapshot that has been through Postgres `jsonb` comes back with its keys
+in the database's order, so every screen puts the keys in one order at each round start and when it restores one
+(`liveCanon`), and the hash is taken over sorted keys.
+
+**Turns.** A round runs every player's start-of-turn processing in seat order, then the humans act, then the CPUs, then
+the next round. Humans at peace with every other human act at the same time. Humans at war with each other take turns in
+seat order, each starting when the previous one ends; a human at peace with everyone is never held up by that. The
+round ends when every human has ended their turn, or when the timer runs out (a `timeout` action, which the server
+accepts once per round and only after the time has really passed). Offers and answers (peace, borders, trade,
+embassy) are not turns: they arrive and show in the Council at once.
+
+**Leaving and coming back.** Each screen touches the server every 10 seconds; a seat is *online* if heard within 25
+seconds. A human who leaves, or is silent for 60 seconds, gets a `cpu-takes-over` action (any other screen may insert it,
+the server keeps one), and a CPU plays that civ from the next round. When they open the game again a `human-returns`
+action hands the civ back at the next round start. Everyone gets a toast both times. If every human has gone the game
+waits on the server.
+
+**What each screen shows.** Every screen holds the whole game state, so it can replay it, but shows only its own seat's
+view: fog of war, names of civs not yet met, the Council and offers addressed to that seat. Cards and toasts about other
+seats are never shown. This is a view rule, not a secret: a player who reads their browser's memory can see more.
+Each seat has a `team` stored in the game (in 5.0 the team is the seat number) so a team mode can be added without
+changing the format.
+
+**The bridge.** The game gets `window.__boredLive = { call(op, payload) → Promise, on(fn) }` from the hub, injected into
+its document before its script, with a channel id and `event.source` checks like the turn-based bridge. Operations:
+`hello`, `game`, `lobby`, `start`, `leave`, `send`, `ping` (co-op only), `report`, `snapshot`, `finish`, `reload`, `resync`,
+`exit`. Events pushed to the game: `game` (the lobby changed), `actions` (the next ones, contiguous), `ping` (a teammate's
+map ping), `presence` (who is online, the round clock), `net` (the hub's connection). The game never sees a token or the network.
+
+**Installing.** Apply `supabase/migrations/20261109120000_together_live_ashcrown.sql` once, the way the other
+forward migrations are applied. It only adds: the `bored_live` schema, its tables, `public.bt_live_rpc`, row-level
+security, and (if the `supabase_realtime` publication exists) the actions table's membership in it. It changes no
+existing table or function. Then publish the frontend. Until the SQL is applied the live buttons simply report an error
+and the rest of Bored Together works as before. Deploy the SQL before the frontend.
+
+**Co-op (Civ Lite 5.1).** The host can set *Mode* to *Co-op: humans vs CPUs* (setup key `mode`, `'ffa'` by default). Every human
+then plays on one team against the CPUs: the game keeps one team number per seat in `G.teams`, teammates share one map, are
+always at peace with open borders, and can trade or give each other horses, iron and gunpowder (the `gift` action, which is
+an ordinary talk action in the log). The team wins and loses together. The mode is part of the room's frozen setup, so every
+screen starts the same game. Map pings (Alt+click, or *Ping* in a hex's card) are the one thing that is not an action: a
+ping goes to `bored_live.pings` through `bt_live_rpc('ping', …)` and teammates read it over Realtime on that table (or by
+polling `'pings'` where there is no socket, which the hub does once a second when the socket is down). It never enters the
+action log or the hash, so it cannot desync a game; the server keeps a ping for a minute and serves one for fifteen seconds.
+Only seated players of a running co-op room can ping, eight in any ten seconds at most. A free-for-all room is stored and
+played exactly as in 5.0.
+
+**Installing co-op.** Apply `supabase/migrations/20261109150000_together_live_coop.sql` once, after the 5.0 migration. It only
+adds: the `mode` key in the setup check (`bored_live.clean_config`, replaced with the same body plus one branch), the
+`bored_live.pings` table with its read policy, `bored_live.ping_api`, and a new body for the thin `public.bt_live_rpc`
+wrapper (same signature) that hands `ping` and `pings` to `ping_api` and everything else to `bored_live.api` as before. It
+does not touch `bored_live.api`, so it can be applied before or after any later change to that function. Deploy the SQL
+before the frontend: until it is applied a free-for-all room is unaffected, a co-op room is refused with *Invalid setup*,
+and pings report an error.
+
+**Known limits.** The server orders actions but does not simulate Civ Lite, so a modified client can send moves its
+rules would refuse (every screen refuses them the same way, so the screens stay in step, but a made-up action is still
+in the log), can read the whole game state, and could upload a bad snapshot first. Timeouts and takeovers are checked
+against the server's clock and presence, not against the game. A browser tab that has been hidden for several minutes
+may have its timers slowed down; that looks like leaving, and opening the game again takes the civ back.
+
 ## Installation and publishing
 
 The existing project is `djdpttltfmwkofdrvkem`. New installations apply
@@ -300,6 +395,16 @@ race tests (competing moves, duplicate queues, crossed requests, leaving and
 Pool commits). PGlite cannot prove native transaction locking. To run these
 locally, use `BT_TEST_DATABASE_URL` pointing to an entirely EMPTY disposable
 database; the test refuses an occupied database. Never use production.
+
+Live games have their own suites, run together with `npm run test:live`: `realtime.test.cjs` (the Realtime client
+against a Phoenix-protocol server on a real WebSocket), `live-hub.test.cjs` (the session between a screen and the room:
+order, retries, polling, presence; and the bridge's channel checks), `live-game.test.cjs` (determinism over 40 rounds,
+snapshot replay including jsonb key order, dynamic turns, the timer, leaving and returning), `live-screen.test.cjs`
+(the game's live screen in two real browsers against a stand-in room), `together-live.test.cjs` (the room's SQL:
+gap-free sequence numbers under concurrent sends, idempotent retries, membership, ordering, the rate limit, and the co-op
+setup key and pings) and
+`live-browser.test.cjs` (two signed-in browsers start, join, play and rejoin against the real SQL, with Realtime cut off
+part way). The last two need a disposable database like `together-postgres.test.cjs` (CI runs them in that job).
 
 No test creates student accounts, memberships or demo matches in production.
 A real Google Sites page and real external Auth providers are not controlled

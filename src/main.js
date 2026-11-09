@@ -23,9 +23,10 @@ import { createLeaderboardView } from './hub/leaderboard-view.js';
 import { createAccountUI } from './hub/account-ui.js';
 import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
+import { createLivePlayer } from './hub/together-live.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnnouncementsUI } from './hub/announcements-ui.js';
-import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
+import { createAnalytics, ANALYTICS_BRIDGE, runtimeErrorMetadata } from './hub/analytics.js';
 import { getAnalyticsAccess } from './hub/analytics-access.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
@@ -152,7 +153,7 @@ gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXT
 
 function restartGame() {
   if (!activeSlug) return;
-  if (activeTogether) { showHint('Your online game is saved. Exit and reopen it to reload.'); closeMenu(); return; }
+  if (activeTogether) { showHint(activeTogether.mode === 'live' ? 'A live game cannot be restarted. Leave it from the game\u2019s Menu.' : 'Your online game is saved. Exit and reopen it to reload.'); closeMenu(); return; }
   captureBest({ leaving: true });
   closeMenu();
   analytics.end('restart');
@@ -284,6 +285,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       const ownsEsc = OWNS_ESCAPE.has(slug);
       showHint(multiplayer
         ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player'
+          : multiplayer.mode === 'live' ? 'Live game · leave from the game’s Menu (it keeps going)'
           : ownsEsc ? 'Your turn saves automatically · Menu → Back to Bored returns to Bored Together' : 'Your turn saves automatically · Esc returns to Bored Together'
         : ownsEsc ? 'Click or tap to play · Esc is the game’s own key · Menu → Back to Bored leaves · Shift+R restarts · Shift+F fullscreen'
           : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
@@ -898,7 +900,7 @@ addEventListener('message', event => {
         });
       }
       break;
-    case 'bored:runtime-error': analytics.event('error', { code: 'runtime' }); break;
+    case 'bored:runtime-error': analytics.event('error', runtimeErrorMetadata(event.data)); break;
     case 'bored:restart': restartGame(); break;
     case 'bored:fullscreen': toggleFullscreen(); break;
     case 'bored:menuclose': closeMenu(); break;
@@ -952,6 +954,9 @@ try { sessionStorage.removeItem('bored.boot-retry'); } catch {}
 const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, callbacks) {
   const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });
   openGame(match.game, null, document.querySelector('#together-nav'), player);
+}, playLive(game, owner, callbacks) {
+  const player = createLivePlayer({ game, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });
+  openGame(game.game, null, document.querySelector('#together-nav'), player);
 } });
 window.addEventListener('bored:identity', () => { if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true }); });
 initAnnouncements();

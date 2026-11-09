@@ -19,6 +19,11 @@ let session = restoredSession();
 let handle = '';
 let rulesReady = false;
 
+// Where Realtime listens: the same project, over a WebSocket, with the same publishable key.
+export function realtimeURL() {
+  return API_URL.replace(/\/+$/, '').replace(/^http/, 'ws') + '/realtime/v1/websocket?apikey=' + encodeURIComponent(API_KEY) + '&vsn=1.0.0';
+}
+
 export function backendReady() {
   return /^https:\/\//.test(API_URL) && API_KEY.length > 20;
 }

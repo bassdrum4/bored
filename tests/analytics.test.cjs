@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
+const vm = require('node:vm');
 const puppeteer = require('puppeteer-core');
 const { serve } = require('./serve.cjs');
 const root = path.resolve(__dirname, '..');
@@ -22,6 +23,28 @@ test('active time excludes hidden, idle, unfocused, paused, loading and clock sl
   assert.deepEqual(prepareAnalyticsRows([
     { _table:'product_events', id:'2', user_id:'stale-user', kind:'visit' }
   ], null), [{ id:'2', user_id:null, kind:'visit' }]);
+});
+
+test('game runtime diagnostics retain type and source coordinates without private text', async () => {
+  const { ANALYTICS_BRIDGE, runtimeErrorMetadata } = await import('../src/hub/analytics.js');
+  const listeners = {}, received = [];
+  assert.ok(ANALYTICS_BRIDGE.startsWith('<script>') && ANALYTICS_BRIDGE.endsWith('</script>'));
+  vm.runInNewContext(ANALYTICS_BRIDGE.slice(8, -9), {
+    addEventListener: (kind, listener) => { listeners[kind] = listener; },
+    parent: { postMessage: message => received.push(message) }
+  });
+  listeners.error({ error: { name:'TypeError', message:'private text that must not leave the game' }, lineno:1234, colno:29 });
+  listeners.unhandledrejection({ reason: { name:'ReferenceError', stack:'private stack' } });
+  assert.equal(JSON.stringify(received).includes('private'), false);
+  assert.deepEqual(runtimeErrorMetadata(received[0]), {
+    code:'runtime', error_kind:'exception', error_name:'TypeError', line:1234, column:29
+  });
+  assert.deepEqual(runtimeErrorMetadata(received[1]), {
+    code:'runtime', error_kind:'rejection', error_name:'ReferenceError', line:0, column:0
+  });
+  assert.deepEqual(runtimeErrorMetadata({ kind:'rejection', error_name:'private message', line:-5, column:999999 }), {
+    code:'runtime', error_kind:'rejection', error_name:'Unknown', line:0, column:0
+  });
 });
 
 test('scoped Civ Lite analytics readers are omitted only from their game telemetry', async () => {
