@@ -598,6 +598,22 @@
     #coach { left: 8px; right: 8px; top: 8px; padding: 8px 10px 9px }
     #coach p { font-size: 12.5px; margin-top: 4px }
   }
+  /* live games */
+  #live-strip { display: flex; align-items: center; gap: 7px; margin-right: 6px }
+  .lv { position: relative; display: inline-flex; align-items: center; gap: 2px }
+  .lv .dot { width: 12px; height: 12px }
+  .lv.done .dot { opacity: .7 }
+  .lv.away .dot { opacity: .45; border-style: dashed }
+  .lv.now .dot { box-shadow: 0 0 0 2px var(--rust) }
+  .lv.me .dot { outline: 1px solid var(--ink-3); outline-offset: 1px }
+  .lv .tk { font-style: normal; font-size: 10px; font-weight: 700; color: var(--moss); line-height: 1 }
+  .lv.away .tk { color: var(--sea); font-size: 8px; letter-spacing: .04em }
+  .lv .mv { font-style: normal; font-size: 8px; color: var(--rust); line-height: 1 }
+  .lv-timer { font: 500 12px var(--font-data); color: var(--ink); font-variant-numeric: tabular-nums }
+  .lv-timer.low { color: var(--rust) }
+  .lv-wait { font-size: 11px; color: var(--ink-3); white-space: nowrap }
+  #live-net { position: fixed; left: 50%; top: 56px; transform: translateX(-50%); z-index: 60; background: var(--panel); border: 1px solid var(--rust); color: var(--rust); font-size: 12px; padding: 4px 10px; border-radius: 3px }
+  .fe-pane.live .seat input[readonly] { background: transparent; border-color: transparent; padding-left: 0 }
 </style>
 </head>
 <body>
@@ -611,6 +627,7 @@
     </button>
     <div id="stats"></div>
     <div class="bar-right">
+      <span id="live-strip" hidden></span>
       <span id="turn-readout"></span>
       <button class="btn" id="btn-tech" type="button" data-act="tech">Tech<kbd>T</kbd></button>
       <button class="btn" id="btn-council" type="button" data-act="council">Council<kbd>D</kbd></button>
@@ -705,9 +722,11 @@
         <div class="setup-col">
           <section class="fe-card fe-players" aria-label="Players">
             <h3>Players</h3>
-            <div class="fe-opt"><label for="opt-humans">Human players</label><select id="opt-humans"></select></div>
+            <div class="fe-opt solo-only"><label for="opt-humans">Human players</label><select id="opt-humans"></select></div>
             <div class="fe-opt"><label for="opt-cpus">CPU players</label><select id="opt-cpus"></select>
-              <p class="fe-note">2 to 8 in all. Humans take their turns one after another on this device; CPUs play on their own.</p></div>
+              <p class="fe-note" id="cpus-note">2 to 8 in all. Humans take their turns one after another on this device; CPUs play on their own.</p></div>
+            <div class="fe-opt live-only" hidden><label for="opt-unjoined">Seats nobody joins</label><select id="opt-unjoined"><option value="cpu">Become CPUs</option><option value="drop">Are dropped</option></select>
+              <p class="fe-note">Friends you invited who have not joined when you start.</p></div>
             <div class="seats" id="seats"></div>
           </section>
           <section class="fe-card fe-victory" aria-label="Victory">
@@ -728,6 +747,8 @@
             <div class="fe-opt"><label for="opt-turns">Turn limit</label>
               <input type="number" id="opt-turns" value="100" min="0" max="500" step="10" inputmode="numeric" aria-describedby="turns-hint">
               <p class="fe-note" id="turns-hint">A whole number from 10 to 500, or 0 for no limit. When the limit hits, the highest score wins.</p></div>
+            <div class="fe-opt live-only" hidden><label for="opt-timer">Turn timer</label><select id="opt-timer"></select>
+              <p class="fe-note">When it runs out, every turn still open is ended for its player. Off lets everyone take as long as they like.</p></div>
           </section>
           <section class="fe-card fe-map" aria-label="Map">
             <h3>Map</h3>
@@ -743,13 +764,15 @@
       <p class="fine" id="start-note"></p>
       <footer class="setup-foot">
         <button class="btn" id="btn-back" type="button" data-act="title-back">Back</button>
-        <button class="btn" id="btn-reset" type="button" data-act="setup-reset">Reset to defaults</button>
+        <button class="btn solo-only" id="btn-reset" type="button" data-act="setup-reset">Reset to defaults</button>
         <span class="grow" id="setup-note"></span>
+        <button class="btn primary live-only" id="btn-ready" type="button" hidden>Ready</button>
         <button class="btn primary" id="btn-begin" type="button">Start game</button>
       </footer>
     </div>
   </section>
 </div>
+<div id="live-net" role="status" hidden>Reconnecting…</div>
 <script>
 "use strict";
 /* ───────────────────────────────────────────────────────────────────────────
@@ -1216,6 +1239,18 @@ let VIS = null;        // what the current viewer can see right now (not saved)
 let hover = null;      // the hex under the pointer, for move previews (not saved)
 let preview = null;    // the path preview for that hex (not saved)
 let placing = null;    // { city, item } while a player picks a hex for a building (not saved)
+// This device's side of a live game (v5.0): never saved, never in G, never in the hash.
+// Live games: what this screen knows about the room that is not part of the game itself (never hashed).
+const LIVE = {
+  net: null,                 // the bridge to the hub on a live screen; null everywhere else
+  applied: 0,                // the last action of the log that has been applied here
+  mute: false,               // set while another seat's order runs: its toasts are not for this screen
+  replay: false,             // catching up on the log: no toasts, no reports
+  errors: [], result: null,  // errors a rule threw (the same on every device); what the last order came to
+  game: null, host: false, me: -1, filled: false, filling: false, entered: 0,
+  after: new Map(), last: new Map(),   // what to do when an action of mine comes back, and how it went
+  early: [], seen: {}, clock: null, finished: false, timeoutAt: 0, backAt: 0, takeAt: {}, sendConfigAt: 0
+};
 
 const keyOf = (x, y) => x + ',' + y;
 const tileAt = (x, y) => {
@@ -1311,7 +1346,8 @@ function noiseFields(seed, cols, rows, shape, wrap) {
   return { elevation, moisture, ridge, hilly, wood };
 }
 function falloff(dx, dy) {
-  return Math.pow(Math.max(Math.abs(dx), Math.abs(dy)), 3) * 0.42 + (dx * dx + dy * dy) * 0.08;
+  const m = Math.max(Math.abs(dx), Math.abs(dy));
+  return m * m * m * 0.42 + (dx * dx + dy * dy) * 0.08;   // m * m * m: Math.pow may differ between engines in its last bit
 }
 
 // The top `share` of the allowed tiles by elevation become land. Then (v4):
@@ -1827,6 +1863,7 @@ function startGame(options) {
   };
   applyTree(G.tree);
   applyPeakName(G);
+  if (options.live) G.live = liveInit(seats, options.timer);
   seats.forEach((seat, i) => {
     G.players.push({
       // A CPU nobody named plays as its civ's leader, like Civ 6.
@@ -1847,7 +1884,8 @@ function startGame(options) {
   });
   log('A new ' + MAP_TYPES[G.map].name.toLowerCase() + ' map. ' + G.players.map(f => nameMark(f)).join(', ') +
     ' set out to found their capitals.', 'turn', null);
-  advanceTurns();
+  if (G.live) liveRoundStart();
+  else advanceTurns();
   return G;
 }
 /* ── the log ───────────────────────────────────────────────────────────────── */
@@ -1855,6 +1893,7 @@ function startGame(options) {
 // to: null for news everyone may read, or a player index for private news.
 function log(text, colour, to) {
   if (!G) return;
+  if (G.live && to !== null && to !== undefined && to !== G.viewer) return;   // live: every device runs every seat's turn, and reads only its own mail
   G.log.push({ turn: G.turn, text, colour: colour || null, to: to === undefined ? null : to });
   if (G.log.length > 500) G.log.splice(0, G.log.length - 500);
 }
@@ -1863,6 +1902,7 @@ function log(text, colour, to) {
 function tell(i, text) {
   const f = pl(i);
   if (!f || !f.human) return;
+  if (G.live && i !== G.viewer) return;
   (f.notes = f.notes || []).push(text);
 }
 // What the toast says as player i's turn starts: their notes, then an offer or a tech waiting.
@@ -3049,7 +3089,18 @@ function beginPath(u, x, y) {
 /* ── combat ────────────────────────────────────────────────────────────────── */
 
 // Civ 6's damage curve: 30 at equal strength, scaled by e^(0.04 × the gap).
-const damageFor = (a, d, r) => Math.max(1, Math.round(30 * Math.exp(0.04 * (a - d)) * r));
+// e^x from + - * / alone: Math.exp may differ in its last bit between browsers, and a live game has to roll
+// the same damage on every device.
+function expFixed(x) {
+  const k = Math.round(x / 0.6931471805599453);
+  const r = x - k * 0.6931471805599453;
+  let term = 1, sum = 1;
+  for (let n = 1; n < 24; n++) { term = term * r / n; sum += term; }
+  let scale = 1;
+  for (let n = Math.abs(k); n > 0; n--) scale *= 2;
+  return k < 0 ? sum / scale : sum * scale;
+}
+const damageFor = (a, d, r) => Math.max(1, Math.round(30 * expFixed(0.04 * (a - d)) * r));
 
 // Bonuses that apply whether the unit attacks or defends.
 function sharedBonus(u) {
@@ -3259,7 +3310,7 @@ function captureCity(c, u) {
   log(nameMark(f) + ' captures ' + c.name + (c.capital ? ', ' + nameMark(pf, true) + '’s capital,' : '') + ' from ' + nameMark(pf) + '.', f.ink, null);
   for (const id of (c.capital ? ['capital', 'conquest'] : c.founder === f.i ? ['retake', 'conquest'] : ['conquest'])) if (awardMoment(f.i, id)) break;
   pushNews({ i: prev, kind: 'alert', type: 'lost', by: f.i, city: c.name, at: [c.x, c.y] });
-  if (f.human && !c.capital) G.pending = { kind: 'capture', city: c.id };
+  if (f.human && !c.capital) { if (G.live) G.live.pend[f.i] = { kind: 'capture', city: c.id }; else G.pending = { kind: 'capture', city: c.id }; }
   checkElimination();
   checkWin();
 }
@@ -3827,6 +3878,8 @@ function computeVision(i) {
   return vis;
 }
 function refreshVision() {
+  // Live: every seat's sight, contacts and cards are brought up to date by liveSee after each action, not by drawing.
+  if (G && G.live) { VIS = G.viewer !== null ? computeVision(G.viewer) : null; return; }
   VIS = G && G.viewer !== null && !G.watch ? computeVision(G.viewer) : null;
   if (VIS && pl(G.viewer).human) { checkContacts(G.viewer); noticeWonders(G.viewer); checkMoments(G.viewer); }
 }
@@ -3929,7 +3982,7 @@ function checkWin() {
   const alive = G.players.filter(f => f.alive);
   if (alive.length === 1) { endGame(alive[0], 'Last player standing'); return; }
   if (!alive.length) { endGame(null, 'Nobody is left'); return; }
-  if (!G.watch && !alive.some(f => f.human)) {
+  if (!G.watch && !alive.some(f => f.human || (G.live && G.live.away[f.i]))) {
     endGame(standings()[0].f, 'Every human player is out, so the top score takes it');
     return;
   }
@@ -4030,6 +4083,402 @@ function endCurrentTurn() {
   restUnits(G.cur);
   G.pending = null;
   advanceTurns();
+}
+
+/* ── live games: rounds and actions (v5.0) ─────────────────────────────────── */
+
+// Bored Together live games: 2 to 4 people and some CPUs play one game at the same time. The server keeps
+// one ordered list of actions { seat, type, args }; every device starts from the same seed and applies the
+// list in order through the rules above, so every device holds the same G. Nothing in the rules reads the
+// clock or the device: the dice are G.rs. What differs between devices is only what the viewer sees: the
+// fog, the cards, the toasts and the selection. Those stay out of the hash (LIVE_LOCAL).
+//
+// A round: every living seat's start-of-turn processing runs in seat order, then the humans act, then the
+// CPUs act, then the next round starts. Humans who are at peace with every other human act at the same
+// time. Humans at war with each other take turns among themselves in seat order, each starting when the
+// one before ends. The round ends when every human has ended their turn.
+
+// What only this device holds. Everything else in G is the shared game.
+const LIVE_LOCAL = ['log', 'news', 'viewer', 'cur', 'handoff', 'pending', 'endShown', 'tipsSeen'];
+
+function liveInit(seats, timer) {
+  return {
+    v: 1,
+    timer: [60, 120, 300].includes(timer) ? timer : 0,   // seconds a round lasts; 0 is no timer
+    // One team per seat. In this version team = seat; a co-op version can group seats without changing the format.
+    teams: seats.map((s, i) => (Number.isInteger(s.team) ? s.team : i)),
+    humans: seats.map((s, i) => (s.human ? i : -1)).filter(i => i >= 0),   // the seats people sit in, whoever plays them now
+    human0: [],       // the humans a round began with: it waits for them
+    done: [],         // per seat: has ended its turn this round
+    groups: [],       // the humans at war with each other, in seat order, frozen when the round began
+    pend: {},         // a city just captured, waiting for Keep or Burn, per seat
+    returning: [],    // humans who came back; they take over at the next round
+    away: {}          // seats a CPU plays because the human left
+  };
+}
+
+// Humans who are at war with each other (directly or through a third) take turns in one group.
+function liveGroups(list) {
+  const groups = [];
+  for (const i of list) {
+    const merged = [i];
+    for (const g of groups.filter(g => g.some(j => atWar(i, j)))) {
+      merged.push(...g);
+      groups.splice(groups.indexOf(g), 1);
+    }
+    groups.push(merged.sort((a, b) => a - b));
+  }
+  return groups.sort((p, q) => p[0] - q[0]);
+}
+
+// May seat i give orders right now?
+function liveCanAct(i) {
+  const L = G && G.live;
+  if (!L || G.over) return false;
+  const f = pl(i);
+  if (!f || !f.alive || !f.human || L.done[i] || !L.human0.includes(i)) return false;
+  const group = L.groups.find(g => g.includes(i));
+  return !group || group.find(s => !L.done[s]) === i;
+}
+// Diplomacy does not wait for a turn: offers and answers go through at once for any human still in the game.
+const liveCanTalk = i => !!(G && G.live && !G.over && pl(i) && pl(i).alive && pl(i).human);
+// Whose turn it is, for the top bar: the humans who may act now.
+const liveActing = () => G.live.human0.filter(liveCanAct);
+
+// Every human seat sees, meets and earns from where its units stand now. All of them are brought up to date
+// after every action and at every round start, in seat order, so the fog and the first-contact cards do not
+// depend on whose screen it is.
+function liveSee() {
+  for (const i of G.live.humans) {
+    const f = pl(i);
+    if (!f || !f.alive) continue;
+    computeVision(i);
+    checkContacts(i);
+    noticeWonders(i);
+    checkMoments(i);
+  }
+}
+
+function liveRoundStart() {
+  const L = G.live;
+  G.turn += 1;
+  if (G.maxTurns && G.turn > G.maxTurns) { finishOnScore(); return; }
+  if (G.turn > 1 && G.turn % 10 === 0) log('Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + '.', 'turn', null);
+  bordersNewRound();
+  for (const i of L.returning.splice(0)) liveHandBack(i);
+  for (const f of G.players) {
+    if (!f.alive) continue;
+    G.cur = f.i;
+    beginPlayerTurn(f.i);
+    checkWin();
+    if (G.over) return;
+  }
+  L.human0 = G.players.filter(f => f.alive && f.human).map(f => f.i);
+  L.done = G.players.map(f => !L.human0.includes(f.i));
+  L.groups = liveGroups(L.human0);
+  liveSee();
+  liveCanon(G);
+}
+
+// The CPUs play, in seat order, once the humans have all ended their turns. A seat whose human left during
+// this round starts playing from the next one.
+function liveCpuPhase() {
+  const L = G.live;
+  for (const f of G.players) {
+    if (!f.alive || f.human || L.human0.includes(f.i)) continue;
+    G.cur = f.i;
+    aiTurn(f);
+    restUnits(f.i);
+    checkElimination();
+    checkWin();
+    if (G.over) return;
+  }
+}
+
+// After anything that could have ended the last human turn: run the CPUs and open the next round. With no
+// human to wait for the game stands still, and waits for somebody to come back.
+function liveAdvance() {
+  const L = G.live;
+  for (let guard = 0; guard < 4 && !G.over; guard++) {
+    if (!L.human0.length || L.human0.some(i => !L.done[i] && pl(i).alive && pl(i).human)) return;
+    liveCpuPhase();
+    if (G.over) return;
+    liveRoundStart();
+  }
+}
+
+function liveEndTurn(i) {
+  const L = G.live;
+  restUnits(i);
+  L.done[i] = true;
+  delete L.pend[i];   // a capture nobody answered is kept
+  return true;
+}
+
+// The human left: a CPU plays the civ from the next round. This round their turn is over as it stands.
+function liveTakeover(i) {
+  const L = G.live, f = pl(i);
+  if (!f || !L.humans.includes(i) || L.away[i]) return false;
+  L.away[i] = true;
+  L.returning = L.returning.filter(s => s !== i);
+  f.human = false;
+  f.aggro = 0.6 + hash2(i, 3, G.seed) * 0.9;
+  delete L.pend[i];
+  if (L.human0.includes(i) && !L.done[i]) { restUnits(i); L.done[i] = true; }
+  log(nameMark(f) + ' has left. A CPU plays this civ from the next round.', f.ink, null);
+  return true;
+}
+function liveHandBack(i) {
+  const L = G.live, f = pl(i);
+  if (!f || !L.away[i]) return false;
+  delete L.away[i];
+  f.human = true;
+  f.aggro = 1;
+  log(nameMark(f) + ' is back and plays this civ again.', f.ink, null);
+  return true;
+}
+// The human came back. Control returns at the next round, unless the game was waiting for somebody: then now.
+function liveReturn(i) {
+  const L = G.live, f = pl(i);
+  if (!f || !L.away[i] || !f.alive) return false;
+  if (L.human0.length) {
+    if (!L.returning.includes(i)) L.returning.push(i);
+    return true;
+  }
+  liveHandBack(i);
+  L.human0 = [i];
+  L.done = G.players.map(o => o.i !== i);
+  L.groups = [[i]];
+  return true;
+}
+
+// The clock ran out: every human who has not ended their turn has it ended for them, in seat order.
+function liveTimeout() {
+  const L = G.live;
+  for (const i of L.human0) {
+    if (L.done[i] || !pl(i).alive || !pl(i).human) continue;
+    liveEndTurn(i);
+  }
+  return true;
+}
+
+/* actions: what a player can do, as plain JSON. Each applier checks everything again, so a stale or made-up
+   action does nothing, and does nothing the same way on every device. */
+
+const liveId = v => typeof v === 'string' && v.length < 12;
+const liveXY = a => Number.isInteger(a.x) && Number.isInteger(a.y) && !!tileAt(a.x, a.y);
+const liveUnit = (s, id) => { const u = liveId(id) ? unitById(id) : null; return u && u.owner === s ? u : null; };
+const liveCity = (s, id) => { const c = liveId(id) ? cityById(id) : null; return c && c.owner === s ? c : null; };
+const liveSeat = v => Number.isInteger(v) && v >= 0 && v < G.players.length;
+
+// An order for a unit on a hex, as orderUnit decides it on the player's screen, without the prompts: a strike,
+// a step, or a march. war: the player agreed to the war the order means.
+function liveOrder(u, a) {
+  const s = u.owner, x = a.x, y = a.y, key = keyOf(x, y);
+  if (computeVision(s)[y * G.cols + x]) {
+    if (strikeInfo(u, x, y)) { LIVE.result = attack(u, x, y); return !!LIVE.result; }
+    const w = warOrder(u, x, y);   // something of a player at peace: the order is war
+    if (w) {
+      if (!a.war || !declareWar(s, w.foe)) return false;
+      if (strikeInfo(u, x, y)) { LIVE.result = attack(u, x, y); return !!LIVE.result; }
+    }
+  }
+  const reach = computeReachable(u);
+  if (reach.has(key)) {
+    if (reach.war && reach.war.has(key) && !a.war) return false;
+    return moveUnit(u, x, y, reach);
+  }
+  if (closedOwner(s, x, y) >= 0 || !seenBy(s, x, y)) return false;
+  if (u.path && u.path.to[0] === x && u.path.to[1] === y) { u.path = null; return true; }
+  return beginPath(u, x, y);
+}
+
+const LIVE_TURN = {
+  'unit-order': (s, a) => { const u = liveUnit(s, a.unit); return !!u && liveXY(a) && liveOrder(u, a); },
+  'unit-skip': (s, a) => { const u = liveUnit(s, a.unit); if (!u) return false; u.mp = 0; return true; },
+  'unit-fortify': (s, a) => {
+    const u = liveUnit(s, a.unit);
+    if (!u || !isMil(u.type)) return false;
+    u.fort = true; u.sleep = false; u.path = null; u.mp = 0;
+    return true;
+  },
+  'unit-sleep': (s, a) => {
+    const u = liveUnit(s, a.unit);
+    if (!u) return false;
+    u.sleep = true; u.fort = false; u.path = null; u.mp = 0;
+    return true;
+  },
+  'unit-clearpath': (s, a) => { const u = liveUnit(s, a.unit); if (!u) return false; u.path = null; return true; },
+  'unit-found': (s, a) => { const u = liveUnit(s, a.unit); return !!u && u.mp > 0 && !foundProblem(u) && !!foundCity(u); },
+  'unit-builder': (s, a) => { const u = liveUnit(s, a.unit); return !!u && typeof a.what === 'string' && builderAct(u, a.what); },
+  'unit-disband': (s, a) => { const u = liveUnit(s, a.unit); if (!u) return false; removeUnit(u); return true; },
+  'city-build': (s, a) => {
+    const c = liveCity(s, a.city);
+    if (!c || typeof a.kind !== 'string' || typeof a.id !== 'string') return false;
+    const known = { unit: UNITS, building: BUILDINGS, project: PROJECTS, research: { research: 1 }, road: null }[a.kind];
+    if (known === undefined || (known && !Object.prototype.hasOwnProperty.call(known, a.id)) || (a.kind === 'road' && !liveId(a.id))) return false;
+    const item = { kind: a.kind, id: a.id };
+    if (item.kind === 'building' && a.at !== undefined) {
+      // The hex the building goes on (v4: it is cleared the moment it is planned).
+      if (!Array.isArray(a.at) || !Number.isInteger(a.at[0]) || !Number.isInteger(a.at[1]) || !BUILDINGS[item.id]) return false;
+      const t = tileAt(a.at[0], a.at[1]);
+      if (!t || !plotOk(c, t, item.id)) return false;
+      c.plot = c.plot || {};
+      const before = c.plot[item.id];
+      c.plot[item.id] = [a.at[0], a.at[1]];
+      if (!setBuild(c, item)) { if (before) c.plot[item.id] = before; else delete c.plot[item.id]; return false; }
+      if (!before || before[0] !== a.at[0] || before[1] !== a.at[1]) clearPlot(c, item.id);
+      return true;
+    }
+    return setBuild(c, item);
+  },
+  'city-clear': (s, a) => { const c = liveCity(s, a.city); return !!c && setBuild(c, null); },
+  'city-embassy': (s, a) => {
+    const c = liveCity(s, a.city);
+    if (!c || !liveSeat(a.to)) return false;
+    LIVE.result = askEmbassy(c, a.to);
+    return !!LIVE.result;
+  },
+  'city-shoot': (s, a) => {
+    const c = liveCity(s, a.city), o = liveId(a.unit) ? unitById(a.unit) : null;
+    if (!c || !o) return false;
+    LIVE.result = cityShoot(c, o);
+    return !!LIVE.result;
+  },
+  'research': (s, a) => typeof a.tech === 'string' && techVisible(s, a.tech) && queueTech(s, a.tech),
+  'end-turn': s => liveEndTurn(s)
+};
+
+// Diplomacy: any human still in the game, at any time. Offers land in the other player's Council at once.
+const LIVE_TALK = {
+  'war': (s, a) => liveSeat(a.to) && declareWar(s, a.to),
+  'peace': (s, a) => { if (!liveSeat(a.to)) return false; LIVE.result = offerPeace(s, a.to); return LIVE.result !== ''; },
+  'offer-answer': (s, a) => liveId(a.id) && answerOffer(s, a.id, a.accept === true),
+  'open-ask': (s, a) => { if (!liveSeat(a.to)) return false; LIVE.result = proposeOpen(s, a.to); return LIVE.result !== ''; },
+  'trade': (s, a) => {
+    if (!liveSeat(a.other) || a.other === s || (a.dir !== 'sell' && a.dir !== 'buy') || !TRADE_RES.includes(a.res)) return false;
+    if (![a.qty, a.turns, a.total].every(Number.isInteger)) return false;
+    const d = {
+      other: a.other, dir: a.dir, proposer: s,
+      seller: a.dir === 'sell' ? s : a.other, buyer: a.dir === 'sell' ? a.other : s,
+      res: a.res, qty: a.qty, turns: a.turns, total: Math.max(0, a.total)
+    };
+    LIVE.result = proposeTrade(d);
+    return LIVE.result.result !== 'error';
+  },
+  'keep': s => { delete G.live.pend[s]; return true; },
+  'burn': s => {
+    const p = G.live.pend[s], c = p ? cityById(p.city) : null;
+    delete G.live.pend[s];
+    return !!c && c.owner === s && burnCity(c);
+  }
+};
+
+// Not a player's own turn: the server and the clock.
+const LIVE_SYSTEM = {
+  'cpu-takes-over': (s, a) => liveSeat(a.seat) && liveTakeover(a.seat),
+  'human-returns': s => liveReturn(s),
+  'timeout': (s, a) => G.live.timer > 0 && a.round === G.turn && liveTimeout()
+};
+
+// Applies the next action of the log. Returns true when it changed anything.
+function applyAction(action) {
+  if (!G || !G.live || G.over || !action || !liveSeat(action.seat) || typeof action.type !== 'string') return false;
+  const s = action.seat, a = action.args && typeof action.args === 'object' && !Array.isArray(action.args) ? action.args : {};
+  G.cur = s;
+  let ok = false;
+  LIVE.mute = LIVE.replay || s !== G.viewer;   // somebody else's order never talks on this screen
+  // A made-up action could make a rule throw. It throws on every device at the same point, so the games still agree.
+  try {
+    const has = table => Object.prototype.hasOwnProperty.call(table, action.type);
+    if (has(LIVE_SYSTEM)) ok = !!LIVE_SYSTEM[action.type](s, a);
+    else if (has(LIVE_TALK)) ok = liveCanTalk(s) && !!LIVE_TALK[action.type](s, a);
+    else if (has(LIVE_TURN)) ok = liveCanAct(s) && !!LIVE_TURN[action.type](s, a);
+    if (!G.over) { checkElimination(); checkWin(); }   // what the screen's afterAction does after every order in a solo game
+  } catch (error) { ok = false; LIVE.errors.push(String(error && error.stack || error)); }
+  LIVE.mute = LIVE.replay;
+  try {
+    liveSee();
+    liveAdvance();
+  } catch (error) { LIVE.errors.push(String(error && error.stack || error)); }
+  LIVE.mute = false;
+  return ok;
+}
+
+/* the hash and the snapshot */
+
+// The game as every device agrees on it.
+function liveState(forHash) {
+  const c = Object.assign({}, G);
+  for (const k of LIVE_LOCAL) delete c[k];
+  c.players = G.players.map(f => {
+    const o = Object.assign({}, f);
+    delete o.notes;
+    if (forHash) { delete o.ink; delete o.light; }   // colors are looks, and the palette search can tie differently between devices
+    return o;
+  });
+  return c;
+}
+function liveDigest(text) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+// JSON text with every object's keys in one order, so two copies of the same state always give the same text.
+function liveStable(v) {
+  if (Array.isArray(v)) return '[' + v.map(x => liveStable(x === undefined || typeof x === 'function' ? null : x)).join(',') + ']';
+  if (v && typeof v === 'object') {
+    const keys = Object.keys(v).filter(k => v[k] !== undefined && typeof v[k] !== 'function').sort();
+    return '{' + keys.map(k => JSON.stringify(k) + ':' + liveStable(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v);
+}
+const liveHash = () => liveDigest(liveStable(liveState(true)));
+
+// Puts the keys of every object in the game in one fixed order, in place. A snapshot that has been through the
+// database comes back with its keys in the database's order, and a game replayed from it has to walk every object
+// the way the screens that played from the start do. It runs where snapshots are taken (the start of each round)
+// and where one is restored, so both sides begin the round with the same order, and what is added after that is
+// added by the same actions in the same sequence.
+function liveCanon(v) {
+  if (Array.isArray(v)) {
+    for (const x of v) if (x && typeof x === 'object') liveCanon(x);
+    return v;
+  }
+  const keys = Object.keys(v);
+  for (const k of keys) if (v[k] && typeof v[k] === 'object') liveCanon(v[k]);
+  if (keys.includes('__proto__')) return v;
+  const sorted = keys.slice().sort();
+  if (keys.every((k, i) => k === sorted[i])) return v;
+  const values = sorted.map(k => v[k]);
+  for (const k of keys) delete v[k];
+  sorted.forEach((k, i) => { v[k] = values[i]; });
+  return v;
+}
+
+// Joining a game that is under way: the newest snapshot, then every action after it (applyAction).
+function liveRestore(state, viewer) {
+  // A snapshot is the live game of this version, so it is taken exactly as it is: prepareState fills in
+  // defaults an old save needs, and a game that had never been through it would then hash differently.
+  G = liveCanon(JSON.parse(JSON.stringify(state)));
+  WRAP_W = G.wrap ? G.cols : 0;
+  roadCache.clear();
+  applyTree(G.tree);
+  applyPeakName(G);
+  G.log = [];
+  G.news = [];
+  G.viewer = viewer;
+  G.cur = viewer;
+  G.handoff = false;
+  G.pending = null;
+  for (const f of G.players) f.notes = [];
+  return G;
 }
 
 // A march with steps left. Such a unit walks on by itself at the start of each turn.
@@ -5139,6 +5588,7 @@ function pushNews(n) {
   const f = pl(n.i);
   if (!G || G.over || !f || !f.human || !f.alive) return;
   if (n.kind !== 'wonder' && (G.tut || !popupsOn())) return;
+  if (G.live && n.i !== G.viewer) return;   // a live game: cards are for the seat they are about
   (G.news = G.news || []).push(n);
 }
 
@@ -6292,6 +6742,10 @@ function confirmPlot(cityId, id, x, y) {
   placing = null;
   closeModal();
   if (!c || c.owner !== G.viewer || !myTurn() || !plotOk(c, tileAt(x, y), id)) { render(); return; }
+  if (G.live) {
+    liveSend('city-build', { city: c.id, kind: 'building', id, at: [x, y] }, ok => { if (ok) toast(BUILDINGS[id].name + ' queued on its own hex.'); afterAction(); });
+    return;
+  }
   c.plot = c.plot || {};
   const before = c.plot[id];
   c.plot[id] = [x, y];
@@ -7070,7 +7524,7 @@ function renderCoach() {
 
 let toastTimer = 0;
 function toast(message) {
-  if (!UI) return;
+  if (!UI || LIVE.mute) return;
   UI.toast.textContent = message;
   // Toasts sit under the top bar, or under the coach box when it's showing.
   const coach = UI.coach && !UI.coach.hidden ? UI.coach.getBoundingClientRect() : null;
@@ -7080,7 +7534,9 @@ function toast(message) {
   toastTimer = setTimeout(() => UI.toast.classList.remove('show'), Math.max(2400, 1200 + message.length * 45));
 }
 
-const myTurn = () => !!G && !G.over && !G.handoff && !onlineSent && G.viewer !== null && G.cur === G.viewer;
+const myTurn = () => !!G && !G.over && !G.handoff && !onlineSent && G.viewer !== null && (G.live ? liveCanAct(G.viewer) : G.cur === G.viewer);
+// Diplomacy in a live game does not wait for a turn: any human still in the game can answer or offer at any time.
+const canTalk = () => !!G && !G.over && !G.handoff && !onlineSent && G.viewer !== null && (G.live ? liveCanTalk(G.viewer) : G.cur === G.viewer);
 const viewerPlayer = () => (G && G.viewer !== null ? pl(G.viewer) : null);
 const dot = (f, size) => '<span class="dot" style="background:' + f.light + ';border-color:' + f.ink +
   (size ? ';width:' + size + 'px;height:' + size + 'px' : '') + '"></span>';
@@ -7121,6 +7577,7 @@ function render() {
     return;
   }
   UI.handoff.hidden = true;
+  if (G.live) G.pending = G.live.pend[G.viewer] || null;   // a captured city of mine that is waiting for Keep or Burn
   refreshVision();
   tutorialTick();
   validateSelection();
@@ -7134,6 +7591,8 @@ function render() {
   renderLog();
   renderCoach();
   UI.btnEnd.disabled = !myTurn();
+  const endLabel = G.live && !myTurn() && !G.over ? (G.live.done[G.viewer] || !G.live.human0.includes(G.viewer) ? 'Waiting for the others' : 'Waiting for your turn') : 'End turn<kbd>enter</kbd>';
+  if (UI.btnEnd.dataset.label !== endLabel) { UI.btnEnd.dataset.label = endLabel; UI.btnEnd.innerHTML = endLabel; }
   if (G.pending && UI.modalLayer.hidden) showPending();
   else if (UI.modalLayer.hidden && !G.over) showNews();
   if (G.over && !UI.endShown) showEndModal();
@@ -7154,8 +7613,9 @@ function renderBar() {
   UI.bannerDot.style.background = f.light;
   UI.bannerDot.style.borderColor = f.ink;
   UI.bannerName.textContent = f.name;
-  UI.bannerWho.textContent = CIVS[f.civ].land + ' · ' + (f.human ? (myTurn() ? 'your turn' : 'waiting') : 'CPU');
-  UI.turnReadout.innerHTML = 'Turn <b>' + Math.max(1, G.turn) + '</b>' + (G.maxTurns ? '<em>/' + G.maxTurns + '</em>' : '');
+  UI.bannerWho.textContent = CIVS[f.civ].land + ' · ' + (f.human ? (myTurn() ? 'your turn' : G.live && G.live.done[f.i] ? 'turn ended' : 'waiting') : 'CPU');
+  UI.turnReadout.innerHTML = (G.live ? 'Round ' : 'Turn ') + '<b>' + Math.max(1, G.turn) + '</b>' + (G.maxTurns ? '<em>/' + G.maxTurns + '</em>' : '');
+  renderLiveStrip();
   if (G.handoff) { UI.stats.innerHTML = ''; return; }
   const s = scoreParts(f.i), inc = stockIncome(f.i), rate = researchRate(f.i);
   const t = f.research ? researchTurns(f.i) : null;
@@ -7512,7 +7972,7 @@ function cityPanel(c) {
     html += kv('Walls', hasWalls(c) ? 'yes' : 'no') +
       '<p class="hint">' + (war ? 'You are at war with ' + esc(knownName(v, f.i, true)) + '. Hit the city down to 0 HP, then step in with a melee land unit to take it. Ships can batter it but can’t take it' + (civIs(v, 'norway') ? ', unless they’re Norway’s' : '') + '.'
         : 'You are at peace with ' + esc(knownName(v, f.i, true)) + '.') + '</p>';
-    if (!war && myTurn()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
+    if (!war && canTalk()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
     html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
     return html;
   }
@@ -7685,7 +8145,7 @@ function unitPanel(u) {
   if (u.owner !== v) {
     const war = v !== null && atWar(v, u.owner);
     html += '<p class="hint">' + (war ? 'You are at war with ' + esc(knownName(v, f.i, true)) + '.' : 'You are at peace with ' + esc(knownName(v, f.i, true)) + '. Declare war before you attack.') + '</p>';
-    if (!war && myTurn()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
+    if (!war && canTalk()) html += '<div class="actions"><button class="act warn" data-act="war-ask:' + f.i + '">Declare war</button></div>';
     html += '<div class="actions"><button class="act" data-act="deselect">Back</button></div>';
     return html;
   }
@@ -8093,7 +8553,7 @@ function showCouncil() {
       const from = pl(o.from), t = offerText(o);
       return '<div class="council-row"><div><div class="cn">' + dot(from) + esc(from.name) + ' <span class="tag ' + t.cls + '">' + t.tag + '</span></div>' +
         '<div class="cd">' + t.note + '</div></div><div class="ca">' +
-        (myTurn() ? '<button class="act" data-act="offer-accept:' + o.id + '">Accept</button><button class="act" data-act="offer-refuse:' + o.id + '">Refuse</button>' : '') +
+        (canTalk() ? '<button class="act" data-act="offer-accept:' + o.id + '">Accept</button><button class="act" data-act="offer-refuse:' + o.id + '">Refuse</button>' : '') +
         '</div></div>';
     }).join('');
   }
@@ -8138,7 +8598,7 @@ function showCouncil() {
         : building ? '<div class="cd">Embassy being built in ' + esc(building.name) + (building.build.ask ? ', waiting for their answer' : '') + '.</div>'
         : hasTech(v, 'writing') && !G.tut ? '<div class="cd">Build an Embassy in one of your cities to ask them.</div>' : '') + '</div><div class="ca">';
     if (cap) html += '<button class="act" data-act="embassy-look:' + o.i + '">Show capital</button>';
-    if (myTurn()) {
+    if (canTalk()) {
       if (war) html += sent ? '<span class="tag">offer sent</span>' : '<button class="act" data-act="peace:' + o.i + '">Offer peace</button>';
       else {
         if (!dealUntil && !bordersNever() && (landClosed(o.i) || landClosed(v))) html += sentBorders ? '<span class="tag">borders offer sent</span>' : '<button class="act" data-act="open-ask:' + o.i + '">Open borders</button>';
@@ -8151,7 +8611,7 @@ function showCouncil() {
   html += '<p class="hint">' + esc(closeNote()) + (bordersNever() ? '' : ' Stepping onto the land of a civ whose borders are closed, without an open-borders deal, means war, and units caught inside are moved out. ' +
     'Open-borders deals last ' + OPEN_TURNS + ' turns.') + '</p>' +
     '<p class="hint">Everyone starts at peace. You can only attack players you are at war with. A CPU player takes peace when it is losing, ' +
-    'tired of a long war, or busy with another war. Another human answers your offer on their own turn.</p>' +
+    'tired of a long war, or busy with another war. ' + (G.live ? 'Another human sees your offer in their Council at once and answers when they like.' : 'Another human answers your offer on their own turn.') + '</p>' +
     '<p class="hint"><b>Trade.</b> Horses, iron and gunpowder change hands at once. The buyer pays in production, in one go or in installments, and only war ends a deal. ' +
     'If the buyer starts the war, what it still owes is paid on the spot; if the seller does, the payments stop. Nobody trades production for production, and one payment can never top what the payer’s best city makes in a turn.</p></div>' +
     '<div class="modal-foot"><button class="btn" data-act="close">Close</button></div>';
@@ -8281,26 +8741,28 @@ function askEndTurn() {
 }
 
 function showMenu() {
-  const howSaved = online ? 'Bored Together keeps this match on the server, not on this device, so your solo campaign is left alone.'
+  const howSaved = G.live ? 'A live game is kept on the server, not in a slot on this device. Leave it any time: a CPU plays your civ while you are gone, and you get it back when you return.'
+    : online ? 'Bored Together keeps this match on the server, not on this device, so your solo campaign is left alone.'
     : G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.'
     : 'The game saves itself on this device after every move (the Autosave) and keeps the start of your last three turns. Save game keeps a copy under a name you pick. Playing the tutorial keeps your saves.';
   openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name) +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
     '<button class="act" data-act="whats-new">What’s new</button>' +
-    (embedded() ? '<button class="act" data-act="leave-bored">Back to Bored</button>' : '') +
+    (embedded() && !G.live ? '<button class="act" data-act="leave-bored">Back to Bored</button>' : '') +   // a live game has one way out: Leave game
     '<button class="act" data-act="civs">All 16 civs</button>' +
     (G.tut ? '<button class="act switch" data-act="coach-toggle">Tutorial coach<b>' + (G.tut.closed ? 'off' : 'on') + '</b></button>'
-      : '<button class="act" data-act="tut-start">Play the tutorial</button>') +
+      : G.live ? '' : '<button class="act" data-act="tut-start">Play the tutorial</button>') +
     '<button class="act switch" data-act="tips-toggle">Tips in my games<b>' + (tipsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="popups-toggle">Event popups<b>' + (popupsOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="jump-toggle">Jump to the next unit after orders<b>' + (jumpOn() ? 'on' : 'off') + '</b></button>' +
     '<button class="act switch" data-act="anim-next">Animation<b>' + ANIM_LEVELS[currentAnim()] + '</b></button>' +
-    (G.tut || online || G.over ? '' : '<button class="act" data-act="slots:save">Save game</button>') +
-    (G.tut || online || G.over || !currentSlot || !slotHead(currentSlot) ? '' :
+    (G.tut || online || G.over || G.live ? '' : '<button class="act" data-act="slots:save">Save game</button>') +
+    (G.tut || online || G.over || G.live || !currentSlot || !slotHead(currentSlot) ? '' :
       '<button class="act" data-act="save">Save to “' + esc(slotHead(currentSlot).name || 'Saved game') + '”<kbd>Ctrl+S</kbd></button>') +
-    (online ? '' : '<button class="act" data-act="slots:load">Load game</button>') +
-    '<button class="act warn" data-act="new-ask">Quit to the main menu</button></div>' +
+    (online || G.live ? '' : '<button class="act" data-act="slots:load">Load game</button>') +
+    (G.live ? '<button class="act warn" data-act="live-leave">Leave game (it keeps going)</button></div>'
+      : '<button class="act warn" data-act="new-ask">Quit to the main menu</button></div>') +
     '<p class="hint">' + howSaved + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Back to the game</button></div>', true);
 }
@@ -8562,7 +9024,8 @@ function showEndModal() {
     '<div class="modal-body"><div class="table-wrap"><table class="standings"><thead><tr><th>Player</th><th class="n">Cities</th><th class="n">Pop</th>' +
     '<th class="n">Tech</th><th class="n">Era</th><th class="n">Military</th><th class="n">Score</th></tr></thead><tbody>' +
     rows + '</tbody></table></div><p class="hint">Score is cities × 5 + pop + tech points + era points + military strength ÷ 20.</p></div>' +
-    '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button><button class="btn primary" data-act="new-setup">New game</button></div>');
+    '<div class="modal-foot"><button class="btn" data-act="close">Look at the map</button>' +
+    (G.live ? '<button class="btn primary" data-act="live-leave-yes">Back to Bored Together</button>' : '<button class="btn primary" data-act="new-setup">New game</button>') + '</div>');
 }
 
 /* ── interface: what a click does ──────────────────────────────────────────── */
@@ -8576,10 +9039,9 @@ function selectCity(c) {
   render();
 }
 function afterAction() {
-  checkElimination();
-  checkWin();
+  if (!G.live) { checkElimination(); checkWin(); }   // a live game ran both when the order came back in the log
   render();
-  autosave();
+  if (!G.live) autosave();
 }
 // A unit that has finished its orders (gone, marching, or out of moves) lets go of the selection:
 // to the next unit that needs orders, or to nothing when the setting is off or nobody does.
@@ -8628,6 +9090,14 @@ function showTurnComplete() {
 }
 
 function doEndTurn() {
+  if (G.live) {
+    closeModal();
+    selection = null;
+    reachable = null;
+    placing = null;
+    liveSend('end-turn', {}, () => render());
+    return;
+  }
   if (online && onlineSent) return;
   closeModal();
   selection = null;
@@ -8644,14 +9114,25 @@ function doEndTurn() {
   }
 }
 
-function strikeAt(u, x, y) {
-  const name = UNITS[u.type].name;
-  const result = attack(u, x, y);
-  if (!result) return;
+function strikeSay(name, result) {
   if (result.captured) toast('Captured!');
   else if (result.died) toast('Your ' + name.toLowerCase() + ' died in the attack.');
   else if (result.killed) toast('Destroyed it. You took ' + result.back + '.');
   else toast('Hit for ' + result.dmg + (result.back ? ', took ' + result.back : '') + '.');
+}
+function strikeAt(u, x, y) {
+  const name = UNITS[u.type].name;
+  if (G.live) {
+    liveSend('unit-order', { unit: u.id, x, y }, (ok, result) => {
+      if (ok && result) strikeSay(name, result);
+      if (!unitById(u.id)) selection = null;
+      afterOrder(u);
+    });
+    return;
+  }
+  const result = attack(u, x, y);
+  if (!result) return;
+  strikeSay(name, result);
   if (!unitById(u.id)) selection = null;
   afterOrder(u);
 }
@@ -8673,6 +9154,8 @@ function onAction(act) {
   if (kind === 'title-new') { showPane('setup'); return; }
   if (kind === 'title-back') { showPane('title'); return; }
   if (kind === 'setup-reset') { resetSetup(); return; }
+  if (G && G.live && (kind === 'tut-start' || kind === 'slots' || kind.startsWith('slot-'))) return;   // no slots, no tutorial in a live game
+  if (kind === 'live-lobby-leave') { liveLobbyLeave(); return; }
   if (kind === 'slots' || kind.startsWith('slot-')) { slotAction(kind, a, b); return; }
   if (kind === 'tut-start') { if (G && !G.tut) saveGame(); startTutorial(); return; }
   if (kind === 'anim-next') {
@@ -8704,6 +9187,7 @@ function onAction(act) {
   }
   if (!G) { if (kind === 'close') closeModal(); return; }
   const selUnit = selection && selection.kind === 'unit' ? unitById(selection.id) : null;
+  if (G.live && liveUi(kind, act, parts, selUnit)) return;
   switch (kind) {
     case 'close': closeModal(); if (G.news && G.news.length) render(); break;
     case 'news-skip': G.news = (G.news || []).filter(m => m.i !== G.viewer); closeModal(); render(); break;
@@ -9008,10 +9492,14 @@ function orderUnit(selUnit, x, y) {
     // Closed land: stepping in is a declaration of war, so ask first.
     if (reachable.war && reachable.war.has(key)) { askEnterWar(selUnit, x, y); return true; }
     const prey = unitsAt(x, y).find(o => o.owner !== selUnit.owner && !isMil(o.type)), was = prey ? prey.type : null;
+    const say = () => {
+      if (prey && prey.owner === selUnit.owner) {
+        toast('Captured a ' + UNITS[was].name.toLowerCase() + (prey.type !== was ? ', now a ' + UNITS[prey.type].name.toLowerCase() : '') + '.');
+      }
+    };
+    if (G.live) { liveSend('unit-order', { unit: selUnit.id, x, y }, ok => { if (ok) say(); afterOrder(selUnit); }); return true; }
     moveUnit(selUnit, x, y, reachable);
-    if (prey && prey.owner === selUnit.owner) {
-      toast('Captured a ' + UNITS[was].name.toLowerCase() + (prey.type !== was ? ', now a ' + UNITS[prey.type].name.toLowerCase() : '') + '.');
-    }
+    say();
     afterOrder(selUnit);
     return true;
   }
@@ -9023,9 +9511,15 @@ function orderUnit(selUnit, x, y) {
   // Clicking the destination again takes the orders back off.
   if (seenBy(v, x, y)) {
     if (selUnit.path && selUnit.path.to[0] === x && selUnit.path.to[1] === y) {
+      if (G.live) { liveSend('unit-order', { unit: selUnit.id, x, y }, () => { toast('Orders canceled.'); afterAction(); }); return true; }
       selUnit.path = null;
       toast('Orders canceled.');
       afterAction();
+      return true;
+    }
+    if (G.live) {
+      if (!computePaths(selUnit).best.has(keyOf(x, y))) return false;
+      liveSend('unit-order', { unit: selUnit.id, x, y }, () => afterOrder(selUnit));
       return true;
     }
     if (beginPath(selUnit, x, y)) { afterOrder(selUnit); return true; }
@@ -9454,7 +9948,7 @@ function slotList() {
 function saveGame() {
   // A Bored Together match lives on the server and in the match document, not
   // in this device's slots: it must never write over (or clear) a solo campaign.
-  if (online) return false;
+  if (online || (G && G.live)) return false;   // a live game is the room's, not this device's
   if (!G || G.watch || G.tut) return false;
   if (G.over) { clearSave(); return false; }
   return slotWrite('auto', slotHeader('auto', G), G);
@@ -9465,7 +9959,7 @@ function clearSave() { slotRemove('auto'); }
 function autosave() { slotDirty = true; saveGame(); }
 // The start of a new turn goes in the oldest of the three turn autosaves.
 function rollTurnSave() {
-  if (online || !G || G.watch || G.tut || G.over) return false;
+  if (online || !G || G.live || G.watch || G.tut || G.over) return false;
   const slots = TURN_IDS.map(id => ({ id, head: slotHead(id) }));
   const target = slots.find(s => !s.head) || slots.reduce((a, b) => (a.head.at <= b.head.at ? a : b));
   return slotWrite(target.id, slotHeader('turn', G), G);
@@ -9473,6 +9967,7 @@ function rollTurnSave() {
 
 // Why this game can't be saved right now, or null.
 function whyNotSave() {
+  if (G && G.live) return 'A live game is kept on the server, so there is nothing to save here.';
   if (online) return 'Bored Together keeps this match on the server, so there is nothing to save here.';
   if (!G || G.watch) return 'There is no game to save.';
   if (G.tut) return 'The tutorial isn’t saved.';
@@ -9638,9 +10133,15 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '4.7.1';
+const VERSION = '5.0';
 // Patch notes for the What’s new screen, newest first: a version, a date and one plain line per change.
 const CHANGELOG = [
+  { v: '5.0', date: 'Nov 9', notes: [
+    'Live online games in Bored Together: 2 to 4 friends plus CPUs in one game at the same time.',
+    'Dynamic turns like Civ 6: everyone moves at once, and players at war with each other take turns.',
+    'An optional turn timer.',
+    'Leave and come back any time: a CPU plays your civ while you’re gone.'
+  ] },
   { v: '4.7.1', date: 'Nov 9', notes: [
     'Esc stays in the game on Bored: it closes windows, deselects, then opens the Menu. Leave with Back to Bored, in the Menu or on the title screen.'
   ] },
@@ -9758,6 +10259,7 @@ function buildStartScreen() {
     '<option value="' + id + '">' + MAP_SIZES[id].name + ' (' + MAP_SIZES[id].players + ')</option>').join('');
   UI.optLevel.innerHTML = Object.keys(LEVELS).map(id => '<option value="' + id + '">' + LEVELS[id].name + '</option>').join('');
   UI.optClose.innerHTML = BORDER_CHOICES.map(b => '<option value="' + b.id + '"' + (b.id === DEFAULT_BORDERS ? ' selected' : '') + '>' + b.name + '</option>').join('');
+  UI.optTimer.innerHTML = [[0, 'Off'], [60, '60 seconds'], [120, '2 minutes'], [300, '5 minutes']].map(t => '<option value="' + t[0] + '">' + t[1] + '</option>').join('');
   UI.optClose.onchange = refreshStart;
   UI.optHumans.onchange = () => fitCounts('humans');
   UI.optCpus.onchange = () => fitCounts('cpus');
@@ -9768,7 +10270,8 @@ function buildStartScreen() {
     document.getElementById('seat-civ-' + i).onchange = refreshStart;
     document.getElementById('seat-name-' + i).oninput = event => { event.target.dataset.edited = '1'; };
   }
-  UI.btnBegin.onclick = beginGame;
+  UI.btnBegin.onclick = () => { if (LIVE.net) liveStartPressed(); else beginGame(); };
+  UI.btnReady.onclick = liveReadyPressed;
   UI.btnContinue.onclick = () => { if (!loadSlot('auto')) { toast('That save can’t be opened.'); refreshTitle(); } };
   document.getElementById('title-ver').textContent = 'v' + VERSION;
   firstVisitNotes();
@@ -9808,6 +10311,7 @@ function refreshTitle() {
 function refreshNotesTag() { document.getElementById('notes-tag').hidden = !notesNew(); }
 // 2 to 8 players in all: changing one count trims the other to fit.
 function fitCounts(changed) {
+  if (LIVE.net) { refreshStart(); return; }
   let h = Number(UI.optHumans.value), c = Number(UI.optCpus.value);
   if (h + c > MAX_PLAYERS) { if (changed === 'humans') c = MAX_PLAYERS - h; else h = MAX_PLAYERS - c; }
   if (h + c < 2) { if (changed === 'humans') c = 2 - h; else h = Math.max(1, 2 - c); }
@@ -9818,8 +10322,7 @@ function fitCounts(changed) {
 const BORDER_CHOICES = [{ id: 'tech', name: 'Close with Early Empire' }, { id: 'never', name: 'Never close' }];
 const DEFAULT_BORDERS = 'tech';
 const seatCounts = () => ({ humans: Number(UI.optHumans.value), cpus: Number(UI.optCpus.value) });
-function refreshStart() {
-  const { humans, cpus } = seatCounts(), n = humans + cpus;
+function refreshSeats(humans, n) {
   // Each seat's dot shows the colors its civ will wear, alternates included.
   const picked = SEATS.map((s, i) => (i < n ? document.getElementById('seat-civ-' + i).value : null));
   const colors = assignColors(picked.map(c => (CIVS[c] ? c : null)));
@@ -9843,6 +10346,10 @@ function refreshStart() {
       note.textContent = CIVS[civ].ability + ' Unique: ' + u.name + '.';
     } else note.textContent = 'A civ nobody else picked, drawn at random.';
   });
+}
+function refreshStart() {
+  const { humans, cpus } = LIVE.net ? liveCounts() : seatCounts(), n = humans + cpus;
+  if (!LIVE.net) refreshSeats(humans, n);
   const size = UI.optSize.value === 'auto' ? sizeFor(n) : UI.optSize.value;
   UI.mapNote.textContent = MAP_TYPES[UI.optMap.value].blurb + (UI.optMap.value === 'mirror' && n % 2 ? ' With an odd number of players one start has no twin.' : '');
   UI.sizeNote.textContent = MAP_SIZES[size].name + ' map, ' + MAP_SIZES[size].cols + ' × ' + MAP_SIZES[size].rows + ', built for ' +
@@ -9851,6 +10358,7 @@ function refreshStart() {
   UI.closeNote.textContent = UI.optClose.value === 'never' ? 'Borders stay open all game: anyone can walk anywhere. Early Empire can still be researched, but it closes nothing.'
     : 'A civ’s land closes to the others when it researches Early Empire, a cheap first tech: stepping onto it without an open-borders deal (made in the Council) means war.';
   UI.startNote.innerHTML = START_NOTE;
+  if (LIVE.net) return;   // the room writes its own note
   // Starting a game takes over the Autosave, so say so; named saves are never touched.
   const auto = online ? null : slotList().find(s => s.id === 'auto');
   UI.setupNote.textContent = auto ? 'Starting a game replaces your Autosave. Games you saved to a slot are kept.' : '';
@@ -10021,6 +10529,566 @@ function nextSeed() {
   return (Date.now() ^ Math.floor(Math.random() * 0xffffffff) ^ Math.imul(gamesStarted + 1, 2654435761)) >>> 0;
 }
 
+/* ── live games on this screen ──────────────────────────────────────────────
+ * The hub owns the network. It gives this page a bridge, window.__boredLive, with call(op, args) and on(fn).
+ * What a player does is sent as an action and takes effect when it comes back in order (liveReceive), the
+ * same way it does on every other player's screen. Selection, hover and previews never leave this page.
+ */
+
+const liveWords = error => String((error && error.message) || error || 'Something went wrong.').replace(/^Error:\s*/, '');
+
+// Sends one action. done(ok, result) runs once it has come back in order and been applied here.
+function liveSend(type, args, done) {
+  if (!LIVE.net) return false;
+  LIVE.net.call('send', { type, args }).then(r => {
+    if (!done || !r) return;
+    const known = LIVE.last.get(r.seq);
+    if (known) done(known.ok, known.result);
+    else LIVE.after.set(r.seq, done);
+  }).catch(error => toast(liveWords(error)));
+  return true;
+}
+
+// The next actions of the log, in order. The hub never skips one; if it did, ask it to look again.
+function liveReceive(list) {
+  if (!G || !G.live) return;
+  for (const a of list) {
+    if (a.seq <= LIVE.applied) continue;
+    if (a.seq !== LIVE.applied + 1) { LIVE.net.call('resync', { after: LIVE.applied }).catch(() => {}); break; }
+    const round = G.turn;
+    LIVE.result = null;
+    const ok = applyAction(a);
+    LIVE.applied = a.seq;
+    LIVE.last.set(a.seq, { ok, result: LIVE.result });
+    if (LIVE.last.size > 64) LIVE.last.delete(LIVE.last.keys().next().value);
+    if (LIVE.replay) continue;
+    liveAnnounce(a, ok);
+    if (G.turn !== round) liveRound();
+    if (G.over && !LIVE.finished) liveFinish();
+    const done = LIVE.after.get(a.seq);
+    if (done) { LIVE.after.delete(a.seq); done(ok, LIVE.last.get(a.seq).result); }
+  }
+  if (!LIVE.replay) render();
+}
+
+// Everyone sees when somebody leaves or comes back.
+function liveAnnounce(a, ok) {
+  if (!ok) return;
+  const args = a.args && typeof a.args === 'object' ? a.args : {};
+  if (a.type === 'cpu-takes-over' && liveSeat(args.seat)) {
+    const f = pl(args.seat);
+    toast(args.seat === G.viewer ? 'A CPU is playing your civ. Rejoining…' : f.name + ' has left. A CPU plays their civ from the next round.');
+  } else if (a.type === 'human-returns') {
+    const f = pl(a.seat);
+    toast(a.seat === G.viewer ? 'You are back. You play again from the next round.' : f.name + ' is back. They play again from the next round.');
+  }
+}
+
+// A new round has begun on this screen: say so to the server (the hash is how the screens check each other), keep
+// a snapshot if this is the screen that does, and start the timer.
+function liveRound() {
+  const round = G.turn;
+  LIVE.clock = G.live.timer && !G.over ? { round, ends: Date.now() + G.live.timer * 1000 } : null;
+  if (G.over) return;
+  const hash = liveHash();
+  LIVE.net.call('report', { round, hash }).then(r => { if (r && r.desync) liveDesync(round); }).catch(() => {});
+  if (liveKeeper()) LIVE.net.call('snapshot', { round, seq: LIVE.applied, hash, state: liveState(false) }).catch(() => {});
+  toast(noticeFor(G.viewer) || 'Round ' + G.turn);
+}
+// The lowest-seated human who is online keeps the snapshot. (Two screens can both think so for a moment; the server keeps the first.)
+function liveKeeper() {
+  for (const i of G.live.humans) {
+    if (!pl(i).human) continue;
+    if (i === G.viewer) return true;
+    if (LIVE.seen[i] && LIVE.seen[i].online) return false;
+  }
+  return false;
+}
+function liveFinish() {
+  LIVE.finished = true;
+  LIVE.net.call('finish', { winner: G.over.winner, why: G.over.why }).catch(() => {});
+}
+// Two screens that disagree on the hash of a round cannot both be right. The one the server tells reloads from the
+// last snapshot and the actions after it.
+function liveDesync(round) {
+  toast('This game drifted out of step with the others. Reloading it…');
+  LIVE.net.call('reload', { round }).catch(() => {});
+}
+
+// What the hub tells the page: the room changed, new actions, who is here, the connection.
+function liveEvent(m) {
+  if (!m || typeof m !== 'object') return;
+  if (m.event === 'actions') {
+    if (G && G.live) liveReceive(m.actions || []);
+    else LIVE.early.push(...(m.actions || []));   // the game is still opening: keep them for when it has
+  }
+  else if (m.event === 'presence') livePresence(m);
+  else if (m.event === 'game') {
+    LIVE.game = m.game;
+    if (G && G.live) return;
+    if (m.game.status === 'lobby') liveLobbyRender(m.game, LIVE.host);
+    else LIVE.net.call('hello', {}).then(liveHello).catch(liveFail);
+  } else if (m.event === 'net') {
+    if (UI.liveNet) UI.liveNet.hidden = m.online !== false;
+  }
+}
+function livePresence(m) {
+  const now = Date.now();
+  for (const s of m.seats || []) LIVE.seen[s.seat] = { online: !!s.online, away: s.away, controller: s.controller, at: now };
+  // The server's clock is the one that counts: the round began when its first hash came in.
+  if (G && G.live && m.timer && m.round === G.turn && Number.isFinite(m.round_age)) {
+    LIVE.clock = { round: G.turn, ends: now + (m.timer - m.round_age) * 1000 };
+  }
+}
+function liveFail(error) {
+  openModal(modalHead('Can’t open this game') + '<div class="modal-body"><p>' + esc(liveWords(error)) + '</p></div>' +
+    '<div class="modal-foot"><button class="btn primary" data-act="live-leave-yes">Back to Bored Together</button></div>', true);
+}
+
+// Once a second: the timer, who has gone quiet, my own civ if a CPU has it.
+function liveTick() {
+  if (!G || !G.live || !LIVE.net || LIVE.replay) return;
+  if (G.over) { renderLiveStrip(); return; }
+  const L = G.live, now = Date.now(), c = LIVE.clock;
+  if (c && c.round === G.turn && now >= c.ends && L.human0.some(i => !L.done[i] && pl(i).alive && pl(i).human) && now - LIVE.timeoutAt > 3000) {
+    LIVE.timeoutAt = now;
+    liveSend('timeout', { round: G.turn });
+  }
+  for (const i of L.humans) {
+    if (i === G.viewer || !pl(i).human || !pl(i).alive) continue;
+    const s = LIVE.seen[i];
+    if (s && s.controller === 'cpu') continue;
+    const away = !s || s.away === null || s.away === undefined ? (now - LIVE.entered) / 1000 : s.away + (now - s.at) / 1000;
+    if ((!s || !s.online) && away >= 60 && now - (LIVE.takeAt[i] || 0) > 8000) {
+      LIVE.takeAt[i] = now;
+      liveSend('cpu-takes-over', { seat: i });
+    }
+  }
+  if (L.away[G.viewer] && pl(G.viewer).alive && now - LIVE.backAt > 4000) {
+    LIVE.backAt = now;
+    liveSend('human-returns', {});
+  }
+  renderLiveStrip();
+}
+
+// The top bar: a dot for every human, a tick once they have ended their turn, an arrow for whose move it is when
+// players at war take turns, and the timer.
+function renderLiveStrip() {
+  const el = UI && UI.liveStrip;
+  if (!el) return;
+  if (!G || !G.live) { el.hidden = true; return; }
+  const L = G.live, v = G.viewer, acting = liveActing();
+  let html = '';
+  for (const i of L.humans) {
+    const f = pl(i), away = !f.human, here = L.human0.includes(i);
+    const group = L.groups.find(g => g.includes(i)), mover = acting.includes(i) && !!group && group.length > 1;
+    const ended = L.done[i] && here && !away, out = away || !f.alive;
+    const who = i === v ? 'You' : knownName(v, i, true);
+    const state = !f.alive ? 'is out' : away ? 'is away: a CPU plays this civ' : !here ? 'plays again next round'
+      : ended ? 'has ended their turn' : mover ? 'is taking their turn now' : group && group.length > 1 ? 'waits for the war turns before them' : 'is playing';
+    html += '<span class="lv' + (ended ? ' done' : '') + (mover ? ' now' : '') + (out ? ' away' : '') + (i === v ? ' me' : '') + '" title="' + esc(who + ' ' + state) + '">' +
+      (mover ? '<i class="mv">▶</i>' : '') + dotFor(v, f, 12) + (ended ? '<i class="tk">✓</i>' : out ? '<i class="tk">CPU</i>' : '') + '</span>';
+  }
+  if (!L.human0.length && !G.over) html += '<span class="lv-wait">waiting for players</span>';
+  else if (LIVE.clock && LIVE.clock.round === G.turn && !G.over) {
+    const left = Math.max(0, Math.ceil((LIVE.clock.ends - Date.now()) / 1000));
+    html += '<b class="lv-timer' + (left <= 10 ? ' low' : '') + '" title="Time left in this round">' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') + '</b>';
+  }
+  if (el.innerHTML !== html) el.innerHTML = html;
+  el.hidden = false;
+}
+
+/* what the buttons do in a live game */
+
+// Send it; finish the job (toasts, selection, redraw) when it has come back in order. Orders for units are
+// 'unit-order' with the hex, as the map click would give. Returns true when the button was handled here.
+function liveUi(kind, act, parts, selUnit) {
+  const me = G.viewer, a = parts[1], b = parts[2];
+  const own = u => !!u && u.owner === me && myTurn();
+  switch (kind) {
+    case 'research':
+      if (!myTurn()) return true;
+      if (!techVisible(me, a)) { toast('That tech is still hidden.'); return true; }
+      liveSend('research', { tech: a }, ok => {
+        if (!ok) return;
+        const q = pl(me).queue;
+        UI.techFocus = a;
+        toast('Researching ' + techName(pl(me).research) + (q.length ? ', then ' + plural(q.length, 'more tech', 'more techs') : '') + '.');
+        render();
+        showTech();
+      });
+      return true;
+    case 'setbuild': {
+      const c = cityById(a);
+      if (!c || c.owner !== me || !myTurn()) return true;
+      const item = { kind: b, id: parts[3] };
+      if (item.kind === 'embassy') { if (!buildProblem(c, item)) showEmbassy(c); return true; }
+      if (buildProblem(c, item)) return true;
+      if (item.kind === 'building' && needsPlot(item.id)) {
+        placing = { city: c.id, item };
+        if (UI.sheetOpen) setSheet(false);
+        centreOn(c.x, c.y);
+        toast('Pick a hex for the ' + BUILDINGS[item.id].name.toLowerCase() + ' (the outlined ones).');
+        render();
+        return true;
+      }
+      liveSend('city-build', { city: c.id, kind: item.kind, id: item.id }, ok => {
+        if (!ok) return;
+        render();
+        if (b === 'research' && !pl(me).research) toast('Now pick a tech for it. Press T.');
+      });
+      return true;
+    }
+    case 'embassy-pick': {
+      const c = cityById(a), to = Number(b);
+      if (c && c.owner === me && myTurn()) liveSend('city-embassy', { city: c.id, to }, (ok, r) => { if (ok) { render(); showEmbassy(c, { to, r }); } });
+      return true;
+    }
+    case 'clearpath':
+      if (selUnit && own(selUnit)) liveSend('unit-clearpath', { unit: selUnit.id }, () => afterAction());
+      return true;
+    case 'clearbuild': {
+      const c = cityById(a);
+      if (c && c.owner === me && myTurn()) liveSend('city-clear', { city: c.id }, () => afterAction());
+      return true;
+    }
+    case 'shoot': {
+      const c = cityById(a), o = unitById(b);
+      if (c && o && c.owner === me && myTurn()) liveSend('city-shoot', { city: c.id, unit: o.id }, (ok, r) => { if (r) toast(c.name + ' hits for ' + r.dmg + '.'); afterAction(); });
+      return true;
+    }
+    case 'strike': if (selUnit && own(selUnit)) strikeAt(selUnit, Number(a), Number(b)); return true;
+    case 'found': {
+      if (!selUnit || !own(selUnit) || selUnit.mp <= 0) return true;
+      const why = foundProblem(selUnit);
+      if (why) { toast(why + '.'); return true; }
+      const x = selUnit.x, y = selUnit.y;
+      liveSend('unit-found', { unit: selUnit.id }, ok => {
+        const c = ok ? cityAt(x, y) : null;
+        if (c && c.owner === me) { selection = { kind: 'city', id: c.id }; toast(c.name + ' founded. Pick something to build.'); }
+        afterAction();
+      });
+      return true;
+    }
+    case 'builder': {
+      const what = act.slice('builder:'.length);
+      if (selUnit && own(selUnit)) liveSend('unit-builder', { unit: selUnit.id, what }, ok => { if (ok) afterAction(); });
+      return true;
+    }
+    case 'skip':
+      if (selUnit && own(selUnit)) liveSend('unit-skip', { unit: selUnit.id }, () => { selection = null; afterAction(); });
+      return true;
+    case 'fortify':
+      if (selUnit && own(selUnit) && isMil(selUnit.type)) liveSend('unit-fortify', { unit: selUnit.id }, ok => { selection = null; if (ok) toast('Fortified: +3 defense until it moves.'); afterAction(); });
+      return true;
+    case 'sleep':
+      if (selUnit && own(selUnit)) liveSend('unit-sleep', { unit: selUnit.id }, ok => { selection = null; if (ok) toast('Asleep. It wakes when an enemy comes in sight.'); afterAction(); });
+      return true;
+    case 'enter-war':
+    case 'order-war': {
+      const u = unitById(a);
+      if (!own(u)) return true;
+      closeModal();
+      liveSend('unit-order', { unit: u.id, x: Number(b), y: Number(parts[3]), war: true }, () => afterOrder(u));
+      return true;
+    }
+    case 'disband':
+      if (selUnit && own(selUnit)) {
+        closeModal();
+        liveSend('unit-disband', { unit: selUnit.id }, () => { selection = null; afterAction(); });
+      }
+      return true;
+    case 'war-ask': if (canTalk()) askWar(Number(a)); return true;
+    case 'war':
+      closeModal();
+      if (canTalk()) liveSend('war', { to: Number(a) }, ok => { if (ok) toast('War with ' + pl(Number(a)).name + '.'); afterAction(); });
+      return true;
+    case 'peace': {
+      if (!canTalk()) return true;
+      const to = Number(a);
+      liveSend('peace', { to }, (ok, r) => {
+        if (!ok) return;
+        const name = knownName(me, to, true);
+        toast(r === 'accepted' ? name + ' accepts peace.' : r === 'refused' ? name + ' refuses peace for now.'
+          : 'Offer sent. ' + name + (pl(to).human ? ' sees it in their Council now.' : ' answers on their turn.'));
+        afterAction();
+        showCouncil();
+      });
+      return true;
+    }
+    case 'offer-accept':
+    case 'offer-refuse':
+      if (canTalk()) liveSend('offer-answer', { id: a, accept: kind === 'offer-accept' }, () => { afterAction(); showCouncil(); });
+      return true;
+    case 'open-ask': {
+      if (!canTalk()) return true;
+      const to = Number(a), name = pl(to).name;
+      liveSend('open-ask', { to }, (ok, r) => {
+        toast(r === 'accepted' ? name + ' agrees: borders open for ' + OPEN_TURNS + ' turns.' : r === 'refused' ? name + ' says no to open borders for now.'
+          : r === 'sent' ? 'Offer sent. ' + name + (pl(to).human ? ' sees it in their Council now.' : ' answers on their turn.') : 'Nothing to open.');
+        afterAction();
+        showCouncil();
+      });
+      return true;
+    }
+    case 'trade-ask': if (canTalk()) showTrade(Number(a)); return true;
+    case 'trade-send': {
+      const d = canTalk() ? readTradeForm() : null;
+      if (!d) return true;
+      liveSend('trade', { other: d.other, dir: d.dir, res: d.res, qty: d.qty, turns: d.turns, total: d.total }, (ok, r) => {
+        const name = pl(d.other).name;
+        if (!ok) { showTrade(d.other, d); refreshTradeForm(false); toast(r && r.why ? r.why + '.' : 'That trade did not go through.'); return; }
+        toast(r.result === 'accepted' ? name + ' agrees. Done.' : r.result === 'refused' ? name + ' ' + r.why + '.'
+          : 'Offer sent. ' + name + (pl(d.other).human ? ' sees it in their Council now.' : ' answers on their turn.'));
+        afterAction();
+        if (r.result === 'refused') { showTrade(d.other, d); refreshTradeForm(false); } else showCouncil();
+      });
+      return true;
+    }
+    case 'keep': liveSend('keep', {}, () => { closeModal(); afterAction(); }); return true;
+    case 'burn': liveSend('burn', {}, () => { closeModal(); selection = null; afterAction(); }); return true;
+    case 'handoff-go': return true;
+    case 'save': toast('A live game is kept on the server, so there is nothing to save here.'); return true;
+    case 'new-ask': case 'new': case 'new-setup': case 'live-leave':
+      if (G.over) liveLeave(); else askLeave();
+      return true;
+    case 'live-leave-yes': liveLeave(); return true;
+  }
+  return false;
+}
+
+function askLeave() {
+  openModal(modalHead('Leave this game?') +
+    '<div class="modal-body"><p>The game keeps going without you. A CPU plays your civ from the next round, and everyone is told. ' +
+    'Open it again from Your Games in Bored Together to take your civ back.</p></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="close">Stay</button><button class="btn primary" data-act="live-leave-yes">Leave game</button></div>', true);
+}
+// A CPU takes the civ at once, then the hub closes this screen.
+function liveLeave() {
+  closeModal();
+  const out = () => LIVE.net.call('exit', {}).catch(() => {});
+  if (!G || !G.live || G.over || G.live.away[G.viewer] || !pl(G.viewer).alive) { out(); return; }
+  LIVE.net.call('send', { type: 'cpu-takes-over', args: { seat: G.viewer } }).then(out, out);
+}
+
+/* the lobby: Game setup, live */
+
+const LIVE_STATE = { invited: 'Invited', joined: 'Joined', ready: 'Ready', left: 'Left' };
+const liveCounts = () => ({ humans: LIVE.game ? LIVE.game.seats.filter(s => s.state !== 'left').length : 2, cpus: Number(UI.optCpus.value) || 0 });
+const liveLobbyControls = () => [UI.optCpus, UI.optMap, UI.optSize, UI.optLevel, UI.optClose, UI.optTurns, UI.optConquest, UI.optScience, UI.optWrap, UI.optTimer, UI.optUnjoined];
+
+// The room's setup, as the server stores it.
+function liveLobbyConfig() {
+  return {
+    map: UI.optMap.value, size: UI.optSize.value, level: UI.optLevel.value, borders: UI.optClose.value === 'never' ? 'never' : 'tech',
+    turns: Number(UI.optTurns.value), cpus: Number(UI.optCpus.value), timer: Number(UI.optTimer.value), wrap: UI.optWrap.checked,
+    conquest: UI.optConquest.checked, science: UI.optScience.checked, unjoined: UI.optUnjoined.value
+  };
+}
+function liveLobbyFill(cfg) {
+  LIVE.filling = true;
+  const pick = (el, v) => { if (v !== undefined && v !== null && [...el.options].some(o => o.value === String(v))) el.value = String(v); };
+  pick(UI.optMap, cfg.map); pick(UI.optSize, cfg.size); pick(UI.optLevel, cfg.level);
+  pick(UI.optClose, cfg.borders); pick(UI.optTimer, cfg.timer); pick(UI.optUnjoined, cfg.unjoined);
+  if (Number.isInteger(cfg.turns)) UI.optTurns.value = String(cfg.turns);
+  if (typeof cfg.wrap === 'boolean') UI.optWrap.checked = cfg.wrap;
+  if (typeof cfg.conquest === 'boolean') UI.optConquest.checked = cfg.conquest;
+  if (typeof cfg.science === 'boolean') UI.optScience.checked = cfg.science;
+  if (Number.isInteger(cfg.cpus)) { liveCpuChoices(); pick(UI.optCpus, cfg.cpus); }
+  LIVE.filling = false;
+}
+// 0 up to as many CPUs as leave room for the people: 8 civs in all.
+function liveCpuChoices() {
+  const humans = liveCounts().humans, max = Math.max(0, MAX_PLAYERS - humans), keep = Number(UI.optCpus.value) || 0;
+  if (UI.optCpus.options.length === max + 1) return;
+  UI.optCpus.innerHTML = Array.from({ length: max + 1 }, (x, k) => '<option value="' + k + '">' + k + '</option>').join('');
+  UI.optCpus.value = String(Math.min(keep, max));
+}
+
+function liveLobbyMode() {
+  UI.paneSetup.classList.add('live');
+  for (const el of document.querySelectorAll('.live-only')) el.hidden = false;
+  for (const el of document.querySelectorAll('.solo-only')) el.hidden = true;
+  UI.paneSetup.querySelector('.eyebrow').textContent = 'Live game';
+  document.getElementById('cpus-note').textContent = 'Civs in all, up to 8, people included. Everyone moves at the same time; players at war with each other take turns.';
+  UI.btnBack.setAttribute('data-act', 'live-lobby-leave');
+  UI.paneTitle.hidden = true;
+  UI.paneSetup.hidden = false;
+  UI.start.hidden = false;
+}
+
+// Draws the room: the host edits the setup, everyone else reads it and picks their own civ and Ready.
+function liveLobbyRender(game, host) {
+  LIVE.game = game;
+  LIVE.host = host;
+  const cfg = game.config || {}, me = game.seats.find(s => s.seat === game.me);
+  const people = game.seats.filter(s => s.state !== 'left');
+  liveLobbyMode();
+  liveCpuChoices();
+  if (!host || !LIVE.filled) { liveLobbyFill(cfg); LIVE.filled = true; }
+  for (const el of liveLobbyControls()) el.disabled = !host;
+  const cpus = Number(UI.optCpus.value) || 0;
+  const rows = people.map(s => ({ person: s })).concat(Array.from({ length: cpus }, () => ({ cpu: true }))).slice(0, MAX_PLAYERS);
+  const picked = rows.map(r => (r.person && CIVS[r.person.civ] ? r.person.civ : null));
+  const colors = assignColors(picked);
+  const civOptions = '<option value="random">Random civ</option>' + CIV_ORDER.map(id => '<option value="' + id + '">' + esc(civTitle(id)) + '</option>').join('');
+  SEATS.forEach((x, i) => {
+    const row = rows[i], el = document.getElementById('seat-' + i);
+    el.hidden = !row;
+    if (!row) return;
+    const name = document.getElementById('seat-name-' + i), civ = document.getElementById('seat-civ-' + i), who = document.getElementById('seat-who-' + i);
+    const dotEl = document.getElementById('seat-dot-' + i), note = document.getElementById('seat-note-' + i);
+    el.classList.toggle('cpu', !!row.cpu);
+    dotEl.style.background = colors[i] ? colors[i][1] : 'transparent';
+    dotEl.style.borderColor = colors[i] ? colors[i][0] : 'var(--ink-3)';
+    dotEl.style.borderStyle = colors[i] ? 'solid' : 'dashed';
+    name.readOnly = true;
+    if (!civ.options.length || civ.dataset.live !== '1') { civ.innerHTML = civOptions; civ.dataset.live = '1'; }
+    if (row.cpu) {
+      name.value = 'CPU';
+      civ.value = 'random';
+      civ.disabled = true;
+      who.textContent = 'CPU';
+      note.textContent = 'Plays as a civ nobody else picked.';
+      return;
+    }
+    const s = row.person, mine = s.seat === game.me;
+    name.value = (s.handle || 'Player') + (mine ? ' (you)' : '');
+    const taken = new Set(people.filter(o => o.seat !== s.seat && o.civ).map(o => o.civ));
+    for (const o of civ.options) o.disabled = taken.has(o.value);
+    civ.value = CIVS[s.civ] ? s.civ : 'random';
+    civ.disabled = !mine || s.state === 'ready' || s.state === 'invited';
+    who.textContent = LIVE_STATE[s.state] || s.state;
+    note.textContent = CIVS[s.civ] ? CIVS[s.civ].ability + ' Unique: ' + civUnique(s.civ).name + '.'
+      : s.state === 'invited' ? 'Invited. ' + (cfg.unjoined === 'drop' ? 'The seat is dropped if they do not join.' : 'A CPU takes the seat if they do not join.')
+      : 'No civ picked yet: they get a random one.';
+  });
+  const waiting = people.filter(s => s.seat !== game.me && s.state === 'joined');
+  UI.btnBegin.hidden = !host;
+  UI.btnReady.hidden = host;
+  UI.btnReady.textContent = me && me.state === 'ready' ? 'Not ready' : 'Ready';
+  UI.btnBegin.disabled = waiting.length > 0;
+  UI.btnBack.textContent = host ? 'Cancel game' : 'Leave';
+  UI.setupNote.textContent = host
+    ? (waiting.length ? 'Waiting for ' + waiting.map(s => s.handle).join(', ') + ' to be ready.' : 'Everyone who joined is ready. ' +
+      (people.some(s => s.state === 'invited') ? (cfg.unjoined === 'drop' ? 'Seats nobody joined are dropped.' : 'Seats nobody joined become CPUs.') : ''))
+    : me && me.state === 'ready' ? 'You are ready. The host starts the game.' : 'Pick your civ if you like, then press Ready.';
+  refreshStart();
+}
+
+// The host changed a field: tell the room (a moment after the last change).
+function liveConfigChanged() {
+  if (!LIVE.net || !LIVE.host || LIVE.filling || !LIVE.game || LIVE.game.status !== 'lobby') return;
+  clearTimeout(LIVE.configTimer);
+  LIVE.configTimer = setTimeout(() => {
+    const cfg = liveLobbyConfig();
+    if (!Number.isInteger(cfg.turns) || cfg.turns < 0 || cfg.turns > 500) return;   // still typing
+    LIVE.net.call('lobby', { config: cfg }).then(g => { if (g) LIVE.game = g; }).catch(error => toast(liveWords(error)));
+  }, 350);
+}
+function liveReadyPressed() {
+  const me = LIVE.game && LIVE.game.seats.find(s => s.seat === LIVE.game.me);
+  if (!me) return;
+  LIVE.net.call('lobby', { ready: me.state !== 'ready' }).then(g => { if (g) liveLobbyRender(g, LIVE.host); }).catch(error => toast(liveWords(error)));
+}
+function liveCivChanged(i) {
+  const value = document.getElementById('seat-civ-' + i).value;
+  LIVE.net.call('lobby', { civ: value }).then(g => { if (g) liveLobbyRender(g, LIVE.host); })
+    .catch(error => { toast(liveWords(error)); LIVE.net.call('game', {}).then(g => { if (g) liveLobbyRender(g, LIVE.host); }).catch(() => {}); });
+}
+function liveStartPressed() {
+  const cfg = liveLobbyConfig();
+  if (!cfg.conquest && !cfg.science && cfg.turns === 0) { toast('With conquest and science off, set a turn limit so someone can win on score.'); return; }
+  if (!Number.isInteger(cfg.turns) || (cfg.turns !== 0 && (cfg.turns < 10 || cfg.turns > 500))) {
+    toast('Turn limit: a whole number from 10 to 500, or 0 for no limit.');
+    UI.optTurns.focus();
+    return;
+  }
+  UI.btnBegin.disabled = true;
+  // The setup the host sees is the setup that starts: send it first, then start.
+  LIVE.net.call('lobby', { config: cfg }).then(() => LIVE.net.call('start', {})).then(() => LIVE.net.call('hello', {})).then(liveHello)
+    .catch(error => { toast(liveWords(error)); UI.btnBegin.disabled = false; });
+}
+function liveLobbyLeave() {
+  LIVE.net.call('leave', {}).catch(() => {}).then(() => LIVE.net.call('exit', {})).catch(() => {});
+}
+
+/* getting in */
+
+// The hub's answer to hello: the room, and for a game under way the newest snapshot and the actions after it.
+function liveHello(info) {
+  if (!info || !info.game) { liveFail('This game could not be opened.'); return; }
+  const g = info.game;
+  LIVE.game = g;
+  LIVE.host = !!info.host;
+  LIVE.me = g.me;
+  if (g.status === 'lobby') { liveLobbyRender(g, LIVE.host); return; }
+  if (g.status === 'cancelled') { liveFail('The host cancelled this game.'); return; }
+  liveEnter(info);
+}
+
+function liveEnter(info) {
+  if (G && G.live) return;   // already in: a second answer from the hub changes nothing
+  const g = info.game, start = g.start || {}, o = start.options || {};
+  const seats = (start.seats || []).map(s => ({ name: s.handle || '', human: s.kind === 'human', civ: s.civ || null, team: s.team }));
+  LIVE.applied = 0;
+  LIVE.finished = false;
+  LIVE.last.clear();
+  LIVE.after.clear();
+  LIVE.entered = Date.now();
+  if (info.snapshot && info.snapshot.state) {
+    liveRestore(info.snapshot.state, g.me);
+    LIVE.applied = info.snapshot.seq;
+  } else {
+    const game = startGame({
+      seats, maxTurns: o.turns || 0, seed: o.seed, map: o.map, level: o.level, size: o.size, wrap: !!o.wrap, borders: o.borders,
+      victory: { conquest: o.conquest !== false, science: o.science !== false }, timer: o.timer, live: true
+    });
+    if (!game) { liveFail('That map did not work out. Ask the host to start again.'); return; }
+    G.viewer = g.me;
+    G.cur = g.me;
+    G.handoff = false;
+    G.pending = null;
+  }
+  gamesStarted++;
+  UI.start.hidden = true;
+  UI.endShown = false;
+  closeModal();
+  selection = null;
+  reachable = null;
+  placing = null;
+  cam.fitted = false;
+  // Catch up quietly: nothing in the past toasts, and the cards of old rounds are not shown again.
+  LIVE.replay = true;
+  try { liveReceive(info.actions || []); liveReceive(LIVE.early.splice(0)); } finally { LIVE.replay = false; }
+  G.news = [];
+  G.log = G.log.filter(e => e.to === null || e.to === G.viewer);
+  LIVE.clock = G.live.timer && !G.over ? { round: G.turn, ends: Date.now() + G.live.timer * 1000 } : null;
+  if (info.presence) livePresence(info.presence);
+  render();
+  fitCamera();
+  focusPlayer(g.me);
+  if (G.over && !LIVE.finished) liveFinish();
+  const note = noticeFor(G.viewer);
+  toast(note || 'Round ' + G.turn);
+}
+
+// A live screen: the hub is the network. Opens the lobby or the game the hub has for this room.
+function liveBoot(bridge) {
+  LIVE.net = bridge;
+  LIVE.entered = Date.now();
+  UI.start.hidden = false;
+  liveLobbyMode();
+  for (const el of liveLobbyControls()) {
+    el.addEventListener('change', liveConfigChanged);
+    if (el === UI.optTurns) el.addEventListener('input', liveConfigChanged);
+  }
+  SEATS.forEach((x, i) => { document.getElementById('seat-civ-' + i).addEventListener('change', () => liveCivChanged(i)); });
+  bridge.on(liveEvent);
+  setInterval(liveTick, 1000);
+  bridge.call('hello', {}).then(liveHello).catch(liveFail);
+}
+
 /* ── boot ──────────────────────────────────────────────────────────────────── */
 
 function boot(data) {
@@ -10031,6 +11099,7 @@ function boot(data) {
     layerTerrain: q('#layer-terrain'), layerWaves: q('#layer-waves'), layerOwner: q('#layer-owner'), layerCoast: q('#layer-coast'),
     layerMarks: q('#layer-marks'), layerBorder: q('#layer-border'), layerOverlay: q('#layer-overlay'),
     layerSites: q('#layer-sites'), layerUnits: q('#layer-units'), layerPath: q('#layer-path'), layerFog: q('#layer-fog'), layerLabels: q('#layer-labels'),
+    liveStrip: q('#live-strip'), liveNet: q('#live-net'), optTimer: q('#opt-timer'), optUnjoined: q('#opt-unjoined'), btnReady: q('#btn-ready'), btnBack: q('#btn-back'),
     stats: q('#stats'), bannerDot: q('#banner-dot'), bannerName: q('#banner-name'), bannerWho: q('#banner-who'),
     turnReadout: q('#turn-readout'), btnEnd: q('#btn-end'), sideScroll: q('#side-scroll'), log: q('#log'),
     modalLayer: q('#modal-layer'), modal: q('#modal'), toast: q('#toast'),
@@ -10099,8 +11168,10 @@ function boot(data) {
     }
   } catch (error) { /* no viewer hook */ }
   // A solo campaign save must never stand in for a Bored Together match.
-  let embedded = null;
+  let embedded = null, live = null;
   try { embedded = window.__boredTogether || null; } catch (error) { /* not embedded */ }
+  try { live = window.__boredLive || null; } catch (error) { /* not embedded */ }
+  if (live && !embedded) { liveBoot(live); return; }   // a live game: the hub brings the room, and the game
   if (data && data.state && !embedded) {
     try {
       const state = JSON.parse(data.state);

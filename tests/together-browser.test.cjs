@@ -5,7 +5,7 @@ const path=require('node:path');
 const {randomUUID}=require('node:crypto');
 const puppeteer=require('puppeteer-core');
 const {serve}=require('./serve.cjs');
-const {database,call,ids,poolHandler,inviteCall}=require('./together-db.cjs');
+const {database,call,as,ids,poolHandler,inviteCall}=require('./together-db.cjs');
 
 test('two embedded browser accounts play, save, auto-return, resume and rematch using production SQL',async t=>{
   const executablePath=[process.env.CHROME_PATH,'/usr/bin/google-chrome','/usr/bin/chromium'].filter(Boolean).find(p=>fs.existsSync(p));
@@ -42,6 +42,14 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
         if(outages.has(identity))return req.abort('internetdisconnected');
         const {action,args}=JSON.parse(req.postData());calls.push({identity,action:'invite:'+action});
         const pending=serial.then(()=>inviteCall(db,ids.includes(identity)?identity:null,action,args));
+        serial=pending.catch(()=>{});
+        try{return reply(await pending);}catch(e){return reply({message:e.message,code:e.code},400);}
+      }
+      if(url.pathname==='/rest/v1/rpc/bt_live_rpc') {
+        // Live rooms: the list is read with every refresh, so an account with none gets an empty one.
+        if(outages.has(identity))return req.abort('internetdisconnected');
+        const {action,args}=JSON.parse(req.postData());
+        const pending=serial.then(()=>as(db,ids.includes(identity)?identity:null,async()=>(await db.query('select public.bt_live_rpc($1,$2::jsonb) result',[action,JSON.stringify(args)])).rows[0].result));
         serial=pending.catch(()=>{});
         try{return reply(await pending);}catch(e){return reply({message:e.message,code:e.code},400);}
       }
