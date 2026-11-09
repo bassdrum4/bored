@@ -689,6 +689,7 @@
         <button class="fe-item" id="btn-help" type="button" data-act="help"><span class="mi">How to play</span><span class="mi-sub">The whole rulebook on one page</span></button>
         <button class="fe-item" id="btn-notes" type="button" data-act="whats-new"><span class="mi">What’s new</span><span class="mi-tag" id="notes-tag" hidden>New</span><span class="mi-sub">Patch notes for every update</span></button>
         <button class="fe-item" id="btn-options" type="button" data-act="options"><span class="mi">Options</span><span class="mi-sub">Tips, event popups and animation</span></button>
+        <button class="fe-item" id="btn-leave" type="button" data-act="leave-bored" hidden><span class="mi">Back to Bored</span><span class="mi-sub">Esc stays in the game; this goes back to the arcade</span></button>
       </nav>
       <p class="fine" id="title-foot">Civ Lite <span id="title-ver"></span> · one device, 1 to 8 players</p>
     </div>
@@ -1778,6 +1779,14 @@ function assignCivs(seats, seed) {
  * runs a private campaign or a CPU stand-in.
  */
 let online = null, onlineSent = false;
+// Is the game in a frame, as it is on Bored? True too when the browser will not say.
+function embedded() {
+  try { return window.parent !== window; } catch (error) { return true; }
+}
+// Bored closes the game, or leaves fullscreen first. Esc does not do this here: it is the game's own key.
+function leaveBored() {
+  try { window.parent.postMessage({ type: 'bored:close' }, '*'); } catch (error) { /* nothing to tell */ }
+}
 function onlineSubmit() {
   if (!online || onlineSent || !G) return;
   onlineSent = true;
@@ -8279,6 +8288,7 @@ function showMenu() {
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
     '<button class="act" data-act="whats-new">What’s new</button>' +
+    (embedded() ? '<button class="act" data-act="leave-bored">Back to Bored</button>' : '') +
     '<button class="act" data-act="civs">All 16 civs</button>' +
     (G.tut ? '<button class="act switch" data-act="coach-toggle">Tutorial coach<b>' + (G.tut.closed ? 'off' : 'on') + '</b></button>'
       : '<button class="act" data-act="tut-start">Play the tutorial</button>') +
@@ -8658,6 +8668,7 @@ function onAction(act) {
   if (kind === 'help-go') { helpGo(a); return; }
   if (kind === 'help-contents') { helpContents(); return; }
   if (kind === 'whats-new') { showWhatsNew(); return; }
+  if (kind === 'leave-bored') { leaveBored(); return; }
   if (kind === 'options') { showOptions(); return; }
   if (kind === 'title-new') { showPane('setup'); return; }
   if (kind === 'title-back') { showPane('title'); return; }
@@ -9627,9 +9638,12 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '4.7';
+const VERSION = '4.7.1';
 // Patch notes for the What’s new screen, newest first: a version, a date and one plain line per change.
 const CHANGELOG = [
+  { v: '4.7.1', date: 'Nov 9', notes: [
+    'Esc stays in the game on Bored: it closes windows, deselects, then opens the Menu. Leave with Back to Bored, in the Menu or on the title screen.'
+  ] },
   { v: '4.7', date: 'Nov 9', notes: [
     'Army upkeep: 2 soldiers per city are free, and each extra one costs its city 1 production a turn.',
     'Warriors cost 30 and can’t be built after Iron Working.',
@@ -9783,6 +9797,7 @@ function refreshTitle() {
   document.getElementById('continue-detail').textContent = auto ? auto.head.meta || '' : '';
   document.getElementById('continue-medal').innerHTML = auto ? slotMedal(auto.head) : '';
   UI.btnLoad.hidden = !slots.length;
+  document.getElementById('btn-leave').hidden = !embedded();
   document.getElementById('load-sub').textContent = named ? plural(named, 'named save', 'named saves') + ' and your autosaves' : 'Your autosaves';
   UI.btnContinue.classList.toggle('primary', !!auto);
   UI.btnNew.classList.toggle('primary', !auto);
