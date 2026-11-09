@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 362,
+  "count": 364,
   "newest": "2026-11-09",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"171bc14","date":"2026-11-09","author":"Claude","subject":"Civ Lite 4.7.1: Esc stays in the game on Bored"},
+  {"sha":"2ef9f2e","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.0: live online games in Bored Together"},
   {"sha":"7ba9625","date":"2026-11-09","author":"Claude","subject":"Civ Lite 4.7: army upkeep, no more warrior spam, wars that end, and who is at war"},
   {"sha":"4e3e269","date":"2026-11-08","author":"Claude","subject":"Civ Lite 4.6.2: a contents list for How to play"},
   {"sha":"40c37ff","date":"2026-11-08","author":"bassdrum4","subject":"Add Minecraft developer note"},
