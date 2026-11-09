@@ -1,15 +1,19 @@
 import { hasIdentity, getSession, ensureProfile } from './backend.js';
-import { togetherRPC, inviteRPC, CONSENT_VERSION } from './together-api.js';
+import { togetherRPC, inviteRPC, liveRPC, CONSENT_VERSION } from './together-api.js';
 import { TOGETHER_GAMES } from '../games/catalog.js';
 import { PREVIEWS } from '../games/discovery.js';
 import { TOGETHER_ADAPTERS } from './together-player.js';
+import { TOGETHER_LIVE, LIVE_DEFAULTS } from './together-live.js';
 import { readStored, writeStored, removeStored } from './store.js';
 
-export function createTogetherUI({ openAuthDialog, playMatch }) {
+export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   const $ = s => document.querySelector(s);
   const root = $('#together'), content = $('#together-content'), status = $('#together-status');
   let owner = null, data = null, visible = false, busy = false, generation = 0, flight = null;
   let lastRefresh = 0;
+  // Live games the account is in (rooms being set up, games running, ones that just finished).
+  let liveGames = [], liveKey = '';
+  const liveSelected = new Set();
   let flow = null, selectedGame = 'connect-four', people = null, outsiders = null, outsidersError = '';
   // The one corner note: dismissed stays dismissed for that set of games, so it
   // can only reappear when something new is actually waiting.
@@ -20,6 +24,10 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   const dismissedInvites = new Set();
   const inviteDialog = $('#invite-dialog');
   const name = game => TOGETHER_GAMES[game]?.name || game;
+  const mySeat = g => (g?.seats || []).find(s => s.seat === g.me);
+  // What a live row shows. Seconds-since-seen change on every read, so they stay out of what counts as a change.
+  const liveSignature = list => JSON.stringify(list.map(g => [g.id, g.status, g.round, g.me, g.winner, g.config,
+    (g.seats || []).map(s => [s.seat, s.user, s.handle, s.state, s.civ, s.controller, s.online])]));
   function node(tag, text, className) {
     const el = document.createElement(tag);
     if (text !== undefined) el.textContent = text;
@@ -40,7 +48,8 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
   }
   function updateBadge() {
     const waiting = data?.enrolled ? data.matches.filter(m => m.status === 'active' && m.turn_user === owner) : [];
-    const count = waiting.length;
+    // A live room you were invited to is waiting on you too.
+    const count = waiting.length + (data?.enrolled ? liveGames.filter(g => g.status === 'lobby' && mySeat(g)?.state === 'invited').length : 0);
     $('#together-badge').hidden = !count; $('#together-badge').textContent = String(count);
     $('#together-home').hidden = !count;
     $('#together-home-link').textContent = count + (count === 1 ? ' game needs' : ' games need') + ' your attention →';
@@ -71,6 +80,7 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     if (owner === next) return;
     owner = next; generation++; flight = null; busy = false; lastRefresh = 0; root.removeAttribute('aria-busy');
     data = flow = people = outsiders = null; outsidersError = ''; invited.clear(); status.textContent = '';
+    liveGames = []; liveKey = ''; liveSelected.clear();
     noticeDismissed = '';
     invite = null; inviteAccepted = false;
     if (inviteDialog?.open) dialogClose(inviteDialog);
@@ -88,7 +98,14 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
       try {
         const next = await togetherRPC('dashboard');
         if (stamp !== generation) return;
-        const changed = JSON.stringify(data) !== JSON.stringify(next);
+        // Live rooms are a separate endpoint. If it is not there yet (its SQL has not been applied), the rest of
+        // Bored Together carries on without it.
+        let lives = null;
+        if (next?.enrolled) { try { lives = await liveRPC('list'); } catch { lives = null; } }
+        if (stamp !== generation) return;
+        const nextKey = Array.isArray(lives) ? liveSignature(lives) : liveKey;
+        const changed = JSON.stringify(data) !== JSON.stringify(next) || nextKey !== liveKey;
+        if (Array.isArray(lives)) { liveGames = lives; liveKey = nextKey; }
         data = next; lastRefresh = Date.now(); updateBadge();
         if (changed || force) render();
       } catch (error) {
@@ -127,6 +144,19 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
         return next;
       },
       reload() { run(() => launch(id)); },
+      onExit() { if (stamp === generation) refresh(true); }
+    });
+  }
+  // A live room opens the game's own screen; the lobby and the game both live in it. Opening one again from the
+  // list is how you rejoin: the screen loads the newest snapshot and the actions after it.
+  async function launchLive(id) {
+    const stamp = generation, player = owner;
+    const game = await liveRPC('game', { id });
+    if (stamp !== generation || !visible) return;
+    if (!['lobby', 'active', 'completed'].includes(game.status)) { await refresh(true); return; }
+    flow = null; people = null; liveSelected.clear(); render();
+    playLive(game, player, {
+      reload() { run(() => launchLive(id)); },
       onExit() { if (stamp === generation) refresh(true); }
     });
   }
@@ -222,7 +252,44 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     }
     host.append(more);
   }
+  // Start a live game: Civ Lite, then one to three members from the same directory the turn-based games use.
+  function livePicker(host) {
+    const limits = TOGETHER_LIVE.ashcrown;
+    const box = node('section', undefined, 'bt-start bt-live-start');
+    box.setAttribute('aria-label', 'Start a live game');
+    box.append(node('p', 'Live game', 'eyebrow'), node('h4', name('ashcrown') + ' · live'),
+      node('p', 'Everyone plays at the same time, with CPUs filling the rest. Pick ' + limits.min + ' to ' + limits.max +
+        ' members to invite. You choose the map, the CPUs and a turn timer in the lobby, and start once everyone is ready.', 'bt-caption'));
+    if (!people) box.append(node('p', 'Loading members…', 'bt-caption'));
+    else if (!people.length) box.append(node('p', 'Nobody else has joined Bored Together yet. Anyone who joins appears here.', 'bt-caption'));
+    else {
+      const list = node('div', undefined, 'bt-people'); list.id = 'bt-live-people';
+      for (const person of people) {
+        const picked = liveSelected.has(person.id);
+        const row = node('label', undefined, 'bt-person');
+        const who = node('div');
+        who.append(node('strong', person.handle), node('span', person.email || 'No email on this account', 'bt-caption'));
+        const box2 = node('input'); box2.type = 'checkbox'; box2.checked = picked; box2.id = 'bt-live-pick-' + person.id;
+        box2.disabled = !picked && liveSelected.size >= limits.max;
+        box2.setAttribute('aria-label', 'Invite ' + person.handle);
+        box2.onchange = () => { if (box2.checked) liveSelected.add(person.id); else liveSelected.delete(person.id); render(); };
+        row.append(who, box2);
+        list.append(row);
+      }
+      box.append(list);
+    }
+    box.append(node('p', liveSelected.size + ' of ' + limits.max + ' invited', 'bt-caption'));
+    const make = button('Open lobby', async () => {
+      const game = await liveRPC('create', { game: 'ashcrown', invite: [...liveSelected], config: LIVE_DEFAULTS });
+      flow = null; people = null; liveSelected.clear();
+      await launchLive(game.id);
+    }, true);
+    make.id = 'bt-live-create'; make.disabled = liveSelected.size < limits.min || liveSelected.size > limits.max;
+    box.append(make, button('Cancel', () => { flow = null; people = null; liveSelected.clear(); render(); }));
+    host.append(box);
+  }
   function picker(host = content) {
+    if (flow === 'live') { livePicker(host); return; }
     const box = node('section', undefined, 'bt-start');
     box.setAttribute('aria-label', flow === 'challenge' ? 'Start a game' : 'Play random');
     box.append(node('p', flow === 'random' ? 'Find a random partner' : 'Choose a partner', 'eyebrow'));
@@ -373,6 +440,44 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     row.append(gamePreview(m.game, 'bt-match-art'), copy, actions);
     host.append(row);
   }
+  // Who is in a live room, and what they are doing: the list says it all, so nobody has to open a game to look.
+  function liveSeatLine(g, s) {
+    const lobby = g.status === 'lobby';
+    const state = lobby ? ({ invited: 'invited', joined: 'joined', ready: 'ready' }[s.state] || s.state)
+      : s.controller === 'cpu' ? 'a CPU is playing' : s.online ? 'online' : 'away';
+    const item = node('li', undefined, 'bt-live-seat' + (s.online ? ' bt-online' : ''));
+    item.append(node('span', s.online ? '\u25cf ' : '\u25cb ', 'bt-dot'),
+      node('strong', (s.handle || 'Player') + (s.seat === g.me ? ' (you)' : '')), node('span', ' \u00b7 ' + state, 'bt-caption'));
+    item.setAttribute('aria-label', (s.handle || 'Player') + ', ' + state);
+    return item;
+  }
+  function liveRow(g, host) {
+    const mine = mySeat(g), lobby = g.status === 'lobby', done = g.status === 'completed';
+    const invitedMe = lobby && mine?.state === 'invited';
+    const row = node('article', undefined, 'bt-match-row bt-match-card bt-live-row' + (invitedMe ? ' bt-ready' : ''));
+    row.dataset.liveId = g.id;
+    const copy = node('div', undefined, 'bt-match-copy');
+    const head = node('div', undefined, 'bt-match-head');
+    head.append(node('h4', name(g.game) + ' \u00b7 live'),
+      node('span', lobby ? (invitedMe ? 'Invited' : 'Setting up') : done ? 'Finished' : 'Live', 'bt-chip' + (invitedMe ? ' bt-chip-turn' : '')));
+    const players = node('ul', undefined, 'bt-live-seats');
+    for (const s of g.seats || []) if (s.state !== 'left') players.append(liveSeatLine(g, s));
+    const host0 = (g.seats || []).find(s => s.user === g.host);
+    const winner = done ? (g.winner == null ? 'Nobody won.' : ((g.seats || []).find(s => s.seat === g.winner)?.handle || 'A CPU') + ' won.') : '';
+    copy.append(head, players,
+      node('p', lobby ? (invitedMe ? (host0?.handle || 'The host') + ' invited you. Join to pick your civ.' : g.host === owner ? 'Waiting for everyone to be ready.' : 'The host starts the game once everyone is ready.')
+        : done ? winner : 'Round ' + (g.round || 1) + (mine?.controller === 'cpu' ? ' \u00b7 a CPU is playing your civ until you rejoin' : ''), 'bt-caption'));
+    const actions = node('div', undefined, 'bt-actions');
+    const rejoin = !lobby && !done && (mine?.controller === 'cpu' || !mine?.online);
+    actions.append(button(invitedMe ? 'Join' : lobby ? 'Open lobby' : done ? 'View' : rejoin ? 'Rejoin' : 'Open', () => launchLive(g.id), !done));
+    if (lobby) {
+      const more = node('details', undefined, 'bt-more');
+      more.append(node('summary', 'More'), button(g.host === owner ? 'Cancel game' : 'Leave lobby', () => liveRPC('leave_lobby', { id: g.id })));
+      actions.append(more);
+    }
+    row.append(gamePreview(g.game, 'bt-match-art'), copy, actions);
+    host.append(row);
+  }
   function dashboard() {
     const open = data.matches.filter(m => m.status === 'active');
     const yours = open.filter(m => m.turn_user === owner);
@@ -445,6 +550,10 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
       }
       flow = 'challenge'; render(); $('#bt-game-select')?.focus();
     }, true),
+      button('Start a live game', async () => {
+        people = await togetherRPC('people');
+        liveSelected.clear(); flow = 'live'; render();
+      }),
       button('Play Random', () => { flow = 'random'; people = null; render(); $('#bt-game-select')?.focus(); }));
     overflow(actions, null);
     if (!flow) start.append(actions);
@@ -457,22 +566,26 @@ export function createTogetherUI({ openAuthDialog, playMatch }) {
     if (yours.length) counts.push(yours.length + ' waiting on you');
     if (waiting.length) counts.push(waiting.length + ' with them');
     if (counts.length) games.append(node('p', counts.join(' · '), 'bt-caption'));
-    if (!open.length && !completed.length && !data.queue.length) {
+    if (!open.length && !completed.length && !data.queue.length && !liveGames.length) {
       games.append(node('p', 'No games yet. Start one above.', 'bt-caption'));
     }
     // Ongoing games are separated by whose move it is; a finished game stays
     // nearby for a rematch but never leads the list.
-    const group = (title, note, list) => {
+    const group = (title, note, list, row = matchRow) => {
       if (!list.length) return;
       games.append(node('h4', title, 'bt-group'));
       if (note) games.append(node('p', note, 'bt-caption bt-group-note'));
-      for (const match of list) matchRow(match, games);
+      for (const match of list) row(match, games);
     };
+    // Live rooms come first: they are happening now.
+    const liveOpen = liveGames.filter(g => g.status === 'lobby' || g.status === 'active');
+    group('Live now \u00b7 ' + liveOpen.length, 'Open one to rejoin it. While you are away a CPU plays your civ.', liveOpen, liveRow);
     group('Your move · ' + yours.length, yours.length === 1
       ? 'Take your turn whenever you are ready.' : 'Every one of these is waiting on you.', yours);
     group('Waiting on them · ' + waiting.length, waiting.length === 1
       ? 'Their turn. Nothing to do until they play.' : 'Their turns. Nothing to do until they play.', waiting);
     group('Finished', null, completed);
+    group('Finished live games', null, liveGames.filter(g => g.status === 'completed'), liveRow);
     for (const game of data.queue) {
       const row = node('div', undefined, 'bt-match-row');
       row.append(node('p', 'Finding an opponent · ' + name(game)), button('Cancel search', () => togetherRPC('queue_cancel', { game })));

@@ -41,3 +41,18 @@ export async function togetherRPC(action, args = {}) {
     }));
   return result;
 }
+
+// Live games have their own endpoint: rooms, the ordered action log, presence and snapshots (bt_live_rpc). It is
+// called a lot more often than togetherRPC (a heartbeat every 10 seconds, an action per click), so it carries no
+// telemetry events of its own.
+export async function liveRPC(action, args = {}) {
+  if (!hasIdentity()) throw new Error('Sign in to your Bored account first.');
+  const owner = getSession()?.user?.id;
+  const session = await freshSession();
+  if (!session || session.user.id !== owner) throw new Error('Sign in again to continue.');
+  const result = await request('/rest/v1/rpc/bt_live_rpc', {
+    method: 'POST', body: { action, args }, token: session.access_token
+  });
+  if (getSession()?.user?.id !== owner) throw new Error('Your account changed. Please try again.');
+  return result;
+}
