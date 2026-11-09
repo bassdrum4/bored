@@ -28,7 +28,7 @@ test('active time excludes hidden, idle, unfocused, paused, loading and clock sl
 test('game runtime diagnostics retain type and source coordinates without private text', async () => {
   const { ANALYTICS_BRIDGE, runtimeErrorMetadata } = await import('../src/hub/analytics.js');
   const listeners = {}, received = [];
-  assert.match(ANALYTICS_BRIDGE, /^<script>[\\s\\S]*<\\/script>$/);
+  assert.ok(ANALYTICS_BRIDGE.startsWith('<script>') && ANALYTICS_BRIDGE.endsWith('</script>'));
   vm.runInNewContext(ANALYTICS_BRIDGE.slice(8, -9), {
     addEventListener: (kind, listener) => { listeners[kind] = listener; },
     parent: { postMessage: message => received.push(message) }
