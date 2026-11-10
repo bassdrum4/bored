@@ -295,6 +295,14 @@
   .mp-person { display: flex; align-items: center; gap: 8px; border: 1px solid var(--rule); border-radius: 3px; padding: 6px 9px; background: var(--panel-hi); font-size: 13px; min-width: 0 }
   .mp-person span { min-width: 0; overflow-wrap: anywhere }
   .mp-person input { flex: none }
+  /* room codes (5.4): the Join with code box on the Multiplayer screen, and the code in the lobby */
+  .mp-join { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center }
+  .mp-join input { width: 9em; font: 600 18px var(--font-data); letter-spacing: .22em; text-align: center; text-transform: uppercase; padding: 6px 8px }
+  .mp-join-err { min-height: 1.5em; margin: 3px 0 6px; font-size: 12.5px }
+  .room-code-value { font: 700 clamp(28px, 9vw, 40px) var(--font-data); letter-spacing: .26em; margin: 2px 0 8px; overflow-wrap: anywhere; user-select: all; color: var(--ink) }
+  .room-code-acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center }
+  .room-code-fallback { width: 100%; margin-top: 8px; font: 13px var(--font-data) }
+  .seat .seat-remove { grid-column: 2 / -1; justify-self: start; padding: 3px 9px; font-size: 12px }
   @media (max-width: 520px) {
     .mp-row { grid-template-columns: minmax(0, 1fr) }
     .mp-acts { justify-content: flex-start }
@@ -756,18 +764,32 @@
       </header>
       <div class="setup-grid">
         <div class="setup-col">
+          <section class="fe-card room-code" id="room-code" aria-label="Room code" hidden>
+            <h3>Room code</h3>
+            <p class="room-code-value" id="room-code-text" aria-label="Room code"></p>
+            <div class="room-code-acts">
+              <button class="btn primary" type="button" id="room-code-copy" data-act="room-code-copy">Copy code</button>
+              <button class="btn" type="button" id="room-code-invite" data-act="room-code-invite">Copy invite</button>
+              <button class="btn" type="button" id="room-code-new" data-act="room-code-new" hidden>New code</button>
+            </div>
+            <input class="room-code-fallback" id="room-code-fallback" type="text" readonly hidden aria-label="Select this text and copy it">
+            <p class="fe-note" id="room-code-note" role="status"></p>
+          </section>
           <section class="fe-card fe-players" aria-label="Players">
             <h3>Players</h3>
             <div class="fe-opt solo-only"><label for="opt-humans">Human players</label><select id="opt-humans"></select></div>
+            <div class="fe-opt" id="mp-humans" hidden><label for="opt-live-humans">Human players</label><select id="opt-live-humans"></select>
+              <p class="fe-note">Seats for people, you included. Friends join with the room code the lobby shows; a seat nobody takes becomes a CPU (or is dropped, below).</p></div>
             <div class="fe-opt"><label for="opt-cpus">CPU players</label><select id="opt-cpus"></select>
               <p class="fe-note" id="cpus-note">2 to 8 in all. Humans take their turns one after another on this device; CPUs play on their own.</p></div>
             <div class="fe-opt"><label for="opt-mode">Mode</label><select id="opt-mode"><option value="ffa">Free-for-all</option><option value="coop">Co-op: humans vs CPUs</option></select>
               <p class="fe-note" id="mode-note"></p></div>
             <div class="fe-opt live-only" hidden><label for="opt-unjoined">Seats nobody joins</label><select id="opt-unjoined"><option value="cpu">Become CPUs</option><option value="drop">Are dropped</option></select>
-              <p class="fe-note">Friends you invited who have not joined when you start.</p></div>
+              <p class="fe-note">Human seats nobody has taken when you start: invited friends who have not joined, and open seats.</p></div>
             <div class="seats" id="seats"></div>
             <div class="mp-pick" id="mp-pick" hidden>
-              <div class="mp-pick-head"><strong>Invite friends</strong><span class="mp-count" id="mp-count"></span></div>
+              <div class="mp-pick-head"><strong>Invite friends by name</strong><span class="mp-count" id="mp-count"></span></div>
+              <p class="fe-note" style="margin:0 0 6px">Optional. They get an invite under Multiplayer; everyone else joins with the code.</p>
               <div class="mp-people" id="mp-people" role="group" aria-label="Invite friends"></div>
             </div>
           </section>
@@ -9177,7 +9199,7 @@ function helpSections() {
       'Turn Event popups off in Options (or the Menu) and the points still count.</p>' },
     { id: 'keys', group: 'Controls', title: 'Keys', html:
       '<p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
-      '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. On Bored, <b>Multiplayer</b> on the title screen hosts a live game, answers invites and rejoins your games. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
+      '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. On Bored, <b>Multiplayer</b> on the title screen hosts a live game, answers invites and rejoins your games. A host’s lobby shows a six-character <b>room code</b> (Copy code, Copy invite); friends type it under <b>Join with code</b>, and <b>New code</b> makes the old one stop working. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
       '<p><b>Saves on every device.</b> Signed in on Bored, your named saves and the Autosave also go to your account, so you can Continue or Load them on another device. A save from another device is marked, and nothing is replaced without asking. The starts of your last three turns stay on the device.</p>' },
   ];
 }
@@ -9455,6 +9477,7 @@ function onAction(act) {
   if (kind === 'setup-reset') { resetSetup(); return; }
   if (G && G.live && (kind === 'tut-start' || kind === 'slots' || kind.startsWith('slot-'))) return;   // no slots, no tutorial in a live game
   if (kind === 'live-lobby-leave') { liveLobbyLeave(); return; }
+  if (kind.startsWith('room-')) { roomAction(kind, a); return; }
   if (kind === 'slots' || kind.startsWith('slot-')) { slotAction(kind, a, b); return; }
   if (kind.startsWith('sy-')) { syncAction(kind, a, b); return; }
   if (kind === 'tut-start') { if (G && !G.tut) saveGame(); startTutorial(); return; }
@@ -10889,9 +10912,12 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '5.3';
+const VERSION = '5.4';
 // Patch notes for the What’s new screen, newest first: a version, a date and one plain line per change.
 const CHANGELOG = [
+  { v: '5.4', date: 'Nov 10', notes: [
+    'Room codes, like Civ 6: host a live game and share its code, and friends join with Multiplayer → Join with code.'
+  ] },
   { v: '5.3', date: 'Nov 9', notes: [
     'Your saves follow your Bored account: save on one device, Continue or Load on another.',
     'Saves from another device are marked, and nothing is replaced without asking.'
@@ -11020,7 +11046,8 @@ function buildStartScreen() {
     '<input type="text" id="seat-name-' + i + '" value="' + s.name + '" maxlength="18" aria-label="Player ' + (i + 1) + ' name">' +
     '<select class="civ" id="seat-civ-' + i + '" aria-label="Player ' + (i + 1) + ' civ">' + civOptions + '</select>' +
     '<span class="who" id="seat-who-' + i + '"></span>' +
-    '<div class="seat-note" id="seat-note-' + i + '"></div></div>').join('');
+    '<div class="seat-note" id="seat-note-' + i + '"></div>' +
+    '<button class="btn seat-remove" type="button" id="seat-remove-' + i + '" aria-label="Remove player ' + (i + 1) + '" hidden>Remove</button></div>').join('');
   // Like Civ: how many people play, and how many CPUs fill the other seats.
   UI.optHumans.innerHTML = Array.from({ length: MAX_PLAYERS }, (x, k) => '<option value="' + (k + 1) + '"' + (k === 1 ? ' selected' : '') + '>' + (k + 1) + '</option>').join('');
   UI.optCpus.innerHTML = Array.from({ length: MAX_PLAYERS }, (x, k) => '<option value="' + k + '">' + k + '</option>').join('');
@@ -11031,6 +11058,8 @@ function buildStartScreen() {
   UI.optLevel.innerHTML = Object.keys(LEVELS).map(id => '<option value="' + id + '">' + LEVELS[id].name + '</option>').join('');
   UI.optClose.innerHTML = BORDER_CHOICES.map(b => '<option value="' + b.id + '"' + (b.id === DEFAULT_BORDERS ? ' selected' : '') + '>' + b.name + '</option>').join('');
   UI.optTimer.innerHTML = [[0, 'Off'], [60, '60 seconds'], [120, '2 minutes'], [300, '5 minutes']].map(t => '<option value="' + t[0] + '">' + t[1] + '</option>').join('');
+  document.getElementById('opt-live-humans').innerHTML = [2, 3, 4].map(n => '<option value="' + n + '">' + n + '</option>').join('');
+  document.getElementById('opt-live-humans').onchange = mpHumansChanged;
   UI.optClose.onchange = refreshStart;
   UI.optHumans.onchange = () => fitCounts('humans');
   UI.optMode.onchange = refreshStart;
@@ -11150,7 +11179,7 @@ function refreshStart() {
   UI.modeNote.textContent = coopProblem(humans, cpus) && UI.optMode.value === 'coop' ? coopProblem(humans, cpus)
     : UI.optMode.value === 'coop' ? 'Every human plays on one team against the CPUs. Needs at least one human and one CPU.' : 'Every civ plays for itself.';
   if (LIVE.net) return;   // the room writes its own note
-  if (MP.host) { UI.setupNote.textContent = MP.picked.size ? 'The lobby opens with your friends invited. You can still change the setup there.' : 'Pick 1 to 3 friends to invite.'; return; }
+  if (MP.host) { UI.setupNote.textContent = 'The lobby opens with a room code to share' + (MP.picked.size ? ', and your invited friends waiting' : '') + '. You can still change the setup there.'; return; }
   // Starting a game takes over the Autosave, so say so; named saves are never touched.
   const auto = online ? null : slotList().find(s => s.id === 'auto');
   UI.setupNote.textContent = auto ? 'Starting a game replaces your Autosave. Games you saved to a slot are kept.' : '';
@@ -11442,6 +11471,8 @@ function liveEvent(m) {
     if (G && G.live) return;
     if (m.game.status === 'lobby') liveLobbyRender(m.game, LIVE.host);
     else LIVE.net.call('hello', {}).then(liveHello).catch(liveFail);
+  } else if (m.event === 'removed') {
+    if (!G) liveFail('The host removed you from this game.');
   } else if (m.event === 'net') {
     if (UI.liveNet) UI.liveNet.hidden = m.online !== false;
   }
@@ -11700,7 +11731,8 @@ function liveLeave() {
 /* the lobby: Game setup, live */
 
 const LIVE_STATE = { invited: 'Invited', joined: 'Joined', ready: 'Ready', left: 'Left' };
-const liveCounts = () => ({ humans: LIVE.game ? LIVE.game.seats.filter(s => s.state !== 'left').length : MP.host ? 1 + Math.max(1, MP.picked.size) : 2, cpus: Number(UI.optCpus.value) || 0 });
+// People in the room: as many seats as it has (its capacity, when the server sent one), or the seats taken if that is more.
+const liveCounts = () => ({ humans: LIVE.game ? Math.max(Number(LIVE.game.capacity) || 0, LIVE.game.seats.filter(s => s.state !== 'left').length) : MP.host ? mpHumans() : 2, cpus: Number(UI.optCpus.value) || 0 });
 const liveLobbyControls = () => [UI.optCpus, UI.optMode, UI.optMap, UI.optSize, UI.optLevel, UI.optClose, UI.optTurns, UI.optConquest, UI.optScience, UI.optWrap, UI.optTimer, UI.optUnjoined];
 
 // The room's setup, as the server stores it.
@@ -11741,6 +11773,7 @@ function liveLobbyMode() {
   for (const el of document.querySelectorAll('.live-only')) el.hidden = false;
   for (const el of document.querySelectorAll('.solo-only')) el.hidden = true;
   UI.paneSetup.querySelector('.eyebrow').textContent = 'Live game';
+  document.getElementById('mp-humans').hidden = true;
   document.getElementById('cpus-note').textContent = 'Civs in all, up to 8, people included. Everyone moves at the same time; players at war with each other take turns.';
   UI.btnBack.setAttribute('data-act', 'live-lobby-leave');
   UI.paneTitle.hidden = true;
@@ -11759,7 +11792,9 @@ function liveLobbyRender(game, host) {
   if (!host || !LIVE.filled) { liveLobbyFill(cfg); LIVE.filled = true; }
   for (const el of liveLobbyControls()) el.disabled = !host;
   const cpus = Number(UI.optCpus.value) || 0;
-  const rows = people.map(s => ({ person: s })).concat(Array.from({ length: cpus }, () => ({ cpu: true }))).slice(0, MAX_PLAYERS);
+  // A room has as many human seats as its capacity: the ones nobody has taken are shown as open.
+  const open = Math.max(0, (Number(game.capacity) || 0) - people.length);
+  const rows = people.map(s => ({ person: s })).concat(Array.from({ length: open }, () => ({ open: true })), Array.from({ length: cpus }, () => ({ cpu: true }))).slice(0, MAX_PLAYERS);
   const picked = rows.map(r => (r.person && CIVS[r.person.civ] ? r.person.civ : null));
   const colors = assignColors(picked);
   const civOptions = '<option value="random">Random civ</option>' + CIV_ORDER.map(id => '<option value="' + id + '">' + esc(civTitle(id)) + '</option>').join('');
@@ -11768,7 +11803,8 @@ function liveLobbyRender(game, host) {
     el.hidden = !row;
     if (!row) return;
     const name = document.getElementById('seat-name-' + i), civ = document.getElementById('seat-civ-' + i), who = document.getElementById('seat-who-' + i);
-    const dotEl = document.getElementById('seat-dot-' + i), note = document.getElementById('seat-note-' + i);
+    const dotEl = document.getElementById('seat-dot-' + i), note = document.getElementById('seat-note-' + i), remove = document.getElementById('seat-remove-' + i);
+    remove.hidden = true;
     el.classList.toggle('cpu', !!row.cpu);
     dotEl.style.background = colors[i] ? colors[i][1] : 'transparent';
     dotEl.style.borderColor = colors[i] ? colors[i][0] : 'var(--ink-3)';
@@ -11783,7 +11819,19 @@ function liveLobbyRender(game, host) {
       note.textContent = 'Plays as a civ nobody else picked.';
       return;
     }
+    if (row.open) {
+      name.value = 'Open seat';
+      civ.value = 'random';
+      civ.disabled = true;
+      who.textContent = 'Open';
+      note.textContent = 'Waiting for a player with the room code. ' + (cfg.unjoined === 'drop' ? 'The seat is dropped if nobody joins.' : 'A CPU takes the seat if nobody joins.');
+      return;
+    }
     const s = row.person, mine = s.seat === game.me;
+    // The host can take anybody else out of the room, invited or joined; they stay out until there is a new code.
+    remove.hidden = !host || mine;
+    remove.setAttribute('data-act', 'room-kick:' + s.seat);
+    remove.setAttribute('aria-label', 'Remove ' + (s.handle || 'player'));
     name.value = (s.handle || 'Player') + (mine ? ' (you)' : '');
     const taken = new Set(people.filter(o => o.seat !== s.seat && o.civ).map(o => o.civ));
     for (const o of civ.options) o.disabled = taken.has(o.value);
@@ -11800,11 +11848,55 @@ function liveLobbyRender(game, host) {
   UI.btnReady.textContent = me && me.state === 'ready' ? 'Not ready' : 'Ready';
   UI.btnBegin.disabled = waiting.length > 0;
   UI.btnBack.textContent = host ? 'Cancel game' : 'Leave';
+  liveRoomCode(game, host);
   UI.setupNote.textContent = host
     ? (waiting.length ? 'Waiting for ' + waiting.map(s => s.handle).join(', ') + ' to be ready.' : 'Everyone who joined is ready. ' +
-      (people.some(s => s.state === 'invited') ? (cfg.unjoined === 'drop' ? 'Seats nobody joined are dropped.' : 'Seats nobody joined become CPUs.') : ''))
+      (open || people.some(s => s.state === 'invited') ? (cfg.unjoined === 'drop' ? 'Seats nobody joined are dropped.' : 'Seats nobody joined become CPUs.') : ''))
     : me && me.state === 'ready' ? 'You are ready. The host starts the game.' : 'Pick your civ if you like, then press Ready.';
   refreshStart();
+}
+
+/* room codes (5.4) */
+
+// The code, large, for the host and for players who joined (so they can pass it on). Nobody else is sent it.
+function liveRoomCode(game, host) {
+  const card = document.getElementById('room-code'), code = typeof game.code === 'string' ? game.code : '';
+  card.hidden = !code;
+  if (!code) return;
+  const taken = game.seats.filter(x => x.state !== 'left').length, free = Math.max(0, (Number(game.capacity) || taken) - taken);
+  document.getElementById('room-code-text').textContent = code;
+  document.getElementById('room-code-new').hidden = !host;
+  document.getElementById('room-code-note').textContent = (free ? free + (free === 1 ? ' seat is open. ' : ' seats are open. ') : 'The room is full. ') +
+    'Friends join from Multiplayer → Join with code.' + (host ? ' A new code stops the old one working.' : '');
+}
+// Copies inside the click, as browsers insist. When that is refused, the text is put in a box, selected, for Ctrl+C.
+function roomCopy(text, done) {
+  const select = () => {
+    const box = document.getElementById('room-code-fallback');
+    box.hidden = false;
+    box.value = text;
+    box.focus();
+    box.select();
+    let ok = false;
+    try { ok = !!document.execCommand && document.execCommand('copy'); } catch (error) { ok = false; }
+    toast(ok ? done : 'Press Ctrl+C (⌘C on a Mac) to copy it.');
+  };
+  try {
+    navigator.clipboard.writeText(text).then(() => { document.getElementById('room-code-fallback').hidden = true; toast(done); }, select);
+  } catch (error) { select(); }
+}
+function roomAction(kind, a) {
+  const game = LIVE.game;
+  if (!LIVE.net || !game || game.status !== 'lobby') return;
+  if (kind === 'room-code-copy' && game.code) roomCopy(game.code, 'Code copied.');
+  else if (kind === 'room-code-invite' && game.code) roomCopy('Join my Civ Lite game on Bored: code ' + game.code, 'Invite copied.');
+  else if (kind === 'room-code-new' && LIVE.host) {
+    LIVE.net.call('new-code', {}).then(g => { if (g) { liveLobbyRender(g, LIVE.host); toast('New code. The old one no longer works.'); } }).catch(error => toast(liveWords(error)));
+  } else if (kind === 'room-kick' && LIVE.host) {
+    const seat = Number(a), who = game.seats.find(x => x.seat === seat);
+    if (!who || who.seat === game.me) return;
+    LIVE.net.call('kick', { seat }).then(g => { if (g) { liveLobbyRender(g, LIVE.host); toast((who.handle || 'The player') + ' was removed. They can not rejoin with this code.'); } }).catch(error => toast(liveWords(error)));
+  }
 }
 
 // The host changed a field: tell the room (a moment after the last change).
@@ -11839,7 +11931,9 @@ function liveStartPressed() {
     // Seats nobody joins become CPUs unless the host dropped them, so they count as CPUs here.
     const seats = LIVE.game ? LIVE.game.seats : [];
     const humans = seats.filter(x => x.state === 'joined' || x.state === 'ready').length;
-    const cpus = cfg.cpus + (cfg.unjoined === 'drop' ? 0 : seats.filter(x => x.state === 'invited').length);
+    // Every human seat nobody took (invited, left or never filled) is a CPU, unless the host dropped them.
+    const unfilled = Math.max(Number(LIVE.game && LIVE.game.capacity) || 0, seats.length) - humans;
+    const cpus = cfg.cpus + (cfg.unjoined === 'drop' ? 0 : unfilled);
     const why = coopProblem(humans, cpus);
     if (why) { toast(why.replace('Add one above.', 'Add one, or let seats nobody joins become CPUs.')); return; }
   }
@@ -11858,9 +11952,10 @@ function liveLobbyLeave() {
  * screen asks who is signed in, which members can be invited, which invites and live games wait, and asks the hub
  * to host a game, join, decline or open one. Opening switches the player into the live game, which reloads this page.
  * Members come as names with opaque references; the page never holds an email, a token or an account id. */
-const MP = { host: false, picked: new Set(), members: null, keep: null, soloNote: '', sig: '', busy: false, pending: false, timer: 0, titleTimer: 0, invites: 0 };
+const MP = { host: false, picked: new Set(), members: null, keep: null, soloNote: '', sig: '', busy: false, pending: false, timer: 0, titleTimer: 0, invites: 0, join: null, joining: false };
 const MP_DEFAULTS = { map: 'pangaea', size: 'auto', level: 'normal', borders: 'tech', turns: 100, cpus: 1, timer: 0, wrap: false, conquest: true, science: true, unjoined: 'cpu', mode: 'ffa' };
 const MP_MAX_INVITED = 3;
+const mpHumans = () => Number(document.getElementById('opt-live-humans').value) || 2;
 function mpBridge() {
   try { return embedded() && window.__boredLobby ? window.__boredLobby : null; } catch (error) { return null; }
 }
@@ -11894,7 +11989,7 @@ function mpBoot() {
 // The screen itself: one modal, redrawn when what it shows changes, refreshed when it opens and every 5 seconds.
 function showMultiplayer() {
   if (!mpBridge()) return;
-  MP.sig = ''; MP.pending = false;
+  MP.sig = ''; MP.pending = false; MP.join = null; MP.joining = false;
   openModal(modalHead('Multiplayer', 'Live games on Bored') +
     '<div class="modal-body mp" id="mp-body"><p class="hint">Loading…</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>', 'wide');
@@ -11942,8 +12037,9 @@ function mpRows(data) {
       '<span class="mp-meta">' + line + '</span>' + mpPlayers(g.players) + '</div>' +
       '<div class="mp-acts"><button class="btn' + (over ? '' : ' primary') + '" data-act="mp-open-game:' + esc(g.id) + '">' + (lobby ? 'Open lobby' : over ? 'View' : rejoin ? 'Rejoin' : 'Open') + '</button></div></div>';
   };
-  return '<h3>Host a live game</h3><p class="mp-lead">Set up the map, the CPUs and the rules, then invite 1 to 3 friends from Bored Together. Everyone plays at the same time, as free-for-all or as one team against the CPUs.</p>' +
+  return '<h3>Host a live game</h3><p class="mp-lead">Set up the map, the CPUs and the rules, and say how many people play (2 to 4). The lobby gives you a room code to share, and you can invite friends from Bored Together by name as well. Everyone plays at the same time, as free-for-all or as one team against the CPUs.</p>' +
     '<div class="mp-acts" style="justify-content:flex-start"><button class="btn primary" data-act="mp-host">Host a live game</button></div>' +
+    '<h3>Join with code</h3><p class="mp-lead">Got a room code from a friend? Type or paste it, and the lobby opens.</p><div id="mp-join-slot"></div>' +
     '<h3>Invites' + (invites.length ? ' · ' + invites.length : '') + '</h3>' +
     (invites.length ? invites.map(inviteRow).join('') : '<p class="mp-lead">No invites waiting.</p>') +
     '<h3>Your live games' + (running.length ? ' · ' + running.length : '') + '</h3>' +
@@ -11968,7 +12064,10 @@ function mpDraw(data) {
   const done = body.querySelector('.mp-done');
   if (done) MP.doneOpen = done.open;
   const top = body.scrollTop, active = document.activeElement, focused = active && active.getAttribute ? active.getAttribute('data-act') : null;
+  const typing = MP.join && document.activeElement === MP.join.input ? [MP.join.input.selectionStart, MP.join.input.selectionEnd] : null;
   body.innerHTML = html;
+  const slot = body.querySelector('#mp-join-slot');
+  if (slot) { slot.replaceWith(mpJoinBox().el); if (typing) { MP.join.input.focus({ preventScroll: true }); try { MP.join.input.setSelectionRange(typing[0], typing[1]); } catch (error) { /* not a text box */ } } }
   const folded = body.querySelector('.mp-done');
   if (folded && MP.doneOpen) folded.open = true;
   body.scrollTop = top;
@@ -11982,6 +12081,7 @@ function mpAction(kind, id) {
   if (kind === 'mp-open') { showMultiplayer(); return; }
   if (kind === 'mp-host') { mpHostOpen(); return; }
   if (kind === 'mp-host-back') { mpHostClose(); return; }
+  if (kind === 'mp-join-code') { mpJoinCode(); return; }
   if (MP.pending) return;
   const ask = (op, payload) => {
     MP.pending = true;
@@ -11995,8 +12095,50 @@ function mpAction(kind, id) {
   else if (kind === 'mp-open-game') ask('open', { game: id });
 }
 
+/* Join with code: one field that takes typing or a paste (also a pasted invite, "Join my Civ Lite game on Bored: code KX7Q2M"). */
+// The six characters a text holds: after the word "code" when there is one, upper case, no spaces, dashes or other marks.
+function mpCodeFrom(text) {
+  const t = String(text || ''), m = /\bcode\b[\s:]*([A-Za-z0-9][A-Za-z0-9 -]*)/i.exec(t);
+  return (m ? m[1] : t).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
+// Built once for the screen and moved into each redraw, so what was typed (and an error under it) survives a refresh.
+function mpJoinBox() {
+  if (MP.join) return MP.join;
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="mp-join"><input id="mp-code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" aria-label="Room code" aria-describedby="mp-code-error" placeholder="KX7Q2M">' +
+    '<button class="btn primary" type="button" id="mp-code-join" data-act="mp-join-code">Join</button></div>' +
+    '<p class="mp-join-err mp-error" id="mp-code-error" role="alert"></p>';
+  const input = el.querySelector('#mp-code'), button = el.querySelector('#mp-code-join'), error = el.querySelector('#mp-code-error');
+  input.addEventListener('input', () => { const v = mpCodeFrom(input.value); if (v !== input.value) input.value = v; error.textContent = ''; });
+  input.addEventListener('paste', event => {
+    const text = event.clipboardData && event.clipboardData.getData ? event.clipboardData.getData('text') : '';
+    if (!text) return;
+    event.preventDefault();
+    input.value = mpCodeFrom(text);
+    error.textContent = '';
+  });
+  input.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); mpJoinCode(); } });
+  MP.join = { el, input, button, error };
+  return MP.join;
+}
+// Asks the hub to seat the player; it then switches this page to the lobby. A refusal shows under the box.
+function mpJoinCode() {
+  const bridge = mpBridge(), box = mpJoinBox();
+  if (!bridge || MP.joining) return;
+  const code = mpCodeFrom(box.input.value);
+  box.input.value = code;
+  if (code.length < 6) { box.error.textContent = code ? 'A room code has 6 characters.' : 'Type or paste the room code.'; box.input.focus(); return; }
+  MP.joining = true;
+  box.button.disabled = true;
+  box.error.textContent = '';
+  bridge.call('join-code', { code }).catch(error => {
+    box.error.textContent = mpWords(error);
+    box.input.focus();
+  }).then(() => { MP.joining = false; box.button.disabled = false; });
+}
+
 // Host a live game: the same Game setup the lobby has, with a friend picker where the seats would be.
-const MP_SOLO_CONTROLS = () => liveLobbyControls().concat(UI.optHumans);
+const MP_SOLO_CONTROLS = () => liveLobbyControls().concat(UI.optHumans, document.getElementById('opt-live-humans'));
 function mpHostLayout(on) {
   UI.paneSetup.classList.toggle('live', on);
   for (const el of document.querySelectorAll('.live-only')) el.hidden = !on;
@@ -12012,6 +12154,7 @@ function mpHostLayout(on) {
   UI.btnBegin.disabled = false;
   UI.seats.hidden = on;
   document.getElementById('mp-pick').hidden = !on;
+  document.getElementById('mp-humans').hidden = !on;
 }
 function mpHostOpen() {
   const bridge = mpBridge();
@@ -12020,8 +12163,9 @@ function mpHostOpen() {
   MP.keep = MP_SOLO_CONTROLS().map(el => [el, el.type === 'checkbox' ? el.checked : el.value]);
   MP.host = true; MP.picked = new Set(); MP.members = null;
   mpHostLayout(true);
+  document.getElementById('opt-live-humans').value = '2';
   liveLobbyFill(MP_DEFAULTS);
-  UI.btnBegin.disabled = true;
+  UI.btnBegin.disabled = false;
   showPane('setup');
   mpMembers();
 }
@@ -12049,22 +12193,31 @@ function mpPickRender() {
   document.getElementById('mp-count').textContent = MP.picked.size + ' of ' + MP_MAX_INVITED + ' invited';
   box.innerHTML = list.length ? list.map(m => '<label class="mp-person"><input type="checkbox" data-ref="' + esc(m.ref) + '"' + (MP.picked.has(m.ref) ? ' checked' : '') +
     (!MP.picked.has(m.ref) && MP.picked.size >= MP_MAX_INVITED ? ' disabled' : '') + '><span>' + esc(m.name) + '</span></label>').join('')
-    : '<p class="hint">Nobody else has joined Bored Together yet. Anyone who joins appears here.</p>';
-  UI.btnBegin.disabled = !MP.picked.size;
+    : '<p class="hint">Nobody else has joined Bored Together yet. Anyone who joins appears here. You can still share the room code.</p>';
+  UI.btnBegin.disabled = false;
   liveCpuChoices();
   refreshStart();
 }
+// Inviting somebody takes a seat: the human players choice grows to fit the invitations.
 function mpPicked(event) {
   const box = event.target;
   if (!box || !box.getAttribute || !box.getAttribute('data-ref')) return;
   const ref = box.getAttribute('data-ref');
   if (box.checked && MP.picked.size < MP_MAX_INVITED) MP.picked.add(ref); else MP.picked.delete(ref);
+  const humans = document.getElementById('opt-live-humans');
+  if (MP.picked.size + 1 > mpHumans()) humans.value = String(MP.picked.size + 1);
+  mpPickRender();
+}
+// Fewer seats than invitations: the most recent invitations are taken back.
+function mpHumansChanged() {
+  const room = mpHumans() - 1;
+  while (MP.picked.size > room) MP.picked.delete([...MP.picked].pop());
   mpPickRender();
 }
 function mpHostPressed() {
   const bridge = mpBridge();
-  if (!bridge || !MP.picked.size) { toast('Pick 1 to 3 friends to invite.'); return; }
-  const cfg = liveLobbyConfig();
+  if (!bridge) return;
+  const cfg = liveLobbyConfig(), humans = mpHumans();
   if (!cfg.conquest && !cfg.science && cfg.turns === 0) { toast('With conquest and science off, set a turn limit so someone can win on score.'); return; }
   if (!Number.isInteger(cfg.turns) || (cfg.turns !== 0 && (cfg.turns < 10 || cfg.turns > 500))) {
     toast('Turn limit: a whole number from 10 to 500, or 0 for no limit.');
@@ -12072,13 +12225,13 @@ function mpHostPressed() {
     return;
   }
   if (cfg.mode === 'coop') {
-    const why = coopProblem(1 + MP.picked.size, cfg.cpus);
+    const why = coopProblem(humans, cfg.cpus);
     if (why) { toast(why); return; }
   }
   UI.btnBegin.disabled = true;
-  bridge.call('host', { settings: cfg, invitees: [...MP.picked] }).catch(error => {
+  bridge.call('host', { settings: cfg, invitees: [...MP.picked], humans }).catch(error => {
     toast(mpWords(error));
-    UI.btnBegin.disabled = !MP.picked.size;
+    UI.btnBegin.disabled = false;
     if (/again/i.test(mpWords(error))) { MP.picked = new Set(); mpMembers(); }
   });
 }

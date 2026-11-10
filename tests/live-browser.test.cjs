@@ -358,3 +358,150 @@ test('Civ Lite Multiplayer: host a co-op game from the title screen, join from t
   assert.deepEqual(errors, []);
   assert.deepEqual(unexpected, []);
 });
+
+// Room codes (5.4) with the real hub and the real SQL: Ann hosts for two humans without inviting anybody and copies the
+// code, Ben types it (lower case, with a dash) in Join with code and lands in the lobby, a third account is told the room
+// is full, a new code makes the old one stale, and both start. The code reaches only the seated players.
+test('Civ Lite room codes: host for two humans, join with a typed code, a third account is refused, a new code retires the old one, and the game starts', async t => {
+  const h = await harness(t);
+  if (!h) return;
+  const { env, errors, unexpected, seen, player, waitPage, inGame } = h;
+  const ann = await player(A), ben = await player(B), cleo = await player(ids[2]);
+  const frameOf = async page => (await page.$('#frame')).contentFrame();
+  const inFrame = async (page, expr, arg, ms = 15000) => {
+    const end = Date.now() + ms;
+    for (;;) {
+      try { return await (await frameOf(page)).waitForFunction(expr, { polling: 50, timeout: Math.max(500, end - Date.now()) }, arg); }
+      catch (error) { if (Date.now() > end) throw error; await sleep(100); }   // the document was replaced under the wait: look again
+    }
+  };
+  const openCivLite = async page => { await page.evaluate(() => { location.hash = 'ashcrown'; }); await waitPage(page, () => !document.querySelector('#player').hidden); };
+  const act = async (page, selector) => { await inFrame(page, sel => !!document.querySelector(sel) && !document.querySelector(sel).disabled, selector); await (await frameOf(page)).evaluate(sel => document.querySelector(sel).click(), selector); };
+  const titleReady = page => inFrame(page, () => typeof G !== 'undefined' && !G && !document.getElementById('start').hidden && !document.getElementById('pane-title').hidden && !document.getElementById('btn-mp').hidden);
+  const codeOf = async page => (await frameOf(page)).$eval('#room-code-text', e => e.textContent);
+  const lobby = page => inFrame(page, () => !!LIVE.net && !document.getElementById('pane-setup').hidden && !document.getElementById('room-code').hidden && document.getElementById('room-code-text').textContent.length === 6);
+  const dbRoom = async () => (await env.admin('select id, status, code, retired_code, capacity from bored_live.games order by created_at desc limit 1'))[0];
+  const ALPHABET = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
+  // Joining with a code from the title screen: type it in the box, press Join.
+  const tryCode = async (page, text) => {
+    await (await frameOf(page)).evaluate(() => { const box = document.getElementById('mp-code'); box.value = ''; box.dispatchEvent(new Event('input', { bubbles: true })); });
+    await (await frameOf(page)).type('#mp-code', text);
+    await act(page, '#mp-code-join');
+  };
+  const refusal = (page, words) => inFrame(page, w => document.getElementById('mp-code-error').textContent === w, words);
+
+  // Ann: Multiplayer, Host a live game for two humans, nobody invited, open the lobby.
+  await openCivLite(ann);
+  await titleReady(ann);
+  await act(ann, '#btn-mp');
+  await act(ann, '[data-act="mp-host"]');
+  await inFrame(ann, () => document.querySelectorAll('#mp-people .mp-person').length >= 1 && !document.getElementById('pane-setup').hidden);
+  assert.equal(await (await frameOf(ann)).$eval('#opt-live-humans', e => e.value), '2');
+  await act(ann, '#btn-begin');
+  await lobby(ann);
+  const code = await codeOf(ann);
+  assert.match(code, ALPHABET);
+  const room = await dbRoom();
+  assert.deepEqual([room.status, room.code, room.capacity], ['lobby', code, 2]);
+  assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 1, 'nobody was invited: only the host is seated');
+  assert.equal(await (await frameOf(ann)).$eval('#room-code-new', b => b.hidden), false, 'the host can make a new code');
+  // Copy invite puts the invitation on the clipboard (a stand-in for it here: the page is not user-activated in this browser).
+  await (await frameOf(ann)).evaluate(() => { window.__copied = null; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: text => { window.__copied = text; return Promise.resolve(); } } }); });
+  await act(ann, '#room-code-invite');
+  await inFrame(ann, c => window.__copied === 'Join my Civ Lite game on Bored: code ' + c, code);
+
+  // Ben types the code in lower case with a dash, and lands in the lobby.
+  await openCivLite(ben);
+  await titleReady(ben);
+  await act(ben, '#btn-mp');
+  await inFrame(ben, () => !!document.getElementById('mp-code'));
+  await tryCode(ben, code.slice(0, 3).toLowerCase() + '-' + code.slice(3).toLowerCase());
+  await lobby(ben);
+  assert.equal(await codeOf(ben), code, 'a joined player sees the code, to pass it on');
+  assert.equal(await (await frameOf(ben)).$eval('#room-code-new', b => b.hidden), true, 'only the host makes a new code');
+  await inFrame(ann, () => document.getElementById('seat-who-1').textContent === 'Joined' && document.getElementById('seat-name-1').value === 'BananaWizard');
+  assert.deepEqual((await env.admin('select seat, state from bored_live.seats where game_id=$1 order by seat', [room.id])).map(r => r.state), ['joined', 'joined']);
+
+  // A third account, Cleo, is a member of Bored Together but the room is full.
+  await openCivLite(cleo);
+  await titleReady(cleo);
+  await act(cleo, '#btn-mp');
+  await inFrame(cleo, () => !!document.getElementById('mp-code'));
+  await tryCode(cleo, code);
+  await refusal(cleo, 'That room is full');
+  assert.equal(await cleo.$eval('#player', e => e.hidden), false);
+  assert.equal(await (await frameOf(cleo)).evaluate(() => typeof G !== 'undefined' && !G && !document.getElementById('start').hidden), true, 'still on the title screen');
+  assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 2, 'nobody was added');
+
+  // Ann makes a new code: the old one is stale for Cleo, and Ben's lobby shows the new one.
+  await act(ann, '#room-code-new');
+  await inFrame(ann, old => document.getElementById('room-code-text').textContent !== old, code);
+  const fresh = await codeOf(ann);
+  assert.match(fresh, ALPHABET);
+  assert.notEqual(fresh, code);
+  assert.equal((await dbRoom()).code, fresh);
+  await tryCode(cleo, code);
+  await refusal(cleo, 'No open room with that code');
+  await inFrame(ben, c => document.getElementById('room-code-text').textContent === c, fresh);
+  // The new code is full too: a refused code never seats anybody.
+  await tryCode(cleo, fresh);
+  await refusal(cleo, 'That room is full');
+
+  // Both are ready, Ann starts, and the game runs on both screens. The code is cleared.
+  await act(ben, '#btn-ready');
+  await inFrame(ann, () => !document.getElementById('btn-begin').disabled);
+  await act(ann, '#btn-begin');
+  for (const page of [ann, ben]) await inFrame(page, () => document.getElementById('start').hidden && !!G && !!G.live && G.turn === 1);
+  assert.equal(await (await frameOf(ann)).evaluate('liveHash()'), await (await frameOf(ben)).evaluate('liveHash()'));
+  for (const page of [ann, ben]) await (await frameOf(page)).evaluate('onAction("end-confirm")');
+  for (const page of [ann, ben]) await inFrame(page, () => G.turn === 2);
+  const started = await dbRoom();
+  assert.equal(started.status, 'active');
+  assert.equal(started.code, null, 'the code is cleared when the game starts');
+  // Late: the game has started, and a code cannot seat anybody in a game under way.
+  await tryCode(cleo, fresh);
+  await refusal(cleo, 'That game has already started');
+  // What the third account was shown never held a code of the room: only what she typed herself.
+  const shown = await (await frameOf(cleo)).evaluate(() => document.body.textContent);
+  assert.ok(!shown.includes(code) && !shown.includes(fresh), 'the room code never reached an account that is not seated');
+  assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 2, 'still Ann and Ben: a code seats nobody once the game has started');
+  assert.ok(seen.includes('join_code') && seen.includes('new_code'));
+  assert.deepEqual(errors, []);
+  assert.deepEqual(unexpected, []);
+});
+
+// Bored Together's own page has the same box next to "Start a live game".
+test('Bored Together: Join with code next to Start a live game says what went wrong under the field, and a good code opens the lobby', async t => {
+  const h = await harness(t);
+  if (!h) return;
+  const { env, errors, unexpected, player, waitPage, game, inGame } = h;
+  const ann = await player(A), ben = await player(B), cleo = await player(ids[2]);
+  const room = await env.rpc(A, 'create', { game: 'ashcrown', capacity: 2, config: { map: 'pangaea' } });
+  assert.match(room.code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/, 'the host is given the code');
+  for (const page of [ben, cleo]) { await page.evaluate(() => document.querySelector('#together-nav').click()); await waitPage(page, () => !document.querySelector('#together').hidden && !!document.querySelector('#bt-join-code')); }
+  const join = async (page, text) => {
+    await page.$eval('#bt-join-code', e => { e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); });
+    await page.type('#bt-join-code', text);
+    await page.evaluate(() => document.querySelector('#bt-join-go').click());
+  };
+  // The box sits in the same row as Start a live game.
+  assert.equal(await ben.evaluate(() => document.querySelector('#bt-join-code').closest('.bt-start-actions') === [...document.querySelectorAll('#together button')].find(b => b.textContent === 'Start a live game').closest('.bt-start-actions')), true);
+  // A short code, a wrong code, then the right one typed as people type it: lower case, with a dash and a space.
+  await join(ben, 'abc');
+  await waitPage(ben, () => /6 characters/.test(document.querySelector('#bt-join-error')?.textContent || ''));
+  await join(ben, 'zzzzzz');
+  await waitPage(ben, () => document.querySelector('#bt-join-error')?.textContent === 'No open room with that code');
+  assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 1, 'a wrong code seats nobody');
+  await join(ben, room.code.slice(0, 3).toLowerCase() + '- ' + room.code.slice(3).toLowerCase());
+  const lobby = await game(ben);
+  await inGame(lobby, () => !document.getElementById('pane-setup').hidden && document.getElementById('seat-who-1').textContent === 'Joined' && !document.getElementById('room-code').hidden);
+  assert.equal(await lobby.$eval('#room-code-text', e => e.textContent), room.code, 'a player who joined sees the code');
+  assert.equal((await env.admin('select state from bored_live.seats where game_id=$1 and seat=1', [room.id]))[0].state, 'joined');
+  // Cleo with the same code: the room is full, and the page stays where it was.
+  await join(cleo, room.code);
+  await waitPage(cleo, () => document.querySelector('#bt-join-error')?.textContent === 'That room is full');
+  assert.equal(await cleo.$eval('#player', e => e.hidden), true);
+  assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 2);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(unexpected, []);
+});

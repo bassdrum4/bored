@@ -36,9 +36,8 @@ async function functional(t,env) {
     await rejects(env.rpc(A,'bogus'),/Unknown operation/);
   });
 
-  await t.test('create: one to three invited members, checked setup, no strangers',async()=>{
-    await rejects(env.rpc(A,'create',{game:'ashcrown',invite:[]}),/Invite one to three/);
-    await rejects(env.rpc(A,'create',{game:'ashcrown',invite:[B,C,D,E]}),/Invite one to three/);
+  await t.test('create: up to three invited members, checked setup, no strangers',async()=>{
+    await rejects(env.rpc(A,'create',{game:'ashcrown',invite:[B,C,D,E]}),/Invite up to three/);
     await rejects(env.rpc(A,'create',{game:'ashcrown',invite:[B,B]}),/Invite each member once/);
     await rejects(env.rpc(A,'create',{game:'ashcrown',invite:[A]}),/Invite each member once/);
     await rejects(env.rpc(A,'create',{game:'ashcrown',invite:[F]}),/can not be invited/);
@@ -432,11 +431,11 @@ async function functional(t,env) {
     await rejects(env.asUser(B,"insert into bored_live.actions(game_id,seq,seat,type,request_id) values($1,99,1,'x',gen_random_uuid())",[id]),/permission denied/);
     await rejects(env.asUser(B,'update bored_live.actions set seat=3'),/permission denied/);
     await rejects(env.asUser(B,'delete from bored_live.actions'),/permission denied/);
-    for(const table of ['games','seats','snapshots','hashes','desyncs','presence','finish_claims']) await rejects(env.asUser(B,`select * from bored_live.${table}`),/permission denied/);
+    for(const table of ['games','seats','snapshots','hashes','desyncs','presence','finish_claims','kicks']) await rejects(env.asUser(B,`select * from bored_live.${table}`),/permission denied/);
     await rejects(env.asUser(B,'select bored_live.cleanup()'),/permission denied/);
     await rejects(env.asUser(null,"select bored_live.api('list','{}'::jsonb)"),/permission denied/);
     const rls=await env.admin("select relname,relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='bored_live' and relkind='r' order by relname");
-    assert.deepEqual(rls.map(r=>r.relname),['actions','desyncs','finish_claims','games','hashes','pings','presence','seats','snapshots']);
+    assert.deepEqual(rls.map(r=>r.relname),['actions','desyncs','finish_claims','games','hashes','kicks','pings','presence','seats','snapshots']);
     assert.ok(rls.every(r=>r.relrowsecurity===true));
   });
 

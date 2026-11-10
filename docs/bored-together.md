@@ -351,12 +351,60 @@ The game has no network, so it asks the hub through a second bridge, `window.__b
 (`src/hub/together-lobby.js`), injected like the live bridge, with its own channel. The hub answers only a message from the
 game's own window, on that channel, and only for a signed-in account (the sign-in request is the one thing answered signed out), and
 it drops an answer if the account changed while the call was out. Operations: `status` (`{ signedIn, enrolled, name }`),
-`members`, `invites`, `games`, `host(settings, invitees)`, `join(invite)`, `decline(invite)`, `open(game)`, plus `sign-in` and
-`open-together`. `host`, `join` and `open` end by switching the player into that live game, exactly as opening it from Bored
+`members`, `invites`, `games`, `host(settings, invitees, humans)`, `join(invite)`, `join-code(code)` (5.4), `decline(invite)`,
+`open(game)`, plus `sign-in` and `open-together`. `host`, `join`, `join-code` and `open` end by switching the player into that live game, exactly as opening it from Bored
 Together does (the document is reloaded with the live bridge). The page is given display names, whether people are online,
 room ids for rooms it may open, and opaque per-list references for the members it may invite: never a token, an email or an
 account id. Leaving a live game from its Menu (or leaving or cancelling in the lobby) now returns to Civ Lite's title screen
-instead of closing the game. Bored Together's own page is unchanged.
+instead of closing the game. (Bored Together's own page got *Join with code* in 5.4, below.)
+
+**Room codes (5.4).** A room has a *join code* and a *capacity*, so friends can join without being invited by name, as in Civ 6.
+
+- *The code.* Six characters from `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no 0, O, 1, I or L), made by the server from
+  `gen_random_uuid()` bytes (`byte & 31`, which is unbiased because 256 divides by 32; no extension is needed). It is unique
+  among rooms still in the lobby (a partial unique index), and it is cleared when the game starts. A lobby untouched for 24
+  hours is closed by the existing cleanup, and `join_code` treats it as closed even before the cleanup has run.
+- *The capacity* is 2 to 4 human seats, set by the host when the room is made. Seats nobody takes (invited friends who did
+  not join, and open seats) become CPUs or are dropped at the start, according to *Seats nobody joins*, as in 5.0.
+- *`create`* no longer needs invitations (0 to 3), takes `capacity` (without it, a room is as big as its invitations, with
+  two as the least, so every earlier caller works as before) and returns the code, to the host only.
+- *`join_code(code)`* is for a signed-in member of Bored Together. It ignores case, spaces and dashes. The room must be in
+  the lobby with a free human seat, and the account must not be blocked by the host (`bored_together.blocked`) or have been
+  removed with this code. It seats the player as `joined`. The answers are plain: *No open room with that code*, *That room
+  is full*, *That game has already started*. Nobody who is blocked or was removed learns that the room exists: they get *No
+  open room with that code*. It is limited to 10 tries a minute per account (`live-code`), on top of the live-calls limit.
+- *`new_code(id)`* (host, lobby) makes a fresh code; the old one stops working, and so does the removal list.
+  *`kick(id, seat)`* (host, lobby) removes a joined or invited player, who cannot come back with the same code until a new
+  one is made (`bored_live.kicks`). The player's screen is told it was removed.
+- *Who sees the code.* The host, in `list` and `game`; a player who has joined (or is ready), in `game` only, so they can
+  pass it on (`list` removes it for everyone but the host). A player who is only invited, someone outside the room, and
+  everyone after the start never receive it. The last code is kept in `retired_code` after the start only so that a late
+  joiner hears *That game has already started*; it is never sent to anyone and the cleanup clears it a day later.
+- *A wrong code is an answer, not an error.* A raised error rolls back the whole call, and with it the server's count of
+  tries, so `join_code` returns `{ ok: false, error }` for a wrong, full, started or blocked room, and the hub's `liveRPC`
+  turns that into an ordinary error. Only going over the limit raises.
+
+In Civ Lite, *Host a live game* has a *Human players* choice (2 to 4) and an optional *Invite friends by name* list (the
+friend list grows the human seats to fit, and fewer seats take back the latest invitations). The lobby shows the code large
+with *Copy code*, *Copy invite* (`Join my Civ Lite game on Bored: code KX7Q2M`) and, for the host, *New code*; seats as they
+fill (open seats are shown as such), and *Remove* on the host's side. The copy buttons call `navigator.clipboard` inside the
+click and, if the browser refuses, put the text in a box and select it. The Multiplayer screen has a *Join with code* box
+(one field that takes typing or a pasted invite) whose refusals show under it; *Join* goes straight to the lobby. Bored
+Together's own page has the same box next to *Start a live game*. The lobby bridge gained `join-code` and a `humans` value on
+`host`; the live bridge gained `new-code` and `kick` and tells the screen `removed` when the server says the player is no
+longer in the room. The code reaches only seated players, and only inside the lobby: it is not in what the lobby bridge
+gives the Multiplayer screen, nor in `list` for anyone but the host.
+
+**Installing room codes.** Apply `supabase/migrations/20261110150000_together_live_room_codes.sql` once, in the Supabase SQL
+editor, after the earlier live migrations (`..._together_live_ashcrown.sql`, `..._coop.sql` and `..._checks.sql`; the file names
+sort in that order). It only adds and replaces: the columns `code`, `retired_code` and `capacity` on `bored_live.games` (lobbies
+that are open already get a capacity equal to their seats, so nothing changes for them; they have no code, so they only fill by
+invitation), the table `bored_live.kicks` (row-level security on, no access for members), the helpers `new_room_code` and
+`assign_code`, and new bodies for `bored_live.game_json`, `bored_live.cleanup` and `bored_live.api` (the 5.1.1 body with every
+check kept). It does not touch `bt_live_rpc`. Deploy the SQL before the frontend. With the SQL applied and the old frontend
+cached, nothing breaks (a room just has a code nobody types). Without the SQL the new frontend still opens a room with at least one
+invited friend (the old server ignores `capacity`), but *Host a live game* with nobody invited says *Invite one to three members*
+and *Join with code* says *Unknown operation*.
 
 **Known limits.** The server orders actions but does not simulate Civ Lite, so a modified client can send moves its
 rules would refuse (every screen refuses them the same way, so the screens stay in step, but a made-up action is still
@@ -452,9 +500,12 @@ order, retries, polling, presence; and the bridge's channel checks), `live-game.
 snapshot replay including jsonb key order, dynamic turns, the timer, leaving and returning), `live-screen.test.cjs`
 (the game's live screen in two real browsers against a stand-in room), `together-live.test.cjs` (the room's SQL:
 gap-free sequence numbers under concurrent sends, idempotent retries, membership, ordering, the rate limit, and the co-op
-setup key and pings) and
-`live-browser.test.cjs` (two signed-in browsers start, join, play and rejoin against the real SQL, with Realtime cut off
-part way). The last two need a disposable database like `together-postgres.test.cjs` (CI runs them in that job).
+setup key and pings),
+`room-codes.test.cjs` (5.4: the code alphabet and uniqueness, `join_code` with its messages and rate limit, `new_code`, `kick`,
+who sees the code, the start, the 24-hour closure, and that the 5.1.1 checks are still in the replaced `api`) and
+`live-browser.test.cjs` (signed-in browsers start, join, play and rejoin against the real SQL, with Realtime cut off
+part way; and host, join with a code, refuse a third account and make a new code). The last three need a disposable
+database like `together-postgres.test.cjs` (CI runs them in that job).
 
 No test creates student accounts, memberships or demo matches in production.
 A real Google Sites page and real external Auth providers are not controlled

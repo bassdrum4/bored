@@ -3,7 +3,7 @@ import { togetherRPC, inviteRPC, liveRPC, CONSENT_VERSION } from './together-api
 import { TOGETHER_GAMES } from '../games/catalog.js';
 import { PREVIEWS } from '../games/discovery.js';
 import { TOGETHER_ADAPTERS } from './together-player.js';
-import { TOGETHER_LIVE, LIVE_DEFAULTS } from './together-live.js';
+import { TOGETHER_LIVE, LIVE_DEFAULTS, roomCodeFrom } from './together-live.js';
 import { readStored, writeStored, removeStored } from './store.js';
 
 export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
@@ -14,6 +14,8 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   // Live games the account is in (rooms being set up, games running, ones that just finished).
   let liveGames = [], liveKey = '';
   const liveSelected = new Set();
+  // The Join with code box: what was typed, and why the last try did not work.
+  let joinText = '', joinError = '';
   let flow = null, selectedGame = 'connect-four', people = null, outsiders = null, outsidersError = '';
   // The one corner note: dismissed stays dismissed for that set of games, so it
   // can only reappear when something new is actually waiting.
@@ -293,6 +295,39 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     box.append(make, button('Cancel', () => { flow = null; people = null; liveSelected.clear(); render(); }));
     host.append(box);
   }
+  // Join with code (5.4): the same thing as Civ Lite's Multiplayer screen. The server seats the player, the lobby opens,
+  // and a code that does not work is said under the box.
+  function joinWithCode() {
+    const form = node('form', undefined, 'bt-join-code');
+    form.setAttribute('aria-label', 'Join with code');
+    const field = node('input'); field.id = 'bt-join-code'; field.type = 'text'; field.value = joinText; field.placeholder = 'Room code';
+    field.autocomplete = 'off'; field.spellcheck = false; field.maxLength = 24;
+    field.setAttribute('autocapitalize', 'characters'); field.setAttribute('aria-label', 'Room code');
+    field.oninput = () => {
+      joinText = roomCodeFrom(field.value);
+      if (field.value !== joinText) field.value = joinText;
+      joinError = ''; const problem = $('#bt-join-error'); if (problem) problem.remove();
+    };
+    field.onpaste = event => {
+      const text = event.clipboardData?.getData?.('text');
+      if (!text) return;
+      event.preventDefault(); joinText = field.value = roomCodeFrom(text);
+    };
+    const go = node('button', 'Join with code', 'action'); go.id = 'bt-join-go'; go.type = 'submit';
+    form.onsubmit = event => {
+      event.preventDefault();
+      run(async () => {
+        const code = roomCodeFrom(field.value); joinText = code; joinError = '';
+        if (code.length < 6) { joinError = code ? 'A room code has 6 characters.' : 'Type or paste the room code.'; return; }
+        let game;
+        try { game = await liveRPC('join_code', { code }); } catch (error) { joinError = error.message || 'That code did not work.'; return; }
+        joinText = '';
+        await launchLive(game.id);
+      });
+    };
+    form.append(field, go);
+    return form;
+  }
   function picker(host = content) {
     if (flow === 'live') { livePicker(host); return; }
     const box = node('section', undefined, 'bt-start');
@@ -559,9 +594,11 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
         people = await togetherRPC('people');
         liveSelected.clear(); flow = 'live'; render();
       }),
+      joinWithCode(),
       button('Play Random', () => { flow = 'random'; people = null; render(); $('#bt-game-select')?.focus(); }));
     overflow(actions, null);
     if (!flow) start.append(actions);
+    if (!flow && joinError) { const problem = node('p', joinError, 'bt-caption bt-join-error'); problem.id = 'bt-join-error'; problem.setAttribute('role', 'alert'); start.append(problem); }
     // The picker lives inside the starter, so choosing a game never pushes the
     // page down into a second, unrelated-looking box.
     if (flow) picker(start);

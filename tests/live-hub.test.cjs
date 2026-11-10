@@ -33,7 +33,7 @@ function room(extra = {}) {
   }, extra);
   const game = () => ({ id: r.id, game: 'ashcrown', host: r.host, status: r.status, config: r.config, start: r.start, timer: r.timer, head: r.head,
     round: r.round, round_age: 1, winner: r.winner == null ? null : r.winner, me: 0, seats: r.seats.map(s => Object.assign({}, s)),
-    snapshot: r.snapshot ? { round: r.snapshot.round, seq: r.snapshot.seq, hash: r.snapshot.hash } : null });
+    snapshot: r.snapshot ? { round: r.snapshot.round, seq: r.snapshot.seq, hash: r.snapshot.hash } : null, capacity: r.capacity, code: r.code });
   const sync = (after, limit) => ({ id: r.id, status: r.status, head: r.head, round: r.round, round_age: 2, timer: r.timer, winner: null,
     actions: r.actions.filter(a => a.seq > after).slice(0, limit).map(a => Object.assign({}, a)),
     seats: r.seats.map(s => ({ seat: s.seat, controller: s.controller, online: s.online, away: s.away })) });
@@ -50,6 +50,8 @@ function room(extra = {}) {
       case 'lobby_set': if (args.config) r.config = args.config; if ('ready' in args) r.seats[0].state = args.ready ? 'ready' : 'joined'; if ('civ' in args) r.seats[0].civ = args.civ; return game();
       case 'start': r.status = 'active'; r.start = { seats: [] }; return game();
       case 'leave_lobby': r.status = 'cancelled'; return game();
+      case 'new_code': r.code = 'N' + (r.codes = (r.codes || 0) + 1) + 'XXXX'; return game();
+      case 'kick': r.seats = r.seats.filter(s => s.seat !== args.seat); return game();
       case 'sync': case 'heartbeat': return sync(args.after || 0, action === 'heartbeat' ? 0 : args.limit || 500);
       case 'load': return { snapshot: r.snapshot };
       case 'snapshot': r.snapshot = r.snapshot || { round: args.round, seq: args.seq, hash: args.hash, state: args.state }; return { stored: true };
@@ -132,6 +134,48 @@ test('lobby calls reach the room as the lobby_set, start and leave_lobby actions
   await s2.call('hello', {});
   assert.equal((await s2.call('leave', {})).status, 'cancelled');
   await assert.rejects(s2.call('bogus', {}), /Unknown operation/);
+});
+
+test('room codes: new code and remove reach the room, a changed code or capacity is lobby news, and being removed is told once', async t => {
+  const r = room({ code: 'ABC234', capacity: 3 });
+  const s = await session(t, r);
+  const hello = await s.call('hello', {});
+  assert.equal(hello.game.code, 'ABC234', 'the code is the room’s, as the server sent it');
+  const fresh = await s.call('new-code', {});
+  assert.deepEqual(r.calls.find(c => c.action === 'new_code').args, { id: 'room-1' });
+  assert.equal(fresh.code, 'N1XXXX');
+  // The poll sees a code or a capacity change (another screen of the host) as news.
+  await wait(60);
+  const before = s.events.filter(e => e.event === 'game').length;
+  r.code = 'ZZZ999';
+  await until(() => s.events.filter(e => e.event === 'game').length > before, 2000, 'the new code');
+  assert.equal(s.events.filter(e => e.event === 'game').at(-1).game.code, 'ZZZ999');
+  r.capacity = 4;
+  await until(() => s.events.filter(e => e.event === 'game').at(-1).game.capacity === 4, 2000, 'the new capacity');
+  // Remove: a seat number, checked here, and the room's answer comes back.
+  const out = await s.call('kick', { seat: 1 });
+  assert.deepEqual(r.calls.find(c => c.action === 'kick').args, { id: 'room-1', seat: 1 });
+  assert.deepEqual(out.seats.map(x => x.seat), [0]);
+  const calls = r.calls.length;
+  for (const seat of [-1, 8, 1.5, 'x', undefined, null]) await assert.rejects(s.call('kick', { seat }), /Nobody to remove/);
+  assert.equal(r.calls.length, calls, 'nothing was sent for those');
+  // When the host removes this screen's player, the poll is refused and the page is told, once.
+  const r2 = room({ code: 'ABC234' });
+  const s2 = await session(t, r2);
+  await s2.call('hello', {});
+  r2.fail.push({ message: 'You are not in this game.', status: 403 });
+  await until(() => s2.events.some(e => e.event === 'removed'), 2000, 'the removal');
+  const polls = r2.calls.filter(c => c.action === 'game').length;
+  await wait(80);
+  assert.equal(s2.events.filter(e => e.event === 'removed').length, 1);
+  assert.equal(r2.calls.filter(c => c.action === 'game').length, polls, 'and it stops asking');
+  // Any other failure is just a missed look: the lobby keeps trying and says nothing.
+  const r3 = room();
+  const s3 = await session(t, r3);
+  await s3.call('hello', {});
+  r3.fail.push({ message: 'Failed to fetch' }, { message: 'Server error', status: 500 }, { message: 'Too many requests. Please try again later.', status: 400 });
+  await wait(120);
+  assert.ok(!s3.events.some(e => e.event === 'removed'));
 });
 
 test('opening a running game gives the newest snapshot and exactly the actions after it, then the rest in order', async t => {

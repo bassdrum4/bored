@@ -141,17 +141,42 @@ export function createLobbyBridge({ frame, deps = {} }) {
     refs = next;
     return out;
   }
-  async function host(me, settings, invitees) {
-    if (!Array.isArray(invitees) || invitees.length < 1 || invitees.length > 3) throw new Error('Invite one to three members.');
+  // A room code that does not work comes back as {ok:false, error} from the server; the hub's own call raises it
+  // already, and this keeps a bridge that was handed the raw answer saying the same thing.
+  const answered = result => {
+    if (result && result.ok === false && typeof result.error === 'string') throw new Error(result.error);
+    return result;
+  };
+  // Invitations are optional (none to three), and the host says how many human seats the room has (two to four).
+  async function host(me, settings, invitees, humans) {
+    const list = invitees === undefined || invitees === null ? [] : invitees;
+    if (!Array.isArray(list) || list.length > 3) throw new Error('Invite up to three members.');
     const ids = [];
-    for (const ref of invitees) {
+    for (const ref of list) {
       const id = typeof ref === 'string' ? refs.get(ref) : null;
       if (!id) throw new Error('Pick the members again.');
       if (!ids.includes(id)) ids.push(id);
     }
-    const created = await rpc('create', { game: 'ashcrown', invite: ids, config: cleanSettings(settings) });
+    let capacity = ids.length + 1 < 2 ? 2 : ids.length + 1;
+    if (humans !== undefined && humans !== null) {
+      if (!Number.isInteger(humans) || humans < 2 || humans > 4) throw new Error('A live game has two to four human players.');
+      capacity = humans;
+    }
+    if (ids.length + 1 > capacity) throw new Error('There are more invitations than seats. Raise the human players, or invite fewer friends.');
+    const created = await rpc('create', { game: 'ashcrown', invite: ids, capacity, config: cleanSettings(settings) });
     cache.clear();
     const id = uuid(created && created.id);
+    if (!same(me.id)) throw new Error('Your account changed. Please try again.');
+    await deps.openLive(id);
+    return { id };
+  }
+  // Join with a room code: the server seats the player and the lobby opens. What the player typed is all the page
+  // ever handles; nothing about the room (its code, who is in it) comes back until the lobby itself.
+  async function joinCode(me, code) {
+    if (typeof code !== 'string') throw new Error('No open room with that code');
+    const joined = answered(await rpc('join_code', { code: code.slice(0, 40) }));
+    cache.clear();
+    const id = uuid(joined && joined.id);
     if (!same(me.id)) throw new Error('Your account changed. Please try again.');
     await deps.openLive(id);
     return { id };
@@ -167,7 +192,8 @@ export function createLobbyBridge({ frame, deps = {} }) {
       case 'members': return members(me);
       case 'invites': return invites();
       case 'games': return games(me);
-      case 'host': return host(me, p.settings, p.invitees);
+      case 'host': return host(me, p.settings, p.invitees, p.humans);
+      case 'join-code': return joinCode(me, p.code);
       case 'join': { const id = uuid(p.invite); await rpc('join', { id }); cache.clear(); await deps.openLive(id); return { id }; }
       case 'decline': { await rpc('leave_lobby', { id: uuid(p.invite) }); cache.clear(); return {}; }
       case 'open': { const id = uuid(p.game); await deps.openLive(id); return { id }; }
