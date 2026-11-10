@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>Corner</title>
+<style>
+  :root {
+    --paper: #f5f2ea; --card: #fffdf7; --ink: #191713; --muted: #6b6558;
+    --line: #d8d2c4; --accent: #2f5d46; --loss: #8a3a2c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { background: var(--paper); }
+  body {
+    min-height: 100vh; background: var(--paper); color: var(--ink);
+    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    display: flex; justify-content: center; align-items: flex-start;
+    padding: 12px 10px 18px; touch-action: manipulation;
+    font-variant-numeric: tabular-nums;
+  }
+  main { width: min(360px, 100%); }
+  .hud {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+    border-bottom: 1px solid var(--ink); padding-bottom: 6px;
+  }
+  .forecast { font-size: 10px; color: var(--muted); margin: 6px 0 10px; min-height: 28px; }
+  .panel { border: 1px solid var(--line); background: var(--card); padding: 10px; }
+  h1 { font: 600 19px/1.1 Georgia, 'Times New Roman', serif; margin-bottom: 4px; }
+  .lede { font-size: 11px; color: var(--muted); margin-bottom: 9px; }
+  .rules { list-style: none; display: grid; gap: 5px; font-size: 10.5px; color: var(--muted); margin-bottom: 12px; }
+  .rules li { padding-left: 10px; position: relative; }
+  .rules li:before { content: ''; position: absolute; left: 0; top: 6px; width: 3px; height: 3px; background: var(--accent); }
+  button {
+    font: inherit; color: inherit; background: none; border: 1px solid var(--line);
+    border-radius: 2px; cursor: pointer; padding: 4px 7px; min-height: 24px;
+  }
+  button:disabled { opacity: .3; cursor: default; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button.primary {
+    width: 100%; background: var(--ink); color: var(--paper); border-color: var(--ink);
+    padding: 9px; font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+  }
+  .shelf { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--muted); letter-spacing: .04em; margin-bottom: 2px; }
+  .row { display: grid; grid-template-columns: minmax(0, 1fr) 84px 60px; gap: 6px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+  .who { min-width: 0; }
+  .name { display: block; font-size: 11.5px; }
+  .meta { display: block; font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .step { display: grid; grid-template-columns: 18px minmax(0, 1fr) 18px; align-items: center; gap: 2px; }
+  .step .lab { grid-column: 1 / -1; font-size: 8px; letter-spacing: .09em; color: var(--muted); text-transform: uppercase; text-align: center; }
+  .step b { font-weight: 400; font-size: 10px; text-align: center; white-space: nowrap; }
+  .step button { width: 18px; height: 22px; min-height: 0; padding: 0; font-size: 12px; line-height: 1; }
+  .hint { font-size: 10px; color: var(--muted); margin: 8px 0; min-height: 15px; }
+  .dayline { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+  .soldline { font-size: 10.5px; min-height: 15px; margin-bottom: 6px; }
+  .ledger { display: grid; gap: 3px; margin: 6px 0 8px; font-size: 11px; }
+  .line { display: flex; justify-content: space-between; gap: 10px; }
+  .line span:first-child { color: var(--muted); }
+  .line span:last-child { text-align: right; }
+  .line.profit span:last-child { color: var(--accent); }
+  .line.loss span:last-child { color: var(--loss); }
+  .line.total { border-top: 1px solid var(--line); margin-top: 3px; padding-top: 4px; }
+  .line.total span:last-child { font-weight: 600; }
+  .upgrades { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin: 8px 0 2px; }
+  .upgrades[hidden] { display: none; }
+  .upgrades button { font-size: 9px; line-height: 1.3; padding: 5px 3px; }
+  .upgrades button span { display: block; }
+  .upgrades button span:last-child { color: var(--muted); }
+  .upgrades button:disabled span:last-child { color: inherit; }
+  .final { font: 600 32px/1.05 Georgia, 'Times New Roman', serif; margin: 2px 0; }
+  .grade { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; min-height: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <p id="hud" class="hud"><span>DAY 1 / 14</span><span>$120 · REP 50</span></p>
+  <p id="forecast" class="forecast">A small shop on a good corner.</p>
+
+  <section id="intro" class="panel">
+    <h1>Corner</h1>
+    <p class="lede">Fourteen days. One shop. Keep the shelf full and the prices honest.</p>
+    <ul class="rules">
+      <li>Buy stock each morning. Milk, bread and ice cream spoil overnight.</li>
+      <li>Cheap prices move volume; dear ones protect the margin.</li>
+      <li>Read the weather and the local notice before you order.</li>
+      <li>Finish with more in the till than the $120 you started with.</li>
+    </ul>
+    <button id="begin" class="primary" type="button">Open day 1</button>
+  </section>
+
+  <section id="plan" class="panel" hidden>
+    <p class="shelf"><span id="shelf">SHELF 0 / 30</span><span id="order">ORDER $0.00</span></p>
+    <div id="rows"></div>
+    <p id="planHint" class="hint">Stock the shelf, set prices, then open.</p>
+    <button id="open" class="primary" type="button">Open shop</button>
+  </section>
+
+  <section id="report" class="panel" hidden>
+    <p id="dayline" class="dayline">DAY 1</p>
+    <p id="soldline" class="soldline"></p>
+    <div id="ledger" class="ledger"></div>
+    <div id="upgrades" class="upgrades"></div>
+    <p id="repNote" class="hint"></p>
+    <button id="next" class="primary" type="button">Next morning</button>
+  </section>
+
+  <section id="over" class="panel" hidden>
+    <p class="dayline">FOURTEEN DAYS</p>
+    <p id="finalCash" class="final">$0</p>
+    <p id="grade" class="grade"></p>
+    <div id="finalStats" class="ledger"></div>
+    <button id="again" class="primary" type="button">Play again</button>
+  </section>
+</main>
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (selector) { return document.querySelector(selector); };
+
+  var DAYS = 14, START_CASH = 120, BASE_SHELF = 30, START_REP = 50;
+
+  var PRODUCTS = [
+    { id: 'milk', name: 'Milk', cost: 1.20, value: 2.20, spoil: 1, base: 1.0 },
+    { id: 'bread', name: 'Bread', cost: 0.90, value: 1.80, spoil: 0.5, base: 1.0 },
+    { id: 'soda', name: 'Soda', cost: 0.35, value: 1.00, spoil: 0, base: 1.1 },
+    { id: 'soup', name: 'Soup', cost: 0.80, value: 1.90, spoil: 0, base: 0.8 },
+    { id: 'ice', name: 'Ice cream', cost: 1.00, value: 2.60, spoil: 1, base: 0.7 },
+    { id: 'umbrella', name: 'Umbrella', cost: 3.00, value: 7.00, spoil: 0, base: 0.25 }
+  ];
+
+  var WEATHER = {
+    clear: { label: 'Clear', hint: 'steady trade', crowd: 0, mult: {} },
+    rain: { label: 'Rain', hint: 'umbrellas and soup move', crowd: -1, mult: { umbrella: 6, soup: 1.8, ice: 0.2, soda: 0.6 } },
+    heat: { label: 'Heat', hint: 'cold drinks and ice cream', crowd: 1, mult: { ice: 4, soda: 2.6, soup: 0.2, bread: 0.8 } },
+    cold: { label: 'Cold snap', hint: 'soup and bread', crowd: -1, mult: { soup: 3, bread: 1.4, ice: 0.1, soda: 0.6 } }
+  };
+  var WEATHER_IDS = ['clear', 'rain', 'heat', 'cold'];
+  var WEATHER_WEIGHT = [0.4, 0.2, 0.2, 0.2];
+
+  var EVENTS = {
+    none: { label: '', hint: '', crowd: 0, mult: {}, budget: 1 },
+    payday: { label: 'Payday', hint: 'fuller baskets', crowd: 0, mult: { soda: 1.4, ice: 1.3, umbrella: 1.2 }, budget: 1.15 },
+    fair: { label: 'School fair', hint: 'crowds after three', crowd: 2, mult: { ice: 2, soda: 1.8 }, budget: 1 },
+    roadworks: { label: 'Roadworks', hint: 'the corner is quiet', crowd: -3, mult: {}, budget: 1 },
+    pension: { label: 'Pension day', hint: 'milk, bread, soup', crowd: 1, mult: { milk: 1.5, bread: 1.5, soup: 1.6 }, budget: 1 },
+    match: { label: 'Match night', hint: 'soda before kickoff', crowd: 2, mult: { soda: 2.2, ice: 1.2 }, budget: 1.05 }
+  };
+  var EVENT_IDS = ['none', 'payday', 'fair', 'roadworks', 'pension', 'match'];
+  var EVENT_WEIGHT = [0.42, 0.12, 0.11, 0.11, 0.11, 0.13];
+
+  var UPGRADES = {
+    shelf: { name: 'Shelf', note: '+12 space', cost: 45 },
+    freezer: { name: 'Freezer', note: 'ice keeps', cost: 55 },
+    awning: { name: 'Awning', note: 'rain custom', cost: 35 }
+  };
+  // Never let an upgrade eat the money needed to fill the shelf: an empty shop
+  // with no cash is a run with nothing left to do.
+  var WORKING_FLOAT = 25;
+
+  var hud = $('#hud'), forecast = $('#forecast');
+  var intro = $('#intro'), planPanel = $('#plan'), reportPanel = $('#report'), overPanel = $('#over');
+  var rows = $('#rows'), shelfLabel = $('#shelf'), orderLabel = $('#order');
+  var planHint = $('#planHint'), openButton = $('#open');
+  var dayline = $('#dayline'), soldline = $('#soldline'), ledger = $('#ledger');
+  var upgrades = $('#upgrades'), repNote = $('#repNote'), nextButton = $('#next');
+  var finalCash = $('#finalCash'), grade = $('#grade'), finalStats = $('#finalStats');
+
+  var state = null;
+  var rowEls = [];
+  var resume = window.__boredResume || null;
+
+  /* ── small helpers ─────────────────────────────────────────────────────── */
+
+  function money(value, signed) {
+    var sign = value < 0 ? '\u2212' : (signed ? '+' : '');
+    return sign + '$' + Math.abs(value).toFixed(2);
+  }
+  function clamp(value, low, high) { return Math.max(low, Math.min(high, value)); }
+  function priceFloor(product) { return Math.round((product.cost + 0.1) * 10) / 10; }
+  function priceCeiling(product) { return Math.round(product.value * 1.9 * 10) / 10; }
+  function zeros() { return PRODUCTS.map(function () { return 0; }); }
+  function capacity() { return BASE_SHELF + (state && state.upgrades.shelf ? 12 : 0); }
+  function stockTotal() {
+    return state.stock.reduce(function (sum, n) { return sum + n; }, 0);
+  }
+  function ordersTotal() {
+    return state.orders.reduce(function (sum, n) { return sum + n; }, 0);
+  }
+  function orderCost() {
+    return state.orders.reduce(function (sum, n, i) { return sum + n * PRODUCTS[i].cost; }, 0);
+  }
+
+  /* ── the day's plan ────────────────────────────────────────────────────── */
+
+  function rngFor(seed, day) {
+    var s = ((seed >>> 0) ^ Math.imul(day + 1, 0x9e3779b9)) >>> 0;
+    return function () {
+      s = (s + 0x6d2b79f5) >>> 0;
+      var t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function pickWeighted(rand, ids, weights) {
+    var total = 0, i;
+    for (i = 0; i < weights.length; i++) total += weights[i];
+    var r = rand() * total;
+    for (i = 0; i < ids.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return ids[i];
+    }
+    return ids[ids.length - 1];
+  }
+
+  // The whole day is fixed the moment the morning opens: same seed, same
+  // weather, same customers, so a saved game resumes the shop exactly and the
+  // first run of a Detroit day is the same for everyone.
+  function makePlan(seed, day, rep, upgradesNow) {
+    var rand = rngFor(seed, day);
+    var weatherId = day === 1 ? 'clear' : pickWeighted(rand, WEATHER_IDS, WEATHER_WEIGHT);
+    var eventId = day === 1 ? 'none' : pickWeighted(rand, EVENT_IDS, EVENT_WEIGHT);
+    var weather = WEATHER[weatherId], event = EVENTS[eventId];
+    var count = day === 1 ? 11 :
+      Math.round(7 + rep * 0.10 + weather.crowd + event.crowd + rand() * 3);
+    if (weatherId === 'rain' && upgradesNow.awning) count += 2;
+    count = clamp(count, 4, 22);
+    var customers = [];
+    for (var c = 0; c < count; c++) {
+      var wants = 1 + (rand() < 0.55 ? 1 : 0) + (rand() < 0.18 ? 1 : 0);
+      var picked = [];
+      var items = [];
+      for (var k = 0; k < wants; k++) {
+        var weights = [], total = 0;
+        for (var i = 0; i < PRODUCTS.length; i++) {
+          var product = PRODUCTS[i];
+          var weight = product.base * (weather.mult[product.id] || 1) * (event.mult[product.id] || 1);
+          if (product.id === 'ice' && upgradesNow.freezer) weight *= 1.25;
+          if (picked.indexOf(i) >= 0) weight = 0;
+          weights.push(weight);
+          total += weight;
+        }
+        if (total <= 0) break;
+        var r = rand() * total, index = 0;
+        for (; index < weights.length; index++) {
+          r -= weights[index];
+          if (r <= 0) break;
+        }
+        index = Math.min(index, PRODUCTS.length - 1);
+        if (picked.indexOf(index) >= 0) continue;
+        picked.push(index);
+        var willing = PRODUCTS[index].value * (0.82 + rand() * 0.36) *
+          event.budget * (1 + (rep - START_REP) / 600);
+        items.push({
+          i: index,
+          qty: rand() < 0.22 ? 2 : 1,
+          maxPrice: Math.round(willing * 100) / 100
+        });
+      }
+      customers.push({ items: items });
+    }
+    return { weatherId: weatherId, eventId: eventId, count: count, customers: customers };
+  }
+
+  function forecastText(plan) {
+    var weather = WEATHER[plan.weatherId], event = EVENTS[plan.eventId];
+    return weather.label + ' \u00b7 ' + weather.hint +
+      (event.label ? ' \u2014 ' + event.label + ': ' + event.hint + '.' : '.');
+  }
+
+  /* ── trading ───────────────────────────────────────────────────────────── */
+
+  function simulate(plan, cost) {
+    var revenue = 0, missed = 0, balked = 0, sold = 0, served = 0;
+    var rep = state.rep;
+    var soldBy = zeros();
+    plan.customers.forEach(function (customer) {
+      var bought = false, short = false;
+      customer.items.forEach(function (item) {
+        var product = PRODUCTS[item.i];
+        if (state.stock[item.i] <= 0) {
+          missed += item.qty;
+          short = true;
+          return;
+        }
+        if (state.prices[item.i] > item.maxPrice + 0.0001) {
+          balked++;
+          short = true;
+          return;
+        }
+        var units = Math.min(state.stock[item.i], item.qty);
+        state.stock[item.i] -= units;
+        revenue += state.prices[item.i] * units;
+        sold += units;
+        soldBy[item.i] += units;
+        bought = true;
+        rep += units * 0.03;
+        if (units < item.qty) {
+          missed += item.qty - units;
+          short = true;
+        }
+      });
+      if (bought) {
+        served++;
+        rep += 0.08;
+      }
+      if (short) rep -= 0.25;
+    });
+
+    var spoiled = 0;
+    PRODUCTS.forEach(function (product, i) {
+      if (state.stock[i] <= 0 || product.spoil <= 0) return;
+      var rate = (product.id === 'ice' && state.upgrades.freezer) ? 0 : product.spoil;
+      var discarded = Math.floor(state.stock[i] * rate);
+      if (discarded > 0) {
+        state.stock[i] -= discarded;
+        spoiled += discarded;
+      }
+    });
+
+    return {
+      revenue: revenue, cost: cost, sold: sold, missed: missed, balked: balked,
+      served: served, count: plan.count, soldBy: soldBy, spoiled: spoiled,
+      repBefore: state.rep, repAfter: clamp(rep, 0, 100),
+      weatherId: plan.weatherId, eventId: plan.eventId
+    };
+  }
+
+  function openShop() {
+    if (!state || state.phase !== 'plan') return;
+    var cost = orderCost();
+    if (cost > state.cash + 0.0001) return;
+    if (stockTotal() + ordersTotal() > capacity()) return;
+    state.stock = state.stock.map(function (n, i) { return n + state.orders[i]; });
+    state.orders = zeros();
+    state.cash -= cost;
+    var result = simulate(state.plan, cost);
+    state.cash += result.revenue;
+    state.soldTotal += result.sold;
+    state.missedTotal += result.missed;
+    state.servedTotal += result.served;
+    state.rep = result.repAfter;
+    state.report = result;
+    state.phase = 'report';
+    paint();
+    saveGame();
+  }
+
+  function nextDay() {
+    if (!state || state.phase !== 'report') return;
+    if (state.day >= DAYS) { finish(); return; }
+    state.day += 1;
+    state.orders = zeros();
+    state.report = null;
+    state.plan = makePlan(state.seed, state.day, state.rep, state.upgrades);
+    state.phase = 'plan';
+    paint();
+    saveGame();
+  }
+
+  function finish() {
+    if (!state) return;
+    state.phase = 'over';
+    state.report = null;
+    if (resume) resume.clear();
+    paint();
+  }
+
+  function gradeFor(cash) {
+    if (cash >= 360) return 'Neighbourhood institution';
+    if (cash >= 290) return 'A proper corner';
+    if (cash >= 220) return 'Steady trade';
+    if (cash >= 160) return 'Thin margins';
+    return 'Shutters down';
+  }
+
+  /* ── drawing ───────────────────────────────────────────────────────────── */
+
+  function renderRows() {
+    rows.innerHTML = PRODUCTS.map(function (product, i) {
+      return '<div class="row">' +
+        '<div class="who"><span class="name">' + product.name + '</span>' +
+        '<span class="meta" title="cost $' + product.cost.toFixed(2) + ' \u00b7 usual $' + product.value.toFixed(2) + '">' +
+        'cost $' + product.cost.toFixed(2) + ' \u00b7 usual $' + product.value.toFixed(2) + '</span></div>' +
+        '<div class="step"><span class="lab">price</span>' +
+        '<button type="button" data-act="price-" data-i="' + i + '" aria-label="Lower ' + product.name + ' price">\u2212</button>' +
+        '<b data-price="' + i + '">$0.00</b>' +
+        '<button type="button" data-act="price+" data-i="' + i + '" aria-label="Raise ' + product.name + ' price">+</button></div>' +
+        '<div class="step"><span class="lab">buy</span>' +
+        '<button type="button" data-act="order-" data-i="' + i + '" aria-label="Order one less ' + product.name + '">\u2212</button>' +
+        '<b data-order="' + i + '">0</b>' +
+        '<button type="button" data-act="order+" data-i="' + i + '" aria-label="Order one more ' + product.name + '">+</button></div>' +
+        '</div>';
+    }).join('');
+    rowEls = PRODUCTS.map(function (product, i) {
+      return {
+        price: rows.querySelector('[data-price="' + i + '"]'),
+        order: rows.querySelector('[data-order="' + i + '"]'),
+        priceMinus: rows.querySelector('[data-act="price-"][data-i="' + i + '"]'),
+        pricePlus: rows.querySelector('[data-act="price+"][data-i="' + i + '"]'),
+        orderMinus: rows.querySelector('[data-act="order-"][data-i="' + i + '"]'),
+        orderPlus: rows.querySelector('[data-act="order+"][data-i="' + i + '"]')
+      };
+    });
+  }
+
+  function paintRows() {
+    var cap = capacity();
+    var used = stockTotal() + ordersTotal();
+    rowEls.forEach(function (el, i) {
+      el.price.textContent = money(state.prices[i]);
+      el.order.textContent = state.orders[i];
+      el.priceMinus.disabled = state.prices[i] <= priceFloor(PRODUCTS[i]) + 0.0001;
+      el.pricePlus.disabled = state.prices[i] >= priceCeiling(PRODUCTS[i]) - 0.0001;
+      el.orderMinus.disabled = state.orders[i] <= 0;
+      el.orderPlus.disabled = used >= cap || state.orders[i] >= 20;
+    });
+  }
+
+  function paintPlan() {
+    shelfLabel.textContent = 'SHELF ' + (stockTotal() + ordersTotal()) + ' / ' + capacity();
+    orderLabel.textContent = 'ORDER ' + money(orderCost());
+    paintRows();
+    var short = orderCost() - state.cash;
+    if (short > 0.0001) {
+      planHint.textContent = 'Short ' + money(short) + ' \u2014 trim the order.';
+    } else if (ordersTotal() === 0) {
+      planHint.textContent = 'No order today. The shelf will not fill itself.';
+    } else {
+      planHint.textContent = 'Prices set. Open when ready.';
+    }
+    openButton.disabled = short > 0.0001;
+  }
+
+  function paintReport() {
+    var result = state.report;
+    if (!result) return;
+    var weather = WEATHER[result.weatherId], event = EVENTS[result.eventId];
+    dayline.textContent = 'DAY ' + state.day + ' \u00b7 ' + weather.label.toUpperCase() +
+      (event.label ? ' \u00b7 ' + event.label.toUpperCase() : '');
+    var bits = [];
+    PRODUCTS.forEach(function (product, i) {
+      if (result.soldBy[i] > 0) bits.push(product.name + ' ' + result.soldBy[i]);
+    });
+    soldline.textContent = bits.length ? bits.join(' \u00b7 ') : 'Nothing sold.';
+
+    var profit = result.revenue - result.cost;
+    ledger.innerHTML =
+      line('Served', result.served + ' of ' + result.count) +
+      line('Missed', result.missed + (result.missed === 1 ? ' item' : ' items')) +
+      line('Revenue', money(result.revenue, true)) +
+      line('Stock', money(-result.cost, true)) +
+      line('Spoiled', result.spoiled ? result.spoiled + ' at cost' : 'none') +
+      '<div class="line ' + (profit < 0 ? 'loss' : 'profit') + '"><span>Day profit</span><span>' + money(profit, true) + '</span></div>' +
+      '<div class="line total"><span>Till</span><span>' + money(state.cash) + ' \u00b7 REP ' + Math.round(state.rep) + '</span></div>';
+
+    var delta = result.repAfter - result.repBefore;
+    repNote.textContent = (delta >= 0 ? '+' : '') + delta.toFixed(1) + ' reputation \u2014 ' +
+      (delta >= 0 ? 'word gets around.' : 'missed baskets cost you.');
+
+    upgrades.hidden = state.day >= DAYS;
+    renderUpgrades();
+    nextButton.textContent = state.day >= DAYS ? 'See final results' : 'Next morning';
+  }
+
+  function line(label, value) {
+    return '<div class="line"><span>' + label + '</span><span>' + value + '</span></div>';
+  }
+
+  function renderUpgrades() {
+    upgrades.innerHTML = Object.keys(UPGRADES).map(function (id) {
+      var upgrade = UPGRADES[id];
+      var owned = state.upgrades[id];
+      var poor = state.cash - upgrade.cost < WORKING_FLOAT;
+      return '<button type="button" data-buy="' + id + '"' + (owned || poor ? ' disabled' : '') +
+        (poor && !owned ? ' title="Keeps $' + WORKING_FLOAT + ' in the till for stock"' : '') + '>' +
+        '<span>' + upgrade.name + ' ' + upgrade.note + '</span>' +
+        '<span>' + (owned ? 'owned' : '$' + upgrade.cost) + '</span></button>';
+    }).join('');
+  }
+
+  function paintOver() {
+    var profit = state.cash - START_CASH;
+    finalCash.textContent = '$' + Math.round(state.cash);
+    grade.textContent = gradeFor(state.cash);
+    finalStats.innerHTML =
+      line('Started with', money(START_CASH)) +
+      '<div class="line ' + (profit < 0 ? 'loss' : 'profit') + '"><span>Profit</span><span>' + money(profit, true) + '</span></div>' +
+      line('Customers served', state.servedTotal) +
+      line('Items missed', state.missedTotal) +
+      line('Reputation', Math.round(state.rep));
+  }
+
+  function paint() {
+    if (!state) {
+      hud.innerHTML = '<span>DAY 1 / 14</span><span>$' + START_CASH + ' \u00b7 REP ' + START_REP + '</span>';
+      forecast.textContent = 'A small shop on a good corner.';
+      intro.hidden = false;
+      planPanel.hidden = true;
+      reportPanel.hidden = true;
+      overPanel.hidden = true;
+      return;
+    }
+    hud.innerHTML = '<span>DAY ' + state.day + ' / ' + DAYS + '</span><span>$' +
+      Math.round(state.cash) + ' \u00b7 REP ' + Math.round(state.rep) + '</span>';
+    intro.hidden = true;
+    planPanel.hidden = state.phase !== 'plan';
+    reportPanel.hidden = state.phase !== 'report';
+    overPanel.hidden = state.phase !== 'over';
+    if (state.phase === 'plan') {
+      forecast.textContent = forecastText(state.plan);
+      paintPlan();
+    } else if (state.phase === 'report') {
+      forecast.textContent = forecastText({ weatherId: state.report.weatherId, eventId: state.report.eventId });
+      paintReport();
+    } else if (state.phase === 'over') {
+      forecast.textContent = 'Fourteen days behind the counter.';
+      paintOver();
+    }
+  }
+
+  /* ── a new run, and the day's seed ─────────────────────────────────────── */
+
+  function readPlayedDay() {
+    try { return localStorage.getItem('bored.corner.daily'); } catch (error) { return null; }
+  }
+  function startingSeed() {
+    var injected = window.__boredSeed;
+    if (injected && Number.isFinite(injected.seed) && readPlayedDay() !== String(injected.date)) {
+      try { localStorage.setItem('bored.corner.daily', String(injected.date)); } catch (error) { /* storage blocked */ }
+      return { seed: injected.seed >>> 0, daily: true };
+    }
+    return {
+      seed: ((Date.now() ^ Math.floor(Math.random() * 4294967295)) >>> 0) || 123456789,
+      daily: false
+    };
+  }
+
+  function beginRun() {
+    var picked = startingSeed();
+    var upgradesNow = { shelf: false, freezer: false, awning: false };
+    state = {
+      day: 1,
+      cash: START_CASH,
+      rep: START_REP,
+      stock: zeros(),
+      orders: zeros(),
+      prices: PRODUCTS.map(function (product) {
+        return Math.round((product.cost + product.value) / 2 * 10) / 10;
+      }),
+      upgrades: upgradesNow,
+      seed: picked.seed,
+      daily: picked.daily,
+      soldTotal: 0,
+      missedTotal: 0,
+      servedTotal: 0,
+      plan: makePlan(picked.seed, 1, START_REP, upgradesNow),
+      report: null,
+      phase: 'plan'
+    };
+    renderRows();
+    paint();
+    saveGame();
+  }
+
+  /* ── saving a run ──────────────────────────────────────────────────────── */
+
+  function serialize() {
+    return {
+      day: state.day, cash: state.cash, rep: state.rep,
+      stock: state.stock.slice(), orders: state.orders.slice(), prices: state.prices.slice(),
+      upgrades: { shelf: state.upgrades.shelf, freezer: state.upgrades.freezer, awning: state.upgrades.awning },
+      seed: state.seed, daily: state.daily,
+      soldTotal: state.soldTotal, missedTotal: state.missedTotal, servedTotal: state.servedTotal,
+      plan: state.plan, report: state.report, phase: state.phase
+    };
+  }
+
+  function saveGame() {
+    if (!resume || !state) return;
+    if (state.phase !== 'plan' && state.phase !== 'report') return;
+    resume.save(serialize(), 'Day ' + state.day + ' of ' + DAYS + ' \u00b7 $' + Math.round(state.cash));
+  }
+
+  function restore(saved) {
+    if (!saved || typeof saved !== 'object') return false;
+    if (!(saved.day >= 1 && saved.day <= DAYS)) return false;
+    if (!Array.isArray(saved.stock) || saved.stock.length !== PRODUCTS.length) return false;
+    if (!Array.isArray(saved.prices) || saved.prices.length !== PRODUCTS.length) return false;
+    if (!Array.isArray(saved.orders) || saved.orders.length !== PRODUCTS.length) return false;
+    if (!Number.isFinite(saved.cash) || !Number.isFinite(saved.rep) || !Number.isFinite(saved.seed)) return false;
+    if (!saved.upgrades || typeof saved.upgrades !== 'object') return false;
+    var upgradesNow = {
+      shelf: !!saved.upgrades.shelf,
+      freezer: !!saved.upgrades.freezer,
+      awning: !!saved.upgrades.awning
+    };
+    state = {
+      day: Math.round(saved.day),
+      cash: saved.cash,
+      rep: clamp(saved.rep, 0, 100),
+      stock: saved.stock.map(Number),
+      prices: saved.prices.map(Number),
+      orders: saved.orders.map(Number),
+      upgrades: upgradesNow,
+      seed: saved.seed >>> 0,
+      daily: !!saved.daily,
+      soldTotal: Number(saved.soldTotal) || 0,
+      missedTotal: Number(saved.missedTotal) || 0,
+      servedTotal: Number(saved.servedTotal) || 0,
+      plan: saved.plan && Array.isArray(saved.plan.customers)
+        ? saved.plan : makePlan(saved.seed >>> 0, Math.round(saved.day), saved.rep, upgradesNow),
+      report: saved.report || null,
+      phase: saved.phase === 'report' && saved.report ? 'report' : 'plan'
+    };
+    renderRows();
+    paint();
+    return true;
+  }
+
+  /* ── wiring ────────────────────────────────────────────────────────────── */
+
+  $('#begin').addEventListener('click', beginRun);
+  $('#again').addEventListener('click', beginRun);
+  openButton.addEventListener('click', openShop);
+  nextButton.addEventListener('click', nextDay);
+
+  rows.addEventListener('click', function (event) {
+    var button = event.target.closest('button[data-act]');
+    if (!button || !state || state.phase !== 'plan') return;
+    var index = Number(button.getAttribute('data-i'));
+    var product = PRODUCTS[index];
+    if (!product) return;
+    var action = button.getAttribute('data-act');
+    if (action === 'price-') state.prices[index] = Math.max(priceFloor(product), Math.round((state.prices[index] - 0.1) * 10) / 10);
+    if (action === 'price+') state.prices[index] = Math.min(priceCeiling(product), Math.round((state.prices[index] + 0.1) * 10) / 10);
+    if (action === 'order-' && state.orders[index] > 0) state.orders[index] -= 1;
+    if (action === 'order+' && state.orders[index] < 20 && stockTotal() + ordersTotal() < capacity()) state.orders[index] += 1;
+    paint();
+    saveGame();
+  });
+
+  upgrades.addEventListener('click', function (event) {
+    var button = event.target.closest('button[data-buy]');
+    if (!button || !state || state.phase !== 'report') return;
+    var id = button.getAttribute('data-buy');
+    var upgrade = UPGRADES[id];
+    if (!upgrade || state.upgrades[id] || state.cash - upgrade.cost < WORKING_FLOAT) return;
+    state.cash -= upgrade.cost;
+    state.upgrades[id] = true;
+    paint();
+    saveGame();
+  });
+
+  // The hub reads this: integers, the current run, never null and never a throw.
+  window.__boredSnapshot = function () {
+    var cash = state ? state.cash : START_CASH;
+    return {
+      slug: 'corner',
+      cash: Math.max(0, Math.round(cash)),
+      day: state ? state.day : 1,
+      reputation: state ? Math.round(state.rep) : START_REP,
+      served: state ? state.servedTotal : 0,
+      missed: state ? state.missedTotal : 0,
+      profit: Math.round(cash - START_CASH),
+      finished: !!(state && state.phase === 'over'),
+      daily: !!(state && state.daily)
+    };
+  };
+
+  renderRows();
+  paint();
+
+  if (resume) {
+    resume.arm(function () {
+      if (!state || (state.phase !== 'plan' && state.phase !== 'report')) return null;
+      return {
+        state: serialize(),
+        label: 'Day ' + state.day + ' of ' + DAYS + ' \u00b7 $' + Math.round(state.cash)
+      };
+    });
+    var saved = resume.read();
+    if (saved && saved.state) {
+      resume.ask(saved.label, function () {
+        if (!restore(saved.state)) beginRun();
+      }, beginRun);
+    }
+  }
+})();
+</script>
+</body>
+</html>

@@ -88,6 +88,12 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Corner ranks the till after fourteen trading days: a shop still mid-week
+  // is not a result, and the board keeps cash rather than a mid-run high.
+  highScore('corner', 'Corner', 'dollars', {
+    metric: 'cash', min: 1, max: 100000,
+    when: snapshot => snapshot.finished === true
+  }),
   // A Ticket to Ride result is the final total of a finished game against the
   // CPU, after destination tickets and the longest-path bonus. An abandoned
   // board is only part of a score, so it never posts.

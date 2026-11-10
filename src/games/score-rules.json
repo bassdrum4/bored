@@ -54,6 +54,11 @@
     "better": "high",
     "max_value": 1000
   },
+  "corner": {
+    "label": "Cash after 14 days",
+    "better": "high",
+    "max_value": 100000
+  },
   "deep": {
     "label": "Score",
     "better": "high",

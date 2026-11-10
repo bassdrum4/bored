@@ -4,6 +4,7 @@ import { ORDER, EXTERNS } from './catalog.js';
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
 export const DISCOVERY = {
+  "corner": info('10–15 min', 'Focused', ['Mouse', 'Touch']),
   "ticket-to-ride": info('20–40 min', 'Turn-based', ['Mouse', 'Touch'], { players: '1 vs CPU' }),
   wallbound: info("3–10 min", "Focused", ["Mouse", "Touch"], { quick: true }),
   risk: info('20–45 min', 'Turn-based', ['Mouse', 'Touch'], { players: '1 vs CPU' }),
@@ -83,7 +84,7 @@ export function inCollection(slug, collection) {
 // A newly scaffolded game starts with an SVG placeholder and is listed here
 // until a real capture replaces it. F-14 and Klang use self-hosted illustrated
 // SVG previews; Risk keeps its existing SVG preview.
-export const PREVIEW_FALLBACKS = {wallbound: '.svg',  risk: '.svg', tank2: '.svg', 'f-14': '.svg', klang: '.svg' };
+export const PREVIEW_FALLBACKS = {"corner": '.svg', wallbound: '.svg',  risk: '.svg', tank2: '.svg', 'f-14': '.svg', klang: '.svg' };
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
   ORDER.filter(([slug]) => !EXTERNS[slug] || PREVIEW_FALLBACKS[slug]).map(([slug]) => [slug, previewUrl(slug)]));
