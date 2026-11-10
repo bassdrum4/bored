@@ -7,15 +7,15 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Downhill Mayhem</title>
-<meta name="description" content="Free browser tribute to Downhill Domination (PS2, 2003): 6 riders, big-air tricks that charge boost, and punches that settle the rest. No ads, no sign-up — press Enter and ride.">
+<meta name="description" content="Downhill mountain biking with six riders, big-air tricks, boost, and hard-fought finishes. Press Enter and ride.">
 <meta property="og:title" content="DOWNHILL MAYHEM — free PS2-style downhill racing in your browser">
-<meta property="og:description" content="One mountain, six riders, tricks that charge boost, punches and kicks that settle the rest. A fan-made tribute to Downhill Domination (2003). Free, no ads, no sign-up.">
+<meta property="og:description" content="Six riders, one mountain. Race downhill, charge boost with tricks and fight for the lead.">
 <meta property="og:type" content="website">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="DOWNHILL MAYHEM — free PS2-style downhill racing in your browser">
-<meta name="twitter:description" content="6 riders, big-air tricks, boost, punches and kicks. A fan-made tribute to PS2-era downhill racing. Free, no ads — press Enter and ride.">
+<meta name="twitter:description" content="Six riders, big-air tricks, boost, punches and kicks. Press Enter and ride.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚵</text></svg>">
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -123,8 +123,7 @@
     box-shadow:0 0 15px rgba(255,210,63,.5), 3px 3px 0 rgba(0,0,0,.55); }
   .dailyRow .k { font-size:11px; color:#9fb4c8; }
   .dailyRow.active .k { color:#ffd23f; }
-  #ghLink { color:#ffd23f; text-decoration:none; pointer-events:auto; }
-  #ghLink:hover { text-decoration:underline; }
+  
   #modeTag { position:absolute; top:50px; left:50%; transform:translateX(-50%) skewX(-6deg); font-size:14px; color:#ffd23f; }
   #target { position:absolute; top:70px; left:50%; transform:translateX(-50%) skewX(-6deg); font-size:15px; color:#59ff7a; }
   #resBtns { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:16px; }
@@ -333,8 +332,7 @@
     <div id="selMountain" class="selRow"></div>
     <div id="selDiff" class="selRow"></div>
     <div id="selDaily" class="dailyRow"></div>
-    <div id="foot"><a id="ghLink" href="https://github.com/pranshuparmar/downhill-mayhem" target="_blank" rel="noopener">★ github.com/pranshuparmar/downhill-mayhem</a><br>
-      Fan-made tribute. Not affiliated with Sony. No original game assets used. · All geometry, textures &amp; audio generated at runtime · three.js r128 (MIT) bundled</div>
+    <div id="foot">Six riders. One mountain. Get to the bottom.</div>
   </div>
 
   <div id="fsBtn" title="Fullscreen">⛶</div>
@@ -382,7 +380,7 @@
         <button id="homeBtn">⌂ HOME</button>
       </div>
       <div id="resAgain">R — RACE AGAIN &nbsp;·&nbsp; ESC / ⌫ — TITLE SCREEN &nbsp;<span style="opacity:.65">(⌫ keeps fullscreen)</span></div>
-      <div id="resFoot"><a href="https://github.com/pranshuparmar/downhill-mayhem" target="_blank" rel="noopener">★ github.com/pranshuparmar/downhill-mayhem</a></div>
+      <div id="resFoot">Downhill Mayhem</div>
     </div>
   </div>
 
@@ -2604,7 +2602,7 @@ function buildResultCard(){
   g.font=font(20,400); g.fillStyle='#cfe3ff';
   g.fillText('this link carries my exact mountain and time — beat it',cx,1014);
   g.font=font(18,400); g.fillStyle='#8fb8ff';
-  g.fillText('free · no ads · in your browser · github.com/pranshuparmar/downhill-mayhem',cx,1050);
+  g.fillText('DOWNHILL MAYHEM · RACE RESULTS',cx,1050);
   return c;
 }
 function shareResult(){
@@ -2690,7 +2688,7 @@ function initHud(){
   const sday=document.getElementById('selDaily');
   sday.addEventListener('pointerdown',stopper);
   sday.addEventListener('click',e=>{ e.stopPropagation(); if(DEMO) selectDaily(); });
-  document.getElementById('ghLink').addEventListener('pointerdown',stopper);
+  
   hudEls.posBig=hudEls.pos.querySelector('.big');
   hudEls.speedNum=hudEls.speed.querySelector('.num');
   // progress dots
@@ -3072,7 +3070,7 @@ function boot(){
   startDemoRace();
   requestAnimationFrame(frame);
   console.log('%cDOWNHILL MAYHEM','font:italic 900 22px Arial;color:#ffd23f;',
-    '— fan-made tribute, all assets procedural.');
+    'Six riders, one mountain.');
 }
 
 // ---------------------------------------------------- test/debug hooks -----

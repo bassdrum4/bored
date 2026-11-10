@@ -300,7 +300,20 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       // saved position while it wires itself up.
       // A match keeps its position on the server, so its document gets an inert
       // helper and never touches this device's saved run for the game.
-      gameFrame.srcdoc = injectHead(html, resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head);
+      // The packaged Unity wrapper still has an aspect-fit ResizeObserver and
+      // a footer that shorten the play area. Override those from the launcher
+      // instead of rebuilding the 11 MB compiled game payload.
+      const gameFill = slug === 'rooftop-snipers' ? '<style>' +
+        'html,body,main,#stage{margin:0!important;width:100%!important;height:100%!important;overflow:hidden!important}' +
+        '#stage{position:relative!important;display:block!important;min-height:0!important}' +
+        '#game{position:absolute!important;inset:0!important;left:0!important;top:0!important;transform:none!important;width:100%!important;height:100%!important}' +
+        '#game canvas{display:block!important;width:100%!important;height:100%!important}' +
+        '@media(max-aspect-ratio:16/9){#game{inset:auto!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:100%!important;height:auto!important;aspect-ratio:16/9!important}}' +
+        'footer{position:absolute!important;bottom:0;left:0;right:0;z-index:10;background:transparent!important;pointer-events:none}' +
+        '#keys{display:none!important}#pads{pointer-events:auto}' +
+        '@media(pointer:fine){footer{display:none!important}}' +
+        '</style>' : '';
+      gameFrame.srcdoc = injectHead(html, resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head + gameFill);
       const ownsEsc = OWNS_ESCAPE.has(slug);
       showHint(multiplayer
         ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player'

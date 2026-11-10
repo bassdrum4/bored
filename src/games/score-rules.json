@@ -69,6 +69,11 @@
     "better": "high",
     "max_value": 1000000
   },
+  "downhill-mayhem": {
+    "label": "Fastest Classic mountain race on Mayhem difficulty (seconds)",
+    "better": "low",
+    "max_value": 3600
+  },
   "frogger": {
     "label": "Score",
     "better": "high",

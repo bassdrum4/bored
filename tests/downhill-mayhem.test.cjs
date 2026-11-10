@@ -15,7 +15,7 @@ const wrapper = fs.readFileSync(wrapperPath, 'utf8');
 const vendor = path.join(root, 'src/games/content/downhill-mayhem');
 const inner = fs.readFileSync(path.join(vendor, 'index.html'), 'utf8');
 
-test('downhill mayhem is a catalogued, local, unscored game', async () => {
+test('downhill mayhem is a catalogued, locally packaged, scored game', async () => {
   const { ORDER, META, EXTERNS, UNSCORED_GAMES, PAYLOAD_SLUGS } = await import('../src/games/catalog.js');
   const { DISCOVERY, PREVIEWS, PREVIEW_FALLBACKS } = await import('../src/games/discovery.js');
   const { CHALLENGES } = await import('../src/daily.js');
@@ -29,10 +29,10 @@ test('downhill mayhem is a catalogued, local, unscored game', async () => {
   assert.ok(META['downhill-mayhem'][1].length > 40);
   assert.ok(DISCOVERY['downhill-mayhem'].inputs.includes('Keyboard'));
   assert.equal(DISCOVERY['downhill-mayhem'].quick, true);
-  assert.ok(UNSCORED_GAMES.includes('downhill-mayhem'));
+  assert.ok(!UNSCORED_GAMES.includes('downhill-mayhem'));
   assert.ok(PAYLOAD_SLUGS.includes('downhill-mayhem'));
-  assert.equal(rules['downhill-mayhem'], undefined);
-  assert.ok(!LB_GAMES.some(game => game.id === 'downhill-mayhem'));
+  assert.equal(rules['downhill-mayhem'].better, 'low');
+  assert.ok(LB_GAMES.some(game => game.id === 'downhill-mayhem' && game.lower));
   assert.ok(!CHALLENGES.some(game => game.slug === 'downhill-mayhem'));
   assert.equal(PREVIEW_FALLBACKS['downhill-mayhem'], undefined);
   assert.ok(PREVIEWS['downhill-mayhem'].endsWith('/downhill-mayhem.webp'));
@@ -68,7 +68,7 @@ test('the wrapper starts the local build from the hub and from its own address',
   // this script does; it must not lift the cover over an empty stage.
   hub.node('game').listeners.load();
   assert.equal(hub.node('cover').hidden, false, 'the placeholder load is not the game');
-  assert.deepEqual({ ...hub.run('__boredSnapshot()') }, { slug: 'downhill-mayhem', started: false, loaded: false, finished: false });
+  assert.deepEqual({ ...hub.run('__boredSnapshot()') }, { slug: 'downhill-mayhem', started: false, loaded: false, finished: false, seconds: 0 });
   assert.equal(hub.node('game').hidden, true, 'the build is not fetched until the player starts');
   hub.node('start').onclick();
   assert.equal(hub.node('game').src, 'https://example.test/bored/games/content/downhill-mayhem/index.html');
@@ -76,6 +76,27 @@ test('the wrapper starts the local build from the hub and from its own address',
   hub.node('game').listeners.load();
   assert.equal(hub.node('cover').hidden, true);
   assert.equal(hub.run('__boredSnapshot()').loaded, true);
+  // The nested game exposes its live race state. Only an actual completed
+  // Classic/MAYHEM attempt qualifies; the demonstration and easier courses do not.
+  const embeddedGame = {
+    demo: false, state: 'finished', mode: 'classic', difficulty: 'mayhem',
+    player: { finished: true, finishTime: 124.56 }
+  };
+  hub.node('game').contentWindow = { GAME: embeddedGame };
+  assert.deepEqual({ ...hub.run('__boredSnapshot()') }, {
+    slug: 'downhill-mayhem', started: true, loaded: true, finished: true, seconds: 125
+  });
+  embeddedGame.difficulty = 'chill';
+  assert.equal(hub.run('__boredSnapshot()').finished, false);
+  embeddedGame.difficulty = 'mayhem';
+  embeddedGame.mode = 'rock';
+  assert.equal(hub.run('__boredSnapshot()').seconds, 0);
+  embeddedGame.mode = 'classic';
+  embeddedGame.demo = true;
+  assert.equal(hub.run('__boredSnapshot()').finished, false);
+  embeddedGame.demo = false;
+  embeddedGame.player.finished = false;
+  assert.equal(hub.run('__boredSnapshot()').finished, false);
 
   // Opened on its own, the game folder sits beside the wrapper document.
   const standalone = bootWrapper(

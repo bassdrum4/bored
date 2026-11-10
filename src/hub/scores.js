@@ -141,6 +141,12 @@ export const HIGH_SCORE_GAMES = [
   // lucky lap on the shortest map.
   highScore('trackbound', 'Trackmania', 'points', { metric: 'points', when: snapshot => snapshot.finished === true }),
   highScore("transit-chaos", "Transit Chaos", "passengers", { metric: "delivered", when: snapshot => snapshot.finished === true }),
+  // Compare completed races on the fixed Classic mountain at standard Mayhem difficulty.
+  highScore('downhill-mayhem', 'Downhill Mayhem', 'seconds', {
+    metric: 'seconds', lower: true, min: 15, max: 3600,
+    when: snapshot => snapshot.finished === true,
+    key: 'bored.high.downhill-mayhem-classic-mayhem-v1'
+  }),
   // Circuit ranks the whole three-lap race: the clock starts on the first
   // keypress and stops at the line, so a quick lap cannot offset a scrappy one.
   // The board stores whole seconds and only a finished race posts; under
