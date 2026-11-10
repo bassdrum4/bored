@@ -41,7 +41,15 @@ test('Dirt Trials opens, drives, completes a real course, and remembers medals',
   assert.equal((await page.evaluate(() => window.__boredSnapshot())).finished,true);
   await page.reload();
   await page.waitForSelector('#stage-list button');
-  assert.equal(await page.$$eval('#stage-list button:disabled', buttons => buttons.length),13,'next course unlocked after reload');
+  assert.equal(await page.$eval('#stage-list button:disabled', buttons => buttons.length),13,'next course unlocked after reload');
+  // A crate costs speed and one second, rather than making later courses
+  // impossible unless the rider hops at exactly one pixel.
+  const impact = await page.evaluate(() => {
+    window.__dirtTrialsTest.reset(7);
+    return window.__dirtTrialsTest.ride(310);
+  });
+  assert.notEqual(impact.mode,'crash','crate collision is recoverable: '+JSON.stringify(impact));
+  assert.ok(impact.timeMs>310/120*1000+700,'crate collision adds a time penalty');
   assert.deepEqual(errors,[]);
 });
 
