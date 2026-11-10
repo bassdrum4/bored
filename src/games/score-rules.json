@@ -44,6 +44,11 @@
     "better": "low",
     "max_value": 3600
   },
+  "clicker": {
+    "label": "Score",
+    "better": "high",
+    "max_value": 10000000
+  },
   "commanders": {
     "label": "Score",
     "better": "high",

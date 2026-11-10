@@ -88,6 +88,9 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Clicker is endless: the running total is the whole score, so it is captured
+  // on any snapshot rather than waiting for a finish line that does not exist.
+  highScore('clicker', 'Clicker', 'points', { metric: 'clicks' }),
   // Career medal total across the fifteen finished courses (3 stars per course).
   highScore('dirt-trials', 'Dirt Trials', 'stars', { metric: 'medals', min: 1, max: 45, when: snapshot => snapshot.finished === true }),
   // Corner ranks the till after fourteen trading days: a shop still mid-week
