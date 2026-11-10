@@ -129,6 +129,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "quickdraw": {
+    "label": "Solo reaction time (ms)",
+    "better": "low",
+    "max_value": 2000
+  },
   "risk": {
     "label": "Fewest human turns to conquer the world vs CPU",
     "better": "low",
