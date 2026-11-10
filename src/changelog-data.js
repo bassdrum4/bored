@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 372,
+  "count": 373,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"ec94d98","date":"2026-11-10","author":"Codebuff","subject":"Add Corner, a fourteen-day corner-shop tycoon."},
+  {"sha":"ef9a21d","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.3: saves follow the player's Bored account across devices"},
   {"sha":"014ceb7","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.2: Multiplayer on the title screen"},
   {"sha":"f39bd41","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.1.1: the live server double-checks endings, rounds and snapshots"},
   {"sha":"aeff889","date":"2026-11-09","author":"Codebuff","subject":"Repair two stale fixtures the browser suite trips over"},
