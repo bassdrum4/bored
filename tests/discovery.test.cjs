@@ -185,34 +185,36 @@ test('discovery keeps its controls and fits small screens', async t => {
 
     await page.click('#settings-nav');
     assert.equal(await page.$eval('#settings', el => el.hidden), false);
-    assert.equal(await page.$('#setting-theme'), null, 'theme switch is not shown');
+    assert.equal(await page.$eval('#setting-theme', el => el.value), 'light');
     await page.select('#setting-density', 'compact');
     await page.click('#setting-descriptions');
     await page.click('#setting-reduced-motion');
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
+    await page.select('#setting-theme', 'dark');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
     assert.equal(await page.evaluate(() => document.documentElement.dataset.descriptions), 'hidden');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), 'dark');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(23, 21, 15)');
 
-    // Returning visitors with an old dark preference should retain their other
-    // local choices, but migrate immediately to the permanent light paper style.
-    await page.evaluate(() => {
-      const key = 'bored.ui.preferences';
-      localStorage.setItem(key, JSON.stringify({ ...JSON.parse(localStorage.getItem(key)), theme: 'dark' }));
-    });
-    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+    // The theme is an explicit device-local choice rather than an OS preference,
+    // and it survives a reload along with the other appearance settings.
+    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
     await page.reload();
     await page.waitForSelector('#settings:not([hidden])');
-    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
-    assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), 'light');
-    assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(245, 242, 234)');
-    assert.equal(await page.evaluate(() => Object.hasOwn(JSON.parse(localStorage.getItem('bored.ui.preferences')), 'theme')), false);
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), 'dark');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(23, 21, 15)');
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.ui.preferences')).theme), 'dark');
+    assert.equal(await page.$eval('#setting-theme', el => el.value), 'dark');
     assert.equal(await page.$eval('#setting-density', el => el.value), 'compact');
     assert.equal(await page.$eval('#setting-descriptions', el => el.checked), false);
     assert.equal(await page.$eval('#setting-reduced-motion', el => el.checked), true);
+    await page.select('#setting-theme', 'light');
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(245, 242, 234)');
     await page.click('#settings-reset');
     assert.equal(await page.$eval('#setting-density', el => el.value), 'comfortable');
     assert.equal(await page.$eval('#setting-descriptions', el => el.checked), true);
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
-    await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
     await page.click('#home-nav');
     assert.equal(await page.$eval('#daily', el => el.hidden), false);
     assert.equal(await page.$eval('#library', el => el.hidden), false);

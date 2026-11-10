@@ -13,6 +13,17 @@
 <link rel="stylesheet" href="./styles.css">
 <link rel="stylesheet" href="./hub/paper-layout.css">
 <link rel="stylesheet" href="./changelog.css">
+<script>
+// Set a saved dark theme before first paint, so it never flashes paper.
+try {
+  const saved = JSON.parse(localStorage.getItem('bored.ui.preferences') || '{}');
+  if (saved && saved.theme === 'dark') {
+    document.documentElement.dataset.theme = 'dark';
+    document.documentElement.style.colorScheme = 'dark';
+    document.querySelector('meta[name="theme-color"]').content = '#17150f';
+  }
+} catch (error) {}
+</script>
 </head>
 <body>
 
