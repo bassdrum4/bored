@@ -2,13 +2,16 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 366,
+  "count": 369,
   "newest": "2026-11-09",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"aeff889","date":"2026-11-09","author":"Codebuff","subject":"Repair two stale fixtures the browser suite trips over"},
+  {"sha":"a608f68","date":"2026-11-09","author":"Codebuff","subject":"Keep Bored Together out of the device's saves"},
+  {"sha":"7dfbfea","date":"2026-11-09","author":"Codebuff","subject":"Add Ticket to Ride, and keep Transit Chaos trains on a redrawn line"},
   {"sha":"3f772c0","date":"2026-11-09","author":"Daniel Lowe","subject":"Fix Bored CI regressions and add safe runtime diagnostics","pr":104},
   {"sha":"f3033a0","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.1: co-op, the humans against the CPUs"},
   {"sha":"171bc14","date":"2026-11-09","author":"Claude","subject":"Civ Lite 4.7.1: Esc stays in the game on Bored"},
