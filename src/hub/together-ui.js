@@ -14,6 +14,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   // Live games the account is in (rooms being set up, games running, ones that just finished).
   let liveGames = [], liveKey = '';
   const liveSelected = new Set();
+  let liveCapacity = 2;
   // The Join with code box: what was typed, and why the last try did not work.
   let joinText = '', joinError = '';
   let flow = null, selectedGame = 'connect-four', people = null, outsiders = null, outsidersError = '';
@@ -82,7 +83,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     if (owner === next) return;
     owner = next; generation++; flight = null; busy = false; lastRefresh = 0; root.removeAttribute('aria-busy');
     data = flow = people = outsiders = null; outsidersError = ''; invited.clear(); status.textContent = '';
-    liveGames = []; liveKey = ''; liveSelected.clear();
+    liveGames = []; liveKey = ''; liveSelected.clear(); liveCapacity = 2;
     noticeDismissed = '';
     invite = null; inviteAccepted = false;
     if (inviteDialog?.open) dialogClose(inviteDialog);
@@ -259,40 +260,57 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     }
     host.append(more);
   }
-  // Start a live game: Civ Lite, then one to three members from the same directory the turn-based games use.
+  // Live is an optional way to play Civ Lite, inside the normal game-selection flow.
+  // Hosting does not require an invitation: friends can join the resulting room by code.
   function livePicker(host) {
-    const limits = TOGETHER_LIVE.ashcrown;
+    const maxInvites = Math.min(3, liveCapacity - 1);
     const box = node('section', undefined, 'bt-start bt-live-start');
-    box.setAttribute('aria-label', 'Start a live game');
-    box.append(node('p', 'Live game', 'eyebrow'), node('h4', name('ashcrown') + ' · live'),
-      node('p', 'Everyone plays at the same time, with CPUs filling the rest. Pick ' + limits.min + ' to ' + limits.max +
-        ' members to invite. You choose the map, the CPUs and a turn timer in the lobby, and start once everyone is ready.', 'bt-caption'));
+    box.setAttribute('aria-label', 'Play Civ Lite live');
+    box.append(node('p', 'Play live', 'eyebrow'), node('h4', name('ashcrown') + ' · live room'),
+      node('p', 'Everyone plays at the same time. Create a room and share its six-character code, or invite members below. Set up the game and start when everyone is ready.', 'bt-caption'));
+
+    const countLabel = node('label', 'Human players ', 'bt-game-picker');
+    const count = node('select'); count.id = 'bt-live-capacity';
+    for (let n = 2; n <= 4; n++) {
+      const option = node('option', n + ' players'); option.value = String(n); count.append(option);
+    }
+    count.value = String(liveCapacity);
+    count.onchange = () => {
+      liveCapacity = Number(count.value);
+      while (liveSelected.size >= liveCapacity) liveSelected.delete([...liveSelected].pop());
+      render();
+    };
+    countLabel.append(count); box.append(countLabel);
+
     if (!people) box.append(node('p', 'Loading members…', 'bt-caption'));
-    else if (!people.length) box.append(node('p', 'Nobody else has joined Bored Together yet. Anyone who joins appears here.', 'bt-caption'));
+    else if (!people.length) box.append(node('p', 'No members to invite yet. You can still create a room and share its code.', 'bt-caption'));
     else {
+      box.append(node('p', 'Invite members (optional)', 'bt-caption'));
       const list = node('div', undefined, 'bt-people'); list.id = 'bt-live-people';
       for (const person of people) {
         const picked = liveSelected.has(person.id);
         const row = node('label', undefined, 'bt-person');
         const who = node('div');
         who.append(node('strong', person.handle), node('span', person.email || 'No email on this account', 'bt-caption'));
-        const box2 = node('input'); box2.type = 'checkbox'; box2.checked = picked; box2.id = 'bt-live-pick-' + person.id;
-        box2.disabled = !picked && liveSelected.size >= limits.max;
-        box2.setAttribute('aria-label', 'Invite ' + person.handle);
-        box2.onchange = () => { if (box2.checked) liveSelected.add(person.id); else liveSelected.delete(person.id); render(); };
-        row.append(who, box2);
-        list.append(row);
+        const checkbox = node('input'); checkbox.type = 'checkbox'; checkbox.checked = picked; checkbox.id = 'bt-live-pick-' + person.id;
+        checkbox.disabled = !picked && liveSelected.size >= maxInvites;
+        checkbox.setAttribute('aria-label', 'Invite ' + person.handle);
+        checkbox.onchange = () => { if (checkbox.checked) liveSelected.add(person.id); else liveSelected.delete(person.id); render(); };
+        row.append(who, checkbox); list.append(row);
       }
       box.append(list);
     }
-    box.append(node('p', liveSelected.size + ' of ' + limits.max + ' invited', 'bt-caption'));
-    const make = button('Open lobby', async () => {
-      const game = await liveRPC('create', { game: 'ashcrown', invite: [...liveSelected], config: LIVE_DEFAULTS });
-      flow = null; people = null; liveSelected.clear();
+    const openSeats = liveCapacity - 1 - liveSelected.size;
+    box.append(node('p', liveSelected.size + ' invited · ' + openSeats + ' seat' + (openSeats === 1 ? '' : 's') + ' available by code', 'bt-caption'));
+    const make = button('Create live room', async () => {
+      const game = await liveRPC('create', { game: 'ashcrown', invite: [...liveSelected], capacity: liveCapacity, config: LIVE_DEFAULTS });
+      flow = null; people = null; liveSelected.clear(); liveCapacity = 2;
       await launchLive(game.id);
     }, true);
-    make.id = 'bt-live-create'; make.disabled = liveSelected.size < limits.min || liveSelected.size > limits.max;
-    box.append(make, button('Cancel', () => { flow = null; people = null; liveSelected.clear(); render(); }));
+    make.id = 'bt-live-create';
+    box.append(make,
+      button('Back to turns', () => { flow = 'challenge'; liveSelected.clear(); render(); }),
+      button('Cancel', () => { flow = null; people = null; liveSelected.clear(); render(); }));
     host.append(box);
   }
   // Join with code (5.4): the same thing as Civ Lite's Multiplayer screen. The server seats the player, the lobby opens,
@@ -341,6 +359,10 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     select.value = selectedGame;
     select.onchange = () => { selectedGame = select.value; render(); };
     label.append(select); box.append(label);
+    if (flow === 'challenge' && TOGETHER_LIVE[selectedGame]) {
+      box.append(node('p', 'Want to play together at the same time instead?', 'bt-caption'),
+        button('Play live instead', () => { liveSelected.clear(); flow = 'live'; render(); }));
+    }
     if (flow === 'random') box.append(button('Find opponent', async () => {
       const result = await togetherRPC('queue_join', { game: selectedGame });
       flow = null; if (result.id) await launch(result.id);
@@ -553,7 +575,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     const start = node('section', undefined, 'bt-start-panel');
     start.append(node('p', 'Start something', 'eyebrow'),
       node('h3', 'Start a game'),
-      node('p', 'Pick a game, then a partner. Your first turn is saved and sent, so they have something waiting the next time they open Bored.', 'bt-caption'));
+      node('p', 'Pick a game and a partner. Take turns whenever you like; Civ Lite also has live rooms for friends online together.', 'bt-caption'));
     // Once a game is chosen the picker takes over below, so there is only ever
     // one game control on screen.
     if (!flow) {
@@ -569,7 +591,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
         option.setAttribute('aria-pressed', String(slug === selectedGame));
         option.append(gamePreview(game.preview || slug, 'bt-game-art'),
           node('span', game.name, 'bt-game-name'),
-          node('span', game.mode === 'duel' ? 'One run each' : 'Take turns', 'bt-game-mode'));
+          node('span', TOGETHER_LIVE[slug] ? 'Take turns · Live option' : game.mode === 'duel' ? 'One run each' : 'Take turns', 'bt-game-mode'));
         option.onclick = () => { selectedGame = slug; render(); };
         grid.append(option);
       }
@@ -590,10 +612,6 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
       }
       flow = 'challenge'; render(); $('#bt-game-select')?.focus();
     }, true),
-      button('Start a live game', async () => {
-        people = await togetherRPC('people');
-        liveSelected.clear(); flow = 'live'; render();
-      }),
       joinWithCode(),
       button('Play Random', () => { flow = 'random'; people = null; render(); $('#bt-game-select')?.focus(); }));
     overflow(actions, null);
