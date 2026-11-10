@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 383,
+  "count": 384,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"fa386e0","date":"2026-11-10","author":"Codebuff","subject":"Keep the library rendering when a cached discovery module lags the catalog."},
   {"sha":"627d8b6","date":"2026-11-10","author":"Codebuff","subject":"Replace Dirt Trials with Downhill Mayhem."},
   {"sha":"8256bf0","date":"2026-11-10","author":"Claude","subject":"Civ Lite 5.4.1: fix the Bored Together page scrolling sideways at 320px, and the warrior flake in the live tests"},
   {"sha":"70d6361","date":"2026-11-10","author":"Claude","subject":"Civ Lite 5.4: join live games with a room code"},
