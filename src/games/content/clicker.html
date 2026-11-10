@@ -53,7 +53,8 @@
     color: var(--ink);
     font-variant-numeric: tabular-nums;
   }
-  #click {
+  .buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .click-button {
     display: block;
     width: 100%;
     margin: 22px 0 14px;
@@ -68,9 +69,9 @@
     cursor: pointer;
     touch-action: manipulation;
   }
-  #click:active { background: #f0ece1; }
-  #click:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-  #click.flash { animation: click-flash .18s ease-out; }
+  .click-button:active { background: #f0ece1; }
+  .click-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .click-button.flash { animation: click-flash .18s ease-out; }
   @keyframes click-flash {
     from { background: #b23b2e; border-color: #b23b2e; color: #fffdf7; }
     to { background: var(--panel); border-color: var(--ink); color: var(--ink); }
@@ -84,33 +85,36 @@
     <h1>Clicker</h1>
     <div id="hud" aria-live="off">points <b id="points">0</b></div>
   </header>
-  <button id="click" type="button">Click</button>
+  <div class="buttons"><button id="click-a" class="click-button" type="button">Click</button><button id="click-b" class="click-button" type="button">Click</button></div>
   <p>One click, one point.</p>
 </main>
 <script>
-const button = document.getElementById('click');
+const buttons = [document.getElementById('click-a'), document.getElementById('click-b')];
 const pointsEl = document.getElementById('points');
 const FLASH = 180;
 let clicks = 0;
-let flashTimer = 0;
+const buttonClicks = [0, 0];
+const flashTimers = [0, 0];
 
-button.addEventListener('click', () => {
-  clicks += 1;
-  pointsEl.textContent = clicks;
-  button.textContent = 'Clicked';
-  // Restart the flash so a fast series of clicks still reads as one each time.
-  button.classList.remove('flash');
-  void button.offsetWidth;
-  button.classList.add('flash');
-  clearTimeout(flashTimer);
-  flashTimer = setTimeout(() => {
+buttons.forEach((button, index) => {
+  button.addEventListener('click', () => {
+    clicks += 1;
+    buttonClicks[index] += 1;
+    pointsEl.textContent = clicks;
+    button.textContent = 'Clicked';
     button.classList.remove('flash');
-    button.textContent = 'Click';
-  }, FLASH);
+    void button.offsetWidth;
+    button.classList.add('flash');
+    clearTimeout(flashTimers[index]);
+    flashTimers[index] = setTimeout(() => {
+      button.classList.remove('flash');
+      button.textContent = 'Click';
+    }, FLASH);
+  });
 });
 
 // The hub reads this. The count is the score; there is no run to end.
-window.__boredSnapshot = () => ({ slug: 'clicker', clicks: clicks, finished: false });
+window.__boredSnapshot = () => ({ slug: 'clicker', clicks: clicks, button_a: buttonClicks[0], button_b: buttonClicks[1], finished: false });
 </script>
 </body>
 </html>
