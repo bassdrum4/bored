@@ -56,14 +56,14 @@ const $ = id => document.getElementById(id);
 const status = $('status'), detail = $('detail'), arena = $('arena'), scoreline = $('scoreline'), startButton = $('start');
 const lanes = [$('left'),$('right')];
 let mode = 'solo', phase = 'idle', timer = 0, signalAt = 0, score = [0,0], rounds = 0, best = 0;
-let reaction = 0, validResult = false, generation = 0;
+let reaction = 0, validResult = false, sessionBest = 0, generation = 0;
 try { best = Number(localStorage.getItem('bored.quickdraw.best')) || 0; } catch {}
 function showBest() { $('best').textContent = best ? 'Local fastest: ' + best + ' ms' : 'Fastest solo reaction wins the board.'; }
 function resetVisuals() { arena.classList.remove('draw'); lanes.forEach(l => l.classList.remove('hit','foul')); }
 function cancel() { generation++; clearTimeout(timer); timer = 0; phase = 'idle'; resetVisuals(); }
 function setMode(next) {
   if(mode === next && phase !== 'idle') return;
-  cancel(); mode = next; score = [0,0]; rounds = 0; validResult = false; reaction = 0;
+  cancel(); mode = next; score = [0,0]; rounds = 0; validResult = false; reaction = 0; sessionBest = 0;
   $('solo').setAttribute('aria-pressed', String(mode === 'solo'));
   $('duel').setAttribute('aria-pressed', String(mode === 'duel'));
   lanes[1].style.visibility = mode === 'solo' ? 'hidden' : '';
@@ -98,6 +98,7 @@ function finish(winner, foul, ms) {
       validResult = reaction >= 100 && reaction <= 2000;
       status.textContent = reaction + ' ms'; detail.textContent = validResult ? (reaction < 220 ? 'Lightning fast.' : reaction < 350 ? 'Nice draw.' : 'Try again.') : 'Shot recorded. Too quick or delayed for the board.';
       lanes[0].classList.add('hit');
+      if(validResult && (!sessionBest || reaction < sessionBest)) sessionBest = reaction;
       if(validResult && (!best || reaction < best)) {
         best = reaction;
         try { localStorage.setItem('bored.quickdraw.best', String(best)); } catch {}
@@ -139,8 +140,8 @@ document.addEventListener('visibilitychange',()=>{
     startButton.hidden=false; startButton.textContent='RESTART';
   }
 });
-window.__boredSnapshot = () => ({ slug:'quickdraw', milliseconds: validResult && mode === 'solo' ? reaction : 0,
-  finished: validResult && mode === 'solo', solo: mode === 'solo', rounds, left_wins:score[0], right_wins:score[1] });
+window.__boredSnapshot = () => ({ slug:'quickdraw', milliseconds: mode === 'solo' ? sessionBest : 0,
+  finished: mode === 'solo' && sessionBest > 0, solo: mode === 'solo', rounds, left_wins:score[0], right_wins:score[1] });
 setMode('solo');
 })();
 </script>
