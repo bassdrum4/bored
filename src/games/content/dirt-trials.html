@@ -233,12 +233,23 @@ function step(dt){
   const wasGround=bike.onGround;
   if(jumpQueued&&wasGround){bike.vy-=310;bike.onGround=false;}
   jumpQueued=false;
-  bike.vx+=((gas?1:0)-(brake?.7:0))*(wasGround?405:70)*dt;
+  bike.vx+=((gas?1:0)-(brake?0.7:0))*(wasGround?405:70)*dt;
   bike.vx=clamp(bike.vx,-125,355);
   bike.vx*=wasGround?.996:.999;
   bike.vy+=1160*dt;
   bike.av+=((forward?1:0)-(back?1:0))*(wasGround?7.4:11)*dt;
-  bike.av*=.993;
+  bike.av*=wasGround?.975:.993;
+  // The frame follows the terrain gently; rider lean still overrides it.
+  // A single front-wheel bump should not cause an immediate backflip.
+  if(wasGround){
+    const backY=groundAt(bike.x-42),frontY=groundAt(bike.x+42);
+    if(backY!==null&&frontY!==null){
+      const slope=Math.atan2(frontY-backY,84);
+      const error=Math.atan2(Math.sin(slope-bike.a),Math.cos(slope-bike.a));
+      bike.av+=(error*13-bike.av*3)*dt;
+    }
+  }
+  bike.av=clamp(bike.av,-5,5);
   bike.a+=bike.av*dt;
   bike.x+=bike.vx*dt;
   bike.y+=bike.vy*dt;
@@ -253,7 +264,7 @@ function step(dt){
         const velocity=bike.vy+bike.av*w.rx;
         const spring=clamp(depth*1500-velocity*78,0,17000);
         bike.vy-=spring*dt*.5;
-        bike.av-=w.rx*spring*dt/7700;
+        bike.av-=w.rx*spring*dt/42000;
         bike.y-=Math.min(depth,8)*.16;
         if((gas||brake)&&Math.abs(bike.vx)>40&&frameCounter%7===0){
           dust.push({x:w.x,y:g-3,vx:-bike.vx*.17+(Math.random()-.5)*48,
