@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 240" width="384" height="240">
+<rect width="384" height="240" fill="#f5f2ea"/>
+<rect x="12" y="12" width="360" height="216" rx="4" fill="#fffdf7" stroke="#c6b9a4"/>
+<path d="M13 166H371V227H13Z" fill="#ead9b9"/>
+<path d="M13 166H371" stroke="#bda680"/>
+<g fill="#221d18">
+<path d="M103 145L108 99 121 93 134 99 139 145 143 174H99ZM94 89H149L144 97H99Z"/>
+<path d="M245 145L250 99 263 93 276 99 281 145 285 174H241ZM236 89H291L286 97H241Z"/>
+</g>
+<text x="192" y="38" font-family="monospace" font-weight="bold" letter-spacing="3" text-anchor="middle" font-size="19" fill="#221d18">QUICKDRAW</text>
+<text x="192" y="92" text-anchor="middle" font-family="monospace" font-size="17" font-weight="bold" fill="#ae4536">DRAW!</text>
+<text x="192" y="210" font-family="monospace" font-size="11" text-anchor="middle" fill="#594d42">WAIT · REACT · WIN</text>
+</svg>
