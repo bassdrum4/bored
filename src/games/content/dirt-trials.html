@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dirt Trials</title>
+<style>
+:root{--paper:#f4f0e6;--ink:#282824;--muted:#776f62;--rule:#c9c0b1;--red:#b04a38;--sand:#d5c6a9;--grass:#8a9775}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:var(--paper);color:var(--ink);font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body{display:flex;flex-direction:column;gap:8px;padding:10px;overflow:hidden;user-select:none;-webkit-user-select:none}
+header,footer{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;flex:0 0 auto}
+h1{font:normal 25px/1.05 Georgia,serif;letter-spacing:-.045em;margin:0}
+h1 b{color:var(--red);font-weight:normal}
+#sub{font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+#stats{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:11px;font-variant-numeric:tabular-nums}
+#stats strong{color:var(--red);font-size:13px}
+#stage{position:relative;flex:1 1 auto;min-height:145px;border:1px solid var(--ink);background:#f6f0e4;overflow:hidden}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+button{font:600 11px/1.3 ui-monospace,monospace;color:var(--ink);border:1px solid var(--ink);border-radius:3px;background:var(--paper);padding:8px 10px;cursor:pointer;touch-action:manipulation}
+button:hover:not(:disabled){background:#e7dfd0}
+button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+button:disabled{opacity:.34;cursor:default}
+button.primary{background:var(--ink);color:#fff9ec}
+#buttons{display:flex;gap:6px;flex-wrap:wrap}
+footer{color:var(--muted);font-size:10px}
+#touch{display:none;align-items:center;justify-content:space-between;gap:5px;width:100%}
+#touch button{flex:1;min-width:0;max-width:130px;min-height:44px;padding:8px 3px;font-size:10px;touch-action:none}
+#touch button.pressed{background:var(--ink);color:white}
+#touch button[data-hold="gas"]{background:var(--red);border-color:var(--red);color:#fff}
+#touch button[data-hold="gas"].pressed{background:#743023}
+#screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(244,240,230,.91);overflow:auto}
+#screen[hidden]{display:none}
+.panel{border:1px solid var(--ink);background:#faf7ef;width:min(100%,580px);max-height:100%;overflow:auto;padding:18px;box-shadow:5px 5px 0 rgba(40,40,36,.1)}
+.panel h2{font:normal 29px/1.1 Georgia,serif;margin:0 0 7px}
+.panel p{margin:0 0 13px;color:var(--muted)}
+#stage-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+#stage-list button{min-height:56px;padding:5px;display:flex;flex-direction:column;justify-content:center;gap:2px;overflow:hidden}
+#stage-list button small{font-size:9px;font-weight:normal;color:var(--muted);line-height:1.15}
+#stage-list button span{font-size:10px}
+#screen-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+#hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);padding:5px 9px;background:#f4f0e6e6;border:1px solid #c9c0b1;color:var(--ink);font-size:10px;white-space:nowrap;pointer-events:none}
+#hint[hidden]{display:none}
+@media(pointer:coarse),(max-width:700px){#touch{display:flex}#keyboard-help{display:none}}
+@media(max-width:520px){
+ body{padding:7px;gap:5px}
+ h1{font-size:20px}
+ #sub{font-size:9px}
+ #stats{gap:7px;font-size:10px}
+ #stats strong{font-size:11px}
+ header{align-items:flex-start}
+ .panel{padding:10px}
+ .panel h2{font-size:23px}
+ #stage-list{grid-template-columns:repeat(3,minmax(0,1fr))}
+ #stage-list button{min-height:45px}
+ #hint{font-size:9px;white-space:normal;text-align:center;max-width:90%;bottom:6px}
+}
+@media(max-height:420px){body{gap:3px;padding:4px}h1{font-size:18px}#touch button{min-height:34px}.panel{padding:8px}#stage-list button{min-height:36px}}
+</style>
+</head>
+<body>
+<header>
+<div><h1>Dirt <b>Trials.</b></h1><div id="sub">15 courses · one very patient bike</div></div>
+<div id="stats">
+<span>STAGE <strong id="stage-no">01 / 15</strong></span>
+<span>TIME <strong id="clock">0.00</strong></span>
+<span>BEST <strong id="best">—</strong></span>
+<span>MEDALS <strong id="career">0 / 45</strong></span>
+</div>
+</header>
+<div id="stage">
+<canvas id="game" aria-label="Side-scrolling bike trials course. Right arrow accelerates; left brakes; up and down lean; Space hops."></canvas>
+<div id="hint">Right arrow to ride · Up / Down to balance · Space to hop</div>
+<div id="screen">
+<div class="panel">
+<h2 id="screen-title">Choose a course</h2>
+<p id="screen-copy">Finish a course to unlock the next. Fast runs earn better medals. Crashes are free.</p>
+<div id="stage-list"></div>
+<div id="screen-actions"></div>
+</div>
+</div>
+</div>
+<footer>
+<span id="keyboard-help">← brake/reverse · → gas · ↑ lean back · ↓ lean forward · Space hop · R restart</span>
+<div id="buttons"><button id="levels" type="button">Courses</button><button id="retry" type="button">Restart · R</button></div>
+</footer>
+<div id="touch" aria-label="Touch riding controls">
+<button data-hold="brake" type="button" aria-label="Brake or reverse">← BRAKE</button>
+<button data-hold="back" type="button" aria-label="Lean back">↶ LEAN</button>
+<button id="hop" type="button" aria-label="Hop">↑ HOP</button>
+<button data-hold="forward" type="button" aria-label="Lean forward">LEAN ↷</button>
+<button data-hold="gas" type="button" aria-label="Accelerate">GAS →</button>
+</div>
+<script>
+(function () {
+'use strict';
+const W=960,H=540,DT=1/120;
+const $=id=>document.getElementById(id);
+const canvas=$('game'),ctx=canvas.getContext('2d'),stage=$('stage');
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const courses=[
+  {name:'First Gear',len:1200,gold:8,pts:[[0,420],[350,420],[540,402],[740,420],[1200,420]]},
+  {name:'The Bump',len:1350,gold:9,pts:[[0,420],[280,420],[410,374],[535,420],[740,420],[855,387],[990,420],[1350,420]]},
+  {name:'Ramp Day',len:1430,gold:10,pts:[[0,420],[270,420],[455,335],[610,420],[800,420],[950,345],[1130,420],[1430,420]]},
+  {name:'A Little Air',len:1490,gold:11,pts:[[0,420],[260,420],[385,351],[455,351],[550,423],[690,423],[860,386],[1000,420],[1490,420]],gaps:[[465,530]]},
+  {name:'Sawtooth',len:1550,gold:12,pts:[[0,420],[190,420],[330,371],[445,420],[555,376],[690,420],[810,358],[950,420],[1100,391],[1250,420],[1550,420]]},
+  {name:'Bridge Out',len:1580,gold:12,pts:[[0,420],[260,420],[425,348],[535,370],[650,415],[850,415],[1030,365],[1190,420],[1580,420]],gaps:[[555,637]]},
+  {name:'Rolling Hills',len:1690,gold:13,pts:[[0,420],[220,420],[365,335],[540,420],[690,358],[860,420],[1015,318],[1170,420],[1370,377],[1510,420],[1690,420]]},
+  {name:'Loose Gravel',len:1700,gold:14,pts:[[0,420],[230,420],[420,389],[590,420],[760,340],[900,420],[1060,372],[1170,420],[1390,358],[1520,420],[1700,420]],crates:[690,1330]},
+  {name:'Leap of Faith',len:1770,gold:14,pts:[[0,420],[260,420],[405,331],[500,343],[710,420],[915,351],[1040,420],[1220,373],[1390,420],[1770,420]],gaps:[[520,610],[1250,1320]]},
+  {name:'Switchbacks',len:1830,gold:15,pts:[[0,420],[250,420],[430,337],[600,420],[725,360],[855,423],[990,332],[1120,420],[1310,350],[1460,420],[1830,420]]},
+  {name:'Crate Country',len:1840,gold:16,pts:[[0,420],[270,420],[425,372],[580,420],[785,355],[930,420],[1125,368],[1270,420],[1475,345],[1600,420],[1840,420]],crates:[565,1060,1570]},
+  {name:'The Valley',len:1950,gold:17,pts:[[0,420],[240,420],[410,474],[560,420],[700,339],[880,465],[1030,420],[1160,345],[1320,462],[1490,420],[1670,356],[1800,420],[1950,420]]},
+  {name:'Double Trouble',len:1950,gold:18,pts:[[0,420],[230,420],[370,343],[480,372],[660,420],[820,337],[960,415],[1110,420],[1275,355],[1420,420],[1690,380],[1950,420]],gaps:[[500,585],[980,1050]]},
+  {name:'The Gauntlet',len:2110,gold:20,pts:[[0,420],[250,420],[405,356],[540,420],[690,345],[850,420],[1010,328],[1170,425],[1330,357],[1490,420],[1680,330],[1830,420],[2110,420]],gaps:[[870,937],[1520,1595]],crates:[585,1260]},
+  {name:'Last Ride',len:2250,gold:22,pts:[[0,420],[270,420],[415,350],[555,420],[740,330],[870,420],[1030,363],[1170,420],[1370,328],[1510,420],[1700,344],[1840,420],[2010,370],[2250,420]],gaps:[[575,640],[1200,1275],[1870,1930]],crates:[950,1600]}
+];
+const storageKey='bored.dirt-trials.progress.v1';
+let bests=loadBests(),level=0,mode='menu',started=false,timeMs=0,cam=0,viewW=W;
+let bike={},dust=[],keys=new Set(),jumpQueued=false,acc=0,last=0,resizeObserver=null;
+let touched=false,frameCounter=0,finishTime=0;
+function loadBests(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(storageKey)||'[]');
+    if(!Array.isArray(saved))return Array(courses.length).fill(null);
+    return courses.map((course,i)=>Number.isInteger(saved[i])&&saved[i]>=1000&&saved[i]<600000?saved[i]:null);
+  }catch{return Array(courses.length).fill(null);}
+}
+function saveBests(){try{localStorage.setItem(storageKey,JSON.stringify(bests));}catch{}}
+function medalAt(i,ms=bests[i]){
+  if(!ms)return 0;
+  if(ms<=courses[i].gold*1000)return 3;
+  if(ms<=courses[i].gold*1500)return 2;
+  return 1;
+}
+function medals(){return bests.reduce((sum,t,i)=>sum+medalAt(i,t),0);}
+function unlocked(i){return i===0||bests.slice(0,i).every(Boolean);}
+function format(ms){return ms==null?'—':(ms/1000).toFixed(2)+'s';}
+function groundAt(x){
+  const c=courses[level];
+  for(const gap of c.gaps||[])if(x>gap[0]&&x<gap[1])return null;
+  const p=c.pts;
+  if(x<=p[0][0])return p[0][1];
+  for(let i=1;i<p.length;i++)if(x<=p[i][0]){
+    const a=p[i-1],b=p[i],t=clamp((x-a[0])/(b[0]-a[0]),0,1);
+    const smooth=t*t*(3-2*t);
+    return a[1]+(b[1]-a[1])*smooth;
+  }
+  return p[p.length-1][1];
+}
+function reset(i=level){
+  level=i;mode='ride';started=false;timeMs=0;finishTime=0;
+  const y=groundAt(85)||420;
+  bike={x:85,y:y-32,vx:0,vy:0,a:0,av:0,onGround:false,crashes:0};
+  dust=[];jumpQueued=false;cam=0;acc=0;
+  keys.clear();document.querySelectorAll('[data-hold]').forEach(el=>el.classList.remove('pressed'));
+  $('screen').hidden=true;
+  $('hint').hidden=false;
+  updateHud();
+}
+function updateHud(){
+  $('stage-no').textContent=String(level+1).padStart(2,'0')+' / 15';
+  $('clock').textContent=(timeMs/1000).toFixed(2);
+  $('best').textContent=format(bests[level]);
+  $('career').textContent=medals()+' / 45';
+}
+function clearActions(){
+  $('stage-list').replaceChildren();$('screen-actions').replaceChildren();
+}
+function addAction(label,fn,primary=false){
+  const btn=document.createElement('button');btn.type='button';btn.textContent=label;
+  if(primary)btn.className='primary';btn.addEventListener('click',fn);
+  $('screen-actions').append(btn);
+}
+function showScreen(title,copy){
+  $('screen-title').textContent=title;$('screen-copy').textContent=copy;
+  clearActions();$('screen').hidden=false;$('hint').hidden=true;
+}
+function selectCourse(){
+  mode='menu';keys.clear();
+  showScreen('Choose a course','Ride, balance and hop. Finish to unlock the next course; improve your times for better medals.');
+  courses.forEach((course,i)=>{
+    const btn=document.createElement('button');btn.type='button';btn.disabled=!unlocked(i);
+    const number=document.createElement('span');number.textContent=String(i+1).padStart(2,'0')+' · '+course.name;
+    const info=document.createElement('small');
+    const m=medalAt(i);
+    info.textContent=m?'★'.repeat(m)+' · '+format(bests[i]):btn.disabled?'Locked':'Ready';
+    btn.append(number,info);btn.addEventListener('click',()=>reset(i));
+    $('stage-list').append(btn);
+  });
+  addAction('Ride '+String(Math.min(courses.length,bests.filter(Boolean).length+1)).padStart(2,'0'),()=>{
+    reset(Math.min(courses.length-1,bests.findIndex(v=>!v)<0?courses.length-1:bests.findIndex(v=>!v)));
+  },true);
+  updateHud();
+}
+function crash(reason){
+  if(mode!=='ride')return;
+  mode='crash';keys.clear();bike.crashes++;
+  showScreen('A small disagreement with gravity.',reason||'The bike is fine. Probably.');
+  addAction('Try again · R',()=>reset(),true);
+  addAction('Choose a course',selectCourse);
+}
+function finish(){
+  if(mode!=='ride'||!started)return;
+  mode='finish';finishTime=Math.round(timeMs);
+  const previous=bests[level],improved=previous===null||finishTime<previous;
+  if(improved){bests[level]=finishTime;saveBests();}
+  const m=medalAt(level,finishTime),bestMedal=medalAt(level);
+  const names=['','BRONZE','SILVER','GOLD'];
+  showScreen(names[m]+' · '+format(finishTime),improved?'A new personal best. The next course is waiting.':'Course clear. You can always come back for a faster run.');
+  if(level+1<courses.length&&unlocked(level+1))addAction('Next course →',()=>reset(level+1),true);
+  addAction('Ride again · R',()=>reset(),level+1>=courses.length);
+  addAction('All courses',selectCourse);
+  updateHud();
+}
+function wheel(sign){
+  const c=Math.cos(bike.a),s=Math.sin(bike.a);
+  return {x:bike.x+sign*29*c-17*s,y:bike.y+sign*29*s+17*c,rx:sign*29*c-17*s};
+}
+function pressed(which){
+  if(which==='gas')return keys.has('ArrowRight')||keys.has('KeyD')||keys.has('gas');
+  if(which==='brake')return keys.has('ArrowLeft')||keys.has('KeyA')||keys.has('brake');
+  if(which==='back')return keys.has('ArrowUp')||keys.has('KeyW')||keys.has('back');
+  if(which==='forward')return keys.has('ArrowDown')||keys.has('KeyS')||keys.has('forward');
+  return false;
+}
+function step(dt){
+  if(mode!=='ride')return;
+  const gas=pressed('gas'),brake=pressed('brake'),back=pressed('back'),forward=pressed('forward');
+  if(!started&&(gas||brake||back||forward||jumpQueued))started=true;
+  if(!started){jumpQueued=false;return;}
+  timeMs+=dt*1000;
+  const wasGround=bike.onGround;
+  if(jumpQueued&&wasGround){bike.vy-=310;bike.onGround=false;}
+  jumpQueued=false;
+  bike.vx+=((gas?1:0)-(brake?.7:0))*(wasGround?405:70)*dt;
+  bike.vx=clamp(bike.vx,-125,355);
+  bike.vx*=wasGround?.996:.999;
+  bike.vy+=1160*dt;
+  bike.av+=((forward?1:0)-(back?1:0))*(wasGround?7.4:11)*dt;
+  bike.av*=.993;
+  bike.a+=bike.av*dt;
+  bike.x+=bike.vx*dt;
+  bike.y+=bike.vy*dt;
+  let grounded=false;
+  for(const sign of [-1,1]){
+    const w=wheel(sign),g=groundAt(w.x);
+    if(g===null)continue;
+    const depth=w.y+13-g;
+    if(depth>-1&&depth<80){
+      grounded=true;
+      if(depth>0){
+        const velocity=bike.vy+bike.av*w.rx;
+        const spring=clamp(depth*1500-velocity*78,0,17000);
+        bike.vy-=spring*dt*.5;
+        bike.av-=w.rx*spring*dt/7700;
+        bike.y-=Math.min(depth,8)*.16;
+        if((gas||brake)&&Math.abs(bike.vx)>40&&frameCounter%7===0){
+          dust.push({x:w.x,y:g-3,vx:-bike.vx*.17+(Math.random()-.5)*48,
+            vy:-30-Math.random()*30,life:.28,r:1+Math.random()*3});
+        }
+      }
+    }
+  }
+  bike.onGround=grounded;
+  const tilt=Math.abs(Math.atan2(Math.sin(bike.a),Math.cos(bike.a)));
+  const ground=groundAt(bike.x);
+  if(bike.x<24){bike.x=24;bike.vx=Math.max(0,bike.vx);}
+  if(bike.y>H+120){crash('The landing was several feet below the course.');return;}
+  if(ground!==null&&bike.y>ground+12){crash('The handlebars tried to become a shovel.');return;}
+  if(grounded&&tilt>2.05){crash('An elegant but unplanned somersault.');return;}
+  const headY=bike.y-30*Math.cos(bike.a)-8*Math.sin(bike.a);
+  if(grounded&&ground!==null&&headY>ground-5){crash('Helmets are not wheels.');return;}
+  for(const x of courses[level].crates||[]){
+    const gy=groundAt(x);if(gy===null)continue;
+    if(Math.abs(bike.x-x)<20&&bike.y>gy-54&&Math.abs(bike.vx)>50){
+      crash('The crate won this round. Hop over it next time.');return;
+    }
+  }
+  if(bike.x>=courses[level].len-58){finish();return;}
+  if(timeMs>=180000){crash('Three minutes on one course. The bike deserves a break.');return;}
+  for(const p of dust){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=150*dt;p.life-=dt;}
+  dust=dust.filter(p=>p.life>0).slice(-70);
+  frameCounter++;
+}
+function hop(){
+  if(mode==='ride'){jumpQueued=true;}
+}
+function resize(){
+  const bounds=stage.getBoundingClientRect();
+  const ratio=Math.min(2,devicePixelRatio||1);
+  canvas.width=Math.max(1,Math.round(bounds.width*ratio));
+  canvas.height=Math.max(1,Math.round(bounds.height*ratio));
+  viewW=H*(canvas.width/canvas.height);
+}
+function drawBackground(){
+  const width=viewW;
+  ctx.fillStyle='#f2ebdc';ctx.fillRect(0,0,width,H);
+  ctx.fillStyle='#e6dbc6';ctx.beginPath();ctx.moveTo(0,H);
+  for(let x=0;x<=width+12;x+=12){const w=x+cam*.15;ctx.lineTo(x,275+Math.sin(w/140)*25+Math.sin(w/65)*9);}
+  ctx.lineTo(width,H);ctx.fill();
+  ctx.fillStyle='#e0d3be';ctx.beginPath();ctx.moveTo(0,H);
+  for(let x=0;x<=width+12;x+=12){const w=x+cam*.28;ctx.lineTo(x,344+Math.sin(w/85)*22+Math.sin(w/41)*7);}
+  ctx.lineTo(width,H);ctx.fill();
+  ctx.fillStyle='#998f80';ctx.font='11px ui-monospace,monospace';
+  ctx.fillText('DIRT / '+String(level+1).padStart(2,'0')+'  '+courses[level].name.toUpperCase(),20,26);
+}
+function drawGround(){
+  const start=Math.max(0,Math.floor(cam/9)*9-9),end=Math.min(courses[level].len+100,cam+viewW+12);
+  let open=false;
+  ctx.fillStyle='#cbbda3';ctx.strokeStyle='#5f594d';ctx.lineWidth=3;
+  for(let x=start;x<=end+9;x+=9){
+    const g=groundAt(x),valid=g!==null;
+    if(!valid){if(open){ctx.lineTo(x-9,H+90);ctx.closePath();ctx.fill();ctx.stroke();open=false;}continue;}
+    if(!open){ctx.beginPath();ctx.moveTo(x,H+90);ctx.lineTo(x,g);open=true;}
+    else ctx.lineTo(x,g);
+  }
+  if(open){ctx.lineTo(end,H+90);ctx.closePath();ctx.fill();ctx.stroke();}
+  ctx.strokeStyle='#9a8d76';ctx.lineWidth=1;
+  for(let x=Math.floor(cam/32)*32;x<cam+viewW+35;x+=32){
+    const y=groundAt(x);if(y===null)continue;
+    ctx.beginPath();ctx.moveTo(x,y+8);ctx.lineTo(x+5,y+12);ctx.stroke();
+  }
+}
+function drawMarkers(){
+  const course=courses[level],finishX=course.len-58,y=groundAt(finishX)||420;
+  ctx.strokeStyle='#373936';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(finishX,y-94);ctx.lineTo(finishX,y);ctx.stroke();
+  for(let r=0;r<4;r++)for(let c=0;c<2;c++){
+    ctx.fillStyle=(r+c)%2===0?'#f7f1e4':'#31332f';
+    ctx.fillRect(finishX+c*13,y-91+r*12,13,12);
+  }
+  ctx.fillStyle='#776c60';ctx.font='12px ui-monospace,monospace';
+  ctx.fillText('FINISH',finishX-10,y-105);
+  for(const x of course.crates||[]){
+    const gy=groundAt(x);if(gy===null)continue;
+    ctx.fillStyle='#b98a5a';ctx.strokeStyle='#5c4836';ctx.lineWidth=3;
+    ctx.fillRect(x-15,gy-28,30,28);ctx.strokeRect(x-15,gy-28,30,28);
+    ctx.beginPath();ctx.moveTo(x-15,gy-28);ctx.lineTo(x+15,gy);
+    ctx.moveTo(x+15,gy-28);ctx.lineTo(x-15,gy);ctx.stroke();
+  }
+  for(const gap of course.gaps||[]){
+    for(const edge of gap){
+      const g=groundAt(edge);if(g===null)continue;
+      ctx.fillStyle='#b04a38';ctx.fillRect(edge-4,g-46,8,46);
+      ctx.fillStyle='#fff8ea';ctx.fillRect(edge-9,g-50,18,6);
+    }
+  }
+}
+function drawBike(){
+  ctx.save();ctx.translate(bike.x,bike.y);ctx.rotate(bike.a);
+  for(const wheelX of [-29,29]){
+    ctx.fillStyle='#e9e2d5';ctx.strokeStyle='#343735';ctx.lineWidth=5;
+    ctx.beginPath();ctx.arc(wheelX,17,13,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.strokeStyle='#9b9c91';ctx.lineWidth=1;
+    for(let i=0;i<6;i++){const a=i*Math.PI/3+timeMs*.004*bike.vx/100;
+      ctx.beginPath();ctx.moveTo(wheelX,17);ctx.lineTo(wheelX+11*Math.cos(a),17+11*Math.sin(a));ctx.stroke();}
+    ctx.fillStyle='#353735';ctx.beginPath();ctx.arc(wheelX,17,3,0,Math.PI*2);ctx.fill();
+  }
+  ctx.strokeStyle='#b04a38';ctx.lineWidth=4;ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.beginPath();ctx.moveTo(-29,17);ctx.lineTo(-5,-1);ctx.lineTo(12,17);ctx.lineTo(-29,17);
+  ctx.moveTo(-5,-1);ctx.lineTo(29,17);ctx.moveTo(12,17);ctx.lineTo(29,-6);ctx.lineTo(37,-6);ctx.stroke();
+  ctx.strokeStyle='#343735';ctx.lineWidth=5;ctx.beginPath();
+  ctx.moveTo(-15,-5);ctx.lineTo(-1,-9);ctx.stroke();
+  ctx.strokeStyle='#555b58';ctx.lineWidth=6;ctx.beginPath();
+  ctx.moveTo(-5,-7);ctx.lineTo(-7,-19);ctx.lineTo(5,-24);
+  ctx.moveTo(-8,-17);ctx.lineTo(-20,-3);ctx.moveTo(-6,-17);ctx.lineTo(6,2);ctx.stroke();
+  ctx.fillStyle='#b04a38';ctx.strokeStyle='#3b3935';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(-4,-30,9,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#eee2c9';ctx.fillRect(-3,-32,7,3);
+  ctx.restore();
+}
+function render(){
+  if(!canvas.width||!canvas.height)return;
+  ctx.setTransform(canvas.width/viewW,0,0,canvas.height/H,0,0);
+  ctx.clearRect(0,0,viewW,H);
+  const target=clamp(bike.x-viewW*.33,0,Math.max(0,courses[level].len-viewW+80));
+  cam+=(target-cam)*.12;
+  drawBackground();
+  ctx.save();ctx.translate(-cam,0);drawGround();drawMarkers();
+  for(const d of dust){ctx.globalAlpha=clamp(d.life/.3,0,1);ctx.fillStyle='#746a5a';ctx.fillRect(d.x,d.y,d.r,d.r);}ctx.globalAlpha=1;
+  drawBike();ctx.restore();
+  const fraction=clamp((bike.x-85)/(courses[level].len-143),0,1);
+  ctx.fillStyle='#383b35';ctx.fillRect(18,H-22,Math.max(0,viewW-36),3);
+  ctx.fillStyle='#b04a38';ctx.fillRect(18,H-22,Math.max(0,viewW-36)*fraction,3);
+  ctx.fillStyle='#605d55';ctx.font='11px ui-monospace,monospace';
+  ctx.textAlign='right';ctx.fillText(String(Math.max(0,Math.round(bike.vx*.18)))+' km/h',viewW-18,26);ctx.textAlign='left';
+}
+function animate(t){
+  if(!last)last=t;
+  acc+=clamp((t-last)/1000,0,.05);last=t;
+  if(mode==='ride'&&!document.hidden){let count=0;while(acc>=DT&&count<8){step(DT);acc-=DT;count++;}}
+  else acc=0;
+  render();updateHud();requestAnimationFrame(animate);
+}
+const movement=new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','KeyA','KeyD','KeyW','KeyS','Space']);
+document.addEventListener('keydown',event=>{
+  if(movement.has(event.code))event.preventDefault();
+  if(event.code==='KeyR'){event.preventDefault();reset();return;}
+  if(event.code==='Space'&&!event.repeat){hop();return;}
+  if(movement.has(event.code))keys.add(event.code);
+});
+document.addEventListener('keyup',event=>keys.delete(event.code));
+window.addEventListener('blur',()=>{keys.clear();document.querySelectorAll('[data-hold]').forEach(el=>el.classList.remove('pressed'));});
+document.querySelectorAll('[data-hold]').forEach(button=>{
+  const key=button.dataset.hold;
+  button.addEventListener('pointerdown',e=>{e.preventDefault();touched=true;keys.add(key);button.classList.add('pressed');button.setPointerCapture?.(e.pointerId);});
+  const stop=e=>{keys.delete(key);button.classList.remove('pressed');};
+  button.addEventListener('pointerup',stop);button.addEventListener('pointercancel',stop);button.addEventListener('lostpointercapture',stop);
+});
+$('hop').addEventListener('pointerdown',e=>{e.preventDefault();hop();});
+$('retry').addEventListener('click',()=>reset());
+$('levels').addEventListener('click',selectCourse);
+window.__boredSnapshot=()=>({slug:'dirt-trials',medals:medals(),levels:bests.filter(Boolean).length,finished:medals()>0});
+if(location.hostname==='localhost'||location.hostname==='127.0.0.1'){
+  window.__dirtTrialsTest={
+    courses:()=>courses.map(c=>({name:c.name,len:c.len,gold:c.gold,gaps:c.gaps||[]})),
+    state:()=>({level,mode,started,timeMs,x:bike.x,y:bike.y,vx:bike.vx,angle:bike.a,medals:medals(),bests:bests.slice()}),
+    ride:(frames,withHop=false)=>{
+      keys.add('gas');
+      for(let i=0;i<Math.min(frames,5000)&&mode==='ride';i++){
+        if(withHop&&i%240===80)jumpQueued=true;
+        step(DT);
+      }
+      keys.delete('gas');updateHud();return {mode,x:bike.x,timeMs,medals:medals()};
+    },
+    reset:i=>reset(i)
+  };
+}
+resize();
+if(window.ResizeObserver){resizeObserver=new ResizeObserver(resize);resizeObserver.observe(stage);}
+else window.addEventListener('resize',resize);
+selectCourse();
+requestAnimationFrame(animate);
+})();
+</script>
+</body></html>
