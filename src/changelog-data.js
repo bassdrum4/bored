@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 369,
-  "newest": "2026-11-09",
+  "count": 370,
+  "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"ec94d98","date":"2026-11-10","author":"Codebuff","subject":"Add Corner, a fourteen-day corner-shop tycoon."},
   {"sha":"aeff889","date":"2026-11-09","author":"Codebuff","subject":"Repair two stale fixtures the browser suite trips over"},
   {"sha":"a608f68","date":"2026-11-09","author":"Codebuff","subject":"Keep Bored Together out of the device's saves"},
   {"sha":"7dfbfea","date":"2026-11-09","author":"Codebuff","subject":"Add Ticket to Ride, and keep Transit Chaos trains on a redrawn line"},
