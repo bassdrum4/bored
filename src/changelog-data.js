@@ -2,13 +2,17 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 388,
+  "count": 392,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f9490e4","date":"2026-11-10","author":"Daniel Lowe","subject":"Register Quickdraw in Bored catalog and score system"},
+  {"sha":"ac8daa3","date":"2026-11-10","author":"Daniel Lowe","subject":"Register Quickdraw in Bored catalog and score system"},
+  {"sha":"fa23246","date":"2026-11-10","author":"Daniel Lowe","subject":"Register Quickdraw in Bored catalog and score system"},
+  {"sha":"6747b20","date":"2026-11-10","author":"Daniel Lowe","subject":"Register Quickdraw in Bored catalog and score system"},
   {"sha":"a0f4a32","date":"2026-11-10","author":"Daniel Lowe","subject":"Create Quickdraw solo reaction and local two-player duel game"},
   {"sha":"80ac965","date":"2026-11-10","author":"Daniel Lowe","subject":"Add identical second Clicker button with per-button analytics snapshots"},
   {"sha":"b82a36b","date":"2026-11-10","author":"Daniel Lowe","subject":"Update live browser tests for unified Bored Together game flow"},
