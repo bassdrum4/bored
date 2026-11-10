@@ -311,6 +311,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
         '@media(max-aspect-ratio:16/9){#game{inset:auto!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:100%!important;height:auto!important;aspect-ratio:16/9!important}}' +
         'footer{position:absolute!important;bottom:0;left:0;right:0;z-index:10;background:transparent!important;pointer-events:none}' +
         '#keys{display:none!important}#pads{pointer-events:auto}' +
+        '#cover > p.muted:last-child{display:none!important}' +
         '@media(pointer:fine){footer{display:none!important}}' +
         '</style>' : '';
       gameFrame.srcdoc = injectHead(html, resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head + gameFill);
