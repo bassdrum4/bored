@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 397,
+  "count": 398,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f7bb0ae","date":"2026-11-10","author":"Codebuff","subject":"Add a warm dark theme selectable from settings"},
   {"sha":"6c7e477","date":"2026-11-10","author":"Daniel Lowe","subject":"Refresh Quickdraw catalog illustration for western duel redesign"},
   {"sha":"3f8a588","date":"2026-11-10","author":"Daniel Lowe","subject":"Redesign Quickdraw as illustrated western duel with bold start action"},
   {"sha":"02419aa","date":"2026-11-10","author":"Daniel Lowe","subject":"Score Downhill Mayhem and expand game views"},
