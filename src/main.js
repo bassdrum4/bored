@@ -24,6 +24,7 @@ import { createAccountUI } from './hub/account-ui.js';
 import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
 import { createLivePlayer } from './hub/together-live.js';
+import { createLobbyBridge } from './hub/together-lobby.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnnouncementsUI } from './hub/announcements-ui.js';
 import { createAnalytics, ANALYTICS_BRIDGE, runtimeErrorMetadata } from './hub/analytics.js';
@@ -214,6 +215,15 @@ async function toggleFullscreen() {
 }
 
 let activeTogether = null;
+// Civ Lite's Multiplayer screen talks to the hub through this bridge whenever the game is open and is not itself a
+// match or a live game. Each document gets its own, with its own channel.
+let activeLobby = null;
+const lobbyDeps = {
+  openLive: id => togetherUI.openLive(id),
+  openSignIn: () => openAuthDialog('signin'),
+  // The Bored Together page sits under the player, so the game is closed first, then the page is opened as a click on its link would.
+  openTogether: () => { closeGame({ force: true }); document.querySelector('#together-nav')?.click(); }
+};
 function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (!ORDER.some(([id]) => id === slug)) return;
   if (!activeSlug) {
@@ -230,6 +240,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   const previousTogether = activeTogether;
   activeTogether = multiplayer;
   if (previousTogether && previousTogether !== multiplayer) previousTogether.dispose();
+  if (activeLobby) { activeLobby.dispose(); activeLobby = null; }
   $('#back span').textContent = multiplayer ? '‹ Bored Together' : '‹ All games';
   $('#restart').hidden = !!multiplayer;
   analytics.end('switch');
@@ -275,6 +286,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       // overwrite it and let a re-deal reroll the shared board.
       html = multiplayer?.mode === 'duel' ? html : injectSeed(html);
       if (multiplayer) html = multiplayer.document(html);
+      else if (slug === 'ashcrown') { activeLobby = createLobbyBridge({ frame: gameFrame, deps: lobbyDeps }); html = activeLobby.document(html); }
       let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};' + (OWNS_ESCAPE.has(slug) ? '' : 'if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}') + 'if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
       gameFrame.removeAttribute('src');
       // The resume helper runs before the game's own script, so a game can offer a
@@ -375,6 +387,7 @@ function closeGame({ force = false } = {}) {
   const together = activeTogether;
   activeTogether = null;
   if (together) together.dispose();
+  if (activeLobby) { activeLobby.dispose(); activeLobby = null; }
   if ($('#invite-dialog')?.open) $('#invite-dialog').close();
   const wasDaily = activeChallenge;
   activeChallenge = null;
@@ -884,6 +897,7 @@ addEventListener('webkitfullscreenchange', onFullscreenChange);
 addEventListener('message', event => {
   if (!activeSlug || EXTERNS[activeSlug] || event.source !== gameFrame.contentWindow) return;
   if (activeTogether) activeTogether.message(event);
+  if (activeLobby) activeLobby.message(event);
   switch (event.data?.type) {
     case 'bored:close':
       if (fullscreenElement()) leaveFullscreen(); else closeGame();
@@ -955,10 +969,14 @@ const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, ca
   const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });
   openGame(match.game, null, document.querySelector('#together-nav'), player);
 }, playLive(game, owner, callbacks) {
-  const player = createLivePlayer({ game, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });
+  // Leaving a live game from its Menu lands on the game's title screen, not out in Bored.
+  const player = createLivePlayer({ game, owner, frame: gameFrame, ...callbacks, close: closeGame, back: () => openGame(game.game, null, document.querySelector('#together-nav')), notify: showHint });
   openGame(game.game, null, document.querySelector('#together-nav'), player);
 } });
-window.addEventListener('bored:identity', () => { if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true }); });
+window.addEventListener('bored:identity', () => {
+  if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true });
+  if (activeLobby) activeLobby.accountChanged();
+});
 initAnnouncements();
 initAccount();
 initFeedback();

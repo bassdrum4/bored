@@ -363,7 +363,7 @@ export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reloa
 }
 
 // The screen's side: puts the bridge into the game's document and passes messages across, checking who sent them.
-export function createLivePlayer({ game, owner, frame, close, onExit, notify, reload, deps = {} }) {
+export function createLivePlayer({ game, owner, frame, close, back, onExit, notify, reload, deps = {} }) {
   if (!game || !TOGETHER_LIVE[game.game]) throw new Error('This game is not available live yet.');
   const channel = crypto.randomUUID();
   let disposed = false;
@@ -377,7 +377,8 @@ export function createLivePlayer({ game, owner, frame, close, onExit, notify, re
       getToken: async () => (await freshSession())?.access_token || ''
     }, options))),
     emit: event => post({ type: 'bored:live-event', event }),
-    exit: () => { if (!disposed) close(); },
+    // Leaving a live game goes back to Civ Lite's title screen when the caller gives a way there, and out otherwise.
+    exit: () => { if (!disposed) (back || close)(); },
     reload: () => { if (!disposed) reload(); },
     notify
   });

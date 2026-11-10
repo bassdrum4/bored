@@ -337,6 +337,27 @@ pieces. Deploy the SQL before the frontend. With the SQL applied and the old fro
 still finishes (every screen sends its claim), but a hub that sent its claim stops listening even though the room waits for
 the second one; reloading the page picks it up again. Without the SQL the frontend's new retries are harmless.
 
+**Multiplayer inside Civ Lite (5.2).** When Civ Lite is open in Bored's player and is not itself a match or a live game, its title
+menu has a *Multiplayer* item (after Load game; a count tag shows how many live-game invites wait). It opens a screen with
+*Host a live game* (the Game setup with a friend picker where the seats would be), *Invites* (who, free-for-all or co-op, when,
+with Join and Decline) and *Your live games* (the players and who is online, the round, Rejoin; finished games folded; the
+turn-by-turn two-player games are listed with a note that they open from Bored Together). It refreshes when it opens and every
+5 seconds while it is open (the live channel is per room, so there is nothing to subscribe to before a game is open). Signed
+out it says *Sign in to Bored to play online* with a button for the hub's sign-in; signed in but not in Bored Together it says
+*Join Bored Together to play online* with a button that closes the game and opens that page. Nothing here needs SQL: it
+uses `bt_live_rpc` (`list`, `create`, `join`, `leave_lobby`, `game`) and `bt_rpc` (`dashboard`, `people`) as they are.
+
+The game has no network, so it asks the hub through a second bridge, `window.__boredLobby = { call(op, payload), on(fn) }`
+(`src/hub/together-lobby.js`), injected like the live bridge, with its own channel. The hub answers only a message from the
+game's own window, on that channel, and only for a signed-in account (the sign-in request is the one thing answered signed out), and
+it drops an answer if the account changed while the call was out. Operations: `status` (`{ signedIn, enrolled, name }`),
+`members`, `invites`, `games`, `host(settings, invitees)`, `join(invite)`, `decline(invite)`, `open(game)`, plus `sign-in` and
+`open-together`. `host`, `join` and `open` end by switching the player into that live game, exactly as opening it from Bored
+Together does (the document is reloaded with the live bridge). The page is given display names, whether people are online,
+room ids for rooms it may open, and opaque per-list references for the members it may invite: never a token, an email or an
+account id. Leaving a live game from its Menu (or leaving or cancelling in the lobby) now returns to Civ Lite's title screen
+instead of closing the game. Bored Together's own page is unchanged.
+
 **Known limits.** The server orders actions but does not simulate Civ Lite, so a modified client can send moves its
 rules would refuse (every screen refuses them the same way, so the screens stay in step, but a made-up action is still
 in the log), can read the whole game state, and, together with a second modified client, can still agree on a made-up

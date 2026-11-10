@@ -149,14 +149,19 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   }
   // A live room opens the game's own screen; the lobby and the game both live in it. Opening one again from the
   // list is how you rejoin: the screen loads the newest snapshot and the actions after it.
-  async function launchLive(id) {
+  // `fromGame` is the Multiplayer screen inside Civ Lite asking for it: the Bored Together page is not open then.
+  async function launchLive(id, fromGame = false) {
+    resetIdentity();
     const stamp = generation, player = owner;
     const game = await liveRPC('game', { id });
-    if (stamp !== generation || !visible) return;
-    if (!['lobby', 'active', 'completed'].includes(game.status)) { await refresh(true); return; }
+    if (stamp !== generation || (!visible && !fromGame)) return;
+    if (!['lobby', 'active', 'completed'].includes(game.status)) {
+      if (fromGame) throw new Error(game.status === 'cancelled' ? 'The host cancelled this game.' : 'This game is no longer open.');
+      await refresh(true); return;
+    }
     flow = null; people = null; liveSelected.clear(); render();
     playLive(game, player, {
-      reload() { run(() => launchLive(id)); },
+      reload() { run(() => launchLive(id, fromGame)); },
       onExit() { if (stamp === generation) refresh(true); }
     });
   }
@@ -644,5 +649,5 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   // badge refresh costs far fewer Auth and database requests on the Free tier.
   setInterval(() => { if (!document.hidden && hasIdentity()) refresh(); }, 15000);
   resetIdentity(); refresh(); if (location.hash === '#together') open();
-  return { open, close, refresh, checkInvites };
+  return { open, close, refresh, checkInvites, openLive: id => launchLive(id, true) };
 }
