@@ -2,6 +2,7 @@ import { readStored, writeStored, removeStored } from './store.js';
 
 const STORAGE_KEY = 'bored.ui.preferences';
 const DEFAULTS = Object.freeze({
+  theme: 'light',
   density: 'comfortable',
   descriptions: true,
   reducedMotion: false
@@ -11,6 +12,7 @@ const $ = id => document.getElementById(id);
 function normalize(saved) {
   if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return { ...DEFAULTS };
   return {
+    theme: saved.theme === 'dark' ? 'dark' : DEFAULTS.theme,
     density: ['comfortable', 'compact'].includes(saved.density) ? saved.density : DEFAULTS.density,
     descriptions: typeof saved.descriptions === 'boolean' ? saved.descriptions : DEFAULTS.descriptions,
     reducedMotion: typeof saved.reducedMotion === 'boolean' ? saved.reducedMotion : DEFAULTS.reducedMotion
@@ -21,22 +23,20 @@ function normalize(saved) {
 export function initPreferences({ clearFavorites, resetAnalytics }) {
   const stored = readStored(STORAGE_KEY);
   let settings = normalize(stored);
-  // Migrate legacy theme selections. Bored always uses its light paper palette.
-  if (stored && typeof stored === 'object' && 'theme' in stored) {
-    writeStored(STORAGE_KEY, settings);
-  }
   const status = $('settings-saved');
 
   function apply() {
-    document.documentElement.dataset.theme = 'light';
+    const dark = settings.theme === 'dark';
+    document.documentElement.dataset.theme = settings.theme;
     document.documentElement.dataset.density = settings.density;
     document.documentElement.dataset.descriptions = settings.descriptions ? 'shown' : 'hidden';
     document.documentElement.dataset.reduceMotion = settings.reducedMotion ? 'true' : 'false';
-    document.documentElement.style.colorScheme = 'light';
+    document.documentElement.style.colorScheme = settings.theme;
     const themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor) themeColor.content = '#f5f2ea';
+    if (themeColor) themeColor.content = dark ? '#17150f' : '#f5f2ea';
   }
   function sync() {
+    $('setting-theme').value = settings.theme;
     $('setting-density').value = settings.density;
     $('setting-descriptions').checked = settings.descriptions;
     $('setting-reduced-motion').checked = settings.reducedMotion;
@@ -52,6 +52,7 @@ export function initPreferences({ clearFavorites, resetAnalytics }) {
     persist();
   }
 
+  $('setting-theme').addEventListener('change', event => change('theme', event.target.value));
   $('setting-density').addEventListener('change', event => change('density', event.target.value));
   $('setting-descriptions').addEventListener('change', event => change('descriptions', event.target.checked));
   $('setting-reduced-motion').addEventListener('change', event => change('reducedMotion', event.target.checked));

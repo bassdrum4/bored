@@ -12,6 +12,17 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&amp;display=swap">
 <link rel="stylesheet" href="./styles.css">
 <link rel="stylesheet" href="./hub/paper-layout.css">
+<script>
+// Set a saved dark theme before first paint, so it never flashes paper.
+try {
+  const saved = JSON.parse(localStorage.getItem('bored.ui.preferences') || '{}');
+  if (saved && saved.theme === 'dark') {
+    document.documentElement.dataset.theme = 'dark';
+    document.documentElement.style.colorScheme = 'dark';
+    document.querySelector('meta[name="theme-color"]').content = '#17150f';
+  }
+} catch (error) {}
+</script>
 </head>
 <body>
 
@@ -122,6 +133,8 @@
           <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">◐</span><div>
             <h3 id="appearance-heading">Appearance</h3><p>Make Bored comfortable to look at.</p>
           </div></div>
+          <div class="settings-row"><div><label for="setting-theme">Theme</label><p>Warm paper, or a soft charcoal for darker rooms.</p></div>
+            <select id="setting-theme"><option value="light">Light</option><option value="dark">Dark</option></select></div>
           <div class="settings-row"><div><label for="setting-density">Game card size</label><p>Fit more games on screen with compact cards.</p></div>
             <select id="setting-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
           <div class="settings-row"><div><label for="setting-descriptions">Show game descriptions</label><p>Keep short summaries below game titles.</p></div>

@@ -28,7 +28,7 @@
 .site-nav #together-nav { white-space: nowrap; }
 .sub { display: block; }
 .intro-row { display: flex; margin-top: 12px; }
-.masthead-bar { background: #fffdf7; }
+.masthead-bar { background: var(--surface); }
 body[data-bored-view="leaderboard"] .intro-row,
 body[data-bored-view="settings"] .intro-row,
 body[data-bored-view="together"] .intro-row { display: none; }
@@ -168,6 +168,8 @@ body[data-bored-view="together"] #together-home { display: none!important; }
 .settings-checkbox:checked { background: var(--ink); border-color: var(--ink); }
 .settings-checkbox:checked::after { transform: translateX(19px); background: var(--paper); }
 .settings-checkbox:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+html[data-theme="dark"] .settings-checkbox:not(:checked) { background: var(--field); }
+html[data-theme="dark"] .settings-checkbox:not(:checked)::after { background: var(--dim); border-color: var(--rule); }
 .settings-sidebar { display: grid; gap: 24px; }
 .settings-aside { padding: 22px; }
 .settings-aside h3 { margin: 9px 0 10px; font: 400 23px/1.24 var(--display); }
@@ -198,7 +200,7 @@ html[data-reduce-motion="true"] *::after {
   scroll-behavior: auto!important;
 }
 
-/* This site uses the light paper palette on every device. */
+/* Light paper is the default; html[data-theme="dark"] overrides it in styles.css. */
 :root { color-scheme: light; }
 
 /* The new wide grid scales down, without losing the original card treatment. */
