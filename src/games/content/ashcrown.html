@@ -263,9 +263,10 @@
   .slot-name { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
   .slot-meta { display: block; font-size: 10.5px; color: var(--ink-3); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
   .slot-when { display: block; font-size: 10.5px; color: var(--ink-3); line-height: 1.45 }
+  .slot-when svg.cloud { width: 14px; height: 10px; vertical-align: -1px; color: var(--ink-3) }
   .slot-acts { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: flex-end }
   .slot-acts .btn { padding: 4px 9px; font-size: 12px }
-  .slot-q { font-size: 11.5px; color: var(--ink-2); max-width: 24ch; text-align: right }
+  .slot-q { font-size: 11.5px; color: var(--ink-2); max-width: 28ch; text-align: right }
   @media (max-width: 520px) {
     .slot { grid-template-columns: 36px minmax(0, 1fr) }
     .slot-acts { grid-column: 1 / -1; justify-content: flex-start }
@@ -1847,6 +1848,7 @@ function embedded() {
 }
 // Bored closes the game, or leaves fullscreen first. Esc does not do this here: it is the game's own key.
 function leaveBored() {
+  syncFlush();   // anything not yet in the account goes before the game closes
   try { window.parent.postMessage({ type: 'bored:close' }, '*'); } catch (error) { /* nothing to tell */ }
 }
 function onlineSubmit() {
@@ -8987,7 +8989,8 @@ function showMenu() {
   const howSaved = G.live ? 'A live game is kept on the server, not in a slot on this device. Leave it any time: a CPU plays your civ while you are gone, and you get it back when you return.'
     : online ? 'Bored Together keeps this match on the server, not on this device, so your solo campaign is left alone.'
     : G.tut ? 'The tutorial isn’t saved, so your saved game stays as it was.'
-    : 'The game saves itself on this device after every move (the Autosave) and keeps the start of your last three turns. Save game keeps a copy under a name you pick. Playing the tutorial keeps your saves.';
+    : 'The game saves itself on this device after every move (the Autosave) and keeps the start of your last three turns. Save game keeps a copy under a name you pick. Playing the tutorial keeps your saves.' +
+      (syncOn() ? ' Signed in, your named saves and the Autosave also go to your Bored account.' : '');
   openModal(modalHead('Menu', 'Turn ' + G.turn + (G.maxTurns ? ' of ' + G.maxTurns : '') + ' · ' + MAP_TYPES[G.map].name + ' · ' + levelOf().name) +
     '<div class="modal-body"><div class="actions" style="flex-direction:column;align-items:stretch">' +
     '<button class="act" data-act="help">How to play</button>' +
@@ -9141,7 +9144,8 @@ function helpSections() {
       'Turn Event popups off in Options (or the Menu) and the points still count.</p>' },
     { id: 'keys', group: 'Controls', title: 'Keys', html:
       '<p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
-      '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' },
+      '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
+      '<p><b>Saves on every device.</b> Signed in on Bored, your named saves and the Autosave also go to your account, so you can Continue or Load them on another device. A save from another device is marked, and nothing is replaced without asking. The starts of your last three turns stay on the device.</p>' },
   ];
 }
 
@@ -9418,6 +9422,7 @@ function onAction(act) {
   if (G && G.live && (kind === 'tut-start' || kind === 'slots' || kind.startsWith('slot-'))) return;   // no slots, no tutorial in a live game
   if (kind === 'live-lobby-leave') { liveLobbyLeave(); return; }
   if (kind === 'slots' || kind.startsWith('slot-')) { slotAction(kind, a, b); return; }
+  if (kind.startsWith('sy-')) { syncAction(kind, a, b); return; }
   if (kind === 'tut-start') { if (G && !G.tut) saveGame(); startTutorial(); return; }
   if (kind === 'anim-next') {
     // Off, wonders only, wonders + features, everything, and round again.
@@ -10230,7 +10235,7 @@ function upgradeHead(id, head) {
 // Every slot that holds a game, with its header.
 function slotList() {
   moveOldSave();
-  return SLOT_IDS.map(id => ({ id, head: slotHead(id) })).filter(s => s.head).map(s => ({ id: s.id, head: upgradeHead(s.id, s.head) }));
+  return syncRows(SLOT_IDS.map(id => ({ id, head: slotHead(id) })).filter(s => s.head).map(s => ({ id: s.id, head: upgradeHead(s.id, s.head) })));
 }
 
 function saveGame() {
@@ -10239,10 +10244,25 @@ function saveGame() {
   if (online || (G && G.live)) return false;   // a live game is the room's, not this device's
   if (!G || G.watch || G.tut) return false;
   if (G.over) { clearSave(); return false; }
-  return slotWrite('auto', slotHeader('auto', G), G);
+  const saved = slotWrite('auto', slotHeader('auto', G), G);
+  if (saved) syncAuto();   // signed in on Bored, the account gets it within a minute
+  return saved;
+}
+// Going away (the tab closing, the page going to the background) saves the game once more, in case something changed
+// that did not come through autosave(). When nothing has changed that is not new play and must not look like it: the
+// time on the autosave is what tells devices which game was played last, so a tab left open for hours must not take
+// it from the device the player is using now.
+function saveGameOnLeaving() {
+  if (G && !G.live && !G.watch && !G.tut && !G.over && !online) {
+    try {
+      const raw = localStorage.getItem(SLOT_PREFIX + 'auto'), cut = raw ? raw.indexOf('\n') : -1;
+      if (cut > 0 && raw.slice(cut + 1) === JSON.stringify(G)) return true;   // the autosave already is this game
+    } catch (error) { /* save it again */ }
+  }
+  return saveGame();
 }
 // A finished game has nothing to continue. The turn autosaves stay, so a loss can be undone.
-function clearSave() { slotRemove('auto'); }
+function clearSave() { slotRemove('auto'); syncDeleted('auto'); }
 // Everything a player does comes through here; leaving the page calls saveGame itself.
 function autosave() { slotDirty = true; saveGame(); }
 // The start of a new turn goes in the oldest of the three turn autosaves.
@@ -10272,6 +10292,7 @@ function saveToSlot(id, name) {
   }
   currentSlot = id;
   slotDirty = false;
+  syncSaved(id);   // a named save goes up to the account at once
   return { ok: true, name: clean };
 }
 // Ctrl+S and "Save to …": write over the slot this game came from or was last saved to.
@@ -10280,6 +10301,8 @@ function quickSave() {
   if (why) { toast(why); return; }
   const head = currentSlot ? slotHead(currentSlot) : null;
   if (!head) { currentSlot = null; slotAction('slots', 'save'); return; }
+  // The account has a newer copy of this slot than this device saw: that is asked about on the Save screen.
+  if (syncClash(currentSlot)) { slotAsk = { kind: 'clash', id: currentSlot }; slotDraft = head.name || ''; showSlots('save'); return; }
   const r = saveToSlot(currentSlot, head.name);
   toast(r.ok ? 'Saved “' + r.name + '”.' : r.text);
 }
@@ -10292,6 +10315,387 @@ function loadSlot(id) {
   slotDirty = currentSlot === null;
   saveGame();   // the autosave is always the game on screen
   return true;
+}
+
+/* ── saves in the account ──────────────────────────────────────────────────── */
+
+// Signed in on Bored, the named saves and the autosave also live in the player's Bored account, so another device
+// can Continue or Load them. The game has no network and no credentials: it asks the hub's saves bridge
+// (window.__boredSaves), which exists only inside Bored's player. Standalone, or signed out, none of this runs and
+// the saves behave exactly as they always did. The turn autosaves never leave the device.
+//
+// Each slot remembers the version of the account's copy it last saw, as a note { v, at }: the version, and the time
+// of the device copy that matches it. A device copy whose time differs from its note has not been uploaded yet.
+// Notes are kept per account. Nothing in either place is replaced without asking, except the rolling autosave,
+// which is replaced by whichever game was played last.
+const SYNC_KEY = 'bored.civlite.sync.v1';
+const SYNC_IDS = ['auto'].concat(MANUAL_IDS);
+const SYNC_BACKOFF = [5, 15, 45, 120, 300];    // seconds between tries of an upload that failed
+const SYNC = { acct: null, list: null, timers: {}, tries: {}, busy: {}, again: {}, blocked: {}, told: {}, asks: [], lastAuto: 0, opening: false };
+const SYNC_CLOUD = '<svg class="cloud" viewBox="0 0 16 11" role="img" aria-label="In your account"><title>In your account</title>' +
+  '<path d="M4.5 10h8a3 3 0 0 0 .4-5.97A4.5 4.5 0 0 0 4.2 3.6 3.2 3.2 0 0 0 4.5 10z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+
+function syncBridge() {
+  try { return embedded() && window.__boredSaves ? window.__boredSaves : null; } catch (error) { return null; }
+}
+function syncOn() { return !!SYNC.acct && !!syncBridge() && !inMatch(); }
+function syncAll() {
+  try {
+    const all = JSON.parse(localStorage.getItem(SYNC_KEY) || 'null');
+    return all && typeof all === 'object' && !Array.isArray(all) ? all : {};
+  } catch (error) { return {}; }
+}
+function syncNote(id) {
+  const mine = syncAll()[SYNC.acct], n = mine && typeof mine === 'object' ? mine[id] : null;
+  return n && Number.isFinite(n.v) && Number.isFinite(n.at) ? n : null;
+}
+function syncSetNote(id, note) {
+  if (!SYNC.acct) return;
+  try {
+    const all = syncAll(), mine = all[SYNC.acct] && typeof all[SYNC.acct] === 'object' ? all[SYNC.acct] : (all[SYNC.acct] = {});
+    if (note) mine[id] = note; else delete mine[id];
+    localStorage.setItem(SYNC_KEY, JSON.stringify(all));
+  } catch (error) { /* storage blocked: the next start sorts it out from the account */ }
+}
+// A device copy that another account on this browser already holds is that account's, not this one's.
+function syncOwnedElsewhere(id, head) {
+  const all = syncAll();
+  return Object.keys(all).some(acct => acct !== SYNC.acct && all[acct] && all[acct][id] && all[acct][id].at === head.at);
+}
+// One slot as it sits in storage: its header and the game's own text, which is not parsed here.
+function slotRaw(id) {
+  try {
+    const raw = localStorage.getItem(SLOT_PREFIX + id), cut = raw ? raw.indexOf('\n') : -1;
+    if (cut < 1) return null;
+    const head = JSON.parse(raw.slice(0, cut));
+    return head && head.v === 1 && Number.isFinite(head.at) ? { head, text: raw.slice(cut + 1) } : null;
+  } catch (error) { return null; }
+}
+
+// How one slot stands with the account, or null when nothing syncs (signed out, standalone, a turn autosave).
+//   synced     the device copy is the account's copy
+//   device     the device copy is not in the account (yet): it is newer, never uploaded, or the account lost it
+//   elsewhere  the account has a newer copy than this device saw, and that is the one to show
+// `newer` says the account's copy is not the one this slot last saw; `changed` that the device copy was never uploaded.
+function syncView(id, head) {
+  if (!syncOn() || !SYNC_IDS.includes(id)) return null;
+  const row = SYNC.list ? SYNC.list[id] || null : null, note = syncNote(id);
+  const newer = !!row && row.version !== (note ? note.v : 0);
+  if (!head) return row && !(note && note.del) ? { state: 'elsewhere', row, newer, changed: false } : null;
+  const changed = !note || note.at !== head.at;
+  let state = changed ? 'device' : row || !SYNC.list ? 'synced' : 'device';
+  if (newer && !(changed && row.stamp <= head.at)) state = 'elsewhere';
+  return { state, row, newer, changed };
+}
+// The slots to show: the device's saves, with the account's copy standing in where it is newer, and the account's
+// saves this device does not have yet.
+function syncRows(list) {
+  if (!syncOn()) return list;
+  const rows = list.map(s => {
+    const view = syncView(s.id, s.head);
+    return view ? { id: s.id, head: view.state === 'elsewhere' ? view.row.header : s.head, view } : s;
+  });
+  for (const id of SYNC_IDS) {
+    if (rows.some(r => r.id === id)) continue;
+    const view = syncView(id, null);
+    if (view) rows.push({ id, head: view.row.header, view });
+  }
+  return rows.sort((a, b) => SLOT_IDS.indexOf(a.id) - SLOT_IDS.indexOf(b.id));
+}
+// The account's copy of a slot when it is not the one this device last saw: saving or deleting there is asked about.
+function syncClash(id) {
+  if (!syncOn() || !SYNC.list) return null;
+  const row = SYNC.list[id], note = syncNote(id);
+  return row && row.version !== (note ? note.v : 0) ? row : null;
+}
+// The player said yes to replacing or deleting the account's copy: that version is now the one this slot has seen.
+function syncAcknowledge(id) {
+  const row = syncClash(id);
+  if (row) syncSetNote(id, { v: row.version, at: 0 });
+}
+function syncFresh(row) {
+  return { version: row.version, stamp: row.stamp, bytes: row.bytes || 0, header: row.header || {} };
+}
+
+function syncRedraw() {
+  try {
+    if (!UI) return;
+    if (!UI.start.hidden && !UI.paneTitle.hidden) refreshTitle();
+    if (UI.modalKind === 'slots' && !UI.modalLayer.hidden) {
+      const body = UI.modal.querySelector('.modal-body'), top = body ? body.scrollTop : 0;
+      if (slotMode === 'save') slotDraft = readSlotName();
+      showSlots(slotMode);
+      const again = UI.modal.querySelector('.modal-body');
+      if (again) again.scrollTop = top;
+    }
+    syncAskNext();
+  } catch (error) { /* a screen that is not there yet */ }
+}
+async function syncRefresh() {
+  const b = syncBridge(), acct = SYNC.acct;
+  if (!b || !acct) return false;
+  try {
+    const got = await b.call('list'), next = {};
+    if (SYNC.acct !== acct) return false;
+    for (const s of got.saves || []) if (SYNC_IDS.includes(s.slot)) next[s.slot] = syncFresh(s);
+    const changed = JSON.stringify(next) !== JSON.stringify(SYNC.list);
+    SYNC.list = next;
+    return changed;
+  } catch (error) { return false; }
+}
+async function syncStart() {
+  const b = syncBridge();
+  if (!b) return;
+  let acct = null;
+  try {
+    const status = await b.call('status');
+    acct = status && status.signedIn && typeof status.account === 'string' ? status.account : null;
+  } catch (error) { acct = null; }
+  if (acct !== SYNC.acct) {
+    SYNC.acct = acct; SYNC.list = null; SYNC.tries = {}; SYNC.blocked = {}; SYNC.asks = [];
+    for (const id of Object.keys(SYNC.timers)) { clearTimeout(SYNC.timers[id]); delete SYNC.timers[id]; }
+  }
+  syncRedraw();   // notes alone already say which saves are in the account
+  if (!acct || inMatch()) return;
+  await syncRefresh();
+  await syncMerge();
+  syncRedraw();
+  syncKick();
+}
+function syncBoot() {
+  const b = syncBridge();
+  if (!b) return;
+  b.on(event => { if (event && event.event === 'account') syncStart(); });
+  window.addEventListener('online', () => {   // back online: whatever was waiting to retry goes now
+    SYNC.tries = {};
+    for (const id of Object.keys(SYNC.timers)) { clearTimeout(SYNC.timers[id]); delete SYNC.timers[id]; }
+    syncKick();
+  });
+  window.addEventListener('pagehide', syncFlush);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { syncFlush(); return; }
+    if (SYNC.acct) syncRefresh().then(changed => { if (changed) syncRedraw(); syncKick(); });
+  });
+  syncStart();
+}
+
+// The first time an account meets this device, the device's own saves go up. A named slot with a different save on
+// each side keeps both: the device's goes into a free named slot as "<name> (this device)", or the player is asked
+// which to keep. The autosave is the one slot that is not split: whichever game was played last wins it.
+async function syncMerge() {
+  if (!syncOn() || !SYNC.list) return;
+  for (const id of MANUAL_IDS) {
+    const head = slotHead(id), row = SYNC.list[id];
+    if (!head || !row || syncNote(id) || syncOwnedElsewhere(id, head)) continue;
+    if (row.header && row.header.at === head.at && row.header.name === head.name) { syncSetNote(id, { v: row.version, at: head.at }); continue; }   // already up
+    const moved = syncKeepDevice(id);
+    if (moved) toast('Slot ' + id.slice(1) + ' on this device and in your account held different saves. This device’s is now “' + moved.name + '”.');
+    else if (!SYNC.asks.some(a => a.id === id)) SYNC.asks.push({ id });
+  }
+}
+// Moves the device's copy of a named slot into a free named slot as "<name> (this device)", so the slot itself can
+// take the account's save. Null when every named slot is taken.
+function syncKeepDevice(id) {
+  if (inMatch()) return null;
+  const free = MANUAL_IDS.find(x => !slotHead(x) && !(SYNC.list && SYNC.list[x])), had = free ? slotRead(id) : null;
+  if (!had) return null;
+  const tag = ' (this device)', name = cleanSaveName((had.head.name || 'Saved game').slice(0, 60 - tag.length) + tag);
+  if (!slotWrite(free, Object.assign({}, had.head, { name, kind: 'manual' }), had.state)) return null;
+  slotRemove(id);
+  if (currentSlot === id) currentSlot = free;
+  syncSetNote(id, null);
+  syncSchedule(free, 0);
+  return { from: id, to: free, name };
+}
+// When every slot is taken and the player has to choose.
+let syncAskTries = 0;
+function syncAskNext() {
+  if (!SYNC.asks.length || !UI) return;
+  if (!UI.modalLayer.hidden) { if (syncAskTries++ < 8) setTimeout(syncAskNext, 1500); return; }
+  syncAskTries = 0;
+  const ask = SYNC.asks[0], head = slotHead(ask.id), row = SYNC.list ? SYNC.list[ask.id] : null, now = Date.now();
+  if (!head || !row) { SYNC.asks.shift(); syncAskNext(); return; }
+  const one = (who, h, when, act, label) => '<div class="slot"><span class="slot-medal">' + slotMedal(h) + '</span><div class="slot-main"><span class="slot-name" title="' + esc(h.name || 'Saved game') + '">' +
+    esc(h.name || 'Saved game') + '</span><span class="slot-meta">' + esc(h.meta || '') + '</span><span class="slot-when">' + who + ' · ' + when + '</span></div><div class="slot-acts">' +
+    '<button class="btn primary" data-act="' + act + ':' + ask.id + '">' + label + '</button></div></div>';
+  openModal(modalHead('Two saves in slot ' + ask.id.slice(1), 'This device and your account') +
+    '<div class="modal-body"><p>You saved here on this device, and your Bored account has a different save in the same slot. Every other slot is taken, so keep one of them. The other is deleted.</p><div class="slots">' +
+    one('On this device', head, agoText(head.at, now), 'sy-keep:device', 'Keep this one') +
+    one('In your account', row.header || {}, agoText(row.stamp, now), 'sy-keep:account', 'Keep this one') + '</div></div>' +
+    '<div class="modal-foot"><button class="btn" data-act="sy-later">Decide later</button></div>');
+  UI.modalKind = 'syncask';
+}
+function syncAction(kind, a, b) {
+  const ask = SYNC.asks[0];
+  if (kind === 'sy-later') { SYNC.asks = []; closeModal(); return; }
+  if (kind !== 'sy-keep' || !ask || ask.id !== b) return;
+  SYNC.asks.shift();
+  if (a === 'device') {
+    syncAcknowledge(b);     // the account's save in this slot is replaced by this device's
+    syncSchedule(b, 0);
+    toast('Kept this device’s save in slot ' + b.slice(1) + '.');
+  } else {
+    slotRemove(b);
+    syncSetNote(b, null);   // the account's save is now the only one in this slot
+    if (currentSlot === b) currentSlot = null;
+    toast('Kept your account’s save in slot ' + b.slice(1) + '.');
+  }
+  closeModal();
+  syncRedraw();
+}
+
+function syncSchedule(id, delay) {
+  if (SYNC.timers[id] || !syncOn()) return;
+  SYNC.timers[id] = setTimeout(() => { delete SYNC.timers[id]; syncPush(id); }, delay);
+}
+// Every move writes the autosave on the device; the account gets it at most once a minute.
+function syncAuto() {
+  if (SYNC.acct) syncSchedule('auto', Math.max(0, SYNC.lastAuto + 60000 - Date.now()));
+}
+function syncSaved(id) {
+  if (SYNC.acct) syncSchedule(id, 0);
+}
+function syncKick() {
+  for (const id of SYNC_IDS) syncSchedule(id, id === 'auto' ? Math.max(0, SYNC.lastAuto + 60000 - Date.now()) : 0);
+}
+// Leaving (Back to Bored, closing the tab, the page going to the background): whatever is waiting goes now.
+function syncFlush() {
+  if (!syncOn()) return;
+  for (const id of SYNC_IDS) {
+    clearTimeout(SYNC.timers[id]);
+    delete SYNC.timers[id];
+    syncPush(id, true);
+  }
+}
+async function syncPush(id, leaving) {
+  const b = syncBridge(), acct = SYNC.acct;
+  if (!b || !acct || inMatch()) return;
+  if (SYNC.busy[id]) { SYNC.again[id] = true; return; }
+  const had = slotRaw(id), note = syncNote(id);
+  if (!had) { if (note && note.del) await syncPushDelete(id, acct); return; }
+  const head = had.head;
+  if (note && note.at === head.at) return;                     // the account already has this one
+  if (syncOwnedElsewhere(id, head)) return;                    // another account on this browser already holds this one: it is theirs
+  if (SYNC.blocked[id] === head.at) return;                    // refused for good: only a change gets it tried again
+  // A named slot the account changed since this device saw it waits for the player, who is asked when saving.
+  if (id !== 'auto' && SYNC.list && SYNC.list[id] && SYNC.list[id].version !== (note ? note.v : 0)) return;
+  SYNC.busy[id] = true;
+  if (id === 'auto') SYNC.lastAuto = Date.now();
+  let next = -1;
+  try {
+    const res = await b.call('put', { slot: id, header: head, state: had.text, expected: note ? note.v : 0, leaving: !!leaving });
+    if (SYNC.acct === acct) {
+      syncSetNote(id, { v: res.version, at: head.at });
+      if (SYNC.list) SYNC.list[id] = syncFresh({ version: res.version, stamp: res.stamp, bytes: res.bytes, header: head });
+      SYNC.tries[id] = 0;
+    }
+  } catch (error) {
+    if (SYNC.acct === acct) {
+      if (error && error.conflict) next = syncConflict(id, head, error.conflict);
+      else if (error && error.retry) {
+        const n = SYNC.tries[id] = (SYNC.tries[id] || 0) + 1;
+        next = SYNC_BACKOFF[Math.min(n, SYNC_BACKOFF.length) - 1] * 1000;
+        if (id === 'auto') next = Math.max(next, SYNC.lastAuto + 60000 - Date.now());
+      } else SYNC.blocked[id] = head.at;
+    }
+  }
+  SYNC.busy[id] = false;
+  if (SYNC.acct !== acct) return;
+  if (SYNC.again[id]) { SYNC.again[id] = false; if (next < 0) next = 0; }
+  if (next >= 0 && !leaving) syncSchedule(id, next);
+  syncRedraw();
+}
+// The account refused an upload because its copy is not the one this slot last saw. Nothing was changed there.
+// Returns how soon to try again, or -1 for not until something changes.
+function syncConflict(id, head, stored) {
+  if (stored.version === null) { syncRefresh().then(changed => { if (changed) syncRedraw(); }); return -1; }
+  if (stored.version === 0) {                                  // deleted on another device: this one is the only copy left
+    syncSetNote(id, null);
+    if (SYNC.list) delete SYNC.list[id];
+    return 0;
+  }
+  const shown = stored.header || {}, stamp = stored.stamp || Date.now();
+  if (shown.at === head.at && shown.name === head.name) {      // this very save went up before and the answer was lost
+    syncSetNote(id, { v: stored.version, at: head.at });
+    if (SYNC.list) SYNC.list[id] = syncFresh({ version: stored.version, stamp, header: shown });
+    return -1;
+  }
+  if (SYNC.list) SYNC.list[id] = syncFresh({ version: stored.version, stamp, header: shown });
+  if (id === 'auto') {
+    // Two devices, one autosave: the game played last takes it.
+    if ((Number(shown.at) || stamp) <= head.at) { syncSetNote(id, { v: stored.version, at: 0 }); return 0; }
+    return -1;
+  }
+  const key = id + ':' + stored.version;
+  if (!SYNC.told[key]) {
+    SYNC.told[key] = true;
+    toast('“' + (head.name || 'Saved game') + '” is saved on this device only: this slot was saved on another device ' + agoText(stamp) + '. Open Save game to replace it.');
+  }
+  return -1;
+}
+// A slot was deleted on this device: the account's copy goes too, unless another device has changed it since.
+function syncDeleted(id) {
+  if (!syncOn() || !SYNC_IDS.includes(id)) return;
+  const note = syncNote(id), row = SYNC.list && SYNC.list[id];
+  if (!note && !row) return;                                   // never in the account
+  syncSetNote(id, { v: note ? note.v : row.version, at: 0, del: 1 });
+  syncSchedule(id, 0);
+}
+async function syncPushDelete(id, acct) {
+  const b = syncBridge(), note = syncNote(id);
+  if (!b || !note || !note.del) return;
+  SYNC.busy[id] = true;
+  let next = -1;
+  try {
+    await b.call('delete', { slot: id, expected: note.v });
+    if (SYNC.acct === acct) { syncSetNote(id, null); if (SYNC.list) delete SYNC.list[id]; }
+  } catch (error) {
+    if (SYNC.acct === acct) {
+      if (error && error.conflict) { syncSetNote(id, null); syncRefresh().then(changed => { if (changed) syncRedraw(); }); }   // changed elsewhere since: it stays
+      else if (error && error.retry) { const n = SYNC.tries[id] = (SYNC.tries[id] || 0) + 1; next = SYNC_BACKOFF[Math.min(n, SYNC_BACKOFF.length) - 1] * 1000; }
+      else syncSetNote(id, null);
+    }
+  }
+  SYNC.busy[id] = false;
+  if (next >= 0 && SYNC.acct === acct) syncSchedule(id, next);
+  syncRedraw();
+}
+
+// Opens a save from the account: downloads it, keeps the device's own copy of that slot safe when it holds changes
+// the account never saw, puts the save in its slot here and loads it.
+async function syncDownload(id) {
+  const b = syncBridge(), acct = SYNC.acct;
+  if (!b || !acct || SYNC.opening) return false;
+  SYNC.opening = true;
+  try {
+    let got;
+    try { got = await b.call('get', { slot: id }); } catch (error) {
+      toast(error && /isn.t in your account/.test(error.message) ? 'That save is no longer in your account.' : error && error.retry ? 'Couldn’t reach your account. Try again in a moment.' : 'That save can’t be opened.');
+      syncRefresh().then(changed => { if (changed) syncRedraw(); });
+      return false;
+    }
+    if (SYNC.acct !== acct) return false;
+    let state = null;
+    try { state = JSON.parse(got.state); } catch (error) { state = null; }
+    if (!validState(state)) { toast('That save can’t be opened.'); return false; }
+    const have = slotRaw(id), note = syncNote(id);
+    if (id !== 'auto' && have && (!note || note.at !== have.head.at)) {   // this device's copy has changes the account never saw
+      const moved = syncKeepDevice(id);
+      if (!moved) { if (!SYNC.asks.some(a => a.id === id)) SYNC.asks.push({ id }); syncAskNext(); return false; }
+      toast('This device’s copy of slot ' + id.slice(1) + ' is now “' + moved.name + '”.');
+    }
+    const head = Object.assign({}, got.header, { v: 1 });
+    if (!Number.isFinite(head.at)) head.at = Date.now();
+    if (slotWrite(id, head, state)) {
+      syncSetNote(id, { v: got.version, at: head.at });
+      if (SYNC.list) SYNC.list[id] = syncFresh({ version: got.version, stamp: got.stamp, header: head });
+    }
+    resumeState(state);
+    currentSlot = slotKind(id) === 'manual' ? id : null;
+    slotDirty = currentSlot === null;
+    saveGame();   // the autosave is always the game on screen
+    return true;
+  } finally { SYNC.opening = false; }
 }
 
 // "just now", "5 minutes ago", "2 hours ago", "yesterday", "3 days ago", then a short date like "Nov 2"
@@ -10311,7 +10715,7 @@ function agoText(at, now) {
 }
 // The little hexagon on a list row: the first human's colors and their civ's mark, like the event cards.
 function slotMedal(head) {
-  if (!head) return '<svg class="pop-art" viewBox="-38 -40 76 80" aria-hidden="true"><polygon points="' + hexPoints(HEX_R - 1.2) +
+  if (!head || !CIVS[head.civ]) return '<svg class="pop-art" viewBox="-38 -40 76 80" aria-hidden="true"><polygon points="' + hexPoints(HEX_R - 1.2) +
     '" fill="none" stroke="#a8a090" stroke-width="1.6" stroke-dasharray="4 3"/></svg>';
   return civMedal(head.civ, head.color || '#cfc8bb', head.ink || '#241c12');
 }
@@ -10324,19 +10728,25 @@ function showSlots(mode) {
   if (online) { toast('Bored Together keeps this match on the server, so there are no saves to manage here.'); return; }
   if (mode === 'save') { const why = whyNotSave(); if (why) { toast(why); return; } }
   slotMode = mode === 'save' ? 'save' : 'load';
-  const saving = slotMode === 'save', now = Date.now(), heads = {};
-  for (const s of slotList()) heads[s.id] = s.head;
+  const saving = slotMode === 'save', now = Date.now(), heads = {}, views = {};
+  for (const s of slotList()) { heads[s.id] = s.head; views[s.id] = s.view || null; }
   const draft = slotDraft !== null ? slotDraft : saving ? defaultSaveName(G) : '';
   const row = id => {
     const head = heads[id], kind = slotKind(id);
     if (!head && !(saving && kind === 'manual')) return '';
-    const ask = slotAsk && slotAsk.id === id ? slotAsk.kind : null;
+    const ask = slotAsk && slotAsk.id === id ? slotAsk.kind : null, view = views[id];
+    const other = view && view.row ? 'This slot was saved on another device ' + agoText(view.row.stamp, now) + '. ' : '';
     const title = kind === 'manual' ? (head ? head.name || 'Saved game' : 'Empty slot') : head.name || 'Autosave · Turn ' + head.turn;
     const detail = head ? esc(head.meta) : 'Slot ' + id.slice(1);
+    // Signed in on Bored: a cloud mark for a save in the account, "On this device only" for one that is not (yet),
+    // and "Saved on another device" for the account's save when it is the newer one.
+    const when = !head ? '' : !view ? agoText(head.at, now)
+      : view.state === 'elsewhere' ? SYNC_CLOUD + ' Saved on another device · ' + agoText(view.row.stamp, now)
+      : view.state === 'synced' ? agoText(head.at, now) + ' ' + SYNC_CLOUD : agoText(head.at, now) + ' · On this device only';
     let acts = '';
     if (ask) {
-      const question = ask === 'overwrite' ? 'Replace this save?' : ask === 'delete' ? 'Delete this save?' : 'This replaces the game you’re playing, which isn’t in a slot.';
-      const yes = ask === 'overwrite' ? ['slot-save', 'Replace'] : ask === 'delete' ? ['slot-del', 'Delete'] : ['slot-load', 'Load anyway'];
+      const question = ask === 'overwrite' ? 'Replace this save?' : ask === 'clash' ? other + 'Replace it?' : ask === 'delete' ? (view && view.newer ? other + 'Delete it?' : 'Delete this save?') : 'This replaces the game you’re playing, which isn’t in a slot.';
+      const yes = ask === 'overwrite' || ask === 'clash' ? ['slot-save', 'Replace'] : ask === 'delete' ? ['slot-del', 'Delete'] : ['slot-load', 'Load anyway'];
       acts = '<span class="slot-q">' + question + '</span><button class="btn primary" data-act="' + yes[0] + ':' + id + '">' + yes[1] +
         '</button><button class="btn" data-act="slot-no">Cancel</button>';
     } else if (saving) {
@@ -10347,7 +10757,7 @@ function showSlots(mode) {
     }
     return '<div class="slot' + (head ? '' : ' empty') + (ask ? ' ask' : '') + '" data-slot="' + id + '"><span class="slot-medal">' + slotMedal(head) +
       '</span><div class="slot-main"><span class="slot-name" title="' + esc(title) + '">' + esc(title) + '</span><span class="slot-meta" title="' + (head ? esc(head.meta) : '') + '">' + detail +
-      '</span>' + (head ? '<span class="slot-when">' + agoText(head.at, now) + '</span>' : '') + '</div><div class="slot-acts">' + acts + '</div></div>';
+      '</span>' + (head ? '<span class="slot-when">' + when + '</span>' : '') + '</div><div class="slot-acts">' + acts + '</div></div>';
   };
   const named = MANUAL_IDS.map(row).join('');
   const byNewest = TURN_IDS.slice().sort((a, b) => (heads[b] ? heads[b].at : 0) - (heads[a] ? heads[a].at : 0));
@@ -10359,9 +10769,13 @@ function showSlots(mode) {
     '<h3>Your saves</h3>' +
     (named ? '<div class="slots">' + named + '</div>' : '<p class="hint">Nothing saved yet. Use Save game in the Menu, or press Ctrl+S in a game, to keep one.</p>') +
     (saving ? '' : '<h3>Autosaves</h3>' + (autos ? '<div class="slots">' + autos + '</div>' : '<p class="hint">Autosaves appear once you start a game.</p>')) +
-    '<p class="hint">' + (saving
-      ? 'Saves stay on this device, in this browser. The game also saves itself after every move, and keeps the start of your last three turns under Load game.'
-      : 'Autosave is the game you were last playing. The turn autosaves are the starts of your last three turns, for going back.') + '</p></div>' +
+    '<p class="hint">' + (syncOn()
+      ? (saving
+        ? 'Saves are kept on this device and in your Bored account, so you can Load them on any device you sign in on. The game also saves itself after every move; the autosave goes to your account too, and the starts of your last three turns stay on this device.'
+        : 'Autosave is the game you were last playing, on any of your devices. The turn autosaves are the starts of your last three turns on this device, for going back.')
+      : saving
+        ? 'Saves stay on this device, in this browser. The game also saves itself after every move, and keeps the start of your last three turns under Load game.'
+        : 'Autosave is the game you were last playing. The turn autosaves are the starts of your last three turns, for going back.') + '</p></div>' +
     '<div class="modal-foot"><button class="btn primary" data-act="close">Done</button></div>');
   UI.modalKind = 'slots';
   const field = UI.modal.querySelector('#slot-name');
@@ -10369,19 +10783,32 @@ function showSlots(mode) {
 }
 function slotAction(kind, a, b) {
   if (online) return;
-  if (kind === 'slots') { slotAsk = null; slotDraft = null; showSlots(a === 'save' ? 'save' : 'load'); return; }
+  if (kind === 'slots') {
+    slotAsk = null; slotDraft = null; showSlots(a === 'save' ? 'save' : 'load');
+    if (syncOn()) syncRefresh().then(changed => { if (changed) syncRedraw(); });   // the account's saves, as of now
+    return;
+  }
   if (kind === 'slot-no') { slotAsk = null; showSlots(slotMode); return; }
   if (kind === 'slot-ask') { slotDraft = slotMode === 'save' ? readSlotName() : null; slotAsk = { kind: a, id: b }; showSlots(slotMode); return; }
   const id = a;
   if (kind === 'slot-save') {
     if (!G || !MANUAL_IDS.includes(id)) return;
-    const name = readSlotName();
-    if (slotHead(id) && !(slotAsk && slotAsk.kind === 'overwrite' && slotAsk.id === id)) {
+    const name = readSlotName(), asked = slotAsk && slotAsk.id === id ? slotAsk.kind : null;
+    // The account has a newer copy of this slot than this device saw: replacing it is asked about in its own words.
+    const clash = syncClash(id);
+    if (clash && asked !== 'clash') {
+      slotDraft = name;
+      slotAsk = { kind: 'clash', id };
+      showSlots('save');
+      return;
+    }
+    if (!clash && slotHead(id) && asked !== 'overwrite') {
       slotDraft = name;
       slotAsk = { kind: 'overwrite', id };
       showSlots('save');
       return;
     }
+    syncAcknowledge(id);
     const r = saveToSlot(id, name);
     slotAsk = null;
     if (r.ok) { slotDraft = null; closeModal(); toast('Saved “' + r.name + '”.'); }
@@ -10393,13 +10820,20 @@ function slotAction(kind, a, b) {
     const replaces = !!G && !G.tut && !G.over && slotDirty;
     if (replaces && !(slotAsk && slotAsk.kind === 'load' && slotAsk.id === id)) { slotAsk = { kind: 'load', id }; showSlots('load'); return; }
     slotAsk = null;
+    // The account's save, when it is the newer one for this slot, comes down first.
+    const view = syncOn() ? syncView(id, slotHead(id)) : null;
+    if (view && view.state === 'elsewhere') {
+      toast('Opening from your account…');
+      syncDownload(id).then(ok => { if (ok) toast('Loaded.'); else if (UI.modalKind === 'slots') showSlots('load'); });
+      return;
+    }
     if (!loadSlot(id)) { toast('That save can’t be opened.'); showSlots('load'); return; }
     toast('Loaded.');
     return;
   }
   if (kind === 'slot-del') {
     slotAsk = null;
-    if (slotKind(id) === 'manual') slotRemove(id);
+    if (slotKind(id) === 'manual') { syncAcknowledge(id); slotRemove(id); syncDeleted(id); }
     if (currentSlot === id) currentSlot = null;
     showSlots('load');
   }
@@ -10421,9 +10855,13 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '5.1.1';
+const VERSION = '5.3';
 // Patch notes for the What’s new screen, newest first: a version, a date and one plain line per change.
 const CHANGELOG = [
+  { v: '5.3', date: 'Nov 9', notes: [
+    'Your saves follow your Bored account: save on one device, Continue or Load on another.',
+    'Saves from another device are marked, and nothing is replaced without asking.'
+  ] },
   { v: '5.1.1', date: 'Nov 9', notes: [
     'Live games: the server double-checks game endings, round numbers and saved snapshots.'
   ] },
@@ -10569,12 +11007,17 @@ function buildStartScreen() {
   }
   UI.btnBegin.onclick = () => { if (LIVE.net) liveStartPressed(); else beginGame(); };
   UI.btnReady.onclick = liveReadyPressed;
-  UI.btnContinue.onclick = () => { if (!loadSlot('auto')) { toast('That save can’t be opened.'); refreshTitle(); } };
+  UI.btnContinue.onclick = () => {
+    const view = syncOn() ? syncView('auto', slotHead('auto')) : null;
+    if (view && view.state === 'elsewhere') { syncDownload('auto').then(ok => { if (!ok) refreshTitle(); }); return; }   // the account's autosave is newer
+    if (!loadSlot('auto')) { toast('That save can’t be opened.'); refreshTitle(); }
+  };
   document.getElementById('title-ver').textContent = 'v' + VERSION;
   firstVisitNotes();
   refreshStart();
   drawTitleArt();
   showPane('title');
+  syncBoot();   // on Bored, signed in: the saves follow the account
 }
 // Two screens share the start overlay: the title menu, and game setup behind New game.
 function showPane(name) {
@@ -10593,7 +11036,11 @@ function refreshTitle() {
   const slots = online ? [] : slotList(), auto = slots.find(s => s.id === 'auto');
   const named = slots.filter(s => slotKind(s.id) === 'manual').length;
   UI.btnContinue.hidden = !auto;
-  document.getElementById('continue-sub').textContent = auto ? (auto.head.name || 'Autosave · Turn ' + auto.head.turn) + ' · ' + agoText(auto.head.at) : '';
+  // Signed in on Bored the line also says which autosave this is: the account's when it is the newer one.
+  const view = auto && auto.view, cname = auto ? auto.head.name || 'Autosave · Turn ' + auto.head.turn : '';
+  document.getElementById('continue-sub').textContent = !auto ? '' : !view ? cname + ' · ' + agoText(auto.head.at)
+    : view.state === 'elsewhere' ? cname + ' · Saved on another device · ' + agoText(view.row.stamp)
+    : cname + ' · ' + agoText(auto.head.at) + ' · ' + (view.state === 'synced' ? 'In your account' : 'On this device only');
   document.getElementById('continue-detail').textContent = auto ? auto.head.meta || '' : '';
   document.getElementById('continue-medal').innerHTML = auto ? slotMedal(auto.head) : '';
   UI.btnLoad.hidden = !slots.length;
@@ -11512,8 +11959,8 @@ function boot(data) {
     else if (UI.sheetOpen) setSheet(false);
     else { selection = null; render(); }
   });
-  window.addEventListener('pagehide', saveGame);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveGame(); });
+  window.addEventListener('pagehide', saveGameOnLeaving);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveGameOnLeaving(); });
 
   // When this page is republished while open, carry the game across.
   try {
