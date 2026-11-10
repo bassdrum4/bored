@@ -16,9 +16,10 @@ __UPSTREAM_LICENSE__
 * { box-sizing: border-box }
 html, body { margin: 0; height: 100%; overflow: hidden }
 body { background: #17191d; color: #f5f2ea; font: 12px/1.5 system-ui, sans-serif }
-main { height: 100%; height: 100dvh; display: flex; flex-direction: column }
-#stage { flex: 1; min-height: 0; position: relative; overflow: hidden; display: grid; place-items: center }
-#game { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 100%; height: 100% }
+main { position: relative; width: 100%; height: 100%; height: 100dvh; overflow: hidden }
+#stage { position: relative; width: 100%; height: 100%; overflow: hidden; display: grid; place-items: center }
+#game { position: absolute; inset: 0; width: 100%; height: 100% }
+@media (max-aspect-ratio: 16/9) { #game { inset: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 100%; height: auto; aspect-ratio: 16/9 } }
 #game canvas { display: block; width: 100%; height: 100%; outline: none }
 #cover { position: relative; width: min(360px, 100%); padding: 24px; text-align: center; background: #17191d }
 h1 { margin: 0 0 14px; font-size: 22px }
@@ -30,8 +31,10 @@ button:focus-visible { outline: 2px solid #f5f2ea; outline-offset: 2px }
 button:disabled { cursor: wait }
 [hidden] { display: none !important }
 progress { display: block; width: 100%; height: 8px; margin: 16px 0 }
-footer { flex: none; padding: 6px 10px; text-align: center; font-size: 11px; background: #17191d }
-#pads { display: flex; justify-content: space-between; gap: 12px; padding-top: 6px }
+footer { position: absolute; z-index: 10; left: 0; right: 0; bottom: 0; padding: 6px 10px; text-align: center; font-size: 11px; pointer-events: none; background: transparent }
+#keys { display: none }
+@media (pointer: fine) { footer { display: none } }
+#pads { display: flex; justify-content: space-between; gap: 12px; padding-top: 6px; pointer-events: auto }
 .pad { display: flex; gap: 6px }
 .pad button { min-width: 56px; touch-action: none; user-select: none; -webkit-user-select: none }
 .pad button.on { background: #f5f2ea; color: #17191d }
@@ -50,7 +53,6 @@ footer { flex: none; padding: 6px 10px; text-align: center; font-size: 11px; bac
       <button type="button" id="start">Load game</button>
       <progress id="progress" max="1" value="0" hidden aria-label="Game loading"></progress>
       <p id="status" role="status" aria-live="polite">Unity WebGL · about 11 MB · needs WebGL</p>
-      <p class="muted">Original game: New Eich Games.<br>No Bored leaderboard for this version.</p>
     </div>
   </section>
   <footer>
@@ -74,16 +76,6 @@ const start = document.querySelector('#start');
 let gameInstance = null, loading = false, ready = false, failed = false;
 const urls = [];
 const pressed = new Map();
-// Unity's camera crops the sides in a portrait canvas. Keep the complete
-// landscape playfield visible, including both players and the native menus.
-new ResizeObserver(entries => {
-  const { width, height } = entries[0].contentRect;
-  const game = document.querySelector('#game');
-  const fittedWidth = Math.min(width, height * 16 / 9);
-  game.style.width = fittedWidth + 'px';
-  game.style.height = fittedWidth * 9 / 16 + 'px';
-}).observe(document.querySelector('#stage'));
-
 // This export intentionally has no score: the compiled game exposes no score API.
 window.__boredSnapshot = () => ({ slug: 'rooftop-snipers', loaded: ready, finished: false });
 

@@ -152,6 +152,9 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   // Ann opens Bored Together, starts a live game, and invites Ben from the member list.
   for (const page of [ann, ben]) { await page.evaluate(() => document.querySelector('#together-nav').click()); await waitPage(page, () => !document.querySelector('#together').hidden); }
   await hubButton(ann, 'Start a Game');
+  // The picker renders only after the people and invitation requests complete.
+  // Selecting immediately races that asynchronous fetch on faster CI machines.
+  await waitPage(ann, () => document.querySelector('#bt-game-select'));
   await ann.select('#bt-game-select', 'ashcrown');
   await hubButton(ann, 'Play live instead');
   await waitPage(ann, () => document.querySelector('#bt-live-people .bt-person'));
