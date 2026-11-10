@@ -151,14 +151,16 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
 
   // Ann opens Bored Together, starts a live game, and invites Ben from the member list.
   for (const page of [ann, ben]) { await page.evaluate(() => document.querySelector('#together-nav').click()); await waitPage(page, () => !document.querySelector('#together').hidden); }
-  await hubButton(ann, 'Start a live game');
+  await hubButton(ann, 'Start a Game');
+  await ann.select('#bt-game-select', 'ashcrown');
+  await hubButton(ann, 'Play live instead');
   await waitPage(ann, () => document.querySelector('#bt-live-people .bt-person'));
-  assert.equal(await ann.$eval('#bt-live-create', b => b.disabled), true, 'nobody is picked yet');
-  assert.match(await ann.$eval('#together-content', e => e.textContent), /Pick 1 to 3 members/);
+  assert.equal(await ann.$eval('#bt-live-create', b => b.disabled), false, 'a room can be hosted with only a join code');
+  assert.match(await ann.$eval('#together-content', e => e.textContent), /Invite members \(optional\)/);
   const benBox = '#bt-live-pick-' + B;
   await ann.evaluate(sel => document.querySelector(sel).click(), benBox);
   await waitPage(ann, () => !document.querySelector('#bt-live-create').disabled);
-  await hubButton(ann, 'Open lobby');
+  await hubButton(ann, 'Create live room');
   const annGame = await game(ann);
   await inGame(annGame, () => !document.getElementById('pane-setup').hidden && document.querySelectorAll('#seats .seat:not([hidden])').length === 3);
   const room = (await env.admin("select id, status from bored_live.games order by created_at desc limit 1"))[0];
@@ -498,8 +500,8 @@ test('Civ Lite room codes: host for two humans, join with a typed code, a third 
   assert.deepEqual(unexpected, []);
 });
 
-// Bored Together's own page has the same box next to "Start a live game".
-test('Bored Together: Join with code next to Start a live game says what went wrong under the field, and a good code opens the lobby', async t => {
+// Bored Together's own page keeps the join-code box next to the unified Start a Game action.
+test('Bored Together: Join with code next to Start a Game says what went wrong under the field, and a good code opens the lobby', async t => {
   const h = await harness(t);
   if (!h) return;
   const { env, errors, unexpected, player, waitPage, game, inGame } = h;
@@ -512,8 +514,8 @@ test('Bored Together: Join with code next to Start a live game says what went wr
     await page.type('#bt-join-code', text);
     await page.evaluate(() => document.querySelector('#bt-join-go').click());
   };
-  // The box sits in the same row as Start a live game.
-  assert.equal(await ben.evaluate(() => document.querySelector('#bt-join-code').closest('.bt-start-actions') === [...document.querySelectorAll('#together button')].find(b => b.textContent === 'Start a live game').closest('.bt-start-actions')), true);
+  // The code box remains alongside Start a Game, rather than a duplicate live-game CTA.
+  assert.equal(await ben.evaluate(() => document.querySelector('#bt-join-code').closest('.bt-start-actions') === [...document.querySelectorAll('#together button')].find(b => b.textContent === 'Start a Game').closest('.bt-start-actions')), true);
   // The page does not scroll sideways on a small phone, and the field and its button stay on the screen (CI's
   // together-browser checks the page's width at 320 too, but it needs PGlite).
   for (const width of [375, 320]) {
