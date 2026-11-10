@@ -99,26 +99,26 @@ const $=id=>document.getElementById(id);
 const canvas=$('game'),ctx=canvas.getContext('2d'),stage=$('stage');
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const courses=[
-  {name:'First Gear',len:1200,gold:8,pts:[[0,420],[350,420],[540,402],[740,420],[1200,420]]},
-  {name:'The Bump',len:1350,gold:9,pts:[[0,420],[280,420],[410,374],[535,420],[740,420],[855,387],[990,420],[1350,420]]},
-  {name:'Ramp Day',len:1430,gold:10,pts:[[0,420],[270,420],[455,335],[610,420],[800,420],[950,345],[1130,420],[1430,420]]},
-  {name:'A Little Air',len:1490,gold:11,pts:[[0,420],[260,420],[385,351],[455,351],[550,423],[690,423],[860,386],[1000,420],[1490,420]],gaps:[[465,530]]},
-  {name:'Sawtooth',len:1550,gold:12,pts:[[0,420],[190,420],[330,371],[445,420],[555,376],[690,420],[810,358],[950,420],[1100,391],[1250,420],[1550,420]]},
-  {name:'Bridge Out',len:1580,gold:12,pts:[[0,420],[260,420],[425,348],[535,370],[650,415],[850,415],[1030,365],[1190,420],[1580,420]],gaps:[[555,637]]},
-  {name:'Rolling Hills',len:1690,gold:13,pts:[[0,420],[220,420],[365,335],[540,420],[690,358],[860,420],[1015,318],[1170,420],[1370,377],[1510,420],[1690,420]]},
-  {name:'Loose Gravel',len:1700,gold:14,pts:[[0,420],[230,420],[420,389],[590,420],[760,340],[900,420],[1060,372],[1170,420],[1390,358],[1520,420],[1700,420]],crates:[690,1330]},
-  {name:'Leap of Faith',len:1770,gold:14,pts:[[0,420],[260,420],[405,331],[500,343],[710,420],[915,351],[1040,420],[1220,373],[1390,420],[1770,420]],gaps:[[520,610],[1250,1320]]},
-  {name:'Switchbacks',len:1830,gold:15,pts:[[0,420],[250,420],[430,337],[600,420],[725,360],[855,423],[990,332],[1120,420],[1310,350],[1460,420],[1830,420]]},
-  {name:'Crate Country',len:1840,gold:16,pts:[[0,420],[270,420],[425,372],[580,420],[785,355],[930,420],[1125,368],[1270,420],[1475,345],[1600,420],[1840,420]],crates:[565,1060,1570]},
-  {name:'The Valley',len:1950,gold:17,pts:[[0,420],[240,420],[410,474],[560,420],[700,339],[880,465],[1030,420],[1160,345],[1320,462],[1490,420],[1670,356],[1800,420],[1950,420]]},
-  {name:'Double Trouble',len:1950,gold:18,pts:[[0,420],[230,420],[370,343],[480,372],[660,420],[820,337],[960,415],[1110,420],[1275,355],[1420,420],[1690,380],[1950,420]],gaps:[[500,585],[980,1050]]},
-  {name:'The Gauntlet',len:2110,gold:20,pts:[[0,420],[250,420],[405,356],[540,420],[690,345],[850,420],[1010,328],[1170,425],[1330,357],[1490,420],[1680,330],[1830,420],[2110,420]],gaps:[[870,937],[1520,1595]],crates:[585,1260]},
-  {name:'Last Ride',len:2250,gold:22,pts:[[0,420],[270,420],[415,350],[555,420],[740,330],[870,420],[1030,363],[1170,420],[1370,328],[1510,420],[1700,344],[1840,420],[2010,370],[2250,420]],gaps:[[575,640],[1200,1275],[1870,1930]],crates:[950,1600]}
+  {name:'First Gear',len:1200,gold:4.1,pts:[[0,420],[350,420],[540,402],[740,420],[1200,420]]},
+  {name:'The Bump',len:1350,gold:4.6,pts:[[0,420],[280,420],[410,374],[535,420],[740,420],[855,387],[990,420],[1350,420]]},
+  {name:'Ramp Day',len:1430,gold:4.9,pts:[[0,420],[270,420],[455,335],[610,420],[800,420],[950,345],[1130,420],[1430,420]]},
+  {name:'A Little Air',len:1490,gold:5.1,pts:[[0,420],[260,420],[385,351],[455,351],[550,423],[690,423],[860,386],[1000,420],[1490,420]],gaps:[[465,530]]},
+  {name:'Sawtooth',len:1550,gold:5.3,pts:[[0,420],[190,420],[330,371],[445,420],[555,376],[690,420],[810,358],[950,420],[1100,391],[1250,420],[1550,420]]},
+  {name:'Bridge Out',len:1580,gold:5.4,pts:[[0,420],[260,420],[425,348],[535,370],[650,415],[850,415],[1030,365],[1190,420],[1580,420]],gaps:[[555,637]]},
+  {name:'Rolling Hills',len:1690,gold:5.8,pts:[[0,420],[220,420],[365,335],[540,420],[690,358],[860,420],[1015,318],[1170,420],[1370,377],[1510,420],[1690,420]]},
+  {name:'Loose Gravel',len:1700,gold:6.3,pts:[[0,420],[230,420],[420,389],[590,420],[760,340],[900,420],[1060,372],[1170,420],[1390,358],[1520,420],[1700,420]],crates:[690,1330]},
+  {name:'Leap of Faith',len:1770,gold:6.2,pts:[[0,420],[260,420],[405,331],[500,343],[710,420],[915,351],[1040,420],[1220,373],[1390,420],[1770,420]],gaps:[[520,610],[1250,1320]]},
+  {name:'Switchbacks',len:1830,gold:6.3,pts:[[0,420],[250,420],[430,337],[600,420],[725,360],[855,423],[990,332],[1120,420],[1310,350],[1460,420],[1830,420]]},
+  {name:'Crate Country',len:1840,gold:6.7,pts:[[0,420],[270,420],[425,372],[580,420],[785,355],[930,420],[1125,368],[1270,420],[1475,345],[1600,420],[1840,420]],crates:[565,1060,1570]},
+  {name:'The Valley',len:1950,gold:6.8,pts:[[0,420],[240,420],[410,474],[560,420],[700,339],[880,465],[1030,420],[1160,345],[1320,462],[1490,420],[1670,356],[1800,420],[1950,420]]},
+  {name:'Double Trouble',len:1950,gold:7.2,pts:[[0,420],[230,420],[370,343],[480,372],[660,420],[820,337],[960,415],[1110,420],[1275,355],[1420,420],[1690,380],[1950,420]],gaps:[[500,585],[980,1050]]},
+  {name:'The Gauntlet',len:2110,gold:7.8,pts:[[0,420],[250,420],[405,356],[540,420],[690,345],[850,420],[1010,328],[1170,425],[1330,357],[1490,420],[1680,330],[1830,420],[2110,420]],gaps:[[870,937],[1520,1595]],crates:[585,1260]},
+  {name:'Last Ride',len:2250,gold:8.6,pts:[[0,420],[270,420],[415,350],[555,420],[740,330],[870,420],[1030,363],[1170,420],[1370,328],[1510,420],[1700,344],[1840,420],[2010,370],[2250,420]],gaps:[[575,640],[1200,1275],[1870,1930]],crates:[950,1600]}
 ];
 const storageKey='bored.dirt-trials.progress.v1';
 let bests=loadBests(),level=0,mode='menu',started=false,timeMs=0,cam=0,viewW=W;
 let bike={x:85,y:388,vx:0,vy:0,a:0,av:0,onGround:false,crashes:0},dust=[],keys=new Set(),jumpQueued=false,acc=0,last=0,resizeObserver=null;
-let touched=false,frameCounter=0,finishTime=0;
+let touched=false,frameCounter=0,finishTime=0,brokenCrates=new Set(),messageUntil=0;
 function loadBests(){
   try{
     const saved=JSON.parse(localStorage.getItem(storageKey)||'[]');
@@ -152,7 +152,7 @@ function reset(i=level){
   level=i;mode='ride';started=false;timeMs=0;finishTime=0;
   const y=groundAt(85)||420;
   bike={x:85,y:y-32,vx:0,vy:0,a:0,av:0,onGround:false,crashes:0};
-  dust=[];jumpQueued=false;cam=0;acc=0;
+  dust=[];jumpQueued=false;cam=0;acc=0;brokenCrates=new Set();messageUntil=0;
   keys.clear();document.querySelectorAll('[data-hold]').forEach(el=>el.classList.remove('pressed'));
   $('screen').hidden=true;
   $('hint').hidden=false;
@@ -163,6 +163,7 @@ function updateHud(){
   $('clock').textContent=(timeMs/1000).toFixed(2);
   $('best').textContent=format(bests[level]);
   $('career').textContent=medals()+' / 45';
+  if(mode==='ride')$('hint').textContent=timeMs<messageUntil?'CRATE HIT · +1.0s':'Right to ride · Up / Down to balance · Space to hop';
 }
 function clearActions(){
   $('stage-list').replaceChildren();$('screen-actions').replaceChildren();
@@ -178,7 +179,7 @@ function showScreen(title,copy){
 }
 function selectCourse(){
   mode='menu';keys.clear();
-  showScreen('Choose a course','Ride, balance and hop. Finish to unlock the next course; improve your times for better medals.');
+  showScreen('Choose a course','Ride, balance and hop. Finish to unlock the next course; improve your times for better medals. Hit a crate and you lose a second, but you can keep going.');
   courses.forEach((course,i)=>{
     const btn=document.createElement('button');btn.type='button';btn.disabled=!unlocked(i);
     const number=document.createElement('span');number.textContent=String(i+1).padStart(2,'0')+' · '+course.name;
@@ -286,8 +287,13 @@ function step(dt){
   if(grounded&&ground!==null&&headY>ground-5){crash('Helmets are not wheels.');return;}
   for(const x of courses[level].crates||[]){
     const gy=groundAt(x);if(gy===null)continue;
-    if(Math.abs(bike.x-x)<20&&bike.y>gy-54&&Math.abs(bike.vx)>50){
-      crash('The crate won this round. Hop over it next time.');return;
+    if(!brokenCrates.has(x)&&Math.abs(bike.x-x)<20&&bike.y>gy-54&&Math.abs(bike.vx)>50){
+      // Boxes are a costly mistake, not an instant game-over. A clean hop
+      // keeps momentum and the clock; a collision makes the next hill harder.
+      brokenCrates.add(x);
+      timeMs+=1000;messageUntil=timeMs+1400;
+      bike.vx*=.55;bike.vy=Math.min(bike.vy,-90);
+      for(let j=0;j<14;j++)dust.push({x,y:gy-13,vx:(Math.random()-.5)*220,vy:-20-Math.random()*130,life:.5,r:2+Math.random()*5});
     }
   }
   if(bike.x>=courses[level].len-58){finish();return;}
@@ -346,6 +352,7 @@ function drawMarkers(){
   ctx.fillStyle='#776c60';ctx.font='12px ui-monospace,monospace';
   ctx.fillText('FINISH',finishX-10,y-105);
   for(const x of course.crates||[]){
+    if(brokenCrates.has(x))continue;
     const gy=groundAt(x);if(gy===null)continue;
     ctx.fillStyle='#b98a5a';ctx.strokeStyle='#5c4836';ctx.lineWidth=3;
     ctx.fillRect(x-15,gy-28,30,28);ctx.strokeRect(x-15,gy-28,30,28);
