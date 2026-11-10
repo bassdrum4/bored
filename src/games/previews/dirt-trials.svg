@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-label="Dirt Trials: a red bike jumping over a sandy ramp">
+<rect width="640" height="360" fill="#f2ebdc"/>
+<path d="M0 215Q100 170 220 218T460 208T640 199V360H0Z" fill="#e1d4be"/>
+<path d="M0 288H92L186 236Q213 220 239 250L297 295H385L449 261L502 291H640V360H0Z" fill="#cdbda3"/>
+<path d="M0 288H92L186 236Q213 220 239 250L297 295H385L449 261L502 291H640" stroke="#625b50" stroke-width="4" fill="none" stroke-linejoin="round"/>
+<path d="M370 295H433" stroke="#f2ebdc" stroke-width="7" stroke-dasharray="9 7"/>
+<g transform="translate(293 184) rotate(-12)">
+<g fill="#eee4d1" stroke="#323633" stroke-width="7">
+<circle cx="-48" cy="37" r="25"/><circle cx="48" cy="37" r="25"/></g>
+<g stroke="#a9a398" stroke-width="2"><path d="M-48 12V62M-73 37H-23M48 12V62M23 37H73M-66 19L-30 55M-66 55L-30 19M30 19L66 55M30 55L66 19"/></g>
+<g fill="none" stroke="#b04a38" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"><path d="M-48 37L-9 0L13 37L-48 37M-9 0L48 37M13 37L48 -10L64 -10"/></g>
+<g stroke="#494e49" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M-8 -12L-17 -42L7 -60M-15 -36L-43 -6M-12 -36L12 11"/></g>
+<circle cx="-7" cy="-74" r="18" fill="#b04a38" stroke="#343735" stroke-width="4"/>
+<path d="M-2 -78h13" stroke="#f5e7cf" stroke-width="5"/>
+</g>
+<g stroke="#b04a38" stroke-width="6" fill="none"><path d="M565 291V167"/></g>
+<path d="M565 167h55v48h-55z" fill="#f2ebdc" stroke="#363833" stroke-width="2"/>
+<path d="M566 169h26v23h-26zM593 192h26v21h-26z" fill="#363833"/>
+<rect x="20" y="19" width="329" height="65" fill="#f8f3e8" stroke="#81796b"/>
+<text x="36" y="59" font-family="Georgia,serif" font-size="40" fill="#32312c">Dirt <tspan fill="#b04a38">Trials.</tspan></text>
+<text x="20" y="341" font-family="monospace" font-size="15" letter-spacing="1" fill="#5b574d">15 COURSES   ·   HOLD ON TO THE HANDLEBARS</text>
+</svg>

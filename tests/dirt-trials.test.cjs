@@ -1,0 +1,79 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const fs = require('node:fs');
+const puppeteer = require('puppeteer-core');
+const { serve } = require('./serve.cjs');
+
+const chrome = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(fs.existsSync);
+
+test('Dirt Trials opens, drives, completes a real course, and remembers medals', async t => {
+  assert.ok(chrome, 'Install Chrome or set CHROME_PATH');
+  const site = await serve(path.resolve(__dirname, '../src'));
+  const browser = await puppeteer.launch({ executablePath: chrome, headless: true, args: ['--no-sandbox'] });
+  t.after(async () => { await browser.close(); await site.close(); });
+  const page = await browser.newPage();
+  page.setDefaultTimeout(15000);
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(site.origin + '/games/content/dirt-trials.html');
+  await page.waitForSelector('#stage-list button');
+  assert.equal(await page.$$eval('#stage-list button', buttons => buttons.length), 15);
+  assert.equal(await page.$$eval('#stage-list button:disabled', buttons => buttons.length), 14);
+  assert.deepEqual(await page.evaluate(() => window.__boredSnapshot()), { slug:'dirt-trials', medals:0, levels:0, finished:false });
+  const levels = await page.evaluate(() => window.__dirtTrialsTest.courses());
+  assert.equal(levels.length,15);
+  assert.ok(levels.every((level,i) => level.gold > 0 && level.len > 1000), 'All levels have goals and full terrain');
+  await page.click('#stage-list button:first-child');
+  let state = await page.evaluate(() => window.__dirtTrialsTest.state());
+  assert.equal(state.mode,'ride');
+  assert.equal(state.started,false);
+  await page.keyboard.down('ArrowRight');
+  // Deterministic simulation makes sure the whole course is traversable, not just a static title card.
+  const result = await page.evaluate(() => window.__dirtTrialsTest.ride(2400));
+  await page.keyboard.up('ArrowRight');
+  assert.equal(result.mode,'finish', 'holding gas should finish the introductory course: ' + JSON.stringify(result));
+  state = await page.evaluate(() => window.__dirtTrialsTest.state());
+  assert.equal(state.bests[0] > 1000,true);
+  assert.ok(state.medals >= 1 && state.medals <= 3);
+  assert.equal(await page.$$eval('#screen-actions button', buttons => buttons.some(button => button.textContent.includes('Next course'))),true);
+  assert.equal((await page.evaluate(() => window.__boredSnapshot())).finished,true);
+  await page.reload();
+  await page.waitForSelector('#stage-list button');
+  assert.equal(await page.$$eval('#stage-list button:disabled', buttons => buttons.length),13,'next course unlocked after reload');
+  // A crate costs speed and one second, rather than making later courses
+  // impossible unless the rider hops at exactly one pixel.
+  const impact = await page.evaluate(() => {
+    window.__dirtTrialsTest.reset(7);
+    return window.__dirtTrialsTest.ride(310);
+  });
+  assert.notEqual(impact.mode,'crash','crate collision is recoverable: '+JSON.stringify(impact));
+  assert.ok(impact.timeMs>310/120*1000+700,'crate collision adds a time penalty');
+  assert.deepEqual(errors,[]);
+});
+
+test('Dirt Trials has touch controls and stays within a phone-width frame', async t => {
+  assert.ok(chrome, 'Install Chrome or set CHROME_PATH');
+  const site = await serve(path.resolve(__dirname, '../src'));
+  const browser = await puppeteer.launch({ executablePath: chrome, headless: true, args: ['--no-sandbox'] });
+  t.after(async () => { await browser.close(); await site.close(); });
+  const page = await browser.newPage();
+  await page.setViewport({width:360,height:640,isMobile:true,hasTouch:true,deviceScaleFactor:1});
+  await page.goto(site.origin+'/games/content/dirt-trials.html');
+  await page.waitForSelector('#stage-list button');
+  await page.click('#stage-list button:first-child');
+  assert.ok(await page.$('[data-hold="gas"]'), 'touch gas exists');
+  const dims = await page.evaluate(() => ({width: document.documentElement.scrollWidth, viewport:innerWidth, canvas:document.querySelector('canvas').getBoundingClientRect().width}));
+  assert.ok(dims.width <= dims.viewport+1,JSON.stringify(dims));
+  const before = await page.evaluate(() => window.__dirtTrialsTest.state());
+  await page.$eval('[data-hold="gas"]', button => button.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:1})));
+  await page.evaluate(() => window.__dirtTrialsTest.ride(60));
+  await page.$eval('[data-hold="gas"]', button => button.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:1})));
+  const after = await page.evaluate(() => window.__dirtTrialsTest.state());
+  assert.ok(after.x>before.x,'bike moves in mobile input mode');
+  await page.click('#retry');
+  const reset = await page.evaluate(() => window.__dirtTrialsTest.state());
+  assert.equal(reset.started,false);
+  assert.equal(reset.timeMs,0);
+  assert.equal(reset.mode,'ride');
+});
