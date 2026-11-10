@@ -1,13 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 240" width="384" height="240">
-<rect width="384" height="240" fill="#f5f2ea"/>
-<rect x="12" y="12" width="360" height="216" rx="4" fill="#fffdf7" stroke="#c6b9a4"/>
-<path d="M13 166H371V227H13Z" fill="#ead9b9"/>
-<path d="M13 166H371" stroke="#bda680"/>
-<g fill="#221d18">
-<path d="M103 145L108 99 121 93 134 99 139 145 143 174H99ZM94 89H149L144 97H99Z"/>
-<path d="M245 145L250 99 263 93 276 99 281 145 285 174H241ZM236 89H291L286 97H241Z"/>
+<rect width="384" height="240" fill="#f4e9d5"/>
+<rect x="8" y="8" width="368" height="224" fill="#f2ddba" stroke="#342b27" stroke-width="3"/>
+<circle cx="192" cy="96" r="46" fill="#dba46e"/>
+<path d="M10 151L36 139L53 113L74 138L109 155L150 137L168 125L202 160L250 138L277 112L297 145L345 150L374 140V231H10Z" fill="#dcc092"/>
+<path d="M10 185Q77 160 150 181T278 180T374 182V231H10Z" fill="#c9a573"/>
+<path d="M10 205Q145 192 213 209T374 203V231H10Z" fill="#dfba80"/>
+<g fill="#342b27">
+<path d="M71 169H113L120 196H65Z"/><path d="M76 193H90L90 229H71Z M94 193H109L117 229H98Z"/>
+<ellipse cx="91" cy="149" rx="17" ry="21"/>
+<path d="M63 132H119L116 139H67Z M75 130L80 112H103L108 130Z"/>
+<path d="M110 166L127 161L153 158L156 165L127 170Z"/>
+<path d="M267 169H309L316 196H261Z"/><path d="M272 193H286L286 229H267Z M290 193H305L313 229H294Z"/>
+<ellipse cx="287" cy="149" rx="17" ry="21"/>
+<path d="M259 132H315L311 139H264Z M271 130L275 112H298L302 130Z"/>
+<path d="M268 166L250 161L224 158L221 165L250 170Z"/>
 </g>
-<text x="192" y="38" font-family="monospace" font-weight="bold" letter-spacing="3" text-anchor="middle" font-size="19" fill="#221d18">QUICKDRAW</text>
-<text x="192" y="92" text-anchor="middle" font-family="monospace" font-size="17" font-weight="bold" fill="#ae4536">DRAW!</text>
-<text x="192" y="210" font-family="monospace" font-size="11" text-anchor="middle" fill="#594d42">WAIT · REACT · WIN</text>
+<g fill="#fdf4e3" stroke="#342b27" stroke-width="2"><rect x="126" y="65" width="132" height="66"/></g>
+<text x="192" y="90" text-anchor="middle" font-family="Georgia,serif" font-size="23" font-weight="bold" fill="#a84430">DRAW!</text>
+<text x="192" y="114" text-anchor="middle" font-family="monospace" font-size="10" fill="#756654">FIRST TO FIRE WINS</text>
+<text x="192" y="34" text-anchor="middle" font-family="Georgia,serif" font-size="23" font-weight="bold" letter-spacing="2" fill="#342b27">QUICKDRAW</text>
 </svg>
