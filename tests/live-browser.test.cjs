@@ -332,6 +332,9 @@ test('Civ Lite Multiplayer: host a co-op game from the title screen, join from t
   // Ann leaves from the Menu: she lands on the title screen, still inside Bored's player, and the game goes on.
   await (await frameOf(ann)).evaluate('onAction("menu")');
   await act(ann, '[data-act="live-leave"]');
+  // Leaving hands her civ to a CPU, and her own screen hears that before it closes. A slow exit holds it open past
+  // the game's one-second tick, which used to read her takeover as her coming back and give the civ back to her.
+  await (await frameOf(ann)).evaluate(() => { const call = LIVE.net.call.bind(LIVE.net); LIVE.net.call = (op, args) => op === 'exit' ? new Promise(r => setTimeout(r, 1500)).then(() => call(op, args)) : call(op, args); });
   await act(ann, '[data-act="live-leave-yes"]');
   await titleReady(ann);
   assert.equal(await ann.$eval('#player', e => e.hidden), false, 'not out in Bored');

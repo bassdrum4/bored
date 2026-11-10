@@ -204,7 +204,8 @@ test('the Menu: no Save or Load, and "Leave game (it keeps going)"; leaving hand
   // Ann comes back: control returns at the next round start.
   await ann.evaluate('liveTick()');
   await sleep(80);
-  await ann.evaluate('LIVE.backAt = 0; liveTick()');
+  // (The mock keeps this screen open after Leave game; a real return is a new document, where `leaving` starts false.)
+  await ann.evaluate('LIVE.backAt = 0; LIVE.leaving = false; liveTick()');
   await waitFor(ben, 'G.live.returning.length === 1');
   await ben.evaluate('onAction("end-confirm")');
   for (const p of pages) await waitFor(p, 'G.turn === 3 && pl(0).human === true && !G.live.away[0]');
