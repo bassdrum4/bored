@@ -262,7 +262,9 @@ function step(dt){
       grounded=true;
       if(depth>0){
         const velocity=bike.vy+bike.av*w.rx;
-        const spring=clamp(depth*1500-velocity*78,0,17000);
+        // Damp downward suspension motion; subtracting velocity here lets the
+        // wheels tunnel through the dirt instead of catching the landing.
+        const spring=clamp(depth*1500+velocity*78,0,17000);
         bike.vy-=spring*dt*.5;
         bike.av-=w.rx*spring*dt/42000;
         bike.y-=Math.min(depth,8)*.16;
