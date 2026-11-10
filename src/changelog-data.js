@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 396,
+  "count": 397,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"6c7e477","date":"2026-11-10","author":"Daniel Lowe","subject":"Refresh Quickdraw catalog illustration for western duel redesign"},
   {"sha":"3f8a588","date":"2026-11-10","author":"Daniel Lowe","subject":"Redesign Quickdraw as illustrated western duel with bold start action"},
   {"sha":"02419aa","date":"2026-11-10","author":"Daniel Lowe","subject":"Score Downhill Mayhem and expand game views"},
   {"sha":"cd08e19","date":"2026-11-10","author":"Daniel Lowe","subject":"Keep Quickdraw best completed solo round available for reliable score capture"},
