@@ -69,11 +69,6 @@
     "better": "high",
     "max_value": 1000000
   },
-  "dirt-trials": {
-    "label": "Stars earned across finished Dirt Trials courses",
-    "better": "high",
-    "max_value": 45
-  },
   "frogger": {
     "label": "Score",
     "better": "high",
