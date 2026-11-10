@@ -84,6 +84,18 @@ async function harness(t) {
         const { action, args } = JSON.parse(req.postData());
         return rpc(async () => (await sql(as, 'select public.bt_invite_rpc($1,$2::jsonb) result', [action, JSON.stringify(args)]))[0].result);
       }
+      // A signed-in Civ Lite also asks for the account's saves (5.3): answered by the real functions, as the rest is.
+      const save = /^\/rest\/v1\/rpc\/(save_(?:list|get|put|delete))$/.exec(address.pathname);
+      if (save) {
+        const b = JSON.parse(req.postData());
+        const call = {
+          save_list: ['select public.save_list($1) r', [b.p_game]],
+          save_get: ['select public.save_get($1,$2) r', [b.p_game, b.p_slot]],
+          save_put: ['select public.save_put($1,$2,$3::jsonb,$4,$5) r', [b.p_game, b.p_slot, JSON.stringify(b.p_header), b.p_data, b.p_expected]],
+          save_delete: ['select public.save_delete($1,$2,$3) r', [b.p_game, b.p_slot, b.p_expected]]
+        }[save[1]];
+        try { return reply((await sql(as, call[0], call[1]))[0].r); } catch (e) { return reply({ code: e.code, message: e.message, details: e.detail || null }, e.code === 'PT409' ? 409 : 400); }
+      }
       if (address.pathname === '/rest/v1/profiles') return reply([{ handle: handles[ids.indexOf(identity)] }]);
       if (address.pathname === '/auth/v1/logout') return reply(null);
       if (['/rest/v1/announcements', '/rest/v1/announcement_reads', '/rest/v1/score_rules', '/rest/v1/leaderboard', '/rest/v1/daily_leaderboard', '/rest/v1/scores', '/rest/v1/player_state', '/rest/v1/daily_results', '/rest/v1/play_events', '/rest/v1/product_events', '/rest/v1/enjoyment_feedback', '/rest/v1/analytics_admins', '/rest/v1/game_analytics_readers'].includes(address.pathname)) return reply(req.method() === 'GET' ? [] : null);
