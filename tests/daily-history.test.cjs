@@ -26,3 +26,12 @@ test('retired Cup Pong remains historical only, never in new calendars', async (
   }
   assert.equal(dailyChallenge('2026-11-04').id, 'v4:2026-11-04:ashcrown');
 });
+
+test('later published v4/v5 IDs stay stable while older history is restored', async () => {
+  const { dailyChallenge } = await daily;
+  for (const [date, id] of [
+    ['2026-10-31', 'v4:2026-10-31:aim-lab'],
+    ['2026-11-03', 'v4:2026-11-03:pac-man'],
+    ['2026-11-09', 'v5:2026-11-09:asteroids']
+  ]) assert.equal(dailyChallenge(date).id, id, date);
+});
