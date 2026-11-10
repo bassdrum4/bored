@@ -229,7 +229,14 @@ export function dailyChallenge(date) {
     const target = Number.isFinite(featured.target) ? featured.target : feature.targets[0];
     return { ...feature, date, target, goal: feature.goal.replace('{target}', target), id: 'v' + version + ':' + date + ':' + feature.slug };
   }
-  const slug = previous[offset % size];
+  // These v4/v5 days were already published with the post-removal rotation.
+  // Restore older v2/v3 history without rewriting later earned completion IDs.
+  const published = {
+    '2026-10-31': 'aim-lab',
+    '2026-11-03': 'pac-man',
+    '2026-11-09': 'asteroids'
+  };
+  const slug = published[date] || previous[offset % size];
   const definition = CHALLENGES.find(item => item.slug === slug) || (day < DAILY_SCHEDULE_V4_START && slug === 'cup-pong' ? LEGACY_CUP_PONG : null);
   const target = definition.targets[cycleNumber % definition.targets.length];
   return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v' + version + ':' + date + ':' + definition.slug };
