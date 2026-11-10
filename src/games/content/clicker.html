@@ -90,7 +90,9 @@
 <script>
 const button = document.getElementById('click');
 const pointsEl = document.getElementById('points');
+const FLASH = 180;
 let clicks = 0;
+let flashTimer = 0;
 
 button.addEventListener('click', () => {
   clicks += 1;
@@ -100,8 +102,12 @@ button.addEventListener('click', () => {
   button.classList.remove('flash');
   void button.offsetWidth;
   button.classList.add('flash');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => {
+    button.classList.remove('flash');
+    button.textContent = 'Click';
+  }, FLASH);
 });
-button.addEventListener('animationend', () => button.classList.remove('flash'));
 
 // The hub reads this. The count is the score; there is no run to end.
 window.__boredSnapshot = () => ({ slug: 'clicker', clicks: clicks, finished: false });
