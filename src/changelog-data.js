@@ -2,18 +2,23 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 377,
+  "count": 382,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"8256bf0","date":"2026-11-10","author":"Claude","subject":"Civ Lite 5.4.1: fix the Bored Together page scrolling sideways at 320px, and the warrior flake in the live tests"},
+  {"sha":"70d6361","date":"2026-11-10","author":"Claude","subject":"Civ Lite 5.4: join live games with a room code"},
+  {"sha":"926ab5e","date":"2026-11-10","author":"Codebuff","subject":"Rebuild Dirt Trials and enlarge the Corner shop."},
   {"sha":"5008b12","date":"2026-11-10","author":"Codebuff","subject":"Return Clicker's label to Click when the flash ends."},
   {"sha":"81d113d","date":"2026-11-10","author":"Codebuff","subject":"Flash Clicker red and switch its label to Clicked on each click."},
   {"sha":"ed4c8c8","date":"2026-11-10","author":"Codebuff","subject":"Add Clicker, a one-click one-point game."},
   {"sha":"f1aa9f6","date":"2026-11-10","author":"Daniel Lowe","subject":"Add Dirt Trials bike game to Bored","pr":109},
   {"sha":"ec94d98","date":"2026-11-10","author":"Codebuff","subject":"Add Corner, a fourteen-day corner-shop tycoon."},
+  {"sha":"a93654b","date":"2026-11-09","author":"Claude","subject":"Civ Lite live: leaving a game no longer gives the civ straight back"},
+  {"sha":"3d0dabc","date":"2026-11-09","author":"Claude","subject":"Live tests: do not depend on the random civ deal, and wait for Ben's own screen"},
   {"sha":"ef9a21d","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.3: saves follow the player's Bored account across devices"},
   {"sha":"014ceb7","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.2: Multiplayer on the title screen"},
   {"sha":"f39bd41","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.1.1: the live server double-checks endings, rounds and snapshots"},

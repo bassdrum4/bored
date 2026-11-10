@@ -54,10 +54,10 @@ jobs:
         env:
           BT_TEST_DATABASE_URL: postgres://postgres:bored_test_only@localhost:5432/bored_together_test
         run: node --test tests/together-postgres.test.cjs
-      - name: Live games - the room's SQL, then two browsers playing against it
+      - name: Live games - the room's SQL and room codes, then browsers playing against it
         env:
           BT_TEST_DATABASE_URL: postgres://postgres:bored_test_only@localhost:5432/bored_together_test
-        run: node --test tests/together-live.test.cjs tests/live-browser.test.cjs
+        run: node --test tests/together-live.test.cjs tests/room-codes.test.cjs tests/live-browser.test.cjs
       - name: Civ Lite cloud saves - the SQL, then several browsers on one account
         env:
           BT_TEST_DATABASE_URL: postgres://postgres:bored_test_only@localhost:5432/bored_together_test
