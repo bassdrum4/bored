@@ -117,7 +117,7 @@ const courses=[
 ];
 const storageKey='bored.dirt-trials.progress.v1';
 let bests=loadBests(),level=0,mode='menu',started=false,timeMs=0,cam=0,viewW=W;
-let bike={},dust=[],keys=new Set(),jumpQueued=false,acc=0,last=0,resizeObserver=null;
+let bike={x:85,y:388,vx:0,vy:0,a:0,av:0,onGround:false,crashes:0},dust=[],keys=new Set(),jumpQueued=false,acc=0,last=0,resizeObserver=null;
 let touched=false,frameCounter=0,finishTime=0;
 function loadBests(){
   try{
@@ -404,7 +404,7 @@ document.addEventListener('keyup',event=>keys.delete(event.code));
 window.addEventListener('blur',()=>{keys.clear();document.querySelectorAll('[data-hold]').forEach(el=>el.classList.remove('pressed'));});
 document.querySelectorAll('[data-hold]').forEach(button=>{
   const key=button.dataset.hold;
-  button.addEventListener('pointerdown',e=>{e.preventDefault();touched=true;keys.add(key);button.classList.add('pressed');button.setPointerCapture?.(e.pointerId);});
+  button.addEventListener('pointerdown',e=>{e.preventDefault();touched=true;keys.add(key);button.classList.add('pressed');try{button.setPointerCapture?.(e.pointerId);}catch{}});
   const stop=e=>{keys.delete(key);button.classList.remove('pressed');};
   button.addEventListener('pointerup',stop);button.addEventListener('pointercancel',stop);button.addEventListener('lostpointercapture',stop);
 });
