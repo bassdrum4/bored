@@ -70,6 +70,11 @@
   }
   #click:active { background: #f0ece1; }
   #click:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  #click.flash { animation: click-flash .18s ease-out; }
+  @keyframes click-flash {
+    from { background: #b23b2e; border-color: #b23b2e; color: #fffdf7; }
+    to { background: var(--panel); border-color: var(--ink); color: var(--ink); }
+  }
   p { text-align: center; font-size: 11.5px; color: var(--muted); }
 </style>
 </head>
@@ -83,13 +88,20 @@
   <p>One click, one point.</p>
 </main>
 <script>
+const button = document.getElementById('click');
 const pointsEl = document.getElementById('points');
 let clicks = 0;
 
-document.getElementById('click').addEventListener('click', () => {
+button.addEventListener('click', () => {
   clicks += 1;
   pointsEl.textContent = clicks;
+  button.textContent = 'Clicked';
+  // Restart the flash so a fast series of clicks still reads as one each time.
+  button.classList.remove('flash');
+  void button.offsetWidth;
+  button.classList.add('flash');
 });
+button.addEventListener('animationend', () => button.classList.remove('flash'));
 
 // The hub reads this. The count is the score; there is no run to end.
 window.__boredSnapshot = () => ({ slug: 'clicker', clicks: clicks, finished: false });
