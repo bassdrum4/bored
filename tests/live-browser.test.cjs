@@ -23,10 +23,11 @@ async function environment() {
   try { return await pgliteEnv(); } catch (error) { return { unavailable: error.message }; }
 }
 
-test('two accounts start a live game from Bored Together, move, end turns, lose Realtime, and rejoin', async t => {
+// The two-account setup: a site, the real SQL, a Realtime stand-in, and a browser account for each person.
+async function harness(t) {
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
   const env = await environment();
-  if (env.unavailable) { t.skip('no disposable Postgres here: ' + env.unavailable); return; }
+  if (env.unavailable) { t.skip('no disposable Postgres here: ' + env.unavailable); return null; }
   const site = await serve(path.join(__dirname, '../src'));
   const realtime = await createMockRealtime();
   const browser = await puppeteer.launch({ executablePath, headless: true });
@@ -83,6 +84,18 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
         const { action, args } = JSON.parse(req.postData());
         return rpc(async () => (await sql(as, 'select public.bt_invite_rpc($1,$2::jsonb) result', [action, JSON.stringify(args)]))[0].result);
       }
+      // A signed-in Civ Lite also asks for the account's saves (5.3): answered by the real functions, as the rest is.
+      const save = /^\/rest\/v1\/rpc\/(save_(?:list|get|put|delete))$/.exec(address.pathname);
+      if (save) {
+        const b = JSON.parse(req.postData());
+        const call = {
+          save_list: ['select public.save_list($1) r', [b.p_game]],
+          save_get: ['select public.save_get($1,$2) r', [b.p_game, b.p_slot]],
+          save_put: ['select public.save_put($1,$2,$3::jsonb,$4,$5) r', [b.p_game, b.p_slot, JSON.stringify(b.p_header), b.p_data, b.p_expected]],
+          save_delete: ['select public.save_delete($1,$2,$3) r', [b.p_game, b.p_slot, b.p_expected]]
+        }[save[1]];
+        try { return reply((await sql(as, call[0], call[1]))[0].r); } catch (e) { return reply({ code: e.code, message: e.message, details: e.detail || null }, e.code === 'PT409' ? 409 : 400); }
+      }
       if (address.pathname === '/rest/v1/profiles') return reply([{ handle: handles[ids.indexOf(identity)] }]);
       if (address.pathname === '/auth/v1/logout') return reply(null);
       if (['/rest/v1/announcements', '/rest/v1/announcement_reads', '/rest/v1/score_rules', '/rest/v1/leaderboard', '/rest/v1/daily_leaderboard', '/rest/v1/scores', '/rest/v1/player_state', '/rest/v1/daily_results', '/rest/v1/play_events', '/rest/v1/product_events', '/rest/v1/enjoyment_feedback', '/rest/v1/analytics_admins', '/rest/v1/game_analytics_readers'].includes(address.pathname)) return reply(req.method() === 'GET' ? [] : null);
@@ -91,9 +104,12 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
     });
     await page.goto(site.url);
     await page.waitForFunction(() => document.querySelectorAll('#grid .card').length > 0, { polling: 50 });
-    await page.evaluate(u => localStorage.setItem('bored.session', JSON.stringify({ access_token: u, refresh_token: 'fixture-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: u, is_anonymous: false, email: 'fixture@example.test' } })), user);
-    await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('#grid .card').length > 0, { polling: 50 });
+    // A guest (no user) never signs in.
+    if (user) {
+      await page.evaluate(u => localStorage.setItem('bored.session', JSON.stringify({ access_token: u, refresh_token: 'fixture-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: u, is_anonymous: false, email: 'fixture@example.test' } })), user);
+      await page.reload();
+      await page.waitForFunction(() => document.querySelectorAll('#grid .card').length > 0, { polling: 50 });
+    }
     return page;
   }
   const waitPage = (page, expr, arg, ms = 15000) => page.waitForFunction(expr, { polling: 50, timeout: ms }, arg);
@@ -124,6 +140,13 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   const inGame = (frame, expr, arg, ms) => frame.waitForFunction(expr, { polling: 50, timeout: ms || 15000 }, arg);
   const click = (frame, selector) => frame.evaluate(sel => document.querySelector(sel).click(), selector);
 
+  return { env, site, realtime, browser, errors, unexpected, seen, player, waitPage, press, hubButton, rowButton, game, inGame, click };
+}
+
+test('two accounts start a live game from Bored Together, move, end turns, lose Realtime, and rejoin', async t => {
+  const h = await harness(t);
+  if (!h) return;
+  const { env, realtime, errors, unexpected, seen, player, waitPage, hubButton, rowButton, game, inGame, click } = h;
   const ann = await player(A), ben = await player(B);
 
   // Ann opens Bored Together, starts a live game, and invites Ben from the member list.
@@ -231,6 +254,107 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   await inGame(annGame, () => G.turn === 3);
   await inGame(back, () => G.turn === 3);
   assert.equal(await annGame.evaluate('liveHash()'), await back.evaluate('liveHash()'));
+  assert.deepEqual(errors, []);
+  assert.deepEqual(unexpected, []);
+});
+
+// Civ Lite's Multiplayer screen with the real hub and the real SQL: Ann hosts a co-op game from the title screen and
+// invites Ben, Ben sees the tag and joins from there, both start, Ann leaves from the Menu and lands on the title
+// screen, and rejoins from Your live games. A guest and an account that is not in Bored Together get their prompts.
+test('Civ Lite Multiplayer: host a co-op game from the title screen, join from the invite, leave to the title screen, rejoin', async t => {
+  const h = await harness(t);
+  if (!h) return;
+  const { env, errors, unexpected, player, waitPage, inGame } = h;
+  const ann = await player(A), ben = await player(B);
+  // Civ Lite opened the ordinary way, from the library; its frame is the one the hub reloads, so ask for it each time.
+  const frameOf = async page => (await page.$('#frame')).contentFrame();
+  const inFrame = async (page, expr, arg, ms = 15000) => {
+    const end = Date.now() + ms;
+    for (;;) {
+      try { return await (await frameOf(page)).waitForFunction(expr, { polling: 50, timeout: Math.max(500, end - Date.now()) }, arg); }
+      catch (error) { if (Date.now() > end) throw error; await sleep(100); }   // the document was replaced under the wait: look again
+    }
+  };
+  const openCivLite = async page => { await page.evaluate(() => { location.hash = 'ashcrown'; }); await waitPage(page, () => !document.querySelector('#player').hidden); };
+  const act = async (page, selector) => { await inFrame(page, sel => !!document.querySelector(sel) && !document.querySelector(sel).disabled, selector); await (await frameOf(page)).evaluate(sel => document.querySelector(sel).click(), selector); };
+  const titleReady = page => inFrame(page, () => typeof G !== 'undefined' && !G && !document.getElementById('start').hidden && !document.getElementById('pane-title').hidden && !document.getElementById('btn-mp').hidden);
+
+  await openCivLite(ann);
+  await titleReady(ann);
+  assert.equal(await (await frameOf(ann)).$eval('#btn-mp .mi-sub', e => e.textContent), 'Play live with friends on Bored');
+  // Ann: Multiplayer, Host a live game, pick Ben, Co-op, open the lobby.
+  await act(ann, '#btn-mp');
+  await act(ann, '[data-act="mp-host"]');
+  await inFrame(ann, () => document.querySelectorAll('#mp-people .mp-person').length >= 1 && !document.getElementById('pane-setup').hidden);
+  const names = await (await frameOf(ann)).$$eval('#mp-people .mp-person span', s => s.map(e => e.textContent));
+  assert.ok(names.includes('BananaWizard') && !names.includes('WackyPenguin'), 'members by name, not herself: ' + names.join(','));
+  assert.ok(!(await (await frameOf(ann)).$eval('#mp-pick', e => e.outerHTML)).includes('@'), 'no emails in the picker');
+  await (await frameOf(ann)).evaluate(() => { [...document.querySelectorAll('#mp-people .mp-person')].find(l => l.textContent === 'BananaWizard').querySelector('input').click(); });
+  await (await frameOf(ann)).select('#opt-mode', 'coop');
+  await act(ann, '#btn-begin');
+  await inFrame(ann, () => !!LIVE.net && !document.getElementById('pane-setup').hidden && document.querySelectorAll('#seats .seat:not([hidden])').length === 3);
+  const room = (await env.admin("select id, status, config from bored_live.games order by created_at desc limit 1"))[0];
+  assert.equal(room.status, 'lobby');
+  assert.equal(room.config.mode, 'coop', 'the setup chosen on the title screen is the room’s setup');
+  assert.equal((await env.admin('select state from bored_live.seats where game_id=$1 and seat=1', [room.id]))[0].state, 'invited');
+
+  // Ben opens Civ Lite: the tag counts the invite, and the Multiplayer screen shows who, Co-op and when.
+  await openCivLite(ben);
+  await titleReady(ben);
+  await inFrame(ben, () => !document.getElementById('mp-tag').hidden && document.getElementById('mp-tag').textContent === '1');
+  await act(ben, '#btn-mp');
+  await inFrame(ben, () => /WackyPenguin invited you/.test(document.querySelector('.modal').textContent));
+  const text = await (await frameOf(ben)).evaluate(() => document.querySelector('.modal').textContent);
+  assert.match(text, /Co-op/);
+  assert.match(text, /just now|minute/);
+  assert.ok(!text.includes('@'), 'no email on the screen');
+  await act(ben, '[data-act^="mp-join:"]');
+  await inFrame(ben, () => !!LIVE.net && document.querySelectorAll('#seats .seat:not([hidden])').length === 3 && document.getElementById('seat-who-1').textContent === 'Joined');
+  await inFrame(ann, () => document.getElementById('seat-who-1').textContent === 'Joined');
+  // Both reach the lobby and start.
+  await act(ben, '#btn-ready');
+  await inFrame(ann, () => !document.getElementById('btn-begin').disabled);
+  await act(ann, '#btn-begin');
+  for (const page of [ann, ben]) await inFrame(page, () => document.getElementById('start').hidden && !!G && !!G.live && G.turn === 1);
+  assert.equal(await (await frameOf(ann)).evaluate('liveHash()'), await (await frameOf(ben)).evaluate('liveHash()'));
+  assert.equal(await (await frameOf(ann)).evaluate('G.teams.length > 0 && sameTeam(0, 1)'), true, 'a co-op game: Ann and Ben are teammates');
+  assert.equal((await env.admin('select status from bored_live.games where id=$1', [room.id]))[0].status, 'active');
+
+  // Ann leaves from the Menu: she lands on the title screen, still inside Bored's player, and the game goes on.
+  await (await frameOf(ann)).evaluate('onAction("menu")');
+  await act(ann, '[data-act="live-leave"]');
+  await act(ann, '[data-act="live-leave-yes"]');
+  await titleReady(ann);
+  assert.equal(await ann.$eval('#player', e => e.hidden), false, 'not out in Bored');
+  assert.equal((await env.admin('select controller from bored_live.seats where game_id=$1 and seat=0', [room.id]))[0].controller, 'cpu', 'a CPU plays her civ');
+  assert.equal((await env.admin('select status from bored_live.games where id=$1', [room.id]))[0].status, 'active');
+  // Your live games lists it with Rejoin, her friend online and the round; Rejoin puts her back in.
+  await act(ann, '#btn-mp');
+  await inFrame(ann, () => /Rejoin/.test(document.querySelector('.modal').textContent));
+  const row = await (await frameOf(ann)).evaluate(() => document.querySelector('.mp-row[data-game]').textContent);
+  assert.match(row, /Co-op/);
+  assert.match(row, /Round 1/);
+  assert.match(row, /BananaWizard/);
+  assert.match(row, /a CPU is playing/);
+  await act(ann, '[data-act^="mp-open-game:"]');
+  await inFrame(ann, () => !!G && !!G.live && G.turn >= 1 && document.getElementById('start').hidden);
+  assert.equal(await (await frameOf(ann)).evaluate('liveHash()'), await (await frameOf(ben)).evaluate('liveHash()'));
+
+  // A guest and an account that has not joined Bored Together get a prompt each, and the buttons reach the hub.
+  const guest = await player(null);
+  await openCivLite(guest);
+  await titleReady(guest);
+  await act(guest, '#btn-mp');
+  await inFrame(guest, () => /Sign in to Bored to play online/.test(document.querySelector('.modal').textContent));
+  await act(guest, '[data-act="mp-signin"]');
+  await waitPage(guest, () => document.querySelector('#auth-dialog').open);
+  const outsider = await player(ids[5]);
+  await openCivLite(outsider);
+  await titleReady(outsider);
+  await act(outsider, '#btn-mp');
+  await inFrame(outsider, () => /Join Bored Together to play online/.test(document.querySelector('.modal').textContent));
+  await act(outsider, '[data-act="mp-together"]');
+  await waitPage(outsider, () => document.querySelector('#player').hidden && !document.querySelector('#together').hidden);
   assert.deepEqual(errors, []);
   assert.deepEqual(unexpected, []);
 });

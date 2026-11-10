@@ -272,6 +272,33 @@
     .slot-acts { grid-column: 1 / -1; justify-content: flex-start }
     .slot-q { max-width: none; text-align: left; flex-basis: 100% }
   }
+  /* multiplayer: the screen behind the title menu's Multiplayer item, and the friend picker in host setup */
+  .mp .mp-lead { font-size: 12.5px; color: var(--ink-2); margin: 0 0 8px; max-width: 62ch }
+  .mp-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; border: 1px solid var(--rule); border-radius: 3px; padding: 7px 9px; background: var(--panel) }
+  .mp-row + .mp-row { margin-top: 5px }
+  .mp-main { min-width: 0 }
+  .mp-name { display: block; font-size: 13px; overflow-wrap: anywhere }
+  .mp-meta { display: block; font-size: 10.5px; color: var(--ink-3); line-height: 1.5; overflow-wrap: anywhere }
+  .mp-who { display: flex; flex-wrap: wrap; gap: 1px 12px; margin-top: 3px; font-size: 11.5px; color: var(--ink-2) }
+  .mp-who .on { color: var(--ink) }
+  .mp-acts { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; justify-content: flex-end }
+  .mp-acts .btn { padding: 4px 9px; font-size: 12px }
+  .mp-prompt { border: 1px dashed var(--rule); border-radius: 3px; padding: 16px 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px }
+  .mp-prompt h3 { margin: 0 !important; font-size: 15px !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--ink) !important }
+  .mp-error { color: var(--rust) }
+  .mp-done { margin-top: 8px }
+  .mp-done summary { font-size: 12px; color: var(--ink-2); cursor: pointer; padding: 4px 0 }
+  .mp-pick { margin: 12px 0 0 }
+  .mp-pick-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; margin-bottom: 6px }
+  .mp-count { color: var(--ink-3); font-size: 11px }
+  .mp-people { display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto }
+  .mp-person { display: flex; align-items: center; gap: 8px; border: 1px solid var(--rule); border-radius: 3px; padding: 6px 9px; background: var(--panel-hi); font-size: 13px; min-width: 0 }
+  .mp-person span { min-width: 0; overflow-wrap: anywhere }
+  .mp-person input { flex: none }
+  @media (max-width: 520px) {
+    .mp-row { grid-template-columns: minmax(0, 1fr) }
+    .mp-acts { justify-content: flex-start }
+  }
 
   /* ── tech tree and civs ──────────────────────────────────────────────── */
   /* the tech tree, Civ style: era columns, prereqs on the left */
@@ -709,6 +736,7 @@
         <button class="fe-item has-medal" id="btn-continue" type="button" hidden><span class="mi-medal" id="continue-medal" aria-hidden="true"></span><span class="mi">Continue</span><span class="mi-sub ell" id="continue-sub"></span><span class="mi-sub ell" id="continue-detail"></span></button>
         <button class="fe-item" id="btn-new" type="button" data-act="title-new"><span class="mi">New game</span><span class="mi-sub">Choose the players, the map and the rules</span></button>
         <button class="fe-item" id="btn-load" type="button" data-act="slots:load" hidden><span class="mi">Load game</span><span class="mi-sub" id="load-sub"></span></button>
+        <button class="fe-item" id="btn-mp" type="button" data-act="mp-open" hidden><span class="mi">Multiplayer</span><span class="mi-tag" id="mp-tag" hidden></span><span class="mi-sub">Play live with friends on Bored</span></button>
         <button class="fe-item" id="btn-tutorial" type="button" data-act="tut-start"><span class="mi">Tutorial</span><span class="mi-tag" id="tut-tag">New here? Start here</span><span class="mi-sub" id="tut-sub"></span></button>
         <button class="fe-item" id="btn-civs" type="button" data-act="civs"><span class="mi">Civs</span><span class="mi-sub">All 16, with what each one does</span></button>
         <button class="fe-item" id="btn-help" type="button" data-act="help"><span class="mi">How to play</span><span class="mi-sub">The whole rulebook on one page</span></button>
@@ -738,6 +766,10 @@
             <div class="fe-opt live-only" hidden><label for="opt-unjoined">Seats nobody joins</label><select id="opt-unjoined"><option value="cpu">Become CPUs</option><option value="drop">Are dropped</option></select>
               <p class="fe-note">Friends you invited who have not joined when you start.</p></div>
             <div class="seats" id="seats"></div>
+            <div class="mp-pick" id="mp-pick" hidden>
+              <div class="mp-pick-head"><strong>Invite friends</strong><span class="mp-count" id="mp-count"></span></div>
+              <div class="mp-people" id="mp-people" role="group" aria-label="Invite friends"></div>
+            </div>
           </section>
           <section class="fe-card fe-victory" aria-label="Victory">
             <h3>Victory</h3>
@@ -8411,6 +8443,7 @@ function openModal(html, size) {
   renderCoach();
 }
 function closeModal() {
+  if (UI.modalKind === 'mp') mpClosed();
   UI.modalLayer.hidden = true;
   UI.modal.innerHTML = '';
   UI.modalKind = null;
@@ -9144,7 +9177,7 @@ function helpSections() {
       'Turn Event popups off in Options (or the Menu) and the points still count.</p>' },
     { id: 'keys', group: 'Controls', title: 'Keys', html:
       '<p>Like Civ 6: <b>right-click</b> sends the selected unit (or attacks) · <b>Enter</b> next action, and end turn when nothing needs orders · <b>Space</b> skip the unit · <b>B</b> found city · <b>F</b> fortify · <b>Z</b> sleep · <b>Delete</b> disband · ' +
-      '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
+      '<b>T</b> tech tree · <b>F1</b> realm · <b>F9</b> rules · <b>Ctrl+S</b> saves · <b>D</b> council · <b>N</b> next unit · arrow keys pan · <b>Esc</b> closes, deselects, then opens the menu. Left-click still works for everything, for touch screens. On Bored, <b>Multiplayer</b> on the title screen hosts a live game, answers invites and rejoins your games. Several of your units can share a hex: a number on the hex says how many, and the buttons at the top of a unit’s panel (or a second click on the hex) switch between them. When an order uses up a unit’s turn, the next unit that needs orders is selected for you (a unit with moves left stays selected). The “Jump to the next unit after orders” switch turns that off, and then the unit is simply deselected. The Animation switch (in Options or the Menu) runs through off, wonders only, wonders + features, and everything.</p>' +
       '<p><b>Saves on every device.</b> Signed in on Bored, your named saves and the Autosave also go to your account, so you can Continue or Load them on another device. A save from another device is marked, and nothing is replaced without asking. The starts of your last three turns stay on the device.</p>' },
   ];
 }
@@ -9418,6 +9451,7 @@ function onAction(act) {
   if (kind === 'options') { showOptions(); return; }
   if (kind === 'title-new') { showPane('setup'); return; }
   if (kind === 'title-back') { showPane('title'); return; }
+  if (kind.startsWith('mp-')) { mpAction(kind, a); return; }
   if (kind === 'setup-reset') { resetSetup(); return; }
   if (G && G.live && (kind === 'tut-start' || kind === 'slots' || kind.startsWith('slot-'))) return;   // no slots, no tutorial in a live game
   if (kind === 'live-lobby-leave') { liveLobbyLeave(); return; }
@@ -10862,6 +10896,9 @@ const CHANGELOG = [
     'Your saves follow your Bored account: save on one device, Continue or Load on another.',
     'Saves from another device are marked, and nothing is replaced without asking.'
   ] },
+  { v: '5.2', date: 'Nov 9', notes: [
+    'Multiplayer on the title screen: host a live game (free-for-all or co-op), answer invites and rejoin your games without leaving Civ Lite.'
+  ] },
   { v: '5.1.1', date: 'Nov 9', notes: [
     'Live games: the server double-checks game endings, round numbers and saved snapshots.'
   ] },
@@ -11005,8 +11042,9 @@ function buildStartScreen() {
     document.getElementById('seat-civ-' + i).onchange = refreshStart;
     document.getElementById('seat-name-' + i).oninput = event => { event.target.dataset.edited = '1'; };
   }
-  UI.btnBegin.onclick = () => { if (LIVE.net) liveStartPressed(); else beginGame(); };
+  UI.btnBegin.onclick = () => { if (LIVE.net) liveStartPressed(); else if (MP.host) mpHostPressed(); else beginGame(); };
   UI.btnReady.onclick = liveReadyPressed;
+  document.getElementById('mp-people').onchange = mpPicked;
   UI.btnContinue.onclick = () => {
     const view = syncOn() ? syncView('auto', slotHead('auto')) : null;
     if (view && view.state === 'elsewhere') { syncDownload('auto').then(ok => { if (!ok) refreshTitle(); }); return; }   // the account's autosave is newer
@@ -11018,6 +11056,7 @@ function buildStartScreen() {
   drawTitleArt();
   showPane('title');
   syncBoot();   // on Bored, signed in: the saves follow the account
+  mpBoot();
 }
 // Two screens share the start overlay: the title menu, and game setup behind New game.
 function showPane(name) {
@@ -11045,6 +11084,8 @@ function refreshTitle() {
   document.getElementById('continue-medal').innerHTML = auto ? slotMedal(auto.head) : '';
   UI.btnLoad.hidden = !slots.length;
   document.getElementById('btn-leave').hidden = !embedded();
+  UI.btnMp.hidden = !mpBridge();
+  mpShowTag();
   document.getElementById('load-sub').textContent = named ? plural(named, 'named save', 'named saves') + ' and your autosaves' : 'Your autosaves';
   UI.btnContinue.classList.toggle('primary', !!auto);
   UI.btnNew.classList.toggle('primary', !auto);
@@ -11059,7 +11100,7 @@ function coopProblem(humans, cpus) {
   return humans < 1 ? 'Co-op needs at least one human.' : cpus < 1 ? 'Co-op needs at least one CPU. Add one above.' : '';
 }
 function fitCounts(changed) {
-  if (LIVE.net) { refreshStart(); return; }
+  if (LIVE.net || MP.host) { refreshStart(); return; }
   let h = Number(UI.optHumans.value), c = Number(UI.optCpus.value);
   if (h + c > MAX_PLAYERS) { if (changed === 'humans') c = MAX_PLAYERS - h; else h = MAX_PLAYERS - c; }
   if (h + c < 2) { if (changed === 'humans') c = 2 - h; else h = Math.max(1, 2 - c); }
@@ -11096,8 +11137,8 @@ function refreshSeats(humans, n) {
   });
 }
 function refreshStart() {
-  const { humans, cpus } = LIVE.net ? liveCounts() : seatCounts(), n = humans + cpus;
-  if (!LIVE.net) refreshSeats(humans, n);
+  const { humans, cpus } = LIVE.net || MP.host ? liveCounts() : seatCounts(), n = humans + cpus;
+  if (!LIVE.net && !MP.host) refreshSeats(humans, n);
   const size = UI.optSize.value === 'auto' ? sizeFor(n) : UI.optSize.value;
   UI.mapNote.textContent = MAP_TYPES[UI.optMap.value].blurb + (UI.optMap.value === 'mirror' && n % 2 ? ' With an odd number of players one start has no twin.' : '');
   UI.sizeNote.textContent = MAP_SIZES[size].name + ' map, ' + MAP_SIZES[size].cols + ' × ' + MAP_SIZES[size].rows + ', built for ' +
@@ -11109,6 +11150,7 @@ function refreshStart() {
   UI.modeNote.textContent = coopProblem(humans, cpus) && UI.optMode.value === 'coop' ? coopProblem(humans, cpus)
     : UI.optMode.value === 'coop' ? 'Every human plays on one team against the CPUs. Needs at least one human and one CPU.' : 'Every civ plays for itself.';
   if (LIVE.net) return;   // the room writes its own note
+  if (MP.host) { UI.setupNote.textContent = MP.picked.size ? 'The lobby opens with your friends invited. You can still change the setup there.' : 'Pick 1 to 3 friends to invite.'; return; }
   // Starting a game takes over the Autosave, so say so; named saves are never touched.
   const auto = online ? null : slotList().find(s => s.id === 'auto');
   UI.setupNote.textContent = auto ? 'Starting a game replaces your Autosave. Games you saved to a slot are kept.' : '';
@@ -11173,7 +11215,7 @@ function frontKeys(event) {
   const modalOpen = !UI.modalLayer.hidden;
   if (event.key === 'Escape') {
     if (modalOpen) closeModal();
-    else if (!UI.paneSetup.hidden) showPane('title');
+    else if (!UI.paneSetup.hidden) { if (MP.host) mpHostClose(); else showPane('title'); }
     return;
   }
   if (modalOpen || UI.paneTitle.hidden) return;
@@ -11658,7 +11700,7 @@ function liveLeave() {
 /* the lobby: Game setup, live */
 
 const LIVE_STATE = { invited: 'Invited', joined: 'Joined', ready: 'Ready', left: 'Left' };
-const liveCounts = () => ({ humans: LIVE.game ? LIVE.game.seats.filter(s => s.state !== 'left').length : 2, cpus: Number(UI.optCpus.value) || 0 });
+const liveCounts = () => ({ humans: LIVE.game ? LIVE.game.seats.filter(s => s.state !== 'left').length : MP.host ? 1 + Math.max(1, MP.picked.size) : 2, cpus: Number(UI.optCpus.value) || 0 });
 const liveLobbyControls = () => [UI.optCpus, UI.optMode, UI.optMap, UI.optSize, UI.optLevel, UI.optClose, UI.optTurns, UI.optConquest, UI.optScience, UI.optWrap, UI.optTimer, UI.optUnjoined];
 
 // The room's setup, as the server stores it.
@@ -11810,6 +11852,237 @@ function liveLobbyLeave() {
   LIVE.net.call('leave', {}).catch(() => {}).then(() => LIVE.net.call('exit', {})).catch(() => {});
 }
 
+/* ── multiplayer (v5.2): the title menu's Multiplayer screen, on Bored only ───────────────────────────────
+ * The game has no network and no credentials. Whenever it is open in Bored's player and is not itself a match or a
+ * live game, the hub gives it a second bridge, window.__boredLobby = { call(op, payload), on(fn) }. Through it the
+ * screen asks who is signed in, which members can be invited, which invites and live games wait, and asks the hub
+ * to host a game, join, decline or open one. Opening switches the player into the live game, which reloads this page.
+ * Members come as names with opaque references; the page never holds an email, a token or an account id. */
+const MP = { host: false, picked: new Set(), members: null, keep: null, soloNote: '', sig: '', busy: false, pending: false, timer: 0, titleTimer: 0, invites: 0 };
+const MP_DEFAULTS = { map: 'pangaea', size: 'auto', level: 'normal', borders: 'tech', turns: 100, cpus: 1, timer: 0, wrap: false, conquest: true, science: true, unjoined: 'cpu', mode: 'ffa' };
+const MP_MAX_INVITED = 3;
+function mpBridge() {
+  try { return embedded() && window.__boredLobby ? window.__boredLobby : null; } catch (error) { return null; }
+}
+const mpWords = error => String((error && error.message) || error || 'Something went wrong.').replace(/^Error:\s*/, '');
+
+// The title menu's tag: how many live-game invites are waiting. Asked when the title shows and every 15 seconds after.
+function mpShowTag() {
+  const tag = document.getElementById('mp-tag');
+  tag.hidden = !MP.invites;
+  tag.textContent = String(MP.invites);
+  tag.title = MP.invites === 1 ? '1 invite waiting' : MP.invites + ' invites waiting';
+}
+function mpTitleTick() {
+  const bridge = mpBridge();
+  if (!bridge || document.hidden || LIVE.net || G || UI.start.hidden || UI.paneTitle.hidden) return;
+  bridge.call('invites').then(list => { MP.invites = Array.isArray(list) ? list.length : 0; mpShowTag(); }, () => { MP.invites = 0; mpShowTag(); });
+}
+function mpBoot() {
+  const bridge = mpBridge();
+  if (!bridge) return;
+  bridge.on(event => {
+    if (!event || event.event !== 'account') return;
+    MP.invites = 0; MP.sig = ''; mpShowTag();
+    mpTitleTick();
+    if (UI.modalKind === 'mp') mpRefresh();
+  });
+  mpTitleTick();
+  MP.titleTimer = setInterval(mpTitleTick, 15000);
+}
+
+// The screen itself: one modal, redrawn when what it shows changes, refreshed when it opens and every 5 seconds.
+function showMultiplayer() {
+  if (!mpBridge()) return;
+  MP.sig = ''; MP.pending = false;
+  openModal(modalHead('Multiplayer', 'Live games on Bored') +
+    '<div class="modal-body mp" id="mp-body"><p class="hint">Loading…</p></div>' +
+    '<div class="modal-foot"><button class="btn primary" data-act="close">Close</button></div>', 'wide');
+  UI.modalKind = 'mp';
+  clearInterval(MP.timer);
+  MP.timer = setInterval(() => { if (UI.modalKind !== 'mp') { clearInterval(MP.timer); MP.timer = 0; } else if (!document.hidden) mpRefresh(); }, 5000);
+  mpRefresh();
+}
+function mpClosed() {
+  clearInterval(MP.timer);
+  MP.timer = 0;
+  setTimeout(mpTitleTick, 0);
+}
+function mpRefresh() {
+  const bridge = mpBridge();
+  if (!bridge || UI.modalKind !== 'mp' || MP.busy) return;
+  MP.busy = true;
+  bridge.call('status').then(status => {
+    if (!status.signedIn || !status.enrolled) return { status };
+    return Promise.all([bridge.call('invites'), bridge.call('games')]).then(all => ({ status, invites: all[0], games: all[1] }));
+  }).then(data => mpDraw(data), error => mpDraw({ error: mpWords(error) })).then(() => { MP.busy = false; }, () => { MP.busy = false; });
+}
+function mpWhen(at) {
+  const t = Date.parse(at);
+  return Number.isFinite(t) ? agoText(t) : '';
+}
+const mpMode = mode => (mode === 'coop' ? 'Co-op' : 'Free-for-all');
+function mpPlayers(list) {
+  return '<span class="mp-who">' + list.map(p => '<span class="' + (p.online ? 'on' : '') + '">' + (p.cpu ? '◇ ' : p.online ? '● ' : '○ ') + esc(p.name) + (p.you ? ' (you)' : '') +
+    (p.cpu ? ' · a CPU is playing' : p.state === 'invited' ? ' · invited' : p.state === 'joined' ? ' · joined' : p.state === 'ready' ? ' · ready' : p.online ? '' : ' · away') + '</span>').join('') + '</span>';
+}
+function mpRows(data) {
+  const invites = data.invites || [], live = (data.games && data.games.live) || [], turns = (data.games && data.games.turns) || [];
+  const running = live.filter(g => g.status !== 'completed'), done = live.filter(g => g.status === 'completed');
+  const inviteRow = g => '<div class="mp-row" data-invite="' + esc(g.id) + '"><div class="mp-main"><span class="mp-name">' + esc(g.host) + ' invited you</span>' +
+    '<span class="mp-meta">' + mpMode(g.mode) + (mpWhen(g.at) ? ' · ' + esc(mpWhen(g.at)) : '') + '</span>' +
+    (g.players.length ? '<span class="mp-meta">Playing: ' + g.players.map(esc).join(', ') + '</span>' : '') + '</div>' +
+    '<div class="mp-acts"><button class="btn primary" data-act="mp-join:' + esc(g.id) + '">Join</button><button class="btn" data-act="mp-decline:' + esc(g.id) + '">Decline</button></div></div>';
+  const gameRow = g => {
+    const lobby = g.status === 'lobby', over = g.status === 'completed';
+    const rejoin = !lobby && !over && (g.you.cpu || !g.you.online);
+    const line = lobby ? (g.host ? 'Setting up · waiting for everyone to be ready' : 'In the lobby · the host starts the game')
+      : over ? (g.winner ? esc(g.winner) + ' won' : 'Finished') : 'Round ' + g.round + (g.you.cpu ? ' · a CPU is playing your civ until you rejoin' : ' · everyone plays at once');
+    return '<div class="mp-row" data-game="' + esc(g.id) + '"><div class="mp-main"><span class="mp-name">' + mpMode(g.mode) + ' · ' + g.players.length + ' players</span>' +
+      '<span class="mp-meta">' + line + '</span>' + mpPlayers(g.players) + '</div>' +
+      '<div class="mp-acts"><button class="btn' + (over ? '' : ' primary') + '" data-act="mp-open-game:' + esc(g.id) + '">' + (lobby ? 'Open lobby' : over ? 'View' : rejoin ? 'Rejoin' : 'Open') + '</button></div></div>';
+  };
+  return '<h3>Host a live game</h3><p class="mp-lead">Set up the map, the CPUs and the rules, then invite 1 to 3 friends from Bored Together. Everyone plays at the same time, as free-for-all or as one team against the CPUs.</p>' +
+    '<div class="mp-acts" style="justify-content:flex-start"><button class="btn primary" data-act="mp-host">Host a live game</button></div>' +
+    '<h3>Invites' + (invites.length ? ' · ' + invites.length : '') + '</h3>' +
+    (invites.length ? invites.map(inviteRow).join('') : '<p class="mp-lead">No invites waiting.</p>') +
+    '<h3>Your live games' + (running.length ? ' · ' + running.length : '') + '</h3>' +
+    (running.length ? running.map(gameRow).join('') : '<p class="mp-lead">No live games yet. Host one, or join an invite.</p>') +
+    (done.length ? '<details class="mp-done"><summary>Finished · ' + done.length + '</summary>' + done.map(gameRow).join('') + '</details>' : '') +
+    (turns.length ? '<h3>Two-player games</h3>' + turns.map(t => '<div class="mp-row"><div class="mp-main"><span class="mp-name">With ' + esc(t.with) + '</span><span class="mp-meta">' + (t.yourTurn ? 'Your turn' : 'Their turn') + '</span></div></div>').join('') +
+      '<p class="mp-lead" style="margin-top:6px">These play turn by turn, so they open from Bored Together. <button class="btn" data-act="mp-together">Open Bored Together</button></p>' : '');
+}
+function mpHtml(data) {
+  if (data.error) return '<p class="mp-lead mp-error">' + esc(data.error) + '</p><p class="mp-lead">Trying again every few seconds.</p>';
+  if (!data.status.signedIn) return '<div class="mp-prompt"><h3>Sign in to Bored to play online</h3><p class="mp-lead">Live games, invites and your games on Bored go with your account.</p><button class="btn primary" data-act="mp-signin">Sign in</button></div>';
+  if (!data.status.enrolled) return '<div class="mp-prompt"><h3>Join Bored Together to play online</h3><p class="mp-lead">Bored Together is where friends find each other. Join it, then come back here to host a live game or answer an invite.</p><button class="btn primary" data-act="mp-together">Join Bored Together</button></div>';
+  return mpRows(data);
+}
+// Redraws only when the text changed, and keeps the scroll position, the focused button and whether Finished is open.
+function mpDraw(data) {
+  const body = document.getElementById('mp-body');
+  if (!body || UI.modalKind !== 'mp') return;
+  const html = mpHtml(data);
+  if (html === MP.sig) return;
+  MP.sig = html;
+  const done = body.querySelector('.mp-done');
+  if (done) MP.doneOpen = done.open;
+  const top = body.scrollTop, active = document.activeElement, focused = active && active.getAttribute ? active.getAttribute('data-act') : null;
+  body.innerHTML = html;
+  const folded = body.querySelector('.mp-done');
+  if (folded && MP.doneOpen) folded.open = true;
+  body.scrollTop = top;
+  if (focused) { const again = [...body.querySelectorAll('[data-act]')].find(b => b.getAttribute('data-act') === focused); if (again) again.focus({ preventScroll: true }); }
+}
+
+// A button on the screen: ask the hub, and tell the player if it said no. Opening a game replaces this page.
+function mpAction(kind, id) {
+  const bridge = mpBridge();
+  if (!bridge) return;
+  if (kind === 'mp-open') { showMultiplayer(); return; }
+  if (kind === 'mp-host') { mpHostOpen(); return; }
+  if (kind === 'mp-host-back') { mpHostClose(); return; }
+  if (MP.pending) return;
+  const ask = (op, payload) => {
+    MP.pending = true;
+    for (const b of document.querySelectorAll('#mp-body .btn')) b.disabled = true;
+    bridge.call(op, payload).catch(error => toast(mpWords(error))).then(() => { MP.pending = false; MP.sig = ''; mpRefresh(); });
+  };
+  if (kind === 'mp-signin') bridge.call('sign-in').catch(error => toast(mpWords(error)));
+  else if (kind === 'mp-together') ask('open-together', {});
+  else if (kind === 'mp-join') ask('join', { invite: id });
+  else if (kind === 'mp-decline') ask('decline', { invite: id });
+  else if (kind === 'mp-open-game') ask('open', { game: id });
+}
+
+// Host a live game: the same Game setup the lobby has, with a friend picker where the seats would be.
+const MP_SOLO_CONTROLS = () => liveLobbyControls().concat(UI.optHumans);
+function mpHostLayout(on) {
+  UI.paneSetup.classList.toggle('live', on);
+  for (const el of document.querySelectorAll('.live-only')) el.hidden = !on;
+  for (const el of document.querySelectorAll('.solo-only')) el.hidden = on;
+  UI.btnReady.hidden = true;
+  UI.paneSetup.querySelector('.eyebrow').textContent = on ? 'Live game' : 'New game';
+  const note = document.getElementById('cpus-note');
+  if (on) { MP.soloNote = note.textContent; note.textContent = 'Civs in all, up to 8, people included. Everyone moves at the same time; players at war with each other take turns.'; }
+  else if (MP.soloNote) note.textContent = MP.soloNote;
+  UI.btnBack.setAttribute('data-act', on ? 'mp-host-back' : 'title-back');
+  UI.btnBack.textContent = 'Back';
+  UI.btnBegin.textContent = on ? 'Open lobby' : 'Start game';
+  UI.btnBegin.disabled = false;
+  UI.seats.hidden = on;
+  document.getElementById('mp-pick').hidden = !on;
+}
+function mpHostOpen() {
+  const bridge = mpBridge();
+  if (!bridge) return;
+  closeModal();
+  MP.keep = MP_SOLO_CONTROLS().map(el => [el, el.type === 'checkbox' ? el.checked : el.value]);
+  MP.host = true; MP.picked = new Set(); MP.members = null;
+  mpHostLayout(true);
+  liveLobbyFill(MP_DEFAULTS);
+  UI.btnBegin.disabled = true;
+  showPane('setup');
+  mpMembers();
+}
+function mpHostClose() {
+  MP.host = false; MP.members = null; MP.picked = new Set();
+  mpHostLayout(false);
+  // The solo setup comes back as it was: its own CPU choices, then every value it had.
+  UI.optCpus.innerHTML = Array.from({ length: MAX_PLAYERS }, (x, k) => '<option value="' + k + '">' + k + '</option>').join('');
+  for (const [el, v] of MP.keep || []) { if (el.type === 'checkbox') el.checked = v; else el.value = v; }
+  MP.keep = null;
+  showPane('title');
+  showMultiplayer();
+}
+function mpMembers() {
+  const bridge = mpBridge(), box = document.getElementById('mp-people');
+  box.innerHTML = '<p class="hint">Loading members…</p>';
+  bridge.call('members').then(list => {
+    if (!MP.host) return;
+    MP.members = Array.isArray(list) ? list : [];
+    mpPickRender();
+  }, error => { if (MP.host) box.innerHTML = '<p class="hint mp-error">' + esc(mpWords(error)) + '</p>'; });
+}
+function mpPickRender() {
+  const box = document.getElementById('mp-people'), list = MP.members || [];
+  document.getElementById('mp-count').textContent = MP.picked.size + ' of ' + MP_MAX_INVITED + ' invited';
+  box.innerHTML = list.length ? list.map(m => '<label class="mp-person"><input type="checkbox" data-ref="' + esc(m.ref) + '"' + (MP.picked.has(m.ref) ? ' checked' : '') +
+    (!MP.picked.has(m.ref) && MP.picked.size >= MP_MAX_INVITED ? ' disabled' : '') + '><span>' + esc(m.name) + '</span></label>').join('')
+    : '<p class="hint">Nobody else has joined Bored Together yet. Anyone who joins appears here.</p>';
+  UI.btnBegin.disabled = !MP.picked.size;
+  liveCpuChoices();
+  refreshStart();
+}
+function mpPicked(event) {
+  const box = event.target;
+  if (!box || !box.getAttribute || !box.getAttribute('data-ref')) return;
+  const ref = box.getAttribute('data-ref');
+  if (box.checked && MP.picked.size < MP_MAX_INVITED) MP.picked.add(ref); else MP.picked.delete(ref);
+  mpPickRender();
+}
+function mpHostPressed() {
+  const bridge = mpBridge();
+  if (!bridge || !MP.picked.size) { toast('Pick 1 to 3 friends to invite.'); return; }
+  const cfg = liveLobbyConfig();
+  if (!cfg.conquest && !cfg.science && cfg.turns === 0) { toast('With conquest and science off, set a turn limit so someone can win on score.'); return; }
+  if (!Number.isInteger(cfg.turns) || (cfg.turns !== 0 && (cfg.turns < 10 || cfg.turns > 500))) {
+    toast('Turn limit: a whole number from 10 to 500, or 0 for no limit.');
+    UI.optTurns.focus();
+    return;
+  }
+  if (cfg.mode === 'coop') {
+    const why = coopProblem(1 + MP.picked.size, cfg.cpus);
+    if (why) { toast(why); return; }
+  }
+  UI.btnBegin.disabled = true;
+  bridge.call('host', { settings: cfg, invitees: [...MP.picked] }).catch(error => {
+    toast(mpWords(error));
+    UI.btnBegin.disabled = !MP.picked.size;
+    if (/again/i.test(mpWords(error))) { MP.picked = new Set(); mpMembers(); }
+  });
+}
+
 /* getting in */
 
 // The hub's answer to hello: the room, and for a game under way the newest snapshot and the actions after it.
@@ -11906,7 +12179,7 @@ function boot(data) {
     start: q('#start'), seats: q('#seats'), optHumans: q('#opt-humans'), optCpus: q('#opt-cpus'), optMode: q('#opt-mode'), modeNote: q('#mode-note'), optSize: q('#opt-size'), sizeNote: q('#size-note'),
     optConquest: q('#opt-conquest'), optScience: q('#opt-science'), optTurns: q('#opt-turns'), optMap: q('#opt-map'),
     optLevel: q('#opt-level'), mapNote: q('#map-note'), levelNote: q('#level-note'), optClose: q('#opt-close'), optWrap: q('#opt-wrap'), closeNote: q('#close-note'),
-    startNote: q('#start-note'), setupNote: q('#setup-note'), paneTitle: q('#pane-title'), paneSetup: q('#pane-setup'), titleMenu: q('#title-menu'), btnNew: q('#btn-new'),
+    startNote: q('#start-note'), setupNote: q('#setup-note'), paneTitle: q('#pane-title'), paneSetup: q('#pane-setup'), titleMenu: q('#title-menu'), btnNew: q('#btn-new'), btnMp: q('#btn-mp'),
     coach: q('#coach'), coachTag: q('#coach-tag'), coachCount: q('#coach-count'), coachSay: q('#coach-say'), coachActions: q('#coach-actions'), btnBegin: q('#btn-begin'), btnContinue: q('#btn-continue'), btnLoad: q('#btn-load'), endShown: false, modalKind: null
   };
   applyAnim();

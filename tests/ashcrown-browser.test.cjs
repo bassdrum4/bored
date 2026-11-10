@@ -367,9 +367,9 @@ for (const width of [400, 320]) {
       assert.equal(await page.$eval('.modal .notes-now', e => e.textContent), '5.3 · Nov 9', label + ': the newest entry is open at the top');
       assert.ok((await page.$eval('.modal .notes-now + .notes-list', e => e.textContent)).startsWith('Your saves follow your Bored account'));
       const folds = await page.$$eval('.modal details.notes-old', ds => ds.map(d => ({ open: d.open, summary: d.querySelector('summary').textContent })));
-      assert.equal(folds.length, 17, label + ': seventeen older entries');
+      assert.equal(folds.length, 18, label + ': eighteen older entries');
       assert.ok(folds.every(f => !f.open), label + ': all folded');
-      assert.deepEqual(folds.slice(0, 3).map(f => f.summary), ['5.1.1 · Nov 9', '5.1 · Nov 9', '5.0 · Nov 9']);
+      assert.deepEqual(folds.slice(0, 3).map(f => f.summary), ['5.2 · Nov 9', '5.1.1 · Nov 9', '5.1 · Nov 9']);
       assert.equal(folds.at(-1).summary, 'Before 4.0 · Nov 3–4');
       assert.deepEqual(await page.evaluate(fits), [], label + ': fits');
     };
@@ -402,7 +402,7 @@ for (const width of [400, 320]) {
     // A real click on an older entry opens it, and only that one.
     await page.click('.modal details.notes-old summary');
     assert.deepEqual(await page.$$eval('.modal details.notes-old', ds => ds.map(d => d.open).slice(0, 3)), [true, false, false]);
-    assert.ok((await page.$eval('.modal details.notes-old[open]', e => e.textContent)).includes('Live games: the server double-checks'));
+    assert.ok((await page.$eval('.modal details.notes-old[open]', e => e.textContent)).includes('Multiplayer on the title screen'));
     // Everything open: still no sideways scroll, and the list scrolls inside the box with Close in reach.
     await page.evaluate(() => document.querySelectorAll('.modal details').forEach(d => { d.open = true; }));
     assert.deepEqual(await page.evaluate(fits), [], 'all entries open: fits');
