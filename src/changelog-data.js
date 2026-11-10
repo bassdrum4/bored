@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 378,
+  "count": 379,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"70d6361","date":"2026-11-10","author":"Claude","subject":"Civ Lite 5.4: join live games with a room code"},
   {"sha":"926ab5e","date":"2026-11-10","author":"Codebuff","subject":"Rebuild Dirt Trials and enlarge the Corner shop."},
   {"sha":"5008b12","date":"2026-11-10","author":"Codebuff","subject":"Return Clicker's label to Click when the flash ends."},
   {"sha":"81d113d","date":"2026-11-10","author":"Codebuff","subject":"Flash Clicker red and switch its label to Clicked on each click."},
