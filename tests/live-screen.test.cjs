@@ -12,6 +12,7 @@ const { createRoom } = require('./live-room.cjs');
 const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // A click on the page itself: puppeteer's own click scrolls and waits for the element, which a busy setup screen can stall.
+const until = async (check, ms = 6000) => { const end = Date.now() + ms; while (Date.now() < end) { if (check()) return true; await sleep(30); } return check(); };
 const press = (page, selector) => page.evaluate(sel => document.querySelector(sel).click(), selector);
 
 async function table(t, config) {
@@ -145,8 +146,31 @@ test('a move on one screen shows on the other at once, and ending turns moves th
   // Each screen reported the round's hash and the lowest-seated human kept the snapshot.
   assert.ok(live.room.calls.some(c => c.op === 'report' && c.seat === 0 && c.p.round === 2));
   assert.ok(live.room.calls.some(c => c.op === 'report' && c.seat === 1 && c.p.round === 2));
-  assert.equal(live.room.snapshots.has(2), true);
+  // The keeper gives the other screen a second to report before it sends the snapshot, and the room keeps it once both agree.
+  assert.equal(await until(() => live.room.snapshots.has(2)), true, 'a snapshot of round 2 is kept');
   assert.equal(live.room.desyncs.length, 0);
+  for (const p of pages) assert.deepEqual(p.errors, []);
+});
+
+test('a snapshot the server says wait to is sent again, and a game ends once both humans have said how: a lost claim is sent again', async t => {
+  const { live, pages } = await started(t, { cpus: 1 });
+  const [ann, ben] = pages;
+  live.room.waits = 1;
+  await ann.evaluate('onAction("end-confirm")');
+  await ben.evaluate('onAction("end-confirm")');
+  for (const p of pages) await waitFor(p, 'G.turn === 2');
+  assert.equal(await until(() => live.room.snapshots.has(2), 9000), true, 'kept on the second try');
+  assert.equal(live.room.calls.filter(c => c.op === 'snapshot' && c.p.round === 2).length, 2, 'one wait, one retry, then it stopped');
+  // Both screens work out the same ending. One claim does not end the room; Ben's first claim is lost on the way and sent again.
+  const over = () => 'G.over = { winner: 1, why: "conquest" }; liveFinish()';
+  await ann.evaluate(over());
+  await sleep(150);
+  assert.equal(live.room.status, 'active', 'one claim is not enough');
+  live.room.failFinish = 1;
+  await ben.evaluate(over());
+  assert.equal(await until(() => live.room.status === 'completed', 6000), true, 'the second claim, after a retry, ends it');
+  assert.equal(live.room.winner, 1);
+  assert.equal(live.room.calls.filter(c => c.op === 'finish' && c.seat === 1).length, 2);
   for (const p of pages) assert.deepEqual(p.errors, []);
 });
 
@@ -201,7 +225,7 @@ test('a screen that opens a game under way restores the snapshot and plays the a
   await ben.evaluate('onAction("select-unit:' + unit + '")');
   await ben.evaluate('onAction("fortify")');
   await waitFor(ben, `unitById(${JSON.stringify(unit)}).fort === true`);
-  assert.equal(live.room.snapshots.has(2), true, 'a snapshot of round 2 exists');
+  assert.equal(await until(() => live.room.snapshots.has(2)), true, 'a snapshot of round 2 exists');
   // A third screen for Ben's seat opens the game: snapshot first, then the log after it.
   const browser = ben.browser();
   const late = await browser.newPage();

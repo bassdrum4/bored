@@ -192,6 +192,11 @@ async function functional(t,env) {
     const id=g.id;
     await rejects(send(env,A,id,'timeout',{round:1}),/has not run out/);
     await rejects(send(env,A,id,'timeout',{round:2}),/round is over/);
+    // A report for a round far ahead is refused and moves neither the round nor its clock, so the timer still runs.
+    const clock=async()=>(await env.admin('select round,round_at from bored_live.games where id=$1',[id]))[0];
+    const before=await clock();
+    for(const round of [3,50,9999]) await rejects(env.rpc(A,'report',{id,round,hash:'abcdef12'}),/Invalid request/);
+    assert.deepEqual(await clock(),before);
     await env.admin("update bored_live.games set round_at=now()-interval '61 seconds' where id=$1",[id]);
     const first=await send(env,A,id,'timeout',{round:1});
     assert.equal(first.duplicate,false);
@@ -205,43 +210,109 @@ async function functional(t,env) {
     await rejects(send(env,A,untimed.id,'timeout',{round:1}),/no turn timer/);
   });
 
-  await t.test('snapshots and hashes: first writer wins, a mismatch is logged, the round clock restarts',async()=>{
+  await t.test('snapshots and hashes: a snapshot waits for another seat to report its hash, first writer wins, a mismatch is logged, rounds are checked',async()=>{
     const g=await startedGame(env);
-    const id=g.id;
+    const id=g.id,H='abcdef12';
+    const snap=(user,round,hash,state={})=>env.rpc(user,'snapshot',{id,round,seq:3,hash,state:{turn:round,...state}});
+    const kept=async()=>(await env.admin('select round,hash,seat from bored_live.snapshots where game_id=$1 order by round',[id]));
     for(let i=0;i<3;i++) await send(env,A,id,'unit-fortify',{unit:i});
-    await rejects(env.rpc(A,'snapshot',{id,round:2,seq:99,hash:'abcdef12',state:{turn:2}}),/Invalid snapshot/);
+    await rejects(env.rpc(A,'snapshot',{id,round:2,seq:99,hash:H,state:{turn:2}}),/Invalid snapshot/);
     await rejects(env.rpc(A,'snapshot',{id,round:2,seq:3,hash:'zz',state:{turn:2}}),/Invalid snapshot/);
-    assert.equal((await env.rpc(A,'snapshot',{id,round:2,seq:3,hash:'abcdef12',state:{turn:2,from:'A'}})).stored,true);
-    assert.equal((await env.rpc(B,'snapshot',{id,round:2,seq:3,hash:'abcdef12',state:{turn:2,from:'B'}})).stored,false);
-    const stored=await env.admin("select state->>'from' f, seat from bored_live.snapshots where game_id=$1 and round=2",[id]);
-    assert.deepEqual([stored[0].f,stored[0].seat],['A',0]);
-    const joined=await env.rpc(C,'game',{id});
-    assert.deepEqual(joined.snapshot,{round:2,seq:3,hash:'abcdef12'});
+    // Three humans are playing: nobody else has reported round 2, so the snapshot is not stored. The sender is told to ask again.
+    assert.deepEqual(await snap(A,2,H,{from:'A'}),{stored:false,wait:true});
+    assert.deepEqual(await kept(),[]);
+    // Another seat reporting a different hash is not a confirmation; the same hash is.
+    await env.rpc(B,'report',{id,round:2,hash:'0badc0de'});
+    assert.deepEqual(await snap(A,2,H,{from:'A'}),{stored:false,wait:true},'a hash nobody else reported is not stored');
+    await env.rpc(C,'report',{id,round:2,hash:H});
+    assert.equal((await snap(A,2,H,{from:'A'})).stored,true);
+    assert.deepEqual(await kept(),[{round:2,hash:H,seat:0}]);
+    // The first writer wins; a later snapshot for the same round is not stored and not asked to wait.
+    assert.deepEqual(await snap(C,2,H,{from:'C'}),{stored:false,wait:true},'C is the only seat that reported H, so no other seat confirms it');
+    await env.rpc(A,'report',{id,round:2,hash:H});
+    assert.deepEqual(await snap(C,2,H,{from:'C'}),{stored:false});
+    assert.equal((await env.admin("select state->>'from' f from bored_live.snapshots where game_id=$1 and round=2",[id]))[0].f,'A');
     // A player who joins or comes back loads the newest snapshot with its state, then syncs from its seq.
-    assert.deepEqual((await env.rpc(C,'load',{id})).snapshot,{round:2,seq:3,hash:'abcdef12',state:{turn:2,from:'A'}});
+    assert.deepEqual((await env.rpc(C,'game',{id})).snapshot,{round:2,seq:3,hash:H});
+    assert.deepEqual((await env.rpc(C,'load',{id})).snapshot,{round:2,seq:3,hash:H,state:{turn:2,from:'A'}});
     await rejects(env.rpc(E,'load',{id}),/not in this game/);
     // Only the newest few snapshots are kept.
-    for(const r of [3,4,5,6]) await env.rpc(A,'snapshot',{id,round:r,seq:3,hash:'abcdef12',state:{turn:r}});
-    assert.deepEqual((await env.admin('select round from bored_live.snapshots where game_id=$1 order by round',[id])).map(r=>r.round),[4,5,6]);
-    // Hashes
-    assert.deepEqual(await env.rpc(A,'report',{id,round:2,hash:'0123abcd'}),{ok:true,desync:false});
-    assert.deepEqual(await env.rpc(B,'report',{id,round:2,hash:'0123abcd'}),{ok:true,desync:false});
-    assert.equal((await env.rpc(C,'sync',{id,after:0})).round,2);
-    const bad=await env.rpc(C,'report',{id,round:2,hash:'ffffffff'});
+    for(const r of [3,4,5,6]) { await env.rpc(B,'report',{id,round:r,hash:H}); await snap(A,r,H); }
+    assert.deepEqual((await kept()).map(r=>r.round),[4,5,6]);
+
+    // Hashes: a mismatch is logged, and the round clock follows the first report of a round.
+    const other=(await startedGame(env)).id;   // a second room, with its own round clock
+    assert.deepEqual(await env.rpc(A,'report',{id:other,round:2,hash:'0123abcd'}),{ok:true,desync:false});
+    assert.deepEqual(await env.rpc(B,'report',{id:other,round:2,hash:'0123abcd'}),{ok:true,desync:false});
+    assert.equal((await env.rpc(C,'sync',{id:other,after:0})).round,2);
+    const bad=await env.rpc(C,'report',{id:other,round:2,hash:'ffffffff'});
     assert.equal(bad.desync,true);
-    const log=await env.admin('select round,seat,expected,got from bored_live.desyncs where game_id=$1',[id]);
+    const log=await env.admin('select round,seat,expected,got from bored_live.desyncs where game_id=$1',[other]);
     assert.deepEqual(log.map(x=>[x.round,x.seat,x.expected,x.got]),[[2,2,'0123abcd','ffffffff']]);
-    // A late report for an old round does not rewind the round clock.
-    await env.rpc(B,'report',{id,round:1,hash:'0123abcd'});
-    assert.equal((await env.rpc(C,'sync',{id,after:0})).round,2);
+    // Only the round under way or the next one is accepted; anything else is refused and moves nothing.
+    const clock=async()=>(await env.admin('select round,round_at from bored_live.games where id=$1',[other]))[0];
+    const was=await clock();
+    for(const round of [1,4,50]) await rejects(env.rpc(B,'report',{id:other,round,hash:'0123abcd'}),/Invalid request/);
+    assert.deepEqual(await clock(),was,'neither the round nor its clock moved');
+    assert.deepEqual(await env.rpc(B,'report',{id:other,round:3,hash:'0123abcd'}),{ok:true,desync:false},'the next round is fine');
+    assert.equal((await clock()).round,3);
+
+    // One human seat: nobody to ask, so a snapshot is stored as before. A seat a CPU is playing still needs a confirmation.
+    const solo=await startedGame(env);
+    await env.admin("update bored_live.seats set controller='cpu' where game_id=$1 and seat in (1,2)",[solo.id]);
+    assert.equal((await env.rpc(A,'snapshot',{id:solo.id,round:2,seq:0,hash:H,state:{turn:2}})).stored,true);
+    assert.deepEqual(await env.rpc(B,'snapshot',{id:solo.id,round:3,seq:0,hash:H,state:{turn:3}}),{stored:false,wait:true},'B’s seat is run by a CPU: it needs another seat to confirm');
   });
 
-  await t.test('finishing a game and who can see it',async()=>{
+  await t.test('finishing a game: two seated humans must send the same winner, or the only human left; a lone claim waits',async()=>{
+    const state=async id=>(await env.admin('select status,winner,over_reason from bored_live.games where id=$1',[id]))[0];
+    const claims=async id=>(await env.admin('select seat,winner from bored_live.finish_claims where game_id=$1 order by seat',[id])).map(c=>[c.seat,c.winner]);
     const g=await startedGame(env);
-    const done=await env.rpc(B,'finish',{id:g.id,winner:1,why:'Conquest'});
+    const id=g.id;
+    // One claim is stored and ignored: the game goes on. The same human again does not make two.
+    assert.equal((await env.rpc(B,'finish',{id,winner:1,why:'Conquest'})).status,'active');
+    assert.equal((await env.rpc(B,'finish',{id,winner:1,why:'Conquest'})).status,'active');
+    assert.deepEqual(await claims(id),[[1,1]]);
+    assert.equal((await send(env,A,id,'unit-fortify',{unit:1})).duplicate,false,'still running');
+    // A different winner from another human is not an agreement either.
+    assert.equal((await env.rpc(C,'finish',{id,winner:2,why:'Score'})).status,'active');
+    assert.deepEqual(await state(id),{status:'active',winner:null,over_reason:null});
+    // The second matching claim ends it, with the winner and the reason they sent.
+    const done=await env.rpc(A,'finish',{id,winner:1,why:'Conquest'});
     assert.deepEqual([done.status,done.winner,done.over_reason],['completed',1,'Conquest']);
-    await rejects(send(env,A,g.id,'end-turn'),/not running/);
-    assert.ok((await env.rpc(A,'list')).some(x=>x.id===g.id&&x.status==='completed'));
+    await rejects(send(env,A,id,'end-turn'),/not running/);
+    assert.ok((await env.rpc(A,'list')).some(x=>x.id===id&&x.status==='completed'));
+    assert.equal((await env.rpc(C,'finish',{id,winner:2,why:'late'})).winner,1,'a finished game stays as it ended');
+    // Claims that do not count: a seat that is not in the game, nonsense, a CPU-run seat, a seat that never joined.
+    const h=await startedGame(env);
+    for(const winner of [7,-1,'x',null,1.5]) await env.rpc(A,'finish',{id:h.id,winner,why:'x'});
+    assert.deepEqual(await claims(h.id),[],'only a seat that is in the game can be named');
+    await env.admin("update bored_live.seats set controller='cpu' where game_id=$1 and seat=1",[h.id]);
+    await env.rpc(B,'finish',{id:h.id,winner:0,why:'x'});
+    assert.deepEqual(await claims(h.id),[],'a seat a CPU is playing sends no claim');
+    await rejects(env.rpc(E,'finish',{id:h.id,winner:0,why:'x'}),/not in this game/);
+    await rejects(env.rpc(F,'finish',{id:h.id,winner:0,why:'x'}),/Join Bored Together first/);
+    // With one human left seated as human, that one is enough. Here A and C remain, then only A.
+    await env.rpc(A,'finish',{id:h.id,winner:0,why:'Conquest'});
+    assert.equal((await state(h.id)).status,'active');
+    await env.admin("update bored_live.seats set controller='cpu' where game_id=$1 and seat=2",[h.id]);
+    assert.equal((await env.rpc(A,'finish',{id:h.id,winner:0,why:'Conquest'})).status,'completed');
+    // A lone claim counts again when the other humans leave afterwards (a takeover re-reads the claims).
+    const k=await startedGame(env);
+    assert.equal((await env.rpc(A,'finish',{id:k.id,winner:1,why:'Score'})).status,'active');
+    await send(env,B,k.id,'cpu-takes-over',{seat:1});
+    assert.equal((await state(k.id)).status,'active','C is still here');
+    await send(env,C,k.id,'cpu-takes-over',{seat:2});
+    assert.deepEqual(await state(k.id),{status:'completed',winner:1,over_reason:'Score'});
+    // The claims are server business: no direct reads, no helper calls.
+    await rejects(env.asUser(A,'select * from bored_live.finish_claims'),/permission denied/);
+    await rejects(env.asUser(A,'select bored_live.settle_finish($1)',[k.id]),/permission denied/);
+    // A co-op room is checked the same way.
+    const co=await startedGame(env,{mode:'coop'});
+    assert.equal((await env.rpc(A,'finish',{id:co.id,winner:1,why:'Your team won'})).status,'active');
+    assert.equal((await env.rpc(B,'finish',{id:co.id,winner:2,why:'Your team lost'})).status,'active','disagreeing claims do not end it');
+    const won=await env.rpc(C,'finish',{id:co.id,winner:1,why:'Your team won'});
+    assert.deepEqual([won.status,won.winner],['completed',1]);
   });
 
   await t.test('rate limits: sending, and creating games',async()=>{
@@ -344,6 +415,7 @@ async function functional(t,env) {
     await env.admin("delete from bored_together.limits where bucket like 'live%'");
     // Ending the game takes its pings with it when the room is cleaned up.
     await env.rpc(B,'finish',{id,winner:1,why:'Conquest'});
+    await env.rpc(A,'finish',{id,winner:1,why:'Conquest'});
     await rejects(env.rpc(A,'ping',{id,x:3,y:3}),/not running/);
     await env.admin("delete from bored_live.games where id=$1",[id]);
     assert.equal((await env.admin('select count(*)::int n from bored_live.pings where game_id=$1',[id]))[0].n,0);
@@ -360,11 +432,11 @@ async function functional(t,env) {
     await rejects(env.asUser(B,"insert into bored_live.actions(game_id,seq,seat,type,request_id) values($1,99,1,'x',gen_random_uuid())",[id]),/permission denied/);
     await rejects(env.asUser(B,'update bored_live.actions set seat=3'),/permission denied/);
     await rejects(env.asUser(B,'delete from bored_live.actions'),/permission denied/);
-    for(const table of ['games','seats','snapshots','hashes','desyncs','presence']) await rejects(env.asUser(B,`select * from bored_live.${table}`),/permission denied/);
+    for(const table of ['games','seats','snapshots','hashes','desyncs','presence','finish_claims']) await rejects(env.asUser(B,`select * from bored_live.${table}`),/permission denied/);
     await rejects(env.asUser(B,'select bored_live.cleanup()'),/permission denied/);
     await rejects(env.asUser(null,"select bored_live.api('list','{}'::jsonb)"),/permission denied/);
     const rls=await env.admin("select relname,relrowsecurity from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='bored_live' and relkind='r' order by relname");
-    assert.deepEqual(rls.map(r=>r.relname),['actions','desyncs','games','hashes','pings','presence','seats','snapshots']);
+    assert.deepEqual(rls.map(r=>r.relname),['actions','desyncs','finish_claims','games','hashes','pings','presence','seats','snapshots']);
     assert.ok(rls.every(r=>r.relrowsecurity===true));
   });
 
@@ -463,4 +535,22 @@ test('the co-op migration only adds: a new table and function, a wider setup che
   assert.match(sql,/create function bored_live\.ping_api/);
   assert.match(sql,/create table bored_live\.pings/);
   assert.match(sql,/function public\.bt_live_rpc\(action text,args jsonb default '\{\}'\) returns jsonb/);
+});
+
+test('the 5.1.1 migration only adds: one table, one helper, the same entry point with three checks',()=>{
+  const sql=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261109190000_together_live_checks.sql'),'utf8');
+  assert.ok(!/\b(drop|truncate)\s+(table|schema|function)/i.test(sql),'no drops');
+  assert.deepEqual([...sql.matchAll(/alter\s+table\s+([\w.]+)/gi)].map(m=>m[1]),['bored_live.finish_claims'],'no existing table is altered, only the new one');
+  assert.deepEqual([...sql.matchAll(/create or replace function ([\w.]+)/gi)].map(m=>m[1]).sort(),['bored_live.api','bored_live.settle_finish']);
+  assert.ok(!/function\s+(public\.bt_live_rpc|bored_live\.(ping_api|clean_config))/i.test(sql),'the co-op pieces from 5.1 are not touched');
+  assert.match(sql,/create table if not exists bored_live\.finish_claims/);
+  assert.match(sql,/revoke all on function bored_live\.settle_finish\(uuid\) from public,anon,authenticated/);
+  assert.match(sql,/grant execute on function bored_live\.api\(text,jsonb\) to authenticated/);
+  // It carries the whole of bored_live.api, so it must still know every action the 5.0 one did.
+  const first=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261109120000_together_live_ashcrown.sql'),'utf8');
+  const actions=text=>text.match(/if action not in \(([^)]*)\)/)[1];
+  assert.equal(actions(sql),actions(first));
+  // And the migrations still sort in the order they must run.
+  const names=fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(f=>/together_live_(ashcrown|coop|checks)/.test(f)).sort();
+  assert.deepEqual(names,['20261109120000_together_live_ashcrown.sql','20261109150000_together_live_coop.sql','20261109190000_together_live_checks.sql']);
 });

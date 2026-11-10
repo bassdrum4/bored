@@ -7,7 +7,7 @@ function createRoom(handles, config) {
   const room = {
     status: 'lobby', config: Object.assign({ map: 'pangaea', size: 'small', level: 'normal', borders: 'tech', turns: 100, cpus: 1, timer: 0, wrap: false, conquest: true, science: true, unjoined: 'cpu' }, config || {}),
     seats: handles.map((handle, i) => ({ seat: i, handle, state: i === 0 ? 'joined' : 'invited', civ: null, controller: 'human', online: true, away: 0, team: i })),
-    start: null, head: 0, round: 1, actions: [], snapshots: new Map(), hashes: new Map(), desyncs: [], pages: new Map(), calls: [], exits: [], reloads: [], pings: []
+    start: null, head: 0, round: 1, actions: [], snapshots: new Map(), hashes: new Map(), claims: new Map(), desyncs: [], pages: new Map(), calls: [], exits: [], reloads: [], pings: []
   };
   const timer = () => room.config.timer || 0;
   const json = seat => ({
@@ -88,18 +88,38 @@ function createRoom(handles, config) {
       for (const [other] of room.pages) if (other !== seat) setTimeout(() => push({ event: 'ping', seat, x: p.x, y: p.y }, other), 5);
       return { id: room.pings.length };
     }
+    // The server's three checks (5.1.1): a report names the round under way or the next one, a snapshot is kept only once
+    // another seat has reported the same hash for that round, and the game ends on two matching claims from humans.
     if (op === 'report') {
+      if (room.status !== 'active') return { ok: true, desync: false };
+      if (p.round !== room.round && p.round !== room.round + 1) throw new Error('Invalid request.');
       const key = p.round + ':' + seat;
-      room.hashes.set(key, p.hash);
+      if (!room.hashes.has(key)) room.hashes.set(key, p.hash);
+      if (p.round > room.round) room.round = p.round;
       const other = [...room.hashes].find(([k, h]) => k.startsWith(p.round + ':') && k !== key && h !== p.hash);
       if (other) { room.desyncs.push({ round: p.round, seat }); return { ok: true, desync: true }; }
       return { ok: true, desync: false };
     }
     if (op === 'snapshot') {
+      if (room.waits > 0) { room.waits--; return { stored: false, wait: true }; }   // a test can make the server say "wait" a few times
+      const humans = room.seats.filter(s => s.state !== 'left' && s.controller === 'human').length;
+      const confirmed = [...room.hashes].some(([k, h]) => k.startsWith(p.round + ':') && k !== p.round + ':' + seat && h === p.hash);
+      if ((humans > 1 || mine.controller !== 'human') && !confirmed) return { stored: false, wait: true };
       if (!room.snapshots.has(p.round)) room.snapshots.set(p.round, { round: p.round, seq: p.seq, hash: p.hash, state: p.state });
       return { stored: true };
     }
-    if (op === 'finish') { room.status = 'completed'; room.winner = p.winner; return json(seat); }
+    if (op === 'finish') {
+      if (room.failFinish > 0) { room.failFinish--; throw new Error('Failed to fetch'); }   // ... or lose a few finish calls
+      if (room.status === 'active' && mine.controller === 'human') {
+        room.claims.set(seat, p.winner);
+        const live = room.seats.filter(s => s.state !== 'left' && s.controller === 'human');
+        const votes = new Map();
+        for (const s of live) if (room.claims.has(s.seat)) votes.set(room.claims.get(s.seat), (votes.get(room.claims.get(s.seat)) || 0) + 1);
+        const best = [...votes].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
+        if (best && best[1] >= Math.min(2, live.length)) { room.status = 'completed'; room.winner = best[0]; }
+      }
+      return json(seat);
+    }
     if (op === 'leave') { if (seat === 0) room.status = 'cancelled'; else mine.state = 'left'; pushGame(); return json(seat); }
     if (op === 'exit') { room.exits.push(seat); return {}; }
     if (op === 'reload') { room.reloads.push({ seat, round: p.round }); return {}; }

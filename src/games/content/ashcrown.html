@@ -10421,9 +10421,12 @@ function resumeState(state) {
 
 const START_NOTE = 'Everyone starts with a settler and a warrior, at peace. No two players share a civ. Keys are Civ 6’s: <b>right-click</b> sends the selected unit, <b>Enter</b> picks the next thing that needs orders (and ends the turn when nothing does), ' +
   '<b>Space</b> skips a unit, <b>B</b> founds a city, <b>F</b> fortifies, <b>Z</b> sleeps, <b>T</b> opens the tech tree, <b>F1</b> the realm and <b>F9</b> the rules.';
-const VERSION = '5.1';
+const VERSION = '5.1.1';
 // Patch notes for the What’s new screen, newest first: a version, a date and one plain line per change.
 const CHANGELOG = [
+  { v: '5.1.1', date: 'Nov 9', notes: [
+    'Live games: the server double-checks game endings, round numbers and saved snapshots.'
+  ] },
   { v: '5.1', date: 'Nov 9', notes: [
     'Co-op, like Civ 6 team play: pick “Co-op: humans vs CPUs” in game setup, in live games and on one device. Every human is on one team against the CPUs.',
     'Teammates share one map and always have open borders. They can’t go to war with each other, and they trade or give each other horses, iron and gunpowder.',
@@ -10895,8 +10898,22 @@ function liveRound() {
   if (G.over) return;
   const hash = liveHash();
   LIVE.net.call('report', { round, hash }).then(r => { if (r && r.desync) liveDesync(round); }).catch(() => {});
-  if (liveKeeper()) LIVE.net.call('snapshot', { round, seq: LIVE.applied, hash, state: liveState(false) }).catch(() => {});
+  if (liveKeeper()) {
+    // With more than one human playing, the server keeps a snapshot only once another screen has reported the same hash,
+    // so give the others a moment first. (One human playing: it is kept at once.)
+    const crowd = G.live.humans.filter(i => pl(i).human).length > 1;
+    const state = liveState(false), seq = LIVE.applied;
+    setTimeout(() => liveKeepSnapshot(round, seq, hash, state, 0), crowd ? 1000 : 0);
+  }
   toast(noticeFor(G.viewer) || 'Round ' + G.turn);
+}
+// Send the round's snapshot, and send it again a few times while the server answers "wait" (no other screen has
+// confirmed the hash yet). It gives up after a minute or once the game has moved on: the next round brings a new one.
+const LIVE_SNAPSHOT_WAITS = [1500, 3000, 5000, 8000, 12000, 20000];
+function liveKeepSnapshot(round, seq, hash, state, tries) {
+  LIVE.net.call('snapshot', { round, seq, hash, state }).then(r => {
+    if (r && r.wait && tries < LIVE_SNAPSHOT_WAITS.length && G && G.live && !G.over && G.turn <= round + 1) setTimeout(() => liveKeepSnapshot(round, seq, hash, state, tries + 1), LIVE_SNAPSHOT_WAITS[tries]);
+  }).catch(() => {});
 }
 // The lowest-seated human who is online keeps the snapshot. (Two screens can both think so for a moment; the server keeps the first.)
 function liveKeeper() {
@@ -10907,9 +10924,13 @@ function liveKeeper() {
   }
   return false;
 }
-function liveFinish() {
+// Every human screen says how the game ended. The server ends the room once two humans have said the same thing (or the
+// only human left has), so a claim that did not get through is sent again a few times.
+function liveFinish(tries) {
   LIVE.finished = true;
-  LIVE.net.call('finish', { winner: G.over.winner, why: G.over.why }).catch(() => {});
+  LIVE.net.call('finish', { winner: G.over.winner, why: G.over.why }).catch(() => {
+    if ((tries || 0) < 4 && G && G.over) setTimeout(() => liveFinish((tries || 0) + 1), 3000);
+  });
 }
 // Two screens that disagree on the hash of a round cannot both be right. The one the server tells reloads from the
 // last snapshot and the actions after it.

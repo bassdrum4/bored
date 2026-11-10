@@ -56,7 +56,8 @@ function room(extra = {}) {
       case 'ping': { const p = { id: ++r.pingHead, seat: 0, x: args.x, y: args.y }; r.pings.push(p); return { id: p.id }; }
       case 'pings': return { pings: r.pings.filter(p => p.id > (args.after || 0)), head: r.pingHead };
       case 'report': return { ok: true, desync: !!r.desync };
-      case 'finish': r.status = 'completed'; r.winner = args.winner; return game();
+      // The server ends a game once enough humans have said so (r.claimsNeeded, 1 unless a test says otherwise).
+      case 'finish': r.claims = (r.claims || 0) + 1; if (r.claims >= (r.claimsNeeded || 1)) { r.status = 'completed'; r.winner = args.winner; } return game();
       case 'send': {
         if (r.requests.has(args.request_id)) return { seq: r.requests.get(args.request_id), duplicate: true, head: r.head };
         if (args.type === 'bad') throw Object.assign(new Error('Invalid action.'), { status: 400 });
@@ -295,6 +296,22 @@ test('report, snapshot and finish go to the room; finishing stops the timers', a
   const n = beats();
   await wait(120);
   assert.equal(beats(), n, 'no more heartbeats once it is over');
+});
+
+test('a finish claim that does not end the game leaves the room open; the claim that does stops the timers', async t => {
+  const r = room({ status: 'active', claimsNeeded: 2 });
+  const sock = socket();
+  const s = await session(t, r, { sock });
+  await s.call('hello', {});
+  assert.equal((await s.call('finish', { winner: 1, why: 'conquest' })).status, 'active');
+  await wait(100);
+  assert.equal(sock.closed, 0, 'one claim: the socket stays');
+  const beats = () => r.calls.filter(c => c.action === 'heartbeat').length;
+  const n = beats();
+  await wait(120);
+  assert.ok(beats() > n, 'and the heartbeat goes on');
+  assert.equal((await s.call('finish', { winner: 1, why: 'conquest' })).status, 'completed');
+  assert.equal(sock.closed, 1);
 });
 
 test('reload is limited to three a couple of minutes; resync rewinds to what the page has; exit closes the screen', async t => {
