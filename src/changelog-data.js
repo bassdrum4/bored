@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 376,
+  "count": 377,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"5008b12","date":"2026-11-10","author":"Codebuff","subject":"Return Clicker's label to Click when the flash ends."},
   {"sha":"81d113d","date":"2026-11-10","author":"Codebuff","subject":"Flash Clicker red and switch its label to Clicked on each click."},
   {"sha":"ed4c8c8","date":"2026-11-10","author":"Codebuff","subject":"Add Clicker, a one-click one-point game."},
   {"sha":"f1aa9f6","date":"2026-11-10","author":"Daniel Lowe","subject":"Add Dirt Trials bike game to Bored","pr":109},
