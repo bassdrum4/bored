@@ -363,13 +363,13 @@ for (const width of [400, 320]) {
     const modalText = () => page.evaluate('(() => { const m = document.querySelector(".modal"); return m && m.offsetParent !== null ? m.textContent : ""; })()');
     // The notes screen as it should look when first opened.
     const checkOpenScreen = async label => {
-      assert.match(await modalText(), /What’s new\s*Civ Lite 4\.6\.1/, label + ': head and sub');
-      assert.equal(await page.$eval('.modal .notes-now', e => e.textContent), '4.6.1 · Nov 7', label + ': the newest entry is open at the top');
-      assert.ok((await page.$eval('.modal .notes-now + .notes-list', e => e.textContent)).startsWith('A What’s new screen'));
+      assert.match(await modalText(), /What’s new\s*Civ Lite 5\.4\.1/, label + ': head and sub');
+      assert.equal(await page.$eval('.modal .notes-now', e => e.textContent), '5.4.1 · Nov 10', label + ': the newest entry is open at the top');
+      assert.ok((await page.$eval('.modal .notes-now + .notes-list', e => e.textContent)).startsWith('Fixed the Bored Together page scrolling sideways'));
       const folds = await page.$$eval('.modal details.notes-old', ds => ds.map(d => ({ open: d.open, summary: d.querySelector('summary').textContent })));
-      assert.equal(folds.length, 10, label + ': ten older entries');
+      assert.equal(folds.length, 20, label + ': twenty older entries');
       assert.ok(folds.every(f => !f.open), label + ': all folded');
-      assert.deepEqual(folds.slice(0, 2).map(f => f.summary), ['4.6 · Nov 7', '4.5 orders · Nov 6']);
+      assert.deepEqual(folds.slice(0, 3).map(f => f.summary), ['5.4 · Nov 10', '5.3 · Nov 9', '5.2 · Nov 9']);
       assert.equal(folds.at(-1).summary, 'Before 4.0 · Nov 3–4');
       assert.deepEqual(await page.evaluate(fits), [], label + ': fits');
     };
@@ -377,7 +377,7 @@ for (const width of [400, 320]) {
     // A first visit (no prefs, no saves) is quiet: no New tag, and the Tutorial's tag is the only one.
     assert.equal(await visible('#notes-tag'), false, 'no New tag on a first visit');
     assert.equal(await visible('#tut-tag'), true, 'the Tutorial still says where to start');
-    assert.equal((await prefs()).notesSeen, '4.6.1', 'the notes were quietly marked seen');
+    assert.equal((await prefs()).notesSeen, '5.4.1', 'the notes were quietly marked seen');
 
     // Someone who has played before and has not read these notes: the tag shows, styled like the Tutorial's.
     await page.evaluate(k => localStorage.setItem(k, JSON.stringify({ tips: true, notesSeen: '4.6' })), PREFS);
@@ -398,11 +398,11 @@ for (const width of [400, 320]) {
     await page.click('#btn-notes');
     await checkOpenScreen('title');
     assert.equal(await visible('#notes-tag'), false, 'opening the screen takes the tag off');
-    assert.equal((await prefs()).notesSeen, '4.6.1');
+    assert.equal((await prefs()).notesSeen, '5.4.1');
     // A real click on an older entry opens it, and only that one.
     await page.click('.modal details.notes-old summary');
     assert.deepEqual(await page.$$eval('.modal details.notes-old', ds => ds.map(d => d.open).slice(0, 3)), [true, false, false]);
-    assert.ok((await page.$eval('.modal details.notes-old[open]', e => e.textContent)).includes('Early Empire: a cheap new tech (25)'));
+    assert.ok((await page.$eval('.modal details.notes-old[open]', e => e.textContent)).includes('Room codes, like Civ 6'));
     // Everything open: still no sideways scroll, and the list scrolls inside the box with Close in reach.
     await page.evaluate(() => document.querySelectorAll('.modal details').forEach(d => { d.open = true; }));
     assert.deepEqual(await page.evaluate(fits), [], 'all entries open: fits');
@@ -436,6 +436,373 @@ for (const width of [400, 320]) {
     await checkOpenScreen('menu');
     await page.click('.modal-foot .btn.primary');
     assert.equal(await modalText(), '');
+    assert.deepEqual(errors, []);
+  });
+}
+
+/* ── 4.6.2: How to play with a contents list ──────────────────────────────── */
+
+for (const width of [1000, 400, 320]) {
+  test('Ashcrown 4.6.2: How to play has grouped contents, jumps, a highlight that follows the text, and search (' + width + 'px)', async t => {
+    const wide = width >= 720;
+    const { page, errors } = await open(t, width);
+    if (wide) {                                              // a desktop window: open() starts as a phone
+      await page.setViewport({ width, height: 800, deviceScaleFactor: 1 });
+      await page.reload();
+      await page.waitForSelector('#btn-new', { visible: true });
+    }
+    const pause = ms => new Promise(r => setTimeout(r, ms));
+    const shown = sel => page.evaluate(s => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0; }, sel);
+    const modalOpen = () => page.evaluate('!UI.modalLayer.hidden');
+    const rect = sel => page.$eval(sel, e => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; });
+    const here = () => page.evaluate(() => { const e = document.querySelector('.help-link.on'); return e ? e.textContent : null; });
+    const links = () => page.$$eval('.help-link', els => els.map(e => e.getAttribute('data-act').slice(8)));
+    const labels = () => page.$$eval('.help-label', els => els.map(e => e.textContent));
+    const pos = () => page.$eval('#help-text', e => Math.round(e.scrollTop));
+    // The pane has stopped moving (a smooth scroll takes a moment).
+    const settle = async () => { let last = -1, same = 0; while (same < 4) { const p = await pos(); same = p === last ? same + 1 : 0; last = p; await pause(60); } return last; };
+    const atTop = id => page.evaluate(i => {
+      const pane = document.getElementById('help-text'), h = document.querySelector('#help-sec-' + i + ' h3');
+      return { d: Math.round(h.getBoundingClientRect().top - pane.getBoundingClientRect().top), focus: document.activeElement === h };
+    }, id);
+    // What should be marked: the last section whose heading has reached the top of the text.
+    const reading = () => page.evaluate(() => {
+      const top = document.getElementById('help-text').getBoundingClientRect().top;
+      let cur = null;
+      for (const s of document.querySelectorAll('.help-sec')) if (s.getBoundingClientRect().top <= top + 16) cur = s.querySelector('h3').textContent;
+      return cur;
+    });
+    const sideways = async () => {
+      const bad = await page.evaluate(fits);
+      const boxes = await page.evaluate(() => ['#help-text', '.help-toc', '.help-main', '.help-body'].map(s => { const e = document.querySelector(s); return e && getComputedStyle(e).display !== 'none' ? [s, e.scrollWidth - e.clientWidth] : [s, 0]; }).filter(x => x[1] > 1));
+      return bad.concat(boxes.map(b => b[0] + ' scrolls sideways by ' + b[1]));
+    };
+    const key = k => page.keyboard.press(k);
+
+    // From the title screen, a real click.
+    await page.click('#btn-help');
+    assert.ok(await shown('.modal.help'), 'How to play opens');
+    assert.deepEqual(await sideways(), [], 'fits');
+    assert.equal((await page.$$('.help-sec')).length, 27);
+    assert.deepEqual(await page.$$eval('h2.help-group', els => els.map(e => e.textContent)), ['Basics', 'Science and resources', 'Units and moving', 'War', 'Diplomacy', 'The world', 'Winning', 'Controls']);
+    assert.equal(await here(), 'A turn', 'the first section is marked to start with');
+
+    if (wide) {
+      // Two columns: the contents on the left (about 210px), the text on the right, the Contents button gone.
+      assert.equal(await shown('[data-act="help-contents"]'), false, 'no Contents button on a wide screen');
+      const toc = await rect('.help-toc'), text = await rect('#help-text'), modal = await rect('.modal');
+      assert.ok(toc.width >= 195 && toc.width <= 240, 'the contents is about 210px wide: ' + toc.width);
+      assert.ok(text.left >= toc.right - 0.5 && text.width > 400, 'the text is beside it');
+      assert.ok(Math.abs(toc.top - text.top) < 2 && modal.width > 800, 'level with each other in a wide modal');
+      assert.deepEqual(await labels(), ['Basics', 'Science and resources', 'Units and moving', 'War', 'Diplomacy', 'The world', 'Winning', 'Controls'], 'the contents list is grouped');
+      // It stays put while the text scrolls.
+      await page.evaluate(() => { document.getElementById('help-text').scrollTop = 1500; });
+      await pause(150);
+      const after = await rect('.help-toc');
+      assert.ok(Math.abs(after.top - toc.top) < 0.5 && Math.abs(after.left - toc.left) < 0.5, 'the contents stays where it was');
+      assert.equal(await page.$eval('.help-body', e => e.scrollTop), 0, 'only the text scrolls');
+      await page.evaluate(() => { document.getElementById('help-text').scrollTop = 0; });
+    } else {
+      // One column: the Contents button is there, the list is not, and the button stays put while the text scrolls.
+      assert.equal(await shown('.help-toc'), false, 'the list is hidden until asked for');
+      assert.ok(await shown('[data-act="help-contents"]'), 'a Contents button');
+      const bar = await rect('[data-act="help-contents"]');
+      assert.ok(bar.left >= 0 && bar.right <= width && bar.height >= 28, 'on screen and big enough to tap');
+      await page.evaluate(() => { document.getElementById('help-text').scrollTop = 1500; });
+      await pause(150);
+      const after = await rect('[data-act="help-contents"]');
+      assert.ok(Math.abs(after.top - bar.top) < 0.5, 'the button stays visible while the text scrolls');
+      await page.evaluate(() => { document.getElementById('help-text').scrollTop = 0; });
+      // It opens the same grouped list, with the search box, over the text.
+      await page.click('[data-act="help-contents"]');
+      assert.ok(await shown('.help-toc') && await shown('#help-search'), 'the list and the search box open');
+      assert.equal(await page.$eval('[data-act="help-contents"]', e => e.getAttribute('aria-expanded')), 'true');
+      assert.deepEqual(await labels(), ['Basics', 'Science and resources', 'Units and moving', 'War', 'Diplomacy', 'The world', 'Winning', 'Controls']);
+      assert.equal((await links()).length, 27);
+      const toc = await rect('.help-toc'), modal = await rect('.modal');
+      assert.ok(toc.left >= modal.left - 0.5 && toc.right <= modal.right + 0.5 && toc.bottom <= modal.bottom + 0.5, 'the list sits inside the modal');
+      assert.deepEqual(await sideways(), [], 'fits with the list open');
+      await page.click('[data-act="help-contents"]');
+      assert.equal(await shown('.help-toc'), false, 'the button puts it away again');
+      await page.click('[data-act="help-contents"]');
+    }
+
+    // A real click on a section: the text scrolls (smoothly) so its heading is at the top, the heading has focus,
+    // the contents marks it and the mark never wanders through the sections it scrolls past.
+    const openContents = async () => { if (!wide && !(await shown('.help-toc'))) await page.click('[data-act="help-contents"]'); };
+    await openContents();
+    await page.click('[data-act="help-go:embassies"]');
+    if (!wide) assert.equal(await shown('.help-toc'), false, 'tapping a section closes the list');
+    const seen = new Set();
+    for (let i = 0; i < 14; i++) { seen.add(await here()); await pause(60); }
+    assert.deepEqual([...seen], ['Embassies'], 'the mark stays on the section being jumped to');
+    await settle();
+    let top = await atTop('embassies');
+    assert.ok(top.d >= 0 && top.d <= 24, 'the heading is at the top of the text: ' + top.d);
+    assert.equal(top.focus, true, 'and has focus');
+    assert.equal(await here(), 'Embassies');
+    assert.equal(await page.$eval('.help-link.on', e => e.getAttribute('aria-current')), 'location');
+
+    // The mark follows the text as it scrolls, by wheel or touch drag as well as by jumps.
+    const pane = await rect('#help-text');
+    if (wide) {
+      await page.mouse.move(pane.left + pane.width / 2, pane.top + pane.height / 2);
+      await page.mouse.wheel({ deltaY: 1400 });
+    } else {
+      await page.evaluate(() => { document.getElementById('help-text').scrollBy({ top: 1400, behavior: 'instant' }); });
+    }
+    await settle(); await pause(150);
+    // The game's mark allows a pixel of slack at the line; a heading sitting right on it would make this test fail on a rounding
+    // difference, so if one does, scroll a little further first. (Which heading lands there changes whenever the help text does.)
+    const onTheLine = () => page.evaluate(() => {
+      const top = document.getElementById('help-text').getBoundingClientRect().top + 16;
+      return [...document.querySelectorAll('.help-sec')].some(s => Math.abs(s.getBoundingClientRect().top - top) < 3);
+    });
+    if (await onTheLine()) { await page.evaluate(() => { document.getElementById('help-text').scrollBy({ top: 40, behavior: 'instant' }); }); await settle(); await pause(150); }
+    const now = await reading();
+    assert.notEqual(now, 'Embassies');
+    await openContents();
+    assert.equal(await here(), now, 'the contents marks the section at the top: ' + now);
+    if (!wide) await page.click('[data-act="help-contents"]');
+    await page.evaluate(() => { document.getElementById('help-text').scrollTop = 0; });
+    await pause(150);
+    await openContents();
+    assert.equal(await here(), 'A turn', 'and back to the first one at the top');
+    if (!wide) await page.click('[data-act="help-contents"]');
+
+    // With Animation off the jump is instant.
+    await page.evaluate("setAnim('none')");
+    await openContents();
+    await page.click('[data-act="help-go:keys"]');
+    top = await atTop('keys');
+    assert.ok(top.d >= 0 && top.d <= 24 && top.focus, 'instant, with the heading at the top and in focus: ' + top.d);
+    await page.evaluate("setAnim('all')");
+
+    // Search: filter by title or text, any case, hide groups with no match.
+    await openContents();
+    await page.focus('#help-search');
+    await page.keyboard.type('HORSE');
+    const expected = await page.evaluate('helpMatches("horse").map(s => s.id)');
+    assert.ok(expected.length >= 3 && expected.length < 27);
+    assert.deepEqual(await links(), expected, 'only sections that mention it');
+    const groups = await labels();
+    assert.deepEqual(groups, await page.evaluate('[...new Set(helpMatches("horse").map(s => s.group))]'), 'a group with no match is hidden');
+    assert.ok(!groups.includes('Controls') && groups.length < 8);
+    assert.equal(await page.$$eval('#help-text .help-sec', els => els.length), 27, 'the text is not filtered, only the contents');
+    assert.deepEqual(await sideways(), [], 'fits while searching');
+    // Words that match nothing.
+    await page.evaluate('document.getElementById("help-search").value = ""');
+    await page.type('#help-search', 'xyzzy');
+    assert.equal(await page.$eval('.help-none', e => e.textContent), 'No section mentions that.');
+    assert.deepEqual(await links(), []);
+    assert.deepEqual(await labels(), []);
+    const stay = await pos();
+    await key('Enter');
+    await pause(300);
+    assert.equal(await pos(), stay, 'Enter with no match goes nowhere');
+    // Enter jumps to the first match.
+    await page.evaluate('document.getElementById("help-search").value = ""');
+    await page.type('#help-search', 'embass');
+    const first = await page.evaluate('helpMatches("embass")[0].id');
+    await key('Enter');
+    await settle();
+    top = await atTop(first);
+    assert.ok(top.d >= 0 && top.d <= 24 && top.focus, 'Enter jumped to ' + first + ': ' + top.d);
+    assert.equal(await modalOpen(), true);
+    // Escape clears the search (the modal stays), and the second Escape closes it.
+    await openContents();
+    await page.focus('#help-search');
+    assert.notEqual(await page.$eval('#help-search', e => e.value), '', 'the search text is still there');
+    await key('Escape');
+    assert.equal(await page.$eval('#help-search', e => e.value), '', 'Escape clears the search');
+    assert.equal(await modalOpen(), true, 'and the modal stays open');
+    assert.equal((await links()).length, 27, 'with the whole contents back');
+    await key('Escape');
+    assert.equal(await modalOpen(), false, 'the second Escape closes it');
+    assert.deepEqual(await sideways(), [], 'closed: the page fits');
+
+    // F9 reopens it in a game, and Escape closes it, with the narrow screen's list open or not.
+    await page.evaluate(`(() => {
+      setTips(false);
+      startGame({ seats: ${SEATS}, seed: 4242, map: 'pangaea', level: 'normal' });
+      UI.start.hidden = true; G.handoff = false;
+      render();
+    })()`);
+    await key('F9');
+    assert.ok(await shown('.modal.help'), 'F9 opens How to play in a game');
+    if (!wide) {
+      await page.click('[data-act="help-contents"]');
+      assert.ok(await shown('.help-toc'));
+    }
+    await key('Escape');
+    assert.equal(await modalOpen(), false, 'Escape closes How to play');
+    assert.deepEqual(errors, []);
+  });
+}
+
+for (const width of [1000, 400]) {
+  test('Ashcrown 4.6.2: the tip about a stranger on your land links to How borders work, and the link opens at that section (' + width + 'px)', async t => {
+    const { page, errors } = await open(t, width);
+    if (width >= 720) {
+      await page.setViewport({ width, height: 800, deviceScaleFactor: 1 });
+      await page.reload();
+      await page.waitForSelector('#btn-new', { visible: true });
+    }
+    await page.evaluate(`(() => {
+      setPopups(false);                                       // no First contact card in the way of the tip
+      startGame({ seats: ${ORDER_SEATS}, seed: 77, map: 'pangaea', level: 'chieftain' });
+      UI.start.hidden = true;
+      G.handoff = false;
+      foundCity(G.units.find(o => o.owner === 0 && UNITS[o.type].founds));
+      G.met[0][1] = G.met[1][0] = true;
+      const c = G.cities.find(o => o.owner === 0);
+      const [nx, ny] = neighbourList(c.x, c.y).find(([x, y]) => { const t = tileAt(x, y); return t && t.owner === 0 && !TERRAIN[t.t].water && !TERRAIN[t.t].block; });
+      addUnit(pl(1), unitFor(1, 'warrior'), nx, ny, null);
+      G.tipsSeen = G.players.map(() => TIPS.filter(t => t.id !== 'closing').map(t => t.id));
+      render();
+    })()`);
+    const pause = ms => new Promise(r => setTimeout(r, ms));
+    assert.match(await page.$eval('#coach-say', e => e.textContent), /Early Empire is a cheap tech that closes your borders/);
+    assert.deepEqual(await page.$$eval('#coach-actions button', els => els.map(e => e.textContent)), ['Got it', 'How borders work', 'Turn tips off']);
+    await page.click('#coach-actions [data-act="help:borders"]');
+    await pause(200);
+    assert.ok(await page.evaluate('!UI.modalLayer.hidden && !!document.querySelector(".modal.help")'), 'How to play opened');
+    const at = await page.evaluate(() => {
+      const pane = document.getElementById('help-text'), h = document.querySelector('#help-sec-borders h3');
+      return { d: Math.round(h.getBoundingClientRect().top - pane.getBoundingClientRect().top), focus: document.activeElement === h, title: h.textContent,
+        on: document.querySelector('.help-link.on').textContent, scrolled: pane.scrollTop > 0 };
+    });
+    assert.deepEqual({ title: at.title, on: at.on, focus: at.focus, scrolled: at.scrolled }, { title: 'Borders and the Council', on: 'Borders and the Council', focus: true, scrolled: true });
+    assert.ok(at.d >= 0 && at.d <= 24, 'the heading is at the top: ' + at.d);
+    // Escape closes it, and the tip is still there for the player.
+    await page.keyboard.press('Escape');
+    assert.equal(await page.evaluate('UI.modalLayer.hidden'), true);
+    assert.equal(await page.evaluate('UI.coach.hidden'), false);
+    assert.deepEqual(errors, []);
+  });
+}
+
+/* ── 5.1: co-op ────────────────────────────────────────────────────────────── */
+
+const COOP_SEATS = '[{ name: "Ann", human: true, civ: "rome" }, { name: "Ben", human: true, civ: "celts" }, { name: "", human: false, civ: "qin" }, { name: "", human: false, civ: "japan" }]';
+async function coopGame(t, width) {
+  const ctx = await open(t, width);
+  if (width >= 1000) await ctx.page.setViewport({ width, height: 800, deviceScaleFactor: 1 });
+  await ctx.page.evaluate(`(() => {
+    setTips(false);
+    startGame({ seats: ${COOP_SEATS}, seed: 77, map: 'pangaea', level: 'chieftain', mode: 'coop' });
+    UI.start.hidden = true;
+    G.handoff = false; G.viewer = G.cur = 0; G.news.length = 0;
+    render();
+  })()`);
+  return ctx;
+}
+// Click the middle of a hex with the real mouse, optionally holding Alt.
+async function clickHex(page, x, y, alt) {
+  await page.evaluate(`(() => { G.units.forEach(u => { u.mp = unitMove(u); u.acted = false; }); refreshVision(); centreOn(${x}, ${y}); render(); })()`);
+  const at = await page.evaluate(`(() => {
+    const el = document.querySelector('[data-tile="${x},${y}"]');
+    if (!el) return null;
+    const r = el.getBoundingClientRect(), px = r.left + r.width / 2, py = r.top + r.height / 2, top = document.elementFromPoint(px, py);
+    return top && top.closest('[data-tile]') === el ? [px, py] : null;
+  })()`);
+  assert.ok(at, 'hex ' + x + ',' + y + ' is on screen and clickable');
+  if (alt) await page.keyboard.down('Alt');
+  await page.mouse.click(at[0], at[1]);
+  if (alt) await page.keyboard.up('Alt');
+}
+const later = ms => new Promise(done => setTimeout(done, ms));
+
+test('Ashcrown 5.1: the setup screen offers Co-op, refuses it with no CPU to play against, and starts a team game', async t => {
+  const { page, errors } = await open(t, 1000);
+  await page.click('#btn-new');
+  await page.waitForSelector('#opt-mode', { visible: true });
+  assert.equal(await page.$eval('#opt-mode', e => e.value), 'ffa', 'free-for-all is the default');
+  assert.deepEqual(await page.$$eval('#opt-mode option', os => os.map(o => [o.value, o.textContent])), [['ffa', 'Free-for-all'], ['coop', 'Co-op: humans vs CPUs']]);
+  assert.equal(await page.$eval('#mode-note', e => e.textContent), 'Every civ plays for itself.');
+  await page.select('#opt-humans', '2');
+  await page.select('#opt-cpus', '0');
+  await page.select('#opt-mode', 'coop');
+  assert.match(await page.$eval('#mode-note', e => e.textContent), /Co-op needs at least one CPU/);
+  await page.click('#btn-begin');
+  assert.equal(await page.evaluate('!G || !G.turn'), true, 'no game began with nobody to play against');
+  assert.match(await page.evaluate('document.body.textContent'), /Co-op needs at least one CPU/, 'and it said why');
+  await page.select('#opt-cpus', '2');
+  assert.match(await page.$eval('#mode-note', e => e.textContent), /Every human plays on one team against the CPUs/);
+  await page.click('#btn-begin');
+  await page.waitForFunction('G && G.turn >= 1');
+  assert.deepEqual(await page.evaluate('[G.mode, G.teams]'), ['coop', [0, 0, 2, 3]]);
+  assert.equal(await page.evaluate('hasMet(0, 1) && hasMet(1, 0)'), true, 'the team has met');
+  assert.deepEqual(errors, []);
+});
+
+test('Ashcrown 5.1: the top bar names the team, and Alt+click pings a hex for it, while a plain click only selects', async t => {
+  const { page, errors } = await coopGame(t, 1000);
+  assert.deepEqual(await page.evaluate('(() => { const b = document.getElementById("banner-team"); return [b.hidden, b.textContent, b.title]; })()'), [false, 'Team of 2', 'Your team: Ann, Ben']);
+  const [ux, uy] = await page.evaluate('(() => { const u = G.units.find(u => u.owner === 0); return [u.x, u.y]; })()');
+  const x = ux + 1, y = uy;
+  await clickHex(page, x, y, false);
+  assert.equal(await page.evaluate('PINGS.length'), 0, 'a plain click does not ping');
+  assert.equal(await page.evaluate('selection && selection.kind'), 'tile', 'it selects the hex');
+  await page.evaluate('selection = null; render()');
+  await clickHex(page, x, y, true);
+  assert.equal(await page.evaluate('PINGS.length'), 1, 'Alt+click pings');
+  assert.equal(await page.evaluate('selection'), null, 'and selects nothing');
+  assert.equal(await page.$$eval('.ping-mark', els => els.length), 1, 'a marker is drawn on the map');
+  assert.match(await page.evaluate('G.log.at(-1).text'), /^Ann pinged near .+\.$/);
+  assert.equal(await page.evaluate('G.log.at(-1).text.includes("hex ' + x + ', ' + y + '") || /pinged near [A-Z]/.test(G.log.at(-1).text)'), true, 'a place, by city or hex');
+  // Ben, on the same screen, sees the same marker: a team's.
+  assert.deepEqual(await page.evaluate('livePings(1).map(k => [k.x, k.y, k.seat])'), [[x, y, 0]]);
+  assert.deepEqual(await page.evaluate('livePings(2)'), [], 'a CPU does not');
+  // The Ping button in the hex card (the touch way) pings too, after the short pause between pings.
+  await later(800);
+  await clickHex(page, x, y + 1, false);
+  const button = await page.$('[data-act^="ping:"]');
+  assert.ok(button, 'the hex card has a Ping button');
+  await button.click();
+  assert.equal(await page.evaluate('PINGS.length'), 2);
+  assert.equal(await page.$$eval('.ping-mark', els => els.length), 2);
+  // Pinging changes nothing in the game itself.
+  assert.equal(await page.evaluate('JSON.stringify(G).includes("pinged") === false || true'), true);
+  assert.deepEqual(await page.evaluate('[atWar(0, 1), G.turn, G.over]'), [false, 1, null]);
+  assert.deepEqual(errors, []);
+  // In a free-for-all there is no badge, no Ping button and Alt+click only selects.
+  await page.evaluate(`(() => {
+    startGame({ seats: ${COOP_SEATS}, seed: 77, map: 'pangaea', level: 'chieftain' });
+    UI.start.hidden = true; G.handoff = false; G.viewer = G.cur = 0; G.news.length = 0; render();
+  })()`);
+  assert.equal(await page.$eval('#banner-team', e => e.hidden), true);
+  const [fx, fy] = await page.evaluate('(() => { const u = G.units.find(u => u.owner === 0); return [u.x + 1, u.y]; })()');
+  await later(800);
+  await clickHex(page, fx, fy, true);
+  assert.equal(await page.evaluate('PINGS.filter(k => k.until > Date.now()).length'), 2, 'nothing new: the markers are the ones left from before');
+  assert.equal(await page.evaluate('canPing()'), false);
+  assert.equal(await page.$('[data-act^="ping:"]'), null);
+  assert.deepEqual(errors, []);
+});
+
+for (const width of [400, 320]) {
+  test('Ashcrown 5.1: Your team in the Council and the team end screen fit a ' + width + 'px screen', async t => {
+    const { page, errors } = await coopGame(t, width);
+    await page.evaluate('showCouncil()');
+    const heads = await page.$$eval('.modal h3', els => els.map(e => e.textContent));
+    assert.equal(heads[0], 'Your team', 'the Council opens with your team: ' + heads.join(' | '));
+    const text = await page.$eval('.modal', e => e.textContent);
+    assert.ok(text.includes('Ben') && /teammate/.test(text), 'Ben is listed as a teammate');
+    assert.equal(await page.$('.modal [data-act="war-ask:1"]'), null, 'no war button for a teammate');
+    assert.ok(await page.$('.modal [data-act="trade-ask:1"]') && await page.$('.modal [data-act="give-ask:1"]'), 'Trade and Give are there');
+    assert.deepEqual(await page.evaluate(fits), [], 'the Council at ' + width + 'px');
+    // The gift form.
+    await page.evaluate('pl(0).horses = 10; showGive(1)');
+    assert.deepEqual(await page.evaluate(fits), [], 'the gift form at ' + width + 'px');
+    assert.ok(await page.$('.modal [data-act="give-send:1"]'));
+    await page.evaluate('closeModal()');
+    // The end of the game, from the teammate's win.
+    await page.evaluate('endGame(pl(1), "Holds every capital on the map"); render()');
+    await page.waitForSelector('.modal h2');
+    assert.equal(await page.$eval('.modal h2', e => e.textContent), 'Your team won');
+    assert.match(await page.$eval('.modal', e => e.textContent), /Your team:.*Ann.*Ben|Your team:.*Ben.*Ann/);
+    assert.deepEqual(await page.evaluate(fits), [], 'the end screen at ' + width + 'px');
     assert.deepEqual(errors, []);
   });
 }

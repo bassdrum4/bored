@@ -114,8 +114,10 @@ function previewFor(slug) {
   return preview;
 }
 
+// A cached copy of an older discovery.js can lag a game that has just landed in
+// the catalog. Read it defensively so one unknown slug cannot blank the grid.
 function gameMeta(slug) {
-  const game = DISCOVERY[slug];
+  const game = DISCOVERY[slug] || {};
   return [game.minutes, game.pace, game.players].filter(Boolean).join(' · ');
 }
 
@@ -221,7 +223,7 @@ function renderLibrary() {
   state.visibleGames = shelf.filter(([slug, name]) => {
     const meta = META[slug];
     return (EXTERNS[slug] || PAYLOAD_SLUGS.includes(slug) || NEW_GAMES.includes(slug)) &&
-      (!filter || [name, slug, ...meta, gameMeta(slug), ...DISCOVERY[slug].inputs].join(' ').toLowerCase().includes(filter)) &&
+      (!filter || [name, slug, ...meta, gameMeta(slug), ...(DISCOVERY[slug]?.inputs || [])].join(' ').toLowerCase().includes(filter)) &&
       (state.category === 'All' || (state.category === 'New' ? FRESH_GAMES.includes(slug) :
         state.category === 'Favorites' ? state.favorites.has(slug) : meta[0] === state.category));
   });
@@ -238,7 +240,7 @@ function renderLibrary() {
     if (FRESH_GAMES.includes(slug)) title.appendChild(element('span', 'badge', 'NEW'));
     text.append(element('span', 'card-category', EXTERNS[slug] ? 'Online extra · Internet required' : META[slug][0] + ' · Offline'),
       title, element('span', 'detail', META[slug][1]), element('span', 'game-meta', gameMeta(slug)),
-      element('span', 'game-inputs', DISCOVERY[slug].inputs.join(' / ')));
+      element('span', 'game-inputs', (DISCOVERY[slug]?.inputs || []).join(' / ')));
     const best = cardBest(slug);
     if (best) text.appendChild(best);
     card.appendChild(text);

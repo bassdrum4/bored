@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Downhill Mayhem</title>
+<!-- The game itself is the vendored single-file build in ./downhill-mayhem/.
+     This document only frames it, so the hub keeps its iframe contract and
+     fetches the payload only when the card is opened. Downhill Mayhem is a
+     fan-made Downhill Domination tribute by Pranshu Parmar, Apache-2.0; this
+     copy follows https://github.com/pranshuparmar/downhill-mayhem (index.html).
+     Its GoatCounter analytics call is removed in the vendored copy. -->
+<style>
+  :root {
+    --paper: #f5f2ea;
+    --board: #fffdf7;
+    --ink: #191713;
+    --hair: #d8d2c4;
+    --dim: #6b6558;
+    --accent: #456653;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+  html, body { height: 100%; overflow: hidden }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 13px/1.5 var(--sans); touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  main { height: 100%; height: 100dvh; width: 100%; padding: 0 }
+  #stage {
+    position: relative; overflow: hidden; width: 100%; height: 100%; border: 0; border-radius: 0;
+    background: var(--board);
+  }
+  #game { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; background: #0b0e12 }
+  #game[hidden] { display: none }
+  #cover {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+    padding: 20px; text-align: center; background: var(--paper);
+  }
+  #cover[hidden] { display: none }
+  h1 { font: 600 15px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase }
+  p { max-width: 40ch; color: var(--dim) }
+  .keys { color: var(--ink); font: 12px/1.8 var(--mono) }
+  .keys b { font-weight: 600 }
+  button {
+    font: 12px/1 var(--mono); padding: 10px 14px; border: 1px solid var(--hair);
+    border-radius: 2px; background: none; color: inherit; cursor: pointer;
+  }
+  button:hover:enabled { border-color: var(--ink) }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+  button:disabled { color: var(--dim); cursor: default }
+  #status { min-height: 1.5em; font-size: 11px }
+  @media (max-height: 420px) {
+    #cover { gap: 6px; padding: 10px }
+    h1 { font-size: 13px }
+    #cover p { font-size: 11px }
+    #cover .keys { display: none }
+  }
+</style>
+</head>
+<body>
+<main>
+  <section id="stage" aria-label="Downhill Mayhem game">
+    <iframe id="game" title="Downhill Mayhem" allow="autoplay; fullscreen; gamepad" scrolling="no" hidden></iframe>
+    <div id="cover">
+      <h1>Downhill Mayhem</h1>
+      <p class="keys"><b>&uarr;</b> pedal &middot; <b>&darr;</b> brake &middot; <b>&larr; &rarr;</b> steer &middot; <b>Space</b> hop<br><b>Shift</b> boost &middot; <b>Z X C</b> tricks &middot; <b>E F</b> punch and kick</p>
+      <p>Six riders, one mountain, and a boost meter that only fills when you ride badly enough to deserve it.</p>
+      <button id="start" type="button">Start race</button>
+      <p id="status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+</main>
+<script>
+const frame = document.getElementById('game');
+const cover = document.getElementById('cover');
+const start = document.getElementById('start');
+const status = document.getElementById('status');
+
+let ready = false, started = false;
+
+// The hub drops this document into the hub page as a srcdoc frame, so a relative
+// address there resolves against the hub. Opened on its own, the same document
+// sits beside the vendored folder instead. Browsers disagree on what a srcdoc
+// frame reports for location.href, so decide from the base URLs instead.
+const bases = [document.baseURI];
+try { if (window.parent !== window) bases.push(window.parent.location.href); } catch (error) { /* cross-origin hub */ }
+bases.push(window.location.href);
+const standalone = bases.some(base => {
+  try { return new URL(base).pathname.endsWith('/downhill-mayhem.html'); } catch (error) { return false; }
+});
+const relative = (standalone ? 'downhill-mayhem' : 'games/content/downhill-mayhem') + '/index.html';
+
+function buildUrl() {
+  for (const base of bases) {
+    try { return new URL(relative, base).href; } catch (error) { /* try the next base */ }
+  }
+  return null;
+}
+
+start.onclick = () => {
+  if (started) return;
+  const url = buildUrl();
+  if (!url) {
+    status.textContent = 'Could not find the game folder beside this page. Open it from the arcade.';
+    return;
+  }
+  started = true;
+  start.disabled = true;
+  status.textContent = 'Loading the mountain\u2026';
+  frame.hidden = false;
+  frame.src = url;
+  // One 750 KB document; say so instead of spinning forever.
+  setTimeout(() => { if (started && !ready) status.textContent = 'Still loading\u2026 the first load is three quarters of a megabyte.'; }, 8000);
+};
+
+frame.addEventListener('load', () => {
+  // An iframe with no src loads a blank document first, and that load event can
+  // arrive even after this script runs — while the real build is still on its
+  // way. Only a load of the actual game may lift the cover.
+  let blank = false;
+  try { if (frame.contentWindow) blank = frame.contentWindow.location.href === 'about:blank'; } catch (error) { /* opaque frame */ }
+  if (!started || !frame.src || blank) return;
+  ready = true;
+  cover.hidden = true;
+  // The build's title screen listens on its own window for Enter, so hand it
+  // the keyboard rather than leaving focus on the hub.
+  try { frame.contentWindow.focus(); } catch (error) { /* the frame may already be gone */ }
+});
+
+// The hub reads completed Classic / Mayhem race times only. Other mountains
+// and easier difficulty settings are deliberately excluded from this board.
+window.__boredSnapshot = () => {
+  let seconds = 0;
+  let finished = false;
+  try {
+    const race = ready && frame.contentWindow && frame.contentWindow.GAME;
+    if (race && !race.demo && race.state === 'finished' &&
+        race.mode === 'classic' && race.difficulty === 'mayhem' &&
+        race.player && race.player.finished) {
+      const time = Number(race.player.finishTime);
+      if (Number.isFinite(time) && time >= 15 && time <= 3600) {
+        seconds = Math.round(time);
+        finished = true;
+      }
+    }
+  } catch (error) { /* game frame may be unavailable while unloading */ }
+  return { slug: 'downhill-mayhem', started, loaded: ready, finished, seconds };
+};
+</script>
+</body>
+</html>

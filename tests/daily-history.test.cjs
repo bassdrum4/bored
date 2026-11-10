@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 
 // Import the real production module rather than reimplementing the schedule.
 const source = fs.readFileSync(path.join(__dirname, '../src/daily.js'), 'utf8');
@@ -18,7 +17,8 @@ test('published daily challenge IDs survive removal of Cup Pong', async () => {
 });
 
 test('retired Cup Pong remains historical only, never in new calendars', async () => {
-  const { dailyChallenge, CHALLENGES } = await daily;
+  const { dailyChallenge, CHALLENGES, parseDailyId } = await daily;
+  assert.equal(parseDailyId('v2:2026-10-27:cup-pong')?.definition.slug, 'cup-pong');
   assert.equal(CHALLENGES.some(item => item.slug === 'cup-pong'), false);
   for (let day = 0; day < 120; day++) {
     const date = new Date(Date.UTC(2026, 9, 31 + day)).toISOString().slice(0, 10);

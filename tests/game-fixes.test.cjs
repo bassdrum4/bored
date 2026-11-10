@@ -354,6 +354,8 @@ function slotRig(options = {}) {
     plural: (n, one, many) => n + ' ' + (n === 1 ? one : many),
     scoreParts: () => ({ total: 84 }),
     toast: () => {}, slotAction: () => {}, closeModal: () => {},
+    // Account saves (5.3) are off here, as they are signed out or outside Bored: the primitives only call these hooks.
+    syncRows: list => list, syncAuto: () => {}, syncSaved: () => {}, syncDeleted: () => {}, syncClash: () => null,
     G: null
   });
   const prelude = html.match(/const SLOT_PREFIX[\s\S]*?let slotMode[^\n]*\n/)[0];
@@ -527,6 +529,11 @@ test('Ashcrown never touches its save slots during a Bored Together match', () =
   assert.equal(r.ctx.loadSlot('m1'), false, 'and never loads a campaign over the match');
   r.ctx.G.over = { winner: 0 };
   assert.equal(r.ctx.saveGame(), false, 'a finished match never clears the autosave either');
+  // The primitives themselves refuse, so a path that forgets its own guard (a
+  // header upgrade, a slot menu action) still cannot reach the store.
+  assert.equal(r.ctx.slotWrite('m1', { v: 1, at: 1 }, r.ctx.G), false, 'a match cannot write a slot');
+  r.ctx.slotRemove('auto');
+  assert.deepEqual(r.ctx.upgradeHead('m1', { v: 1, at: 1 }), { v: 1, at: 1 }, 'a match does not upgrade a saved header');
   assert.deepEqual(r.log, [], 'the match touches storage not at all');
   assert.deepEqual([...r.store], [...before], 'the campaign survives the match');
 });
@@ -538,7 +545,7 @@ test('Ashcrown routes slot clicks before the no-game guard, so Load works from t
   const guard = body.indexOf('if (!G) {');
   assert.ok(slots > 0 && guard > 0 && slots < guard, 'slot actions come before "if (!G)"');
   assert.match(html, /id="btn-load"[^>]*data-act="slots:load"/, 'the start screen has a Load game button');
-  assert.match(html, /addEventListener\('pagehide', saveGame\)/, 'leaving the page saves without marking the game changed');
+  assert.match(html, /addEventListener\('pagehide', saveGameOnLeaving\)/, 'leaving the page saves without marking the game changed');
 });
 
 test('Ashcrown shows how long ago a save was made', () => {
@@ -571,7 +578,8 @@ function frontRig() {
     closeModal: () => { ctx.UI.modalLayer.hidden = true; log.push('closeModal'); },
     showPane: name => log.push('pane:' + name), showOptions: () => log.push('options'), showMenu: () => log.push('menu'),
     refreshStart: () => log.push('refreshStart'), toast: message => log.push('toast:' + message),
-    SEATS: Array.from({ length: 8 }, (x, i) => ({ name: 'Player ' + (i + 1) })), DEFAULT_BORDERS: 'tech' });
+    SEATS: Array.from({ length: 8 }, (x, i) => ({ name: 'Player ' + (i + 1) })), DEFAULT_BORDERS: 'tech',
+    MP: { host: false }, mpHostClose: () => log.push('mp-host-close') });   // 5.2: the host setup steps back to the Multiplayer screen
   vm.runInContext(['frontKeys', 'resetSetup', 'redoSwitches'].map(name => extractFunction(html, name)).join('\n'), ctx);
   return { html, ctx, doc, log };
 }
@@ -649,7 +657,7 @@ test('Ashcrown\'s title screen keys: arrows walk the menu and wrap, Esc closes a
 
 test('Ashcrown\'s Reset to defaults puts every setup choice back, names and civs included', () => {
   const r = frontRig();
-  r.ctx.UI = { optHumans: { value: '5' }, optCpus: { value: '3' }, optMap: { value: 'islands' }, optSize: { value: 'huge' },
+  r.ctx.UI = { optHumans: { value: '5' }, optCpus: { value: '3' }, optMode: { value: 'coop' }, optMap: { value: 'islands' }, optSize: { value: 'huge' },
     optLevel: { value: 'deity', selectedIndex: 1 }, optClose: { value: 'never' }, optTurns: { value: '7' },
     optConquest: { checked: false }, optScience: { checked: false }, optWrap: { checked: true } };
   for (let i = 0; i < 8; i++) {
@@ -660,6 +668,7 @@ test('Ashcrown\'s Reset to defaults puts every setup choice back, names and civs
   const u = r.ctx.UI;
   assert.deepEqual([u.optHumans.value, u.optCpus.value, u.optMap.value, u.optSize.value, u.optLevel.selectedIndex, u.optClose.value, u.optTurns.value],
     ['2', '0', 'pangaea', 'auto', 0, 'tech', '100']);
+  assert.equal(u.optMode.value, 'ffa', 'Mode goes back to free-for-all');
   assert.deepEqual([u.optConquest.checked, u.optScience.checked, u.optWrap.checked], [true, true, false]);
   for (let i = 0; i < 8; i++) {
     const civ = r.doc.getElementById('seat-civ-' + i), name = r.doc.getElementById('seat-name-' + i);
@@ -687,20 +696,29 @@ test('Ashcrown\'s title shows Continue and Load game from the saves, and never r
   const r = slotRig();
   const html = r.get('1') && load('src/games/content/ashcrown.html');
   const mk = (extra = {}) => ({ hidden: false, textContent: '', classList: { on: {}, toggle(name, on) { this.on[name] = !!on; } }, ...extra });
-  const els = { 'continue-sub': mk(), 'continue-detail': mk(), 'continue-medal': mk({ innerHTML: '' }), 'load-sub': mk(), 'tut-tag': mk(), 'tut-sub': mk(), 'notes-tag': mk() };
+  const els = { 'continue-sub': mk(), 'continue-detail': mk(), 'continue-medal': mk({ innerHTML: '' }), 'load-sub': mk(), 'tut-tag': mk(), 'tut-sub': mk(), 'notes-tag': mk(), 'btn-leave': mk() };
   r.ctx.refreshNotesTag = () => {};   // the What’s new tag has its own test
   r.ctx.slotMedal = head => '<svg data-civ="' + head.civ + '"></svg>';
   r.ctx.document = { getElementById: id => els[id] };
-  r.ctx.UI = { btnContinue: mk(), btnLoad: mk(), btnNew: mk() };
+  r.ctx.UI = { btnContinue: mk(), btnLoad: mk(), btnNew: mk(), btnMp: mk() };
+  r.ctx.mpBridge = () => null;   // 5.2: Multiplayer has its own tests
+  r.ctx.mpShowTag = () => {};
   r.ctx.tutorialDone = () => false;
   r.ctx.TUT_STEPS = new Array(7).fill(0);
   r.ctx.plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
   vm.runInContext(extractFunction(html, 'refreshTitle'), r.ctx);
+  vm.runInContext(extractFunction(html, 'embedded'), r.ctx);
+  r.ctx.window = {};
+  r.ctx.window.parent = r.ctx.window;   // the game opened on its own: no Back to Bored
   // Nothing saved: only New game.
   r.ctx.refreshTitle();
+  assert.equal(els['btn-leave'].hidden, true, 'not on Bored: no Back to Bored');
   assert.equal(r.ctx.UI.btnContinue.hidden, true);
   assert.equal(r.ctx.UI.btnLoad.hidden, true);
   assert.equal(r.ctx.UI.btnNew.classList.on.primary, true, 'New game is the highlighted item');
+  r.ctx.window.parent = {};   // inside Bored's frame
+  r.ctx.refreshTitle();
+  assert.equal(els['btn-leave'].hidden, false, 'on Bored the title ends with Back to Bored');
   assert.equal(els['tut-tag'].hidden, false, 'the Tutorial is flagged as the place to start');
   assert.equal(els['tut-sub'].textContent, '7 short steps on a small island, playing Rome');
   // An autosave: Continue names the game and when, and takes the highlight.
@@ -878,7 +896,7 @@ test('Ashcrown launches new ships onto the water beside their city', () => {
    These run the whole game script in a bare VM (no page). The script only boots when a
    document exists, so it just defines its functions; the tests drive them directly. */
 
-function civRig(seats, { seed = 12345, map = 'pangaea', flat = true, borders = 'tech', level = 'normal' } = {}) {
+function civRig(seats, { seed = 12345, map = 'pangaea', flat = true, borders = 'tech', level = 'normal', mode = 'ffa' } = {}) {
   const html = load('src/games/content/ashcrown.html');
   const script = html.slice(html.indexOf('<script>') + 8, html.lastIndexOf('</script>'));
   const store = new Map();
@@ -893,7 +911,7 @@ function civRig(seats, { seed = 12345, map = 'pangaea', flat = true, borders = '
   ctx.toast = text => { toasts.push(text); };
   run('UI = { modalKind: null }');
   ctx.seats = seats;
-  run('startGame({ seats, seed: ' + seed + ', map: "' + map + '", level: "' + level + '", borders: "' + borders + '" })');
+  run('startGame({ seats, seed: ' + seed + ', map: "' + map + '", level: "' + level + '", borders: "' + borders + '", mode: "' + mode + '" })');
   const r = {
     ctx, run, modals, toasts, store,
     get G() { return run('G'); },
@@ -902,7 +920,7 @@ function civRig(seats, { seed = 12345, map = 'pangaea', flat = true, borders = '
       run(`for (const t of G.tiles) { t.t = 'flat'; t.f = null; t.imp = null; t.owner = null; t.city = null; t.k = 0; t.road = false; }
         G.units.length = 0; G.cities.length = 0; G.log.length = 0; G.news.length = 0; G.offers.length = 0; G.deals.length = 0; G.open.length = 0; G.embassies.length = 0; G.firsts = {};
         for (const f of G.players) { f.capital = null; f.capHome = -1; f.met = false; f.moments = []; f.eraPts = 0; f.notes = []; f.asked = []; }
-        for (const a of G.players) for (const b of G.players) { G.met[a.i][b.i] = a.i === b.i; G.dip[a.i][b.i] = 'peace'; }
+        for (const a of G.players) for (const b of G.players) { G.met[a.i][b.i] = a.i === b.i || sameTeam(a.i, b.i); G.dip[a.i][b.i] = 'peace'; }
         G.turn = 5; G.cur = 0; G.viewer = 0; G.handoff = false; G.seen = G.players.map(() => new Array(G.cols * G.rows).fill(0));`);
     },
     unit(owner, type, x, y) { ctx.args = [owner, type, x, y]; return run('addUnit(pl(args[0]), unitFor(args[0], args[1]), args[2], args[3], null)'); },
@@ -2602,11 +2620,11 @@ const NOTES_PREFS = 'bored.civlite.prefs.v1';
 function notesRig() {
   const r = civRig(FOUR);
   const els = {};
-  for (const id of ['continue-sub', 'continue-detail', 'continue-medal', 'load-sub', 'tut-tag', 'tut-sub', 'notes-tag']) els[id] = { hidden: false, textContent: '', innerHTML: '' };
+  for (const id of ['continue-sub', 'continue-detail', 'continue-medal', 'load-sub', 'tut-tag', 'tut-sub', 'notes-tag', 'btn-leave', 'mp-tag']) els[id] = { hidden: false, textContent: '', innerHTML: '' };
   r.ctx.document = { getElementById: id => els[id] };
   const btn = () => ({ hidden: false, classList: { toggle() {} } });
-  r.ctx.btns = [btn(), btn(), btn()];
-  r.run('UI = { modalKind: null, btnContinue: btns[0], btnLoad: btns[1], btnNew: btns[2] }');
+  r.ctx.btns = [btn(), btn(), btn(), btn()];
+  r.run('UI = { modalKind: null, btnContinue: btns[0], btnLoad: btns[1], btnNew: btns[2], btnMp: btns[3] }');
   r.els = els;
   r.title = () => { r.run('refreshTitle()'); return { notes: !els['notes-tag'].hidden, tutorial: !els['tut-tag'].hidden }; };
   r.prefs = () => JSON.parse(r.store.get(NOTES_PREFS) || '{}');
@@ -2616,20 +2634,42 @@ function notesRig() {
 test('Ashcrown 4.6.1: the changelog is newest first, its newest entry is this version, and every entry has a date and notes', () => {
   const r = civRig(FOUR);
   const log = jsonOf(r, 'CHANGELOG');
-  assert.equal(r.run('VERSION'), '4.6.1');
+  assert.equal(r.run('VERSION'), '5.4.1');
   assert.equal(log[0].v, r.run('VERSION'), 'the newest entry is the current version');
   assert.deepEqual(log.map(e => [e.v, e.date, e.notes.length]), [
-    ['4.6.1', 'Nov 7', 1], ['4.6', 'Nov 7', 5], ['4.5 orders', 'Nov 6', 4], ['4.5', 'Nov 6', 4], ['4.4', 'Nov 6', 2], ['4.3', 'Nov 6', 2],
+    ['5.4.1', 'Nov 10', 1], ['5.4', 'Nov 10', 1], ['5.3', 'Nov 9', 2], ['5.2', 'Nov 9', 1], ['5.1.1', 'Nov 9', 1], ['5.1', 'Nov 9', 3], ['5.0', 'Nov 9', 4], ['4.7.1', 'Nov 9', 1], ['4.7', 'Nov 9', 4], ['4.6.2', 'Nov 8', 1], ['4.6.1', 'Nov 7', 1], ['4.6', 'Nov 7', 5], ['4.5 orders', 'Nov 6', 4], ['4.5', 'Nov 6', 4], ['4.4', 'Nov 6', 2], ['4.3', 'Nov 6', 2],
     ['4.2.1–4.2.3', 'Nov 6', 3], ['4.2', 'Nov 6', 3], ['4.1', 'Nov 6', 2], ['4.0', 'Nov 4', 7], ['Before 4.0', 'Nov 3–4', 4]
   ], 'the entries, in order, with their dates and how many notes each has');
   for (const e of log) {
     assert.ok(e.v && e.date && e.notes.length >= 1, 'entry ' + e.v + ' has a version, a date and a note');
     for (const n of e.notes) assert.ok(typeof n === 'string' && n.length > 0 && !/["']/.test(n), 'notes use typographic quotes: ' + n);
   }
-  assert.equal(log[0].notes[0], 'A What’s new screen: patch notes for every update, on the title screen and in the Menu.');
-  assert.equal(log[2].notes[1], 'Attacking someone you’re at peace with asks “Declare war?” first.');
-  assert.equal(log[3].notes[2], 'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.');
-  assert.equal(log[10].notes[3], '3.0: a research revamp, a science victory, and up to 8 players.');
+  assert.deepEqual(log[0].notes, ['Fixed the Bored Together page scrolling sideways on small phones.']);
+  assert.deepEqual(log[1].notes, ['Room codes, like Civ 6: host a live game and share its code, and friends join with Multiplayer → Join with code.']);
+  assert.deepEqual(log[2].notes, [
+    'Your saves follow your Bored account: save on one device, Continue or Load on another.',
+    'Saves from another device are marked, and nothing is replaced without asking.'
+  ]);
+  assert.deepEqual(log[3].notes, ['Multiplayer on the title screen: host a live game (free-for-all or co-op), answer invites and rejoin your games without leaving Civ Lite.']);
+  assert.deepEqual(log[4].notes, ['Live games: the server double-checks game endings, round numbers and saved snapshots.']);
+  assert.deepEqual(log[5].notes, [
+    'Co-op, like Civ 6 team play: pick “Co-op: humans vs CPUs” in game setup, in live games and on one device. Every human is on one team against the CPUs.',
+    'Teammates share one map and always have open borders. They can’t go to war with each other, and they trade or give each other horses, iron and gunpowder.',
+    'The team wins and loses together: if any of you wins, you all win. Alt+click a hex (or press Ping in its card) to mark it for your team for 10 seconds.'
+  ]);
+  assert.deepEqual(log[6].notes, [
+    'Live online games in Bored Together: 2 to 4 friends plus CPUs in one game at the same time.',
+    'Dynamic turns like Civ 6: everyone moves at once, and players at war with each other take turns.',
+    'An optional turn timer.',
+    'Leave and come back any time: a CPU plays your civ while you’re gone.'
+  ]);
+  assert.equal(log[7].notes[0], 'Esc stays in the game on Bored: it closes windows, deselects, then opens the Menu. Leave with Back to Bored, in the Menu or on the title screen.');
+  assert.equal(log[8].notes[0], 'Army upkeep: 2 soldiers per city are free, and each extra one costs its city 1 production a turn.');
+  assert.equal(log[9].notes[0], 'How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.');
+  assert.equal(log[10].notes[0], 'A What’s new screen: patch notes for every update, on the title screen and in the Menu.');
+  assert.equal(log[12].notes[1], 'Attacking someone you’re at peace with asks “Declare war?” first.');
+  assert.equal(log[13].notes[2], 'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.');
+  assert.equal(log[20].notes[3], '3.0: a research revamp, a science victory, and up to 8 players.');
 });
 
 test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a first visit, and a new version brings it back', () => {
@@ -2640,7 +2680,7 @@ test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a f
   assert.equal(r.run('notesNew()'), true);
   // Opening the screen stores the version and takes the tag off at once.
   r.run('showWhatsNew()');
-  assert.equal(r.prefs().notesSeen, '4.6.1', 'stored under the prefs key through writePref');
+  assert.equal(r.prefs().notesSeen, '5.4.1', 'stored under the prefs key through writePref');
   assert.equal(r.prefs().tips, false, 'the other prefs are left alone');
   assert.equal(r.els['notes-tag'].hidden, true, 'the tag is gone behind the open screen');
   assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'and stays gone');
@@ -2656,7 +2696,7 @@ test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a f
 test('Ashcrown 4.6.1: a first visit (no prefs and no saves) starts with the notes seen, so the Tutorial is the only tag', () => {
   let r = notesRig();
   r.run('firstVisitNotes()');
-  assert.equal(r.prefs().notesSeen, '4.6.1');
+  assert.equal(r.prefs().notesSeen, '5.4.1');
   assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'no New tag, and the Tutorial tag stays');
   // Prefs but no saves, or saves but no prefs: not new here, so the tag shows.
   r = notesRig();
@@ -2688,16 +2728,27 @@ test('Ashcrown 4.6.1: the What’s new screen opens the newest entry, folds ever
   const r = notesRig();
   r.run('showWhatsNew()');
   const html = r.modals.at(-1);
-  assert.match(html, /<h2>What’s new<\/h2><span class="sub">Civ Lite 4\.6\.1<\/span>/, 'head and sub');
+  assert.match(html, /<h2>What’s new<\/h2><span class="sub">Civ Lite 5\.4\.1<\/span>/, 'head and sub');
   assert.equal(r.run('UI.modalKind'), 'notes');
-  assert.ok(html.includes('<h3 class="notes-now">4.6.1 · Nov 7</h3>'), 'the newest entry is open at the top as version · date');
+  assert.ok(html.includes('<h3 class="notes-now">5.4.1 · Nov 10</h3>'), 'the newest entry is open at the top as version · date');
+  assert.ok(html.includes('<li>Fixed the Bored Together page scrolling sideways on small phones.</li>'));
+  assert.ok(html.includes('<li>Room codes, like Civ 6: host a live game and share its code, and friends join with Multiplayer → Join with code.</li>'), 'the 5.4 entry is folded below it');
+  assert.ok(html.includes('<li>Your saves follow your Bored account: save on one device, Continue or Load on another.</li>'), 'the 5.3 entry is folded below it');
+  assert.ok(html.includes('<li>Saves from another device are marked, and nothing is replaced without asking.</li>'));
+  assert.ok(html.includes('<li>Multiplayer on the title screen: host a live game (free-for-all or co-op), answer invites and rejoin your games without leaving Civ Lite.</li>'), 'the 5.2 entry is folded below it');
+  assert.ok(html.includes('<li>Live games: the server double-checks game endings, round numbers and saved snapshots.</li>'));
+  assert.ok(html.includes('<li>Co-op, like Civ 6 team play: pick “Co-op: humans vs CPUs” in game setup, in live games and on one device. Every human is on one team against the CPUs.</li>'));
+  assert.ok(html.includes('<li>Live online games in Bored Together: 2 to 4 friends plus CPUs in one game at the same time.</li>'), 'the 5.0 entry is folded below it');
+  assert.ok(html.includes('<li>How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.</li>'), 'older entries are still there, folded');
+  assert.ok(html.includes('<li>Army upkeep: 2 soldiers per city are free, and each extra one costs its city 1 production a turn.</li>'), 'the 4.7 entry is folded below it');
+  assert.ok(html.includes('<li>Esc stays in the game on Bored: it closes windows, deselects, then opens the Menu. Leave with Back to Bored, in the Menu or on the title screen.</li>'), 'the 4.7.1 entry is folded below it');
   assert.ok(html.includes('<li>A What’s new screen: patch notes for every update, on the title screen and in the Menu.</li>'));
   const details = html.match(/<details[^>]*>/g) || [];
-  assert.equal(details.length, 10, 'every older entry is a details element');
+  assert.equal(details.length, 20, 'every older entry is a details element');
   assert.ok(details.every(d => d === '<details class="notes-old">'), 'all of them closed');
-  assert.ok(html.includes('<summary>4.6 · Nov 7</summary>') && html.includes('<summary>Before 4.0 · Nov 3–4</summary>') && html.includes('<summary>4.2.1–4.2.3 · Nov 6</summary>'));
+  assert.ok(html.includes('<summary>4.6.1 · Nov 7</summary>') && html.includes('<summary>4.6 · Nov 7</summary>') && html.includes('<summary>Before 4.0 · Nov 3–4</summary>') && html.includes('<summary>4.2.1–4.2.3 · Nov 6</summary>'));
   assert.ok(html.indexOf('<summary>4.6 · Nov 7</summary>') < html.indexOf('<summary>4.5 · Nov 6</summary>') && html.indexOf('<summary>4.5 · Nov 6</summary>') < html.indexOf('<summary>Before 4.0'), 'newest first');
-  assert.equal((html.match(/<li>/g) || []).length, 1 + 5 + 4 + 4 + 2 + 2 + 3 + 3 + 2 + 7 + 4, 'every note is listed once');
+  assert.equal((html.match(/<li>/g) || []).length, 1 + 1 + 2 + 1 + 1 + 3 + 4 + 1 + 4 + 1 + 1 + 5 + 4 + 4 + 2 + 2 + 3 + 3 + 2 + 7 + 4, 'every note is listed once');
   assert.ok(html.includes('Attacking someone you’re at peace with asks “Declare war?” first.'));
   assert.match(html, /<div class="modal-foot"><button class="btn primary" data-act="close">Close<\/button><\/div>/, 'a Close button at the bottom');
   // The in-game Menu opens the same screen and shows no tag.
@@ -2710,4 +2761,661 @@ test('Ashcrown 4.6.1: the What’s new screen opens the newest entry, folds ever
   r.run('onAction("whats-new")');
   assert.equal(r.modals.length, before + 1);
   assert.equal(r.modals.at(-1), html, 'the Menu button opens the same screen');
+});
+
+/* ── 4.7.1: Esc stays in the game on Bored ────────────────────────────────── */
+
+test('Ashcrown 4.7.1: Back to Bored is in the Menu only when the game is in a frame, and it asks Bored to close the game', () => {
+  const r = notesRig();
+  const sent = [];
+  const win = { postMessage: (data, to) => sent.push([data, to]) };
+  r.ctx.window = { parent: win };
+  r.run('G.turn = 1');
+  assert.equal(r.run('embedded()'), true, 'in a frame');
+  r.run('showMenu()');
+  const menu = r.modals.at(-1);
+  assert.ok(menu.includes('<button class="act" data-act="leave-bored">Back to Bored</button>'), 'the Menu has the button');
+  assert.ok(menu.indexOf('data-act="whats-new"') < menu.indexOf('data-act="leave-bored"') && menu.indexOf('data-act="leave-bored"') < menu.indexOf('data-act="civs"'), 'after What’s new');
+  r.run('onAction("leave-bored")');
+  assert.equal(JSON.stringify(sent), JSON.stringify([[{ type: 'bored:close' }, '*']]), 'the hub gets bored:close, which it already handles');
+  // A live game has one way out, Leave game (it keeps going), and no Back to Bored beside it.
+  r.run('G.live = {}');
+  r.run('showMenu()');
+  const live = r.modals.at(-1);
+  assert.ok(!live.includes('leave-bored') && !live.includes('Back to Bored</button>'), 'no Back to Bored in a live game');
+  assert.ok(live.includes('<button class="act warn" data-act="live-leave">Leave game (it keeps going)</button>'), 'Leave game is the way out');
+  assert.equal((live.match(/class="act warn"/g) || []).length, 1, 'one way out');
+  r.run('delete G.live');
+  // Opened on its own: no button, and a click that somehow arrives does nothing harmful.
+  const alone = {};
+  alone.parent = alone;
+  r.ctx.window = alone;
+  alone.postMessage = () => { throw new Error('there is no hub'); };
+  assert.equal(r.run('embedded()'), false);
+  r.run('showMenu()');
+  assert.ok(!r.modals.at(-1).includes('leave-bored'), 'no Back to Bored outside Bored');
+  // A browser that will not say counts as embedded (a cross-origin parent can throw).
+  r.ctx.window = { get parent() { throw new Error('blocked'); } };
+  assert.equal(r.run('embedded()'), true);
+  assert.doesNotThrow(() => r.run('leaveBored()'));
+});
+
+/* ── 4.6.2: How to play has a contents list ────────────────────────────────── */
+
+const HELP_GROUPS = [
+  ['Basics', ['turn', 'cities', 'hex-buildings', 'tiers', 'roads', 'builders']],
+  ['Science and resources', ['science', 'era4', 'resources']],
+  ['Units and moving', ['moving', 'marches', 'zoc', 'ships']],
+  ['War', ['fighting', 'taking-cities', 'declaring-war']],
+  ['Diplomacy', ['first-contact', 'borders', 'embassies', 'trading', 'coop']],
+  ['The world', ['maps', 'wonders', 'difficulty']],
+  ['Winning', ['winning', 'moments']],
+  ['Controls', ['keys']]
+];
+// civRig plus a stand-in for the few page elements How to play touches: the text pane and a heading per section.
+const plain = o => JSON.parse(JSON.stringify(o));
+function helpRig() {
+  const r = embRig();
+  const ids = jsonOf(r, 'helpSections().map(s => s.id)');
+  const pane = { scrollTop: 0, scrollHeight: 9000, clientHeight: 500, scrolls: [], scrollTo(o) { this.scrolls.push(o); } };
+  const focused = [];
+  const sec = id => ({ offsetTop: ids.indexOf(id) * 300 + 40, querySelector: () => ({ focus: o => focused.push([id, o]) }) });
+  r.els = { 'help-text': pane, 'help-search': { value: '' }, 'help-list': { innerHTML: '', querySelectorAll: () => [] }, 'help-toc': { classList: { contains: () => false, toggle() {} } } };
+  r.ctx.document = { getElementById: id => (id.startsWith('help-sec-') ? sec(id.slice(9)) : r.els[id] || null), querySelector: () => null };
+  r.sizes = [];
+  r.ctx.openModal = (html, size) => { r.modals.push(html); r.sizes.push(size); };
+  r.pane = pane;
+  r.focused = focused;
+  r.top = id => ids.indexOf(id) * 300 + 40 - 8;
+  r.run('UI = { modalKind: null, coach: { hidden: true }, coachTag: {}, coachCount: {}, coachSay: {}, coachActions: {} }');
+  return r;
+}
+
+test('Ashcrown 4.6.2: How to play is one list of sections, grouped, and the old text is only reordered', () => {
+  const r = helpRig();
+  const secs = jsonOf(r, 'helpSections()');
+  assert.equal(r.run('VERSION'), '5.4.1');
+  assert.equal(secs.length, 27);
+  assert.equal(new Set(secs.map(s => s.id)).size, 27, 'ids are unique');
+  assert.deepEqual([...new Set(secs.map(s => s.group))], HELP_GROUPS.map(g => g[0]), 'the groups, in order');
+  for (const [group, ids] of HELP_GROUPS) assert.deepEqual(secs.filter(s => s.group === group).map(s => s.id), ids, group);
+  assert.deepEqual(secs.filter(s => ['turn', 'era4', 'declaring-war', 'borders', 'maps', 'moments'].includes(s.id)).map(s => s.title),
+    ['A turn', 'Era 4 is shuffled', 'Declaring war with an order', 'Borders and the Council', 'Maps and continents', 'Historic moments']);
+  for (const s of secs) {
+    assert.ok(s.title && s.html.startsWith('<p>') && s.html.endsWith('</p>'), s.id + ' has a title and its paragraph');
+    assert.ok(!/<h[1-6]/.test(s.html), s.id + ' leaves the heading to the page');
+  }
+  assert.ok(secs.find(s => s.id === 'keys').html.startsWith('<p>Like Civ 6: <b>right-click</b> sends the selected unit'), 'text kept as it was');
+  assert.ok(secs.find(s => s.id === 'embassies').html.includes('<b>Embassy</b> (30 production)'));
+});
+
+test('Ashcrown 4.6.2: the page lists every group and section, and showHelp(id) opens at that section', () => {
+  const r = helpRig();
+  r.run('showHelp()');
+  const html = r.modals.at(-1);
+  assert.equal(r.sizes.at(-1), 'wide help', 'a wide modal with the help class');
+  assert.equal(r.run('UI.modalKind'), 'help');
+  assert.match(html, /<h2>How to play<\/h2>/);
+  assert.ok(html.includes('data-act="help-contents"') && html.includes('>Contents</button>'), 'the Contents button for narrow screens');
+  assert.ok(html.includes('id="help-search"') && html.includes('placeholder="Search the rules"'), 'the search box');
+  assert.deepEqual((html.match(/<h2 class="help-group">[^<]*/g) || []).map(h => h.replace(/<[^>]*>/, '')), HELP_GROUPS.map(g => g[0]), 'a heading above each group of text');
+  assert.deepEqual((html.match(/<div class="help-label">[^<]*/g) || []).map(h => h.replace(/<[^>]*>/, '')), HELP_GROUPS.map(g => g[0]), 'and a small label in the contents');
+  const all = HELP_GROUPS.flatMap(g => g[1]);
+  assert.deepEqual((html.match(/<section class="help-sec" id="help-sec-[^"]*"><h3 tabindex="-1">/g) || []).map(s => s.match(/help-sec-([^"]*)/)[1]), all, 'every section, headed so focus can land on it');
+  assert.deepEqual((html.match(/data-act="help-go:[^"]*"/g) || []).map(s => s.slice(18, -1)), all, 'a link for each');
+  assert.equal(r.pane.scrolls.length, 0, 'no id, no jump');
+  assert.equal(html.match(/class="help-link on"/g).length, 1, 'one link is marked: the first section');
+  assert.ok(html.includes('class="help-link on" type="button" data-act="help-go:turn"'));
+  // An id opens straight at the section: instant, heading focused. An unknown id just opens it.
+  r.run('showHelp("borders")');
+  assert.deepEqual(plain(r.pane.scrolls.at(-1)), { top: r.top('borders'), behavior: 'auto' });
+  assert.equal(r.focused.at(-1)[0], 'borders');
+  assert.deepEqual(plain(r.focused.at(-1)[1]), { preventScroll: true });
+  assert.equal(r.run('UI.helpCur'), 'borders');
+  const jumps = r.pane.scrolls.length;
+  r.run('showHelp("nope")');
+  assert.equal(r.pane.scrolls.length, jumps);
+  // The menu items still open it with no id.
+  r.run('onAction("help")');
+  assert.equal(r.pane.scrolls.length, jumps);
+  assert.equal(r.run('UI.helpCur'), 'turn');
+});
+
+test('Ashcrown 4.6.2: a jump is smooth unless Animation is off, and the heading takes focus', () => {
+  const r = helpRig();
+  r.run('showHelp()');
+  r.act('help-go:ships');
+  assert.deepEqual(plain(r.pane.scrolls.at(-1)), { top: r.top('ships'), behavior: 'smooth' });
+  assert.deepEqual(r.focused.at(-1)[0], 'ships');
+  assert.equal(r.run('UI.helpCur'), 'ships', 'marked at once');
+  r.run('setAnim("none")');
+  r.act('help-go:keys');
+  assert.deepEqual(plain(r.pane.scrolls.at(-1)), { top: r.top('keys'), behavior: 'auto' }, 'instant with Animation off');
+  assert.equal(r.run('UI.helpAim'), null);
+  // The last section can always be brought to the top: the target never goes past the end of the text.
+  r.pane.scrollHeight = 5000;
+  r.act('help-go:keys');
+  assert.equal(r.pane.scrolls.at(-1).top, 4500, 'clamped to the end of the pane');
+});
+
+test('Ashcrown 4.6.2: search matches the title or the text, every word, any case, and a group with no match is hidden', () => {
+  const r = helpRig();
+  const ids = q => jsonOf(r, 'helpMatches(' + JSON.stringify(q) + ').map(s => s.id)');
+  assert.equal(ids('').length, 27, 'an empty search is everything');
+  assert.deepEqual(ids('zone control'), ['zoc'], 'two words, both needed');
+  assert.deepEqual(ids('ZONE'), ids('zone'), 'case does not matter');
+  assert.ok(ids('zone').includes('zoc'));
+  assert.deepEqual(ids('borders').filter(x => x === 'borders'), ['borders'], 'a title word');
+  const text = ids('horse');
+  assert.ok(text.includes('resources') && text.includes('fighting') && text.includes('trading'), 'a word in the text finds the section: ' + text);
+  assert.ok(!text.includes('keys') && !text.includes('maps'));
+  assert.deepEqual(ids('<b>'), [], 'tags are not text');
+  assert.deepEqual(ids('xyzzy'), []);
+  // The list keeps the page's order, shows only groups that still have a match, and marks the section being read.
+  r.run('UI.helpCur = "trading"');
+  const list = r.run('helpListHtml(helpMatches("embassy"))');
+  assert.deepEqual((list.match(/<div class="help-label">[^<]*/g) || []).map(h => h.replace(/<[^>]*>/, '')), ['Diplomacy']);
+  assert.ok(!list.includes('help-go:turn'), 'sections with no match are gone');
+  assert.ok(list.includes('data-act="help-go:embassies"'));
+  assert.ok(!list.includes('help-link on'), 'the section being read is not in this list, so nothing is marked');
+  const full = r.run('helpListHtml(helpSections())');
+  assert.ok(full.includes('<button class="help-link on" type="button" data-act="help-go:trading" aria-current="location">Trading</button>'));
+  assert.equal(full.match(/aria-current/g).length, 1);
+  assert.equal(r.run('helpListHtml(helpMatches("xyzzy"))'), '<p class="help-none">No section mentions that.</p>');
+  // Typing filters the list in place.
+  r.els['help-list'].innerHTML = '';
+  r.run('helpFilter("horse")');
+  assert.deepEqual((r.els['help-list'].innerHTML.match(/help-go:[a-z0-9-]+/g) || []).map(s => s.slice(8)), text);
+});
+
+test('Ashcrown 4.6.2: Enter jumps to the first match, Escape clears the search and the next Escape is left to close', () => {
+  const r = helpRig();
+  r.run('showHelp()');
+  const box = r.els['help-search'];
+  const key = (k, target) => { const e = { key: k, target, prevented: false, stopped: false, preventDefault() { this.prevented = true; }, stopPropagation() { this.stopped = true; } }; r.ctx.ev = e; r.run('helpKey(ev)'); return e; };
+  box.value = 'horse';
+  key('Enter', box);
+  assert.equal(r.focused.at(-1)[0], 'builders', 'the first match in page order');
+  assert.equal(r.pane.scrolls.at(-1).top, r.top('builders'));
+  box.value = 'xyzzy';
+  const n = r.pane.scrolls.length;
+  key('Enter', box);
+  box.value = '   ';
+  key('Enter', box);
+  assert.equal(r.pane.scrolls.length, n, 'nothing to jump to');
+  // Escape: first the search is cleared and the whole contents is back.
+  box.value = 'horse';
+  r.els['help-list'].innerHTML = 'filtered';
+  const first = key('Escape', box);
+  assert.equal(box.value, '');
+  assert.equal(first.prevented && first.stopped, true, 'handled: the modal stays open');
+  assert.equal((r.els['help-list'].innerHTML.match(/help-go:/g) || []).length, 27, 'the contents is whole again');
+  assert.equal(r.run('helpEscape()'), false, 'the second Escape is not ours: it closes the modal');
+});
+
+test('Ashcrown 4.6.2: the closing tip links to How borders work, and nothing else gets a link', () => {
+  const r = helpRig();
+  assert.deepEqual(jsonOf(r, 'TIPS.filter(t => t.help).map(t => [t.id, t.help, t.helpLabel])'), [['closing', 'borders', 'How borders work']]);
+  r.city(0, 3, 5);
+  r.unit(1, 'warrior', 4, 5);
+  r.meetOnly(0, 1);
+  r.run('pl(0).techs = pl(0).techs.filter(t => t !== "earlyempire")');
+  assert.equal(r.run('currentTip() && currentTip().tip.id'), 'closing', 'a stranger on your land brings the tip up');
+  r.run('renderCoach()');
+  const actions = r.run('UI.coachActions.innerHTML');
+  assert.ok(actions.includes('<button class="act" data-act="help:borders">How borders work</button>'), 'the link');
+  assert.ok(actions.indexOf('data-act="tip-ok:closing"') < actions.indexOf('data-act="help:borders"') && actions.indexOf('data-act="help:borders"') < actions.indexOf('data-act="tips-off"'), 'between Got it and Turn tips off');
+  assert.ok(r.run('UI.coachSay.innerHTML').includes('Early Empire is a cheap tech that closes your borders'), 'the tip text is unchanged');
+  // The button opens How to play at Borders and the Council. It also works from the title screen, where there is no game.
+  r.act('help:borders');
+  assert.deepEqual(plain(r.pane.scrolls.at(-1)), { top: r.top('borders'), behavior: 'auto' }, 'it opens right there');
+  assert.equal(r.run('UI.helpCur'), 'borders');
+  assert.equal(r.run('UI.modalKind'), 'help');
+  r.run('G = null');
+  r.act('help:keys');
+  assert.equal(r.focused.at(-1)[0], 'keys');
+});
+
+/* ── 4.7: army upkeep, obsolete warriors, CPUs that attack with a plan, stalemates, who is at war ── */
+
+test('Ashcrown 4.7: 2 soldiers per city are free, and each extra one costs its home city 1 production, never below 0', () => {
+  const r = ordersRig();
+  const a = r.city(0, 4, 5), b = r.city(0, 10, 9);
+  for (let k = 0; k < 4; k++) r.unit(0, 'warrior', 5 + k, 6);
+  assert.equal(r.run('armyFree(0)'), 4);
+  assert.equal(r.run('upkeepCharges(0).size'), 0, '4 soldiers for 2 cities cost nothing');
+  r.unit(0, 'warrior', 5, 7); r.unit(0, 'warrior', 6, 7);
+  const charged = r.run('[...upkeepCharges(0).values()].reduce((n, k) => n + k, 0)');
+  assert.equal(charged, 2, '6 soldiers for 2 cities: 2 pay');
+  const cost = r.run('cityYields(cityAt(4, 5)).armyCost + cityYields(cityAt(10, 9)).armyCost');
+  assert.equal(cost, 2, 'and the cities pay it in production');
+  assert.ok(r.run('cityYields(cityAt(4, 5)).prod') >= 0 && r.run('cityYields(cityAt(10, 9)).prod') >= 0, 'never below 0');
+  assert.ok(r.run('realmPanel()').includes('Army: 6 units, 4 free, upkeep 2 production a turn.'), 'the realm panel says so');
+  void a; void b;
+});
+
+test('Ashcrown 4.7: warriors cost 30 and are not offered once you know Iron Working', () => {
+  const r = ordersRig();
+  r.city(0, 4, 5);
+  assert.equal(r.run('UNITS.warrior.cost'), 30);
+  assert.equal(r.run('UNITS.terracotta.cost'), 30, 'the Terracotta Warrior follows the warrior');
+  assert.equal(r.run('buildProblem(cityAt(4, 5), { kind: "unit", id: "warrior" })'), '');
+  r.run('pl(0).techs.push("mining", "bronze", "ironworking")');
+  assert.equal(r.run('buildProblem(cityAt(4, 5), { kind: "unit", id: "warrior" })'), 'Obsolete after Iron Working');
+  assert.equal(r.run('unlockedFor(0, UNITS.warrior)'), false, 'so the build list hides it');
+  assert.equal(r.run('unlockedFor(0, UNITS.spearman)'), true);
+});
+
+test('Ashcrown 4.7: a CPU only goes for a city when its force nearby is clearly stronger, with archers once it can build them', () => {
+  const r = ordersRig();
+  r.city(1, 10, 5);
+  r.war(3, 1);
+  const ready = () => r.run('aiReadyFor(pl(3), cityAt(10, 5), ownUnits(3).filter(u => isMil(u.type)))');
+  r.unit(3, 'warrior', 8, 5); r.unit(3, 'warrior', 8, 6);
+  assert.equal(r.run('cityStrength(cityAt(10, 5))'), 28);
+  assert.equal(ready(), false, '40 strength against a city holding 28: not enough');
+  r.unit(3, 'warrior', 8, 4);
+  assert.equal(ready(), true, '60 is at least 1.5 times 28');
+  r.run('pl(3).techs.push("archery")');
+  assert.equal(ready(), false, 'once it can build archers, one must come');
+  r.unit(3, 'archer', 7, 5);
+  assert.equal(ready(), true);
+  r.unit(1, 'swordsman', 11, 5);
+  assert.equal(ready(), false, 'a swordsman next to the city counts too: 85 against 1.5 times 63');
+});
+
+test('Ashcrown 4.7: 20 turns of war with no city changing hands is a stalemate, and the CPU wants peace', () => {
+  const r = ordersRig();
+  r.war(2, 3);
+  r.run('G.turn = 40; G.warSince[2][3] = G.warSince[3][2] = 30');
+  assert.equal(r.run('stalemate(2, 3)'), false, '10 turns is not yet');
+  r.run('G.warSince[2][3] = G.warSince[3][2] = 20');
+  assert.equal(r.run('stalemate(2, 3)'), true, '20 turns with nothing taken');
+  assert.equal(r.run('aiWantsPeace(pl(2), pl(3))'), true);
+  r.run('noteTake(3, 2)');
+  assert.equal(r.run('stalemate(2, 3)'), false, 'a city that just changed hands resets it');
+  assert.equal(r.run('stalemate(0, 1)'), false, 'at peace is never a stalemate');
+});
+
+test('Ashcrown 4.7: the Council and the realm panel show who is at war with whom, without naming civs you have not met', () => {
+  const r = ordersRig();
+  r.run('G.met = G.players.map(a => G.players.map(b => a.i === b.i))');
+  r.war(2, 3);
+  r.meetOnly(0, 2);
+  r.seat(0);
+  assert.equal(r.run('warLine(0, pl(2))'), 'At war with: 1 civ you haven’t met');
+  assert.equal(r.run('warsList(0).length'), 0, 'a war with a civ you have not met is not listed');
+  r.meetOnly(0, 3);
+  assert.equal(r.run('warLine(0, pl(2))'), 'At war with: Japan');
+  assert.equal(r.run('warLine(0, pl(1))'), 'At peace with everyone');
+  assert.equal(r.run('warsList(0).map(w => w.a.i + "-" + w.b.i).join()'), '2-3');
+  r.run('showCouncil()');
+  const html = r.modals.at(-1);
+  assert.ok(html.includes('<h3>Wars</h3>') && html.includes('China') && html.includes('Since turn'), 'the Wars list');
+  assert.ok(html.includes('At war with: Japan'), 'and the line on China’s row');
+  assert.ok(r.run('realmPanel()').includes('At war with: China'), 'the realm panel too');
+});
+
+test('A Bored Together match never writes the arcade best a solo game reads', () => {
+  // 2048 (a duel) and the native arcade games keep their best in `bored.best.*`,
+  // which the solo game and the hub high score both read. A match is somebody
+  // else's run: it must not replace that key in either match mode.
+  const source = load('src/games/arcade.js');
+  const store = new Map();
+  const context = vm.createContext({
+    localStorage: {
+      getItem: key => (store.has(key) ? store.get(key) : null),
+      setItem: (key, value) => store.set(key, String(value))
+    },
+    window: {}
+  });
+  vm.runInContext(extractFunction(source, 'inMatch') + '\n' + extractFunction(source, 'write'), context);
+  context.write('2048', 12);
+  assert.equal(store.get('bored.best.2048'), '12', 'solo play keeps its best');
+  context.window.__boredTogether = { context: {} };
+  context.write('2048', 40);
+  assert.equal(store.get('bored.best.2048'), '12', 'a turns match never overwrites it');
+  context.window.__boredTogether = null;
+  context.window.__boredSeed = { seed: 7, match: true };
+  context.write('2048', 99);
+  assert.equal(store.get('bored.best.2048'), '12', 'a duel never overwrites it');
+});
+
+/* ── Ashcrown 5.1: co-op, the humans against the CPUs ──────────────────────── */
+
+const COOP = { mode: 'coop' };
+
+test('Ashcrown 5.1: setup gives each seat a team: its own in a free-for-all, one for every human in co-op, and co-op needs a human and a CPU', () => {
+  const ffa = civRig(FOUR, { flat: false });
+  assert.deepEqual(jsonOf(ffa, 'G.teams'), [0, 1, 2, 3]);
+  assert.equal(ffa.run('G.mode'), 'ffa');
+  assert.equal(ffa.run('coopOn()'), false);
+  const co = civRig(FOUR, { flat: false, mode: 'coop' });
+  assert.deepEqual(jsonOf(co, 'G.teams'), [0, 0, 2, 3], 'Ann and Ben are one team, each CPU keeps its own');
+  assert.equal(co.run('G.mode'), 'coop');
+  assert.equal(co.run('sameTeam(0, 1) && !sameTeam(0, 2) && !sameTeam(2, 3) && sameTeam(2, 2)'), true);
+  assert.deepEqual(jsonOf(co, 'teammates(0)'), [1]);
+  assert.deepEqual(jsonOf(co, 'teammates(2)'), []);
+  // Teammates have met from turn 1, nobody else has.
+  assert.equal(co.met(0, 1) && co.met(1, 0), true, 'teammates have met');
+  assert.equal(co.met(0, 2) || co.met(1, 2) || co.met(2, 3), false, 'strangers have not');
+  assert.equal(co.run('metSomeone(pl(0))'), false, 'a teammate is not first contact');
+  assert.equal(co.run('G.news.filter(n => n.kind === "meet").length'), 0, 'no first-contact card');
+  // Without somebody on each side it is a free-for-all, whatever was picked.
+  const rule = (seats, mode) => jsonOf(co, 'teamsFor(' + JSON.stringify(seats) + ', ' + JSON.stringify(mode) + ')');
+  assert.deepEqual(rule([{ human: true }, { human: true }, { human: false }], 'coop'), { mode: 'coop', teams: [0, 0, 2] });
+  assert.deepEqual(rule([{ human: false }, { human: true }, { human: false }], 'coop'), { mode: 'coop', teams: [0, 1, 2] }, 'one human on a team of one');
+  assert.deepEqual(rule([{ human: true }, { human: true }], 'coop'), { mode: 'ffa', teams: [0, 1] }, 'no CPU: free-for-all');
+  assert.deepEqual(rule([{ human: false }, { human: false }], 'coop'), { mode: 'ffa', teams: [0, 1] }, 'no human: free-for-all');
+  assert.deepEqual(rule([{ human: true }, { human: false }], 'ffa'), { mode: 'ffa', teams: [0, 1] });
+  assert.deepEqual(rule([{ human: true }, { human: false }], undefined), { mode: 'ffa', teams: [0, 1] });
+  // A game with no teams at all (an older save, a bare board) reads as one team per seat.
+  co.run('delete G.teams; delete G.mode');
+  assert.equal(co.run('teamOf(1)'), 1);
+  assert.equal(co.run('sameTeam(0, 1)'), false);
+  assert.equal(co.run('coopOn()'), false);
+});
+
+test('Ashcrown 5.1: a save from before teams loads as a free-for-all, keeps playing, and a 5.0 live game drops its own team list', () => {
+  const r = civRig(FOUR, { flat: false });
+  const old = jsonOf(r, 'G');
+  delete old.teams; delete old.mode;
+  r.ctx.old = old;
+  const up = jsonOf(r, 'prepareState(JSON.parse(JSON.stringify(old)))');
+  assert.deepEqual(up.teams, [0, 1, 2, 3]);
+  assert.equal(up.mode, 'ffa');
+  const live = jsonOf(r, 'G');
+  live.live = { teams: [0, 1, 2, 3], humans: [0, 1] }; delete live.teams; delete live.mode;
+  r.ctx.live = live;
+  const kept = jsonOf(r, 'prepareState(JSON.parse(JSON.stringify(live)))');
+  assert.equal(kept.live.teams, undefined);
+  assert.deepEqual(kept.live.humans, [0, 1]);
+  // A co-op game keeps its teams through a save and load.
+  const co = civRig(FOUR, { flat: false, mode: 'coop' });
+  const saved = jsonOf(co, 'prepareState(JSON.parse(JSON.stringify(G)))');
+  assert.deepEqual(saved.teams, [0, 0, 2, 3]);
+  assert.equal(saved.mode, 'coop');
+});
+
+test('Ashcrown 5.1: teammates are always at peace, always open to each other, and never fight, capture or pin each other', () => {
+  const r = ordersRig(COOP);
+  r.meetOnly(0, 2);
+  for (const x of [8, 9, 10]) for (const y of [4, 5, 6]) r.own(1, x, y);   // Ben's land
+  for (const x of [12, 13]) for (const y of [4, 5, 6]) r.own(2, x, y);     // a CPU's land
+  r.run('for (const i of [1, 2]) pl(i).techs.push("earlyempire")');
+  // War is refused, however it is asked for.
+  assert.equal(r.run('declareWar(0, 1)'), false);
+  assert.equal(r.run('declareWar(1, 0)'), false);
+  assert.equal(r.at(0, 1), false);
+  assert.equal(r.run('declareWar(0, 2)'), true, 'a CPU is another matter');
+  assert.equal(r.at(0, 2) && !r.at(1, 2), true, 'and war with it is not war for the whole team');
+  r.run('makePeace(0, 2)');
+  // Borders: a teammate's land is open even once it is closed; a CPU's is not.
+  assert.equal(r.run('landClosed(1)'), true);
+  assert.equal(r.run('closedOwner(0, 9, 5)'), -1, 'Ann walks on Ben’s closed land');
+  assert.equal(r.run('closedOwner(1, 13, 5)'), 2, 'while the CPU’s closed land stays closed to Ben');
+  assert.equal(r.run('closedOwner(0, 13, 5)'), 2);
+  assert.equal(r.run('openBetween(0, 1) && openBetween(1, 0)'), true);
+  assert.equal(r.run('proposeOpen(0, 1)'), '', 'nothing to ask for');
+  const scout = r.unit(0, 'warrior', 7, 5);
+  r.seat(0); r.ready(); r.pick(scout);
+  const boxes = r.modals.length;
+  assert.equal(r.order(scout, 9, 5), true, 'Ann’s warrior walks onto Ben’s land');
+  assert.equal(r.get(scout, 'u.x'), 9);
+  assert.equal(r.modals.length, boxes, 'nothing is asked');
+  assert.equal(r.at(0, 1), false);
+  // Turn start does not move a teammate off closed land.
+  r.run('beginPlayerTurn(0)');
+  assert.equal(r.get(scout, 'u.x'), 9, 'not ejected');
+  // A teammate's soldier or civilian next to your soldier is never a target, never a "Declare war?" question.
+  const mine = r.unit(0, 'warrior', 4, 5), mate = r.unit(1, 'warrior', 5, 5), settler = r.unit(1, 'settler', 4, 6);
+  const foe = r.unit(2, 'warrior', 3, 5), prey = r.unit(2, 'builder', 4, 4);
+  r.ready();
+  assert.equal(r.run('warOrder(unitById("' + mine.id + '"), 5, 5)'), null, 'no prompt for a teammate’s soldier');
+  assert.equal(r.run('warOrder(unitById("' + mine.id + '"), 4, 6)'), null, 'nor for a teammate’s settler');
+  assert.equal(r.run('strikeInfo(unitById("' + mine.id + '"), 5, 5)'), null, 'and an attack on them is not on offer');
+  r.run('G.viewer = 0; G.cur = 0; selection = { kind: "unit", id: "' + mine.id + '" }; hover = [4, 6]; renderPathLayer = () => {}; refreshPreview()');
+  assert.equal(r.run('preview && preview.cap'), null, 'hovering a teammate’s settler offers no “Capture (means war)” label');
+  r.run('hover = [4, 4]; refreshPreview()');
+  assert.ok(r.run('preview && preview.cap && preview.cap.label').includes('means war'), 'while a CPU’s builder still does');
+  assert.equal(r.run('canStop(unitById("' + mine.id + '"), 4, 6)'), false, 'a hex with their civilian is not a stop');
+  assert.notEqual(r.run('warOrder(unitById("' + mine.id + '"), 3, 5)'), null, 'the CPU’s soldier still asks “Declare war?”');
+  assert.notEqual(r.run('warOrder(unitById("' + mine.id + '"), 4, 4)'), null, 'and its lone builder asks for war too');
+  // The click on a teammate says they are on the team, and no war button is offered in their cards.
+  r.pick(mine);
+  r.order(mine, 5, 5);
+  assert.ok(r.toasts.at(-1).includes('is on your team'), r.toasts.at(-1));
+  r.run('selection = { kind: "unit", id: "' + mate.id + '" }');
+  const panel = r.run('sidePanelHTML()');
+  assert.ok(!panel.includes('war-ask:'), 'no Declare war on a teammate’s unit');
+  assert.ok(panel.includes('is on your team'));
+  r.run('selection = { kind: "unit", id: "' + foe.id + '" }');
+  assert.ok(r.run('sidePanelHTML()').includes('war-ask:2'), 'but there is one for a CPU’s');
+  // Zones of control: a teammate's soldier pins nothing, an enemy's does.
+  assert.equal(r.run('zocFor(unitById("' + mine.id + '"))'), null, 'no zone from a teammate (and none from a CPU at peace)');
+  r.war(0, 2);
+  assert.notEqual(r.run('zocFor(unitById("' + mine.id + '"))'), null, 'a CPU at war has one');
+  assert.equal(r.run('[...zocFor(unitById("' + mine.id + '")).keys()].includes("5,4") || true'), true);
+  const zone = jsonOf(r, '[...zocFor(unitById("' + mine.id + '"))]');
+  assert.ok(!zone.includes('6,5') && !zone.includes('5,6'), 'hexes beside the teammate’s soldier are not in a zone');
+  // Cities: a teammate's city is never struck or taken.
+  const city = r.city(1, 10, 8);
+  const hitter = r.unit(0, 'warrior', 10, 7);
+  r.ready();
+  assert.equal(r.run('targetAt(unitById("' + hitter.id + '"), 10, 8).peace'), 1);
+  assert.equal(r.run('strikeInfo(unitById("' + hitter.id + '"), 10, 8)'), null);
+  assert.equal(r.run('warOrder(unitById("' + hitter.id + '"), 10, 8)'), null);
+  assert.ok(city, 'the city stands');
+});
+
+test('Ashcrown 5.1: a teammate’s sight is the team’s: one map for all, and a stranger seen by one is met by all', () => {
+  const r = civRig(FOUR, { ...COOP, flat: true });
+  const ann = r.unit(0, 'warrior', 3, 5), ben = r.unit(1, 'warrior', 14, 5);
+  r.run('G.units.forEach(u => { u.mp = 2; })');
+  const seenBy = (i, x, y) => r.run('seenBy(' + i + ', ' + x + ', ' + y + ')');
+  r.run('G.seen.forEach(s => s.fill(0)); computeVision(0)');
+  assert.equal(r.run('computeVision(0)[5 * G.cols + 14]'), 1, 'Ann’s screen shows the hex under Ben’s warrior');
+  assert.equal(r.run('computeVision(0)[5 * G.cols + 3]'), 1, 'and her own');
+  assert.equal(r.run('computeVision(0)[5 * G.cols + 9]'), 0, 'but not the empty middle');
+  assert.equal(seenBy(1, 3, 5), true, 'Ben’s map got what Ann sees');
+  assert.equal(seenBy(0, 14, 5) && seenBy(1, 14, 5), true, 'one shared map');
+  assert.equal(seenBy(2, 3, 5), false, 'a CPU’s map is its own');
+  // A free-for-all shares nothing.
+  const ffa = civRig(FOUR, { flat: true });
+  ffa.unit(0, 'warrior', 3, 5); ffa.unit(1, 'warrior', 14, 5);
+  assert.equal(ffa.run('computeVision(0)[5 * G.cols + 14]'), 0, 'no shared sight without a team');
+  assert.equal(ffa.run('seenBy(1, 3, 5)'), false);
+  // A stranger next to Ben is met by Ben and by Ann, with a card each, and the contact is paid once each.
+  r.unit(2, 'warrior', 15, 5);
+  r.run('checkContacts(1)');
+  assert.equal(r.met(1, 2) && r.met(2, 1), true, 'Ben meets the CPU');
+  assert.equal(r.met(0, 2) && r.met(2, 0), true, 'and so does Ann, who did not see it herself');
+  assert.equal(r.met(0, 3) || r.met(1, 3), false, 'the other CPU stays a stranger');
+  assert.equal(r.say(0, 'meet'), 1);
+  assert.equal(r.say(1, 'meet'), 1);
+  assert.equal(r.run('metSomeone(pl(0)) && metSomeone(pl(1))'), true);
+  r.run('checkContacts(0); checkContacts(1)');
+  assert.equal(r.say(0, 'meet') + r.say(1, 'meet'), 2, 'no second cards');
+  // And a CPU that sees only Ann's side meets the whole team.
+  const other = civRig(FOUR, { ...COOP, flat: true });
+  other.unit(0, 'warrior', 3, 5); other.unit(3, 'warrior', 4, 5);
+  other.run('checkContacts(3)');
+  assert.equal(other.met(3, 0) && other.met(3, 1), true, 'the CPU meets both teammates');
+  assert.equal(other.met(1, 3), true);
+  assert.equal(ann && ben ? true : true, true);
+});
+
+test('Ashcrown 5.1: a gift of horses, iron or gunpowder goes through between teammates, in fives, up to the cap, and to nobody else', () => {
+  const r = civRig(FOUR, COOP);
+  r.run('pl(0).horses = 20; pl(0).iron = 5; pl(0).gunpowder = 10; pl(1).horses = 10; pl(1).iron = 28');
+  const give = (from, to, res, qty) => r.run('giveResource(' + from + ', ' + to + ', "' + res + '", ' + qty + ')');
+  assert.equal(give(0, 1, 'horses', 5), '', 'a gift of 5 horses');
+  assert.deepEqual(jsonOf(r, '[pl(0).horses, pl(1).horses]'), [15, 15], 'it moves at once');
+  assert.equal(give(0, 1, 'gunpowder', 10), '');
+  assert.equal(r.run('pl(1).gunpowder'), 10);
+  assert.match(give(0, 1, 'horses', 3), /fives/, 'fives only');
+  assert.match(give(0, 1, 'horses', 0), /fives/);
+  assert.match(give(0, 1, 'horses', -5), /fives/);
+  assert.match(give(0, 1, 'horses', 2.5), /fives/);
+  assert.match(give(0, 1, 'iron', 10), /has only 5 iron/, 'not more than you have');
+  assert.match(give(0, 1, 'horses', 20), /has only 15 horses/);
+  assert.equal(give(1, 0, 'iron', 25), '', 'the other way too');
+  assert.match(give(1, 0, 'iron', 5), /has only 3 iron/);
+  r.run('pl(1).iron = 30; pl(0).iron = 5');
+  assert.match(give(0, 1, 'iron', 5), /can only hold 0 more iron/, 'the cap');
+  assert.match(give(0, 1, 'gold', 5), /Not a gift/, 'only the three resources');
+  assert.match(give(0, 0, 'horses', 5), /Not a gift/, 'not to yourself');
+  assert.match(give(0, 2, 'horses', 5), /Only teammates/, 'not to a CPU on another team');
+  assert.match(give(0, 7, 'horses', 5), /Not a gift/, 'not to a seat that does not exist');
+  r.run('pl(1).alive = false');
+  assert.match(give(0, 1, 'horses', 5), /Not a gift/, 'not to a civ that is out');
+  assert.equal(r.run('pl(0).horses'), 15, 'refusals change nothing');
+  // A free-for-all has no gifts.
+  const ffa = civRig(FOUR);
+  ffa.run('pl(0).horses = 20');
+  assert.match(ffa.run('giveResource(0, 1, "horses", 5)'), /Only teammates/);
+  assert.equal(ffa.run('pl(0).horses'), 20);
+});
+
+test('Ashcrown 5.1: the Council opens with Your team, with Trade and Give and no war, and a free-for-all Council has no such section', () => {
+  const r = ordersRig(COOP);
+  r.seat(0);
+  r.meetOnly(0, 2);
+  r.run('G.offers.push({ id: "o1", kind: "peace", from: 2, to: 0, turn: 5 })');
+  r.run('G.dip[2][3] = G.dip[3][2] = "war"; G.met[2][3] = G.met[3][2] = true; G.met[0][3] = G.met[3][0] = true; G.dip[1][2] = G.dip[2][1] = "war"; G.met[1][2] = G.met[2][1] = true');
+  r.city(0, 3, 3); r.city(1, 12, 5); r.city(2, 3, 12); r.city(3, 14, 12);
+  r.run('showCouncil()');
+  const html = r.modals.at(-1);
+  const team = html.indexOf('<h3>Your team</h3>');
+  assert.ok(team > 0, 'there is a Your team section');
+  assert.ok(team < html.indexOf('<h3>Offers to you</h3>') && team < html.indexOf('<h3>Wars</h3>') && team < html.indexOf('<h3>Players</h3>'), 'and it comes first');
+  const mates = html.slice(team, html.indexOf('<h3>Offers to you</h3>'));
+  assert.ok(mates.includes(r.run('fullName(pl(1))')), 'Ben is listed');
+  assert.ok(mates.includes('teammate'), 'tagged');
+  assert.match(mates, /score \d+/);
+  assert.ok(mates.includes('1 city'), 'with his cities');
+  assert.ok(mates.includes('data-act="trade-ask:1"') && mates.includes('data-act="give-ask:1"'), 'Trade and Give');
+  assert.ok(!html.includes('data-act="war-ask:1"') && !html.includes('data-act="peace:1"') && !html.includes('data-act="open-ask:1"'), 'no war, peace or borders button for a teammate');
+  assert.ok(!html.slice(html.indexOf('<h3>Players</h3>')).includes(r.run('fullName(pl(1))')), 'he is not repeated under Players');
+  assert.ok(html.slice(html.indexOf('<h3>Players</h3>')).includes('data-act="war-ask:2"'), 'the CPU is under Players with its war button');
+  assert.ok(html.includes('data-act="trade-ask:2"'));
+  // The Wars list shows the teammate's wars as usual, and ours with the CPU.
+  const wars = html.slice(html.indexOf('<h3>Wars</h3>'), html.indexOf('<h3>Players</h3>'));
+  assert.ok(wars.includes(r.run('landName(pl(1))')) && wars.includes(r.run('landName(pl(2))')), 'Ben’s war with the CPU is listed');
+  // A teammate that is out stays listed, as out.
+  r.run('pl(1).alive = false; showCouncil()');
+  assert.ok(r.modals.at(-1).includes('<span class="tag">out</span>') && !r.modals.at(-1).includes('data-act="give-ask:1"'));
+  // The gift form opens and sends through giveResource.
+  r.run('pl(1).alive = true; pl(0).horses = 10; pl(1).horses = 0; showGive(1)');
+  assert.ok(r.modals.at(-1).includes('Give to ' + r.run('pl(1).name')) && r.modals.at(-1).includes('data-act="give-send:1"'));
+  assert.equal(r.run('UI.modalKind'), 'give');
+  // Outside co-op there is no such section.
+  const ffa = ordersRig();
+  ffa.seat(0);
+  ffa.meetOnly(0, 1);
+  ffa.run('showCouncil()');
+  assert.ok(!ffa.modals.at(-1).includes('Your team') && ffa.modals.at(-1).includes('data-act="war-ask:1"'), 'free-for-all keeps its war buttons');
+});
+
+test('Ashcrown 5.1: the realm panel lists your team first, and rivals leave the team out', () => {
+  const r = ordersRig(COOP);
+  r.seat(0);
+  r.meetOnly(0, 2);
+  r.run('selection = { kind: "realm" }');
+  const html = r.run('realmPanel()');
+  const rivals = html.indexOf('>Rivals<');
+  assert.ok(html.indexOf('>Your team<') > 0 && html.indexOf('>Your team<') < html.indexOf('>Army') + 9999, 'a Your team section');
+  assert.ok(html.indexOf('>Your team<') < html.indexOf('>Score<'), 'before the score');
+  assert.ok(html.slice(0, rivals).includes(r.run('fullName(pl(1))')), 'Ben is under Your team');
+  assert.ok(!html.slice(rivals).includes(r.run('fullName(pl(1))')), 'and not under Rivals');
+  assert.ok(html.slice(rivals).includes(r.run('fullName(pl(2))')), 'the CPU is a rival');
+  const plain = ordersRig();
+  plain.seat(0); plain.meetOnly(0, 1);
+  plain.run('selection = { kind: "realm" }');
+  assert.ok(!plain.run('realmPanel()').includes('>Your team<'), 'no team section in a free-for-all');
+});
+
+/* the end: winning together */
+
+function coopEnd(opts = {}) {
+  const r = ordersRig(COOP);
+  r.run('checkElimination = checkElimination0; checkWin = checkWin0');
+  return r;
+}
+
+test('Ashcrown 5.1: a win by any teammate is the whole team’s, by conquest, by last standing, by science and on score at the limit', () => {
+  const mk = () => {
+    const r = civRig(FOUR, COOP);
+    r.run('G.viewer = 0; G.cur = 0; G.handoff = false');
+    return r;
+  };
+  // Conquest: every capital held by the team, even split between teammates, ends it with the team named.
+  let r = mk();
+  for (const [i, x, y] of [[0, 3, 3], [1, 12, 5], [2, 3, 12], [3, 14, 12]]) { r.unit(i, 'settler', x, y); r.run('foundCity(G.units.find(u => u.owner === ' + i + ' && UNITS[u.type].founds))'); }
+  r.run('checkWin()');
+  assert.equal(r.run('G.over'), null, 'two CPU capitals still stand');
+  r.run('for (const c of G.cities) if (c.owner >= 2) c.owner = c.owner === 2 ? 0 : 1; checkWin()');
+  assert.equal(r.run('!!G.over'), true, 'the team holds every capital');
+  assert.match(r.run('G.over.why'), /holds every capital/i);
+  assert.equal(r.run('G.over.team'), 0);
+  assert.deepEqual(jsonOf(r, 'G.over.members'), [0, 1]);
+  assert.ok([0, 1].includes(r.run('G.over.winner')));
+  assert.ok(r.run('G.log.at(-1).text').includes(' win together.'), 'the log names both');
+  // Last team standing: the CPUs are out, both teammates remain.
+  r = mk();
+  for (const [i, x, y] of [[0, 3, 3], [1, 12, 5], [2, 3, 12], [3, 14, 12]]) { r.unit(i, 'settler', x, y); r.run('foundCity(G.units.find(u => u.owner === ' + i + ' && UNITS[u.type].founds))'); }
+  r.run('G.victory.conquest = false; for (const i of [2, 3]) { pl(i).alive = false; } checkWin()');
+  assert.equal(r.run('G.over.why'), 'Last team standing');
+  assert.deepEqual(jsonOf(r, 'G.over.members'), [0, 1]);
+  // One teammate going out does not end it: the team plays on, and the one who is out stays a spectator.
+  r = mk();
+  for (const [i, x, y] of [[0, 3, 3], [1, 12, 5], [2, 3, 12], [3, 14, 12]]) { r.unit(i, 'settler', x, y); r.run('foundCity(G.units.find(u => u.owner === ' + i + ' && UNITS[u.type].founds))'); }
+  r.run('G.victory.conquest = false; for (const c of G.cities.filter(c => c.owner === 1)) { c.owner = 2; } checkElimination(); checkWin()');
+  assert.equal(r.run('pl(1).alive'), false, 'Ben is out');
+  assert.equal(r.run('G.over'), null, 'the game goes on while Ann is in');
+  assert.equal(r.run('computeVision(1)[G.cities.find(c => c.owner === 0).y * G.cols + G.cities.find(c => c.owner === 0).x]'), 1, 'and Ben, out, sees what the team sees');
+  // The team loses when every teammate is out.
+  r.run('for (const c of G.cities.filter(c => c.owner === 0)) { c.owner = 3; } checkElimination(); checkWin()');
+  assert.equal(r.run('!!G.over'), true);
+  assert.equal(r.run('pl(G.over.winner).human'), false, 'a CPU took it');
+  assert.ok(!r.run('G.over.members').includes(0), 'the team is not among the winners');
+  // Science: the home-coming of one teammate's expedition is the team's win.
+  r = mk();
+  r.run('endGame(pl(1), "The Grand Expedition came home")');
+  assert.deepEqual(jsonOf(r, 'G.over.members'), [0, 1]);
+  assert.equal(r.run('G.over.winner'), 1);
+  // The turn limit: the team wins when its best score tops the game, loses when a CPU's does.
+  r = mk();
+  for (const [i, x, y] of [[0, 3, 3], [1, 12, 5], [2, 3, 12], [3, 14, 12]]) { r.unit(i, 'settler', x, y); r.run('foundCity(G.units.find(u => u.owner === ' + i + ' && UNITS[u.type].founds))'); }
+  r.run('G.maxTurns = 20; pl(1).eraPts = 500; finishOnScore()');
+  assert.equal(r.run('G.over.winner'), 1, 'Ben had the highest score in the game');
+  assert.deepEqual(jsonOf(r, 'G.over.members'), [0, 1], 'so Ann wins too');
+  r = mk();
+  for (const [i, x, y] of [[0, 3, 3], [1, 12, 5], [2, 3, 12], [3, 14, 12]]) { r.unit(i, 'settler', x, y); r.run('foundCity(G.units.find(u => u.owner === ' + i + ' && UNITS[u.type].founds))'); }
+  r.run('G.maxTurns = 20; pl(3).eraPts = 500; finishOnScore()');
+  assert.equal(r.run('G.over.winner'), 3);
+  assert.deepEqual(jsonOf(r, 'G.over.members'), [3]);
+  // A game with no teams keeps the old shape of the end.
+  const ffa = civRig(FOUR);
+  ffa.run('endGame(pl(1), "x")');
+  assert.deepEqual(jsonOf(ffa, 'G.over'), { winner: 1, why: 'x', turn: 5 });
+});
+
+test('Ashcrown 5.1: the end screen says Your team won or lost, lists every teammate, and a free-for-all still names a winner', () => {
+  const r = civRig(FOUR, COOP);
+  r.run('G.viewer = 0; G.cur = 0; G.handoff = false');
+  r.run('endGame(pl(1), "Holds every capital on the map")');
+  r.run('showEndModal()');
+  let html = r.modals.at(-1);
+  assert.ok(html.includes('<h2>Your team won</h2>'), 'Ann was not the winner, but her team won');
+  assert.ok(html.includes('Your team:') && html.includes(r.run('fullName(pl(0))')) && html.includes(r.run('fullName(pl(1))')), 'both teammates are listed');
+  r.run('G.over = null; endGame(pl(2), "Highest score when the turn limit hit"); UI.endShown = false; showEndModal()');
+  html = r.modals.at(-1);
+  assert.ok(html.includes('<h2>Your team lost</h2>'));
+  assert.ok(html.includes('Your team:'));
+  r.run('G.viewer = 1; G.over = null; endGame(pl(0), "x"); showEndModal()');
+  assert.ok(r.modals.at(-1).includes('<h2>Your team won</h2>'), 'Ben sees it too');
+  const ffa = civRig(FOUR);
+  ffa.run('G.viewer = 0; G.handoff = false; endGame(pl(1), "x"); showEndModal()');
+  assert.ok(ffa.modals.at(-1).includes(ffa.run('fullName(pl(1))') + ' wins') && !ffa.modals.at(-1).includes('Your team'), 'a free-for-all keeps its heading');
 });

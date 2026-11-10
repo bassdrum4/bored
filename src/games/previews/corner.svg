@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="Corner: the inside of a small shop with stocked shelves, a window, a counter and potted plant">
+<rect width="800" height="500" fill="#f5f0e2"/>
+<rect y="446" width="800" height="54" fill="#e9dfc8"/>
+<path d="M0 446h800" stroke="#3a382f" stroke-width="2"/>
+<g stroke="#cbbfa6" stroke-width="1"><path d="M76 446l-22 54M176 446l-22 54M276 446l-22 54M376 446l-22 54M476 446l-22 54M576 446l-22 54M676 446l-22 54M776 446l-22 54"/></g>
+<rect y="430" width="800" height="16" fill="#e3d7bc"/><path d="M0 430h800" stroke="#3a382f" stroke-width="1.6"/>
+<text x="152" y="47" text-anchor="middle" font-family="Georgia, serif" font-size="25" fill="#2c2a22">Corner</text>
+<text x="152" y="60" text-anchor="middle" font-family="monospace" font-size="7.5" letter-spacing="1.5" fill="#7d7462">GROCERIES · OPEN 7&#8211;7</text>
+<path d="M80 66h144" stroke="#cfc4ab"/>
+<path d="M46 78h214v190H46z" fill="#e9e7d2" stroke="#2c2a22" stroke-width="2.4"/>
+<circle cx="196" cy="130" r="20" fill="#e2d6b8" stroke="#cfc4ab"/>
+<path d="M153 78v190M46 173h214" stroke="#2c2a22" stroke-width="2.2"/>
+<path d="M46 252h214v16H46z" fill="#e3d7bc" stroke="#2c2a22" stroke-width="1.6"/>
+<circle cx="284" cy="142" r="16" fill="#fbf6ea" stroke="#2c2a22" stroke-width="2"/>
+<path d="M284 142v-9M284 142l7 2" stroke="#2c2a22" stroke-width="1.8"/>
+<path d="M404 0v84M536 0v84" stroke="#2c2a22" stroke-width="1.4"/>
+<g fill="#efe4cc" stroke="#2c2a22" stroke-width="1.8"><path d="M385 84h38l-8 20h-22z"/><path d="M517 84h38l-8 20h-22z"/></g>
+<circle cx="404" cy="108" r="4.5" fill="#fbf6ea" stroke="#2c2a22" stroke-width="1.2"/>
+<circle cx="536" cy="108" r="4.5" fill="#fbf6ea" stroke="#2c2a22" stroke-width="1.2"/>
+<g>
+<rect x="304" y="196" width="312" height="7" fill="#efe4cc" stroke="#2c2a22" stroke-width="1.6"/>
+<rect x="304" y="278" width="312" height="7" fill="#efe4cc" stroke="#2c2a22" stroke-width="1.6"/>
+<rect x="304" y="360" width="312" height="7" fill="#efe4cc" stroke="#2c2a22" stroke-width="1.6"/>
+<g stroke="#2c2a22" stroke-width="2" fill="#fbf6ea" stroke-linejoin="round">
+<path d="M386 190v-20l4-7h12l3 7v20z"/><path d="M382 190v-9q0-8 11-8t11 8v9z"/>
+<path d="M522 190v-15l4-5h3v-4h7v4h3l4 5v15z"/><path d="M520 190v-9q0-8 11-8t11 8v9z"/>
+</g>
+<path d="M386 168h20" stroke="#2f5d46" stroke-width="4"/><path d="M384 176h18" stroke="#2c2a22" stroke-width="1.4"/>
+<path d="M522 174h20" stroke="#2f5d46" stroke-width="4"/>
+<rect x="330" y="203" width="116" height="19" fill="#fbf6ea" stroke="#cfc4ab"/>
+<text x="335" y="216" font-family="monospace" font-size="9" fill="#2c2a22">Milk</text><text x="441" y="216" text-anchor="end" font-family="monospace" font-size="9" fill="#2c2a22">$1.70</text>
+<rect x="472" y="203" width="116" height="19" fill="#fbf6ea" stroke="#cfc4ab"/>
+<text x="477" y="216" font-family="monospace" font-size="9" fill="#2c2a22">Bread</text><text x="583" y="216" text-anchor="end" font-family="monospace" font-size="9" fill="#2c2a22">$1.40</text>
+<g stroke="#2c2a22" stroke-width="2" fill="#fbf6ea">
+<path d="M384 272v-14l4-6h4v-4h6v4h4l4 6v14z"/><rect x="518" y="252" width="16" height="20"/><path d="M518 258h16"/>
+<path d="M386 354v-16h20v16zM386 338h20M388 333h16"/>
+</g>
+<path d="M384 258h20" stroke="#2f5d46" stroke-width="4"/><path d="M518 261h16" stroke="#2f5d46" stroke-width="3"/>
+<path d="M386 345h20" stroke="#2f5d46" stroke-width="4"/>
+<g stroke="#2c2a22" stroke-width="2" fill="#fbf6ea"><path d="M522 354q0-11 12-11t12 11zM534 354v4"/><path d="M518 354q0-11 12-11"/></g>
+<path d="M526 343h4v8h-4z" fill="#b04a38" stroke="none"/>
+<rect x="330" y="285" width="116" height="19" fill="#fbf6ea" stroke="#cfc4ab"/>
+<text x="335" y="298" font-family="monospace" font-size="9" fill="#2c2a22">Soda</text><text x="441" y="298" text-anchor="end" font-family="monospace" font-size="9" fill="#2c2a22">$0.70</text>
+<rect x="472" y="285" width="116" height="19" fill="#fbf6ea" stroke="#cfc4ab"/>
+<text x="477" y="298" font-family="monospace" font-size="9" fill="#2c2a22">Soup</text><text x="583" y="298" text-anchor="end" font-family="monospace" font-size="9" fill="#2c2a22">$1.40</text>
+<rect x="330" y="367" width="116" height="19" fill="#fbf6ea" stroke="#cfc4ab"/>
+<text x="335" y="380" font-family="monospace" font-size="9" fill="#2c2a22">Ice cream</text><text x="441" y="380" text-anchor="end" font-family="monospace" font-size="9" fill="#2c2a22">$1.80</text>
+<rect x="472" y="367" width="116" height="19" fill="#fbf6ea" stroke="#cfc4ab"/>
+<text x="477" y="380" font-family="monospace" font-size="9" fill="#2c2a22">Umbrella</text><text x="583" y="380" text-anchor="end" font-family="monospace" font-size="9" fill="#2c2a22">$5.00</text>
+</g>
+<rect x="660" y="150" width="88" height="254" fill="#efe9d8" stroke="#2c2a22" stroke-width="2.6"/>
+<rect x="672" y="164" width="64" height="182" fill="#f7f2e4" stroke="#2c2a22" stroke-width="1.4"/>
+<rect x="678" y="200" width="52" height="20" fill="#2f5d46"/>
+<text x="704" y="214" text-anchor="middle" font-family="monospace" font-size="8" letter-spacing="1.2" fill="#f5f0e2">OPEN</text>
+<path d="M744 404v-8a4 4 0 0 0-8 0v8" stroke="#2c2a22" stroke-width="2" fill="none"/>
+<g stroke="#2f5d46" stroke-width="1.8" fill="none"><path d="M126 416v-20M126 408q-18-8-22-28M126 404q16-10 20-30M126 396q-8-6-10-20M126 398q10-8 12-22"/></g>
+<ellipse cx="104" cy="380" rx="5" ry="2.4" fill="#dbe4d2"/><ellipse cx="146" cy="374" rx="5" ry="2.4" fill="#dbe4d2"/>
+<path d="M107 416h38l-5 30h-28z" fill="#fbf6ea" stroke="#2c2a22" stroke-width="2.4"/>
+<g stroke="#2c2a22" stroke-width="1.6" fill="#efe4cc"><rect x="38" y="416" width="30" height="30"/><rect x="72" y="416" width="30" height="30"/><rect x="38" y="386" width="30" height="30"/></g>
+<g stroke="#cbbfa6"><path d="M38 426h30M38 436h30M72 426h30M72 436h30"/></g>
+<ellipse cx="470" cy="472" rx="176" ry="14" fill="#efe4c9" stroke="#cfc4ab"/>
+<path d="M350 466h240" stroke="#2f5d46" stroke-width="1.2"/>
+<rect x="292" y="404" width="420" height="46" fill="#fbf6ea" stroke="#2c2a22" stroke-width="2.4"/>
+<path d="M292 418h420M316 418v32M382 418v32M448 418v32M514 418v32M580 418v32M646 418v32" stroke="#2c2a22" stroke-width="1.4"/>
+<rect x="600" y="378" width="58" height="26" fill="#2c2a22"/><rect x="606" y="383" width="30" height="9" fill="#fbf6ea"/><rect x="646" y="383" width="6" height="9" fill="#2f5d46"/>
+<text x="618" y="416" font-family="monospace" font-size="7" fill="#7d7462">TILL</text>
+<g stroke="#2c2a22" stroke-width="2.2" fill="#fbf6ea"><circle cx="624" cy="358" r="12"/><path d="M612 404v-28a12 12 0 0 1 24 0v28"/></g>
+<path d="M612 388h24v16h-24z" fill="#2f5d46"/><path d="M624 346a12 12 0 0 0 12 11" stroke="#2c2a22" stroke-width="1.4" fill="none"/>
+<g fill="#2c2a22"><circle cx="620" cy="356" r="1.2"/><circle cx="629" cy="356" r="1.2"/></g>
+<path d="M638 386l20 12v6" stroke="#2c2a22" stroke-width="1.8" fill="none"/>
+<path d="M330 388h30v16h-30z" fill="#fbf6ea" stroke="#2c2a22" stroke-width="1.4"/>
+<path d="M335 394h20M335 399h14" stroke="#7d7462"/>
+<path d="M470 396a7 7 0 0 1 14 0" fill="none" stroke="#2c2a22" stroke-width="1.6"/><path d="M477 396v6" stroke="#2c2a22" stroke-width="1.6"/>
+</svg>

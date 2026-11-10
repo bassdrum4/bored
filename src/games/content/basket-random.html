@@ -29,10 +29,9 @@
     font: 13px/1.5 var(--sans); touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
-  main { height: 100%; height: 100dvh; display: grid; place-items: center; padding: 8px }
+  main { height: 100%; height: 100dvh; width: 100%; padding: 0 }
   #stage {
-    position: relative; overflow: hidden; width: min(960px, 100%, calc((100dvh - 16px) * 290 / 190));
-    aspect-ratio: 290 / 190; border: 1px solid var(--hair); border-radius: 2px;
+    position: relative; overflow: hidden; width: 100%; height: 100%; border: 0; border-radius: 0;
     background: var(--board);
   }
   #game { position: absolute; inset: 0; display: block; width: 100%; height: 100%; border: 0; background: var(--board) }

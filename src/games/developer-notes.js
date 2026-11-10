@@ -1,7 +1,7 @@
 // Add a note here using its exact game slug from catalog.js.
 // Notes are first-person stories, separate from searchable META blurbs.
 export const DEVELOPER_NOTES = Object.freeze({
-  'eaglecraft': "Unfortunately, because of Google Sites' constraints, I can't get mouse lock to work, so this is basically unplayable... I'm sorry guys :(((((",
+  'clicker': "This was made for andrew. Personally I think its a waste of time, but the customer knows best I guess.",
   'block-blast': "An easier version of Tetris. I remember watching Danielle playing this at a drumline party. It's very satisfying. I'm working on making this more like actual Block Blast.",
   'void-runner': "My first game I made. It's honestly not that great and I almost cut it, but I saved it solely because it was the first.",
   'rooftop-snipers': "Great game. The original is copyrighted, which makes hosting it a bit awkward. I'm working on being able to edit the code, because right now it's in binary :(",

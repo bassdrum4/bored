@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ticket to Ride</title>
+<style>
+:root{--paper:#f5f2ea;--board:#faf9f3;--ink:#1d2927;--dim:#65736c;--rule:#cbd3c9;--accent:#ba9141;--good:#54784f;--bad:#b64d43}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:ui-monospace,Consolas,monospace}
+body{display:flex;justify-content:center;padding:8px;-webkit-tap-highlight-color:transparent}
+main{width:min(100%,900px)}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:6px}
+h1{font-size:20px;letter-spacing:.12em;margin:0}
+header p{margin:0;font-size:10px;color:var(--dim)}
+#hud{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 10px;font-size:10.5px;font-weight:bold;margin:0 0 6px}
+#players{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px}
+.player{display:flex;align-items:center;gap:5px;border:1px solid var(--rule);border-radius:3px;padding:3px 6px;font-size:10px;line-height:1.25}
+.player.active{border-color:var(--ink);background:#fffdf7}
+.player i{width:8px;height:8px;border-radius:50%;flex:none;border:1px solid rgba(0,0,0,.25)}
+.player small{color:var(--dim);font-size:9px}
+#boardwrap{border:1px solid var(--ink);background:var(--board);border-radius:2px;overflow:hidden}
+#board{display:block;width:100%;height:auto;aspect-ratio:800/480;touch-action:manipulation}
+#board:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.route{pointer-events:none}
+.route .hit{pointer-events:stroke;stroke:transparent}
+.route.can{pointer-events:stroke;cursor:pointer}
+.route.can:hover .track{stroke-width:9;opacity:1}
+.city-label{font-size:9px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--board);stroke-width:2.5px;stroke-linejoin:round;pointer-events:none}
+#bar{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;margin:7px 0 5px}
+#hand,#market{display:flex;flex-wrap:wrap;gap:4px}
+.chip,.card{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--rule);border-radius:3px;background:transparent;color:var(--ink);font:10px ui-monospace,monospace;padding:4px 6px;white-space:nowrap}
+.chip i,.card i{width:8px;height:8px;border-radius:50%;border:1px solid rgba(0,0,0,.25);flex:none}
+.card{cursor:pointer;min-height:28px}
+.card:hover:not(:disabled){border-color:var(--ink)}
+.card:disabled{opacity:.42;cursor:default}
+.card.loco{border-style:dashed}
+#deck{margin-left:4px}
+#actions{display:flex;flex-wrap:wrap;gap:6px;margin:3px 0 5px}
+button{font:11px ui-monospace,monospace;background:transparent;color:var(--ink);border:1px solid var(--rule);border-radius:3px;padding:6px 9px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--ink)}button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#tickets{display:flex;flex-wrap:wrap;gap:4px;min-height:22px;margin:2px 0 4px}
+.ticket{font-size:10px;border:1px solid var(--rule);border-radius:3px;padding:3px 6px;color:var(--dim);background:#fffdf7}
+.ticket.done{border-color:var(--good);color:var(--good)}
+.ticket b{font-weight:600}
+#status{font-size:10.5px;color:var(--dim);min-height:16px;margin:1px 0}
+#log{font-size:9.5px;color:var(--dim);line-height:1.5;min-height:30px}
+#overlay{position:fixed;inset:0;z-index:5;background:rgba(250,249,243,.96);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+#overlay[hidden]{display:none}
+#panel{width:min(100%,470px);text-align:left}
+#panel h2{font-size:19px;letter-spacing:.06em;margin:0 0 9px}
+#panel p{font-size:11.5px;line-height:1.65;margin:0 0 10px;color:var(--ink)}
+#panel p.muted{color:var(--dim)}
+#panel table{width:100%;border-collapse:collapse;font-size:10.5px;margin:8px 0}
+#panel th,#panel td{border-bottom:1px solid var(--rule);padding:4px 3px;text-align:right}
+#panel th:first-child,#panel td:first-child{text-align:left}
+#panel th{font-size:9px;color:var(--dim);font-weight:600;letter-spacing:.05em}
+#options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
+#options.single{grid-template-columns:1fr}
+#options button{text-align:left;padding:9px;min-height:48px}
+#options button b,#options button small{display:block}#options button small{font-size:9px;color:var(--dim);margin-top:3px}
+.ticket-option{display:flex;align-items:flex-start;gap:7px;border:1px solid var(--rule);border-radius:3px;padding:8px;font-size:10.5px;cursor:pointer;background:#fffdf7}
+.ticket-option input{margin:2px 0 0;accent-color:var(--ink)}
+.ticket-option b{font-weight:600}
+.ticket-option small{display:block;color:var(--dim);font-size:9px;margin-top:2px}
+#overlayActions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+select{font:11px ui-monospace,monospace;background:#fffdf7;color:var(--ink);border:1px solid var(--ink);border-radius:3px;padding:6px 8px}
+@media(max-width:560px){
+  h1{font-size:16px}header p{font-size:9px}
+  body{padding:5px}
+  #hud{font-size:9.5px}
+  .player{font-size:9px;padding:2px 4px}.player small{font-size:8px}
+  .city-label{font-size:10px}
+  .chip,.card{font-size:9px;padding:3px 5px}
+  button{font-size:10px;padding:5px 7px}
+  #log{display:none}
+  #panel h2{font-size:16px}#panel p{font-size:11px}
+  #options{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body><main>
+<header><h1>TICKET TO RIDE</h1><p>NORTH AMERICA · 1900</p></header>
+<div id="hud"><span id="hudTurn">SETUP</span><span id="hudPoints">POINTS 0</span><span id="hudTrains">TRAINS 45</span><span id="hudCards">CARDS 0</span><span id="hudTickets">TICKETS 0</span></div>
+<div id="players"></div>
+<div id="boardwrap"><svg id="board" viewBox="0 0 800 480" role="img" aria-label="Map of North American railway routes. Click a route to claim it for your train line."></svg></div>
+<div id="bar"><div id="hand" aria-label="Your train cards"></div><div id="market" aria-label="Face-up train cards"></div><button id="deck" class="card" type="button">DECK</button></div>
+<div id="actions"><button id="drawTickets" type="button">Draw destination tickets</button><button id="rules" type="button">Rules</button><button id="restart" type="button">New game</button></div>
+<div id="tickets"></div>
+<div id="status" role="status"></div>
+<div id="log"></div>
+<div id="overlay" hidden><div id="panel"><h2 id="overlayTitle"></h2><p id="overlayText"></p><div id="options"></div><div id="overlayActions"></div></div></div>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const TAU = Math.PI * 2;
+
+/* ── map and cards ───────────────────────────────────────────────────────── */
+
+const COLOR_LABEL = { purple: "Purple", blue: "Blue", orange: "Orange", white: "White", green: "Green", yellow: "Yellow", black: "Black", red: "Red", gray: "Any colour", locomotive: "Locomotive" };
+const COLOR = { purple: "#7b5d92", blue: "#3c628c", orange: "#c07a3e", white: "#cfc7b4", green: "#4f7750", yellow: "#c2a03c", black: "#2e2e2c", red: "#a8403a", gray: "#9a9486" };
+const CARD_COLORS = ["purple", "blue", "orange", "white", "green", "yellow", "black", "red"];
+const ROUTE_POINTS = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 10, 6: 15 };
+const PLAYER_COLORS = [
+  { ink: "#3c628c", pale: "#dfe6ee" },
+  { ink: "#a8403a", pale: "#f0dedb" },
+  { ink: "#4f7750", pale: "#dfe8de" },
+  { ink: "#2e2e2c", pale: "#deded8" },
+  { ink: "#b08a2e", pale: "#f1e9d4" }
+];
+const PLAYER_NAMES = ["You", "Ada", "Bram", "Cass", "Dee"];
+
+// The 36 cities of the original North American board. Coordinates are the
+// published map positions, normalised to an 800 × 480 drawing.
+const CITY_DATA = [
+  ["Vancouver", .10812, .84585], ["Calgary", .23472, .87147], ["Seattle", .10359, .76689],
+  ["Helena", .33273, .67747], ["Winnipeg", .45340, .85526], ["Sault Ste. Marie", .68848, .78258],
+  ["Montreal", .87542, .87775], ["Boston", .94517, .79356], ["New York", .89390, .68375],
+  ["Toronto", .79520, .75173], ["Pittsburgh", .81159, .61786], ["Washington", .90158, .55093],
+  ["Raleigh", .84473, .45210], ["Charleston", .87193, .35641], ["Miami", .90367, .12529],
+  ["Atlanta", .78055, .36687], ["Nashville", .73103, .41864], ["New Orleans", .68604, .18019],
+  ["Little Rock", .62326, .34438], ["Saint Louis", .63825, .47459], ["Chicago", .68394, .59642],
+  ["Duluth", .56362, .68584], ["Omaha", .53467, .55145], ["Kansas City", .55490, .47720],
+  ["Oklahoma City", .53537, .35014], ["Dallas", .55455, .22098], ["Houston", .59535, .16294],
+  ["Denver", .39028, .45106], ["Santa Fe", .38295, .31824], ["El Paso", .37772, .18542],
+  ["Salt Lake City", .26263, .49655], ["Las Vegas", .20752, .33549], ["Phoenix", .26158, .24033],
+  ["Los Angeles", .14474, .25026], ["San Francisco", .06836, .40243], ["Portland", .08231, .69055]
+];
+const CITIES = CITY_DATA.map(([name, nx, ny]) => ({ name, x: 30 + nx * 740, y: 26 + (1 - ny) * 428 }));
+const CITY = Object.fromEntries(CITIES.map(city => [city.name, city]));
+
+// Every route printed on the USA board, including both halves of the double
+// routes. X is a gray route that can be paid with any one colour.
+const ROUTES_RAW = [
+  ["Vancouver", "Calgary", 3, "gray"], ["Vancouver", "Seattle", 1, "gray"], ["Vancouver", "Seattle", 1, "gray"],
+  ["Seattle", "Calgary", 4, "yellow"], ["Seattle", "Helena", 6, "yellow"], ["Seattle", "Portland", 1, "gray"],
+  ["Seattle", "Portland", 1, "gray"], ["Portland", "Salt Lake City", 6, "blue"], ["Portland", "San Francisco", 5, "green"],
+  ["Portland", "San Francisco", 5, "purple"], ["San Francisco", "Salt Lake City", 5, "orange"], ["San Francisco", "Salt Lake City", 5, "white"],
+  ["San Francisco", "Los Angeles", 3, "yellow"], ["San Francisco", "Los Angeles", 3, "purple"], ["Los Angeles", "Las Vegas", 2, "gray"],
+  ["Los Angeles", "Phoenix", 3, "gray"], ["Los Angeles", "El Paso", 6, "black"], ["Calgary", "Winnipeg", 6, "white"],
+  ["Calgary", "Helena", 4, "gray"], ["Helena", "Winnipeg", 4, "blue"], ["Helena", "Salt Lake City", 3, "purple"],
+  ["Helena", "Denver", 4, "green"], ["Helena", "Duluth", 6, "orange"], ["Helena", "Omaha", 5, "red"],
+  ["Salt Lake City", "Denver", 3, "red"], ["Salt Lake City", "Denver", 3, "yellow"], ["Las Vegas", "Salt Lake City", 3, "orange"],
+  ["Phoenix", "Denver", 5, "white"], ["Phoenix", "Santa Fe", 3, "gray"], ["Phoenix", "El Paso", 3, "gray"],
+  ["Winnipeg", "Sault Ste. Marie", 6, "gray"], ["Winnipeg", "Duluth", 4, "black"], ["Duluth", "Sault Ste. Marie", 3, "gray"],
+  ["Duluth", "Toronto", 6, "purple"], ["Duluth", "Chicago", 3, "red"], ["Duluth", "Omaha", 2, "gray"],
+  ["Duluth", "Omaha", 2, "gray"], ["Omaha", "Chicago", 4, "blue"], ["Omaha", "Kansas City", 1, "gray"],
+  ["Omaha", "Kansas City", 1, "gray"], ["Kansas City", "Saint Louis", 2, "blue"], ["Kansas City", "Saint Louis", 2, "purple"],
+  ["Kansas City", "Oklahoma City", 2, "gray"], ["Kansas City", "Oklahoma City", 2, "gray"], ["Oklahoma City", "Little Rock", 2, "gray"],
+  ["Oklahoma City", "Dallas", 2, "gray"], ["Oklahoma City", "Dallas", 2, "gray"], ["Dallas", "Little Rock", 2, "gray"],
+  ["Dallas", "Houston", 1, "gray"], ["Dallas", "Houston", 1, "gray"], ["Houston", "New Orleans", 2, "gray"],
+  ["El Paso", "Houston", 6, "green"], ["El Paso", "Dallas", 4, "red"], ["El Paso", "Oklahoma City", 5, "yellow"],
+  ["El Paso", "Santa Fe", 2, "gray"], ["Santa Fe", "Oklahoma City", 3, "blue"], ["Oklahoma City", "Denver", 4, "red"],
+  ["Santa Fe", "Denver", 2, "gray"], ["Denver", "Kansas City", 4, "black"], ["Denver", "Kansas City", 4, "orange"],
+  ["Denver", "Omaha", 4, "purple"], ["New Orleans", "Miami", 6, "red"], ["New Orleans", "Atlanta", 4, "orange"],
+  ["New Orleans", "Atlanta", 4, "yellow"], ["New Orleans", "Little Rock", 3, "green"], ["Little Rock", "Nashville", 3, "white"],
+  ["Little Rock", "Saint Louis", 2, "gray"], ["Saint Louis", "Nashville", 2, "gray"], ["Saint Louis", "Pittsburgh", 5, "green"],
+  ["Saint Louis", "Chicago", 2, "green"], ["Saint Louis", "Chicago", 2, "white"], ["Chicago", "Pittsburgh", 3, "black"],
+  ["Chicago", "Pittsburgh", 3, "orange"], ["Chicago", "Toronto", 4, "white"], ["Sault Ste. Marie", "Montreal", 5, "black"],
+  ["Toronto", "Montreal", 3, "gray"], ["Sault Ste. Marie", "Toronto", 2, "gray"], ["Toronto", "Pittsburgh", 2, "gray"],
+  ["Pittsburgh", "New York", 2, "white"], ["Pittsburgh", "New York", 2, "green"], ["Pittsburgh", "Washington", 2, "gray"],
+  ["Pittsburgh", "Raleigh", 2, "gray"], ["Nashville", "Raleigh", 3, "black"], ["Nashville", "Atlanta", 1, "gray"],
+  ["Nashville", "Pittsburgh", 4, "yellow"], ["Atlanta", "Miami", 5, "blue"], ["Atlanta", "Charleston", 2, "gray"],
+  ["Atlanta", "Raleigh", 2, "gray"], ["Atlanta", "Raleigh", 2, "gray"], ["Charleston", "Miami", 4, "purple"],
+  ["Raleigh", "Charleston", 2, "gray"], ["Raleigh", "Washington", 2, "gray"], ["Raleigh", "Washington", 2, "gray"],
+  ["Washington", "New York", 2, "orange"], ["Washington", "New York", 2, "black"], ["New York", "Boston", 2, "yellow"],
+  ["New York", "Boston", 2, "red"], ["New York", "Montreal", 3, "blue"], ["Boston", "Montreal", 2, "gray"],
+  ["Boston", "Montreal", 2, "gray"]
+];
+
+// The 30 published destination tickets, with their printed point values.
+const TICKETS = [
+  ["Los Angeles", "New York", 21], ["Duluth", "Houston", 8], ["Sault Ste. Marie", "Nashville", 8],
+  ["New York", "Atlanta", 6], ["Portland", "Nashville", 17], ["Vancouver", "Montreal", 20],
+  ["Duluth", "El Paso", 10], ["Toronto", "Miami", 10], ["Portland", "Phoenix", 11],
+  ["Dallas", "New York", 11], ["Calgary", "Salt Lake City", 7], ["Calgary", "Phoenix", 13],
+  ["Los Angeles", "Miami", 20], ["Winnipeg", "Little Rock", 11], ["San Francisco", "Atlanta", 17],
+  ["Kansas City", "Houston", 5], ["Los Angeles", "Chicago", 16], ["Denver", "Pittsburgh", 11],
+  ["Chicago", "Santa Fe", 9], ["Vancouver", "Santa Fe", 13], ["Boston", "Miami", 12],
+  ["Chicago", "New Orleans", 7], ["Montreal", "Atlanta", 9], ["Seattle", "New York", 22],
+  ["Denver", "El Paso", 4], ["Helena", "Los Angeles", 8], ["Winnipeg", "Houston", 12],
+  ["Montreal", "New Orleans", 13], ["Sault Ste. Marie", "Oklahoma City", 9], ["Seattle", "Los Angeles", 9]
+];
+
+const ROUTES = ROUTES_RAW.map(([a, b, cars, color], id) => ({ id, a, b, cars, color, owner: null, pair: [a, b].sort().join("|") }));
+const PAIR_MATES = new Map();
+for (const route of ROUTES) {
+  if (!PAIR_MATES.has(route.pair)) PAIR_MATES.set(route.pair, []);
+  PAIR_MATES.get(route.pair).push(route);
+}
+
+/* ── state ───────────────────────────────────────────────────────────────── */
+
+const state = {
+  players: [], deck: [], discard: [], market: [], ticketDeck: [],
+  turn: 0, phase: "idle", drawCount: 0, turnsTaken: 0,
+  endTriggered: false, endAt: Infinity, finished: false, result: null,
+  finalPoints: 0, log: []
+};
+let seed = 1;
+
+function reseed(value) { seed = (Number(value) >>> 0) || 1; }
+function rnd() { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }
+function shuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+function emptyHand() {
+  const hand = { locomotive: 0 };
+  for (const color of CARD_COLORS) hand[color] = 0;
+  return hand;
+}
+function handSize(player) {
+  return CARD_COLORS.reduce((n, color) => n + player.hand[color], player.hand.locomotive);
+}
+function setStatus(text) { $("status").textContent = text; }
+function addLog(text) {
+  state.log.push(text);
+  if (state.log.length > 7) state.log.shift();
+  $("log").textContent = state.log.slice(-4).join("  ·  ");
+}
+function humanTurn() { return state.phase === "play" && !state.finished && state.turn === 0; }
+function canAct() { return humanTurn() && state.drawCount < 2; }
+// Drawing cards is one indivisible action: once the first card is taken the
+// player must finish the draw rather than switching to a route or tickets.
+function canStartAction() { return humanTurn() && state.drawCount === 0; }
+
+/* ── deck and market ─────────────────────────────────────────────────────── */
+
+function buildDeck() {
+  const deck = [];
+  for (const color of CARD_COLORS) for (let i = 0; i < 12; i++) deck.push(color);
+  for (let i = 0; i < 14; i++) deck.push("locomotive");
+  return shuffle(deck);
+}
+function drawFromDeck() {
+  if (!state.deck.length && state.discard.length) state.deck = shuffle(state.discard.splice(0));
+  return state.deck.pop() || null;
+}
+function fillMarket() {
+  state.market = [];
+  while (state.market.length < 5) {
+    const card = drawFromDeck();
+    if (!card) break;
+    state.market.push(card);
+  }
+  // Three face-up locomotives are discarded and the market is redealt.
+  let guard = 0;
+  while (state.market.filter(card => card === "locomotive").length >= 3 && guard++ < 4) {
+    state.discard.push(...state.market);
+    state.market = [];
+    while (state.market.length < 5) {
+      const card = drawFromDeck();
+      if (!card) break;
+      state.market.push(card);
+    }
+  }
+}
+function drawTicketCards(count) {
+  if (!state.ticketDeck.length) return [];
+  return state.ticketDeck.splice(-Math.min(count, state.ticketDeck.length), Math.min(count, state.ticketDeck.length));
+}
+function returnTickets(tickets) {
+  state.ticketDeck.unshift(...tickets);
+}
+
+/* ── routes and tickets ──────────────────────────────────────────────────── */
+
+function canClaim(route, index) {
+  if (route.owner !== null) return false;
+  const mates = PAIR_MATES.get(route.pair).filter(mate => mate !== route);
+  // In a two or three player game one half of a double route closes the other.
+  if (state.players.length <= 3 && mates.some(mate => mate.owner !== null)) return false;
+  // No player may claim both halves of a double route.
+  if (mates.some(mate => mate.owner === index)) return false;
+  return true;
+}
+function canPay(player, color, count) {
+  return (player.hand[color] || 0) + player.hand.locomotive >= count;
+}
+function affordableColors(route, player) {
+  if (player.trains < route.cars) return [];
+  if (route.color !== "gray") return canPay(player, route.color, route.cars) ? [route.color] : [];
+  const options = CARD_COLORS.filter(color => canPay(player, color, route.cars));
+  options.sort((a, b) => (player.hand[b] - player.hand[a]) || CARD_COLORS.indexOf(a) - CARD_COLORS.indexOf(b));
+  return options;
+}
+function paymentColor(route, player) {
+  const options = affordableColors(route, player);
+  return options.length ? options[0] : null;
+}
+function payCards(player, color, count) {
+  const useColor = Math.min(player.hand[color] || 0, count);
+  const useWilds = count - useColor;
+  player.hand[color] -= useColor;
+  player.hand.locomotive -= useWilds;
+  for (let i = 0; i < useColor; i++) state.discard.push(color);
+  for (let i = 0; i < useWilds; i++) state.discard.push("locomotive");
+}
+function claimRoute(route, index, color) {
+  const player = state.players[index];
+  payCards(player, color, route.cars);
+  route.owner = index;
+  player.trains -= route.cars;
+  player.score += ROUTE_POINTS[route.cars];
+  addLog(player.name + " claimed " + route.a + " – " + route.b + " (+" + ROUTE_POINTS[route.cars] + ")");
+}
+
+function connected(index, from, to) {
+  if (from === to) return true;
+  const seen = new Set([from]);
+  const queue = [from];
+  while (queue.length) {
+    const city = queue.shift();
+    for (const route of ROUTES) {
+      if (route.owner !== index) continue;
+      const other = route.a === city ? route.b : route.b === city ? route.a : null;
+      if (!other || seen.has(other)) continue;
+      if (other === to) return true;
+      seen.add(other);
+      queue.push(other);
+    }
+  }
+  return false;
+}
+
+function shortestPath(from, to, allowed) {
+  if (from === to) return [];
+  const distance = new Map([[from, 0]]);
+  const previous = new Map();
+  const done = new Set();
+  while (true) {
+    let city = null;
+    let best = Infinity;
+    for (const [name, cost] of distance) {
+      if (!done.has(name) && cost < best) { best = cost; city = name; }
+    }
+    if (city === null) break;
+    if (city === to) break;
+    done.add(city);
+    for (const route of ROUTES) {
+      if (!allowed(route)) continue;
+      const other = route.a === city ? route.b : route.b === city ? route.a : null;
+      if (!other || done.has(other)) continue;
+      const next = best + route.cars;
+      if (next < (distance.get(other) ?? Infinity)) {
+        distance.set(other, next);
+        previous.set(other, { city, route });
+      }
+    }
+  }
+  if (!distance.has(to)) return null;
+  const path = [];
+  let cursor = to;
+  while (cursor !== from) {
+    const step = previous.get(cursor);
+    if (!step) return null;
+    path.unshift(step.route);
+    cursor = step.city;
+  }
+  return path;
+}
+
+function longestPath(index) {
+  const edges = ROUTES.filter(route => route.owner === index);
+  if (!edges.length) return 0;
+  const adjacency = new Map();
+  edges.forEach((route, id) => {
+    if (!adjacency.has(route.a)) adjacency.set(route.a, []);
+    if (!adjacency.has(route.b)) adjacency.set(route.b, []);
+    adjacency.get(route.a).push({ to: route.b, length: route.cars, id });
+    adjacency.get(route.b).push({ to: route.a, length: route.cars, id });
+  });
+  let best = 0;
+  const used = new Set();
+  function walk(city, total) {
+    if (total > best) best = total;
+    for (const edge of adjacency.get(city) || []) {
+      if (used.has(edge.id)) continue;
+      used.add(edge.id);
+      walk(edge.to, total + edge.length);
+      used.delete(edge.id);
+    }
+  }
+  for (const city of adjacency.keys()) walk(city, 0);
+  return best;
+}
+
+/* ── starting a game ─────────────────────────────────────────────────────── */
+
+function readPlayedDay() {
+  try { return localStorage.getItem("bored.ticket-to-ride.daily"); } catch (error) { return null; }
+}
+function markPlayedDay() {
+  try {
+    if (window.__boredSeed && window.__boredSeed.date) localStorage.setItem("bored.ticket-to-ride.daily", String(window.__boredSeed.date));
+  } catch (error) { /* embedded storage can be blocked */ }
+}
+function startingSeed() {
+  const injected = window.__boredSeed;
+  if (injected && Number.isFinite(injected.seed) && readPlayedDay() !== String(injected.date)) return injected.seed >>> 0;
+  return ((Date.now() ^ Math.floor(Math.random() * 4294967295)) >>> 0) || 123456789;
+}
+
+function beginGame(playerCount) {
+  reseed(startingSeed());
+  markPlayedDay();
+  state.players = PLAYER_NAMES.slice(0, playerCount).map((name, index) => ({
+    name, index, human: index === 0, color: PLAYER_COLORS[index], hand: emptyHand(), tickets: [],
+    trains: 45, score: 0
+  }));
+  state.deck = buildDeck();
+  state.discard = [];
+  state.market = [];
+  state.ticketDeck = shuffle(TICKETS.map(([a, b, points]) => ({ a, b, points })));
+  state.turn = 0;
+  state.drawCount = 0;
+  state.turnsTaken = 0;
+  state.endTriggered = false;
+  state.endAt = Infinity;
+  state.finished = false;
+  state.result = null;
+  state.finalPoints = 0;
+  state.log = [];
+  state.phase = "setup";
+  for (const route of ROUTES) route.owner = null;
+
+  // Each player is dealt four train cards and three destination tickets.
+  for (let round = 0; round < 4; round++) {
+    for (const player of state.players) {
+      const card = drawFromDeck();
+      if (card) player.hand[card]++;
+    }
+  }
+  fillMarket();
+
+  const deals = state.players.map(player => drawTicketCards(3));
+  state.players.forEach((player, index) => {
+    if (!player.human) {
+      const keep = aiKeepTickets(deals[index], 2);
+      player.tickets.push(...keep);
+      returnTickets(deals[index].filter(ticket => !keep.includes(ticket)));
+    }
+  });
+  $("log").textContent = "";
+  render();
+  const drawn = deals[0];
+  if (!drawn.length) {
+    state.phase = "play";
+    beginTurn();
+    return;
+  }
+  showTicketPicker(drawn, Math.min(2, drawn.length), kept => {
+    const human = state.players[0];
+    human.tickets.push(...kept);
+    returnTickets(drawn.filter(ticket => !kept.includes(ticket)));
+    addLog("You kept " + kept.length + " destination " + (kept.length === 1 ? "ticket" : "tickets"));
+    state.phase = "play";
+    beginTurn();
+  }, true);
+}
+
+/* ── turn flow ───────────────────────────────────────────────────────────── */
+
+function beginTurn() {
+  if (state.finished) return;
+  state.drawCount = 0;
+  render();
+  if (state.turn === 0) {
+    setStatus("Your turn. Draw two train cards, claim a route, or draw destination tickets.");
+  } else {
+    setStatus(state.players[state.turn].name + " is taking a turn…");
+    setTimeout(aiTurn, 650);
+  }
+}
+
+function endTurn() {
+  if (state.finished) return;
+  const acting = state.players[state.turn];
+  state.turnsTaken++;
+  state.drawCount = 0;
+  if (!state.endTriggered && acting.trains <= 2) {
+    state.endTriggered = true;
+    state.endAt = state.turnsTaken + state.players.length - 1;
+    addLog(acting.name + " reached two trains. Every player gets one final turn.");
+  }
+  const noRouteLeft = !ROUTES.some(route => state.players.some((_, index) => canClaim(route, index)));
+  if (state.endTriggered && (state.turnsTaken >= state.endAt || noRouteLeft)) { finishGame(); return; }
+  if (noRouteLeft || state.turnsTaken >= 400) { finishGame(); return; }
+  state.phase = "play";
+  state.turn = (state.turn + 1) % state.players.length;
+  beginTurn();
+}
+
+function finishGame() {
+  if (state.finished) return;
+  state.finished = true;
+  state.phase = "over";
+  const scoring = state.players.map(player => {
+    const completed = player.tickets.map(ticket => ({ ...ticket, done: connected(player.index, ticket.a, ticket.b) }));
+    const ticketNet = completed.reduce((sum, ticket) => sum + (ticket.done ? ticket.points : -ticket.points), 0);
+    const longest = longestPath(player.index);
+    return { player, completed, ticketNet, longest, longestBonus: 0, total: 0 };
+  });
+  const best = Math.max(...scoring.map(entry => entry.longest));
+  for (const entry of scoring) {
+    if (best > 0 && entry.longest === best) entry.longestBonus = 10;
+    entry.total = entry.player.score + entry.ticketNet + entry.longestBonus;
+  }
+  scoring.sort((a, b) => b.total - a.total || b.ticketNet - a.ticketNet || a.player.name.localeCompare(b.player.name));
+  state.result = scoring;
+  state.finalPoints = scoring.find(entry => entry.player.index === 0).total;
+  render();
+  showResults(scoring);
+}
+
+/* ── human actions ───────────────────────────────────────────────────────── */
+
+function takeMarketCard(index, marketIndex) {
+  const color = state.market[marketIndex];
+  if (!color) return null;
+  state.market.splice(marketIndex, 1);
+  state.players[index].hand[color]++;
+  fillMarket();
+  return color;
+}
+function drawBlind(index) {
+  const card = drawFromDeck();
+  if (card) state.players[index].hand[card]++;
+  return card;
+}
+
+function humanMarket(marketIndex) {
+  if (!canAct()) return;
+  const color = state.market[marketIndex];
+  if (!color) return;
+  if (color === "locomotive" && state.drawCount > 0) {
+    setStatus("A face-up locomotive must be your whole draw. Take a colour card or the deck instead.");
+    return;
+  }
+  takeMarketCard(0, marketIndex);
+  state.drawCount += color === "locomotive" ? 2 : 1;
+  addLog("You drew " + COLOR_LABEL[color] + " from the market");
+  if (state.drawCount >= 2) endTurn();
+  else { setStatus("Draw one more card."); render(); }
+}
+
+function humanBlind() {
+  if (!canAct()) return;
+  const card = drawBlind(0);
+  if (!card) { setStatus("The train deck is empty."); return; }
+  state.drawCount++;
+  addLog("You drew a card from the deck");
+  if (state.drawCount >= 2) endTurn();
+  else { setStatus("Draw one more card."); render(); }
+}
+
+function humanClaim(route) {
+  if (!humanTurn()) return;
+  if (state.drawCount > 0) {
+    setStatus("You have already started drawing cards this turn.");
+    return;
+  }
+  if (!canClaim(route, 0)) {
+    setStatus("That route is already claimed or closed by its parallel line.");
+    return;
+  }
+  const player = state.players[0];
+  if (player.trains < route.cars) {
+    setStatus("You only have " + player.trains + " trains left; that route needs " + route.cars + ".");
+    return;
+  }
+  const options = affordableColors(route, player);
+  if (!options.length) {
+    const need = route.color === "gray" ? route.cars + " cards of one colour" : route.cars + " " + COLOR_LABEL[route.color] + " cards";
+    setStatus("You need " + need + " (locomotives count as any colour).");
+    return;
+  }
+  if (options.length === 1) {
+    claimRoute(route, 0, options[0]);
+    endTurn();
+    return;
+  }
+  showPaymentPicker(route, options);
+}
+
+function showPaymentPicker(route, options) {
+  state.phase = "tickets";
+  const player = state.players[0];
+  showOverlay("CLAIM " + route.a.toUpperCase() + " – " + route.b.toUpperCase(), "The route is gray, so choose which colour to pay.");
+  $("options").className = "single";
+  for (const color of options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.innerHTML = "<b>" + COLOR_LABEL[color] + "</b><small>" + route.cars + " " + COLOR_LABEL[color] + " cards · you hold " + player.hand[color] + " plus " + player.hand.locomotive + " locomotives</small>";
+    button.onclick = () => {
+      hideOverlay();
+      state.phase = "play";
+      claimRoute(route, 0, color);
+      endTurn();
+    };
+    $("options").append(button);
+  }
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.textContent = "Cancel";
+  cancel.onclick = () => { hideOverlay(); state.phase = "play"; render(); };
+  $("overlayActions").append(cancel);
+}
+
+function humanDrawTickets() {
+  if (!humanTurn()) return;
+  if (state.drawCount > 0) {
+    setStatus("Finish drawing your two train cards first. Drawing tickets is a whole turn.");
+    return;
+  }
+  const drawn = drawTicketCards(3);
+  if (!drawn.length) { setStatus("There are no destination tickets left to draw."); return; }
+  showTicketPicker(drawn, Math.min(1, drawn.length), kept => {
+    state.players[0].tickets.push(...kept);
+    returnTickets(drawn.filter(ticket => !kept.includes(ticket)));
+    addLog("You kept " + kept.length + " destination " + (kept.length === 1 ? "ticket" : "tickets"));
+    endTurn();
+  }, false);
+}
+
+/* ── CPU ─────────────────────────────────────────────────────────────────── */
+
+function bestGrayColor(player, length) {
+  let best = null;
+  for (const color of CARD_COLORS) {
+    if ((player.hand[color] || 0) + player.hand.locomotive < length) continue;
+    if (!best || player.hand[color] > player.hand[best]) best = color;
+  }
+  return best;
+}
+
+function aiTicketDistance(ticket) {
+  const path = shortestPath(ticket.a, ticket.b, () => true);
+  return path ? path.reduce((sum, route) => sum + route.cars, 0) : 99;
+}
+
+function aiKeepTickets(drawn, minimum) {
+  const ranked = drawn.slice().sort((a, b) => aiTicketDistance(a) - aiTicketDistance(b));
+  const keep = ranked.filter(ticket => aiTicketDistance(ticket) <= 20).slice(0, 3);
+  for (const ticket of ranked) {
+    if (keep.length >= minimum) break;
+    if (!keep.includes(ticket)) keep.push(ticket);
+  }
+  return keep.slice(0, Math.max(minimum, Math.min(3, keep.length)));
+}
+
+function aiNeededColors(index) {
+  const player = state.players[index];
+  const needed = new Map();
+  for (const ticket of player.tickets) {
+    if (connected(index, ticket.a, ticket.b)) continue;
+    const path = shortestPath(ticket.a, ticket.b, route => route.owner === null || route.owner === index);
+    if (!path) continue;
+    for (const route of path) {
+      if (route.owner === index) continue;
+      const color = route.color === "gray" ? (bestGrayColor(player, route.cars) || "gray") : route.color;
+      needed.set(color, (needed.get(color) || 0) + 1);
+    }
+  }
+  return needed;
+}
+
+function aiChooseRoute(index) {
+  const player = state.players[index];
+  const needed = aiNeededColors(index);
+  const usage = new Map();
+  for (const ticket of player.tickets) {
+    if (connected(index, ticket.a, ticket.b)) continue;
+    const path = shortestPath(ticket.a, ticket.b, route => route.owner === null || route.owner === index);
+    if (path) for (const route of path) if (route.owner === null) usage.set(route.id, (usage.get(route.id) || 0) + 1);
+  }
+  const options = ROUTES.filter(route =>
+    canClaim(route, index) && player.trains >= route.cars && paymentColor(route, player) !== null
+  );
+  const useful = options.filter(route => (usage.get(route.id) || 0) > 0);
+  if (useful.length) {
+    useful.sort((a, b) => ((usage.get(b.id) || 0) * 14 + b.cars) - ((usage.get(a.id) || 0) * 14 + a.cars));
+    return useful[0];
+  }
+  if (!player.tickets.length || needed.size === 0) {
+    options.sort((a, b) => b.cars - a.cars);
+    return options[0] || null;
+  }
+  return null;
+}
+
+function aiDrawTwo(index) {
+  const needed = aiNeededColors(index);
+  const player = state.players[index];
+  let draws = 0;
+  while (draws < 2) {
+    if (draws === 0) {
+      const loco = state.market.indexOf("locomotive");
+      if (loco >= 0 && (needed.get("locomotive") || player.hand.locomotive < 2)) {
+        takeMarketCard(index, loco);
+        draws = 2;
+        break;
+      }
+    }
+    let pick = -1;
+    for (let i = 0; i < state.market.length; i++) {
+      const color = state.market[i];
+      if (color !== "locomotive" && (needed.get(color) || 0) > 0) { pick = i; break; }
+    }
+    if (pick >= 0) takeMarketCard(index, pick);
+    else drawBlind(index);
+    draws++;
+  }
+}
+
+function aiTurn() {
+  if (state.finished || state.phase !== "play") return;
+  const index = state.turn;
+  if (index === 0) return;
+  const player = state.players[index];
+  const unfinished = player.tickets.filter(ticket => !connected(index, ticket.a, ticket.b));
+
+  if (!unfinished.length && state.ticketDeck.length && player.tickets.length < 6) {
+    const drawn = drawTicketCards(3);
+    if (drawn.length) {
+      const keep = aiKeepTickets(drawn, 1);
+      player.tickets.push(...keep);
+      returnTickets(drawn.filter(ticket => !keep.includes(ticket)));
+      addLog(player.name + " drew destination tickets");
+      endTurn();
+      return;
+    }
+  }
+
+  const route = aiChooseRoute(index);
+  if (route) {
+    const color = paymentColor(route, player);
+    if (color) {
+      claimRoute(route, index, color);
+      endTurn();
+      return;
+    }
+  }
+  aiDrawTwo(index);
+  addLog(player.name + " drew train cards");
+  endTurn();
+}
+
+/* ── drawing and rendering ───────────────────────────────────────────────── */
+
+function playerChip(player) {
+  return '<span class="player' + (player.index === state.turn && state.phase === "play" ? " active" : "") + '">' +
+    '<i style="background:' + player.color.ink + '"></i>' + player.name +
+    '<small>' + player.score + " pts · " + player.trains + " trains · " + handSize(player) + " cards · " + player.tickets.length + " tickets</small></span>";
+}
+
+function labelPosition(city) {
+  const overrides = {
+    "Vancouver": [-7, -9, "end"], "Seattle": [8, -5, "start"], "Portland": [8, 14, "start"],
+    "San Francisco": [-8, 14, "end"], "Los Angeles": [-8, 14, "end"], "Las Vegas": [-8, 4, "end"],
+    "Phoenix": [-8, 14, "end"], "Calgary": [8, -8, "start"], "Winnipeg": [8, -8, "start"],
+    "Sault Ste. Marie": [0, -13, "middle"], "Montreal": [-8, -8, "end"], "Boston": [-8, 4, "end"],
+    "New York": [10, -8, "start"], "Miami": [-8, 6, "end"], "Washington": [10, 10, "start"],
+    "Raleigh": [8, -6, "start"], "Charleston": [8, 10, "start"], "Atlanta": [-8, 13, "end"],
+    "Nashville": [8, -7, "start"], "New Orleans": [-8, -8, "end"], "Chicago": [8, 13, "start"],
+    "Duluth": [-8, -8, "end"], "Omaha": [-8, -6, "end"], "Kansas City": [-8, 15, "end"],
+    "Oklahoma City": [-8, -6, "end"], "Dallas": [8, 13, "start"], "Houston": [8, 13, "start"],
+    "Denver": [8, 13, "start"], "Santa Fe": [-8, 13, "end"], "El Paso": [-8, 13, "end"],
+    "Helena": [-8, -8, "end"], "Toronto": [8, -7, "start"], "Pittsburgh": [8, -10, "start"],
+    "Saint Louis": [-8, -6, "end"], "Salt Lake City": [-9, -10, "end"], "Little Rock": [8, -6, "start"]
+  };
+  return overrides[city.name] || (city.x > 640 ? [-8, -8, "end"] : [8, -8, "start"]);
+}
+
+function renderMap() {
+  const board = $("board");
+  const parts = [];
+  for (const route of ROUTES) {
+    const a = CITY[route.a], b = CITY[route.b];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const ux = dx / length, uy = dy / length;
+    const inset = 8;
+    const mates = PAIR_MATES.get(route.pair);
+    const offset = mates.length > 1 ? (mates.indexOf(route) - (mates.length - 1) / 2) * 5 : 0;
+    const ox = -uy * offset, oy = ux * offset;
+    const x1 = a.x + ux * inset + ox, y1 = a.y + uy * inset + oy;
+    const x2 = b.x - ux * inset + ox, y2 = b.y - uy * inset + oy;
+    const span = Math.hypot(x2 - x1, y2 - y1) || 1;
+    const car = span / route.cars;
+    const dash = route.cars > 1 ? (car * 0.62).toFixed(1) + " " + (car * 0.38).toFixed(1) : "";
+    const owner = route.owner !== null ? state.players[route.owner] : null;
+    const color = owner ? owner.color.ink : COLOR[route.color];
+    const can = humanTurn() && state.drawCount === 0 && canClaim(route, 0) && affordableColors(route, state.players[0]).length > 0;
+    const label = route.color === "gray" ? "any colour" : COLOR_LABEL[route.color];
+    parts.push('<g class="route' + (can ? " can" : "") + '" data-id="' + route.id + '">' +
+      "<title>" + route.a + " – " + route.b + " · " + route.cars + " " + label + (owner ? " · " + owner.name : "") + "</title>" +
+      '<line class="hit" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke-width="16"/>' +
+      '<line class="casing" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#faf9f3" stroke-width="10" stroke-linecap="butt"/>' +
+      '<line class="track" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + color + '" stroke-width="' + (owner ? 8 : 5) + '" opacity="' + (owner ? 1 : 0.55) + '" stroke-linecap="butt" ' + (dash ? 'stroke-dasharray="' + dash + '"' : "") + "/>" +
+      "</g>");
+  }
+  for (const city of CITIES) {
+    const [dx, dy, anchor] = labelPosition(city);
+    parts.push('<g class="city"><circle cx="' + city.x + '" cy="' + city.y + '" r="5.5" fill="#faf9f3" stroke="#1d2927" stroke-width="1.5"/>' +
+      '<text class="city-label" x="' + (city.x + dx) + '" y="' + (city.y + dy) + '" text-anchor="' + anchor + '">' + city.name + "</text></g>");
+  }
+  board.innerHTML = parts.join("");
+}
+
+function renderMarket() {
+  const market = $("market");
+  market.replaceChildren();
+  const active = canAct();
+  state.market.forEach((color, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "card" + (color === "locomotive" ? " loco" : "");
+    button.disabled = !active;
+    button.setAttribute("aria-label", "Take " + COLOR_LABEL[color] + " from the market");
+    const swatch = document.createElement("i");
+    swatch.style.background = color === "locomotive" ? "linear-gradient(90deg,#a8403a,#c2a03c,#4f7750,#3c628c)" : COLOR[color];
+    button.append(swatch, document.createTextNode(color === "locomotive" ? "LOCO" : COLOR_LABEL[color].toUpperCase()));
+    button.onclick = () => humanMarket(index);
+    market.append(button);
+  });
+  const deck = $("deck");
+  deck.disabled = !active;
+  deck.textContent = "DECK " + state.deck.length;
+}
+
+function renderHand() {
+  const hand = $("hand");
+  hand.replaceChildren();
+  const player = state.players[0];
+  if (!player) return;
+  for (const color of CARD_COLORS) {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    const swatch = document.createElement("i");
+    swatch.style.background = COLOR[color];
+    chip.append(swatch, document.createTextNode(COLOR_LABEL[color].slice(0, 3).toUpperCase() + " " + player.hand[color]));
+    hand.append(chip);
+  }
+  const loco = document.createElement("span");
+  loco.className = "chip";
+  const swatch = document.createElement("i");
+  swatch.style.background = "linear-gradient(90deg,#a8403a,#c2a03c,#4f7750,#3c628c)";
+  loco.append(swatch, document.createTextNode("LOCO " + player.hand.locomotive));
+  hand.append(loco);
+}
+
+function renderTickets() {
+  const box = $("tickets");
+  box.replaceChildren();
+  const player = state.players[0];
+  if (!player) return;
+  if (!player.tickets.length) {
+    const empty = document.createElement("span");
+    empty.className = "ticket";
+    empty.textContent = "No destination tickets yet.";
+    box.append(empty);
+    return;
+  }
+  for (const ticket of player.tickets) {
+    const done = connected(0, ticket.a, ticket.b);
+    const chip = document.createElement("span");
+    chip.className = "ticket" + (done ? " done" : "");
+    chip.innerHTML = ticket.a + " – " + ticket.b + " <b>" + ticket.points + "</b>" + (done ? " ✓" : "");
+    chip.title = done ? "Connected — scores " + ticket.points + " points" : "Not connected yet — costs " + ticket.points + " points";
+    box.append(chip);
+  }
+}
+
+function render() {
+  const me = state.players[0];
+  $("hudTurn").textContent = state.finished ? "GAME OVER" : state.players.length ? (state.turn === 0 ? "YOUR TURN" : state.players[state.turn].name.toUpperCase() + " · CPU") : "SETUP";
+  $("hudPoints").textContent = "POINTS " + (me ? me.score : 0);
+  $("hudTrains").textContent = "TRAINS " + (me ? me.trains : 45);
+  $("hudCards").textContent = "CARDS " + (me ? handSize(me) : 0);
+  $("hudTickets").textContent = "TICKETS " + (me ? me.tickets.length : 0);
+  const players = $("players");
+  players.innerHTML = state.players.map(playerChip).join("");
+  $("drawTickets").disabled = !canStartAction();
+  renderHand();
+  renderMarket();
+  renderTickets();
+  renderMap();
+}
+
+/* ── overlays ────────────────────────────────────────────────────────────── */
+
+function showOverlay(title, text) {
+  $("overlayTitle").textContent = title;
+  $("overlayText").textContent = text;
+  $("options").className = "";
+  $("options").replaceChildren();
+  $("overlayActions").replaceChildren();
+  $("overlay").hidden = false;
+}
+function hideOverlay() { $("overlay").hidden = true; }
+
+function showTicketPicker(drawn, minimum, onDone, initial) {
+  state.phase = "tickets";
+  showOverlay("DESTINATION TICKETS", initial
+    ? "Keep at least two of these tickets. Each completed ticket adds its points at the end; each unfinished one subtracts them."
+    : "Keep at least one of these tickets. Return the rest to the bottom of the deck.");
+  $("options").className = "single";
+  const boxes = [];
+  for (const ticket of drawn) {
+    const label = document.createElement("label");
+    label.className = "ticket-option";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = true;
+    const text = document.createElement("span");
+    text.innerHTML = "<b>" + ticket.a + " – " + ticket.b + "</b><small>" + ticket.points + " points · shortest route " + aiTicketDistance(ticket) + " trains</small>";
+    label.append(input, text);
+    $("options").append(label);
+    boxes.push({ input, ticket });
+  }
+  const confirm = document.createElement("button");
+  confirm.type = "button";
+  confirm.className = "primary";
+  const update = () => {
+    const count = boxes.filter(box => box.input.checked).length;
+    confirm.disabled = count < minimum;
+    confirm.textContent = "Keep " + count + " ticket" + (count === 1 ? "" : "s");
+  };
+  boxes.forEach(box => { box.input.onchange = update; });
+  update();
+  confirm.onclick = () => {
+    const kept = boxes.filter(box => box.input.checked).map(box => box.ticket);
+    if (kept.length < minimum) return;
+    hideOverlay();
+    state.phase = "play";
+    onDone(kept);
+  };
+  $("overlayActions").append(confirm);
+}
+
+function showResults(scoring) {
+  const winner = scoring[0];
+  showOverlay("FINAL SCORING", winner.player.name + " wins with " + winner.total + " points. Route points, destination tickets, and the ten-point longest continuous path are counted below.");
+  const table = document.createElement("table");
+  table.innerHTML = "<thead><tr><th>Player</th><th>Routes</th><th>Tickets</th><th>Longest</th><th>Total</th></tr></thead><tbody>" +
+    scoring.map(entry => "<tr><td>" + entry.player.name + "</td><td>" + entry.player.score + "</td><td>" + (entry.ticketNet >= 0 ? "+" : "") + entry.ticketNet + "</td><td>" + entry.longestBonus + "</td><td><b>" + entry.total + "</b></td></tr>").join("") +
+    "</tbody>";
+  $("options").className = "single";
+  $("options").append(table);
+  const again = document.createElement("button");
+  again.type = "button";
+  again.className = "primary";
+  again.textContent = "Play again";
+  again.onclick = () => { hideOverlay(); showTitle(); };
+  $("overlayActions").append(again);
+}
+
+function showRules() {
+  const prior = state.phase;
+  state.phase = "rules";
+  showOverlay("RULES", "Collect train cards, spend them to claim routes, and connect the two cities on your destination tickets before the game ends.");
+  $("options").className = "single";
+  const rules = document.createElement("div");
+  rules.className = "ticket-option";
+  rules.style.display = "block";
+  rules.innerHTML =
+    "<b>On your turn, do one thing.</b><br>" +
+    "Draw two train cards, claim one route, or draw three destination tickets and keep at least one.<br><br>" +
+    "<b>Claiming routes.</b> Pay one card per space. Coloured routes need that colour; gray routes take any one colour. Locomotives are wild. A face-up locomotive must be your whole draw. If three face-up cards are locomotives, the market is redealt.<br><br>" +
+    "<b>Double routes.</b> With two or three players only one of a parallel pair can be used. No player may claim both halves.<br><br>" +
+    "<b>Route points.</b> 1 space = 1, 2 = 2, 3 = 4, 4 = 7, 5 = 10, 6 = 15.<br><br>" +
+    "<b>Game end.</b> When a player has two or fewer trains at the end of a turn, every player takes one final turn. Add completed destination tickets, subtract unfinished ones, and award 10 points for the longest continuous path.<br><br>" +
+    "<b>Destination tickets.</b> 30 printed tickets, from Denver – El Paso (4) to Seattle – New York (22).";
+  $("options").append(rules);
+  const close = document.createElement("button");
+  close.type = "button";
+  close.textContent = "Back to the game";
+  close.onclick = () => {
+    hideOverlay();
+    state.phase = prior === "idle" || prior === "rules" ? (state.players.length ? "play" : "idle") : prior;
+    if (!state.players.length) showTitle();
+    else render();
+  };
+  $("overlayActions").append(close);
+}
+
+function showTitle() {
+  state.phase = "idle";
+  state.finished = false;
+  state.result = null;
+  state.players = [];
+  state.market = [];
+  state.deck = [];
+  state.ticketDeck = [];
+  for (const route of ROUTES) route.owner = null;
+  render();
+  showOverlay("TICKET TO RIDE", "The original North American board: 36 cities, 100 routes, all 30 destination tickets, and 45 trains each. Claim lines, connect your tickets, and hold the longest continuous path when the last trains leave the station.");
+  $("options").className = "single";
+  const note = document.createElement("div");
+  note.className = "ticket-option";
+  note.style.display = "block";
+  note.innerHTML =
+    "<b>The game.</b> Draw train cards, claim railway routes, and complete destination tickets.<br><br>" +
+    "<b>Scoring.</b> Routes score while you build: 1/2/4/7/10/15 for 1–6 spaces. Finished tickets add their printed points; unfinished ones subtract. Longest continuous path earns 10.<br><br>" +
+    "<b>The end.</b> Once anyone is down to two trains, everyone gets one last turn.";
+  $("options").append(note);
+  const select = document.createElement("select");
+  select.setAttribute("aria-label", "Number of players");
+  for (const count of [2, 3, 4, 5]) {
+    const option = document.createElement("option");
+    option.value = String(count);
+    option.textContent = (count - 1) + " CPU " + (count === 2 ? "opponent" : "opponents") + " · " + count + " players";
+    select.append(option);
+  }
+  select.value = "3";
+  const start = document.createElement("button");
+  start.type = "button";
+  start.className = "primary";
+  start.textContent = "Start game";
+  start.onclick = () => { hideOverlay(); beginGame(Number(select.value)); };
+  $("overlayActions").append(select, start);
+}
+
+/* ── wiring ──────────────────────────────────────────────────────────────── */
+
+$("board").addEventListener("click", event => {
+  const group = event.target.closest(".route");
+  if (!group) return;
+  humanClaim(ROUTES[Number(group.dataset.id)]);
+});
+$("deck").onclick = humanBlind;
+$("drawTickets").onclick = humanDrawTickets;
+$("rules").onclick = showRules;
+$("restart").onclick = () => {
+  if (state.turn === 0 && state.players.length && !state.finished) {
+    if (!window.confirm("Start a new game? The current one will be lost.")) return;
+  }
+  showTitle();
+};
+
+window.__boredSnapshot = () => {
+  const me = state.players[0];
+  const finished = state.finished === true;
+  const mine = state.result ? state.result.find(entry => entry.player.index === 0) : null;
+  const points = finished && Number.isFinite(state.finalPoints) ? state.finalPoints : (me ? me.score : 0);
+  const won = finished && mine && state.result ? mine.total === state.result[0].total : false;
+  const tickets = finished && mine
+    ? mine.completed.filter(ticket => ticket.done).length
+    : me ? me.tickets.filter(ticket => connected(0, ticket.a, ticket.b)).length : 0;
+  return {
+    slug: "ticket-to-ride",
+    points: Math.max(-999, Math.min(999, Math.round(points))),
+    finished,
+    cpu: true,
+    won,
+    tickets: Math.max(0, tickets)
+  };
+};
+
+showTitle();
+</script>
+</body>
+</html>

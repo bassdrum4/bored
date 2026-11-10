@@ -41,3 +41,23 @@ export async function togetherRPC(action, args = {}) {
     }));
   return result;
 }
+
+// Live games have their own endpoint: rooms, the ordered action log, presence and snapshots (bt_live_rpc). It is
+// called a lot more often than togetherRPC (a heartbeat every 10 seconds, an action per click), so it carries no
+// telemetry events of its own.
+export async function liveRPC(action, args = {}) {
+  if (!hasIdentity()) throw new Error('Sign in to your Bored account first.');
+  const owner = getSession()?.user?.id;
+  const session = await freshSession();
+  if (!session || session.user.id !== owner) throw new Error('Sign in again to continue.');
+  const result = await request('/rest/v1/rpc/bt_live_rpc', {
+    method: 'POST', body: { action, args }, token: session.access_token
+  });
+  if (getSession()?.user?.id !== owner) throw new Error('Your account changed. Please try again.');
+  // A room code that does not work is answered, not raised (a raised error would undo the server's count of tries):
+  // {ok:false, error}. It reads as an ordinary refusal here, and never as a lost connection (it has a status).
+  if (result && result.ok === false && typeof result.error === 'string') {
+    const refusal = new Error(result.error); refusal.status = 400; throw refusal;
+  }
+  return result;
+}

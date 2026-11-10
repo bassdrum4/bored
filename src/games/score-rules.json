@@ -44,6 +44,11 @@
     "better": "low",
     "max_value": 3600
   },
+  "clicker": {
+    "label": "Score",
+    "better": "high",
+    "max_value": 10000000
+  },
   "commanders": {
     "label": "Score",
     "better": "high",
@@ -54,10 +59,20 @@
     "better": "high",
     "max_value": 1000
   },
+  "corner": {
+    "label": "Cash after 14 days",
+    "better": "high",
+    "max_value": 100000
+  },
   "deep": {
     "label": "Score",
     "better": "high",
     "max_value": 1000000
+  },
+  "downhill-mayhem": {
+    "label": "Fastest Classic mountain race on Mayhem difficulty (seconds)",
+    "better": "low",
+    "max_value": 3600
   },
   "frogger": {
     "label": "Score",
@@ -119,6 +134,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "quickdraw": {
+    "label": "Solo reaction time (ms)",
+    "better": "low",
+    "max_value": 2000
+  },
   "risk": {
     "label": "Fewest human turns to conquer the world vs CPU",
     "better": "low",
@@ -178,6 +198,11 @@
     "label": "Score",
     "better": "high",
     "max_value": 10000000
+  },
+  "ticket-to-ride": {
+    "label": "Victory points in a finished game vs CPU",
+    "better": "high",
+    "max_value": 500
   },
   "trackbound": {
     "label": "Career points",

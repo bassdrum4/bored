@@ -98,7 +98,10 @@ export const CHALLENGES = [
   // Renown is the game's own tally for a banner (cities, population, tech and
   // army), so the goal is reached mid-campaign by growing one, and the hardest
   // step asks for more than a couple of cities' worth.
-  { slug: 'ashcrown', label: 'Banner rising', goal: 'Grow one banner to {target} renown in a single campaign.', metric: 'renown', targets: [150, 300, 450], unit: 'renown' }
+  { slug: 'ashcrown', label: 'Banner rising', goal: 'Grow one banner to {target} renown in a single campaign.', metric: 'renown', targets: [150, 300, 450], unit: 'renown' },
+  // Corner's daily is the whole fortnight, not a mid-run till: the rule below
+  // checks that the shop actually finished before the cash is counted.
+  { slug: 'corner', label: 'Open for business', goal: 'Finish all fourteen days with at least ${target} in the till.', metric: 'cash', targets: [180, 230, 280], rule: 'corner', unit: 'cash' }
 ];
 // Preserve the original v2 order, including retired Cup Pong, for historical IDs.
 // Do not add the retired game to the playable CHALLENGES catalog.
@@ -159,6 +162,11 @@ const DAILY_SCHEDULE_V4_START = Date.parse('2026-10-31T00:00:00Z') / 86400000;
 // the old version actually played instead of a historic placeholder.
 const DAILY_SCHEDULE_V5 = Object.freeze([...DAILY_SCHEDULE_V4, 'ashcrown']);
 const DAILY_SCHEDULE_V5_START = Date.parse('2026-11-05T00:00:00Z') / 86400000;
+// V6 adds Corner. It opens the day after this release so the challenges already
+// published for 2026-11-10 keep their games; its first full circuit begins on
+// 2026-12-20.
+const DAILY_SCHEDULE_V6 = Object.freeze([...DAILY_SCHEDULE_V5, 'corner']);
+const DAILY_SCHEDULE_V6_START = Date.parse('2026-11-11T00:00:00Z') / 86400000;
 const DAILY_SCHEDULE_START = Date.parse('2026-10-28T00:00:00Z') / 86400000;
 // A one-day promotion plays its game instead of the calendar's on that date and
 // changes nothing else. The calendar itself is untouched, so the next day
@@ -178,11 +186,12 @@ export function dailyChallenge(date) {
     const target = definition.targets[circuit];
     return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v2:' + date + ':' + definition.slug };
   }
+  const v6 = day >= DAILY_SCHEDULE_V6_START;
   const v5 = day >= DAILY_SCHEDULE_V5_START;
-  const schedule = v5 ? DAILY_SCHEDULE_V5 : day < DAILY_SCHEDULE_V4_START ? DAILY_SCHEDULE_V3 : DAILY_SCHEDULE_V4;
-  const version = v5 ? 5 : day < DAILY_SCHEDULE_V4_START ? 3 : 4;
+  const schedule = v6 ? DAILY_SCHEDULE_V6 : v5 ? DAILY_SCHEDULE_V5 : day < DAILY_SCHEDULE_V4_START ? DAILY_SCHEDULE_V3 : DAILY_SCHEDULE_V4;
+  const version = v6 ? 6 : v5 ? 5 : day < DAILY_SCHEDULE_V4_START ? 3 : 4;
   const size = schedule.length;
-  const offset = day - (v5 ? DAILY_SCHEDULE_V5_START : DAILY_SCHEDULE_START);
+  const offset = day - (v6 ? DAILY_SCHEDULE_V6_START : v5 ? DAILY_SCHEDULE_V5_START : DAILY_SCHEDULE_START);
   const cycleNumber = Math.floor(offset / size);
   let previous = [];
   // Deterministic seeded order per cycle: each game once per circuit.
@@ -196,13 +205,16 @@ export function dailyChallenge(date) {
       const j = state % (i + 1);
       [order[i], order[j]] = [order[j], order[i]];
     }
-    const recent = cycle ? previous.slice(-7) : v5
-      // Look back at the days v4 really published rather than a stand-in.
+    const recent = cycle ? previous.slice(-7) : v6
+      // Look back at the seven days v5 really published rather than a stand-in.
+      ? Array.from({ length: 7 }, (_, i) =>
+          dailyChallenge(new Date((DAILY_SCHEDULE_V6_START - 7 + i) * 86400000).toISOString().slice(0, 10)).slug)
+      : v5
       ? Array.from({ length: 7 }, (_, i) =>
           dailyChallenge(new Date((DAILY_SCHEDULE_V5_START - 7 + i) * 86400000).toISOString().slice(0, 10)).slug)
       : Array.from({ length: 7 }, (_, i) => {
           const historicDay = DAILY_SCHEDULE_START - 7 + i;
-          return DAILY_V2_CHALLENGES[((historicDay % DAILY_V2_COUNT) + DAILY_V2_COUNT) % DAILY_V2_COUNT].slug;
+          return CHALLENGES[((historicDay % DAILY_V2_COUNT) + DAILY_V2_COUNT) % DAILY_V2_COUNT].slug;
         });
     for (let i = 0; i < 7 && i < size; i++) {
       if (!recent.includes(order[i])) continue;
@@ -218,7 +230,7 @@ export function dailyChallenge(date) {
     return { ...feature, date, target, goal: feature.goal.replace('{target}', target), id: 'v' + version + ':' + date + ':' + feature.slug };
   }
   const slug = previous[offset % size];
-  const definition = CHALLENGES.find(item => item.slug === slug);
+  const definition = CHALLENGES.find(item => item.slug === slug) || (day < DAILY_SCHEDULE_V4_START && slug === 'cup-pong' ? LEGACY_CUP_PONG : null);
   const target = definition.targets[cycleNumber % definition.targets.length];
   return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v' + version + ':' + date + ':' + definition.slug };
 }
@@ -249,6 +261,9 @@ export function dailyCheck(challenge, snapshot) {
     // Speed only counts if the test finished and stayed accurate: a flailing
     // 30 seconds of keystrokes is not 60 words per minute.
     case 'typing': complete = complete && snapshot.finished === true && snapshot.accuracy >= 95; notes.push(snapshot.accuracy + '% accuracy', snapshot.finished ? 'finished' : 'finish the test'); break;
+    // The shop's goal is the fortnight's takings, so a good Wednesday does not
+    // count until day fourteen is closed.
+    case 'corner': complete = complete && snapshot.finished === true; notes.push(snapshot.finished ? 'fourteen days served' : 'finish all fourteen days'); break;
   }
   return { complete, progress: value + ' ' + challenge.unit + ' · target ' + t + (notes.length ? ' · ' + notes.join(' · ') : '') };
 }
@@ -264,7 +279,7 @@ export function dailyCheck(challenge, snapshot) {
 export function parseDailyId(id) {
   const match = /^v\d+:(\d{4}-\d{2}-\d{2}):([a-z0-9-]+)$/.exec(typeof id === 'string' ? id : '');
   if (!match) return null;
-  const definition = CHALLENGES.find(item => item.slug === match[2]);
+  const definition = CHALLENGES.find(item => item.slug === match[2]) || (match[2] === 'cup-pong' ? LEGACY_CUP_PONG : null);
   if (!definition || !Number.isFinite(Date.parse(match[1] + 'T00:00:00Z'))) return null;
   return { date: match[1], definition };
 }

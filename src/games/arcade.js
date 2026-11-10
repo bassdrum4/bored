@@ -4,7 +4,15 @@ function arcadeGame(kind) {
   const $ = selector => document.querySelector(selector);
   const board = $('#board'), status = $('#status'), stats = $('#stats');
   const read = key => { try { return Number(localStorage.getItem('bored.best.' + key)) || 0; } catch { return 0; } };
-  const write = (key, value) => { try { localStorage.setItem('bored.best.' + key, String(value)); } catch {} };
+  // A Bored Together match is not this device's run: the solo game and the hub
+  // high score both read this key, so a match never writes it. Turns games get
+  // the bridge, duel games only the match seed, so both count as a match.
+  function inMatch() {
+    try { return !!(window.__boredTogether || (window.__boredSeed && window.__boredSeed.match)); } catch (error) { return false; }
+  }
+  function write(key, value) {
+    try { if (!inMatch()) localStorage.setItem('bored.best.' + key, String(value)); } catch (error) { /* storage blocked */ }
+  }
   const shuffle = list => {
     for (let i = list.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));

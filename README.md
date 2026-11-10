@@ -609,6 +609,14 @@ saves keep the game open with retry/reload controls. Escape or the player menu
 returns without forfeiting. CPU/local games, single-player scores and daily
 challenges remain independent.
 
+**Live games.** *Start a live game* in Bored Together opens a Civ Lite lobby for 1 to 3 invited members plus CPUs, all
+playing the same game at the same time with Civ 6 style turns (everyone moves at once; players at war with each other
+take turns), an optional turn timer, and a CPU that plays your civ while you are away. Open it again from Your Games to
+rejoin. Details, the sync design and its limits are in [docs/bored-together.md](docs/bored-together.md#live-games-civ-lite-50).
+
+**Civ Lite saves.** Signed in, Civ Lite's saves follow your Bored account: save on one device, Continue or Load on
+another, and nothing is replaced without asking. Details and the one-time SQL are in [docs/civ-lite-saves.md](docs/civ-lite-saves.md).
+
 There are no social tabs, friend requests, stats dashboards, activity feed or
 mini-game renderers. Rematches are played first too and sit beside recently
 finished games; small overflow menus hold blocking, deleting a game for both

@@ -37,7 +37,7 @@ try {
     tank: '#m1', '8ball': '#btnCpu', tetris: '#start-btn',
     'brick-run': '#start', 'transit-chaos': '#start', ashcrown: '#btn-begin',
     trackbound: '#btnDaily', chess: '#new', mahjong: '#deal',
-    'basket-random': '#start'
+    'basket-random': '#start', 'ticket-to-ride': '#overlayActions button.primary'
   };
   const buttons = { pong: '1 PLAYER', 'gun-mayhem': '1 PLAYER vs CPU' };
   const keys = { commanders: 'Space', qbert: 'Space', frogger: 'Space', 'pac-man': 'Space',
@@ -106,6 +106,28 @@ try {
     }
     if (slug === 'typing-test') for (const code of ['KeyT', 'KeyH', 'KeyE', 'Space', 'KeyQ', 'KeyU', 'KeyI', 'KeyC', 'KeyK']) await press(code);
     if (slug === 'circuit') for (const code of ['ArrowUp', 'ArrowUp', 'ArrowLeft', 'ArrowUp']) await press(code);
+    if (slug === 'ticket-to-ride') {
+      // The first click starts the game and opens the destination-ticket
+      // picker; keep the dealt tickets and build a small mid-game network so
+      // the card shows the board rather than an empty map under an overlay.
+      await frame.waitForSelector('#overlayActions button.primary', { timeout: 4000 });
+      await frame.click('#overlayActions button.primary');
+      await frame.evaluate(() => {
+        const picks = [[13, 0], [17, 1], [33, 2], [61, 1], [79, 0], [86, 2], [8, 0], [55, 1], [26, 2], [74, 0]];
+        for (const [id, owner] of picks) {
+          const route = ROUTES[id];
+          if (!route) continue;
+          route.owner = owner;
+          state.players[owner].trains -= route.cars;
+          state.players[owner].score += ROUTE_POINTS[route.cars];
+        }
+        state.players[0].hand = { purple: 2, blue: 1, orange: 0, white: 3, green: 1, yellow: 0, black: 2, red: 2, locomotive: 1 };
+        document.getElementById('overlay').hidden = true;
+        state.phase = 'play';
+        state.turn = 0;
+        render();
+      });
+    }
     if (slug === 'scrabble') {
       // The board sits behind the player-choice overlay, so put a plausible
       // mid-game position on it instead of capturing the empty board.

@@ -88,6 +88,28 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Solo only: reaction time in milliseconds. False starts and implausibly
+  // fast responses do not qualify; local duels never affect the leaderboard.
+  highScore('quickdraw', 'Quickdraw', 'ms', {
+    metric: 'milliseconds', lower: true, min: 100, max: 2000,
+    when: snapshot => snapshot.finished === true && snapshot.solo === true
+  }),
+  // Clicker is endless: the running total is the whole score, so it is captured
+  // on any snapshot rather than waiting for a finish line that does not exist.
+  highScore('clicker', 'Clicker', 'points', { metric: 'clicks' }),
+  // Corner ranks the till after fourteen trading days: a shop still mid-week
+  // is not a result, and the board keeps cash rather than a mid-run high.
+  highScore('corner', 'Corner', 'dollars', {
+    metric: 'cash', min: 1, max: 100000,
+    when: snapshot => snapshot.finished === true
+  }),
+  // A Ticket to Ride result is the final total of a finished game against the
+  // CPU, after destination tickets and the longest-path bonus. An abandoned
+  // board is only part of a score, so it never posts.
+  highScore('ticket-to-ride', 'Ticket to Ride', 'points', {
+    metric: 'points', min: 1, max: 500,
+    when: snapshot => snapshot.finished === true && snapshot.cpu === true
+  }),
   // The leaderboard measures the sum of best stars earned over all 20 stages (up to 60).
   highScore('wallbound', 'Sticky Ninja', 'stars', { metric: 'medals', min: 1, max: 60, when: snapshot => snapshot.finished === true }),
   // A fair Risk result requires winning the entire world against the CPU;
@@ -119,6 +141,12 @@ export const HIGH_SCORE_GAMES = [
   // lucky lap on the shortest map.
   highScore('trackbound', 'Trackmania', 'points', { metric: 'points', when: snapshot => snapshot.finished === true }),
   highScore("transit-chaos", "Transit Chaos", "passengers", { metric: "delivered", when: snapshot => snapshot.finished === true }),
+  // Compare completed races on the fixed Classic mountain at standard Mayhem difficulty.
+  highScore('downhill-mayhem', 'Downhill Mayhem', 'seconds', {
+    metric: 'seconds', lower: true, min: 15, max: 3600,
+    when: snapshot => snapshot.finished === true,
+    key: 'bored.high.downhill-mayhem-classic-mayhem-v1'
+  }),
   // Circuit ranks the whole three-lap race: the clock starts on the first
   // keypress and stops at the line, so a quick lap cannot offset a scrappy one.
   // The board stores whole seconds and only a finished race posts; under

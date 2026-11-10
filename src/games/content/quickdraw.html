@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Quickdraw</title>
+<meta name="description" content="Wait for DRAW. First to fire wins. Shoot early and lose.">
+<style>
+:root{--paper:#f5f2ea;--ink:#221d18;--line:#c6b9a4;--red:#ae4536;--sand:#ead9b9;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:13px/1.5 system-ui,sans-serif;display:grid;place-items:center;padding:12px}
+main{width:min(650px,100%);margin:auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}
+h1{font:700 15px var(--mono);letter-spacing:.15em;text-transform:uppercase;margin:0}
+nav{display:flex;gap:5px}
+button{font:12px var(--mono);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:3px;cursor:pointer;padding:9px 13px;touch-action:manipulation}
+button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+button[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#status{font:700 clamp(21px,5vw,35px) var(--mono);text-align:center;margin:22px 0 2px;min-height:44px}
+#detail{text-align:center;color:#665c51;min-height:21px;font:12px var(--mono)}
+.arena{height:clamp(185px,35vh,285px);border:1px solid var(--line);margin-top:16px;position:relative;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;background:linear-gradient(to bottom,var(--paper) 0 70%,var(--sand) 70% 100%)}
+.arena:after{content:"";position:absolute;top:70%;left:0;right:0;border-top:1px solid #bda680;pointer-events:none}
+.lane{position:relative;border:0;border-radius:0;display:flex;align-items:end;justify-content:center;padding:10px;min-width:0;background:transparent}
+.lane+ .lane{border-left:1px dashed var(--line)}
+.lane::before{content:"";position:absolute;bottom:24%;width:37px;height:66px;background:var(--ink);clip-path:polygon(25% 0,75% 0,88% 29%,83% 55%,100% 100%,0 100%,17% 55%,12% 29%);opacity:.8}
+.lane::after{content:"";position:absolute;bottom:calc(24% + 60px);width:55px;height:12px;background:var(--ink);clip-path:polygon(8% 0,92% 0,100% 100%,0 100%)}
+.lane span{position:relative;z-index:1;background:var(--paper);border:1px solid var(--line);padding:4px 9px;font-size:11px}
+.lane.hit{background:#dfe7d9}.lane.foul{background:#f1d8d1}
+.arena.draw{background:linear-gradient(to bottom,#e6eddc 0 70%,var(--sand) 70% 100%)}
+.arena.draw .lane{cursor:pointer}
+#scoreline{font:12px var(--mono);text-align:center;margin:13px 0;color:#645a4f}
+#start{display:block;margin:13px auto 0;padding:12px 24px;background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#hint{text-align:center;margin:15px 0 0;color:#6b6257;font-size:12px}
+#best{text-align:center;font:11px var(--mono);color:#6b6257;margin-top:6px}
+@media(max-width:390px){nav button{padding:8px}#status{margin-top:14px}.arena{margin-top:10px}}
+</style>
+</head>
+<body>
+<main>
+<header><h1>Quickdraw</h1><nav aria-label="Mode"><button id="solo" aria-pressed="true">Solo</button><button id="duel" aria-pressed="false">2 players</button></nav></header>
+<div id="status" aria-live="polite">READY?</div>
+<div id="detail" aria-live="polite">One shot. No second chances.</div>
+<div id="arena" class="arena">
+<button id="left" class="lane" aria-label="Left player fires"><span>LEFT · A</span></button>
+<button id="right" class="lane" aria-label="Right player fires"><span>RIGHT · L</span></button>
+</div>
+<div id="scoreline">Reaction time decides everything.</div>
+<button id="start">START</button>
+<div id="hint">Wait for DRAW. Fire early and you lose.</div>
+<div id="best"></div>
+</main>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const status = $('status'), detail = $('detail'), arena = $('arena'), scoreline = $('scoreline'), startButton = $('start');
+const lanes = [$('left'),$('right')];
+let mode = 'solo', phase = 'idle', timer = 0, signalAt = 0, score = [0,0], rounds = 0, best = 0;
+let reaction = 0, validResult = false, sessionBest = 0, generation = 0;
+try { best = Number(localStorage.getItem('bored.quickdraw.best')) || 0; } catch {}
+function showBest() { $('best').textContent = best ? 'Local fastest: ' + best + ' ms' : 'Fastest solo reaction wins the board.'; }
+function resetVisuals() { arena.classList.remove('draw'); lanes.forEach(l => l.classList.remove('hit','foul')); }
+function cancel() { generation++; clearTimeout(timer); timer = 0; phase = 'idle'; resetVisuals(); }
+function setMode(next) {
+  if(mode === next && phase !== 'idle') return;
+  cancel(); mode = next; score = [0,0]; rounds = 0; validResult = false; reaction = 0; sessionBest = 0;
+  $('solo').setAttribute('aria-pressed', String(mode === 'solo'));
+  $('duel').setAttribute('aria-pressed', String(mode === 'duel'));
+  lanes[1].style.visibility = mode === 'solo' ? 'hidden' : '';
+  lanes[0].querySelector('span').textContent = mode === 'solo' ? 'FIRE · SPACE / TAP' : 'LEFT · A';
+  status.textContent = 'READY?'; detail.textContent = mode === 'solo' ? 'One shot. No second chances.' : 'First to three wins.';
+  scoreline.textContent = mode === 'solo' ? 'Reaction time decides everything.' : 'LEFT 0 — 0 RIGHT';
+  startButton.textContent = 'START'; startButton.hidden = false;
+  $('hint').textContent = mode === 'solo' ? 'Wait for DRAW. Space, A, or tap to fire.' : 'Wait for DRAW. Left fires A, right fires L. Or tap your side.';
+  showBest();
+}
+function begin() {
+  cancel();
+  if(mode === 'duel' && (score[0] >= 3 || score[1] >= 3)) { score = [0,0]; rounds = 0; }
+  validResult = false; reaction = 0; resetVisuals();
+  phase = 'waiting'; status.textContent = 'WAIT…'; detail.textContent = 'Not yet.';
+  startButton.hidden = true;
+  const g = generation, delay = 1600 + Math.random()*2500;
+  timer = setTimeout(() => {
+    if(g !== generation || phase !== 'waiting') return;
+    signalAt = performance.now(); phase = 'draw'; arena.classList.add('draw');
+    status.textContent = 'DRAW!'; detail.textContent = 'FIRE!';
+  }, delay);
+}
+function finish(winner, foul, ms) {
+  if(phase !== 'waiting' && phase !== 'draw') return;
+  clearTimeout(timer); phase = 'result'; arena.classList.remove('draw');
+  if(mode === 'solo') {
+    if(foul) { validResult = false; reaction = 0; status.textContent = 'TOO EARLY'; detail.textContent = 'You fired before the signal.'; lanes[0].classList.add('foul'); }
+    else {
+      reaction = Math.round(ms);
+      // Below 100 ms is too fast to count as a meaningful human reaction record.
+      validResult = reaction >= 100 && reaction <= 2000;
+      status.textContent = reaction + ' ms'; detail.textContent = validResult ? (reaction < 220 ? 'Lightning fast.' : reaction < 350 ? 'Nice draw.' : 'Try again.') : 'Shot recorded. Too quick or delayed for the board.';
+      lanes[0].classList.add('hit');
+      if(validResult && (!sessionBest || reaction < sessionBest)) sessionBest = reaction;
+      if(validResult && (!best || reaction < best)) {
+        best = reaction;
+        try { localStorage.setItem('bored.quickdraw.best', String(best)); } catch {}
+      }
+    }
+    scoreline.textContent = foul ? 'False start. No score.' : 'Reaction: ' + reaction + ' ms';
+  } else {
+    if(foul) lanes[1-winner].classList.add('foul'); else lanes[winner].classList.add('hit');
+    score[winner]++; rounds++;
+    status.textContent = foul ? 'FALSE START' : (winner === 0 ? 'LEFT WINS' : 'RIGHT WINS');
+    detail.textContent = foul ? (winner === 0 ? 'Right fired early.' : 'Left fired early.') : Math.round(ms) + ' ms reaction';
+    scoreline.textContent = 'LEFT ' + score[0] + ' — ' + score[1] + ' RIGHT';
+    if(score[winner] >= 3) detail.textContent += ' · Match over.';
+  }
+  startButton.hidden = false; startButton.textContent = mode === 'duel' && Math.max(...score) >= 3 ? 'NEW MATCH' : 'AGAIN';
+  showBest();
+}
+function fire(side) {
+  if(mode === 'solo' && side !== 0) return;
+  if(phase !== 'waiting' && phase !== 'draw') return;
+  const now = performance.now();
+  if(phase === 'waiting') finish(mode === 'solo' ? 0 : 1-side, true, 0);
+  else finish(side, false, now-signalAt);
+}
+lanes.forEach((lane,i)=>lane.addEventListener('pointerdown',e=>{ e.preventDefault(); fire(i); }));
+document.addEventListener('keydown',e=>{
+  if(e.repeat || e.altKey || e.ctrlKey || e.metaKey) return;
+  const key=e.key.toLowerCase();
+  if(key === ' ' || key === 'a' || (mode === 'duel' && key === 'l')) {
+    e.preventDefault(); fire(mode === 'duel' && key === 'l' ? 1 : 0);
+  } else if(key === 'enter' && (phase === 'idle' || phase === 'result')) { e.preventDefault(); begin(); }
+});
+startButton.addEventListener('click',begin);
+$('solo').addEventListener('click',()=>setMode('solo'));
+$('duel').addEventListener('click',()=>setMode('duel'));
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden && (phase === 'waiting' || phase === 'draw')) {
+    cancel(); status.textContent='PAUSED'; detail.textContent='Round cancelled while away.';
+    startButton.hidden=false; startButton.textContent='RESTART';
+  }
+});
+window.__boredSnapshot = () => ({ slug:'quickdraw', milliseconds: mode === 'solo' ? sessionBest : 0,
+  finished: mode === 'solo' && sessionBest > 0, solo: mode === 'solo', rounds, left_wins:score[0], right_wins:score[1] });
+setMode('solo');
+})();
+</script>
+</body>
+</html>

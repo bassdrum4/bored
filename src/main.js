@@ -23,13 +23,16 @@ import { createLeaderboardView } from './hub/leaderboard-view.js';
 import { createAccountUI } from './hub/account-ui.js';
 import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
+import { createLivePlayer } from './hub/together-live.js';
+import { createLobbyBridge } from './hub/together-lobby.js';
 import { createFeedbackUI } from './hub/feedback-ui.js';
 import { createAnnouncementsUI } from './hub/announcements-ui.js';
-import { createAnalytics, ANALYTICS_BRIDGE } from './hub/analytics.js';
+import { createAnalytics, ANALYTICS_BRIDGE, runtimeErrorMetadata } from './hub/analytics.js';
 import { getAnalyticsAccess } from './hub/analytics-access.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
 import { resumeScript } from './hub/resume.js';
+import { createSavesBridge } from './hub/saves-bridge.js';
 import { initVoice } from './hub/voice.js';
 import { initPreferences } from './hub/preferences.js';
 import { createHubNavigation } from './hub/navigation.js';
@@ -41,6 +44,10 @@ function challengeDate(...args) {
   return (window.dailyDate || defaultDailyDate)(...args);
 }
 if (typeof window !== 'undefined') window.dailyDate = defaultDailyDate;
+
+// Games that use Esc themselves: Bored leaves its Esc-closes-the-game shortcut out of their document (the
+// game has its own Back to Bored button, in its Menu and on its title screen). Every other game still closes on Esc.
+const OWNS_ESCAPE = new Set(['ashcrown']);
 
 /* ── DOM handles ──────────────────────────────────────────────────────────── */
 
@@ -148,7 +155,7 @@ gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXT
 
 function restartGame() {
   if (!activeSlug) return;
-  if (activeTogether) { showHint('Your online game is saved. Exit and reopen it to reload.'); closeMenu(); return; }
+  if (activeTogether) { showHint(activeTogether.mode === 'live' ? 'A live game cannot be restarted. Leave it from the game\u2019s Menu.' : 'Your online game is saved. Exit and reopen it to reload.'); closeMenu(); return; }
   captureBest({ leaving: true });
   closeMenu();
   analytics.end('restart');
@@ -209,6 +216,17 @@ async function toggleFullscreen() {
 }
 
 let activeTogether = null;
+// Civ Lite's account saves: a bridge for the one document of Civ Lite that is open and not in a match.
+let activeSaves = null;
+// Civ Lite's Multiplayer screen talks to the hub through this bridge whenever the game is open and is not itself a
+// match or a live game. Each document gets its own, with its own channel.
+let activeLobby = null;
+const lobbyDeps = {
+  openLive: id => togetherUI.openLive(id),
+  openSignIn: () => openAuthDialog('signin'),
+  // The Bored Together page sits under the player, so the game is closed first, then the page is opened as a click on its link would.
+  openTogether: () => { closeGame({ force: true }); document.querySelector('#together-nav')?.click(); }
+};
 function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   if (!ORDER.some(([id]) => id === slug)) return;
   if (!activeSlug) {
@@ -225,6 +243,8 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   const previousTogether = activeTogether;
   activeTogether = multiplayer;
   if (previousTogether && previousTogether !== multiplayer) previousTogether.dispose();
+  if (activeSaves) { activeSaves.dispose(); activeSaves = null; }
+  if (activeLobby) { activeLobby.dispose(); activeLobby = null; }
   $('#back span').textContent = multiplayer ? '‹ Bored Together' : '‹ All games';
   $('#restart').hidden = !!multiplayer;
   analytics.end('switch');
@@ -270,16 +290,38 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       // overwrite it and let a re-deal reroll the shared board.
       html = multiplayer?.mode === 'duel' ? html : injectSeed(html);
       if (multiplayer) html = multiplayer.document(html);
-      let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
+      else if (slug === 'ashcrown') { activeLobby = createLobbyBridge({ frame: gameFrame, deps: lobbyDeps }); html = activeLobby.document(html); }
+      // Civ Lite keeps its saves in the player's account. A live or turn-by-turn match lives on the server and
+      // never touches saves, so only a solo document is offered the bridge.
+      if (slug === 'ashcrown' && !multiplayer) { activeSaves = createSavesBridge({ frame: gameFrame }); html = activeSaves.document(html); }
+      let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};' + (OWNS_ESCAPE.has(slug) ? '' : 'if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}') + 'if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
       gameFrame.removeAttribute('src');
       // The resume helper runs before the game's own script, so a game can offer a
       // saved position while it wires itself up.
       // A match keeps its position on the server, so its document gets an inert
       // helper and never touches this device's saved run for the game.
-      gameFrame.srcdoc = injectHead(html, resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head);
+      // The packaged Unity wrapper still has an aspect-fit ResizeObserver and
+      // a footer that shorten the play area. Override those from the launcher
+      // instead of rebuilding the 11 MB compiled game payload.
+      const gameFill = slug === 'rooftop-snipers' ? '<style>' +
+        'html,body,main,#stage{margin:0!important;width:100%!important;height:100%!important;overflow:hidden!important}' +
+        '#stage{position:relative!important;display:block!important;min-height:0!important}' +
+        '#game{position:absolute!important;inset:0!important;left:0!important;top:0!important;transform:none!important;width:100%!important;height:100%!important}' +
+        '#game canvas{display:block!important;width:100%!important;height:100%!important}' +
+        '@media(max-aspect-ratio:16/9){#game{inset:auto!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;width:100%!important;height:auto!important;aspect-ratio:16/9!important}}' +
+        'footer{position:absolute!important;bottom:0;left:0;right:0;z-index:10;background:transparent!important;pointer-events:none}' +
+        '#keys{display:none!important}#pads{pointer-events:auto}' +
+        '#cover > p.muted:last-child{display:none!important}' +
+        '@media(pointer:fine){footer{display:none!important}}' +
+        '</style>' : '';
+      gameFrame.srcdoc = injectHead(html, resumeScript(slug, { online: !!multiplayer }) + ANALYTICS_BRIDGE + head + gameFill);
+      const ownsEsc = OWNS_ESCAPE.has(slug);
       showHint(multiplayer
-        ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player' : 'Your turn saves automatically · Esc returns to Bored Together'
-        : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
+        ? multiplayer.mode === 'duel' ? 'One run on the same board · Esc sends it to the other player'
+          : multiplayer.mode === 'live' ? 'Live game · leave from the game’s Menu (it keeps going)'
+          : ownsEsc ? 'Your turn saves automatically · Menu → Back to Bored returns to Bored Together' : 'Your turn saves automatically · Esc returns to Bored Together'
+        : ownsEsc ? 'Click or tap to play · Esc is the game’s own key · Menu → Back to Bored leaves · Shift+R restarts · Shift+F fullscreen'
+          : 'Click or tap to play · Esc leaves · Shift+R restarts · Shift+F fullscreen');
     };
     const fail = () => {
       if (token !== loadToken) return;
@@ -366,6 +408,9 @@ function closeGame({ force = false } = {}) {
   const together = activeTogether;
   activeTogether = null;
   if (together) together.dispose();
+  // A save the game asked for as it closed is already on its way; this only stops the bridge hearing more.
+  if (activeSaves) { activeSaves.dispose(); activeSaves = null; }
+  if (activeLobby) { activeLobby.dispose(); activeLobby = null; }
   if ($('#invite-dialog')?.open) $('#invite-dialog').close();
   const wasDaily = activeChallenge;
   activeChallenge = null;
@@ -875,6 +920,8 @@ addEventListener('webkitfullscreenchange', onFullscreenChange);
 addEventListener('message', event => {
   if (!activeSlug || EXTERNS[activeSlug] || event.source !== gameFrame.contentWindow) return;
   if (activeTogether) activeTogether.message(event);
+  if (activeSaves) activeSaves.message(event);
+  if (activeLobby) activeLobby.message(event);
   switch (event.data?.type) {
     case 'bored:close':
       if (fullscreenElement()) leaveFullscreen(); else closeGame();
@@ -891,7 +938,7 @@ addEventListener('message', event => {
         });
       }
       break;
-    case 'bored:runtime-error': analytics.event('error', { code: 'runtime' }); break;
+    case 'bored:runtime-error': analytics.event('error', runtimeErrorMetadata(event.data)); break;
     case 'bored:restart': restartGame(); break;
     case 'bored:fullscreen': toggleFullscreen(); break;
     case 'bored:menuclose': closeMenu(); break;
@@ -908,6 +955,7 @@ addEventListener('keydown', event => {
     else if (fullscreenElement()) { event.preventDefault(); leaveFullscreen(); }
     // Leaving a game and leaving a page both end at the hub's home. A duel asks
     // to send the run first, and that prompt must stay on its own view.
+    else if (activeSlug && OWNS_ESCAPE.has(activeSlug)) gameFrame.focus();   // the game's own Esc: back into it, never out
     else if (activeSlug && Date.now() - leftFullscreenAt > 500) { closeGame(); if (!activeSlug) navigation.goHome(); }
     else if (!activeSlug) navigation.goHome();
   } else if (activeSlug && !typing && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
@@ -944,8 +992,16 @@ try { sessionStorage.removeItem('bored.boot-retry'); } catch {}
 const togetherUI = createTogetherUI({ openAuthDialog, playMatch(match, owner, callbacks) {
   const player = createTogetherPlayer({ match, owner, frame: gameFrame, ...callbacks, close: closeGame, notify: showHint });
   openGame(match.game, null, document.querySelector('#together-nav'), player);
+}, playLive(game, owner, callbacks) {
+  // Leaving a live game from its Menu lands on the game's title screen, not out in Bored.
+  const player = createLivePlayer({ game, owner, frame: gameFrame, ...callbacks, close: closeGame, back: () => openGame(game.game, null, document.querySelector('#together-nav')), notify: showHint });
+  openGame(game.game, null, document.querySelector('#together-nav'), player);
 } });
-window.addEventListener('bored:identity', () => { if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true }); });
+window.addEventListener('bored:identity', () => {
+  if (activeTogether && !activeTogether.isOwner()) closeGame({ force: true });
+  if (activeLobby) activeLobby.accountChanged();
+  if (activeSaves) activeSaves.accountChanged();
+});
 initAnnouncements();
 initAccount();
 initFeedback();

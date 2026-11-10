@@ -378,6 +378,12 @@ dialog{margin:auto}
 .bt-start-actions{margin-top:18px}
 .bt-start-actions>.action{padding:14px 22px;font-size:14px}
 .bt-start-actions>.bt-more{margin-left:auto}
+/* min-width:0 on the row and width:0 on the field: a text input is about 20 characters wide by itself, and without these
+   the row could not shrink below that plus the button, which pushed the Bored Together page sideways at 320px. */
+.bt-join-code{display:flex;gap:8px;align-items:center;flex:1 1 240px;min-width:0}
+.bt-join-code input{flex:1 1 0;width:0;min-width:0;padding:13px 12px;font:600 15px var(--mono);letter-spacing:.2em;text-transform:uppercase;text-align:center}
+.bt-join-code>.action{padding:14px 18px;font-size:14px;white-space:nowrap}
+.bt-join-error{color:var(--red)}
 #together .bt-primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .bt-caption{font:12px/1.6 var(--mono);color:var(--dim);margin-top:6px;overflow-wrap:anywhere}
 .bt-enrollment{max-width:560px;padding:8px 0 28px;display:grid;gap:16px}
@@ -484,6 +490,8 @@ body.playing .bt-notice,.together-open .bt-notice{display:none}
   .bt-start-actions{gap:8px}
   .bt-start-actions>.action{flex:1;padding:12px;font-size:12px}
   .bt-start-actions>.bt-more{margin-left:0}
+  .bt-join-code{flex-basis:100%}
+  .bt-join-code>.action{flex:none;padding:12px;font-size:12px}
   .bt-hero{grid-template-columns:minmax(0,1fr);gap:14px;padding:15px}
   .bt-hero-art{max-width:280px}
   .bt-hero>.action{width:100%;text-align:center}
