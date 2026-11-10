@@ -1313,7 +1313,8 @@ const LIVE = {
   errors: [], result: null,  // errors a rule threw (the same on every device); what the last order came to
   game: null, host: false, me: -1, filled: false, filling: false, entered: 0,
   after: new Map(), last: new Map(),   // what to do when an action of mine comes back, and how it went
-  early: [], seen: {}, clock: null, finished: false, timeoutAt: 0, backAt: 0, takeAt: {}, sendConfigAt: 0
+  early: [], seen: {}, clock: null, finished: false, timeoutAt: 0, backAt: 0, takeAt: {}, sendConfigAt: 0,
+  leaving: false             // the player pressed Leave game: this screen is on its way out
 };
 
 const keyOf = (x, y) => x + ',' + y;
@@ -11509,7 +11510,7 @@ function liveTick() {
       liveSend('cpu-takes-over', { seat: i });
     }
   }
-  if (L.away[G.viewer] && pl(G.viewer).alive && now - LIVE.backAt > 4000) {
+  if (L.away[G.viewer] && pl(G.viewer).alive && !LIVE.leaving && now - LIVE.backAt > 4000) {
     LIVE.backAt = now;
     liveSend('human-returns', {});
   }
@@ -11723,7 +11724,8 @@ function askLeave() {
 // A CPU takes the civ at once, then the hub closes this screen.
 function liveLeave() {
   closeModal();
-  const out = () => LIVE.net.call('exit', {}).catch(() => {});
+  LIVE.leaving = true;   // this screen is going: its own takeover coming back is not a return
+  const out = () => LIVE.net.call('exit', {}).catch(() => { LIVE.leaving = false; });
   if (!G || !G.live || G.over || G.live.away[G.viewer] || !pl(G.viewer).alive) { out(); return; }
   LIVE.net.call('send', { type: 'cpu-takes-over', args: { seat: G.viewer } }).then(out, out);
 }

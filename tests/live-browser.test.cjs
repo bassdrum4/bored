@@ -163,6 +163,11 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   await inGame(annGame, () => !document.getElementById('pane-setup').hidden && document.querySelectorAll('#seats .seat:not([hidden])').length === 3);
   const room = (await env.admin("select id, status from bored_live.games order by created_at desc limit 1"))[0];
   assert.equal(room.status, 'lobby');
+  // The deal is random on the server, and some civs have no plain warrior (China's is the Terracotta Warrior), so
+  // the two humans pick their civs: the run does not depend on the deal.
+  await annGame.select('#seat-civ-0', 'rome');
+  for (let i = 0; i < 40 && (await env.admin('select civ from bored_live.seats where game_id=$1 and seat=0', [room.id]))[0].civ !== 'rome'; i++) await sleep(100);
+  assert.equal((await env.admin('select civ from bored_live.seats where game_id=$1 and seat=0', [room.id]))[0].civ, 'rome');
   // Ben sees the invitation in Your Games, with who is in it, and joins.
   await ben.evaluate(() => document.querySelector('#together-refresh').click());
   await waitPage(ben, id => document.querySelector('[data-live-id="' + id + '"]'), room.id);
@@ -172,6 +177,8 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   await inGame(benGame, () => document.querySelectorAll('#seats .seat:not([hidden])').length === 3 && document.getElementById('seat-who-1').textContent === 'Joined');
   await inGame(annGame, () => document.getElementById('seat-who-1').textContent === 'Joined');
   assert.equal((await env.admin('select state from bored_live.seats where game_id=$1 and seat=1', [room.id]))[0].state, 'joined');
+  await benGame.select('#seat-civ-1', 'celts');
+  await inGame(annGame, () => document.getElementById('seat-civ-1').value === 'celts');
   // Ben is ready; Ann starts. Both screens open the same game.
   await click(benGame, '#btn-ready');
   await inGame(annGame, () => !document.getElementById('btn-begin').disabled);
@@ -179,11 +186,12 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   for (const frame of [annGame, benGame]) await inGame(frame, () => document.getElementById('start').hidden && !!G && !!G.live && G.turn === 1);
   assert.equal(await annGame.evaluate('liveHash()'), await benGame.evaluate('liveHash()'));
   assert.equal(await annGame.evaluate('G.players.length'), 3);
+  assert.deepEqual(await annGame.evaluate('G.players.slice(0, 2).map(p => p.civ)'), ['rome', 'celts']);
   assert.equal((await env.admin('select status from bored_live.games where id=$1', [room.id]))[0].status, 'active');
 
   // Ann moves a unit; Ben sees it within two seconds.
   const move = async (frame, owner) => frame.evaluate(`(() => {
-    const u = G.units.find(x => x.owner === ${owner} && x.type === 'warrior');
+    const u = G.units.find(x => x.owner === ${owner} && x.type === unitFor(${owner}, 'warrior'));   // a civ's own, which some replace
     selection = { kind: 'unit', id: u.id };
     render();
     const spot = [...reachable.keys()].map(k => k.split(',').map(Number)).find(([x, y]) => !(x === u.x && y === u.y));
@@ -224,6 +232,7 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   const resent = Date.now();
   await arrived(annGame, second);
   assert.ok(Date.now() - resent < 2500, 'polling is enough while the socket is down');
+  await arrived(benGame, second);   // Ben's own screen carries his order out when it comes back in the log, like Ann's
   assert.equal(await annGame.evaluate('liveHash()'), await benGame.evaluate('liveHash()'));
   realtime.state.refuse = false;
 
@@ -323,6 +332,9 @@ test('Civ Lite Multiplayer: host a co-op game from the title screen, join from t
   // Ann leaves from the Menu: she lands on the title screen, still inside Bored's player, and the game goes on.
   await (await frameOf(ann)).evaluate('onAction("menu")');
   await act(ann, '[data-act="live-leave"]');
+  // Leaving hands her civ to a CPU, and her own screen hears that before it closes. A slow exit holds it open past
+  // the game's one-second tick, which used to read her takeover as her coming back and give the civ back to her.
+  await (await frameOf(ann)).evaluate(() => { const call = LIVE.net.call.bind(LIVE.net); LIVE.net.call = (op, args) => op === 'exit' ? new Promise(r => setTimeout(r, 1500)).then(() => call(op, args)) : call(op, args); });
   await act(ann, '[data-act="live-leave-yes"]');
   await titleReady(ann);
   assert.equal(await ann.$eval('#player', e => e.hidden), false, 'not out in Bored');

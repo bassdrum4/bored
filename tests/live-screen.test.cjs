@@ -235,7 +235,7 @@ async function started(t, config) {
 test('a move on one screen shows on the other at once, and ending turns moves the round on together', async t => {
   const { live, pages } = await started(t, { cpus: 1 });
   const [ann, ben] = pages;
-  const warrior = await ann.evaluate('(() => { const u = G.units.find(u => u.owner === 0 && u.type === "warrior"); return { id: u.id, x: u.x, y: u.y }; })()');
+  const warrior = await ann.evaluate('(() => { const u = G.units.find(u => u.owner === 0 && u.type === unitFor(0, "warrior")); return { id: u.id, x: u.x, y: u.y }; })()');
   // A click on a reachable hex: nothing moves until the order comes back in the log, and then it moves on both screens.
   const target = await ann.evaluate(`(() => {
     const u = unitById(${JSON.stringify(warrior.id)});
@@ -330,7 +330,8 @@ test('the Menu: no Save or Load, and "Leave game (it keeps going)"; leaving hand
   // Ann comes back: control returns at the next round start.
   await ann.evaluate('liveTick()');
   await sleep(80);
-  await ann.evaluate('LIVE.backAt = 0; liveTick()');
+  // (The mock keeps this screen open after Leave game; a real return is a new document, where `leaving` starts false.)
+  await ann.evaluate('LIVE.backAt = 0; LIVE.leaving = false; liveTick()');
   await waitFor(ben, 'G.live.returning.length === 1');
   await ben.evaluate('onAction("end-confirm")');
   for (const p of pages) await waitFor(p, 'G.turn === 3 && pl(0).human === true && !G.live.away[0]');
@@ -347,7 +348,7 @@ test('a screen that opens a game under way restores the snapshot and plays the a
   for (const p of pages) await waitFor(p, 'G.turn === 2');
   await waitFor(ann, 'true');
   await sleep(60);
-  const unit = await ben.evaluate('G.units.find(u => u.owner === 1 && u.type === "warrior").id');
+  const unit = await ben.evaluate('G.units.find(u => u.owner === 1 && u.type === unitFor(1, "warrior")).id');
   await ben.evaluate('onAction("select-unit:' + unit + '")');
   await ben.evaluate('onAction("fortify")');
   await waitFor(ben, `unitById(${JSON.stringify(unit)}).fort === true`);
