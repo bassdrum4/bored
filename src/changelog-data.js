@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 373,
+  "count": 374,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f1aa9f6","date":"2026-11-10","author":"Daniel Lowe","subject":"Add Dirt Trials bike game to Bored","pr":109},
   {"sha":"ec94d98","date":"2026-11-10","author":"Codebuff","subject":"Add Corner, a fourteen-day corner-shop tycoon."},
   {"sha":"ef9a21d","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.3: saves follow the player's Bored account across devices"},
   {"sha":"014ceb7","date":"2026-11-09","author":"Claude","subject":"Civ Lite 5.2: Multiplayer on the title screen"},
