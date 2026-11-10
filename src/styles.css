@@ -378,8 +378,10 @@ dialog{margin:auto}
 .bt-start-actions{margin-top:18px}
 .bt-start-actions>.action{padding:14px 22px;font-size:14px}
 .bt-start-actions>.bt-more{margin-left:auto}
-.bt-join-code{display:flex;gap:8px;align-items:center;flex:1 1 240px}
-.bt-join-code input{flex:1 1 7em;min-width:0;padding:13px 12px;font:600 15px var(--mono);letter-spacing:.2em;text-transform:uppercase;text-align:center}
+/* min-width:0 on the row and width:0 on the field: a text input is about 20 characters wide by itself, and without these
+   the row could not shrink below that plus the button, which pushed the Bored Together page sideways at 320px. */
+.bt-join-code{display:flex;gap:8px;align-items:center;flex:1 1 240px;min-width:0}
+.bt-join-code input{flex:1 1 0;width:0;min-width:0;padding:13px 12px;font:600 15px var(--mono);letter-spacing:.2em;text-transform:uppercase;text-align:center}
 .bt-join-code>.action{padding:14px 18px;font-size:14px;white-space:nowrap}
 .bt-join-error{color:var(--red)}
 #together .bt-primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}

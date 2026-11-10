@@ -444,6 +444,22 @@ test('Civ Lite room codes: host for two humans, join with a typed code, a third 
   assert.equal(await cleo.$eval('#player', e => e.hidden), false);
   assert.equal(await (await frameOf(cleo)).evaluate(() => typeof G !== 'undefined' && !G && !document.getElementById('start').hidden), true, 'still on the title screen');
   assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 2, 'nobody was added');
+  // The Multiplayer screen, with Cleo's refusal under the box, fits a small phone inside Bored's player too.
+  for (const width of [375, 320]) {
+    await cleo.setViewport({ width, height: 800 });
+    await sleep(200);
+    const bad = await (await frameOf(cleo)).evaluate(() => {
+      const w = document.documentElement.clientWidth, out = [];
+      if (document.documentElement.scrollWidth > w) out.push('the screen scrolls sideways: ' + document.documentElement.scrollWidth + ' > ' + w);
+      for (const e of document.querySelectorAll('.modal, .modal-body, .mp-join, #mp-code, #mp-code-join, #mp-code-error, .mp-acts')) {
+        const r = e.getBoundingClientRect();
+        if (r.width && (r.right > w + 0.5 || r.left < -0.5)) out.push((e.id || e.className) + ' leaves the screen: ' + Math.round(r.left) + '..' + Math.round(r.right) + ' of ' + w);
+      }
+      return out;
+    });
+    assert.deepEqual(bad, [], 'the Multiplayer screen at ' + width + 'px');
+  }
+  await cleo.setViewport({ width: 1100, height: 800, deviceScaleFactor: 1 });
 
   // Ann makes a new code: the old one is stale for Cleo, and Ben's lobby shows the new one.
   await act(ann, '#room-code-new');
@@ -498,6 +514,22 @@ test('Bored Together: Join with code next to Start a live game says what went wr
   };
   // The box sits in the same row as Start a live game.
   assert.equal(await ben.evaluate(() => document.querySelector('#bt-join-code').closest('.bt-start-actions') === [...document.querySelectorAll('#together button')].find(b => b.textContent === 'Start a live game').closest('.bt-start-actions')), true);
+  // The page does not scroll sideways on a small phone, and the field and its button stay on the screen (CI's
+  // together-browser checks the page's width at 320 too, but it needs PGlite).
+  for (const width of [375, 320]) {
+    await ben.setViewport({ width, height: 850 });
+    const fit = await ben.evaluate(() => {
+      const w = innerWidth, bad = [];
+      if (document.documentElement.scrollWidth > w) bad.push('the page scrolls sideways: ' + document.documentElement.scrollWidth + ' > ' + w);
+      for (const e of document.querySelectorAll('.bt-start-actions, .bt-start-actions > *, #bt-join-code, #bt-join-go')) {
+        const r = e.getBoundingClientRect();
+        if (r.width && (r.right > w + 0.5 || r.left < -0.5)) bad.push((e.id || e.className || e.tagName) + ' leaves the screen: ' + Math.round(r.left) + '..' + Math.round(r.right));
+      }
+      return bad;
+    });
+    assert.deepEqual(fit, [], 'the Join with code row at ' + width + 'px');
+  }
+  await ben.setViewport({ width: 1100, height: 800, deviceScaleFactor: 1 });
   // A short code, a wrong code, then the right one typed as people type it: lower case, with a dash and a space.
   await join(ben, 'abc');
   await waitPage(ben, () => /6 characters/.test(document.querySelector('#bt-join-error')?.textContent || ''));

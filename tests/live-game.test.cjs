@@ -321,7 +321,7 @@ test('leaving and coming back: a CPU plays the civ from the next round, and give
   assert.equal(own(1).replace(/:\d+/g, ''), before.replace(/:\d+/g, ''), 'the CPU did not play seat 1 in the round they left during');
   // Round two: the CPU plays seat 1 after seat 0 has ended.
   assert.equal(q(rm, 'G.live.human0.join()'), '0');
-  const settler = q(rm, 'G.units.find(u => u.owner === 1 && u.type.includes("settler"))');
+  const settler = q(rm, 'G.units.find(u => u.owner === 1 && u.type === unitFor(1, "settler"))');
   end(rm, 0);
   assert.equal(q(rm, 'G.turn'), 3);
   assert.ok(q(rm, 'G.cities.some(c => c.owner === 1)') || own(1) !== before, 'seat 1 was played by a CPU');

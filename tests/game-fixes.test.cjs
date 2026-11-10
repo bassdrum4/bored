@@ -2634,41 +2634,42 @@ function notesRig() {
 test('Ashcrown 4.6.1: the changelog is newest first, its newest entry is this version, and every entry has a date and notes', () => {
   const r = civRig(FOUR);
   const log = jsonOf(r, 'CHANGELOG');
-  assert.equal(r.run('VERSION'), '5.4');
+  assert.equal(r.run('VERSION'), '5.4.1');
   assert.equal(log[0].v, r.run('VERSION'), 'the newest entry is the current version');
   assert.deepEqual(log.map(e => [e.v, e.date, e.notes.length]), [
-    ['5.4', 'Nov 10', 1], ['5.3', 'Nov 9', 2], ['5.2', 'Nov 9', 1], ['5.1.1', 'Nov 9', 1], ['5.1', 'Nov 9', 3], ['5.0', 'Nov 9', 4], ['4.7.1', 'Nov 9', 1], ['4.7', 'Nov 9', 4], ['4.6.2', 'Nov 8', 1], ['4.6.1', 'Nov 7', 1], ['4.6', 'Nov 7', 5], ['4.5 orders', 'Nov 6', 4], ['4.5', 'Nov 6', 4], ['4.4', 'Nov 6', 2], ['4.3', 'Nov 6', 2],
+    ['5.4.1', 'Nov 10', 1], ['5.4', 'Nov 10', 1], ['5.3', 'Nov 9', 2], ['5.2', 'Nov 9', 1], ['5.1.1', 'Nov 9', 1], ['5.1', 'Nov 9', 3], ['5.0', 'Nov 9', 4], ['4.7.1', 'Nov 9', 1], ['4.7', 'Nov 9', 4], ['4.6.2', 'Nov 8', 1], ['4.6.1', 'Nov 7', 1], ['4.6', 'Nov 7', 5], ['4.5 orders', 'Nov 6', 4], ['4.5', 'Nov 6', 4], ['4.4', 'Nov 6', 2], ['4.3', 'Nov 6', 2],
     ['4.2.1–4.2.3', 'Nov 6', 3], ['4.2', 'Nov 6', 3], ['4.1', 'Nov 6', 2], ['4.0', 'Nov 4', 7], ['Before 4.0', 'Nov 3–4', 4]
   ], 'the entries, in order, with their dates and how many notes each has');
   for (const e of log) {
     assert.ok(e.v && e.date && e.notes.length >= 1, 'entry ' + e.v + ' has a version, a date and a note');
     for (const n of e.notes) assert.ok(typeof n === 'string' && n.length > 0 && !/["']/.test(n), 'notes use typographic quotes: ' + n);
   }
-  assert.deepEqual(log[0].notes, ['Room codes, like Civ 6: host a live game and share its code, and friends join with Multiplayer → Join with code.']);
-  assert.deepEqual(log[1].notes, [
+  assert.deepEqual(log[0].notes, ['Fixed the Bored Together page scrolling sideways on small phones.']);
+  assert.deepEqual(log[1].notes, ['Room codes, like Civ 6: host a live game and share its code, and friends join with Multiplayer → Join with code.']);
+  assert.deepEqual(log[2].notes, [
     'Your saves follow your Bored account: save on one device, Continue or Load on another.',
     'Saves from another device are marked, and nothing is replaced without asking.'
   ]);
-  assert.deepEqual(log[2].notes, ['Multiplayer on the title screen: host a live game (free-for-all or co-op), answer invites and rejoin your games without leaving Civ Lite.']);
-  assert.deepEqual(log[3].notes, ['Live games: the server double-checks game endings, round numbers and saved snapshots.']);
-  assert.deepEqual(log[4].notes, [
+  assert.deepEqual(log[3].notes, ['Multiplayer on the title screen: host a live game (free-for-all or co-op), answer invites and rejoin your games without leaving Civ Lite.']);
+  assert.deepEqual(log[4].notes, ['Live games: the server double-checks game endings, round numbers and saved snapshots.']);
+  assert.deepEqual(log[5].notes, [
     'Co-op, like Civ 6 team play: pick “Co-op: humans vs CPUs” in game setup, in live games and on one device. Every human is on one team against the CPUs.',
     'Teammates share one map and always have open borders. They can’t go to war with each other, and they trade or give each other horses, iron and gunpowder.',
     'The team wins and loses together: if any of you wins, you all win. Alt+click a hex (or press Ping in its card) to mark it for your team for 10 seconds.'
   ]);
-  assert.deepEqual(log[5].notes, [
+  assert.deepEqual(log[6].notes, [
     'Live online games in Bored Together: 2 to 4 friends plus CPUs in one game at the same time.',
     'Dynamic turns like Civ 6: everyone moves at once, and players at war with each other take turns.',
     'An optional turn timer.',
     'Leave and come back any time: a CPU plays your civ while you’re gone.'
   ]);
-  assert.equal(log[6].notes[0], 'Esc stays in the game on Bored: it closes windows, deselects, then opens the Menu. Leave with Back to Bored, in the Menu or on the title screen.');
-  assert.equal(log[7].notes[0], 'Army upkeep: 2 soldiers per city are free, and each extra one costs its city 1 production a turn.');
-  assert.equal(log[8].notes[0], 'How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.');
-  assert.equal(log[9].notes[0], 'A What’s new screen: patch notes for every update, on the title screen and in the Menu.');
-  assert.equal(log[11].notes[1], 'Attacking someone you’re at peace with asks “Declare war?” first.');
-  assert.equal(log[12].notes[2], 'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.');
-  assert.equal(log[19].notes[3], '3.0: a research revamp, a science victory, and up to 8 players.');
+  assert.equal(log[7].notes[0], 'Esc stays in the game on Bored: it closes windows, deselects, then opens the Menu. Leave with Back to Bored, in the Menu or on the title screen.');
+  assert.equal(log[8].notes[0], 'Army upkeep: 2 soldiers per city are free, and each extra one costs its city 1 production a turn.');
+  assert.equal(log[9].notes[0], 'How to play has a contents list, like a Civilopedia: sections grouped by topic, a search box, and the section you’re reading highlighted as you scroll.');
+  assert.equal(log[10].notes[0], 'A What’s new screen: patch notes for every update, on the title screen and in the Menu.');
+  assert.equal(log[12].notes[1], 'Attacking someone you’re at peace with asks “Declare war?” first.');
+  assert.equal(log[13].notes[2], 'Saves get real names, like “Qin Shi Huang · Medieval · Turn 42”, with a detail line and your civ’s medallion.');
+  assert.equal(log[20].notes[3], '3.0: a research revamp, a science victory, and up to 8 players.');
 });
 
 test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a first visit, and a new version brings it back', () => {
@@ -2679,7 +2680,7 @@ test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a f
   assert.equal(r.run('notesNew()'), true);
   // Opening the screen stores the version and takes the tag off at once.
   r.run('showWhatsNew()');
-  assert.equal(r.prefs().notesSeen, '5.4', 'stored under the prefs key through writePref');
+  assert.equal(r.prefs().notesSeen, '5.4.1', 'stored under the prefs key through writePref');
   assert.equal(r.prefs().tips, false, 'the other prefs are left alone');
   assert.equal(r.els['notes-tag'].hidden, true, 'the tag is gone behind the open screen');
   assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'and stays gone');
@@ -2695,7 +2696,7 @@ test('Ashcrown 4.6.1: the New tag shows until the notes are opened, never on a f
 test('Ashcrown 4.6.1: a first visit (no prefs and no saves) starts with the notes seen, so the Tutorial is the only tag', () => {
   let r = notesRig();
   r.run('firstVisitNotes()');
-  assert.equal(r.prefs().notesSeen, '5.4');
+  assert.equal(r.prefs().notesSeen, '5.4.1');
   assert.deepEqual(r.title(), { notes: false, tutorial: true }, 'no New tag, and the Tutorial tag stays');
   // Prefs but no saves, or saves but no prefs: not new here, so the tag shows.
   r = notesRig();
@@ -2727,10 +2728,11 @@ test('Ashcrown 4.6.1: the What’s new screen opens the newest entry, folds ever
   const r = notesRig();
   r.run('showWhatsNew()');
   const html = r.modals.at(-1);
-  assert.match(html, /<h2>What’s new<\/h2><span class="sub">Civ Lite 5\.4<\/span>/, 'head and sub');
+  assert.match(html, /<h2>What’s new<\/h2><span class="sub">Civ Lite 5\.4\.1<\/span>/, 'head and sub');
   assert.equal(r.run('UI.modalKind'), 'notes');
-  assert.ok(html.includes('<h3 class="notes-now">5.4 · Nov 10</h3>'), 'the newest entry is open at the top as version · date');
-  assert.ok(html.includes('<li>Room codes, like Civ 6: host a live game and share its code, and friends join with Multiplayer → Join with code.</li>'));
+  assert.ok(html.includes('<h3 class="notes-now">5.4.1 · Nov 10</h3>'), 'the newest entry is open at the top as version · date');
+  assert.ok(html.includes('<li>Fixed the Bored Together page scrolling sideways on small phones.</li>'));
+  assert.ok(html.includes('<li>Room codes, like Civ 6: host a live game and share its code, and friends join with Multiplayer → Join with code.</li>'), 'the 5.4 entry is folded below it');
   assert.ok(html.includes('<li>Your saves follow your Bored account: save on one device, Continue or Load on another.</li>'), 'the 5.3 entry is folded below it');
   assert.ok(html.includes('<li>Saves from another device are marked, and nothing is replaced without asking.</li>'));
   assert.ok(html.includes('<li>Multiplayer on the title screen: host a live game (free-for-all or co-op), answer invites and rejoin your games without leaving Civ Lite.</li>'), 'the 5.2 entry is folded below it');
@@ -2742,11 +2744,11 @@ test('Ashcrown 4.6.1: the What’s new screen opens the newest entry, folds ever
   assert.ok(html.includes('<li>Esc stays in the game on Bored: it closes windows, deselects, then opens the Menu. Leave with Back to Bored, in the Menu or on the title screen.</li>'), 'the 4.7.1 entry is folded below it');
   assert.ok(html.includes('<li>A What’s new screen: patch notes for every update, on the title screen and in the Menu.</li>'));
   const details = html.match(/<details[^>]*>/g) || [];
-  assert.equal(details.length, 19, 'every older entry is a details element');
+  assert.equal(details.length, 20, 'every older entry is a details element');
   assert.ok(details.every(d => d === '<details class="notes-old">'), 'all of them closed');
   assert.ok(html.includes('<summary>4.6.1 · Nov 7</summary>') && html.includes('<summary>4.6 · Nov 7</summary>') && html.includes('<summary>Before 4.0 · Nov 3–4</summary>') && html.includes('<summary>4.2.1–4.2.3 · Nov 6</summary>'));
   assert.ok(html.indexOf('<summary>4.6 · Nov 7</summary>') < html.indexOf('<summary>4.5 · Nov 6</summary>') && html.indexOf('<summary>4.5 · Nov 6</summary>') < html.indexOf('<summary>Before 4.0'), 'newest first');
-  assert.equal((html.match(/<li>/g) || []).length, 1 + 2 + 1 + 1 + 3 + 4 + 1 + 4 + 1 + 1 + 5 + 4 + 4 + 2 + 2 + 3 + 3 + 2 + 7 + 4, 'every note is listed once');
+  assert.equal((html.match(/<li>/g) || []).length, 1 + 1 + 2 + 1 + 1 + 3 + 4 + 1 + 4 + 1 + 1 + 5 + 4 + 4 + 2 + 2 + 3 + 3 + 2 + 7 + 4, 'every note is listed once');
   assert.ok(html.includes('Attacking someone you’re at peace with asks “Declare war?” first.'));
   assert.match(html, /<div class="modal-foot"><button class="btn primary" data-act="close">Close<\/button><\/div>/, 'a Close button at the bottom');
   // The in-game Menu opens the same screen and shows no tag.
@@ -2832,7 +2834,7 @@ function helpRig() {
 test('Ashcrown 4.6.2: How to play is one list of sections, grouped, and the old text is only reordered', () => {
   const r = helpRig();
   const secs = jsonOf(r, 'helpSections()');
-  assert.equal(r.run('VERSION'), '5.4');
+  assert.equal(r.run('VERSION'), '5.4.1');
   assert.equal(secs.length, 27);
   assert.equal(new Set(secs.map(s => s.id)).size, 27, 'ids are unique');
   assert.deepEqual([...new Set(secs.map(s => s.group))], HELP_GROUPS.map(g => g[0]), 'the groups, in order');
