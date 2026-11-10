@@ -251,7 +251,9 @@ actions: each screen runs the CPU turns itself from the seeded random generator,
   recorded in `bored_live.desyncs` and that screen reloads from the newest snapshot and the log after it (at most three
   times in two minutes). The hash covers the whole game except what each screen shows only to itself.
 - At each round start the lowest-seated human who is online uploads a snapshot (first writer wins, the last three are
-  kept). Opening or rejoining a game loads the newest snapshot and replays the actions after it.
+  kept). Since 5.1.1 the server keeps one only once another seat has reported the same hash for that round, so the
+  uploader waits a second and asks again a few times while the server answers `wait`. Opening or rejoining a game loads
+  the newest snapshot and replays the actions after it.
 
 **What replay needs from the rules.** Rule code never calls `Math.random()` or `Date.now()` (it uses `roll()`, the
 seeded generator), avoids functions that differ between engines (`Math.exp` and `Math.pow` are written out), and does
@@ -309,9 +311,36 @@ does not touch `bored_live.api`, so it can be applied before or after any later 
 before the frontend: until it is applied a free-for-all room is unaffected, a co-op room is refused with *Invalid setup*,
 and pings report an error.
 
+**Live-game checks (Civ Lite 5.1.1).** The server still does not simulate Civ Lite, but it no longer takes one client's word
+for three things. They apply the same way to free-for-all and co-op rooms (in a co-op room every human screen computes
+the same hashes and the same ending).
+
+- *Game ending.* Every human screen sends `finish` with the winner it computed. A claim is stored per seat in
+  `bored_live.finish_claims` (a screen that did not get through sends it again a few times). The room is completed once
+  two seated humans have claimed the same winner, or once one human is left (a room with one human seat, or humans taken
+  over by CPUs): a lone claim waits and is counted again if the other human is replaced by a CPU. Claims from seats a CPU
+  plays, and winners that are not a seat of the game, are ignored. Until the room is completed it stays open and keeps its
+  heartbeat on the hub side.
+- *Round numbers.* `report` accepts only the round under way (`g.round`) or the next one (`g.round + 1`); anything else is
+  refused with *Invalid request.* and changes nothing. If every screen failed to report one round, the server's round
+  stays behind and a later round's report is refused until a report for the next round reaches it; the turn timer
+  compares against the server's round, so the game keeps going but a timeout waits for the round to catch up.
+- *Snapshots.* A snapshot is stored only if another seat has already reported the same hash for that round (when more
+  than one human seat plays, or the sender's seat is run by a CPU). With one human playing it is stored at once.
+  Otherwise the answer is `{ stored: false, wait: true }`, and the first writer still wins once it is stored.
+
+**Installing the checks.** Apply `supabase/migrations/20261109190000_together_live_checks.sql` once, after the 5.0 and
+5.1 migrations (the file names sort in that order). It only adds: the `bored_live.finish_claims` table (row-level security
+on, no access for members), the `bored_live.settle_finish` helper, and a new body for `bored_live.api` (same signature,
+same operations, with the three checks above). It changes no existing table and does not touch `bt_live_rpc` or the co-op
+pieces. Deploy the SQL before the frontend. With the SQL applied and the old frontend still cached, a game
+still finishes (every screen sends its claim), but a hub that sent its claim stops listening even though the room waits for
+the second one; reloading the page picks it up again. Without the SQL the frontend's new retries are harmless.
+
 **Known limits.** The server orders actions but does not simulate Civ Lite, so a modified client can send moves its
 rules would refuse (every screen refuses them the same way, so the screens stay in step, but a made-up action is still
-in the log), can read the whole game state, and could upload a bad snapshot first. Timeouts and takeovers are checked
+in the log), can read the whole game state, and, together with a second modified client, can still agree on a made-up
+ending or snapshot. Timeouts and takeovers are checked
 against the server's clock and presence, not against the game. A browser tab that has been hidden for several minutes
 may have its timers slowed down; that looks like leaving, and opening the game again takes the civ back.
 

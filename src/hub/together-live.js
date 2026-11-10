@@ -329,7 +329,8 @@ export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reloa
       }
       case 'report': return api('report', { round: p.round, hash: p.hash });
       case 'snapshot': return api('snapshot', { round: p.round, seq: p.seq, hash: p.hash, state: p.state });
-      case 'finish': { const g = await api('finish', { winner: p.winner, why: p.why }); settle(); return g; }
+      // One claim does not end a game: the room stays open (and on the heartbeat) until the server says it is over.
+      case 'finish': { const g = await api('finish', { winner: p.winner, why: p.why }); if (!g || g.status !== 'active') settle(); return g; }
       case 'reload': return limitedReload(p);
       case 'resync':
         if (delivered !== null) { delivered = Math.max(0, Math.min(delivered, Number(p.after) || 0)); buffer.clear(); catchUp(); }
