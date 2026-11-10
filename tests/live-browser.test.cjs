@@ -163,6 +163,11 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   await inGame(annGame, () => !document.getElementById('pane-setup').hidden && document.querySelectorAll('#seats .seat:not([hidden])').length === 3);
   const room = (await env.admin("select id, status from bored_live.games order by created_at desc limit 1"))[0];
   assert.equal(room.status, 'lobby');
+  // The deal is random on the server, and some civs have no plain warrior (China's is the Terracotta Warrior), so
+  // the two humans pick their civs: the run does not depend on the deal.
+  await annGame.select('#seat-civ-0', 'rome');
+  for (let i = 0; i < 40 && (await env.admin('select civ from bored_live.seats where game_id=$1 and seat=0', [room.id]))[0].civ !== 'rome'; i++) await sleep(100);
+  assert.equal((await env.admin('select civ from bored_live.seats where game_id=$1 and seat=0', [room.id]))[0].civ, 'rome');
   // Ben sees the invitation in Your Games, with who is in it, and joins.
   await ben.evaluate(() => document.querySelector('#together-refresh').click());
   await waitPage(ben, id => document.querySelector('[data-live-id="' + id + '"]'), room.id);
@@ -172,6 +177,8 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   await inGame(benGame, () => document.querySelectorAll('#seats .seat:not([hidden])').length === 3 && document.getElementById('seat-who-1').textContent === 'Joined');
   await inGame(annGame, () => document.getElementById('seat-who-1').textContent === 'Joined');
   assert.equal((await env.admin('select state from bored_live.seats where game_id=$1 and seat=1', [room.id]))[0].state, 'joined');
+  await benGame.select('#seat-civ-1', 'celts');
+  await inGame(annGame, () => document.getElementById('seat-civ-1').value === 'celts');
   // Ben is ready; Ann starts. Both screens open the same game.
   await click(benGame, '#btn-ready');
   await inGame(annGame, () => !document.getElementById('btn-begin').disabled);
@@ -179,11 +186,12 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
   for (const frame of [annGame, benGame]) await inGame(frame, () => document.getElementById('start').hidden && !!G && !!G.live && G.turn === 1);
   assert.equal(await annGame.evaluate('liveHash()'), await benGame.evaluate('liveHash()'));
   assert.equal(await annGame.evaluate('G.players.length'), 3);
+  assert.deepEqual(await annGame.evaluate('G.players.slice(0, 2).map(p => p.civ)'), ['rome', 'celts']);
   assert.equal((await env.admin('select status from bored_live.games where id=$1', [room.id]))[0].status, 'active');
 
   // Ann moves a unit; Ben sees it within two seconds.
   const move = async (frame, owner) => frame.evaluate(`(() => {
-    const u = G.units.find(x => x.owner === ${owner} && x.type === 'warrior');
+    const u = G.units.find(x => x.owner === ${owner} && x.type === unitFor(${owner}, 'warrior'));   // a civ's own, which some replace
     selection = { kind: 'unit', id: u.id };
     render();
     const spot = [...reachable.keys()].map(k => k.split(',').map(Number)).find(([x, y]) => !(x === u.x && y === u.y));
@@ -432,6 +440,22 @@ test('Civ Lite room codes: host for two humans, join with a typed code, a third 
   assert.equal(await cleo.$eval('#player', e => e.hidden), false);
   assert.equal(await (await frameOf(cleo)).evaluate(() => typeof G !== 'undefined' && !G && !document.getElementById('start').hidden), true, 'still on the title screen');
   assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 2, 'nobody was added');
+  // The Multiplayer screen, with Cleo's refusal under the box, fits a small phone inside Bored's player too.
+  for (const width of [375, 320]) {
+    await cleo.setViewport({ width, height: 800 });
+    await sleep(200);
+    const bad = await (await frameOf(cleo)).evaluate(() => {
+      const w = document.documentElement.clientWidth, out = [];
+      if (document.documentElement.scrollWidth > w) out.push('the screen scrolls sideways: ' + document.documentElement.scrollWidth + ' > ' + w);
+      for (const e of document.querySelectorAll('.modal, .modal-body, .mp-join, #mp-code, #mp-code-join, #mp-code-error, .mp-acts')) {
+        const r = e.getBoundingClientRect();
+        if (r.width && (r.right > w + 0.5 || r.left < -0.5)) out.push((e.id || e.className) + ' leaves the screen: ' + Math.round(r.left) + '..' + Math.round(r.right) + ' of ' + w);
+      }
+      return out;
+    });
+    assert.deepEqual(bad, [], 'the Multiplayer screen at ' + width + 'px');
+  }
+  await cleo.setViewport({ width: 1100, height: 800, deviceScaleFactor: 1 });
 
   // Ann makes a new code: the old one is stale for Cleo, and Ben's lobby shows the new one.
   await act(ann, '#room-code-new');
@@ -486,6 +510,22 @@ test('Bored Together: Join with code next to Start a live game says what went wr
   };
   // The box sits in the same row as Start a live game.
   assert.equal(await ben.evaluate(() => document.querySelector('#bt-join-code').closest('.bt-start-actions') === [...document.querySelectorAll('#together button')].find(b => b.textContent === 'Start a live game').closest('.bt-start-actions')), true);
+  // The page does not scroll sideways on a small phone, and the field and its button stay on the screen (CI's
+  // together-browser checks the page's width at 320 too, but it needs PGlite).
+  for (const width of [375, 320]) {
+    await ben.setViewport({ width, height: 850 });
+    const fit = await ben.evaluate(() => {
+      const w = innerWidth, bad = [];
+      if (document.documentElement.scrollWidth > w) bad.push('the page scrolls sideways: ' + document.documentElement.scrollWidth + ' > ' + w);
+      for (const e of document.querySelectorAll('.bt-start-actions, .bt-start-actions > *, #bt-join-code, #bt-join-go')) {
+        const r = e.getBoundingClientRect();
+        if (r.width && (r.right > w + 0.5 || r.left < -0.5)) bad.push((e.id || e.className || e.tagName) + ' leaves the screen: ' + Math.round(r.left) + '..' + Math.round(r.right));
+      }
+      return bad;
+    });
+    assert.deepEqual(fit, [], 'the Join with code row at ' + width + 'px');
+  }
+  await ben.setViewport({ width: 1100, height: 800, deviceScaleFactor: 1 });
   // A short code, a wrong code, then the right one typed as people type it: lower case, with a dash and a space.
   await join(ben, 'abc');
   await waitPage(ben, () => /6 characters/.test(document.querySelector('#bt-join-error')?.textContent || ''));
