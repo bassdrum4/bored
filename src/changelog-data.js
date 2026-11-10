@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 393,
+  "count": 394,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"cd08e19","date":"2026-11-10","author":"Daniel Lowe","subject":"Keep Quickdraw best completed solo round available for reliable score capture"},
   {"sha":"ac408a4","date":"2026-11-10","author":"Daniel Lowe","subject":"Add illustrated Quickdraw preview"},
   {"sha":"f9490e4","date":"2026-11-10","author":"Daniel Lowe","subject":"Register Quickdraw in Bored catalog and score system"},
   {"sha":"ac8daa3","date":"2026-11-10","author":"Daniel Lowe","subject":"Register Quickdraw in Bored catalog and score system"},
