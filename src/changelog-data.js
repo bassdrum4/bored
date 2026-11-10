@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 386,
+  "count": 387,
   "newest": "2026-11-10",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"80ac965","date":"2026-11-10","author":"Daniel Lowe","subject":"Add identical second Clicker button with per-button analytics snapshots"},
   {"sha":"b82a36b","date":"2026-11-10","author":"Daniel Lowe","subject":"Update live browser tests for unified Bored Together game flow"},
   {"sha":"a2b9d44","date":"2026-11-10","author":"Daniel Lowe","subject":"Simplify Bored Together live play into Civ Lite game flow and code-only hosting"},
   {"sha":"fa386e0","date":"2026-11-10","author":"Codebuff","subject":"Keep the library rendering when a cached discovery module lags the catalog."},
