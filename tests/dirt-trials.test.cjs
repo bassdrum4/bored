@@ -29,7 +29,6 @@ test('Dirt Trials opens, drives, completes a real course, and remembers medals',
   assert.equal(state.mode,'ride');
   assert.equal(state.started,false);
   await page.keyboard.down('ArrowRight');
-  await page.waitForTimeout?.(200).catch(()=>{});
   // Deterministic simulation makes sure the whole course is traversable, not just a static title card.
   const result = await page.evaluate(() => window.__dirtTrialsTest.ride(2400));
   await page.keyboard.up('ArrowRight');
