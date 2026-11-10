@@ -15,12 +15,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const until = async (check, ms = 6000) => { const end = Date.now() + ms; while (Date.now() < end) { if (check()) return true; await sleep(30); } return check(); };
 const press = (page, selector) => page.evaluate(sel => document.querySelector(sel).click(), selector);
 
-async function table(t, config) {
+async function table(t, config, opts) {
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
   const site = await serve(path.join(__dirname, '../src'));
   const browser = await puppeteer.launch({ executablePath, headless: true });
   t.after(async () => { await browser.close(); await site.close(); });
-  const live = createRoom(['Ann', 'Ben'], config);
+  const live = createRoom(['Ann', 'Ben'], config, opts);
   const pages = [];
   for (const seat of [0, 1]) {
     const page = await browser.newPage();
@@ -91,6 +91,132 @@ test('the live lobby: the host edits the setup, the guest reads it and gets read
   assert.equal(await ben.evaluate('G.players[1].civ'), 'japan');
   assert.equal(await ann.evaluate('G.live.timer'), 120);
   assert.equal(await ann.evaluate('liveHash()'), await ben.evaluate('liveHash()'));
+  for (const p of pages) assert.deepEqual(p.errors, []);
+});
+
+// What a stand-in clipboard does: keeps the text, or refuses as some browsers and app views do.
+const clipboard = (page, refuse) => page.evaluate(no => {
+  window.__copied = null;
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: text => { if (no) return Promise.reject(new Error('Not allowed')); window.__copied = text; return Promise.resolve(); } } });
+}, !!refuse);
+const shown = (page, sel) => page.evaluate(s => { const e = document.querySelector(s); return !!e && e.getClientRects().length > 0 && !e.hidden; }, sel);
+
+test('the lobby shows the room code large to the host and to a player who joined; Copy code, Copy invite (or select it when the copy is refused) and the host\'s New code', async t => {
+  const { live, pages } = await table(t, { cpus: 1 }, { capacity: 3, code: 'KX7Q2M' });
+  const [ann, ben] = pages;
+  await waitFor(ann, 'document.querySelector("#room-code") && !document.querySelector("#room-code").hidden');
+  await waitFor(ben, 'document.querySelector("#room-code") && !document.querySelector("#room-code").hidden');
+  for (const p of pages) {
+    assert.equal(await p.$eval('#room-code-text', e => e.textContent), 'KX7Q2M');
+    assert.ok(await p.$eval('#room-code-text', e => parseFloat(getComputedStyle(e).fontSize)) >= 28, 'large');
+    assert.deepEqual(await p.$$eval('#room-code .btn', bs => bs.filter(b => b.getClientRects().length).map(b => b.textContent)), p === ann ? ['Copy code', 'Copy invite', 'New code'] : ['Copy code', 'Copy invite']);
+    assert.match(await p.$eval('#room-code-note', e => e.textContent), /1 seat is open\. Friends join from Multiplayer → Join with code\./);
+  }
+  assert.match(await ann.$eval('#room-code-note', e => e.textContent), /A new code stops the old one working/);
+  assert.doesNotMatch(await ben.$eval('#room-code-note', e => e.textContent), /new code/i, 'only the host can make one');
+  // The seats as they fill: Ann, Ben and one open seat for the third person, then the CPU.
+  const rows = p => p.$$eval('#seats .seat:not([hidden])', els => els.map(e => ({ name: e.querySelector('input').value, who: e.querySelector('.who').textContent })));
+  assert.deepEqual(await rows(ann), [{ name: 'Ann (you)', who: 'Joined' }, { name: 'Ben', who: 'Joined' }, { name: 'Open seat', who: 'Open' }, { name: 'CPU', who: 'CPU' }]);
+  assert.deepEqual((await rows(ben)).map(r => r.name), ['Ann', 'Ben (you)', 'Open seat', 'CPU']);
+  // Copy code and Copy invite: the text goes to the clipboard inside the click.
+  await clipboard(ann);
+  await press(ann, '#room-code-copy');
+  await waitFor(ann, 'window.__copied === "KX7Q2M"');
+  assert.match(await ann.$eval('#toast', e => e.textContent), /Code copied/);
+  await press(ann, '#room-code-invite');
+  await waitFor(ann, 'window.__copied === "Join my Civ Lite game on Bored: code KX7Q2M"');
+  assert.match(await ann.$eval('#toast', e => e.textContent), /Invite copied/);
+  assert.equal(await shown(ann, '#room-code-fallback'), false);
+  await clipboard(ben);
+  await press(ben, '#room-code-invite');
+  await waitFor(ben, 'window.__copied === "Join my Civ Lite game on Bored: code KX7Q2M"');
+  // Refused: the text is put in a box and selected, so Ctrl+C works.
+  await clipboard(ann, true);
+  await press(ann, '#room-code-invite');
+  await waitFor(ann, 'document.getElementById("room-code-fallback").hidden === false');
+  const picked = await ann.evaluate(() => { const b = document.getElementById('room-code-fallback'); return { value: b.value, focus: document.activeElement === b, from: b.selectionStart, to: b.selectionEnd }; });
+  assert.deepEqual(picked, { value: 'Join my Civ Lite game on Bored: code KX7Q2M', focus: true, from: 0, to: picked.value.length });
+  assert.equal(await ann.evaluate(() => window.__copied), null);
+  await press(ann, '#room-code-copy');
+  await waitFor(ann, 'document.getElementById("room-code-fallback").value === "KX7Q2M"');
+  // No clipboard at all behaves the same.
+  await ann.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined }));
+  await press(ann, '#room-code-copy');
+  await waitFor(ann, 'document.getElementById("room-code-fallback").hidden === false');
+  // New code: the host asks, and the old one is gone for both screens.
+  await clipboard(ann);
+  await press(ann, '#room-code-new');
+  await waitFor(ann, 'document.getElementById("room-code-text").textContent === "M7K4PQ"');
+  await waitFor(ben, 'document.getElementById("room-code-text").textContent === "M7K4PQ"');
+  assert.equal(live.room.code, 'M7K4PQ');
+  assert.ok(live.room.calls.some(c => c.seat === 0 && c.op === 'new-code'));
+  assert.match(await ann.$eval('#toast', e => e.textContent), /New code/);
+  await press(ann, '#room-code-copy');
+  await waitFor(ann, 'window.__copied === "M7K4PQ"');
+  for (const p of pages) assert.deepEqual(p.errors, []);
+});
+
+test('the host removes a player in the lobby: the seat is empty again and the player is told', async t => {
+  const { live, pages } = await table(t, { cpus: 1 }, { capacity: 3, code: 'KX7Q2M' });
+  const [ann, ben] = pages;
+  await waitFor(ann, 'document.querySelectorAll("#seats .seat:not([hidden])").length === 4');
+  await waitFor(ben, 'document.querySelectorAll("#seats .seat:not([hidden])").length === 4');
+  // Remove is the host's, for the others only.
+  const removes = p => p.$$eval('#seats .seat:not([hidden]) .seat-remove', bs => bs.map(b => !b.hidden));
+  assert.deepEqual(await removes(ann), [false, true, false, false], 'not on the host, the open seat or the CPU');
+  assert.deepEqual(await removes(ben), [false, false, false, false]);
+  assert.equal(await ann.$eval('#seat-remove-1', b => b.getAttribute('aria-label')), 'Remove Ben');
+  await press(ann, '#seat-remove-1');
+  await waitFor(ann, 'document.querySelectorAll("#seats .seat:not([hidden])").length === 4 && document.getElementById("seat-name-1").value === "Open seat"');
+  assert.deepEqual(live.room.calls.filter(c => c.op === 'kick').map(c => c.p), [{ seat: 1 }]);
+  assert.match(await ann.$eval('#toast', e => e.textContent), /Ben was removed/);
+  assert.deepEqual(live.room.seats.map(s => s.handle), ['Ann']);
+  assert.match(await ann.$eval('#room-code-note', e => e.textContent), /2 seats are open/);
+  // Ben is told, and has no room to wait in.
+  await waitFor(ben, '!!document.querySelector(".modal") && /host removed you/.test(document.querySelector(".modal").textContent)');
+  for (const p of pages) assert.deepEqual(p.errors, []);
+});
+
+for (const width of [400, 320]) {
+  test('the room code panel fits a ' + width + 'px screen, with the fallback box open', async t => {
+    const { pages } = await table(t, { cpus: 1 }, { capacity: 4, code: 'KX7Q2M' });
+    const [ann] = pages;
+    await ann.setViewport({ width, height: 800, deviceScaleFactor: 1 });
+    await waitFor(ann, 'document.querySelector("#room-code") && !document.querySelector("#room-code").hidden');
+    await ann.evaluate(() => { const b = document.getElementById('room-code-fallback'); b.hidden = false; b.value = 'Join my Civ Lite game on Bored: code KX7Q2M'; });
+    const bad = await ann.evaluate(() => {
+      const w = document.documentElement.clientWidth, out = [];
+      if (document.documentElement.scrollWidth > w) out.push('page scrolls sideways: ' + document.documentElement.scrollWidth + ' > ' + w);
+      for (const e of document.querySelectorAll('#room-code, #room-code-text, #room-code .btn, #room-code-fallback, #room-code-note')) {
+        const r = e.getBoundingClientRect();
+        if (r.width && (r.right > w + 0.5 || r.left < -0.5)) out.push((e.id || e.textContent) + ' leaves the screen: ' + Math.round(r.left) + '..' + Math.round(r.right) + ' of ' + w);
+      }
+      return out;
+    });
+    assert.deepEqual(bad, []);
+    assert.deepEqual(ann.errors, []);
+  });
+}
+
+test('a lobby sent without a code shows no code panel, and the code is gone from the room once the game has started', async t => {
+  const { live, pages } = await table(t, { cpus: 1 }, { capacity: 2, code: 'KX7Q2M' });
+  const [ann, ben] = pages;
+  await waitFor(ann, 'document.querySelector("#room-code") && !document.querySelector("#room-code").hidden');
+  // The server sends no code to a player it has not seated, or after the start: the panel is simply not there.
+  live.room.code = null;
+  await press(ben, '#btn-ready');
+  await waitFor(ann, 'document.getElementById("seat-who-1").textContent === "Ready"');
+  assert.equal(await shown(ann, '#room-code'), false);
+  assert.equal(await shown(ben, '#room-code'), false);
+  live.room.code = 'KX7Q2M';
+  await press(ben, '#btn-ready');
+  await waitFor(ben, 'document.getElementById("seat-who-1").textContent === "Joined" && !document.getElementById("room-code").hidden');
+  await press(ben, '#btn-ready');
+  await waitFor(ann, '!document.getElementById("btn-begin").disabled');
+  await press(ann, '#btn-begin');
+  for (const p of pages) await waitFor(p, 'document.getElementById("start").hidden && !!G && !!G.live');
+  assert.equal(live.room.code, null, 'cleared when the game started');
+  assert.equal(await shown(ann, '#room-code'), false);
   for (const p of pages) assert.deepEqual(p.errors, []);
 });
 

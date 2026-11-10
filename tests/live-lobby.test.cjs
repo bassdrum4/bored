@@ -14,6 +14,7 @@ const lobby = () => import(pathToFileURL(path.join(__dirname, '../src/hub/togeth
 
 const ME = 'user-me', FRIEND = 'user-friend', OTHER = 'user-other';
 const TOKEN = 'SECRET-ACCESS-TOKEN';
+const ROOM_CODE = 'KX7Q2M';
 const ROOM = (n) => '00000000-0000-4000-8000-00000000000' + n;
 const seats = (...list) => list.map((s, i) => Object.assign({ seat: i, user: s.user, handle: s.handle, state: 'joined', controller: 'human', online: true }, s));
 
@@ -24,7 +25,7 @@ function world(extra = {}) {
     rooms: [
       { id: ROOM(1), game: 'ashcrown', host: FRIEND, status: 'lobby', config: { mode: 'coop' }, created_at: '2026-11-09T18:00:00Z', me: 1, round: 1, winner: null,
         seats: seats({ user: FRIEND, handle: 'Friend', state: 'ready' }, { user: ME, handle: 'Me', state: 'invited', online: false }) },
-      { id: ROOM(2), game: 'ashcrown', host: ME, status: 'active', config: {}, created_at: '2026-11-09T17:00:00Z', me: 0, round: 12, winner: null,
+      { id: ROOM(2), game: 'ashcrown', host: ME, status: 'active', config: {}, code: ROOM_CODE, capacity: 3, created_at: '2026-11-09T17:00:00Z', me: 0, round: 12, winner: null,
         seats: seats({ user: ME, handle: 'Me', controller: 'cpu', online: false }, { user: FRIEND, handle: 'Friend' }) },
       { id: ROOM(3), game: 'ashcrown', host: FRIEND, status: 'completed', config: { mode: 'coop' }, created_at: '2026-11-08T17:00:00Z', me: 1, round: 40, winner: 0,
         seats: seats({ user: FRIEND, handle: 'Friend' }, { user: ME, handle: 'Me' }) }
@@ -93,7 +94,7 @@ test('signed out: the status says so, the sign-in button reaches the hub, and ev
   await ask('sign-in');
   assert.equal(w.signins, 1);
   for (const [op, payload] of [['members'], ['invites'], ['games'], ['host', { settings: {}, invitees: ['x'] }], ['join', { invite: ROOM(1) }], ['decline', { invite: ROOM(1) }],
-    ['open', { game: ROOM(2) }], ['open-together']]) {
+    ['open', { game: ROOM(2) }], ['open-together'], ['join-code', { code: 'KX7Q2M' }]]) {
     const r = await ask(op, payload);
     assert.equal(r.error, 'Sign in to Bored to play online.', op);
   }
@@ -128,6 +129,7 @@ test('invites and games are shaped for the screen, and nothing private goes with
   const text = JSON.stringify(posts);
   assert.ok(!/@/.test(text), 'no email address');
   assert.ok(!text.includes(TOKEN), 'no token');
+  assert.ok(!text.includes(ROOM_CODE), 'not even a room code: the lobby gets that from its own room, and only if it is seated');
   for (const id of [ME, FRIEND, OTHER]) assert.ok(!text.includes(id), 'no account id: ' + id);
   for (const key of ['"user"', '"email"', '"user_id"', 'access_token']) assert.ok(!text.includes(key), 'no ' + key);
   // The server was asked once for the list and once for the dashboard, however many things the screen asked for.
@@ -142,13 +144,14 @@ test('host: members are picked by reference, the setup is cleaned, and the hub c
   assert.ok(!Object.values(members[0]).some(v => v === FRIEND || v === OTHER), 'the ref is not the account id');
   const settings = { map: 'islands', size: 'auto', level: 'normal', borders: 'tech', turns: 100.7, cpus: 2, timer: 60, wrap: false, conquest: true, science: false, unjoined: 'drop', mode: 'coop',
     host: 'someone-else', invite: ['user-x'], map2: 'x', turnsText: '5', cpusBad: NaN };
+  const config = { map: 'islands', size: 'auto', level: 'normal', borders: 'tech', unjoined: 'drop', mode: 'coop', turns: 100, cpus: 2, timer: 60, wrap: false, conquest: true, science: false };
   const reply = await ask('host', { settings, invitees: [friend, other, friend] });
   assert.deepEqual(reply.result, { id: ROOM(9) });
   const create = w.calls.find(c => c[1] === 'create');
-  assert.deepEqual(create[2], { game: 'ashcrown', invite: [FRIEND, OTHER], config: { map: 'islands', size: 'auto', level: 'normal', borders: 'tech', unjoined: 'drop', mode: 'coop',
-    turns: 100, cpus: 2, timer: 60, wrap: false, conquest: true, science: false } });
+  // Without a number of human players, the room is as big as its invitations: the host and two friends.
+  assert.deepEqual(create[2], { game: 'ashcrown', invite: [FRIEND, OTHER], capacity: 3, config });
   assert.deepEqual(w.opened, [ROOM(9)]);
-  for (const bad of [[], undefined, 'x', ['not-a-ref'], [friend, other, other, 'a', 'b'], [friend, FRIEND]]) {
+  for (const bad of ['x', ['not-a-ref'], [friend, other, other, 'a', 'b'], [friend, FRIEND]]) {
     const r = await ask('host', { settings, invitees: bad });
     assert.ok(r.error, 'refused: ' + JSON.stringify(bad));
   }
@@ -156,6 +159,61 @@ test('host: members are picked by reference, the setup is cleaned, and the hub c
   // A member list is only good for the account and the moment it was read: a new list forgets the old refs.
   await ask('members');
   assert.ok((await ask('host', { settings, invitees: [friend] })).error, 'a ref from an earlier list is no longer valid');
+});
+
+test('host: nobody has to be invited, and the human players (2 to 4) are the room’s capacity', async () => {
+  const w = world(), { ask } = await bridge(w);
+  const members = (await ask('members')).result;
+  const friend = members.find(m => m.name === 'Friend').ref, other = members.find(m => m.name === 'Other').ref;
+  const created = () => w.calls.filter(c => c[1] === 'create').map(c => [c[2].invite, c[2].capacity]);
+  // No invitations at all: just a room with a code to share, for two, three or four people.
+  assert.deepEqual((await ask('host', { settings: {}, humans: 2 })).result, { id: ROOM(9) });
+  await ask('host', { settings: {}, invitees: [], humans: 4 });
+  await ask('host', { settings: {} });
+  assert.deepEqual(created(), [[[], 2], [[], 4], [[], 2]]);
+  // Some invitations and some seats left for the code.
+  await ask('members');
+  const again = (await ask('members')).result;
+  const f2 = again.find(m => m.name === 'Friend').ref;
+  await ask('host', { settings: {}, invitees: [f2], humans: 3 });
+  assert.deepEqual(created().at(-1), [[FRIEND], 3]);
+  // Not a number of players a room can have, and more invitations than seats, never reach the server.
+  const count = created().length;
+  for (const humans of [1, 5, 0, -2, 2.5, '3', NaN, true, {}]) assert.ok((await ask('host', { settings: {}, humans })).error, 'humans ' + JSON.stringify(humans));
+  const fresh = (await ask('members')).result;
+  const [a, b] = [fresh.find(m => m.name === 'Friend').ref, fresh.find(m => m.name === 'Other').ref];
+  assert.match((await ask('host', { settings: {}, invitees: [a, b], humans: 2 })).error, /more invitations than seats/);
+  assert.match((await ask('host', { settings: {}, invitees: ['x', 'y', 'z', 'w'], humans: 4 })).error, /Invite up to three/);
+  assert.equal(created().length, count, 'none of those created a room');
+  assert.ok(friend && other);
+});
+
+test('join-code: the code goes to the room call as typed, the hub opens the lobby, and a refusal reaches the page as its own message', async () => {
+  const w = world(), { ask } = await bridge(w);
+  w.impl.rpc = async (action, args) => { w.calls.push(['live', action, args]); return action === 'join_code' ? { id: ROOM(7), status: 'lobby', code: ROOM_CODE } : { ok: true }; };
+  assert.deepEqual((await ask('join-code', { code: 'kx7-q2m' })).result, { id: ROOM(7) }, 'only the room id comes back, not the room');
+  assert.deepEqual(w.calls.filter(c => c[1] === 'join_code').map(c => c[2]), [{ code: 'kx7-q2m' }]);
+  assert.deepEqual(w.opened, [ROOM(7)]);
+  assert.ok(!JSON.stringify((await ask('join-code', { code: 'KX7Q2M' }))).includes(ROOM_CODE), 'the code is not echoed to the page');
+  // Not a string: refused here, nothing asked.
+  const count = w.calls.length;
+  for (const code of [undefined, null, 12, {}, ['KX7Q2M']]) assert.equal((await ask('join-code', { code })).error, 'No open room with that code');
+  assert.equal(w.calls.length, count);
+  // A long paste is cut before it is sent.
+  await ask('join-code', { code: 'x'.repeat(5000) });
+  assert.equal(w.calls.at(-1)[2].code.length, 40);
+  // The server answers a wrong, full or started room as {ok:false, error}; a thrown error reads the same to the page.
+  for (const error of ['No open room with that code', 'That room is full', 'That game has already started']) {
+    w.impl.rpc = async () => ({ ok: false, error });
+    const opened = w.opened.length;
+    assert.equal((await ask('join-code', { code: 'KX7Q2M' })).error, error);
+    assert.equal(w.opened.length, opened, 'nothing opened');
+  }
+  w.impl.rpc = async () => { throw Object.assign(new Error('Too many requests. Please try again later.'), { status: 400, secret: TOKEN }); };
+  assert.equal((await ask('join-code', { code: 'KX7Q2M' })).error, 'Too many requests. Please try again later.');
+  // The same account that asked is still the one signed in when the answer lands.
+  w.impl.rpc = async () => { w.account = { id: OTHER, name: 'Other' }; return { id: ROOM(7) }; };
+  assert.equal((await ask('join-code', { code: 'KX7Q2M' })).error, 'Your account changed. Please try again.');
 });
 
 test('join, decline and open go through the room calls Bored Together makes, and only for real room ids', async () => {

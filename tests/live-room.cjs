@@ -3,18 +3,30 @@
 // on Postgres, and the real hub client in live-hub.test.cjs; this one only has to give the page what they would.
 const START_OPTIONS = ['map', 'size', 'level', 'borders', 'turns', 'wrap', 'conquest', 'science', 'timer'];
 
-function createRoom(handles, config) {
+// opts (5.4): { capacity, code } make it a room with a join code, as the server's rooms are: the code is in what a joined
+// or ready player is sent while the room is in the lobby, and the host can make a new one or remove a player.
+const NEXT_CODES = ['M7K4PQ', 'H3W9TX', 'C6N2RZ', 'D8F5GJ'];
+function createRoom(handles, config, opts) {
+  opts = opts || {};
   const room = {
+    capacity: opts.capacity || null, code: opts.code || null, codeSerial: 0, removed: new Set(),
     status: 'lobby', config: Object.assign({ map: 'pangaea', size: 'small', level: 'normal', borders: 'tech', turns: 100, cpus: 1, timer: 0, wrap: false, conquest: true, science: true, unjoined: 'cpu' }, config || {}),
     seats: handles.map((handle, i) => ({ seat: i, handle, state: i === 0 ? 'joined' : 'invited', civ: null, controller: 'human', online: true, away: 0, team: i })),
     start: null, head: 0, round: 1, actions: [], snapshots: new Map(), hashes: new Map(), claims: new Map(), desyncs: [], pages: new Map(), calls: [], exits: [], reloads: [], pings: []
   };
   const timer = () => room.config.timer || 0;
-  const json = seat => ({
-    id: 'room', game: 'ashcrown', host: 'host', status: room.status, config: room.config, start: room.start, timer: timer(), head: room.head, round: room.round, round_age: 0,
-    winner: null, me: seat, seats: room.seats.map(s => Object.assign({}, s)),
-    snapshot: room.snapshots.size ? { round: Math.max(...room.snapshots.keys()), seq: 0, hash: '' } : null
-  });
+  const json = seat => {
+    const me = room.seats.find(s => s.seat === seat);
+    const out = {
+      id: 'room', game: 'ashcrown', host: 'host', status: room.status, config: room.config, start: room.start, timer: timer(), head: room.head, round: room.round, round_age: 0,
+      winner: null, me: seat, seats: room.seats.map(s => Object.assign({}, s)),
+      snapshot: room.snapshots.size ? { round: Math.max(...room.snapshots.keys()), seq: 0, hash: '' } : null
+    };
+    if (room.capacity) out.capacity = room.capacity;
+    // The code goes to the host and to players who joined, in the lobby only; an invited player has not joined yet.
+    if (room.code && room.status === 'lobby' && me && (seat === 0 || me.state === 'joined' || me.state === 'ready')) out.code = room.code;
+    return out;
+  };
   const latest = () => (room.snapshots.size ? room.snapshots.get(Math.max(...room.snapshots.keys())) : null);
   async function push(event, only) {
     for (const [seat, page] of room.pages) {
@@ -27,6 +39,7 @@ function createRoom(handles, config) {
   async function call(seat, op, p) {
     room.calls.push({ seat, op, p });
     const mine = room.seats.find(s => s.seat === seat);
+    if (!mine) throw new Error('You are not in this game.');   // a player the host removed
     if (op === 'hello' || op === 'game') {
       if (room.status === 'lobby' && mine.state === 'invited') { mine.state = 'joined'; pushGame(); }
       const snap = room.status === 'active' ? latest() : null;
@@ -53,6 +66,27 @@ function createRoom(handles, config) {
       pushGame();
       return json(seat);
     }
+    if (op === 'new-code') {
+      if (seat !== 0) throw new Error('Only the host can make a new code.');
+      if (room.status !== 'lobby') throw new Error('This game has already started.');
+      room.code = NEXT_CODES[room.codeSerial++ % NEXT_CODES.length];
+      room.removed.clear();
+      pushGame();
+      return json(seat);
+    }
+    if (op === 'kick') {
+      if (seat !== 0) throw new Error('Only the host can remove a player.');
+      if (room.status !== 'lobby') throw new Error('This game has already started.');
+      if (!Number.isInteger(p.seat) || p.seat === seat) throw new Error('Invalid request.');
+      const gone = room.seats.find(s => s.seat === p.seat);
+      if (!gone) throw new Error('That seat is empty.');
+      room.seats = room.seats.filter(s => s !== gone);
+      room.removed.add(gone.handle);
+      push({ event: 'removed' }, gone.seat);
+      room.pages.delete(gone.seat);
+      pushGame();
+      return json(seat);
+    }
     if (op === 'start') {
       if (seat !== 0) throw new Error('Only the host can start the game.');
       if (room.seats.some(s => s.state === 'joined' && s.seat !== 0)) throw new Error('Everyone who joined has to be ready.');
@@ -61,11 +95,15 @@ function createRoom(handles, config) {
         if (s.state === 'joined' || s.state === 'ready') list.push({ seat: list.length, kind: 'human', handle: s.handle, civ: s.civ, team: list.length });
         else if (room.config.unjoined === 'cpu') list.push({ seat: list.length, kind: 'cpu', handle: null, civ: null, team: list.length });
       }
+      // Seats of the room's capacity nobody took are CPUs too (or dropped), as the server does.
+      const open = room.capacity ? Math.max(0, room.capacity - room.seats.length) : 0;
+      if (room.config.unjoined === 'cpu') for (let k = 0; k < open; k++) list.push({ seat: list.length, kind: 'cpu', handle: null, civ: null, team: list.length });
       for (let k = 0; k < room.config.cpus; k++) list.push({ seat: list.length, kind: 'cpu', handle: null, civ: null, team: list.length });
       room.seats = room.seats.filter(s => s.state === 'joined' || s.state === 'ready').map((s, i) => Object.assign(s, { seat: i, state: 'ready' }));
       room.start = { seats: list, options: { map: room.config.map, size: room.config.size, level: room.config.level, borders: room.config.borders, turns: room.config.turns,
         wrap: room.config.wrap, conquest: room.config.conquest, science: room.config.science, timer: room.config.timer, seed: 777001 } };
       room.status = 'active';
+      room.code = null;   // cleared at start
       pushGame();
       return json(seat);
     }

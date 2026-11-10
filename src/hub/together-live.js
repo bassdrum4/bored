@@ -3,10 +3,18 @@ import { liveRPC } from './together-api.js';
 import { subscribeChanges } from './realtime.js';
 
 // Games that can be played live in Bored Together: everyone in the room plays the same game at the same time,
-// from one ordered log of actions. A room is the host plus min to max invited members (CPUs fill the rest).
+// from one ordered log of actions. A room is the host plus min to max invited members (CPUs fill the rest). A room
+// opened from Civ Lite's Multiplayer screen can be as small as the host and a friend with a code (see together-lobby.js).
 export const TOGETHER_LIVE = Object.freeze({
   ashcrown: { min: 1, max: 3 }
 });
+
+// The six characters a room code is made of, from what somebody typed or pasted (even a whole invite, "Join my Civ Lite
+// game on Bored: code KX7Q2M"): after the word "code" when there is one, upper case, without spaces or dashes.
+export function roomCodeFrom(text) {
+  const t = String(text || ''), m = /\bcode\b[\s:]*([A-Za-z0-9][A-Za-z0-9 -]*)/i.exec(t);
+  return (m ? m[1] : t).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
 
 // What a new room starts with. The host changes it in the game's own setup screen before starting.
 export const LIVE_DEFAULTS = Object.freeze({
@@ -53,7 +61,7 @@ const isNetwork = error => !error || !error.status || error.status >= 500 || err
 // Seconds-since-seen and round clocks change on every read and would make every poll look like news.
 function lobbyKey(game) {
   if (!game) return '';
-  return JSON.stringify([game.status, game.config, game.start, (game.seats || []).map(s => [s.seat, s.user, s.state, s.civ, s.controller, s.online])]);
+  return JSON.stringify([game.status, game.config, game.start, game.code, game.capacity, (game.seats || []).map(s => [s.seat, s.user, s.state, s.civ, s.controller, s.online])]);
 }
 function seatsKey(seats) {
   return JSON.stringify((seats || []).map(s => [s.seat, s.controller, s.online]));
@@ -107,7 +115,11 @@ export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reloa
   function watchLobby() {
     if (lobbyTimer || stopped) return;
     lobbyTimer = repeat(async () => {
-      try { setGame(await api('game', {}), true); } catch (error) { /* the next look tries again */ }
+      try { setGame(await api('game', {}), true); } catch (error) {
+        // The host removed this player: the room does not list them any more, so there is nothing to wait for.
+        if (error && (error.status === 403 || error.code === '42501') && /not in this game/i.test(error.message || '')) { stopLobby(); tell({ event: 'removed' }); }
+        /* anything else: the next look tries again */
+      }
     }, every.lobby);
   }
   function stopLobby() { if (lobbyTimer) { stopRepeat(lobbyTimer); lobbyTimer = 0; } }
@@ -317,6 +329,14 @@ export function createLiveSession({ id, owner, rpc, subscribe, emit, exit, reloa
         const g = await api('lobby_set', args);
         setGame(g, false);
         return g;
+      }
+      // The host's two lobby tools for a room code: a new code (the old one stops working) and removing a player
+      // (who stays out for as long as the room's code lasts). The server checks it is the host and the lobby.
+      case 'new-code': { const g = await api('new_code', {}); setGame(g, false); return g; }
+      case 'kick': {
+        const seat = p.seat;
+        if (!Number.isInteger(seat) || seat < 0 || seat > 7) throw new Error('Nobody to remove.');
+        const g = await api('kick', { seat }); setGame(g, false); return g;
       }
       case 'start': { const g = await api('start', {}); setGame(g, false); return g; }
       case 'leave': { const g = await api('leave_lobby', {}); setGame(g, false); return g; }
