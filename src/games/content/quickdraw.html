@@ -3,51 +3,165 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4e9d5">
 <title>Quickdraw</title>
 <meta name="description" content="Wait for DRAW. First to fire wins. Shoot early and lose.">
 <style>
-:root{--paper:#f5f2ea;--ink:#221d18;--line:#c6b9a4;--red:#ae4536;--sand:#ead9b9;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-*{box-sizing:border-box}html,body{height:100%}
-body{margin:0;background:var(--paper);color:var(--ink);font:13px/1.5 system-ui,sans-serif;display:grid;place-items:center;padding:12px}
-main{width:min(650px,100%);margin:auto}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}
-h1{font:700 15px var(--mono);letter-spacing:.15em;text-transform:uppercase;margin:0}
-nav{display:flex;gap:5px}
-button{font:12px var(--mono);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:3px;cursor:pointer;padding:9px 13px;touch-action:manipulation}
-button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
-button[aria-pressed=true]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-#status{font:700 clamp(21px,5vw,35px) var(--mono);text-align:center;margin:22px 0 2px;min-height:44px}
-#detail{text-align:center;color:#665c51;min-height:21px;font:12px var(--mono)}
-.arena{height:clamp(185px,35vh,285px);border:1px solid var(--line);margin-top:16px;position:relative;display:grid;grid-template-columns:1fr 1fr;overflow:hidden;background:linear-gradient(to bottom,var(--paper) 0 70%,var(--sand) 70% 100%)}
-.arena:after{content:"";position:absolute;top:70%;left:0;right:0;border-top:1px solid #bda680;pointer-events:none}
-.lane{position:relative;border:0;border-radius:0;display:flex;align-items:end;justify-content:center;padding:10px;min-width:0;background:transparent}
-.lane+ .lane{border-left:1px dashed var(--line)}
-.lane::before{content:"";position:absolute;bottom:24%;width:37px;height:66px;background:var(--ink);clip-path:polygon(25% 0,75% 0,88% 29%,83% 55%,100% 100%,0 100%,17% 55%,12% 29%);opacity:.8}
-.lane::after{content:"";position:absolute;bottom:calc(24% + 60px);width:55px;height:12px;background:var(--ink);clip-path:polygon(8% 0,92% 0,100% 100%,0 100%)}
-.lane span{position:relative;z-index:1;background:var(--paper);border:1px solid var(--line);padding:4px 9px;font-size:11px}
-.lane.hit{background:#dfe7d9}.lane.foul{background:#f1d8d1}
-.arena.draw{background:linear-gradient(to bottom,#e6eddc 0 70%,var(--sand) 70% 100%)}
-.arena.draw .lane{cursor:pointer}
-#scoreline{font:12px var(--mono);text-align:center;margin:13px 0;color:#645a4f}
-#start{display:block;margin:13px auto 0;padding:12px 24px;background:var(--ink);color:var(--paper);border-color:var(--ink)}
-#hint{text-align:center;margin:15px 0 0;color:#6b6257;font-size:12px}
-#best{text-align:center;font:11px var(--mono);color:#6b6257;margin-top:6px}
-@media(max-width:390px){nav button{padding:8px}#status{margin-top:14px}.arena{margin-top:10px}}
+:root{
+  --paper:#f4e9d5;--cream:#fff9eb;--ink:#342b27;--line:#c1a883;--rust:#a84430;
+  --sand:#e8c895;--muted:#756654;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:13px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center;padding:12px;-webkit-tap-highlight-color:transparent}
+main{width:min(730px,100%);margin:auto}
+header{display:flex;align-items:end;justify-content:space-between;gap:12px;padding:0 1px 13px}
+.eyebrow{font:700 10px/1.5 var(--mono);color:var(--rust);letter-spacing:.14em;text-transform:uppercase}
+h1{font:900 clamp(27px,5vw,40px)/1.05 Georgia,serif;letter-spacing:.03em;text-transform:uppercase;margin:1px 0 0}
+nav{display:flex;gap:5px;flex-shrink:0}
+button{font:600 12px var(--mono);color:var(--ink);background:var(--cream);border:1px solid var(--line);border-radius:3px;cursor:pointer;padding:9px 12px;touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--rust);outline-offset:3px}
+nav button{font-size:11px;min-height:35px}
+nav button[aria-pressed=true]{background:var(--ink);color:var(--cream);border-color:var(--ink)}
+.arena{height:clamp(230px,43vh,330px);border:2px solid var(--ink);position:relative;overflow:hidden;background:#efdab4;isolation:isolate}
+.landscape{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.scene-top{fill:#f2ddba}.sun{fill:#dba46e}.hills-back{fill:#dcc092}.hills-front{fill:#c9a573}.ground{fill:#dfba80}
+.arena[data-state="draw"] .scene-top{fill:#f9e8c4}
+.arena[data-state="draw"] .sun{fill:#e5b469}
+.arena:after{content:"";position:absolute;inset:0;border:7px solid rgba(255,250,230,.18);pointer-events:none;z-index:5}
+.lane{position:absolute;inset:0 auto 0 0;width:50%;background:transparent;border:0;border-radius:0;padding:0;display:block;z-index:3}
+.lane.right{left:50%}
+.lane:disabled{cursor:default;opacity:1}
+.cowboy{width:clamp(125px,27vw,190px);max-width:90%;height:80%;position:absolute;bottom:8%;left:9%;transition:filter .1s linear;transform-origin:50% 85%}
+.right .cowboy{left:auto;right:9%;transform:scaleX(-1)}
+.cowboy .muzzle{opacity:0}
+.lane.hit .muzzle{opacity:1}
+.lane.hit .cowboy{transform:rotate(-3deg)}
+.lane.right.hit .cowboy{transform:scaleX(-1) rotate(-3deg)}
+.lane.foul .cowboy{filter:sepia(1) saturate(2) hue-rotate(315deg)}
+.lane.hit::after,.lane.foul::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.18}
+.lane.hit::after{background:#f8e8ba}.lane.foul::after{background:#aa3026}
+.lane-label{position:absolute;bottom:13px;left:12%;font:700 10px var(--mono);text-transform:uppercase;letter-spacing:.08em;padding:6px 9px;border:1px solid #745946;background:var(--cream);white-space:nowrap;z-index:1}
+.right .lane-label{left:auto;right:12%}
+.arena[data-state="draw"] .lane:not(:disabled){cursor:crosshair}
+.stage-message{position:absolute;z-index:4;top:8%;left:50%;transform:translateX(-50%);width:min(60%,330px);display:flex;align-items:center;flex-direction:column;pointer-events:none}
+.signal-frame{text-align:center;padding:10px 13px 8px;min-width:70%;max-width:100%;background:var(--cream);border:2px solid var(--ink);box-shadow:4px 4px 0 rgba(52,43,39,.14)}
+#status{font:900 clamp(22px,4.7vw,42px)/1.03 Georgia,serif;text-transform:uppercase;letter-spacing:-.025em;white-space:nowrap}
+#detail{font:600 clamp(9px,1.55vw,11px)/1.4 var(--mono);text-align:center;color:var(--muted);margin:7px 0 0;max-width:100%}
+.arena[data-state="waiting"] .signal-frame{background:#f8ecda}
+.arena[data-state="draw"] .signal-frame{background:var(--rust);color:var(--cream);border-color:var(--cream);box-shadow:5px 5px 0 var(--ink)}
+.arena[data-state="draw"] #status{font-size:clamp(35px,7vw,63px);letter-spacing:.02em}
+.arena[data-state="draw"] #detail{color:var(--ink);font-weight:800}
+.arena[data-state="foul"] .signal-frame{background:var(--rust);color:var(--cream)}
+.arena[data-state="foul"] #detail{color:var(--ink)}
+.below{border:1px solid var(--line);border-top:0;background:var(--cream);padding:12px 16px 15px;text-align:center}
+#scoreline{font:700 12px var(--mono);color:var(--ink);min-height:18px}
+#start{display:flex;align-items:center;justify-content:center;gap:15px;width:min(100%,420px);min-height:66px;margin:12px auto 0;padding:15px 22px;border:2px solid #6c281e;border-bottom-width:6px;background:var(--rust);color:#fff8e8;font:900 clamp(16px,3.4vw,21px)/1.1 Georgia,serif;letter-spacing:.09em;text-transform:uppercase;box-shadow:0 5px 0 rgba(52,43,39,.12);transition:transform .08s ease,background .1s ease}
+#start::before,#start::after{content:"";width:24px;height:1px;background:rgba(255,250,235,.72)}
+#start:hover{background:#8d3527;transform:translateY(-2px)}
+#start:active{transform:translateY(2px);border-bottom-width:3px}
+#start[hidden]{display:none}
+#hint{font-size:12px;color:var(--muted);margin:11px 0 0;text-align:center}
+#best{font:11px var(--mono);color:var(--muted);margin:6px 0 0;text-align:center}
+@media(max-width:490px){
+  body{padding:8px}header{align-items:center;padding-bottom:9px}h1{font-size:26px}.eyebrow{font-size:8px}
+  nav button{padding:8px;font-size:10px}.arena{height:clamp(235px,39vh,275px)}
+  .cowboy{width:145px;max-width:100%;height:72%;bottom:13%}
+  .left .cowboy{left:-7%}.right .cowboy{right:-7%}
+  .stage-message{top:8%;width:58%}.signal-frame{padding:9px 6px 7px}
+  #status{font-size:clamp(20px,6vw,27px)}.arena[data-state="draw"] #status{font-size:clamp(30px,9vw,43px)}
+  #detail{font-size:9px;margin-top:5px}.lane-label{font-size:9px;left:6%;bottom:8px;padding:5px}.right .lane-label{right:6%}
+  .below{padding:9px 10px 13px}#start{min-height:60px;margin-top:10px}
+}
+@media(prefers-reduced-motion:reduce){#start{transition:none}}
 </style>
 </head>
 <body>
 <main>
-<header><h1>Quickdraw</h1><nav aria-label="Mode"><button id="solo" aria-pressed="true">Solo</button><button id="duel" aria-pressed="false">2 players</button></nav></header>
-<div id="status" aria-live="polite">READY?</div>
-<div id="detail" aria-live="polite">One shot. No second chances.</div>
-<div id="arena" class="arena">
-<button id="left" class="lane" aria-label="Left player fires"><span>LEFT · A</span></button>
-<button id="right" class="lane" aria-label="Right player fires"><span>RIGHT · L</span></button>
+<header>
+  <div><div class="eyebrow">High noon · The fastest hand wins</div><h1>Quickdraw</h1></div>
+  <nav aria-label="Mode"><button id="solo" type="button" aria-pressed="true">Solo</button><button id="duel" type="button" aria-pressed="false">2 players</button></nav>
+</header>
+<div id="arena" class="arena" data-state="idle">
+  <svg class="landscape" viewBox="0 0 760 330" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <rect width="760" height="330" class="scene-top"/>
+    <circle cx="383" cy="112" r="59" class="sun"/>
+    <path class="hills-back" d="M0 195L54 180L79 143L105 155L127 117L161 180L225 194L280 164L308 140L337 181L394 193L467 172L496 129L517 161L548 143L579 191L633 193L664 158L700 184L760 170V330H0Z"/>
+    <path class="hills-front" d="M0 238Q84 195 165 223T322 236T485 219T645 240T760 226V330H0Z"/>
+    <path class="ground" d="M0 277Q180 245 370 274T760 265V330H0Z"/>
+    <g fill="#94765b" opacity=".85">
+      <path d="M47 234v-55h7v55zM39 192h8v8h-8zM39 192v-24h6v24zM54 206h10v8H54zM60 181h6v33h-6z"/>
+      <path d="M699 247v-73h8v73zM689 201h10v9h-10zM689 201v-25h7v25zM707 219h13v8h-13zM715 191h7v36h-7z"/>
+    </g>
+    <path d="M0 289Q120 283 253 297T513 293T760 299" stroke="#c39b6c" stroke-width="2" fill="none"/>
+    <g fill="#ae8b65" opacity=".7"><ellipse cx="92" cy="288" rx="22" ry="3"/><ellipse cx="642" cy="295" rx="31" ry="3"/><ellipse cx="427" cy="307" rx="15" ry="2"/></g>
+  </svg>
+  <button id="left" class="lane left" type="button" aria-label="Left player fires">
+    <svg class="cowboy" viewBox="0 0 180 230" aria-hidden="true">
+  <ellipse cx="91" cy="216" rx="58" ry="6" fill="#8b7158" opacity=".26"/>
+  <path d="M72 155L107 155L110 217L92 217L87 176L83 217L66 217Z" fill="#342d2a"/>
+  <path d="M64 212H83V222H57Q56 216 64 212ZM93 212H113L120 222H93Z" fill="#342d2a"/>
+  <path d="M62 116L77 103H113L129 116L123 165L58 165Z" fill="#47382e"/>
+  <path d="M66 154H122L121 163H63Z" fill="#b88a56"/>
+  <rect x="102" y="154" width="10" height="9" rx="1" fill="#eed29d"/>
+  <path d="M65 114L53 117L43 155L54 160L73 130Z" fill="#47382e"/>
+  <path d="M45 150L55 155L52 168L42 164Z" fill="#b98969"/>
+  <path d="M116 113L133 118L147 122L143 132L125 132L112 124Z" fill="#47382e"/>
+  <path d="M142 120L154 120L154 129L142 130Z" fill="#b98969"/>
+  <path d="M151 117H174V123H151Z" fill="#302823"/>
+  <path d="M156 123H164L165 132H160Z" fill="#302823"/>
+  <circle class="muzzle" cx="176" cy="119" r="8" fill="#fff4d3"/>
+  <path d="M76 90L108 90L114 108L91 125L70 108Z" fill="#b14b35"/>
+  <path d="M79 91L95 102L111 91" fill="none" stroke="#f0c69e" stroke-width="2"/>
+  <rect x="80" y="84" width="24" height="13" rx="5" fill="#b98969"/>
+  <ellipse cx="92" cy="68" rx="22" ry="27" fill="#b98969"/>
+  <path d="M70 63Q70 43 90 42Q111 42 114 65L109 63L105 48L81 49L76 64Z" fill="#342d2a"/>
+  <path d="M80 75H86M99 75H104" stroke="#342d2a" stroke-width="3" stroke-linecap="round"/>
+  <path d="M86 88Q92 92 99 88" fill="none" stroke="#714b3b" stroke-width="2" stroke-linecap="round"/>
+  <path d="M61 48H124L114 57H71Z" fill="#4b3a30"/>
+  <path d="M72 46L79 19H107L115 46Z" fill="#4b3a30"/>
+  <path d="M77 38H111L113 44H75Z" fill="#bd7652"/>
+  <path d="M55 48Q92 58 131 48L128 56Q92 66 58 55Z" fill="#342d2a"/>
+</svg>
+    <span class="lane-label">LEFT · A</span>
+  </button>
+  <button id="right" class="lane right" type="button" aria-label="Right player fires">
+    <svg class="cowboy" viewBox="0 0 180 230" aria-hidden="true">
+  <ellipse cx="91" cy="216" rx="58" ry="6" fill="#8b7158" opacity=".26"/>
+  <path d="M72 155L107 155L110 217L92 217L87 176L83 217L66 217Z" fill="#342d2a"/>
+  <path d="M64 212H83V222H57Q56 216 64 212ZM93 212H113L120 222H93Z" fill="#342d2a"/>
+  <path d="M62 116L77 103H113L129 116L123 165L58 165Z" fill="#47382e"/>
+  <path d="M66 154H122L121 163H63Z" fill="#b88a56"/>
+  <rect x="102" y="154" width="10" height="9" rx="1" fill="#eed29d"/>
+  <path d="M65 114L53 117L43 155L54 160L73 130Z" fill="#47382e"/>
+  <path d="M45 150L55 155L52 168L42 164Z" fill="#b98969"/>
+  <path d="M116 113L133 118L147 122L143 132L125 132L112 124Z" fill="#47382e"/>
+  <path d="M142 120L154 120L154 129L142 130Z" fill="#b98969"/>
+  <path d="M151 117H174V123H151Z" fill="#302823"/>
+  <path d="M156 123H164L165 132H160Z" fill="#302823"/>
+  <circle class="muzzle" cx="176" cy="119" r="8" fill="#fff4d3"/>
+  <path d="M76 90L108 90L114 108L91 125L70 108Z" fill="#b14b35"/>
+  <path d="M79 91L95 102L111 91" fill="none" stroke="#f0c69e" stroke-width="2"/>
+  <rect x="80" y="84" width="24" height="13" rx="5" fill="#b98969"/>
+  <ellipse cx="92" cy="68" rx="22" ry="27" fill="#b98969"/>
+  <path d="M70 63Q70 43 90 42Q111 42 114 65L109 63L105 48L81 49L76 64Z" fill="#342d2a"/>
+  <path d="M80 75H86M99 75H104" stroke="#342d2a" stroke-width="3" stroke-linecap="round"/>
+  <path d="M86 88Q92 92 99 88" fill="none" stroke="#714b3b" stroke-width="2" stroke-linecap="round"/>
+  <path d="M61 48H124L114 57H71Z" fill="#4b3a30"/>
+  <path d="M72 46L79 19H107L115 46Z" fill="#4b3a30"/>
+  <path d="M77 38H111L113 44H75Z" fill="#bd7652"/>
+  <path d="M55 48Q92 58 131 48L128 56Q92 66 58 55Z" fill="#342d2a"/>
+</svg>
+    <span class="lane-label">RIGHT · L</span>
+  </button>
+  <div class="stage-message"><div class="signal-frame"><div id="status" aria-live="assertive">READY?</div></div><div id="detail" aria-live="polite">One shot. No second chances.</div></div>
 </div>
-<div id="scoreline">Reaction time decides everything.</div>
-<button id="start">START</button>
-<div id="hint">Wait for DRAW. Fire early and you lose.</div>
-<div id="best"></div>
+<div class="below">
+  <div id="scoreline">Reaction time decides everything.</div>
+  <button id="start" type="button">START DUEL</button>
+  <div id="hint">Wait for DRAW. Fire early and you lose.</div>
+  <div id="best"></div>
+</div>
 </main>
 <script>
 (() => {
@@ -59,18 +173,20 @@ let mode = 'solo', phase = 'idle', timer = 0, signalAt = 0, score = [0,0], round
 let reaction = 0, validResult = false, sessionBest = 0, generation = 0;
 try { best = Number(localStorage.getItem('bored.quickdraw.best')) || 0; } catch {}
 function showBest() { $('best').textContent = best ? 'Local fastest: ' + best + ' ms' : 'Fastest solo reaction wins the board.'; }
-function resetVisuals() { arena.classList.remove('draw'); lanes.forEach(l => l.classList.remove('hit','foul')); }
+function resetVisuals() { arena.classList.remove('draw'); arena.dataset.state = 'idle'; lanes.forEach(l => l.classList.remove('hit','foul')); }
 function cancel() { generation++; clearTimeout(timer); timer = 0; phase = 'idle'; resetVisuals(); }
 function setMode(next) {
   if(mode === next && phase !== 'idle') return;
   cancel(); mode = next; score = [0,0]; rounds = 0; validResult = false; reaction = 0; sessionBest = 0;
   $('solo').setAttribute('aria-pressed', String(mode === 'solo'));
   $('duel').setAttribute('aria-pressed', String(mode === 'duel'));
-  lanes[1].style.visibility = mode === 'solo' ? 'hidden' : '';
-  lanes[0].querySelector('span').textContent = mode === 'solo' ? 'FIRE · SPACE / TAP' : 'LEFT · A';
+  lanes[1].disabled = mode === 'solo';
+  lanes[1].setAttribute('aria-label', mode === 'solo' ? 'Clock opponent, decorative' : 'Right player fires');
+  lanes[1].querySelector('.lane-label').textContent = mode === 'solo' ? 'THE CLOCK' : 'RIGHT · L';
+  lanes[0].querySelector('.lane-label').textContent = mode === 'solo' ? 'FIRE · SPACE / TAP' : 'LEFT · A';
   status.textContent = 'READY?'; detail.textContent = mode === 'solo' ? 'One shot. No second chances.' : 'First to three wins.';
   scoreline.textContent = mode === 'solo' ? 'Reaction time decides everything.' : 'LEFT 0 — 0 RIGHT';
-  startButton.textContent = 'START'; startButton.hidden = false;
+  startButton.textContent = 'START DUEL'; startButton.hidden = false;
   $('hint').textContent = mode === 'solo' ? 'Wait for DRAW. Space, A, or tap to fire.' : 'Wait for DRAW. Left fires A, right fires L. Or tap your side.';
   showBest();
 }
@@ -78,18 +194,18 @@ function begin() {
   cancel();
   if(mode === 'duel' && (score[0] >= 3 || score[1] >= 3)) { score = [0,0]; rounds = 0; }
   validResult = false; reaction = 0; resetVisuals();
-  phase = 'waiting'; status.textContent = 'WAIT…'; detail.textContent = 'Not yet.';
+  phase = 'waiting'; arena.dataset.state = 'waiting'; status.textContent = 'WAIT…'; detail.textContent = 'Not yet.';
   startButton.hidden = true;
   const g = generation, delay = 1600 + Math.random()*2500;
   timer = setTimeout(() => {
     if(g !== generation || phase !== 'waiting') return;
-    signalAt = performance.now(); phase = 'draw'; arena.classList.add('draw');
+    signalAt = performance.now(); phase = 'draw'; arena.dataset.state = 'draw'; arena.classList.add('draw');
     status.textContent = 'DRAW!'; detail.textContent = 'FIRE!';
   }, delay);
 }
 function finish(winner, foul, ms) {
   if(phase !== 'waiting' && phase !== 'draw') return;
-  clearTimeout(timer); phase = 'result'; arena.classList.remove('draw');
+  clearTimeout(timer); phase = 'result'; arena.classList.remove('draw'); arena.dataset.state = foul ? 'foul' : 'hit';
   if(mode === 'solo') {
     if(foul) { validResult = false; reaction = 0; status.textContent = 'TOO EARLY'; detail.textContent = 'You fired before the signal.'; lanes[0].classList.add('foul'); }
     else {
