@@ -41,7 +41,7 @@ function playScripted(rm, rounds, onRound) {
       if (!first('capture', seat, 0)) return;
       assert.ok(rm.send({ seat: 0, type: 'war', args: { to: 3 } }), 'war with the CPU');
       rm.fixture(`(() => {
-        const c = G.cities.find(c => c.owner === 3 && !c.capital), u = G.units.find(u => u.owner === 0 && u.type === 'warrior');
+        const c = G.cities.find(c => c.owner === 3 && !c.capital), u = G.units.find(u => u.owner === 0 && u.type === unitFor(0, 'warrior'));
         const spot = neighbourList(c.x, c.y).find(([x, y]) => { const t = tileAt(x, y); return t && !TERRAIN[t.t].water && !TERRAIN[t.t].block && !unitsAt(x, y).length && !cityAt(x, y); });
         u.x = spot[0]; u.y = spot[1]; u.mp = unitMove(u); u.acted = false; u.pinned = false; u.path = null; u.fort = false; u.sleep = false;
         c.hp = 0;
@@ -198,7 +198,7 @@ test('dynamic turns: humans at peace act together and a round waits for all of t
   assert.deepEqual(q(rm, 'G.live.groups'), [[0], [1], [2]]);
   assert.deepEqual([0, 1, 2, 3].map(i => q(rm, 'liveCanAct(' + i + ')')), [true, true, true, false], 'all three humans move at once; the CPU waits its turn');
   // Orders from different seats interleave in one round.
-  const unit = seat => q(rm, 'G.units.find(u => u.owner === ' + seat + ' && u.type.includes("warrior"))');
+  const unit = seat => q(rm, 'G.units.find(u => u.owner === ' + seat + ' && u.type === unitFor(' + seat + ', "warrior"))');
   const moved = [];
   for (const seat of [2, 0, 1]) {
     const u = unit(seat);
@@ -230,7 +230,7 @@ test('dynamic turns: humans at war take turns in seat order; a third human at pe
   assert.deepEqual(q(rm, 'G.live.groups'), [[0, 1], [2]]);
   assert.deepEqual([0, 1, 2].map(i => q(rm, 'liveCanAct(' + i + ')')), [true, false, true], 'seat 0 first, seat 1 waits, seat 2 is not held up');
   // Seat 1 cannot act out of turn: the order does nothing, on every device.
-  const unit1 = q(rm, 'G.units.find(u => u.owner === 1 && u.type.includes("warrior"))');
+  const unit1 = q(rm, 'G.units.find(u => u.owner === 1 && u.type === unitFor(1, "warrior"))');
   const cells = rm.ref.json('(() => { const r = computeReachable(unitById("' + unit1.id + '")); return [...r.keys()].map(k => k.split(",").map(Number)); })()');
   const hash = rm.agree('before the out-of-turn order');
   rm.send({ seat: 1, type: 'unit-order', args: { unit: unit1.id, x: cells[0][0], y: cells[0][1] } });
