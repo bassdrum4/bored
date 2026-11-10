@@ -27,8 +27,8 @@ export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 export const FRESH_GAMES = ["clicker", "dirt-trials", "corner", "ticket-to-ride"];
 export const META = {
   "clicker": ["Arcade", "One click, one point. That is the whole game."],
-  "dirt-trials": ["Arcade", "Balance a little motorbike over 15 obstacle courses. Lean, hop, chase medals and try not to land on your head."],
-  "corner": ["Strategy", "Run a corner shop for fourteen days: stock the shelf, set the prices, read the weather, and finish with more in the till than you started with."],
+  "dirt-trials": ["Arcade", "Fifteen short time trials on loose dirt. Lean, hop, chase the checkpoint splits and the gold time without landing on your head."],
+  "corner": ["Strategy", "Fourteen days behind one counter: fill the shelves, read the notice on the wall and the weather outside, price for the margin, and finish with more in the till."],
   "ticket-to-ride": ["Strategy", "Claim railway routes across North America, complete destination tickets, and hold the longest continuous path."],
   "wallbound": ["Arcade", "Pull back and launch a little ninja. Stick to walls, ricochet off springs, break glass and clear 20 stages."],
   "risk": ["Strategy", "Conquer the world against up to five computer commanders. Place troops, roll dice, defend borders, and claim continents."],

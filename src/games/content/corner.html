@@ -7,111 +7,230 @@
 <title>Corner</title>
 <style>
   :root {
-    --paper: #f5f2ea; --card: #fffdf7; --ink: #191713; --muted: #6b6558;
-    --line: #d8d2c4; --accent: #2f5d46; --loss: #8a3a2c;
+    --paper: #f4efe2; --card: #fffcf3; --ink: #22201b; --muted: #6d6759;
+    --line: #d6cdb9; --accent: #2f5d46; --loss: #8a3a2c; --sand: #e4d8bd;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { background: var(--paper); }
   body {
     min-height: 100vh; background: var(--paper); color: var(--ink);
-    font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     display: flex; justify-content: center; align-items: flex-start;
-    padding: 12px 10px 18px; touch-action: manipulation;
+    padding: 20px 16px 32px; touch-action: manipulation;
     font-variant-numeric: tabular-nums;
   }
-  main { width: min(360px, 100%); }
-  .hud {
-    display: flex; justify-content: space-between; gap: 8px;
-    font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
-    border-bottom: 1px solid var(--ink); padding-bottom: 6px;
-  }
-  .forecast { font-size: 10px; color: var(--muted); margin: 6px 0 10px; min-height: 28px; }
-  .panel { border: 1px solid var(--line); background: var(--card); padding: 10px; }
-  h1 { font: 600 19px/1.1 Georgia, 'Times New Roman', serif; margin-bottom: 4px; }
-  .lede { font-size: 11px; color: var(--muted); margin-bottom: 9px; }
-  .rules { list-style: none; display: grid; gap: 5px; font-size: 10.5px; color: var(--muted); margin-bottom: 12px; }
-  .rules li { padding-left: 10px; position: relative; }
-  .rules li:before { content: ''; position: absolute; left: 0; top: 6px; width: 3px; height: 3px; background: var(--accent); }
-  button {
-    font: inherit; color: inherit; background: none; border: 1px solid var(--line);
-    border-radius: 2px; cursor: pointer; padding: 4px 7px; min-height: 24px;
-  }
+  main { width: min(1040px, 100%); }
+
+  /* ── header ───────────────────────────────────────────────────────────── */
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--ink); padding-bottom: 10px; }
+  h1 { font: 400 34px/1 Georgia, 'Times New Roman', serif; letter-spacing: -.02em; }
+  .tag { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+  .strip { display: flex; gap: 18px; flex-wrap: wrap; }
+  .strip div { min-width: 66px; }
+  .strip span { display: block; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .strip b { display: block; font-size: 17px; font-weight: 600; letter-spacing: -.02em; margin-top: 1px; }
+  .strip b.good { color: var(--accent); }
+  .strip b.bad { color: var(--loss); }
+
+  /* ── board ────────────────────────────────────────────────────────────── */
+  .board { display: grid; grid-template-columns: minmax(0, 1.32fr) minmax(340px, .68fr); gap: 14px; margin-top: 14px; align-items: start; }
+  .panel { border: 1px solid var(--line); background: var(--card); }
+  .shop { overflow: hidden; }
+  .shop-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 9px 12px 7px; }
+  .shop-head b { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  .shop-head span { font-size: 10px; color: var(--muted); letter-spacing: .05em; }
+  #shop { display: block; width: 100%; height: auto; aspect-ratio: 8 / 5; background: var(--paper); }
+  .shop-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center;
+    border-top: 1px solid var(--line); padding: 8px 12px; font-size: 10px; color: var(--muted); }
+  .shop-foot b { color: var(--ink); font-size: 11px; }
+  .meter { display: flex; align-items: center; gap: 6px; }
+  .meter i { display: block; width: 110px; height: 5px; background: var(--line); position: relative; }
+  .meter i span { display: block; height: 100%; background: var(--accent); }
+  .meter i.full span { background: var(--loss); }
+
+  .side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .pad { padding: 14px; }
+  h2 { font: 400 24px/1.1 Georgia, serif; letter-spacing: -.02em; }
+  .lede { font-size: 11.5px; color: var(--muted); margin: 6px 0 12px; }
+  .rules { list-style: none; display: grid; gap: 6px; font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+  .rules li { padding-left: 12px; position: relative; }
+  .rules li::before { content: ''; position: absolute; left: 0; top: 6px; width: 4px; height: 4px; background: var(--accent); }
+
+  button { font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line);
+    border-radius: 3px; cursor: pointer; padding: 6px 9px; min-height: 30px; }
+  button:hover:not(:disabled) { border-color: var(--ink); }
   button:disabled { opacity: .3; cursor: default; }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  button.primary {
-    width: 100%; background: var(--ink); color: var(--paper); border-color: var(--ink);
-    padding: 9px; font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
-  }
-  .shelf { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--muted); letter-spacing: .04em; margin-bottom: 2px; }
-  .row { display: grid; grid-template-columns: minmax(0, 1fr) 84px 60px; gap: 6px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
-  .who { min-width: 0; }
-  .name { display: block; font-size: 11.5px; }
-  .meta { display: block; font-size: 9px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .step { display: grid; grid-template-columns: 18px minmax(0, 1fr) 18px; align-items: center; gap: 2px; }
-  .step .lab { grid-column: 1 / -1; font-size: 8px; letter-spacing: .09em; color: var(--muted); text-transform: uppercase; text-align: center; }
-  .step b { font-weight: 400; font-size: 10px; text-align: center; white-space: nowrap; }
-  .step button { width: 18px; height: 22px; min-height: 0; padding: 0; font-size: 12px; line-height: 1; }
-  .hint { font-size: 10px; color: var(--muted); margin: 8px 0; min-height: 15px; }
-  .dayline { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
-  .soldline { font-size: 10.5px; min-height: 15px; margin-bottom: 6px; }
-  .ledger { display: grid; gap: 3px; margin: 6px 0 8px; font-size: 11px; }
+  button.primary { width: 100%; background: var(--ink); color: var(--paper); border-color: var(--ink);
+    padding: 11px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  button.primary:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ── order sheet ──────────────────────────────────────────────────────── */
+  .sheet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    border-bottom: 1px solid var(--line); padding: 11px 12px 8px; }
+  .sheet-head b { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+  .sheet-head span { font-size: 10px; color: var(--muted); }
+  .products { display: grid; gap: 0; }
+  .product { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 8px;
+    padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .product:last-child { border-bottom: 0; }
+  .product canvas.icon { width: 54px; height: 54px; display: block; align-self: center; }
+  .pname { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .pname b { font-size: 12.5px; }
+  .pname span { font-size: 9.5px; color: var(--muted); }
+  .pname span.down { color: var(--loss); }
+  .pmeta { font-size: 9.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .steppers { display: flex; gap: 8px; margin-top: 5px; }
+  .stepper { flex: 1; display: grid; grid-template-columns: 30px minmax(0, 1fr) 30px; gap: 3px; align-items: center; }
+  .stepper .lab { grid-column: 1 / -1; font-size: 8px; letter-spacing: .1em; color: var(--muted);
+    text-transform: uppercase; text-align: center; line-height: 1.1; }
+  .stepper button { min-height: 30px; padding: 0; width: 30px; font-size: 14px; line-height: 1; }
+  .stepper b { text-align: center; font-size: 12px; font-weight: 600; white-space: nowrap; background: #f2ecdd; padding: 5px 2px; border: 1px solid var(--line); border-radius: 2px; }
+  .stepper b.price { color: var(--ink); }
+  .stepper .up { color: var(--accent); }
+  .stepper .down { color: var(--loss); }
+  .order-foot { border-top: 1px solid var(--ink); padding: 10px 12px 12px; display: grid; gap: 7px; }
+  .totals { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; }
+  .totals b { font-size: 15px; }
+  .hint { font-size: 10px; color: var(--muted); min-height: 14px; }
+
+  /* ── report ───────────────────────────────────────────────────────────── */
+  .report-head { padding: 12px 12px 8px; border-bottom: 1px solid var(--line); }
+  .report-head .day { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+  .report-head h2 { font-size: 22px; margin-top: 2px; }
+  .report-head p { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+  .sold { display: flex; flex-wrap: wrap; gap: 10px 14px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  .sold div { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .sold canvas { width: 26px; height: 26px; display: block; }
+  .sold span { color: var(--muted); }
+  .ledger { display: grid; gap: 4px; padding: 10px 12px; font-size: 11.5px; }
   .line { display: flex; justify-content: space-between; gap: 10px; }
   .line span:first-child { color: var(--muted); }
-  .line span:last-child { text-align: right; }
   .line.profit span:last-child { color: var(--accent); }
   .line.loss span:last-child { color: var(--loss); }
-  .line.total { border-top: 1px solid var(--line); margin-top: 3px; padding-top: 4px; }
+  .line.total { border-top: 1px solid var(--line); margin-top: 3px; padding-top: 5px; }
   .line.total span:last-child { font-weight: 600; }
-  .upgrades { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin: 8px 0 2px; }
+  .customers { padding: 8px 12px 10px; border-top: 1px solid var(--line); }
+  .customers .lab { font-size: 8.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .dots { display: flex; flex-wrap: wrap; gap: 3px; }
+  .dots i { display: block; width: 7px; height: 12px; background: var(--ink); border-radius: 1px; }
+  .dots i.miss { background: none; border: 1px solid var(--line); }
+  .upgrades { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding: 10px 12px 0; }
   .upgrades[hidden] { display: none; }
-  .upgrades button { font-size: 9px; line-height: 1.3; padding: 5px 3px; }
-  .upgrades button span { display: block; }
-  .upgrades button span:last-child { color: var(--muted); }
-  .upgrades button:disabled span:last-child { color: inherit; }
-  .final { font: 600 32px/1.05 Georgia, 'Times New Roman', serif; margin: 2px 0; }
-  .grade { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; min-height: 14px; }
+  .upgrade { display: grid; justify-items: center; gap: 2px; padding: 7px 3px; min-height: 70px; font-size: 9px; line-height: 1.3; text-align: center; }
+  .upgrade svg { width: 26px; height: 20px; display: block; }
+  .upgrade b { font-size: 9.5px; }
+  .upgrade span { color: var(--muted); }
+  .upgrade.owned { background: #eef1e8; border-color: var(--accent); }
+  .upgrade.owned span { color: var(--accent); }
+  .report-actions { padding: 12px; display: grid; gap: 6px; }
+  .repnote { font-size: 10px; color: var(--muted); padding: 0 12px; }
+
+  /* ── final ────────────────────────────────────────────────────────────── */
+  .over { padding: 18px; }
+  .final { font: 400 52px/1 Georgia, serif; letter-spacing: -.03em; margin: 2px 0 4px; }
+  .grade { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+  .final-stats { display: grid; gap: 4px; font-size: 11.5px; margin-bottom: 14px; }
+  .empty { padding: 26px 16px; text-align: center; color: var(--muted); font-size: 11px; }
+
+  @media (max-width: 860px) {
+    body { padding: 12px 10px 24px; }
+    .board { grid-template-columns: minmax(0, 1fr); }
+    .side { gap: 10px; }
+  }
+  @media (max-width: 480px) {
+    h1 { font-size: 26px; }
+    .strip { gap: 10px; }
+    .strip b { font-size: 14px; }
+    .head { gap: 10px; }
+    .product { grid-template-columns: 44px minmax(0, 1fr); padding: 8px 9px; }
+    .product canvas.icon { width: 44px; height: 44px; }
+    .stepper button { width: 30px; min-height: 30px; }
+    .stepper { grid-template-columns: 30px minmax(0, 1fr) 30px; }
+    .upgrades { grid-template-columns: 1fr; }
+    .final { font-size: 40px; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <p id="hud" class="hud"><span>DAY 1 / 14</span><span>$120 · REP 50</span></p>
-  <p id="forecast" class="forecast">A small shop on a good corner.</p>
+  <header class="head">
+    <div>
+      <h1>Corner</h1>
+      <p class="tag">One shop · fourteen days · weather permitting</p>
+    </div>
+    <div class="strip">
+      <div><span>Day</span><b id="stat-day">1 / 14</b></div>
+      <div><span>Till</span><b id="stat-cash">$120</b></div>
+      <div><span>Reputation</span><b id="stat-rep">50</b></div>
+    </div>
+  </header>
 
-  <section id="intro" class="panel">
-    <h1>Corner</h1>
-    <p class="lede">Fourteen days. One shop. Keep the shelf full and the prices honest.</p>
-    <ul class="rules">
-      <li>Buy stock each morning. Milk, bread and ice cream spoil overnight.</li>
-      <li>Cheap prices move volume; dear ones protect the margin.</li>
-      <li>Read the weather and the local notice before you order.</li>
-      <li>Finish with more in the till than the $120 you started with.</li>
-    </ul>
-    <button id="begin" class="primary" type="button">Open day 1</button>
-  </section>
+  <div class="board">
+    <section class="panel shop" aria-label="The shop">
+      <div class="shop-head">
+        <b>Inside the shop</b>
+        <span id="shop-status">Shutters down</span>
+      </div>
+      <canvas id="shop" width="800" height="500" aria-label="A small corner shop: window, shelves of stock, counter and till."></canvas>
+      <div class="shop-foot">
+        <span class="meter">Shelf <b id="shelf-count">0 / 30</b><i id="shelf-meter"><span></span></i></span>
+        <span id="shop-note">A small shop on a good corner.</span>
+      </div>
+    </section>
 
-  <section id="plan" class="panel" hidden>
-    <p class="shelf"><span id="shelf">SHELF 0 / 30</span><span id="order">ORDER $0.00</span></p>
-    <div id="rows"></div>
-    <p id="planHint" class="hint">Stock the shelf, set prices, then open.</p>
-    <button id="open" class="primary" type="button">Open shop</button>
-  </section>
+    <div class="side">
+      <section id="intro" class="panel pad">
+        <h2>A shop on the corner.</h2>
+        <p class="lede">Fourteen days behind the counter. Buy the stock, price it, read the weather, and try to end with more in the till than the $120 you started with.</p>
+        <ul class="rules">
+          <li>Milk, bread and ice cream spoil overnight. Order what you can sell.</li>
+          <li>Cheap prices move volume; dear ones protect the margin. Customers have a limit.</li>
+          <li>Read the forecast and the notice on the wall before you order.</li>
+          <li>Reputation brings more customers. Empty shelves send them away.</li>
+        </ul>
+        <button id="begin" class="primary" type="button">Open day 1</button>
+      </section>
 
-  <section id="report" class="panel" hidden>
-    <p id="dayline" class="dayline">DAY 1</p>
-    <p id="soldline" class="soldline"></p>
-    <div id="ledger" class="ledger"></div>
-    <div id="upgrades" class="upgrades"></div>
-    <p id="repNote" class="hint"></p>
-    <button id="next" class="primary" type="button">Next morning</button>
-  </section>
+      <section id="plan" class="panel" hidden>
+        <div class="sheet-head"><b>Morning order</b><span id="order-day">Day 1</span></div>
+        <div class="products" id="products"></div>
+        <div class="order-foot">
+          <div class="totals"><span>Stock in the shop</span><b id="order-total">$0.00</b></div>
+          <p id="plan-hint" class="hint">Stock the shelf, set prices, then open.</p>
+          <button id="open" class="primary" type="button">Open shop</button>
+        </div>
+      </section>
 
-  <section id="over" class="panel" hidden>
-    <p class="dayline">FOURTEEN DAYS</p>
-    <p id="finalCash" class="final">$0</p>
-    <p id="grade" class="grade"></p>
-    <div id="finalStats" class="ledger"></div>
-    <button id="again" class="primary" type="button">Play again</button>
-  </section>
+      <section id="report" class="panel" hidden>
+        <div class="report-head">
+          <p class="day" id="report-day">DAY 1</p>
+          <h2 id="report-title">A steady day.</h2>
+          <p id="report-weather"></p>
+        </div>
+        <div class="sold" id="sold"></div>
+        <div class="ledger" id="ledger"></div>
+        <div class="customers">
+          <p class="lab">Through the door</p>
+          <div class="dots" id="customer-dots"></div>
+        </div>
+        <p id="rep-note" class="repnote"></p>
+        <div class="upgrades" id="upgrades"></div>
+        <div class="report-actions">
+          <button id="next" class="primary" type="button">Next morning</button>
+        </div>
+      </section>
+
+      <section id="over" class="panel over" hidden>
+        <p class="tag">Fourteen days later</p>
+        <p id="final-cash" class="final">$0</p>
+        <p id="final-grade" class="grade"></p>
+        <div id="final-stats" class="final-stats"></div>
+        <button id="again" class="primary" type="button">Open another shop</button>
+      </section>
+    </div>
+  </div>
 </main>
 <script>
 (function () {
@@ -155,21 +274,28 @@
     freezer: { name: 'Freezer', note: 'ice keeps', cost: 55 },
     awning: { name: 'Awning', note: 'rain custom', cost: 35 }
   };
-  // Never let an upgrade eat the money needed to fill the shelf: an empty shop
-  // with no cash is a run with nothing left to do.
   var WORKING_FLOAT = 25;
 
-  var hud = $('#hud'), forecast = $('#forecast');
-  var intro = $('#intro'), planPanel = $('#plan'), reportPanel = $('#report'), overPanel = $('#over');
-  var rows = $('#rows'), shelfLabel = $('#shelf'), orderLabel = $('#order');
-  var planHint = $('#planHint'), openButton = $('#open');
-  var dayline = $('#dayline'), soldline = $('#soldline'), ledger = $('#ledger');
-  var upgrades = $('#upgrades'), repNote = $('#repNote'), nextButton = $('#next');
-  var finalCash = $('#finalCash'), grade = $('#grade'), finalStats = $('#finalStats');
+  var $day = $('#stat-day'), $cash = $('#stat-cash'), $rep = $('#stat-rep');
+  var $shop = $('#shop'), $status = $('#shop-status'), $shelfCount = $('#shelf-count'), $meter = $('#shelf-meter span'), $shopNote = $('#shop-note');
+  var introPanel = $('#intro'), planPanel = $('#plan'), reportPanel = $('#report'), overPanel = $('#over');
+  var productsBox = $('#products'), orderDay = $('#order-day'), orderTotal = $('#order-total');
+  var planHint = $('#plan-hint'), openButton = $('#open');
+  var reportDay = $('#report-day'), reportTitle = $('#report-title'), reportWeather = $('#report-weather');
+  var soldBox = $('#sold'), ledgerBox = $('#ledger'), dotsBox = $('#customer-dots'), repNote = $('#rep-note');
+  var upgradesBox = $('#upgrades'), nextButton = $('#next');
+  var finalCash = $('#final-cash'), finalGrade = $('#final-grade'), finalStats = $('#final-stats');
 
   var state = null;
   var rowEls = [];
   var resume = window.__boredResume || null;
+  var shopCtx = $shop.getContext('2d');
+
+  var C = {
+    wall: '#f7f1e1', floor: '#e7dcc4', card: '#fffcf3', ink: '#22201b',
+    muted: '#6d6759', line: '#d6cdb9', accent: '#2f5d46', loss: '#8a3a2c',
+    sand: '#dccdaa', pale: '#efe7d3'
+  };
 
   /* ── small helpers ─────────────────────────────────────────────────────── */
 
@@ -182,15 +308,9 @@
   function priceCeiling(product) { return Math.round(product.value * 1.9 * 10) / 10; }
   function zeros() { return PRODUCTS.map(function () { return 0; }); }
   function capacity() { return BASE_SHELF + (state && state.upgrades.shelf ? 12 : 0); }
-  function stockTotal() {
-    return state.stock.reduce(function (sum, n) { return sum + n; }, 0);
-  }
-  function ordersTotal() {
-    return state.orders.reduce(function (sum, n) { return sum + n; }, 0);
-  }
-  function orderCost() {
-    return state.orders.reduce(function (sum, n, i) { return sum + n * PRODUCTS[i].cost; }, 0);
-  }
+  function stockTotal() { return state.stock.reduce(function (sum, n) { return sum + n; }, 0); }
+  function ordersTotal() { return state.orders.reduce(function (sum, n) { return sum + n; }, 0); }
+  function orderCost() { return state.orders.reduce(function (sum, n, i) { return sum + n * PRODUCTS[i].cost; }, 0); }
 
   /* ── the day's plan ────────────────────────────────────────────────────── */
 
@@ -376,42 +496,546 @@
     return 'Shutters down';
   }
 
-  /* ── drawing ───────────────────────────────────────────────────────────── */
+  /* ── product line art ──────────────────────────────────────────────────── */
+  /* One set of shapes, drawn at any size: the tiny cards and the big shop
+     window share them. Origin is the bottom centre of the drawing. */
+  function drawProductIcon(target, id, size, originX, originY) {
+    var ctx = target;
+    ctx.save();
+    ctx.translate(originX == null ? size / 2 : originX, originY == null ? size * 0.86 : originY);
+    var scale = size / 44;
+    ctx.scale(scale, scale);
+    ctx.lineWidth = 2.1;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = C.ink;
+    ctx.fillStyle = C.card;
+    if (id === 'milk') {
+      ctx.beginPath();
+      ctx.moveTo(-10, 0); ctx.lineTo(-10, -22); ctx.lineTo(-4, -30);
+      ctx.lineTo(8, -30); ctx.lineTo(10, -22); ctx.lineTo(10, 0); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-10, -22); ctx.lineTo(1, -22); ctx.lineTo(0, -30); ctx.stroke();
+      ctx.fillStyle = C.accent; ctx.fillRect(-7, -17, 14, 5);
+      ctx.fillStyle = C.ink; ctx.fillRect(-7, -17, 3, 5);
+    } else if (id === 'bread') {
+      ctx.beginPath();
+      ctx.moveTo(-15, 0); ctx.lineTo(-15, -9);
+      ctx.quadraticCurveTo(-12, -18, 0, -18);
+      ctx.quadraticCurveTo(12, -18, 15, -9);
+      ctx.lineTo(15, 0); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-7, -12); ctx.lineTo(-2, -15);
+      ctx.moveTo(0, -12); ctx.lineTo(5, -15);
+      ctx.moveTo(7, -12); ctx.lineTo(11, -14);
+      ctx.stroke();
+    } else if (id === 'soda') {
+      ctx.beginPath();
+      ctx.moveTo(-8, 0); ctx.lineTo(-8, -17); ctx.lineTo(-4, -23);
+      ctx.lineTo(-4, -28); ctx.lineTo(4, -28); ctx.lineTo(4, -23);
+      ctx.lineTo(8, -17); ctx.lineTo(8, 0); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = C.accent; ctx.fillRect(-8, -14, 16, 6);
+      ctx.fillStyle = C.ink; ctx.fillRect(-4, -31, 8, 3);
+    } else if (id === 'soup') {
+      ctx.beginPath(); ctx.rect(-9, -24, 18, 24); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, -24, 9, 2.6, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = C.accent; ctx.fillRect(-9, -18, 18, 4);
+      ctx.strokeStyle = C.pale; ctx.beginPath();
+      ctx.moveTo(-5, -10); ctx.lineTo(5, -10); ctx.moveTo(-5, -6); ctx.lineTo(3, -6); ctx.stroke();
+    } else if (id === 'ice') {
+      ctx.beginPath();
+      ctx.moveTo(-11, -20); ctx.lineTo(11, -20); ctx.lineTo(9, 0); ctx.lineTo(-9, 0); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-11, -20); ctx.lineTo(11, -20);
+      ctx.moveTo(-8, -25); ctx.lineTo(8, -25); ctx.stroke();
+      ctx.fillStyle = C.accent; ctx.fillRect(-8, -15, 16, 4);
+      ctx.beginPath(); ctx.arc(0, -27, 4, Math.PI, 0); ctx.fillStyle = C.card; ctx.fill(); ctx.stroke();
+    } else if (id === 'umbrella') {
+      ctx.beginPath();
+      ctx.moveTo(-17, -21);
+      ctx.quadraticCurveTo(-17, -33, 0, -33);
+      ctx.quadraticCurveTo(17, -33, 17, -21);
+      ctx.quadraticCurveTo(10, -24, 6, -21);
+      ctx.quadraticCurveTo(2, -24, 0, -21);
+      ctx.quadraticCurveTo(-2, -24, -6, -21);
+      ctx.quadraticCurveTo(-10, -24, -17, -21);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -33); ctx.lineTo(0, -3);
+      ctx.quadraticCurveTo(0, 2, -5, 2); ctx.stroke();
+      ctx.fillStyle = C.accent; ctx.fillRect(-6, -30, 4, 9);
+    }
+    ctx.restore();
+  }
+
+  function paintCardIcons() {
+    document.querySelectorAll('canvas[data-icon]').forEach(function (canvas) {
+      var id = canvas.getAttribute('data-icon');
+      var size = 64;
+      var dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (canvas.width !== size * dpr) {
+        canvas.width = size * dpr;
+        canvas.height = size * dpr;
+      }
+      var ctx = canvas.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawProductIcon(ctx, id, size);
+    });
+  }
+
+  /* ── the shop, drawn ───────────────────────────────────────────────────── */
+
+  function resizeShop() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var rect = $shop.getBoundingClientRect();
+    var width = Math.max(1, Math.round(rect.width * dpr));
+    var height = Math.max(1, Math.round(rect.height * dpr));
+    if ($shop.width !== width || $shop.height !== height) {
+      $shop.width = width; $shop.height = height;
+    }
+  }
+
+  function pen(x1, y1, x2, y2) {
+    shopCtx.beginPath(); shopCtx.moveTo(x1, y1); shopCtx.lineTo(x2, y2); shopCtx.stroke();
+  }
+  function mono(size, weight) {
+    shopCtx.font = (weight || 400) + ' ' + size + 'px ui-monospace,SFMono-Regular,Menlo,monospace';
+  }
+
+  function drawWindow(weather) {
+    var x = 46, y = 78, w = 214, h = 190;
+    // Glass: the day outside.
+    shopCtx.fillStyle = weather === 'rain' ? '#dfe4dd' : weather === 'heat' ? '#f2e6c8' : weather === 'cold' ? '#e8ebe6' : '#ece9d4';
+    shopCtx.fillRect(x, y, w, h);
+    if (weather === 'clear' || weather === 'heat') {
+      shopCtx.fillStyle = weather === 'heat' ? C.sand : C.pale;
+      shopCtx.strokeStyle = C.line; shopCtx.lineWidth = 1.2;
+      shopCtx.beginPath(); shopCtx.arc(x + 150, y + 52, weather === 'heat' ? 26 : 20, 0, Math.PI * 2);
+      shopCtx.fill(); shopCtx.stroke();
+      if (weather === 'heat') {
+        shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1;
+        for (var r = 0; r < 3; r++) {
+          shopCtx.beginPath();
+          shopCtx.moveTo(x + 16, y + 110 + r * 22);
+          shopCtx.quadraticCurveTo(x + 48, y + 104 + r * 22, x + 80, y + 110 + r * 22);
+          shopCtx.stroke();
+        }
+      }
+    } else if (weather === 'rain') {
+      shopCtx.strokeStyle = '#8d9b93'; shopCtx.lineWidth = 1.4;
+      for (var i = 0; i < 22; i++) {
+        var rx = x + 10 + (i * 37) % (w - 20);
+        var ry = y + 12 + (i * 53) % (h - 40);
+        pen(rx, ry, rx - 5, ry + 11);
+      }
+      shopCtx.fillStyle = C.muted;
+      shopCtx.beginPath(); shopCtx.arc(x + 54, y + 46, 16, 0, Math.PI * 2);
+      shopCtx.arc(x + 72, y + 42, 20, 0, Math.PI * 2);
+      shopCtx.fill();
+    } else {
+      shopCtx.fillStyle = C.card; shopCtx.strokeStyle = C.line;
+      for (var s = 0; s < 26; s++) {
+        var sx = x + 12 + (s * 41) % (w - 24);
+        var sy = y + 14 + (s * 31) % (h - 28);
+        shopCtx.beginPath(); shopCtx.arc(sx, sy, 1.7, 0, Math.PI * 2); shopCtx.fill(); shopCtx.stroke();
+      }
+      shopCtx.fillStyle = '#dbe0da';
+      shopCtx.fillRect(x, y + h - 34, w, 34);
+    }
+    // Pavement outside.
+    shopCtx.fillStyle = '#d9d0bb';
+    shopCtx.fillRect(x, y + h - 18, w, 18);
+    // Frame.
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 3;
+    shopCtx.strokeRect(x, y, w, h);
+    pen(x + w / 2, y, x + w / 2, y + h);
+    pen(x, y + h * 0.52, x + w, y + h * 0.52);
+    // Sill.
+    shopCtx.fillStyle = C.card;
+    shopCtx.fillRect(x - 10, y + h, w + 20, 10);
+    shopCtx.strokeRect(x - 10, y + h, w + 20, 10);
+    // A couple of things on the sill.
+    shopCtx.fillStyle = C.accent;
+    shopCtx.fillRect(x + 22, y + h - 16, 10, 16);
+    shopCtx.strokeRect(x + 22, y + h - 16, 10, 16);
+    shopCtx.fillStyle = C.card;
+    shopCtx.beginPath(); shopCtx.arc(x + 176, y + h - 9, 8, Math.PI, 0); shopCtx.fill();
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.6; shopCtx.stroke();
+  }
+
+  function drawAwning() {
+    shopCtx.save();
+    shopCtx.beginPath();
+    shopCtx.moveTo(24, 60); shopCtx.lineTo(292, 60); shopCtx.lineTo(282, 84); shopCtx.lineTo(34, 84);
+    shopCtx.closePath();
+    shopCtx.fillStyle = C.accent; shopCtx.fill();
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 2; shopCtx.stroke();
+    shopCtx.fillStyle = C.card;
+    for (var i = 0; i < 8; i += 2) {
+      var x = 34 + i * 31;
+      shopCtx.beginPath();
+      shopCtx.moveTo(x, 61); shopCtx.lineTo(x + 15, 61); shopCtx.lineTo(x + 12, 83); shopCtx.lineTo(x - 1, 83);
+      shopCtx.closePath(); shopCtx.fill();
+    }
+    shopCtx.restore();
+  }
+
+  function drawClock() {
+    var x = 282, y = 148;
+    shopCtx.beginPath(); shopCtx.arc(x, y, 17, 0, Math.PI * 2);
+    shopCtx.fillStyle = C.card; shopCtx.fill();
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 2; shopCtx.stroke();
+    shopCtx.strokeStyle = C.muted; shopCtx.lineWidth = 1;
+    for (var i = 0; i < 12; i++) {
+      var a = i * Math.PI / 6;
+      pen(x + Math.sin(a) * 11, y - Math.cos(a) * 11, x + Math.sin(a) * 14, y - Math.cos(a) * 14);
+    }
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.8;
+    pen(x, y, x, y - 9);
+    pen(x, y, x + 7, y + 2);
+  }
+
+  function drawShelves(plan) {
+    var boards = [
+      { y: 196, items: [0, 1] },
+      { y: 278, items: [2, 3] },
+      { y: 360, items: [4, 5] }
+    ];
+    var stock = state ? state.stock : zeros();
+    var prices = state ? state.prices : null;
+    boards.forEach(function (board) {
+      board.items.forEach(function (index, slot) {
+        var product = PRODUCTS[index];
+        var bx = 370 + slot * 148;
+        var count = stock[index] || 0;
+        shopCtx.save();
+        shopCtx.globalAlpha = count > 0 ? 1 : 0.2;
+        drawProductIcon(shopCtx, product.id, 46, bx, board.y - 1);
+        shopCtx.restore();
+        // Stock marks on the shelf lip.
+        var marks = Math.min(count, 10);
+        shopCtx.fillStyle = count > 0 ? C.accent : C.line;
+        for (var s = 0; s < marks; s++) shopCtx.fillRect(bx - 34 + s * 7, board.y - 4, 4, 4);
+        if (count > 10) {
+          shopCtx.fillStyle = C.muted; mono(9);
+          shopCtx.fillText('+' + (count - 10), bx + 36, board.y - 1);
+        }
+        // Shelf-edge ticket: name and price together.
+        shopCtx.fillStyle = C.card;
+        shopCtx.strokeStyle = C.line; shopCtx.lineWidth = 1.2;
+        shopCtx.fillRect(bx - 60, board.y + 6, 124, 21);
+        shopCtx.strokeRect(bx - 60, board.y + 6, 124, 21);
+        shopCtx.fillStyle = C.ink; mono(10);
+        shopCtx.textAlign = 'left';
+        shopCtx.fillText(product.name, bx - 55, board.y + 20);
+        shopCtx.textAlign = 'right';
+        shopCtx.fillText(prices ? '$' + prices[index].toFixed(2) : '—', bx + 59, board.y + 20);
+        shopCtx.textAlign = 'left';
+      });
+      // The board itself, with its little brackets.
+      shopCtx.fillStyle = C.sand;
+      shopCtx.fillRect(304, board.y, 312, 7);
+      shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.8;
+      shopCtx.strokeRect(304, board.y, 312, 7);
+    });
+  }
+
+  function drawShopSign() {
+    shopCtx.fillStyle = C.ink;
+    shopCtx.font = '600 25px Georgia, "Times New Roman", serif';
+    shopCtx.textAlign = 'center';
+    shopCtx.fillText('Corner', 152, 46);
+    shopCtx.fillStyle = C.muted; mono(7.5);
+    shopCtx.fillText('GROCERIES  \u00b7  OPEN 7\u20137', 152, 58);
+    shopCtx.strokeStyle = C.line; shopCtx.lineWidth = 1;
+    pen(78, 64, 226, 64);
+    shopCtx.textAlign = 'left';
+  }
+
+  function drawLamps() {
+    [404, 536].forEach(function (lx) {
+      shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.4;
+      pen(lx, 0, lx, 84);
+      shopCtx.beginPath();
+      shopCtx.moveTo(lx - 19, 84); shopCtx.lineTo(lx + 19, 84);
+      shopCtx.lineTo(lx + 11, 104); shopCtx.lineTo(lx - 11, 104); shopCtx.closePath();
+      shopCtx.fillStyle = C.sand; shopCtx.fill();
+      shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.8; shopCtx.stroke();
+      shopCtx.beginPath(); shopCtx.arc(lx, 108, 4.5, 0, Math.PI * 2);
+      shopCtx.fillStyle = C.card; shopCtx.fill(); shopCtx.stroke();
+    });
+  }
+
+  function drawPlant() {
+    var x = 126, floor = 446;
+    shopCtx.fillStyle = C.card;
+    shopCtx.beginPath();
+    shopCtx.moveTo(x - 17, floor - 26); shopCtx.lineTo(x + 17, floor - 26);
+    shopCtx.lineTo(x + 12, floor); shopCtx.lineTo(x - 12, floor); shopCtx.closePath();
+    shopCtx.fill();
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 2; shopCtx.stroke();
+    shopCtx.strokeStyle = C.accent; shopCtx.lineWidth = 1.8;
+    var leaves = [[-26, -54], [-12, -66], [4, -70], [16, -58], [26, -48], [0, -44]];
+    leaves.forEach(function (leaf, i) {
+      shopCtx.beginPath();
+      shopCtx.moveTo(x + (i - 2) * 2, floor - 26);
+      shopCtx.quadraticCurveTo(x + leaf[0] * 0.5, floor + leaf[1] * 0.72, x + leaf[0], floor + leaf[1]);
+      shopCtx.stroke();
+      shopCtx.beginPath();
+      shopCtx.ellipse(x + leaf[0], floor + leaf[1], 5, 2.6, i * 0.6, 0, Math.PI * 2);
+      shopCtx.fillStyle = '#dfe6d9'; shopCtx.fill(); shopCtx.stroke();
+    });
+  }
+
+  function drawFloorDressing() {
+    // A worn rug under the customers.
+    shopCtx.beginPath();
+    shopCtx.ellipse(470, 472, 196, 22, 0, 0, Math.PI * 2);
+    shopCtx.fillStyle = '#efe4c9'; shopCtx.fill();
+    shopCtx.strokeStyle = C.line; shopCtx.lineWidth = 1.5; shopCtx.stroke();
+    shopCtx.strokeStyle = C.accent; shopCtx.lineWidth = 1;
+    shopCtx.beginPath();
+    shopCtx.ellipse(470, 472, 176, 14, 0, 0, Math.PI * 2);
+    shopCtx.stroke();
+    pen(350, 466, 590, 466);
+    // Crates by the window; the shelf upgrade adds one more.
+    var crates = 2 + (state && state.upgrades.shelf ? 1 : 0);
+    for (var i = 0; i < crates; i++) {
+      var cx = 40 + (i % 2) * 34, cy = 446 - 30 * (i < 2 ? 0 : 1);
+      shopCtx.fillStyle = C.sand;
+      shopCtx.fillRect(cx, cy, 30, 30);
+      shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.6;
+      shopCtx.strokeRect(cx, cy, 30, 30);
+      pen(cx, cy + 10, cx + 30, cy + 10);
+      pen(cx, cy + 20, cx + 30, cy + 20);
+    }
+  }
+
+  function drawDoor(stateNow) {
+    var x = 660, y = 150, w = 88, h = 250;
+    shopCtx.fillStyle = C.card;
+    shopCtx.fillRect(x, y, w, h);
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 3;
+    shopCtx.strokeRect(x, y, w, h);
+    shopCtx.fillStyle = '#e9e2d0';
+    shopCtx.fillRect(x + 10, y + 14, w - 20, h - 60);
+    shopCtx.strokeStyle = C.line; shopCtx.lineWidth = 1.6;
+    shopCtx.strokeRect(x + 10, y + 14, w - 20, h - 60);
+    // Handle.
+    shopCtx.fillStyle = C.ink;
+    shopCtx.fillRect(x + 12, y + 120, 4, 18);
+    // OPEN sign hangs on the glass.
+    var open = stateNow && stateNow.phase === 'report';
+    shopCtx.fillStyle = open ? C.accent : C.muted;
+    shopCtx.fillRect(x + 22, y + 40, 44, 18);
+    shopCtx.fillStyle = C.card; mono(9, 600); shopCtx.textAlign = 'center';
+    shopCtx.fillText(open ? 'OPEN' : 'SHUT', x + 44, y + 53);
+    shopCtx.textAlign = 'left';
+    // Step.
+    shopCtx.fillStyle = C.sand; shopCtx.fillRect(x - 12, y + h, w + 24, 8);
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.4; shopCtx.strokeRect(x - 12, y + h, w + 24, 8);
+  }
+
+  function drawCounter(plan) {
+    var y = 404;
+    shopCtx.fillStyle = C.card;
+    shopCtx.fillRect(292, y, 420, 46);
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 3;
+    shopCtx.strokeRect(292, y, 420, 46);
+    shopCtx.strokeStyle = C.line; shopCtx.lineWidth = 1;
+    pen(292, y + 14, 712, y + 14);
+    // Panelled front.
+    for (var i = 0; i < 6; i++) pen(316 + i * 66, y + 18, 316 + i * 66, y + 42);
+    // Till.
+    shopCtx.fillStyle = C.ink; shopCtx.fillRect(600, y - 26, 58, 26);
+    shopCtx.fillStyle = C.card; shopCtx.fillRect(606, y - 21, 30, 9);
+    shopCtx.fillStyle = C.accent; shopCtx.fillRect(646, y - 21, 6, 9);
+    mono(8); shopCtx.fillStyle = C.muted;
+    shopCtx.fillText('TILL', 614, y + 10);
+    // Bell and a paper.
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.6;
+    shopCtx.beginPath(); shopCtx.arc(470, y - 8, 7, Math.PI, 0); shopCtx.stroke();
+    pen(470, y - 8, 470, y - 2);
+    shopCtx.fillStyle = C.card; shopCtx.fillRect(330, y - 16, 30, 16);
+    shopCtx.strokeRect(330, y - 16, 30, 16);
+    pen(335, y - 11, 354, y - 11);
+    pen(335, y - 7, 348, y - 7);
+  }
+
+  function drawKeeper() {
+    // The shopkeeper, behind the counter.
+    var x = 624, y = 404;
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 2.6;
+    shopCtx.fillStyle = C.card;
+    shopCtx.beginPath();
+    shopCtx.moveTo(x - 20, y); shopCtx.lineTo(x - 14, y - 42);
+    shopCtx.quadraticCurveTo(x, y - 50, x + 14, y - 42);
+    shopCtx.lineTo(x + 20, y); shopCtx.closePath();
+    shopCtx.fill(); shopCtx.stroke();
+    shopCtx.fillStyle = C.accent;
+    shopCtx.fillRect(x - 12, y - 34, 24, 20);
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.4;
+    shopCtx.strokeRect(x - 12, y - 34, 24, 20);
+    shopCtx.beginPath(); shopCtx.arc(x, y - 58, 12, 0, Math.PI * 2);
+    shopCtx.fillStyle = C.card; shopCtx.fill(); shopCtx.stroke();
+    // Hair, in one stroke.
+    shopCtx.beginPath(); shopCtx.arc(x, y - 60, 12, Math.PI * 1.05, Math.PI * 1.85); shopCtx.stroke();
+    // Eyes.
+    shopCtx.fillStyle = C.ink;
+    shopCtx.fillRect(x - 5, y - 59, 2, 2);
+    shopCtx.fillRect(x + 3, y - 59, 2, 2);
+    // A hand on the counter.
+    shopCtx.beginPath(); shopCtx.moveTo(x + 14, y - 30); shopCtx.lineTo(x + 30, y - 20); shopCtx.lineTo(x + 34, y - 6); shopCtx.stroke();
+  }
+
+  function drawCustomers(plan) {
+    if (!plan) return;
+    // A little queue at the counter for the day's trade.
+    var shown = Math.min(4, Math.max(1, plan.count - 5));
+    for (var i = 0; i < shown; i++) {
+      var x = 352 + i * 42;
+      var y = 490;
+      shopCtx.save();
+      shopCtx.globalAlpha = 0.9;
+      shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 2;
+      shopCtx.fillStyle = C.pale;
+      shopCtx.beginPath();
+      shopCtx.arc(x, y - 34, 9, 0, Math.PI * 2); shopCtx.fill(); shopCtx.stroke();
+      shopCtx.beginPath();
+      shopCtx.moveTo(x - 11, y); shopCtx.lineTo(x - 8, y - 22);
+      shopCtx.quadraticCurveTo(x, y - 26, x + 8, y - 22);
+      shopCtx.lineTo(x + 11, y); shopCtx.stroke();
+      shopCtx.fillStyle = C.ink;
+      shopCtx.fillRect(x - 3, y - 35, 1.6, 1.6);
+      shopCtx.fillRect(x + 2, y - 35, 1.6, 1.6);
+      shopCtx.restore();
+    }
+    mono(8); shopCtx.fillStyle = C.muted;
+  }
+
+  function drawShop() {
+    if (!shopCtx) return;
+    resizeShop();
+    var cw = $shop.width, ch = $shop.height;
+    if (!cw || !ch) return;
+    shopCtx.setTransform(cw / 800, 0, 0, ch / 500, 0, 0);
+    shopCtx.clearRect(0, 0, 800, 500);
+
+    var phase = state ? state.phase : 'intro';
+    var plan = state
+      ? (phase === 'report' ? state.report : state.plan)
+      : { weatherId: 'clear', eventId: 'none', count: 0 };
+
+    // Wall and floor.
+    shopCtx.fillStyle = C.wall; shopCtx.fillRect(0, 0, 800, 500);
+    shopCtx.fillStyle = C.floor; shopCtx.fillRect(0, 446, 800, 54);
+    shopCtx.strokeStyle = C.line; shopCtx.lineWidth = 1.2;
+    for (var x = 0; x < 800; x += 64) pen(x, 446, x - 26, 500);
+    pen(0, 446, 800, 446);
+    // Skirting.
+    shopCtx.fillStyle = C.sand; shopCtx.fillRect(0, 430, 800, 16);
+    shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.6;
+    line(0, 430, 800, 430); pen(0, 446, 800, 446);
+
+    drawWindow(plan.weatherId);
+    drawShopSign();
+    if (state && state.upgrades.awning) drawAwning();
+    drawLamps();
+    drawClock();
+    drawShelves(plan);
+    drawDoor(state);
+    if (state && state.upgrades.freezer) {
+      // Chest freezer.
+      shopCtx.fillStyle = C.card; shopCtx.fillRect(604, 340, 48, 38);
+      shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 2.2; shopCtx.strokeRect(604, 340, 48, 38);
+      pen(604, 348, 652, 348);
+      shopCtx.fillStyle = C.accent; shopCtx.fillRect(640, 343, 5, 3);
+      shopCtx.fillStyle = C.muted; mono(7); shopCtx.fillText('FREEZER', 606, 366);
+    }
+    drawPlant();
+    drawFloorDressing();
+    drawKeeper();
+    drawCounter(plan);
+    if (phase === 'report' && state.report) drawCustomers(state.report);
+
+    // An event notice pinned to the wall under the window.
+    if (plan && EVENTS[plan.eventId] && EVENTS[plan.eventId].label) {
+      var event = EVENTS[plan.eventId];
+      shopCtx.fillStyle = C.card;
+      shopCtx.fillRect(38, 284, 196, 62);
+      shopCtx.strokeStyle = C.ink; shopCtx.lineWidth = 1.4; shopCtx.strokeRect(38, 284, 196, 62);
+      shopCtx.fillStyle = C.accent;
+      shopCtx.beginPath(); shopCtx.arc(136, 292, 2.2, 0, Math.PI * 2); shopCtx.fill();
+      shopCtx.fillStyle = C.ink; mono(8, 600); shopCtx.textAlign = 'center';
+      shopCtx.fillText('NOTICE', 136, 306);
+      shopCtx.fillStyle = C.accent; mono(9);
+      var words = event.label.toUpperCase().split(' ');
+      shopCtx.fillText(words[0], 136, 319);
+      if (words[1]) shopCtx.fillText(words[1], 136, 329);
+      shopCtx.fillStyle = C.muted; mono(7);
+      shopCtx.fillText(event.hint.slice(0, 28), 136, 340);
+      shopCtx.textAlign = 'left';
+    }
+
+    // Shop status chip.
+    shopCtx.fillStyle = phase === 'report' ? C.accent : C.muted;
+    shopCtx.fillRect(672, 40, 98, 22);
+    shopCtx.fillStyle = C.card; mono(9, 600); shopCtx.textAlign = 'center';
+    shopCtx.fillText(phase === 'report' ? 'TRADING' : state ? 'PREPARING' : 'SHUTTERS DOWN', 721, 55);
+    shopCtx.textAlign = 'left';
+  }
+
+  /* ── the order sheet ──────────────────────────────────────────────────── */
 
   function renderRows() {
-    rows.innerHTML = PRODUCTS.map(function (product, i) {
-      return '<div class="row">' +
-        '<div class="who"><span class="name">' + product.name + '</span>' +
-        '<span class="meta" title="cost $' + product.cost.toFixed(2) + ' \u00b7 usual $' + product.value.toFixed(2) + '">' +
-        'cost $' + product.cost.toFixed(2) + ' \u00b7 usual $' + product.value.toFixed(2) + '</span></div>' +
-        '<div class="step"><span class="lab">price</span>' +
-        '<button type="button" data-act="price-" data-i="' + i + '" aria-label="Lower ' + product.name + ' price">\u2212</button>' +
-        '<b data-price="' + i + '">$0.00</b>' +
-        '<button type="button" data-act="price+" data-i="' + i + '" aria-label="Raise ' + product.name + ' price">+</button></div>' +
-        '<div class="step"><span class="lab">buy</span>' +
-        '<button type="button" data-act="order-" data-i="' + i + '" aria-label="Order one less ' + product.name + '">\u2212</button>' +
-        '<b data-order="' + i + '">0</b>' +
-        '<button type="button" data-act="order+" data-i="' + i + '" aria-label="Order one more ' + product.name + '">+</button></div>' +
-        '</div>';
+    productsBox.innerHTML = PRODUCTS.map(function (product, i) {
+      return '<article class="product">' +
+        '<canvas class="icon" data-icon="' + product.id + '" aria-hidden="true"></canvas>' +
+        '<div>' +
+          '<div class="pname"><b>' + product.name + '</b><span data-stock="' + i + '">Shelf 0</span></div>' +
+          '<div class="pmeta">cost $' + product.cost.toFixed(2) + ' \u00b7 usual $' + product.value.toFixed(2) +
+            (product.spoil ? ' \u00b7 spoils' : '') + '</div>' +
+          '<div class="steppers">' +
+            '<div class="stepper"><span class="lab">price</span>' +
+              '<button type="button" data-act="price-" data-i="' + i + '" aria-label="Lower ' + product.name + ' price">\u2212</button>' +
+              '<b class="price" data-price="' + i + '">$0.00</b>' +
+              '<button type="button" data-act="price+" data-i="' + i + '" aria-label="Raise ' + product.name + ' price">+</button></div>' +
+            '<div class="stepper"><span class="lab">order</span>' +
+              '<button type="button" data-act="order-" data-i="' + i + '" aria-label="Order one less ' + product.name + '">\u2212</button>' +
+              '<b data-order="' + i + '">0</b>' +
+              '<button type="button" data-act="order+" data-i="' + i + '" aria-label="Order one more ' + product.name + '">+</button></div>' +
+          '</div>' +
+        '</div>' +
+      '</article>';
     }).join('');
     rowEls = PRODUCTS.map(function (product, i) {
       return {
-        price: rows.querySelector('[data-price="' + i + '"]'),
-        order: rows.querySelector('[data-order="' + i + '"]'),
-        priceMinus: rows.querySelector('[data-act="price-"][data-i="' + i + '"]'),
-        pricePlus: rows.querySelector('[data-act="price+"][data-i="' + i + '"]'),
-        orderMinus: rows.querySelector('[data-act="order-"][data-i="' + i + '"]'),
-        orderPlus: rows.querySelector('[data-act="order+"][data-i="' + i + '"]')
+        price: productsBox.querySelector('[data-price="' + i + '"]'),
+        order: productsBox.querySelector('[data-order="' + i + '"]'),
+        stock: productsBox.querySelector('[data-stock="' + i + '"]'),
+        priceMinus: productsBox.querySelector('[data-act="price-"][data-i="' + i + '"]'),
+        pricePlus: productsBox.querySelector('[data-act="price+"][data-i="' + i + '"]'),
+        orderMinus: productsBox.querySelector('[data-act="order-"][data-i="' + i + '"]'),
+        orderPlus: productsBox.querySelector('[data-act="order+"][data-i="' + i + '"]')
       };
     });
+    paintCardIcons();
   }
 
   function paintRows() {
     var cap = capacity();
     var used = stockTotal() + ordersTotal();
     rowEls.forEach(function (el, i) {
+      var margin = state.prices[i] - PRODUCTS[i].cost;
       el.price.textContent = money(state.prices[i]);
+      el.price.className = 'price ' + (margin >= 0 ? 'up' : 'down');
       el.order.textContent = state.orders[i];
+      var onShelf = state.stock[i] + state.orders[i];
+      el.stock.textContent = 'Shelf ' + onShelf;
+      el.stock.className = onShelf === 0 ? 'down' : '';
       el.priceMinus.disabled = state.prices[i] <= priceFloor(PRODUCTS[i]) + 0.0001;
       el.pricePlus.disabled = state.prices[i] >= priceCeiling(PRODUCTS[i]) - 0.0001;
       el.orderMinus.disabled = state.orders[i] <= 0;
@@ -420,8 +1044,12 @@
   }
 
   function paintPlan() {
-    shelfLabel.textContent = 'SHELF ' + (stockTotal() + ordersTotal()) + ' / ' + capacity();
-    orderLabel.textContent = 'ORDER ' + money(orderCost());
+    var used = stockTotal() + ordersTotal();
+    $shelfCount.textContent = used + ' / ' + capacity();
+    $meter.style.width = clamp(used / capacity() * 100, 0, 100) + '%';
+    $meter.parentElement.className = used >= capacity() ? 'full' : '';
+    orderTotal.textContent = money(orderCost());
+    orderDay.textContent = 'Day ' + state.day;
     paintRows();
     var short = orderCost() - state.cash;
     if (short > 0.0001) {
@@ -432,51 +1060,78 @@
       planHint.textContent = 'Prices set. Open when ready.';
     }
     openButton.disabled = short > 0.0001;
-  }
-
-  function paintReport() {
-    var result = state.report;
-    if (!result) return;
-    var weather = WEATHER[result.weatherId], event = EVENTS[result.eventId];
-    dayline.textContent = 'DAY ' + state.day + ' \u00b7 ' + weather.label.toUpperCase() +
-      (event.label ? ' \u00b7 ' + event.label.toUpperCase() : '');
-    var bits = [];
-    PRODUCTS.forEach(function (product, i) {
-      if (result.soldBy[i] > 0) bits.push(product.name + ' ' + result.soldBy[i]);
-    });
-    soldline.textContent = bits.length ? bits.join(' \u00b7 ') : 'Nothing sold.';
-
-    var profit = result.revenue - result.cost;
-    ledger.innerHTML =
-      line('Served', result.served + ' of ' + result.count) +
-      line('Missed', result.missed + (result.missed === 1 ? ' item' : ' items')) +
-      line('Revenue', money(result.revenue, true)) +
-      line('Stock', money(-result.cost, true)) +
-      line('Spoiled', result.spoiled ? result.spoiled + ' at cost' : 'none') +
-      '<div class="line ' + (profit < 0 ? 'loss' : 'profit') + '"><span>Day profit</span><span>' + money(profit, true) + '</span></div>' +
-      '<div class="line total"><span>Till</span><span>' + money(state.cash) + ' \u00b7 REP ' + Math.round(state.rep) + '</span></div>';
-
-    var delta = result.repAfter - result.repBefore;
-    repNote.textContent = (delta >= 0 ? '+' : '') + delta.toFixed(1) + ' reputation \u2014 ' +
-      (delta >= 0 ? 'word gets around.' : 'missed baskets cost you.');
-
-    upgrades.hidden = state.day >= DAYS;
-    renderUpgrades();
-    nextButton.textContent = state.day >= DAYS ? 'See final results' : 'Next morning';
+    $shopNote.textContent = forecastText(state.plan);
+    $status.textContent = 'Preparing to open';
   }
 
   function line(label, value) {
     return '<div class="line"><span>' + label + '</span><span>' + value + '</span></div>';
   }
 
+  function paintReport() {
+    var result = state.report;
+    if (!result) return;
+    var weather = WEATHER[result.weatherId], event = EVENTS[result.eventId];
+    reportDay.textContent = 'DAY ' + state.day + ' \u00b7 ' + weather.label.toUpperCase() +
+      (event.label ? ' \u00b7 ' + event.label.toUpperCase() : '');
+    reportWeather.textContent = forecastText({ weatherId: result.weatherId, eventId: result.eventId });
+    reportTitle.textContent = result.served === result.count
+      ? 'Everybody served.'
+      : result.served >= Math.ceil(result.count * 0.65) ? 'A busy enough day.'
+      : result.served > 0 ? 'Some of them walked out.' : 'A quiet till.';
+
+    var bits = '';
+    PRODUCTS.forEach(function (product, i) {
+      if (result.soldBy[i] > 0) {
+        bits += '<div><canvas data-icon="' + product.id + '" width="26" height="26" aria-hidden="true"></canvas>' +
+          '<b>' + result.soldBy[i] + '</b><span>' + product.name + '</span></div>';
+      }
+    });
+    soldBox.innerHTML = bits || '<div><span>Nothing sold today.</span></div>';
+
+    var profit = result.revenue - result.cost;
+    ledgerBox.innerHTML =
+      line('Customers served', result.served + ' of ' + result.count) +
+      line('Items missed', result.missed + (result.missed === 1 ? ' item' : ' items')) +
+      line('Revenue', money(result.revenue, true)) +
+      line('Stock bought', money(-result.cost, true)) +
+      line('Spoiled', result.spoiled ? result.spoiled + ' at cost' : 'none') +
+      '<div class="line ' + (profit < 0 ? 'loss' : 'profit') + '"><span>Day profit</span><span>' + money(profit, true) + '</span></div>' +
+      '<div class="line total"><span>Till</span><span>' + money(state.cash) + ' \u00b7 REP ' + Math.round(state.rep) + ' \u00b7 SHELF ' + stockTotal() + '</span></div>';
+
+    var dots = '';
+    for (var d = 0; d < result.count; d++) dots += '<i class="' + (d < result.served ? '' : 'miss') + '"></i>';
+    dotsBox.innerHTML = dots;
+    dotsBox.setAttribute('aria-label', result.served + ' of ' + result.count + ' customers served');
+
+    var delta = result.repAfter - result.repBefore;
+    repNote.textContent = (delta >= 0 ? '+' : '') + delta.toFixed(1) + ' reputation \u2014 ' +
+      (delta >= 0 ? 'word gets around.' : 'missed baskets cost you.');
+
+    upgradesBox.hidden = state.day >= DAYS;
+    renderUpgrades();
+    paintCardIcons();
+    nextButton.textContent = state.day >= DAYS ? 'See final results' : 'Next morning';
+    $shopNote.textContent = forecastText({ weatherId: result.weatherId, eventId: result.eventId });
+    $status.textContent = 'Trading \u00b7 day ' + state.day;
+  }
+
   function renderUpgrades() {
-    upgrades.innerHTML = Object.keys(UPGRADES).map(function (id) {
+    var icons = {
+      shelf: '<svg viewBox="0 0 26 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5h22M2 14h22M4 5v12M22 5v12"/><rect x="6" y="7" width="4" height="6"/><rect x="12" y="7" width="4" height="6"/></svg>',
+      freezer: '<svg viewBox="0 0 26 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="22" height="14"/><path d="M2 8h22"/><path d="M5 5h4"/></svg>',
+      awning: '<svg viewBox="0 0 26 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 6h22l-2 4H4z"/><path d="M2 6V4h22v2"/><path d="M6 10v7M20 10v7"/></svg>'
+    };
+    upgradesBox.innerHTML = Object.keys(UPGRADES).map(function (id) {
       var upgrade = UPGRADES[id];
       var owned = state.upgrades[id];
       var poor = state.cash - upgrade.cost < WORKING_FLOAT;
-      return '<button type="button" data-buy="' + id + '"' + (owned || poor ? ' disabled' : '') +
+      return '<button type="button" class="upgrade' + (owned ? ' owned' : '') + '" data-buy="' + id + '"' +
+        (owned || poor ? ' disabled' : '') +
         (poor && !owned ? ' title="Keeps $' + WORKING_FLOAT + ' in the till for stock"' : '') + '>' +
-        '<span>' + upgrade.name + ' ' + upgrade.note + '</span>' +
+        icons[id] +
+        '<b>' + upgrade.name + '</b>' +
+        '<span>' + upgrade.note + '</span>' +
         '<span>' + (owned ? 'owned' : '$' + upgrade.cost) + '</span></button>';
     }).join('');
   }
@@ -484,41 +1139,52 @@
   function paintOver() {
     var profit = state.cash - START_CASH;
     finalCash.textContent = '$' + Math.round(state.cash);
-    grade.textContent = gradeFor(state.cash);
+    finalGrade.textContent = gradeFor(state.cash);
     finalStats.innerHTML =
       line('Started with', money(START_CASH)) +
       '<div class="line ' + (profit < 0 ? 'loss' : 'profit') + '"><span>Profit</span><span>' + money(profit, true) + '</span></div>' +
       line('Customers served', state.servedTotal) +
       line('Items missed', state.missedTotal) +
-      line('Reputation', Math.round(state.rep));
+      line('Final reputation', Math.round(state.rep)) +
+      line('Stock left on the shelf', stockTotal());
+    $shopNote.textContent = 'Fourteen days behind the counter.';
+    $status.textContent = 'Closed';
+  }
+
+  function paintHud() {
+    var cash = state ? state.cash : START_CASH;
+    var rep = state ? state.rep : START_REP;
+    $day.textContent = (state ? state.day : 1) + ' / ' + DAYS;
+    $cash.textContent = '$' + Math.round(cash);
+    $cash.className = cash < START_CASH ? 'bad' : 'good';
+    $rep.textContent = Math.round(rep);
   }
 
   function paint() {
+    paintHud();
     if (!state) {
-      hud.innerHTML = '<span>DAY 1 / 14</span><span>$' + START_CASH + ' \u00b7 REP ' + START_REP + '</span>';
-      forecast.textContent = 'A small shop on a good corner.';
-      intro.hidden = false;
+      introPanel.hidden = false;
       planPanel.hidden = true;
       reportPanel.hidden = true;
       overPanel.hidden = true;
-      return;
+      $shelfCount.textContent = '0 / ' + BASE_SHELF;
+      $meter.style.width = '0%';
+      $shopNote.textContent = 'A small shop on a good corner.';
+      $status.textContent = 'Shutters down';
+    } else {
+      introPanel.hidden = true;
+      planPanel.hidden = state.phase !== 'plan';
+      reportPanel.hidden = state.phase !== 'report';
+      overPanel.hidden = state.phase !== 'over';
+      if (state.phase === 'plan') paintPlan();
+      else if (state.phase === 'report') paintReport();
+      else if (state.phase === 'over') paintOver();
+      if (state.phase !== 'plan') {
+        $shelfCount.textContent = stockTotal() + ' / ' + capacity();
+        $meter.style.width = clamp(stockTotal() / capacity() * 100, 0, 100) + '%';
+      }
     }
-    hud.innerHTML = '<span>DAY ' + state.day + ' / ' + DAYS + '</span><span>$' +
-      Math.round(state.cash) + ' \u00b7 REP ' + Math.round(state.rep) + '</span>';
-    intro.hidden = true;
-    planPanel.hidden = state.phase !== 'plan';
-    reportPanel.hidden = state.phase !== 'report';
-    overPanel.hidden = state.phase !== 'over';
-    if (state.phase === 'plan') {
-      forecast.textContent = forecastText(state.plan);
-      paintPlan();
-    } else if (state.phase === 'report') {
-      forecast.textContent = forecastText({ weatherId: state.report.weatherId, eventId: state.report.eventId });
-      paintReport();
-    } else if (state.phase === 'over') {
-      forecast.textContent = 'Fourteen days behind the counter.';
-      paintOver();
-    }
+    drawShop();
   }
 
   /* ── a new run, and the day's seed ─────────────────────────────────────── */
@@ -627,7 +1293,7 @@
   openButton.addEventListener('click', openShop);
   nextButton.addEventListener('click', nextDay);
 
-  rows.addEventListener('click', function (event) {
+  productsBox.addEventListener('click', function (event) {
     var button = event.target.closest('button[data-act]');
     if (!button || !state || state.phase !== 'plan') return;
     var index = Number(button.getAttribute('data-i'));
@@ -642,7 +1308,7 @@
     saveGame();
   });
 
-  upgrades.addEventListener('click', function (event) {
+  upgradesBox.addEventListener('click', function (event) {
     var button = event.target.closest('button[data-buy]');
     if (!button || !state || state.phase !== 'report') return;
     var id = button.getAttribute('data-buy');
@@ -672,6 +1338,8 @@
 
   renderRows();
   paint();
+  if (window.ResizeObserver) new ResizeObserver(function () { drawShop(); }).observe($shop);
+  else window.addEventListener('resize', drawShop);
 
   if (resume) {
     resume.arm(function () {
