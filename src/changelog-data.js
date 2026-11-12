@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 402,
+  "count": 403,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1cd54b6","date":"2026-11-12","author":"Codebuff","subject":"Replace Fluid with the full upstream fluid simulation"},
   {"sha":"9522696","date":"2026-11-12","author":"bassdrum4","subject":"Restore the original OpenKrillion client and run state API"},
   {"sha":"b758d4d","date":"2026-11-12","author":"Codebuff","subject":"Accept faster Quickdraw times, fix Scrabble blanks and close the fluid walls"},
   {"sha":"1465a9b","date":"2026-11-12","author":"bassdrum4","subject":"Keep the Krillion migration portable"},
