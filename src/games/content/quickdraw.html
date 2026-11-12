@@ -210,8 +210,8 @@ function finish(winner, foul, ms) {
     if(foul) { validResult = false; reaction = 0; status.textContent = 'TOO EARLY'; detail.textContent = 'You fired before the signal.'; lanes[0].classList.add('foul'); }
     else {
       reaction = Math.round(ms);
-      // Below 100 ms is too fast to count as a meaningful human reaction record.
-      validResult = reaction >= 100 && reaction <= 2000;
+      // Below 50 ms is too fast to count as a meaningful human reaction record.
+      validResult = reaction >= 50 && reaction <= 2000;
       status.textContent = reaction + ' ms'; detail.textContent = validResult ? (reaction < 220 ? 'Lightning fast.' : reaction < 350 ? 'Nice draw.' : 'Try again.') : 'Shot recorded. Too quick or delayed for the board.';
       lanes[0].classList.add('hit');
       if(validResult && (!sessionBest || reaction < sessionBest)) sessionBest = reaction;

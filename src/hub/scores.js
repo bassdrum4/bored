@@ -96,7 +96,7 @@ export const HIGH_SCORE_GAMES = [
   // Solo only: reaction time in milliseconds. False starts and implausibly
   // fast responses do not qualify; local duels never affect the leaderboard.
   highScore('quickdraw', 'Quickdraw', 'ms', {
-    metric: 'milliseconds', lower: true, min: 100, max: 2000,
+    metric: 'milliseconds', lower: true, min: 50, max: 2000,
     when: snapshot => snapshot.finished === true && snapshot.solo === true
   }),
   // Clicker is endless: the running total is the whole score, so it is captured

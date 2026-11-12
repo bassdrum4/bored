@@ -258,6 +258,24 @@
     '}'
   ].join('\n');
 
+  // Closed walls. The outside of the grid has no cells, so a velocity cell on
+  // the border may only slide along it; the component pushing through is
+  // reflected to zero. Without this the field keeps pushing ink at the edge
+  // and the fluid looks like it is draining off screen instead of hitting a
+  // wall and piling up against it.
+  var BOUNDARY_FS = HEAD + [
+    'uniform sampler2D uVelocity;',
+    'uniform vec2 texelSize;',
+    'void main () {',
+    '  vec2 velocity = texture(uVelocity, vUv).xy;',
+    '  if (vUv.x < texelSize.x) velocity.x = max(velocity.x, 0.0);',
+    '  if (vUv.x > 1.0 - texelSize.x) velocity.x = min(velocity.x, 0.0);',
+    '  if (vUv.y < texelSize.y) velocity.y = max(velocity.y, 0.0);',
+    '  if (vUv.y > 1.0 - texelSize.y) velocity.y = min(velocity.y, 0.0);',
+    '  fragColor = vec4(velocity, 0.0, 1.0);',
+    '}'
+  ].join('\n');
+
   var CLEAR_FS = HEAD + [
     'uniform sampler2D uTexture;',
     'uniform float value;',
@@ -316,6 +334,7 @@
       vorticity: link(VORTICITY_FS),
       pressure: link(PRESSURE_FS),
       gradient: link(GRADIENT_FS),
+      boundary: link(BOUNDARY_FS),
       clear: link(CLEAR_FS),
       display: link(DISPLAY_FS)
     };
@@ -476,6 +495,14 @@
     blit(velocity.write);
     velocity.swap();
 
+    // The projection above can push the border outward again, so close the box
+    // once more before that field moves any ink.
+    gl.useProgram(programs.boundary.program);
+    gl.uniform2f(programs.boundary.uniforms.texelSize, velocity.texelX, velocity.texelY);
+    gl.uniform1i(programs.boundary.uniforms.uVelocity, velocity.read.attach(0));
+    blit(velocity.write);
+    velocity.swap();
+
     gl.useProgram(programs.advection.program);
     gl.uniform2f(programs.advection.uniforms.texelSize, velocity.texelX, velocity.texelY);
     gl.uniform1i(programs.advection.uniforms.uVelocity, velocity.read.attach(0));
@@ -490,6 +517,13 @@
     gl.uniform1f(programs.advection.uniforms.dissipation, config.DENSITY_DISSIPATION);
     blit(dye.write);
     dye.swap();
+
+    // Last, so every force added this frame meets the same closed border.
+    gl.useProgram(programs.boundary.program);
+    gl.uniform2f(programs.boundary.uniforms.texelSize, velocity.texelX, velocity.texelY);
+    gl.uniform1i(programs.boundary.uniforms.uVelocity, velocity.read.attach(0));
+    blit(velocity.write);
+    velocity.swap();
   }
 
   function render() {

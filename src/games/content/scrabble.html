@@ -10091,7 +10091,7 @@ for (const letter of 'abcdefghijklmnopqrstuvwxyz') {
     const choice = blankChoice;
     blankChoice = null;
     pickerEl.hidden = true;
-    place(choice.tile, choice.index, choice.letter);
+    place(choice.tile, choice.index, button.dataset.letter);
   };
   $('#letters').appendChild(button);
 }
