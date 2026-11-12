@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 409,
+  "count": 410,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2dae94c","date":"2026-11-12","author":"bassdrum4","subject":"Strip Krillion down to the playable surface"},
   {"sha":"a31fa30","date":"2026-11-12","author":"bassdrum4","subject":"Refresh the Puffer Party stylesheet cache"},
   {"sha":"ba0f4aa","date":"2026-11-12","author":"bassdrum4","subject":"Add live Puffer Party rooms over Supabase Realtime"},
   {"sha":"8583c10","date":"2026-11-12","author":"Codebuff","subject":"Ignore finished-game popups on a hub page without the dialog"},
