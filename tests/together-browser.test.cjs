@@ -98,7 +98,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   async function drop(page,n,returns=true){
     const game=await frame(page,'.columns');
     await game.waitForSelector(`.columns button[aria-label="Drop in column ${n}"]:not([disabled])`);
-    await game.click(`.columns button[aria-label="Drop in column ${n}"]`);
+    await game.$eval(`.columns button[aria-label="Drop in column ${n}"]:not([disabled])`, button => button.click());
     if(returns){
       try { await page.waitForFunction(()=>document.querySelector('#player').hidden,{timeout:15000}); }
       catch(error) {
