@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Air Hockey</title>
+<style>
+  :root{
+    --paper:#f5f2ea;
+    --rink:#e9ede7;
+    --ink:#191713;
+    --hair:#c3cbc2;
+    --dim:#6b6558;
+    --p1:#2f5041;
+    --p2:#a8412f;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --serif:Georgia,"Times New Roman",serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--paper);color:var(--ink);
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;overscroll-behavior:none;
+    font-family:var(--mono);touch-action:manipulation}
+  #stage{position:fixed;inset:0;display:flex;flex-direction:column}
+  #hud{flex:0 0 auto;display:flex;align-items:baseline;justify-content:center;gap:14px;
+    padding:10px 14px 2px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+  #hud b{font-weight:600;font-size:17px;font-variant-numeric:tabular-nums}
+  #hud .mid{color:var(--dim)}
+  #hud .who{color:var(--dim);font-size:10px}
+  #p1Score{color:var(--p1)} #p2Score{color:var(--p2)}
+  #meta{text-align:center;font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);padding-bottom:4px}
+  #board{position:relative;flex:1 1 auto;min-height:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  #toast{position:absolute;left:50%;top:12px;transform:translateX(-50%);font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--ink);background:var(--paper);border:1px solid var(--hair);
+    border-radius:2px;padding:5px 10px;opacity:0;transition:opacity .18s;pointer-events:none;white-space:nowrap}
+  #toast.on{opacity:1}
+
+  .overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:8px;padding:22px;text-align:center;background:var(--paper);background:rgba(245,242,234,.96)}
+  .overlay[hidden]{display:none}
+  .title{font-family:var(--serif);font-weight:700;font-size:clamp(30px,7vw,44px);letter-spacing:.02em;line-height:1}
+  .sub{margin-top:2px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+  .btn{width:min(260px,80vw);margin-top:12px;padding:11px 16px;font:inherit;font-size:12px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink);background:none;border:1px solid var(--ink);border-radius:2px;cursor:pointer}
+  .btn:hover:enabled,.btn:focus-visible{background:var(--ink);color:var(--paper);outline:none}
+  .btn small{display:block;margin-top:4px;font-size:9px;letter-spacing:.06em;text-transform:none;color:var(--dim)}
+  .btn:hover small,.btn:focus-visible small{color:#c9c4b8}
+  .btn.quiet{border-color:var(--hair)}
+  .btn.quiet:hover:enabled,.btn.quiet:focus-visible{border-color:var(--ink);background:none;color:var(--ink)}
+  .rule{width:min(260px,80vw);height:1px;background:var(--hair);margin:14px 0 2px}
+  .hint{max-width:34ch;margin-top:10px;font-size:11px;line-height:1.7;color:var(--dim)}
+  .score{font-family:var(--serif);font-weight:700;font-size:clamp(30px,7vw,46px);letter-spacing:.03em}
+  #resSub{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="hud">
+    <span class="who" id="p1Name">You</span>
+    <b id="p1Score">0</b>
+    <span class="mid">—</span>
+    <b id="p2Score">0</b>
+    <span class="who" id="p2Name">CPU</span>
+  </div>
+  <div id="meta">First to 7</div>
+  <div id="board">
+    <canvas id="c"></canvas>
+    <div id="toast" role="status" aria-live="polite"></div>
+  </div>
+</div>
+
+<div class="overlay" id="menu">
+  <div class="title">Air Hockey</div>
+  <div class="sub">Two mallets · one puck · first to seven</div>
+  <button class="btn" id="btnCpu">Play the computer</button>
+  <button class="btn quiet" id="btn2p">Two players</button>
+  <div class="rule"></div>
+  <div class="hint">Drag your mallet anywhere on your half of the table.<br>Your mallet is the only thing that hits the puck.</div>
+</div>
+
+<div class="overlay" id="diff" hidden>
+  <div class="title" style="font-size:clamp(24px,5.4vw,32px)">Pick a brain</div>
+  <div class="sub">The computer defends the far end</div>
+  <button class="btn" data-diff="easy">Easy<small>leaves the middle open</small></button>
+  <button class="btn" data-diff="normal">Normal<small>reads the angle</small></button>
+  <button class="btn" data-diff="hard">Hard<small>never stops moving</small></button>
+  <button class="btn quiet" id="btnDiffBack">Back</button>
+</div>
+
+<div class="overlay" id="over" hidden>
+  <div class="score" id="resTitle">You win</div>
+  <div id="resSub">7 — 4</div>
+  <button class="btn" id="btnRematch">Rematch</button>
+  <button class="btn quiet" id="btnMenu">Main menu</button>
+</div>
+
+<script>
+'use strict';
+(() => {
+
+/* ── table geometry ─────────────────────────────────────────────────────── */
+const W = 200, H = 110;          // rink, in table units; goals on the short ends
+const PUCK_R = 3.2, MALLET_R = 5.3;
+const GOAL_W = 34;               // goal mouth, centred on each end wall
+const RAIL = 2.6;                // drawn rail outside the rink edge
+const MAX_PUCK = 340;            // table units per second
+const MALLET_MAX = 720;
+const WIN_AT = 7;
+const SERVE_PAUSE = 1.05;
+
+/* ── canvas / fit ──────────────────────────────────────────────────────── */
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let SW = 0, SH = 0, DPR = 1, SCALE = 1, CX = 0, CY = 0, PORTRAIT = false;
+
+function resize(){
+  const board = document.getElementById('board').getBoundingClientRect();
+  SW = Math.max(1, board.width); SH = Math.max(1, board.height);
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(SW * DPR); cv.height = Math.round(SH * DPR);
+  cv.style.width = SW + 'px'; cv.style.height = SH + 'px';
+  PORTRAIT = SH > SW * 1.04;
+  // leave room for the rail and the goal mouths that sit in it
+  const pad = 22;
+  const long = PORTRAIT ? H : W, short = PORTRAIT ? W : H;
+  SCALE = Math.min((SW - pad * 2) / long, (SH - pad * 2) / short);
+  CX = SW / 2; CY = SH / 2;
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', resize);
+if(window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+resize();
+
+/* screen -> table. The portrait table is the same rink turned a quarter turn,
+   so player one (x = 0) sits at the bottom and the far goal is at the top. */
+function toTable(clientX, clientY){
+  const r = cv.getBoundingClientRect();
+  const dx = clientX - r.left - CX, dy = clientY - r.top - CY;
+  if(PORTRAIT) return { x: W/2 - dy / SCALE, y: H/2 + dx / SCALE };
+  return { x: W/2 + dx / SCALE, y: H/2 + dy / SCALE };
+}
+
+/* ── sound (small, synthesised) ────────────────────────────────────────── */
+let AC = null, MASTER = null;
+function audio(){
+  if(!AC){
+    try{
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      MASTER = AC.createGain(); MASTER.gain.value = .5; MASTER.connect(AC.destination);
+    }catch(e){ AC = null; }
+  }
+  if(AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, vol, type, to, delay){
+  const ac = audio(); if(!ac || !MASTER) return;
+  const t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+  if(to) o.frequency.exponentialRampToValueAtTime(Math.max(30, to), t + dur);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(.0002, vol), t + .004);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(MASTER); o.start(t); o.stop(t + dur + .03);
+}
+const sndHit  = v => { const k = Math.min(1, v / 240); tone(190 + 120 * k, .08, .05 + .05 * k, 'triangle', 90); tone(1000 + 500 * k, .025, .03, 'square'); };
+const sndWall = v => tone(150, .05, .025 + .02 * Math.min(1, v / 300), 'sine', 80);
+const sndGoal = () => { [0, 5, 9].forEach((s, i) => tone(392 * Math.pow(2, s / 12), .3, .045, 'triangle', null, i * .09)); };
+
+/* ── state ─────────────────────────────────────────────────────────────── */
+let mode = null;                 // 'cpu' | '2p'
+let difficulty = 'normal';
+let phase = 'menu';              // menu | diff | play | over
+let pausedUntil = 0;             // serve pause after a goal
+let score = [0, 0];
+let winner = -1;
+let toastTimer = 0;
+let serveToken = 0;
+
+const puck = { x: W/2, y: H/2, vx: 0, vy: 0, trail: [] };
+const mallets = [
+  { x: W*0.16, y: H/2, vx: 0, vy: 0, target: null },
+  { x: W*0.84, y: H/2, vx: 0, vy: 0, target: null }
+];
+const pointers = new Map();      // pointerId -> side
+const ripples = [];              // {x,y,r,t}
+let flashGoal = 0, flashSide = -1;
+
+const DIFF = {
+  easy:   { speed: 82,  react: .22,  err: 9,   attack: .6 },
+  normal: { speed: 112, react: .12,  err: 4.5, attack: .8 },
+  hard:   { speed: 150, react: .055, err: 1.8, attack: .95 }
+};
+let cpuBuf = { tx: W * .86, ty: H / 2, t: 0 };
+
+const $ = id => document.getElementById(id);
+
+function resetPositions(){
+  score = [0, 0];
+  winner = -1;
+  puck.x = W / 2; puck.y = H / 2; puck.vx = 0; puck.vy = 0; puck.trail.length = 0;
+  mallets[0].x = W * .16; mallets[0].y = H / 2; mallets[0].vx = mallets[0].vy = 0; mallets[0].target = null;
+  mallets[1].x = W * .84; mallets[1].y = H / 2; mallets[1].vx = mallets[1].vy = 0; mallets[1].target = null;
+  ripples.length = 0; pointers.clear(); flashGoal = 0;
+  pausedUntil = 0;
+  serveToken++;
+  hud();
+}
+
+function hud(){
+  $('p1Score').textContent = score[0];
+  $('p2Score').textContent = score[1];
+  $('p1Name').textContent = mode === '2p' ? 'P1' : 'You';
+  $('p2Name').textContent = mode === '2p' ? 'P2' : 'CPU';
+  $('meta').textContent = 'First to ' + WIN_AT +
+    (mode === 'cpu' ? ' · ' + difficulty : mode === '2p' ? ' · two players, one table' : '');
+}
+
+function toast(text, ms){
+  const el = $('toast');
+  el.textContent = text;
+  el.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('on'), ms || 1100);
+}
+
+function startGame(nextMode, keepScore){
+  mode = nextMode;
+  phase = 'play';
+  $('menu').hidden = true;
+  $('diff').hidden = true;
+  $('over').hidden = true;
+  if(!keepScore) resetPositions();
+  hud();
+  audio();
+}
+
+/* ── table helpers ─────────────────────────────────────────────────────── */
+const halfOf = side => side === 0
+  ? { min: MALLET_R + 1, max: W / 2 - .5 }
+  : { min: W / 2 + .5, max: W - MALLET_R - 1 };
+
+function clampMallet(side){
+  const m = mallets[side], h = halfOf(side);
+  m.x = Math.max(h.min, Math.min(h.max, m.x));
+  m.y = Math.max(MALLET_R + 1, Math.min(H - MALLET_R - 1, m.y));
+}
+
+const inMouth = y => Math.abs(y - H / 2) <= GOAL_W / 2;
+const isCpu = side => mode === 'cpu' && side === 1;
+
+/* ── physics ───────────────────────────────────────────────────────────── */
+function moveMallets(dt){
+  for(let side = 0; side < 2; side++){
+    const m = mallets[side];
+    const ox = m.x, oy = m.y;
+    if(m.target && !isCpu(side)){
+      const dx = m.target.x - m.x, dy = m.target.y - m.y;
+      const dist = Math.hypot(dx, dy);
+      const step = Math.min(dist, MALLET_MAX * dt);
+      if(dist > 0.0001){ m.x += dx / dist * step; m.y += dy / dist * step; }
+    }
+    clampMallet(side);
+    m.vx = (m.x - ox) / dt;
+    m.vy = (m.y - oy) / dt;
+    // a hand cannot teleport a mallet, and the puck should not see a wall of
+    // velocity it could never have been given
+    const sp = Math.hypot(m.vx, m.vy);
+    if(sp > MALLET_MAX){ m.vx *= MALLET_MAX / sp; m.vy *= MALLET_MAX / sp; }
+  }
+}
+
+function cpuThink(dt){
+  const m = mallets[1], cfg = DIFF[difficulty] || DIFF.normal;
+  cpuBuf.t -= dt;
+  if(cpuBuf.t <= 0){
+    cpuBuf.t = cfg.react;
+    const err = cfg.err * (Math.random() * 2 - 1);
+    const px = puck.x + puck.vx * (cfg.react + .04);
+    const py = puck.y + puck.vy * (cfg.react + .04);
+    const attacking = px > W * .46 && (puck.vx > -30 || px > W * .62);
+    if(attacking){
+      // sit behind the puck, aimed at the far goal, and push through it
+      const gy = H / 2 + err * .6;
+      const ang = Math.atan2(gy - py, 0 - px);
+      const back = (PUCK_R + MALLET_R) * .94;
+      cpuBuf.tx = px - Math.cos(ang) * back + err * .35;
+      cpuBuf.ty = py - Math.sin(ang) * back + err;
+    } else {
+      cpuBuf.tx = W - 13;
+      cpuBuf.ty = H / 2 + (py - H / 2) * .82 + err;
+      // drift back into the centre when the puck is nowhere near
+      if(puck.x < W * .3 && Math.abs(puck.vx) < 40) cpuBuf.ty += (H / 2 - cpuBuf.ty) * .5;
+    }
+    const lim = halfOf(1);
+    cpuBuf.tx = Math.max(lim.min, Math.min(lim.max, cpuBuf.tx));
+    cpuBuf.ty = Math.max(MALLET_R + 2, Math.min(H - MALLET_R - 2, cpuBuf.ty));
+  }
+
+  const dx = cpuBuf.tx - m.x, dy = cpuBuf.ty - m.y;
+  const dist = Math.hypot(dx, dy);
+  const step = Math.min(dist, cfg.speed * dt);
+  if(dist > .0001){
+    m.x += dx / dist * step;
+    m.y += dy / dist * step;
+  }
+}
+
+function paddleHit(m){
+  const dx = puck.x - m.x, dy = puck.y - m.y;
+  const d = Math.hypot(dx, dy) || .0001;
+  const min = PUCK_R + MALLET_R;
+  if(d >= min) return false;
+  const nx = dx / d, ny = dy / d;
+  puck.x = m.x + nx * min;
+  puck.y = m.y + ny * min;
+  const paddleAlong = m.vx * nx + m.vy * ny;
+  const puckAlong = puck.vx * nx + puck.vy * ny;
+  const closing = puckAlong - paddleAlong;
+  if(closing < 0){
+    const j = -(1 + .92) * closing;
+    puck.vx += nx * j;
+    puck.vy += ny * j;
+  }
+  // carry some of the mallet's own motion, so a moving strike is heavier
+  puck.vx += m.vx * .22;
+  puck.vy += m.vy * .22;
+  const sp = Math.hypot(puck.vx, puck.vy);
+  if(sp < 55){ puck.vx += nx * 38; puck.vy += ny * 38; }
+  sndHit(Math.hypot(m.vx, m.vy) + Math.abs(closing));
+  ripples.push({ x: puck.x, y: puck.y, r: PUCK_R, t: 1 });
+  return true;
+}
+
+function stepPuck(dt){
+  if(pausedUntil > performance.now() / 1000){
+    puck.vx = puck.vy = 0;
+    return;
+  }
+  puck.trail.push({ x: puck.x, y: puck.y });
+  if(puck.trail.length > 6) puck.trail.shift();
+
+  puck.x += puck.vx * dt;
+  puck.y += puck.vy * dt;
+
+  // air: very little friction, so a hard shot keeps its pace across the table
+  const drag = Math.max(0, 1 - .30 * dt);
+  puck.vx *= drag; puck.vy *= drag;
+  const sp = Math.hypot(puck.vx, puck.vy);
+  if(sp > MAX_PUCK){ puck.vx *= MAX_PUCK / sp; puck.vy *= MAX_PUCK / sp; }
+  if(sp < 2){ puck.vx = 0; puck.vy = 0; }
+
+  for(const m of mallets) paddleHit(m);
+
+  // long walls
+  if(puck.y < PUCK_R){ puck.y = PUCK_R; if(puck.vy < 0){ puck.vy = -puck.vy * .94; sndWall(-puck.vy); } }
+  if(puck.y > H - PUCK_R){ puck.y = H - PUCK_R; if(puck.vy > 0){ puck.vy = -puck.vy * .94; sndWall(puck.vy); } }
+
+  // goal ends
+  if(puck.x < PUCK_R){
+    if(inMouth(puck.y) && puck.x < 0){ goal(1); return; }
+    if(!inMouth(puck.y)){ puck.x = PUCK_R; if(puck.vx < 0){ puck.vx = -puck.vx * .94; sndWall(-puck.vx); } }
+  }
+  if(puck.x > W - PUCK_R){
+    if(inMouth(puck.y) && puck.x > W){ goal(0); return; }
+    if(!inMouth(puck.y)){ puck.x = W - PUCK_R; if(puck.vx > 0){ puck.vx = -puck.vx * .94; sndWall(puck.vx); } }
+  }
+}
+
+function goal(side){
+  score[side]++;
+  flashGoal = 1; flashSide = side;
+  sndGoal();
+  hud();
+  ripples.length = 0;
+  if(score[side] >= WIN_AT){
+    winner = side;
+    phase = 'over';
+    puck.vx = puck.vy = 0;
+    showResult();
+    return;
+  }
+  // the team that conceded gets the puck back: centre spot, served their way
+  puck.x = W / 2; puck.y = H / 2;
+  puck.vx = 0; puck.vy = 0;
+  puck.trail.length = 0;
+  pausedUntil = performance.now() / 1000 + SERVE_PAUSE;
+  const token = ++serveToken;
+  setTimeout(() => {
+    if(token !== serveToken || phase !== 'play') return;
+    pausedUntil = 0;
+    // possession goes to the side that conceded: the puck waits in their half
+    const concededBy = side === 0 ? 1 : 0;
+    puck.x = concededBy === 1 ? W / 2 + 18 : W / 2 - 18;
+    puck.y = H / 2 + (Math.random() * 2 - 1) * 10;
+    puck.vx = 0; puck.vy = 0;
+    puck.trail.length = 0;
+    toast(side === 0 ? 'Goal — ' + (mode === '2p' ? 'P1' : 'you') : (mode === '2p' ? 'Goal — P2' : 'CPU scores'));
+  }, SERVE_PAUSE * 1000);
+}
+
+/* ── input ─────────────────────────────────────────────────────────────── */
+function sideFor(point){
+  if(point.x < W / 2) return 0;
+  return 1;
+}
+
+function onDown(e){
+  if(phase !== 'play') return;
+  audio();
+  const p = toTable(e.clientX, e.clientY);
+  const side = sideFor(p);
+  if(isCpu(side)) return;
+  e.preventDefault();
+  pointers.set(e.pointerId, side);
+  try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+  const m = mallets[side];
+  m.target = { x: p.x, y: p.y };
+}
+
+function onMove(e){
+  if(phase !== 'play') return;
+  const side = pointers.get(e.pointerId);
+  if(side === undefined) return;
+  e.preventDefault();
+  const p = toTable(e.clientX, e.clientY);
+  mallets[side].target = { x: p.x, y: p.y };
+}
+
+function onUp(e){
+  pointers.delete(e.pointerId);
+}
+
+cv.addEventListener('pointerdown', onDown, { passive: false });
+cv.addEventListener('pointermove', onMove, { passive: false });
+cv.addEventListener('pointerup', onUp);
+cv.addEventListener('pointercancel', onUp);
+cv.addEventListener('contextmenu', e => e.preventDefault());
+
+/* ── render ────────────────────────────────────────────────────────────── */
+function roundRect(x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawTable(){
+  // rail: a pale wooden edge with the goals cut into it
+  ctx.fillStyle = '#d9dfd5';
+  roundRect(-RAIL, -RAIL, W + RAIL * 2, H + RAIL * 2, 6);
+  ctx.fill();
+
+  // surface
+  ctx.fillStyle = '#e9ede7';
+  roundRect(0, 0, W, H, 2.5);
+  ctx.fill();
+
+  // markings
+  ctx.strokeStyle = '#c3cbc2';
+  ctx.lineWidth = .7;
+  ctx.beginPath(); ctx.moveTo(W / 2, 2); ctx.lineTo(W / 2, H - 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(W / 2, H / 2, 15, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = '#c3cbc2';
+  ctx.beginPath(); ctx.arc(W / 2, H / 2, 1.1, 0, Math.PI * 2); ctx.fill();
+
+  // goal creases and mouths
+  for(const side of [0, 1]){
+    const x = side === 0 ? 0 : W;
+    const inbound = side === 0 ? 1 : -1;
+    ctx.strokeStyle = side === 0 ? '#9fb3a6' : '#d3a79f';
+    ctx.lineWidth = .8;
+    ctx.beginPath();
+    ctx.arc(x, H / 2, 19, side === 0 ? -Math.PI / 2 : Math.PI / 2, side === 0 ? Math.PI / 2 : Math.PI * 1.5);
+    ctx.stroke();
+
+    // the mouth: a slot through the rail, wider at the back
+    const flash = flashGoal > 0 && flashSide === side;
+    ctx.fillStyle = flash ? (side === 0 ? '#2f5041' : '#a8412f') : '#191713';
+    ctx.globalAlpha = flash ? .55 + .35 * flashGoal : .82;
+    ctx.beginPath();
+    ctx.moveTo(x, H / 2 - GOAL_W / 2);
+    ctx.lineTo(x - inbound * RAIL, H / 2 - GOAL_W / 2 - .6);
+    ctx.lineTo(x - inbound * RAIL, H / 2 + GOAL_W / 2 + .6);
+    ctx.lineTo(x, H / 2 + GOAL_W / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // a thin lip so the slot reads as part of the table, not a hole in the page
+    ctx.strokeStyle = '#efece2';
+    ctx.lineWidth = .6;
+    ctx.beginPath();
+    ctx.moveTo(x, H / 2 - GOAL_W / 2);
+    ctx.lineTo(x, H / 2 + GOAL_W / 2);
+    ctx.stroke();
+  }
+}
+
+function drawPuck(){
+  for(let i = 0; i < puck.trail.length; i++){
+    const t = puck.trail[i];
+    ctx.globalAlpha = (i / puck.trail.length) * .10;
+    ctx.fillStyle = '#191713';
+    ctx.beginPath(); ctx.arc(t.x, t.y, PUCK_R, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#191713';
+  ctx.beginPath(); ctx.arc(puck.x, puck.y, PUCK_R, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#e9ede7';
+  ctx.beginPath(); ctx.arc(puck.x, puck.y, PUCK_R * .45, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawMallet(m, side){
+  const color = side === 0 ? '#2f5041' : '#a8412f';
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(m.x, m.y, MALLET_R, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#f5f2ea';
+  ctx.lineWidth = .9;
+  ctx.beginPath(); ctx.arc(m.x, m.y, MALLET_R * .62, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = '#f5f2ea';
+  ctx.beginPath(); ctx.arc(m.x, m.y, MALLET_R * .2, 0, Math.PI * 2); ctx.fill();
+}
+
+function draw(){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, SW, SH);
+  ctx.save();
+  ctx.translate(CX, CY);
+  if(PORTRAIT) ctx.rotate(-Math.PI / 2);
+  ctx.scale(SCALE, SCALE);
+  ctx.translate(-W / 2, -H / 2);
+
+  drawTable();
+  for(const r of ripples){
+    ctx.globalAlpha = r.t * .35;
+    ctx.strokeStyle = '#191713';
+    ctx.lineWidth = .6;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  drawPuck();
+  drawMallet(mallets[0], 0);
+  drawMallet(mallets[1], 1);
+  ctx.restore();
+}
+
+/* ── loop ──────────────────────────────────────────────────────────────── */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(.05, (now - last) / 1000);
+  last = now;
+
+  if(phase === 'play'){
+    if(isCpu(1)) cpuThink(dt);
+    moveMallets(dt);
+    const steps = 4, h = dt / steps;
+    for(let i = 0; i < steps; i++){ if(phase !== 'play') break; stepPuck(h); }
+    for(const r of ripples){ r.r += 26 * dt; r.t -= 1.7 * dt; }
+    for(let i = ripples.length - 1; i >= 0; i--) if(ripples[i].t <= 0) ripples.splice(i, 1);
+    if(flashGoal > 0) flashGoal = Math.max(0, flashGoal - dt * 1.6);
+  }
+  draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ── menus ─────────────────────────────────────────────────────────────── */
+$('btnCpu').addEventListener('click', () => {
+  $('menu').hidden = true;
+  $('diff').hidden = false;
+});
+$('btn2p').addEventListener('click', () => startGame('2p'));
+$('btnDiffBack').addEventListener('click', () => {
+  $('diff').hidden = true;
+  $('menu').hidden = false;
+});
+for(const b of document.querySelectorAll('[data-diff]')){
+  b.addEventListener('click', () => {
+    difficulty = b.dataset.diff;
+    startGame('cpu');
+  });
+}
+$('btnRematch').addEventListener('click', () => {
+  startGame(mode, false);
+  cpuBuf = { tx: W * .86, ty: H / 2, t: 0 };
+});
+$('btnMenu').addEventListener('click', () => {
+  phase = 'menu'; mode = null;
+  resetPositions();
+  $('over').hidden = true;
+  $('menu').hidden = false;
+  hud();
+});
+
+function showResult(){
+  const p1 = score[0], p2 = score[1];
+  const label = mode === '2p' ? (winner === 0 ? 'P1 wins' : 'P2 wins')
+                              : (winner === 0 ? 'You win' : 'The computer wins');
+  $('resTitle').textContent = label;
+  $('resTitle').style.color = winner === 0 ? '#2f5041' : '#a8412f';
+  $('resSub').textContent = p1 + ' — ' + p2;
+  $('over').hidden = false;
+}
+
+/* ── Bored hook ────────────────────────────────────────────────────────── */
+// A finished match against the computer ranks on the margin, so a 7–1 night
+// beats a 7–6 one. Local two-player games never post a score.
+window.__boredSnapshot = () => ({
+  slug: 'air-hockey',
+  goals: score[0],
+  conceded: score[1],
+  margin: Math.max(0, score[0] - score[1]),
+  won: phase === 'over' && winner === 0,
+  finished: phase === 'over',
+  cpu: mode === 'cpu'
+});
+
+})();
+</script>
+</body>
+</html>

@@ -2658,9 +2658,12 @@ function initHud(){
   const sb=document.getElementById('shareBtn');
   sb.addEventListener('pointerdown',stopper);
   sb.addEventListener('click',e=>{ e.stopPropagation(); shareResult(); });
+  // the vendored copy carries no credit <a> in #resFoot, so this link is optional
   const rf=document.querySelector('#resFoot a');
-  rf.addEventListener('pointerdown',stopper);
-  rf.addEventListener('click',e=>e.stopPropagation());
+  if(rf){
+    rf.addEventListener('pointerdown',stopper);
+    rf.addEventListener('click',e=>e.stopPropagation());
+  }
   // desktop fullscreen toggle (touch devices use the ⛶ in the button row);
   // pointerdown must not leak into "tap to start / race again"
   const fs=document.getElementById('fsBtn');

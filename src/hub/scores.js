@@ -88,6 +88,12 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // A finished match against the computer ranks the winning margin, so 7–1
+  // beats 7–6. Local two-player games and abandoned matches never post.
+  highScore("air-hockey", "Air Hockey", "goals", {
+    metric: "margin", min: 1, max: 7,
+    when: snapshot => snapshot.finished === true && snapshot.won === true && snapshot.cpu === true
+  }),
   // Today's three dailies added up: Pokédoku (1350) + Inverse Doku (600) + Shiny Hunt (700).
   highScore("pokedoku", "Pokédoku", "points", { metric: "points", max: 2650, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
   // Krillion ranks the server-checked total of a finished seven-prompt dive.

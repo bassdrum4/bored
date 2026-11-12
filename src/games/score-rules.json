@@ -9,6 +9,11 @@
     "better": "high",
     "max_value": 1000
   },
+  "air-hockey": {
+    "label": "Goal margin",
+    "better": "high",
+    "max_value": 7
+  },
   "ashcrown": {
     "label": "Renown in a finished campaign",
     "better": "high",
@@ -125,7 +130,7 @@
     "max_value": 10000000
   },
   "pokedoku": {
-    "label": "Today's three Pok\u00e9mon dailies added up",
+    "label": "Today's three Pokémon dailies added up",
     "better": "high",
     "max_value": 2650
   },
