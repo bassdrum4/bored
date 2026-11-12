@@ -68,40 +68,57 @@ function status(message, tone = '') {
 const reef = new Reef($('reef'));
 reef.start();
 
-function ringPoints(count) {
+// The ring lives in the water between the category card and the dock, so the
+// top perch never hides behind the card and the bottom one never sits on the
+// clock. Krillion lays its own ring out the same way.
+function ringLayout(count) {
   const w = innerWidth;
   const h = innerHeight;
   const cx = w / 2;
-  const cy = h * (h < 640 ? .38 : .41);
-  const rx = Math.min(w * (count > 6 ? .37 : .30), 330);
-  const ry = Math.min(h * .115, 110);
+  const card = $('prompt-card');
+  const dock = $('dock');
+  const foot = $('lobbyfoot');
+  const top = card && !card.hidden ? card.getBoundingClientRect().bottom + 10 : h * (h < 640 ? .30 : .28);
+  let bottom = h - (h < 640 ? 150 : 196);
+  if (dock && !dock.hidden) bottom = Math.min(bottom, dock.getBoundingClientRect().top - 16);
+  else if (foot && !foot.hidden) bottom = Math.min(bottom, foot.getBoundingClientRect().top - 14);
+  bottom = Math.max(top + 140, bottom);
+  const cy = Math.round((top + bottom) / 2);
+  const ry = Math.max(40, (bottom - top) / 2 - 70);
+  const rx = Math.min(w * (count > 6 ? .34 : .31), 340);
   const scale = w < 760 ? .72 : w < 1100 ? .86 : 1;
   const points = [];
   for (let i = 0; i < count; i++) {
     const angle = Math.PI / 2 + i * (Math.PI * 2 / count);
     points.push({ x: cx + Math.cos(angle) * rx, y: cy + Math.sin(angle) * ry, scale });
   }
-  return points;
+  return { points, cx, cy };
+}
+
+function ringPoints(count) {
+  return ringLayout(count).points;
 }
 
 function placeRing(count) {
-  const points = ringPoints(count);
+  const { points, cx, cy } = ringLayout(count);
   reef.seats = points;
-  $('puffer').style.left = (innerWidth / 2) + 'px';
-  $('puffer').style.top = (innerHeight * (innerHeight < 640 ? .42 : .44)) + 'px';
-  $('zz').style.left = (innerWidth / 2 + 58) + 'px';
-  $('zz').style.top = (innerHeight * (innerHeight < 640 ? .42 : .44) - 78) + 'px';
-  for (const seat of document.querySelectorAll('#ring .pf-seat')) {
-    const point = points[Number(seat.dataset.seat)];
-    if (!point) continue;
+  $('puffer').style.left = cx + 'px';
+  $('puffer').style.top = cy + 'px';
+  $('zz').style.left = (cx + 58) + 'px';
+  $('zz').style.top = (cy - 78) + 'px';
+  // Perches are laid out in ring order, not in seat order: a round only rings
+  // the divers who are still in it, and the room lobby adds its open perches.
+  [...document.querySelectorAll('#ring .pf-seat')].forEach((seat, index) => {
+    const point = points[index];
+    if (!point) return;
     seat.style.left = point.x + 'px';
     seat.style.top = point.y + 'px';
-  }
+  });
 }
 
 addEventListener('resize', () => {
   reef.resize();
-  if (state.view) placeRing(state.view.seats || state.seats);
+  if (state.view) placeRing(seatSlots(state.view).length);
 });
 
 /* ── lobby ──────────────────────────────────────────────────────────────── */
@@ -213,16 +230,28 @@ function meterBar(player, target) {
   return `<span class="pf-meter pf-seat-meter${Number(player.meter) >= target ? ' full' : ''}">${bars}</span>`;
 }
 
+// A round rings only the divers still in it; the lobby rings every seat, with
+// unclaimed ones waiting empty. My own perch always sits at the bottom.
+function seatSlots(view) {
+  const total = view.seats || state.seats;
+  const slots = Array.from({ length: total }, (_, index) => ({
+    seat: index,
+    player: view.players.find(item => item.seat === index) || null,
+  }));
+  const list = view.status === 'lobby' ? slots : slots.filter(slot => slot.player);
+  const mine = list.findIndex(slot => slot.player?.you);
+  return mine > 0 ? [...list.slice(mine), ...list.slice(0, mine)] : list;
+}
+
 function paintSeats(view) {
-  const seats = view.seats || state.seats;
+  const slots = seatSlots(view);
   const winnerSeat = view.winner?.seat;
   const maxLives = view.maxLives || 5;
   const target = view.heartMeter || 600;
   const spoken = new Map();
   for (const entry of view.used || []) if (entry.name) spoken.set(entry.name, entry);
   const rows = [];
-  for (let i = 0; i < seats; i++) {
-    const player = view.players.find(item => item.seat === i);
+  for (const { seat: i, player } of slots) {
     if (!player) {
       rows.push(`<div class="pf-seat open" data-seat="${i}"><div class="pf-seat-in"><div class="pf-body"><div class="pf-spr-wrap"></div></div><span class="pf-meter pf-seat-meter"></span><div class="pf-plate"></div></div></div>`);
       continue;
@@ -253,7 +282,7 @@ function paintSeats(view) {
     </div>`);
   }
   $('ring').innerHTML = rows.join('');
-  placeRing(seats);
+  placeRing(slots.length);
 }
 
 function paintHud(view) {
@@ -384,8 +413,9 @@ function paint(view) {
   state.view = view;
   state.offset = (view.serverNow || Date.now()) - Date.now();
   paintHud(view);
-  paintSeats(view);
+  // Prompt first: the ring measures the card to stay out of its way.
   paintPrompt(view);
+  paintSeats(view);
   paintTurn(view);
   paintOver(view);
   paintClock();
