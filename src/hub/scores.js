@@ -88,12 +88,8 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
-  // Only the daily board scores: 100 a category, 6 guesses, max 600.
-  highScore("inverse-doku", "Inverse Doku", "points", { metric: "points", max: 600, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
-  // Only the daily hunt scores: seven prompts, up to 100 each.
-  highScore("shiny-hunt", "Shiny Hunt", "points", { metric: "points", max: 700, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
-  // Only the daily board scores: 50 a square plus a rarity bonus, max 1350.
-  highScore("pokedoku", "Pokédoku", "points", { metric: "points", max: 1350, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
+  // Today's three dailies added up: Pokédoku (1350) + Inverse Doku (600) + Shiny Hunt (700).
+  highScore("pokedoku", "Pokédoku", "points", { metric: "points", max: 2650, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
   // Krillion ranks the server-checked total of a finished seven-prompt dive.
   highScore('krillion', 'Krillion', 'points', {
     metric: 'score', min: 1, max: 700,
