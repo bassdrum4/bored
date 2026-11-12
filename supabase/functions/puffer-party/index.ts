@@ -18,6 +18,10 @@ const ROUNDS = 7;
 const START_LIVES = 2;
 const MAX_LIVES = 5;
 const HEART_METER = 600;
+// The host can retune the heart meter: 50-point steps, six hundred by default.
+const METER_MIN = 300;
+const METER_MAX = 5000;
+const METER_STEP = 50;
 const FUSE_MIN = 10_000;
 const FUSE_MAX = 30_000;
 // The host picks the fuse floor (MIN. TURN) and the starting hearts (LIVES) in
@@ -58,6 +62,7 @@ type PartyState = {
   seats: number;
   lives: number;
   minTurn: number;
+  meterTarget?: number;
   rated: boolean;
   round: number;
   promptIndex: number;
@@ -374,7 +379,7 @@ async function snapshot(room: Room, state: PartyState, token: string, book: Book
     revision: state.revision,
     prompt: { text: prompt.text, number: prompt.number, total: prompt.total },
     round: state.round,
-    heartMeter: HEART_METER,
+    heartMeter: state.meterTarget || HEART_METER,
     maxLives: MAX_LIVES,
     fuseTotal: state.fuseTotal ?? 0,
     freeze: state.popUntil && now < state.popUntil ? state.popUntil : null,
@@ -550,13 +555,14 @@ async function answerParty(body: Record<string, any>, token: string) {
   const last = segs[segs.length - 1];
   if (last && last.tier === match.tier) last.amt += points;
   else segs.push({ tier: match.tier, amt: points });
+  const meterTarget = state.meterTarget || HEART_METER;
   let hearts = 0;
-  while (mine.meter >= HEART_METER && mine.lives < MAX_LIVES) {
+  while (mine.meter >= meterTarget && mine.lives < MAX_LIVES) {
     mine.lives += 1;
-    mine.meter -= HEART_METER;
+    mine.meter -= meterTarget;
     hearts += 1;
   }
-  if (mine.meter >= HEART_METER) mine.meter = HEART_METER - 1;
+  if (mine.meter >= meterTarget) mine.meter = meterTarget - 1;
   // Spending the meter on a heart clears its segments; the leftover stays.
   if (hearts) mine.segs = mine.meter > 0 ? [{ tier: match.tier, amt: mine.meter }] : [];
   else mine.segs = segs;
@@ -591,6 +597,12 @@ async function settingsParty(body: Record<string, any>, token: string) {
   if (state.status !== 'lobby') throw new HttpError('The room is locked once the puffer wakes.', 409);
   const nextLives = clampInt(body.lives ?? state.lives, LIVES_MIN, MAX_LIVES, state.lives);
   const nextTurn = clampInt(body.minTurn ?? state.minTurn, MIN_TURN_MIN, MIN_TURN_MAX, state.minTurn);
+  let nextMeter = state.meterTarget || HEART_METER;
+  if (body.meterTarget !== undefined) {
+    const wanted = Number(body.meterTarget);
+    if (!Number.isFinite(wanted)) throw new HttpError('That meter is not a number.', 400);
+    nextMeter = Math.max(METER_MIN, Math.min(METER_MAX, Math.round(wanted / METER_STEP) * METER_STEP));
+  }
   let nextSeats = state.seats;
   if (body.seats !== undefined) {
     const wanted = Number(body.seats);
@@ -598,13 +610,15 @@ async function settingsParty(body: Record<string, any>, token: string) {
     if (wanted < state.players.length) throw new HttpError('More divers are aboard than that many seats.', 409);
     nextSeats = wanted;
   }
-  const changed = nextLives !== state.lives || nextTurn !== state.minTurn || nextSeats !== state.seats;
+  const changed = nextLives !== state.lives || nextTurn !== state.minTurn || nextSeats !== state.seats
+    || nextMeter !== (state.meterTarget || HEART_METER);
   state.lives = nextLives;
   state.minTurn = nextTurn;
   state.seats = nextSeats;
+  state.meterTarget = nextMeter;
   for (const player of state.players) player.lives = nextLives;
   if (!changed) return snapshot(room, state, token, await loadBook());
-  pushLog(state, [`The host set the room to ${nextLives} ${nextLives === 1 ? 'heart' : 'hearts'} and a ${nextTurn}s minimum turn.`]);
+  pushLog(state, [`The host set the room to ${nextLives} ${nextLives === 1 ? 'heart' : 'hearts'}, a ${nextTurn}s minimum turn and a ${nextMeter}-point meter.`]);
   const saved = await saveRoom(room, state);
   return snapshot(saved, state, token, await loadBook());
 }
