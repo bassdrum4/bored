@@ -117,7 +117,10 @@ test('the entry document loads the hub as modules from its own folder', () => {
   assert.match(entry, /<script type="module" src="\.\/main\.js"><\/script>/, 'the hub is a module beside the page');
   assert.match(entry, /<link rel="stylesheet" href="\.\/styles\.css">/, 'the stylesheet is a sibling file');
   assert.doesNotMatch(entry, /(?:src|href)="\/(?!\/)/, 'no root-absolute paths: the site is served under /bored/');
-  assert.doesNotMatch(entry, /<script>/, 'nothing is inlined into the page');
+  const inlineScripts = [...entry.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)];
+  assert.equal(inlineScripts.length, 1, 'the theme bootstrap is the only inline script');
+  assert.match(inlineScripts[0][1], /localStorage\\.getItem\\('bored\\.ui\\.preferences'\\)/, 'bootstrap reads saved preferences');
+  assert.match(inlineScripts[0][1], /dataset\\.theme = 'dark'/, 'bootstrap sets theme before paint');
   const context = rules(['arcadeGame', 'nativeHTML']);
   for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
     const game = context.nativeHTML(slug);
