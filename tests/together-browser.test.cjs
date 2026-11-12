@@ -94,7 +94,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
     await page.$eval(`[data-match-id="${id}"]`,row=>row.querySelector('.bt-actions>button').click());
     await page.waitForFunction(()=>!document.querySelector('#player').hidden);
   }
-  async function exit(page){await page.click('#menu-toggle');await page.click('#back');await page.waitForFunction(()=>document.querySelector('#player').hidden);await refresh(page);}
+  async function exit(page){await page.$eval('#menu-toggle',button=>button.click());await page.waitForFunction(()=>!document.querySelector('#back').hidden);await page.$eval('#back',button=>button.click());await page.waitForFunction(()=>document.querySelector('#player').hidden);await refresh(page);}
   async function drop(page,n,returns=true){
     const game=await frame(page,'.columns');
     await game.waitForSelector(`.columns button[aria-label="Drop in column ${n}"]:not([disabled])`);
