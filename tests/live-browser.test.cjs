@@ -151,6 +151,9 @@ test('two accounts start a live game from Bored Together, move, end turns, lose 
 
   // Ann opens Bored Together, starts a live game, and invites Ben from the member list.
   for (const page of [ann, ben]) { await page.evaluate(() => document.querySelector('#together-nav').click()); await waitPage(page, () => !document.querySelector('#together').hidden); }
+  // The hub has no room-code box of its own: joining by code happens on the
+  // game's Multiplayer screen, so there is only one place to keep working.
+  assert.equal(await ann.$$eval('#bt-join-code, #bt-join-go', b => b.length), 0, 'no duplicate Join with code on the Bored Together page');
   await hubButton(ann, 'Start a Game');
   // The picker renders only after the people and invitation requests complete.
   // Selecting immediately races that asynchronous fetch on faster CI machines.
@@ -499,58 +502,6 @@ test('Civ Lite room codes: host for two humans, join with a typed code, a third 
   assert.ok(!shown.includes(code) && !shown.includes(fresh), 'the room code never reached an account that is not seated');
   assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 2, 'still Ann and Ben: a code seats nobody once the game has started');
   assert.ok(seen.includes('join_code') && seen.includes('new_code'));
-  assert.deepEqual(errors, []);
-  assert.deepEqual(unexpected, []);
-});
-
-// Bored Together's own page keeps the join-code box next to the unified Start a Game action.
-test('Bored Together: Join with code next to Start a Game says what went wrong under the field, and a good code opens the lobby', async t => {
-  const h = await harness(t);
-  if (!h) return;
-  const { env, errors, unexpected, player, waitPage, game, inGame } = h;
-  const ann = await player(A), ben = await player(B), cleo = await player(ids[2]);
-  const room = await env.rpc(A, 'create', { game: 'ashcrown', capacity: 2, config: { map: 'pangaea' } });
-  assert.match(room.code, /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/, 'the host is given the code');
-  for (const page of [ben, cleo]) { await page.evaluate(() => document.querySelector('#together-nav').click()); await waitPage(page, () => !document.querySelector('#together').hidden && !!document.querySelector('#bt-join-code')); }
-  const join = async (page, text) => {
-    await page.$eval('#bt-join-code', e => { e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); });
-    await page.type('#bt-join-code', text);
-    await page.evaluate(() => document.querySelector('#bt-join-go').click());
-  };
-  // The code box remains alongside Start a Game, rather than a duplicate live-game CTA.
-  assert.equal(await ben.evaluate(() => document.querySelector('#bt-join-code').closest('.bt-start-actions') === [...document.querySelectorAll('#together button')].find(b => b.textContent === 'Start a Game').closest('.bt-start-actions')), true);
-  // The page does not scroll sideways on a small phone, and the field and its button stay on the screen (CI's
-  // together-browser checks the page's width at 320 too, but it needs PGlite).
-  for (const width of [375, 320]) {
-    await ben.setViewport({ width, height: 850 });
-    const fit = await ben.evaluate(() => {
-      const w = innerWidth, bad = [];
-      if (document.documentElement.scrollWidth > w) bad.push('the page scrolls sideways: ' + document.documentElement.scrollWidth + ' > ' + w);
-      for (const e of document.querySelectorAll('.bt-start-actions, .bt-start-actions > *, #bt-join-code, #bt-join-go')) {
-        const r = e.getBoundingClientRect();
-        if (r.width && (r.right > w + 0.5 || r.left < -0.5)) bad.push((e.id || e.className || e.tagName) + ' leaves the screen: ' + Math.round(r.left) + '..' + Math.round(r.right));
-      }
-      return bad;
-    });
-    assert.deepEqual(fit, [], 'the Join with code row at ' + width + 'px');
-  }
-  await ben.setViewport({ width: 1100, height: 800, deviceScaleFactor: 1 });
-  // A short code, a wrong code, then the right one typed as people type it: lower case, with a dash and a space.
-  await join(ben, 'abc');
-  await waitPage(ben, () => /6 characters/.test(document.querySelector('#bt-join-error')?.textContent || ''));
-  await join(ben, 'zzzzzz');
-  await waitPage(ben, () => document.querySelector('#bt-join-error')?.textContent === 'No open room with that code');
-  assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 1, 'a wrong code seats nobody');
-  await join(ben, room.code.slice(0, 3).toLowerCase() + '- ' + room.code.slice(3).toLowerCase());
-  const lobby = await game(ben);
-  await inGame(lobby, () => !document.getElementById('pane-setup').hidden && document.getElementById('seat-who-1').textContent === 'Joined' && !document.getElementById('room-code').hidden);
-  assert.equal(await lobby.$eval('#room-code-text', e => e.textContent), room.code, 'a player who joined sees the code');
-  assert.equal((await env.admin('select state from bored_live.seats where game_id=$1 and seat=1', [room.id]))[0].state, 'joined');
-  // Cleo with the same code: the room is full, and the page stays where it was.
-  await join(cleo, room.code);
-  await waitPage(cleo, () => document.querySelector('#bt-join-error')?.textContent === 'That room is full');
-  assert.equal(await cleo.$eval('#player', e => e.hidden), true);
-  assert.equal((await env.admin('select count(*)::int n from bored_live.seats where game_id=$1', [room.id]))[0].n, 2);
   assert.deepEqual(errors, []);
   assert.deepEqual(unexpected, []);
 });

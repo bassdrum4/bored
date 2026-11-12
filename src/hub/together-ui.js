@@ -3,7 +3,7 @@ import { togetherRPC, inviteRPC, liveRPC, CONSENT_VERSION } from './together-api
 import { TOGETHER_GAMES } from '../games/catalog.js';
 import { PREVIEWS } from '../games/discovery.js';
 import { TOGETHER_ADAPTERS } from './together-player.js';
-import { TOGETHER_LIVE, LIVE_DEFAULTS, roomCodeFrom } from './together-live.js';
+import { TOGETHER_LIVE, LIVE_DEFAULTS } from './together-live.js';
 import { readStored, writeStored, removeStored } from './store.js';
 
 export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
@@ -15,8 +15,6 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   let liveGames = [], liveKey = '';
   const liveSelected = new Set();
   let liveCapacity = 2;
-  // The Join with code box: what was typed, and why the last try did not work.
-  let joinText = '', joinError = '';
   let flow = null, selectedGame = 'connect-four', people = null, outsiders = null, outsidersError = '';
   // The one corner note: dismissed stays dismissed for that set of games, so it
   // can only reappear when something new is actually waiting.
@@ -26,6 +24,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   let invite = null, inviteAccepted = false, inviteBusy = false;
   const dismissedInvites = new Set();
   const inviteDialog = $('#invite-dialog');
+  const resultDialog = $('#result-dialog');
   const name = game => TOGETHER_GAMES[game]?.name || game;
   const mySeat = g => (g?.seats || []).find(s => s.seat === g.me);
   // What a live row shows. Seconds-since-seen change on every read, so they stay out of what counts as a change.
@@ -48,6 +47,67 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   function dialogClose(dialog) {
     if (!dialog) return;
     if (dialog.close) dialog.close(); else dialog.removeAttribute('open');
+  }
+  /* ── Finished games ──────────────────────────────────────────────────────── */
+
+  // A game can end on the other player's turn, while you are nowhere near
+  // Bored Together. The first time you come back, the result is a popup; the
+  // per-account map below remembers what was already announced so it is said
+  // once and the list can carry the rest quietly.
+  let resultsSeen = null;
+  const resultsKey = () => 'bored.together.results.' + owner;
+  function completedResults() {
+    const out = [];
+    for (const m of data?.matches || []) {
+      // An unsent game was never anyone's turn, so it cannot have a result.
+      if (m.status !== 'completed' || m.revealed_at == null) continue;
+      out.push({ key: 'match:' + m.id,
+        outcome: m.winner === owner ? 'won' : m.winner ? 'lost' : 'draw',
+        game: name(m.game), who: m.opponent?.handle || '' });
+    }
+    for (const g of liveGames) {
+      if (g.status !== 'completed') continue;
+      const seat = mySeat(g);
+      if (!seat || seat.state === 'left') continue;
+      out.push({ key: 'live:' + g.id,
+        outcome: g.winner == null ? 'draw' : g.winner === seat.seat ? 'won' : 'lost',
+        game: name(g.game) + ' live', who: '' });
+    }
+    return out;
+  }
+  function seenResults() {
+    if (resultsSeen) return resultsSeen;
+    const saved = readStored(resultsKey(), null);
+    resultsSeen = new Set(Array.isArray(saved) ? saved : []);
+    return resultsSeen;
+  }
+  function saveResults() {
+    writeStored(resultsKey(), [...seenResults()].slice(-200));
+  }
+  function maybeShowResult() {
+    if (!visible || !owner || !data?.enrolled || document.hidden) return;
+    if (document.body.classList.contains('playing') || resultDialog?.open) return;
+    const seen = seenResults();
+    const pending = completedResults().filter(result => !seen.has(result.key));
+    if (!pending.length) return;
+    const first = pending[0];
+    $('#result-title').textContent = first.outcome === 'won' ? 'YOU WON!'
+      : first.outcome === 'lost' ? 'YOU LOST :(' : 'DRAW';
+    $('#result-title').dataset.result = first.outcome;
+    $('#result-copy').textContent = first.game + (first.who ? ' with ' + first.who : '');
+    $('#result-note').textContent = pending.length > 1
+      ? (pending.length - 1) + ' more finished ' + (pending.length === 2 ? 'game' : 'games') + ' in Your games.'
+      : '';
+    dialogOpen(resultDialog);
+  }
+  function dismissResult() {
+    for (const result of completedResults()) seenResults().add(result.key);
+    saveResults();
+    dialogClose(resultDialog);
+  }
+  if (resultDialog) {
+    $('#result-close').onclick = dismissResult;
+    resultDialog.addEventListener('cancel', dismissResult);
   }
   function updateBadge() {
     const waiting = data?.enrolled ? data.matches.filter(m => m.status === 'active' && m.turn_user === owner) : [];
@@ -84,6 +144,8 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     owner = next; generation++; flight = null; busy = false; lastRefresh = 0; root.removeAttribute('aria-busy');
     data = flow = people = outsiders = null; outsidersError = ''; invited.clear(); status.textContent = '';
     liveGames = []; liveKey = ''; liveSelected.clear(); liveCapacity = 2;
+    resultsSeen = null;
+    if (resultDialog?.open) dialogClose(resultDialog);
     noticeDismissed = '';
     invite = null; inviteAccepted = false;
     if (inviteDialog?.open) dialogClose(inviteDialog);
@@ -111,6 +173,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
         if (Array.isArray(lives)) { liveGames = lives; liveKey = nextKey; }
         data = next; lastRefresh = Date.now(); updateBadge();
         if (changed || force) render();
+        maybeShowResult();
       } catch (error) {
         if (stamp === generation) status.textContent = 'Could not refresh. Your saved games are safe. ' + error.message;
       }
@@ -312,39 +375,6 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
       button('Back to turns', () => { flow = 'challenge'; liveSelected.clear(); render(); }),
       button('Cancel', () => { flow = null; people = null; liveSelected.clear(); render(); }));
     host.append(box);
-  }
-  // Join with code (5.4): the same thing as Civ Lite's Multiplayer screen. The server seats the player, the lobby opens,
-  // and a code that does not work is said under the box.
-  function joinWithCode() {
-    const form = node('form', undefined, 'bt-join-code');
-    form.setAttribute('aria-label', 'Join with code');
-    const field = node('input'); field.id = 'bt-join-code'; field.type = 'text'; field.value = joinText; field.placeholder = 'Room code';
-    field.autocomplete = 'off'; field.spellcheck = false; field.maxLength = 24;
-    field.setAttribute('autocapitalize', 'characters'); field.setAttribute('aria-label', 'Room code');
-    field.oninput = () => {
-      joinText = roomCodeFrom(field.value);
-      if (field.value !== joinText) field.value = joinText;
-      joinError = ''; const problem = $('#bt-join-error'); if (problem) problem.remove();
-    };
-    field.onpaste = event => {
-      const text = event.clipboardData?.getData?.('text');
-      if (!text) return;
-      event.preventDefault(); joinText = field.value = roomCodeFrom(text);
-    };
-    const go = node('button', 'Join with code', 'action'); go.id = 'bt-join-go'; go.type = 'submit';
-    form.onsubmit = event => {
-      event.preventDefault();
-      run(async () => {
-        const code = roomCodeFrom(field.value); joinText = code; joinError = '';
-        if (code.length < 6) { joinError = code ? 'A room code has 6 characters.' : 'Type or paste the room code.'; return; }
-        let game;
-        try { game = await liveRPC('join_code', { code }); } catch (error) { joinError = error.message || 'That code did not work.'; return; }
-        joinText = '';
-        await launchLive(game.id);
-      });
-    };
-    form.append(field, go);
-    return form;
   }
   function picker(host = content) {
     if (flow === 'live') { livePicker(host); return; }
@@ -612,11 +642,9 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
       }
       flow = 'challenge'; render(); $('#bt-game-select')?.focus();
     }, true),
-      joinWithCode(),
       button('Play Random', () => { flow = 'random'; people = null; render(); $('#bt-game-select')?.focus(); }));
     overflow(actions, null);
     if (!flow) start.append(actions);
-    if (!flow && joinError) { const problem = node('p', joinError, 'bt-caption bt-join-error'); problem.id = 'bt-join-error'; problem.setAttribute('role', 'alert'); start.append(problem); }
     // The picker lives inside the starter, so choosing a game never pushes the
     // page down into a second, unrelated-looking box.
     if (flow) picker(start);
@@ -668,10 +696,11 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     for (const el of document.querySelectorAll('#daily,#recent,#leaderboard,#library,.activity-notice')) el.hidden = true;
     root.hidden = false; $('#together-nav').setAttribute('aria-current', 'page');
     try { history.replaceState(null, '', '#together'); } catch {}
-    resetIdentity(); render(); refresh(true); root.scrollIntoView({ block: 'start' });
+    resetIdentity(); render(); refresh(true); maybeShowResult(); root.scrollIntoView({ block: 'start' });
   }
   function close() {
     visible = false; flow = people = null; root.hidden = true;
+    if (resultDialog?.open) dialogClose(resultDialog);
     document.body.classList.remove('together-open'); $('#together-nav').removeAttribute('aria-current');
     for (const el of document.querySelectorAll('#daily,#recent,#leaderboard,#library,.activity-notice')) el.hidden = false;
   }

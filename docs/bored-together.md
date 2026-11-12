@@ -35,6 +35,17 @@ them, recording no winner — and Leave. Leaving removes you from the directory,
 drops games nobody has seen yet, cancels games you have not sent and forfeits the
 ones in progress.
 
+A game that ends while you are away announces itself when you next open Bored
+Together: a popup says **YOU WON!**, **YOU LOST :(** or **DRAW**, naming the game
+and opponent. Each result is announced once per account, and the popup never
+opens over a game that is being played.
+
+A game that ended while you were inside it is announced the same way when you
+come back out, so the result is never only a line in the list.
+
+Joining a live room by code is not duplicated here: the room code is typed on
+Civ Lite's own Multiplayer screen, where the lobby lives.
+
 Two games are a single run rather than a turn: **2048** and **Mahjong**. The server
 picks the seed, both players get that board, and the game's own score is
 submitted once. Neither result is shown to the other player until both are in,
@@ -356,7 +367,7 @@ it drops an answer if the account changed while the call was out. Operations: `s
 Together does (the document is reloaded with the live bridge). The page is given display names, whether people are online,
 room ids for rooms it may open, and opaque per-list references for the members it may invite: never a token, an email or an
 account id. Leaving a live game from its Menu (or leaving or cancelling in the lobby) now returns to Civ Lite's title screen
-instead of closing the game. (Bored Together's own page got *Join with code* in 5.4, below.)
+instead of closing the game. (Bored Together's own page leaves room codes to the game's Multiplayer screen.)
 
 **Room codes (5.4).** A room has a *join code* and a *capacity*, so friends can join without being invited by name, as in Civ 6.
 
@@ -390,7 +401,7 @@ with *Copy code*, *Copy invite* (`Join my Civ Lite game on Bored: code KX7Q2M`) 
 fill (open seats are shown as such), and *Remove* on the host's side. The copy buttons call `navigator.clipboard` inside the
 click and, if the browser refuses, put the text in a box and select it. The Multiplayer screen has a *Join with code* box
 (one field that takes typing or a pasted invite) whose refusals show under it; *Join* goes straight to the lobby. Bored
-Together's own page has the same box next to *Start a live game*. The lobby bridge gained `join-code` and a `humans` value on
+Together's own page deliberately has no second box: a code is typed where its lobby lives, on the game's screen. The lobby bridge gained `join-code` and a `humans` value on
 `host`; the live bridge gained `new-code` and `kick` and tells the screen `removed` when the server says the player is no
 longer in the room. The code reaches only seated players, and only inside the lobby: it is not in what the lobby bridge
 gives the Multiplayer screen, nor in `list` for anyone but the host.
