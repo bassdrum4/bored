@@ -353,8 +353,8 @@ beats an abandoned one — and two runs that tie on a coarse counter (lines
 cleared, waves survived, levels painted) still separate on points.
 
 Two-player games are local games with a CPU in one seat, so they only post when
-the opponent was the computer: Pong, SUMO, VolletBall, Lava, Tank and Gun Mayhem
-all check the mode they were played in, and a win over a person stays in that
+the opponent was the computer: Pong, SUMO, VolletBall, Lava, Tank, Gun Mayhem and
+Air Hockey all check the mode they were played in, and a win over a person stays in that
 browser. SUMO, VolletBall and Lava start against the CPU and switch to two
 players from the button in their controls.
 

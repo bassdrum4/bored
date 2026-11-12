@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Air Hockey</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  [hidden] { display: none !important }
+  html, body { height: 100% }
+  body { background: #f5f2ea; color: #191713; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+         overflow: hidden; -webkit-user-select: none; user-select: none; touch-action: none }
+
+  #app { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center;
+         padding: 8px 10px 10px; gap: 6px }
+  #hud { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+         font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #6b6558; white-space: nowrap }
+  #hud b { color: #191713; font-weight: 600 }
+  #hud-info { overflow: hidden; text-overflow: ellipsis }
+  #stage { flex: 1; min-height: 0; width: 100%; display: grid; place-items: center }
+  canvas { display: block; touch-action: none }
+  canvas.mouse { cursor: none }
+  #hint { font-size: 11px; color: #6b6558; text-align: center; min-height: 16px }
+
+  button { font: inherit; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: #191713;
+           background: none; border: 1px solid #191713; border-radius: 0; padding: 10px 18px; min-height: 42px;
+           min-width: 170px; cursor: pointer }
+  button:hover, button:focus-visible { background: #191713; color: #f5f2ea; outline: none }
+  button.link { border: 0; min-width: 0; min-height: 0; padding: 0; font-size: 11px; color: #6b6558;
+                text-decoration: underline; text-underline-offset: 3px }
+  button.link:hover, button.link:focus-visible { background: none; color: #191713 }
+
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 12px; padding: 18px 16px; text-align: center; background: #f5f2ea;
+            overflow-y: auto; touch-action: pan-y }
+  .screen.over { background: rgba(245, 242, 234, .93) }
+  .screen h1, .screen h2 { font: 600 30px/1.1 Georgia, 'Times New Roman', serif; letter-spacing: -.01em }
+  .screen h2 { font-size: 24px }
+  .screen p { font-size: 12px; color: #6b6558; max-width: 340px }
+  .stack { display: flex; flex-direction: column; gap: 8px; align-items: center }
+  .stack > button:not(.choice) { width: 240px; max-width: 86vw }
+  .choice { width: min(320px, 88vw); text-align: left; text-transform: none; letter-spacing: 0; padding: 9px 14px }
+  .choice b { display: block; font-size: 12px; letter-spacing: .06em; text-transform: uppercase }
+  .choice span { display: block; font-size: 11px; color: #6b6558 }
+  .choice:hover span, .choice:focus-visible span { color: #d8d2c4 }
+  .rule { width: 56px; border-top: 1px solid #191713 }
+
+  @media (max-width: 420px) { #hud-info { display: none } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud" hidden>
+    <span id="hud-score"></span>
+    <span id="hud-info"></span>
+    <button id="pause" class="link" type="button">Pause</button>
+  </div>
+  <div id="stage" hidden><canvas id="rink"></canvas></div>
+  <div id="hint" hidden></div>
+
+  <section id="menu" class="screen">
+    <h1>Air Hockey</h1>
+    <div class="rule"></div>
+    <p>Slide the puck past the other paddle. First to seven.</p>
+    <div class="stack">
+      <button id="one" type="button">1 player</button>
+      <button id="two" type="button">2 players</button>
+    </div>
+    <p>One player uses the mouse, trackpad or touch screen. Two players share the keyboard: W A S D and the arrow keys. Touch screens work too, one side each.</p>
+  </section>
+
+  <section id="levels" class="screen" hidden>
+    <h2>Difficulty</h2>
+    <div class="stack" id="level-list"></div>
+    <button id="back" class="link" type="button">Back</button>
+  </section>
+
+  <section id="overlay" class="screen over" hidden>
+    <h2 id="ov-title"></h2>
+    <p id="ov-body"></p>
+    <div class="stack" id="ov-buttons"></div>
+  </section>
+</div>
+
+<script>
+'use strict';
+/* Table coordinates: the long axis is x, the table is W by H, player one defends
+   the left goal and player two the right. On a tall, narrow screen the whole
+   table is drawn turned a quarter so it still fills the space. */
+const $ = selector => document.querySelector(selector);
+const W = 800, H = 440, M = 26, PD = 22;
+const GOAL = 150, GY0 = (H - GOAL) / 2, GY1 = (H + GOAL) / 2;
+const PR = 30, KR = 15;
+const WIN = 7, STEP = 1 / 120;
+const HUMAN_MAX = 1200, KEY_SPEED = 620, KEY_ACCEL = 6500;
+const DRAG = 0.22, WALL_REST = 0.92, PADDLE_REST = 0.8, MAX_SPEED = 1300;
+const INK = '#191713', PAPER = '#f5f2ea', TABLE = '#fffdf7', RULE = '#d8d2c4', DIM = '#6b6558', RED = '#b3261e', POCKET = '#e9e4d6';
+
+/* speed and accel move the paddle; think is how often it re-plans; noise is how
+   far off its read of an incoming shot is; attackAt is the puck speed under which
+   it goes for the puck instead of guarding; bank is how often it tries a bank
+   shot; smart is how often it aims away from where your paddle is; slip is how
+   often it simply does not react to a shot. */
+const LEVELS = [
+  { name: 'Easy',   note: 'Slow and forgiving. Misses a lot.',            speed: 330, accel: 2600, think: .30, noise: 52, aim: .30, attackAt: 90,  bank: 0,   smart: 0,   slip: .22 },
+  { name: 'Medium', note: 'Decent reflexes. Tries a bank shot sometimes.', speed: 560, accel: 5200, think: .13, noise: 22, aim: .15, attackAt: 210, bank: .18, smart: .5,  slip: .05 },
+  { name: 'Hard',   note: 'Quick, tidy, and it banks shots. Good luck.',   speed: 780, accel: 9000, think: .04, noise: 12, aim: .05, attackAt: 420, bank: .30, smart: .9,  slip: 0 }
+];
+
+let rand = Math.random;
+const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
+
+const puck = { x: W / 2, y: H / 2, vx: 0, vy: 0 };
+const paddles = [0, 1].map(i => ({ i, x: 0, y: H / 2, vx: 0, vy: 0, tx: null, ty: null, ctl: 'key', ai: null }));
+let mode = null, level = 1, score = [0, 0], phase = 'menu', paused = false;
+let winner = -1, finished = false, scorer = -1, goalTimer = 0, rest = 0, acc = 0, last = 0;
+let portrait = false, scale = 1, cssW = 0, cssH = 0, dpr = 1;
+const keys = {};
+const owners = {};
+
+const canvas = $('#rink');
+const ctx = canvas.getContext('2d');
+
+/* ---------- state ---------- */
+
+function setupPaddles() {
+  paddles[0].x = W * .14; paddles[1].x = W * .86;
+  for (const p of paddles) { p.y = H / 2; p.vx = p.vy = 0; p.tx = p.ty = null; p.ctl = 'key'; }
+}
+
+function serve(side) {
+  puck.x = side === 0 ? W * .3 : W * .7;
+  puck.y = H / 2; puck.vx = puck.vy = 0; rest = 0;
+  const ai = paddles[1].ai;
+  if (ai) { ai.wait = .7; ai.attacking = false; ai.incoming = false; }
+}
+
+function makeAI(cfg) {
+  return { cfg, timer: 0, wait: 0, tx: W - 74, ty: H / 2, attacking: false, incoming: false, skip: false, err: 0, r: 0, s: 0, j: 0, stuck: 0 };
+}
+
+function startMatch(m, lv) {
+  mode = m; level = lv; score = [0, 0]; winner = -1; finished = false; scorer = -1;
+  paddles[0].ai = null;
+  paddles[1].ai = m === '1p' ? makeAI(LEVELS[lv]) : null;
+  setupPaddles();
+  serve(0);
+  phase = 'play'; paused = false; acc = 0;
+  closeOverlay();
+  view('game');
+  hint();
+  hud();
+}
+
+function goal(s) {
+  score[s]++; scorer = s; phase = 'goal'; goalTimer = .9;
+  puck.vx = puck.vy = 0;
+  hud();
+}
+
+function afterGoal() {
+  if (score[scorer] >= WIN) { endMatch(scorer); return; }
+  phase = 'play';
+  serve(1 - scorer);
+}
+
+function endMatch(s) {
+  winner = s; finished = true; phase = 'over';
+  const tally = score[0] + '–' + score[1];
+  if (mode === '1p') {
+    const name = LEVELS[level].name.toLowerCase();
+    overlay(s === 0 ? 'You win.' : 'CPU wins.', tally + ' on ' + name + '.',
+      [['Play again', () => startMatch('1p', level)], ['Change difficulty', chooseLevel], ['Menu', toMenu]]);
+  } else {
+    overlay('Player ' + (s + 1) + ' wins.', tally + '.',
+      [['Rematch', () => startMatch('2p', 0)], ['Menu', toMenu]]);
+  }
+}
+
+/* ---------- physics ---------- */
+
+function place(p, nx, ny, dt) {
+  const x0 = p.i === 0 ? PR : W / 2 + PR, x1 = p.i === 0 ? W / 2 - PR : W - PR;
+  nx = clamp(nx, x0, x1); ny = clamp(ny, PR, H - PR);
+  p.vx = (nx - p.x) / dt; p.vy = (ny - p.y) / dt;
+  p.x = nx; p.y = ny;
+}
+
+function keyVec(i) {
+  const down = c => keys[c] ? 1 : 0;
+  let kx, ky;
+  if (i === 0) {
+    kx = down('KeyD') - down('KeyA'); ky = down('KeyS') - down('KeyW');
+    if (mode === '1p') { kx += down('ArrowRight') - down('ArrowLeft'); ky += down('ArrowDown') - down('ArrowUp'); }
+  } else {
+    kx = down('ArrowRight') - down('ArrowLeft'); ky = down('ArrowDown') - down('ArrowUp');
+  }
+  kx = clamp(kx, -1, 1); ky = clamp(ky, -1, 1);
+  // keys follow the screen, so turn them back into table directions
+  const dx = portrait ? -ky : kx, dy = portrait ? kx : ky;
+  const len = Math.hypot(dx, dy);
+  return len > 1 ? [dx / len, dy / len] : [dx, dy];
+}
+
+function humanStep(p, dt) {
+  if (p.ctl === 'pointer' && p.tx !== null) {
+    const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
+    if (d > .01) {
+      const move = Math.min(HUMAN_MAX, d * 60) * dt;
+      place(p, p.x + dx / d * move, p.y + dy / d * move, dt);
+    } else place(p, p.x, p.y, dt);
+    return;
+  }
+  const [kx, ky] = keyVec(p.i);
+  const lim = KEY_ACCEL * dt;
+  p.vx += clamp(kx * KEY_SPEED - p.vx, -lim, lim);
+  p.vy += clamp(ky * KEY_SPEED - p.vy, -lim, lim);
+  place(p, p.x + p.vx * dt, p.y + p.vy * dt, dt);
+}
+
+function hitPaddle(p) {
+  const dx = puck.x - p.x, dy = puck.y - p.y, d = Math.hypot(dx, dy), min = PR + KR;
+  if (d >= min) return;
+  const nx = d < 1e-6 ? (p.i === 0 ? 1 : -1) : dx / d, ny = d < 1e-6 ? 0 : dy / d;
+  puck.x = p.x + nx * min; puck.y = p.y + ny * min;
+  const vn = (puck.vx - p.vx) * nx + (puck.vy - p.vy) * ny;
+  if (vn < 0) { puck.vx -= (1 + PADDLE_REST) * vn * nx; puck.vy -= (1 + PADDLE_REST) * vn * ny; }
+}
+
+function hitPost(px, py) {
+  const dx = puck.x - px, dy = puck.y - py, d = Math.hypot(dx, dy);
+  if (d >= KR || d < 1e-6) return;
+  const nx = dx / d, ny = dy / d;
+  puck.x = px + nx * KR; puck.y = py + ny * KR;
+  const vn = puck.vx * nx + puck.vy * ny;
+  if (vn < 0) { puck.vx -= (1 + WALL_REST) * vn * nx; puck.vy -= (1 + WALL_REST) * vn * ny; }
+}
+
+function walls() {
+  if (puck.y < KR) { puck.y = KR; if (puck.vy < 0) puck.vy = -puck.vy * WALL_REST; }
+  if (puck.y > H - KR) { puck.y = H - KR; if (puck.vy > 0) puck.vy = -puck.vy * WALL_REST; }
+  const mouthY = puck.y > GY0 && puck.y < GY1;
+  if (puck.x < KR && !mouthY) { puck.x = KR; if (puck.vx < 0) puck.vx = -puck.vx * WALL_REST; }
+  if (puck.x > W - KR && !mouthY) { puck.x = W - KR; if (puck.vx > 0) puck.vx = -puck.vx * WALL_REST; }
+  if (puck.x < KR || puck.x > W - KR) {
+    const ex = puck.x < W / 2 ? 0 : W;
+    hitPost(ex, GY0); hitPost(ex, GY1);
+  }
+}
+
+function movePuck(dt) {
+  puck.vx *= 1 - DRAG * dt; puck.vy *= 1 - DRAG * dt;
+  puck.x += puck.vx * dt; puck.y += puck.vy * dt;
+  for (const p of paddles) hitPaddle(p);
+  walls();
+  const sp = Math.hypot(puck.vx, puck.vy);
+  if (sp > MAX_SPEED) { puck.vx *= MAX_SPEED / sp; puck.vy *= MAX_SPEED / sp; }
+  else if (sp < 3) { puck.vx = puck.vy = 0; }
+  if (puck.y > GY0 && puck.y < GY1) {
+    if (puck.x < 0) goal(1);
+    else if (puck.x > W) goal(0);
+  }
+}
+
+// A puck that dies in the CPU's half and never gets hit is nudged back into play.
+function watchStall(dt) {
+  if (mode === '1p' && puck.x > W / 2 && !puck.vx && !puck.vy) {
+    rest += dt;
+    if (rest > 3.5) { puck.vx = -140; puck.vy = (rand() - .5) * 120; rest = 0; }
+  } else rest = 0;
+}
+
+function tick(dt) {
+  for (const p of paddles) { if (p.ai) cpuStep(p, dt); else humanStep(p, dt); }
+  if (phase === 'play') { movePuck(dt); watchStall(dt); }
+  else if (phase === 'goal') { goalTimer -= dt; if (goalTimer <= 0) afterGoal(); }
+}
+
+/* ---------- the CPU ---------- */
+
+// Fold a straight-line y into the table the way bounces would.
+function fold(y) {
+  const span = H - 2 * KR;
+  let t = (y - KR) % (2 * span);
+  if (t < 0) t += 2 * span;
+  if (t > span) t = 2 * span - t;
+  return KR + t;
+}
+
+function cpuStep(p, dt) {
+  const ai = p.ai, cfg = ai.cfg, flip = p.i === 0;
+  if (phase !== 'play') {
+    ai.tx = flip ? 74 : W - 74; ai.ty = H / 2;
+  } else if (ai.wait > 0) {
+    ai.wait -= dt;
+  } else {
+    ai.timer -= dt;
+    if (ai.timer <= 0) { ai.timer = cfg.think * (.8 + rand() * .4); plan(p); }
+  }
+  const dx = ai.tx - p.x, dy = ai.ty - p.y, d = Math.hypot(dx, dy);
+  let wx = 0, wy = 0;
+  if (d > .5) { const s = Math.min(cfg.speed, d * 16); wx = dx / d * s; wy = dy / d * s; }
+  let ax = wx - p.vx, ay = wy - p.vy;
+  const am = Math.hypot(ax, ay), lim = cfg.accel * dt;
+  if (am > lim) { ax *= lim / am; ay *= lim / am; }
+  p.vx += ax; p.vy += ay;
+  place(p, p.x + p.vx * dt, p.y + p.vy * dt, dt);
+}
+
+/* Planning happens in the paddle's own frame: its goal is at x = W and the
+   opponent's is at x = 0. For the left paddle the table is mirrored on the way in
+   and out. A loose puck in its half gets lined up and hit toward the far goal; an
+   incoming shot is met early and hit back along the same kind of line, or blocked
+   at the goal if there is no time. */
+function plan(p) {
+  const ai = p.ai, cfg = ai.cfg, flip = p.i === 0;
+  const fx = x => flip ? W - x : x, dir = flip ? -1 : 1;
+  const px = fx(puck.x), py = puck.y, vx = dir * puck.vx, vy = puck.vy;
+  const qx = fx(p.x), qy = p.y, oy = paddles[1 - p.i].y;
+  const sp = Math.hypot(vx, vy), HOME = W - 74, MEET = W - 190, reach = PR + KR;
+  const norm = (x, y) => { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; };
+  const ok = (sx, sy) => sx <= W - PR && sy >= PR && sy <= H - PR;
+  const roll = () => { ai.r = rand(); ai.s = rand(); ai.j = rand() * 2 - 1; ai.stuck = 0; };
+
+  // how to hit a puck at (cx, cy): the direction, and the spot behind it to wait at
+  const shoot = (cx, cy) => {
+    // aim: the goal mouth (away from your paddle if it is smart), or the far wall for a bank shot
+    const ay = ai.r < cfg.bank ? (cy < H / 2 ? H * 1.5 : -H * .5)
+      : ai.s < cfg.smart ? H / 2 + (oy < H / 2 ? 1 : -1) * GOAL * .36 + ai.j * cfg.aim * H * .5
+      : H / 2 + ai.j * (GOAL * .3 + cfg.aim * H);
+    const toward = cy < H / 2 ? 1 : -1;
+    const spot = (dx, dy) => [cx - dx * (reach + 34), cy - dy * (reach + 34)];
+    let [dx, dy] = norm(-cx, ay - cy), [sx, sy] = spot(dx, dy);
+    if (!ok(sx, sy)) { [dx, dy] = norm(-1, toward * .3); [sx, sy] = spot(dx, dy); }
+    if (!ok(sx, sy)) { [dx, dy] = norm(-.4, toward); [sx, sy] = spot(dx, dy); }
+    return { dx, dy, sx, sy, ok: ok(sx, sy) };
+  };
+
+  let tx = HOME, ty = H / 2 + (py - H / 2) * .35;
+  let attacking = false;
+  if (vx <= 30) ai.incoming = false;
+
+  if (px > W / 2 - KR && sp < cfg.attackAt) {
+    attacking = true;
+    if (!ai.attacking) { ai.attacking = true; roll(); }
+    const g = shoot(px, py);
+    const ux = qx - px, uy = qy - py, ul = Math.hypot(ux, uy) || 1;
+    if (ul < reach + 25 && sp < 20) ai.stuck += cfg.think; else ai.stuck = 0;
+    if (ai.stuck > .5) {
+      // wedged against a wall or corner: scrape it loose from the side
+      const a = (py < H / 2 ? 1 : -1) * .6, c = Math.cos(a), s = Math.sin(a);
+      const qpx = -ux / ul, qpy = -uy / ul;
+      tx = px + (qpx * c - qpy * s) * 30; ty = py + (qpx * s + qpy * c) * 30;
+    } else if (!g.ok) {
+      tx = px + (-ux / ul) * 30; ty = py + (-uy / ul) * 30;
+    } else if (-(ux * g.dx + uy * g.dy) / ul > .88 && ul < reach + 100) {
+      tx = px + g.dx * 30; ty = py + g.dy * 30;           // lined up: drive through it
+    } else {
+      tx = g.sx; ty = g.sy;                                // get behind it first
+      const vxs = g.sx - qx, vys = g.sy - qy, l2 = vxs * vxs + vys * vys;
+      const k = l2 ? clamp(((px - qx) * vxs + (py - qy) * vys) / l2, 0, 1) : 0;
+      if (Math.hypot(px - (qx + vxs * k), py - (qy + vys * k)) < reach + 8) {
+        // the direct line runs through the puck: go round it
+        const nx = -g.dy, ny = g.dx, side = (ux * nx + uy * ny) >= 0 ? 1 : -1;
+        tx = px + nx * side * (reach + 48); ty = py + ny * side * (reach + 48);
+      }
+    }
+  } else if (vx > 30) {
+    if (!ai.incoming) { ai.incoming = true; roll(); ai.err = (rand() * 2 - 1) * cfg.noise; ai.skip = rand() < cfg.slip; }
+    if (ai.skip) { if (!attacking) ai.attacking = false; return; }
+    const tHome = Math.max(0, (HOME - px) / vx);
+    tx = HOME; ty = fold(py + vy * tHome) + ai.err;       // block, unless there is time to hit it back
+    if (px < MEET) {
+      const t = (MEET - px) / vx, cy = fold(py + vy * t) + ai.err * .5;
+      const g = shoot(MEET, cy);
+      if (g.ok && Math.hypot(g.sx - qx, g.sy - qy) < cfg.speed * t + 25) {
+        if (t < 90 / (cfg.speed * .7) + .04) { tx = MEET + g.dx * 30; ty = cy + g.dy * 30; }
+        else { tx = g.sx; ty = g.sy; }
+      }
+    }
+  }
+  if (!attacking) ai.attacking = false;
+  ai.tx = fx(clamp(tx, W / 2 + PR, W - PR));
+  ai.ty = clamp(ty, PR, H - PR);
+}
+
+/* ---------- input ---------- */
+
+function tablePoint(e) {
+  const r = canvas.getBoundingClientRect();
+  const px = e.clientX - r.left, py = e.clientY - r.top, TW = W + 2 * M;
+  const tx = portrait ? TW - py / scale : px / scale, ty = portrait ? px / scale : py / scale;
+  return [tx - M, ty - M];
+}
+
+function aim(owner, e) {
+  const p = paddles[owner], [x, y] = tablePoint(e);
+  p.tx = x; p.ty = y; p.ctl = 'pointer';
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (phase === 'menu') return;
+  if (mode === '2p' && e.pointerType !== 'touch') return;
+  const [x] = tablePoint(e);
+  owners[e.pointerId] = mode === '1p' ? 0 : (x < W / 2 ? 0 : 1);
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  aim(owners[e.pointerId], e);
+  e.preventDefault();
+});
+canvas.addEventListener('pointermove', e => {
+  if (mode === '1p') { aim(0, e); return; }
+  if (mode === '2p' && owners[e.pointerId] !== undefined) aim(owners[e.pointerId], e);
+});
+const letGo = e => { delete owners[e.pointerId]; };
+canvas.addEventListener('pointerup', letGo);
+canvas.addEventListener('pointercancel', letGo);
+
+const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+window.addEventListener('keydown', e => {
+  if (e.code === 'Escape' || e.code === 'KeyP') {
+    if (phase === 'play' || phase === 'goal') setPaused(!paused);
+    else if (paused) setPaused(false);
+    return;
+  }
+  if (MOVE_KEYS.includes(e.code)) {
+    if (phase === 'play' || phase === 'goal') e.preventDefault();
+    if (!keys[e.code]) {
+      keys[e.code] = true;
+      const arrow = e.code.startsWith('Arrow');
+      const owner = arrow && mode === '2p' ? 1 : 0;
+      paddles[owner].ctl = 'key'; paddles[owner].tx = paddles[owner].ty = null;
+    }
+  }
+});
+window.addEventListener('keyup', e => { delete keys[e.code]; });
+window.addEventListener('blur', () => { for (const k in keys) delete keys[k]; if (phase === 'play' || phase === 'goal') setPaused(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && (phase === 'play' || phase === 'goal')) setPaused(true); });
+
+/* ---------- screens ---------- */
+
+function view(name) {
+  $('#menu').hidden = name !== 'menu';
+  $('#levels').hidden = name !== 'levels';
+  const game = name === 'game';
+  $('#hud').hidden = !game; $('#stage').hidden = !game; $('#hint').hidden = !game;
+  if (name !== 'game') phase = 'menu';
+  if (game) layout();
+}
+
+function overlay(title, body, buttons) {
+  $('#ov-title').textContent = title;
+  $('#ov-body').textContent = body;
+  const box = $('#ov-buttons');
+  box.innerHTML = '';
+  for (const [label, fn] of buttons) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = label; b.onclick = fn;
+    box.appendChild(b);
+  }
+  $('#overlay').hidden = false;
+  const first = box.querySelector('button');
+  if (first) first.focus();
+}
+
+function closeOverlay() { $('#overlay').hidden = true; }
+
+function setPaused(on) {
+  if (phase !== 'play' && phase !== 'goal') { if (!on && paused) paused = false; return; }
+  paused = on;
+  if (on) overlay('Paused', '', [['Resume', () => setPaused(false)], ['Quit to menu', toMenu]]);
+  else { closeOverlay(); last = 0; }
+}
+
+function toMenu() {
+  closeOverlay();
+  paused = false; finished = false; winner = -1; mode = null;
+  view('menu');
+  $('#one').focus();
+}
+
+function chooseLevel() {
+  closeOverlay();
+  paused = false; finished = false; winner = -1; mode = null;
+  view('levels');
+  let saved = level;
+  try { const v = parseInt(localStorage.getItem('bored.air-hockey.level'), 10); if (v >= 0 && v < LEVELS.length) saved = v; } catch (err) {}
+  const list = $('#level-list');
+  list.innerHTML = '';
+  LEVELS.forEach((cfg, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'choice';
+    b.innerHTML = '<b></b><span></span>';
+    b.querySelector('b').textContent = cfg.name;
+    b.querySelector('span').textContent = cfg.note;
+    b.onclick = () => {
+      try { localStorage.setItem('bored.air-hockey.level', String(i)); } catch (err) {}
+      startMatch('1p', i);
+    };
+    list.appendChild(b);
+    if (i === saved) b.focus();
+  });
+}
+
+function hud() {
+  const s = score;
+  $('#hud-score').innerHTML = mode === '1p'
+    ? 'You <b>' + s[0] + '</b> – <b>' + s[1] + '</b> CPU'
+    : 'P1 <b>' + s[0] + '</b> – <b>' + s[1] + '</b> P2';
+  $('#hud-info').textContent = (mode === '1p' ? LEVELS[level].name : 'Two players') + ' · first to ' + WIN;
+}
+
+function hint() {
+  $('#hint').textContent = mode === '1p'
+    ? 'Mouse, trackpad or touch. W A S D and the arrow keys work too.'
+    : 'P1: W A S D. P2: arrow keys. Or touch your own side.';
+  canvas.className = mode === '1p' ? 'mouse' : '';
+}
+
+$('#one').onclick = chooseLevel;
+$('#two').onclick = () => startMatch('2p', 0);
+$('#back').onclick = toMenu;
+$('#pause').onclick = () => setPaused(!paused);
+
+/* ---------- drawing ---------- */
+
+function layout() {
+  const stage = $('#stage');
+  const aw = stage.clientWidth, ah = stage.clientHeight;
+  if (!aw || !ah) return;
+  const TW = W + 2 * M, TH = H + 2 * M;
+  const sL = Math.min(aw / TW, ah / TH), sP = Math.min(aw / TH, ah / TW);
+  portrait = sP > sL * 1.2;
+  scale = portrait ? sP : sL;
+  cssW = Math.floor((portrait ? TH : TW) * scale);
+  cssH = Math.floor((portrait ? TW : TH) * scale);
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.style.width = cssW + 'px'; canvas.style.height = cssH + 'px';
+  canvas.width = Math.round(cssW * dpr); canvas.height = Math.round(cssH * dpr);
+}
+
+function disc(x, y, r, fill) {
+  ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+}
+
+function draw() {
+  if (!cssW) return;
+  const k = dpr * scale, TW = W + 2 * M;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (portrait) ctx.setTransform(0, -k, k, 0, 0, k * TW); else ctx.setTransform(k, 0, 0, k, 0, 0);
+  ctx.translate(M, M);
+
+  // goal pockets, lit in the scorer's colour for the moment after a goal
+  const lit = phase === 'goal' ? (scorer === 0 ? INK : RED) : null;
+  ctx.fillStyle = POCKET;
+  ctx.fillRect(-PD, GY0, PD, GOAL); ctx.fillRect(W, GY0, PD, GOAL);
+  if (lit) { ctx.fillStyle = lit; if (scorer === 0) ctx.fillRect(W, GY0, PD, GOAL); else ctx.fillRect(-PD, GY0, PD, GOAL); }
+
+  ctx.fillStyle = TABLE; ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = RULE; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+  ctx.beginPath(); ctx.arc(W / 2, H / 2, 62, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, H / 2, GOAL * .85, -Math.PI / 2, Math.PI / 2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(W, H / 2, GOAL * .85, Math.PI / 2, Math.PI * 1.5); ctx.stroke();
+  disc(W / 2, H / 2, 4, RULE);
+
+  ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.lineCap = 'square'; ctx.lineJoin = 'miter';
+  ctx.beginPath();
+  ctx.moveTo(0, GY0); ctx.lineTo(0, 0); ctx.lineTo(W, 0); ctx.lineTo(W, GY0);
+  ctx.moveTo(0, GY1); ctx.lineTo(0, H); ctx.lineTo(W, H); ctx.lineTo(W, GY1);
+  ctx.moveTo(0, GY0); ctx.lineTo(-PD, GY0); ctx.lineTo(-PD, GY1); ctx.lineTo(0, GY1);
+  ctx.moveTo(W, GY0); ctx.lineTo(W + PD, GY0); ctx.lineTo(W + PD, GY1); ctx.lineTo(W, GY1);
+  ctx.stroke();
+
+  disc(puck.x, puck.y, KR, INK);
+  paddles.forEach((p, i) => {
+    disc(p.x, p.y, PR, i === 0 ? INK : RED);
+    ctx.strokeStyle = PAPER; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(p.x, p.y, PR * .58, 0, Math.PI * 2); ctx.stroke();
+  });
+}
+
+function frame(t) {
+  requestAnimationFrame(frame);
+  const now = t / 1000;
+  const dt = last ? Math.min(now - last, .05) : 0;
+  last = now;
+  if (!paused && (phase === 'play' || phase === 'goal')) {
+    acc += dt;
+    while (acc >= STEP) { tick(STEP); acc -= STEP; }
+  }
+  if (phase !== 'menu') draw();
+}
+
+if (typeof ResizeObserver === 'function') new ResizeObserver(layout).observe($('#stage'));
+window.addEventListener('resize', layout);
+requestAnimationFrame(frame);
+
+// The hub reads this: integer metrics, the current run, never null. A win
+// against the CPU counts as the level that was beaten (1 easy, 2 medium, 3 hard);
+// a loss, a two-player match or an unfinished one is 0 and never posts.
+window.__boredSnapshot = () => ({
+  slug: 'air-hockey',
+  beaten: finished && mode === '1p' && winner === 0 ? level + 1 : 0,
+  points: score[0],
+  cpu: mode === '1p',
+  finished
+});
+</script>
+</body>
+</html>
