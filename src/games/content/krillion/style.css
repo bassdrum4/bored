@@ -230,3 +230,17 @@ body[data-phase="done"] .mascot{z-index:15}
 .low-power .mascot:not(.poked):not(.celebrate) img{animation-play-state:paused}
 @media(prefers-reduced-motion:reduce){.mascot img{animation:none!important}}
 
+
+/* Puffer Party banner: the landing's door into the live room. It carries the
+   badge, the puffer and the live head count, and it has to read as the biggest
+   thing above BEGIN DESCENT without shouting over the game. */
+.party-banner{display:flex;flex-direction:column;gap:8px;align-items:stretch;min-height:96px;padding:14px 20px 16px;background:linear-gradient(#14243d,#0c1728);color:var(--foam);text-decoration:none;line-height:1.1;box-shadow:0 0 0 3px #050a14,0 0 0 6px #ff5d8f,0 6px 0 6px #123048,0 0 22px #ff5d8f33;transition:box-shadow .18s,translate .12s}
+.party-banner .party-badge{align-self:flex-start;font-size:12px;letter-spacing:.26em;color:#ffd166;background:#ffd1661a;padding:4px 9px 3px;box-shadow:inset 0 0 0 1px #ffd16655}
+.party-banner .party-line{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;align-items:center;column-gap:14px;row-gap:2px}
+.party-banner .party-line img{grid-row:1/3;width:52px;height:52px;image-rendering:pixelated}
+.party-banner .party-line strong{font-size:30px;font-weight:400;letter-spacing:.1em;color:var(--foam)}
+.party-banner .party-line small{font-size:15px;letter-spacing:.1em;color:var(--cyan)}
+.party-banner:hover{box-shadow:0 0 0 3px #050a14,0 0 0 6px #4de3ff,0 6px 0 6px #123048,0 0 26px #4de3ff44;translate:0 -1px}
+.party-banner:active{translate:0 2px}
+@media(max-width:699px){.party-banner{min-height:82px;padding:12px 14px 13px}.party-banner .party-line img{width:44px;height:44px}.party-banner .party-line strong{font-size:24px}.party-banner .party-line small{font-size:13px}}
+@media(max-height:650px){.party-banner{min-height:74px;padding:10px 16px 11px;gap:5px}.party-banner .party-line img{width:40px;height:40px}.party-banner .party-line strong{font-size:24px}}

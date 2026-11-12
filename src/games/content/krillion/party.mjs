@@ -16,7 +16,8 @@ const tierFor = points => points >= 100 ? 'krillion' : points >= 85 ? 'deepcut' 
 
 const state = {
   code: '', view: null, offset: 0, live: null, poll: null, ticker: null, busy: false,
-  size: 6, rated: true, listed: false, roomsOffset: 0, seats: 6, lives: 2, minTurn: 8, meter: 600, sprite: 'krill', lastStatus: ''
+  size: 6, rated: true, listed: false, roomsOffset: 0, seats: 6, lives: 2, minTurn: 8, meter: 600, sprite: 'krill', lastStatus: '',
+  paintedRevision: -1, seatHtml: '', syncing: false, again: false, liveSync: null
 };
 const SEAT_CHOICES = [2, 3, 6, 10];
 const TURN_MIN = 3;
@@ -281,7 +282,12 @@ function paintSeats(view) {
       </div>
     </div>`);
   }
-  $('ring').innerHTML = rows.join('');
+  // A poll that finds nothing new must not tear down the seats: rebuilding them
+  // re-creates every sprite image and is what made the room stutter.
+  const html = rows.join('');
+  if (html === state.seatHtml) return;
+  state.seatHtml = html;
+  $('ring').innerHTML = html;
   placeRing(slots.length);
 }
 
@@ -420,6 +426,7 @@ function paintSettings(view) {
 function paint(view) {
   if (!view || !view.code || !Array.isArray(view.players)) { if (state.code) leaveRoom(); return; }
   state.view = view;
+  state.paintedRevision = view.revision;
   state.offset = (view.serverNow || Date.now()) - Date.now();
   paintHud(view);
   // Prompt first: the ring measures the card to stay out of its way.
@@ -453,15 +460,29 @@ function openChannel() {
   state.live = connectParty({
     code: state.code, name: prefs.name,
     onStatus: value => { if (value === 'disconnected') paintPresenceNote('reconnecting…'); },
-    onMessage: message => { if (message.type === 'broadcast') sync(); },
+    onMessage: message => {
+      if (message.type !== 'broadcast') return;
+      // The nudge is only a trigger: a room read is personalised ("(you)", whose
+      // turn it is), so a peer's copy is never painted here. It just spares the
+      // room a wait for the next poll, which is most of the felt delay.
+      clearTimeout(state.liveSync);
+      state.liveSync = setTimeout(() => sync(), 60);
+    },
   });
 }
 function paintPresenceNote(note) { status(note, ''); }
 
-async function sync() {
+async function sync(force = false) {
   if (!state.code) return;
+  if (state.syncing) { state.again = true; return; }
+  state.syncing = true;
   try {
-    paint(await api('party/room?code=' + state.code));
+    const view = await api('party/room?code=' + state.code);
+    // A poll that lands on the same revision only needs the clock corrected.
+    if (!force && view.revision === state.paintedRevision) {
+      state.offset = (view.serverNow || Date.now()) - Date.now();
+      paintClock();
+    } else paint(view);
   } catch (error) {
     if (error.status === 403 || error.status === 404) {
       stopRoom();
@@ -469,12 +490,25 @@ async function sync() {
       status('You are not in that room any more.', 'bad');
       loadRooms();
     }
+  } finally {
+    state.syncing = false;
+    if (state.again) { state.again = false; sync(); }
   }
 }
 
+// A live round refreshes several times a second so a pass, a pop or a new heart
+// lands while it is still news; a lobby only needs a lazy read. Polls that find
+// the same revision cost one small request and no repaint.
 function scheduleSync() {
   clearInterval(state.poll);
-  state.poll = setInterval(sync, 1500);
+  let tick = 0;
+  state.poll = setInterval(() => {
+    tick += 1;
+    if (document.hidden) return;
+    const playing = !!state.view && state.view.status !== 'lobby';
+    if (!playing && tick % 3) return;
+    sync();
+  }, 500);
   clearInterval(state.ticker);
   state.ticker = setInterval(paintClock, 100);
 }
@@ -487,6 +521,8 @@ function showLobby() {
   $('lobby').hidden = false;
   $('party-over').hidden = true;
   reef.seats = [];
+  state.seatHtml = '';
+  state.paintedRevision = -1;
   history.replaceState({}, '', 'party.html');
   loadIdentity();
   loadRooms(0);
@@ -520,6 +556,8 @@ async function host() {
 
 function openRoom(view, code) {
   state.code = code;
+  state.seatHtml = '';
+  state.paintedRevision = -1;
   state.seats = view.seats || state.size;
   $('lobby').hidden = true;
   $('room').hidden = false;
@@ -536,11 +574,12 @@ async function act(path, data = {}) {
     const view = await api(path, { code: state.code, ...data });
     if (view.gone) { showLobby(); status('You left the room.'); return; }
     paint(view);
-    state.live?.broadcast?.();
+    state.live?.broadcast?.(view.revision);
     status('');
   } catch (error) {
     status(error.message, 'bad');
-    if (error.status === 409) sync();
+    // A refused move almost always means someone else's move arrived first.
+    if (error.status === 409) sync(true);
   }
 }
 
