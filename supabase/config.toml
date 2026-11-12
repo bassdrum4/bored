@@ -1,2 +1,5 @@
 [functions.together-pool]
 verify_jwt = true
+
+[functions.krillion]
+verify_jwt = false

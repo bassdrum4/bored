@@ -1,4 +1,9 @@
 {
+  "krillion": {
+    "label": "Points in a finished seven-prompt dive",
+    "better": "high",
+    "max_value": 700
+  },
   "2048": {
     "label": "Score",
     "better": "high",

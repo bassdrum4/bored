@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Krillion</title>
+<meta name="description" content="Seven prompts, twenty-five seconds an answer. Rarer answers sink deeper.">
+<style>
+  :root {
+    --bg: #f6f5f0;
+    --ink: #22221e;
+    --muted: #7b7669;
+    --hair: #d9d5c9;
+    --wash: #e6eef0;
+    --accent: #1f5f7a;
+    --bad: #8a3b32;
+    --sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { min-height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.45 var(--sans);
+    display: flex;
+    justify-content: center;
+    overflow-y: auto;
+    touch-action: manipulation;
+  }
+  #app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    padding: 14px 16px 20px;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--hair);
+  }
+  h1 {
+    font: 600 12px/1 var(--sans);
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+  #hud {
+    display: flex;
+    gap: 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  #hud b { font-weight: 400; color: var(--ink); font-variant-numeric: tabular-nums; }
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 22px 0;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h2 {
+    font: 500 28px/1.12 var(--sans);
+    letter-spacing: -.02em;
+    margin: 8px 0 12px;
+  }
+  .lede { color: var(--muted); max-width: 34ch; }
+  .rules {
+    list-style: none;
+    margin: 20px 0 24px;
+    border-top: 1px solid var(--hair);
+  }
+  .rules li {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--hair);
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  .rules li b { color: var(--ink); font-weight: 600; }
+  button {
+    font: 600 10.5px/1 var(--sans);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    background: transparent;
+    color: var(--ink);
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+  button.primary { background: var(--ink); color: var(--bg); }
+  button.quiet { border-color: var(--hair); color: var(--muted); }
+  button:disabled { opacity: .45; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #start-btn { width: 100%; margin-top: 4px; }
+  .status {
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status.error { color: var(--bad); }
+  .stale { color: var(--bad); }
+  .round-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  #timer { font-variant-numeric: tabular-nums; color: var(--ink); }
+  #timer.urgent { color: var(--bad); }
+  .bar {
+    height: 2px;
+    background: var(--hair);
+    margin: 8px 0 20px;
+    overflow: hidden;
+  }
+  .bar i {
+    display: block;
+    height: 100%;
+    width: 100%;
+    background: var(--accent);
+    transition: width .2s linear;
+  }
+  #prompt { min-height: 2.3em; }
+  form {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  #answer {
+    flex: 1;
+    min-width: 0;
+    font: 16px/1.2 var(--sans);
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    padding: 12px 11px;
+  }
+  #answer::placeholder { color: #a9a396; }
+  #answer:disabled { background: var(--bg); }
+  #submit { flex: 0 0 auto; }
+  .result {
+    min-height: 3.2em;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--hair);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .result strong {
+    display: block;
+    font: 600 15px/1.3 var(--sans);
+    color: var(--ink);
+    margin-bottom: 2px;
+  }
+  .result.good strong { color: var(--accent); }
+  .result.miss strong { color: var(--bad); }
+  #next { margin-top: 12px; }
+  .score-line {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 6px 0 2px;
+  }
+  #total {
+    font: 400 58px/1 var(--mono);
+    letter-spacing: -.06em;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-line span { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  #band { font-size: 13px; margin-top: 4px; }
+  #best { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 6px; }
+  #review {
+    list-style: none;
+    margin: 20px 0;
+    border-top: 1px solid var(--hair);
+  }
+  #review li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--hair);
+  }
+  .rev-prompt { color: var(--muted); font-size: 11.5px; grid-column: 1 / -1; }
+  .rev-answer { font-size: 12.5px; overflow-wrap: anywhere; }
+  .rev-score { font-family: var(--mono); font-size: 12px; text-align: right; color: var(--ink); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  #answers { flex: 1; }
+  #again { flex: 1; }
+  #answer-book { margin-top: 18px; }
+  #answer-book details { border-bottom: 1px solid var(--hair); padding: 8px 0; }
+  #answer-book summary { cursor: pointer; font-size: 12px; }
+  .book-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 11.5px;
+    color: var(--muted);
+    padding: 4px 0 0 14px;
+  }
+  .book-row b { font-weight: 400; color: var(--ink); }
+  @media (max-width: 360px) {
+    #app { padding: 12px 12px 16px; }
+    h2 { font-size: 24px; }
+    form { flex-direction: column; }
+    #submit { width: 100%; }
+    #total { font-size: 48px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Krillion</h1>
+    <div id="hud" aria-live="off">
+      <span>score <b id="hud-score">0</b></span>
+      <span id="hud-day">DIVE …</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="start-panel">
+      <p class="eyebrow" id="day-label">DIVE …</p>
+      <h2>Seven prompts.<br>One dive.</h2>
+      <p class="lede">Twenty-five seconds an answer. Rarer answers sink deeper.</p>
+      <ul class="rules">
+        <li>Everyone gets the <b>same seven prompts</b> today.</li>
+        <li>Rare answers score <b>10 to 100</b>; a blank or unknown answer scores zero.</li>
+        <li><b>700 points</b> is the trench. Your best dive counts.</li>
+      </ul>
+      <button class="primary" id="start-btn" type="button">Begin dive</button>
+      <p class="status" id="start-error" hidden></p>
+      <p class="status stale" id="stale-note" hidden></p>
+      <button class="quiet" id="retry-btn" type="button" hidden>Retry</button>
+    </section>
+
+    <section id="round-panel" hidden>
+      <div class="round-top">
+        <span id="progress">Prompt 1 of 7</span>
+        <span id="timer" aria-live="off">25s</span>
+      </div>
+      <div class="bar" aria-hidden="true"><i id="bar"></i></div>
+      <h2 id="prompt"></h2>
+      <form id="form">
+        <label for="answer" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Your answer</label>
+        <input id="answer" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="80" placeholder="Type one answer">
+        <button class="primary" id="submit" type="submit">Submit</button>
+      </form>
+      <p class="result" id="result" aria-live="polite" hidden></p>
+      <p class="status error" id="round-error" hidden></p>
+      <button class="quiet" id="next" type="button" hidden>Next prompt</button>
+    </section>
+
+    <section id="done-panel" hidden>
+      <p class="eyebrow" id="done-day">DIVE …</p>
+      <h2>Dive complete</h2>
+      <div class="score-line"><b id="total">0</b><span>/ 700</span></div>
+      <p id="band"></p>
+      <p id="best"></p>
+      <ol id="review"></ol>
+      <div class="actions">
+        <button class="quiet" id="answers" type="button">Show accepted answers</button>
+        <button class="primary" id="again" type="button">Dive again</button>
+      </div>
+      <div id="answer-book" hidden></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const API = 'https://djdpttltfmwkofdrvkem.supabase.co/functions/v1/krillion';
+const KEY = 'sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ';
+const ROUND_MS = 25000;
+const BANDS = [
+  { min: 0, name: 'Plankton', text: 'Plenty of ocean left down there.' },
+  { min: 151, name: 'Schooler', text: 'Swimming with the school.' },
+  { min: 251, name: 'Rare', text: 'Below the thermocline. Nice.' },
+  { min: 351, name: 'Deep cut', text: 'Seriously deep dive.' },
+  { min: 450, name: 'One in a krillion', text: 'Trench dweller. Absurd.' }
+];
+const bandFor = score => [...BANDS].reverse().find(band => score >= band.min) || BANDS[0];
+const $ = id => document.getElementById(id);
+
+const state = {
+  book: null, round: 0, answers: [], results: [], score: 0,
+  started: false, finished: false, locked: false,
+  deadline: 0, interval: 0, advance: 0
+};
+
+const startPanel = $('start-panel'), roundPanel = $('round-panel'), donePanel = $('done-panel');
+const startBtn = $('start-btn'), retryBtn = $('retry-btn'), startError = $('start-error');
+const staleNote = $('stale-note'), dayLabel = $('day-label'), hudDay = $('hud-day'), hudScore = $('hud-score');
+const progressEl = $('progress'), timerEl = $('timer'), barEl = $('bar'), promptEl = $('prompt');
+const form = $('form'), answerEl = $('answer'), submitBtn = $('submit'), resultEl = $('result');
+const roundError = $('round-error'), nextBtn = $('next');
+const doneDay = $('done-day'), totalEl = $('total'), bandEl = $('band'), bestEl = $('best');
+const reviewEl = $('review'), answersBtn = $('answers'), againBtn = $('again'), answerBookEl = $('answer-book');
+
+window.__boredSnapshot = () => ({
+  slug: 'krillion',
+  score: state.finished ? state.score : 0,
+  finished: state.finished,
+  dayNumber: state.book ? state.book.dayNumber : 0
+});
+
+function readBest() {
+  try { return Number(localStorage.getItem('bored.krillion.best')) || 0; } catch (error) { return 0; }
+}
+function writeBest(value) {
+  try { localStorage.setItem('bored.krillion.best', String(value)); } catch (error) {}
+}
+
+async function api(action, payload) {
+  const request = action === 'today'
+    ? { headers: { apikey: KEY }, cache: 'no-store' }
+    : { method: 'POST', headers: { apikey: KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ action }, payload || {})) };
+  if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) request.signal = AbortSignal.timeout(20000);
+  const response = await fetch(action === 'today' ? API + '?action=today' : API, request);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'The dive could not be reached.');
+  return data;
+}
+
+async function boot() {
+  startBtn.disabled = true;
+  startBtn.textContent = 'Loading…';
+  startError.hidden = true;
+  staleNote.hidden = true;
+  retryBtn.hidden = true;
+  try {
+    const book = await api('today');
+    if (!Array.isArray(book.prompts) || book.prompts.length !== 7) throw new Error('Today’s dive is not ready.');
+    state.book = book;
+    dayLabel.textContent = 'DIVE #' + (book.dayNumber || '?');
+    hudDay.textContent = 'DIVE #' + (book.dayNumber || '?');
+    if (book.stale) {
+      staleNote.hidden = false;
+      staleNote.textContent = 'Live reference unavailable. Playing Dive #' + book.dayNumber + '.';
+    }
+    startBtn.disabled = false;
+    startBtn.textContent = 'Begin dive';
+  } catch (error) {
+    startBtn.disabled = true;
+    startBtn.textContent = 'Unavailable';
+    startError.hidden = false;
+    startError.textContent = error.message || 'The dive could not be reached.';
+    retryBtn.hidden = false;
+  }
+}
+
+function start() {
+  if (!state.book) return;
+  clearInterval(state.interval);
+  clearTimeout(state.advance);
+  state.round = 0;
+  state.answers = [];
+  state.results = [];
+  state.score = 0;
+  state.started = true;
+  state.finished = false;
+  state.locked = false;
+  hudScore.textContent = '0';
+  startPanel.hidden = true;
+  donePanel.hidden = true;
+  answerBookEl.hidden = true;
+  roundPanel.hidden = false;
+  renderRound();
+}
+
+function renderRound() {
+  const prompt = state.book.prompts[state.round];
+  state.locked = false;
+  clearInterval(state.interval);
+  clearTimeout(state.advance);
+  progressEl.textContent = 'Prompt ' + (state.round + 1) + ' of ' + state.book.prompts.length;
+  promptEl.textContent = prompt.text;
+  answerEl.value = '';
+  answerEl.disabled = false;
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Submit';
+  nextBtn.hidden = true;
+  resultEl.hidden = true;
+  resultEl.className = 'result';
+  resultEl.replaceChildren();
+  roundError.hidden = true;
+  timerEl.classList.remove('urgent');
+  timerEl.textContent = '25s';
+  barEl.style.width = '100%';
+  state.deadline = Date.now() + ROUND_MS;
+  state.interval = setInterval(tick, 200);
+  tick();
+  setTimeout(() => answerEl.focus(), 30);
+}
+
+function tick() {
+  const left = Math.max(0, Math.ceil((state.deadline - Date.now()) / 1000));
+  timerEl.textContent = left + 's';
+  barEl.style.width = Math.max(0, Math.min(100, left / 25 * 100)) + '%';
+  timerEl.classList.toggle('urgent', left <= 5);
+  if (Date.now() >= state.deadline && !state.locked) submit(true);
+}
+
+async function submit(auto) {
+  if (state.locked || !state.started || state.finished) return;
+  state.locked = true;
+  clearInterval(state.interval);
+  const raw = answerEl.value.trim();
+  answerEl.disabled = true;
+  submitBtn.disabled = true;
+  submitBtn.textContent = auto ? 'Time' : 'Checking…';
+  roundError.hidden = true;
+  try {
+    const data = await api('check', { date: state.book.date, round: state.round, answer: raw });
+    state.answers.push(raw);
+    state.results.push(Object.assign({ raw }, data));
+    if (data.accepted) state.score += Number(data.score) || 0;
+    hudScore.textContent = String(state.score);
+    showResult(data, raw, auto);
+    state.advance = setTimeout(nextRound, data.accepted && data.quip ? 2800 : 2200);
+  } catch (error) {
+    state.locked = false;
+    answerEl.disabled = false;
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Retry';
+    roundError.hidden = false;
+    roundError.textContent = error.message || 'Try that again.';
+  }
+}
+
+function showResult(data, raw, auto) {
+  resultEl.hidden = false;
+  resultEl.replaceChildren();
+  const head = document.createElement('strong');
+  if (data.accepted) {
+    head.textContent = data.name + '  +' + data.score;
+    resultEl.className = 'result good';
+  } else {
+    head.textContent = raw ? 'No match. 0 points.' : 'No answer. 0 points.';
+    resultEl.className = 'result miss';
+  }
+  const line = document.createElement('span');
+  if (data.accepted) {
+    line.textContent = (data.correction ? 'Counted as ' : '') + data.answer + (data.quip ? ' — ' + data.quip : '');
+  } else {
+    line.textContent = auto ? 'Time ran out.' : 'It happens. The next prompt is a fresh start.';
+  }
+  resultEl.append(head, line);
+  nextBtn.hidden = false;
+  nextBtn.textContent = state.round === state.book.prompts.length - 1 ? 'See results' : 'Next prompt';
+  submitBtn.textContent = 'Submitted';
+}
+
+function nextRound() {
+  clearTimeout(state.advance);
+  clearInterval(state.interval);
+  if (state.round >= state.book.prompts.length - 1) {
+    finish();
+    return;
+  }
+  state.round += 1;
+  renderRound();
+}
+
+async function finish() {
+  if (state.finished) return;
+  state.finished = true;
+  state.started = false;
+  clearInterval(state.interval);
+  clearTimeout(state.advance);
+  roundPanel.hidden = true;
+  donePanel.hidden = false;
+  doneDay.textContent = 'DIVE #' + (state.book.dayNumber || '?');
+  renderDone(state.score);
+  try {
+    const data = await api('submit', { date: state.book.date, answers: state.answers });
+    if (Number.isFinite(data.score)) {
+      const checked = Math.max(0, Math.min(700, Math.round(data.score)));
+      if (checked !== state.score) {
+        state.score = checked;
+        hudScore.textContent = String(checked);
+        renderDone(checked);
+      }
+    }
+  } catch (error) {
+    // The local result still stands; the review below comes from the checks
+    // already confirmed by the function.
+  }
+}
+
+function renderDone(score) {
+  totalEl.textContent = String(score);
+  const band = bandFor(score);
+  bandEl.textContent = band.name + ' — ' + band.text;
+  const previous = readBest();
+  if (score > previous) writeBest(score);
+  bestEl.textContent = 'Best ' + Math.max(previous, score) + ' / 700';
+  reviewEl.replaceChildren();
+  state.results.forEach((result, index) => {
+    const item = document.createElement('li');
+    const prompt = document.createElement('span');
+    prompt.className = 'rev-prompt';
+    prompt.textContent = (index + 1) + '. ' + state.book.prompts[index].text;
+    const answer = document.createElement('span');
+    answer.className = 'rev-answer';
+    answer.textContent = result.raw || '—';
+    const points = document.createElement('span');
+    points.className = 'rev-score';
+    points.textContent = result.accepted ? '+' + result.score : '0';
+    item.append(prompt, answer, points);
+    reviewEl.appendChild(item);
+  });
+}
+
+async function showAnswers() {
+  if (!state.book) return;
+  answersBtn.disabled = true;
+  answersBtn.textContent = 'Loading…';
+  answerBookEl.hidden = false;
+  answerBookEl.replaceChildren();
+  try {
+    const data = await api('review', { date: state.book.date });
+    data.prompts.forEach((prompt, index) => {
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = (index + 1) + '. ' + prompt.text;
+      details.appendChild(summary);
+      prompt.answers.slice(0, 5).forEach(answer => {
+        const row = document.createElement('p');
+        row.className = 'book-row';
+        const name = document.createElement('span');
+        name.textContent = answer.answer;
+        const score = document.createElement('b');
+        score.textContent = answer.tier + ' · ' + answer.score;
+        row.append(name, score);
+        details.appendChild(row);
+      });
+      answerBookEl.appendChild(details);
+    });
+    answersBtn.textContent = 'Answers shown';
+  } catch (error) {
+    answerBookEl.textContent = error.message || 'The answer book is unavailable.';
+    answersBtn.disabled = false;
+    answersBtn.textContent = 'Try again';
+  }
+}
+
+form.addEventListener('submit', event => {
+  event.preventDefault();
+  submit(false);
+});
+nextBtn.addEventListener('click', nextRound);
+startBtn.addEventListener('click', start);
+retryBtn.addEventListener('click', boot);
+againBtn.addEventListener('click', start);
+answersBtn.addEventListener('click', showAnswers);
+
+boot();
+</script>
+</body>
+</html>

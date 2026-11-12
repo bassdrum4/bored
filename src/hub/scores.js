@@ -88,6 +88,11 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Krillion ranks the server-checked total of a finished seven-prompt dive.
+  highScore('krillion', 'Krillion', 'points', {
+    metric: 'score', min: 1, max: 700,
+    when: snapshot => snapshot.finished === true
+  }),
   // Solo only: reaction time in milliseconds. False starts and implausibly
   // fast responses do not qualify; local duels never affect the leaderboard.
   highScore('quickdraw', 'Quickdraw', 'ms', {

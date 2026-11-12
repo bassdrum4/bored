@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-labelledby="title desc">
+  <title id="title">Krillion</title>
+  <desc id="desc">Seven prompts, twenty-five seconds each, with rarer answers scoring deeper.</desc>
+  <rect width="640" height="400" fill="#f6f5f0"/>
+  <path d="M0 268c64-18 128-18 192 0s128 18 192 0 128-18 256 0v132H0Z" fill="#e6eef0"/>
+  <path d="M0 300c80-14 160-14 240 0s160 14 240 0 120-10 160 0v100H0Z" fill="#d5e3e7"/>
+  <g fill="none" stroke="#1f5f7a" stroke-width="1.5" opacity=".55">
+    <path d="M58 252c34-10 68-10 102 0"/>
+    <path d="M420 244c40-12 80-12 120 0"/>
+    <path d="M250 282c34-10 68-10 102 0"/>
+  </g>
+  <g fill="#1f5f7a">
+    <circle cx="104" cy="208" r="4"/>
+    <circle cx="118" cy="194" r="2.5"/>
+    <circle cx="508" cy="220" r="3"/>
+    <circle cx="526" cy="204" r="2"/>
+  </g>
+  <text x="48" y="92" fill="#22221e" font-family="system-ui, -apple-system, Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" letter-spacing="3">KRILLION</text>
+  <text x="46" y="150" fill="#22221e" font-family="system-ui, -apple-system, Segoe UI, Arial, sans-serif" font-size="38" font-weight="500">Seven prompts.</text>
+  <text x="46" y="190" fill="#22221e" font-family="system-ui, -apple-system, Segoe UI, Arial, sans-serif" font-size="38" font-weight="500">One dive.</text>
+  <text x="48" y="227" fill="#7b7669" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12">25 SECONDS AN ANSWER / 700 POINTS</text>
+  <g transform="translate(452 150)">
+    <rect width="126" height="86" fill="#f6f5f0" stroke="#d9d5c9"/>
+    <text x="14" y="26" fill="#7b7669" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="9">DIVE 119</text>
+    <text x="14" y="52" fill="#1f5f7a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22">700</text>
+    <text x="14" y="70" fill="#7b7669" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="8">TRENCH FLOOR</text>
+  </g>
+</svg>
