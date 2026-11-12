@@ -337,7 +337,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   await embed.$eval(`[data-match-id="${active.id}"]`,e=>e.querySelector('button').click());
   await embed.waitForFunction(()=>document.querySelector('#frame').contentDocument?.querySelector('.connect'));
   assert.ok(await embed.$eval('#player',e=>!e.hidden),'full player works within embedded site');
-  await embed.click('#menu-toggle');await embed.click('#back');await embed.waitForFunction(()=>document.querySelector('#player').hidden);
+  await embed.$eval('#menu-toggle',button=>button.click());await embed.$eval('#back',button=>button.click());await embed.waitForFunction(()=>document.querySelector('#player').hidden);
   await a.goto(site.url+'?after-embed#together');await a.waitForSelector('#bt-your-games');
   await click(a,'Start a Game');await a.waitForSelector('#bt-people .bt-person');await refresh(a);
   assert.ok(await a.$('#bt-people'),'polling preserves the member list');
