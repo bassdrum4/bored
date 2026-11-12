@@ -79,7 +79,12 @@ export function matchAnswer(input, answers) {
   }
   const allowance = key.length < 4 ? 0 : key.length < 8 ? 1 : 2;
   const candidates = entries.map(e => ({ ...e, d: distance(key, e.key, allowance) })).filter(e => e.d <= allowance).sort((a, b) => a.d - b.d);
-  if (candidates.length && (!candidates[1] || candidates[0].d < candidates[1].d || candidates[0].a.answer === candidates[1].a.answer)) return { ...candidates[0].a, correction: true };
+  // A typo equally close to two different answers lands on the lower-scoring
+  // one, so a misspelling is never worth more than the answer it might have meant.
+  if (candidates.length) {
+    const best = candidates.filter(e => e.d === candidates[0].d).sort((a, b) => (TIERS[a.a.tier]?.score ?? 0) - (TIERS[b.a.tier]?.score ?? 0))[0];
+    return { ...best.a, correction: true };
+  }
   // Only after exact and typo matching: a unique longer phrase that starts with
   // one known answer ("Bob Pettit hawks") counts, and never more than one tier.
   const qualified = entries
