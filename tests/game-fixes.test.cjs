@@ -274,15 +274,17 @@ test('Sand cloner learns wind heading and emits live directional gusts', () => {
   }
 });
 
-test('Fluid exposes editable live solver parameters', () => {
+test('Fluid ships the full simulation with its live settings panel', () => {
   const html = load('src/games/content/fluid.html');
-  const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>'));
-  assert.doesNotThrow(() => new vm.Script(script));
-  for (const setting of ['SPLAT_FORCE', 'CURL', 'SPLAT_RADIUS', 'DYE_STRENGTH', 'DENSITY_DISSIPATION']) {
-    assert.match(html, new RegExp('data-setting="' + setting + '"'), setting + ' has a slider');
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]);
+  assert.ok(scripts.length >= 2, 'the settings library and the simulation are both inline');
+  for (const source of scripts) assert.doesNotThrow(() => new vm.Script(source));
+  for (const setting of ['SIM_RESOLUTION', 'DYE_RESOLUTION', 'SPLAT_FORCE', 'CURL', 'BLOOM', 'SUNRAYS']) {
+    assert.match(html, new RegExp(setting), setting + ' is part of the simulation');
   }
-  assert.match(html, /id="editor-toggle"/);
-  assert.match(html, /id="fluid-reset-settings"/);
+  assert.match(html, /new dat\.GUI\(/);
+  assert.match(html, /window\.__boredSnapshot\s*=/);
+  assert.doesNotMatch(html, /google-analytics|promo|twitter|discord/i, 'promotional identifiers are stripped');
 });
 
 test('Game card leaderboard reports co-leaders instead of choosing alphabetically', () => {
