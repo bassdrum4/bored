@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 416,
+  "count": 417,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2a5f64e","date":"2026-11-12","author":"Claude","subject":"Pokédoku: make your own board and share it as a 7-letter code"},
   {"sha":"202081a","date":"2026-11-12","author":"Claude","subject":"Pokédoku: show pixel sprites on filled squares and in autocomplete"},
   {"sha":"ad06705","date":"2026-11-12","author":"Claude","subject":"Add Pokédoku: 3x3 Pokémon grid puzzle"},
   {"sha":"63fb7ce","date":"2026-11-12","author":"Vettel Xu","subject":"fix(krillion): typo ties go to the lower-scoring answer"},
