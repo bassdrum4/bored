@@ -277,6 +277,15 @@ $('room-list').addEventListener('click', event => {
   if (button) enter(button.dataset.code);
 });
 $('party-start-btn').addEventListener('click', () => act('party/start'));
+// Inside Bored the dive is an inline document in the game frame, and this page
+// is a real navigation away from it. Stepping back restores that dive with the
+// hub's helpers intact. A room link opened on its own has no dive behind it, so
+// the link's own address opens Bored on Krillion instead.
+$('back-link')?.addEventListener('click', event => {
+  if (window.parent === window || history.length < 2) return;
+  event.preventDefault();
+  history.back();
+});
 $('again-btn').addEventListener('click', () => act('party/start'));
 $('leave-btn').addEventListener('click', () => act('party/leave'));
 $('copy-btn').addEventListener('click', async () => {
