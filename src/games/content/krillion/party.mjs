@@ -16,7 +16,7 @@ const tierFor = points => points >= 100 ? 'krillion' : points >= 85 ? 'deepcut' 
 
 const state = {
   code: '', view: null, offset: 0, live: null, poll: null, ticker: null, busy: false,
-  size: 6, rated: true, listed: false, roomsOffset: 0, seats: 6, lives: 2, minTurn: 8, sprite: 'krill', lastStatus: ''
+  size: 6, rated: true, listed: false, roomsOffset: 0, seats: 6, lives: 2, minTurn: 8, meter: 600, sprite: 'krill', lastStatus: ''
 };
 const SEAT_CHOICES = [2, 3, 6, 10];
 const TURN_MIN = 3;
@@ -211,7 +211,7 @@ $('refresh')?.addEventListener('click', () => loadRooms(0));
 $('load-more').addEventListener('click', () => loadRooms(state.roomsOffset + 50));
 $('host-btn').addEventListener('click', host);
 $('howto-btn').addEventListener('click', () => $('howto-dialog').showModal());
-$('rules-btn').addEventListener('click', () => $('howto-dialog').showModal());
+$('rules-btn').addEventListener('click', () => $('rules-dialog').showModal());
 $('howto-room').addEventListener('click', () => $('howto-dialog').showModal());
 document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => button.closest('dialog')?.close()));
 
@@ -391,6 +391,10 @@ function nextSetting(kind, dir) {
     const next = Math.max(1, Math.min(5, state.lives + dir));
     return next === state.lives ? null : next;
   }
+  if (kind === 'meter') {
+    const next = Math.max(300, Math.min(5000, state.meter + dir * 50));
+    return next === state.meter ? null : next;
+  }
   const next = Math.max(TURN_MIN, Math.min(TURN_MAX, state.minTurn + dir));
   return next === state.minTurn ? null : next;
 }
@@ -399,9 +403,14 @@ function paintSettings(view) {
   state.lives = Number(view.lives) || state.lives;
   state.minTurn = Number(view.minTurn) || state.minTurn;
   state.seats = Number(view.seats) || state.seats;
+  state.meter = Number(view.heartMeter) || state.meter;
   $('lives-value').textContent = String(state.lives);
   $('minturn-value').textContent = `${state.minTurn}s`;
   $('seats-value').textContent = String(state.seats);
+  const meterValue = $('meter-value');
+  if (meterValue) meterValue.textContent = String(state.meter);
+  const meterLine = $('meter-line');
+  if (meterLine) meterLine.textContent = `${state.meter} points buys an extra heart.`;
   const editable = !!view.host && view.status === 'lobby';
   document.querySelectorAll('[data-step]').forEach(button => {
     button.disabled = !editable || nextSetting(button.dataset.step, Number(button.dataset.dir)) === null;
@@ -544,7 +553,7 @@ async function leaveRoom() {
 
 document.querySelectorAll('[data-step]').forEach(button => button.addEventListener('click', () => {
   const next = nextSetting(button.dataset.step, Number(button.dataset.dir));
-  if (next !== null) act('party/settings', { [button.dataset.step]: next });
+  if (next !== null) act('party/settings', { [button.dataset.step === 'meter' ? 'meterTarget' : button.dataset.step]: next });
 }));
 
 // Inside Bored the dive is an inline document in the game frame, and this page
