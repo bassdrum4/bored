@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 418,
+  "count": 419,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"0bdfe1b","date":"2026-11-12","author":"Codebuff","subject":"Rebuild Puffer Party's screens and make LIVES / MIN. TURN real room settings"},
   {"sha":"63ee339","date":"2026-11-12","author":"Claude","subject":"Pokédoku: regional, Mega and Gigantamax forms; host sprites with the site"},
   {"sha":"2a5f64e","date":"2026-11-12","author":"Claude","subject":"Pokédoku: make your own board and share it as a 7-letter code"},
   {"sha":"202081a","date":"2026-11-12","author":"Claude","subject":"Pokédoku: show pixel sprites on filled squares and in autocomplete"},
