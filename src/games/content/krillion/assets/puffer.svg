@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" shape-rendering="crispEdges" role="img" aria-label="Pixel puffer fish">
+  <g fill="#f5c542">
+    <rect x="6" y="5" width="7" height="1"/><rect x="5" y="6" width="9" height="1"/><rect x="4" y="7" width="11" height="6"/>
+    <rect x="5" y="13" width="9" height="1"/><rect x="6" y="14" width="7" height="1"/>
+  </g>
+  <g fill="#e08a2e">
+    <rect x="2" y="9" width="2" height="3"/><rect x="16" y="8" width="2" height="2"/><rect x="9" y="15" width="2" height="2"/>
+  </g>
+  <g fill="#8a5a1f">
+    <rect x="9" y="2" width="2" height="2"/><rect x="3" y="5" width="1" height="1"/><rect x="15" y="5" width="1" height="1"/><rect x="3" y="14" width="1" height="1"/><rect x="15" y="14" width="1" height="1"/>
+  </g>
+  <g fill="#0a1320"><rect x="7" y="8" width="2" height="2"/></g>
+  <g fill="#ffffff"><rect x="7" y="8" width="1" height="1"/></g>
+  <g fill="#7a3f00"><rect x="10" y="11" width="2" height="1"/></g>
+</svg>
