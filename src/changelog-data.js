@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 421,
+  "count": 422,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1b87786","date":"2026-11-12","author":"Claude","subject":"Pokédoku: combine Pokédoku, Inverse Doku and Shiny Hunt into one game"},
   {"sha":"cea63b8","date":"2026-11-12","author":"Codebuff","subject":"Match the Puffer Party seat plates to Krillion's own round DOM"},
   {"sha":"f55d497","date":"2026-11-12","author":"Claude","subject":"Pokémon games: rarity scoring, start screens, Shiny Hunt and Inverse Doku"},
   {"sha":"0bdfe1b","date":"2026-11-12","author":"Codebuff","subject":"Rebuild Puffer Party's screens and make LIVES / MIN. TURN real room settings"},
