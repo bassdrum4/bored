@@ -26,8 +26,12 @@
   .cell:disabled { cursor: default }
   .cell .nm { font-size: 11px; font-weight: 600; line-height: 1.15; word-break: break-word }
   .cell .sm { font-size: 10px; opacity: .8; margin-top: 2px }
-  .cell.got { color: #fff; border-color: transparent }
-  .cell .t2 { position: absolute; left: 0; right: 0; bottom: 0; height: 5px }
+  .cell.got { color: #fff; border-color: transparent; padding: 0; overflow: hidden }
+  .cell.got .nm { position: absolute; left: 0; right: 0; bottom: 6px; padding: 0 4px; z-index: 2; text-shadow: 0 1px 2px rgba(0,0,0,.6) }
+  .cell.got .sm { position: absolute; top: 3px; right: 5px; z-index: 2; margin: 0; text-shadow: 0 1px 2px rgba(0,0,0,.6) }
+  .cell.got img { position: absolute; inset: 0; margin: auto; width: 86%; height: 86%; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)) }
+  .cell .t2 { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; z-index: 1 }
+  #opts img { width: 24px; height: 24px; image-rendering: pixelated; vertical-align: middle; margin-right: 4px }
   .cell.miss { border-color: #b8402a }
   .cell.open .nm { color: #6b6558; font-weight: 400 }
   #panel { border: 1px solid #d8d2c4; background: #fffdf7; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-radius: 2px }
@@ -109,6 +113,7 @@ const ROMAN = ["","I","II","III","IV","V","VI","VII","VIII","IX"];
 const GEN_END = [0,151,251,386,493,649,721,809,905,1025];
 const genOf = n => GEN_END.findIndex((e,i) => i > 0 && n <= e);
 const MONS = RAW.map(([name,num,types,flags]) => ({ name, num, types: types.split("/"), flags: new Set(flags ? flags.split(" ") : []), gen: genOf(num), key: name.toLowerCase().replace(/[^a-z0-9]/g,"") }));
+const sprite = num => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${num}.png`;
 
 const CATS = {};
 TYPES.forEach(t => CATS["t_"+t] = { fam:"type", w:3, kind:"type", label:t, test:m => m.types.includes(t) });
@@ -182,7 +187,7 @@ function render() {
       b.type = "button"; b.className = "cell"; b.id = "c" + i;
       if (m) {
         b.classList.add("got"); b.style.background = TC[m.types[0]];
-        b.innerHTML = `<span class="nm">${m.name}</span><span class="sm">#${m.num} · ${n}</span>` + (m.types[1] ? `<span class="t2" style="background:${TC[m.types[1]]}"></span>` : "");
+        b.innerHTML = `<img src="${sprite(m.num)}" alt="" loading="lazy"><span class="sm">${n}</span><span class="nm">${m.name}</span>` + (m.types[1] ? `<span class="t2" style="background:${TC[m.types[1]]}"></span>` : "");
         b.setAttribute("aria-label", m.name + ", " + n + " possible");
       } else if (S.over) {
         b.classList.add("open"); b.innerHTML = `<span class="nm">${n} fit</span>`;
@@ -232,7 +237,7 @@ function paint() {
   opts.forEach((m, i) => {
     const used = S.cells.includes(m.name), li = document.createElement("li"), b = document.createElement("button");
     b.type = "button"; b.disabled = used;
-    b.innerHTML = `<span>${m.name}${used ? " (used)" : ""}</span><span class="dots muted">#${m.num}${m.types.map(t => `<i style="background:${TC[t]}"></i>`).join("")}</span>`;
+    b.innerHTML = `<span><img src="${sprite(m.num)}" alt="" loading="lazy">${m.name}${used ? " (used)" : ""}</span><span class="dots muted">${m.types.map(t => `<i style="background:${TC[t]}"></i>`).join("")}</span>`;
     if (i === hi) b.classList.add("on");
     b.onclick = () => submit(m);
     li.appendChild(b); ul.appendChild(li);
