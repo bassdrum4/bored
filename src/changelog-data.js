@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 412,
+  "count": 413,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"9bc0c40","date":"2026-11-12","author":"Vettel Xu","subject":"fix(krillion): Puffer Party back link no longer 404s"},
   {"sha":"d4d51f6","date":"2026-11-12","author":"Codebuff","subject":"Show each chess difficulty's measured Elo in the picker"},
   {"sha":"2b9eabd","date":"2026-11-12","author":"bassdrum4","subject":"Land on the Krillion homepage instead of auto-opening results"},
   {"sha":"2dae94c","date":"2026-11-12","author":"bassdrum4","subject":"Strip Krillion down to the playable surface"},
