@@ -1,10 +1,167 @@
-<!doctype html><html lang="en"><head><base href="./"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#050a14"><title>Puffer Party — Multiplayer Krillion Category Game | OpenKrillion</title><meta name="description" content="Play Puffer Party: a live multiplayer category game. Name an answer, pass the puffer before it pops, last diver floating wins. 1v1, 3, 4–6 or 8–10 players, rated or quick play."><meta name="keywords" content="krillion,krillion game,play krillion,krillion daily dive,openkrillion,rare answer trivia"><link rel="canonical" href="https://bassdrum4.github.io/bored//party"><meta property="og:type" content="website"><meta property="og:title" content="Puffer Party — Multiplayer Krillion Category Game | OpenKrillion"><meta property="og:description" content="Play Puffer Party: a live multiplayer category game. Name an answer, pass the puffer before it pops, last diver floating wins. 1v1, 3, 4–6 or 8–10 players, rated or quick play."><meta property="og:url" content="https://bassdrum4.github.io/bored//party"><meta property="og:site_name" content="OpenKrillion"><meta property="og:image" content="https://bassdrum4.github.io/bored/assets/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Puffer Party — Multiplayer Krillion Category Game | OpenKrillion"><meta name="twitter:description" content="Play Puffer Party: a live multiplayer category game. Name an answer, pass the puffer before it pops, last diver floating wins. 1v1, 3, 4–6 or 8–10 players, rated or quick play."><meta name="twitter:image" content="https://bassdrum4.github.io/bored/assets/og.png"><link rel="icon" href="assets/favicon.png" type="image/png"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><link rel="preload" href="assets/vt323-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="style.css?v=20261112a"></head><body class="party-page"><main class="party-shell">
-<div class="party-masthead"><a class="back-link" id="back-link" href="../../../#krillion" target="_top">← BACK TO THE DIVE</a><p class="party-kicker">KRILLION</p><h1>PUFFER PARTY</h1><p class="party-tagline">pass the puffer · don't let it pop on you</p><p class="party-lead">Name an answer and pass the puffer before it pops. Play with friends or join a public room. Last one floating wins.</p></div>
-<div class="party-columns"><div class="party-main">
-<section id="lobby" class="party-card"><div class="party-card-head"><h2>WHO'S PLAYING</h2><button id="howto-btn" class="text-button" type="button">HOW TO PLAY</button></div><div id="badge-row" class="badge-row"><span class="badge" data-badge="KRILL">KRILL<small></small></span><span class="badge" data-badge="SCHOOLER">SCHOOLER<small>5-day</small></span><span class="badge" data-badge="SQUID">SQUID<small>14-day</small></span><span class="badge" data-badge="ANGLER">ANGLER<small>30-day</small></span><span class="badge" data-badge="EVIL">EVIL<small>45-day</small></span></div><label class="party-field"><span>YOUR NAME</span><input id="lobby-name" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="diver name"></label><p id="identity-line" class="muted">Rating 1200 · Krill</p><p class="rule">PLAY NOW</p><div class="chip-row" role="group" aria-label="Players"><button class="chip" data-size="2" type="button">1V1</button><button class="chip" data-size="3" type="button">3S</button><button class="chip is-on" data-size="6" type="button">4–6</button><button class="chip" data-size="10" type="button">8–10</button></div><p id="size-note" class="muted">4 to 6 players</p><div class="toggle-row"><button id="rated-btn" class="toggle-btn is-on" type="button" aria-pressed="true">▶ RATED <small>near your rating · it moves</small></button><button id="quick-btn" class="toggle-btn" type="button" aria-pressed="false">QUICK PLAY <small>unrated · just for fun</small></button></div><button id="host-btn" class="begin-btn party-btn" type="button">▼ HOST A ROOM ▼</button><button id="listed-btn" class="text-button listed-btn" type="button" aria-pressed="false">PUBLIC · LISTED <small>anyone can join from the list</small></button></section>
-<section class="party-card"><p class="rule">JOIN BY CODE</p><form id="join-form" class="party-join"><label class="sr-only" for="code-input">Four-letter room code</label><input id="code-input" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD"><button type="submit" class="quiet">JOIN ▸</button></form><p id="lobby-status" class="party-status" role="status"></p></section>
+<!doctype html><html lang="en"><head><base href="./"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#050a14"><title>Puffer Party · Krillion</title><meta name="description" content="Play Puffer Party: a live multiplayer category game. Name an answer, pass the puffer before it pops, last diver floating wins. 1v1, 3, 4–6 or 8–10 players, rated or quick play."><meta name="keywords" content="krillion,krillion game,play krillion,krillion daily dive,openkrillion,rare answer trivia"><link rel="canonical" href="https://bassdrum4.github.io/bored//party"><meta property="og:type" content="website"><meta property="og:title" content="Puffer Party — Multiplayer Krillion Category Game | OpenKrillion"><meta property="og:description" content="Play Puffer Party: a live multiplayer category game. Name an answer, pass the puffer before it pops, last diver floating wins. 1v1, 3, 4–6 or 8–10 players, rated or quick play."><meta property="og:url" content="https://bassdrum4.github.io/bored//party"><meta property="og:site_name" content="OpenKrillion"><meta property="og:image" content="https://bassdrum4.github.io/bored/assets/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Puffer Party — Multiplayer Krillion Category Game | OpenKrillion"><meta name="twitter:description" content="Play Puffer Party: a live multiplayer category game. Name an answer, pass the puffer before it pops, last diver floating wins. 1v1, 3, 4–6 or 8–10 players, rated or quick play."><meta name="twitter:image" content="https://bassdrum4.github.io/bored/assets/og.png"><link rel="icon" href="assets/favicon.png" type="image/png"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><link rel="preload" href="assets/vt323-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="style.css?v=20261112a"><link rel="stylesheet" href="party.css?v=20261112d"></head><body class="party-page pf-page">
+<div class="pf-root" id="pf">
+  <canvas id="reef" class="pf-reef" aria-hidden="true"></canvas>
+  <div class="pf-vignette" aria-hidden="true"></div>
+  <div class="pf-crt" aria-hidden="true"></div>
+
+  <section class="pf-door" id="lobby" aria-label="Puffer Party lobby">
+    <div class="pf-door-inner">
+      <header class="pf-masthead">
+        <a class="pf-back" id="back-link" href="../../../#krillion" target="_top">← BACK TO THE DIVE</a>
+        <p class="pf-brand" aria-hidden="true">KRILLION</p>
+        <h1 class="pf-title">PUFFER PARTY</h1>
+        <p class="pf-lead">Krillion's multiplayer category game. Name an answer and pass the puffer before it pops. Play with friends or join a public room. Last one floating wins.</p>
+        <div class="pf-puffersleep" aria-hidden="true"><img src="assets/puffer.svg" alt="" width="96" height="76"><span>z z z</span></div>
+      </header>
+
+      <section class="pf-card">
+        <div class="pf-cardhead"><h2>Who's Playing</h2><i class="pf-rule"></i><button id="howto-btn" class="pf-textbtn" type="button">HOW TO PLAY</button></div>
+        <label class="pf-field"><span>YOUR NAME</span><input id="lobby-name" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="what the ring calls you"></label>
+        <div id="badge-row" class="pf-badges" role="group" aria-label="Your buddy">
+          <button class="pf-badge" data-badge="KRILL" type="button" aria-pressed="true" title="The Krill"><img src="assets/krill.svg" alt=""><b>KRILL</b><small>&nbsp;</small></button>
+          <button class="pf-badge" data-badge="SCHOOLER" type="button" aria-pressed="false" title="Schooler, unlocks at a 5-day streak"><img src="assets/schooler.svg" alt=""><b>SCHOOLER</b><small>5-day</small></button>
+          <button class="pf-badge" data-badge="SQUID" type="button" aria-pressed="false" title="Rare Squid, unlocks at a 14-day streak"><img src="assets/rare.svg" alt=""><b>SQUID</b><small>14-day</small></button>
+          <button class="pf-badge" data-badge="ANGLER" type="button" aria-pressed="false" title="Deep Cut Angler, unlocks at a 30-day streak"><img src="assets/deepcut.svg" alt=""><b>ANGLER</b><small>30-day</small></button>
+          <button class="pf-badge" data-badge="EVIL" type="button" aria-pressed="false" title="Evil Krill, unlocks at a 45-day streak"><img src="assets/evil.svg" alt=""><b>EVIL</b><small>45-day</small></button>
+        </div>
+      </section>
+
+      <section class="pf-card">
+        <div class="pf-cardhead"><h2>Play Now</h2><i class="pf-rule"></i><p class="pf-meta">RATING <b id="rating-value">1200</b></p></div>
+        <div class="pf-sizes" role="radiogroup" aria-label="Table size">
+          <button class="pf-chip" data-size="2" type="button" role="radio" aria-checked="false">1V1</button>
+          <button class="pf-chip" data-size="3" type="button" role="radio" aria-checked="false">3S</button>
+          <button class="pf-chip" data-size="6" type="button" role="radio" aria-checked="true">4–6</button>
+          <button class="pf-chip" data-size="10" type="button" role="radio" aria-checked="false">8–10</button>
+        </div>
+        <p id="size-note" class="pf-note">4 to 6 players</p>
+        <div class="pf-modes">
+          <button id="rated-btn" class="pf-mode is-on" type="button" aria-pressed="true"><span>▶ RATED ◀</span><small>near your rating · it moves</small></button>
+          <button id="quick-btn" class="pf-mode" type="button" aria-pressed="false"><span>QUICK PLAY</span><small>unrated · just for fun</small></button>
+        </div>
+        <p class="pf-ratingline">your rating is saved on this browser · <b id="rating-games">0 rated matches</b></p>
+      </section>
+
+      <section class="pf-card">
+        <div class="pf-cardhead"><h2>Host</h2><i class="pf-rule"></i></div>
+        <button id="host-btn" class="pf-big" type="button">▼ HOST A ROOM ▼</button>
+        <div class="pf-hostrow">
+          <button id="listed-btn" class="pf-listed" type="button" aria-pressed="false">PUBLIC · LISTED</button>
+          <span id="listed-note">anyone can join from the list</span>
+        </div>
+      </section>
+
+      <section class="pf-card">
+        <div class="pf-cardhead"><h2>Join by Code</h2><i class="pf-rule"></i></div>
+        <form id="join-form" class="pf-join" autocomplete="off">
+          <label class="sr-only" for="code-input">Room code</label>
+          <input id="code-input" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="KRLP">
+          <button type="submit" class="pf-joinbutton" id="join-btn">JOIN</button>
+        </form>
+        <p id="lobby-status" class="pf-status" role="status"></p>
+      </section>
+
+      <section class="pf-card">
+        <div class="pf-cardhead"><h2>Public Rooms</h2><i class="pf-rule"></i><p class="pf-meta" id="rooms-title">SHOWING 0</p></div>
+        <ul id="room-list" class="pf-rooms"><li class="pf-empty">Looking for rooms…</li></ul>
+        <button id="load-more" class="pf-loadmore" type="button" hidden>LOAD MORE</button>
+      </section>
+    </div>
+  </section>
+
+  <div class="pf-world" id="room" hidden>
+    <button id="leave-btn" class="pf-leave" type="button" aria-label="Leave room">←</button>
+    <header class="pf-roomhead" id="roomhead" aria-hidden="true">
+      <p class="pf-brand">KRILLION</p>
+      <p class="pf-title">PUFFER PARTY</p>
+    </header>
+    <div class="pf-hud">
+      <div class="pf-pod"><span id="privacy-label">PUBLIC ↔</span><strong id="room-code">----</strong></div>
+      <p class="pf-hudmid" id="room-state">LOBBY</p>
+      <div class="pf-pod pf-pod-right"><span id="hud-label">READY</span><strong id="hud-value">0/6</strong></div>
+    </div>
+    <div class="pf-ring" id="ring"></div>
+    <div class="pf-puffer" id="puffer"><img src="assets/puffer.svg" alt="" width="120" height="96"><span class="pf-clockface" id="puffer-count"></span></div>
+    <p class="pf-zz" id="zz">z z z</p>
+
+    <section class="pf-card-prompt" id="prompt-card" aria-live="polite" hidden>
+      <div class="pf-cardhead"><span id="prompt-number">CATEGORY</span><span id="round-tag">ROUND 1</span></div>
+      <h2 id="prompt-text"></h2>
+      <p class="pf-hint">pass the puffer · no repeats</p>
+    </section>
+    <div class="pf-fuse" id="fuse" hidden><i id="fuse-fill"></i></div>
+
+    <div class="pf-dock" id="dock" hidden>
+      <p class="pf-turnline" id="turn-line"></p>
+      <form id="answer-form" autocomplete="off">
+        <div class="pf-clock" id="clock-face"><span id="clock">8</span></div>
+        <label class="sr-only" for="answer">Your answer</label>
+        <input id="answer" name="answer" maxlength="80" placeholder="wait for the puffer…" autocomplete="off" autocapitalize="none" spellcheck="false" disabled>
+        <button id="submit-btn" type="submit" disabled>PASS</button>
+      </form>
+      <p id="party-status" class="pf-status" role="status"></p>
+    </div>
+
+    <div class="pf-lobbyfoot" id="lobbyfoot">
+      <div class="pf-settings">
+        <div class="pf-setting"><span>LIVES</span><div class="pf-stepper"><button type="button" data-step="lives" data-dir="-1" aria-label="Fewer hearts">◀</button><b id="lives-value">2</b><button type="button" data-step="lives" data-dir="1" aria-label="More hearts">▶</button></div></div>
+        <div class="pf-setting"><span>MIN. TURN</span><div class="pf-stepper"><button type="button" data-step="minTurn" data-dir="-1" aria-label="Shorter minimum turn">◀</button><b id="minturn-value">8s</b><button type="button" data-step="minTurn" data-dir="1" aria-label="Longer minimum turn">▶</button></div></div>
+        <div class="pf-setting"><span>SEATS</span><div class="pf-stepper"><button type="button" data-step="seats" data-dir="-1" aria-label="Fewer seats">◀</button><b id="seats-value">6</b><button type="button" data-step="seats" data-dir="1" aria-label="More seats">▶</button></div></div>
+        <button class="pf-setting pf-rules" id="rules-btn" type="button"><span>RULES</span><b>EDIT</b></button>
+      </div>
+      <button id="start-btn" class="pf-wake" type="button">▼ WAKE THE PUFFER ▼</button>
+      <div class="pf-lobbyrow">
+        <p class="pf-readyline" id="ready-line">1 READY · 5 OPEN</p>
+        <span class="pf-spacer"></span>
+        <button id="howto-room" class="pf-small" type="button">HOW TO PLAY</button>
+        <button id="invite-btn" class="pf-small" type="button">INVITE</button>
+      </div>
+    </div>
+
+    <section class="pf-over" id="party-over" hidden>
+      <div class="pf-over-card">
+        <h2 id="over-kicker">LAST DIVER FLOATING</h2>
+        <h3 id="party-winner"></h3>
+        <p class="pf-note" id="party-placement"></p>
+        <ol class="pf-over-list" id="over-list"></ol>
+        <div class="pf-over-actions">
+          <button id="again-btn" type="button" hidden>WAKE IT AGAIN</button>
+          <button id="copy-btn" type="button">INVITE</button>
+          <button id="over-leave" type="button">LEAVE ROOM</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="howto-dialog" class="pf-modal">
+    <button class="pf-close" data-close aria-label="Close how to play">×</button>
+    <h2>How to play</h2>
+    <ul>
+      <li>Answer the category before the puffer explodes on you.</li>
+      <li>Pass it on and the next diver inherits whatever fuse is left, with the room's MIN. TURN as the floor.</li>
+      <li>Rarer answers fill your meter. Six hundred points buys an extra heart.</li>
+      <li>You cannot reuse an answer for the current category.</li>
+      <li>You start with the hearts the host set and can hold five. Lose them all and you watch. Last diver floating wins.</li>
+    </ul>
+    <p>Rated rooms move a rating that starts at 1200. Quick play changes nothing.</p>
+  </dialog>
+
+  <dialog id="leave-dialog" class="pf-modal">
+    <h2>Leave the game?</h2>
+    <p>You're still floating. Leaving gives up your seat for this room.</p>
+    <div class="pf-confirm-actions">
+      <button id="keep-btn" type="button">KEEP PLAYING</button>
+      <button id="confirm-leave" class="pf-danger" type="button">LEAVE</button>
+    </div>
+  </dialog>
+
+  <dialog id="invite-dialog" class="pf-modal">
+    <button class="pf-close" data-close aria-label="Close invite">×</button>
+    <h2>Invite your friends</h2>
+    <p>Send them this link, or read out the room code.</p>
+    <code id="invite-link"></code>
+    <button id="invite-copy" class="pf-big" type="button">COPY INVITE LINK</button>
+  </dialog>
 </div>
-<div class="party-side"><section class="party-card party-rating"><p class="rule">RATING</p><strong id="rating-value">1200</strong><p id="rating-note" class="muted">saved in this browser</p></section><section class="party-card"><div class="party-card-head"><h2 id="rooms-title">PUBLIC ROOMS SHOWING 0</h2><button id="refresh-btn" class="text-button" type="button">REFRESH</button></div><ul id="room-list" class="party-rooms"><li class="muted">Looking for rooms…</li></ul><button id="load-more" class="quiet load-more" type="button" hidden>LOAD MORE</button></section></div></div>
-<section id="room" class="party-card party-room" hidden><div class="party-head"><h2>ROOM <span id="room-code">----</span></h2><span id="room-state" class="party-state">IN THE LOBBY</span></div><p id="room-presence" class="muted"></p><ul id="party-players" class="party-players"></ul><div class="puffer-stage"><div id="puffer" class="puffer" aria-hidden="true"><span id="puffer-count">·</span></div><div class="fuse-wrap"><div class="fuse-bar"><i id="fuse-fill"></i></div><p id="turn-line" class="party-turn"></p><p id="meter-line" class="muted"></p></div></div><p class="eyebrow" id="party-prompt-number">WAITING FOR DIVERS</p><h3 id="party-prompt" class="party-prompt"></h3><form id="party-answer-form" class="party-answer" autocomplete="off"><label class="sr-only" for="party-answer">Your answer</label><input id="party-answer" name="answer" maxlength="80" placeholder="wait for the puffer…" autocomplete="off" autocapitalize="none" spellcheck="false" disabled><button id="party-submit" type="submit" disabled>PASS</button></form><p id="party-status" class="party-status" role="status"></p><div class="party-grid"><div><p class="rule">ON THE TABLE</p><ul id="party-used" class="party-used"></ul></div><div><p class="rule">PUFFER LOG</p><ol id="party-log" class="party-log"></ol></div></div><div id="party-over" class="party-over" hidden><h3 id="party-winner"></h3><p id="party-placement" class="muted"></p><div class="party-actions"><button id="again-btn" class="quiet" hidden>PLAY AGAIN</button><button id="copy-btn" class="quiet">COPY ROOM LINK</button><button id="leave-btn" class="quiet">LEAVE ROOM</button></div></div><div class="party-actions"><button id="party-start-btn" class="begin-btn party-btn" hidden>START THE PARTY</button></div></section>
-<dialog id="howto-dialog" class="panel"><button class="close" data-close aria-label="Close how to play">×</button><h2>How to play</h2><ul class="howto-list"><li>Answer the category before the puffer explodes on you.</li><li>Rarer answers fill the meter. 600 points buys an extra heart.</li><li>You cannot reuse an answer for the current category.</li><li>The fuse is shared: whatever is left when you pass is what the next diver inherits, with an 8-second floor.</li><li>You start with 2 hearts and can hold 5. Lose them all and you watch. Last diver floating wins.</li></ul><p class="muted">Rated rooms move a rating that starts at 1200; quick play changes nothing.</p></dialog>
-</main><script type="module" src="party.mjs"></script></body></html>
+<script type="module" src="party.mjs"></script>
+</body></html>

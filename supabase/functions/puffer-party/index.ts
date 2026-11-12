@@ -20,7 +20,12 @@ const MAX_LIVES = 5;
 const HEART_METER = 600;
 const FUSE_MIN = 10_000;
 const FUSE_MAX = 30_000;
-const FUSE_FLOOR = 8_000;
+// The host picks the fuse floor (MIN. TURN) and the starting hearts (LIVES) in
+// the room lobby; every read clamps them back into these bounds.
+const LIVES_MIN = 1;
+const MIN_TURN_MIN = 3;
+const MIN_TURN_MAX = 30;
+const MIN_TURN_DEFAULT = 8;
 const FREEZE_MS = 1_500;
 const ROOM_TTL = 3 * 60 * 60 * 1000;
 const RATING_START = 1200;
@@ -50,6 +55,8 @@ type PartyState = {
   host: string;
   listed: boolean;
   seats: number;
+  lives: number;
+  minTurn: number;
   rated: boolean;
   round: number;
   promptIndex: number;
@@ -130,12 +137,7 @@ function matchAnswer(input: string, answers: Answer[]): Answer | null {
   const candidates = entries.map(entry => ({ ...entry, d: distance(key, entry.key, allowance) }))
     .filter(entry => entry.d <= allowance)
     .sort((a, b) => a.d - b.d);
-  // A typo equally close to two different answers lands on the lower-scoring
-  // one, so a misspelling is never worth more than the answer it might have meant.
-  if (candidates.length) {
-    return candidates.filter(entry => entry.d === candidates[0].d)
-      .sort((a, b) => (TIERS[a.a.tier]?.score ?? 0) - (TIERS[b.a.tier]?.score ?? 0))[0].a;
-  }
+  if (candidates.length && (!candidates[1] || candidates[0].d < candidates[1].d || candidates[0].a.answer === candidates[1].a.answer)) return candidates[0].a;
   const qualified = entries
     .filter(entry => entry.key.length >= 4 && key.length > entry.key.length && key.length - entry.key.length <= QU && key.startsWith(entry.key))
     .sort((a, b) => b.key.length - a.key.length)[0];
@@ -208,6 +210,13 @@ const cleanToken = (value: unknown) => {
 const label = (player: Player | null | undefined) => player?.name || 'Diver';
 const alive = (players: Player[]) => players.filter(player => !player.out && player.lives > 0);
 const fuseLength = () => FUSE_MIN + Math.floor(Math.random() * (FUSE_MAX - FUSE_MIN + 1));
+const clampInt = (value: unknown, min: number, max: number, fallback: number) => {
+  const number = Math.round(Number(value));
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, number));
+};
+// How long a diver must hold the puffer before it can pop on them.
+const turnFloor = (state: PartyState) => Math.max(1_000, Math.round(Number(state.minTurn) || MIN_TURN_DEFAULT) * 1000);
 
 function nextTurn(players: Player[], seat: number) {
   const order = alive(players).sort((a, b) => a.seat - b.seat);
@@ -282,6 +291,9 @@ async function readRoom(code: string): Promise<Room | null> {
   const row = rows?.[0];
   if (!row) return null;
   if (typeof row.state === 'string') row.state = JSON.parse(row.state);
+  // Rooms created before settings existed get the defaults.
+  if (!Number.isFinite(Number(row.state.lives))) row.state.lives = START_LIVES;
+  if (!Number.isFinite(Number(row.state.minTurn))) row.state.minTurn = MIN_TURN_DEFAULT;
   return row as Room;
 }
 
@@ -344,6 +356,8 @@ async function snapshot(room: Room, state: PartyState, token: string, book: Book
     status: state.status,
     rated: !!state.rated,
     seats: state.seats,
+    lives: state.lives,
+    minTurn: state.minTurn,
     revision: state.revision,
     prompt: { text: prompt.text, number: prompt.number, total: prompt.total },
     round: state.round,
@@ -399,6 +413,8 @@ async function freshCode() {
 async function createParty(body: Record<string, any>, token: string) {
   const book = await loadBook();
   const seats = SEAT_LIMITS.includes(Number(body.seats)) ? Number(body.seats) : 6;
+  const lives = clampInt(body.lives, LIVES_MIN, MAX_LIVES, START_LIVES);
+  const minTurn = clampInt(body.minTurn, MIN_TURN_MIN, MIN_TURN_MAX, MIN_TURN_DEFAULT);
   const code = await freshCode();
   const state: PartyState = {
     code,
@@ -407,6 +423,8 @@ async function createParty(body: Record<string, any>, token: string) {
     host: token,
     listed: body.listed !== false,
     seats,
+    lives,
+    minTurn,
     rated: body.rated === true,
     round: 0,
     promptIndex: Math.floor(Math.random() * book.prompts.length),
@@ -416,7 +434,7 @@ async function createParty(body: Record<string, any>, token: string) {
     popUntil: null,
     winner: null,
     revision: 0,
-    players: [{ token, seat: 0, name: cleanName(body.name, 0), lives: START_LIVES, meter: 0, out: false, delta: 0 }],
+    players: [{ token, seat: 0, name: cleanName(body.name, 0), lives, meter: 0, out: false, delta: 0 }],
     used: [],
     log: ['Room opened. Waiting for divers.']
   };
@@ -447,7 +465,7 @@ async function joinParty(body: Record<string, any>, token: string) {
   const seat = Array.from({ length: state.seats }, (_, index) => index).find(index => !state.players.some(player => player.seat === index));
   if (seat == null) throw new HttpError('That room is full.', 409);
   const name = cleanName(body.name, seat);
-  state.players.push({ token, seat, name, lives: START_LIVES, meter: 0, out: false, delta: 0 });
+  state.players.push({ token, seat, name, lives: state.lives, meter: 0, out: false, delta: 0 });
   pushLog(state, [`${name} joined the room.`]);
   const saved = await saveRoom(room, state);
   return snapshot(saved, state, token, book);
@@ -462,7 +480,7 @@ async function startParty(body: Record<string, any>, token: string) {
   const book = await loadBook();
   const state = room.state;
   for (const player of state.players) {
-    player.lives = START_LIVES;
+    player.lives = state.lives;
     player.meter = 0;
     player.out = false;
     player.delta = 0;
@@ -523,7 +541,7 @@ async function answerParty(body: Record<string, any>, token: string) {
   const events = [`${label(mine)} named “${match.answer}” (+${points}).`];
   if (hearts) events.push(`${label(mine)} filled the meter: extra heart.`);
   const now = Date.now();
-  const remaining = Math.max(FUSE_FLOOR, (state.turnDeadline ?? now) - now);
+  const remaining = Math.max(turnFloor(state), (state.turnDeadline ?? now) - now);
   const step = nextTurn(state.players, mine.seat);
   state.turn = step.token ?? state.turn;
   state.turnDeadline = now + remaining;
@@ -540,6 +558,32 @@ async function answerParty(body: Record<string, any>, token: string) {
   if (state.status === 'finished') await applyRatings(state);
   const saved = await saveRoom(room, state);
   return snapshot(saved, state, token, book);
+}
+
+async function settingsParty(body: Record<string, any>, token: string) {
+  const room = await readRoom(String(body.code || '').toUpperCase());
+  if (!room) throw new HttpError('No room with that code.', 404);
+  const state = room.state;
+  if (state.host !== token) throw new HttpError('Only the host can change the room.', 403);
+  if (state.status !== 'lobby') throw new HttpError('The room is locked once the puffer wakes.', 409);
+  const nextLives = clampInt(body.lives ?? state.lives, LIVES_MIN, MAX_LIVES, state.lives);
+  const nextTurn = clampInt(body.minTurn ?? state.minTurn, MIN_TURN_MIN, MIN_TURN_MAX, state.minTurn);
+  let nextSeats = state.seats;
+  if (body.seats !== undefined) {
+    const wanted = Number(body.seats);
+    if (!SEAT_LIMITS.includes(wanted)) throw new HttpError('That table size is not on the menu.', 400);
+    if (wanted < state.players.length) throw new HttpError('More divers are aboard than that many seats.', 409);
+    nextSeats = wanted;
+  }
+  const changed = nextLives !== state.lives || nextTurn !== state.minTurn || nextSeats !== state.seats;
+  state.lives = nextLives;
+  state.minTurn = nextTurn;
+  state.seats = nextSeats;
+  for (const player of state.players) player.lives = nextLives;
+  if (!changed) return snapshot(room, state, token, await loadBook());
+  pushLog(state, [`The host set the room to ${nextLives} ${nextLives === 1 ? 'heart' : 'hearts'} and a ${nextTurn}s minimum turn.`]);
+  const saved = await saveRoom(room, state);
+  return snapshot(saved, state, token, await loadBook());
 }
 
 async function leaveParty(body: Record<string, any>, token: string) {
@@ -560,7 +604,7 @@ async function leaveParty(body: Record<string, any>, token: string) {
   if (state.status === 'playing' && state.turn === token) {
     const step = nextTurn(remaining, mine.seat);
     state.turn = step.token ?? state.turn;
-    state.turnDeadline = Date.now() + Math.max(FUSE_FLOOR, (state.turnDeadline ?? Date.now()) - Date.now());
+    state.turnDeadline = Date.now() + Math.max(turnFloor(state), (state.turnDeadline ?? Date.now()) - Date.now());
     state.popUntil = null;
     if (step.wrapped) {
       state.round += 1;
@@ -630,6 +674,7 @@ Deno.serve(async (req: Request) => {
     if (path === '/party/create') return reply(await createParty(body, token));
     if (path === '/party/join') return reply(await joinParty(body, token));
     if (path === '/party/start') return reply(await startParty(body, token));
+    if (path === '/party/settings') return reply(await settingsParty(body, token));
     if (path === '/party/answer') return reply(await answerParty(body, token));
     if (path === '/party/leave') return reply(await leaveParty(body, token));
     throw new HttpError('Unknown endpoint.', 404);
