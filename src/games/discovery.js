@@ -4,6 +4,7 @@ import { ORDER, EXTERNS } from './catalog.js';
 // Friends means sharing this device unless explicitly marked online.
 const info = (minutes, pace, inputs, extra = {}) => ({ minutes, pace, inputs, ...extra });
 export const DISCOVERY = {
+  "air-hockey": info('3–7 min', 'Competitive', ['Mouse', 'Touch'], { quick: true, players: '1 vs CPU or 2 local' }),
   "pokedoku": info('5–10 min', 'Competitive', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   "krillion": info('5–10 min', 'Focused', ['Keyboard', 'Mouse', 'Touch'], { quick: true }),
   "quickdraw": info("20 sec–2 min", "Competitive", ["Keyboard", "Mouse", "Touch"], { quick: true, players: "2 local" }),
@@ -89,7 +90,7 @@ export function inCollection(slug, collection) {
 // A newly scaffolded game starts with an SVG placeholder and is listed here
 // until a real capture replaces it. F-14 and Klang use self-hosted illustrated
 // SVG previews; Risk keeps its existing SVG preview.
-export const PREVIEW_FALLBACKS = {"pokedoku": '.svg', "quickdraw": ".svg","clicker": '.svg',"corner": '.svg', wallbound: '.svg',  risk: '.svg', tank2: '.svg', 'f-14': '.svg', klang: '.svg' };
+export const PREVIEW_FALLBACKS = {"air-hockey": '.svg', "pokedoku": '.svg', "quickdraw": ".svg","clicker": '.svg',"corner": '.svg', wallbound: '.svg',  risk: '.svg', tank2: '.svg', 'f-14': '.svg', klang: '.svg' };
 const previewUrl = slug => new URL('./previews/' + slug + (PREVIEW_FALLBACKS[slug] || '.webp'), import.meta.url).href;
 export const PREVIEWS = Object.fromEntries(
   ORDER.filter(([slug]) => !EXTERNS[slug] || PREVIEW_FALLBACKS[slug]).map(([slug]) => [slug, previewUrl(slug)]));
