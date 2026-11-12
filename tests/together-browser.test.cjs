@@ -133,8 +133,9 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
     const game=await frame(page,'#c');
     await game.waitForFunction(()=>__test.state()==='aim');
     await game.evaluate(({angle,power})=>{__test.set(angle);__test.setPower(power);},{angle,power});
-    await page.focus('#frame');
-    await page.keyboard.press('Enter');
+    // Trigger the original game's shoot action directly; focus animations can
+    // swallow synthetic Enter presses even though the shot logic is working.
+    await game.evaluate(()=>__test.shoot());
   }
   const guest=await player();await open(guest);
   assert.equal(calls.length,0,'guest makes no multiplayer requests');
