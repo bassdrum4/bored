@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pokédoku</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  [hidden] { display: none !important }
+  body { background: #f5f2ea; color: #191713; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+         display: flex; justify-content: center; padding: 16px 12px 28px }
+  main { width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px }
+  #hud { font-size: 12px; letter-spacing: .08em; font-variant: small-caps; text-transform: uppercase; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap }
+  #hud b { font-weight: 600 }
+  .muted { color: #6b6558 }
+  #grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px }
+  .hd { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; line-height: 1.2;
+        padding: 4px 2px; min-height: 48px; word-break: break-word }
+  .ty { display: inline-block; padding: 3px 5px; color: #fff; font-size: 11px; font-weight: 600; letter-spacing: .04em; border-radius: 2px }
+  .cell { aspect-ratio: 1; min-width: 0; border: 1px solid #d8d2c4; background: #fffdf7; color: inherit; font: inherit;
+          display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+          padding: 3px; cursor: pointer; position: relative; touch-action: manipulation; border-radius: 2px }
+  .cell:hover:not(:disabled), .cell.sel { border-color: #191713 }
+  .cell.sel { outline: 1px solid #191713 }
+  .cell:focus-visible { outline: 2px solid #b8402a }
+  .cell:disabled { cursor: default }
+  .cell .nm { font-size: 11px; font-weight: 600; line-height: 1.15; word-break: break-word }
+  .cell .sm { font-size: 10px; opacity: .8; margin-top: 2px }
+  .cell.got { color: #fff; border-color: transparent }
+  .cell .t2 { position: absolute; left: 0; right: 0; bottom: 0; height: 5px }
+  .cell.miss { border-color: #b8402a }
+  .cell.open .nm { color: #6b6558; font-weight: 400 }
+  #panel { border: 1px solid #d8d2c4; background: #fffdf7; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-radius: 2px }
+  #ask { font-size: 12px }
+  #ask b { font-weight: 600 }
+  #guess { font: inherit; font-size: 16px; padding: 7px 8px; border: 1px solid #191713; background: #fff; color: #191713; width: 100%; border-radius: 2px }
+  #opts { list-style: none; display: flex; flex-direction: column }
+  #opts button { width: 100%; text-align: left; font: inherit; font-size: 13px; padding: 6px; border: 0; background: none; color: inherit;
+                 cursor: pointer; display: flex; justify-content: space-between; gap: 6px; border-radius: 2px }
+  #opts button.on, #opts button:hover { background: #ece7da }
+  #opts button:disabled { color: #a49d8e; cursor: not-allowed }
+  .dots i { display: inline-block; width: 8px; height: 8px; margin-left: 2px; border-radius: 1px }
+  .row { display: flex; gap: 6px; flex-wrap: wrap }
+  button.lbl { font: inherit; font-size: 12px; padding: 7px 10px; border: 1px solid #191713; background: none; color: inherit; cursor: pointer; border-radius: 2px }
+  button.lbl:hover { background: #ece7da }
+  #code { font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid #d8d2c4; background: #fffdf7; color: inherit; flex: 1 1 120px; min-width: 0; border-radius: 2px }
+  #msg { font-size: 12px; min-height: 1.4em }
+  #msg.bad { color: #b8402a }
+  pre { font: inherit; font-size: 13px; white-space: pre-wrap; user-select: all }
+  #ans { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; max-height: 180px; overflow-y: auto }
+  details { font-size: 12px; color: #6b6558 }
+  details summary { cursor: pointer; color: #191713 }
+  details ul { padding-left: 16px; margin-top: 6px }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1b1a17; color: #ece7da }
+    .muted, details { color: #a49d8e }
+    details summary { color: #ece7da }
+    .cell, #panel, #code { background: #24221e; border-color: #3a372f }
+    .cell:hover:not(:disabled), .cell.sel { border-color: #ece7da }
+    .cell.sel { outline-color: #ece7da }
+    #guess { background: #1b1a17; color: #ece7da; border-color: #ece7da }
+    button.lbl { border-color: #ece7da }
+    button.lbl:hover, #opts button.on, #opts button:hover { background: #2f2c26 }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div id="hud"><span id="hudl"></span><span id="hudr"></span></div>
+  <div id="grid" aria-label="Pokédoku board"></div>
+
+  <section id="panel">
+    <div id="ask"></div>
+    <input id="guess" type="text" placeholder="type a Pokémon" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Pokémon name">
+    <ul id="opts"></ul>
+    <div id="msg" role="status"></div>
+    <pre id="share" hidden></pre>
+    <div id="ans" hidden></div>
+  </section>
+
+  <div class="row">
+    <button class="lbl" id="daily" type="button">Daily board</button>
+    <button class="lbl" id="fresh" type="button">New board</button>
+    <button class="lbl" id="giveup" type="button">Give up</button>
+    <button class="lbl" id="copy" type="button">Copy result</button>
+  </div>
+  <form class="row" id="codeform">
+    <input id="code" inputmode="numeric" placeholder="board code" aria-label="Board code">
+    <button class="lbl" type="submit">Play code</button>
+  </form>
+
+  <details>
+    <summary>how to play</summary>
+    <ul>
+      <li>Pick a square, then name a Pokémon that fits its row and its column.</li>
+      <li>9 guesses. Wrong ones still cost a guess. No Pokémon twice.</li>
+      <li>The number on a filled square is how many Pokémon fit there. Lower is rarer.</li>
+      <li>"Evolved with a stone" / "by trade" means that Pokémon itself evolved that way (Gengar yes, Haunter no).</li>
+      <li>Legendary includes sub-legendaries. Mythical is separate.</li>
+      <li>The daily board is the same for everyone. Send a friend the board code to race on any board.</li>
+    </ul>
+  </details>
+</main>
+<script>
+const RAW = [["Bulbasaur",1,"Grass/Poison","first"],["Ivysaur",2,"Grass/Poison",""],["Venusaur",3,"Grass/Poison","mega final"],["Charmander",4,"Fire","first"],["Charmeleon",5,"Fire",""],["Charizard",6,"Fire/Flying","mega final"],["Squirtle",7,"Water","first"],["Wartortle",8,"Water",""],["Blastoise",9,"Water","mega final"],["Caterpie",10,"Bug","first"],["Metapod",11,"Bug",""],["Butterfree",12,"Bug/Flying","final"],["Weedle",13,"Bug/Poison","first"],["Kakuna",14,"Bug/Poison",""],["Beedrill",15,"Bug/Poison","mega final"],["Pidgey",16,"Normal/Flying","first"],["Pidgeotto",17,"Normal/Flying",""],["Pidgeot",18,"Normal/Flying","mega final"],["Rattata",19,"Normal","reg first"],["Raticate",20,"Normal","reg final"],["Spearow",21,"Normal/Flying","first"],["Fearow",22,"Normal/Flying","final"],["Ekans",23,"Poison","first"],["Arbok",24,"Poison","final"],["Pikachu",25,"Electric","reg"],["Raichu",26,"Electric","mega reg final stone"],["Sandshrew",27,"Ground","reg first"],["Sandslash",28,"Ground","reg final"],["Nidoran-F",29,"Poison","first"],["Nidorina",30,"Poison",""],["Nidoqueen",31,"Poison/Ground","final stone"],["Nidoran-M",32,"Poison","first"],["Nidorino",33,"Poison",""],["Nidoking",34,"Poison/Ground","final stone"],["Clefairy",35,"Fairy",""],["Clefable",36,"Fairy","mega final stone"],["Vulpix",37,"Fire","reg first"],["Ninetales",38,"Fire","reg final stone"],["Jigglypuff",39,"Normal/Fairy",""],["Wigglytuff",40,"Normal/Fairy","final stone"],["Zubat",41,"Poison/Flying","first"],["Golbat",42,"Poison/Flying",""],["Oddish",43,"Grass/Poison","first"],["Gloom",44,"Grass/Poison",""],["Vileplume",45,"Grass/Poison","final stone"],["Paras",46,"Bug/Grass","first"],["Parasect",47,"Bug/Grass","final"],["Venonat",48,"Bug/Poison","first"],["Venomoth",49,"Bug/Poison","final"],["Diglett",50,"Ground","reg first"],["Dugtrio",51,"Ground","reg final"],["Meowth",52,"Normal","reg first"],["Persian",53,"Normal","reg final"],["Psyduck",54,"Water","first"],["Golduck",55,"Water","final"],["Mankey",56,"Fighting","first"],["Primeape",57,"Fighting",""],["Growlithe",58,"Fire","reg first"],["Arcanine",59,"Fire","reg final stone"],["Poliwag",60,"Water","first"],["Poliwhirl",61,"Water",""],["Poliwrath",62,"Water/Fighting","final stone"],["Abra",63,"Psychic","first"],["Kadabra",64,"Psychic",""],["Alakazam",65,"Psychic","mega final trade"],["Machop",66,"Fighting","first"],["Machoke",67,"Fighting",""],["Machamp",68,"Fighting","final trade"],["Bellsprout",69,"Grass/Poison","first"],["Weepinbell",70,"Grass/Poison",""],["Victreebel",71,"Grass/Poison","mega final stone"],["Tentacool",72,"Water/Poison","first"],["Tentacruel",73,"Water/Poison","final"],["Geodude",74,"Rock/Ground","reg first"],["Graveler",75,"Rock/Ground","reg"],["Golem",76,"Rock/Ground","reg final trade"],["Ponyta",77,"Fire","reg first"],["Rapidash",78,"Fire","reg final"],["Slowpoke",79,"Water/Psychic","reg first"],["Slowbro",80,"Water/Psychic","mega reg final"],["Magnemite",81,"Electric/Steel","first"],["Magneton",82,"Electric/Steel",""],["Farfetch’d",83,"Normal/Flying","reg single"],["Doduo",84,"Normal/Flying","first"],["Dodrio",85,"Normal/Flying","final"],["Seel",86,"Water","first"],["Dewgong",87,"Water/Ice","final"],["Grimer",88,"Poison","reg first"],["Muk",89,"Poison","reg final"],["Shellder",90,"Water","first"],["Cloyster",91,"Water/Ice","final stone"],["Gastly",92,"Ghost/Poison","first"],["Haunter",93,"Ghost/Poison",""],["Gengar",94,"Ghost/Poison","mega final trade"],["Onix",95,"Rock/Ground","first"],["Drowzee",96,"Psychic","first"],["Hypno",97,"Psychic","final"],["Krabby",98,"Water","first"],["Kingler",99,"Water","final"],["Voltorb",100,"Electric","reg first"],["Electrode",101,"Electric","reg final"],["Exeggcute",102,"Grass/Psychic","first"],["Exeggutor",103,"Grass/Psychic","reg final stone"],["Cubone",104,"Ground","first"],["Marowak",105,"Ground","reg final"],["Hitmonlee",106,"Fighting","final"],["Hitmonchan",107,"Fighting","final"],["Lickitung",108,"Normal","first"],["Koffing",109,"Poison","first"],["Weezing",110,"Poison","reg final"],["Rhyhorn",111,"Ground/Rock","first"],["Rhydon",112,"Ground/Rock",""],["Chansey",113,"Normal",""],["Tangela",114,"Grass","first"],["Kangaskhan",115,"Normal","mega single"],["Horsea",116,"Water","first"],["Seadra",117,"Water",""],["Goldeen",118,"Water","first"],["Seaking",119,"Water","final"],["Staryu",120,"Water","first"],["Starmie",121,"Water/Psychic","mega final stone"],["Mr. Mime",122,"Psychic/Fairy","reg final"],["Scyther",123,"Bug/Flying","first"],["Jynx",124,"Ice/Psychic","final"],["Electabuzz",125,"Electric",""],["Magmar",126,"Fire",""],["Pinsir",127,"Bug","mega single"],["Tauros",128,"Normal","reg single"],["Magikarp",129,"Water","first"],["Gyarados",130,"Water/Flying","mega final"],["Lapras",131,"Water/Ice","single"],["Ditto",132,"Normal","single"],["Eevee",133,"Normal","first"],["Vaporeon",134,"Water","final stone"],["Jolteon",135,"Electric","final stone"],["Flareon",136,"Fire","final stone"],["Porygon",137,"Normal","first"],["Omanyte",138,"Rock/Water","first"],["Omastar",139,"Rock/Water","final"],["Kabuto",140,"Rock/Water","first"],["Kabutops",141,"Rock/Water","final"],["Aerodactyl",142,"Rock/Flying","mega single"],["Snorlax",143,"Normal","final"],["Articuno",144,"Ice/Flying","lg reg single"],["Zapdos",145,"Electric/Flying","lg reg single"],["Moltres",146,"Fire/Flying","lg reg single"],["Dratini",147,"Dragon","first"],["Dragonair",148,"Dragon",""],["Dragonite",149,"Dragon/Flying","mega final"],["Mewtwo",150,"Psychic","lg mega single"],["Mew",151,"Psychic","my single"],["Chikorita",152,"Grass","first"],["Bayleef",153,"Grass",""],["Meganium",154,"Grass","mega final"],["Cyndaquil",155,"Fire","first"],["Quilava",156,"Fire",""],["Typhlosion",157,"Fire","reg final"],["Totodile",158,"Water","first"],["Croconaw",159,"Water",""],["Feraligatr",160,"Water","mega final"],["Sentret",161,"Normal","first"],["Furret",162,"Normal","final"],["Hoothoot",163,"Normal/Flying","first"],["Noctowl",164,"Normal/Flying","final"],["Ledyba",165,"Bug/Flying","first"],["Ledian",166,"Bug/Flying","final"],["Spinarak",167,"Bug/Poison","first"],["Ariados",168,"Bug/Poison","final"],["Crobat",169,"Poison/Flying","final"],["Chinchou",170,"Water/Electric","first"],["Lanturn",171,"Water/Electric","final"],["Pichu",172,"Electric","first"],["Cleffa",173,"Fairy","first"],["Igglybuff",174,"Normal/Fairy","first"],["Togepi",175,"Fairy","first"],["Togetic",176,"Fairy/Flying",""],["Natu",177,"Psychic/Flying","first"],["Xatu",178,"Psychic/Flying","final"],["Mareep",179,"Electric","first"],["Flaaffy",180,"Electric",""],["Ampharos",181,"Electric","mega final"],["Bellossom",182,"Grass","final stone"],["Marill",183,"Water/Fairy",""],["Azumarill",184,"Water/Fairy","final"],["Sudowoodo",185,"Rock","final"],["Politoed",186,"Water","final trade"],["Hoppip",187,"Grass/Flying","first"],["Skiploom",188,"Grass/Flying",""],["Jumpluff",189,"Grass/Flying","final"],["Aipom",190,"Normal","first"],["Sunkern",191,"Grass","first"],["Sunflora",192,"Grass","final stone"],["Yanma",193,"Bug/Flying","first"],["Wooper",194,"Water/Ground","reg first"],["Quagsire",195,"Water/Ground","final"],["Espeon",196,"Psychic","final"],["Umbreon",197,"Dark","final"],["Murkrow",198,"Dark/Flying","first"],["Slowking",199,"Water/Psychic","reg final trade"],["Misdreavus",200,"Ghost","first"],["Unown",201,"Psychic","single"],["Wobbuffet",202,"Psychic","final"],["Girafarig",203,"Normal/Psychic","first"],["Pineco",204,"Bug","first"],["Forretress",205,"Bug/Steel","final"],["Dunsparce",206,"Normal","first"],["Gligar",207,"Ground/Flying","first"],["Steelix",208,"Steel/Ground","mega final trade"],["Snubbull",209,"Fairy","first"],["Granbull",210,"Fairy","final"],["Qwilfish",211,"Water/Poison","reg single"],["Scizor",212,"Bug/Steel","mega final trade"],["Shuckle",213,"Bug/Rock","single"],["Heracross",214,"Bug/Fighting","mega single"],["Sneasel",215,"Dark/Ice","reg first"],["Teddiursa",216,"Normal","first"],["Ursaring",217,"Normal",""],["Slugma",218,"Fire","first"],["Magcargo",219,"Fire/Rock","final"],["Swinub",220,"Ice/Ground","first"],["Piloswine",221,"Ice/Ground",""],["Corsola",222,"Water/Rock","reg single"],["Remoraid",223,"Water","first"],["Octillery",224,"Water","final"],["Delibird",225,"Ice/Flying","single"],["Mantine",226,"Water/Flying","final"],["Skarmory",227,"Steel/Flying","mega single"],["Houndour",228,"Dark/Fire","first"],["Houndoom",229,"Dark/Fire","mega final"],["Kingdra",230,"Water/Dragon","final trade"],["Phanpy",231,"Ground","first"],["Donphan",232,"Ground","final"],["Porygon2",233,"Normal","trade"],["Stantler",234,"Normal","first"],["Smeargle",235,"Normal","single"],["Tyrogue",236,"Fighting","first"],["Hitmontop",237,"Fighting","final"],["Smoochum",238,"Ice/Psychic","first"],["Elekid",239,"Electric","first"],["Magby",240,"Fire","first"],["Miltank",241,"Normal","single"],["Blissey",242,"Normal","final"],["Raikou",243,"Electric","lg single"],["Entei",244,"Fire","lg single"],["Suicune",245,"Water","lg single"],["Larvitar",246,"Rock/Ground","first"],["Pupitar",247,"Rock/Ground",""],["Tyranitar",248,"Rock/Dark","mega final"],["Lugia",249,"Psychic/Flying","lg single"],["Ho-Oh",250,"Fire/Flying","lg single"],["Celebi",251,"Psychic/Grass","my single"],["Treecko",252,"Grass","first"],["Grovyle",253,"Grass",""],["Sceptile",254,"Grass","mega final"],["Torchic",255,"Fire","first"],["Combusken",256,"Fire/Fighting",""],["Blaziken",257,"Fire/Fighting","mega final"],["Mudkip",258,"Water","first"],["Marshtomp",259,"Water/Ground",""],["Swampert",260,"Water/Ground","mega final"],["Poochyena",261,"Dark","first"],["Mightyena",262,"Dark","final"],["Zigzagoon",263,"Normal","reg first"],["Linoone",264,"Normal","reg final"],["Wurmple",265,"Bug","first"],["Silcoon",266,"Bug",""],["Beautifly",267,"Bug/Flying","final"],["Cascoon",268,"Bug",""],["Dustox",269,"Bug/Poison","final"],["Lotad",270,"Water/Grass","first"],["Lombre",271,"Water/Grass",""],["Ludicolo",272,"Water/Grass","final stone"],["Seedot",273,"Grass","first"],["Nuzleaf",274,"Grass/Dark",""],["Shiftry",275,"Grass/Dark","final stone"],["Taillow",276,"Normal/Flying","first"],["Swellow",277,"Normal/Flying","final"],["Wingull",278,"Water/Flying","first"],["Pelipper",279,"Water/Flying","final"],["Ralts",280,"Psychic/Fairy","first"],["Kirlia",281,"Psychic/Fairy",""],["Gardevoir",282,"Psychic/Fairy","mega final"],["Surskit",283,"Bug/Water","first"],["Masquerain",284,"Bug/Flying","final"],["Shroomish",285,"Grass","first"],["Breloom",286,"Grass/Fighting","final"],["Slakoth",287,"Normal","first"],["Vigoroth",288,"Normal",""],["Slaking",289,"Normal","final"],["Nincada",290,"Bug/Ground","first"],["Ninjask",291,"Bug/Flying","final"],["Shedinja",292,"Bug/Ghost","final"],["Whismur",293,"Normal","first"],["Loudred",294,"Normal",""],["Exploud",295,"Normal","final"],["Makuhita",296,"Fighting","first"],["Hariyama",297,"Fighting","final"],["Azurill",298,"Normal/Fairy","first"],["Nosepass",299,"Rock","first"],["Skitty",300,"Normal","first"],["Delcatty",301,"Normal","final stone"],["Sableye",302,"Dark/Ghost","mega single"],["Mawile",303,"Steel/Fairy","mega single"],["Aron",304,"Steel/Rock","first"],["Lairon",305,"Steel/Rock",""],["Aggron",306,"Steel/Rock","mega final"],["Meditite",307,"Fighting/Psychic","first"],["Medicham",308,"Fighting/Psychic","mega final"],["Electrike",309,"Electric","first"],["Manectric",310,"Electric","mega final"],["Plusle",311,"Electric","single"],["Minun",312,"Electric","single"],["Volbeat",313,"Bug","single"],["Illumise",314,"Bug","single"],["Roselia",315,"Grass/Poison",""],["Gulpin",316,"Poison","first"],["Swalot",317,"Poison","final"],["Carvanha",318,"Water/Dark","first"],["Sharpedo",319,"Water/Dark","mega final"],["Wailmer",320,"Water","first"],["Wailord",321,"Water","final"],["Numel",322,"Fire/Ground","first"],["Camerupt",323,"Fire/Ground","mega final"],["Torkoal",324,"Fire","single"],["Spoink",325,"Psychic","first"],["Grumpig",326,"Psychic","final"],["Spinda",327,"Normal","single"],["Trapinch",328,"Ground","first"],["Vibrava",329,"Ground/Dragon",""],["Flygon",330,"Ground/Dragon","final"],["Cacnea",331,"Grass","first"],["Cacturne",332,"Grass/Dark","final"],["Swablu",333,"Normal/Flying","first"],["Altaria",334,"Dragon/Flying","mega final"],["Zangoose",335,"Normal","single"],["Seviper",336,"Poison","single"],["Lunatone",337,"Rock/Psychic","single"],["Solrock",338,"Rock/Psychic","single"],["Barboach",339,"Water/Ground","first"],["Whiscash",340,"Water/Ground","final"],["Corphish",341,"Water","first"],["Crawdaunt",342,"Water/Dark","final"],["Baltoy",343,"Ground/Psychic","first"],["Claydol",344,"Ground/Psychic","final"],["Lileep",345,"Rock/Grass","first"],["Cradily",346,"Rock/Grass","final"],["Anorith",347,"Rock/Bug","first"],["Armaldo",348,"Rock/Bug","final"],["Feebas",349,"Water","first"],["Milotic",350,"Water","final trade"],["Castform",351,"Normal","single"],["Kecleon",352,"Normal","single"],["Shuppet",353,"Ghost","first"],["Banette",354,"Ghost","mega final"],["Duskull",355,"Ghost","first"],["Dusclops",356,"Ghost",""],["Tropius",357,"Grass/Flying","single"],["Chimecho",358,"Psychic","mega final"],["Absol",359,"Dark","mega single"],["Wynaut",360,"Psychic","first"],["Snorunt",361,"Ice","first"],["Glalie",362,"Ice","mega final"],["Spheal",363,"Ice/Water","first"],["Sealeo",364,"Ice/Water",""],["Walrein",365,"Ice/Water","final"],["Clamperl",366,"Water","first"],["Huntail",367,"Water","final trade"],["Gorebyss",368,"Water","final trade"],["Relicanth",369,"Water/Rock","single"],["Luvdisc",370,"Water","single"],["Bagon",371,"Dragon","first"],["Shelgon",372,"Dragon",""],["Salamence",373,"Dragon/Flying","mega final"],["Beldum",374,"Steel/Psychic","first"],["Metang",375,"Steel/Psychic",""],["Metagross",376,"Steel/Psychic","mega final"],["Regirock",377,"Rock","lg single"],["Regice",378,"Ice","lg single"],["Registeel",379,"Steel","lg single"],["Latias",380,"Dragon/Psychic","lg mega single"],["Latios",381,"Dragon/Psychic","lg mega single"],["Kyogre",382,"Water","lg single"],["Groudon",383,"Ground","lg single"],["Rayquaza",384,"Dragon/Flying","lg mega single"],["Jirachi",385,"Steel/Psychic","my single"],["Deoxys",386,"Psychic","my single"],["Turtwig",387,"Grass","first"],["Grotle",388,"Grass",""],["Torterra",389,"Grass/Ground","final"],["Chimchar",390,"Fire","first"],["Monferno",391,"Fire/Fighting",""],["Infernape",392,"Fire/Fighting","final"],["Piplup",393,"Water","first"],["Prinplup",394,"Water",""],["Empoleon",395,"Water/Steel","final"],["Starly",396,"Normal/Flying","first"],["Staravia",397,"Normal/Flying",""],["Staraptor",398,"Normal/Flying","mega final"],["Bidoof",399,"Normal","first"],["Bibarel",400,"Normal/Water","final"],["Kricketot",401,"Bug","first"],["Kricketune",402,"Bug","final"],["Shinx",403,"Electric","first"],["Luxio",404,"Electric",""],["Luxray",405,"Electric","final"],["Budew",406,"Grass/Poison","first"],["Roserade",407,"Grass/Poison","final stone"],["Cranidos",408,"Rock","first"],["Rampardos",409,"Rock","final"],["Shieldon",410,"Rock/Steel","first"],["Bastiodon",411,"Rock/Steel","final"],["Burmy",412,"Bug","first"],["Wormadam",413,"Bug/Grass","final"],["Mothim",414,"Bug/Flying","final"],["Combee",415,"Bug/Flying","first"],["Vespiquen",416,"Bug/Flying","final"],["Pachirisu",417,"Electric","single"],["Buizel",418,"Water","first"],["Floatzel",419,"Water","final"],["Cherubi",420,"Grass","first"],["Cherrim",421,"Grass","final"],["Shellos",422,"Water","first"],["Gastrodon",423,"Water/Ground","final"],["Ambipom",424,"Normal","final"],["Drifloon",425,"Ghost/Flying","first"],["Drifblim",426,"Ghost/Flying","final"],["Buneary",427,"Normal","first"],["Lopunny",428,"Normal","mega final"],["Mismagius",429,"Ghost","final stone"],["Honchkrow",430,"Dark/Flying","final stone"],["Glameow",431,"Normal","first"],["Purugly",432,"Normal","final"],["Chingling",433,"Psychic","first"],["Stunky",434,"Poison/Dark","first"],["Skuntank",435,"Poison/Dark","final"],["Bronzor",436,"Steel/Psychic","first"],["Bronzong",437,"Steel/Psychic","final"],["Bonsly",438,"Rock","first"],["Mime Jr.",439,"Psychic/Fairy","first"],["Happiny",440,"Normal","first"],["Chatot",441,"Normal/Flying","single"],["Spiritomb",442,"Ghost/Dark","single"],["Gible",443,"Dragon/Ground","first"],["Gabite",444,"Dragon/Ground",""],["Garchomp",445,"Dragon/Ground","mega final"],["Munchlax",446,"Normal","first"],["Riolu",447,"Fighting","first"],["Lucario",448,"Fighting/Steel","mega final"],["Hippopotas",449,"Ground","first"],["Hippowdon",450,"Ground","final"],["Skorupi",451,"Poison/Bug","first"],["Drapion",452,"Poison/Dark","final"],["Croagunk",453,"Poison/Fighting","first"],["Toxicroak",454,"Poison/Fighting","final"],["Carnivine",455,"Grass","single"],["Finneon",456,"Water","first"],["Lumineon",457,"Water","final"],["Mantyke",458,"Water/Flying","first"],["Snover",459,"Grass/Ice","first"],["Abomasnow",460,"Grass/Ice","mega final"],["Weavile",461,"Dark/Ice","final"],["Magnezone",462,"Electric/Steel","final stone"],["Lickilicky",463,"Normal","final"],["Rhyperior",464,"Ground/Rock","final trade"],["Tangrowth",465,"Grass","final"],["Electivire",466,"Electric","final trade"],["Magmortar",467,"Fire","final trade"],["Togekiss",468,"Fairy/Flying","final stone"],["Yanmega",469,"Bug/Flying","final"],["Leafeon",470,"Grass","final stone"],["Glaceon",471,"Ice","final stone"],["Gliscor",472,"Ground/Flying","final"],["Mamoswine",473,"Ice/Ground","final"],["Porygon-Z",474,"Normal","final trade"],["Gallade",475,"Psychic/Fighting","mega final stone"],["Probopass",476,"Rock/Steel","final"],["Dusknoir",477,"Ghost","final trade"],["Froslass",478,"Ice/Ghost","mega final stone"],["Rotom",479,"Electric/Ghost","single"],["Uxie",480,"Psychic","lg single"],["Mesprit",481,"Psychic","lg single"],["Azelf",482,"Psychic","lg single"],["Dialga",483,"Steel/Dragon","lg single"],["Palkia",484,"Water/Dragon","lg single"],["Heatran",485,"Fire/Steel","lg mega single"],["Regigigas",486,"Normal","lg single"],["Giratina",487,"Ghost/Dragon","lg single"],["Cresselia",488,"Psychic","lg single"],["Phione",489,"Water","my single"],["Manaphy",490,"Water","my single"],["Darkrai",491,"Dark","my mega single"],["Shaymin",492,"Grass","my single"],["Arceus",493,"Normal","my single"],["Victini",494,"Psychic/Fire","my single"],["Snivy",495,"Grass","first"],["Servine",496,"Grass",""],["Serperior",497,"Grass","final"],["Tepig",498,"Fire","first"],["Pignite",499,"Fire/Fighting",""],["Emboar",500,"Fire/Fighting","mega final"],["Oshawott",501,"Water","first"],["Dewott",502,"Water",""],["Samurott",503,"Water","reg final"],["Patrat",504,"Normal","first"],["Watchog",505,"Normal","final"],["Lillipup",506,"Normal","first"],["Herdier",507,"Normal",""],["Stoutland",508,"Normal","final"],["Purrloin",509,"Dark","first"],["Liepard",510,"Dark","final"],["Pansage",511,"Grass","first"],["Simisage",512,"Grass","final stone"],["Pansear",513,"Fire","first"],["Simisear",514,"Fire","final stone"],["Panpour",515,"Water","first"],["Simipour",516,"Water","final stone"],["Munna",517,"Psychic","first"],["Musharna",518,"Psychic","final stone"],["Pidove",519,"Normal/Flying","first"],["Tranquill",520,"Normal/Flying",""],["Unfezant",521,"Normal/Flying","final"],["Blitzle",522,"Electric","first"],["Zebstrika",523,"Electric","final"],["Roggenrola",524,"Rock","first"],["Boldore",525,"Rock",""],["Gigalith",526,"Rock","final trade"],["Woobat",527,"Psychic/Flying","first"],["Swoobat",528,"Psychic/Flying","final"],["Drilbur",529,"Ground","first"],["Excadrill",530,"Ground/Steel","mega final"],["Audino",531,"Normal","mega single"],["Timburr",532,"Fighting","first"],["Gurdurr",533,"Fighting",""],["Conkeldurr",534,"Fighting","final trade"],["Tympole",535,"Water","first"],["Palpitoad",536,"Water/Ground",""],["Seismitoad",537,"Water/Ground","final"],["Throh",538,"Fighting","single"],["Sawk",539,"Fighting","single"],["Sewaddle",540,"Bug/Grass","first"],["Swadloon",541,"Bug/Grass",""],["Leavanny",542,"Bug/Grass","final"],["Venipede",543,"Bug/Poison","first"],["Whirlipede",544,"Bug/Poison",""],["Scolipede",545,"Bug/Poison","mega final"],["Cottonee",546,"Grass/Fairy","first"],["Whimsicott",547,"Grass/Fairy","final stone"],["Petilil",548,"Grass","first"],["Lilligant",549,"Grass","reg final stone"],["Basculin",550,"Water","single"],["Sandile",551,"Ground/Dark","first"],["Krokorok",552,"Ground/Dark",""],["Krookodile",553,"Ground/Dark","final"],["Darumaka",554,"Fire","reg first"],["Darmanitan",555,"Fire","reg final"],["Maractus",556,"Grass","single"],["Dwebble",557,"Bug/Rock","first"],["Crustle",558,"Bug/Rock","final"],["Scraggy",559,"Dark/Fighting","first"],["Scrafty",560,"Dark/Fighting","mega final"],["Sigilyph",561,"Psychic/Flying","single"],["Yamask",562,"Ghost","reg first"],["Cofagrigus",563,"Ghost","final"],["Tirtouga",564,"Water/Rock","first"],["Carracosta",565,"Water/Rock","final"],["Archen",566,"Rock/Flying","first"],["Archeops",567,"Rock/Flying","final"],["Trubbish",568,"Poison","first"],["Garbodor",569,"Poison","final"],["Zorua",570,"Dark","reg first"],["Zoroark",571,"Dark","reg final"],["Minccino",572,"Normal","first"],["Cinccino",573,"Normal","final stone"],["Gothita",574,"Psychic","first"],["Gothorita",575,"Psychic",""],["Gothitelle",576,"Psychic","final"],["Solosis",577,"Psychic","first"],["Duosion",578,"Psychic",""],["Reuniclus",579,"Psychic","final"],["Ducklett",580,"Water/Flying","first"],["Swanna",581,"Water/Flying","final"],["Vanillite",582,"Ice","first"],["Vanillish",583,"Ice",""],["Vanilluxe",584,"Ice","final"],["Deerling",585,"Normal/Grass","first"],["Sawsbuck",586,"Normal/Grass","final"],["Emolga",587,"Electric/Flying","single"],["Karrablast",588,"Bug","first"],["Escavalier",589,"Bug/Steel","final trade"],["Foongus",590,"Grass/Poison","first"],["Amoonguss",591,"Grass/Poison","final"],["Frillish",592,"Water/Ghost","first"],["Jellicent",593,"Water/Ghost","final"],["Alomomola",594,"Water","single"],["Joltik",595,"Bug/Electric","first"],["Galvantula",596,"Bug/Electric","final"],["Ferroseed",597,"Grass/Steel","first"],["Ferrothorn",598,"Grass/Steel","final"],["Klink",599,"Steel","first"],["Klang",600,"Steel",""],["Klinklang",601,"Steel","final"],["Tynamo",602,"Electric","first"],["Eelektrik",603,"Electric",""],["Eelektross",604,"Electric","mega final stone"],["Elgyem",605,"Psychic","first"],["Beheeyem",606,"Psychic","final"],["Litwick",607,"Ghost/Fire","first"],["Lampent",608,"Ghost/Fire",""],["Chandelure",609,"Ghost/Fire","mega final stone"],["Axew",610,"Dragon","first"],["Fraxure",611,"Dragon",""],["Haxorus",612,"Dragon","final"],["Cubchoo",613,"Ice","first"],["Beartic",614,"Ice","final"],["Cryogonal",615,"Ice","single"],["Shelmet",616,"Bug","first"],["Accelgor",617,"Bug","final trade"],["Stunfisk",618,"Ground/Electric","reg single"],["Mienfoo",619,"Fighting","first"],["Mienshao",620,"Fighting","final"],["Druddigon",621,"Dragon","single"],["Golett",622,"Ground/Ghost","first"],["Golurk",623,"Ground/Ghost","mega final"],["Pawniard",624,"Dark/Steel","first"],["Bisharp",625,"Dark/Steel",""],["Bouffalant",626,"Normal","single"],["Rufflet",627,"Normal/Flying","first"],["Braviary",628,"Normal/Flying","reg final"],["Vullaby",629,"Dark/Flying","first"],["Mandibuzz",630,"Dark/Flying","final"],["Heatmor",631,"Fire","single"],["Durant",632,"Bug/Steel","single"],["Deino",633,"Dark/Dragon","first"],["Zweilous",634,"Dark/Dragon",""],["Hydreigon",635,"Dark/Dragon","final"],["Larvesta",636,"Bug/Fire","first"],["Volcarona",637,"Bug/Fire","final"],["Cobalion",638,"Steel/Fighting","lg single"],["Terrakion",639,"Rock/Fighting","lg single"],["Virizion",640,"Grass/Fighting","lg single"],["Tornadus",641,"Flying","lg single"],["Thundurus",642,"Electric/Flying","lg single"],["Reshiram",643,"Dragon/Fire","lg single"],["Zekrom",644,"Dragon/Electric","lg single"],["Landorus",645,"Ground/Flying","lg single"],["Kyurem",646,"Dragon/Ice","lg single"],["Keldeo",647,"Water/Fighting","my single"],["Meloetta",648,"Normal/Psychic","my single"],["Genesect",649,"Bug/Steel","my single"],["Chespin",650,"Grass","first"],["Quilladin",651,"Grass",""],["Chesnaught",652,"Grass/Fighting","mega final"],["Fennekin",653,"Fire","first"],["Braixen",654,"Fire",""],["Delphox",655,"Fire/Psychic","mega final"],["Froakie",656,"Water","first"],["Frogadier",657,"Water",""],["Greninja",658,"Water/Dark","mega final"],["Bunnelby",659,"Normal","first"],["Diggersby",660,"Normal/Ground","final"],["Fletchling",661,"Normal/Flying","first"],["Fletchinder",662,"Fire/Flying",""],["Talonflame",663,"Fire/Flying","final"],["Scatterbug",664,"Bug","first"],["Spewpa",665,"Bug",""],["Vivillon",666,"Bug/Flying","final"],["Litleo",667,"Fire/Normal","first"],["Pyroar",668,"Fire/Normal","mega final"],["Flabébé",669,"Fairy","first"],["Floette",670,"Fairy","mega"],["Florges",671,"Fairy","final stone"],["Skiddo",672,"Grass","first"],["Gogoat",673,"Grass","final"],["Pancham",674,"Fighting","first"],["Pangoro",675,"Fighting/Dark","final"],["Furfrou",676,"Normal","single"],["Espurr",677,"Psychic","first"],["Meowstic",678,"Psychic","mega final"],["Honedge",679,"Steel/Ghost","first"],["Doublade",680,"Steel/Ghost",""],["Aegislash",681,"Steel/Ghost","final stone"],["Spritzee",682,"Fairy","first"],["Aromatisse",683,"Fairy","final trade"],["Swirlix",684,"Fairy","first"],["Slurpuff",685,"Fairy","final trade"],["Inkay",686,"Dark/Psychic","first"],["Malamar",687,"Dark/Psychic","mega final"],["Binacle",688,"Rock/Water","first"],["Barbaracle",689,"Rock/Water","mega final"],["Skrelp",690,"Poison/Water","first"],["Dragalge",691,"Poison/Dragon","mega final"],["Clauncher",692,"Water","first"],["Clawitzer",693,"Water","final"],["Helioptile",694,"Electric/Normal","first"],["Heliolisk",695,"Electric/Normal","final stone"],["Tyrunt",696,"Rock/Dragon","first"],["Tyrantrum",697,"Rock/Dragon","final"],["Amaura",698,"Rock/Ice","first"],["Aurorus",699,"Rock/Ice","final"],["Sylveon",700,"Fairy","final"],["Hawlucha",701,"Fighting/Flying","mega single"],["Dedenne",702,"Electric/Fairy","single"],["Carbink",703,"Rock/Fairy","single"],["Goomy",704,"Dragon","first"],["Sliggoo",705,"Dragon","reg"],["Goodra",706,"Dragon","reg final"],["Klefki",707,"Steel/Fairy","single"],["Phantump",708,"Ghost/Grass","first"],["Trevenant",709,"Ghost/Grass","final trade"],["Pumpkaboo",710,"Ghost/Grass","first"],["Gourgeist",711,"Ghost/Grass","final trade"],["Bergmite",712,"Ice","first"],["Avalugg",713,"Ice","reg final"],["Noibat",714,"Flying/Dragon","first"],["Noivern",715,"Flying/Dragon","final"],["Xerneas",716,"Fairy","lg single"],["Yveltal",717,"Dark/Flying","lg single"],["Zygarde",718,"Dragon/Ground","lg mega single"],["Diancie",719,"Rock/Fairy","my mega single"],["Hoopa",720,"Psychic/Ghost","my single"],["Volcanion",721,"Fire/Water","my single"],["Rowlet",722,"Grass/Flying","first"],["Dartrix",723,"Grass/Flying",""],["Decidueye",724,"Grass/Ghost","reg final"],["Litten",725,"Fire","first"],["Torracat",726,"Fire",""],["Incineroar",727,"Fire/Dark","final"],["Popplio",728,"Water","first"],["Brionne",729,"Water",""],["Primarina",730,"Water/Fairy","final"],["Pikipek",731,"Normal/Flying","first"],["Trumbeak",732,"Normal/Flying",""],["Toucannon",733,"Normal/Flying","final"],["Yungoos",734,"Normal","first"],["Gumshoos",735,"Normal","final"],["Grubbin",736,"Bug","first"],["Charjabug",737,"Bug/Electric",""],["Vikavolt",738,"Bug/Electric","final stone"],["Crabrawler",739,"Fighting","first"],["Crabominable",740,"Fighting/Ice","mega final stone"],["Oricorio",741,"Fire/Flying","single"],["Cutiefly",742,"Bug/Fairy","first"],["Ribombee",743,"Bug/Fairy","final"],["Rockruff",744,"Rock","first"],["Lycanroc",745,"Rock","final"],["Wishiwashi",746,"Water","single"],["Mareanie",747,"Poison/Water","first"],["Toxapex",748,"Poison/Water","final"],["Mudbray",749,"Ground","first"],["Mudsdale",750,"Ground","final"],["Dewpider",751,"Water/Bug","first"],["Araquanid",752,"Water/Bug","final"],["Fomantis",753,"Grass","first"],["Lurantis",754,"Grass","final"],["Morelull",755,"Grass/Fairy","first"],["Shiinotic",756,"Grass/Fairy","final"],["Salandit",757,"Poison/Fire","first"],["Salazzle",758,"Poison/Fire","final"],["Stufful",759,"Normal/Fighting","first"],["Bewear",760,"Normal/Fighting","final"],["Bounsweet",761,"Grass","first"],["Steenee",762,"Grass",""],["Tsareena",763,"Grass","final"],["Comfey",764,"Fairy","single"],["Oranguru",765,"Normal/Psychic","single"],["Passimian",766,"Fighting","single"],["Wimpod",767,"Bug/Water","first"],["Golisopod",768,"Bug/Water","mega final"],["Sandygast",769,"Ghost/Ground","first"],["Palossand",770,"Ghost/Ground","final"],["Pyukumuku",771,"Water","single"],["Type: Null",772,"Normal","lg first"],["Silvally",773,"Normal","lg final"],["Minior",774,"Rock/Flying","single"],["Komala",775,"Normal","single"],["Turtonator",776,"Fire/Dragon","single"],["Togedemaru",777,"Electric/Steel","single"],["Mimikyu",778,"Ghost/Fairy","single"],["Bruxish",779,"Water/Psychic","single"],["Drampa",780,"Normal/Dragon","mega single"],["Dhelmise",781,"Ghost/Grass","single"],["Jangmo-o",782,"Dragon","first"],["Hakamo-o",783,"Dragon/Fighting",""],["Kommo-o",784,"Dragon/Fighting","final"],["Tapu Koko",785,"Electric/Fairy","lg single"],["Tapu Lele",786,"Psychic/Fairy","lg single"],["Tapu Bulu",787,"Grass/Fairy","lg single"],["Tapu Fini",788,"Water/Fairy","lg single"],["Cosmog",789,"Psychic","lg first"],["Cosmoem",790,"Psychic","lg"],["Solgaleo",791,"Psychic/Steel","lg final"],["Lunala",792,"Psychic/Ghost","lg final"],["Nihilego",793,"Rock/Poison","single"],["Buzzwole",794,"Bug/Fighting","single"],["Pheromosa",795,"Bug/Fighting","single"],["Xurkitree",796,"Electric","single"],["Celesteela",797,"Steel/Flying","single"],["Kartana",798,"Grass/Steel","single"],["Guzzlord",799,"Dark/Dragon","single"],["Necrozma",800,"Psychic","lg single"],["Magearna",801,"Steel/Fairy","my mega single"],["Marshadow",802,"Fighting/Ghost","my single"],["Poipole",803,"Poison","first"],["Naganadel",804,"Poison/Dragon","final"],["Stakataka",805,"Rock/Steel","single"],["Blacephalon",806,"Fire/Ghost","single"],["Zeraora",807,"Electric","my mega single"],["Meltan",808,"Steel","my single"],["Melmetal",809,"Steel","my single"],["Grookey",810,"Grass","first"],["Thwackey",811,"Grass",""],["Rillaboom",812,"Grass","final"],["Scorbunny",813,"Fire","first"],["Raboot",814,"Fire",""],["Cinderace",815,"Fire","final"],["Sobble",816,"Water","first"],["Drizzile",817,"Water",""],["Inteleon",818,"Water","final"],["Skwovet",819,"Normal","first"],["Greedent",820,"Normal","final"],["Rookidee",821,"Flying","first"],["Corvisquire",822,"Flying",""],["Corviknight",823,"Flying/Steel","final"],["Blipbug",824,"Bug","first"],["Dottler",825,"Bug/Psychic",""],["Orbeetle",826,"Bug/Psychic","final"],["Nickit",827,"Dark","first"],["Thievul",828,"Dark","final"],["Gossifleur",829,"Grass","first"],["Eldegoss",830,"Grass","final"],["Wooloo",831,"Normal","first"],["Dubwool",832,"Normal","final"],["Chewtle",833,"Water","first"],["Drednaw",834,"Water/Rock","final"],["Yamper",835,"Electric","first"],["Boltund",836,"Electric","final"],["Rolycoly",837,"Rock","first"],["Carkol",838,"Rock/Fire",""],["Coalossal",839,"Rock/Fire","final"],["Applin",840,"Grass/Dragon","first"],["Flapple",841,"Grass/Dragon","final"],["Appletun",842,"Grass/Dragon","final"],["Silicobra",843,"Ground","first"],["Sandaconda",844,"Ground","final"],["Cramorant",845,"Flying/Water","single"],["Arrokuda",846,"Water","first"],["Barraskewda",847,"Water","final"],["Toxel",848,"Electric/Poison","first"],["Toxtricity",849,"Electric/Poison","final"],["Sizzlipede",850,"Fire/Bug","first"],["Centiskorch",851,"Fire/Bug","final"],["Clobbopus",852,"Fighting","first"],["Grapploct",853,"Fighting","final"],["Sinistea",854,"Ghost","first"],["Polteageist",855,"Ghost","final"],["Hatenna",856,"Psychic","first"],["Hattrem",857,"Psychic",""],["Hatterene",858,"Psychic/Fairy","final"],["Impidimp",859,"Dark/Fairy","first"],["Morgrem",860,"Dark/Fairy",""],["Grimmsnarl",861,"Dark/Fairy","final"],["Obstagoon",862,"Dark/Normal","final"],["Perrserker",863,"Steel","final"],["Cursola",864,"Ghost","final"],["Sirfetch’d",865,"Fighting","final"],["Mr. Rime",866,"Ice/Psychic","final"],["Runerigus",867,"Ground/Ghost","final"],["Milcery",868,"Fairy","first"],["Alcremie",869,"Fairy","final"],["Falinks",870,"Fighting","mega single"],["Pincurchin",871,"Electric","single"],["Snom",872,"Ice/Bug","first"],["Frosmoth",873,"Ice/Bug","final"],["Stonjourner",874,"Rock","single"],["Eiscue",875,"Ice","single"],["Indeedee",876,"Psychic/Normal","single"],["Morpeko",877,"Electric/Dark","single"],["Cufant",878,"Steel","first"],["Copperajah",879,"Steel","final"],["Dracozolt",880,"Electric/Dragon","single"],["Arctozolt",881,"Electric/Ice","single"],["Dracovish",882,"Water/Dragon","single"],["Arctovish",883,"Water/Ice","single"],["Duraludon",884,"Steel/Dragon","first"],["Dreepy",885,"Dragon/Ghost","first"],["Drakloak",886,"Dragon/Ghost",""],["Dragapult",887,"Dragon/Ghost","final"],["Zacian",888,"Fairy","lg single"],["Zamazenta",889,"Fighting","lg single"],["Eternatus",890,"Poison/Dragon","lg single"],["Kubfu",891,"Fighting","lg first"],["Urshifu",892,"Fighting/Dark","lg final"],["Zarude",893,"Dark/Grass","my single"],["Regieleki",894,"Electric","lg single"],["Regidrago",895,"Dragon","lg single"],["Glastrier",896,"Ice","lg single"],["Spectrier",897,"Ghost","lg single"],["Calyrex",898,"Psychic/Grass","lg single"],["Wyrdeer",899,"Normal/Psychic","final"],["Kleavor",900,"Bug/Rock","final"],["Ursaluna",901,"Ground/Normal","final"],["Basculegion",902,"Water/Ghost","final"],["Sneasler",903,"Fighting/Poison","final"],["Overqwil",904,"Dark/Poison","final"],["Enamorus",905,"Fairy/Flying","lg single"],["Sprigatito",906,"Grass","first"],["Floragato",907,"Grass",""],["Meowscarada",908,"Grass/Dark","final"],["Fuecoco",909,"Fire","first"],["Crocalor",910,"Fire",""],["Skeledirge",911,"Fire/Ghost","final"],["Quaxly",912,"Water","first"],["Quaxwell",913,"Water",""],["Quaquaval",914,"Water/Fighting","final"],["Lechonk",915,"Normal","first"],["Oinkologne",916,"Normal","final"],["Tarountula",917,"Bug","first"],["Spidops",918,"Bug","final"],["Nymble",919,"Bug","first"],["Lokix",920,"Bug/Dark","final"],["Pawmi",921,"Electric","first"],["Pawmo",922,"Electric/Fighting",""],["Pawmot",923,"Electric/Fighting","final"],["Tandemaus",924,"Normal","first"],["Maushold",925,"Normal","final"],["Fidough",926,"Fairy","first"],["Dachsbun",927,"Fairy","final"],["Smoliv",928,"Grass/Normal","first"],["Dolliv",929,"Grass/Normal",""],["Arboliva",930,"Grass/Normal","final"],["Squawkabilly",931,"Normal/Flying","single"],["Nacli",932,"Rock","first"],["Naclstack",933,"Rock",""],["Garganacl",934,"Rock","final"],["Charcadet",935,"Fire","first"],["Armarouge",936,"Fire/Psychic","final"],["Ceruledge",937,"Fire/Ghost","final"],["Tadbulb",938,"Electric","first"],["Bellibolt",939,"Electric","final stone"],["Wattrel",940,"Electric/Flying","first"],["Kilowattrel",941,"Electric/Flying","final"],["Maschiff",942,"Dark","first"],["Mabosstiff",943,"Dark","final"],["Shroodle",944,"Poison/Normal","first"],["Grafaiai",945,"Poison/Normal","final"],["Bramblin",946,"Grass/Ghost","first"],["Brambleghast",947,"Grass/Ghost","final"],["Toedscool",948,"Ground/Grass","first"],["Toedscruel",949,"Ground/Grass","final"],["Klawf",950,"Rock","single"],["Capsakid",951,"Grass","first"],["Scovillain",952,"Grass/Fire","mega final stone"],["Rellor",953,"Bug","first"],["Rabsca",954,"Bug/Psychic","final"],["Flittle",955,"Psychic","first"],["Espathra",956,"Psychic","final"],["Tinkatink",957,"Fairy/Steel","first"],["Tinkatuff",958,"Fairy/Steel",""],["Tinkaton",959,"Fairy/Steel","final"],["Wiglett",960,"Water","first"],["Wugtrio",961,"Water","final"],["Bombirdier",962,"Flying/Dark","single"],["Finizen",963,"Water","first"],["Palafin",964,"Water","final"],["Varoom",965,"Steel/Poison","first"],["Revavroom",966,"Steel/Poison","final"],["Cyclizar",967,"Dragon/Normal","single"],["Orthworm",968,"Steel","single"],["Glimmet",969,"Rock/Poison","first"],["Glimmora",970,"Rock/Poison","mega final"],["Greavard",971,"Ghost","first"],["Houndstone",972,"Ghost","final"],["Flamigo",973,"Flying/Fighting","single"],["Cetoddle",974,"Ice","first"],["Cetitan",975,"Ice","final stone"],["Veluza",976,"Water/Psychic","single"],["Dondozo",977,"Water","single"],["Tatsugiri",978,"Dragon/Water","mega single"],["Annihilape",979,"Fighting/Ghost","final"],["Clodsire",980,"Poison/Ground","final"],["Farigiraf",981,"Normal/Psychic","final"],["Dudunsparce",982,"Normal","final"],["Kingambit",983,"Dark/Steel","final"],["Great Tusk",984,"Ground/Fighting","single"],["Scream Tail",985,"Fairy/Psychic","single"],["Brute Bonnet",986,"Grass/Dark","single"],["Flutter Mane",987,"Ghost/Fairy","single"],["Slither Wing",988,"Bug/Fighting","single"],["Sandy Shocks",989,"Electric/Ground","single"],["Iron Treads",990,"Ground/Steel","single"],["Iron Bundle",991,"Ice/Water","single"],["Iron Hands",992,"Fighting/Electric","single"],["Iron Jugulis",993,"Dark/Flying","single"],["Iron Moth",994,"Fire/Poison","single"],["Iron Thorns",995,"Rock/Electric","single"],["Frigibax",996,"Dragon/Ice","first"],["Arctibax",997,"Dragon/Ice",""],["Baxcalibur",998,"Dragon/Ice","mega final"],["Gimmighoul",999,"Ghost","first"],["Gholdengo",1000,"Steel/Ghost","final"],["Wo-Chien",1001,"Dark/Grass","lg single"],["Chien-Pao",1002,"Dark/Ice","lg single"],["Ting-Lu",1003,"Dark/Ground","lg single"],["Chi-Yu",1004,"Dark/Fire","lg single"],["Roaring Moon",1005,"Dragon/Dark","single"],["Iron Valiant",1006,"Fairy/Fighting","single"],["Koraidon",1007,"Fighting/Dragon","lg single"],["Miraidon",1008,"Electric/Dragon","lg single"],["Walking Wake",1009,"Water/Dragon","single"],["Iron Leaves",1010,"Grass/Psychic","single"],["Dipplin",1011,"Grass/Dragon",""],["Poltchageist",1012,"Grass/Ghost","first"],["Sinistcha",1013,"Grass/Ghost","final"],["Okidogi",1014,"Poison/Fighting","lg single"],["Munkidori",1015,"Poison/Psychic","lg single"],["Fezandipiti",1016,"Poison/Fairy","lg single"],["Ogerpon",1017,"Grass","lg single"],["Archaludon",1018,"Steel/Dragon","final"],["Hydrapple",1019,"Grass/Dragon","final"],["Gouging Fire",1020,"Fire/Dragon","single"],["Raging Bolt",1021,"Electric/Dragon","single"],["Iron Boulder",1022,"Rock/Psychic","single"],["Iron Crown",1023,"Steel/Psychic","single"],["Terapagos",1024,"Normal","lg single"],["Pecharunt",1025,"Poison/Ghost","my single"]];
+const TC = {Normal:"#8a8a68",Fire:"#d6682a",Water:"#4f78d8",Electric:"#c9a315",Grass:"#4f9a33",Ice:"#4fa9a7",Fighting:"#a8322a",Poison:"#8c3a8d",Ground:"#a98839",Flying:"#7a6bd0",Psychic:"#d8456f",Bug:"#838f18",Rock:"#978232",Ghost:"#5e4d86",Dragon:"#5d36d6",Dark:"#5c4a3d",Steel:"#7e7ea0",Fairy:"#c56d93"};
+const TYPES = Object.keys(TC);
+const ROMAN = ["","I","II","III","IV","V","VI","VII","VIII","IX"];
+const GEN_END = [0,151,251,386,493,649,721,809,905,1025];
+const genOf = n => GEN_END.findIndex((e,i) => i > 0 && n <= e);
+const MONS = RAW.map(([name,num,types,flags]) => ({ name, num, types: types.split("/"), flags: new Set(flags ? flags.split(" ") : []), gen: genOf(num), key: name.toLowerCase().replace(/[^a-z0-9]/g,"") }));
+
+const CATS = {};
+TYPES.forEach(t => CATS["t_"+t] = { fam:"type", w:3, kind:"type", label:t, test:m => m.types.includes(t) });
+for (let g = 1; g <= 9; g++) CATS["g_"+g] = { fam:"gen", w:1, label:"Gen "+ROMAN[g], test:m => m.gen === g };
+const flag = (id, fam, label, w = 1) => CATS[id] = { fam, w, label, test:m => m.flags.has(id) };
+CATS.mono = { fam:"count", w:1, label:"Single type", test:m => m.types.length === 1 };
+CATS.dual = { fam:"count", w:1, label:"Dual type", test:m => m.types.length === 2 };
+flag("lg","legend","Legendary",.8); flag("my","legend","Mythical",.4);
+flag("mega","mega","Has a Mega",.8); flag("reg","reg","Has a regional form",.8);
+flag("first","stage","First stage"); flag("final","stage","Final evolution"); flag("single","stage","Doesn't evolve");
+flag("stone","evo","Evolved with a stone",.6); flag("trade","evo","Evolved by trade",.4);
+const IDS = Object.keys(CATS);
+
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function pick(r, ids) { let x = r() * ids.reduce((s,i) => s + CATS[i].w, 0); for (const i of ids) { x -= CATS[i].w; if (x <= 0) return i; } return ids[ids.length-1]; }
+const fits = (a,b) => MONS.filter(m => CATS[a].test(m) && CATS[b].test(m));
+function makeBoard(seed) {
+  const r = rng(seed);
+  for (let n = 0; n < 20000; n++) {
+    const rows = [], cols = [];
+    while (rows.length < 3) { const c = pick(r, IDS); if (!rows.includes(c)) rows.push(c); }
+    const fams = new Set(rows.map(c => CATS[c].fam));
+    const pool = IDS.filter(c => !rows.includes(c) && (CATS[c].fam === "type" || !fams.has(CATS[c].fam)));
+    while (cols.length < 3) { const c = pick(r, pool); if (!cols.includes(c)) cols.push(c); }
+    const nt = [...rows, ...cols].filter(c => CATS[c].fam === "type").length;
+    if (nt < 2 || nt > 5) continue;
+    const ans = rows.map(a => cols.map(b => fits(a,b)));
+    if (ans.every(row => row.every(x => x.length >= 2))) return { seed, rows, cols, ans };
+  }
+  return makeBoard(seed + 1);
+}
+
+const $ = s => document.querySelector(s);
+const read = k => { try { return JSON.parse(localStorage.getItem("bored.pokedoku." + k)); } catch { return null; } };
+const write = (k,v) => { try { localStorage.setItem("bored.pokedoku." + k, JSON.stringify(v)); } catch {} };
+function todayInfo() {
+  const s = window.__boredSeed;
+  if (s && Number.isFinite(s.seed)) return { date: s.date, seed: s.seed >>> 0 };
+  const d = new Date(), date = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  let h = 2166136261 >>> 0; for (let i = 0; i < date.length; i++) { h ^= date.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return { date, seed: h };
+}
+const TODAY = todayInfo();
+
+let B, S, sel = -1, opts = [], hi = 0;
+const fresh = () => ({ cells: Array(9).fill(null), left: 9, over: false, gaveUp: false });
+function load(seed) {
+  B = makeBoard(seed >>> 0);
+  S = read("s" + B.seed) || fresh();
+  write("last", B.seed);
+  sel = -1; $("#msg").textContent = ""; $("#msg").className = "";
+  render();
+}
+const save = () => write("s" + B.seed, S);
+const isDaily = () => B.seed === TODAY.seed;
+const filled = () => S.cells.filter(Boolean).length;
+
+function head(id) {
+  const c = CATS[id];
+  return c.kind === "type" ? `<span class="ty" style="background:${TC[c.label]}">${c.label.toUpperCase()}</span>` : c.label;
+}
+function render() {
+  $("#hudl").innerHTML = `${isDaily() ? "daily " + TODAY.date : "board " + B.seed}`;
+  $("#hudr").innerHTML = `squares <b>${filled()}</b>/9 · guesses <b>${S.left}</b>`;
+  const g = $("#grid"); g.innerHTML = "<div></div>";
+  B.cols.forEach(c => g.insertAdjacentHTML("beforeend", `<div class="hd">${head(c)}</div>`));
+  for (let r = 0; r < 3; r++) {
+    g.insertAdjacentHTML("beforeend", `<div class="hd">${head(B.rows[r])}</div>`);
+    for (let c = 0; c < 3; c++) {
+      const i = r*3 + c, b = document.createElement("button"), m = S.cells[i] && MONS.find(x => x.name === S.cells[i]), n = B.ans[r][c].length;
+      b.type = "button"; b.className = "cell"; b.id = "c" + i;
+      if (m) {
+        b.classList.add("got"); b.style.background = TC[m.types[0]];
+        b.innerHTML = `<span class="nm">${m.name}</span><span class="sm">#${m.num} · ${n}</span>` + (m.types[1] ? `<span class="t2" style="background:${TC[m.types[1]]}"></span>` : "");
+        b.setAttribute("aria-label", m.name + ", " + n + " possible");
+      } else if (S.over) {
+        b.classList.add("open"); b.innerHTML = `<span class="nm">${n} fit</span>`;
+      } else {
+        b.innerHTML = `<span class="nm muted">+</span>`;
+        b.setAttribute("aria-label", CATS[B.rows[r]].label + " and " + CATS[B.cols[c]].label);
+      }
+      if (i === sel) b.classList.add("sel");
+      b.onclick = () => choose(i);
+      if (!S.over && m) b.disabled = true;
+      g.appendChild(b);
+    }
+  }
+  const playing = !S.over;
+  $("#guess").hidden = !playing; $("#opts").hidden = !playing;
+  $("#giveup").hidden = !playing;
+  $("#share").hidden = playing; $("#copy").hidden = playing;
+  if (playing) {
+    $("#ask").innerHTML = sel < 0 ? "Pick a square." : `<b>${CATS[B.rows[Math.floor(sel/3)]].label}</b> + <b>${CATS[B.cols[sel%3]].label}</b>`;
+    $("#guess").disabled = sel < 0;
+  } else {
+    $("#ask").innerHTML = (filled() === 9 ? "Full board." : S.gaveUp ? "Gave up." : "Out of guesses.") + " Tap a square to see what fit.";
+    $("#share").textContent = shareText();
+    if (sel < 0) $("#ans").hidden = true;
+  }
+}
+function choose(i) {
+  sel = i;
+  if (S.over) { showAnswers(i); render(); return; }
+  render();
+  $("#guess").value = ""; opts = []; $("#opts").innerHTML = "";
+  $("#guess").focus();
+}
+function showAnswers(i) {
+  const list = B.ans[Math.floor(i/3)][i%3];
+  $("#ans").hidden = false;
+  $("#ans").innerHTML = `<b>${list.length} fit:</b> ` + list.map(m => `<span>${m.name}</span>`).join("");
+}
+function suggest(q) {
+  const k = q.toLowerCase().replace(/[^a-z0-9]/g,"");
+  hi = 0;
+  opts = !k ? [] : [...MONS.filter(m => m.key.startsWith(k)), ...MONS.filter(m => !m.key.startsWith(k) && m.key.includes(k))].slice(0, 6);
+  paint();
+}
+function paint() {
+  const ul = $("#opts"); ul.innerHTML = "";
+  opts.forEach((m, i) => {
+    const used = S.cells.includes(m.name), li = document.createElement("li"), b = document.createElement("button");
+    b.type = "button"; b.disabled = used;
+    b.innerHTML = `<span>${m.name}${used ? " (used)" : ""}</span><span class="dots muted">#${m.num}${m.types.map(t => `<i style="background:${TC[t]}"></i>`).join("")}</span>`;
+    if (i === hi) b.classList.add("on");
+    b.onclick = () => submit(m);
+    li.appendChild(b); ul.appendChild(li);
+  });
+  if ($("#guess").value.trim() && !opts.length) ul.innerHTML = `<li class="muted" style="padding:6px">no Pokémon by that name</li>`;
+}
+function submit(m) {
+  if (sel < 0 || S.over || S.cells.includes(m.name)) return;
+  const i = sel, r = Math.floor(i/3), c = i % 3, ok = CATS[B.rows[r]].test(m) && CATS[B.cols[c]].test(m);
+  S.left--;
+  if (ok) { S.cells[i] = m.name; sel = -1; }
+  if (S.left <= 0 || filled() === 9) S.over = true;
+  save();
+  $("#msg").textContent = ok ? m.name + " fits." : m.name + " doesn't fit there.";
+  $("#msg").className = ok ? "" : "bad";
+  $("#guess").value = ""; opts = []; $("#opts").innerHTML = "";
+  if (S.over) { sel = -1; $("#opts").innerHTML = ""; }
+  render();
+  if (!ok && !S.over) { $("#c" + i).classList.add("miss"); $("#guess").focus(); }
+}
+function shareText() {
+  let grid = "";
+  for (let r = 0; r < 3; r++) { for (let c = 0; c < 3; c++) grid += S.cells[r*3+c] ? "■" : "□"; grid += "\n"; }
+  return `Pokédoku ${isDaily() ? "daily " + TODAY.date : "board"} · code ${B.seed}\n${filled()}/9 squares\n${grid}`.trim();
+}
+
+$("#guess").addEventListener("input", e => suggest(e.target.value));
+$("#guess").addEventListener("keydown", e => {
+  if (e.key === "ArrowDown") { hi = Math.min(hi + 1, opts.length - 1); paint(); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { hi = Math.max(hi - 1, 0); paint(); e.preventDefault(); }
+  else if (e.key === "Enter") { e.preventDefault(); if (opts[hi]) submit(opts[hi]); }
+});
+$("#daily").onclick = () => load(TODAY.seed);
+$("#fresh").onclick = () => load(Math.floor(Math.random() * 4294967295) + 1);
+$("#giveup").onclick = () => { S.over = true; S.gaveUp = true; sel = -1; save(); $("#msg").textContent = ""; $("#opts").innerHTML = ""; render(); };
+$("#copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(shareText()); $("#msg").textContent = "Copied."; }
+  catch { $("#msg").textContent = "Copy blocked here. Select the text above and copy it."; }
+  $("#msg").className = "";
+};
+$("#codeform").onsubmit = e => {
+  e.preventDefault();
+  const v = Number($("#code").value.replace(/\D/g, ""));
+  if (v > 0 && v <= 4294967295) { $("#code").value = ""; load(v); }
+  else { $("#msg").textContent = "Board codes are numbers, like the one in a friend's result."; $("#msg").className = "bad"; }
+};
+
+// The first board of the day is the shared daily; after that, pick up where you left off.
+const last = read("last"), lastState = last && read("s" + last);
+load(read("day") !== TODAY.date ? TODAY.seed : (lastState ? last : TODAY.seed));
+write("day", TODAY.date);
+
+// The hub reads this: integer metrics, the current run, never null.
+window.__boredSnapshot = () => ({ slug: 'pokedoku', squares: S ? filled() : 0, finished: !!(S && S.over), daily: !!(B && isDaily()) });
+</script>
+</body>
+</html>

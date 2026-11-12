@@ -88,6 +88,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  highScore("pokedoku", "Pokédoku", "squares", { metric: "squares", when: snapshot => snapshot.finished === true }),
   // Krillion ranks the server-checked total of a finished seven-prompt dive.
   highScore('krillion', 'Krillion', 'points', {
     metric: 'score', min: 1, max: 700,

@@ -1,9 +1,4 @@
 {
-  "krillion": {
-    "label": "Points in a finished seven-prompt dive",
-    "better": "high",
-    "max_value": 700
-  },
   "2048": {
     "label": "Score",
     "better": "high",
@@ -89,6 +84,11 @@
     "better": "high",
     "max_value": 99
   },
+  "krillion": {
+    "label": "Points in a finished seven-prompt dive",
+    "better": "high",
+    "max_value": 700
+  },
   "lava": {
     "label": "Points scored against CPU (endless mode)",
     "better": "high",
@@ -123,6 +123,11 @@
     "label": "Points",
     "better": "high",
     "max_value": 10000000
+  },
+  "pokedoku": {
+    "label": "Squares filled on a finished board",
+    "better": "high",
+    "max_value": 9
   },
   "poker": {
     "label": "Chips above the start stack",
