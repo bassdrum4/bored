@@ -46,7 +46,8 @@ const TIERS: Record<string, { score: number; name: string }> = {
 type Answer = { answer: string; tier: string; quip?: string; aliases?: string[] };
 type Prompt = { id: string; text: string; answers: Answer[] };
 type Book = { date: string; prompts: Prompt[] };
-type Player = { token: string; seat: number; name: string; lives: number; meter: number; out: boolean; delta: number };
+type MeterSeg = { tier: string; amt: number };
+type Player = { token: string; seat: number; name: string; lives: number; meter: number; segs?: MeterSeg[]; out: boolean; delta: number };
 type UsedAnswer = { round: number; player: string; rawAnswer: string; normalized: string; points: number };
 type PartyState = {
   code: string;
@@ -323,6 +324,17 @@ async function ratingFor(token: string) {
   return rows?.[0] ?? { rating: RATING_START, games: 0 };
 }
 
+// The seat plate shows every diver's rating, so one query covers the room.
+async function ratingsFor(tokens: string[]) {
+  const unique = [...new Set(tokens.filter(token => /^[A-Za-z0-9_-]{8,80}$/.test(token || '')))];
+  const map = new Map<string, { rating: number; games: number }>();
+  if (!unique.length) return map;
+  const response = await sb('party_ratings?token=in.(' + unique.join(',') + ')&select=token,rating,games');
+  const rows: any[] = response.ok ? await response.json() : [];
+  for (const row of rows) map.set(row.token, { rating: Number(row.rating) || RATING_START, games: Number(row.games) || 0 });
+  return map;
+}
+
 async function applyRatings(state: PartyState) {
   if (!state.rated || !state.winner || state.ratedApplied) return;
   const values = await Promise.all(state.players.map(async player => ({ player, row: await ratingFor(player.token) })));
@@ -350,7 +362,8 @@ async function snapshot(room: Room, state: PartyState, token: string, book: Book
   const current = state.status === 'playing' ? state.players.find(player => player.token === state.turn) ?? null : null;
   const winner = state.players.find(player => player.token === state.winner) ?? null;
   const me = state.players.find(player => player.token === token) ?? null;
-  const rating = await ratingFor(token);
+  const ratings = await ratingsFor(state.players.map(player => player.token));
+  const rating = ratings.get(token) ?? { rating: RATING_START, games: 0 };
   return {
     code: room.code,
     status: state.status,
@@ -375,9 +388,11 @@ async function snapshot(room: Room, state: PartyState, token: string, book: Book
       name: label(player),
       lives: player.lives,
       meter: player.meter ?? 0,
+      segs: (player.segs || []).map(seg => ({ tier: seg.tier, amt: seg.amt })),
       out: !!player.out,
       you: player.token === token,
-      delta: player.delta ?? 0
+      delta: player.delta ?? 0,
+      rating: ratings.get(player.token)?.rating ?? RATING_START
     })),
     used: state.used.filter(entry => entry.round === state.round).map(entry => ({
       answer: entry.rawAnswer,
@@ -530,6 +545,11 @@ async function answerParty(body: Record<string, any>, token: string) {
   }
   const points = TIERS[match.tier]?.score ?? 0;
   mine.meter = Number(mine.meter || 0) + points;
+  // The seat meter is drawn in tier-coloured segments, so the room keeps them.
+  const segs: MeterSeg[] = (mine.segs || []).map(seg => ({ tier: seg.tier, amt: seg.amt }));
+  const last = segs[segs.length - 1];
+  if (last && last.tier === match.tier) last.amt += points;
+  else segs.push({ tier: match.tier, amt: points });
   let hearts = 0;
   while (mine.meter >= HEART_METER && mine.lives < MAX_LIVES) {
     mine.lives += 1;
@@ -537,6 +557,9 @@ async function answerParty(body: Record<string, any>, token: string) {
     hearts += 1;
   }
   if (mine.meter >= HEART_METER) mine.meter = HEART_METER - 1;
+  // Spending the meter on a heart clears its segments; the leftover stays.
+  if (hearts) mine.segs = mine.meter > 0 ? [{ tier: match.tier, amt: mine.meter }] : [];
+  else mine.segs = segs;
   state.used.push({ round: state.round, player: token, rawAnswer: answer, normalized, points });
   const events = [`${label(mine)} named “${match.answer}” (+${points}).`];
   if (hearts) events.push(`${label(mine)} filled the meter: extra heart.`);

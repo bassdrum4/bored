@@ -8,7 +8,11 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const SIZE_LABEL = { 2: '1v1 · two divers', 3: '3 divers', 6: '4 to 6 players', 10: '8 to 10 players' };
 const BUDDIES = { KRILL: 'krill', SCHOOLER: 'schooler', SQUID: 'rare', ANGLER: 'deepcut', EVIL: 'evil' };
 const BUDDY_DAYS = { KRILL: 0, SCHOOLER: 5, SQUID: 14, ANGLER: 30, EVIL: 45 };
-const HEART = '<svg viewBox="0 0 10 9" aria-hidden="true"><path fill="currentColor" d="M5 8.4 1.2 4.6A2.6 2.6 0 0 1 5 1a2.6 2.6 0 0 1 3.8 3.6Z"/></svg>';
+// Krillion's own pixel heart (7x6, crisp edges) and tier palette, so a seat
+// plate and its meter read the same as theirs.
+const HEART = '<svg viewBox="0 0 7 6" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><rect x="1" y="0" width="2" height="1"/><rect x="4" y="0" width="2" height="1"/><rect x="0" y="1" width="7" height="2"/><rect x="1" y="3" width="5" height="1"/><rect x="2" y="4" width="3" height="1"/><rect x="3" y="5" width="1" height="1"/></svg>';
+const TIER_COLOR = { plankton: '#8fa3c4', tooclever: '#ff9f43', schooler: '#4de3ff', rare: '#ff5252', deepcut: '#9d7bff', krillion: '#ffd166' };
+const tierFor = points => points >= 100 ? 'krillion' : points >= 85 ? 'deepcut' : points >= 60 ? 'rare' : points >= 30 ? 'schooler' : points >= 15 ? 'tooclever' : 'plankton';
 
 const state = {
   code: '', view: null, offset: 0, live: null, poll: null, ticker: null, busy: false,
@@ -196,32 +200,55 @@ document.querySelectorAll('[data-close]').forEach(button => button.addEventListe
 
 /* ── the room ───────────────────────────────────────────────────────────── */
 
+// Hearts are a fixed row: every slot up to the room's cap is drawn, and the
+// hearts a diver has lost stay behind as empty outlines.
+function heartsRow(lives, maxLives) {
+  const total = Math.min(5, Math.max(Number(maxLives) || 5, Number(lives) || 0, 2));
+  return Array.from({ length: total }, (_, index) => `<i class="pf-heart${index < lives ? '' : ' empty'}">${HEART}</i>`).join('');
+}
+
+function meterBar(player, target) {
+  const segs = Array.isArray(player.segs) && player.segs.length ? player.segs : (player.meter ? [{ tier: '', amt: player.meter }] : []);
+  const bars = segs.map(seg => `<i style="width:${Math.min(100, (seg.amt / target) * 100)}%;background:${TIER_COLOR[seg.tier] || '#3a5378'}"></i>`).join('');
+  return `<span class="pf-meter pf-seat-meter${Number(player.meter) >= target ? ' full' : ''}">${bars}</span>`;
+}
+
 function paintSeats(view) {
   const seats = view.seats || state.seats;
   const winnerSeat = view.winner?.seat;
+  const maxLives = view.maxLives || 5;
+  const target = view.heartMeter || 600;
+  const spoken = new Map();
+  for (const entry of view.used || []) if (entry.name) spoken.set(entry.name, entry);
   const rows = [];
   for (let i = 0; i < seats; i++) {
     const player = view.players.find(item => item.seat === i);
     if (!player) {
-      rows.push(`<div class="pf-seat open" data-seat="${i}"><div class="pf-sprite"></div><div class="pf-plate"></div></div>`);
+      rows.push(`<div class="pf-seat open" data-seat="${i}"><div class="pf-seat-in"><div class="pf-body"><div class="pf-spr-wrap"></div></div><span class="pf-meter pf-seat-meter"></span><div class="pf-plate"></div></div></div>`);
       continue;
     }
     const holding = view.status === 'playing' && view.turn?.seat === i;
-    const hearts = Array.from({ length: Math.max(0, player.lives) }, () => `<span class="pf-heart">${HEART}</span>`).join('')
-      || `<span class="pf-heart off">${HEART}</span>`;
-    const meter = Math.max(0, Math.min(100, Math.round((player.meter / (view.heartMeter || 600)) * 100)));
     const classes = ['pf-seat'];
     if (player.you) classes.push('me');
     if (player.out) classes.push('out');
     if (holding) classes.push('hold');
     if (winnerSeat === i) classes.push('win');
     const sprite = player.you ? state.sprite : 'krill';
+    const answer = view.status === 'playing' ? spoken.get(player.name) : null;
+    const say = answer
+      ? `<div class="pf-say rest" style="--cc:${TIER_COLOR[tierFor(answer.points)]}">${esc(answer.answer)}</div>`
+      : '';
+    const delta = Number(player.delta) || 0;
+    const elo = `<span class="pf-elo">${player.rating ?? ''}${delta ? `<i class="${delta < 0 ? 'down' : 'up'}">${delta > 0 ? ` +${delta}` : ` ${delta}`}</i>` : ''}</span>`;
     rows.push(`<div class="${classes.join(' ')}" data-seat="${i}">
-      <div class="pf-sprite"><img src="assets/${sprite}.svg" alt=""></div>
-      <div class="pf-plate">
-        <span class="pf-name">${esc(player.name)}${player.you ? ' (you)' : ''}</span>
-        <span class="pf-hearts">${hearts}</span>
-        <span class="pf-meter${meter >= 100 ? ' full' : ''}"><i style="width:${meter}%"></i></span>
+      <div class="pf-seat-in">
+        <div class="pf-body"><div class="pf-spr-wrap"><img class="pf-spr" src="assets/${sprite}.svg" alt=""></div></div>
+        ${meterBar(player, target)}
+        ${say}
+        <div class="pf-plate">
+          <b class="pf-name">${esc(player.name)}${player.you ? ' (you)' : ''}</b>
+          <div class="pf-row"><span class="pf-hearts">${heartsRow(player.lives, maxLives)}</span>${elo}</div>
+        </div>
       </div>
     </div>`);
   }

@@ -119,33 +119,40 @@
 .pf-roomhead .pf-title{margin:6px 0 0;font-size:clamp(15px,2.4vw,21px);letter-spacing:.4em}
 
 .pf-ring{position:absolute;inset:0;z-index:3;pointer-events:none}
+/* Seats follow Krillion's own round DOM: .pf-seat-in holds .pf-body (sprite on
+   its perch), a .pf-meter outside the plate, the .pf-say answer chip and the
+   .pf-plate with the name over a .pf-row of hearts and rating. */
 .pf-seat{position:absolute;width:130px;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
-.pf-sprite{position:relative;width:70px;height:70px;margin:0 auto;filter:drop-shadow(0 0 8px #ff5d8f4d)}
-.pf-sprite img{display:block;width:100%;height:100%;animation:pf-swim 2.6s ease-in-out infinite}
+.pf-seat-in{position:relative;display:flex;flex-direction:column;align-items:center}
+.pf-body{position:relative;width:70px;height:70px}
+.pf-spr-wrap{position:absolute;inset:0;transition:transform 1.6s cubic-bezier(.3,.1,.3,1)}
+.pf-spr{display:block;width:100%;height:100%;filter:drop-shadow(0 0 8px #ff5d8f59);animation:pf-swim 2.6s ease-in-out infinite;transition:filter .6s}
 @keyframes pf-swim{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-5px) rotate(3deg)}}
-.pf-seat:nth-child(2n) .pf-sprite img{animation-delay:-1.1s}
-.pf-seat:nth-child(3n) .pf-sprite img{animation-duration:2.9s}
-.pf-plate{margin-top:2px}
-.pf-name{display:block;font-size:15px;line-height:1.1;letter-spacing:.12em;color:var(--ink);text-shadow:0 1px 0 #050a14,0 0 7px #050a14;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pf-hearts{display:flex;justify-content:center;gap:2px;margin-top:3px}
-.pf-heart{width:10px;height:9px;color:var(--hold);filter:drop-shadow(0 1px 0 #050a14)}
-.pf-heart.off{color:#22365a}
-.pf-meter{width:34px;height:5px;margin:4px auto 0;background:#0a1322;box-shadow:0 0 0 1px #0c1727;overflow:hidden}
-.pf-meter i{display:block;height:100%;background:linear-gradient(90deg,#4de3ff,#9df0ff);transition:width .4s ease-out}
-.pf-meter.full{box-shadow:0 0 0 1px #0c1727,0 0 8px #ffd166cc}
-.pf-meter.full i{background:linear-gradient(90deg,#ffd166,#ffe9a3)}
-.pf-seat.hold .pf-sprite{filter:drop-shadow(0 0 10px #ff5d8faa)}
+.pf-seat:nth-child(2n) .pf-spr{animation-delay:-1.1s}
+.pf-seat:nth-child(3n) .pf-spr{animation-duration:2.9s;animation-delay:-.5s}
+.pf-meter{position:relative;display:flex;width:34px;height:5px;overflow:hidden;background:#0a1322;box-shadow:0 0 0 2px #060d1a}
+.pf-seat-meter{flex:none;margin:5px 0 3px}
+.pf-meter i{display:block;height:100%}
+.pf-meter.full{box-shadow:0 0 0 2px #060d1a,0 0 8px #ffd166cc}
+.pf-plate{display:flex;flex-direction:column;align-items:center;gap:2px;width:120px;text-align:center}
+.pf-name{display:block;max-width:120px;font-size:15px;line-height:1.1;letter-spacing:.12em;color:var(--ink);text-shadow:0 1px 0 #050a14,0 0 7px #050a14;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-row{display:flex;align-items:center;gap:5px}
+.pf-hearts{display:flex;align-items:center;gap:2px}
+.pf-heart{display:block;width:10px;height:9px;color:var(--hold);filter:drop-shadow(0 1px #050a14)}
+.pf-heart.empty{color:#22365a}
+.pf-elo{font-size:11px;line-height:1;letter-spacing:.08em;color:#9fb4d6;text-shadow:0 1px #000000b3;white-space:nowrap}
+.pf-elo i{font-style:normal;color:var(--drift)}
+.pf-elo i.down{color:#ff9f43}
+.pf-say{position:absolute;left:50%;top:-26px;transform:translateX(-50%);max-width:150px;padding:5px 9px 3px;font-size:15px;line-height:1;letter-spacing:.04em;color:var(--cc,#e8f1ff);background:#101d33f2;box-shadow:0 0 0 3px var(--cc,#4de3ff),0 0 18px #4de3ff59;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 .pf-seat.hold .pf-name{color:var(--hold);text-shadow:0 0 9px #ff5d8f8c}
-.pf-seat.hold .pf-sprite img{animation-duration:1.2s}
+.pf-seat.hold .pf-spr{filter:drop-shadow(0 0 10px #ff5d8faa);animation-duration:1.3s}
 .pf-seat.me .pf-name{color:#bfeaff}
-.pf-seat.out{opacity:.62}
-.pf-seat.out .pf-sprite{filter:grayscale(1) brightness(.62);transform:translateY(26px) rotate(14deg)}
-.pf-seat.out .pf-sprite img{animation:none}
-.pf-seat.out .pf-name{text-decoration:line-through;text-decoration-thickness:2px}
-.pf-seat.open .pf-sprite,.pf-seat.open .pf-hearts,.pf-seat.open .pf-meter{opacity:0}
-
-.pf-seat.win .pf-sprite{filter:drop-shadow(0 0 16px #ffd166cc)}
-.pf-seat.win .pf-name{color:var(--gold);text-shadow:0 0 10px #ffd16699}
+.pf-seat.out .pf-spr-wrap{transform:translate(14px,38px) rotate(168deg)}
+.pf-seat.out .pf-spr{filter:grayscale(1) brightness(.5) contrast(.9);opacity:.8;animation:none}
+.pf-seat.out .pf-plate,.pf-seat.out .pf-seat-meter,.pf-seat.out .pf-say{opacity:.5}
+.pf-seat.open .pf-spr-wrap,.pf-seat.open .pf-row,.pf-seat.open .pf-seat-meter{visibility:hidden}
+.pf-seat.win .pf-name{color:var(--gold);text-shadow:0 0 9px #ffd166b3}
+.pf-seat.win .pf-spr{filter:none;animation-duration:2s}
 
 .pf-puffer{position:absolute;z-index:4;width:0;height:0}
 .pf-puffer img{position:absolute;left:-60px;bottom:0;width:120px;height:96px;transform-origin:50% 80%;transition:transform .18s linear,filter .3s;animation:pf-bob 3.2s ease-in-out infinite}
@@ -251,9 +258,12 @@
  .pf-setting>span{font-size:8px;letter-spacing:.16em}
  .pf-setting b{font-size:19px;min-width:26px}
  .pf-seat{width:96px}
- .pf-sprite{width:54px;height:54px}
- .pf-name{font-size:12px}
+ .pf-body,.pf-spr-wrap{width:54px;height:54px}
+ .pf-name{max-width:96px;font-size:12px}
+ .pf-plate{width:96px}
  .pf-meter{width:26px}
+ .pf-heart{width:8px;height:7px}
+ .pf-say{font-size:12px;max-width:110px;padding:4px 8px 2px}
  .pf-hud{padding:8px 8px}
  .pf-pod{min-width:96px;padding:4px 9px 6px}
  .pf-pod>strong{font-size:24px}
