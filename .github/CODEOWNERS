@@ -1,0 +1,4 @@
+# Changes to main require a trusted code owner when the branch ruleset's
+# "Require review from Code Owners" option is enabled.
+# Add other trusted GitHub reviewer accounts on this line if appropriate.
+* @bassdrum4
