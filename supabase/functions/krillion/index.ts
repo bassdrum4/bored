@@ -132,8 +132,12 @@ function matchAnswer(input: string, answers: Answer[]): Match | null {
   const candidates = entries.map(entry => ({ ...entry, d: distance(key, entry.key, allowance) }))
     .filter(entry => entry.d <= allowance)
     .sort((a, b) => a.d - b.d);
-  if (candidates.length && (!candidates[1] || candidates[0].d < candidates[1].d || candidates[0].a.answer === candidates[1].a.answer)) {
-    return { ...candidates[0].a, correction: true };
+  // A typo equally close to two different answers lands on the lower-scoring
+  // one, so a misspelling is never worth more than the answer it might have meant.
+  if (candidates.length) {
+    const best = candidates.filter(entry => entry.d === candidates[0].d)
+      .sort((a, b) => (TIERS[a.a.tier]?.score ?? 0) - (TIERS[b.a.tier]?.score ?? 0))[0];
+    return { ...best.a, correction: true };
   }
   const qualified = entries
     .filter(entry => entry.key.length >= 4 && key.length > entry.key.length && key.length - entry.key.length <= QUALIFIER && key.startsWith(entry.key))
