@@ -54,7 +54,8 @@ export function connectParty({ code, name = 'Diver', onStatus = () => {}, onMess
       return;
     }
     if (message.event === 'broadcast' && message.payload?.event === 'party') {
-      onMessage({ type: 'broadcast', revision: Number(message.payload.payload?.revision) || 0, kind: message.payload.payload?.kind || 'update' });
+      const payload = message.payload.payload || {};
+      onMessage({ type: 'broadcast', revision: Number(payload.revision) || 0, kind: payload.kind || 'update' });
     }
   }
 
@@ -87,8 +88,8 @@ export function connectParty({ code, name = 'Diver', onStatus = () => {}, onMess
 
   open();
   return {
-    broadcast() {
-      send('broadcast', { type: 'broadcast', event: 'party', payload: { revision: 0, kind: 'update' } });
+    broadcast(revision = 0) {
+      send('broadcast', { type: 'broadcast', event: 'party', payload: { revision: Number(revision) || 0, kind: 'update' } });
     },
     close() {
       closed = true;
