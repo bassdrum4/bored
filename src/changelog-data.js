@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 407,
+  "count": 408,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"ba0f4aa","date":"2026-11-12","author":"bassdrum4","subject":"Add live Puffer Party rooms over Supabase Realtime"},
   {"sha":"8583c10","date":"2026-11-12","author":"Codebuff","subject":"Ignore finished-game popups on a hub page without the dialog"},
   {"sha":"e4aae92","date":"2026-11-12","author":"Codebuff","subject":"Drop the duplicate room-code box and announce finished Bored Together games"},
   {"sha":"abaec0c","date":"2026-11-12","author":"bassdrum4","subject":"Ship Krillion's seascape module with the restored client"},
