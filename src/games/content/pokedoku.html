@@ -47,11 +47,20 @@
   .row { display: flex; gap: 6px; flex-wrap: wrap }
   button.lbl { font: inherit; font-size: 12px; padding: 7px 10px; border: 1px solid #191713; background: none; color: inherit; cursor: pointer; border-radius: 2px }
   button.lbl:hover { background: #ece7da }
+  button.lbl:disabled { opacity: .4; cursor: not-allowed }
   #code { font: inherit; font-size: 14px; padding: 6px 8px; border: 1px solid #d8d2c4; background: #fffdf7; color: inherit; flex: 1 1 120px; min-width: 0; border-radius: 2px }
   #msg { font-size: 12px; min-height: 1.4em }
   #msg.bad { color: #b8402a }
   pre { font: inherit; font-size: 13px; white-space: pre-wrap; user-select: all }
   #ans { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; max-height: 180px; overflow-y: auto }
+  #play { display: flex; flex-direction: column; gap: 10px }
+  #maker { border: 1px solid #d8d2c4; background: #fffdf7; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-radius: 2px }
+  #maker h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600 }
+  #mkgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; align-items: center }
+  #mkgrid select { width: 100%; min-width: 0; font: inherit; font-size: 11px; padding: 4px 2px; border: 1px solid #191713; background: #fff; color: #191713; border-radius: 2px }
+  .mkc { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; border: 1px dashed #d8d2c4; border-radius: 2px; color: #6b6558 }
+  .mkc.zero { border: 1px solid #b8402a; color: #b8402a }
+  #mkcode { font-size: 22px; font-weight: 600; letter-spacing: .18em; user-select: all }
   details { font-size: 12px; color: #6b6558 }
   details summary { cursor: pointer; color: #191713 }
   details ul { padding-left: 16px; margin-top: 6px }
@@ -59,7 +68,9 @@
     body { background: #1b1a17; color: #ece7da }
     .muted, details { color: #a49d8e }
     details summary { color: #ece7da }
-    .cell, #panel, #code { background: #24221e; border-color: #3a372f }
+    .cell, #panel, #code, #maker { background: #24221e; border-color: #3a372f }
+    .mkc { border-color: #3a372f; color: #a49d8e }
+    #mkgrid select { background: #1b1a17; color: #ece7da; border-color: #ece7da }
     .cell:hover:not(:disabled), .cell.sel { border-color: #ece7da }
     .cell.sel { outline-color: #ece7da }
     #guess { background: #1b1a17; color: #ece7da; border-color: #ece7da }
@@ -70,26 +81,48 @@
 </head>
 <body>
 <main>
-  <div id="hud"><span id="hudl"></span><span id="hudr"></span></div>
-  <div id="grid" aria-label="Pokédoku board"></div>
+  <div id="play">
+    <div id="hud"><span id="hudl"></span><span id="hudr"></span></div>
+    <div id="grid" aria-label="Pokédoku board"></div>
 
-  <section id="panel">
-    <div id="ask"></div>
-    <input id="guess" type="text" placeholder="type a Pokémon" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Pokémon name">
-    <ul id="opts"></ul>
-    <div id="msg" role="status"></div>
-    <pre id="share" hidden></pre>
-    <div id="ans" hidden></div>
+    <section id="panel">
+      <div id="ask"></div>
+      <input id="guess" type="text" placeholder="type a Pokémon" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Pokémon name">
+      <ul id="opts"></ul>
+      <div id="msg" role="status"></div>
+      <pre id="share" hidden></pre>
+      <div id="ans" hidden></div>
+    </section>
+  </div>
+
+  <section id="maker" hidden>
+    <h2>Make a board</h2>
+    <div class="muted">Pick 3 rows and 3 columns. Each square shows how many Pokémon fit.</div>
+    <div id="mkgrid"></div>
+    <div id="mkmsg" role="status"></div>
+    <div class="row">
+      <button class="lbl" id="mkmake" type="button">Get code</button>
+      <button class="lbl" id="mkcancel" type="button">Back to game</button>
+    </div>
+    <div id="mkout" hidden>
+      <div class="muted">Your code. Friends type it in the board code box.</div>
+      <div id="mkcode"></div>
+      <div class="row">
+        <button class="lbl" id="mkcopy" type="button">Copy code</button>
+        <button class="lbl" id="mkplay" type="button">Play it</button>
+      </div>
+    </div>
   </section>
 
   <div class="row">
     <button class="lbl" id="daily" type="button">Daily board</button>
     <button class="lbl" id="fresh" type="button">New board</button>
+    <button class="lbl" id="make" type="button">Make a board</button>
     <button class="lbl" id="giveup" type="button">Give up</button>
     <button class="lbl" id="copy" type="button">Copy result</button>
   </div>
   <form class="row" id="codeform">
-    <input id="code" inputmode="numeric" placeholder="board code" aria-label="Board code">
+    <input id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="board code" aria-label="Board code">
     <button class="lbl" type="submit">Play code</button>
   </form>
 
@@ -102,6 +135,7 @@
       <li>"Evolved with a stone" / "by trade" means that Pokémon itself evolved that way (Gengar yes, Haunter no).</li>
       <li>Legendary includes sub-legendaries. Mythical is separate.</li>
       <li>The daily board is the same for everyone. Send a friend the board code to race on any board.</li>
+      <li>Make a board to pick the categories yourself. You get a 7-letter code; anyone who types it in gets your board.</li>
     </ul>
   </details>
 </main>
@@ -146,6 +180,44 @@ function makeBoard(seed) {
   return makeBoard(seed + 1);
 }
 
+// Custom boards: the six categories are packed into one number, scrambled, and
+// written as 7 letters, so the code itself is the board and needs no server.
+// CODE_CATS order is part of every code: only ever append new categories.
+const CODE_CATS = IDS.slice(), K = BigInt(CODE_CATS.length), SPAN = K ** 6n;
+const ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", MOD = 26n ** 7n, MUL = 1103515245n, ADD = 4021973n;
+const INV = (() => { let [a, b, x, y] = [MUL % MOD, MOD, 1n, 0n]; while (b) { const q = a / b; [a, b] = [b, a - q * b]; [x, y] = [y, x - q * y]; } return ((x % MOD) + MOD) % MOD; })();
+function encode(rows, cols) {
+  let n = 0n; for (const c of [...rows, ...cols]) n = n * K + BigInt(CODE_CATS.indexOf(c));
+  let m = (n * MUL + ADD) % MOD, s = "";
+  for (let i = 0; i < 7; i++) { s = ABC[Number(m % 26n)] + s; m /= 26n; }
+  return s;
+}
+function decode(code) {
+  if (!/^[A-Z]{7}$/.test(code)) return null;
+  let m = 0n; for (const ch of code) m = m * 26n + BigInt(ABC.indexOf(ch));
+  let n = (((m - ADD) % MOD + MOD) % MOD) * INV % MOD;
+  if (n >= SPAN) return null;
+  const ids = []; for (let i = 0; i < 6; i++) { ids.unshift(CODE_CATS[Number(n % K)]); n /= K; }
+  return { rows: ids.slice(0, 3), cols: ids.slice(3) };
+}
+const answers = (rows, cols) => rows.map(a => cols.map(b => fits(a, b)));
+// Can every square get its own Pokémon at once? (bipartite matching)
+function solvable(ans) {
+  const cells = ans.flat(), owner = new Map();
+  const take = (i, seen) => { for (const m of cells[i]) { if (seen.has(m.name)) continue; seen.add(m.name); if (!owner.has(m.name) || take(owner.get(m.name), seen)) { owner.set(m.name, i); return true; } } return false; };
+  return cells.every((_, i) => take(i, new Set()));
+}
+function checkCustom(rows, cols) {
+  const all = [...rows, ...cols];
+  if (all.some(c => !CATS[c])) return "Pick all 6 categories.";
+  if (new Set(all).size < 6) return "Each category can only be used once.";
+  const ans = answers(rows, cols);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++)
+    if (!ans[r][c].length) return `No Pokémon is ${CATS[rows[r]].label} and ${CATS[cols[c]].label}.`;
+  if (!solvable(ans)) return "Some squares share their only answers, so nobody could fill all 9.";
+  return "";
+}
+
 const $ = s => document.querySelector(s);
 const read = k => { try { return JSON.parse(localStorage.getItem("bored.pokedoku." + k)); } catch { return null; } };
 const write = (k,v) => { try { localStorage.setItem("bored.pokedoku." + k, JSON.stringify(v)); } catch {} };
@@ -160,15 +232,25 @@ const TODAY = todayInfo();
 
 let B, S, sel = -1, opts = [], hi = 0;
 const fresh = () => ({ cells: Array(9).fill(null), left: 9, over: false, gaveUp: false });
-function load(seed) {
-  B = makeBoard(seed >>> 0);
-  S = read("s" + B.seed) || fresh();
-  write("last", B.seed);
-  sel = -1; $("#msg").textContent = ""; $("#msg").className = "";
+function note(text, bad) { $("#msg").textContent = text; $("#msg").className = bad ? "bad" : ""; }
+// id is a seed number (daily/random boards) or a 7-letter custom code.
+function load(id) {
+  if (typeof id === "string") {
+    const d = decode(id);
+    if (!d || checkCustom(d.rows, d.cols)) { closeMaker(); note("That code doesn't match a board. Check the letters.", true); return false; }
+    B = { code: id, rows: d.rows, cols: d.cols, ans: answers(d.rows, d.cols) };
+  } else B = makeBoard(Number(id) >>> 0);
+  B.id = B.code || B.seed;
+  S = read("s" + B.id) || fresh();
+  write("last", B.id);
+  sel = -1; note("");
+  closeMaker();
   render();
+  return true;
 }
-const save = () => write("s" + B.seed, S);
-const isDaily = () => B.seed === TODAY.seed;
+const save = () => write("s" + B.id, S);
+const isDaily = () => !B.code && B.seed === TODAY.seed;
+const boardName = () => B.code ? "custom " + B.code : isDaily() ? "daily " + TODAY.date : "board " + B.seed;
 const filled = () => S.cells.filter(Boolean).length;
 
 function head(id) {
@@ -176,7 +258,7 @@ function head(id) {
   return c.kind === "type" ? `<span class="ty" style="background:${TC[c.label]}">${c.label.toUpperCase()}</span>` : c.label;
 }
 function render() {
-  $("#hudl").innerHTML = `${isDaily() ? "daily " + TODAY.date : "board " + B.seed}`;
+  $("#hudl").textContent = boardName();
   $("#hudr").innerHTML = `squares <b>${filled()}</b>/9 · guesses <b>${S.left}</b>`;
   const g = $("#grid"); g.innerHTML = "<div></div>";
   B.cols.forEach(c => g.insertAdjacentHTML("beforeend", `<div class="hd">${head(c)}</div>`));
@@ -261,7 +343,8 @@ function submit(m) {
 function shareText() {
   let grid = "";
   for (let r = 0; r < 3; r++) { for (let c = 0; c < 3; c++) grid += S.cells[r*3+c] ? "■" : "□"; grid += "\n"; }
-  return `Pokédoku ${isDaily() ? "daily " + TODAY.date : "board"} · code ${B.seed}\n${filled()}/9 squares\n${grid}`.trim();
+  const head = B.code ? `Pokédoku custom · code ${B.code}` : `Pokédoku ${isDaily() ? "daily " + TODAY.date : "board"} · code ${B.seed}`;
+  return `${head}\n${filled()}/9 squares\n${grid}`.trim();
 }
 
 $("#guess").addEventListener("input", e => suggest(e.target.value));
@@ -280,18 +363,65 @@ $("#copy").onclick = async () => {
 };
 $("#codeform").onsubmit = e => {
   e.preventDefault();
-  const v = Number($("#code").value.replace(/\D/g, ""));
-  if (v > 0 && v <= 4294967295) { $("#code").value = ""; load(v); }
-  else { $("#msg").textContent = "Board codes are numbers, like the one in a friend's result."; $("#msg").className = "bad"; }
+  const raw = $("#code").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (/^[A-Z]{7}$/.test(raw)) { if (load(raw)) $("#code").value = ""; }
+  else if (/^\d+$/.test(raw) && +raw > 0 && +raw <= 4294967295) { $("#code").value = ""; load(+raw); }
+  else { closeMaker(); note("Codes are 7 letters (made boards) or a number (random boards).", true); }
+};
+
+// Board maker: header selects in the same 4x4 shape as the game, live counts per square.
+const GROUPS = [["Type", IDS.filter(c => CATS[c].fam === "type")], ["Generation", IDS.filter(c => CATS[c].fam === "gen")], ["Other", IDS.filter(c => !["type", "gen"].includes(CATS[c].fam))]];
+const pickHtml = (id, label) => `<select id="${id}" aria-label="${label}"><option value="">pick</option>${GROUPS.map(([g, ids]) => `<optgroup label="${g}">${ids.map(c => `<option value="${c}">${CATS[c].label}</option>`).join("")}</optgroup>`).join("")}</select>`;
+(() => {
+  let h = "<div></div>";
+  for (let c = 0; c < 3; c++) h += pickHtml("mkc" + c, "Column " + (c + 1));
+  for (let r = 0; r < 3; r++) { h += pickHtml("mkr" + r, "Row " + (r + 1)); for (let c = 0; c < 3; c++) h += `<div class="mkc" id="mkn${r}${c}"></div>`; }
+  $("#mkgrid").innerHTML = h;
+  $("#mkgrid").addEventListener("change", mkUpdate);
+})();
+const mkPicks = () => ({ rows: [0, 1, 2].map(r => $("#mkr" + r).value), cols: [0, 1, 2].map(c => $("#mkc" + c).value) });
+function mkUpdate() {
+  const { rows, cols } = mkPicks();
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) {
+    const el = $(`#mkn${r}${c}`), n = rows[r] && cols[c] && rows[r] !== cols[c] ? fits(rows[r], cols[c]).length : null;
+    el.textContent = n === null ? "" : n + " fit"; el.classList.toggle("zero", n === 0);
+  }
+  const err = checkCustom(rows, cols);
+  $("#mkmsg").textContent = err; $("#mkmsg").className = err ? "bad" : "";
+  $("#mkmake").disabled = !!err;
+  $("#mkout").hidden = true;
+}
+function openMaker() {
+  // Start from the board on screen so there is something to tweak.
+  B.rows.forEach((c, r) => $("#mkr" + r).value = c);
+  B.cols.forEach((c, i) => $("#mkc" + i).value = c);
+  mkUpdate();
+  $("#play").hidden = true; $("#maker").hidden = false; $("#make").hidden = true; $("#giveup").hidden = true; $("#copy").hidden = true;
+}
+function closeMaker() { $("#maker").hidden = true; $("#play").hidden = false; $("#make").hidden = false; }
+$("#make").onclick = openMaker;
+$("#mkcancel").onclick = () => { closeMaker(); render(); };
+$("#mkmake").onclick = () => {
+  const { rows, cols } = mkPicks();
+  if (checkCustom(rows, cols)) return;
+  $("#mkcode").textContent = encode(rows, cols);
+  $("#mkout").hidden = false;
+};
+$("#mkplay").onclick = () => load($("#mkcode").textContent);
+$("#mkcopy").onclick = async () => {
+  const code = $("#mkcode").textContent;
+  try { await navigator.clipboard.writeText(`Pokédoku code: ${code}`); $("#mkmsg").textContent = "Copied."; }
+  catch { $("#mkmsg").textContent = "Copy blocked here. Select the code and copy it."; }
+  $("#mkmsg").className = "";
 };
 
 // The first board of the day is the shared daily; after that, pick up where you left off.
-const last = read("last"), lastState = last && read("s" + last);
-load(read("day") !== TODAY.date ? TODAY.seed : (lastState ? last : TODAY.seed));
+const last = read("last");
+if (read("day") === TODAY.date && last != null) { if (!load(last)) load(TODAY.seed); } else load(TODAY.seed);
 write("day", TODAY.date);
 
 // The hub reads this: integer metrics, the current run, never null.
-window.__boredSnapshot = () => ({ slug: 'pokedoku', squares: S ? filled() : 0, finished: !!(S && S.over), daily: !!(B && isDaily()) });
+window.__boredSnapshot = () => ({ slug: 'pokedoku', squares: S ? filled() : 0, finished: !!(S && S.over), daily: !!(B && isDaily()), custom: !!(B && B.code) });
 </script>
 </body>
 </html>
