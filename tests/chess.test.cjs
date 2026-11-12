@@ -106,6 +106,24 @@ test('chess: choosing the CPU reveals difficulty and starts the engine at that l
   assert.equal(game.state().started, false);
 });
 
+test('chess: each level carries its measured rating, in the picker and the HUD', () => {
+  const game = boot();
+  const ratings = game.run('JSON.stringify(RATING)');
+  assert.deepEqual(JSON.parse(ratings), { easy: 700, medium: 1050, hard: 1250 });
+
+  game.nodes.mode.value = 'computer';
+  game.nodes.level.value = 'hard';
+  game.nodes.begin.onclick();
+  assert.match(game.nodes.hud.textContent, /vs computer \u00b7 hard \u00b7 1250/);
+
+  game.nodes.level.value = 'easy';
+  game.nodes.new.onclick();
+  game.nodes.mode.value = 'computer';
+  game.nodes.level.value = 'easy';
+  game.nodes.begin.onclick();
+  assert.match(game.nodes.hud.textContent, /\u00b7 easy \u00b7 700/);
+});
+
 test('chess: a restored saved game skips the overlay and keeps its difficulty', () => {
   const game = boot();
   const saved = {

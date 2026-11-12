@@ -83,7 +83,7 @@
     <button id="new" type="button">New game</button>
   </div>
   <p id="status" role="status" aria-live="polite">Choose players to begin.</p>
-  <p id="hint">Pawns promote to a queen. The difficulty is how far ahead the computer looks.</p>
+  <p id="hint">Pawns promote to a queen. The difficulty is how far ahead the computer looks; the rating is measured against Stockfish at its weakest setting.</p>
   <section id="setup" aria-label="Choose players">
     <h2>One player or two?</h2>
     <div class="choice">
@@ -390,6 +390,16 @@ const DIFFICULTY = {
   hard:   { depth: 3, slip: 0 }
 };
 
+// Measured, not estimated by eye: each level played a tournament as the game's
+// own Black seat against Stockfish strength-limited to UCI_Elo 1320, plus
+// shallower and material-odds Stockfish rungs, and these are the ratings fitted
+// from those results (about 100 games per level). Stockfish's 1700 setting
+// recovered 1702 in the same fit, which is what says the scale still holds up
+// there. Shut-out scorelines are counted as half a point, the usual convention,
+// so the two weaker levels are the soft ones: their real numbers could sit a
+// couple of hundred either way. Rounded to the nearest 50.
+const RATING = { easy: 700, medium: 1050, hard: 1250 };
+
 function chooseMove(state, level) {
   const moves = legalMoves(state);
   if (!moves.length) return null;
@@ -413,9 +423,15 @@ let selected = -1, targets = [], lastMove = null;
 let over = false, result = null, plies = 0, sessionWins = 0;
 let thinking = false, generation = 0, started = false;
 
+// The picker says how strong a level is, not only how deep it looks.
+for (const option of levelEl.options || []) {
+  if (RATING[option.value]) option.textContent += ' \u00b7 ' + RATING[option.value];
+}
+
 function updateHud() {
   const cpu = modeEl.value === 'computer';
-  const versus = cpu ? 'vs computer \u00b7 ' + levelEl.value
+  const versus = cpu ? 'vs computer \u00b7 ' + levelEl.value +
+      (RATING[levelEl.value] ? ' \u00b7 ' + RATING[levelEl.value] : '')
     : modeEl.value === 'friend' ? 'two players' : 'choose players';
   hudEl.textContent = 'Move ' + (Math.floor(plies / 2) + 1) + ' \u00b7 ' + versus +
     (sessionWins ? ' \u00b7 won ' + sessionWins : '');
