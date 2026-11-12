@@ -86,7 +86,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   }
   function maybeShowResult() {
     if (!visible || !owner || !data?.enrolled || document.hidden) return;
-    if (document.body.classList.contains('playing') || resultDialog?.open) return;
+    if (!resultDialog || document.body.classList.contains('playing') || resultDialog.open) return;
     const seen = seenResults();
     const pending = completedResults().filter(result => !seen.has(result.key));
     if (!pending.length) return;
