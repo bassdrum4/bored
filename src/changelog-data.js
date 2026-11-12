@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 410,
+  "count": 411,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2b9eabd","date":"2026-11-12","author":"bassdrum4","subject":"Land on the Krillion homepage instead of auto-opening results"},
   {"sha":"2dae94c","date":"2026-11-12","author":"bassdrum4","subject":"Strip Krillion down to the playable surface"},
   {"sha":"a31fa30","date":"2026-11-12","author":"bassdrum4","subject":"Refresh the Puffer Party stylesheet cache"},
   {"sha":"ba0f4aa","date":"2026-11-12","author":"bassdrum4","subject":"Add live Puffer Party rooms over Supabase Realtime"},
