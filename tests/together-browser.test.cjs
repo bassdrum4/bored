@@ -99,7 +99,20 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
     const game=await frame(page,'.columns');
     await game.waitForSelector(`.columns button[aria-label="Drop in column ${n}"]:not([disabled])`);
     await game.click(`.columns button[aria-label="Drop in column ${n}"]`);
-    if(returns){await page.waitForFunction(()=>document.querySelector('#player').hidden);await refresh(page);}
+    if(returns){
+      try { await page.waitForFunction(()=>document.querySelector('#player').hidden,{timeout:15000}); }
+      catch(error) {
+        const state=await page.evaluate(()=>({
+          playerHidden:document.querySelector('#player')?.hidden,
+          status:document.querySelector('#together-status')?.textContent,
+          error:document.querySelector('#frame')?.contentDocument?.querySelector('#together-error')?.textContent,
+          gameStatus:document.querySelector('#frame')?.contentDocument?.querySelector('#status')?.textContent,
+          canPlay:document.querySelector('#frame')?.contentWindow?.__boredTogether?.context?.canPlay
+        }));
+        throw new Error('Turn did not auto-return: '+JSON.stringify(state),{cause:error});
+      }
+      await refresh(page);
+    }
   }
   // Pick a game, then a member from the directory; the challenge opens the
   // original game straight away with the first turn.
