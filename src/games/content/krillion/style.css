@@ -416,3 +416,5 @@ body[data-phase="done"] .mascot{z-index:15}
 .intro-meta nav{margin-left:auto;flex-wrap:nowrap;gap:6px}
 .intro-nav a{padding:5px 7px;font-size:10px;letter-spacing:.1em;white-space:nowrap}
 @media(max-width:699px){.party-line{font-size:15px}.party-line img{width:28px;height:28px}.party-line small{font-size:10px;max-width:38%}.intro-nav a{font-size:9px;padding:5px 4px;letter-spacing:.08em}.intro-meta{gap:5px}}
+
+.party-join label.sr-only{width:1px;height:1px;margin:-1px;padding:0}
