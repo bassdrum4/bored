@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 419,
+  "count": 420,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"f55d497","date":"2026-11-12","author":"Claude","subject":"Pokémon games: rarity scoring, start screens, Shiny Hunt and Inverse Doku"},
   {"sha":"0bdfe1b","date":"2026-11-12","author":"Codebuff","subject":"Rebuild Puffer Party's screens and make LIVES / MIN. TURN real room settings"},
   {"sha":"63ee339","date":"2026-11-12","author":"Claude","subject":"Pokédoku: regional, Mega and Gigantamax forms; host sprites with the site"},
   {"sha":"2a5f64e","date":"2026-11-12","author":"Claude","subject":"Pokédoku: make your own board and share it as a 7-letter code"},
