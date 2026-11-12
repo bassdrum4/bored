@@ -290,7 +290,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   await a.focus('#frame');await a.keyboard.press('Escape');
   await a.waitForFunction(()=>!document.querySelector('#duel-finish').hidden);
   assert.match(await a.$eval('#duel-finish-text',e=>e.textContent),/Send your run/);
-  await a.click('#duel-send');
+  await a.$eval('#duel-send',button=>button.click());
   await a.waitForFunction(()=>document.querySelector('#player').hidden);
   await refresh(a);await refresh(b);
   assert.ok(!(await b.$eval(`[data-match-id="${duel.id}"]`,e=>e.textContent)).includes('beat'),'the run to beat is hidden');
@@ -300,7 +300,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   for(const key of ['ArrowUp','ArrowRight','ArrowUp','ArrowRight']){await b.focus('#frame');await b.keyboard.press(key);await b.keyboard.press(key);}
   await b.focus('#frame');await b.keyboard.press('Escape');
   await b.waitForFunction(()=>!document.querySelector('#duel-finish').hidden);
-  await b.click('#duel-send');await b.waitForFunction(()=>document.querySelector('#player').hidden);
+  await b.$eval('#duel-send',button=>button.click());await b.waitForFunction(()=>document.querySelector('#player').hidden);
   await refresh(a);
   const done=(await call(db,ids[0],'dashboard')).matches.find(m=>m.id===duel.id);
   assert.equal(done.status,'completed');assert.equal(done.state.plays['1'],mine);
