@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 400,
+  "count": 401,
   "newest": "2026-11-12",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"b758d4d","date":"2026-11-12","author":"Codebuff","subject":"Accept faster Quickdraw times, fix Scrabble blanks and close the fluid walls"},
   {"sha":"1465a9b","date":"2026-11-12","author":"bassdrum4","subject":"Keep the Krillion migration portable"},
   {"sha":"4ee423a","date":"2026-11-12","author":"bassdrum4","subject":"Add Krillion daily dive with a Supabase scorer"},
   {"sha":"f7bb0ae","date":"2026-11-10","author":"Codebuff","subject":"Add a warm dark theme selectable from settings"},
