@@ -84,6 +84,11 @@
     "better": "high",
     "max_value": 99
   },
+  "inverse-doku": {
+    "label": "Categories found on the daily board, 100 each",
+    "better": "high",
+    "max_value": 600
+  },
   "krillion": {
     "label": "Points in a finished seven-prompt dive",
     "better": "high",
@@ -125,9 +130,9 @@
     "max_value": 10000000
   },
   "pokedoku": {
-    "label": "Squares filled on a finished board",
+    "label": "Points on the daily board (50 a square plus rarity)",
     "better": "high",
-    "max_value": 9
+    "max_value": 1350
   },
   "poker": {
     "label": "Chips above the start stack",
@@ -163,6 +168,11 @@
     "label": "Files downloaded",
     "better": "high",
     "max_value": 999
+  },
+  "shiny-hunt": {
+    "label": "Points in the daily seven-prompt hunt",
+    "better": "high",
+    "max_value": 700
   },
   "signal-tower": {
     "label": "Waves cleared in one run",
