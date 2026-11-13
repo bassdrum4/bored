@@ -350,15 +350,15 @@ const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
 const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
 const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
 const gymLevel = i => routeLevel(i) + 3, champLevel = r => routeLevel(r * 4 + 3) + 6;
-// Gyms, Champions and legendaries have extra HP: steepest early, where a party at the cap used to win in seconds, settling at 1.8x from Galar on.
+// Gyms, Champions and legendaries have extra HP: steepest early, where a party at the cap used to win in seconds, settling at 1.5x in Paldea.
 // A capped party that only idles should lose most of them; tapping, type matchups and some protein get it through.
-const bossHard = i => Math.max(1.8, Math.min(2 + 4 * i, 24 * Math.pow(.92, i)));
+const bossHard = i => Math.max(1.5, Math.min(2 + 4 * i, 24 * Math.pow(.92, i)));
 // However strong the party, a boss needs tapping: if the party alone could beat a gym leader's or Champion's
 // Pokémon in its share of the timer (a legendary: in all the time left), it gets enough HP that idling falls this far short.
 const IDLE_SHORT = 1.25;
 // Wild Pokémon on routes get extra HP through the middle of the game, where a party at the cap used to one-shot them:
-// about 3 seconds a fight idle for an ordinary party, half that tapping. Late routes are slow enough already.
-const wildHard = i => Math.max(1, Math.min(1.5 + .8 * i, 6.5 * Math.pow(.925, i)));
+// about 4-5 seconds a fight idle for an ordinary party, about half that tapping. Late routes are slow enough already.
+const wildHard = i => Math.max(1, Math.min(1.5 + 1.2 * i, 9.5 * Math.pow(.925, i)));
 const GYM_HP = 1.6, CHAMP_HP = 1.8, DUNGEON_HP = 1.3, LEGEND_HP = 10, LEGEND_PAY = 4;
 // XP per kill is foe level x XP_RATE, to every party member.
 const XP_RATE = 2;
@@ -407,9 +407,9 @@ const catchChance = (m, ball) => Math.min(1, (m.cr / 255) * .6 * ball.mult + bal
 const throwChance = (m, ball) => catchChance(m, ball) * (legendary(m) && ball.id !== "master" ? .5 : 1);
 const ITEM_PRICE = 1500, CORD_PRICE = 2500;
 const ticketPrice = r => Math.round(250 * Math.pow(r + 1, 1.8));
-const proteinPrice = n => Math.round(300 * Math.pow(1.45, n));
-// Protein: +5% party damage each, and only 5 count per region you've opened.
-const PROTEIN_STEP = .05, PROTEIN_PER_REGION = 5;
+const proteinPrice = n => Math.round(300 * Math.pow(1.5, n));
+// Protein: +3% party damage each, and only 5 count per region you've opened.
+const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 
 // ── Save
 const KEY = "bored.poke-idle.save";
@@ -712,7 +712,7 @@ function renderShop() {
   for (const b of BALLS.filter(b => b.price)) rows.push([`${b.name} <span class="muted">(have ${S.balls[b.id]})</span>`, b.price, `ball:${b.id}`, true]);
   const r = S.loc.r;
   rows.push([`${REGIONS[r].name} dungeon ticket <span class="muted">(have ${S.tickets[r] || 0})</span>`, ticketPrice(r), `ticket:${r}`, badge(r, 1)]);
-  rows.push([`Protein: party +5% damage <span class="muted">(${S.protein}/${proteinCap()})</span>`, proteinPrice(S.protein), "protein", S.protein < proteinCap()]);
+  rows.push([`Protein: party +3% damage <span class="muted">(${S.protein}/${proteinCap()})</span>`, proteinPrice(S.protein), "protein", S.protein < proteinCap()]);
   rows.push([`Linking Cord: trade evolutions <span class="muted">(have ${S.cords})</span>`, CORD_PRICE, "cord", true]);
   // Only items something in your Box is waiting on.
   const want = new Set(); for (const n of Object.keys(S.box).map(Number)) for (const e of evoOptions(n)) if (e[1] === "I") want.add(e[2]);
