@@ -89,7 +89,7 @@ const highScore = (id, name, unit, extra = {}) => ({
 
 export const HIGH_SCORE_GAMES = [
   // Unique species in the Box (evolving counts too), out of 1025.
-  highScore("poke-idle", "Poké Idle", "caught", { metric: "caught", max: 1025, when: snapshot => snapshot.finished === true }),
+  highScore("poke-idle", "Poké Idle", "points", { metric: "score", max: 2050, when: snapshot => snapshot.finished === true }),
   // A finished match against the computer ranks the winning margin, so 7–1
   // beats 7–6. Local two-player games and abandoned matches never post.
   highScore("air-hockey", "Air Hockey", "goals", {

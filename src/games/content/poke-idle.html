@@ -35,7 +35,7 @@
   button.lbl.on, button.lbl.on:hover:not(:disabled) { background: var(--ink); color: var(--paper) }
 
   /* The arcade floats its menu button over the top-left corner. */
-  @media (max-width: 880px) { #top, #pick .title { padding-left: 56px } }
+  @media (max-width: 880px) { #top, #pick .title, #title .head { padding-left: 56px } }
 
   /* Header: name on the left, one line of standing on the right. */
   #top { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; min-height: 32px }
@@ -72,7 +72,7 @@
   .ground { position: absolute; left: 50%; bottom: 14px; width: min(68%, 320px); height: 46px; transform: translateX(-50%); border: 1px solid var(--rule); border-radius: 50%; background: var(--g-route) }
   .field[data-kind="gym"] .ground { background: var(--g-gym) }
   .field[data-kind="dungeon"] .ground { background: var(--g-dungeon) }
-  .field[data-kind="champ"] .ground { background: var(--g-champ); border-color: var(--gold) }
+  .field[data-kind="champ"] .ground, .field[data-kind="summit"] .ground { background: var(--g-champ); border-color: var(--gold) }
   #foe img { position: absolute; left: 50%; bottom: 26px; height: calc(100% - 40px); width: auto; max-width: 90%; transform: translateX(-50%); object-fit: contain; object-position: bottom; image-rendering: pixelated; transition: transform .06s }
   #foe:active img { transform: translateX(-50%) scale(.94) }
   #foe .pop { position: absolute; font-weight: 700; font-size: 14px; color: var(--red); pointer-events: none; animation: rise .6s ease-out forwards }
@@ -87,7 +87,7 @@
   .bar.hp[data-s="mid"] i { background: var(--warn) }
   .bar.hp[data-s="low"] i { background: var(--red) }
   .bar.time i { background: var(--ink) }
-  .bar.xp { height: 3px } .bar.xp i { background: var(--xp) }
+  .bar.xp { height: 3px } .bar.xp i { background: var(--xp) } .bar.xp.cap i { background: var(--dim) }
 
   /* The battle log reads like a text box under the field. */
   #log { font-size: 13px; min-height: 3.4em; padding: 8px 10px; border: 1px solid var(--rule); border-top: 2px solid var(--ink); background: var(--surface); border-radius: 0 0 3px 3px }
@@ -161,6 +161,32 @@
   .starters .types { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center }
   #pick .how { font-size: 12px; color: var(--dim); display: grid; gap: 2px; padding-left: 2px }
 
+  /* Title screen: the world on the left, a start menu on the right, the way the handhelds did it. */
+  #title { display: flex; flex-direction: column; gap: 12px; padding-top: 4px }
+  #title .head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; min-height: 32px }
+  .t-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); grid-template-areas: "field menu" "card menu"; gap: 12px; align-items: start }
+  @media (max-width: 680px) { .t-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "field" "menu" "card" } }
+  #t-field { grid-area: field } #menu { grid-area: menu } #t-card { grid-area: card }
+  .t-stage { position: relative; height: clamp(150px, 26vw, 210px) }
+  .t-stage > img { position: absolute; left: 50%; bottom: 26px; height: calc(100% - 40px); width: auto; max-width: 90%; transform: translateX(-50%); object-fit: contain; object-position: bottom; image-rendering: pixelated }
+  .t-stage .trio { position: absolute; left: 0; right: 0; bottom: 24px; display: flex; justify-content: center; gap: 2px }
+  .t-stage .trio img { width: min(30%, 104px); aspect-ratio: 1; object-fit: contain; object-position: bottom; image-rendering: pixelated }
+  /* The start menu: a doubled 1px rule like the old text boxes, and a cursor that follows you. */
+  .menu { display: flex; flex-direction: column; padding: 10px 6px; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--ink) }
+  .menu button { font: inherit; font-size: 14px; text-align: left; border: 0; background: none; color: inherit; padding: 8px 10px 8px 30px; cursor: pointer; position: relative; border-radius: 2px }
+  .menu button::before { content: ""; position: absolute; left: 13px; top: 50%; margin-top: -5px; border-left: 7px solid var(--red); border-top: 5px solid transparent; border-bottom: 5px solid transparent; visibility: hidden }
+  .menu button.cur::before { visibility: visible }
+  .menu button[aria-pressed="true"] { font-weight: 700 }
+  .menu button:focus-visible { outline-offset: -2px }
+  .menu .sep { border-top: 1px solid var(--rule); margin: 4px 10px }
+  .t-stats { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 18px; font-size: 13px }
+  .t-stats dt { color: var(--dim) } .t-stats dd { font-variant-numeric: tabular-nums }
+  .t-party { display: flex; gap: 2px; flex-wrap: wrap }
+  .t-party img { width: 44px; height: 44px; object-fit: contain; image-rendering: pixelated }
+  .t-how { list-style: none; display: grid; gap: 6px; font-size: 13px; max-width: 64ch }
+  .t-how li { padding-left: 14px; text-indent: -14px } .t-how li::before { content: "- "; color: var(--dim) }
+  button.lbl.danger { color: var(--red); border-color: var(--red) }
+
   @media (prefers-color-scheme: dark) {
     .dex img.no { filter: brightness(0) invert(1); opacity: .14 }
   }
@@ -171,20 +197,31 @@
 </head>
 <body>
 <main>
+  <section id="title" hidden>
+    <div class="head"><h1>Poké Idle</h1><span class="small muted">Your party fights on its own; you just help.</span></div>
+    <div class="t-grid">
+      <div class="field" id="t-field"></div>
+      <nav class="menu" id="menu" aria-label="Title menu"></nav>
+      <div class="box" id="t-card" aria-live="polite"></div>
+    </div>
+  </section>
+
   <section id="pick" hidden>
     <div class="title">
       <h1>Pick your first partner</h1>
       <p>Poké Idle. Your party fights on its own; you just help.</p>
+      <div><button class="lbl" id="pickback" type="button">Back to title</button></div>
     </div>
     <div class="starters" id="starters"></div>
     <div class="how">
       <span>Tap the wild Pokémon to hit harder.</span>
       <span>Clear a route's 10 fights to open its gym. Badges open the next route.</span>
+      <span>Your party can't level past 2 over the next gym leader. Each badge raises the cap.</span>
     </div>
   </section>
 
   <div id="game" hidden>
-    <div id="top"><h1>Poké Idle</h1><span class="hud"><span>$<b id="money">0</b></span><span>Dex <b id="dexn">0</b>/1025</span><span>Badges <b id="badgen">0</b>/36</span></span></div>
+    <div id="top"><span class="row"><h1>Poké Idle</h1><button class="lbl" id="totitle" type="button">Title screen</button></span><span class="hud"><span>$<b id="money">0</b></span><span>Dex <b id="dexn">0</b>/1025</span><span>Badges <b id="badgen">0</b>/36</span><span>Lv cap <b id="capn">8</b></span></span></div>
     <div id="tabs" role="tablist">
       <button class="on" data-tab="battle" type="button">Battle</button>
       <button data-tab="party" type="button">Party &amp; Box</button>
@@ -220,7 +257,7 @@
       <div class="party" id="party"></div>
       <div id="detail" class="box" hidden></div>
       <div class="row between"><h2>Box</h2>
-        <span class="row small">sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option></select></span></div>
+        <span class="row small">sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option><option value="evo">Can evolve</option></select></span></div>
       <div class="grid" id="boxgrid"></div>
     </section>
 
@@ -241,6 +278,7 @@
         <span>Ones you already caught</span><select id="s-dupe"></select>
         <span>Shinies</span><select id="s-shiny"></select>
       </div>
+      <div class="small muted">Auto throws the cheapest ball with at least an even chance, or your best one if none gets there. It only spends a Master Ball on a shiny or a legendary.</div>
       <h2>Save</h2>
       <div class="small muted">Your save lives in this browser. Copy the code to move it to another device, then paste it there and load.</div>
       <textarea id="savecode" aria-label="Save code" spellcheck="false"></textarea>
@@ -285,9 +323,21 @@ const REGIONS = [
   ["Paldea", [["Larry", "Normal"], ["Ryme", "Ghost"], ["Tulip", "Psychic"], ["Atticus", "Poison"]], "Geeta"]
 ].map(([name, gyms, champ], r) => ({ name, gyms, champ, gen: r + 1 }));
 const KILLS_FOR_GYM = 10, GYM_TIME = 30, DUNGEON_TIME = 60, CHAMP_TIME = 60, DUNGEON_SIZE = 8;
+// Mt. Silver: Red waits there once all nine Champions are down. Brutal on purpose; the Shiny Charm is the prize.
+const RED_TEAM = [25, 196, 143, 3, 6, 9], SUMMIT_HP = 10, SUMMIT_LEVEL = 100, SUMMIT_TIME = 120;
+// Shinies: 1 in 4096, as in the newer games. The Shiny Charm triples it.
+const shinyOdds = () => (S.charm ? 3 : 1) / 4096;
 const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
 const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
 const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
+const gymLevel = i => routeLevel(i) + 3, champLevel = r => routeLevel(r * 4 + 3) + 6;
+// Gyms, Champions and legendaries have extra HP. It is steepest early, where a party at the cap used to win in seconds, and settles at 1.5x from Kalos on.
+const bossHard = i => Math.max(1.5, Math.min(2 + 2.5 * i, 12 * Math.pow(.93, i)));
+const GYM_HP = 1.6, CHAMP_HP = 1.8, DUNGEON_HP = 1.3, LEGEND_HP = 10, LEGEND_PAY = 4;
+// XP per kill is foe level x XP_RATE, to every party member.
+const XP_RATE = 2;
+// The level cap sits CAP_OVER above the next gym leader or Champion you haven't beaten, and lifts to 100 once all nine Champions are down.
+const CAP_OVER = 2;
 
 function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const regionMons = r => MON.filter(m => m.gen === REGIONS[r].gen);
@@ -327,21 +377,43 @@ const BALLS = [
   { id: "master", name: "Master Ball", price: 0, mult: 1, add: 1 }
 ];
 const catchChance = (m, ball) => Math.min(1, (m.cr / 255) * .6 * ball.mult + ball.add);
+// Legendaries shrug off anything short of a Master Ball half the time.
+const throwChance = (m, ball) => catchChance(m, ball) * (legendary(m) && ball.id !== "master" ? .5 : 1);
 const ITEM_PRICE = 1500, CORD_PRICE = 2500;
 const ticketPrice = r => Math.round(250 * Math.pow(r + 1, 1.8));
 const proteinPrice = n => Math.round(300 * Math.pow(1.45, n));
+// Protein: +5% party damage each, and only 5 count per region you've opened.
+const PROTEIN_STEP = .05, PROTEIN_PER_REGION = 5;
 
 // ── Save
 const KEY = "bored.poke-idle.save";
-const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "poke", dupe: "none", shiny: "best" }, last: Date.now() });
+const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, last: Date.now() });
 let S = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 1 ? s : null; } catch { return null; } })();
 const save = () => { S.last = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
 
 // ── Party power
 const lvlOf = xp => Math.max(1, Math.min(100, Math.floor(Math.cbrt(xp + 0.5))));
-const level = n => lvlOf(S.box[n].xp);
-const power = n => { const m = mon(n); return Math.max(m.atk, m.spa) * level(n) / 50 * (1 + .1 * S.protein); };
-const partyDps = foe => S.party.reduce((s, n) => s + power(n) * (foe ? bestEff(mon(n), foe) : 1), 0);
+function levelCap() {
+  for (let r = 0; r < REGIONS.length; r++) {
+    for (let k = 0; k < 4; k++) if (!S.badges[r + "-" + k]) return Math.min(100, gymLevel(r * 4 + k) + CAP_OVER);
+    if (!S.champs[r]) return Math.min(100, champLevel(r) + CAP_OVER);
+  }
+  return 100;
+}
+// XP past the cap (from older saves) is kept but doesn't count until the cap catches up.
+const level = n => Math.min(lvlOf(S.box[n].xp), levelCap());
+// Every place has its own cap too: the one you had when you first got there. Go back to an
+// earlier region and your party fights held down to it, so a Lv 90 team from Galar is a Lv 30 team on Hoenn Route 1.
+function areaCap(loc = S.loc) {
+  if (!loc || loc.kind === "summit") return 100;
+  const L = loc.kind === "champ" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
+  return Math.min(100, L + CAP_OVER);
+}
+const battleLevel = n => Math.min(level(n), areaCap());
+const proteinCap = () => PROTEIN_PER_REGION * Math.min(REGIONS.length, 1 + Object.keys(S.champs).length);
+const proteinBoost = () => PROTEIN_STEP * Math.min(S.protein, proteinCap());
+const power = (n, L = level(n)) => { const m = mon(n); return Math.max(m.atk, m.spa) * L / 50 * (1 + proteinBoost()); };
+const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n)) * (foe ? bestEff(mon(n), foe) : 1), 0);
 const clickDamage = () => Math.max(1, Math.round(1 + partyDps(null) * .15));
 
 // ── Battle state
@@ -351,6 +423,7 @@ const badge = (r, k) => !!S.badges[r + "-" + k];
 const kills = (r, k) => S.kills[r + "-" + k] || 0;
 function unlocked(loc) {
   const { kind, r, k } = loc;
+  if (kind === "summit") return Object.keys(S.champs).length >= REGIONS.length;
   if (!regionOpen(r)) return false;
   if (kind === "route") return k === 0 || badge(r, k - 1);
   if (kind === "gym") return kills(r, k) >= KILLS_FOR_GYM;
@@ -362,6 +435,7 @@ function locName(loc) {
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
   if (loc.kind === "gym") return `${R.gyms[loc.k][0]}'s ${R.gyms[loc.k][1]} gym`;
   if (loc.kind === "dungeon") return `${R.name} dungeon`;
+  if (loc.kind === "summit") return "Mt. Silver";
   return `Champion ${R.champ}`;
 }
 function startLoc(loc) {
@@ -372,11 +446,13 @@ function startLoc(loc) {
     S.tickets[loc.r] = t - 1;
   }
   if (loc.kind !== "route" && !S.party.length) { say("Put at least one Pokémon in your party first.", true); return; }
+  const from = S.loc.r;
   S.loc = { kind: loc.kind, r: loc.r, k: loc.k || 0 };
   const r = loc.r, i = r * 4 + (loc.k || 0);
   if (loc.kind === "route") B = { kind: "route", r, k: loc.k, i };
-  else if (loc.kind === "gym") B = { kind: "gym", r, k: loc.k, i, queue: gymTeam(r, loc.k), L: routeLevel(i) + 3, time: GYM_TIME, idx: 0 };
-  else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: routeLevel(r * 4 + 3) + 6, time: CHAMP_TIME, idx: 0 };
+  else if (loc.kind === "gym") B = { kind: "gym", r, k: loc.k, i, queue: gymTeam(r, loc.k), L: gymLevel(i), time: GYM_TIME, idx: 0 };
+  else if (loc.kind === "summit") B = { kind: "summit", r, i: 36, queue: RED_TEAM.map(mon), L: SUMMIT_LEVEL, time: SUMMIT_TIME, idx: 0, back: from };
+  else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: champLevel(r), time: CHAMP_TIME, idx: 0 };
   else {
     const rand = Math.random, pool = dungeonPool(r), bosses = dungeonBosses(r);
     const q = Array.from({ length: DUNGEON_SIZE }, () => pool[Math.floor(rand() * pool.length)]);
@@ -386,15 +462,18 @@ function startLoc(loc) {
   spawn(); renderLocs(); save();
 }
 function spawn() {
-  let m, L, mult = 1, shiny = false;
-  if (B.kind === "route") { const pool = routePool(B.r, B.k); m = pool[Math.floor(Math.random() * pool.length)]; L = routeLevel(B.i); shiny = Math.random() < 1 / 512; }
+  let m, L, mult = 1, pay = 1, shiny = false;
+  if (B.kind === "route") { const pool = routePool(B.r, B.k); m = pool[Math.floor(Math.random() * pool.length)]; L = routeLevel(B.i); shiny = Math.random() < shinyOdds(); }
   else {
     m = B.queue[B.idx]; L = B.L;
     const boss = B.kind === "dungeon" && B.idx === B.queue.length - 1;
-    mult = B.kind === "dungeon" ? (boss ? 4 : 1.3) : B.kind === "champ" ? 1.8 : 1.6;
-    shiny = B.kind === "dungeon" && Math.random() < 1 / 512;
+    // The extra boss HP doesn't raise the payout, or gym rematches would turn into a money farm.
+    pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" ? CHAMP_HP : GYM_HP;
+    mult = B.kind === "dungeon" ? (boss ? LEGEND_HP * bossHard(B.i) : DUNGEON_HP) : pay * bossHard(B.i);
+    if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
+    shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
-  B.foe = { m, L, shiny, max: hpFor(m, L, B.i, mult), wild: B.kind === "route" || B.kind === "dungeon", reward: rewardFor(L, B.i, mult) };
+  B.foe = { m, L, shiny, max: hpFor(m, L, B.i, mult), wild: B.kind === "route" || B.kind === "dungeon", reward: rewardFor(L, B.i, pay) };
   B.foe.hp = B.foe.max; B.pause = 0;
   S.seen[m.num] = 1;
   $("#foeimg").src = sprite(m.num, shiny);
@@ -410,14 +489,14 @@ function hit(dmg) {
 function defeat() {
   const f = B.foe; f.hp = 0; B.pause = 1;
   S.money += f.reward;
-  gainXp(Math.round(f.L * 6 * (f.wild ? 1 : 1.5)));
+  gainXp(Math.round(f.L * XP_RATE * (f.wild ? 1 : 1.5)));
   if (B.kind === "route") S.kills[B.r + "-" + B.k] = kills(B.r, B.k) + 1;
   let text = `${f.m.name} fainted. +$${fmt(f.reward)}.`;
   if (f.wild) {
     const ball = chooseBall(f);
     if (ball) {
       S.balls[ball.id]--;
-      const ok = Math.random() < catchChance(f.m, ball) * (legendary(f.m) && ball.id !== "master" ? .5 : 1);
+      const ok = Math.random() < throwChance(f.m, ball);
       text += ` Threw a ${ball.name}… ` + (ok ? "caught!" : "it broke free.");
       if (ok) addMon(f.m.num, f.L, f.shiny);
     }
@@ -429,8 +508,14 @@ function defeat() {
 function chooseBall(f) {
   const owned = !!S.box[f.m.num], pref = f.shiny ? S.set.shiny : owned ? S.set.dupe : S.set.fresh;
   if (pref === "none") return null;
-  // "Best" only spends a Master Ball on a shiny or a legendary; a chosen ball falls back to cheaper ones, never pricier.
   const LADDER = ["poke", "great", "ultra"];
+  // "Auto": the cheapest ball with at least an even chance, else the strongest one left. Master Balls only for shinies and legendaries.
+  if (pref === "auto") {
+    if ((f.shiny || legendary(f.m)) && S.balls.master > 0) return BALLS.find(b => b.id === "master");
+    const have = LADDER.filter(id => (S.balls[id] || 0) > 0).map(id => BALLS.find(b => b.id === id));
+    return have.find(b => throwChance(f.m, b) >= .5) || have[have.length - 1] || null;
+  }
+  // "Best" only spends a Master Ball on a shiny or a legendary; a chosen ball falls back to cheaper ones, never pricier.
   const order = pref === "best" ? ["master", "ultra", "great", "poke"].filter(id => id !== "master" || f.shiny || legendary(f.m))
     : pref === "master" ? ["master"] : [pref, ...LADDER.slice(0, LADDER.indexOf(pref)).reverse()];
   const id = order.find(x => (S.balls[x] || 0) > 0);
@@ -442,19 +527,20 @@ function next() {
   B.idx++;
   if (B.idx < B.queue.length) { spawn(); return; }
   const R = REGIONS[B.r];
-  if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.`); }
-  if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first) S.balls.master++; toast(first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`); }
+  if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}`); }
+  if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first) S.balls.master++; toast(first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`); }
+  if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast(first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`); }
   if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.`); }
   backToRoute(); save();
 }
 function backToRoute() {
-  const r = B ? B.r : 0;
+  const r = B ? (B.back ?? B.r) : 0;
   let k = 3; while (k > 0 && !unlocked({ kind: "route", r, k })) k--;
   B = null; startLoc({ kind: "route", r, k }); renderAll();
 }
 function addMon(num, L, shiny) {
   const had = S.box[num];
-  if (!had) S.box[num] = { xp: Math.pow(L, 3), shiny: !!shiny };
+  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny };
   else if (shiny) had.shiny = true;
   if (!had && S.party.length < 6) S.party.push(num);
   if (!had) toast(`${mon(num).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
@@ -462,11 +548,15 @@ function addMon(num, L, shiny) {
 }
 // Level evolutions happen on their own when there is only one way to go; the rest wait for you.
 function gainXp(xp) {
+  const top = Math.pow(levelCap(), 3);
   for (const n of S.party.slice()) {
-    const before = level(n); S.box[n].xp += xp; const after = level(n);
-    if (after > before) autoEvolve(n);
+    const b = S.box[n], before = level(n);
+    if (b.xp < top) b.xp = Math.min(top, b.xp + xp);
+    if (level(n) > before) autoEvolve(n);
   }
 }
+// A new badge can lift a Pokémon that was already sitting at the cap over its evolution level.
+function liftCap() { for (const n of S.party.slice()) autoEvolve(n); }
 const evoOptions = n => mon(n).evos.filter(([t]) => !S.box[t]);
 function canEvolve(n, e) {
   const [, how, v] = e;
@@ -494,6 +584,7 @@ function evolve(n, e) {
 let lastTick = performance.now();
 function tick() {
   const now = performance.now(), dt = Math.min(1, (now - lastTick) / 1000); lastTick = now;
+  if (screen !== "game") return; // battles hold still behind the title screen
   if (B && B.foe && !B.pause) {
     hit(partyDps(B.foe.m) * dt);
     if (B.time != null) {
@@ -512,9 +603,9 @@ function drawBattle() {
   $("#field").dataset.kind = B.kind;
   $("#where").textContent = locName(S.loc) + (B.queue ? ` · ${B.idx + 1}/${B.queue.length}` : ` · ${Math.min(kills(B.r, B.k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM}`);
   $("#timerwrap").hidden = B.time == null;
-  if (B.time != null) { const total = B.kind === "gym" ? GYM_TIME : B.kind === "dungeon" ? DUNGEON_TIME : CHAMP_TIME; $("#timebar").style.width = (100 * Math.max(0, B.time) / total) + "%"; $("#timetext").textContent = Math.ceil(Math.max(0, B.time)) + "s left"; }
+  if (B.time != null) { const total = B.kind === "gym" ? GYM_TIME : B.kind === "dungeon" ? DUNGEON_TIME : B.kind === "summit" ? SUMMIT_TIME : CHAMP_TIME; $("#timebar").style.width = (100 * Math.max(0, B.time) / total) + "%"; $("#timetext").textContent = Math.ceil(Math.max(0, B.time)) + "s left"; }
   $("#money").textContent = fmt(S.money);
-  $("#dps").innerHTML = `<span>Party <b>${fmt(partyDps(B.foe.m))}</b>/s on this one</span><span>Tap <b>${fmt(clickDamage())}</b></span>${S.protein ? `<span>Protein <b>+${S.protein * 10}%</b></span>` : ""}`;
+  $("#dps").innerHTML = `<span>Party <b>${fmt(partyDps(B.foe.m))}</b>/s on this one</span><span>Tap <b>${fmt(clickDamage())}</b></span>${S.protein ? `<span>Protein <b>+${Math.round(proteinBoost() * 100)}%</b></span>` : ""}${S.party.some(n => battleLevel(n) < level(n)) ? `<span>Held to <b>Lv ${areaCap()}</b> here</span>` : ""}`;
   $("#balls").textContent = BALLS.filter(b => S.balls[b.id] > 0).map(b => `${S.balls[b.id]} ${b.name.split(" ")[0]}`).join(", ") || "no balls";
 }
 function say(t, bad) { $("#log").textContent = t; $("#log").className = bad ? "bad" : ""; }
@@ -527,6 +618,7 @@ function renderAll() { renderTop(); renderLocs(); renderMinis(); if (tab === "pa
 function renderTop() {
   $("#dexn").textContent = Object.keys(S.box).length;
   $("#badgen").textContent = Object.keys(S.badges).length;
+  $("#capn").textContent = levelCap();
   $("#money").textContent = fmt(S.money);
 }
 function renderLocs() {
@@ -538,6 +630,7 @@ function renderLocs() {
     if (k === 1) items.push({ kind: "dungeon", r, note: `${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"} · cleared ${S.dungeons[r] || 0}x`, done: !!S.dungeons[r] });
   }
   items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${CHAMP_TIME}s`, done: !!S.champs[r] });
+  if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${SUMMIT_TIME}s` : "after all 9 Champions", done: !!S.charm });
   $("#locs").innerHTML = items.map(it => {
     const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0);
     return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0 })}'${unlocked(it) ? "" : " disabled"}><span>${esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
@@ -546,16 +639,18 @@ function renderLocs() {
 function monTile(n, opts = {}) {
   const m = mon(n), b = S.box[n], e = opts.foe ? bestEff(m, opts.foe) : null;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny ? '<span class="star">S</span>' : ""}<img src="${sprite(n, b.shiny)}" alt="" loading="lazy"><span class="nm">${esc(m.name)}</span><span>Lv ${level(n)}</span>${opts.xp ? `<span class="bar xp" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny ? '<span class="star">S</span>' : ""}<img src="${sprite(n, b.shiny)}" alt="" loading="lazy"><span class="nm">${esc(m.name)}</span><span>Lv ${opts.battle ? battleLevel(n) : level(n)}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
-const xpPct = n => { const L = level(n); if (L >= 100) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
+const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
   const foe = B && B.foe ? B.foe.m : null;
-  $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
+  $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true, battle: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
 }
 function renderParty() {
   $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
-  const sort = $("#sort").value, list = Object.keys(S.box).map(Number).sort((a, b) => sort === "lvl" ? level(b) - level(a) : sort === "power" ? power(b) - power(a) : a - b);
+  // "Can evolve": ready right now first, then ones with an evolution still to get, then the rest.
+  const evoRank = n => { const o = evoOptions(n); return o.some(e => canEvolve(n, e)) ? 0 : o.length ? 1 : 2; };
+  const sort = $("#sort").value, list = Object.keys(S.box).map(Number).sort((a, b) => sort === "lvl" ? level(b) - level(a) : sort === "power" ? power(b) - power(a) : sort === "evo" ? evoRank(a) - evoRank(b) || a - b : a - b);
   $("#boxgrid").innerHTML = list.map(n => monTile(n, { inparty: S.party.includes(n) })).join("");
   renderDetail();
 }
@@ -564,10 +659,10 @@ function renderDetail() {
   if (!detail || !S.box[detail]) { el.hidden = true; return; }
   const m = mon(detail), opts = m.evos;
   el.hidden = false;
-  el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${m.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · catch rate ${m.cr}</span></div>` +
+  el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${m.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     (opts.length ? `<div class="small">${opts.map(e => {
       const [t, how, v] = e, have = !!S.box[t], ok = !have && canEvolve(detail, e);
-      const need = how === "L" ? `Lv ${v}` : how === "I" ? `${v} (have ${S.items[v] || 0})` : `Linking Cord (have ${S.cords})`;
+      const need = how === "L" ? `Lv ${v}${v > levelCap() ? " (over the cap)" : ""}` : how === "I" ? `${v} (have ${S.items[v] || 0})` : `Linking Cord (have ${S.cords})`;
       return `<div class="row" style="justify-content:space-between"><span>→ ${esc(mon(t).name)} <span class="muted">${need}</span></span>${have ? '<span class="good">have it</span>' : `<button class="lbl" type="button" data-evo="${t}"${ok ? "" : " disabled"}>Evolve</button>`}</div>`;
     }).join("")}</div>` : '<div class="small muted">Doesn\'t evolve.</div>') +
     `<div class="row"><button class="lbl" type="button" data-toggle="${detail}">${S.party.includes(detail) ? "Send to Box" : "Add to party"}</button><button class="lbl" type="button" data-close="1">Close</button></div>`;
@@ -575,7 +670,7 @@ function renderDetail() {
 function renderDex() {
   $("#dexregions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === dexR ? " on" : ""}" data-dr="${r}" type="button">${R.name}</button>`).join("");
   const list = regionMons(dexR), got = list.filter(m => S.box[m.num]).length, shinies = list.filter(m => S.box[m.num] && S.box[m.num].shiny).length;
-  $("#dexsum").innerHTML = `${REGIONS[dexR].name}: <b>${got}/${list.length}</b> caught · ${shinies} shiny · all regions ${Object.keys(S.box).length}/1025`;
+  $("#dexsum").innerHTML = `${REGIONS[dexR].name}: <b>${got}/${list.length}</b> caught · ${shinies} shiny${S.charm ? " (Shiny Charm)" : ""} · all regions ${Object.keys(S.box).length}/1025`;
   $("#dexgrid").innerHTML = list.map(m => { const b = S.box[m.num]; return `<img src="${sprite(m.num, b && b.shiny)}" alt="${b || S.seen[m.num] ? esc(m.name) : "unknown"}" title="#${m.num} ${b || S.seen[m.num] ? esc(m.name) : "???"}" class="${b ? "" : "no"}" loading="lazy">`; }).join("");
 }
 function renderShop() {
@@ -583,18 +678,18 @@ function renderShop() {
   for (const b of BALLS.filter(b => b.price)) rows.push([`${b.name} <span class="muted">(have ${S.balls[b.id]})</span>`, b.price, `ball:${b.id}`, true]);
   const r = S.loc.r;
   rows.push([`${REGIONS[r].name} dungeon ticket <span class="muted">(have ${S.tickets[r] || 0})</span>`, ticketPrice(r), `ticket:${r}`, badge(r, 1)]);
-  rows.push([`Protein: party +10% damage <span class="muted">(bought ${S.protein})</span>`, proteinPrice(S.protein), "protein", true]);
+  rows.push([`Protein: party +5% damage <span class="muted">(${S.protein}/${proteinCap()})</span>`, proteinPrice(S.protein), "protein", S.protein < proteinCap()]);
   rows.push([`Linking Cord: trade evolutions <span class="muted">(have ${S.cords})</span>`, CORD_PRICE, "cord", true]);
   // Only items something in your Box is waiting on.
   const want = new Set(); for (const n of Object.keys(S.box).map(Number)) for (const e of evoOptions(n)) if (e[1] === "I") want.add(e[2]);
   for (const it of [...want].sort()) rows.push([`${esc(it)} <span class="muted">(have ${S.items[it] || 0})</span>`, ITEM_PRICE, "item:" + it, true]);
   $("#shop").innerHTML = rows.map(([label, price, id, ok]) => `<span class="it"><span>${label}</span></span><span class="p">$${fmt(price)}</span><span class="row">${id.startsWith("ball") ? `<button class="lbl" type="button" data-buy="${id}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button><button class="lbl" type="button" data-buy="${id}" data-q="10"${ok && S.money >= price * 10 ? "" : " disabled"}>x10</button>` : `<button class="lbl" type="button" data-buy="${esc(id)}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button>`}</span>`).join("") +
-    `<span class="muted small" style="grid-column:1/-1">Dungeon tickets are for the region you're in. Evolution items only show up when a Pokémon in your Box needs one.</span>`;
+    `<span class="muted small" style="grid-column:1/-1">Dungeon tickets are for the region you're in. Evolution items only show up when a Pokémon in your Box needs one. Protein: 5 count per region you've opened.</span>`;
 }
 function buy(id, q) {
   const [kind, arg] = id.split(/:(.*)/);
   const price = kind === "ball" ? BALLS.find(b => b.id === arg).price : kind === "ticket" ? ticketPrice(+arg) : kind === "protein" ? proteinPrice(S.protein) : kind === "cord" ? CORD_PRICE : ITEM_PRICE;
-  if (S.money < price * q) return;
+  if (S.money < price * q || (kind === "protein" && S.protein >= proteinCap())) return;
   S.money -= price * q;
   if (kind === "ball") S.balls[arg] += q;
   else if (kind === "ticket") S.tickets[arg] = (S.tickets[arg] || 0) + 1;
@@ -605,17 +700,29 @@ function buy(id, q) {
 }
 
 // ── Events
-$("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; tab = b.dataset.tab; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b)); ["battle", "party", "dex", "shop", "settings"].forEach(t => $("#t-" + t).hidden = t !== tab); if (tab === "dex") dexR = S.loc.r; renderAll(); };
+function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; renderAll(); }
+$("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) openTab(b.dataset.tab); };
 $("#regions").onclick = e => { const b = e.target.closest("[data-r]"); if (b) { viewR = +b.dataset.r; renderLocs(); } };
 $("#locs").onclick = e => { const b = e.target.closest("[data-loc]"); if (b) startLoc(JSON.parse(b.dataset.loc)); };
+// Taps draw from a small bucket that refills 8 times a second, so quick fingers lose nothing
+// and an auto-clicker gets no more than a fast human. Scripted clicks don't count at all.
+const TAP_RATE = 8, TAP_BURST = 4;
+let tapFill = TAP_BURST, tapAt = 0;
+function tap(e) {
+  if (!B || !B.foe || B.pause || !e.isTrusted) return 0;
+  const now = performance.now();
+  tapFill = Math.min(TAP_BURST, tapFill + (now - tapAt) / 1000 * TAP_RATE); tapAt = now;
+  if (tapFill < 1) return 0;
+  tapFill--;
+  const d = clickDamage(); hit(d); return d;
+}
 $("#foe").addEventListener("pointerdown", e => {
-  if (!B || !B.foe || B.pause) return;
-  const d = clickDamage(); hit(d);
+  const d = tap(e); if (!d) return;
   const p = document.createElement("span"); p.className = "pop"; p.textContent = "-" + fmt(d);
   const r = $("#foe").getBoundingClientRect(); p.style.left = (e.clientX - r.left - 10) + "px"; p.style.top = (e.clientY - r.top - 20) + "px";
   $("#foe").appendChild(p); setTimeout(() => p.remove(), 600);
 });
-$("#foe").addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); hit(clickDamage()); } });
+$("#foe").addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!e.repeat) tap(e); } });
 function partyClick(e) {
   const t = e.target.closest("[data-n]"), ev = e.target.closest("[data-evo]"), tg = e.target.closest("[data-toggle]"), cl = e.target.closest("[data-close]");
   if (ev) { const e2 = mon(detail).evos.find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
@@ -636,57 +743,143 @@ $("#dexregions").onclick = e => { const b = e.target.closest("[data-dr]"); if (b
 $("#shop").onclick = e => { const b = e.target.closest("[data-buy]"); if (b) buy(b.dataset.buy, +b.dataset.q); };
 for (const id of ["fresh", "dupe", "shiny"]) {
   const sel = $("#s-" + id);
-  sel.innerHTML = `<option value="none">Don't throw</option><option value="best">Best I have</option>` + BALLS.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
+  sel.innerHTML = `<option value="auto">Auto</option><option value="best">Best I have</option><option value="none">Don't throw</option>` + BALLS.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
   sel.onchange = () => { S.set[id] = sel.value; save(); };
 }
 $("#export").onclick = () => { save(); $("#savecode").value = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); $("#savecode").select(); $("#setmsg").textContent = "Copy this code and keep it somewhere safe."; };
+const BAD_CODE = 'That code didn\'t load. Paste the whole code from "Show my save code".';
+function loadCode(text) {
+  try { const s = JSON.parse(decodeURIComponent(escape(atob(String(text).trim())))); if (!s || s.v !== 1 || !s.box) return false; S = s; save(); return true; }
+  catch { return false; }
+}
 $("#import").onclick = () => {
-  try { const s = JSON.parse(decodeURIComponent(escape(atob($("#savecode").value.trim())))); if (!s || s.v !== 1 || !s.box) throw 0; S = s; save(); boot(); $("#setmsg").textContent = "Save loaded."; }
-  catch { $("#setmsg").innerHTML = '<span class="bad">That code didn\'t load. Paste the whole code from "Show my save code".</span>'; }
+  if (loadCode($("#savecode").value)) { boot(); titleMsg = "Save loaded."; renderTitle(); }
+  else $("#setmsg").innerHTML = `<span class="bad">${esc(BAD_CODE)}</span>`;
 };
+function eraseSave() { try { localStorage.removeItem(KEY); } catch {} S = null; B = null; showPick(); }
 let resetArmed = false;
 $("#reset").onclick = () => {
   if (!resetArmed) { resetArmed = true; $("#reset").textContent = "Tap again to erase everything"; $("#setmsg").innerHTML = '<span class="bad">This deletes your Box, badges and money on this device.</span>'; setTimeout(() => { resetArmed = false; $("#reset").textContent = "Start over"; }, 4000); return; }
-  try { localStorage.removeItem(KEY); } catch {} S = null; B = null; boot();
+  eraseSave();
 };
+$("#totitle").onclick = () => { save(); showTitle(); };
 document.addEventListener("visibilitychange", () => { if (document.hidden && S) save(); });
 window.addEventListener("pagehide", () => { if (S) save(); });
 
 // ── Offline: up to 8 hours on your last route, money and XP but no catches.
 function offline() {
   const secs = Math.min(8 * 3600, (Date.now() - (S.last || Date.now())) / 1000);
-  if (secs < 60 || !S.party.length) return;
+  if (secs < 60 || !S.party.length) return "";
   const r = S.loc.r, k = S.loc.kind === "route" ? S.loc.k : 0, i = r * 4 + k, L = routeLevel(i), pool = routePool(r, k);
   const avgHp = pool.reduce((s, m) => s + hpFor(m, L, i), 0) / pool.length, dps = partyDps(null);
-  // Offline is slower than playing: about a third of the live rate, and no tapping.
-  const n = Math.floor(secs * dps / avgHp * .3);
-  if (!n) return;
+  // Offline is slower than playing: about a third of the live rate (the pause between fights included), and no tapping.
+  const n = dps > 0 ? Math.floor(secs * .3 / (avgHp / dps + .65)) : 0;
+  if (!n) return "";
   const money = n * rewardFor(L, i);
-  S.money += money; gainXp(n * L * 6);
-  toast(`While you were away (${Math.round(secs / 60)} min): beat ${n} Pokémon, earned $${fmt(money)}.`);
+  S.money += money; gainXp(n * L * XP_RATE);
+  return `While you were away (${Math.round(secs / 60)} min) your party beat ${n} Pokémon and earned $${fmt(money)}.`;
 }
 
+// Older saves sent new Pokémon only Poké Balls, so bought Great and Ultra Balls sat unused. Move that one default to Auto, once.
+function migrateSave() { if (!S.set.auto) { if (S.set.fresh === "poke") S.set.fresh = "auto"; S.set.auto = 1; } }
+
+// ── Screens: title (the landing page), pick (a new save's starter), game.
+let screen = "title", panel = "save", cur = 0, awayText = "", titleMsg = "";
+function show(name) { screen = name; $("#title").hidden = name !== "title"; $("#pick").hidden = name !== "pick"; $("#game").hidden = name !== "game"; }
 function boot() {
-  if (!S) {
-    $("#game").hidden = true; $("#pick").hidden = false;
-    $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><span class="stage"><img src="${sprite(n)}" alt=""></span><b>${mon(n).name}</b><span class="types">${mon(n).types.map(tyChip).join("")}</span></button>`).join("");
-    return;
-  }
-  $("#pick").hidden = true; $("#game").hidden = false;
-  for (const id of ["fresh", "dupe", "shiny"]) $("#s-" + id).value = S.set[id];
-  offline();
-  viewR = S.loc.r;
-  B = null;
-  if (S.loc.kind === "route" && unlocked(S.loc)) startLoc(S.loc); else { B = { r: S.loc.r }; backToRoute(); }
-  renderAll(); save();
+  B = null; awayText = ""; titleMsg = "";
+  if (S) { migrateSave(); awayText = offline(); save(); }
+  showTitle();
 }
-$("#starters").onclick = e => { const b = e.target.closest("[data-start]"); if (!b) return; S = fresh(); S.box[+b.dataset.start] = { xp: 125, shiny: false }; S.party = [+b.dataset.start]; boot(); toast(`${mon(+b.dataset.start).name} is your partner. Tap the wild Pokémon to help it fight.`); };
+function showTitle() { show("title"); panel = S ? "save" : "how"; cur = 0; renderTitle(); }
+function showPick() {
+  show("pick");
+  $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><span class="stage"><img src="${sprite(n)}" alt=""></span><b>${mon(n).name}</b><span class="types">${mon(n).types.map(tyChip).join("")}</span></button>`).join("");
+}
+function enter(t) {
+  show("game");
+  if (!B) {
+    for (const id of ["fresh", "dupe", "shiny"]) $("#s-" + id).value = S.set[id];
+    viewR = S.loc.r;
+    if (S.loc.kind === "route" && unlocked(S.loc)) startLoc(S.loc); else { B = { r: S.loc.r }; backToRoute(); }
+  }
+  openTab(t); save();
+}
+
+const MENU = {
+  save: [["continue", "Continue"], ["party", "Party & Box"], ["dex", "Pokédex"], ["settings", "Settings"], ["how", "How to play"], ["new", "New game"]],
+  fresh: [["new", "New game"], ["load", "Load a save code"], ["how", "How to play"]]
+};
+const HOW = [
+  "Your party fights the wild Pokémon by itself. Tap it to hit harder; up to 8 taps a second count.",
+  "Beat 10 on a route to open its gym. Each badge opens the next route, four open the Champion, and the Champion opens the next region.",
+  "Your party can't level past 2 over the next gym leader or Champion. Every first win raises the cap. Back in earlier places it fights held to the cap that place had.",
+  "Each wild Pokémon you beat gets a ball thrown at it. Settings decides which ones.",
+  "Shinies turn up 1 in 4096. Dungeons, with a ticket from the Shop, end in a legendary.",
+  "Your leaderboard score is one point per Pokédex entry plus one per shiny.",
+  "Someone waits on Mt. Silver once every Champion is beaten."
+];
+function renderTitle() {
+  const items = MENU[S ? "save" : "fresh"];
+  cur = Math.min(cur, items.length - 1);
+  $("#menu").innerHTML = items.map(([id, label], i) => (id === "new" && S ? '<span class="sep" aria-hidden="true"></span>' : "") +
+    `<button type="button" data-go="${id}"${i === cur ? ' class="cur"' : ""}${id === panel ? ' aria-pressed="true"' : ""}>${label}</button>`).join("");
+  $("#t-field").innerHTML = S && S.party.length ? leadField() : `<div class="fieldhead"><b>Three partners are waiting</b><span class="muted">pick one in New game</span></div><div class="t-stage"><span class="ground"></span><span class="trio">${[1, 4, 7].map(n => `<img src="${sprite(n)}" alt="${mon(n).name}">`).join("")}</span></div>`;
+  const card = $("#t-card");
+  if (panel === "how") card.innerHTML = `<h2>How to play</h2><ul class="t-how">${HOW.map(t => `<li>${t}</li>`).join("")}</ul>`;
+  else if (panel === "load") card.innerHTML = `<h2>Load a save code</h2><p class="small muted">On your other device, open Settings and use "Show my save code", then paste the code here.</p><textarea id="t-code" aria-label="Save code" spellcheck="false"></textarea><div class="row"><button class="lbl" type="button" data-act="load">Load save</button></div><div class="small bad" id="t-msg" role="status"></div>`;
+  else if (panel === "new") card.innerHTML = `<h2>Start a new game?</h2><p class="small">This erases the save on this device: your Box, badges and money. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase save and start new game</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`;
+  else card.innerHTML = saveCard();
+}
+function leadField() {
+  const n = S.party[0], b = S.box[n];
+  return `<div class="fieldhead"><b>${esc(mon(n).name)}</b><span class="muted">Lv ${level(n)}</span></div><div class="t-stage"><span class="ground"></span><img src="${sprite(n, b.shiny)}" alt="">${b.shiny ? '<span class="shinymark">shiny</span>' : ""}</div>`;
+}
+function saveCard() {
+  const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
+  const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`],
+    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${caught + shiny} points`]];
+  return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
+    `<div class="t-party">${S.party.map(n => `<img src="${sprite(n, S.box[n].shiny)}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
+    (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "");
+}
+function go(id) {
+  if (id === "continue") return enter("battle");
+  if (id === "party" || id === "dex" || id === "settings") return enter(id);
+  if (id === "new" && !S) return showPick();
+  // How to play, Load and New game (with a save) open in the card; choosing the open one again closes it.
+  panel = panel === id && S ? "save" : id; titleMsg = ""; renderTitle();
+  if (panel === "load") $("#t-code").focus();
+}
+function setCur(b) { const all = [...$("#menu").querySelectorAll("[data-go]")]; cur = all.indexOf(b); all.forEach(x => x.classList.toggle("cur", x === b)); }
+$("#menu").onclick = e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go); };
+$("#menu").addEventListener("pointerover", e => { const b = e.target.closest("[data-go]"); if (b) setCur(b); });
+$("#menu").addEventListener("focusin", e => { const b = e.target.closest("[data-go]"); if (b) setCur(b); });
+// Arrow keys walk the cursor, the way a start menu does; Enter picks.
+document.addEventListener("keydown", e => {
+  if (screen !== "title" || e.target.closest("textarea, input, select")) return;
+  const all = [...$("#menu").querySelectorAll("[data-go]")];
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); all[(cur + (e.key === "ArrowDown" ? 1 : all.length - 1)) % all.length].focus(); }
+  else if (e.key === "Enter" && !e.target.closest("button")) { e.preventDefault(); all[cur].click(); }
+});
+$("#t-card").onclick = e => {
+  const a = e.target.closest("[data-act]"); if (!a) return;
+  if (a.dataset.act === "erase") eraseSave();
+  else if (a.dataset.act === "keep") { panel = "save"; renderTitle(); }
+  else if (a.dataset.act === "load") { if (loadCode($("#t-code").value)) { boot(); titleMsg = "Save loaded."; renderTitle(); } else $("#t-msg").textContent = BAD_CODE; }
+};
+$("#pickback").onclick = showTitle;
+$("#starters").onclick = e => { const b = e.target.closest("[data-start]"); if (!b) return; S = fresh(); S.box[+b.dataset.start] = { xp: 125, shiny: false }; S.party = [+b.dataset.start]; B = null; enter("battle"); toast(`${mon(+b.dataset.start).name} is your partner. Tap the wild Pokémon to help it fight.`); };
 setInterval(tick, 100);
 setInterval(() => { if (S) save(); }, 5000);
 boot();
 
 // The hub reads this: integer metrics, never null.
-window.__boredSnapshot = () => ({ slug: 'poke-idle', caught: S ? Object.keys(S.box).length : 0, badges: S ? Object.keys(S.badges).length : 0, finished: !!S });
+// score is the board's number: one point per Pokédex entry and one more for each one you have shiny.
+window.__boredSnapshot = () => {
+  const caught = S ? Object.keys(S.box).length : 0, shinies = S ? Object.values(S.box).filter(b => b.shiny).length : 0;
+  return { slug: 'poke-idle', caught, shinies, score: caught + shinies, badges: S ? Object.keys(S.badges).length : 0, finished: !!S };
+};
 </script>
 </body>
 </html>
