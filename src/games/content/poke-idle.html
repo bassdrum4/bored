@@ -66,14 +66,14 @@
   .hpline .bar { flex: 1 }
   #hptext { font-variant-numeric: tabular-nums; min-width: 9ch; text-align: right }
 
-  #foe { width: 100%; height: clamp(190px, 30vw, 236px); border: 0; background: none; cursor: pointer; position: relative; display: block; touch-action: manipulation; user-select: none; -webkit-user-select: none; color: inherit; font: inherit }
+  #foe { width: 100%; height: 232px; border: 0; background: none; cursor: pointer; position: relative; display: block; touch-action: manipulation; user-select: none; -webkit-user-select: none; color: inherit; font: inherit }
   #foe:focus-visible { outline-offset: -4px }
   /* The ground the wild Pokémon stands on; its colour says where you are. */
   .ground { position: absolute; left: 50%; bottom: 14px; width: min(68%, 320px); height: 46px; transform: translateX(-50%); border: 1px solid var(--rule); border-radius: 50%; background: var(--g-route) }
   .field[data-kind="gym"] .ground { background: var(--g-gym) }
   .field[data-kind="dungeon"] .ground { background: var(--g-dungeon) }
   .field[data-kind="champ"] .ground, .field[data-kind="summit"] .ground { background: var(--g-champ); border-color: var(--gold) }
-  #foe img { position: absolute; left: 50%; bottom: 26px; height: calc(100% - 40px); width: auto; max-width: 90%; transform: translateX(-50%); object-fit: contain; object-position: bottom; image-rendering: pixelated; transition: transform .06s }
+  #foe img { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); image-rendering: pixelated; transition: transform .06s }
   #foe:active img { transform: translateX(-50%) scale(.94) }
   #foe .pop { position: absolute; font-weight: 700; font-size: 14px; color: var(--red); pointer-events: none; animation: rise .6s ease-out forwards }
   @keyframes rise { to { transform: translateY(-28px); opacity: 0 } }
@@ -117,13 +117,14 @@
   .party { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px }
   .mon { font: inherit; font-size: 10px; border: 1px solid var(--rule); background: var(--surface); color: inherit; border-radius: 3px; padding: 4px 3px 3px; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; cursor: pointer; position: relative }
   .mon:hover { border-color: var(--ink) }
-  .mon img { width: 100%; max-width: 88px; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated }
+  .mon .pic { width: 100%; max-width: 96px; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; overflow: hidden }
   .mon .nm { width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
   .mon.empty { border-style: dashed; background: none; cursor: default; min-height: 64px }
   .mon.empty:hover { border-color: var(--rule) }
   .mon .eff { position: absolute; top: 2px; left: 3px; font-weight: 700 }
   .mon .star { position: absolute; top: 2px; right: 3px; color: var(--gold); font-weight: 700 }
   .mon.inparty { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink) }
+  .mon .evo ~ .eff { top: 16px }
   .mon .evo { position: absolute; top: 2px; left: 2px; right: 2px; background: var(--xp); color: #fff; font-size: 9px; font-weight: 700; letter-spacing: .04em; border-radius: 2px; text-align: center }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 4px }
   .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 2px }
@@ -156,7 +157,7 @@
   .starters button:hover { border-color: var(--ink) }
   .starters .stage { position: relative; width: 100%; height: 104px }
   .starters .stage::before { content: ""; position: absolute; left: 50%; bottom: 2px; width: min(86%, 120px); height: 26px; transform: translateX(-50%); border: 1px solid var(--rule); border-radius: 50%; background: var(--g-route) }
-  .starters img { position: absolute; left: 50%; bottom: 10px; width: 88px; height: 88px; transform: translateX(-50%); object-fit: contain; object-position: bottom; image-rendering: pixelated }
+  .starters img { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); image-rendering: pixelated }
   .starters b { font-size: 14px }
   .starters .types { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center }
   #pick .how { font-size: 12px; color: var(--dim); display: grid; gap: 2px; padding-left: 2px }
@@ -167,10 +168,10 @@
   .t-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); grid-template-areas: "field menu" "card menu"; gap: 12px; align-items: start }
   @media (max-width: 680px) { .t-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "field" "menu" "card" } }
   #t-field { grid-area: field } #menu { grid-area: menu } #t-card { grid-area: card }
-  .t-stage { position: relative; height: clamp(150px, 26vw, 210px) }
-  .t-stage > img { position: absolute; left: 50%; bottom: 26px; height: calc(100% - 40px); width: auto; max-width: 90%; transform: translateX(-50%); object-fit: contain; object-position: bottom; image-rendering: pixelated }
-  .t-stage .trio { position: absolute; left: 0; right: 0; bottom: 24px; display: flex; justify-content: center; gap: 2px }
-  .t-stage .trio img { width: min(30%, 104px); aspect-ratio: 1; object-fit: contain; object-position: bottom; image-rendering: pixelated }
+  .t-stage { position: relative; height: 232px }
+  .t-stage > img { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); image-rendering: pixelated }
+  .t-stage .trio { position: absolute; left: 0; right: 0; bottom: 24px; display: flex; justify-content: center; align-items: flex-end; gap: 6px }
+  .t-stage .trio img { image-rendering: pixelated }
   /* The start menu: a doubled 1px rule like the old text boxes, and a cursor that follows you. */
   .menu { display: flex; flex-direction: column; padding: 10px 6px; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--ink) }
   .menu button { font: inherit; font-size: 14px; text-align: left; border: 0; background: none; color: inherit; padding: 8px 10px 8px 30px; cursor: pointer; position: relative; border-radius: 2px }
@@ -238,7 +239,7 @@
             <div class="row" id="foeinfo"></div>
             <div class="hpline"><span>HP</span><div class="bar hp" id="hpwrap"><i id="hpbar"></i></div><span id="hptext"></span></div>
           </div>
-          <button id="foe" type="button" aria-label="Attack the wild Pokémon"><span class="ground"></span><img id="foeimg" alt=""><span class="shinymark" id="shiny" hidden>Shiny</span></button>
+          <button id="foe" type="button" aria-label="Attack the wild Pokémon"><span class="ground"></span><img id="foeimg" class="spr" alt=""><span class="shinymark" id="shiny" hidden>Shiny</span></button>
           <div id="timerwrap" hidden><div class="bar time"><i id="timebar"></i></div><span id="timetext"></span></div>
         </div>
         <div id="log" role="status"></div>
@@ -299,6 +300,24 @@ const fmt = n => n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : n >= 1e6 ? (n / 1e6).to
 // Sprites ship with Pokédoku. In the hub this page is a srcdoc frame that resolves paths from the arcade root.
 const SPRITE_DIR = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI) ? "pokedoku/sprites/" : "games/content/pokedoku/sprites/";
 const sprite = (num, shiny) => SPRITE_DIR + (shiny ? "shiny/" : "") + num + ".png";
+// Sprites are cropped to the Pokémon, so a Caterpie file is 31px and a Lugia 96px. Stretching each one to fill
+// its box blew the small ones up more, so every spot now draws all of them at one scale: a whole number of screen
+// pixels per sprite pixel where the biggest (96px) fits, an even shrink where it doesn't. A small Pokémon looks
+// small. data-ref sets a smaller reference where only the three starters ever show.
+const SPRITE_MAX = 96;
+function fitSprite(img) {
+  const host = img.closest(".pic, #foe, .t-stage, .stage");
+  if (!img.naturalWidth || !host || !host.clientWidth) return;
+  let room = host.matches(".pic") ? host.clientWidth : host.clientHeight - (host.matches(".stage") ? 14 : 40);
+  if (img.closest(".trio")) room = Math.min(room, host.clientWidth / 3.2);
+  room = Math.min(room, host.clientWidth * .9);
+  const dpr = window.devicePixelRatio || 1, px = room * dpr / (+img.dataset.ref || SPRITE_MAX), k = (px >= 1 ? Math.floor(px) : px) / dpr;
+  img.style.width = img.naturalWidth * k + "px"; img.style.height = img.naturalHeight * k + "px";
+  img.style.imageRendering = k * dpr >= 1 ? "pixelated" : "auto";
+}
+const refitSprites = () => document.querySelectorAll("img.spr").forEach(fitSprite);
+document.addEventListener("load", e => { if (e.target instanceof HTMLImageElement && e.target.classList.contains("spr")) fitSprite(e.target); }, true);
+addEventListener("resize", refitSprites);
 const tyChip = t => `<span class="ty" style="background:${TC[t]}">${t.toUpperCase()}</span>`;
 
 // ── Data: [name, types, atk, spa, hp, catch rate, flags, evolutions [[num, L|I|T, level|item]], base stat total]
@@ -331,11 +350,15 @@ const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
 const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
 const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
 const gymLevel = i => routeLevel(i) + 3, champLevel = r => routeLevel(r * 4 + 3) + 6;
-// Gyms and Champions have extra HP: steepest early, where a party at the cap used to win in seconds, settling at 1.8x from Galar on.
+// Gyms, Champions and legendaries have extra HP: steepest early, where a party at the cap used to win in seconds, settling at 1.8x from Galar on.
 // A capped party that only idles should lose most of them; tapping, type matchups and some protein get it through.
 const bossHard = i => Math.max(1.8, Math.min(2 + 4 * i, 24 * Math.pow(.92, i)));
-// Legendary dungeon bosses keep their own, gentler curve: 1.5x from Kalos on.
-const legendHard = i => Math.max(1.5, Math.min(2 + 2.5 * i, 12 * Math.pow(.93, i)));
+// However strong the party, a boss needs tapping: if the party alone could beat a gym leader's or Champion's
+// Pokémon in its share of the timer (a legendary: in all the time left), it gets enough HP that idling falls this far short.
+const IDLE_SHORT = 1.25;
+// Wild Pokémon on routes get extra HP through the middle of the game, where a party at the cap used to one-shot them:
+// about 3 seconds a fight idle for an ordinary party, half that tapping. Late routes are slow enough already.
+const wildHard = i => Math.max(1, Math.min(1.5 + .8 * i, 6.5 * Math.pow(.925, i)));
 const GYM_HP = 1.6, CHAMP_HP = 1.8, DUNGEON_HP = 1.3, LEGEND_HP = 10, LEGEND_PAY = 4;
 // XP per kill is foe level x XP_RATE, to every party member.
 const XP_RATE = 2;
@@ -462,21 +485,23 @@ function startLoc(loc) {
     q.push(bosses[Math.floor(rand() * bosses.length)]);
     B = { kind: "dungeon", r, i: r * 4 + 2, queue: q, L: routeLevel(r * 4 + 2) + 4, time: DUNGEON_TIME, idx: 0 };
   }
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "dungeon" ? "The legendary at the end can't be beaten without tapping." : "Your party can't win this one alone. Tap to help it."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
-  let m, L, mult = 1, pay = 1, shiny = false;
-  if (B.kind === "route") { const pool = routePool(B.r, B.k); m = pool[Math.floor(Math.random() * pool.length)]; L = routeLevel(B.i); shiny = Math.random() < shinyOdds(); }
+  let m, L, mult = 1, pay = 1, shiny = false, boss = false;
+  if (B.kind === "route") { const pool = routePool(B.r, B.k); m = pool[Math.floor(Math.random() * pool.length)]; L = routeLevel(B.i); mult = wildHard(B.i); shiny = Math.random() < shinyOdds(); }
   else {
     m = B.queue[B.idx]; L = B.L;
-    const boss = B.kind === "dungeon" && B.idx === B.queue.length - 1;
+    boss = B.kind !== "dungeon" || B.idx === B.queue.length - 1;
     // The extra boss HP doesn't raise the payout, or gym rematches would turn into a money farm.
     pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" ? CHAMP_HP : GYM_HP;
-    mult = B.kind === "dungeon" ? (boss ? LEGEND_HP * legendHard(B.i) : DUNGEON_HP) : pay * bossHard(B.i);
+    mult = B.kind === "dungeon" ? (boss ? LEGEND_HP * bossHard(B.i) : DUNGEON_HP) : pay * bossHard(B.i);
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
     shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
   B.foe = { m, L, shiny, max: hpFor(m, L, B.i, mult), wild: B.kind === "route" || B.kind === "dungeon", reward: rewardFor(L, B.i, pay) };
+  if (boss) B.foe.max = Math.max(B.foe.max, Math.ceil(IDLE_SHORT * partyDps(m) * (B.kind === "dungeon" ? B.time : B.total / B.queue.length)));
   B.foe.hp = B.foe.max; B.pause = 0;
   S.seen[m.num] = 1;
   $("#foeimg").src = sprite(m.num, shiny);
@@ -560,7 +585,9 @@ function gainXp(xp) {
 }
 // A new badge can lift a Pokémon that was already sitting at the cap over its evolution level.
 function liftCap() { for (const n of S.party.slice()) autoEvolve(n); }
-const evoOptions = n => mon(n).evos.filter(([t]) => !S.box[t]);
+// An evolution is open if you don't have that species yet, or if this one would bring it more levels:
+// evolving into one you already own merges them, and the Box keeps the higher XP.
+const evoOptions = n => mon(n).evos.filter(([t]) => !S.box[t] || level(t) < level(n));
 function canEvolve(n, e) {
   const [, how, v] = e;
   if (how === "L") return level(n) >= v;
@@ -573,13 +600,16 @@ function autoEvolve(n) {
 }
 function evolve(n, e) {
   const [t, how, v] = e;
-  if (S.box[t] || !canEvolve(n, e)) return;
+  if (!evoOptions(n).some(x => x[0] === t) || !canEvolve(n, e)) return;
   if (how === "I") S.items[v]--;
   if (how === "T") S.cords--;
-  S.box[t] = { xp: S.box[n].xp, shiny: S.box[n].shiny };
+  const had = S.box[t];
+  if (had) { had.xp = Math.max(had.xp, S.box[n].xp); had.shiny = had.shiny || S.box[n].shiny; }
+  else S.box[t] = { xp: S.box[n].xp, shiny: S.box[n].shiny };
   const slot = S.party.indexOf(n);
-  if (slot >= 0) S.party[slot] = t;
-  toast(`${mon(n).name} evolved into ${mon(t).name}! (${mon(n).name} stays in your Box.)`);
+  if (slot >= 0) { if (S.party.includes(t)) S.party.splice(slot, 1); else S.party[slot] = t; }
+  toast(had ? `${mon(n).name} evolved and your ${mon(t).name} took its levels: now Lv ${level(t)}. (${mon(n).name} stays in your Box.)`
+    : `${mon(n).name} evolved into ${mon(t).name}! (${mon(n).name} stays in your Box.)`);
   save(); renderAll();
 }
 
@@ -642,7 +672,7 @@ function renderLocs() {
 function monTile(n, opts = {}) {
   const m = mon(n), b = S.box[n], e = opts.foe ? bestEff(m, opts.foe) : null;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny ? '<span class="star">S</span>' : ""}<img src="${sprite(n, b.shiny)}" alt="" loading="lazy"><span class="nm">${esc(m.name)}</span><span>Lv ${opts.battle ? battleLevel(n) : level(n)}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny ? '<span class="star">S</span>' : ""}<span class="pic"><img class="spr" src="${sprite(n, b.shiny)}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>Lv ${opts.battle ? battleLevel(n) : level(n)}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -664,9 +694,10 @@ function renderDetail() {
   el.hidden = false;
   el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${m.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     (opts.length ? `<div class="small">${opts.map(e => {
-      const [t, how, v] = e, have = !!S.box[t], ok = !have && canEvolve(detail, e);
+      const [t, how, v] = e, owned = S.box[t], open = !owned || level(t) < level(detail), ok = open && canEvolve(detail, e);
       const need = how === "L" ? `Lv ${v}${v > levelCap() ? " (over the cap)" : ""}` : how === "I" ? `${v} (have ${S.items[v] || 0})` : `Linking Cord (have ${S.cords})`;
-      return `<div class="row" style="justify-content:space-between"><span>→ ${esc(mon(t).name)} <span class="muted">${need}</span></span>${have ? '<span class="good">have it</span>' : `<button class="lbl" type="button" data-evo="${t}"${ok ? "" : " disabled"}>Evolve</button>`}</div>`;
+      const yours = owned ? ` <span class="muted">· yours is Lv ${level(t)}${open ? ", evolving gives it these levels" : ""}</span>` : "";
+      return `<div class="row" style="justify-content:space-between"><span>→ ${esc(mon(t).name)} <span class="muted">${need}</span>${yours}</span>${open ? `<button class="lbl" type="button" data-evo="${t}"${ok ? "" : " disabled"}>Evolve</button>` : '<span class="good">have it</span>'}</div>`;
     }).join("")}</div>` : '<div class="small muted">Doesn\'t evolve.</div>') +
     `<div class="row"><button class="lbl" type="button" data-toggle="${detail}">${S.party.includes(detail) ? "Send to Box" : "Add to party"}</button><button class="lbl" type="button" data-close="1">Close</button></div>`;
 }
@@ -692,6 +723,7 @@ function renderShop() {
 function buy(id, q) {
   const [kind, arg] = id.split(/:(.*)/);
   const price = kind === "ball" ? BALLS.find(b => b.id === arg).price : kind === "ticket" ? ticketPrice(+arg) : kind === "protein" ? proteinPrice(S.protein) : kind === "cord" ? CORD_PRICE : ITEM_PRICE;
+  if (kind === "protein" && B && B.kind !== "route") { toast("Buy Protein between battles."); return; }
   if (S.money < price * q || (kind === "protein" && S.protein >= proteinCap())) return;
   S.money -= price * q;
   if (kind === "ball") S.balls[arg] += q;
@@ -703,7 +735,7 @@ function buy(id, q) {
 }
 
 // ── Events
-function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; renderAll(); }
+function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; renderAll(); refitSprites(); }
 $("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) openTab(b.dataset.tab); };
 $("#regions").onclick = e => { const b = e.target.closest("[data-r]"); if (b) { viewR = +b.dataset.r; renderLocs(); } };
 $("#locs").onclick = e => { const b = e.target.closest("[data-loc]"); if (b) startLoc(JSON.parse(b.dataset.loc)); };
@@ -728,7 +760,7 @@ $("#foe").addEventListener("pointerdown", e => {
 $("#foe").addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!e.repeat) tap(e); } });
 function partyClick(e) {
   const t = e.target.closest("[data-n]"), ev = e.target.closest("[data-evo]"), tg = e.target.closest("[data-toggle]"), cl = e.target.closest("[data-close]");
-  if (ev) { const e2 = mon(detail).evos.find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
+  if (ev) { if (B && B.kind !== "route") { toast("Evolve between battles."); return; } const e2 = mon(detail).evos.find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
   if (cl) { detail = null; renderDetail(); return; }
   if (tg) { toggleParty(+tg.dataset.toggle); return; }
   if (t) { detail = +t.dataset.n; renderParty(); }
@@ -774,7 +806,7 @@ function offline() {
   const secs = Math.min(8 * 3600, (Date.now() - (S.last || Date.now())) / 1000);
   if (secs < 60 || !S.party.length) return "";
   const r = S.loc.r, k = S.loc.kind === "route" ? S.loc.k : 0, i = r * 4 + k, L = routeLevel(i), pool = routePool(r, k);
-  const avgHp = pool.reduce((s, m) => s + hpFor(m, L, i), 0) / pool.length, dps = partyDps(null);
+  const avgHp = pool.reduce((s, m) => s + hpFor(m, L, i, wildHard(i)), 0) / pool.length, dps = partyDps(null);
   // Offline is slower than playing: about a third of the live rate (the pause between fights included), and no tapping.
   const n = dps > 0 ? Math.floor(secs * .3 / (avgHp / dps + .65)) : 0;
   if (!n) return "";
@@ -788,7 +820,7 @@ function migrateSave() { if (!S.set.auto) { if (S.set.fresh === "poke") S.set.fr
 
 // ── Screens: title (the landing page), pick (a new save's starter), game.
 let screen = "title", panel = "save", cur = 0, awayText = "", titleMsg = "";
-function show(name) { screen = name; $("#title").hidden = name !== "title"; $("#pick").hidden = name !== "pick"; $("#game").hidden = name !== "game"; }
+function show(name) { screen = name; $("#title").hidden = name !== "title"; $("#pick").hidden = name !== "pick"; $("#game").hidden = name !== "game"; refitSprites(); }
 function boot() {
   B = null; awayText = ""; titleMsg = "";
   if (S) { migrateSave(); awayText = offline(); save(); }
@@ -797,7 +829,7 @@ function boot() {
 function showTitle() { show("title"); panel = S ? "save" : "how"; cur = 0; renderTitle(); }
 function showPick() {
   show("pick");
-  $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><span class="stage"><img src="${sprite(n)}" alt=""></span><b>${mon(n).name}</b><span class="types">${mon(n).types.map(tyChip).join("")}</span></button>`).join("");
+  $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><span class="stage"><img class="spr" data-ref="42" src="${sprite(n)}" alt=""></span><b>${mon(n).name}</b><span class="types">${mon(n).types.map(tyChip).join("")}</span></button>`).join("");
 }
 function enter(t) {
   show("game");
@@ -816,6 +848,7 @@ const MENU = {
 const HOW = [
   "Your party fights the wild Pokémon by itself. Tap it to hit harder; up to 8 taps a second count.",
   "Beat 10 on a route to open its gym. Each badge opens the next route, four open the Champion, and the Champion opens the next region.",
+  "Gyms, Champions and legendaries can't be beaten by idling, however strong your party is. You have to tap.",
   "Your party can't level past 2 over the next gym leader or Champion. Every first win raises the cap. Back in earlier places it fights held to the cap that place had.",
   "Each wild Pokémon you beat gets a ball thrown at it. Settings decides which ones.",
   "Shinies turn up 1 in 4096. Dungeons, with a ticket from the Shop, end in a legendary.",
@@ -827,7 +860,7 @@ function renderTitle() {
   cur = Math.min(cur, items.length - 1);
   $("#menu").innerHTML = items.map(([id, label], i) => (id === "new" && S ? '<span class="sep" aria-hidden="true"></span>' : "") +
     `<button type="button" data-go="${id}"${i === cur ? ' class="cur"' : ""}${id === panel ? ' aria-pressed="true"' : ""}>${label}</button>`).join("");
-  $("#t-field").innerHTML = S && S.party.length ? leadField() : `<div class="fieldhead"><b>Three partners are waiting</b><span class="muted">pick one in New game</span></div><div class="t-stage"><span class="ground"></span><span class="trio">${[1, 4, 7].map(n => `<img src="${sprite(n)}" alt="${mon(n).name}">`).join("")}</span></div>`;
+  $("#t-field").innerHTML = S && S.party.length ? leadField() : `<div class="fieldhead"><b>Three partners are waiting</b><span class="muted">pick one in New game</span></div><div class="t-stage"><span class="ground"></span><span class="trio">${[1, 4, 7].map(n => `<img class="spr" data-ref="48" src="${sprite(n)}" alt="${mon(n).name}">`).join("")}</span></div>`;
   const card = $("#t-card");
   if (panel === "how") card.innerHTML = `<h2>How to play</h2><ul class="t-how">${HOW.map(t => `<li>${t}</li>`).join("")}</ul>`;
   else if (panel === "load") card.innerHTML = `<h2>Load a save code</h2><p class="small muted">On your other device, open Settings and use "Show my save code", then paste the code here.</p><textarea id="t-code" aria-label="Save code" spellcheck="false"></textarea><div class="row"><button class="lbl" type="button" data-act="load">Load save</button></div><div class="small bad" id="t-msg" role="status"></div>`;
@@ -836,7 +869,7 @@ function renderTitle() {
 }
 function leadField() {
   const n = S.party[0], b = S.box[n];
-  return `<div class="fieldhead"><b>${esc(mon(n).name)}</b><span class="muted">Lv ${level(n)}</span></div><div class="t-stage"><span class="ground"></span><img src="${sprite(n, b.shiny)}" alt="">${b.shiny ? '<span class="shinymark">shiny</span>' : ""}</div>`;
+  return `<div class="fieldhead"><b>${esc(mon(n).name)}</b><span class="muted">Lv ${level(n)}</span></div><div class="t-stage"><span class="ground"></span><img class="spr" src="${sprite(n, b.shiny)}" alt="">${b.shiny ? '<span class="shinymark">shiny</span>' : ""}</div>`;
 }
 function saveCard() {
   const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
