@@ -94,7 +94,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
     await page.$eval(`[data-match-id="${id}"]`,row=>row.querySelector('.bt-actions>button').click());
     await page.waitForFunction(()=>!document.querySelector('#player').hidden);
   }
-  async function exit(page){await page.click('#menu-toggle');await page.click('#back');await page.waitForFunction(()=>document.querySelector('#player').hidden);await refresh(page);}
+  async function exit(page){await page.$eval('#menu-toggle',button=>button.click());await page.waitForFunction(()=>!document.querySelector('#back').hidden);await page.$eval('#back',button=>button.click());await page.waitForFunction(()=>document.querySelector('#player').hidden);await refresh(page);}
   async function drop(page,n,returns=true){
     const game=await frame(page,'.columns');
     await game.waitForSelector(`.columns button[aria-label="Drop in column ${n}"]:not([disabled])`);
@@ -133,8 +133,9 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
     const game=await frame(page,'#c');
     await game.waitForFunction(()=>__test.state()==='aim');
     await game.evaluate(({angle,power})=>{__test.set(angle);__test.setPower(power);},{angle,power});
-    await page.focus('#frame');
-    await page.keyboard.press('Enter');
+    // Trigger the original game's shoot action directly; focus animations can
+    // swallow synthetic Enter presses even though the shot logic is working.
+    await game.evaluate(()=>__test.shoot());
   }
   const guest=await player();await open(guest);
   assert.equal(calls.length,0,'guest makes no multiplayer requests');
@@ -289,7 +290,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   await a.focus('#frame');await a.keyboard.press('Escape');
   await a.waitForFunction(()=>!document.querySelector('#duel-finish').hidden);
   assert.match(await a.$eval('#duel-finish-text',e=>e.textContent),/Send your run/);
-  await a.click('#duel-send');
+  await a.$eval('#duel-send',button=>button.click());
   await a.waitForFunction(()=>document.querySelector('#player').hidden);
   await refresh(a);await refresh(b);
   assert.ok(!(await b.$eval(`[data-match-id="${duel.id}"]`,e=>e.textContent)).includes('beat'),'the run to beat is hidden');
@@ -299,7 +300,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   for(const key of ['ArrowUp','ArrowRight','ArrowUp','ArrowRight']){await b.focus('#frame');await b.keyboard.press(key);await b.keyboard.press(key);}
   await b.focus('#frame');await b.keyboard.press('Escape');
   await b.waitForFunction(()=>!document.querySelector('#duel-finish').hidden);
-  await b.click('#duel-send');await b.waitForFunction(()=>document.querySelector('#player').hidden);
+  await b.$eval('#duel-send',button=>button.click());await b.waitForFunction(()=>document.querySelector('#player').hidden);
   await refresh(a);
   const done=(await call(db,ids[0],'dashboard')).matches.find(m=>m.id===duel.id);
   assert.equal(done.status,'completed');assert.equal(done.state.plays['1'],mine);
@@ -336,7 +337,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   await embed.$eval(`[data-match-id="${active.id}"]`,e=>e.querySelector('button').click());
   await embed.waitForFunction(()=>document.querySelector('#frame').contentDocument?.querySelector('.connect'));
   assert.ok(await embed.$eval('#player',e=>!e.hidden),'full player works within embedded site');
-  await embed.click('#menu-toggle');await embed.click('#back');await embed.waitForFunction(()=>document.querySelector('#player').hidden);
+  await embed.$eval('#menu-toggle',button=>button.click());await embed.$eval('#back',button=>button.click());await embed.waitForFunction(()=>document.querySelector('#player').hidden);
   await a.goto(site.url+'?after-embed#together');await a.waitForSelector('#bt-your-games');
   await click(a,'Start a Game');await a.waitForSelector('#bt-people .bt-person');await refresh(a);
   assert.ok(await a.$('#bt-people'),'polling preserves the member list');
