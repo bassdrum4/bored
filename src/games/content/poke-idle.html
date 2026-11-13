@@ -424,8 +424,10 @@ const SPECIALS = {
     img: ASSET_DIR + "937-birthday.png", hp: 83, atk: 138, def: 88, spa: 66, spd: 110, spe: 94 }
 };
 for (const sp of Object.values(SPECIALS)) Object.assign(sp, { types: mon(sp.num).types, cr: mon(sp.num).cr, flags: mon(sp.num).flags, gen: mon(sp.num).gen, evos: [], bst: sp.hp + sp.atk + sp.def + sp.spa + sp.spd + sp.spe });
-// Forms have no shiny sprites, so a shiny Mega shows its usual colours.
-const spriteOf = (m, shiny) => m.img ? m.img : m.sprite ? sprite(m.sprite) : sprite(m.num, shiny);
+// A shiny Pokémon stays shiny as a Mega or Gigantamax: every form has a shiny sprite (PokeAPI's, cropped like the
+// rest) except Mega Zygarde, which shows its usual colours.
+const NO_SHINY_FORM = new Set([10301]);
+const spriteOf = (m, shiny) => m.img ? m.img : m.sprite ? sprite(m.sprite, shiny && !NO_SHINY_FORM.has(m.sprite)) : sprite(m.num, shiny);
 const TI = Object.fromEntries(D.types.map((t, i) => [t, i]));
 const MULT = { "0": 0, h: .5, "1": 1, "2": 2 };
 const eff = (atkType, defTypes) => defTypes.reduce((m, d) => m * MULT[D.chart[TI[atkType]][TI[d]]], 1);
