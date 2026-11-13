@@ -190,6 +190,17 @@
 
   #sign { user-select: none; -webkit-user-select: none; touch-action: manipulation; -webkit-touch-callout: none }
 
+  /* Achievements: one line each, a bar for the ones still going. */
+  .ach-group { font-size: 12px; color: var(--dim); margin: 14px 0 4px; padding-bottom: 3px; border-bottom: 1px solid var(--rule) }
+  .ach-group:first-child { margin-top: 0 }
+  .ach { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 2px 14px; align-items: center; padding: 6px 2px; font-size: 12px; color: var(--dim) }
+  .ach b { font-weight: 700 }
+  .ach.got { color: var(--ink) }
+  .ach.got b::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; background: var(--good); border-radius: 1px; vertical-align: 1px }
+  .ach .when, .ach .count { font-size: 11px; text-align: right; font-variant-numeric: tabular-nums }
+  .ach .bar { display: block; height: 3px; margin-top: 3px } .ach .bar i { background: var(--dim) }
+  @media (max-width: 480px) { .ach { grid-template-columns: minmax(0, 1fr) 84px } }
+
   /* Mail: the letters down the left, the open one beside them. */
   #mailn:not(:empty) { margin-left: 5px; padding: 0 5px; border-radius: 2px; background: var(--red); color: #fff; font-size: 10px }
   .mail { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 12px; align-items: start }
@@ -282,6 +293,7 @@
       <button data-tab="settings" type="button">Settings</button>
       <button data-tab="wiki" type="button">Wiki</button>
       <button data-tab="mail" type="button">Mail<b id="mailn"></b></button>
+      <button data-tab="ach" type="button">Achievements</button>
     </div>
 
     <section id="t-battle" class="cols">
@@ -334,6 +346,11 @@
         </nav>
         <div class="wiki-text" id="wiki-text"></div>
       </div>
+    </section>
+
+    <section id="t-ach" class="box" hidden>
+      <div class="small" id="achsum"></div>
+      <div id="achlist"></div>
     </section>
 
     <section id="t-mail" class="box" hidden>
@@ -522,7 +539,7 @@ const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", SLOT_KEY = "bored.poke-idle.slot";
 let slot = (() => { try { return localStorage.getItem(SLOT_KEY) === "test" ? TEST_KEY : KEY; } catch { return KEY; } })();
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
-const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, last: Date.now() });
+const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, last: Date.now() });
 let S = readSlot(slot);
 const save = () => { S.last = Date.now(); try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
 
@@ -682,7 +699,7 @@ function hit(dmg) {
 }
 function defeat() {
   const f = B.foe; f.hp = 0; B.pause = 1;
-  S.money += f.reward;
+  S.money += f.reward; S.stats.wins++;
   gainXp(Math.round(f.L * XP_RATE * (f.wild ? 1 : 1.5)));
   if (B.kind === "route") S.kills[B.r + "-" + B.k] = kills(B.r, B.k) + 1;
   let text = `${f.m.name} fainted. +$${fmt(f.reward)}.`;
@@ -785,7 +802,7 @@ function evolve(n, e) {
   else S.box[t] = { xp: S.box[n].xp, shiny: S.box[n].shiny };
   const slot = S.party.indexOf(n);
   if (slot >= 0) { if (S.party.includes(t)) S.party.splice(slot, 1); else S.party[slot] = t; }
-  dropForm(n);
+  dropForm(n); S.stats.evolved++;
   toast(had ? `${mon(n).name} evolved and your ${mon(t).name} took its levels: now Lv ${level(t)}. (${mon(n).name} stays in your Box.)`
     : `${mon(n).name} evolved into ${mon(t).name}! (${mon(n).name} stays in your Box.)`);
   save(); renderAll();
@@ -946,6 +963,64 @@ function buy(id, q) {
   save(); renderShop(); renderTop(); renderMinis();
 }
 
+// ── Achievements. Each has what counts toward it and how many it needs; when it's reached the save remembers when.
+// They're for show: no rewards, nothing changes the balance. Checked every few seconds; an older save gets credit for
+// what it has already done without a pile of toasts.
+const dexCount = () => Object.keys(S.box).length, shinyCount = () => Object.values(S.box).filter(b => b.shiny).length;
+const topLevel = () => Math.max(1, ...Object.keys(S.box).map(Number).map(level));
+const ACH = [
+  ...[[2, "First catch", "Catch a Pokémon"], [10, "Collector", "10 in your Pokédex"], [50, "Getting serious", "50 in your Pokédex"], [100, "Triple digits", "100 in your Pokédex"],
+    [250, "Quarter way", "250 in your Pokédex"], [500, "Halfway there", "500 in your Pokédex"], [750, "Nearly there", "750 in your Pokédex"], [1025, "Gotta catch 'em all", "Every Pokémon, all 1025"]]
+    .map(([need, title, desc]) => ({ id: "dex" + need, group: "Pokédex", title, desc, need, have: dexCount })),
+  ...REGIONS.map((R, r) => ({ id: "region" + r, group: "Regional Pokédex", title: `${R.name} complete`, desc: `Every Pokémon first found in ${R.name}`, need: regionMons(r).length, have: () => regionMons(r).filter(m => S.box[m.num]).length })),
+  ...[[1, "Something sparkly", "Catch a shiny"], [10, "Shiny hunter", "10 shinies"], [100, "Glittering", "100 shinies"]].map(([need, title, desc]) => ({ id: "shiny" + need, group: "Shinies", title, desc, need, have: shinyCount })),
+  ...[[1, "First badge", "Win a gym badge"], [8, "Two regions in", "8 badges"], [24, "Seasoned", "24 badges"], [36, "Every badge", "All 36 badges"]].map(([need, title, desc]) => ({ id: "badge" + need, group: "Gyms and Champions", title, desc, need, have: () => Object.keys(S.badges).length })),
+  ...[[1, "Champion", "Beat a Champion"], [5, "Five crowns", "Beat 5 Champions"], [9, "Champion of everywhere", "Beat all 9 Champions"]].map(([need, title, desc]) => ({ id: "champ" + need, group: "Gyms and Champions", title, desc, need, have: () => Object.keys(S.champs).length })),
+  { id: "red", group: "Gyms and Champions", title: "The summit", desc: "Beat Red on Mt. Silver", need: 1, have: () => S.charm ? 1 : 0 },
+  { id: "lv50", group: "Training", title: "Halfway to 100", desc: "A Pokémon at Lv 50", need: 50, have: topLevel },
+  { id: "lv100", group: "Training", title: "Lv 100", desc: "A Pokémon at Lv 100", need: 100, have: topLevel },
+  { id: "team100", group: "Training", title: "Dream team", desc: "A full party of six at Lv 100", need: 6, have: () => S.party.filter(n => level(n) >= 100).length },
+  ...[[1, "First evolution", "Evolve a Pokémon"], [50, "Metamorphosis", "50 evolutions"]].map(([need, title, desc]) => ({ id: "evo" + need, group: "Training", title, desc, need, have: () => S.stats.evolved })),
+  ...[[100, "Warming up", "Win 100 fights"], [1000, "Veteran", "Win 1,000 fights"], [10000, "Unstoppable", "Win 10,000 fights"]].map(([need, title, desc]) => ({ id: "wins" + need, group: "Battle", title, desc, need, have: () => S.stats.wins })),
+  ...[[1000, "Helping hand", "Tap 1,000 times"], [10000, "Sore finger", "Tap 10,000 times"], [100000, "Auto-clicker? No", "Tap 100,000 times"]].map(([need, title, desc]) => ({ id: "taps" + need, group: "Battle", title, desc, need, have: () => S.stats.taps })),
+  { id: "dungeon1", group: "Dungeons and legendaries", title: "Into the dark", desc: "Clear a dungeon", need: 1, have: () => Object.values(S.dungeons).reduce((a, b) => a + b, 0) },
+  { id: "dungeon9", group: "Dungeons and legendaries", title: "Spelunker", desc: "Clear every region's dungeon", need: 9, have: () => Object.keys(S.dungeons).length },
+  { id: "dungeon50", group: "Dungeons and legendaries", title: "Regular", desc: "Clear 50 dungeons", need: 50, have: () => Object.values(S.dungeons).reduce((a, b) => a + b, 0) },
+  ...[[1, "Legend", "Catch a legendary or mythical"], [10, "Myth hunter", "Catch 10 legendaries or mythicals"]].map(([need, title, desc]) => ({ id: "legend" + need, group: "Dungeons and legendaries", title, desc, need, have: () => Object.keys(S.box).filter(n => legendary(mon(+n))).length })),
+  { id: "key", group: "Megas and Gigantamax", title: "Key Stone", desc: "Get the Key Stone from Steven", need: 1, have: () => S.key ? 1 : 0 },
+  { id: "band", group: "Megas and Gigantamax", title: "Dynamax Band", desc: "Get the Dynamax Band from Leon", need: 1, have: () => S.band ? 1 : 0 },
+  { id: "form1", group: "Megas and Gigantamax", title: "Power within", desc: "Unlock a Mega or Gigantamax form", need: 1, have: () => Object.keys(S.stones).length + Object.keys(S.gfactor).length },
+  { id: "formall", group: "Megas and Gigantamax", title: "Every form", desc: `Unlock all ${FORMS.length} forms`, need: FORMS.length, have: () => FORMS.filter(f => f.kind === "mega" ? S.stones[f.id] : S.gfactor[f.num]).length },
+  { id: "money100k", group: "Extras", title: "Saving up", desc: "Hold $100,000", need: 1e5, have: () => S.money },
+  { id: "money10m", group: "Extras", title: "Tycoon", desc: "Hold $10,000,000", need: 1e7, have: () => S.money },
+  { id: "protein", group: "Extras", title: "Gains", desc: `All ${PROTEIN_PER_REGION * REGIONS.length} Protein`, need: PROTEIN_PER_REGION * REGIONS.length, have: () => S.protein },
+  { id: "gift", group: "Extras", title: "You've got mail", desc: "Claim a gift", need: 1, have: () => S.stats.gifts },
+  { id: "special", group: "Extras", title: "Special edition", desc: "Own a special edition Pokémon", need: 1, have: () => Object.values(S.box).filter(b => b.special).length }
+];
+function checkAch(quiet) {
+  if (!S || !S.ach) return [];
+  const now = Date.now(), got = ACH.filter(a => !S.ach[a.id] && a.have() >= a.need);
+  for (const a of got) S.ach[a.id] = now;
+  if (!got.length) return got;
+  const msg = got.length === 1 ? `Achievement: ${got[0].title}` : `${got.length} achievements: ${got.map(a => a.title).join(", ")}`;
+  if (!quiet) { const el = $("#toast"); toast(el.hidden ? msg : `${el.textContent} ${msg}.`); }
+  if (tab === "ach" && screen === "game") renderAch();
+  return got;
+}
+function renderAch() {
+  if (!S) return;
+  const done = ACH.filter(a => S.ach[a.id]).length;
+  $("#achsum").innerHTML = `<b>${done}/${ACH.length}</b> earned. Just for show: they don't change the game.`;
+  let html = "", group = null;
+  for (const a of ACH) {
+    if (a.group !== group) { group = a.group; html += `<div class="ach-group">${esc(group)}</div>`; }
+    const at = S.ach[a.id], have = Math.min(a.have(), a.need);
+    html += `<div class="ach${at ? " got" : ""}"><span><b>${esc(a.title)}</b> · ${esc(a.desc)}</span>` +
+      (at ? `<span class="when">${new Date(at).toLocaleDateString()}</span>` : `<span><span class="count" style="display:block">${fmt(Math.floor(have))} / ${fmt(a.need)}</span><span class="bar"><i style="width:${100 * have / a.need}%"></i></span></span>`) + `</div>`;
+  }
+  $("#achlist").innerHTML = html;
+}
+
 // ── Mail: update notes and gifts, newest first.
 // To send something, put a new entry at the top with an id that has never been used (each save remembers the ids it
 // has read and claimed). A gift can hold: money, balls { poke, great, ultra, master }, items { "Fire Stone": 1 },
@@ -1015,7 +1090,7 @@ function claimGift(id) {
     S.box[sp.num] = { xp: Math.max(Math.pow(levelCap(), 3), had ? had.xp : 0), shiny: had ? had.shiny : false, special: g.special };
     if (!had && S.party.length < 6) S.party.push(sp.num);
   }
-  S.mail.claimed[id] = 1;
+  S.mail.claimed[id] = 1; S.stats.gifts++;
   toast(`Claimed ${giftText(g)}.`);
   renderMail();
 }
@@ -1052,6 +1127,7 @@ function wikiSections() {
     { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${new Set(FORMS.filter(f => f.kind === "gmax").map(f => f.num)).size} species with a Gigantamax form then needs Max Soup: $${fmt(SOUP_PRICE)}, or a boss drop at the same odds as Mega Stones, again only for your party. One Gigantamax Pokémon at a time, always on; it hits ${pct(GMAX_BOOST - 1)} harder. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
     { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm. A shiny that evolves stays shiny. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
     { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>One point per Pokédex entry and one more for each one you have shiny, up to 2050. It posts to the arcade board when you're signed in.</p>` },
+    { id: "achievements", group: "Collection", title: "Achievements", html: `<p>${ACH.length} of them, from your first catch to every form, in the Achievements tab with how far along each is. They're for show: no rewards, nothing changes the game.</p>` },
     { id: "mail", group: "Collection", title: "Mail", html: `<p>Update notes and gifts arrive in the Mail tab; the tab and the title screen show how many are new. Each gift can be claimed once per save, between battles.</p>` },
     { id: "saves", group: "Collection", title: "Saves", html: `<p>Your save lives in this browser. Settings → "Show my save code" gives a code to paste on another device; the title screen can load one too. New game erases the save on this device, so copy the code first if you might want it back.</p>` }
   ];
@@ -1141,7 +1217,7 @@ $("#wiki-text").addEventListener("scroll", () => {
 });
 
 // ── Events
-function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki", "mail"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; if (t === "wiki") renderWiki(); if (t === "mail") renderMail(); renderAll(); refitSprites(); }
+function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki", "mail", "ach"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; if (t === "wiki") renderWiki(); if (t === "mail") renderMail(); if (t === "ach") renderAch(); renderAll(); refitSprites(); }
 $("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) openTab(b.dataset.tab); };
 $("#regions").onclick = e => { const b = e.target.closest("[data-r]"); if (b) { viewR = +b.dataset.r; renderLocs(); } };
 $("#locs").onclick = e => { const b = e.target.closest("[data-loc]"); if (b) startLoc(JSON.parse(b.dataset.loc)); };
@@ -1154,7 +1230,7 @@ function tap(e) {
   const now = performance.now();
   tapFill = Math.min(TAP_BURST, tapFill + (now - tapAt) / 1000 * TAP_RATE); tapAt = now;
   if (tapFill < 1) return 0;
-  tapFill--;
+  tapFill--; S.stats.taps++;
   const d = clickDamage(); hit(d); return d;
 }
 $("#foe").addEventListener("pointerdown", e => {
@@ -1242,6 +1318,7 @@ function migrateSave() {
   // Megas and Gigantamax arrived later: saves past Steven or Leon get the key item they would have been given.
   S.stones = S.stones || {}; S.gfactor = S.gfactor || {}; S.mega = S.mega || null; S.gmax = S.gmax || 0;
   S.mail = S.mail || { read: {}, claimed: {} }; S.mail.got = S.mail.got || {};
+  S.ach = S.ach || {}; S.stats = Object.assign({ taps: 0, wins: 0, evolved: 0, gifts: 0 }, S.stats);
   if (S.champs[KEY_STONE_FROM]) S.key = 1;
   if (S.champs[BAND_FROM]) S.band = 1;
 }
@@ -1251,8 +1328,10 @@ let screen = "title", panel = "save", cur = 0, awayText = "", titleMsg = "";
 function show(name) { screen = name; $("#title").hidden = name !== "title"; $("#pick").hidden = name !== "pick"; $("#game").hidden = name !== "game"; refitSprites(); }
 function boot() {
   B = null; awayText = ""; titleMsg = "";
-  if (S) { migrateSave(); deliverMail(); awayText = offline(); save(); }
+  let earned = [];
+  if (S) { migrateSave(); deliverMail(); awayText = offline(); earned = checkAch(true); save(); }
   showTitle();
+  if (earned.length) { titleMsg = `${earned.length} achievement${earned.length > 1 ? "s" : ""} earned: see the Achievements tab.`; renderTitle(); }
 }
 function showTitle() { show("title"); panel = S ? "save" : "how"; cur = 0; renderTitle(); }
 function showPick() {
@@ -1270,7 +1349,7 @@ function enter(t) {
 }
 
 const MENU = {
-  save: [["continue", "Continue"], ["party", "Party & Box"], ["dex", "Pokédex"], ["settings", "Settings"], ["wiki", "Wiki"], ["mail", "Mail"], ["how", "How to play"], ["new", "New game"]],
+  save: [["continue", "Continue"], ["party", "Party & Box"], ["dex", "Pokédex"], ["settings", "Settings"], ["wiki", "Wiki"], ["mail", "Mail"], ["ach", "Achievements"], ["how", "How to play"], ["new", "New game"]],
   fresh: [["new", "New game"], ["load", "Load a save code"], ["how", "How to play"]]
 };
 const HOW = [
@@ -1347,14 +1426,14 @@ function leadField() {
 function saveCard() {
   const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
   const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`],
-    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${caught + shiny} points`]].concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
+    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${caught + shiny} points`]].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<div class="t-party">${S.party.map(n => `<img src="${sprite(n, S.box[n].shiny)}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
     (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "");
 }
 function go(id) {
   if (id === "continue") return enter("battle");
-  if (id === "party" || id === "dex" || id === "settings" || id === "wiki" || id === "mail") return enter(id);
+  if (id === "party" || id === "dex" || id === "settings" || id === "wiki" || id === "mail" || id === "ach") return enter(id);
   if (id === "back") return useSlot(KEY);
   if (id === "new" && !S) return showPick();
   // How to play, Load and New game (with a save) open in the card; choosing the open one again closes it.
@@ -1381,7 +1460,7 @@ $("#t-card").onclick = e => {
 $("#pickback").onclick = showTitle;
 $("#starters").onclick = e => { const b = e.target.closest("[data-start]"); if (!b) return; S = fresh(); S.box[+b.dataset.start] = { xp: 125, shiny: false }; S.party = [+b.dataset.start]; B = null; enter("battle"); toast(`${mon(+b.dataset.start).name} is your partner. Tap the wild Pokémon to help it fight.`); };
 setInterval(tick, 100);
-setInterval(() => { if (S) { deliverMail(); save(); } }, 5000);
+setInterval(() => { if (S) { deliverMail(); checkAch(); save(); } }, 5000);
 boot();
 
 // The hub reads this: integer metrics, never null.
