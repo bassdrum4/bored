@@ -188,6 +188,23 @@
   .t-how li { padding-left: 14px; text-indent: -14px } .t-how li::before { content: "- "; color: var(--dim) }
   button.lbl.danger { color: var(--red); border-color: var(--red) }
 
+  #sign { user-select: none; -webkit-user-select: none; touch-action: manipulation; -webkit-touch-callout: none }
+
+  /* Mail: the letters down the left, the open one beside them. */
+  #mailn:not(:empty) { margin-left: 5px; padding: 0 5px; border-radius: 2px; background: var(--red); color: #fff; font-size: 10px }
+  .mail { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 12px; align-items: start }
+  @media (max-width: 680px) { .mail { grid-template-columns: minmax(0, 1fr) } }
+  .mail-list { display: flex; flex-direction: column; border-top: 1px solid var(--rule) }
+  .mail-item { font: inherit; font-size: 12px; text-align: left; background: none; color: var(--dim); border: 0; border-bottom: 1px solid var(--rule); padding: 8px 8px 8px 12px; cursor: pointer; display: grid; gap: 1px; position: relative }
+  .mail-item:hover { background: var(--sunk) }
+  .mail-item.new { color: var(--ink); font-weight: 700 }
+  .mail-item.on { background: var(--surface); color: var(--ink) }
+  .mail-item.on::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; background: var(--red) }
+  .mail-item .gift { color: var(--gold); font-weight: 700 }
+  .letter { border: 1px solid var(--rule); background: var(--surface); border-radius: 3px; padding: 12px 14px; font-size: 13px; line-height: 1.55; display: flex; flex-direction: column; gap: 6px; max-width: 70ch }
+  .letter ul { padding-left: 18px }
+  .letter .giftbox { border: 1px dashed var(--gold); border-radius: 3px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap }
+
   /* Wiki: laid out like Civ Lite's How to play. Contents and search on the left, the text scrolls on its own. */
   #t-wiki { padding: 0; gap: 0 }
   .wiki { display: flex; height: min(74vh, 700px); min-height: 380px; position: relative }
@@ -232,7 +249,8 @@
 <body>
 <main>
   <section id="title" hidden>
-    <div class="head"><h1>Poké Idle</h1><span class="small muted">Your party fights on its own; you just help.</span></div>
+    <div class="head"><h1 id="sign">Poké Idle</h1><span class="small muted" id="tagline">Your party fights on its own; you just help.</span></div>
+    <form class="row small" id="testdoor" hidden><input type="password" id="testpw" aria-label="Password" autocomplete="off" spellcheck="false"><button class="lbl" type="submit">Open</button><span class="bad" id="testmsg" role="status"></span></form>
     <div class="t-grid">
       <div class="field" id="t-field"></div>
       <nav class="menu" id="menu" aria-label="Title menu"></nav>
@@ -263,6 +281,7 @@
       <button data-tab="shop" type="button">Shop</button>
       <button data-tab="settings" type="button">Settings</button>
       <button data-tab="wiki" type="button">Wiki</button>
+      <button data-tab="mail" type="button">Mail<b id="mailn"></b></button>
     </div>
 
     <section id="t-battle" class="cols">
@@ -315,6 +334,10 @@
         </nav>
         <div class="wiki-text" id="wiki-text"></div>
       </div>
+    </section>
+
+    <section id="t-mail" class="box" hidden>
+      <div class="mail" id="mail"></div>
     </section>
 
     <section id="t-settings" class="box" hidden>
@@ -375,8 +398,17 @@ const mon = n => MON[n - 1];
 const FORMS = [[10033,3,"Mega Venusaur","Grass/Poison","m",80,100,123,122,120,80],[10195,3,"Gigantamax Venusaur","Grass/Poison","g",80,82,83,100,100,80],[10034,6,"Mega Charizard X","Fire/Dragon","m",78,130,111,130,85,100],[10035,6,"Mega Charizard Y","Fire/Flying","m",78,104,78,159,115,100],[10196,6,"Gigantamax Charizard","Fire/Flying","g",78,84,78,109,85,100],[10036,9,"Mega Blastoise","Water","m",79,103,120,135,115,78],[10197,9,"Gigantamax Blastoise","Water","g",79,83,100,85,105,78],[10198,12,"Gigantamax Butterfree","Bug/Flying","g",60,45,50,90,80,70],[10090,15,"Mega Beedrill","Bug/Poison","m",65,150,40,15,80,145],[10073,18,"Mega Pidgeot","Normal/Flying","m",83,80,80,135,80,121],[10199,25,"Gigantamax Pikachu","Electric","g",35,55,40,50,50,90],[10304,26,"Mega Raichu X","Electric","m",60,135,95,90,95,110],[10305,26,"Mega Raichu Y","Electric","m",60,100,55,160,80,130],[10278,36,"Mega Clefable","Fairy/Flying","m",95,80,93,135,110,70],[10200,52,"Gigantamax Meowth","Normal","g",40,45,35,40,40,90],[10037,65,"Mega Alakazam","Psychic","m",55,50,65,175,105,150],[10201,68,"Gigantamax Machamp","Fighting","g",90,130,80,65,85,55],[10279,71,"Mega Victreebel","Grass/Poison","m",80,125,85,135,95,70],[10071,80,"Mega Slowbro","Water/Psychic","m",95,75,180,130,80,30],[10038,94,"Mega Gengar","Ghost/Poison","m",60,65,80,170,95,130],[10202,94,"Gigantamax Gengar","Ghost/Poison","g",60,65,60,130,75,110],[10203,99,"Gigantamax Kingler","Water","g",55,130,115,50,50,75],[10039,115,"Mega Kangaskhan","Normal","m",105,125,100,60,100,100],[10280,121,"Mega Starmie","Water/Psychic","m",60,100,105,130,105,120],[10040,127,"Mega Pinsir","Bug/Flying","m",65,155,120,65,90,105],[10041,130,"Mega Gyarados","Water/Dark","m",95,155,109,70,130,81],[10204,131,"Gigantamax Lapras","Water/Ice","g",130,85,80,85,95,60],[10205,133,"Gigantamax Eevee","Normal","g",55,55,50,45,65,55],[10042,142,"Mega Aerodactyl","Rock/Flying","m",80,135,85,70,95,150],[10206,143,"Gigantamax Snorlax","Normal","g",160,110,65,65,110,30],[10281,149,"Mega Dragonite","Dragon/Flying","m",91,124,115,145,125,100],[10043,150,"Mega Mewtwo X","Psychic/Fighting","m",106,190,100,154,100,130],[10044,150,"Mega Mewtwo Y","Psychic","m",106,150,70,194,120,140],[10282,154,"Mega Meganium","Grass/Fairy","m",80,92,115,143,115,80],[10283,160,"Mega Feraligatr","Water/Dragon","m",85,160,125,89,93,78],[10045,181,"Mega Ampharos","Electric/Dragon","m",90,95,105,165,110,45],[10072,208,"Mega Steelix","Steel/Ground","m",75,125,230,55,95,30],[10046,212,"Mega Scizor","Bug/Steel","m",70,150,140,65,100,75],[10047,214,"Mega Heracross","Bug/Fighting","m",80,185,115,40,105,75],[10284,227,"Mega Skarmory","Steel/Flying","m",65,140,110,40,100,110],[10048,229,"Mega Houndoom","Dark/Fire","m",75,90,90,140,90,115],[10049,248,"Mega Tyranitar","Rock/Dark","m",100,164,150,95,120,71],[10065,254,"Mega Sceptile","Grass/Dragon","m",70,110,75,145,85,145],[10050,257,"Mega Blaziken","Fire/Fighting","m",80,160,80,130,80,100],[10064,260,"Mega Swampert","Water/Ground","m",100,150,110,95,110,70],[10051,282,"Mega Gardevoir","Psychic/Fairy","m",68,85,65,165,135,100],[10066,302,"Mega Sableye","Dark/Ghost","m",50,85,125,85,115,20],[10052,303,"Mega Mawile","Steel/Fairy","m",50,105,125,55,95,50],[10053,306,"Mega Aggron","Steel","m",70,140,230,60,80,50],[10054,308,"Mega Medicham","Fighting/Psychic","m",60,100,85,80,85,100],[10055,310,"Mega Manectric","Electric","m",70,75,80,135,80,135],[10070,319,"Mega Sharpedo","Water/Dark","m",70,140,70,110,65,105],[10087,323,"Mega Camerupt","Fire/Ground","m",70,120,100,145,105,20],[10067,334,"Mega Altaria","Dragon/Fairy","m",75,110,110,110,105,80],[10056,354,"Mega Banette","Ghost","m",64,165,75,93,83,75],[10306,358,"Mega Chimecho","Psychic/Steel","m",75,50,110,135,120,65],[10057,359,"Mega Absol","Dark","m",65,150,60,115,60,115],[10307,359,"Mega Absol Z","Dark/Ghost","m",65,154,60,75,60,151],[10074,362,"Mega Glalie","Ice","m",80,120,80,120,80,100],[10089,373,"Mega Salamence","Dragon/Flying","m",95,145,130,120,90,120],[10076,376,"Mega Metagross","Steel/Psychic","m",80,145,150,105,110,110],[10062,380,"Mega Latias","Dragon/Psychic","m",80,100,120,140,150,110],[10063,381,"Mega Latios","Dragon/Psychic","m",80,130,100,160,120,110],[10079,384,"Mega Rayquaza","Dragon/Flying","m",105,180,100,180,100,115],[10308,398,"Mega Staraptor","Fighting/Flying","m",85,140,100,60,90,110],[10088,428,"Mega Lopunny","Normal/Fighting","m",65,136,94,54,96,135],[10058,445,"Mega Garchomp","Dragon/Ground","m",108,170,115,120,95,92],[10309,445,"Mega Garchomp Z","Dragon","m",108,130,85,141,85,151],[10059,448,"Mega Lucario","Fighting/Steel","m",70,145,88,140,70,112],[10310,448,"Mega Lucario Z","Fighting/Steel","m",70,100,70,164,70,151],[10060,460,"Mega Abomasnow","Grass/Ice","m",90,132,105,132,105,30],[10068,475,"Mega Gallade","Psychic/Fighting","m",68,165,95,65,115,110],[10285,478,"Mega Froslass","Ice/Ghost","m",70,80,70,140,100,120],[10311,485,"Mega Heatran","Fire/Steel","m",91,120,106,175,141,67],[10312,491,"Mega Darkrai","Dark","m",70,120,130,165,130,85],[10286,500,"Mega Emboar","Fire/Fighting","m",110,148,75,110,110,75],[10287,530,"Mega Excadrill","Ground/Steel","m",110,165,100,65,65,103],[10069,531,"Mega Audino","Normal/Fairy","m",103,60,126,80,126,50],[10288,545,"Mega Scolipede","Bug/Poison","m",60,140,149,75,99,62],[10289,560,"Mega Scrafty","Dark/Fighting","m",65,130,135,55,135,68],[10207,569,"Gigantamax Garbodor","Poison","g",80,95,82,60,82,75],[10290,604,"Mega Eelektross","Electric","m",85,145,80,135,90,80],[10291,609,"Mega Chandelure","Ghost/Fire","m",60,75,110,175,110,90],[10313,623,"Mega Golurk","Ground/Ghost","m",89,159,105,70,105,55],[10292,652,"Mega Chesnaught","Grass/Fighting","m",88,137,172,74,115,44],[10293,655,"Mega Delphox","Fire/Psychic","m",75,69,72,159,125,134],[10294,658,"Mega Greninja","Water/Dark","m",72,125,77,133,81,142],[10295,668,"Mega Pyroar","Fire/Normal","m",86,88,92,129,86,126],[10296,670,"Mega Floette","Fairy","m",74,85,87,155,148,102],[10297,687,"Mega Malamar","Dark/Psychic","m",86,102,88,98,120,88],[10298,689,"Mega Barbaracle","Rock/Fighting","m",72,140,130,64,106,88],[10299,691,"Mega Dragalge","Poison/Dragon","m",65,85,105,132,163,44],[10300,701,"Mega Hawlucha","Fighting/Flying","m",78,137,100,74,93,118],[10301,718,"Mega Zygarde","Dragon/Ground","m",216,70,91,216,85,100],[10075,719,"Mega Diancie","Rock/Fairy","m",50,160,110,160,110,110],[10315,740,"Mega Crabominable","Fighting/Ice","m",97,157,122,62,107,33],[10316,768,"Mega Golisopod","Bug/Steel","m",75,150,175,70,120,40],[10302,780,"Mega Drampa","Normal/Dragon","m",78,85,110,160,116,36],[10317,801,"Mega Magearna","Steel/Fairy","m",80,125,115,170,115,95],[10319,807,"Mega Zeraora","Electric","m",88,157,75,147,80,153],[10208,809,"Gigantamax Melmetal","Steel","g",135,143,143,80,65,34],[10209,812,"Gigantamax Rillaboom","Grass","g",100,125,90,60,70,85],[10210,815,"Gigantamax Cinderace","Fire","g",80,116,75,65,75,119],[10211,818,"Gigantamax Inteleon","Water","g",70,85,65,125,65,120],[10212,823,"Gigantamax Corviknight","Flying/Steel","g",98,87,105,53,85,67],[10213,826,"Gigantamax Orbeetle","Bug/Psychic","g",60,45,110,80,120,90],[10214,834,"Gigantamax Drednaw","Water/Rock","g",90,115,90,48,68,74],[10215,839,"Gigantamax Coalossal","Rock/Fire","g",110,80,120,80,90,30],[10216,841,"Gigantamax Flapple","Grass/Dragon","g",70,110,80,95,60,70],[10217,842,"Gigantamax Appletun","Grass/Dragon","g",110,85,80,100,80,30],[10218,844,"Gigantamax Sandaconda","Ground","g",72,107,125,65,70,71],[10219,849,"Gigantamax Toxtricity (Amped)","Electric/Poison","g",75,98,70,114,70,75],[10228,849,"Gigantamax Toxtricity (Low Key)","Electric/Poison","g",75,98,70,114,70,75],[10220,851,"Gigantamax Centiskorch","Fire/Bug","g",100,115,65,90,90,65],[10221,858,"Gigantamax Hatterene","Psychic/Fairy","g",57,90,95,136,103,29],[10222,861,"Gigantamax Grimmsnarl","Dark/Fairy","g",95,120,65,95,75,60],[10223,869,"Gigantamax Alcremie","Fairy","g",65,60,75,110,121,64],[10303,870,"Mega Falinks","Fighting","m",65,135,135,70,65,100],[10224,879,"Gigantamax Copperajah","Steel","g",122,130,69,80,69,30],[10225,884,"Gigantamax Duraludon","Steel/Dragon","g",70,95,115,120,50,85],[10226,892,"Gigantamax Urshifu (Single Strike)","Fighting/Dark","g",100,130,100,63,60,97],[10227,892,"Gigantamax Urshifu (Rapid Strike)","Fighting/Water","g",100,130,100,63,60,97],[10320,952,"Mega Scovillain","Grass/Fire","m",65,138,85,138,85,75],[10321,970,"Mega Glimmora","Rock/Poison","m",83,90,105,150,96,101],[10325,998,"Mega Baxcalibur","Dragon/Ice","m",115,175,117,105,101,87],[10314,678,"Mega Meowstic","Psychic","m",74,48,76,143,101,124],[10322,978,"Mega Tatsugiri","Dragon/Water","m",68,65,90,135,125,92]].map(([id, num, name, types, kind, hp, atk, def, spa, spd, spe]) => ({ id, num, sprite: id, name, types: types.split("/"), kind: kind === "m" ? "mega" : "gmax", hp, atk, def, spa, spd, spe, bst: hp + atk + def + spa + spd + spe, cr: mon(num).cr, evos: [], flags: mon(num).flags, gen: mon(num).gen }));
 const formById = id => FORMS.find(f => f.id === id);
 const formsOf = (n, kind) => FORMS.filter(f => f.num === n && f.kind === kind);
+// Poké Idle's own pictures (one-of-a-kind gifts), next to this file; same frame trick as SPRITE_DIR.
+const ASSET_DIR = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI) ? "poke-idle/" : "games/content/poke-idle/";
+// One-of-a-kind Pokémon sent by mail. A save keeps one of each species, so a special takes over its species in that
+// save (box entry { special: id }): its own picture, its own stats, same types.
+const SPECIALS = {
+  "bday-ceruledge": { num: 937, name: "Ceruledge", title: "Birthday Ceruledge", note: "A birthday gift, Nov 16, 2026. Every stat 10% above a normal Ceruledge's.",
+    img: ASSET_DIR + "937-birthday.png", hp: 83, atk: 138, def: 88, spa: 66, spd: 110, spe: 94 }
+};
+for (const sp of Object.values(SPECIALS)) Object.assign(sp, { types: mon(sp.num).types, cr: mon(sp.num).cr, flags: mon(sp.num).flags, gen: mon(sp.num).gen, evos: [], bst: sp.hp + sp.atk + sp.def + sp.spa + sp.spd + sp.spe });
 // Forms have no shiny sprites, so a shiny Mega shows its usual colours.
-const spriteOf = (m, shiny) => m.sprite ? sprite(m.sprite) : sprite(m.num, shiny);
+const spriteOf = (m, shiny) => m.img ? m.img : m.sprite ? sprite(m.sprite) : sprite(m.num, shiny);
 const TI = Object.fromEntries(D.types.map((t, i) => [t, i]));
 const MULT = { "0": 0, h: .5, "1": 1, "2": 2 };
 const eff = (atkType, defTypes) => defTypes.reduce((m, d) => m * MULT[D.chart[TI[atkType]][TI[d]]], 1);
@@ -486,10 +518,13 @@ const proteinPrice = n => Math.round(300 * Math.pow(1.5, n));
 const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 
 // ── Save
-const KEY = "bored.poke-idle.save";
-const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, last: Date.now() });
-let S = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 1 ? s : null; } catch { return null; } })();
-const save = () => { S.last = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+// The real save, and a separate slot for the test account (below). Which slot is open is remembered.
+const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", SLOT_KEY = "bored.poke-idle.slot";
+let slot = (() => { try { return localStorage.getItem(SLOT_KEY) === "test" ? TEST_KEY : KEY; } catch { return KEY; } })();
+const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
+const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, last: Date.now() });
+let S = readSlot(slot);
+const save = () => { S.last = Date.now(); try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
 
 // ── Party power
 const lvlOf = xp => Math.max(1, Math.min(100, Math.floor(Math.cbrt(xp + 0.5))));
@@ -519,7 +554,8 @@ const hitRate = m => (m.spe + 75) / 150;
 const bulkOf = m => (m.hp + m.def + m.spd) / 3;
 const PARTY_BULK = 85;
 // What a party member fights as: its Mega form if it's the party's Mega.
-const fighter = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || mon(n);
+const special = n => S.box[n] && S.box[n].special && SPECIALS[S.box[n].special];
+const fighter = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || special(n) || mon(n);
 const partyTime = () => S.party.length ? Math.min(1.25, Math.max(.8, S.party.reduce((s, n) => s + bulkOf(fighter(n)), 0) / S.party.length / PARTY_BULK)) : 1;
 const power = (n, L = level(n)) => { const m = fighter(n); return Math.max(m.atk, m.spa) * L / 50 * hitRate(m) * (1 + proteinBoost()) * (S.gmax === n ? GMAX_BOOST : 1); };
 const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n)) * (foe ? bestEff(fighter(n), foe) : 1), 0);
@@ -791,6 +827,8 @@ function toast(t) { const el = $("#toast"); el.textContent = t; el.hidden = fals
 let tab = "battle", dexR = 0, viewR = 0, detail = null;
 function renderAll() { renderTop(); renderLocs(); renderMinis(); if (tab === "party") renderParty(); if (tab === "dex") renderDex(); if (tab === "shop") renderShop(); }
 function renderTop() {
+  $("#top h1").textContent = S && S.test ? "Poké Idle (test)" : "Poké Idle";
+  $("#mailn").textContent = unreadMail() || "";
   $("#dexn").textContent = Object.keys(S.box).length;
   $("#badgen").textContent = Object.keys(S.badges).length;
   $("#capn").textContent = levelCap();
@@ -812,11 +850,11 @@ function renderLocs() {
   }).join("");
 }
 // How a party member looks: its Mega or Gigantamax form when it has one on.
-const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax === n && formsOf(n, "gmax")[0]) || mon(n);
+const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax === n && formsOf(n, "gmax")[0]) || special(n) || mon(n);
 function monTile(n, opts = {}) {
-  const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : m, e = opts.foe ? bestEff(fighter(n), opts.foe) : null;
+  const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : special(n) || m, e = opts.foe ? bestEff(fighter(n), opts.foe) : null;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny || look !== m ? `<span class="star">${[b.shiny ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, b.shiny)}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](m)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny || look !== m ? `<span class="star">${[b.shiny && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, b.shiny)}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](m)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -847,10 +885,11 @@ function formLines(n) {
 function renderDetail() {
   const el = $("#detail");
   if (!detail || !S.box[detail]) { el.hidden = true; return; }
-  const m = mon(detail), opts = m.evos;
+  const sp = special(detail), m = mon(detail), opts = m.evos, st = sp || m;
   el.hidden = false;
   el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${m.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
-    `<div class="small muted">HP <b>${m.hp}</b> · Atk <b>${m.atk}</b> · Def <b>${m.def}</b> · SpA <b>${m.spa}</b> · SpD <b>${m.spd}</b> · Spe <b>${m.spe}</b> · Total <b>${m.bst}</b></div>` +
+    `<div class="small muted">HP <b>${st.hp}</b> · Atk <b>${st.atk}</b> · Def <b>${st.def}</b> · SpA <b>${st.spa}</b> · SpD <b>${st.spd}</b> · Spe <b>${st.spe}</b> · Total <b>${st.bst}</b></div>` +
+    (sp ? `<div class="small"><b>SP · Special edition: ${esc(sp.title)}</b> <span class="muted">${esc(sp.note)}</span></div>` : "") +
     (opts.length ? `<div class="small">${opts.map(e => {
       const [t, how, v] = e, owned = S.box[t], open = !owned || level(t) < level(detail), ok = open && canEvolve(detail, e);
       const need = how === "L" ? `Lv ${v}${v > levelCap() ? " (over the cap)" : ""}` : how === "I" ? `${v} (have ${S.items[v] || 0})` : `Linking Cord (have ${S.cords})`;
@@ -871,7 +910,7 @@ function renderDex() {
   }
   const list = regionMons(dexR), got = list.filter(m => S.box[m.num]).length, shinies = list.filter(m => S.box[m.num] && S.box[m.num].shiny).length;
   $("#dexsum").innerHTML = `${REGIONS[dexR].name}: <b>${got}/${list.length}</b> caught · ${shinies} shiny${S.charm ? " (Shiny Charm)" : ""} · all regions ${Object.keys(S.box).length}/1025`;
-  $("#dexgrid").innerHTML = list.map(m => { const b = S.box[m.num]; return `<img src="${sprite(m.num, b && b.shiny)}" alt="${b || S.seen[m.num] ? esc(m.name) : "unknown"}" title="#${m.num} ${b || S.seen[m.num] ? esc(m.name) : "???"}" class="${b ? "" : "no"}" loading="lazy">`; }).join("");
+  $("#dexgrid").innerHTML = list.map(m => { const b = S.box[m.num]; return `<img src="${b && special(m.num) ? special(m.num).img : sprite(m.num, b && b.shiny)}" alt="${b || S.seen[m.num] ? esc(m.name) : "unknown"}" title="#${m.num} ${b || S.seen[m.num] ? esc(m.name) : "???"}" class="${b ? "" : "no"}" loading="lazy">`; }).join("");
 }
 function renderShop() {
   const rows = [];
@@ -907,6 +946,84 @@ function buy(id, q) {
   save(); renderShop(); renderTop(); renderMinis();
 }
 
+// ── Mail: update notes and gifts, newest first.
+// To send something, put a new entry at the top with an id that has never been used (each save remembers the ids it
+// has read and claimed). A gift can hold: money, balls { poke, great, ultra, master }, items { "Fire Stone": 1 },
+// cords, tickets { region index (0 = Kanto): count }, protein, stones [Mega form ids, see FORMS] and soup [dex numbers].
+// Every save can claim each gift once. A gift can also be a one-of-a-kind Pokémon: special: an id from SPECIALS.
+// An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
+// time, as for the daily challenge); once it has arrived it stays in that save's Mail.
+const MAIL = [
+  { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Vettel", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
+    body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
+  { id: "mail-welcome", date: "Nov 13, 2026", from: "Vettel", title: "Mail is here", gift: { balls: { great: 20, ultra: 10 }, money: 5000 },
+    body: `<p>From now on, update notes and the odd gift land here. Gifts are claimed once per save.</p><p>Here's a little something to start.</p>` },
+  { id: "update-2026-11-13b", date: "Nov 13, 2026", from: "Vettel", title: "Megas, Gigantamax, Speed and Def, and a wiki",
+    body: `<ul><li><b>Speed</b> sets how often each Pokémon hits. <b>Def</b>: your party's HP, Defense and Sp. Def stretch or shrink the timer in boss fights.</li>
+      <li><b>Megas</b>: beat Steven for the Key Stone, then get Mega Stones in the Shop or from boss drops (only for Pokémon in your party). One Mega in the party at a time.</li>
+      <li><b>Gigantamax</b>: beat Leon for the Dynamax Band, then Max Soup the same way. One at a time, hits 30% harder.</li>
+      <li>Champions' aces and some legendaries come out as Megas.</li>
+      <li>A <b>Wiki</b> tab with every rule and an entry for every Pokémon. Pokédex has a Forms page.</li></ul>` },
+  { id: "update-2026-11-13a", date: "Nov 13, 2026", from: "Vettel", title: "The big balance update",
+    body: `<ul><li><b>Level cap</b>: 2 over the next gym leader or Champion, and going back to an older place holds your levels to its cap. XP is slower.</li>
+      <li><b>Gyms and Champions</b> are set so a strong super-effective team at the cap, tapping hard, only just wins. Idling never beats a boss.</li>
+      <li>Boss teams' Attack and Speed set how long you get; their Defense goes into their HP.</li>
+      <li>Wild Pokémon are tougher in the middle of the game. Protein is +3% each and only 5 count per region you've opened.</li>
+      <li>Shinies are 1 in 4096 and count toward your leaderboard score. Red waits on Mt. Silver after every Champion, with the Shiny Charm.</li>
+      <li>Auto ball throwing, Box filters and stat sorts, true-size sprites, a title screen, and fixes for evolving into Pokémon you own and buying dungeon tickets.</li></ul>` }
+];
+const arcadeDay = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Detroit", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+const delivered = m => !m.day || !!S.mail.got[m.id];
+function deliverMail(today = arcadeDay()) {
+  if (!S) return;
+  const fresh = MAIL.filter(m => m.day === today && !S.mail.got[m.id]);
+  for (const m of fresh) S.mail.got[m.id] = 1;
+  if (fresh.length) { save(); renderTop(); if (screen === "title") renderTitle(); if (screen === "game") toast(`New mail: ${fresh[0].title}`); }
+}
+const inbox = () => MAIL.filter(delivered);
+const unreadMail = () => S ? inbox().filter(m => !S.mail.read[m.id]).length : 0;
+const giftText = g => [g.money && `$${fmt(g.money)}`, ...Object.entries(g.balls || {}).map(([b, q]) => `${q} ${BALLS.find(x => x.id === b).name}${q > 1 ? "s" : ""}`),
+  ...Object.entries(g.items || {}).map(([it, q]) => `${q} ${it}`), g.cords && `${g.cords} Linking Cord${g.cords > 1 ? "s" : ""}`,
+  ...Object.entries(g.tickets || {}).map(([r, q]) => `${q} ${REGIONS[r].name} dungeon ticket${q > 1 ? "s" : ""}`), g.protein && `${g.protein} Protein`,
+  ...(g.stones || []).map(id => `a Mega Stone for ${formById(id).name}`), ...(g.soup || []).map(n => `Max Soup for ${mon(n).name}`),
+  g.special && `${SPECIALS[g.special].title}`].filter(Boolean).join(", ");
+let mailOpen = null;
+function renderMail() {
+  if (!S) return;
+  if (!inbox().some(m => m.id === mailOpen)) mailOpen = inbox().length ? inbox()[0].id : null;
+  if (mailOpen) S.mail.read[mailOpen] = 1;
+  const m = MAIL.find(x => x.id === mailOpen);
+  $("#mail").innerHTML = `<div class="mail-list">${inbox().map(x => `<button class="mail-item${S.mail.read[x.id] ? "" : " new"}${x.id === mailOpen ? " on" : ""}" type="button" data-mail="${x.id}"><span>${esc(x.title)}</span><span class="small muted">${esc(x.date)} · ${esc(x.from)}${x.gift ? ` · <span class="gift">${S.mail.claimed[x.id] ? "gift claimed" : "gift"}</span>` : ""}</span></button>`).join("")}</div>` +
+    (m ? `<article class="letter"><b>${esc(m.title)}</b><span class="small muted">${esc(m.from)}, ${esc(m.date)}</span>${m.body}` +
+      (m.gift ? `<div class="giftbox"><span>${S.mail.claimed[m.id] ? "Claimed: " : "Gift: "}${giftText(m.gift)}</span>${S.mail.claimed[m.id] ? "" : `<button class="lbl" type="button" data-claim="${m.id}">Claim</button>`}</div>` : "") + `</article>` : '<p class="small muted">No mail yet.</p>');
+  renderTop(); save();
+}
+function claimGift(id) {
+  const m = MAIL.find(x => x.id === id), g = m && m.gift;
+  if (!g || S.mail.claimed[id] || !delivered(m)) return;
+  if (B && B.kind !== "route") { toast("Claim gifts between battles."); return; }
+  S.money += g.money || 0;
+  for (const [b, q] of Object.entries(g.balls || {})) S.balls[b] = (S.balls[b] || 0) + q;
+  for (const [it, q] of Object.entries(g.items || {})) S.items[it] = (S.items[it] || 0) + q;
+  S.cords += g.cords || 0; S.protein += g.protein || 0;
+  for (const [r, q] of Object.entries(g.tickets || {})) S.tickets[r] = (S.tickets[r] || 0) + q;
+  for (const f of g.stones || []) S.stones[f] = 1;
+  for (const n of g.soup || []) S.gfactor[n] = 1;
+  if (g.special) {
+    const sp = SPECIALS[g.special], had = S.box[sp.num];
+    // Special editions aren't shiny. A shiny one already caught keeps its record (it still counts on the board) but shows as SP.
+    S.box[sp.num] = { xp: Math.max(Math.pow(levelCap(), 3), had ? had.xp : 0), shiny: had ? had.shiny : false, special: g.special };
+    if (!had && S.party.length < 6) S.party.push(sp.num);
+  }
+  S.mail.claimed[id] = 1;
+  toast(`Claimed ${giftText(g)}.`);
+  renderMail();
+}
+$("#mail").onclick = e => {
+  const it = e.target.closest("[data-mail]"), c = e.target.closest("[data-claim]");
+  if (c) claimGift(c.dataset.claim); else if (it) { mailOpen = it.dataset.mail; renderMail(); }
+};
+
 // ── Wiki, laid out like Civ Lite's How to play: sections in groups, a contents list with search beside the text,
 // and the section you're reading marked as you scroll. Numbers are read from the constants above, so the text
 // can't drift from the game. Searching a name also finds Pokémon, each with an entry of its own.
@@ -935,6 +1052,7 @@ function wikiSections() {
     { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${new Set(FORMS.filter(f => f.kind === "gmax").map(f => f.num)).size} species with a Gigantamax form then needs Max Soup: $${fmt(SOUP_PRICE)}, or a boss drop at the same odds as Mega Stones, again only for your party. One Gigantamax Pokémon at a time, always on; it hits ${pct(GMAX_BOOST - 1)} harder. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
     { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm. A shiny that evolves stays shiny. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
     { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>One point per Pokédex entry and one more for each one you have shiny, up to 2050. It posts to the arcade board when you're signed in.</p>` },
+    { id: "mail", group: "Collection", title: "Mail", html: `<p>Update notes and gifts arrive in the Mail tab; the tab and the title screen show how many are new. Each gift can be claimed once per save, between battles.</p>` },
     { id: "saves", group: "Collection", title: "Saves", html: `<p>Your save lives in this browser. Settings → "Show my save code" gives a code to paste on another device; the title screen can load one too. New game erases the save on this device, so copy the code first if you might want it back.</p>` }
   ];
 }
@@ -1023,7 +1141,7 @@ $("#wiki-text").addEventListener("scroll", () => {
 });
 
 // ── Events
-function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; if (t === "wiki") renderWiki(); renderAll(); refitSprites(); }
+function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki", "mail"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; if (t === "wiki") renderWiki(); if (t === "mail") renderMail(); renderAll(); refitSprites(); }
 $("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) openTab(b.dataset.tab); };
 $("#regions").onclick = e => { const b = e.target.closest("[data-r]"); if (b) { viewR = +b.dataset.r; renderLocs(); } };
 $("#locs").onclick = e => { const b = e.target.closest("[data-loc]"); if (b) startLoc(JSON.parse(b.dataset.loc)); };
@@ -1094,7 +1212,7 @@ $("#import").onclick = () => {
   if (loadCode($("#savecode").value)) { boot(); titleMsg = "Save loaded."; renderTitle(); }
   else $("#setmsg").innerHTML = `<span class="bad">${esc(BAD_CODE)}</span>`;
 };
-function eraseSave() { try { localStorage.removeItem(KEY); } catch {} S = null; B = null; showPick(); }
+function eraseSave() { try { localStorage.removeItem(slot); } catch {} S = null; B = null; showPick(); }
 let resetArmed = false;
 $("#reset").onclick = () => {
   if (!resetArmed) { resetArmed = true; $("#reset").textContent = "Tap again to erase everything"; $("#setmsg").innerHTML = '<span class="bad">This deletes your Box, badges and money on this device.</span>'; setTimeout(() => { resetArmed = false; $("#reset").textContent = "Start over"; }, 4000); return; }
@@ -1123,6 +1241,7 @@ function migrateSave() {
   if (!S.set.auto) { if (S.set.fresh === "poke") S.set.fresh = "auto"; S.set.auto = 1; }
   // Megas and Gigantamax arrived later: saves past Steven or Leon get the key item they would have been given.
   S.stones = S.stones || {}; S.gfactor = S.gfactor || {}; S.mega = S.mega || null; S.gmax = S.gmax || 0;
+  S.mail = S.mail || { read: {}, claimed: {} }; S.mail.got = S.mail.got || {};
   if (S.champs[KEY_STONE_FROM]) S.key = 1;
   if (S.champs[BAND_FROM]) S.band = 1;
 }
@@ -1132,7 +1251,7 @@ let screen = "title", panel = "save", cur = 0, awayText = "", titleMsg = "";
 function show(name) { screen = name; $("#title").hidden = name !== "title"; $("#pick").hidden = name !== "pick"; $("#game").hidden = name !== "game"; refitSprites(); }
 function boot() {
   B = null; awayText = ""; titleMsg = "";
-  if (S) { migrateSave(); awayText = offline(); save(); }
+  if (S) { migrateSave(); deliverMail(); awayText = offline(); save(); }
   showTitle();
 }
 function showTitle() { show("title"); panel = S ? "save" : "how"; cur = 0; renderTitle(); }
@@ -1151,7 +1270,7 @@ function enter(t) {
 }
 
 const MENU = {
-  save: [["continue", "Continue"], ["party", "Party & Box"], ["dex", "Pokédex"], ["settings", "Settings"], ["wiki", "Wiki"], ["how", "How to play"], ["new", "New game"]],
+  save: [["continue", "Continue"], ["party", "Party & Box"], ["dex", "Pokédex"], ["settings", "Settings"], ["wiki", "Wiki"], ["mail", "Mail"], ["how", "How to play"], ["new", "New game"]],
   fresh: [["new", "New game"], ["load", "Load a save code"], ["how", "How to play"]]
 };
 const HOW = [
@@ -1166,11 +1285,54 @@ const HOW = [
   "Beat Steven for a Key Stone and Leon for a Dynamax Band. Mega Stones and Max Soup for your party come from the Shop or boss drops.",
   "Someone waits on Mt. Silver once every Champion is beaten. The Wiki tab has every rule and every Pokémon."
 ];
+// ── Test account. Hold, hold, tap, tap, tap on the title screen's "Poké Idle" (Morse --...: a hold is 350ms or
+// more, and a pause over 1.5s starts over) and a password box appears. The password opens a maxed account in its
+// own save slot; the real save is left alone, and "Back to my save" goes back to it. The test account never reaches
+// the leaderboard: its snapshot reports nothing. Anyone reading this page can see the password, so it's a developer
+// door, not a lock.
+const TEST_PASSWORD = "happynewyear", TEST_PATTERN = "--...";
+function testAccount() {
+  const t = fresh(), every = MON.map(m => m.num);
+  for (const n of every) { t.box[n] = { xp: 100 ** 3, shiny: true }; t.seen[n] = 1; }
+  t.box[937] = { xp: 100 ** 3, shiny: false, special: "bday-ceruledge" };
+  t.party = [384, 150, 445, 6, 248, 937];
+  t.money = 1e9; t.balls = { poke: 999, great: 999, ultra: 999, master: 99 }; t.cords = 99;
+  t.protein = PROTEIN_PER_REGION * REGIONS.length;
+  for (const it of D.items) t.items[it] = 99;
+  REGIONS.forEach((R, r) => { t.champs[r] = 1; t.tickets[r] = 99; t.dungeons[r] = 1; for (let k = 0; k < 4; k++) { t.badges[r + "-" + k] = 1; t.kills[r + "-" + k] = KILLS_FOR_GYM; } });
+  t.charm = 1; t.key = 1; t.band = 1;
+  for (const f of FORMS) { if (f.kind === "mega") t.stones[f.id] = 1; else t.gfactor[f.num] = 1; }
+  t.mega = { n: 150, f: formsOf(150, "mega").find(f => / Y$/.test(f.name)).id }; t.gmax = 6;
+  t.loc = { kind: "route", r: 8, k: 3 }; t.test = 1;
+  return t;
+}
+function useSlot(k, account) {
+  if (S) save();
+  slot = k; try { localStorage.setItem(SLOT_KEY, k === TEST_KEY ? "test" : "real"); } catch {}
+  S = account || readSlot(k);
+  if (S) save();
+  $("#testdoor").hidden = true; boot();
+}
+let signDown = 0, signUp = 0, signTaps = "";
+$("#sign").addEventListener("pointerdown", () => { signDown = performance.now(); });
+$("#sign").addEventListener("pointerup", () => {
+  const now = performance.now();
+  if (now - signUp > 1500) signTaps = "";
+  signUp = now; signTaps = (signTaps + (now - signDown >= 350 ? "-" : ".")).slice(-TEST_PATTERN.length);
+  if (signTaps === TEST_PATTERN) { signTaps = ""; $("#testdoor").hidden = false; $("#testmsg").textContent = ""; $("#testpw").value = ""; $("#testpw").focus(); }
+});
+$("#sign").addEventListener("contextmenu", e => e.preventDefault());
+$("#testdoor").onsubmit = e => {
+  e.preventDefault();
+  if ($("#testpw").value === TEST_PASSWORD) useSlot(TEST_KEY, testAccount());
+  else $("#testmsg").textContent = "That's not it.";
+};
 function renderTitle() {
-  const items = MENU[S ? "save" : "fresh"];
+  const items = MENU[S ? "save" : "fresh"].concat(slot === TEST_KEY ? [["back", "Back to my save"]] : []);
+  $("#tagline").textContent = slot === TEST_KEY ? "Test account: maxed out, and nothing here reaches the leaderboard." : "Your party fights on its own; you just help.";
   cur = Math.min(cur, items.length - 1);
   $("#menu").innerHTML = items.map(([id, label], i) => (id === "new" && S ? '<span class="sep" aria-hidden="true"></span>' : "") +
-    `<button type="button" data-go="${id}"${i === cur ? ' class="cur"' : ""}${id === panel ? ' aria-pressed="true"' : ""}>${label}</button>`).join("");
+    `<button type="button" data-go="${id}"${i === cur ? ' class="cur"' : ""}${id === panel ? ' aria-pressed="true"' : ""}>${label}${id === "mail" && unreadMail() ? ` <span class="bad">(${unreadMail()} new)</span>` : ""}</button>`).join("");
   $("#t-field").innerHTML = S && S.party.length ? leadField() : `<div class="fieldhead"><b>Three partners are waiting</b><span class="muted">pick one in New game</span></div><div class="t-stage"><span class="ground"></span><span class="trio">${[1, 4, 7].map(n => `<img class="spr" data-ref="48" src="${sprite(n)}" alt="${mon(n).name}">`).join("")}</span></div>`;
   const card = $("#t-card");
   if (panel === "how") card.innerHTML = `<h2>How to play</h2><ul class="t-how">${HOW.map(t => `<li>${t}</li>`).join("")}</ul>`;
@@ -1192,7 +1354,8 @@ function saveCard() {
 }
 function go(id) {
   if (id === "continue") return enter("battle");
-  if (id === "party" || id === "dex" || id === "settings" || id === "wiki") return enter(id);
+  if (id === "party" || id === "dex" || id === "settings" || id === "wiki" || id === "mail") return enter(id);
+  if (id === "back") return useSlot(KEY);
   if (id === "new" && !S) return showPick();
   // How to play, Load and New game (with a save) open in the card; choosing the open one again closes it.
   panel = panel === id && S ? "save" : id; titleMsg = ""; renderTitle();
@@ -1218,12 +1381,13 @@ $("#t-card").onclick = e => {
 $("#pickback").onclick = showTitle;
 $("#starters").onclick = e => { const b = e.target.closest("[data-start]"); if (!b) return; S = fresh(); S.box[+b.dataset.start] = { xp: 125, shiny: false }; S.party = [+b.dataset.start]; B = null; enter("battle"); toast(`${mon(+b.dataset.start).name} is your partner. Tap the wild Pokémon to help it fight.`); };
 setInterval(tick, 100);
-setInterval(() => { if (S) save(); }, 5000);
+setInterval(() => { if (S) { deliverMail(); save(); } }, 5000);
 boot();
 
 // The hub reads this: integer metrics, never null.
 // score is the board's number: one point per Pokédex entry and one more for each one you have shiny.
 window.__boredSnapshot = () => {
+  if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, badges: 0, finished: false };
   const caught = S ? Object.keys(S.box).length : 0, shinies = S ? Object.values(S.box).filter(b => b.shiny).length : 0;
   return { slug: 'poke-idle', caught, shinies, score: caught + shinies, badges: S ? Object.keys(S.badges).length : 0, finished: !!S };
 };
