@@ -364,6 +364,19 @@ Deno.serve(async (req: Request) => {
         return reply(publicBook(await loadBook(etDate())));
       }
       if (path === '/health') return reply({ ok: true, rounds: 7 });
+      // Unlimited: seven prompts picked at random from past dives. The client
+      // scores them itself and keeps the run on the device, so no run row is
+      // written and today's answer book never leaves this function.
+      if (path === '/unlimited') {
+        const response = await sb('rpc/krillion_random_prompts', {
+          method: 'POST',
+          body: JSON.stringify({ p_count: 7 })
+        });
+        if (!response.ok) throw new HttpError('The archive is out of reach. Try again shortly.', 503);
+        const prompts = await response.json();
+        if (!Array.isArray(prompts) || prompts.length !== 7) throw new HttpError('The archive is out of reach. Try again shortly.', 503);
+        return reply({ title: 'The Open Water', prompts });
+      }
       if (path === '/party/rooms') return reply({ rooms: [], seats: [] });
       if (path === '/state') {
         const run = await readRun(url.searchParams.get('run') || '');
