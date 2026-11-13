@@ -110,6 +110,7 @@
   .loc:disabled { color: var(--dim); cursor: not-allowed }
   .loc:disabled .ty { opacity: .45 }
   .loc .done { color: var(--good) }
+  .loc.quest { cursor: default; color: var(--dim) } .loc.quest:hover { background: none }
   .loc > span:last-child { font-weight: 400; white-space: nowrap; font-variant-numeric: tabular-nums }
   .ty { display: inline-block; padding: 1px 5px; color: #fff; font-size: 10px; font-weight: 600; border-radius: 2px; letter-spacing: .03em; vertical-align: 1px }
 
@@ -425,9 +426,8 @@ const SPECIALS = {
 };
 for (const sp of Object.values(SPECIALS)) Object.assign(sp, { types: mon(sp.num).types, cr: mon(sp.num).cr, flags: mon(sp.num).flags, gen: mon(sp.num).gen, evos: [], bst: sp.hp + sp.atk + sp.def + sp.spa + sp.spd + sp.spe });
 // A shiny Pokémon stays shiny as a Mega or Gigantamax: every form has a shiny sprite (PokeAPI's, cropped like the
-// rest) except Mega Zygarde, which shows its usual colours.
-const NO_SHINY_FORM = new Set([10301]);
-const spriteOf = (m, shiny) => m.img ? m.img : m.sprite ? sprite(m.sprite, shiny && !NO_SHINY_FORM.has(m.sprite)) : sprite(m.num, shiny);
+// rest; Mega Zygarde's, which PokeAPI lacks, is a separate drawing added by hand).
+const spriteOf = (m, shiny) => m.img ? m.img : m.sprite ? sprite(m.sprite, shiny) : sprite(m.num, shiny);
 const TI = Object.fromEntries(D.types.map((t, i) => [t, i]));
 const MULT = { "0": 0, h: .5, "1": 1, "2": 2 };
 const eff = (atkType, defTypes) => defTypes.reduce((m, d) => m * MULT[D.chart[TI[atkType]][TI[d]]], 1);
@@ -541,7 +541,7 @@ const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", SLOT_KEY = "bored.poke-idle.slot";
 let slot = (() => { try { return localStorage.getItem(SLOT_KEY) === "test" ? TEST_KEY : KEY; } catch { return KEY; } })();
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
-const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, last: Date.now() });
+const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, last: Date.now() });
 let S = readSlot(slot);
 const save = () => { S.last = Date.now(); try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
 
@@ -579,7 +579,30 @@ const PARTY_BULK = 85;
 const lookKind = n => { const b = S.box[n], l = b.look; return l === "normal" || (l === "shiny" && b.shiny) || (l === "special" && b.special) ? l : b.special ? "special" : b.shiny ? "shiny" : "normal"; };
 const showsShiny = n => !!S.box[n] && lookKind(n) === "shiny";
 const special = n => S.box[n] && S.box[n].special && lookKind(n) === "special" && SPECIALS[S.box[n].special];
-const fighter = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || special(n) || mon(n);
+// ── Zygarde Cells, a side quest after the main games': once Diantha (Kalos's Champion) is beaten, every wild win has a
+// 1 in CELL_ODDS chance of a Zygarde Cell and every boss win brings CELL_BOSS. 10 cells unlock Zygarde's 10% Forme (and
+// bring a Zygarde if you have none); 100 unlock its Complete Forme, Zygarde at 100%. Pick the forme in Zygarde's detail.
+const CELLS_FROM = 5, CELL_ODDS = 50, CELL_BOSS = 3, ZYGARDE = 718;
+const ZFORMES = {
+  "10": { mark: "10%", sprite: 10181, name: "Zygarde 10% Forme", need: 10, hp: 54, atk: 100, def: 71, spa: 61, spd: 85, spe: 115 },
+  "50": { need: 0 },
+  complete: { mark: "100%", sprite: 10120, name: "Zygarde Complete Forme", need: 100, hp: 216, atk: 100, def: 121, spa: 91, spd: 95, spe: 85 }
+};
+for (const z of [ZFORMES["10"], ZFORMES.complete]) Object.assign(z, { num: ZYGARDE, types: mon(ZYGARDE).types, cr: mon(ZYGARDE).cr, flags: mon(ZYGARDE).flags, gen: mon(ZYGARDE).gen, evos: [], bst: z.hp + z.atk + z.def + z.spa + z.spd + z.spe });
+const zforme = n => { const b = n === ZYGARDE && S.box[n], z = b && b.forme && ZFORMES[b.forme]; return z && z.sprite && (S.cells || 0) >= z.need ? z : null; };
+function gainCells(k) {
+  if (!S.champs[CELLS_FROM] || (S.cells || 0) >= 100 || k <= 0) return "";
+  const before = S.cells || 0; S.cells = Math.min(100, before + k);
+  let note = ` Found ${S.cells - before > 1 ? S.cells - before + " Zygarde Cells" : "a Zygarde Cell"} (${S.cells}/100).`;
+  if (before < 10 && S.cells >= 10) {
+    if (!S.box[ZYGARDE]) { S.box[ZYGARDE] = { xp: Math.pow(levelCap(), 3), shiny: false, forme: "10" }; if (S.party.length < 6) S.party.push(ZYGARDE); }
+    note += " The cells came together: Zygarde's 10% Forme is yours!";
+  }
+  if (before < 100 && S.cells >= 100) note += " Zygarde is at 100%: Complete Forme unlocked!";
+  if (before < 10 && S.cells >= 10 || before < 100 && S.cells >= 100) toast(note.trim());
+  return note;
+}
+const fighter = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || special(n) || zforme(n) || mon(n);
 const partyTime = () => S.party.length ? Math.min(1.25, Math.max(.8, S.party.reduce((s, n) => s + bulkOf(fighter(n)), 0) / S.party.length / PARTY_BULK)) : 1;
 const power = (n, L = level(n)) => { const m = fighter(n); return Math.max(m.atk, m.spa) * L / 50 * hitRate(m) * (1 + proteinBoost()) * (S.gmax === n ? GMAX_BOOST : 1); };
 const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n)) * (foe ? bestEff(fighter(n), foe) : 1), 0);
@@ -710,6 +733,7 @@ function defeat() {
   gainXp(Math.round(f.L * XP_RATE * (f.wild ? 1 : 1.5)));
   if (B.kind === "route") S.kills[B.r + "-" + B.k] = kills(B.r, B.k) + 1;
   let text = `${f.m.name} fainted. +$${fmt(f.reward)}.`;
+  if (f.wild && Math.random() < 1 / CELL_ODDS) text += gainCells(1);
   if (f.wild) {
     const ball = chooseBall(f);
     if (ball) {
@@ -754,12 +778,12 @@ function next() {
   B.idx++;
   if (B.idx < B.queue.length) { spawn(); return; }
   const R = REGIONS[B.r];
-  if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + rollDrop("gym")); }
+  if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + rollDrop("gym") + gainCells(CELL_BOSS)); }
   if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first) S.balls.master++;
     const unlock = first && B.r === KEY_STONE_FROM ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
-    toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + rollDrop("champ")); }
-  if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast((first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`) + rollDrop("summit")); }
-  if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.` + rollDrop("dungeon")); }
+    toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + rollDrop("champ") + gainCells(CELL_BOSS)); }
+  if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast((first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`) + rollDrop("summit") + gainCells(CELL_BOSS)); }
+  if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.` + rollDrop("dungeon") + gainCells(CELL_BOSS)); }
   backToRoute(); save();
 }
 function backToRoute() {
@@ -868,17 +892,18 @@ function renderLocs() {
   }
   items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
   if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
+  const quest = r === CELLS_FROM ? `<div class="loc quest"><span>Zygarde Cells</span><span${(S.cells || 0) >= 100 ? ' class="done"' : ""}>${S.champs[CELLS_FROM] ? `${S.cells || 0}/100` : "after Diantha"}</span></div>` : "";
   $("#locs").innerHTML = items.map(it => {
     const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0);
     return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0 })}'${unlocked(it) ? "" : " disabled"}><span>${esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
-  }).join("");
+  }).join("") + quest;
 }
 // How a party member looks: its Mega or Gigantamax form when it has one on.
-const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax === n && formsOf(n, "gmax")[0]) || special(n) || mon(n);
+const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax === n && formsOf(n, "gmax")[0]) || special(n) || zforme(n) || mon(n);
 function monTile(n, opts = {}) {
   const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : special(n) || m, e = opts.foe ? bestEff(fighter(n), opts.foe) : null;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](m)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](m)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -906,6 +931,12 @@ function formLines(n) {
   if (gmax) rows.push(line(gmax, !S.band ? "needs the Dynamax Band (beat Leon)" : !S.gfactor[n] ? "needs Max Soup: Shop or boss drops, party only" : !inParty ? "add it to your party first" : "", S.gmax === n, "data-gmax=\"1\""));
   return rows.length ? `<div class="small">${rows.join("")}<div class="muted">One Mega and one Gigantamax in the party at a time.</div></div>` : "";
 }
+function formeLine(n) {
+  if (n !== ZYGARDE) return "";
+  const c = S.cells || 0, cur = zforme(n) ? S.box[n].forme : "50";
+  const opt = (k, label) => `<button class="lbl${k === cur ? " on" : ""}" type="button" data-forme="${k}"${c >= ZFORMES[k].need ? "" : " disabled"} aria-pressed="${k === cur}">${label}</button>`;
+  return `<div class="row small"><span class="muted">Forme</span>${opt("10", "10%")}${opt("50", "50%")}${opt("complete", "100%")}<span class="muted">${S.champs[CELLS_FROM] ? `Zygarde Cells ${c}/100` : "Zygarde Cells turn up once Diantha is beaten"}</span></div>`;
+}
 function lookLine(n) {
   const b = S.box[n], cur = lookKind(n), opts = [["normal", "Normal"]].concat(b.shiny ? [["shiny", "Shiny"]] : [], b.special ? [["special", "SP"]] : []);
   if (opts.length < 2) return "";
@@ -918,7 +949,7 @@ function renderDetail() {
   el.hidden = false;
   el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${m.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small muted">HP <b>${st.hp}</b> · Atk <b>${st.atk}</b> · Def <b>${st.def}</b> · SpA <b>${st.spa}</b> · SpD <b>${st.spd}</b> · Spe <b>${st.spe}</b> · Total <b>${st.bst}</b></div>` +
-    (owned.special ? `<div class="small"><b>SP · Special edition: ${esc(SPECIALS[owned.special].title)}</b> <span class="muted">${esc(SPECIALS[owned.special].note)}</span></div>` : "") + lookLine(detail) +
+    (owned.special ? `<div class="small"><b>SP · Special edition: ${esc(SPECIALS[owned.special].title)}</b> <span class="muted">${esc(SPECIALS[owned.special].note)}</span></div>` : "") + lookLine(detail) + formeLine(detail) +
     (opts.length ? `<div class="small">${opts.map(e => {
       const [t, how, v] = e, owned = S.box[t], open = !owned || level(t) < level(detail), ok = open && canEvolve(detail, e);
       const need = how === "L" ? `Lv ${v}${v > levelCap() ? " (over the cap)" : ""}` : how === "I" ? `${v} (have ${S.items[v] || 0})` : `Linking Cord (have ${S.cords})`;
@@ -995,6 +1026,7 @@ const ACH = [
   ...[[1, "First evolution", "Evolve a Pokémon"], [50, "Metamorphosis", "50 evolutions"]].map(([need, title, desc]) => ({ id: "evo" + need, group: "Training", title, desc, need, have: () => S.stats.evolved })),
   ...[[100, "Warming up", "Win 100 fights"], [1000, "Veteran", "Win 1,000 fights"], [10000, "Unstoppable", "Win 10,000 fights"]].map(([need, title, desc]) => ({ id: "wins" + need, group: "Battle", title, desc, need, have: () => S.stats.wins })),
   ...[[1000, "Helping hand", "Tap 1,000 times"], [10000, "Sore finger", "Tap 10,000 times"], [100000, "Auto-clicker? No", "Tap 100,000 times"]].map(([need, title, desc]) => ({ id: "taps" + need, group: "Battle", title, desc, need, have: () => S.stats.taps })),
+  { id: "zygarde100", group: "Dungeons and legendaries", title: "Perfect order", desc: "Collect all 100 Zygarde Cells", need: 100, have: () => S.cells || 0 },
   { id: "dungeon1", group: "Dungeons and legendaries", title: "Into the dark", desc: "Clear a dungeon", need: 1, have: () => Object.values(S.dungeons).reduce((a, b) => a + b, 0) },
   { id: "dungeon9", group: "Dungeons and legendaries", title: "Spelunker", desc: "Clear every region's dungeon", need: 9, have: () => Object.keys(S.dungeons).length },
   { id: "dungeon50", group: "Dungeons and legendaries", title: "Regular", desc: "Clear 50 dungeons", need: 50, have: () => Object.values(S.dungeons).reduce((a, b) => a + b, 0) },
@@ -1041,17 +1073,19 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
-  { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Vettel", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
+  { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
-  { id: "mail-welcome", date: "Nov 13, 2026", from: "Vettel", title: "Mail is here", gift: { balls: { great: 20, ultra: 10 }, money: 5000 },
+  { id: "update-2026-11-13c", date: "Nov 13, 2026", from: "Prof Penguin", title: "New side quest: Zygarde Cells",
+    body: `<p>Beat Diantha in Kalos and Zygarde Cells start turning up: now and then from wild Pokémon, and a few from every boss you beat.</p><ul><li>10 cells: Zygarde's 10% Forme (and a Zygarde if you don't have one).</li><li>100 cells: the Complete Forme, Zygarde at 100%.</li></ul><p>Kalos's list shows how many you have. Also new: choose a Pokémon's look (normal, shiny or special edition), and shiny Megas and Gigantamax.</p>` },
+  { id: "mail-welcome", date: "Nov 13, 2026", from: "Prof Penguin", title: "Mail is here", gift: { balls: { great: 20, ultra: 10 }, money: 5000 },
     body: `<p>From now on, update notes and the odd gift land here. Gifts are claimed once per save.</p><p>Here's a little something to start.</p>` },
-  { id: "update-2026-11-13b", date: "Nov 13, 2026", from: "Vettel", title: "Megas, Gigantamax, Speed and Def, and a wiki",
+  { id: "update-2026-11-13b", date: "Nov 13, 2026", from: "Prof Penguin", title: "Megas, Gigantamax, Speed and Def, and a wiki",
     body: `<ul><li><b>Speed</b> sets how often each Pokémon hits. <b>Def</b>: your party's HP, Defense and Sp. Def stretch or shrink the timer in boss fights.</li>
       <li><b>Megas</b>: beat Steven for the Key Stone, then get Mega Stones in the Shop or from boss drops (only for Pokémon in your party). One Mega in the party at a time.</li>
       <li><b>Gigantamax</b>: beat Leon for the Dynamax Band, then Max Soup the same way. One at a time, hits 30% harder.</li>
       <li>Champions' aces and some legendaries come out as Megas.</li>
       <li>A <b>Wiki</b> tab with every rule and an entry for every Pokémon. Pokédex has a Forms page.</li></ul>` },
-  { id: "update-2026-11-13a", date: "Nov 13, 2026", from: "Vettel", title: "The big balance update",
+  { id: "update-2026-11-13a", date: "Nov 13, 2026", from: "Prof Penguin", title: "The big balance update",
     body: `<ul><li><b>Level cap</b>: 2 over the next gym leader or Champion, and going back to an older place holds your levels to its cap. XP is slower.</li>
       <li><b>Gyms and Champions</b> are set so a strong super-effective team at the cap, tapping hard, only just wins. Idling never beats a boss.</li>
       <li>Boss teams' Attack and Speed set how long you get; their Defense goes into their HP.</li>
@@ -1132,7 +1166,8 @@ function wikiSections() {
     { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, with no protein and tapping ${GYM_TAPS} times a second, uses ${pct(GYM_USE)} of the time it would get. Weaker, off-type or under-cap teams lose; protein, Megas, bulkier and better teams give you room. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
     { id: "tapping", group: "Bosses", title: "No idle wins", html: `<p>However strong your party, boss fights need tapping: if your party could clear a gym, Champion or Red without it, every foe gets the same extra HP until idling falls ${pct(IDLE_SHORT - 1)} short. A dungeon's legendary is checked the same way against the time left when it comes out.</p>` },
     { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>The legendary is random, so its HP is set for a decent team of any types (the 7th to 12th strongest you could have) at the cap, tapping ${LEGEND_TAPS} times a second, to clear the run in ${pct(LEGEND_USE)} of the time. A legendary with a Mega form comes out as one half the time; catching it gets you the usual form.</p>` },
-    { id: "silver", group: "Bosses", title: "Mt. Silver", html: `<p>Once all nine Champions are beaten, Red waits on Mt. Silver (in Johto's list) with ${RED_TEAM.map(n => mon(n).name).join(", ")} at Lv ${SUMMIT_LEVEL}, ×${SUMMIT_HP} HP, in ${SUMMIT_TIME}s give or take. It's meant to be brutal. The first win gives the Shiny Charm.</p>` },
+    { id: "silver", group: "Side quests", title: "Mt. Silver", html: `<p>Once all nine Champions are beaten, Red waits on Mt. Silver (in Johto's list) with ${RED_TEAM.map(n => mon(n).name).join(", ")} at Lv ${SUMMIT_LEVEL}, ×${SUMMIT_HP} HP, in ${SUMMIT_TIME}s give or take. It's meant to be brutal. The first win gives the Shiny Charm.</p>` },
+    { id: "cells", group: "Side quests", title: "Zygarde Cells", html: `<p>Once Diantha (Kalos's Champion) is beaten, every wild win has a 1 in ${CELL_ODDS} chance of turning up a Zygarde Cell, and every gym, Champion, dungeon and Red win brings ${CELL_BOSS}. Time away finds them at half the rate. Kalos's list shows how many you have.</p><p>10 cells unlock Zygarde's 10% Forme (fast and frail: Speed ${ZFORMES["10"].spe}) and bring you a Zygarde if you have none. 100 unlock its Complete Forme, Zygarde at 100%: HP ${ZFORMES.complete.hp}, double the usual. Pick the forme in Zygarde's detail; it keeps its level.</p>` },
     { id: "shop", group: "Items", title: "The Shop", html: `<p>Balls, dungeon tickets (250 × (region number)^1.8), protein, the Linking Cord, evolution items your Box is waiting on, and, once you have the key items, Mega Stones ($${fmt(STONE_PRICE)}) and Max Soup ($${fmt(SOUP_PRICE)}) for Pokémon in your party.</p>` },
     { id: "protein", group: "Items", title: "Protein", html: `<p>+${pct(PROTEIN_STEP)} party damage each. Only ${PROTEIN_PER_REGION} count per region you've opened (up to ${PROTEIN_PER_REGION * REGIONS.length}), and each costs 1.5× the last, from $300. You can't buy it mid-fight.</p>` },
     { id: "mega", group: "Megas and Gigantamax", title: "Mega Evolution", html: `<p>Beat Steven (Hoenn's Champion) for the Key Stone. Each Mega form then needs its own Mega Stone: $${fmt(STONE_PRICE)} in the Shop, or a boss drop (gyms ${pct(drop.gym)}, Champions and dungeons ${pct(drop.champ)}, Red always). Like PokéRogue, stones only ever turn up for Pokémon in your party.</p><p>Turn it on in the Pokémon's detail in Party & Box. One Mega in the party at a time, on in every fight, using its Mega stats and types. ${FORMS.filter(f => f.kind === "mega").length} Megas, from the originals to Legends: Z-A's.</p>` },
@@ -1254,6 +1289,8 @@ $("#foe").addEventListener("pointerdown", e => {
 $("#foe").addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!e.repeat) tap(e); } });
 function partyClick(e) {
   const t = e.target.closest("[data-n]"), ev = e.target.closest("[data-evo]"), tg = e.target.closest("[data-toggle]"), cl = e.target.closest("[data-close]");
+  const fm = e.target.closest("[data-forme]");
+  if (fm) { if (B && B.kind !== "route") { toast("Change formes between battles."); return; } S.box[detail].forme = fm.dataset.forme; save(); renderAll(); return; }
   const lk = e.target.closest("[data-look]");
   if (lk) {
     if (B && B.kind !== "route" && (lk.dataset.look === "special" || lookKind(detail) === "special")) { toast("Change editions between battles."); return; }
@@ -1326,7 +1363,9 @@ function offline() {
   if (!n) return "";
   const money = n * rewardFor(L, i);
   S.money += money; gainXp(n * L * XP_RATE);
-  return `While you were away (${Math.round(secs / 60)} min) your party beat ${n} Pokémon and earned $${fmt(money)}.`;
+  // Cells come at half the rate while you're away.
+  const cells = gainCells(Math.floor(n / CELL_ODDS / 2));
+  return `While you were away (${Math.round(secs / 60)} min) your party beat ${n} Pokémon and earned $${fmt(money)}.${cells}`;
 }
 
 // Older saves sent new Pokémon only Poké Balls, so bought Great and Ultra Balls sat unused. Move that one default to Auto, once.
@@ -1335,7 +1374,7 @@ function migrateSave() {
   // Megas and Gigantamax arrived later: saves past Steven or Leon get the key item they would have been given.
   S.stones = S.stones || {}; S.gfactor = S.gfactor || {}; S.mega = S.mega || null; S.gmax = S.gmax || 0;
   S.mail = S.mail || { read: {}, claimed: {} }; S.mail.got = S.mail.got || {};
-  S.ach = S.ach || {}; S.stats = Object.assign({ taps: 0, wins: 0, evolved: 0, gifts: 0 }, S.stats);
+  S.ach = S.ach || {}; S.stats = Object.assign({ taps: 0, wins: 0, evolved: 0, gifts: 0 }, S.stats); S.cells = S.cells || 0;
   if (S.champs[KEY_STONE_FROM]) S.key = 1;
   if (S.champs[BAND_FROM]) S.band = 1;
 }
@@ -1390,7 +1429,8 @@ const TEST_PASSWORD = "happynewyear", TEST_PATTERN = "--...";
 function testAccount() {
   const t = fresh(), every = MON.map(m => m.num);
   for (const n of every) { t.box[n] = { xp: 100 ** 3, shiny: true }; t.seen[n] = 1; }
-  t.box[937] = { xp: 100 ** 3, shiny: false, special: "bday-ceruledge" };
+  t.box[937] = { xp: 100 ** 3, shiny: true, special: "bday-ceruledge", look: "special" };
+  t.cells = 100;
   t.party = [384, 150, 445, 6, 248, 937];
   t.money = 1e9; t.balls = { poke: 999, great: 999, ultra: 999, master: 99 }; t.cords = 99;
   t.protein = PROTEIN_PER_REGION * REGIONS.length;
