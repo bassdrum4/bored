@@ -247,3 +247,6 @@ body[data-phase="done"] .mascot{z-index:15}
 .party-banner:active{translate:0 2px}
 @media(max-width:699px){.party-banner{min-height:82px;padding:12px 14px 13px}.party-banner .party-line img{width:44px;height:44px}.party-banner .party-line strong{font-size:24px}.party-banner .party-line small{font-size:13px}}
 @media(max-height:650px){.party-banner{min-height:74px;padding:10px 16px 11px;gap:5px}.party-banner .party-line img{width:40px;height:40px}.party-banner .party-line strong{font-size:24px}}
+
+/* Practice left the meta row, so the day label no longer shares its width. */
+@media(max-width:699px){.intro-meta>span{max-width:none;text-align:center}.intro-meta{justify-content:center}}
