@@ -23,6 +23,7 @@
     --moss: #41602f;
     --sea: #2f6069;
     --scrim: rgba(36, 28, 18, .34);
+    --table: #d4c4a1;
     --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif;
     --font-data: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -87,7 +88,7 @@
   #turn-readout { font-family: var(--font-data); font-size: 12px; color: var(--ink-2); white-space: nowrap; margin-right: 4px }
   #turn-readout b { font-weight: 500; color: var(--ink) }
   #turn-readout em { font-style: normal; color: var(--ink-3) }
-  #stage { position: relative; overflow: hidden; background: var(--paper); min-width: 0; --panel-right: 0px; --panel-bottom: 0px }
+  #stage { position: relative; overflow: hidden; background: var(--table); min-width: 0; --panel-right: 0px; --panel-bottom: 0px }
   #map { display: block; width: 100%; height: 100%; cursor: grab; user-select: none; touch-action: none }
   #map.dragging { cursor: grabbing }
   .float { background: var(--panel); border: 1px solid var(--rule); box-shadow: 0 6px 18px rgba(36,28,18,.14) }
@@ -1990,13 +1991,19 @@ function tell(i, text) {
   (f.notes = f.notes || []).push(text);
 }
 // What the toast says as player i's turn starts: their notes, then an offer or a tech waiting.
+// A phone has no T key: name the Tech button instead. Desktops (and the test VM) keep the key.
+function pressT(cap) {
+  let touch = false;
+  try { touch = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-hover: hover)').matches; } catch {}
+  return touch ? (cap ? 'Tap Tech' : 'tap Tech') : (cap ? 'Press T' : 'press T');
+}
 function noticeFor(i) {
   const f = pl(i);
   if (!f) return '';
   const parts = (f.notes || []).splice(0);
   const offers = G.offers.filter(o => o.to === i).length;
   if (offers) parts.push(plural(offers, 'offer is', 'offers are') + ' waiting in the Council.');
-  else if (needsTech(i)) parts.push('Pick your next tech. Press T.');
+  else if (needsTech(i)) parts.push('Pick your next tech. ' + pressT(true) + '.');
   return parts.join(' ');
 }
 
@@ -7371,7 +7378,7 @@ const TUT_STEPS = [
 
   // ── Your city ──
   { ch: 'Your city',
-    say: 'Time to research. Open the <b>tech tree</b> (press T) and pick <b>Animal Husbandry</b>. A tech unlocks new units, buildings and abilities, and they stay hidden until you learn it. ' +
+    say: 'Time to research. Open the <b>tech tree</b> (' + pressT(false) + ') and pick <b>Animal Husbandry</b>. A tech unlocks new units, buildings and abilities, and they stay hidden until you learn it. ' +
       'You have 40 science saved, so it finishes next turn.',
     el: '#btn-tech, [data-act="research:husbandry"]',
     done: () => pl(0).research === 'husbandry' || hasTech(0, 'husbandry'),
@@ -7602,7 +7609,7 @@ const TIPS = [
     test: i => !bordersNever() && !hasTech(i, 'earlyempire') &&
       G.units.find(u => u.owner !== i && !sameTeam(i, u.owner) && pl(u.owner).alive && hasMet(i, u.owner) && !atWar(i, u.owner) && visibleTo(u.x, u.y) && tileAt(u.x, u.y).owner === i),
     say: (i, u) => esc(knownName(i, u.owner, true)) + '’s ' + esc(UNITS[u.type].name.toLowerCase()) + ' is standing on your land. Early Empire is a cheap tech that closes your borders: ' +
-      'other civs then need an open-borders deal to come in, and stepping in without one means war. Press T to research it.',
+      'other civs then need an open-borders deal to come in, and stepping in without one means war. ' + pressT(true) + ' to research it.',
     at: u => [u.x, u.y],
     el: '#btn-tech', help: 'borders', helpLabel: 'How borders work' },
   { id: 'roads', test: i => hasTech(i, 'masonry') && ownCities(i).length >= 2 && roadChoices(ownCities(i)[0]).some(o => o.r.cost > 0),
@@ -7619,7 +7626,7 @@ const TIPS = [
       '. Each pasture on horses and each mine on iron inside your borders adds 2 a turn.',
     at: c => [c.x, c.y] },
   { id: 'tech', test: i => needsTech(i),
-    say: () => 'You aren’t researching anything. Press T and pick a tech. Science you make meanwhile is banked, not lost.',
+    say: () => 'You aren’t researching anything. ' + pressT(true) + ' and pick a tech. Science you make meanwhile is banked, not lost.',
     el: '#btn-tech' },
   { id: 'eureka', test: i => Object.keys(EUREKAS).find(id => pl(i).boost && pl(i).boost[id] && !hasTech(i, id)),
     say: (i, id) => 'Eureka! “' + esc(EUREKAS[id].say) + '” is done, so ' + esc(techName(id)) + ' now costs half. Seven major techs have a eureka; the tech tree says what each one wants.',
@@ -9612,7 +9619,7 @@ function onAction(act) {
         if (setBuild(c, item)) {
           render();
           autosave();
-          if (b === 'research' && !pl(G.viewer).research) toast('Now pick a tech for it. Press T.');
+          if (b === 'research' && !pl(G.viewer).research) toast('Now pick a tech for it. ' + pressT(true) + '.');
         }
       }
       break;
@@ -11584,7 +11591,7 @@ function liveUi(kind, act, parts, selUnit) {
       liveSend('city-build', { city: c.id, kind: item.kind, id: item.id }, ok => {
         if (!ok) return;
         render();
-        if (b === 'research' && !pl(me).research) toast('Now pick a tech for it. Press T.');
+        if (b === 'research' && !pl(me).research) toast('Now pick a tech for it. ' + pressT(true) + '.');
       });
       return true;
     }
