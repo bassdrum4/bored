@@ -26,7 +26,7 @@ import { TIERS, ROUND_MS, PREVIEW_MS, matchAnswer } from './rules.mjs';
 const SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
 async function loadFromSite(name) {
-  const response = await fetch(new URL(`sets/${name}.json`, import.meta.url), { cache: 'no-store' });
+  const response = await fetch(new URL(`./sets/${name}.json`, import.meta.url), { cache: 'no-store' });
   if (response.status === 404) throw new Error(`There is no set called “${name}”.`);
   if (!response.ok) throw new Error(`The “${name}” set could not be loaded.`);
   return response.json();
