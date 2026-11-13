@@ -12,10 +12,15 @@ set search_path = public
 as $$
   select coalesce(jsonb_agg(entry), '[]'::jsonb)
   from (
-    select prompt as entry
-    from public.krillion_books book
-    cross join lateral jsonb_array_elements(book.book -> 'prompts') prompt
-    where book.date < to_char((now() at time zone 'America/New_York')::date, 'YYYY-MM-DD')
+    select entry
+    from (
+      -- One row per question: a dive should never ask the same prompt twice.
+      select distinct on (prompt ->> 'text') prompt as entry
+      from public.krillion_books book
+      cross join lateral jsonb_array_elements(book.book -> 'prompts') prompt
+      where book.date < to_char((now() at time zone 'America/New_York')::date, 'YYYY-MM-DD')
+      order by prompt ->> 'text', random()
+    ) unique_prompts
     order by random()
     limit least(greatest(coalesce(p_count, 7), 1), 7)
   ) picked;

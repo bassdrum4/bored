@@ -2,7 +2,7 @@
 //
 // This is the API the original OpenKrillion client expects. The reference site
 // has no CORS headers, so the answer book is fetched and cached here, and each
-// daily run is kept in Postgres. The client only receives prompts until it has
+// run, daily or unlimited, is kept in Postgres. The client only receives prompts until it has
 // finished the dive; answer checks happen on this side.
 
 const CORS = {
@@ -24,7 +24,8 @@ const TIERS: Record<string, { name: string; score: number }> = {
 
 type Answer = { answer: string; tier: string; quip?: string; aliases?: string[] };
 type Prompt = { id: string; text: string; answers: Answer[] };
-type Book = { date: string; dayNumber: number; source: string; prompts: Prompt[] };
+type Book = { date: string; dayNumber: number; source: string; title?: string; prompts: Prompt[] };
+type PickedPrompt = { id: string; text: string; date: string };
 type Match = Answer & { correction: boolean };
 type Loaded = { book: Book; stale: boolean };
 type AnswerResult = {
@@ -46,6 +47,7 @@ type Run = {
   completed: boolean;
   results: AnswerResult[];
   hint_used: boolean;
+  prompts?: PickedPrompt[];
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
@@ -54,7 +56,8 @@ const REFERENCE = 'https://krillion.io';
 const USER_AGENT = 'BoredKrillion/1.0 (+https://bassdrum4.github.io/bored/)';
 const ROUND_MS = 25_000;
 const PREVIEW_MS = 3_000;
-const RUN_COLUMNS = 'id,date,mode,round,round_start,paused_at,completed,results,hint_used';
+const RUN_COLUMNS = 'id,date,mode,round,round_start,paused_at,completed,results,hint_used,prompts';
+const ARCHIVE_TITLE = 'The Open Water';
 
 const normalize = (value: unknown) => String(value).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
 const stripArticle = (value: unknown) => String(value).trim().replace(/^(?:the|a|an)\s+/i, '');
@@ -285,12 +288,37 @@ async function loadBook(date: string): Promise<Loaded> {
 const publicBook = (loaded: Loaded) => ({
   date: loaded.book.date,
   dayNumber: loaded.book.dayNumber,
+  ...(loaded.book.title ? { title: loaded.book.title } : {}),
   sample: false,
   prompts: loaded.book.prompts.map(prompt => ({ id: prompt.id, text: prompt.text })),
   resetsAt: resetAt(loaded.book.date),
   source: loaded.book.source,
   stale: loaded.stale
 });
+
+// A practice dive keeps only the identity of the prompts it drew, so the answer
+// book for those prompts stays in Postgres and is scored here like the daily's.
+async function bookForRun(run: Run): Promise<Book> {
+  const picked = Array.isArray(run.prompts)
+    ? run.prompts.filter(entry => entry && typeof entry.id === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(String(entry.date)))
+    : [];
+  if (picked.length !== 7) return (await loadBook(run.date)).book;
+  const books = new Map<string, Book>();
+  await Promise.all([...new Set(picked.map(entry => entry.date))].map(async date => {
+    books.set(date, (await loadBook(date)).book);
+  }));
+  return {
+    date: run.date,
+    dayNumber: 0,
+    source: 'Archive dive',
+    title: ARCHIVE_TITLE,
+    prompts: picked.map(entry => {
+      const prompt = books.get(entry.date)?.prompts.find(candidate => candidate.id === entry.id);
+      if (!prompt) throw new HttpError('This dive lost its prompts. Start a new one.', 503);
+      return prompt;
+    })
+  };
+}
 
 async function readRun(id: string): Promise<Run | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id || '')) return null;
@@ -300,7 +328,7 @@ async function readRun(id: string): Promise<Run | null> {
   return (rows?.[0] || null) as Run | null;
 }
 
-async function createRun(mode: string, book: Book): Promise<Run> {
+async function createRun(mode: string, book: Book, prompts: PickedPrompt[] = []): Promise<Run> {
   const row = {
     id: crypto.randomUUID(),
     date: book.date,
@@ -310,7 +338,8 @@ async function createRun(mode: string, book: Book): Promise<Run> {
     paused_at: null,
     completed: false,
     results: [],
-    hint_used: false
+    hint_used: false,
+    prompts
   };
   const response = await sb('krillion_runs', {
     method: 'POST',
@@ -364,32 +393,18 @@ Deno.serve(async (req: Request) => {
         return reply(publicBook(await loadBook(etDate())));
       }
       if (path === '/health') return reply({ ok: true, rounds: 7 });
-      // Unlimited: seven prompts picked at random from past dives. The client
-      // scores them itself and keeps the run on the device, so no run row is
-      // written and today's answer book never leaves this function.
-      if (path === '/unlimited') {
-        const response = await sb('rpc/krillion_random_prompts', {
-          method: 'POST',
-          body: JSON.stringify({ p_count: 7 })
-        });
-        if (!response.ok) throw new HttpError('The archive is out of reach. Try again shortly.', 503);
-        const prompts = await response.json();
-        if (!Array.isArray(prompts) || prompts.length !== 7) throw new HttpError('The archive is out of reach. Try again shortly.', 503);
-        return reply({ title: 'The Open Water', prompts });
-      }
       if (path === '/party/rooms') return reply({ rooms: [], seats: [] });
       if (path === '/state') {
         const run = await readRun(url.searchParams.get('run') || '');
         if (!run) throw new HttpError('Dive not found on this browser.', 404);
-        const loaded = await loadBook(run.date);
-        return reply(stateFor(run, loaded.book));
+        return reply(stateFor(run, await bookForRun(run)));
       }
       if (path === '/review') {
         const run = await readRun(url.searchParams.get('run') || '');
         if (!run?.completed) throw new HttpError('Finish your dive before opening the answer sheet.', 403);
-        const loaded = await loadBook(run.date);
+        const book = await bookForRun(run);
         return reply({
-          prompts: loaded.book.prompts.map(prompt => ({
+          prompts: book.prompts.map(prompt => ({
             id: prompt.id,
             text: prompt.text,
             answers: prompt.answers
@@ -415,16 +430,28 @@ Deno.serve(async (req: Request) => {
 
     if (path === '/start') {
       if (body.archive || body.pack || body.unlimited) throw new HttpError('Only the daily dive is available in Bored.', 400);
+      if (body.practice === true) {
+        // Unlimited: seven prompts picked at random from past dives. The run is
+        // stored like a daily dive, but against the days those prompts came from.
+        const response = await sb('rpc/krillion_random_prompts', {
+          method: 'POST',
+          body: JSON.stringify({ p_count: 7 })
+        });
+        if (!response.ok) throw new HttpError('The archive is out of reach. Try again shortly.', 503);
+        const prompts = await response.json();
+        if (!Array.isArray(prompts) || prompts.length !== 7) throw new HttpError('The archive is out of reach. Try again shortly.', 503);
+        const run = await createRun('practice', { date: etDate(), dayNumber: 0, source: 'Archive dive', title: ARCHIVE_TITLE, prompts: [] }, prompts);
+        return reply(stateFor(run, await bookForRun(run)));
+      }
       const loaded = await loadBook(etDate());
-      const run = await createRun(body.practice === true ? 'practice' : 'daily', loaded.book);
+      const run = await createRun('daily', loaded.book);
       return reply(stateFor(run, loaded.book));
     }
 
     if (path === '/answer') {
       const run = await readRun(String(body.runId || ''));
       if (!run) throw new HttpError('Dive not found.', 404);
-      const loaded = await loadBook(run.date);
-      const book = loaded.book;
+      const book = await bookForRun(run);
       const round = Number(body.round);
       if (!Number.isInteger(round) || round < 0 || round >= book.prompts.length) throw new HttpError('Invalid round.', 400);
       if (run.completed || run.round_start == null || round !== Number(run.round)) {
@@ -464,17 +491,17 @@ Deno.serve(async (req: Request) => {
     if (path === '/next') {
       const run = await readRun(String(body.runId || ''));
       if (!run) throw new HttpError('Dive not found.', 404);
-      const loaded = await loadBook(run.date);
+      const book = await bookForRun(run);
       const updated = !run.completed && run.round_start == null
         ? await updateRun(run.id, { round_start: Date.now() + PREVIEW_MS })
         : run;
-      return reply(stateFor(updated, loaded.book));
+      return reply(stateFor(updated, book));
     }
 
     if (path === '/pause') {
       const run = await readRun(String(body.runId || ''));
       if (!run) throw new HttpError('Dive not found.', 404);
-      const loaded = await loadBook(run.date);
+      const book = await bookForRun(run);
       let updated = run;
       if (body.paused === true && !run.completed && run.round_start != null && !run.paused_at && Date.now() <= Number(run.round_start) + ROUND_MS) {
         updated = await updateRun(run.id, { paused_at: Date.now() });
@@ -482,16 +509,16 @@ Deno.serve(async (req: Request) => {
         const delta = Date.now() - Number(run.paused_at);
         updated = await updateRun(run.id, { round_start: Number(run.round_start) + delta, paused_at: null });
       }
-      return reply(stateFor(updated, loaded.book));
+      return reply(stateFor(updated, book));
     }
 
     if (path === '/hint') {
       const run = await readRun(String(body.runId || ''));
       if (!run) throw new HttpError('Dive not found.', 404);
       if (run.completed) throw new HttpError('This dive is over.', 409);
-      if (run.hint_used) throw new HttpError('That hint is already spent for today.', 409);
-      const loaded = await loadBook(run.date);
-      const prompt = loaded.book.prompts[Number(run.round)];
+      if (run.hint_used) throw new HttpError('That hint is already spent for this dive.', 409);
+      const book = await bookForRun(run);
+      const prompt = book.prompts[Number(run.round)];
       if (!prompt) throw new HttpError('This dive is over.', 409);
       const gem = prompt.answers.find(answer => answer.tier === 'krillion') || prompt.answers[prompt.answers.length - 1];
       await updateRun(run.id, { hint_used: true });

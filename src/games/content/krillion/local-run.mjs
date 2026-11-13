@@ -1,9 +1,9 @@
 // A dive that runs in the browser instead of on the shared board.
 //
-// The prompts come from a loader, scoring uses the same matcher as the daily
-// dive, and the whole run — the prompts and its progress — lives in local
-// storage when a storage pair is supplied. Nothing is posted and no run row is
-// written, so unlimited dives and classroom sets cost the database nothing.
+// The prompts come from a loader and scoring uses the same matcher as the daily
+// dive. Only classroom sets use this: they are files a teacher controls, so
+// there is no server and nothing to store. Unlimited dives are ordinary runs on
+// the API, scored and kept in Postgres.
 import { TIERS, ROUND_MS, PREVIEW_MS, matchAnswer } from './rules.mjs';
 
 export function prepareBook(raw, fallbackTitle) {
@@ -28,9 +28,8 @@ export function prepareBook(raw, fallbackTitle) {
 
 // Returns the same (path, data) => body function the game uses for the daily
 // dive, so the client does not need a second code path. `load` resolves a raw
-// book whenever a fresh run starts; `storage` keeps an unfinished run alive
-// across a reload. Both are optional and injectable for tests.
-export function createLocalRun({ mode, load, storage = null, idPrefix = 'local', fallbackTitle = 'This dive' }) {
+// book whenever a fresh run starts.
+export function createLocalRun({ mode, load, idPrefix = 'local', fallbackTitle = 'This dive' }) {
   let book = null;
   let loading = null;
   let run = null;
@@ -45,11 +44,6 @@ export function createLocalRun({ mode, load, storage = null, idPrefix = 'local',
         .catch(error => { loading = null; throw error; });
     }
     return loading;
-  };
-
-  const persist = () => {
-    if (!storage) return;
-    try { storage.write({ book, run }); } catch { /* A full browser can refuse the run; it stays in memory. */ }
   };
 
   const score = () => (run ? run.results.reduce((total, result) => total + result.score, 0) : 0);
@@ -76,18 +70,6 @@ export function createLocalRun({ mode, load, storage = null, idPrefix = 'local',
   });
 
   const start = async () => {
-    if (storage) {
-      const kept = storage.read();
-      if (kept?.book?.prompts?.length === 7 && kept.run && !kept.run.completed) {
-        book = kept.book;
-        run = kept.run;
-        // A tab can sit closed for days, so the round gets a fresh window
-        // instead of resuming against last week's clock.
-        if (run.roundStart != null) run.roundStart = Date.now() + PREVIEW_MS;
-        run.pausedAt = null;
-        return stateFor();
-      }
-    }
     await read();
     seq += 1;
     run = { id: `${idPrefix}-${seq}-${Date.now().toString(36)}`, round: 0, roundStart: Date.now() + PREVIEW_MS, pausedAt: null, completed: false, results: [], hintUsed: false };
@@ -97,11 +79,7 @@ export function createLocalRun({ mode, load, storage = null, idPrefix = 'local',
   return async function api(path, data = {}) {
     const route = String(path).split('?')[0].replace(/^\/+/, '');
 
-    if (route === 'start') {
-      const state = await start();
-      persist();
-      return state;
-    }
+    if (route === 'start') return start();
 
     await read();
     if (route === 'today') {
@@ -139,13 +117,11 @@ export function createLocalRun({ mode, load, storage = null, idPrefix = 'local',
       run.round = round + 1;
       run.roundStart = null;
       run.completed = run.round >= book.prompts.length;
-      persist();
       return { result, state: stateFor() };
     }
 
     if (route === 'next') {
       if (!run.completed) run.roundStart = Date.now() + PREVIEW_MS;
-      persist();
       return stateFor();
     }
 
@@ -156,7 +132,6 @@ export function createLocalRun({ mode, load, storage = null, idPrefix = 'local',
         run.roundStart = Number(run.roundStart) + (Date.now() - Number(run.pausedAt));
         run.pausedAt = null;
       }
-      persist();
       return stateFor();
     }
 
@@ -167,7 +142,6 @@ export function createLocalRun({ mode, load, storage = null, idPrefix = 'local',
       if (!prompt) throw new Error('This dive is over.');
       const gem = prompt.answers.find(answer => answer.tier === 'krillion') || prompt.answers[prompt.answers.length - 1];
       run.hintUsed = true;
-      persist();
       return { used: true, hint: `${prompt.answers.length} answers land here. The deepest one starts with “${gem.answer[0].toUpperCase()}”.` };
     }
 
