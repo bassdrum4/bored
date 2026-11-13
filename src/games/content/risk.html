@@ -5365,22 +5365,35 @@
         };
         if (state.phase==="REINFORCE") {
           if (hasValidSet(state.players[pid].cards || [])) processTrade(pid);
-          const pool=Math.max(0,state.reserves);
+          const pool=Math.max(0,state.reserves)+Math.max(0,Number(state.botReserves?.[pid])||0);
           const fronts=Object.keys(state.territories)
             .filter(n=>state.territories[n].owner===pid)
             .map(n=>({n,score:riskFrontAssessment(pid,n)}))
             .filter(c=>c.score>-1e5).sort((a,b)=>b.score-a.score);
+          state.botReserves=state.botReserves||{};
           if(fronts.length && pool>0) {
-            const focus=fronts[0].n;
-            const secondary=fronts.find(c=>c.n!==focus && c.score > fronts[0].score-12)?.n || focus;
-            const heavy=diff===1?.55:diff===2?.76:.86;
-            const first=Math.max(1,Math.round(pool*heavy));
-            state.territories[focus].armies+=first;
-            state.territories[secondary].armies+=pool-first;
-            report(state.players[pid].name+" reinforced "+focus+".");
+            // A whole reserve must not land on one territory: a single 100-army
+            // dump decides the war before the player can react. Each front takes
+            // a bounded share this turn; whatever the line cannot absorb is
+            // carried by the bot, because reserves are reset at the next turn.
+            const ceiling=diff===1?18:diff===2?24:30;
+            const weights=[1,.6,.35];
+            let left=pool;
+            fronts.forEach((front,index)=>{
+              if(left<=0)return;
+              const share=Math.min(left,Math.max(1,Math.round(ceiling*(weights[index]??.25))));
+              state.territories[front.n].armies+=share;
+              left-=share;
+            });
+            state.botReserves[pid]=left;
+            report(state.players[pid].name+" reinforced "+fronts[0].n+".");
           } else if (pool>0) {
             const fallback=Object.keys(state.territories).find(n=>state.territories[n].owner===pid);
-            if(fallback)state.territories[fallback].armies+=pool;
+            const share=Math.min(pool,diff===1?18:30);
+            if(fallback)state.territories[fallback].armies+=share;
+            state.botReserves[pid]=pool-share;
+          } else {
+            state.botReserves[pid]=0;
           }
           state.reserves=0;
           broadcastState();
@@ -5416,7 +5429,10 @@
                 const biggest=oldEnemies.reduce((m,n)=>Math.max(m,state.territories[n].armies),0);
                 const garrison=Math.max(1,Math.ceil(biggest*(diff===3?.8:1.0)));
                 const available=Math.max(0,source.armies-garrison);
-                const move=Math.min(available,Math.floor(available*(diff===1?.4:diff===2?.65:.82)));
+                // Advance a bounded column, not the surviving stack: chaining a
+                // 95-army slide through every new border rolls the map in a turn.
+                const advanceCeiling=diff===1?6:diff===2?10:14;
+                const move=Math.min(available,Math.floor(available*(diff===1?.4:diff===2?.65:.82)),advanceCeiling);
                 if(move>0) {
                   source.armies-=move;
                   captured.armies+=move;

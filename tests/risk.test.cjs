@@ -148,6 +148,35 @@ test('CPU fortifies from rear via friendly routes, preserving a garrison',()=>{
   assert.ok(move.amount>0 && move.amount<f.state.territories.REAR.armies);
 });
 
+test('CPU spreads a large reserve instead of one 100-army dump',()=>{
+  const f=cpuFixture({reserves:100});
+  const before=Object.fromEntries(Object.entries(f.state.territories)
+    .map(([name,t])=>[name,t.armies]));
+  vm.runInContext('executeAITurn()',f.context);
+  const gains=Object.entries(f.state.territories)
+    .filter(([,t])=>t.owner===1)
+    .map(([name,t])=>t.armies-before[name]);
+  const placed=gains.reduce((sum,n)=>sum+n,0);
+  const carried=Number(f.state.botReserves?.[1])||0;
+  assert.ok(Math.max(...gains)<=30,'no single territory may take more than the ceiling');
+  assert.ok(placed<100,'the whole reserve must not be spent on one turn');
+  assert.equal(placed+carried,100,'carried troops are neither dumped nor lost');
+  assert.equal(f.state.reserves,0,'the shared reserve is cleared for the next player');
+});
+
+test('CPU advances a bounded column, not the whole surviving stack',()=>{
+  const f=cpuFixture({reserves:0,aiDifficulty:3});
+  f.state.territories.HOME.armies=100;
+  f.state.territories.BORDER.armies=1;
+  f.state.territories.FINAL.owner=1;
+  f.state.territories.FINAL.armies=9;
+  vm.runInContext('executeAITurn()',f.context);
+  f.pump();
+  assert.equal(f.state.territories.BORDER.owner,1,'CPU captures the border first');
+  assert.ok(f.state.territories.BORDER.armies<=16,
+    'only a capped column follows the conquest, not the 95 that survived');
+});
+
 test('Risk only scores finished human world conquest',()=>{
   assert.match(html, /return \{slug:"risk", turns, won, finished:state\?\.phase === "GAME_OVER", cpu:true\}/);
   assert.match(html, /Object\.values\(state\.territories \|\| \{\}\)\.every\(t => t\.owner === 0\)/);
