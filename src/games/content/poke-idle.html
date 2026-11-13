@@ -571,7 +571,12 @@ const hitRate = m => (m.spe + 75) / 150;
 const bulkOf = m => (m.hp + m.def + m.spd) / 3;
 const PARTY_BULK = 85;
 // What a party member fights as: its Mega form if it's the party's Mega.
-const special = n => S.box[n] && S.box[n].special && SPECIALS[S.box[n].special];
+// Each species keeps one level but can wear any edition you own: normal always, shiny once you've caught one, a
+// special edition once you have it (box entry look). The look picks the picture; only a special edition also brings
+// its own stats. A shiny counts on the leaderboard whichever look is on.
+const lookKind = n => { const b = S.box[n], l = b.look; return l === "normal" || (l === "shiny" && b.shiny) || (l === "special" && b.special) ? l : b.special ? "special" : b.shiny ? "shiny" : "normal"; };
+const showsShiny = n => !!S.box[n] && lookKind(n) === "shiny";
+const special = n => S.box[n] && S.box[n].special && lookKind(n) === "special" && SPECIALS[S.box[n].special];
 const fighter = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || special(n) || mon(n);
 const partyTime = () => S.party.length ? Math.min(1.25, Math.max(.8, S.party.reduce((s, n) => s + bulkOf(fighter(n)), 0) / S.party.length / PARTY_BULK)) : 1;
 const power = (n, L = level(n)) => { const m = fighter(n); return Math.max(m.atk, m.spa) * L / 50 * hitRate(m) * (1 + proteinBoost()) * (S.gmax === n ? GMAX_BOOST : 1); };
@@ -763,7 +768,7 @@ function backToRoute() {
 function addMon(num, L, shiny) {
   const had = S.box[num];
   if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny };
-  else if (shiny) had.shiny = true;
+  else if (shiny) { const first = !had.shiny; had.shiny = true; had.look = "shiny"; if (first) toast(`A shiny ${mon(num).name}! Yours wears it now; Party & Box can switch it back.`); }
   if (!had && S.party.length < 6) S.party.push(num);
   if (!had) toast(`${mon(num).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
   renderAll();
@@ -799,7 +804,7 @@ function evolve(n, e) {
   if (how === "T") S.cords--;
   const had = S.box[t];
   if (had) { had.xp = Math.max(had.xp, S.box[n].xp); had.shiny = had.shiny || S.box[n].shiny; }
-  else S.box[t] = { xp: S.box[n].xp, shiny: S.box[n].shiny };
+  else S.box[t] = { xp: S.box[n].xp, shiny: S.box[n].shiny, look: lookKind(n) === "shiny" ? "shiny" : "normal" };
   const slot = S.party.indexOf(n);
   if (slot >= 0) { if (S.party.includes(t)) S.party.splice(slot, 1); else S.party[slot] = t; }
   dropForm(n); S.stats.evolved++;
@@ -871,7 +876,7 @@ const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax 
 function monTile(n, opts = {}) {
   const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : special(n) || m, e = opts.foe ? bestEff(fighter(n), opts.foe) : null;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny || look !== m ? `<span class="star">${[b.shiny && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, b.shiny)}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](m)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](m)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -899,14 +904,19 @@ function formLines(n) {
   if (gmax) rows.push(line(gmax, !S.band ? "needs the Dynamax Band (beat Leon)" : !S.gfactor[n] ? "needs Max Soup: Shop or boss drops, party only" : !inParty ? "add it to your party first" : "", S.gmax === n, "data-gmax=\"1\""));
   return rows.length ? `<div class="small">${rows.join("")}<div class="muted">One Mega and one Gigantamax in the party at a time.</div></div>` : "";
 }
+function lookLine(n) {
+  const b = S.box[n], cur = lookKind(n), opts = [["normal", "Normal"]].concat(b.shiny ? [["shiny", "Shiny"]] : [], b.special ? [["special", "SP"]] : []);
+  if (opts.length < 2) return "";
+  return `<div class="row small"><span class="muted">Look</span>${opts.map(([k, l]) => `<button class="lbl${k === cur ? " on" : ""}" type="button" data-look="${k}" aria-pressed="${k === cur}">${l}</button>`).join("")}<span class="muted">same Pokémon, same level${b.special ? "; SP brings its own stats" : ""}</span></div>`;
+}
 function renderDetail() {
   const el = $("#detail");
   if (!detail || !S.box[detail]) { el.hidden = true; return; }
-  const sp = special(detail), m = mon(detail), opts = m.evos, st = sp || m;
+  const sp = special(detail), m = mon(detail), opts = m.evos, st = sp || m, owned = S.box[detail];
   el.hidden = false;
   el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${m.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small muted">HP <b>${st.hp}</b> · Atk <b>${st.atk}</b> · Def <b>${st.def}</b> · SpA <b>${st.spa}</b> · SpD <b>${st.spd}</b> · Spe <b>${st.spe}</b> · Total <b>${st.bst}</b></div>` +
-    (sp ? `<div class="small"><b>SP · Special edition: ${esc(sp.title)}</b> <span class="muted">${esc(sp.note)}</span></div>` : "") +
+    (owned.special ? `<div class="small"><b>SP · Special edition: ${esc(SPECIALS[owned.special].title)}</b> <span class="muted">${esc(SPECIALS[owned.special].note)}</span></div>` : "") + lookLine(detail) +
     (opts.length ? `<div class="small">${opts.map(e => {
       const [t, how, v] = e, owned = S.box[t], open = !owned || level(t) < level(detail), ok = open && canEvolve(detail, e);
       const need = how === "L" ? `Lv ${v}${v > levelCap() ? " (over the cap)" : ""}` : how === "I" ? `${v} (have ${S.items[v] || 0})` : `Linking Cord (have ${S.cords})`;
@@ -927,7 +937,7 @@ function renderDex() {
   }
   const list = regionMons(dexR), got = list.filter(m => S.box[m.num]).length, shinies = list.filter(m => S.box[m.num] && S.box[m.num].shiny).length;
   $("#dexsum").innerHTML = `${REGIONS[dexR].name}: <b>${got}/${list.length}</b> caught · ${shinies} shiny${S.charm ? " (Shiny Charm)" : ""} · all regions ${Object.keys(S.box).length}/1025`;
-  $("#dexgrid").innerHTML = list.map(m => { const b = S.box[m.num]; return `<img src="${b && special(m.num) ? special(m.num).img : sprite(m.num, b && b.shiny)}" alt="${b || S.seen[m.num] ? esc(m.name) : "unknown"}" title="#${m.num} ${b || S.seen[m.num] ? esc(m.name) : "???"}" class="${b ? "" : "no"}" loading="lazy">`; }).join("");
+  $("#dexgrid").innerHTML = list.map(m => { const b = S.box[m.num]; return `<img src="${b && special(m.num) ? special(m.num).img : sprite(m.num, b && showsShiny(m.num))}" alt="${b || S.seen[m.num] ? esc(m.name) : "unknown"}" title="#${m.num} ${b || S.seen[m.num] ? esc(m.name) : "???"}" class="${b ? "" : "no"}" loading="lazy">`; }).join("");
 }
 function renderShop() {
   const rows = [];
@@ -1087,7 +1097,7 @@ function claimGift(id) {
   if (g.special) {
     const sp = SPECIALS[g.special], had = S.box[sp.num];
     // Special editions aren't shiny. A shiny one already caught keeps its record (it still counts on the board) but shows as SP.
-    S.box[sp.num] = { xp: Math.max(Math.pow(levelCap(), 3), had ? had.xp : 0), shiny: had ? had.shiny : false, special: g.special };
+    S.box[sp.num] = { xp: Math.max(Math.pow(levelCap(), 3), had ? had.xp : 0), shiny: had ? had.shiny : false, special: g.special, look: "special" };
     if (!had && S.party.length < 6) S.party.push(sp.num);
   }
   S.mail.claimed[id] = 1; S.stats.gifts++;
@@ -1149,7 +1159,7 @@ function wikiEntry(n) {
   const m = mon(n), b = S.box[n], from = PARENT[n], forms = FORMS.filter(f => f.num === n);
   const stats = x => `<div class="pk-stats">${[["HP", x.hp], ["Atk", x.atk], ["Def", x.def], ["SpA", x.spa], ["SpD", x.spd], ["Spe", x.spe], ["Total", x.bst]].map(([k]) => `<span>${k}</span>`).join("")}${[x.hp, x.atk, x.def, x.spa, x.spd, x.spe, x.bst].map(v => `<b>${v}</b>`).join("")}</div>`;
   const tag = m.flags.has("my") ? " · mythical" : m.flags.has("lg") ? " · legendary" : "";
-  return `<div class="pk"><span class="pic pk-pic"><img class="spr" src="${sprite(n, b && b.shiny)}" alt=""></span><div class="pk-body">` +
+  return `<div class="pk"><span class="pic pk-pic"><img class="spr" src="${b && special(n) ? special(n).img : sprite(n, b && showsShiny(n))}" alt=""></span><div class="pk-body">` +
     `<p>#${n} · ${m.types.map(tyChip).join(" ")} · Gen ${m.gen} (${REGIONS[m.gen - 1].name})${tag}</p>${stats(m)}` +
     `<p>Catch rate ${m.cr} (a Poké Ball: ${pct(throwChance(m, BALLS[0]))}). Hits ${hitRate(m).toFixed(2)} times a second, bulk ${Math.round(bulkOf(m))}.</p>` +
     `<p>${b ? `You have it at Lv ${level(n)}${b.shiny ? ", shiny" : ""}.` : S.seen[n] ? "You've seen it but not caught it." : "You haven't seen it yet."}</p>` +
@@ -1242,6 +1252,11 @@ $("#foe").addEventListener("pointerdown", e => {
 $("#foe").addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!e.repeat) tap(e); } });
 function partyClick(e) {
   const t = e.target.closest("[data-n]"), ev = e.target.closest("[data-evo]"), tg = e.target.closest("[data-toggle]"), cl = e.target.closest("[data-close]");
+  const lk = e.target.closest("[data-look]");
+  if (lk) {
+    if (B && B.kind !== "route" && (lk.dataset.look === "special" || lookKind(detail) === "special")) { toast("Change editions between battles."); return; }
+    S.box[detail].look = lk.dataset.look; save(); renderAll(); return;
+  }
   const mg = e.target.closest("[data-mega]"), gx = e.target.closest("[data-gmax]");
   if (mg || gx) { if (B && B.kind !== "route") { toast("Change forms between battles."); return; } if (mg) setMega(detail, +mg.dataset.mega); else setGmax(detail); return; }
   if (ev) { if (B && B.kind !== "route") { toast("Evolve between battles."); return; } const e2 = mon(detail).evos.find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
@@ -1421,14 +1436,14 @@ function renderTitle() {
 }
 function leadField() {
   const n = S.party[0], b = S.box[n], look = lookOf(n);
-  return `<div class="fieldhead"><b>${esc(look.name)}</b><span class="muted">Lv ${level(n)}</span></div><div class="t-stage"><span class="ground"></span><img class="spr" src="${spriteOf(look, b.shiny)}" alt="">${b.shiny ? '<span class="shinymark">shiny</span>' : ""}</div>`;
+  return `<div class="fieldhead"><b>${esc(look.name)}</b><span class="muted">Lv ${level(n)}</span></div><div class="t-stage"><span class="ground"></span><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="">${showsShiny(n) ? '<span class="shinymark">shiny</span>' : ""}</div>`;
 }
 function saveCard() {
   const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
   const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`],
     ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${caught + shiny} points`]].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
-    `<div class="t-party">${S.party.map(n => `<img src="${sprite(n, S.box[n].shiny)}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
+    `<div class="t-party">${S.party.map(n => `<img src="${spriteOf(lookOf(n), showsShiny(n))}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
     (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "");
 }
 function go(id) {
