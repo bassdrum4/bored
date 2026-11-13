@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Poké Idle</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  [hidden] { display: none !important }
+  body { background: #f5f2ea; color: #191713; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 12px 28px; display: flex; justify-content: center }
+  main { width: min(760px, 100%); display: flex; flex-direction: column; gap: 10px }
+  .muted { color: #6b6558 } .small { font-size: 12px } .bad { color: #b8402a } .good { color: #3d7a35 }
+  h1 { font-size: 18px; font-weight: 700 }
+  h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600 }
+  .box { border: 1px solid #d8d2c4; background: #fffdf7; padding: 10px; border-radius: 2px; display: flex; flex-direction: column; gap: 8px; min-width: 0 }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center }
+  button.lbl { font: inherit; font-size: 12px; padding: 6px 9px; border: 1px solid #191713; background: none; color: inherit; cursor: pointer; border-radius: 2px }
+  button.lbl:hover:not(:disabled) { background: #ece7da }
+  button.lbl:disabled { opacity: .35; cursor: not-allowed }
+  button.lbl.on, button.lbl.on:hover:not(:disabled) { background: #191713; color: #f5f2ea }
+  /* The arcade floats its menu button over the top-left corner. */
+  @media (max-width: 880px) { #top, #pick h1 { padding-left: 56px } }
+  #top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 12px }
+  #top b { font-variant-numeric: tabular-nums }
+  #tabs { display: flex; gap: 4px; flex-wrap: wrap }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: start }
+  @media (max-width: 640px) { .cols { grid-template-columns: minmax(0, 1fr) } }
+  .locs { display: flex; flex-direction: column; gap: 4px }
+  .loc { font: inherit; font-size: 12px; text-align: left; padding: 6px 8px; border: 1px solid #d8d2c4; background: none; color: inherit; cursor: pointer; border-radius: 2px; display: flex; justify-content: space-between; gap: 8px }
+  .loc:hover:not(:disabled) { border-color: #191713 }
+  .loc.here { border-color: #191713; background: #ece7da }
+  .loc:disabled { opacity: .4; cursor: not-allowed }
+  .loc .done { color: #3d7a35 }
+  .ty { display: inline-block; padding: 1px 5px; color: #fff; font-size: 10px; font-weight: 600; border-radius: 2px; letter-spacing: .03em }
+  #foe { width: 100%; aspect-ratio: 4 / 3; max-height: 220px; border: 1px dashed #d8d2c4; background: none; cursor: pointer; display: grid; place-items: center; position: relative; border-radius: 2px; touch-action: manipulation; user-select: none; -webkit-user-select: none }
+  #foe img { width: 60%; height: 85%; object-fit: contain; image-rendering: pixelated; transition: transform .06s }
+  #foe:active img { transform: scale(.94) }
+  #foe .pop { position: absolute; font-weight: 700; font-size: 13px; pointer-events: none; animation: rise .6s ease-out forwards }
+  @keyframes rise { to { transform: translateY(-28px); opacity: 0 } }
+  .shinymark { position: absolute; top: 6px; right: 8px; font-size: 11px; font-weight: 700; color: #b8860b }
+  .bar { height: 8px; background: #ece7da; border-radius: 2px; overflow: hidden }
+  .bar i { display: block; height: 100%; background: #3d7a35 }
+  .bar.time i { background: #191713 }
+  .bar.xp { height: 3px } .bar.xp i { background: #3a6fd8 }
+  #log { font-size: 12px; min-height: 2.9em }
+  .party { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px }
+  .mon { font: inherit; font-size: 10px; border: 1px solid #d8d2c4; background: #fffdf7; color: inherit; border-radius: 2px; padding: 3px; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; cursor: pointer; position: relative }
+  .mon img { width: 100%; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated }
+  .mon .nm { width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .mon.empty { border-style: dashed; color: #6b6558; justify-content: center; cursor: default }
+  .mon .eff { position: absolute; top: 2px; left: 3px; font-weight: 700 }
+  .mon .star { position: absolute; top: 2px; right: 3px; color: #b8860b; font-weight: 700 }
+  .mon.inparty { outline: 2px solid #191713; outline-offset: -2px }
+  .mon .evo { position: absolute; top: 2px; left: 2px; right: 2px; background: #3a6fd8; color: #fff; font-size: 9px; font-weight: 700; letter-spacing: .06em; border-radius: 2px; text-align: center }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 4px }
+  .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 2px }
+  .dex img { width: 100%; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated }
+  .dex img.no { filter: brightness(0); opacity: .18 }
+  .shop { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 10px; align-items: center; font-size: 12px }
+  .shop .p { text-align: right; font-variant-numeric: tabular-nums }
+  select, textarea, input { font: inherit; font-size: 12px; border: 1px solid #191713; background: #fff; color: #191713; border-radius: 2px; padding: 4px }
+  textarea { width: 100%; min-height: 70px; resize: vertical }
+  .set { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; font-size: 12px }
+  #toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: #191713; color: #f5f2ea; padding: 8px 12px; border-radius: 2px; font-size: 12px; z-index: 5; max-width: calc(100% - 32px) }
+  .starters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px }
+  .starters button { font: inherit; border: 1px solid #191713; background: #fffdf7; color: inherit; padding: 8px; cursor: pointer; border-radius: 2px; display: flex; flex-direction: column; align-items: center; gap: 4px }
+  .starters img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1b1a17; color: #ece7da }
+    .muted { color: #a49d8e }
+    .box, .mon, .starters button { background: #24221e; border-color: #3a372f }
+    .loc { border-color: #3a372f } .loc:hover:not(:disabled), .loc.here { border-color: #ece7da } .loc.here { background: #2f2c26 }
+    #foe { border-color: #3a372f }
+    .bar { background: #3a372f } .bar.time i { background: #ece7da }
+    button.lbl, select, textarea, input { border-color: #ece7da } button.lbl:hover:not(:disabled) { background: #2f2c26 }
+    button.lbl.on, button.lbl.on:hover:not(:disabled) { background: #ece7da; color: #1b1a17 }
+    select, textarea, input { background: #1b1a17; color: #ece7da }
+    .mon.inparty { outline-color: #ece7da }
+    .dex img.no { filter: brightness(0) invert(1) }
+    #toast { background: #ece7da; color: #1b1a17 }
+  }
+</style>
+</head>
+<body>
+<main>
+  <section id="pick" class="box" hidden>
+    <h1>Poké Idle</h1>
+    <div class="small">Pick your first partner. Your party of up to 6 fights wild Pokémon on its own; tap the wild Pokémon to hit harder. Beat routes, earn badges, catch them all.</div>
+    <div class="starters" id="starters"></div>
+  </section>
+
+  <div id="game" hidden>
+    <div id="top"><h1>Poké Idle</h1><span>$<b id="money">0</b> · Pokédex <b id="dexn">0</b>/1025 · badges <b id="badgen">0</b>/36</span></div>
+    <div id="tabs">
+      <button class="lbl on" data-tab="battle" type="button">Battle</button>
+      <button class="lbl" data-tab="party" type="button">Party &amp; Box</button>
+      <button class="lbl" data-tab="dex" type="button">Pokédex</button>
+      <button class="lbl" data-tab="shop" type="button">Shop</button>
+      <button class="lbl" data-tab="settings" type="button">Settings</button>
+    </div>
+
+    <section id="t-battle" class="cols">
+      <div class="box">
+        <div class="row" id="regions"></div>
+        <div class="locs" id="locs"></div>
+      </div>
+      <div class="box">
+        <div class="row" style="justify-content:space-between"><b id="where"></b><span class="small muted" id="balls"></span></div>
+        <div class="row small" id="foeinfo"></div>
+        <div class="bar"><i id="hpbar"></i></div>
+        <button id="foe" type="button" aria-label="Attack the wild Pokémon"><img id="foeimg" alt=""><span class="shinymark" id="shiny" hidden>SHINY</span></button>
+        <div id="timerwrap" hidden><div class="bar time"><i id="timebar"></i></div><div class="small muted" id="timetext"></div></div>
+        <div id="log" role="status"></div>
+        <div class="party" id="minis"></div>
+        <div class="small muted" id="dps"></div>
+      </div>
+    </section>
+
+    <section id="t-party" class="box" hidden>
+      <h2>Party</h2>
+      <div class="small muted">Tap a party Pokémon to send it to the Box. Tap a Box Pokémon to add it to the party (up to 6). EVOLVE means it can evolve now: tap it, then Evolve.</div>
+      <div class="party" id="party"></div>
+      <div id="detail" class="box" hidden></div>
+      <div class="row" style="justify-content:space-between"><h2>Box</h2>
+        <span class="row small">sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option></select></span></div>
+      <div class="grid" id="boxgrid"></div>
+    </section>
+
+    <section id="t-dex" class="box" hidden>
+      <div class="row" id="dexregions"></div>
+      <div class="small" id="dexsum"></div>
+      <div class="dex" id="dexgrid"></div>
+    </section>
+
+    <section id="t-shop" class="box" hidden>
+      <div class="shop" id="shop"></div>
+    </section>
+
+    <section id="t-settings" class="box" hidden>
+      <h2>Auto-throw</h2>
+      <div class="set">
+        <span>New Pokémon</span><select id="s-fresh"></select>
+        <span>Ones you already caught</span><select id="s-dupe"></select>
+        <span>Shinies</span><select id="s-shiny"></select>
+      </div>
+      <h2>Save</h2>
+      <div class="small muted">Your save lives in this browser. Copy the code to move it to another device, then paste it there and load.</div>
+      <textarea id="savecode" aria-label="Save code" spellcheck="false"></textarea>
+      <div class="row"><button class="lbl" id="export" type="button">Show my save code</button><button class="lbl" id="import" type="button">Load pasted code</button><button class="lbl" id="reset" type="button">Start over</button></div>
+      <div class="small" id="setmsg" role="status"></div>
+    </section>
+  </div>
+</main>
+<div id="toast" hidden></div>
+<script>
+const D = {"mons":[["Bulbasaur","Grass/Poison",49,65,45,45,"starter",[[2,"L",16]],318],["Ivysaur","Grass/Poison",62,80,60,45,"starter",[[3,"L",32]],405],["Venusaur","Grass/Poison",82,100,80,45,"starter",[],525],["Charmander","Fire",52,60,39,45,"starter",[[5,"L",16]],309],["Charmeleon","Fire",64,80,58,45,"starter",[[6,"L",36]],405],["Charizard","Fire/Flying",84,109,78,45,"starter",[],534],["Squirtle","Water",48,50,44,45,"starter",[[8,"L",16]],314],["Wartortle","Water",63,65,59,45,"starter",[[9,"L",36]],405],["Blastoise","Water",83,85,79,45,"starter",[],530],["Caterpie","Bug",30,20,45,255,"",[[11,"L",7]],195],["Metapod","Bug",20,25,50,120,"",[[12,"L",10]],205],["Butterfree","Bug/Flying",45,90,60,45,"",[],395],["Weedle","Bug/Poison",35,20,40,255,"",[[14,"L",7]],195],["Kakuna","Bug/Poison",25,25,45,120,"",[[15,"L",10]],205],["Beedrill","Bug/Poison",90,45,65,45,"",[],395],["Pidgey","Normal/Flying",45,35,40,255,"",[[17,"L",18]],251],["Pidgeotto","Normal/Flying",60,50,63,120,"",[[18,"L",36]],349],["Pidgeot","Normal/Flying",80,70,83,45,"",[],479],["Rattata","Normal",56,25,30,255,"",[[20,"L",20]],253],["Raticate","Normal",81,50,55,127,"",[],413],["Spearow","Normal/Flying",60,31,40,255,"",[[22,"L",20]],262],["Fearow","Normal/Flying",90,61,65,90,"",[],442],["Ekans","Poison",60,40,35,255,"",[[24,"L",22]],288],["Arbok","Poison",95,65,60,90,"",[],448],["Pikachu","Electric",55,50,35,190,"",[[26,"I","Thunder Stone"],[26,"I","Thunder Stone"]],320],["Raichu","Electric",90,90,60,75,"",[],485],["Sandshrew","Ground",75,20,50,255,"",[[28,"L",22]],300],["Sandslash","Ground",100,45,75,90,"",[],450],["Nidoran-F","Poison",47,40,55,235,"",[[30,"L",16]],275],["Nidorina","Poison",62,55,70,120,"",[[31,"I","Moon Stone"]],365],["Nidoqueen","Poison/Ground",92,75,90,45,"",[],505],["Nidoran-M","Poison",57,40,46,235,"",[[33,"L",16]],273],["Nidorino","Poison",72,55,61,120,"",[[34,"I","Moon Stone"]],365],["Nidoking","Poison/Ground",102,85,81,45,"",[],505],["Clefairy","Fairy",45,60,70,150,"",[[36,"I","Moon Stone"]],323],["Clefable","Fairy",70,95,95,25,"",[],483],["Vulpix","Fire",41,50,38,190,"",[[38,"I","Fire Stone"]],299],["Ninetales","Fire",76,81,73,75,"",[],505],["Jigglypuff","Normal/Fairy",45,45,115,170,"",[[40,"I","Moon Stone"]],270],["Wigglytuff","Normal/Fairy",70,85,140,50,"",[],435],["Zubat","Poison/Flying",45,30,40,255,"",[[42,"L",22]],245],["Golbat","Poison/Flying",80,65,75,90,"",[[169,"L",30]],455],["Oddish","Grass/Poison",50,75,45,255,"",[[44,"L",21]],320],["Gloom","Grass/Poison",65,85,60,120,"",[[45,"I","Leaf Stone"],[182,"I","Sun Stone"]],395],["Vileplume","Grass/Poison",80,110,75,45,"",[],490],["Paras","Bug/Grass",70,45,35,190,"",[[47,"L",24]],285],["Parasect","Bug/Grass",95,60,60,75,"",[],405],["Venonat","Bug/Poison",55,40,60,190,"",[[49,"L",31]],305],["Venomoth","Bug/Poison",65,90,70,75,"",[],450],["Diglett","Ground",55,35,10,255,"",[[51,"L",26]],265],["Dugtrio","Ground",100,50,35,50,"",[],425],["Meowth","Normal",45,40,40,255,"",[[53,"L",28]],290],["Persian","Normal",70,65,65,90,"",[],440],["Psyduck","Water",52,65,50,190,"",[[55,"L",33]],320],["Golduck","Water",82,95,80,75,"",[],500],["Mankey","Fighting",80,35,40,190,"",[[57,"L",28]],305],["Primeape","Fighting",105,60,65,75,"",[[979,"L",30]],455],["Growlithe","Fire",70,70,55,190,"",[[59,"I","Fire Stone"]],350],["Arcanine","Fire",110,100,90,75,"",[],555],["Poliwag","Water",50,40,40,255,"",[[61,"L",25]],300],["Poliwhirl","Water",65,50,65,120,"",[[62,"I","Water Stone"],[186,"T",0]],385],["Poliwrath","Water/Fighting",95,70,90,45,"",[],510],["Abra","Psychic",20,105,25,200,"",[[64,"L",16]],310],["Kadabra","Psychic",35,120,40,100,"",[[65,"T",0]],400],["Alakazam","Psychic",50,135,55,50,"",[],500],["Machop","Fighting",80,35,70,180,"",[[67,"L",28]],305],["Machoke","Fighting",100,50,80,90,"",[[68,"T",0]],405],["Machamp","Fighting",130,65,90,45,"",[],505],["Bellsprout","Grass/Poison",75,70,50,255,"",[[70,"L",21]],300],["Weepinbell","Grass/Poison",90,85,65,120,"",[[71,"I","Leaf Stone"]],390],["Victreebel","Grass/Poison",105,100,80,45,"",[],490],["Tentacool","Water/Poison",40,50,40,190,"",[[73,"L",30]],335],["Tentacruel","Water/Poison",70,80,80,60,"",[],515],["Geodude","Rock/Ground",80,30,40,255,"",[[75,"L",25]],300],["Graveler","Rock/Ground",95,45,55,120,"",[[76,"T",0]],390],["Golem","Rock/Ground",120,55,80,45,"",[],495],["Ponyta","Fire",85,65,50,190,"",[[78,"L",40]],410],["Rapidash","Fire",100,80,65,60,"",[],500],["Slowpoke","Water/Psychic",65,40,90,190,"",[[80,"L",37],[199,"T",0]],315],["Slowbro","Water/Psychic",75,100,95,75,"",[],490],["Magnemite","Electric/Steel",35,95,25,190,"",[[82,"L",30]],325],["Magneton","Electric/Steel",60,120,50,60,"",[[462,"I","Thunder Stone"]],465],["Farfetch’d","Normal/Flying",90,58,52,45,"",[],377],["Doduo","Normal/Flying",85,35,35,190,"",[[85,"L",31]],310],["Dodrio","Normal/Flying",110,60,60,45,"",[],470],["Seel","Water",45,45,65,190,"",[[87,"L",34]],325],["Dewgong","Water/Ice",70,70,90,75,"",[],475],["Grimer","Poison",80,40,80,190,"",[[89,"L",38]],325],["Muk","Poison",105,65,105,75,"",[],500],["Shellder","Water",65,45,30,190,"",[[91,"I","Water Stone"]],305],["Cloyster","Water/Ice",95,85,50,60,"",[],525],["Gastly","Ghost/Poison",35,100,30,190,"",[[93,"L",25]],310],["Haunter","Ghost/Poison",50,115,45,90,"",[[94,"T",0]],405],["Gengar","Ghost/Poison",65,130,60,45,"",[],500],["Onix","Rock/Ground",45,30,35,45,"",[[208,"T",0]],385],["Drowzee","Psychic",48,43,60,190,"",[[97,"L",26]],328],["Hypno","Psychic",73,73,85,75,"",[],483],["Krabby","Water",105,25,30,225,"",[[99,"L",28]],325],["Kingler","Water",130,50,55,60,"",[],475],["Voltorb","Electric",30,55,40,190,"",[[101,"L",30]],330],["Electrode","Electric",50,80,60,60,"",[],490],["Exeggcute","Grass/Psychic",40,60,60,90,"",[[103,"I","Leaf Stone"],[103,"I","Leaf Stone"]],325],["Exeggutor","Grass/Psychic",95,125,95,45,"",[],530],["Cubone","Ground",50,40,50,190,"",[[105,"L",28],[105,"L",28]],320],["Marowak","Ground",80,50,60,75,"",[],425],["Hitmonlee","Fighting",120,35,50,45,"",[],455],["Hitmonchan","Fighting",105,35,50,45,"",[],455],["Lickitung","Normal",55,60,90,45,"",[[463,"L",30]],385],["Koffing","Poison",65,60,40,190,"",[[110,"L",35],[110,"L",35]],340],["Weezing","Poison",90,85,65,60,"",[],490],["Rhyhorn","Ground/Rock",85,30,80,120,"",[[112,"L",42]],345],["Rhydon","Ground/Rock",130,45,105,60,"",[[464,"T",0]],485],["Chansey","Normal",5,35,250,30,"",[[242,"L",30]],450],["Tangela","Grass",55,100,65,45,"",[[465,"L",30]],435],["Kangaskhan","Normal",95,40,105,45,"",[],490],["Horsea","Water",40,70,30,225,"",[[117,"L",32]],295],["Seadra","Water",65,95,55,75,"",[[230,"T",0]],440],["Goldeen","Water",67,35,45,225,"",[[119,"L",33]],320],["Seaking","Water",92,65,80,60,"",[],450],["Staryu","Water",45,70,30,225,"",[[121,"I","Water Stone"]],340],["Starmie","Water/Psychic",75,100,60,60,"",[],520],["Mr. Mime","Psychic/Fairy",45,100,40,45,"",[],460],["Scyther","Bug/Flying",110,55,70,45,"",[[212,"T",0],[900,"I","Black Augurite"]],500],["Jynx","Ice/Psychic",50,115,65,45,"",[],455],["Electabuzz","Electric",83,95,65,45,"",[[466,"T",0]],490],["Magmar","Fire",95,100,65,45,"",[[467,"T",0]],495],["Pinsir","Bug",125,55,65,45,"",[],500],["Tauros","Normal",100,40,75,45,"",[],490],["Magikarp","Water",10,15,20,255,"",[[130,"L",20]],200],["Gyarados","Water/Flying",125,60,95,45,"",[],540],["Lapras","Water/Ice",85,85,130,45,"",[],535],["Ditto","Normal",48,48,48,35,"",[],288],["Eevee","Normal",55,45,55,45,"",[[134,"I","Water Stone"],[135,"I","Thunder Stone"],[136,"I","Fire Stone"],[196,"L",30],[197,"L",30],[470,"I","Leaf Stone"],[471,"I","Ice Stone"],[700,"L",30]],325],["Vaporeon","Water",65,110,130,45,"",[],525],["Jolteon","Electric",65,110,65,45,"",[],525],["Flareon","Fire",130,95,65,45,"",[],525],["Porygon","Normal",60,85,65,45,"",[[233,"T",0]],395],["Omanyte","Rock/Water",40,90,35,45,"fossil",[[139,"L",40]],355],["Omastar","Rock/Water",60,115,70,45,"fossil",[],495],["Kabuto","Rock/Water",80,55,30,45,"fossil",[[141,"L",40]],355],["Kabutops","Rock/Water",115,65,60,45,"fossil",[],495],["Aerodactyl","Rock/Flying",105,60,80,45,"fossil",[],515],["Snorlax","Normal",110,65,160,25,"",[],540],["Articuno","Ice/Flying",85,95,90,3,"lg",[],580],["Zapdos","Electric/Flying",90,125,90,3,"lg",[],580],["Moltres","Fire/Flying",100,125,90,3,"lg",[],580],["Dratini","Dragon",64,50,41,45,"pseudo",[[148,"L",30]],300],["Dragonair","Dragon",84,70,61,45,"pseudo",[[149,"L",55]],420],["Dragonite","Dragon/Flying",134,100,91,45,"pseudo",[],600],["Mewtwo","Psychic",110,154,106,3,"lg",[],680],["Mew","Psychic",100,100,100,45,"my",[],600],["Chikorita","Grass",49,49,45,45,"starter",[[153,"L",16]],318],["Bayleef","Grass",62,63,60,45,"starter",[[154,"L",32]],405],["Meganium","Grass",82,83,80,45,"starter",[],525],["Cyndaquil","Fire",52,60,39,45,"starter",[[156,"L",14]],309],["Quilava","Fire",64,80,58,45,"starter",[[157,"L",36],[157,"L",36]],405],["Typhlosion","Fire",84,109,78,45,"starter",[],534],["Totodile","Water",65,44,50,45,"starter",[[159,"L",18]],314],["Croconaw","Water",80,59,65,45,"starter",[[160,"L",30]],405],["Feraligatr","Water",105,79,85,45,"starter",[],530],["Sentret","Normal",46,35,35,255,"",[[162,"L",15]],215],["Furret","Normal",76,45,85,90,"",[],415],["Hoothoot","Normal/Flying",30,36,60,255,"",[[164,"L",20]],262],["Noctowl","Normal/Flying",50,86,100,90,"",[],452],["Ledyba","Bug/Flying",20,40,40,255,"",[[166,"L",18]],265],["Ledian","Bug/Flying",35,55,55,90,"",[],390],["Spinarak","Bug/Poison",60,40,40,255,"",[[168,"L",22]],250],["Ariados","Bug/Poison",90,60,70,90,"",[],400],["Crobat","Poison/Flying",90,70,85,90,"",[],535],["Chinchou","Water/Electric",38,56,75,190,"",[[171,"L",27]],330],["Lanturn","Water/Electric",58,76,125,75,"",[],460],["Pichu","Electric",40,35,20,190,"",[[25,"L",30]],205],["Cleffa","Fairy",25,45,50,150,"",[[35,"L",30]],218],["Igglybuff","Normal/Fairy",30,40,90,170,"",[[39,"L",30]],210],["Togepi","Fairy",20,40,35,190,"",[[176,"L",30]],245],["Togetic","Fairy/Flying",40,80,55,75,"",[[468,"I","Shiny Stone"]],405],["Natu","Psychic/Flying",50,70,40,190,"",[[178,"L",25]],320],["Xatu","Psychic/Flying",75,95,65,75,"",[],470],["Mareep","Electric",40,65,55,235,"",[[180,"L",15]],280],["Flaaffy","Electric",55,80,70,120,"",[[181,"L",30]],365],["Ampharos","Electric",75,115,90,45,"",[],510],["Bellossom","Grass",80,90,75,45,"",[],490],["Marill","Water/Fairy",20,20,70,190,"",[[184,"L",18]],250],["Azumarill","Water/Fairy",50,60,100,75,"",[],420],["Sudowoodo","Rock",100,30,70,65,"",[],410],["Politoed","Water",75,90,90,45,"",[],500],["Hoppip","Grass/Flying",35,35,35,255,"",[[188,"L",18]],250],["Skiploom","Grass/Flying",45,45,55,120,"",[[189,"L",27]],340],["Jumpluff","Grass/Flying",55,55,75,45,"",[],460],["Aipom","Normal",70,40,55,45,"",[[424,"L",30]],360],["Sunkern","Grass",30,30,30,235,"",[[192,"I","Sun Stone"]],180],["Sunflora","Grass",75,105,75,120,"",[],425],["Yanma","Bug/Flying",65,75,65,75,"",[[469,"L",30]],390],["Wooper","Water/Ground",45,25,55,255,"",[[195,"L",20]],210],["Quagsire","Water/Ground",85,65,95,90,"",[],430],["Espeon","Psychic",65,130,65,45,"",[],525],["Umbreon","Dark",65,60,95,45,"",[],525],["Murkrow","Dark/Flying",85,85,60,30,"",[[430,"I","Dusk Stone"]],405],["Slowking","Water/Psychic",75,100,95,70,"",[],490],["Misdreavus","Ghost",60,85,60,45,"",[[429,"I","Dusk Stone"]],435],["Unown","Psychic",72,72,48,225,"",[],336],["Wobbuffet","Psychic",33,33,190,45,"",[],405],["Girafarig","Normal/Psychic",80,90,70,60,"",[[981,"L",30]],455],["Pineco","Bug",65,35,50,190,"",[[205,"L",31]],290],["Forretress","Bug/Steel",90,60,75,75,"",[],465],["Dunsparce","Normal",70,65,100,190,"",[[982,"L",30],[982,"L",30]],415],["Gligar","Ground/Flying",75,35,65,60,"",[[472,"L",30]],430],["Steelix","Steel/Ground",85,55,75,25,"",[],510],["Snubbull","Fairy",80,40,60,190,"",[[210,"L",23]],300],["Granbull","Fairy",120,60,90,75,"",[],450],["Qwilfish","Water/Poison",95,55,65,45,"",[],440],["Scizor","Bug/Steel",130,55,70,25,"",[],500],["Shuckle","Bug/Rock",10,10,20,190,"",[],505],["Heracross","Bug/Fighting",125,40,80,45,"",[],500],["Sneasel","Dark/Ice",95,35,55,60,"",[[461,"L",30]],430],["Teddiursa","Normal",80,50,60,120,"",[[217,"L",30]],330],["Ursaring","Normal",130,75,90,60,"",[[901,"I","Peat Block"]],500],["Slugma","Fire",40,70,40,190,"",[[219,"L",38]],250],["Magcargo","Fire/Rock",50,90,60,75,"",[],430],["Swinub","Ice/Ground",50,30,50,225,"",[[221,"L",33]],250],["Piloswine","Ice/Ground",100,60,100,75,"",[[473,"L",30]],450],["Corsola","Water/Rock",55,65,65,60,"",[],410],["Remoraid","Water",65,65,35,190,"",[[224,"L",25]],300],["Octillery","Water",105,105,75,75,"",[],480],["Delibird","Ice/Flying",55,65,45,45,"",[],330],["Mantine","Water/Flying",40,80,85,25,"",[],485],["Skarmory","Steel/Flying",80,40,65,25,"",[],465],["Houndour","Dark/Fire",60,80,45,120,"",[[229,"L",24]],330],["Houndoom","Dark/Fire",90,110,75,45,"",[],500],["Kingdra","Water/Dragon",95,95,75,45,"",[],540],["Phanpy","Ground",60,40,90,120,"",[[232,"L",25]],330],["Donphan","Ground",120,60,90,60,"",[],500],["Porygon2","Normal",80,105,85,45,"",[[474,"T",0]],515],["Stantler","Normal",95,85,73,45,"",[[899,"L",30]],465],["Smeargle","Normal",20,20,55,45,"",[],250],["Tyrogue","Fighting",35,35,35,75,"",[[106,"L",20],[107,"L",20],[237,"L",20]],210],["Hitmontop","Fighting",95,35,50,45,"",[],455],["Smoochum","Ice/Psychic",30,85,45,45,"",[[124,"L",30]],305],["Elekid","Electric",63,65,45,45,"",[[125,"L",30]],360],["Magby","Fire",75,70,45,45,"",[[126,"L",30]],365],["Miltank","Normal",80,40,95,45,"",[],490],["Blissey","Normal",10,75,255,30,"",[],540],["Raikou","Electric",85,115,90,3,"lg",[],580],["Entei","Fire",115,90,115,3,"lg",[],580],["Suicune","Water",75,90,100,3,"lg",[],580],["Larvitar","Rock/Ground",64,45,50,45,"pseudo",[[247,"L",30]],300],["Pupitar","Rock/Ground",84,65,70,45,"pseudo",[[248,"L",55]],410],["Tyranitar","Rock/Dark",134,95,100,45,"pseudo",[],600],["Lugia","Psychic/Flying",90,90,106,3,"lg",[],680],["Ho-Oh","Fire/Flying",130,110,106,3,"lg",[],680],["Celebi","Psychic/Grass",100,100,100,45,"my",[],600],["Treecko","Grass",45,65,40,45,"starter",[[253,"L",16]],310],["Grovyle","Grass",65,85,50,45,"starter",[[254,"L",36]],405],["Sceptile","Grass",85,105,70,45,"starter",[],530],["Torchic","Fire",60,70,45,45,"starter",[[256,"L",16]],310],["Combusken","Fire/Fighting",85,85,60,45,"starter",[[257,"L",36]],405],["Blaziken","Fire/Fighting",120,110,80,45,"starter",[],530],["Mudkip","Water",70,50,50,45,"starter",[[259,"L",16]],310],["Marshtomp","Water/Ground",85,60,70,45,"starter",[[260,"L",36]],405],["Swampert","Water/Ground",110,85,100,45,"starter",[],535],["Poochyena","Dark",55,30,35,255,"",[[262,"L",18]],220],["Mightyena","Dark",90,60,70,127,"",[],420],["Zigzagoon","Normal",30,30,38,255,"",[[264,"L",20]],240],["Linoone","Normal",70,50,78,90,"",[],420],["Wurmple","Bug",45,20,45,255,"",[[266,"L",7],[268,"L",7]],195],["Silcoon","Bug",35,25,50,120,"",[[267,"L",10]],205],["Beautifly","Bug/Flying",70,100,60,45,"",[],395],["Cascoon","Bug",35,25,50,120,"",[[269,"L",10]],205],["Dustox","Bug/Poison",50,50,60,45,"",[],385],["Lotad","Water/Grass",30,40,40,255,"",[[271,"L",14]],220],["Lombre","Water/Grass",50,60,60,120,"",[[272,"I","Water Stone"]],340],["Ludicolo","Water/Grass",70,90,80,45,"",[],480],["Seedot","Grass",40,30,40,255,"",[[274,"L",14]],220],["Nuzleaf","Grass/Dark",70,60,70,120,"",[[275,"I","Leaf Stone"]],340],["Shiftry","Grass/Dark",100,90,90,45,"",[],480],["Taillow","Normal/Flying",55,30,40,200,"",[[277,"L",22]],270],["Swellow","Normal/Flying",85,75,60,45,"",[],455],["Wingull","Water/Flying",30,55,40,190,"",[[279,"L",25]],270],["Pelipper","Water/Flying",50,95,60,45,"",[],440],["Ralts","Psychic/Fairy",25,45,28,235,"",[[281,"L",20]],198],["Kirlia","Psychic/Fairy",35,65,38,120,"",[[282,"L",30],[475,"I","Dawn Stone"]],278],["Gardevoir","Psychic/Fairy",65,125,68,45,"",[],518],["Surskit","Bug/Water",30,50,40,200,"",[[284,"L",22]],269],["Masquerain","Bug/Flying",60,100,70,75,"",[],454],["Shroomish","Grass",40,40,60,255,"",[[286,"L",23]],295],["Breloom","Grass/Fighting",130,60,60,90,"",[],460],["Slakoth","Normal",60,35,60,255,"",[[288,"L",18]],280],["Vigoroth","Normal",80,55,80,120,"",[[289,"L",36]],440],["Slaking","Normal",160,95,150,45,"",[],670],["Nincada","Bug/Ground",45,30,31,255,"",[[291,"L",20],[292,"L",20]],266],["Ninjask","Bug/Flying",90,50,61,120,"",[],456],["Shedinja","Bug/Ghost",90,30,1,45,"",[],236],["Whismur","Normal",51,51,64,190,"",[[294,"L",20]],240],["Loudred","Normal",71,71,84,120,"",[[295,"L",40]],360],["Exploud","Normal",91,91,104,45,"",[],490],["Makuhita","Fighting",60,20,72,180,"",[[297,"L",24]],237],["Hariyama","Fighting",120,40,144,200,"",[],474],["Azurill","Normal/Fairy",20,20,50,150,"",[[183,"L",30]],190],["Nosepass","Rock",45,45,30,255,"",[[476,"L",30]],375],["Skitty","Normal",45,35,50,255,"",[[301,"I","Moon Stone"]],260],["Delcatty","Normal",65,55,70,60,"",[],400],["Sableye","Dark/Ghost",75,65,50,45,"",[],380],["Mawile","Steel/Fairy",85,55,50,45,"",[],380],["Aron","Steel/Rock",70,40,50,180,"",[[305,"L",32]],330],["Lairon","Steel/Rock",90,50,60,90,"",[[306,"L",42]],430],["Aggron","Steel/Rock",110,60,70,45,"",[],530],["Meditite","Fighting/Psychic",40,40,30,180,"",[[308,"L",37]],280],["Medicham","Fighting/Psychic",60,60,60,90,"",[],410],["Electrike","Electric",45,65,40,120,"",[[310,"L",26]],295],["Manectric","Electric",75,105,70,45,"",[],475],["Plusle","Electric",50,85,60,200,"",[],405],["Minun","Electric",40,75,60,200,"",[],405],["Volbeat","Bug",73,47,65,150,"",[],430],["Illumise","Bug",47,73,65,150,"",[],430],["Roselia","Grass/Poison",60,100,50,150,"",[[407,"I","Shiny Stone"]],400],["Gulpin","Poison",43,43,70,225,"",[[317,"L",26]],302],["Swalot","Poison",73,73,100,75,"",[],467],["Carvanha","Water/Dark",90,65,45,225,"",[[319,"L",30]],305],["Sharpedo","Water/Dark",120,95,70,60,"",[],460],["Wailmer","Water",70,70,130,125,"",[[321,"L",40]],400],["Wailord","Water",90,90,170,60,"",[],500],["Numel","Fire/Ground",60,65,60,255,"",[[323,"L",33]],305],["Camerupt","Fire/Ground",100,105,70,150,"",[],460],["Torkoal","Fire",85,85,70,90,"",[],470],["Spoink","Psychic",25,70,60,255,"",[[326,"L",32]],330],["Grumpig","Psychic",45,90,80,60,"",[],470],["Spinda","Normal",60,60,60,255,"",[],360],["Trapinch","Ground",100,45,45,255,"",[[329,"L",35]],290],["Vibrava","Ground/Dragon",70,50,50,120,"",[[330,"L",45]],340],["Flygon","Ground/Dragon",100,80,80,45,"",[],520],["Cacnea","Grass",85,85,50,190,"",[[332,"L",32]],335],["Cacturne","Grass/Dark",115,115,70,60,"",[],475],["Swablu","Normal/Flying",40,40,45,255,"",[[334,"L",35]],310],["Altaria","Dragon/Flying",70,70,75,45,"",[],490],["Zangoose","Normal",115,60,73,90,"",[],458],["Seviper","Poison",100,100,73,90,"",[],458],["Lunatone","Rock/Psychic",55,95,90,45,"",[],460],["Solrock","Rock/Psychic",95,55,90,45,"",[],460],["Barboach","Water/Ground",48,46,50,190,"",[[340,"L",30]],288],["Whiscash","Water/Ground",78,76,110,75,"",[],468],["Corphish","Water",80,50,43,205,"",[[342,"L",30]],308],["Crawdaunt","Water/Dark",120,90,63,155,"",[],468],["Baltoy","Ground/Psychic",40,40,40,255,"",[[344,"L",36]],300],["Claydol","Ground/Psychic",70,70,60,90,"",[],500],["Lileep","Rock/Grass",41,61,66,45,"fossil",[[346,"L",40]],355],["Cradily","Rock/Grass",81,81,86,45,"fossil",[],495],["Anorith","Rock/Bug",95,40,45,45,"fossil",[[348,"L",40]],355],["Armaldo","Rock/Bug",125,70,75,45,"fossil",[],495],["Feebas","Water",15,10,20,255,"",[[350,"T",0]],200],["Milotic","Water",60,100,95,60,"",[],540],["Castform","Normal",70,70,70,45,"",[],420],["Kecleon","Normal",90,60,60,200,"",[],440],["Shuppet","Ghost",75,63,44,225,"",[[354,"L",37]],295],["Banette","Ghost",115,83,64,45,"",[],455],["Duskull","Ghost",40,30,20,190,"",[[356,"L",37]],295],["Dusclops","Ghost",70,60,40,90,"",[[477,"T",0]],455],["Tropius","Grass/Flying",68,72,99,200,"",[],460],["Chimecho","Psychic",50,95,75,45,"",[],455],["Absol","Dark",130,75,65,30,"",[],465],["Wynaut","Psychic",23,23,95,125,"",[[202,"L",15]],260],["Snorunt","Ice",50,50,50,190,"",[[362,"L",42],[478,"I","Dawn Stone"]],300],["Glalie","Ice",80,80,80,75,"",[],480],["Spheal","Ice/Water",40,55,70,255,"",[[364,"L",32]],290],["Sealeo","Ice/Water",60,75,90,120,"",[[365,"L",44]],410],["Walrein","Ice/Water",80,95,110,45,"",[],530],["Clamperl","Water",64,74,35,255,"",[[367,"T",0],[368,"T",0]],345],["Huntail","Water",104,94,55,60,"",[],485],["Gorebyss","Water",84,114,55,60,"",[],485],["Relicanth","Water/Rock",90,45,100,25,"",[],485],["Luvdisc","Water",30,40,43,225,"",[],330],["Bagon","Dragon",75,40,45,45,"pseudo",[[372,"L",30]],300],["Shelgon","Dragon",95,60,65,45,"pseudo",[[373,"L",50]],420],["Salamence","Dragon/Flying",135,110,95,45,"pseudo",[],600],["Beldum","Steel/Psychic",55,35,40,3,"pseudo",[[375,"L",20]],300],["Metang","Steel/Psychic",75,55,60,3,"pseudo",[[376,"L",45]],420],["Metagross","Steel/Psychic",135,95,80,3,"pseudo",[],600],["Regirock","Rock",100,50,80,3,"lg",[],580],["Regice","Ice",50,100,80,3,"lg",[],580],["Registeel","Steel",75,75,80,3,"lg",[],580],["Latias","Dragon/Psychic",80,110,80,3,"lg",[],600],["Latios","Dragon/Psychic",90,130,80,3,"lg",[],600],["Kyogre","Water",100,150,100,3,"lg",[],670],["Groudon","Ground",150,100,100,3,"lg",[],670],["Rayquaza","Dragon/Flying",150,150,105,45,"lg",[],680],["Jirachi","Steel/Psychic",100,100,100,3,"my",[],600],["Deoxys","Psychic",150,150,50,3,"my",[],600],["Turtwig","Grass",68,45,55,45,"starter",[[388,"L",18]],318],["Grotle","Grass",89,55,75,45,"starter",[[389,"L",32]],405],["Torterra","Grass/Ground",109,75,95,45,"starter",[],525],["Chimchar","Fire",58,58,44,45,"starter",[[391,"L",14]],309],["Monferno","Fire/Fighting",78,78,64,45,"starter",[[392,"L",36]],405],["Infernape","Fire/Fighting",104,104,76,45,"starter",[],534],["Piplup","Water",51,61,53,45,"starter",[[394,"L",16]],314],["Prinplup","Water",66,81,64,45,"starter",[[395,"L",36]],405],["Empoleon","Water/Steel",86,111,84,45,"starter",[],530],["Starly","Normal/Flying",55,30,40,255,"",[[397,"L",14]],245],["Staravia","Normal/Flying",75,40,55,120,"",[[398,"L",34]],340],["Staraptor","Normal/Flying",120,50,85,45,"",[],485],["Bidoof","Normal",45,35,59,255,"",[[400,"L",15]],250],["Bibarel","Normal/Water",85,55,79,127,"",[],410],["Kricketot","Bug",25,25,37,255,"",[[402,"L",10]],194],["Kricketune","Bug",85,55,77,45,"",[],384],["Shinx","Electric",65,40,45,235,"",[[404,"L",15]],263],["Luxio","Electric",85,60,60,120,"",[[405,"L",30]],363],["Luxray","Electric",120,95,80,45,"",[],523],["Budew","Grass/Poison",30,50,40,255,"",[[315,"L",30]],280],["Roserade","Grass/Poison",70,125,60,75,"",[],515],["Cranidos","Rock",125,30,67,45,"fossil",[[409,"L",30]],350],["Rampardos","Rock",165,65,97,45,"fossil",[],495],["Shieldon","Rock/Steel",42,42,30,45,"fossil",[[411,"L",30]],350],["Bastiodon","Rock/Steel",52,47,60,45,"fossil",[],495],["Burmy","Bug",29,29,40,120,"",[[413,"L",20],[413,"L",20],[413,"L",20],[414,"L",20]],224],["Wormadam","Bug/Grass",59,79,60,45,"",[],424],["Mothim","Bug/Flying",94,94,70,45,"",[],424],["Combee","Bug/Flying",30,30,30,120,"",[[416,"L",21]],244],["Vespiquen","Bug/Flying",80,80,70,45,"",[],474],["Pachirisu","Electric",45,45,60,200,"",[],405],["Buizel","Water",65,60,55,190,"",[[419,"L",26]],330],["Floatzel","Water",105,85,85,75,"",[],495],["Cherubi","Grass",35,62,45,190,"",[[421,"L",25]],275],["Cherrim","Grass",60,87,70,75,"",[],450],["Shellos","Water",48,57,76,190,"",[[423,"L",30]],325],["Gastrodon","Water/Ground",83,92,111,75,"",[],475],["Ambipom","Normal",100,60,75,45,"",[],482],["Drifloon","Ghost/Flying",50,60,90,125,"",[[426,"L",28]],348],["Drifblim","Ghost/Flying",80,90,150,60,"",[],498],["Buneary","Normal",66,44,55,190,"",[[428,"L",30]],350],["Lopunny","Normal",76,54,65,60,"",[],480],["Mismagius","Ghost",60,105,60,45,"",[],495],["Honchkrow","Dark/Flying",125,105,100,30,"",[],505],["Glameow","Normal",55,42,49,190,"",[[432,"L",38]],310],["Purugly","Normal",82,64,71,75,"",[],452],["Chingling","Psychic",30,65,45,120,"",[[358,"L",30]],285],["Stunky","Poison/Dark",63,41,63,225,"",[[435,"L",34]],329],["Skuntank","Poison/Dark",93,71,103,60,"",[],479],["Bronzor","Steel/Psychic",24,24,57,255,"",[[437,"L",33]],300],["Bronzong","Steel/Psychic",89,79,67,90,"",[],500],["Bonsly","Rock",80,10,50,255,"",[[185,"L",30]],290],["Mime Jr.","Psychic/Fairy",25,70,20,145,"",[[122,"L",30],[122,"L",30]],310],["Happiny","Normal",5,15,100,130,"",[[113,"L",30]],220],["Chatot","Normal/Flying",65,92,76,30,"",[],411],["Spiritomb","Ghost/Dark",92,92,50,100,"",[],485],["Gible","Dragon/Ground",70,40,58,45,"pseudo",[[444,"L",24]],300],["Gabite","Dragon/Ground",90,50,68,45,"pseudo",[[445,"L",48]],410],["Garchomp","Dragon/Ground",130,80,108,45,"pseudo",[],600],["Munchlax","Normal",85,40,135,50,"",[[143,"L",30]],390],["Riolu","Fighting",70,35,40,75,"",[[448,"L",30]],285],["Lucario","Fighting/Steel",110,115,70,45,"",[],525],["Hippopotas","Ground",72,38,68,140,"",[[450,"L",34]],330],["Hippowdon","Ground",112,68,108,60,"",[],525],["Skorupi","Poison/Bug",50,30,40,120,"",[[452,"L",40]],330],["Drapion","Poison/Dark",90,60,70,45,"",[],500],["Croagunk","Poison/Fighting",61,61,48,140,"",[[454,"L",37]],300],["Toxicroak","Poison/Fighting",106,86,83,75,"",[],490],["Carnivine","Grass",100,90,74,200,"",[],454],["Finneon","Water",49,49,49,190,"",[[457,"L",31]],330],["Lumineon","Water",69,69,69,75,"",[],460],["Mantyke","Water/Flying",20,60,45,25,"",[[226,"L",30]],345],["Snover","Grass/Ice",62,62,60,120,"",[[460,"L",40]],334],["Abomasnow","Grass/Ice",92,92,90,60,"",[],494],["Weavile","Dark/Ice",120,45,70,45,"",[],510],["Magnezone","Electric/Steel",70,130,70,30,"",[],535],["Lickilicky","Normal",85,80,110,30,"",[],515],["Rhyperior","Ground/Rock",140,55,115,30,"",[],535],["Tangrowth","Grass",100,110,100,30,"",[],535],["Electivire","Electric",123,95,75,30,"",[],540],["Magmortar","Fire",95,125,75,30,"",[],540],["Togekiss","Fairy/Flying",50,120,85,30,"",[],545],["Yanmega","Bug/Flying",76,116,86,30,"",[],515],["Leafeon","Grass",110,60,65,45,"",[],525],["Glaceon","Ice",60,130,65,45,"",[],525],["Gliscor","Ground/Flying",95,45,75,30,"",[],510],["Mamoswine","Ice/Ground",130,70,110,50,"",[],530],["Porygon-Z","Normal",80,135,85,30,"",[],535],["Gallade","Psychic/Fighting",125,65,68,45,"",[],518],["Probopass","Rock/Steel",55,75,60,60,"",[],525],["Dusknoir","Ghost",100,65,45,45,"",[],525],["Froslass","Ice/Ghost",80,80,70,75,"",[],480],["Rotom","Electric/Ghost",50,95,50,45,"",[],440],["Uxie","Psychic",75,75,75,3,"lg",[],580],["Mesprit","Psychic",105,105,80,3,"lg",[],580],["Azelf","Psychic",125,125,75,3,"lg",[],580],["Dialga","Steel/Dragon",120,150,100,3,"lg",[],680],["Palkia","Water/Dragon",120,150,90,3,"lg",[],680],["Heatran","Fire/Steel",90,130,91,3,"lg",[],600],["Regigigas","Normal",160,80,110,3,"lg",[],670],["Giratina","Ghost/Dragon",100,100,150,3,"lg",[],680],["Cresselia","Psychic",70,75,120,3,"lg",[],580],["Phione","Water",80,80,80,30,"my",[],480],["Manaphy","Water",100,100,100,3,"my",[],600],["Darkrai","Dark",90,135,70,3,"my",[],600],["Shaymin","Grass",100,100,100,45,"my",[],600],["Arceus","Normal",120,120,120,3,"my",[],720],["Victini","Psychic/Fire",100,100,100,3,"my",[],600],["Snivy","Grass",45,45,45,45,"starter",[[496,"L",17]],308],["Servine","Grass",60,60,60,45,"starter",[[497,"L",36]],413],["Serperior","Grass",75,75,75,45,"starter",[],528],["Tepig","Fire",63,45,65,45,"starter",[[499,"L",17]],308],["Pignite","Fire/Fighting",93,70,90,45,"starter",[[500,"L",36]],418],["Emboar","Fire/Fighting",123,100,110,45,"starter",[],528],["Oshawott","Water",55,63,55,45,"starter",[[502,"L",17]],308],["Dewott","Water",75,83,75,45,"starter",[[503,"L",36],[503,"L",36]],413],["Samurott","Water",100,108,95,45,"starter",[],528],["Patrat","Normal",55,35,45,255,"",[[505,"L",20]],255],["Watchog","Normal",85,60,60,255,"",[],420],["Lillipup","Normal",60,25,45,255,"",[[507,"L",16]],275],["Herdier","Normal",80,35,65,120,"",[[508,"L",32]],370],["Stoutland","Normal",110,45,85,45,"",[],500],["Purrloin","Dark",50,50,41,255,"",[[510,"L",20]],281],["Liepard","Dark",88,88,64,90,"",[],446],["Pansage","Grass",53,53,50,190,"",[[512,"I","Leaf Stone"]],316],["Simisage","Grass",98,98,75,75,"",[],498],["Pansear","Fire",53,53,50,190,"",[[514,"I","Fire Stone"]],316],["Simisear","Fire",98,98,75,75,"",[],498],["Panpour","Water",53,53,50,190,"",[[516,"I","Water Stone"]],316],["Simipour","Water",98,98,75,75,"",[],498],["Munna","Psychic",25,67,76,190,"",[[518,"I","Moon Stone"]],292],["Musharna","Psychic",55,107,116,75,"",[],487],["Pidove","Normal/Flying",55,36,50,255,"",[[520,"L",21]],264],["Tranquill","Normal/Flying",77,50,62,120,"",[[521,"L",32]],358],["Unfezant","Normal/Flying",115,65,80,45,"",[],488],["Blitzle","Electric",60,50,45,190,"",[[523,"L",27]],295],["Zebstrika","Electric",100,80,75,75,"",[],497],["Roggenrola","Rock",75,25,55,255,"",[[525,"L",25]],280],["Boldore","Rock",105,50,70,120,"",[[526,"T",0]],390],["Gigalith","Rock",135,60,85,45,"",[],515],["Woobat","Psychic/Flying",45,55,65,190,"",[[528,"L",30]],323],["Swoobat","Psychic/Flying",57,77,67,45,"",[],425],["Drilbur","Ground",85,30,60,120,"",[[530,"L",31]],328],["Excadrill","Ground/Steel",135,50,110,60,"",[],508],["Audino","Normal",60,60,103,255,"",[],445],["Timburr","Fighting",80,25,75,180,"",[[533,"L",25]],305],["Gurdurr","Fighting",105,40,85,90,"",[[534,"T",0]],405],["Conkeldurr","Fighting",140,55,105,45,"",[],505],["Tympole","Water",50,50,50,255,"",[[536,"L",25]],294],["Palpitoad","Water/Ground",65,65,75,120,"",[[537,"L",36]],384],["Seismitoad","Water/Ground",95,85,105,45,"",[],509],["Throh","Fighting",100,30,120,45,"",[],465],["Sawk","Fighting",125,30,75,45,"",[],465],["Sewaddle","Bug/Grass",53,40,45,255,"",[[541,"L",20]],310],["Swadloon","Bug/Grass",63,50,55,120,"",[[542,"L",30]],380],["Leavanny","Bug/Grass",103,70,75,45,"",[],500],["Venipede","Bug/Poison",45,30,30,255,"",[[544,"L",22]],260],["Whirlipede","Bug/Poison",55,40,40,120,"",[[545,"L",30]],360],["Scolipede","Bug/Poison",100,55,60,45,"",[],485],["Cottonee","Grass/Fairy",27,37,40,190,"",[[547,"I","Sun Stone"]],280],["Whimsicott","Grass/Fairy",67,77,60,75,"",[],480],["Petilil","Grass",35,70,45,190,"",[[549,"I","Sun Stone"],[549,"I","Sun Stone"]],280],["Lilligant","Grass",60,110,70,75,"",[],480],["Basculin","Water",92,80,70,25,"",[],460],["Sandile","Ground/Dark",72,35,50,180,"",[[552,"L",29]],292],["Krokorok","Ground/Dark",82,45,60,90,"",[[553,"L",40]],351],["Krookodile","Ground/Dark",117,65,95,45,"",[],519],["Darumaka","Fire",90,15,70,120,"",[[555,"L",35]],315],["Darmanitan","Fire",140,30,105,60,"",[],480],["Maractus","Grass",86,106,75,255,"",[],461],["Dwebble","Bug/Rock",65,35,50,190,"",[[558,"L",34]],325],["Crustle","Bug/Rock",105,65,70,75,"",[],485],["Scraggy","Dark/Fighting",75,35,50,180,"",[[560,"L",39]],348],["Scrafty","Dark/Fighting",90,45,65,90,"",[],488],["Sigilyph","Psychic/Flying",58,103,72,45,"",[],490],["Yamask","Ghost",30,55,38,190,"",[[563,"L",34]],303],["Cofagrigus","Ghost",50,95,58,90,"",[],483],["Tirtouga","Water/Rock",78,53,54,45,"fossil",[[565,"L",37]],355],["Carracosta","Water/Rock",108,83,74,45,"fossil",[],495],["Archen","Rock/Flying",112,74,55,45,"fossil",[[567,"L",37]],401],["Archeops","Rock/Flying",140,112,75,45,"fossil",[],567],["Trubbish","Poison",50,40,50,190,"",[[569,"L",36]],329],["Garbodor","Poison",95,60,80,60,"",[],474],["Zorua","Dark",65,80,40,75,"",[[571,"L",30]],330],["Zoroark","Dark",105,120,60,45,"",[],510],["Minccino","Normal",50,40,55,255,"",[[573,"I","Shiny Stone"]],300],["Cinccino","Normal",95,65,75,60,"",[],470],["Gothita","Psychic",30,55,45,200,"",[[575,"L",32]],290],["Gothorita","Psychic",45,75,60,100,"",[[576,"L",41]],390],["Gothitelle","Psychic",55,95,70,50,"",[],490],["Solosis","Psychic",30,105,45,200,"",[[578,"L",32]],290],["Duosion","Psychic",40,125,65,100,"",[[579,"L",41]],370],["Reuniclus","Psychic",65,125,110,50,"",[],490],["Ducklett","Water/Flying",44,44,62,190,"",[[581,"L",35]],305],["Swanna","Water/Flying",87,87,75,45,"",[],473],["Vanillite","Ice",50,65,36,255,"",[[583,"L",35]],305],["Vanillish","Ice",65,80,51,120,"",[[584,"L",47]],395],["Vanilluxe","Ice",95,110,71,45,"",[],535],["Deerling","Normal/Grass",60,40,60,190,"",[[586,"L",34]],335],["Sawsbuck","Normal/Grass",100,60,80,75,"",[],475],["Emolga","Electric/Flying",75,75,55,200,"",[],428],["Karrablast","Bug",75,40,50,200,"",[[589,"T",0]],315],["Escavalier","Bug/Steel",135,60,70,75,"",[],495],["Foongus","Grass/Poison",55,55,69,190,"",[[591,"L",39]],294],["Amoonguss","Grass/Poison",85,85,114,75,"",[],464],["Frillish","Water/Ghost",40,65,55,190,"",[[593,"L",40]],335],["Jellicent","Water/Ghost",60,85,100,60,"",[],480],["Alomomola","Water",75,40,165,75,"",[],470],["Joltik","Bug/Electric",47,57,50,190,"",[[596,"L",36]],319],["Galvantula","Bug/Electric",77,97,70,75,"",[],472],["Ferroseed","Grass/Steel",50,24,44,255,"",[[598,"L",40]],305],["Ferrothorn","Grass/Steel",94,54,74,90,"",[],489],["Klink","Steel",55,45,40,130,"",[[600,"L",38]],300],["Klang","Steel",80,70,60,60,"",[[601,"L",49]],440],["Klinklang","Steel",100,70,60,30,"",[],520],["Tynamo","Electric",55,45,35,190,"",[[603,"L",39]],275],["Eelektrik","Electric",85,75,65,60,"",[[604,"I","Thunder Stone"]],405],["Eelektross","Electric",115,105,85,30,"",[],515],["Elgyem","Psychic",55,85,55,255,"",[[606,"L",42]],335],["Beheeyem","Psychic",75,125,75,90,"",[],485],["Litwick","Ghost/Fire",30,65,50,190,"",[[608,"L",41]],275],["Lampent","Ghost/Fire",40,95,60,90,"",[[609,"I","Dusk Stone"]],370],["Chandelure","Ghost/Fire",55,145,60,45,"",[],520],["Axew","Dragon",87,30,46,75,"",[[611,"L",38]],320],["Fraxure","Dragon",117,40,66,60,"",[[612,"L",48]],410],["Haxorus","Dragon",147,60,76,45,"",[],540],["Cubchoo","Ice",70,60,55,120,"",[[614,"L",37]],305],["Beartic","Ice",130,70,95,60,"",[],505],["Cryogonal","Ice",50,95,80,25,"",[],515],["Shelmet","Bug",40,40,50,200,"",[[617,"T",0]],305],["Accelgor","Bug",70,100,80,75,"",[],495],["Stunfisk","Ground/Electric",66,81,109,75,"",[],471],["Mienfoo","Fighting",85,55,45,180,"",[[620,"L",50]],350],["Mienshao","Fighting",125,95,65,45,"",[],510],["Druddigon","Dragon",120,60,77,45,"",[],485],["Golett","Ground/Ghost",74,35,59,190,"",[[623,"L",43]],303],["Golurk","Ground/Ghost",124,55,89,90,"",[],483],["Pawniard","Dark/Steel",85,40,45,120,"",[[625,"L",52]],340],["Bisharp","Dark/Steel",125,60,65,45,"",[[983,"L",30]],490],["Bouffalant","Normal",110,40,95,45,"",[],490],["Rufflet","Normal/Flying",83,37,70,190,"",[[628,"L",54],[628,"L",54]],350],["Braviary","Normal/Flying",123,57,100,60,"",[],510],["Vullaby","Dark/Flying",55,45,70,190,"",[[630,"L",54]],370],["Mandibuzz","Dark/Flying",65,55,110,60,"",[],510],["Heatmor","Fire",97,105,85,90,"",[],484],["Durant","Bug/Steel",109,48,58,90,"",[],484],["Deino","Dark/Dragon",65,45,52,45,"pseudo",[[634,"L",50]],300],["Zweilous","Dark/Dragon",85,65,72,45,"pseudo",[[635,"L",64]],420],["Hydreigon","Dark/Dragon",105,125,92,45,"pseudo",[],600],["Larvesta","Bug/Fire",85,50,55,45,"",[[637,"L",59]],360],["Volcarona","Bug/Fire",60,135,85,15,"",[],550],["Cobalion","Steel/Fighting",90,90,91,3,"lg",[],580],["Terrakion","Rock/Fighting",129,72,91,3,"lg",[],580],["Virizion","Grass/Fighting",90,90,91,3,"lg",[],580],["Tornadus","Flying",115,125,79,3,"lg",[],580],["Thundurus","Electric/Flying",115,125,79,3,"lg",[],580],["Reshiram","Dragon/Fire",120,150,100,3,"lg",[],680],["Zekrom","Dragon/Electric",150,120,100,3,"lg",[],680],["Landorus","Ground/Flying",125,115,89,3,"lg",[],600],["Kyurem","Dragon/Ice",130,130,125,3,"lg",[],660],["Keldeo","Water/Fighting",72,129,91,3,"my",[],580],["Meloetta","Normal/Psychic",77,128,100,3,"my",[],600],["Genesect","Bug/Steel",120,120,71,3,"my",[],600],["Chespin","Grass",61,48,56,45,"starter",[[651,"L",16]],313],["Quilladin","Grass",78,56,61,45,"starter",[[652,"L",36]],405],["Chesnaught","Grass/Fighting",107,74,88,45,"starter",[],530],["Fennekin","Fire",45,62,40,45,"starter",[[654,"L",16]],307],["Braixen","Fire",59,90,59,45,"starter",[[655,"L",36]],409],["Delphox","Fire/Psychic",69,114,75,45,"starter",[],534],["Froakie","Water",56,62,41,45,"starter",[[657,"L",16]],314],["Frogadier","Water",63,83,54,45,"starter",[[658,"L",36]],405],["Greninja","Water/Dark",95,103,72,45,"starter",[],530],["Bunnelby","Normal",36,32,38,255,"",[[660,"L",20]],237],["Diggersby","Normal/Ground",56,50,85,127,"",[],423],["Fletchling","Normal/Flying",50,40,45,255,"",[[662,"L",17]],278],["Fletchinder","Fire/Flying",73,56,62,120,"",[[663,"L",35]],382],["Talonflame","Fire/Flying",81,74,78,45,"",[],499],["Scatterbug","Bug",35,27,38,255,"",[[665,"L",9]],200],["Spewpa","Bug",22,27,45,120,"",[[666,"L",12],[666,"L",12]],213],["Vivillon","Bug/Flying",52,90,80,45,"",[],411],["Litleo","Fire/Normal",50,73,62,220,"",[[668,"L",35]],369],["Pyroar","Fire/Normal",68,109,86,65,"",[],507],["Flabébé","Fairy",38,61,44,225,"",[[670,"L",19]],303],["Floette","Fairy",45,75,54,120,"",[[671,"I","Shiny Stone"]],371],["Florges","Fairy",65,112,78,45,"",[],552],["Skiddo","Grass",65,62,66,200,"",[[673,"L",32]],350],["Gogoat","Grass",100,97,123,45,"",[],531],["Pancham","Fighting",82,46,67,220,"",[[675,"L",32]],348],["Pangoro","Fighting/Dark",124,69,95,65,"",[],495],["Furfrou","Normal",80,65,75,160,"",[],472],["Espurr","Psychic",48,63,62,190,"",[[678,"L",25],[678,"L",25]],355],["Meowstic","Psychic",48,83,74,75,"",[],466],["Honedge","Steel/Ghost",80,35,45,180,"",[[680,"L",35]],325],["Doublade","Steel/Ghost",110,45,59,90,"",[[681,"I","Dusk Stone"]],448],["Aegislash","Steel/Ghost",50,50,60,45,"",[],500],["Spritzee","Fairy",52,63,78,200,"",[[683,"T",0]],341],["Aromatisse","Fairy",72,99,101,140,"",[],462],["Swirlix","Fairy",48,59,62,200,"",[[685,"T",0]],341],["Slurpuff","Fairy",80,85,82,140,"",[],480],["Inkay","Dark/Psychic",54,37,53,190,"",[[687,"L",30]],288],["Malamar","Dark/Psychic",92,68,86,80,"",[],482],["Binacle","Rock/Water",52,39,42,120,"",[[689,"L",39]],306],["Barbaracle","Rock/Water",105,54,72,45,"",[],500],["Skrelp","Poison/Water",60,60,50,225,"",[[691,"L",48]],320],["Dragalge","Poison/Dragon",75,97,65,55,"",[],494],["Clauncher","Water",53,58,50,225,"",[[693,"L",37]],330],["Clawitzer","Water",73,120,71,55,"",[],500],["Helioptile","Electric/Normal",38,61,44,190,"",[[695,"I","Sun Stone"]],289],["Heliolisk","Electric/Normal",55,109,62,75,"",[],481],["Tyrunt","Rock/Dragon",89,45,58,45,"fossil",[[697,"L",39]],362],["Tyrantrum","Rock/Dragon",121,69,82,45,"fossil",[],521],["Amaura","Rock/Ice",59,67,77,45,"fossil",[[699,"L",39]],362],["Aurorus","Rock/Ice",77,99,123,45,"fossil",[],521],["Sylveon","Fairy",65,110,95,45,"",[],525],["Hawlucha","Fighting/Flying",92,74,78,100,"",[],500],["Dedenne","Electric/Fairy",58,81,67,180,"",[],431],["Carbink","Rock/Fairy",50,50,50,60,"",[],500],["Goomy","Dragon",50,55,45,45,"pseudo",[[705,"L",40],[705,"L",40]],300],["Sliggoo","Dragon",75,83,68,45,"pseudo",[[706,"L",50]],452],["Goodra","Dragon",100,110,90,45,"pseudo",[],600],["Klefki","Steel/Fairy",80,80,57,75,"",[],470],["Phantump","Ghost/Grass",70,50,43,120,"",[[709,"T",0]],309],["Trevenant","Ghost/Grass",110,65,85,60,"",[],474],["Pumpkaboo","Ghost/Grass",66,44,49,120,"",[[711,"T",0]],335],["Gourgeist","Ghost/Grass",90,58,65,60,"",[],494],["Bergmite","Ice",69,32,55,190,"",[[713,"L",37],[713,"L",37]],304],["Avalugg","Ice",117,44,95,55,"",[],514],["Noibat","Flying/Dragon",30,45,40,190,"",[[715,"L",48]],245],["Noivern","Flying/Dragon",70,97,85,45,"",[],535],["Xerneas","Fairy",131,131,126,45,"lg",[],680],["Yveltal","Dark/Flying",131,131,126,45,"lg",[],680],["Zygarde","Dragon/Ground",100,81,108,3,"lg",[],600],["Diancie","Rock/Fairy",100,100,50,3,"my",[],600],["Hoopa","Psychic/Ghost",110,150,80,3,"my",[],600],["Volcanion","Fire/Water",110,130,80,3,"my",[],600],["Rowlet","Grass/Flying",55,50,68,45,"starter",[[723,"L",17]],320],["Dartrix","Grass/Flying",75,70,78,45,"starter",[[724,"L",34],[724,"L",36]],420],["Decidueye","Grass/Ghost",107,100,78,45,"starter",[],530],["Litten","Fire",65,60,45,45,"starter",[[726,"L",17]],320],["Torracat","Fire",85,80,65,45,"starter",[[727,"L",34]],420],["Incineroar","Fire/Dark",115,80,95,45,"starter",[],530],["Popplio","Water",54,66,50,45,"starter",[[729,"L",17]],320],["Brionne","Water",69,91,60,45,"starter",[[730,"L",34]],420],["Primarina","Water/Fairy",74,126,80,45,"starter",[],530],["Pikipek","Normal/Flying",75,30,35,255,"",[[732,"L",14]],265],["Trumbeak","Normal/Flying",85,40,55,120,"",[[733,"L",28]],355],["Toucannon","Normal/Flying",120,75,80,45,"",[],485],["Yungoos","Normal",70,30,48,255,"",[[735,"L",20]],253],["Gumshoos","Normal",110,55,88,127,"",[],418],["Grubbin","Bug",62,55,47,255,"",[[737,"L",20]],300],["Charjabug","Bug/Electric",82,55,57,120,"",[[738,"I","Thunder Stone"]],400],["Vikavolt","Bug/Electric",70,145,77,45,"",[],500],["Crabrawler","Fighting",82,42,47,225,"",[[740,"I","Ice Stone"]],338],["Crabominable","Fighting/Ice",132,62,97,60,"",[],478],["Oricorio","Fire/Flying",70,98,75,45,"",[],476],["Cutiefly","Bug/Fairy",45,55,40,190,"",[[743,"L",25]],304],["Ribombee","Bug/Fairy",55,95,60,75,"",[],464],["Rockruff","Rock",65,30,45,190,"",[[745,"L",25],[745,"L",25]],280],["Lycanroc","Rock",115,55,75,90,"",[],487],["Wishiwashi","Water",20,25,45,60,"",[],175],["Mareanie","Poison/Water",53,43,50,190,"",[[748,"L",38]],305],["Toxapex","Poison/Water",63,53,50,75,"",[],495],["Mudbray","Ground",100,45,70,190,"",[[750,"L",30]],385],["Mudsdale","Ground",125,55,100,60,"",[],500],["Dewpider","Water/Bug",40,40,38,200,"",[[752,"L",22]],269],["Araquanid","Water/Bug",70,50,68,100,"",[],454],["Fomantis","Grass",55,50,40,190,"",[[754,"L",34]],250],["Lurantis","Grass",105,80,70,75,"",[],480],["Morelull","Grass/Fairy",35,65,40,190,"",[[756,"L",24]],285],["Shiinotic","Grass/Fairy",45,90,60,75,"",[],405],["Salandit","Poison/Fire",44,71,48,120,"",[[758,"L",33]],320],["Salazzle","Poison/Fire",64,111,68,45,"",[],480],["Stufful","Normal/Fighting",75,45,70,140,"",[[760,"L",27]],340],["Bewear","Normal/Fighting",125,55,120,70,"",[],500],["Bounsweet","Grass",30,30,42,235,"",[[762,"L",18]],210],["Steenee","Grass",40,40,52,120,"",[[763,"L",30]],290],["Tsareena","Grass",120,50,72,45,"",[],510],["Comfey","Fairy",52,82,51,60,"",[],485],["Oranguru","Normal/Psychic",60,90,90,45,"",[],490],["Passimian","Fighting",120,40,100,45,"",[],490],["Wimpod","Bug/Water",35,20,25,90,"",[[768,"L",30]],230],["Golisopod","Bug/Water",125,60,75,45,"",[],530],["Sandygast","Ghost/Ground",55,70,55,140,"",[[770,"L",42]],320],["Palossand","Ghost/Ground",75,100,85,60,"",[],480],["Pyukumuku","Water",60,30,55,60,"",[],410],["Type: Null","Normal",95,95,95,3,"lg",[[773,"L",30]],534],["Silvally","Normal",95,95,95,3,"lg",[],570],["Minior","Rock/Flying",100,100,60,30,"",[],500],["Komala","Normal",115,75,65,45,"",[],480],["Turtonator","Fire/Dragon",78,91,60,70,"",[],485],["Togedemaru","Electric/Steel",98,40,65,180,"",[],435],["Mimikyu","Ghost/Fairy",90,50,55,45,"",[],476],["Bruxish","Water/Psychic",105,70,68,80,"",[],475],["Drampa","Normal/Dragon",60,135,78,70,"",[],485],["Dhelmise","Ghost/Grass",131,86,70,25,"",[],517],["Jangmo-o","Dragon",55,45,45,45,"pseudo",[[783,"L",35]],300],["Hakamo-o","Dragon/Fighting",75,65,55,45,"pseudo",[[784,"L",45]],420],["Kommo-o","Dragon/Fighting",110,100,75,45,"pseudo",[],600],["Tapu Koko","Electric/Fairy",115,95,70,3,"lg",[],570],["Tapu Lele","Psychic/Fairy",85,130,70,3,"lg",[],570],["Tapu Bulu","Grass/Fairy",130,85,70,3,"lg",[],570],["Tapu Fini","Water/Fairy",75,95,70,3,"lg",[],570],["Cosmog","Psychic",29,29,43,45,"lg",[[790,"L",43]],200],["Cosmoem","Psychic",29,29,43,45,"lg",[[791,"L",53],[792,"L",53]],400],["Solgaleo","Psychic/Steel",137,113,137,45,"lg",[],680],["Lunala","Psychic/Ghost",113,137,137,45,"lg",[],680],["Nihilego","Rock/Poison",53,127,109,45,"",[],570],["Buzzwole","Bug/Fighting",139,53,107,45,"",[],570],["Pheromosa","Bug/Fighting",137,137,71,45,"",[],570],["Xurkitree","Electric",89,173,83,45,"",[],570],["Celesteela","Steel/Flying",101,107,97,45,"",[],570],["Kartana","Grass/Steel",181,59,59,45,"",[],570],["Guzzlord","Dark/Dragon",101,97,223,45,"",[],570],["Necrozma","Psychic",107,127,97,255,"lg",[],600],["Magearna","Steel/Fairy",95,130,80,3,"my",[],600],["Marshadow","Fighting/Ghost",125,90,90,3,"my",[],600],["Poipole","Poison",73,73,67,45,"",[[804,"L",30]],420],["Naganadel","Poison/Dragon",73,127,73,45,"",[],540],["Stakataka","Rock/Steel",131,53,61,30,"",[],570],["Blacephalon","Fire/Ghost",127,151,53,30,"",[],570],["Zeraora","Electric",112,102,88,3,"my",[],600],["Meltan","Steel",65,55,46,3,"my",[],300],["Melmetal","Steel",143,80,135,3,"my",[],600],["Grookey","Grass",65,40,50,45,"starter",[[811,"L",16]],310],["Thwackey","Grass",85,55,70,45,"starter",[[812,"L",35]],420],["Rillaboom","Grass",125,60,100,45,"starter",[],530],["Scorbunny","Fire",71,40,50,45,"starter",[[814,"L",16]],310],["Raboot","Fire",86,55,65,45,"starter",[[815,"L",35]],420],["Cinderace","Fire",116,65,80,45,"starter",[],530],["Sobble","Water",40,70,50,45,"starter",[[817,"L",16]],310],["Drizzile","Water",60,95,65,45,"starter",[[818,"L",35]],420],["Inteleon","Water",85,125,70,45,"starter",[],530],["Skwovet","Normal",55,35,70,255,"",[[820,"L",24]],275],["Greedent","Normal",95,55,120,90,"",[],460],["Rookidee","Flying",47,33,38,255,"",[[822,"L",18]],245],["Corvisquire","Flying",67,43,68,120,"",[[823,"L",38]],365],["Corviknight","Flying/Steel",87,53,98,45,"",[],495],["Blipbug","Bug",20,25,25,255,"",[[825,"L",10]],180],["Dottler","Bug/Psychic",35,50,50,120,"",[[826,"L",30]],335],["Orbeetle","Bug/Psychic",45,80,60,45,"",[],505],["Nickit","Dark",28,47,40,255,"",[[828,"L",18]],245],["Thievul","Dark",58,87,70,127,"",[],455],["Gossifleur","Grass",40,40,40,190,"",[[830,"L",20]],250],["Eldegoss","Grass",50,80,60,75,"",[],460],["Wooloo","Normal",40,40,42,255,"",[[832,"L",24]],270],["Dubwool","Normal",80,60,72,127,"",[],490],["Chewtle","Water",64,38,50,255,"",[[834,"L",22]],284],["Drednaw","Water/Rock",115,48,90,75,"",[],485],["Yamper","Electric",45,40,59,255,"",[[836,"L",25]],270],["Boltund","Electric",90,90,69,45,"",[],490],["Rolycoly","Rock",40,40,30,255,"",[[838,"L",18]],240],["Carkol","Rock/Fire",60,60,80,120,"",[[839,"L",34]],410],["Coalossal","Rock/Fire",80,80,110,45,"",[],510],["Applin","Grass/Dragon",40,40,40,255,"",[[841,"I","Tart Apple"],[842,"I","Sweet Apple"],[1011,"I","Syrupy Apple"]],260],["Flapple","Grass/Dragon",110,95,70,45,"",[],485],["Appletun","Grass/Dragon",85,100,110,45,"",[],485],["Silicobra","Ground",57,35,52,255,"",[[844,"L",36]],315],["Sandaconda","Ground",107,65,72,120,"",[],510],["Cramorant","Flying/Water",85,85,70,45,"",[],475],["Arrokuda","Water",63,40,41,255,"",[[847,"L",26]],280],["Barraskewda","Water",123,60,61,60,"",[],490],["Toxel","Electric/Poison",38,54,40,75,"",[[849,"L",30],[849,"L",30]],242],["Toxtricity","Electric/Poison",98,114,75,45,"",[],502],["Sizzlipede","Fire/Bug",65,50,50,190,"",[[851,"L",28]],305],["Centiskorch","Fire/Bug",115,90,100,75,"",[],525],["Clobbopus","Fighting",68,50,50,180,"",[[853,"L",30]],310],["Grapploct","Fighting",118,70,80,45,"",[],480],["Sinistea","Ghost",45,74,40,120,"",[[855,"I","Cracked Pot"]],308],["Polteageist","Ghost",65,134,60,60,"",[],508],["Hatenna","Psychic",30,56,42,235,"",[[857,"L",32]],265],["Hattrem","Psychic",40,86,57,120,"",[[858,"L",42]],370],["Hatterene","Psychic/Fairy",90,136,57,45,"",[],510],["Impidimp","Dark/Fairy",45,55,45,255,"",[[860,"L",32]],265],["Morgrem","Dark/Fairy",60,75,65,120,"",[[861,"L",42]],370],["Grimmsnarl","Dark/Fairy",120,95,95,45,"",[],510],["Obstagoon","Dark/Normal",90,60,93,45,"",[],520],["Perrserker","Steel",110,50,70,90,"",[],440],["Cursola","Ghost",95,145,60,30,"",[],510],["Sirfetch’d","Fighting",135,68,62,45,"",[],507],["Mr. Rime","Ice/Psychic",85,110,80,45,"",[],520],["Runerigus","Ground/Ghost",95,50,58,90,"",[],483],["Milcery","Fairy",40,50,45,200,"",[[869,"L",30]],270],["Alcremie","Fairy",60,110,65,100,"",[],495],["Falinks","Fighting",100,70,65,45,"",[],470],["Pincurchin","Electric",101,91,48,75,"",[],435],["Snom","Ice/Bug",25,45,30,190,"",[[873,"L",30]],185],["Frosmoth","Ice/Bug",65,125,70,75,"",[],475],["Stonjourner","Rock",125,20,100,60,"",[],470],["Eiscue","Ice",80,65,75,60,"",[],470],["Indeedee","Psychic/Normal",65,105,60,30,"",[],475],["Morpeko","Electric/Dark",95,70,58,180,"",[],436],["Cufant","Steel",80,40,72,190,"",[[879,"L",34]],330],["Copperajah","Steel",130,80,122,90,"",[],500],["Dracozolt","Electric/Dragon",100,80,90,45,"fossil",[],505],["Arctozolt","Electric/Ice",100,90,90,45,"fossil",[],505],["Dracovish","Water/Dragon",90,70,90,45,"fossil",[],505],["Arctovish","Water/Ice",90,80,90,45,"fossil",[],505],["Duraludon","Steel/Dragon",95,120,70,45,"",[[1018,"I","Metal Alloy"]],535],["Dreepy","Dragon/Ghost",60,40,28,45,"pseudo",[[886,"L",50]],270],["Drakloak","Dragon/Ghost",80,60,68,45,"pseudo",[[887,"L",60]],410],["Dragapult","Dragon/Ghost",120,100,88,45,"pseudo",[],600],["Zacian","Fairy",120,80,92,10,"lg",[],660],["Zamazenta","Fighting",120,80,92,10,"lg",[],660],["Eternatus","Poison/Dragon",85,145,140,255,"lg",[],690],["Kubfu","Fighting",90,53,60,3,"lg",[[892,"L",30],[892,"L",30]],385],["Urshifu","Fighting/Dark",130,63,100,3,"lg",[],550],["Zarude","Dark/Grass",120,70,105,3,"my",[],600],["Regieleki","Electric",100,100,80,3,"lg",[],580],["Regidrago","Dragon",100,100,200,3,"lg",[],580],["Glastrier","Ice",145,65,100,3,"lg",[],580],["Spectrier","Ghost",65,145,100,3,"lg",[],580],["Calyrex","Psychic/Grass",80,80,100,3,"lg",[],500],["Wyrdeer","Normal/Psychic",105,105,103,135,"",[],525],["Kleavor","Bug/Rock",135,45,70,115,"",[],500],["Ursaluna","Ground/Normal",140,45,130,75,"",[],550],["Basculegion","Water/Ghost",112,80,120,135,"",[],530],["Sneasler","Fighting/Poison",130,40,80,135,"",[],510],["Overqwil","Dark/Poison",115,65,85,135,"",[],510],["Enamorus","Fairy/Flying",115,135,74,3,"lg",[],580],["Sprigatito","Grass",61,45,40,45,"starter",[[907,"L",16]],310],["Floragato","Grass",80,60,61,45,"starter",[[908,"L",36]],410],["Meowscarada","Grass/Dark",110,81,76,45,"starter",[],530],["Fuecoco","Fire",45,63,67,45,"starter",[[910,"L",16]],310],["Crocalor","Fire",55,90,81,45,"starter",[[911,"L",36]],411],["Skeledirge","Fire/Ghost",75,110,104,45,"starter",[],530],["Quaxly","Water",65,50,55,45,"starter",[[913,"L",16]],310],["Quaxwell","Water",85,65,70,45,"starter",[[914,"L",36]],410],["Quaquaval","Water/Fighting",120,85,85,45,"starter",[],530],["Lechonk","Normal",45,35,54,255,"",[[916,"L",18],[916,"L",18]],254],["Oinkologne","Normal",100,59,110,100,"",[],489],["Tarountula","Bug",41,29,35,255,"",[[918,"L",15]],210],["Spidops","Bug",79,52,60,120,"",[],404],["Nymble","Bug",46,21,33,190,"",[[920,"L",24]],210],["Lokix","Bug/Dark",102,52,71,30,"",[],450],["Pawmi","Electric",50,40,45,190,"",[[922,"L",18]],240],["Pawmo","Electric/Fighting",75,50,60,80,"",[[923,"L",30]],350],["Pawmot","Electric/Fighting",115,70,70,45,"",[],490],["Tandemaus","Normal",50,40,50,150,"",[[925,"L",25],[925,"L",25]],305],["Maushold","Normal",75,65,74,75,"",[],470],["Fidough","Fairy",55,30,37,190,"",[[927,"L",26]],312],["Dachsbun","Fairy",80,50,57,90,"",[],477],["Smoliv","Grass/Normal",35,58,41,255,"",[[929,"L",25]],260],["Dolliv","Grass/Normal",53,78,52,120,"",[[930,"L",35]],354],["Arboliva","Grass/Normal",69,125,78,45,"",[],510],["Squawkabilly","Normal/Flying",96,45,82,190,"",[],417],["Nacli","Rock",55,35,55,255,"",[[933,"L",24]],280],["Naclstack","Rock",60,35,60,120,"",[[934,"L",38]],355],["Garganacl","Rock",100,45,100,45,"",[],500],["Charcadet","Fire",50,50,40,90,"",[[936,"I","Auspicious Armor"],[937,"I","Malicious Armor"]],255],["Armarouge","Fire/Psychic",60,125,85,25,"",[],525],["Ceruledge","Fire/Ghost",125,60,75,25,"",[],525],["Tadbulb","Electric",31,59,61,190,"",[[939,"I","Thunder Stone"]],272],["Bellibolt","Electric",64,103,109,50,"",[],495],["Wattrel","Electric/Flying",40,55,40,180,"",[[941,"L",25]],280],["Kilowattrel","Electric/Flying",70,105,70,90,"",[],490],["Maschiff","Dark",78,40,60,150,"",[[943,"L",30]],340],["Mabosstiff","Dark",120,60,80,75,"",[],505],["Shroodle","Poison/Normal",65,40,40,190,"",[[945,"L",28]],290],["Grafaiai","Poison/Normal",95,80,63,90,"",[],485],["Bramblin","Grass/Ghost",65,45,40,190,"",[[947,"L",30]],275],["Brambleghast","Grass/Ghost",115,80,55,45,"",[],480],["Toedscool","Ground/Grass",40,50,40,190,"",[[949,"L",30]],335],["Toedscruel","Ground/Grass",70,80,80,90,"",[],515],["Klawf","Rock",100,35,70,120,"",[],450],["Capsakid","Grass",62,62,50,190,"",[[952,"I","Fire Stone"]],304],["Scovillain","Grass/Fire",108,108,65,75,"",[],486],["Rellor","Bug",50,31,41,190,"",[[954,"L",30]],270],["Rabsca","Bug/Psychic",50,115,75,45,"",[],470],["Flittle","Psychic",35,55,30,120,"",[[956,"L",35]],255],["Espathra","Psychic",60,101,95,60,"",[],481],["Tinkatink","Fairy/Steel",45,35,50,190,"",[[958,"L",24]],297],["Tinkatuff","Fairy/Steel",55,45,65,90,"",[[959,"L",38]],380],["Tinkaton","Fairy/Steel",75,70,85,45,"",[],506],["Wiglett","Water",55,35,10,255,"",[[961,"L",26]],245],["Wugtrio","Water",100,50,35,50,"",[],425],["Bombirdier","Flying/Dark",103,60,70,25,"",[],485],["Finizen","Water",45,45,70,200,"",[[964,"L",38]],315],["Palafin","Water",70,53,100,45,"",[],457],["Varoom","Steel/Poison",70,30,45,190,"",[[966,"L",40]],300],["Revavroom","Steel/Poison",119,54,80,75,"",[],500],["Cyclizar","Dragon/Normal",95,85,70,190,"",[],501],["Orthworm","Steel",85,60,70,25,"",[],480],["Glimmet","Rock/Poison",35,105,48,70,"",[[970,"L",35]],350],["Glimmora","Rock/Poison",55,130,83,25,"",[],525],["Greavard","Ghost",61,30,50,120,"",[[972,"L",30]],290],["Houndstone","Ghost",101,50,72,60,"",[],488],["Flamigo","Flying/Fighting",115,75,82,100,"",[],500],["Cetoddle","Ice",68,30,108,150,"",[[975,"I","Ice Stone"]],334],["Cetitan","Ice",113,45,170,50,"",[],521],["Veluza","Water/Psychic",102,78,90,100,"",[],478],["Dondozo","Water",100,65,150,25,"",[],530],["Tatsugiri","Dragon/Water",50,120,68,100,"",[],475],["Annihilape","Fighting/Ghost",115,50,110,45,"",[],535],["Clodsire","Poison/Ground",75,45,130,90,"",[],430],["Farigiraf","Normal/Psychic",90,110,120,45,"",[],520],["Dudunsparce","Normal",100,85,125,45,"",[],520],["Kingambit","Dark/Steel",135,60,100,25,"",[],550],["Great Tusk","Ground/Fighting",131,53,115,30,"",[],570],["Scream Tail","Fairy/Psychic",65,65,115,50,"",[],570],["Brute Bonnet","Grass/Dark",127,79,111,50,"",[],570],["Flutter Mane","Ghost/Fairy",55,135,55,30,"",[],570],["Slither Wing","Bug/Fighting",135,85,85,30,"",[],570],["Sandy Shocks","Electric/Ground",81,121,85,30,"",[],570],["Iron Treads","Ground/Steel",112,72,90,30,"",[],570],["Iron Bundle","Ice/Water",80,124,56,50,"",[],570],["Iron Hands","Fighting/Electric",140,50,154,50,"",[],570],["Iron Jugulis","Dark/Flying",80,122,94,30,"",[],570],["Iron Moth","Fire/Poison",70,140,80,30,"",[],570],["Iron Thorns","Rock/Electric",134,70,100,30,"",[],570],["Frigibax","Dragon/Ice",75,35,65,45,"pseudo",[[997,"L",35]],320],["Arctibax","Dragon/Ice",95,45,90,25,"pseudo",[[998,"L",54]],423],["Baxcalibur","Dragon/Ice",145,75,115,10,"pseudo",[],600],["Gimmighoul","Ghost",30,75,45,45,"",[[1000,"L",30]],300],["Gholdengo","Steel/Ghost",60,133,87,45,"",[],550],["Wo-Chien","Dark/Grass",85,95,85,6,"lg",[],570],["Chien-Pao","Dark/Ice",120,90,80,6,"lg",[],570],["Ting-Lu","Dark/Ground",110,55,155,6,"lg",[],570],["Chi-Yu","Dark/Fire",80,135,55,6,"lg",[],570],["Roaring Moon","Dragon/Dark",139,55,105,10,"",[],590],["Iron Valiant","Fairy/Fighting",130,120,74,10,"",[],590],["Koraidon","Fighting/Dragon",135,85,100,3,"lg",[],670],["Miraidon","Electric/Dragon",85,135,100,3,"lg",[],670],["Walking Wake","Water/Dragon",83,125,99,5,"",[],590],["Iron Leaves","Grass/Psychic",130,70,90,5,"",[],590],["Dipplin","Grass/Dragon",80,95,80,45,"",[[1019,"L",30]],485],["Poltchageist","Grass/Ghost",45,74,40,120,"",[[1013,"I","Unremarkable Teacup"]],308],["Sinistcha","Grass/Ghost",60,121,71,60,"",[],508],["Okidogi","Poison/Fighting",128,58,88,3,"lg",[],555],["Munkidori","Poison/Psychic",75,130,88,3,"lg",[],555],["Fezandipiti","Poison/Fairy",91,70,88,3,"lg",[],555],["Ogerpon","Grass",120,60,80,5,"lg",[],550],["Archaludon","Steel/Dragon",105,125,90,10,"",[],600],["Hydrapple","Grass/Dragon",80,120,106,10,"",[],540],["Gouging Fire","Fire/Dragon",115,65,105,10,"",[],590],["Raging Bolt","Electric/Dragon",73,137,125,10,"",[],590],["Iron Boulder","Rock/Psychic",120,68,90,10,"",[],590],["Iron Crown","Steel/Psychic",72,122,90,10,"",[],590],["Terapagos","Normal",65,65,90,255,"lg",[],450],["Pecharunt","Poison/Ghost",88,88,88,3,"my",[],600]],"types":["Bug","Dark","Dragon","Electric","Fairy","Fighting","Fire","Flying","Ghost","Grass","Ground","Ice","Normal","Poison","Psychic","Rock","Steel","Water"],"chart":["1211hhhhh2111h21h1","1h11hh112111112111","1121011111111111h1","11hh11121h01111112","122112h111111h11h1","h211h11h01122hh221","21h111h11212111h2h","211h12111211111hh1","1h1111112111012111","h1h111hh1h211h12h2","h11211201h11121221","112111h2122h1111hh","111111110111111hh1","11112111h2h11h1h01","10111211111112h1h1","21111h2211h21111h1","111h21h111121112hh","11h111211h2111121h"],"items":["Auspicious Armor","Black Augurite","Cracked Pot","Dawn Stone","Dusk Stone","Fire Stone","Ice Stone","Leaf Stone","Malicious Armor","Metal Alloy","Moon Stone","Peat Block","Shiny Stone","Sun Stone","Sweet Apple","Syrupy Apple","Tart Apple","Thunder Stone","Unremarkable Teacup","Water Stone"]};
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const TC = {Normal:"#8a8a68",Fire:"#d6682a",Water:"#4f78d8",Electric:"#c9a315",Grass:"#4f9a33",Ice:"#4fa9a7",Fighting:"#a8322a",Poison:"#8c3a8d",Ground:"#a98839",Flying:"#7a6bd0",Psychic:"#d8456f",Bug:"#838f18",Rock:"#978232",Ghost:"#5e4d86",Dragon:"#5d36d6",Dark:"#5c4a3d",Steel:"#7e7ea0",Fairy:"#c56d93"};
+const GEN_END = [0,151,251,386,493,649,721,809,905,1025];
+const genOf = n => GEN_END.findIndex((e, i) => i > 0 && n <= e);
+const fmt = n => n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e4 ? (n / 1e3).toFixed(1) + "k" : String(Math.floor(n));
+// Sprites ship with Pokédoku. In the hub this page is a srcdoc frame that resolves paths from the arcade root.
+const SPRITE_DIR = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI) ? "pokedoku/sprites/" : "games/content/pokedoku/sprites/";
+const sprite = (num, shiny) => SPRITE_DIR + (shiny ? "shiny/" : "") + num + ".png";
+const tyChip = t => `<span class="ty" style="background:${TC[t]}">${t.toUpperCase()}</span>`;
+
+// ── Data: [name, types, atk, spa, hp, catch rate, flags, evolutions [[num, L|I|T, level|item]], base stat total]
+const MON = D.mons.map(([name, types, atk, spa, hp, cr, flags, evos, bst], i) => ({ num: i + 1, name, types: types.split("/"), atk, spa, hp, cr, bst, evos, flags: new Set(flags ? flags.split(" ") : []), gen: genOf(i + 1) }));
+const mon = n => MON[n - 1];
+const TI = Object.fromEntries(D.types.map((t, i) => [t, i]));
+const MULT = { "0": 0, h: .5, "1": 1, "2": 2 };
+const eff = (atkType, defTypes) => defTypes.reduce((m, d) => m * MULT[D.chart[TI[atkType]][TI[d]]], 1);
+const bestEff = (a, d) => Math.max(...a.types.map(t => eff(t, d.types)));
+const legendary = m => m.flags.has("lg") || m.flags.has("my");
+
+// ── World: 9 regions, each 4 routes, 4 gyms (two gyms per type across the game), 1 dungeon and a Champion.
+const REGIONS = [
+  ["Kanto", [["Brock", "Rock"], ["Misty", "Water"], ["Erika", "Grass"], ["Giovanni", "Ground"]], "Blue"],
+  ["Johto", [["Falkner", "Flying"], ["Bugsy", "Bug"], ["Whitney", "Normal"], ["Jasmine", "Steel"]], "Lance"],
+  ["Hoenn", [["Brawly", "Fighting"], ["Wattson", "Electric"], ["Flannery", "Fire"], ["Tate & Liza", "Psychic"]], "Steven"],
+  ["Sinnoh", [["Gardenia", "Grass"], ["Fantina", "Ghost"], ["Byron", "Steel"], ["Candice", "Ice"]], "Cynthia"],
+  ["Unova", [["Roxie", "Poison"], ["Clay", "Ground"], ["Skyla", "Flying"], ["Drayden", "Dragon"]], "Alder"],
+  ["Kalos", [["Viola", "Bug"], ["Korrina", "Fighting"], ["Valerie", "Fairy"], ["Wulfric", "Ice"]], "Diantha"],
+  ["Alola", [["Olivia", "Rock"], ["Kiawe", "Fire"], ["Sophocles", "Electric"], ["Nanu", "Dark"]], "Kukui"],
+  ["Galar", [["Nessa", "Water"], ["Opal", "Fairy"], ["Piers", "Dark"], ["Raihan", "Dragon"]], "Leon"],
+  ["Paldea", [["Larry", "Normal"], ["Ryme", "Ghost"], ["Tulip", "Psychic"], ["Atticus", "Poison"]], "Geeta"]
+].map(([name, gyms, champ], r) => ({ name, gyms, champ, gen: r + 1 }));
+const KILLS_FOR_GYM = 10, GYM_TIME = 30, DUNGEON_TIME = 60, CHAMP_TIME = 60, DUNGEON_SIZE = 8;
+const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
+const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
+const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
+
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const regionMons = r => MON.filter(m => m.gen === REGIONS[r].gen);
+const firstStage = m => !MON.some(x => x.evos.some(e => e[0] === m.num));
+const finalStage = m => !m.evos.length;
+function routePool(r, k) {
+  const all = regionMons(r).filter(m => !legendary(m)), starts = all.filter(firstStage).sort((a, b) => a.bst - b.bst);
+  const half = Math.ceil(starts.length / 2);
+  if (k === 0) return starts.slice(0, half);
+  if (k === 1) return starts.slice(half);
+  if (k === 2) return all.filter(m => !finalStage(m) || firstStage(m));
+  return all;
+}
+function gymTeam(r, k) {
+  const [, type] = REGIONS[r].gyms[k], gi = r * 4 + k, size = 3 + (r >= 3) + (r >= 6);
+  const c = MON.filter(m => m.types.includes(type) && m.gen <= REGIONS[r].gen && !legendary(m)).sort((a, b) => a.bst - b.bst);
+  const centre = Math.floor((0.2 + 0.75 * gi / 35) * (c.length - 1)), rand = rng(gi * 7919 + 13), team = [];
+  for (let span = 2; team.length < size && span < c.length * 2; span++) {
+    const pick = c[Math.max(0, Math.min(c.length - 1, centre + Math.round((rand() - 0.5) * span)))];
+    if (!team.includes(pick)) team.push(pick);
+  }
+  return team.sort((a, b) => a.bst - b.bst);
+}
+function champTeam(r) {
+  const c = MON.filter(m => m.gen <= REGIONS[r].gen && finalStage(m) && !legendary(m)).sort((a, b) => b.bst - a.bst).slice(0, 60), rand = rng(r * 104729 + 7), team = [], types = new Set();
+  while (team.length < 6) { const m = c[Math.floor(rand() * c.length)]; if (!team.includes(m) && !types.has(m.types[0])) { team.push(m); types.add(m.types[0]); } if (types.size >= 17) types.clear(); }
+  return team.sort((a, b) => a.bst - b.bst);
+}
+const dungeonPool = r => regionMons(r).filter(m => !legendary(m) && (m.flags.has("pseudo") || m.flags.has("fossil") || m.flags.has("starter") || m.cr <= 60));
+const dungeonBosses = r => regionMons(r).filter(legendary);
+
+// ── Items
+const BALLS = [
+  { id: "poke", name: "Poké Ball", price: 20, mult: 1, add: 0 },
+  { id: "great", name: "Great Ball", price: 150, mult: 1.5, add: .05 },
+  { id: "ultra", name: "Ultra Ball", price: 600, mult: 2, add: .1 },
+  { id: "master", name: "Master Ball", price: 0, mult: 1, add: 1 }
+];
+const catchChance = (m, ball) => Math.min(1, (m.cr / 255) * .6 * ball.mult + ball.add);
+const ITEM_PRICE = 1500, CORD_PRICE = 2500;
+const ticketPrice = r => Math.round(250 * Math.pow(r + 1, 1.8));
+const proteinPrice = n => Math.round(300 * Math.pow(1.45, n));
+
+// ── Save
+const KEY = "bored.poke-idle.save";
+const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "poke", dupe: "none", shiny: "best" }, last: Date.now() });
+let S = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 1 ? s : null; } catch { return null; } })();
+const save = () => { S.last = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+
+// ── Party power
+const lvlOf = xp => Math.max(1, Math.min(100, Math.floor(Math.cbrt(xp + 0.5))));
+const level = n => lvlOf(S.box[n].xp);
+const power = n => { const m = mon(n); return Math.max(m.atk, m.spa) * level(n) / 50 * (1 + .1 * S.protein); };
+const partyDps = foe => S.party.reduce((s, n) => s + power(n) * (foe ? bestEff(mon(n), foe) : 1), 0);
+const clickDamage = () => Math.max(1, Math.round(1 + partyDps(null) * .15));
+
+// ── Battle state
+let B = null, msgT = 0;
+const regionOpen = r => r === 0 || !!S.champs[r - 1];
+const badge = (r, k) => !!S.badges[r + "-" + k];
+const kills = (r, k) => S.kills[r + "-" + k] || 0;
+function unlocked(loc) {
+  const { kind, r, k } = loc;
+  if (!regionOpen(r)) return false;
+  if (kind === "route") return k === 0 || badge(r, k - 1);
+  if (kind === "gym") return kills(r, k) >= KILLS_FOR_GYM;
+  if (kind === "dungeon") return badge(r, 1);
+  if (kind === "champ") return badge(r, 3);
+}
+function locName(loc) {
+  const R = REGIONS[loc.r];
+  if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
+  if (loc.kind === "gym") return `${R.gyms[loc.k][0]}'s ${R.gyms[loc.k][1]} gym`;
+  if (loc.kind === "dungeon") return `${R.name} dungeon`;
+  return `Champion ${R.champ}`;
+}
+function startLoc(loc) {
+  if (!unlocked(loc)) return;
+  if (loc.kind === "dungeon") {
+    const t = S.tickets[loc.r] || 0;
+    if (!t) { say(`You need a ${REGIONS[loc.r].name} dungeon ticket. The Shop sells them.`, true); return; }
+    S.tickets[loc.r] = t - 1;
+  }
+  if (loc.kind !== "route" && !S.party.length) { say("Put at least one Pokémon in your party first.", true); return; }
+  S.loc = { kind: loc.kind, r: loc.r, k: loc.k || 0 };
+  const r = loc.r, i = r * 4 + (loc.k || 0);
+  if (loc.kind === "route") B = { kind: "route", r, k: loc.k, i };
+  else if (loc.kind === "gym") B = { kind: "gym", r, k: loc.k, i, queue: gymTeam(r, loc.k), L: routeLevel(i) + 3, time: GYM_TIME, idx: 0 };
+  else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: routeLevel(r * 4 + 3) + 6, time: CHAMP_TIME, idx: 0 };
+  else {
+    const rand = Math.random, pool = dungeonPool(r), bosses = dungeonBosses(r);
+    const q = Array.from({ length: DUNGEON_SIZE }, () => pool[Math.floor(rand() * pool.length)]);
+    q.push(bosses[Math.floor(rand() * bosses.length)]);
+    B = { kind: "dungeon", r, i: r * 4 + 2, queue: q, L: routeLevel(r * 4 + 2) + 4, time: DUNGEON_TIME, idx: 0 };
+  }
+  spawn(); renderLocs(); save();
+}
+function spawn() {
+  let m, L, mult = 1, shiny = false;
+  if (B.kind === "route") { const pool = routePool(B.r, B.k); m = pool[Math.floor(Math.random() * pool.length)]; L = routeLevel(B.i); shiny = Math.random() < 1 / 512; }
+  else {
+    m = B.queue[B.idx]; L = B.L;
+    const boss = B.kind === "dungeon" && B.idx === B.queue.length - 1;
+    mult = B.kind === "dungeon" ? (boss ? 4 : 1.3) : B.kind === "champ" ? 1.8 : 1.6;
+    shiny = B.kind === "dungeon" && Math.random() < 1 / 512;
+  }
+  B.foe = { m, L, shiny, max: hpFor(m, L, B.i, mult), wild: B.kind === "route" || B.kind === "dungeon", reward: rewardFor(L, B.i, mult) };
+  B.foe.hp = B.foe.max; B.pause = 0;
+  S.seen[m.num] = 1;
+  $("#foeimg").src = sprite(m.num, shiny);
+  $("#shiny").hidden = !shiny;
+  $("#foeinfo").innerHTML = `<b>${esc(m.name)}</b> Lv ${L} ${m.types.map(tyChip).join(" ")}${S.box[m.num] ? ' <span class="muted">· caught</span>' : ""}`;
+  renderMinis();
+}
+function hit(dmg) {
+  if (!B || !B.foe || B.pause) return;
+  B.foe.hp -= dmg;
+  if (B.foe.hp <= 0) defeat();
+}
+function defeat() {
+  const f = B.foe; f.hp = 0; B.pause = 1;
+  S.money += f.reward;
+  gainXp(Math.round(f.L * 6 * (f.wild ? 1 : 1.5)));
+  if (B.kind === "route") S.kills[B.r + "-" + B.k] = kills(B.r, B.k) + 1;
+  let text = `${f.m.name} fainted. +$${fmt(f.reward)}.`;
+  if (f.wild) {
+    const ball = chooseBall(f);
+    if (ball) {
+      S.balls[ball.id]--;
+      const ok = Math.random() < catchChance(f.m, ball) * (legendary(f.m) && ball.id !== "master" ? .5 : 1);
+      text += ` Threw a ${ball.name}… ` + (ok ? "caught!" : "it broke free.");
+      if (ok) addMon(f.m.num, f.L, f.shiny);
+    }
+  }
+  say(text);
+  // Only move on if the player hasn't switched to another battle in the meantime.
+  const here = B; setTimeout(() => { if (B === here) next(); }, 650);
+}
+function chooseBall(f) {
+  const owned = !!S.box[f.m.num], pref = f.shiny ? S.set.shiny : owned ? S.set.dupe : S.set.fresh;
+  if (pref === "none") return null;
+  // "Best" only spends a Master Ball on a shiny or a legendary; a chosen ball falls back to cheaper ones, never pricier.
+  const LADDER = ["poke", "great", "ultra"];
+  const order = pref === "best" ? ["master", "ultra", "great", "poke"].filter(id => id !== "master" || f.shiny || legendary(f.m))
+    : pref === "master" ? ["master"] : [pref, ...LADDER.slice(0, LADDER.indexOf(pref)).reverse()];
+  const id = order.find(x => (S.balls[x] || 0) > 0);
+  return id ? BALLS.find(b => b.id === id) : null;
+}
+function next() {
+  if (!B) return;
+  if (B.kind === "route") { spawn(); return; }
+  B.idx++;
+  if (B.idx < B.queue.length) { spawn(); return; }
+  const R = REGIONS[B.r];
+  if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.`); }
+  if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first) S.balls.master++; toast(first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`); }
+  if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.`); }
+  backToRoute(); save();
+}
+function backToRoute() {
+  const r = B ? B.r : 0;
+  let k = 3; while (k > 0 && !unlocked({ kind: "route", r, k })) k--;
+  B = null; startLoc({ kind: "route", r, k }); renderAll();
+}
+function addMon(num, L, shiny) {
+  const had = S.box[num];
+  if (!had) S.box[num] = { xp: Math.pow(L, 3), shiny: !!shiny };
+  else if (shiny) had.shiny = true;
+  if (!had && S.party.length < 6) S.party.push(num);
+  if (!had) toast(`${mon(num).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
+  renderAll();
+}
+// Level evolutions happen on their own when there is only one way to go; the rest wait for you.
+function gainXp(xp) {
+  for (const n of S.party.slice()) {
+    const before = level(n); S.box[n].xp += xp; const after = level(n);
+    if (after > before) autoEvolve(n);
+  }
+}
+const evoOptions = n => mon(n).evos.filter(([t]) => !S.box[t]);
+function canEvolve(n, e) {
+  const [, how, v] = e;
+  if (how === "L") return level(n) >= v;
+  if (how === "I") return (S.items[v] || 0) > 0;
+  return S.cords > 0;
+}
+function autoEvolve(n) {
+  const lv = evoOptions(n).filter(e => e[1] === "L");
+  if (lv.length === 1 && mon(n).evos.filter(e => e[1] === "L").length === 1 && canEvolve(n, lv[0])) evolve(n, lv[0]);
+}
+function evolve(n, e) {
+  const [t, how, v] = e;
+  if (S.box[t] || !canEvolve(n, e)) return;
+  if (how === "I") S.items[v]--;
+  if (how === "T") S.cords--;
+  S.box[t] = { xp: S.box[n].xp, shiny: S.box[n].shiny };
+  const slot = S.party.indexOf(n);
+  if (slot >= 0) S.party[slot] = t;
+  toast(`${mon(n).name} evolved into ${mon(t).name}! (${mon(n).name} stays in your Box.)`);
+  save(); renderAll();
+}
+
+// ── Loop
+let lastTick = performance.now();
+function tick() {
+  const now = performance.now(), dt = Math.min(1, (now - lastTick) / 1000); lastTick = now;
+  if (B && B.foe && !B.pause) {
+    hit(partyDps(B.foe.m) * dt);
+    if (B.time != null) {
+      B.time -= dt;
+      if (B.time <= 0) { say(`Out of time. ${B.kind === "dungeon" ? "The dungeon run ended." : "Train up and try again."}`, true); backToRoute(); }
+    }
+  }
+  drawBattle();
+}
+function drawBattle() {
+  if (!B || !B.foe) return;
+  $("#hpbar").style.width = (100 * Math.max(0, B.foe.hp) / B.foe.max) + "%";
+  $("#where").textContent = locName(S.loc) + (B.queue ? ` · ${B.idx + 1}/${B.queue.length}` : ` · ${Math.min(kills(B.r, B.k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM}`);
+  $("#timerwrap").hidden = B.time == null;
+  if (B.time != null) { const total = B.kind === "gym" ? GYM_TIME : B.kind === "dungeon" ? DUNGEON_TIME : CHAMP_TIME; $("#timebar").style.width = (100 * Math.max(0, B.time) / total) + "%"; $("#timetext").textContent = Math.ceil(Math.max(0, B.time)) + "s left"; }
+  $("#money").textContent = fmt(S.money);
+  $("#dps").textContent = `party ${fmt(partyDps(B.foe.m))}/s vs this Pokémon · tap ${fmt(clickDamage())} · protein +${S.protein * 10}%`;
+  $("#balls").textContent = BALLS.filter(b => S.balls[b.id] > 0).map(b => `${b.name.split(" ")[0]} ${S.balls[b.id]}`).join(" · ") || "no balls";
+}
+function say(t, bad) { $("#log").textContent = t; $("#log").className = bad ? "bad" : ""; }
+let toastT = 0;
+function toast(t) { const el = $("#toast"); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 3200); }
+
+// ── Rendering
+let tab = "battle", dexR = 0, viewR = 0, detail = null;
+function renderAll() { renderTop(); renderLocs(); renderMinis(); if (tab === "party") renderParty(); if (tab === "dex") renderDex(); if (tab === "shop") renderShop(); }
+function renderTop() {
+  $("#dexn").textContent = Object.keys(S.box).length;
+  $("#badgen").textContent = Object.keys(S.badges).length;
+  $("#money").textContent = fmt(S.money);
+}
+function renderLocs() {
+  $("#regions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === viewR ? " on" : ""}" data-r="${r}" type="button"${regionOpen(r) ? "" : " disabled"}>${R.name}</button>`).join("");
+  const r = viewR, items = [];
+  for (let k = 0; k < 4; k++) {
+    items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${routeLevel(r * 4 + k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
+    items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${GYM_TIME}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
+    if (k === 1) items.push({ kind: "dungeon", r, note: `${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"} · cleared ${S.dungeons[r] || 0}x`, done: !!S.dungeons[r] });
+  }
+  items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${CHAMP_TIME}s`, done: !!S.champs[r] });
+  $("#locs").innerHTML = items.map(it => {
+    const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0);
+    return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0 })}'${unlocked(it) ? "" : " disabled"}><span>${esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
+  }).join("");
+}
+function monTile(n, opts = {}) {
+  const m = mon(n), b = S.box[n], e = opts.foe ? bestEff(m, opts.foe) : null;
+  const ready = evoOptions(n).some(x => canEvolve(n, x));
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny ? '<span class="star">S</span>' : ""}<img src="${sprite(n, b.shiny)}" alt="" loading="lazy"><span class="nm">${esc(m.name)}</span><span>Lv ${level(n)}</span>${opts.xp ? `<span class="bar xp" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+}
+const xpPct = n => { const L = level(n); if (L >= 100) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
+function renderMinis() {
+  const foe = B && B.foe ? B.foe.m : null;
+  $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true }) : '<div class="mon empty">empty</div>').join("");
+}
+function renderParty() {
+  $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true }) : '<div class="mon empty">empty</div>').join("");
+  const sort = $("#sort").value, list = Object.keys(S.box).map(Number).sort((a, b) => sort === "lvl" ? level(b) - level(a) : sort === "power" ? power(b) - power(a) : a - b);
+  $("#boxgrid").innerHTML = list.map(n => monTile(n, { inparty: S.party.includes(n) })).join("");
+  renderDetail();
+}
+function renderDetail() {
+  const el = $("#detail");
+  if (!detail || !S.box[detail]) { el.hidden = true; return; }
+  const m = mon(detail), opts = m.evos;
+  el.hidden = false;
+  el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${m.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · catch rate ${m.cr}</span></div>` +
+    (opts.length ? `<div class="small">${opts.map(e => {
+      const [t, how, v] = e, have = !!S.box[t], ok = !have && canEvolve(detail, e);
+      const need = how === "L" ? `Lv ${v}` : how === "I" ? `${v} (have ${S.items[v] || 0})` : `Linking Cord (have ${S.cords})`;
+      return `<div class="row" style="justify-content:space-between"><span>→ ${esc(mon(t).name)} <span class="muted">${need}</span></span>${have ? '<span class="good">have it</span>' : `<button class="lbl" type="button" data-evo="${t}"${ok ? "" : " disabled"}>Evolve</button>`}</div>`;
+    }).join("")}</div>` : '<div class="small muted">Doesn\'t evolve.</div>') +
+    `<div class="row"><button class="lbl" type="button" data-toggle="${detail}">${S.party.includes(detail) ? "Send to Box" : "Add to party"}</button><button class="lbl" type="button" data-close="1">Close</button></div>`;
+}
+function renderDex() {
+  $("#dexregions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === dexR ? " on" : ""}" data-dr="${r}" type="button">${R.name}</button>`).join("");
+  const list = regionMons(dexR), got = list.filter(m => S.box[m.num]).length, shinies = list.filter(m => S.box[m.num] && S.box[m.num].shiny).length;
+  $("#dexsum").innerHTML = `${REGIONS[dexR].name}: <b>${got}/${list.length}</b> caught · ${shinies} shiny · all regions ${Object.keys(S.box).length}/1025`;
+  $("#dexgrid").innerHTML = list.map(m => { const b = S.box[m.num]; return `<img src="${sprite(m.num, b && b.shiny)}" alt="${b || S.seen[m.num] ? esc(m.name) : "unknown"}" title="#${m.num} ${b || S.seen[m.num] ? esc(m.name) : "???"}" class="${b ? "" : "no"}" loading="lazy">`; }).join("");
+}
+function renderShop() {
+  const rows = [];
+  for (const b of BALLS.filter(b => b.price)) rows.push([`${b.name} <span class="muted">(have ${S.balls[b.id]})</span>`, b.price, `ball:${b.id}`, true]);
+  const r = S.loc.r;
+  rows.push([`${REGIONS[r].name} dungeon ticket <span class="muted">(have ${S.tickets[r] || 0})</span>`, ticketPrice(r), `ticket:${r}`, badge(r, 1)]);
+  rows.push([`Protein: party +10% damage <span class="muted">(bought ${S.protein})</span>`, proteinPrice(S.protein), "protein", true]);
+  rows.push([`Linking Cord: trade evolutions <span class="muted">(have ${S.cords})</span>`, CORD_PRICE, "cord", true]);
+  // Only items something in your Box is waiting on.
+  const want = new Set(); for (const n of Object.keys(S.box).map(Number)) for (const e of evoOptions(n)) if (e[1] === "I") want.add(e[2]);
+  for (const it of [...want].sort()) rows.push([`${esc(it)} <span class="muted">(have ${S.items[it] || 0})</span>`, ITEM_PRICE, "item:" + it, true]);
+  $("#shop").innerHTML = rows.map(([label, price, id, ok]) => `<span>${label}</span><span class="p">$${fmt(price)}</span><span class="row">${id.startsWith("ball") ? `<button class="lbl" type="button" data-buy="${id}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button><button class="lbl" type="button" data-buy="${id}" data-q="10"${ok && S.money >= price * 10 ? "" : " disabled"}>x10</button>` : `<button class="lbl" type="button" data-buy="${esc(id)}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button>`}</span>`).join("") +
+    `<span class="muted small" style="grid-column:1/-1">Dungeon tickets are for the region you're in. Evolution items only show up when a Pokémon in your Box needs one.</span>`;
+}
+function buy(id, q) {
+  const [kind, arg] = id.split(/:(.*)/);
+  const price = kind === "ball" ? BALLS.find(b => b.id === arg).price : kind === "ticket" ? ticketPrice(+arg) : kind === "protein" ? proteinPrice(S.protein) : kind === "cord" ? CORD_PRICE : ITEM_PRICE;
+  if (S.money < price * q) return;
+  S.money -= price * q;
+  if (kind === "ball") S.balls[arg] += q;
+  else if (kind === "ticket") S.tickets[arg] = (S.tickets[arg] || 0) + 1;
+  else if (kind === "protein") S.protein++;
+  else if (kind === "cord") S.cords++;
+  else S.items[arg] = (S.items[arg] || 0) + 1;
+  save(); renderShop(); renderTop(); renderMinis();
+}
+
+// ── Events
+$("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; tab = b.dataset.tab; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b)); ["battle", "party", "dex", "shop", "settings"].forEach(t => $("#t-" + t).hidden = t !== tab); if (tab === "dex") dexR = S.loc.r; renderAll(); };
+$("#regions").onclick = e => { const b = e.target.closest("[data-r]"); if (b) { viewR = +b.dataset.r; renderLocs(); } };
+$("#locs").onclick = e => { const b = e.target.closest("[data-loc]"); if (b) startLoc(JSON.parse(b.dataset.loc)); };
+$("#foe").addEventListener("pointerdown", e => {
+  if (!B || !B.foe || B.pause) return;
+  const d = clickDamage(); hit(d);
+  const p = document.createElement("span"); p.className = "pop"; p.textContent = "-" + fmt(d);
+  const r = $("#foe").getBoundingClientRect(); p.style.left = (e.clientX - r.left - 10) + "px"; p.style.top = (e.clientY - r.top - 20) + "px";
+  $("#foe").appendChild(p); setTimeout(() => p.remove(), 600);
+});
+$("#foe").addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); hit(clickDamage()); } });
+function partyClick(e) {
+  const t = e.target.closest("[data-n]"), ev = e.target.closest("[data-evo]"), tg = e.target.closest("[data-toggle]"), cl = e.target.closest("[data-close]");
+  if (ev) { const e2 = mon(detail).evos.find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
+  if (cl) { detail = null; renderDetail(); return; }
+  if (tg) { toggleParty(+tg.dataset.toggle); return; }
+  if (t) { detail = +t.dataset.n; renderParty(); }
+}
+function toggleParty(n) {
+  if (B && B.kind !== "route") { toast("You can't change your party during a gym, dungeon or Champion battle."); return; }
+  const i = S.party.indexOf(n);
+  if (i >= 0) { if (S.party.length === 1) { toast("Keep at least one Pokémon in your party."); return; } S.party.splice(i, 1); }
+  else if (S.party.length < 6) S.party.push(n); else { toast("Your party is full. Send one to the Box first."); return; }
+  save(); renderParty(); renderMinis();
+}
+$("#t-party").onclick = partyClick;
+$("#sort").onchange = renderParty;
+$("#dexregions").onclick = e => { const b = e.target.closest("[data-dr]"); if (b) { dexR = +b.dataset.dr; renderDex(); } };
+$("#shop").onclick = e => { const b = e.target.closest("[data-buy]"); if (b) buy(b.dataset.buy, +b.dataset.q); };
+for (const id of ["fresh", "dupe", "shiny"]) {
+  const sel = $("#s-" + id);
+  sel.innerHTML = `<option value="none">Don't throw</option><option value="best">Best I have</option>` + BALLS.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
+  sel.onchange = () => { S.set[id] = sel.value; save(); };
+}
+$("#export").onclick = () => { save(); $("#savecode").value = btoa(unescape(encodeURIComponent(JSON.stringify(S)))); $("#savecode").select(); $("#setmsg").textContent = "Copy this code and keep it somewhere safe."; };
+$("#import").onclick = () => {
+  try { const s = JSON.parse(decodeURIComponent(escape(atob($("#savecode").value.trim())))); if (!s || s.v !== 1 || !s.box) throw 0; S = s; save(); boot(); $("#setmsg").textContent = "Save loaded."; }
+  catch { $("#setmsg").innerHTML = '<span class="bad">That code didn\'t load. Paste the whole code from "Show my save code".</span>'; }
+};
+let resetArmed = false;
+$("#reset").onclick = () => {
+  if (!resetArmed) { resetArmed = true; $("#reset").textContent = "Tap again to erase everything"; $("#setmsg").innerHTML = '<span class="bad">This deletes your Box, badges and money on this device.</span>'; setTimeout(() => { resetArmed = false; $("#reset").textContent = "Start over"; }, 4000); return; }
+  try { localStorage.removeItem(KEY); } catch {} S = null; B = null; boot();
+};
+document.addEventListener("visibilitychange", () => { if (document.hidden && S) save(); });
+window.addEventListener("pagehide", () => { if (S) save(); });
+
+// ── Offline: up to 8 hours on your last route, money and XP but no catches.
+function offline() {
+  const secs = Math.min(8 * 3600, (Date.now() - (S.last || Date.now())) / 1000);
+  if (secs < 60 || !S.party.length) return;
+  const r = S.loc.r, k = S.loc.kind === "route" ? S.loc.k : 0, i = r * 4 + k, L = routeLevel(i), pool = routePool(r, k);
+  const avgHp = pool.reduce((s, m) => s + hpFor(m, L, i), 0) / pool.length, dps = partyDps(null);
+  // Offline is slower than playing: about a third of the live rate, and no tapping.
+  const n = Math.floor(secs * dps / avgHp * .3);
+  if (!n) return;
+  const money = n * rewardFor(L, i);
+  S.money += money; gainXp(n * L * 6);
+  toast(`While you were away (${Math.round(secs / 60)} min): beat ${n} Pokémon, earned $${fmt(money)}.`);
+}
+
+function boot() {
+  if (!S) {
+    $("#game").hidden = true; $("#pick").hidden = false;
+    $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><img src="${sprite(n)}" alt=""><b>${mon(n).name}</b>${mon(n).types.map(tyChip).join(" ")}</button>`).join("");
+    return;
+  }
+  $("#pick").hidden = true; $("#game").hidden = false;
+  for (const id of ["fresh", "dupe", "shiny"]) $("#s-" + id).value = S.set[id];
+  offline();
+  viewR = S.loc.r;
+  B = null;
+  if (S.loc.kind === "route" && unlocked(S.loc)) startLoc(S.loc); else { B = { r: S.loc.r }; backToRoute(); }
+  renderAll(); save();
+}
+$("#starters").onclick = e => { const b = e.target.closest("[data-start]"); if (!b) return; S = fresh(); S.box[+b.dataset.start] = { xp: 125, shiny: false }; S.party = [+b.dataset.start]; boot(); toast(`${mon(+b.dataset.start).name} is your partner. Tap the wild Pokémon to help it fight.`); };
+setInterval(tick, 100);
+setInterval(() => { if (S) save(); }, 5000);
+boot();
+
+// The hub reads this: integer metrics, never null.
+window.__boredSnapshot = () => ({ slug: 'poke-idle', caught: S ? Object.keys(S.box).length : 0, badges: S ? Object.keys(S.badges).length : 0, finished: !!S });
+</script>
+</body>
+</html>
