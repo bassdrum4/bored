@@ -1,0 +1,108 @@
+{
+  "title": "World War II · 1939–1945",
+  "prompts": [
+    {
+      "text": "Name a country that fought in the Second World War.",
+      "answers": [
+        { "answer": "United States", "tier": "plankton", "aliases": ["usa", "us", "america", "united states of america"] },
+        { "answer": "Germany", "tier": "plankton", "aliases": ["nazi germany", "third reich"] },
+        { "answer": "Japan", "tier": "plankton", "aliases": ["imperial japan"] },
+        { "answer": "Soviet Union", "tier": "schooler", "aliases": ["ussr", "russia"] },
+        { "answer": "Italy", "tier": "schooler" },
+        { "answer": "China", "tier": "schooler" },
+        { "answer": "Brazil", "tier": "rare" },
+        { "answer": "Mexico", "tier": "deepcut" },
+        { "answer": "Mongolia", "tier": "krillion", "aliases": ["mongolian people's republic"] }
+      ]
+    },
+    {
+      "text": "Name a leader who held power during the Second World War.",
+      "answers": [
+        { "answer": "Adolf Hitler", "tier": "plankton", "aliases": ["hitler"] },
+        { "answer": "Winston Churchill", "tier": "plankton", "aliases": ["churchill"] },
+        { "answer": "Joseph Stalin", "tier": "plankton", "aliases": ["stalin"] },
+        { "answer": "Franklin Roosevelt", "tier": "plankton", "aliases": ["fdr", "franklin delano roosevelt", "roosevelt"] },
+        { "answer": "Emperor Hirohito", "tier": "schooler", "aliases": ["hirohito"] },
+        { "answer": "Benito Mussolini", "tier": "schooler", "aliases": ["mussolini"] },
+        { "answer": "Charles de Gaulle", "tier": "rare", "aliases": ["de gaulle"] },
+        { "answer": "Chiang Kai-shek", "tier": "deepcut", "aliases": ["chiang kai shek"] },
+        { "answer": "Josip Broz Tito", "tier": "deepcut", "aliases": ["tito"] },
+        { "answer": "Vidkun Quisling", "tier": "krillion", "aliases": ["quisling"] }
+      ]
+    },
+    {
+      "text": "Name a battle or campaign of the Second World War.",
+      "answers": [
+        { "answer": "D-Day", "tier": "plankton", "aliases": ["day", "normandy", "invasion of normandy"] },
+        { "answer": "Stalingrad", "tier": "plankton", "aliases": ["battle of stalingrad"] },
+        { "answer": "Pearl Harbor", "tier": "plankton", "aliases": ["pearl harbour"] },
+        { "answer": "Midway", "tier": "schooler", "aliases": ["battle of midway"] },
+        { "answer": "Iwo Jima", "tier": "schooler" },
+        { "answer": "Battle of the Bulge", "tier": "schooler", "aliases": ["bulge"] },
+        { "answer": "El Alamein", "tier": "rare", "aliases": ["alamein"] },
+        { "answer": "Kursk", "tier": "rare", "aliases": ["battle of kursk"] },
+        { "answer": "Monte Cassino", "tier": "deepcut" },
+        { "answer": "Battle of Castle Itter", "tier": "krillion", "aliases": ["castle itter", "itter"] }
+      ]
+    },
+    {
+      "text": "Name a weapon, ship or vehicle used in the Second World War.",
+      "answers": [
+        { "answer": "Spitfire", "tier": "plankton", "aliases": ["supermarine spitfire"] },
+        { "answer": "Sherman tank", "tier": "plankton", "aliases": ["sherman", "m4 sherman"] },
+        { "answer": "Tiger tank", "tier": "schooler", "aliases": ["tiger"] },
+        { "answer": "T-34", "tier": "schooler", "aliases": ["t34", "t 34"] },
+        { "answer": "B-17 Flying Fortress", "tier": "schooler", "aliases": ["b17", "flying fortress", "b-17"] },
+        { "answer": "Bismarck", "tier": "rare" },
+        { "answer": "Yamato", "tier": "rare" },
+        { "answer": "Enola Gay", "tier": "rare", "aliases": ["enola gay bomber"] },
+        { "answer": "Katyusha", "tier": "deepcut", "aliases": ["katyusha rocket", "stalin's organ"] },
+        { "answer": "Panjandrum", "tier": "krillion", "aliases": ["great panjandrum"] }
+      ]
+    },
+    {
+      "text": "Name a code name from the Second World War.",
+      "answers": [
+        { "answer": "Overlord", "tier": "plankton", "aliases": ["operation overlord"] },
+        { "answer": "Barbarossa", "tier": "schooler", "aliases": ["operation barbarossa"] },
+        { "answer": "Enigma", "tier": "schooler" },
+        { "answer": "Torch", "tier": "rare", "aliases": ["operation torch"] },
+        { "answer": "Sea Lion", "tier": "rare", "aliases": ["operation sea lion", "sealion", "seelowe"] },
+        { "answer": "Manhattan", "tier": "rare", "aliases": ["manhattan project"] },
+        { "answer": "Market Garden", "tier": "rare", "aliases": ["operation market garden"] },
+        { "answer": "Husky", "tier": "deepcut", "aliases": ["operation husky"] },
+        { "answer": "Paperclip", "tier": "deepcut", "aliases": ["operation paperclip"] },
+        { "answer": "Mincemeat", "tier": "krillion", "aliases": ["operation mincemeat"] }
+      ]
+    },
+    {
+      "text": "Name something that was rationed during the Second World War.",
+      "answers": [
+        { "answer": "Gasoline", "tier": "plankton", "aliases": ["petrol", "gas", "fuel"] },
+        { "answer": "Sugar", "tier": "plankton" },
+        { "answer": "Meat", "tier": "schooler" },
+        { "answer": "Rubber", "tier": "schooler" },
+        { "answer": "Coffee", "tier": "schooler" },
+        { "answer": "Cheese", "tier": "rare" },
+        { "answer": "Tires", "tier": "rare", "aliases": ["tyres", "tyre", "tire"] },
+        { "answer": "Silk", "tier": "rare" },
+        { "answer": "Chocolate", "tier": "deepcut" },
+        { "answer": "Safety pins", "tier": "krillion", "aliases": ["safety pin"] }
+      ]
+    },
+    {
+      "text": "Name a country that stayed neutral through the Second World War.",
+      "answers": [
+        { "answer": "Switzerland", "tier": "plankton" },
+        { "answer": "Spain", "tier": "schooler" },
+        { "answer": "Sweden", "tier": "schooler" },
+        { "answer": "Ireland", "tier": "rare", "aliases": ["eire"] },
+        { "answer": "Portugal", "tier": "rare" },
+        { "answer": "Turkey", "tier": "rare", "aliases": ["turkiye"] },
+        { "answer": "Argentina", "tier": "deepcut" },
+        { "answer": "Afghanistan", "tier": "deepcut" },
+        { "answer": "Liechtenstein", "tier": "krillion" }
+      ]
+    }
+  ]
+}
