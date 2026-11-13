@@ -1,0 +1,34 @@
+name: Auto-merge Vettel game updates
+
+# Reuse the existing CI suite instead of running redundant tests. This event's
+# workflow code comes from main, NOT from the pull request being evaluated.
+on:
+  workflow_run:
+    workflows: ["Check Bored"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: vetted-game-merge-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  vetted-game-merge:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted default-branch automation only
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Merge eligible Vettel game-only PRs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BORED_AUTOMERGE_TOKEN: ${{ secrets.BORED_AUTOMERGE_TOKEN }}
+        run: node .github/scripts/auto-merge-vettel.mjs
