@@ -188,6 +188,39 @@
   .t-how li { padding-left: 14px; text-indent: -14px } .t-how li::before { content: "- "; color: var(--dim) }
   button.lbl.danger { color: var(--red); border-color: var(--red) }
 
+  /* Wiki: laid out like Civ Lite's How to play. Contents and search on the left, the text scrolls on its own. */
+  #t-wiki { padding: 0; gap: 0 }
+  .wiki { display: flex; height: min(74vh, 700px); min-height: 380px; position: relative }
+  .wiki-toc { width: 210px; flex: none; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--rule); background: var(--surface) }
+  .wiki-search { margin: 10px 10px 4px; min-width: 0 }
+  .wiki-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 14px }
+  .wiki-label { font-size: 11px; color: var(--dim); margin: 12px 0 3px }
+  .wiki-link { display: block; width: 100%; text-align: left; font: inherit; font-size: 12px; color: var(--dim); background: none; border: 0; border-left: 2px solid transparent; padding: 3px 8px; cursor: pointer }
+  .wiki-link:hover { color: var(--ink) }
+  .wiki-link.on { color: var(--ink); font-weight: 700; border-left-color: var(--red) }
+  .wiki-none { font-size: 12px; color: var(--dim); margin: 12px 2px }
+  .wiki-text { flex: 1; min-width: 0; overflow-y: auto; position: relative; padding: 12px 18px 24px; font-size: 13px; line-height: 1.55 }
+  .wiki-text h2 { font-size: 14px; margin: 22px 0 8px; padding-bottom: 3px; border-bottom: 1px solid var(--rule) }
+  .wiki-text h2:first-child { margin-top: 0 }
+  .wiki-text h3 { font-size: 13px; margin: 0 0 4px; scroll-margin-top: 8px }
+  .wiki-text h3:focus { outline: none }
+  .wiki-sec { margin-bottom: 16px; max-width: 72ch }
+  .wiki-sec:last-child { min-height: 100% }
+  .wiki-sec p + p, .wiki-sec p + ul, .wiki-sec ul + p { margin-top: 6px }
+  .wiki-sec ul { padding-left: 18px }
+  .wiki-sec code { font: inherit; background: var(--sunk); padding: 0 3px; border-radius: 2px }
+  .pk { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap }
+  .pk .pic.pk-pic { width: 192px; max-width: 40%; aspect-ratio: 1; border: 1px solid var(--rule); border-radius: 3px; background: var(--g-route); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px }
+  .pk-body { flex: 1; min-width: 220px }
+  .pk-stats { display: grid; grid-template-columns: repeat(7, auto); gap: 0 12px; justify-content: start; font-variant-numeric: tabular-nums; margin: 4px 0 }
+  .pk-stats span { color: var(--dim); font-size: 11px }
+  .wiki-bar { display: none; padding: 8px 10px; border-bottom: 1px solid var(--rule) }
+  @media (max-width: 680px) {
+    .wiki-bar { display: block }
+    .wiki-toc { display: none; position: absolute; inset: 0; width: auto; z-index: 2; border-right: 0 }
+    .wiki-toc.open { display: flex }
+  }
+
   @media (prefers-color-scheme: dark) {
     .dex img.no { filter: brightness(0) invert(1); opacity: .14 }
   }
@@ -229,6 +262,7 @@
       <button data-tab="dex" type="button">Pokédex</button>
       <button data-tab="shop" type="button">Shop</button>
       <button data-tab="settings" type="button">Settings</button>
+      <button data-tab="wiki" type="button">Wiki</button>
     </div>
 
     <section id="t-battle" class="cols">
@@ -272,6 +306,17 @@
       <div class="shop" id="shop"></div>
     </section>
 
+    <section id="t-wiki" class="box" hidden>
+      <div class="wiki-bar"><button class="lbl" id="wiki-contents" type="button" aria-expanded="false" aria-controls="wiki-toc">Contents</button></div>
+      <div class="wiki">
+        <nav class="wiki-toc" id="wiki-toc" aria-label="Wiki contents">
+          <input class="wiki-search" id="wiki-search" type="search" placeholder="Search the wiki" aria-label="Search the wiki" autocomplete="off">
+          <div class="wiki-list" id="wiki-list"></div>
+        </nav>
+        <div class="wiki-text" id="wiki-text"></div>
+      </div>
+    </section>
+
     <section id="t-settings" class="box" hidden>
       <h2>Auto-throw</h2>
       <div class="set">
@@ -310,7 +355,7 @@ function fitSprite(img) {
   if (!img.naturalWidth || !host || !host.clientWidth) return;
   let room = host.matches(".pic") ? host.clientWidth : host.clientHeight - (host.matches(".stage") ? 14 : 40);
   if (img.closest(".trio")) room = Math.min(room, host.clientWidth / 3.2);
-  room = Math.min(room, host.clientWidth * .9);
+  room = Math.min(room, host.clientWidth * (host.matches(".pic") ? 1 : .9));
   const dpr = window.devicePixelRatio || 1, px = room * dpr / (+img.dataset.ref || SPRITE_MAX), k = (px >= 1 ? Math.floor(px) : px) / dpr;
   img.style.width = img.naturalWidth * k + "px"; img.style.height = img.naturalHeight * k + "px";
   img.style.imageRendering = k * dpr >= 1 ? "pixelated" : "auto";
@@ -325,6 +370,13 @@ const tyChip = t => `<span class="ty" style="background:${TC[t]}">${t.toUpperCas
 const EXT = "49,65,45;63,80,60;83,100,80;43,50,65;58,65,80;78,85,100;65,64,43;80,80,58;100,105,78;35,20,45;55,25,30;50,80,70;30,20,50;50,25,35;40,80,75;40,35,56;55,50,71;75,70,101;35,35,72;60,70,97;30,31,70;65,61,100;44,54,55;69,79,80;40,50,90;55,80,110;85,30,40;110,55,65;52,40,41;67,55,56;87,85,76;40,40,50;57,55,65;77,75,85;48,65,35;73,90,60;40,65,65;75,100,100;20,25,20;45,50,45;35,40,55;70,75,90;55,65,30;70,75,40;85,90,50;55,55,25;80,80,30;50,55,45;60,75,90;25,45,95;50,70,120;35,40,90;60,65,115;48,50,55;78,80,85;35,45,70;60,70,95;45,50,60;80,80,95;40,40,90;65,50,90;95,90,70;15,55,90;30,70,105;45,95,120;50,35,35;70,60,45;80,85,55;35,30,40;50,45,55;65,70,70;35,100,70;65,120,100;100,30,20;115,45,35;130,65,45;55,65,90;70,80,105;65,40,15;110,80,30;70,55,45;95,70,70;55,62,60;45,35,75;70,60,110;55,70,45;80,95,70;50,50,25;75,100,50;100,25,40;180,45,70;30,35,80;45,55,95;60,75,110;160,45,70;45,90,42;70,115,67;90,25,50;115,50,75;50,55,100;70,80,150;80,45,40;85,75,55;95,50,35;110,80,45;53,110,87;79,110,76;75,75,30;95,45,35;120,70,60;95,30,25;120,45,40;5,105,50;115,40,60;80,80,90;70,25,60;95,45,85;60,50,63;65,80,68;55,55,85;85,85,115;65,120,90;80,80,105;35,95,95;57,85,105;57,85,93;100,70,85;95,70,110;55,20,80;79,100,81;80,95,60;48,48,48;50,65,55;60,95,65;60,95,130;60,110,65;70,75,40;100,55,35;125,70,55;90,45,55;105,70,80;65,75,130;65,110,30;100,125,85;85,90,100;90,85,90;45,50,50;65,70,70;95,100,80;90,90,130;100,100,100;65,65,45;80,80,60;100,100,80;43,50,65;58,65,80;78,85,100;64,48,43;80,63,58;100,83,78;34,45,20;64,55,90;30,56,50;50,96,70;30,80,55;50,110,85;40,40,30;70,70,40;80,80,130;38,56,67;58,76,67;15,35,60;28,55,15;15,20,15;65,65,20;85,105,40;45,45,70;70,70,95;40,45,35;55,60,45;85,90,55;95,100,50;50,50,40;80,80,50;115,65,30;75,100,70;40,55,50;50,65,80;70,95,110;55,55,85;30,30,30;55,85,30;45,45,95;45,25,15;85,65,35;60,95,110;110,130,65;42,42,91;80,110,30;60,85,85;48,48,48;58,58,33;65,65,85;90,35,15;140,60,40;70,65,45;105,65,85;200,65,30;50,40,30;75,60,45;85,55,85;100,80,65;230,230,5;75,95,85;55,75,115;50,50,40;75,75,55;40,40,20;120,80,30;40,30,50;80,60,50;95,95,35;35,35,65;75,75,45;45,45,75;70,140,70;140,70,70;30,50,65;50,80,95;95,95,85;60,40,40;120,60,50;90,95,60;62,65,85;35,45,75;35,35,35;95,110,70;15,65,65;37,55,95;37,55,83;105,70,100;10,135,55;75,100,115;85,75,100;115,115,85;50,50,41;70,70,51;110,100,61;130,154,110;90,154,90;100,100,100;35,55,70;45,65,95;65,85,120;40,50,45;60,60,55;70,70,80;50,50,40;70,70,50;90,90,60;35,30,35;70,60,70;41,41,60;61,61,100;35,30,20;55,25,15;50,50,65;55,25,15;70,90,65;30,50,30;50,70,50;70,100,70;50,30,30;40,40,60;60,60,80;30,30,85;60,50,125;30,30,85;100,70,65;25,35,40;35,55,50;65,115,80;32,52,65;62,82,80;60,60,35;80,60,70;60,35,30;80,55,90;100,65,100;90,30,40;45,50,160;45,30,40;23,23,28;43,43,48;63,73,68;30,30,25;60,60,50;40,40,20;135,90,30;45,35,50;65,55,90;75,65,50;85,55,50;100,40,30;140,50,40;180,60,50;55,55,60;75,75,80;40,40,65;60,60,105;40,75,95;50,85,95;75,85,85;75,85,85;45,80,65;53,53,40;83,83,55;20,20,65;40,40,95;35,35,60;45,45,60;40,45,35;70,75,40;140,70,20;35,80,60;65,110,80;60,60,60;45,45,10;50,50,70;80,80,100;40,40,35;60,60,55;60,75,50;90,105,80;60,60,90;60,60,65;65,85,70;85,65,70;43,41,60;73,71,60;65,35,35;85,55,55;55,70,55;105,120,75;77,87,23;97,107,43;50,50,75;100,80,45;20,55,80;79,125,81;70,70,70;70,120,40;35,33,45;65,63,65;90,90,25;130,130,25;83,87,51;80,90,65;60,60,75;48,48,23;50,50,50;80,80,80;50,50,25;70,70,45;90,90,65;85,55,32;105,75,52;105,75,52;130,65,55;55,65,97;60,30,50;100,50,50;80,80,100;80,60,30;100,80,50;130,90,70;200,100,50;100,200,50;150,150,50;90,130,110;80,110,110;90,140,90;140,90,90;90,90,95;100,100,100;50,50,150;64,55,31;85,65,36;105,85,56;44,44,61;52,52,81;71,71,108;53,56,40;68,76,50;88,101,60;30,30,60;50,40,80;70,60,100;40,40,31;60,60,71;41,41,25;51,51,65;34,34,45;49,49,60;79,79,70;35,70,55;65,105,90;40,30,58;60,50,58;118,88,30;168,138,30;45,45,36;85,105,36;50,50,66;42,42,70;102,102,40;70,90,95;35,30,85;55,50,115;45,53,35;70,78,85;48,62,34;68,82,39;66,66,115;34,44,70;44,54,80;44,56,85;84,96,105;60,105,105;52,52,71;42,37,85;64,59,112;50,50,45;47,41,74;67,61,84;86,86,23;116,116,33;95,45,10;45,90,60;5,65,30;45,42,91;108,108,35;45,45,42;65,55,82;95,85,102;40,85,5;40,40,60;70,70,90;78,42,32;118,72,47;90,55,65;110,75,95;40,40,50;65,65,85;72,72,46;56,61,66;76,86,91;50,120,50;50,60,40;75,85,60;65,85,125;115,90,60;95,95,50;130,55,40;125,50,50;67,85,95;67,95,83;95,115,80;86,56,95;130,65,95;110,95,65;125,75,95;80,60,80;70,75,90;65,115,80;145,150,40;135,135,45;70,70,110;77,77,91;130,130,95;105,105,80;70,70,115;120,100,90;100,120,100;106,106,77;110,110,100;120,120,90;110,120,85;80,80,80;100,100,100;90,90,125;100,100,100;120,120,120;100,100,100;55,55,63;75,75,83;95,95,113;45,45,45;55,55,55;65,65,65;45,45,45;60,60,60;85,70,70;39,39,42;69,69,77;45,45,55;65,65,60;90,90,80;37,37,66;50,50,106;48,48,64;63,63,101;48,48,64;63,63,101;48,48,64;63,63,101;45,55,24;85,95,29;50,30,43;62,42,65;80,55,93;32,32,76;63,63,116;85,25,15;105,40,20;130,80,25;43,43,72;55,55,114;40,45,68;60,65,88;86,86,50;55,35,35;85,50,40;95,65,45;40,40,64;55,55,69;75,75,74;85,85,45;75,75,85;70,60,42;90,80,42;80,80,92;59,39,57;99,79,47;89,69,112;60,50,66;85,75,116;50,50,30;75,75,90;65,55,98;35,35,65;45,45,74;80,70,92;45,45,50;55,55,95;67,67,60;85,35,55;125,75,45;70,70,48;115,115,58;80,80,97;85,65,30;145,105,30;103,45,22;133,65,32;45,45,70;65,65,110;62,62,65;82,82,75;40,40,65;60,60,105;40,40,75;60,60,115;50,65,45;70,85,55;95,110,65;40,50,20;50,60,30;75,85,30;50,50,55;63,63,98;50,60,44;65,75,59;85,95,79;50,50,75;70,70,95;60,60,103;45,45,60;105,105,20;45,55,15;70,80,30;50,85,40;70,105,60;80,45,65;50,50,65;60,60,108;91,86,10;131,116,20;70,60,30;95,85,50;115,85,90;40,40,60;70,70,40;80,80,50;55,55,30;75,95,40;55,55,20;60,60,55;90,90,80;60,40,57;70,50,67;90,70,97;40,40,40;80,80,50;50,135,105;85,65,25;40,60,145;84,99,32;50,50,65;60,60,105;90,90,48;50,50,35;80,80,55;70,40,60;100,70,70;95,95,55;50,50,60;75,75,80;75,65,60;105,95,80;66,66,65;112,48,109;50,50,38;70,70,58;90,90,98;55,55,60;65,105,100;129,72,108;90,90,108;72,129,108;70,80,111;70,80,111;100,120,90;120,100,90;90,80,101;90,90,95;90,90,108;77,128,90;95,95,99;65,45,38;95,58,57;122,75,64;40,60,60;58,70,73;72,100,104;40,44,71;52,56,97;67,71,122;38,36,57;77,77,78;43,38,62;55,52,84;71,69,126;40,25,35;60,30,29;50,50,89;58,54,72;72,66,106;39,79,42;47,98,52;68,154,75;48,57,52;62,81,68;62,48,43;78,71,58;60,90,102;54,60,68;76,81,104;100,37,28;150,49,35;140,140,60;60,65,23;72,89,29;66,57,49;86,75,72;53,46,45;88,75,73;67,56,50;115,86,68;60,60,30;90,123,44;62,63,44;88,89,59;33,43,70;52,94,109;77,45,48;119,59,71;50,63,46;72,92,58;65,130,60;75,63,118;57,67,101;150,150,50;35,75,40;53,113,60;70,150,80;91,87,75;48,60,38;76,82,56;70,55,51;122,75,84;85,35,28;184,46,28;35,40,55;80,80,123;95,98,99;95,98,99;121,95,95;150,150,50;60,130,70;120,90,70;55,50,42;75,70,52;75,100,70;40,40,70;50,50,90;90,90,60;54,56,40;69,81,50;74,116,60;30,30,65;50,50,75;75,75,60;30,30,45;60,60,45;45,45,46;95,75,36;90,75,43;57,47,63;77,67,43;70,70,93;40,40,84;60,70,124;40,40,60;65,65,112;20,25,40;62,52,45;152,142,35;70,55,45;100,85,35;52,72,27;92,132,42;35,35,35;90,90,45;55,75,15;80,100,30;40,40,77;60,60,117;50,50,50;80,60,60;38,38,32;48,48,62;98,98,72;90,110,100;80,110,60;90,60,80;40,30,80;140,90,40;80,45,15;110,75,35;130,130,5;95,95,59;95,95,95;60,60,120;65,95,65;135,85,36;63,73,96;80,105,96;70,70,92;85,91,36;100,90,40;65,45,45;90,70,65;125,105,85;85,75,130;75,115,95;115,95,75;115,130,85;31,31,37;131,131,37;107,89,97;89,107,97;47,131,103;139,53,79;37,37,151;71,71,83;103,101,61;131,31,109;53,53,43;101,89,79;115,115,65;80,90,125;67,67,73;73,73,121;211,101,13;53,79,107;75,80,143;65,35,34;143,65,34;50,40,65;70,60,80;90,70,85;40,40,69;60,60,94;75,75,119;40,40,70;55,55,90;65,65,120;55,35,25;95,75,20;35,35,57;55,55,77;105,85,67;20,45,45;80,90,30;110,120,90;28,52,50;58,92,90;60,60,10;90,120,60;55,45,48;100,90,88;50,38,44;90,68,74;50,50,26;60,60,121;50,50,30;90,70,50;120,90,30;80,40,20;80,60,70;80,80,30;75,50,46;125,70,71;55,95,85;40,30,66;60,50,136;35,35,40;70,70,75;45,50,45;65,90,65;60,50,32;90,80,42;45,54,50;65,114,70;45,53,39;65,73,49;95,103,29;30,40,50;45,55,70;65,75,60;101,81,95;100,60,50;50,130,30;95,82,65;75,100,70;145,105,30;40,61,34;75,121,64;100,60,75;95,85,15;35,30,20;60,90,65;135,20,70;110,90,50;55,95,95;58,58,97;49,49,40;69,69,30;90,70,75;90,80,55;100,80,75;100,90,55;115,50,85;30,30,82;50,50,102;75,75,142;115,115,138;115,115,138;95,95,130;60,50,72;100,60,97;105,95,105;50,50,200;50,50,80;130,110,30;60,80,130;80,80,80;72,75,65;95,70,85;105,80,50;65,75,78;60,80,120;95,65,85;70,80,106;54,45,65;63,63,83;70,70,123;59,40,36;78,58,49;100,75,66;45,45,50;65,60,65;80,75,85;40,45,35;75,80,65;45,40,20;92,86,35;40,25,45;78,55,92;20,25,60;40,40,85;70,60,105;45,45,75;70,75,111;70,55,65;115,80,95;45,51,30;60,78,33;90,109,39;51,51,92;75,35,25;100,65,35;130,90,35;40,40,35;100,80,75;80,100,85;41,35,45;91,83,45;35,40,70;60,60,125;60,51,51;90,70,85;35,35,75;65,72,110;30,35,60;70,70,90;35,100,70;65,120,100;115,55,75;40,40,50;65,65,75;60,58,30;85,100,45;30,30,75;60,60,105;45,64,58;55,82,78;77,105,94;25,25,95;50,70,120;85,85,82;40,40,75;72,62,100;63,45,47;90,67,90;65,65,121;145,55,65;42,60,60;90,81,86;60,55,34;100,97,68;74,64,90;45,40,43;65,55,73;73,65,70;115,65,35;60,95,82;80,90,90;60,100,20;70,70,60;80,75,55;120,85,50;131,53,87;99,115,111;99,99,55;55,135,135;79,105,81;97,85,101;120,70,106;114,60,136;108,68,50;86,80,108;60,110,110;110,84,72;45,45,55;66,65,62;92,86,87;70,70,10;95,91,84;100,135,70;80,65,135;125,80,45;80,120,100;71,101,119;90,60,116;115,100,135;100,115,135;91,83,109;88,108,104;110,80,40;45,54,50;106,80,70;115,86,80;66,90,106;82,125,99;84,96,110;130,65,85;110,80,44;121,93,91;91,89,75;80,108,124;100,108,98;85,85,60;160,88,88".split(";").map(r => r.split(",").map(Number));
 const MON = D.mons.map(([name, types, atk, spa, hp, cr, flags, evos, bst], i) => ({ num: i + 1, name, types: types.split("/"), atk, spa, hp, def: EXT[i][0], spd: EXT[i][1], spe: EXT[i][2], cr, bst, evos, flags: new Set(flags ? flags.split(" ") : []), gen: genOf(i + 1) }));
 const mon = n => MON[n - 1];
+// Mega and Gigantamax forms: [sprite id, base dex number, name, types, m(ega) or g(max), HP, Atk, Def, SpA, SpD, Spe].
+// Names, types and sprites come with Pokédoku, stats from @pkmn/dex. Gigantamax forms keep their base stats.
+const FORMS = [[10033,3,"Mega Venusaur","Grass/Poison","m",80,100,123,122,120,80],[10195,3,"Gigantamax Venusaur","Grass/Poison","g",80,82,83,100,100,80],[10034,6,"Mega Charizard X","Fire/Dragon","m",78,130,111,130,85,100],[10035,6,"Mega Charizard Y","Fire/Flying","m",78,104,78,159,115,100],[10196,6,"Gigantamax Charizard","Fire/Flying","g",78,84,78,109,85,100],[10036,9,"Mega Blastoise","Water","m",79,103,120,135,115,78],[10197,9,"Gigantamax Blastoise","Water","g",79,83,100,85,105,78],[10198,12,"Gigantamax Butterfree","Bug/Flying","g",60,45,50,90,80,70],[10090,15,"Mega Beedrill","Bug/Poison","m",65,150,40,15,80,145],[10073,18,"Mega Pidgeot","Normal/Flying","m",83,80,80,135,80,121],[10199,25,"Gigantamax Pikachu","Electric","g",35,55,40,50,50,90],[10304,26,"Mega Raichu X","Electric","m",60,135,95,90,95,110],[10305,26,"Mega Raichu Y","Electric","m",60,100,55,160,80,130],[10278,36,"Mega Clefable","Fairy/Flying","m",95,80,93,135,110,70],[10200,52,"Gigantamax Meowth","Normal","g",40,45,35,40,40,90],[10037,65,"Mega Alakazam","Psychic","m",55,50,65,175,105,150],[10201,68,"Gigantamax Machamp","Fighting","g",90,130,80,65,85,55],[10279,71,"Mega Victreebel","Grass/Poison","m",80,125,85,135,95,70],[10071,80,"Mega Slowbro","Water/Psychic","m",95,75,180,130,80,30],[10038,94,"Mega Gengar","Ghost/Poison","m",60,65,80,170,95,130],[10202,94,"Gigantamax Gengar","Ghost/Poison","g",60,65,60,130,75,110],[10203,99,"Gigantamax Kingler","Water","g",55,130,115,50,50,75],[10039,115,"Mega Kangaskhan","Normal","m",105,125,100,60,100,100],[10280,121,"Mega Starmie","Water/Psychic","m",60,100,105,130,105,120],[10040,127,"Mega Pinsir","Bug/Flying","m",65,155,120,65,90,105],[10041,130,"Mega Gyarados","Water/Dark","m",95,155,109,70,130,81],[10204,131,"Gigantamax Lapras","Water/Ice","g",130,85,80,85,95,60],[10205,133,"Gigantamax Eevee","Normal","g",55,55,50,45,65,55],[10042,142,"Mega Aerodactyl","Rock/Flying","m",80,135,85,70,95,150],[10206,143,"Gigantamax Snorlax","Normal","g",160,110,65,65,110,30],[10281,149,"Mega Dragonite","Dragon/Flying","m",91,124,115,145,125,100],[10043,150,"Mega Mewtwo X","Psychic/Fighting","m",106,190,100,154,100,130],[10044,150,"Mega Mewtwo Y","Psychic","m",106,150,70,194,120,140],[10282,154,"Mega Meganium","Grass/Fairy","m",80,92,115,143,115,80],[10283,160,"Mega Feraligatr","Water/Dragon","m",85,160,125,89,93,78],[10045,181,"Mega Ampharos","Electric/Dragon","m",90,95,105,165,110,45],[10072,208,"Mega Steelix","Steel/Ground","m",75,125,230,55,95,30],[10046,212,"Mega Scizor","Bug/Steel","m",70,150,140,65,100,75],[10047,214,"Mega Heracross","Bug/Fighting","m",80,185,115,40,105,75],[10284,227,"Mega Skarmory","Steel/Flying","m",65,140,110,40,100,110],[10048,229,"Mega Houndoom","Dark/Fire","m",75,90,90,140,90,115],[10049,248,"Mega Tyranitar","Rock/Dark","m",100,164,150,95,120,71],[10065,254,"Mega Sceptile","Grass/Dragon","m",70,110,75,145,85,145],[10050,257,"Mega Blaziken","Fire/Fighting","m",80,160,80,130,80,100],[10064,260,"Mega Swampert","Water/Ground","m",100,150,110,95,110,70],[10051,282,"Mega Gardevoir","Psychic/Fairy","m",68,85,65,165,135,100],[10066,302,"Mega Sableye","Dark/Ghost","m",50,85,125,85,115,20],[10052,303,"Mega Mawile","Steel/Fairy","m",50,105,125,55,95,50],[10053,306,"Mega Aggron","Steel","m",70,140,230,60,80,50],[10054,308,"Mega Medicham","Fighting/Psychic","m",60,100,85,80,85,100],[10055,310,"Mega Manectric","Electric","m",70,75,80,135,80,135],[10070,319,"Mega Sharpedo","Water/Dark","m",70,140,70,110,65,105],[10087,323,"Mega Camerupt","Fire/Ground","m",70,120,100,145,105,20],[10067,334,"Mega Altaria","Dragon/Fairy","m",75,110,110,110,105,80],[10056,354,"Mega Banette","Ghost","m",64,165,75,93,83,75],[10306,358,"Mega Chimecho","Psychic/Steel","m",75,50,110,135,120,65],[10057,359,"Mega Absol","Dark","m",65,150,60,115,60,115],[10307,359,"Mega Absol Z","Dark/Ghost","m",65,154,60,75,60,151],[10074,362,"Mega Glalie","Ice","m",80,120,80,120,80,100],[10089,373,"Mega Salamence","Dragon/Flying","m",95,145,130,120,90,120],[10076,376,"Mega Metagross","Steel/Psychic","m",80,145,150,105,110,110],[10062,380,"Mega Latias","Dragon/Psychic","m",80,100,120,140,150,110],[10063,381,"Mega Latios","Dragon/Psychic","m",80,130,100,160,120,110],[10079,384,"Mega Rayquaza","Dragon/Flying","m",105,180,100,180,100,115],[10308,398,"Mega Staraptor","Fighting/Flying","m",85,140,100,60,90,110],[10088,428,"Mega Lopunny","Normal/Fighting","m",65,136,94,54,96,135],[10058,445,"Mega Garchomp","Dragon/Ground","m",108,170,115,120,95,92],[10309,445,"Mega Garchomp Z","Dragon","m",108,130,85,141,85,151],[10059,448,"Mega Lucario","Fighting/Steel","m",70,145,88,140,70,112],[10310,448,"Mega Lucario Z","Fighting/Steel","m",70,100,70,164,70,151],[10060,460,"Mega Abomasnow","Grass/Ice","m",90,132,105,132,105,30],[10068,475,"Mega Gallade","Psychic/Fighting","m",68,165,95,65,115,110],[10285,478,"Mega Froslass","Ice/Ghost","m",70,80,70,140,100,120],[10311,485,"Mega Heatran","Fire/Steel","m",91,120,106,175,141,67],[10312,491,"Mega Darkrai","Dark","m",70,120,130,165,130,85],[10286,500,"Mega Emboar","Fire/Fighting","m",110,148,75,110,110,75],[10287,530,"Mega Excadrill","Ground/Steel","m",110,165,100,65,65,103],[10069,531,"Mega Audino","Normal/Fairy","m",103,60,126,80,126,50],[10288,545,"Mega Scolipede","Bug/Poison","m",60,140,149,75,99,62],[10289,560,"Mega Scrafty","Dark/Fighting","m",65,130,135,55,135,68],[10207,569,"Gigantamax Garbodor","Poison","g",80,95,82,60,82,75],[10290,604,"Mega Eelektross","Electric","m",85,145,80,135,90,80],[10291,609,"Mega Chandelure","Ghost/Fire","m",60,75,110,175,110,90],[10313,623,"Mega Golurk","Ground/Ghost","m",89,159,105,70,105,55],[10292,652,"Mega Chesnaught","Grass/Fighting","m",88,137,172,74,115,44],[10293,655,"Mega Delphox","Fire/Psychic","m",75,69,72,159,125,134],[10294,658,"Mega Greninja","Water/Dark","m",72,125,77,133,81,142],[10295,668,"Mega Pyroar","Fire/Normal","m",86,88,92,129,86,126],[10296,670,"Mega Floette","Fairy","m",74,85,87,155,148,102],[10297,687,"Mega Malamar","Dark/Psychic","m",86,102,88,98,120,88],[10298,689,"Mega Barbaracle","Rock/Fighting","m",72,140,130,64,106,88],[10299,691,"Mega Dragalge","Poison/Dragon","m",65,85,105,132,163,44],[10300,701,"Mega Hawlucha","Fighting/Flying","m",78,137,100,74,93,118],[10301,718,"Mega Zygarde","Dragon/Ground","m",216,70,91,216,85,100],[10075,719,"Mega Diancie","Rock/Fairy","m",50,160,110,160,110,110],[10315,740,"Mega Crabominable","Fighting/Ice","m",97,157,122,62,107,33],[10316,768,"Mega Golisopod","Bug/Steel","m",75,150,175,70,120,40],[10302,780,"Mega Drampa","Normal/Dragon","m",78,85,110,160,116,36],[10317,801,"Mega Magearna","Steel/Fairy","m",80,125,115,170,115,95],[10319,807,"Mega Zeraora","Electric","m",88,157,75,147,80,153],[10208,809,"Gigantamax Melmetal","Steel","g",135,143,143,80,65,34],[10209,812,"Gigantamax Rillaboom","Grass","g",100,125,90,60,70,85],[10210,815,"Gigantamax Cinderace","Fire","g",80,116,75,65,75,119],[10211,818,"Gigantamax Inteleon","Water","g",70,85,65,125,65,120],[10212,823,"Gigantamax Corviknight","Flying/Steel","g",98,87,105,53,85,67],[10213,826,"Gigantamax Orbeetle","Bug/Psychic","g",60,45,110,80,120,90],[10214,834,"Gigantamax Drednaw","Water/Rock","g",90,115,90,48,68,74],[10215,839,"Gigantamax Coalossal","Rock/Fire","g",110,80,120,80,90,30],[10216,841,"Gigantamax Flapple","Grass/Dragon","g",70,110,80,95,60,70],[10217,842,"Gigantamax Appletun","Grass/Dragon","g",110,85,80,100,80,30],[10218,844,"Gigantamax Sandaconda","Ground","g",72,107,125,65,70,71],[10219,849,"Gigantamax Toxtricity (Amped)","Electric/Poison","g",75,98,70,114,70,75],[10228,849,"Gigantamax Toxtricity (Low Key)","Electric/Poison","g",75,98,70,114,70,75],[10220,851,"Gigantamax Centiskorch","Fire/Bug","g",100,115,65,90,90,65],[10221,858,"Gigantamax Hatterene","Psychic/Fairy","g",57,90,95,136,103,29],[10222,861,"Gigantamax Grimmsnarl","Dark/Fairy","g",95,120,65,95,75,60],[10223,869,"Gigantamax Alcremie","Fairy","g",65,60,75,110,121,64],[10303,870,"Mega Falinks","Fighting","m",65,135,135,70,65,100],[10224,879,"Gigantamax Copperajah","Steel","g",122,130,69,80,69,30],[10225,884,"Gigantamax Duraludon","Steel/Dragon","g",70,95,115,120,50,85],[10226,892,"Gigantamax Urshifu (Single Strike)","Fighting/Dark","g",100,130,100,63,60,97],[10227,892,"Gigantamax Urshifu (Rapid Strike)","Fighting/Water","g",100,130,100,63,60,97],[10320,952,"Mega Scovillain","Grass/Fire","m",65,138,85,138,85,75],[10321,970,"Mega Glimmora","Rock/Poison","m",83,90,105,150,96,101],[10325,998,"Mega Baxcalibur","Dragon/Ice","m",115,175,117,105,101,87],[10314,678,"Mega Meowstic","Psychic","m",74,48,76,143,101,124],[10322,978,"Mega Tatsugiri","Dragon/Water","m",68,65,90,135,125,92]].map(([id, num, name, types, kind, hp, atk, def, spa, spd, spe]) => ({ id, num, sprite: id, name, types: types.split("/"), kind: kind === "m" ? "mega" : "gmax", hp, atk, def, spa, spd, spe, bst: hp + atk + def + spa + spd + spe, cr: mon(num).cr, evos: [], flags: mon(num).flags, gen: mon(num).gen }));
+const formById = id => FORMS.find(f => f.id === id);
+const formsOf = (n, kind) => FORMS.filter(f => f.num === n && f.kind === kind);
+// Forms have no shiny sprites, so a shiny Mega shows its usual colours.
+const spriteOf = (m, shiny) => m.sprite ? sprite(m.sprite) : sprite(m.num, shiny);
 const TI = Object.fromEntries(D.types.map((t, i) => [t, i]));
 const MULT = { "0": 0, h: .5, "1": 1, "2": 2 };
 const eff = (atkType, defTypes) => defTypes.reduce((m, d) => m * MULT[D.chart[TI[atkType]][TI[d]]], 1);
@@ -359,6 +411,12 @@ const IDLE_SHORT = 1.25;
 // Wild Pokémon on routes get extra HP through the middle of the game, where a party at the cap used to one-shot them:
 // about 4-5 seconds a fight idle for an ordinary party, about half that tapping. Late routes are slow enough already.
 const wildHard = i => Math.max(1, Math.min(1.5 + 1.2 * i, 9.5 * Math.pow(.925, i)));
+// Megas and Gigantamax, after PokéRogue: key items come from Champions (Steven: Key Stone; Leon: Dynamax Band), then each
+// Mega form needs its own Mega Stone and each species its Gigantamax factor (Max Soup), from the Shop or as boss drops,
+// and only ever for Pokémon in your party. The party has one Mega and one Gigantamax at a time, always on.
+// A Mega fights with its Mega stats and types; a Gigantamax Pokémon hits 30% harder.
+const KEY_STONE_FROM = 2, BAND_FROM = 7, STONE_PRICE = 30000, SOUP_PRICE = 40000, GMAX_BOOST = 1.3;
+const DROP_CHANCE = { gym: .1, champ: .35, dungeon: .35, summit: 1 };
 // Payout multipliers for boss fights (their HP is tuned separately, below startLoc), and dungeon fodder HP.
 const GYM_HP = 1.6, CHAMP_HP = 1.8, DUNGEON_HP = 1.3, LEGEND_PAY = 4;
 // XP per kill is foe level x XP_RATE, to every party member.
@@ -391,7 +449,11 @@ function gymTeam(r, k) {
 function champTeam(r) {
   const c = MON.filter(m => m.gen <= REGIONS[r].gen && finalStage(m) && !legendary(m)).sort((a, b) => b.bst - a.bst).slice(0, 60), rand = rng(r * 104729 + 7), team = [], types = new Set();
   while (team.length < 6) { const m = c[Math.floor(rand() * c.length)]; if (!team.includes(m) && !types.has(m.types[0])) { team.push(m); types.add(m.types[0]); } if (types.size >= 17) types.clear(); }
-  return team.sort((a, b) => a.bst - b.bst);
+  team.sort((a, b) => a.bst - b.bst);
+  // The Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on, as PokéRogue's bosses do.
+  const ace = team[team.length - 1], form = formsOf(ace.num, "mega")[0] || (r >= BAND_FROM ? formsOf(ace.num, "gmax")[0] : null);
+  if (form) team[team.length - 1] = form;
+  return team;
 }
 const dungeonPool = r => regionMons(r).filter(m => !legendary(m) && (m.flags.has("pseudo") || m.flags.has("fossil") || m.flags.has("starter") || m.cr <= 60));
 const dungeonBosses = r => regionMons(r).filter(legendary);
@@ -399,7 +461,7 @@ const dungeonBosses = r => regionMons(r).filter(legendary);
 // a faster, harder-hitting team gives you up to 20% less time and a slow one up to 20% more (a dungeon's random
 // legendary: -10% to +15%). Each boss Pokémon's HP comes from its HP, Defense and Sp. Def together.
 const offense = m => Math.max(m.atk, m.spa) + m.spe;
-const bossHpFor = (m, L, i, mult = 1) => Math.round((2 * ((m.hp + m.def + m.spd) / 3) * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
+const bossHpFor = (m, L, i, mult = 1) => Math.round((2 * ((m.hp + m.def + m.spd) / 3) * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult * (m.kind === "gmax" ? 2 : 1));
 const teamCache = new Map(), cachedTeam = (key, make) => teamCache.get(key) || teamCache.set(key, make()).get(key);
 const regionOffense = r => cachedTeam("off" + r, () => { const all = [0, 1, 2, 3].flatMap(k => gymTeam(r, k)).concat(champTeam(r)); return all.reduce((s, m) => s + offense(m), 0) / all.length; });
 const RED_OFFENSE = 180;
@@ -425,7 +487,7 @@ const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 
 // ── Save
 const KEY = "bored.poke-idle.save";
-const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, last: Date.now() });
+const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, last: Date.now() });
 let S = (() => { try { const s = JSON.parse(localStorage.getItem(KEY)); return s && s.v === 1 ? s : null; } catch { return null; } })();
 const save = () => { S.last = Date.now(); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
 
@@ -450,8 +512,17 @@ function areaCap(loc = S.loc) {
 const battleLevel = n => Math.min(level(n), areaCap());
 const proteinCap = () => PROTEIN_PER_REGION * Math.min(REGIONS.length, 1 + Object.keys(S.champs).length);
 const proteinBoost = () => PROTEIN_STEP * Math.min(S.protein, proteinCap());
-const power = (n, L = level(n)) => { const m = mon(n); return Math.max(m.atk, m.spa) * L / 50 * (1 + proteinBoost()); };
-const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n)) * (foe ? bestEff(mon(n), foe) : 1), 0);
+// Party stats in battle. Attack (the higher of Attack and Sp. Atk) is damage per hit. Speed is how often a Pokémon
+// hits: Speed 75 is once a second, 150 is 1.5x as often, 0 is half. The party's HP, Defense and Sp. Def (averaged)
+// stretch or shrink the timer in gym, Champion, dungeon and Red fights, from -20% to +25%, against a bulk of 85.
+const hitRate = m => (m.spe + 75) / 150;
+const bulkOf = m => (m.hp + m.def + m.spd) / 3;
+const PARTY_BULK = 85;
+// What a party member fights as: its Mega form if it's the party's Mega.
+const fighter = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || mon(n);
+const partyTime = () => S.party.length ? Math.min(1.25, Math.max(.8, S.party.reduce((s, n) => s + bulkOf(fighter(n)), 0) / S.party.length / PARTY_BULK)) : 1;
+const power = (n, L = level(n)) => { const m = fighter(n); return Math.max(m.atk, m.spa) * L / 50 * hitRate(m) * (1 + proteinBoost()) * (S.gmax === n ? GMAX_BOOST : 1); };
+const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n)) * (foe ? bestEff(fighter(n), foe) : 1), 0);
 const clickDamage = () => Math.max(1, Math.round(1 + partyDps(null) * .15));
 
 // ── Battle state
@@ -492,13 +563,15 @@ function refPool(r, k, cap) {
   const have = m => !legendary(m) && minLv(m.num) <= cap && (m.gen <= r || (m.gen === r + 1 && (open.has(m.num) || (open.has(rootOf(m.num)) && byLevelOnly(m.num)))));
   return MON.filter(m => have(m) && !m.evos.some(([t]) => have(mon(t))));
 }
-const refHit = (m, cap) => Math.max(m.atk, m.spa) * cap / 50;
+const refHit = (m, cap) => Math.max(m.atk, m.spa) * cap / 50 * hitRate(m);
+// The reference team's own Def: tuning measures it against the time that team would get, so Def counts relative to it.
+const refDef = P => Math.min(1.25, Math.max(.8, P.reduce((s, m) => s + bulkOf(m), 0) / P.length / PARTY_BULK));
 const refTaps = (P, cap, taps) => taps * Math.max(1, Math.round(1 + .15 * P.reduce((s, m) => s + refHit(m, cap), 0)));
 function gymTuning(B, k, size) {
   const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap) * bestEff(m, f), 0);
   const P = refPool(B.r, k, cap).sort((a, b) => vs(b) - vs(a)).slice(0, size), tap = refTaps(P, cap, GYM_TAPS);
   const secs = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap) * bestEff(m, f), 0) + tap), 0);
-  return GYM_USE * B.base / secs;
+  return GYM_USE * B.bossTime * refDef(P) / secs;
 }
 // Dungeon fodder is as tough as that region's route Pokémon, and a bit more.
 const fodderHp = i => DUNGEON_HP * wildHard(i);
@@ -507,7 +580,7 @@ function legendTuning(B) {
   const cap = areaCap(), P = refPool(B.r, 2, cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
   const dps = P.reduce((d, m) => d + refHit(m, cap), 0) + refTaps(P, cap, LEGEND_TAPS), n = B.queue.length;
   const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps, 0);
-  return Math.max(1, (LEGEND_USE * B.base - fodder) * dps / bossHpFor(B.queue[n - 1], B.L, B.i));
+  return Math.max(1, (LEGEND_USE * B.bossTime * refDef(P) - fodder) * dps / bossHpFor(B.queue[n - 1], B.L, B.i));
 }
 
 function startLoc(loc) {
@@ -529,9 +602,12 @@ function startLoc(loc) {
   else {
     const rand = Math.random, pool = dungeonPool(r), bosses = dungeonBosses(r);
     const q = Array.from({ length: DUNGEON_SIZE }, () => pool[Math.floor(rand() * pool.length)]);
-    q.push(bosses[Math.floor(rand() * bosses.length)]);
+    const lg = bosses[Math.floor(rand() * bosses.length)], lgMegas = formsOf(lg.num, "mega");
+    // A legendary with a Mega form comes out as one half the time. Catching it gets you the usual form.
+    q.push(lgMegas.length && rand() < .5 ? lgMegas[Math.floor(rand() * lgMegas.length)] : lg);
     B = { kind: "dungeon", r, i: r * 4 + 2, queue: q, L: routeLevel(r * 4 + 2) + 4, base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [q[q.length - 1]], regionOffense(r), .9, 1.15), idx: 0 };
   }
+  if (B.kind !== "route") { B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def); }
   if (B.kind === "gym") B.tune = gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
   else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
   else if (B.kind === "dungeon") B.tune = legendTuning(B);
@@ -558,7 +634,7 @@ function spawn() {
   if (boss) B.foe.max = B.kind === "dungeon" ? Math.max(B.foe.max, Math.ceil(IDLE_SHORT * partyDps(m) * B.time)) : Math.ceil(B.foe.max * B.floor);
   B.foe.hp = B.foe.max; B.pause = 0;
   S.seen[m.num] = 1;
-  $("#foeimg").src = sprite(m.num, shiny);
+  $("#foeimg").src = spriteOf(m, shiny);
   $("#shiny").hidden = !shiny;
   $("#foeinfo").innerHTML = `<b>${esc(m.name)}</b> Lv ${L} ${m.types.map(tyChip).join(" ")}${S.box[m.num] ? ' <span class="muted">· caught</span>' : ""}`;
   renderMinis();
@@ -603,16 +679,27 @@ function chooseBall(f) {
   const id = order.find(x => (S.balls[x] || 0) > 0);
   return id ? BALLS.find(b => b.id === id) : null;
 }
+// A boss can drop a Mega Stone or Max Soup, PokéRogue-style: only ever for a Pokémon in your party that can use it.
+function rollDrop(kind) {
+  if (Math.random() >= (DROP_CHANCE[kind] || 0)) return "";
+  const can = S.party.flatMap(n => [...(S.key ? formsOf(n, "mega").filter(f => !S.stones[f.id]) : []), ...(S.band && !S.gfactor[n] ? formsOf(n, "gmax").slice(0, 1) : [])]);
+  if (!can.length) return "";
+  const f = can[Math.floor(Math.random() * can.length)];
+  if (f.kind === "mega") S.stones[f.id] = 1; else S.gfactor[f.num] = 1;
+  return f.kind === "mega" ? ` It dropped a Mega Stone for ${f.name}!` : ` It dropped Max Soup: ${mon(f.num).name} can Gigantamax now!`;
+}
 function next() {
   if (!B) return;
   if (B.kind === "route") { spawn(); return; }
   B.idx++;
   if (B.idx < B.queue.length) { spawn(); return; }
   const R = REGIONS[B.r];
-  if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}`); }
-  if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first) S.balls.master++; toast(first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`); }
-  if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast(first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`); }
-  if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.`); }
+  if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + rollDrop("gym")); }
+  if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first) S.balls.master++;
+    const unlock = first && B.r === KEY_STONE_FROM ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
+    toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + rollDrop("champ")); }
+  if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast((first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`) + rollDrop("summit")); }
+  if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.` + rollDrop("dungeon")); }
   backToRoute(); save();
 }
 function backToRoute() {
@@ -662,6 +749,7 @@ function evolve(n, e) {
   else S.box[t] = { xp: S.box[n].xp, shiny: S.box[n].shiny };
   const slot = S.party.indexOf(n);
   if (slot >= 0) { if (S.party.includes(t)) S.party.splice(slot, 1); else S.party[slot] = t; }
+  dropForm(n);
   toast(had ? `${mon(n).name} evolved and your ${mon(t).name} took its levels: now Lv ${level(t)}. (${mon(n).name} stays in your Box.)`
     : `${mon(n).name} evolved into ${mon(t).name}! (${mon(n).name} stays in your Box.)`);
   save(); renderAll();
@@ -692,7 +780,7 @@ function drawBattle() {
   $("#timerwrap").hidden = B.time == null;
   if (B.time != null) { const total = B.total; $("#timebar").style.width = (100 * Math.max(0, B.time) / total) + "%"; $("#timetext").textContent = Math.ceil(Math.max(0, B.time)) + "s left"; }
   $("#money").textContent = fmt(S.money);
-  $("#dps").innerHTML = `<span>Party <b>${fmt(partyDps(B.foe.m))}</b>/s on this one</span><span>Tap <b>${fmt(clickDamage())}</b></span>${S.protein ? `<span>Protein <b>+${Math.round(proteinBoost() * 100)}%</b></span>` : ""}${S.party.some(n => battleLevel(n) < level(n)) ? `<span>Held to <b>Lv ${areaCap()}</b> here</span>` : ""}`;
+  $("#dps").innerHTML = `<span>Party <b>${fmt(partyDps(B.foe.m))}</b>/s on this one</span><span>Tap <b>${fmt(clickDamage())}</b></span>${S.protein ? `<span>Protein <b>+${Math.round(proteinBoost() * 100)}%</b></span>` : ""}${S.party.some(n => battleLevel(n) < level(n)) ? `<span>Held to <b>Lv ${areaCap()}</b> here</span>` : ""}${B.def && B.def !== 1 ? `<span>Def <b>${B.def > 1 ? "+" : ""}${Math.round(B.def * 100 - 100)}%</b> time</span>` : ""}`;
   $("#balls").textContent = BALLS.filter(b => S.balls[b.id] > 0).map(b => `${S.balls[b.id]} ${b.name.split(" ")[0]}`).join(", ") || "no balls";
 }
 function say(t, bad) { $("#log").textContent = t; $("#log").className = bad ? "bad" : ""; }
@@ -713,30 +801,32 @@ function renderLocs() {
   const r = viewR, items = [];
   for (let k = 0; k < 4; k++) {
     items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${routeLevel(r * 4 + k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
-    items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${gymTime(r, k)}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
+    items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${Math.round(gymTime(r, k) * partyTime())}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
     if (k === 1) items.push({ kind: "dungeon", r, note: `${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"} · cleared ${S.dungeons[r] || 0}x`, done: !!S.dungeons[r] });
   }
-  items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${champTime(r)}s`, done: !!S.champs[r] });
-  if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2)}s` : "after all 9 Champions", done: !!S.charm });
+  items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
+  if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
   $("#locs").innerHTML = items.map(it => {
     const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0);
     return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0 })}'${unlocked(it) ? "" : " disabled"}><span>${esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
   }).join("");
 }
+// How a party member looks: its Mega or Gigantamax form when it has one on.
+const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax === n && formsOf(n, "gmax")[0]) || mon(n);
 function monTile(n, opts = {}) {
-  const m = mon(n), b = S.box[n], e = opts.foe ? bestEff(m, opts.foe) : null;
+  const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : m, e = opts.foe ? bestEff(fighter(n), opts.foe) : null;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny ? '<span class="star">S</span>' : ""}<span class="pic"><img class="spr" src="${sprite(n, b.shiny)}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](m)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${b.shiny || look !== m ? `<span class="star">${[b.shiny ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, b.shiny)}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](m)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
   const foe = B && B.foe ? B.foe.m : null;
-  $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true, battle: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
+  $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true, battle: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
 }
 // Base-stat sorts for the Box: label shown on the tile, and the value. Biggest first.
 const STAT_SORTS = { hp: ["HP", m => m.hp], atk: ["Atk", m => m.atk], def: ["Def", m => m.def], spa: ["SpA", m => m.spa], spd: ["SpD", m => m.spd], spe: ["Spe", m => m.spe], bst: ["Total", m => m.bst] };
 function renderParty() {
-  $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
+  $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
   // "Can evolve": ready right now first, then ones with an evolution still to get, then the rest.
   const evoRank = n => { const o = evoOptions(n); return o.some(e => canEvolve(n, e)) ? 0 : o.length ? 1 : 2; };
   const sort = $("#sort").value, type = $("#tfilter").value, stat = STAT_SORTS[sort];
@@ -744,6 +834,15 @@ function renderParty() {
     .sort((a, b) => stat ? stat[1](mon(b)) - stat[1](mon(a)) || a - b : sort === "lvl" ? level(b) - level(a) : sort === "power" ? power(b) - power(a) : sort === "evo" ? evoRank(a) - evoRank(b) || a - b : a - b);
   $("#boxgrid").innerHTML = list.map(n => monTile(n, { inparty: S.party.includes(n), stat })).join("") || `<span class="small muted">No ${esc(type)} Pokémon in your Box yet.</span>`;
   renderDetail();
+}
+// Mega and Gigantamax lines in a Pokémon's detail: what each form is, and what it still needs.
+function formLines(n) {
+  const megas = formsOf(n, "mega"), gmax = formsOf(n, "gmax")[0], inParty = S.party.includes(n), rows = [];
+  const line = (f, why, on, attr) => `<div class="row" style="justify-content:space-between"><span>${esc(f.name)} ${f.types.map(tyChip).join(" ")} <span class="muted">${why ||
+    (f.kind === "mega" ? `Atk ${f.atk} · SpA ${f.spa} · Def ${f.def} · Spe ${f.spe}` : "hits 30% harder")}</span></span>${why ? "" : `<button class="lbl${on ? " on" : ""}" type="button" ${attr}>${on ? "Turn off" : f.kind === "mega" ? "Mega Evolve" : "Gigantamax"}</button>`}</div>`;
+  for (const f of megas) rows.push(line(f, !S.key ? "needs the Key Stone (beat Steven)" : !S.stones[f.id] ? "needs its Mega Stone: Shop or boss drops, party only" : !inParty ? "add it to your party first" : "", S.mega && S.mega.n === n && S.mega.f === f.id, `data-mega="${f.id}"`));
+  if (gmax) rows.push(line(gmax, !S.band ? "needs the Dynamax Band (beat Leon)" : !S.gfactor[n] ? "needs Max Soup: Shop or boss drops, party only" : !inParty ? "add it to your party first" : "", S.gmax === n, "data-gmax=\"1\""));
+  return rows.length ? `<div class="small">${rows.join("")}<div class="muted">One Mega and one Gigantamax in the party at a time.</div></div>` : "";
 }
 function renderDetail() {
   const el = $("#detail");
@@ -757,11 +856,19 @@ function renderDetail() {
       const need = how === "L" ? `Lv ${v}${v > levelCap() ? " (over the cap)" : ""}` : how === "I" ? `${v} (have ${S.items[v] || 0})` : `Linking Cord (have ${S.cords})`;
       const yours = owned ? ` <span class="muted">· yours is Lv ${level(t)}${open ? ", evolving gives it these levels" : ""}</span>` : "";
       return `<div class="row" style="justify-content:space-between"><span>→ ${esc(mon(t).name)} <span class="muted">${need}</span>${yours}</span>${open ? `<button class="lbl" type="button" data-evo="${t}"${ok ? "" : " disabled"}>Evolve</button>` : '<span class="good">have it</span>'}</div>`;
-    }).join("")}</div>` : '<div class="small muted">Doesn\'t evolve.</div>') +
+    }).join("")}</div>` : '<div class="small muted">Doesn\'t evolve.</div>') + formLines(detail) +
     `<div class="row"><button class="lbl" type="button" data-toggle="${detail}">${S.party.includes(detail) ? "Send to Box" : "Add to party"}</button><button class="lbl" type="button" data-close="1">Close</button></div>`;
 }
 function renderDex() {
-  $("#dexregions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === dexR ? " on" : ""}" data-dr="${r}" type="button">${R.name}</button>`).join("");
+  $("#dexregions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === dexR ? " on" : ""}" data-dr="${r}" type="button">${R.name}</button>`).join("") +
+    `<button class="lbl${dexR === "forms" ? " on" : ""}" data-dr="forms" type="button">Forms</button>`;
+  if (dexR === "forms") {
+    // Unlocked: you hold its Mega Stone, or the species has its Gigantamax factor. Not part of the leaderboard.
+    const has = f => f.kind === "mega" ? !!S.stones[f.id] : !!S.gfactor[f.num], got = FORMS.filter(has);
+    $("#dexsum").innerHTML = `Forms: <b>${got.length}/${FORMS.length}</b> unlocked (${got.filter(f => f.kind === "mega").length} Mega, ${got.filter(f => f.kind === "gmax").length} Gigantamax) · ${S.key ? "Key Stone" : "no Key Stone yet (beat Steven)"} · ${S.band ? "Dynamax Band" : "no Dynamax Band yet (beat Leon)"} · not part of the leaderboard`;
+    $("#dexgrid").innerHTML = FORMS.map(f => `<img src="${spriteOf(f)}" alt="${esc(f.name)}" title="${esc(f.name)}" class="${has(f) ? "" : "no"}" loading="lazy">`).join("");
+    return;
+  }
   const list = regionMons(dexR), got = list.filter(m => S.box[m.num]).length, shinies = list.filter(m => S.box[m.num] && S.box[m.num].shiny).length;
   $("#dexsum").innerHTML = `${REGIONS[dexR].name}: <b>${got}/${list.length}</b> caught · ${shinies} shiny${S.charm ? " (Shiny Charm)" : ""} · all regions ${Object.keys(S.box).length}/1025`;
   $("#dexgrid").innerHTML = list.map(m => { const b = S.box[m.num]; return `<img src="${sprite(m.num, b && b.shiny)}" alt="${b || S.seen[m.num] ? esc(m.name) : "unknown"}" title="#${m.num} ${b || S.seen[m.num] ? esc(m.name) : "???"}" class="${b ? "" : "no"}" loading="lazy">`; }).join("");
@@ -775,15 +882,18 @@ function renderShop() {
     rows.push([`${REGIONS[r].name} dungeon ticket <span class="muted">(have ${S.tickets[r] || 0})</span>`, ticketPrice(r), `ticket:${r}`, badge(r, 1)]);
   rows.push([`Protein: party +3% damage <span class="muted">(${S.protein}/${proteinCap()})</span>`, proteinPrice(S.protein), "protein", S.protein < proteinCap()]);
   rows.push([`Linking Cord: trade evolutions <span class="muted">(have ${S.cords})</span>`, CORD_PRICE, "cord", true]);
+  // Mega Stones and Max Soup: only for Pokémon in your party, as in PokéRogue.
+  if (S.key) for (const n of S.party) for (const f of formsOf(n, "mega")) if (!S.stones[f.id]) rows.push([`Mega Stone for ${esc(f.name)}`, STONE_PRICE, `stone:${f.id}`, true]);
+  if (S.band) for (const n of S.party) if (formsOf(n, "gmax").length && !S.gfactor[n]) rows.push([`Max Soup: ${esc(mon(n).name)} can Gigantamax`, SOUP_PRICE, `soup:${n}`, true]);
   // Only items something in your Box is waiting on.
   const want = new Set(); for (const n of Object.keys(S.box).map(Number)) for (const e of evoOptions(n)) if (e[1] === "I") want.add(e[2]);
   for (const it of [...want].sort()) rows.push([`${esc(it)} <span class="muted">(have ${S.items[it] || 0})</span>`, ITEM_PRICE, "item:" + it, true]);
   $("#shop").innerHTML = rows.map(([label, price, id, ok]) => `<span class="it"><span>${label}</span></span><span class="p">$${fmt(price)}</span><span class="row">${id.startsWith("ball") ? `<button class="lbl" type="button" data-buy="${id}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button><button class="lbl" type="button" data-buy="${id}" data-q="10"${ok && S.money >= price * 10 ? "" : " disabled"}>x10</button>` : `<button class="lbl" type="button" data-buy="${esc(id)}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button>`}</span>`).join("") +
-    `<span class="muted small" style="grid-column:1/-1">Each dungeon takes its own region's ticket. Evolution items only show up when a Pokémon in your Box needs one. Protein: 5 count per region you've opened.</span>`;
+    `<span class="muted small" style="grid-column:1/-1">Each dungeon takes its own region's ticket. Evolution items only show up when a Pokémon in your Box needs one, and Mega Stones and Max Soup only for Pokémon in your party. Protein: 5 count per region you've opened.</span>`;
 }
 function buy(id, q) {
   const [kind, arg] = id.split(/:(.*)/);
-  const price = kind === "ball" ? BALLS.find(b => b.id === arg).price : kind === "ticket" ? ticketPrice(+arg) : kind === "protein" ? proteinPrice(S.protein) : kind === "cord" ? CORD_PRICE : ITEM_PRICE;
+  const price = kind === "ball" ? BALLS.find(b => b.id === arg).price : kind === "ticket" ? ticketPrice(+arg) : kind === "protein" ? proteinPrice(S.protein) : kind === "cord" ? CORD_PRICE : kind === "stone" ? STONE_PRICE : kind === "soup" ? SOUP_PRICE : ITEM_PRICE;
   if (kind === "protein" && B && B.kind !== "route") { toast("Buy Protein between battles."); return; }
   if (S.money < price * q || (kind === "protein" && S.protein >= proteinCap())) return;
   S.money -= price * q;
@@ -791,12 +901,129 @@ function buy(id, q) {
   else if (kind === "ticket") S.tickets[arg] = (S.tickets[arg] || 0) + 1;
   else if (kind === "protein") S.protein++;
   else if (kind === "cord") S.cords++;
+  else if (kind === "stone") S.stones[arg] = 1;
+  else if (kind === "soup") S.gfactor[arg] = 1;
   else S.items[arg] = (S.items[arg] || 0) + 1;
   save(); renderShop(); renderTop(); renderMinis();
 }
 
+// ── Wiki, laid out like Civ Lite's How to play: sections in groups, a contents list with search beside the text,
+// and the section you're reading marked as you scroll. Numbers are read from the constants above, so the text
+// can't drift from the game. Searching a name also finds Pokémon, each with an entry of its own.
+const pct = x => Math.round(x * 100) + "%";
+function wikiSections() {
+  const ballRows = BALLS.map(b => `<li>${b.name}: ${b.price ? "$" + fmt(b.price) : "Champions only"}${b.id === "master" ? ", always catches" : `, catch rate × ${b.mult}${b.add ? " + " + pct(b.add) : ""}`}</li>`).join("");
+  const drop = DROP_CHANCE;
+  return [
+    { id: "idea", group: "Basics", title: "The idea", html: `<p>Your party of up to 6 fights wild Pokémon on its own. You tap to help, catch what you beat, train up, take 36 gyms and 9 Champions across nine regions, and fill the Pokédex.</p>` },
+    { id: "fighting", group: "Basics", title: "Fighting", html: `<p>Every second, each party Pokémon deals its damage per hit × its hits per second × its best type matchup against the foe. The battle line under the field adds that up as "Party …/s on this one".</p><p>Tapping the foe (or Space/Enter) hits for 1 + 15% of the party's damage per second, shown as "Tap". Up to ${TAP_RATE} taps a second count, with a few in hand for bursts; scripted clicks and held keys don't count. There's a ${0.65}s pause after each faint.</p>` },
+    { id: "map", group: "Basics", title: "Routes, gyms and regions", html: `<p>Each region has 4 routes, 4 gyms, a dungeon and a Champion. Beat ${KILLS_FOR_GYM} on a route to open its gym; each badge opens the next route; all 4 badges open the Champion; beating the Champion opens the next region and gives a Master Ball. Wild levels go up by about 2.75 a route, from Lv 3 on Kanto Route 1 to Lv 100.</p>` },
+    { id: "wild", group: "Basics", title: "Wild Pokémon", html: `<p>Routes 1 and 2 have the region's first-stage Pokémon (the weaker half, then the stronger half), Route 3 adds middle stages, Route 4 has everything from the region but legendaries.</p><p>Wild Pokémon have extra HP through the middle of the game, from ×${wildHard(0).toFixed(1)} on Kanto Route 1 up to ×${Math.max(...Array.from({ length: 36 }, (_, i) => wildHard(i))).toFixed(1)} and none from Galar Route 2 on. Each win pays (6 + 1.5 × its level) × 1.08 per route index.</p>` },
+    { id: "catching", group: "Basics", title: "Catching", html: `<p>When a wild Pokémon faints, a ball is thrown at it, picked by Settings: one choice for new Pokémon, one for ones you have, one for shinies. Chance = catch rate ÷ 255 × 0.6 × the ball's multiplier + its bonus, at most 100%. Legendaries and mythicals shrug off anything but a Master Ball half the time.</p><ul>${ballRows}</ul><p>Auto (the default for new Pokémon) throws the cheapest ball with at least an even chance, else your best one, and only spends a Master Ball on a shiny or a legendary.</p>` },
+    { id: "offline", group: "Basics", title: "Offline", html: `<p>While you're away (up to 8 hours) your party keeps fighting on your last route at about a third of the live pace, the pause included: money and XP, no catches. The title screen says what it did.</p>` },
+    { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Attack</b>: damage per hit is the higher of Attack and Sp. Atk × level ÷ 50 × protein${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}.</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often.</p><p><b>Def</b>: your party's HP, Defense and Sp. Def, averaged, stretch or shrink the timer in gym, Champion, dungeon and Red fights against a bulk of ${PARTY_BULK}: from −20% to +25%. The map shows the time your current party gets.</p>` },
+    { id: "types", group: "Stats and levels", title: "Types", html: `<p>The main games' type chart. Each party Pokémon uses its better type against the foe; the tile shows 2x, 4x, ½x, ¼x or 0x when it isn't neutral. A Mega fights with its Mega typing.</p>` },
+    { id: "levels", group: "Stats and levels", title: "Levels and the cap", html: `<p>Each win gives every party Pokémon the foe's level × ${XP_RATE} XP (× 1.5 against trainers). Level is the cube root of XP, up to 100.</p><p>The level cap is ${CAP_OVER} over the next gym leader or Champion you haven't beaten, and 100 once every Champion is down. Each place also keeps the cap it had when you first got there: go back and your party fights held to it, so a Lv 90 team is Lv 30 on Hoenn Route 1. XP past the cap from older saves waits until the cap catches up.</p>` },
+    { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
+    { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, with no protein and tapping ${GYM_TAPS} times a second, uses ${pct(GYM_USE)} of the time it would get. Weaker, off-type or under-cap teams lose; protein, Megas, bulkier and better teams give you room. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
+    { id: "tapping", group: "Bosses", title: "No idle wins", html: `<p>However strong your party, boss fights need tapping: if your party could clear a gym, Champion or Red without it, every foe gets the same extra HP until idling falls ${pct(IDLE_SHORT - 1)} short. A dungeon's legendary is checked the same way against the time left when it comes out.</p>` },
+    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>The legendary is random, so its HP is set for a decent team of any types (the 7th to 12th strongest you could have) at the cap, tapping ${LEGEND_TAPS} times a second, to clear the run in ${pct(LEGEND_USE)} of the time. A legendary with a Mega form comes out as one half the time; catching it gets you the usual form.</p>` },
+    { id: "silver", group: "Bosses", title: "Mt. Silver", html: `<p>Once all nine Champions are beaten, Red waits on Mt. Silver (in Johto's list) with ${RED_TEAM.map(n => mon(n).name).join(", ")} at Lv ${SUMMIT_LEVEL}, ×${SUMMIT_HP} HP, in ${SUMMIT_TIME}s give or take. It's meant to be brutal. The first win gives the Shiny Charm.</p>` },
+    { id: "shop", group: "Items", title: "The Shop", html: `<p>Balls, dungeon tickets (250 × (region number)^1.8), protein, the Linking Cord, evolution items your Box is waiting on, and, once you have the key items, Mega Stones ($${fmt(STONE_PRICE)}) and Max Soup ($${fmt(SOUP_PRICE)}) for Pokémon in your party.</p>` },
+    { id: "protein", group: "Items", title: "Protein", html: `<p>+${pct(PROTEIN_STEP)} party damage each. Only ${PROTEIN_PER_REGION} count per region you've opened (up to ${PROTEIN_PER_REGION * REGIONS.length}), and each costs 1.5× the last, from $300. You can't buy it mid-fight.</p>` },
+    { id: "mega", group: "Megas and Gigantamax", title: "Mega Evolution", html: `<p>Beat Steven (Hoenn's Champion) for the Key Stone. Each Mega form then needs its own Mega Stone: $${fmt(STONE_PRICE)} in the Shop, or a boss drop (gyms ${pct(drop.gym)}, Champions and dungeons ${pct(drop.champ)}, Red always). Like PokéRogue, stones only ever turn up for Pokémon in your party.</p><p>Turn it on in the Pokémon's detail in Party & Box. One Mega in the party at a time, on in every fight, using its Mega stats and types. ${FORMS.filter(f => f.kind === "mega").length} Megas, from the originals to Legends: Z-A's.</p>` },
+    { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${new Set(FORMS.filter(f => f.kind === "gmax").map(f => f.num)).size} species with a Gigantamax form then needs Max Soup: $${fmt(SOUP_PRICE)}, or a boss drop at the same odds as Mega Stones, again only for your party. One Gigantamax Pokémon at a time, always on; it hits ${pct(GMAX_BOOST - 1)} harder. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
+    { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm. A shiny that evolves stays shiny. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
+    { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>One point per Pokédex entry and one more for each one you have shiny, up to 2050. It posts to the arcade board when you're signed in.</p>` },
+    { id: "saves", group: "Collection", title: "Saves", html: `<p>Your save lives in this browser. Settings → "Show my save code" gives a code to paste on another device; the title screen can load one too. New game erases the save on this device, so copy the code first if you might want it back.</p>` }
+  ];
+}
+const wikiPools = new Map();
+const wikiPool = (r, k) => wikiPools.get(r * 4 + k) || wikiPools.set(r * 4 + k, new Set(routePool(r, k).map(m => m.num))).get(r * 4 + k);
+function wikiWhere(n) {
+  const m = mon(n), r = m.gen - 1, out = [];
+  if ([1, 4, 7].includes(n)) out.push("a starter you can pick");
+  if (legendary(m)) out.push(`the ${REGIONS[r].name} dungeon's legendary`);
+  else {
+    for (let k = 0; k < 4; k++) if (wikiPool(r, k).has(n)) out.push(`${REGIONS[r].name} Route ${k + 1} (Lv ${routeLevel(r * 4 + k)})`);
+    if (dungeonPool(r).some(x => x.num === n)) out.push(`the ${REGIONS[r].name} dungeon`);
+  }
+  return out.length ? out.join(", ") : "only by evolving";
+}
+const wikiHow = ([, how, v]) => how === "L" ? `Lv ${v}` : how === "I" ? v : "trade (Linking Cord)";
+function wikiEntry(n) {
+  const m = mon(n), b = S.box[n], from = PARENT[n], forms = FORMS.filter(f => f.num === n);
+  const stats = x => `<div class="pk-stats">${[["HP", x.hp], ["Atk", x.atk], ["Def", x.def], ["SpA", x.spa], ["SpD", x.spd], ["Spe", x.spe], ["Total", x.bst]].map(([k]) => `<span>${k}</span>`).join("")}${[x.hp, x.atk, x.def, x.spa, x.spd, x.spe, x.bst].map(v => `<b>${v}</b>`).join("")}</div>`;
+  const tag = m.flags.has("my") ? " · mythical" : m.flags.has("lg") ? " · legendary" : "";
+  return `<div class="pk"><span class="pic pk-pic"><img class="spr" src="${sprite(n, b && b.shiny)}" alt=""></span><div class="pk-body">` +
+    `<p>#${n} · ${m.types.map(tyChip).join(" ")} · Gen ${m.gen} (${REGIONS[m.gen - 1].name})${tag}</p>${stats(m)}` +
+    `<p>Catch rate ${m.cr} (a Poké Ball: ${pct(throwChance(m, BALLS[0]))}). Hits ${hitRate(m).toFixed(2)} times a second, bulk ${Math.round(bulkOf(m))}.</p>` +
+    `<p>${b ? `You have it at Lv ${level(n)}${b.shiny ? ", shiny" : ""}.` : S.seen[n] ? "You've seen it but not caught it." : "You haven't seen it yet."}</p>` +
+    `<p>Found: ${wikiWhere(n)}.</p>` +
+    (from ? `<p>Evolves from ${esc(mon(from.p).name)} (${wikiHow([0, from.how, from.v])}).</p>` : "") +
+    (m.evos.length ? `<p>Evolves into ${m.evos.map(e => `${esc(mon(e[0]).name)} (${wikiHow(e)})`).join(", ")}.</p>` : "") +
+    forms.map(f => `<p><b>${esc(f.name)}</b> ${f.types.map(tyChip).join(" ")}${f.kind === "gmax" ? ` · same stats, hits ${pct(GMAX_BOOST - 1)} harder` : ""}</p>${f.kind === "mega" ? stats(f) : ""}`).join("") +
+    `</div></div>`;
+}
+let wikiCur = "", wikiPk = 0, wikiAim = 0;
+function wikiMatches(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const secs = wikiSections().filter(s => words.every(w => (s.title + " " + s.html.replace(/<[^>]+>/g, " ")).toLowerCase().includes(w)));
+  const name = q.trim().toLowerCase(), mons = name.length < 2 ? [] : MON.filter(m => m.name.toLowerCase().includes(name))
+    .concat(FORMS.filter(f => f.name.toLowerCase().includes(name)).map(f => mon(f.num))).filter((m, i, a) => a.indexOf(m) === i).slice(0, 12);
+  return { secs, mons };
+}
+function wikiList() {
+  const { secs, mons } = wikiMatches($("#wiki-search").value);
+  let html = "", group = null;
+  for (const s of secs) {
+    if (s.group !== group) { group = s.group; html += `<div class="wiki-label">${esc(group)}</div>`; }
+    html += `<button class="wiki-link${s.id === wikiCur ? " on" : ""}" type="button" data-wiki="${s.id}">${esc(s.title)}</button>`;
+  }
+  if (mons.length) html += `<div class="wiki-label">Pokémon</div>` + mons.map(m => `<button class="wiki-link${wikiCur === "pk" && wikiPk === m.num ? " on" : ""}" type="button" data-wpk="${m.num}">${esc(m.name)}</button>`).join("");
+  $("#wiki-list").innerHTML = html || '<p class="wiki-none">Nothing in the wiki mentions that.</p>';
+}
+function renderWiki() {
+  const secs = wikiSections();
+  let text = wikiPk ? `<h2>Pokémon</h2><section class="wiki-sec" id="wiki-pk"><h3 tabindex="-1">${esc(mon(wikiPk).name)}</h3>${wikiEntry(wikiPk)}</section>` : "", group = null;
+  for (const s of secs) {
+    if (s.group !== group) { group = s.group; text += `<h2>${esc(group)}</h2>`; }
+    text += `<section class="wiki-sec" id="wiki-${s.id}"><h3 tabindex="-1">${esc(s.title)}</h3>${s.html}</section>`;
+  }
+  $("#wiki-text").innerHTML = text;
+  if (!wikiCur) wikiCur = secs[0].id;
+  wikiList();
+}
+function wikiGo(id) {
+  const pane = $("#wiki-text"), sec = $(id === "pk" ? "#wiki-pk" : "#wiki-" + id);
+  if (!sec) return;
+  wikiContents(false);
+  wikiCur = id; wikiAim = Date.now() + 600; wikiList();
+  pane.scrollTop = Math.max(0, sec.offsetTop - 8);
+  sec.querySelector("h3").focus({ preventScroll: true });
+}
+function wikiContents(open) {
+  const toc = $("#wiki-toc"), on = open === undefined ? !toc.classList.contains("open") : open;
+  toc.classList.toggle("open", on); $("#wiki-contents").setAttribute("aria-expanded", on ? "true" : "false");
+}
+$("#wiki-list").onclick = e => {
+  const s = e.target.closest("[data-wiki]"), p = e.target.closest("[data-wpk]");
+  if (s) wikiGo(s.dataset.wiki);
+  else if (p) { wikiPk = +p.dataset.wpk; renderWiki(); refitSprites(); wikiGo("pk"); }
+};
+$("#wiki-search").addEventListener("input", wikiList);
+$("#wiki-contents").onclick = () => wikiContents();
+// Mark the section being read: the last one whose heading has scrolled past the top of the pane.
+$("#wiki-text").addEventListener("scroll", () => {
+  if (Date.now() < wikiAim) return;
+  const pane = $("#wiki-text");
+  let cur = null;
+  for (const sec of pane.querySelectorAll(".wiki-sec")) if (sec.offsetTop - 12 <= pane.scrollTop) cur = sec.id === "wiki-pk" ? "pk" : sec.id.slice(5);
+  if (cur && cur !== wikiCur) { wikiCur = cur; wikiList(); }
+});
+
 // ── Events
-function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; renderAll(); refitSprites(); }
+function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; if (t === "wiki") renderWiki(); renderAll(); refitSprites(); }
 $("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) openTab(b.dataset.tab); };
 $("#regions").onclick = e => { const b = e.target.closest("[data-r]"); if (b) { viewR = +b.dataset.r; renderLocs(); } };
 $("#locs").onclick = e => { const b = e.target.closest("[data-loc]"); if (b) startLoc(JSON.parse(b.dataset.loc)); };
@@ -821,15 +1048,28 @@ $("#foe").addEventListener("pointerdown", e => {
 $("#foe").addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); if (!e.repeat) tap(e); } });
 function partyClick(e) {
   const t = e.target.closest("[data-n]"), ev = e.target.closest("[data-evo]"), tg = e.target.closest("[data-toggle]"), cl = e.target.closest("[data-close]");
+  const mg = e.target.closest("[data-mega]"), gx = e.target.closest("[data-gmax]");
+  if (mg || gx) { if (B && B.kind !== "route") { toast("Change forms between battles."); return; } if (mg) setMega(detail, +mg.dataset.mega); else setGmax(detail); return; }
   if (ev) { if (B && B.kind !== "route") { toast("Evolve between battles."); return; } const e2 = mon(detail).evos.find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
   if (cl) { detail = null; renderDetail(); return; }
   if (tg) { toggleParty(+tg.dataset.toggle); return; }
   if (t) { detail = +t.dataset.n; renderParty(); }
 }
+function dropForm(n) { if (S.mega && S.mega.n === n) S.mega = null; if (S.gmax === n) S.gmax = 0; }
+function setMega(n, id) {
+  if (S.mega && S.mega.n === n && S.mega.f === id) { S.mega = null; toast(`${mon(n).name} went back to normal.`); }
+  else { S.mega = { n, f: id }; if (S.gmax === n) S.gmax = 0; toast(`${mon(n).name} Mega Evolved into ${formById(id).name}!`); }
+  save(); renderAll();
+}
+function setGmax(n) {
+  if (S.gmax === n) { S.gmax = 0; toast(`${mon(n).name} went back to normal.`); }
+  else { S.gmax = n; if (S.mega && S.mega.n === n) S.mega = null; toast(`${mon(n).name} will Gigantamax in every fight.`); }
+  save(); renderAll();
+}
 function toggleParty(n) {
   if (B && B.kind !== "route") { toast("You can't change your party during a gym, dungeon or Champion battle."); return; }
   const i = S.party.indexOf(n);
-  if (i >= 0) { if (S.party.length === 1) { toast("Keep at least one Pokémon in your party."); return; } S.party.splice(i, 1); }
+  if (i >= 0) { if (S.party.length === 1) { toast("Keep at least one Pokémon in your party."); return; } S.party.splice(i, 1); dropForm(n); }
   else if (S.party.length < 6) S.party.push(n); else { toast("Your party is full. Send one to the Box first."); return; }
   save(); renderParty(); renderMinis();
 }
@@ -837,7 +1077,7 @@ $("#t-party").onclick = partyClick;
 $("#sort").onchange = renderParty;
 $("#tfilter").innerHTML += D.types.map(t => `<option value="${t}">${t}</option>`).join("");
 $("#tfilter").onchange = renderParty;
-$("#dexregions").onclick = e => { const b = e.target.closest("[data-dr]"); if (b) { dexR = +b.dataset.dr; renderDex(); } };
+$("#dexregions").onclick = e => { const b = e.target.closest("[data-dr]"); if (b) { dexR = b.dataset.dr === "forms" ? "forms" : +b.dataset.dr; renderDex(); } };
 $("#shop").onclick = e => { const b = e.target.closest("[data-buy]"); if (b) buy(b.dataset.buy, +b.dataset.q); };
 for (const id of ["fresh", "dupe", "shiny"]) {
   const sel = $("#s-" + id);
@@ -879,7 +1119,13 @@ function offline() {
 }
 
 // Older saves sent new Pokémon only Poké Balls, so bought Great and Ultra Balls sat unused. Move that one default to Auto, once.
-function migrateSave() { if (!S.set.auto) { if (S.set.fresh === "poke") S.set.fresh = "auto"; S.set.auto = 1; } }
+function migrateSave() {
+  if (!S.set.auto) { if (S.set.fresh === "poke") S.set.fresh = "auto"; S.set.auto = 1; }
+  // Megas and Gigantamax arrived later: saves past Steven or Leon get the key item they would have been given.
+  S.stones = S.stones || {}; S.gfactor = S.gfactor || {}; S.mega = S.mega || null; S.gmax = S.gmax || 0;
+  if (S.champs[KEY_STONE_FROM]) S.key = 1;
+  if (S.champs[BAND_FROM]) S.band = 1;
+}
 
 // ── Screens: title (the landing page), pick (a new save's starter), game.
 let screen = "title", panel = "save", cur = 0, awayText = "", titleMsg = "";
@@ -905,7 +1151,7 @@ function enter(t) {
 }
 
 const MENU = {
-  save: [["continue", "Continue"], ["party", "Party & Box"], ["dex", "Pokédex"], ["settings", "Settings"], ["how", "How to play"], ["new", "New game"]],
+  save: [["continue", "Continue"], ["party", "Party & Box"], ["dex", "Pokédex"], ["settings", "Settings"], ["wiki", "Wiki"], ["how", "How to play"], ["new", "New game"]],
   fresh: [["new", "New game"], ["load", "Load a save code"], ["how", "How to play"]]
 };
 const HOW = [
@@ -916,7 +1162,9 @@ const HOW = [
   "Each wild Pokémon you beat gets a ball thrown at it. Settings decides which ones.",
   "Shinies turn up 1 in 4096. Dungeons, with a ticket from the Shop, end in a legendary.",
   "Your leaderboard score is one point per Pokédex entry plus one per shiny.",
-  "Someone waits on Mt. Silver once every Champion is beaten."
+  "Speed sets how often each Pokémon hits, and your party's HP, Defense and Sp. Def stretch the timer in boss fights.",
+  "Beat Steven for a Key Stone and Leon for a Dynamax Band. Mega Stones and Max Soup for your party come from the Shop or boss drops.",
+  "Someone waits on Mt. Silver once every Champion is beaten. The Wiki tab has every rule and every Pokémon."
 ];
 function renderTitle() {
   const items = MENU[S ? "save" : "fresh"];
@@ -931,20 +1179,20 @@ function renderTitle() {
   else card.innerHTML = saveCard();
 }
 function leadField() {
-  const n = S.party[0], b = S.box[n];
-  return `<div class="fieldhead"><b>${esc(mon(n).name)}</b><span class="muted">Lv ${level(n)}</span></div><div class="t-stage"><span class="ground"></span><img class="spr" src="${sprite(n, b.shiny)}" alt="">${b.shiny ? '<span class="shinymark">shiny</span>' : ""}</div>`;
+  const n = S.party[0], b = S.box[n], look = lookOf(n);
+  return `<div class="fieldhead"><b>${esc(look.name)}</b><span class="muted">Lv ${level(n)}</span></div><div class="t-stage"><span class="ground"></span><img class="spr" src="${spriteOf(look, b.shiny)}" alt="">${b.shiny ? '<span class="shinymark">shiny</span>' : ""}</div>`;
 }
 function saveCard() {
   const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
   const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`],
-    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${caught + shiny} points`]];
+    ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${caught + shiny} points`]].concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<div class="t-party">${S.party.map(n => `<img src="${sprite(n, S.box[n].shiny)}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
     (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "");
 }
 function go(id) {
   if (id === "continue") return enter("battle");
-  if (id === "party" || id === "dex" || id === "settings") return enter(id);
+  if (id === "party" || id === "dex" || id === "settings" || id === "wiki") return enter(id);
   if (id === "new" && !S) return showPick();
   // How to play, Load and New game (with a save) open in the card; choosing the open one again closes it.
   panel = panel === id && S ? "save" : id; titleMsg = ""; renderTitle();
