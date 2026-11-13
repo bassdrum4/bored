@@ -350,16 +350,15 @@ const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
 const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
 const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
 const gymLevel = i => routeLevel(i) + 3, champLevel = r => routeLevel(r * 4 + 3) + 6;
-// Gyms, Champions and legendaries have extra HP: steepest early, where a party at the cap used to win in seconds, settling at 1.5x in Paldea.
-// A capped party that only idles should lose most of them; tapping, type matchups and some protein get it through.
-const bossHard = i => Math.max(1.5, Math.min(2 + 4 * i, 24 * Math.pow(.92, i)));
-// However strong the party, a boss needs tapping: if the party alone could beat a gym leader's or Champion's
-// Pokémon in its share of the timer (a legendary: in all the time left), it gets enough HP that idling falls this far short.
+// However strong the party, a boss fight needs tapping: if the party alone could clear a gym, Champion or Red in time,
+// every Pokémon in it gets the same extra HP until idling falls this far short (checked when the fight starts; a
+// dungeon's legendary is checked against the time left when it comes out).
 const IDLE_SHORT = 1.25;
 // Wild Pokémon on routes get extra HP through the middle of the game, where a party at the cap used to one-shot them:
 // about 4-5 seconds a fight idle for an ordinary party, about half that tapping. Late routes are slow enough already.
 const wildHard = i => Math.max(1, Math.min(1.5 + 1.2 * i, 9.5 * Math.pow(.925, i)));
-const GYM_HP = 1.6, CHAMP_HP = 1.8, DUNGEON_HP = 1.3, LEGEND_HP = 10, LEGEND_PAY = 4;
+// Payout multipliers for boss fights (their HP is tuned separately, below startLoc), and dungeon fodder HP.
+const GYM_HP = 1.6, CHAMP_HP = 1.8, DUNGEON_HP = 1.3, LEGEND_PAY = 4;
 // XP per kill is foe level x XP_RATE, to every party member.
 const XP_RATE = 2;
 // The level cap sits CAP_OVER above the next gym leader or Champion you haven't beaten, and lifts to 100 once all nine Champions are down.
@@ -464,6 +463,38 @@ function locName(loc) {
   if (loc.kind === "summit") return "Mt. Silver";
   return `Champion ${R.champ}`;
 }
+// ── Boss HP. Gym leaders and Champions are tuned so a strong super-effective team, as evolved as the level cap
+// allows, at the cap, with no protein and tapping flat out (8 a second), barely wins: 95% of the timer. Weaker teams,
+// off-type teams and teams under the cap lose. A dungeon's legendary is random, so it is tuned for a decent team
+// of any types at the cap, tapping 6 a second, to clear the whole run with some room: 85% of the timer.
+const GYM_TAPS = 8, LEGEND_TAPS = 6, GYM_USE = .95, LEGEND_USE = .85;
+const PARENT = {}; for (const m of MON) for (const [t, how, v] of m.evos) PARENT[t] = { p: m.num, how, v };
+const minLv = n => { const p = PARENT[n]; return p ? Math.max(minLv(p.p), p.how === "L" ? p.v : 0) : 0; };
+const rootOf = n => PARENT[n] ? rootOf(PARENT[n].p) : n;
+const byLevelOnly = n => !PARENT[n] || (PARENT[n].how === "L" && byLevelOnly(PARENT[n].p));
+// What a player could have for a fight in region r with routes up to k open: anything from earlier regions, and
+// from this one whatever the open routes offer, evolved by level. Each one at its most evolved form under the cap.
+function refPool(r, k, cap) {
+  const open = new Set(); for (let j = 0; j <= Math.min(k, 3); j++) for (const m of routePool(r, j)) open.add(m.num);
+  const have = m => !legendary(m) && minLv(m.num) <= cap && (m.gen <= r || (m.gen === r + 1 && (open.has(m.num) || (open.has(rootOf(m.num)) && byLevelOnly(m.num)))));
+  return MON.filter(m => have(m) && !m.evos.some(([t]) => have(mon(t))));
+}
+const refHit = (m, cap) => Math.max(m.atk, m.spa) * cap / 50;
+const refTaps = (P, cap, taps) => taps * Math.max(1, Math.round(1 + .15 * P.reduce((s, m) => s + refHit(m, cap), 0)));
+function gymTuning(B, k, size) {
+  const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap) * bestEff(m, f), 0);
+  const P = refPool(B.r, k, cap).sort((a, b) => vs(b) - vs(a)).slice(0, size), tap = refTaps(P, cap, GYM_TAPS);
+  const secs = B.queue.reduce((s, f) => s + hpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap) * bestEff(m, f), 0) + tap), 0);
+  return GYM_USE * B.time / secs;
+}
+function legendTuning(B) {
+  // "Decent": the 7th to 12th strongest you could have by now, with no type edge either way.
+  const cap = areaCap(), P = refPool(B.r, 2, cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
+  const dps = P.reduce((d, m) => d + refHit(m, cap), 0) + refTaps(P, cap, LEGEND_TAPS), n = B.queue.length;
+  const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, DUNGEON_HP) / dps, 0);
+  return Math.max(1, (LEGEND_USE * B.time - fodder) * dps / hpFor(B.queue[n - 1], B.L, B.i));
+}
+
 function startLoc(loc) {
   if (!unlocked(loc)) return;
   if (loc.kind === "dungeon") {
@@ -485,6 +516,13 @@ function startLoc(loc) {
     q.push(bosses[Math.floor(rand() * bosses.length)]);
     B = { kind: "dungeon", r, i: r * 4 + 2, queue: q, L: routeLevel(r * 4 + 2) + 4, time: DUNGEON_TIME, idx: 0 };
   }
+  if (B.kind === "gym") B.tune = gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
+  else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
+  else if (B.kind === "dungeon") B.tune = legendTuning(B);
+  if (B.kind === "gym" || B.kind === "champ" || B.kind === "summit") {
+    const mult = B.kind === "summit" ? SUMMIT_HP : B.tune, idle = B.queue.reduce((s, f) => s + hpFor(f, B.L, B.i, mult) / Math.max(1e-9, partyDps(f)), 0);
+    B.floor = Math.max(1, IDLE_SHORT * B.time / idle);
+  }
   if (B.kind !== "route") { B.total = B.time; say(B.kind === "dungeon" ? "The legendary at the end can't be beaten without tapping." : "Your party can't win this one alone. Tap to help it."); }
   spawn(); renderLocs(); save();
 }
@@ -496,12 +534,12 @@ function spawn() {
     boss = B.kind !== "dungeon" || B.idx === B.queue.length - 1;
     // The extra boss HP doesn't raise the payout, or gym rematches would turn into a money farm.
     pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" ? CHAMP_HP : GYM_HP;
-    mult = B.kind === "dungeon" ? (boss ? LEGEND_HP * bossHard(B.i) : DUNGEON_HP) : pay * bossHard(B.i);
+    mult = B.kind === "dungeon" && !boss ? DUNGEON_HP : B.tune;
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
     shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
   B.foe = { m, L, shiny, max: hpFor(m, L, B.i, mult), wild: B.kind === "route" || B.kind === "dungeon", reward: rewardFor(L, B.i, pay) };
-  if (boss) B.foe.max = Math.max(B.foe.max, Math.ceil(IDLE_SHORT * partyDps(m) * (B.kind === "dungeon" ? B.time : B.total / B.queue.length)));
+  if (boss) B.foe.max = B.kind === "dungeon" ? Math.max(B.foe.max, Math.ceil(IDLE_SHORT * partyDps(m) * B.time)) : Math.ceil(B.foe.max * B.floor);
   B.foe.hp = B.foe.max; B.pause = 0;
   S.seen[m.num] = 1;
   $("#foeimg").src = sprite(m.num, shiny);
