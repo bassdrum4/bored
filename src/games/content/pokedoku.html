@@ -94,6 +94,12 @@ function landing() {
     card.querySelector("button").onclick = () => open(m);
     $("#cards").appendChild(card);
   }
+  // Poké Idle is its own library game (so it gets its own leaderboard); this card just opens it.
+  const idle = document.createElement("div");
+  idle.className = "card";
+  idle.innerHTML = `<h2>Poké Idle</h2><p>Build a party of 6, beat 36 gyms across nine regions, and fill the Pokédex. Its own game with its own leaderboard.</p><div class="st">Keeps going while you're away</div><button class="lbl big" type="button">Open</button>`;
+  idle.querySelector("button").onclick = openIdle;
+  $("#cards").appendChild(idle);
   document.querySelector("#cards").style.cssText = "display:flex;flex-direction:column;gap:8px";
 }
 // Each mode is its own document in a frame, kept alive so switching back keeps its place.
@@ -112,6 +118,11 @@ function open(m) {
   frames[m.id].focus();
 }
 $("#back").onclick = landing;
+function openIdle() {
+  // In the arcade, the page above this one is the hub: point it at Poké Idle and reload.
+  try { if (parent !== window && parent.location.pathname) { parent.location.hash = "#poke-idle"; parent.location.reload(); return; } } catch {}
+  location.href = "poke-idle.html";
+}
 landing();
 
 // The hub reads this: today's finished dailies added up, never null.

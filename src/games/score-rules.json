@@ -129,8 +129,13 @@
     "better": "high",
     "max_value": 10000000
   },
+  "poke-idle": {
+    "label": "Unique Pok\u00e9mon caught",
+    "better": "high",
+    "max_value": 1025
+  },
   "pokedoku": {
-    "label": "Today's three Pokémon dailies added up",
+    "label": "Today's three Pok\u00e9mon dailies added up",
     "better": "high",
     "max_value": 2650
   },
