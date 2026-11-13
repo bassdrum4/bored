@@ -331,8 +331,11 @@ const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
 const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
 const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
 const gymLevel = i => routeLevel(i) + 3, champLevel = r => routeLevel(r * 4 + 3) + 6;
-// Gyms, Champions and legendaries have extra HP. It is steepest early, where a party at the cap used to win in seconds, and settles at 1.5x from Kalos on.
-const bossHard = i => Math.max(1.5, Math.min(2 + 2.5 * i, 12 * Math.pow(.93, i)));
+// Gyms and Champions have extra HP: steepest early, where a party at the cap used to win in seconds, settling at 1.8x from Galar on.
+// A capped party that only idles should lose most of them; tapping, type matchups and some protein get it through.
+const bossHard = i => Math.max(1.8, Math.min(2 + 4 * i, 24 * Math.pow(.92, i)));
+// Legendary dungeon bosses keep their own, gentler curve: 1.5x from Kalos on.
+const legendHard = i => Math.max(1.5, Math.min(2 + 2.5 * i, 12 * Math.pow(.93, i)));
 const GYM_HP = 1.6, CHAMP_HP = 1.8, DUNGEON_HP = 1.3, LEGEND_HP = 10, LEGEND_PAY = 4;
 // XP per kill is foe level x XP_RATE, to every party member.
 const XP_RATE = 2;
@@ -469,7 +472,7 @@ function spawn() {
     const boss = B.kind === "dungeon" && B.idx === B.queue.length - 1;
     // The extra boss HP doesn't raise the payout, or gym rematches would turn into a money farm.
     pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" ? CHAMP_HP : GYM_HP;
-    mult = B.kind === "dungeon" ? (boss ? LEGEND_HP * bossHard(B.i) : DUNGEON_HP) : pay * bossHard(B.i);
+    mult = B.kind === "dungeon" ? (boss ? LEGEND_HP * legendHard(B.i) : DUNGEON_HP) : pay * bossHard(B.i);
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
     shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
