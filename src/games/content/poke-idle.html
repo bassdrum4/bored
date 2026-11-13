@@ -5,114 +5,212 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Poké Idle</title>
 <style>
+  :root {
+    --paper: #f5f2ea; --surface: #fffdf7; --sunk: #ece7da; --ink: #191713; --dim: #6b6558; --rule: #d8d2c4;
+    --red: #b3261e; --good: #3d7a35; --warn: #b07a12; --gold: #a87b0c; --xp: #3a6fd8;
+    --g-route: #dfe5cc; --g-gym: #e6e0d2; --g-dungeon: #d6cfc1; --g-champ: #ece2c8;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #1b1a17; --surface: #24221e; --sunk: #2f2c26; --ink: #ece7da; --dim: #a49d8e; --rule: #3a372f;
+      --red: #e0685c; --good: #7bb86f; --warn: #d9a441; --gold: #d8b04a; --xp: #6f9bf0;
+      --g-route: #2c3324; --g-gym: #302d27; --g-dungeon: #26231e; --g-champ: #3a3324;
+    }
+  }
   * { margin: 0; padding: 0; box-sizing: border-box }
   [hidden] { display: none !important }
-  body { background: #f5f2ea; color: #191713; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 12px 12px 28px; display: flex; justify-content: center }
-  main { width: min(760px, 100%); display: flex; flex-direction: column; gap: 10px }
-  .muted { color: #6b6558 } .small { font-size: 12px } .bad { color: #b8402a } .good { color: #3d7a35 }
-  h1 { font-size: 18px; font-weight: 700 }
-  h2 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600 }
-  .box { border: 1px solid #d8d2c4; background: #fffdf7; padding: 10px; border-radius: 2px; display: flex; flex-direction: column; gap: 8px; min-width: 0 }
+  body { background: var(--paper); color: var(--ink); font: 14px/1.45 var(--mono); padding: 12px 12px 28px; display: flex; justify-content: center }
+  main { width: min(780px, 100%); display: flex; flex-direction: column; gap: 12px }
+  .muted { color: var(--dim) } .small { font-size: 12px } .bad { color: var(--red) } .good { color: var(--good) }
+  h1 { font-size: 18px; font-weight: 700; letter-spacing: -.01em }
+  h2 { font-size: 13px; font-weight: 700 }
+  :focus-visible { outline: 2px solid var(--red); outline-offset: 2px }
+  .box { border: 1px solid var(--rule); background: var(--surface); padding: 12px; border-radius: 3px; display: flex; flex-direction: column; gap: 10px; min-width: 0 }
   .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center }
-  button.lbl { font: inherit; font-size: 12px; padding: 6px 9px; border: 1px solid #191713; background: none; color: inherit; cursor: pointer; border-radius: 2px }
-  button.lbl:hover:not(:disabled) { background: #ece7da }
+  .between { justify-content: space-between }
+  button.lbl { font: inherit; font-size: 12px; padding: 5px 9px; border: 1px solid var(--ink); background: none; color: inherit; cursor: pointer; border-radius: 2px }
+  button.lbl:hover:not(:disabled) { background: var(--sunk) }
   button.lbl:disabled { opacity: .35; cursor: not-allowed }
-  button.lbl.on, button.lbl.on:hover:not(:disabled) { background: #191713; color: #f5f2ea }
+  button.lbl.on, button.lbl.on:hover:not(:disabled) { background: var(--ink); color: var(--paper) }
+
   /* The arcade floats its menu button over the top-left corner. */
-  @media (max-width: 880px) { #top, #pick h1 { padding-left: 56px } }
-  #top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 12px }
-  #top b { font-variant-numeric: tabular-nums }
-  #tabs { display: flex; gap: 4px; flex-wrap: wrap }
-  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: start }
-  @media (max-width: 640px) { .cols { grid-template-columns: minmax(0, 1fr) } }
-  .locs { display: flex; flex-direction: column; gap: 4px }
-  .loc { font: inherit; font-size: 12px; text-align: left; padding: 6px 8px; border: 1px solid #d8d2c4; background: none; color: inherit; cursor: pointer; border-radius: 2px; display: flex; justify-content: space-between; gap: 8px }
-  .loc:hover:not(:disabled) { border-color: #191713 }
-  .loc.here { border-color: #191713; background: #ece7da }
-  .loc:disabled { opacity: .4; cursor: not-allowed }
-  .loc .done { color: #3d7a35 }
-  .ty { display: inline-block; padding: 1px 5px; color: #fff; font-size: 10px; font-weight: 600; border-radius: 2px; letter-spacing: .03em }
-  #foe { width: 100%; aspect-ratio: 4 / 3; max-height: 220px; border: 1px dashed #d8d2c4; background: none; cursor: pointer; display: grid; place-items: center; position: relative; border-radius: 2px; touch-action: manipulation; user-select: none; -webkit-user-select: none }
-  #foe img { width: 60%; height: 85%; object-fit: contain; image-rendering: pixelated; transition: transform .06s }
-  #foe:active img { transform: scale(.94) }
-  #foe .pop { position: absolute; font-weight: 700; font-size: 13px; pointer-events: none; animation: rise .6s ease-out forwards }
+  @media (max-width: 880px) { #top, #pick .title { padding-left: 56px } }
+
+  /* Header: name on the left, one line of standing on the right. */
+  #top { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; min-height: 32px }
+  .hud { display: flex; gap: 14px; font-size: 12px; color: var(--dim); flex-wrap: wrap }
+  .hud b { color: var(--ink); font-variant-numeric: tabular-nums }
+
+  /* Folder tabs: the open one joins the page below it. */
+  #game { display: flex; flex-direction: column; gap: 12px }
+  #tabs { display: flex; gap: 2px; box-shadow: inset 0 -1px 0 var(--ink); overflow-x: auto; scrollbar-width: none; margin-bottom: -4px }
+  #tabs::-webkit-scrollbar { display: none }
+  #tabs button { font: inherit; font-size: 12px; padding: 6px 12px 5px; border: 1px solid transparent; border-bottom: 0; background: none; color: var(--dim); cursor: pointer; white-space: nowrap; border-radius: 3px 3px 0 0 }
+  #tabs button:hover { color: var(--ink) }
+  @media (max-width: 420px) { #tabs button { padding-left: 8px; padding-right: 8px } .hud { gap: 10px } }
+  #tabs button.on { color: var(--ink); font-weight: 700; border-color: var(--ink); background: var(--paper); padding-bottom: 6px }
+
+  /* Battle: the field leads, the map sits beside it (or under it on a phone). */
+  .cols { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 12px; align-items: start }
+  @media (max-width: 680px) { .cols { grid-template-columns: minmax(0, 1fr) } }
+  .fight { display: flex; flex-direction: column; gap: 8px; min-width: 0 }
+
+  .field { border: 1px solid var(--ink); background: var(--surface); border-radius: 3px; display: flex; flex-direction: column; min-width: 0 }
+  .fieldhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--rule); font-size: 12px }
+  .fieldhead b { font-size: 13px }
+  .plate { padding: 10px 10px 0; display: flex; flex-direction: column; gap: 5px }
+  #foeinfo { font-size: 13px; gap: 6px }
+  #foeinfo b { font-size: 15px }
+  .hpline { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim) }
+  .hpline .bar { flex: 1 }
+  #hptext { font-variant-numeric: tabular-nums; min-width: 9ch; text-align: right }
+
+  #foe { width: 100%; height: clamp(190px, 30vw, 236px); border: 0; background: none; cursor: pointer; position: relative; display: block; touch-action: manipulation; user-select: none; -webkit-user-select: none; color: inherit; font: inherit }
+  #foe:focus-visible { outline-offset: -4px }
+  /* The ground the wild Pokémon stands on; its colour says where you are. */
+  .ground { position: absolute; left: 50%; bottom: 14px; width: min(68%, 320px); height: 46px; transform: translateX(-50%); border: 1px solid var(--rule); border-radius: 50%; background: var(--g-route) }
+  .field[data-kind="gym"] .ground { background: var(--g-gym) }
+  .field[data-kind="dungeon"] .ground { background: var(--g-dungeon) }
+  .field[data-kind="champ"] .ground { background: var(--g-champ); border-color: var(--gold) }
+  #foe img { position: absolute; left: 50%; bottom: 26px; height: calc(100% - 40px); width: auto; max-width: 90%; transform: translateX(-50%); object-fit: contain; object-position: bottom; image-rendering: pixelated; transition: transform .06s }
+  #foe:active img { transform: translateX(-50%) scale(.94) }
+  #foe .pop { position: absolute; font-weight: 700; font-size: 14px; color: var(--red); pointer-events: none; animation: rise .6s ease-out forwards }
   @keyframes rise { to { transform: translateY(-28px); opacity: 0 } }
-  .shinymark { position: absolute; top: 6px; right: 8px; font-size: 11px; font-weight: 700; color: #b8860b }
-  .bar { height: 8px; background: #ece7da; border-radius: 2px; overflow: hidden }
-  .bar i { display: block; height: 100%; background: #3d7a35 }
-  .bar.time i { background: #191713 }
-  .bar.xp { height: 3px } .bar.xp i { background: #3a6fd8 }
-  #log { font-size: 12px; min-height: 2.9em }
+  .shinymark { position: absolute; top: 8px; right: 10px; font-size: 11px; font-weight: 700; color: var(--gold) }
+  #timerwrap { padding: 0 10px 10px; display: flex; align-items: center; gap: 8px; font-size: 11px }
+  #timerwrap .bar { flex: 1 }
+  #timetext { font-variant-numeric: tabular-nums; min-width: 7ch; text-align: right }
+
+  .bar { height: 6px; background: var(--sunk); border-radius: 1px; overflow: hidden }
+  .bar i { display: block; height: 100%; background: var(--good); transition: width .12s linear }
+  .bar.hp[data-s="mid"] i { background: var(--warn) }
+  .bar.hp[data-s="low"] i { background: var(--red) }
+  .bar.time i { background: var(--ink) }
+  .bar.xp { height: 3px } .bar.xp i { background: var(--xp) }
+
+  /* The battle log reads like a text box under the field. */
+  #log { font-size: 13px; min-height: 3.4em; padding: 8px 10px; border: 1px solid var(--rule); border-top: 2px solid var(--ink); background: var(--surface); border-radius: 0 0 3px 3px }
+  #log:empty::before { content: "Tap the wild Pokémon to hit it."; color: var(--dim) }
+  #dps { display: flex; gap: 14px; flex-wrap: wrap }
+  #dps b { color: var(--ink); font-variant-numeric: tabular-nums }
+
+  /* Map: regions as a line of names, then the stops in order. */
+  .map { display: flex; flex-direction: column; gap: 8px; min-width: 0 }
+  #regions { gap: 2px 12px; font-size: 12px; padding: 2px 2px 6px; border-bottom: 1px solid var(--rule) }
+  #regions button { font: inherit; border: 0; background: none; color: var(--ink); padding: 2px 0; cursor: pointer; text-underline-offset: 5px }
+  #regions button:hover:not(:disabled) { text-decoration: underline 1px }
+  #regions button.on { font-weight: 700; text-decoration: underline 2px var(--red) }
+  #regions button:disabled { color: var(--dim); opacity: .55; cursor: not-allowed }
+  .locs { display: flex; flex-direction: column }
+  .loc { font: inherit; font-size: 12px; text-align: left; padding: 7px 8px 7px 12px; border: 0; border-bottom: 1px solid var(--rule); background: none; color: inherit; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; position: relative }
+  .loc:hover:not(:disabled) { background: var(--sunk) }
+  .loc.here { background: var(--surface); font-weight: 700 }
+  .loc.here::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; background: var(--red) }
+  .loc:disabled { color: var(--dim); cursor: not-allowed }
+  .loc:disabled .ty { opacity: .45 }
+  .loc .done { color: var(--good) }
+  .loc > span:last-child { font-weight: 400; white-space: nowrap; font-variant-numeric: tabular-nums }
+  .ty { display: inline-block; padding: 1px 5px; color: #fff; font-size: 10px; font-weight: 600; border-radius: 2px; letter-spacing: .03em; vertical-align: 1px }
+
+  /* Party slots. Empty ones are just an outline. */
   .party { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px }
-  .mon { font: inherit; font-size: 10px; border: 1px solid #d8d2c4; background: #fffdf7; color: inherit; border-radius: 2px; padding: 3px; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; cursor: pointer; position: relative }
-  .mon img { width: 100%; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated }
+  .mon { font: inherit; font-size: 10px; border: 1px solid var(--rule); background: var(--surface); color: inherit; border-radius: 3px; padding: 4px 3px 3px; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; cursor: pointer; position: relative }
+  .mon:hover { border-color: var(--ink) }
+  .mon img { width: 100%; max-width: 88px; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated }
   .mon .nm { width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-  .mon.empty { border-style: dashed; color: #6b6558; justify-content: center; cursor: default }
+  .mon.empty { border-style: dashed; background: none; cursor: default; min-height: 64px }
+  .mon.empty:hover { border-color: var(--rule) }
   .mon .eff { position: absolute; top: 2px; left: 3px; font-weight: 700 }
-  .mon .star { position: absolute; top: 2px; right: 3px; color: #b8860b; font-weight: 700 }
-  .mon.inparty { outline: 2px solid #191713; outline-offset: -2px }
-  .mon .evo { position: absolute; top: 2px; left: 2px; right: 2px; background: #3a6fd8; color: #fff; font-size: 9px; font-weight: 700; letter-spacing: .06em; border-radius: 2px; text-align: center }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 4px }
+  .mon .star { position: absolute; top: 2px; right: 3px; color: var(--gold); font-weight: 700 }
+  .mon.inparty { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink) }
+  .mon .evo { position: absolute; top: 2px; left: 2px; right: 2px; background: var(--xp); color: #fff; font-size: 9px; font-weight: 700; letter-spacing: .04em; border-radius: 2px; text-align: center }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 4px }
   .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 2px }
   .dex img { width: 100%; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated }
-  .dex img.no { filter: brightness(0); opacity: .18 }
-  .shop { display: grid; grid-template-columns: 1fr auto auto; gap: 6px 10px; align-items: center; font-size: 12px }
-  .shop .p { text-align: right; font-variant-numeric: tabular-nums }
-  select, textarea, input { font: inherit; font-size: 12px; border: 1px solid #191713; background: #fff; color: #191713; border-radius: 2px; padding: 4px }
+  .dex img.no { filter: brightness(0); opacity: .16 }
+  #dexregions { gap: 2px 12px; font-size: 12px }
+  #dexregions button.lbl { border: 0; padding: 2px 0; text-underline-offset: 5px }
+  #dexregions button.lbl:hover { background: none; text-decoration: underline 1px }
+  #dexregions button.lbl.on { background: none; color: var(--ink); font-weight: 700; text-decoration: underline 2px var(--red) }
+
+  /* Shop: a counter price list with dotted leaders. */
+  .shop { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px 10px; align-items: center; font-size: 12px }
+  .shop .it { display: flex; align-items: baseline; gap: 6px; min-width: 0 }
+  .shop .it::after { content: ""; flex: 1; min-width: 12px; border-bottom: 1px dotted var(--dim); transform: translateY(-3px) }
+  .shop .p { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700 }
+  .shop .row { flex-wrap: nowrap }
+  @media (max-width: 480px) { .shop .it::after { display: none } }
+
+  select, textarea, input { font: inherit; font-size: 12px; border: 1px solid var(--ink); background: var(--surface); color: var(--ink); border-radius: 2px; padding: 4px }
   textarea { width: 100%; min-height: 70px; resize: vertical }
   .set { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center; font-size: 12px }
-  #toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: #191713; color: #f5f2ea; padding: 8px 12px; border-radius: 2px; font-size: 12px; z-index: 5; max-width: calc(100% - 32px) }
+  #toast { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 8px 12px; border-radius: 2px; font-size: 12px; z-index: 5; max-width: calc(100% - 32px) }
+
+  /* First screen: three partners, each on its own patch of ground. */
+  #pick { display: flex; flex-direction: column; gap: 14px; padding-top: 4px }
+  #pick .title { display: flex; flex-direction: column; gap: 4px }
+  #pick .title p { font-size: 13px; color: var(--dim); max-width: 56ch }
   .starters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px }
-  .starters button { font: inherit; border: 1px solid #191713; background: #fffdf7; color: inherit; padding: 8px; cursor: pointer; border-radius: 2px; display: flex; flex-direction: column; align-items: center; gap: 4px }
-  .starters img { width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated }
+  .starters button { font: inherit; border: 1px solid var(--rule); background: var(--surface); color: inherit; padding: 12px 6px 10px; cursor: pointer; border-radius: 3px; display: flex; flex-direction: column; align-items: center; gap: 6px }
+  .starters button:hover { border-color: var(--ink) }
+  .starters .stage { position: relative; width: 100%; height: 104px }
+  .starters .stage::before { content: ""; position: absolute; left: 50%; bottom: 2px; width: min(86%, 120px); height: 26px; transform: translateX(-50%); border: 1px solid var(--rule); border-radius: 50%; background: var(--g-route) }
+  .starters img { position: absolute; left: 50%; bottom: 10px; width: 88px; height: 88px; transform: translateX(-50%); object-fit: contain; object-position: bottom; image-rendering: pixelated }
+  .starters b { font-size: 14px }
+  .starters .types { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center }
+  #pick .how { font-size: 12px; color: var(--dim); display: grid; gap: 2px; padding-left: 2px }
+
   @media (prefers-color-scheme: dark) {
-    body { background: #1b1a17; color: #ece7da }
-    .muted { color: #a49d8e }
-    .box, .mon, .starters button { background: #24221e; border-color: #3a372f }
-    .loc { border-color: #3a372f } .loc:hover:not(:disabled), .loc.here { border-color: #ece7da } .loc.here { background: #2f2c26 }
-    #foe { border-color: #3a372f }
-    .bar { background: #3a372f } .bar.time i { background: #ece7da }
-    button.lbl, select, textarea, input { border-color: #ece7da } button.lbl:hover:not(:disabled) { background: #2f2c26 }
-    button.lbl.on, button.lbl.on:hover:not(:disabled) { background: #ece7da; color: #1b1a17 }
-    select, textarea, input { background: #1b1a17; color: #ece7da }
-    .mon.inparty { outline-color: #ece7da }
-    .dex img.no { filter: brightness(0) invert(1) }
-    #toast { background: #ece7da; color: #1b1a17 }
+    .dex img.no { filter: brightness(0) invert(1); opacity: .14 }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #foe .pop { animation-duration: .01s } .bar i, #foe img { transition: none }
   }
 </style>
 </head>
 <body>
 <main>
-  <section id="pick" class="box" hidden>
-    <h1>Poké Idle</h1>
-    <div class="small">Pick your first partner. Your party of up to 6 fights wild Pokémon on its own; tap the wild Pokémon to hit harder. Beat routes, earn badges, catch them all.</div>
+  <section id="pick" hidden>
+    <div class="title">
+      <h1>Pick your first partner</h1>
+      <p>Poké Idle. Your party fights on its own; you just help.</p>
+    </div>
     <div class="starters" id="starters"></div>
+    <div class="how">
+      <span>Tap the wild Pokémon to hit harder.</span>
+      <span>Clear a route's 10 fights to open its gym. Badges open the next route.</span>
+    </div>
   </section>
 
   <div id="game" hidden>
-    <div id="top"><h1>Poké Idle</h1><span>$<b id="money">0</b> · Pokédex <b id="dexn">0</b>/1025 · badges <b id="badgen">0</b>/36</span></div>
-    <div id="tabs">
-      <button class="lbl on" data-tab="battle" type="button">Battle</button>
-      <button class="lbl" data-tab="party" type="button">Party &amp; Box</button>
-      <button class="lbl" data-tab="dex" type="button">Pokédex</button>
-      <button class="lbl" data-tab="shop" type="button">Shop</button>
-      <button class="lbl" data-tab="settings" type="button">Settings</button>
+    <div id="top"><h1>Poké Idle</h1><span class="hud"><span>$<b id="money">0</b></span><span>Dex <b id="dexn">0</b>/1025</span><span>Badges <b id="badgen">0</b>/36</span></span></div>
+    <div id="tabs" role="tablist">
+      <button class="on" data-tab="battle" type="button">Battle</button>
+      <button data-tab="party" type="button">Party &amp; Box</button>
+      <button data-tab="dex" type="button">Pokédex</button>
+      <button data-tab="shop" type="button">Shop</button>
+      <button data-tab="settings" type="button">Settings</button>
     </div>
 
     <section id="t-battle" class="cols">
-      <div class="box">
-        <div class="row" id="regions"></div>
-        <div class="locs" id="locs"></div>
-      </div>
-      <div class="box">
-        <div class="row" style="justify-content:space-between"><b id="where"></b><span class="small muted" id="balls"></span></div>
-        <div class="row small" id="foeinfo"></div>
-        <div class="bar"><i id="hpbar"></i></div>
-        <button id="foe" type="button" aria-label="Attack the wild Pokémon"><img id="foeimg" alt=""><span class="shinymark" id="shiny" hidden>SHINY</span></button>
-        <div id="timerwrap" hidden><div class="bar time"><i id="timebar"></i></div><div class="small muted" id="timetext"></div></div>
+      <div class="fight">
+        <div class="field" id="field">
+          <div class="fieldhead"><b id="where"></b><span class="muted" id="balls"></span></div>
+          <div class="plate">
+            <div class="row" id="foeinfo"></div>
+            <div class="hpline"><span>HP</span><div class="bar hp" id="hpwrap"><i id="hpbar"></i></div><span id="hptext"></span></div>
+          </div>
+          <button id="foe" type="button" aria-label="Attack the wild Pokémon"><span class="ground"></span><img id="foeimg" alt=""><span class="shinymark" id="shiny" hidden>Shiny</span></button>
+          <div id="timerwrap" hidden><div class="bar time"><i id="timebar"></i></div><span id="timetext"></span></div>
+        </div>
         <div id="log" role="status"></div>
         <div class="party" id="minis"></div>
         <div class="small muted" id="dps"></div>
+      </div>
+      <div class="map">
+        <div class="row" id="regions"></div>
+        <div class="locs" id="locs"></div>
       </div>
     </section>
 
@@ -121,7 +219,7 @@
       <div class="small muted">Tap a party Pokémon to send it to the Box. Tap a Box Pokémon to add it to the party (up to 6). EVOLVE means it can evolve now: tap it, then Evolve.</div>
       <div class="party" id="party"></div>
       <div id="detail" class="box" hidden></div>
-      <div class="row" style="justify-content:space-between"><h2>Box</h2>
+      <div class="row between"><h2>Box</h2>
         <span class="row small">sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option></select></span></div>
       <div class="grid" id="boxgrid"></div>
     </section>
@@ -407,13 +505,17 @@ function tick() {
 }
 function drawBattle() {
   if (!B || !B.foe) return;
-  $("#hpbar").style.width = (100 * Math.max(0, B.foe.hp) / B.foe.max) + "%";
+  const hpf = Math.max(0, B.foe.hp) / B.foe.max;
+  $("#hpbar").style.width = (100 * hpf) + "%";
+  $("#hpwrap").dataset.s = hpf > .5 ? "" : hpf > .2 ? "mid" : "low";
+  $("#hptext").textContent = fmt(Math.ceil(Math.max(0, B.foe.hp))) + "/" + fmt(B.foe.max);
+  $("#field").dataset.kind = B.kind;
   $("#where").textContent = locName(S.loc) + (B.queue ? ` · ${B.idx + 1}/${B.queue.length}` : ` · ${Math.min(kills(B.r, B.k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM}`);
   $("#timerwrap").hidden = B.time == null;
   if (B.time != null) { const total = B.kind === "gym" ? GYM_TIME : B.kind === "dungeon" ? DUNGEON_TIME : CHAMP_TIME; $("#timebar").style.width = (100 * Math.max(0, B.time) / total) + "%"; $("#timetext").textContent = Math.ceil(Math.max(0, B.time)) + "s left"; }
   $("#money").textContent = fmt(S.money);
-  $("#dps").textContent = `party ${fmt(partyDps(B.foe.m))}/s vs this Pokémon · tap ${fmt(clickDamage())} · protein +${S.protein * 10}%`;
-  $("#balls").textContent = BALLS.filter(b => S.balls[b.id] > 0).map(b => `${b.name.split(" ")[0]} ${S.balls[b.id]}`).join(" · ") || "no balls";
+  $("#dps").innerHTML = `<span>Party <b>${fmt(partyDps(B.foe.m))}</b>/s on this one</span><span>Tap <b>${fmt(clickDamage())}</b></span>${S.protein ? `<span>Protein <b>+${S.protein * 10}%</b></span>` : ""}`;
+  $("#balls").textContent = BALLS.filter(b => S.balls[b.id] > 0).map(b => `${S.balls[b.id]} ${b.name.split(" ")[0]}`).join(", ") || "no balls";
 }
 function say(t, bad) { $("#log").textContent = t; $("#log").className = bad ? "bad" : ""; }
 let toastT = 0;
@@ -449,10 +551,10 @@ function monTile(n, opts = {}) {
 const xpPct = n => { const L = level(n); if (L >= 100) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
   const foe = B && B.foe ? B.foe.m : null;
-  $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true }) : '<div class="mon empty">empty</div>').join("");
+  $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
 }
 function renderParty() {
-  $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true }) : '<div class="mon empty">empty</div>').join("");
+  $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
   const sort = $("#sort").value, list = Object.keys(S.box).map(Number).sort((a, b) => sort === "lvl" ? level(b) - level(a) : sort === "power" ? power(b) - power(a) : a - b);
   $("#boxgrid").innerHTML = list.map(n => monTile(n, { inparty: S.party.includes(n) })).join("");
   renderDetail();
@@ -486,7 +588,7 @@ function renderShop() {
   // Only items something in your Box is waiting on.
   const want = new Set(); for (const n of Object.keys(S.box).map(Number)) for (const e of evoOptions(n)) if (e[1] === "I") want.add(e[2]);
   for (const it of [...want].sort()) rows.push([`${esc(it)} <span class="muted">(have ${S.items[it] || 0})</span>`, ITEM_PRICE, "item:" + it, true]);
-  $("#shop").innerHTML = rows.map(([label, price, id, ok]) => `<span>${label}</span><span class="p">$${fmt(price)}</span><span class="row">${id.startsWith("ball") ? `<button class="lbl" type="button" data-buy="${id}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button><button class="lbl" type="button" data-buy="${id}" data-q="10"${ok && S.money >= price * 10 ? "" : " disabled"}>x10</button>` : `<button class="lbl" type="button" data-buy="${esc(id)}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button>`}</span>`).join("") +
+  $("#shop").innerHTML = rows.map(([label, price, id, ok]) => `<span class="it"><span>${label}</span></span><span class="p">$${fmt(price)}</span><span class="row">${id.startsWith("ball") ? `<button class="lbl" type="button" data-buy="${id}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button><button class="lbl" type="button" data-buy="${id}" data-q="10"${ok && S.money >= price * 10 ? "" : " disabled"}>x10</button>` : `<button class="lbl" type="button" data-buy="${esc(id)}" data-q="1"${ok && S.money >= price ? "" : " disabled"}>Buy</button>`}</span>`).join("") +
     `<span class="muted small" style="grid-column:1/-1">Dungeon tickets are for the region you're in. Evolution items only show up when a Pokémon in your Box needs one.</span>`;
 }
 function buy(id, q) {
@@ -567,7 +669,7 @@ function offline() {
 function boot() {
   if (!S) {
     $("#game").hidden = true; $("#pick").hidden = false;
-    $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><img src="${sprite(n)}" alt=""><b>${mon(n).name}</b>${mon(n).types.map(tyChip).join(" ")}</button>`).join("");
+    $("#starters").innerHTML = [1, 4, 7].map(n => `<button type="button" data-start="${n}"><span class="stage"><img src="${sprite(n)}" alt=""></span><b>${mon(n).name}</b><span class="types">${mon(n).types.map(tyChip).join("")}</span></button>`).join("");
     return;
   }
   $("#pick").hidden = true; $("#game").hidden = false;
