@@ -60,8 +60,8 @@ export async function run() {
   if (repo !== 'bassdrum4/bored') throw new Error('This workflow only operates in bassdrum4/bored');
   const event = JSON.parse(fs.readFileSync(eventFile, 'utf8'));
   const ci = event.workflow_run;
-  if (ci?.name !== 'Check Bored' || ci.event !== 'pull_request' || ci.conclusion !== 'success') {
-    note('Not a successful pull-request Check Bored run; nothing to merge.');
+  if (ci?.name !== 'Check Bored' || ci.event !== 'pull_request' || !['success', 'failure'].includes(ci.conclusion)) {
+    note('Not a completed pull-request Check Bored run; nothing to merge.');
     return;
   }
   // GitHub sometimes reports an empty workflow_run.pull_requests array even
@@ -100,6 +100,19 @@ export async function run() {
       note(`PR #${number}: manual review required (${disallowed.slice(0, 5).map(f => f.filename).join(', ') || 'no changes'}${disallowed.length > 5 ? ', …' : ''}).`);
       continue;
     }
+    // Require the normal browser/logic suite for every auto-merge. Civ Lite
+    // additionally depends on the multiplayer/PostgreSQL suite; Pokédoku and
+    // Poké Idle do not, so an unrelated multiplayer flake must not block them.
+    const { payload: jobList } = await api(`actions/runs/${ci.id}/jobs?per_page=100`, readToken);
+    const jobs = jobList.jobs || [];
+    const jobPassed = name => jobs.some(job => job.name === name && job.conclusion === 'success');
+    const touchesCivLite = files.some(f => f.filename === 'src/games/content/ashcrown.html' ||
+      f.filename === 'src/games/previews/ashcrown.webp' ||
+      f.filename === 'tests/ashcrown-browser.test.cjs');
+    if (!jobPassed('test') || (touchesCivLite && !jobPassed('together-postgres'))) {
+      note(`PR #${number}: relevant CI tests have not passed. Manual review required.`);
+      continue;
+    }
     if (!mergeToken) {
       warn(`PR #${number} eligible, but BORED_AUTOMERGE_TOKEN secret is not configured. Manual review still applies.`);
       continue;
@@ -111,7 +124,7 @@ export async function run() {
       merge_method: 'squash',
     });
     if (result.merged !== true) throw new Error(`PR #${number} was not merged: ${result.message || 'Unknown reason'}`);
-    note(`Automatically merged vetted game-only PR #${number} after Check Bored CI passed.`);
+    note(`Automatically merged vetted game-only PR #${number} after the relevant Check Bored jobs passed.`);
   }
 }
 
