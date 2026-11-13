@@ -124,8 +124,11 @@ function matchAnswer(input: string, answers: Answer[]): Answer | null {
     frenchfries: ['fries'],
     bakedpotato: ['baked potato', 'jacket potato']
   };
+  // A plain object also answers for its prototype, so an answer named
+  // "Constructor" would read Object.prototype.constructor — not iterable.
+  const commonFor = (word: string) => Object.hasOwn(commonAliases, word) ? commonAliases[word] : [];
   const entries: { word: string; a: Answer; key: string }[] = answers.flatMap(answer =>
-    [answer.answer, ...(answer.aliases || []), ...(commonAliases[bare(answer.answer)] || [])]
+    [answer.answer, ...(answer.aliases || []), ...commonFor(bare(answer.answer))]
       .map(word => ({ word, a: answer, key: bare(word) }))
   );
   const exact = entries.find(entry => entry.key === key);

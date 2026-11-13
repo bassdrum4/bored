@@ -63,7 +63,10 @@ export function matchAnswer(input, answers) {
   const key = bare(input);
   if (!key || key.length > 256) return null;
   const commonAliases = { mashedpotatoes: ['mashed', 'mash'], frenchfries: ['fries'], bakedpotato: ['baked potato', 'jacket potato'] };
-  const entries = answers.flatMap(a => [a.answer, ...(a.aliases || []), ...(commonAliases[bare(a.answer)] || [])].map(word => ({ word, a, key: bare(word) })));
+  // A plain object also answers for its prototype, so an answer named
+  // "Constructor" would read Object.prototype.constructor — not iterable.
+  const commonFor = word => Object.hasOwn(commonAliases, word) ? commonAliases[word] : [];
+  const entries = answers.flatMap(a => [a.answer, ...(a.aliases || []), ...commonFor(bare(a.answer))].map(word => ({ word, a, key: bare(word) })));
   const exact = entries.find(e => e.key === key);
   if (exact) return { ...exact.a, correction: key !== bare(exact.a.answer) };
   // A plain plural is the same answer, not a different one.
