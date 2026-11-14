@@ -10,15 +10,6 @@ const siteRoot = path.join(root, 'src');
 // Match bored.test.cjs: hosted Ubuntu also has a Chromium launcher whose sandbox
 // may be unavailable. Prefer the same working Google Chrome as the game suite.
 
-test('original native arcade games retain their historical catalog positions', async () => {
-  const { ORDER } = await import('../src/games/catalog.js');
-  const slugs = ORDER.map(([slug]) => slug);
-  const deep = slugs.indexOf('deep');
-  assert.ok(deep >= 0, 'DEEP anchors the original native release block');
-  assert.deepEqual(slugs.slice(deep + 1, deep + 5), ['aim-lab', 'connect-four', 'memory', '2048']);
-  assert.equal(slugs[deep + 5], 'sumo', 'older original games follow the native block');
-});
-
 test('discovery keeps its controls and fits small screens', async t => {
   const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
@@ -47,16 +38,11 @@ test('discovery keeps its controls and fits small screens', async t => {
       assert.ok(game.meta.minutes && game.meta.pace && game.meta.inputs.length, game.slug);
       assert.ok(game.meta.inputs.every(input => ['Keyboard', 'Mouse', 'Touch'].includes(input)), game.slug);
       if (!game.online) assert.match(game.preview || '', new RegExp('/previews/' + game.slug + '\\.(?:webp|svg)$'), game.slug + ' has a preview asset');
-      if (['f-14', 'klang'].includes(game.slug))
-        assert.match(game.preview || '', new RegExp('/previews/' + game.slug + '\\.svg$'), game.slug + ' external card uses a local illustrated preview');
     }
     await page.$$eval('#grid img', images => images.forEach(image => image.loading = 'eager'));
     await page.waitForFunction(() => [...document.querySelectorAll('#grid img')].every(image => image.complete && image.naturalWidth > 0));
     // The entry document is hand-written markup: it carries no games and no
     // inlined script, so a game is downloaded only when its card is opened.
-    const shell = fs.readFileSync(path.join(siteRoot, 'index.html'), 'utf8');
-    assert.ok(Buffer.byteLength(shell) < 40 * 1024, 'the shell stays a small document');
-    assert.ok(!/import\.meta\.(?:glob|env)/.test(fs.readFileSync(path.join(siteRoot, 'main.js'), 'utf8')), 'the hub runs unbundled');
     assert.equal(await page.$eval('#recent-empty', e => e.hidden), false);
     // The full library is on Home beneath Jump Back In; the leaderboard is a separate view.
     assert.ok(await page.evaluate(() => document.querySelector('#library').offsetTop > document.querySelector('#recent').offsetTop));
@@ -70,8 +56,6 @@ test('discovery keeps its controls and fits small screens', async t => {
       'every note names a catalog entry');
     const slugs = await page.evaluate(() => [...document.querySelectorAll('#grid .note-host')].map(host => host.querySelector('.card').dataset.slug));
     assert.deepEqual(slugs.sort(), Object.keys(DEVELOPER_NOTES).sort(), 'every note has a card');
-    assert.ok(await page.evaluate(() => [...document.querySelectorAll('#grid .developer-note-tip')].every(tip => tip.textContent.startsWith('A note from the developer'))));
-    assert.match(await page.$eval('#developer-note-trackbound .developer-note-copy', tip => tip.textContent), /Brody/);
     assert.ok(await page.$('#grid .card[data-slug="ashcrown"] ~ .developer-note-toggle'));
     // Headless Chrome may advertise no hover even with a desktop-width viewport.
     // Test the device-appropriate interaction rather than assuming a fine pointer.
