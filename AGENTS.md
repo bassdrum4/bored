@@ -205,6 +205,9 @@ Arguments are `(id, display name, unit, options)`. Options:
   (e.g. `snapshot => snapshot.handOver === true`).
 - `transform: snapshot => …` — derive the number when it is not a plain field (8-ball counts
   potted balls).
+- `page: 'slug'` — a second board fed by another game's snapshot (Poké Idle's Battle Tower is
+  `poke-idle-tower`, `page: 'poke-idle'`). It has no catalog entry of its own, but it still needs its
+  own rule in `score-rules.json` and the database; `games:check` holds it to that.
 
 Best values are cached locally (`bored.high.<id>`) and pushed to the `scores` table for signed-in
 players. Games in that list rank on the shared board, so the id must match the snapshot

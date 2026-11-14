@@ -12,7 +12,7 @@ import {
 } from './hub/backend.js';
 import {
   LB_GAMES, HIGH_SCORE_GAMES, accountStandings, rankPoints, boardGames,
-  isLocalOnly, bestValue, formatScore, recordBest, scoreValue,
+  isLocalOnly, bestValue, formatScore, recordBest, scoreValue, boardsOn,
   syncScores, onScoresPosted, boardLeaders
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
@@ -453,16 +453,20 @@ function captureBest({ leaving = false } = {}) {
   if (activeTogether) return false;
   if (!activeSlug || playerPanel.hidden) return false;
   const snapshot = snapshotFor(activeSlug);
-  const improved = snapshot ? recordBest(activeSlug, snapshot, { leaving }) : false;
-  if (improved) {
-    requestCloudPush();
+  if (!snapshot) return false;
+  // A page can feed more than one board (Poké Idle's Battle Tower); its own comes first.
+  let improved = false, claimed = false;
+  for (const board of boardsOn(activeSlug)) {
+    if (!recordBest(board, snapshot, { leaving })) continue;
+    improved = true;
     // A guest has no account to post under. Remember the run so leaving the
     // game can offer them one instead of quietly dropping the score.
-    if (!hasIdentity()) {
-      const value = scoreValue(activeSlug, snapshot, { leaving });
-      if (value && !isLocalOnly(activeSlug)) guestClaim = { slug: activeSlug, value };
+    if (!hasIdentity() && !claimed) {
+      const value = scoreValue(board, snapshot, { leaving });
+      if (value && !isLocalOnly(board)) { guestClaim = { slug: board, value }; claimed = true; }
     }
   }
+  if (improved) requestCloudPush();
   return improved;
 }
 

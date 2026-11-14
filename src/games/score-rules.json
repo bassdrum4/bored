@@ -134,6 +134,11 @@
     "better": "high",
     "max_value": 2050
   },
+  "poke-idle-tower": {
+    "label": "Highest Battle Tower floor cleared",
+    "better": "high",
+    "max_value": 100000
+  },
   "pokedoku": {
     "label": "Today's three Pok\u00e9mon dailies added up",
     "better": "high",
