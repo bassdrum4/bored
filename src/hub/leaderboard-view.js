@@ -105,8 +105,10 @@ function renderLeaderboard() {
   const cached = state.lbCache.get('overall');
   const all = cached?.rows || [];
   const rows = accountStandings(all);
-  const played = new Set(all.map(row => row.game).filter(id => LB_GAMES.some(entry => entry.id === id))).size;
-  $('#lb-note').textContent = 'Players ranked across ' + LB_GAMES.length + ' games · ' + rows.length +
+  // Boards only Penguin's Leaderboard ranks (standings: false) stay out of this count.
+  const ranked = LB_GAMES.filter(entry => entry.standings !== false);
+  const played = new Set(all.map(row => row.game).filter(id => ranked.some(entry => entry.id === id))).size;
+  $('#lb-note').textContent = 'Players ranked across ' + ranked.length + ' games · ' + rows.length +
     (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores · ' + rankPoints(1) +
     ' points for a first place, down to 1 for fifth. Pick a name to see its games.';
 
@@ -148,7 +150,7 @@ function renderLeaderboard() {
         .sort((a, b) => byGameName(specOf(a.game), specOf(b.game)));
       for (const entry of own) {
         const spec = LB_GAMES.find(g => g.id === entry.game);
-        if (!spec) continue;
+        if (!spec || spec.standings === false) continue;
         const value = Number(entry.value);
         const line = element('li', 'lb-line');
         // The number on the row is the viewer's own best, since that is the one

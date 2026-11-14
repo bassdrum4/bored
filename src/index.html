@@ -33,9 +33,10 @@ try {
     <nav class="site-nav" aria-label="Main navigation">
       <a id="home-nav" class="nav-link" href="#home">Home</a>
       <a id="library-nav" class="nav-link" href="#library">All Games</a>
-      <a id="leaderboard-nav" class="nav-link" href="#leaderboard">Leaderboard</a>
+      <a id="leaderboard-nav" class="nav-link" href="#leaderboard">Leader&shy;board</a>
+      <a id="league-nav" class="nav-link" href="#league">Penguin's Leader&shy;board</a>
       <a id="together-nav" class="nav-link" href="#together">Bored Together <span id="together-badge" class="badge" hidden></span></a>
-      <a id="changelog-nav" class="nav-link" href="./changelog.html">Changelog</a>
+      <a id="changelog-nav" class="nav-link" href="./changelog.html">Change&shy;log</a>
       <a id="settings-nav" class="nav-link" href="#settings">Settings</a>
     </nav></div>
     <p class="sub"><b id="count"></b> things to play &middot; in your browser </p>
@@ -120,6 +121,19 @@ try {
     <ol id="lb-list"></ol>
     <p id="lb-empty" hidden></p>
     <p id="lb-mine"></p>
+  </section>
+  <section id="league" aria-labelledby="league-heading" hidden>
+    <div class="league-head">
+      <h2 id="league-heading">Penguin's Leaderboard</h2>
+      <button id="league-refresh" class="action" type="button">Refresh</button>
+    </div>
+    <p class="league-lede">Every Pokémon game on Bored on one page: Poké Idle and the three Pokédoku dailies. Each event has its own table, and the combined one adds them all up.</p>
+    <div id="league-tabs" class="league-tabs" role="tablist" aria-label="Penguin's Leaderboard tables"></div>
+    <div class="league-prof"><span class="league-prof-name" aria-hidden="true">Penguin</span><p id="league-prof" role="status" aria-live="polite"></p></div>
+    <div id="league-board" class="league-board" role="tabpanel" aria-labelledby="league-heading"></div>
+    <p id="league-empty" class="league-empty" hidden></p>
+    <p id="league-mine" class="league-mine"></p>
+    <p id="league-how" class="league-how"></p>
   </section>
   <section id="settings" class="settings-page" aria-labelledby="settings-heading" hidden>
     <div class="settings-intro">

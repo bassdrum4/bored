@@ -141,8 +141,10 @@ function openIdle() {
 }
 landing();
 
-// The hub reads this: today's finished dailies added up, never null.
-window.__boredSnapshot = () => { const t = totals(); return { slug: 'pokedoku', points: t.points, finished: t.finished, daily: true }; };
+// The hub reads this: today's finished dailies added up, never null. Each daily's own score (0 until it's finished)
+// feeds Penguin's Leaderboard.
+const modePoints = id => { const s = sum(id); return s && s.finished ? s.points : 0; };
+window.__boredSnapshot = () => { const t = totals(); return { slug: 'pokedoku', points: t.points, doku: modePoints("doku"), inverse: modePoints("inverse"), shiny: modePoints("shiny"), finished: t.finished, daily: true }; };
 </script>
 </body>
 </html>

@@ -1566,12 +1566,14 @@ test('browser regressions', async t => {
       // score — so this holds whatever the live rule list contains.
       const boards = await page.evaluate(() => ({
         ids: LB_GAMES.map(game => game.id),
+        // Boards only Penguin's Leaderboard ranks (standings: false) stay out of this note's count.
+        ranked: LB_GAMES.filter(game => game.standings !== false).length,
         boards: boardGames().length,
         localOnly: LB_GAMES.filter(game => isLocalOnly(game.id)).length
       }));
       assert.equal(boards.boards, boards.ids.length, 'every game is its own board');
       assert.equal(new Set(boards.ids).size, boards.ids.length, 'no board is listed twice');
-      assert.match(await text(page, '#lb-note'), new RegExp('across ' + boards.ids.length + ' games'));
+      assert.match(await text(page, '#lb-note'), new RegExp('across ' + boards.ranked + ' games'));
     } finally {
       if (await page.$eval('#player', el => !el.hidden)) await close();
       await page.evaluate(list => list.forEach(key => localStorage.removeItem(key)), keys);
