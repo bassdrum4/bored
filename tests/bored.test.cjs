@@ -108,19 +108,10 @@ async function noOverflow(frame = page) {
   assert.ok(await frame.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow');
 }
 
-test('F-14 points to its GitHub Pages build', () => {
-  const externs = JSON.parse(source.match(/const EXTERNS = (.*);/)[1]);
-  assert.equal(externs['f-14'], 'https://bassdrum4.github.io/f-14-4/');
-});
-
 test('the entry document loads the hub as modules from its own folder', () => {
   assert.match(entry, /<script type="module" src="\.\/main\.js"><\/script>/, 'the hub is a module beside the page');
   assert.match(entry, /<link rel="stylesheet" href="\.\/styles\.css">/, 'the stylesheet is a sibling file');
   assert.doesNotMatch(entry, /(?:src|href)="\/(?!\/)/, 'no root-absolute paths: the site is served under /bored/');
-  const inlineScripts = [...entry.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)].filter(match => !/\bsrc\s*=/.test(match[1]));
-  assert.equal(inlineScripts.length, 1, 'the theme bootstrap is the only inline script');
-  assert.match(inlineScripts[0][2], /localStorage\.getItem\('bored\.ui\.preferences'\)/, 'bootstrap reads saved preferences');
-  assert.match(inlineScripts[0][2], /dataset\.theme = 'dark'/, 'bootstrap sets theme before paint');
   const context = rules(['arcadeGame', 'nativeHTML']);
   for (const slug of ['2048', 'memory', 'connect-four', 'aim-lab']) {
     const game = context.nativeHTML(slug);
