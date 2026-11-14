@@ -261,6 +261,37 @@ test('Ashcrown orders: a real right-click on their unit at peace asks first, and
 // Keep browser coverage for saves, fog of war, direct input, and co-op;
 // release-note/help/embassy markup is not a stable UI contract.
 
+/* ── 5.1: co-op ────────────────────────────────────────────────────────────── */
+
+const COOP_SEATS = '[{ name: "Ann", human: true, civ: "rome" }, { name: "Ben", human: true, civ: "celts" }, { name: "", human: false, civ: "qin" }, { name: "", human: false, civ: "japan" }]';
+async function coopGame(t, width) {
+  const ctx = await open(t, width);
+  if (width >= 1000) await ctx.page.setViewport({ width, height: 800, deviceScaleFactor: 1 });
+  await ctx.page.evaluate(`(() => {
+    setTips(false);
+    startGame({ seats: ${COOP_SEATS}, seed: 77, map: 'pangaea', level: 'chieftain', mode: 'coop' });
+    UI.start.hidden = true;
+    G.handoff = false; G.viewer = G.cur = 0; G.news.length = 0;
+    render();
+  })()`);
+  return ctx;
+}
+// Click the middle of a hex with the real mouse, optionally holding Alt.
+async function clickHex(page, x, y, alt) {
+  await page.evaluate(`(() => { G.units.forEach(u => { u.mp = unitMove(u); u.acted = false; }); refreshVision(); centreOn(${x}, ${y}); render(); })()`);
+  const at = await page.evaluate(`(() => {
+    const el = document.querySelector('[data-tile="${x},${y}"]');
+    if (!el) return null;
+    const r = el.getBoundingClientRect(), px = r.left + r.width / 2, py = r.top + r.height / 2, top = document.elementFromPoint(px, py);
+    return top && top.closest('[data-tile]') === el ? [px, py] : null;
+  })()`);
+  assert.ok(at, 'hex ' + x + ',' + y + ' is on screen and clickable');
+  if (alt) await page.keyboard.down('Alt');
+  await page.mouse.click(at[0], at[1]);
+  if (alt) await page.keyboard.up('Alt');
+}
+const later = ms => new Promise(done => setTimeout(done, ms));
+
 test('Ashcrown 5.1: the setup screen offers Co-op, refuses it with no CPU to play against, and starts a team game', async t => {
   const { page, errors } = await open(t, 1000);
   await page.click('#btn-new');
