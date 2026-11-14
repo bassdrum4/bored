@@ -103,7 +103,8 @@ test('discovery keeps its controls and fits small screens', async t => {
     await page.click('[data-filter="Friends"]');
     assert.ok(await page.$eval('#grid .card', cards => cards.length) > 0);
     assert.ok(await page.$eval('#grid .card', cards => cards.every(card =>
-      !!TOGETHER_GAMES[card.dataset.slug] || (DISCOVERY[card.dataset.slug]?.players || '').includes('2 local'))));
+      !!card.closest('.row')?.querySelector('.catalog-together') ||
+      (DISCOVERY[card.dataset.slug]?.players || '').includes('2 local'))));
     await page.click('[data-filter="Relax"]');
     assert.ok(await page.$eval('#grid .card', cards => cards.length) > 0);
     assert.ok(await page.$eval('#grid .card', cards =>
