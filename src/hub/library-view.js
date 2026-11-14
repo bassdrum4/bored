@@ -199,6 +199,7 @@ function renderRecent() {
   $('#favorites-all').hidden = !state.favorites.size;
   $('#favorites-all').textContent = 'Browse ' + state.favorites.size + (state.favorites.size === 1 ? ' favorite' : ' favorites') + ' →';
   $('#recent-empty').hidden = shown.length > 0;
+  $('#recent-empty').closest('.empty-note').hidden = shown.length > 0;
 }
 
 // All Games sorts independently of the welcome/history shelf; Popular uses the
