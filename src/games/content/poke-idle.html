@@ -516,7 +516,7 @@ const REGIONS = [
 ].map(([name, gyms, champ], r) => ({ name, gyms, champ, gen: r + 1 }));
 const KILLS_FOR_GYM = 10, GYM_TIME = 30, DUNGEON_TIME = 60, CHAMP_TIME = 60, DUNGEON_SIZE = 8;
 // Mt. Silver: Red waits there once all nine Champions are down. Brutal on purpose; the Shiny Charm is the prize.
-const RED_TEAM = [25, 196, 143, 3, 6, 9], SUMMIT_HP = 10, SUMMIT_LEVEL = 100, SUMMIT_TIME = 120;
+const RED_TEAM = [25, 196, 143, 3, 6, 9], SUMMIT_HP = 9.8, SUMMIT_LEVEL = 100, SUMMIT_TIME = 120;
 // Shinies: 1 in 4096, as in the newer games. The Shiny Charm triples it.
 const shinyOdds = () => (S.charm ? 3 : 1) / 4096;
 const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
@@ -639,6 +639,18 @@ const proteinBoost = () => PROTEIN_STEP * Math.min(S.protein, proteinCap());
 // hits: Speed 75 is once a second, 150 is 1.5x as often, 0 is half. The party's HP, Defense and Sp. Def (averaged)
 // stretch or shrink the timer in gym, Champion, dungeon and Red fights, from -20% to +25%, against a bulk of 85.
 const hitRate = m => (m.spe + 75) / 150;
+// Physical or special. Attack meets the foe's Defense and Sp. Atk its Sp. Def: each hit is × √(the foe's average
+// defense ÷ the one it hits), from ×0.67 to ×1.5, so a foe with even defenses takes what it always did, Steelix
+// (Def 200, Sp. Def 65) takes ×1.43 from special hits and ×0.81 from physical ones. A Pokémon hits with its better
+// attacking stat, even where the other would do more, as you'd never teach it a move off its weak one. Mixed attackers
+// (Attack and Sp. Atk within 10% of each other, like Lucario, Arceus or Rayquaza) use whichever hits that foe harder.
+const MIXED = .9, DEF_LO = 2 / 3, DEF_HI = 1.5;
+const defMult = (foe, phys) => Math.min(DEF_HI, Math.max(DEF_LO, Math.sqrt((foe.def + foe.spd) / 2 / (phys ? foe.def : foe.spd))));
+const isMixed = m => Math.min(m.atk, m.spa) >= MIXED * Math.max(m.atk, m.spa);
+const category = m => isMixed(m) ? "mixed" : m.atk >= m.spa ? "physical" : "special";
+// Which side it hits this foe on (true: Attack vs Defense) and the attacking stat times that side's multiplier.
+const hitsPhys = (m, foe) => isMixed(m) ? m.atk * defMult(foe, true) >= m.spa * defMult(foe, false) : m.atk >= m.spa;
+const hitStat = (m, foe) => { if (!foe) return Math.max(m.atk, m.spa); const ph = hitsPhys(m, foe); return (ph ? m.atk : m.spa) * defMult(foe, ph); };
 const bulkOf = m => (m.hp + m.def + m.spd) / 3;
 const PARTY_BULK = 85;
 // What a party member fights as: its Mega form if it's the party's Mega.
@@ -759,7 +771,7 @@ const QUESTS = [
   { id: "origin", r: 3, place: "Hall of Origin", boss: "Arceus", prize: 493, need: [483, 484, 487], hp: 14.2, prizeNote: "any type",
     foes: [statForm(493, { name: "Arceus", sprite: 493 }, "Normal", ARCEUS_STATS), statForm(493, { name: "Arceus (Dragon)", sprite: "493-dragon" }, "Dragon", ARCEUS_STATS), statForm(493, { name: "Arceus (Ghost)", sprite: "493-ghost" }, "Ghost", ARCEUS_STATS)],
     won: "Arceus can take any type now: pick its Plate in its detail." },
-  { id: "crown", r: 7, place: "Crown Shrine", boss: "Calyrex", prize: 898, need: [898, 896, 897], hp: 29.6, prizeNote: "both Riders",
+  { id: "crown", r: 7, place: "Crown Shrine", boss: "Calyrex", prize: 898, need: [898, 896, 897], hp: 29.7, prizeNote: "both Riders",
     foes: [QFORMES[898][0], QFORMES[898][1]], won: "Calyrex can ride Glastrier or Spectrier now: pick a Rider in its detail." },
   { id: "megalo", r: 6, place: "Megalo Tower", boss: "Ultra Necrozma", prize: 800, need: [800, 791, 792], hp: 62.7, prizeNote: "Dusk Mane, Dawn Wings, Ultra",
     foes: [statForm(800, { name: "Ultra Necrozma", sprite: 10157 }, "Psychic/Dragon", [97, 167, 97, 167, 97, 129])], won: "Necrozma can become Dusk Mane, Dawn Wings or Ultra Necrozma now: pick it in its detail." },
@@ -767,7 +779,7 @@ const QUESTS = [
     foes: [statForm(386, { name: "Deoxys", sprite: 386 }, "Psychic", [50, 150, 50, 150, 50, 150]), statForm(386, { name: "Deoxys (Attack Forme)", sprite: 10001 }, "Psychic", [50, 180, 20, 180, 20, 150]),
       statForm(386, { name: "Deoxys (Defense Forme)", sprite: 10002 }, "Psychic", [50, 70, 160, 70, 160, 90]), statForm(386, { name: "Deoxys (Speed Forme)", sprite: 10003 }, "Psychic", [50, 95, 90, 95, 90, 180])],
     won: "Rayquaza can Mega Evolve now: turn it on in its detail in Party & Box." },
-  { id: "cerulean", r: 0, place: "Cerulean Cave", boss: "Mega Mewtwo", prize: 150, need: [150, 151], hp: 23.8, prizeNote: "both Mewtwonites", stones: MEWTWONITES,
+  { id: "cerulean", r: 0, place: "Cerulean Cave", boss: "Mega Mewtwo", prize: 150, need: [150, 151], hp: 23.4, prizeNote: "both Mewtwonites", stones: MEWTWONITES,
     foes: MEWTWONITES.map(formById), won: "Mewtwo can Mega Evolve into X or Y now: pick one in its detail in Party & Box." }
 ];
 const QUEST = Object.fromEntries(QUESTS.map(Q => [Q.id, Q]));
@@ -804,8 +816,9 @@ function signature(n) {
   if (q && q.boost) return q;
   return n === ARCEUS && S.won && S.won.origin ? { move: "Judgment", boost: JUDGMENT } : null;
 }
-const power = (n, L = level(n)) => { const m = fighter(n), sig = signature(n); return Math.max(m.atk, m.spa) * L / 50 * hitRate(m) * truant(n) * (1 + proteinBoost()) * (sig ? sig.boost : S.gmax === n ? GMAX_BOOST : 1); };
-const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n)) * (foe ? bestEff(fighter(n), foe) : 1), 0);
+// Damage a second; against a given foe, with its Defense or Sp. Def counted (type matchups come on top, in partyDps).
+const power = (n, L = level(n), foe) => { const m = fighter(n), sig = signature(n); return hitStat(m, foe) * L / 50 * hitRate(m) * truant(n) * (1 + proteinBoost()) * (sig ? sig.boost : S.gmax === n ? GMAX_BOOST : 1); };
+const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n), foe) * (foe ? bestEff(fighter(n), foe) : 1), 0);
 const clickDamage = () => Math.max(1, Math.round(1 + partyDps(null) * .15));
 
 // ── Battle state
@@ -852,24 +865,24 @@ function refPool(r, k, cap) {
   const have = m => !legendary(m) && minLv(m.num) <= cap && (m.gen <= r || (m.gen === r + 1 && (open.has(m.num) || (open.has(rootOf(m.num)) && byLevelOnly(m.num)))));
   return MON.filter(m => have(m) && !m.evos.some(([t]) => have(mon(t))));
 }
-const refHit = (m, cap) => Math.max(m.atk, m.spa) * cap / 50 * hitRate(m) * truant(m.num);
+const refHit = (m, cap, foe) => hitStat(m, foe) * cap / 50 * hitRate(m) * truant(m.num);
 // The reference team's own Def: tuning measures it against the time that team would get, so Def counts relative to it.
 const refDef = P => Math.min(1.25, Math.max(.8, P.reduce((s, m) => s + bulkOf(m), 0) / P.length / PARTY_BULK));
 const refTaps = (P, cap, taps) => taps * Math.max(1, Math.round(1 + .15 * P.reduce((s, m) => s + refHit(m, cap), 0)));
 function gymTuning(B, k, size) {
-  const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap) * bestEff(m, f), 0);
+  const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap, f) * bestEff(m, f), 0);
   const P = refPool(B.r, k, cap).sort((a, b) => vs(b) - vs(a)).slice(0, size), tap = refTaps(P, cap, GYM_TAPS);
-  const secs = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap) * bestEff(m, f), 0) + tap), 0);
+  const secs = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap, f) * bestEff(m, f), 0) + tap), 0);
   return GYM_USE * B.bossTime * refDef(P) / secs;
 }
 // Dungeon fodder is as tough as that region's route Pokémon, and a bit more.
 const fodderHp = i => DUNGEON_HP * wildHard(i);
 function legendTuning(B) {
-  // "Decent": the 7th to 12th strongest you could have by now, with no type edge either way.
+  // "Decent": the 7th to 12th strongest you could have by now, with no type edge either way (Def and Sp. Def count).
   const cap = areaCap(), P = refPool(B.r, 2, cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
-  const dps = P.reduce((d, m) => d + refHit(m, cap), 0) + refTaps(P, cap, LEGEND_TAPS), n = B.queue.length;
-  const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps, 0);
-  return Math.max(1, (LEGEND_USE * B.bossTime * refDef(P) - fodder) * dps / bossHpFor(B.queue[n - 1], B.L, B.i));
+  const tap = refTaps(P, cap, LEGEND_TAPS), dps = f => P.reduce((d, m) => d + refHit(m, cap, f), 0) + tap, n = B.queue.length, lg = B.queue[n - 1];
+  const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps(f), 0);
+  return Math.max(1, (LEGEND_USE * B.bossTime * refDef(P) - fodder) * dps(lg) / bossHpFor(lg, B.L, B.i));
 }
 
 function startLoc(loc) {
@@ -932,7 +945,7 @@ function spawn() {
   S.seen[m.num] = 1;
   $("#foeimg").src = spriteOf(m, shiny);
   $("#shiny").hidden = !shiny;
-  $("#foeinfo").innerHTML = `<b>${esc(m.name)}</b> Lv ${L} ${m.types.map(tyChip).join(" ")}${ownsFoe(m) ? ' <span class="muted">· caught</span>' : ""}`;
+  $("#foeinfo").innerHTML = `<b>${esc(m.name)}</b> Lv ${L} ${m.types.map(tyChip).join(" ")} <span class="muted small">Def ${m.def} · SpD ${m.spd}</span>${ownsFoe(m) ? ' <span class="muted">· caught</span>' : ""}`;
   renderMinis();
 }
 function hit(dmg) {
@@ -1177,9 +1190,13 @@ function renderLocs() {
 // How a party member looks: its Mega or Gigantamax form when it has one on.
 const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax === n && gmaxOf(n)) || special(n) || altOf(n) || mon(n);
 function monTile(n, opts = {}) {
-  const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : special(n) || altOf(n) || m, e = opts.foe ? bestEff(fighter(n), opts.foe) : null;
+  const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : special(n) || altOf(n) || m, fm = fighter(n), te = opts.foe ? bestEff(fm, opts.foe) : null;
+  // In battle: how hard it hits this foe, type matchup × Defense or Sp. Def side, shown when it's 10% or more off even.
+  const ph = opts.foe && hitsPhys(fm, opts.foe), dm = opts.foe ? defMult(opts.foe, ph) : 1, e = te == null ? null : te * dm;
+  const eLabel = e == null ? "" : dm > .95 && dm < 1.05 ? ({ 0: "0x", .25: "¼x", .5: "½x" })[te] || te + "x" : (e >= 10 ? Math.round(e) : Math.round(e * 10) / 10) + "x";
+  const eTitle = e == null ? "" : `${te}x type; ${ph ? "Attack vs Defense" : "Sp. Atk vs Sp. Def"} ×${dm.toFixed(2)}`;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](statsOf(n))}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && (e >= 1.1 || e <= .9) ? `<span class="eff ${e > 1 ? "good" : "bad"}" title="${eTitle}">${eLabel}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](statsOf(n))}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -1261,7 +1278,7 @@ function renderDetail() {
   if (!detail || !S.box[detail]) { el.hidden = true; return; }
   const sp = special(detail), m = mon(detail), opts = evosOf(detail), st = sp || altOf(detail) || m, owned = S.box[detail];
   el.hidden = false;
-  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · bulk ${Math.round(bulkOf(fighter(detail)))} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
+  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${Math.round(bulkOf(fighter(detail)))} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small muted">HP <b>${st.hp}</b> · Atk <b>${st.atk}</b> · Def <b>${st.def}</b> · SpA <b>${st.spa}</b> · SpD <b>${st.spd}</b> · Spe <b>${st.spe}</b> · Total <b>${st.bst}</b></div>` +
     (TRUANT.has(detail) ? '<div class="small muted">Truant: it only attacks every other turn, so it deals half damage.</div>' : "") +
     (signature(detail) ? `<div class="small"><b>${esc(signature(detail).move)}</b> <span class="muted">signature move: ×${signature(detail).boost} damage</span></div>` : "") +
@@ -1417,6 +1434,8 @@ function renderAch() {
 const MAIL = [
   { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
+  { id: "update-2026-11-14b", date: "Nov 14, 2026", from: "Prof Penguin", title: "Physical and special attackers",
+    body: `<p>Defense and Sp. Def count now. Each of your Pokémon is a physical attacker (Attack against the foe's Defense) or a special one (Sp. Atk against its Sp. Def), by whichever stat is higher, just like the moves you'd give it. Pokémon with both about equal, like Lucario or Arceus, are mixed and use whichever hits harder.</p><p>So bring special attackers to Steelix and physical ones to Blissey. The foe's Def and Sp. Def show next to its name, and each tile in your party shows how hard it hits, type and defense together. Every boss has been re-tuned, so a team built for the fight finds it as hard as before.</p>` },
   { id: "update-2026-11-14", date: "Nov 14, 2026", from: "Prof Penguin", title: "Two more legends, and stronger prizes",
     body: `<ul><li>Two more extremely difficult quests open once every Champion is beaten:</li>
       <li><b>Sky Pillar</b> (Hoenn): own Rayquaza, Groudon and Kyogre. Deoxys fights you in all four Formes, back to back. Win, and Rayquaza can Mega Evolve.</li>
@@ -1524,8 +1543,8 @@ function wikiSections() {
     { id: "catching", group: "Basics", title: "Catching", html: `<p>When a wild Pokémon faints, a ball is thrown at it, picked by Settings: one choice for new Pokémon, one for ones you have, one for shinies. Chance = catch rate ÷ 255 × 0.6 × the ball's multiplier + its bonus, at most 100%. Legendaries and mythicals shrug off anything but a Master Ball half the time.</p><ul>${ballRows}</ul><p>Auto (the default for new Pokémon) throws the cheapest ball with at least an even chance, else your best one, and only spends a Master Ball on a shiny or a legendary.</p><p>New Pokémon join your party until it has been full once. After that they go to the Box, so an empty slot stays free for whoever you choose.</p>` },
     { id: "partybox", group: "Basics", title: "Party & Box", html: `<p>Drag a party Pokémon onto another slot to trade places, drag a Box Pokémon onto a party slot to swap it in, or drag a party Pokémon down to the Box to send it back. On a phone, hold it still for a moment before dragging, so a swipe still scrolls. With a full party, a Box Pokémon's detail also has Swap into party: tap it, then tap who goes.</p><p>Order doesn't change how the party fights, so you can rearrange during any battle. Swapping someone in or out waits until you're back on a route.</p>` },
     { id: "offline", group: "Basics", title: "Offline", html: `<p>While you're away (up to 8 hours) your party keeps fighting on your last route at about a third of the live pace, the pause included: money and XP, no catches. The title screen says what it did.</p>` },
-    { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Attack</b>: damage per hit is the higher of Attack and Sp. Atk × level ÷ 50 × protein${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}, or × a side-quest prize's signature move (see Signature moves).</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often. Slaking has Truant: it only attacks every other turn, so it deals half damage.</p><p><b>Bulk</b> (Def): a Pokémon's HP, Defense and Sp. Def averaged. Your party's average bulk stretches or shrinks the timer in boss fights against a bulk of ${PARTY_BULK}: from −20% to +25%. Party & Box shows each Pokémon's bulk next to its power, and the team's under the party. The map shows the time your current party gets.</p>` },
-    { id: "types", group: "Stats and levels", title: "Types", html: `<p>The main games' type chart. Each party Pokémon uses its better type against the foe; the tile shows 2x, 4x, ½x, ¼x or 0x when it isn't neutral. A Mega fights with its Mega typing.</p>` },
+    { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Physical or special</b>: each Pokémon hits with its better attacking stat, Attack against the foe's Defense or Sp. Atk against its Sp. Def, even where the other would do more (you wouldn't teach it a move off its weak stat). Mixed attackers, with Attack and Sp. Atk within ${pct(1 - MIXED)} of each other (Lucario, Arceus, Rayquaza), use whichever hits each foe harder. Each hit is × √(the foe's average defense ÷ the one it hits), from ×${DEF_LO.toFixed(2)} to ×${DEF_HI}: Steelix (Def 200, Sp. Def 65) takes ×1.43 from special hits and ×0.81 from physical ones, and a foe with even defenses takes ×1 from both. The foe's Def and Sp. Def show next to its name, and each party tile shows how hard it hits that foe, type and defense together (hover for the split).</p><p><b>Attack</b>: damage per hit is that attacking stat × level ÷ 50 × protein × the defense side above${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}, or × a side-quest prize's signature move (see Signature moves).</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often. Slaking has Truant: it only attacks every other turn, so it deals half damage.</p><p><b>Bulk</b> (Def): a Pokémon's HP, Defense and Sp. Def averaged. Your party's average bulk stretches or shrinks the timer in boss fights against a bulk of ${PARTY_BULK}: from −20% to +25%. Party & Box shows each Pokémon's bulk next to its power, and the team's under the party. The map shows the time your current party gets.</p>` },
+    { id: "types", group: "Stats and levels", title: "Types", html: `<p>The main games' type chart. Each party Pokémon uses its better type against the foe; the tile shows 2x, 4x, ½x, ¼x or 0x when it isn't neutral, times the Defense or Sp. Def side (see Attack, Speed and Def). A Mega fights with its Mega typing.</p>` },
     { id: "levels", group: "Stats and levels", title: "Levels and the cap", html: `<p>Each win gives every party Pokémon the foe's level × ${XP_RATE} XP (× 1.5 against trainers). Level is the cube root of XP, up to 100.</p><p>The level cap is ${CAP_OVER} over the next gym leader or Champion you haven't beaten, and 100 once every Champion is down. Each place also keeps the cap it had when you first got there: go back and your party fights held to it, so a Lv 90 team is Lv 30 on Hoenn Route 1. XP past the cap from older saves waits until the cap catches up.</p>` },
     { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
     { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, with no protein and tapping ${GYM_TAPS} times a second, uses ${pct(GYM_USE)} of the time it would get. Weaker, off-type or under-cap teams lose; protein, Megas, bulkier and better teams give you room. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
@@ -1604,7 +1623,7 @@ function wikiEntry(n) {
       <dt>Where</dt><dd>${wikiWhere(n)}</dd>
       <dt>Evolution</dt><dd>${wikiEvo(n)}</dd>
       <dt>Catching</dt><dd>Catch rate ${m.cr}: ${balls}.${legendary(m) ? " It breaks out of anything but a Master Ball half the time." : ""}</dd>
-      <dt>In battle</dt><dd>Hits ${hitRate(m).toFixed(2)} times a second for about ${fmt(Math.round(Math.max(m.atk, m.spa) * 2 * hitRate(m) * truant(n)))} damage a second at Lv 100, before type matchups and Protein. Bulk ${Math.round(bulkOf(m))}.${TRUANT.has(n) ? " Truant: it only attacks every other turn, so it deals half damage." : ""}</dd>
+      <dt>In battle</dt><dd>${{ physical: "Physical: Attack against the foe's Defense.", special: "Special: Sp. Atk against the foe's Sp. Def.", mixed: "Mixed: Attack or Sp. Atk, whichever hits each foe harder." }[category(m)]} Hits ${hitRate(m).toFixed(2)} times a second for about ${fmt(Math.round(Math.max(m.atk, m.spa) * 2 * hitRate(m) * truant(n)))} damage a second at Lv 100, before type matchups and Protein. Bulk ${Math.round(bulkOf(m))}.${TRUANT.has(n) ? " Truant: it only attacks every other turn, so it deals half damage." : ""}</dd>
       <dt>Yours</dt><dd>${yours}</dd>
     </dl>${forms.length ? `
     <h4>Forms</h4><div class="pk-forms">${forms.map(f => `<div class="pk-form"><span class="pic"><img class="spr" src="${sprite(f.sprite, wikiShiny)}" alt=""></span><div><p><b>${esc(f.num === 493 ? "Arceus (any Plate)" : f.name)}</b> ${f.num === 493 ? "" : f.types.map(tyChip).join(" ")}</p><p class="muted small">${f.vid ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. ${esc(variantWhere(f))}.` : f.key && f.quest ? (f.num === 493 ? `Any of the 17 Plate types, same stats. Win the Hall of Origin. Judgment: ×${JUDGMENT} damage.` : `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Win at the ${QUEST[f.quest].place}.${f.boost ? ` ${f.move}: ×${f.boost} damage.` : ""}`) : f === RAPID ? "Same stats, Fighting/Water. Pick the style in Urshifu's detail." : f.need ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Takes ${f.need} Zygarde Cells.` : f.kind === "mega" ? `Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. ${f.quest ? `Win at the ${QUEST[f.quest].place}. ${f.move}: ×${f.boost} damage.` : "Needs its Mega Stone."}` : f.quest ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Win the Darkest Day. Takes the Gigantamax slot; Dynamax Cannon: ×${ETERNAMAX_BOOST} damage.` : `Same stats, hits ${pct(GMAX_BOOST - 1)} harder. Needs Max Soup.`}</p></div></div>`).join("")}</div>` : ""}
