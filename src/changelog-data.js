@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 482,
+  "count": 483,
   "newest": "2026-11-14",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"6df10a2","date":"2026-11-14","author":"Daniel Lowe","subject":"test: prune redundant and implementation-bound Bored regressions","pr":144},
   {"sha":"e352853","date":"2026-11-14","author":"Daniel Lowe","subject":"fix(ci): allow changelog bot to commit through owner token"},
   {"sha":"311c4d7","date":"2026-11-14","author":"PenguinV360","subject":"Poké Idle: sync saves across Bored account devices","pr":143},
   {"sha":"e3f1aa7","date":"2026-11-14","author":"PenguinV360","subject":"feat(poke-idle): physical and special attackers against Defense and Sp. Def","pr":142},
