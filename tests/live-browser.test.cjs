@@ -71,6 +71,10 @@ async function harness(t) {
       const identity = req.headers().authorization?.replace('Bearer ', '');
       const as = ids.includes(identity) ? identity : null;
       const rpc = async fn => { try { return reply(await fn()); } catch (e) { return reply({ message: e.message, code: e.code }, 400); } };
+      if (address.pathname === '/rest/v1/rpc/bored_popular_games') {
+        // Public seven-day ranks are unrelated to the live multiplayer protocol.
+        return reply([{ game: 'trackbound', ranking: 1 }]);
+      }
       if (address.pathname === '/rest/v1/rpc/bt_live_rpc') {
         const { action, args } = JSON.parse(req.postData());
         seen.push(action);
