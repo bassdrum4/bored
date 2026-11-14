@@ -136,7 +136,7 @@
   #boxgrid.drop { outline: 1px dashed var(--red); outline-offset: 4px }
   #ghost { position: fixed; left: 0; top: 0; width: 60px; height: 60px; z-index: 6; pointer-events: none; display: flex; align-items: center; justify-content: center; background: var(--surface); border: 1px solid var(--ink); border-radius: 3px }
   #ghost img { max-width: 52px; max-height: 52px; image-rendering: pixelated }
-  #partyhint b { color: var(--ink) }
+  #partyhint b, #teamline b { color: var(--ink); font-variant-numeric: tabular-nums }
   .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 2px }
   .dex button { display: block; width: 100%; padding: 0; border: 1px solid transparent; border-radius: 2px; background: none; cursor: pointer }
   .dex button:hover { border-color: var(--rule); background: var(--surface) }
@@ -369,9 +369,10 @@
       <h2>Party</h2>
       <div class="small muted" id="partyhint"></div>
       <div class="party" id="party"></div>
+      <div class="small muted" id="teamline"></div>
       <div id="detail" class="box" hidden></div>
       <div class="row between" id="boxhead"><h2>Box</h2>
-        <span class="row small">type <select id="tfilter" aria-label="Show one type"><option value="">all</option></select> sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option><option value="evo">Can evolve</option><option value="hp">HP</option><option value="atk">Attack</option><option value="def">Defense</option><option value="spa">Sp. Atk</option><option value="spd">Sp. Def</option><option value="spe">Speed</option><option value="bst">Total</option></select></span></div>
+        <span class="row small">type <select id="tfilter" aria-label="Show one type"><option value="">all</option></select> sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option><option value="bulk">Bulk</option><option value="evo">Can evolve</option><option value="hp">HP</option><option value="atk">Attack</option><option value="def">Defense</option><option value="spa">Sp. Atk</option><option value="spd">Sp. Def</option><option value="spe">Speed</option><option value="bst">Total</option></select></span></div>
       <div class="grid" id="boxgrid"></div>
     </section>
 
@@ -1059,7 +1060,7 @@ const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax 
 function monTile(n, opts = {}) {
   const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : special(n) || m, e = opts.foe ? bestEff(fighter(n), opts.foe) : null;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](m)}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](statsOf(n))}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -1067,18 +1068,22 @@ function renderMinis() {
   $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true, battle: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
 }
 // Base-stat sorts for the Box: label shown on the tile, and the value. Biggest first.
-const STAT_SORTS = { hp: ["HP", m => m.hp], atk: ["Atk", m => m.atk], def: ["Def", m => m.def], spa: ["SpA", m => m.spa], spd: ["SpD", m => m.spd], spe: ["Spe", m => m.spe], bst: ["Total", m => m.bst] };
+const statsOf = n => special(n) || zforme(n) || ustyle(n) || mon(n);
+const STAT_SORTS = { bulk: ["Bulk", m => Math.round(bulkOf(m))], hp: ["HP", m => m.hp], atk: ["Atk", m => m.atk], def: ["Def", m => m.def], spa: ["SpA", m => m.spa], spd: ["SpD", m => m.spd], spe: ["Spe", m => m.spe], bst: ["Total", m => m.bst] };
 const PARTY_HINT = "Drag to rearrange your party, drag a Box Pokémon onto a slot to swap it in, or drag one down to the Box. On a phone, hold it first. Tap any Pokémon for its details; EVOLVE means it can evolve now.";
 function renderParty() {
   // Rebuilding the tiles mid-drag would pull the one in your hand out from under you: catch up when it's dropped.
   if (drag) { dragDirty = true; return; }
   $("#partyhint").innerHTML = swapPick && S.box[swapPick] ? `<b>Tap the party Pokémon ${esc(mon(swapPick).name)} should replace.</b> <button class="lbl" type="button" data-swapcancel="1">Cancel</button>` : PARTY_HINT;
+  // Power is how hard the party hits; bulk (HP, Defense and Sp. Def averaged) is how long it lasts: boss timers stretch or shrink by it.
+  const avgBulk = S.party.length ? S.party.reduce((t, n) => t + bulkOf(fighter(n)), 0) / S.party.length : 0, stretch = Math.round(partyTime() * 100 - 100);
+  $("#teamline").innerHTML = S.party.length ? `Team power <b>${fmt(partyDps(null))}</b>/s · bulk <b>${Math.round(avgBulk)}</b> on average, so boss timers are <b>${stretch > 0 ? "+" : ""}${stretch}%</b> (${PARTY_BULK} is even; from −20% to +25%)` : "";
   $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
   // "Can evolve": ready right now first, then ones with an evolution still to get, then the rest.
   const evoRank = n => { const o = evoOptions(n); return o.some(e => canEvolve(n, e)) ? 0 : o.length ? 1 : 2; };
   const sort = $("#sort").value, type = $("#tfilter").value, stat = STAT_SORTS[sort];
   const list = Object.keys(S.box).map(Number).filter(n => !type || mon(n).types.includes(type))
-    .sort((a, b) => stat ? stat[1](mon(b)) - stat[1](mon(a)) || a - b : sort === "lvl" ? level(b) - level(a) : sort === "power" ? power(b) - power(a) : sort === "evo" ? evoRank(a) - evoRank(b) || a - b : a - b);
+    .sort((a, b) => stat ? stat[1](statsOf(b)) - stat[1](statsOf(a)) || a - b : sort === "lvl" ? level(b) - level(a) : sort === "power" ? power(b) - power(a) : sort === "evo" ? evoRank(a) - evoRank(b) || a - b : a - b);
   $("#boxgrid").innerHTML = list.map(n => monTile(n, { inparty: S.party.includes(n), stat })).join("") || `<span class="small muted">No ${esc(type)} Pokémon in your Box yet.</span>`;
   renderDetail();
 }
@@ -1111,7 +1116,7 @@ function renderDetail() {
   if (!detail || !S.box[detail]) { el.hidden = true; return; }
   const sp = special(detail), m = mon(detail), opts = m.evos, st = sp || zforme(detail) || ustyle(detail) || m, owned = S.box[detail];
   el.hidden = false;
-  el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
+  el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · bulk ${Math.round(bulkOf(fighter(detail)))} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small muted">HP <b>${st.hp}</b> · Atk <b>${st.atk}</b> · Def <b>${st.def}</b> · SpA <b>${st.spa}</b> · SpD <b>${st.spd}</b> · Spe <b>${st.spe}</b> · Total <b>${st.bst}</b></div>` +
     (TRUANT.has(detail) ? '<div class="small muted">Truant: it only attacks every other turn, so it deals half damage.</div>' : "") +
     (owned.special ? `<div class="small"><b>SP · Special edition: ${esc(SPECIALS[owned.special].title)}</b> <span class="muted">${esc(SPECIALS[owned.special].note)}</span></div>` : "") + lookLine(detail) + formeLine(detail) +
@@ -1261,6 +1266,7 @@ const MAIL = [
       <li><b>Party &amp; Box</b>: drag to rearrange your party, or drag a Box Pokémon onto a party slot to swap it in. Once your party has been full, new catches wait in the Box instead of taking an open slot.</li>
       <li><b>Urshifu</b> can switch to its Rapid Strike Style (Fighting/Water) in its detail, and it Gigantamaxes in whichever style it's in.</li>
       <li><b>Slaking</b> has Truant now: it only attacks every other turn.</li>
+      <li>Each Pokémon's <b>bulk</b> shows next to its power, and the Box can sort by it: power is how hard it hits, bulk is how much boss time it buys. Under your party you'll see what the whole team adds up to.</li>
       <li>The Wiki has a <b>Pokédex</b> tab, the Pokédex can show your shinies, and new trainers get a few tips from me along the way.</li></ul>` },
   { id: "update-2026-11-13c", date: "Nov 13, 2026", from: "Prof Penguin", title: "New side quest: Zygarde Cells",
     body: `<p>Beat Diantha in Kalos and Zygarde Cells start turning up: now and then from wild Pokémon, and a few from every boss you beat.</p><ul><li>10 cells: Zygarde's 10% Forme (and a Zygarde if you don't have one).</li><li>100 cells: the Complete Forme, Zygarde at 100%.</li></ul><p>Kalos's list shows how many you have. Also new: choose a Pokémon's look (normal, shiny or special edition), and shiny Megas and Gigantamax.</p>` },
@@ -1347,7 +1353,7 @@ function wikiSections() {
     { id: "catching", group: "Basics", title: "Catching", html: `<p>When a wild Pokémon faints, a ball is thrown at it, picked by Settings: one choice for new Pokémon, one for ones you have, one for shinies. Chance = catch rate ÷ 255 × 0.6 × the ball's multiplier + its bonus, at most 100%. Legendaries and mythicals shrug off anything but a Master Ball half the time.</p><ul>${ballRows}</ul><p>Auto (the default for new Pokémon) throws the cheapest ball with at least an even chance, else your best one, and only spends a Master Ball on a shiny or a legendary.</p><p>New Pokémon join your party until it has been full once. After that they go to the Box, so an empty slot stays free for whoever you choose.</p>` },
     { id: "partybox", group: "Basics", title: "Party & Box", html: `<p>Drag a party Pokémon onto another slot to trade places, drag a Box Pokémon onto a party slot to swap it in, or drag a party Pokémon down to the Box to send it back. On a phone, hold it still for a moment before dragging, so a swipe still scrolls. With a full party, a Box Pokémon's detail also has Swap into party: tap it, then tap who goes.</p><p>Order doesn't change how the party fights, so you can rearrange during any battle. Swapping someone in or out waits until you're back on a route.</p>` },
     { id: "offline", group: "Basics", title: "Offline", html: `<p>While you're away (up to 8 hours) your party keeps fighting on your last route at about a third of the live pace, the pause included: money and XP, no catches. The title screen says what it did.</p>` },
-    { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Attack</b>: damage per hit is the higher of Attack and Sp. Atk × level ÷ 50 × protein${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}.</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often. Slaking has Truant: it only attacks every other turn, so it deals half damage.</p><p><b>Def</b>: your party's HP, Defense and Sp. Def, averaged, stretch or shrink the timer in gym, Champion, dungeon and Red fights against a bulk of ${PARTY_BULK}: from −20% to +25%. The map shows the time your current party gets.</p>` },
+    { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Attack</b>: damage per hit is the higher of Attack and Sp. Atk × level ÷ 50 × protein${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}.</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often. Slaking has Truant: it only attacks every other turn, so it deals half damage.</p><p><b>Bulk</b> (Def): a Pokémon's HP, Defense and Sp. Def averaged. Your party's average bulk stretches or shrinks the timer in boss fights against a bulk of ${PARTY_BULK}: from −20% to +25%. Party & Box shows each Pokémon's bulk next to its power, and the team's under the party. The map shows the time your current party gets.</p>` },
     { id: "types", group: "Stats and levels", title: "Types", html: `<p>The main games' type chart. Each party Pokémon uses its better type against the foe; the tile shows 2x, 4x, ½x, ¼x or 0x when it isn't neutral. A Mega fights with its Mega typing.</p>` },
     { id: "levels", group: "Stats and levels", title: "Levels and the cap", html: `<p>Each win gives every party Pokémon the foe's level × ${XP_RATE} XP (× 1.5 against trainers). Level is the cube root of XP, up to 100.</p><p>The level cap is ${CAP_OVER} over the next gym leader or Champion you haven't beaten, and 100 once every Champion is down. Each place also keeps the cap it had when you first got there: go back and your party fights held to it, so a Lv 90 team is Lv 30 on Hoenn Route 1. XP past the cap from older saves waits until the cap catches up.</p>` },
     { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
