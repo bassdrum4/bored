@@ -19,7 +19,8 @@ export const rankPoints = rank => RANK_WINDOW + 1 - rank;
 
 export function accountStandings(scores) {
   const accounts = new Map();
-  const scoresByGame = new Map(LB_GAMES.map(game => [game.id, []]));
+  // Boards only Penguin's Leaderboard ranks (standings: false) stay out of these standings.
+  const scoresByGame = new Map(LB_GAMES.filter(game => game.standings !== false).map(game => [game.id, []]));
   for (const row of scores) {
     const gameScores = scoresByGame.get(row.game);
     const handle = String(row.handle || '').trim();
@@ -32,6 +33,7 @@ export function accountStandings(scores) {
   }
   for (const game of LB_GAMES) {
     const rows = scoresByGame.get(game.id);
+    if (!rows) continue;
     rows.sort((a, b) => (game.lower ? a.value - b.value : b.value - a.value) || a.key.localeCompare(b.key));
     let rank = 0;
     let previous = null;
@@ -93,6 +95,10 @@ export const HIGH_SCORE_GAMES = [
   // Poké Idle's Battle Tower ranks on its own board: the highest floor cleared. It has no page of its own, so
   // `page` names the game whose snapshot feeds it (see boardsOn).
   highScore("poke-idle-tower", "Poké Idle: Battle Tower", "floors", { page: "poke-idle", metric: "tower", min: 1, max: 100000, when: snapshot => snapshot.finished === true }),
+  // Boards for Penguin's Leaderboard only (standings: false keeps them out of the overall standings, where
+  // Poké Idle and Pokédoku already have their own boards): achievements earned in Poké Idle, and each Pokédoku daily's
+  // best finished score on its own.
+  highScore("poke-idle-ach", "Poké Idle: Achievements", "achievements", { page: "poke-idle", metric: "ach", min: 1, max: 1000, standings: false, when: snapshot => snapshot.finished === true }),
   // A finished match against the computer ranks the winning margin, so 7–1
   // beats 7–6. Local two-player games and abandoned matches never post.
   highScore("air-hockey", "Air Hockey", "goals", {
@@ -101,6 +107,9 @@ export const HIGH_SCORE_GAMES = [
   }),
   // Today's three dailies added up: Pokédoku (1350) + Inverse Doku (600) + Shiny Hunt (700).
   highScore("pokedoku", "Pokédoku", "points", { metric: "points", max: 2650, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
+  highScore("pokedoku-doku", "Pokédoku: the grid", "points", { page: "pokedoku", metric: "doku", min: 1, max: 1350, standings: false, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
+  highScore("pokedoku-inverse", "Pokédoku: Inverse Doku", "points", { page: "pokedoku", metric: "inverse", min: 1, max: 600, standings: false, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
+  highScore("pokedoku-shiny", "Pokédoku: Shiny Hunt", "points", { page: "pokedoku", metric: "shiny", min: 1, max: 700, standings: false, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
   // Krillion ranks the server-checked total of a finished seven-prompt dive.
   highScore('krillion', 'Krillion', 'points', {
     metric: 'score', min: 1, max: 700,

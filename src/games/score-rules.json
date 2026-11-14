@@ -134,6 +134,11 @@
     "better": "high",
     "max_value": 2050
   },
+  "poke-idle-ach": {
+    "label": "Pok\u00e9 Idle achievements earned",
+    "better": "high",
+    "max_value": 1000
+  },
   "poke-idle-tower": {
     "label": "Highest Battle Tower floor cleared",
     "better": "high",
@@ -143,6 +148,21 @@
     "label": "Today's three Pok\u00e9mon dailies added up",
     "better": "high",
     "max_value": 2650
+  },
+  "pokedoku-doku": {
+    "label": "Best daily Pok\u00e9doku grid",
+    "better": "high",
+    "max_value": 1350
+  },
+  "pokedoku-inverse": {
+    "label": "Best daily Inverse Doku",
+    "better": "high",
+    "max_value": 600
+  },
+  "pokedoku-shiny": {
+    "label": "Best daily Shiny Hunt",
+    "better": "high",
+    "max_value": 700
   },
   "poker": {
     "label": "Chips above the start stack",
