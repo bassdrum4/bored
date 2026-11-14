@@ -27,7 +27,10 @@ export function createHubNavigation({ togetherUI, onLeaderboard }) {
       if (id === next) nav.setAttribute('aria-current', 'page');
       else nav.removeAttribute('aria-current');
     }
-    // The multiplayer badge remains controlled by the multiplayer module.
+    const mobileMore = $('mobile-more-nav');
+    if (mobileMore && next !== 'leaderboard' && next !== 'settings') mobileMore.open = false;
+
+  // The multiplayer badge remains controlled by the multiplayer module.
     if (next === 'leaderboard' && view !== 'leaderboard') onLeaderboard();
     view = next;
     if (!scroll || isTogether) return;
@@ -46,6 +49,15 @@ export function createHubNavigation({ togetherUI, onLeaderboard }) {
       navigate(id);
     });
   }
+  // The mobile overflow menu uses regular links so deep links work without JS.
+  // Close it after choosing a page and when tapping outside it.
+  const mobileMore = $('mobile-more-nav');
+  mobileMore?.addEventListener('click', event => {
+    if (event.target.closest('.mobile-more-menu a')) mobileMore.open = false;
+  });
+  document.addEventListener('pointerdown', event => {
+    if (mobileMore?.open && !mobileMore.contains(event.target)) mobileMore.open = false;
+  });
   // Together has its own established entry points; update the outer page state
   // after its click handler opens or closes the match view.
   $('together-nav').addEventListener('click', () => setView('together'));

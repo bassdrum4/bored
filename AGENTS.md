@@ -42,9 +42,11 @@ scripts/setup-feedback.mjs    create the feedback table (scripts/feedback-setup.
 scripts/player-state.sql     create the per-account player_state table (SQL editor)
 ```
 
-The homepage order is fixed in `src/index.html`: daily, Jump Back In, leaderboard, library.
-The shelf is one row of four cards shared by recent games and favorites. `PICKS` and the
-"Worth Trying" section are gone; do not bring back a second editorial shelf.
+The homepage order in `src/index.html` is the four-card game shelf, a compact Daily
+Challenge, then All Games; Leaderboard is a separate page. The one shelf shows recent
+games and favorites for returning players, or four playable starter choices to new
+visitors (popular ranking with an offline fallback). Do not bring back a second
+editorial shelf or an empty first-visit history message.
 
 Feedback posts through `src/hub/feedback.js` with the publishable key. The `feedback` table is
 insert-only for that key (`npm run feedback:setup`), so the page can send a note and never read

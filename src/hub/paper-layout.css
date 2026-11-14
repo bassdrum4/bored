@@ -284,3 +284,61 @@ html[data-reduce-motion="true"] *::after {
   .settings-row label { font-size: 11px; }
   .settings-row p { font-size: 12px; }
 }
+
+
+/* Play-first homepage: game choices appear above this compact daily invitation. */
+#daily {
+  grid-template-columns: minmax(0, 1.7fr) minmax(160px, .55fr);
+  gap: 22px;
+  padding: 16px 20px;
+}
+#daily .daily-kicker { margin-bottom: 5px; }
+#daily h2 { font-size: clamp(23px, 2.4vw, 29px); margin-bottom: 6px; }
+#daily-goal { font-size: 15px; line-height: 1.4; margin-bottom: 4px; }
+#daily .daily-actions { margin: 10px 0 7px; }
+#daily .primary-action { padding: 10px 14px; }
+#daily .daily-visual { max-width: 220px; justify-self: end; }
+#daily .preview-caption { display: none; }
+
+/* The picture and description carry the card; secondary game details stay quiet. */
+.grid .card .text { padding: 13px 14px; }
+.grid .card .detail { margin: 4px 0 7px; min-height: 0; font-size: 14px; }
+.grid .card .game-meta { font-size: 10px; line-height: 1.45; }
+
+/* Keep desktop navigation intact. On narrow screens, move secondary pages to More. */
+#mobile-more-nav { display: none; }
+@media (max-width: 700px) {
+  #daily { grid-template-columns: minmax(0, 1fr); padding: 15px; gap: 0; }
+  #daily .daily-visual { display: none; }
+  .site-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .site-nav > #leaderboard-nav,
+  .site-nav > #changelog-nav,
+  .site-nav > #settings-nav { display: none; }
+  .site-nav > a:not(#together-nav),
+  .site-nav > #together-nav { font-size: 10.5px; min-height: 48px; }
+  #mobile-more-nav { display: block; min-width: 0; position: relative; }
+  #mobile-more-nav summary {
+    display: flex; justify-content: center; align-items: center;
+    min-height: 48px; padding: 7px 4px; cursor: pointer;
+    color: var(--ink); font: 10.5px/1.3 var(--mono); list-style: none;
+    border-bottom: 2px solid transparent;
+  }
+  #mobile-more-nav summary::-webkit-details-marker { display: none; }
+  #mobile-more-nav[open] summary { color: var(--red); border-bottom-color: var(--red); }
+  #mobile-more-nav .mobile-more-menu {
+    position: absolute; right: 0; bottom: calc(100% + 9px); z-index: 50;
+    width: min(230px, 85vw); padding: 7px; display: grid; gap: 3px;
+    border: 1px solid var(--ink); background: var(--paper);
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+  .site-nav #mobile-more-nav .mobile-more-menu a {
+    display: block; min-height: 0; padding: 12px 11px;
+    text-align: left; font: 12px/1.4 var(--mono);
+    border: 0; background: transparent; color: var(--ink);
+    text-decoration: none;
+  }
+  .site-nav #mobile-more-nav .mobile-more-menu a:hover,
+  .site-nav #mobile-more-nav .mobile-more-menu a:focus-visible {
+    background: var(--field-wash); text-decoration: underline;
+  }
+}

@@ -1,7 +1,6 @@
 import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
-import { DISCOVERY, PREVIEWS } from '../games/discovery.js';
+import { DISCOVERY, PREVIEWS, inCollection } from '../games/discovery.js';
 import { DEVELOPER_NOTES } from '../games/developer-notes.js';
-import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scores.js';
 import { readStored, writeStored } from './store.js';
 import { backendReady, request, ANON_TOKEN } from './backend.js';
 import { popularityRanks, sortPopularGames } from './popularity.js';
@@ -42,6 +41,7 @@ async function loadPopularity() {
     // Preserve focus: never shuffle a card out from under a keyboard user.
     if (popularRankings.size && $('#sort').value === 'popular' &&
         !document.activeElement?.closest('#grid')) renderLibrary();
+    if (popularRankings.size && !document.activeElement?.closest('#recent')) renderRecent();
   } catch {
     // Offline or RPC not deployed yet: Popular falls back to catalog-newest.
   }
@@ -153,62 +153,6 @@ function gameMeta(slug) {
   return [game.minutes, game.pace, game.players].filter(Boolean).join(' · ');
 }
 
-// The scored games, and the leaders of the rows the leaderboard last fetched.
-// Rows are cached by array identity so typing in the search box does not walk a
-// whole board on every keystroke.
-const scoredGames = new Map(LB_GAMES.map(game => [game.id, game]));
-let leaderRows = null;
-let leaders = new Map();
-let topThrees = new Map();
-// The byline and its tooltip read the same rows the leaderboard fetched, and
-// the per-game top list is derived once per fetch rather than per card.
-function boardData(slug) {
-  const rows = state.lbCache.get('overall')?.rows || [];
-  if (rows !== leaderRows) {
-    leaderRows = rows;
-    leaders = boardLeaders(rows);
-    topThrees = new Map();
-  }
-  if (!topThrees.has(slug)) topThrees.set(slug, boardTop(rows, slug, 3));
-  return { leader: leaders.get(slug) || null, top: topThrees.get(slug) };
-}
-
-// One quiet byline: the posted high score and who holds it, or the best this
-// browser has when the game has not reached the shared board. Hovering or
-// keyboard-focusing it lists the top three players on that board.
-function cardBest(slug) {
-  const spec = scoredGames.get(slug);
-  if (!spec) return null;
-  const line = element('span', 'card-best');
-  const { leader, top } = boardData(slug);
-  const own = bestValue(spec);
-  if (leader) {
-    const tied = leader.handles || [leader.handle];
-    line.textContent = 'Best ' + formatScore(leader.value, spec) + ' · ' +
-      (tied.length === 1 ? tied[0] : tied.length + ' tied leaders');
-    if (tied.length > 1) line.title = 'Tied: ' + tied.join(', ');
-  }
-  else if (Number.isFinite(own) && own > 0) line.textContent = 'Your best ' + formatScore(own, spec);
-  else line.textContent = 'No score yet';
-  // One posted score is already named in the byline, so a one-row list would
-  // only repeat it. The tooltip sits beside `.card-best`, never inside it, so
-  // the byline text stays exactly what it says.
-  if (top.length < 2) return line;
-  const wrap = element('span', 'card-best-wrap');
-  const tip = element('span', 'card-best-tip');
-  tip.setAttribute('role', 'tooltip');
-  tip.append(element('span', 'card-best-tip-title', 'Top ' + top.length + ' · ' + spec.name));
-  top.forEach((row, index) => {
-    const item = element('span', 'card-best-tip-row');
-    item.append(element('span', 'card-best-tip-rank', String(index + 1)),
-      element('span', 'card-best-tip-name', row.handle),
-      element('span', 'card-best-tip-value', formatScore(row.value, spec)));
-    tip.append(item);
-  });
-  wrap.append(line, tip);
-  return wrap;
-}
-
 function shelfGame(slug, note) {
   const name = ORDER.find(([id]) => id === slug)[1];
   const button = element('button', 'shelf-play');
@@ -232,20 +176,34 @@ const SHELF_LIMIT = 4;
 
 function renderRecent() {
   const saved = [...state.favorites].filter(slug => !state.recentGames.includes(slug));
-  const shown = [...state.recentGames, ...saved].slice(0, SHELF_LIMIT);
+  const hasHistory = state.recentGames.length > 0 || state.favorites.size > 0;
+  // New visitors get four playable starting points rather than an empty history shelf.
+  // Rankings are aggregated, never individual player histories. Offline has a fixed fallback.
+  const popular = sortPopularGames(
+    ORDER.filter(([slug]) => popularRankings.has(slug) && !EXTERNS[slug]),
+    popularRankings
+  ).slice(0, SHELF_LIMIT).map(([slug]) => slug);
+  const starterGames = [...new Set([...popular, 'clicker', 'block-blast', 'quickdraw', '2048'])].slice(0, SHELF_LIMIT);
+  const shown = hasHistory
+    ? [...state.recentGames, ...saved].slice(0, SHELF_LIMIT) : starterGames;
+  $('#recent').dataset.shelf = hasHistory ? 'history' : 'discover';
+  $('#recent-heading').textContent = hasHistory ? 'Jump Back In' : 'Start playing';
+  $('#recent .eyebrow').textContent = hasHistory ? '01 / Your corner' : '01 / Pick a game';
   $('#recent-list').replaceChildren(...shown.map(slug => shelfGame(slug,
-    (EXTERNS[slug] ? 'Online extra · ' : '') + (state.recentGames.includes(slug)
-      ? (state.favorites.has(slug) ? 'Favorite · Recently played' : 'Recently played')
-      : 'Favorite'))));
+    hasHistory
+      ? (EXTERNS[slug] ? 'Online extra · ' : '') + (state.recentGames.includes(slug)
+        ? (state.favorites.has(slug) ? 'Favorite · Recently played' : 'Recently played')
+        : 'Favorite')
+      : (popularRankings.has(slug) ? 'Popular right now' : 'Easy to jump into'))));
   watchImpressions([...$('#recent-list').querySelectorAll('.shelf-play')], 'recent');
   $('#favorites-all').hidden = !state.favorites.size;
   $('#favorites-all').textContent = 'Browse ' + state.favorites.size + (state.favorites.size === 1 ? ' favorite' : ' favorites') + ' →';
   $('#recent-empty').hidden = shown.length > 0;
+  $('#recent-empty').closest('.empty-note').hidden = shown.length > 0;
 }
 
-// The recent shelf is unchanged. Only the All Games list is sortable. Newest
-// follows the catalog's arrival order; Popular uses one cached ranking per day
-// and uses that same order for ties or games without recorded players.
+// All Games sorts independently of the welcome/history shelf; Popular uses the
+// same cached daily rankings and falls back to catalog order when offline.
 
 function renderLibrary() {
   const filter = searchInput.value.trim().toLowerCase();
@@ -256,7 +214,11 @@ function renderLibrary() {
     return (EXTERNS[slug] || PAYLOAD_SLUGS.includes(slug) || NEW_GAMES.includes(slug)) &&
       (!filter || [name, slug, ...meta, gameMeta(slug), ...(DISCOVERY[slug]?.inputs || [])].join(' ').toLowerCase().includes(filter)) &&
       (state.category === 'All' || (state.category === 'New' ? FRESH_GAMES.includes(slug) :
-        state.category === 'Favorites' ? state.favorites.has(slug) : meta[0] === state.category));
+        state.category === 'Favorites' ? state.favorites.has(slug) :
+        state.category === 'Quick' ? inCollection(slug, 'quick') :
+        state.category === 'Friends' ? (Boolean(TOGETHER_GAMES[slug]) ||
+          (DISCOVERY[slug]?.players || '').includes('2 local')) :
+        state.category === 'Relax' ? inCollection(slug, 'relax') : meta[0] === state.category));
   });
   const sortMode = $('#sort').value;
   if (sortMode === 'az') state.visibleGames.sort((a, b) => a[1].localeCompare(b[1]));
@@ -271,11 +233,10 @@ function renderLibrary() {
     const text = element('span', 'text');
     const title = element('span', 'name', name);
     if (FRESH_GAMES.includes(slug)) title.appendChild(element('span', 'badge', 'NEW'));
-    text.append(element('span', 'card-category', EXTERNS[slug] ? 'Online extra · Internet required' : META[slug][0] + ' · Offline'),
-      title, element('span', 'detail', META[slug][1]), element('span', 'game-meta', gameMeta(slug)),
-      element('span', 'game-inputs', (DISCOVERY[slug]?.inputs || []).join(' / ')));
-    const best = cardBest(slug);
-    if (best) text.appendChild(best);
+    const discovery = DISCOVERY[slug] || {};
+    const playInfo = [discovery.minutes, discovery.players || discovery.inputs?.join(' / ')].filter(Boolean).join(' · ');
+    text.append(element('span', 'card-category', EXTERNS[slug] ? 'Online · Internet required' : META[slug][0]),
+      title, element('span', 'detail', META[slug][1]), element('span', 'game-meta', playInfo));
     card.appendChild(text);
     card.onclick = () => openGame(slug);
 
@@ -307,9 +268,9 @@ function renderLibrary() {
     row.append(card, star);
     if (TOGETHER_GAMES[slug]) {
       row.classList.add('has-together');
-      const together = element('button', 'catalog-together', 'Bored Together →');
+      const together = element('button', 'catalog-together', 'Play with a friend →');
       together.type = 'button';
-      together.setAttribute('aria-label', 'Play ' + name + ' on Bored Together');
+      together.setAttribute('aria-label', 'Play ' + name + ' with a friend');
       together.onclick = () => window.dispatchEvent(new CustomEvent('bored:together-open', { detail: { game: slug } }));
       row.append(together);
     }

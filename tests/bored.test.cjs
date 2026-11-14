@@ -1788,8 +1788,12 @@ test('browser regressions', async t => {
     await restricted.close();
   });
 
-  await t.test('a guest plays without an account and is offered the best they just set', async () => {
-    await page.evaluate(() => { localStorage.removeItem('bored.high.lights-out'); openGame('lights-out'); });
+  await t.test('a guest gets one optional account offer, but not on future plays', async () => {
+    await page.evaluate(() => {
+      localStorage.removeItem('bored.claimPromptSeen');
+      localStorage.removeItem('bored.high.lights-out');
+      openGame('lights-out');
+    });
     await page.waitForFunction(() => document.querySelector('#frame').contentWindow.__boredSnapshot?.().slug === 'lights-out');
     await page.evaluate(() => {
       document.querySelector('#frame').contentWindow.__boredSnapshot = () => ({ slug: 'lights-out', cleared: 3 });
@@ -1811,6 +1815,8 @@ test('browser regressions', async t => {
     const claimBo = await page.$eval('#claim-bo', el => ({ mood: el.dataset.mood, href: el.querySelector('use').getAttribute('href') }));
     assert.ok(['pleased', 'surprised'].includes(claimBo.mood), 'score dialog Bo is ' + claimBo.mood);
     assert.equal(claimBo.href, './bo.svg#' + claimBo.mood, 'the dialog points at the matching symbol');
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.claimPromptSeen'))), true,
+      'the first account invitation is remembered immediately');
     assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('bored.pendingClaim') || 'null')), null,
       'showing the offer stores nothing; only choosing an account does');
     await page.click('#claim-signin');
@@ -1823,6 +1829,16 @@ test('browser regressions', async t => {
       'choosing an account remembers which run was offered'
     );
     await page.click('#auth-cancel');
+    // Another improved score in the same browser must not open another modal.
+    await page.evaluate(() => { localStorage.removeItem('bored.high.lights-out'); openGame('lights-out'); });
+    await page.waitForFunction(() => document.querySelector('#frame').contentWindow.__boredSnapshot?.().slug === 'lights-out');
+    await page.evaluate(() => {
+      document.querySelector('#frame').contentWindow.__boredSnapshot = () => ({ slug: 'lights-out', cleared: 2 });
+      captureHighScore();
+    });
+    await close({ dismissClaim: false });
+    assert.equal(await page.$eval('#claim-dialog', dialog => dialog.open), false,
+      'later games should never interrupt with an account offer');
     // The board is now on its own page and still keeps not pointing at them.
     await page.click('#leaderboard-nav');
     await page.click('#lb-refresh');

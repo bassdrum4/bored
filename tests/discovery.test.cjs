@@ -43,9 +43,14 @@ test('discovery keeps its controls and fits small screens', async t => {
     await page.waitForFunction(() => [...document.querySelectorAll('#grid img')].every(image => image.complete && image.naturalWidth > 0));
     // The entry document is hand-written markup: it carries no games and no
     // inlined script, so a game is downloaded only when its card is opened.
-    assert.equal(await page.$eval('#recent-empty', e => e.hidden), false);
-    // The full library is on Home beneath Jump Back In; the leaderboard is a separate view.
-    assert.ok(await page.evaluate(() => document.querySelector('#library').offsetTop > document.querySelector('#recent').offsetTop));
+    assert.equal(await page.$eval('#recent-empty', e => e.hidden), true);
+    assert.equal(await page.$eval('#recent-heading', e => e.textContent), 'Start playing');
+    assert.equal(await page.$$eval('#recent-list .shelf-play', cards => cards.length), 4,
+      'first-time visitors should see four playable games, not an empty shelf');
+    // Game suggestions lead, followed by the compact daily invitation and library.
+    assert.ok(await page.evaluate(() =>
+      document.querySelector('#recent').offsetTop < document.querySelector('#daily').offsetTop &&
+      document.querySelector('#daily').offsetTop < document.querySelector('#library').offsetTop));
     assert.equal(await page.$eval('#leaderboard', el => el.hidden), true);
   });
 
@@ -91,6 +96,19 @@ test('discovery keeps its controls and fits small screens', async t => {
     const actual = await page.$$eval('#grid .card', cards => cards.map(card => card.dataset.slug));
     const expected = await page.evaluate(() => ORDER.filter(([slug]) => META[slug][0] === 'Puzzle').map(([slug]) => slug));
     assert.deepEqual(actual.sort(), expected.sort());
+    await page.click('[data-filter="Quick"]');
+    assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
+    assert.ok(await page.$$eval('#grid .card', cards =>
+      cards.every(card => DISCOVERY[card.dataset.slug]?.quick === true)), 'quick games really are short-session picks');
+    await page.click('[data-filter="Friends"]');
+    assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
+    assert.ok(await page.$$eval('#grid .card', cards => cards.every(card =>
+      !!card.closest('.row')?.querySelector('.catalog-together') ||
+      (DISCOVERY[card.dataset.slug]?.players || '').includes('2 local'))));
+    await page.click('[data-filter="Relax"]');
+    assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
+    assert.ok(await page.$$eval('#grid .card', cards =>
+      cards.every(card => DISCOVERY[card.dataset.slug]?.pace === 'Relaxing')));
     await page.click('[data-filter="Favorites"]');
     assert.equal(await page.$$eval('#grid .card', cards => cards.length), 0);
     assert.equal(await page.$eval('#random', b => b.disabled), true);
@@ -104,7 +122,6 @@ test('discovery keeps its controls and fits small screens', async t => {
     assert.equal(await page.evaluate(() => document.activeElement.id), 'q');
     await page.type('#q', 'touch');
     assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
-    assert.ok(await page.$$eval('#grid .game-inputs', spans => spans.every(span => span.textContent.includes('Touch'))));
     await page.evaluate(() => {
       document.querySelector('[data-filter="All"]').click();
       const q = document.querySelector('#q');
@@ -219,9 +236,15 @@ test('discovery keeps its controls and fits small screens', async t => {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow at ' + width);
       const targets = await page.$$eval('#daily-play,#filters button,#grid .star,#random', nodes => nodes.map(node => ({ label: node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })));
       assert.ok(targets.every(box => box.width >= 30 && box.height >= 30), 'usable control sizes at ' + width);
-      const regions = await page.$$eval('#daily,#recent,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
+      const regions = await page.$$eval('#recent,#daily,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
       assert.ok(regions.every((region, index) => !index || region.top >= regions[index - 1].top + regions[index - 1].height), 'sections do not overlap');
     }
+    assert.notEqual(await page.$eval('#mobile-more-nav', el => getComputedStyle(el).display), 'none');
+    await page.click('#mobile-more-nav summary');
+    await page.click('#mobile-more-nav .mobile-more-menu a[href="#settings"]');
+    assert.equal(await page.$eval('#settings', el => el.hidden), false);
+    assert.equal(await page.$eval('#mobile-more-nav', el => el.open), false);
+    await page.click('#home-nav');
     await page.evaluate(() => document.querySelector('.skip-link').focus());
     await page.keyboard.press('Enter');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'library');
@@ -344,10 +367,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
   // and beat it.
   await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('rival'));
   await page.click('#leaderboard-nav');
-  // The card byline names the board leader, and a game with no board has none.
-  await page.waitForFunction(() => document.querySelector('#grid [data-slug="lights-out"] .card-best')?.textContent.includes('rival'));
-  assert.equal(await page.$eval('#grid [data-slug="lights-out"] .card-best', el => el.textContent), 'Best 9 boards · rival');
-  assert.equal(await page.$eval('#grid [data-slug="8ball"]', card => card.querySelector('.card-best')), null);
+  // Game-card score clutter is gone, while the leaderboard still gives both scores.
+  assert.equal(await page.$('#grid .card-best'), null);
   await page.evaluate(() => {
     [...document.querySelectorAll('#lb-list .lb-row')]
       .find(row => row.textContent.includes('rival')).click();
