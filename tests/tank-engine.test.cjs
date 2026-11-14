@@ -312,7 +312,7 @@ test('Tank 2 remains registered and its playable document parses', async () => {
   assert.ok(PAYLOAD_SLUGS.includes('tank2'), 'the hub can load it');
 
   const html = fs.readFileSync(path.join(__dirname, '../src/games/content/tank2.html'), 'utf8');
-  const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)];
+  const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
   assert.ok(scripts.some(([, code]) => code.trim()), 'gameplay JavaScript exists');
   for (const [, code] of scripts) assert.doesNotThrow(() => new (require('node:vm').Script)(code));
   // In-browser score and multiplayer wiring is covered by the shared hub browser suites.
