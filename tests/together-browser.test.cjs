@@ -144,8 +144,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   await click(guest,'Join Bored Together');assert.ok(await guest.$eval('#auth-dialog',e=>e.open));
   const a=await player(ids[0]),b=await player(ids[1]);await open(a);await open(b);
   await click(a,'Join Bored Together');await click(b,'Join Bored Together');
-  // Bored Together has no tabs of its own (other pages, like Penguin's Leaderboard, may).
-  assert.equal(await a.$('#together [role="tablist"]'),null,'no social subnavigation');
+  assert.equal(await a.$('[role="tablist"]'),null,'no social subnavigation');
   await challengePlayer(a,'connect-four','BananaWizard');
   // The picker is the directory: the member's address is how you recognise them.
   assert.equal((await call(db,ids[1],'dashboard')).matches.length,0,'nothing is sent before the first turn is saved');

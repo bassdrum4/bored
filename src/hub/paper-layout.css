@@ -30,15 +30,12 @@
 .intro-row { display: flex; margin-top: 12px; }
 .masthead-bar { background: var(--surface); }
 body[data-bored-view="leaderboard"] .intro-row,
-body[data-bored-view="league"] .intro-row,
 body[data-bored-view="settings"] .intro-row,
 body[data-bored-view="together"] .intro-row { display: none; }
 body[data-bored-view="leaderboard"] .masthead-bar,
-body[data-bored-view="league"] .masthead-bar,
 body[data-bored-view="settings"] .masthead-bar,
 body[data-bored-view="together"] .masthead-bar { margin-top: 17px; }
 body[data-bored-view="leaderboard"] #together-home,
-body[data-bored-view="league"] #together-home,
 body[data-bored-view="settings"] #together-home,
 body[data-bored-view="together"] #together-home { display: none!important; }
 
@@ -232,7 +229,7 @@ html[data-reduce-motion="true"] *::after {
     left: 0; right: 0; bottom: 0;
     z-index: 40;
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0;
     margin: 0;
     padding: 4px 6px calc(5px + env(safe-area-inset-bottom, 0px));
@@ -246,8 +243,7 @@ html[data-reduce-motion="true"] *::after {
     justify-content: center;
     min-width: 0;
     min-height: 43px;
-    padding: 7px 2px;
-    hyphens: manual;
+    padding: 7px 4px;
     border: 0;
     border-bottom: 2px solid transparent;
     border-radius: 0;
@@ -287,62 +283,4 @@ html[data-reduce-motion="true"] *::after {
   .settings-row select { min-width: 114px; padding: 8px 6px; font-size: 11px; }
   .settings-row label { font-size: 11px; }
   .settings-row p { font-size: 12px; }
-}
-
-/* Penguin's Leaderboard. The hub's paper and ink, with one piece borrowed from Poké Idle: the handheld text box (a
-   doubled rule, the speaker's name sitting on the frame) where Penguin calls the standings. */
-#league { min-height: 55vh; border-top: 3px double var(--ink); padding-top: 24px; margin: 30px 0 36px; }
-.league-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 18px; flex-wrap: wrap; }
-.league-head h2 { font: 400 clamp(30px, 3.4vw, 45px)/1.1 var(--display); letter-spacing: -.01em; }
-.league-lede { max-width: 62ch; margin-top: 10px; font-size: 15px; line-height: 1.55; color: var(--dim); }
-.league-tabs { display: flex; gap: 6px clamp(14px, 2vw, 26px); margin-top: 22px; border-bottom: 1px solid var(--rule);
-  overflow-x: auto; scrollbar-width: none; }
-.league-tabs::-webkit-scrollbar { display: none; }
-.league-tab { flex: none; padding: 9px 0 8px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none;
-  color: var(--ink); font: 12px/1.5 var(--mono); cursor: pointer; white-space: nowrap; }
-.league-tab:hover { text-decoration: underline; text-underline-offset: 3px; }
-.league-tab[aria-selected="true"] { color: var(--red); border-bottom-color: var(--red); text-decoration: none; }
-.league-tab:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
-.league-prof { position: relative; max-width: 760px; margin: 30px 0 22px; padding: 17px 20px 15px; background: var(--surface);
-  border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--ink); }
-.league-prof-name { position: absolute; top: -10px; left: 14px; padding: 0 7px; background: var(--paper); font: 700 12px/18px var(--mono); }
-#league-prof { font-size: 18px; line-height: 1.5; }
-#league-prof b { font-weight: 700; }
-.league-board { max-width: 1100px; overflow-x: auto; }
-.league-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.league-table thead th { padding: 0 10px 8px 0; border-bottom: 1px solid var(--ink); font: 11px/1.4 var(--mono); color: var(--dim);
-  text-align: right; vertical-align: bottom; white-space: nowrap; }
-.league-table thead th small { display: block; font-size: 10px; opacity: .8; }
-.league-table th.lg-name, .league-table td.lg-rank { text-align: left; }
-.league-table thead th.lg-rank, .league-table thead th.lg-name { text-align: left; }
-.league-table tbody td, .league-table tbody th { padding: 11px 10px 10px 0; border-bottom: 1px solid var(--rule); text-align: right; vertical-align: middle; }
-.league-table .lg-rank { width: 3.5ch; font: 12px var(--mono); color: var(--dim); }
-.league-table tbody tr:first-child .lg-rank { color: var(--red); }
-.league-table tbody .lg-name { font-weight: 400; font-size: 17px; line-height: 1.3; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.league-table tr.you .lg-handle { color: var(--red); }
-.league-table tbody .lg-total, .league-table tbody .lg-best { font: 600 14px var(--mono); white-space: nowrap; }
-.league-table tbody .lg-ev, .league-table tbody .lg-league { width: 9.5%; min-width: 74px; font: 12px var(--mono); }
-.league-table.single tbody .lg-league { width: 26%; }
-.league-table .lg-ev.none { color: var(--dim); }
-.lg-pts { display: block; }
-.lg-bar { display: block; height: 3px; margin-top: 5px; background: var(--surface-sunk); }
-.lg-bar i { display: block; height: 100%; background: var(--ink); }
-.league-table tr.you .lg-bar i { background: var(--red); }
-.lg-strip { display: none; }
-.league-empty { margin: 18px 0 0; font-style: italic; color: var(--dim); }
-.league-mine { margin-top: 16px; font: 12px/1.7 var(--mono); color: var(--dim); }
-.league-mine:empty { display: none; }
-.league-how { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; max-width: 1100px;
-  margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--rule); font-size: 14px; line-height: 1.6; color: var(--dim); }
-.league-how > span { max-width: 70ch; }
-.league-play { flex: none; font: 12px var(--mono); }
-@media (max-width: 720px) {
-  .league-tabs { flex-wrap: wrap; overflow: visible; gap: 2px 18px; }
-  .league-prof { margin-top: 26px; padding: 15px 15px 13px; }
-  #league-prof { font-size: 16px; }
-  .league-table .lg-ev, .league-table thead .lg-ev { display: none; }
-  .league-table tbody .lg-name { max-width: none; white-space: normal; }
-  .lg-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; max-width: 220px; margin-top: 7px; }
-  .lg-strip .lg-bar { margin: 0; height: 4px; }
-  .league-table.single tbody .lg-league { width: 34%; }
 }

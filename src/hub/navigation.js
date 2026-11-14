@@ -1,9 +1,9 @@
 // URL-addressable views around the existing Bored game launcher. The library remains
 // directly below Jump Back In: "All Games" scrolls there instead of loading another page.
 const $ = id => document.getElementById(id);
-const PAGES = new Set(['home', 'library', 'leaderboard', 'league', 'together', 'settings']);
+const PAGES = new Set(['home', 'library', 'leaderboard', 'together', 'settings']);
 
-export function createHubNavigation({ togetherUI, onLeaderboard, onLeague = () => {} }) {
+export function createHubNavigation({ togetherUI, onLeaderboard }) {
   let view = 'home';
 
   function setView(next, { scroll = false } = {}) {
@@ -17,12 +17,11 @@ export function createHubNavigation({ togetherUI, onLeaderboard, onLeague = () =
     }
     for (const id of ['daily', 'recent', 'library']) $(id).hidden = !isHome;
     $('leaderboard').hidden = next !== 'leaderboard';
-    $('league').hidden = next !== 'league';
     $('settings').hidden = next !== 'settings';
     if (!isTogether) $('together').hidden = true;
 
     document.body.dataset.boredView = next;
-    for (const id of ['home', 'library', 'leaderboard', 'league', 'together', 'settings']) {
+    for (const id of ['home', 'library', 'leaderboard', 'together', 'settings']) {
       const nav = $(id + '-nav');
       if (!nav) continue;
       if (id === next) nav.setAttribute('aria-current', 'page');
@@ -30,7 +29,6 @@ export function createHubNavigation({ togetherUI, onLeaderboard, onLeague = () =
     }
     // The multiplayer badge remains controlled by the multiplayer module.
     if (next === 'leaderboard' && view !== 'leaderboard') onLeaderboard();
-    if (next === 'league' && view !== 'league') onLeague();
     view = next;
     if (!scroll || isTogether) return;
     if (next === 'library') $('library').scrollIntoView({ block: 'start' });
@@ -42,7 +40,7 @@ export function createHubNavigation({ togetherUI, onLeaderboard, onLeague = () =
     setView(next, { scroll: true });
   }
 
-  for (const id of ['home', 'library', 'leaderboard', 'league', 'settings']) {
+  for (const id of ['home', 'library', 'leaderboard', 'settings']) {
     $(id + '-nav').addEventListener('click', event => {
       event.preventDefault();
       navigate(id);

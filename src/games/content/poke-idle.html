@@ -1877,7 +1877,6 @@ function offline() {
 
 // Older saves sent new Pokémon only Poké Balls, so bought Great and Ultra Balls sat unused. Move that one default to Auto, once.
 function migrateSave() {
-  if (S.test) topUpTest(S);
   if (!S.set.auto) { if (S.set.fresh === "poke") S.set.fresh = "auto"; S.set.auto = 1; }
   // Megas and Gigantamax arrived later: saves past Steven or Leon get the key item they would have been given.
   S.stones = S.stones || {}; S.gfactor = S.gfactor || {}; S.mega = S.mega || null; S.gmax = S.gmax || 0;
@@ -1959,18 +1958,6 @@ function testAccount() {
   t.loc = { kind: "route", r: 8, k: 3 }; t.test = 1;
   return t;
 }
-// The test account keeps up with the game. Every time it loads, whatever has been added since it was made (forms,
-// quests, items) is unlocked, while its party, place, looks and form picks stay as they were.
-function topUpTest(s) {
-  const t = testAccount();
-  for (const [n, b] of Object.entries(t.box)) {
-    const had = s.box[n];
-    s.box[n] = had ? { ...b, ...had, xp: b.xp, shiny: true, vars: { ...(b.vars || {}), ...(had.vars || {}) } } : b;
-  }
-  for (const k of ["cells", "pieces", "eternamax", "plates", "charm", "key", "band", "protein", "cords", "full", "balls"]) s[k] = t[k];
-  for (const k of ["won", "seen", "stones", "gfactor", "items", "champs", "tickets", "dungeons", "badges", "kills"]) s[k] = { ...s[k], ...t[k] };
-  s.money = Math.max(s.money || 0, t.money); s.tut = { ...s.tut, off: 1 }; s.test = 1;
-}
 function useSlot(k, account) {
   if (S) save();
   slot = k; try { localStorage.setItem(SLOT_KEY, k === TEST_KEY ? "test" : "real"); } catch {}
@@ -2051,12 +2038,11 @@ boot();
 
 // The hub reads this: integer metrics, never null.
 // score is the board's number: one point per Pokédex entry and one more for each one you have shiny.
-// tower is the Battle Tower board's: the highest floor cleared. ach is achievements earned, for Penguin's Leaderboard,
-// which counts ACH.length (now 67) as a full score: keep LEAGUE_EVENTS in src/hub/league.js in step.
+// tower is the Battle Tower board's: the highest floor cleared.
 window.__boredSnapshot = () => {
-  if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, badges: 0, tower: 0, ach: 0, finished: false };
+  if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, badges: 0, tower: 0, finished: false };
   const caught = S ? Object.keys(S.box).length : 0, shinies = S ? Object.values(S.box).filter(b => b.shiny).length : 0;
-  return { slug: 'poke-idle', caught, shinies, score: caught + shinies, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, ach: S && S.ach ? Object.keys(S.ach).length : 0, finished: !!S };
+  return { slug: 'poke-idle', caught, shinies, score: caught + shinies, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, finished: !!S };
 };
 </script>
 </body>

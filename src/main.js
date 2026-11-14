@@ -20,7 +20,6 @@ import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
 import { createLeaderboardView } from './hub/leaderboard-view.js';
-import { createLeagueView } from './hub/league-view.js';
 import { createAccountUI } from './hub/account-ui.js';
 import { createTogetherUI } from './hub/together-ui.js';
 import { createTogetherPlayer } from './hub/together-player.js';
@@ -814,20 +813,15 @@ async function shareDailyResult() {
   }
 }
 
-const { renderLeaderboard: renderOverall, loadLeaderboard } = createLeaderboardView({
+const { renderLeaderboard, loadLeaderboard } = createLeaderboardView({
   state: uiState, openGame,
   // The cards carry each board's leader, so fresh rows repaint them. Never out
   // from under a game or a card the player is already on.
   onBoard: () => {
-    renderLeague();
     if (activeSlug || document.activeElement?.closest?.('#grid')) return;
     renderLibrary();
   }
 });
-// Penguin's Leaderboard reads the same rows as the leaderboard, so both
-// redraw together whenever scores or the account change.
-const { renderLeague, loadLeague } = createLeagueView({ state: uiState, openGame, loadBoard: force => loadLeaderboard(force) });
-function renderLeaderboard() { renderOverall(); renderLeague(); }
 
 const { renderAccount, openAuthDialog, initAccount } = createAccountUI({
   state: uiState, activateProfile, applyPendingClaim, startClaimAuth, closeClaimDialog,
@@ -1020,8 +1014,7 @@ initVoice();
 
 const navigation = createHubNavigation({
   togetherUI,
-  onLeaderboard: () => loadLeaderboard(true),
-  onLeague: () => loadLeague(true)
+  onLeaderboard: () => loadLeaderboard(true)
 });
 
 // The same footer link routes to the dashboard this account may actually use.
