@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 # Serialize changelog writes; a new push supersedes an older generator.
 concurrency:
@@ -22,6 +22,9 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          # Owner-scoped token is permitted to bypass main's PR-only ruleset.
+          # GITHUB_TOKEN cannot push this generated file to main.
+          token: ${{ secrets.BORED_AUTOMERGE_TOKEN }}
           persist-credentials: true
       - name: Generate and commit current changelog
         run: |
