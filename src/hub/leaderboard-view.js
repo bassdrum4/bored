@@ -172,7 +172,8 @@ function renderLeaderboard() {
         const play = element('button', 'lb-play', 'Play');
         play.type = 'button';
         play.setAttribute('aria-label', 'Play ' + spec.name);
-        play.onclick = event => openGame(spec.id, null, event.currentTarget);
+        // A second board inside a game (the Battle Tower) plays its page.
+        play.onclick = event => openGame(spec.page || spec.id, null, event.currentTarget);
         line.append(play);
         detail.appendChild(line);
       }
