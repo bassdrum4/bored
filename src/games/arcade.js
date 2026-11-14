@@ -320,6 +320,16 @@ function arcadeGame(kind) {
       const match = online.context;
       cells = match.state.board.slice(); turn = match.seat; over = match.status !== 'active'; busy = !match.canPlay;
       draw();
+      // Their move arrived while this board was closed: drop the disc that came
+      // in rather than presenting a board that changed on its own.
+      const move = match.lastMove && match.lastMove.seat !== match.seat ? match.lastMove.move : null;
+      const column = move && Number.isInteger(Number(move.column)) ? Number(move.column) : null;
+      if (column !== null && !over && column >= 0 && column < 7) {
+        for (let row = 5; row >= 0; row--) {
+          const index = row * 7 + column;
+          if (cells[index]) { board.children[index].classList.add('drop-in'); break; }
+        }
+      }
       stats.textContent = match.players[0] + ': red / ' + match.players[1] + ': gold';
       status.textContent = over ? 'Game finished.' : match.canPlay ? 'Your turn. Pick a column.' : 'Their turn. Your game is saved.';
     }
@@ -495,6 +505,7 @@ export function nativeHTML(slug) {
     '.memory-card{aspect-ratio:1;background:#191713;color:#f5f2ea;font-size:34px;padding:0}.memory-card.flipped{background:#eee4d0;color:#191713}.memory-card.matched{opacity:1;background:#dce3cf;color:#344827}' +
     '.connect,.columns{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.connect{padding:10px;background:#292e38}.columns{padding:0 10px;margin-bottom:8px}.columns button{padding:7px 0;min-width:0}' +
     '.disc{aspect-ratio:1;border-radius:50%;background:#f5f2ea}.disc.p1{background:#b3261e}.disc.p2{background:#e7af35}' +
+    '.disc.drop-in{animation:disc-drop .42s ease-out}@keyframes disc-drop{from{transform:translateY(-320%);opacity:.35}to{transform:none;opacity:1}}' +
     '.aim{position:relative;min-height:240px;height:min(48vh,370px);border:1px solid #d8d2c4;background:repeating-linear-gradient(0deg,transparent,transparent 31px,#e8e2d5 32px),repeating-linear-gradient(90deg,transparent,transparent 31px,#e8e2d5 32px);overflow:hidden}' +
     '.target{position:absolute;transform:translate(-50%,-50%);border-radius:50%;border:0;background:#b3261e;color:#fff;font-size:34px;padding:0;line-height:1}' +
     '.memory-target{position:absolute;display:grid;place-items:center;transform:translate(-50%,-50%);pointer-events:none;border-radius:50%;background:#253b30;color:#f5f2ea;font:bold 20px ui-monospace,monospace;box-shadow:0 0 0 3px #f5f2ea,0 0 0 5px #253b30}' +

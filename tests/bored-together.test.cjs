@@ -167,6 +167,16 @@ test('Together production SQL: consent, directory, blocks, moves, duels and rete
     await assert.rejects(call(db,a,'move',{match_id:m.id,version:won.version,request_id:randomUUID(),
       move:{seat:1,angle:55,power:70,weapon:'standard',at:{x:145,y:351,attach:'ground'},rng:1,wind:0}}),/not your turn|over/);
     assert.deepEqual(await call(db,b,'delete',{match_id:m.id}),{ok:true});
+    // A round whose result never reached the server can be settled from either
+    // screen: the loser resigns, and the survivor claims the win its replay sees.
+    const stuck=await call(db,a,'challenge',{user_id:b,game:'tank2'});
+    await call(db,a,'move',{match_id:stuck.id,version:stuck.version,request_id:randomUUID(),
+      move:{seat:1,angle:55,power:70,weapon:'standard',at:{x:145,y:351,attach:'ground'},rng:7,wind:0}});
+    const claimed=await call(db,a,'claim',{match_id:stuck.id});
+    assert.equal(claimed.status,'completed');assert.equal(claimed.winner,a);
+    assert.equal(claimed.state.turn,null);assert.equal(claimed.reason,'Last tank standing');
+    await assert.rejects(call(db,b,'claim',{match_id:stuck.id}),/no longer active/);
+    await assert.rejects(call(db,a,'claim',{match_id:randomUUID()}),/unavailable/);
     await call(db,e,'queue_join',{game:'tank2'});
     assert.deepEqual((await call(db,e,'dashboard')).queue,['tank2'],'the random queue offers it too');
     await call(db,e,'queue_cancel',{game:'tank2'});

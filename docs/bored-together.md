@@ -153,6 +153,30 @@ state. A shot that a client claims ended the game is stored as a win; the
 opponent's replay of the same shots is what shows whether that was true, and the
 stored result is not silently trusted by either screen.
 
+Opening a match whose turn has just come back does not present the board as if
+it changed by itself: every earlier shot is fast-forwarded, then the newest one
+is played at its own speed — the shell, the explosion and the ground settling —
+so the player who was away sees what the other side did. Connect Four does the
+same for its newest disc. Pool and Civ Lite still arrive as their resulting
+table and board.
+
+In an online match, mines resolve only while a shell is in the air, never during
+somebody's aim, so a round always ends on a shot both clients can reproduce and
+the mover's stored verdict covers it. Solo and local play keep the original mine
+clock: an armed mine under a tank goes off while the player lines up, so moving
+clear is the answer.
+
+A tank that is lost on its own turn — driving into a hole, or a mine left armed
+from before — has no shot to carry the result, so a match can be left holding
+the turn for a tank that is gone. Either screen settles it: the losing screen
+resigns, and the survivor claims the win its replay shows (`claim` in
+`bored_together.api`, added by
+[`20261114000000_together_tank2_settle.sql`](../supabase/migrations/20261114000000_together_tank2_settle.sql)).
+As with the `won` field on a shot, the server takes the client's word; it bounds
+the request by membership, an active rules-v3 match, no stored winner and at
+least one shot played. The losing screen side needs no new SQL, so until that
+migration is applied only the survivor's claim is unavailable.
+
 This is deliberately weaker than Pool: the database bounds the shot (field,
 angle, power, weapon, turn, version, shot count) but does not simulate it. A
 modified client could therefore submit a shot geometry that never happened;

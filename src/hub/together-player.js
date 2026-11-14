@@ -31,6 +31,26 @@ function gameBridge(context, channel, engineURL) {
       });
     },
     finishTurn() { parent.postMessage({ type: 'bored:together-done', channel }, '*'); },
+    // The game itself decided the round against this seat (a tank that fell out),
+    // with no shot to carry the result. The server records the loss.
+    end() {
+      if (pending) return Promise.reject(new Error('A move is already saving.'));
+      return new Promise((resolve, reject) => {
+        const id = ++serial;
+        pending = { id, resolve, reject };
+        parent.postMessage({ type: 'bored:together-end', channel, id }, '*');
+      });
+    },
+    // The mirror: this seat's replay says the other tank is gone, so a match the
+    // turn holder can no longer play is settled in this seat's favour.
+    claim() {
+      if (pending) return Promise.reject(new Error('A move is already saving.'));
+      return new Promise((resolve, reject) => {
+        const id = ++serial;
+        pending = { id, resolve, reject };
+        parent.postMessage({ type: 'bored:together-claim', channel, id }, '*');
+      });
+    },
     error(error, retry) {
       document.getElementById('together-error')?.remove();
       const box = document.createElement('div'); box.id = 'together-error'; box.setAttribute('role', 'alert');
@@ -59,10 +79,47 @@ export function createTogetherPlayer({ match, owner, frame, submit, reload, clos
   const duel = adapter.mode === 'duel';
   const channel = crypto.randomUUID();
   let current = match, saving = false, disposed = false, confirmed = false, live = true, pollTimer = 0, retryAt = 0;
+  // A settle that arrives while a save is in flight waits for it instead of
+  // leaving the game's promise unanswered.
+  let queued = null;
   const identity = () => !disposed && hasIdentity() && getSession()?.user?.id === owner;
+  // The newest saved move, when the launch read carried the move log: it lets a
+  // game show what the other side did as the turn comes back, instead of only
+  // its result. Only the opponent's own move is offered.
+  const lastMove = m => {
+    const moves = Array.isArray(m.moves) ? m.moves : [];
+    const last = moves[moves.length - 1];
+    if (!last || last.actor === owner || !last.actor) return null;
+    return { seat: last.actor === m.p1 ? 1 : 2, move: last.move };
+  };
   const context = m => ({ state: m.state, status: m.status, seat: m.p1 === owner ? 1 : 2,
     canPlay: m.status === 'active' && m.turn_user === owner,
-    players: [m.p1_handle, m.p2_handle] });
+    players: [m.p1_handle, m.p2_handle], lastMove: lastMove(m) });
+  const replyTo = (request, payload) => frame.contentWindow?.postMessage({ type: 'bored:together-result', channel, id: request.id, ...payload }, '*');
+  // `resign` records this seat's loss; `claim` records the win its replay shows.
+  // Both answer the frame, whatever happens to the request.
+  async function finishMatch(request, action) {
+    const reply = payload => replyTo(request, payload);
+    if (!identity()) { reply({ error: 'Your account changed.' }); return; }
+    if (current.status !== 'active') { reply({ context: context(current) }); return; }
+    saving = true;
+    try {
+      const next = await submit(current, {}, action);
+      if (!identity()) { reply({ error: 'Your account changed.' }); return; }
+      current = next; confirmed = true;
+      reply({ context: context(current) });
+      close();
+    } catch (error) {
+      reply({ error: error.message });
+    } finally {
+      saving = false;
+      drain();
+    }
+  }
+  function drain() {
+    const next = queued; queued = null;
+    if (next) void finishMatch(next.request, next.action);
+  }
   const snapshot = () => { try { return frame.contentWindow?.__boredSnapshot?.() || null; } catch { return null; } };
   // A duel's result is whatever the game's own snapshot says right now; the hub
   // sends it when the run ends or the player asks to finish.
@@ -125,13 +182,30 @@ export function createTogetherPlayer({ match, owner, frame, submit, reload, clos
     async message(event) {
       if (duel) return;
       const request = event.data;
-      if (!identity() || event.source !== frame.contentWindow || request?.channel !== channel) return;
+      if (event.source !== frame.contentWindow || request?.channel !== channel) return;
+      if (!identity()) {
+        // An answer, even a refusal, but never silence: the game waits on it.
+        if (['bored:together-end', 'bored:together-claim', 'bored:together-move'].includes(request.type))
+          frame.contentWindow?.postMessage({ type: 'bored:together-result', channel, id: request.id, error: 'Your account changed.' }, '*');
+        return;
+      }
       if (request.type === 'bored:together-done') {
         // A renderer cannot decide whether the authoritative turn has ended.
         if (confirmed && !saving && !context(current).canPlay) close();
         return;
       }
       if (request.type === 'bored:together-reload') { if (!saving) reload(); return; }
+      if (request.type === 'bored:together-end' || request.type === 'bored:together-claim') {
+        const action = request.type === 'bored:together-end' ? 'resign' : 'claim';
+        if (saving) {
+          // One settle waits; anything it replaces is answered rather than left hanging.
+          if (queued) replyTo(queued.request, { error: 'A later settle replaced this one.' });
+          queued = { request, action };
+          return;
+        }
+        await finishMatch(request, action);
+        return;
+      }
       if (request.type !== 'bored:together-move' || saving) return;
       saving = true;
       try {
@@ -142,7 +216,7 @@ export function createTogetherPlayer({ match, owner, frame, submit, reload, clos
         frame.contentWindow.postMessage({ type: 'bored:together-result', channel, id: request.id, context: context(current) }, '*');
       } catch (error) {
         if (identity()) frame.contentWindow.postMessage({ type: 'bored:together-result', channel, id: request.id, error: error.message }, '*');
-      } finally { saving = false; }
+      } finally { saving = false; drain(); }
     },
     dispose() { disposed = true; stop(); onExit(); }
   };

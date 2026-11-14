@@ -215,7 +215,7 @@ class TankGame {
  constructor(seed,mode='solo',hooks={}){
    this.seed=seed>>>0;this.rng=new Random(this.seed);this.world=new World(this.seed);
    this.tanks=[makeTank(0,this.world),makeTank(1,this.world)];
-   this.mode=mode;this.hooks=hooks;this.turn=0;this.turnNumber=1;this.phase='aim';this.wind=this.rollWind();
+   this.mode=mode;this.hooks=hooks;this.online=!!hooks.online;this.turn=0;this.turnNumber=1;this.phase='aim';this.wind=this.rollWind();
    this.projectiles=[];this.mines=[];this.drops=[];this.effects=[];this.particles=[];this.message='The border is not decorative.';
    this.shotTimer=0;this.settleTimer=0;this.ai=null;this.winner=null;this.actions=[];this.lastBlast=null;
  }
@@ -518,7 +518,13 @@ class TankGame {
    if(this.phase==='gameover'){this.updateFx(dt);return}
    if(this.phase==='thinking')this.stepAI(dt);
    for(const t of this.tanks)this.updateTank(t,dt);
-   this.updateMines(dt);this.updateDrops(dt);
+   this.updateDrops(dt);
+   // Solo and local play keep the original mine clock: an armed mine under a
+   // tank goes off while the player lines up a shot, so moving clear is the
+   // answer. An online match resolves mines only while a shell is in the air,
+   // because a round has to end on a shot both clients replay and the mover
+   // saves — a silent kill during the other player's aim has nothing to report.
+   if(!this.online||this.phase==='flight')this.updateMines(dt);
    if(this.phase==='flight'){
      this.shotTimer+=dt;
      for(let i=this.projectiles.length-1;i>=0;i--){
@@ -579,6 +585,8 @@ const page=document.getElementById('page'),arena=document.getElementById('arena'
 const tempCanvas=document.createElement('canvas');tempCanvas.width=Math.round(GW/CELL);tempCanvas.height=Math.round(GH/CELL);const tc=tempCanvas.getContext('2d',{willReadFrequently:true});
 const $=id=>document.getElementById(id);
 let game=null,muted=false,audio=null,pressed=new Set(),accumulator=0,lastTime=0,shake=0,uiHitCooldown=0,drawScale=1,geo={x:0,y:0,scale:1};
+// Bored Together state, declared before the HUD reads it.
+let onlineSeat=0,onlineShot=null,onlineSent=false,onlineReplay=null,onlineEnding=false,onlineClaiming=false;
 let messages=['THAT WAS THE MENU.','THAT IS NOT THE ENEMY.','THE WALL WAS HOLDING THINGS TOGETHER.','VERY GOOD. NOW THE BUTTON.','THE INTERFACE OBJECTS.'];
 function startAudio(){if(muted)return;try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume()}catch(e){}}
 function noiseSound(type){if(muted||!audio)return;const now=audio.currentTime;
@@ -594,13 +602,23 @@ function resize(){const r=page.getBoundingClientRect(),a=arena.getBoundingClient
   // The arena is the whole page area. Instead of letterboxing a fixed board,
   // the world grows to the viewport at the current scale, so every visible
   // pixel is drivable ground and nothing is hidden at a margin.
-  const scale=a.height>80?a.height/GH:1;
+  // An online match keeps one field for both players, so its width is fixed.
+  // Fit that field inside the arena instead of scaling it by height alone: a
+  // height-only scale makes it wider than the panel (the far tank cropped) or
+  // narrower (the battle pushed against the left edge), and neither side
+  // should be looking at a different amount of ground.
+  const fixed=!!window.__boredTogether;
+  const scale=fixed
+    ?Math.max(.3,Math.min(a.height>80?a.height/GH:1,(a.width||ONLINE_GW)/ONLINE_GW))
+    :(a.height>80?a.height/GH:1);
   // Snap the world to whole cells: GW/CELL has to be an integer or the
   // destructible grid shears (see the World constructor).
-  const rawWidth=window.__boredTogether?ONLINE_GW:Math.max(360,Math.round(a.width/scale));
+  const rawWidth=fixed?ONLINE_GW:Math.max(360,Math.round(a.width/scale));
   const worldWidth=Math.max(CELL,rawWidth-rawWidth%CELL);
   if(worldWidth!==GW){GW=worldWidth;if(game)game.resizeWorld()}
-  geo={x:a.left-r.left,y:a.top-r.top,scale,width:r.width,height:r.height};
+  const spareX=fixed?Math.max(0,(a.width-worldWidth*scale)/2):0;
+  const spareY=fixed?Math.max(0,(a.height-GH*scale)/2):0;
+  geo={x:a.left-r.left+spareX,y:a.top-r.top+spareY,scale,width:r.width,height:r.height};
 }
 function makeTexture(){if(!game)return;const w=game.world.width,h=game.world.height,data=game.world.data;
  if(tempCanvas.width!==w||tempCanvas.height!==h){tempCanvas.width=w;tempCanvas.height=h}
@@ -694,7 +712,7 @@ function updateHUD(){if(!game)return;
  const t=game.active();$('redHP').textContent=game.tanks[0].hp;$('greenHP').textContent=game.tanks[1].hp;
  $('redHealth').style.width=game.tanks[0].hp+'%';$('greenHealth').style.width=game.tanks[1].hp+'%';
  $('redName').textContent='RED · '+(game.mode==='solo'?'YOU':'P1');$('greenName').textContent='GREEN · '+(game.mode==='solo'?'CPU':'P2');
- $('turnCaption').textContent=game.phase==='gameover'?'MATCH OVER':game.phase==='flight'?'SHELL IN FLIGHT':game.phase==='thinking'?'GREEN IS THINKING':(game.turn===0?'RED':'GREEN')+' TO FIRE · TURN '+String(game.turnNumber).padStart(2,'0');
+ $('turnCaption').textContent=game.phase==='gameover'?'MATCH OVER':game.phase==='flight'?(onlineReplay?'REPLAY · THEIR LAST SHOT':'SHELL IN FLIGHT'):game.phase==='thinking'?'GREEN IS THINKING':(game.turn===0?'RED':'GREEN')+' TO FIRE · TURN '+String(game.turnNumber).padStart(2,'0');
  $('angleValue').textContent=Math.round(t.angle)+'°';$('powerValue').textContent=Math.round(t.power)+'%';
  $('windValue').textContent=(game.wind>0?'+':'')+game.wind;$('windArrow').textContent=game.wind===0?'·':game.wind>0?'→':'←';
  $('message').textContent=game.message;
@@ -756,6 +774,7 @@ let hudTime=0;
 function frame(ms){const now=ms/1000,dt=lastTime?Math.min(.045,now-lastTime):0;lastTime=now;accumulator=Math.min(.1,accumulator+dt);
  let ticks=0;while(accumulator>=STEP&&ticks++<10){humanInput(STEP);if(game)game.tick(STEP);if(uiHitCooldown>0)uiHitCooldown=Math.max(0,uiHitCooldown-STEP);accumulator-=STEP}
  if(game&&onlineShot&&!onlineSent)onlineFinish();
+ if(game&&online)onlineWatch();
  if(game){resize();drawWorld(now);hudTime+=dt;if(hudTime>.08){updateHUD();hudTime=0}}
  requestAnimationFrame(frame)
 }
@@ -766,14 +785,13 @@ function frame(ms){const now=ms/1000,dt=lastTime?Math.min(.045,now-lastTime):0;l
  * rebuild the same battle from that list, so neither side is watching a copy.
  */
 const online = (() => { try { return window.__boredTogether || null; } catch (error) { return null; } })();
-let onlineSeat = 0, onlineShot = null, onlineSent = false;
 function hullState(t) {
   // Full precision: rounding a hull is enough to move an explosion one tank-width
   // and change the damage by a point on the far side.
   return { x: t.x, y: t.y, angle: t.angle, power: t.power,
     hp: t.hp, vy: t.vy || 0, attach: t.attach, grounded: !!t.grounded };
 }
-function replayShot(shot) {
+function replayShot(shot, animate) {
   const id = Number(shot.seat) - 1, t = game && game.tanks[id];
   if (!t) return;
   const at = shot.at || {};
@@ -802,6 +820,9 @@ function replayShot(shot) {
   game.wind = Number(shot.wind) || 0;
   game.turn = id; game.phase = 'aim';
   TankGame.prototype.shoot.call(game, id, t.weapon);
+  // An animated shot is left to the frame loop, so the shell is watched rather
+  // than teleported to its crater.
+  if (animate) return;
   for (let guard = 0; guard < 20000 && game.phase !== 'aim' && game.phase !== 'gameover'; guard++) game.tick(STEP);
 }
 function onlineStart() {
@@ -810,14 +831,30 @@ function onlineStart() {
   GW = ONLINE_GW;
   game = new TankGame((Number(state.seed) >>> 0) || 1, 'local', {
     message: () => {}, sound: noiseSound, shake: v => { shake = Math.min(6, shake + v); }, escape: uiHit,
+    online: true,                       // mines resolve on the shot, not in the aim
     end: () => {}                       // the server owns the result, not this screen
   });
   const shots = Array.isArray(state.shots) ? state.shots : [];
-  for (const shot of shots) replayShot(shot);
-  game.turnNumber = shots.length + 1;
-  game.turn = clamp((Number(state.turn) || 1) - 1, 0, 1);
-  game.winner = state.winner ? Number(state.winner) - 1 : null;
-  game.phase = state.winner ? 'gameover' : 'aim';
+  // When the turn comes back to us, the board already moved: replay their last
+  // shot instead of presenting its result as if nothing happened. Everything
+  // before it is fast-forwarded; that one runs on the frame loop's own clock.
+  const last = shots[shots.length - 1];
+  const replay = !state.winner && last && Number(last.seat) !== onlineSeat && Number(state.turn) === onlineSeat;
+  const done = replay ? shots.slice(0, -1) : shots;
+  for (const shot of done) replayShot(shot);
+  game.turnNumber = done.length + 1;
+  if (replay) {
+    onlineReplay = last;
+    replayShot(last, true);
+    game.message = 'Their shot, as it happened.';
+  } else {
+    game.turn = clamp((Number(state.turn) || 1) - 1, 0, 1);
+    game.winner = state.winner ? Number(state.winner) - 1 : null;
+    // A round the replay ends on its own stays finished even if the save that
+    // would have recorded it never arrived.
+    game.phase = state.winner || game.phase === 'gameover' ? 'gameover' : 'aim';
+    game.turnNumber = shots.length + 1;
+  }
   const fire = game.shoot.bind(game), pick = game.selectWeapon.bind(game);
   game.shoot = (id = game.turn, kind = null) => {
     if (game.turn !== onlineSeat - 1 || game.phase !== 'aim') return false;
@@ -831,6 +868,47 @@ function onlineStart() {
   game.selectWeapon = kind => (game.turn === onlineSeat - 1 ? pick(kind) : false);
   $('soloBtn').disabled = $('twoBtn').disabled = true;
   window.tank2 = game; makeTexture(); updateHUD(); resize();
+}
+// The replay has landed: hand the board back to the server's turn, which is ours.
+function onlineReplayEnd() {
+  const state = (online && online.context && online.context.state) || {};
+  onlineReplay = null;
+  game.turn = clamp((Number(state.turn) || 1) - 1, 0, 1);
+  if (state.winner) game.winner = Number(state.winner) - 1;
+  game.phase = state.winner || game.phase === 'gameover' ? 'gameover' : 'aim';
+  game.turnNumber = (Array.isArray(state.shots) ? state.shots.length : 0) + 1;
+  game.message = game.phase === 'gameover' ? 'The round is over.' : 'Your turn.';
+  updateHUD();
+}
+// A round can end without a shot from us — driving into a hole is enough. This
+// screen then holds the turn on the server, so it is the one that must say so,
+// or the match waits forever on a tank that is already gone.
+function onlineConcede() {
+  if (onlineEnding || !online || !online.context || online.context.status !== 'active') return;
+  if (typeof online.end !== 'function') return;
+  onlineEnding = true;
+  online.end().catch(error => { onlineEnding = false; online.error(error, onlineConcede); });
+}
+// The other tank is gone and the server never heard about it: this screen's
+// replay is the evidence, and the survivor's word settles the round.
+function onlineClaim() {
+  if (onlineClaiming || !online || !online.context || online.context.status !== 'active') return;
+  if (typeof online.claim !== 'function') return;
+  onlineClaiming = true;
+  online.claim().catch(error => {
+    onlineClaiming = false;
+    if (/no longer active|is over/i.test(error.message)) return;   // the other screen settled it first
+    online.error(error, onlineClaim);
+  });
+}
+function onlineWatch() {
+  if (onlineReplay) { if (game.phase !== 'flight') onlineReplayEnd(); return; }
+  if (onlineShot || onlineSent) return;
+  if (game.phase !== 'gameover' || game.winner == null) return;
+  // Either screen can finish a round the save never recorded: the loser reports
+  // the loss, and the survivor claims the win its replay shows.
+  if (game.winner === onlineSeat - 1) onlineClaim();
+  else onlineConcede();
 }
 // One shell per turn: send it once it has landed, then hand the turn over.
 function onlineFinish() {

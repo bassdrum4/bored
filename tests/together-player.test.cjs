@@ -40,3 +40,49 @@ test('original-game bridge waits for authoritative end, rejects other frames and
  // No reply is delivered to the disposed/previous-account frame.
  delayed.dispose();assert.equal(exits,1);void late;
 });
+
+test('a settle that arrives during a save waits for it and is answered',async()=>{
+ let closed=0,release;
+ const incoming=[],replies=[];
+ const frameWindow={postMessage:message=>replies.push(message)};
+ const create=controller({hasIdentity:()=>true,getSession:()=>({user:{id:'a'}}),location:{href:'https://example.test/bored/'},crypto:require('node:crypto')});
+ const match={game:'tank2',rules_version:3,status:'active',state:{seed:5,shots:[],turn:1,winner:null},p1:'a',p2:'b',turn_user:'a',p1_handle:'A',p2_handle:'B',version:1};
+ const finished={...match,status:'completed',winner:'b',version:3};
+ const calls=[];
+ const player=create({match,owner:'a',frame:{contentWindow:frameWindow},
+  submit:(current,move,action)=>{calls.push(action);if(action==='move')return new Promise(resolve=>{release=resolve});return Promise.resolve(finished)},
+  close:()=>closed++,reload:()=>{},onExit:()=>{}});
+ const script=player.document('<head></head>').match(/<script>([\s\S]*)<\/script>/)[1];
+ const realm={window:{},parent:{postMessage:m=>incoming.push(m)},addEventListener:()=>{}};
+ vm.runInNewContext(script,realm);
+ const bridge=realm.window.__boredTogether;
+ bridge.finishTurn();
+ const channel=incoming.shift().channel;
+ const moving=player.message({source:frameWindow,data:{type:'bored:together-move',channel,id:1,move:{column:0}}});
+ const settling=player.message({source:frameWindow,data:{type:'bored:together-end',channel,id:2}});
+ await settling;
+ assert.equal(replies.length,0,'a settle during a save is held, not dropped');
+ release({...match,version:2,turn_user:'b'});
+ await moving;
+ for(let i=0;i<100&&!replies.some(r=>r.id===2);i++)await new Promise(r=>setTimeout(r,5));
+ const answer=replies.find(r=>r.id===2);
+ assert.ok(answer,'the held settle is answered');
+ assert.equal(answer.error,undefined,answer.error);
+ assert.deepEqual(calls,['move','resign'],'the save finishes first, then the loss is recorded');
+ assert.equal(closed,1);
+ // The survivor's mirror uses the claim action instead of a forfeit.
+ const claims=[],claimPosts=[];
+ const winnerFrame={postMessage:message=>claimPosts.push(message)};
+ const winner=create({match,owner:'a',frame:{contentWindow:winnerFrame},
+  submit:async(current,move,action)=>{claims.push(action);return {...match,status:'completed',winner:'a',version:4}},
+  close:()=>closed++,reload:()=>{},onExit:()=>{}});
+ const winnerScript=winner.document('<head></head>').match(/<script>([\s\S]*)<\/script>/)[1];
+ const winnerRealm={window:{},parent:{postMessage:m=>incoming.push(m)},addEventListener:()=>{}};
+ vm.runInNewContext(winnerScript,winnerRealm);
+ winnerRealm.window.__boredTogether.finishTurn();
+ const winnerChannel=incoming.shift().channel;
+ await winner.message({source:winnerFrame,data:{type:'bored:together-claim',channel:winnerChannel,id:3}});
+ assert.deepEqual(claims,['claim'],'the survivor claims the win rather than resigning it');
+ assert.equal(claimPosts.find(post=>post.id===3)?.error,undefined,'the claim is answered without an error');
+ assert.equal(closed,2);
+});
