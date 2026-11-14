@@ -284,6 +284,10 @@ test('account UI and score sync still work through the redesigned hub (mock back
     // Role checks are expected on sign-in; this ordinary tester has no analytics access.
     if (url.pathname === '/rest/v1/analytics_admins' || url.pathname === '/rest/v1/game_analytics_readers') return reply([]);
     if (url.pathname === '/rest/v1/score_rules') return reply(rules);
+    if (url.pathname === '/rest/v1/rpc/bored_popular_games') {
+      // The public aggregate contains rankings, never raw player analytics.
+      return reply([{ game: 'trackbound', ranking: 1 }, { game: 'krillion', ranking: 2 }]);
+    }
     if (url.pathname === '/auth/v1/token') return reply({ access_token: 'mock-access', refresh_token: 'mock-refresh', expires_in: 3600, user: { id: 'test-user', email: 'tester@example.test' } });
     if (url.pathname === '/rest/v1/profiles') return reply([{ handle: 'tester' }]);
     if (url.pathname === '/rest/v1/player_state') {
