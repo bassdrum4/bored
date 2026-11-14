@@ -98,6 +98,25 @@ async function scenarios(t,env) {
     await refused(env.admin("update public.game_saves set bytes=5 where user_id=$1",[B]),/violates check constraint/);
   });
 
+  await t.test('Poké Idle keeps one save, slot auto, beside Civ Lite’s and apart from them',async()=>{
+    const idle={head:{v:1,at:1000,touched:900,kind:'auto',name:'Bulbasaur’s party',meta:'Pokédex 3',dex:3},data:'gz:IDLE',game:'poke-idle'};
+    await put(env,A,'auto',{head:header({kind:'auto'}),data:'gz:CIV'});
+    assert.equal((await put(env,A,'auto',idle)).version,1,'same slot name, another game: its own row');
+    assert.deepEqual((await list(env,A,'poke-idle')).map(r=>[r.slot,r.header.dex]),[['auto',3]]);
+    assert.deepEqual((await list(env,A)).map(r=>r.slot),['auto'],'Civ Lite’s list has only its own');
+    assert.equal((await get(env,A,'auto','poke-idle')).data,'gz:IDLE');
+    assert.equal((await get(env,A,'auto')).data,'gz:CIV');
+    for(const slot of ['m1','m8']) await refused(put(env,A,slot,idle),/violates check constraint/);
+    await refused(env.admin("insert into public.game_saves(user_id,game,slot,header,data,bytes) values($1,'poke-idle','m2','{}','x',1)",[A]),/violates check constraint/);
+    // The same version check: a device that saw nothing is told what is there.
+    assert.equal((await conflict(put(env,A,'auto',{...idle,expected:0}))).header.dex,3);
+    assert.equal((await put(env,A,'auto',{...idle,expected:1})).version,2);
+    assert.deepEqual(await del(env,A,'auto',2,'poke-idle'),{slot:'auto',deleted:true,version:2});
+    assert.deepEqual((await list(env,A)).map(r=>r.slot),['auto'],'deleting Poké Idle’s left Civ Lite’s');
+    await refused(list(env,B,'Poke-Idle'),/Unknown game/);
+    assert.equal((await list(env,B,'poke-idle')).length,0,'B sees none of A’s');
+  });
+
   await t.test('a stale expected_version is refused with the stored header, and nothing changes',async()=>{
     const one=await put(env,A,'m1',{head:header({name:'first',at:1000}),data:'gz:one'});
     assert.equal(one.version,1);
@@ -206,4 +225,16 @@ test('the 5.3 migration only adds: one table, one schema, four public functions,
   assert.ok(!/grant (insert|update|delete)/i.test(sql),'the table has no direct write grants');
   const names=fs.readdirSync(path.join(__dirname,'../supabase/migrations')).sort();
   assert.ok(names.indexOf('20261109210000_civ_lite_cloud_saves.sql')>names.indexOf('20261109190000_together_live_checks.sql'),'it runs after the Bored Together migrations it relies on');
+});
+
+test('the Poké Idle migration only widens the game check, adds one slot check and replaces the guard',()=>{
+  const sql=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261114210000_poke_idle_cloud_saves.sql'),'utf8');
+  const code=sql.replace(/--.*$/gm,'');
+  assert.ok(!/\b(drop|truncate)\s+(table|schema|function)/i.test(code),'no drops of tables, schemas or functions');
+  assert.deepEqual([...code.matchAll(/drop constraint if exists (\w+)/gi)].map(m=>m[1]),['game_saves_game_check','game_saves_poke_idle_slot_check']);
+  assert.deepEqual([...code.matchAll(/alter\s+table\s+([\w.]+)/gi)].map(m=>m[1]),Array(4).fill('public.game_saves'));
+  assert.deepEqual([...code.matchAll(/create or replace function ([\w.]+)/gi)].map(m=>m[1]),['bored_saves.guard']);
+  assert.match(code,/set search_path = ''/);
+  assert.match(code,/revoke all on function bored_saves\.guard\(text, boolean\) from public, anon, authenticated/);
+  assert.match(code,/p_game not in \('ashcrown', 'poke-idle'\)/);
 });

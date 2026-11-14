@@ -1,8 +1,8 @@
 import { hasIdentity, getSession, request, freshSession } from './backend.js';
 
-// Civ Lite's saves follow the player's Bored account (5.3). The game has no network and no credentials, so
-// whatever it keeps in the account goes through this bridge, which exists whenever Civ Lite is open in Bored's
-// player and is not in a match or a live game. The game asks with postMessage on a channel only this document
+// Civ Lite's saves follow the player's Bored account (5.3), and so does Poké Idle's one save. The game has no
+// network and no credentials, so whatever it keeps in the account goes through this bridge, which exists whenever
+// one of those games is open in Bored's player and is not in a match or a live game. The game asks with postMessage on a channel only this document
 // knows. The hub checks who asked (the game's own window), the channel and the signed-in account, then calls
 // the save_* functions itself with the player's session. No token ever goes into the page.
 //
@@ -10,18 +10,30 @@ import { hasIdentity, getSession, request, freshSession } from './backend.js';
 // one slot), and an opaque reference for the account so it can keep its notes per account. Never a token, an
 // email or an account id.
 
-const GAME = 'ashcrown';
-const SLOTS = ['auto', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8'];
+// The games that keep saves in the account, each with its slots and the header keys its save list shows. The
+// server holds the same list (game and slot checks in public.game_saves): keep them in step.
+export const SAVE_GAMES = {
+  ashcrown: {
+    slots: ['auto', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8'],
+    header: { v: 'n', mv: 'n', at: 'n', kind: 's', name: 's', meta: 's', turn: 'n', seed: 'n', civ: 's', color: 's', ink: 's', era: 's' }
+  },
+  // One save, played on whichever device is in front of you.
+  'poke-idle': {
+    slots: ['auto'],
+    header: { v: 'n', at: 'n', touched: 'n', kind: 's', name: 's', meta: 's', dex: 'n', shinies: 'n', badges: 'n', champs: 'n' }
+  }
+};
 const MAX_TEXT = 16 * 1024 * 1024;     // a game, as the page sends it, before compression
 const MAX_DATA = 2 * 1024 * 1024;      // what the server keeps (data, after compression and base64)
 const MAX_OPEN = 64 * 1024 * 1024;     // what a download may grow to when it is unpacked
 const KEEPALIVE = 60 * 1024;           // browsers only let a request outlive its page with a body under 64 KB
-const HEADER_KEYS = { v: 'n', mv: 'n', at: 'n', kind: 's', name: 's', meta: 's', turn: 'n', seed: 'n', civ: 's', color: 's', ink: 's', era: 's' };
+const LEAVE_GRACE = 3000;              // how long after the game closed its parting save is still taken
 
 // Serialized into the game's document before its script runs, like the other bridges: call(op, payload) answers
-// with the hub's result, and on(fn) hears what the hub pushes.
+// with the hub's result, and on(fn) hears what the hub pushes. onLeave(fn) is run by the hub, synchronously, just
+// before it closes the game (leave()), which a page's own pagehide is not guaranteed to be.
 function savesBridge(channel) {
-  let serial = 0, listener = null;
+  let serial = 0, listener = null, leaving = null;
   const waiting = new Map(), early = [];
   window.__boredSaves = {
     call(op, payload) {
@@ -34,7 +46,9 @@ function savesBridge(channel) {
     on(fn) {
       listener = fn;
       while (early.length) fn(early.shift());
-    }
+    },
+    onLeave(fn) { leaving = fn; },
+    leave() { try { if (leaving) leaving(); } catch (error) { /* the game is closing either way */ } }
   };
   addEventListener('message', event => {
     const m = event.data;
@@ -70,14 +84,14 @@ export function accountRef(id) {
   return 'a' + a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }
 
-// The page's header, cut down to the keys a header has, with plain values and short text.
-export function cleanHeader(head) {
+// The page's header, cut down to the keys that game's header has, with plain values and short text.
+export function cleanHeader(head, game = 'ashcrown') {
   if (!head || typeof head !== 'object' || Array.isArray(head)) throw refuse('Invalid save.');
-  const out = {};
-  for (const key of Object.keys(HEADER_KEYS)) {
+  const keys = SAVE_GAMES[game].header, out = {};
+  for (const key of Object.keys(keys)) {
     const value = head[key];
-    if (HEADER_KEYS[key] === 'n' && Number.isFinite(value)) out[key] = value;
-    else if (HEADER_KEYS[key] === 's' && typeof value === 'string') out[key] = value.slice(0, 200);
+    if (keys[key] === 'n' && Number.isFinite(value)) out[key] = value;
+    else if (keys[key] === 's' && typeof value === 'string') out[key] = value.slice(0, 200);
   }
   if (!Number.isFinite(out.at)) throw refuse('Invalid save.');
   return out;
@@ -129,10 +143,6 @@ export async function decodeSave(data) {
   return new TextDecoder().decode(await pipe(bytes, new DecompressionStream('gzip'), MAX_OPEN));
 }
 
-const slotOf = value => {
-  if (typeof value !== 'string' || !SLOTS.includes(value)) throw refuse('That isn’t a save slot.');
-  return value;
-};
 const versionOf = value => {
   if (!Number.isInteger(value) || value < 0 || value > 1e9) throw refuse('Invalid request.');
   return value;
@@ -157,15 +167,22 @@ function failure(error) {
   return out;
 }
 
-// The saves bridge for one document of Civ Lite. Everything it needs from the page around it is injected, so it
-// can be tested without a browser or a network:
+// The saves bridge for one document of a game in SAVE_GAMES (Civ Lite unless told otherwise). Everything it needs
+// from the page around it is injected, so it can be tested without a browser or a network:
 //   rpc(fn, args, options)   one of the save_* functions, with the player's session
 //   account()                who is signed in now, as { id }, or null
-export function createSavesBridge({ frame, deps = {} }) {
+// A game only ever reaches its own saves: the game name is fixed here, never taken from the page.
+export function createSavesBridge({ frame, game = 'ashcrown', deps = {} }) {
+  if (!SAVE_GAMES[game]) throw new Error('No account saves for ' + game);
+  const GAME = game, SLOTS = SAVE_GAMES[game].slots;
+  const slotOf = value => {
+    if (typeof value !== 'string' || !SLOTS.includes(value)) throw refuse('That isn’t a save slot.');
+    return value;
+  };
   const channel = crypto.randomUUID();
   const account = deps.account || (() => (hasIdentity() ? { id: getSession()?.user?.id } : null));
   const encode = deps.encode || encodeSave, decode = deps.decode || decodeSave;
-  let disposed = false, listing = null;
+  let disposed = false, closedAt = 0, listing = null;
 
   async function realRpc(fn, args, options) {
     const owner = getSession()?.user?.id;
@@ -209,7 +226,7 @@ export function createSavesBridge({ frame, deps = {} }) {
         return { slot: row.slot, version: Number(row.version) || 0, stamp: Number(row.stamp) || 0, header: row.header || {}, state: await decode(row.data) };
       }
       case 'put': {
-        const slot = slotOf(p.slot), expected = versionOf(p.expected), head = cleanHeader(p.header);
+        const slot = slotOf(p.slot), expected = versionOf(p.expected), head = cleanHeader(p.header, GAME);
         const data = await encode(p.state);
         if (data.length > MAX_DATA) throw refuse('That save is larger than your account keeps (2 MB).');
         // A page that is closing leaves the request with the browser; that only works for a small body.
@@ -233,7 +250,10 @@ export function createSavesBridge({ frame, deps = {} }) {
     },
     async message(event) {
       const asked = event.data;
-      if (disposed || event.source !== frame.contentWindow || !asked || asked.channel !== channel || asked.type !== 'bored:saves-call') return;
+      if (event.source !== frame.contentWindow || !asked || asked.channel !== channel || asked.type !== 'bored:saves-call') return;
+      // Once the game is closed only its parting save is still taken, for a moment, and nothing is answered. The
+      // channel is known only to that document, so the next game in the frame can't use it.
+      if (disposed && !(asked.op === 'put' && asked.payload && asked.payload.leaving === true && Date.now() - closedAt < LEAVE_GRACE)) return;
       const before = account(), owner = before ? before.id : null;
       try {
         const result = await call(asked.op, asked.payload);
@@ -251,6 +271,6 @@ export function createSavesBridge({ frame, deps = {} }) {
       listing = null;
       post({ type: 'bored:saves-event', event: { event: 'account' } });
     },
-    dispose() { disposed = true; listing = null; }
+    dispose() { disposed = true; closedAt = Date.now(); listing = null; }
   };
 }

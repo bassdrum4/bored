@@ -206,6 +206,10 @@
   .tip { position: relative; margin-top: 8px; padding: 14px 16px 12px; background: var(--surface); border: 1px solid var(--ink); border-radius: 6px; box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 4px var(--ink); display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.55 }
   .tip .who { position: absolute; top: -9px; left: 12px; padding: 0 6px; background: var(--paper); font-size: 12px; font-weight: 700; line-height: 16px }
   .tip p { max-width: 68ch }
+  .syncask { margin: 0 0 12px }
+  .syncask h2 { margin: 0; font-size: 14px }
+  .sync-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px }
+  .sync-two > div { border: 1px solid var(--line, var(--ink)); border-radius: 4px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start }
   .tip .row { justify-content: flex-end }
   .tip .skip { margin-right: auto; font: inherit; font-size: 12px; border: 0; background: none; color: var(--dim); padding: 0; cursor: pointer; text-decoration: underline 1px; text-underline-offset: 3px }
   .tip .skip:hover { color: var(--ink) }
@@ -307,6 +311,7 @@
 </head>
 <body>
 <main>
+  <div class="tip syncask" id="syncask" role="alertdialog" aria-labelledby="syncask-h" hidden></div>
   <section id="title" hidden>
     <div class="head"><h1 id="sign">Poké Idle</h1><span class="small muted" id="tagline">Your party fights on its own; you just help.</span></div>
     <form class="row small" id="testdoor" hidden><input type="password" id="testpw" aria-label="Password" autocomplete="off" spellcheck="false"><button class="lbl" type="submit">Open</button><span class="bad" id="testmsg" role="status"></span></form>
@@ -421,7 +426,8 @@
       <div class="small muted">Short tips for new trainers that show up the first time you reach something.</div>
       <div class="row"><button class="lbl" id="tut-replay" type="button">Show the tips again</button><button class="lbl" id="tut-off" type="button">Turn tips off</button><span class="small muted" id="tut-msg" role="status"></span></div>
       <h2>Save</h2>
-      <div class="small muted">Your save lives in this browser. Copy the code to move it to another device, then paste it there and load.</div>
+      <div class="small muted">Your save lives in this browser. Signed in on Bored, it also goes to your Bored account, so you can carry on from any device. Without an account, copy the code to move it to another device, then paste it there and load.</div>
+      <div class="small" id="syncline" role="status"></div>
       <textarea id="savecode" aria-label="Save code" spellcheck="false"></textarea>
       <div class="row"><button class="lbl" id="export" type="button">Show my save code</button><button class="lbl" id="import" type="button">Load pasted code</button><button class="lbl" id="reset" type="button">Start over</button></div>
       <div class="small" id="setmsg" role="status"></div>
@@ -611,7 +617,10 @@ let slot = (() => { try { return localStorage.getItem(SLOT_KEY) === "test" ? TES
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
 const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, last: Date.now() });
 let S = readSlot(slot);
-const save = () => { S.last = Date.now(); if (S.party.length >= 6) S.full = 1; try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
+// Your save in your Bored account (see "Saves in your account" further down). openAt is the save's time as this page
+// found it, before anything here touched it.
+const SYNC = { acct: null, state: "start", row: null, busy: false, again: false, tries: 0, retryAt: 0, lastPush: 0, hidden: false, ask: null, hideAsk: false, blocked: 0, error: false, openAt: (readSlot(KEY) || {}).last || 0 };
+const save = () => { if (syncHold()) return; S.last = Date.now(); if (S.party.length >= 6) S.full = 1; try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
 
 // ── Party power
 const lvlOf = xp => Math.max(1, Math.min(100, Math.floor(Math.cbrt(xp + 0.5))));
@@ -1434,6 +1443,8 @@ function renderAch() {
 const MAIL = [
   { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
+  { id: "update-2026-11-14c", date: "Nov 14, 2026", from: "Prof Penguin", title: "Your save follows you",
+    body: `<p>Signed in on Bored, your save now goes to your Bored account too, like Civ Lite's. Open Poké Idle on your phone and it picks up where your computer left off, and the other way round.</p><p>It goes up about once a minute while you play, and whenever you leave or switch tabs. A tab left open on another device just idles, so it never gets in the way. If two devices were both played since they last met, you'll be asked which save to keep. The test account stays on the device it's on.</p>` },
   { id: "update-2026-11-14b", date: "Nov 14, 2026", from: "Prof Penguin", title: "Physical and special attackers",
     body: `<p>Defense and Sp. Def count now. Each of your Pokémon is a physical attacker (Attack against the foe's Defense) or a special one (Sp. Atk against its Sp. Def), by whichever stat is higher, just like the moves you'd give it. Pokémon with both about equal, like Lucario or Arceus, are mixed and use whichever hits harder.</p><p>So bring special attackers to Steelix and physical ones to Blissey. The foe's Def and Sp. Def show next to its name, and each tile in your party shows how hard it hits, type and defense together. Every boss has been re-tuned, so a team built for the fight finds it as hard as before.</p>` },
   { id: "update-2026-11-14", date: "Nov 14, 2026", from: "Prof Penguin", title: "Two more legends, and stronger prizes",
@@ -1569,7 +1580,7 @@ function wikiSections() {
     { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>One point per Pokédex entry and one more for each one you have shiny, up to 2050. It posts to the arcade board when you're signed in.</p>` },
     { id: "achievements", group: "Collection", title: "Achievements", html: `<p>${ACH.length} of them, from your first catch to every form, in the Achievements tab with how far along each is. They're for show: no rewards, nothing changes the game.</p>` },
     { id: "mail", group: "Collection", title: "Mail", html: `<p>Update notes and gifts arrive in the Mail tab; the tab and the title screen show how many are new. Each gift can be claimed once per save, between battles.</p>` },
-    { id: "saves", group: "Collection", title: "Saves", html: `<p>Your save lives in this browser. Settings → "Show my save code" gives a code to paste on another device; the title screen can load one too. New game erases the save on this device, so copy the code first if you might want it back.</p>` }
+    { id: "saves", group: "Collection", title: "Saves", html: `<p>Your save lives in this browser. Signed in on Bored, it also goes to your Bored account: at most once a minute while you play, and whenever you leave or switch tabs. Open Poké Idle on another device and it picks up where you left off. If two devices both played since they last met (two tabs at once, or one offline), you choose which save to keep. The test account never leaves the device.</p><p>Without an account, Settings → "Show my save code" gives a code to paste on another device; the title screen can load one too. New game erases your save (in your account too, when you're signed in), so copy the code first if you might want it back.</p>` }
   ];
 }
 const wikiPools = new Map();
@@ -2062,7 +2073,7 @@ function renderTitle() {
   const card = $("#t-card");
   if (panel === "how") card.innerHTML = `<h2>How to play</h2><ul class="t-how">${HOW.map(t => `<li>${t}</li>`).join("")}</ul>`;
   else if (panel === "load") card.innerHTML = `<h2>Load a save code</h2><p class="small muted">On your other device, open Settings and use "Show my save code", then paste the code here.</p><textarea id="t-code" aria-label="Save code" spellcheck="false"></textarea><div class="row"><button class="lbl" type="button" data-act="load">Load save</button></div><div class="small bad" id="t-msg" role="status"></div>`;
-  else if (panel === "new") card.innerHTML = `<h2>Start a new game?</h2><p class="small">This erases the save on this device: your Box, badges and money. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase save and start new game</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`;
+  else if (panel === "new") card.innerHTML = `<h2>Start a new game?</h2><p class="small">This erases your save${syncOn() ? " on this device and in your Bored account" : " on this device"}: your Box, badges and money. If you might want it back, copy your save code from Settings first.</p><div class="row"><button class="lbl danger" type="button" data-act="erase">Erase save and start new game</button><button class="lbl" type="button" data-act="keep">Keep my save</button></div>`;
   else card.innerHTML = saveCard();
 }
 function leadField() {
@@ -2075,7 +2086,8 @@ function saveCard() {
     ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${caught + shiny} points`]].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<div class="t-party">${S.party.map(n => `<img src="${spriteOf(lookOf(n), showsShiny(n))}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
-    (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "");
+    (awayText ? `<p class="small muted">${esc(awayText)}</p>` : "") + (titleMsg ? `<p class="small good">${esc(titleMsg)}</p>` : "") +
+    `<p class="small muted" id="t-sync" role="status">${esc(syncText())}</p>`;
 }
 function go(id) {
   if (id === "continue") return enter("battle");
@@ -2105,9 +2117,193 @@ $("#t-card").onclick = e => {
 };
 $("#pickback").onclick = showTitle;
 $("#starters").onclick = e => { const b = e.target.closest("[data-start]"); if (!b) return; S = fresh(); S.box[+b.dataset.start] = { xp: 125, shiny: false }; S.party = [+b.dataset.start]; B = null; enter("battle"); toast(`${mon(+b.dataset.start).name} is your partner. Tap the wild Pokémon to help it fight.`); };
+// ── Saves in your account. Signed in on Bored, the save also lives in your Bored account, so any device can carry on
+// where another left off. The game has no network and no credentials: it asks the hub's saves bridge
+// (window.__boredSaves), which only exists inside Bored's player. Standalone, or signed out, none of this runs and the
+// save behaves as it always did. The test account never leaves the device.
+// The account keeps one copy (slot "auto") with a version that goes up on every write. This device remembers, per
+// account, the version it last saw and the time (S.last) of the save that matched it: { v, at }, the base both sides
+// last shared. A save with another time has progress the account hasn't seen. Each save also keeps when you last
+// touched the game (S.touched, a tap or a key), because an idle game moves on by itself: a tab left open on another
+// device isn't being played. When the account has a version this device hasn't seen:
+//   * this device has nothing new, or only idled since the base: the account's copy is loaded, the usual way to move
+//     between devices;
+//   * this device was played and the account's copy only idled: this device's wins and goes up;
+//   * both were played (two devices at once, one offline), or the two saves have never met: you choose which to keep.
+// While the page is hidden the save holds still, so going to the background changes nothing.
+const SYNC_KEY = "bored.poke-idle.sync.v1", SYNC_SLOT = "auto", SYNC_EVERY = 60000, SYNC_BACKOFF = [5, 15, 45, 120, 300];
+function syncBridge() { try { return window.__boredSaves || null; } catch { return null; } }
+function syncOn() { return !!SYNC.acct && !!syncBridge(); }
+function syncHold() { return SYNC.hidden && syncOn(); }
+function syncNotes() {
+  try { const all = JSON.parse(localStorage.getItem(SYNC_KEY) || "null"); return all && typeof all === "object" && !Array.isArray(all) ? all : {}; } catch { return {}; }
+}
+function syncNote() { const n = SYNC.acct ? syncNotes()[SYNC.acct] : null; return n && Number.isFinite(n.v) && Number.isFinite(n.at) ? n : null; }
+function syncSetNote(n) {
+  if (!SYNC.acct) return;
+  try { const all = syncNotes(); if (n) all[SYNC.acct] = n; else delete all[SYNC.acct]; localStorage.setItem(SYNC_KEY, JSON.stringify(all)); } catch {}
+  // A save that has been in an account belongs to it (owner: the bridge's opaque name for the account, never an id).
+  if (n && S && slot === KEY) S.owner = SYNC.acct;
+}
+// One browser, two players: the device keeps one Poké Idle save, so a save another account here already holds is
+// theirs: it never goes into this account. Known by its owner, or for one that never got it, by another account's note.
+const syncTheirs = (s, at = s && s.last) => !!s && ((!!s.owner && s.owner !== SYNC.acct) || Object.entries(syncNotes()).some(([a, n]) => a !== SYNC.acct && n && n.at === at));
+// The real save as it sits in storage, whichever slot is open.
+function localSave() {
+  try { const text = localStorage.getItem(KEY), s = text && JSON.parse(text); return s && s.v === 1 && s.box ? { s, text } : null; } catch { return null; }
+}
+function syncHeader(s) {
+  const dex = Object.keys(s.box).length, shinies = Object.values(s.box).filter(b => b.shiny).length, badges = Object.keys(s.badges || {}).length, champs = Object.keys(s.champs || {}).length;
+  return { v: 1, at: s.last || 0, touched: s.touched || 0, kind: "auto", name: s.party && s.party[0] ? mon(s.party[0]).name + "'s party" : "Poké Idle", meta: `Pokédex ${dex} · ${badges} badges · ${champs} Champions`, dex, shinies, badges, champs };
+}
+const agoText = t => { const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+function syncText() {
+  if (!syncBridge()) return "";
+  if (SYNC.state === "start") return "Checking your Bored account…";
+  if (!SYNC.acct) return "Sign in to Bored and your save follows you to any device.";
+  if (slot === TEST_KEY) return "The test account stays on this device; your own save is in your Bored account.";
+  if (SYNC.ask) return "Two different saves: pick the one to keep.";
+  if (syncTheirs(localSave() && localSave().s)) return "This save belongs to another Bored account on this browser, so it stays on this device.";
+  if (SYNC.error) return "Couldn't reach your Bored account. Trying again.";
+  if (!SYNC.row) return localSave() ? "Saving to your Bored account…" : "";
+  return `In your Bored account, saved there ${agoText(SYNC.row.stamp || Date.now())}.`;
+}
+function syncShow() {
+  const t = syncText();
+  for (const id of ["#t-sync", "#syncline"]) { const el = $(id); if (el && el.textContent !== t) el.textContent = t; }
+  const box = $("#syncask"), ask = SYNC.ask;
+  box.hidden = !ask || SYNC.hideAsk;
+  if (box.hidden) return;
+  const here = localSave(), mine = here ? syncHeader(here.s) : {}, theirs = ask.row.header || {};
+  const side = (who, h, when, act, label) => `<div><b>${who}</b><span class="small">${esc(h.meta || "")}</span><span class="small muted">${esc(h.name || "")}, ${when}</span><button class="lbl" type="button" data-sync="${act}">${label}</button></div>`;
+  box.innerHTML = `<span class="who">Your saves</span><h2 id="syncask-h">Two different saves</h2><p>Your Bored account has a save from another device, and this device has progress the account hasn't seen. Keep one: the other is replaced.</p>` +
+    `<div class="sync-two">${side("This device", mine, "played " + agoText(mine.at || Date.now()), "device", "Keep this device's")}${side("Your account", theirs, "saved " + agoText(ask.row.stamp || Date.now()), "account", "Keep the account's")}</div>` +
+    `<div class="row"><button class="lbl" type="button" data-sync="later">Decide later</button></div>`;
+}
+$("#syncask").onclick = e => {
+  const b = e.target.closest("[data-sync]"); if (!b || !SYNC.ask) return;
+  const row = SYNC.ask.row;
+  if (b.dataset.sync === "later") { SYNC.hideAsk = true; syncShow(); return; }
+  SYNC.ask = null; SYNC.hideAsk = false;
+  if (b.dataset.sync === "device") { syncSetNote({ v: row.version, at: 0 }); SYNC.row = row; syncShow(); syncPush(); toast("Kept this device's save. It's going to your account."); }
+  else syncDownload("Loaded the save from your Bored account.");
+};
+async function syncList() {
+  const got = await syncBridge().call("list"), r = (got.saves || []).find(x => x.slot === SYNC_SLOT);
+  return r ? { version: r.version, stamp: r.stamp, header: r.header || {} } : null;
+}
+// Where this device stands with the account, and what to do about it. opening: the page just loaded, so compare the
+// save as it was found (boot has already moved it on with offline progress).
+async function syncCheck(opening) {
+  if (!syncOn()) return;
+  const acct = SYNC.acct;
+  let row;
+  try { row = await syncList(); SYNC.error = false; } catch (e) { SYNC.error = !!(e && e.retry); SYNC.state = "ready"; syncShow(); return; }
+  if (SYNC.acct !== acct) return;
+  SYNC.row = row; SYNC.state = "ready";
+  const note = syncNote(), local = localSave(), at = local ? local.s.last || 0 : 0;
+  if (row && row.version !== (note ? note.v : 0) && await syncResolve(row, opening)) return;
+  syncShow();
+  if (!SYNC.ask) syncPush();
+}
+// The account has a copy this device hasn't seen: load it, replace it, or ask (see the top of this section). True
+// when the account's copy was loaded.
+async function syncResolve(row, opening) {
+  const note = syncNote(), local = localSave(), at = local ? local.s.last || 0 : 0, mine = opening ? SYNC.openAt : at, h = row.header || {};
+  const load = () => syncDownload(opening ? "Picked up where you left off on your other device." : "Your other device played since: here's that save.");
+  if (!local) return load();
+  if (h.at === at) { syncSetNote({ v: row.version, at }); return false; }      // the same save: it went up before and the answer was lost
+  if (!note) { if (syncTheirs(local.s, mine)) return load(); SYNC.ask = { row }; SYNC.hideAsk = false; return false; }
+  if (mine === note.at || (local.s.touched || 0) <= note.at) return load();     // nothing new here, or only idling
+  if ((h.touched || 0) <= note.at) { syncSetNote({ v: row.version, at: 0 }); SYNC.again = true; return false; }   // only idling there: this one goes up over it
+  SYNC.ask = { row }; SYNC.hideAsk = false;
+  return false;
+}
+async function syncDownload(msg) {
+  const b = syncBridge(), acct = SYNC.acct;
+  if (!b || !acct) return false;
+  let got;
+  try { got = await b.call("get", { slot: SYNC_SLOT }); } catch (e) { toast(e && e.retry ? "Couldn't reach your Bored account. Try again in a moment." : "The save in your account can't be opened."); return false; }
+  if (SYNC.acct !== acct) return false;
+  let s = null;
+  try { s = JSON.parse(got.state); } catch {}
+  if (!s || s.v !== 1 || !s.box) { toast("The save in your account can't be opened."); return false; }
+  try { localStorage.setItem(KEY, got.state); } catch { toast("This browser has no room for the save from your account."); return false; }
+  syncSetNote({ v: got.version, at: s.last || 0 });
+  SYNC.row = { version: got.version, stamp: got.stamp, header: got.header || {} }; SYNC.ask = null;
+  if (slot === KEY) { S = s; boot(); titleMsg = msg; renderTitle(); }
+  syncShow();
+  return true;
+}
+async function syncPush(leaving) {
+  const b = syncBridge(), acct = SYNC.acct;
+  if (!b || !acct || SYNC.state !== "ready" || SYNC.ask) return;
+  if (SYNC.busy) { SYNC.again = true; return; }
+  const local = localSave(), note = syncNote();
+  if (!local) return;
+  const at = local.s.last || 0;
+  if (note && note.at === at) return;                       // the account has this one
+  if (syncTheirs(local.s)) return;                          // another account's save on this browser
+  if (SYNC.blocked === at) return;                          // refused for good: only a change gets it tried again
+  SYNC.busy = true; SYNC.lastPush = Date.now();
+  const head = syncHeader(local.s);
+  try {
+    const res = await b.call("put", { slot: SYNC_SLOT, header: head, state: local.text, expected: note ? note.v : 0, leaving: !!leaving });
+    if (SYNC.acct === acct) { syncSetNote({ v: res.version, at }); SYNC.row = { version: res.version, stamp: res.stamp, header: head }; SYNC.tries = 0; SYNC.retryAt = 0; SYNC.error = false; }
+  } catch (e) {
+    if (SYNC.acct === acct) {
+      const c = e && e.conflict;
+      if (c && c.version === 0) { syncSetNote(null); SYNC.row = null; SYNC.again = true; }                       // gone from the account: this is the only copy
+      else if (c && c.version && c.header && c.header.at === at) { syncSetNote({ v: c.version, at }); SYNC.row = { version: c.version, stamp: c.stamp, header: c.header }; }
+      else if (c && c.version) { SYNC.row = { version: c.version, stamp: c.stamp, header: c.header || {} }; SYNC.busy = false; if (await syncResolve(SYNC.row, false)) return; }
+      else if (c) syncCheck(false);
+      else if (e && e.retry) { SYNC.error = true; SYNC.retryAt = Date.now() + SYNC_BACKOFF[Math.min(++SYNC.tries, SYNC_BACKOFF.length) - 1] * 1000; }
+      else SYNC.blocked = at;
+    }
+  }
+  SYNC.busy = false;
+  if (SYNC.acct === acct && SYNC.again && !leaving) { SYNC.again = false; syncPush(); }
+  syncShow();
+}
+// Every save stays on the device; the account gets one at most once a minute, and whatever's waiting when you leave.
+function syncTick() {
+  if (syncOn() && SYNC.state === "ready" && !SYNC.hidden && Date.now() >= Math.max(SYNC.retryAt, SYNC.lastPush + SYNC_EVERY)) syncPush();
+  else syncShow();
+}
+async function syncStart() {
+  const b = syncBridge();
+  if (!b) return;
+  let acct = null;
+  try { const st = await b.call("status"); acct = st && st.signedIn && typeof st.account === "string" ? st.account : null; } catch {}
+  if (acct !== SYNC.acct) Object.assign(SYNC, { acct, row: null, ask: null, hideAsk: false, tries: 0, retryAt: 0, blocked: 0, error: false });
+  SYNC.state = acct ? "start" : "ready";
+  syncShow();
+  if (acct) await syncCheck(true);
+}
+// A tap or a key anywhere in the game: you're playing this save, not just letting it idle.
+const touch = () => { if (S && slot === KEY) S.touched = Date.now(); };
+addEventListener("pointerdown", touch, true);
+addEventListener("keydown", touch, true);
+function syncBoot() {
+  const b = syncBridge();
+  if (!b) return;
+  b.on(ev => { if (ev && ev.event === "account") { SYNC.openAt = (readSlot(KEY) || {}).last || 0; syncStart(); } });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") { if (S && slot === KEY) save(); SYNC.hidden = true; if (syncOn()) syncPush(); return; }
+    SYNC.hidden = false;
+    if (syncOn()) syncCheck(false);
+  });
+  // Leaving: Bored's player says so just before it closes the game; pagehide covers a closing tab.
+  const leave = () => { if (!SYNC.hidden && S && slot === KEY) save(); if (syncOn()) syncPush(true); };
+  if (b.onLeave) b.onLeave(leave);
+  addEventListener("pagehide", leave);
+  syncStart();
+}
+
 setInterval(tick, 100);
-setInterval(() => { if (S) { deliverMail(); checkAch(); save(); tutor(); } }, 5000);
+setInterval(() => { if (S) { deliverMail(); checkAch(); save(); tutor(); } syncTick(); }, 5000);
 boot();
+syncBoot();
 
 // The hub reads this: integer metrics, never null.
 // score is the board's number: one point per Pokédex entry and one more for each one you have shiny.

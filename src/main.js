@@ -32,7 +32,7 @@ import { getAnalyticsAccess } from './hub/analytics-access.js';
 import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
 import { resumeScript } from './hub/resume.js';
-import { createSavesBridge } from './hub/saves-bridge.js';
+import { createSavesBridge, SAVE_GAMES } from './hub/saves-bridge.js';
 import { initVoice } from './hub/voice.js';
 import { initPreferences } from './hub/preferences.js';
 import { createHubNavigation } from './hub/navigation.js';
@@ -218,6 +218,9 @@ async function toggleFullscreen() {
 let activeTogether = null;
 // Civ Lite's account saves: a bridge for the one document of Civ Lite that is open and not in a match.
 let activeSaves = null;
+// The saves bridge of the game that just closed: it still takes that game's parting save for a moment.
+let closingSaves = null;
+const closeSaves = () => { if (activeSaves) { activeSaves.dispose(); closingSaves = activeSaves; activeSaves = null; } };
 // Civ Lite's Multiplayer screen talks to the hub through this bridge whenever the game is open and is not itself a
 // match or a live game. Each document gets its own, with its own channel.
 let activeLobby = null;
@@ -238,12 +241,12 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     const shelf = from.closest?.('#recent-list, #grid');
     launchSelector = shelf ? '#' + shelf.id + ' [data-slug="' + slug + '"]' : from.id ? '#' + from.id : '';
   }
-  if (activeSlug) { pollDaily(); captureBest({ leaving: true }); }
+  if (activeSlug) { pollDaily(); captureBest({ leaving: true }); try { gameFrame.contentWindow?.__boredSaves?.leave?.(); } catch {} }
   $('#duel-finish').hidden = true;
   const previousTogether = activeTogether;
   activeTogether = multiplayer;
   if (previousTogether && previousTogether !== multiplayer) previousTogether.dispose();
-  if (activeSaves) { activeSaves.dispose(); activeSaves = null; }
+  closeSaves();
   if (activeLobby) { activeLobby.dispose(); activeLobby = null; }
   $('#back span').textContent = multiplayer ? '‹ Bored Together' : '‹ All games';
   $('#restart').hidden = !!multiplayer;
@@ -291,9 +294,9 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       html = multiplayer?.mode === 'duel' ? html : injectSeed(html);
       if (multiplayer) html = multiplayer.document(html);
       else if (slug === 'ashcrown') { activeLobby = createLobbyBridge({ frame: gameFrame, deps: lobbyDeps }); html = activeLobby.document(html); }
-      // Civ Lite keeps its saves in the player's account. A live or turn-by-turn match lives on the server and
-      // never touches saves, so only a solo document is offered the bridge.
-      if (slug === 'ashcrown' && !multiplayer) { activeSaves = createSavesBridge({ frame: gameFrame }); html = activeSaves.document(html); }
+      // Civ Lite and Poké Idle keep their saves in the player's account. A live or turn-by-turn match lives on the
+      // server and never touches saves, so only a solo document is offered the bridge.
+      if (SAVE_GAMES[slug] && !multiplayer) { activeSaves = createSavesBridge({ frame: gameFrame, game: slug }); html = activeSaves.document(html); }
       let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};' + (OWNS_ESCAPE.has(slug) ? '' : 'if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}') + 'if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
       gameFrame.removeAttribute('src');
       // The resume helper runs before the game's own script, so a game can offer a
@@ -398,6 +401,8 @@ function closeGame({ force = false } = {}) {
   // Store the position one last time before the frame is torn down; a game's own
   // pagehide is not guaranteed to run after srcdoc is cleared.
   try { gameFrame.contentWindow?.__boredResume?.flush?.(); } catch {}
+  // Likewise a game keeping saves in the account sends its last one now (the saves bridge takes it after closing).
+  try { gameFrame.contentWindow?.__boredSaves?.leave?.(); } catch {}
   gameFrame.removeAttribute('src');
   gameFrame.srcdoc = '';
   activeSlug = null;
@@ -409,7 +414,7 @@ function closeGame({ force = false } = {}) {
   activeTogether = null;
   if (together) together.dispose();
   // A save the game asked for as it closed is already on its way; this only stops the bridge hearing more.
-  if (activeSaves) { activeSaves.dispose(); activeSaves = null; }
+  closeSaves();
   if (activeLobby) { activeLobby.dispose(); activeLobby = null; }
   if ($('#invite-dialog')?.open) $('#invite-dialog').close();
   const wasDaily = activeChallenge;
@@ -922,6 +927,8 @@ addEventListener('fullscreenchange', onFullscreenChange);
 addEventListener('webkitfullscreenchange', onFullscreenChange);
 
 addEventListener('message', event => {
+  // The game that just closed may still send its parting save; that bridge checks its own frame and channel.
+  if (closingSaves) closingSaves.message(event);
   if (!activeSlug || EXTERNS[activeSlug] || event.source !== gameFrame.contentWindow) return;
   if (activeTogether) activeTogether.message(event);
   if (activeSaves) activeSaves.message(event);

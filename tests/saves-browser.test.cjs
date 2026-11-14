@@ -100,6 +100,24 @@ async function lab(t) {
         throw error;
       }
     };
+    // Opens Poké Idle in Bored's player and waits for its first look at the account.
+    d.openIdle = async () => {
+      if (!(await page.evaluate(() => location.hash === '#poke-idle'))) await page.evaluate(() => { location.hash = '#poke-idle'; });
+      else { await page.reload(); await grid(); }
+      await page.waitForFunction(() => !document.querySelector('#player').hidden && document.querySelector('#frame').contentDocument?.getElementById('syncask'), { polling: 50 });
+      d.frame = await (await page.$('#frame')).contentFrame();
+      await d.frame.waitForFunction('typeof SYNC === "object" && SYNC.state === "ready" && !SYNC.busy', { polling: 50, timeout: 15000 });
+      return d.frame;
+    };
+    d.untilIdle = async (expr, arg, ms) => {
+      try { return await d.frame.waitForFunction(expr, { polling: 50, timeout: ms || 15000 }, arg); } catch (error) {
+        const state = await d.frame.evaluate(() => JSON.stringify({ acct: SYNC.acct, state: SYNC.state, row: SYNC.row, note: syncNote(), ask: !!SYNC.ask, busy: SYNC.busy, error: SYNC.error, at: (localSave() || { s: {} }).s.last, slot }));
+        error.message += '\n' + d.name + ' state: ' + state;
+        throw error;
+      }
+    };
+    // The game's page going to the background and back, as switching tabs or apps does.
+    d.visible = on => d.frame.evaluate(v => { Object.defineProperty(document, 'visibilityState', { value: v ? 'visible' : 'hidden', configurable: true }); document.dispatchEvent(new Event('visibilitychange')); }, on);
     d.run = expr => d.frame.evaluate(expr);
     d.start = () => d.run(`startGame({ seats: ${SEATS}, seed: 4242, map: 'islands', level: 'normal' })`);
     d.rows = () => d.frame.$$eval('.slot', els => els.map(e => ({ id: e.dataset.slot, name: e.querySelector('.slot-name').textContent, when: (c => { const w = c.querySelector('.slot-when'); if (!w) return ''; const copy = w.cloneNode(true); copy.querySelectorAll('svg').forEach(x => x.remove()); return copy.textContent; })(e), cloud: !!e.querySelector('.slot-when svg.cloud'), question: (e.querySelector('.slot-q') || {}).textContent || '', buttons: [...e.querySelectorAll('.slot-acts button')].map(b => b.textContent) })));
@@ -111,8 +129,9 @@ async function lab(t) {
     d.screen = (mode) => d.run(`closeModal(); slotAction('slots', '${mode}')`);
     return d;
   }
-  const saves = user => env.admin("select slot, version, header->>'name' as name, left(data, 3) as enc from public.game_saves where user_id = $1 order by slot", [user]);
-  return { env, site, device, saves, errors, unexpected };
+  const saves = user => env.admin("select slot, version, header->>'name' as name, left(data, 3) as enc from public.game_saves where user_id = $1 and game = 'ashcrown' order by slot", [user]);
+  const idleSaves = user => env.admin("select slot, version, (header->>'dex')::int as dex, header->>'meta' as meta, left(data, 3) as enc from public.game_saves where user_id = $1 and game = 'poke-idle'", [user]);
+  return { env, site, device, saves, idleSaves, errors, unexpected };
 }
 
 test('save on one device, Load and Continue on another, and a clash is asked about first', async t => {
@@ -330,5 +349,149 @@ test('a second account on the same browser does not inherit the first one’s sa
   assert.equal(await ann.run(`slotHead('m1').name`), 'Ann only');
   await ann.screen('load');
   assert.ok((await ann.rows()).every(r => !r.cloud && !/device only|another device/.test(r.when)));
+  assert.deepEqual(L.errors, []);
+});
+
+// ── Poké Idle: one save, slot "auto", played on whichever device is in front of you.
+// A tap first: these are played changes, not idling.
+const TAP = `document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));`;
+const PARTY = `S = fresh(); for (const n of [1, 4, 7]) S.box[n] = { xp: 125, shiny: false }; S.party = [1, 4, 7]; ${TAP} save(); window.__mark = S.last; syncPush();`;
+// Saves a change and marks it; upTo() is true once the account has that change (a page on screen keeps saving every
+// few seconds, so its newest save is usually a little ahead of the account's). synced() is for a hidden page.
+const change = n => `${TAP} S.box[${n}] = { xp: 125, shiny: false }; save(); window.__mark = S.last; syncPush();`;
+const upTo = () => !SYNC.busy && !SYNC.ask && !!syncNote() && syncNote().at >= window.__mark;
+const synced = () => !SYNC.busy && !!syncNote() && !!localSave() && syncNote().at === localSave().s.last;
+
+test('Poké Idle: the save follows the account, and another device picks up where the first left off', async t => {
+  const L = await lab(t);
+  if (!L) return;
+  const ann = await L.device(A, 'device A'), ben = await L.device(A, 'device B');
+  await ann.openIdle();
+  assert.equal(await ann.run('syncText()'), '', 'signed in with nothing anywhere: nothing to say');
+  await ann.run(PARTY);
+  await ann.untilIdle(upTo);
+  assert.deepEqual((await L.idleSaves(A)).map(r => [r.slot, r.dex, r.enc]), [['auto', 3, 'gz:']], 'one compressed save, in slot auto');
+  assert.deepEqual(await L.saves(A), [], 'Civ Lite’s saves are its own');
+
+  // Device B has nothing yet: opening the game picks up A's save.
+  await ben.openIdle();
+  await ben.untilIdle(() => S && Object.keys(S.box).length === 3 && !!syncNote());
+  assert.equal(await ben.run('screen'), 'title');
+  assert.match(await ben.run(`$('#t-card').textContent`), /Picked up where you left off on your other device/);
+  assert.match(await ben.run(`$('#t-sync').textContent`), /In your Bored account, saved there/);
+
+  // A goes to the background (its save holds still and goes up); B plays on; A comes back to B's save.
+  await ann.visible(false);
+  await ann.untilIdle(synced);
+  const held = await ann.run('localSave().s.last');
+  await ben.run(change(25));
+  await ben.untilIdle(upTo);
+  await sleep(5500);   // one of A's save ticks passes while it is hidden
+  assert.equal(await ann.run('localSave().s.last'), held, 'a hidden page doesn’t move the save on');
+  assert.deepEqual((await L.idleSaves(A)).map(r => r.dex), [4]);
+  await ann.visible(true);
+  await ann.untilIdle(() => S && !!S.box[25] && !SYNC.ask);
+  assert.match(await ann.run(`$('#t-card').textContent`), /Your other device played since/);
+  assert.equal(await ann.run('$("#syncask").hidden'), true, 'nothing to ask: A had nothing new');
+  assert.deepEqual(L.errors, []);
+  assert.deepEqual(L.unexpected, []);
+});
+
+test('Poké Idle: leaving with the back button sends the last bit of play', async t => {
+  const L = await lab(t);
+  if (!L) return;
+  const ann = await L.device(A, 'device A');
+  await ann.openIdle();
+  await ann.run(PARTY);
+  await ann.untilIdle(upTo);
+  // Played on, then straight back to Bored, well inside the minute between uploads.
+  await ann.run(`${TAP} S.box[94] = { xp: 125, shiny: false }; save();`);
+  await ann.page.$eval('#back', button => button.click());
+  await ann.page.waitForFunction(() => document.querySelector('#player').hidden, { polling: 50 });
+  for (let i = 0; i < 40 && !(await L.idleSaves(A)).some(r => r.dex === 4); i++) await sleep(100);
+  assert.deepEqual((await L.idleSaves(A)).map(r => r.dex), [4], 'the account has it');
+  assert.deepEqual(L.errors, []);
+});
+
+test('Poké Idle: when both devices played since they last met, it asks which save to keep', async t => {
+  const L = await lab(t);
+  if (!L) return;
+  const ann = await L.device(A, 'device A'), ben = await L.device(A, 'device B');
+  await ann.openIdle();
+  await ann.run(PARTY);
+  await ann.untilIdle(upTo);
+  await ben.openIdle();
+  await ben.untilIdle(() => S && Object.keys(S.box).length === 3 && !!syncNote());
+  // Both play at once: B's goes up first, so A's is refused and A is asked.
+  await ben.run(change(150));
+  await ben.untilIdle(upTo);
+  await ann.run(change(151));
+  await ann.untilIdle(() => !!SYNC.ask && !$('#syncask').hidden);
+  const box = await ann.run(`$('#syncask').textContent`);
+  assert.match(box, /Two different saves/);
+  assert.match(box, /This device.*Pokédex 4 .*Your account.*Pokédex 4 /s);
+  assert.equal((await L.idleSaves(A))[0].dex, 4);
+  assert.ok(!(await L.idleSaves(A)).some(r => r.dex !== 4));
+  // "Decide later" changes nothing, and nothing goes up meanwhile.
+  await ann.run(`[...document.querySelectorAll('#syncask [data-sync]')].find(b => b.dataset.sync === 'later').click()`);
+  assert.equal(await ann.run('$("#syncask").hidden'), true);
+  await ann.run('syncPush()');
+  await sleep(500);
+  assert.ok(await ann.run('!!localSave().s.box[151]'));
+  // Coming back to the tab asks again; keeping the account's loads B's save.
+  await ann.visible(false); await ann.visible(true);
+  await ann.untilIdle(() => !!SYNC.ask && !$('#syncask').hidden);
+  await ann.run(`$('#syncask [data-sync="account"]').click()`);
+  await ann.untilIdle(() => S && !!S.box[150] && !S.box[151] && !SYNC.ask);
+  assert.match(await ann.run(`$('#t-card').textContent`), /Loaded the save from your Bored account/);
+
+  // The other way round: B keeps its own, and it replaces the account's.
+  await ann.run(change(152));
+  await ann.untilIdle(upTo);
+  await ben.run(change(153));
+  await ben.untilIdle(() => !!SYNC.ask && !$('#syncask').hidden);
+  await ben.run(`window.__mark = localSave().s.last; $('#syncask [data-sync="device"]').click()`);
+  await ben.untilIdle(upTo);
+  await ann.visible(false); await ann.visible(true);
+  await ann.untilIdle(() => S && !!S.box[153]);
+  assert.equal(await ann.run('!!S.box[152]'), false, 'A’s last bit was replaced, as B chose');
+  assert.deepEqual(L.errors, []);
+});
+
+test('Poké Idle: a save made before signing in is asked about, the test account stays home, and another account’s save is not taken', async t => {
+  const L = await lab(t);
+  if (!L) return;
+  const ann = await L.device(A, 'device A');
+  await ann.openIdle();
+  await ann.run(PARTY);
+  await ann.untilIdle(upTo);
+  // A guest on another device has a save of its own, then signs in to the same account.
+  const guest = await L.device(null, 'guest');
+  await guest.openIdle();
+  assert.equal(await guest.run('SYNC.acct'), null);
+  await guest.run(`S = fresh(); S.box[133] = { xp: 125, shiny: false }; S.party = [133]; ${TAP} save();`);
+  await sleep(300);
+  assert.ok(!guest.net.calls.includes('save_put'), 'a guest’s save stays on the device');
+  await guest.page.evaluate(u => localStorage.setItem('bored.session', JSON.stringify({ access_token: 'tok-' + u, refresh_token: 'fixture-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: u, is_anonymous: false, email: 'fixture@example.test' } })), A);
+  await guest.openIdle();
+  await guest.untilIdle(() => !!SYNC.ask && !$('#syncask').hidden);
+  await guest.run(`window.__mark = localSave().s.last; $('#syncask [data-sync="device"]').click()`);
+  await guest.untilIdle(upTo);
+  assert.deepEqual((await L.idleSaves(A)).map(r => r.dex), [1], 'the device’s save went up, as chosen');
+
+  // The test account never leaves the device (switching to it saves your own game first, which may go up).
+  await guest.run(`useSlot(TEST_KEY, testAccount())`);
+  await sleep(300);
+  await guest.run('syncPush()');
+  await sleep(800);
+  assert.deepEqual((await L.idleSaves(A)).map(r => r.dex), [1], 'still your own save, not the test account’s 1025');
+  assert.match(await guest.run(`$('#t-sync') ? $('#t-sync').textContent : syncText()`), /test account stays on this device/);
+  await guest.run(`useSlot(KEY)`);
+
+  // Ben signs in on the same browser: the save there is Ann's (her account holds it), so it doesn't go into his.
+  await guest.page.evaluate(u => localStorage.setItem('bored.session', JSON.stringify({ access_token: 'tok-' + u, refresh_token: 'fixture-refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: u, is_anonymous: false, email: 'fixture@example.test' } })), B);
+  await guest.openIdle();
+  await sleep(1500);
+  assert.deepEqual(await L.idleSaves(B), [], 'Ann’s save did not go into Ben’s account');
   assert.deepEqual(L.errors, []);
 });

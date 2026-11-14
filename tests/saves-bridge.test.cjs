@@ -15,13 +15,13 @@ const mod = () => import(pathToFileURL(path.join(__dirname, '../src/hub/saves-br
 const wait = ms => new Promise(done => setTimeout(done, ms));
 
 // A frame that records what the hub posts into it, and an account the test can change.
-async function world() {
+async function world(game) {
   const { createSavesBridge } = await mod();
   const posted = [], calls = [];
   const win = { postMessage(message) { posted.push(message); } };
   const frame = { contentWindow: win };
   const w = { me: { id: OWNER }, calls, posted, win, frame, fail: null, hold: null, rows: [] };
-  w.bridge = createSavesBridge({ frame, deps: {
+  w.bridge = createSavesBridge({ frame, ...(game ? { game } : {}), deps: {
     account: () => w.me,
     rpc: async (fn, args, options) => {
       calls.push({ fn, args, options });
@@ -221,4 +221,42 @@ test('accountChanged tells the page, and two list calls in flight share one requ
   release();
   await Promise.all([one, two]);
   assert.equal(w.calls.filter(c => c.fn === 'save_list').length, 1);
+});
+
+test('Poké Idle gets its own game name, one slot and its own header keys; nothing else is reachable', async () => {
+  const { createSavesBridge, SAVE_GAMES, cleanHeader } = await mod();
+  assert.deepEqual(Object.keys(SAVE_GAMES).sort(), ['ashcrown', 'poke-idle']);
+  assert.throws(() => createSavesBridge({ frame: { contentWindow: null }, game: 'chess' }), /No account saves for chess/);
+  const w = await world('poke-idle');
+  await w.send('list', {});
+  assert.deepEqual(w.calls.map(c => c.args.p_game), ['poke-idle'], 'the game name comes from the hub, not the page');
+  w.rows = [{ slot: 'auto', version: 2, bytes: 9, stamp: 5, header: { at: 1 } }, { slot: 'm1', version: 1, bytes: 9, stamp: 5, header: {} }];
+  await w.send('list', {});
+  assert.deepEqual(w.last().result.saves.map(r => r.slot), ['auto'], 'only its own slot is listed');
+  for (const slot of ['m1', 'm8', 't1']) {
+    await w.send('put', { slot, header: { v: 1, at: 9 }, state: '{}', expected: 0 });
+    assert.match(w.last().error, /isn.t a save slot/, slot + ' is not Poké Idle’s');
+  }
+  await w.send('put', { slot: 'auto', header: { v: 1, at: 9, touched: 8, name: 'Bulbasaur’s party', meta: 'Pokédex 3', dex: 3, shinies: 1, badges: 2, champs: 0, turn: 5, civ: 'china', token: 'x' }, state: '{"v":1}', expected: 2 });
+  const put = w.calls[w.calls.length - 1];
+  assert.equal(put.args.p_game, 'poke-idle');
+  assert.deepEqual(put.args.p_header, { v: 1, at: 9, touched: 8, name: 'Bulbasaur’s party', meta: 'Pokédex 3', dex: 3, shinies: 1, badges: 2, champs: 0 }, 'Civ Lite’s keys and anything else are dropped');
+  assert.deepEqual(cleanHeader({ at: 1, turn: 4, dex: 3 }), { at: 1, turn: 4 }, 'Civ Lite’s header is unchanged by default');
+});
+
+test('after the game closes, only its parting save is taken, for a moment, and nothing is answered', async () => {
+  const w = await world('poke-idle');
+  w.bridge.dispose();
+  await w.send('list', {});
+  await w.send('put', { slot: 'auto', header: { v: 1, at: 2 }, state: '{"v":1}', expected: 0 });
+  assert.equal(w.calls.length, 0, 'a list, or a put that isn’t a parting one, is not taken after closing');
+  await w.send('put', { slot: 'auto', header: { v: 1, at: 3 }, state: '{"v":1}', expected: 0, leaving: true });
+  assert.deepEqual(w.calls.map(c => c.fn), ['save_put'], 'the parting save is');
+  assert.equal(w.posted.length, 0, 'and nothing is posted into the closed page');
+  await w.bridge.message({ source: w.win, data: { type: 'bored:saves-call', channel: 'a-guess', id: 9, op: 'put', payload: { slot: 'auto', header: { v: 1, at: 4 }, state: '{}', expected: 0, leaving: true } } });
+  assert.equal(w.calls.length, 1, 'only on the closed game’s own channel');
+  const realNow = Date.now;
+  Date.now = () => realNow() + 4000;
+  try { await w.send('put', { slot: 'auto', header: { v: 1, at: 5 }, state: '{"v":1}', expected: 1, leaving: true }); } finally { Date.now = realNow; }
+  assert.equal(w.calls.length, 1, 'and only for a moment');
 });
