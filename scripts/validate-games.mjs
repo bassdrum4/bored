@@ -62,7 +62,16 @@ for (const [id, name] of ORDER) {
     check(specs.has(id), id + ': no score capture spec (leaderboard silently skips it)');
   }
 }
-for (const id of [...native, ...online, ...FRESH_GAMES, ...UNSCORED_GAMES, ...PAYLOAD_SLUGS, ...Object.keys(META), ...Object.keys(DISCOVERY), ...Object.keys(PREVIEWS), ...Object.keys(rules), ...specs.keys(), ...challenges]) {
+// A board a game page feeds besides its own (a spec with `page`) has a rule but no catalog entry: its page must be a
+// local game whose snapshot it reads, and it needs its own rule like any board.
+const pageOf = id => specs.get(id)?.page || id;
+for (const [id, spec] of specs) {
+  if (!spec.page) continue;
+  check(idSet.has(spec.page) && !online.has(spec.page), id + ': page ' + spec.page + ' is not a local game');
+  check(high.has(spec.page), id + ': page ' + spec.page + ' has no board of its own');
+  check(!!rules[id], id + ': no score rule');
+}
+for (const id of [...native, ...online, ...FRESH_GAMES, ...UNSCORED_GAMES, ...PAYLOAD_SLUGS, ...Object.keys(META), ...Object.keys(DISCOVERY), ...Object.keys(PREVIEWS), ...Object.keys(rules).map(pageOf), ...[...specs.keys()].map(pageOf), ...challenges]) {
   check(idSet.has(id), id + ': referenced outside catalog');
 }
 check(PAYLOAD_SLUGS.length === local.length - native.size, 'document set does not match catalog');

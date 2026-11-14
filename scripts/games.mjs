@@ -284,8 +284,10 @@ async function registerRules(flags) {
   const withoutRule = offline.filter(slug => !wanted[slug]);
   const existing = new Set((await api('/rest/v1/score_rules?select=game', { key }))?.map(row => row.game) || []);
 
-  const missing = offline.filter(slug => wanted[slug] && !existing.has(slug));
-  const orphans = [...existing].filter(game => !entries.has(game));
+  // A second board inside a game (a spec with `page` in scores.js) has a rule here but no catalog entry.
+  const boards = Object.keys(wanted).filter(id => !entries.has(id));
+  const missing = [...offline, ...boards].filter(slug => wanted[slug] && !existing.has(slug));
+  const orphans = [...existing].filter(game => !entries.has(game) && !wanted[game]);
 
   console.log(`catalog: ${entries.size} games (${offline.length} offline, ${externals.size} external)`);
   console.log(`shared board: ${existing.size} rules on the server, ${Object.keys(wanted).length} recorded here\n`);

@@ -90,6 +90,9 @@ const highScore = (id, name, unit, extra = {}) => ({
 export const HIGH_SCORE_GAMES = [
   // Unique species in the Box (evolving counts too), out of 1025.
   highScore("poke-idle", "Poké Idle", "points", { metric: "score", max: 2050, when: snapshot => snapshot.finished === true }),
+  // Poké Idle's Battle Tower ranks on its own board: the highest floor cleared. It has no page of its own, so
+  // `page` names the game whose snapshot feeds it (see boardsOn).
+  highScore("poke-idle-tower", "Poké Idle: Battle Tower", "floors", { page: "poke-idle", metric: "tower", min: 1, max: 100000, when: snapshot => snapshot.finished === true }),
   // A finished match against the computer ranks the winning margin, so 7–1
   // beats 7–6. Local two-player games and abandoned matches never post.
   highScore("air-hockey", "Air Hockey", "goals", {
@@ -246,6 +249,14 @@ export const LB_GAMES = [...LEGACY_GAMES, ...HIGH_SCORE_GAMES];
 const highScoreSpec = new Map(HIGH_SCORE_GAMES.map(game => [game.id, game]));
 
 /**
+ * The boards one game page feeds: its own, then any spec that names it as its
+ * `page` (a second board inside the same game, like Poké Idle's Battle Tower).
+ */
+export function boardsOn(slug) {
+  return HIGH_SCORE_GAMES.filter(game => game.id === slug || game.page === slug).map(game => game.id);
+}
+
+/**
  * The posted high score of each board, with the handle that holds it. The
  * library cards use it as a byline, so it works from the same rows the
  * leaderboard reads: one best per game, the minimum for a lower-is-better
@@ -343,7 +354,7 @@ export function formatScore(value, game) {
  */
 export function scoreValue(slug, snapshot, { leaving = false } = {}) {
   const spec = highScoreSpec.get(slug);
-  if (!spec || !snapshot || snapshot.slug !== slug) return 0;
+  if (!spec || !snapshot || snapshot.slug !== (spec.page || slug)) return 0;
   if (spec.qualify && !spec.qualify(snapshot)) return 0;
   if (spec.when && !spec.when(snapshot) && !(leaving && spec.resumable)) return 0;
   const value = spec.transform ? spec.transform(snapshot) : Number(snapshot[spec.metric]);
