@@ -45,7 +45,7 @@ test('discovery keeps its controls and fits small screens', async t => {
     // inlined script, so a game is downloaded only when its card is opened.
     assert.equal(await page.$eval('#recent-empty', e => e.hidden), true);
     assert.equal(await page.$eval('#recent-heading', e => e.textContent), 'Start playing');
-    assert.equal(await page.$eval('#recent-list .shelf-play', cards => cards.length), 4,
+    assert.equal(await page.$$eval('#recent-list .shelf-play', cards => cards.length), 4,
       'first-time visitors should see four playable games, not an empty shelf');
     // Game suggestions lead, followed by the compact daily invitation and library.
     assert.ok(await page.evaluate(() =>
@@ -97,17 +97,17 @@ test('discovery keeps its controls and fits small screens', async t => {
     const expected = await page.evaluate(() => ORDER.filter(([slug]) => META[slug][0] === 'Puzzle').map(([slug]) => slug));
     assert.deepEqual(actual.sort(), expected.sort());
     await page.click('[data-filter="Quick"]');
-    assert.ok(await page.$eval('#grid .card', cards => cards.length) > 0);
-    assert.ok(await page.$eval('#grid .card', cards =>
+    assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
+    assert.ok(await page.$$eval('#grid .card', cards =>
       cards.every(card => DISCOVERY[card.dataset.slug]?.quick === true)), 'quick games really are short-session picks');
     await page.click('[data-filter="Friends"]');
-    assert.ok(await page.$eval('#grid .card', cards => cards.length) > 0);
-    assert.ok(await page.$eval('#grid .card', cards => cards.every(card =>
+    assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
+    assert.ok(await page.$$eval('#grid .card', cards => cards.every(card =>
       !!card.closest('.row')?.querySelector('.catalog-together') ||
       (DISCOVERY[card.dataset.slug]?.players || '').includes('2 local'))));
     await page.click('[data-filter="Relax"]');
-    assert.ok(await page.$eval('#grid .card', cards => cards.length) > 0);
-    assert.ok(await page.$eval('#grid .card', cards =>
+    assert.ok(await page.$$eval('#grid .card', cards => cards.length) > 0);
+    assert.ok(await page.$$eval('#grid .card', cards =>
       cards.every(card => DISCOVERY[card.dataset.slug]?.pace === 'Relaxing')));
     await page.click('[data-filter="Favorites"]');
     assert.equal(await page.$$eval('#grid .card', cards => cards.length), 0);
@@ -236,7 +236,7 @@ test('discovery keeps its controls and fits small screens', async t => {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'no horizontal overflow at ' + width);
       const targets = await page.$$eval('#daily-play,#filters button,#grid .star,#random', nodes => nodes.map(node => ({ label: node.textContent, width: node.getBoundingClientRect().width, height: node.getBoundingClientRect().height })));
       assert.ok(targets.every(box => box.width >= 30 && box.height >= 30), 'usable control sizes at ' + width);
-      const regions = await page.$eval('#recent,#daily,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
+      const regions = await page.$$eval('#recent,#daily,#library', nodes => nodes.map(node => ({ top: node.offsetTop, height: node.offsetHeight })));
       assert.ok(regions.every((region, index) => !index || region.top >= regions[index - 1].top + regions[index - 1].height), 'sections do not overlap');
     }
     assert.notEqual(await page.$eval('#mobile-more-nav', el => getComputedStyle(el).display), 'none');
