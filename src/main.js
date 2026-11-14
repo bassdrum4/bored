@@ -260,7 +260,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     history.pushState(null, '', '#' + slug);
   }
   const from = origin || document.activeElement;
-  const launchSource = challenge ? 'daily' : from?.closest?.('#recent') ? 'recent' : from?.closest?.('#leaderboard') ? 'leaderboard' : from?.id === 'random' ? 'random' : from?.closest?.('#grid') ? 'library' : 'other';
+  const launchSource = challenge ? 'daily' : from?.closest?.('#recent') ? ($('#recent').dataset.shelf === 'discover' ? 'library' : 'recent') : from?.closest?.('#leaderboard') ? 'leaderboard' : from?.id === 'random' ? 'random' : from?.closest?.('#grid') ? 'library' : 'other';
   // F-14 now tracks its own genuine flight phases, actions, and mission
   // outcomes in Supabase. A second host session would double-count every
   // Bored-launched flight, so defer to the native game for this slug.
@@ -479,8 +479,11 @@ function captureBest({ leaving = false } = {}) {
  * have an account, and only the score they were just shown is carried over. */
 
 const CLAIM_KEY = 'bored.pendingClaim';
+const CLAIM_PROMPT_SEEN_KEY = 'bored.claimPromptSeen';
 
 function offerClaim(claim, returnTo) {
+  // Ask only once per browser. Declining must never prompt again after later games.
+  if (readStored(CLAIM_PROMPT_SEEN_KEY, false)) return;
   const spec = LB_GAMES.find(game => game.id === claim.slug);
   if (!spec || !backendReady()) return;
   claimOffered = claim;
@@ -495,6 +498,7 @@ function offerClaim(claim, returnTo) {
   if (!dialog.open) {
     if (dialog.showModal) dialog.showModal();
     else dialog.setAttribute('open', '');
+    writeStored(CLAIM_PROMPT_SEEN_KEY, true);
   }
 }
 
