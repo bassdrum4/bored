@@ -38,6 +38,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
         calls.push({identity,action:'pool-end',status:response.status});
         return req.respond({status:response.status,headers:cors,contentType:'application/json',body:await response.text()});
       }
+      if(url.pathname==='/rest/v1/rpc/bored_popular_games')return reply([{game:'trackbound',ranking:1}]);
       if(url.pathname==='/rest/v1/rpc/bt_invite_rpc') {
         if(outages.has(identity))return req.abort('internetdisconnected');
         const {action,args}=JSON.parse(req.postData());calls.push({identity,action:'invite:'+action});

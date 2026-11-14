@@ -2,7 +2,9 @@ import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, TOGETHER_G
 import { DISCOVERY, PREVIEWS } from '../games/discovery.js';
 import { DEVELOPER_NOTES } from '../games/developer-notes.js';
 import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scores.js';
-import { writeStored } from './store.js';
+import { readStored, writeStored } from './store.js';
+import { backendReady, request, ANON_TOKEN } from './backend.js';
+import { popularityRanks, sortPopularGames } from './popularity.js';
 
 export function createLibraryView({ state, openGame, saveLibrary, track = () => {} }) {
 const $ = selector => document.querySelector(selector);
@@ -14,6 +16,36 @@ function element(tag, className, text) {
 }
 const searchInput = $('#q');
 const gameGrid = $('#grid');
+
+// Popularity is a public, aggregated seven-day ranking — never raw analytics.
+// Cache one ranking per Detroit day so library visits do not repeatedly query
+// the database or rearrange the cards as a visitor browses.
+const POPULARITY_CACHE_KEY = 'bored.popularity.v1';
+const detroitDay = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Detroit', year: 'numeric', month: '2-digit', day: '2-digit'
+}).format(new Date());
+const cachedPopularity = readStored(POPULARITY_CACHE_KEY, null);
+let popularRankings = cachedPopularity?.day === detroitDay()
+  ? popularityRanks(cachedPopularity.rows) : new Map();
+
+async function loadPopularity() {
+  if (popularRankings.size || !backendReady()) return;
+  try {
+    // A SECURITY DEFINER RPC returns only game names and aggregate ranks.
+    // It cannot expose player identifiers or the protected analytics table.
+    const rows = await request('/rest/v1/rpc/bored_popular_games', {
+      method: 'POST', body: {}, token: ANON_TOKEN
+    });
+    if (!Array.isArray(rows)) return;
+    popularRankings = popularityRanks(rows);
+    writeStored(POPULARITY_CACHE_KEY, { day: detroitDay(), rows });
+    // Preserve focus: never shuffle a card out from under a keyboard user.
+    if (popularRankings.size && $('#sort').value === 'popular' &&
+        !document.activeElement?.closest('#grid')) renderLibrary();
+  } catch {
+    // Offline or RPC not deployed yet: Popular falls back to catalog-newest.
+  }
+}
 
 // Measure genuine card visibility, not catalog rendering or search results.
 // One 750ms impression per game/surface per page view. No scroll paths or text.
@@ -211,10 +243,9 @@ function renderRecent() {
   $('#recent-empty').hidden = shown.length > 0;
 }
 
-// The shelf keeps the catalog's own order: a game arrives at the front when it
-// is added and never moves again. The NEW badge marks recent arrivals on their
-// card instead of pulling them out of line, so the list cannot reshuffle under
-// the player while they are reading it.
+// The recent shelf is unchanged. Only the All Games list is sortable. Newest
+// follows the catalog's arrival order; Popular uses one cached ranking per day
+// and uses that same order for ties or games without recorded players.
 
 function renderLibrary() {
   const filter = searchInput.value.trim().toLowerCase();
@@ -227,7 +258,9 @@ function renderLibrary() {
       (state.category === 'All' || (state.category === 'New' ? FRESH_GAMES.includes(slug) :
         state.category === 'Favorites' ? state.favorites.has(slug) : meta[0] === state.category));
   });
-  if ($('#sort').value === 'az') state.visibleGames.sort((a, b) => a[1].localeCompare(b[1]));
+  const sortMode = $('#sort').value;
+  if (sortMode === 'az') state.visibleGames.sort((a, b) => a[1].localeCompare(b[1]));
+  else if (sortMode === 'popular') sortPopularGames(state.visibleGames, popularRankings);
 
   for (const [slug, name] of state.visibleGames) {
     const row = element('div', 'row');
@@ -302,5 +335,5 @@ function showLibraryMessage() {
 }
 
 
-return { previewFor, gameMeta, renderRecent, renderLibrary, showLibraryMessage };
+return { previewFor, gameMeta, renderRecent, renderLibrary, loadPopularity, showLibraryMessage };
 }

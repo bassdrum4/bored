@@ -131,7 +131,7 @@ function saveLibrary() {
   requestCloudPush();
 }
 
-const { previewFor, gameMeta, renderRecent, renderLibrary, showLibraryMessage } =
+const { previewFor, gameMeta, renderRecent, renderLibrary, loadPopularity, showLibraryMessage } =
   createLibraryView({ state: uiState, openGame, saveLibrary,
     track: (kind, details) => analytics.track(kind, details) });
 
@@ -995,6 +995,7 @@ bootStep('library state', loadLibrary);
 bootStep('daily challenge', renderDaily);
 bootStep('recent shelf', renderRecent);
 bootStep('game library', renderLibrary);
+void loadPopularity();
 // The shell's watchdog reads this. It also clears the watchdog's one retry so a
 // later reload can recover from a fresh load failure.
 window.__boredHubReady = true;

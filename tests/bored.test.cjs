@@ -364,8 +364,9 @@ test('browser regressions', async t => {
     }));
     assert.equal(await page.$$eval('.card', els => els.length), catalog.total);
     assert.equal(await text(page, '#count'), String(catalog.total));
-    // The NEW badge holds four games at most, and it marks them where they sit
-    // instead of moving them: the shelf stays in the order the games arrived.
+    // Popular is the default, but Newest preserves catalog order on demand.
+    assert.equal(await page.$eval('#sort', el => el.value), 'popular');
+    await page.select('#sort', 'original');
     assert.ok(catalog.newest > 0 && catalog.newest <= 4, 'the NEW badge holds four games at most');
     assert.deepEqual(
       await page.$$eval('.card', els => els.map(el => el.dataset.slug)),
@@ -391,7 +392,7 @@ test('browser regressions', async t => {
     await page.select('#sort', 'az');
     const names = await page.$$eval('.card .name', els => els.map(el => el.firstChild.textContent));
     assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b)));
-    await page.select('#sort', 'original');
+    await page.select('#sort', 'popular');
     await page.click('[aria-label="Add Memory to favorites"]');
     await filter('Favorites');
     assert.equal(await page.$$eval('.card', els => els.length), 1);

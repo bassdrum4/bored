@@ -51,6 +51,7 @@ async function lab(t) {
       if (address.hostname !== 'djdpttltfmwkofdrvkem.supabase.co') { unexpected.push(req.url()); return req.abort(); }
       const token = (req.headers().authorization || '').replace('Bearer ', '');
       const as = ids.find(id => 'tok-' + id === token) || null;
+      if (address.pathname === '/rest/v1/rpc/bored_popular_games') return reply([{ game: 'trackbound', ranking: 1 }]);
       const save = /^\/rest\/v1\/rpc\/(save_(?:list|get|put|delete))$/.exec(address.pathname);
       if (save) {
         net.calls.push(save[1]);
