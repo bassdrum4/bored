@@ -107,23 +107,21 @@ Browser tests should continue mocking analytics requests as defense in depth.
 
 ## Find something to play
 
-- Start with the featured **Daily challenge**, including its objective, verified
-  completion status and Play button.
-- **Jump Back In** is one shelf of four cards: recent games first, saved
-  favorites filling whatever room is left. **Browse favorites** jumps to the
+- Start with a four-card game shelf. For a new visitor, **Start playing** suggests
+  popular offline games or simple fallback picks; returning players get **Jump Back In**
+  with recent games and saved favorites. **Browse favorites** jumps to the
   library filtered to them.
-- The **Leaderboard** follows the shelf, above the library, and is linked in the
-  masthead. The account strip under the intro keeps **Sign in** as its only
-  filled button, and **Send feedback** sits beside it.
+- A compact **Daily challenge** follows the shelf, retaining its goal, verified
+  completion and Play button.
+- **Leaderboard** is a separate view, linked in the masthead. The account strip
+  offers optional sign-in and **Send feedback** sits beside it. The automatic
+  guest score-to-account invitation appears only once per browser.
 - Search names, categories, descriptions, controls (for example `touch` or
   `keyboard`), pace, and session estimates; press **/** to focus search.
-- Browse **Quick Break**, **Play Against Friends**, or **Relax & Unwind**.
-  Collections combine with search and category filters;
-  **Clear filters** returns to the whole library. Friends means local two-player
-  games on one device. Online multiplayer is identified separately on its card.
-- Filter by **New**, **Favorites**, **Arcade**, **Puzzle**, **Strategy**,
-  **Sandbox**, or **Online**.
-- Sort by the original order or A–Z.
+- Filter by **Quick games**, **2 players** (local or supported Bored Together),
+  **Relaxing**, **New**, **Favorites**, **Arcade**, **Puzzle**, **Strategy**,
+  **Sandbox**, or **Online**. Search includes game names, descriptions and controls.
+- Sort by seven-day **Popular**, **Newest** or **A–Z**.
 - Star games to save favorites and revisit the last four recently played games.
 - **Surprise me** chooses from the current results. Remote entries are excluded
   unless you deliberately select **Online**.
