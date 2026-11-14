@@ -72,7 +72,7 @@
   .ground { position: absolute; left: 50%; bottom: 14px; width: min(68%, 320px); height: 46px; transform: translateX(-50%); border: 1px solid var(--rule); border-radius: 50%; background: var(--g-route) }
   .field[data-kind="gym"] .ground { background: var(--g-gym) }
   .field[data-kind="dungeon"] .ground { background: var(--g-dungeon) }
-  .field[data-kind="champ"] .ground, .field[data-kind="summit"] .ground, .field[data-kind="darkest"] .ground, .field[data-kind="tower"] .ground { background: var(--g-champ); border-color: var(--gold) }
+  .field[data-kind="champ"] .ground, .field[data-kind="summit"] .ground, .field[data-kind="darkest"] .ground, .field[data-kind="tower"] .ground, .field[data-kind="quest"] .ground { background: var(--g-champ); border-color: var(--gold) }
   #foe img { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); image-rendering: pixelated; transition: transform .06s }
   #foe:active img { transform: translateX(-50%) scale(.94) }
   #foe .pop { position: absolute; font-weight: 700; font-size: 14px; color: var(--red); pointer-events: none; animation: rise .6s ease-out forwards }
@@ -119,13 +119,13 @@
   .mon { font: inherit; font-size: 10px; border: 1px solid var(--rule); background: var(--surface); color: inherit; border-radius: 3px; padding: 4px 3px 3px; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; cursor: pointer; position: relative }
   .mon:hover { border-color: var(--ink) }
   .mon .pic { width: 100%; max-width: 96px; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; overflow: hidden }
-  .mon .nm { width: 100%; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+  .mon .nm { width: 100%; text-align: center; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.25; overflow-wrap: anywhere }
   .mon.empty { border-style: dashed; background: none; cursor: default; min-height: 64px }
   .mon.empty:hover { border-color: var(--rule) }
   .mon .eff { position: absolute; top: 2px; left: 3px; font-weight: 700 }
   .mon .star { position: absolute; top: 2px; right: 3px; color: var(--gold); font-weight: 700 }
   .mon.inparty { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink) }
-  .mon .evo ~ .eff { top: 16px }
+  .mon .evo ~ .eff, .mon .evo ~ .star { top: 16px }
   .mon .evo { position: absolute; top: 2px; left: 2px; right: 2px; background: var(--xp); color: #fff; font-size: 9px; font-weight: 700; letter-spacing: .04em; border-radius: 2px; text-align: center }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 4px }
   /* Dragging in Party & Box: the tile you lifted fades, the slot it would land in gets the focus colour. */
@@ -541,7 +541,7 @@ const regionMons = r => MON.filter(m => m.gen === REGIONS[r].gen);
 const firstStage = m => !MON.some(x => x.evos.some(e => e[0] === m.num));
 const finalStage = m => !m.evos.length;
 function routePool(r, k) {
-  const all = regionMons(r).filter(m => !legendary(m)), starts = all.filter(firstStage).sort((a, b) => a.bst - b.bst);
+  const all = regionMons(r).filter(m => !legendary(m)).concat(VARIANTS.filter(v => v.region === r && !legendary(v))), starts = all.filter(firstStage).sort((a, b) => a.bst - b.bst);
   const half = Math.ceil(starts.length / 2);
   if (k === 0) return starts.slice(0, half);
   if (k === 1) return starts.slice(half);
@@ -568,7 +568,7 @@ function champTeam(r) {
   return team;
 }
 const dungeonPool = r => regionMons(r).filter(m => !legendary(m) && (m.flags.has("pseudo") || m.flags.has("fossil") || m.flags.has("starter") || m.cr <= 60));
-const dungeonBosses = r => regionMons(r).filter(legendary);
+const dungeonBosses = r => regionMons(r).filter(legendary).concat(VARIANTS.filter(v => v.region === r && legendary(v)));
 // Boss stats shape the fight. A team's Attack and Speed set how long you last: against the other bosses of its region,
 // a faster, harder-hitting team gives you up to 20% less time and a slow one up to 20% more (a dungeon's random
 // legendary: -10% to +15%). Each boss Pokémon's HP comes from its HP, Defense and Sp. Def together.
@@ -602,7 +602,7 @@ const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", SLOT_KEY = "bored.poke-idle.slot";
 let slot = (() => { try { return localStorage.getItem(SLOT_KEY) === "test" ? TEST_KEY : KEY; } catch { return KEY; } })();
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
-const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, last: Date.now() });
+const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, last: Date.now() });
 let S = readSlot(slot);
 const save = () => { S.last = Date.now(); if (S.party.length >= 6) S.full = 1; try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
 
@@ -621,7 +621,7 @@ const level = n => Math.min(lvlOf(S.box[n].xp), levelCap());
 // earlier region and your party fights held down to it, so a Lv 90 team from Galar is a Lv 30 team on Hoenn Route 1.
 function areaCap(loc = S.loc) {
   // The post-game fights (Red, the Darkest Day, the Battle Tower) hold nobody back.
-  if (!loc || loc.kind === "summit" || loc.kind === "darkest" || loc.kind === "tower") return 100;
+  if (!loc || loc.kind === "summit" || loc.kind === "darkest" || loc.kind === "tower" || loc.kind === "quest") return 100;
   const L = loc.kind === "champ" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
   return Math.min(100, L + CAP_OVER);
 }
@@ -705,9 +705,75 @@ const towerHp = f => TOWER_HP * Math.pow(TOWER_GROW, f - 1) * (tycoonFloor(f) ? 
 const URSHIFU = 892;
 const RAPID = (({ hp, atk, def, spa, spd, spe, bst, cr, flags, gen }) => ({ num: URSHIFU, mark: "RS", sprite: 10191, name: "Urshifu (Rapid Strike)", types: ["Fighting", "Water"], hp, atk, def, spa, spd, spe, bst, cr, flags, gen, evos: [] }))(mon(URSHIFU));
 const ustyle = n => n === URSHIFU && S.box[n] && S.box[n].forme === "rapid" ? RAPID : null;
-// The Gigantamax form a Pokémon takes: the one whose typing matches the form it's in (Urshifu has one per style).
-const gmaxOf = n => { const g = formsOf(n, "gmax"), t = (ustyle(n) || mon(n)).types.join(); return g.find(f => f.types.join() === t) || g[0]; };
-const fighter = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || special(n) || zforme(n) || ustyle(n) || mon(n);
+// ── Regional forms: Alolan, Galarian, Hisuian (found in Sinnoh, which is Hisui long ago) and Paldean. Each is a form of its
+// species, like Urshifu's styles: catch one in its region, or evolve the usual one there, then pick it in the detail. Forms
+// aren't Pokédex entries, so they don't change the score. Rows come from @pkmn/dex (stats, evolutions) and PokeAPI (sprite
+// ids): [sprite, species, region, name, tile mark, types, HP, Atk, Def, SpA, SpD, Spe, evolutions, evolves from the usual].
+const VARIANT_ROWS = [[10091,19,6,"Alolan Rattata","ALOLA","Dark/Normal",30,56,35,25,35,72,[[20,"L",20,"v10092"]],0],[10092,20,6,"Alolan Raticate","ALOLA","Dark/Normal",75,71,70,40,80,77,[],0],[10100,26,6,"Alolan Raichu","ALOLA","Electric/Psychic",60,85,50,95,85,110,[],25],[10101,27,6,"Alolan Sandshrew","ALOLA","Ice/Steel",50,75,90,10,35,40,[[28,"I","Ice Stone","v10102"]],0],[10102,28,6,"Alolan Sandslash","ALOLA","Ice/Steel",75,100,120,25,65,65,[],0],[10103,37,6,"Alolan Vulpix","ALOLA","Ice",38,41,40,50,65,65,[[38,"I","Ice Stone","v10104"]],0],[10104,38,6,"Alolan Ninetales","ALOLA","Ice/Fairy",73,67,75,81,100,109,[],0],[10105,50,6,"Alolan Diglett","ALOLA","Ground/Steel",10,55,30,35,45,90,[[51,"L",26,"v10106"]],0],[10106,51,6,"Alolan Dugtrio","ALOLA","Ground/Steel",35,100,60,50,70,110,[],0],[10107,52,6,"Alolan Meowth","ALOLA","Dark",40,35,35,50,40,90,[[53,"L",30,"v10108"]],0],[10108,53,6,"Alolan Persian","ALOLA","Dark",65,60,60,75,65,115,[],0],[10109,74,6,"Alolan Geodude","ALOLA","Rock/Electric",40,80,100,30,30,20,[[75,"L",25,"v10110"]],0],[10110,75,6,"Alolan Graveler","ALOLA","Rock/Electric",55,95,115,45,45,35,[[76,"T",0,"v10111"]],0],[10111,76,6,"Alolan Golem","ALOLA","Rock/Electric",80,120,130,55,65,45,[],0],[10112,88,6,"Alolan Grimer","ALOLA","Poison/Dark",80,80,50,40,50,25,[[89,"L",38,"v10113"]],0],[10113,89,6,"Alolan Muk","ALOLA","Poison/Dark",105,105,75,65,100,50,[],0],[10114,103,6,"Alolan Exeggutor","ALOLA","Grass/Dragon",95,105,85,125,75,45,[],102],[10115,105,6,"Alolan Marowak","ALOLA","Fire/Ghost",60,80,110,50,80,45,[],104],[10161,52,7,"Galarian Meowth","GALAR","Steel",50,65,55,40,40,40,[[863,"L",28]],0],[10162,77,7,"Galarian Ponyta","GALAR","Psychic",50,85,55,65,65,90,[[78,"L",40,"v10163"]],0],[10163,78,7,"Galarian Rapidash","GALAR","Psychic/Fairy",65,100,70,80,80,105,[],0],[10164,79,7,"Galarian Slowpoke","GALAR","Psychic",90,65,65,40,40,15,[[80,"I","Galarica Cuff","v10165"],[199,"I","Galarica Wreath","v10172"]],0],[10165,80,7,"Galarian Slowbro","GALAR","Poison/Psychic",95,100,95,100,70,30,[],0],[10166,83,7,"Galarian Farfetch’d","GALAR","Fighting",52,95,55,58,62,55,[[865,"L",30]],0],[10167,110,7,"Galarian Weezing","GALAR","Poison/Fairy",65,90,120,85,70,60,[],109],[10168,122,7,"Galarian Mr. Mime","GALAR","Ice/Psychic",50,65,65,90,90,100,[[866,"L",42]],439],[10169,144,7,"Galarian Articuno","GALAR","Psychic/Flying",90,85,85,125,100,95,[],0],[10170,145,7,"Galarian Zapdos","GALAR","Fighting/Flying",90,125,90,85,90,100,[],0],[10171,146,7,"Galarian Moltres","GALAR","Dark/Flying",90,85,90,100,125,90,[],0],[10172,199,7,"Galarian Slowking","GALAR","Poison/Psychic",95,65,80,110,110,30,[],0],[10173,222,7,"Galarian Corsola","GALAR","Ghost",60,55,100,65,100,30,[[864,"L",38]],0],[10174,263,7,"Galarian Zigzagoon","GALAR","Dark/Normal",38,30,41,30,41,60,[[264,"L",20,"v10175"]],0],[10175,264,7,"Galarian Linoone","GALAR","Dark/Normal",78,70,61,50,61,100,[[862,"L",35]],0],[10176,554,7,"Galarian Darumaka","GALAR","Ice",70,90,45,15,45,50,[[555,"I","Ice Stone","v10177"]],0],[10177,555,7,"Galarian Darmanitan","GALAR","Ice",105,140,55,30,55,95,[],0],[10179,562,7,"Galarian Yamask","GALAR","Ground/Ghost",38,55,85,30,65,30,[[867,"L",30]],0],[10180,618,7,"Galarian Stunfisk","GALAR","Ground/Steel",109,81,99,66,84,32,[],0],[10229,58,3,"Hisuian Growlithe","HISUI","Fire/Rock",60,75,45,65,50,55,[[59,"I","Fire Stone","v10230"]],0],[10230,59,3,"Hisuian Arcanine","HISUI","Fire/Rock",95,115,80,95,80,90,[],0],[10231,100,3,"Hisuian Voltorb","HISUI","Electric/Grass",40,30,50,55,55,100,[[101,"I","Leaf Stone","v10232"]],0],[10232,101,3,"Hisuian Electrode","HISUI","Electric/Grass",60,50,70,80,80,150,[],0],[10233,157,3,"Hisuian Typhlosion","HISUI","Fire/Ghost",73,84,78,119,85,95,[],156],[10234,211,3,"Hisuian Qwilfish","HISUI","Dark/Poison",65,95,85,55,55,85,[[904,"L",30]],0],[10235,215,3,"Hisuian Sneasel","HISUI","Fighting/Poison",55,95,55,35,75,115,[[903,"L",30]],0],[10236,503,3,"Hisuian Samurott","HISUI","Water/Dark",90,108,80,100,65,85,[],502],[10237,549,3,"Hisuian Lilligant","HISUI","Grass/Fighting",70,105,75,50,75,105,[],548],[10238,570,3,"Hisuian Zorua","HISUI","Normal/Ghost",35,60,40,85,40,70,[[571,"L",30,"v10239"]],0],[10239,571,3,"Hisuian Zoroark","HISUI","Normal/Ghost",55,100,60,125,60,110,[],0],[10240,628,3,"Hisuian Braviary","HISUI","Psychic/Flying",110,83,70,112,70,65,[],627],[10241,705,3,"Hisuian Sliggoo","HISUI","Steel/Dragon",58,75,83,83,113,40,[[706,"L",50,"v10242"]],704],[10242,706,3,"Hisuian Goodra","HISUI","Steel/Dragon",80,100,100,110,150,60,[],0],[10243,713,3,"Hisuian Avalugg","HISUI","Ice/Rock",95,127,184,34,36,38,[],712],[10244,724,3,"Hisuian Decidueye","HISUI","Grass/Fighting",88,112,80,95,95,60,[],723],[10250,128,8,"Paldean Tauros (Combat Breed)","COMBAT","Fighting",75,110,105,30,70,100,[],0],[10251,128,8,"Paldean Tauros (Blaze Breed)","BLAZE","Fighting/Fire",75,110,105,30,70,100,[],0],[10252,128,8,"Paldean Tauros (Aqua Breed)","AQUA","Fighting/Water",75,110,105,30,70,100,[],0],[10253,194,8,"Paldean Wooper","PALDEA","Poison/Ground",55,45,45,25,25,15,[[980,"L",20]],0]];
+// A regional form goes by its own name ("Galarian Meowth"); tag is its button in the form picker.
+const VARIANTS = VARIANT_ROWS.map(([id, num, region, name, tag, types, hp, atk, def, spa, spd, spe, evos, from]) => ({ vid: "v" + id, id, num, sprite: id, region, name, tag, types: types.split("/"), hp, atk, def, spa, spd, spe, bst: hp + atk + def + spa + spd + spe, cr: mon(num).cr, flags: mon(num).flags, gen: mon(num).gen, evos, from }));
+const VARIANT = Object.fromEntries(VARIANTS.map(v => [v.vid, v]));
+const variantsOf = n => VARIANTS.filter(v => v.num === n);
+const hasVar = (n, vid) => !!(S.box[n] && S.box[n].vars && S.box[n].vars[vid]);
+const variantOf = n => { const b = S.box[n], k = b && b.forme; return k && k[0] === "v" && hasVar(n, k) ? VARIANT[k] : null; };
+function unlockVar(n, vid, pick) { const b = S.box[n]; b.vars = b.vars || {}; const fresh = !b.vars[vid]; b.vars[vid] = 1; if (pick) b.forme = vid; return fresh; }
+// Owned means this exact form: an Alolan Rattata is new to a trainer who only has Kanto's.
+const ownsFoe = m => !!S.box[m.num] && (!m.vid || hasVar(m.num, m.vid));
+// ── Forms won in the OP-Pokémon quests: Calyrex's Riders (Crown Shrine), Necrozma's Dusk Mane and Dawn Wings (Megalo
+// Tower), and Arceus's 17 Plates (Hall of Origin), each of which makes it that type.
+const statForm = (num, extra, types, [hp, atk, def, spa, spd, spe]) => ({ num, ...extra, types: types.split("/"), hp, atk, def, spa, spd, spe, bst: hp + atk + def + spa + spd + spe, cr: mon(num).cr, flags: mon(num).flags, gen: mon(num).gen, evos: [] });
+const QFORMES = {
+  898: [statForm(898, { key: "ice", quest: "crown", sprite: 10193, name: "Calyrex (Ice Rider)" }, "Psychic/Ice", [100, 165, 150, 85, 130, 50]),
+    statForm(898, { key: "shadow", quest: "crown", sprite: 10194, name: "Calyrex (Shadow Rider)" }, "Psychic/Ghost", [100, 85, 80, 165, 100, 150])],
+  800: [statForm(800, { key: "dusk", quest: "megalo", sprite: 10155, name: "Dusk Mane Necrozma" }, "Psychic/Steel", [97, 157, 127, 113, 109, 77]),
+    statForm(800, { key: "dawn", quest: "megalo", sprite: 10156, name: "Dawn Wings Necrozma" }, "Psychic/Ghost", [97, 113, 109, 157, 127, 77])],
+  493: D.types.filter(t => t !== "Normal").map(t => statForm(493, { key: "t:" + t, quest: "origin", sprite: "493-" + t.toLowerCase(), name: `Arceus (${t})` }, t, [120, 120, 120, 120, 120, 120]))
+};
+const qforme = n => { const b = S.box[n], f = QFORMES[n] && b && b.forme && QFORMES[n].find(x => x.key === b.forme); return f && S.won && S.won[f.quest] ? f : null; };
+// The form a Pokémon is in, short of Mega and Gigantamax: Zygarde's formes, Urshifu's style, a quest form or a regional form.
+const altOf = n => zforme(n) || ustyle(n) || qforme(n) || variantOf(n);
+// Regional and quest forms go by their own names on tiles and in the detail ("Galarian Meowth", "Dusk Mane Necrozma").
+const nameOf = n => (variantOf(n) || qforme(n) || mon(n)).name;
+// The Gigantamax form a Pokémon takes: the one whose typing matches the form it's in (Urshifu has one per style). As in
+// the games, a regional form has no Gigantamax or Mega of its own: Galarian Meowth can't Gigantamax.
+const gmaxOf = n => { const g = formsOf(n, "gmax"), t = (altOf(n) || mon(n)).types.join(); return g.find(f => f.types.join() === t) || (variantOf(n) ? null : g[0]) || null; };
+const megasOf = n => variantOf(n) ? [] : formsOf(n, "mega");
+const fighter = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || special(n) || altOf(n) || mon(n);
+// ── The OP-Pokémon quests, after all nine Champions, each as extremely difficult as the Darkest Day. HP multipliers were
+// set offline with the game's own formulas: the six Pokémon that hit the boss hardest, at Lv 100 with all the Protein
+// and tapping 8 a second, need the same share of the clock as the six that hit Eternamax hardest do there (84%; at 6 taps
+// a second, 93%). Anything less than a team built for the boss runs out of time. Calyrex's Riders take 4x from the best
+// Ghost and Dark attackers, so its HP sits right where the no-idle floor stops deciding it.
+const PLATES_FROM = 3, PLATE_ODDS = 40, PLATE_BOSS = 2, PLATES_NEED = 17, QUEST_TIME = 120, ARCEUS_STATS = [120, 120, 120, 120, 120, 120];
+const QUESTS = [
+  { id: "origin", r: 3, place: "Hall of Origin", boss: "Arceus", prize: 493, need: [483, 484, 487], hp: 14.2, prizeNote: "any type",
+    foes: [statForm(493, { name: "Arceus", sprite: 493 }, "Normal", ARCEUS_STATS), statForm(493, { name: "Arceus (Dragon)", sprite: "493-dragon" }, "Dragon", ARCEUS_STATS), statForm(493, { name: "Arceus (Ghost)", sprite: "493-ghost" }, "Ghost", ARCEUS_STATS)],
+    won: "Arceus can take any type now: pick its Plate in its detail." },
+  { id: "crown", r: 7, place: "Crown Shrine", boss: "Calyrex", prize: 898, need: [898, 896, 897], hp: 29.6, prizeNote: "both Riders",
+    foes: [QFORMES[898][0], QFORMES[898][1]], won: "Calyrex can ride Glastrier or Spectrier now: pick a Rider in its detail." },
+  { id: "megalo", r: 6, place: "Megalo Tower", boss: "Ultra Necrozma", prize: 800, need: [800, 791, 792], hp: 62.7, prizeNote: "Dusk Mane, Dawn Wings",
+    foes: [statForm(800, { name: "Ultra Necrozma", sprite: 10157 }, "Psychic/Dragon", [97, 167, 97, 167, 97, 129])], won: "Necrozma can become Dusk Mane or Dawn Wings now: pick it in its detail." }
+];
+const QUEST = Object.fromEntries(QUESTS.map(Q => [Q.id, Q]));
+const allChamps = () => Object.keys(S.champs).length >= REGIONS.length;
+const questMissing = Q => Q.need.filter(n => !S.box[n]);
+const questOpen = Q => allChamps() && !questMissing(Q).length && (Q.id !== "origin" || (S.plates || 0) >= PLATES_NEED);
+const questTime = Q => fightTime(QUEST_TIME, Q.foes, RED_OFFENSE, .8, 1.2);
+function questNote(Q) {
+  if (S.won[Q.id]) return Q.prizeNote;
+  if (!allChamps()) return "after all 9 Champions";
+  if (Q.id === "origin" && (S.plates || 0) < PLATES_NEED) return `Plates ${S.plates || 0}/${PLATES_NEED}`;
+  const miss = questMissing(Q);
+  return miss.length ? "needs " + miss.map(n => mon(n).name).join(", ") : `${Q.boss} · ${Math.round(questTime(Q) * partyTime())}s`;
+}
+// Sinnoh's wild Pokémon now and then turn up one of Arceus's Plates once every Champion is beaten; its bosses bring a couple.
+function gainPlates(k) {
+  if (!allChamps() || (S.plates || 0) >= PLATES_NEED || k <= 0) return "";
+  const before = S.plates || 0; S.plates = Math.min(PLATES_NEED, before + k);
+  let note = ` Found ${S.plates - before > 1 ? S.plates - before + " Plates" : "a Plate"} (${S.plates}/${PLATES_NEED}).`;
+  if (S.plates >= PLATES_NEED) { note += " All 17 Plates: the Hall of Origin is in Sinnoh's list."; toast(note.trim()); }
+  return note;
+}
 const partyTime = () => S.party.length ? Math.min(1.25, Math.max(.8, S.party.reduce((s, n) => s + bulkOf(fighter(n)), 0) / S.party.length / PARTY_BULK)) : 1;
 const power = (n, L = level(n)) => { const m = fighter(n); return Math.max(m.atk, m.spa) * L / 50 * hitRate(m) * truant(n) * (1 + proteinBoost()) * (S.gmax === n ? GMAX_BOOST : 1); };
 const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n)) * (foe ? bestEff(fighter(n), foe) : 1), 0);
@@ -723,6 +789,7 @@ function unlocked(loc) {
   if (kind === "summit") return Object.keys(S.champs).length >= REGIONS.length;
   if (kind === "darkest") return !!S.champs[PIECES_FROM] && (S.pieces || 0) >= PIECES_NEED;
   if (kind === "tower") return !!S.champs[TOWER_FROM];
+  if (kind === "quest") return !!QUEST[loc.q] && questOpen(QUEST[loc.q]);
   if (!regionOpen(r)) return false;
   if (kind === "route") return k === 0 || badge(r, k - 1);
   if (kind === "gym") return kills(r, k) >= KILLS_FOR_GYM;
@@ -737,6 +804,7 @@ function locName(loc) {
   if (loc.kind === "summit") return "Mt. Silver";
   if (loc.kind === "darkest") return "Energy Plant";
   if (loc.kind === "tower") return "Battle Tower";
+  if (loc.kind === "quest") return QUEST[loc.q].place;
   return `Champion ${R.champ}`;
 }
 // ── Boss HP. Gym leaders and Champions are tuned so a strong super-effective team, as evolved as the level cap
@@ -785,11 +853,12 @@ function startLoc(loc) {
     S.tickets[loc.r] = t - 1;
   }
   const from = S.loc.r;
-  S.loc = { kind: loc.kind, r: loc.r, k: loc.k || 0 };
+  S.loc = { kind: loc.kind, r: loc.r, k: loc.k || 0, ...(loc.q ? { q: loc.q } : {}) };
   const r = loc.r, i = r * 4 + (loc.k || 0);
   if (loc.kind === "route") B = { kind: "route", r, k: loc.k, i };
   else if (loc.kind === "gym") B = { kind: "gym", r, k: loc.k, i, queue: gymTeam(r, loc.k), L: gymLevel(i), base: GYM_TIME, time: gymTime(r, loc.k), idx: 0 };
   else if (loc.kind === "summit") B = { kind: "summit", r, i: 36, queue: RED_TEAM.map(mon), L: SUMMIT_LEVEL, base: SUMMIT_TIME, time: fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2), idx: 0, back: from };
+  else if (loc.kind === "quest") { const Q = QUEST[loc.q]; B = { kind: "quest", q: Q.id, r, i: 36, queue: Q.foes, L: 100, base: QUEST_TIME, time: questTime(Q), idx: 0 }; }
   else if (loc.kind === "darkest") B = { kind: "darkest", r, i: 36, queue: [ETERNAMAX_FOE], L: 100, base: DARKEST_TIME, time: darkTime(), idx: 0 };
   else if (loc.kind === "tower") { B = { kind: "tower", r, i: 36, f: 1, queue: towerTeam(1), L: 100, base: TOWER_START, time: TOWER_START, idx: 0 }; S.tower.runs++; }
   else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: champLevel(r), base: CHAMP_TIME, time: champTime(r), idx: 0 };
@@ -805,8 +874,8 @@ function startLoc(loc) {
   if (B.kind === "gym") B.tune = gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
   else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
   else if (B.kind === "dungeon") B.tune = legendTuning(B);
-  if (B.kind === "gym" || B.kind === "champ" || B.kind === "summit" || B.kind === "darkest") {
-    const mult = B.kind === "summit" ? SUMMIT_HP : B.kind === "darkest" ? DARKEST_HP : B.tune, idle = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i, mult) / Math.max(1e-9, partyDps(f)), 0);
+  if (B.kind === "gym" || B.kind === "champ" || B.kind === "summit" || B.kind === "darkest" || B.kind === "quest") {
+    const mult = B.kind === "summit" ? SUMMIT_HP : B.kind === "darkest" ? DARKEST_HP : B.kind === "quest" ? QUEST[B.q].hp : B.tune, idle = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i, mult) / Math.max(1e-9, partyDps(f)), 0);
     B.floor = Math.max(1, IDLE_SHORT * B.time / idle);
   }
   if (B.kind === "tower") B.floor = 1;
@@ -824,6 +893,7 @@ function spawn() {
     mult = B.kind === "dungeon" && !boss ? fodderHp(B.i) : B.tune;
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
     if (B.kind === "darkest") { pay = CHAMP_HP; mult = DARKEST_HP; }
+    if (B.kind === "quest") { pay = CHAMP_HP; mult = QUEST[B.q].hp; }
     if (B.kind === "tower") { pay = CHAMP_HP; mult = towerHp(B.f); }
     shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
@@ -833,7 +903,7 @@ function spawn() {
   S.seen[m.num] = 1;
   $("#foeimg").src = spriteOf(m, shiny);
   $("#shiny").hidden = !shiny;
-  $("#foeinfo").innerHTML = `<b>${esc(m.name)}</b> Lv ${L} ${m.types.map(tyChip).join(" ")}${S.box[m.num] ? ' <span class="muted">· caught</span>' : ""}`;
+  $("#foeinfo").innerHTML = `<b>${esc(m.name)}</b> Lv ${L} ${m.types.map(tyChip).join(" ")}${ownsFoe(m) ? ' <span class="muted">· caught</span>' : ""}`;
   renderMinis();
 }
 function hit(dmg) {
@@ -849,13 +919,14 @@ function defeat() {
   let text = `${f.m.name} fainted. +$${fmt(f.reward)}.`;
   if (f.wild && Math.random() < 1 / CELL_ODDS) text += gainCells(1);
   if (f.wild && B.r === PIECES_FROM && Math.random() < 1 / PIECE_ODDS) text += gainPieces(1);
+  if (f.wild && B.r === PLATES_FROM && Math.random() < 1 / PLATE_ODDS) text += gainPlates(1);
   if (f.wild) {
     const ball = chooseBall(f);
     if (ball) {
       S.balls[ball.id]--;
       const ok = Math.random() < throwChance(f.m, ball);
       text += ` Threw a ${ball.name}… ` + (ok ? "caught!" : "it broke free.");
-      if (ok) addMon(f.m.num, f.L, f.shiny);
+      if (ok) addMon(f.m.num, f.L, f.shiny, f.m.vid);
     }
   }
   say(text);
@@ -863,7 +934,7 @@ function defeat() {
   const here = B; setTimeout(() => { if (B === here) next(); }, 650);
 }
 function chooseBall(f) {
-  const owned = !!S.box[f.m.num], pref = f.shiny ? S.set.shiny : owned ? S.set.dupe : S.set.fresh;
+  const owned = ownsFoe(f.m), pref = f.shiny ? S.set.shiny : owned ? S.set.dupe : S.set.fresh;
   if (pref === "none") return null;
   const LADDER = ["poke", "great", "ultra"];
   // "Auto": the cheapest ball with at least an even chance, else the strongest one left. Master Balls only for shinies and legendaries.
@@ -893,13 +964,20 @@ function next() {
   B.idx++;
   if (B.idx < B.queue.length) { spawn(); return; }
   if (B.kind === "tower") { towerFloor(); return; }
-  const R = REGIONS[B.r], galar = B.r === PIECES_FROM ? gainPieces(PIECE_BOSS) : "";
+  // Bosses in Galar bring Wishing Pieces, in Sinnoh Plates.
+  const R = REGIONS[B.r], galar = (B.r === PIECES_FROM ? gainPieces(PIECE_BOSS) : "") + (B.r === PLATES_FROM && B.kind !== "quest" ? gainPlates(PLATE_BOSS) : "");
   if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + rollDrop("gym") + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "champ") { const first = !S.champs[B.r]; S.champs[B.r] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 30); S.money += prize; if (first) S.balls.master++;
     const unlock = first && B.r === KEY_STONE_FROM ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
     toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + rollDrop("champ") + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast((first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`) + rollDrop("summit") + gainCells(CELL_BOSS)); }
   if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.` + rollDrop("dungeon") + gainCells(CELL_BOSS) + galar); }
+  if (B.kind === "quest") {
+    const Q = QUEST[B.q], first = !S.won[Q.id], prize = rewardFor(B.L, B.i, 30); S.money += prize; S.won[Q.id] = 1;
+    let joined = "";
+    if (!S.box[Q.prize]) { S.box[Q.prize] = { xp: Math.pow(levelCap(), 3), shiny: false }; if (joinsParty()) joinParty(Q.prize); joined = ` ${mon(Q.prize).name} joins you.`; }
+    toast((first ? `You beat ${Q.boss} at the ${Q.place}! +$${fmt(prize)}.${joined} ${Q.won}` : `${Q.boss} rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS));
+  }
   if (B.kind === "darkest") {
     const first = !S.eternamax, prize = rewardFor(B.L, B.i, 30); S.money += prize; S.eternamax = 1; S.gfactor[ETERNATUS] = 1;
     let joined = "";
@@ -921,12 +999,14 @@ function backToRoute() {
   let k = 3; while (k > 0 && !unlocked({ kind: "route", r, k })) k--;
   B = null; startLoc({ kind: "route", r, k }); renderAll();
 }
-function addMon(num, L, shiny) {
-  const had = S.box[num];
+function addMon(num, L, shiny, vid) {
+  const had = S.box[num], v = vid && VARIANT[vid];
   if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny };
   else if (shiny) { const first = !had.shiny; had.shiny = true; had.look = "shiny"; if (first) toast(`A shiny ${mon(num).name}! Yours wears it now; Party & Box can switch it back.`); }
+  const newForm = v ? unlockVar(num, vid, !had) : false;
   if (!had && joinsParty()) joinParty(num);
-  if (!had) toast(`${mon(num).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
+  if (!had) toast(`${(v || mon(num)).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
+  else if (newForm) toast(`${v.name}! It joins as a form of your ${mon(num).name}: pick it in its detail in Party & Box.`);
   renderAll(); tutor();
 }
 // Level evolutions happen on their own when there is only one way to go; the rest wait for you.
@@ -942,7 +1022,14 @@ function gainXp(xp) {
 function liftCap() { for (const n of S.party.slice()) autoEvolve(n); }
 // An evolution is open if you don't have that species yet, or if this one would bring it more levels:
 // evolving into one you already own merges them, and the Box keeps the higher XP.
-const evoOptions = n => mon(n).evos.filter(([t]) => !S.box[t] || level(t) < level(n));
+// Evolutions come from the form it's in (Galarian Meowth becomes Perrserker), without the repeats the data keeps for
+// regional branches. Evolving the usual form inside a regional form's region gives that form (Pikachu in Alola becomes
+// Alolan Raichu), and an evolution that brings a form you don't have is open even when you have the species higher.
+const evosOf = n => { const seen = new Set(); return (variantOf(n) || mon(n)).evos.filter(e => !seen.has(e.join()) && seen.add(e.join())); };
+const regionalOn = (n, t) => variantOf(n) ? null : VARIANTS.find(v => v.num === t && v.from === n && v.region === S.loc.r) || null;
+const evoForm = (n, e) => e[3] ? VARIANT[e[3]] : regionalOn(n, e[0]);
+const evoOpen = (n, e) => { const t = e[0], f = evoForm(n, e); return !S.box[t] || level(t) < level(n) || (!!f && !hasVar(t, f.vid)); };
+const evoOptions = n => evosOf(n).filter(e => evoOpen(n, e));
 function canEvolve(n, e) {
   const [, how, v] = e;
   if (how === "L") return level(n) >= v;
@@ -951,21 +1038,22 @@ function canEvolve(n, e) {
 }
 function autoEvolve(n) {
   const lv = evoOptions(n).filter(e => e[1] === "L");
-  if (lv.length === 1 && mon(n).evos.filter(e => e[1] === "L").length === 1 && canEvolve(n, lv[0])) evolve(n, lv[0]);
+  if (lv.length === 1 && evosOf(n).filter(e => e[1] === "L").length === 1 && canEvolve(n, lv[0])) evolve(n, lv[0]);
 }
 function evolve(n, e) {
-  const [t, how, v] = e;
+  const [t, how, v] = e, form = evoForm(n, e), from = (variantOf(n) || mon(n)).name, into = form ? form.name : mon(t).name;
   if (!evoOptions(n).some(x => x[0] === t) || !canEvolve(n, e)) return;
   if (how === "I") S.items[v]--;
   if (how === "T") S.cords--;
   const had = S.box[t];
   if (had) { had.xp = Math.max(had.xp, S.box[n].xp); had.shiny = had.shiny || S.box[n].shiny; }
   else S.box[t] = { xp: S.box[n].xp, shiny: S.box[n].shiny, look: lookKind(n) === "shiny" ? "shiny" : "normal" };
+  if (form) unlockVar(t, form.vid, true);
   const slot = S.party.indexOf(n);
   if (slot >= 0) { if (S.party.includes(t)) S.party.splice(slot, 1); else S.party[slot] = t; }
   dropForm(n); S.stats.evolved++;
-  toast(had ? `${mon(n).name} evolved and your ${mon(t).name} took its levels: now Lv ${level(t)}. (${mon(n).name} stays in your Box.)`
-    : `${mon(n).name} evolved into ${mon(t).name}! (${mon(n).name} stays in your Box.)`);
+  toast(had ? `${from} evolved and your ${into} took its levels: now Lv ${level(t)}. (${from} stays in your Box.)`
+    : `${from} evolved into ${into}! (${from} stays in your Box.)`);
   save(); renderAll();
 }
 
@@ -1047,20 +1135,21 @@ function renderLocs() {
   }
   items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
   if (r === PIECES_FROM) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
+  for (const Q of QUESTS) if (Q.r === r) items.push({ kind: "quest", r, q: Q.id, note: questNote(Q), done: !!S.won[Q.id] });
   if (r === TOWER_FROM) items.push({ kind: "tower", r, note: S.champs[TOWER_FROM] ? (S.tower.best ? `best floor ${S.tower.best}` : "endless, timed") : "after Geeta", done: false });
   if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
   const quest = r === CELLS_FROM ? `<div class="loc quest"><span>Zygarde Cells</span><span${(S.cells || 0) >= 100 ? ' class="done"' : ""}>${S.champs[CELLS_FROM] ? `${S.cells || 0}/100` : "after Diantha"}</span></div>` : "";
   $("#locs").innerHTML = items.map(it => {
-    const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0);
-    return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0 })}'${unlocked(it) ? "" : " disabled"}><span>${esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
+    const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0) && (S.loc.q || "") === (it.q || "");
+    return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0, ...(it.q ? { q: it.q } : {}) })}'${unlocked(it) ? "" : " disabled"}><span>${esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
   }).join("") + quest;
 }
 // How a party member looks: its Mega or Gigantamax form when it has one on.
-const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax === n && gmaxOf(n)) || special(n) || zforme(n) || ustyle(n) || mon(n);
+const lookOf = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax === n && gmaxOf(n)) || special(n) || altOf(n) || mon(n);
 function monTile(n, opts = {}) {
-  const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : special(n) || m, e = opts.foe ? bestEff(fighter(n), opts.foe) : null;
+  const m = mon(n), b = S.box[n], look = opts.form ? lookOf(n) : special(n) || altOf(n) || m, e = opts.foe ? bestEff(fighter(n), opts.foe) : null;
   const ready = evoOptions(n).some(x => canEvolve(n, x));
-  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(m.name)}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](statsOf(n))}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
+  return `<button class="mon${opts.inparty ? " inparty" : ""}" type="button" data-n="${n}">${ready ? '<span class="evo">EVOLVE</span>' : ""}${e != null && e !== 1 ? `<span class="eff ${e > 1 ? "good" : "bad"}">${({ 0: "0x", .25: "¼x", .5: "½x" })[e] || e + "x"}</span>` : ""}${showsShiny(n) || look !== m ? `<span class="star">${[showsShiny(n) && !look.img ? "S" : "", look.kind === "mega" ? "MEGA" : look.kind === "gmax" ? "GMAX" : look.img ? "SP" : look.mark || ""].filter(Boolean).join(" ")}</span>` : ""}<span class="pic"><img class="spr" src="${spriteOf(look, showsShiny(n))}" alt="" loading="lazy"></span><span class="nm">${esc(nameOf(n))}</span><span>${opts.stat ? `${opts.stat[0]} ${opts.stat[1](statsOf(n))}` : `Lv ${opts.battle ? battleLevel(n) : level(n)}`}</span>${opts.xp ? `<span class="bar xp${level(n) >= levelCap() ? " cap" : ""}" style="width:100%"><i style="width:${xpPct(n)}%"></i></span>` : ""}</button>`;
 }
 const xpPct = n => { const L = level(n); if (L >= levelCap()) return 100; const a = L ** 3, b = (L + 1) ** 3; return 100 * (S.box[n].xp - a) / (b - a); };
 function renderMinis() {
@@ -1068,7 +1157,7 @@ function renderMinis() {
   $("#minis").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { foe, xp: true, battle: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
 }
 // Base-stat sorts for the Box: label shown on the tile, and the value. Biggest first.
-const statsOf = n => special(n) || zforme(n) || ustyle(n) || mon(n);
+const statsOf = n => special(n) || altOf(n) || mon(n);
 const STAT_SORTS = { bulk: ["Bulk", m => Math.round(bulkOf(m))], hp: ["HP", m => m.hp], atk: ["Atk", m => m.atk], def: ["Def", m => m.def], spa: ["SpA", m => m.spa], spd: ["SpD", m => m.spd], spe: ["Spe", m => m.spe], bst: ["Total", m => m.bst] };
 const PARTY_HINT = "Drag to rearrange your party, drag a Box Pokémon onto a slot to swap it in, or drag one down to the Box. On a phone, hold it first. Tap any Pokémon for its details; EVOLVE means it can evolve now.";
 function renderParty() {
@@ -1089,14 +1178,31 @@ function renderParty() {
 }
 // Mega and Gigantamax lines in a Pokémon's detail: what each form is, and what it still needs.
 function formLines(n) {
-  const megas = formsOf(n, "mega"), gmax = formsOf(n, "gmax").length ? gmaxOf(n) : null, inParty = S.party.includes(n), rows = [];
+  const megas = megasOf(n), gmax = formsOf(n, "gmax").length ? gmaxOf(n) : null, inParty = S.party.includes(n), rows = [];
   const line = (f, why, on, attr) => `<div class="row" style="justify-content:space-between"><span>${esc(f.name)} ${f.types.map(tyChip).join(" ")} <span class="muted">${why ||
     (f.kind === "mega" ? `Atk ${f.atk} · SpA ${f.spa} · Def ${f.def} · Spe ${f.spe}` : "hits 30% harder")}</span></span>${why ? "" : `<button class="lbl${on ? " on" : ""}" type="button" ${attr}>${on ? "Turn off" : f.kind === "mega" ? "Mega Evolve" : "Gigantamax"}</button>`}</div>`;
   for (const f of megas) rows.push(line(f, !S.key ? "needs the Key Stone (beat Steven)" : !S.stones[f.id] ? "needs its Mega Stone: Shop or boss drops, party only" : !inParty ? "add it to your party first" : "", S.mega && S.mega.n === n && S.mega.f === f.id, `data-mega="${f.id}"`));
   if (gmax) rows.push(line(gmax, !S.band ? "needs the Dynamax Band (beat Leon)" : !S.gfactor[n] ? (gmax.quest ? "win the Darkest Day at Galar's Energy Plant" : "needs Max Soup: Shop or boss drops, party only") : !inParty ? "add it to your party first" : "", S.gmax === n, "data-gmax=\"1\""));
   return rows.length ? `<div class="small">${rows.join("")}<div class="muted">One Mega and one Gigantamax in the party at a time.</div></div>` : "";
 }
+const regionLabel = v => REGIONS[v.region].name;
+const formLabel = v => v.tag[0] + v.tag.slice(1).toLowerCase();
 function formeLine(n) {
+  const pick = (k, label, cur, can) => `<button class="lbl${k === cur ? " on" : ""}" type="button" data-forme="${k}"${can ? "" : " disabled"} aria-pressed="${k === cur}">${esc(label)}</button>`;
+  const vars = variantsOf(n);
+  if (vars.length) {
+    const cur = variantOf(n) ? S.box[n].forme : "", locked = vars.filter(v => !hasVar(n, v.vid));
+    const where = [...new Set(locked.map(regionLabel))];
+    return `<div class="row small"><span class="muted">Form</span>${pick("", REGIONS[mon(n).gen - 1].name, cur, true)}${vars.map(v => pick(v.vid, formLabel(v), cur, hasVar(n, v.vid))).join("")}<span class="muted">${locked.length ? `catch ${locked.length > 1 ? "the others" : "it"} in ${where.join(" and ")}, or evolve one there` : "same level"}</span></div>`;
+  }
+  if (n === 493) {
+    const won = S.won && S.won.origin, cur = qforme(n) ? S.box[n].forme : "";
+    return `<div class="row small"><span class="muted">Plate</span><select data-plate="1" aria-label="Arceus's type"${won ? "" : " disabled"}>${["", ...QFORMES[493].map(f => f.key)].map(k => `<option value="${k}"${k === cur ? " selected" : ""}>${k ? k.slice(2) : "Normal"}</option>`).join("")}</select><span class="muted">${won ? "any of the 17 Plates, same stats" : "win the Hall of Origin (Sinnoh's list) to change its type"}</span></div>`;
+  }
+  if (QFORMES[n]) {
+    const Q = QUEST[QFORMES[n][0].quest], won = S.won && S.won[Q.id], cur = qforme(n) ? S.box[n].forme : "";
+    return `<div class="row small"><span class="muted">Form</span>${pick("", mon(n).name, cur, true)}${QFORMES[n].map(f => pick(f.key, f.name.replace(/ ?(Necrozma|Calyrex) ?/, "").replace(/[()]/g, ""), cur, won)).join("")}<span class="muted">${won ? "same level" : `win at the ${Q.place} (${REGIONS[Q.r].name}'s list)`}</span></div>`;
+  }
   if (n === URSHIFU) {
     const cur = ustyle(n) ? "rapid" : "single", opt = (k, label) => `<button class="lbl${k === cur ? " on" : ""}" type="button" data-forme="${k}" aria-pressed="${k === cur}">${label}</button>`;
     return `<div class="row small"><span class="muted">Style</span>${opt("single", "Single Strike")}${opt("rapid", "Rapid Strike")}<span class="muted">${cur === "rapid" ? "Fighting/Water" : "Fighting/Dark"}, same stats and level</span></div>`;
@@ -1114,17 +1220,18 @@ function lookLine(n) {
 function renderDetail() {
   const el = $("#detail");
   if (!detail || !S.box[detail]) { el.hidden = true; return; }
-  const sp = special(detail), m = mon(detail), opts = m.evos, st = sp || zforme(detail) || ustyle(detail) || m, owned = S.box[detail];
+  const sp = special(detail), m = mon(detail), opts = evosOf(detail), st = sp || altOf(detail) || m, owned = S.box[detail];
   el.hidden = false;
-  el.innerHTML = `<div class="row"><b>${esc(m.name)}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · bulk ${Math.round(bulkOf(fighter(detail)))} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
+  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">power ${fmt(power(detail))}/s · bulk ${Math.round(bulkOf(fighter(detail)))} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small muted">HP <b>${st.hp}</b> · Atk <b>${st.atk}</b> · Def <b>${st.def}</b> · SpA <b>${st.spa}</b> · SpD <b>${st.spd}</b> · Spe <b>${st.spe}</b> · Total <b>${st.bst}</b></div>` +
     (TRUANT.has(detail) ? '<div class="small muted">Truant: it only attacks every other turn, so it deals half damage.</div>' : "") +
     (owned.special ? `<div class="small"><b>SP · Special edition: ${esc(SPECIALS[owned.special].title)}</b> <span class="muted">${esc(SPECIALS[owned.special].note)}</span></div>` : "") + lookLine(detail) + formeLine(detail) +
     (opts.length ? `<div class="small">${opts.map(e => {
-      const [t, how, v] = e, owned = S.box[t], open = !owned || level(t) < level(detail), ok = open && canEvolve(detail, e);
+      const [t, how, v] = e, owned = S.box[t], open = evoOpen(detail, e), ok = open && canEvolve(detail, e), form = evoForm(detail, e);
+      const elsewhere = !form && !variantOf(detail) && VARIANTS.find(x => x.num === t && x.from === detail);
       const need = how === "L" ? `Lv ${v}${v > levelCap() ? " (over the cap)" : ""}` : how === "I" ? `${v} (have ${S.items[v] || 0})` : `Linking Cord (have ${S.cords})`;
       const yours = owned ? ` <span class="muted">· yours is Lv ${level(t)}${open ? ", evolving gives it these levels" : ""}</span>` : "";
-      return `<div class="row" style="justify-content:space-between"><span>→ ${esc(mon(t).name)} <span class="muted">${need}</span>${yours}</span>${open ? `<button class="lbl" type="button" data-evo="${t}"${ok ? "" : " disabled"}>Evolve</button>` : '<span class="good">have it</span>'}</div>`;
+      return `<div class="row" style="justify-content:space-between"><span>→ ${esc(form ? form.name : mon(t).name)} <span class="muted">${need}</span>${yours}${elsewhere ? ` <span class="muted">· in ${regionLabel(elsewhere)} it becomes ${esc(elsewhere.name)}</span>` : ""}</span>${open ? `<button class="lbl" type="button" data-evo="${t}"${ok ? "" : " disabled"}>Evolve</button>` : '<span class="good">have it</span>'}</div>`;
     }).join("")}</div>` : '<div class="small muted">Doesn\'t evolve.</div>') + formLines(detail) +
     `<div class="row">${!S.party.includes(detail) && S.party.length >= 6 ? `<button class="lbl" type="button" data-swap="${detail}">Swap into party</button>` : `<button class="lbl" type="button" data-toggle="${detail}">${S.party.includes(detail) ? "Send to Box" : "Add to party"}</button>`}<button class="lbl" type="button" data-close="1">Close</button></div>`;
 }
@@ -1142,7 +1249,9 @@ function renderDex() {
     const has = f => f.kind === "mega" ? !!S.stones[f.id] : !!S.gfactor[f.num], got = FORMS.filter(has), lit = f => has(f) && (!dexShiny || shinyOf(f.num));
     $("#dexsum").innerHTML = dexShiny ? `Forms: <b>${FORMS.filter(lit).length}/${FORMS.length}</b> unlocked on a Pokémon you have shiny` :
       `Forms: <b>${got.length}/${FORMS.length}</b> unlocked (${got.filter(f => f.kind === "mega").length} Mega, ${got.filter(f => f.kind === "gmax").length} Gigantamax) · ${S.key ? "Key Stone" : "no Key Stone yet (beat Steven)"} · ${S.band ? "Dynamax Band" : "no Dynamax Band yet (beat Leon)"} · not part of the leaderboard`;
-    $("#dexgrid").innerHTML = FORMS.map(f => dexCell(f.num, sprite(f.sprite, dexShiny), lit(f), f.name)).join("");
+    const vlit = v => hasVar(v.num, v.vid) && (!dexShiny || shinyOf(v.num));
+    $("#dexsum").innerHTML += ` · regional forms <b>${VARIANTS.filter(vlit).length}/${VARIANTS.length}</b>`;
+    $("#dexgrid").innerHTML = FORMS.map(f => dexCell(f.num, sprite(f.sprite, dexShiny), lit(f), f.name)).join("") + VARIANTS.map(v => dexCell(v.num, sprite(v.sprite, dexShiny), vlit(v), v.name)).join("");
     return;
   }
   const list = regionMons(dexR), got = list.filter(m => S.box[m.num]).length, shinies = list.filter(m => shinyOf(m.num)).length;
@@ -1214,8 +1323,14 @@ const ACH = [
   { id: "zygarde100", group: "Side quests", title: "Perfect order", desc: "All 100 Zygarde Cells: Zygarde at 100%", need: 100, have: () => S.cells || 0 },
   { id: "pieces", group: "Side quests", title: "Wish upon a star", desc: `Collect ${PIECES_NEED} Wishing Pieces`, need: PIECES_NEED, have: () => S.pieces || 0 },
   { id: "darkest", group: "Side quests", title: "The Darkest Day", desc: "Beat Eternamax Eternatus at the Energy Plant", need: 1, have: () => S.eternamax ? 1 : 0 },
+  { id: "plates", group: "Side quests", title: "Tablets of creation", desc: `Collect all ${PLATES_NEED} Plates`, need: PLATES_NEED, have: () => S.plates || 0 },
+  { id: "origin", group: "Side quests", title: "Judgment", desc: "Beat Arceus at the Hall of Origin", need: 1, have: () => S.won && S.won.origin ? 1 : 0 },
+  { id: "crown", group: "Side quests", title: "King of Bountiful Harvests", desc: "Beat both of Calyrex's Riders at the Crown Shrine", need: 1, have: () => S.won && S.won.crown ? 1 : 0 },
+  { id: "megalo", group: "Side quests", title: "Blinding light", desc: "Beat Ultra Necrozma at Megalo Tower", need: 1, have: () => S.won && S.won.megalo ? 1 : 0 },
   ...[[5, "First steps up", "Clear 5 Battle Tower floors"], [10, "Tower climber", "Clear floor 10 and beat the Tower Tycoon"], [20, "High rise", "Clear 20 Battle Tower floors"], [30, "Above the clouds", "Clear 30 Battle Tower floors"], [40, "Top of the tower", "Clear 40 Battle Tower floors"]]
     .map(([need, title, desc]) => ({ id: "tower" + need, group: "Battle Tower", title, desc, need, have: () => S.tower ? S.tower.best : 0 })),
+  ...[[1, "Far from home", "Collect a regional form"], [VARIANTS.length, "Around the world", `Collect all ${VARIANTS.length} regional forms`]]
+    .map(([need, title, desc]) => ({ id: "regional" + need, group: "Regional forms", title, desc, need, have: () => VARIANTS.filter(v => hasVar(v.num, v.vid)).length })),
   { id: "key", group: "Megas and Gigantamax", title: "Key Stone", desc: "Get the Key Stone from Steven", need: 1, have: () => S.key ? 1 : 0 },
   { id: "band", group: "Megas and Gigantamax", title: "Dynamax Band", desc: "Get the Dynamax Band from Leon", need: 1, have: () => S.band ? 1 : 0 },
   { id: "form1", group: "Megas and Gigantamax", title: "Power within", desc: "Unlock a Mega or Gigantamax form", need: 1, have: () => Object.keys(S.stones).length + Object.keys(S.gfactor).length },
@@ -1260,6 +1375,12 @@ function renderAch() {
 const MAIL = [
   { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
+  { id: "update-2026-11-13e", date: "Nov 13, 2026", from: "Prof Penguin", title: "Regional forms, and three gods to face",
+    body: `<ul><li><b>Regional forms</b> live in their regions now: Alolan forms in Alola, Galarian in Galar (Galarian Articuno, Zapdos and Moltres are the Galar dungeon's legendaries), Paldean in Paldea, and Hisuian forms in Sinnoh, which was Hisui long ago. Catch one, or evolve the usual Pokémon in that region, then pick the form in its detail. Each evolves its own way: Galarian Meowth becomes Perrserker, Alolan Vulpix needs an Ice Stone.</li>
+      <li>Once every Champion is beaten, three of the strongest Pokémon there are will be waiting for you. Each fight is as hard as Eternamax, so bring a team built for it, and tap like you mean it:</li>
+      <li><b>Hall of Origin</b> (Sinnoh): collect the 17 Plates from Sinnoh's Pokémon and own Dialga, Palkia and Giratina. Arceus fights you in three types. Win, and Arceus can take any type.</li>
+      <li><b>Crown Shrine</b> (Galar): own Calyrex, Glastrier and Spectrier. Face the Ice Rider and the Shadow Rider back to back. Win, and Calyrex can ride either.</li>
+      <li><b>Megalo Tower</b> (Alola): own Necrozma, Solgaleo and Lunala, and face Ultra Necrozma. Win, and Necrozma can become Dusk Mane or Dawn Wings.</li></ul>` },
   { id: "update-2026-11-13d", date: "Nov 13, 2026", from: "Prof Penguin", title: "The Battle Tower, Eternatus and a tidier Box",
     body: `<ul><li><b>Battle Tower</b>: beat Geeta and an endless, timed climb opens in Paldea's list. Every floor you clear adds time to the clock. How high you get has its own leaderboard.</li>
       <li><b>The Darkest Day</b>: after Leon, Galar's Pokémon turn up Wishing Pieces. Fifty open the Energy Plant, where Eternamax Eternatus waits. Beat it and yours can Eternamax.</li>
@@ -1364,10 +1485,14 @@ function wikiSections() {
     { id: "cells", group: "Side quests", title: "Zygarde Cells", html: `<p>Once Diantha (Kalos's Champion) is beaten, every wild win has a 1 in ${CELL_ODDS} chance of turning up a Zygarde Cell, and every gym, Champion, dungeon and Red win brings ${CELL_BOSS}. Time away finds them at half the rate. Kalos's list shows how many you have.</p><p>10 cells unlock Zygarde's 10% Forme (fast and frail: Speed ${ZFORMES["10"].spe}) and bring you a Zygarde if you have none. 100 unlock its Complete Forme, Zygarde at 100%: HP ${ZFORMES.complete.hp}, double the usual. Pick the forme in Zygarde's detail; it keeps its level.</p>` },
     { id: "darkest", group: "Side quests", title: "The Darkest Day", html: `<p>Once Leon (Galar's Champion) is beaten, every wild win in Galar has a 1 in ${PIECE_ODDS} chance of a Wishing Piece, and every gym, Champion and dungeon win there brings ${PIECE_BOSS}. Time away in Galar finds them at half the rate. Galar's list shows how many you have.</p><p>${PIECES_NEED} pieces open the Energy Plant, where Eternamax Eternatus waits at Lv 100 in ${DARKEST_TIME}s give or take. It's harder than Red: only a top team of legendaries, with a Mega, a Gigantamax and all the Protein, wins, and only tapping close to flat out. Beat it and Eternatus is yours if it wasn't already, with its Eternamax form unlocked. Eternamax takes your one Gigantamax slot and hits ${pct(GMAX_BOOST - 1)} harder, like Gigantamax.</p>` },
     { id: "tower", group: "Side quests", title: "Battle Tower", html: `<p>Once Geeta (Paldea's Champion) is beaten, the Battle Tower opens in Paldea's list: an endless climb against one clock. You start with ${TOWER_START}s. Each floor is ${TOWER_SIZE} Pokémon at Lv 100, the same ones for every player, and each floor is ${pct(TOWER_GROW - 1)} tougher than the last. Clearing a floor adds ${TOWER_ADD}s, and your party's bulk stretches that like any boss timer.</p><p>Every 10th floor is the Tower Tycoon: three legendaries, the last one Mega Evolved if it can, with half again the HP, and clearing it adds ${TOWER_TYCOON_ADD}s. The run ends when the clock does. The highest floor you've cleared is your best, and it has its own leaderboard in the arcade.</p>` },
+    { id: "origin", group: "Side quests", title: "Hall of Origin (Arceus)", html: `<p>Once every Champion is beaten, every wild win in Sinnoh has a 1 in ${PLATE_ODDS} chance of one of Arceus's Plates, and every gym, Champion and dungeon win there brings ${PLATE_BOSS}. Time away in Sinnoh finds them at half the rate. With all ${PLATES_NEED} Plates and Dialga, Palkia and Giratina in your Box, the Hall of Origin opens in Sinnoh's list.</p><p>Arceus fights at Lv 100 three times, as Normal, Dragon and Ghost, so one type of team won't do. Win, and Arceus is yours (if it wasn't already) and can take any of the 17 Plate types: pick it in its detail.</p>` },
+    { id: "crown", group: "Side quests", title: "Crown Shrine (Calyrex)", html: `<p>Once every Champion is beaten and Calyrex, Glastrier and Spectrier are in your Box (all three come from the Galar dungeon), the Crown Shrine opens in Galar's list. Calyrex comes out as the Ice Rider (Psychic/Ice), then the Shadow Rider (Psychic/Ghost), back to back. Win, and Calyrex can ride either: pick it in its detail.</p>` },
+    { id: "megalo", group: "Side quests", title: "Megalo Tower (Necrozma)", html: `<p>Once every Champion is beaten and Necrozma, Solgaleo and Lunala are in your Box (all from the Alola dungeon), Megalo Tower opens in Alola's list. Ultra Necrozma (Psychic/Dragon) fights at Lv 100. Win, and Necrozma can become Dusk Mane (Psychic/Steel, Attack 157) or Dawn Wings (Psychic/Ghost, Sp. Atk 157): pick it in its detail.</p><p>Like the Darkest Day, these three are extremely difficult. Their HP is set so the six Pokémon that hit that boss hardest, at Lv 100 with all the Protein and tapping close to flat out, only just win.</p>` },
     { id: "shop", group: "Items", title: "The Shop", html: `<p>Balls, dungeon tickets (250 × (region number)^1.8), protein, the Linking Cord, evolution items your Box is waiting on, and, once you have the key items, Mega Stones ($${fmt(STONE_PRICE)}) and Max Soup ($${fmt(SOUP_PRICE)}) for Pokémon in your party.</p>` },
     { id: "protein", group: "Items", title: "Protein", html: `<p>+${pct(PROTEIN_STEP)} party damage each. Only ${PROTEIN_PER_REGION} count per region you've opened (up to ${PROTEIN_PER_REGION * REGIONS.length}), and each costs 1.5× the last, from $300. You can't buy it mid-fight.</p>` },
     { id: "mega", group: "Megas and Gigantamax", title: "Mega Evolution", html: `<p>Beat Steven (Hoenn's Champion) for the Key Stone. Each Mega form then needs its own Mega Stone: $${fmt(STONE_PRICE)} in the Shop, or a boss drop (gyms ${pct(drop.gym)}, Champions and dungeons ${pct(drop.champ)}, Red always). Like PokéRogue, stones only ever turn up for Pokémon in your party.</p><p>Turn it on in the Pokémon's detail in Party & Box. One Mega in the party at a time, on in every fight, using its Mega stats and types. ${FORMS.filter(f => f.kind === "mega").length} Megas, from the originals to Legends: Z-A's.</p>` },
     { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${new Set(FORMS.filter(f => f.kind === "gmax" && !f.quest).map(f => f.num)).size} species with a Gigantamax form then needs Max Soup: $${fmt(SOUP_PRICE)}, or a boss drop at the same odds as Mega Stones, again only for your party. One Gigantamax Pokémon at a time, always on; it hits ${pct(GMAX_BOOST - 1)} harder. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
+    { id: "regional", group: "Collection", title: "Regional forms", html: `<p>${VARIANTS.length} regional forms live in their own regions: Alolan in Alola, Galarian in Galar, Paldean in Paldea, and Hisuian in Sinnoh, which was Hisui long ago. They turn up on that region's routes like any wild Pokémon; Galarian Articuno, Zapdos and Moltres are among the Galar dungeon's legendaries.</p><p>A form belongs to its species, so catching an Alolan Rattata gives you Rattata (if you didn't have it) with its Alolan form, and picking the form in the detail keeps its level. Evolving the usual Pokémon inside a regional form's region gives that form, Pikachu into Alolan Raichu in Alola for one, and each form evolves its own way: Galarian Meowth becomes Perrserker, Alolan Vulpix needs an Ice Stone. Forms aren't Pokédex entries, so they don't change your leaderboard score. Pokédex → Forms shows which you have.</p>` },
     { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm. A shiny that evolves stays shiny. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
     { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>One point per Pokédex entry and one more for each one you have shiny, up to 2050. It posts to the arcade board when you're signed in.</p>` },
     { id: "achievements", group: "Collection", title: "Achievements", html: `<p>${ACH.length} of them, from your first catch to every form, in the Achievements tab with how far along each is. They're for show: no rewards, nothing changes the game.</p>` },
@@ -1390,6 +1515,14 @@ function wikiWhere(n) {
   if (Object.values(SPECIALS).some(x => x.num === n)) out.push("a special edition came as a gift in Mail");
   return out.length ? out.join(", ") : "only by evolving";
 }
+function variantWhere(v) {
+  const out = [], R = REGIONS[v.region].name;
+  for (let k = 0; k < 4; k++) if (routePool(v.region, k).includes(v)) out.push(`${R} Route ${k + 1}`);
+  if (dungeonBosses(v.region).includes(v)) out.push(`the ${R} dungeon's legendary`);
+  if (v.from) out.push(`evolve ${mon(v.from).name} in ${R}`);
+  const pre = VARIANTS.find(x => x.evos.some(e => e[3] === v.vid)); if (pre) out.push(`evolve ${pre.name}`);
+  return out.join(", ");
+}
 const wikiHow = ([, how, v]) => how === "L" ? `Lv ${v}` : how === "I" ? v : "trade (Linking Cord)";
 const dexNo = n => "#" + String(n).padStart(4, "0");
 const wikiLink = n => `<button class="wk" type="button" data-wpk="${n}">${esc(mon(n).name)}</button>`;
@@ -1403,7 +1536,7 @@ const wikiStats = x => `<table class="pk-stats"><tbody>${[["HP", x.hp], ["Attack
   .map(([k, v]) => `<tr><th scope="row">${k}</th><td>${v}</td><td class="sbar"><i style="width:${Math.min(100, v / 2.55).toFixed(1)}%"></i></td></tr>`).join("")}<tr class="tot"><th scope="row">Total</th><td>${x.bst}</td><td></td></tr></tbody></table>`;
 // One Pokémon's page in the wiki's Pokédex: what it is, where it lives, how it evolves, how it fights, its forms.
 function wikiEntry(n) {
-  const m = mon(n), b = S.box[n], forms = [...(n === URSHIFU ? [RAPID] : n === ZYGARDE ? [ZFORMES["10"], ZFORMES.complete] : []), ...FORMS.filter(f => f.num === n)], prev = n > 1 ? n - 1 : 0, next = n < MON.length ? n + 1 : 0;
+  const m = mon(n), b = S.box[n], forms = [...(n === URSHIFU ? [RAPID] : n === ZYGARDE ? [ZFORMES["10"], ZFORMES.complete] : []), ...variantsOf(n), ...(n === 493 ? QFORMES[493].slice(0, 1) : QFORMES[n] || []), ...FORMS.filter(f => f.num === n)], prev = n > 1 ? n - 1 : 0, next = n < MON.length ? n + 1 : 0;
   const tag = m.flags.has("my") ? "Mythical" : m.flags.has("lg") ? "Legendary" : m.flags.has("pseudo") ? "Pseudo-legendary" : m.flags.has("starter") ? "Starter" : m.flags.has("fossil") ? "Fossil" : "";
   const balls = BALLS.filter(x => x.id !== "master").map(x => `${x.name} ${pct(throwChance(m, x))}`).join(", ");
   const yours = b ? `Yours is Lv ${level(n)}${b.shiny ? ", and you have it shiny" : ""}${b.special ? ", with a special edition look" : ""}.` : S.seen[n] ? "You've seen one but haven't caught it." : "You haven't met one yet.";
@@ -1421,7 +1554,7 @@ function wikiEntry(n) {
       <dt>In battle</dt><dd>Hits ${hitRate(m).toFixed(2)} times a second for about ${fmt(Math.round(Math.max(m.atk, m.spa) * 2 * hitRate(m) * truant(n)))} damage a second at Lv 100, before type matchups and Protein. Bulk ${Math.round(bulkOf(m))}.${TRUANT.has(n) ? " Truant: it only attacks every other turn, so it deals half damage." : ""}</dd>
       <dt>Yours</dt><dd>${yours}</dd>
     </dl>${forms.length ? `
-    <h4>Forms</h4><div class="pk-forms">${forms.map(f => `<div class="pk-form"><span class="pic"><img class="spr" src="${sprite(f.sprite, wikiShiny)}" alt=""></span><div><p><b>${esc(f.name)}</b> ${f.types.map(tyChip).join(" ")}</p><p class="muted small">${f === RAPID ? "Same stats, Fighting/Water. Pick the style in Urshifu's detail." : f.need ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Takes ${f.need} Zygarde Cells.` : f.kind === "mega" ? `Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Needs its Mega Stone.` : f.quest ? `Win the Darkest Day. Takes the Gigantamax slot and hits ${pct(GMAX_BOOST - 1)} harder.` : `Same stats, hits ${pct(GMAX_BOOST - 1)} harder. Needs Max Soup.`}</p></div></div>`).join("")}</div>` : ""}
+    <h4>Forms</h4><div class="pk-forms">${forms.map(f => `<div class="pk-form"><span class="pic"><img class="spr" src="${sprite(f.sprite, wikiShiny)}" alt=""></span><div><p><b>${esc(f.num === 493 ? "Arceus (any Plate)" : f.name)}</b> ${f.num === 493 ? "" : f.types.map(tyChip).join(" ")}</p><p class="muted small">${f.vid ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. ${esc(variantWhere(f))}.` : f.quest ? (f.num === 493 ? "Any of the 17 Plate types, same stats. Win the Hall of Origin." : `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Win at the ${QUEST[f.quest].place}.`) : f === RAPID ? "Same stats, Fighting/Water. Pick the style in Urshifu's detail." : f.need ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Takes ${f.need} Zygarde Cells.` : f.kind === "mega" ? `Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Needs its Mega Stone.` : f.quest ? `Win the Darkest Day. Takes the Gigantamax slot and hits ${pct(GMAX_BOOST - 1)} harder.` : `Same stats, hits ${pct(GMAX_BOOST - 1)} harder. Needs Max Soup.`}</p></div></div>`).join("")}</div>` : ""}
   </article>`;
 }
 // The wiki has two tabs: the guide (every rule, searchable) and the Pokédex (every Pokémon, with filters).
@@ -1431,13 +1564,13 @@ function wikiMatches(q) {
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   const secs = wikiSections().filter(s => words.every(w => (s.title + " " + s.html.replace(/<[^>]+>/g, " ")).toLowerCase().includes(w)));
   const name = q.trim().toLowerCase(), mons = name.length < 2 ? [] : MON.filter(m => m.name.toLowerCase().includes(name))
-    .concat(FORMS.filter(f => f.name.toLowerCase().includes(name)).map(f => mon(f.num))).filter((m, i, a) => a.indexOf(m) === i).slice(0, 12);
+    .concat([...FORMS, ...VARIANTS].filter(f => f.name.toLowerCase().includes(name)).map(f => mon(f.num))).filter((m, i, a) => a.indexOf(m) === i).slice(0, 12);
   return { secs, mons };
 }
 function wikiDexList() {
   const q = wikiQuery.dex.trim().toLowerCase().replace(/^#0*/, ""), r = $("#wiki-region").value, ty = $("#wiki-type").value;
   return MON.filter(m => (r === "" || m.gen === +r + 1) && (!ty || m.types.includes(ty)) &&
-    (!q || m.name.toLowerCase().includes(q) || String(m.num) === q || FORMS.some(f => f.num === m.num && f.name.toLowerCase().includes(q))));
+    (!q || m.name.toLowerCase().includes(q) || String(m.num) === q || [...FORMS, ...VARIANTS].some(f => f.num === m.num && f.name.toLowerCase().includes(q))));
 }
 function wikiList() {
   if (wikiMode === "dex") {
@@ -1557,7 +1690,14 @@ function partyClick(e) {
   if (swapPick && slotEl) { const n = swapPick; swapPick = 0; if (placeIn(n, [...$("#party").children].indexOf(slotEl))) { save(); renderMinis(); } renderParty(); return; }
   const t = e.target.closest("[data-n]"), ev = e.target.closest("[data-evo]"), tg = e.target.closest("[data-toggle]"), cl = e.target.closest("[data-close]");
   const fm = e.target.closest("[data-forme]");
-  if (fm) { if (B && B.kind !== "route") { toast("Change formes between battles."); return; } S.box[detail].forme = fm.dataset.forme; save(); renderAll(); return; }
+  if (fm) {
+    if (B && B.kind !== "route") { toast("Change formes between battles."); return; }
+    S.box[detail].forme = fm.dataset.forme;
+    // A form without a Mega or a Gigantamax of its own drops the one the usual form had on.
+    if (S.mega && S.mega.n === detail && !megasOf(detail).some(f => f.id === S.mega.f)) S.mega = null;
+    if (S.gmax === detail && !gmaxOf(detail)) S.gmax = 0;
+    save(); renderAll(); return;
+  }
   const lk = e.target.closest("[data-look]");
   if (lk) {
     if (B && B.kind !== "route" && (lk.dataset.look === "special" || lookKind(detail) === "special")) { toast("Change editions between battles."); return; }
@@ -1565,7 +1705,7 @@ function partyClick(e) {
   }
   const mg = e.target.closest("[data-mega]"), gx = e.target.closest("[data-gmax]");
   if (mg || gx) { if (B && B.kind !== "route") { toast("Change forms between battles."); return; } if (mg) setMega(detail, +mg.dataset.mega); else setGmax(detail); return; }
-  if (ev) { if (B && B.kind !== "route") { toast("Evolve between battles."); return; } const e2 = mon(detail).evos.find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
+  if (ev) { if (B && B.kind !== "route") { toast("Evolve between battles."); return; } const e2 = evosOf(detail).find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
   if (cl) { detail = null; renderDetail(); return; }
   if (tg) { toggleParty(+tg.dataset.toggle); return; }
   if (t) { detail = +t.dataset.n; renderParty(); }
@@ -1589,6 +1729,11 @@ function toggleParty(n) {
   save(); renderParty(); renderMinis();
 }
 $("#t-party").onclick = partyClick;
+$("#t-party").addEventListener("change", e => {
+  const sel = e.target.closest("[data-plate]"); if (!sel || !detail) return;
+  if (B && B.kind !== "route") { toast("Change Plates between battles."); renderDetail(); return; }
+  S.box[detail].forme = sel.value; save(); renderAll();
+});
 $("#tip").onclick = e => {
   const b = e.target.closest("[data-tip]"), t = tipNow; if (!b || !t) return;
   S.tut.seen[t.id] = 1; hideTip();
@@ -1726,7 +1871,7 @@ function offline() {
   const money = n * rewardFor(L, i);
   S.money += money; gainXp(n * L * XP_RATE);
   // Cells come at half the rate while you're away.
-  const cells = gainCells(Math.floor(n / CELL_ODDS / 2)), pieces = r === PIECES_FROM ? gainPieces(Math.floor(n / PIECE_ODDS / 2)) : "";
+  const cells = gainCells(Math.floor(n / CELL_ODDS / 2)), pieces = (r === PIECES_FROM ? gainPieces(Math.floor(n / PIECE_ODDS / 2)) : "") + (r === PLATES_FROM ? gainPlates(Math.floor(n / PLATE_ODDS / 2)) : "");
   return `While you were away (${Math.round(secs / 60)} min) your party beat ${n} Pokémon and earned $${fmt(money)}.${cells}${pieces}`;
 }
 
@@ -1739,7 +1884,7 @@ function migrateSave() {
   S.ach = S.ach || {}; S.stats = Object.assign({ taps: 0, wins: 0, evolved: 0, gifts: 0 }, S.stats); S.cells = S.cells || 0;
   // New catches stop joining the party once it has been full: a save past its first six catches already has been.
   if (S.full == null) S.full = S.party.length >= 6 || Object.keys(S.box).length > 6 ? 1 : 0;
-  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
+  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.plates = S.plates || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
   // Prof Penguin's tips are for new players: a save three badges in has found its feet.
   if (!S.tut) S.tut = { seen: {}, off: Object.keys(S.badges).length >= 3 ? 1 : 0 };
   if (S.champs[KEY_STONE_FROM]) S.key = 1;
@@ -1799,6 +1944,9 @@ function testAccount() {
   for (const n of every) { t.box[n] = { xp: 100 ** 3, shiny: true }; t.seen[n] = 1; }
   t.box[937] = { xp: 100 ** 3, shiny: true, special: "bday-ceruledge", look: "special" };
   t.cells = 100; t.pieces = PIECES_NEED; t.eternamax = 1; t.full = 1; t.tut.off = 1;
+  t.won = Object.fromEntries(QUESTS.map(Q => [Q.id, 1])); t.plates = PLATES_NEED;
+  for (const v of VARIANTS) { const b = t.box[v.num]; b.vars = b.vars || {}; b.vars[v.vid] = 1; }
+  for (const it of ["Galarica Cuff", "Galarica Wreath"]) t.items[it] = 99;
   t.party = [384, 150, 445, 6, 248, 937];
   t.money = 1e9; t.balls = { poke: 999, great: 999, ultra: 999, master: 99 }; t.cords = 99;
   t.protein = PROTEIN_PER_REGION * REGIONS.length;
