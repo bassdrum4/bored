@@ -378,7 +378,7 @@
       <div class="small muted" id="teamline"></div>
       <div id="detail" class="box" hidden></div>
       <div class="row between" id="boxhead"><h2>Box</h2>
-        <span class="row small"><input class="box-search" id="boxq" type="search" placeholder="Name or number" aria-label="Search your Box by name or number" autocomplete="off"> type <select id="tfilter" aria-label="Show one type"><option value="">all</option></select> sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option><option value="bulk">Bulk</option><option value="evo">Can evolve</option><option value="hp">HP</option><option value="atk">Attack</option><option value="def">Defense</option><option value="spa">Sp. Atk</option><option value="spd">Sp. Def</option><option value="spe">Speed</option><option value="bst">Total</option></select></span></div>
+        <span class="row small"><input class="box-search" id="boxq" type="search" placeholder="Name or number" aria-label="Search your Box by name or number" autocomplete="off"> type <select id="tfilter" aria-label="Show one type"><option value="">all</option></select><select id="tfilter2" aria-label="And a second type"><option value="">+ any</option></select> sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option><option value="bulk">Bulk</option><option value="evo">Can evolve</option><option value="hp">HP</option><option value="atk">Attack</option><option value="def">Defense</option><option value="spa">Sp. Atk</option><option value="spd">Sp. Def</option><option value="spe">Speed</option><option value="bst">Total</option></select></span></div>
       <div class="grid" id="boxgrid"></div>
     </section>
 
@@ -398,7 +398,7 @@
       <div class="wiki">
         <nav class="wiki-toc" id="wiki-toc" aria-label="Wiki contents">
           <input class="wiki-search" id="wiki-search" type="search" placeholder="Search the wiki" aria-label="Search the wiki" autocomplete="off">
-          <div class="wiki-filters" id="wiki-filters" hidden><select id="wiki-region" aria-label="Region"></select><select id="wiki-type" aria-label="Type"></select></div>
+          <div class="wiki-filters" id="wiki-filters" hidden><select id="wiki-region" aria-label="Region"></select><select id="wiki-type" aria-label="Type"></select><select id="wiki-type2" aria-label="And a second type"></select></div>
           <div class="wiki-list" id="wiki-list"></div>
         </nav>
         <div class="wiki-text" id="wiki-text"></div>
@@ -507,6 +507,13 @@ const MULT = { "0": 0, h: .5, "1": 1, "2": 2 };
 const eff = (atkType, defTypes) => defTypes.reduce((m, d) => m * MULT[D.chart[TI[atkType]][TI[d]]], 1);
 const bestEff = (a, d) => Math.max(...a.types.map(t => eff(t, d.types)));
 const legendary = m => m.flags.has("lg") || m.flags.has("my");
+// Ultra Beasts and Paradox Pokémon only come from their own side quests, the Ultra Wormhole (after Alola's Champion)
+// and Area Zero (after Paldea's): never on routes, in the usual dungeons or on trainers' teams. The six from the
+// DLC are rarer: only ever Area Zero's last one. Koraidon and Miraidon stay Paldea's legendaries.
+const ULTRA_BEASTS = [793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806];
+const PARADOX = [984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 1005, 1006], PARADOX_LATE = [1009, 1010, 1020, 1021, 1022, 1023];
+const TRIP_ONLY = new Set([...ULTRA_BEASTS, ...PARADOX, ...PARADOX_LATE]);
+const tripOnly = m => TRIP_ONLY.has(m.num);
 
 // ── World: 9 regions, each 4 routes, 4 gyms (two gyms per type across the game), 1 dungeon and a Champion.
 const REGIONS = [
@@ -554,7 +561,7 @@ const regionMons = r => MON.filter(m => m.gen === REGIONS[r].gen);
 const firstStage = m => !MON.some(x => x.evos.some(e => e[0] === m.num));
 const finalStage = m => !m.evos.length;
 function routePool(r, k) {
-  const all = regionMons(r).filter(m => !legendary(m)).concat(VARIANTS.filter(v => v.region === r && !legendary(v))), starts = all.filter(firstStage).sort((a, b) => a.bst - b.bst);
+  const all = regionMons(r).filter(m => !legendary(m) && !tripOnly(m)).concat(VARIANTS.filter(v => v.region === r && !legendary(v))), starts = all.filter(firstStage).sort((a, b) => a.bst - b.bst);
   const half = Math.ceil(starts.length / 2);
   if (k === 0) return starts.slice(0, half);
   if (k === 1) return starts.slice(half);
@@ -563,7 +570,7 @@ function routePool(r, k) {
 }
 function gymTeam(r, k) {
   const [, type] = REGIONS[r].gyms[k], gi = r * 4 + k, size = 3 + (r >= 3) + (r >= 6);
-  const c = MON.filter(m => m.types.includes(type) && m.gen <= REGIONS[r].gen && !legendary(m)).sort((a, b) => a.bst - b.bst);
+  const c = MON.filter(m => m.types.includes(type) && m.gen <= REGIONS[r].gen && !legendary(m) && !tripOnly(m)).sort((a, b) => a.bst - b.bst);
   const centre = Math.floor((0.2 + 0.75 * gi / 35) * (c.length - 1)), rand = rng(gi * 7919 + 13), team = [];
   for (let span = 2; team.length < size && span < c.length * 2; span++) {
     const pick = c[Math.max(0, Math.min(c.length - 1, centre + Math.round((rand() - 0.5) * span)))];
@@ -572,7 +579,7 @@ function gymTeam(r, k) {
   return team.sort((a, b) => a.bst - b.bst);
 }
 function champTeam(r) {
-  const c = MON.filter(m => m.gen <= REGIONS[r].gen && finalStage(m) && !legendary(m)).sort((a, b) => b.bst - a.bst).slice(0, 60), rand = rng(r * 104729 + 7), team = [], types = new Set();
+  const c = MON.filter(m => m.gen <= REGIONS[r].gen && finalStage(m) && !legendary(m) && !tripOnly(m)).sort((a, b) => b.bst - a.bst).slice(0, 60), rand = rng(r * 104729 + 7), team = [], types = new Set();
   while (team.length < 6) { const m = c[Math.floor(rand() * c.length)]; if (!team.includes(m) && !types.has(m.types[0])) { team.push(m); types.add(m.types[0]); } if (types.size >= 17) types.clear(); }
   team.sort((a, b) => a.bst - b.bst);
   // The Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on, as PokéRogue's bosses do.
@@ -580,7 +587,7 @@ function champTeam(r) {
   if (form) team[team.length - 1] = form;
   return team;
 }
-const dungeonPool = r => regionMons(r).filter(m => !legendary(m) && (m.flags.has("pseudo") || m.flags.has("fossil") || m.flags.has("starter") || m.cr <= 60));
+const dungeonPool = r => regionMons(r).filter(m => !legendary(m) && !tripOnly(m) && (m.flags.has("pseudo") || m.flags.has("fossil") || m.flags.has("starter") || m.cr <= 60));
 const dungeonBosses = r => regionMons(r).filter(legendary).concat(VARIANTS.filter(v => v.region === r && legendary(v)));
 // Boss stats shape the fight. A team's Attack and Speed set how long you last: against the other bosses of its region,
 // a faster, harder-hitting team gives you up to 20% less time and a slow one up to 20% more (a dungeon's random
@@ -615,7 +622,7 @@ const PROTEIN_STEP = .03, PROTEIN_PER_REGION = 5;
 const KEY = "bored.poke-idle.save", TEST_KEY = "bored.poke-idle.test", SLOT_KEY = "bored.poke-idle.slot";
 let slot = (() => { try { return localStorage.getItem(SLOT_KEY) === "test" ? TEST_KEY : KEY; } catch { return KEY; } })();
 const readSlot = k => { try { const s = JSON.parse(localStorage.getItem(k)); return s && s.v === 1 ? s : null; } catch { return null; } };
-const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, last: Date.now() });
+const fresh = () => ({ v: 1, money: 0, box: {}, party: [], balls: { poke: 10, great: 0, ultra: 0, master: 0 }, items: {}, cords: 0, protein: 0, kills: {}, badges: {}, champs: {}, dungeons: {}, trips: {}, tickets: {}, seen: {}, loc: { kind: "route", r: 0, k: 0 }, set: { fresh: "auto", dupe: "none", shiny: "best", auto: 1 }, stones: {}, gfactor: {}, mega: null, gmax: 0, mail: { read: {}, claimed: {}, got: {} }, ach: {}, stats: { taps: 0, wins: 0, evolved: 0, gifts: 0 }, cells: 0, full: 0, pieces: 0, eternamax: 0, tower: { best: 0, runs: 0 }, tut: { seen: {}, off: 0 }, won: {}, plates: 0, last: Date.now() });
 let S = readSlot(slot);
 // Your save in your Bored account (see "Saves in your account" further down). openAt is the save's time as this page
 // found it, before anything here touched it.
@@ -637,8 +644,9 @@ const level = n => Math.min(lvlOf(S.box[n].xp), levelCap());
 // earlier region and your party fights held down to it, so a Lv 90 team from Galar is a Lv 30 team on Hoenn Route 1.
 function areaCap(loc = S.loc) {
   // The post-game fights (Red, the Darkest Day, the Battle Tower) hold nobody back.
-  if (!loc || loc.kind === "summit" || loc.kind === "darkest" || loc.kind === "tower" || loc.kind === "quest") return 100;
-  const L = loc.kind === "champ" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
+  if (!loc || loc.kind === "summit" || loc.kind === "darkest" || loc.kind === "tower" || (loc.kind === "quest" && !(QUEST[loc.q] && QUEST[loc.q].mini))) return 100;
+  // Mini quests and the Ultra Wormhole and Area Zero come after that region's Champion: its level cap.
+  const L = loc.kind === "champ" || loc.x || loc.kind === "quest" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
   return Math.min(100, L + CAP_OVER);
 }
 const battleLevel = n => Math.min(level(n), areaCap());
@@ -661,7 +669,10 @@ const category = m => isMixed(m) ? "mixed" : m.atk >= m.spa ? "physical" : "spec
 const hitsPhys = (m, foe) => isMixed(m) ? m.atk * defMult(foe, true) >= m.spa * defMult(foe, false) : m.atk >= m.spa;
 const hitStat = (m, foe) => { if (!foe) return Math.max(m.atk, m.spa); const ph = hitsPhys(m, foe); return (ph ? m.atk : m.spa) * defMult(foe, ph); };
 const bulkOf = m => (m.hp + m.def + m.spd) / 3;
-const PARTY_BULK = 85;
+// What one Pokémon's bulk counts for in the party's boss timer: up to 150, so a single wall (Eternamax's is 252)
+// can't carry a team of glass cannons to the +25% cap.
+const PARTY_BULK = 85, BULK_CAP = 150;
+const bulkFor = m => Math.min(BULK_CAP, bulkOf(m));
 // What a party member fights as: its Mega form if it's the party's Mega.
 // Each species keeps one level but can wear any edition you own: normal always, shiny once you've caught one, a
 // special edition once you have it (box entry look). The look picks the picture; only a special edition also brings
@@ -747,9 +758,11 @@ const variantOf = n => { const b = S.box[n], k = b && b.forme; return k && k[0] 
 function unlockVar(n, vid, pick) { const b = S.box[n]; b.vars = b.vars || {}; const fresh = !b.vars[vid]; b.vars[vid] = 1; if (pick) b.forme = vid; return fresh; }
 // Owned means this exact form: an Alolan Rattata is new to a trainer who only has Kanto's.
 const ownsFoe = m => !!S.box[m.num] && (!m.vid || hasVar(m.num, m.vid));
-// ── Forms won in the OP-Pokémon quests: Calyrex's Riders (Crown Shrine), Necrozma's Dusk Mane, Dawn Wings and Ultra
-// Necrozma (Megalo Tower), and Arceus's 17 Plates (Hall of Origin), each of which makes it that type. move and boost are
-// a signature move: see signature().
+// ── Forms won in side quests: Calyrex's Riders (Crown Shrine), Necrozma's Dusk Mane, Dawn Wings and Ultra Necrozma
+// (Megalo Tower), Arceus's 17 Plates (Hall of Origin), each of which makes it that type, and Black and White Kyurem
+// (Giant Chasm); from the mini quests, Deoxys's Formes (Meteor Falls) and the Crowned Sword and Shield (Slumbering
+// Weald). move and boost are a signature move: see signature().
+const KYUREM_BOOST = 1.55;
 const statForm = (num, extra, types, [hp, atk, def, spa, spd, spe]) => ({ num, ...extra, types: types.split("/"), hp, atk, def, spa, spd, spe, bst: hp + atk + def + spa + spd + spe, cr: mon(num).cr, flags: mon(num).flags, gen: mon(num).gen, evos: [] });
 const QFORMES = {
   898: [statForm(898, { key: "ice", quest: "crown", sprite: 10193, name: "Calyrex (Ice Rider)", move: "Glacial Lance", boost: 1.8 }, "Psychic/Ice", [100, 165, 150, 85, 130, 50]),
@@ -757,7 +770,15 @@ const QFORMES = {
   800: [statForm(800, { key: "dusk", quest: "megalo", sprite: 10155, name: "Dusk Mane Necrozma" }, "Psychic/Steel", [97, 157, 127, 113, 109, 77]),
     statForm(800, { key: "dawn", quest: "megalo", sprite: 10156, name: "Dawn Wings Necrozma" }, "Psychic/Ghost", [97, 113, 109, 157, 127, 77]),
     statForm(800, { key: "ultra", quest: "megalo", sprite: 10157, name: "Ultra Necrozma", move: "Photon Geyser", boost: 1.4 }, "Psychic/Dragon", [97, 167, 97, 167, 97, 129])],
-  493: D.types.filter(t => t !== "Normal").map(t => statForm(493, { key: "t:" + t, quest: "origin", sprite: "493-" + t.toLowerCase(), name: `Arceus (${t})` }, t, [120, 120, 120, 120, 120, 120]))
+  493: D.types.filter(t => t !== "Normal").map(t => statForm(493, { key: "t:" + t, quest: "origin", sprite: "493-" + t.toLowerCase(), name: `Arceus (${t})` }, t, [120, 120, 120, 120, 120, 120])),
+  646: [statForm(646, { key: "black", quest: "chasm", sprite: 10022, name: "Black Kyurem", move: "Freeze Shock", boost: KYUREM_BOOST }, "Dragon/Ice", [125, 170, 100, 120, 90, 95]),
+    statForm(646, { key: "white", quest: "chasm", sprite: 10023, name: "White Kyurem", move: "Ice Burn", boost: KYUREM_BOOST }, "Dragon/Ice", [125, 120, 90, 170, 100, 95])],
+  // The mini quests' forms have no signature move: Deoxys's Formes are trade-offs, and the Crowned pair are simply stronger.
+  386: [statForm(386, { key: "attack", quest: "meteor", sprite: 10001, name: "Deoxys (Attack Forme)" }, "Psychic", [50, 180, 20, 180, 20, 150]),
+    statForm(386, { key: "defense", quest: "meteor", sprite: 10002, name: "Deoxys (Defense Forme)" }, "Psychic", [50, 70, 160, 70, 160, 90]),
+    statForm(386, { key: "speed", quest: "meteor", sprite: 10003, name: "Deoxys (Speed Forme)" }, "Psychic", [50, 95, 90, 95, 90, 180])],
+  888: [statForm(888, { key: "crowned", quest: "weald", sprite: 10188, name: "Zacian (Crowned Sword)" }, "Fairy/Steel", [92, 150, 115, 80, 115, 148])],
+  889: [statForm(889, { key: "crowned", quest: "weald", sprite: 10189, name: "Zamazenta (Crowned Shield)" }, "Fighting/Steel", [92, 120, 140, 80, 140, 128])]
 };
 const qforme = n => { const b = S.box[n], f = QFORMES[n] && b && b.forme && QFORMES[n].find(x => x.key === b.forme); return f && S.won && S.won[f.quest] ? f : null; };
 // The form a Pokémon is in, short of Mega and Gigantamax: Zygarde's formes, Urshifu's style, a quest form or a regional form.
@@ -789,19 +810,38 @@ const QUESTS = [
       statForm(386, { name: "Deoxys (Defense Forme)", sprite: 10002 }, "Psychic", [50, 70, 160, 70, 160, 90]), statForm(386, { name: "Deoxys (Speed Forme)", sprite: 10003 }, "Psychic", [50, 95, 90, 95, 90, 180])],
     won: "Rayquaza can Mega Evolve now: turn it on in its detail in Party & Box." },
   { id: "cerulean", r: 0, place: "Cerulean Cave", boss: "Mega Mewtwo", prize: 150, need: [150, 151], hp: 23.4, prizeNote: "both Mewtwonites", stones: MEWTWONITES,
-    foes: MEWTWONITES.map(formById), won: "Mewtwo can Mega Evolve into X or Y now: pick one in its detail in Party & Box." }
+    foes: MEWTWONITES.map(formById), won: "Mewtwo can Mega Evolve into X or Y now: pick one in its detail in Party & Box." },
+  { id: "chasm", r: 4, place: "Giant Chasm", boss: "Kyurem", prize: 646, need: [646, 644, 643], hp: 29.9, prizeNote: "Black and White",
+    foes: [QFORMES[646][0], QFORMES[646][1]], won: "Kyurem can fuse with Zekrom or Reshiram now: pick Black or White Kyurem in its detail." },
+  // Mini quests: once that region's Champion is beaten, as hard as a dungeon's legendary (see miniTuning).
+  { id: "meteor", r: 2, mini: true, place: "Meteor Falls", boss: "Deoxys", prize: 386, need: [386], prizeNote: "all four Formes",
+    foes: QFORMES[386], won: "Deoxys can change Forme now: pick Attack, Defense or Speed in its detail." },
+  { id: "weald", r: 7, mini: true, place: "Slumbering Weald", boss: "Zacian and Zamazenta", prize: 0, needAny: [888, 889], prizeNote: "Crowned Sword and Shield",
+    foes: [mon(888), mon(889)], won: "The Rusted Sword and Shield are yours: Zacian and Zamazenta can take their Crowned forms in their details." }
 ];
+// ── The Ultra Wormhole and Area Zero: dungeon runs (a ticket each) where every foe is an Ultra Beast or a Paradox
+// Pokémon, and any you beat might stay with you, as a dungeon's legendary might.
+const TRIPS = [
+  { id: "wormhole", r: 6, place: "Ultra Wormhole", at: "the Ultra Wormhole", what: "Ultra Beasts", mons: ULTRA_BEASTS, all: ULTRA_BEASTS },
+  { id: "areazero", r: 8, place: "Area Zero", at: "Area Zero", what: "Paradox Pokémon", mons: PARADOX, all: [...PARADOX, ...PARADOX_LATE], late: PARADOX_LATE }
+];
+const TRIP = Object.fromEntries(TRIPS.map(T => [T.id, T]));
+const tripCaught = T => T.all.filter(n => S.box[n]).length;
+// The last one: any of them in the Ultra Wormhole; in Area Zero, one of the six from the DLC a third of the time.
+const tripBoss = (T, rand) => mon(T.late && rand() < 1 / 3 ? T.late[Math.floor(rand() * T.late.length)] : T.mons[Math.floor(rand() * T.mons.length)]);
 const QUEST = Object.fromEntries(QUESTS.map(Q => [Q.id, Q]));
 const allChamps = () => Object.keys(S.champs).length >= REGIONS.length;
-const questMissing = Q => Q.need.filter(n => !S.box[n]);
-const questOpen = Q => allChamps() && !questMissing(Q).length && (Q.id !== "origin" || (S.plates || 0) >= PLATES_NEED);
-const questTime = Q => fightTime(QUEST_TIME, Q.foes, RED_OFFENSE, .8, 1.2);
+// needAny: one of them is enough (the Slumbering Weald wants Zacian or Zamazenta).
+const questMissing = Q => Q.needAny ? (Q.needAny.some(n => S.box[n]) ? [] : Q.needAny) : Q.need.filter(n => !S.box[n]);
+const questReady = Q => Q.mini ? !!S.champs[Q.r] : allChamps();
+const questOpen = Q => questReady(Q) && !questMissing(Q).length && (Q.id !== "origin" || (S.plates || 0) >= PLATES_NEED);
+const questTime = Q => Q.mini ? fightTime(QUEST_TIME, Q.foes, regionOffense(Q.r), .9, 1.15) : fightTime(QUEST_TIME, Q.foes, RED_OFFENSE, .8, 1.2);
 function questNote(Q) {
   if (S.won[Q.id]) return Q.prizeNote;
-  if (!allChamps()) return "after all 9 Champions";
+  if (!questReady(Q)) return Q.mini ? `after ${REGIONS[Q.r].champ}` : "after all 9 Champions";
   if (Q.id === "origin" && (S.plates || 0) < PLATES_NEED) return `Plates ${S.plates || 0}/${PLATES_NEED}`;
   const miss = questMissing(Q);
-  return miss.length ? "needs " + miss.map(n => mon(n).name).join(", ") : `${Q.boss} · ${Math.round(questTime(Q) * partyTime())}s`;
+  return miss.length ? "needs " + miss.map(n => mon(n).name).join(Q.needAny ? " or " : ", ") : `${Q.boss} · ${Math.round(questTime(Q) * partyTime())}s`;
 }
 // Sinnoh's wild Pokémon now and then turn up one of Arceus's Plates once every Champion is beaten; its bosses bring a couple.
 function gainPlates(k) {
@@ -811,7 +851,7 @@ function gainPlates(k) {
   if (S.plates >= PLATES_NEED) { note += " All 17 Plates: the Hall of Origin is in Sinnoh's list."; toast(note.trim()); }
   return note;
 }
-const partyTime = () => S.party.length ? Math.min(1.25, Math.max(.8, S.party.reduce((s, n) => s + bulkOf(fighter(n)), 0) / S.party.length / PARTY_BULK)) : 1;
+const partyTime = () => S.party.length ? Math.min(1.25, Math.max(.8, S.party.reduce((s, n) => s + bulkFor(fighter(n)), 0) / S.party.length / PARTY_BULK)) : 1;
 // Signature moves: the OP-Pokémon quest prizes hit harder than their stats alone, so a Pokémon that took an extremely
 // difficult quest beats any you can simply catch. Set offline with the game's formulas: in the sixth slot of a strong
 // Lv 100 team (Garchomp, Tyranitar, Dragonite, Metagross, Salamence, all the Protein), counting the timer its bulk adds,
@@ -841,6 +881,7 @@ function unlocked(loc) {
   if (kind === "darkest") return !!S.champs[PIECES_FROM] && (S.pieces || 0) >= PIECES_NEED;
   if (kind === "tower") return !!S.champs[TOWER_FROM];
   if (kind === "quest") return !!QUEST[loc.q] && questOpen(QUEST[loc.q]);
+  if (kind === "dungeon" && loc.x) return !!TRIP[loc.x] && !!S.champs[TRIP[loc.x].r];
   if (!regionOpen(r)) return false;
   if (kind === "route") return k === 0 || badge(r, k - 1);
   if (kind === "gym") return kills(r, k) >= KILLS_FOR_GYM;
@@ -851,7 +892,7 @@ function locName(loc) {
   const R = REGIONS[loc.r];
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
   if (loc.kind === "gym") return `${R.gyms[loc.k][0]}'s ${R.gyms[loc.k][1]} gym`;
-  if (loc.kind === "dungeon") return `${R.name} dungeon`;
+  if (loc.kind === "dungeon") return loc.x ? TRIP[loc.x].place : `${R.name} dungeon`;
   if (loc.kind === "summit") return "Mt. Silver";
   if (loc.kind === "darkest") return "Energy Plant";
   if (loc.kind === "tower") return "Battle Tower";
@@ -876,7 +917,7 @@ function refPool(r, k, cap) {
 }
 const refHit = (m, cap, foe) => hitStat(m, foe) * cap / 50 * hitRate(m) * truant(m.num);
 // The reference team's own Def: tuning measures it against the time that team would get, so Def counts relative to it.
-const refDef = P => Math.min(1.25, Math.max(.8, P.reduce((s, m) => s + bulkOf(m), 0) / P.length / PARTY_BULK));
+const refDef = P => Math.min(1.25, Math.max(.8, P.reduce((s, m) => s + bulkFor(m), 0) / P.length / PARTY_BULK));
 const refTaps = (P, cap, taps) => taps * Math.max(1, Math.round(1 + .15 * P.reduce((s, m) => s + refHit(m, cap), 0)));
 function gymTuning(B, k, size) {
   const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap, f) * bestEff(m, f), 0);
@@ -884,11 +925,19 @@ function gymTuning(B, k, size) {
   const secs = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap, f) * bestEff(m, f), 0) + tap), 0);
   return GYM_USE * B.bossTime * refDef(P) / secs;
 }
+// Mini quests (Meteor Falls, Slumbering Weald) are tuned like a dungeon's legendary, every foe a boss: a decent team of
+// any types at the cap, tapping 6 a second, clears them with 85% of the timer.
+function miniTuning(B) {
+  const cap = areaCap(), P = refPool(B.r, 3, cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
+  const tap = refTaps(P, cap, LEGEND_TAPS), dps = f => P.reduce((d, m) => d + refHit(m, cap, f), 0) + tap;
+  return LEGEND_USE * B.bossTime * refDef(P) / B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / dps(f), 0);
+}
+const questHp = B => QUEST[B.q].mini ? B.tune : QUEST[B.q].hp;
 // Dungeon fodder is as tough as that region's route Pokémon, and a bit more.
 const fodderHp = i => DUNGEON_HP * wildHard(i);
 function legendTuning(B) {
   // "Decent": the 7th to 12th strongest you could have by now, with no type edge either way (Def and Sp. Def count).
-  const cap = areaCap(), P = refPool(B.r, 2, cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
+  const cap = areaCap(), P = refPool(B.r, B.x ? 3 : 2, cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
   const tap = refTaps(P, cap, LEGEND_TAPS), dps = f => P.reduce((d, m) => d + refHit(m, cap, f), 0) + tap, n = B.queue.length, lg = B.queue[n - 1];
   const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps(f), 0);
   return Math.max(1, (LEGEND_USE * B.bossTime * refDef(P) - fodder) * dps(lg) / bossHpFor(lg, B.L, B.i));
@@ -904,33 +953,38 @@ function startLoc(loc) {
     S.tickets[loc.r] = t - 1;
   }
   const from = S.loc.r;
-  S.loc = { kind: loc.kind, r: loc.r, k: loc.k || 0, ...(loc.q ? { q: loc.q } : {}) };
+  S.loc = { kind: loc.kind, r: loc.r, k: loc.k || 0, ...(loc.q ? { q: loc.q } : {}), ...(loc.x ? { x: loc.x } : {}) };
   const r = loc.r, i = r * 4 + (loc.k || 0);
   if (loc.kind === "route") B = { kind: "route", r, k: loc.k, i };
   else if (loc.kind === "gym") B = { kind: "gym", r, k: loc.k, i, queue: gymTeam(r, loc.k), L: gymLevel(i), base: GYM_TIME, time: gymTime(r, loc.k), idx: 0 };
   else if (loc.kind === "summit") B = { kind: "summit", r, i: 36, queue: RED_TEAM.map(mon), L: SUMMIT_LEVEL, base: SUMMIT_TIME, time: fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2), idx: 0, back: from };
-  else if (loc.kind === "quest") { const Q = QUEST[loc.q]; B = { kind: "quest", q: Q.id, r, i: 36, queue: Q.foes, L: 100, base: QUEST_TIME, time: questTime(Q), idx: 0 }; }
+  else if (loc.kind === "quest") { const Q = QUEST[loc.q]; B = { kind: "quest", q: Q.id, r, i: Q.mini ? r * 4 + 3 : 36, queue: Q.foes, L: Q.mini ? champLevel(r) : 100, base: QUEST_TIME, time: questTime(Q), idx: 0 }; }
   else if (loc.kind === "darkest") B = { kind: "darkest", r, i: 36, queue: [ETERNAMAX_FOE], L: 100, base: DARKEST_TIME, time: darkTime(), idx: 0 };
   else if (loc.kind === "tower") { B = { kind: "tower", r, i: 36, f: 1, queue: towerTeam(1), L: 100, base: TOWER_START, time: TOWER_START, idx: 0 }; S.tower.runs++; }
   else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: champLevel(r), base: CHAMP_TIME, time: champTime(r), idx: 0 };
   else {
-    const rand = Math.random, pool = dungeonPool(r), bosses = dungeonBosses(r);
+    // A dungeon, or the Ultra Wormhole or Area Zero (x): the same run, with Ultra Beasts or Paradox Pokémon all the way.
+    const T = loc.x && TRIP[loc.x], rand = Math.random, pool = T ? T.mons.map(mon) : dungeonPool(r), bosses = T ? null : dungeonBosses(r);
     const q = Array.from({ length: DUNGEON_SIZE }, () => pool[Math.floor(rand() * pool.length)]);
-    const lg = bosses[Math.floor(rand() * bosses.length)], lgMegas = formsOf(lg.num, "mega");
-    // A legendary with a Mega form comes out as one half the time. Catching it gets you the usual form.
-    q.push(lgMegas.length && rand() < .5 ? lgMegas[Math.floor(rand() * lgMegas.length)] : lg);
-    B = { kind: "dungeon", r, i: r * 4 + 2, queue: q, L: routeLevel(r * 4 + 2) + 4, base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [q[q.length - 1]], regionOffense(r), .9, 1.15), idx: 0 };
+    if (T) q.push(tripBoss(T, rand));
+    else {
+      const lg = bosses[Math.floor(rand() * bosses.length)], lgMegas = formsOf(lg.num, "mega");
+      // A legendary with a Mega form comes out as one half the time. Catching it gets you the usual form.
+      q.push(lgMegas.length && rand() < .5 ? lgMegas[Math.floor(rand() * lgMegas.length)] : lg);
+    }
+    B = { kind: "dungeon", ...(T ? { x: T.id } : {}), r, i: r * 4 + (T ? 3 : 2), queue: q, L: T ? champLevel(r) : routeLevel(r * 4 + 2) + 4, base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [q[q.length - 1]], regionOffense(r), .9, 1.15), idx: 0 };
   }
   if (B.kind !== "route") { B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def); }
   if (B.kind === "gym") B.tune = gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
   else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
   else if (B.kind === "dungeon") B.tune = legendTuning(B);
+  else if (B.kind === "quest" && QUEST[B.q].mini) B.tune = miniTuning(B);
   if (B.kind === "gym" || B.kind === "champ" || B.kind === "summit" || B.kind === "darkest" || B.kind === "quest") {
-    const mult = B.kind === "summit" ? SUMMIT_HP : B.kind === "darkest" ? DARKEST_HP : B.kind === "quest" ? QUEST[B.q].hp : B.tune, idle = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i, mult) / Math.max(1e-9, partyDps(f)), 0);
+    const mult = B.kind === "summit" ? SUMMIT_HP : B.kind === "darkest" ? DARKEST_HP : B.kind === "quest" ? questHp(B) : B.tune, idle = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i, mult) / Math.max(1e-9, partyDps(f)), 0);
     B.floor = Math.max(1, IDLE_SHORT * B.time / idle);
   }
   if (B.kind === "tower") B.floor = 1;
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? "The legendary at the end can't be beaten without tapping." : "Your party can't win this one alone. Tap to help it."); }
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? (B.x ? `The last one can't be beaten without tapping. Beaten ${TRIP[B.x].what} might stay with you.` : "The legendary at the end can't be beaten without tapping.") : "Your party can't win this one alone. Tap to help it."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
@@ -944,7 +998,7 @@ function spawn() {
     mult = B.kind === "dungeon" && !boss ? fodderHp(B.i) : B.tune;
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
     if (B.kind === "darkest") { pay = CHAMP_HP; mult = DARKEST_HP; }
-    if (B.kind === "quest") { pay = CHAMP_HP; mult = QUEST[B.q].hp; }
+    if (B.kind === "quest") { pay = CHAMP_HP; mult = questHp(B); }
     if (B.kind === "tower") { pay = CHAMP_HP; mult = towerHp(B.f); }
     shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
@@ -1022,12 +1076,13 @@ function next() {
     const unlock = first && B.r === KEY_STONE_FROM ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
     toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + rollDrop("champ") + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast((first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`) + rollDrop("summit") + gainCells(CELL_BOSS)); }
-  if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.` + rollDrop("dungeon") + gainCells(CELL_BOSS) + galar); }
+  if (B.kind === "dungeon" && B.x) { S.trips[B.x] = (S.trips[B.x] || 0) + 1; const T = TRIP[B.x]; toast(`${T.place} cleared. ${T.what}: ${tripCaught(T)}/${T.all.length} caught.` + rollDrop("dungeon") + gainCells(CELL_BOSS)); }
+  else if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.` + rollDrop("dungeon") + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "quest") {
     const Q = QUEST[B.q], first = !S.won[Q.id], prize = rewardFor(B.L, B.i, 30); S.money += prize; S.won[Q.id] = 1;
     for (const id of Q.stones || []) S.stones[id] = 1;
     let joined = "";
-    if (!S.box[Q.prize]) { S.box[Q.prize] = { xp: Math.pow(levelCap(), 3), shiny: false }; if (joinsParty()) joinParty(Q.prize); joined = ` ${mon(Q.prize).name} joins you.`; }
+    if (Q.prize && !S.box[Q.prize]) { S.box[Q.prize] = { xp: Math.pow(levelCap(), 3), shiny: false }; if (joinsParty()) joinParty(Q.prize); joined = ` ${mon(Q.prize).name} joins you.`; }
     toast((first ? `You beat ${Q.boss} at the ${Q.place}! +$${fmt(prize)}.${joined} ${Q.won}` : `${Q.boss} rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS));
   }
   if (B.kind === "darkest") {
@@ -1187,13 +1242,14 @@ function renderLocs() {
   }
   items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
   if (r === PIECES_FROM) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
+  for (const T of TRIPS) if (T.r === r) items.push({ kind: "dungeon", r, x: T.id, note: S.champs[r] ? `${tripCaught(T)}/${T.all.length} caught · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : `after ${REGIONS[r].champ}`, done: tripCaught(T) >= T.all.length });
   for (const Q of QUESTS) if (Q.r === r) items.push({ kind: "quest", r, q: Q.id, note: questNote(Q), done: !!S.won[Q.id] });
   if (r === TOWER_FROM) items.push({ kind: "tower", r, note: S.champs[TOWER_FROM] ? (S.tower.best ? `best floor ${S.tower.best}` : "endless, timed") : "after Geeta", done: false });
   if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
   const quest = r === CELLS_FROM ? `<div class="loc quest"><span>Zygarde Cells</span><span${(S.cells || 0) >= 100 ? ' class="done"' : ""}>${S.champs[CELLS_FROM] ? `${S.cells || 0}/100` : "after Diantha"}</span></div>` : "";
   $("#locs").innerHTML = items.map(it => {
-    const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0) && (S.loc.q || "") === (it.q || "");
-    return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0, ...(it.q ? { q: it.q } : {}) })}'${unlocked(it) ? "" : " disabled"}><span>${esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
+    const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0) && (S.loc.q || "") === (it.q || "") && (S.loc.x || "") === (it.x || "");
+    return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0, ...(it.q ? { q: it.q } : {}), ...(it.x ? { x: it.x } : {}) })}'${unlocked(it) ? "" : " disabled"}><span>${esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
   }).join("") + quest;
 }
 // How a party member looks: its Mega or Gigantamax form when it has one on.
@@ -1230,13 +1286,14 @@ function renderParty() {
   if (drag) { dragDirty = true; return; }
   $("#partyhint").innerHTML = swapPick && S.box[swapPick] ? `<b>Tap the party Pokémon ${esc(mon(swapPick).name)} should replace.</b> <button class="lbl" type="button" data-swapcancel="1">Cancel</button>` : PARTY_HINT;
   // Power is how hard the party hits; bulk (HP, Defense and Sp. Def averaged) is how long it lasts: boss timers stretch or shrink by it.
-  const avgBulk = S.party.length ? S.party.reduce((t, n) => t + bulkOf(fighter(n)), 0) / S.party.length : 0, stretch = Math.round(partyTime() * 100 - 100);
-  $("#teamline").innerHTML = S.party.length ? `Team power <b>${fmt(partyDps(null))}</b>/s · bulk <b>${Math.round(avgBulk)}</b> on average, so boss timers are <b>${stretch > 0 ? "+" : ""}${stretch}%</b> (${PARTY_BULK} is even; from −20% to +25%)` : "";
+  const avgBulk = S.party.length ? S.party.reduce((t, n) => t + bulkFor(fighter(n)), 0) / S.party.length : 0, stretch = Math.round(partyTime() * 100 - 100);
+  $("#teamline").innerHTML = S.party.length ? `Team power <b>${fmt(partyDps(null))}</b>/s · bulk <b>${Math.round(avgBulk)}</b> on average, so boss timers are <b>${stretch > 0 ? "+" : ""}${stretch}%</b> (${PARTY_BULK} is even; each Pokémon counts up to ${BULK_CAP}; from −20% to +25%)` : "";
   $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
   // "Can evolve": ready right now first, then ones with an evolution still to get, then the rest.
   const evoRank = n => { const o = evoOptions(n); return o.some(e => canEvolve(n, e)) ? 0 : o.length ? 1 : 2; };
-  const sort = $("#sort").value, type = $("#tfilter").value, stat = STAT_SORTS[sort], q = $("#boxq").value.trim();
-  const list = Object.keys(S.box).map(Number).filter(n => (!type || mon(n).types.includes(type)) && boxMatch(n, q))
+  // Up to two types: a Pokémon has to have both (Water + Flying), in the form it's in.
+  const sort = $("#sort").value, types = [$("#tfilter").value, $("#tfilter2").value].filter(Boolean), type = types.join(" + "), stat = STAT_SORTS[sort], q = $("#boxq").value.trim();
+  const list = Object.keys(S.box).map(Number).filter(n => types.every(t => (altOf(n) || mon(n)).types.includes(t)) && boxMatch(n, q))
     .sort((a, b) => stat ? stat[1](statsOf(b)) - stat[1](statsOf(a)) || a - b : sort === "lvl" ? level(b) - level(a) : sort === "power" ? power(b) - power(a) : sort === "evo" ? evoRank(a) - evoRank(b) || a - b : a - b);
   $("#boxgrid").innerHTML = list.map(n => monTile(n, { inparty: S.party.includes(n), stat })).join("") || `<span class="small muted">${q ? `No${type ? " " + esc(type) : ""} Pokémon in your Box match “${esc(q)}”.` : `No ${esc(type)} Pokémon in your Box yet.`}</span>`;
   renderDetail();
@@ -1266,7 +1323,7 @@ function formeLine(n) {
   }
   if (QFORMES[n]) {
     const Q = QUEST[QFORMES[n][0].quest], won = S.won && S.won[Q.id], cur = qforme(n) ? S.box[n].forme : "";
-    return `<div class="row small"><span class="muted">Form</span>${pick("", mon(n).name, cur, true)}${QFORMES[n].map(f => pick(f.key, f.name.replace(/ ?(Necrozma|Calyrex) ?/, "").replace(/[()]/g, ""), cur, won)).join("")}<span class="muted">${won ? QFORMES[n].filter(f => f.boost).map(f => `${f.move} ×${f.boost}`).concat("same level").join("; ") : `win at the ${Q.place} (${REGIONS[Q.r].name}'s list)`}</span></div>`;
+    return `<div class="row small"><span class="muted">Form</span>${pick("", mon(n).name, cur, true)}${QFORMES[n].map(f => pick(f.key, f.name.replace(mon(n).name, "").replace(/[()]/g, "").replace(/ Forme$/, "").trim(), cur, won)).join("")}<span class="muted">${won ? QFORMES[n].filter(f => f.boost).map(f => `${f.move} ×${f.boost}`).concat("same level").join("; ") : `win at the ${Q.place} (${REGIONS[Q.r].name}'s list)`}</span></div>`;
   }
   if (n === URSHIFU) {
     const cur = ustyle(n) ? "rapid" : "single", opt = (k, label) => `<button class="lbl${k === cur ? " on" : ""}" type="button" data-forme="${k}" aria-pressed="${k === cur}">${label}</button>`;
@@ -1287,7 +1344,7 @@ function renderDetail() {
   if (!detail || !S.box[detail]) { el.hidden = true; return; }
   const sp = special(detail), m = mon(detail), opts = evosOf(detail), st = sp || altOf(detail) || m, owned = S.box[detail];
   el.hidden = false;
-  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${Math.round(bulkOf(fighter(detail)))} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
+  el.innerHTML = `<div class="row"><b>${esc(nameOf(detail))}</b> Lv ${level(detail)} ${st.types.map(tyChip).join(" ")} <span class="muted small">${category(fighter(detail))} · power ${fmt(power(detail))}/s · bulk ${Math.round(bulkOf(fighter(detail)))}${bulkOf(fighter(detail)) > BULK_CAP ? ` (counts as ${BULK_CAP})` : ""} · catch rate ${m.cr}${level(detail) >= levelCap() && levelCap() < 100 ? " · at the level cap" : ""}</span></div>` +
     `<div class="small muted">HP <b>${st.hp}</b> · Atk <b>${st.atk}</b> · Def <b>${st.def}</b> · SpA <b>${st.spa}</b> · SpD <b>${st.spd}</b> · Spe <b>${st.spe}</b> · Total <b>${st.bst}</b></div>` +
     (TRUANT.has(detail) ? '<div class="small muted">Truant: it only attacks every other turn, so it deals half damage.</div>' : "") +
     (signature(detail) ? `<div class="small"><b>${esc(signature(detail).move)}</b> <span class="muted">signature move: ×${signature(detail).boost} damage</span></div>` : "") +
@@ -1395,6 +1452,11 @@ const ACH = [
   { id: "megalo", group: "Side quests", title: "Blinding light", desc: "Beat Ultra Necrozma at Megalo Tower", need: 1, have: () => S.won && S.won.megalo ? 1 : 0 },
   { id: "sky", group: "Side quests", title: "Dragon Ascent", desc: "Beat all four of Deoxys's Formes at the Sky Pillar", need: 1, have: () => S.won && S.won.sky ? 1 : 0 },
   { id: "cerulean", group: "Side quests", title: "The original", desc: "Beat Mega Mewtwo X and Y in Cerulean Cave", need: 1, have: () => S.won && S.won.cerulean ? 1 : 0 },
+  { id: "chasm", group: "Side quests", title: "Ideals and truth", desc: "Beat Black and White Kyurem in the Giant Chasm", need: 1, have: () => S.won && S.won.chasm ? 1 : 0 },
+  { id: "meteor", group: "Side quests", title: "Falling star", desc: "Beat Deoxys's Attack, Defense and Speed Formes at Meteor Falls", need: 1, have: () => S.won && S.won.meteor ? 1 : 0 },
+  { id: "weald", group: "Side quests", title: "Sword and shield", desc: "Beat Zacian and Zamazenta in the Slumbering Weald", need: 1, have: () => S.won && S.won.weald ? 1 : 0 },
+  { id: "wormhole", group: "Side quests", title: "Beyond the wormhole", desc: "Catch all 11 Ultra Beasts", need: ULTRA_BEASTS.length, have: () => ULTRA_BEASTS.filter(n => S.box[n]).length },
+  { id: "areazero", group: "Side quests", title: "Out of time", desc: "Catch all 20 Paradox Pokémon", need: PARADOX.length + PARADOX_LATE.length, have: () => [...PARADOX, ...PARADOX_LATE].filter(n => S.box[n]).length },
   ...[[5, "First steps up", "Clear 5 Battle Tower floors"], [10, "Tower climber", "Clear floor 10 and beat the Tower Tycoon"], [20, "High rise", "Clear 20 Battle Tower floors"], [30, "Above the clouds", "Clear 30 Battle Tower floors"], [40, "Top of the tower", "Clear 40 Battle Tower floors"]]
     .map(([need, title, desc]) => ({ id: "tower" + need, group: "Battle Tower", title, desc, need, have: () => S.tower ? S.tower.best : 0 })),
   ...[[1, "Far from home", "Collect a regional form"], [VARIANTS.length, "Around the world", `Collect all ${VARIANTS.length} regional forms`]]
@@ -1443,6 +1505,13 @@ function renderAch() {
 const MAIL = [
   { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
+  { id: "update-2026-11-14d", date: "Nov 14, 2026", from: "Prof Penguin", title: "Kyurem, Deoxys, the Crowned pair, and two new runs",
+    body: `<ul><li><b>Giant Chasm</b> (Unova, after all 9 Champions): own Kyurem, Zekrom and Reshiram, then beat Black and White Kyurem. Kyurem can take either form, with Freeze Shock or Ice Burn (×${KYUREM_BOOST}).</li>
+      <li><b>Meteor Falls</b> (Hoenn, after Steven), a mini quest: beat Deoxys's three other Formes and yours can take any of them.</li>
+      <li><b>Slumbering Weald</b> (Galar, after Leon), a mini quest: beat Zacian and Zamazenta for the Rusted Sword and Shield and their Crowned forms.</li>
+      <li><b>Ultra Wormhole</b> (Alola) and <b>Area Zero</b> (Paldea): Ultra Beasts and Paradox Pokémon only turn up in these runs now, after that region's Champion. Any you've caught stay yours.</li>
+      <li>Bulk: each Pokémon counts for up to ${BULK_CAP} in your team's boss timer, so one wall can't carry a team of glass cannons anymore.</li>
+      <li>The Box and the Pokédex can filter by two types at once (Water + Flying).</li></ul>` },
   { id: "update-2026-11-14c", date: "Nov 14, 2026", from: "Prof Penguin", title: "Your save follows you",
     body: `<p>Signed in on Bored, your save now goes to your Bored account too, like Civ Lite's. Open Poké Idle on your phone and it picks up where your computer left off, and the other way round.</p><p>It goes up about once a minute while you play, and whenever you leave or switch tabs. A tab left open on another device just idles, so it never gets in the way. If two devices were both played since they last met, you'll be asked which save to keep. The test account stays on the device it's on.</p>` },
   { id: "update-2026-11-14b", date: "Nov 14, 2026", from: "Prof Penguin", title: "Physical and special attackers",
@@ -1554,7 +1623,7 @@ function wikiSections() {
     { id: "catching", group: "Basics", title: "Catching", html: `<p>When a wild Pokémon faints, a ball is thrown at it, picked by Settings: one choice for new Pokémon, one for ones you have, one for shinies. Chance = catch rate ÷ 255 × 0.6 × the ball's multiplier + its bonus, at most 100%. Legendaries and mythicals shrug off anything but a Master Ball half the time.</p><ul>${ballRows}</ul><p>Auto (the default for new Pokémon) throws the cheapest ball with at least an even chance, else your best one, and only spends a Master Ball on a shiny or a legendary.</p><p>New Pokémon join your party until it has been full once. After that they go to the Box, so an empty slot stays free for whoever you choose.</p>` },
     { id: "partybox", group: "Basics", title: "Party & Box", html: `<p>Drag a party Pokémon onto another slot to trade places, drag a Box Pokémon onto a party slot to swap it in, or drag a party Pokémon down to the Box to send it back. On a phone, hold it still for a moment before dragging, so a swipe still scrolls. With a full party, a Box Pokémon's detail also has Swap into party: tap it, then tap who goes.</p><p>Order doesn't change how the party fights, so you can rearrange during any battle. Swapping someone in or out waits until you're back on a route.</p>` },
     { id: "offline", group: "Basics", title: "Offline", html: `<p>While you're away (up to 8 hours) your party keeps fighting on your last route at about a third of the live pace, the pause included: money and XP, no catches. The title screen says what it did.</p>` },
-    { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Physical or special</b>: each Pokémon hits with its better attacking stat, Attack against the foe's Defense or Sp. Atk against its Sp. Def, even where the other would do more (you wouldn't teach it a move off its weak stat). Mixed attackers, with Attack and Sp. Atk within ${pct(1 - MIXED)} of each other (Lucario, Arceus, Rayquaza), use whichever hits each foe harder. Each hit is × √(the foe's average defense ÷ the one it hits), from ×${DEF_LO.toFixed(2)} to ×${DEF_HI}: Steelix (Def 200, Sp. Def 65) takes ×1.43 from special hits and ×0.81 from physical ones, and a foe with even defenses takes ×1 from both. The foe's Def and Sp. Def show next to its name, and each party tile shows how hard it hits that foe, type and defense together (hover for the split).</p><p><b>Attack</b>: damage per hit is that attacking stat × level ÷ 50 × protein × the defense side above${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}, or × a side-quest prize's signature move (see Signature moves).</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often. Slaking has Truant: it only attacks every other turn, so it deals half damage.</p><p><b>Bulk</b> (Def): a Pokémon's HP, Defense and Sp. Def averaged. Your party's average bulk stretches or shrinks the timer in boss fights against a bulk of ${PARTY_BULK}: from −20% to +25%. Party & Box shows each Pokémon's bulk next to its power, and the team's under the party. The map shows the time your current party gets.</p>` },
+    { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Physical or special</b>: each Pokémon hits with its better attacking stat, Attack against the foe's Defense or Sp. Atk against its Sp. Def, even where the other would do more (you wouldn't teach it a move off its weak stat). Mixed attackers, with Attack and Sp. Atk within ${pct(1 - MIXED)} of each other (Lucario, Arceus, Rayquaza), use whichever hits each foe harder. Each hit is × √(the foe's average defense ÷ the one it hits), from ×${DEF_LO.toFixed(2)} to ×${DEF_HI}: Steelix (Def 200, Sp. Def 65) takes ×1.43 from special hits and ×0.81 from physical ones, and a foe with even defenses takes ×1 from both. The foe's Def and Sp. Def show next to its name, and each party tile shows how hard it hits that foe, type and defense together (hover for the split).</p><p><b>Attack</b>: damage per hit is that attacking stat × level ÷ 50 × protein × the defense side above${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}, or × a side-quest prize's signature move (see Signature moves).</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often. Slaking has Truant: it only attacks every other turn, so it deals half damage.</p><p><b>Bulk</b> (Def): a Pokémon's HP, Defense and Sp. Def averaged. Your party's average bulk stretches or shrinks the timer in boss fights against a bulk of ${PARTY_BULK}: from −20% to +25%. Each Pokémon counts for at most ${BULK_CAP}, so one wall can't carry a frail team: Eternamax's 252 counts as ${BULK_CAP}. Party & Box shows each Pokémon's bulk next to its power, and the team's under the party. The map shows the time your current party gets.</p>` },
     { id: "types", group: "Stats and levels", title: "Types", html: `<p>The main games' type chart. Each party Pokémon uses its better type against the foe; the tile shows 2x, 4x, ½x, ¼x or 0x when it isn't neutral, times the Defense or Sp. Def side (see Attack, Speed and Def). A Mega fights with its Mega typing.</p>` },
     { id: "levels", group: "Stats and levels", title: "Levels and the cap", html: `<p>Each win gives every party Pokémon the foe's level × ${XP_RATE} XP (× 1.5 against trainers). Level is the cube root of XP, up to 100.</p><p>The level cap is ${CAP_OVER} over the next gym leader or Champion you haven't beaten, and 100 once every Champion is down. Each place also keeps the cap it had when you first got there: go back and your party fights held to it, so a Lv 90 team is Lv 30 on Hoenn Route 1. XP past the cap from older saves waits until the cap catches up.</p>` },
     { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
@@ -1569,8 +1638,12 @@ function wikiSections() {
     { id: "crown", group: "Side quests", title: "Crown Shrine (Calyrex)", html: `<p>Once every Champion is beaten and Calyrex, Glastrier and Spectrier are in your Box (all three come from the Galar dungeon), the Crown Shrine opens in Galar's list. Calyrex comes out as the Ice Rider (Psychic/Ice), then the Shadow Rider (Psychic/Ghost), back to back. Win, and Calyrex can ride either: pick it in its detail. The Ice Rider's Glacial Lance hits ${pct(QFORMES[898][0].boost - 1)} harder, and the Shadow Rider's Astral Barrage ${pct(QFORMES[898][1].boost - 1)}.</p>` },
     { id: "megalo", group: "Side quests", title: "Megalo Tower (Necrozma)", html: `<p>Once every Champion is beaten and Necrozma, Solgaleo and Lunala are in your Box (all from the Alola dungeon), Megalo Tower opens in Alola's list. Ultra Necrozma (Psychic/Dragon) fights at Lv 100. Win, and Necrozma can become Dusk Mane (Psychic/Steel, Attack 157), Dawn Wings (Psychic/Ghost, Sp. Atk 157) or Ultra Necrozma (Psychic/Dragon, Attack and Sp. Atk 167), whose Photon Geyser hits ${pct(QFORMES[800][2].boost - 1)} harder: pick it in its detail.</p>` },
     { id: "sky", group: "Side quests", title: "Sky Pillar (Rayquaza)", html: `<p>Once every Champion is beaten and Rayquaza, Groudon and Kyogre are in your Box (all from the Hoenn dungeon), the Sky Pillar opens in Hoenn's list. Deoxys fights at Lv 100 in all four of its Formes, back to back: Normal, Attack, Defense and Speed. Win, and Rayquaza can Mega Evolve (you need the Key Stone); its Dragon Ascent hits ${pct(formById(MEGA_RAYQUAZA).boost - 1)} harder. The Shop and boss drops never offer Rayquaza's Mega Stone.</p>` },
-    { id: "cerulean", group: "Side quests", title: "Cerulean Cave (Mewtwo)", html: `<p>Once every Champion is beaten and Mewtwo and Mew are in your Box (both from the Kanto dungeon), Cerulean Cave opens in Kanto's list. Mega Mewtwo X (Psychic/Fighting) fights at Lv 100, then Mega Mewtwo Y (Psychic). Win both Mewtwonites: Mewtwo can Mega Evolve into either, and its Psystrike hits ${pct(formById(MEWTWONITES[0]).boost - 1)} harder. The Shop and boss drops never offer them.</p><p>Like the Darkest Day, these five quests are extremely difficult. Their HP is set so the six Pokémon that hit that boss hardest, at Lv 100 with all the Protein and tapping close to flat out, only just win.</p>` },
-    { id: "signature", group: "Side quests", title: "Signature moves", html: `<p>The quest prizes hit harder than their stats alone, so a Pokémon that took an extremely difficult quest beats any you can simply catch:</p><ul><li>Eternamax: Dynamax Cannon, ×${ETERNAMAX_BOOST} (in place of Gigantamax's ×${GMAX_BOOST})</li><li>Arceus: Judgment, ×${JUDGMENT}, in any type</li><li>Ultra Necrozma: Photon Geyser, ×${QFORMES[800][2].boost}</li><li>Calyrex: Glacial Lance (Ice Rider), ×${QFORMES[898][0].boost}; Astral Barrage (Shadow Rider), ×${QFORMES[898][1].boost}</li><li>Mega Rayquaza: Dragon Ascent, ×${formById(MEGA_RAYQUAZA).boost}</li><li>Mega Mewtwo X and Y: Psystrike, ×${formById(MEWTWONITES[0]).boost}</li></ul><p>The Ice Rider gets the most because it's slow (Speed 50), so it hits less often. Bulk counts too: Eternamax's makes your boss timers as long as they go on its own.</p>` },
+    { id: "cerulean", group: "Side quests", title: "Cerulean Cave (Mewtwo)", html: `<p>Once every Champion is beaten and Mewtwo and Mew are in your Box (both from the Kanto dungeon), Cerulean Cave opens in Kanto's list. Mega Mewtwo X (Psychic/Fighting) fights at Lv 100, then Mega Mewtwo Y (Psychic). Win both Mewtwonites: Mewtwo can Mega Evolve into either, and its Psystrike hits ${pct(formById(MEWTWONITES[0]).boost - 1)} harder. The Shop and boss drops never offer them.</p><p>Like the Darkest Day, these quests (and the Giant Chasm) are extremely difficult. Their HP is set so the six Pokémon that hit that boss hardest, at Lv 100 with all the Protein and tapping close to flat out, only just win.</p>` },
+    { id: "chasm", group: "Side quests", title: "Giant Chasm (Kyurem)", html: `<p>Once every Champion is beaten and Kyurem, Zekrom and Reshiram are all in your Box (from the Unova dungeon), the Giant Chasm opens in Unova's list. Black Kyurem (Dragon/Ice, Attack 170) fights at Lv 100, then White Kyurem (Sp. Atk 170). It's as hard as the other extremely difficult quests. Win, and Kyurem can fuse into either: pick it in its detail. Black Kyurem's Freeze Shock and White Kyurem's Ice Burn hit ${pct(KYUREM_BOOST - 1)} harder.</p>` },
+    { id: "meteor", group: "Side quests", title: "Meteor Falls (Deoxys)", html: `<p>A mini quest. Once Hoenn's Champion is beaten and Deoxys is in your Box (from the Hoenn dungeon), Meteor Falls opens in Hoenn's list: Deoxys in its Attack, Defense and Speed Formes, back to back, about as hard as a dungeon's legendary. Win, and your Deoxys can take any of its four Formes, picked in its detail. None is simply better: Attack hits hardest but its bulk is 30, Defense is a wall (bulk 123) that hardly hits, Speed sits between.</p>` },
+    { id: "weald", group: "Side quests", title: "Slumbering Weald (Zacian, Zamazenta)", html: `<p>A mini quest. Once Galar's Champion is beaten and Zacian or Zamazenta is in your Box (from the Galar dungeon), the Slumbering Weald opens in Galar's list: Zacian, then Zamazenta, about as hard as a dungeon's legendary. Win the Rusted Sword and Shield: Zacian can take its Crowned Sword form (Fairy/Steel, Attack 150, Speed 148) and Zamazenta its Crowned Shield (Fighting/Steel, Defense and Sp. Def 140), picked in their details. Both start in their usual Hero form.</p>` },
+    { id: "trips", group: "Side quests", title: "Ultra Wormhole and Area Zero", html: `<p>Ultra Beasts and Paradox Pokémon are never on routes, in the usual dungeons or on trainers' teams. They have their own runs, each a ticket from that region's dungeon, like a dungeon run:</p><ul><li><b>Ultra Wormhole</b> (Alola's list, after ${REGIONS[6].champ}): all ${ULTRA_BEASTS.length} Ultra Beasts.</li><li><b>Area Zero</b> (Paldea's list, after ${REGIONS[8].champ}): the ${PARADOX.length} Paradox Pokémon from Scarlet and Violet. The last one is one of the six from the DLC (Walking Wake, Iron Leaves, Gouging Fire, Raging Bolt, Iron Boulder, Iron Crown) a third of the time; they turn up nowhere else.</li></ul><p>Every one you beat might stay with you, by your ball settings, as a dungeon's legendary might. The last one in each run can't be beaten without tapping. Koraidon and Miraidon are Paldea's legendaries, in its dungeon. Anything you caught before stays yours.</p>` },
+    { id: "signature", group: "Side quests", title: "Signature moves", html: `<p>The quest prizes hit harder than their stats alone, so a Pokémon that took an extremely difficult quest beats any you can simply catch:</p><ul><li>Eternamax: Dynamax Cannon, ×${ETERNAMAX_BOOST} (in place of Gigantamax's ×${GMAX_BOOST})</li><li>Arceus: Judgment, ×${JUDGMENT}, in any type</li><li>Ultra Necrozma: Photon Geyser, ×${QFORMES[800][2].boost}</li><li>Calyrex: Glacial Lance (Ice Rider), ×${QFORMES[898][0].boost}; Astral Barrage (Shadow Rider), ×${QFORMES[898][1].boost}</li><li>Mega Rayquaza: Dragon Ascent, ×${formById(MEGA_RAYQUAZA).boost}</li><li>Mega Mewtwo X and Y: Psystrike, ×${formById(MEWTWONITES[0]).boost}</li><li>Black and White Kyurem: Freeze Shock and Ice Burn, ×${KYUREM_BOOST}</li></ul><p>The Ice Rider gets the most because it's slow (Speed 50), so it hits less often. Bulk counts too: Eternamax's makes your boss timers as long as they go on its own.</p>` },
     { id: "shop", group: "Items", title: "The Shop", html: `<p>Balls, dungeon tickets (250 × (region number)^1.8), protein, the Linking Cord, evolution items your Box is waiting on, and, once you have the key items, Mega Stones ($${fmt(STONE_PRICE)}) and Max Soup ($${fmt(SOUP_PRICE)}) for Pokémon in your party.</p>` },
     { id: "protein", group: "Items", title: "Protein", html: `<p>+${pct(PROTEIN_STEP)} party damage each. Only ${PROTEIN_PER_REGION} count per region you've opened (up to ${PROTEIN_PER_REGION * REGIONS.length}), and each costs 1.5× the last, from $300. You can't buy it mid-fight.</p>` },
     { id: "mega", group: "Megas and Gigantamax", title: "Mega Evolution", html: `<p>Beat Steven (Hoenn's Champion) for the Key Stone. Each Mega form then needs its own Mega Stone: $${fmt(STONE_PRICE)} in the Shop, or a boss drop (gyms ${pct(drop.gym)}, Champions and dungeons ${pct(drop.champ)}, Red always). Like PokéRogue, stones only ever turn up for Pokémon in your party. The stones for Mega Rayquaza and Mega Mewtwo X and Y are the exception: they only come from side quests (the Sky Pillar and Cerulean Cave).</p><p>Turn it on in the Pokémon's detail in Party & Box. One Mega in the party at a time, on in every fight, using its Mega stats and types. ${FORMS.filter(f => f.kind === "mega").length} Megas, from the originals to Legends: Z-A's.</p>` },
@@ -1594,6 +1667,8 @@ function wikiWhere(n) {
     for (let k = 0; k < 4; k++) if (wikiPool(r, k).has(n)) out.push(`${REGIONS[r].name} Route ${k + 1} (Lv ${routeLevel(r * 4 + k)})`);
     if (dungeonPool(r).some(x => x.num === n)) out.push(`the ${REGIONS[r].name} dungeon`);
   }
+  const T = TRIPS.find(t => t.all.includes(n));
+  if (T) out.push(`${T.at}, after ${REGIONS[T.r].champ}${T.late && T.late.includes(n) ? " (only as the last one)" : ""}`);
   if (n === ETERNATUS) out.push("the Darkest Day at Galar's Energy Plant");
   if (Object.values(SPECIALS).some(x => x.num === n)) out.push("a special edition came as a gift in Mail");
   return out.length ? out.join(", ") : "only by evolving";
@@ -1651,8 +1726,8 @@ function wikiMatches(q) {
   return { secs, mons };
 }
 function wikiDexList() {
-  const q = wikiQuery.dex.trim().toLowerCase().replace(/^#0*/, ""), r = $("#wiki-region").value, ty = $("#wiki-type").value;
-  return MON.filter(m => (r === "" || m.gen === +r + 1) && (!ty || m.types.includes(ty)) &&
+  const q = wikiQuery.dex.trim().toLowerCase().replace(/^#0*/, ""), r = $("#wiki-region").value, tys = [$("#wiki-type").value, $("#wiki-type2").value].filter(Boolean);
+  return MON.filter(m => (r === "" || m.gen === +r + 1) && tys.every(t => m.types.includes(t)) &&
     (!q || m.name.toLowerCase().includes(q) || String(m.num) === q || [...FORMS, ...VARIANTS].some(f => f.num === m.num && f.name.toLowerCase().includes(q))));
 }
 function wikiList() {
@@ -1698,7 +1773,7 @@ function renderWiki() {
 function wikiOpen(n) {
   wikiMode = "dex"; wikiDex = n;
   if ($("#wiki-region").value !== "" && +$("#wiki-region").value !== mon(n).gen - 1) $("#wiki-region").value = "";
-  if ($("#wiki-type").value && !mon(n).types.includes($("#wiki-type").value)) $("#wiki-type").value = "";
+  for (const id of ["#wiki-type", "#wiki-type2"]) if ($(id).value && !mon(n).types.includes($(id).value)) $(id).value = "";
   if (tab !== "wiki") openTab("wiki"); else renderWiki();
   wikiContents(false);
   $("#pk-title").focus({ preventScroll: true });
@@ -1717,7 +1792,8 @@ function wikiContents(open) {
 }
 $("#wiki-region").innerHTML = `<option value="">Region</option>` + REGIONS.map((R, r) => `<option value="${r}">${R.name}</option>`).join("");
 $("#wiki-type").innerHTML = `<option value="">Type</option>` + D.types.map(t => `<option value="${t}">${t}</option>`).join("");
-$("#wiki-region").onchange = $("#wiki-type").onchange = wikiList;
+$("#wiki-type2").innerHTML = `<option value="">+ type</option>` + D.types.map(t => `<option value="${t}">+ ${t}</option>`).join("");
+$("#wiki-region").onchange = $("#wiki-type").onchange = $("#wiki-type2").onchange = wikiList;
 $("#wiki-modes").onclick = e => { const b = e.target.closest("[data-wmode]"); if (b && b.dataset.wmode !== wikiMode) { wikiMode = b.dataset.wmode; renderWiki(); } };
 $("#wiki-list").onclick = e => {
   const s = e.target.closest("[data-wiki]"), p = e.target.closest("[data-wpk]");
@@ -1914,7 +1990,8 @@ $("#t-party").addEventListener("contextmenu", e => { if (drag) e.preventDefault(
 $("#t-party").addEventListener("dragstart", e => e.preventDefault());
 $("#sort").onchange = renderParty;
 $("#tfilter").innerHTML += D.types.map(t => `<option value="${t}">${t}</option>`).join("");
-$("#tfilter").onchange = renderParty;
+$("#tfilter2").innerHTML += D.types.map(t => `<option value="${t}">+ ${t}</option>`).join("");
+$("#tfilter").onchange = $("#tfilter2").onchange = renderParty;
 $("#boxq").addEventListener("input", renderParty);
 $("#dexregions").onclick = e => { const b = e.target.closest("[data-dr]"); if (b) { dexR = b.dataset.dr === "forms" ? "forms" : +b.dataset.dr; renderDex(); } };
 $("#shop").onclick = e => { const b = e.target.closest("[data-buy]"); if (b) buy(b.dataset.buy, +b.dataset.q); };
@@ -1968,7 +2045,7 @@ function migrateSave() {
   S.ach = S.ach || {}; S.stats = Object.assign({ taps: 0, wins: 0, evolved: 0, gifts: 0 }, S.stats); S.cells = S.cells || 0;
   // New catches stop joining the party once it has been full: a save past its first six catches already has been.
   if (S.full == null) S.full = S.party.length >= 6 || Object.keys(S.box).length > 6 ? 1 : 0;
-  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.plates = S.plates || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
+  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.trips = S.trips || {}; S.plates = S.plates || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
   // Prof Penguin's tips are for new players: a save three badges in has found its feet.
   if (!S.tut) S.tut = { seen: {}, off: Object.keys(S.badges).length >= 3 ? 1 : 0 };
   if (S.champs[KEY_STONE_FROM]) S.key = 1;
