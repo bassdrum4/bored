@@ -541,13 +541,13 @@ const gymLevel = i => routeLevel(i) + 3, champLevel = r => routeLevel(r * 4 + 3)
 // 2 under, the dungeon, the Ultra Wormhole and Area Zero at it, and your party fights at its full level there. Catches
 // come in at a level you can use. Gyms, Champions and quests keep their own levels.
 const cleared = r => !!(S && S.champs && S.champs[r]);
-const wildLevel = (r, k) => cleared(r) ? Math.max(routeLevel(r * 4 + k), Math.min(100, levelCap() - 8 + 2 * k)) : routeLevel(r * 4 + k);
+const wildLevel = (r, k) => r === TRAIN_R ? levelCap() : cleared(r) ? Math.max(routeLevel(r * 4 + k), Math.min(100, levelCap() - 8 + 2 * k)) : routeLevel(r * 4 + k);
 const dungeonLevel = r => cleared(r) ? Math.max(routeLevel(r * 4 + 2) + 4, levelCap()) : routeLevel(r * 4 + 2) + 4;
 // ...and as tough as where you are now: a raised wild Pokémon has the HP, pay and XP pace of a route at its level (the
 // route index whose usual level that is), so an old route is no shortcut, and an old dungeon, the Ultra Wormhole and
 // Area Zero are tuned against what you could have now (the furthest region you've reached), not that region's own.
 const levelIndex = L => Math.max(0, Math.round((L - 3) / 2.75));
-const wildIndex = (r, k) => cleared(r) ? Math.max(r * 4 + k, levelIndex(wildLevel(r, k))) : r * 4 + k;
+const wildIndex = (r, k) => r === TRAIN_R ? Math.max((REGIONS.length - 1) * 4 + 3, levelIndex(levelCap())) : cleared(r) ? Math.max(r * 4 + k, levelIndex(wildLevel(r, k))) : r * 4 + k;
 const frontier = () => { for (let r = 0; r < REGIONS.length; r++) if (!S.champs[r]) return r; return REGIONS.length - 1; };
 // The reference pool for a fight in region r: that region's (routes up to k open), or in a cleared region, whatever the
 // furthest region's open routes and everything before it offer.
@@ -583,6 +583,12 @@ function routePool(r, k) {
   if (k === 2) return all.filter(m => !finalStage(m) || firstStage(m));
   return all;
 }
+// Training areas, after all 9 Champions: a tenth "region" (TRAIN_R) whose 18 routes are one per type. Its wild Pokémon
+// all have that type (every stage, no legendaries or trip-only ones), at the level cap, as tough as your newest route's,
+// and catchable. The whole party gets TRAIN_XP times the XP there, so train a team where it hits hardest: a Rock team
+// in the Flying or Bug area. Money is a normal route's.
+const TRAIN_R = 9, TRAIN_XP = 3, TRAIN_TYPES = Object.keys(TC);
+const trainPool = k => MON.filter(m => m.types.includes(TRAIN_TYPES[k]) && !legendary(m) && !tripOnly(m)).concat(VARIANTS.filter(v => v.types.includes(TRAIN_TYPES[k]) && !legendary(v)));
 function gymTeam(r, k) {
   const [, type] = REGIONS[r].gyms[k], gi = r * 4 + k, size = 3 + (r >= 3) + (r >= 6);
   const c = MON.filter(m => m.types.includes(type) && m.gen <= REGIONS[r].gen && !legendary(m) && !tripOnly(m)).sort((a, b) => a.bst - b.bst);
@@ -661,7 +667,7 @@ function areaCap(loc = S.loc) {
   // The post-game fights (Red, the Darkest Day, the Battle Tower) hold nobody back.
   if (!loc || loc.kind === "summit" || loc.kind === "darkest" || loc.kind === "tower" || (loc.kind === "quest" && !(QUEST[loc.q] && QUEST[loc.q].mini))) return 100;
   // Mini quests and the Ultra Wormhole and Area Zero come after that region's Champion: its level cap.
-  if ((loc.kind === "route" || loc.kind === "dungeon" || loc.kind === "raid") && cleared(loc.r)) return levelCap();
+  if (loc.r === TRAIN_R || ((loc.kind === "route" || loc.kind === "dungeon" || loc.kind === "raid") && cleared(loc.r))) return levelCap();
   const L = loc.kind === "champ" || loc.x || loc.kind === "quest" || loc.kind === "raid" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
   return Math.min(100, L + CAP_OVER);
 }
@@ -920,6 +926,7 @@ function unlocked(loc) {
   if (kind === "raid") return !!raidMon();
   if (kind === "quest") return !!QUEST[loc.q] && questOpen(QUEST[loc.q]);
   if (kind === "dungeon" && loc.x) return !!TRIP[loc.x] && !!S.champs[TRIP[loc.x].r];
+  if (r === TRAIN_R) return kind === "route" && allChamps();
   if (!regionOpen(r)) return false;
   if (kind === "route") return k === 0 || badge(r, k - 1);
   if (kind === "gym") return kills(r, k) >= KILLS_FOR_GYM;
@@ -927,6 +934,7 @@ function unlocked(loc) {
   if (kind === "champ") return badge(r, 3);
 }
 function locName(loc) {
+  if (loc.r === TRAIN_R) return `${TRAIN_TYPES[loc.k]} training area`;
   const R = REGIONS[loc.r];
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
   if (loc.kind === "gym") return `${R.gyms[loc.k][0]}'s ${R.gyms[loc.k][1]} gym`;
@@ -1034,7 +1042,7 @@ function startLoc(loc) {
 }
 function spawn() {
   let m, L, mult = 1, pay = 1, shiny = false, boss = false;
-  if (B.kind === "route") { const pool = routePool(B.r, B.k); m = pool[Math.floor(Math.random() * pool.length)]; L = wildLevel(B.r, B.k); mult = wildHard(B.i); shiny = Math.random() < shinyOdds(); }
+  if (B.kind === "route") { const pool = B.r === TRAIN_R ? trainPool(B.k) : routePool(B.r, B.k); m = pool[Math.floor(Math.random() * pool.length)]; L = wildLevel(B.r, B.k); mult = wildHard(B.i); shiny = Math.random() < shinyOdds(); }
   else {
     m = B.queue[B.idx]; L = B.L;
     boss = B.kind !== "dungeon" || B.idx === B.queue.length - 1;
@@ -1063,8 +1071,8 @@ function hit(dmg) {
 function defeat() {
   const f = B.foe; f.hp = 0; B.pause = 1;
   S.money += f.reward; S.stats.wins++;
-  gainXp(Math.round(f.L * XP_RATE * (f.wild ? 1 : 1.5)));
-  if (B.kind === "route") S.kills[B.r + "-" + B.k] = kills(B.r, B.k) + 1;
+  gainXp(Math.round(f.L * XP_RATE * (f.wild ? 1 : 1.5) * (B.kind === "route" && B.r === TRAIN_R ? TRAIN_XP : 1)));
+  if (B.kind === "route" && B.r !== TRAIN_R) S.kills[B.r + "-" + B.k] = kills(B.r, B.k) + 1;
   let text = `${f.m.name} fainted. +$${fmt(f.reward)}.`;
   if (f.wild && Math.random() < 1 / CELL_ODDS) text += gainCells(1);
   if (f.wild && B.r === PIECES_FROM && Math.random() < 1 / PIECE_ODDS) text += gainPieces(1);
@@ -1272,7 +1280,7 @@ function drawBattle() {
   $("#hpwrap").dataset.s = hpf > .5 ? "" : hpf > .2 ? "mid" : "low";
   $("#hptext").textContent = fmt(Math.ceil(Math.max(0, B.foe.hp))) + "/" + fmt(B.foe.max);
   $("#field").dataset.kind = B.kind;
-  $("#where").textContent = locName(S.loc) + (B.kind === "tower" ? ` · floor ${B.f} · ${B.idx + 1}/${B.queue.length}` : B.queue ? ` · ${B.idx + 1}/${B.queue.length}` : ` · ${Math.min(kills(B.r, B.k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM}`);
+  $("#where").textContent = locName(S.loc) + (B.kind === "tower" ? ` · floor ${B.f} · ${B.idx + 1}/${B.queue.length}` : B.queue ? ` · ${B.idx + 1}/${B.queue.length}` : B.r === TRAIN_R ? ` · ×${TRAIN_XP} XP` : ` · ${Math.min(kills(B.r, B.k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM}`);
   $("#timerwrap").hidden = B.time == null;
   if (B.time != null) { const total = B.total; $("#timebar").style.width = (100 * Math.max(0, B.time) / total) + "%"; $("#timetext").textContent = Math.ceil(Math.max(0, B.time)) + "s left"; }
   $("#money").textContent = fmt(S.money);
@@ -1289,6 +1297,7 @@ const TIPS = [
   { id: "hello", when: () => true, text: () => "Welcome to Poké Idle! I'm Prof Penguin. Your party battles wild Pokémon on its own, but you can help: tap the wild Pokémon, or press Space, to hit harder. Beat 10 on a route and its gym opens." },
   { id: "catch", when: () => dexCount() >= 2, text: () => "A new Pokémon! After every win a ball gets thrown on its own, and Settings picks which one. Your first catches join your party. Once it has been full, new ones wait in the Box." },
   { id: "gym", when: () => kills(0, 0) >= KILLS_FOR_GYM, tab: "battle", text: () => `${REGIONS[0].gyms[0][0]}'s gym is open on the map. Bosses come with a timer: the right team beats them on its own, and tapping helps a little. His Rock types take double damage from Water, Grass, Fighting, Ground and Steel.` },
+  { id: "training", when: () => allChamps(), tab: "battle", text: () => `You beat every region! Training areas are open: the Training tab after Paldea has one for each of the 18 types, at your level cap, with ×${TRAIN_XP} XP for the whole party. Train where your team hits hardest, like a Rock team in the Flying or Bug area, and catch Pokémon of a type in its own area.` },
   { id: "lost", when: () => (S.stats.losses || 0) > 0, text: () => "Out of time? It happens to everyone. Train on the routes, evolve your team and bring types that hit the boss hard. The map shows how many seconds your party gets." },
   { id: "box", when: () => S.full && dexCount() > 6, tab: "party", text: () => "Your party is full, so new catches go to the Box now. In Party & Box, drag Pokémon to rearrange them, or drag one from the Box onto a party slot to swap it in. On a phone, hold it for a moment first." },
   { id: "evolve", when: () => S.party.some(n => evoOptions(n).some(e => canEvolve(n, e))), tab: "party", text: () => "One of your Pokémon can evolve! In Party & Box, look for EVOLVE, tap it, then tap Evolve. A Pokémon with only one level evolution does it on its own." },
@@ -1320,24 +1329,28 @@ function renderTop() {
   $("#money").textContent = fmt(S.money);
 }
 function renderLocs() {
-  $("#regions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === viewR ? " on" : ""}" data-r="${r}" type="button"${regionOpen(r) ? "" : " disabled"}>${R.name}</button>`).join("");
+  $("#regions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === viewR ? " on" : ""}" data-r="${r}" type="button"${regionOpen(r) ? "" : " disabled"}>${R.name}</button>`).join("")
+    + (allChamps() ? `<button class="lbl${viewR === TRAIN_R ? " on" : ""}" data-r="${TRAIN_R}" type="button">Training</button>` : "");
   const r = viewR, items = [];
-  for (let k = 0; k < 4; k++) {
-    items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${wildLevel(r, k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
-    items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${Math.round(gymTime(r, k) * partyTime())}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
-    if (k === 1) items.push({ kind: "dungeon", r, types: unlocked({ kind: "dungeon", r }) ? denFoe(r).types : null, note: `${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}`, done: !!S.dungeons[r] });
+  if (r === TRAIN_R) TRAIN_TYPES.forEach((t, k) => items.push({ kind: "route", r, k, train: t, note: `Lv ${levelCap()} · ×${TRAIN_XP} XP` }));
+  else {
+    for (let k = 0; k < 4; k++) {
+      items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${wildLevel(r, k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
+      items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${Math.round(gymTime(r, k) * partyTime())}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
+      if (k === 1) items.push({ kind: "dungeon", r, types: unlocked({ kind: "dungeon", r }) ? denFoe(r).types : null, note: `${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}`, done: !!S.dungeons[r] });
+    }
+    items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
+    if (r === PIECES_FROM) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
+    if (r === BAND_FROM) { const n = raidMon(); items.push({ kind: "raid", r, types: n ? raidForm(n).types : null, note: !S.band ? "after Leon" : n ? `${mon(n).name} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : "every Gigantamax won", done: S.band && !n }); }
+    for (const T of TRIPS) if (T.r === r) items.push({ kind: "dungeon", r, x: T.id, types: unlocked({ kind: "dungeon", r, x: T.id }) ? denFoe(r, T.id).types : null, note: S.champs[r] ? `${tripCaught(T)}/${T.all.length} caught · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : `after ${REGIONS[r].champ}`, done: tripCaught(T) >= T.all.length });
+    for (const Q of QUESTS) if (Q.r === r) items.push({ kind: "quest", r, q: Q.id, note: questNote(Q), done: !!S.won[Q.id] });
+    if (r === TOWER_FROM) items.push({ kind: "tower", r, note: S.champs[TOWER_FROM] ? (S.tower.best ? `best floor ${S.tower.best}` : "endless, timed") : "after Geeta", done: false });
+    if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
   }
-  items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
-  if (r === PIECES_FROM) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
-  if (r === BAND_FROM) { const n = raidMon(); items.push({ kind: "raid", r, types: n ? raidForm(n).types : null, note: !S.band ? "after Leon" : n ? `${mon(n).name} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : "every Gigantamax won", done: S.band && !n }); }
-  for (const T of TRIPS) if (T.r === r) items.push({ kind: "dungeon", r, x: T.id, types: unlocked({ kind: "dungeon", r, x: T.id }) ? denFoe(r, T.id).types : null, note: S.champs[r] ? `${tripCaught(T)}/${T.all.length} caught · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : `after ${REGIONS[r].champ}`, done: tripCaught(T) >= T.all.length });
-  for (const Q of QUESTS) if (Q.r === r) items.push({ kind: "quest", r, q: Q.id, note: questNote(Q), done: !!S.won[Q.id] });
-  if (r === TOWER_FROM) items.push({ kind: "tower", r, note: S.champs[TOWER_FROM] ? (S.tower.best ? `best floor ${S.tower.best}` : "endless, timed") : "after Geeta", done: false });
-  if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
   const quest = r === CELLS_FROM ? `<div class="loc quest"><span>Zygarde Cells</span><span${(S.cells || 0) >= 100 ? ' class="done"' : ""}>${S.champs[CELLS_FROM] ? `${S.cells || 0}/100` : "after Diantha"}</span></div>` : "";
   $("#locs").innerHTML = items.map(it => {
     const here = S.loc.kind === it.kind && S.loc.r === it.r && (S.loc.k || 0) === (it.k || 0) && (S.loc.q || "") === (it.q || "") && (S.loc.x || "") === (it.x || "");
-    return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0, ...(it.q ? { q: it.q } : {}), ...(it.x ? { x: it.x } : {}) })}'${unlocked(it) ? "" : " disabled"}><span>${esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}${it.types ? " " + it.types.map(tyChip).join(" ") : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
+    return `<button class="loc${here ? " here" : ""}" type="button" data-loc='${JSON.stringify({ kind: it.kind, r: it.r, k: it.k || 0, ...(it.q ? { q: it.q } : {}), ...(it.x ? { x: it.x } : {}) })}'${unlocked(it) ? "" : " disabled"}><span>${it.train ? `${tyChip(it.train)} area` : esc(locName(it))}${it.type ? " " + tyChip(it.type) : ""}${it.types ? " " + it.types.map(tyChip).join(" ") : ""}</span><span class="${it.done ? "done" : "muted"}">${it.note}</span></button>`;
   }).join("") + quest;
 }
 // How a party member looks: its Mega or Gigantamax form when it has one on.
@@ -1480,7 +1493,7 @@ function renderShop() {
   const rows = [];
   for (const b of BALLS.filter(b => b.price)) rows.push([`${b.name} <span class="muted">(have ${S.balls[b.id]})</span>`, b.price, `ball:${b.id}`, true]);
   // A ticket for every dungeon you've opened, wherever you are; the region you're in comes first.
-  const here = S.loc.r, open = REGIONS.map((_, r) => r).filter(r => regionOpen(r) && badge(r, 1));
+  const here = S.loc.r === TRAIN_R ? REGIONS.length - 1 : S.loc.r, open = REGIONS.map((_, r) => r).filter(r => regionOpen(r) && badge(r, 1));
   for (const r of [here, ...open.filter(r => r !== here)]) if (open.includes(r) || r === here)
     rows.push([`${REGIONS[r].name} dungeon ticket <span class="muted">(have ${S.tickets[r] || 0})</span>`, ticketPrice(r), `ticket:${r}`, badge(r, 1)]);
   rows.push([`Protein: party +3% damage <span class="muted">(${S.protein}/${proteinCap()})</span>`, proteinPrice(S.protein), "protein", S.protein < proteinCap()]);
@@ -1598,6 +1611,10 @@ function renderAch() {
 const MAIL = [
   { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
+  { id: "update-2026-11-15b", date: "Nov 15, 2026", from: "Prof Penguin", title: "Training areas",
+    body: `<ul><li>Beat all 9 Champions and a <b>Training</b> tab opens after Paldea: ${TRAIN_TYPES.length} areas, one for each type, at your level cap.</li>
+      <li>Every wild Pokémon in an area has that type, every stage, and you can catch them.</li>
+      <li>Your whole party gets ×${TRAIN_XP} XP there. Train where your team hits hardest: a Rock team in the Flying or Bug area levels fastest.</li></ul>` },
   { id: "update-2026-11-15a", date: "Nov 15, 2026", from: "Prof Penguin", title: "Dungeons are Champion-tough, and show what's waiting",
     body: `<ul><li>Each dungeon now shows its legendary's types in the list before you go in, like a Max Raid den in Sword and Shield. Build for those types: your party is locked once you're in.</li>
       <li>The legendary stays until you beat it. Losing or leaving the run doesn't roll a new one.</li>
@@ -1735,6 +1752,7 @@ function wikiSections() {
     { id: "idea", group: "Basics", title: "The idea", html: `<p>Your party of up to 6 fights wild Pokémon on its own. You build the team, catch what you beat, train up, take 36 gyms and 9 Champions across nine regions, and fill the Pokédex.</p>` },
     { id: "fighting", group: "Basics", title: "Fighting", html: `<p>Every second, each party Pokémon deals its damage per hit × its hits per second × its best type matchup against the foe. The battle line under the field adds that up as "Party …/s on this one".</p><p>Tapping the foe (or Space/Enter) hits for 1 + ${pct(TAP_SHARE)} of the party's damage per second, shown as "Tap": it helps, but your team does the winning. Up to ${TAP_RATE} taps a second count, with a few in hand for bursts; scripted clicks and held keys don't count. There's a ${0.65}s pause after each faint.</p>` },
     { id: "map", group: "Basics", title: "Routes, gyms and regions", html: `<p>Each region has 4 routes, 4 gyms, a dungeon and a Champion. Beat ${KILLS_FOR_GYM} on a route to open its gym; each badge opens the next route; all 4 badges open the Champion; beating the Champion opens the next region and gives a Master Ball. Wild levels go up by about 2.75 a route, from Lv 3 on Kanto Route 1 to Lv 100.</p>` },
+    { id: "training", group: "Basics", title: "Training areas", html: `<p>Once you've beaten all 9 Champions, the Training tab after Paldea opens ${TRAIN_TYPES.length} training areas, one for each type. Every wild Pokémon in an area has that type (every stage, from any generation; no legendaries, Ultra Beasts or Paradox Pokémon), at your level cap and as tough as your newest route's.</p><p>Your whole party gets ×${TRAIN_XP} XP there, and catch-up XP still applies on top. Train where your team hits hardest: a Rock team in the Flying or Bug area beats each one faster, so it levels faster. Catching works like on any route, so an area is also where to find Pokémon of its type. Money is a normal route's, and offline time there counts the ×${TRAIN_XP} too.</p>` },
     { id: "wild", group: "Basics", title: "Wild Pokémon", html: `<p>Routes 1 and 2 have the region's first-stage Pokémon (the weaker half, then the stronger half), Route 3 adds middle stages, Route 4 has everything from the region but legendaries.</p><p>Wild Pokémon have extra HP through the middle of the game, from ×${wildHard(0).toFixed(1)} on Kanto Route 1 up to ×${Math.max(...Array.from({ length: 36 }, (_, i) => wildHard(i))).toFixed(1)} and none from Galar Route 2 on. Each win pays (6 + 1.5 × its level) × 1.08 per route index.</p>` },
     { id: "catching", group: "Basics", title: "Catching", html: `<p>When a wild Pokémon faints, a ball is thrown at it, picked by Settings: one choice for new Pokémon, one for ones you have, one for shinies. Chance = catch rate ÷ 255 × 0.6 × the ball's multiplier + its bonus, at most 100%. Legendaries and mythicals shrug off anything but a Master Ball half the time.</p><ul>${ballRows}</ul><p>Auto (the default for new Pokémon) throws the cheapest ball with at least an even chance, else your best one, and only spends a Master Ball on a shiny or a legendary.</p><p>New Pokémon join your party until it has been full once. After that they go to the Box, so an empty slot stays free for whoever you choose.</p>` },
     { id: "partybox", group: "Basics", title: "Party & Box", html: `<p>Drag a party Pokémon onto another slot to trade places, drag a Box Pokémon onto a party slot to swap it in, or drag a party Pokémon down to the Box to send it back. On a phone, hold it still for a moment before dragging, so a swipe still scrolls. With a full party, a Box Pokémon's detail also has Swap into party: tap it, then tap who goes.</p><p>Order doesn't change how the party fights, so you can rearrange during any battle. Swapping someone in or out waits until you're back on a route.</p>` },
@@ -2146,13 +2164,13 @@ window.addEventListener("pagehide", () => { if (S) save(); });
 function offline() {
   const secs = Math.min(8 * 3600, (Date.now() - (S.last || Date.now())) / 1000);
   if (secs < 60 || !S.party.length) return "";
-  const r = S.loc.r, k = S.loc.kind === "route" ? S.loc.k : 0, i = wildIndex(r, k), L = wildLevel(r, k), pool = routePool(r, k);
+  const r = S.loc.r, k = S.loc.kind === "route" ? S.loc.k : 0, i = wildIndex(r, k), L = wildLevel(r, k), pool = r === TRAIN_R ? trainPool(k) : routePool(r, k);
   const avgHp = pool.reduce((s, m) => s + hpFor(m, L, i, wildHard(i)), 0) / pool.length, dps = partyDps(null);
   // Offline is slower than playing: about a third of the live rate (the pause between fights included), and no tapping.
   const n = dps > 0 ? Math.floor(secs * .3 / (avgHp / dps + .65)) : 0;
   if (!n) return "";
   const money = n * rewardFor(L, i);
-  S.money += money; gainXp(n * L * XP_RATE);
+  S.money += money; gainXp(n * L * XP_RATE * (r === TRAIN_R ? TRAIN_XP : 1));
   // Cells come at half the rate while you're away.
   const cells = gainCells(Math.floor(n / CELL_ODDS / 2)), pieces = (r === PIECES_FROM ? gainPieces(Math.floor(n / PIECE_ODDS / 2)) : "") + (r === PLATES_FROM ? gainPlates(Math.floor(n / PLATE_ODDS / 2)) : "");
   return `While you were away (${Math.round(secs / 60)} min) your party beat ${n} Pokémon and earned $${fmt(money)}.${cells}${pieces}`;
