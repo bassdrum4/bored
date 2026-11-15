@@ -1,6 +1,7 @@
 import { ORDER, EXTERNS, NEW_GAMES, FRESH_GAMES, META, PAYLOAD_SLUGS, TOGETHER_GAMES } from '../games/catalog.js';
 import { DISCOVERY, PREVIEWS, inCollection } from '../games/discovery.js';
 import { DEVELOPER_NOTES } from '../games/developer-notes.js';
+import { LB_GAMES, boardLeaders, boardTop, bestValue, formatScore } from './scores.js';
 import { readStored, writeStored } from './store.js';
 import { backendReady, request, ANON_TOKEN } from './backend.js';
 import { popularityRanks, sortPopularGames } from './popularity.js';
@@ -153,6 +154,62 @@ function gameMeta(slug) {
   return [game.minutes, game.pace, game.players].filter(Boolean).join(' · ');
 }
 
+// The scored games, and the leaders of the rows the leaderboard last fetched.
+// Rows are cached by array identity so typing in the search box does not walk a
+// whole board on every keystroke.
+const scoredGames = new Map(LB_GAMES.map(game => [game.id, game]));
+let leaderRows = null;
+let leaders = new Map();
+let topThrees = new Map();
+// The byline and its tooltip read the same rows the leaderboard fetched, and
+// the per-game top list is derived once per fetch rather than per card.
+function boardData(slug) {
+  const rows = state.lbCache.get('overall')?.rows || [];
+  if (rows !== leaderRows) {
+    leaderRows = rows;
+    leaders = boardLeaders(rows);
+    topThrees = new Map();
+  }
+  if (!topThrees.has(slug)) topThrees.set(slug, boardTop(rows, slug, 3));
+  return { leader: leaders.get(slug) || null, top: topThrees.get(slug) };
+}
+
+// One quiet byline: the posted high score and who holds it, or the best this
+// browser has when the game has not reached the shared board. Hovering or
+// keyboard-focusing it lists the top three players on that board.
+function cardBest(slug) {
+  const spec = scoredGames.get(slug);
+  if (!spec) return null;
+  const line = element('span', 'card-best');
+  const { leader, top } = boardData(slug);
+  const own = bestValue(spec);
+  if (leader) {
+    const tied = leader.handles || [leader.handle];
+    line.textContent = 'Best ' + formatScore(leader.value, spec) + ' · ' +
+      (tied.length === 1 ? tied[0] : tied.length + ' tied leaders');
+    if (tied.length > 1) line.title = 'Tied: ' + tied.join(', ');
+  }
+  else if (Number.isFinite(own) && own > 0) line.textContent = 'Your best ' + formatScore(own, spec);
+  else line.textContent = 'No score yet';
+  // One posted score is already named in the byline, so a one-row list would
+  // only repeat it. The tooltip sits beside `.card-best`, never inside it, so
+  // the byline text stays exactly what it says.
+  if (top.length < 2) return line;
+  const wrap = element('span', 'card-best-wrap');
+  const tip = element('span', 'card-best-tip');
+  tip.setAttribute('role', 'tooltip');
+  tip.append(element('span', 'card-best-tip-title', 'Top ' + top.length + ' · ' + spec.name));
+  top.forEach((row, index) => {
+    const item = element('span', 'card-best-tip-row');
+    item.append(element('span', 'card-best-tip-rank', String(index + 1)),
+      element('span', 'card-best-tip-name', row.handle),
+      element('span', 'card-best-tip-value', formatScore(row.value, spec)));
+    tip.append(item);
+  });
+  wrap.append(line, tip);
+  return wrap;
+}
+
 function shelfGame(slug, note) {
   const name = ORDER.find(([id]) => id === slug)[1];
   const button = element('button', 'shelf-play');
@@ -237,6 +294,8 @@ function renderLibrary() {
     const playInfo = [discovery.minutes, discovery.players || discovery.inputs?.join(' / ')].filter(Boolean).join(' · ');
     text.append(element('span', 'card-category', EXTERNS[slug] ? 'Online · Internet required' : META[slug][0]),
       title, element('span', 'detail', META[slug][1]), element('span', 'game-meta', playInfo));
+    const best = cardBest(slug);
+    if (best) text.appendChild(best);
     card.appendChild(text);
     card.onclick = () => openGame(slug);
 
