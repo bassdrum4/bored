@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 490,
+  "count": 491,
   "newest": "2026-11-14",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"2ed152c","date":"2026-11-14","author":"PenguinV360","subject":"Poké Idle: SP look in the wiki Pokédex","pr":152},
   {"sha":"ca78970","date":"2026-11-14","author":"PenguinV360","subject":"Poké Idle: Mega Stones from dungeons, Max Raid Den, catch-up XP","pr":151},
   {"sha":"7e1f0d6","date":"2026-11-14","author":"PenguinV360","subject":"Poké Idle: Evolve all, tougher gyms, legendaries need a type edge","pr":150},
   {"sha":"86a51e5","date":"2026-11-14","author":"PenguinV360","subject":"fix(poke-idle): stricter gyms and dungeons; cleared regions are no shortcut","pr":149},
