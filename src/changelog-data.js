@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 494,
+  "count": 495,
   "newest": "2026-11-15",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"aede1fe","date":"2026-11-15","author":"PenguinV360","subject":"Poké Idle: party line shows bulk at your levels too","pr":156},
   {"sha":"f7f325e","date":"2026-11-15","author":"PenguinV360","subject":"Poké Idle: levels count more, catchable legendaries, Master Balls, Space/Enter","pr":155},
   {"sha":"d137b41","date":"2026-11-15","author":"PenguinV360","subject":"Poké Idle: training areas for all 18 types after the 9th Champion","pr":154},
   {"sha":"3a8f022","date":"2026-11-15","author":"PenguinV360","subject":"Poké Idle: dungeons show their legendary's types and keep it until beaten; tougher tuning","pr":153},
