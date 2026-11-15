@@ -377,7 +377,7 @@
       <div class="party" id="party"></div>
       <div class="small muted" id="teamline"></div>
       <div id="detail" class="box" hidden></div>
-      <div class="row between" id="boxhead"><h2>Box</h2>
+      <div class="row between" id="boxhead"><span class="row"><h2>Box</h2><button class="lbl" id="evoall" type="button" hidden>Evolve all</button></span>
         <span class="row small"><input class="box-search" id="boxq" type="search" placeholder="Name or number" aria-label="Search your Box by name or number" autocomplete="off"> type <select id="tfilter" aria-label="Show one type"><option value="">all</option></select><select id="tfilter2" aria-label="And a second type"><option value="">+ any</option></select> sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option><option value="bulk">Bulk</option><option value="evo">Can evolve</option><option value="hp">HP</option><option value="atk">Attack</option><option value="def">Defense</option><option value="spa">Sp. Atk</option><option value="spd">Sp. Def</option><option value="spe">Speed</option><option value="bst">Total</option></select></span></div>
       <div class="grid" id="boxgrid"></div>
     </section>
@@ -916,12 +916,15 @@ function locName(loc) {
   return `Champion ${R.champ}`;
 }
 // ── Boss HP. Your team wins boss fights, not your taps: no boss needs tapping, and a team built for it wins idling.
+// LEGEND_EDGE: dungeon legendaries, the Ultra Wormhole and Area Zero's last one, and the mini quests are set for a decent
+// team with a type edge: 1.4x the damage it would do with none, about half the team hitting 2x. With no edge, it loses.
+const LEGEND_EDGE = 1.4;
 // Gym leaders and Champions are tuned so the strongest super-effective team you could have, as evolved as the level
-// cap allows, at the cap, with no protein, only just wins idling (GYM_USE of the timer, plus the pause after each
-// faint). Protein, Megas and better picks give room; off-type and under-leveled teams lose, even tapping. A dungeon's legendary is random, so it is tuned for a decent team of any types at the cap,
-// idling, to only just clear the whole run (LEGEND_USE, the pause after each faint included): types that hit the
-// legendary hard give room.
-const GYM_TAPS = 0, LEGEND_TAPS = 0, GYM_USE = .9, LEGEND_USE = .95;
+// cap allows, at the cap, with no protein, falls a little short idling (GYM_USE: 115% of the timer). It needs some
+// Protein, a Mega or a few taps; off-type and under-leveled teams lose, even tapping. A dungeon's legendary is tuned for a decent team at the cap
+// with about half of it hitting the legendary super-effectively (LEGEND_EDGE), idling, to only just clear the whole run (LEGEND_USE, the
+// pause after each faint included). Without a type edge it loses.
+const GYM_TAPS = 0, LEGEND_TAPS = 0, GYM_USE = 1.15, LEGEND_USE = .95;
 const PARENT = {}; for (const m of MON) for (const [t, how, v] of m.evos) PARENT[t] = { p: m.num, how, v };
 const minLv = n => { const p = PARENT[n]; return p ? Math.max(minLv(p.p), p.how === "L" ? p.v : 0) : 0; };
 const rootOf = n => PARENT[n] ? rootOf(PARENT[n].p) : n;
@@ -943,11 +946,11 @@ function gymTuning(B, k, size) {
   const secs = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap, f) * bestEff(m, f), 0) + tap), 0);
   return GYM_USE * B.bossTime * refDef(P) / secs;
 }
-// Mini quests (Meteor Falls, Slumbering Weald) are tuned like a dungeon's legendary, every foe a boss: a decent team of
-// any types at the cap, tapping 6 a second, clears them with 85% of the timer.
+// Mini quests (Meteor Falls, Slumbering Weald) are tuned like a dungeon's legendary, every foe a boss: a decent team at
+// the cap, about half of it hitting them super-effectively, only just clears them idling.
 function miniTuning(B) {
   const cap = areaCap(), P = refPool(...refArea(B.r, 3), cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
-  const tap = refTaps(P, cap, LEGEND_TAPS), dps = f => P.reduce((d, m) => d + refHit(m, cap, f), 0) + tap;
+  const tap = refTaps(P, cap, LEGEND_TAPS), dps = f => P.reduce((d, m) => d + refHit(m, cap, f), 0) * LEGEND_EDGE + tap;
   return LEGEND_USE * B.bossTime * refDef(P) / B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / dps(f), 0);
 }
 const questHp = B => QUEST[B.q].mini ? B.tune : QUEST[B.q].hp;
@@ -959,10 +962,10 @@ function legendTuning(B) {
   // "Decent": the 7th to 12th strongest you could have by now, with no type edge either way (Def and Sp. Def count).
   const cap = areaCap(), P = refPool(...refArea(B.r, B.x ? 3 : 2), cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
   const tap = refTaps(P, cap, LEGEND_TAPS), dps = f => P.reduce((d, m) => d + refHit(m, cap, f), 0) + tap, n = B.queue.length, lg = B.queue[n - 1];
-  const budget = LEGEND_USE * B.bossTime * refDef(P) - .65 * n;
+  const budget = LEGEND_USE * B.bossTime * refDef(P) - .65 * n, edge = P.reduce((d, m) => d + refHit(m, cap, lg), 0) * LEGEND_EDGE + tap;
   const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps(f), 0), room = FODDER_USE * budget;
   B.fodder = fodderHp(B.i) * Math.min(1, room / Math.max(1e-9, fodder));
-  return Math.max(1, (budget - Math.min(fodder, room)) * dps(lg) / bossHpFor(lg, B.L, B.i));
+  return Math.max(1, (budget - Math.min(fodder, room)) * edge / bossHpFor(lg, B.L, B.i));
 }
 
 function startLoc(loc) {
@@ -1164,9 +1167,10 @@ function autoEvolve(n) {
   const lv = evoOptions(n).filter(e => e[1] === "L");
   if (lv.length === 1 && evosOf(n).filter(e => e[1] === "L").length === 1 && canEvolve(n, lv[0])) evolve(n, lv[0]);
 }
-function evolve(n, e) {
+// quiet: part of Evolve all, which says what happened once at the end.
+function evolve(n, e, quiet) {
   const [t, how, v] = e, form = evoForm(n, e), from = (variantOf(n) || mon(n)).name, into = form ? form.name : mon(t).name;
-  if (!evoOptions(n).some(x => x[0] === t) || !canEvolve(n, e)) return;
+  if (!evoOptions(n).some(x => x[0] === t) || !canEvolve(n, e)) return null;
   if (how === "I") S.items[v]--;
   if (how === "T") S.cords--;
   const had = S.box[t];
@@ -1176,9 +1180,28 @@ function evolve(n, e) {
   const slot = S.party.indexOf(n);
   if (slot >= 0) { if (S.party.includes(t)) S.party.splice(slot, 1); else S.party[slot] = t; }
   dropForm(n); S.stats.evolved++;
+  if (quiet) return into;
   toast(had ? `${from} evolved and your ${into} took its levels: now Lv ${level(t)}. (${from} stays in your Box.)`
     : `${from} evolved into ${into}! (${from} stays in your Box.)`);
   save(); renderAll();
+  return into;
+}
+// Evolve all: every Pokémon (Box and party) that has reached a level evolution with only one way to go, again and again,
+// so a Lv 40 Charmander ends up a Charizard. Ones with a choice (Wurmple, Tyrogue) and item or trade evolutions wait
+// for you in their details, so it never spends a stone you were keeping for something else.
+const evoAllReady = n => { const ready = evoOptions(n).filter(e => canEvolve(n, e)); return ready.length === 1 && ready[0][1] === "L" ? ready[0] : null; };
+const evoAllCount = () => Object.keys(S.box).filter(n => evoAllReady(+n)).length;
+function evolveAll() {
+  if (B && B.kind !== "route") { toast("Evolve between battles."); return; }
+  const into = [];
+  for (let pass = 0; pass < 4; pass++) {
+    let any = false;
+    for (const n of Object.keys(S.box).map(Number)) { const e = evoAllReady(n); if (e) { const name = evolve(n, e, true); if (name) { into.push(name); any = true; } } }
+    if (!any) break;
+  }
+  const left = Object.keys(S.box).map(Number).filter(n => evoOptions(n).some(e => canEvolve(n, e))).length;
+  toast(into.length ? `Evolved ${into.length}: ${into.slice(0, 6).join(", ")}${into.length > 6 ? ` and ${into.length - 6} more` : ""}.${left ? ` ${left} more can evolve with a choice, an item or a Linking Cord: see their details.` : ""}` : "Nothing can evolve by level right now.");
+  save(); renderAll(); tutor();
 }
 
 // ── Loop
@@ -1312,6 +1335,8 @@ function renderParty() {
   const sort = $("#sort").value, types = [$("#tfilter").value, $("#tfilter2").value].filter(Boolean), type = types.join(" + "), stat = STAT_SORTS[sort], q = $("#boxq").value.trim();
   const list = Object.keys(S.box).map(Number).filter(n => types.every(t => (altOf(n) || mon(n)).types.includes(t)) && boxMatch(n, q))
     .sort((a, b) => stat ? stat[1](statsOf(b)) - stat[1](statsOf(a)) || a - b : sort === "lvl" ? level(b) - level(a) : sort === "power" ? power(b) - power(a) : sort === "evo" ? evoRank(a) - evoRank(b) || a - b : a - b);
+  const evoN = evoAllCount();
+  $("#evoall").hidden = !evoN; $("#evoall").textContent = `Evolve all (${evoN})`;
   $("#boxgrid").innerHTML = list.map(n => monTile(n, { inparty: S.party.includes(n), stat })).join("") || `<span class="small muted">${q ? `No${type ? " " + esc(type) : ""} Pokémon in your Box match “${esc(q)}”.` : `No ${esc(type)} Pokémon in your Box yet.`}</span>`;
   renderDetail();
 }
@@ -1523,9 +1548,10 @@ const MAIL = [
   { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
   { id: "update-2026-11-14f", date: "Nov 14, 2026", from: "Prof Penguin", title: "Gyms bite again, and no shortcuts",
-    body: `<ul><li>Gyms and Champions are tougher: the best super-effective team you could have at the level cap only just wins on its own. Protein, Megas and good picks give room; off-type or under-leveled teams lose, even tapping.</li>
-      <li>Dungeons, the Ultra Wormhole, Area Zero and the mini quests too: a decent team with no type edge only just wins on its own, and types that hit them hard give you room.</li>
-      <li>Old regions keep up with you, but they're no shortcut anymore: their raised wild Pokémon are as tough as a route at that level, so they give XP and money at the same pace as where you are now, and their dungeons are tuned against the team you could have now.</li></ul>` },
+    body: `<ul><li>Gyms and Champions are tougher: even the best super-effective team you could have at the level cap needs some Protein, a Mega or a few taps. Off-type or under-leveled teams lose, even tapping.</li>
+      <li>Dungeons, the Ultra Wormhole, Area Zero and the mini quests need a type edge now: a decent team with about half its members hitting the boss super-effectively only just wins on its own, and one with no edge loses.</li>
+      <li>Old regions keep up with you, but they're no shortcut anymore: their raised wild Pokémon are as tough as a route at that level, so they give XP and money at the same pace as where you are now, and their dungeons are tuned against the team you could have now.</li>
+      <li><b>Evolve all</b>, next to the Box: every Pokémon that has reached a level evolution with only one way to go evolves in one go. Choices, stones and Linking Cords still wait for you.</li></ul>` },
   { id: "update-2026-11-14e", date: "Nov 14, 2026", from: "Prof Penguin", title: "Build the team, not the tapping finger",
     body: `<ul><li><b>Bosses are won by your team now.</b> No boss needs tapping anymore: each one is set for a team built for it (types that hit it hard, levels, evolutions, Protein), and that team wins on its own. The wrong team loses, even tapping flat out.</li>
       <li>A tap is now ${Math.round(TAP_SHARE * 100)}% of your party's damage per second, so 8 a second add about a third: enough to rescue a close fight.</li>
@@ -1655,10 +1681,10 @@ function wikiSections() {
     { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Physical or special</b>: each Pokémon hits with its better attacking stat, Attack against the foe's Defense or Sp. Atk against its Sp. Def, even where the other would do more (you wouldn't teach it a move off its weak stat). Mixed attackers, with Attack and Sp. Atk within ${pct(1 - MIXED)} of each other (Lucario, Arceus, Rayquaza), use whichever hits each foe harder. Each hit is × √(the foe's average defense ÷ the one it hits), from ×${DEF_LO.toFixed(2)} to ×${DEF_HI}: Steelix (Def 200, Sp. Def 65) takes ×1.43 from special hits and ×0.81 from physical ones, and a foe with even defenses takes ×1 from both. The foe's Def and Sp. Def show next to its name, and each party tile shows how hard it hits that foe, type and defense together (hover for the split).</p><p><b>Attack</b>: damage per hit is that attacking stat × level ÷ 50 × protein × the defense side above${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}, or × a side-quest prize's signature move (see Signature moves).</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often. Slaking has Truant: it only attacks every other turn, so it deals half damage.</p><p><b>Bulk</b> (Def): a Pokémon's HP, Defense and Sp. Def averaged. Your party's average bulk stretches or shrinks the timer in boss fights against a bulk of ${PARTY_BULK}: from −20% to +25%. Each Pokémon counts for at most ${BULK_CAP}, so one wall can't carry a frail team: Eternamax's 252 counts as ${BULK_CAP}. Party & Box shows each Pokémon's bulk next to its power, and the team's under the party. The map shows the time your current party gets.</p>` },
     { id: "types", group: "Stats and levels", title: "Types", html: `<p>The main games' type chart. Each party Pokémon uses its better type against the foe; the tile shows 2x, 4x, ½x, ¼x or 0x when it isn't neutral, times the Defense or Sp. Def side (see Attack, Speed and Def). A Mega fights with its Mega typing.</p>` },
     { id: "levels", group: "Stats and levels", title: "Levels and the cap", html: `<p>Each win gives every party Pokémon the foe's level × ${XP_RATE} XP (× 1.5 against trainers). Level is the cube root of XP, up to 100.</p><p>The level cap is ${CAP_OVER} over the next gym leader or Champion you haven't beaten, and 100 once every Champion is down. Each place also keeps the cap it had when you first got there: go back and your party fights held to it, so a Lv 90 team is Lv 30 on Hoenn Route 1, until you beat that region's Champion. After that its wild Pokémon keep up with you (Route 1 sits 8 under your cap, Route 4 2 under, the dungeon, the Ultra Wormhole and Area Zero at it), your party fights at its full level there, and catches come in at a level you can use. They're as tough as where you are now, too: a raised wild Pokémon has the HP, pay and XP pace of a route at its level, and an old dungeon is tuned against the team you could have now, so going back is no shortcut. XP past the cap from older saves waits until the cap catches up.</p>` },
-    { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
-    { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, with no protein, only just wins on its own (${pct(GYM_USE)} of the time it would get, plus the pause after each faint). Off-type and under-leveled teams lose, even tapping; protein, Megas, bulkier and better teams give you room. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
+    { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. Evolve all, next to the Box, does every level evolution that's ready with only one way to go, again and again (a Lv 40 Charmander ends up a Charizard); choices, items and Linking Cords stay with you. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
+    { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, with no protein, falls a little short on its own (it would need ${pct(GYM_USE)} of the time it gets): bring some Protein, a Mega or a few taps. Off-type and under-leveled teams lose, even tapping. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
     { id: "tapping", group: "Bosses", title: "Your team wins, not your taps", html: `<p>No boss needs tapping. Every one is set for a team built for it: the right types, levels, evolutions and Protein win on their own, and the wrong team loses even tapping flat out. A tap is ${pct(TAP_SHARE)} of your party's damage per second, so ${TAP_RATE} a second add about a third: enough to rescue a close fight, not to carry a weak team.</p>` },
-    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>The legendary is random, so its HP is set for a decent team of any types (the 7th to 12th strongest you could have) at the cap, idling, to clear the run in ${pct(LEGEND_USE)} of the time. A legendary with a Mega form comes out as one half the time; catching it gets you the usual form.</p>` },
+    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>Its HP is set for a decent team (the 7th to 12th strongest you could have) at the cap, with about half of it hitting the legendary super-effectively, idling, to only just clear the run (${pct(LEGEND_USE)} of the time). Without a type edge you lose, and the legendary is random: a team that covers many types is the way in. A legendary with a Mega form comes out as one half the time; catching it gets you the usual form.</p>` },
     { id: "silver", group: "Side quests", title: "Mt. Silver", html: `<p>Once all nine Champions are beaten, Red waits on Mt. Silver (in Johto's list) with ${RED_TEAM.map(n => mon(n).name).join(", ")} at Lv ${SUMMIT_LEVEL}, ×${SUMMIT_HP} HP, in ${SUMMIT_TIME}s give or take. It's meant to be brutal. The first win gives the Shiny Charm.</p>` },
     { id: "cells", group: "Side quests", title: "Zygarde Cells", html: `<p>Once Diantha (Kalos's Champion) is beaten, every wild win has a 1 in ${CELL_ODDS} chance of turning up a Zygarde Cell, and every gym, Champion, dungeon and Red win brings ${CELL_BOSS}. Time away finds them at half the rate. Kalos's list shows how many you have.</p><p>10 cells unlock Zygarde's 10% Forme (fast and frail: Speed ${ZFORMES["10"].spe}) and bring you a Zygarde if you have none. 100 unlock its Complete Forme, Zygarde at 100%: HP ${ZFORMES.complete.hp}, double the usual. Pick the forme in Zygarde's detail; it keeps its level.</p>` },
     { id: "darkest", group: "Side quests", title: "The Darkest Day", html: `<p>Once Leon (Galar's Champion) is beaten, every wild win in Galar has a 1 in ${PIECE_ODDS} chance of a Wishing Piece, and every gym, Champion and dungeon win there brings ${PIECE_BOSS}. Time away in Galar finds them at half the rate. Galar's list shows how many you have.</p><p>${PIECES_NEED} pieces open the Energy Plant, where Eternamax Eternatus waits at Lv 100 in ${DARKEST_TIME}s give or take. Only a team built for it wins: the Pokémon that hit Eternamax hardest, at Lv 100 with all the Protein, beat it on their own with a little to spare, and anything weaker loses even tapping. Beat it and Eternatus is yours if it wasn't already, with its Eternamax form unlocked. Eternamax takes your one Gigantamax slot and fights with its own stats (HP 255, Defense and Sp. Def 250, the bulkiest Pokémon in the game), and its Dynamax Cannon hits ${pct(ETERNAMAX_BOOST - 1)} harder, where a Gigantamax hits ${pct(GMAX_BOOST - 1)} harder.</p>` },
@@ -2021,6 +2047,7 @@ $("#sort").onchange = renderParty;
 $("#tfilter").innerHTML += D.types.map(t => `<option value="${t}">${t}</option>`).join("");
 $("#tfilter2").innerHTML += D.types.map(t => `<option value="${t}">+ ${t}</option>`).join("");
 $("#tfilter").onchange = $("#tfilter2").onchange = renderParty;
+$("#evoall").onclick = evolveAll;
 $("#boxq").addEventListener("input", renderParty);
 $("#dexregions").onclick = e => { const b = e.target.closest("[data-dr]"); if (b) { dexR = b.dataset.dr === "forms" ? "forms" : +b.dataset.dr; renderDex(); } };
 $("#shop").onclick = e => { const b = e.target.closest("[data-buy]"); if (b) buy(b.dataset.buy, +b.dataset.q); };
