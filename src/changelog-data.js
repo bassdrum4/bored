@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 488,
+  "count": 489,
   "newest": "2026-11-14",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"7e1f0d6","date":"2026-11-14","author":"PenguinV360","subject":"Poké Idle: Evolve all, tougher gyms, legendaries need a type edge","pr":150},
   {"sha":"86a51e5","date":"2026-11-14","author":"PenguinV360","subject":"fix(poke-idle): stricter gyms and dungeons; cleared regions are no shortcut","pr":149},
   {"sha":"34730a7","date":"2026-11-14","author":"Daniel Lowe","subject":"Restore game-card leaderboards","pr":148},
   {"sha":"0e0ab29","date":"2026-11-14","author":"PenguinV360","subject":"feat(poke-idle): bosses are won by the team, not taps; old regions keep up with you","pr":147},
