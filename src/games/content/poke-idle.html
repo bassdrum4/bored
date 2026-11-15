@@ -245,6 +245,8 @@
   .wiki-toc { width: 210px; flex: none; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--rule); background: var(--surface) }
   .wiki-search { margin: 10px 10px 4px; min-width: 0 }
   .box-search { width: 13em; max-width: 100% }
+  #teams { margin-top: 6px; gap: 4px; flex-wrap: wrap } #teams .team { gap: 0 } #teamname { width: 10em }
+  #throwbox { gap: 4px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--rule); border-top: 0; background: var(--surface) }
   .wiki-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 14px }
   .wiki-label { font-size: 11px; color: var(--dim); margin: 12px 0 3px }
   .wiki-link { display: block; width: 100%; text-align: left; font: inherit; font-size: 12px; color: var(--dim); background: none; border: 0; border-left: 2px solid transparent; padding: 3px 8px; cursor: pointer }
@@ -363,6 +365,7 @@
           <div id="timerwrap" hidden><div class="bar time"><i id="timebar"></i></div><span id="timetext"></span></div>
         </div>
         <div id="log" role="status"></div>
+        <div id="throwbox" class="row small" hidden></div>
         <div class="party" id="minis"></div>
         <div class="small muted" id="dps"></div>
       </div>
@@ -377,6 +380,7 @@
       <div class="small muted" id="partyhint"></div>
       <div class="party" id="party"></div>
       <div class="small muted" id="teamline"></div>
+      <div class="row small" id="teams"></div>
       <div id="detail" class="box" hidden></div>
       <div class="row between" id="boxhead"><span class="row"><h2>Box</h2><button class="lbl" id="evoall" type="button" hidden>Evolve all</button></span>
         <span class="row small"><input class="box-search" id="boxq" type="search" placeholder="Name or number" aria-label="Search your Box by name or number" autocomplete="off"> type <select id="tfilter" aria-label="Show one type"><option value="">all</option></select><select id="tfilter2" aria-label="And a second type"><option value="">+ any</option></select> sort <select id="sort" aria-label="Sort the box"><option value="num">Dex number</option><option value="lvl">Level</option><option value="power">Power</option><option value="bulk">Bulk</option><option value="evo">Can evolve</option><option value="hp">HP</option><option value="atk">Attack</option><option value="def">Defense</option><option value="spa">Sp. Atk</option><option value="spd">Sp. Def</option><option value="spe">Speed</option><option value="bst">Total</option><option value="base">Base total</option></select></span></div>
@@ -422,7 +426,8 @@
         <span>Ones you already caught</span><select id="s-dupe"></select>
         <span>Shinies</span><select id="s-shiny"></select>
       </div>
-      <div class="small muted">Auto throws the cheapest ball with at least an even chance, or your best one if none gets there. It only spends a Master Ball on a shiny or a legendary.</div>
+      <label class="row small"><input type="checkbox" id="s-manual"> Throw by hand at legendaries, dungeon bosses and shinies</label>
+      <div class="small muted">Auto throws the cheapest ball with at least an even chance, or your best one if none gets there. It only spends a Master Ball on a shiny or a legendary. By hand, the fight pauses when one goes down and you pick each ball, with the odds shown, for as many throws as you've earned; leave it for 30s and the rest go by the settings above.</div>
       <h2>Prof Penguin's tips</h2>
       <div class="small muted">Short tips for new trainers that show up the first time you reach something.</div>
       <div class="row"><button class="lbl" id="tut-replay" type="button">Show the tips again</button><button class="lbl" id="tut-off" type="button">Turn tips off</button><span class="small muted" id="tut-msg" role="status"></span></div>
@@ -921,7 +926,7 @@ const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n), fo
 // A tap is a helper, not the engine: 4% of the party's damage per second, so 8 a second add about a third. Your team
 // wins or loses a fight; tapping only rescues a close one.
 const TAP_SHARE = .04;
-const clickDamage = () => Math.max(1, Math.round(1 + partyDps(null) * TAP_SHARE));
+const clickDamage = () => Math.max(1, Math.round(1 + partyDps(null) * TAP_SHARE * (B && B.kind && B.kind !== "route" ? BOSS_TAP : 1)));
 
 // ── Battle state
 let B = null, msgT = 0;
@@ -957,15 +962,15 @@ function locName(loc) {
   return `Champion ${R.champ}`;
 }
 // ── Boss HP. Your team wins boss fights, not your taps: no boss needs tapping, and a team built for it wins idling.
-// Gym leaders and Champions are tuned so the strongest super-effective team you could have, as evolved as the level
-// cap allows, at the cap, with no protein, falls a little short idling (GYM_USE: 115% of the timer). It needs some
-// Protein, a Mega or a few taps; off-type and under-leveled teams lose, even tapping. Max Raids and the mini quests
-// follow the same rule. Dungeons (their legendary), the Ultra Wormhole and Area Zero (their last one): the 6 strongest
-// you could have against it (4x matchups count), at the cap, with a modest Protein (DEN_PROTEIN: a quarter of what
-// you could have by now), only just win the run idling (DEN_USE). Most players carry more Protein, so they can win with
-// fewer perfect counters. A dungeon shows its legendary's types before you go in, and keeps it until you beat it.
-const GYM_TAPS = 0, GYM_USE = 1.15, DEN_USE = .97, DEN_PROTEIN = .25;
-const denProtein = () => Math.floor(proteinCap() * DEN_PROTEIN);
+// Every boss follows one rule: the strongest team you could have for that fight (super-effective picks, 4x matchups
+// counting, as evolved as the cap allows, at the cap), carrying a modest Protein (BOSS_PROTEIN: a quarter of what you
+// could have by now), only just wins idling (BOSS_USE of the timer, the pause after each faint included). Gym leaders,
+// Champions, Max Raids and mini quests are set against their whole team; dungeons (their legendary), the Ultra Wormhole
+// and Area Zero (their last one) against the boss, with the fodder before it capped. Most players carry more Protein,
+// so they can win with fewer perfect counters; off-type and under-leveled teams lose. Taps do BOSS_TAP of their usual
+// damage in boss fights. A dungeon shows its legendary's types before you go in, and keeps it until you beat it.
+const GYM_TAPS = 0, BOSS_USE = .97, BOSS_PROTEIN = .25, BOSS_TAP = .5;
+const bossProtein = () => Math.floor(proteinCap() * BOSS_PROTEIN), bossBoost = () => 1 + PROTEIN_STEP * bossProtein();
 const PARENT = {}; for (const m of MON) for (const [t, how, v] of m.evos) PARENT[t] = { p: m.num, how, v };
 const minLv = n => { const p = PARENT[n]; return p ? Math.max(minLv(p.p), p.how === "L" ? p.v : 0) : 0; };
 const rootOf = n => PARENT[n] ? rootOf(PARENT[n].p) : n;
@@ -984,15 +989,15 @@ const refTaps = (P, cap, taps) => taps * Math.max(1, Math.round(1 + TAP_SHARE * 
 function gymTuning(B, k, size, area = [B.r, k]) {
   const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap, f) * bestEff(m, f), 0);
   const P = refPool(...area, cap).sort((a, b) => vs(b) - vs(a)).slice(0, size), tap = refTaps(P, cap, GYM_TAPS);
-  const secs = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap, f) * bestEff(m, f), 0) + tap), 0);
-  return GYM_USE * B.bossTime * refDef(P) / secs;
+  const secs = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap, f) * bestEff(m, f), 0) * bossBoost() + tap), 0);
+  return BOSS_USE * B.bossTime * refDef(P) / secs;
 }
-// The Max Raid Den is tuned like a Champion: the strongest team for its Gigantamax Pokémon you could have, at the cap,
-// with no Protein, falls a little short idling (GYM_USE). It needs Protein, a Mega or a few taps.
+// The Max Raid Den: the strongest team for its Gigantamax Pokémon you could have, at the cap, with bossProtein(), only
+// just wins idling (BOSS_USE).
 function raidTuning(B) {
   const cap = areaCap(), f = B.queue[0], hit = m => refHit(m, cap, f) * bestEff(m, f);
   const P = refPool(...refArea(B.r, 3), cap).sort((a, b) => hit(b) - hit(a)).slice(0, 6), tap = refTaps(P, cap, GYM_TAPS);
-  return GYM_USE * B.bossTime * refDef(P) * (P.reduce((d, m) => d + hit(m), 0) + tap) / bossHpFor(f, B.L, B.i);
+  return BOSS_USE * B.bossTime * refDef(P) * (P.reduce((d, m) => d + hit(m), 0) * bossBoost() + tap) / bossHpFor(f, B.L, B.i);
 }
 // Mini quests (Meteor Falls, Slumbering Weald): you know who's there, so they're tuned like a Champion's team.
 const miniTuning = B => gymTuning(B, 3, 6, refArea(B.r, 3));
@@ -1002,12 +1007,12 @@ const questHp = B => QUEST[B.q].mini ? B.tune : QUEST[B.q].hp;
 const fodderHp = i => DUNGEON_HP * wildHard(i), FODDER_USE = .35;
 // Sets B.fodder (the fodder's HP multiplier) and returns the legendary's.
 function legendTuning(B) {
-  // The 6 strongest you could have against this legendary, at the cap, with denProtein() Protein, need DEN_USE of the
-  // time for the whole run (the pause after each faint included).
+  // The 6 strongest you could have against this legendary, at the cap, with bossProtein(), need BOSS_USE of the time for
+  // the whole run (the pause after each faint included).
   const cap = areaCap(), n = B.queue.length, lg = B.queue[n - 1], hit = (m, f) => refHit(m, cap, f) * bestEff(m, f);
-  const P = refPool(...refArea(B.r, B.x ? 3 : 2), cap).sort((a, b) => hit(b, lg) - hit(a, lg)).slice(0, 6), boost = 1 + PROTEIN_STEP * denProtein();
+  const P = refPool(...refArea(B.r, B.x ? 3 : 2), cap).sort((a, b) => hit(b, lg) - hit(a, lg)).slice(0, 6), boost = bossBoost();
   const tap = refTaps(P, cap, GYM_TAPS), dps = f => P.reduce((d, m) => d + hit(m, f), 0) * boost + tap;
-  const budget = DEN_USE * B.bossTime * refDef(P) - .65 * n;
+  const budget = BOSS_USE * B.bossTime * refDef(P) - .65 * n;
   const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps(f), 0), room = FODDER_USE * budget;
   B.fodder = fodderHp(B.i) * Math.min(1, room / Math.max(1e-9, fodder));
   return Math.max(1, (budget - Math.min(fodder, room)) * dps(lg) / bossHpFor(lg, B.L, B.i));
@@ -1015,6 +1020,7 @@ function legendTuning(B) {
 
 function startLoc(loc) {
   if (!unlocked(loc)) return;
+  if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
   if (loc.kind !== "route" && !S.party.length) { say("Put at least one Pokémon in your party first.", true); return; }
   // The ticket is only used once the run is sure to start.
   if (loc.kind === "dungeon" || loc.kind === "raid") {
@@ -1087,7 +1093,9 @@ function defeat() {
   if (f.wild && Math.random() < 1 / CELL_ODDS) text += gainCells(1);
   if (f.wild && B.r === PIECES_FROM && Math.random() < 1 / PIECE_ODDS) text += gainPieces(1);
   if (f.wild && B.r === PLATES_FROM && Math.random() < 1 / PLATE_ODDS) text += gainPlates(1);
-  if (f.wild && B.kind === "dungeon" && B.idx === B.queue.length - 1) text += bossThrows(f);
+  const boss = f.wild && B.kind === "dungeon" && B.idx === B.queue.length - 1;
+  if ((boss || (f.wild && f.shiny)) && S.set.manual && BALLS.some(b => S.balls[b.id] > 0)) { say(text); startManual(f, boss); return; }
+  if (boss) text += bossThrows(f);
   else if (f.wild) {
     const ball = chooseBall(f);
     if (ball) {
@@ -1110,20 +1118,75 @@ const pityKey = m => m.vid || m.num, bossRate = m => m.cr ?? mon(m.num).cr;
 const bossChance = (m, ball) => ball.id === "master" ? 1 : Math.min(1, Math.pow(bossRate(m) * ball.mult * 2.5 / 255, .75) + BOSS_PITY * ((S.pity || {})[pityKey(m)] || 0));
 const bossThrowsFor = (left, total) => Math.min(BOSS_THROWS, 1 + Math.floor(Math.max(0, left) / total / BOSS_THROW_STEP + 1e-9));
 function bossThrows(f) {
-  S.pity = S.pity || {};
-  const n = bossThrowsFor(B.time, B.total), had = ownsFoe(f.m), key = pityKey(f.m), used = {};
+  const n = bossThrowsFor(B.time, B.total), had = ownsFoe(f.m), used = {};
   let thrown = 0, caught = false;
   for (let i = 0; i < n && !caught; i++) {
     const ball = chooseBall(f); if (!ball) break;
     S.balls[ball.id]--; thrown++; used[ball.name] = (used[ball.name] || 0) + 1;
     caught = Math.random() < bossChance(f.m, ball);
   }
-  B.bossCaught = caught || had;
-  if (!thrown) return "";
+  return ` ${n} throw${n > 1 ? "s" : ""} for the win` + bossResult(f, had, caught, thrown, used);
+}
+// After the throws at a boss: a catch joins you and clears its pity; a miss on one you don't have raises it. Caught it,
+// or had it already, and a new one rolls (B.bossCaught); missed, it stays.
+function bossResult(f, had, caught, thrown, used) {
+  S.pity = S.pity || {};
+  const key = pityKey(f.m); B.bossCaught = caught || had;
+  if (!thrown) return ".";
   if (caught) { addMon(f.m.num, f.L, f.shiny, f.m.vid); delete S.pity[key]; }
   else if (!had) S.pity[key] = (S.pity[key] || 0) + 1;
   const balls = Object.entries(used).map(([b, c]) => c > 1 ? `${c} ${b}s` : `a ${b}`).join(" and ");
-  return ` ${n} throw${n > 1 ? "s" : ""} for the win: threw ${balls}… ` + (caught ? "caught!" : `it got away.${had ? "" : ` Next time: +${Math.round(BOSS_PITY * S.pity[key] * 100)}% a throw.`}`);
+  return `: threw ${balls}… ` + (caught ? "caught!" : `it got away.${had ? "" : ` Next time: +${Math.round(BOSS_PITY * S.pity[key] * 100)}% a throw.`}`);
+}
+// Throwing by hand (Settings): a dungeon boss, or a shiny, pauses the fight once it faints, and you pick each ball,
+// with its odds shown, for the throws you've earned (a boss: as above; a shiny: 1). Leave it MANUAL_WAIT seconds and
+// the rest go by the auto-throw settings, so a shiny is never lost to being away.
+const MANUAL_WAIT = 30;
+function startManual(f, boss) {
+  B.manual = { f, boss, left: boss ? bossThrowsFor(B.time, B.total) : 1, had: ownsFoe(f.m), used: {}, thrown: 0, until: Date.now() + MANUAL_WAIT * 1000 };
+  renderThrow();
+}
+const manualOdds = (M, ball) => M.boss ? bossChance(M.f.m, ball) : throwChance(M.f.m, ball);
+function renderThrow() {
+  const M = B && B.manual, el = $("#throwbox");
+  if (!M) { el.hidden = true; el.innerHTML = ""; return; }
+  const secs = Math.max(0, Math.ceil((M.until - Date.now()) / 1000));
+  el.hidden = false;
+  el.innerHTML = `<b>${M.f.shiny ? "Shiny " : ""}${esc(M.f.m.name)}</b> <span>${M.left} throw${M.left > 1 ? "s" : ""} left:</span>`
+    + BALLS.filter(b => S.balls[b.id] > 0).map(b => `<button class="lbl" type="button" data-throw="${b.id}">${b.name} ×${S.balls[b.id]} · ${Math.round(manualOdds(M, b) * 100)}%</button>`).join("")
+    + `<button class="lbl" type="button" data-throw="">Let it go</button> <span class="muted" id="throwwait">auto in ${secs}s</span>`;
+}
+function manualThrow(id) {
+  const M = B && B.manual; if (!M) return;
+  if (!id) return manualDone(false);
+  if (!(S.balls[id] > 0)) return;
+  const ball = BALLS.find(b => b.id === id);
+  S.balls[id]--; M.thrown++; M.left--; M.used[ball.name] = (M.used[ball.name] || 0) + 1;
+  if (Math.random() < manualOdds(M, ball)) return manualDone(true);
+  if (M.left <= 0 || !BALLS.some(b => S.balls[b.id] > 0)) return manualDone(false);
+  M.until = Date.now() + MANUAL_WAIT * 1000;
+  say(`Threw a ${ball.name}… it broke free.`); renderThrow();
+}
+// Out of time to choose: the rest go by the auto-throw settings.
+function manualAuto() {
+  const M = B.manual; let caught = false;
+  while (M.left > 0 && !caught) {
+    const ball = chooseBall(M.f); if (!ball) break;
+    S.balls[ball.id]--; M.thrown++; M.left--; M.used[ball.name] = (M.used[ball.name] || 0) + 1;
+    caught = Math.random() < manualOdds(M, ball);
+  }
+  manualDone(caught);
+}
+function manualDone(caught) {
+  const M = B.manual, f = M.f; B.manual = null; renderThrow();
+  let text;
+  if (M.boss) text = `${f.m.name}${M.thrown ? "" : " got away"}` + bossResult(f, M.had, caught, M.thrown, M.used);
+  else {
+    if (caught) addMon(f.m.num, f.L, f.shiny, f.m.vid);
+    text = M.thrown ? `Threw ${Object.entries(M.used).map(([b, c]) => c > 1 ? `${c} ${b}s` : `a ${b}`).join(" and ")} at the shiny ${f.m.name}… ${caught ? "caught!" : "it got away."}` : `You let the shiny ${f.m.name} go.`;
+  }
+  say(text); save(); renderAll();
+  const here = B; setTimeout(() => { if (B === here) next(); }, 650);
 }
 function chooseBall(f) {
   const owned = ownsFoe(f.m), pref = f.shiny ? S.set.shiny : owned ? S.set.dupe : S.set.fresh;
@@ -1269,6 +1332,7 @@ function evolve(n, e, quiet) {
   if (form) unlockVar(t, form.vid, true);
   const slot = S.party.indexOf(n);
   if (slot >= 0) { if (S.party.includes(t)) S.party.splice(slot, 1); else S.party[slot] = t; }
+  for (const T of S.teams || []) { const i = T.party.indexOf(n); if (i >= 0) { if (T.party.includes(t)) T.party.splice(i, 1); else T.party[i] = t; } if (T.gmax === n) T.gmax = 0; if (T.mega && T.mega.n === n) T.mega = null; }
   dropForm(n); S.stats.evolved++;
   if (quiet) return into;
   toast(had ? `${from} evolved and your ${into} took its levels: now Lv ${level(t)}. (${from} stays in your Box.)`
@@ -1299,6 +1363,7 @@ let lastTick = performance.now();
 function tick() {
   const now = performance.now(), dt = Math.min(1, (now - lastTick) / 1000); lastTick = now;
   if (screen !== "game") return; // battles hold still behind the title screen
+  if (B && B.manual) { if (Date.now() > B.manual.until) manualAuto(); else { const w = $("#throwwait"); if (w) w.textContent = `auto in ${Math.max(0, Math.ceil((B.manual.until - Date.now()) / 1000))}s`; } }
   if (B && B.foe && !B.pause) {
     hit(partyDps(B.foe.m) * dt);
     if (B.time != null) {
@@ -1417,6 +1482,32 @@ function boxMatch(n, q) {
 // Biggest first.
 const statsOf = n => special(n) || altOf(n) || mon(n), statsNow = n => statsAt(statsOf(n), level(n));
 const STAT_SORTS = { bulk: ["Bulk", n => Math.round(bulkNow(n))], hp: ["HP", n => statsNow(n).hp], atk: ["Atk", n => statsNow(n).atk], def: ["Def", n => statsNow(n).def], spa: ["SpA", n => statsNow(n).spa], spd: ["SpD", n => statsNow(n).spd], spe: ["Spe", n => statsNow(n).spe], bst: ["Total", n => statsNow(n).bst], base: ["Base", n => statsOf(n).bst] };
+// Saved teams: name your party and switch back to it in one tap between battles, Mega and Gigantamax picks included.
+// They follow your Pokémon when they evolve. Saving under a name you already have replaces that team.
+const TEAM_SLOTS = 10;
+function renderTeams() {
+  const T = S.teams || [], same = t => t.party.length === S.party.length && t.party.every((n, i) => S.party[i] === n);
+  $("#teams").innerHTML = (T.length ? '<span class="muted">Teams:</span>' : "") + T.map((t, i) => `<span class="row team"><button class="lbl${same(t) ? " on" : ""}" type="button" data-team="${i}" title="${esc(t.party.filter(n => S.box[n]).map(n => nameOf(n)).join(", "))}">${esc(t.name)}</button><button class="lbl" type="button" data-teamdel="${i}" aria-label="Delete the team ${esc(t.name)}">×</button></span>`).join("")
+    + (S.party.length ? `<input id="teamname" type="text" maxlength="24" placeholder="Team name" aria-label="Name for your party as a team" autocomplete="off"><button class="lbl" type="button" id="teamsave">Save party as a team</button>` : "");
+}
+function saveTeam() {
+  const name = ($("#teamname").value || "").trim().slice(0, 24) || `Team ${(S.teams || []).length + 1}`, T = S.teams = S.teams || [];
+  const team = { name, party: S.party.slice(), mega: S.mega && S.party.includes(S.mega.n) ? { ...S.mega } : null, gmax: S.party.includes(S.gmax) ? S.gmax : 0 };
+  const i = T.findIndex(t => t.name.toLowerCase() === name.toLowerCase());
+  if (i >= 0) T[i] = team; else if (T.length >= TEAM_SLOTS) { toast(`You have ${TEAM_SLOTS} teams. Delete one to save another.`); return; } else T.push(team);
+  save(); renderParty(); toast(i >= 0 ? `${name} updated.` : `Saved your party as ${name}.`);
+}
+function loadTeam(i) {
+  if (B && B.kind !== "route") { toast("Switch teams between battles."); return; }
+  const t = (S.teams || [])[i]; if (!t) return;
+  const party = t.party.filter(n => S.box[n]).slice(0, 6);
+  if (!party.length) { toast(`None of ${t.name} is in your Box anymore.`); return; }
+  for (const n of S.party) if (!party.includes(n)) dropForm(n);
+  S.party = party;
+  if (t.mega && party.includes(t.mega.n) && S.key && S.stones[t.mega.f]) S.mega = { ...t.mega };
+  if (t.gmax && party.includes(t.gmax) && S.band && S.gfactor[t.gmax]) S.gmax = t.gmax;
+  save(); renderAll(); toast(`${t.name} is your party now.`);
+}
 const PARTY_HINT = "Drag to rearrange your party, drag a Box Pokémon onto a slot to swap it in, or drag one down to the Box. On a phone, hold it first. Tap any Pokémon for its details; EVOLVE means it can evolve now.";
 function renderParty() {
   // Rebuilding the tiles mid-drag would pull the one in your hand out from under you: catch up when it's dropped.
@@ -1426,6 +1517,7 @@ function renderParty() {
   // Below the cap each one counts × (level ÷ cap)², so the line shows both: on paper, and at their levels.
   const avg = f => S.party.length ? S.party.reduce((t, n) => t + f(n), 0) / S.party.length : 0, stretch = Math.round(partyTime() * 100 - 100);
   const avgBulk = avg(n => bulkFor(fighter(n))), lvBulk = avg(n => bulkFor(fighter(n)) * underCap(battleLevel(n)) ** 2), under = Math.round(lvBulk) < Math.round(avgBulk);
+  renderTeams();
   $("#teamline").innerHTML = S.party.length ? `Team power <b>${fmt(partyDps(null))}</b>/s · bulk <b>${Math.round(lvBulk)}</b> on average${under ? ` at their levels (base ${Math.round(avgBulk)}; below the cap each counts × (level ÷ cap)²)` : ""}, so boss timers are <b>${stretch > 0 ? "+" : ""}${stretch}%</b> (${PARTY_BULK} is even; each Pokémon counts up to ${BULK_CAP}; from −20% to +25%)` : "";
   $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
   // "Can evolve": ready right now first, then ones with an evolution still to get, then the rest.
@@ -1651,6 +1743,10 @@ function renderAch() {
 const MAIL = [
   { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
+  { id: "update-2026-11-15e", date: "Nov 15, 2026", from: "Prof Penguin", title: "Teams, throwing by hand, and one rule for bosses",
+    body: `<ul><li><b>Teams</b>: in Party & Box, save your party under a name (a Ground team, a Rock team...) and switch to it in one tap between battles.</li>
+      <li><b>Throw by hand</b> (Settings): a dungeon boss or a shiny pauses the fight when it goes down, and you pick each ball yourself, odds shown. Say four Ultra Balls before you decide on the Master Ball.</li>
+      <li>Gyms, Champions, Max Raids and mini quests now follow the dungeons' rule: the best team for the fight, with a modest Protein, only just wins. Taps do half as much in boss fights.</li></ul>` },
   { id: "update-2026-11-15d", date: "Nov 15, 2026", from: "Prof Penguin", title: "Stats at your level",
     body: `<ul><li>Like the real games, a Pokémon's stats now come from its base stats and its level. Party & Box shows its stats now, with its base stats under them as its potential.</li>
       <li>The Box sorts by stats now, and by <b>Base total</b> for potential. A foe's Def and Sp. Def show at its level.</li>
@@ -1803,16 +1899,16 @@ function wikiSections() {
     { id: "map", group: "Basics", title: "Routes, gyms and regions", html: `<p>Each region has 4 routes, 4 gyms, a dungeon and a Champion. Beat ${KILLS_FOR_GYM} on a route to open its gym; each badge opens the next route; all 4 badges open the Champion; beating the Champion opens the next region and gives a Master Ball. Wild levels go up by about 2.75 a route, from Lv 3 on Kanto Route 1 to Lv 100.</p>` },
     { id: "training", group: "Basics", title: "Training areas", html: `<p>Once you've beaten all 9 Champions, the Training tab after Paldea opens ${TRAIN_TYPES.length} training areas, one for each type. Every wild Pokémon in an area has that type (every stage, from any generation; no legendaries, Ultra Beasts or Paradox Pokémon), at your level cap and as tough as your newest route's.</p><p>Your whole party gets ×${TRAIN_XP} XP there, and catch-up XP still applies on top. Train where your team hits hardest: a Rock team in the Flying or Bug area beats each one faster, so it levels faster. Catching works like on any route, so an area is also where to find Pokémon of its type. Money is a normal route's, and offline time there counts the ×${TRAIN_XP} too.</p>` },
     { id: "wild", group: "Basics", title: "Wild Pokémon", html: `<p>Routes 1 and 2 have the region's first-stage Pokémon (the weaker half, then the stronger half), Route 3 adds middle stages, Route 4 has everything from the region but legendaries.</p><p>Wild Pokémon have extra HP through the middle of the game, from ×${wildHard(0).toFixed(1)} on Kanto Route 1 up to ×${Math.max(...Array.from({ length: 36 }, (_, i) => wildHard(i))).toFixed(1)} and none from Galar Route 2 on. Each win pays (6 + 1.5 × its level) × 1.08 per route index.</p>` },
-    { id: "catching", group: "Basics", title: "Catching", html: `<p>When a wild Pokémon faints, a ball is thrown at it, picked by Settings: one choice for new Pokémon, one for ones you have, one for shinies. Chance = catch rate ÷ 255 × 0.6 × the ball's multiplier + its bonus, at most 100%. Legendaries and mythicals shrug off anything but a Master Ball half the time.</p><p>A dungeon's legendary is different (see Dungeons and legendaries): you get more throws the more time you win by, at the real games' odds.</p><ul>${ballRows}</ul><p>Auto (the default for new Pokémon) throws the cheapest ball with at least an even chance, else your best one, and only spends a Master Ball on a shiny or a legendary.</p><p>New Pokémon join your party until it has been full once. After that they go to the Box, so an empty slot stays free for whoever you choose.</p>` },
-    { id: "partybox", group: "Basics", title: "Party & Box", html: `<p>Drag a party Pokémon onto another slot to trade places, drag a Box Pokémon onto a party slot to swap it in, or drag a party Pokémon down to the Box to send it back. On a phone, hold it still for a moment before dragging, so a swipe still scrolls. With a full party, a Box Pokémon's detail also has Swap into party: tap it, then tap who goes.</p><p>Order doesn't change how the party fights, so you can rearrange during any battle. Swapping someone in or out waits until you're back on a route.</p>` },
+    { id: "catching", group: "Basics", title: "Catching", html: `<p>When a wild Pokémon faints, a ball is thrown at it, picked by Settings: one choice for new Pokémon, one for ones you have, one for shinies. Chance = catch rate ÷ 255 × 0.6 × the ball's multiplier + its bonus, at most 100%. Legendaries and mythicals shrug off anything but a Master Ball half the time.</p><p>A dungeon's legendary is different (see Dungeons and legendaries): you get more throws the more time you win by, at the real games' odds.</p><ul>${ballRows}</ul><p>Auto (the default for new Pokémon) throws the cheapest ball with at least an even chance, else your best one, and only spends a Master Ball on a shiny or a legendary.</p><p><b>Throw by hand</b> (Settings): when a dungeon boss or a shiny goes down, the fight pauses and you pick each ball, with its odds, for the throws you've earned, say four Ultra Balls before deciding on a Master Ball. Leave it ${MANUAL_WAIT}s and the rest go by your auto-throw settings.</p><p>New Pokémon join your party until it has been full once. After that they go to the Box, so an empty slot stays free for whoever you choose.</p>` },
+    { id: "partybox", group: "Basics", title: "Party & Box", html: `<p>Drag a party Pokémon onto another slot to trade places, drag a Box Pokémon onto a party slot to swap it in, or drag a party Pokémon down to the Box to send it back. On a phone, hold it still for a moment before dragging, so a swipe still scrolls. With a full party, a Box Pokémon's detail also has Swap into party: tap it, then tap who goes.</p><p>Order doesn't change how the party fights, so you can rearrange during any battle. Swapping someone in or out waits until you're back on a route.</p><p><b>Teams</b>: under the party, name it and Save party as a team (up to ${TEAM_SLOTS}; saving under a name you have replaces it). Tap a team to make it your party between battles, its Mega and Gigantamax picks included. Teams follow your Pokémon when they evolve.</p>` },
     { id: "offline", group: "Basics", title: "Offline", html: `<p>While you're away (up to 8 hours) your party keeps fighting on your last route at about a third of the live pace, the pause included: money and XP, no catches. The title screen says what it did.</p>` },
     { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Physical or special</b>: each Pokémon hits with its better attacking stat, Attack against the foe's Defense or Sp. Atk against its Sp. Def, even where the other would do more (you wouldn't teach it a move off its weak stat). Mixed attackers, with Attack and Sp. Atk within ${pct(1 - MIXED)} of each other (Lucario, Arceus, Rayquaza), use whichever hits each foe harder. Each hit is × √(the foe's average defense ÷ the one it hits), from ×${DEF_LO.toFixed(2)} to ×${DEF_HI}: Steelix (Def 200, Sp. Def 65) takes ×1.43 from special hits and ×0.81 from physical ones, and a foe with even defenses takes ×1 from both. The foe's Def and Sp. Def show next to its name, and each party tile shows how hard it hits that foe, type and defense together (hover for the split).</p><p><b>Attack</b>: damage per hit is that attacking stat × level ÷ 50 × (level ÷ cap, below the cap) × protein × the defense side above${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}, or × a side-quest prize's signature move (see Signature moves).</p><p><b>Base stats and stats now</b>: base stats (the Pokédex's numbers) are a Pokémon's potential. What it has now depends on its level, as in the real games with no IVs or EVs: HP = 2 × base × level ÷ 100 + level + 10, the others 2 × base × level ÷ 100 + 5, so a Lv 50 has about its base stats and a Lv 100 about double. Party & Box shows both, and the Box sorts by its stats now or by its base total. A foe's Def and Sp. Def show at its level. Fights follow the same idea: damage per hit below is that stat now, about, and bulk counts level too.</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often. Slaking has Truant: it only attacks every other turn, so it deals half damage.</p><p><b>Bulk</b> (Def): a Pokémon's HP, Defense and Sp. Def averaged. Your party's average bulk stretches or shrinks the timer in boss fights against a bulk of ${PARTY_BULK}: from −20% to +25%. Below the cap a Pokémon's bulk counts × (level ÷ cap)², as if it would faint sooner. Each Pokémon counts for at most ${BULK_CAP}, so one wall can't carry a frail team: Eternamax's 252 counts as ${BULK_CAP}. Party & Box shows each Pokémon's bulk next to its power, and the team's under the party. The map shows the time your current party gets.</p>` },
     { id: "types", group: "Stats and levels", title: "Types", html: `<p>The main games' type chart. Each party Pokémon uses its better type against the foe; the tile shows 2x, 4x, ½x, ¼x or 0x when it isn't neutral, times the Defense or Sp. Def side (see Attack, Speed and Def). A Mega fights with its Mega typing.</p>` },
     { id: "levels", group: "Stats and levels", title: "Levels and the cap", html: `<p>Each win gives every party Pokémon the foe's level × ${XP_RATE} XP (× 1.5 against trainers). Level is the cube root of XP, up to 100.</p><p><b>Levels count</b>, like in the real games, where Attack and the damage formula both grow with level: below the cap a Pokémon hits × (level ÷ cap) on top of the usual × level ÷ 50, so a Lv 80 hits 69% as hard as one at 96 and a Lv 86 80%. Its bulk counts × (level ÷ cap)² for the boss timer. At the cap nothing changes, so bosses are set the same; an under-leveled team just has less room.</p><p><b>Catch-up</b>: a party Pokémon below your strongest one gets more XP, doubling every ${CATCH_UP} levels it's behind (up to ×${CATCH_MAX}), but never past the strongest one. A Lv 44 next to a Lv 78 gets within 10 levels in about 5 minutes. The strongest one levels at the usual pace.</p><p>The level cap is ${CAP_OVER} over the next gym leader or Champion you haven't beaten, and 100 once every Champion is down. Each place also keeps the cap it had when you first got there: go back and your party fights held to it, so a Lv 90 team is Lv 30 on Hoenn Route 1, until you beat that region's Champion. After that its wild Pokémon keep up with you (Route 1 sits 8 under your cap, Route 4 2 under, the dungeon, the Ultra Wormhole and Area Zero at it), your party fights at its full level there, and catches come in at a level you can use. They're as tough as where you are now, too: a raised wild Pokémon has the HP, pay and XP pace of a route at its level, and an old dungeon is tuned against the team you could have now, so going back is no shortcut. XP past the cap from older saves waits until the cap catches up.</p>` },
     { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. Evolve all, next to the Box, does every level evolution that's ready with only one way to go, again and again (a Lv 40 Charmander ends up a Charizard); choices, items and Linking Cords stay with you. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
-    { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, with no protein, falls a little short on its own (it would need ${pct(GYM_USE)} of the time it gets): bring some Protein, a Mega or a few taps. Off-type and under-leveled teams lose, even tapping. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
-    { id: "tapping", group: "Bosses", title: "Your team wins, not your taps", html: `<p>No boss needs tapping. Every one is set for a team built for it: the right types, levels, evolutions and Protein win on their own, and the wrong team loses even tapping flat out. A tap is ${pct(TAP_SHARE)} of your party's damage per second, so ${TAP_RATE} a second add about a third: enough to rescue a close fight, not to carry a weak team.</p>` },
-    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>Like a Max Raid den in Sword and Shield, the list shows the waiting legendary's types before you go in, but not which one it is. Build your team for those types: your party is locked once the run starts. The legendary stays the same until you beat it; losing or leaving the run (which still uses the ticket) doesn't roll a new one. A legendary with a Mega form comes out as one half the time, and the list shows the Mega's types; catching it gets you the usual form.</p><p>It's set so the 6 strongest Pokémon you could have against it (a 4× weakness counts), at the cap, with a modest Protein (a quarter of what you could have by now: ${denProtein()} right now), only just win the run on their own. Carry more Protein and you can win with fewer perfect counters; a Mega or a few taps help too. Off-type teams lose. The Pokémon before it never take more than ${pct(FODDER_USE)} of the time. The Ultra Wormhole and Area Zero work the same way for their last one, and the mini quests (Meteor Falls, the Slumbering Weald) are tuned like a Champion's team.</p><p><b>Catching it</b>: beat it and you get 1 throw, plus 1 for every ${pct(BOSS_THROW_STEP)} of the clock left, up to ${BOSS_THROWS}. Each uses your ball setting and the real games' odds for a worn-down, sleeping Pokémon: (catch rate × ball × 2.5 ÷ 255)^0.75, with no extra legendary dodge. A catch-rate-3 legendary (the birds, Mewtwo, Lugia...) is ${Math.round(Math.pow(3 * 2 * 2.5 / 255, .75) * 100)}% a throw with an Ultra Ball; a catch-rate-45 one (Mew, Rayquaza, Ultra Beasts...) ${Math.round(Math.pow(45 * 2 * 2.5 / 255, .75) * 100)}%. A Master Ball always catches. Each win where you don't catch it adds +${pct(BOSS_PITY)} a throw against it, until you do. Catch it, or have it already, and a new legendary rolls; miss, and it stays for another try.</p>` },
+    { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, carrying a modest Protein (a quarter of what you could have by now: ${bossProtein()} right now), only just wins on its own. Most players carry more Protein, so a team that isn't quite that strong can still win; a Mega or a few taps help too. Off-type and under-leveled teams lose, even tapping. Max Raids, dungeons and the mini quests use the same rule. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
+    { id: "tapping", group: "Bosses", title: "Your team wins, not your taps", html: `<p>No boss needs tapping. Every one is set for a team built for it: the right types, levels, evolutions and Protein win on their own, and the wrong team loses even tapping flat out. A tap is ${pct(TAP_SHARE)} of your party's damage per second, and half that in boss fights, so ${TAP_RATE} a second add about a third on a route and a sixth against a boss: enough to rescue a close fight, not to carry a weak team.</p>` },
+    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>Like a Max Raid den in Sword and Shield, the list shows the waiting legendary's types before you go in, but not which one it is. Build your team for those types: your party is locked once the run starts. The legendary stays the same until you beat it; losing or leaving the run (which still uses the ticket) doesn't roll a new one. A legendary with a Mega form comes out as one half the time, and the list shows the Mega's types; catching it gets you the usual form.</p><p>It's set so the 6 strongest Pokémon you could have against it (a 4× weakness counts), at the cap, with a modest Protein (a quarter of what you could have by now: ${bossProtein()} right now), only just win the run on their own. Carry more Protein and you can win with fewer perfect counters; a Mega or a few taps help too. Off-type teams lose. The Pokémon before it never take more than ${pct(FODDER_USE)} of the time. The Ultra Wormhole and Area Zero work the same way for their last one, and the mini quests (Meteor Falls, the Slumbering Weald) are tuned like a Champion's team.</p><p><b>Catching it</b>: beat it and you get 1 throw, plus 1 for every ${pct(BOSS_THROW_STEP)} of the clock left, up to ${BOSS_THROWS}. Each uses your ball setting and the real games' odds for a worn-down, sleeping Pokémon: (catch rate × ball × 2.5 ÷ 255)^0.75, with no extra legendary dodge. A catch-rate-3 legendary (the birds, Mewtwo, Lugia...) is ${Math.round(Math.pow(3 * 2 * 2.5 / 255, .75) * 100)}% a throw with an Ultra Ball; a catch-rate-45 one (Mew, Rayquaza, Ultra Beasts...) ${Math.round(Math.pow(45 * 2 * 2.5 / 255, .75) * 100)}%. A Master Ball always catches. Each win where you don't catch it adds +${pct(BOSS_PITY)} a throw against it, until you do. Catch it, or have it already, and a new legendary rolls; miss, and it stays for another try.</p>` },
     { id: "silver", group: "Side quests", title: "Mt. Silver", html: `<p>Once all nine Champions are beaten, Red waits on Mt. Silver (in Johto's list) with ${RED_TEAM.map(n => mon(n).name).join(", ")} at Lv ${SUMMIT_LEVEL}, ×${SUMMIT_HP} HP, in ${SUMMIT_TIME}s give or take. It's meant to be brutal. The first win gives the Shiny Charm.</p>` },
     { id: "cells", group: "Side quests", title: "Zygarde Cells", html: `<p>Once Diantha (Kalos's Champion) is beaten, every wild win has a 1 in ${CELL_ODDS} chance of turning up a Zygarde Cell, and every gym, Champion, dungeon and Red win brings ${CELL_BOSS}. Time away finds them at half the rate. Kalos's list shows how many you have.</p><p>10 cells unlock Zygarde's 10% Forme (fast and frail: Speed ${ZFORMES["10"].spe}) and bring you a Zygarde if you have none. 100 unlock its Complete Forme, Zygarde at 100%: HP ${ZFORMES.complete.hp}, double the usual. Pick the forme in Zygarde's detail; it keeps its level.</p>` },
     { id: "darkest", group: "Side quests", title: "The Darkest Day", html: `<p>Once Leon (Galar's Champion) is beaten, every wild win in Galar has a 1 in ${PIECE_ODDS} chance of a Wishing Piece, and every gym, Champion and dungeon win there brings ${PIECE_BOSS}. Time away in Galar finds them at half the rate. Galar's list shows how many you have.</p><p>${PIECES_NEED} pieces open the Energy Plant, where Eternamax Eternatus waits at Lv 100 in ${DARKEST_TIME}s give or take. Only a team built for it wins: the Pokémon that hit Eternamax hardest, at Lv 100 with all the Protein, beat it on their own with a little to spare, and anything weaker loses even tapping. Beat it and Eternatus is yours if it wasn't already, with its Eternamax form unlocked. Eternamax takes your one Gigantamax slot and fights with its own stats (HP 255, Defense and Sp. Def 250, the bulkiest Pokémon in the game), and its Dynamax Cannon hits ${pct(ETERNAMAX_BOOST - 1)} harder, where a Gigantamax hits ${pct(GMAX_BOOST - 1)} harder.</p>` },
@@ -1830,7 +1926,7 @@ function wikiSections() {
     { id: "shop", group: "Items", title: "The Shop", html: `<p>Balls, dungeon tickets (250 × (region number)^1.8), protein, the Linking Cord, evolution items your Box is waiting on, and, once you have the key items, a random Mega Stone ($${fmt(STONE_PRICE)}) or random Max Soup ($${fmt(SOUP_PRICE)}) for a Pokémon you own that lacks one. Those are for bad luck: dungeons and the Max Raid Den are the usual way.</p>` },
     { id: "protein", group: "Items", title: "Protein", html: `<p>+${pct(PROTEIN_STEP)} party damage each. Only ${PROTEIN_PER_REGION} count per region you've opened (up to ${PROTEIN_PER_REGION * REGIONS.length}), and each costs 1.5× the last, from $300. You can't buy it mid-fight.</p>` },
     { id: "mega", group: "Megas and Gigantamax", title: "Mega Evolution", html: `<p>Beat Steven (Hoenn's Champion) for the Key Stone. Each Mega form then needs its own Mega Stone, and each region's dungeon drops its own generation's: Kanto's Gen 1 (Charizard, Gengar, Gyarados...), Johto's Gen 2, and so on to Paldea. ${pct(STONE_DROP)} of clears drop one, and only for a Pokémon you own: one in your party if it can, else one in your Box. The Ultra Wormhole and Area Zero count as Alola's and Paldea's. Stones per dungeon: ${REGIONS.map((R, r) => `${R.name} ${FORMS.filter(f => f.kind === "mega" && !f.quest && f.gen === r + 1).length}`).join(", ")}.</p><p>Out of luck? The Shop sells a random Mega Stone for a Pokémon you own for $${fmt(STONE_PRICE)}. The stones for Mega Rayquaza and Mega Mewtwo X and Y only come from side quests (the Sky Pillar and Cerulean Cave).</p><p>Turn it on in the Pokémon's detail in Party & Box. One Mega in the party at a time, on in every fight, using its Mega stats and types. ${FORMS.filter(f => f.kind === "mega").length} Megas, from the originals to Legends: Z-A's.</p>` },
-    { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${new Set(FORMS.filter(f => f.kind === "gmax" && !f.quest).map(f => f.num)).size} species with a Gigantamax form then needs its Gigantamax factor, won in Galar's <b>Max Raid Den</b>: one Gigantamax Pokémon you can see before you go in, a Galar dungeon ticket a try, and as tough as a Champion (the strongest team for it you could have at the cap needs some Protein or a Mega). The den holds a species you don't have yet: one in your party if it can, else one in your Box, else any. Win and it can Gigantamax, and it joins you if you don't have it (legendaries still come the usual way). Lose and it waits for you. Out of luck? The Shop sells random Max Soup for a species you own for $${fmt(SOUP_PRICE)}.</p><p>One Gigantamax Pokémon at a time, always on; it hits ${pct(GMAX_BOOST - 1)} harder. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
+    { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${new Set(FORMS.filter(f => f.kind === "gmax" && !f.quest).map(f => f.num)).size} species with a Gigantamax form then needs its Gigantamax factor, won in Galar's <b>Max Raid Den</b>: one Gigantamax Pokémon you can see before you go in, a Galar dungeon ticket a try, and as tough as a Champion (the strongest team for it you could have at the cap, with a modest Protein, only just wins). The den holds a species you don't have yet: one in your party if it can, else one in your Box, else any. Win and it can Gigantamax, and it joins you if you don't have it (legendaries still come the usual way). Lose and it waits for you. Out of luck? The Shop sells random Max Soup for a species you own for $${fmt(SOUP_PRICE)}.</p><p>One Gigantamax Pokémon at a time, always on; it hits ${pct(GMAX_BOOST - 1)} harder. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
     { id: "regional", group: "Collection", title: "Regional forms", html: `<p>${VARIANTS.length} regional forms live in their own regions: Alolan in Alola, Galarian in Galar, Paldean in Paldea, and Hisuian in Sinnoh, which was Hisui long ago. They turn up on that region's routes like any wild Pokémon; Galarian Articuno, Zapdos and Moltres are among the Galar dungeon's legendaries.</p><p>A form belongs to its species, so catching an Alolan Rattata gives you Rattata (if you didn't have it) with its Alolan form, and picking the form in the detail keeps its level. Evolving the usual Pokémon inside a regional form's region gives that form, Pikachu into Alolan Raichu in Alola for one, and each form evolves its own way: Galarian Meowth becomes Perrserker, Alolan Vulpix needs an Ice Stone. Forms aren't Pokédex entries, so they don't change your leaderboard score. Pokédex → Forms shows which you have.</p>` },
     { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm. A shiny that evolves stays shiny. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
     { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>One point per Pokédex entry and one more for each one you have shiny, up to 2050. It posts to the arcade board when you're signed in.</p>` },
@@ -2008,6 +2104,10 @@ $("#wiki-text").addEventListener("scroll", () => {
 function openTab(t) { tab = t; document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.tab === t)); ["battle", "party", "dex", "shop", "settings", "wiki", "mail", "ach"].forEach(x => $("#t-" + x).hidden = x !== t); if (t === "dex") dexR = S.loc.r; if (t === "wiki") renderWiki(); if (t === "mail") renderMail(); if (t === "ach") renderAch(); renderAll(); refitSprites(); }
 $("#tabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (b) openTab(b.dataset.tab); };
 $("#regions").onclick = e => { const b = e.target.closest("[data-r]"); if (b) { viewR = +b.dataset.r; renderLocs(); } };
+$("#throwbox").onclick = e => { const b = e.target.closest("[data-throw]"); if (b) manualThrow(b.dataset.throw); };
+$("#teams").onclick = e => { const l = e.target.closest("[data-team]"), d = e.target.closest("[data-teamdel]"); if (l) loadTeam(+l.dataset.team); else if (d) { const t = S.teams[+d.dataset.teamdel]; S.teams.splice(+d.dataset.teamdel, 1); save(); renderParty(); toast(`Deleted ${t.name}.`); } else if (e.target.id === "teamsave") saveTeam(); };
+$("#teams").addEventListener("keydown", e => { if (e.target.id === "teamname" && e.key === "Enter") { e.preventDefault(); saveTeam(); } });
+$("#s-manual").onchange = () => { S.set.manual = $("#s-manual").checked; save(); };
 $("#locs").onclick = e => { const b = e.target.closest("[data-loc]"); if (b) startLoc(JSON.parse(b.dataset.loc)); };
 // Taps draw from a small bucket that refills 8 times a second, so quick fingers lose nothing
 // and an auto-clicker gets no more than a fast human. Scripted clicks don't count at all.
@@ -2241,7 +2341,7 @@ function migrateSave() {
   S.ach = S.ach || {}; S.stats = Object.assign({ taps: 0, wins: 0, evolved: 0, gifts: 0 }, S.stats); S.cells = S.cells || 0;
   // New catches stop joining the party once it has been full: a save past its first six catches already has been.
   if (S.full == null) S.full = S.party.length >= 6 || Object.keys(S.box).length > 6 ? 1 : 0;
-  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.trips = S.trips || {}; S.den = S.den || {}; S.pity = S.pity || {}; S.plates = S.plates || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
+  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.trips = S.trips || {}; S.den = S.den || {}; S.pity = S.pity || {}; S.teams = S.teams || []; S.plates = S.plates || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
   // Prof Penguin's tips are for new players: a save three badges in has found its feet.
   if (!S.tut) S.tut = { seen: {}, off: Object.keys(S.badges).length >= 3 ? 1 : 0 };
   if (S.champs[KEY_STONE_FROM]) S.key = 1;
@@ -2267,6 +2367,7 @@ function enter(t) {
   show("game");
   if (!B) {
     for (const id of ["fresh", "dupe", "shiny"]) $("#s-" + id).value = S.set[id];
+    $("#s-manual").checked = !!S.set.manual;
     viewR = S.loc.r;
     if (S.loc.kind === "route" && unlocked(S.loc)) startLoc(S.loc); else { B = { r: S.loc.r }; backToRoute(); }
   }
