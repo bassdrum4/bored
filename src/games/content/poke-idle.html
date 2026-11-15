@@ -278,6 +278,7 @@
   .pk-top { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap }
   .pk-fig { width: 176px; max-width: 44%; display: flex; flex-direction: column; align-items: center; gap: 6px }
   .pk .pic.pk-pic { width: 100%; aspect-ratio: 1; border: 1px solid var(--rule); border-radius: 3px; background: var(--g-route); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px }
+  .pk .spr.unknown { filter: brightness(0); opacity: .3 }
   .pk-body { flex: 1; min-width: 210px; display: flex; flex-direction: column; gap: 2px }
   table.pk-stats { border-collapse: collapse; table-layout: fixed; width: 100%; max-width: 340px; margin-top: 8px; font-size: 12px; font-variant-numeric: tabular-nums }
   .pk-stats th { text-align: left; font-weight: 400; color: var(--dim); padding: 2px 0; white-space: nowrap; width: 9ch }
@@ -1798,12 +1799,17 @@ function wikiEntry(n) {
   const tag = m.flags.has("my") ? "Mythical" : m.flags.has("lg") ? "Legendary" : m.flags.has("pseudo") ? "Pseudo-legendary" : m.flags.has("starter") ? "Starter" : m.flags.has("fossil") ? "Fossil" : "";
   const balls = BALLS.filter(x => x.id !== "master").map(x => `${x.name} ${pct(throwChance(m, x))}`).join(", ");
   const yours = b ? `Yours is Lv ${level(n)}${b.shiny ? ", and you have it shiny" : ""}${b.special ? ", with a special edition look" : ""}.` : S.seen[n] ? "You've seen one but haven't caught it." : "You haven't met one yet.";
-  const look = k => `<button class="lbl${(k === "shiny") === wikiShiny ? " on" : ""}" type="button" data-wshiny="${k === "shiny" ? 1 : 0}" aria-pressed="${(k === "shiny") === wikiShiny}">${k === "shiny" ? "Shiny" : "Normal"}</button>`;
+  // A species with a special edition gets a third look: SP if you have it, ??? (its outline only) if you don't.
+  const spe = Object.entries(SPECIALS).find(([, x]) => x.num === n), sp = spe && spe[1], spHave = !!(spe && b && b.special === spe[0]), spOn = wikiSp && !!sp;
+  const look = k => { const on = k === "sp" ? spOn : !spOn && (k === "shiny") === wikiShiny;
+    return `<button class="lbl${on ? " on" : ""}" type="button" data-wshiny="${k === "shiny" ? 1 : k === "sp" ? "sp" : 0}" aria-pressed="${on}"${k === "sp" && !spHave ? ' aria-label="Special edition, not yours yet"' : ""}>${k === "shiny" ? "Shiny" : k === "sp" ? (spHave ? "SP" : "???") : "Normal"}</button>`; };
+  const pic = spOn ? `<img class="spr${spHave ? "" : " unknown"}" src="${sp.img}" alt="${spHave ? esc(sp.title) : "A special edition you don't have yet"}">` : `<img class="spr" src="${sprite(n, wikiShiny)}" alt="${esc(m.name)}${wikiShiny ? ", shiny" : ""}">`;
+  const spNote = spOn ? `<p class="small">${spHave ? `<b>${esc(sp.title)}</b>: ${esc(sp.note)}` : "There's a special edition of this Pokémon. Its look stays hidden until you have one."}</p>` : "";
   return `<article class="pk" aria-labelledby="pk-title">
     <header class="pk-head"><h3 id="pk-title" tabindex="-1">${dexNo(n)} ${esc(m.name)}</h3><span class="row">${prev ? `<button class="lbl" type="button" data-wpk="${prev}">Previous: ${esc(mon(prev).name)}</button>` : ""}${next ? `<button class="lbl" type="button" data-wpk="${next}">Next: ${esc(mon(next).name)}</button>` : ""}</span></header>
     <div class="pk-top">
-      <figure class="pk-fig"><span class="pic pk-pic"><img class="spr" src="${sprite(n, wikiShiny)}" alt="${esc(m.name)}${wikiShiny ? ", shiny" : ""}"></span><span class="row">${look("normal")}${look("shiny")}</span></figure>
-      <div class="pk-body"><p>${m.types.map(tyChip).join(" ")}${tag ? ` <span class="muted">${tag}</span>` : ""}</p><p class="muted">Generation ${m.gen}, first found in ${REGIONS[m.gen - 1].name}</p>${wikiStats(m)}</div>
+      <figure class="pk-fig"><span class="pic pk-pic">${pic}</span><span class="row">${look("normal")}${look("shiny")}${sp ? look("sp") : ""}</span></figure>
+      <div class="pk-body"><p>${m.types.map(tyChip).join(" ")}${tag ? ` <span class="muted">${tag}</span>` : ""}</p><p class="muted">Generation ${m.gen}, first found in ${REGIONS[m.gen - 1].name}</p>${spNote}${wikiStats(spOn && spHave ? sp : m)}</div>
     </div>
     <dl class="pk-facts">
       <dt>Where</dt><dd>${wikiWhere(n)}</dd>
@@ -1816,7 +1822,7 @@ function wikiEntry(n) {
   </article>`;
 }
 // The wiki has two tabs: the guide (every rule, searchable) and the Pokédex (every Pokémon, with filters).
-let wikiMode = "guide", wikiCur = "", wikiAim = 0, wikiDex = 1, wikiShiny = false;
+let wikiMode = "guide", wikiCur = "", wikiAim = 0, wikiDex = 1, wikiShiny = false, wikiSp = false;
 const wikiQuery = { guide: "", dex: "" };
 function wikiMatches(q) {
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -1903,7 +1909,7 @@ $("#wiki-list").onclick = e => {
 $("#wiki-text").onclick = e => {
   const p = e.target.closest("[data-wpk]"), sh = e.target.closest("[data-wshiny]");
   if (p) wikiOpen(+p.dataset.wpk);
-  else if (sh) { wikiShiny = sh.dataset.wshiny === "1"; renderWiki(); }
+  else if (sh) { wikiShiny = sh.dataset.wshiny === "1"; wikiSp = sh.dataset.wshiny === "sp"; renderWiki(); }
 };
 $("#wiki-search").addEventListener("input", () => { wikiQuery[wikiMode] = $("#wiki-search").value; wikiList(); });
 $("#wiki-contents").onclick = () => wikiContents();
