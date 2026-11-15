@@ -845,6 +845,23 @@ const TRIPS = [
 const TRIP = Object.fromEntries(TRIPS.map(T => [T.id, T]));
 const tripCaught = T => T.all.filter(n => S.box[n]).length;
 // The last one: any of them in the Ultra Wormhole; in Area Zero, one of the six from the DLC a third of the time.
+// Each dungeon (and the Ultra Wormhole and Area Zero) rolls its boss ahead, shows its types in the list, and keeps it
+// until you beat it: losing or leaving the run doesn't roll a new one. Stored as "m:150", "v:v10169" or "f:10043".
+const foeKey = f => f.kind === "mega" ? "f:" + f.id : f.vid ? "v:" + f.vid : "m:" + f.num;
+const foeOf = k => { const [t, v] = String(k).split(":"); return t === "f" ? formById(+v) : t === "v" ? VARIANTS.find(x => x.vid === v) : t === "m" ? mon(+v) : null; };
+function denFoe(r, x) {
+  S.den = S.den || {};
+  const key = x || "d" + r, kept = S.den[key] && foeOf(S.den[key]);
+  if (kept) return kept;
+  const rand = Math.random; let f;
+  if (x) f = tripBoss(TRIP[x], rand);
+  else {
+    const bosses = dungeonBosses(r), lg = bosses[Math.floor(rand() * bosses.length)], lgMegas = formsOf(lg.num, "mega");
+    // A legendary with a Mega form comes out as one half the time. Catching it gets you the usual form.
+    f = lgMegas.length && rand() < .5 ? lgMegas[Math.floor(rand() * lgMegas.length)] : lg;
+  }
+  S.den[key] = foeKey(f); return f;
+}
 const tripBoss = (T, rand) => mon(T.late && rand() < 1 / 3 ? T.late[Math.floor(rand() * T.late.length)] : T.mons[Math.floor(rand() * T.mons.length)]);
 const QUEST = Object.fromEntries(QUESTS.map(Q => [Q.id, Q]));
 const allChamps = () => Object.keys(S.champs).length >= REGIONS.length;
@@ -922,15 +939,15 @@ function locName(loc) {
   return `Champion ${R.champ}`;
 }
 // ── Boss HP. Your team wins boss fights, not your taps: no boss needs tapping, and a team built for it wins idling.
-// LEGEND_EDGE: dungeon legendaries, the Ultra Wormhole and Area Zero's last one, and the mini quests are set for a decent
-// team with a type edge: 1.4x the damage it would do with none, about half the team hitting 2x. With no edge, it loses.
-const LEGEND_EDGE = 1.4;
 // Gym leaders and Champions are tuned so the strongest super-effective team you could have, as evolved as the level
 // cap allows, at the cap, with no protein, falls a little short idling (GYM_USE: 115% of the timer). It needs some
-// Protein, a Mega or a few taps; off-type and under-leveled teams lose, even tapping. A dungeon's legendary is tuned for a decent team at the cap
-// with about half of it hitting the legendary super-effectively (LEGEND_EDGE), idling, to only just clear the whole run (LEGEND_USE, the
-// pause after each faint included). Without a type edge it loses.
-const GYM_TAPS = 0, LEGEND_TAPS = 0, GYM_USE = 1.15, LEGEND_USE = .95;
+// Protein, a Mega or a few taps; off-type and under-leveled teams lose, even tapping. Max Raids and the mini quests
+// follow the same rule. Dungeons (their legendary), the Ultra Wormhole and Area Zero (their last one): the 6 strongest
+// you could have against it (4x matchups count), at the cap, with a modest Protein (DEN_PROTEIN: a quarter of what
+// you could have by now), only just win the run idling (DEN_USE). Most players carry more Protein, so they can win with
+// fewer perfect counters. A dungeon shows its legendary's types before you go in, and keeps it until you beat it.
+const GYM_TAPS = 0, GYM_USE = 1.15, DEN_USE = .97, DEN_PROTEIN = .25;
+const denProtein = () => Math.floor(proteinCap() * DEN_PROTEIN);
 const PARENT = {}; for (const m of MON) for (const [t, how, v] of m.evos) PARENT[t] = { p: m.num, how, v };
 const minLv = n => { const p = PARENT[n]; return p ? Math.max(minLv(p.p), p.how === "L" ? p.v : 0) : 0; };
 const rootOf = n => PARENT[n] ? rootOf(PARENT[n].p) : n;
@@ -946,9 +963,9 @@ const refHit = (m, cap, foe) => hitStat(m, foe) * cap / 50 * hitRate(m) * truant
 // The reference team's own Def: tuning measures it against the time that team would get, so Def counts relative to it.
 const refDef = P => Math.min(1.25, Math.max(.8, P.reduce((s, m) => s + bulkFor(m), 0) / P.length / PARTY_BULK));
 const refTaps = (P, cap, taps) => taps * Math.max(1, Math.round(1 + TAP_SHARE * P.reduce((s, m) => s + refHit(m, cap), 0)));
-function gymTuning(B, k, size) {
+function gymTuning(B, k, size, area = [B.r, k]) {
   const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap, f) * bestEff(m, f), 0);
-  const P = refPool(B.r, k, cap).sort((a, b) => vs(b) - vs(a)).slice(0, size), tap = refTaps(P, cap, GYM_TAPS);
+  const P = refPool(...area, cap).sort((a, b) => vs(b) - vs(a)).slice(0, size), tap = refTaps(P, cap, GYM_TAPS);
   const secs = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / (P.reduce((d, m) => d + refHit(m, cap, f) * bestEff(m, f), 0) + tap), 0);
   return GYM_USE * B.bossTime * refDef(P) / secs;
 }
@@ -959,26 +976,23 @@ function raidTuning(B) {
   const P = refPool(...refArea(B.r, 3), cap).sort((a, b) => hit(b) - hit(a)).slice(0, 6), tap = refTaps(P, cap, GYM_TAPS);
   return GYM_USE * B.bossTime * refDef(P) * (P.reduce((d, m) => d + hit(m), 0) + tap) / bossHpFor(f, B.L, B.i);
 }
-// Mini quests (Meteor Falls, Slumbering Weald) are tuned like a dungeon's legendary, every foe a boss: a decent team at
-// the cap, about half of it hitting them super-effectively, only just clears them idling.
-function miniTuning(B) {
-  const cap = areaCap(), P = refPool(...refArea(B.r, 3), cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
-  const tap = refTaps(P, cap, LEGEND_TAPS), dps = f => P.reduce((d, m) => d + refHit(m, cap, f), 0) * LEGEND_EDGE + tap;
-  return LEGEND_USE * B.bossTime * refDef(P) / B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / dps(f), 0);
-}
+// Mini quests (Meteor Falls, Slumbering Weald): you know who's there, so they're tuned like a Champion's team.
+const miniTuning = B => gymTuning(B, 3, 6, refArea(B.r, 3));
 const questHp = B => QUEST[B.q].mini ? B.tune : QUEST[B.q].hp;
-// Dungeon fodder is as tough as that region's route Pokémon, and a bit more, but never more than the decent team
-// below clears in FODDER_USE of its time: the run is about the legendary, and idling has to be able to get there.
+// Dungeon fodder is as tough as that region's route Pokémon, and a bit more, but never more than the team below clears
+// in FODDER_USE of its time: the run is about the legendary, and idling has to be able to get there.
 const fodderHp = i => DUNGEON_HP * wildHard(i), FODDER_USE = .35;
 // Sets B.fodder (the fodder's HP multiplier) and returns the legendary's.
 function legendTuning(B) {
-  // "Decent": the 7th to 12th strongest you could have by now, with no type edge either way (Def and Sp. Def count).
-  const cap = areaCap(), P = refPool(...refArea(B.r, B.x ? 3 : 2), cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
-  const tap = refTaps(P, cap, LEGEND_TAPS), dps = f => P.reduce((d, m) => d + refHit(m, cap, f), 0) + tap, n = B.queue.length, lg = B.queue[n - 1];
-  const budget = LEGEND_USE * B.bossTime * refDef(P) - .65 * n, edge = P.reduce((d, m) => d + refHit(m, cap, lg), 0) * LEGEND_EDGE + tap;
+  // The 6 strongest you could have against this legendary, at the cap, with denProtein() Protein, need DEN_USE of the
+  // time for the whole run (the pause after each faint included).
+  const cap = areaCap(), n = B.queue.length, lg = B.queue[n - 1], hit = (m, f) => refHit(m, cap, f) * bestEff(m, f);
+  const P = refPool(...refArea(B.r, B.x ? 3 : 2), cap).sort((a, b) => hit(b, lg) - hit(a, lg)).slice(0, 6), boost = 1 + PROTEIN_STEP * denProtein();
+  const tap = refTaps(P, cap, GYM_TAPS), dps = f => P.reduce((d, m) => d + hit(m, f), 0) * boost + tap;
+  const budget = DEN_USE * B.bossTime * refDef(P) - .65 * n;
   const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps(f), 0), room = FODDER_USE * budget;
   B.fodder = fodderHp(B.i) * Math.min(1, room / Math.max(1e-9, fodder));
-  return Math.max(1, (budget - Math.min(fodder, room)) * edge / bossHpFor(lg, B.L, B.i));
+  return Math.max(1, (budget - Math.min(fodder, room)) * dps(lg) / bossHpFor(lg, B.L, B.i));
 }
 
 function startLoc(loc) {
@@ -1003,14 +1017,9 @@ function startLoc(loc) {
   else if (loc.kind === "raid") { const n = raidMon(), f = raidForm(n), L = Math.max(champLevel(r), levelCap()); B = { kind: "raid", r, n, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [f], L, base: RAID_TIME, time: fightTime(RAID_TIME, [f], regionOffense(r), .9, 1.15), idx: 0 }; }
   else {
     // A dungeon, or the Ultra Wormhole or Area Zero (x): the same run, with Ultra Beasts or Paradox Pokémon all the way.
-    const T = loc.x && TRIP[loc.x], rand = Math.random, pool = T ? T.mons.map(mon) : dungeonPool(r), bosses = T ? null : dungeonBosses(r);
+    const T = loc.x && TRIP[loc.x], rand = Math.random, pool = T ? T.mons.map(mon) : dungeonPool(r);
     const q = Array.from({ length: DUNGEON_SIZE }, () => pool[Math.floor(rand() * pool.length)]);
-    if (T) q.push(tripBoss(T, rand));
-    else {
-      const lg = bosses[Math.floor(rand() * bosses.length)], lgMegas = formsOf(lg.num, "mega");
-      // A legendary with a Mega form comes out as one half the time. Catching it gets you the usual form.
-      q.push(lgMegas.length && rand() < .5 ? lgMegas[Math.floor(rand() * lgMegas.length)] : lg);
-    }
+    q.push(denFoe(r, loc.x));
     const L = T ? Math.max(champLevel(r), levelCap()) : dungeonLevel(r);
     B = { kind: "dungeon", ...(T ? { x: T.id } : {}), r, i: Math.max(r * 4 + (T ? 3 : 2), cleared(r) ? levelIndex(L) : 0), queue: q, L, base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [q[q.length - 1]], regionOffense(r), .9, 1.15), idx: 0 };
   }
@@ -1020,7 +1029,7 @@ function startLoc(loc) {
   else if (B.kind === "dungeon") B.tune = legendTuning(B);
   else if (B.kind === "raid") B.tune = raidTuning(B);
   else if (B.kind === "quest" && QUEST[B.q].mini) B.tune = miniTuning(B);
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? (B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end.") : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
@@ -1126,6 +1135,7 @@ function next() {
     const unlock = first && B.r === KEY_STONE_FROM ? (S.key = 1, " Steven gives you a Key Stone: Mega Evolution is open.") : first && B.r === BAND_FROM ? (S.band = 1, " Leon gives you a Dynamax Band: Gigantamax is open.") : "";
     toast((first ? `You beat Champion ${R.champ}! +$${fmt(prize)} and a Master Ball. Level cap ${levelCap()}.${B.r < 8 ? " " + REGIONS[B.r + 1].name + " is open." : " You beat every region!"}` : `Champion rematch won. +$${fmt(prize)}.`) + unlock + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "summit") { const first = !S.charm; S.charm = 1; const prize = rewardFor(B.L, B.i, 30); S.money += prize; toast((first ? `You beat Red on Mt. Silver! +$${fmt(prize)} and the Shiny Charm: shinies are three times as common now.` : `Red rematch won. +$${fmt(prize)}.`) + gainCells(CELL_BOSS)); }
+  if (B.kind === "dungeon") delete (S.den || {})[B.x || "d" + B.r];
   if (B.kind === "dungeon" && B.x) { S.trips[B.x] = (S.trips[B.x] || 0) + 1; const T = TRIP[B.x]; toast(`${T.place} cleared. ${T.what}: ${tripCaught(T)}/${T.all.length} caught.` + stoneDrop(B.r) + gainCells(CELL_BOSS)); }
   else if (B.kind === "dungeon") { S.dungeons[B.r] = (S.dungeons[B.r] || 0) + 1; toast(`${R.name} dungeon cleared.` + stoneDrop(B.r) + gainCells(CELL_BOSS) + galar); }
   if (B.kind === "quest") {
@@ -1315,12 +1325,12 @@ function renderLocs() {
   for (let k = 0; k < 4; k++) {
     items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${wildLevel(r, k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
     items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${Math.round(gymTime(r, k) * partyTime())}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
-    if (k === 1) items.push({ kind: "dungeon", r, note: `${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"} · cleared ${S.dungeons[r] || 0}x`, done: !!S.dungeons[r] });
+    if (k === 1) items.push({ kind: "dungeon", r, types: unlocked({ kind: "dungeon", r }) ? denFoe(r).types : null, note: `${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}`, done: !!S.dungeons[r] });
   }
   items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
   if (r === PIECES_FROM) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
   if (r === BAND_FROM) { const n = raidMon(); items.push({ kind: "raid", r, types: n ? raidForm(n).types : null, note: !S.band ? "after Leon" : n ? `${mon(n).name} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : "every Gigantamax won", done: S.band && !n }); }
-  for (const T of TRIPS) if (T.r === r) items.push({ kind: "dungeon", r, x: T.id, note: S.champs[r] ? `${tripCaught(T)}/${T.all.length} caught · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : `after ${REGIONS[r].champ}`, done: tripCaught(T) >= T.all.length });
+  for (const T of TRIPS) if (T.r === r) items.push({ kind: "dungeon", r, x: T.id, types: unlocked({ kind: "dungeon", r, x: T.id }) ? denFoe(r, T.id).types : null, note: S.champs[r] ? `${tripCaught(T)}/${T.all.length} caught · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}` : `after ${REGIONS[r].champ}`, done: tripCaught(T) >= T.all.length });
   for (const Q of QUESTS) if (Q.r === r) items.push({ kind: "quest", r, q: Q.id, note: questNote(Q), done: !!S.won[Q.id] });
   if (r === TOWER_FROM) items.push({ kind: "tower", r, note: S.champs[TOWER_FROM] ? (S.tower.best ? `best floor ${S.tower.best}` : "endless, timed") : "after Geeta", done: false });
   if (r === 1) items.push({ kind: "summit", r, note: S.charm ? "Shiny Charm" : unlocked({ kind: "summit" }) ? `Red · ${Math.round(fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2) * partyTime())}s` : "after all 9 Champions", done: !!S.charm });
@@ -1588,6 +1598,11 @@ function renderAch() {
 const MAIL = [
   { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
+  { id: "update-2026-11-15a", date: "Nov 15, 2026", from: "Prof Penguin", title: "Dungeons are Champion-tough, and show what's waiting",
+    body: `<ul><li>Each dungeon now shows its legendary's types in the list before you go in, like a Max Raid den in Sword and Shield. Build for those types: your party is locked once you're in.</li>
+      <li>The legendary stays until you beat it. Losing or leaving the run doesn't roll a new one.</li>
+      <li>Dungeons are much tougher: the best team against that legendary, with a modest Protein (a quarter of what you could have by now), only just wins. More Protein lets you win with fewer perfect counters, and off-type teams lose.</li>
+      <li>The Ultra Wormhole and Area Zero show and keep their last one the same way, and the mini quests are Champion-tough too.</li></ul>` },
   { id: "update-2026-11-14g", date: "Nov 14, 2026", from: "Prof Penguin", title: "Mega Stones from dungeons, Max Raids, and catch-up XP",
     body: `<ul><li><b>Mega Stones</b> come from dungeons now, each one its own generation's: Kanto's dungeon drops Gen 1's (Charizard, Gengar, Gyarados...), Johto's Gen 2's, and so on to Paldea. Half of all clears drop one once you have the Key Stone, and only for a Pokémon you own, your party first. Gyms, Champions and Red don't drop them anymore.</li>
       <li><b>Max Raid Den</b> in Galar, after Leon: one Gigantamax Pokémon you see before you go in, as tough as a Champion, a Galar ticket a try. Win and it can Gigantamax, and it joins you if you didn't have it. That's how you get Gigantamax now.</li>
@@ -1730,7 +1745,7 @@ function wikiSections() {
     { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. Evolve all, next to the Box, does every level evolution that's ready with only one way to go, again and again (a Lv 40 Charmander ends up a Charizard); choices, items and Linking Cords stay with you. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
     { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, with no protein, falls a little short on its own (it would need ${pct(GYM_USE)} of the time it gets): bring some Protein, a Mega or a few taps. Off-type and under-leveled teams lose, even tapping. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
     { id: "tapping", group: "Bosses", title: "Your team wins, not your taps", html: `<p>No boss needs tapping. Every one is set for a team built for it: the right types, levels, evolutions and Protein win on their own, and the wrong team loses even tapping flat out. A tap is ${pct(TAP_SHARE)} of your party's damage per second, so ${TAP_RATE} a second add about a third: enough to rescue a close fight, not to carry a weak team.</p>` },
-    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>Its HP is set for a decent team (the 7th to 12th strongest you could have) at the cap, with about half of it hitting the legendary super-effectively, idling, to only just clear the run (${pct(LEGEND_USE)} of the time). Without a type edge you lose, and the legendary is random: a team that covers many types is the way in. A legendary with a Mega form comes out as one half the time; catching it gets you the usual form.</p>` },
+    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>Like a Max Raid den in Sword and Shield, the list shows the waiting legendary's types before you go in, but not which one it is. Build your team for those types: your party is locked once the run starts. The legendary stays the same until you beat it; losing or leaving the run (which still uses the ticket) doesn't roll a new one. A legendary with a Mega form comes out as one half the time, and the list shows the Mega's types; catching it gets you the usual form.</p><p>It's set so the 6 strongest Pokémon you could have against it (a 4× weakness counts), at the cap, with a modest Protein (a quarter of what you could have by now: ${denProtein()} right now), only just win the run on their own. Carry more Protein and you can win with fewer perfect counters; a Mega or a few taps help too. Off-type teams lose. The Pokémon before it never take more than ${pct(FODDER_USE)} of the time. The Ultra Wormhole and Area Zero work the same way for their last one, and the mini quests (Meteor Falls, the Slumbering Weald) are tuned like a Champion's team.</p>` },
     { id: "silver", group: "Side quests", title: "Mt. Silver", html: `<p>Once all nine Champions are beaten, Red waits on Mt. Silver (in Johto's list) with ${RED_TEAM.map(n => mon(n).name).join(", ")} at Lv ${SUMMIT_LEVEL}, ×${SUMMIT_HP} HP, in ${SUMMIT_TIME}s give or take. It's meant to be brutal. The first win gives the Shiny Charm.</p>` },
     { id: "cells", group: "Side quests", title: "Zygarde Cells", html: `<p>Once Diantha (Kalos's Champion) is beaten, every wild win has a 1 in ${CELL_ODDS} chance of turning up a Zygarde Cell, and every gym, Champion, dungeon and Red win brings ${CELL_BOSS}. Time away finds them at half the rate. Kalos's list shows how many you have.</p><p>10 cells unlock Zygarde's 10% Forme (fast and frail: Speed ${ZFORMES["10"].spe}) and bring you a Zygarde if you have none. 100 unlock its Complete Forme, Zygarde at 100%: HP ${ZFORMES.complete.hp}, double the usual. Pick the forme in Zygarde's detail; it keeps its level.</p>` },
     { id: "darkest", group: "Side quests", title: "The Darkest Day", html: `<p>Once Leon (Galar's Champion) is beaten, every wild win in Galar has a 1 in ${PIECE_ODDS} chance of a Wishing Piece, and every gym, Champion and dungeon win there brings ${PIECE_BOSS}. Time away in Galar finds them at half the rate. Galar's list shows how many you have.</p><p>${PIECES_NEED} pieces open the Energy Plant, where Eternamax Eternatus waits at Lv 100 in ${DARKEST_TIME}s give or take. Only a team built for it wins: the Pokémon that hit Eternamax hardest, at Lv 100 with all the Protein, beat it on their own with a little to spare, and anything weaker loses even tapping. Beat it and Eternatus is yours if it wasn't already, with its Eternamax form unlocked. Eternamax takes your one Gigantamax slot and fights with its own stats (HP 255, Defense and Sp. Def 250, the bulkiest Pokémon in the game), and its Dynamax Cannon hits ${pct(ETERNAMAX_BOOST - 1)} harder, where a Gigantamax hits ${pct(GMAX_BOOST - 1)} harder.</p>` },
@@ -2152,7 +2167,7 @@ function migrateSave() {
   S.ach = S.ach || {}; S.stats = Object.assign({ taps: 0, wins: 0, evolved: 0, gifts: 0 }, S.stats); S.cells = S.cells || 0;
   // New catches stop joining the party once it has been full: a save past its first six catches already has been.
   if (S.full == null) S.full = S.party.length >= 6 || Object.keys(S.box).length > 6 ? 1 : 0;
-  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.trips = S.trips || {}; S.plates = S.plates || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
+  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.trips = S.trips || {}; S.den = S.den || {}; S.plates = S.plates || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
   // Prof Penguin's tips are for new players: a save three badges in has found its feet.
   if (!S.tut) S.tut = { seen: {}, off: Object.keys(S.badges).length >= 3 ? 1 : 0 };
   if (S.champs[KEY_STONE_FROM]) S.key = 1;
