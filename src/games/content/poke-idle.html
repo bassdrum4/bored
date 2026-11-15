@@ -1416,8 +1416,10 @@ function renderParty() {
   if (drag) { dragDirty = true; return; }
   $("#partyhint").innerHTML = swapPick && S.box[swapPick] ? `<b>Tap the party Pokémon ${esc(mon(swapPick).name)} should replace.</b> <button class="lbl" type="button" data-swapcancel="1">Cancel</button>` : PARTY_HINT;
   // Power is how hard the party hits; bulk (HP, Defense and Sp. Def averaged) is how long it lasts: boss timers stretch or shrink by it.
-  const avgBulk = S.party.length ? S.party.reduce((t, n) => t + bulkFor(fighter(n)), 0) / S.party.length : 0, stretch = Math.round(partyTime() * 100 - 100);
-  $("#teamline").innerHTML = S.party.length ? `Team power <b>${fmt(partyDps(null))}</b>/s · bulk <b>${Math.round(avgBulk)}</b> on average, so boss timers are <b>${stretch > 0 ? "+" : ""}${stretch}%</b> (${PARTY_BULK} is even; each Pokémon counts up to ${BULK_CAP}; from −20% to +25%)` : "";
+  // Below the cap each one counts × (level ÷ cap)², so the line shows both: on paper, and at their levels.
+  const avg = f => S.party.length ? S.party.reduce((t, n) => t + f(n), 0) / S.party.length : 0, stretch = Math.round(partyTime() * 100 - 100);
+  const avgBulk = avg(n => bulkFor(fighter(n))), lvBulk = avg(n => bulkFor(fighter(n)) * underCap(battleLevel(n)) ** 2), under = Math.round(lvBulk) < Math.round(avgBulk);
+  $("#teamline").innerHTML = S.party.length ? `Team power <b>${fmt(partyDps(null))}</b>/s · bulk <b>${Math.round(avgBulk)}</b> on average${under ? `, <b>${Math.round(lvBulk)}</b> at their levels (below the cap, each counts × (level ÷ cap)²)` : ""}, so boss timers are <b>${stretch > 0 ? "+" : ""}${stretch}%</b> (${PARTY_BULK} is even; each Pokémon counts up to ${BULK_CAP}; from −20% to +25%)` : "";
   $("#party").innerHTML = Array.from({ length: 6 }, (_, i) => S.party[i] ? monTile(S.party[i], { inparty: true, xp: true, form: true }) : '<div class="mon empty" aria-hidden="true"></div>').join("");
   // "Can evolve": ready right now first, then ones with an evolution still to get, then the rest.
   const evoRank = n => { const o = evoOptions(n); return o.some(e => canEvolve(n, e)) ? 0 : o.length ? 1 : 2; };
