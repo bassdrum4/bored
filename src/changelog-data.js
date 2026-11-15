@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 487,
+  "count": 488,
   "newest": "2026-11-14",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"86a51e5","date":"2026-11-14","author":"PenguinV360","subject":"fix(poke-idle): stricter gyms and dungeons; cleared regions are no shortcut","pr":149},
   {"sha":"34730a7","date":"2026-11-14","author":"Daniel Lowe","subject":"Restore game-card leaderboards","pr":148},
   {"sha":"0e0ab29","date":"2026-11-14","author":"PenguinV360","subject":"feat(poke-idle): bosses are won by the team, not taps; old regions keep up with you","pr":147},
   {"sha":"c9e8d33","date":"2026-11-14","author":"PenguinV360","subject":"feat(poke-idle): Kyurem, Deoxys and Crowned quests, Ultra Wormhole and Area Zero, bulk cap, two-type search","pr":146},
