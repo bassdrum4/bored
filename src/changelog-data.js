@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 484,
+  "count": 485,
   "newest": "2026-11-14",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c9e8d33","date":"2026-11-14","author":"PenguinV360","subject":"feat(poke-idle): Kyurem, Deoxys and Crowned quests, Ultra Wormhole and Area Zero, bulk cap, two-type search","pr":146},
   {"sha":"60533bd","date":"2026-11-14","author":"Daniel Lowe","subject":"Make Bored easier to start playing","pr":145},
   {"sha":"6df10a2","date":"2026-11-14","author":"Daniel Lowe","subject":"test: prune redundant and implementation-bound Bored regressions","pr":144},
   {"sha":"e352853","date":"2026-11-14","author":"Daniel Lowe","subject":"fix(ci): allow changelog bot to commit through owner token"},
