@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 485,
+  "count": 486,
   "newest": "2026-11-14",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"0e0ab29","date":"2026-11-14","author":"PenguinV360","subject":"feat(poke-idle): bosses are won by the team, not taps; old regions keep up with you","pr":147},
   {"sha":"c9e8d33","date":"2026-11-14","author":"PenguinV360","subject":"feat(poke-idle): Kyurem, Deoxys and Crowned quests, Ultra Wormhole and Area Zero, bulk cap, two-type search","pr":146},
   {"sha":"60533bd","date":"2026-11-14","author":"Daniel Lowe","subject":"Make Bored easier to start playing","pr":145},
   {"sha":"6df10a2","date":"2026-11-14","author":"Daniel Lowe","subject":"test: prune redundant and implementation-bound Bored regressions","pr":144},
