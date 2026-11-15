@@ -529,17 +529,19 @@ const REGIONS = [
 ].map(([name, gyms, champ], r) => ({ name, gyms, champ, gen: r + 1 }));
 const KILLS_FOR_GYM = 10, GYM_TIME = 30, DUNGEON_TIME = 60, CHAMP_TIME = 60, DUNGEON_SIZE = 8;
 // Mt. Silver: Red waits there once all nine Champions are down. Brutal on purpose; the Shiny Charm is the prize.
-const RED_TEAM = [25, 196, 143, 3, 6, 9], SUMMIT_HP = 9.8, SUMMIT_LEVEL = 100, SUMMIT_TIME = 120;
+const RED_TEAM = [25, 196, 143, 3, 6, 9], SUMMIT_HP = 5.3, SUMMIT_LEVEL = 100, SUMMIT_TIME = 120;
 // Shinies: 1 in 4096, as in the newer games. The Shiny Charm triples it.
 const shinyOdds = () => (S.charm ? 3 : 1) / 4096;
 const routeLevel = i => Math.min(100, Math.round(3 + i * 2.75));
 const hpFor = (m, L, i, mult = 1) => Math.round((2 * m.hp * L / 100 + L + 10) * 2.5 * Math.pow(1.1, i) * mult);
 const rewardFor = (L, i, mult = 1) => Math.round((6 + L * 1.5) * Math.pow(1.08, i) * mult);
 const gymLevel = i => routeLevel(i) + 3, champLevel = r => routeLevel(r * 4 + 3) + 6;
-// However strong the party, a boss fight needs tapping: if the party alone could clear a gym, Champion or Red in time,
-// every Pokémon in it gets the same extra HP until idling falls this far short (checked when the fight starts; a
-// dungeon's legendary is checked against the time left when it comes out).
-const IDLE_SHORT = 1.25;
+// Once a region's Champion is beaten, its wild Pokémon keep up with you: Route 1 sits 8 under your level cap, Route 4
+// 2 under, the dungeon, the Ultra Wormhole and Area Zero at it, and your party fights at its full level there. Catches
+// come in at a level you can use. Gyms, Champions and quests keep their own levels.
+const cleared = r => !!(S && S.champs && S.champs[r]);
+const wildLevel = (r, k) => cleared(r) ? Math.max(routeLevel(r * 4 + k), Math.min(100, levelCap() - 8 + 2 * k)) : routeLevel(r * 4 + k);
+const dungeonLevel = r => cleared(r) ? Math.max(routeLevel(r * 4 + 2) + 4, levelCap()) : routeLevel(r * 4 + 2) + 4;
 // Wild Pokémon on routes get extra HP through the middle of the game, where a party at the cap used to one-shot them:
 // about 4-5 seconds a fight idle for an ordinary party, about half that tapping. Late routes are slow enough already.
 const wildHard = i => Math.max(1, Math.min(1.5 + 1.2 * i, 9.5 * Math.pow(.925, i)));
@@ -646,6 +648,7 @@ function areaCap(loc = S.loc) {
   // The post-game fights (Red, the Darkest Day, the Battle Tower) hold nobody back.
   if (!loc || loc.kind === "summit" || loc.kind === "darkest" || loc.kind === "tower" || (loc.kind === "quest" && !(QUEST[loc.q] && QUEST[loc.q].mini))) return 100;
   // Mini quests and the Ultra Wormhole and Area Zero come after that region's Champion: its level cap.
+  if ((loc.kind === "route" || loc.kind === "dungeon") && cleared(loc.r)) return levelCap();
   const L = loc.kind === "champ" || loc.x || loc.kind === "quest" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
   return Math.min(100, L + CAP_OVER);
 }
@@ -710,9 +713,9 @@ function gainCells(k) {
 }
 // ── The Darkest Day (after Leon). Galar's wild Pokémon now and then turn up a Wishing Piece, and its bosses bring a
 // couple. 50 open the Energy Plant in Galar's list, where Eternamax Eternatus waits. Win and yours can Eternamax.
-// One of the four OP-Pokémon quests, so extremely difficult: harder than Red. Only a top Lv 100 team (legendaries,
-// a Mega and a Gigantamax, all the Protein) wins, and only tapping at about the 8-a-second limit, with ~5% to spare.
-const PIECES_FROM = 7, PIECE_ODDS = 40, PIECE_BOSS = 2, PIECES_NEED = 50, DARKEST_TIME = 120, DARKEST_HP = 15;
+// One of the OP-Pokémon quests, so extremely difficult: set like the quests below (the six that hit Eternamax hardest win
+// idling with a little to spare).
+const PIECES_FROM = 7, PIECE_ODDS = 40, PIECE_BOSS = 2, PIECES_NEED = 50, DARKEST_TIME = 120, DARKEST_HP = 10.3;
 const ETERNAMAX_FOE = formById(ETERNAMAX);
 const darkTime = () => fightTime(DARKEST_TIME, [ETERNAMAX_FOE], RED_OFFENSE, .8, 1.2);
 function gainPieces(k) {
@@ -725,8 +728,9 @@ function gainPieces(k) {
 // ── Battle Tower (after Geeta): an endless climb against one clock. Each floor is three Pokémon at Lv 100, the same
 // ones for everyone, and each floor is 5% tougher than the last. Clearing a floor adds time to the clock; every 10th
 // floor is the Tower Tycoon's legendaries. The highest floor you clear is your best, with its own leaderboard.
-// Simulated: a strong Lv 100 team gets to about floor 30 tapping 8 a second, 23 at 5 a second, 10 idling.
-const TOWER_FROM = 8, TOWER_START = 45, TOWER_ADD = 15, TOWER_TYCOON_ADD = 25, TOWER_GROW = 1.05, TOWER_HP = 1.25, TOWER_SIZE = 3;
+// Simulated: a strong Lv 100 team gets to about floor 29 idling, 33 tapping 4 a second (where flat-out tapping used to
+// get it) and 37 at 8.
+const TOWER_FROM = 8, TOWER_START = 45, TOWER_ADD = 15, TOWER_TYCOON_ADD = 25, TOWER_GROW = 1.05, TOWER_HP = .7, TOWER_SIZE = 3;
 const tycoonFloor = f => f % 10 === 0;
 let towerPool = null;
 function towerTeam(f) {
@@ -792,26 +796,26 @@ const megasOf = n => variantOf(n) ? [] : formsOf(n, "mega");
 const fighter = n => (S.mega && S.mega.n === n && formById(S.mega.f)) || (S.gmax === n && n === ETERNATUS && ETERNAMAX_FOE) || special(n) || altOf(n) || mon(n);
 // ── The OP-Pokémon quests, after all nine Champions, each as extremely difficult as the Darkest Day. Sky Pillar and
 // Cerulean Cave give Mega Stones (stones) rather than forms. HP multipliers were
-// set offline with the game's own formulas: the six Pokémon that hit the boss hardest, at Lv 100 with all the Protein
-// and tapping 8 a second, need the same share of the clock as the six that hit Eternamax hardest do there (84%; at 6 taps
-// a second, 93%). Anything less than a team built for the boss runs out of time. Calyrex's Riders take 4x from the best
-// Ghost and Dark attackers, so its HP sits right where the no-idle floor stops deciding it.
+// set offline with the game's own formulas: the six Pokémon that hit the boss hardest (no quest prizes, Megas or
+// Gigantamax), at Lv 100 with all the Protein, win idling with 7% of the clock to spare. Anything
+// less than a team built for the boss loses, even tapping; prizes, Megas and Gigantamax give room. Red and the Darkest
+// Day are set the same way.
 const PLATES_FROM = 3, PLATE_ODDS = 40, PLATE_BOSS = 2, PLATES_NEED = 17, QUEST_TIME = 120, ARCEUS_STATS = [120, 120, 120, 120, 120, 120];
 const QUESTS = [
-  { id: "origin", r: 3, place: "Hall of Origin", boss: "Arceus", prize: 493, need: [483, 484, 487], hp: 14.2, prizeNote: "any type",
+  { id: "origin", r: 3, place: "Hall of Origin", boss: "Arceus", prize: 493, need: [483, 484, 487], hp: 9, prizeNote: "any type",
     foes: [statForm(493, { name: "Arceus", sprite: 493 }, "Normal", ARCEUS_STATS), statForm(493, { name: "Arceus (Dragon)", sprite: "493-dragon" }, "Dragon", ARCEUS_STATS), statForm(493, { name: "Arceus (Ghost)", sprite: "493-ghost" }, "Ghost", ARCEUS_STATS)],
     won: "Arceus can take any type now: pick its Plate in its detail." },
-  { id: "crown", r: 7, place: "Crown Shrine", boss: "Calyrex", prize: 898, need: [898, 896, 897], hp: 29.7, prizeNote: "both Riders",
+  { id: "crown", r: 7, place: "Crown Shrine", boss: "Calyrex", prize: 898, need: [898, 896, 897], hp: 21.8, prizeNote: "both Riders",
     foes: [QFORMES[898][0], QFORMES[898][1]], won: "Calyrex can ride Glastrier or Spectrier now: pick a Rider in its detail." },
-  { id: "megalo", r: 6, place: "Megalo Tower", boss: "Ultra Necrozma", prize: 800, need: [800, 791, 792], hp: 62.7, prizeNote: "Dusk Mane, Dawn Wings, Ultra",
+  { id: "megalo", r: 6, place: "Megalo Tower", boss: "Ultra Necrozma", prize: 800, need: [800, 791, 792], hp: 43.1, prizeNote: "Dusk Mane, Dawn Wings, Ultra",
     foes: [statForm(800, { name: "Ultra Necrozma", sprite: 10157 }, "Psychic/Dragon", [97, 167, 97, 167, 97, 129])], won: "Necrozma can become Dusk Mane, Dawn Wings or Ultra Necrozma now: pick it in its detail." },
-  { id: "sky", r: 2, place: "Sky Pillar", boss: "Deoxys", prize: 384, need: [384, 383, 382], hp: 15.2, prizeNote: "Mega Rayquaza", stones: [MEGA_RAYQUAZA],
+  { id: "sky", r: 2, place: "Sky Pillar", boss: "Deoxys", prize: 384, need: [384, 383, 382], hp: 10.5, prizeNote: "Mega Rayquaza", stones: [MEGA_RAYQUAZA],
     foes: [statForm(386, { name: "Deoxys", sprite: 386 }, "Psychic", [50, 150, 50, 150, 50, 150]), statForm(386, { name: "Deoxys (Attack Forme)", sprite: 10001 }, "Psychic", [50, 180, 20, 180, 20, 150]),
       statForm(386, { name: "Deoxys (Defense Forme)", sprite: 10002 }, "Psychic", [50, 70, 160, 70, 160, 90]), statForm(386, { name: "Deoxys (Speed Forme)", sprite: 10003 }, "Psychic", [50, 95, 90, 95, 90, 180])],
     won: "Rayquaza can Mega Evolve now: turn it on in its detail in Party & Box." },
-  { id: "cerulean", r: 0, place: "Cerulean Cave", boss: "Mega Mewtwo", prize: 150, need: [150, 151], hp: 23.4, prizeNote: "both Mewtwonites", stones: MEWTWONITES,
+  { id: "cerulean", r: 0, place: "Cerulean Cave", boss: "Mega Mewtwo", prize: 150, need: [150, 151], hp: 15.8, prizeNote: "both Mewtwonites", stones: MEWTWONITES,
     foes: MEWTWONITES.map(formById), won: "Mewtwo can Mega Evolve into X or Y now: pick one in its detail in Party & Box." },
-  { id: "chasm", r: 4, place: "Giant Chasm", boss: "Kyurem", prize: 646, need: [646, 644, 643], hp: 29.9, prizeNote: "Black and White",
+  { id: "chasm", r: 4, place: "Giant Chasm", boss: "Kyurem", prize: 646, need: [646, 644, 643], hp: 20.6, prizeNote: "Black and White",
     foes: [QFORMES[646][0], QFORMES[646][1]], won: "Kyurem can fuse with Zekrom or Reshiram now: pick Black or White Kyurem in its detail." },
   // Mini quests: once that region's Champion is beaten, as hard as a dungeon's legendary (see miniTuning).
   { id: "meteor", r: 2, mini: true, place: "Meteor Falls", boss: "Deoxys", prize: 386, need: [386], prizeNote: "all four Formes",
@@ -868,7 +872,10 @@ function signature(n) {
 // Damage a second; against a given foe, with its Defense or Sp. Def counted (type matchups come on top, in partyDps).
 const power = (n, L = level(n), foe) => { const m = fighter(n), sig = signature(n); return hitStat(m, foe) * L / 50 * hitRate(m) * truant(n) * (1 + proteinBoost()) * (sig ? sig.boost : S.gmax === n ? GMAX_BOOST : 1); };
 const partyDps = foe => S.party.reduce((s, n) => s + power(n, battleLevel(n), foe) * (foe ? bestEff(fighter(n), foe) : 1), 0);
-const clickDamage = () => Math.max(1, Math.round(1 + partyDps(null) * .15));
+// A tap is a helper, not the engine: 4% of the party's damage per second, so 8 a second add about a third. Your team
+// wins or loses a fight; tapping only rescues a close one.
+const TAP_SHARE = .04;
+const clickDamage = () => Math.max(1, Math.round(1 + partyDps(null) * TAP_SHARE));
 
 // ── Battle state
 let B = null, msgT = 0;
@@ -899,11 +906,12 @@ function locName(loc) {
   if (loc.kind === "quest") return QUEST[loc.q].place;
   return `Champion ${R.champ}`;
 }
-// ── Boss HP. Gym leaders and Champions are tuned so a strong super-effective team, as evolved as the level cap
-// allows, at the cap, with no protein and tapping flat out (8 a second), barely wins: 95% of the timer. Weaker teams,
-// off-type teams and teams under the cap lose. A dungeon's legendary is random, so it is tuned for a decent team
-// of any types at the cap, tapping 6 a second, to clear the whole run with some room: 85% of the timer.
-const GYM_TAPS = 8, LEGEND_TAPS = 6, GYM_USE = .95, LEGEND_USE = .85;
+// ── Boss HP. Your team wins boss fights, not your taps: no boss needs tapping, and a team built for it wins idling.
+// Gym leaders and Champions are tuned so the strongest super-effective team you could have, as evolved as the level
+// cap allows, at the cap, with no protein, wins idling with room to spare (GYM_USE of the timer); an off-type team needs
+// to tap flat out, or loses. A dungeon's legendary is random, so it is tuned for a decent team of any types at the cap,
+// idling, to clear the whole run with some room (LEGEND_USE, the pause after each faint included).
+const GYM_TAPS = 0, LEGEND_TAPS = 0, GYM_USE = .6, LEGEND_USE = .85;
 const PARENT = {}; for (const m of MON) for (const [t, how, v] of m.evos) PARENT[t] = { p: m.num, how, v };
 const minLv = n => { const p = PARENT[n]; return p ? Math.max(minLv(p.p), p.how === "L" ? p.v : 0) : 0; };
 const rootOf = n => PARENT[n] ? rootOf(PARENT[n].p) : n;
@@ -918,7 +926,7 @@ function refPool(r, k, cap) {
 const refHit = (m, cap, foe) => hitStat(m, foe) * cap / 50 * hitRate(m) * truant(m.num);
 // The reference team's own Def: tuning measures it against the time that team would get, so Def counts relative to it.
 const refDef = P => Math.min(1.25, Math.max(.8, P.reduce((s, m) => s + bulkFor(m), 0) / P.length / PARTY_BULK));
-const refTaps = (P, cap, taps) => taps * Math.max(1, Math.round(1 + .15 * P.reduce((s, m) => s + refHit(m, cap), 0)));
+const refTaps = (P, cap, taps) => taps * Math.max(1, Math.round(1 + TAP_SHARE * P.reduce((s, m) => s + refHit(m, cap), 0)));
 function gymTuning(B, k, size) {
   const cap = areaCap(), vs = m => B.queue.reduce((s, f) => s + refHit(m, cap, f) * bestEff(m, f), 0);
   const P = refPool(B.r, k, cap).sort((a, b) => vs(b) - vs(a)).slice(0, size), tap = refTaps(P, cap, GYM_TAPS);
@@ -933,14 +941,18 @@ function miniTuning(B) {
   return LEGEND_USE * B.bossTime * refDef(P) / B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i) / dps(f), 0);
 }
 const questHp = B => QUEST[B.q].mini ? B.tune : QUEST[B.q].hp;
-// Dungeon fodder is as tough as that region's route Pokémon, and a bit more.
-const fodderHp = i => DUNGEON_HP * wildHard(i);
+// Dungeon fodder is as tough as that region's route Pokémon, and a bit more, but never more than the decent team
+// below clears in FODDER_USE of its time: the run is about the legendary, and idling has to be able to get there.
+const fodderHp = i => DUNGEON_HP * wildHard(i), FODDER_USE = .35;
+// Sets B.fodder (the fodder's HP multiplier) and returns the legendary's.
 function legendTuning(B) {
   // "Decent": the 7th to 12th strongest you could have by now, with no type edge either way (Def and Sp. Def count).
   const cap = areaCap(), P = refPool(B.r, B.x ? 3 : 2, cap).sort((a, b) => refHit(b, cap) - refHit(a, cap)).slice(6, 12);
   const tap = refTaps(P, cap, LEGEND_TAPS), dps = f => P.reduce((d, m) => d + refHit(m, cap, f), 0) + tap, n = B.queue.length, lg = B.queue[n - 1];
-  const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps(f), 0);
-  return Math.max(1, (LEGEND_USE * B.bossTime * refDef(P) - fodder) * dps(lg) / bossHpFor(lg, B.L, B.i));
+  const budget = LEGEND_USE * B.bossTime * refDef(P) - .65 * n;
+  const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps(f), 0), room = FODDER_USE * budget;
+  B.fodder = fodderHp(B.i) * Math.min(1, room / Math.max(1e-9, fodder));
+  return Math.max(1, (budget - Math.min(fodder, room)) * dps(lg) / bossHpFor(lg, B.L, B.i));
 }
 
 function startLoc(loc) {
@@ -972,30 +984,25 @@ function startLoc(loc) {
       // A legendary with a Mega form comes out as one half the time. Catching it gets you the usual form.
       q.push(lgMegas.length && rand() < .5 ? lgMegas[Math.floor(rand() * lgMegas.length)] : lg);
     }
-    B = { kind: "dungeon", ...(T ? { x: T.id } : {}), r, i: r * 4 + (T ? 3 : 2), queue: q, L: T ? champLevel(r) : routeLevel(r * 4 + 2) + 4, base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [q[q.length - 1]], regionOffense(r), .9, 1.15), idx: 0 };
+    B = { kind: "dungeon", ...(T ? { x: T.id } : {}), r, i: r * 4 + (T ? 3 : 2), queue: q, L: T ? Math.max(champLevel(r), levelCap()) : dungeonLevel(r), base: DUNGEON_TIME, time: fightTime(DUNGEON_TIME, [q[q.length - 1]], regionOffense(r), .9, 1.15), idx: 0 };
   }
   if (B.kind !== "route") { B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def); }
   if (B.kind === "gym") B.tune = gymTuning(B, B.k, B.r === 0 ? 3 + B.k : 6);
   else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
   else if (B.kind === "dungeon") B.tune = legendTuning(B);
   else if (B.kind === "quest" && QUEST[B.q].mini) B.tune = miniTuning(B);
-  if (B.kind === "gym" || B.kind === "champ" || B.kind === "summit" || B.kind === "darkest" || B.kind === "quest") {
-    const mult = B.kind === "summit" ? SUMMIT_HP : B.kind === "darkest" ? DARKEST_HP : B.kind === "quest" ? questHp(B) : B.tune, idle = B.queue.reduce((s, f) => s + bossHpFor(f, B.L, B.i, mult) / Math.max(1e-9, partyDps(f)), 0);
-    B.floor = Math.max(1, IDLE_SHORT * B.time / idle);
-  }
-  if (B.kind === "tower") B.floor = 1;
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? (B.x ? `The last one can't be beaten without tapping. Beaten ${TRIP[B.x].what} might stay with you.` : "The legendary at the end can't be beaten without tapping.") : "Your party can't win this one alone. Tap to help it."); }
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? (B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end.") : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
   let m, L, mult = 1, pay = 1, shiny = false, boss = false;
-  if (B.kind === "route") { const pool = routePool(B.r, B.k); m = pool[Math.floor(Math.random() * pool.length)]; L = routeLevel(B.i); mult = wildHard(B.i); shiny = Math.random() < shinyOdds(); }
+  if (B.kind === "route") { const pool = routePool(B.r, B.k); m = pool[Math.floor(Math.random() * pool.length)]; L = wildLevel(B.r, B.k); mult = wildHard(B.i); shiny = Math.random() < shinyOdds(); }
   else {
     m = B.queue[B.idx]; L = B.L;
     boss = B.kind !== "dungeon" || B.idx === B.queue.length - 1;
     // The extra boss HP doesn't raise the payout, or gym rematches would turn into a money farm.
     pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" ? CHAMP_HP : GYM_HP;
-    mult = B.kind === "dungeon" && !boss ? fodderHp(B.i) : B.tune;
+    mult = B.kind === "dungeon" && !boss ? (B.fodder || fodderHp(B.i)) : B.tune;
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
     if (B.kind === "darkest") { pay = CHAMP_HP; mult = DARKEST_HP; }
     if (B.kind === "quest") { pay = CHAMP_HP; mult = questHp(B); }
@@ -1003,7 +1010,6 @@ function spawn() {
     shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
   B.foe = { m, L, shiny, max: (boss ? bossHpFor : hpFor)(m, L, B.i, mult), wild: B.kind === "route" || B.kind === "dungeon", reward: rewardFor(L, B.i, pay) };
-  if (boss) B.foe.max = B.kind === "dungeon" ? Math.max(B.foe.max, Math.ceil(IDLE_SHORT * partyDps(m) * B.time)) : Math.ceil(B.foe.max * B.floor);
   B.foe.hp = B.foe.max; B.pause = 0;
   S.seen[m.num] = 1;
   $("#foeimg").src = spriteOf(m, shiny);
@@ -1201,7 +1207,7 @@ function toast(t) { const el = $("#toast"); el.textContent = t; el.hidden = fals
 const TIPS = [
   { id: "hello", when: () => true, text: () => "Welcome to Poké Idle! I'm Prof Penguin. Your party battles wild Pokémon on its own, but you can help: tap the wild Pokémon, or press Space, to hit harder. Beat 10 on a route and its gym opens." },
   { id: "catch", when: () => dexCount() >= 2, text: () => "A new Pokémon! After every win a ball gets thrown on its own, and Settings picks which one. Your first catches join your party. Once it has been full, new ones wait in the Box." },
-  { id: "gym", when: () => kills(0, 0) >= KILLS_FOR_GYM, tab: "battle", text: () => `${REGIONS[0].gyms[0][0]}'s gym is open on the map. Bosses come with a timer, and no party beats them alone, so tap hard! His Rock types take double damage from Water, Grass, Fighting, Ground and Steel.` },
+  { id: "gym", when: () => kills(0, 0) >= KILLS_FOR_GYM, tab: "battle", text: () => `${REGIONS[0].gyms[0][0]}'s gym is open on the map. Bosses come with a timer: the right team beats them on its own, and tapping helps a little. His Rock types take double damage from Water, Grass, Fighting, Ground and Steel.` },
   { id: "lost", when: () => (S.stats.losses || 0) > 0, text: () => "Out of time? It happens to everyone. Train on the routes, evolve your team and bring types that hit the boss hard. The map shows how many seconds your party gets." },
   { id: "box", when: () => S.full && dexCount() > 6, tab: "party", text: () => "Your party is full, so new catches go to the Box now. In Party & Box, drag Pokémon to rearrange them, or drag one from the Box onto a party slot to swap it in. On a phone, hold it for a moment first." },
   { id: "evolve", when: () => S.party.some(n => evoOptions(n).some(e => canEvolve(n, e))), tab: "party", text: () => "One of your Pokémon can evolve! In Party & Box, look for EVOLVE, tap it, then tap Evolve. A Pokémon with only one level evolution does it on its own." },
@@ -1236,7 +1242,7 @@ function renderLocs() {
   $("#regions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === viewR ? " on" : ""}" data-r="${r}" type="button"${regionOpen(r) ? "" : " disabled"}>${R.name}</button>`).join("");
   const r = viewR, items = [];
   for (let k = 0; k < 4; k++) {
-    items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${routeLevel(r * 4 + k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
+    items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${wildLevel(r, k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
     items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${Math.round(gymTime(r, k) * partyTime())}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
     if (k === 1) items.push({ kind: "dungeon", r, note: `${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"} · cleared ${S.dungeons[r] || 0}x`, done: !!S.dungeons[r] });
   }
@@ -1505,6 +1511,14 @@ function renderAch() {
 const MAIL = [
   { id: "gift-2026-11-16-birthday", day: "2026-11-16", date: "Nov 16, 2026", from: "Prof Penguin", title: "Happy birthday to my friend!", gift: { special: "bday-ceruledge" },
     body: `<p>Happy birthday to my friend!</p><p>To celebrate, everyone who plays today gets a special edition Ceruledge (marked SP): its own colours, and every stat a little above a normal one's. It arrives at your level cap, and if you already have a Ceruledge, yours becomes this one.</p><p>This letter only comes today, but once it's here it stays, so claim it whenever you like.</p>` },
+  { id: "update-2026-11-14e", date: "Nov 14, 2026", from: "Prof Penguin", title: "Build the team, not the tapping finger",
+    body: `<ul><li><b>Bosses are won by your team now.</b> No boss needs tapping anymore: each one is set for a team built for it (types that hit it hard, levels, evolutions, Protein), and that team wins on its own. The wrong team loses, even tapping flat out.</li>
+      <li>A tap is now ${Math.round(TAP_SHARE * 100)}% of your party's damage per second, so 8 a second add about a third: enough to rescue a close fight.</li>
+      <li>Gyms and Champions: the right types at the level cap win with room to spare; an off-type team needs Protein and fast tapping.</li>
+      <li>Red, the Darkest Day and the big quests: the six that hit that boss hardest win on their own with a little to spare. Quest prizes, Megas and Gigantamax give you more.</li>
+      <li>Dungeons: a decent team wins on its own, and the Pokémon before the legendary go down faster.</li>
+      <li>Battle Tower: idling gets a strong team about as high as tapping flat out used to.</li>
+      <li><b>Old regions keep up with you.</b> Once you've beaten a region's Champion, its wild Pokémon rise with your level cap (Route 1 sits 8 under it, Route 4 2 under, the dungeon at it), and your party fights at its full level there. What you catch comes in ready to use.</li></ul>` },
   { id: "update-2026-11-14d", date: "Nov 14, 2026", from: "Prof Penguin", title: "Kyurem, Deoxys, the Crowned pair, and two new runs",
     body: `<ul><li><b>Giant Chasm</b> (Unova, after all 9 Champions): own Kyurem, Zekrom and Reshiram, then beat Black and White Kyurem. Kyurem can take either form, with Freeze Shock or Ice Burn (×${KYUREM_BOOST}).</li>
       <li><b>Meteor Falls</b> (Hoenn, after Steven), a mini quest: beat Deoxys's three other Formes and yours can take any of them.</li>
@@ -1616,8 +1630,8 @@ function wikiSections() {
   const ballRows = BALLS.map(b => `<li>${b.name}: ${b.price ? "$" + fmt(b.price) : "Champions only"}${b.id === "master" ? ", always catches" : `, catch rate × ${b.mult}${b.add ? " + " + pct(b.add) : ""}`}</li>`).join("");
   const drop = DROP_CHANCE;
   return [
-    { id: "idea", group: "Basics", title: "The idea", html: `<p>Your party of up to 6 fights wild Pokémon on its own. You tap to help, catch what you beat, train up, take 36 gyms and 9 Champions across nine regions, and fill the Pokédex.</p>` },
-    { id: "fighting", group: "Basics", title: "Fighting", html: `<p>Every second, each party Pokémon deals its damage per hit × its hits per second × its best type matchup against the foe. The battle line under the field adds that up as "Party …/s on this one".</p><p>Tapping the foe (or Space/Enter) hits for 1 + 15% of the party's damage per second, shown as "Tap". Up to ${TAP_RATE} taps a second count, with a few in hand for bursts; scripted clicks and held keys don't count. There's a ${0.65}s pause after each faint.</p>` },
+    { id: "idea", group: "Basics", title: "The idea", html: `<p>Your party of up to 6 fights wild Pokémon on its own. You build the team, catch what you beat, train up, take 36 gyms and 9 Champions across nine regions, and fill the Pokédex.</p>` },
+    { id: "fighting", group: "Basics", title: "Fighting", html: `<p>Every second, each party Pokémon deals its damage per hit × its hits per second × its best type matchup against the foe. The battle line under the field adds that up as "Party …/s on this one".</p><p>Tapping the foe (or Space/Enter) hits for 1 + ${pct(TAP_SHARE)} of the party's damage per second, shown as "Tap": it helps, but your team does the winning. Up to ${TAP_RATE} taps a second count, with a few in hand for bursts; scripted clicks and held keys don't count. There's a ${0.65}s pause after each faint.</p>` },
     { id: "map", group: "Basics", title: "Routes, gyms and regions", html: `<p>Each region has 4 routes, 4 gyms, a dungeon and a Champion. Beat ${KILLS_FOR_GYM} on a route to open its gym; each badge opens the next route; all 4 badges open the Champion; beating the Champion opens the next region and gives a Master Ball. Wild levels go up by about 2.75 a route, from Lv 3 on Kanto Route 1 to Lv 100.</p>` },
     { id: "wild", group: "Basics", title: "Wild Pokémon", html: `<p>Routes 1 and 2 have the region's first-stage Pokémon (the weaker half, then the stronger half), Route 3 adds middle stages, Route 4 has everything from the region but legendaries.</p><p>Wild Pokémon have extra HP through the middle of the game, from ×${wildHard(0).toFixed(1)} on Kanto Route 1 up to ×${Math.max(...Array.from({ length: 36 }, (_, i) => wildHard(i))).toFixed(1)} and none from Galar Route 2 on. Each win pays (6 + 1.5 × its level) × 1.08 per route index.</p>` },
     { id: "catching", group: "Basics", title: "Catching", html: `<p>When a wild Pokémon faints, a ball is thrown at it, picked by Settings: one choice for new Pokémon, one for ones you have, one for shinies. Chance = catch rate ÷ 255 × 0.6 × the ball's multiplier + its bonus, at most 100%. Legendaries and mythicals shrug off anything but a Master Ball half the time.</p><ul>${ballRows}</ul><p>Auto (the default for new Pokémon) throws the cheapest ball with at least an even chance, else your best one, and only spends a Master Ball on a shiny or a legendary.</p><p>New Pokémon join your party until it has been full once. After that they go to the Box, so an empty slot stays free for whoever you choose.</p>` },
@@ -1625,20 +1639,20 @@ function wikiSections() {
     { id: "offline", group: "Basics", title: "Offline", html: `<p>While you're away (up to 8 hours) your party keeps fighting on your last route at about a third of the live pace, the pause included: money and XP, no catches. The title screen says what it did.</p>` },
     { id: "stats", group: "Stats and levels", title: "Attack, Speed and Def", html: `<p><b>Physical or special</b>: each Pokémon hits with its better attacking stat, Attack against the foe's Defense or Sp. Atk against its Sp. Def, even where the other would do more (you wouldn't teach it a move off its weak stat). Mixed attackers, with Attack and Sp. Atk within ${pct(1 - MIXED)} of each other (Lucario, Arceus, Rayquaza), use whichever hits each foe harder. Each hit is × √(the foe's average defense ÷ the one it hits), from ×${DEF_LO.toFixed(2)} to ×${DEF_HI}: Steelix (Def 200, Sp. Def 65) takes ×1.43 from special hits and ×0.81 from physical ones, and a foe with even defenses takes ×1 from both. The foe's Def and Sp. Def show next to its name, and each party tile shows how hard it hits that foe, type and defense together (hover for the split).</p><p><b>Attack</b>: damage per hit is that attacking stat × level ÷ 50 × protein × the defense side above${GMAX_BOOST !== 1 ? ` × ${GMAX_BOOST} when Gigantamax` : ""}, or × a side-quest prize's signature move (see Signature moves).</p><p><b>Speed</b>: hits per second = (Speed + 75) ÷ 150, so Speed 75 hits once a second, 150 hits 1.5 times, 0 hits half as often. Slaking has Truant: it only attacks every other turn, so it deals half damage.</p><p><b>Bulk</b> (Def): a Pokémon's HP, Defense and Sp. Def averaged. Your party's average bulk stretches or shrinks the timer in boss fights against a bulk of ${PARTY_BULK}: from −20% to +25%. Each Pokémon counts for at most ${BULK_CAP}, so one wall can't carry a frail team: Eternamax's 252 counts as ${BULK_CAP}. Party & Box shows each Pokémon's bulk next to its power, and the team's under the party. The map shows the time your current party gets.</p>` },
     { id: "types", group: "Stats and levels", title: "Types", html: `<p>The main games' type chart. Each party Pokémon uses its better type against the foe; the tile shows 2x, 4x, ½x, ¼x or 0x when it isn't neutral, times the Defense or Sp. Def side (see Attack, Speed and Def). A Mega fights with its Mega typing.</p>` },
-    { id: "levels", group: "Stats and levels", title: "Levels and the cap", html: `<p>Each win gives every party Pokémon the foe's level × ${XP_RATE} XP (× 1.5 against trainers). Level is the cube root of XP, up to 100.</p><p>The level cap is ${CAP_OVER} over the next gym leader or Champion you haven't beaten, and 100 once every Champion is down. Each place also keeps the cap it had when you first got there: go back and your party fights held to it, so a Lv 90 team is Lv 30 on Hoenn Route 1. XP past the cap from older saves waits until the cap catches up.</p>` },
+    { id: "levels", group: "Stats and levels", title: "Levels and the cap", html: `<p>Each win gives every party Pokémon the foe's level × ${XP_RATE} XP (× 1.5 against trainers). Level is the cube root of XP, up to 100.</p><p>The level cap is ${CAP_OVER} over the next gym leader or Champion you haven't beaten, and 100 once every Champion is down. Each place also keeps the cap it had when you first got there: go back and your party fights held to it, so a Lv 90 team is Lv 30 on Hoenn Route 1, until you beat that region's Champion. After that its wild Pokémon keep up with you (Route 1 sits 8 under your cap, Route 4 2 under, the dungeon, the Ultra Wormhole and Area Zero at it), your party fights at its full level there, and catches come in at a level you can use. XP past the cap from older saves waits until the cap catches up.</p>` },
     { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
-    { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, with no protein and tapping ${GYM_TAPS} times a second, uses ${pct(GYM_USE)} of the time it would get. Weaker, off-type or under-cap teams lose; protein, Megas, bulkier and better teams give you room. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
-    { id: "tapping", group: "Bosses", title: "No idle wins", html: `<p>However strong your party, boss fights need tapping: if your party could clear a gym, Champion or Red without it, every foe gets the same extra HP until idling falls ${pct(IDLE_SHORT - 1)} short. A dungeon's legendary is checked the same way against the time left when it comes out.</p>` },
-    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>The legendary is random, so its HP is set for a decent team of any types (the 7th to 12th strongest you could have) at the cap, tapping ${LEGEND_TAPS} times a second, to clear the run in ${pct(LEGEND_USE)} of the time. A legendary with a Mega form comes out as one half the time; catching it gets you the usual form.</p>` },
+    { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, with no protein, wins on its own with ${pct(GYM_USE)} of the time it would get. An off-type team has to tap flat out, or loses; protein, Megas, bulkier and better teams give you room. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
+    { id: "tapping", group: "Bosses", title: "Your team wins, not your taps", html: `<p>No boss needs tapping. Every one is set for a team built for it: the right types, levels, evolutions and Protein win on their own, and the wrong team loses even tapping flat out. A tap is ${pct(TAP_SHARE)} of your party's damage per second, so ${TAP_RATE} a second add about a third: enough to rescue a close fight, not to carry a weak team.</p>` },
+    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>The legendary is random, so its HP is set for a decent team of any types (the 7th to 12th strongest you could have) at the cap, idling, to clear the run in ${pct(LEGEND_USE)} of the time. A legendary with a Mega form comes out as one half the time; catching it gets you the usual form.</p>` },
     { id: "silver", group: "Side quests", title: "Mt. Silver", html: `<p>Once all nine Champions are beaten, Red waits on Mt. Silver (in Johto's list) with ${RED_TEAM.map(n => mon(n).name).join(", ")} at Lv ${SUMMIT_LEVEL}, ×${SUMMIT_HP} HP, in ${SUMMIT_TIME}s give or take. It's meant to be brutal. The first win gives the Shiny Charm.</p>` },
     { id: "cells", group: "Side quests", title: "Zygarde Cells", html: `<p>Once Diantha (Kalos's Champion) is beaten, every wild win has a 1 in ${CELL_ODDS} chance of turning up a Zygarde Cell, and every gym, Champion, dungeon and Red win brings ${CELL_BOSS}. Time away finds them at half the rate. Kalos's list shows how many you have.</p><p>10 cells unlock Zygarde's 10% Forme (fast and frail: Speed ${ZFORMES["10"].spe}) and bring you a Zygarde if you have none. 100 unlock its Complete Forme, Zygarde at 100%: HP ${ZFORMES.complete.hp}, double the usual. Pick the forme in Zygarde's detail; it keeps its level.</p>` },
-    { id: "darkest", group: "Side quests", title: "The Darkest Day", html: `<p>Once Leon (Galar's Champion) is beaten, every wild win in Galar has a 1 in ${PIECE_ODDS} chance of a Wishing Piece, and every gym, Champion and dungeon win there brings ${PIECE_BOSS}. Time away in Galar finds them at half the rate. Galar's list shows how many you have.</p><p>${PIECES_NEED} pieces open the Energy Plant, where Eternamax Eternatus waits at Lv 100 in ${DARKEST_TIME}s give or take. It's harder than Red: only a top team of legendaries, with a Mega, a Gigantamax and all the Protein, wins, and only tapping close to flat out. Beat it and Eternatus is yours if it wasn't already, with its Eternamax form unlocked. Eternamax takes your one Gigantamax slot and fights with its own stats (HP 255, Defense and Sp. Def 250, the bulkiest Pokémon in the game), and its Dynamax Cannon hits ${pct(ETERNAMAX_BOOST - 1)} harder, where a Gigantamax hits ${pct(GMAX_BOOST - 1)} harder.</p>` },
+    { id: "darkest", group: "Side quests", title: "The Darkest Day", html: `<p>Once Leon (Galar's Champion) is beaten, every wild win in Galar has a 1 in ${PIECE_ODDS} chance of a Wishing Piece, and every gym, Champion and dungeon win there brings ${PIECE_BOSS}. Time away in Galar finds them at half the rate. Galar's list shows how many you have.</p><p>${PIECES_NEED} pieces open the Energy Plant, where Eternamax Eternatus waits at Lv 100 in ${DARKEST_TIME}s give or take. Only a team built for it wins: the Pokémon that hit Eternamax hardest, at Lv 100 with all the Protein, beat it on their own with a little to spare, and anything weaker loses even tapping. Beat it and Eternatus is yours if it wasn't already, with its Eternamax form unlocked. Eternamax takes your one Gigantamax slot and fights with its own stats (HP 255, Defense and Sp. Def 250, the bulkiest Pokémon in the game), and its Dynamax Cannon hits ${pct(ETERNAMAX_BOOST - 1)} harder, where a Gigantamax hits ${pct(GMAX_BOOST - 1)} harder.</p>` },
     { id: "tower", group: "Side quests", title: "Battle Tower", html: `<p>Once Geeta (Paldea's Champion) is beaten, the Battle Tower opens in Paldea's list: an endless climb against one clock. You start with ${TOWER_START}s. Each floor is ${TOWER_SIZE} Pokémon at Lv 100, the same ones for every player, and each floor is ${pct(TOWER_GROW - 1)} tougher than the last. Clearing a floor adds ${TOWER_ADD}s, and your party's bulk stretches that like any boss timer.</p><p>Every 10th floor is the Tower Tycoon: three legendaries, the last one Mega Evolved if it can, with half again the HP, and clearing it adds ${TOWER_TYCOON_ADD}s. The run ends when the clock does. The highest floor you've cleared is your best, and it has its own leaderboard in the arcade.</p>` },
     { id: "origin", group: "Side quests", title: "Hall of Origin (Arceus)", html: `<p>Once every Champion is beaten, every wild win in Sinnoh has a 1 in ${PLATE_ODDS} chance of one of Arceus's Plates, and every gym, Champion and dungeon win there brings ${PLATE_BOSS}. Time away in Sinnoh finds them at half the rate. With all ${PLATES_NEED} Plates and Dialga, Palkia and Giratina in your Box, the Hall of Origin opens in Sinnoh's list.</p><p>Arceus fights at Lv 100 three times, as Normal, Dragon and Ghost, so one type of team won't do. Win, and Arceus is yours (if it wasn't already) and can take any of the 17 Plate types: pick it in its detail. Its Judgment makes it hit ${JUDGMENT} times as hard, in any type.</p>` },
     { id: "crown", group: "Side quests", title: "Crown Shrine (Calyrex)", html: `<p>Once every Champion is beaten and Calyrex, Glastrier and Spectrier are in your Box (all three come from the Galar dungeon), the Crown Shrine opens in Galar's list. Calyrex comes out as the Ice Rider (Psychic/Ice), then the Shadow Rider (Psychic/Ghost), back to back. Win, and Calyrex can ride either: pick it in its detail. The Ice Rider's Glacial Lance hits ${pct(QFORMES[898][0].boost - 1)} harder, and the Shadow Rider's Astral Barrage ${pct(QFORMES[898][1].boost - 1)}.</p>` },
     { id: "megalo", group: "Side quests", title: "Megalo Tower (Necrozma)", html: `<p>Once every Champion is beaten and Necrozma, Solgaleo and Lunala are in your Box (all from the Alola dungeon), Megalo Tower opens in Alola's list. Ultra Necrozma (Psychic/Dragon) fights at Lv 100. Win, and Necrozma can become Dusk Mane (Psychic/Steel, Attack 157), Dawn Wings (Psychic/Ghost, Sp. Atk 157) or Ultra Necrozma (Psychic/Dragon, Attack and Sp. Atk 167), whose Photon Geyser hits ${pct(QFORMES[800][2].boost - 1)} harder: pick it in its detail.</p>` },
     { id: "sky", group: "Side quests", title: "Sky Pillar (Rayquaza)", html: `<p>Once every Champion is beaten and Rayquaza, Groudon and Kyogre are in your Box (all from the Hoenn dungeon), the Sky Pillar opens in Hoenn's list. Deoxys fights at Lv 100 in all four of its Formes, back to back: Normal, Attack, Defense and Speed. Win, and Rayquaza can Mega Evolve (you need the Key Stone); its Dragon Ascent hits ${pct(formById(MEGA_RAYQUAZA).boost - 1)} harder. The Shop and boss drops never offer Rayquaza's Mega Stone.</p>` },
-    { id: "cerulean", group: "Side quests", title: "Cerulean Cave (Mewtwo)", html: `<p>Once every Champion is beaten and Mewtwo and Mew are in your Box (both from the Kanto dungeon), Cerulean Cave opens in Kanto's list. Mega Mewtwo X (Psychic/Fighting) fights at Lv 100, then Mega Mewtwo Y (Psychic). Win both Mewtwonites: Mewtwo can Mega Evolve into either, and its Psystrike hits ${pct(formById(MEWTWONITES[0]).boost - 1)} harder. The Shop and boss drops never offer them.</p><p>Like the Darkest Day, these quests (and the Giant Chasm) are extremely difficult. Their HP is set so the six Pokémon that hit that boss hardest, at Lv 100 with all the Protein and tapping close to flat out, only just win.</p>` },
+    { id: "cerulean", group: "Side quests", title: "Cerulean Cave (Mewtwo)", html: `<p>Once every Champion is beaten and Mewtwo and Mew are in your Box (both from the Kanto dungeon), Cerulean Cave opens in Kanto's list. Mega Mewtwo X (Psychic/Fighting) fights at Lv 100, then Mega Mewtwo Y (Psychic). Win both Mewtwonites: Mewtwo can Mega Evolve into either, and its Psystrike hits ${pct(formById(MEWTWONITES[0]).boost - 1)} harder. The Shop and boss drops never offer them.</p><p>Like the Darkest Day, these quests (and the Giant Chasm) are extremely difficult. Their HP is set so the six Pokémon that hit that boss hardest, at Lv 100 with all the Protein, win on their own with a little to spare. Anything less than a team built for the boss loses, even tapping; quest prizes, Megas and Gigantamax give you room.</p>` },
     { id: "chasm", group: "Side quests", title: "Giant Chasm (Kyurem)", html: `<p>Once every Champion is beaten and Kyurem, Zekrom and Reshiram are all in your Box (from the Unova dungeon), the Giant Chasm opens in Unova's list. Black Kyurem (Dragon/Ice, Attack 170) fights at Lv 100, then White Kyurem (Sp. Atk 170). It's as hard as the other extremely difficult quests. Win, and Kyurem can fuse into either: pick it in its detail. Black Kyurem's Freeze Shock and White Kyurem's Ice Burn hit ${pct(KYUREM_BOOST - 1)} harder.</p>` },
     { id: "meteor", group: "Side quests", title: "Meteor Falls (Deoxys)", html: `<p>A mini quest. Once Hoenn's Champion is beaten and Deoxys is in your Box (from the Hoenn dungeon), Meteor Falls opens in Hoenn's list: Deoxys in its Attack, Defense and Speed Formes, back to back, about as hard as a dungeon's legendary. Win, and your Deoxys can take any of its four Formes, picked in its detail. None is simply better: Attack hits hardest but its bulk is 30, Defense is a wall (bulk 123) that hardly hits, Speed sits between.</p>` },
     { id: "weald", group: "Side quests", title: "Slumbering Weald (Zacian, Zamazenta)", html: `<p>A mini quest. Once Galar's Champion is beaten and Zacian or Zamazenta is in your Box (from the Galar dungeon), the Slumbering Weald opens in Galar's list: Zacian, then Zamazenta, about as hard as a dungeon's legendary. Win the Rusted Sword and Shield: Zacian can take its Crowned Sword form (Fairy/Steel, Attack 150, Speed 148) and Zamazenta its Crowned Shield (Fighting/Steel, Defense and Sp. Def 140), picked in their details. Both start in their usual Hero form.</p>` },
@@ -1664,7 +1678,7 @@ function wikiWhere(n) {
   if (n === ZYGARDE) out.push("10 Zygarde Cells, after Diantha");
   if (legendary(m)) out.push(`the ${REGIONS[r].name} dungeon's legendary`);
   else {
-    for (let k = 0; k < 4; k++) if (wikiPool(r, k).has(n)) out.push(`${REGIONS[r].name} Route ${k + 1} (Lv ${routeLevel(r * 4 + k)})`);
+    for (let k = 0; k < 4; k++) if (wikiPool(r, k).has(n)) out.push(`${REGIONS[r].name} Route ${k + 1} (Lv ${wildLevel(r, k)})`);
     if (dungeonPool(r).some(x => x.num === n)) out.push(`the ${REGIONS[r].name} dungeon`);
   }
   const T = TRIPS.find(t => t.all.includes(n));
@@ -2024,7 +2038,7 @@ window.addEventListener("pagehide", () => { if (S) save(); });
 function offline() {
   const secs = Math.min(8 * 3600, (Date.now() - (S.last || Date.now())) / 1000);
   if (secs < 60 || !S.party.length) return "";
-  const r = S.loc.r, k = S.loc.kind === "route" ? S.loc.k : 0, i = r * 4 + k, L = routeLevel(i), pool = routePool(r, k);
+  const r = S.loc.r, k = S.loc.kind === "route" ? S.loc.k : 0, i = r * 4 + k, L = wildLevel(r, k), pool = routePool(r, k);
   const avgHp = pool.reduce((s, m) => s + hpFor(m, L, i, wildHard(i)), 0) / pool.length, dps = partyDps(null);
   // Offline is slower than playing: about a third of the live rate (the pause between fights included), and no tapping.
   const n = dps > 0 ? Math.floor(secs * .3 / (avgHp / dps + .65)) : 0;
@@ -2082,10 +2096,10 @@ const MENU = {
   fresh: [["new", "New game"], ["load", "Load a save code"], ["how", "How to play"]]
 };
 const HOW = [
-  "Your party fights the wild Pokémon by itself. Tap it to hit harder; up to 8 taps a second count.",
+  "Your party fights the wild Pokémon by itself. Tap it to help a little; up to 8 taps a second count.",
   "Beat 10 on a route to open its gym. Each badge opens the next route, four open the Champion, and the Champion opens the next region.",
-  "Gyms, Champions and legendaries can't be beaten by idling, however strong your party is. You have to tap.",
-  "Your party can't level past 2 over the next gym leader or Champion. Every first win raises the cap. Back in earlier places it fights held to the cap that place had.",
+  "Bosses are beaten by building the right team: types that hit hard, levels, evolutions and Protein. Tapping only helps a little.",
+  "Your party can't level past 2 over the next gym leader or Champion. Every first win raises the cap. Back in earlier places it fights held to the cap that place had, until you beat that region's Champion: then its wild Pokémon keep up with you.",
   "Each wild Pokémon you beat gets a ball thrown at it. Settings decides which ones.",
   "Shinies turn up 1 in 4096. Dungeons, with a ticket from the Shop, end in a legendary.",
   "Your leaderboard score is one point per Pokédex entry plus one per shiny.",
