@@ -367,8 +367,16 @@ test('account UI and score sync still work through the redesigned hub (mock back
   // and beat it.
   await page.waitForFunction(() => document.querySelector('#lb-list').textContent.includes('rival'));
   await page.click('#leaderboard-nav');
-  // Game-card score clutter is gone, while the leaderboard still gives both scores.
-  assert.equal(await page.$('#grid .card-best'), null);
+  // The card byline names the board leader, and a game with no board has none.
+  await page.waitForFunction(() => document.querySelector('#grid [data-slug="lights-out"] .card-best')?.textContent.includes('rival'));
+  assert.equal(await page.$eval('#grid [data-slug="lights-out"] .card-best', el => el.textContent), 'Best 9 boards · rival');
+  assert.equal(await page.$eval('#grid [data-slug="8ball"]', card => card.querySelector('.card-best')), null);
+  const detail = await page.$eval('#grid [data-slug="lights-out"] .card-best-wrap', node => ({
+    count: node.querySelectorAll('.card-best-tip-row').length,
+    names: [...node.querySelectorAll('.card-best-tip-name')].map(el => el.textContent)
+  }));
+  assert.ok(detail.count >= 2 && detail.count <= 3, 'top performers appear in the card tooltip');
+  assert.ok(detail.names.includes('rival'), 'the leading player appears in the card tooltip');
   await page.evaluate(() => {
     [...document.querySelectorAll('#lb-list .lb-row')]
       .find(row => row.textContent.includes('rival')).click();
