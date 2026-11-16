@@ -72,9 +72,13 @@
   .ground { position: absolute; left: 50%; bottom: 14px; width: min(68%, 320px); height: 46px; transform: translateX(-50%); border: 1px solid var(--rule); border-radius: 50%; background: var(--g-route) }
   .field[data-kind="gym"] .ground { background: var(--g-gym) }
   .field[data-kind="dungeon"] .ground { background: var(--g-dungeon) }
-  .field[data-kind="champ"] .ground, .field[data-kind="summit"] .ground, .field[data-kind="darkest"] .ground, .field[data-kind="tower"] .ground, .field[data-kind="quest"] .ground, .field[data-kind="raid"] .ground { background: var(--g-champ); border-color: var(--gold) }
+  .field[data-kind="final"] .ground, .field[data-kind="champ"] .ground, .field[data-kind="summit"] .ground, .field[data-kind="darkest"] .ground, .field[data-kind="tower"] .ground, .field[data-kind="quest"] .ground, .field[data-kind="raid"] .ground { background: var(--g-champ); border-color: var(--gold) }
   #foe img { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); image-rendering: pixelated; transition: transform .06s }
   #foe:active img { transform: translateX(-50%) scale(.94) }
+  #foe img.trainer, #foe:active img.trainer { left: 10px; top: 8px; bottom: auto; transform: none }
+  .credits { position: fixed; inset: 0; z-index: 40; background: var(--paper); display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto }
+  .credits[hidden] { display: none }
+  .credits .box { max-width: 44ch; text-align: center; align-items: center; font-size: 13px; line-height: 1.6 }
   #foe .pop { position: absolute; font-weight: 700; font-size: 14px; color: var(--red); pointer-events: none; animation: rise .6s ease-out forwards }
   @keyframes rise { to { transform: translateY(-28px); opacity: 0 } }
   .shinymark { position: absolute; top: 8px; right: 10px; font-size: 11px; font-weight: 700; color: var(--gold) }
@@ -246,6 +250,7 @@
   .wiki-search { margin: 10px 10px 4px; min-width: 0 }
   .box-search { width: 13em; max-width: 100% }
   #teams { margin-top: 6px; gap: 4px; flex-wrap: wrap } #teams .team { gap: 0 } #teamname { width: 10em }
+  #finalbox { gap: 6px; flex-wrap: wrap; align-items: center; padding: 6px 10px; border: 1px solid var(--rule); border-top: 0; background: var(--surface) }
   #throwbox { gap: 4px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--rule); border-top: 0; background: var(--surface) }
   .wiki-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 14px }
   .wiki-label { font-size: 11px; color: var(--dim); margin: 12px 0 3px }
@@ -352,6 +357,7 @@
       <button data-tab="ach" type="button">Achievements</button>
     </div>
     <div class="tip" id="tip" role="status" hidden></div>
+    <div class="credits" id="credits" role="dialog" aria-modal="true" aria-labelledby="credits-h" hidden></div>
 
     <section id="t-battle" class="cols">
       <div class="fight">
@@ -361,11 +367,12 @@
             <div class="row" id="foeinfo"></div>
             <div class="hpline"><span>HP</span><div class="bar hp" id="hpwrap"><i id="hpbar"></i></div><span id="hptext"></span></div>
           </div>
-          <button id="foe" type="button" aria-label="Attack the wild Pokémon"><span class="ground"></span><img id="foeimg" class="spr" alt=""><span class="shinymark" id="shiny" hidden>Shiny</span></button>
+          <button id="foe" type="button" aria-label="Attack the wild Pokémon"><span class="ground"></span><img id="foeimg" class="spr" alt=""><span class="shinymark" id="shiny" hidden>Shiny</span><img id="trainerimg" class="trainer" alt="Prof Penguin" hidden></button>
           <div id="timerwrap" hidden><div class="bar time"><i id="timebar"></i></div><span id="timetext"></span></div>
         </div>
         <div id="log" role="status"></div>
         <div id="throwbox" class="row small" hidden></div>
+        <div id="finalbox" class="row small" hidden></div>
         <div class="party" id="minis"></div>
         <div class="small muted" id="dps"></div>
       </div>
@@ -522,7 +529,13 @@ const ASSET_DIR = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseUR
 // save (box entry { special: id }): its own picture, its own stats, same types.
 const SPECIALS = {
   "bday-ceruledge": { num: 937, name: "Ceruledge", title: "Birthday Ceruledge", note: "A birthday gift, Nov 16, 2026. Every stat 10% above a normal Ceruledge's.",
-    img: ASSET_DIR + "937-birthday.png", hp: 83, atk: 138, def: 88, spa: 66, spd: 110, spe: 94 }
+    img: ASSET_DIR + "937-birthday.png", hp: 83, atk: 138, def: 88, spa: 66, spd: 110, spe: 94 },
+  // The prize for beating Prof Penguin's final showdown: a permanent Mega, Tier 1 (key: see TIER). No Mega Stone, no
+  // Mega toggle, and it doesn't take the party's Mega slot: it's a special edition, like any other.
+  "prof-empoleon": { num: 395, key: "prof", name: "Empoleon", title: "Prof Penguin's Mega Empoleon", move: "Hydro Cannon",
+    note: "Prof Penguin's own partner, yours for beating his final showdown. A permanent Mega: no Mega Stone, and it doesn't take your Mega slot. Tier 1.",
+    where: "Prof Penguin's Mega Empoleon is the prize for beating his final showdown",
+    img: SPRITE_DIR + "prof-empoleon.png", hp: 140, atk: 100, def: 160, spa: 140, spd: 160, spe: 80 }
 };
 for (const sp of Object.values(SPECIALS)) Object.assign(sp, { types: mon(sp.num).types, cr: mon(sp.num).cr, flags: mon(sp.num).flags, gen: mon(sp.num).gen, evos: [], bst: sp.hp + sp.atk + sp.def + sp.spa + sp.spd + sp.spe });
 // A shiny Pokémon stays shiny as a Mega or Gigantamax: every form has a shiny sprite (PokeAPI's, cropped like the
@@ -695,6 +708,7 @@ const level = n => Math.min(lvlOf(S.box[n].xp), levelCap());
 function areaCap(loc = S.loc) {
   // Red and the Battle Tower hold nobody back.
   if (!loc || loc.kind === "summit" || loc.kind === "tower") return 100;
+  if (loc.kind === "final") return levelCap();
   // Side quests, the Darkest Day, and the Ultra Wormhole and Area Zero come after a Champion: your level cap.
   if (loc.r === TRAIN_R || ((loc.kind === "route" || loc.kind === "dungeon" || loc.kind === "raid") && cleared(loc.r)) || loc.kind === "quest" || loc.kind === "darkest") return levelCap();
   const L = loc.kind === "champ" || loc.x || loc.kind === "quest" || loc.kind === "raid" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
@@ -717,8 +731,12 @@ const defMult = (foe, phys) => Math.min(DEF_HI, Math.max(DEF_LO, Math.sqrt((foe.
 const isMixed = m => Math.min(m.atk, m.spa) >= MIXED * Math.max(m.atk, m.spa);
 const category = m => isMixed(m) ? "mixed" : m.atk >= m.spa ? "physical" : "special";
 // Which side it hits this foe on (true: Attack vs Defense) and the attacking stat times that side's multiplier.
-const hitsPhys = (m, foe) => isMixed(m) ? m.atk * defMult(foe, true) >= m.spa * defMult(foe, false) : m.atk >= m.spa;
-const hitStat = (m, foe) => { if (!foe) return Math.max(m.atk, m.spa); const ph = hitsPhys(m, foe); return (ph ? m.atk : m.spa) * defMult(foe, ph); };
+// Eiscue (Prof Penguin's last one in phase 1): its Ice Face takes physical hits at ICE_FACE until that HP bar breaks, and
+// while its Noice Face is out the clock runs NOICE_CLOCK times as fast. A mixed attacker picks its special side there.
+const ICE_FACE = .25, NOICE_CLOCK = 1.5;
+const iceFace = (foe, phys) => phys && foe && foe.iceFace ? ICE_FACE : 1, clockRate = m => m && m.noice ? NOICE_CLOCK : 1;
+const hitsPhys = (m, foe) => isMixed(m) ? m.atk * defMult(foe, true) * iceFace(foe, true) >= m.spa * defMult(foe, false) : m.atk >= m.spa;
+const hitStat = (m, foe) => { if (!foe) return Math.max(m.atk, m.spa); const ph = hitsPhys(m, foe); return (ph ? m.atk : m.spa) * defMult(foe, ph) * iceFace(foe, ph); };
 const bulkOf = m => (m.hp + m.def + m.spd) / 3;
 // What one Pokémon's bulk counts for in the party's boss timer: up to 150, so a single wall (Eternamax's is 252)
 // can't carry a team of glass cannons to the +25% cap.
@@ -884,7 +902,7 @@ const UNTIERED = new Set([772, 789, 790, 808, 809, 891, 892, 898, 1024]), ARCEUS
 mon(ARCEUS).move = "Judgment";
 const TIER_OF = [
   [ETERNAMAX_FOE],
-  [...MEWTWONITES, MEGA_RAYQUAZA, MEGA_ZYGARDE].map(formById).concat([QFORMES[800][2], mon(ARCEUS)]),
+  [...MEWTWONITES, MEGA_RAYQUAZA, MEGA_ZYGARDE].map(formById).concat([QFORMES[800][2], mon(ARCEUS), SPECIALS["prof-empoleon"]]),
   [...QFORMES[646], QFORMES[888][0], QFORMES[889][0], ...QFORMES[898], QFORMES[383][0], QFORMES[382][0], QFORMES[487][0]],
   [150, 249, 250, 382, 383, 384, 483, 484, 487, 486, 643, 644, 646, 716, 717, 791, 792, 888, 889, 890, 1007, 1008, 773].map(mon)
     .concat(QFORMES[800].slice(0, 2), [ZFORMES.complete], QFORMES[386], [641, 642, 645, 905, 647, 1024].map(n => QFORMES[n][0]))
@@ -1038,6 +1056,7 @@ const kills = (r, k) => S.kills[r + "-" + k] || 0;
 function unlocked(loc) {
   const { kind, r, k } = loc;
   if (kind === "summit") return Object.keys(S.champs).length >= REGIONS.length;
+  if (kind === "final") return finalOpen();
   if (kind === "darkest") return !!S.champs[PIECES_FROM] && (S.pieces || 0) >= PIECES_NEED;
   if (kind === "tower") return !!S.champs[TOWER_FROM];
   if (kind === "raid") return !!raidMon();
@@ -1051,6 +1070,7 @@ function unlocked(loc) {
   if (kind === "champ") return badge(r, 3);
 }
 function locName(loc) {
+  if (loc.kind === "final") return "Prof Penguin's Lab";
   if (loc.r === TRAIN_R) return `${TRAIN_TYPES[loc.k]} training area`;
   const R = REGIONS[loc.r];
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
@@ -1135,7 +1155,8 @@ function raidTuning(B) {
 // tier below the prize's (Tier 1 quests: Tier 2 and weaker), at the cap with their tier bonus and bossProtein(), and it
 // only just wins idling: BOSS_USE of the clock (which stands still in the pause after each faint).
 function tierTuning(B, tier, area) {
-  const cap = areaCap(), hit = (m, f) => refHit(m, cap, f) * bestEff(m, f), foes = B.queue.map(f => ({ f, hp: bossHpFor(f, B.L, B.i) }));
+  // A foe that runs the clock faster (Eiscue's Noice Face) counts its time that much more.
+  const cap = areaCap(), hit = (m, f) => refHit(m, cap, f) * bestEff(m, f), foes = B.queue.map(f => ({ f, hp: bossHpFor(f, B.L, B.i) * clockRate(f) }));
   const P = refPick(refPool(...area, cap, tier), foes, hit), boost = bossBoost(), tap = refTaps(P, cap, GYM_TAPS);
   const secs = foes.reduce((s, { f, hp }) => s + hp / (P.reduce((d, m) => d + hit(m, f), 0) * boost + tap), 0);
   return Math.max(.05, BOSS_USE * B.bossTime * refDef(P) / secs);
@@ -1157,6 +1178,92 @@ function legendTuning(B) {
   return Math.max(1, (budget - Math.min(fodder, room)) * dps(lg) / bossHpFor(lg, B.L, B.i));
 }
 
+// ── Prof Penguin's final showdown. His Lab opens once every "Side quests" achievement is yours: one gauntlet, no
+// ticket, two phases at your level cap, and out of time anywhere it starts over from phase 1.
+// Phase 1: his Water and Ice line-up, set like a Tier 1 quest (tierTuning, Eiscue's faces counted).
+// Then the party is free for FINAL_BREAK seconds to load a saved team ("Start phase 2" skips the wait).
+// Phase 2: his real team, picked against the party you bring once the break ends: Giratina Origin (unless 3 or more of
+// your party hit it 2× or harder), counter-picks from Tiers 1 to 3 that your party hurts least (power × matchup, summed;
+// one Mega and one Gigantamax at most; Arceus takes whichever Plate suits him), and his Mega Empoleon, Tier 0, last.
+// Phase 2 is set so the best six of every tier (Eternamax, one Mega, one Gigantamax), with every matchup counted as 1×,
+// at the cap with bossProtein(), use FINAL_USE of the clock.
+const FINAL_R = 3, FINAL_TIME = 120, FINAL_BREAK = 30, FINAL_USE = .97, FINAL_PICKS = 4, PROF_SP = "prof-empoleon", PROF_LETTER = "prof-graduation";
+const PROF_IMG = SPRITE_DIR + "prof-penguin.png";
+$("#trainerimg").src = PROF_IMG;
+const ICE_FACE_FOE = statForm(875, { name: "Eiscue (Ice Face)", sprite: 875, iceFace: true }, "Ice", [75, 80, 110, 65, 90, 50]);
+const NOICE_FOE = statForm(875, { name: "Eiscue (Noice Face)", sprite: 10185, noice: true }, "Ice", [75, 80, 70, 65, 50, 130]);
+const FINAL_P1 = [393, 394, 225, 991, 395].map(mon).concat([ICE_FACE_FOE, NOICE_FOE]);
+const PROF_EMPOLEON = (({ cr, flags, gen }) => ({ id: "prof-empoleon", num: 395, kind: "mega", img: SPRITE_DIR + "prof-empoleon.png", name: "Prof Penguin's Mega Empoleon", types: ["Water", "Steel"],
+  hp: 255, atk: 110, def: 170, spa: 130, spd: 170, spe: 50, bst: 885, cr, flags, gen, evos: [] }))(mon(395));
+TIER[PROF_EMPOLEON.id] = 0;
+const sideQuests = () => { const all = ACH.filter(a => a.group === "Side quests"); return [all.filter(a => S.ach[a.id] || a.have() >= a.need).length, all.length]; };
+const finalOpen = () => { const [got, all] = sideQuests(); return got >= all; };
+// His real team against your party now: see above. Ties (a party that can't touch several of them) go to the
+// stronger one: lower tier, then higher stat total.
+function finalTeam() {
+  const hurt = f => S.party.reduce((s, n) => s + power(n, battleLevel(n), f) * bestEff(fighter(n), f), 0);
+  const giratina = QFORMES[487][0], countered = S.party.filter(n => bestEff(fighter(n), giratina) >= 2).length >= 3;
+  const picks = [], nums = new Set([487, 395]); let mega = false, gmax = false;
+  for (const f of TIERED().filter(m => tierOf(m) <= 3).map(m => [m, hurt(m)]).sort((a, b) => a[1] - b[1] || tierOf(a[0]) - tierOf(b[0]) || b[0].bst - a[0].bst).map(x => x[0])) {
+    if (picks.length >= FINAL_PICKS + (countered ? 1 : 0)) break;
+    if (nums.has(f.num) || (mega && f.kind === "mega") || (gmax && f.kind === "gmax")) continue;
+    picks.push(f); nums.add(f.num); mega = mega || f.kind === "mega"; gmax = gmax || f.kind === "gmax";
+  }
+  return [...(countered ? [] : [giratina]), ...picks, PROF_EMPOLEON];
+}
+function finalTuning(B) {
+  const cap = areaCap(), hit = (m, f) => refHit(m, cap, f), foes = B.queue.map(f => ({ f, hp: bossHpFor(f, B.L, B.i) * clockRate(f) }));
+  const P = refPick([...refPool(...refArea(B.r, 3), cap, 0), ETERNAMAX_FOE], foes, hit), boost = bossBoost();
+  const secs = foes.reduce((s, { f, hp }) => s + hp / (P.reduce((d, m) => d + hit(m, f), 0) * boost), 0);
+  return FINAL_USE * B.bossTime * refDef(P) / secs;
+}
+// Phase 1 is over: the party is free until the break ends.
+function finalBreak() {
+  B.foe = null; B.queue = null; B.brk = FINAL_BREAK;
+  $("#foeimg").src = PROF_IMG; $("#shiny").hidden = true; $("#trainerimg").hidden = true; $("#timerwrap").hidden = true;
+  $("#hpbar").style.width = "0%"; $("#hptext").textContent = ""; $("#where").textContent = "Prof Penguin's Lab · break";
+  $("#foeinfo").innerHTML = '<b>Prof Penguin</b> <span class="muted small">picks his real team against the party you bring</span>';
+  say("Phase 1 cleared! Your party is free: load a saved team in Party & Box. Prof Penguin picks his real team when phase 2 starts.");
+  renderFinalBox(); renderAll(); save();
+}
+function renderFinalBox() {
+  const el = $("#finalbox"), on = !!(B && B.brk != null);
+  el.hidden = !on;
+  el.innerHTML = on ? `<span>Phase 2 starts in <b id="finalwait">${Math.ceil(B.brk)}s</b>.</span><button class="lbl" type="button" data-final="go">Start phase 2</button>` : "";
+}
+function finalGo() {
+  if (!B || B.brk == null) return;
+  if (!S.party.length) { say("Put at least one Pokémon in your party. The showdown starts over from phase 1.", true); backToRoute(); return; }
+  B.brk = null; B.phase = 2; B.queue = finalTeam(); B.idx = 0;
+  B.time = fightTime(FINAL_TIME, B.queue, RED_OFFENSE, .8, 1.2); B.bossTime = B.time; B.def = partyTime(); B.time = Math.round(B.time * B.def);
+  B.tune = finalTuning(B); B.total = B.time;
+  say(`Phase 2: Prof Penguin's real team, ${B.queue.map(f => f.name).join(", ")}.`);
+  renderFinalBox(); spawn(); renderAll(); save();
+}
+$("#finalbox").onclick = e => { if (e.target.closest("[data-final]")) finalGo(); };
+// Party changes wait for the end of a boss fight, but the break in Prof Penguin's showdown is free.
+const bossLocked = () => !!(B && B.kind !== "route" && !(B.kind === "final" && B.brk != null));
+function finalWin() {
+  const first = !S.beat, prize = rewardFor(B.L, B.i, 50); S.money += prize;
+  if (first) {
+    S.beat = arcadeDay();
+    const sp = SPECIALS[PROF_SP], had = S.box[sp.num];
+    S.box[sp.num] = { ...(had || {}), xp: Math.max(Math.pow(levelCap(), 3), had ? had.xp : 0), shiny: had ? had.shiny : false, special: PROF_SP, look: "special" };
+    if (!had && joinsParty()) joinParty(sp.num);
+    S.mail.got[PROF_LETTER] = 1;
+    showCredits();
+  }
+  toast(first ? `You beat Prof Penguin! +$${fmt(prize)}. His Mega Empoleon is yours, and he left you a letter in Mail.` : `Prof Penguin rematch won. +$${fmt(prize)}.`);
+}
+function showCredits() {
+  const el = $("#credits");
+  el.innerHTML = `<div class="box"><h2 id="credits-h">You graduated</h2><p>You beat Prof Penguin on ${esc(S.beat || arcadeDay())}.</p>
+    <p><b>Poké Idle</b><br>Made by Vettel, for the Bored arcade.<br>Prof Penguin as himself.</p>
+    <p class="small muted">Sprites from PokeAPI. Pokémon is © Nintendo, Creatures and Game Freak; this is a fan game.</p>
+    <p>Thanks for playing.</p><button class="lbl" type="button" data-credits="close">Close</button></div>`;
+  el.hidden = false; el.querySelector("[data-credits]").focus();
+}
+$("#credits").onclick = e => { if (e.target.closest("[data-credits]")) $("#credits").hidden = true; };
 function startLoc(loc) {
   if (!unlocked(loc)) return;
   if (B && B.manual) { toast("Finish throwing first: pick a ball or let it go."); return; }
@@ -1175,6 +1282,7 @@ function startLoc(loc) {
   else if (loc.kind === "summit") B = { kind: "summit", r, i: 36, queue: RED_TEAM.map(mon), L: SUMMIT_LEVEL, base: SUMMIT_TIME, time: fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2), idx: 0, back: from };
   else if (loc.kind === "quest") { const Q = QUEST[loc.q], L = Math.max(champLevel(r), levelCap()); B = { kind: "quest", q: Q.id, r, i: Math.max(r * 4 + 3, levelIndex(L)), queue: Q.foes, L, base: QUEST_TIME, time: questTime(Q), idx: 0 }; }
   else if (loc.kind === "darkest") { const L = Math.max(champLevel(r), levelCap()); B = { kind: "darkest", r, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [ETERNAMAX_FOE], L, base: DARKEST_TIME, time: darkTime(), idx: 0 }; }
+  else if (loc.kind === "final") { const L = Math.max(champLevel(r), levelCap()); B = { kind: "final", r, phase: 1, i: Math.max(r * 4 + 3, levelIndex(L)), queue: FINAL_P1, L, base: FINAL_TIME, time: fightTime(FINAL_TIME, FINAL_P1, RED_OFFENSE, .8, 1.2), idx: 0 }; }
   else if (loc.kind === "tower") { B = { kind: "tower", r, i: 36, f: 1, queue: towerTeam(1), L: 100, base: TOWER_START, time: TOWER_START, idx: 0 }; S.tower.runs++; }
   else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: champLevel(r), base: CHAMP_TIME, time: champTime(r), idx: 0 };
   else if (loc.kind === "raid") { const n = raidMon(), f = raidForm(n), L = Math.max(champLevel(r), levelCap()); B = { kind: "raid", r, n, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [f], L, base: RAID_TIME, time: fightTime(RAID_TIME, [f], regionOffense(r), .9, 1.15), idx: 0 }; }
@@ -1193,7 +1301,8 @@ function startLoc(loc) {
   else if (B.kind === "raid") B.tune = raidTuning(B);
   else if (B.kind === "quest") B.tune = tierTuning(B, QUEST[B.q].tier, refArea(B.r, 3));
   else if (B.kind === "darkest") B.tune = tierTuning(B, 0, refArea(B.r, 3));
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
+  else if (B.kind === "final") B.tune = tierTuning(B, 1, refArea(B.r, 3));
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
@@ -1206,7 +1315,7 @@ function spawn() {
     pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" || B.kind === "raid" ? CHAMP_HP : GYM_HP;
     mult = B.kind === "dungeon" && !boss ? (B.fodder || fodderHp(B.i)) : B.tune;
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
-    if (B.kind === "darkest" || B.kind === "quest") pay = CHAMP_HP;
+    if (B.kind === "darkest" || B.kind === "quest" || B.kind === "final") pay = CHAMP_HP;
     if (B.kind === "tower") { pay = CHAMP_HP; mult = towerHp(B.f); }
     shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
@@ -1215,7 +1324,8 @@ function spawn() {
   S.seen[m.num] = 1;
   $("#foeimg").src = spriteOf(m, shiny);
   $("#shiny").hidden = !shiny;
-  $("#foeinfo").innerHTML = `<b>${esc(m.name)}</b> Lv ${L} ${m.types.map(tyChip).join(" ")} <span class="muted small">Def ${statAt(m.def, L)} · SpD ${statAt(m.spd, L)}</span>${ownsFoe(m) ? ' <span class="muted">· caught</span>' : ""}`;
+  $("#trainerimg").hidden = B.kind !== "final"; renderFinalBox();
+  $("#foeinfo").innerHTML = `<b>${esc(m.name)}</b>${m.kind === "mega" ? ' <span class="muted small">MEGA</span>' : ""} Lv ${L} ${m.types.map(tyChip).join(" ")} <span class="muted small">Def ${statAt(m.def, L)} · SpD ${statAt(m.spd, L)}</span>${ownsFoe(m) ? ' <span class="muted">· caught</span>' : ""}`;
   renderMinis();
 }
 function hit(dmg) {
@@ -1378,6 +1488,7 @@ function next() {
   B.idx++;
   if (B.idx < B.queue.length) { spawn(); return; }
   if (B.kind === "tower") { towerFloor(); return; }
+  if (B.kind === "final" && B.phase === 1) { finalBreak(); return; }
   // Bosses in Galar bring Wishing Pieces, in Sinnoh Plates.
   const R = REGIONS[B.r], galar = (B.r === PIECES_FROM ? gainPieces(PIECE_BOSS) : "") + (B.r === PLATES_FROM && B.kind !== "quest" ? gainPlates(PLATE_BOSS) : "");
   if (B.kind === "gym") { const first = !badge(B.r, B.k); S.badges[B.r + "-" + B.k] = 1; liftCap(); const prize = rewardFor(B.L, B.i, 15); S.money += prize; toast(`${first ? "Badge earned" : "Rematch won"}: ${R.gyms[B.k][0]}'s ${R.gyms[B.k][1]} badge. +$${fmt(prize)}.${first ? ` Level cap ${levelCap()}.` : ""}` + gainCells(CELL_BOSS) + galar); }
@@ -1411,6 +1522,7 @@ function next() {
     S.raid = 0; raidMon();
     toast(`You won the Max Raid! ${mon(n).name} can Gigantamax now: turn it on in its detail in Party & Box. +$${fmt(prize)}.${joined}` + gainCells(CELL_BOSS) + galar);
   }
+  if (B.kind === "final") finalWin();
   backToRoute(); save(); tutor();
 }
 // A cleared floor: count it, pay for it, add time, and send out the next floor's three.
@@ -1497,7 +1609,7 @@ function evolve(n, e, quiet) {
 const evoAllReady = n => { const ready = evoOptions(n).filter(e => canEvolve(n, e)); return ready.length === 1 && ready[0][1] === "L" ? ready[0] : null; };
 const evoAllCount = () => Object.keys(S.box).filter(n => evoAllReady(+n)).length;
 function evolveAll() {
-  if (B && B.kind !== "route") { toast("Evolve between battles."); return; }
+  if (bossLocked()) { toast("Evolve between battles."); return; }
   const into = [];
   for (let pass = 0; pass < 4; pass++) {
     let any = false;
@@ -1514,12 +1626,13 @@ let lastTick = performance.now();
 function tick() {
   const now = performance.now(), dt = Math.min(1, (now - lastTick) / 1000); lastTick = now;
   if (screen !== "game") return; // battles hold still behind the title screen
+  if (B && B.brk != null) { B.brk -= dt; if (B.brk <= 0) finalGo(); else { const w = $("#finalwait"); if (w) w.textContent = Math.ceil(B.brk) + "s"; } }
   if (B && B.manual) { if (Date.now() > B.manual.until) manualAuto(); else { const w = $("#throwwait"); if (w) w.textContent = `auto in ${Math.max(0, Math.ceil((B.manual.until - Date.now()) / 1000))}s`; } }
   if (B && B.foe && !B.pause) {
     hit(partyDps(B.foe.m) * dt);
     if (B.time != null) {
-      B.time -= dt;
-      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "dungeon" ? "The dungeon run ended." : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
+      B.time -= dt * clockRate(B.foe.m);
+      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "dungeon" ? "The dungeon run ended." : B.kind === "final" ? "Prof Penguin's showdown starts over from phase 1." : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
     }
   }
   drawBattle();
@@ -1531,7 +1644,7 @@ function drawBattle() {
   $("#hpwrap").dataset.s = hpf > .5 ? "" : hpf > .2 ? "mid" : "low";
   $("#hptext").textContent = fmt(Math.ceil(Math.max(0, B.foe.hp))) + "/" + fmt(B.foe.max);
   $("#field").dataset.kind = B.kind;
-  $("#where").textContent = locName(S.loc) + (B.kind === "tower" ? ` · floor ${B.f} · ${B.idx + 1}/${B.queue.length}` : B.queue ? ` · ${B.idx + 1}/${B.queue.length}` : B.r === TRAIN_R ? ` · ×${TRAIN_XP} XP` : ` · ${Math.min(kills(B.r, B.k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM}`);
+  $("#where").textContent = locName(S.loc) + (B.kind === "final" ? ` · phase ${B.phase}` : "") + (B.kind === "tower" ? ` · floor ${B.f} · ${B.idx + 1}/${B.queue.length}` : B.queue ? ` · ${B.idx + 1}/${B.queue.length}` : B.r === TRAIN_R ? ` · ×${TRAIN_XP} XP` : ` · ${Math.min(kills(B.r, B.k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM}`);
   $("#timerwrap").hidden = B.time == null;
   if (B.time != null) { const total = B.total; $("#timebar").style.width = (100 * Math.max(0, B.time) / total) + "%"; $("#timetext").textContent = Math.ceil(Math.max(0, B.time)) + "s left"; }
   $("#money").textContent = fmt(S.money);
@@ -1584,7 +1697,9 @@ function renderTop() {
 function renderLocs() {
   $("#regions").innerHTML = REGIONS.map((R, r) => `<button class="lbl${r === viewR ? " on" : ""}" data-r="${r}" type="button"${regionOpen(r) ? "" : " disabled"}>${R.name}</button>`).join("")
     + (allChamps() ? `<button class="lbl${viewR === TRAIN_R ? " on" : ""}" data-r="${TRAIN_R}" type="button">Training</button>` : "");
-  const r = viewR, items = [];
+  const r = viewR, items = [], [sqGot, sqAll] = sideQuests();
+  // Prof Penguin's Lab sits at the top of every list.
+  items.push({ kind: "final", r: FINAL_R, note: S.beat ? `graduated ${S.beat}` : finalOpen() ? "2 phases, no ticket" : `${sqGot}/${sqAll} side quests`, done: !!S.beat });
   if (r === TRAIN_R) TRAIN_TYPES.forEach((t, k) => items.push({ kind: "route", r, k, train: t, note: `Lv ${levelCap()} · ×${TRAIN_XP} XP` }));
   else {
     for (let k = 0; k < 4; k++) {
@@ -1651,7 +1766,7 @@ function saveTeam() {
   save(); renderParty(); toast(i >= 0 ? `${name} updated.` : `Saved your party as ${name}.`);
 }
 function loadTeam(i) {
-  if (B && B.kind !== "route") { toast("Switch teams between battles."); return; }
+  if (bossLocked()) { toast("Switch teams between battles."); return; }
   const t = (S.teams || [])[i]; if (!t) return;
   const party = t.party.filter(n => S.box[n]).slice(0, 6);
   if (!party.length) { toast(`None of ${t.name} is in your Box anymore.`); return; }
@@ -1858,6 +1973,7 @@ const ACH = [
   { id: "weald", group: "Side quests", title: "Sword and shield", desc: "Beat Zacian and Zamazenta in the Slumbering Weald", need: 1, have: () => S.won && S.won.weald ? 1 : 0 },
   { id: "wormhole", group: "Side quests", title: "Beyond the wormhole", desc: "Catch all 11 Ultra Beasts", need: ULTRA_BEASTS.length, have: () => ULTRA_BEASTS.filter(n => S.box[n]).length },
   { id: "areazero", group: "Side quests", title: "Out of time", desc: "Catch all 20 Paradox Pokémon", need: PARADOX.length + PARADOX_LATE.length, have: () => [...PARADOX, ...PARADOX_LATE].filter(n => S.box[n]).length },
+  { id: "graduation", group: "Prof Penguin", title: "Graduation", desc: "Beat Prof Penguin's final showdown", need: 1, have: () => S.beat ? 1 : 0 },
   ...[[5, "First steps up", "Clear 5 Battle Tower floors"], [10, "Tower climber", "Clear floor 10 and beat the Tower Tycoon"], [20, "High rise", "Clear 20 Battle Tower floors"], [30, "Above the clouds", "Clear 30 Battle Tower floors"], [40, "Top of the tower", "Clear 40 Battle Tower floors"]]
     .map(([need, title, desc]) => ({ id: "tower" + need, group: "Battle Tower", title, desc, need, have: () => S.tower ? S.tower.best : 0 })),
   ...[[1, "Far from home", "Collect a regional form"], [VARIANTS.length, "Around the world", `Collect all ${VARIANTS.length} regional forms`]]
@@ -1914,6 +2030,13 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "prof-graduation", beat: true, date: "Graduation day", from: "Prof Penguin", title: "You beat me!",
+    body: `<p>Well! That's the first time anyone has beaten my real team.</p><p>When I gave you your first Pokémon, I hoped you'd see every region, but I didn't expect you to catch every legendary on the way. My Empoleon wants to go with you. Look after it: it's been with me since my first day as a professor.</p><p>You've graduated. The Lab is always open if you want a rematch.</p><p>Your friend, Prof Penguin</p>` },
+  { id: "update-2026-11-16f", date: "Nov 16, 2026", from: "Prof Penguin", title: "My final showdown",
+    body: `<ul><li><b>Prof Penguin's Lab</b> is at the top of every list. It opens once you have every achievement in the Side quests group. Until then it shows how many you have.</li>
+      <li>One gauntlet, two phases, no ticket. Phase 1 is my Water and Ice team. Then you get 30 seconds to load a saved team before phase 2, my real team, picked against the party you bring.</li>
+      <li>Run out of time anywhere and you start over from phase 1.</li>
+      <li>Beat me and my Mega Empoleon is yours. The Wiki's Prof Penguin's Lab page has the details.</li></ul>` },
   { id: "update-2026-11-16e", date: "Nov 16, 2026", from: "Prof Penguin", title: "Every legendary tier hits harder",
     body: `<ul><li>Tier bonuses go up and reach every legendary tier: Tier 0 ×1.4, Tier 1 ×1.55, Tier 2 ×1.45, Tier 3 ×1.3, Tier 4 ×1.15. Pokémon that aren't legendary stay at ×1.</li>
       <li>Before, a Tier 4 legendary hit no harder than a pseudo-legendary. Now each tier is 15-30% above the next, so a team two tiers down is about a third weaker or more.</li>
@@ -2044,7 +2167,8 @@ const MAIL = [
       <li>Auto ball throwing, Box filters and stat sorts, true-size sprites, a title screen, and fixes for evolving into Pokémon you own and buying dungeon tickets.</li></ul>` }
 ];
 const arcadeDay = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Detroit", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-const delivered = m => !m.day || !!S.mail.got[m.id];
+// A letter with beat: true arrives when you beat Prof Penguin.
+const delivered = m => (m.beat ? !!S.beat : !m.day) || !!S.mail.got[m.id];
 function deliverMail(today = arcadeDay()) {
   if (!S) return;
   const fresh = MAIL.filter(m => m.day === today && !S.mail.got[m.id]);
@@ -2137,6 +2261,11 @@ function wikiSections() {
     { id: "aether", group: "Side quests", title: "Aether Paradise (Silvally)", html: `<p>Once Kukui is beaten, Aether Paradise opens in Alola's list: Type: Null, then Silvally, at your level cap. Silvally is Tier 3 (${mon(773).bst}), so it's set against Tier 4 and weaker (see Tiers).</p><p>Win, and Type: Null and Silvally join you, with all 17 Memories: Silvally can take any type, picked in its detail, with the same stats. They only come from here.</p>` },
     { id: "underdepths", group: "Side quests", title: "Area Zero Underdepths (Terapagos)", html: `<p>Once Geeta is beaten, the Area Zero Underdepths open in Paldea's list: Terapagos in its Terastal Form, then its Stellar Form, at your level cap. The Stellar Form is Tier 3 (${QFORMES[1024][0].bst}), so it's set against Tier 4 and weaker (see Tiers).</p><p>Win, and Terapagos joins you with its Stellar Form, picked in its detail. Terapagos only comes from here.</p>` },
     { id: "kitakami", group: "Side quests", title: "Kitakami (Ogerpon)", html: `<p>Once Geeta is beaten and Okidogi, Munkidori and Fezandipiti are in your Box (from the Paldea dungeon), Kitakami opens in Paldea's list: Ogerpon in its four masks, Teal (Grass), Wellspring (Grass/Water), Hearthflame (Grass/Fire) and Cornerstone (Grass/Rock), at your level cap. Ogerpon is Tier 4 (${mon(1017).bst}), so it's set against Pokémon that aren't legendary (see Tiers).</p><p>Win, and Ogerpon joins you with all four masks, picked in its detail, with the same stats. It only comes from here.</p>` },
+    { id: "final", group: "Side quests", title: "Prof Penguin's Lab", html: `<p>Prof Penguin's final showdown. His Lab sits at the top of every list, and opens once you have every achievement in the Side quests group (the list shows how many). One gauntlet, no ticket, two phases at your level cap. Run out of time anywhere and it starts over from phase 1.</p>
+      <p><b>Phase 1</b>: Piplup, Prinplup, Delibird, Iron Bundle, Empoleon and Eiscue, set like a Tier 1 quest (see Tiers). Eiscue's Ice Face takes physical hits at ×${ICE_FACE} until its HP bar breaks; while its Noice Face is out, the clock runs ×${NOICE_CLOCK}. Bring special attackers for the Ice Face.</p>
+      <p><b>The break</b>: then your party is free for ${FINAL_BREAK}s. Load a saved team in Party & Box, or press Start phase 2.</p>
+      <p><b>Phase 2</b>: his real team, picked against the party you bring when the break ends. Giratina in its Origin Forme leads, unless 3 or more of your party hit it 2× or harder. Then Tier 1 to 3 Pokémon your party hurts least (one Mega and one Gigantamax at most; his Arceus takes whichever Plate suits him), and last his own Mega Empoleon (Water/Steel, Tier 0, HP ${PROF_EMPOLEON.hp}, Def and Sp. Def ${PROF_EMPOLEON.def}). It's set so the best six of every tier, counting every matchup as even, only just win: cover many types so he can't counter all of you.</p>
+      <p>Win the first time for his Mega Empoleon, a special edition (SP) of Empoleon: Water/Steel, Tier 1, total ${SPECIALS[PROF_SP].bst}. It's a permanent Mega: no Mega Stone, and it doesn't take your Mega slot. He also leaves you a letter, and the title screen remembers the day you beat the game.</p>` },
     { id: "terminus", group: "Side quests", title: "Terminus Cave (Zygarde)", html: `<p>Zygarde's Last Stand, as at the end of Legends: Z-A. Once every Champion is beaten, Zygarde is in your Box and all 100 Zygarde Cells are in, Terminus Cave opens in Kalos's list. Zygarde fights in three Formes, 10%, 50% and Complete, at your level cap. Mega Zygarde is Tier 1, so it's set against Tier 2 and weaker (see Tiers). They're all Dragon and Ground, so Ice hits them four times over.</p><p>Win it once for the Zygardite. Like in Z-A, Zygarde only Mega Evolves from its Complete Forme: pick 100% in its detail, then Mega Evolve. Dungeons and the Shop never give its stone.</p>` },
     { id: "meteor", group: "Side quests", title: "Meteor Falls (Deoxys)", html: `<p>Once Hoenn's Champion is beaten and Deoxys is in your Box (from the Hoenn dungeon), Meteor Falls opens in Hoenn's list: Deoxys in its Attack, Defense and Speed Formes, back to back, at your level cap. The Formes are Tier 3, so it's set against Tier 4 and weaker (see Tiers). Win, and your Deoxys can take any of its four Formes, picked in its detail. All three are Tier 3, and none is simply better: Attack hits hardest but its bulk is ${Math.round(bulkOf(QFORMES[386][0]))}, Defense is a wall (bulk ${Math.round(bulkOf(QFORMES[386][1]))}) that hardly hits, Speed sits between.</p>` },
     { id: "weald", group: "Side quests", title: "Slumbering Weald (Zacian, Zamazenta)", html: `<p>Once every Champion is beaten and Zacian or Zamazenta is in your Box (from the Galar dungeon), the Slumbering Weald opens in Galar's list: Zacian, then Zamazenta, at your level cap. The Crowned forms are Tier 2, so it's set against Tier 3 and weaker (see Tiers). Win the Rusted Sword and Shield: Zacian can take its Crowned Sword form (Fairy/Steel, Attack 150, Speed 148) and Zamazenta its Crowned Shield (Fighting/Steel, Defense and Sp. Def 140), both Tier 2, picked in their details. Both start in their usual Hero form.</p>` },
@@ -2189,7 +2318,7 @@ function wikiWhere(n) {
   // A quest prize you don't need to start it with: Arceus from the Hall of Origin, and so on.
   for (const Q of QUESTS) if ([Q.prize, ...(Q.gives || [])].includes(n) && !(Q.need || []).includes(n)) out.push(`${theQ(Q)} (${REGIONS[Q.r].name}'s list)`);
   if (n === COSMOG) out.push("a gift the first time you catch Solgaleo or Lunala");
-  if (Object.values(SPECIALS).some(x => x.num === n)) out.push("a special edition came as a gift in Mail");
+  for (const x of Object.values(SPECIALS)) if (x.num === n) out.push(x.where || "a special edition came as a gift in Mail");
   return out.length ? out.join(", ") : "only by evolving";
 }
 function variantWhere(v) {
@@ -2385,7 +2514,7 @@ function partyClick(e) {
   const t = e.target.closest("[data-n]"), ev = e.target.closest("[data-evo]"), tg = e.target.closest("[data-toggle]"), cl = e.target.closest("[data-close]");
   const fm = e.target.closest("[data-forme]");
   if (fm) {
-    if (B && B.kind !== "route") { toast("Change formes between battles."); return; }
+    if (bossLocked()) { toast("Change formes between battles."); return; }
     S.box[detail].forme = fm.dataset.forme;
     // A form without a Mega or a Gigantamax of its own drops the one the usual form had on.
     if (S.mega && S.mega.n === detail && (!megasOf(detail).some(f => f.id === S.mega.f) || (S.mega.f === MEGA_ZYGARDE && !zygardeComplete()))) S.mega = null;
@@ -2394,12 +2523,12 @@ function partyClick(e) {
   }
   const lk = e.target.closest("[data-look]");
   if (lk) {
-    if (B && B.kind !== "route" && (lk.dataset.look === "special" || lookKind(detail) === "special")) { toast("Change editions between battles."); return; }
+    if (bossLocked() && (lk.dataset.look === "special" || lookKind(detail) === "special")) { toast("Change editions between battles."); return; }
     S.box[detail].look = lk.dataset.look; save(); renderAll(); return;
   }
   const mg = e.target.closest("[data-mega]"), gx = e.target.closest("[data-gmax]");
-  if (mg || gx) { if (B && B.kind !== "route") { toast("Change forms between battles."); return; } if (mg) setMega(detail, +mg.dataset.mega); else setGmax(detail); return; }
-  if (ev) { if (B && B.kind !== "route") { toast("Evolve between battles."); return; } const e2 = evosOf(detail).find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
+  if (mg || gx) { if (bossLocked()) { toast("Change forms between battles."); return; } if (mg) setMega(detail, +mg.dataset.mega); else setGmax(detail); return; }
+  if (ev) { if (bossLocked()) { toast("Evolve between battles."); return; } const e2 = evosOf(detail).find(x => x[0] === +ev.dataset.evo); evolve(detail, e2); return; }
   if (cl) { detail = null; renderDetail(); return; }
   if (tg) { toggleParty(+tg.dataset.toggle); return; }
   if (t) { detail = +t.dataset.n; renderParty(); }
@@ -2417,7 +2546,7 @@ function setGmax(n) {
   save(); renderAll();
 }
 function toggleParty(n) {
-  if (B && B.kind !== "route") { toast("You can't change your party during a gym, dungeon or Champion battle."); return; }
+  if (bossLocked()) { toast("You can't change your party during a gym, dungeon or Champion battle."); return; }
   const i = S.party.indexOf(n);
   if (i >= 0) { if (S.party.length === 1) { toast("Keep at least one Pokémon in your party."); return; } S.party.splice(i, 1); dropForm(n); }
   else if (S.party.length < 6) joinParty(n); else { toast("Your party is full. Drag one onto a party slot to swap it in, or send one to the Box first."); return; }
@@ -2426,7 +2555,7 @@ function toggleParty(n) {
 $("#t-party").onclick = partyClick;
 $("#t-party").addEventListener("change", e => {
   const sel = e.target.closest("[data-plate]"); if (!sel || !detail) return;
-  if (B && B.kind !== "route") { toast("Change Plates between battles."); renderDetail(); return; }
+  if (bossLocked()) { toast("Change Plates between battles."); renderDetail(); return; }
   S.box[detail].forme = sel.value; save(); renderAll();
 });
 $("#tip").onclick = e => {
@@ -2453,7 +2582,7 @@ function placeIn(n, j) {
     if (out == null) { S.party.splice(i, 1); S.party.push(n); } else { S.party[i] = out; S.party[j] = n; }
     return true;
   }
-  if (B && B.kind !== "route") { toast("You can't change your party during a gym, dungeon or Champion battle."); return false; }
+  if (bossLocked()) { toast("You can't change your party during a gym, dungeon or Champion battle."); return false; }
   if (out == null) { if (S.party.length >= 6) return false; joinParty(n); toast(`${mon(n).name} joined your party.`); return true; }
   S.party[j] = n; dropForm(out);
   toast(`${mon(n).name} is in. ${mon(out).name} went to the Box.`);
@@ -2703,7 +2832,7 @@ function leadField() {
 }
 function saveCard() {
   const caught = Object.keys(S.box).length, shiny = Object.values(S.box).filter(b => b.shiny).length;
-  const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`],
+  const rows = [["Pokédex", `${caught} of 1025`], ["Shinies", shiny + (S.charm ? ", Shiny Charm" : "")], ["Badges", `${Object.keys(S.badges).length} of 36`], ["Champions", `${Object.keys(S.champs).length} of 9`], ...(S.beat ? [["Beat the game", S.beat]] : []),
     ["Money", "$" + fmt(S.money)], ["Level cap", levelCap()], ["Last spot", locName(S.loc)], ["Leaderboard", `${caught + shiny} points`]].concat([["Achievements", `${ACH.filter(a => S.ach[a.id]).length} of ${ACH.length}`]]).concat(S.key ? [["Forms", `${Object.keys(S.stones).length + Object.keys(S.gfactor).length} unlocked`]] : []);
   return `<dl class="t-stats">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` +
     `<div class="t-party">${S.party.map(n => `<img src="${spriteOf(lookOf(n), showsShiny(n))}" alt="${esc(mon(n).name)}" title="${esc(mon(n).name)}, Lv ${level(n)}">`).join("")}</div>` +
