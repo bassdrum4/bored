@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 506,
+  "count": 507,
   "newest": "2026-11-16",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"b22156d","date":"2026-11-16","author":"PenguinV360","subject":"Poké Idle: sprites for Prof Penguin and his Empoleon","pr":167},
   {"sha":"cbafd15","date":"2026-11-16","author":"PenguinV360","subject":"Poké Idle: land the final tier bonuses; side-quest achievements in tier order","pr":166},
   {"sha":"9acfcf2","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: a bonus for every legendary tier; tune to the clock as it runs","pr":165},
   {"sha":"d03af13","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: eight Tier 3 and 4 side quests, and the Cosmog gift","pr":164},
