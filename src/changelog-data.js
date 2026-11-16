@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 514,
+  "count": 515,
   "newest": "2026-11-16",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c475b01","date":"2026-11-16","author":"Codebuff","subject":"Fix retired-duel test, auto-merge Poké Gacha, extend scoped analytics"},
   {"sha":"71a7830","date":"2026-11-16","author":"Claude","subject":"Start the wallet the first time Poké Gacha is opened"},
   {"sha":"d3f291f","date":"2026-11-16","author":"Claude","subject":"Poké Gacha wallet and rewards engine (hub side)"},
   {"sha":"6626e0c","date":"2026-11-16","author":"Vettel Xu","subject":"docs(poke-gacha): add design spec"},
