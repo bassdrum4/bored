@@ -16,6 +16,7 @@ import {
   syncScores, onScoresPosted, boardLeaders
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
+import { readWallet, mergeStoredWallet, observeStoredSnapshot } from './hub/rewards.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
@@ -471,7 +472,11 @@ function captureBest({ leaving = false } = {}) {
       if (value && !isLocalOnly(board)) { guestClaim = { slug: board, value }; claimed = true; }
     }
   }
-  if (improved) requestCloudPush();
+  // Poké Idle and Pokédoku also pay into the Poké Gacha wallet (a no-op until
+  // the player has opened Poké Gacha once).
+  let earned = false;
+  try { earned = observeStoredSnapshot(activeSlug, snapshot); } catch {}
+  if (improved || earned) requestCloudPush();
   return improved;
 }
 
@@ -563,7 +568,8 @@ function localPlayerState() {
     bests: Object.fromEntries(LB_GAMES
       .map(game => [cloudScoreKey(game.id), bestValue(game)])
       .filter(([, value]) => Number.isFinite(value) && value > 0)),
-    daily: Object.fromEntries(daily)
+    daily: Object.fromEntries(daily),
+    wallet: readWallet()
   };
 }
 
@@ -619,6 +625,7 @@ function mergePlayerState(data) {
     if (!result || result.id !== id || readStored(DAILY_PREFIX + id, null)) continue;
     if (writeStored(DAILY_PREFIX + id, result)) changed = true;
   }
+  if (data.wallet) mergeStoredWallet(data.wallet);
   return changed;
 }
 

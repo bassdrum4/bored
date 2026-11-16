@@ -7,7 +7,9 @@ const PENDING = 'bored.player.signup.';
 const EXACT = new Set([
   'bored.library', 'bored.favoriteEvents',
   'snake.bestScore', 'pacHi', 'voidrunner_best', 'simonBest', 'minesweeper_scores',
-  'bored.best.2048', 'bored.best.aim-lab.64', 'bored.best.memory'
+  'bored.best.2048', 'bored.best.aim-lab.64', 'bored.best.memory',
+  // The Poké Gacha wallet belongs to whoever earned it, like a best score.
+  'bored.wallet'
 ]);
 // `bored.resume.` is a game in progress, so it belongs to the player who left it:
 // switching accounts must not hand the next player a half-finished board.
