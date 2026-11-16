@@ -59,8 +59,12 @@ test('native PostgreSQL: competing moves, queues, crossed requests and leave rac
     [a,c]
   )).rows[0].n,2);
   // Same-type and different-type games can coexist. Retired social operations
-  // remain unavailable.
-  const duel=await rpc(a,'challenge',{user_id:b,game:'2048'});
+  // remain unavailable. Chess, Scrabble and Risk replaced the 2048 and Mahjong
+  // duels (20261116120000_together_chess_scrabble_risk.sql): old matches stay
+  // readable, but no new challenge may name the retired games.
+  await assert.rejects(rpc(a,'challenge',{user_id:b,game:'2048'}),/Game unavailable/);
+  await assert.rejects(rpc(a,'challenge',{user_id:b,game:'mahjong'}),/Game unavailable/);
+  const duel=await rpc(a,'challenge',{user_id:b,game:'chess'});
   assert.ok(duel.id && duel.id!==active.id);
   const another=await rpc(a,'challenge',{user_id:b});
   assert.notEqual(another.id,active.id);
