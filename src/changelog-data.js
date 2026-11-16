@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 500,
+  "count": 501,
   "newest": "2026-11-16",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"4223d98","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: legendary tiers, tier bonus in place of signature moves, catch odds by tier","pr":161},
   {"sha":"5284480","date":"2026-11-16","author":"Codebuff","subject":"Add Chess, Scrabble and Risk to Bored Together"},
   {"sha":"0e2e703","date":"2026-11-15","author":"PenguinV360","subject":"Poké Idle: Gigantamax gets a Mega's worth of stats instead of a flat 30%","pr":160},
   {"sha":"d7d6159","date":"2026-11-15","author":"PenguinV360","subject":"Poké Idle: Zygarde's Last Stand at Terminus Cave; Zygardite is a quest prize","pr":159},
