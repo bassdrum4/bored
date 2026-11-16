@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 504,
+  "count": 505,
   "newest": "2026-11-16",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"9acfcf2","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: a bonus for every legendary tier; tune to the clock as it runs","pr":165},
   {"sha":"d03af13","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: eight Tier 3 and 4 side quests, and the Cosmog gift","pr":164},
   {"sha":"52e017b","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: Cave of Origin and Distortion World; the Crown Shrine gives Calyrex","pr":163},
   {"sha":"5ef4d2d","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: tuning by tier, dungeon phases, quest-only prizes","pr":162},
