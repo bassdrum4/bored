@@ -510,6 +510,8 @@ for (const id of [10226, 10227]) { const f = formById(id); f.atk += 10; f.spe +=
 const MEGA_RAYQUAZA = 10079, MEWTWONITES = [10043, 10044];
 Object.assign(formById(MEGA_RAYQUAZA), { quest: "sky", move: "Dragon Ascent" });
 for (const id of MEWTWONITES) Object.assign(formById(id), { quest: "cerulean", move: "Psystrike" });
+// Latiasite and Latiosite are the Southern Island's prize: dungeons and the Shop never give them either.
+for (const id of [10062, 10063]) formById(id).quest = "southern";
 // Gigantamax forms the Shop and the Max Raid Den can give: everything but quest prizes.
 const soupFormsOf = n => formsOf(n, "gmax").filter(f => !f.quest);
 // Slaking's Truant: it only attacks every other turn, so it deals half damage.
@@ -633,8 +635,10 @@ function champTeam(r) {
   return team;
 }
 const dungeonPool = r => regionMons(r).filter(m => !legendary(m) && !tripOnly(m) && (m.flags.has("pseudo") || m.flags.has("fossil") || m.flags.has("starter") || m.cr <= 60));
-// Only Tier 3 and 4 come from dungeons: Arceus (Tier 1) is the Hall of Origin's.
-const dungeonBosses = r => regionMons(r).filter(m => legendary(m) && tierOf(m) >= 3).concat(VARIANTS.filter(v => v.region === r && legendary(v)));
+// Only Tier 3 and 4 come from dungeons (Arceus, Tier 1, is the Hall of Origin's), and never a quest-only species: those
+// come from their quests (or, for Cosmog, as a gift).
+const QUEST_ONLY = new Set([772, 773, 789, 790, 808, 809, 891, 892, 898, 1017, 1024]);
+const dungeonBosses = r => regionMons(r).filter(m => legendary(m) && tierOf(m) >= 3 && tierOf(m) <= 4 && !QUEST_ONLY.has(m.num)).concat(VARIANTS.filter(v => v.region === r && legendary(v)));
 // Boss stats shape the fight. A team's Attack and Speed set how long you last: against the other bosses of its region,
 // a faster, harder-hitting team gives you up to 20% less time and a slow one up to 20% more (a dungeon's random
 // legendary: -10% to +15%). Each boss Pokémon's HP comes from its HP, Defense and Sp. Def together.
@@ -689,10 +693,10 @@ const level = n => Math.min(lvlOf(S.box[n].xp), levelCap());
 // Every place has its own cap too: the one you had when you first got there. Go back to an
 // earlier region and your party fights held down to it, so a Lv 90 team from Galar is a Lv 30 team on Hoenn Route 1.
 function areaCap(loc = S.loc) {
-  // The post-game fights (Red, the Darkest Day, the Battle Tower) hold nobody back.
-  if (!loc || loc.kind === "summit" || loc.kind === "darkest" || loc.kind === "tower" || (loc.kind === "quest" && !(QUEST[loc.q] && QUEST[loc.q].mini))) return 100;
-  // Mini quests and the Ultra Wormhole and Area Zero come after that region's Champion: its level cap.
-  if (loc.r === TRAIN_R || ((loc.kind === "route" || loc.kind === "dungeon" || loc.kind === "raid") && cleared(loc.r)) || (loc.kind === "quest" && QUEST[loc.q] && QUEST[loc.q].atCap)) return levelCap();
+  // Red and the Battle Tower hold nobody back.
+  if (!loc || loc.kind === "summit" || loc.kind === "tower") return 100;
+  // Side quests, the Darkest Day, and the Ultra Wormhole and Area Zero come after a Champion: your level cap.
+  if (loc.r === TRAIN_R || ((loc.kind === "route" || loc.kind === "dungeon" || loc.kind === "raid") && cleared(loc.r)) || loc.kind === "quest" || loc.kind === "darkest") return levelCap();
   const L = loc.kind === "champ" || loc.x || loc.kind === "quest" || loc.kind === "raid" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
   return Math.min(100, L + CAP_OVER);
 }
@@ -769,9 +773,8 @@ function gainCells(k) {
 }
 // ── The Darkest Day (after Leon). Galar's wild Pokémon now and then turn up a Wishing Piece, and its bosses bring a
 // couple. 50 open the Energy Plant in Galar's list, where Eternamax Eternatus waits. Win and yours can Eternamax.
-// One of the OP-Pokémon quests, so extremely difficult: set like the quests below (the six that hit Eternamax hardest win
-// idling with a little to spare).
-const PIECES_FROM = 7, PIECE_ODDS = 40, PIECE_BOSS = 2, PIECES_NEED = 50, DARKEST_TIME = 120, DARKEST_HP = 10.3;
+// Eternamax is Tier 0, so it's set against Tier 1 and weaker (see tierTuning), at your level cap.
+const PIECES_FROM = 7, PIECE_ODDS = 40, PIECE_BOSS = 2, PIECES_NEED = 50, DARKEST_TIME = 120;
 const ETERNAMAX_FOE = formById(ETERNAMAX);
 const darkTime = () => fightTime(DARKEST_TIME, [ETERNAMAX_FOE], RED_OFFENSE, .8, 1.2);
 function gainPieces(k) {
@@ -875,36 +878,32 @@ for (const m of MON) if ((legendary(m) || tripOnly(m)) && !(m.num in TIER) && !U
 const tierOf = m => { const k = tierKey(m); if (k in TIER) return TIER[k]; if (k !== m.num && m.num in TIER) return TIER[m.num]; return legendary(m) || UNTIERED.has(m.num) ? null : 5; };
 const tierBonus = m => TIER_BONUS[tierOf(m)] || 1;
 const tierLabel = m => { const t = tierOf(m); return t != null && t < 5 ? "Tier " + t : ""; };
-// ── The OP-Pokémon quests, after all nine Champions, each as extremely difficult as the Darkest Day. Sky Pillar and
-// Cerulean Cave give Mega Stones (stones) rather than forms. HP multipliers were
-// set offline with the game's own formulas: the six Pokémon that hit the boss hardest (no quest prizes, Megas or
-// Gigantamax), at Lv 100 with all the Protein, win idling with 7% of the clock to spare. Anything
-// less than a team built for the boss loses, even tapping; prizes, Megas and Gigantamax give room. Red and the Darkest
-// Day are set the same way.
+// ── Side quests. Each has its prize's tier and is set against the tier below it (see tierTuning), at your level cap
+// (atCap). Tier 3 and 4 quests open after their region's Champion, Tier 0 to 2 after all nine. Sky Pillar and Cerulean
+// Cave give Mega Stones (stones) rather than forms.
 const PLATES_FROM = 3, PLATE_ODDS = 40, PLATE_BOSS = 2, PLATES_NEED = 17, QUEST_TIME = 120;
 const QUESTS = [
-  { id: "origin", r: 3, place: "Hall of Origin", boss: "Arceus", prize: 493, need: [483, 484, 487], hp: 9, prizeNote: "any type",
+  { id: "origin", r: 3, tier: 1, atCap: true, place: "Hall of Origin", boss: "Arceus", prize: 493, need: [483, 484, 487], prizeNote: "any type",
     foes: [statForm(493, { name: "Arceus", sprite: 493 }, "Normal", ARCEUS_STATS), statForm(493, { name: "Arceus (Dragon)", sprite: "493-dragon" }, "Dragon", ARCEUS_STATS), statForm(493, { name: "Arceus (Ghost)", sprite: "493-ghost" }, "Ghost", ARCEUS_STATS)],
     won: "Arceus can take any type now: pick its Plate in its detail." },
-  { id: "crown", r: 7, place: "Crown Shrine", boss: "Calyrex", prize: 898, need: [898, 896, 897], hp: 21.8, prizeNote: "both Riders",
+  { id: "crown", r: 7, tier: 2, atCap: true, place: "Crown Shrine", boss: "Calyrex", prize: 898, need: [898, 896, 897], prizeNote: "both Riders",
     foes: [QFORMES[898][0], QFORMES[898][1]], won: "Calyrex can ride Glastrier or Spectrier now: pick a Rider in its detail." },
-  { id: "megalo", r: 6, place: "Megalo Tower", boss: "Ultra Necrozma", prize: 800, need: [800, 791, 792], hp: 43.1, prizeNote: "Dusk Mane, Dawn Wings, Ultra",
+  { id: "megalo", r: 6, tier: 1, atCap: true, place: "Megalo Tower", boss: "Ultra Necrozma", prize: 800, need: [800, 791, 792], prizeNote: "Dusk Mane, Dawn Wings, Ultra",
     foes: [QFORMES[800][2]], won: "Necrozma can become Dusk Mane, Dawn Wings or Ultra Necrozma now: pick it in its detail." },
-  { id: "sky", r: 2, place: "Sky Pillar", boss: "Deoxys", prize: 384, need: [384, 383, 382], hp: 10.5, prizeNote: "Mega Rayquaza", stones: [MEGA_RAYQUAZA],
+  { id: "sky", r: 2, tier: 1, atCap: true, place: "Sky Pillar", boss: "Deoxys", prize: 384, need: [384, 383, 382], prizeNote: "Mega Rayquaza", stones: [MEGA_RAYQUAZA],
     foes: [mon(386), ...QFORMES[386]],
     won: "Rayquaza can Mega Evolve now: turn it on in its detail in Party & Box." },
-  { id: "cerulean", r: 0, place: "Cerulean Cave", boss: "Mega Mewtwo", prize: 150, need: [150, 151], hp: 15.8, prizeNote: "both Mewtwonites", stones: MEWTWONITES,
+  { id: "cerulean", r: 0, tier: 1, atCap: true, place: "Cerulean Cave", boss: "Mega Mewtwo", prize: 150, need: [150, 151], prizeNote: "both Mewtwonites", stones: MEWTWONITES,
     foes: MEWTWONITES.map(formById), won: "Mewtwo can Mega Evolve into X or Y now: pick one in its detail in Party & Box." },
-  { id: "chasm", r: 4, place: "Giant Chasm", boss: "Kyurem", prize: 646, need: [646, 644, 643], hp: 20.6, prizeNote: "Black and White",
+  { id: "chasm", r: 4, tier: 2, atCap: true, place: "Giant Chasm", boss: "Kyurem", prize: 646, need: [646, 644, 643], prizeNote: "Black and White",
     foes: [QFORMES[646][0], QFORMES[646][1]], won: "Kyurem can fuse with Zekrom or Reshiram now: pick Black or White Kyurem in its detail." },
-  // Mini quests: once that region's Champion is beaten, as hard as a dungeon's legendary (see miniTuning).
-  { id: "meteor", r: 2, mini: true, place: "Meteor Falls", boss: "Deoxys", prize: 386, need: [386], prizeNote: "all four Formes",
+  { id: "meteor", r: 2, tier: 3, atCap: true, place: "Meteor Falls", boss: "Deoxys", prize: 386, need: [386], prizeNote: "all four Formes",
     foes: QFORMES[386], won: "Deoxys can change Forme now: pick Attack, Defense or Speed in its detail." },
-  { id: "weald", r: 7, mini: true, place: "Slumbering Weald", boss: "Zacian and Zamazenta", prize: 0, needAny: [888, 889], prizeNote: "Crowned Sword and Shield",
+  { id: "weald", r: 7, tier: 2, atCap: true, place: "Slumbering Weald", boss: "Zacian and Zamazenta", prize: 0, needAny: [888, 889], prizeNote: "Crowned Sword and Shield",
     foes: [mon(888), mon(889)], won: "The Rusted Sword and Shield are yours: Zacian and Zamazenta can take their Crowned forms in their details." },
   // Zygarde's Last Stand, as at the end of Legends: Z-A: once all 100 cells are in, Zygarde fights in its 10%, 50% and
-  // Complete Formes, at your level cap. The prize is the Zygardite.
-  { id: "terminus", r: 5, mini: true, atCap: true, cells: 100, place: "Terminus Cave", boss: "Zygarde", prize: 0, need: [718], prizeNote: "the Zygardite", stones: [10301],
+  // Complete Formes, at your level cap. The prize is the Zygardite (Mega Zygarde, Tier 1).
+  { id: "terminus", r: 5, tier: 1, atCap: true, cells: 100, place: "Terminus Cave", boss: "Zygarde", prize: 0, need: [718], prizeNote: "the Zygardite", stones: [10301],
     foes: [statForm(718, { name: "Zygarde 10% Forme", sprite: 10181 }, "Dragon/Ground", [54, 100, 71, 61, 85, 115]), statForm(718, { name: "Zygarde 50% Forme", sprite: 718 }, "Dragon/Ground", [108, 100, 121, 81, 95, 95]),
       statForm(718, { name: "Zygarde Complete Forme", sprite: 10120 }, "Dragon/Ground", [216, 100, 121, 91, 95, 85])],
     won: "The Zygardite is yours: Zygarde can Mega Evolve from its Complete Forme now. Pick 100%, then Mega Evolve, in its detail in Party & Box." },
@@ -922,17 +921,24 @@ const tripCaught = T => T.all.filter(n => S.box[n]).length;
 // until you beat it: losing or leaving the run doesn't roll a new one. Stored as "m:150", "v:v10169" or "f:10043".
 const foeKey = f => f.kind === "mega" ? "f:" + f.id : f.vid ? "v:" + f.vid : "m:" + f.num;
 const foeOf = k => { const [t, v] = String(k).split(":"); return t === "f" ? formById(+v) : t === "v" ? VARIANTS.find(x => x.vid === v) : t === "m" ? mon(+v) : null; };
+// A dungeon rolls in two phases: first its Tier 4 legendaries you don't have; once all of them are in your Box, its
+// Tier 3s you don't have, and once you have those too, any Tier 3 or 4 of it. Never a Mega. A kept one that the rules
+// don't allow (a quest prize, a Mega, a Tier 3 from before the Tier 4s were done: older saves) rolls again.
+const dungeonT4 = r => dungeonBosses(r).filter(m => tierOf(m) === 4);
+const dungeonPhase = r => dungeonT4(r).every(ownsFoe) ? 3 : 4;
+function denChoices(r) {
+  const all = dungeonBosses(r), t4 = all.filter(m => tierOf(m) === 4), left4 = t4.filter(m => !ownsFoe(m));
+  if (left4.length) return left4;
+  const left3 = all.filter(m => tierOf(m) === 3 && !ownsFoe(m));
+  return left3.length ? left3 : all;
+}
+const denValid = (r, f) => !!f && f.kind !== "mega" && dungeonBosses(r).includes(f) && (tierOf(f) === 4 || dungeonPhase(r) === 3);
 function denFoe(r, x) {
   S.den = S.den || {};
   const key = x || "d" + r, kept = S.den[key] && foeOf(S.den[key]);
-  if (kept) return kept;
-  const rand = Math.random; let f;
-  if (x) f = tripBoss(TRIP[x], rand);
-  else {
-    const bosses = dungeonBosses(r), lg = bosses[Math.floor(rand() * bosses.length)], lgMegas = formsOf(lg.num, "mega");
-    // A legendary with a Mega form comes out as one half the time. Catching it gets you the usual form.
-    f = lgMegas.length && rand() < .5 ? lgMegas[Math.floor(rand() * lgMegas.length)] : lg;
-  }
+  if (kept && (x || denValid(r, kept))) return kept;
+  const rand = Math.random, choices = x ? null : denChoices(r);
+  const f = x ? tripBoss(TRIP[x], rand) : choices[Math.floor(rand() * choices.length)];
   S.den[key] = foeKey(f); return f;
 }
 const tripBoss = (T, rand) => mon(T.late && rand() < 1 / 3 ? T.late[Math.floor(rand() * T.late.length)] : T.mons[Math.floor(rand() * T.mons.length)]);
@@ -940,12 +946,14 @@ const QUEST = Object.fromEntries(QUESTS.map(Q => [Q.id, Q]));
 const allChamps = () => Object.keys(S.champs).length >= REGIONS.length;
 // needAny: one of them is enough (the Slumbering Weald wants Zacian or Zamazenta).
 const questMissing = Q => Q.needAny ? (Q.needAny.some(n => S.box[n]) ? [] : Q.needAny) : Q.need.filter(n => !S.box[n]);
-const questReady = Q => Q.mini ? !!S.champs[Q.r] : allChamps();
+const questReady = Q => Q.tier >= 3 ? !!S.champs[Q.r] : allChamps();
+// Where a quest is, for "win it at ...": the place and its region's list.
+const questAt = id => QUEST[id] ? `at the ${QUEST[id].place} (${REGIONS[QUEST[id].r].name}'s list)` : "in a side quest (coming soon)";
 const questOpen = Q => questReady(Q) && !questMissing(Q).length && (Q.id !== "origin" || (S.plates || 0) >= PLATES_NEED) && (!Q.cells || (S.cells || 0) >= Q.cells);
-const questTime = Q => Q.mini ? fightTime(QUEST_TIME, Q.foes, regionOffense(Q.r), .9, 1.15) : fightTime(QUEST_TIME, Q.foes, RED_OFFENSE, .8, 1.2);
+const questTime = Q => Q.tier >= 3 ? fightTime(QUEST_TIME, Q.foes, regionOffense(Q.r), .9, 1.15) : fightTime(QUEST_TIME, Q.foes, RED_OFFENSE, .8, 1.2);
 function questNote(Q) {
   if (S.won[Q.id]) return Q.prizeNote;
-  if (!questReady(Q)) return Q.mini ? `after ${REGIONS[Q.r].champ}` : "after all 9 Champions";
+  if (!questReady(Q)) return Q.tier >= 3 ? `after ${REGIONS[Q.r].champ}` : "after all 9 Champions";
   if (Q.id === "origin" && (S.plates || 0) < PLATES_NEED) return `Plates ${S.plates || 0}/${PLATES_NEED}`;
   if (Q.cells && (S.cells || 0) < Q.cells) return `Zygarde Cells ${S.cells || 0}/${Q.cells}`;
   const miss = questMissing(Q);
@@ -1012,8 +1020,9 @@ function locName(loc) {
 // Every boss follows one rule: the strongest team you could have for that fight (super-effective picks, 4x matchups
 // counting, as evolved as the cap allows, at the cap), carrying a modest Protein (BOSS_PROTEIN: a quarter of what you
 // could have by now), only just wins idling (BOSS_USE of the timer, the pause after each faint included). Gym leaders,
-// Champions, Max Raids and mini quests are set against their whole team; dungeons (their legendary), the Ultra Wormhole
-// and Area Zero (their last one) against the boss, with the fodder before it capped. Most players carry more Protein,
+// Champions and Max Raids are set against their whole team; dungeons (their legendary), the Ultra Wormhole and Area
+// Zero (their last one) against the boss, with the fodder before it capped. Legendary bosses (dungeons, trips, side
+// quests, the Darkest Day) are set against the tier below them: the team comes from tier N+1 and weaker (see refPool). Most players carry more Protein,
 // so they can win with fewer perfect counters; off-type and under-leveled teams lose. Taps do BOSS_TAP of their usual
 // damage in boss fights. A dungeon shows its legendary's types before you go in, and keeps it until you beat it.
 const GYM_TAPS = 0, BOSS_USE = .97, BOSS_PROTEIN = .25, BOSS_TAP = .5;
@@ -1024,10 +1033,39 @@ const rootOf = n => PARENT[n] ? rootOf(PARENT[n].p) : n;
 const byLevelOnly = n => !PARENT[n] || (PARENT[n].how === "L" && byLevelOnly(PARENT[n].p));
 // What a player could have for a fight in region r with routes up to k open: anything from earlier regions, and
 // from this one whatever the open routes offer, evolved by level. Each one at its most evolved form under the cap.
-function refPool(r, k, cap) {
+// With a tier (a legendary boss's), the pool for the tier below it: those Pokémon that aren't legendary (Tier 5), with
+// their Megas (once you have the Key Stone) and Gigantamax forms (once you have the Dynamax Band), and every species and
+// form of the tiers weaker than the boss's and stronger than 5, all counted as yours. refPick takes at most one Mega
+// and one Gigantamax from it.
+let tieredPool = null;
+const TIERED = () => tieredPool || (tieredPool = [...MON, ...FORMS, ...Object.values(QFORMES).flat(), ZFORMES.complete].filter(m => tierOf(m) >= 1 && tierOf(m) <= 4));
+function refPool(r, k, cap, tier) {
   const open = new Set(); for (let j = 0; j <= Math.min(k, 3); j++) for (const m of routePool(r, j)) open.add(m.num);
   const have = m => !legendary(m) && minLv(m.num) <= cap && (m.gen <= r || (m.gen === r + 1 && (open.has(m.num) || (open.has(rootOf(m.num)) && byLevelOnly(m.num)))));
-  return MON.filter(m => have(m) && !m.evos.some(([t]) => have(mon(t))));
+  const base = MON.filter(m => have(m) && !m.evos.some(([t]) => have(mon(t))));
+  if (tier == null) return base;
+  const t5 = base.filter(m => tierOf(m) === 5), nums = new Set(t5.map(m => m.num));
+  const forms = FORMS.filter(f => nums.has(f.num) && tierOf(f) === 5 && (f.kind === "mega" ? S.key : S.band));
+  return [...t5, ...forms, ...TIERED().filter(m => tierOf(m) > tier)];
+}
+// The best six of a pool against foes [{ f, hp }]: one at a time, whichever cuts the fight's total time most, each
+// species once, at most one Mega and one Gigantamax (as in a real party).
+function refPick(P, foes, hit, size = 6) {
+  const H = P.map(m => foes.map(({ f }) => hit(m, f))), dps = foes.map(() => 0), out = [], nums = new Set();
+  let mega = false, gmax = false;
+  while (out.length < size) {
+    let best = -1, cost = Infinity;
+    for (let i = 0; i < P.length; i++) {
+      const m = P[i];
+      if (nums.has(m.num) || (mega && m.kind === "mega") || (gmax && m.kind === "gmax")) continue;
+      const c = foes.reduce((s, { hp }, j) => s + hp / Math.max(1e-9, dps[j] + H[i][j]), 0);
+      if (c < cost) { cost = c; best = i; }
+    }
+    if (best < 0) break;
+    const m = P[best]; out.push(m); nums.add(m.num); mega = mega || m.kind === "mega"; gmax = gmax || m.kind === "gmax";
+    H[best].forEach((h, j) => { dps[j] += h; });
+  }
+  return out;
 }
 const refHit = (m, cap, foe) => hitStat(m, foe) * cap / 50 * hitRate(m) * truant(m.num) * tierBonus(m);
 // The reference team's own Def: tuning measures it against the time that team would get, so Def counts relative to it.
@@ -1046,18 +1084,25 @@ function raidTuning(B) {
   const P = refPool(...refArea(B.r, 3), cap).sort((a, b) => hit(b) - hit(a)).slice(0, 6), tap = refTaps(P, cap, GYM_TAPS);
   return BOSS_USE * B.bossTime * refDef(P) * (P.reduce((d, m) => d + hit(m), 0) * bossBoost() + tap) / bossHpFor(f, B.L, B.i);
 }
-// Mini quests (Meteor Falls, Slumbering Weald): you know who's there, so they're tuned like a Champion's team.
-const miniTuning = B => gymTuning(B, 3, 6, refArea(B.r, 3));
-const questHp = B => QUEST[B.q].mini ? B.tune : QUEST[B.q].hp;
+// Side quests and the Darkest Day: you know who's there, so the team is the best one against all of them, from the
+// tier below the prize's (Tier 1 quests: Tier 2 and weaker), at the cap with their tier bonus and bossProtein(), and it
+// only just wins idling: BOSS_USE of the time, the pause after each faint included.
+function tierTuning(B, tier, area) {
+  const cap = areaCap(), n = B.queue.length, hit = (m, f) => refHit(m, cap, f) * bestEff(m, f), foes = B.queue.map(f => ({ f, hp: bossHpFor(f, B.L, B.i) }));
+  const P = refPick(refPool(...area, cap, tier), foes, hit), boost = bossBoost(), tap = refTaps(P, cap, GYM_TAPS);
+  const secs = foes.reduce((s, { f, hp }) => s + hp / (P.reduce((d, m) => d + hit(m, f), 0) * boost + tap), 0);
+  return Math.max(.05, (BOSS_USE * B.bossTime * refDef(P) - .65 * n) / secs);
+}
 // Dungeon fodder is as tough as that region's route Pokémon, and a bit more, but never more than the team below clears
 // in FODDER_USE of its time: the run is about the legendary, and idling has to be able to get there.
 const fodderHp = i => DUNGEON_HP * wildHard(i), FODDER_USE = .35;
 // Sets B.fodder (the fodder's HP multiplier) and returns the legendary's.
 function legendTuning(B) {
-  // The 6 strongest you could have against this legendary, at the cap, with bossProtein(), need BOSS_USE of the time for
-  // the whole run (the pause after each faint included).
+  // The 6 strongest you could have against this legendary from the tier below it (Tier 4: Pokémon that aren't
+  // legendary; Tier 3: Tier 4 and weaker), at the cap, with bossProtein(), need BOSS_USE of the time for the whole run
+  // (the pause after each faint included).
   const cap = areaCap(), n = B.queue.length, lg = B.queue[n - 1], hit = (m, f) => refHit(m, cap, f) * bestEff(m, f);
-  const P = refPool(...refArea(B.r, B.x ? 3 : 2), cap).sort((a, b) => hit(b, lg) - hit(a, lg)).slice(0, 6), boost = bossBoost();
+  const P = refPick(refPool(...refArea(B.r, B.x ? 3 : 2), cap, tierOf(lg) ?? 4), [{ f: lg, hp: 1 }], hit), boost = bossBoost();
   const tap = refTaps(P, cap, GYM_TAPS), dps = f => P.reduce((d, m) => d + hit(m, f), 0) * boost + tap;
   const budget = BOSS_USE * B.bossTime * refDef(P) - .65 * n;
   const fodder = B.queue.slice(0, n - 1).reduce((s, f) => s + hpFor(f, B.L, B.i, fodderHp(B.i)) / dps(f), 0), room = FODDER_USE * budget;
@@ -1081,8 +1126,8 @@ function startLoc(loc) {
   if (loc.kind === "route") B = { kind: "route", r, k: loc.k, i: wildIndex(r, loc.k) };
   else if (loc.kind === "gym") B = { kind: "gym", r, k: loc.k, i, queue: gymTeam(r, loc.k), L: gymLevel(i), base: GYM_TIME, time: gymTime(r, loc.k), idx: 0 };
   else if (loc.kind === "summit") B = { kind: "summit", r, i: 36, queue: RED_TEAM.map(mon), L: SUMMIT_LEVEL, base: SUMMIT_TIME, time: fightTime(SUMMIT_TIME, RED_TEAM.map(mon), RED_OFFENSE, .8, 1.2), idx: 0, back: from };
-  else if (loc.kind === "quest") { const Q = QUEST[loc.q], L = Q.atCap ? Math.max(champLevel(r), levelCap()) : Q.mini ? champLevel(r) : 100; B = { kind: "quest", q: Q.id, r, i: Q.atCap ? Math.max(r * 4 + 3, levelIndex(L)) : Q.mini ? r * 4 + 3 : 36, queue: Q.foes, L, base: QUEST_TIME, time: questTime(Q), idx: 0 }; }
-  else if (loc.kind === "darkest") B = { kind: "darkest", r, i: 36, queue: [ETERNAMAX_FOE], L: 100, base: DARKEST_TIME, time: darkTime(), idx: 0 };
+  else if (loc.kind === "quest") { const Q = QUEST[loc.q], L = Math.max(champLevel(r), levelCap()); B = { kind: "quest", q: Q.id, r, i: Math.max(r * 4 + 3, levelIndex(L)), queue: Q.foes, L, base: QUEST_TIME, time: questTime(Q), idx: 0 }; }
+  else if (loc.kind === "darkest") { const L = Math.max(champLevel(r), levelCap()); B = { kind: "darkest", r, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [ETERNAMAX_FOE], L, base: DARKEST_TIME, time: darkTime(), idx: 0 }; }
   else if (loc.kind === "tower") { B = { kind: "tower", r, i: 36, f: 1, queue: towerTeam(1), L: 100, base: TOWER_START, time: TOWER_START, idx: 0 }; S.tower.runs++; }
   else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: champLevel(r), base: CHAMP_TIME, time: champTime(r), idx: 0 };
   else if (loc.kind === "raid") { const n = raidMon(), f = raidForm(n), L = Math.max(champLevel(r), levelCap()); B = { kind: "raid", r, n, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [f], L, base: RAID_TIME, time: fightTime(RAID_TIME, [f], regionOffense(r), .9, 1.15), idx: 0 }; }
@@ -1099,7 +1144,8 @@ function startLoc(loc) {
   else if (B.kind === "champ") B.tune = gymTuning(B, 3, 6);
   else if (B.kind === "dungeon") B.tune = legendTuning(B);
   else if (B.kind === "raid") B.tune = raidTuning(B);
-  else if (B.kind === "quest" && QUEST[B.q].mini) B.tune = miniTuning(B);
+  else if (B.kind === "quest") B.tune = tierTuning(B, QUEST[B.q].tier, refArea(B.r, 3));
+  else if (B.kind === "darkest") B.tune = tierTuning(B, 0, refArea(B.r, 3));
   if (B.kind !== "route") { B.total = B.time; say(B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
@@ -1113,8 +1159,7 @@ function spawn() {
     pay = B.kind === "dungeon" ? (boss ? LEGEND_PAY : DUNGEON_HP) : B.kind === "champ" || B.kind === "raid" ? CHAMP_HP : GYM_HP;
     mult = B.kind === "dungeon" && !boss ? (B.fodder || fodderHp(B.i)) : B.tune;
     if (B.kind === "summit") { pay = CHAMP_HP; mult = SUMMIT_HP; }
-    if (B.kind === "darkest") { pay = CHAMP_HP; mult = DARKEST_HP; }
-    if (B.kind === "quest") { pay = CHAMP_HP; mult = questHp(B); }
+    if (B.kind === "darkest" || B.kind === "quest") pay = CHAMP_HP;
     if (B.kind === "tower") { pay = CHAMP_HP; mult = towerHp(B.f); }
     shiny = B.kind === "dungeon" && Math.random() < shinyOdds();
   }
@@ -1254,11 +1299,13 @@ function chooseBall(f) {
 }
 // A dungeon run (the Ultra Wormhole and Area Zero count as Alola's and Paldea's) can drop a Mega Stone of its region's
 // generation, once you have the Key Stone, for a Pokémon you own: one in your party if it can, else one in your Box.
-// Mewtwo's and Rayquaza's stones are quest prizes.
-const stoneFor = (f, gen) => f.kind === "mega" && !f.quest && (!gen || f.gen === gen) && !!S.box[f.num] && !S.stones[f.id];
+// Quest stones (Mewtwo's, Rayquaza's, Zygarde's, Latios's and Latias's) never drop. A Tier 3 Mega's stone (the
+// pseudo-legendaries', and Heatran's, Darkrai's, Diancie's, Magearna's and Zeraora's) only drops once that dungeon's Tier 3s
+// are out (r: the dungeon), and the Shop's random stone never gives one.
+const stoneFor = (f, gen, r) => f.kind === "mega" && !f.quest && (!gen || f.gen === gen) && !!S.box[f.num] && !S.stones[f.id] && (tierOf(f) !== 3 || (r != null && dungeonPhase(r) === 3));
 function stoneDrop(r) {
   if (!S.key || Math.random() >= STONE_DROP) return "";
-  const all = FORMS.filter(f => stoneFor(f, r + 1)), party = all.filter(f => S.party.includes(f.num)), pick = party.length ? party : all;
+  const all = FORMS.filter(f => stoneFor(f, r + 1, r)), party = all.filter(f => S.party.includes(f.num)), pick = party.length ? party : all;
   if (!pick.length) return "";
   const f = pick[Math.floor(Math.random() * pick.length)]; S.stones[f.id] = 1;
   return ` It dropped a Mega Stone for ${f.name}!`;
@@ -1266,7 +1313,9 @@ function stoneDrop(r) {
 // Galar's Max Raid Den, after Leon: one Gigantamax Pokémon you can see before you go in, a Galar ticket a try. It holds
 // a species whose Gigantamax you don't have: one in your party if it can, else one in your Box, else any. Win and that
 // species can Gigantamax, and it joins you if you don't have it (legendaries still come the usual way). Lose and it stays.
-const raidSpecies = () => [...new Set(FORMS.filter(f => f.kind === "gmax" && !f.quest).map(f => f.num))];
+// Urshifu's and Melmetal's Gigantamax are side-quest prizes: never in the den or the Shop's Max Soup.
+const QUEST_GMAX = new Set([URSHIFU, 809]);
+const raidSpecies = () => [...new Set(FORMS.filter(f => f.kind === "gmax" && !f.quest && !QUEST_GMAX.has(f.num)).map(f => f.num))];
 const raidForm = n => formsOf(n, "gmax").find(f => !f.quest);
 function raidMon() {
   if (!S.band) return 0;
@@ -1452,7 +1501,9 @@ const TIPS = [
   { id: "cap", when: () => levelCap() < 100 && S.party.some(n => level(n) >= levelCap()), text: () => `Your party has hit the level cap, Lv ${levelCap()}. Every first win against a gym leader or Champion raises it.` },
   { id: "badge", when: () => Object.keys(S.badges).length >= 1, tab: "shop", text: () => "Your first badge! Each badge opens the next route and raises the level cap. Spend your prize money in the Shop on better balls, Protein and evolution stones." },
   { id: "dungeon", when: () => badge(0, 1), tab: "shop", text: () => "Two badges open the region's dungeon, a run that ends with a legendary Pokémon. You need a ticket, and the Shop sells them." },
-  { id: "wiki", when: () => Object.keys(S.badges).length >= 2, tab: "wiki", text: () => "If you get stuck, the Wiki has every rule, and its Pokédex tab shows where each Pokémon lives and how it evolves. Good luck out there!" }
+  { id: "wiki", when: () => Object.keys(S.badges).length >= 2, tab: "wiki", text: () => "If you get stuck, the Wiki has every rule, and its Pokédex tab shows where each Pokémon lives and how it evolves. Good luck out there!" },
+  { id: "tier3", when: () => REGIONS.some((_, r) => badge(r, 1) && dungeonPhase(r) === 3), tab: "battle", text: () => { const r = REGIONS.findIndex((_, r) => badge(r, 1) && dungeonPhase(r) === 3);
+    return `You have every Tier 4 legendary from the ${REGIONS[r].name} dungeon, so its Tier 3s come out now: ${dungeonBosses(r).filter(m => tierOf(m) === 3).map(m => m.name).join(", ")}. They're set against Tier 4 legendaries, so bring yours, with types that hit hard. They're harder to catch too: about ${pct(Math.pow(TIER_RATE[3] * 5 / 255, .75))} an Ultra Ball.`; } }
 ];
 let tipNow = null;
 function tutor() {
@@ -1485,7 +1536,7 @@ function renderLocs() {
     for (let k = 0; k < 4; k++) {
       items.push({ kind: "route", r, k, note: `${Math.min(kills(r, k), KILLS_FOR_GYM)}/${KILLS_FOR_GYM} · Lv ${wildLevel(r, k)}`, done: kills(r, k) >= KILLS_FOR_GYM });
       items.push({ kind: "gym", r, k, note: badge(r, k) ? "badge" : `${Math.round(gymTime(r, k) * partyTime())}s`, done: badge(r, k), type: REGIONS[r].gyms[k][1] });
-      if (k === 1) items.push({ kind: "dungeon", r, types: unlocked({ kind: "dungeon", r }) ? denFoe(r).types : null, note: `${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}`, done: !!S.dungeons[r] });
+      if (k === 1) { const t4 = dungeonT4(r); items.push({ kind: "dungeon", r, types: unlocked({ kind: "dungeon", r }) ? denFoe(r).types : null, note: `${dungeonPhase(r) === 4 ? `Legends ${t4.filter(ownsFoe).length}/${t4.length}` : "Tier 3"} · ${S.tickets[r] || 0} ticket${S.tickets[r] === 1 ? "" : "s"}`, done: !!S.dungeons[r] }); }
     }
     items.push({ kind: "champ", r, note: S.champs[r] ? "beaten" : `${Math.round(champTime(r) * partyTime())}s`, done: !!S.champs[r] });
     if (r === PIECES_FROM) items.push({ kind: "darkest", r, note: S.eternamax ? "Eternamax" : unlocked({ kind: "darkest", r }) ? `Eternatus · ${Math.round(darkTime() * partyTime())}s` : S.champs[PIECES_FROM] ? `Wishing Pieces ${S.pieces || 0}/${PIECES_NEED}` : "after Leon", done: !!S.eternamax });
@@ -1584,8 +1635,8 @@ function formLines(n) {
   const megas = megasOf(n), gmax = formsOf(n, "gmax").length ? gmaxOf(n) : null, inParty = S.party.includes(n), rows = [];
   const line = (f, why, on, attr) => `<div class="row" style="justify-content:space-between"><span>${esc(f.name)} ${f.types.map(tyChip).join(" ")} <span class="muted">${why ||
     (f.kind === "mega" || !f.quest ? `Atk ${f.atk} · SpA ${f.spa} · Def ${f.def} · Spe ${f.spe}` : `HP ${f.hp} · Def ${f.def} · SpD ${f.spd}`) + (tierLabel(f) ? ` · ${tierLabel(f)}${tierBonus(f) > 1 ? `, ${f.move} ×${tierBonus(f)}` : ""}` : "")}</span></span>${why ? "" : `<button class="lbl${on ? " on" : ""}" type="button" ${attr}>${on ? "Turn off" : f.kind === "mega" ? "Mega Evolve" : "Gigantamax"}</button>`}</div>`;
-  for (const f of megas) rows.push(line(f, !S.key ? "needs the Key Stone (beat Steven)" : !S.stones[f.id] ? (f.quest ? `win at the ${QUEST[f.quest].place} (${REGIONS[QUEST[f.quest].r].name}'s list)` : `needs its Mega Stone: the ${REGIONS[f.gen - 1].name} dungeon drops it`) : !inParty ? "add it to your party first" : f.id === MEGA_ZYGARDE && !zygardeComplete() ? "only from its Complete Forme: pick 100% above" : "", S.mega && S.mega.n === n && S.mega.f === f.id, `data-mega="${f.id}"`));
-  if (gmax) rows.push(line(gmax, !S.band ? "needs the Dynamax Band (beat Leon)" : !S.gfactor[n] ? (gmax.quest ? "win the Darkest Day at Galar's Energy Plant" : "win it in Galar's Max Raid Den (put it in your party to see it there next)") : !inParty ? "add it to your party first" : "", S.gmax === n, "data-gmax=\"1\""));
+  for (const f of megas) rows.push(line(f, !S.key ? "needs the Key Stone (beat Steven)" : !S.stones[f.id] ? (f.quest ? `win ${questAt(f.quest)}` : `needs its Mega Stone: the ${REGIONS[f.gen - 1].name} dungeon drops it${tierOf(f) === 3 ? " once its Tier 3s are out" : ""}`) : !inParty ? "add it to your party first" : f.id === MEGA_ZYGARDE && !zygardeComplete() ? "only from its Complete Forme: pick 100% above" : "", S.mega && S.mega.n === n && S.mega.f === f.id, `data-mega="${f.id}"`));
+  if (gmax) rows.push(line(gmax, !S.band ? "needs the Dynamax Band (beat Leon)" : !S.gfactor[n] ? (gmax.quest ? "win the Darkest Day at Galar's Energy Plant" : QUEST_GMAX.has(n) ? "a side-quest prize (coming soon)" : "win it in Galar's Max Raid Den (put it in your party to see it there next)") : !inParty ? "add it to your party first" : "", S.gmax === n, "data-gmax=\"1\""));
   return rows.length ? `<div class="small">${rows.join("")}<div class="muted">One Mega and one Gigantamax in the party at a time.</div></div>` : "";
 }
 const regionLabel = v => REGIONS[v.region].name;
@@ -1790,6 +1841,14 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "update-2026-11-16b", date: "Nov 16, 2026", from: "Prof Penguin", title: "You need the tier below",
+    body: `<ul><li>Every legendary boss is now set against the tier below it: the best six from that tier and weaker (one Mega, one Gigantamax), at the cap with a modest Protein, only just win. The Wiki's Tiers page has the list.</li>
+      <li>Dungeons come in two phases. First only the Tier 4 legendaries you don't have yet. Once you have all of a dungeon's Tier 4s, its Tier 3s come out (Mewtwo in Kanto, Lugia and Ho-Oh in Johto...).</li>
+      <li>Dungeon legendaries don't come out Mega Evolved anymore.</li>
+      <li>Side quests fight at your level cap. Tier 0 to 2 quests, now including the Slumbering Weald and Terminus Cave, open after all 9 Champions; Tier 3 quests after their region's Champion.</li>
+      <li>Some legendaries are quest prizes now and leave the dungeons: Type: Null, Silvally, Kubfu, Urshifu, Meltan, Melmetal, Calyrex, Cosmog, Ogerpon and Terapagos. The Max Raid Den and Max Soup skip Urshifu and Melmetal.</li>
+      <li>Latiasite and Latiosite come from a side quest. Tier 3 Mega Stones (Dragonite, Garchomp, Metagross...) drop once their dungeon's Tier 3s are out, and the Shop's random stone skips them.</li>
+      <li>You keep everything: Pokémon, stones, Gigantamax and forms. A waiting dungeon legendary that doesn't fit the new rules rolls again.</li></ul>` },
   { id: "update-2026-11-16a", date: "Nov 16, 2026", from: "Prof Penguin", title: "Legendary tiers",
     body: `<ul><li>Legendaries come in <b>tiers</b> now, from Tier 0 (Eternamax) to Tier 4. Party & Box and the Pokédex show each one's tier. The Wiki's new Tiers page lists them.</li>
       <li>One bonus per tier replaces the old signature moves: Tier 0 hits ×1.4, Tier 1 ×1.2, Tier 2 ×1.1. The move names stay. Judgment was ×2 and is ×1.2 now, and Arceus is stronger in every Plate (total 780).</li>
@@ -1968,28 +2027,28 @@ function wikiSections() {
     { id: "types", group: "Stats and levels", title: "Types", html: `<p>The main games' type chart. Each party Pokémon uses its better type against the foe; the tile shows 2x, 4x, ½x, ¼x or 0x when it isn't neutral, times the Defense or Sp. Def side (see Attack, Speed and Def). A Mega fights with its Mega typing.</p>` },
     { id: "levels", group: "Stats and levels", title: "Levels and the cap", html: `<p>Each win gives every party Pokémon the foe's level × ${XP_RATE} XP (× 1.5 against trainers). Level is the cube root of XP, up to 100.</p><p><b>Levels count</b>, like in the real games, where Attack and the damage formula both grow with level: below the cap a Pokémon hits × (level ÷ cap) on top of the usual × level ÷ 50, so a Lv 80 hits 69% as hard as one at 96 and a Lv 86 80%. Its bulk counts × (level ÷ cap)² for the boss timer. At the cap nothing changes, so bosses are set the same; an under-leveled team just has less room.</p><p><b>Catch-up</b>: a party Pokémon below your strongest one gets more XP, doubling every ${CATCH_UP} levels it's behind (up to ×${CATCH_MAX}), but never past the strongest one. A Lv 44 next to a Lv 78 gets within 10 levels in about 5 minutes. The strongest one levels at the usual pace.</p><p>The level cap is ${CAP_OVER} over the next gym leader or Champion you haven't beaten, and 100 once every Champion is down. Each place also keeps the cap it had when you first got there: go back and your party fights held to it, so a Lv 90 team is Lv 30 on Hoenn Route 1, until you beat that region's Champion. After that its wild Pokémon keep up with you (Route 1 sits 8 under your cap, Route 4 2 under, the dungeon, the Ultra Wormhole and Area Zero at it), your party fights at its full level there, and catches come in at a level you can use. They're as tough as where you are now, too: a raised wild Pokémon has the HP, pay and XP pace of a route at its level, and an old dungeon is tuned against the team you could have now, so going back is no shortcut. XP past the cap from older saves waits until the cap catches up.</p>` },
     { id: "evolution", group: "Stats and levels", title: "Evolution", html: `<p>By level, by item (sold for $${fmt(ITEM_PRICE)}, and only listed once something in your Box needs it) or by trade (a Linking Cord, $${fmt(CORD_PRICE)}). A Pokémon with one level evolution does it on its own; the rest wait for you in Party & Box. Evolve all, next to the Box, does every level evolution that's ready with only one way to go, again and again (a Lv 40 Charmander ends up a Charizard); choices, items and Linking Cords stay with you. The evolved form joins your Box and the old one stays.</p><p>Evolving into a species you already own merges them when it would raise your one's level: the Box keeps the higher XP.</p>` },
-    { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, carrying a modest Protein (a quarter of what you could have by now: ${bossProtein()} right now), only just wins on its own. Most players carry more Protein, so a team that isn't quite that strong can still win; a Mega or a few taps help too. Off-type and under-leveled teams lose, even tapping. Max Raids, dungeons and the mini quests use the same rule. Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
+    { id: "gyms", group: "Bosses", title: "Gym leaders and Champions", html: `<p>A gym gives ${GYM_TIME}s and a Champion ${CHAMP_TIME}s, then the team's Attack and Speed against the other bosses of its region move that from −20% to +20% (fast, hard-hitting teams make short fights), and your party's bulk moves it again.</p><p>HP is set when the fight starts: the strongest super-effective team you could have by then (anything from earlier regions, plus what this region's open routes offer, each as evolved as the level cap allows), at the cap, carrying a modest Protein (a quarter of what you could have by now: ${bossProtein()} right now), only just wins on its own. Most players carry more Protein, so a team that isn't quite that strong can still win; a Mega or a few taps help too. Off-type and under-leveled teams lose, even tapping. Max Raids use the same rule; dungeons and side quests use it with the tier below the boss (see Tiers). Each foe's share comes from its HP, Defense and Sp. Def.</p><p>A Champion's ace comes out Mega Evolved if it can, or Gigantamax from Galar on (with doubled HP). Wins pay 15× (gyms) or 30× (Champions) a wild win. Your party, protein, evolutions and forms are locked during the fight.</p>` },
     { id: "tapping", group: "Bosses", title: "Your team wins, not your taps", html: `<p>No boss needs tapping. Every one is set for a team built for it: the right types, levels, evolutions and Protein win on their own, and the wrong team loses even tapping flat out. A tap is ${pct(TAP_SHARE)} of your party's damage per second, and half that in boss fights, so ${TAP_RATE} a second add about a third on a route and a sixth against a boss: enough to rescue a close fight, not to carry a weak team.</p>` },
-    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>Like a Max Raid den in Sword and Shield, the list shows the waiting legendary's types before you go in, but not which one it is. Build your team for those types: your party is locked once the run starts. The legendary stays the same until you beat it; losing or leaving the run (which still uses the ticket) doesn't roll a new one. A legendary with a Mega form comes out as one half the time, and the list shows the Mega's types; catching it gets you the usual form.</p><p>It's set so the 6 strongest Pokémon you could have against it (a 4× weakness counts), at the cap, with a modest Protein (a quarter of what you could have by now: ${bossProtein()} right now), only just win the run on their own. Carry more Protein and you can win with fewer perfect counters; a Mega or a few taps help too. Off-type teams lose. The Pokémon before it never take more than ${pct(FODDER_USE)} of the time. The Ultra Wormhole and Area Zero work the same way for their last one, and the mini quests (Meteor Falls, the Slumbering Weald) are tuned like a Champion's team.</p><p><b>Catching it</b>: beat it and you get 1 throw, plus 1 for every ${pct(BOSS_THROW_STEP)} of the clock left, up to ${BOSS_THROWS}. Each uses your ball setting and the real games' odds for a worn-down, sleeping Pokémon: (catch rate × ball × 2.5 ÷ 255)^0.75, with no extra legendary dodge. The catch rate is its tier's, not the species': ${TIER_RATE[3]} for Tier 3 (Mewtwo, Lugia, Rayquaza...), ${pct(Math.pow(TIER_RATE[3] * 2 * 2.5 / 255, .75))} a throw with an Ultra Ball, and ${TIER_RATE[4]} for Tier 4 (the birds, Mew, Ultra Beasts, Paradox Pokémon...), ${pct(Math.pow(TIER_RATE[4] * 2 * 2.5 / 255, .75))}. A Master Ball always catches. Each win where you don't catch it adds +${pct(BOSS_PITY)} a throw against it, until you do. Catch it, or have it already, and a new legendary rolls; miss, and it stays for another try.</p>` },
+    { id: "dungeons", group: "Bosses", title: "Dungeons and legendaries", html: `<p>A region's dungeon opens with its second badge and takes a ticket from the Shop (any opened dungeon's ticket can be bought from anywhere). It's ${DUNGEON_SIZE} pseudo-legendary, fossil and starter-line Pokémon, as tough as the region's route Pokémon and then some, and then one of the region's legendaries, all in ${DUNGEON_TIME}s (−10% to +15% by the legendary's Attack and Speed, then your bulk).</p><p>Like a Max Raid den in Sword and Shield, the list shows the waiting legendary's types before you go in, but not which one it is. Build your team for those types: your party is locked once the run starts. The legendary stays the same until you beat it; losing or leaving the run (which still uses the ticket) doesn't roll a new one.</p><p><b>Two phases</b>: first a dungeon only sends out its Tier 4 legendaries you don't have yet, and the list shows how many you have (Legends 3/5). Once all of them are in your Box, its Tier 3s come out: the ones you don't have first, then any Tier 3 or 4 of it. Dungeon legendaries never come out Mega Evolved, and quest prizes (Type: Null, Kubfu, Meltan, Calyrex, Cosmog, Ogerpon, Terapagos...) never come from dungeons.</p><p>It's set against the tier below it (see Tiers): a Tier 4 legendary against Pokémon that aren't legendary, a Tier 3 one against Tier 4 legendaries. The 6 best Pokémon for it from there (a 4× weakness counts; one Mega, one Gigantamax), at the cap with their tier bonus and a modest Protein (a quarter of what you could have by now: ${bossProtein()} right now), only just win the run on their own. Carry more Protein and you can win with fewer perfect counters; a Mega or a few taps help too. Off-type teams lose. The Pokémon before it never take more than ${pct(FODDER_USE)} of the time. The Ultra Wormhole and Area Zero work the same way for their last one, a Tier 4.</p><p><b>Catching it</b>: beat it and you get 1 throw, plus 1 for every ${pct(BOSS_THROW_STEP)} of the clock left, up to ${BOSS_THROWS}. Each uses your ball setting and the real games' odds for a worn-down, sleeping Pokémon: (catch rate × ball × 2.5 ÷ 255)^0.75, with no extra legendary dodge. The catch rate is its tier's, not the species': ${TIER_RATE[3]} for Tier 3 (Mewtwo, Lugia, Rayquaza...), ${pct(Math.pow(TIER_RATE[3] * 2 * 2.5 / 255, .75))} a throw with an Ultra Ball, and ${TIER_RATE[4]} for Tier 4 (the birds, Mew, Ultra Beasts, Paradox Pokémon...), ${pct(Math.pow(TIER_RATE[4] * 2 * 2.5 / 255, .75))}. A Master Ball always catches. Each win where you don't catch it adds +${pct(BOSS_PITY)} a throw against it, until you do. Catch it, or have it already, and a new legendary rolls; miss, and it stays for another try.</p>` },
     { id: "silver", group: "Side quests", title: "Mt. Silver", html: `<p>Once all nine Champions are beaten, Red waits on Mt. Silver (in Johto's list) with ${RED_TEAM.map(n => mon(n).name).join(", ")} at Lv ${SUMMIT_LEVEL}, ×${SUMMIT_HP} HP, in ${SUMMIT_TIME}s give or take. It's meant to be brutal. The first win gives the Shiny Charm.</p>` },
     { id: "cells", group: "Side quests", title: "Zygarde Cells", html: `<p>Once Diantha (Kalos's Champion) is beaten, every wild win has a 1 in ${CELL_ODDS} chance of turning up a Zygarde Cell, and every gym, Champion, dungeon and Red win brings ${CELL_BOSS}. Time away finds them at half the rate. Kalos's list shows how many you have.</p><p>10 cells unlock Zygarde's 10% Forme (fast and frail: Speed ${ZFORMES["10"].spe}) and bring you a Zygarde if you have none. 100 unlock its Complete Forme, Zygarde at 100%: HP ${ZFORMES.complete.hp}, double the usual. Pick the forme in Zygarde's detail; it keeps its level. All 100 open Terminus Cave in Kalos's list: Zygarde's Last Stand, for the Zygardite.</p>` },
-    { id: "darkest", group: "Side quests", title: "The Darkest Day", html: `<p>Once Leon (Galar's Champion) is beaten, every wild win in Galar has a 1 in ${PIECE_ODDS} chance of a Wishing Piece, and every gym, Champion and dungeon win there brings ${PIECE_BOSS}. Time away in Galar finds them at half the rate. Galar's list shows how many you have.</p><p>${PIECES_NEED} pieces open the Energy Plant, where Eternamax Eternatus waits at Lv 100 in ${DARKEST_TIME}s give or take. Only a team built for it wins: the Pokémon that hit Eternamax hardest, at Lv 100 with all the Protein, beat it on their own with a little to spare, and anything weaker loses even tapping. Beat it and Eternatus is yours if it wasn't already, with its Eternamax form unlocked. Eternamax takes your one Gigantamax slot and fights with its own stats (HP 255, Defense and Sp. Def 250, the bulkiest Pokémon in the game), and it's the one Tier 0 Pokémon, so its Dynamax Cannon hits ×${TIER_BONUS[0]} on top (see Tiers).</p>` },
+    { id: "darkest", group: "Side quests", title: "The Darkest Day", html: `<p>Once Leon (Galar's Champion) is beaten, every wild win in Galar has a 1 in ${PIECE_ODDS} chance of a Wishing Piece, and every gym, Champion and dungeon win there brings ${PIECE_BOSS}. Time away in Galar finds them at half the rate. Galar's list shows how many you have.</p><p>${PIECES_NEED} pieces open the Energy Plant, where Eternamax Eternatus waits at your level cap in ${DARKEST_TIME}s give or take. It's Tier 0, so it's set against Tier 1 and weaker: the best six of those for it (Mega Mewtwo, Arceus in the right Plate...; one Mega, one Gigantamax), at the cap with their tier bonus and a modest Protein, only just win on their own. Beat it and Eternatus is yours if it wasn't already, with its Eternamax form unlocked. Eternamax takes your one Gigantamax slot and fights with its own stats (HP 255, Defense and Sp. Def 250, the bulkiest Pokémon in the game), and it's the one Tier 0 Pokémon, so its Dynamax Cannon hits ×${TIER_BONUS[0]} on top (see Tiers).</p>` },
     { id: "tower", group: "Side quests", title: "Battle Tower", html: `<p>Once Geeta (Paldea's Champion) is beaten, the Battle Tower opens in Paldea's list: an endless climb against one clock. You start with ${TOWER_START}s. Each floor is ${TOWER_SIZE} Pokémon at Lv 100, the same ones for every player, and each floor is ${pct(TOWER_GROW - 1)} tougher than the last. Clearing a floor adds ${TOWER_ADD}s, and your party's bulk stretches that like any boss timer.</p><p>Every 10th floor is the Tower Tycoon: three legendaries, the last one Mega Evolved if it can, with half again the HP, and clearing it adds ${TOWER_TYCOON_ADD}s. The run ends when the clock does. The highest floor you've cleared is your best, and it has its own leaderboard in the arcade.</p>` },
-    { id: "origin", group: "Side quests", title: "Hall of Origin (Arceus)", html: `<p>Once every Champion is beaten, every wild win in Sinnoh has a 1 in ${PLATE_ODDS} chance of one of Arceus's Plates, and every gym, Champion and dungeon win there brings ${PLATE_BOSS}. Time away in Sinnoh finds them at half the rate. With all ${PLATES_NEED} Plates and Dialga, Palkia and Giratina in your Box, the Hall of Origin opens in Sinnoh's list.</p><p>Arceus fights at Lv 100 three times, as Normal, Dragon and Ghost, so one type of team won't do. Win, and Arceus is yours (if it wasn't already) and can take any of the 17 Plate types: pick it in its detail. Arceus is Tier 1 in every type: its Judgment hits ×${TIER_BONUS[1]}.</p>` },
+    { id: "origin", group: "Side quests", title: "Hall of Origin (Arceus)", html: `<p>Once every Champion is beaten, every wild win in Sinnoh has a 1 in ${PLATE_ODDS} chance of one of Arceus's Plates, and every gym, Champion and dungeon win there brings ${PLATE_BOSS}. Time away in Sinnoh finds them at half the rate. With all ${PLATES_NEED} Plates and Dialga, Palkia and Giratina in your Box, the Hall of Origin opens in Sinnoh's list.</p><p>Arceus fights at your level cap three times, as Normal, Dragon and Ghost, so one type of team won't do. Win, and Arceus is yours (if it wasn't already) and can take any of the 17 Plate types: pick it in its detail. Arceus is Tier 1 in every type: its Judgment hits ×${TIER_BONUS[1]}.</p>` },
     { id: "crown", group: "Side quests", title: "Crown Shrine (Calyrex)", html: `<p>Once every Champion is beaten and Calyrex, Glastrier and Spectrier are in your Box (all three come from the Galar dungeon), the Crown Shrine opens in Galar's list. Calyrex comes out as the Ice Rider (Psychic/Ice), then the Shadow Rider (Psychic/Ghost), back to back. Win, and Calyrex can ride either: pick it in its detail. Both Riders are Tier 2: the Ice Rider's Glacial Lance and the Shadow Rider's Astral Barrage hit ×${TIER_BONUS[2]}.</p>` },
-    { id: "megalo", group: "Side quests", title: "Megalo Tower (Necrozma)", html: `<p>Once every Champion is beaten and Necrozma, Solgaleo and Lunala are in your Box (all from the Alola dungeon), Megalo Tower opens in Alola's list. Ultra Necrozma (Psychic/Dragon) fights at Lv 100. Win, and Necrozma can become Dusk Mane (Psychic/Steel, Attack 157), Dawn Wings (Psychic/Ghost, Sp. Atk 157) or Ultra Necrozma (Psychic/Dragon, Attack and Sp. Atk ${QFORMES[800][2].atk}, Tier 1), whose Photon Geyser hits ×${TIER_BONUS[1]}: pick it in its detail. Dusk Mane and Dawn Wings are Tier 3.</p>` },
-    { id: "sky", group: "Side quests", title: "Sky Pillar (Rayquaza)", html: `<p>Once every Champion is beaten and Rayquaza, Groudon and Kyogre are in your Box (all from the Hoenn dungeon), the Sky Pillar opens in Hoenn's list. Deoxys fights at Lv 100 in all four of its Formes, back to back: Normal, Attack, Defense and Speed. Win, and Rayquaza can Mega Evolve (you need the Key Stone); it's Tier 1, and its Dragon Ascent hits ×${TIER_BONUS[1]}. The Shop and dungeon drops never offer Rayquaza's Mega Stone.</p>` },
-    { id: "cerulean", group: "Side quests", title: "Cerulean Cave (Mewtwo)", html: `<p>Once every Champion is beaten and Mewtwo and Mew are in your Box (both from the Kanto dungeon), Cerulean Cave opens in Kanto's list. Mega Mewtwo X (Psychic/Fighting) fights at Lv 100, then Mega Mewtwo Y (Psychic). Win both Mewtwonites: Mewtwo can Mega Evolve into either, both are Tier 1, and Psystrike hits ×${TIER_BONUS[1]}. The Shop and dungeon drops never offer them.</p><p>Like the Darkest Day, these quests (and the Giant Chasm) are extremely difficult. Their HP is set so the six Pokémon that hit that boss hardest, at Lv 100 with all the Protein, win on their own with a little to spare. Anything less than a team built for the boss loses, even tapping; quest prizes, Megas and Gigantamax give you room.</p>` },
-    { id: "chasm", group: "Side quests", title: "Giant Chasm (Kyurem)", html: `<p>Once every Champion is beaten and Kyurem, Zekrom and Reshiram are all in your Box (from the Unova dungeon), the Giant Chasm opens in Unova's list. Black Kyurem (Dragon/Ice, Attack 170) fights at Lv 100, then White Kyurem (Sp. Atk 170). It's as hard as the other extremely difficult quests. Win, and Kyurem can fuse into either: pick it in its detail. Both are Tier 2: Black Kyurem's Freeze Shock and White Kyurem's Ice Burn hit ×${TIER_BONUS[2]}.</p>` },
-    { id: "terminus", group: "Side quests", title: "Terminus Cave (Zygarde)", html: `<p>A mini quest, Zygarde's Last Stand, as at the end of Legends: Z-A. Once Diantha (Kalos's Champion) is beaten, Zygarde is in your Box and all 100 Zygarde Cells are in, Terminus Cave opens in Kalos's list. Zygarde fights in three Formes, 10%, 50% and Complete, at your level cap, set like a Champion's team: the strongest team for it you could have, with a modest Protein, only just wins. They're all Dragon and Ground, so Ice hits them four times over.</p><p>Win it once for the Zygardite. Like in Z-A, Zygarde only Mega Evolves from its Complete Forme: pick 100% in its detail, then Mega Evolve. Dungeons and the Shop never give its stone.</p>` },
-    { id: "meteor", group: "Side quests", title: "Meteor Falls (Deoxys)", html: `<p>A mini quest. Once Hoenn's Champion is beaten and Deoxys is in your Box (from the Hoenn dungeon), Meteor Falls opens in Hoenn's list: Deoxys in its Attack, Defense and Speed Formes, back to back, about as hard as a dungeon's legendary. Win, and your Deoxys can take any of its four Formes, picked in its detail. All three are Tier 3, and none is simply better: Attack hits hardest but its bulk is ${Math.round(bulkOf(QFORMES[386][0]))}, Defense is a wall (bulk ${Math.round(bulkOf(QFORMES[386][1]))}) that hardly hits, Speed sits between.</p>` },
-    { id: "weald", group: "Side quests", title: "Slumbering Weald (Zacian, Zamazenta)", html: `<p>A mini quest. Once Galar's Champion is beaten and Zacian or Zamazenta is in your Box (from the Galar dungeon), the Slumbering Weald opens in Galar's list: Zacian, then Zamazenta, about as hard as a dungeon's legendary. Win the Rusted Sword and Shield: Zacian can take its Crowned Sword form (Fairy/Steel, Attack 150, Speed 148) and Zamazenta its Crowned Shield (Fighting/Steel, Defense and Sp. Def 140), both Tier 2, picked in their details. Both start in their usual Hero form.</p>` },
+    { id: "megalo", group: "Side quests", title: "Megalo Tower (Necrozma)", html: `<p>Once every Champion is beaten and Necrozma, Solgaleo and Lunala are in your Box (all from the Alola dungeon), Megalo Tower opens in Alola's list. Ultra Necrozma (Psychic/Dragon) fights at your level cap. Win, and Necrozma can become Dusk Mane (Psychic/Steel, Attack 157), Dawn Wings (Psychic/Ghost, Sp. Atk 157) or Ultra Necrozma (Psychic/Dragon, Attack and Sp. Atk ${QFORMES[800][2].atk}, Tier 1), whose Photon Geyser hits ×${TIER_BONUS[1]}: pick it in its detail. Dusk Mane and Dawn Wings are Tier 3.</p>` },
+    { id: "sky", group: "Side quests", title: "Sky Pillar (Rayquaza)", html: `<p>Once every Champion is beaten and Rayquaza, Groudon and Kyogre are in your Box (all from the Hoenn dungeon), the Sky Pillar opens in Hoenn's list. Deoxys fights at your level cap in all four of its Formes, back to back: Normal, Attack, Defense and Speed. Win, and Rayquaza can Mega Evolve (you need the Key Stone); it's Tier 1, and its Dragon Ascent hits ×${TIER_BONUS[1]}. The Shop and dungeon drops never offer Rayquaza's Mega Stone.</p>` },
+    { id: "cerulean", group: "Side quests", title: "Cerulean Cave (Mewtwo)", html: `<p>Once every Champion is beaten and Mewtwo and Mew are in your Box (both from the Kanto dungeon), Cerulean Cave opens in Kanto's list. Mega Mewtwo X (Psychic/Fighting) fights at your level cap, then Mega Mewtwo Y (Psychic). Win both Mewtwonites: Mewtwo can Mega Evolve into either, both are Tier 1, and Psystrike hits ×${TIER_BONUS[1]}. The Shop and dungeon drops never offer them.</p><p>Like every side quest, it's set against the tier below its prize (see Tiers). Mega Mewtwo is Tier 1, so the six best Pokémon from Tier 2 and weaker for it (one Mega, one Gigantamax), at your level cap with their tier bonus and a modest Protein, only just win on their own. A team from Tier 3 and weaker loses.</p>` },
+    { id: "chasm", group: "Side quests", title: "Giant Chasm (Kyurem)", html: `<p>Once every Champion is beaten and Kyurem, Zekrom and Reshiram are all in your Box (from the Unova dungeon), the Giant Chasm opens in Unova's list. Black Kyurem (Dragon/Ice, Attack 170) fights at your level cap, then White Kyurem (Sp. Atk 170). Its prize is Tier 2, so it's set against Tier 3 and weaker (see Tiers). Win, and Kyurem can fuse into either: pick it in its detail. Both are Tier 2: Black Kyurem's Freeze Shock and White Kyurem's Ice Burn hit ×${TIER_BONUS[2]}.</p>` },
+    { id: "terminus", group: "Side quests", title: "Terminus Cave (Zygarde)", html: `<p>Zygarde's Last Stand, as at the end of Legends: Z-A. Once every Champion is beaten, Zygarde is in your Box and all 100 Zygarde Cells are in, Terminus Cave opens in Kalos's list. Zygarde fights in three Formes, 10%, 50% and Complete, at your level cap. Mega Zygarde is Tier 1, so it's set against Tier 2 and weaker (see Tiers). They're all Dragon and Ground, so Ice hits them four times over.</p><p>Win it once for the Zygardite. Like in Z-A, Zygarde only Mega Evolves from its Complete Forme: pick 100% in its detail, then Mega Evolve. Dungeons and the Shop never give its stone.</p>` },
+    { id: "meteor", group: "Side quests", title: "Meteor Falls (Deoxys)", html: `<p>Once Hoenn's Champion is beaten and Deoxys is in your Box (from the Hoenn dungeon), Meteor Falls opens in Hoenn's list: Deoxys in its Attack, Defense and Speed Formes, back to back, at your level cap. The Formes are Tier 3, so it's set against Tier 4 and weaker (see Tiers). Win, and your Deoxys can take any of its four Formes, picked in its detail. All three are Tier 3, and none is simply better: Attack hits hardest but its bulk is ${Math.round(bulkOf(QFORMES[386][0]))}, Defense is a wall (bulk ${Math.round(bulkOf(QFORMES[386][1]))}) that hardly hits, Speed sits between.</p>` },
+    { id: "weald", group: "Side quests", title: "Slumbering Weald (Zacian, Zamazenta)", html: `<p>Once every Champion is beaten and Zacian or Zamazenta is in your Box (from the Galar dungeon), the Slumbering Weald opens in Galar's list: Zacian, then Zamazenta, at your level cap. The Crowned forms are Tier 2, so it's set against Tier 3 and weaker (see Tiers). Win the Rusted Sword and Shield: Zacian can take its Crowned Sword form (Fairy/Steel, Attack 150, Speed 148) and Zamazenta its Crowned Shield (Fighting/Steel, Defense and Sp. Def 140), both Tier 2, picked in their details. Both start in their usual Hero form.</p>` },
     { id: "trips", group: "Side quests", title: "Ultra Wormhole and Area Zero", html: `<p>Ultra Beasts and Paradox Pokémon are never on routes, in the usual dungeons or on trainers' teams. They have their own runs, each a ticket from that region's dungeon, like a dungeon run:</p><ul><li><b>Ultra Wormhole</b> (Alola's list, after ${REGIONS[6].champ}): all ${ULTRA_BEASTS.length} Ultra Beasts.</li><li><b>Area Zero</b> (Paldea's list, after ${REGIONS[8].champ}): the ${PARADOX.length} Paradox Pokémon from Scarlet and Violet. The last one is one of the six from the DLC (Walking Wake, Iron Leaves, Gouging Fire, Raging Bolt, Iron Boulder, Iron Crown) a third of the time; they turn up nowhere else.</li></ul><p>Every one you beat might stay with you, by your ball settings, as a dungeon's legendary might. The last one in each run can't be beaten without tapping. Koraidon and Miraidon are Paldea's legendaries, in its dungeon. Anything you caught before stays yours.</p>` },
     { id: "tiers", group: "Bosses", title: "Tiers", html: wikiTiers() },
     { id: "shop", group: "Items", title: "The Shop", html: `<p>Balls, dungeon tickets (250 × (region number)^1.8), protein, the Linking Cord, evolution items your Box is waiting on, and, once you have the key items, a random Mega Stone ($${fmt(STONE_PRICE)}) or random Max Soup ($${fmt(SOUP_PRICE)}) for a Pokémon you own that lacks one. Those are for bad luck: dungeons and the Max Raid Den are the usual way.</p>` },
     { id: "protein", group: "Items", title: "Protein", html: `<p>+${pct(PROTEIN_STEP)} party damage each. Only ${PROTEIN_PER_REGION} count per region you've opened (up to ${PROTEIN_PER_REGION * REGIONS.length}), and each costs 1.5× the last, from $300. You can't buy it mid-fight.</p>` },
-    { id: "mega", group: "Megas and Gigantamax", title: "Mega Evolution", html: `<p>Beat Steven (Hoenn's Champion) for the Key Stone. Each Mega form then needs its own Mega Stone, and each region's dungeon drops its own generation's: Kanto's Gen 1 (Charizard, Gengar, Gyarados...), Johto's Gen 2, and so on to Paldea. ${pct(STONE_DROP)} of clears drop one, and only for a Pokémon you own: one in your party if it can, else one in your Box. The Ultra Wormhole and Area Zero count as Alola's and Paldea's. Stones per dungeon: ${REGIONS.map((R, r) => `${R.name} ${FORMS.filter(f => f.kind === "mega" && !f.quest && f.gen === r + 1).length}`).join(", ")}.</p><p>Out of luck? The Shop sells a random Mega Stone for a Pokémon you own for $${fmt(STONE_PRICE)}. The stones for Mega Rayquaza, Mega Mewtwo X and Y and Mega Zygarde only come from side quests (the Sky Pillar, Cerulean Cave and Terminus Cave), and Zygarde only Mega Evolves from its Complete Forme.</p><p>Turn it on in the Pokémon's detail in Party & Box. One Mega in the party at a time, on in every fight, using its Mega stats and types. ${FORMS.filter(f => f.kind === "mega").length} Megas, from the originals to Legends: Z-A's.</p>` },
-    { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${new Set(FORMS.filter(f => f.kind === "gmax" && !f.quest).map(f => f.num)).size} species with a Gigantamax form then needs its Gigantamax factor, won in Galar's <b>Max Raid Den</b>: one Gigantamax Pokémon you can see before you go in, a Galar dungeon ticket a try, and as tough as a Champion (the strongest team for it you could have at the cap, with a modest Protein, only just wins). The den holds a species you don't have yet: one in your party if it can, else one in your Box, else any. Win and it can Gigantamax, and it joins you if you don't have it (legendaries still come the usual way). Lose and it waits for you. Out of luck? The Shop sells random Max Soup for a species you own for $${fmt(SOUP_PRICE)}.</p><p>One Gigantamax Pokémon at a time, always on. Like a Mega, it fights with stats of its own, a Mega's worth on top of its usual ones (the average Mega's change): +${GMAX_STATS.main} to its better attacking stat, +${GMAX_STATS.off} to the other, +${GMAX_STATS.def} Def and Sp. Def, +${GMAX_STATS.spe} Speed. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
+    { id: "mega", group: "Megas and Gigantamax", title: "Mega Evolution", html: `<p>Beat Steven (Hoenn's Champion) for the Key Stone. Each Mega form then needs its own Mega Stone, and each region's dungeon drops its own generation's: Kanto's Gen 1 (Charizard, Gengar, Gyarados...), Johto's Gen 2, and so on to Paldea. ${pct(STONE_DROP)} of clears drop one, and only for a Pokémon you own: one in your party if it can, else one in your Box. The Ultra Wormhole and Area Zero count as Alola's and Paldea's. Stones per dungeon: ${REGIONS.map((R, r) => `${R.name} ${FORMS.filter(f => f.kind === "mega" && !f.quest && f.gen === r + 1).length}`).join(", ")}.</p><p>Out of luck? The Shop sells a random Mega Stone for a Pokémon you own for $${fmt(STONE_PRICE)}. The stones for Mega Rayquaza, Mega Mewtwo X and Y and Mega Zygarde only come from side quests (the Sky Pillar, Cerulean Cave and Terminus Cave), and Zygarde only Mega Evolves from its Complete Forme. Latiasite and Latiosite are side-quest prizes too. The Tier 3 Megas' stones (${FORMS.filter(f => f.kind === "mega" && !f.quest && tierOf(f) === 3).map(f => f.name.replace("Mega ", "")).join(", ")}) only drop from their dungeon once its Tier 3s are out, and the Shop's random stone never gives them.</p><p>Turn it on in the Pokémon's detail in Party & Box. One Mega in the party at a time, on in every fight, using its Mega stats and types. ${FORMS.filter(f => f.kind === "mega").length} Megas, from the originals to Legends: Z-A's.</p>` },
+    { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${raidSpecies().length} species with a Gigantamax form then needs its Gigantamax factor, won in Galar's <b>Max Raid Den</b> (Urshifu's and Melmetal's come from their side quests instead): one Gigantamax Pokémon you can see before you go in, a Galar dungeon ticket a try, and as tough as a Champion (the strongest team for it you could have at the cap, with a modest Protein, only just wins). The den holds a species you don't have yet: one in your party if it can, else one in your Box, else any. Win and it can Gigantamax, and it joins you if you don't have it (legendaries still come the usual way). Lose and it waits for you. Out of luck? The Shop sells random Max Soup for a species you own for $${fmt(SOUP_PRICE)}.</p><p>One Gigantamax Pokémon at a time, always on. Like a Mega, it fights with stats of its own, a Mega's worth on top of its usual ones (the average Mega's change): +${GMAX_STATS.main} to its better attacking stat, +${GMAX_STATS.off} to the other, +${GMAX_STATS.def} Def and Sp. Def, +${GMAX_STATS.spe} Speed. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
     { id: "regional", group: "Collection", title: "Regional forms", html: `<p>${VARIANTS.length} regional forms live in their own regions: Alolan in Alola, Galarian in Galar, Paldean in Paldea, and Hisuian in Sinnoh, which was Hisui long ago. They turn up on that region's routes like any wild Pokémon; Galarian Articuno, Zapdos and Moltres are among the Galar dungeon's legendaries.</p><p>A form belongs to its species, so catching an Alolan Rattata gives you Rattata (if you didn't have it) with its Alolan form, and picking the form in the detail keeps its level. Evolving the usual Pokémon inside a regional form's region gives that form, Pikachu into Alolan Raichu in Alola for one, and each form evolves its own way: Galarian Meowth becomes Perrserker, Alolan Vulpix needs an Ice Stone. Forms aren't Pokédex entries, so they don't change your leaderboard score. Pokédex → Forms shows which you have.</p>` },
     { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm. A shiny that evolves stays shiny. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
     { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>One point per Pokédex entry and one more for each one you have shiny, up to 2050. It posts to the arcade board when you're signed in.</p>` },
@@ -2007,6 +2066,13 @@ function wikiTiers() {
     <table class="pk-stats"><tbody><tr><th scope="col">Tier</th><th scope="col">Total</th><th scope="col">Bonus</th></tr>${[0, 1, 2, 3, 4].map(t => `<tr><th scope="row">Tier ${t}</th><td>${t === 4 ? "570-600" : band(t)}</td><td>×${TIER_BONUS[t]}</td></tr>`).join("")}</tbody></table>
     <ul><li><b>Tier 0</b>: ${names(0)}.</li><li><b>Tier 1</b>: ${names(1)}.</li><li><b>Tier 2</b>: ${names(2)}.</li><li><b>Tier 3</b>: ${names(3)}.</li><li><b>Tier 4</b>: every other legendary and mythical, the Ultra Beasts and the Paradox Pokémon.</li></ul>
     <p><b>Tier bonus</b>: whatever form is fighting hits × its tier's bonus, under its move's name: Dynamax Cannon ×${TIER_BONUS[0]}, Judgment or Psystrike ×${TIER_BONUS[1]}, Freeze Shock or Glacial Lance ×${TIER_BONUS[2]}. Tiers 3 to 5 hit ×1. Arceus's Judgment takes the type of its Plate.</p>
+    <p><b>You need the tier below</b>: every legendary boss is set so the best six Pokémon from the tier below it and weaker only just win idling: the right types (a 4× weakness counts), at most one Mega and one Gigantamax, at the cap with their tier bonus and a modest Protein (a quarter of what you could have by now: ${bossProtein()} right now). More Protein lets you win with fewer perfect counters; a team from two tiers down loses. Legendaries count as all yours for this; other Pokémon as what you could have by then.</p>
+    <table class="pk-stats"><tbody><tr><th scope="col">Boss</th><th scope="col">Set against</th></tr>${[
+      ["Tier 0: the Darkest Day", "Tier 1 and weaker"],
+      ...[1, 2, 3, 4].map(t => [`Tier ${t}: ${[...(t >= 3 ? ["dungeon legendaries"] : []), ...(t === 4 ? ["the Ultra Wormhole", "Area Zero"] : []), ...QUESTS.filter(Q => Q.tier === t).map(Q => Q.place)].join(", ")}`, t === 4 ? "Pokémon that aren't legendary" : `Tier ${t + 1} and weaker`])
+    ].map(([a, b]) => `<tr><th scope="row">${a}</th><td>${b}</td></tr>`).join("")}</tbody></table>
+    <p>Side quests fight at your level cap. Tier 3 and 4 quests open after their region's Champion, Tier 0 to 2 quests after all nine.</p>
+    <p><b>Dungeons</b> come in two phases. First a dungeon only sends out its Tier 4 legendaries you don't have yet. Once all of them are in your Box, its Tier 3s come out: the ones you don't have first, then any Tier 3 or 4 of it. Quest prizes never come from dungeons, and dungeon legendaries never come out Mega Evolved.</p>
     <p><b>Catching</b>: a dungeon's legendary, and the last one in the Ultra Wormhole and Area Zero, catches at its tier's rate, not its species': Tier 3 at ${TIER_RATE[3]} (${ultra(3)} an Ultra Ball throw), Tier 4 at ${TIER_RATE[4]} (${ultra(4)}). Every miss still adds +${pct(BOSS_PITY)} a throw, and a Master Ball always catches.</p>`;
 }
 const wikiPools = new Map();
@@ -2025,6 +2091,7 @@ function wikiWhere(n) {
   if (n === ETERNATUS) out.push("the Darkest Day at Galar's Energy Plant");
   // A quest prize you don't need to start it with: Arceus from the Hall of Origin, and so on.
   for (const Q of QUESTS) if (Q.prize === n && !(Q.need || []).includes(n)) out.push(`the ${Q.place} (${REGIONS[Q.r].name}'s list)`);
+  if (QUEST_ONLY.has(n) && !out.length) out.push("a side-quest prize (coming soon)");
   if (Object.values(SPECIALS).some(x => x.num === n)) out.push("a special edition came as a gift in Mail");
   return out.length ? out.join(", ") : "only by evolving";
 }
@@ -2072,7 +2139,7 @@ function wikiEntry(n) {
       <dt>In battle</dt><dd>${{ physical: "Physical: Attack against the foe's Defense.", special: "Special: Sp. Atk against the foe's Sp. Def.", mixed: "Mixed: Attack or Sp. Atk, whichever hits each foe harder." }[category(m)]} Hits ${hitRate(m).toFixed(2)} times a second for about ${fmt(Math.round(Math.max(m.atk, m.spa) * 2 * hitRate(m) * truant(n)))} damage a second at Lv 100, before type matchups and Protein. Bulk ${Math.round(bulkOf(m))}.${TRUANT.has(n) ? " Truant: it only attacks every other turn, so it deals half damage." : ""}</dd>
       <dt>Yours</dt><dd>${yours}</dd>
     </dl>${forms.length ? `
-    <h4>Forms</h4><div class="pk-forms">${forms.map(f => `<div class="pk-form"><span class="pic"><img class="spr" src="${sprite(f.sprite, wikiShiny)}" alt=""></span><div><p><b>${esc(f.num === 493 ? "Arceus (any Plate)" : f.name)}</b> ${f.num === 493 ? "" : f.types.map(tyChip).join(" ")}${tierLabel(f) ? ` <span class="muted">${tierLabel(f)}</span>` : ""}</p><p class="muted small">${f.vid ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. ${esc(variantWhere(f))}.` : f.key && f.quest ? (f.num === 493 ? `Any of the 17 Plate types, same stats. Win the Hall of Origin. Judgment: ×${tierBonus(f)} damage.` : `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Win at the ${QUEST[f.quest].place}.${tierBonus(f) > 1 ? ` ${f.move}: ×${tierBonus(f)} damage.` : ""}`) : f === RAPID ? "Same stats, Fighting/Water. Pick the style in Urshifu's detail." : f.need ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Takes ${f.need} Zygarde Cells.` : f.kind === "mega" ? `Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. ${f.quest ? `Win at the ${QUEST[f.quest].place}. ${f.move}: ×${tierBonus(f)} damage.` : "Needs its Mega Stone."}` : f.quest ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Win the Darkest Day. Takes the Gigantamax slot; Dynamax Cannon: ×${tierBonus(f)} damage.` : `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}: a Mega's worth on top of its usual stats. Win it in Galar's Max Raid Den.`}</p></div></div>`).join("")}</div>` : ""}
+    <h4>Forms</h4><div class="pk-forms">${forms.map(f => `<div class="pk-form"><span class="pic"><img class="spr" src="${sprite(f.sprite, wikiShiny)}" alt=""></span><div><p><b>${esc(f.num === 493 ? "Arceus (any Plate)" : f.name)}</b> ${f.num === 493 ? "" : f.types.map(tyChip).join(" ")}${tierLabel(f) ? ` <span class="muted">${tierLabel(f)}</span>` : ""}</p><p class="muted small">${f.vid ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. ${esc(variantWhere(f))}.` : f.key && f.quest ? (f.num === 493 ? `Any of the 17 Plate types, same stats. Win the Hall of Origin. Judgment: ×${tierBonus(f)} damage.` : `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Win at the ${QUEST[f.quest].place}.${tierBonus(f) > 1 ? ` ${f.move}: ×${tierBonus(f)} damage.` : ""}`) : f === RAPID ? "Same stats, Fighting/Water. Pick the style in Urshifu's detail." : f.need ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Takes ${f.need} Zygarde Cells.` : f.kind === "mega" ? `Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. ${f.quest ? `Win ${questAt(f.quest)}.${tierBonus(f) > 1 ? ` ${f.move}: ×${tierBonus(f)} damage.` : ""}` : tierOf(f) === 3 ? "Needs its Mega Stone: its dungeon drops it once its Tier 3s are out." : "Needs its Mega Stone."}` : f.quest ? `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}. Win the Darkest Day. Takes the Gigantamax slot; Dynamax Cannon: ×${tierBonus(f)} damage.` : `HP ${f.hp}, Atk ${f.atk}, Def ${f.def}, SpA ${f.spa}, SpD ${f.spd}, Spe ${f.spe}: a Mega's worth on top of its usual stats. ${QUEST_GMAX.has(f.num) ? "A side-quest prize." : "Win it in Galar's Max Raid Den."}`}</p></div></div>`).join("")}</div>` : ""}
   </article>`;
 }
 // The wiki has two tabs: the guide (every rule, searchable) and the Pokédex (every Pokémon, with filters).
@@ -2418,7 +2485,11 @@ function migrateSave() {
   S.ach = S.ach || {}; S.stats = Object.assign({ taps: 0, wins: 0, evolved: 0, gifts: 0 }, S.stats); S.cells = S.cells || 0;
   // New catches stop joining the party once it has been full: a save past its first six catches already has been.
   if (S.full == null) S.full = S.party.length >= 6 || Object.keys(S.box).length > 6 ? 1 : 0;
-  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.trips = S.trips || {}; S.den = S.den || {}; S.pity = S.pity || {}; S.teams = S.teams || []; S.plates = S.plates || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
+  S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.trips = S.trips || {}; S.den = S.den || {};
+  // Tiers: a dungeon's kept legendary the rules don't allow now (a quest prize, a Mega, a Tier 3 from before the
+  // dungeon's Tier 4s were all caught) rolls again, and so does a Max Raid for Urshifu or Melmetal.
+  for (const k of Object.keys(S.den)) if (/^d\d+$/.test(k) && !denValid(+k.slice(1), foeOf(S.den[k]))) delete S.den[k];
+  if (S.raid && !raidSpecies().includes(S.raid)) S.raid = 0; S.pity = S.pity || {}; S.teams = S.teams || []; S.plates = S.plates || 0; S.tower = Object.assign({ best: 0, runs: 0 }, S.tower);
   // Prof Penguin's tips are for new players: a save three badges in has found its feet.
   if (!S.tut) S.tut = { seen: {}, off: Object.keys(S.badges).length >= 3 ? 1 : 0 };
   if (S.champs[KEY_STONE_FROM]) S.key = 1;
