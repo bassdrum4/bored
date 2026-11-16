@@ -99,14 +99,14 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
   let run = null, last = now(), lastInput = -Infinity, pending = [], busy = false;
   let visitor = canRecord() ? getVisitorId() : null;
   let detach = () => {}, lastFlush = now(), flushTimer = null;
-  let checkedAccount = null, adminCheck = null, scopedReaderId = null;
+  let checkedAccount = null, adminCheck = null, scopedReader = null;
   const scheduleFlush = () => {
     if (flushTimer) return;
     flushTimer = setTimeout(() => { flushTimer = null; void flush(); }, 1200);
   };
   const owner = () => getSession()?.user?.id || null;
-  const suppressGame = game => scopedReaderId !== null && scopedReaderId === owner() &&
-    isSuppressedGame('civ-lite', game);
+  const suppressGame = game => scopedReader !== null && scopedReader.id === owner() &&
+    isSuppressedGame('game-reader', game, scopedReader.games);
   // Fail closed for signed-in accounts until their current identity is checked.
   // The hub may queue events meanwhile, but no bytes reach Supabase beforehand.
   // The database separately enforces the admin denial even if client code is
@@ -129,10 +129,11 @@ export function createAnalytics({ frame, snapshot, score, paused = () => false, 
         window.dispatchEvent(new Event('bored:analytics-disabled'));
         return false;
       }
-      // Scoped readers are still ordinary players in every other game. Purge
-      // already queued Civ Lite events before the first network write.
-      scopedReaderId = access.kind === 'civ-lite' ? id : null;
-      pending = filterGameReaderTelemetry(pending, access.kind);
+      // Scoped readers are still ordinary players in every game they cannot
+      // read. Purge already queued events for their own games before the first
+      // network write.
+      scopedReader = access.kind === 'game-reader' ? { id, games: new Set(access.games) } : null;
+      pending = filterGameReaderTelemetry(pending, access.kind, access.games);
       if (suppressGame(run?.game)) {
         run = null;
         detach(); detach = () => {};

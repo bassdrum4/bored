@@ -1,5 +1,13 @@
 import { request, freshSession, getSession } from './backend.js';
+import { getAnalyticsAccess } from './analytics-access.js';
 
+const GAME_NAMES = {
+  ashcrown: 'Civ Lite (Ashcrown)',
+  pokedoku: 'Pokédoku',
+  'poke-idle': 'Poké Idle',
+  'poke-gacha': 'Poké Gacha'
+};
+const gameName = game => GAME_NAMES[game] || game;
 const $ = selector => document.querySelector(selector);
 const formatNumber = value => Number(value || 0).toLocaleString();
 const formatTime = value => {
@@ -54,7 +62,7 @@ function render(report) {
     ['Avg active / session', formatTime(Number(t.activeMs) / Math.max(1, Number(t.sessions)))],
     ['Engaged sessions', formatNumber(t.engagedSessions)],
     ['Finished sessions', formatNumber(t.endedSessions)],
-    ['Daily completions', formatNumber(t.completedSessions)],
+    ['Completed rounds', formatNumber(t.completedSessions)],
     ['Recorded errors', formatNumber(t.errors)]
   ];
   $('#totals').replaceChildren(...metrics.map(([label, value]) => {
@@ -72,36 +80,59 @@ function render(report) {
   renderTable('#discovery', ['Event','Count'],
     (report.discovery || []).map(d => [d.label,formatNumber(d.count)]));
 }
+function syncGames(games) {
+  const select = $('#game');
+  const current = select.value;
+  select.replaceChildren(...games.map(game => {
+    const option = document.createElement('option');
+    option.value = game;
+    option.textContent = gameName(game);
+    return option;
+  }));
+  select.value = games.includes(current) ? current : games.includes('ashcrown') ? 'ashcrown' : games[0];
+  select.disabled = games.length < 2;
+}
 let loading = false, epoch = 0;
 async function load() {
   if (loading) return;
   loading = true;
   const current = ++epoch;
   $('#refresh').disabled = true;
-  $('#status').textContent = 'Checking Civ Lite access…';
+  $('#status').textContent = 'Checking analytics access…';
   try {
     const session = await freshSession();
     if (!session) throw new Error('Sign in to your Bored account first.');
+    const access = await getAnalyticsAccess();
+    if (current !== epoch || getSession()?.user?.id !== session.user.id) {
+      throw new Error('Account changed. Reload this page.');
+    }
+    if (!access.games.length) {
+      const error = new Error('This account has not been granted analytics access.');
+      error.code = '42501';
+      throw error;
+    }
+    syncGames(access.games);
+    const game = $('#game').value;
     const from = $('#from').value, through = $('#through').value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(through)
       || from > through || shiftDay(from, 89) < through) {
       throw new Error('Choose an inclusive date range of 1 to 90 days.');
     }
-    const report = await request('/rest/v1/rpc/civ_lite_analytics_v1', {
-      method: 'POST', body: { p_from: from, p_through: through }
+    const report = await request('/rest/v1/rpc/game_analytics_v1', {
+      method: 'POST', body: { p_game: game, p_from: from, p_through: through }
     });
     if (current !== epoch || getSession()?.user?.id !== session.user.id) {
       throw new Error('Account changed. Reload this page.');
     }
     render(report);
     $('#dashboard').hidden = false; $('#access').hidden = true; $('#refresh').hidden = false;
-    $('#status').textContent = 'Civ Lite only · ' + from + ' through ' + through + ' · updated ' +
+    $('#status').textContent = gameName(game) + ' · ' + from + ' through ' + through + ' · updated ' +
       new Date().toLocaleTimeString([], { timeZone: 'America/Detroit', hour: 'numeric', minute: '2-digit' });
   } catch (error) {
     $('#dashboard').hidden = true;
     $('#access').hidden = false;
     $('#status').textContent = error?.code === '42501'
-      ? 'This account has not been granted Civ Lite analytics access.'
+      ? 'This account has not been granted analytics access.'
       : (error.message || 'Could not load analytics.');
   } finally {
     loading = false;
@@ -112,6 +143,7 @@ const today = formatDay(new Date());
 $('#from').value = shiftDay(today, -13);
 $('#through').value = today;
 $('#filters').onsubmit = event => { event.preventDefault(); void load(); };
+$('#game').onchange = () => void load();
 $('#refresh').onclick = () => void load();
 window.addEventListener('storage', event => {
   if (event.key !== 'bored.session') return;

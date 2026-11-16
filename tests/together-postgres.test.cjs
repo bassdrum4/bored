@@ -60,7 +60,7 @@ test('native PostgreSQL: competing moves, queues, crossed requests and leave rac
   )).rows[0].n,2);
   // Same-type and different-type games can coexist. Retired social operations
   // remain unavailable.
-  const duel=await rpc(a,'challenge',{user_id:b,game:'2048'});
+  const duel=await rpc(a,'challenge',{user_id:b,game:'chess'});
   assert.ok(duel.id && duel.id!==active.id);
   const another=await rpc(a,'challenge',{user_id:b});
   assert.notEqual(another.id,active.id);

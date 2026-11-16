@@ -1052,9 +1052,9 @@ async function renderAnalyticsLink() {
   try {
     const access = await getAnalyticsAccess();
     if (epoch !== analyticsLinkEpoch || getSession()?.user?.id !== access.userId) return;
-    if (access.kind !== 'admin' && access.kind !== 'civ-lite') return;
+    if (access.kind !== 'admin' && access.kind !== 'game-reader') return;
     link.href = access.kind === 'admin' ? './analytics.html' : './civ-lite-analytics.html';
-    link.textContent = access.kind === 'admin' ? 'Admin analytics · ' : 'Civ Lite analytics · ';
+    link.textContent = access.kind === 'admin' ? 'Admin analytics · ' : 'Game analytics · ';
     link.hidden = false;
   } catch {
     // No verified permission means no link, including on a failed network call.

@@ -47,22 +47,26 @@ test('game runtime diagnostics retain type and source coordinates without privat
   });
 });
 
-test('scoped Civ Lite analytics readers are omitted only from their game telemetry', async () => {
+test('scoped game analytics readers are omitted only from the games they can read', async () => {
   const { isSuppressedGame, filterGameReaderTelemetry } = await import('../src/hub/analytics-access.js');
+  const games = ['ashcrown','pokedoku','poke-idle','poke-gacha'];
   const rows = [
     { id:'1', game:'ashcrown', _table:'play_events' },
     { id:'2', game:'snake', _table:'play_events' },
     { id:'3', game:'ashcrown', _table:'product_events' },
     { id:'4', game:null, _table:'product_events' },
-    { id:'5', game:'risk', _table:'product_events' }
+    { id:'5', game:'risk', _table:'product_events' },
+    { id:'6', game:'pokedoku', _table:'play_events' }
   ];
-  assert.equal(isSuppressedGame('civ-lite','ashcrown'), true);
-  assert.equal(isSuppressedGame('civ-lite','snake'), false);
-  assert.equal(isSuppressedGame('admin','ashcrown'), false);
-  assert.equal(isSuppressedGame(null,'ashcrown'), false);
-  assert.deepEqual(filterGameReaderTelemetry(rows,'civ-lite').map(row => row.id), ['2','4','5']);
-  assert.deepEqual(filterGameReaderTelemetry(rows,'admin'), []);
-  assert.deepEqual(filterGameReaderTelemetry(rows,null), rows);
+  assert.equal(isSuppressedGame('game-reader','ashcrown',games), true);
+  assert.equal(isSuppressedGame('game-reader','poke-gacha',games), true);
+  assert.equal(isSuppressedGame('game-reader','snake',games), false);
+  assert.equal(isSuppressedGame('admin','ashcrown',games), false);
+  assert.equal(isSuppressedGame(null,'ashcrown',games), false);
+  assert.equal(isSuppressedGame('game-reader',null,games), false);
+  assert.deepEqual(filterGameReaderTelemetry(rows,'game-reader',games).map(row => row.id), ['2','4','5']);
+  assert.deepEqual(filterGameReaderTelemetry(rows,'admin',games), []);
+  assert.deepEqual(filterGameReaderTelemetry(rows,null,games), rows);
 });
 
 test('analytics footer routes only authorized accounts to their dashboard', async t => {
@@ -83,7 +87,7 @@ test('analytics footer routes only authorized accounts to their dashboard', asyn
     const response = url.pathname === '/rest/v1/analytics_admins'
       ? (id === 'eq.admin-id' ? [{user_id:'admin-id'}] : [])
       : url.pathname === '/rest/v1/game_analytics_readers'
-        ? (id === 'eq.penguin-id' ? [{game:'ashcrown'}] : [])
+        ? (id === 'eq.penguin-id' ? [{game:'ashcrown'},{game:'pokedoku'},{game:'poke-idle'},{game:'poke-gacha'}] : [])
         : [];
     return req.respond({status:200,headers,contentType:'application/json',body:JSON.stringify(response)});
   });

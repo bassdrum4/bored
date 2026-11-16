@@ -65,7 +65,6 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
       if(url.pathname==='/rest/v1/analytics_admins'||url.pathname==='/rest/v1/game_analytics_readers') {
         assert.equal(req.method(),'GET','analytics roles are read-only');
         assert.equal(url.searchParams.get('user_id'),'eq.'+identity,'analytics roles are scoped to this account');
-        if(url.pathname==='/rest/v1/game_analytics_readers')assert.equal(url.searchParams.get('game'),'eq.ashcrown');
         return reply([]);
       }
       if(url.pathname==='/rest/v1/profiles')return reply([{handle:handles[ids.indexOf(identity)]}]);

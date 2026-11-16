@@ -7,12 +7,15 @@ const allowedExact = new Set([
   'src/games/content/ashcrown.html', // Civ Lite's actual slug
   'src/games/content/pokedoku.html',
   'src/games/content/poke-idle.html',
+  'src/games/content/poke-gacha.html',
   'src/games/previews/ashcrown.webp',
   'src/games/previews/pokedoku.svg',
   'src/games/previews/poke-idle.svg',
+  'src/games/previews/poke-gacha.svg',
   'tests/ashcrown-browser.test.cjs',
   'tests/pokedoku.test.cjs',
   'tests/poke-idle.test.cjs',
+  'tests/poke-gacha.test.cjs',
 ]);
 const allowedSprite = /^src\/games\/content\/pokedoku\/sprites\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.(?:png|webp|jpg|jpeg|gif)$/;
 
@@ -101,8 +104,9 @@ export async function run() {
       continue;
     }
     // Require the normal browser/logic suite for every auto-merge. Civ Lite
-    // additionally depends on the multiplayer/PostgreSQL suite; Pokédoku and
-    // Poké Idle do not, so an unrelated multiplayer flake must not block them.
+    // additionally depends on the multiplayer/PostgreSQL suite; Pokédoku,
+    // Poké Idle and Poké Gacha do not, so an unrelated multiplayer flake must
+    // not block them.
     const { payload: jobList } = await api(`actions/runs/${ci.id}/jobs?per_page=100`, readToken);
     const jobs = jobList.jobs || [];
     const jobPassed = name => jobs.some(job => job.name === name && job.conclusion === 'success');
