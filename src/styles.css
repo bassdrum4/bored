@@ -200,6 +200,9 @@ section[id]{scroll-margin-top:20px}
 #account{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:10px;min-width:220px;
   font:11.5px/1.6 var(--mono);color:var(--dim)}
 #account-state{flex:1;min-width:190px}
+/* The Poké Gacha buddy. SP is a palette swap until SP skins have their own art. */
+#account-buddy{width:32px;height:32px;object-fit:contain;image-rendering:pixelated;margin-right:-4px}
+#account-buddy.sp{filter:hue-rotate(150deg) saturate(1.3)}
 #account-state b{color:var(--ink);font-weight:600}
 #account button{background:none;border:1px solid var(--rule);color:var(--ink);min-height:38px;
   padding:8px 12px;font:11px var(--mono);cursor:pointer}

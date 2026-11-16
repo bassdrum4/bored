@@ -6,68 +6,216 @@
 <title>Poké Gacha</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box }
-  body { display: grid; place-items: start center; min-height: 100vh; padding: 16px 0; background: #f5f2ea; color: #191713;
-         font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace }
-  main { width: min(340px, 92vw); text-align: center }
-  h1 { font-size: 12px; font-weight: 600; letter-spacing: .08em; margin-bottom: 12px }
-  p { font-size: 12px; color: #6b6558; margin-top: 12px }
-  #stage { height: 160px; border: 1px solid #d8d2c4; background: #fffdf7; display: grid; place-items: center }
-  #stage img { width: 96px; height: 96px; image-rendering: pixelated }
-  #pull { font: inherit; font-size: 12px; border: 1px solid #191713; background: none; color: inherit;
-          padding: 9px 14px; margin-top: 12px; cursor: pointer; touch-action: manipulation }
-  #box { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 12px }
-  #box img { width: 100%; aspect-ratio: 1; border: 1px solid #d8d2c4; background: #fffdf7; image-rendering: pixelated }
+  body { display: grid; place-items: start center; min-height: 100vh; padding: 14px 0 28px; background: #f5f2ea; color: #191713;
+         font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace }
+  main { width: min(360px, 94vw) }
+  #hud { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid #191713; padding-bottom: 6px }
+  #waves { font-size: 11px; color: #6b6558; margin-top: 2px }
+  nav { display: flex; gap: 4px; margin: 10px 0 }
+  button { font: inherit; font-size: 12px; border: 1px solid #191713; background: none; color: inherit; padding: 6px 9px;
+           border-radius: 2px; cursor: pointer; touch-action: manipulation }
+  button:disabled { color: #a49d8d; border-color: #d8d2c4; cursor: default }
+  button.on { background: #191713; color: #f5f2ea }
+  nav button { flex: 1; padding: 6px 4px }
+  h2 { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin: 14px 0 6px }
+  p, li { font-size: 12px }
+  .quiet { color: #6b6558 }
+  .row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center }
+  .col { display: grid; gap: 4px }
+  .col button { text-align: left; display: flex; justify-content: space-between; gap: 8px }
+  .box { border: 1px solid #d8d2c4; background: #fffdf7; padding: 8px; margin-top: 6px }
+  .banner { display: flex; gap: 8px; align-items: center }
+  img.spr { image-rendering: pixelated; object-fit: contain }
+  img.sp { filter: hue-rotate(150deg) saturate(1.3) }
+  .eggs { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px }
+  .egg { border: 1px solid #d8d2c4; padding: 1px 4px; font-size: 11px; background: #fffdf7 }
+  .egg.t1 { border-color: #191713 } .egg.t2, .egg.t3, .egg.t4 { border-color: #b3412e; color: #b3412e }
+  ul { list-style: none; display: grid; gap: 3px }
+  .meter { height: 4px; background: #e6e0d2; margin-top: 2px } .meter i { display: block; height: 100%; background: #191713 }
+  #grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 6px }
+  #grid button { padding: 0; border-color: #d8d2c4; background: #fffdf7 }
+  #grid button.on { border-color: #191713; background: #fffdf7 }
+  #grid img { display: block; width: 100%; height: auto; aspect-ratio: 1 }
+  .detail { display: grid; grid-template-columns: 72px 1fr; gap: 8px; align-items: start }
+  .detail img { width: 72px; height: 72px; border: 1px solid #d8d2c4; background: #fffdf7 }
+  .done { text-decoration: line-through; color: #6b6558 }
+  #note { min-height: 18px; margin-top: 8px; color: #b3412e }
+  #off { margin-top: 12px }
 </style>
 </head>
 <body>
 <main>
-  <h1 id="hud">PULLS 0 · CAUGHT 0</h1>
-  <div id="stage"><span id="last">no pulls yet</span></div>
-  <button id="pull" type="button">Pull</button>
-  <p id="hint">Shell build. Rates, currency and banners come later.</p>
-  <div id="box"></div>
+  <div id="hud">Poké Gacha</div>
+  <div id="waves"></div>
+  <nav id="tabs">
+    <button type="button" data-tab="pull" class="on">Pull</button>
+    <button type="button" data-tab="eggs">Eggs</button>
+    <button type="button" data-tab="dex">Dex</button>
+    <button type="button" data-tab="missions">Missions</button>
+  </nav>
+  <section id="view"></section>
+  <p id="note" role="status"></p>
+  <p id="off" class="quiet" hidden>Open Poké Gacha from the Bored arcade: the wallet, eggs and dex live on your Bored profile.</p>
 </main>
 <script>
-/* Poké Gacha — shell. Placeholder pull loop only; the real game goes here.
-   Hooks that must survive: <title> is the display name, and
-   window.__boredSnapshot() reports the current state. Unscored for now
-   (UNSCORED_GAMES in catalog.js); give it a score rule when it has one. */
+/* Poké Gacha. The engine and the wallet live in the hub (src/hub/gacha.js,
+   src/hub/rewards.js) and this page calls them through parent.__boredGacha,
+   so every pull and hatch lands in the one ledger that syncs to the account.
+   Pulls are cosmetic outside Poké Gacha's own tower defense (coming later). */
 const $ = s => document.querySelector(s);
-// Sprites are shared with Pokédoku. Same base-URL check it uses: standalone
-// the page sits beside the folder, inside the hub it resolves from src/.
 const SPRITE_DIR = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI) ? "pokedoku/sprites/" : "games/content/pokedoku/sprites/";
-const sprite = id => SPRITE_DIR + id + ".png";
-const MAX_ID = 1025;
-const KEY = 'bored.poke-gacha.box';
+const G = (() => { try { return parent !== window && parent.__boredGacha ? parent.__boredGacha : null; } catch { return null; } })();
+const PREF = "bored.poke-gacha.ui";
+const pref = (() => { try { return JSON.parse(localStorage.getItem(PREF) || "null") || {}; } catch { return {}; } })();
+const keep = () => { try { localStorage.setItem(PREF, JSON.stringify(pref)); } catch {} };
+let tab = "pull", machine = pref.machine || "move", picked = 0, look = "normal", lastPull = null, lastHatch = null, S = null;
 
-let pulls = 0, box = [];
-try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) ({ pulls, box } = saved); } catch {}
-function save() { try { localStorage.setItem(KEY, JSON.stringify({ pulls, box })); } catch {} }
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const stars = n => n + "★";
+const name = num => G.dex[num - 1][0];
+const types = num => G.dex[num - 1][1].replace("/", " / ");
+const sprite = (num, shiny, sp, size = 40) =>
+  `<img class="spr${sp ? " sp" : ""}" src="${SPRITE_DIR}${shiny ? "shiny/" : ""}${num}.png" alt="${esc(name(num))}" width="${size}" height="${size}">`;
+const note = text => { $("#note").textContent = text || ""; };
+const REASONS = { vouchers: "Not enough vouchers.", full: "Egg storage is full (99). Hatch some first.", inactive: "Your wallet is not open yet.",
+  candy: "Not enough candy.", shards: "Not enough shards.", owned: "Already done.", order: "Cut the cost by 1 first.", locked: "That look is not unlocked.",
+  "not-owned": "You do not have that one yet." };
+const said = result => { if (!result.ok) note(REASONS[result.reason] || "Not now."); return result.ok; };
 
-function img(id) {
-  const el = document.createElement('img');
-  el.src = sprite(id); el.alt = '#' + id; el.title = '#' + String(id).padStart(3, '0');
-  return el;
+function hud() {
+  const b = S.balance;
+  const ready = S.eggs.filter(e => e.ready).length;
+  $("#hud").textContent = `Coins ${b.coins} · Shards ${b.shards} · Eggs ${S.eggs.length}/${G.maxEggs} · Dex ${S.owned.length}`;
+  $("#waves").textContent = `Vouchers: ${b.regular} Regular, ${b.plus} Plus, ${b.premium} Premium, ${b.gold} Gold` + (ready ? ` · ${ready} eggs ready` : "");
+  for (const button of document.querySelectorAll("#tabs button")) {
+    button.classList.toggle("on", button.dataset.tab === tab);
+    if (button.dataset.tab === "eggs") button.textContent = "Eggs" + (ready ? " (" + ready + ")" : "");
+  }
 }
+
+function eggRow(eggs) {
+  return `<div class="eggs">${eggs.map(e => `<span class="egg t${e.tier}">${e.tier === 4 ? "Banner" : stars(G.stars[e.tier])}</span>`).join("")}</div>`;
+}
+
+function pullView() {
+  const b = S.balance, p = S.pity;
+  const until = (limit, n) => Math.max(1, limit - n);
+  const machines = Object.entries(G.machines).map(([id, label]) =>
+    `<button type="button" data-machine="${id}" class="${machine === id ? "on" : ""}">${label}</button>`).join("");
+  const about = { move: "Rare skills twice as often.", legend: "Adds today's banner legendary. Eggs count double toward Legendary pity.",
+    shiny: "Shiny 1 in 64 instead of 1 in 128. The only machine that rolls SP skins (1 in 200)." }[machine];
+  const voucher = (id, label, have, need = 1, count = 1) =>
+    `<button type="button" data-voucher="${id}" data-count="${count}" ${have >= need ? "" : "disabled"}><span>${label}</span><span>${have}</span></button>`;
+  return `<h2>Machine</h2><div class="row">${machines}</div>
+    <p class="quiet" style="margin-top:4px">${about}</p>
+    ${machine === "legend" ? `<div class="box banner">${sprite(S.banner, false, false, 48)}<p>Today's banner: <b>${esc(name(S.banner))}</b><br><span class="quiet">1 in 256 per egg, on top of the usual Legendary.</span></p></div>` : ""}
+    <h2>Vouchers</h2><div class="col">
+      ${voucher("regular", "Regular: 1 egg", b.regular)}
+      ${voucher("regular", "10 Regular: 10 eggs, 1 Rare or better", b.regular, G.batch, G.batch)}
+      ${voucher("plus", "Plus: 5 eggs", b.plus)}
+      ${voucher("premium", "Premium: 10 eggs, 1 Rare or better", b.premium)}
+      ${voucher("gold", "Gold: 25 eggs, 1 Epic or better", b.gold)}
+      <button type="button" id="buy" ${b.coins >= 100 ? "" : "disabled"}><span>Buy 1 Regular for 100 coins</span><span>${b.coins}</span></button>
+    </div>
+    <p class="quiet" style="margin-top:6px">Pity: a Rare within ${until(9, p.rare)} eggs, an Epic within ${until(59, p.epic)}, a Legendary within ${until(412, p.legendary)}.</p>
+    ${lastPull ? `<h2>Last pull</h2>${eggRow(lastPull)}<p class="quiet">Eggs hatch on waves you earn in Poké Idle, Pokédoku and Poké Gacha.</p>` : ""}`;
+}
+
+function eggsView() {
+  const ready = S.eggs.filter(e => e.ready).length;
+  const tiers = [0, 1, 2, 3, 4].map(t => S.eggs.filter(e => e.tier === t)).filter(list => list.length);
+  const rows = tiers.map(list => {
+    const e = list[0], label = e.tier === 4 ? "Banner " + name(e.banner) : G.tiers[e.tier] + " " + stars(G.stars[e.tier]);
+    const done = list.filter(x => x.ready).length;
+    return `<li>${esc(label)} ×${list.length} <span class="quiet">${done ? done + " ready" : e.progress + " of " + e.need + " waves"}</span>
+      <div class="meter"><i style="width:${100 * e.progress / e.need}%"></i></div></li>`;
+  }).join("");
+  const hatched = lastHatch ? `<h2>Hatched</h2><ul>${lastHatch.map(h => `<li class="row">${sprite(h.species, h.shiny, h.sp, 32)}
+      <span>${esc(name(h.species))} ${stars(G.stars[h.tier])}${h.fresh ? " · new" : " · dupe, +" + h.shards + " shards"}${h.shiny ? " · shiny" : ""}${h.sp ? " · SP" : ""}
+      <br><span class="quiet">+${h.candy} candy · ${esc(G.skillsOf(h.species)[h.skill])}${h.skill === 3 ? " (rare)" : ""}</span></span></li>`).join("")}</ul>` : "";
+  return `<h2>Waiting</h2>${rows ? `<ul>${rows}</ul>` : `<p class="quiet">No eggs. Pull some.</p>`}
+    <p class="quiet" style="margin-top:6px">All eggs count down together. Nothing hatches from waiting: waves come from catching in Poké Idle, finishing Pokédoku boards and, later, tower defense waves.</p>
+    <div class="row" style="margin-top:8px"><button type="button" id="hatch" ${ready ? "" : "disabled"}>Hatch ${ready || ""}</button></div>${hatched}`;
+}
+
+function dexView() {
+  if (!S.owned.length) return `<p class="quiet" style="margin-top:8px">Your dex is empty. Hatch an egg.</p>`;
+  if (!S.owned.includes(picked)) picked = S.owned[0];
+  const grid = S.owned.map(num => {
+    return `<button type="button" data-pick="${num}" class="${num === picked ? "on" : ""}" title="${esc(name(num))}">${sprite(num, false, false)}</button>`; }).join("");
+  const num = picked, lineNum = G.lineOf(num), l = S.lines[lineNum], star = G.dex[lineNum - 1][9];
+  const looks = ["normal"].concat(l.shiny ? ["shiny"] : [], l.sp ? ["sp"] : []);
+  if (!looks.includes(look)) look = "normal";
+  const skills = G.skillsOf(num).map((skill, i) => `<li class="${l.skills[i] ? "" : "quiet"}">${l.skills[i] ? "" : "locked · "}${esc(skill)}${i === 3 ? " (rare)" : ""}</li>`).join("");
+  const evos = G.evolutionsOf(num).map(to => { const cost = G.costs.evolve[Math.min(G.stageOf(num), 2) - 1];
+    return S.owned.includes(to) ? `<span class="quiet">${esc(name(to))} owned</span>`
+      : `<button type="button" data-evolve="${to}" ${l.candy >= cost ? "" : "disabled"}>Evolve: ${esc(name(to))} · ${cost} candy</button>`; }).join("");
+  const isBuddy = S.buddy && S.buddy.species === num && S.buddy.shiny === (look === "shiny") && S.buddy.sp === (look === "sp");
+  return `<div id="grid">${grid}</div>
+    <div class="box"><div class="detail">${sprite(num, look === "shiny", look === "sp", 72)}<div>
+      <b>${esc(name(num))}</b> <span class="quiet">#${num}</span><br>${esc(types(num))} · ${stars(star)} line · stage ${G.stageOf(num)}<br>
+      ${l.candy} candy · hatched ${l.hatches}×</div></div>
+      <div class="row" style="margin-top:6px">${looks.map(k => `<button type="button" data-look="${k}" class="${look === k ? "on" : ""}">${{ normal: "Normal", shiny: "Shiny", sp: "SP" }[k]}</button>`).join("")}
+        <button type="button" id="buddy" ${isBuddy ? "disabled" : ""}>${isBuddy ? "Your buddy" : "Make buddy"}</button></div>
+      <h2>Skills</h2><ul>${skills}</ul>
+      ${evos ? `<h2>Evolve</h2><div class="row">${evos}</div>` : ""}
+      <h2>Upgrades</h2><div class="col">
+        <button type="button" data-up="passive" ${l.passive || l.candy < G.costs.passive ? "disabled" : ""}><span>${l.passive ? "Passive unlocked" : "Unlock passive"}</span><span>${l.passive ? "" : G.costs.passive + " candy"}</span></button>
+        <button type="button" data-up="cost1" ${l.cost >= 1 || l.candy < G.costs.cost1 ? "disabled" : ""}><span>Deploy cost −1${l.cost >= 1 ? " (done)" : ""}</span><span>${l.cost >= 1 ? "" : G.costs.cost1 + " candy"}</span></button>
+        <button type="button" data-up="cost2" ${l.cost !== 1 || l.candy < G.costs.cost2 ? "disabled" : ""}><span>Deploy cost −2${l.cost >= 2 ? " (done)" : ""}</span><span>${l.cost >= 2 ? "" : G.costs.cost2 + " candy"}</span></button>
+        <button type="button" id="sp" ${l.sp || S.balance.shards < G.costs.sp ? "disabled" : ""}><span>${l.sp ? "SP skin owned" : "SP skin"}</span><span>${l.sp ? "" : G.costs.sp + " shards"}</span></button>
+      </div>
+      <p class="quiet" style="margin-top:6px">Upgrades and skills are for tower defense. Shiny and SP are looks only.</p>
+    </div>`;
+}
+
+function missionsView() {
+  const trophies = G.trophies();
+  return `<h2>Daily</h2><ul><li class="${S.login ? "done" : ""}">Log in: 3 Regular</li></ul>
+    <h2>Starter missions · 2 Regular each</h2><ul>${G.missions.map(m => `<li class="${S.missions[m.id] ? "done" : ""}">${esc(m.label)}</li>`).join("")}</ul>
+    <h2>Trophies · ${trophies.length}</h2>${trophies.length ? `<ul>${trophies.map(t => `<li>${esc(t.name)} <span class="quiet">${t.tier}</span></li>`).join("")}</ul>`
+      : `<p class="quiet">From Poké Idle and Pokédoku: catch, collect badges, climb the tower, finish dailies.</p>`}`;
+}
+
 function render() {
-  $('#hud').textContent = 'PULLS ' + pulls + ' · CAUGHT ' + box.length;
-  $('#box').replaceChildren(...box.slice().sort((a, b) => a - b).map(img));
+  S = G.state();
+  hud();
+  $("#view").innerHTML = { pull: pullView, eggs: eggsView, dex: dexView, missions: missionsView }[tab]();
 }
-function pull() {
-  const id = 1 + Math.floor(Math.random() * MAX_ID);
-  pulls++;
-  const fresh = !box.includes(id);
-  if (fresh) box.push(id);
-  const shown = img(id);
-  shown.onerror = () => { $('#stage').textContent = '#' + id + ' (sprite missing)'; };
-  $('#stage').replaceChildren(shown);
-  $('#hint').textContent = '#' + String(id).padStart(3, '0') + (fresh ? ' — new' : ' — dupe');
-  save(); render();
-}
-$('#pull').onclick = pull;
-render();
 
-window.__boredSnapshot = () => ({ slug: 'poke-gacha', caught: box.length, pulls, finished: false });
+$("#tabs").onclick = e => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.tab; note(""); render(); };
+$("#view").onclick = e => {
+  const b = e.target.closest("button");
+  if (!b || b.disabled) return;
+  note("");
+  const d = b.dataset;
+  if (d.machine) { machine = pref.machine = d.machine; keep(); }
+  else if (d.voucher) { const r = G.pull({ voucher: d.voucher, count: Number(d.count), machine }); if (said(r)) lastPull = r.eggs; }
+  else if (b.id === "buy") said(G.buyRegular({ count: 1 }));
+  else if (b.id === "hatch") { const r = G.hatch(); if (said(r)) lastHatch = r.hatched; }
+  else if (d.pick) { picked = Number(d.pick); look = "normal"; }
+  else if (d.look) look = d.look;
+  else if (b.id === "buddy") { if (said(G.setBuddy({ species: picked, shiny: look === "shiny", sp: look === "sp" }))) note("Buddy set. It shows next to your name on Bored."); }
+  else if (d.evolve) { const to = Number(d.evolve); if (said(G.evolve({ from: picked, to }))) picked = to; }
+  else if (d.up) said(G.upgrade({ line: G.lineOf(picked), kind: d.up }));
+  else if (b.id === "sp") said(G.buySp({ line: G.lineOf(picked) }));
+  render();
+};
+
+if (!G) {
+  $("#tabs").hidden = true; $("#off").hidden = false;
+} else {
+  if (G.claimLogin().ok) note("Daily login: +3 Regular.");
+  render();
+  // Waves earned in another game, or a sync from another device, show up here.
+  setInterval(() => { if (!document.hidden) { const was = JSON.stringify(S); const now = G.state(); if (JSON.stringify(now) !== was) render(); } }, 3000);
+}
+
+// The hub reads this. Unscored for now; the planned score is unique species caught.
+window.__boredSnapshot = () => {
+  try { const s = S || (G && G.state()); return { slug: "poke-gacha", caught: s ? s.owned.length : 0, pulls: s ? s.pulls : 0, finished: false }; }
+  catch { return { slug: "poke-gacha", caught: 0, pulls: 0, finished: false }; }
+};
 </script>
 </body>
 </html>
