@@ -16,7 +16,7 @@ import {
   syncScores, onScoresPosted, boardLeaders
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
-import { readWallet, mergeStoredWallet, observeStoredSnapshot } from './hub/rewards.js';
+import { readWallet, mergeStoredWallet, observeStoredSnapshot, activateStoredWallet } from './hub/rewards.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
@@ -266,6 +266,11 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   // outcomes in Supabase. A second host session would double-count every
   // Bored-launched flight, so defer to the native game for this slug.
   if (slug !== 'f-14') analytics.start(slug, { source: multiplayer ? 'together' : launchSource, daily: !!challenge, external: !!external, embedded: isEmbedded(), device: matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop' });
+  // The first time a player opens Poké Gacha, the wallet starts earning and
+  // pays the capped backpay for what they had already done.
+  if (slug === 'poke-gacha' && !multiplayer) {
+    try { if (activateStoredWallet()) requestCloudPush(); } catch {}
+  }
   recentGames = [slug, ...recentGames.filter(id => id !== slug)].slice(0, 4);
   saveLibrary();
   renderRecent();
