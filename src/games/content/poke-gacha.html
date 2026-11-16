@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Poké Gacha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box }
   body { display: grid; place-items: start center; min-height: 100vh; padding: 14px 0 28px; background: #f5f2ea; color: #191713;
@@ -41,6 +43,33 @@
   .done { text-decoration: line-through; color: #6b6558 }
   #note { min-height: 18px; margin-top: 8px; color: #b3412e }
   #off { margin-top: 12px }
+
+  /* The pull screen: a 320×180 pixel scene, scaled to the frame. The art is a
+     canvas drawn here in code; the words sit on top as text so they stay sharp. */
+  #pullwrap { width: min(640px, 96vw); position: relative; left: 50%; transform: translateX(-50%); margin-top: 2px; overflow: hidden;
+              outline: none; touch-action: manipulation; user-select: none }
+  #stage { position: absolute; left: 0; top: 0; width: 320px; height: 180px; transform-origin: 0 0;
+           font-family: "Pixelify Sans", ui-monospace, SFMono-Regular, Menlo, monospace; color: #f4f1ff }
+  #scene { position: absolute; inset: 0; width: 320px; height: 180px; image-rendering: pixelated }
+  .win { position: absolute; background: #2c2a44; border: 2px solid #c8372f; box-shadow: 0 0 0 1px #5a1712, inset 0 0 0 1px #5a1712 }
+  .win canvas { image-rendering: pixelated }
+  #counts { position: absolute; right: 2px; top: 2px; display: flex; gap: 2px }
+  #counts .win { position: static; width: 54px; height: 17px; display: flex; align-items: center; justify-content: space-between; padding: 0 3px 0 4px;
+                 font-size: 11px; line-height: 1 }
+  #plate { position: absolute; display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600;
+           color: #2c2a44; line-height: 1; pointer-events: none }
+  #plate img { width: 22px; height: 22px; image-rendering: pixelated }
+  #clock { position: absolute; font-size: 8px; color: #2c2a44; background: #f2f0ea; border: 1px solid #8d8a80; border-radius: 3px;
+           padding: 1px 3px; line-height: 1.1; pointer-events: none }
+  #menu { right: 3px; top: 50px; width: 104px; padding: 4px 2px 3px 4px }
+  #menu div { display: flex; align-items: center; gap: 4px; height: 12px; font-size: 9px; line-height: 1; cursor: pointer; padding-left: 8px; position: relative; white-space: nowrap }
+  #menu div.off { color: #807c9a }
+  #menu div.at::before { content: ""; position: absolute; left: 1px; top: 2px; border: 4px solid transparent; border-left: 5px solid #f4f1ff; border-right: 0 }
+  #menu .times { width: 18px }
+  #menu[hidden] { display: none }
+  #msg { left: 3px; right: 3px; bottom: 3px; height: 30px; padding: 4px 6px; font-size: 9px; line-height: 1.25; display: flex; gap: 6px; align-items: flex-start }
+  #msg .eggs { display: flex; flex-wrap: wrap; gap: 1px; margin: 2px 0 0; max-height: 11px; overflow: hidden }
+  .hit { position: absolute; cursor: pointer }
 </style>
 </head>
 <body>
@@ -53,6 +82,19 @@
     <button type="button" data-tab="dex">Dex</button>
     <button type="button" data-tab="missions">Missions</button>
   </nav>
+  <div id="pullwrap" tabindex="0" aria-label="Egg machines. Left and right switch machines, up and down pick a voucher, Enter pulls." hidden>
+    <div id="stage">
+      <canvas id="scene" width="320" height="180"></canvas>
+      <div id="counts"></div>
+      <div id="plate"></div>
+      <div id="clock" hidden></div>
+      <div class="hit" id="hit-left" style="left:0;top:40px;width:40px;height:100px" title="Previous machine"></div>
+      <div class="hit" id="hit-machine" style="left:110px;top:40px;width:100px;height:100px" title="Open the voucher menu"></div>
+      <div class="hit" id="hit-right" style="left:212px;top:150px;width:0;height:0"></div>
+      <div class="win" id="menu" role="listbox"></div>
+      <div class="win" id="msg" role="status"></div>
+    </div>
+  </div>
   <section id="view"></section>
   <p id="note" role="status"></p>
   <p id="off" class="quiet" hidden>Open Poké Gacha from the Bored arcade: the wallet, eggs and dex live on your Bored profile.</p>
@@ -95,30 +137,6 @@ function hud() {
 
 function eggRow(eggs) {
   return `<div class="eggs">${eggs.map(e => `<span class="egg t${e.tier}">${e.tier === 4 ? "Banner" : stars(G.stars[e.tier])}</span>`).join("")}</div>`;
-}
-
-function pullView() {
-  const b = S.balance, p = S.pity;
-  const until = (limit, n) => Math.max(1, limit - n);
-  const machines = Object.entries(G.machines).map(([id, label]) =>
-    `<button type="button" data-machine="${id}" class="${machine === id ? "on" : ""}">${label}</button>`).join("");
-  const about = { move: "Rare skills twice as often.", legend: "Adds today's banner legendary. Eggs count double toward Legendary pity.",
-    shiny: "Shiny 1 in 64 instead of 1 in 128. The only machine that rolls SP skins (1 in 200)." }[machine];
-  const voucher = (id, label, have, need = 1, count = 1) =>
-    `<button type="button" data-voucher="${id}" data-count="${count}" ${have >= need ? "" : "disabled"}><span>${label}</span><span>${have}</span></button>`;
-  return `<h2>Machine</h2><div class="row">${machines}</div>
-    <p class="quiet" style="margin-top:4px">${about}</p>
-    ${machine === "legend" ? `<div class="box banner">${sprite(S.banner, false, false, 48)}<p>Today's banner: <b>${esc(name(S.banner))}</b><br><span class="quiet">1 in 256 per egg, on top of the usual Legendary.</span></p></div>` : ""}
-    <h2>Vouchers</h2><div class="col">
-      ${voucher("regular", "Regular: 1 egg", b.regular)}
-      ${voucher("regular", "10 Regular: 10 eggs, 1 Rare or better", b.regular, G.batch, G.batch)}
-      ${voucher("plus", "Plus: 5 eggs", b.plus)}
-      ${voucher("premium", "Premium: 10 eggs, 1 Rare or better", b.premium)}
-      ${voucher("gold", "Gold: 25 eggs, 1 Epic or better", b.gold)}
-      <button type="button" id="buy" ${b.coins >= 100 ? "" : "disabled"}><span>Buy 1 Regular for 100 coins</span><span>${b.coins}</span></button>
-    </div>
-    <p class="quiet" style="margin-top:6px">Pity: a Rare within ${until(9, p.rare)} eggs, an Epic within ${until(59, p.epic)}, a Legendary within ${until(412, p.legendary)}.</p>
-    ${lastPull ? `<h2>Last pull</h2>${eggRow(lastPull)}<p class="quiet">Eggs hatch on waves you earn in Poké Idle, Pokédoku and Poké Gacha.</p>` : ""}`;
 }
 
 function eggsView() {
@@ -177,22 +195,318 @@ function missionsView() {
       : `<p class="quiet">From Poké Idle and Pokédoku: catch, collect badges, climb the tower, finish dailies.</p>`}`;
 }
 
+/* ── The pull screen ──────────────────────────────────────────────────────
+   One machine in the middle, its neighbours at the edges. Left and right
+   switch machines, up and down move the cursor, Enter pulls. All art is drawn
+   here from rectangles; nothing is loaded but the Pokémon sprites. */
+const ORDER_M = ["move", "legend", "shiny"];
+const LOOK = {
+  move: { body: "#3f9e8a", dark: "#256656", light: "#77c9b2", label: "Move UP!", about: "Move UP: rare skills roll twice as often." },
+  legend: { body: "#d6463c", dark: "#8f2621", light: "#f0857a", label: "UP!", about: "Legendary UP: today's banner legendary, 1 in 256. Eggs count double toward Legendary pity." },
+  shiny: { body: "#e3ad2b", dark: "#a07514", light: "#f6d77a", label: "Shiny UP!", about: "Shiny UP: shiny 1 in 64, and the only machine with SP skins (1 in 200)." }
+};
+const TICKET = { regular: ["#e4587a", "#fbe7ee"], plus: ["#3a5bb5", "#a8c4ff"], premium: ["#8f4fd0", "#e0c6ff"], gold: ["#eebd2c", "#fff1b8"] };
+const EGG_LOOK = [["#e6ecd8", "#7fb36a"], ["#9fd0f0", "#3d7fc0"], ["#f3d36a", "#c0852a"], ["#f08cb4", "#a8326a"], ["#d6463c", "#f6d77a"]];
+const OPTIONS = [
+  { voucher: "regular", count: 1, times: "x1", label: "1 Pull", about: "1 Regular: 1 egg." },
+  { voucher: "regular", count: 10, times: "x10", label: "10 Pulls", about: "10 Regular: 10 eggs, 1 Rare or better." },
+  { voucher: "plus", count: 1, times: "x1", label: "5 Pulls", about: "1 Plus: 5 eggs." },
+  { voucher: "premium", count: 1, times: "x1", label: "10 Pulls", about: "1 Premium: 10 eggs, 1 Rare or better." },
+  { voucher: "gold", count: 1, times: "x1", label: "25 Pulls", about: "1 Gold: 25 eggs, 1 Epic or better." },
+  { buy: true, times: "100", label: "Buy 1", about: "Buy 1 Regular voucher for 100 coins." },
+  { cancel: true, times: "", label: "Cancel", about: "" }
+];
+let cursor = 0, menuOpen = true, slide = 0, slideFrom = 0, crank = 0, message = null;
+
+function pixelCanvas(w, h, draw) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h; c.style.width = w + "px"; c.style.height = h + "px";
+  draw(c.getContext("2d"));
+  return c;
+}
+function ellipse(g, cx, cy, rx, ry, color) {
+  g.fillStyle = color;
+  for (let y = -ry; y <= ry; y++) {
+    const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry))));
+    g.fillRect(cx - half, cy + y, half * 2 + 1, 1);
+  }
+}
+function box(g, x, y, w, h, color, cut = 2) {
+  g.fillStyle = color;
+  g.fillRect(x + cut, y, w - cut * 2, h);
+  g.fillRect(x, y + cut, w, h - cut * 2);
+  if (cut > 1) { g.fillRect(x + 1, y + 1, w - 2, h - 2); }
+}
+function ticket(kind) {
+  const [base, stripe] = TICKET[kind] || ["#f0c230", "#fff1b8"];
+  return pixelCanvas(16, 9, g => {
+    g.fillStyle = "#1c1b2c"; g.fillRect(1, 0, 14, 9); g.fillRect(0, 1, 16, 7);
+    g.fillStyle = base; g.fillRect(1, 1, 14, 7);
+    g.fillStyle = stripe; g.fillRect(4, 1, 2, 7); g.fillRect(8, 3, 5, 1); g.fillRect(8, 5, 4, 1);
+    g.fillStyle = "#1c1b2c"; g.fillRect(6, 1, 1, 7);
+  });
+}
+function coin() {
+  return pixelCanvas(16, 9, g => { ellipse(g, 7, 4, 4, 4, "#7a5410"); ellipse(g, 7, 4, 3, 3, "#eebd2c"); g.fillStyle = "#fff1b8"; g.fillRect(6, 2, 1, 4); });
+}
+function eggIcon(tier) {
+  const [shell, spot] = EGG_LOOK[tier];
+  return pixelCanvas(8, 10, g => {
+    ellipse(g, 3, 5, 3, 4, "#1c1b2c"); ellipse(g, 3, 5, 2, 3, shell);
+    g.fillStyle = spot; g.fillRect(2, 3, 2, 1); g.fillRect(4, 6, 1, 2); g.fillRect(1, 6, 1, 1);
+  });
+}
+
+// A fixed handful of eggs in each dome, so a machine always looks the same.
+function domeEggs(seed) {
+  let s = seed;
+  const rand = () => (s = (s * 1103515245 + 12345) >>> 0) / 4294967296;
+  const colors = ["#79c6a8", "#8fd3e8", "#9b8fe0", "#5aa0d6", "#e08fb0", "#6fbf6f", "#7fd0c0"];
+  const eggs = [];
+  for (let row = 0; row < 4; row++) for (let i = 0; i < 6; i++)
+    eggs.push({ x: 8 + i * 18 + (row % 2) * 9 + Math.floor(rand() * 4), y: 18 + row * 12 + Math.floor(rand() * 3), c: colors[Math.floor(rand() * colors.length)], r: 8 + Math.floor(rand() * 3) });
+  return eggs;
+}
+const DOMES = { move: domeEggs(3), legend: domeEggs(11), shiny: domeEggs(29) };
+
+function drawMachine(g, cx, id, front) {
+  const L = LOOK[id], x = cx - 56;
+  const ink = "#1c1b2c";
+  // Cap and rim.
+  box(g, x + 4, 22, 104, 16, ink); box(g, x + 5, 23, 102, 14, L.body);
+  g.fillStyle = L.light; g.fillRect(x + 7, 24, 98, 3);
+  g.fillStyle = L.dark; g.fillRect(x + 6, 33, 100, 3);
+  box(g, x - 1, 37, 114, 9, ink); box(g, x, 38, 112, 7, "#e2e0dc"); g.fillStyle = "#aaa79f"; g.fillRect(x + 1, 43, 110, 1);
+  // Dome of eggs behind glass.
+  g.fillStyle = ink; g.fillRect(x + 5, 45, 102, 58);
+  g.save(); g.beginPath(); g.rect(x + 6, 45, 100, 57); g.clip();
+  g.fillStyle = "#c9ecf2"; g.fillRect(x + 6, 45, 100, 57);
+  for (const egg of DOMES[id]) {
+    ellipse(g, x + egg.x, 45 + egg.y, egg.r, egg.r + 2, "#2e4a52");
+    ellipse(g, x + egg.x, 45 + egg.y, egg.r - 1, egg.r + 1, egg.c);
+    g.fillStyle = "rgba(255,255,255,.35)"; g.fillRect(x + egg.x - 3, 45 + egg.y - egg.r + 1, 2, 3);
+    g.fillStyle = "rgba(0,0,0,.18)"; g.fillRect(x + egg.x + 1, 45 + egg.y + 1, 3, 2);
+  }
+  g.fillStyle = "rgba(255,255,255,.4)"; g.fillRect(x + 12, 47, 3, 50); g.fillRect(x + 17, 47, 1, 50);
+  g.restore();
+  // Name plate in front of the dome.
+  box(g, x + 16, 70, 80, 26, ink, 4); box(g, x + 17, 71, 78, 24, "#f2f0ea", 3);
+  g.fillStyle = "#c7c3b8"; g.fillRect(x + 18, 92, 76, 2);
+  // Lower rim and body.
+  box(g, x - 1, 101, 114, 9, ink); box(g, x, 102, 112, 7, "#e2e0dc"); g.fillStyle = "#aaa79f"; g.fillRect(x + 1, 107, 110, 1);
+  g.fillStyle = ink; g.fillRect(x + 4, 110, 104, 70);
+  g.fillStyle = L.body; g.fillRect(x + 5, 110, 102, 70);
+  g.fillStyle = L.dark; g.fillRect(x + 5, 110, 102, 3); g.fillRect(x + 5, 110, 4, 70);
+  g.fillStyle = L.light; g.fillRect(x + 101, 113, 3, 60);
+  // Chute, where the egg comes out.
+  box(g, x + 13, 118, 30, 26, ink, 5); box(g, x + 15, 120, 26, 22, "#3b3a45", 4); g.fillStyle = "#56555f"; g.fillRect(x + 19, 122, 10, 3);
+  // Coin slot.
+  g.fillStyle = ink; g.fillRect(x + 50, 122, 26, 4); g.fillStyle = L.dark; g.fillRect(x + 51, 126, 24, 1);
+  // Crank: a white wheel with a grip that turns after a pull.
+  ellipse(g, x + 93, 120, 11, 11, ink); ellipse(g, x + 93, 120, 10, 10, "#f2f0ea"); ellipse(g, x + 93, 120, 6, 6, "#c7c3b8"); ellipse(g, x + 93, 120, 5, 5, "#f2f0ea");
+  if (front) {
+    const a = crank * Math.PI;
+    g.fillStyle = ink;
+    for (const off of [0, Math.PI]) g.fillRect(Math.round(x + 93 + Math.cos(a + off) * 7) - 1, Math.round(120 + Math.sin(a + off) * 7) - 1, 3, 3);
+    g.fillRect(x + 92, 119, 3, 3);
+  }
+}
+
+function drawScene() {
+  const g = $("#scene").getContext("2d");
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = "#d9efc4"; g.fillRect(0, 0, 320, 180);
+  g.fillStyle = "#eef8e4"; for (let y = 2; y < 180; y += 6) g.fillRect(0, y, 320, 3);
+  g.fillStyle = "#b7e0f0"; g.fillRect(0, 0, 320, 3);
+  const at = ORDER_M.indexOf(machine), cx = 148 + slide;
+  const prev = ORDER_M[(at + 2) % 3], next = ORDER_M[(at + 1) % 3];
+  drawMachine(g, cx - 180, prev, false);
+  drawMachine(g, cx + 180, next, false);
+  drawMachine(g, cx, machine, true);
+  // Arrows to the neighbours.
+  g.fillStyle = "#1c1b2c";
+  for (let i = 0; i < 6; i++) { g.fillRect(30 + i, 72 - i, 1, i * 2 + 1); g.fillRect(250 - i, 32 - i, 1, i * 2 + 1); }
+  // The plate's words follow the machine as it slides.
+  const plate = $("#plate");
+  plate.style.left = (cx - 56 + 17) + "px"; plate.style.top = "71px"; plate.style.width = "78px"; plate.style.height = "21px";
+  const clock = $("#clock");
+  clock.style.left = (cx - 56 + 52) + "px"; clock.style.top = "133px";
+}
+
+function placeStage() {
+  const wrap = $("#pullwrap"), stage = $("#stage");
+  const k = wrap.clientWidth / 320;
+  stage.style.transform = "scale(" + k + ")";
+  wrap.style.height = Math.round(180 * k) + "px";
+}
+
+function untilMidnight() {
+  // The banner changes at midnight in Detroit, with the daily seed.
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Detroit", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    .formatToParts(new Date()).map(p => [p.type, Number(p.value)]));
+  const left = Math.max(0, 86400 - ((parts.hour % 24) * 3600 + parts.minute * 60 + parts.second));
+  const two = n => String(n).padStart(2, "0");
+  return two(Math.floor(left / 3600)) + ":" + two(Math.floor(left / 60) % 60) + ":" + two(left % 60);
+}
+
+function haveFor(option) {
+  if (option.buy) return S.balance.coins >= 100;
+  if (option.cancel) return true;
+  return (S.balance[option.voucher] || 0) >= (option.voucher === "regular" ? option.count : 1);
+}
+
+function updateScene() {
+  if (!S) return;
+  const b = S.balance;
+  $("#counts").replaceChildren(...["gold", "premium", "plus", "regular"].map(kind => {
+    const win = document.createElement("div");
+    win.className = "win";
+    const n = document.createElement("span");
+    n.textContent = b[kind];
+    win.append(n, ticket(kind));
+    win.title = kind[0].toUpperCase() + kind.slice(1) + " vouchers";
+    return win;
+  }));
+  const plate = $("#plate");
+  if (machine === "legend") {
+    const img = new Image(22, 22);
+    img.src = SPRITE_DIR + S.banner + ".png"; img.alt = name(S.banner);
+    const span = document.createElement("span"); span.textContent = LOOK.legend.label;
+    plate.replaceChildren(img, span);
+    $("#clock").hidden = false; $("#clock").textContent = untilMidnight();
+    $("#clock").title = "Until the banner changes";
+  } else {
+    plate.textContent = LOOK[machine].label;
+    $("#clock").hidden = true;
+  }
+  const menu = $("#menu");
+  menu.hidden = !menuOpen;
+  menu.replaceChildren(...OPTIONS.map((option, i) => {
+    const row = document.createElement("div");
+    row.setAttribute("role", "option");
+    row.dataset.option = i;
+    row.className = (i === cursor ? "at " : "") + (haveFor(option) ? "" : "off");
+    row.setAttribute("aria-selected", i === cursor);
+    if (!option.cancel) row.append(option.buy ? coin() : ticket(option.voucher));
+    const times = document.createElement("span"); times.className = "times"; times.textContent = option.times;
+    const label = document.createElement("span"); label.textContent = option.label;
+    if (!option.cancel) row.append(times);
+    row.append(label);
+    return row;
+  }));
+  const msg = $("#msg");
+  if (message && message.eggs) {
+    const eggs = document.createElement("div"); eggs.className = "eggs";
+    eggs.append(...message.eggs.map(e => eggIcon(e.tier)));
+    const text = document.createElement("span"); text.textContent = message.text;
+    const col = document.createElement("div"); col.append(text, eggs);
+    msg.replaceChildren(col);
+  } else {
+    const option = OPTIONS[cursor];
+    msg.textContent = message ? message.text
+      : !menuOpen ? "Select a machine." : (option.cancel ? LOOK[machine].about : option.about + (haveFor(option) ? "" : " You don't have enough."));
+  }
+  drawScene();
+}
+
+function tierSummary(eggs) {
+  const names = ["Common", "Rare", "Epic", "Legendary", "banner"];
+  const counts = [0, 0, 0, 0, 0];
+  for (const e of eggs) counts[e.tier]++;
+  return counts.map((n, t) => n ? n + " " + names[t] : "").filter(Boolean).reverse().join(", ");
+}
+
+function switchMachine(step) {
+  const at = ORDER_M.indexOf(machine);
+  machine = pref.machine = ORDER_M[(at + step + 3) % 3];
+  keep();
+  message = null;
+  slideFrom = step * 60; slide = slideFrom;
+  const start = performance.now();
+  const tick = now => {
+    const t = Math.min(1, (now - start) / 160);
+    slide = Math.round(slideFrom * (1 - t));
+    drawScene();
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  updateScene();
+}
+
+function turnCrank() {
+  const start = performance.now();
+  const tick = now => {
+    const t = Math.min(1, (now - start) / 420);
+    crank = t * 2;
+    drawScene();
+    if (t < 1) requestAnimationFrame(tick); else crank = 0;
+  };
+  requestAnimationFrame(tick);
+}
+
+function choose(i) {
+  const option = OPTIONS[i];
+  cursor = i;
+  if (option.cancel) { menuOpen = false; message = null; return updateScene(); }
+  if (!haveFor(option)) { message = { text: option.buy ? "Not enough coins: a Regular costs 100." : "You don't have enough vouchers for that." }; return updateScene(); }
+  if (option.buy) {
+    const r = G.buyRegular({ count: 1 });
+    message = { text: r.ok ? "Bought 1 Regular for 100 coins." : REASONS[r.reason] || "Not now." };
+  } else {
+    const r = G.pull({ voucher: option.voucher, count: option.count, machine });
+    if (r.ok) {
+      lastPull = r.eggs;
+      turnCrank();
+      message = { text: r.eggs.length + (r.eggs.length === 1 ? " egg: " : " eggs: ") + tierSummary(r.eggs) + ".", eggs: r.eggs };
+    } else message = { text: REASONS[r.reason] || "Not now." };
+  }
+  S = G.state(); hud(); updateScene();
+}
+
+function sceneKey(e) {
+  if (tab !== "pull" || $("#pullwrap").hidden) return;
+  const k = e.key;
+  if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); switchMachine(k === "ArrowLeft" ? -1 : 1); }
+  else if (k === "ArrowUp" || k === "ArrowDown") {
+    e.preventDefault();
+    if (!menuOpen) { menuOpen = true; message = null; return updateScene(); }
+    cursor = (cursor + (k === "ArrowUp" ? -1 : 1) + OPTIONS.length) % OPTIONS.length;
+    message = null; updateScene();
+  } else if (k === "Enter" || k === " ") {
+    e.preventDefault();
+    if (!menuOpen) { menuOpen = true; message = null; return updateScene(); }
+    choose(cursor);
+  } else if (k === "Backspace") { e.preventDefault(); menuOpen = false; message = null; updateScene(); }
+}
+
+function buildScene() {
+  $("#pullwrap").hidden = true;
+  document.addEventListener("keydown", sceneKey);
+  $("#menu").onclick = e => { const row = e.target.closest("[data-option]"); if (row) choose(Number(row.dataset.option)); };
+  $("#menu").onmousemove = e => { const row = e.target.closest("[data-option]"); if (row && Number(row.dataset.option) !== cursor && !message) { cursor = Number(row.dataset.option); updateScene(); } };
+  $("#hit-left").onclick = () => switchMachine(-1);
+  $("#hit-right").onclick = () => switchMachine(1);
+  $("#hit-machine").onclick = () => { menuOpen = true; message = null; updateScene(); };
+  new ResizeObserver(placeStage).observe($("#pullwrap"));
+  setInterval(() => { if (tab === "pull" && machine === "legend" && !$("#clock").hidden) $("#clock").textContent = untilMidnight(); }, 1000);
+}
+
 function render() {
   S = G.state();
   hud();
-  $("#view").innerHTML = { pull: pullView, eggs: eggsView, dex: dexView, missions: missionsView }[tab]();
+  const pulling = tab === "pull";
+  $("#pullwrap").hidden = !pulling;
+  if (pulling) { $("#view").replaceChildren(); placeStage(); updateScene(); }
+  else $("#view").innerHTML = { eggs: eggsView, dex: dexView, missions: missionsView }[tab]();
 }
 
-$("#tabs").onclick = e => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.tab; note(""); render(); };
+$("#tabs").onclick = e => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.tab; note(""); render(); if (tab === "pull") $("#pullwrap").focus({ preventScroll: true }); };
 $("#view").onclick = e => {
   const b = e.target.closest("button");
   if (!b || b.disabled) return;
   note("");
   const d = b.dataset;
-  if (d.machine) { machine = pref.machine = d.machine; keep(); }
-  else if (d.voucher) { const r = G.pull({ voucher: d.voucher, count: Number(d.count), machine }); if (said(r)) lastPull = r.eggs; }
-  else if (b.id === "buy") said(G.buyRegular({ count: 1 }));
-  else if (b.id === "hatch") { const r = G.hatch(); if (said(r)) lastHatch = r.hatched; }
+  if (b.id === "hatch") { const r = G.hatch(); if (said(r)) lastHatch = r.hatched; }
   else if (d.pick) { picked = Number(d.pick); look = "normal"; }
   else if (d.look) look = d.look;
   else if (b.id === "buddy") { if (said(G.setBuddy({ species: picked, shiny: look === "shiny", sp: look === "sp" }))) note("Buddy set. It shows next to your name on Bored."); }
@@ -205,8 +519,10 @@ $("#view").onclick = e => {
 if (!G) {
   $("#tabs").hidden = true; $("#off").hidden = false;
 } else {
-  if (G.claimLogin().ok) note("Daily login: +3 Regular.");
+  buildScene();
+  if (G.claimLogin().ok) message = { text: "Daily login: +3 Regular vouchers." };
   render();
+  $("#pullwrap").focus({ preventScroll: true });
   // Waves earned in another game, or a sync from another device, show up here.
   setInterval(() => { if (!document.hidden) { const was = JSON.stringify(S); const now = G.state(); if (JSON.stringify(now) !== was) render(); } }, 3000);
 }
