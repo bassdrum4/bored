@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Poké Gacha</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  body { display: grid; place-items: start center; min-height: 100vh; padding: 16px 0; background: #f5f2ea; color: #191713;
+         font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace }
+  main { width: min(340px, 92vw); text-align: center }
+  h1 { font-size: 12px; font-weight: 600; letter-spacing: .08em; margin-bottom: 12px }
+  p { font-size: 12px; color: #6b6558; margin-top: 12px }
+  #stage { height: 160px; border: 1px solid #d8d2c4; background: #fffdf7; display: grid; place-items: center }
+  #stage img { width: 96px; height: 96px; image-rendering: pixelated }
+  #pull { font: inherit; font-size: 12px; border: 1px solid #191713; background: none; color: inherit;
+          padding: 9px 14px; margin-top: 12px; cursor: pointer; touch-action: manipulation }
+  #box { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 12px }
+  #box img { width: 100%; aspect-ratio: 1; border: 1px solid #d8d2c4; background: #fffdf7; image-rendering: pixelated }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="hud">PULLS 0 · CAUGHT 0</h1>
+  <div id="stage"><span id="last">no pulls yet</span></div>
+  <button id="pull" type="button">Pull</button>
+  <p id="hint">Shell build. Rates, currency and banners come later.</p>
+  <div id="box"></div>
+</main>
+<script>
+/* Poké Gacha — shell. Placeholder pull loop only; the real game goes here.
+   Hooks that must survive: <title> is the display name, and
+   window.__boredSnapshot() reports the current state. Unscored for now
+   (UNSCORED_GAMES in catalog.js); give it a score rule when it has one. */
+const $ = s => document.querySelector(s);
+// Sprites are shared with Pokédoku. Same base-URL check it uses: standalone
+// the page sits beside the folder, inside the hub it resolves from src/.
+const SPRITE_DIR = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI) ? "pokedoku/sprites/" : "games/content/pokedoku/sprites/";
+const sprite = id => SPRITE_DIR + id + ".png";
+const MAX_ID = 1025;
+const KEY = 'bored.poke-gacha.box';
+
+let pulls = 0, box = [];
+try { const saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) ({ pulls, box } = saved); } catch {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify({ pulls, box })); } catch {} }
+
+function img(id) {
+  const el = document.createElement('img');
+  el.src = sprite(id); el.alt = '#' + id; el.title = '#' + String(id).padStart(3, '0');
+  return el;
+}
+function render() {
+  $('#hud').textContent = 'PULLS ' + pulls + ' · CAUGHT ' + box.length;
+  $('#box').replaceChildren(...box.slice().sort((a, b) => a - b).map(img));
+}
+function pull() {
+  const id = 1 + Math.floor(Math.random() * MAX_ID);
+  pulls++;
+  const fresh = !box.includes(id);
+  if (fresh) box.push(id);
+  const shown = img(id);
+  shown.onerror = () => { $('#stage').textContent = '#' + id + ' (sprite missing)'; };
+  $('#stage').replaceChildren(shown);
+  $('#hint').textContent = '#' + String(id).padStart(3, '0') + (fresh ? ' — new' : ' — dupe');
+  save(); render();
+}
+$('#pull').onclick = pull;
+render();
+
+window.__boredSnapshot = () => ({ slug: 'poke-gacha', caught: box.length, pulls, finished: false });
+</script>
+</body>
+</html>
