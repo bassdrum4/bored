@@ -3,6 +3,7 @@
 // Conditional updates on updated_at make each merge atomic with respect to
 // concurrent clients, without changing the existing Supabase schema.
 import { request, getSession, freshSession } from './backend.js';
+import { mergeWallet } from './rewards.js';
 
 const TABLE = '/rest/v1/player_state';
 // Score units changed in v3. Never interpret a legacy pair count or
@@ -62,7 +63,10 @@ export function mergeCloudState(remote, incoming) {
   for (const [id, result] of Object.entries(object(b.daily))) {
     if (result && result.id === id && !daily[id]) daily[id] = result;
   }
-  return { library: { favorites: [...favorites], recent, favoriteEvents: events }, bests, daily };
+  // The Poké Gacha ledger: a union of entries by id, so neither copy loses or doubles a grant.
+  const state = { library: { favorites: [...favorites], recent, favoriteEvents: events }, bests, daily };
+  if (a.wallet || b.wallet) state.wallet = mergeWallet(a.wallet, b.wallet);
+  return state;
 }
 
 function sameSession(id) {
