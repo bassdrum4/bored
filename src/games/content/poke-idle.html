@@ -1873,6 +1873,15 @@ const ACH = [
   { id: "gift", group: "Extras", title: "You've got mail", desc: "Claim a gift", need: 1, have: () => S.stats.gifts },
   { id: "special", group: "Extras", title: "Special edition", desc: "Own a special edition Pokémon", need: 1, have: () => Object.values(S.box).filter(b => b.special).length }
 ];
+// Side quests in the order you'd take them on: by tier, weakest first (Tier 4 up to the Darkest Day's Tier 0), then by
+// generation. A collection goal (Plates, Zygarde Cells, Wishing Pieces) sits just before its quest; Red comes first.
+{
+  const base = { red: [5, 1], wormhole: [4, 6], areazero: [4, 8], darkest: [0, 7] }, before = { zygarde100: "terminus", plates: "origin", pieces: "darkest" };
+  const place = id => QUEST[id] ? [QUEST[id].tier, QUEST[id].r] : base[id] || [5, 9];
+  const rank = a => { const [t, r] = place(before[a.id] || a.id); return (5 - t) * 100 + r * 10 + (before[a.id] ? 0 : 1); };
+  const at = ACH.map((a, i) => a.group === "Side quests" ? i : -1).filter(i => i >= 0), sorted = at.map(i => ACH[i]).sort((a, b) => rank(a) - rank(b));
+  at.forEach((i, j) => { ACH[i] = sorted[j]; });
+}
 function checkAch(quiet) {
   if (!S || !S.ach) return [];
   const now = Date.now(), got = ACH.filter(a => !S.ach[a.id] && a.have() >= a.need);
