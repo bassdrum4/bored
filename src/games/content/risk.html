@@ -6277,7 +6277,97 @@
         };
         reader.readAsText(file);
       }
-      window.addEventListener("DOMContentLoaded", riskUpdateIntro);
+      // ── Bored Together ─────────────────────────────────────────────────────────
+// An async match is two human seats. One finished turn travels as a position:
+// territories, armies, reserves, cards and whose turn is next. The other seat
+// restores it and plays on. The server stores the position; it does not
+// simulate the dice, which is the same trust a saved war already uses.
+const ONLINE = (() => { try { return window.__boredTogether || null; } catch (error) { return null; } })();
+let onlineSent = false;
+const onlineSeat = () => Number(ONLINE?.context?.seat) === 2 ? 2 : 1;
+function onlineWinnerIndex() {
+  const owners = [...new Set(Object.values(state.territories || {}).map(t => t && t.owner))]
+    .filter(owner => owner !== undefined && owner >= 0);
+  return owners.length === 1 ? owners[0] : -1;
+}
+function onlineSubmit() {
+  if (!ONLINE || onlineSent) return;
+  onlineSent = true;
+  const winner = state.phase === 'GAME_OVER' && onlineWinnerIndex() >= 0 ? onlineWinnerIndex() + 1 : null;
+  const game = JSON.parse(JSON.stringify(Object.assign({}, state, {
+    historyStack: [], _aiRunning: false,
+    logs: (state.logs || []).slice(-20), chat: (state.chat || []).slice(-20),
+    battleLogs: (state.battleLogs || []).slice(-20), aiRecentReplies: []
+  })));
+  ONLINE.submit({ game, winner, draw: false }).then(() => {
+    onlineSent = true;
+    ONLINE.finishTurn();
+  }).catch(error => {
+    onlineSent = false;
+    ONLINE.error(error, onlineSubmit);
+  });
+}
+function onlineStart() {
+  const ctx = ONLINE?.context || {};
+  const saved = ctx.state?.game;
+  const names = Array.isArray(ctx.players) ? ctx.players : [];
+  isHost = true;
+  myPlayerIndex = onlineSeat() - 1;
+  if (saved && typeof saved === 'object') {
+    state = hydrateGameState(saved);
+    state.players = (state.players || []).slice(0, 2);
+    while (state.players.length < 2) state.players.push({
+      name: 'Commander ' + (state.players.length + 1), uid: 'seat_' + (state.players.length + 1),
+      alive: true, ready: false, cards: [], stats: {}, isAI: false
+    });
+  } else {
+    state = createGameState();
+    const commander = i => ({
+      name: String(names[i] || ('Commander ' + (i + 1))).slice(0, 10),
+      uid: 'seat_' + (i + 1), alive: true, ready: true, cards: [], stats: {}, isAI: false
+    });
+    state.players = [commander(0), commander(1)];
+    const deck = [...LOCS].sort(() => Math.random() - 0.5);
+    deck.forEach((card, i) => { state.territories[card[2]] = { owner: i % 2, armies: 1 }; });
+    state.setupPool = [0, 0];
+    state.phase = 'REINFORCE';
+    state.turnIndex = 0;
+    state.reserves = Math.max(3, 40 - Object.values(state.territories).filter(t => t.owner === 0).length);
+    state.logs.push('--- WAR STARTED ---');
+    state.chat.push({ name: 'SYSTEM', msg: 'Two commanders. One world.' });
+  }
+  state.players.forEach(player => { if (player) player.isAI = false; });
+  state.setupPool = [0, 0];
+  myPlayerIndex = onlineSeat() - 1;
+  const overlay = document.getElementById('overlay-layer');
+  if (overlay) overlay.classList.add('hidden');
+  ['login-panel', 'lobby-panel'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+  try { updateHUD(); updateLobbyUI(); } catch (error) {}
+  if (state.phase === 'GAME_OVER' && onlineWinnerIndex() >= 0) {
+    state.turnIndex = onlineWinnerIndex();
+    showVictory();
+  } else {
+    const victory = document.getElementById('victory-panel');
+    if (victory) victory.classList.add('hidden');
+  }
+  requestAnimationFrame(drawLoop);
+}
+if (ONLINE) {
+  const baseAdvancePhase = advancePhase;
+  advancePhase = function () {
+    const before = state.turnIndex;
+    baseAdvancePhase();
+    if (state.turnIndex !== before || state.phase === 'GAME_OVER') onlineSubmit();
+  };
+  const baseCheckWin = checkWinCondition;
+  checkWinCondition = function () {
+    baseCheckWin();
+    if (state.phase === 'GAME_OVER') onlineSubmit();
+  };
+  onlineStart();
+}
+
+window.addEventListener("DOMContentLoaded", riskUpdateIntro);
     </script>
     <script>
       // Ensure key functions are available on window for inline handlers

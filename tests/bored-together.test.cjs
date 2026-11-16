@@ -12,7 +12,7 @@ function reference(board,col,seat) {
 }
 const play=(db,m,u,value)=>call(db,u,'submit_run',{match_id:m.id,version:m.version,value,request_id:randomUUID()});
 
-test('Together production SQL: consent, directory, blocks, moves, duels and retention',async t=>{
+test('Together production SQL: consent, directory, blocks, moves, new turn games and retention',async t=>{
   const db=await database(); t.after(()=>db.close());
   const [a,b,c,non,d,e,anonymous]=ids;
   await t.test('guests and anonymous accounts cannot use the API; no automatic enrollment',async()=>{
@@ -105,36 +105,40 @@ test('Together production SQL: consent, directory, blocks, moves, duels and rete
     assert.equal(reopened.moves.filter(x=>x.actor===a).length,4);
     finished=m;
   });
-  await t.test('duels give both players the same board and compare one run each',async()=>{
-    const started=await call(db,a,'challenge',{user_id:b,game:'mahjong'});
-    assert.equal(started.mode,'duel');assert.equal(started.turn_user,a);
-    assert.deepEqual(started.state.plays,{});
-    assert.ok(Number.isInteger(started.state.seed)&&started.state.seed>0,'the server chooses the board');
-    assert.equal(started.state.seed,(await call(db,c,'challenge',{user_id:b,game:'mahjong'})).state.seed,'every board that day is the same');
-    await call(db,c,'delete',{match_id:(await call(db,c,'dashboard')).matches.find(x=>x.game==='mahjong').id});
-    // A duel is not played with moves.
-    await assert.rejects(move(db,started,a,0),/run, not moves/);
-    await assert.rejects(call(db,a,'submit_run',{match_id:started.id,version:started.version,value:99,request_id:randomUUID()}),/Invalid result/,'the board size is the ceiling');
-    await assert.rejects(call(db,a,'submit_run',{match_id:started.id,version:started.version,value:-1,request_id:randomUUID()}),/Invalid result/);
-    const mine=await play(db,started,a,12);
-    assert.equal(mine.status,'active');assert.equal(mine.turn_user,b);
-    // The opponent cannot see the run they have to beat, and the player keeps
-    // their own submission visible.
-    assert.deepEqual((await call(db,b,'match',{match_id:mine.id})).state.plays,{});
-    assert.deepEqual((await call(db,a,'match',{match_id:mine.id})).state.plays,{1:12});
-    await assert.rejects(play(db,mine,a,20),/not your turn/);
-    const theirRun=await play(db,mine,b,20);
-    assert.equal(theirRun.status,'completed');assert.equal(theirRun.winner,b);
-    const both=await call(db,a,'match',{match_id:theirRun.id});
-    assert.deepEqual(both.state.plays,{1:12,2:20});
-    assert.match(both.reason,/Higher run on the same board/);
-    // A duel cannot be reopened with moves, and a turns game cannot be scored.
-    await assert.rejects(move(db,both,a,0),/run, not moves/);
-    await assert.rejects(call(db,b,'submit_run',{match_id:finished.id,version:finished.version,value:1,request_id:randomUUID()}),/played by moves/);
-    const draw=await play(db,await call(db,a,'challenge',{user_id:b,game:'2048'}),a,512);
-    const drawn=await play(db,draw,b,512);
-    assert.equal(drawn.winner,null);assert.equal(drawn.status,'completed');
-    assert.match(drawn.reason,/Drew/);
+  await t.test('the retired duels are gone and the new turn games carry a position',async()=>{
+    for (const game of ['2048','mahjong']) {
+      await assert.rejects(call(db,a,'challenge',{user_id:b,game}),/Game unavailable/,game+' is retired from new matches');
+      await assert.rejects(call(db,a,'queue_join',{game}),/Game unavailable/);
+      await assert.rejects(inviteCall(db,a,'send',{user_id:c,game}),/Game unavailable/,game+' cannot be invited');
+    }
+    // Each arrival is an ordinary turn-based match, opened for the challenger.
+    for (const game of ['chess','scrabble','risk']) {
+      const started=await call(db,a,'challenge',{user_id:b,game});
+      assert.equal(started.mode,'turns',game+' is played turn by turn');
+      assert.equal(started.turn_user,a);
+      assert.equal(started.state.game,null);
+      if (game==='scrabble') assert.ok(Number.isInteger(started.state.seed)&&started.state.seed>0,'Scrabble deals from a server seed');
+      await call(db,a,'delete',{match_id:started.id});
+    }
+    // A chess position travels with the move, and the mover's result claim is
+    // honoured even when it names the other seat.
+    const started=await call(db,a,'challenge',{user_id:b,game:'chess'});
+    await assert.rejects(move(db,started,a,undefined,{move:{game:'not-an-object'}}),/Invalid turn/);
+    const passed=await move(db,started,a,undefined,{move:{game:{board:new Array(64).fill(''),turn:'b'},winner:null}});
+    assert.equal(passed.status,'active');assert.equal(passed.turn_user,b);
+    assert.deepEqual(passed.state.game.board,new Array(64).fill(''));
+    const logged=(await call(db,b,'match',{match_id:passed.id})).moves[0].move;
+    assert.equal(logged.game,undefined,'the large position is not duplicated into the move log');
+    assert.ok(JSON.stringify(logged).length<100);
+    const finishedChess=await move(db,passed,b,undefined,{move:{game:{board:new Array(64).fill(''),turn:null},winner:1}});
+    assert.equal(finishedChess.status,'completed');
+    assert.equal(finishedChess.winner,a,'winnerSeat names the winner, not the caller');
+    // A draw completes without a winner.
+    const drawn=await move(db,await call(db,a,'challenge',{user_id:b,game:'risk'}),a,undefined,
+      {move:{game:{territories:{},turn:null},winner:null,draw:true}});
+    assert.equal(drawn.status,'completed');assert.equal(drawn.winner,null);assert.match(drawn.reason,/Draw/);
+    const scrabble=await call(db,a,'challenge',{user_id:b,game:'scrabble'});
+    await assert.rejects(call(db,a,'submit_run',{match_id:scrabble.id,version:scrabble.version,value:1,request_id:randomUUID()}),/played by moves/);
   });
   await t.test('Tanks keeps the live shot and bounds what one may say',async()=>{
     const started=await call(db,a,'challenge',{user_id:b,game:'tank2'});

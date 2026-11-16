@@ -423,6 +423,13 @@ let selected = -1, targets = [], lastMove = null;
 let over = false, result = null, plies = 0, sessionWins = 0;
 let thinking = false, generation = 0, started = false;
 
+// A Bored Together match hands the position over after every move. The seat
+// that created the match is white, and the server gives the turn to the other
+// seat once this move is saved.
+const ONLINE = (() => { try { return window.__boredTogether || null; } catch (error) { return null; } })();
+const onlineColor = () => Number(ONLINE?.context?.seat) === 2 ? 'b' : 'w';
+let onlineBusy = false, onlineDone = false;
+
 // The picker says how strong a level is, not only how deep it looks.
 for (const option of levelEl.options || []) {
   if (RATING[option.value]) option.textContent += ' \u00b7 ' + RATING[option.value];
@@ -430,7 +437,8 @@ for (const option of levelEl.options || []) {
 
 function updateHud() {
   const cpu = modeEl.value === 'computer';
-  const versus = cpu ? 'vs computer \u00b7 ' + levelEl.value +
+  const versus = ONLINE ? 'online \u00b7 you are ' + (onlineColor() === 'w' ? 'white' : 'black')
+    : cpu ? 'vs computer \u00b7 ' + levelEl.value +
       (RATING[levelEl.value] ? ' \u00b7 ' + RATING[levelEl.value] : '')
     : modeEl.value === 'friend' ? 'two players' : 'choose players';
   hudEl.textContent = 'Move ' + (Math.floor(plies / 2) + 1) + ' \u00b7 ' + versus +
@@ -496,6 +504,7 @@ function play(move) {
   selected = -1;
   targets = [];
   settle();
+  if (ONLINE) { onlineSubmit(); return; }
   if (!over && modeEl.value === 'computer' && state.turn === 'b') scheduleComputer();
 }
 
@@ -513,7 +522,9 @@ function scheduleComputer() {
 
 function handle(index) {
   if (!started || over || thinking) return;
-  if (modeEl.value === 'computer' && state.turn !== 'w') return;
+  if (ONLINE) {
+    if (!ONLINE.context?.canPlay || state.turn !== onlineColor()) return;
+  } else if (modeEl.value === 'computer' && state.turn !== 'w') return;
   const move = targets.find(candidate => candidate.to === index);
   if (move) { play(move); return; }
   const piece = state.board[index];
@@ -586,6 +597,69 @@ window.__boredSnapshot = () => ({
 });
 
 /* Small handle for the test suite; it only exposes what the board already shows. */
+/* ── Bored Together ────────────────────────────────────────────────────────
+ * A match is one position carried between two players. The mover sends the
+ * board after their move; the other seat restores it from the match. Checkmate
+ * is the mover's word, exactly as the finished board already shows it.
+ */
+function onlinePack() {
+  return {
+    board: state.board.slice(), turn: state.turn,
+    castling: Object.assign({}, state.castling), ep: state.ep,
+    half: state.half, full: state.full, plies: plies, over: over, result: result
+  };
+}
+function onlineWinner() {
+  return result === 'win-w' ? 1 : result === 'win-b' ? 2 : null;
+}
+function onlineStatus() {
+  if (over) {
+    const winner = onlineWinner();
+    statusEl.textContent = winner === 1 ? 'Checkmate. White wins.'
+      : winner === 2 ? 'Checkmate. Black wins.' : 'The game is a draw.';
+  } else {
+    statusEl.textContent = (state.turn === 'w' ? 'White' : 'Black') + ' to move.';
+  }
+  render();
+}
+function onlineSubmit() {
+  if (!ONLINE || onlineBusy || onlineDone) return;
+  onlineBusy = true;
+  const winner = over ? onlineWinner() : null;
+  ONLINE.submit({ game: onlinePack(), winner, draw: over && winner === null })
+    .then(() => { onlineBusy = false; onlineDone = true; ONLINE.finishTurn(); })
+    .catch(error => { onlineBusy = false; ONLINE.error(error, onlineSubmit); });
+}
+function onlineStart() {
+  const saved = ONLINE?.context?.state?.game;
+  generation += 1;
+  thinking = false;
+  if (saved && Array.isArray(saved.board) && saved.board.length === 64) {
+    state = {
+      board: saved.board.slice(), turn: saved.turn === 'b' ? 'b' : 'w',
+      castling: Object.assign({ K: false, Q: false, k: false, q: false }, saved.castling),
+      ep: Number.isInteger(saved.ep) ? saved.ep : -1,
+      half: Math.max(0, saved.half | 0), full: Math.max(1, saved.full | 0)
+    };
+    plies = Math.max(0, saved.plies | 0);
+    over = Boolean(saved.over);
+    result = saved.result === 'win-w' || saved.result === 'win-b' ? saved.result
+      : saved.result === 'draw' || saved.draw ? 'draw' : null;
+  } else {
+    state = newState();
+    plies = 0;
+    over = false;
+    result = null;
+  }
+  modeEl.value = 'friend';
+  started = true;
+  setupEl.hidden = true;
+  selected = -1;
+  targets = [];
+  lastMove = null;
+  onlineStatus();
+}
+
 window.__test = {
   state: () => ({
     board: state.board.slice(), turn: state.turn, castling: Object.assign({}, state.castling),
@@ -663,7 +737,8 @@ function restoreRun(saved) {
   return true;
 }
 
-if (!RESUME) reset();
+if (ONLINE) onlineStart();
+else if (!RESUME) reset();
 else {
   const saved = RESUME.read();
   reset();

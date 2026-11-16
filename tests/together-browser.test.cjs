@@ -279,35 +279,31 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   assert.equal(ashNext.turn, 1);
   assert.equal(ashNext.board.turn, ashState.board.turn + 1, 'the second player advances the same valley');
   if (!(await a.$eval('#player', node => node.hidden))) await exit(a);
-  // A duel deals both players the same board and compares one run each; the
-  // opponent's score stays hidden until your own run is in.
-  await challengePlayer(a,'2048','BananaWizard');
-  const duel=(await call(db,ids[0],'dashboard')).matches.find(m=>m.game==='2048');
-  assert.equal(duel.mode,'duel');assert.equal(duel.turn_user,ids[0]);
-  let duelBoard=await frame(a,'.tiles');
-  assert.equal(await duelBoard.evaluate(()=>window.__boredSeed.seed),duel.state.seed,'the match seed reaches the game');
-  for(const key of ['ArrowLeft','ArrowDown','ArrowLeft','ArrowUp']){await a.focus('#frame');await a.keyboard.press(key);await a.keyboard.press(key);}
-  const mine=await duelBoard.evaluate(()=>__boredSnapshot().score);assert.ok(mine>0,'a duel run scores');
-  await a.focus('#frame');await a.keyboard.press('Escape');
-  await a.waitForFunction(()=>!document.querySelector('#duel-finish').hidden);
-  assert.match(await a.$eval('#duel-finish-text',e=>e.textContent),/Send your run/);
-  await a.$eval('#duel-send',button=>button.click());
-  await a.waitForFunction(()=>document.querySelector('#player').hidden);
-  await refresh(a);await refresh(b);
-  assert.ok(!(await b.$eval(`[data-match-id="${duel.id}"]`,e=>e.textContent)).includes('beat'),'the run to beat is hidden');
-  await launch(b,duel.id);
-  duelBoard=await frame(b,'.tiles');
-  assert.equal(await duelBoard.evaluate(()=>window.__boredSeed.seed),duel.state.seed,'both players get the same board');
-  for(const key of ['ArrowUp','ArrowRight','ArrowUp','ArrowRight']){await b.focus('#frame');await b.keyboard.press(key);await b.keyboard.press(key);}
-  await b.focus('#frame');await b.keyboard.press('Escape');
-  await b.waitForFunction(()=>!document.querySelector('#duel-finish').hidden);
-  await b.$eval('#duel-send',button=>button.click());await b.waitForFunction(()=>document.querySelector('#player').hidden);
-  await refresh(a);
-  const done=(await call(db,ids[0],'dashboard')).matches.find(m=>m.id===duel.id);
-  assert.equal(done.status,'completed');assert.equal(done.state.plays['1'],mine);
-  const theirs=done.state.plays['2'];
-  assert.equal(done.winner,theirs===mine?null:theirs>mine?ids[1]:ids[0]);
-  assert.match(await a.$eval(`[data-match-id="${duel.id}"]`,e=>e.textContent),/\d+ points to \d+ points/,'both runs are shown once they are in');
+  // Chess: the position travels between two accounts, and the second seat
+  // opens on the first player's board with the black pieces to move.
+  await challengePlayer(a,'chess','BananaWizard');
+  const chess=(await call(db,ids[0],'dashboard')).matches.find(m=>m.game==='chess');
+  assert.equal(chess.mode,'turns');assert.equal(chess.turn_user,ids[0]);
+  await launch(a,chess.id);
+  const chessA=await frame(a,'#board');
+  await chessA.waitForFunction(()=>document.querySelector('#setup').hidden,{timeout:20000});
+  await chessA.evaluate(()=>__test.move('e2','e4'));
+  await a.waitForFunction(()=>document.querySelector('#player').hidden,{timeout:20000});
+  const afterWhite=(await call(db,ids[0],'match',{match_id:chess.id})).state;
+  assert.equal(afterWhite.turn,2);
+  assert.equal(afterWhite.game.board[36],'P','the white pawn moved to e4');
+  await refresh(b);
+  await launch(b,chess.id);
+  const chessB=await frame(b,'#board');
+  await chessB.waitForFunction(()=>document.querySelector('#setup').hidden,{timeout:20000});
+  assert.equal(await chessB.evaluate(()=>__test.state().turn),'b','black to move on the restored board');
+  await chessB.evaluate(()=>__test.move('e7','e5'));
+  await b.waitForFunction(()=>document.querySelector('#player').hidden,{timeout:20000});
+  const afterBlack=(await call(db,ids[1],'match',{match_id:chess.id})).state;
+  assert.equal(afterBlack.turn,1);
+  assert.equal(afterBlack.game.board[28],'p','the black pawn moved to e5');
+  assert.equal(afterBlack.game.board[36],'P','white still holds e4');
+  if (!(await a.$eval('#player', node => node.hidden))) await exit(a);
   // Mixed list: attention first, no separate people/history/settings/feed.
   await call(db,ids[2],'enroll',{consent_version:'2026-10-26-v3'});
   const fromC=await call(db,ids[2],'challenge',{user_id:ids[0]});

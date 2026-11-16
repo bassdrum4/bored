@@ -46,11 +46,20 @@ come back out, so the result is never only a line in the list.
 Joining a live room by code is not duplicated here: the room code is typed on
 Civ Lite's own Multiplayer screen, where the lobby lives.
 
-Two games are a single run rather than a turn: **2048** and **Mahjong**. The server
-picks the seed, both players get that board, and the game's own score is
-submitted once. Neither result is shown to the other player until both are in,
-so nobody plays against a known target; the row is then the scoreboard. Leaving
-one asks before sending the run.
+**Chess**, **Scrabble** and **Risk** are turn-based matches like the others.
+One finished turn carries the whole position to the other seat — the board, the
+armies, or both racks and the bag — and the server stores it, owns the turn
+order and records the result the mover reports. It does not simulate the moves,
+so this is the same trust Tank 2 and Civ Lite use, not a server-refereed board.
+
+The **2048** and **Mahjong** duels have been retired from new matches. Their
+rows and duel helpers stay readable so an old active match does not break, but
+neither game is offered by the picker, the queue or the invite list.
+
+A known limit of the position handover: both Scrabble racks travel in the saved
+position, so a modified client can read the opponent's tiles. The board, bag
+and scores are still the positions both screens agree on; hiding a rack would
+need a server-side draw, not a different client.
 
 Friend requests, the notification feed, email-visibility settings, name/address
 search, Accept/Decline/Cancel and the pre-play-first `pending` state have been
@@ -120,22 +129,16 @@ Reload fetches fresh authoritative state to recover stale versions. Exiting
 while a save is in flight does not cancel the server transaction; reopening
 always loads the saved state. There are no offline multiplayer moves.
 
-Two kinds of adapter exist, distinguished by `mode` in `TOGETHER_ADAPTERS`:
+`mode` in `TOGETHER_ADAPTERS` is `turns` for every game the picker offers.
+Connect Four and Pool have a server-owned board; Tank 2, Civ Lite, Chess,
+Scrabble and Risk carry a position or a shot list and replay it on both screens.
+The old `duel` mode (2048 and Mahjong) remains in the SQL for legacy rows but no
+new match can be created in it.
 
-- `turns` — the server owns the board, validates each move and decides the
-  result. Connect Four and Pool.
-- `duel` — the server owns the seed and one submission per player, and compares
-  two numbers. 2048 and Mahjong. It is the same trust the single-player boards
-  already use, bounded by `duel_limit`; there is no replay and no claim that the
-  board was played honestly.
-
-A duel's seed is chosen once per Detroit day (`duel_seed`) and injected as
-`window.__boredSeed = { seed, match: true }` before the game's own script, which
-replaces the hub's daily seed so a re-deal replays the same board. 2048 draws
-both its spawns and its restarts from that seed; Mahjong deals and re-deals from
-it. The hub polls the game's `__boredSnapshot()` and sends the run itself the
-moment the game reports `finished`, so a completed run is never lost to a
-forgotten send.
+A legacy duel's seed is chosen once per Detroit day (`duel_seed`) and injected
+as `window.__boredSeed = { seed, match: true }`. No game in the current picker
+uses that path. Scrabble's bag still comes from the match's seed so both
+screens shuffle alike.
 
 **Tank 2** is a `turns` game without a server-side simulation, because the
 game itself is already turn-based. A match stores one seed — which picks one of
@@ -227,8 +230,13 @@ mass account creation. Shared transaction advisory locks, match-row locks,
 participant checks, turn ownership, rule versions, stale-version checks and
 unique request IDs are unchanged.
 
-Connect Four moves contain only a column; a duel submission is one integer
-bounded by the game's own limit (72 pairs for Mahjong, 10,000,000 for 2048).
+Connect Four moves contain only a column.
+Chess sends `{board, turn, castling, ep, half, full}`; Scrabble sends the
+board, both racks, the bag, the scores and the turn; Risk sends territories,
+armies, reserves, cards and the turn. Chess adds `winner: 1|2` or `draw`, and
+Scrabble adds `winner: 1|2` when the bag or four passes end it. The dispatcher
+bounds each position at 400,000 bytes and strips it from the move log.
+
 Pool sends angle (integer tenths of a degree), power (1–100) and optional legal
 cue placement. The `together-pool` Edge
 function authenticates the player, reads the match through their JWT, simulates
@@ -498,9 +506,9 @@ CHROME_PATH=/path/to/chrome npm test
 The SQL tests execute the baseline and every forward migration in isolated
 PGlite databases, including privacy, opt-in, auth/role denial, the retired
 actions answering "Unknown operation", blocks, rate limits,
-legal/illegal/stale/duplicate moves, duels (shared seed, hidden opponent run,
-bounds, draw, one submission each), completed games, rematches, delete, leaving
-and retention. Independent Connect Four rules check seeded games and draws.
+legal/illegal/stale/duplicate moves, the new turn games (position handover,
+winnerSeat, draws), retired duels answering "Game unavailable", completed games,
+rematches, delete, leaving and retention. Independent Connect Four rules check seeded games and draws.
 Pool tests retain physics parity with the original game, legal pots/retained
 turns, fouls, ball in hand, 8-ball outcomes, idempotency, service-role validation
 and concurrent-change protection.
@@ -511,10 +519,10 @@ It plays a game from the picker: the challenger starts in the original player, a
 failed save is retried, the opponent only receives the game once the turn is
 saved, the board resumes, the game completes, and a rematch is played first too.
 It also covers the member directory (addresses shown, never in a game row), queue
-persistence/cancellation, exit, refresh, a legal multi-shot Pool turn, a 2048
-duel where both players get the match's seed and the scores stay hidden until
-both runs are in, a Tanks match where the second player's screen rebuilds the
-first player's damage from the stored aim, sign-out privacy, original offline
+persistence/cancellation, exit, refresh, a legal multi-shot Pool turn, a Chess
+match where the second account opens on the first player's board and answers
+with black, a Tanks match where the second player's screen rebuilds the first
+player's damage from the stored aim, sign-out privacy, original offline
 play, 1100/375/320px layouts and a sandboxed nested iframe equivalent to a
 Google Sites embed. `tests/tank-engine.test.cjs` holds the engine to the
 document's own terrain, column for column on all five layouts, and proves a shot

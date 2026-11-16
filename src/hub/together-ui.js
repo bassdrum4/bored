@@ -26,6 +26,8 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   const inviteDialog = $('#invite-dialog');
   const resultDialog = $('#result-dialog');
   const name = game => TOGETHER_GAMES[game]?.name || game;
+  // A retired game stays readable in the database but is no longer a row here.
+  const offered = m => Boolean(TOGETHER_ADAPTERS[m.game]);
   const mySeat = g => (g?.seats || []).find(s => s.seat === g.me);
   // What a live row shows. Seconds-since-seen change on every read, so they stay out of what counts as a change.
   const liveSignature = list => JSON.stringify(list.map(g => [g.id, g.status, g.round, g.me, g.winner, g.config,
@@ -59,6 +61,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   function completedResults() {
     const out = [];
     for (const m of data?.matches || []) {
+      if (!offered(m)) continue;
       // An unsent game was never anyone's turn, so it cannot have a result.
       if (m.status !== 'completed' || m.revealed_at == null) continue;
       out.push({ key: 'match:' + m.id,
@@ -110,7 +113,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     resultDialog.addEventListener('cancel', dismissResult);
   }
   function updateBadge() {
-    const waiting = data?.enrolled ? data.matches.filter(m => m.status === 'active' && m.turn_user === owner) : [];
+    const waiting = data?.enrolled ? data.matches.filter(m => offered(m) && m.status === 'active' && m.turn_user === owner) : [];
     // A live room you were invited to is waiting on you too.
     const count = waiting.length + (data?.enrolled ? liveGames.filter(g => g.status === 'lobby' && mySeat(g)?.state === 'invited').length : 0);
     $('#together-badge').hidden = !count; $('#together-badge').textContent = String(count);
@@ -571,11 +574,12 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     host.append(row);
   }
   function dashboard() {
-    const open = data.matches.filter(m => m.status === 'active');
+    const played = data.matches.filter(offered);
+    const open = played.filter(m => m.status === 'active');
     const yours = open.filter(m => m.turn_user === owner);
     const waiting = open.filter(m => m.turn_user !== owner);
     // Keep rematches close to the finished game, without a history page or records.
-    const completed = data.matches.filter(m => m.status === 'completed').slice(0, 3);
+    const completed = played.filter(m => m.status === 'completed').slice(0, 3);
 
     // The lobby's front door: the game that is actually waiting on you.
     if (yours.length) {

@@ -10,8 +10,13 @@ export const TOGETHER_ADAPTERS = Object.freeze({
   // Tanks stores its seed and the shots fired; both clients replay them through
   // the same rules file, so the move on the wire is an angle, not a result.
   'tank2': { rulesVersion: 3, action: 'move', mode: 'turns' },
-  '2048': { rulesVersion: 1, action: 'submit_run', mode: 'duel', metric: 'score' },
-  mahjong: { rulesVersion: 1, action: 'submit_run', mode: 'duel', metric: 'pairs' },
+  // Chess, Scrabble and Risk hand the whole position over with each finished
+  // turn, the way a campaign does: the server stores it and the other seat
+  // restores it, so both players see the same board without a server-side
+  // engine for every rule in three very different games.
+  chess: { rulesVersion: 1, action: 'move', mode: 'turns' },
+  scrabble: { rulesVersion: 1, action: 'move', mode: 'turns' },
+  risk: { rulesVersion: 1, action: 'move', mode: 'turns' },
   // A campaign is handed over turn by turn; the board travels with the move.
   ashcrown: { rulesVersion: 1, action: 'move', mode: 'turns' }
 });
