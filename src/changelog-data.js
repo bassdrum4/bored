@@ -2,14 +2,16 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 510,
+  "count": 512,
   "newest": "2026-11-16",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"6626e0c","date":"2026-11-16","author":"Vettel Xu","subject":"docs(poke-gacha): add design spec"},
   {"sha":"3c10518","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: one shiny catch is one shiny, not its whole line","pr":171},
+  {"sha":"7aac495","date":"2026-11-16","author":"Vettel Xu","subject":"feat(poke-gacha): add Poké Gacha shell"},
   {"sha":"47572b9","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: Prof Penguin's final showdown","pr":169},
   {"sha":"77090ba","date":"2026-11-16","author":"PenguinV360","subject":"Poké Idle: Prof Penguin's Empoleon sprite is now his Mega Empoleon","pr":168},
   {"sha":"b22156d","date":"2026-11-16","author":"PenguinV360","subject":"Poké Idle: sprites for Prof Penguin and his Empoleon","pr":167},
