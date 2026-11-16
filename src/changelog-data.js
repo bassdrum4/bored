@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 513,
+  "count": 514,
   "newest": "2026-11-16",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"71a7830","date":"2026-11-16","author":"Claude","subject":"Start the wallet the first time Poké Gacha is opened"},
   {"sha":"d3f291f","date":"2026-11-16","author":"Claude","subject":"Poké Gacha wallet and rewards engine (hub side)"},
   {"sha":"6626e0c","date":"2026-11-16","author":"Vettel Xu","subject":"docs(poke-gacha): add design spec"},
   {"sha":"3c10518","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: one shiny catch is one shiny, not its whole line","pr":171},
