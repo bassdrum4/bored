@@ -5,35 +5,37 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Poké Gacha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Workbench&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap">
 <style>
 /* Poké Gacha screens. One fixed internal resolution (640×408: a 48px tab bar
    and a 640×360 stage), scaled by a whole number. Rules every screen keeps:
    - one panel style (.panel), one list style (.rows) with one ▶ cursor
    - spacing on a 4px grid, 8px margins and gaps everywhere
-   - one pixel font (Workbench) at its native 16px and exactly 2x (32px), no
-     ligatures; numbers in the same font, right-aligned in columns
+   - body text in Bored's own mono stack, 16px weight 600, numbers right-aligned;
+     headers in Silkscreen at exactly 24px (3x its 8px pixel grid)
    - the eight colors below and nothing else; egg tiers are fixed colors
    - every sprite at 1x, centered in a 96px cell (the largest sprite is 96px) */
 :root {
   --ink: #1c1b2c; --panel: #2c2a44; --red: #c8372f; --paper: #f4f1ff;
   --dim: #807c9a; --gold: #e3ad2b; --teal: #3f9e8a; --sky: #8fd3e8;
-  --body: 16px; --title: 32px;
+  --body: 16px; --title: 24px;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
 }
 * { margin: 0; padding: 0; box-sizing: border-box }
 body { background: var(--ink); display: grid; place-items: start center; min-height: 100vh; padding-top: 4px; overflow: hidden }
 #wrap { position: relative; overflow: hidden; outline: none; touch-action: manipulation; user-select: none }
 #frame { position: absolute; left: 0; top: 0; width: 640px; height: 408px; transform-origin: 0 0; background: var(--ink);
-         font: var(--body)/20px Workbench, ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--paper);
-         letter-spacing: 1px; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0, "zero" 1; font-synthesis: none }
+         font: 600 var(--body)/20px var(--mono); color: var(--paper);
+         font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0 }
 canvas, img { image-rendering: pixelated; display: block }
 #stage { position: absolute; left: 0; top: 48px; width: 640px; height: 360px; overflow: hidden }
 #scene { position: absolute; inset: 0; width: 640px; height: 360px }
 
 .panel { position: absolute; background: var(--panel); border: 2px solid var(--red); outline: 2px solid var(--ink); padding: 8px }
-.title { font-size: var(--title); line-height: 36px; margin-bottom: 4px }
+.title { font: 400 var(--title)/32px Silkscreen, var(--mono); margin-bottom: 4px }
 .head { margin-bottom: 4px }
 .num { color: var(--gold) }
+.title .count { font: 600 var(--body)/32px var(--mono) }
 .dim { color: var(--dim) }
 .gold { color: var(--gold) }
 /* Lists scroll by whole 24px rows and never stop on a half-cut one. */
@@ -60,7 +62,7 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Pull */
 #counts { position: absolute; right: 8px; top: 8px; display: flex; gap: 8px }
 #counts .panel { position: static; width: 100px; height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 4px 8px }
-#plate { position: absolute; display: flex; align-items: center; justify-content: center; font-size: var(--title); line-height: 36px;
+#plate { position: absolute; display: flex; align-items: center; justify-content: center; font: 400 var(--title)/32px Silkscreen, var(--mono);
          color: var(--ink); pointer-events: none }
 #banner { position: absolute; width: 96px; height: 96px; pointer-events: none }
 #clock { position: absolute; color: var(--ink); background: var(--paper); border: 2px solid var(--ink); padding: 0 4px; pointer-events: none }
@@ -68,16 +70,26 @@ canvas, img { image-rendering: pixelated; display: block }
 .hit { position: absolute; cursor: pointer }
 
 /* Eggs */
-#eggs-tray { left: 8px; top: 8px; width: 400px; height: 280px }
-#eggs-grid { display: grid; grid-template-columns: repeat(15, 24px) }
-#eggs-grid .egg { width: 24px; height: 28px; display: grid; place-items: center; position: relative; cursor: pointer }
-#eggs-grid .egg i { position: absolute; left: 4px; bottom: 0; height: 2px; background: var(--gold) }
-#eggs-grid .egg.at { outline: 2px solid var(--paper); outline-offset: -2px }
-#eggs-side { left: 416px; top: 8px; width: 216px; height: 280px }
-#hatch { left: 8px; top: 8px; width: 624px; height: 280px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 40px 1fr; gap: 0 12px }
+/* Eggs: the selected egg on the left, every egg in a grid on the right. */
+#egg-pic { left: 8px; top: 8px; width: 232px; height: 120px; display: grid; place-items: center }
+#egg-name { left: 8px; top: 136px; width: 232px; height: 48px; padding: 4px 12px }
+#egg-day { left: 8px; top: 192px; width: 232px; height: 44px }
+#egg-from { left: 8px; top: 244px; width: 232px; height: 44px }
+#eggs-tray { left: 248px; top: 8px; width: 384px; height: 280px }
+#eggs-grid { display: grid; grid-template-columns: repeat(11, 32px); grid-auto-rows: 28px }
+#eggs-grid .egg { display: grid; place-items: center; position: relative; cursor: pointer }
+#eggs-grid .egg i { position: absolute; left: 8px; bottom: 0; height: 2px; background: var(--gold) }
+#eggs-grid .bracket { position: absolute; inset: 0; pointer-events: none }
+#eggs-grid .bracket b { position: absolute; width: 8px; height: 8px; border: 0 solid var(--red) }
+#eggs-grid .bracket b:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px }
+#eggs-grid .bracket b:nth-child(2) { right: 0; top: 0; border-width: 2px 2px 0 0 }
+#eggs-grid .bracket b:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 2px 2px }
+#eggs-grid .bracket b:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0 }
+#hatch { left: 8px; top: 8px; width: 624px; height: 280px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 36px 1fr; gap: 0 12px }
 #hatch .title, #hatch .head { grid-column: 1 / -1 }
 #hatch.sum { grid-template-rows: 24px 1fr }
 #hatch .cell { width: 96px; height: 96px; background: var(--ink) }
+#hatch .cell.egg-phase { background: var(--panel) }
 #hatch-text div { min-height: 20px }
 #hatch .grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 96px); gap: 4px 4px; overflow: hidden }
 #hatch .grid .tag { height: 20px; text-align: center }
@@ -115,8 +127,11 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel rows" id="menu" role="listbox"></div>
       </section>
       <section id="scr-eggs" class="screen" hidden>
-        <div class="panel" id="eggs-tray"><div class="title" id="eggs-title">EGGS</div><div id="eggs-grid"></div></div>
-        <div class="panel" id="eggs-side"><div class="title">HATCH</div><div class="rows" id="eggs-menu"></div><div class="rows" id="eggs-legend"></div></div>
+        <div class="panel" id="egg-pic"></div>
+        <div class="panel title" id="egg-name"></div>
+        <div class="panel" id="egg-day"></div>
+        <div class="panel" id="egg-from"></div>
+        <div class="panel" id="eggs-tray"><div id="eggs-grid"></div></div>
         <div class="panel" id="hatch" hidden></div>
       </section>
       <section id="scr-dex" class="screen" hidden>
@@ -243,6 +258,9 @@ function say(text, extra) {
   if (extra) col.append(extra);
   $("#msg").replaceChildren(col);
 }
+// Headers: the word in Silkscreen, any count beside it in the body font's number style
+// (Silkscreen's 0 and O look alike).
+function titled(node, word, count) { node.replaceChildren(word, ...(count === undefined ? [] : [" ", el("span", "num count", count)])); return node; }
 const HINT = "Arrows move · Enter picks · Backspace goes back · 1–5 switch screens.";
 function drawBackdrop() {
   const g = $("#scene").getContext("2d");
@@ -450,40 +468,46 @@ function pullKey(e) {
 }
 
 /* ── Eggs: the tray, and hatching ──────────────────────────────────────── */
-let eggAt = 0, eggMenuAt = 0, hatching = null;
+let eggAt = 0, hatching = null;
+const EGG_SHOWN = ["eggs-tray", "egg-pic", "egg-name", "egg-day", "egg-from"];
+const weekday = day => { try { return new Date(day + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }); } catch { return ""; } };
+function eggWords(egg) {
+  const part = egg.progress / egg.need;
+  if (egg.ready) return "Something is moving inside. It's ready to hatch!";
+  if (part >= 0.66) return "It's starting to move. It will hatch soon.";
+  if (part >= 0.33) return "It makes small sounds now and then. Not long now.";
+  return "It looks like this egg will take a while to hatch.";
+}
 function eggsUpdate() {
   drawBackdrop();
   const ready = S.eggs.filter(e => e.ready).length;
   if (eggAt >= S.eggs.length) eggAt = Math.max(0, S.eggs.length - 1);
-  $("#eggs-title").textContent = "EGGS " + S.eggs.length + "/" + G.maxEggs;
   $("#eggs-grid").replaceChildren(...S.eggs.map((egg, i) => {
-    const cell = el("div", "egg" + (i === eggAt ? " at" : ""));
+    const cell = el("div", "egg");
     cell.dataset.egg = i;
     cell.append(eggIcon(egg.tier));
     const bar = el("i"); bar.style.width = Math.round(8 * egg.progress / egg.need) * 2 + "px";
     cell.append(bar);
+    if (i === eggAt) { const br = el("div", "bracket"); br.append(el("b"), el("b"), el("b"), el("b")); cell.append(br); }
     return cell;
   }));
   if (!S.eggs.length) $("#eggs-grid").append(el("p", "dim", "No eggs yet."));
-  $("#eggs-grid").onclick = e => { const c = e.target.closest("[data-egg]"); if (c) { eggAt = Number(c.dataset.egg); eggsUpdate(); } };
-  rows($("#eggs-menu"), [{ label: "Hatch", right: ready, off: !ready }, { label: "Pull more" }], eggMenuAt,
-    (i, click) => { eggMenuAt = i; if (click) eggMenu(i); else eggsUpdate(); });
-  $("#eggs-legend").replaceChildren(...[0, 1, 2, 3].map(t => {
-    const r = el("div", "off"); r.style.cursor = "default";
-    r.append(eggIcon(t), el("span", "grow", TIER_NAME[t]), el("span", "right num", [5, 15, 30, 60][t] + "w"));
-    return r;
-  }));
+  $("#eggs-grid").onclick = e => { const c = e.target.closest("[data-egg]"); if (!c) return; if (Number(c.dataset.egg) === eggAt) startHatch(); else { eggAt = Number(c.dataset.egg); eggsUpdate(); } };
   const egg = S.eggs[eggAt];
-  say(egg ? TIER_NAME[egg.tier] + " egg" + (egg.banner ? " (" + name(egg.banner) + ")" : "") + " from " + G.machines[egg.machine] + ": " +
-      (egg.ready ? "ready to hatch." : egg.progress + " of " + egg.need + " waves.")
-    : "Eggs hatch on waves you earn: Poké Idle catches, Pokédoku boards, tower defense waves.");
+  $("#egg-pic").replaceChildren(egg ? bigEgg(egg.tier, 0, false) : el("span", "dim", "No eggs"));
+  titled($("#egg-name"), egg ? TIER_NAME[egg.tier].toUpperCase() + " EGG" : "EGGS", egg ? undefined : "0/" + G.maxEggs);
+  $("#egg-day").replaceChildren(el("span", "", egg && egg.day ? egg.day + " " + weekday(egg.day) : "—"));
+  const from = egg ? G.machines[egg.machine] + (egg.banner ? ": " + name(egg.banner) : "") : "Pull some on the Pull tab";
+  $("#egg-from").replaceChildren(el("span", egg ? "" : "dim", from));
+  const progress = egg ? el("span", "num", egg.progress + "/" + egg.need) : null;
+  if (egg) say(eggWords(egg) + " ", (() => { const d = el("div"); d.append(progress, " waves · ", ready ? "Enter hatches " + ready + " ready." : "Waves come from Poké Idle, Pokédoku and battles."); return d; })());
+  else say("Eggs hatch on waves you earn: Poké Idle catches, Pokédoku boards, tower defense waves.");
 }
-function eggMenu(i) { if (i === 0) startHatch(); else go("pull"); }
 function eggsKey(e) {
   const k = e.key, n = S.eggs.length;
-  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -15, ArrowDown: 15 }[k];
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -11, ArrowDown: 11 }[k];
   if (step) { e.preventDefault(); if (n) { eggAt = Math.max(0, Math.min(n - 1, eggAt + step)); eggsUpdate(); } }
-  else if (k === "Enter" || k === " ") { e.preventDefault(); eggMenu(eggMenuAt); }
+  else if (k === "Enter" || k === " ") { e.preventDefault(); startHatch(); }
   else if (k === "Backspace") { e.preventDefault(); go("pull"); }
 }
 function startHatch() {
@@ -492,7 +516,7 @@ function startHatch() {
   hatching = { list: r.hatched, i: 0, phase: "shake", start: performance.now(), summary: false };
   refreshTop();
   $("#hatch").hidden = false;
-  $("#eggs-tray").hidden = $("#eggs-side").hidden = true;
+  for (const id of EGG_SHOWN) $("#" + id).hidden = true;
   showHatch();
 }
 // The big egg: 24×24 art pixels at 4x fills the 96px cell.
@@ -502,11 +526,13 @@ function bigEgg(tier, wobble, crack) {
   const g = c.getContext("2d");
   g.scale(4, 4);
   const cx = 12 + wobble;
-  ellipse(g, cx, 12, 8, 11, C.ink); ellipse(g, cx, 12, 7, 10, TIER_COLOR[tier]);
+  // A hard-edged shadow on the ground, then the egg.
+  g.fillStyle = C.ink; g.fillRect(cx - 9, 21, 15, 2); g.fillRect(cx - 7, 23, 11, 1);
+  ellipse(g, cx, 11, 8, 10, C.ink); ellipse(g, cx, 11, 7, 9, TIER_COLOR[tier]);
   g.fillStyle = tier === 0 ? C.dim : C.ink;
-  for (const [x, y, w, h] of [[-4, -6, 3, 2], [2, -7, 2, 2], [3, 0, 2, 2], [-5, 3, 2, 2], [-1, 6, 3, 2]]) g.fillRect(cx + x, 12 + y, w, h);
-  g.fillStyle = C.paper; g.fillRect(cx - 4, 5, 2, 3);
-  if (crack) { g.fillStyle = C.ink; for (let i = -6; i <= 6; i += 2) g.fillRect(cx + i, 11 + (i % 4 ? 1 : -1), 2, 1); }
+  for (const [x, y, w, h] of [[-4, -6, 3, 2], [2, -6, 2, 2], [3, 0, 2, 2], [-5, 3, 2, 2], [-1, 5, 3, 2]]) g.fillRect(cx + x, 11 + y, w, h);
+  g.fillStyle = C.paper; g.fillRect(cx - 4, 4, 2, 3);
+  if (crack) { g.fillStyle = C.ink; for (let i = -6; i <= 6; i += 2) g.fillRect(cx + i, 10 + (i % 4 ? 1 : -1), 2, 1); }
   return c;
 }
 const hatchLook = x => x.sp ? x.sp : x.shiny ? "shiny" : "normal";
@@ -524,11 +550,12 @@ function showHatch() {
   }
   const x = h.list[h.i];
   panel.classList.remove("sum");
-  const art = cellWith(bigEgg(x.tier, 0, false));
+  const art = cellWith(bigEgg(x.tier, 0, false), CELL, "egg-phase");
   const text = el("div"); text.id = "hatch-text";
-  panel.replaceChildren(el("div", "title", "EGG " + (h.i + 1) + " OF " + h.list.length), art, text);
+  panel.replaceChildren(titled(el("div", "title"), "EGG", (h.i + 1) + "/" + h.list.length), art, text);
   const reveal = () => {
     h.phase = "shown";
+    art.classList.remove("egg-phase");
     art.replaceChildren(sprite(x.species, hatchLook(x)));
     const candy = el("div"); candy.append(el("span", "num", "+" + x.candy), " candy");
     if (x.shards) candy.append(" · ", el("span", "num", "+" + x.shards), " shards");
@@ -560,7 +587,7 @@ function hatchKey(e) {
     else endHatch();
   } else if (e.key === "Backspace") { e.preventDefault(); if (h.summary) endHatch(); else { h.summary = true; showHatch(); } }
 }
-function endHatch() { hatching = null; $("#hatch").hidden = true; $("#eggs-tray").hidden = $("#eggs-side").hidden = false; refreshTop(); eggsUpdate(); }
+function endHatch() { hatching = null; $("#hatch").hidden = true; for (const id of EGG_SHOWN) $("#" + id).hidden = false; refreshTop(); eggsUpdate(); }
 
 /* ── Dex: every line an egg can hatch, and what candy does ─────────────── */
 const BASES = G ? G.dex.map((row, i) => row[9] > 0 ? i + 1 : 0).filter(Boolean) : [];
@@ -598,7 +625,7 @@ function dexActions(line) {
 function dexUpdate() {
   drawBackdrop();
   const owned = new Set(Object.keys(S.lines).map(Number));
-  $("#dex-title").textContent = "DEX " + owned.size + "/" + BASES.length;
+  titled($("#dex-title"), "DEX", owned.size + "/" + BASES.length);
   rows($("#dex-rows"), BASES.map(num => ({ label: String(num).padStart(4, "0") + " " + name(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
     dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); });
   const line = BASES[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
@@ -694,7 +721,7 @@ function questsUpdate() {
   rows($("#quest-list"), items.map(q => ({ label: q.label, right: q.right, off: q.done })), questFocus === "missions" ? questAt : -1,
     i => { questAt = i; questFocus = "missions"; questsUpdate(); });
   const trophies = G.trophies();
-  $("#trophy-title").textContent = "TROPHIES " + trophies.length;
+  titled($("#trophy-title"), "TROPHIES", trophies.length);
   rows($("#trophy-list"), trophies.map(t => ({ label: t.name, right: t.tier })), questFocus === "trophies" ? trophyAt : -1,
     i => { trophyAt = i; questFocus = "trophies"; questsUpdate(); });
   if (!trophies.length) $("#trophy-list").replaceChildren(el("p", "dim", "None yet."));

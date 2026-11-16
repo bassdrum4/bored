@@ -215,7 +215,7 @@ export function gachaState(wallet, today = dailyDate()) {
     passive: false, cost: 0, look: 'normal' });
   for (const pull of pulls) {
     pull.eggs.forEach((tier, i) => {
-      const egg = { id: pull.key + '.' + i, tier, machine: pull.machine, banner: tier === 4 ? pull.banner : 0 };
+      const egg = { id: pull.key + '.' + i, tier, machine: pull.machine, banner: tier === 4 ? pull.banner : 0, day: pull.day };
       const hatch = readHatch(entries['hatch:' + egg.id]);
       if (!hatch) {
         const progress = Math.max(0, balance.waves - pull.waves);
