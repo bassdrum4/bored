@@ -72,7 +72,7 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
       if(url.pathname==='/auth/v1/logout')return reply(null);
       // Signed-in bootstrap also reads the analytics entitlement tables; like
       // the other account-wide reads they answer empty for these mock users.
-      if(['/rest/v1/announcements','/rest/v1/announcement_reads','/rest/v1/score_rules','/rest/v1/leaderboard','/rest/v1/daily_leaderboard','/rest/v1/scores','/rest/v1/player_state','/rest/v1/daily_results','/rest/v1/play_events','/rest/v1/product_events','/rest/v1/enjoyment_feedback','/rest/v1/analytics_admins','/rest/v1/game_analytics_readers'].includes(url.pathname))return reply(req.method()==='GET'?[]:null);
+      if(['/rest/v1/announcements','/rest/v1/announcement_reads','/rest/v1/score_rules','/rest/v1/leaderboard','/rest/v1/daily_leaderboard','/rest/v1/buddy_board','/rest/v1/scores','/rest/v1/player_state','/rest/v1/daily_results','/rest/v1/play_events','/rest/v1/product_events','/rest/v1/enjoyment_feedback','/rest/v1/analytics_admins','/rest/v1/game_analytics_readers'].includes(url.pathname))return reply(req.method()==='GET'?[]:null);
       unexpected.push(req.method()+' '+url.pathname);return req.abort();
     });
     await page.goto(site.url);await page.waitForFunction(()=>document.querySelectorAll('#grid .card').length>0);

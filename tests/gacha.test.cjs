@@ -20,7 +20,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const gacha = moduleUnderTest('src/hub/gacha.js', [
   'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin',
-  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY'
+  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf'
 ], { ...daily, ...rewards, DEX, DEX_TYPES });
 const { mergeWallet, walletBalance, activateWallet, grantOnce } = rewards;
 const { gachaState, pullEggs, hatchReady, evolve, upgrade, buySp, setBuddy, claimLogin, eggPools, bannerFor } = gacha;
@@ -206,22 +206,59 @@ test('candy evolves, unlocks the passive and cuts the deploy cost in order', () 
   assert.deepEqual([state.lines[line].passive, state.lines[line].cost, state.lines[line].candy], [true, 2, 205 - 50 - 30 - 60]);
 });
 
-test('Shiny UP rolls shinies and SP skins; the shard shop sells SP', () => {
+test('SP skins exist only for listed species: no list, no SP roll and nothing to buy', () => {
+  gacha.setSkins([]);
   let wallet = fresh({ regular: 1, waves: 0 });
   wallet = pull(wallet, { machine: 'shiny', rand: always(0.001) }).wallet;
   wallet = fund(wallet, { waves: 10 });
   const egg = hatchReady(wallet, opts({ rand: always(0.001) }));
-  assert.equal(egg.hatched[0].shiny, true);
-  assert.equal(egg.hatched[0].sp, true);
+  assert.equal(egg.hatched[0].shiny, true, 'Shiny UP still rolls shinies');
+  assert.equal(egg.hatched[0].sp, null, 'no skin in the list, so no SP roll');
+  assert.equal(buySp(fund(egg.wallet, { shards: 300 }), 'anything', opts()).reason, 'unknown');
+});
+
+test('a listed skin rolls on Shiny UP only for its species, and the shard shop sells it', () => {
+  const first = eggPools()[0][0];
+  assert.equal(gacha.setSkins([{ id: 'test-skin', species: first, name: 'Test' }, { id: 'Bad Id', species: 1, name: 'x' }, { id: 'nobody', species: 99999, name: 'x' }]), 1,
+    'malformed entries are dropped');
+  let wallet = fresh({ regular: 2, waves: 0 });
+  wallet = pull(wallet, { machine: 'shiny', rand: always(0.001) }).wallet;
+  wallet = pull(wallet, { machine: 'move', rand: always(0.001) }).wallet;
+  const hatched = hatchReady(fund(wallet, { waves: 10 }), opts({ rand: always(0.001) }));
+  assert.equal(hatched.hatched[0].species, first);
+  assert.equal(hatched.hatched[0].sp, 'test-skin', 'Shiny UP rolled the listed skin');
+  assert.equal(hatched.hatched[1].sp, null, 'only Shiny UP rolls SP');
+  let state = gachaState(hatched.wallet, TODAY);
+  assert.deepEqual(state.lines[first].skins, ['test-skin']);
+  assert.deepEqual(gacha.looksOf(state.lines[first]), ['normal', 'shiny', 'test-skin']);
+  const worn = gacha.setLook(hatched.wallet, first, 'test-skin', opts()).wallet;
+  assert.equal(gacha.lookFor(gachaState(worn, TODAY), first), 'test-skin');
+  const next = gacha.evolutionsOf(first)[0];
+  if (next) assert.equal(gacha.lookFor(gachaState(worn, TODAY), next), 'normal', 'a skin is drawn only on its own species');
+  assert.equal(setBuddy(worn, first, opts({ skin: 'test-skin' })).ok, true);
+  // The shop: someone without the skin buys it for 300 shards; nobody buys it twice.
   let other = fresh({ regular: 1, waves: 0 });
   other = pull(other, { machine: 'move', rand: always(0.001) }).wallet;
   other = hatchReady(fund(other, { waves: 10 }), opts({ rand: always(0.001) })).wallet;
-  const line = gachaState(other, TODAY).owned[0];
-  assert.equal(gachaState(other, TODAY).lines[line].sp, false, 'only Shiny UP rolls SP');
-  assert.equal(buySp(other, line, opts()).reason, 'shards');
-  other = buySp(fund(other, { shards: 300 }), line, opts()).wallet;
-  assert.equal(gachaState(other, TODAY).lines[line].sp, true);
+  assert.equal(buySp(other, 'test-skin', opts()).reason, 'shards');
+  other = buySp(fund(other, { shards: 300 }), 'test-skin', opts()).wallet;
+  assert.deepEqual(gachaState(other, TODAY).lines[first].skins, ['test-skin']);
   assert.equal(walletBalance(other).shards, 0);
+  assert.equal(buySp(fund(other, { shards: 300 }), 'test-skin', opts()).reason, 'owned');
+  assert.equal(buySp(fresh({ shards: 300 }), 'test-skin', opts()).reason, 'not-owned', 'you need the line first');
+  // A skin taken off the list stops counting, and the look falls back to normal.
+  gacha.setSkins([]);
+  assert.equal(gacha.lookFor(gachaState(worn, TODAY), first), 'normal');
+  assert.deepEqual(gachaState(worn, TODAY).lines[first].skins, []);
+});
+
+test('the shipped SP list is valid, and every listed skin has its PNG', () => {
+  const dir = path.join(root, 'src/games/content/poke-gacha/sp');
+  const list = JSON.parse(fs.readFileSync(path.join(dir, 'skins.json'), 'utf8'));
+  assert.ok(Array.isArray(list));
+  assert.equal(gacha.setSkins(list), list.length, 'every entry is well formed');
+  for (const skin of list) assert.ok(fs.existsSync(path.join(dir, skin.id + '.png')), skin.id + '.png is missing');
+  gacha.setSkins([]);
 });
 
 test('the buddy must be owned, its look unlocked, and the latest choice wins', () => {
@@ -232,6 +269,7 @@ test('the buddy must be owned, its look unlocked, and the latest choice wins', (
   const [a, b] = gachaState(wallet, TODAY).owned;
   assert.equal(setBuddy(wallet, 25, opts()).reason, 'not-owned');
   assert.equal(setBuddy(wallet, a, opts({ shiny: true })).reason, 'locked');
+  assert.equal(setBuddy(wallet, a, opts({ skin: 'not-a-skin' })).reason, 'locked');
   wallet = setBuddy(wallet, a, opts()).wallet;
   wallet = setBuddy(wallet, b || a, opts()).wallet;
   const state = gachaState(wallet, TODAY);
@@ -254,4 +292,25 @@ test('skills come from the line\'s types', () => {
   assert.deepEqual(gacha.skillsOf(named('Bulbasaur')), ['Vine Whip', 'Razor Leaf', 'Poison Sting', 'Solar Beam']);
   assert.deepEqual(gacha.skillsOf(named('Venusaur')), gacha.skillsOf(named('Bulbasaur')), 'shared by the line');
   assert.equal(gacha.stageOf(named('Venusaur')), 3);
+});
+
+test('a line wears one look across Bored, and only one it has unlocked', () => {
+  let wallet = fresh({ regular: 1, waves: 0 });
+  wallet = pull(wallet, { machine: 'shiny', rand: always(0.001) }).wallet;
+  wallet = hatchReady(fund(wallet, { waves: 10 }), opts({ rand: always(0.001) })).wallet;
+  const line = gachaState(wallet, TODAY).owned[0];
+  assert.equal(gacha.lookFor(gachaState(wallet, TODAY), line), 'normal');
+  assert.equal(gacha.setLook(wallet, line, 'sp', opts()).reason, 'locked', 'no such skin');
+  wallet = gacha.setLook(wallet, line, 'shiny', opts()).wallet;
+  wallet = gacha.setLook(wallet, line, 'normal', opts()).wallet;
+  wallet = gacha.setLook(wallet, line, 'shiny', opts()).wallet;
+  assert.equal(gachaState(wallet, TODAY).lines[line].look, 'shiny', 'the latest choice wins');
+  const next = gacha.evolutionsOf(line)[0];
+  if (next) assert.equal(gacha.lookFor(gachaState(wallet, TODAY), next), 'shiny', 'evolutions share the line\'s look');
+  assert.equal(gacha.lookFor(gachaState(wallet, TODAY), 25), 'normal');
+  let plain = fresh({ regular: 1, waves: 0 });
+  plain = pull(plain, { machine: 'move', rand: always(0.001) }).wallet;
+  plain = hatchReady(fund(plain, { waves: 10 }), opts({ rand: always(0.9) })).wallet;
+  const own = gachaState(plain, TODAY).owned[0];
+  assert.equal(gacha.setLook(plain, own, 'shiny', opts()).reason, 'locked');
 });

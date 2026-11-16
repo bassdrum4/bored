@@ -5,100 +5,137 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Poké Gacha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Workbench&display=swap">
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box }
-  body { display: grid; place-items: start center; min-height: 100vh; padding: 14px 0 28px; background: #f5f2ea; color: #191713;
-         font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace }
-  main { width: min(360px, 94vw) }
-  #hud { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid #191713; padding-bottom: 6px }
-  #waves { font-size: 11px; color: #6b6558; margin-top: 2px }
-  nav { display: flex; gap: 4px; margin: 10px 0 }
-  button { font: inherit; font-size: 12px; border: 1px solid #191713; background: none; color: inherit; padding: 6px 9px;
-           border-radius: 2px; cursor: pointer; touch-action: manipulation }
-  button:disabled { color: #a49d8d; border-color: #d8d2c4; cursor: default }
-  button.on { background: #191713; color: #f5f2ea }
-  nav button { flex: 1; padding: 6px 4px }
-  h2 { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin: 14px 0 6px }
-  p, li { font-size: 12px }
-  .quiet { color: #6b6558 }
-  .row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center }
-  .col { display: grid; gap: 4px }
-  .col button { text-align: left; display: flex; justify-content: space-between; gap: 8px }
-  .box { border: 1px solid #d8d2c4; background: #fffdf7; padding: 8px; margin-top: 6px }
-  .banner { display: flex; gap: 8px; align-items: center }
-  img.spr { image-rendering: pixelated; object-fit: contain }
-  img.sp { filter: hue-rotate(150deg) saturate(1.3) }
-  .eggs { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px }
-  .egg { border: 1px solid #d8d2c4; padding: 1px 4px; font-size: 11px; background: #fffdf7 }
-  .egg.t1 { border-color: #191713 } .egg.t2, .egg.t3, .egg.t4 { border-color: #b3412e; color: #b3412e }
-  ul { list-style: none; display: grid; gap: 3px }
-  .meter { height: 4px; background: #e6e0d2; margin-top: 2px } .meter i { display: block; height: 100%; background: #191713 }
-  #grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 6px }
-  #grid button { padding: 0; border-color: #d8d2c4; background: #fffdf7 }
-  #grid button.on { border-color: #191713; background: #fffdf7 }
-  #grid img { display: block; width: 100%; height: auto; aspect-ratio: 1 }
-  .detail { display: grid; grid-template-columns: 72px 1fr; gap: 8px; align-items: start }
-  .detail img { width: 72px; height: 72px; border: 1px solid #d8d2c4; background: #fffdf7 }
-  .done { text-decoration: line-through; color: #6b6558 }
-  #note { min-height: 18px; margin-top: 8px; color: #b3412e }
-  #off { margin-top: 12px }
+/* Poké Gacha screens. One fixed internal resolution (640×408: a 48px tab bar
+   and a 640×360 stage), scaled by a whole number. Rules every screen keeps:
+   - one panel style (.panel), one list style (.rows) with one ▶ cursor
+   - spacing on a 4px grid, 8px margins and gaps everywhere
+   - one pixel font (Workbench) at its native 16px and exactly 2x (32px), no
+     ligatures; numbers in the same font, right-aligned in columns
+   - the eight colors below and nothing else; egg tiers are fixed colors
+   - every sprite at 1x, centered in a 96px cell (the largest sprite is 96px) */
+:root {
+  --ink: #1c1b2c; --panel: #2c2a44; --red: #c8372f; --paper: #f4f1ff;
+  --dim: #807c9a; --gold: #e3ad2b; --teal: #3f9e8a; --sky: #8fd3e8;
+  --body: 16px; --title: 32px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box }
+body { background: var(--ink); display: grid; place-items: start center; min-height: 100vh; padding-top: 4px; overflow: hidden }
+#wrap { position: relative; overflow: hidden; outline: none; touch-action: manipulation; user-select: none }
+#frame { position: absolute; left: 0; top: 0; width: 640px; height: 408px; transform-origin: 0 0; background: var(--ink);
+         font: var(--body)/20px Workbench, ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--paper);
+         letter-spacing: 1px; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0, "zero" 1; font-synthesis: none }
+canvas, img { image-rendering: pixelated; display: block }
+#stage { position: absolute; left: 0; top: 48px; width: 640px; height: 360px; overflow: hidden }
+#scene { position: absolute; inset: 0; width: 640px; height: 360px }
 
-  /* The pull screen: a 320×180 pixel scene, scaled to the frame. The art is a
-     canvas drawn here in code; the words sit on top as text so they stay sharp. */
-  #pullwrap { width: min(640px, 96vw); position: relative; left: 50%; transform: translateX(-50%); margin-top: 2px; overflow: hidden;
-              outline: none; touch-action: manipulation; user-select: none }
-  #stage { position: absolute; left: 0; top: 0; width: 320px; height: 180px; transform-origin: 0 0;
-           font-family: "Pixelify Sans", ui-monospace, SFMono-Regular, Menlo, monospace; color: #f4f1ff }
-  #scene { position: absolute; inset: 0; width: 320px; height: 180px; image-rendering: pixelated }
-  .win { position: absolute; background: #2c2a44; border: 2px solid #c8372f; box-shadow: 0 0 0 1px #5a1712, inset 0 0 0 1px #5a1712 }
-  .win canvas { image-rendering: pixelated }
-  #counts { position: absolute; right: 2px; top: 2px; display: flex; gap: 2px }
-  #counts .win { position: static; width: 54px; height: 17px; display: flex; align-items: center; justify-content: space-between; padding: 0 3px 0 4px;
-                 font-size: 11px; line-height: 1 }
-  #plate { position: absolute; display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600;
-           color: #2c2a44; line-height: 1; pointer-events: none }
-  #plate img { width: 22px; height: 22px; image-rendering: pixelated }
-  #clock { position: absolute; font-size: 8px; color: #2c2a44; background: #f2f0ea; border: 1px solid #8d8a80; border-radius: 3px;
-           padding: 1px 3px; line-height: 1.1; pointer-events: none }
-  #menu { right: 3px; top: 50px; width: 104px; padding: 4px 2px 3px 4px }
-  #menu div { display: flex; align-items: center; gap: 4px; height: 12px; font-size: 9px; line-height: 1; cursor: pointer; padding-left: 8px; position: relative; white-space: nowrap }
-  #menu div.off { color: #807c9a }
-  #menu div.at::before { content: ""; position: absolute; left: 1px; top: 2px; border: 4px solid transparent; border-left: 5px solid #f4f1ff; border-right: 0 }
-  #menu .times { width: 18px }
-  #menu[hidden] { display: none }
-  #msg { left: 3px; right: 3px; bottom: 3px; height: 30px; padding: 4px 6px; font-size: 9px; line-height: 1.25; display: flex; gap: 6px; align-items: flex-start }
-  #msg .eggs { display: flex; flex-wrap: wrap; gap: 1px; margin: 2px 0 0; max-height: 11px; overflow: hidden }
-  .hit { position: absolute; cursor: pointer }
+.panel { position: absolute; background: var(--panel); border: 2px solid var(--red); outline: 2px solid var(--ink); padding: 8px }
+.title { font-size: var(--title); line-height: 36px; margin-bottom: 4px }
+.head { margin-bottom: 4px }
+.num { color: var(--gold) }
+.dim { color: var(--dim) }
+.gold { color: var(--gold) }
+/* Lists scroll by whole 24px rows and never stop on a half-cut one. */
+.scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--red) var(--panel); scroll-snap-type: y mandatory }
+.scroll > * { scroll-snap-align: start }
+.rows > div { display: flex; align-items: center; gap: 8px; height: 24px; padding-left: 16px; position: relative; white-space: nowrap; cursor: pointer }
+.rows > div.off { color: var(--dim) }
+.rows > div.at::before { content: ""; position: absolute; left: 0; top: 6px; border-style: solid; border-width: 6px 0 6px 8px;
+                          border-color: transparent transparent transparent var(--paper) }
+.rows .grow { flex: 1; overflow: hidden; text-overflow: ellipsis }
+.rows .right { display: flex; align-items: center; gap: 4px; padding-right: 4px }
+.rows p { padding: 4px 0 }
+.cell { display: grid; place-items: center; overflow: hidden }
+.unseen { filter: brightness(0) }
+[hidden] { display: none !important }
+
+#tabs { position: absolute; left: 8px; right: 8px; top: 8px; height: 32px; display: flex; gap: 8px }
+#tabs .panel { position: static; height: 32px; padding: 4px 12px; cursor: pointer }
+#tabs .panel.on { background: var(--red) }
+#tabs .purse { margin-left: auto; display: flex; align-items: center; gap: 8px; cursor: default }
+#msg { left: 8px; right: 8px; bottom: 8px; height: 56px; padding: 6px 12px; display: flex; gap: 8px; align-items: flex-start }
+#msg .eggs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px }
+
+/* Pull */
+#counts { position: absolute; right: 8px; top: 8px; display: flex; gap: 8px }
+#counts .panel { position: static; width: 100px; height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 4px 8px }
+#plate { position: absolute; display: flex; align-items: center; justify-content: center; font-size: var(--title); line-height: 36px;
+         color: var(--ink); pointer-events: none }
+#banner { position: absolute; width: 96px; height: 96px; pointer-events: none }
+#clock { position: absolute; color: var(--ink); background: var(--paper); border: 2px solid var(--ink); padding: 0 4px; pointer-events: none }
+#menu { right: 8px; top: 96px; width: 216px; padding: 8px }
+.hit { position: absolute; cursor: pointer }
+
+/* Eggs */
+#eggs-tray { left: 8px; top: 8px; width: 400px; height: 280px }
+#eggs-grid { display: grid; grid-template-columns: repeat(15, 24px) }
+#eggs-grid .egg { width: 24px; height: 28px; display: grid; place-items: center; position: relative; cursor: pointer }
+#eggs-grid .egg i { position: absolute; left: 4px; bottom: 0; height: 2px; background: var(--gold) }
+#eggs-grid .egg.at { outline: 2px solid var(--paper); outline-offset: -2px }
+#eggs-side { left: 416px; top: 8px; width: 216px; height: 280px }
+#hatch { left: 8px; top: 8px; width: 624px; height: 280px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 40px 1fr; gap: 0 12px }
+#hatch .title, #hatch .head { grid-column: 1 / -1 }
+#hatch.sum { grid-template-rows: 24px 1fr }
+#hatch .cell { width: 96px; height: 96px; background: var(--ink) }
+#hatch-text div { min-height: 20px }
+#hatch .grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 96px); gap: 4px 4px; overflow: hidden }
+#hatch .grid .tag { height: 20px; text-align: center }
+
+/* Dex */
+#dex-list { left: 8px; top: 8px; width: 248px; height: 280px; display: flex; flex-direction: column }
+#dex-rows { height: 216px }
+#dex-detail { left: 264px; top: 8px; width: 368px; height: 280px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 96px 1fr; gap: 8px 12px }
+#dex-detail .cell { width: 96px; height: 96px; background: var(--ink) }
+#dex-acts { grid-column: 1 / -1; height: 144px }
+
+/* Shop and quests share one layout */
+.left-panel { left: 8px; top: 8px; width: 400px; height: 280px; display: flex; flex-direction: column }
+.right-panel { left: 416px; top: 8px; width: 216px; height: 280px; display: flex; flex-direction: column; gap: 8px }
+.right-panel .cell { width: 96px; height: 96px; background: var(--ink); align-self: center }
+/* Scrolling lists hold whole rows only: 9 × 24px. */
+.left-panel .rows, .right-panel .rows { height: 216px }
+#off { position: absolute; left: 8px; right: 8px; top: 56px; padding: 12px }
 </style>
 </head>
 <body>
-<main>
-  <div id="hud">Poké Gacha</div>
-  <div id="waves"></div>
-  <nav id="tabs">
-    <button type="button" data-tab="pull" class="on">Pull</button>
-    <button type="button" data-tab="eggs">Eggs</button>
-    <button type="button" data-tab="dex">Dex</button>
-    <button type="button" data-tab="missions">Missions</button>
-  </nav>
-  <div id="pullwrap" tabindex="0" aria-label="Egg machines. Left and right switch machines, up and down pick a voucher, Enter pulls." hidden>
+<div id="wrap" tabindex="0" aria-label="Poké Gacha. Arrow keys move, Enter picks, Backspace goes back, 1 to 5 switch screens.">
+  <div id="frame">
+    <div id="tabs"></div>
     <div id="stage">
-      <canvas id="scene" width="320" height="180"></canvas>
-      <div id="counts"></div>
-      <div id="plate"></div>
-      <div id="clock" hidden></div>
-      <div class="hit" id="hit-left" style="left:0;top:40px;width:40px;height:100px" title="Previous machine"></div>
-      <div class="hit" id="hit-machine" style="left:110px;top:40px;width:100px;height:100px" title="Open the voucher menu"></div>
-      <div class="hit" id="hit-right" style="left:212px;top:150px;width:0;height:0"></div>
-      <div class="win" id="menu" role="listbox"></div>
-      <div class="win" id="msg" role="status"></div>
+      <canvas id="scene" width="640" height="360"></canvas>
+      <section id="scr-pull" class="screen">
+        <div id="counts"></div>
+        <img id="banner" alt="" hidden>
+        <div id="plate"></div>
+        <div id="clock" class="num" hidden></div>
+        <div class="hit" id="hit-left" style="left:0;top:80px;width:80px;height:200px" title="Previous machine"></div>
+        <div class="hit" id="hit-right" style="left:432px;top:44px;width:208px;height:48px" title="Next machine"></div>
+        <div class="hit" id="hit-machine" style="left:208px;top:80px;width:176px;height:200px" title="Open the voucher menu"></div>
+        <div class="panel rows" id="menu" role="listbox"></div>
+      </section>
+      <section id="scr-eggs" class="screen" hidden>
+        <div class="panel" id="eggs-tray"><div class="title" id="eggs-title">EGGS</div><div id="eggs-grid"></div></div>
+        <div class="panel" id="eggs-side"><div class="title">HATCH</div><div class="rows" id="eggs-menu"></div><div class="rows" id="eggs-legend"></div></div>
+        <div class="panel" id="hatch" hidden></div>
+      </section>
+      <section id="scr-dex" class="screen" hidden>
+        <div class="panel" id="dex-list"><div class="title" id="dex-title">DEX</div><div class="rows scroll" id="dex-rows"></div></div>
+        <div class="panel" id="dex-detail"><div class="cell" id="dex-pic"></div><div id="dex-info"></div><div class="rows scroll" id="dex-acts"></div></div>
+      </section>
+      <section id="scr-shop" class="screen" hidden>
+        <div class="panel left-panel"><div class="title" id="shop-title">SHOP</div><div class="rows scroll" id="shop-list"></div></div>
+        <div class="panel right-panel" id="shop-preview"></div>
+      </section>
+      <section id="scr-quests" class="screen" hidden>
+        <div class="panel left-panel"><div class="title">MISSIONS</div><div class="rows scroll" id="quest-list"></div></div>
+        <div class="panel right-panel"><div class="title" id="trophy-title">TROPHIES</div><div class="rows scroll" id="trophy-list"></div></div>
+      </section>
+      <div class="panel" id="msg" role="status"></div>
+      <div class="panel" id="off" hidden>Open Poké Gacha from the Bored arcade: your wallet, eggs and dex live on your Bored profile.</div>
     </div>
   </div>
-  <section id="view"></section>
-  <p id="note" role="status"></p>
-  <p id="off" class="quiet" hidden>Open Poké Gacha from the Bored arcade: the wallet, eggs and dex live on your Bored profile.</p>
-</main>
+</div>
 <script>
 /* Poké Gacha. The engine and the wallet live in the hub (src/hub/gacha.js,
    src/hub/rewards.js) and this page calls them through parent.__boredGacha,
@@ -110,118 +147,26 @@ const G = (() => { try { return parent !== window && parent.__boredGacha ? paren
 const PREF = "bored.poke-gacha.ui";
 const pref = (() => { try { return JSON.parse(localStorage.getItem(PREF) || "null") || {}; } catch { return {}; } })();
 const keep = () => { try { localStorage.setItem(PREF, JSON.stringify(pref)); } catch {} };
-let tab = "pull", machine = pref.machine || "move", picked = 0, look = "normal", lastPull = null, lastHatch = null, S = null;
-
-const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const stars = n => n + "★";
+let tab = pref.tab || "pull", machine = pref.machine || "move", S = null;
 const name = num => G.dex[num - 1][0];
-const types = num => G.dex[num - 1][1].replace("/", " / ");
-const sprite = (num, shiny, sp, size = 40) =>
-  `<img class="spr${sp ? " sp" : ""}" src="${SPRITE_DIR}${shiny ? "shiny/" : ""}${num}.png" alt="${esc(name(num))}" width="${size}" height="${size}">`;
-const note = text => { $("#note").textContent = text || ""; };
 const REASONS = { vouchers: "Not enough vouchers.", full: "Egg storage is full (99). Hatch some first.", inactive: "Your wallet is not open yet.",
   candy: "Not enough candy.", shards: "Not enough shards.", owned: "Already done.", order: "Cut the cost by 1 first.", locked: "That look is not unlocked.",
   "not-owned": "You do not have that one yet." };
-const said = result => { if (!result.ok) note(REASONS[result.reason] || "Not now."); return result.ok; };
 
-function hud() {
-  const b = S.balance;
-  const ready = S.eggs.filter(e => e.ready).length;
-  $("#hud").textContent = `Coins ${b.coins} · Shards ${b.shards} · Eggs ${S.eggs.length}/${G.maxEggs} · Dex ${S.owned.length}`;
-  $("#waves").textContent = `Vouchers: ${b.regular} Regular, ${b.plus} Plus, ${b.premium} Premium, ${b.gold} Gold` + (ready ? ` · ${ready} eggs ready` : "");
-  for (const button of document.querySelectorAll("#tabs button")) {
-    button.classList.toggle("on", button.dataset.tab === tab);
-    if (button.dataset.tab === "eggs") button.textContent = "Eggs" + (ready ? " (" + ready + ")" : "");
-  }
-}
-
-function eggRow(eggs) {
-  return `<div class="eggs">${eggs.map(e => `<span class="egg t${e.tier}">${e.tier === 4 ? "Banner" : stars(G.stars[e.tier])}</span>`).join("")}</div>`;
-}
-
-function eggsView() {
-  const ready = S.eggs.filter(e => e.ready).length;
-  const tiers = [0, 1, 2, 3, 4].map(t => S.eggs.filter(e => e.tier === t)).filter(list => list.length);
-  const rows = tiers.map(list => {
-    const e = list[0], label = e.tier === 4 ? "Banner " + name(e.banner) : G.tiers[e.tier] + " " + stars(G.stars[e.tier]);
-    const done = list.filter(x => x.ready).length;
-    return `<li>${esc(label)} ×${list.length} <span class="quiet">${done ? done + " ready" : e.progress + " of " + e.need + " waves"}</span>
-      <div class="meter"><i style="width:${100 * e.progress / e.need}%"></i></div></li>`;
-  }).join("");
-  const hatched = lastHatch ? `<h2>Hatched</h2><ul>${lastHatch.map(h => `<li class="row">${sprite(h.species, h.shiny, h.sp, 32)}
-      <span>${esc(name(h.species))} ${stars(G.stars[h.tier])}${h.fresh ? " · new" : " · dupe, +" + h.shards + " shards"}${h.shiny ? " · shiny" : ""}${h.sp ? " · SP" : ""}
-      <br><span class="quiet">+${h.candy} candy · ${esc(G.skillsOf(h.species)[h.skill])}${h.skill === 3 ? " (rare)" : ""}</span></span></li>`).join("")}</ul>` : "";
-  return `<h2>Waiting</h2>${rows ? `<ul>${rows}</ul>` : `<p class="quiet">No eggs. Pull some.</p>`}
-    <p class="quiet" style="margin-top:6px">All eggs count down together. Nothing hatches from waiting: waves come from catching in Poké Idle, finishing Pokédoku boards and, later, tower defense waves.</p>
-    <div class="row" style="margin-top:8px"><button type="button" id="hatch" ${ready ? "" : "disabled"}>Hatch ${ready || ""}</button></div>${hatched}`;
-}
-
-function dexView() {
-  if (!S.owned.length) return `<p class="quiet" style="margin-top:8px">Your dex is empty. Hatch an egg.</p>`;
-  if (!S.owned.includes(picked)) picked = S.owned[0];
-  const grid = S.owned.map(num => {
-    return `<button type="button" data-pick="${num}" class="${num === picked ? "on" : ""}" title="${esc(name(num))}">${sprite(num, false, false)}</button>`; }).join("");
-  const num = picked, lineNum = G.lineOf(num), l = S.lines[lineNum], star = G.dex[lineNum - 1][9];
-  const looks = ["normal"].concat(l.shiny ? ["shiny"] : [], l.sp ? ["sp"] : []);
-  if (!looks.includes(look)) look = "normal";
-  const skills = G.skillsOf(num).map((skill, i) => `<li class="${l.skills[i] ? "" : "quiet"}">${l.skills[i] ? "" : "locked · "}${esc(skill)}${i === 3 ? " (rare)" : ""}</li>`).join("");
-  const evos = G.evolutionsOf(num).map(to => { const cost = G.costs.evolve[Math.min(G.stageOf(num), 2) - 1];
-    return S.owned.includes(to) ? `<span class="quiet">${esc(name(to))} owned</span>`
-      : `<button type="button" data-evolve="${to}" ${l.candy >= cost ? "" : "disabled"}>Evolve: ${esc(name(to))} · ${cost} candy</button>`; }).join("");
-  const isBuddy = S.buddy && S.buddy.species === num && S.buddy.shiny === (look === "shiny") && S.buddy.sp === (look === "sp");
-  return `<div id="grid">${grid}</div>
-    <div class="box"><div class="detail">${sprite(num, look === "shiny", look === "sp", 72)}<div>
-      <b>${esc(name(num))}</b> <span class="quiet">#${num}</span><br>${esc(types(num))} · ${stars(star)} line · stage ${G.stageOf(num)}<br>
-      ${l.candy} candy · hatched ${l.hatches}×</div></div>
-      <div class="row" style="margin-top:6px">${looks.map(k => `<button type="button" data-look="${k}" class="${look === k ? "on" : ""}">${{ normal: "Normal", shiny: "Shiny", sp: "SP" }[k]}</button>`).join("")}
-        <button type="button" id="buddy" ${isBuddy ? "disabled" : ""}>${isBuddy ? "Your buddy" : "Make buddy"}</button></div>
-      <h2>Skills</h2><ul>${skills}</ul>
-      ${evos ? `<h2>Evolve</h2><div class="row">${evos}</div>` : ""}
-      <h2>Upgrades</h2><div class="col">
-        <button type="button" data-up="passive" ${l.passive || l.candy < G.costs.passive ? "disabled" : ""}><span>${l.passive ? "Passive unlocked" : "Unlock passive"}</span><span>${l.passive ? "" : G.costs.passive + " candy"}</span></button>
-        <button type="button" data-up="cost1" ${l.cost >= 1 || l.candy < G.costs.cost1 ? "disabled" : ""}><span>Deploy cost −1${l.cost >= 1 ? " (done)" : ""}</span><span>${l.cost >= 1 ? "" : G.costs.cost1 + " candy"}</span></button>
-        <button type="button" data-up="cost2" ${l.cost !== 1 || l.candy < G.costs.cost2 ? "disabled" : ""}><span>Deploy cost −2${l.cost >= 2 ? " (done)" : ""}</span><span>${l.cost >= 2 ? "" : G.costs.cost2 + " candy"}</span></button>
-        <button type="button" id="sp" ${l.sp || S.balance.shards < G.costs.sp ? "disabled" : ""}><span>${l.sp ? "SP skin owned" : "SP skin"}</span><span>${l.sp ? "" : G.costs.sp + " shards"}</span></button>
-      </div>
-      <p class="quiet" style="margin-top:6px">Upgrades and skills are for tower defense. Shiny and SP are looks only.</p>
-    </div>`;
-}
-
-function missionsView() {
-  const trophies = G.trophies();
-  return `<h2>Daily</h2><ul><li class="${S.login ? "done" : ""}">Log in: 3 Regular</li></ul>
-    <h2>Starter missions · 2 Regular each</h2><ul>${G.missions.map(m => `<li class="${S.missions[m.id] ? "done" : ""}">${esc(m.label)}</li>`).join("")}</ul>
-    <h2>Trophies · ${trophies.length}</h2>${trophies.length ? `<ul>${trophies.map(t => `<li>${esc(t.name)} <span class="quiet">${t.tier}</span></li>`).join("")}</ul>`
-      : `<p class="quiet">From Poké Idle and Pokédoku: catch, collect badges, climb the tower, finish dailies.</p>`}`;
-}
-
-/* ── The pull screen ──────────────────────────────────────────────────────
-   One machine in the middle, its neighbours at the edges. Left and right
-   switch machines, up and down move the cursor, Enter pulls. All art is drawn
-   here from rectangles; nothing is loaded but the Pokémon sprites. */
-const ORDER_M = ["move", "legend", "shiny"];
-const LOOK = {
-  move: { body: "#3f9e8a", dark: "#256656", light: "#77c9b2", label: "Move UP!", about: "Move UP: rare skills roll twice as often." },
-  legend: { body: "#d6463c", dark: "#8f2621", light: "#f0857a", label: "UP!", about: "Legendary UP: today's banner legendary, 1 in 256. Eggs count double toward Legendary pity." },
-  shiny: { body: "#e3ad2b", dark: "#a07514", light: "#f6d77a", label: "Shiny UP!", about: "Shiny UP: shiny 1 in 64, and the only machine with SP skins (1 in 200)." }
-};
-const TICKET = { regular: ["#e4587a", "#fbe7ee"], plus: ["#3a5bb5", "#a8c4ff"], premium: ["#8f4fd0", "#e0c6ff"], gold: ["#eebd2c", "#fff1b8"] };
-const EGG_LOOK = [["#e6ecd8", "#7fb36a"], ["#9fd0f0", "#3d7fc0"], ["#f3d36a", "#c0852a"], ["#f08cb4", "#a8326a"], ["#d6463c", "#f6d77a"]];
-const OPTIONS = [
-  { voucher: "regular", count: 1, times: "x1", label: "1 Pull", about: "1 Regular: 1 egg." },
-  { voucher: "regular", count: 10, times: "x10", label: "10 Pulls", about: "10 Regular: 10 eggs, 1 Rare or better." },
-  { voucher: "plus", count: 1, times: "x1", label: "5 Pulls", about: "1 Plus: 5 eggs." },
-  { voucher: "premium", count: 1, times: "x1", label: "10 Pulls", about: "1 Premium: 10 eggs, 1 Rare or better." },
-  { voucher: "gold", count: 1, times: "x1", label: "25 Pulls", about: "1 Gold: 25 eggs, 1 Epic or better." },
-  { buy: true, times: "100", label: "Buy 1", about: "Buy 1 Regular voucher for 100 coins." },
-  { cancel: true, times: "", label: "Cancel", about: "" }
-];
-let cursor = 0, menuOpen = true, slide = 0, slideFrom = 0, crank = 0, message = null;
-
+/* ── The palette, and pixel art drawn at 2x from it ────────────────────── */
+const C = { ink: "#1c1b2c", panel: "#2c2a44", red: "#c8372f", paper: "#f4f1ff", dim: "#807c9a", gold: "#e3ad2b", teal: "#3f9e8a", sky: "#8fd3e8" };
+// Fixed egg tier colors everywhere: Common, Rare, Epic, Legendary (and the banner, a legendary).
+const TIER_COLOR = [C.paper, C.sky, C.gold, C.red, C.red];
+const TIER_NAME = ["Common", "Rare", "Epic", "Legendary", "Banner"];
+const ART = 2;
+// A canvas of w×h art pixels, each ART internal pixels across.
 function pixelCanvas(w, h, draw) {
   const c = document.createElement("canvas");
-  c.width = w; c.height = h; c.style.width = w + "px"; c.style.height = h + "px";
-  draw(c.getContext("2d"));
+  c.width = w * ART; c.height = h * ART;
+  c.style.width = w * ART + "px"; c.style.height = h * ART + "px";
+  const g = c.getContext("2d");
+  g.scale(ART, ART);
+  draw(g);
   return c;
 }
 function ellipse(g, cx, cy, rx, ry, color) {
@@ -231,115 +176,170 @@ function ellipse(g, cx, cy, rx, ry, color) {
     g.fillRect(cx - half, cy + y, half * 2 + 1, 1);
   }
 }
-function box(g, x, y, w, h, color, cut = 2) {
+function box(g, x, y, w, h, color, cut = 1) {
   g.fillStyle = color;
   g.fillRect(x + cut, y, w - cut * 2, h);
   g.fillRect(x, y + cut, w, h - cut * 2);
-  if (cut > 1) { g.fillRect(x + 1, y + 1, w - 2, h - 2); }
 }
+const TICKET = { regular: C.red, plus: C.sky, premium: C.teal, gold: C.gold };
 function ticket(kind) {
-  const [base, stripe] = TICKET[kind] || ["#f0c230", "#fff1b8"];
   return pixelCanvas(16, 9, g => {
-    g.fillStyle = "#1c1b2c"; g.fillRect(1, 0, 14, 9); g.fillRect(0, 1, 16, 7);
-    g.fillStyle = base; g.fillRect(1, 1, 14, 7);
-    g.fillStyle = stripe; g.fillRect(4, 1, 2, 7); g.fillRect(8, 3, 5, 1); g.fillRect(8, 5, 4, 1);
-    g.fillStyle = "#1c1b2c"; g.fillRect(6, 1, 1, 7);
+    box(g, 0, 0, 16, 9, C.ink);
+    g.fillStyle = TICKET[kind]; g.fillRect(1, 1, 14, 7);
+    g.fillStyle = C.paper; g.fillRect(4, 1, 2, 7); g.fillRect(8, 3, 5, 1); g.fillRect(8, 5, 4, 1);
   });
 }
-function coin() {
-  return pixelCanvas(16, 9, g => { ellipse(g, 7, 4, 4, 4, "#7a5410"); ellipse(g, 7, 4, 3, 3, "#eebd2c"); g.fillStyle = "#fff1b8"; g.fillRect(6, 2, 1, 4); });
-}
+function coin() { return pixelCanvas(8, 8, g => { ellipse(g, 3, 3, 3, 3, C.ink); ellipse(g, 3, 3, 2, 2, C.gold); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 3); }); }
+function shardIcon() { return pixelCanvas(8, 8, g => { g.fillStyle = C.ink; g.fillRect(2, 0, 4, 8); g.fillRect(0, 2, 8, 4); g.fillStyle = C.sky; g.fillRect(3, 1, 2, 6); g.fillRect(1, 3, 6, 2); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 2); }); }
+function candyIcon() { return pixelCanvas(8, 8, g => { g.fillStyle = C.ink; g.fillRect(2, 1, 4, 6); g.fillRect(0, 2, 8, 4); g.fillStyle = C.red; g.fillRect(3, 2, 2, 4); g.fillRect(1, 3, 6, 2); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 1); }); }
 function eggIcon(tier) {
-  const [shell, spot] = EGG_LOOK[tier];
   return pixelCanvas(8, 10, g => {
-    ellipse(g, 3, 5, 3, 4, "#1c1b2c"); ellipse(g, 3, 5, 2, 3, shell);
-    g.fillStyle = spot; g.fillRect(2, 3, 2, 1); g.fillRect(4, 6, 1, 2); g.fillRect(1, 6, 1, 1);
+    ellipse(g, 3, 5, 3, 4, C.ink); ellipse(g, 3, 5, 2, 3, TIER_COLOR[tier]);
+    g.fillStyle = tier === 0 ? C.dim : C.ink; g.fillRect(2, 3, 1, 1); g.fillRect(4, 6, 1, 1);
   });
 }
+function check(done) { return pixelCanvas(8, 8, g => { g.fillStyle = done ? C.gold : C.dim; if (done) { g.fillRect(1, 4, 2, 2); g.fillRect(3, 5, 1, 2); g.fillRect(4, 3, 1, 3); g.fillRect(5, 1, 1, 3); g.fillRect(6, 0, 1, 2); } else g.fillRect(3, 3, 2, 2); }); }
+
+/* ── Shared pieces: elements, sprites in fixed cells, lists, messages ──── */
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+// SP skins: hand-made art listed in poke-gacha/sp/skins.json. Hidden until the list has one.
+const SKIN_DIR = SPRITE_DIR.replace("pokedoku/sprites/", "poke-gacha/sp/");
+const skins = () => (G ? G.skins() : []);
+const skinOf = id => skins().find(skin => skin.id === id) || null;
+const isSkin = look => look !== "normal" && look !== "shiny";
+const spriteUrl = (num, look) => isSkin(look) ? SKIN_DIR + look + ".png" : SPRITE_DIR + (look === "shiny" ? "shiny/" : "") + num + ".png";
+const lookName = look => look === "normal" ? "Normal" : look === "shiny" ? "Shiny" : "SP " + (skinOf(look)?.name || "skin");
+// Every Pokémon sprite at 1x, never scaled or cropped: cells are 96px, the largest sprite.
+const CELL = 96;
+function sprite(num, look = "normal", dark = false) {
+  const img = new Image();
+  img.alt = name(num);
+  img.draggable = false;
+  if (dark) img.className = "unseen";
+  img.src = spriteUrl(num, look);
+  return img;
+}
+function cellWith(node, size = CELL, cls = "") { const c = el("div", "cell " + cls); c.style.width = c.style.height = size + "px"; c.append(node); return c; }
+function rows(container, list, at, onPick) {
+  container.replaceChildren(...list.map((row, i) => {
+    const r = el("div", (i === at ? "at " : "") + (row.off ? "off" : ""));
+    r.dataset.row = i;
+    if (row.icon) r.append(row.icon);
+    r.append(el("span", "grow", row.label));
+    if (row.right !== undefined && row.right !== "") {
+      const right = el("span", "right");
+      for (const part of [].concat(row.right)) right.append(typeof part === "object" ? part : el("span", typeof part === "number" ? "num" : "", String(part)));
+      r.append(right);
+    }
+    return r;
+  }));
+  container.onclick = e => { const r = e.target.closest("[data-row]"); if (r) onPick(Number(r.dataset.row), true); };
+  const row = container.children[at];
+  if (row && row.scrollIntoView) row.scrollIntoView({ block: "nearest" });
+}
+function say(text, extra) {
+  const col = el("div");
+  col.append(el("span", "", text));
+  if (extra) col.append(extra);
+  $("#msg").replaceChildren(col);
+}
+const HINT = "Arrows move · Enter picks · Backspace goes back · 1–5 switch screens.";
+function drawBackdrop() {
+  const g = $("#scene").getContext("2d");
+  g.setTransform(ART, 0, 0, ART, 0, 0);
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = C.paper; g.fillRect(0, 0, 320, 180);
+  g.fillStyle = C.sky; for (let y = 4; y < 180; y += 6) g.fillRect(0, y, 320, 2);
+  g.fillRect(0, 0, 320, 2);
+}
+
+/* ── The pull screen ──────────────────────────────────────────────────────
+   One machine in the middle, its neighbours at the edges. Left and right
+   switch machines, up and down move the cursor, Enter pulls. The art is in
+   320×180 art pixels, drawn at 2x. */
+const ORDER_M = ["move", "legend", "shiny"];
+const LOOK = {
+  move: { body: C.teal, label: "Move UP!", about: "Move UP: rare skills roll twice as often." },
+  legend: { body: C.red, label: "UP!", about: "Legendary UP: today's banner legendary, 1 in 256. Eggs count double toward Legendary pity." },
+  shiny: { body: C.gold, label: "Shiny UP!", about: "Shiny UP: shiny 1 in 64 instead of 1 in 128." }
+};
+const OPTIONS = [
+  { voucher: "regular", count: 1, times: "x1", label: "1 Pull", about: "1 Regular: 1 egg." },
+  { voucher: "regular", count: 10, times: "x10", label: "10 Pulls", about: "10 Regular: 10 eggs, 1 Rare or better." },
+  { voucher: "plus", count: 1, times: "x1", label: "5 Pulls", about: "1 Plus: 5 eggs." },
+  { voucher: "premium", count: 1, times: "x1", label: "10 Pulls", about: "1 Premium: 10 eggs, 1 Rare or better." },
+  { voucher: "gold", count: 1, times: "x1", label: "25 Pulls", about: "1 Gold: 25 eggs, 1 Epic or better." },
+  { buy: true, times: "100", label: "Buy 1", about: "Buy 1 Regular voucher for 100 coins." },
+  { cancel: true, times: "", label: "Cancel", about: "" }
+];
+let cursor = 0, menuOpen = true, slide = 0, crank = 0, message = null;
 
 // A fixed handful of eggs in each dome, so a machine always looks the same.
 function domeEggs(seed) {
   let s = seed;
   const rand = () => (s = (s * 1103515245 + 12345) >>> 0) / 4294967296;
-  const colors = ["#79c6a8", "#8fd3e8", "#9b8fe0", "#5aa0d6", "#e08fb0", "#6fbf6f", "#7fd0c0"];
   const eggs = [];
   for (let row = 0; row < 4; row++) for (let i = 0; i < 6; i++)
-    eggs.push({ x: 8 + i * 18 + (row % 2) * 9 + Math.floor(rand() * 4), y: 18 + row * 12 + Math.floor(rand() * 3), c: colors[Math.floor(rand() * colors.length)], r: 8 + Math.floor(rand() * 3) });
+    eggs.push({ x: 8 + i * 18 + (row % 2) * 9 + Math.floor(rand() * 4), y: 18 + row * 12 + Math.floor(rand() * 3), tier: [0, 0, 0, 1, 1, 2, 3][Math.floor(rand() * 7)], r: 8 + Math.floor(rand() * 3) });
   return eggs;
 }
 const DOMES = { move: domeEggs(3), legend: domeEggs(11), shiny: domeEggs(29) };
-
 function drawMachine(g, cx, id, front) {
-  const L = LOOK[id], x = cx - 56;
-  const ink = "#1c1b2c";
+  const body = LOOK[id].body, x = cx - 56;
   // Cap and rim.
-  box(g, x + 4, 22, 104, 16, ink); box(g, x + 5, 23, 102, 14, L.body);
-  g.fillStyle = L.light; g.fillRect(x + 7, 24, 98, 3);
-  g.fillStyle = L.dark; g.fillRect(x + 6, 33, 100, 3);
-  box(g, x - 1, 37, 114, 9, ink); box(g, x, 38, 112, 7, "#e2e0dc"); g.fillStyle = "#aaa79f"; g.fillRect(x + 1, 43, 110, 1);
+  box(g, x + 4, 22, 104, 16, C.ink); g.fillStyle = body; g.fillRect(x + 5, 23, 102, 14);
+  g.fillStyle = C.paper; g.fillRect(x + 7, 24, 98, 2);
+  g.fillStyle = C.ink; g.fillRect(x + 6, 34, 100, 1);
+  box(g, x - 1, 37, 114, 9, C.ink); g.fillStyle = C.paper; g.fillRect(x, 38, 112, 7); g.fillStyle = C.dim; g.fillRect(x + 1, 43, 110, 1);
   // Dome of eggs behind glass.
-  g.fillStyle = ink; g.fillRect(x + 5, 45, 102, 58);
+  g.fillStyle = C.ink; g.fillRect(x + 5, 45, 102, 58);
   g.save(); g.beginPath(); g.rect(x + 6, 45, 100, 57); g.clip();
-  g.fillStyle = "#c9ecf2"; g.fillRect(x + 6, 45, 100, 57);
+  g.fillStyle = C.sky; g.fillRect(x + 6, 45, 100, 57);
   for (const egg of DOMES[id]) {
-    ellipse(g, x + egg.x, 45 + egg.y, egg.r, egg.r + 2, "#2e4a52");
-    ellipse(g, x + egg.x, 45 + egg.y, egg.r - 1, egg.r + 1, egg.c);
-    g.fillStyle = "rgba(255,255,255,.35)"; g.fillRect(x + egg.x - 3, 45 + egg.y - egg.r + 1, 2, 3);
-    g.fillStyle = "rgba(0,0,0,.18)"; g.fillRect(x + egg.x + 1, 45 + egg.y + 1, 3, 2);
+    ellipse(g, x + egg.x, 45 + egg.y, egg.r, egg.r + 2, C.ink);
+    ellipse(g, x + egg.x, 45 + egg.y, egg.r - 1, egg.r + 1, TIER_COLOR[egg.tier]);
+    g.fillStyle = C.paper; g.fillRect(x + egg.x - 3, 45 + egg.y - egg.r + 1, 2, 2);
   }
-  g.fillStyle = "rgba(255,255,255,.4)"; g.fillRect(x + 12, 47, 3, 50); g.fillRect(x + 17, 47, 1, 50);
+  g.fillStyle = C.paper; g.fillRect(x + 12, 47, 2, 50);
   g.restore();
   // Name plate in front of the dome.
-  box(g, x + 16, 70, 80, 26, ink, 4); box(g, x + 17, 71, 78, 24, "#f2f0ea", 3);
-  g.fillStyle = "#c7c3b8"; g.fillRect(x + 18, 92, 76, 2);
+  box(g, x + 16, 70, 80, 26, C.ink, 2); box(g, x + 17, 71, 78, 24, C.paper, 2);
+  g.fillStyle = C.dim; g.fillRect(x + 18, 93, 76, 1);
   // Lower rim and body.
-  box(g, x - 1, 101, 114, 9, ink); box(g, x, 102, 112, 7, "#e2e0dc"); g.fillStyle = "#aaa79f"; g.fillRect(x + 1, 107, 110, 1);
-  g.fillStyle = ink; g.fillRect(x + 4, 110, 104, 70);
-  g.fillStyle = L.body; g.fillRect(x + 5, 110, 102, 70);
-  g.fillStyle = L.dark; g.fillRect(x + 5, 110, 102, 3); g.fillRect(x + 5, 110, 4, 70);
-  g.fillStyle = L.light; g.fillRect(x + 101, 113, 3, 60);
+  box(g, x - 1, 101, 114, 9, C.ink); g.fillStyle = C.paper; g.fillRect(x, 102, 112, 7); g.fillStyle = C.dim; g.fillRect(x + 1, 107, 110, 1);
+  g.fillStyle = C.ink; g.fillRect(x + 4, 110, 104, 70);
+  g.fillStyle = body; g.fillRect(x + 5, 110, 102, 70);
+  g.fillStyle = C.ink; g.fillRect(x + 5, 110, 102, 1);
+  g.fillStyle = C.paper; g.fillRect(x + 102, 113, 2, 60);
   // Chute, where the egg comes out.
-  box(g, x + 13, 118, 30, 26, ink, 5); box(g, x + 15, 120, 26, 22, "#3b3a45", 4); g.fillStyle = "#56555f"; g.fillRect(x + 19, 122, 10, 3);
+  box(g, x + 13, 118, 30, 26, C.ink, 3); box(g, x + 15, 120, 26, 22, C.panel, 3); g.fillStyle = C.dim; g.fillRect(x + 19, 122, 10, 2);
   // Coin slot.
-  g.fillStyle = ink; g.fillRect(x + 50, 122, 26, 4); g.fillStyle = L.dark; g.fillRect(x + 51, 126, 24, 1);
-  // Crank: a white wheel with a grip that turns after a pull.
-  ellipse(g, x + 93, 120, 11, 11, ink); ellipse(g, x + 93, 120, 10, 10, "#f2f0ea"); ellipse(g, x + 93, 120, 6, 6, "#c7c3b8"); ellipse(g, x + 93, 120, 5, 5, "#f2f0ea");
+  g.fillStyle = C.ink; g.fillRect(x + 50, 122, 26, 4);
+  // Crank: a wheel with a grip that turns after a pull.
+  ellipse(g, x + 93, 120, 11, 11, C.ink); ellipse(g, x + 93, 120, 10, 10, C.paper); ellipse(g, x + 93, 120, 6, 6, C.dim); ellipse(g, x + 93, 120, 5, 5, C.paper);
   if (front) {
     const a = crank * Math.PI;
-    g.fillStyle = ink;
+    g.fillStyle = C.ink;
     for (const off of [0, Math.PI]) g.fillRect(Math.round(x + 93 + Math.cos(a + off) * 7) - 1, Math.round(120 + Math.sin(a + off) * 7) - 1, 3, 3);
     g.fillRect(x + 92, 119, 3, 3);
   }
 }
-
 function drawScene() {
+  drawBackdrop();
   const g = $("#scene").getContext("2d");
-  g.imageSmoothingEnabled = false;
-  g.fillStyle = "#d9efc4"; g.fillRect(0, 0, 320, 180);
-  g.fillStyle = "#eef8e4"; for (let y = 2; y < 180; y += 6) g.fillRect(0, y, 320, 3);
-  g.fillStyle = "#b7e0f0"; g.fillRect(0, 0, 320, 3);
   const at = ORDER_M.indexOf(machine), cx = 148 + slide;
-  const prev = ORDER_M[(at + 2) % 3], next = ORDER_M[(at + 1) % 3];
-  drawMachine(g, cx - 180, prev, false);
-  drawMachine(g, cx + 180, next, false);
+  drawMachine(g, cx - 180, ORDER_M[(at + 2) % 3], false);
+  drawMachine(g, cx + 180, ORDER_M[(at + 1) % 3], false);
   drawMachine(g, cx, machine, true);
   // Arrows to the neighbours.
-  g.fillStyle = "#1c1b2c";
+  g.fillStyle = C.ink;
   for (let i = 0; i < 6; i++) { g.fillRect(30 + i, 72 - i, 1, i * 2 + 1); g.fillRect(250 - i, 32 - i, 1, i * 2 + 1); }
-  // The plate's words follow the machine as it slides.
-  const plate = $("#plate");
-  plate.style.left = (cx - 56 + 17) + "px"; plate.style.top = "71px"; plate.style.width = "78px"; plate.style.height = "21px";
-  const clock = $("#clock");
-  clock.style.left = (cx - 56 + 52) + "px"; clock.style.top = "133px";
+  // The words and the banner follow the machine as it slides (art px × 2).
+  const left = (cx - 56) * ART;
+  Object.assign($("#plate").style, { left: left + 34 + "px", top: "142px", width: "156px", height: "42px" });
+  Object.assign($("#banner").style, { left: left + 64 + "px", top: "44px" });
+  Object.assign($("#clock").style, { left: left + 104 + "px", top: "264px" });
 }
-
-function placeStage() {
-  const wrap = $("#pullwrap"), stage = $("#stage");
-  const k = wrap.clientWidth / 320;
-  stage.style.transform = "scale(" + k + ")";
-  wrap.style.height = Math.round(180 * k) + "px";
-}
-
 function untilMidnight() {
   // The banner changes at midnight in Detroit, with the daily seed.
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Detroit", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })
@@ -348,102 +348,77 @@ function untilMidnight() {
   const two = n => String(n).padStart(2, "0");
   return two(Math.floor(left / 3600)) + ":" + two(Math.floor(left / 60) % 60) + ":" + two(left % 60);
 }
-
 function haveFor(option) {
   if (option.buy) return S.balance.coins >= 100;
   if (option.cancel) return true;
   return (S.balance[option.voucher] || 0) >= (option.voucher === "regular" ? option.count : 1);
 }
-
 function updateScene() {
   if (!S) return;
-  const b = S.balance;
   $("#counts").replaceChildren(...["gold", "premium", "plus", "regular"].map(kind => {
-    const win = document.createElement("div");
-    win.className = "win";
-    const n = document.createElement("span");
-    n.textContent = b[kind];
-    win.append(n, ticket(kind));
-    win.title = kind[0].toUpperCase() + kind.slice(1) + " vouchers";
-    return win;
+    const b = el("div", "panel");
+    b.append(el("span", "num", S.balance[kind]), ticket(kind));
+    b.title = kind[0].toUpperCase() + kind.slice(1) + " vouchers";
+    return b;
   }));
-  const plate = $("#plate");
-  if (machine === "legend") {
-    const img = new Image(22, 22);
-    img.src = SPRITE_DIR + S.banner + ".png"; img.alt = name(S.banner);
-    const span = document.createElement("span"); span.textContent = LOOK.legend.label;
-    plate.replaceChildren(img, span);
-    $("#clock").hidden = false; $("#clock").textContent = untilMidnight();
-    $("#clock").title = "Until the banner changes";
-  } else {
-    plate.textContent = LOOK[machine].label;
-    $("#clock").hidden = true;
+  const legend = machine === "legend";
+  $("#plate").textContent = LOOK[machine].label;
+  $("#banner").hidden = !legend;
+  if (legend) {
+    const img = $("#banner");
+    // 1x like every sprite, standing on the bottom of its 96px cell.
+    img.onload = () => { img.width = img.naturalWidth; img.height = img.naturalHeight;
+      img.style.marginLeft = Math.floor((96 - img.width) / 2) + "px"; img.style.marginTop = (96 - img.height) + "px"; };
+    if (!img.src.endsWith("/" + S.banner + ".png")) img.src = spriteUrl(S.banner, "normal");
+    img.alt = name(S.banner);
   }
-  const menu = $("#menu");
-  menu.hidden = !menuOpen;
-  menu.replaceChildren(...OPTIONS.map((option, i) => {
-    const row = document.createElement("div");
-    row.setAttribute("role", "option");
-    row.dataset.option = i;
-    row.className = (i === cursor ? "at " : "") + (haveFor(option) ? "" : "off");
-    row.setAttribute("aria-selected", i === cursor);
-    if (!option.cancel) row.append(option.buy ? coin() : ticket(option.voucher));
-    const times = document.createElement("span"); times.className = "times"; times.textContent = option.times;
-    const label = document.createElement("span"); label.textContent = option.label;
-    if (!option.cancel) row.append(times);
-    row.append(label);
-    return row;
-  }));
-  const msg = $("#msg");
+  $("#clock").hidden = !legend;
+  if (legend) { $("#clock").textContent = untilMidnight(); $("#clock").title = "Until the banner changes"; }
+  $("#menu").hidden = !menuOpen;
+  rows($("#menu"), OPTIONS.map(o => ({ icon: o.cancel ? null : o.buy ? coin() : ticket(o.voucher), label: o.label,
+    right: o.times ? (o.buy ? 100 : o.times) : "", off: !haveFor(o) })), cursor, (i, click) => click ? choose(i) : null);
   if (message && message.eggs) {
-    const eggs = document.createElement("div"); eggs.className = "eggs";
+    const eggs = el("div", "eggs");
     eggs.append(...message.eggs.map(e => eggIcon(e.tier)));
-    const text = document.createElement("span"); text.textContent = message.text;
-    const col = document.createElement("div"); col.append(text, eggs);
-    msg.replaceChildren(col);
+    say(message.text, eggs);
   } else {
     const option = OPTIONS[cursor];
-    msg.textContent = message ? message.text
-      : !menuOpen ? "Select a machine." : (option.cancel ? LOOK[machine].about : option.about + (haveFor(option) ? "" : " You don't have enough."));
+    const about = LOOK[machine].about + (machine === "shiny" && skins().length ? " The only machine that rolls SP skins (1 in 200)." : "");
+    say(message ? message.text : !menuOpen ? "Select a machine. " + HINT
+      : (option.cancel ? about : option.about + (haveFor(option) ? "" : " You don't have enough.")));
   }
   drawScene();
 }
-
 function tierSummary(eggs) {
-  const names = ["Common", "Rare", "Epic", "Legendary", "banner"];
   const counts = [0, 0, 0, 0, 0];
   for (const e of eggs) counts[e.tier]++;
-  return counts.map((n, t) => n ? n + " " + names[t] : "").filter(Boolean).reverse().join(", ");
+  return counts.map((n, t) => n ? n + " " + TIER_NAME[t] : "").filter(Boolean).reverse().join(", ");
 }
-
 function switchMachine(step) {
-  const at = ORDER_M.indexOf(machine);
-  machine = pref.machine = ORDER_M[(at + step + 3) % 3];
+  machine = pref.machine = ORDER_M[(ORDER_M.indexOf(machine) + step + 3) % 3];
   keep();
   message = null;
-  slideFrom = step * 60; slide = slideFrom;
-  const start = performance.now();
+  const from = step * 60, start = performance.now();
   const tick = now => {
     const t = Math.min(1, (now - start) / 160);
-    slide = Math.round(slideFrom * (1 - t));
+    slide = Math.round(from * (1 - t));
     drawScene();
     if (t < 1) requestAnimationFrame(tick);
   };
-  requestAnimationFrame(tick);
+  slide = from;
   updateScene();
+  requestAnimationFrame(tick);
 }
-
 function turnCrank() {
   const start = performance.now();
   const tick = now => {
     const t = Math.min(1, (now - start) / 420);
     crank = t * 2;
-    drawScene();
+    if (tab === "pull") drawScene();
     if (t < 1) requestAnimationFrame(tick); else crank = 0;
   };
   requestAnimationFrame(tick);
 }
-
 function choose(i) {
   const option = OPTIONS[i];
   cursor = i;
@@ -454,17 +429,12 @@ function choose(i) {
     message = { text: r.ok ? "Bought 1 Regular for 100 coins." : REASONS[r.reason] || "Not now." };
   } else {
     const r = G.pull({ voucher: option.voucher, count: option.count, machine });
-    if (r.ok) {
-      lastPull = r.eggs;
-      turnCrank();
-      message = { text: r.eggs.length + (r.eggs.length === 1 ? " egg: " : " eggs: ") + tierSummary(r.eggs) + ".", eggs: r.eggs };
-    } else message = { text: REASONS[r.reason] || "Not now." };
+    if (r.ok) { turnCrank(); message = { text: r.eggs.length + (r.eggs.length === 1 ? " egg: " : " eggs: ") + tierSummary(r.eggs) + ".", eggs: r.eggs }; }
+    else message = { text: REASONS[r.reason] || "Not now." };
   }
-  S = G.state(); hud(); updateScene();
+  refreshTop(); updateScene();
 }
-
-function sceneKey(e) {
-  if (tab !== "pull" || $("#pullwrap").hidden) return;
+function pullKey(e) {
   const k = e.key;
   if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); switchMachine(k === "ArrowLeft" ? -1 : 1); }
   else if (k === "ArrowUp" || k === "ArrowDown") {
@@ -479,52 +449,344 @@ function sceneKey(e) {
   } else if (k === "Backspace") { e.preventDefault(); menuOpen = false; message = null; updateScene(); }
 }
 
-function buildScene() {
-  $("#pullwrap").hidden = true;
-  document.addEventListener("keydown", sceneKey);
-  $("#menu").onclick = e => { const row = e.target.closest("[data-option]"); if (row) choose(Number(row.dataset.option)); };
-  $("#menu").onmousemove = e => { const row = e.target.closest("[data-option]"); if (row && Number(row.dataset.option) !== cursor && !message) { cursor = Number(row.dataset.option); updateScene(); } };
+/* ── Eggs: the tray, and hatching ──────────────────────────────────────── */
+let eggAt = 0, eggMenuAt = 0, hatching = null;
+function eggsUpdate() {
+  drawBackdrop();
+  const ready = S.eggs.filter(e => e.ready).length;
+  if (eggAt >= S.eggs.length) eggAt = Math.max(0, S.eggs.length - 1);
+  $("#eggs-title").textContent = "EGGS " + S.eggs.length + "/" + G.maxEggs;
+  $("#eggs-grid").replaceChildren(...S.eggs.map((egg, i) => {
+    const cell = el("div", "egg" + (i === eggAt ? " at" : ""));
+    cell.dataset.egg = i;
+    cell.append(eggIcon(egg.tier));
+    const bar = el("i"); bar.style.width = Math.round(8 * egg.progress / egg.need) * 2 + "px";
+    cell.append(bar);
+    return cell;
+  }));
+  if (!S.eggs.length) $("#eggs-grid").append(el("p", "dim", "No eggs yet."));
+  $("#eggs-grid").onclick = e => { const c = e.target.closest("[data-egg]"); if (c) { eggAt = Number(c.dataset.egg); eggsUpdate(); } };
+  rows($("#eggs-menu"), [{ label: "Hatch", right: ready, off: !ready }, { label: "Pull more" }], eggMenuAt,
+    (i, click) => { eggMenuAt = i; if (click) eggMenu(i); else eggsUpdate(); });
+  $("#eggs-legend").replaceChildren(...[0, 1, 2, 3].map(t => {
+    const r = el("div", "off"); r.style.cursor = "default";
+    r.append(eggIcon(t), el("span", "grow", TIER_NAME[t]), el("span", "right num", [5, 15, 30, 60][t] + "w"));
+    return r;
+  }));
+  const egg = S.eggs[eggAt];
+  say(egg ? TIER_NAME[egg.tier] + " egg" + (egg.banner ? " (" + name(egg.banner) + ")" : "") + " from " + G.machines[egg.machine] + ": " +
+      (egg.ready ? "ready to hatch." : egg.progress + " of " + egg.need + " waves.")
+    : "Eggs hatch on waves you earn: Poké Idle catches, Pokédoku boards, tower defense waves.");
+}
+function eggMenu(i) { if (i === 0) startHatch(); else go("pull"); }
+function eggsKey(e) {
+  const k = e.key, n = S.eggs.length;
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -15, ArrowDown: 15 }[k];
+  if (step) { e.preventDefault(); if (n) { eggAt = Math.max(0, Math.min(n - 1, eggAt + step)); eggsUpdate(); } }
+  else if (k === "Enter" || k === " ") { e.preventDefault(); eggMenu(eggMenuAt); }
+  else if (k === "Backspace") { e.preventDefault(); go("pull"); }
+}
+function startHatch() {
+  const r = G.hatch();
+  if (!r.ok || !r.hatched.length) { say("Nothing is ready yet. Eggs count down on waves you earn."); return; }
+  hatching = { list: r.hatched, i: 0, phase: "shake", start: performance.now(), summary: false };
+  refreshTop();
+  $("#hatch").hidden = false;
+  $("#eggs-tray").hidden = $("#eggs-side").hidden = true;
+  showHatch();
+}
+// The big egg: 24×24 art pixels at 4x fills the 96px cell.
+function bigEgg(tier, wobble, crack) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 96; c.style.width = c.style.height = "96px";
+  const g = c.getContext("2d");
+  g.scale(4, 4);
+  const cx = 12 + wobble;
+  ellipse(g, cx, 12, 8, 11, C.ink); ellipse(g, cx, 12, 7, 10, TIER_COLOR[tier]);
+  g.fillStyle = tier === 0 ? C.dim : C.ink;
+  for (const [x, y, w, h] of [[-4, -6, 3, 2], [2, -7, 2, 2], [3, 0, 2, 2], [-5, 3, 2, 2], [-1, 6, 3, 2]]) g.fillRect(cx + x, 12 + y, w, h);
+  g.fillStyle = C.paper; g.fillRect(cx - 4, 5, 2, 3);
+  if (crack) { g.fillStyle = C.ink; for (let i = -6; i <= 6; i += 2) g.fillRect(cx + i, 11 + (i % 4 ? 1 : -1), 2, 1); }
+  return c;
+}
+const hatchLook = x => x.sp ? x.sp : x.shiny ? "shiny" : "normal";
+function showHatch() {
+  const h = hatching, panel = $("#hatch");
+  if (h.summary) {
+    const grid = el("div", "grid");
+    // NEW sits under the cell, never on the sprite.
+    for (const x of h.list.slice(0, 12)) { const item = el("div"); item.append(cellWith(sprite(x.species, hatchLook(x))), el("div", "tag " + (x.fresh ? "gold" : "dim"), x.fresh ? "NEW" : "+" + x.shards)); grid.append(item); }
+    panel.classList.add("sum");
+    panel.replaceChildren(el("div", "head gold", "HATCHED " + h.list.length), grid);
+    const fresh = h.list.filter(x => x.fresh).length;
+    say(h.list.length + " eggs: " + fresh + " new, " + h.list.reduce((t, x) => t + x.shards, 0) + " shards from dupes" + (h.list.length > 12 ? ". First 12 shown; all are in the Dex." : ".") + " Enter closes.");
+    return;
+  }
+  const x = h.list[h.i];
+  panel.classList.remove("sum");
+  const art = cellWith(bigEgg(x.tier, 0, false));
+  const text = el("div"); text.id = "hatch-text";
+  panel.replaceChildren(el("div", "title", "EGG " + (h.i + 1) + " OF " + h.list.length), art, text);
+  const reveal = () => {
+    h.phase = "shown";
+    art.replaceChildren(sprite(x.species, hatchLook(x)));
+    const candy = el("div"); candy.append(el("span", "num", "+" + x.candy), " candy");
+    if (x.shards) candy.append(" · ", el("span", "num", "+" + x.shards), " shards");
+    text.replaceChildren(el("div", "title", name(x.species)), el("div", x.fresh ? "gold" : "dim", x.fresh ? "New for your dex" : "Already in your dex"),
+      el("div", "", TIER_NAME[x.tier] + " " + G.stars[x.tier] + "★ · " + G.dex[x.species - 1][1].replace("/", " / ")), candy,
+      el("div", x.skill === 3 ? "gold" : "", "Skill: " + G.skillsOf(x.species)[x.skill] + (x.skill === 3 ? " (rare)" : "")),
+      ...(x.shiny ? [el("div", "gold", "Shiny!")] : []), ...(x.sp ? [el("div", "gold", "SP skin: " + (skinOf(x.sp)?.name || x.sp) + "!")] : []));
+    say("Enter: next egg · Backspace: skip to the end.");
+  };
+  say("Oh? The egg is moving...");
+  const tick = now => {
+    if (hatching !== h || h.phase !== "shake" || h.list[h.i] !== x) return;
+    const t = (now - h.start) / 900;
+    if (t >= 1) return reveal();
+    art.replaceChildren(bigEgg(x.tier, t < 0.75 ? Math.round(Math.sin(t * 28)) : 0, t >= 0.75));
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  h.reveal = reveal;
+}
+function hatchKey(e) {
+  const h = hatching;
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    if (h.summary) return endHatch();
+    if (h.phase === "shake") return h.reveal();
+    if (h.i + 1 < h.list.length) { h.i++; h.phase = "shake"; h.start = performance.now(); showHatch(); }
+    else if (h.list.length > 1) { h.summary = true; showHatch(); }
+    else endHatch();
+  } else if (e.key === "Backspace") { e.preventDefault(); if (h.summary) endHatch(); else { h.summary = true; showHatch(); } }
+}
+function endHatch() { hatching = null; $("#hatch").hidden = true; $("#eggs-tray").hidden = $("#eggs-side").hidden = false; refreshTop(); eggsUpdate(); }
+
+/* ── Dex: every line an egg can hatch, and what candy does ─────────────── */
+const BASES = G ? G.dex.map((row, i) => row[9] > 0 ? i + 1 : 0).filter(Boolean) : [];
+let dexAt = 0, dexFocus = "list", actAt = 0;
+const lineForms = line => S.owned.filter(num => G.lineOf(num) === line);
+const tipOf = line => lineForms(line).sort((a, b) => G.stageOf(b) - G.stageOf(a) || a - b)[0] || line;
+function dexActions(line) {
+  const l = S.lines[line];
+  if (!l) return [];
+  const list = [];
+  for (const from of lineForms(line)) for (const to of G.evolutionsOf(from)) {
+    if (S.owned.includes(to)) continue;
+    const cost = G.costs.evolve[Math.min(G.stageOf(from), 2) - 1];
+    list.push({ label: "Evolve: " + name(to), right: [cost, candyIcon()], off: l.candy < cost,
+      about: "Evolve " + name(from) + " into " + name(to) + " for " + cost + " candy. Both stay in your dex.", run: () => G.evolve({ from, to }) });
+  }
+  const up = (kind, label, done, cost, about, blocked) => list.push({ label, right: done ? [check(true)] : [cost, candyIcon()],
+    off: done || blocked || l.candy < cost, about, run: () => G.upgrade({ line, kind }) });
+  up("passive", "Passive", l.passive, G.costs.passive, "Unlock this line's passive for tower defense.");
+  up("cost1", "Cost -1", l.cost >= 1, G.costs.cost1, "Deploy this line for 1 less energy in tower defense.");
+  up("cost2", "Cost -2", l.cost >= 2, G.costs.cost2, "Deploy for 2 less energy. Needs Cost -1 first.", l.cost < 1);
+  const looks = G.looksOf(l);
+  list.push({ label: "Look: " + lookName(l.look), off: looks.length < 2,
+    about: looks.length > 1 ? "Change the look this line wears here, in Pokédoku and as your buddy." : "Hatch it shiny to unlock another look.",
+    run: () => G.setLook({ line, look: looks[(looks.indexOf(l.look) + 1) % looks.length] }) });
+  // A skin belongs to one species, so the buddy is that species when the line wears one.
+  const skin = isSkin(l.look) ? skinOf(l.look) : null;
+  const who = skin ? skin.species : tipOf(line);
+  const isBuddy = S.buddy && S.buddy.species === who && S.buddy.shiny === (l.look === "shiny") && (S.buddy.skin || null) === (skin ? skin.id : null);
+  list.push({ label: isBuddy ? "Your buddy" : "Make buddy", right: isBuddy ? [check(true)] : "", off: isBuddy,
+    about: "Show " + name(who) + " next to your name on Bored and the leaderboard.",
+    run: () => G.setBuddy({ species: who, shiny: l.look === "shiny", skin: skin ? skin.id : null }) });
+  return list;
+}
+function dexUpdate() {
+  drawBackdrop();
+  const owned = new Set(Object.keys(S.lines).map(Number));
+  $("#dex-title").textContent = "DEX " + owned.size + "/" + BASES.length;
+  rows($("#dex-rows"), BASES.map(num => ({ label: String(num).padStart(4, "0") + " " + name(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
+    dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); });
+  const line = BASES[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
+  const shown = l && isSkin(l.look) && skinOf(l.look) ? skinOf(l.look).species : tip;
+  $("#dex-pic").replaceChildren(sprite(shown, l ? G.lookFor(shown) : "normal", !l));
+  const info = $("#dex-info");
+  info.replaceChildren(el("div", "title", l ? name(tip) : "???"),
+    el("div", "", "#" + String(tip).padStart(4, "0") + " · " + G.dex[line - 1][9] + "★ line"),
+    el("div", "dim", l ? G.dex[tip - 1][1].replace("/", " / ") : "Not caught yet"));
+  if (l) { const c = el("div"); c.append(el("span", "num", l.candy), " candy · hatched ", el("span", "num", l.hatches)); info.append(c); }
+  const acts = dexActions(line);
+  if (actAt >= acts.length) actAt = Math.max(0, acts.length - 1);
+  if (!acts.length) dexFocus = "list";
+  rows($("#dex-acts"), acts, dexFocus === "acts" ? actAt : -1, (i, click) => { actAt = i; dexFocus = "acts"; if (click) runDex(acts[i]); else dexUpdate(); });
+  if (!l) $("#dex-acts").replaceChildren(el("p", "dim", "Hatches from " + TIER_NAME[G.dex[line - 1][9] - 3] + " eggs."));
+  const skills = G.skillsOf(line).map((skill, i) => (l && l.skills[i] ? skill : "(" + skill + ")") + (i === 3 ? "*" : ""));
+  say(dexFocus === "acts" && acts[actAt] ? acts[actAt].about
+    : (l ? "Skills: " + skills.join(", ") + ". Locked in brackets, * is rare. Enter: candy and looks." : "Hatch this line to unlock it. " + HINT));
+}
+function runDex(action) {
+  if (!action || action.off) return;
+  const r = action.run();
+  refreshTop(); dexUpdate();
+  if (!r.ok) say(REASONS[r.reason] || "Not now.");
+}
+function dexKey(e) {
+  const k = e.key;
+  if (dexFocus === "list") {
+    const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -8, ArrowRight: 8 }[k];
+    if (step) { e.preventDefault(); dexAt = Math.max(0, Math.min(BASES.length - 1, dexAt + step)); actAt = 0; return dexUpdate(); }
+    if (k === "Enter" || k === " ") { e.preventDefault(); if (dexActions(BASES[dexAt]).length) { dexFocus = "acts"; actAt = 0; dexUpdate(); } }
+    if (k === "Backspace") { e.preventDefault(); go("pull"); }
+  } else {
+    const acts = dexActions(BASES[dexAt]);
+    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); actAt = (actAt + (k === "ArrowUp" ? -1 : 1) + acts.length) % acts.length; return dexUpdate(); }
+    if (k === "Enter" || k === " ") { e.preventDefault(); return runDex(acts[actAt]); }
+    if (k === "Backspace" || k === "ArrowLeft") { e.preventDefault(); dexFocus = "list"; dexUpdate(); }
+  }
+}
+
+/* ── Shop: coins for Regulars, and shards for listed SP skins ──────────── */
+let shopAt = 0;
+function shopItems() {
+  const items = [{ kind: "reg", label: "Regular voucher", price: 100, cur: "coins", icon: ticket("regular"),
+    about: "1 Regular voucher for 100 coins. Coins come from Poké Idle, Pokédoku and tower defense." }];
+  for (const skin of skins()) {
+    const held = S.lines[G.lineOf(skin.species)];
+    const owned = held && held.skins.includes(skin.id);
+    items.push({ kind: "sp", skin, label: "SP " + skin.name + ": " + name(skin.species), price: G.costs.sp, cur: "shards", icon: shardIcon(),
+      owned, locked: !held,
+      about: owned ? "You own this skin. Wear it from the Dex: Look." : !held ? "Hatch the " + name(G.lineOf(skin.species)) + " line first to buy this skin."
+        : "SP skin for " + name(skin.species) + ": its own art here, in Pokédoku and as your buddy. Looks only." });
+  }
+  return items;
+}
+function shopUpdate() {
+  drawBackdrop();
+  const items = shopItems();
+  if (shopAt >= items.length) shopAt = items.length - 1;
+  $("#shop-title").textContent = items.length > 1 ? "SHARD SHOP" : "SHOP";
+  rows($("#shop-list"), items.map(it => ({ icon: it.icon, label: it.label, right: it.owned ? [check(true)] : [it.price, it.cur === "coins" ? coin() : shardIcon()],
+    off: it.owned || it.locked || (it.cur === "coins" ? S.balance.coins : S.balance.shards) < it.price })), shopAt, (i, click) => { shopAt = i; if (click) buy(items[i]); else shopUpdate(); });
+  const it = items[shopAt];
+  const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins");
+  if (items.length > 1) have.append(" · ", el("span", "num", S.balance.shards), " shards");
+  $("#shop-preview").replaceChildren(el("div", "title", it.kind === "sp" ? "PREVIEW" : "VOUCHER"),
+    cellWith(it.kind === "sp" ? sprite(it.skin.species, it.skin.id) : ticket("regular")), el("div", "", it.kind === "sp" ? it.skin.name : "1 Regular = 1 egg"), have);
+  say(it.about);
+}
+function buy(it) {
+  if (it.owned || it.locked) return say(it.about);
+  const r = it.kind === "reg" ? G.buyRegular({ count: 1 }) : G.buySkin({ skin: it.skin.id });
+  refreshTop(); shopUpdate();
+  say(r.ok ? (it.kind === "reg" ? "Bought 1 Regular voucher." : "SP skin unlocked. Wear it from the Dex: Look.") : (REASONS[r.reason] || "Not now."));
+}
+function shopKey(e) {
+  const items = shopItems();
+  if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); shopAt = (shopAt + (e.key === "ArrowUp" ? -1 : 1) + items.length) % items.length; shopUpdate(); }
+  else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); buy(items[shopAt]); }
+  else if (e.key === "Backspace") { e.preventDefault(); go("pull"); }
+}
+
+/* ── Quests: daily login, starter missions, trophies ───────────────────── */
+let questAt = 0, questFocus = "missions", trophyAt = 0;
+function questItems() {
+  return [{ label: "Daily login", right: [3, ticket("regular"), check(S.login)], about: "Open Poké Gacha each day for 3 Regular vouchers.", done: S.login }]
+    .concat(G.missions.map(m => ({ label: m.label.replace(" (tower defense, coming later)", ""), right: [2, ticket("regular"), check(S.missions[m.id])],
+      about: m.id === "stage" ? "Starter mission. Tower defense is coming in the next update." : "Starter mission: 2 Regular vouchers, once.", done: S.missions[m.id] })));
+}
+function questsUpdate() {
+  drawBackdrop();
+  const items = questItems();
+  rows($("#quest-list"), items.map(q => ({ label: q.label, right: q.right, off: q.done })), questFocus === "missions" ? questAt : -1,
+    i => { questAt = i; questFocus = "missions"; questsUpdate(); });
+  const trophies = G.trophies();
+  $("#trophy-title").textContent = "TROPHIES " + trophies.length;
+  rows($("#trophy-list"), trophies.map(t => ({ label: t.name, right: t.tier })), questFocus === "trophies" ? trophyAt : -1,
+    i => { trophyAt = i; questFocus = "trophies"; questsUpdate(); });
+  if (!trophies.length) $("#trophy-list").replaceChildren(el("p", "dim", "None yet."));
+  const t = trophies[trophyAt];
+  say(questFocus === "trophies" && t ? t.name + ": tier " + t.tier + " (S = 1 Plus, M = 1 Premium, B = 1 Gold)."
+    : (items[questAt] ? items[questAt].about : "") + (trophies.length ? " Right: trophies." : ""));
+}
+function questsKey(e) {
+  const k = e.key;
+  if (k === "ArrowRight" && G.trophies().length) { e.preventDefault(); questFocus = "trophies"; return questsUpdate(); }
+  if (k === "ArrowLeft" || k === "Backspace") {
+    e.preventDefault();
+    if (questFocus === "trophies") { questFocus = "missions"; return questsUpdate(); }
+    if (k === "Backspace") go("pull");
+    return;
+  }
+  if (k === "ArrowUp" || k === "ArrowDown") {
+    e.preventDefault();
+    const d = k === "ArrowUp" ? -1 : 1;
+    if (questFocus === "missions") { const n = questItems().length; questAt = (questAt + d + n) % n; }
+    else { const n = G.trophies().length; trophyAt = (trophyAt + d + n) % n; }
+    questsUpdate();
+  }
+}
+
+/* ── Frame, tabs and switching screens ─────────────────────────────────── */
+const TABS = [["pull", "Pull"], ["eggs", "Eggs"], ["dex", "Dex"], ["shop", "Shop"], ["quests", "Quests"]];
+const SCREENS = { pull: [updateScene, pullKey], eggs: [eggsUpdate, eggsKey], dex: [dexUpdate, dexKey], shop: [shopUpdate, shopKey], quests: [questsUpdate, questsKey] };
+function refreshTop() {
+  S = G.state();
+  const ready = S.eggs.filter(e => e.ready).length;
+  $("#tabs").replaceChildren(...TABS.map(([id, label], i) => {
+    const t = el("div", "panel" + (tab === id ? " on" : ""));
+    t.append(el("span", "", label));
+    if (id === "eggs" && ready) t.append(" ", el("span", "num", ready));
+    t.dataset.tab = id;
+    t.title = label + " (" + (i + 1) + ")";
+    return t;
+  }));
+  const purse = el("div", "panel purse");
+  purse.append(el("span", "num", S.balance.coins), coin(), el("span", "num", S.balance.shards), shardIcon());
+  purse.title = "Coins and shards";
+  $("#tabs").append(purse);
+}
+function go(id) {
+  if (!SCREENS[id] || hatching) return;
+  tab = pref.tab = id; keep();
+  message = null;
+  for (const [sid] of TABS) $("#scr-" + sid).hidden = sid !== id;
+  refreshTop();
+  SCREENS[id][0]();
+  $("#wrap").focus({ preventScroll: true });
+}
+// Whole-number scaling only. Below 640px wide (a phone) the frame shrinks to fit instead.
+function placeFrame() {
+  const w = document.documentElement.clientWidth - 8, h = window.innerHeight - 8;
+  const fit = Math.min(w / 640, h / 408);
+  const k = fit >= 1 ? Math.floor(fit) : fit;
+  $("#wrap").style.width = Math.floor(640 * k) + "px";
+  $("#wrap").style.height = Math.floor(408 * k) + "px";
+  $("#frame").style.transform = "scale(" + k + ")";
+}
+
+window.addEventListener("resize", placeFrame);
+placeFrame();
+if (!G) {
+  drawBackdrop();
+  for (const [sid] of TABS) $("#scr-" + sid).hidden = true;
+  $("#msg").hidden = true; $("#off").hidden = false;
+} else {
+  document.addEventListener("keydown", e => {
+    if (/^[1-5]$/.test(e.key) && !hatching) { e.preventDefault(); return go(TABS[Number(e.key) - 1][0]); }
+    if (hatching) return hatchKey(e);
+    SCREENS[tab][1](e);
+  });
+  $("#tabs").onclick = e => { const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
+  $("#menu").onmousemove = e => { const r = e.target.closest("[data-row]"); if (r && Number(r.dataset.row) !== cursor && !message) { cursor = Number(r.dataset.row); updateScene(); } };
   $("#hit-left").onclick = () => switchMachine(-1);
   $("#hit-right").onclick = () => switchMachine(1);
   $("#hit-machine").onclick = () => { menuOpen = true; message = null; updateScene(); };
-  new ResizeObserver(placeStage).observe($("#pullwrap"));
+  $("#hatch").onclick = () => hatching && hatchKey({ key: "Enter", preventDefault() {} });
   setInterval(() => { if (tab === "pull" && machine === "legend" && !$("#clock").hidden) $("#clock").textContent = untilMidnight(); }, 1000);
-}
-
-function render() {
-  S = G.state();
-  hud();
-  const pulling = tab === "pull";
-  $("#pullwrap").hidden = !pulling;
-  if (pulling) { $("#view").replaceChildren(); placeStage(); updateScene(); }
-  else $("#view").innerHTML = { eggs: eggsView, dex: dexView, missions: missionsView }[tab]();
-}
-
-$("#tabs").onclick = e => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.tab; note(""); render(); if (tab === "pull") $("#pullwrap").focus({ preventScroll: true }); };
-$("#view").onclick = e => {
-  const b = e.target.closest("button");
-  if (!b || b.disabled) return;
-  note("");
-  const d = b.dataset;
-  if (b.id === "hatch") { const r = G.hatch(); if (said(r)) lastHatch = r.hatched; }
-  else if (d.pick) { picked = Number(d.pick); look = "normal"; }
-  else if (d.look) look = d.look;
-  else if (b.id === "buddy") { if (said(G.setBuddy({ species: picked, shiny: look === "shiny", sp: look === "sp" }))) note("Buddy set. It shows next to your name on Bored."); }
-  else if (d.evolve) { const to = Number(d.evolve); if (said(G.evolve({ from: picked, to }))) picked = to; }
-  else if (d.up) said(G.upgrade({ line: G.lineOf(picked), kind: d.up }));
-  else if (b.id === "sp") said(G.buySp({ line: G.lineOf(picked) }));
-  render();
-};
-
-if (!G) {
-  $("#tabs").hidden = true; $("#off").hidden = false;
-} else {
-  buildScene();
-  if (G.claimLogin().ok) message = { text: "Daily login: +3 Regular vouchers." };
-  render();
-  $("#pullwrap").focus({ preventScroll: true });
   // Waves earned in another game, or a sync from another device, show up here.
-  setInterval(() => { if (!document.hidden) { const was = JSON.stringify(S); const now = G.state(); if (JSON.stringify(now) !== was) render(); } }, 3000);
+  let seen = "";
+  setInterval(() => {
+    if (document.hidden || hatching) return;
+    const now = JSON.stringify(G.state());
+    if (now !== seen) { seen = now; refreshTop(); SCREENS[tab][0](); }
+  }, 3000);
+  const login = G.claimLogin().ok;
+  go(SCREENS[tab] ? tab : "pull");
+  if (login) { if (tab === "pull") { message = { text: "Daily login: +3 Regular vouchers." }; updateScene(); } else say("Daily login: +3 Regular vouchers."); }
 }
 
 // The hub reads this. Unscored for now; the planned score is unique species caught.
