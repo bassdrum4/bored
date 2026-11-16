@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 508,
+  "count": 509,
   "newest": "2026-11-16",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"47572b9","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Idle: Prof Penguin's final showdown","pr":169},
   {"sha":"77090ba","date":"2026-11-16","author":"PenguinV360","subject":"Poké Idle: Prof Penguin's Empoleon sprite is now his Mega Empoleon","pr":168},
   {"sha":"b22156d","date":"2026-11-16","author":"PenguinV360","subject":"Poké Idle: sprites for Prof Penguin and his Empoleon","pr":167},
   {"sha":"cbafd15","date":"2026-11-16","author":"PenguinV360","subject":"Poké Idle: land the final tier bonuses; side-quest achievements in tier order","pr":166},
