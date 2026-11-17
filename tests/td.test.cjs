@@ -335,10 +335,11 @@ function playInOrder(stage, squad, plan) {
   return b;
 }
 test('late stages want type-matched squads: matched level-3 commons and rares win, the worst-typed lose', () => {
-  for (const id of ['1-8', '2-3', '2-4', '2-5', '2-6']) {
+  for (const id of ['1-8', '2-3', '2-4', '2-5', '2-6', '3-1', '3-2', '3-3', '3-4', '3-5', '3-6']) {
     const stage = td.STAGES.find(s => s.id === id);
     const good = squadFor(stage, 1), bad = squadFor(stage, -1);
     assert.equal(playInOrder(stage, good, placed(stage, good)).over, 'win', id + ': a type-matched level-3 squad wins');
-    assert.equal(playInOrder(stage, bad, placed(stage, bad)).over, 'lose', id + ': the worst-typed level-3 squad loses');
+    // The Petrel boss is the one stage a worst-typed squad can scrape through, with 1 star.
+    if (id !== '3-6') assert.equal(playInOrder(stage, bad, placed(stage, bad)).over, 'lose', id + ': the worst-typed level-3 squad loses');
   }
 });
