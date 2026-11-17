@@ -153,6 +153,9 @@ canvas, img { image-rendering: pixelated; display: block }
 #scr-story .left-panel { width: 304px }
 #scr-story .right-panel { left: 320px; width: 312px }
 #story-info { gap: 0 }
+/* Weekly milestones: two rows of two, a check, the risk and the reward's icon. */
+#story-info .milestones { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; margin-top: 4px }
+#story-info .milestones span { display: flex; align-items: center; gap: 4px; white-space: nowrap; height: 24px }
 
 /* Story and battles, on the 344px stage: HUD 4-36, field 40-280, deploy cards 284-336. */
 #tabs.locked .panel[data-tab] { color: var(--dim); cursor: default }
@@ -165,6 +168,7 @@ canvas, img { image-rendering: pixelated; display: block }
 #deploy .card.off { color: var(--dim) }
 #battle-talk { left: 8px; bottom: 8px; width: 624px; height: 52px; padding: 4px 12px; cursor: pointer }
 #battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
+#battle-result .reward-icons { display: flex; align-items: center; gap: 2px; white-space: nowrap }
 </style>
 </head>
 <body>
@@ -984,7 +988,22 @@ const pages = () => chapters().length + (hasWeekly() ? 1 : 0);
 const onWeekly = () => hasWeekly() && chapterAt >= chapters().length;
 const riskPick = () => (Array.isArray(pref.risks) ? pref.risks : []).filter(id => T.risks.some(r => r.id === id));
 // The weekly page opens once the first stage is cleared.
-const weeklyOpen = td => (td.best[allStages()[0].id] || 0) > 0;
+// The weekly page opens once the chapter 1 boss is cleared (the hub says which stage).
+const weeklyUnlock = () => T.weeklyUnlock || "1-8";
+const weeklyOpen = td => td.challengeOpen !== undefined ? td.challengeOpen : (td.best[weeklyUnlock()] || 0) > 0;
+// Risk milestones: each pays once a week. Shown with a check once this week's wins have paid it.
+const MILESTONE_ICON = { plus: () => ticket("plus"), premium: () => ticket("premium"), gold: () => ticket("gold"), shards: () => shardIcon() };
+function milestoneGrid(td) {
+  const grid = el("div", "milestones");
+  T.milestones.forEach((m, i) => {
+    const [kind, n] = Object.entries(m.grant)[0];
+    const cell = el("span", (td.challengeClaimed || [])[i] ? "" : "dim");
+    cell.title = "Win at risk " + m.risk + "+: " + m.label + ", once a week";
+    cell.append(check(!!(td.challengeClaimed || [])[i]), " Risk ", el("span", "num", m.risk), " ", ...(n > 1 ? [el("span", "num", n)] : []), (MILESTONE_ICON[kind] || (() => ""))());
+    grid.append(cell);
+  });
+  return grid;
+}
 const stageNow = () => onWeekly() ? T.state().challenge : stagesNow()[storyAt];
 const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
 const stageStars = starIcons;
@@ -1037,8 +1056,9 @@ function weeklyUpdate() {
   if (armoredOf(stage).length) info.append(el("div", "gold", "Armored: " + armoredOf(stage).map(name).join(", ")));
   const score = el("div"); score.append("Risk ", el("span", "num", risk), " · best this week ", el("span", "num", td.challengeBest || 0));
   info.append(score);
-  if (!weeklyOpen(td)) return say("Clear " + allStages()[0].id + " first: the weekly challenge opens after the first stage. Left/Right: chapter.");
-  if (storyAt === 0) return say("The same map for everyone this week. Win to score your risk total; your best win counts. Enter: choose your squad.");
+  if (T.milestones) info.append(milestoneGrid(td));
+  if (!weeklyOpen(td)) return say("Clear " + weeklyUnlock() + " first: the weekly challenge opens after the chapter 1 boss. Left/Right: chapter.");
+  if (storyAt === 0) return say("The same map for everyone this week. Win to score your risk; each reward pays once a week. Enter: choose your squad.");
   const r = T.risks[storyAt - 1];
   say((picked.includes(r.id) ? "On" : "Off") + ": " + r.label + " (+" + r.risk + " risk). Enter toggles it. Risks stack.");
 }
@@ -1050,7 +1070,7 @@ function pickStage() {
       pref.risks = picked.includes(id) ? picked.filter(x => x !== id) : picked.concat(id); keep();
       return storyUpdate();
     }
-    if (!weeklyOpen(td)) return say("Clear " + allStages()[0].id + " first.");
+    if (!weeklyOpen(td)) return say("Clear " + weeklyUnlock() + " first.");
     if (!S.owned.length) return say("Hatch some eggs first: you need mons for your squad.");
     storyMode = "squad"; squadAt = 0; return storyUpdate();
   }
@@ -1235,8 +1255,8 @@ function endBattle() {
   const r = bt.weekly ? T.finishWeekly({ mods: bt.mods, stars, waves: b.wavesDone })
     : T.finish({ stage: bt.stage.id, stars, team: [...b.deployed], waves: b.wavesDone });
   refreshTop();
-  // The weekly run pays hatch waves only; its score is the risk.
-  const gained = bt.weekly ? [] : ["coins", "regular", "plus", "gold"].map(k => [k, S.balance[k] - before[k]]).filter(([, n]) => n > 0);
+  // A weekly win also pays any risk milestone it reaches for the first time this week.
+  const gained = ["coins", "regular", "plus", "premium", "gold", "shards"].map(k => [k, S.balance[k] - before[k]]).filter(([, n]) => n > 0);
   if (stars) bt.talk = bt.stage.after.slice();
   bt.result = { stars, waves: r.waves || 0, gained, weekly: bt.weekly, risk: r.risk || 0, best };
   battleTalk();
@@ -1250,8 +1270,14 @@ function showResult() {
   const lines = [el("div", "title", res.stars ? "CLEARED" : "DEFEATED"), res.stars ? (() => { const d = el("div"); d.append(stageStars(res.stars)); return d; })() : el("div", "num", "Try another squad or placement")];
   const waves = el("div"); waves.append("+", el("span", "num", res.waves), " hatch waves");
   lines.push(waves);
-  const NAMES = { coins: ["coin", "coins"], regular: ["Regular voucher", "Regular vouchers"], plus: ["Plus voucher", "Plus vouchers"], gold: ["Gold voucher", "Gold vouchers"] };
-  for (const [k, n] of res.gained) { const d = el("div"); d.append("+", el("span", "num", n), " " + NAMES[k][n === 1 ? 0 : 1]); lines.push(d); }
+  const NAMES = { coins: ["coin", "coins"], regular: ["Regular voucher", "Regular vouchers"], plus: ["Plus voucher", "Plus vouchers"],
+    premium: ["Premium voucher", "Premium vouchers"], gold: ["Gold voucher", "Gold vouchers"], shards: ["shard", "shards"] };
+  // Weekly rewards go on one line of icons: a first max-risk win can pay four at once.
+  if (res.weekly && res.gained.length) {
+    const d = el("div", "reward-icons");
+    for (const [k, n] of res.gained) d.append("+", el("span", "num", n), MILESTONE_ICON[k] ? MILESTONE_ICON[k]() : " " + NAMES[k][1], " ");
+    lines.push(d);
+  } else for (const [k, n] of res.gained) { const d = el("div"); d.append("+", el("span", "num", n), " " + NAMES[k][n === 1 ? 0 : 1]); lines.push(d); }
   if (res.weekly) {
     const d = el("div", res.stars && res.risk > res.best ? "gold" : "");
     d.append("Risk ", el("span", "num", res.risk), res.stars ? (res.risk > res.best ? " · new best" : " · best " + res.best) : " · not scored");
@@ -1445,10 +1471,13 @@ if (!G) {
   else if (login) { if (tab === "pull") { message = { text: "Daily login: +3 Regular vouchers." }; updateScene(); } else say("Daily login: +3 Regular vouchers."); }
 }
 
-// The hub reads this. Unscored for now; the planned score is unique species caught.
+// The hub reads this. Poké Gacha itself is unscored; weeklyRisk (this week's
+// best risk won) feeds its second board, poke-gacha-weekly.
 window.__boredSnapshot = () => {
-  try { const s = S || (G && G.state()); return { slug: "poke-gacha", caught: s ? s.owned.length : 0, pulls: s ? s.pulls : 0, finished: false }; }
-  catch { return { slug: "poke-gacha", caught: 0, pulls: 0, finished: false }; }
+  let weeklyRisk = 0;
+  try { weeklyRisk = T && T.state ? Number(T.state().challengeBest) || 0 : 0; } catch {}
+  try { const s = S || (G && G.state()); return { slug: "poke-gacha", caught: s ? s.owned.length : 0, pulls: s ? s.pulls : 0, weeklyRisk, finished: false }; }
+  catch { return { slug: "poke-gacha", caught: 0, pulls: 0, weeklyRisk, finished: false }; }
 };
 </script>
 </body>
