@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 567,
+  "count": 568,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"fc547cb","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Idle: daily boss from the arcade's shared seed","pr":210},
   {"sha":"e053515","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: role-aware stage preview and loss hints, rates + pity, tab dots","pr":208},
   {"sha":"e4b4b93","date":"2026-11-17","author":"Claude","subject":"scripts/economy-sim.mjs: a normal player's month in coins and vouchers (report only)"},
   {"sha":"501f952","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: a short, skippable tutorial","pr":207},
