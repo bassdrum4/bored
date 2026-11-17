@@ -296,12 +296,74 @@ test('Dex: F filters what is shown, T a type, S the order, and the choice is kep
   // Back to all, any type; sort by name.
   await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; keep(); dexUpdate(); });
   await key(tab, 's');
-  const names = await game.evaluate(() => dexList().map(name));
-  assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b)), 'S sorts by name');
+  // Caught lines by name, then the uncaught ones (their names are hidden) by number.
+  const sorted = await game.evaluate(() => dexList().map(num => [!!S.lines[num], name(num), num]));
+  const caught = sorted.filter(r => r[0]), missing = sorted.filter(r => !r[0]);
+  assert.deepEqual(sorted, [...caught, ...missing], 'caught lines first');
+  assert.deepEqual(caught.map(r => r[1]), caught.map(r => r[1]).sort((a, b) => a.localeCompare(b)), 'S sorts caught lines by name');
+  assert.deepEqual(missing.map(r => r[2]), missing.map(r => r[2]).sort((a, b) => a - b), 'and the rest by number');
   assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')).dexSort), 'Name', 'the choice is kept');
   assert.ok((await rowsNow()).length > 0);
   await game.evaluate(() => { pref.dexSort = 'Number'; keep(); });
   assert.deepEqual(errors, []);
+});
+
+test('Dex: uncaught lines are ??? with a silhouette, the egg they hatch from and no type; caught ones are named and checked', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; pref.dexSort = 'Number'; keep(); go('dex'); });
+  // The list: a caught row has its name, a colour sprite and a check; an uncaught one only its number.
+  const rowsSeen = await game.evaluate(() => [...document.querySelectorAll('#dex-rows > div')].map((r, i) => {
+    const num = dexList()[i];
+    return { caught: !!S.lines[num], text: r.textContent.trim(), name: name(num), dark: !!r.querySelector('.unseen'), check: !!r.querySelector('canvas:not(.unseen)'),
+      tip: r.querySelector('.mini').title };
+  }));
+  assert.ok(rowsSeen.some(r => r.caught) && rowsSeen.some(r => !r.caught), 'the first rows hold both');
+  for (const r of rowsSeen) {
+    if (r.caught) { assert.ok(r.text.includes(r.name) && !r.dark && r.check, r.name + ' reads as caught'); }
+    else { assert.ok(!r.text.includes(r.name) && /\?\?\?/.test(r.text) && r.dark && r.tip === '???', r.text + ' hides its name'); }
+  }
+  // The detail for an uncaught line: a silhouette that fills the cell, the egg and its icon, type ???.
+  const line = await game.evaluate(() => { dexAt = dexList().findIndex(num => !S.lines[num]); dexUpdate(); return dexList()[dexAt]; });
+  await game.waitForFunction(() => { const c = document.querySelector('#dex-pic canvas.silhouette'); return c && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some(v => v > 0); });
+  const pic = await game.evaluate(() => {
+    const c = document.querySelector('#dex-pic canvas.silhouette'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let x0 = c.width, x1 = -1, y0 = c.height, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    return { size: c.width, span: Math.max(x1 - x0, y1 - y0) + 1 };
+  });
+  assert.ok(pic.span >= pic.size * 0.8, 'the silhouette fills the box (' + pic.span + ' of ' + pic.size + ')');
+  const info = await game.evaluate(() => ({ text: $('#dex-info').textContent, egg: $('#dex-info .egg-line img')?.alt, all: document.querySelector('#dex-detail').textContent }));
+  const [want, types, nm] = await game.evaluate(n => [TIER_NAME[G.dex[n - 1][9] - 3] + ' egg', G.dex[n - 1][1], name(n)], line);
+  assert.equal(info.egg, want, 'the egg icon is the tier it hatches from');
+  assert.match(info.text, /^\?\?\?/);
+  assert.match(info.text, /Type \?\?\?/);
+  assert.ok(!info.all.includes(nm), 'no name in the detail');
+  assert.ok(!info.text.includes(types), 'no type in the detail');
+  // A caught line: name, egg, type and candy costs in words (no red candy icon).
+  await game.evaluate(() => { dexAt = dexList().findIndex(num => !!S.lines[num]); dexUpdate(); });
+  const shown = await game.evaluate(() => ({ text: $('#dex-info').textContent, n: name(tipOf(dexList()[dexAt])), type: G.dex[tipOf(dexList()[dexAt]) - 1][1], icons: $('#dex-acts').querySelectorAll('canvas').length,
+    acts: $('#dex-acts').textContent, spill: $('#dex-info').scrollHeight > $('#dex-info').clientHeight + 1 }));
+  assert.ok(shown.text.startsWith(shown.n) && shown.text.includes(shown.type), 'a caught line shows its name and type');
+  assert.match(shown.acts, /\d+ candy/);
+  assert.equal(shown.spill, false);
+  assert.deepEqual(errors, []);
+});
+
+test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Rare, Bonsly (Sudowoodo, 410) stays Common', async () => {
+  const { DEX } = await import(path.join(root, 'src/hub/gacha-dex.js'));
+  const bst = r => r[2] + r[3] + r[4] + r[5] + r[6] + r[7];
+  const kids = {};
+  DEX.forEach((r, i) => { if (r[8]) (kids[r[8]] ||= []).push(i + 1); });
+  const finals = n => kids[n] ? kids[n].flatMap(finals) : [n];
+  const off = [];
+  DEX.forEach((r, i) => {
+    if (r[9] !== 3 && r[9] !== 4) return;
+    const best = Math.max(...finals(i + 1).map(f => bst(DEX[f - 1])));
+    if ((best >= 500 ? 4 : 3) !== r[9]) off.push(r[0] + ' ' + r[9] + '★ (final ' + best + ')');
+  });
+  assert.deepEqual(off, [], 'every Common/Rare line is tiered by its final form');
+  const star = n => DEX.find(r => r[0] === n)[9];
+  assert.deepEqual(['Magikarp', 'Happiny', 'Munchlax', 'Feebas', 'Bonsly'].map(star), [4, 4, 4, 4, 3]);
 });
 
 test('tower defense: chapter 4 says which enemies are armored', async t => {

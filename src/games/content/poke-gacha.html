@@ -147,6 +147,9 @@ canvas, img { image-rendering: pixelated; display: block }
 #dex-detail { left: 264px; top: 8px; width: 368px; height: 264px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 96px 1fr; gap: 8px 12px }
 #dex-detail .cell { width: 96px; height: 96px; background: var(--ink) }
 #dex-acts { grid-column: 1 / -1; height: 120px }
+#dex-info .egg-line { display: flex; align-items: center; gap: 4px; height: 36px; white-space: nowrap }
+#dex-info > div:last-child { white-space: nowrap }
+#dex-pic .silhouette { display: block }
 
 /* Starter pick: the Dex layout, with the three gifts under the starter. */
 #starter-list { left: 8px; top: 8px; width: 248px; height: 264px; display: flex; flex-direction: column }
@@ -404,7 +407,7 @@ function miniStyle(node, num, look = "normal", scale = 1) {
   });
   return node;
 }
-const mini = (num, look, dark = false) => { const d = miniStyle(el("span", "mini" + (dark ? " unseen" : "")), num, look); d.title = name(num); return d; };
+const mini = (num, look, dark = false) => { const d = miniStyle(el("span", "mini" + (dark ? " unseen" : "")), num, look); d.title = dark ? "???" : name(num); return d; };
 /* PIXEL_MAPS:BEGIN — hand-placed icons, one char per pixel. tests/poke-gacha.test.cjs checks the outlines. */
 const PIXEL_MAPS = {
  "candy": ["..kkkk..", ".k2211k.", "k22w110k", "k2w1w10k", "k21w110k", "k111100k", ".k1000k.", "..kkkk.."],
@@ -453,11 +456,36 @@ const lookName = look => look === "normal" ? "Normal" : look === "shiny" ? "Shin
 const CELL = 96;
 function sprite(num, look = "normal", dark = false) {
   const img = new Image();
-  img.alt = name(num);
+  img.alt = dark ? "???" : name(num);
   img.draggable = false;
   if (dark) img.className = "unseen";
   img.src = spriteUrl(num, look);
   return img;
+}
+// An uncaught line's shape, cropped to the sprite and scaled up to fill a cell (nearest
+// neighbour, so the edge stays pixel-sharp). Drawn once the sprite loads.
+function silhouette(num, size = CELL, pad = 6) {
+  const c = document.createElement("canvas");
+  c.width = c.height = size; c.className = "silhouette"; c.setAttribute("aria-label", "???");
+  const img = new Image();
+  img.onload = () => {
+    const t = document.createElement("canvas"); t.width = img.width; t.height = img.height;
+    const tg = t.getContext("2d"); tg.drawImage(img, 0, 0);
+    let px; try { px = tg.getImageData(0, 0, t.width, t.height).data; } catch { px = null; }
+    let x0 = 0, y0 = 0, x1 = t.width - 1, y1 = t.height - 1;
+    if (px) {
+      x0 = t.width; y0 = t.height; x1 = -1; y1 = -1;
+      for (let y = 0; y < t.height; y++) for (let x = 0; x < t.width; x++) if (px[(y * t.width + x) * 4 + 3] > 16) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (x1 < 0) return;
+    }
+    const w = x1 - x0 + 1, h = y1 - y0 + 1, k = (size - pad * 2) / Math.max(w, h);
+    const g = c.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.drawImage(t, x0, y0, w, h, Math.round((size - w * k) / 2), Math.round((size - h * k) / 2), Math.round(w * k), Math.round(h * k));
+    g.globalCompositeOperation = "source-in"; g.fillStyle = "#0b0a14"; g.fillRect(0, 0, size, size);
+  };
+  img.src = spriteUrl(num, "normal");
+  return c;
 }
 function cellWith(node, size = CELL, cls = "") { const c = el("div", "cell " + cls); c.style.width = c.style.height = size + "px"; c.append(node); return c; }
 function rows(container, list, at, onPick) {
@@ -960,7 +988,7 @@ function dexList() {
   let list = BASES.filter(num => v.filter === "Owned" ? !!S.lines[num] : v.filter === "Not owned" ? !S.lines[num]
     : /★/.test(v.filter) ? tier(num) === Number(v.filter[0]) : true);
   if (v.type) list = list.filter(num => G.dex[num - 1][1].split("/").includes(v.type));
-  if (v.sort === "Name") list = list.slice().sort((a, b) => name(a).localeCompare(name(b)));
+  if (v.sort === "Name") list = list.slice().sort((a, b) => (!S.lines[a] - !S.lines[b]) || (S.lines[a] ? name(a).localeCompare(name(b)) : a - b));
   if (v.sort === "Tier") list = list.slice().sort((a, b) => tier(b) - tier(a) || a - b);
   return list;
 }
@@ -982,10 +1010,10 @@ function dexActions(line) {
   for (const from of lineForms(line)) for (const to of G.evolutionsOf(from)) {
     if (S.owned.includes(to)) continue;
     const cost = G.costs.evolve[Math.min(G.stageOf(from), 2) - 1];
-    list.push({ label: "Evolve: " + name(to), right: [cost, candyIcon()], off: l.candy < cost,
+    list.push({ label: "Evolve: " + name(to), right: [cost, " candy"], off: l.candy < cost,
       about: "Evolve " + name(from) + " into " + name(to) + " for " + cost + " candy. Both stay in your dex.", run: () => G.evolve({ from, to }) });
   }
-  const up = (kind, label, done, cost, about, blocked) => list.push({ label, right: done ? [check(true)] : [cost, candyIcon()],
+  const up = (kind, label, done, cost, about, blocked) => list.push({ label, right: done ? [check(true)] : [cost, " candy"],
     off: done || blocked || l.candy < cost, about, run: () => G.upgrade({ line, kind }) });
   up("passive", "Passive", l.passive, G.costs.passive, "Unlock this line's passive for tower defense.");
   up("cost1", "Cost -1", l.cost >= 1, G.costs.cost1, "Deploy this line for 1 less energy in tower defense.");
@@ -1008,7 +1036,7 @@ function dexUpdate() {
   const owned = new Set(Object.keys(S.lines).map(Number)), list = dexList(), v = dexView();
   // The count: caught of all lines, or shown of all lines while a filter is on.
   const filtered = v.filter !== "All" || v.type;
-  titled($("#dex-title"), "DEX", (filtered ? list.length : owned.size) + "/" + BASES.length);
+  titled($("#dex-title"), "DEX", (filtered ? list.length + " shown" : owned.size + "/" + BASES.length + " caught"));
   const view = dexViewText();
   $("#dex-detail").hidden = !list.length;
   if (!list.length) {
@@ -1016,23 +1044,27 @@ function dexUpdate() {
     return say("Nothing matches " + view + " Press F, T or S to change it.");
   }
   if (dexAt >= list.length) dexAt = list.length - 1;
-  // Each row carries the line's mini sprite at 1x, dark until it is caught.
+  // Caught: the line's mini sprite in colour, its name and a gold check. Not caught: a
+  // black silhouette, the number and ???.
   rows($("#dex-rows"), list.map(num => ({ icon: owned.has(num) ? mini(tipOf(num), S.lines[num].look) : mini(num, "normal", true),
-    label: String(num).padStart(4, "0") + " " + name(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
+    label: String(num).padStart(4, "0") + " " + (owned.has(num) ? name(num) : "???"), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
     dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); });
   const line = list[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
   const shown = l && isSkin(l.look) && skinOf(l.look) ? skinOf(l.look).species : tip;
-  $("#dex-pic").replaceChildren(sprite(shown, l ? G.lookFor(shown) : "normal", !l));
-  const info = $("#dex-info");
-  info.replaceChildren(el("div", "title", l ? name(tip) : "???"),
-    el("div", "", "#" + String(tip).padStart(4, "0") + " · " + G.dex[line - 1][9] + "★ line"),
-    el("div", "dim", l ? G.dex[tip - 1][1].replace("/", " / ") : "Not caught yet"));
-  if (l) { const c = el("div"); c.append(el("span", "num", l.candy), " candy · hatched ", el("span", "num", l.hatches)); info.append(c); }
+  $("#dex-pic").replaceChildren(l ? sprite(shown, G.lookFor(shown)) : silhouette(line));
+  const info = $("#dex-info"), stars = G.dex[line - 1][9], egg = el("div", "egg-line");
+  // Which egg it hatches from, with that egg's icon: Common 3★, Rare 4★, Epic 5★, Legendary 6★.
+  egg.append("#" + String(tip).padStart(4, "0") + " ·", eggImg(stars - 3), TIER_NAME[stars - 3] + " egg · " + stars + "★");
+  // Then the type (??? until caught), and for a caught line its candy.
+  const more = el("div", l ? "" : "dim");
+  if (l) more.append(el("span", "dim", G.dex[tip - 1][1]), " · ", el("span", "num", l.candy), " candy · hatched ", el("span", "num", l.hatches));
+  else more.append("Type ??? · not caught");
+  info.replaceChildren(el("div", "title", l ? name(tip) : "???"), egg, more);
   const acts = dexActions(line);
   if (actAt >= acts.length) actAt = Math.max(0, acts.length - 1);
   if (!acts.length) dexFocus = "list";
   rows($("#dex-acts"), acts, dexFocus === "acts" ? actAt : -1, (i, click) => { actAt = i; dexFocus = "acts"; if (click) runDex(acts[i]); else dexUpdate(); });
-  if (!l) $("#dex-acts").replaceChildren(el("p", "dim", "Hatches from " + TIER_NAME[G.dex[line - 1][9] - 3] + " eggs."));
+  if (!l) $("#dex-acts").replaceChildren(el("p", "dim", "Hatch it from " + (stars === 5 ? "an " : "a ") + TIER_NAME[stars - 3] + " egg to see what it is."));
   const skills = G.skillsOf(line).map((skill, i) => (l && l.skills[i] ? skill : "(" + skill + ")") + (i === 3 ? "*" : ""));
   say(dexFocus === "acts" && acts[actAt] ? acts[actAt].about
     : (l ? "Skills: " + skills.join(", ") + ". Locked in brackets, * is rare. Enter: candy and looks." : "Hatch this line to unlock it. F, T and S filter and sort the Dex."));
@@ -2322,7 +2354,11 @@ function refreshTop() {
   $("#tabs").replaceChildren(...shownTabs().map(([id, label], i) => {
     const t = el("div", "panel" + (tab === id && !picking ? " on" : ""));
     t.append(el("span", "", label));
-    if ((id === "eggs" && ready) || (id === "quests" && fresh)) { const d = mapCanvas("dot", { k: C.ink, 1: C.red }); d.classList.add("alert"); t.append(d); }
+    if ((id === "eggs" && ready) || (id === "quests" && fresh)) {
+      const d = mapCanvas("dot", { k: C.ink, 1: C.red }); d.classList.add("alert");
+      d.title = id === "eggs" ? "An egg is ready to hatch" : "New rewards since you last looked";
+      t.append(d);
+    }
     t.dataset.tab = id;
     t.title = label + " (" + (i + 1) + ")" + (id === "eggs" && ready ? ": " + ready + " ready to hatch" : id === "quests" && fresh ? ": new rewards" : "");
     return t;
