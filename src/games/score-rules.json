@@ -129,6 +129,11 @@
     "better": "high",
     "max_value": 10000000
   },
+  "photo-puzzle": {
+    "label": "Fastest 4x4 solve on an uploaded picture",
+    "better": "low",
+    "max_value": 3600
+  },
   "poke-idle": {
     "label": "Pok\u00e9dex entries plus shinies",
     "better": "high",

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Photo Puzzle</title>
+<style>
+  :root { --paper: #f5f2ea; --card: #fffdf7; --ink: #1d2927; --dim: #65736c; --rule: #cbd3c9; --red: #b64d43 }
+  * { margin: 0; padding: 0; box-sizing: border-box }
+  html, body { background: var(--paper); color: var(--ink) }
+  body { display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding: 10px;
+         font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace }
+  main { width: min(100%, 430px) }
+  header { text-align: center; margin-bottom: 8px }
+  h1 { font-size: 20px; letter-spacing: .12em; margin: 0 }
+  header p { margin: 4px 0 0; font-size: 10px; color: var(--dim); letter-spacing: .06em }
+  #hud { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; font-weight: bold; margin-bottom: 7px }
+  #stage { position: relative; border: 1px solid var(--ink); background: var(--card) }
+  #board { display: block; width: 100%; height: auto; aspect-ratio: 1; touch-action: manipulation; cursor: pointer }
+  #done { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; justify-items: center;
+          padding: 16px; text-align: center; background: rgba(250, 249, 243, .93) }
+  #done[hidden] { display: none }
+  #done p { font-size: 13px; font-weight: bold; letter-spacing: .06em }
+  #done small { font-size: 11px; color: var(--dim) }
+  #bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 6px }
+  button, label.button { cursor: pointer; background: transparent; color: var(--ink);
+    font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 7px 9px;
+    border: 1px solid var(--rule); border-radius: 3px }
+  button:hover, label.button:hover { border-color: var(--ink) }
+  button:focus-visible, label.button:focus-within { outline: 2px solid var(--red); outline-offset: 2px }
+  button.active { border-color: var(--ink); background: var(--ink); color: var(--paper) }
+  #sizes { display: flex; gap: 4px }
+  #status { font-size: 10px; line-height: 1.6; color: var(--dim); min-height: 30px }
+  #start { background: var(--ink); color: var(--paper); border-color: var(--ink) }
+  @media (max-width: 380px) { h1 { font-size: 17px } button, label.button { font-size: 10px; padding: 6px 7px } }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>PHOTO PUZZLE</h1><p>ONE PICTURE, SIXTEEN TILES.</p></header>
+  <div id="hud"><span id="time">TIME 0:00</span><span id="moves">MOVES 0</span><span id="size">4 &times; 4</span></div>
+  <div id="stage">
+    <canvas id="board" width="640" height="640" aria-label="Photo puzzle board. Tap one tile, then another, to swap them."></canvas>
+    <div id="done" hidden><p id="doneText">SOLVED</p><small id="doneDetail"></small><button id="again" type="button">Play again</button></div>
+  </div>
+  <div id="bar">
+    <label class="button" for="file">Upload picture</label>
+    <input id="file" type="file" accept="image/*" hidden>
+    <span id="sizes">
+      <button data-grid="3" type="button">3&times;3</button>
+      <button data-grid="4" type="button" class="active">4&times;4</button>
+      <button data-grid="5" type="button">5&times;5</button>
+    </span>
+    <button id="shuffle" type="button">Restart</button>
+    <button id="sample" type="button">Sample</button>
+  </div>
+  <p id="status" role="status">Tap one tile, then another, to swap them. Your 4&times;4 upload counts for the high score.</p>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const PICTURE_KEY = "bored.photo-puzzle.picture";
+const GRID_KEY = "bored.photo-puzzle.grid";
+const CANVAS = 640;      // drawing surface of the board
+const SOURCE = 720;      // square working copy of the picture
+const board = $("board"), ctx = board.getContext("2d");
+const source = document.createElement("canvas");
+source.width = source.height = SOURCE;
+const sourceCtx = source.getContext("2d");
+
+let picture = false;      // a picture is loaded and can be drawn
+let uploaded = false;     // the current picture came from the player's device
+let grid = 4;
+let order = [];           // board cell -> tile index of the original picture
+let selected = -1;
+let moves = 0;
+let startedAt = 0;
+let elapsed = 0;
+let finished = false;
+
+/* ── storage (embedded frames can refuse it; never let that break play) ───── */
+function readStored(key) {
+  try { return localStorage.getItem(key); } catch (error) { return null; }
+}
+function saveStored(key, value) {
+  try { localStorage.setItem(key, value); return true; } catch (error) { return false; }
+}
+function forgetStored(key) {
+  try { localStorage.removeItem(key); } catch (error) {}
+}
+
+/* ── the sample picture, drawn once so the game plays without an upload ───── */
+function sampleCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = SOURCE;
+  const c = canvas.getContext("2d");
+  c.fillStyle = "#f0ebdd"; c.fillRect(0, 0, SOURCE, SOURCE);
+  // A band of hatching, a disc, a block field and a wedge give every tile a
+  // recognisable piece of the picture to aim at.
+  c.strokeStyle = "#c8bfa8"; c.lineWidth = 3;
+  for (let i = -SOURCE; i < SOURCE; i += 26) {
+    c.beginPath(); c.moveTo(i, 0); c.lineTo(i + SOURCE, SOURCE); c.stroke();
+  }
+  c.fillStyle = "#1d2927"; c.fillRect(0, SOURCE * 0.62, SOURCE, SOURCE * 0.09);
+  c.fillStyle = "#b64d43";
+  c.beginPath(); c.arc(SOURCE * 0.34, SOURCE * 0.36, SOURCE * 0.19, 0, Math.PI * 2); c.fill();
+  c.fillStyle = "#237d85";
+  c.beginPath(); c.moveTo(SOURCE * 0.62, SOURCE * 0.16); c.lineTo(SOURCE * 0.94, SOURCE * 0.5);
+  c.lineTo(SOURCE * 0.62, SOURCE * 0.5); c.closePath(); c.fill();
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      c.fillStyle = (row + col) % 2 ? "#ba9141" : "#faf9f3";
+      c.fillRect(SOURCE * 0.56 + col * SOURCE * 0.13, SOURCE * 0.56 + row * SOURCE * 0.13,
+        SOURCE * 0.09, SOURCE * 0.09);
+    }
+  }
+  c.fillStyle = "#1d2927";
+  for (let i = 0; i < 9; i++) c.fillRect(SOURCE * (0.06 + i * 0.036), SOURCE * 0.84, SOURCE * 0.02, SOURCE * 0.12);
+  return canvas;
+}
+
+/* ── loading a picture ────────────────────────────────────────────────────── */
+// Centre-crop whatever the player picked to a square, then keep it small
+// enough that the data URL fits comfortably in local storage.
+function squareFrom(image) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = SOURCE;
+  const side = Math.min(image.width, image.height);
+  if (!side) return null;
+  canvas.getContext("2d").drawImage(
+    image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, SOURCE, SOURCE);
+  return canvas;
+}
+function loadPicture(address, callback) {
+  const image = new Image();
+  image.onload = () => callback(squareFrom(image));
+  image.onerror = () => callback(null);
+  image.src = address;
+}
+function useCanvas(canvas, fromDevice) {
+  sourceCtx.clearRect(0, 0, SOURCE, SOURCE);
+  sourceCtx.drawImage(canvas, 0, 0, SOURCE, SOURCE);
+  picture = true;
+  uploaded = fromDevice;
+  newRun();
+}
+function useSample() {
+  useCanvas(sampleCanvas(), false);
+  forgetStored(PICTURE_KEY);
+  $("status").textContent = "Sample picture. Upload one of your own to rank on the board.";
+}
+function useSavedOrSample() {
+  const saved = readStored(PICTURE_KEY);
+  if (saved && /^data:image\//.test(saved)) {
+    loadPicture(saved, canvas => {
+      if (canvas) useCanvas(canvas, true);
+      else useSample();
+    });
+    return;
+  }
+  useSample();
+}
+
+/* ── board state ──────────────────────────────────────────────────────────── */
+function scramble(count) {
+  const tiles = [...Array(count).keys()];
+  for (let tries = 0; tries < 80; tries++) {
+    for (let i = tiles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const held = tiles[i]; tiles[i] = tiles[j]; tiles[j] = held;
+    }
+    // No tile starts in its own place, so a run never opens half-solved.
+    if (tiles.every((tile, cell) => tile !== cell)) return tiles;
+  }
+  return tiles.reverse();
+}
+function newRun() {
+  order = scramble(grid * grid);
+  selected = -1;
+  moves = 0;
+  elapsed = 0;
+  startedAt = 0;
+  finished = false;
+  $("done").hidden = true;
+  updateHud();
+  draw();
+}
+function isSolved() {
+  return order.every((tile, cell) => tile === cell);
+}
+function clock(seconds) {
+  const whole = Math.max(0, Math.floor(seconds));
+  return Math.floor(whole / 60) + ":" + String(whole % 60).padStart(2, "0");
+}
+function updateHud() {
+  $("time").textContent = "TIME " + clock(elapsed);
+  $("moves").textContent = "MOVES " + moves;
+  $("size").textContent = grid + " \u00d7 " + grid;
+}
+function solve() {
+  finished = true;
+  elapsed = startedAt ? (Date.now() - startedAt) / 1000 : 0;
+  updateHud();
+  $("doneText").textContent = "SOLVED IN " + clock(elapsed);
+  $("doneDetail").textContent = moves + " swaps \u00b7 " + grid + "\u00d7" + grid +
+    (uploaded && grid === 4 ? " \u00b7 counted on the board" : "");
+  $("done").hidden = false;
+  $("status").textContent = "Tap Play again to reshuffle the same picture.";
+  draw();
+}
+
+/* ── drawing ──────────────────────────────────────────────────────────────── */
+function draw() {
+  ctx.fillStyle = "#faf9f3";
+  ctx.fillRect(0, 0, CANVAS, CANVAS);
+  if (!picture) return;
+  const cell = CANVAS / grid;
+  const tile = SOURCE / grid;
+  for (let index = 0; index < order.length; index++) {
+    const piece = order[index];
+    const col = index % grid, row = Math.floor(index / grid);
+    const sx = (piece % grid) * tile, sy = Math.floor(piece / grid) * tile;
+    ctx.drawImage(source, sx, sy, tile, tile, col * cell, row * cell, cell, cell);
+  }
+  ctx.strokeStyle = "rgba(29,41,39,.35)";
+  ctx.lineWidth = 2;
+  for (let i = 1; i < grid; i++) {
+    ctx.beginPath(); ctx.moveTo(i * cell, 0); ctx.lineTo(i * cell, CANVAS); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, i * cell); ctx.lineTo(CANVAS, i * cell); ctx.stroke();
+  }
+  if (selected >= 0) {
+    ctx.strokeStyle = "#b64d43";
+    ctx.lineWidth = 6;
+    ctx.strokeRect((selected % grid) * cell + 3, Math.floor(selected / grid) * cell + 3, cell - 6, cell - 6);
+  }
+}
+
+/* ── input ────────────────────────────────────────────────────────────────── */
+function cellAt(event) {
+  const rect = board.getBoundingClientRect();
+  if (!rect.width || !rect.height) return -1;
+  const x = (event.clientX - rect.left) / rect.width;
+  const y = (event.clientY - rect.top) / rect.height;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return -1;
+  const col = Math.min(grid - 1, Math.floor(x * grid));
+  const row = Math.min(grid - 1, Math.floor(y * grid));
+  return row * grid + col;
+}
+board.addEventListener("pointerdown", event => {
+  event.preventDefault();
+  if (finished || !picture) return;
+  const cell = cellAt(event);
+  if (cell < 0) return;
+  if (selected < 0) {
+    selected = cell;
+    if (!startedAt) startedAt = Date.now();
+    $("status").textContent = "Tile " + (cell + 1) + " picked. Tap the tile it belongs on.";
+    draw();
+    return;
+  }
+  if (selected === cell) {
+    selected = -1;
+    draw();
+    return;
+  }
+  const held = order[selected];
+  order[selected] = order[cell];
+  order[cell] = held;
+  selected = -1;
+  moves++;
+  updateHud();
+  draw();
+  if (isSolved()) solve();
+});
+
+/* ── controls ─────────────────────────────────────────────────────────────── */
+$("file").addEventListener("change", event => {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  if (!/^image\//.test(file.type || "")) {
+    $("status").textContent = "That file is not an image.";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    loadPicture(String(reader.result), canvas => {
+      if (!canvas) { $("status").textContent = "That picture could not be read."; return; }
+      const kept = saveStored(PICTURE_KEY, canvas.toDataURL("image/jpeg", 0.82));
+      useCanvas(canvas, true);
+      $("status").textContent = kept
+        ? "Picture saved on this device and ready to play."
+        : "Picture ready, but too large to keep on this device. It plays this visit only.";
+    });
+  };
+  reader.onerror = () => { $("status").textContent = "That picture could not be read."; };
+  reader.readAsDataURL(file);
+});
+for (const button of document.querySelectorAll("[data-grid]")) {
+  button.addEventListener("click", () => {
+    const next = Number(button.dataset.grid);
+    if (!next || next === grid) return;
+    grid = next;
+    saveStored(GRID_KEY, String(grid));
+    for (const other of document.querySelectorAll("[data-grid]")) {
+      other.classList.toggle("active", Number(other.dataset.grid) === grid);
+    }
+    $("status").textContent = grid + "\u00d7" + grid + " board. Tap two tiles to swap them.";
+    newRun();
+  });
+}
+$("shuffle").addEventListener("click", () => {
+  if (!picture) { useSavedOrSample(); return; }
+  $("status").textContent = "Reshuffled. Tap two tiles to swap them.";
+  newRun();
+});
+$("sample").addEventListener("click", () => {
+  useSample();
+  $("status").textContent = "Sample picture. Upload one of your own to rank on the board.";
+});
+$("again").addEventListener("click", () => {
+  $("status").textContent = "Reshuffled. Tap two tiles to swap them.";
+  newRun();
+});
+
+/* ── the hub's hooks ──────────────────────────────────────────────────────── */
+// Metrics are integers, the state is the current run, and nothing here throws.
+window.__boredSnapshot = () => ({
+  slug: "photo-puzzle",
+  seconds: finished ? Math.round(elapsed) : 0,
+  moves: finished ? moves : 0,
+  pieces: order.filter((tile, cell) => tile === cell).length,
+  finished: finished,
+  standard: grid === 4,
+  uploaded: uploaded
+});
+
+// The clock is the only thing on a timer: the board redraws when it changes.
+setInterval(() => {
+  if (startedAt && !finished) {
+    elapsed = (Date.now() - startedAt) / 1000;
+    updateHud();
+  }
+}, 250);
+
+/* ── boot ─────────────────────────────────────────────────────────────────── */
+const savedGrid = Number(readStored(GRID_KEY));
+if ([3, 4, 5].includes(savedGrid)) {
+  grid = savedGrid;
+  for (const other of document.querySelectorAll("[data-grid]")) {
+    other.classList.toggle("active", Number(other.dataset.grid) === grid);
+  }
+}
+order = scramble(grid * grid);
+updateHud();
+draw();
+useSavedOrSample();
+</script>
+</body>
+</html>

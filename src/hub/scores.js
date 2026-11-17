@@ -88,6 +88,14 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // A photo puzzle ranks the time to solve the standard 4x4 board on a picture
+  // the player uploaded: the built-in sample is the same picture for everyone,
+  // and the other grid sizes are a different test, so neither can post.
+  highScore('photo-puzzle', 'Photo Puzzle', 'seconds', {
+    metric: 'seconds', lower: true, min: 8, max: 3600,
+    when: snapshot => snapshot.finished === true && snapshot.standard === true && snapshot.uploaded === true,
+    key: 'bored.high.photo-puzzle-4x4-v1'
+  }),
   // Unique species in the Box (evolving counts too), out of 1025.
   highScore("poke-idle", "Poké Idle", "points", { metric: "score", max: 2050, when: snapshot => snapshot.finished === true }),
   // Poké Idle's Battle Tower ranks on its own board: the highest floor cleared. It has no page of its own, so
