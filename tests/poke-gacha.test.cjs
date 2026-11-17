@@ -556,7 +556,7 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
   assert.equal(await game.evaluate(() => storyMode), 'squad');
   assert.equal(await game.$eval('#msg', n => n.hidden), true, 'the squad screen uses the whole stage');
   // The stage it is for, and what it sends.
-  assert.match(await game.$eval('#squad-stage', n => n.textContent), /1-1.*Foes: Normal/);
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /1-1.*Tank Rock, Steel.*Dmg Fighting/);
   // Every roster card: class icon, level as "Lv n" and the deploy cost as its own badge, matching the engine.
   const cards = await game.evaluate(() => [...document.querySelectorAll('#squad-grid > .card')].map((c, i) => ({
     lv: c.querySelector('.low').textContent, cost: c.querySelector('.cost').textContent, icon: !!c.querySelector('canvas.ci'),
@@ -814,5 +814,101 @@ test('tutorial: Skip works from the first box, in a battle step and on a replay,
   assert.equal((await tutorUp(game)).id, 'pull');
   await game.evaluate(() => document.querySelector('#tutor-box [data-skip]').click());
   assert.equal(await tutorUp(game), false);
+  assert.deepEqual(errors, []);
+});
+
+/* ── Stage preview and loss hints ──────────────────────────────────────── */
+test('stage preview shows types, waves and a recommended level; a loss names what the foes are weak to', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '1');
+  const info = await game.$eval('#story-info', n => n.textContent);
+  assert.match(info, /2 waves · 3 lives · Rec\. Lv\s*1/);
+  assert.match(info, /Types: Normal/);
+  // Late stages ask for more.
+  assert.ok(await game.evaluate(() => recLevel(T.allStages.find(s => s.id === '3-4')) >= 3));
+  assert.deepEqual(await game.evaluate(() => weakTo(T.allStages.find(s => s.id === '1-1'))), ['Fighting']);
+  // Lose 1-1 on purpose: the result says what to bring.
+  await key(tab, 'Enter');
+  await game.evaluate(() => { sq.zone = 'head'; sq.head = 3; setSquad(S.owned.slice(0, 1)); squadUpdate(); });
+  await key(tab, 'Enter');
+  await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
+  await game.evaluate(() => { battle.talk = []; battleTalk(); battle.b.life = 1; battle.paused = false; });
+  await game.waitForFunction(() => battle.done, { timeout: 60000 });
+  for (let i = 0; i < 4 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
+  const result = await game.$eval('#battle-result', n => [n.textContent, n.scrollHeight, n.clientHeight]);
+  assert.match(result[0], /DEFEATED.*Fighting/);
+  assert.ok(result[1] <= result[2], 'the hint fits the result box');
+  assert.deepEqual(errors, []);
+});
+
+test('roles: 1-1 asks for tanks that resist Normal and Fighting damage, the loss hint says which went wrong, Squad marks the fits', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '1');
+  const on11 = fn => game.evaluate(fn => new Function('stage', 'return ' + fn)(T.allStages.find(s => s.id === '1-1')), String(fn).replace(/^stage => /, ''));
+  // Rattata attacks with Normal: Rock and Steel resist it, Ghost is immune (Rock and Steel have more tanks).
+  assert.deepEqual(await on11(stage => attackTypes(stage)), ['Normal']);
+  assert.deepEqual(await on11(stage => tankTypes(stage, 3)), ['Rock', 'Steel', 'Ghost']);
+  assert.ok(await on11(stage => tankTypes(stage, 3).every(t => T.typeMultiplier('Normal', [t]) < 1)), 'every tank type resists Normal');
+  // Rattata is Normal: Fighting is super effective.
+  assert.deepEqual(await on11(stage => weakTo(stage)), ['Fighting']);
+  assert.ok(await on11(stage => T.typeMultiplier('Fighting', ['Normal']) > 1));
+  // The preview shows both.
+  assert.match(await game.$eval('#story-info .roles', n => n.textContent), /^Tanks: Rock, Steel\s*Damage: Fighting$/);
+  // The loss hint: a blocker that fell fast wants a tank, foes that leaked healthy want damage, else both roles.
+  assert.match(await on11(stage => lossHint(stage, { fell: [{ cls: 'blocker', lasted: 6 }], leakHp: [0.1] })), /blocker fell fast: try a tank that resists Normal \(Rock, Steel\)/);
+  assert.match(await on11(stage => lossHint(stage, { fell: [], leakHp: [0.9, 0.7] })), /most of their HP: bring Fighting damage/);
+  assert.match(await on11(stage => lossHint(stage, { fell: [{ cls: 'blocker', lasted: 60 }], leakHp: [0.2] })), /Tanks: Rock, Steel · Damage: Fighting/);
+  // Who fits: a Rock or Ghost blocker is a tank here, a Fighting caster or sniper is damage; others are neither.
+  assert.deepEqual(await on11(stage => [['blocker', ['Rock', 'Ground']], ['guard', ['Ghost']], ['blocker', ['Fighting']], ['caster', ['Fighting']], ['sniper', ['Fighting', 'Steel']],
+    ['caster', ['Fire']], ['medic', ['Rock']]].map(([cls, types]) => roleFit({ cls, types }, stage))), ['tank', 'tank', '', 'damage', 'damage', '', '']);
+  // Squad from 1-1 marks exactly the owned mons that fit, and its stage box names both roles.
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => storyMode), 'squad');
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /Tank Rock, Steel.*Dmg Fighting/);
+  const marks = await game.evaluate(() => [...document.querySelectorAll('#squad-grid .card')].map(c => c.classList.contains('fit-tank') ? 'tank' : c.classList.contains('fit-damage') ? 'damage' : ''));
+  const want = await game.evaluate(() => roster().list.map(u => roleFit(u, stageNow())));
+  assert.deepEqual(marks, want);
+  assert.ok(await game.evaluate(() => [...document.querySelectorAll('#squad-grid .card.fit-tank, #squad-grid .card.fit-damage')].every(c => c.querySelector('.fit').offsetHeight > 0)), 'fits show a bar');
+  assert.deepEqual(errors, []);
+});
+
+/* ── Rates and pity, and the tab dots ──────────────────────────────────── */
+test('the page copy of rates, shiny odds and pity matches the engine', () => {
+  const engine = fs.readFileSync(path.join(root, 'src/hub/gacha.js'), 'utf8');
+  const pick = (src, re) => src.match(re)[1].replace(/\s+/g, '');
+  assert.equal(pick(page, /const RATES = (\{[^;]*\});/), pick(engine, /export const EGG_RATES = (\{[^;]*\});/));
+  assert.equal(pick(page, /const SHINY_IN = (\{[^}]*\})/), pick(engine, /export const SHINY_ODDS = (\{[^}]*\})/));
+  assert.equal(pick(page, /SP_IN = (\d+)/), pick(engine, /export const SP_ODDS = (\d+)/));
+  assert.equal(pick(page, /PITY = (\[[^\]]*\])/), pick(engine, /export const RARITY_PITY = (\[[^\]]*\])/));
+});
+test('Pull shows each machine\'s rates and my pity; Eggs and Quests get a dot when something is waiting', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '2');
+  await key(tab, 'd');
+  assert.equal(await game.$eval('#rates', n => n.hidden), false);
+  const text = await game.$eval('#rates', n => n.textContent);
+  assert.match(text, /Common egg\s*79\.7%/);
+  assert.match(text, /Shiny on hatch\s*1 in (64|128)/);
+  const p = await game.evaluate(() => S.pity);
+  assert.ok(text.includes(`Rare ${p.rare}/9`) && text.includes(`Epic ${p.epic}/59`) && text.includes(`Legendary ${p.legendary}/412`), text);
+  const over = await game.$eval('#rates', n => n.scrollHeight > n.clientHeight + 1);
+  assert.equal(over, false, 'the rates panel fits');
+  await key(tab, 'd');
+  assert.equal(await game.$eval('#rates', n => n.hidden), true);
+  // An egg ready to hatch: a dot on Eggs.
+  await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000);
+    const w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:one'] = { at: now - 50, g: { regular: 1 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    G.pull({ voucher: 'regular', count: 1, machine: 'move' });
+    const w2 = JSON.parse(parent.localStorage.getItem('bored.wallet')); w2.entries['test:w'] = { at: now + 50, g: { waves: 100 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w2));
+    refreshTop();
+  });
+  assert.equal(await game.$$eval('#tabs [data-tab="eggs"] .alert', n => n.length), 1);
+  // Quests: a dot for rewards paid since the last visit, gone once it is opened.
+  await game.evaluate(() => { pref.questsSeen = 0; keep(); refreshTop(); });
+  assert.equal(await game.$$eval('#tabs [data-tab="quests"] .alert', n => n.length), 1);
+  await key(tab, '6');
+  assert.equal(await game.$$eval('#tabs [data-tab="quests"] .alert', n => n.length), 0);
   assert.deepEqual(errors, []);
 });
