@@ -121,7 +121,7 @@
   /* Party slots. Empty ones are just an outline. */
   .party { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px }
   .mon { font: inherit; font-size: 10px; border: 1px solid var(--rule); background: var(--surface); color: inherit; border-radius: 3px; padding: 4px 3px 3px; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; cursor: pointer; position: relative }
-  .mon:hover { border-color: var(--ink) }
+  @media (hover: hover) { .mon:hover { border-color: var(--dim) } }
   .mon .pic { width: 100%; max-width: 96px; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; overflow: hidden }
   .mon .nm { width: 100%; text-align: center; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.25; overflow-wrap: anywhere }
   .mon.empty { border-style: dashed; background: none; cursor: default; min-height: 64px }
@@ -690,7 +690,7 @@ let S = readSlot(slot);
 // Your save in your Bored account (see "Saves in your account" further down). openAt is the save's time as this page
 // found it, before anything here touched it.
 const SYNC = { acct: null, state: "start", row: null, busy: false, again: false, tries: 0, retryAt: 0, lastPush: 0, hidden: false, ask: null, hideAsk: false, blocked: 0, error: false, openAt: (readSlot(KEY) || {}).last || 0 };
-const save = () => { if (syncHold()) return; S.last = Date.now(); if (S.party.length >= 6) S.full = 1; try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
+const save = () => { if (syncHold()) return; shineLines(); S.last = Date.now(); if (S.party.length >= 6) S.full = 1; try { localStorage.setItem(slot, JSON.stringify(S)); } catch {} };
 
 // ── Party power
 const lvlOf = xp => Math.max(1, Math.min(100, Math.floor(Math.cbrt(xp + 0.5))));
@@ -1539,18 +1539,42 @@ function backToRoute() {
   B = null; startLoc({ kind: "route", r, k }); renderAll();
 }
 function addMon(num, L, shiny, vid) {
-  const had = S.box[num], v = vid && VARIANT[vid];
-  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny };
-  else if (shiny) { const first = !had.shiny; had.shiny = true; had.look = "shiny"; if (first) toast(`A shiny ${mon(num).name}! Yours wears it now; Party & Box can switch it back.`); }
+  const had = S.box[num], v = vid && VARIANT[vid], lineWasShiny = lineShiny(num);
+  if (!had) S.box[num] = { xp: Math.pow(Math.min(L, levelCap()), 3), shiny: !!shiny || lineWasShiny };
+  else if (shiny) shineOne(had);
+  shineLines();
   const newForm = v ? unlockVar(num, vid, !had) : false;
   if (!had && joinsParty()) joinParty(num);
-  if (!had) toast(`${(v || mon(num)).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
-  else if (newForm) toast(`${v.name}! It joins as a form of your ${mon(num).name}: pick it in its detail in Party & Box.`);
+  const msgs = [];
+  if (!had) msgs.push(`${(v || mon(num)).name} joined your Box${S.party.includes(num) ? " and your party" : ""}. Pokédex ${Object.keys(S.box).length}/1025.`);
+  else if (newForm) msgs.push(`${v.name}! It joins as a form of your ${mon(num).name}: pick it in its detail in Party & Box.`);
+  // The shiny toast comes once per line: a second shiny of a line that already shines says nothing new.
+  if (shiny && !lineWasShiny) msgs.push(`A shiny ${(v || mon(num)).name}!${familyOf(num).length > 1 ? " Its whole evolution line is shiny for you now." : ""} Party & Box can switch the look back.`);
+  if (msgs.length) toast(msgs.join(" "));
   // Cosmog is a gift the first time you catch Solgaleo or Lunala; Cosmoem comes from evolving it.
   if (!had && (num === 791 || num === 792) && giftCosmog()) toast(`${mon(num).name} joined your Box, and a Cosmog came with it: it's yours.`);
   renderAll(); tutor();
 }
 const COSMOG = 789;
+// ── Shinies go by evolution line: once any member of a line is shiny, every member you have is shiny, and any you get
+// later (caught, evolved, given) comes out shiny too. A line is every species joined by an evolution, regional ones and
+// branches included (Eevee's eight; Meowth's Persian and Perrserker). A look you picked stays: an SP look stays SP, and
+// a shiny you set back to Normal stays Normal. A Pokémon that wasn't shiny has no look to keep unless it's an SP one
+// (without a shiny or SP edition the look picker isn't shown), so it switches to its shiny look.
+let familyMap = null;
+function familyOf(n) {
+  if (!familyMap) {
+    const up = {}, find = x => up[x] == null || up[x] === x ? x : (up[x] = find(up[x])), join = (a, b) => { a = find(a); b = find(b); if (a !== b) up[b] = a; };
+    for (const m of MON) for (const [t] of m.evos) join(m.num, t);
+    for (const v of VARIANTS) { for (const [t] of v.evos) join(v.num, t); if (v.from) join(v.from, v.num); }
+    const lines = {}; for (const m of MON) (lines[find(m.num)] = lines[find(m.num)] || []).push(m.num);
+    familyMap = {}; for (const line of Object.values(lines)) for (const k of line) familyMap[k] = line;
+  }
+  return familyMap[n] || [n];
+}
+const lineShiny = n => familyOf(n).some(m => S.box[m] && S.box[m].shiny);
+const shineOne = b => { if (b.shiny) return; b.shiny = true; if (!b.special) b.look = "shiny"; };
+function shineLines() { if (!S || !S.box) return; for (const k of Object.keys(S.box)) if (S.box[k].shiny) for (const m of familyOf(+k)) if (S.box[m]) shineOne(S.box[m]); }
 function giftCosmog() { if (S.cosmog) return false; S.cosmog = 1; if (S.box[COSMOG]) return false; S.box[COSMOG] = { xp: Math.pow(levelCap(), 3), shiny: false }; return true; }
 // Level evolutions happen on their own when there is only one way to go; the rest wait for you.
 function gainXp(xp) {
@@ -1589,12 +1613,12 @@ function evolve(n, e, quiet) {
   if (!evoOptions(n).some(x => x[0] === t) || !canEvolve(n, e)) return null;
   if (how === "I") S.items[v]--;
   if (how === "T") S.cords--;
-  const had = S.box[t], shiny = S.box[n].shiny, moves = shiny && !(had && had.shiny);
-  if (had) { had.xp = Math.max(had.xp, S.box[n].xp); had.shiny = had.shiny || shiny; }
-  else S.box[t] = { xp: S.box[n].xp, shiny, look: lookKind(n) === "shiny" ? "shiny" : "normal" };
-  // One shiny stays one shiny: the shine goes with the evolution, and the one left in the Box is a normal one. Otherwise
-  // one shiny catch made its whole line shiny (a leaderboard point each). An evolution that was already shiny keeps its own.
-  if (moves) { S.box[n].shiny = false; if (S.box[n].look === "shiny") S.box[n].look = "normal"; }
+  // Shinies go by line (shineLines): the evolution is shiny if its line is, and wears the look the one it came from
+  // had picked (a shiny set back to Normal stays Normal).
+  const had = S.box[t];
+  if (had) had.xp = Math.max(had.xp, S.box[n].xp);
+  else S.box[t] = { xp: S.box[n].xp, shiny: lineShiny(n), ...(S.box[n].shiny && lookKind(n) === "normal" ? { look: "normal" } : {}) };
+  shineLines();
   if (form) unlockVar(t, form.vid, true);
   const slot = S.party.indexOf(n);
   if (slot >= 0) { if (S.party.includes(t)) S.party.splice(slot, 1); else S.party[slot] = t; }
@@ -2033,6 +2057,11 @@ function renderAch() {
 // An entry with day: "YYYY-MM-DD" only arrives for players who open the game on that day (the arcade's day, Detroit
 // time, as for the daily challenge); once it has arrived it stays in that save's Mail.
 const MAIL = [
+  { id: "update-2026-11-17a", date: "Nov 17, 2026", from: "Prof Penguin", title: "A shiny counts for its whole line",
+    body: `<ul><li>Catch a shiny of any stage and its whole evolution line is shiny for you: a shiny Dreepy makes your Drakloak and Dragapult shiny, and any you get later come out shiny too. Branches count, so one shiny Eevee covers all of its evolutions.</li>
+      <li>Your shinies from before count the same way: any line with a shiny in it is shiny all through now.</li>
+      <li>A look you picked stays. An SP edition stays SP, and you can switch any of them back to Normal in Party & Box.</li>
+      <li>Fixed: a Box tile you'd tapped could look like it was in your party.</li></ul>` },
   { id: "update-2026-11-16g", date: "Nov 16, 2026", from: "Prof Penguin", title: "Fix: one shiny, not a shiny line",
     body: `<ul><li>Evolving a shiny made every stage of its line shiny, because the one left in your Box stayed shiny too. Now the shine goes with the evolution, and the one left behind is a normal one.</li>
       <li>Shinies you already have stay as they are.</li></ul>` },
@@ -2282,7 +2311,7 @@ function wikiSections() {
     { id: "mega", group: "Megas and Gigantamax", title: "Mega Evolution", html: `<p>Beat Steven (Hoenn's Champion) for the Key Stone. Each Mega form then needs its own Mega Stone, and each region's dungeon drops its own generation's: Kanto's Gen 1 (Charizard, Gengar, Gyarados...), Johto's Gen 2, and so on to Paldea. ${pct(STONE_DROP)} of clears drop one, and only for a Pokémon you own: one in your party if it can, else one in your Box. The Ultra Wormhole and Area Zero count as Alola's and Paldea's. Stones per dungeon: ${REGIONS.map((R, r) => `${R.name} ${FORMS.filter(f => f.kind === "mega" && !f.quest && f.gen === r + 1).length}`).join(", ")}.</p><p>Out of luck? The Shop sells a random Mega Stone for a Pokémon you own for $${fmt(STONE_PRICE)}. The stones for Mega Rayquaza, Mega Mewtwo X and Y and Mega Zygarde only come from side quests (the Sky Pillar, Cerulean Cave and Terminus Cave), and Zygarde only Mega Evolves from its Complete Forme. Latiasite and Latiosite come from the Southern Island. The Tier 3 Megas' stones (${FORMS.filter(f => f.kind === "mega" && !f.quest && tierOf(f) === 3).map(f => f.name.replace("Mega ", "")).join(", ")}) only drop from their dungeon once its Tier 3s are out, and the Shop's random stone never gives them.</p><p>Turn it on in the Pokémon's detail in Party & Box. One Mega in the party at a time, on in every fight, using its Mega stats and types. ${FORMS.filter(f => f.kind === "mega").length} Megas, from the originals to Legends: Z-A's.</p>` },
     { id: "gmax", group: "Megas and Gigantamax", title: "Gigantamax", html: `<p>Beat Leon (Galar's Champion) for the Dynamax Band. Each of the ${raidSpecies().length} species with a Gigantamax form then needs its Gigantamax factor, won in Galar's <b>Max Raid Den</b> (Urshifu's comes from the Towers of Two Fists and Melmetal's from the Mystery Box instead): one Gigantamax Pokémon you can see before you go in, a Galar dungeon ticket a try, and as tough as a Champion (the strongest team for it you could have at the cap, with a modest Protein, only just wins). The den holds a species you don't have yet: one in your party if it can, else one in your Box, else any. Win and it can Gigantamax, and it joins you if you don't have it (legendaries still come the usual way). Lose and it waits for you. Out of luck? The Shop sells random Max Soup for a species you own for $${fmt(SOUP_PRICE)}.</p><p>One Gigantamax Pokémon at a time, always on. Like a Mega, it fights with stats of its own, a Mega's worth on top of its usual ones (the average Mega's change): +${GMAX_STATS.main} to its better attacking stat, +${GMAX_STATS.off} to the other, +${GMAX_STATS.def} Def and Sp. Def, +${GMAX_STATS.spe} Speed. A Pokémon can't be Mega and Gigantamax at once.</p><p>Pokédex → Forms shows every form and which you've unlocked. Forms don't count toward the leaderboard.</p>` },
     { id: "regional", group: "Collection", title: "Regional forms", html: `<p>${VARIANTS.length} regional forms live in their own regions: Alolan in Alola, Galarian in Galar, Paldean in Paldea, and Hisuian in Sinnoh, which was Hisui long ago. They turn up on that region's routes like any wild Pokémon; Galarian Articuno, Zapdos and Moltres are among the Galar dungeon's legendaries.</p><p>A form belongs to its species, so catching an Alolan Rattata gives you Rattata (if you didn't have it) with its Alolan form, and picking the form in the detail keeps its level. Evolving the usual Pokémon inside a regional form's region gives that form, Pikachu into Alolan Raichu in Alola for one, and each form evolves its own way: Galarian Meowth becomes Perrserker, Alolan Vulpix needs an Ice Stone. Forms aren't Pokédex entries, so they don't change your leaderboard score. Pokédex → Forms shows which you have.</p>` },
-    { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm. A shiny that evolves stays shiny, and the one left in your Box is a normal one: one shiny catch is one shiny, not its whole line. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
+    { id: "shiny", group: "Collection", title: "Shinies", html: `<p>1 in 4096 on routes and in dungeons, 3 in 4096 with the Shiny Charm. Shinies go by evolution line: once you have a shiny of any stage, every member of its line you have is shiny, branches included (all of Eevee's), and any you get later comes out shiny too. A look you picked stays: an SP edition stays SP. The Settings ball choice for shinies defaults to your best ball, Master Ball included.</p>` },
     { id: "score", group: "Collection", title: "Leaderboard score", html: `<p>One point per Pokédex entry and one more for each one you have shiny, up to 2050. It posts to the arcade board when you're signed in.</p>` },
     { id: "achievements", group: "Collection", title: "Achievements", html: `<p>${ACH.length} of them, from your first catch to every form, in the Achievements tab with how far along each is. They're for show: no rewards, nothing changes the game.</p>` },
     { id: "mail", group: "Collection", title: "Mail", html: `<p>Update notes and gifts arrive in the Mail tab; the tab and the title screen show how many are new. Each gift can be claimed once per save, between battles.</p>` },
@@ -2718,6 +2747,10 @@ function migrateSave() {
   // New catches stop joining the party once it has been full: a save past its first six catches already has been.
   if (S.full == null) S.full = S.party.length >= 6 || Object.keys(S.box).length > 6 ? 1 : 0;
   S.pieces = S.pieces || 0; S.eternamax = S.eternamax || 0; S.won = S.won || {}; S.trips = S.trips || {}; S.den = S.den || {};
+  // Shinies go by line now: a line with any shiny member is shiny all through (this also undoes the one-shiny change).
+  shineLines();
+  // The party is at most six different Pokémon you have; anything past that showed as in the party in the Box, and fought.
+  S.party = [...new Set(S.party.map(Number))].filter(n => S.box[n]).slice(0, 6);
   // Tiers: a dungeon's kept legendary the rules don't allow now (a quest prize, a Mega, a Tier 3 from before the
   // dungeon's Tier 4s were all caught) rolls again, and so does a Max Raid for Urshifu or Melmetal.
   for (const k of Object.keys(S.den)) if (/^d\d+$/.test(k) && !denValid(+k.slice(1), foeOf(S.den[k]))) delete S.den[k];
