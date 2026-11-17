@@ -153,15 +153,16 @@ test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1
   await key(tab, 'Enter');
   const owned = await game.evaluate(() => S.owned.length);
   assert.ok(owned > 8, 'the seeded wallet owns more than 8 mons');
-  assert.equal(await game.$$eval('#squad-list > div', rows => rows.length), owned + 1, 'a Start row and one row per owned mon');
-  // Pick eight with the keyboard: down, Enter, eight times.
-  for (let i = 0; i < 8; i++) await key(tab, 'ArrowDown'), await key(tab, 'Enter');
+  assert.equal(await game.$$eval('#squad-grid > .card', cells => cells.length), owned, 'one roster card per owned mon');
+  // Pick eight with the keyboard: Enter, then right, eight times.
+  for (let i = 0; i < 8; i++) await key(tab, 'Enter'), await key(tab, 'ArrowRight');
   assert.equal(await game.evaluate(() => squadPick().length), 8);
-  await key(tab, 'ArrowDown'); await key(tab, 'Enter');
-  assert.match(await game.$eval('#msg', n => n.textContent), /holds 8/, 'a ninth pick is refused');
+  assert.equal(await game.$$eval('#squad-slots > .card:not(.empty)', cells => cells.length), 8, 'all eight slots are filled');
+  await key(tab, 'Enter');
+  assert.match(await game.$eval('#squad-detail', n => n.textContent), /holds 8/, 'a ninth pick is refused');
 
-  // Start: the battle opens on its dialogue, tabs locked, the message box hidden.
-  await game.evaluate(() => { squadAt = 0; squadUpdate(); });
+  // Start (top right): the battle opens on its dialogue, tabs locked, the message box hidden.
+  await game.evaluate(() => { sq.zone = 'head'; sq.head = 3; squadUpdate(); });
   await key(tab, 'Enter');
   await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
   assert.ok(await game.$eval('#tabs', n => n.classList.contains('locked')));
@@ -372,7 +373,7 @@ test('a new account picks a starter, clears 1-1 with the gifts, pulls and hatche
   // 2. Play 1-1 with the four, deployed in the squad's order on the first free tile for each.
   await key(tab, 'Enter');
   assert.deepEqual(await game.evaluate(() => squadPick().map(name)), ['Geodude', 'Pidgey', 'Audino', 'Charmander']);
-  await game.evaluate(() => { squadAt = 0; squadUpdate(); });
+  await game.evaluate(() => { sq.zone = 'head'; sq.head = 3; squadUpdate(); });
   await key(tab, 'Enter');
   await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
   for (let i = 0; i < 6 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
@@ -466,8 +467,8 @@ test('weekly challenge: risks stack, the run uses them, and a win scores the ris
   await game.evaluate(() => { storyAt = 0; storyUpdate(); });
   await key(tab, 'Enter');
   assert.equal(await game.evaluate(() => storyMode), 'squad');
-  await game.evaluate(() => { pref.squad = S.owned.slice(0, 8); keep(); squadAt = 0; squadUpdate(); });
-  assert.match(await game.$eval('#squad-info', n => n.textContent), /Risk 4/);
+  await game.evaluate(() => { setSquad(S.owned.slice(0, 8)); sq.zone = 'head'; sq.head = 3; squadUpdate(); });
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /Risk 4/);
   await key(tab, 'Enter');
   await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
   assert.equal(await game.evaluate(() => battle.b.life), 1, 'one life');
@@ -531,5 +532,81 @@ test('hatching plays the cracking egg, the rays and the shell shards from the ha
   assert.ok(await game.evaluate(() => !!document.querySelector('#hatch .cell canvas')), 'the egg is drawn on a canvas');
   await game.waitForFunction(() => hatching && hatching.phase === 'shown', { timeout: 5000 });
   assert.ok(await game.evaluate(() => !!document.querySelector('#hatch .cell img')), 'then the Pokémon sprite');
+  assert.deepEqual(errors, []);
+});
+
+/* ── Squad: slots, roster grid, filters, sorting, detail and teams ─────── */
+test('squad: slots and a roster grid with real level and cost, filters, sorting, detail and three teams', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '1');
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => storyMode), 'squad');
+  assert.equal(await game.$eval('#msg', n => n.hidden), true, 'the squad screen uses the whole stage');
+  // The stage it is for, and what it sends.
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /1-1.*Foes: Normal/);
+  // Every roster card: class icon, level as "Lv n" and the deploy cost as its own badge, matching the engine.
+  const cards = await game.evaluate(() => [...document.querySelectorAll('#squad-grid > .card')].map((c, i) => ({
+    lv: c.querySelector('.low').textContent, cost: c.querySelector('.cost').textContent, icon: !!c.querySelector('canvas.ci'),
+    unit: rosterCache.list[i] })));
+  for (const c of cards) {
+    assert.equal(c.lv, 'Lv' + c.unit.level);
+    assert.equal(c.cost, String(c.unit.cost));
+    assert.ok(c.icon);
+  }
+  // The cursor is a bracket on the selected card; Enter adds it, and it gets a check and a gold outline.
+  await game.evaluate(() => { sq.zone = 'grid'; sq.at = 0; squadUpdate(); });
+  assert.ok(await game.evaluate(() => !!document.querySelector('#squad-grid > .card .bracket')));
+  await key(tab, 'Enter');
+  const first = await game.evaluate(() => rosterCache.list[0].num);
+  assert.deepEqual(await game.evaluate(() => squadPick()), [first]);
+  assert.ok(await game.evaluate(() => document.querySelector('#squad-grid > .card').classList.contains('in')));
+  // The detail: types, class, range, level and its next cost, six stats and four skills.
+  const detail = await game.$eval('#squad-detail', n => n.textContent);
+  assert.match(detail, /Range [\d.]+/); assert.match(detail, /Lv \d+\/10/); assert.match(detail, /cost \d+/);
+  for (const k of ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe']) assert.match(detail, new RegExp(k + ' \\d+'));
+  assert.equal(await game.$$eval('#squad-detail .skills > span', n => n.length), 4);
+  // Filters: C cycles the class (spelled out), T a type, R a tier, Q only the squad.
+  await key(tab, 'c');
+  const cls = await game.evaluate(() => sqView().cls);
+  assert.equal(cls, 'vanguard');
+  assert.match(await game.$eval('#squad-filters', n => n.textContent), /Vanguard/);
+  assert.ok(await game.evaluate(c => rosterCache.list.every(u => u.cls === c), cls));
+  await game.evaluate(() => { pref.squadView = {}; keep(); squadUpdate(); });
+  await key(tab, 'r');
+  assert.ok(await game.evaluate(() => rosterCache.list.every(u => tierOf(u.num) === 3)));
+  await key(tab, 'q');
+  // Q: only squad members (still 3★ only).
+  const shown = await game.evaluate(() => rosterCache.list.map(u => u.num).sort((a, b) => a - b));
+  assert.deepEqual(shown, await game.evaluate(() => squadPick().filter(n => tierOf(n) === 3).sort((a, b) => a - b)));
+  await game.evaluate(() => { pref.squadView = {}; keep(); squadUpdate(); });
+  // Sorting: S goes Level, Cost, Tier, Newest.
+  await key(tab, 's');
+  const costs = await game.evaluate(() => rosterCache.list.map(u => u.cost));
+  assert.deepEqual(costs, costs.slice().sort((a, b) => a - b), 'sorted by cost');
+  // Slots: Enter on a slot removes it.
+  await game.evaluate(() => { sq.zone = 'slots'; sq.slot = 0; squadUpdate(); });
+  await key(tab, 'Enter');
+  assert.deepEqual(await game.evaluate(() => squadPick()), []);
+  // Teams: three saved squads; P switches, and each keeps its own picks.
+  await game.evaluate(() => setSquad(S.owned.slice(0, 3)));
+  await key(tab, 'p');
+  assert.equal(await game.evaluate(() => pref.team), 1);
+  assert.deepEqual(await game.evaluate(() => squadPick()), []);
+  await game.evaluate(() => setSquad(S.owned.slice(3, 5)));
+  await key(tab, 'p'); await key(tab, 'p');
+  assert.equal(await game.evaluate(() => pref.team), 0);
+  assert.deepEqual(await game.evaluate(() => squadPick()), await game.evaluate(() => S.owned.slice(0, 3)));
+  assert.deepEqual(await game.evaluate(() => pref.squads[1]), await game.evaluate(() => S.owned.slice(3, 5)));
+  // Nothing on the squad screen spills or overlaps.
+  const spill = await game.evaluate(() => [...document.querySelectorAll('#squad, #squad *')].filter(n => n.offsetParent && n.id !== 'squad-grid' &&
+    (n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1) && n.clientWidth > 0).map(n => n.id || n.className));
+  assert.deepEqual(spill, []);
+  const box = id => rect(game, id);
+  const parts = await Promise.all(['#squad-slots', '#squad-roster', '#squad-stage', '#squad-detail'].map(box));
+  for (let i = 0; i < parts.length; i++) for (let j = i + 1; j < parts.length; j++) assert.ok(apart(parts[i], parts[j]), 'squad panels ' + i + ' and ' + j + ' do not overlap');
+  // Backspace goes back to the stages, and the message box comes back.
+  await key(tab, 'Backspace');
+  assert.equal(await game.evaluate(() => storyMode), 'stages');
+  assert.equal(await game.$eval('#msg', n => n.hidden), false);
   assert.deepEqual(errors, []);
 });

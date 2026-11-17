@@ -157,6 +157,58 @@ canvas, img { image-rendering: pixelated; display: block }
 #story-info .milestones { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; margin-top: 4px }
 #story-info .milestones span { display: flex; align-items: center; gap: 4px; white-space: nowrap; height: 24px }
 
+/* Squad, Arknights-style, over the whole stage (the message box is hidden here):
+   the 8 slots on top and the roster grid under them on the left; the stage, the
+   teams and Start top right, the detail under them. */
+#squad-slots { left: 8px; top: 8px; width: 406px; height: 64px; padding: 2px 4px; display: grid; grid-template-columns: repeat(8, 49px) }
+#squad-roster { left: 8px; top: 80px; width: 406px; height: 256px; padding: 4px 6px }
+#squad-filters { display: flex; gap: 10px; height: 20px; margin-bottom: 4px; white-space: nowrap }
+#squad-filters span { cursor: pointer }
+#squad-filters span.on { color: var(--gold) }
+/* 7 columns of 56x55 cells; four rows show and the grid scrolls by whole rows. */
+#squad-grid { display: grid; grid-template-columns: repeat(7, 54px); grid-auto-rows: 53px; gap: 2px; height: 218px; overflow-y: auto;
+              scrollbar-width: thin; scrollbar-color: var(--red) var(--panel); scroll-snap-type: y mandatory }
+#squad-grid > * { scroll-snap-align: start }
+#squad-stage { left: 422px; top: 8px; width: 210px; height: 92px; padding: 4px 6px }
+#squad-stage .line { display: flex; gap: 8px; white-space: nowrap }
+#squad-stage .teams { display: flex; gap: 6px; align-items: center; margin-top: 2px }
+#squad-stage .teams span { padding: 0 4px; border: 1px solid var(--dim); cursor: pointer; line-height: 18px }
+#squad-stage .teams span.on { border-color: var(--gold); color: var(--gold) }
+#squad-stage .teams span.at { outline: 2px solid var(--paper); outline-offset: 1px }
+#squad-stage .teams .start { margin-left: auto; background: var(--red); border-color: var(--red); color: var(--paper) }
+#squad-stage .teams .start.off { background: none; border-color: var(--dim); color: var(--dim) }
+#squad-detail { left: 422px; top: 108px; width: 210px; height: 228px; padding: 4px 6px }
+#squad-detail .stats { display: grid; grid-template-columns: repeat(3, 1fr) }
+/* Skills flow two to a line, and a long pair wraps onto a third line rather than being cut. */
+#squad-detail .skills { display: flex; flex-wrap: wrap; column-gap: 10px }
+#squad-detail .skills span, #squad-detail .stats span { white-space: nowrap }
+#squad-detail .line { display: flex; align-items: center; gap: 4px; white-space: nowrap }
+/* A card: the mini sprite at 1x with its class icon top left and a check top right
+   when it is in the squad; level bottom left, deploy cost bottom right. */
+#squad .card { position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer }
+#squad .card .mini { margin-top: 3px }
+#squad .card .ci { position: absolute; left: 1px; top: 1px }
+#squad .card .ck { position: absolute; right: 2px; bottom: 4px }
+/* Roster cells sit on their own ink tiles; the deploy cost is a gold badge top right,
+   and a squad member has a gold outline as well as its check. */
+#squad-grid .card { background: var(--ink) }
+#squad-grid .card.in { box-shadow: inset 0 0 0 2px var(--gold) }
+#squad .card .cost { position: absolute; right: 2px; top: 1px; color: var(--gold); line-height: 18px }
+#squad .card .low { display: flex; align-items: center; width: 100%; padding: 0 3px; height: 20px; white-space: nowrap }
+#squad .card .low span { display: flex; align-items: center; gap: 1px }
+#squad .card.empty { color: var(--dim) }
+#squad .card.empty .slot { width: 40px; height: 30px; margin-top: 3px; border: 1px dashed var(--dim) }
+/* The mono fallback is much wider than the pixel font, so the squad's dense panels
+   use a narrow sans at 13px when the pixel font cannot load. */
+#frame.no-pixel #squad-detail, #frame.no-pixel #squad-stage, #frame.no-pixel #squad-filters, #frame.no-pixel #squad .card .low, #frame.no-pixel #squad .card .cost { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
+#frame.no-pixel #squad-detail .title { font-size: 20px }
+#squad .bracket { position: absolute; inset: 0; pointer-events: none }
+#squad .bracket b { position: absolute; width: 8px; height: 8px; border: 0 solid var(--paper) }
+#squad .bracket b:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px }
+#squad .bracket b:nth-child(2) { right: 0; top: 0; border-width: 2px 2px 0 0 }
+#squad .bracket b:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 2px 2px }
+#squad .bracket b:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0 }
+
 /* Story and battles, on the 344px stage: HUD 4-36, field 40-280, deploy cards 284-336. */
 #tabs.locked .panel[data-tab] { color: var(--dim); cursor: default }
 #battle-hud { left: 8px; top: 4px; width: 624px; height: 32px; padding: 4px 12px; display: flex; gap: 16px; align-items: center; white-space: nowrap }
@@ -166,6 +218,7 @@ canvas, img { image-rendering: pixelated; display: block }
 #deploy .card { height: 40px; background: var(--ink); padding: 0 4px; line-height: 20px; cursor: pointer; white-space: nowrap; overflow: hidden }
 #deploy .card.on { outline: 2px solid var(--paper); outline-offset: -2px }
 #deploy .card.off { color: var(--dim) }
+#deploy .card .low { display: flex; align-items: center; gap: 4px }
 #battle-talk { left: 8px; bottom: 8px; width: 624px; height: 52px; padding: 4px 12px; cursor: pointer }
 #battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
 #battle-result .reward-icons { display: flex; align-items: center; gap: 2px; white-space: nowrap }
@@ -180,8 +233,12 @@ canvas, img { image-rendering: pixelated; display: block }
       <section id="scr-story" class="screen" hidden>
         <div class="panel left-panel" id="story-list-panel"><div class="title" id="story-title">CHAPTER</div><div class="rows scroll" id="story-list"></div></div>
         <div class="panel right-panel" id="story-info"></div>
-        <div class="panel left-panel" id="squad-list-panel" hidden><div class="title" id="squad-title">SQUAD</div><div class="rows scroll" id="squad-list"></div></div>
-        <div class="panel right-panel" id="squad-info" hidden></div>
+        <div id="squad" hidden>
+          <div class="panel" id="squad-slots"></div>
+          <div class="panel" id="squad-roster"><div id="squad-filters"></div><div id="squad-grid"></div></div>
+          <div class="panel" id="squad-stage"></div>
+          <div class="panel" id="squad-detail"></div>
+        </div>
       </section>
       <section id="scr-battle" class="screen" hidden>
         <div class="panel" id="battle-hud"></div>
@@ -305,7 +362,13 @@ const PIXEL_MAPS = {
  "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
  "dot": ["kkkk", "k11k", "k11k", "kkkk"],
  "star": ["........k........", ".......k3k.......", ".......k3k.......", "......k321k......", "......k321k......", ".kkkkk32221kkkkk.", "k333332222211111k", ".k3222222222221k.", "..k32222222221k..", "...k322222221k...", "....k3222221k....", "....k3222221k....", "...k322222221k...", "...k3211k2221k...", "..k321kk.kk221k..", "..k31k.....k21k..", "...kk.......kk..."],
- "shield": ["kkkkk", "k121k", "k111k", "k111k", ".k1k.", "..k.."]
+ "shield": ["kkkkk", "k121k", "k111k", "k111k", ".k1k.", "..k.."],
+ "cls-vanguard": ["kkkkkk.", "k1111k.", "k11111k", "k1111k.", "kkkkkk.", "k1k....", "kkk...."],
+ "cls-guard": ["..k..", ".k1k.", ".k1k.", ".k1k.", ".k1k.", "kk1kk", "k111k", "kk1kk", ".kkk."],
+ "cls-blocker": ["kkkkkkk", "k11111k", "k11111k", "k11111k", ".k111k.", "..k1k..", "...k..."],
+ "cls-sniper": [".kkkkk.", "k11111k", "k1kkk1k", "k1k1k1k", "k1kkk1k", "k11111k", ".kkkkk."],
+ "cls-caster": ["...k...", "..k1k..", ".k111k.", "k11111k", ".k111k.", "..k1k..", "...k..."],
+ "cls-medic": ["..kkk..", "..k1k..", "kkk1kkk", "k11111k", "kkk1kkk", "..k1k..", "..kkk.."]
 };
 /* PIXEL_MAPS:END */
 // Draw a pixel map: '.' is transparent, every other char looks its color up in `pal`.
@@ -1011,8 +1074,7 @@ function questsKey(e) {
 // The engine lives in the hub (src/hub/td.js). Until the hub has it, the Story
 // tab and the battle missions stay hidden and the rest of the page works as before.
 const T = G && G.td ? G.td : null;
-const CLASS_SHORT = { vanguard: "Van", guard: "Grd", blocker: "Blk", sniper: "Snp", caster: "Cst", medic: "Med" };
-let storyAt = 0, storyMode = "stages", squadAt = 0, battle = null, chapterAt = 0;
+let storyAt = 0, storyMode = "stages", battle = null, chapterAt = 0;
 // Chapters: the engine's list when it has one (chapter 2 and on), else chapter 1 alone.
 const chapters = () => T.chapters || [{ id: T.chapter.id, name: T.chapter.name, stages: T.stages }];
 const stagesNow = () => chapters()[Math.min(chapterAt, chapters().length - 1)].stages;
@@ -1057,7 +1119,9 @@ function storyUpdate() {
   drawBackdrop();
   const td = T.state();
   $("#story-list-panel").hidden = $("#story-info").hidden = storyMode !== "stages";
-  $("#squad-list-panel").hidden = $("#squad-info").hidden = storyMode !== "squad";
+  $("#squad").hidden = storyMode !== "squad";
+  // The squad screen uses the whole stage; its hints are in its own panels.
+  $("#msg").hidden = storyMode === "squad";
   if (storyMode === "squad") return squadUpdate();
   if (onWeekly()) return weeklyUpdate();
   const chapter = chapters()[Math.min(chapterAt, chapters().length - 1)], list = stagesNow();
@@ -1116,52 +1180,207 @@ function pickStage() {
     }
     if (!weeklyOpen(td)) return say("Clear " + weeklyUnlock() + " first.");
     if (!S.owned.length) return say("Hatch some eggs first: you need mons for your squad.");
-    storyMode = "squad"; squadAt = 0; return storyUpdate();
+    storyMode = "squad"; sq.zone = "grid"; sq.at = 0; sq.note = ""; return storyUpdate();
   }
   const stage = stagesNow()[storyAt];
   if (!isOpen(td, stage)) return say("Clear " + stageBefore(stage).id + " first.");
   if (!S.owned.length) return say("Hatch some eggs first: you need mons for your squad.");
-  storyMode = "squad"; squadAt = 0; storyUpdate();
+  storyMode = "squad"; sq.zone = "grid"; sq.at = 0; sq.note = ""; storyUpdate();
 }
-function squadRows() {
-  const pick = squadPick();
+/* ── Squad ───────────────────────────────────────────────────────────────
+   Three saved teams (pref.squads, the active one in pref.team); pref.squad is
+   always the active team, so the rest of the page reads one list. The cursor
+   is in one of three zones: "head" (Team 1-3, Start), "slots" (the 8 squad
+   cards) or "grid" (the roster). Filters: C class, T type, R tier, Q in squad;
+   S sorts; P switches team; L levels up. */
+const CLASS_ORDER = ["vanguard", "guard", "blocker", "sniper", "caster", "medic"];
+const CLASS_COLOR = { vanguard: C.teal, guard: C.paper, blocker: C.sky, sniper: C.gold, caster: SHADE.red[2], medic: C.red };
+const classIcon = cls => { const c = mapCanvas("cls-" + cls, { k: C.ink, 1: CLASS_COLOR[cls] || C.paper }); c.title = T.classes[cls]?.name || cls; return c; };
+const SORTS = [["level", "Level"], ["cost", "Cost"], ["tier", "Tier"], ["recent", "Newest"]];
+const TIERS = [3, 4, 5, 6];
+const sq = { zone: "grid", at: 0, slot: 0, head: 3, note: "" };
+function teams() {
+  if (!Array.isArray(pref.squads) || pref.squads.length !== 3) pref.squads = [Array.isArray(pref.squad) ? pref.squad.slice() : [], [], []];
+  if (![0, 1, 2].includes(pref.team)) pref.team = 0;
+  return pref.squads;
+}
+function setSquad(list) { teams(); pref.squad = list.slice(0, 8); pref.squads[pref.team] = pref.squad.slice(); keep(); }
+function useTeam(i) {
+  teams();
+  pref.squads[pref.team] = squadPick();
+  pref.team = i; pref.squad = pref.squads[i].slice(); keep();
+}
+const tierOf = num => G.dex[G.lineOf(num) - 1][9];
+// When each owned species last joined: its latest hatch, or the starter pick.
+function joinedAt() {
+  const at = {};
+  for (const h of S.hatched || []) at[h.species] = Math.max(at[h.species] || 0, h.at || 0);
+  if (S.starter) for (const n of [S.starter.species, ...S.starter.gifts]) at[n] = Math.max(at[n] || 0, S.starter.at || 0);
+  return at;
+}
+function sqView() {
+  const v = pref.squadView || {};
+  return { cls: CLASS_ORDER.includes(v.cls) ? v.cls : "", type: G.types.includes(v.type) ? v.type : "",
+    tier: TIERS.includes(v.tier) ? v.tier : 0, mine: !!v.mine, sort: SORTS.some(([id]) => id === v.sort) ? v.sort : "level" };
+}
+let rosterCache = null;
+function roster() {
   const units = [];
   for (let i = 0; i < S.owned.length; i += 8) units.push(...T.squad(S.owned.slice(i, i + 8)));
-  return [{ start: true, label: pick.length ? "Start battle" : "Pick up to 8 mons", right: [pick.length + "/8"], off: !pick.length }]
-    .concat(units.map(u => ({ unit: u, label: name(u.num), right: [CLASS_SHORT[u.cls], "Lv" + u.level, u.cost], picked: pick.includes(u.num) })));
+  const v = sqView(), pick = squadPick(), when = joinedAt();
+  const list = units.filter(u => (!v.cls || u.cls === v.cls) && (!v.type || u.types.includes(v.type)) &&
+    (!v.tier || tierOf(u.num) === v.tier) && (!v.mine || pick.includes(u.num)));
+  const by = { level: u => -u.level, cost: u => u.cost, tier: u => -tierOf(u.num), recent: u => -(when[u.num] || 0) }[v.sort];
+  list.sort((a, b) => by(a) - by(b) || a.num - b.num);
+  rosterCache = { list, units };
+  return rosterCache;
+}
+const unitOf = num => (rosterCache ? rosterCache.units : T.squad([num])).find(u => u.num === num) || T.squad([num])[0];
+function cycleSquad(key) {
+  const v = sqView();
+  if (key === "c") v.cls = CLASS_ORDER[(CLASS_ORDER.indexOf(v.cls) + 2) % (CLASS_ORDER.length + 1) - 1] || "";
+  if (key === "t") v.type = G.types[(G.types.indexOf(v.type) + 2) % (G.types.length + 1) - 1] || "";
+  if (key === "r") v.tier = TIERS[(TIERS.indexOf(v.tier) + 2) % (TIERS.length + 1) - 1] || 0;
+  if (key === "q") v.mine = !v.mine;
+  if (key === "s") v.sort = SORTS[(SORTS.findIndex(([id]) => id === v.sort) + 1) % SORTS.length][0];
+  pref.squadView = v; keep();
+  sq.at = 0; sq.zone = "grid"; squadUpdate();
+}
+function card(u, { at = false, picked = false, empty = false, cost = true } = {}) {
+  const c = el("div", "card" + (empty ? " empty" : "") + (picked ? " in" : ""));
+  if (empty) { c.append(el("div", "slot"), el("div", "low", "")); }
+  else {
+    c.append(mini(u.num, u.look), (() => { const i = classIcon(u.cls); i.classList.add("ci"); return i; })());
+    if (cost) { const co = el("span", "cost", String(u.cost)); co.title = "Deploy cost"; c.append(co); }
+    if (picked) { const k = check(true); k.classList.add("ck"); c.append(k); }
+    const low = el("div", "low"), lv = el("span");
+    lv.append(el("span", "dim", "Lv"), el("span", "", u.level));
+    low.append(lv);
+    c.append(low);
+    c.title = name(u.num) + " · " + T.classes[u.cls].name + " · Lv " + u.level + " · cost " + u.cost;
+  }
+  if (at) { const b = el("div", "bracket"); b.append(el("b"), el("b"), el("b"), el("b")); c.append(b); }
+  return c;
+}
+// The stage this squad is for: its name and what it sends, so the player can pick counters.
+function stageFoes(stage) {
+  const types = [...new Set(stage.waves.flatMap(w => G.dex[w[1] - 1][1].split("/")))];
+  const marks = [flyersOf(stage).length && "flying", explodersOf(stage).length && "exploding", armoredOf(stage).length && "armored"].filter(Boolean);
+  return { types, marks };
 }
 function squadUpdate() {
-  const list = squadRows();
-  if (squadAt >= list.length) squadAt = list.length - 1;
+  teams();
+  const pick = squadPick(), { list } = roster(), v = sqView();
+  if (sq.at >= list.length) sq.at = Math.max(0, list.length - 1);
+  if (sq.zone === "grid" && !list.length) sq.zone = "slots";
+  // Slots
+  $("#squad-slots").replaceChildren(...Array.from({ length: 8 }, (_, i) => {
+    const num = pick[i], c = num ? card(unitOf(num), { at: sq.zone === "slots" && sq.slot === i, cost: false }) : card(null, { empty: true, at: sq.zone === "slots" && sq.slot === i });
+    c.dataset.slot = i;
+    return c;
+  }));
+  // Filters
+  const f = (key, text, on) => { const n = el("span", on ? "on" : "", text); n.dataset.key = key; n.title = "Press " + key.toUpperCase(); return n; };
+  $("#squad-filters").replaceChildren(f("c", v.cls ? T.classes[v.cls].name : "Class", !!v.cls), f("t", v.type || "Type", !!v.type),
+    f("r", v.tier ? v.tier + "★" : "Tier", !!v.tier), f("q", "In squad", v.mine), f("s", "Sort: " + SORTS.find(([id]) => id === v.sort)[1], false));
+  // Grid
+  const grid = $("#squad-grid");
+  grid.replaceChildren(...list.map((u, i) => { const c = card(u, { at: sq.zone === "grid" && sq.at === i, picked: pick.includes(u.num) }); c.dataset.at = i; return c; }));
+  if (!list.length) grid.replaceChildren(el("p", "dim", "No one matches. C T R Q change the filters."));
+  const cur = grid.children[sq.at];
+  if (sq.zone === "grid" && cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest" });
+  // Stage, teams, Start
+  const stage = stageNow(), foes = stageFoes(stage), box = $("#squad-stage");
+  const head = el("div", "line"); head.append(el("span", "", onWeekly() ? "Weekly" : stage.id), el("span", "dim", stage.name));
+  if (onWeekly()) head.append(el("span", "gold", "Risk " + T.riskOf(riskPick())));
+  const foeLine = el("div", "dim", "Foes: " + foes.types.join(", ") + (foes.marks.length ? " · " + foes.marks.join(", ") : ""));
+  foeLine.style.whiteSpace = "normal"; foeLine.style.lineHeight = "18px";
+  const row = el("div", "teams");
+  ["Team 1", "Team 2", "Team 3"].forEach((t, i) => {
+    const b = el("span", (pref.team === i ? "on" : "") + (sq.zone === "head" && sq.head === i ? " at" : ""), t.replace("Team ", "T"));
+    b.dataset.team = i; b.title = t + ": " + (pref.squads[i].length ? pref.squads[i].map(name).join(", ") : "empty"); row.append(b);
+  });
+  const go_ = el("span", "start" + (pick.length ? "" : " off") + (sq.zone === "head" && sq.head === 3 ? " at" : ""), "Start");
+  go_.dataset.start = 1; row.append(go_);
+  box.replaceChildren(head, foeLine, row);
+  // Detail
+  squadDetail(sq.zone === "slots" ? pick[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null);
+}
+function squadDetail(num) {
+  const box = $("#squad-detail");
+  // One line of keys for where the cursor is, or what just went wrong.
+  const hint = el("div", sq.note ? "gold" : "dim", sq.note || (sq.zone === "head" ? "Enter team or Start · P team" :
+    sq.zone === "slots" ? "Enter remove · L level up" : "Enter add · L level · S sort"));
+  hint.style.whiteSpace = "nowrap";
+  if (!num) { box.replaceChildren(el("div", "title", "SQUAD"), el("div", "", squadPick().length + " of 8 picked"), hint); return; }
+  const u = unitOf(num), row = G.dex[num - 1], c = T.classes[u.cls], l = S.lines[G.lineOf(num)] || {};
+  const head = el("div", "title", name(num));
+  const kind = el("div", "line"); kind.append(classIcon(u.cls), c.name, el("span", "dim", "· " + row[1].replace("/", " / ")));
+  const fight = el("div", "line"); fight.append("Range ", el("span", "num", u.range), ...(c.block ? [" · block ", el("span", "num", c.block)] : []), " · cost ", el("span", "num", u.cost));
+  const lv = T.state().levels[G.lineOf(num)] || 1;
+  const level = el("div", "line"); level.append("Lv ", el("span", "num", lv + "/" + T.maxLevel));
+  if (lv < T.maxLevel) level.append(" · next ", el("span", "num", T.levelCost(lv)), coin()); else level.append(el("span", "dim", " · max"));
+  const stats = el("div", "stats");
+  [["HP", 2], ["Atk", 3], ["Def", 4], ["SpA", 5], ["SpD", 6], ["Spe", 7]].forEach(([k, i]) => { const s_ = el("span"); s_.append(el("span", "dim", k + " "), el("span", "", row[i])); stats.append(s_); });
+  const skills = el("div", "skills");
+  G.skillsOf(num).forEach((sk, i) => skills.append(el("span", (l.skills && l.skills[i]) ? (i === 3 ? "gold" : "") : "dim", sk + (i === 3 ? "*" : ""))));
+  box.replaceChildren(head, kind, fight, level, stats, skills, hint);
+}
+function squadToggle(num) {
   const pick = squadPick();
-  titled($("#squad-title"), "SQUAD", pick.length + "/8");
-  rows($("#squad-list"), list.map(r => ({ label: (r.picked ? "✓ " : r.start ? "" : "  ") + r.label, right: r.right, off: r.off })), squadAt,
-    (i, click) => { squadAt = i; if (click) squadPick_(i); else squadUpdate(); });
-  const row = list[squadAt], info = $("#squad-info");
-  if (row.start) {
-    const stage = stageNow();
-    info.replaceChildren(el("div", "title", onWeekly() ? "WEEKLY" : stage.id), el("div", "", stage.name),
-      el("div", "dim", pick.map(name).join(", ") || "Nobody picked yet."));
-    if (onWeekly()) { const r = el("div", "gold"); r.append("Risk ", el("span", "num", T.riskOf(riskPick()))); info.append(r); }
-    say("Enter: start. Ground classes (Van, Grd, Blk) stand on the path; ranged ones (Snp, Cst, Med) on high ground.");
+  sq.note = "";
+  if (pick.includes(num)) setSquad(pick.filter(n => n !== num));
+  else if (pick.length >= 8) { sq.note = "A squad holds 8. Remove one first."; }
+  else setSquad(pick.concat(num));
+  squadUpdate();
+}
+function squadStart() {
+  if (!squadPick().length) { sq.note = "Pick at least one mon."; return squadUpdate(); }
+  sq.note = "";
+  startBattle();
+}
+function squadKey(e) {
+  const k = e.key, { list } = rosterCache || roster(), cols = 7;
+  if (/^[ctrqs]$/i.test(k)) { e.preventDefault(); return cycleSquad(k.toLowerCase()); }
+  if (k === "p" || k === "P") { e.preventDefault(); useTeam((pref.team + 1) % 3); sq.note = ""; return squadUpdate(); }
+  if (k === "Backspace") { e.preventDefault(); sq.note = ""; storyMode = "stages"; return storyUpdate(); }
+  if (k === "l" || k === "L") {
+    const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null;
+    if (num) { const r = T.levelUp({ line: G.lineOf(num) }); refreshTop(); sq.note = r.ok ? "" : r.reason === "coins" ? "Not enough coins." : "Already at max level."; squadUpdate(); }
     return;
   }
-  const u = row.unit, c = T.classes[u.cls];
-  const stats = el("div"); stats.append("HP ", el("span", "num", u.hp), " ATK ", el("span", "num", u.atk), " DEF ", el("span", "num", u.def));
-  const cost = el("div"); cost.append("Cost ", el("span", "num", u.cost), " · Lv ", el("span", "num", u.level));
-  info.replaceChildren(cellWith(sprite(u.num, u.look)), el("div", "", c.name + (c.block ? " · blocks " + c.block : "")), stats, cost,
-    el("div", u.rare ? "gold" : "dim", "Skill: " + u.skill + (u.rare ? " (rare)" : "")));
-  const lv = T.state().levels[G.lineOf(u.num)] || 1;
-  say(c.about + (lv < T.maxLevel ? " L: level up for " + T.levelCost(lv) + " coins." : " Max level.") + " Enter: " + (row.picked ? "remove from" : "add to") + " squad.");
+  const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
+  if (move) {
+    e.preventDefault(); sq.note = "";
+    const [dx, dy] = move;
+    if (sq.zone === "head") {
+      if (dy > 0) sq.zone = "slots"; else sq.head = (sq.head + dx + 4) % 4;
+    } else if (sq.zone === "slots") {
+      if (dy < 0) sq.zone = "head"; else if (dy > 0 && list.length) { sq.zone = "grid"; sq.at = Math.min(sq.slot, list.length - 1); } else sq.slot = (sq.slot + dx + 8) % 8;
+    } else {
+      const next = sq.at + dx + dy * cols;
+      if (dy < 0 && next < 0) { sq.zone = "slots"; sq.slot = Math.min(7, sq.at % cols); }
+      else sq.at = Math.max(0, Math.min(list.length - 1, next));
+    }
+    return squadUpdate();
+  }
+  if (k === "Enter" || k === " ") {
+    e.preventDefault();
+    if (sq.zone === "head") { if (sq.head === 3) return squadStart(); useTeam(sq.head); sq.note = ""; return squadUpdate(); }
+    if (sq.zone === "slots") { const num = squadPick()[sq.slot]; if (num) squadToggle(num); return; }
+    if (list[sq.at]) squadToggle(list[sq.at].num);
+  }
 }
-function squadPick_(i) {
-  const row = squadRows()[i];
-  if (row.start) return row.off ? say("Pick at least one mon.") : startBattle();
-  const pick = squadPick();
-  if (row.picked) pref.squad = pick.filter(n => n !== row.unit.num);
-  else if (pick.length >= 8) return say("A squad holds 8. Remove one first.");
-  else pref.squad = pick.concat(row.unit.num);
-  keep(); squadUpdate();
+function squadClick(e) {
+  const t = e.target.closest("[data-slot],[data-at],[data-key],[data-team],[data-start]");
+  if (!t) return;
+  if (t.dataset.key) return cycleSquad(t.dataset.key);
+  if (t.dataset.team) { useTeam(Number(t.dataset.team)); sq.zone = "head"; sq.head = Number(t.dataset.team); sq.note = ""; return squadUpdate(); }
+  if (t.dataset.start) return squadStart();
+  if (t.dataset.slot) { sq.zone = "slots"; sq.slot = Number(t.dataset.slot); const num = squadPick()[sq.slot]; if (num) squadToggle(num); else squadUpdate(); return; }
+  sq.zone = "grid"; sq.at = Number(t.dataset.at);
+  const u = (rosterCache || roster()).list[sq.at];
+  if (u) squadToggle(u.num);
 }
 function storyKey(e) {
   const k = e.key;
@@ -1175,13 +1394,7 @@ function storyKey(e) {
     else if (k === "Backspace") { e.preventDefault(); go("pull"); }
     return;
   }
-  const list = squadRows();
-  if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); squadAt = (squadAt + (k === "ArrowUp" ? -1 : 1) + list.length) % list.length; squadUpdate(); }
-  else if (k === "Enter" || k === " ") { e.preventDefault(); squadPick_(squadAt); }
-  else if (k === "l" || k === "L") {
-    const row = list[squadAt];
-    if (row.unit) { const r = T.levelUp({ line: G.lineOf(row.unit.num) }); refreshTop(); squadUpdate(); if (!r.ok) say(r.reason === "coins" ? "Not enough coins." : "Already at max level."); }
-  } else if (k === "Backspace") { e.preventDefault(); storyMode = "stages"; storyUpdate(); }
+  squadKey(e);
 }
 
 /* The battle: a 10×5 field of 48px tiles. */
@@ -1284,7 +1497,8 @@ function battleHud() {
     const card = el("div", "card" + (i === bt.slot ? " on" : "") + (on || cool || banned || b.energy < cost ? " off" : ""));
     card.dataset.slot = i;
     const top = el("div", "", (i + 1) + " " + name(u.num).slice(0, 5));
-    const low = el("div"); low.append(CLASS_SHORT[u.cls] + " ", el("span", "num", banned ? "no" : on ? "out" : cool ? cool + "s" : cost));
+    // The class as its icon (its name on hover), then the cost or why it cannot deploy.
+    const low = el("div", "low"); low.append(classIcon(u.cls), el("span", "num", banned ? "no" : on ? "out" : cool ? cool + "s" : cost));
     card.append(top, low);
     return card;
   }));
@@ -1442,6 +1656,8 @@ function go(id) {
   tab = pref.tab = id; keep();
   message = null;
   for (const [sid] of TABS) $("#scr-" + sid).hidden = sid !== id;
+  // Only the squad screen hides the message box; every other screen has it.
+  $("#msg").hidden = false;
   refreshTop();
   SCREENS[id][0]();
   $("#wrap").focus({ preventScroll: true });
