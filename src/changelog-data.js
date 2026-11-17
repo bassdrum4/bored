@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 515,
-  "newest": "2026-11-16",
+  "count": 516,
+  "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1c2285a","date":"2026-11-17","author":"Codebuff","subject":"Keep the save rate-limit test inside a calendar-minute window"},
   {"sha":"c475b01","date":"2026-11-16","author":"Codebuff","subject":"Fix retired-duel test, auto-merge Poké Gacha, extend scoped analytics"},
   {"sha":"71a7830","date":"2026-11-16","author":"Claude","subject":"Start the wallet the first time Poké Gacha is opened"},
   {"sha":"d3f291f","date":"2026-11-16","author":"Claude","subject":"Poké Gacha wallet and rewards engine (hub side)"},
