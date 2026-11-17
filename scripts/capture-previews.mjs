@@ -18,7 +18,9 @@ try {
     page.setDefaultTimeout(4000);
     await page.setViewport({ width: 768, height, deviceScaleFactor: 1 });
     await page.setRequestInterception(true);
-    page.on('request', request => /^https?:/.test(request.url()) && !request.url().startsWith(site.origin + '/') ? request.abort() : request.continue());
+    // Off-site requests are blocked, except Google Fonts: a game's webfont is part of how it looks.
+    const fonts = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//;
+    page.on('request', request => /^https?:/.test(request.url()) && !request.url().startsWith(site.origin + '/') && !fonts.test(request.url()) ? request.abort() : request.continue());
     await page.evaluateOnNewDocument(() => {
       let seed = 4981;
       Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -93,6 +95,29 @@ try {
           if (bubble) bubble.hidden = true;
         }
       });
+    }
+    if (slug === 'poke-gacha') {
+      // A returning player's Pull screen: the starter picked (no pick screen),
+      // a few vouchers, a ten-pull just made on the red Legendary UP machine
+      // (its banner on the plate), the menu closed so the counts and both side
+      // machines show.
+      await frame.waitForFunction(() => typeof G === 'object' && typeof go === 'function');
+      await frame.evaluate(() => {
+        if (typeof picking !== 'undefined' && picking) { picking.at = 3; starterEnter(); starterEnter(); }
+        const wallet = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+        wallet.entries['preview:grant'] = { at: Math.floor(Date.now() / 1000) - 100, g: { regular: 24, plus: 2, premium: 1, gold: 1, coins: 740, shards: 120 } };
+        parent.localStorage.setItem('bored.wallet', JSON.stringify(wallet));
+        machine = pref.machine = 'legend'; keep();
+        go('pull');
+        const pulled = G.pull({ voucher: 'regular', count: 10, machine: 'legend' });
+        refreshTop();
+        menuOpen = false;
+        message = pulled.ok ? { text: pulled.eggs.length + ' eggs:', eggs: pulled.eggs } : null;
+        updateScene();
+      });
+      // The pixel font, or the card shows the monospace fallback.
+      await frame.waitForFunction(() => document.fonts.check('20px "Jersey 10"') && !document.querySelector('#frame').classList.contains('no-pixel'), { timeout: 10000 }).catch(() => {});
+      await frame.evaluate(() => { refreshTop(); updateScene(); });
     }
     if (slug === 'snake') await press('ArrowRight');
     if (slug === 'minigolf') await frame.evaluate(() => { holeIndex = 4; loadHole(); });
@@ -185,7 +210,13 @@ try {
       if (box && box.width * box.height > area) { area = box.width * box.height; target = node; }
     }
     const file = path.join(shots, slug + '.png');
-    const box = await target?.boundingBox();
+    let box = await target?.boundingBox();
+    // Poké Gacha's scene canvas covers the whole window; frame the machines,
+    // from the tabs to the message box, with the side machines showing equally.
+    if (slug === 'poke-gacha') {
+      const wrap = await frame.$eval('#wrap', node => { const b = node.getBoundingClientRect(); return { x: b.x, y: b.y }; });
+      box = { x: wrap.x - 26, y: wrap.y + 2, width: 600, height: 375 };
+    }
     // Do not use ElementHandle.screenshot here: scrolling a canvas inside a
     // fixed iframe can make Chrome capture the underlying hub instead.
     const height = page.viewport().height;

@@ -66,7 +66,7 @@ export const LAUNCHED = {
 };
 export const META = {
   "photo-puzzle": ["Puzzle", "Upload a picture, break it into tiles, then swap them back into place."],
-  "poke-gacha": ["Arcade", "Pull for Pokémon and build a collection. Work in progress."],
+  "poke-gacha": ["Arcade", "Pull eggs, hatch a team, and beat Team Rocket in tower defense."],
   "poke-idle": ["Strategy", "Build a party of 6, beat 36 gyms across nine regions, and fill the Pokédex."],
   "air-hockey": ["Arcade", "Two mallets, one puck, first to seven. Hold your half and put it away."],
   "pokedoku": ["Puzzle", "Three daily Pokémon puzzles: Pokédoku, Inverse Doku and Shiny Hunt."],
