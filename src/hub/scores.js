@@ -109,10 +109,11 @@ export const HIGH_SCORE_GAMES = [
   }),
   // Today's three dailies added up: Pokédoku (1350) + Inverse Doku (600) + Shiny Hunt (700).
   highScore("pokedoku", "Pokédoku", "points", { metric: "points", max: 2650, when: snapshot => snapshot.finished === true && snapshot.daily === true }),
-  // Solo only: reaction time in milliseconds. False starts and implausibly
-  // fast responses do not qualify; local duels never affect the leaderboard.
+  // Solo only: reaction time in milliseconds. False starts do not qualify, and
+  // there is no floor, so a faster draw always improves the best; local duels
+  // never affect the leaderboard.
   highScore('quickdraw', 'Quickdraw', 'ms', {
-    metric: 'milliseconds', lower: true, min: 50, max: 2000,
+    metric: 'milliseconds', lower: true, max: 2000,
     when: snapshot => snapshot.finished === true && snapshot.solo === true
   }),
   // Clicker is endless: the running total is the whole score, so it is captured
