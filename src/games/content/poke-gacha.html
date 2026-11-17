@@ -62,6 +62,7 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Icons sit in one 40px slot so labels line up whatever the icon. */
 .rows .ico { width: 40px; display: grid; place-items: center; flex: none }
 .rows .right { display: flex; align-items: center; gap: 4px; padding-right: 4px }
+.stars { display: inline-flex; gap: 2px; vertical-align: middle }
 .rows p { padding: 4px 0 }
 .cell { display: grid; place-items: center; overflow: hidden }
 .unseen { filter: brightness(0) }
@@ -273,8 +274,28 @@ function miniStyle(node, num, look = "normal", scale = 1) {
   return node;
 }
 const mini = (num, look, dark = false) => { const d = miniStyle(el("span", "mini" + (dark ? " unseen" : "")), num, look); d.title = name(num); return d; };
-function candyIcon() { return pixelCanvas(8, 8, g => { g.fillStyle = C.ink; g.fillRect(2, 1, 4, 6); g.fillRect(0, 2, 8, 4); g.fillStyle = C.red; g.fillRect(3, 2, 2, 4); g.fillRect(1, 3, 6, 2); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 1); }); }
-function check(done) { return pixelCanvas(8, 8, g => { g.fillStyle = done ? C.gold : C.dim; if (done) { g.fillRect(1, 4, 2, 2); g.fillRect(3, 5, 1, 2); g.fillRect(4, 3, 1, 3); g.fillRect(5, 1, 1, 3); g.fillRect(6, 0, 1, 2); } else g.fillRect(3, 3, 2, 2); }); }
+/* PIXEL_MAPS:BEGIN — hand-placed icons, one char per pixel. tests/poke-gacha.test.cjs checks the outlines. */
+const PIXEL_MAPS = {
+ "candy": ["..kkkk..", ".k2211k.", "k22w110k", "k2w1w10k", "k21w110k", "k111100k", ".k1000k.", "..kkkk.."],
+ "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
+ "dot": ["kkkk", "k11k", "k11k", "kkkk"],
+ "star": ["...k...", "..k1k..", "kkk1kkk", "k11111k", ".k111k.", "k1kkk1k", "kk...kk"]
+};
+/* PIXEL_MAPS:END */
+// Draw a pixel map: '.' is transparent, every other char looks its color up in `pal`.
+function mapCanvas(key, pal) {
+  const map = PIXEL_MAPS[key];
+  return pixelCanvas(map[0].length, map.length, g => map.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") { g.fillStyle = pal[row[x]]; g.fillRect(x, y, 1, 1); } }));
+}
+const candyIcon = () => mapCanvas("candy", { k: C.ink, 0: SHADE.red[0], 1: C.red, 2: SHADE.red[2], w: C.paper });
+const check = done => done ? mapCanvas("check", { k: C.ink, 1: C.gold }) : mapCanvas("dot", { k: C.ink, 1: C.dim });
+// Stage stars: gold when earned, dim when not, three in a row.
+function starIcons(n) {
+  const row = document.createElement("span");
+  row.className = "stars"; row.title = n + " of 3 stars";
+  for (let i = 0; i < 3; i++) row.append(mapCanvas("star", { k: C.ink, 1: i < n ? C.gold : C.dim }));
+  return row;
+}
 
 /* ── Shared pieces: elements, sprites in fixed cells, lists, messages ──── */
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
@@ -887,7 +908,7 @@ const isOpen = (td, stage) => td.unlockedById ? !!td.unlockedById[stage.id] : !!
 const stageBefore = stage => allStages()[allStages().indexOf(stage) - 1];
 const flyersOf = stage => [...new Set(stage.waves.filter(w => w[5]).map(w => w[1]))];
 const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
-const stageStars = n => "★".repeat(n) + "☆".repeat(3 - n);
+const stageStars = starIcons;
 function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5]).map(w => w[1]))].map(name).join(", "); }
 function storyUpdate() {
   drawBackdrop();
@@ -906,7 +927,7 @@ function storyUpdate() {
     el("div", "dim", "Enemies: " + enemiesOf(stage)));
   // Flying enemies: only snipers can hit them, so a stage says so up front.
   if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ") + ". Snipers only."));
-  const reward = el("div"); reward.append(best ? "Best " : "First clear: ", best ? el("span", "num", stageStars(best)) : el("span", "num", "50"), best ? "" : " coins + 2 Regular");
+  const reward = el("div"); reward.append(best ? "Best " : "First clear: ", best ? stageStars(best) : el("span", "num", "50"), best ? "" : " coins + 2 Regular");
   info.append(reward);
   if (stage.admin && !best) { const g = el("div"); g.append("Admin: ", el("span", "num", "+1"), " Gold"); info.append(g); }
   if (best < 3) { const r3 = el("div", "dim"); r3.append("First 3★: ", el("span", "num", "100"), " coins + 1 Plus"); info.append(r3); }
@@ -924,7 +945,7 @@ function squadRows() {
   const pick = squadPick();
   const units = [];
   for (let i = 0; i < S.owned.length; i += 8) units.push(...T.squad(S.owned.slice(i, i + 8)));
-  return [{ start: true, label: pick.length ? "Start battle" : "Pick up to 8 mons", right: [pick.length, "/8"], off: !pick.length }]
+  return [{ start: true, label: pick.length ? "Start battle" : "Pick up to 8 mons", right: [pick.length + "/8"], off: !pick.length }]
     .concat(units.map(u => ({ unit: u, label: name(u.num), right: [CLASS_SHORT[u.cls], "Lv" + u.level, u.cost], picked: pick.includes(u.num) })));
 }
 function squadUpdate() {
@@ -1091,7 +1112,7 @@ function showResult() {
   if (bt.talk.length) { $("#battle-result").hidden = true; return; }
   const box = $("#battle-result");
   box.hidden = false;
-  const lines = [el("div", "title", res.stars ? "CLEARED" : "DEFEATED"), el("div", "num", res.stars ? stageStars(res.stars) : "Try another squad or placement")];
+  const lines = [el("div", "title", res.stars ? "CLEARED" : "DEFEATED"), res.stars ? (() => { const d = el("div"); d.append(stageStars(res.stars)); return d; })() : el("div", "num", "Try another squad or placement")];
   const waves = el("div"); waves.append("+", el("span", "num", res.waves), " hatch waves");
   lines.push(waves);
   const NAMES = { coins: ["coin", "coins"], regular: ["Regular voucher", "Regular vouchers"], plus: ["Plus voucher", "Plus vouchers"], gold: ["Gold voucher", "Gold vouchers"] };
