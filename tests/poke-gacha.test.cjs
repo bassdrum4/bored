@@ -199,3 +199,30 @@ test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1
   }
   assert.deepEqual(errors, []);
 });
+
+test('tower defense: Left and Right switch chapters, and chapter 2 says which enemies fly', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length > 1)) return t.skip('the hub engine has one chapter');
+  // A recorded 1-8 clear opens chapter 2.
+  await game.evaluate(() => {
+    const w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['td:run:test-1-8'] = { at: Math.floor(Date.now() / 1000), x: { st: '1-8', s: 3, tm: [], d: T.state().monday } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    refreshTop();
+  });
+  await key(tab, '1');
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/2/);
+  await key(tab, 'ArrowRight');
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*2\/2/);
+  const rows = await game.$$eval('#story-list > div', list => list.map(r => r.textContent));
+  assert.equal(rows.length, 6);
+  assert.match(rows[0], /^2-1 /);
+  assert.doesNotMatch(rows[0], /locked/, '2-1 is open after 1-8');
+  assert.match(rows[1], /locked/);
+  assert.match(await game.$eval('#story-info', n => n.textContent), /Flying: .*Snipers only/);
+  await key(tab, 'ArrowDown', 5);
+  assert.match(await game.$eval('#story-info', n => n.textContent), /ADMIN/, '2-6 is the admin stage');
+  await key(tab, 'ArrowLeft');
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/2/);
+  assert.deepEqual(errors, []);
+});
