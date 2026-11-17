@@ -53,6 +53,8 @@ test('the Poké Gacha pull screen fills the window at a whole-number scale, with
   await page.evaluate(() => openGame('poke-gacha'));
   await page.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
   const game = await (await page.$('#frame')).contentFrame();
+  // A new wallet opens on the starter pick when the page has one: take the first.
+  await game.evaluate(() => { if (typeof picking !== 'undefined' && picking) { starterEnter(); starterEnter(); } });
   await game.evaluate(() => go('pull'));
 
   // A phone, the 640x384 frame exactly, a small embed, the owner's Google Sites game
