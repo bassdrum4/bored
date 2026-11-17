@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
 const td = moduleUnderTest('src/hub/td.js', [
-  'classOf', 'STAGES', 'CHAPTERS', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
+  'classOf', 'STAGES', 'CHAPTERS', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
   'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H'
 ], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor });
 const { walletBalance, activateWallet, grantOnce } = rewards;
@@ -371,4 +371,42 @@ test('late stages want type-matched squads: matched level-3 commons and rares wi
     // The Petrel boss is the one stage a worst-typed squad can scrape through, with 1 star.
     if (id !== '3-6') assert.equal(playInOrder(stage, bad, placed(stage, bad)).over, 'lose', id + ': the worst-typed level-3 squad loses');
   }
+});
+
+test('weekly challenge: one stage a week for everyone, and risks that stack', () => {
+  const a = td.weeklyStage('2026-11-16'), b = td.weeklyStage('2026-11-16');
+  assert.equal(a.base, b.base, 'the same stage for everyone in a week');
+  assert.ok(!a.boss && a.weekly);
+  const weeks = new Set(['2026-11-16', '2026-11-23', '2026-11-30', '2026-12-07', '2026-12-14'].map(m => td.weeklyStage(m).base));
+  assert.ok(weeks.size > 1, 'it changes from week to week');
+  assert.equal(td.riskOf(['hp', 'onelife', 'six']), 6);
+  assert.equal(td.riskOf(['nonsense']), 0);
+  // The risks change the battle.
+  const squad = [td.unitStats(named('Chansey')), td.unitStats(named('Machamp'))];
+  const plain = td.newBattle(a, squad), hard = td.newBattle(a, squad, ['onelife', 'nomedic', 'cost', 'energy']);
+  assert.equal(hard.life, 1);
+  hard.energy = 99;
+  assert.equal(td.canDeploy(hard, 0, 0, 0), 'banned', 'no medics');
+  plain.energy = hard.energy = 20; td.step(plain); td.step(hard);
+  assert.ok(hard.energy - 20 < plain.energy - 20, 'energy refills slower');
+  const six = td.newBattle(a, Array(8).fill(td.unitStats(named('Machamp'))), ['six']);
+  six.energy = 999;
+  const ground = []; a.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === '.') ground.push([x, y]); }));
+  for (let slot = 0; slot < 8; slot++) td.deploy(six, slot, ...ground[slot]);
+  assert.equal(six.units.length, 6, 'at most 6 units on the field');
+  // Spawned enemies carry the HP risk.
+  const tough = td.newBattle(a, [], ['hp']), base = td.newBattle(a, []);
+  while (!tough.enemies.length) td.step(tough);
+  while (!base.enemies.length) td.step(base);
+  assert.ok(tough.enemies[0].maxHp > base.enemies[0].maxHp);
+});
+
+test('weekly challenge: a win records its risk as the week score, and waves still pay', () => {
+  const team = [named('Machamp')];
+  let w = owning(team);
+  w = td.tdWeekly(w, { mods: ['hp', 'atk'], stars: 2, waves: 2 }, opts()).wallet;
+  w = td.tdWeekly(w, { mods: ['onelife'], stars: 0, waves: 1 }, opts()).wallet;
+  const state = td.tdState(w, TODAY);
+  assert.equal(state.challengeBest, 2, 'a loss does not count; the win with 2 risk does');
+  assert.equal(walletBalance(w).waves, 3, 'waves cleared pay either way');
 });

@@ -269,16 +269,40 @@ export const REDEPLOY = 18;
 export const START_ENERGY = 10;
 
 /** A fresh battle. `squad` is up to 8 unitStats(). */
-export function newBattle(stage, squad) {
+/* ── The weekly challenge: one stage a week, with stacking risk modifiers ── */
+// Like Arknights' Contingency Contract: pick any risks, win, and the risk total is
+// the week's score. RISKS are applied by newBattle/step/canDeploy through b.mods.
+export const RISKS = [
+  { id: 'hp', label: 'Enemies have 30% more HP', risk: 1 },
+  { id: 'atk', label: 'Enemies hit 30% harder', risk: 1 },
+  { id: 'cost', label: 'Deploying costs 3 more', risk: 1 },
+  { id: 'nomedic', label: 'No medics', risk: 1 },
+  { id: 'fast', label: 'Enemies move 20% faster', risk: 2 },
+  { id: 'energy', label: 'Energy refills 25% slower', risk: 2 },
+  { id: 'six', label: 'At most 6 units on the field', risk: 2 },
+  { id: 'onelife', label: 'One life', risk: 3 }
+];
+export const riskOf = mods => RISKS.filter(r => mods.includes(r.id)).reduce((n, r) => n + r.risk, 0);
+/** This week's challenge: a non-boss story stage picked from the Monday's seed, the same for everyone. */
+export function weeklyStage(monday) {
+  const pool = STAGES.filter(s => !s.boss);
+  const base = pool[(seedNumber('td-week:' + monday) >>> 0) % pool.length];
+  return { ...base, id: 'W-' + monday, base: base.id, name: 'Weekly: ' + base.name, weekly: true,
+    before: ['A Rocket squad is holding ' + base.name + ' this week. Add risks for a higher score.'], after: ['Challenge cleared.'] };
+}
+const costOf = (b, u) => u.cost + (b.mods.has('cost') ? 3 : 0);
+
+export function newBattle(stage, squad, mods = []) {
   const paths = pathsOf(stage);
   const queue = [];
   stage.waves.forEach(([at, num, count, gap, boss, flying, explodes, armored], wave) => {
     for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying, explodes: !!explodes, armored: !!armored });
   });
   queue.sort((a, b) => a.at - b.at);
-  return { stage, paths, squad: squad.slice(0, 8), t: 0, energy: START_ENERGY, life: stage.lives, queue, spawned: 0,
+  const set = new Set(mods.filter(id => RISKS.some(r => r.id === id)));
+  return { stage, paths, squad: squad.slice(0, 8), t: 0, energy: START_ENERGY, life: set.has('onelife') ? 1 : stage.lives, queue, spawned: 0,
     units: [], enemies: [], waveLeft: stage.waves.map(w => w[2]), wavesDone: 0, leaks: 0, kills: 0,
-    deployed: new Set(), cooldown: {}, nextId: 1, over: null, log: [] };
+    deployed: new Set(), cooldown: {}, nextId: 1, over: null, log: [], mods: set };
 }
 const tileAt = (b, x, y) => (b.stage.map[y] || '')[x] || '#';
 export function canDeploy(b, slot, x, y) {
@@ -286,7 +310,9 @@ export function canDeploy(b, slot, x, y) {
   if (!u || b.over) return 'none';
   if (b.units.some(unit => unit.slot === slot)) return 'deployed';
   if ((b.cooldown[slot] || 0) > b.t) return 'cooldown';
-  if (b.energy < u.cost) return 'energy';
+  if (b.mods?.has('nomedic') && u.cls === 'medic') return 'banned';
+  if (b.mods?.has('six') && b.units.length >= 6) return 'full';
+  if (b.energy < (b.mods ? costOf(b, u) : u.cost)) return 'energy';
   const tile = tileAt(b, x, y);
   if (u.ground ? tile !== '.' : tile !== 'H') return 'tile';
   if (b.units.some(unit => unit.x === x && unit.y === y)) return 'taken';
@@ -296,7 +322,7 @@ export function deploy(b, slot, x, y) {
   const why = canDeploy(b, slot, x, y);
   if (why) return why;
   const u = b.squad[slot];
-  b.energy -= u.cost;
+  b.energy -= b.mods ? costOf(b, u) : u.cost;
   b.units.push({ ...u, id: b.nextId++, slot, x, y, maxHp: u.hp, cd: 0, sp: 0, blocking: [] });
   b.deployed.add(u.num);
   return null;
@@ -340,7 +366,7 @@ function useSkill(b, u) {
 export function step(b, dt = TICK) {
   if (b.over) return b;
   b.t += dt;
-  b.energy = Math.min(99, b.energy + dt);
+  b.energy = Math.min(99, b.energy + dt * (b.mods?.has('energy') ? 0.75 : 1));
   // Spawns.
   while (b.queue.length && b.queue[0].at <= b.t) {
     const s = b.queue.shift();
@@ -350,6 +376,9 @@ export function step(b, dt = TICK) {
     b.enemies.push({ ...enemyStats(s.num, b.stage.level, s.boss, s.flying), id: b.nextId++, wave: s.wave, boss: s.boss, path, seg: 0,
       x: path[0][0], y: path[0][1], cd: 0, blockedBy: null, maxHp: 0, explodes: s.explodes, fuse: null, armored: s.armored });
     const e = b.enemies[b.enemies.length - 1];
+    if (b.mods?.has('hp')) e.hp = Math.round(e.hp * 1.3);
+    if (b.mods?.has('atk')) e.atk = Math.round(e.atk * 1.3);
+    if (b.mods?.has('fast')) e.speed *= 1.2;
     e.maxHp = e.hp;
     b.spawned++;
   }
@@ -537,6 +566,10 @@ export function tdState(wallet, today = dailyDate()) {
     dailyAll: !!e['td:daily:' + today + ':all'],
     weekly: WEEKLY.map(m => ({ ...m, done: !!e['td:week:' + monday + ':' + m.id] })),
     weeklyAll: !!e['td:week:' + monday + ':all'],
+    // The weekly challenge: this week's stage and the best risk total won so far.
+    challenge: weeklyStage(monday),
+    challengeBest: Math.max(0, ...Object.entries(e).filter(([id, entry]) => id.startsWith('td:wk:') && object(entry.x).wk === monday && object(entry.x).s > 0)
+      .map(([, entry]) => Number(entry.x.r) || 0)),
     monday
   };
 }
@@ -563,6 +596,20 @@ export function tdFinish(wallet, { stage, stars, team = [], waves = 0 } = {}, { 
   if (stars === 3) next = grantOnce(next, 'td:star3:' + s.id, FIRST_STAR3, { now }).wallet;
   next = claimMissions(next, today, now);
   return { wallet: next, ok: true, waves: cleared, newGrants: Object.keys(next.entries).length - before };
+}
+/**
+ * Record a weekly challenge run: waves cleared pay hatch waves like any battle,
+ * and a win keeps its risk total as the week's score. No other reward yet.
+ */
+export function tdWeekly(wallet, { mods = [], stars = 0, waves = 0 } = {}, { today = dailyDate(), now = Date.now() } = {}) {
+  const monday = mondayOf(today), stage = weeklyStage(monday);
+  if (!Number.isInteger(stars) || stars < 0 || stars > 3) return { wallet: mergeWallet(wallet), ok: false, reason: 'unknown' };
+  if (!gachaState(wallet, today).active) return { wallet: mergeWallet(wallet), ok: false, reason: 'inactive' };
+  const cleared = Math.max(0, Math.min(stage.waves.length, Math.floor(waves)));
+  const risk = riskOf(mods);
+  const next = mergeWallet(wallet);
+  next.entries['td:wk:' + uuid()] = { at: seconds(now), ...(cleared ? { g: { waves: cleared } } : {}), x: { wk: monday, r: risk, s: stars, m: mods.filter(id => RISKS.some(r => r.id === id)) } };
+  return { wallet: next, ok: true, waves: cleared, risk };
 }
 /** Buy a level for a line with coins. */
 export function levelUp(wallet, line, { today = dailyDate(), now = Date.now() } = {}) {
@@ -597,6 +644,9 @@ export function tdBridge({ onChange = () => {} } = {}) {
     state: () => tdState(readWallet()),
     squad: species => squadFrom(readWallet(), species),
     finish: act((w, o) => tdFinish(w, o)),
-    levelUp: act((w, o) => levelUp(w, o.line))
+    levelUp: act((w, o) => levelUp(w, o.line)),
+    // The weekly challenge (draft): stage and risks, and recording a run.
+    risks: RISKS, riskOf, weeklyStage,
+    finishWeekly: act((w, o) => tdWeekly(w, o))
   };
 }
