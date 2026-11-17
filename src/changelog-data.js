@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 540,
+  "count": 546,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -11,6 +11,12 @@ export const CHANGELOG_META = {
 export const CHANGELOG = [
   {"sha":"bfe1585","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: Dex filters and sorting","pr":192},
   {"sha":"3178370","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha TD: chapter 4 screens: armored enemies","pr":191},
+  {"sha":"32f1c41","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: the chapter-switch page test reads any chapter count"},
+  {"sha":"b006cee","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: tune chapter 3 (3-5 at 2.15, 3-6 at 2.3)"},
+  {"sha":"3389d9f","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: the flyer-first test sets both enemies in range"},
+  {"sha":"8772d57","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 3, Petrel, with enemies that explode (manual review)"},
+  {"sha":"6bbcbe4","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: snipers shoot flyers first; targets by distance left to the goal"},
+  {"sha":"31c92fd","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: difficulty pass for chapters 1 and 2 (manual review)"},
   {"sha":"710a68d","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 2, Proton, with flying enemies (manual review)"},
   {"sha":"588fd78","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 1 engine and the hub bridge (manual review)"},
   {"sha":"665778e","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: one pixel font for all text"},
