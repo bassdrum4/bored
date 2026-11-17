@@ -397,7 +397,7 @@ const EGG_PICS = [0, 1, 2, 3].map(i => { const img = new Image(); img.src = ART_
 /* Mini sprites: 40x30 icons in two atlases (scripts/gacha-art.py), 32 a row. */
 const MINI = [40, 30], MINI_COLS = 32, MINI_SHEET = [1280, 990];
 function miniStyle(node, num, look = "normal", scale = 1) {
-  const n = isSkin(look) ? (skinOf(look)?.species || num) : num;
+  const n = isSkin(look) ? skinForm(look, num) : num;
   const i = n - 1;
   Object.assign(node.style, {
     width: MINI[0] * scale + "px", height: MINI[1] * scale + "px",
@@ -450,7 +450,12 @@ const SKIN_DIR = SPRITE_DIR.replace("pokedoku/sprites/", "poke-gacha/sp/");
 const skins = () => (G ? G.skins() : []);
 const skinOf = id => skins().find(skin => skin.id === id) || null;
 const isSkin = look => look !== "normal" && look !== "shiny";
-const spriteUrl = (num, look) => isSkin(look) ? SKIN_DIR + look + ".png" : SPRITE_DIR + (look === "shiny" ? "shiny/" : "") + num + ".png";
+// A skin's art is one file per form it covers: sp/<id>-<species>.png. A set covers several forms.
+const skinFileOf = (id, num) => G && G.skinFile ? G.skinFile(id, num) : id + "-" + num + ".png";
+const skinCovers = (id, num) => !!skinOf(id)?.forms?.includes(num);
+// The form a skin is drawn on: this one if the skin covers it, else the form it was drawn for.
+const skinForm = (id, num) => skinCovers(id, num) ? num : skinOf(id)?.species || num;
+const spriteUrl = (num, look) => isSkin(look) ? SKIN_DIR + skinFileOf(look, skinForm(look, num)) : SPRITE_DIR + (look === "shiny" ? "shiny/" : "") + num + ".png";
 const lookName = look => look === "normal" ? "Normal" : look === "shiny" ? "Shiny" : "SP " + (skinOf(look)?.name || "skin");
 // Every Pokémon sprite at 1x, never scaled or cropped: cells are 96px, the largest sprite.
 const CELL = 96;
@@ -918,12 +923,15 @@ function bigEgg(tier, wobble, crack) {
   return c;
 }
 const hatchLook = x => x.sp ? x.sp : x.shiny ? "shiny" : "normal";
+// What a hatch shows: the species, or for an SP skin the skin on the form it covers (a Charizard
+// skin rolled from a Charmander egg shows Charizard).
+const hatchSprite = x => sprite(x.sp ? skinForm(x.sp, x.species) : x.species, hatchLook(x));
 function showHatch() {
   const h = hatching, panel = $("#hatch");
   if (h.summary) {
     const grid = el("div", "grid");
     // NEW sits under the cell, never on the sprite.
-    for (const x of h.list.slice(0, 12)) { const item = el("div"); item.append(cellWith(sprite(x.species, hatchLook(x))), el("div", "tag " + (x.fresh ? "gold" : "dim"), x.fresh ? "NEW" : "+" + x.shards)); grid.append(item); }
+    for (const x of h.list.slice(0, 12)) { const item = el("div"); item.append(cellWith(hatchSprite(x)), el("div", "tag " + (x.fresh ? "gold" : "dim"), x.fresh ? "NEW" : "+" + x.shards)); grid.append(item); }
     panel.classList.add("sum");
     panel.replaceChildren(el("div", "head gold", "HATCHED " + h.list.length), grid);
     const fresh = h.list.filter(x => x.fresh).length;
@@ -938,13 +946,13 @@ function showHatch() {
   const reveal = () => {
     h.phase = "shown";
     art.classList.remove("egg-phase");
-    art.replaceChildren(sprite(x.species, hatchLook(x)));
+    art.replaceChildren(hatchSprite(x));
     const candy = el("div"); candy.append(el("span", "num", "+" + x.candy), " candy");
     if (x.shards) candy.append(" · ", el("span", "num", "+" + x.shards), " shards");
     text.replaceChildren(el("div", "title", name(x.species)), el("div", x.fresh ? "gold" : "dim", x.fresh ? "New for your dex" : "Already in your dex"),
       el("div", "", TIER_NAME[x.tier] + " " + G.stars[x.tier] + "★ · " + G.dex[x.species - 1][1].replace("/", " / ")), candy,
       el("div", x.skill === 3 ? "gold" : "", "Skill: " + G.skillsOf(x.species)[x.skill] + (x.skill === 3 ? " (rare)" : "")),
-      ...(x.shiny ? [el("div", "gold", "Shiny!")] : []), ...(x.sp ? [el("div", "gold", "SP skin: " + (skinOf(x.sp)?.name || x.sp) + "!")] : []));
+      ...(x.shiny ? [el("div", "gold", "Shiny!")] : []), ...(x.sp ? [el("div", "gold", "SP skin: " + (skinOf(x.sp)?.name || x.sp) + "! Wear it from the Dex.")] : []));
     say("Enter: next egg · Backspace: skip to the end.");
   };
   say("Oh? The egg is moving...");
@@ -1022,12 +1030,13 @@ function dexActions(line) {
   list.push({ label: "Look: " + lookName(l.look), off: looks.length < 2,
     about: looks.length > 1 ? "Change the look this line wears here, in Pokédoku and as your buddy." : "Hatch it shiny to unlock another look.",
     run: () => G.setLook({ line, look: looks[(looks.indexOf(l.look) + 1) % looks.length] }) });
-  // A skin belongs to one species, so the buddy is that species when the line wears one.
+  // With a skin on, the buddy is the line's newest form the skin covers (it must be owned).
   const skin = isSkin(l.look) ? skinOf(l.look) : null;
-  const who = skin ? skin.species : tipOf(line);
+  const who = skin ? (lineForms(line).filter(num => skinCovers(skin.id, num)).sort((a, b) => G.stageOf(b) - G.stageOf(a))[0] || skin.species) : tipOf(line);
+  const can = S.owned.includes(who);
   const isBuddy = S.buddy && S.buddy.species === who && S.buddy.shiny === (l.look === "shiny") && (S.buddy.skin || null) === (skin ? skin.id : null);
-  list.push({ label: isBuddy ? "Your buddy" : "Make buddy", right: isBuddy ? [check(true)] : "", off: isBuddy,
-    about: "Show " + name(who) + " next to your name on Bored and the leaderboard.",
+  list.push({ label: isBuddy ? "Your buddy" : "Make buddy", right: isBuddy ? [check(true)] : "", off: isBuddy || !can,
+    about: can ? "Show " + name(who) + " next to your name on Bored and the leaderboard." : "Evolve into " + name(who) + " to show this skin as your buddy.",
     run: () => G.setBuddy({ species: who, shiny: l.look === "shiny", skin: skin ? skin.id : null }) });
   return list;
 }
@@ -1050,7 +1059,7 @@ function dexUpdate() {
     label: String(num).padStart(4, "0") + " " + (owned.has(num) ? name(num) : "???"), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
     dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); });
   const line = list[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
-  const shown = l && isSkin(l.look) && skinOf(l.look) ? skinOf(l.look).species : tip;
+  const shown = l && isSkin(l.look) && skinOf(l.look) ? skinForm(l.look, tip) : tip;
   $("#dex-pic").replaceChildren(l ? sprite(shown, G.lookFor(shown)) : silhouette(line));
   const info = $("#dex-info"), stars = G.dex[line - 1][9], egg = el("div", "egg-line");
   // Which egg it hatches from, with that egg's icon: Common 3★, Rare 4★, Epic 5★, Legendary 6★.
@@ -1096,13 +1105,15 @@ let shopAt = 0;
 function shopItems() {
   const items = [{ kind: "reg", label: "Regular voucher", price: 100, cur: "coins", icon: ticket("regular"),
     about: "1 Regular voucher for 100 coins. Coins come from Poké Idle, Pokédoku and tower defense." }];
-  for (const skin of skins()) {
-    const held = S.lines[G.lineOf(skin.species)];
+  // Lines the eggs never hatch (Mew, for now) have no way in, so their skins wait off the list.
+  for (const skin of skins().filter(skin => G.dex[G.lineOf(skin.species) - 1][9] > 0)) {
+    const held = S.lines[G.lineOf(skin.species)], forms = skin.forms || [skin.species];
     const owned = held && held.skins.includes(skin.id);
-    items.push({ kind: "sp", skin, label: "SP " + skin.name + ": " + name(skin.species), price: G.costs.sp, cur: "shards", icon: shardIcon(),
-      owned, locked: !held,
+    const covers = forms.length > 1 ? "a set for " + forms.map(name).join(", ") : "for " + name(skin.species);
+    items.push({ kind: "sp", skin, label: "SP " + skin.name + (forms.length > 1 ? " (" + forms.length + " forms)" : ""),
+      price: G.skinPrice ? G.skinPrice({ forms }) : G.costs.sp, cur: "shards", icon: shardIcon(), owned, locked: !held,
       about: owned ? "You own this skin. Wear it from the Dex: Look." : !held ? "Hatch the " + name(G.lineOf(skin.species)) + " line first to buy this skin."
-        : "SP skin for " + name(skin.species) + ": its own art here, in Pokédoku and as your buddy. Looks only." });
+        : "SP skin, " + covers + ": its own art here, in battle, in Pokédoku and as your buddy. Looks only. Shiny UP can also drop it (1 in " + SP_IN + ")." });
   }
   return items;
 }
@@ -1117,7 +1128,7 @@ function shopUpdate() {
   const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins");
   if (items.length > 1) have.append(" · ", el("span", "num", S.balance.shards), " shards");
   $("#shop-preview").replaceChildren(el("div", "title", it.kind === "sp" ? "PREVIEW" : "VOUCHER"),
-    cellWith(it.kind === "sp" ? sprite(it.skin.species, it.skin.id) : ticket("regular", 2)), el("div", "", it.kind === "sp" ? it.skin.name : "1 Regular = 1 egg"), have);
+    cellWith(it.kind === "sp" ? sprite((it.skin.forms || [it.skin.species]).slice(-1)[0], it.skin.id) : ticket("regular", 2)), el("div", "", it.kind === "sp" ? it.skin.name : "1 Regular = 1 egg"), have);
   say(it.about);
 }
 function buy(it) {
