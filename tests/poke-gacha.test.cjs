@@ -217,7 +217,9 @@ test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1
   const quests = await game.evaluate(() => questItems().map(q => ({ label: q.label, done: !!q.done, off: !!q.off })));
   if (quests.some(q => /daily missions/.test(q.label))) {
     assert.ok(quests.find(q => q.label === 'Clear any stage')?.done ?? true, 'a clear ticks "Clear any stage" when it is drawn today');
-    assert.ok(quests.find(q => q.label === 'All 5 weekly missions').off, 'the weekly Gold is locked while the Poké Idle boss mission is');
+    // The Poké Idle daily boss mission is open, so nothing on the weekly list is locked.
+    assert.ok(!quests.find(q => q.label === 'All 5 weekly missions').off, 'the weekly Gold can be earned');
+    assert.ok(!quests.find(q => /Poké Idle daily boss/.test(q.label)).off, 'the boss mission is open');
     assert.ok(quests.find(q => q.label === 'Clear stage 1-1').done, 'the 1-1 starter mission is done');
   }
   assert.deepEqual(errors, []);
