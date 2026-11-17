@@ -68,7 +68,8 @@ const pageOf = id => specs.get(id)?.page || id;
 for (const [id, spec] of specs) {
   if (!spec.page) continue;
   check(idSet.has(spec.page) && !online.has(spec.page), id + ': page ' + spec.page + ' is not a local game');
-  check(high.has(spec.page), id + ': page ' + spec.page + ' has no board of its own');
+  // An unscored game (Poké Gacha) may still feed a second board of its own (its weekly challenge).
+  check(high.has(spec.page) || UNSCORED_GAMES.includes(spec.page), id + ': page ' + spec.page + ' has no board of its own');
   check(!!rules[id], id + ': no score rule');
 }
 for (const id of [...native, ...online, ...FRESH_GAMES, ...UNSCORED_GAMES, ...PAYLOAD_SLUGS, ...Object.keys(META), ...Object.keys(DISCOVERY), ...Object.keys(PREVIEWS), ...Object.keys(rules).map(pageOf), ...[...specs.keys()].map(pageOf), ...challenges]) {
