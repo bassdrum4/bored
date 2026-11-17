@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 557,
+  "count": 558,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"886b8d8","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: the hatch plays the owner's egg-hatch frames","pr":200},
   {"sha":"5307032","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha weekly page: opens after 1-8, shows the risk milestones, feeds the board","pr":199},
   {"sha":"69b84df","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: the owner's pixel star for stage stars, with a gray palette swap"},
   {"sha":"bf1f43d","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: the weekly challenge page in Story"},
