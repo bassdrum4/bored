@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+10&display=swap">
 <style>
 /* Poké Gacha screens. One fixed internal resolution (640×384: a 40px tab bar
-   and a 640×344 stage), scaled by a whole number. 384 high so 2x (1280×768)
+   and a 640×344 stage), scaled by the biggest quarter step that fits, pixelated. 384 high so 2x (1280×768)
    fits the ~790px game area of the Google Sites embed. Rules every screen keeps:
    - one panel style (.panel), one list style (.rows) with one ▶ cursor
    - spacing on a 4px grid, 8px margins and gaps everywhere
@@ -81,15 +81,16 @@ canvas, img { image-rendering: pixelated; display: block }
 .art { image-rendering: pixelated; display: block; flex: none }
 .mini { display: block; flex: none; image-rendering: pixelated; background-repeat: no-repeat }
 
-/* Pull: the machine on the left (96-324), the vouchers and the menu in their own
-   column (332-548), the next machine beyond it, and the message box under all
-   three. The machine stands on a shelf at y 272, above the message box (280). */
-#counts { position: absolute; left: 332px; top: 8px; width: 216px; display: grid; grid-template-columns: 104px 104px; gap: 8px }
+/* Pull: an arrow in its own column (32-48), the machine (56-268), the vouchers
+   and the menu in their own column (276-492), the other arrow (500-516), the next
+   machine from 524, and the message box under all of them. Machines end at
+   y 272 with a closed base, above the message box (280). */
+#counts { position: absolute; left: 276px; top: 8px; width: 216px; display: grid; grid-template-columns: 104px 104px; gap: 8px }
 #counts .panel { position: static; height: 32px; display: flex; align-items: center; justify-content: space-between; padding: 4px 8px }
 /* The banner: the 40x30 mini sprite at 1x, inside the plate. */
 #banner { position: absolute; width: 40px; height: 30px; pointer-events: none }
 
-#menu { left: 332px; top: 88px; width: 216px; padding: 4px 8px }
+#menu { left: 276px; top: 88px; width: 216px; padding: 4px 8px }
 .hit { position: absolute; cursor: pointer }
 
 /* Eggs */
@@ -172,9 +173,9 @@ canvas, img { image-rendering: pixelated; display: block }
       <section id="scr-pull" class="screen">
         <div id="counts"></div>
         <div id="banner" class="mini" hidden></div>
-        <div class="hit" id="hit-left" style="left:0;top:8px;width:104px;height:264px" title="Previous machine"></div>
-        <div class="hit" id="hit-right" style="left:548px;top:8px;width:92px;height:264px" title="Next machine"></div>
-        <div class="hit" id="hit-machine" style="left:104px;top:14px;width:212px;height:258px" title="Open the voucher menu"></div>
+        <div class="hit" id="hit-left" style="left:0;top:6px;width:52px;height:266px" title="Previous machine"></div>
+        <div class="hit" id="hit-right" style="left:496px;top:6px;width:144px;height:266px" title="Next machine"></div>
+        <div class="hit" id="hit-machine" style="left:56px;top:6px;width:212px;height:266px" title="Open the voucher menu"></div>
         <div class="panel rows" id="menu" role="listbox"></div>
       </section>
       <section id="scr-eggs" class="screen" hidden>
@@ -356,13 +357,12 @@ function drawBackdrop() {
   const g = $("#sky").getContext("2d");
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.imageSmoothingEnabled = false;
-  // Ink down to the bottom of the tab bar, then sky lines on paper, lined up with the stage.
+  // One continuous scene: sky lines on paper over the whole window, the tab bar
+  // included, lined up with the stage so the stripes never jump.
   const top = VIEW.y + BAR;
-  g.fillStyle = C.ink; g.fillRect(0, 0, VIEW.w, top);
-  g.fillStyle = C.paper; g.fillRect(0, top, VIEW.w, VIEW.h - top);
+  g.fillStyle = C.paper; g.fillRect(0, 0, VIEW.w, VIEW.h);
   g.fillStyle = C.sky;
-  g.fillRect(0, top, VIEW.w, 4);
-  for (let y = top + 8; y < VIEW.h; y += 12) g.fillRect(0, y, VIEW.w, 4);
+  for (let y = top + 8 - Math.ceil((top + 8) / 12) * 12; y < VIEW.h; y += 12) g.fillRect(0, y, VIEW.w, 4);
 }
 /* ── The pull screen ──────────────────────────────────────────────────────
    The owner's gacha machine (106x129, shown at 2x) on the left, its
@@ -385,22 +385,30 @@ const OPTIONS = [
 ];
 let cursor = 0, menuOpen = true, slide = 0, shake = 0, message = null;
 
-// The machines, in internal pixels: 212x258 standing on the shelf at y 272.
-// The current one's left edge is at 104, the previous ends at 88, the next
-// starts at 560, past the menu column.
+// The machines, in internal pixels: 212x258 plus an 8px base, ending at y 272.
+// The current one's left edge is at 56, the previous ends at 24, the next starts
+// at 524; the arrows have their own columns with 8px of padding on each side.
 const MACHINE_PICS = Object.fromEntries(ORDER_M.map(id => { const img = new Image(); img.src = ART_DIR + "machine-" + id + ".png"; return [id, img]; }));
 const machinesLoaded = Promise.all(Object.values(MACHINE_PICS).map(img => img.decode().catch(() => {})));
-const M_W = 106 * ART, M_H = 129 * ART, SHELF = 272, M_Y = SHELF - M_H, M_AT = 104, M_PREV = -228, M_NEXT = 456;
+const M_W = 106 * ART, M_H = 129 * ART, M_BASE = 8, M_Y = 272 - M_BASE - M_H, M_AT = 56, M_PREV = -244, M_NEXT = 468;
 // On the machine (internal px from its top-left): the plate's clear area under
 // its emblem, and the timer pill on the body.
 const PLATE = { x: 58, y: 84, w: 96, h: 30 }, PILL = { x: 76, y: 154, w: 60, h: 20 };
 function drawMachine(g, left, id) {
   const pic = MACHINE_PICS[id];
-  if (pic.complete && pic.naturalWidth) g.drawImage(pic, left, M_Y, M_W, M_H);
+  if (!pic.complete || !pic.naturalWidth) return;
+  g.drawImage(pic, left, M_Y, M_W, M_H);
+  // The drawing stops at its bottom edge, so close it: two more rows of its own
+  // body, then its shade and its outline colour across the bottom, corners open.
+  const y = M_Y + M_H, last = pic.naturalHeight - 1;
+  g.drawImage(pic, 0, last, pic.naturalWidth, 1, left, y, M_W, 4);
+  g.drawImage(pic, 100, last, 1, 1, left + 10, y + 4, M_W - 20, 2);
+  g.drawImage(pic, 4, last, 1, 1, left + 10, y + 6, M_W - 20, 2);
+  g.drawImage(pic, 4, last, 1, 1, left + 8, y + 4, 2, 2); g.drawImage(pic, 4, last, 1, 1, left + M_W - 10, y + 4, 2, 2);
 }
 function arrow(g, x, y, dir) {
-  // A small triangle in ink with a paper edge, pointing left (-1) or right (1), in 2px steps.
-  for (let i = 0; i < 5; i++) {
+  // A 16px triangle in ink with a paper edge, pointing left (-1) or right (1), in 2px steps.
+  for (let i = 0; i < 8; i++) {
     const col = dir < 0 ? x + i * 2 : x - i * 2;
     g.fillStyle = C.paper; g.fillRect(col, y - i * 2 - 2, 2, i * 4 + 6);
     g.fillStyle = C.ink; g.fillRect(col, y - i * 2, 2, i * 4 + 2);
@@ -412,9 +420,6 @@ function drawScene() {
   g.setTransform(1, 0, 0, 1, VIEW.x, VIEW.y + BAR);
   g.imageSmoothingEnabled = false;
   const at = ORDER_M.indexOf(machine), mx = M_AT + slide;
-  // The shelf the machines stand on, across the whole window.
-  g.fillStyle = C.ink; g.fillRect(-VIEW.x, SHELF, VIEW.w, 2);
-  g.fillStyle = C.dim; g.fillRect(-VIEW.x, SHELF + 2, VIEW.w, 4);
   const sides = [[mx + M_PREV, ORDER_M[(at + 2) % 3]], [mx + M_NEXT, ORDER_M[(at + 1) % 3]]];
   for (const [left, id] of sides) drawMachine(g, left, id);
   // The current machine jiggles by whole machine pixels after a pull.
@@ -422,8 +427,8 @@ function drawScene() {
   drawMachine(g, mx + jiggle, machine);
   for (const [left, id] of sides) drawPlate(g, left, id, false);
   drawPlate(g, mx + jiggle, machine, true);
-  // Arrows to the neighbours, in the gaps beside the machine and the menu column.
-  arrow(g, 92, 150, -1); arrow(g, 556, 150, 1);
+  // Arrows to the neighbours, each in its own column (32-48 and 500-516).
+  arrow(g, 32, 140, -1); arrow(g, 514, 140, 1);
   // The banner rides on the plate as the machine slides.
   Object.assign($("#banner").style, { left: mx + jiggle + PLATE.x + 4 + "px", top: M_Y + PLATE.y + "px" });
 }
@@ -1234,13 +1239,14 @@ function go(id) {
   SCREENS[id][0]();
   $("#wrap").focus({ preventScroll: true });
 }
-// Whole-number scaling only: the biggest of 1x, 2x, 3x... that fits the window,
-// centered on a whole internal pixel. Below 640x384 (a phone) it shrinks to fit
-// instead. The scene canvas covers the whole window at the same scale.
+// The biggest scale that fits the window, in quarter steps (1, 1.25, 1.5 ... 2,
+// 2.25 ...), rendered pixelated, so a 1900x800 or larger embed fills its height
+// instead of stopping at a whole number. Below 640x384 (a phone) it shrinks to
+// fit exactly. The scene canvas covers the whole window at the same scale.
 function placeFrame() {
   const W = document.documentElement.clientWidth, H = document.documentElement.clientHeight;
   const fit = Math.min(W / FRAME_W, H / FRAME_H);
-  const k = fit >= 1 ? Math.floor(fit) : fit;
+  const k = fit >= 1 ? Math.floor(fit * 4) / 4 : fit;
   // The canvas in internal pixels, and the frame's corner on it.
   VIEW.w = Math.max(FRAME_W, Math.ceil(W / k)); VIEW.h = Math.max(FRAME_H, Math.ceil(H / k));
   VIEW.x = Math.floor((VIEW.w - FRAME_W) / 2); VIEW.y = Math.floor((VIEW.h - FRAME_H) / 2);
