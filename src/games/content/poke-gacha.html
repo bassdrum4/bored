@@ -5,37 +5,50 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Poké Gacha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+10&display=swap">
 <style>
-/* Poké Gacha screens. One fixed internal resolution (640×408: a 48px tab bar
-   and a 640×360 stage), scaled by a whole number. Rules every screen keeps:
+/* Poké Gacha screens. One fixed internal resolution (640×384: a 40px tab bar
+   and a 640×344 stage), scaled by a whole number. 384 high so 2x (1280×768)
+   fits the ~790px game area of the Google Sites embed. Rules every screen keeps:
    - one panel style (.panel), one list style (.rows) with one ▶ cursor
    - spacing on a 4px grid, 8px margins and gaps everywhere
-   - body text in Bored's own mono stack, 16px weight 600, numbers right-aligned;
-     headers in Silkscreen at exactly 24px (3x its 8px pixel grid)
+   - one pixel font for all text, Jersey 10 (OFL, in the spirit of PokéRogue's
+     text, not a copy of it): body at 20px and headers at 30px, 2x and 3x its
+     10px grid so it stays sharp; Bored's mono stack is the fallback. Numbers
+     right-aligned
    - the eight colors below and nothing else; egg tiers are fixed colors
    - every sprite at 1x, centered in a 96px cell (the largest sprite is 96px) */
 :root {
   --ink: #1c1b2c; --panel: #2c2a44; --red: #c8372f; --paper: #f4f1ff;
   --dim: #807c9a; --gold: #e3ad2b; --teal: #3f9e8a; --sky: #8fd3e8;
-  --body: 16px; --title: 24px;
+  --body: 20px; --title: 30px;
   --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+  --pixel: "Jersey 10", var(--mono);
 }
 * { margin: 0; padding: 0; box-sizing: border-box }
-body { background: var(--ink); display: grid; place-items: start center; min-height: 100vh; padding-top: 4px; overflow: hidden }
-#wrap { position: relative; overflow: hidden; outline: none; touch-action: manipulation; user-select: none }
-#frame { position: absolute; left: 0; top: 0; width: 640px; height: 408px; transform-origin: 0 0; background: var(--ink);
-         font: 600 var(--body)/20px var(--mono); color: var(--paper);
+/* The frame is scaled by the biggest whole number that fits and centered; the
+   scene canvas (#sky) covers the whole window at the same scale behind it, so
+   the backdrop and the neighbouring machines run on past the frame's edges. */
+html, body { height: 100% }
+body { background: var(--ink); overflow: hidden }
+#sky { position: fixed; left: 0; top: 0; transform-origin: 0 0 }
+#wrap { position: fixed; left: 0; top: 0; overflow: hidden; outline: none; touch-action: manipulation; user-select: none }
+#frame { position: absolute; left: 0; top: 0; width: 640px; height: 384px; transform-origin: 0 0;
+         font: 400 var(--body)/20px var(--pixel); color: var(--paper);
          font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0 }
 canvas, img { image-rendering: pixelated; display: block }
-#stage { position: absolute; left: 0; top: 48px; width: 640px; height: 360px; overflow: hidden }
-#scene { position: absolute; inset: 0; width: 640px; height: 360px }
+#stage { position: absolute; left: 0; top: 40px; width: 640px; height: 344px; overflow: hidden }
 
 .panel { position: absolute; background: var(--panel); border: 2px solid var(--red); outline: 2px solid var(--ink); padding: 8px }
-.title { font: 400 var(--title)/32px Silkscreen, var(--mono); margin-bottom: 4px }
+.title { font: 400 var(--title)/32px var(--pixel); margin-bottom: 4px }
 .head { margin-bottom: 4px }
 .num { color: var(--gold) }
-.title .count { font: 600 var(--body)/32px var(--mono) }
+.title .count { font: 400 var(--body)/32px var(--pixel) }
+/* If the pixel font cannot load, the mono fallback goes back to its own sizes (it is wider). */
+#frame.no-pixel { --body: 16px; --title: 24px; font-weight: 600 }
+/* Menu rows in columns: how many vouchers, then the number of pulls right-aligned. */
+.rows .c1 { display: inline-block; width: 36px }
+.rows .c2 { display: inline-block; width: 22px; text-align: right; margin-right: 6px }
 .dim { color: var(--dim) }
 .gold { color: var(--gold) }
 /* Lists scroll by whole 24px rows and never stop on a half-cut one. */
@@ -55,82 +68,94 @@ canvas, img { image-rendering: pixelated; display: block }
 .unseen { filter: brightness(0) }
 [hidden] { display: none !important }
 
-#tabs { position: absolute; left: 8px; right: 8px; top: 8px; height: 32px; display: flex; gap: 8px }
+#tabs { position: absolute; left: 8px; right: 8px; top: 4px; height: 32px; display: flex; gap: 8px }
 #tabs .panel { position: static; height: 32px; padding: 4px 12px; cursor: pointer }
 #tabs .panel.on { background: var(--red) }
 #tabs .purse { margin-left: auto; display: flex; align-items: center; gap: 8px; cursor: default }
 #msg { left: 8px; right: 8px; bottom: 8px; height: 56px; padding: 6px 12px; display: flex; gap: 8px; align-items: flex-start }
-#msg .eggs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px }
+#msg.with-eggs { align-items: center; padding-top: 0; padding-bottom: 0 }
+#msg.with-eggs > div { display: flex; gap: 12px; align-items: center }
+#msg .eggs { display: flex; gap: 12px; align-items: center }
+#msg .eggs span { display: flex; gap: 4px; align-items: center }
+/* Art PNGs, always at a whole-number scale. */
+.art { image-rendering: pixelated; display: block; flex: none }
+.mini { display: block; flex: none; image-rendering: pixelated; background-repeat: no-repeat }
 
-/* Pull */
-#counts { position: absolute; right: 8px; top: 8px; display: flex; gap: 8px }
-#counts .panel { position: static; width: 100px; height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 4px 8px }
-#plate { position: absolute; display: flex; align-items: center; justify-content: center; font: 400 var(--title)/32px Silkscreen, var(--mono);
-         color: var(--ink); pointer-events: none }
-#banner { position: absolute; width: 96px; height: 96px; pointer-events: none }
-#clock { position: absolute; color: var(--ink); background: var(--paper); border: 2px solid var(--ink); padding: 0 4px; pointer-events: none }
-#menu { right: 8px; top: 96px; width: 216px; padding: 8px }
+/* Pull: the machine on the left (96-324), the vouchers and the menu in their own
+   column (332-548), the next machine beyond it, and the message box under all
+   three. The machine stands on a shelf at y 272, above the message box (280). */
+#counts { position: absolute; left: 332px; top: 8px; width: 216px; display: grid; grid-template-columns: 104px 104px; gap: 8px }
+#counts .panel { position: static; height: 32px; display: flex; align-items: center; justify-content: space-between; padding: 4px 8px }
+/* The banner: the 40x30 mini sprite at 1x, inside the plate. */
+#banner { position: absolute; width: 40px; height: 30px; pointer-events: none }
+
+#menu { left: 332px; top: 88px; width: 216px; padding: 4px 8px }
 .hit { position: absolute; cursor: pointer }
 
 /* Eggs */
 /* Eggs: the selected egg on the left, every egg in a grid on the right. */
-#egg-pic { left: 8px; top: 8px; width: 232px; height: 120px; display: grid; place-items: center }
-#egg-name { left: 8px; top: 136px; width: 232px; height: 48px; padding: 4px 12px }
-#egg-day { left: 8px; top: 192px; width: 232px; height: 44px }
-#egg-from { left: 8px; top: 244px; width: 232px; height: 44px }
-#eggs-tray { left: 248px; top: 8px; width: 384px; height: 280px }
-#eggs-grid { display: grid; grid-template-columns: repeat(11, 32px); grid-auto-rows: 28px }
-#eggs-grid .egg { display: grid; place-items: center; position: relative; cursor: pointer }
-#eggs-grid .egg i { position: absolute; left: 8px; bottom: 0; height: 2px; background: var(--gold) }
+#egg-pic { left: 8px; top: 8px; width: 232px; height: 112px; padding: 4px; display: grid; place-items: center }
+#egg-name { left: 8px; top: 128px; width: 232px; height: 48px; padding: 4px 12px }
+#egg-day { left: 8px; top: 184px; width: 232px; height: 40px }
+#egg-from { left: 8px; top: 232px; width: 232px; height: 40px }
+#eggs-tray { left: 248px; top: 8px; width: 384px; height: 264px }
+/* 10 columns of 36x40 cells: the 31x33 egg at 1x over its wave bar. Six rows show; the tray scrolls by whole rows. */
+#eggs-grid { display: grid; grid-template-columns: repeat(10, 36px); grid-auto-rows: 40px; height: 240px; overflow-y: auto;
+             scrollbar-width: thin; scrollbar-color: var(--red) var(--panel); scroll-snap-type: y mandatory }
+#eggs-grid > * { scroll-snap-align: start }
+#eggs-grid .egg { display: grid; place-items: start center; padding-top: 2px; position: relative; cursor: pointer }
+#eggs-grid .egg i { position: absolute; left: 2px; bottom: 2px; height: 2px; background: var(--gold) }
 #eggs-grid .bracket { position: absolute; inset: 0; pointer-events: none }
 #eggs-grid .bracket b { position: absolute; width: 8px; height: 8px; border: 0 solid var(--red) }
 #eggs-grid .bracket b:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px }
 #eggs-grid .bracket b:nth-child(2) { right: 0; top: 0; border-width: 2px 2px 0 0 }
 #eggs-grid .bracket b:nth-child(3) { left: 0; bottom: 0; border-width: 0 0 2px 2px }
 #eggs-grid .bracket b:nth-child(4) { right: 0; bottom: 0; border-width: 0 2px 2px 0 }
-#hatch { left: 8px; top: 8px; width: 624px; height: 280px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 36px 1fr; gap: 0 12px }
+#hatch { left: 8px; top: 8px; width: 624px; height: 264px; padding: 4px 8px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 36px 1fr; gap: 0 12px }
 #hatch .title, #hatch .head { grid-column: 1 / -1 }
 #hatch.sum { grid-template-rows: 24px 1fr }
 #hatch .cell { width: 96px; height: 96px; background: var(--ink) }
 #hatch .cell.egg-phase { background: var(--panel) }
 #hatch-text div { min-height: 20px }
 #hatch .grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 96px); gap: 4px 4px; overflow: hidden }
-#hatch .grid .tag { height: 20px; text-align: center }
+#hatch .grid .tag { height: 16px; line-height: 16px; text-align: center }
 
 /* Dex */
-#dex-list { left: 8px; top: 8px; width: 248px; height: 280px; display: flex; flex-direction: column }
-#dex-rows { height: 216px }
-#dex-detail { left: 264px; top: 8px; width: 368px; height: 280px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 96px 1fr; gap: 8px 12px }
+#dex-list { left: 8px; top: 8px; width: 248px; height: 264px; display: flex; flex-direction: column }
+#dex-rows { height: 192px }
+/* Dex rows hold the 40x30 mini sprite at 1x, so they are 32px tall: 6 whole rows. */
+#dex-rows > div { height: 32px }
+#dex-detail { left: 264px; top: 8px; width: 368px; height: 264px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 96px 1fr; gap: 8px 12px }
 #dex-detail .cell { width: 96px; height: 96px; background: var(--ink) }
-#dex-acts { grid-column: 1 / -1; height: 144px }
+#dex-acts { grid-column: 1 / -1; height: 120px }
 
 /* Shop and quests share one layout */
-.left-panel { left: 8px; top: 8px; width: 400px; height: 280px; display: flex; flex-direction: column }
-.right-panel { left: 416px; top: 8px; width: 216px; height: 280px; display: flex; flex-direction: column; gap: 8px }
+.left-panel { left: 8px; top: 8px; width: 400px; height: 264px; display: flex; flex-direction: column }
+.right-panel { left: 416px; top: 8px; width: 216px; height: 264px; display: flex; flex-direction: column; gap: 8px }
 .right-panel .cell { width: 96px; height: 96px; background: var(--ink); align-self: center }
-/* Scrolling lists hold whole rows only: 9 × 24px. */
-.left-panel .rows, .right-panel .rows { height: 216px }
-#off { position: absolute; left: 8px; right: 8px; top: 56px; padding: 12px }
+/* Scrolling lists hold whole rows only: 8 × 24px. */
+.left-panel .rows, .right-panel .rows { height: 192px }
+#off { position: absolute; left: 8px; right: 8px; top: 48px; padding: 12px }
 
-/* Story and battles */
+/* Story and battles, on the 344px stage: HUD 4-36, field 40-280, deploy cards 284-336. */
 #tabs.locked .panel[data-tab] { color: var(--dim); cursor: default }
-#battle-hud { left: 8px; top: 4px; width: 624px; height: 36px; padding: 6px 12px; display: flex; gap: 16px; align-items: center; white-space: nowrap }
+#battle-hud { left: 8px; top: 4px; width: 624px; height: 32px; padding: 4px 12px; display: flex; gap: 16px; align-items: center; white-space: nowrap }
 #battle-hud .right { margin-left: auto }
-#field { position: absolute; left: 80px; top: 48px; width: 480px; height: 240px; outline: 2px solid var(--ink); cursor: pointer }
-#deploy { left: 8px; bottom: 8px; width: 624px; height: 56px; display: grid; grid-template-columns: repeat(8, 72px); gap: 4px; padding: 6px 8px }
+#field { position: absolute; left: 80px; top: 40px; width: 480px; height: 240px; outline: 2px solid var(--ink); cursor: pointer }
+#deploy { left: 8px; bottom: 8px; width: 624px; height: 52px; display: grid; grid-template-columns: repeat(8, 72px); gap: 4px; padding: 4px 8px }
 #deploy .card { height: 40px; background: var(--ink); padding: 0 4px; line-height: 20px; cursor: pointer; white-space: nowrap; overflow: hidden }
 #deploy .card.on { outline: 2px solid var(--paper); outline-offset: -2px }
 #deploy .card.off { color: var(--dim) }
-#battle-talk { left: 8px; bottom: 8px; width: 624px; height: 56px; padding: 6px 12px; cursor: pointer }
-#battle-result { left: 160px; top: 64px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
+#battle-talk { left: 8px; bottom: 8px; width: 624px; height: 52px; padding: 4px 12px; cursor: pointer }
+#battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
 </style>
 </head>
 <body>
+<canvas id="sky" width="640" height="384"></canvas>
 <div id="wrap" tabindex="0" aria-label="Poké Gacha. Arrow keys move, Enter picks, Backspace goes back, number keys switch screens.">
   <div id="frame">
     <div id="tabs"></div>
     <div id="stage">
-      <canvas id="scene" width="640" height="360"></canvas>
       <section id="scr-story" class="screen" hidden>
         <div class="panel left-panel" id="story-list-panel"><div class="title" id="story-title">CHAPTER</div><div class="rows scroll" id="story-list"></div></div>
         <div class="panel right-panel" id="story-info"></div>
@@ -146,12 +171,10 @@ canvas, img { image-rendering: pixelated; display: block }
       </section>
       <section id="scr-pull" class="screen">
         <div id="counts"></div>
-        <img id="banner" alt="" hidden>
-        <div id="plate"></div>
-        <div id="clock" class="num" hidden></div>
-        <div class="hit" id="hit-left" style="left:0;top:80px;width:80px;height:200px" title="Previous machine"></div>
-        <div class="hit" id="hit-right" style="left:432px;top:44px;width:208px;height:48px" title="Next machine"></div>
-        <div class="hit" id="hit-machine" style="left:208px;top:80px;width:176px;height:200px" title="Open the voucher menu"></div>
+        <div id="banner" class="mini" hidden></div>
+        <div class="hit" id="hit-left" style="left:0;top:8px;width:104px;height:264px" title="Previous machine"></div>
+        <div class="hit" id="hit-right" style="left:548px;top:8px;width:92px;height:264px" title="Next machine"></div>
+        <div class="hit" id="hit-machine" style="left:104px;top:14px;width:212px;height:258px" title="Open the voucher menu"></div>
         <div class="panel rows" id="menu" role="listbox"></div>
       </section>
       <section id="scr-eggs" class="screen" hidden>
@@ -198,8 +221,6 @@ const REASONS = { vouchers: "Not enough vouchers.", full: "Egg storage is full (
 
 /* ── The palette, and pixel art drawn at 2x from it ────────────────────── */
 const C = { ink: "#1c1b2c", panel: "#2c2a44", red: "#c8372f", paper: "#f4f1ff", dim: "#807c9a", gold: "#e3ad2b", teal: "#3f9e8a", sky: "#8fd3e8" };
-// Fixed egg tier colors everywhere: Common, Rare, Epic, Legendary (and the banner, a legendary).
-const TIER_COLOR = [C.paper, C.sky, C.gold, C.red, C.red];
 const TIER_NAME = ["Common", "Rare", "Epic", "Legendary", "Banner"];
 const ART = 2;
 // Darker and lighter shades of the eight colors, for the art only ([dark, base, light]).
@@ -208,8 +229,6 @@ const SHADE = {
   paper: ["#c9c4dc", C.paper, "#ffffff"], sky: ["#4f93b8", C.sky, "#d4f1f8"], gold: ["#a07514", C.gold, "#f6d77a"],
   red: ["#8f2621", C.red, "#f0857a"], teal: ["#256656", C.teal, "#7fcdb7"]
 };
-const TIER_SHADE = [SHADE.paper, SHADE.sky, SHADE.gold, SHADE.red, SHADE.red];
-const TIER_SPOT = [C.dim, SHADE.sky[0], SHADE.gold[0], SHADE.gold[2], SHADE.gold[2]];
 // A canvas of w×h art pixels, each ART internal pixels across.
 function pixelCanvas(w, h, draw) {
   const c = document.createElement("canvas");
@@ -220,72 +239,41 @@ function pixelCanvas(w, h, draw) {
   draw(g);
   return c;
 }
-function ellipse(g, cx, cy, rx, ry, color) {
-  g.fillStyle = color;
-  for (let y = -ry; y <= ry; y++) {
-    const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry))));
-    g.fillRect(cx - half, cy + y, half * 2 + 1, 1);
-  }
+/* The owner's art: eggs per tier (white Common, blue Rare, black Epic, purple
+   Legendary and the banner), the vouchers, the coin and the shard. Each PNG is
+   shown at a whole-number scale (scripts/gacha-art.py brings stretched uploads
+   back to their native size). */
+const ART_DIR = SPRITE_DIR.replace("pokedoku/sprites/", "poke-gacha/art/");
+const EGG_SIZE = [31, 33], COIN_SIZE = [17, 18], SHARD_SIZE = [17, 18], TICKET_SIZE = [21, 17];
+const EGG_ART = [0, 1, 2, 3, 3];
+function artImg(file, [w, h], scale = 1, alt = "") {
+  const img = new Image(w * scale, h * scale);
+  img.className = "art"; img.alt = alt; img.draggable = false;
+  img.src = ART_DIR + file;
+  return img;
 }
-function box(g, x, y, w, h, color, cut = 1) {
-  g.fillStyle = color;
-  g.fillRect(x + cut, y, w - cut * 2, h);
-  g.fillRect(x, y + cut, w, h - cut * 2);
-}
-// One egg drawing for everything: the dome, the icons and the big egg. Shadow
-// side bottom right, a highlight top left, and spots placed from `seed`.
-function shadedEgg(g, cx, cy, rx, ry, tier, seed = 1, outline = true) {
-  const [dark, base, light] = TIER_SHADE[tier];
-  if (outline) ellipse(g, cx, cy, rx + 1, ry + 1, C.ink);
-  const inside = (x, y) => (x * x) / ((rx + 0.5) * (rx + 0.5)) + (y * y) / ((ry + 0.5) * (ry + 0.5)) <= 1;
-  for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
-    if (!inside(x, y)) continue;
-    g.fillStyle = (x / rx) * 0.6 + (y / ry) * 0.8 > 0.55 ? dark : base;
-    g.fillRect(cx + x, cy + y, 1, 1);
-  }
-  let s = seed * 7919 + 13;
-  const rand = () => (s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296;
-  const count = rx >= 6 ? 5 : rx >= 3 ? 2 : 1;
-  for (let i = 0; i < count; i++) {
-    const a = rand() * Math.PI * 2, d = 0.3 + rand() * 0.35;
-    const sx = Math.round(Math.cos(a) * rx * d), sy = Math.round(Math.sin(a) * ry * d);
-    const sr = Math.max(0, Math.round(rx * (0.1 + rand() * 0.1)));
-    g.fillStyle = TIER_SPOT[tier];
-    for (let y = -sr; y <= sr; y++) for (let x = -sr; x <= sr; x++)
-      if (x * x + y * y <= sr * sr + sr && inside(sx + x, sy + y)) g.fillRect(cx + sx + x, cy + sy + y, 1, 1);
-  }
-  const hx = Math.round(cx - rx * 0.4), hy = Math.round(cy - ry * 0.45);
-  g.fillStyle = light;
-  g.fillRect(hx, hy, Math.max(1, Math.round(rx * 0.3)), Math.max(1, Math.round(ry * 0.3)));
-}
-// Vouchers: a ticket tilted up to the right, with a tear-off stub and an emblem per kind.
-const TICKET = { regular: SHADE.red, plus: SHADE.sky, premium: SHADE.teal, gold: SHADE.gold };
-const EMBLEM = {
-  regular: [[10, 5], [11, 5], [10, 6], [11, 6], [9, 5], [12, 6]],
-  plus: [[10, 4], [9, 5], [10, 5], [11, 5], [10, 6], [10, 7], [8, 5], [12, 5]],
-  premium: [[10, 3], [9, 4], [11, 4], [8, 5], [12, 5], [9, 6], [11, 6], [10, 7], [10, 5]],
-  gold: [[10, 3], [10, 4], [8, 5], [9, 5], [10, 5], [11, 5], [12, 5], [9, 6], [11, 6], [8, 7], [12, 7], [10, 6]]
-};
-function ticket(kind) {
-  const [dark, base, light] = TICKET[kind];
-  const off = row => Math.floor((11 - row) / 4);
-  return pixelCanvas(20, 12, g => {
-    g.fillStyle = C.ink;
-    for (let row = 0; row < 12; row++) g.fillRect(off(row) + (row === 0 || row === 11 ? 1 : 0), row, row === 0 || row === 11 ? 15 : 17, 1);
-    for (let row = 1; row < 11; row++) {
-      g.fillStyle = row <= 2 ? light : row >= 9 ? dark : base;
-      g.fillRect(off(row) + 1, row, 15, 1);
-      // The stub, lighter, behind a dashed tear line.
-      g.fillStyle = row <= 2 ? "#ffffff" : light;
-      g.fillRect(off(row) + 1, row, 3, 1);
-      if (row % 2) { g.fillStyle = C.ink; g.fillRect(off(row) + 4, row, 1, 1); }
-    }
-    g.fillStyle = C.paper;
-    for (const [x, row] of EMBLEM[kind]) g.fillRect(off(row) + x, row, 1, 1);
+const eggImg = (tier, scale = 1) => artImg("egg-" + EGG_ART[tier] + ".png", EGG_SIZE, scale, TIER_NAME[tier] + " egg");
+// The coin and the shard are the same size, both at 1x.
+const coin = () => artImg("coin.png", COIN_SIZE, 1, "coins");
+const shardIcon = () => artImg("shard.png", SHARD_SIZE, 1, "shards");
+// Vouchers, worst to best: green Regular, blue Plus, purple Premium, gold Gold.
+const ticket = (kind, scale = 1) => artImg("ticket-" + kind + ".png", TICKET_SIZE, scale, kind[0].toUpperCase() + kind.slice(1) + " voucher");
+// The same eggs for canvas drawing, redrawn once they arrive.
+const EGG_PICS = [0, 1, 2, 3].map(i => { const img = new Image(); img.src = ART_DIR + "egg-" + i + ".png"; return img; });
+/* Mini sprites: 40x30 icons in two atlases (scripts/gacha-art.py), 32 a row. */
+const MINI = [40, 30], MINI_COLS = 32, MINI_SHEET = [1280, 990];
+function miniStyle(node, num, look = "normal", scale = 1) {
+  const n = isSkin(look) ? (skinOf(look)?.species || num) : num;
+  const i = n - 1;
+  Object.assign(node.style, {
+    width: MINI[0] * scale + "px", height: MINI[1] * scale + "px",
+    backgroundImage: "url(" + ART_DIR + (look === "shiny" ? "icons-shiny.webp" : "icons.webp") + ")",
+    backgroundSize: MINI_SHEET[0] * scale + "px " + MINI_SHEET[1] * scale + "px",
+    backgroundPosition: -(i % MINI_COLS) * MINI[0] * scale + "px " + -Math.floor(i / MINI_COLS) * MINI[1] * scale + "px"
   });
+  return node;
 }
-function coin() { return pixelCanvas(8, 8, g => { ellipse(g, 3, 3, 3, 3, C.ink); ellipse(g, 3, 3, 2, 2, C.gold); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 3); }); }
-function shardIcon() { return pixelCanvas(8, 8, g => { g.fillStyle = C.ink; g.fillRect(2, 0, 4, 8); g.fillRect(0, 2, 8, 4); g.fillStyle = C.sky; g.fillRect(3, 1, 2, 6); g.fillRect(1, 3, 6, 2); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 2); }); }
+const mini = (num, look, dark = false) => { const d = miniStyle(el("span", "mini" + (dark ? " unseen" : "")), num, look); d.title = name(num); return d; };
 /* PIXEL_MAPS:BEGIN — hand-placed icons, one char per pixel. tests/poke-gacha.test.cjs checks the outlines. */
 const PIXEL_MAPS = {
  "candy": ["..kkkk..", ".k2211k.", "k22w110k", "k2w1w10k", "k21w110k", "k111100k", ".k1000k.", "..kkkk.."],
@@ -301,9 +289,6 @@ function mapCanvas(key, pal) {
   return pixelCanvas(map[0].length, map.length, g => map.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") { g.fillStyle = pal[row[x]]; g.fillRect(x, y, 1, 1); } }));
 }
 const candyIcon = () => mapCanvas("candy", { k: C.ink, 0: SHADE.red[0], 1: C.red, 2: SHADE.red[2], w: C.paper });
-function eggIcon(tier) {
-  return pixelCanvas(10, 12, g => shadedEgg(g, 5, 6, 3, 4, tier, tier + 1));
-}
 const check = done => done ? mapCanvas("check", { k: C.ink, 1: C.gold }) : mapCanvas("dot", { k: C.ink, 1: C.dim });
 // Stage stars: gold when earned, dim when not, three in a row.
 function starIcons(n) {
@@ -338,7 +323,9 @@ function rows(container, list, at, onPick) {
     const r = el("div", (i === at ? "at " : "") + (row.off ? "off" : ""));
     r.dataset.row = i;
     if (row.icon) { const ico = el("span", "ico"); ico.append(row.icon); r.append(ico); }
-    r.append(el("span", "grow", row.label));
+    const label = el("span", "grow");
+    label.append(row.label);
+    r.append(label);
     if (row.right !== undefined && row.right !== "") {
       const right = el("span", "right");
       for (const part of [].concat(row.right)) right.append(typeof part === "object" ? part : el("span", typeof part === "number" ? "num" : "", String(part)));
@@ -355,29 +342,37 @@ function say(text, extra) {
   col.append(el("span", "", text));
   if (extra) col.append(extra);
   $("#msg").replaceChildren(col);
+  $("#msg").classList.remove("with-eggs");
 }
-// Headers: the word in Silkscreen, any count beside it in the body font's number style
-// (Silkscreen's 0 and O look alike).
+// Headers: the word at header size, any count beside it at body size.
 function titled(node, word, count) { node.replaceChildren(word, ...(count === undefined ? [] : [" ", el("span", "num count", count)])); return node; }
 const HINT = "Arrows move · Enter picks · Backspace goes back · number keys switch screens.";
+// The scene canvas covers the window. VIEW is where the frame sits on it, in
+// internal pixels; the pull scene is drawn in internal pixels from the stage's
+// top-left corner.
+const FRAME_W = 640, FRAME_H = 384, BAR = 40;
+const VIEW = { w: FRAME_W, h: FRAME_H, x: 0, y: 0 };
 function drawBackdrop() {
-  const g = $("#scene").getContext("2d");
-  g.setTransform(ART, 0, 0, ART, 0, 0);
+  const g = $("#sky").getContext("2d");
+  g.setTransform(1, 0, 0, 1, 0, 0);
   g.imageSmoothingEnabled = false;
-  g.fillStyle = C.paper; g.fillRect(0, 0, 320, 180);
-  g.fillStyle = C.sky; for (let y = 4; y < 180; y += 6) g.fillRect(0, y, 320, 2);
-  g.fillRect(0, 0, 320, 2);
+  // Ink down to the bottom of the tab bar, then sky lines on paper, lined up with the stage.
+  const top = VIEW.y + BAR;
+  g.fillStyle = C.ink; g.fillRect(0, 0, VIEW.w, top);
+  g.fillStyle = C.paper; g.fillRect(0, top, VIEW.w, VIEW.h - top);
+  g.fillStyle = C.sky;
+  g.fillRect(0, top, VIEW.w, 4);
+  for (let y = top + 8; y < VIEW.h; y += 12) g.fillRect(0, y, VIEW.w, 4);
 }
-
 /* ── The pull screen ──────────────────────────────────────────────────────
-   One machine in the middle, its neighbours at the edges. Left and right
-   switch machines, up and down move the cursor, Enter pulls. The art is in
-   320×180 art pixels, drawn at 2x. */
+   The owner's gacha machine (106x129, shown at 2x) on the left, its
+   neighbours beside it. Left and right switch machines, up and down move the
+   cursor, Enter pulls. Each machine is the same drawing in its own colour. */
 const ORDER_M = ["move", "legend", "shiny"];
 const LOOK = {
-  move: { body: C.teal, shade: SHADE.teal, label: "Move UP!", about: "Move UP: rare skills roll twice as often." },
-  legend: { body: C.red, shade: SHADE.red, label: "UP!", about: "Legendary UP: today's banner legendary, 1 in 256. Eggs count double toward Legendary pity." },
-  shiny: { body: C.gold, shade: SHADE.gold, label: "Shiny UP!", about: "Shiny UP: shiny 1 in 64 instead of 1 in 128." }
+  move: { label: "Move UP!", about: "Move UP: rare skills roll twice as often." },
+  legend: { label: "Legendary UP", about: "Legendary UP: today's banner legendary, 1 in 256. Eggs count double toward Legendary pity." },
+  shiny: { label: "Shiny UP!", about: "Shiny UP: shiny 1 in 64 instead of 1 in 128." }
 };
 const OPTIONS = [
   { voucher: "regular", count: 1, times: "x1", label: "1 Pull", about: "1 Regular: 1 egg." },
@@ -388,73 +383,115 @@ const OPTIONS = [
   { buy: true, times: "100", label: "Buy 1", about: "Buy 1 Regular voucher for 100 coins." },
   { cancel: true, times: "", label: "Cancel", about: "" }
 ];
-let cursor = 0, menuOpen = true, slide = 0, crank = 0, message = null;
+let cursor = 0, menuOpen = true, slide = 0, shake = 0, message = null;
 
-// A fixed handful of eggs in each dome, so a machine always looks the same.
-function domeEggs(seed) {
-  let s = seed;
-  const rand = () => (s = (s * 1103515245 + 12345) >>> 0) / 4294967296;
-  const eggs = [];
-  for (let row = 0; row < 4; row++) for (let i = 0; i < 6; i++)
-    eggs.push({ x: 8 + i * 18 + (row % 2) * 9 + Math.floor(rand() * 4), y: 18 + row * 12 + Math.floor(rand() * 3), tier: [0, 0, 0, 1, 1, 2, 3][Math.floor(rand() * 7)], r: 8 + Math.floor(rand() * 3) });
-  return eggs;
+// The machines, in internal pixels: 212x258 standing on the shelf at y 272.
+// The current one's left edge is at 104, the previous ends at 88, the next
+// starts at 560, past the menu column.
+const MACHINE_PICS = Object.fromEntries(ORDER_M.map(id => { const img = new Image(); img.src = ART_DIR + "machine-" + id + ".png"; return [id, img]; }));
+const machinesLoaded = Promise.all(Object.values(MACHINE_PICS).map(img => img.decode().catch(() => {})));
+const M_W = 106 * ART, M_H = 129 * ART, SHELF = 272, M_Y = SHELF - M_H, M_AT = 104, M_PREV = -228, M_NEXT = 456;
+// On the machine (internal px from its top-left): the plate's clear area under
+// its emblem, and the timer pill on the body.
+const PLATE = { x: 58, y: 84, w: 96, h: 30 }, PILL = { x: 76, y: 154, w: 60, h: 20 };
+function drawMachine(g, left, id) {
+  const pic = MACHINE_PICS[id];
+  if (pic.complete && pic.naturalWidth) g.drawImage(pic, left, M_Y, M_W, M_H);
 }
-const DOMES = { move: domeEggs(3), legend: domeEggs(11), shiny: domeEggs(29) };
-function drawMachine(g, cx, id, front) {
-  const body = LOOK[id].body, [dark, , light] = LOOK[id].shade, x = cx - 56;
-  // Cap and rim.
-  box(g, x + 4, 22, 104, 16, C.ink); g.fillStyle = body; g.fillRect(x + 5, 23, 102, 14);
-  g.fillStyle = light; g.fillRect(x + 7, 24, 98, 3);
-  g.fillStyle = dark; g.fillRect(x + 5, 32, 102, 5);
-  g.fillStyle = C.ink; g.fillRect(x + 6, 34, 100, 1);
-  box(g, x - 1, 37, 114, 9, C.ink); g.fillStyle = C.paper; g.fillRect(x, 38, 112, 7); g.fillStyle = C.dim; g.fillRect(x + 1, 43, 110, 1);
-  // Dome of eggs behind glass.
-  g.fillStyle = C.ink; g.fillRect(x + 5, 45, 102, 58);
-  g.save(); g.beginPath(); g.rect(x + 6, 45, 100, 57); g.clip();
-  g.fillStyle = SHADE.sky[0]; g.fillRect(x + 6, 45, 100, 57);
-  DOMES[id].forEach((egg, i) => shadedEgg(g, x + egg.x, 45 + egg.y, egg.r - 1, egg.r + 1, egg.tier, i + 1));
-  // Glass: two light streaks down the left side.
-  g.fillStyle = SHADE.sky[2]; g.fillRect(x + 11, 47, 3, 50); g.fillRect(x + 16, 47, 1, 50);
-  g.restore();
-  // Name plate in front of the dome.
-  box(g, x + 16, 70, 80, 26, C.ink, 2); box(g, x + 17, 71, 78, 24, C.paper, 2);
-  g.fillStyle = C.dim; g.fillRect(x + 18, 93, 76, 1);
-  // Lower rim and body.
-  box(g, x - 1, 101, 114, 9, C.ink); g.fillStyle = C.paper; g.fillRect(x, 102, 112, 7); g.fillStyle = C.dim; g.fillRect(x + 1, 107, 110, 1);
-  g.fillStyle = C.ink; g.fillRect(x + 4, 110, 104, 70);
-  g.fillStyle = body; g.fillRect(x + 5, 110, 102, 70);
-  // Body shading: a dark side on the left and under the rim, a light edge on the right.
-  g.fillStyle = dark; g.fillRect(x + 5, 110, 8, 70); g.fillRect(x + 5, 110, 102, 3);
-  g.fillStyle = light; g.fillRect(x + 99, 113, 4, 60);
-  g.fillStyle = C.ink; g.fillRect(x + 5, 110, 102, 1);
-  // Chute, where the egg comes out.
-  box(g, x + 13, 118, 30, 26, C.ink, 3); box(g, x + 15, 120, 26, 22, C.panel, 3); g.fillStyle = C.dim; g.fillRect(x + 19, 122, 10, 2);
-  // Coin slot.
-  g.fillStyle = C.ink; g.fillRect(x + 50, 122, 26, 4);
-  // Crank: a wheel with a grip that turns after a pull.
-  ellipse(g, x + 93, 120, 11, 11, C.ink); ellipse(g, x + 93, 120, 10, 10, C.paper); ellipse(g, x + 93, 120, 6, 6, C.dim); ellipse(g, x + 93, 120, 5, 5, C.paper);
-  if (front) {
-    const a = crank * Math.PI;
-    g.fillStyle = C.ink;
-    for (const off of [0, Math.PI]) g.fillRect(Math.round(x + 93 + Math.cos(a + off) * 7) - 1, Math.round(120 + Math.sin(a + off) * 7) - 1, 3, 3);
-    g.fillRect(x + 92, 119, 3, 3);
+function arrow(g, x, y, dir) {
+  // A small triangle in ink with a paper edge, pointing left (-1) or right (1), in 2px steps.
+  for (let i = 0; i < 5; i++) {
+    const col = dir < 0 ? x + i * 2 : x - i * 2;
+    g.fillStyle = C.paper; g.fillRect(col, y - i * 2 - 2, 2, i * 4 + 6);
+    g.fillStyle = C.ink; g.fillRect(col, y - i * 2, 2, i * 4 + 2);
   }
 }
 function drawScene() {
   drawBackdrop();
-  const g = $("#scene").getContext("2d");
-  const at = ORDER_M.indexOf(machine), cx = 148 + slide;
-  drawMachine(g, cx - 180, ORDER_M[(at + 2) % 3], false);
-  drawMachine(g, cx + 180, ORDER_M[(at + 1) % 3], false);
-  drawMachine(g, cx, machine, true);
-  // Arrows to the neighbours.
-  g.fillStyle = C.ink;
-  for (let i = 0; i < 6; i++) { g.fillRect(30 + i, 72 - i, 1, i * 2 + 1); g.fillRect(250 - i, 32 - i, 1, i * 2 + 1); }
-  // The words and the banner follow the machine as it slides (art px × 2).
-  const left = (cx - 56) * ART;
-  Object.assign($("#plate").style, { left: left + 34 + "px", top: "142px", width: "156px", height: "42px" });
-  Object.assign($("#banner").style, { left: left + 64 + "px", top: "44px" });
-  Object.assign($("#clock").style, { left: left + 104 + "px", top: "264px" });
+  const g = $("#sky").getContext("2d");
+  g.setTransform(1, 0, 0, 1, VIEW.x, VIEW.y + BAR);
+  g.imageSmoothingEnabled = false;
+  const at = ORDER_M.indexOf(machine), mx = M_AT + slide;
+  // The shelf the machines stand on, across the whole window.
+  g.fillStyle = C.ink; g.fillRect(-VIEW.x, SHELF, VIEW.w, 2);
+  g.fillStyle = C.dim; g.fillRect(-VIEW.x, SHELF + 2, VIEW.w, 4);
+  const sides = [[mx + M_PREV, ORDER_M[(at + 2) % 3]], [mx + M_NEXT, ORDER_M[(at + 1) % 3]]];
+  for (const [left, id] of sides) drawMachine(g, left, id);
+  // The current machine jiggles by whole machine pixels after a pull.
+  const jiggle = Math.round(Math.sin(shake * Math.PI * 6) * (1 - shake) * 2) * ART;
+  drawMachine(g, mx + jiggle, machine);
+  for (const [left, id] of sides) drawPlate(g, left, id, false);
+  drawPlate(g, mx + jiggle, machine, true);
+  // Arrows to the neighbours, in the gaps beside the machine and the menu column.
+  arrow(g, 92, 150, -1); arrow(g, 556, 150, 1);
+  // The banner rides on the plate as the machine slides.
+  Object.assign($("#banner").style, { left: mx + jiggle + PLATE.x + 4 + "px", top: M_Y + PLATE.y + "px" });
+}
+/* Words on the machines, in hand-placed pixel letters on the machine's own grid
+   (one letter pixel is one machine pixel, 2 internal px). Letters are 8 rows to
+   the baseline, with 2 more below for "y"; digits are 3x5 for the timer pill. */
+const GLYPHS = {
+  M: ["#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#", "#...#"],
+  o: ["....", "....", ".##.", "#..#", "#..#", "#..#", "#..#", ".##."],
+  v: ["....", "....", "#..#", "#..#", "#..#", "#..#", ".##.", ".##."],
+  e: ["....", "....", ".##.", "#..#", "####", "#...", "#..#", ".##."],
+  U: ["#..#", "#..#", "#..#", "#..#", "#..#", "#..#", "#..#", ".##."],
+  P: ["###.", "#..#", "#..#", "#..#", "###.", "#...", "#...", "#..."],
+  S: [".###", "#...", "#...", ".##.", "...#", "...#", "...#", "###."],
+  h: ["#...", "#...", "###.", "#..#", "#..#", "#..#", "#..#", "#..#"],
+  i: ["#", ".", "#", "#", "#", "#", "#", "#"],
+  n: ["....", "....", "###.", "#..#", "#..#", "#..#", "#..#", "#..#"],
+  y: ["....", "....", "#..#", "#..#", "#..#", "#..#", "#..#", ".###", "...#", "###."],
+  "!": ["#", "#", "#", "#", "#", "#", ".", "#"],
+  " ": ["..", "..", "..", "..", "..", "..", "..", ".."]
+};
+const DIGITS = {
+  0: ["###", "#.#", "#.#", "#.#", "###"], 1: [".#.", "##.", ".#.", ".#.", "###"], 2: ["###", "..#", "###", "#..", "###"],
+  3: ["###", "..#", ".##", "..#", "###"], 4: ["#.#", "#.#", "###", "..#", "..#"], 5: ["###", "#..", "###", "..#", "###"],
+  6: ["###", "#..", "###", "#.#", "###"], 7: ["###", "..#", "..#", ".#.", ".#."], 8: ["###", "#.#", "###", "#.#", "###"],
+  9: ["###", "#.#", "###", "..#", "###"], ":": [".", "#", ".", "#", "."]
+};
+// Plate emblems, 7x7, our own: a disc for Move UP and a sparkle for Shiny UP
+// (Legendary UP's crown is part of its drawing). a = dark, b = light.
+const PLATE_EMBLEM = {
+  move: { colors: { a: "#737f95", b: "#a5acb9" }, map: ["..aaa..", ".abbba.", "abbabba", "abaaaba", "abbabba", ".abbba.", "..aaa.."] },
+  shiny: { colors: { a: SHADE.gold[0], b: C.gold }, map: ["...a...", "...a...", "..aba..", "aabbbaa", "..aba..", "...a...", "...a..."] }
+};
+const PLATE_INK = "#444242";
+const textWidth = (text, set, gap = 1) => [...text].reduce((w, ch) => w + set[ch][0].length + gap, -gap);
+function pixelText(g, text, set, x, y, color, gap = 1) {
+  g.fillStyle = color;
+  for (const ch of text) {
+    const rows = set[ch];
+    rows.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] === "#") g.fillRect((x + c) * ART, (y + r) * ART, ART, ART); });
+    x += rows[0].length + gap;
+  }
+}
+// The mini sprite sheet, for the banner on a Legendary UP machine at the side.
+const ICON_SHEET = new Image();
+ICON_SHEET.src = ART_DIR + "icons.webp";
+ICON_SHEET.onload = () => { if (S && tab === "pull" && !hatching) drawScene(); };
+// One machine's plate and pill, in machine pixels from its top-left corner.
+function drawPlate(g, left, id, front) {
+  g.save();
+  g.translate(left, M_Y);
+  const emblem = PLATE_EMBLEM[id];
+  if (emblem) emblem.map.forEach((row, r) => { for (let c = 0; c < 7; c++) if (row[c] !== ".") { g.fillStyle = emblem.colors[row[c]]; g.fillRect((50 + c) * ART, (35 + r) * ART, ART, ART); } });
+  if (id === "legend") {
+    // "UP!" beside the banner sprite (the front machine's is the #banner element).
+    if (!front && S && ICON_SHEET.complete && ICON_SHEET.naturalWidth) {
+      const i = S.banner - 1;
+      g.drawImage(ICON_SHEET, (i % MINI_COLS) * MINI[0], Math.floor(i / MINI_COLS) * MINI[1], MINI[0], MINI[1], PLATE.x + 4, PLATE.y, MINI[0], MINI[1]);
+    }
+    pixelText(g, "UP!", GLYPHS, 58, 46, PLATE_INK);
+    // The time until the banner changes, in the pill.
+    const time = untilMidnight();
+    pixelText(g, time, DIGITS, Math.round(53 - textWidth(time, DIGITS) / 2), 79, PLATE_INK);
+  } else {
+    const label = LOOK[id].label;
+    pixelText(g, label, GLYPHS, Math.round(53 - textWidth(label, GLYPHS) / 2), 45, PLATE_INK);
+  }
+  g.restore();
 }
 function untilMidnight() {
   // The banner changes at midnight in Detroit, with the daily seed.
@@ -464,6 +501,12 @@ function untilMidnight() {
   const two = n => String(n).padStart(2, "0");
   return two(Math.floor(left / 3600)) + ":" + two(Math.floor(left / 60) % 60) + ":" + two(left % 60);
 }
+// "x1   1 Pull" / "x10 10 Pulls": the count, then the number of pulls right-aligned.
+function menuLine(o) {
+  const line = el("span"), [n, ...rest] = o.label.split(" "), counted = /^\d+$/.test(n);
+  line.append(el("span", "c1", o.times), counted ? el("span", "c2", n) : "", counted ? rest.join(" ") : o.label);
+  return line;
+}
 function haveFor(option) {
   if (option.buy) return S.balance.coins >= 100;
   if (option.cancel) return true;
@@ -471,32 +514,28 @@ function haveFor(option) {
 }
 function updateScene() {
   if (!S) return;
-  $("#counts").replaceChildren(...["gold", "premium", "plus", "regular"].map(kind => {
+  $("#counts").replaceChildren(...["regular", "plus", "premium", "gold"].map(kind => {
     const b = el("div", "panel");
     b.append(el("span", "num", S.balance[kind]), ticket(kind));
     b.title = kind[0].toUpperCase() + kind.slice(1) + " vouchers";
     return b;
   }));
   const legend = machine === "legend";
-  $("#plate").textContent = LOOK[machine].label;
+  $("#hit-machine").title = LOOK[machine].label + ": open the voucher menu";
   $("#banner").hidden = !legend;
-  if (legend) {
-    const img = $("#banner");
-    // 1x like every sprite, standing on the bottom of its 96px cell.
-    img.onload = () => { img.width = img.naturalWidth; img.height = img.naturalHeight;
-      img.style.marginLeft = Math.floor((96 - img.width) / 2) + "px"; img.style.marginTop = (96 - img.height) + "px"; };
-    if (!img.src.endsWith("/" + S.banner + ".png")) img.src = spriteUrl(S.banner, "normal");
-    img.alt = name(S.banner);
-  }
-  $("#clock").hidden = !legend;
-  if (legend) { $("#clock").textContent = untilMidnight(); $("#clock").title = "Until the banner changes"; }
+  // Today's banner legendary: its mini sprite at exactly 2x, filling the machine's window.
+  if (legend) { miniStyle($("#banner"), S.banner, "normal", 1); $("#banner").title = name(S.banner); }
   $("#menu").hidden = !menuOpen;
-  rows($("#menu"), OPTIONS.map(o => ({ icon: o.cancel ? null : o.buy ? coin() : ticket(o.voucher), label: o.label,
-    right: o.times ? (o.buy ? 100 : o.times) : "", off: !haveFor(o) })), cursor, (i, click) => click ? choose(i) : null);
+  // Each row, as on the machine screens it follows: the voucher, how many it spends, what it buys.
+  rows($("#menu"), OPTIONS.map(o => ({ icon: o.cancel ? null : o.buy ? coin() : ticket(o.voucher),
+    label: o.cancel ? o.label : menuLine(o), off: !haveFor(o) })), cursor, (i, click) => click ? choose(i) : null);
   if (message && message.eggs) {
-    const eggs = el("div", "eggs");
-    eggs.append(...message.eggs.map(e => eggIcon(e.tier)));
+    // One egg per tier pulled, rarest first, each at 1x with its count.
+    const eggs = el("div", "eggs"), counts = [0, 0, 0, 0, 0];
+    for (const e of message.eggs) counts[e.tier]++;
+    for (let t = 4; t >= 0; t--) if (counts[t]) { const g = el("span"); g.title = TIER_NAME[t]; g.append(eggImg(t), el("span", "num", "x" + counts[t])); eggs.append(g); }
     say(message.text, eggs);
+    $("#msg").classList.add("with-eggs");
   } else {
     const option = OPTIONS[cursor];
     const about = LOOK[machine].about + (machine === "shiny" && skins().length ? " The only machine that rolls SP skins (1 in 200)." : "");
@@ -505,16 +544,11 @@ function updateScene() {
   }
   drawScene();
 }
-function tierSummary(eggs) {
-  const counts = [0, 0, 0, 0, 0];
-  for (const e of eggs) counts[e.tier]++;
-  return counts.map((n, t) => n ? n + " " + TIER_NAME[t] : "").filter(Boolean).reverse().join(", ");
-}
 function switchMachine(step) {
   machine = pref.machine = ORDER_M[(ORDER_M.indexOf(machine) + step + 3) % 3];
   keep();
   message = null;
-  const from = step * 60, start = performance.now();
+  const from = step * 120, start = performance.now();
   const tick = now => {
     const t = Math.min(1, (now - start) / 160);
     slide = Math.round(from * (1 - t));
@@ -529,9 +563,9 @@ function turnCrank() {
   const start = performance.now();
   const tick = now => {
     const t = Math.min(1, (now - start) / 420);
-    crank = t * 2;
+    shake = t;
     if (tab === "pull") drawScene();
-    if (t < 1) requestAnimationFrame(tick); else crank = 0;
+    if (t < 1) requestAnimationFrame(tick); else shake = 0;
   };
   requestAnimationFrame(tick);
 }
@@ -545,7 +579,7 @@ function choose(i) {
     message = { text: r.ok ? "Bought 1 Regular for 100 coins." : REASONS[r.reason] || "Not now." };
   } else {
     const r = G.pull({ voucher: option.voucher, count: option.count, machine });
-    if (r.ok) { turnCrank(); message = { text: r.eggs.length + (r.eggs.length === 1 ? " egg: " : " eggs: ") + tierSummary(r.eggs) + ".", eggs: r.eggs }; }
+    if (r.ok) { turnCrank(); message = { text: r.eggs.length + (r.eggs.length === 1 ? " egg:" : " eggs:"), eggs: r.eggs }; }
     else message = { text: REASONS[r.reason] || "Not now." };
   }
   refreshTop(); updateScene();
@@ -583,16 +617,19 @@ function eggsUpdate() {
   $("#eggs-grid").replaceChildren(...S.eggs.map((egg, i) => {
     const cell = el("div", "egg");
     cell.dataset.egg = i;
-    cell.append(eggIcon(egg.tier));
-    const bar = el("i"); bar.style.width = Math.round(8 * egg.progress / egg.need) * 2 + "px";
+    cell.append(eggImg(egg.tier));
+    const bar = el("i"); bar.style.width = Math.round(16 * egg.progress / egg.need) * 2 + "px";
     cell.append(bar);
     if (i === eggAt) { const br = el("div", "bracket"); br.append(el("b"), el("b"), el("b"), el("b")); cell.append(br); }
     return cell;
   }));
   if (!S.eggs.length) $("#eggs-grid").append(el("p", "dim", "No eggs yet."));
+  const at = $("#eggs-grid").children[eggAt];
+  if (at && S.eggs.length) at.scrollIntoView({ block: "nearest" });
   $("#eggs-grid").onclick = e => { const c = e.target.closest("[data-egg]"); if (!c) return; if (Number(c.dataset.egg) === eggAt) startHatch(); else { eggAt = Number(c.dataset.egg); eggsUpdate(); } };
   const egg = S.eggs[eggAt];
-  $("#egg-pic").replaceChildren(egg ? bigEgg(egg.tier, 0, false) : el("span", "dim", "No eggs"));
+  // The selected egg at 3x (93x99) in its 100px-high panel.
+  $("#egg-pic").replaceChildren(egg ? eggImg(egg.tier, 3) : el("span", "dim", "No eggs"));
   titled($("#egg-name"), egg ? TIER_NAME[egg.tier].toUpperCase() + " EGG" : "EGGS", egg ? undefined : "0/" + G.maxEggs);
   $("#egg-day").replaceChildren(el("span", "", egg && egg.day ? egg.day + " " + weekday(egg.day) : "—"));
   const from = egg ? G.machines[egg.machine] + (egg.banner ? ": " + name(egg.banner) : "") : "Pull some on the Pull tab";
@@ -603,7 +640,7 @@ function eggsUpdate() {
 }
 function eggsKey(e) {
   const k = e.key, n = S.eggs.length;
-  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -11, ArrowDown: 11 }[k];
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -10, ArrowDown: 10 }[k];
   if (step) { e.preventDefault(); if (n) { eggAt = Math.max(0, Math.min(n - 1, eggAt + step)); eggsUpdate(); } }
   else if (k === "Enter" || k === " ") { e.preventDefault(); startHatch(); }
   else if (k === "Backspace") { e.preventDefault(); go("pull"); }
@@ -617,17 +654,18 @@ function startHatch() {
   for (const id of EGG_SHOWN) $("#" + id).hidden = true;
   showHatch();
 }
-// The big egg: 24×24 art pixels at 4x fills the 96px cell.
+// The hatching egg: the owner's egg at 2x (62x66) standing in the 96px cell,
+// on a hard-edged shadow. It wobbles by whole art pixels and cracks at the end.
 function bigEgg(tier, wobble, crack) {
   const c = document.createElement("canvas");
   c.width = c.height = 96; c.style.width = c.style.height = "96px";
   const g = c.getContext("2d");
-  g.scale(4, 4);
-  const cx = 12 + wobble;
-  // A hard-edged shadow on the ground, then the egg.
-  g.fillStyle = C.ink; g.fillRect(cx - 9, 21, 15, 2); g.fillRect(cx - 7, 23, 11, 1);
-  shadedEgg(g, cx, 11, 7, 9, tier, 5);
-  if (crack) { g.fillStyle = C.ink; for (let i = -6; i <= 6; i += 2) g.fillRect(cx + i, 10 + (i % 4 ? 1 : -1), 2, 1); }
+  g.imageSmoothingEnabled = false;
+  const x = 17 + wobble * 2, y = 20;
+  g.fillStyle = C.ink; g.fillRect(x + 6, 86, 50, 4); g.fillRect(x + 12, 90, 38, 2);
+  const pic = EGG_PICS[EGG_ART[tier]];
+  if (pic.complete && pic.naturalWidth) g.drawImage(pic, x, y, EGG_SIZE[0] * 2, EGG_SIZE[1] * 2);
+  if (crack) { g.fillStyle = C.ink; for (let i = -12; i <= 12; i += 4) g.fillRect(x + 31 + i, 50 + (i % 8 ? 2 : -2), 4, 2); }
   return c;
 }
 const hatchLook = x => x.sp ? x.sp : x.shiny ? "shiny" : "normal";
@@ -753,7 +791,9 @@ function dexUpdate() {
     return say("Nothing matches " + view + " Press F, T or S to change it.");
   }
   if (dexAt >= list.length) dexAt = list.length - 1;
-  rows($("#dex-rows"), list.map(num => ({ label: String(num).padStart(4, "0") + " " + name(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
+  // Each row carries the line's mini sprite at 1x, dark until it is caught.
+  rows($("#dex-rows"), list.map(num => ({ icon: owned.has(num) ? mini(tipOf(num), S.lines[num].look) : mini(num, "normal", true),
+    label: String(num).padStart(4, "0") + " " + name(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
     dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); });
   const line = list[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
   const shown = l && isSkin(l.look) && skinOf(l.look) ? skinOf(l.look).species : tip;
@@ -820,7 +860,7 @@ function shopUpdate() {
   const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins");
   if (items.length > 1) have.append(" · ", el("span", "num", S.balance.shards), " shards");
   $("#shop-preview").replaceChildren(el("div", "title", it.kind === "sp" ? "PREVIEW" : "VOUCHER"),
-    cellWith(it.kind === "sp" ? sprite(it.skin.species, it.skin.id) : ticket("regular")), el("div", "", it.kind === "sp" ? it.skin.name : "1 Regular = 1 egg"), have);
+    cellWith(it.kind === "sp" ? sprite(it.skin.species, it.skin.id) : ticket("regular", 2)), el("div", "", it.kind === "sp" ? it.skin.name : "1 Regular = 1 egg"), have);
   say(it.about);
 }
 function buy(it) {
@@ -1194,18 +1234,31 @@ function go(id) {
   SCREENS[id][0]();
   $("#wrap").focus({ preventScroll: true });
 }
-// Whole-number scaling only. Below 640px wide (a phone) the frame shrinks to fit instead.
+// Whole-number scaling only: the biggest of 1x, 2x, 3x... that fits the window,
+// centered on a whole internal pixel. Below 640x384 (a phone) it shrinks to fit
+// instead. The scene canvas covers the whole window at the same scale.
 function placeFrame() {
-  const w = document.documentElement.clientWidth - 8, h = window.innerHeight - 8;
-  const fit = Math.min(w / 640, h / 408);
+  const W = document.documentElement.clientWidth, H = document.documentElement.clientHeight;
+  const fit = Math.min(W / FRAME_W, H / FRAME_H);
   const k = fit >= 1 ? Math.floor(fit) : fit;
-  $("#wrap").style.width = Math.floor(640 * k) + "px";
-  $("#wrap").style.height = Math.floor(408 * k) + "px";
+  // The canvas in internal pixels, and the frame's corner on it.
+  VIEW.w = Math.max(FRAME_W, Math.ceil(W / k)); VIEW.h = Math.max(FRAME_H, Math.ceil(H / k));
+  VIEW.x = Math.floor((VIEW.w - FRAME_W) / 2); VIEW.y = Math.floor((VIEW.h - FRAME_H) / 2);
+  const sky = $("#sky");
+  if (sky.width !== VIEW.w || sky.height !== VIEW.h) { sky.width = VIEW.w; sky.height = VIEW.h; }
+  sky.style.width = VIEW.w + "px"; sky.style.height = VIEW.h + "px";
+  sky.style.transform = "scale(" + k + ")";
+  const wrap = $("#wrap");
+  Object.assign(wrap.style, { left: VIEW.x * k + "px", top: VIEW.y * k + "px", width: Math.floor(FRAME_W * k) + "px", height: Math.floor(FRAME_H * k) + "px" });
   $("#frame").style.transform = "scale(" + k + ")";
+  if (S && tab === "pull" && !hatching) drawScene(); else drawBackdrop();
 }
-
 window.addEventListener("resize", placeFrame);
+try { document.fonts.load('20px "Jersey 10"').then(found => { if (!found.length) $("#frame").classList.add("no-pixel"); }, () => $("#frame").classList.add("no-pixel")); }
+catch { $("#frame").classList.add("no-pixel"); }
 placeFrame();
+// The eggs in the domes and in the hatching egg are drawn once their art arrives.
+machinesLoaded.then(() => { if (S && tab === "pull") drawScene(); });
 if (!G) {
   drawBackdrop();
   for (const [sid] of TABS) $("#scr-" + sid).hidden = true;
@@ -1232,7 +1285,8 @@ if (!G) {
   $("#hit-right").onclick = () => switchMachine(1);
   $("#hit-machine").onclick = () => { menuOpen = true; message = null; updateScene(); };
   $("#hatch").onclick = () => hatching && hatchKey({ key: "Enter", preventDefault() {} });
-  setInterval(() => { if (tab === "pull" && machine === "legend" && !$("#clock").hidden) $("#clock").textContent = untilMidnight(); }, 1000);
+  // The Legendary UP timer is on screen whichever machine is in front.
+  setInterval(() => { if (tab === "pull" && !hatching && !document.hidden) drawScene(); }, 1000);
   // Waves earned in another game, or a sync from another device, show up here.
   let seen = "";
   setInterval(() => {
