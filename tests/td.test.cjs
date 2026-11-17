@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools', 'pickStarter', 'STARTERS', 'STARTER_GIFTS'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
 const td = moduleUnderTest('src/hub/td.js', [
-  'classOf', 'STAGES', 'CHAPTERS', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
+  'classOf', 'STAGES', 'CHAPTERS', 'MAX_RISK', 'WEEKLY_MILESTONES', 'WEEKLY_UNLOCK', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
   'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H'
 ], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor });
 const { walletBalance, activateWallet, grantOnce } = rewards;
@@ -404,11 +404,50 @@ test('weekly challenge: one stage a week for everyone, and risks that stack', ()
 test('weekly challenge: a win records its risk as the week score, and waves still pay', () => {
   const team = [named('Machamp')];
   let w = owning(team);
+  w = td.tdFinish(w, { stage: '1-8', stars: 1, team, waves: 0 }, opts()).wallet;
+  const wavesBefore = walletBalance(w).waves;
   w = td.tdWeekly(w, { mods: ['hp', 'atk'], stars: 2, waves: 2 }, opts()).wallet;
   w = td.tdWeekly(w, { mods: ['onelife'], stars: 0, waves: 1 }, opts()).wallet;
   const state = td.tdState(w, TODAY);
   assert.equal(state.challengeBest, 2, 'a loss does not count; the win with 2 risk does');
-  assert.equal(walletBalance(w).waves, 3, 'waves cleared pay either way');
+  assert.equal(walletBalance(w).waves - wavesBefore, 3, 'waves cleared pay either way');
+});
+
+test('weekly challenge: opens after 1-8, and risk milestones pay once a week each', () => {
+  assert.equal(td.MAX_RISK, 13, 'every risk at once');
+  assert.deepEqual(td.WEEKLY_MILESTONES.map(m => m.risk), [3, 7, 10, 12], 'about 25, 50, 75 and 90% of 13');
+  assert.equal(td.WEEKLY_UNLOCK, '1-8');
+  const team = [named('Machamp')];
+  let w = owning(team);
+  assert.equal(td.tdState(w, TODAY).challengeOpen, false);
+  assert.equal(td.tdWeekly(w, { mods: ['hp'], stars: 3, waves: 2 }, opts()).reason, 'locked', 'locked until the chapter 1 boss falls');
+  w = td.tdFinish(w, { stage: '1-8', stars: 1, team, waves: 0 }, opts()).wallet;
+  assert.equal(td.tdState(w, TODAY).challengeOpen, true);
+  const before = walletBalance(w);
+  // A loss at risk 13 pays no milestone.
+  const all = td.RISKS.map(r => r.id);
+  let r = td.tdWeekly(w, { mods: all, stars: 0, waves: 1 }, opts());
+  assert.deepEqual(r.claimed, []);
+  // A win at risk 7 (one life + fast + six = 7) pays the first two.
+  r = td.tdWeekly(r.wallet, { mods: ['onelife', 'fast', 'six'], stars: 1, waves: 2 }, opts());
+  assert.equal(r.risk, 7);
+  assert.deepEqual(r.claimed, [0, 1]);
+  w = r.wallet;
+  let bal = walletBalance(w);
+  assert.deepEqual([bal.plus - before.plus, bal.premium - before.premium, bal.gold - before.gold], [1, 1, 0]);
+  // The same milestones never pay twice in a week; risk 13 adds Gold and 50 shards.
+  r = td.tdWeekly(w, { mods: ['onelife', 'fast', 'six'], stars: 3, waves: 2 }, opts());
+  assert.deepEqual(r.claimed, [], 'already paid this week');
+  r = td.tdWeekly(r.wallet, { mods: all, stars: 1, waves: 2 }, opts());
+  assert.deepEqual(r.claimed, [2, 3]);
+  bal = walletBalance(r.wallet);
+  assert.deepEqual([bal.plus - before.plus, bal.premium - before.premium, bal.gold - before.gold, bal.shards - before.shards], [1, 1, 1, 50]);
+  assert.deepEqual(td.tdState(r.wallet, TODAY).challengeClaimed, [true, true, true, true]);
+  // Next week they pay again.
+  const nextWeek = '2026-11-23';
+  assert.deepEqual(td.tdState(r.wallet, nextWeek).challengeClaimed, [false, false, false, false]);
+  const again = td.tdWeekly(r.wallet, { mods: ['onelife'], stars: 1, waves: 2 }, { today: nextWeek, now: later() });
+  assert.deepEqual(again.claimed, [0]);
 });
 
 test('every starter with its three gifts clears 1-1 at level 1, deployed blocker first', () => {

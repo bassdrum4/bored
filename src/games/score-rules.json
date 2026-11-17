@@ -139,6 +139,11 @@
     "better": "high",
     "max_value": 100000
   },
+  "poke-gacha-weekly": {
+    "label": "Highest risk won in a Poké Gacha weekly challenge",
+    "better": "high",
+    "max_value": 13
+  },
   "pokedoku": {
     "label": "Today's three Pok\u00e9mon dailies added up",
     "better": "high",

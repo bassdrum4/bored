@@ -282,6 +282,18 @@ export const RISKS = [
   { id: 'six', label: 'At most 6 units on the field', risk: 2 },
   { id: 'onelife', label: 'One life', risk: 3 }
 ];
+// The most risk a run can carry: every modifier at once.
+export const MAX_RISK = RISKS.reduce((n, r) => n + r.risk, 0);
+// The weekly challenge opens once the chapter 1 boss is cleared.
+export const WEEKLY_UNLOCK = '1-8';
+// Risk milestones: a win at or above each total pays once a week (ledger id
+// td:wkm:<monday>:<index>). About 25%, 50%, 75% and 90% of MAX_RISK (13).
+export const WEEKLY_MILESTONES = [
+  { risk: 3, grant: { plus: 1 }, label: '1 Plus voucher' },
+  { risk: 7, grant: { premium: 1 }, label: '1 Premium voucher' },
+  { risk: 10, grant: { gold: 1 }, label: '1 Gold voucher' },
+  { risk: 12, grant: { shards: 50 }, label: '50 shards' }
+];
 export const riskOf = mods => RISKS.filter(r => mods.includes(r.id)).reduce((n, r) => n + r.risk, 0);
 /** This week's challenge: a non-boss story stage picked from the Monday's seed, the same for everyone. */
 export function weeklyStage(monday) {
@@ -570,6 +582,9 @@ export function tdState(wallet, today = dailyDate()) {
     challenge: weeklyStage(monday),
     challengeBest: Math.max(0, ...Object.entries(e).filter(([id, entry]) => id.startsWith('td:wk:') && object(entry.x).wk === monday && object(entry.x).s > 0)
       .map(([, entry]) => Number(entry.x.r) || 0)),
+    challengeOpen: (best[WEEKLY_UNLOCK] || 0) > 0,
+    // Which risk milestones this week's wins have paid.
+    challengeClaimed: WEEKLY_MILESTONES.map((m, i) => !!e['td:wkm:' + monday + ':' + i]),
     monday
   };
 }
@@ -605,11 +620,20 @@ export function tdWeekly(wallet, { mods = [], stars = 0, waves = 0 } = {}, { tod
   const monday = mondayOf(today), stage = weeklyStage(monday);
   if (!Number.isInteger(stars) || stars < 0 || stars > 3) return { wallet: mergeWallet(wallet), ok: false, reason: 'unknown' };
   if (!gachaState(wallet, today).active) return { wallet: mergeWallet(wallet), ok: false, reason: 'inactive' };
+  if (!tdState(wallet, today).challengeOpen) return { wallet: mergeWallet(wallet), ok: false, reason: 'locked' };
   const cleared = Math.max(0, Math.min(stage.waves.length, Math.floor(waves)));
   const risk = riskOf(mods);
-  const next = mergeWallet(wallet);
+  let next = mergeWallet(wallet);
   next.entries['td:wk:' + uuid()] = { at: seconds(now), ...(cleared ? { g: { waves: cleared } } : {}), x: { wk: monday, r: risk, s: stars, m: mods.filter(id => RISKS.some(r => r.id === id)) } };
-  return { wallet: next, ok: true, waves: cleared, risk };
+  // A win pays every milestone its risk reaches, each once this week.
+  const claimed = [];
+  if (stars > 0) WEEKLY_MILESTONES.forEach((m, i) => {
+    if (risk < m.risk) return;
+    const r = grantOnce(next, 'td:wkm:' + monday + ':' + i, m.grant, { now });
+    next = r.wallet;
+    if (r.changed) claimed.push(i);
+  });
+  return { wallet: next, ok: true, waves: cleared, risk, claimed };
 }
 /** Buy a level for a line with coins. */
 export function levelUp(wallet, line, { today = dailyDate(), now = Date.now() } = {}) {
@@ -646,7 +670,7 @@ export function tdBridge({ onChange = () => {} } = {}) {
     finish: act((w, o) => tdFinish(w, o)),
     levelUp: act((w, o) => levelUp(w, o.line)),
     // The weekly challenge (draft): stage and risks, and recording a run.
-    risks: RISKS, riskOf, weeklyStage,
+    risks: RISKS, riskOf, weeklyStage, maxRisk: MAX_RISK, milestones: WEEKLY_MILESTONES, weeklyUnlock: WEEKLY_UNLOCK,
     finishWeekly: act((w, o) => tdWeekly(w, o))
   };
 }
