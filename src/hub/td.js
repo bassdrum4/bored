@@ -1,6 +1,6 @@
 // Poké Gacha tower defense: chapter 1 (Team Rocket grunts), chapter 2 (Proton,
-// with flying enemies), chapter 3 (Petrel, with enemies that explode), the
-// battle simulation, and the TD rewards and missions.
+// with flying enemies), chapter 3 (Petrel, with enemies that explode), chapter 4
+// (Ariana, with armored enemies), the battle simulation, and the TD rewards and missions.
 //
 // The simulation is plain data stepped at a fixed rate, so it runs the same in
 // the page and in tests. Classes come from each species' stats; nothing is
@@ -51,13 +51,15 @@ export function classOf(num) {
 
 // Maps are 10×5 tiles: '#' no deploy, '.' ground (melee, and the path runs on
 // it), 'H' high ground (ranged), 'S' where enemies come in, 'G' the goal.
-// Waves: [seconds, species, count, gap between them, boss, flying, explodes].
+// Waves: [seconds, species, count, gap between them, boss, flying, explodes, armored].
 // Each line is one wave. A boss has its HP times 4; flying enemies cross the map
 // in a straight line from their spawn to the goal, cannot be blocked, never
 // attack, and only snipers can hit them. An exploding enemy lights a fuse when
 // it is blocked (FUSE seconds); when the fuse runs out it blows up, hitting every
 // unit within BLAST tiles for BLAST_POWER times its attack, and is gone. Killing
-// it first defuses it, so ranged units and fast hitters matter.
+// it first defuses it, so ranged units and fast hitters matter. An armored enemy
+// has its Defense times ARMOR against physical attacks; casters' special attacks
+// ignore the armor, so tanky stages want casters.
 export const CHAPTER = { id: 1, name: 'Team Rocket Grunts', boss: 'Grunt boss' };
 export const STAGES = [
   { id: '1-1', name: 'First patrol', lives: 3, level: 1, map: ['##H##H####', 'S........G', '##H##H####', '##########', '##########'],
@@ -145,14 +147,45 @@ export const STAGES = [
     map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
     waves: [[3, 109, 4, 2.5, 0, 0, 1], [12, 41, 3, 2.5, 0, 1], [24, 101, 4, 2, 0, 0, 1], [36, 89, 3, 3], [48, 110, 1, 1, 1]],
     before: ['Petrel: Kneel before Giovanni! ...Fine. It is a costume.', 'Petrel: Weezing, smog them out!', 'The boss Weezing has four times the HP and does not explode. Its Koffing and Electrode do.'],
-    after: ['Petrel: Ariana will make you pay for this.', 'Chapter 3 cleared. One more admin stands between you and the boss.'] }
+    after: ['Petrel: Ariana will make you pay for this.', 'Chapter 3 cleared. One more admin stands between you and the boss.'] },
+
+  /* ── Chapter 4: Ariana (Arbok, and mons that shrug off hits) ─────────── */
+  { id: '4-1', chapter: 4, name: 'Rock wall', lives: 3, level: 2.3, map: ['##H##H##H#', 'S........G', '##H##H##H#', '##########', '##########'],
+    waves: [[3, 23, 3, 3], [14, 75, 2, 4, 0, 0, 0, 1], [28, 24, 3, 3], [40, 75, 3, 3, 0, 0, 0, 1]],
+    before: ['Ariana: Petrel always did talk too much. I prefer walls.', 'Graveler are armored: physical hits barely scratch them. Casters\' special attacks go straight through.'],
+    after: ['Ariana: A crack in the wall. Nothing more.'] },
+  { id: '4-2', chapter: 4, name: 'Garden of thorns', lives: 3, level: 2.25, map: ['S...H#####', '###.H##H##', '#H#......G', '#####H####', '##########'],
+    waves: [[3, 43, 3, 3], [14, 95, 2, 4, 0, 0, 0, 1], [26, 45, 3, 3], [38, 95, 2, 4, 0, 0, 0, 1]],
+    before: ['Grunt: Vileplume in the garden, Onix in the rocks.', 'Fire and Flying burn Grass. Water and Grass wear down Rock.'],
+    after: ['Grunt: My garden...'] },
+  { id: '4-3', chapter: 4, name: 'Night market', lives: 3, level: 1.9, map: ['#H#H#H#H##', 'S........G', '#H##.#H#H#', '####H#####', '##########'],
+    waves: [[3, 23, 3, 3], [12, 198, 2, 3, 0, 1], [24, 75, 2, 4, 0, 0, 0, 1], [36, 24, 3, 3], [44, 198, 3, 3, 0, 1]],
+    before: ['Grunt: Murkrow steal from the sky. Arbok guard the stalls.', 'Snipers for the Murkrow, casters for the Graveler.'],
+    after: ['Grunt: Closing time.'] },
+  { id: '4-4', chapter: 4, name: 'Quarry', lives: 3, level: 2.45, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
+    waves: [[3, 74, 3, 3, 0, 0, 0, 1], [12, 23, 4, 2.5], [24, 95, 2, 4, 0, 0, 0, 1], [36, 110, 2, 4, 0, 0, 1]],
+    before: ['Ariana: Rock from both sides, and a Weezing for old times\' sake.', 'Two spawns. Armored mons on both, and a Weezing that explodes.'],
+    after: ['Ariana: You are more stubborn than my Onix.'] },
+  { id: '4-5', chapter: 4, name: 'Iron path', lives: 3, level: 1.95, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#G.......#', '####H#####'],
+    waves: [[3, 74, 3, 3.5, 0, 0, 0, 1], [14, 198, 3, 2.5, 0, 1], [26, 24, 4, 2.5], [38, 95, 3, 3, 0, 0, 0, 1], [48, 45, 3, 3]],
+    before: ['Grunt: The long way round. Every step of it guarded.', 'A long path gives casters time to wear the armor down.'],
+    after: ['Grunt: The admin is waiting at the end of the path.'] },
+  { id: '4-6', chapter: 4, name: 'Ariana', boss: true, admin: true, lives: 3, level: 2.35,
+    map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
+    waves: [[3, 74, 3, 3, 0, 0, 0, 1], [12, 198, 3, 2.5, 0, 1], [24, 45, 3, 3], [36, 95, 2, 4, 0, 0, 0, 1], [48, 24, 1, 1, 1, 0, 0, 1]],
+    before: ['Ariana: You have beaten three admins. You will not beat the fourth.', 'Ariana: Arbok, wrap them up!', 'The boss Arbok has four times the HP and is armored: bring casters.'],
+    after: ['Ariana: Impossible... Giovanni must hear of this.', 'Chapter 4 cleared. Only Archer and the boss himself remain.'] }
 ];
 // Chapters in order, each with its stages. Stages unlock in the order of STAGES.
 export const CHAPTERS = [
   { id: 1, name: 'Team Rocket Grunts', admin: 'Grunts', stages: STAGES.filter(s => (s.chapter || 1) === 1) },
   { id: 2, name: 'Proton', admin: 'Proton', stages: STAGES.filter(s => s.chapter === 2) },
-  { id: 3, name: 'Petrel', admin: 'Petrel', stages: STAGES.filter(s => s.chapter === 3) }
+  { id: 3, name: 'Petrel', admin: 'Petrel', stages: STAGES.filter(s => s.chapter === 3) },
+  { id: 4, name: 'Ariana', admin: 'Ariana', stages: STAGES.filter(s => s.chapter === 4) }
 ];
+// Armored enemies' Defense against physical attacks; casters ignore it.
+export const ARMOR = 3;
+const defenceAgainst = (u, e) => e.def * (e.armored && u.cls !== 'caster' ? ARMOR : 1);
 export const FUSE = 2.5, BLAST = 1.5, BLAST_POWER = 3;
 export const stageById = id => STAGES.find(stage => stage.id === id) || null;
 export const W = 10, H = 5;
@@ -239,8 +272,8 @@ export const START_ENERGY = 10;
 export function newBattle(stage, squad) {
   const paths = pathsOf(stage);
   const queue = [];
-  stage.waves.forEach(([at, num, count, gap, boss, flying, explodes], wave) => {
-    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying, explodes: !!explodes });
+  stage.waves.forEach(([at, num, count, gap, boss, flying, explodes, armored], wave) => {
+    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying, explodes: !!explodes, armored: !!armored });
   });
   queue.sort((a, b) => a.at - b.at);
   return { stage, paths, squad: squad.slice(0, 8), t: 0, energy: START_ENERGY, life: stage.lives, queue, spawned: 0,
@@ -298,7 +331,7 @@ function useSkill(b, u) {
   else {
     const targets = b.enemies.filter(e => canHit(u, e) && dist(e, u.x, u.y) <= u.range + 0.5);
     const list = u.cls === 'caster' ? targets : targets.slice(0, u.cls === 'sniper' ? 3 : 1);
-    for (const e of list) e.hp -= hit(u.atk, e.def, typeMultiplier(u.types[0], e.types)) * (u.cls === 'guard' ? 3 : 1.5) * power;
+    for (const e of list) e.hp -= hit(u.atk, defenceAgainst(u, e), typeMultiplier(u.types[0], e.types)) * (u.cls === 'guard' ? 3 : 1.5) * power;
   }
   b.log.push({ t: b.t, skill: u.skill, unit: u.id });
 }
@@ -315,7 +348,7 @@ export function step(b, dt = TICK) {
     // Flyers go straight from their spawn to the goal, over everything.
     const path = s.flying ? [ground[0], ground[ground.length - 1]] : ground;
     b.enemies.push({ ...enemyStats(s.num, b.stage.level, s.boss, s.flying), id: b.nextId++, wave: s.wave, boss: s.boss, path, seg: 0,
-      x: path[0][0], y: path[0][1], cd: 0, blockedBy: null, maxHp: 0, explodes: s.explodes, fuse: null });
+      x: path[0][0], y: path[0][1], cd: 0, blockedBy: null, maxHp: 0, explodes: s.explodes, fuse: null, armored: s.armored });
     const e = b.enemies[b.enemies.length - 1];
     e.maxHp = e.hp;
     b.spawned++;
@@ -358,7 +391,7 @@ export function step(b, dt = TICK) {
     const rank = e => (e.blockedBy === u.id ? -1e6 : 0) + (e.flying && CLASSES[u.cls].air ? -1e3 : 0) + distanceLeft(e);
     const target = inRange.sort((a, c) => rank(a) - rank(c))[0];
     const victims = u.cls === 'caster' ? b.enemies.filter(e => canHit(u, e) && dist(e, target.x, target.y) <= CLASSES.caster.splash) : [target];
-    for (const e of victims) e.hp -= hit(u.atk, e.def, typeMultiplier(u.types[0], e.types));
+    for (const e of victims) e.hp -= hit(u.atk, defenceAgainst(u, e), typeMultiplier(u.types[0], e.types));
     u.cd = u.interval;
   }
   // Exploders count down instead of attacking, then blow up on every unit nearby.
