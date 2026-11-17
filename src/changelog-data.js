@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 562,
+  "count": 563,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"8d77072","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Idle: a shiny counts for its whole evolution line; in-party border only for the party","pr":205},
   {"sha":"ee6be30","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: the Squad screen, Arknights-style","pr":204},
   {"sha":"872d182","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: a real library preview, the Pull screen","pr":202},
   {"sha":"e5bf4bf","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: a real blurb, and the capture script can shoot its Pull screen"},
