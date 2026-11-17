@@ -421,3 +421,63 @@ test('a new account picks a starter, clears 1-1 with the gifts, pulls and hatche
   assert.equal(await again.evaluate(() => !!picking), false, 'no second pick');
   assert.deepEqual(errors, []);
 });
+
+/* ── The weekly challenge: a page after the last chapter ───────────────── */
+test('weekly challenge: risks stack, the run uses them, and a win scores the risk total', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  if (!await game.evaluate(() => typeof hasWeekly === 'function' && hasWeekly())) return t.skip('the hub has no weekly challenge yet');
+  await key(tab, '1');
+  // Left from chapter 1 wraps to the weekly page.
+  await key(tab, 'ArrowLeft');
+  assert.equal(await game.evaluate(() => onWeekly()), true);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /^WEEKLY/);
+  const rowsShown = await game.$$eval('#story-list > div', rows => rows.map(r => r.textContent));
+  assert.equal(rowsShown.length, await game.evaluate(() => T.risks.length + 1), 'a Start row and one row per risk');
+  assert.match(rowsShown[0], /locked/, 'locked until 1-1 is cleared');
+  await key(tab, 'Enter');
+  assert.match(await game.$eval('#msg', n => n.textContent), /Clear 1-1 first/);
+
+  // Clear 1-1, then stack two risks: harder HP (+1) and one life (+3).
+  await game.evaluate(() => { T.finish({ stage: '1-1', stars: 3, team: [S.owned[0]], waves: 2 }); pref.risks = []; keep(); storyUpdate(); });
+  const at = id => game.evaluate(i => T.risks.findIndex(r => r.id === i) + 1, id);
+  for (const id of ['hp', 'onelife']) { await game.evaluate(i => { storyAt = i; storyUpdate(); }, await at(id)); await key(tab, 'Enter'); }
+  assert.deepEqual(await game.evaluate(() => riskPick().sort()), ['hp', 'onelife']);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /risk 4/);
+  assert.match(await game.$eval('#story-info', n => n.textContent), / 1 life(?!s)/, 'one life shows on the panel');
+  // Toggle hp back off and on again.
+  await game.evaluate(i => { storyAt = i; storyUpdate(); }, await at('hp'));
+  await key(tab, 'Enter'); assert.deepEqual(await game.evaluate(() => riskPick()), ['onelife']);
+  await key(tab, 'Enter'); assert.equal(await game.evaluate(() => T.riskOf(riskPick())), 4);
+  const panel = await game.$eval('#story-info', n => [n.scrollHeight, n.clientHeight]);
+  assert.ok(panel[0] <= panel[1], 'the weekly panel does not overflow');
+
+  // Start: squad, then the battle carries the risks.
+  await game.evaluate(() => { storyAt = 0; storyUpdate(); });
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => storyMode), 'squad');
+  await game.evaluate(() => { pref.squad = S.owned.slice(0, 8); keep(); squadAt = 0; squadUpdate(); });
+  assert.match(await game.$eval('#squad-info', n => n.textContent), /Risk 4/);
+  await key(tab, 'Enter');
+  await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
+  assert.equal(await game.evaluate(() => battle.b.life), 1, 'one life');
+  assert.match(await game.$eval('#battle-hud', n => n.textContent), /Weekly.*Risk 4/);
+  for (let i = 0; i < 4 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
+  await game.evaluate(() => {
+    const b = battle.b; b.energy = 99;
+    b.squad.forEach((u, i) => { for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) if (!b.units.some(o => o.slot === i)) T.deploy(b, i, x, y); });
+    // Win or lose, the run is recorded; give it the field's best shot.
+    for (let i = 0; i < 20000 && !b.over; i++) { b.energy = 99; T.step(b); }
+  });
+  await game.waitForFunction(() => battle.done, { timeout: 5000 });
+  const won = await game.evaluate(() => battle.b.over === 'win');
+  for (let i = 0; i < 4 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
+  const result = await game.$eval('#battle-result', n => n.textContent);
+  assert.match(result, /Risk 4/);
+  assert.match(result, won ? /new best/ : /not scored/);
+  const box = await game.$eval('#battle-result', n => [n.scrollHeight, n.clientHeight, [...n.children].map(c => c.textContent + ':' + c.getBoundingClientRect().height).join(' / ')]);
+  assert.ok(box[0] <= box[1], 'the result box does not overflow: ' + box[2]);
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => onWeekly()), true, 'back on the weekly page');
+  assert.equal(await game.evaluate(() => T.state().challengeBest), won ? 4 : 0);
+  assert.deepEqual(errors, []);
+});
