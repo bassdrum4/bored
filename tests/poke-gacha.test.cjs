@@ -174,14 +174,23 @@ test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1
   assert.equal(await game.evaluate(() => battle.paused), false);
   await key(tab, ' ');
   assert.equal(await game.evaluate(() => battle.paused), true, 'Space pauses');
-  assert.match(await game.$eval('#battle-hud', n => n.textContent), /Paused/);
+  assert.match(await game.$eval('#battle-pause', n => n.textContent), /Paused/);
   await key(tab, ' ');
 
-  // The battle screen: HUD on one line, and field, HUD and deploy cards never overlap.
+  // The battle screen: the tab bar gives way, the HUD is one line, and the HUD,
+  // pause, energy line, deploy cards and tip never overlap each other or the map.
+  assert.equal(await game.$eval('#tabs', n => getComputedStyle(n).display), 'none', 'the tab bar gives way to the battle');
   const hud = await game.$eval('#battle-hud', n => [n.scrollHeight, n.clientHeight]);
   assert.ok(hud[0] <= hud[1], 'the HUD is one line');
-  const field = await rect(game, '#field'), hudBox = await rect(game, '#battle-hud'), deck = await rect(game, '#deploy');
-  assert.ok(apart(field, hudBox) && apart(field, deck) && apart(hudBox, deck), 'HUD, field and deploy cards do not overlap');
+  const map = await game.evaluate(() => mapBox());
+  const parts = await Promise.all(['#battle-hud', '#battle-pause', '#deploy-info', '#deploy', '#battle-tip'].map(id => rect(game, id)));
+  for (let i = 0; i < parts.length; i++) {
+    assert.ok(apart(parts[i], map), 'panel ' + i + ' stays off the map');
+    for (let j = i + 1; j < parts.length; j++) assert.ok(apart(parts[i], parts[j]), 'battle panels ' + i + ' and ' + j + ' do not overlap');
+  }
+  // Each deploy card: its sprite, class icon and cost, and no name to cut off.
+  const cards = await game.$$eval('#deploy .card', cs => cs.map(c => ({ mini: !!c.querySelector('.mini'), icon: !!c.querySelector('canvas'), cost: c.querySelector('.num')?.textContent })));
+  assert.ok(cards.length && cards.every(c => c.mini && c.icon && /^\d+$/.test(c.cost)));
 
   // Deploy the squad where each class may stand, then let the engine play the stage out.
   await game.evaluate(() => {
@@ -472,7 +481,7 @@ test('weekly challenge: risks stack, the run uses them, and a win scores the ris
   await key(tab, 'Enter');
   await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
   assert.equal(await game.evaluate(() => battle.b.life), 1, 'one life');
-  assert.match(await game.$eval('#battle-hud', n => n.textContent), /Weekly.*Risk 4/);
+  assert.match(await game.$eval('#battle-hud', n => n.textContent), /Risk\s*4/);
   for (let i = 0; i < 4 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
   await game.evaluate(() => {
     const b = battle.b; b.energy = 99;
@@ -608,5 +617,55 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
   await key(tab, 'Backspace');
   assert.equal(await game.evaluate(() => storyMode), 'stages');
   assert.equal(await game.$eval('#msg', n => n.hidden), false);
+  assert.deepEqual(errors, []);
+});
+
+/* ── The battle's feel: blocking, effects and the 3/4 field ────────────── */
+test('battle: blocked enemies stand clear of the blocker, hits show numbers and flashes, and the range previews', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '1');
+  await game.evaluate(() => { setSquad(S.owned.filter(n => T.classOf(n) === 'blocker').slice(0, 1).concat(S.owned.filter(n => T.classOf(n) === 'sniper').slice(0, 1))); });
+  await key(tab, 'Enter');
+  await game.evaluate(() => { sq.zone = 'head'; sq.head = 3; squadUpdate(); });
+  await key(tab, 'Enter');
+  await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
+  const result = await game.evaluate(() => {
+    battle.talk = []; battleTalk(); battle.paused = true;
+    const b = battle.b, st = battle.stage;
+    const ground = T.pathsOf(st)[0].filter(([x, y]) => st.map[y][x] === '.');
+    b.energy = 99;
+    const bi = b.squad.findIndex(u => u.cls === 'blocker');
+    T.deploy(b, bi, ground[2][0], ground[2][1]);
+    // A virtual clock, 50ms a tick, as in play.
+    let vt = performance.now(); const real = performance.now.bind(performance); performance.now = () => vt;
+    let blocked = null, sawNum = false, sawFlash = false;
+    for (let i = 0; i < 3000 && !b.over; i++) {
+      vt += 50; stepWithFx(battle);
+      sawNum ||= battle.fx.some(f => f.kind === 'num');
+      sawFlash ||= Object.values(battle.anim).some(a => a && a.flash);
+      const e = b.enemies.find(o => o.blockedBy);
+      if (e && !blocked) {
+        const u = b.units.find(o => o.id === e.blockedBy);
+        const [ex, ey] = enemySpot(battle, e);
+        blocked = { gap: Math.hypot(ex - u.x, ey - u.y), facing: facesRight(e) === (u.x > ex) };
+      }
+      if (blocked && sawNum && sawFlash) break;
+    }
+    drawField(vt);
+    performance.now = real;
+    // Range preview: hovering a high tile with the sniper card shows its range.
+    const si = b.squad.findIndex(u => u.cls === 'sniper');
+    const high = []; st.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H') high.push([x, y]); }));
+    battle.slot = si; battle.hover = high[0];
+    return { blocked, sawNum, sawFlash, range: inRange(b.squad[si], high[0][0], high[0][1]).length };
+  });
+  assert.ok(result.blocked, 'an enemy was blocked');
+  assert.ok(result.blocked.gap >= 0.8, 'a blocked enemy stands at the edge of the tile, not on the blocker');
+  assert.ok(result.blocked.facing, 'and faces it');
+  assert.ok(result.sawNum && result.sawFlash, 'hits show a number and a flash');
+  assert.ok(result.range > 4, 'a sniper covers several tiles');
+  // The field is drawn in the 3/4 view: high ground stands above the floor.
+  const lifted = await game.evaluate(() => { const st = battle.stage; for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) if (st.map[y][x] === 'H') return tileRect(st, x, y).y < MY + y * TH; return null; });
+  assert.equal(lifted, true);
   assert.deepEqual(errors, []);
 });
