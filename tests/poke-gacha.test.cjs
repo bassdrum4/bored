@@ -501,3 +501,35 @@ test('weekly challenge: risks stack, the run uses them, and a win scores the ris
   }
   assert.deepEqual(errors, []);
 });
+
+/* ── The hatch: the owner's egg-hatch frames ───────────────────────────── */
+test('hatching plays the cracking egg, the rays and the shell shards from the hatch sheet', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  // The sheet is inline, so it is there without a network.
+  await game.waitForFunction(() => typeof HATCH_SHEET !== 'undefined' && HATCH_SHEET.complete && HATCH_SHEET.naturalWidth === 384);
+  // Every tier draws at every step: the cracking egg, the rays, the burst.
+  const drawn = await game.evaluate(() => [0, 1, 2, 3, 4].map(tier => [0, 0.7, 1.4, 1.65, 1.95].map(t => {
+    const g = hatchFrame(tier, t).getContext('2d'), d = g.getImageData(0, 0, 96, 96).data;
+    let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++;
+    return n;
+  })));
+  for (const row of drawn) for (const n of row) assert.ok(n > 40, 'every frame draws something: ' + JSON.stringify(drawn));
+  // The cracks grow: the last stage differs from the first.
+  const differ = await game.evaluate(() => hatchFrame(0, 0).toDataURL() !== hatchFrame(0, 1.3).toDataURL());
+  assert.ok(differ);
+  // A real hatch shows the sheet's frames in the cell while it shakes, then the Pokémon.
+  await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000);
+    const put = (id, entry) => { const w = JSON.parse(parent.localStorage.getItem('bored.wallet')); w.entries[id] = entry; parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); };
+    put('test:more', { at: now - 50, g: { regular: 1 } });
+    G.pull({ voucher: 'regular', count: 1, machine: 'move' });
+    put('test:more-waves', { at: now + 50, g: { waves: 100 } });
+    refreshTop(); go('eggs');
+  });
+  await key(tab, 'Enter');
+  assert.ok(await game.evaluate(() => !!hatching && hatching.phase === 'shake'));
+  assert.ok(await game.evaluate(() => !!document.querySelector('#hatch .cell canvas')), 'the egg is drawn on a canvas');
+  await game.waitForFunction(() => hatching && hatching.phase === 'shown', { timeout: 5000 });
+  assert.ok(await game.evaluate(() => !!document.querySelector('#hatch .cell img')), 'then the Pokémon sprite');
+  assert.deepEqual(errors, []);
+});
