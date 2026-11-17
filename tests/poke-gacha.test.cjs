@@ -250,3 +250,23 @@ test('tower defense: chapter 3 says which enemies explode', async t => {
   assert.ok(info[0] <= info[1], 'the stage panel does not overflow');
   assert.deepEqual(errors, []);
 });
+
+test('tower defense: chapter 4 says which enemies are armored', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length > 3)) return t.skip('the hub engine has fewer than 4 chapters');
+  await game.evaluate(() => {
+    const w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    for (const st of ['1-8', '2-6', '3-6']) w.entries['td:run:test-' + st] = { at: Math.floor(Date.now() / 1000), x: { st, s: 3, tm: [], d: T.state().monday } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    refreshTop();
+  });
+  await key(tab, '1');
+  await key(tab, 'ArrowRight', 3);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*4\//);
+  assert.doesNotMatch((await game.$$eval('#story-list > div', list => list.map(r => r.textContent)))[0], /locked/, '4-1 is open after 3-6');
+  assert.match(await game.$eval('#story-info', n => n.textContent), /Armored: /);
+  assert.match(await game.$eval('#msg', n => n.textContent), /Casters go through armor/);
+  const info = await game.$eval('#story-info', n => [n.scrollHeight, n.clientHeight]);
+  assert.ok(info[0] <= info[1], 'the stage panel does not overflow');
+  assert.deepEqual(errors, []);
+});
