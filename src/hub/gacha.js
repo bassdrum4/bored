@@ -11,6 +11,9 @@
 //                         x = { s, t, n, sh, sp, k } species, tier, new, shiny, SP skin id, skill
 //   cfg:buddy:<uuid>    the equipped buddy; the latest one counts
 //   cfg:look:<uuid>     the look a line wears across Bored (x = { l, look }); the latest counts
+//   cfg:starter         the starter pick, once per account: x = { s, c } the chosen starter and
+//                         the three gifted commons. The id is fixed, so it is written once and
+//                         a second device's pick loses to the earlier one in a merge.
 // The hatch id is fixed by the egg, so an egg hatched on two devices pays once.
 // Eggs count down on the wallet's running wave total, which is never spent:
 // an egg's progress is the waves earned since it was pulled.
@@ -76,6 +79,17 @@ const skinsOfSpecies = num => SKINS.filter(skin => skin.species === num);
 export const COSTS = { evolve: [25, 100], passive: 50, cost1: 30, cost2: 60, sp: 300 };
 export const LOGIN = { regular: 3 };
 export const STARTER = { regular: 2 };
+// The first time Poké Gacha opens, the player picks one first-stage starter and
+// gets three commons with it, so the first squad is four and clears 1-1 (a
+// blocker, a sniper for flyers and the one common medic). Old accounts get the
+// same pick once. STARTER_GENS 9 offers every generation; 1 offers Kanto only.
+export const STARTER_GENS = 9;
+const STARTER_LINES = [1, 4, 7, 152, 155, 158, 252, 255, 258, 387, 390, 393, 495, 498, 501,
+  650, 653, 656, 722, 725, 728, 810, 813, 816, 906, 909, 912];
+export const STARTERS = STARTER_LINES.slice(0, STARTER_GENS * 3);
+export const STARTER_GIFTS = [74, 16, 531]; // Geodude, Pidgey, Audino
+// The first FREE_HATCHES eggs a player ever pulls hatch at once; after that, waves.
+export const FREE_HATCHES = 10;
 export const STARTER_MISSIONS = [
   { id: 'pull', label: 'Pull your first egg' },
   { id: 'hatch', label: 'Hatch an egg' },
@@ -180,6 +194,12 @@ function readPulls(entries) {
   return pulls.sort((a, b) => a.n - b.n || a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
+function readStarter(entry) {
+  const x = object(entry?.x);
+  if (!STARTER_LINES.includes(x.s) || !Array.isArray(x.c)) return null;
+  return { species: x.s, gifts: x.c.filter(num => STARTER_GIFTS.includes(num)), at: entry.at };
+}
+
 function readHatch(entry) {
   const x = object(entry?.x);
   if (!validNum(x.s) || !Number.isInteger(x.t) || x.t < 0 || x.t > 4) return null;
@@ -213,14 +233,22 @@ export function gachaState(wallet, today = dailyDate()) {
   const owned = new Set();
   const line = num => (lines[num] ||= { line: num, hatches: 0, shiny: false, skins: [], skills: [false, false, false, false],
     passive: false, cost: 0, look: 'normal' });
+  // The starter and its gifts are owned with their first common skill, like a hatch.
+  const starterPick = readStarter(entries['cfg:starter']);
+  if (starterPick) for (const num of [starterPick.species, ...starterPick.gifts]) {
+    owned.add(num);
+    line(lineOf(num)).skills[0] = true;
+  }
+  let nth = 0;
   for (const pull of pulls) {
     pull.eggs.forEach((tier, i) => {
       const egg = { id: pull.key + '.' + i, tier, machine: pull.machine, banner: tier === 4 ? pull.banner : 0, day: pull.day };
       const hatch = readHatch(entries['hatch:' + egg.id]);
+      // The first eggs ever pulled need no waves, so a new player hatches straight away.
+      const need = nth++ < FREE_HATCHES ? 0 : HATCH_WAVES[tier];
       if (!hatch) {
         const progress = Math.max(0, balance.waves - pull.waves);
-        eggs.push({ ...egg, need: HATCH_WAVES[tier], progress: Math.min(progress, HATCH_WAVES[tier]),
-          ready: progress >= HATCH_WAVES[tier] });
+        eggs.push({ ...egg, need, free: need === 0, progress: Math.min(progress, need), ready: progress >= need });
         return;
       }
       hatched.push({ ...egg, ...hatch });
@@ -243,6 +271,7 @@ export function gachaState(wallet, today = dailyDate()) {
       if (validNum(x.s)) buddy = { species: x.s, shiny: x.sh === 1, skin: typeof x.sp === 'string' ? x.sp : null, at: entry.at };
       continue;
     }
+    if (id === 'cfg:starter') continue;
     if (id.startsWith('cfg:look:')) {
       if (lines[x.l] && typeof x.look === 'string') lines[x.l].look = x.look;
       continue;
@@ -271,6 +300,7 @@ export function gachaState(wallet, today = dailyDate()) {
   return {
     balance, eggs, hatched, owned: [...owned].sort((a, b) => a - b), lines,
     pity: rarityCounters(pulls), dupe, buddy, pulls: pulls.length,
+    starter: starterPick, needsStarter: !starterPick,
     banner: bannerFor(today), today,
     login: !!entries['gacha:login:' + today],
     missions: Object.fromEntries(STARTER_MISSIONS.map(m => [m.id, !!entries['gacha:start:' + m.id]])),
@@ -282,6 +312,16 @@ export function gachaState(wallet, today = dailyDate()) {
 
 const refuse = (wallet, reason) => ({ wallet: mergeWallet(wallet), ok: false, reason });
 const starter = (wallet, id, now) => grantOnce(wallet, 'gacha:start:' + id, STARTER, { now }).wallet;
+
+/** Pick the starter, once per account; the three gifts come with it. */
+export function pickStarter(wallet, species, { now = Date.now() } = {}) {
+  const next = mergeWallet(wallet);
+  if (!next.entries.on) return refuse(wallet, 'inactive');
+  if (next.entries['cfg:starter']) return refuse(wallet, 'picked');
+  if (!STARTERS.includes(species)) return refuse(wallet, 'unknown');
+  next.entries['cfg:starter'] = { at: seconds(now), x: { s: species, c: STARTER_GIFTS.slice() } };
+  return { wallet: next, ok: true, species, gifts: STARTER_GIFTS.slice() };
+}
 
 function rollTier(rand, machine, count) {
   const table = machine === 'legend' ? EGG_RATES.legend : EGG_RATES.standard;
@@ -340,6 +380,7 @@ export function hatchReady(wallet, { today = dailyDate(), now = Date.now(), rand
   if (!ready.length) return { wallet: mergeWallet(wallet), ok: true, hatched: [] };
   const next = mergeWallet(wallet);
   const owned = new Set(state.hatched.map(h => h.species));
+  if (state.starter) for (const num of [state.starter.species, ...state.starter.gifts]) owned.add(num);
   const dupe = state.dupe.slice();
   const pools = eggPools();
   const at = seconds(now);
@@ -473,9 +514,11 @@ export function gachaBridge({ onChange = () => {} } = {}) {
   return {
     dex: DEX, types: DEX_TYPES, tiers: EGG_TIERS, stars: EGG_STARS, machines: MACHINES, vouchers: VOUCHERS,
     costs: COSTS, missions: STARTER_MISSIONS, maxEggs: MAX_EGGS, batch: REGULAR_BATCH,
+    starters: STARTERS, starterGifts: STARTER_GIFTS, freeHatches: FREE_HATCHES,
     skillsOf, lineOf, stageOf, evolutionsOf,
     state: () => gachaState(readWallet(), dailyDate()),
     trophies: () => walletTrophies(readWallet()),
+    pickStarter: act((w, o) => pickStarter(w, o.species, o)),
     pull: act((w, o) => pullEggs(w, o)),
     hatch: act((w, o) => hatchReady(w, o)),
     buyRegular: act((w, o) => buyRegular(w, o.count || 1, { now: o.now })),
