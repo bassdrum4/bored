@@ -49,6 +49,7 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Icons sit in one 40px slot so labels line up whatever the icon. */
 .rows .ico { width: 40px; display: grid; place-items: center; flex: none }
 .rows .right { display: flex; align-items: center; gap: 4px; padding-right: 4px }
+.stars { display: inline-flex; gap: 2px; vertical-align: middle }
 .rows p { padding: 4px 0 }
 .cell { display: grid; place-items: center; overflow: hidden }
 .unseen { filter: brightness(0) }
@@ -285,11 +286,32 @@ function ticket(kind) {
 }
 function coin() { return pixelCanvas(8, 8, g => { ellipse(g, 3, 3, 3, 3, C.ink); ellipse(g, 3, 3, 2, 2, C.gold); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 3); }); }
 function shardIcon() { return pixelCanvas(8, 8, g => { g.fillStyle = C.ink; g.fillRect(2, 0, 4, 8); g.fillRect(0, 2, 8, 4); g.fillStyle = C.sky; g.fillRect(3, 1, 2, 6); g.fillRect(1, 3, 6, 2); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 2); }); }
-function candyIcon() { return pixelCanvas(8, 8, g => { g.fillStyle = C.ink; g.fillRect(2, 1, 4, 6); g.fillRect(0, 2, 8, 4); g.fillStyle = C.red; g.fillRect(3, 2, 2, 4); g.fillRect(1, 3, 6, 2); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 1); }); }
+/* PIXEL_MAPS:BEGIN — hand-placed icons, one char per pixel. tests/poke-gacha.test.cjs checks the outlines. */
+const PIXEL_MAPS = {
+ "candy": ["..kkkk..", ".k2211k.", "k22w110k", "k2w1w10k", "k21w110k", "k111100k", ".k1000k.", "..kkkk.."],
+ "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
+ "dot": ["kkkk", "k11k", "k11k", "kkkk"],
+ "star": ["...k...", "..k1k..", "kkk1kkk", "k11111k", ".k111k.", "k1kkk1k", "kk...kk"],
+ "shield": ["kkkkk", "k121k", "k111k", "k111k", ".k1k.", "..k.."]
+};
+/* PIXEL_MAPS:END */
+// Draw a pixel map: '.' is transparent, every other char looks its color up in `pal`.
+function mapCanvas(key, pal) {
+  const map = PIXEL_MAPS[key];
+  return pixelCanvas(map[0].length, map.length, g => map.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") { g.fillStyle = pal[row[x]]; g.fillRect(x, y, 1, 1); } }));
+}
+const candyIcon = () => mapCanvas("candy", { k: C.ink, 0: SHADE.red[0], 1: C.red, 2: SHADE.red[2], w: C.paper });
 function eggIcon(tier) {
   return pixelCanvas(10, 12, g => shadedEgg(g, 5, 6, 3, 4, tier, tier + 1));
 }
-function check(done) { return pixelCanvas(8, 8, g => { g.fillStyle = done ? C.gold : C.dim; if (done) { g.fillRect(1, 4, 2, 2); g.fillRect(3, 5, 1, 2); g.fillRect(4, 3, 1, 3); g.fillRect(5, 1, 1, 3); g.fillRect(6, 0, 1, 2); } else g.fillRect(3, 3, 2, 2); }); }
+const check = done => done ? mapCanvas("check", { k: C.ink, 1: C.gold }) : mapCanvas("dot", { k: C.ink, 1: C.dim });
+// Stage stars: gold when earned, dim when not, three in a row.
+function starIcons(n) {
+  const row = document.createElement("span");
+  row.className = "stars"; row.title = n + " of 3 stars";
+  for (let i = 0; i < 3; i++) row.append(mapCanvas("star", { k: C.ink, 1: i < n ? C.gold : C.dim }));
+  return row;
+}
 
 /* ── Shared pieces: elements, sprites in fixed cells, lists, messages ──── */
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
@@ -665,6 +687,29 @@ function endHatch() { hatching = null; $("#hatch").hidden = true; for (const id 
 /* ── Dex: every line an egg can hatch, and what candy does ─────────────── */
 const BASES = G ? G.dex.map((row, i) => row[9] > 0 ? i + 1 : 0).filter(Boolean) : [];
 let dexAt = 0, dexFocus = "list", actAt = 0;
+// Filters and sorting: F cycles what is shown, T cycles a type, S cycles the order. Kept per device.
+const DEX_FILTERS = ["All", "Owned", "Not owned", "3★", "4★", "5★", "6★"], DEX_SORTS = ["Number", "Name", "Tier"];
+const DEX_TYPES = [...new Set(BASES.flatMap(num => G.dex[num - 1][1].split("/")))].sort();
+const dexView = () => ({ filter: DEX_FILTERS.includes(pref.dexFilter) ? pref.dexFilter : "All",
+  type: DEX_TYPES.includes(pref.dexType) ? pref.dexType : "", sort: DEX_SORTS.includes(pref.dexSort) ? pref.dexSort : "Number" });
+function dexList() {
+  const v = dexView(), tier = num => G.dex[num - 1][9];
+  let list = BASES.filter(num => v.filter === "Owned" ? !!S.lines[num] : v.filter === "Not owned" ? !S.lines[num]
+    : /★/.test(v.filter) ? tier(num) === Number(v.filter[0]) : true);
+  if (v.type) list = list.filter(num => G.dex[num - 1][1].split("/").includes(v.type));
+  if (v.sort === "Name") list = list.slice().sort((a, b) => name(a).localeCompare(name(b)));
+  if (v.sort === "Tier") list = list.slice().sort((a, b) => tier(b) - tier(a) || a - b);
+  return list;
+}
+function cycleDex(what) {
+  const v = dexView();
+  if (what === "f") pref.dexFilter = DEX_FILTERS[(DEX_FILTERS.indexOf(v.filter) + 1) % DEX_FILTERS.length];
+  if (what === "t") pref.dexType = ["", ...DEX_TYPES][(["", ...DEX_TYPES].indexOf(v.type) + 1) % (DEX_TYPES.length + 1)];
+  if (what === "s") pref.dexSort = DEX_SORTS[(DEX_SORTS.indexOf(v.sort) + 1) % DEX_SORTS.length];
+  keep(); dexAt = 0; actAt = 0; dexFocus = "list"; dexUpdate();
+  if (dexList().length) say(dexViewText() + " " + dexList().length + " shown.");
+}
+const dexViewText = () => { const v = dexView(); return "F: " + v.filter + " · T: " + (v.type || "any type") + " · S: " + v.sort + "."; };
 const lineForms = line => S.owned.filter(num => G.lineOf(num) === line);
 const tipOf = line => lineForms(line).sort((a, b) => G.stageOf(b) - G.stageOf(a) || a - b)[0] || line;
 function dexActions(line) {
@@ -697,11 +742,20 @@ function dexActions(line) {
 }
 function dexUpdate() {
   drawBackdrop();
-  const owned = new Set(Object.keys(S.lines).map(Number));
-  titled($("#dex-title"), "DEX", owned.size + "/" + BASES.length);
-  rows($("#dex-rows"), BASES.map(num => ({ label: String(num).padStart(4, "0") + " " + name(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
+  const owned = new Set(Object.keys(S.lines).map(Number)), list = dexList(), v = dexView();
+  // The count: caught of all lines, or shown of all lines while a filter is on.
+  const filtered = v.filter !== "All" || v.type;
+  titled($("#dex-title"), "DEX", (filtered ? list.length : owned.size) + "/" + BASES.length);
+  const view = dexViewText();
+  $("#dex-detail").hidden = !list.length;
+  if (!list.length) {
+    $("#dex-rows").replaceChildren(el("p", "dim", "No lines match."));
+    return say("Nothing matches " + view + " Press F, T or S to change it.");
+  }
+  if (dexAt >= list.length) dexAt = list.length - 1;
+  rows($("#dex-rows"), list.map(num => ({ label: String(num).padStart(4, "0") + " " + name(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
     dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); });
-  const line = BASES[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
+  const line = list[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
   const shown = l && isSkin(l.look) && skinOf(l.look) ? skinOf(l.look).species : tip;
   $("#dex-pic").replaceChildren(sprite(shown, l ? G.lookFor(shown) : "normal", !l));
   const info = $("#dex-info");
@@ -716,7 +770,7 @@ function dexUpdate() {
   if (!l) $("#dex-acts").replaceChildren(el("p", "dim", "Hatches from " + TIER_NAME[G.dex[line - 1][9] - 3] + " eggs."));
   const skills = G.skillsOf(line).map((skill, i) => (l && l.skills[i] ? skill : "(" + skill + ")") + (i === 3 ? "*" : ""));
   say(dexFocus === "acts" && acts[actAt] ? acts[actAt].about
-    : (l ? "Skills: " + skills.join(", ") + ". Locked in brackets, * is rare. Enter: candy and looks." : "Hatch this line to unlock it. " + HINT));
+    : (l ? "Skills: " + skills.join(", ") + ". Locked in brackets, * is rare. Enter: candy and looks." : "Hatch this line to unlock it. F, T and S filter and sort the Dex."));
 }
 function runDex(action) {
   if (!action || action.off) return;
@@ -727,12 +781,13 @@ function runDex(action) {
 function dexKey(e) {
   const k = e.key;
   if (dexFocus === "list") {
-    const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -8, ArrowRight: 8 }[k];
-    if (step) { e.preventDefault(); dexAt = Math.max(0, Math.min(BASES.length - 1, dexAt + step)); actAt = 0; return dexUpdate(); }
-    if (k === "Enter" || k === " ") { e.preventDefault(); if (dexActions(BASES[dexAt]).length) { dexFocus = "acts"; actAt = 0; dexUpdate(); } }
+    const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -8, ArrowRight: 8 }[k], list = dexList();
+    if (/^[fts]$/i.test(k)) { e.preventDefault(); return cycleDex(k.toLowerCase()); }
+    if (step) { e.preventDefault(); dexAt = Math.max(0, Math.min(list.length - 1, dexAt + step)); actAt = 0; return dexUpdate(); }
+    if (k === "Enter" || k === " ") { e.preventDefault(); if (list[dexAt] && dexActions(list[dexAt]).length) { dexFocus = "acts"; actAt = 0; dexUpdate(); } }
     if (k === "Backspace") { e.preventDefault(); go("pull"); }
   } else {
-    const acts = dexActions(BASES[dexAt]);
+    const acts = dexActions(dexList()[dexAt]);
     if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); actAt = (actAt + (k === "ArrowUp" ? -1 : 1) + acts.length) % acts.length; return dexUpdate(); }
     if (k === "Enter" || k === " ") { e.preventDefault(); return runDex(acts[actAt]); }
     if (k === "Backspace" || k === "ArrowLeft") { e.preventDefault(); dexFocus = "list"; dexUpdate(); }
@@ -846,8 +901,13 @@ const allStages = () => chapters().flatMap(c => c.stages);
 const isOpen = (td, stage) => td.unlockedById ? !!td.unlockedById[stage.id] : !!td.unlocked[T.stages.indexOf(stage)];
 const stageBefore = stage => allStages()[allStages().indexOf(stage) - 1];
 const flyersOf = stage => [...new Set(stage.waves.filter(w => w[5]).map(w => w[1]))];
+// Exploders (wave field 6, chapter 3 on): blocked, they light a fuse and then blow up.
+const explodersOf = stage => [...new Set(stage.waves.filter(w => w[6]).map(w => w[1]))];
+// Armored enemies (wave field 7, chapter 4 on): physical hits barely scratch them; casters go through.
+const armoredOf = stage => [...new Set(stage.waves.filter(w => w[7]).map(w => w[1]))];
+let shieldIcon = null;
 const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
-const stageStars = n => "★".repeat(n) + "☆".repeat(3 - n);
+const stageStars = starIcons;
 function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5]).map(w => w[1]))].map(name).join(", "); }
 function storyUpdate() {
   drawBackdrop();
@@ -865,12 +925,17 @@ function storyUpdate() {
   info.replaceChildren(el("div", "title", stage.admin ? "ADMIN" : stage.boss ? "BOSS" : "STAGE"), el("div", "", stage.name), el("div", "dim", stage.waves.length + " waves · " + stage.lives + " lives"),
     el("div", "dim", "Enemies: " + enemiesOf(stage)));
   // Flying enemies: only snipers can hit them, so a stage says so up front.
-  if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ") + ". Snipers only."));
-  const reward = el("div"); reward.append(best ? "Best " : "First clear: ", best ? el("span", "num", stageStars(best)) : el("span", "num", "50"), best ? "" : " coins + 2 Regular");
+  // Short notes here; the advice goes in the message box, so the panel never overflows.
+  if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ")));
+  if (explodersOf(stage).length) info.append(el("div", "gold", "Explodes: " + explodersOf(stage).map(name).join(", ")));
+  if (armoredOf(stage).length) info.append(el("div", "gold", "Armored: " + armoredOf(stage).map(name).join(", ")));
+  const reward = el("div"); reward.append(best ? "Best " : "First clear: ", best ? stageStars(best) : el("span", "num", "50"), best ? "" : " coins + 2 Regular");
   info.append(reward);
   if (stage.admin && !best) { const g = el("div"); g.append("Admin: ", el("span", "num", "+1"), " Gold"); info.append(g); }
   if (best < 3) { const r3 = el("div", "dim"); r3.append("First 3★: ", el("span", "num", "100"), " coins + 1 Plus"); info.append(r3); }
-  const more = chapters().length > 1 ? " Left/Right: chapter." : "";
+  const more = (flyersOf(stage).length ? " Only snipers hit flyers." : "") + (explodersOf(stage).length ? " Kill exploders before the fuse." : "") +
+    (armoredOf(stage).length ? " Casters go through armor." : "") +
+    (chapters().length > 1 ? " Left/Right: chapter." : "");
   say((isOpen(td, stage) ? stage.before[0] + " Enter: choose your squad." : "Clear " + stageBefore(stage).id + " to unlock this stage.") + more);
 }
 function pickStage() {
@@ -884,7 +949,7 @@ function squadRows() {
   const pick = squadPick();
   const units = [];
   for (let i = 0; i < S.owned.length; i += 8) units.push(...T.squad(S.owned.slice(i, i + 8)));
-  return [{ start: true, label: pick.length ? "Start battle" : "Pick up to 8 mons", right: [pick.length, "/8"], off: !pick.length }]
+  return [{ start: true, label: pick.length ? "Start battle" : "Pick up to 8 mons", right: [pick.length + "/8"], off: !pick.length }]
     .concat(units.map(u => ({ unit: u, label: name(u.num), right: [CLASS_SHORT[u.cls], "Lv" + u.level, u.cost], picked: pick.includes(u.num) })));
 }
 function squadUpdate() {
@@ -1004,9 +1069,17 @@ function drawField() {
   const things = [...b.units.map(o => ({ o, unit: true })), ...b.enemies.map(o => ({ o, unit: false }))].sort((a, c) => a.o.y - c.o.y);
   for (const { o, unit } of things) {
     const cx = o.x * TILE + TILE / 2, by = o.y * TILE + TILE - 4;
+    // A lit fuse: the tile blinks a red box, and a red bar under the HP bar burns down.
+    if (!unit && o.fuse !== null && o.fuse !== undefined) {
+      const left = Math.max(0, o.fuse / (T.FUSE || 2.5));
+      if (Math.floor(performance.now() / 150) % 2) { g.fillStyle = C.red; const px = o.x * TILE, py = o.y * TILE; g.fillRect(px, py, TILE, 2); g.fillRect(px, py + TILE - 2, TILE, 2); g.fillRect(px, py, 2, TILE); g.fillRect(px + TILE - 2, py, 2, TILE); }
+      g.fillStyle = C.ink; g.fillRect(cx - 17, o.y * TILE + 6, 34, 3); g.fillStyle = C.red; g.fillRect(cx - 16, o.y * TILE + 7, Math.round(32 * left), 1);
+    }
     // A flyer floats 12px above a small ink shadow on the ground.
     if (!unit && o.flying) { g.fillStyle = C.ink; g.fillRect(cx - 10, by - 2, 20, 2); g.fillRect(cx - 7, by, 14, 2); }
     drawMon(spriteFor(o.num, unit ? o.look : "normal"), cx, by - (!unit && o.flying ? 12 : 0));
+    // An armored enemy carries a small outlined shield at its top-left, over its sprite.
+    if (!unit && o.armored) { shieldIcon ||= mapCanvas("shield", { k: C.ink, 1: C.dim, 2: C.paper }); g.drawImage(shieldIcon, Math.round(o.x * TILE) + 2, Math.round(o.y * TILE) + 10); }
     bar(cx, o.y * TILE + 2, o.hp / o.maxHp, unit ? C.teal : C.red);
     if (unit) { g.fillStyle = C.ink; g.fillRect(cx - 17, o.y * TILE + 6, 34, 3); g.fillStyle = C.gold; g.fillRect(cx - 16, o.y * TILE + 7, Math.round(32 * o.sp / o.spMax), 1); }
     if (!unit && o.boss) { g.fillStyle = C.gold; g.fillRect(cx - 4, o.y * TILE - 6, 8, 4); }
@@ -1051,7 +1124,7 @@ function showResult() {
   if (bt.talk.length) { $("#battle-result").hidden = true; return; }
   const box = $("#battle-result");
   box.hidden = false;
-  const lines = [el("div", "title", res.stars ? "CLEARED" : "DEFEATED"), el("div", "num", res.stars ? stageStars(res.stars) : "Try another squad or placement")];
+  const lines = [el("div", "title", res.stars ? "CLEARED" : "DEFEATED"), res.stars ? (() => { const d = el("div"); d.append(stageStars(res.stars)); return d; })() : el("div", "num", "Try another squad or placement")];
   const waves = el("div"); waves.append("+", el("span", "num", res.waves), " hatch waves");
   lines.push(waves);
   const NAMES = { coins: ["coin", "coins"], regular: ["Regular voucher", "Regular vouchers"], plus: ["Plus voucher", "Plus vouchers"], gold: ["Gold voucher", "Gold vouchers"] };
