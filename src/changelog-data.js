@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 536,
+  "count": 540,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -13,6 +13,10 @@ export const CHANGELOG = [
   {"sha":"3178370","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha TD: chapter 4 screens: armored enemies","pr":191},
   {"sha":"710a68d","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 2, Proton, with flying enemies (manual review)"},
   {"sha":"588fd78","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 1 engine and the hub bridge (manual review)"},
+  {"sha":"665778e","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: one pixel font for all text"},
+  {"sha":"93bf90a","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: a 640x384 frame, so 2x fits the Google Sites game area"},
+  {"sha":"6a3e890","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: fill the window, no overlaps on the pull screen, the owner's art"},
+  {"sha":"3827f8c","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: shaded eggs, tilted tickets, machine shading"},
   {"sha":"5f23353","date":"2026-11-17","author":"Codebuff","subject":"Give a new game three days above the ranked Popular order"},
   {"sha":"5493212","date":"2026-11-17","author":"Codebuff","subject":"Let QuickDraw record reactions faster than its old 50 ms floor"},
   {"sha":"b415331","date":"2026-11-17","author":"Codebuff","subject":"Stop ranking Krillion on the shared board"},
