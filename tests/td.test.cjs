@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
 const td = moduleUnderTest('src/hub/td.js', [
-  'classOf', 'STAGES', 'CHAPTERS', 'canHit', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
+  'classOf', 'STAGES', 'CHAPTERS', 'canHit', 'FUSE', 'BLAST', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
   'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H'
 ], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor });
 const { walletBalance, activateWallet, grantOnce } = rewards;
@@ -53,9 +53,13 @@ test('classes come from stats, with healers the only hand-written list', () => {
   assert.deepEqual([...classes].sort(), ['blocker', 'caster', 'guard', 'medic', 'sniper', 'vanguard']);
 });
 
-test('chapter 1 has 8 stages and chapter 2 has 6, each with a walkable path from every spawn to the goal', () => {
-  assert.deepEqual(td.CHAPTERS.map(c => c.stages.length), [8, 6]);
-  assert.equal(td.STAGES.length, 14, 'stages unlock in this one order across chapters');
+test('chapters 1-3 have 8, 6 and 6 stages, each with a walkable path from every spawn to the goal', () => {
+  assert.deepEqual(td.CHAPTERS.map(c => c.stages.length), [8, 6, 6]);
+  assert.equal(td.STAGES.length, 20, 'stages unlock in this one order across chapters');
+  const petrel = td.CHAPTERS[2].stages[5];
+  assert.ok(petrel.boss && petrel.admin, '3-6 is the Petrel admin boss');
+  assert.ok(td.CHAPTERS[2].stages.every(s => s.waves.some(w => w[6])), 'every chapter 3 stage has exploding waves');
+  assert.ok(td.STAGES.filter(s => (s.chapter || 1) < 3).every(s => s.waves.every(w => !w[6])), 'chapters 1 and 2 have none');
   assert.ok(td.CHAPTERS[0].stages[7].boss);
   const proton = td.CHAPTERS[1].stages[5];
   assert.ok(proton.boss && proton.admin, '2-6 is the Proton admin boss, worth 1 Gold');
@@ -170,6 +174,55 @@ test('flyers cross in a straight line, ignore blockers, and only snipers hit the
   assert.equal(won.over, 'win');
 });
 
+test('snipers shoot flyers first, and everyone else the enemy with the least way left to go', () => {
+  // A Rattata on the path and a Zubat in the air, both in a sniper's range: the Zubat is shot first.
+  const stage = { id: 'x', lives: 3, level: 1, map: ['##########', 'S........G', '####H#####', '##########', '##########'],
+    waves: [[0, named('Rattata'), 1, 1], [0, named('Zubat'), 1, 1, 0, 1]] };
+  const sniper = td.unitStats(named('Archeops'));
+  const b = td.newBattle(stage, [sniper]);
+  b.energy = 99; td.deploy(b, 0, 4, 2);
+  while (b.enemies.length < 2) td.step(b);
+  const [rat, bat] = [b.enemies.find(e => !e.flying), b.enemies.find(e => e.flying)];
+  // Both in range, the Rattata further along: by distance alone it would be shot first.
+  Object.assign(rat, { x: 5, y: 1, seg: 5 }); Object.assign(bat, { x: 3, y: 1, seg: 0 });
+  rat.speed = bat.speed = 0;
+  while (rat.hp === rat.maxHp && bat.hp === bat.maxHp && !b.over) td.step(b);
+  assert.ok(bat.hp < bat.maxHp && rat.hp === rat.maxHp, 'the first shot hits the flyer');
+});
+
+test('exploders light a fuse when blocked and blow up on every unit nearby, unless killed first', () => {
+  const stage = { id: 'x', lives: 3, level: 1, map: ['##########', 'S........G', '##H#######', '##########', '##########'], waves: [[0, named('Koffing'), 1, 1, 0, 0, 1]] };
+  const onix = td.unitStats(named('Onix')), machamp = td.unitStats(named('Machamp'));
+  // A blocker alone: the Koffing is held, burns its fuse, and blasts the blocker and its neighbour.
+  let b = td.newBattle(stage, [onix, machamp]);
+  b.energy = 99;
+  td.deploy(b, 0, 3, 1); td.deploy(b, 1, 4, 1);
+  b.units.forEach(u => { u.atk = 0; });
+  const full = b.units.map(u => u.hp);
+  while (!b.enemies.length) td.step(b);
+  while (!b.enemies[0].fuse) td.step(b);
+  assert.ok(b.enemies[0].fuse <= td.FUSE, 'the fuse is lit once it is blocked');
+  while (b.enemies.length) td.step(b);
+  assert.equal(b.blasts, 1, 'it blew up');
+  assert.ok(b.units.every((u, i) => u.hp < full[i]), 'every unit within the blast is hurt');
+  assert.equal(b.leaks, 0, 'a blast is not a leak');
+  // Killed before the fuse runs out: no blast.
+  b = td.newBattle(stage, [onix, td.unitStats(named('Mewtwo'), { level: 10 })]);
+  b.energy = 99;
+  td.deploy(b, 0, 3, 1); td.deploy(b, 1, 2, 2);
+  for (let i = 0; i < 400 && !b.over; i++) td.step(b);
+  assert.equal(b.over, 'win');
+  assert.ok(!b.blasts, 'a Koffing shot down before its fuse runs out never explodes');
+  // The fuse goes out when its blocker leaves.
+  b = td.newBattle(stage, [onix]);
+  b.energy = 99; td.deploy(b, 0, 5, 1);
+  b.units[0].atk = 0;
+  while (!b.enemies.length || !b.enemies[0].fuse) td.step(b);
+  td.retreat(b, b.units[0].id);
+  td.step(b);
+  assert.equal(b.enemies[0].fuse, null, 'unblocked, it walks on with no fuse');
+});
+
 test('finishing pays waves every time, and first clear and first 3-star once', () => {
   const team = [named('Machamp'), named('Alakazam')];
   let w = owning(team);
@@ -245,4 +298,48 @@ test('levels cost coins and raise stats; the squad reads candy upgrades', () => 
   assert.equal(unit.level, 2);
   assert.ok(unit.atk > td.unitStats(num).atk);
   assert.deepEqual(td.squadFrom(w, [named('Mew')], TODAY), [], 'only owned species');
+});
+
+// Difficulty: the late stages want a type-matched squad. From the commons and rares
+// (3★ and 4★ lines), take the 60 whose first type hits the stage's enemies hardest
+// (or worst), build a squad with a class mix, and play it at level 3 with the same
+// placement a player would use (snipers first and beside the flight lines when bats fly).
+function squadFor(stage, rank) {
+  const mult = (atk, defend) => td.typeMultiplier(atk, defend);
+  const foes = stage.waves.map(w => gacha.mon(w[1]).types);
+  const fit = num => foes.reduce((s, types) => s + Math.log2(mult(gacha.mon(num).types[0], types)), 0) / foes.length;
+  const pool = dex.DEX.map((row, i) => [row, i + 1]).filter(([row]) => row[9] === 3 || row[9] === 4).map(([, num]) => num);
+  const ranked = pool.map(num => [num, rank * fit(num) + (gacha.mon(num).bst || 0) / 2000]).sort((a, b) => b[1] - a[1]).map(([num]) => num).slice(0, 60);
+  const by = cls => ranked.filter(num => td.classOf(num) === cls);
+  const flying = stage.waves.some(w => w[5]);
+  const core = [...by('blocker').slice(0, 1), ...by('guard').slice(0, 2), ...by('vanguard').slice(0, 1),
+    ...(flying ? by('sniper').slice(0, 2) : by('caster').slice(0, 2)), ...by('sniper').slice(0, 1), ...by('medic').slice(0, 1), ...by('caster').slice(0, 1)];
+  return [...new Set([...core, ...ranked])].slice(0, 8).map(num => td.unitStats(num, { level: 3 }));
+}
+function placed(stage, squad) {
+  const flying = stage.waves.some(w => w[5]);
+  const high = [];
+  stage.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H') high.push([x, y]); }));
+  if (flying) high.sort((a, b) => toFlightLines(stage, ...a) - toFlightLines(stage, ...b));
+  const ground = td.pathsOf(stage)[0].slice().reverse().filter(([x, y]) => stage.map[y][x] === '.');
+  const order = squad.map((u, slot) => slot).sort((a, b) => flying ? (squad[b].cls === 'sniper') - (squad[a].cls === 'sniper') : 0);
+  return order.map(slot => [slot, ...(squad[slot].ground ? ground.shift() || [0, 0] : high.shift() || [0, 0])]);
+}
+// Deploy in the plan's order, waiting for energy for the next one, as a player with a plan does.
+function playInOrder(stage, squad, plan) {
+  const b = td.newBattle(stage, squad);
+  for (let guard = 0; !b.over && guard < 20 * 450; guard++) {
+    for (const [slot, x, y] of plan) if (td.deploy(b, slot, x, y) === 'energy') break;
+    td.step(b);
+  }
+  return b;
+}
+test('late stages want type-matched squads: matched level-3 commons and rares win, the worst-typed lose', () => {
+  for (const id of ['1-8', '2-3', '2-4', '2-5', '2-6', '3-1', '3-2', '3-3', '3-4', '3-5', '3-6']) {
+    const stage = td.STAGES.find(s => s.id === id);
+    const good = squadFor(stage, 1), bad = squadFor(stage, -1);
+    assert.equal(playInOrder(stage, good, placed(stage, good)).over, 'win', id + ': a type-matched level-3 squad wins');
+    // The Petrel boss is the one stage a worst-typed squad can scrape through, with 1 star.
+    if (id !== '3-6') assert.equal(playInOrder(stage, bad, placed(stage, bad)).over, 'lose', id + ': the worst-typed level-3 squad loses');
+  }
 });
