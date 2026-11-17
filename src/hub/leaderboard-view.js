@@ -132,6 +132,8 @@ function renderLeaderboard() {
     button.type = 'button';
     const rank = element('span', 'lb-rank', String(index + 1).padStart(2, '0'));
     const label = element('span', 'lb-name', name + (mine ? ' (you)' : ''));
+    const buddy = buddyImage(key);
+    if (buddy) label.prepend(buddy);
     const score = element('span', 'lb-score');
 
     label.appendChild(element('small', 'lb-player-meta', row.gamesRanked + ' of ' + row.gamesPlayed + ' games scoring'));
@@ -221,6 +223,36 @@ async function loadStreaks(force) {
   }
 }
 
+// Poké Gacha buddies, shown beside handles. Optional: if the view is not
+// deployed yet, or the request fails, the board simply has no sprites.
+async function loadBuddies(force) {
+  if (!force && state.buddies && Date.now() - state.buddies.at < 60000) return;
+  const map = new Map();
+  try {
+    const rows = await request('/rest/v1/buddy_board?select=handle,species,shiny,skin&limit=5000', { token: ANON_TOKEN });
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const species = Number(row.species);
+      if (row.handle && Number.isInteger(species) && species >= 1 && species <= 1025)
+        map.set(String(row.handle).toLowerCase(), { species, shiny: row.shiny === true,
+          skin: typeof row.skin === 'string' && /^[a-z0-9][a-z0-9-]{0,39}$/.test(row.skin) ? row.skin : null });
+    }
+  } catch {}
+  state.buddies = { map, at: Date.now() };
+}
+
+function buddyImage(key) {
+  const buddy = state.buddies?.map.get(key);
+  if (!buddy) return null;
+  const img = document.createElement('img');
+  img.className = 'lb-buddy';
+  img.src = buddy.skin ? './games/content/poke-gacha/sp/' + buddy.skin + '.png'
+    : './games/content/pokedoku/sprites/' + (buddy.shiny ? 'shiny/' : '') + buddy.species + '.png';
+  img.alt = '';
+  img.width = 24; img.height = 24;
+  img.loading = 'lazy';
+  return img;
+}
+
 async function loadLeaderboard(force = false) {
   if (!backendReady()) { renderLeaderboard(); return; }
   const key = 'overall';
@@ -257,6 +289,7 @@ async function loadLeaderboard(force = false) {
     state.lbCache.set(key, { rows: [], at: Date.now(), error: authErrorMessage(err) });
   }
   await loadStreaks(force);
+  await loadBuddies(force);
   renderLeaderboard();
   // The library cards read the same rows, so they redraw once they land.
   onBoard();

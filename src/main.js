@@ -17,6 +17,7 @@ import {
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
 import { readWallet, mergeStoredWallet, observeStoredSnapshot, activateStoredWallet } from './hub/rewards.js';
+import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, mon as gachaMon } from './hub/gacha.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
@@ -630,7 +631,7 @@ function mergePlayerState(data) {
     if (!result || result.id !== id || readStored(DAILY_PREFIX + id, null)) continue;
     if (writeStored(DAILY_PREFIX + id, result)) changed = true;
   }
-  if (data.wallet) mergeStoredWallet(data.wallet);
+  if (data.wallet && mergeStoredWallet(data.wallet)) renderBuddy();
   return changed;
 }
 
@@ -649,6 +650,52 @@ function activateProfile() {
   renderRecent();
   renderLibrary();
   renderDaily();
+  renderBuddy();
+}
+
+/* ── Poké Gacha ───────────────────────────────────────────────────────────── */
+
+// The page calls the gacha through `parent.__boredGacha`, so the hub's wallet
+// is the only copy: every pull, hatch and spend is written here and synced.
+window.__boredGacha = gachaBridge({ onChange: () => { requestCloudPush(); renderBuddy(); } });
+// Pokédoku asks this for the look a player's line wears (normal, shiny or an SP skin).
+window.__boredLooks = storedLooks();
+
+// SP skins are hand-made art listed in games/content/poke-gacha/sp/skins.json.
+// Until the list loads (or if it is empty) nothing rolls or sells SP.
+fetch('./' + SKIN_DIR + 'skins.json', { cache: 'no-store' })
+  .then(response => response.ok ? response.json() : [])
+  .then(list => { setSkins(list); renderBuddy(); })
+  .catch(() => {});
+
+// The equipped buddy sits beside the player's name in the header.
+function renderBuddy() {
+  const img = $('#account-buddy');
+  if (!img) return;
+  const buddy = storedBuddy();
+  const species = buddy && gachaMon(buddy.species);
+  try { syncBuddy(); } catch {}
+  img.hidden = !species;
+  if (!species) { img.removeAttribute('src'); return; }
+  img.src = buddy.skin ? './' + SKIN_DIR + buddy.skin + '.png'
+    : './games/content/pokedoku/sprites/' + (buddy.shiny ? 'shiny/' : '') + buddy.species + '.png';
+  img.alt = 'Buddy: ' + (buddy.shiny ? 'shiny ' : '') + species.name;
+  img.title = img.alt + (buddy.skin ? ' (SP)' : '');
+}
+
+// A signed-in player's buddy is also public on the leaderboard (set_buddy, see
+// supabase/migrations/20261117000000_poke_gacha_buddies.sql). Guests never post.
+let postedBuddy = null;
+function syncBuddy() {
+  if (!hasIdentity() || !backendReady()) return;
+  const buddy = storedBuddy();
+  // Nothing to post until the player has equipped one.
+  if (!buddy) return;
+  const key = getSession().user.id + ':' + [buddy.species, buddy.shiny, buddy.skin || ''].join(',');
+  if (key === postedBuddy) return;
+  postedBuddy = key;
+  request('/rest/v1/rpc/set_buddy', { method: 'POST', body: { p_species: buddy.species, p_shiny: buddy.shiny, p_skin: buddy.skin || null } })
+    .catch(() => { postedBuddy = null; });
 }
 
 let cloudTimer = 0;
@@ -1012,6 +1059,7 @@ bootStep('library state', loadLibrary);
 bootStep('daily challenge', renderDaily);
 bootStep('recent shelf', renderRecent);
 bootStep('game library', renderLibrary);
+bootStep('buddy', renderBuddy);
 void loadPopularity();
 // The shell's watchdog reads this. It also clears the watchdog's one retry so a
 // later reload can recover from a fresh load failure.

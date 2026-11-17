@@ -164,7 +164,8 @@ PokéRogue's Manaphy egg is left out; its 1/256 goes to Common.
 - **Move UP**: doubles the chance of rolling a rare skill
 - **Legendary UP**: adds that day's banner legendary, chosen from the shared daily seed
 - **Shiny UP**: shiny chance is 1/64 (it is 1/128 on the other two machines). This is also the
-  only machine that can roll an SP skin (1/200 per egg)
+  only machine that can roll an SP skin: 1/200 per egg, and only when the hatched species has a
+  skin in the SP list (see below). Otherwise there is no SP roll
 
 ### Pity
 
@@ -210,10 +211,32 @@ Sprites come from `src/games/content/pokedoku/sprites/` (ids 1 to 1025 are all p
 
 ### SP skins and buddy (cosmetic, site-wide)
 
-- Ways to get an SP skin: the 1/200 roll on Shiny UP, or buying it for 300 shards in the shard shop
+- SP skins are hand-drawn art for a handful of popular mons, added by hand. Each skin belongs to
+  one species. They live in `src/games/content/poke-gacha/sp/`: one PNG per skin and one list
+  file, `skins.json`
+- Ways to get an SP skin: the 1/200 roll on Shiny UP (only for a species with a listed skin), or
+  buying it for 300 shards in the shard shop. The shop sells only skins in the list, and only
+  for a species line the player has hatched
+- The list ships empty. While it is empty, nothing rolls or sells SP and the SP parts of the
+  screens are hidden
+- A line wears one look: normal, shiny (if hatched shiny), or one of its owned SP skins. A skin is
+  drawn only on its own species; the rest of the line looks normal
 - **Buddy**: the player equips one mon. It shows next to their name on the leaderboard and in
   the hub header
 - Shiny and SP skins also apply in pokeclicker and Pokédoku. They never change any stats
+
+#### How to add an SP skin
+
+1. Draw the skin as a PNG, no bigger than 96×96 (the size of the largest normal sprite), on a
+   transparent background, and save it as `src/games/content/poke-gacha/sp/<id>.png`. The id is
+   lowercase letters, numbers and dashes, for example `ceruledge-birthday`
+2. Add one line to the list in `src/games/content/poke-gacha/sp/skins.json`, with a comma after
+   every entry but the last:
+   `{ "id": "ceruledge-birthday", "species": 937, "name": "Birthday" }`. `species` is the
+   national dex number the skin is drawn for, and `name` is what the screens show
+3. Run `npm test`. It fails if the list is malformed or a listed PNG is missing
+
+No code changes are needed. Taking a line out of the list hides that skin again for everyone.
 
 ## Tower defense (the main game, Arknights-style)
 

@@ -14,6 +14,8 @@
 //   bp  backpay, in coin-equivalents. The sum of every bp is capped (BACKPAY)
 //       and paid out as vouchers
 //   h   historic: recorded at activation from play that happened before it
+//   x   a small payload for Poké Gacha (the eggs a pull made, what a hatch
+//       gave); src/hub/gacha.js reads and checks it
 //
 // Poké Idle pays from marks, never from current state: income is
 // rate × (highest value ever recorded − baseline), so restarting Poké Idle and
@@ -80,6 +82,9 @@ export const ACHIEVEMENTS = [
 ];
 
 const ID = /^[a-z0-9][a-z0-9:._-]{0,119}$/i;
+const X_LIMIT = 1500;
+// Poké Gacha writes these itself (src/hub/gacha.js); nothing else may grant under them.
+const RESERVED = /^(on|mark:|base:|bp:|ach:|pdoku:|spend:|pull:|hatch:|cfg:)/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const int = value => { const n = Number(value); return Number.isFinite(n) ? Math.trunc(n) : 0; };
@@ -104,6 +109,10 @@ export function cleanEntry(raw) {
   if (entry.v !== undefined && int(entry.v) >= 0) clean.v = int(entry.v);
   if (entry.bp !== undefined && int(entry.bp) > 0) clean.bp = int(entry.bp);
   if (entry.h) clean.h = 1;
+  if (entry.x && typeof entry.x === 'object' && !Array.isArray(entry.x)) {
+    const text = JSON.stringify(entry.x);
+    if (text.length <= X_LIMIT) clean.x = JSON.parse(text);
+  }
   return clean;
 }
 
@@ -294,7 +303,7 @@ export function observeSnapshot(wallet, slug, snapshot, { today = dailyDate(), n
 /** A one-time grant from Poké Gacha itself (login, stage clears, missions). */
 export function grantOnce(wallet, id, grant, { now = Date.now() } = {}) {
   const next = mergeWallet(wallet);
-  if (!ID.test(id) || next.entries[id] || /^(on|mark:|base:|bp:|ach:|pdoku:|spend:)/.test(id))
+  if (!ID.test(id) || next.entries[id] || RESERVED.test(id))
     return { wallet: next, changed: false };
   const entry = cleanEntry({ at: seconds(now), g: grant });
   if (!entry?.g || Object.values(entry.g).some(n => n < 0)) return { wallet: next, changed: false };
@@ -306,12 +315,13 @@ export function grantOnce(wallet, id, grant, { now = Date.now() } = {}) {
  * Spend from the wallet: `cost` is positive, e.g. { coins: 100 }, and the
  * entry is a negative grant. Refused when any balance is short.
  */
-export function spendFrom(wallet, cost, { id = null, now = Date.now(), gain = {} } = {}) {
+export function spendFrom(wallet, cost, { id = null, now = Date.now(), gain = {}, x = null } = {}) {
   const next = mergeWallet(wallet);
   const balance = walletBalance(next);
   const debit = {};
   for (const [name, n] of Object.entries(object(cost))) {
-    if (!currencyOk(name) || !(int(n) > 0)) return { wallet: next, ok: false };
+    // Waves are a running total that egg progress reads, so they are never spent.
+    if (!currencyOk(name) || name === 'waves' || !(int(n) > 0)) return { wallet: next, ok: false };
     if ((balance[name] || 0) < int(n)) return { wallet: next, ok: false };
     debit[name] = -int(n);
   }
@@ -324,8 +334,10 @@ export function spendFrom(wallet, cost, { id = null, now = Date.now(), gain = {}
   const key = 'spend:' + (id || (globalThis.crypto?.randomUUID?.() ||
     Date.now().toString(36) + Math.random().toString(36).slice(2)));
   if (!ID.test(key) || next.entries[key]) return { wallet: next, ok: false };
-  next.entries[key] = { at: seconds(now), g: debit };
-  return { wallet: next, ok: true };
+  const entry = cleanEntry({ at: seconds(now), g: debit, x });
+  if (x && !entry.x) return { wallet: next, ok: false };
+  next.entries[key] = entry;
+  return { wallet: next, ok: true, id: key };
 }
 
 /** 100 coins buys one Regular voucher. */
