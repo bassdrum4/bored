@@ -278,6 +278,9 @@ test('Dex: F filters what is shown, T a type, S the order, and the choice is kep
   assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')).dexSort), 'Name', 'the choice is kept');
   assert.ok((await rowsNow()).length > 0);
   await game.evaluate(() => { pref.dexSort = 'Number'; keep(); });
+  assert.deepEqual(errors, []);
+});
+
 test('tower defense: chapter 4 says which enemies are armored', async t => {
   const { tab, game, errors } = await openWithMons(t);
   if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length > 3)) return t.skip('the hub engine has fewer than 4 chapters');
