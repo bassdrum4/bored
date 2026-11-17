@@ -41,6 +41,11 @@ export const PI_RATES = {
   tower: { coins: 10, waves: 1 }
 };
 export const PI_FIELDS = Object.keys(PI_RATES);
+// Poké Idle's daily boss (snapshot `boss: { date, won }`): a win pays once a day, and
+// 5 weekday wins in a row pay a Premium. Weekends pay the daily reward but neither
+// count toward the streak nor break it. Ledger ids: `pi:boss:<date>`, `pi:streak:<date>`.
+export const PI_BOSS = { coins: 150, waves: 15 };
+export const PI_BOSS_STREAK = { days: 5, grant: { premium: 1 } };
 export const DOKU_MODES = ['doku', 'inverse', 'shiny'];
 export const DOKU = {
   daily: { coins: 100, waves: 10 },
@@ -84,7 +89,7 @@ export const ACHIEVEMENTS = [
 const ID = /^[a-z0-9][a-z0-9:._-]{0,119}$/i;
 const X_LIMIT = 1500;
 // Poké Gacha writes these itself (src/hub/gacha.js); nothing else may grant under them.
-const RESERVED = /^(on|mark:|base:|bp:|ach:|pdoku:|spend:|pull:|hatch:|cfg:)/;
+const RESERVED = /^(on|mark:|base:|bp:|ach:|pdoku:|pi:|spend:|pull:|hatch:|cfg:)/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const int = value => { const n = Number(value); return Number.isFinite(n) ? Math.trunc(n) : 0; };
@@ -268,6 +273,20 @@ export function observeSnapshot(wallet, slug, snapshot, { today = dailyDate(), n
         put('bp:pi:' + field, { bp: value * (PI_RATES[field].coins || 0) });
       const mark = entries['mark:pi:' + field];
       if (!mark || value > mark.v) { entries['mark:pi:' + field] = { at, v: value }; changed = true; }
+    }
+    // The daily boss, for its own day (or yesterday's, beaten just before midnight).
+    const boss = object(s.boss);
+    const date = boss.date === today || boss.date === shiftDay(today, -1) ? boss.date : null;
+    if (date && boss.won === true && put('pi:boss:' + date, { g: PI_BOSS })) {
+      // Weekday wins in a row, counted back from this one, stepping over weekends.
+      const weekend = day => [0, 6].includes(new Date(day + 'T00:00:00Z').getUTCDay());
+      let run = 0;
+      if (!weekend(date)) for (let day = date; run < 400; day = shiftDay(day, -1)) {
+        if (weekend(day)) continue;
+        if (!entries['pi:boss:' + day]) break;
+        run++;
+      }
+      if (run > 0 && run % PI_BOSS_STREAK.days === 0) put('pi:streak:' + date, { g: PI_BOSS_STREAK.grant });
     }
   }
 

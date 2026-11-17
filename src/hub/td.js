@@ -487,7 +487,7 @@ export const DAILY_POOL = [
 export const WEEKLY = [
   { id: 'star3x5', label: '3-star 5 stages' },
   { id: 'daily5', label: 'Finish all daily missions on 5 days' },
-  { id: 'boss5', label: 'Beat the Poké Idle daily boss on 5 days', later: true },
+  { id: 'boss5', label: 'Beat the Poké Idle daily boss on 5 days' },
   { id: 'teams3', label: 'Clear one stage with 3 different teams' },
   { id: 'doku10', label: 'Finish 10 Pokédoku dailies' }
 ];
@@ -541,6 +541,8 @@ function weeklyDone(id, entries, list, monday) {
     for (const r of week) (teams[r.stage] ||= new Set()).add(r.team.slice().sort((a, b) => a - b).join(','));
     return Object.values(teams).some(set => set.size >= 3);
   }
+  // Read from the wallet: rewards.js writes `pi:boss:<date>` when Poké Idle reports a daily boss win.
+  if (id === 'boss5') return Object.keys(entries).filter(k => /^pi:boss:\d{4}-\d{2}-\d{2}$/.test(k) && inWeek(k.slice(-10))).length >= 5;
   if (id === 'doku10') return Object.keys(entries).filter(k => /^pdoku:daily:[a-z]+:\d{4}-\d{2}-\d{2}$/.test(k) && inWeek(k.slice(-10))).length >= 10;
   return false;
 }

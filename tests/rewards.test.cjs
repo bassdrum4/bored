@@ -197,3 +197,39 @@ test('the account copy carries the wallet through the cloud merge', () => {
   assert.equal(walletBalance(merged.wallet).regular, 6);
   assert.equal('wallet' in mergeCloudState({}, {}), false, 'rows without a wallet stay as they were');
 });
+
+test('the Poké Idle daily boss pays once a day, and five weekday wins in a row pay a Premium; weekends neither count nor break it', () => {
+  // 2026-11-16 is a Monday.
+  const day = d => '2026-11-' + String(d).padStart(2, '0');
+  const at = d => ({ today: day(d), now: Date.parse(day(d) + 'T15:00:00Z') });
+  const win = (w, d, won = true) => observeSnapshot(w, 'poke-idle', idle({ boss: { date: day(d), won } }), at(d)).wallet;
+  let w = activateWallet({}, at(16)).wallet;
+  const before = walletBalance(w);
+  w = win(w, 16, false);
+  assert.equal(w.entries['pi:boss:' + day(16)], undefined, 'not beaten, not paid');
+  w = win(win(w, 16), 16);
+  assert.deepEqual(w.entries['pi:boss:' + day(16)].g, { coins: 150, waves: 15 });
+  assert.equal(walletBalance(w).coins - before.coins, 150, 'once a day');
+  // Monday to Friday: the fifth win pays a Premium.
+  for (const d of [17, 18, 19]) w = win(w, d);
+  assert.equal(walletBalance(w).premium, before.premium);
+  w = win(w, 20);
+  assert.deepEqual(w.entries['pi:streak:' + day(20)].g, { premium: 1 });
+  // A weekend win pays its coins; the weekend neither counts nor breaks the run.
+  w = win(w, 21);
+  assert.ok(w.entries['pi:boss:' + day(21)]);
+  assert.equal(w.entries['pi:streak:' + day(21)], undefined);
+  for (const d of [23, 24, 25, 26]) w = win(w, d);
+  assert.equal(w.entries['pi:streak:' + day(26)], undefined, 'four into the next run');
+  w = win(w, 27);
+  assert.ok(w.entries['pi:streak:' + day(27)], 'ten weekday wins in a row: a second Premium, across the weekend');
+  assert.equal(walletBalance(w).premium - before.premium, 2);
+  // A missed weekday breaks the run.
+  let gap = activateWallet({}, at(16)).wallet;
+  for (const d of [16, 17, 19, 20, 23]) gap = win(gap, d);
+  assert.equal(Object.keys(gap.entries).filter(id => id.startsWith('pi:streak:')).length, 0);
+  // Yesterday's boss still pays today; an older one, or a forged id, does not.
+  assert.ok(observeSnapshot(activateWallet({}, at(17)).wallet, 'poke-idle', idle({ boss: { date: day(16), won: true } }), at(17)).wallet.entries['pi:boss:' + day(16)]);
+  assert.equal(observeSnapshot(activateWallet({}, at(18)).wallet, 'poke-idle', idle({ boss: { date: day(16), won: true } }), at(18)).wallet.entries['pi:boss:' + day(16)], undefined);
+  assert.equal(grantOnce(w, 'pi:boss:' + day(28), { coins: 150 }).changed, false, 'pi: ids are the hub\'s own');
+});

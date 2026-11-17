@@ -309,8 +309,21 @@ test('weekly missions: Pokédoku dailies and teams count within the Monday week'
   const weekly = Object.fromEntries(td.tdState(w, TODAY).weekly.map(m => [m.id, m.done]));
   assert.equal(weekly.doku10, true);
   assert.equal(weekly.teams3, true);
-  assert.equal(weekly.boss5, false, 'the Poké Idle boss is not built yet');
+  assert.equal(weekly.boss5, false, 'no daily boss wins yet');
   assert.equal(td.tdState(w, TODAY).weeklyAll, false);
+});
+
+test('weekly: the Poké Idle daily boss on 5 days of the week opens the mission (and the all-weekly Gold can be reached)', () => {
+  let w = owning([named('Machamp')]);
+  for (const d of ['2026-11-13', '2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19']) w.entries['pi:boss:' + d] = { at: 1, g: { coins: 150, waves: 15 } };
+  const done = wallet => td.tdState(wallet, TODAY).weekly.find(m => m.id === 'boss5').done;
+  w = td.tdFinish(w, { stage: '1-1', stars: 1, team: [named('Machamp')], waves: 1 }, opts()).wallet;
+  assert.equal(done(w), false, 'last Friday is another week');
+  w.entries['pi:boss:2026-11-22'] = { at: 1, g: { coins: 150, waves: 15 } };
+  w = td.tdFinish(w, { stage: '1-1', stars: 1, team: [named('Machamp')], waves: 1 }, opts()).wallet;
+  assert.equal(done(w), true);
+  assert.ok(w.entries['td:week:2026-11-16:boss5']);
+  assert.ok(td.tdState(w, TODAY).weekly.every(m => !m.later), 'no weekly mission is locked');
 });
 
 test('levels cost coins and raise stats; the squad reads candy upgrades', () => {
