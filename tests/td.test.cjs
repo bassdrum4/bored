@@ -179,6 +179,9 @@ test('snipers shoot flyers first, and everyone else the enemy with the least way
   b.energy = 99; td.deploy(b, 0, 4, 2);
   while (b.enemies.length < 2) td.step(b);
   const [rat, bat] = [b.enemies.find(e => !e.flying), b.enemies.find(e => e.flying)];
+  // Both in range, the Rattata further along: by distance alone it would be shot first.
+  Object.assign(rat, { x: 5, y: 1, seg: 5 }); Object.assign(bat, { x: 3, y: 1, seg: 0 });
+  rat.speed = bat.speed = 0;
   while (rat.hp === rat.maxHp && bat.hp === bat.maxHp && !b.over) td.step(b);
   assert.ok(bat.hp < bat.maxHp && rat.hp === rat.maxHp, 'the first shot hits the flyer');
 });
