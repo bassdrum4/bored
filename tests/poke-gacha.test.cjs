@@ -433,12 +433,15 @@ test('weekly challenge: risks stack, the run uses them, and a win scores the ris
   assert.match(await game.$eval('#story-title', n => n.textContent), /^WEEKLY/);
   const rowsShown = await game.$$eval('#story-list > div', rows => rows.map(r => r.textContent));
   assert.equal(rowsShown.length, await game.evaluate(() => T.risks.length + 1), 'a Start row and one row per risk');
-  assert.match(rowsShown[0], /locked/, 'locked until 1-1 is cleared');
+  assert.match(rowsShown[0], /locked/, 'locked until 1-8 is cleared');
   await key(tab, 'Enter');
-  assert.match(await game.$eval('#msg', n => n.textContent), /Clear 1-1 first/);
+  assert.match(await game.$eval('#msg', n => n.textContent), /Clear 1-8 first/);
+  // Clearing 1-1 is not enough: the chapter 1 boss opens it.
+  await game.evaluate(() => { T.finish({ stage: '1-1', stars: 3, team: [S.owned[0]], waves: 2 }); storyUpdate(); });
+  assert.match((await game.$$eval('#story-list > div', rows => rows.map(r => r.textContent)))[0], /locked/);
 
-  // Clear 1-1, then stack two risks: harder HP (+1) and one life (+3).
-  await game.evaluate(() => { T.finish({ stage: '1-1', stars: 3, team: [S.owned[0]], waves: 2 }); pref.risks = []; keep(); storyUpdate(); });
+  // Clear 1-8, then stack two risks: harder HP (+1) and one life (+3).
+  await game.evaluate(() => { T.finish({ stage: '1-8', stars: 1, team: [S.owned[0]], waves: 2 }); pref.risks = []; keep(); storyUpdate(); });
   const at = id => game.evaluate(i => T.risks.findIndex(r => r.id === i) + 1, id);
   for (const id of ['hp', 'onelife']) { await game.evaluate(i => { storyAt = i; storyUpdate(); }, await at(id)); await key(tab, 'Enter'); }
   assert.deepEqual(await game.evaluate(() => riskPick().sort()), ['hp', 'onelife']);
@@ -450,6 +453,14 @@ test('weekly challenge: risks stack, the run uses them, and a win scores the ris
   await key(tab, 'Enter'); assert.equal(await game.evaluate(() => T.riskOf(riskPick())), 4);
   const panel = await game.$eval('#story-info', n => [n.scrollHeight, n.clientHeight]);
   assert.ok(panel[0] <= panel[1], 'the weekly panel does not overflow');
+  // The four risk milestones, none claimed yet this week (when the hub has them).
+  const milestones = await game.evaluate(() => !!T.milestones);
+  if (milestones) {
+    const cells = await game.$$eval('#story-info .milestones > span', ns => ns.map(n => ({ text: n.textContent, dim: n.classList.contains('dim') })));
+    assert.equal(cells.length, 4);
+    assert.deepEqual(cells.map(c => c.text.match(/Risk (\d+)/)[1]), ['3', '7', '10', '12']);
+    assert.ok(cells.every(c => c.dim), 'nothing claimed yet');
+  }
 
   // Start: squad, then the battle carries the risks.
   await game.evaluate(() => { storyAt = 0; storyUpdate(); });
@@ -479,5 +490,14 @@ test('weekly challenge: risks stack, the run uses them, and a win scores the ris
   await key(tab, 'Enter');
   assert.equal(await game.evaluate(() => onWeekly()), true, 'back on the weekly page');
   assert.equal(await game.evaluate(() => T.state().challengeBest), won ? 4 : 0);
+  assert.equal((await game.evaluate(() => __boredSnapshot())).weeklyRisk, won ? 4 : 0, 'the snapshot carries the best risk for the board');
+  if (milestones) {
+    // A win at risk 4 pays the risk-3 milestone (a Plus) once; the page shows it claimed.
+    const claimed = await game.evaluate(() => T.state().challengeClaimed);
+    assert.deepEqual(claimed, [won, false, false, false]);
+    const dims = await game.$$eval('#story-info .milestones > span', ns => ns.map(n => n.classList.contains('dim')));
+    assert.deepEqual(dims, [!won, true, true, true]);
+    if (won) assert.match(result, /\+1/, 'the result lists the Plus');
+  }
   assert.deepEqual(errors, []);
 });
