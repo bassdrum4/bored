@@ -907,6 +907,8 @@ const allStages = () => chapters().flatMap(c => c.stages);
 const isOpen = (td, stage) => td.unlockedById ? !!td.unlockedById[stage.id] : !!td.unlocked[T.stages.indexOf(stage)];
 const stageBefore = stage => allStages()[allStages().indexOf(stage) - 1];
 const flyersOf = stage => [...new Set(stage.waves.filter(w => w[5]).map(w => w[1]))];
+// Exploders (wave field 6, chapter 3 on): blocked, they light a fuse and then blow up.
+const explodersOf = stage => [...new Set(stage.waves.filter(w => w[6]).map(w => w[1]))];
 const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
 const stageStars = starIcons;
 function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5]).map(w => w[1]))].map(name).join(", "); }
@@ -926,12 +928,15 @@ function storyUpdate() {
   info.replaceChildren(el("div", "title", stage.admin ? "ADMIN" : stage.boss ? "BOSS" : "STAGE"), el("div", "", stage.name), el("div", "dim", stage.waves.length + " waves · " + stage.lives + " lives"),
     el("div", "dim", "Enemies: " + enemiesOf(stage)));
   // Flying enemies: only snipers can hit them, so a stage says so up front.
-  if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ") + ". Snipers only."));
+  // Short notes here; the advice goes in the message box, so the panel never overflows.
+  if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ")));
+  if (explodersOf(stage).length) info.append(el("div", "gold", "Explodes: " + explodersOf(stage).map(name).join(", ")));
   const reward = el("div"); reward.append(best ? "Best " : "First clear: ", best ? stageStars(best) : el("span", "num", "50"), best ? "" : " coins + 2 Regular");
   info.append(reward);
   if (stage.admin && !best) { const g = el("div"); g.append("Admin: ", el("span", "num", "+1"), " Gold"); info.append(g); }
   if (best < 3) { const r3 = el("div", "dim"); r3.append("First 3★: ", el("span", "num", "100"), " coins + 1 Plus"); info.append(r3); }
-  const more = chapters().length > 1 ? " Left/Right: chapter." : "";
+  const more = (flyersOf(stage).length ? " Only snipers hit flyers." : "") + (explodersOf(stage).length ? " Kill exploders before the fuse." : "") +
+    (chapters().length > 1 ? " Left/Right: chapter." : "");
   say((isOpen(td, stage) ? stage.before[0] + " Enter: choose your squad." : "Clear " + stageBefore(stage).id + " to unlock this stage.") + more);
 }
 function pickStage() {
@@ -1065,6 +1070,12 @@ function drawField() {
   const things = [...b.units.map(o => ({ o, unit: true })), ...b.enemies.map(o => ({ o, unit: false }))].sort((a, c) => a.o.y - c.o.y);
   for (const { o, unit } of things) {
     const cx = o.x * TILE + TILE / 2, by = o.y * TILE + TILE - 4;
+    // A lit fuse: the tile blinks a red box, and a red bar under the HP bar burns down.
+    if (!unit && o.fuse !== null && o.fuse !== undefined) {
+      const left = Math.max(0, o.fuse / (T.FUSE || 2.5));
+      if (Math.floor(performance.now() / 150) % 2) { g.fillStyle = C.red; const px = o.x * TILE, py = o.y * TILE; g.fillRect(px, py, TILE, 2); g.fillRect(px, py + TILE - 2, TILE, 2); g.fillRect(px, py, 2, TILE); g.fillRect(px + TILE - 2, py, 2, TILE); }
+      g.fillStyle = C.ink; g.fillRect(cx - 17, o.y * TILE + 6, 34, 3); g.fillStyle = C.red; g.fillRect(cx - 16, o.y * TILE + 7, Math.round(32 * left), 1);
+    }
     // A flyer floats 12px above a small ink shadow on the ground.
     if (!unit && o.flying) { g.fillStyle = C.ink; g.fillRect(cx - 10, by - 2, 20, 2); g.fillRect(cx - 7, by, 14, 2); }
     drawMon(spriteFor(o.num, unit ? o.look : "normal"), cx, by - (!unit && o.flying ? 12 : 0));

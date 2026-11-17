@@ -211,18 +211,42 @@ test('tower defense: Left and Right switch chapters, and chapter 2 says which en
     refreshTop();
   });
   await key(tab, '1');
-  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/2/);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/[2-9]/);
   await key(tab, 'ArrowRight');
-  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*2\/2/);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*2\/[2-9]/);
   const rows = await game.$$eval('#story-list > div', list => list.map(r => r.textContent));
   assert.equal(rows.length, 6);
   assert.match(rows[0], /^2-1 /);
   assert.doesNotMatch(rows[0], /locked/, '2-1 is open after 1-8');
   assert.match(rows[1], /locked/);
-  assert.match(await game.$eval('#story-info', n => n.textContent), /Flying: .*Snipers only/);
+  assert.match(await game.$eval('#story-info', n => n.textContent), /Flying: Zubat/);
+  assert.match(await game.$eval('#msg', n => n.textContent), /Only snipers hit flyers/);
   await key(tab, 'ArrowDown', 5);
   assert.match(await game.$eval('#story-info', n => n.textContent), /ADMIN/, '2-6 is the admin stage');
   await key(tab, 'ArrowLeft');
-  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/2/);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/[2-9]/);
+  assert.deepEqual(errors, []);
+});
+
+test('tower defense: chapter 3 says which enemies explode', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length > 2)) return t.skip('the hub engine has fewer than 3 chapters');
+  // Recorded clears of 1-8 and 2-6 open chapter 3.
+  await game.evaluate(() => {
+    const w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    for (const st of ['1-8', '2-6']) w.entries['td:run:test-' + st] = { at: Math.floor(Date.now() / 1000), x: { st, s: 3, tm: [], d: T.state().monday } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    refreshTop();
+  });
+  await key(tab, '1');
+  await key(tab, 'ArrowRight', 2);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*3\//);
+  const rows = await game.$$eval('#story-list > div', list => list.map(r => r.textContent));
+  assert.equal(rows.length, 6);
+  assert.doesNotMatch(rows[0], /locked/, '3-1 is open after 2-6');
+  assert.match(await game.$eval('#story-info', n => n.textContent), /Explodes: Koffing/);
+  assert.match(await game.$eval('#msg', n => n.textContent), /Kill exploders before the fuse/);
+  const info = await game.$eval('#story-info', n => [n.scrollHeight, n.clientHeight]);
+  assert.ok(info[0] <= info[1], 'the stage panel does not overflow');
   assert.deepEqual(errors, []);
 });
