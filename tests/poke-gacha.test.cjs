@@ -556,7 +556,7 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
   assert.equal(await game.evaluate(() => storyMode), 'squad');
   assert.equal(await game.$eval('#msg', n => n.hidden), true, 'the squad screen uses the whole stage');
   // The stage it is for, and what it sends.
-  assert.match(await game.$eval('#squad-stage', n => n.textContent), /1-1.*Foes: Normal/);
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /1-1.*Tank Rock, Steel.*Dmg Fighting/);
   // Every roster card: class icon, level as "Lv n" and the deploy cost as its own badge, matching the engine.
   const cards = await game.evaluate(() => [...document.querySelectorAll('#squad-grid > .card')].map((c, i) => ({
     lv: c.querySelector('.low').textContent, cost: c.querySelector('.cost').textContent, icon: !!c.querySelector('canvas.ci'),
@@ -836,8 +836,39 @@ test('stage preview shows types, waves and a recommended level; a loss names wha
   await game.waitForFunction(() => battle.done, { timeout: 60000 });
   for (let i = 0; i < 4 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
   const result = await game.$eval('#battle-result', n => [n.textContent, n.scrollHeight, n.clientHeight]);
-  assert.match(result[0], /DEFEATED.*weak to Fighting/);
+  assert.match(result[0], /DEFEATED.*Fighting/);
   assert.ok(result[1] <= result[2], 'the hint fits the result box');
+  assert.deepEqual(errors, []);
+});
+
+test('roles: 1-1 asks for tanks that resist Normal and Fighting damage, the loss hint says which went wrong, Squad marks the fits', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '1');
+  const on11 = fn => game.evaluate(fn => new Function('stage', 'return ' + fn)(T.allStages.find(s => s.id === '1-1')), String(fn).replace(/^stage => /, ''));
+  // Rattata attacks with Normal: Rock and Steel resist it, Ghost is immune (Rock and Steel have more tanks).
+  assert.deepEqual(await on11(stage => attackTypes(stage)), ['Normal']);
+  assert.deepEqual(await on11(stage => tankTypes(stage, 3)), ['Rock', 'Steel', 'Ghost']);
+  assert.ok(await on11(stage => tankTypes(stage, 3).every(t => T.typeMultiplier('Normal', [t]) < 1)), 'every tank type resists Normal');
+  // Rattata is Normal: Fighting is super effective.
+  assert.deepEqual(await on11(stage => weakTo(stage)), ['Fighting']);
+  assert.ok(await on11(stage => T.typeMultiplier('Fighting', ['Normal']) > 1));
+  // The preview shows both.
+  assert.match(await game.$eval('#story-info .roles', n => n.textContent), /^Tanks: Rock, Steel\s*Damage: Fighting$/);
+  // The loss hint: a blocker that fell fast wants a tank, foes that leaked healthy want damage, else both roles.
+  assert.match(await on11(stage => lossHint(stage, { fell: [{ cls: 'blocker', lasted: 6 }], leakHp: [0.1] })), /blocker fell fast: try a tank that resists Normal \(Rock, Steel\)/);
+  assert.match(await on11(stage => lossHint(stage, { fell: [], leakHp: [0.9, 0.7] })), /most of their HP: bring Fighting damage/);
+  assert.match(await on11(stage => lossHint(stage, { fell: [{ cls: 'blocker', lasted: 60 }], leakHp: [0.2] })), /Tanks: Rock, Steel · Damage: Fighting/);
+  // Who fits: a Rock or Ghost blocker is a tank here, a Fighting caster or sniper is damage; others are neither.
+  assert.deepEqual(await on11(stage => [['blocker', ['Rock', 'Ground']], ['guard', ['Ghost']], ['blocker', ['Fighting']], ['caster', ['Fighting']], ['sniper', ['Fighting', 'Steel']],
+    ['caster', ['Fire']], ['medic', ['Rock']]].map(([cls, types]) => roleFit({ cls, types }, stage))), ['tank', 'tank', '', 'damage', 'damage', '', '']);
+  // Squad from 1-1 marks exactly the owned mons that fit, and its stage box names both roles.
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => storyMode), 'squad');
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /Tank Rock, Steel.*Dmg Fighting/);
+  const marks = await game.evaluate(() => [...document.querySelectorAll('#squad-grid .card')].map(c => c.classList.contains('fit-tank') ? 'tank' : c.classList.contains('fit-damage') ? 'damage' : ''));
+  const want = await game.evaluate(() => roster().list.map(u => roleFit(u, stageNow())));
+  assert.deepEqual(marks, want);
+  assert.ok(await game.evaluate(() => [...document.querySelectorAll('#squad-grid .card.fit-tank, #squad-grid .card.fit-damage')].every(c => c.querySelector('.fit').offsetHeight > 0)), 'fits show a bar');
   assert.deepEqual(errors, []);
 });
 
