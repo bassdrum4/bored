@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 566,
+  "count": 567,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"e053515","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: role-aware stage preview and loss hints, rates + pity, tab dots","pr":208},
+  {"sha":"e4b4b93","date":"2026-11-17","author":"Claude","subject":"scripts/economy-sim.mjs: a normal player's month in coins and vouchers (report only)"},
   {"sha":"501f952","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: a short, skippable tutorial","pr":207},
   {"sha":"3ca86a3","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: battle redo, 3/4 camera + combat feel (queue item 1)","pr":206},
   {"sha":"8d77072","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Idle: a shiny counts for its whole evolution line; in-party border only for the party","pr":205},
