@@ -686,6 +686,29 @@ function endHatch() { hatching = null; $("#hatch").hidden = true; for (const id 
 /* ── Dex: every line an egg can hatch, and what candy does ─────────────── */
 const BASES = G ? G.dex.map((row, i) => row[9] > 0 ? i + 1 : 0).filter(Boolean) : [];
 let dexAt = 0, dexFocus = "list", actAt = 0;
+// Filters and sorting: F cycles what is shown, T cycles a type, S cycles the order. Kept per device.
+const DEX_FILTERS = ["All", "Owned", "Not owned", "3★", "4★", "5★", "6★"], DEX_SORTS = ["Number", "Name", "Tier"];
+const DEX_TYPES = [...new Set(BASES.flatMap(num => G.dex[num - 1][1].split("/")))].sort();
+const dexView = () => ({ filter: DEX_FILTERS.includes(pref.dexFilter) ? pref.dexFilter : "All",
+  type: DEX_TYPES.includes(pref.dexType) ? pref.dexType : "", sort: DEX_SORTS.includes(pref.dexSort) ? pref.dexSort : "Number" });
+function dexList() {
+  const v = dexView(), tier = num => G.dex[num - 1][9];
+  let list = BASES.filter(num => v.filter === "Owned" ? !!S.lines[num] : v.filter === "Not owned" ? !S.lines[num]
+    : /★/.test(v.filter) ? tier(num) === Number(v.filter[0]) : true);
+  if (v.type) list = list.filter(num => G.dex[num - 1][1].split("/").includes(v.type));
+  if (v.sort === "Name") list = list.slice().sort((a, b) => name(a).localeCompare(name(b)));
+  if (v.sort === "Tier") list = list.slice().sort((a, b) => tier(b) - tier(a) || a - b);
+  return list;
+}
+function cycleDex(what) {
+  const v = dexView();
+  if (what === "f") pref.dexFilter = DEX_FILTERS[(DEX_FILTERS.indexOf(v.filter) + 1) % DEX_FILTERS.length];
+  if (what === "t") pref.dexType = ["", ...DEX_TYPES][(["", ...DEX_TYPES].indexOf(v.type) + 1) % (DEX_TYPES.length + 1)];
+  if (what === "s") pref.dexSort = DEX_SORTS[(DEX_SORTS.indexOf(v.sort) + 1) % DEX_SORTS.length];
+  keep(); dexAt = 0; actAt = 0; dexFocus = "list"; dexUpdate();
+  if (dexList().length) say(dexViewText() + " " + dexList().length + " shown.");
+}
+const dexViewText = () => { const v = dexView(); return "F: " + v.filter + " · T: " + (v.type || "any type") + " · S: " + v.sort + "."; };
 const lineForms = line => S.owned.filter(num => G.lineOf(num) === line);
 const tipOf = line => lineForms(line).sort((a, b) => G.stageOf(b) - G.stageOf(a) || a - b)[0] || line;
 function dexActions(line) {
@@ -718,11 +741,20 @@ function dexActions(line) {
 }
 function dexUpdate() {
   drawBackdrop();
-  const owned = new Set(Object.keys(S.lines).map(Number));
-  titled($("#dex-title"), "DEX", owned.size + "/" + BASES.length);
-  rows($("#dex-rows"), BASES.map(num => ({ label: String(num).padStart(4, "0") + " " + name(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
+  const owned = new Set(Object.keys(S.lines).map(Number)), list = dexList(), v = dexView();
+  // The count: caught of all lines, or shown of all lines while a filter is on.
+  const filtered = v.filter !== "All" || v.type;
+  titled($("#dex-title"), "DEX", (filtered ? list.length : owned.size) + "/" + BASES.length);
+  const view = dexViewText();
+  $("#dex-detail").hidden = !list.length;
+  if (!list.length) {
+    $("#dex-rows").replaceChildren(el("p", "dim", "No lines match."));
+    return say("Nothing matches " + view + " Press F, T or S to change it.");
+  }
+  if (dexAt >= list.length) dexAt = list.length - 1;
+  rows($("#dex-rows"), list.map(num => ({ label: String(num).padStart(4, "0") + " " + name(num), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
     dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); });
-  const line = BASES[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
+  const line = list[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
   const shown = l && isSkin(l.look) && skinOf(l.look) ? skinOf(l.look).species : tip;
   $("#dex-pic").replaceChildren(sprite(shown, l ? G.lookFor(shown) : "normal", !l));
   const info = $("#dex-info");
@@ -737,7 +769,7 @@ function dexUpdate() {
   if (!l) $("#dex-acts").replaceChildren(el("p", "dim", "Hatches from " + TIER_NAME[G.dex[line - 1][9] - 3] + " eggs."));
   const skills = G.skillsOf(line).map((skill, i) => (l && l.skills[i] ? skill : "(" + skill + ")") + (i === 3 ? "*" : ""));
   say(dexFocus === "acts" && acts[actAt] ? acts[actAt].about
-    : (l ? "Skills: " + skills.join(", ") + ". Locked in brackets, * is rare. Enter: candy and looks." : "Hatch this line to unlock it. " + HINT));
+    : (l ? "Skills: " + skills.join(", ") + ". Locked in brackets, * is rare. Enter: candy and looks." : "Hatch this line to unlock it. F, T and S filter and sort the Dex."));
 }
 function runDex(action) {
   if (!action || action.off) return;
@@ -748,12 +780,13 @@ function runDex(action) {
 function dexKey(e) {
   const k = e.key;
   if (dexFocus === "list") {
-    const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -8, ArrowRight: 8 }[k];
-    if (step) { e.preventDefault(); dexAt = Math.max(0, Math.min(BASES.length - 1, dexAt + step)); actAt = 0; return dexUpdate(); }
-    if (k === "Enter" || k === " ") { e.preventDefault(); if (dexActions(BASES[dexAt]).length) { dexFocus = "acts"; actAt = 0; dexUpdate(); } }
+    const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -8, ArrowRight: 8 }[k], list = dexList();
+    if (/^[fts]$/i.test(k)) { e.preventDefault(); return cycleDex(k.toLowerCase()); }
+    if (step) { e.preventDefault(); dexAt = Math.max(0, Math.min(list.length - 1, dexAt + step)); actAt = 0; return dexUpdate(); }
+    if (k === "Enter" || k === " ") { e.preventDefault(); if (list[dexAt] && dexActions(list[dexAt]).length) { dexFocus = "acts"; actAt = 0; dexUpdate(); } }
     if (k === "Backspace") { e.preventDefault(); go("pull"); }
   } else {
-    const acts = dexActions(BASES[dexAt]);
+    const acts = dexActions(dexList()[dexAt]);
     if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); actAt = (actAt + (k === "ArrowUp" ? -1 : 1) + acts.length) % acts.length; return dexUpdate(); }
     if (k === "Enter" || k === " ") { e.preventDefault(); return runDex(acts[actAt]); }
     if (k === "Backspace" || k === "ArrowLeft") { e.preventDefault(); dexFocus = "list"; dexUpdate(); }

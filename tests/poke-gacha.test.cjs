@@ -250,3 +250,33 @@ test('tower defense: chapter 3 says which enemies explode', async t => {
   assert.ok(info[0] <= info[1], 'the stage panel does not overflow');
   assert.deepEqual(errors, []);
 });
+
+test('Dex: F filters what is shown, T a type, S the order, and the choice is kept', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; pref.dexSort = 'Number'; keep(); go('dex'); });
+  const rowsNow = () => game.$$eval('#dex-rows > div', list => list.map(r => r.textContent.trim()));
+  const all = await game.evaluate(() => dexList().length);
+  assert.equal(all, await game.evaluate(() => BASES.length), 'All shows every line');
+  await key(tab, 'f');
+  assert.deepEqual(await game.evaluate(() => dexList().every(num => !!S.lines[num])), true, 'Owned shows only owned lines');
+  assert.equal(await game.evaluate(() => dexList().length), await game.evaluate(() => Object.keys(S.lines).length));
+  assert.match(await game.$eval('#msg', n => n.textContent), /F: Owned/);
+  const msg = await game.$eval('#msg', n => [n.scrollHeight, n.clientHeight]);
+  assert.ok(msg[0] <= msg[1], 'the message box does not overflow');
+  await key(tab, 'f');
+  assert.ok(await game.evaluate(() => dexList().every(num => !S.lines[num])), 'Not owned shows only missing lines');
+  // A type: every line shown has it.
+  await key(tab, 't');
+  const type = await game.evaluate(() => dexView().type);
+  assert.ok(type);
+  assert.ok(await game.evaluate(t => dexList().every(num => G.dex[num - 1][1].split('/').includes(t)), type), 'every line shown is ' + type);
+  // Back to all, any type; sort by name.
+  await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; keep(); dexUpdate(); });
+  await key(tab, 's');
+  const names = await game.evaluate(() => dexList().map(name));
+  assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b)), 'S sorts by name');
+  assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')).dexSort), 'Name', 'the choice is kept');
+  assert.ok((await rowsNow()).length > 0);
+  await game.evaluate(() => { pref.dexSort = 'Number'; keep(); });
+  assert.deepEqual(errors, []);
+});
