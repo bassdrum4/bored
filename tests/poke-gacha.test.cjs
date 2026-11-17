@@ -643,25 +643,40 @@ test('battle: blocked enemies stand clear of the blocker, hits show numbers and 
       vt += 50; stepWithFx(battle);
       sawNum ||= battle.fx.some(f => f.kind === 'num');
       sawFlash ||= Object.values(battle.anim).some(a => a && a.flash);
-      const e = b.enemies.find(o => o.blockedBy);
+      const e = b.enemies.find(o => o.blockedBy && !o.flying);
       if (e && !blocked) {
         const u = b.units.find(o => o.id === e.blockedBy);
         const [ex, ey] = enemySpot(battle, e);
-        blocked = { gap: Math.hypot(ex - u.x, ey - u.y), facing: facesRight(e) === (u.x > ex) };
+        const [fx, fy] = feetOf(battle, e), [gx, gy] = feet(st, ex, ey, false);
+        drawField(vt);
+        const bar = (battle.bars || []).find(p => p.id === 'e' + e.id);
+        blocked = { gap: Math.hypot(ex - u.x, ey - u.y), facing: facesRight(e) === (u.x > ex) || facesRight(e) === (u.x >= ex),
+          tile: st.map[Math.round(ey)][Math.round(ex)], sameRow: Math.round(ey) === u.y || Math.round(ex) === u.x,
+          rowOffset: Math.abs(ey - Math.round(ey)), raised: fy !== gy || fx !== gx, bar: !!bar && bar.y > 0 };
       }
       if (blocked && sawNum && sawFlash) break;
     }
     drawField(vt);
+    // Every live enemy has its HP bar on the top layer, inside the field; every sprite fits the 48x64 box.
+    const ids = new Set((battle.bars || []).filter(p => p.y >= 0 && p.y < FIELD_H).map(p => p.id));
+    const allBars = b.enemies.every(e => ids.has('e' + e.id)) && b.units.every(u => ids.has('u' + u.id));
+    const fits = [...b.units, ...b.enemies].every(o => { const img = spriteFor(o.num, o.look || 'normal'), tr = trimOf(img); return !tr || ((tr.b - tr.t) * fitOf(tr) <= 48.5 && (tr.r - tr.l) * fitOf(tr) <= 64.5); });
     performance.now = real;
     // Range preview: hovering a high tile with the sniper card shows its range.
     const si = b.squad.findIndex(u => u.cls === 'sniper');
     const high = []; st.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H') high.push([x, y]); }));
     battle.slot = si; battle.hover = high[0];
-    return { blocked, sawNum, sawFlash, range: inRange(b.squad[si], high[0][0], high[0][1]).length };
+    return { blocked, sawNum, sawFlash, allBars, fits, range: inRange(b.squad[si], high[0][0], high[0][1]).length };
   });
   assert.ok(result.blocked, 'an enemy was blocked');
   assert.ok(result.blocked.gap >= 0.8, 'a blocked enemy stands at the edge of the tile, not on the blocker');
   assert.ok(result.blocked.facing, 'and faces it');
+  assert.ok(['.', 'S'].includes(result.blocked.tile), 'a blocked ground enemy stands on the path, not up on high ground: ' + result.blocked.tile);
+  assert.ok(result.blocked.sameRow && result.blocked.rowOffset < 0.01, 'in the path tile next to the blocker, along the path');
+  assert.equal(result.blocked.raised, false, 'only flyers are raised');
+  assert.ok(result.blocked.bar, 'a blocked enemy keeps its HP bar');
+  assert.ok(result.allBars, 'every live enemy and unit has an HP bar');
+  assert.ok(result.fits, 'every sprite fits the tile box');
   assert.ok(result.sawNum && result.sawFlash, 'hits show a number and a flash');
   assert.ok(result.range > 4, 'a sniper covers several tiles');
   // The field is drawn in the 3/4 view: high ground stands above the floor.
