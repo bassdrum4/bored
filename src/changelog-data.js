@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 551,
+  "count": 553,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,8 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"296df59","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: the chapter 3 and 4 stage panels fit again","pr":196},
+  {"sha":"26b6341","date":"2026-11-17","author":"Claude","subject":"gacha-screen test: get past the starter pick before measuring the pull screen"},
+  {"sha":"81fc26f","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: starter pick, three gifted commons and ten free hatches"},
   {"sha":"4a6acd5","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: centered scene, closed machine bases, arrow columns, quarter-step scale"},
   {"sha":"76393d0","date":"2026-11-17","author":"Claude","subject":"wip: pull layout"},
   {"sha":"98d8997","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: weekly challenge stage with stacking risk modifiers (draft)"},
