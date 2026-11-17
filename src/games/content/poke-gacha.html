@@ -787,7 +787,17 @@ function questItems() {
   const login = [{ label: "Daily login", right: [3, ticket("regular"), check(S.login)], about: "Open Poké Gacha each day for 3 Regular vouchers.", done: S.login }];
   const starters = G.missions.map(m => ({ label: m.label.replace(" (tower defense, coming later)", ""), right: [2, ticket("regular"), check(S.missions[m.id])],
     about: m.id === "stage" && !T ? "Starter mission. Tower defense is coming in the next update." : "Starter mission: 2 Regular vouchers, once.", done: S.missions[m.id] }));
-  return login.concat(starters);
+  if (!T) return login.concat(starters);
+  const td = T.state();
+  return login
+    .concat(td.daily.map(m => ({ label: m.label, right: [50, coin(), check(m.done)], about: "Daily: " + m.label + ". Pays 50 coins and 5 hatch waves.", done: m.done })))
+    .concat([{ label: "All 4 daily missions", right: [1, ticket("plus"), check(td.dailyAll)], about: "Finish today's four battle missions for 1 Plus.", done: td.dailyAll }])
+    .concat(td.weekly.map(m => ({ label: m.label, right: m.later ? ["later"] : [1, ticket("plus"), check(m.done)],
+      about: m.later ? "Weekly: " + m.label + ". Locked: the Poké Idle daily boss isn't built yet." : "Weekly (resets Monday): " + m.label + ". Pays 1 Plus.", done: m.done, off: m.later })))
+    // While one weekly mission waits on the Poké Idle boss, "all 5" cannot finish.
+    .concat([{ label: "All 5 weekly missions", right: [1, ticket("gold"), check(td.weeklyAll)], done: td.weeklyAll, off: td.weekly.some(m => m.later),
+      about: td.weekly.some(m => m.later) ? "All five weekly missions pay 1 Gold. Locked until the Poké Idle boss mission opens." : "All five weekly missions pay 1 Gold." }])
+    .concat(starters);
 }
 function questsUpdate() {
   drawBackdrop();
