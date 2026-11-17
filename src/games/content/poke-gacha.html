@@ -46,6 +46,8 @@ canvas, img { image-rendering: pixelated; display: block }
 .rows > div.at::before { content: ""; position: absolute; left: 0; top: 6px; border-style: solid; border-width: 6px 0 6px 8px;
                           border-color: transparent transparent transparent var(--paper) }
 .rows .grow { flex: 1; overflow: hidden; text-overflow: ellipsis }
+/* Icons sit in one 40px slot so labels line up whatever the icon. */
+.rows .ico { width: 40px; display: grid; place-items: center; flex: none }
 .rows .right { display: flex; align-items: center; gap: 4px; padding-right: 4px }
 .rows p { padding: 4px 0 }
 .cell { display: grid; place-items: center; overflow: hidden }
@@ -174,6 +176,14 @@ const C = { ink: "#1c1b2c", panel: "#2c2a44", red: "#c8372f", paper: "#f4f1ff", 
 const TIER_COLOR = [C.paper, C.sky, C.gold, C.red, C.red];
 const TIER_NAME = ["Common", "Rare", "Epic", "Legendary", "Banner"];
 const ART = 2;
+// Darker and lighter shades of the eight colors, for the art only ([dark, base, light]).
+// Panels and text keep to the eight.
+const SHADE = {
+  paper: ["#c9c4dc", C.paper, "#ffffff"], sky: ["#4f93b8", C.sky, "#d4f1f8"], gold: ["#a07514", C.gold, "#f6d77a"],
+  red: ["#8f2621", C.red, "#f0857a"], teal: ["#256656", C.teal, "#7fcdb7"]
+};
+const TIER_SHADE = [SHADE.paper, SHADE.sky, SHADE.gold, SHADE.red, SHADE.red];
+const TIER_SPOT = [C.dim, SHADE.sky[0], SHADE.gold[0], SHADE.gold[2], SHADE.gold[2]];
 // A canvas of w×h art pixels, each ART internal pixels across.
 function pixelCanvas(w, h, draw) {
   const c = document.createElement("canvas");
@@ -196,22 +206,63 @@ function box(g, x, y, w, h, color, cut = 1) {
   g.fillRect(x + cut, y, w - cut * 2, h);
   g.fillRect(x, y + cut, w, h - cut * 2);
 }
-const TICKET = { regular: C.red, plus: C.sky, premium: C.teal, gold: C.gold };
+// One egg drawing for everything: the dome, the icons and the big egg. Shadow
+// side bottom right, a highlight top left, and spots placed from `seed`.
+function shadedEgg(g, cx, cy, rx, ry, tier, seed = 1, outline = true) {
+  const [dark, base, light] = TIER_SHADE[tier];
+  if (outline) ellipse(g, cx, cy, rx + 1, ry + 1, C.ink);
+  const inside = (x, y) => (x * x) / ((rx + 0.5) * (rx + 0.5)) + (y * y) / ((ry + 0.5) * (ry + 0.5)) <= 1;
+  for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) {
+    if (!inside(x, y)) continue;
+    g.fillStyle = (x / rx) * 0.6 + (y / ry) * 0.8 > 0.55 ? dark : base;
+    g.fillRect(cx + x, cy + y, 1, 1);
+  }
+  let s = seed * 7919 + 13;
+  const rand = () => (s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296;
+  const count = rx >= 6 ? 5 : rx >= 3 ? 2 : 1;
+  for (let i = 0; i < count; i++) {
+    const a = rand() * Math.PI * 2, d = 0.3 + rand() * 0.35;
+    const sx = Math.round(Math.cos(a) * rx * d), sy = Math.round(Math.sin(a) * ry * d);
+    const sr = Math.max(0, Math.round(rx * (0.1 + rand() * 0.1)));
+    g.fillStyle = TIER_SPOT[tier];
+    for (let y = -sr; y <= sr; y++) for (let x = -sr; x <= sr; x++)
+      if (x * x + y * y <= sr * sr + sr && inside(sx + x, sy + y)) g.fillRect(cx + sx + x, cy + sy + y, 1, 1);
+  }
+  const hx = Math.round(cx - rx * 0.4), hy = Math.round(cy - ry * 0.45);
+  g.fillStyle = light;
+  g.fillRect(hx, hy, Math.max(1, Math.round(rx * 0.3)), Math.max(1, Math.round(ry * 0.3)));
+}
+// Vouchers: a ticket tilted up to the right, with a tear-off stub and an emblem per kind.
+const TICKET = { regular: SHADE.red, plus: SHADE.sky, premium: SHADE.teal, gold: SHADE.gold };
+const EMBLEM = {
+  regular: [[10, 5], [11, 5], [10, 6], [11, 6], [9, 5], [12, 6]],
+  plus: [[10, 4], [9, 5], [10, 5], [11, 5], [10, 6], [10, 7], [8, 5], [12, 5]],
+  premium: [[10, 3], [9, 4], [11, 4], [8, 5], [12, 5], [9, 6], [11, 6], [10, 7], [10, 5]],
+  gold: [[10, 3], [10, 4], [8, 5], [9, 5], [10, 5], [11, 5], [12, 5], [9, 6], [11, 6], [8, 7], [12, 7], [10, 6]]
+};
 function ticket(kind) {
-  return pixelCanvas(16, 9, g => {
-    box(g, 0, 0, 16, 9, C.ink);
-    g.fillStyle = TICKET[kind]; g.fillRect(1, 1, 14, 7);
-    g.fillStyle = C.paper; g.fillRect(4, 1, 2, 7); g.fillRect(8, 3, 5, 1); g.fillRect(8, 5, 4, 1);
+  const [dark, base, light] = TICKET[kind];
+  const off = row => Math.floor((11 - row) / 4);
+  return pixelCanvas(20, 12, g => {
+    g.fillStyle = C.ink;
+    for (let row = 0; row < 12; row++) g.fillRect(off(row) + (row === 0 || row === 11 ? 1 : 0), row, row === 0 || row === 11 ? 15 : 17, 1);
+    for (let row = 1; row < 11; row++) {
+      g.fillStyle = row <= 2 ? light : row >= 9 ? dark : base;
+      g.fillRect(off(row) + 1, row, 15, 1);
+      // The stub, lighter, behind a dashed tear line.
+      g.fillStyle = row <= 2 ? "#ffffff" : light;
+      g.fillRect(off(row) + 1, row, 3, 1);
+      if (row % 2) { g.fillStyle = C.ink; g.fillRect(off(row) + 4, row, 1, 1); }
+    }
+    g.fillStyle = C.paper;
+    for (const [x, row] of EMBLEM[kind]) g.fillRect(off(row) + x, row, 1, 1);
   });
 }
 function coin() { return pixelCanvas(8, 8, g => { ellipse(g, 3, 3, 3, 3, C.ink); ellipse(g, 3, 3, 2, 2, C.gold); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 3); }); }
 function shardIcon() { return pixelCanvas(8, 8, g => { g.fillStyle = C.ink; g.fillRect(2, 0, 4, 8); g.fillRect(0, 2, 8, 4); g.fillStyle = C.sky; g.fillRect(3, 1, 2, 6); g.fillRect(1, 3, 6, 2); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 2); }); }
 function candyIcon() { return pixelCanvas(8, 8, g => { g.fillStyle = C.ink; g.fillRect(2, 1, 4, 6); g.fillRect(0, 2, 8, 4); g.fillStyle = C.red; g.fillRect(3, 2, 2, 4); g.fillRect(1, 3, 6, 2); g.fillStyle = C.paper; g.fillRect(3, 2, 1, 1); }); }
 function eggIcon(tier) {
-  return pixelCanvas(8, 10, g => {
-    ellipse(g, 3, 5, 3, 4, C.ink); ellipse(g, 3, 5, 2, 3, TIER_COLOR[tier]);
-    g.fillStyle = tier === 0 ? C.dim : C.ink; g.fillRect(2, 3, 1, 1); g.fillRect(4, 6, 1, 1);
-  });
+  return pixelCanvas(10, 12, g => shadedEgg(g, 5, 6, 3, 4, tier, tier + 1));
 }
 function check(done) { return pixelCanvas(8, 8, g => { g.fillStyle = done ? C.gold : C.dim; if (done) { g.fillRect(1, 4, 2, 2); g.fillRect(3, 5, 1, 2); g.fillRect(4, 3, 1, 3); g.fillRect(5, 1, 1, 3); g.fillRect(6, 0, 1, 2); } else g.fillRect(3, 3, 2, 2); }); }
 
@@ -239,7 +290,7 @@ function rows(container, list, at, onPick) {
   container.replaceChildren(...list.map((row, i) => {
     const r = el("div", (i === at ? "at " : "") + (row.off ? "off" : ""));
     r.dataset.row = i;
-    if (row.icon) r.append(row.icon);
+    if (row.icon) { const ico = el("span", "ico"); ico.append(row.icon); r.append(ico); }
     r.append(el("span", "grow", row.label));
     if (row.right !== undefined && row.right !== "") {
       const right = el("span", "right");
@@ -277,9 +328,9 @@ function drawBackdrop() {
    320×180 art pixels, drawn at 2x. */
 const ORDER_M = ["move", "legend", "shiny"];
 const LOOK = {
-  move: { body: C.teal, label: "Move UP!", about: "Move UP: rare skills roll twice as often." },
-  legend: { body: C.red, label: "UP!", about: "Legendary UP: today's banner legendary, 1 in 256. Eggs count double toward Legendary pity." },
-  shiny: { body: C.gold, label: "Shiny UP!", about: "Shiny UP: shiny 1 in 64 instead of 1 in 128." }
+  move: { body: C.teal, shade: SHADE.teal, label: "Move UP!", about: "Move UP: rare skills roll twice as often." },
+  legend: { body: C.red, shade: SHADE.red, label: "UP!", about: "Legendary UP: today's banner legendary, 1 in 256. Eggs count double toward Legendary pity." },
+  shiny: { body: C.gold, shade: SHADE.gold, label: "Shiny UP!", about: "Shiny UP: shiny 1 in 64 instead of 1 in 128." }
 };
 const OPTIONS = [
   { voucher: "regular", count: 1, times: "x1", label: "1 Pull", about: "1 Regular: 1 egg." },
@@ -303,22 +354,20 @@ function domeEggs(seed) {
 }
 const DOMES = { move: domeEggs(3), legend: domeEggs(11), shiny: domeEggs(29) };
 function drawMachine(g, cx, id, front) {
-  const body = LOOK[id].body, x = cx - 56;
+  const body = LOOK[id].body, [dark, , light] = LOOK[id].shade, x = cx - 56;
   // Cap and rim.
   box(g, x + 4, 22, 104, 16, C.ink); g.fillStyle = body; g.fillRect(x + 5, 23, 102, 14);
-  g.fillStyle = C.paper; g.fillRect(x + 7, 24, 98, 2);
+  g.fillStyle = light; g.fillRect(x + 7, 24, 98, 3);
+  g.fillStyle = dark; g.fillRect(x + 5, 32, 102, 5);
   g.fillStyle = C.ink; g.fillRect(x + 6, 34, 100, 1);
   box(g, x - 1, 37, 114, 9, C.ink); g.fillStyle = C.paper; g.fillRect(x, 38, 112, 7); g.fillStyle = C.dim; g.fillRect(x + 1, 43, 110, 1);
   // Dome of eggs behind glass.
   g.fillStyle = C.ink; g.fillRect(x + 5, 45, 102, 58);
   g.save(); g.beginPath(); g.rect(x + 6, 45, 100, 57); g.clip();
-  g.fillStyle = C.sky; g.fillRect(x + 6, 45, 100, 57);
-  for (const egg of DOMES[id]) {
-    ellipse(g, x + egg.x, 45 + egg.y, egg.r, egg.r + 2, C.ink);
-    ellipse(g, x + egg.x, 45 + egg.y, egg.r - 1, egg.r + 1, TIER_COLOR[egg.tier]);
-    g.fillStyle = C.paper; g.fillRect(x + egg.x - 3, 45 + egg.y - egg.r + 1, 2, 2);
-  }
-  g.fillStyle = C.paper; g.fillRect(x + 12, 47, 2, 50);
+  g.fillStyle = SHADE.sky[0]; g.fillRect(x + 6, 45, 100, 57);
+  DOMES[id].forEach((egg, i) => shadedEgg(g, x + egg.x, 45 + egg.y, egg.r - 1, egg.r + 1, egg.tier, i + 1));
+  // Glass: two light streaks down the left side.
+  g.fillStyle = SHADE.sky[2]; g.fillRect(x + 11, 47, 3, 50); g.fillRect(x + 16, 47, 1, 50);
   g.restore();
   // Name plate in front of the dome.
   box(g, x + 16, 70, 80, 26, C.ink, 2); box(g, x + 17, 71, 78, 24, C.paper, 2);
@@ -327,8 +376,10 @@ function drawMachine(g, cx, id, front) {
   box(g, x - 1, 101, 114, 9, C.ink); g.fillStyle = C.paper; g.fillRect(x, 102, 112, 7); g.fillStyle = C.dim; g.fillRect(x + 1, 107, 110, 1);
   g.fillStyle = C.ink; g.fillRect(x + 4, 110, 104, 70);
   g.fillStyle = body; g.fillRect(x + 5, 110, 102, 70);
+  // Body shading: a dark side on the left and under the rim, a light edge on the right.
+  g.fillStyle = dark; g.fillRect(x + 5, 110, 8, 70); g.fillRect(x + 5, 110, 102, 3);
+  g.fillStyle = light; g.fillRect(x + 99, 113, 4, 60);
   g.fillStyle = C.ink; g.fillRect(x + 5, 110, 102, 1);
-  g.fillStyle = C.paper; g.fillRect(x + 102, 113, 2, 60);
   // Chute, where the egg comes out.
   box(g, x + 13, 118, 30, 26, C.ink, 3); box(g, x + 15, 120, 26, 22, C.panel, 3); g.fillStyle = C.dim; g.fillRect(x + 19, 122, 10, 2);
   // Coin slot.
@@ -528,10 +579,7 @@ function bigEgg(tier, wobble, crack) {
   const cx = 12 + wobble;
   // A hard-edged shadow on the ground, then the egg.
   g.fillStyle = C.ink; g.fillRect(cx - 9, 21, 15, 2); g.fillRect(cx - 7, 23, 11, 1);
-  ellipse(g, cx, 11, 8, 10, C.ink); ellipse(g, cx, 11, 7, 9, TIER_COLOR[tier]);
-  g.fillStyle = tier === 0 ? C.dim : C.ink;
-  for (const [x, y, w, h] of [[-4, -6, 3, 2], [2, -6, 2, 2], [3, 0, 2, 2], [-5, 3, 2, 2], [-1, 5, 3, 2]]) g.fillRect(cx + x, 11 + y, w, h);
-  g.fillStyle = C.paper; g.fillRect(cx - 4, 4, 2, 3);
+  shadedEgg(g, cx, 11, 7, 9, tier, 5);
   if (crack) { g.fillStyle = C.ink; for (let i = -6; i <= 6; i += 2) g.fillRect(cx + i, 10 + (i % 4 ? 1 : -1), 2, 1); }
   return c;
 }
