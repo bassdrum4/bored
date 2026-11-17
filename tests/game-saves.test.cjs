@@ -16,6 +16,20 @@ const list=(env,user,game='ashcrown')=>env.asUser(user,'select public.save_list(
 const get=(env,user,slot,game='ashcrown')=>env.asUser(user,'select public.save_get($1,$2) r',[game,slot]).then(rows=>rows[0].r);
 const del=(env,user,slot,expected,game='ashcrown')=>env.asUser(user,'select public.save_delete($1,$2,$3) r',[game,slot,expected]).then(rows=>rows[0].r);
 const refused=(promise,pattern)=>assert.rejects(promise,pattern);
+// bored_together.rate_limit counts in sixty-second windows aligned to the clock.
+// A fast loop can straddle a boundary and legitimately receive a second
+// allowance, so require the refusal within a second window rather than pinning
+// it to the call right after the limit. Returns how many calls were served.
+async function untilRefused(call,maximum) {
+  for(let i=1;i<=maximum*2+1;i++) {
+    try { await call(); }
+    catch(error) {
+      assert.match(error.message,/Too many requests/);
+      return i-1;
+    }
+  }
+  assert.fail('the rate limit never refused within '+(maximum*2+1)+' calls');
+}
 // A 409 carries the stored copy in its DETAIL.
 async function conflict(promise) {
   try { await promise; } catch(e) {
@@ -165,16 +179,24 @@ async function scenarios(t,env) {
   });
 
   await t.test('rate limit: 60 calls a minute, 20 writes a minute, per account',async()=>{
-    for(let i=0;i<60;i++) await list(env,E);
-    await refused(list(env,E),/Too many requests/);
+    const reads=await untilRefused(()=>list(env,E),60);
+    assert.ok(reads>=60,'the full read allowance is served');
+    assert.ok(reads<=120,'unused calls do not carry into a later window');
     await refused(put(env,E,'m1'),/Too many requests/);
     assert.equal((await list(env,D)).length,0,'another account is not affected');
     await env.admin('delete from bored_together.limits');
-    for(let i=0;i<20;i++) await put(env,E,'m1',{expected:i,data:'gz:'+i});
-    await refused(put(env,E,'m1',{expected:20}),/Too many requests/);
-    await refused(del(env,E,'m1',20),/Too many requests/);
+    let version=0;
+    const writes=await untilRefused(async()=>{
+      const saved=await put(env,E,'m1',{expected:version,data:'gz:'+(version+1)});
+      version=saved.version;
+      return saved;
+    },20);
+    assert.ok(writes>=20,'the full write allowance is served');
+    assert.ok(writes<=40,'unused writes do not carry into a later window');
+    await refused(put(env,E,'m1',{expected:version}),/Too many requests/);
+    await refused(del(env,E,'m1',version),/Too many requests/);
     assert.equal((await get(env,E,'m1')).header.turn,42,'reads still go through under the write limit');
-    assert.equal((await get(env,E,'m1')).data,'gz:19');
+    assert.equal((await get(env,E,'m1')).data,'gz:'+writes);
   });
 }
 
