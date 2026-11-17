@@ -135,14 +135,39 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Scrolling lists hold whole rows only: 8 × 24px. */
 .left-panel .rows, .right-panel .rows { height: 192px }
 #off { position: absolute; left: 8px; right: 8px; top: 48px; padding: 12px }
+
+/* Story and battles, on the 344px stage: HUD 4-36, field 40-280, deploy cards 284-336. */
+#tabs.locked .panel[data-tab] { color: var(--dim); cursor: default }
+#battle-hud { left: 8px; top: 4px; width: 624px; height: 32px; padding: 4px 12px; display: flex; gap: 16px; align-items: center; white-space: nowrap }
+#battle-hud .right { margin-left: auto }
+#field { position: absolute; left: 80px; top: 40px; width: 480px; height: 240px; outline: 2px solid var(--ink); cursor: pointer }
+#deploy { left: 8px; bottom: 8px; width: 624px; height: 52px; display: grid; grid-template-columns: repeat(8, 72px); gap: 4px; padding: 4px 8px }
+#deploy .card { height: 40px; background: var(--ink); padding: 0 4px; line-height: 20px; cursor: pointer; white-space: nowrap; overflow: hidden }
+#deploy .card.on { outline: 2px solid var(--paper); outline-offset: -2px }
+#deploy .card.off { color: var(--dim) }
+#battle-talk { left: 8px; bottom: 8px; width: 624px; height: 52px; padding: 4px 12px; cursor: pointer }
+#battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
 </style>
 </head>
 <body>
 <canvas id="sky" width="640" height="384"></canvas>
-<div id="wrap" tabindex="0" aria-label="Poké Gacha. Arrow keys move, Enter picks, Backspace goes back, 1 to 5 switch screens.">
+<div id="wrap" tabindex="0" aria-label="Poké Gacha. Arrow keys move, Enter picks, Backspace goes back, number keys switch screens.">
   <div id="frame">
     <div id="tabs"></div>
     <div id="stage">
+      <section id="scr-story" class="screen" hidden>
+        <div class="panel left-panel" id="story-list-panel"><div class="title" id="story-title">CHAPTER</div><div class="rows scroll" id="story-list"></div></div>
+        <div class="panel right-panel" id="story-info"></div>
+        <div class="panel left-panel" id="squad-list-panel" hidden><div class="title" id="squad-title">SQUAD</div><div class="rows scroll" id="squad-list"></div></div>
+        <div class="panel right-panel" id="squad-info" hidden></div>
+      </section>
+      <section id="scr-battle" class="screen" hidden>
+        <div class="panel" id="battle-hud"></div>
+        <canvas id="field" width="480" height="240"></canvas>
+        <div class="panel" id="deploy"></div>
+        <div class="panel" id="battle-talk" hidden></div>
+        <div class="panel" id="battle-result" hidden></div>
+      </section>
       <section id="scr-pull" class="screen">
         <div id="counts"></div>
         <div id="banner" class="mini" hidden></div>
@@ -299,7 +324,7 @@ function say(text, extra) {
 }
 // Headers: the word at header size, any count beside it at body size.
 function titled(node, word, count) { node.replaceChildren(word, ...(count === undefined ? [] : [" ", el("span", "num count", count)])); return node; }
-const HINT = "Arrows move · Enter picks · Backspace goes back · 1–5 switch screens.";
+const HINT = "Arrows move · Enter picks · Backspace goes back · number keys switch screens.";
 // The scene canvas covers the window. VIEW is where the frame sits on it, in
 // internal pixels; the pull scene is drawn in internal pixels from the stage's
 // top-left corner.
@@ -799,14 +824,25 @@ function shopKey(e) {
 /* ── Quests: daily login, starter missions, trophies ───────────────────── */
 let questAt = 0, questFocus = "missions", trophyAt = 0;
 function questItems() {
-  return [{ label: "Daily login", right: [3, ticket("regular"), check(S.login)], about: "Open Poké Gacha each day for 3 Regular vouchers.", done: S.login }]
-    .concat(G.missions.map(m => ({ label: m.label.replace(" (tower defense, coming later)", ""), right: [2, ticket("regular"), check(S.missions[m.id])],
-      about: m.id === "stage" ? "Starter mission. Tower defense is coming in the next update." : "Starter mission: 2 Regular vouchers, once.", done: S.missions[m.id] })));
+  const login = [{ label: "Daily login", right: [3, ticket("regular"), check(S.login)], about: "Open Poké Gacha each day for 3 Regular vouchers.", done: S.login }];
+  const starters = G.missions.map(m => ({ label: m.label.replace(" (tower defense, coming later)", ""), right: [2, ticket("regular"), check(S.missions[m.id])],
+    about: m.id === "stage" && !T ? "Starter mission. Tower defense is coming in the next update." : "Starter mission: 2 Regular vouchers, once.", done: S.missions[m.id] }));
+  if (!T) return login.concat(starters);
+  const td = T.state();
+  return login
+    .concat(td.daily.map(m => ({ label: m.label, right: [50, coin(), check(m.done)], about: "Daily: " + m.label + ". Pays 50 coins and 5 hatch waves.", done: m.done })))
+    .concat([{ label: "All 4 daily missions", right: [1, ticket("plus"), check(td.dailyAll)], about: "Finish today's four battle missions for 1 Plus.", done: td.dailyAll }])
+    .concat(td.weekly.map(m => ({ label: m.label, right: m.later ? ["later"] : [1, ticket("plus"), check(m.done)],
+      about: m.later ? "Weekly: " + m.label + ". Locked: the Poké Idle daily boss isn't built yet." : "Weekly (resets Monday): " + m.label + ". Pays 1 Plus.", done: m.done, off: m.later })))
+    // While one weekly mission waits on the Poké Idle boss, "all 5" cannot finish.
+    .concat([{ label: "All 5 weekly missions", right: [1, ticket("gold"), check(td.weeklyAll)], done: td.weeklyAll, off: td.weekly.some(m => m.later),
+      about: td.weekly.some(m => m.later) ? "All five weekly missions pay 1 Gold. Locked until the Poké Idle boss mission opens." : "All five weekly missions pay 1 Gold." }])
+    .concat(starters);
 }
 function questsUpdate() {
   drawBackdrop();
   const items = questItems();
-  rows($("#quest-list"), items.map(q => ({ label: q.label, right: q.right, off: q.done })), questFocus === "missions" ? questAt : -1,
+  rows($("#quest-list"), items.map(q => ({ label: q.label, right: q.right, off: q.done || q.off })), questFocus === "missions" ? questAt : -1,
     i => { questAt = i; questFocus = "missions"; questsUpdate(); });
   const trophies = G.trophies();
   titled($("#trophy-title"), "TROPHIES", trophies.length);
@@ -835,13 +871,255 @@ function questsKey(e) {
   }
 }
 
+/* ── Story: chapter 1, the squad, and battles ──────────────────────────────
+   Story lists the stages; Enter picks one and opens the squad; Start runs the
+   battle. Battles are real time and desktop only. Space pauses. */
+// The engine lives in the hub (src/hub/td.js). Until the hub has it, the Story
+// tab and the battle missions stay hidden and the rest of the page works as before.
+const T = G && G.td ? G.td : null;
+const CLASS_SHORT = { vanguard: "Van", guard: "Grd", blocker: "Blk", sniper: "Snp", caster: "Cst", medic: "Med" };
+let storyAt = 0, storyMode = "stages", squadAt = 0, battle = null;
+const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
+const stageStars = n => "★".repeat(n) + "☆".repeat(3 - n);
+function enemiesOf(stage) { return [...new Set(stage.waves.map(w => w[1]))].map(name).join(", "); }
+function storyUpdate() {
+  drawBackdrop();
+  const td = T.state();
+  $("#story-list-panel").hidden = $("#story-info").hidden = storyMode !== "stages";
+  $("#squad-list-panel").hidden = $("#squad-info").hidden = storyMode !== "squad";
+  if (storyMode === "squad") return squadUpdate();
+  titled($("#story-title"), "CHAPTER", T.chapter.id);
+  rows($("#story-list"), T.stages.map((stage, i) => ({ label: stage.id + " " + stage.name, right: td.unlocked[i] ? stageStars(td.best[stage.id] || 0) : "locked",
+    off: !td.unlocked[i] })), storyAt, (i, click) => { storyAt = i; if (click) pickStage(); else storyUpdate(); });
+  const stage = T.stages[storyAt], best = td.best[stage.id] || 0;
+  const info = $("#story-info");
+  info.replaceChildren(el("div", "title", stage.boss ? "BOSS" : "STAGE"), el("div", "", stage.name), el("div", "dim", stage.waves.length + " waves · " + stage.lives + " lives"),
+    el("div", "dim", "Enemies: " + enemiesOf(stage)));
+  const reward = el("div"); reward.append(best ? "Best " : "First clear: ", best ? el("span", "num", stageStars(best)) : el("span", "num", "50"), best ? "" : " coins + 2 Regular");
+  info.append(reward);
+  if (best < 3) { const r3 = el("div", "dim"); r3.append("First 3★: ", el("span", "num", "100"), " coins + 1 Plus"); info.append(r3); }
+  say(td.unlocked[storyAt] ? stage.before[0] + " Enter: choose your squad." : "Clear " + T.stages[storyAt - 1].id + " to unlock this stage.");
+}
+function pickStage() {
+  const td = T.state();
+  if (!td.unlocked[storyAt]) return say("Clear " + T.stages[storyAt - 1].id + " first.");
+  if (!S.owned.length) return say("Hatch some eggs first: you need mons for your squad.");
+  storyMode = "squad"; squadAt = 0; storyUpdate();
+}
+function squadRows() {
+  const pick = squadPick();
+  const units = [];
+  for (let i = 0; i < S.owned.length; i += 8) units.push(...T.squad(S.owned.slice(i, i + 8)));
+  return [{ start: true, label: pick.length ? "Start battle" : "Pick up to 8 mons", right: [pick.length, "/8"], off: !pick.length }]
+    .concat(units.map(u => ({ unit: u, label: name(u.num), right: [CLASS_SHORT[u.cls], "Lv" + u.level, u.cost], picked: pick.includes(u.num) })));
+}
+function squadUpdate() {
+  const list = squadRows();
+  if (squadAt >= list.length) squadAt = list.length - 1;
+  const pick = squadPick();
+  titled($("#squad-title"), "SQUAD", pick.length + "/8");
+  rows($("#squad-list"), list.map(r => ({ label: (r.picked ? "✓ " : r.start ? "" : "  ") + r.label, right: r.right, off: r.off })), squadAt,
+    (i, click) => { squadAt = i; if (click) squadPick_(i); else squadUpdate(); });
+  const row = list[squadAt], info = $("#squad-info");
+  if (row.start) {
+    info.replaceChildren(el("div", "title", T.stages[storyAt].id), el("div", "", T.stages[storyAt].name),
+      el("div", "dim", pick.map(name).join(", ") || "Nobody picked yet."));
+    say("Enter: start. Ground classes (Van, Grd, Blk) stand on the path; ranged ones (Snp, Cst, Med) on high ground.");
+    return;
+  }
+  const u = row.unit, c = T.classes[u.cls];
+  const stats = el("div"); stats.append("HP ", el("span", "num", u.hp), " ATK ", el("span", "num", u.atk), " DEF ", el("span", "num", u.def));
+  const cost = el("div"); cost.append("Cost ", el("span", "num", u.cost), " · Lv ", el("span", "num", u.level));
+  info.replaceChildren(cellWith(sprite(u.num, u.look)), el("div", "", c.name + (c.block ? " · blocks " + c.block : "")), stats, cost,
+    el("div", u.rare ? "gold" : "dim", "Skill: " + u.skill + (u.rare ? " (rare)" : "")));
+  const lv = T.state().levels[G.lineOf(u.num)] || 1;
+  say(c.about + (lv < T.maxLevel ? " L: level up for " + T.levelCost(lv) + " coins." : " Max level.") + " Enter: " + (row.picked ? "remove from" : "add to") + " squad.");
+}
+function squadPick_(i) {
+  const row = squadRows()[i];
+  if (row.start) return row.off ? say("Pick at least one mon.") : startBattle();
+  const pick = squadPick();
+  if (row.picked) pref.squad = pick.filter(n => n !== row.unit.num);
+  else if (pick.length >= 8) return say("A squad holds 8. Remove one first.");
+  else pref.squad = pick.concat(row.unit.num);
+  keep(); squadUpdate();
+}
+function storyKey(e) {
+  const k = e.key;
+  if (storyMode === "stages") {
+    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); storyAt = (storyAt + (k === "ArrowUp" ? -1 : 1) + T.stages.length) % T.stages.length; storyUpdate(); }
+    else if (k === "Enter" || k === " ") { e.preventDefault(); pickStage(); }
+    else if (k === "Backspace") { e.preventDefault(); go("pull"); }
+    return;
+  }
+  const list = squadRows();
+  if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); squadAt = (squadAt + (k === "ArrowUp" ? -1 : 1) + list.length) % list.length; squadUpdate(); }
+  else if (k === "Enter" || k === " ") { e.preventDefault(); squadPick_(squadAt); }
+  else if (k === "l" || k === "L") {
+    const row = list[squadAt];
+    if (row.unit) { const r = T.levelUp({ line: G.lineOf(row.unit.num) }); refreshTop(); squadUpdate(); if (!r.ok) say(r.reason === "coins" ? "Not enough coins." : "Already at max level."); }
+  } else if (k === "Backspace") { e.preventDefault(); storyMode = "stages"; storyUpdate(); }
+}
+
+/* The battle: a 10×5 field of 48px tiles. */
+const TILE = 48, FX = 80, FY = 48;
+const spriteCache = {};
+function spriteFor(num, look) {
+  const key = num + ":" + look;
+  if (!spriteCache[key]) { const img = new Image(); img.src = spriteUrl(num, look); spriteCache[key] = img; }
+  return spriteCache[key];
+}
+function startBattle() {
+  if (matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches) return say("Battles are desktop only: they need a mouse or keyboard.");
+  const squad = T.squad(squadPick());
+  const stage = T.stages[storyAt];
+  battle = { b: T.newBattle(stage, squad), stage, slot: 0, cur: [0, 0], paused: true, talk: stage.before.slice(), last: performance.now(), acc: 0, done: false, selected: null };
+  const ground = T.pathsOf(stage)[0];
+  battle.cur = ground[Math.floor(ground.length / 2)].slice();
+  for (const u of squad) spriteFor(u.num, u.look);
+  for (const w of stage.waves) spriteFor(w[1], "normal");
+  $("#scr-story").hidden = true; $("#scr-battle").hidden = false; $("#msg").hidden = true; $("#tabs").classList.add("locked");
+  drawBackdrop();
+  battleTalk();
+  requestAnimationFrame(battleFrame);
+}
+function battleTalk() {
+  const t = battle.talk;
+  $("#battle-talk").hidden = !t.length;
+  if (t.length) $("#battle-talk").replaceChildren(el("div", "", t[0]), el("div", "dim", "Enter to continue"));
+}
+function battleFrame(now) {
+  if (!battle) return;
+  const bt = battle, b = bt.b;
+  const dt = Math.min(0.25, (now - bt.last) / 1000); bt.last = now;
+  if (!bt.paused && !bt.talk.length && !document.hidden && !b.over) {
+    bt.acc += dt;
+    while (bt.acc >= T.TICK) { T.step(b); bt.acc -= T.TICK; }
+  }
+  drawField();
+  battleHud();
+  if (b.over && !bt.done) endBattle();
+  requestAnimationFrame(battleFrame);
+}
+function drawField() {
+  const bt = battle, b = bt.b, g = $("#field").getContext("2d");
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = C.ink; g.fillRect(0, 0, 480, 240);
+  const path = new Set(b.paths.flat().map(([x, y]) => x + "," + y));
+  for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
+    const c = bt.stage.map[y][x], px = x * TILE, py = y * TILE;
+    if (c === "#") { g.fillStyle = C.panel; g.fillRect(px, py, TILE, TILE); continue; }
+    if (c === "H") { g.fillStyle = SHADE.sky[0]; g.fillRect(px, py, TILE, TILE); g.fillStyle = C.sky; g.fillRect(px + 2, py + 2, TILE - 4, TILE - 8); continue; }
+    g.fillStyle = path.has(x + "," + y) ? SHADE.paper[0] : C.dim; g.fillRect(px + 1, py + 1, TILE - 2, TILE - 2);
+    if (c === "S") { g.fillStyle = C.red; g.fillRect(px + 4, py + 4, TILE - 8, TILE - 8); g.fillStyle = SHADE.paper[0]; g.fillRect(px + 8, py + 8, TILE - 16, TILE - 16); }
+    if (c === "G") { g.fillStyle = C.teal; g.fillRect(px + 4, py + 4, TILE - 8, TILE - 8); g.fillStyle = SHADE.teal[2]; g.fillRect(px + 10, py + 10, TILE - 20, TILE - 20); }
+  }
+  // Where the selected card can go.
+  const u = b.squad[bt.slot];
+  if (u && !bt.selected) for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) if (!T.canDeploy(b, bt.slot, x, y) || T.canDeploy(b, bt.slot, x, y) === "energy") {
+    if (T.canDeploy(b, bt.slot, x, y) === "energy" && (u.ground ? bt.stage.map[y][x] !== "." : bt.stage.map[y][x] !== "H")) continue;
+    if (b.units.some(o => o.x === x && o.y === y)) continue;
+    g.fillStyle = C.gold; g.fillRect(x * TILE + 2, y * TILE + 2, TILE - 4, 2); g.fillRect(x * TILE + 2, y * TILE + TILE - 4, TILE - 4, 2);
+  }
+  const drawMon = (img, cx, by) => { if (img.complete && img.naturalWidth) g.drawImage(img, Math.round(cx - img.naturalWidth / 2), Math.round(by - img.naturalHeight)); };
+  const bar = (cx, top, part, color) => { g.fillStyle = C.ink; g.fillRect(cx - 17, top, 34, 4); g.fillStyle = color; g.fillRect(cx - 16, top + 1, Math.max(0, Math.round(32 * part)), 2); };
+  const things = [...b.units.map(o => ({ o, unit: true })), ...b.enemies.map(o => ({ o, unit: false }))].sort((a, c) => a.o.y - c.o.y);
+  for (const { o, unit } of things) {
+    const cx = o.x * TILE + TILE / 2, by = o.y * TILE + TILE - 4;
+    drawMon(spriteFor(o.num, unit ? o.look : "normal"), cx, by);
+    bar(cx, o.y * TILE + 2, o.hp / o.maxHp, unit ? C.teal : C.red);
+    if (unit) { g.fillStyle = C.ink; g.fillRect(cx - 17, o.y * TILE + 6, 34, 3); g.fillStyle = C.gold; g.fillRect(cx - 16, o.y * TILE + 7, Math.round(32 * o.sp / o.spMax), 1); }
+    if (!unit && o.boss) { g.fillStyle = C.gold; g.fillRect(cx - 4, o.y * TILE - 6, 8, 4); }
+  }
+  // The tile cursor: a corner bracket, like the egg list.
+  const [x, y] = bt.cur, px = x * TILE, py = y * TILE;
+  g.fillStyle = bt.selected ? C.red : C.paper;
+  for (const [ax, ay, w, h] of [[0, 0, 10, 2], [0, 0, 2, 10], [TILE - 10, 0, 10, 2], [TILE - 2, 0, 2, 10], [0, TILE - 2, 10, 2], [0, TILE - 10, 2, 10], [TILE - 10, TILE - 2, 10, 2], [TILE - 2, TILE - 10, 2, 10]])
+    g.fillRect(px + ax, py + ay, w, h);
+}
+function battleHud() {
+  const bt = battle, b = bt.b;
+  const hud = $("#battle-hud");
+  const parts = [["", bt.stage.id], ["Energy ", Math.floor(b.energy)], ["Lives ", b.life], ["Wave ", Math.min(b.stage.waves.length, b.wavesDone + 1) + "/" + b.stage.waves.length]];
+  hud.replaceChildren(...parts.map(([label, value]) => { const s = el("span"); s.append(label, typeof value === "number" || /\d/.test(String(value)) && label ? el("span", "num", value) : value); return s; }),
+    el("span", "dim right", bt.done ? "" : bt.paused ? "Paused: Space" : bt.selected ? "Enter retreats" : "Space pauses"));
+  $("#deploy").replaceChildren(...b.squad.map((u, i) => {
+    const on = b.units.find(o => o.slot === i), cool = Math.max(0, Math.ceil((b.cooldown[i] || 0) - b.t));
+    const card = el("div", "card" + (i === bt.slot ? " on" : "") + (on || cool || b.energy < u.cost ? " off" : ""));
+    card.dataset.slot = i;
+    const top = el("div", "", (i + 1) + " " + name(u.num).slice(0, 5));
+    const low = el("div"); low.append(CLASS_SHORT[u.cls] + " ", el("span", "num", on ? "out" : cool ? cool + "s" : u.cost));
+    card.append(top, low);
+    return card;
+  }));
+}
+function endBattle() {
+  const bt = battle, b = bt.b;
+  bt.done = true;
+  const stars = T.starsFor(b);
+  const before = S.balance;
+  const r = T.finish({ stage: bt.stage.id, stars, team: [...b.deployed], waves: b.wavesDone });
+  refreshTop();
+  const gained = ["coins", "regular", "plus", "gold"].map(k => [k, S.balance[k] - before[k]]).filter(([, n]) => n > 0);
+  if (stars) bt.talk = bt.stage.after.slice();
+  bt.result = { stars, waves: r.waves || 0, gained };
+  battleTalk();
+  showResult();
+}
+function showResult() {
+  const bt = battle, res = bt.result;
+  if (bt.talk.length) { $("#battle-result").hidden = true; return; }
+  const box = $("#battle-result");
+  box.hidden = false;
+  const lines = [el("div", "title", res.stars ? "CLEARED" : "DEFEATED"), el("div", "num", res.stars ? stageStars(res.stars) : "Try another squad or placement")];
+  const waves = el("div"); waves.append("+", el("span", "num", res.waves), " hatch waves");
+  lines.push(waves);
+  const NAMES = { coins: ["coin", "coins"], regular: ["Regular voucher", "Regular vouchers"], plus: ["Plus voucher", "Plus vouchers"], gold: ["Gold voucher", "Gold vouchers"] };
+  for (const [k, n] of res.gained) { const d = el("div"); d.append("+", el("span", "num", n), " " + NAMES[k][n === 1 ? 0 : 1]); lines.push(d); }
+  lines.push(el("div", "dim", "Enter: back to the chapter"));
+  box.replaceChildren(...lines);
+}
+function leaveBattle() {
+  battle = null;
+  $("#scr-battle").hidden = true; $("#battle-result").hidden = true; $("#msg").hidden = false; $("#tabs").classList.remove("locked");
+  storyMode = "stages"; go("story");
+}
+function battleKey(e) {
+  const bt = battle, b = bt.b, k = e.key;
+  if (bt.talk.length) {
+    if (k === "Enter" || k === " ") { e.preventDefault(); bt.talk.shift(); battleTalk(); if (!bt.talk.length) { if (bt.done) showResult(); else bt.paused = false; } }
+    return;
+  }
+  if (bt.done) { if (k === "Enter" || k === " ") { e.preventDefault(); leaveBattle(); } return; }
+  if (k === " ") { e.preventDefault(); bt.paused = !bt.paused; return; }
+  const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
+  if (move) { e.preventDefault(); bt.cur = [Math.max(0, Math.min(T.W - 1, bt.cur[0] + move[0])), Math.max(0, Math.min(T.H - 1, bt.cur[1] + move[1]))]; bt.selected = b.units.find(o => o.x === bt.cur[0] && o.y === bt.cur[1]) ? bt.selected : null; return; }
+  if (/^[1-8]$/.test(k)) { e.preventDefault(); bt.slot = Number(k) - 1; bt.selected = null; return; }
+  if (k === "Enter") { e.preventDefault(); tileAction(bt.cur[0], bt.cur[1]); return; }
+  if (k === "Backspace") { e.preventDefault(); bt.selected = null; }
+}
+function tileAction(x, y) {
+  const bt = battle, b = bt.b;
+  const here = b.units.find(o => o.x === x && o.y === y);
+  if (here) {
+    if (bt.selected === here.id) { T.retreat(b, here.id); bt.selected = null; }
+    else bt.selected = here.id;
+    return;
+  }
+  const why = T.deploy(b, bt.slot, x, y);
+  bt.note = why;
+  if (!why) { const next = b.squad.findIndex((u, i) => !b.units.some(o => o.slot === i)); if (next >= 0) bt.slot = next; }
+}
+
 /* ── Frame, tabs and switching screens ─────────────────────────────────── */
-const TABS = [["pull", "Pull"], ["eggs", "Eggs"], ["dex", "Dex"], ["shop", "Shop"], ["quests", "Quests"]];
-const SCREENS = { pull: [updateScene, pullKey], eggs: [eggsUpdate, eggsKey], dex: [dexUpdate, dexKey], shop: [shopUpdate, shopKey], quests: [questsUpdate, questsKey] };
+const TABS = [["story", "Story"], ["pull", "Pull"], ["eggs", "Eggs"], ["dex", "Dex"], ["shop", "Shop"], ["quests", "Quests"]];
+// The tabs shown: Story only once the hub has the tower defense engine.
+const shownTabs = () => TABS.filter(([id]) => id !== "story" || T);
+const SCREENS = { story: [storyUpdate, storyKey], pull: [updateScene, pullKey], eggs: [eggsUpdate, eggsKey], dex: [dexUpdate, dexKey], shop: [shopUpdate, shopKey], quests: [questsUpdate, questsKey] };
 function refreshTop() {
   S = G.state();
   const ready = S.eggs.filter(e => e.ready).length;
-  $("#tabs").replaceChildren(...TABS.map(([id, label], i) => {
+  $("#tabs").replaceChildren(...shownTabs().map(([id, label], i) => {
     const t = el("div", "panel" + (tab === id ? " on" : ""));
     t.append(el("span", "", label));
     if (id === "eggs" && ready) t.append(" ", el("span", "num", ready));
@@ -855,7 +1133,7 @@ function refreshTop() {
   $("#tabs").append(purse);
 }
 function go(id) {
-  if (!SCREENS[id] || hatching) return;
+  if (!SCREENS[id] || hatching || battle || !shownTabs().some(([shown]) => shown === id)) return;
   tab = pref.tab = id; keep();
   message = null;
   for (const [sid] of TABS) $("#scr-" + sid).hidden = sid !== id;
@@ -894,11 +1172,21 @@ if (!G) {
   $("#msg").hidden = true; $("#off").hidden = false;
 } else {
   document.addEventListener("keydown", e => {
-    if (/^[1-5]$/.test(e.key) && !hatching) { e.preventDefault(); return go(TABS[Number(e.key) - 1][0]); }
+    if (battle) return battleKey(e);
+    if (/^[1-9]$/.test(e.key) && !hatching && shownTabs()[Number(e.key) - 1]) { e.preventDefault(); return go(shownTabs()[Number(e.key) - 1][0]); }
     if (hatching) return hatchKey(e);
     SCREENS[tab][1](e);
   });
   $("#tabs").onclick = e => { const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
+  $("#field").onclick = e => {
+    if (!battle || battle.talk.length || battle.done) return;
+    const box = $("#field").getBoundingClientRect(), k = box.width / 480;
+    const x = Math.floor((e.clientX - box.left) / k / TILE), y = Math.floor((e.clientY - box.top) / k / TILE);
+    battle.cur = [x, y]; tileAction(x, y);
+  };
+  $("#deploy").onclick = e => { const c = e.target.closest("[data-slot]"); if (c && battle) { battle.slot = Number(c.dataset.slot); battle.selected = null; } };
+  $("#battle-talk").onclick = () => battle && battleKey({ key: "Enter", preventDefault() {} });
+  $("#battle-result").onclick = () => battle && battle.done && !battle.talk.length && leaveBattle();
   $("#menu").onmousemove = e => { const r = e.target.closest("[data-row]"); if (r && Number(r.dataset.row) !== cursor && !message) { cursor = Number(r.dataset.row); updateScene(); } };
   $("#hit-left").onclick = () => switchMachine(-1);
   $("#hit-right").onclick = () => switchMachine(1);
@@ -914,7 +1202,7 @@ if (!G) {
     if (now !== seen) { seen = now; refreshTop(); SCREENS[tab][0](); }
   }, 3000);
   const login = G.claimLogin().ok;
-  go(SCREENS[tab] ? tab : "pull");
+  go(shownTabs().some(([id]) => id === tab) ? tab : "pull");
   if (login) { if (tab === "pull") { message = { text: "Daily login: +3 Regular vouchers." }; updateScene(); } else say("Daily login: +3 Regular vouchers."); }
 }
 
