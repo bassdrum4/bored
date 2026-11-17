@@ -18,7 +18,7 @@ const dex = moduleUnderTest('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CH
 const rewards = moduleUnderTest('src/hub/rewards.js', [
   'mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
-const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools'],
+const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools', 'pickStarter', 'STARTERS', 'STARTER_GIFTS'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
 const td = moduleUnderTest('src/hub/td.js', [
   'classOf', 'STAGES', 'CHAPTERS', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
@@ -409,4 +409,17 @@ test('weekly challenge: a win records its risk as the week score, and waves stil
   const state = td.tdState(w, TODAY);
   assert.equal(state.challengeBest, 2, 'a loss does not count; the win with 2 risk does');
   assert.equal(walletBalance(w).waves, 3, 'waves cleared pay either way');
+});
+
+test('every starter with its three gifts clears 1-1 at level 1, deployed blocker first', () => {
+  const stage = td.STAGES.find(s => s.id === '1-1');
+  for (const starter of gacha.STARTERS) {
+    const wallet = gacha.pickStarter(activateWallet({}, { today: TODAY, now: NOW }).wallet, starter, opts()).wallet;
+    // The gifts first (Geodude holds the path), then the starter, as the squad screen lists them.
+    const squad = td.squadFrom(wallet, [...gacha.STARTER_GIFTS, starter], TODAY);
+    assert.equal(squad.length, 4, 'the starter squad is four');
+    const plan = placed(stage, squad);
+    const b = playInOrder(stage, squad, plan);
+    assert.equal(b.over, 'win', gacha.mon(starter).name + ' and the gifts win 1-1');
+  }
 });

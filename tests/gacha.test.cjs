@@ -20,7 +20,8 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const gacha = moduleUnderTest('src/hub/gacha.js', [
   'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin',
-  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf'
+  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf',
+  'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES'
 ], { ...daily, ...rewards, DEX, DEX_TYPES });
 const { mergeWallet, walletBalance, activateWallet, grantOnce } = rewards;
 const { gachaState, pullEggs, hatchReady, evolve, upgrade, buySp, setBuddy, claimLogin, eggPools, bannerFor } = gacha;
@@ -129,26 +130,82 @@ test('a pull needs vouchers, an active wallet and room under 99 eggs', () => {
   assert.equal(pullEggs(wallet, opts({ voucher: 'gold' })).reason, 'full');
 });
 
-test('eggs count down on waves earned after the pull, and hatch once', () => {
-  let wallet = fresh({ regular: 1, waves: 50 });
-  wallet = pull(wallet, { rand: always(0) }).wallet;
+test('the first ten eggs hatch at once, and later eggs count down on waves earned after the pull', () => {
+  let wallet = fresh({ regular: 11, waves: 50 });
+  wallet = pull(wallet, { count: 10, rand: always(0) }).wallet;
   let state = gachaState(wallet, TODAY);
-  assert.deepEqual([state.eggs[0].progress, state.eggs[0].need, state.eggs[0].ready], [0, 5, false],
-    'waves banked before the pull do not count');
+  assert.equal(state.eggs.length, 10);
+  assert.ok(state.eggs.every(egg => egg.need === 0 && egg.ready && egg.free), 'the first ten need no waves');
+  const first = hatchReady(wallet, opts({ rand: always(0) }));
+  assert.equal(first.hatched.length, 10);
+  const egg = first.hatched[0];
+  assert.equal(egg.fresh, true);
+  assert.equal(egg.shards, 0);
+  wallet = first.wallet;
+  state = gachaState(wallet, TODAY);
+  assert.ok(state.owned.includes(egg.species));
+  assert.ok(state.lines[egg.species].candy >= 10);
+  assert.ok(state.lines[egg.species].skills.some(Boolean), 'the first hatch always gives a skill');
+  assert.equal(state.missions.hatch, true);
+
+  wallet = pull(wallet, { rand: always(0) }).wallet;
+  state = gachaState(wallet, TODAY);
+  assert.deepEqual([state.eggs[0].progress, state.eggs[0].need, state.eggs[0].ready, state.eggs[0].free], [0, 5, false, false],
+    'the 11th egg waits, and waves banked before the pull do not count');
   assert.equal(hatchReady(wallet, opts()).hatched.length, 0);
   wallet = fund(wallet, { waves: 5 });
   const hatched = hatchReady(wallet, opts({ rand: always(0) }));
   assert.equal(hatched.hatched.length, 1);
-  const egg = hatched.hatched[0];
-  assert.equal(egg.fresh, true);
-  assert.equal(egg.shards, 0);
-  state = gachaState(hatched.wallet, TODAY);
-  assert.equal(state.eggs.length, 0);
-  assert.deepEqual(state.owned, [egg.species]);
-  assert.equal(state.lines[egg.species].candy, 10);
-  assert.ok(state.lines[egg.species].skills.some(Boolean), 'the first hatch always gives a skill');
-  assert.equal(state.missions.hatch, true);
-  assert.equal(hatchReady(hatched.wallet, opts()).hatched.length, 0);
+  assert.equal(gachaState(hatched.wallet, TODAY).eggs.length, 0);
+  assert.equal(hatchReady(hatched.wallet, opts()).hatched.length, 0, 'an egg hatches once');
+});
+
+test('the starter pick: one first-stage starter plus three gifted commons, once per account', () => {
+  const { pickStarter, STARTERS, STARTER_GIFTS } = gacha;
+  const named = name => DEX.findIndex(row => row[0] === name) + 1;
+  assert.equal(STARTERS.length, 27, 'gens 1-9');
+  for (const num of STARTERS) assert.equal(DEX[num - 1][8], 0, DEX[num - 1][0] + ' is a first stage');
+  assert.deepEqual(STARTER_GIFTS, [named('Geodude'), named('Pidgey'), named('Audino')]);
+  assert.ok(STARTER_GIFTS.every(num => eggPools()[0].includes(num)), 'the gifts are commons');
+
+  let wallet = fresh({});
+  assert.equal(gachaState(wallet, TODAY).needsStarter, true);
+  assert.equal(pickStarter({}, named('Charmander'), opts()).reason, 'inactive');
+  assert.equal(pickStarter(wallet, named('Charmeleon'), opts()).reason, 'unknown', 'only first-stage starters');
+  const picked = pickStarter(wallet, named('Charmander'), opts());
+  assert.ok(picked.ok);
+  wallet = picked.wallet;
+  const state = gachaState(wallet, TODAY);
+  assert.equal(state.needsStarter, false);
+  assert.deepEqual(state.owned, [named('Charmander'), ...STARTER_GIFTS].sort((a, b) => a - b), 'a squad of four');
+  assert.equal(state.lines[named('Charmander')].skills[0], true, 'the starter has its first skill');
+  assert.equal(walletBalance(wallet).regular, 0, 'the pick pays no vouchers');
+  assert.equal(pickStarter(wallet, named('Squirtle'), opts()).reason, 'picked', 'a second pick is refused');
+
+  // Two devices that each picked offline: the earlier pick wins, and nothing doubles.
+  const other = pickStarter(fresh({}), named('Squirtle'), { today: TODAY, now: NOW + 99e6 }).wallet;
+  const merged = gachaState(mergeWallet(wallet, other), TODAY);
+  assert.deepEqual(merged.owned, state.owned);
+
+  // A hatched egg of a gifted species is a dupe.
+  wallet = fund(wallet, { regular: 1 });
+  wallet = pull(wallet, { rand: always(0) }).wallet;
+  const pidgeyPool = eggPools()[0].indexOf(named('Pidgey'));
+  const dupe = hatchReady(wallet, opts({ rand: () => (pidgeyPool + 0.5) / eggPools()[0].length })).hatched[0];
+  assert.equal(dupe.species, named('Pidgey'));
+  assert.equal(dupe.fresh, false);
+});
+
+test('an existing account with hatches and no pick is offered the starter once', () => {
+  let wallet = fresh({ regular: 1, waves: 0 });
+  wallet = pull(wallet, { rand: always(0) }).wallet;
+  wallet = hatchReady(wallet, opts({ rand: always(0) })).wallet;
+  const before = gachaState(wallet, TODAY);
+  assert.equal(before.needsStarter, true);
+  wallet = gacha.pickStarter(wallet, gacha.STARTERS[0], opts()).wallet;
+  const after = gachaState(wallet, TODAY);
+  assert.equal(after.needsStarter, false);
+  assert.equal(after.owned.length, before.owned.length + 4);
 });
 
 test('an egg hatched on two devices pays once after the merge', () => {
