@@ -170,6 +170,19 @@ test('flyers cross in a straight line, ignore blockers, and only snipers hit the
   assert.equal(won.over, 'win');
 });
 
+test('snipers shoot flyers first, and everyone else the enemy with the least way left to go', () => {
+  // A Rattata on the path and a Zubat in the air, both in a sniper's range: the Zubat is shot first.
+  const stage = { id: 'x', lives: 3, level: 1, map: ['##########', 'S........G', '####H#####', '##########', '##########'],
+    waves: [[0, named('Rattata'), 1, 1], [0, named('Zubat'), 1, 1, 0, 1]] };
+  const sniper = td.unitStats(named('Archeops'));
+  const b = td.newBattle(stage, [sniper]);
+  b.energy = 99; td.deploy(b, 0, 4, 2);
+  while (b.enemies.length < 2) td.step(b);
+  const [rat, bat] = [b.enemies.find(e => !e.flying), b.enemies.find(e => e.flying)];
+  while (rat.hp === rat.maxHp && bat.hp === bat.maxHp && !b.over) td.step(b);
+  assert.ok(bat.hp < bat.maxHp && rat.hp === rat.maxHp, 'the first shot hits the flyer');
+});
+
 test('finishing pays waves every time, and first clear and first 3-star once', () => {
   const team = [named('Machamp'), named('Alakazam')];
   let w = owning(team);

@@ -245,6 +245,12 @@ export function retreat(b, id) {
   return true;
 }
 const dist = (a, x, y) => Math.hypot(a.x - x, a.y - y);
+// How far an enemy still has to go: to its next point, then along the rest of its path.
+function distanceLeft(e) {
+  let left = e.path[e.seg + 1] ? Math.hypot(e.path[e.seg + 1][0] - e.x, e.path[e.seg + 1][1] - e.y) : 0;
+  for (let i = e.seg + 2; i < e.path.length; i++) left += Math.hypot(e.path[i][0] - e.path[i - 1][0], e.path[i][1] - e.path[i - 1][1]);
+  return left;
+}
 // Only snipers reach flying enemies.
 export const canHit = (u, e) => !e.flying || !!CLASSES[u.cls]?.air;
 function finishWaveFor(b, e) {
@@ -312,8 +318,10 @@ export function step(b, dt = TICK) {
     }
     const inRange = b.enemies.filter(e => canHit(u, e) && (e.blockedBy === u.id || dist(e, u.x, u.y) <= u.range));
     if (!inRange.length) continue;
-    // The enemy closest to the goal first, as in Arknights.
-    const target = inRange.sort((a, c) => (c.seg + (c.blockedBy === u.id ? 99 : 0)) - (a.seg + (a.blockedBy === u.id ? 99 : 0)))[0];
+    // Whoever it is blocking first, then (for snipers) flyers, since nothing else can
+    // hit them; then the enemy with the least distance left to the goal, as in Arknights.
+    const rank = e => (e.blockedBy === u.id ? -1e6 : 0) + (e.flying && CLASSES[u.cls].air ? -1e3 : 0) + distanceLeft(e);
+    const target = inRange.sort((a, c) => rank(a) - rank(c))[0];
     const victims = u.cls === 'caster' ? b.enemies.filter(e => canHit(u, e) && dist(e, target.x, target.y) <= CLASSES.caster.splash) : [target];
     for (const e of victims) e.hp -= hit(u.atk, e.def, typeMultiplier(u.types[0], e.types));
     u.cd = u.interval;
