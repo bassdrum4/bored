@@ -2,19 +2,22 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 529,
+  "count": 532,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"710a68d","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 2, Proton, with flying enemies (manual review)"},
+  {"sha":"588fd78","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 1 engine and the hub bridge (manual review)"},
   {"sha":"5f23353","date":"2026-11-17","author":"Codebuff","subject":"Give a new game three days above the ranked Popular order"},
   {"sha":"5493212","date":"2026-11-17","author":"Codebuff","subject":"Let QuickDraw record reactions faster than its old 50 ms floor"},
   {"sha":"b415331","date":"2026-11-17","author":"Codebuff","subject":"Stop ranking Krillion on the shared board"},
   {"sha":"63d8e51","date":"2026-11-17","author":"Codebuff","subject":"Add Photo Puzzle, played on a picture kept in local storage"},
   {"sha":"c35682b","date":"2026-11-17","author":"Codebuff","subject":"Keep Transit Chaos train time proportional to each leg's distance"},
   {"sha":"1c2285a","date":"2026-11-17","author":"Codebuff","subject":"Keep the save rate-limit test inside a calendar-minute window"},
+  {"sha":"b4b428c","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Gacha TD: chapter screens for chapter 2 (hidden until the engine has it)","pr":184},
   {"sha":"d95f7bf","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Gacha TD: browser tests for the Story, Squad, Battle and Quests screens","pr":182},
   {"sha":"01b7934","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Gacha TD: daily and weekly battle missions on Quests","pr":181},
   {"sha":"82e720b","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Gacha TD: Story, Squad and Battle screens","pr":180},

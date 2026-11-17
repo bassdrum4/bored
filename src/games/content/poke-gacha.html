@@ -878,31 +878,45 @@ function questsKey(e) {
 // tab and the battle missions stay hidden and the rest of the page works as before.
 const T = G && G.td ? G.td : null;
 const CLASS_SHORT = { vanguard: "Van", guard: "Grd", blocker: "Blk", sniper: "Snp", caster: "Cst", medic: "Med" };
-let storyAt = 0, storyMode = "stages", squadAt = 0, battle = null;
+let storyAt = 0, storyMode = "stages", squadAt = 0, battle = null, chapterAt = 0;
+// Chapters: the engine's list when it has one (chapter 2 and on), else chapter 1 alone.
+const chapters = () => T.chapters || [{ id: T.chapter.id, name: T.chapter.name, stages: T.stages }];
+const stagesNow = () => chapters()[Math.min(chapterAt, chapters().length - 1)].stages;
+const allStages = () => chapters().flatMap(c => c.stages);
+const isOpen = (td, stage) => td.unlockedById ? !!td.unlockedById[stage.id] : !!td.unlocked[T.stages.indexOf(stage)];
+const stageBefore = stage => allStages()[allStages().indexOf(stage) - 1];
+const flyersOf = stage => [...new Set(stage.waves.filter(w => w[5]).map(w => w[1]))];
 const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
 const stageStars = n => "★".repeat(n) + "☆".repeat(3 - n);
-function enemiesOf(stage) { return [...new Set(stage.waves.map(w => w[1]))].map(name).join(", "); }
+function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5]).map(w => w[1]))].map(name).join(", "); }
 function storyUpdate() {
   drawBackdrop();
   const td = T.state();
   $("#story-list-panel").hidden = $("#story-info").hidden = storyMode !== "stages";
   $("#squad-list-panel").hidden = $("#squad-info").hidden = storyMode !== "squad";
   if (storyMode === "squad") return squadUpdate();
-  titled($("#story-title"), "CHAPTER", T.chapter.id);
-  rows($("#story-list"), T.stages.map((stage, i) => ({ label: stage.id + " " + stage.name, right: td.unlocked[i] ? stageStars(td.best[stage.id] || 0) : "locked",
-    off: !td.unlocked[i] })), storyAt, (i, click) => { storyAt = i; if (click) pickStage(); else storyUpdate(); });
-  const stage = T.stages[storyAt], best = td.best[stage.id] || 0;
+  const chapter = chapters()[Math.min(chapterAt, chapters().length - 1)], list = stagesNow();
+  if (storyAt >= list.length) storyAt = list.length - 1;
+  titled($("#story-title"), "CHAPTER", chapter.id + (chapters().length > 1 ? "/" + chapters().length : ""));
+  rows($("#story-list"), list.map(stage => ({ label: stage.id + " " + stage.name, right: isOpen(td, stage) ? stageStars(td.best[stage.id] || 0) : "locked",
+    off: !isOpen(td, stage) })), storyAt, (i, click) => { storyAt = i; if (click) pickStage(); else storyUpdate(); });
+  const stage = list[storyAt], best = td.best[stage.id] || 0;
   const info = $("#story-info");
-  info.replaceChildren(el("div", "title", stage.boss ? "BOSS" : "STAGE"), el("div", "", stage.name), el("div", "dim", stage.waves.length + " waves · " + stage.lives + " lives"),
+  info.replaceChildren(el("div", "title", stage.admin ? "ADMIN" : stage.boss ? "BOSS" : "STAGE"), el("div", "", stage.name), el("div", "dim", stage.waves.length + " waves · " + stage.lives + " lives"),
     el("div", "dim", "Enemies: " + enemiesOf(stage)));
+  // Flying enemies: only snipers can hit them, so a stage says so up front.
+  if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ") + ". Snipers only."));
   const reward = el("div"); reward.append(best ? "Best " : "First clear: ", best ? el("span", "num", stageStars(best)) : el("span", "num", "50"), best ? "" : " coins + 2 Regular");
   info.append(reward);
+  if (stage.admin && !best) { const g = el("div"); g.append("Admin: ", el("span", "num", "+1"), " Gold"); info.append(g); }
   if (best < 3) { const r3 = el("div", "dim"); r3.append("First 3★: ", el("span", "num", "100"), " coins + 1 Plus"); info.append(r3); }
-  say(td.unlocked[storyAt] ? stage.before[0] + " Enter: choose your squad." : "Clear " + T.stages[storyAt - 1].id + " to unlock this stage.");
+  const more = chapters().length > 1 ? " Left/Right: chapter." : "";
+  say((isOpen(td, stage) ? stage.before[0] + " Enter: choose your squad." : "Clear " + stageBefore(stage).id + " to unlock this stage.") + more);
 }
 function pickStage() {
   const td = T.state();
-  if (!td.unlocked[storyAt]) return say("Clear " + T.stages[storyAt - 1].id + " first.");
+  const stage = stagesNow()[storyAt];
+  if (!isOpen(td, stage)) return say("Clear " + stageBefore(stage).id + " first.");
   if (!S.owned.length) return say("Hatch some eggs first: you need mons for your squad.");
   storyMode = "squad"; squadAt = 0; storyUpdate();
 }
@@ -922,7 +936,7 @@ function squadUpdate() {
     (i, click) => { squadAt = i; if (click) squadPick_(i); else squadUpdate(); });
   const row = list[squadAt], info = $("#squad-info");
   if (row.start) {
-    info.replaceChildren(el("div", "title", T.stages[storyAt].id), el("div", "", T.stages[storyAt].name),
+    info.replaceChildren(el("div", "title", stagesNow()[storyAt].id), el("div", "", stagesNow()[storyAt].name),
       el("div", "dim", pick.map(name).join(", ") || "Nobody picked yet."));
     say("Enter: start. Ground classes (Van, Grd, Blk) stand on the path; ranged ones (Snp, Cst, Med) on high ground.");
     return;
@@ -947,7 +961,11 @@ function squadPick_(i) {
 function storyKey(e) {
   const k = e.key;
   if (storyMode === "stages") {
-    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); storyAt = (storyAt + (k === "ArrowUp" ? -1 : 1) + T.stages.length) % T.stages.length; storyUpdate(); }
+    const n = stagesNow().length;
+    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); storyAt = (storyAt + (k === "ArrowUp" ? -1 : 1) + n) % n; storyUpdate(); }
+    else if ((k === "ArrowLeft" || k === "ArrowRight") && chapters().length > 1) {
+      e.preventDefault(); chapterAt = (chapterAt + (k === "ArrowLeft" ? -1 : 1) + chapters().length) % chapters().length; storyAt = 0; storyUpdate();
+    }
     else if (k === "Enter" || k === " ") { e.preventDefault(); pickStage(); }
     else if (k === "Backspace") { e.preventDefault(); go("pull"); }
     return;
@@ -972,7 +990,7 @@ function spriteFor(num, look) {
 function startBattle() {
   if (matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches) return say("Battles are desktop only: they need a mouse or keyboard.");
   const squad = T.squad(squadPick());
-  const stage = T.stages[storyAt];
+  const stage = stagesNow()[storyAt];
   battle = { b: T.newBattle(stage, squad), stage, slot: 0, cur: [0, 0], paused: true, talk: stage.before.slice(), last: performance.now(), acc: 0, done: false, selected: null };
   const ground = T.pathsOf(stage)[0];
   battle.cur = ground[Math.floor(ground.length / 2)].slice();
@@ -1026,7 +1044,9 @@ function drawField() {
   const things = [...b.units.map(o => ({ o, unit: true })), ...b.enemies.map(o => ({ o, unit: false }))].sort((a, c) => a.o.y - c.o.y);
   for (const { o, unit } of things) {
     const cx = o.x * TILE + TILE / 2, by = o.y * TILE + TILE - 4;
-    drawMon(spriteFor(o.num, unit ? o.look : "normal"), cx, by);
+    // A flyer floats 12px above a small ink shadow on the ground.
+    if (!unit && o.flying) { g.fillStyle = C.ink; g.fillRect(cx - 10, by - 2, 20, 2); g.fillRect(cx - 7, by, 14, 2); }
+    drawMon(spriteFor(o.num, unit ? o.look : "normal"), cx, by - (!unit && o.flying ? 12 : 0));
     bar(cx, o.y * TILE + 2, o.hp / o.maxHp, unit ? C.teal : C.red);
     if (unit) { g.fillStyle = C.ink; g.fillRect(cx - 17, o.y * TILE + 6, 34, 3); g.fillStyle = C.gold; g.fillRect(cx - 16, o.y * TILE + 7, Math.round(32 * o.sp / o.spMax), 1); }
     if (!unit && o.boss) { g.fillStyle = C.gold; g.fillRect(cx - 4, o.y * TILE - 6, 8, 4); }
