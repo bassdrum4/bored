@@ -12,7 +12,7 @@ const { respondToAnalytics } = require('./telemetry-isolation.cjs');
 const root = path.resolve(__dirname, '..');
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-// Read in the game frame: rectangles in CSS pixels, scaled from the 640x408 internal frame.
+// Read in the game frame: rectangles in CSS pixels, scaled from the 640x384 internal frame.
 function measure() {
   machine = 'legend';
   updateScene();
@@ -24,10 +24,10 @@ function measure() {
     k, width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth,
     wrap: box('#wrap'), sky: box('#sky'), menu: box('#menu'), counts: box('#counts'), msg: box('#msg'), banner: box('#banner'),
     // Drawn on the canvas, so measured from the layout: the machine (internal x 104-316,
-    // y 30-288), the next machine from x 560, the egg pile above the plate, the
+    // y 14-272), the next machine from x 560, the egg pile above the plate, the
     // plate's clear area that holds the banner, and the "UP!" drawn beside it.
-    machine: at(104, 30, 316, 288), next: at(560, 30, 772, 288), pile: at(116, 50, 304, 92), window: at(162, 114, 258, 144),
-    words: at(220, 122, 244, 138)
+    machine: at(104, 14, 316, 272), next: at(560, 14, 772, 272), pile: at(116, 34, 304, 76), window: at(162, 98, 258, 128),
+    words: at(220, 106, 244, 122)
   };
 }
 const overlap = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
@@ -55,8 +55,9 @@ test('the Poké Gacha pull screen fills the window at a whole-number scale, with
   const game = await (await page.$('#frame')).contentFrame();
   await game.evaluate(() => go('pull'));
 
-  // A phone, the 640x408 frame exactly, a Google Sites embed, laptops and big screens.
-  const expected = { '360x640': 0.5625, '640x408': 1, '1000x630': 1, '1366x768': 1, '1440x900': 2, '1920x1080': 2, '2560x1440': 3 };
+  // A phone, the 640x384 frame exactly, a small embed, the owner's Google Sites game
+  // area (about 1900x790, which must reach 2x), laptops and big screens.
+  const expected = { '360x640': 0.5625, '640x384': 1, '1000x630': 1, '1900x790': 2, '1366x768': 2, '1440x900': 2, '1920x1080': 2, '2560x1440': 3 };
   for (const [size, scale] of Object.entries(expected)) {
     const [width, height] = size.split('x').map(Number);
     await page.setViewport({ width, height });
