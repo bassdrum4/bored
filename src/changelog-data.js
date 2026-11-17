@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 516,
+  "count": 520,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,7 +10,11 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"1c2285a","date":"2026-11-17","author":"Codebuff","subject":"Keep the save rate-limit test inside a calendar-minute window"},
+  {"sha":"d08a20d","date":"2026-11-16","author":"Claude","subject":"Poké Gacha: Bored's mono font, and the egg list layout"},
   {"sha":"c475b01","date":"2026-11-16","author":"Codebuff","subject":"Fix retired-duel test, auto-merge Poké Gacha, extend scoped analytics"},
+  {"sha":"e7eab9e","date":"2026-11-16","author":"Claude","subject":"Poké Gacha: finish phase 2 screens, SP skins, looks and leaderboard buddy"},
+  {"sha":"ccd57ff","date":"2026-11-16","author":"Claude","subject":"Poké Gacha: pixel pull screen with three machines"},
+  {"sha":"dc40ce7","date":"2026-11-16","author":"Claude","subject":"Poké Gacha phase 2: the real gacha"},
   {"sha":"71a7830","date":"2026-11-16","author":"Claude","subject":"Start the wallet the first time Poké Gacha is opened"},
   {"sha":"d3f291f","date":"2026-11-16","author":"Claude","subject":"Poké Gacha wallet and rewards engine (hub side)"},
   {"sha":"6626e0c","date":"2026-11-16","author":"Vettel Xu","subject":"docs(poke-gacha): add design spec"},
