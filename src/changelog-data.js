@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 526,
+  "count": 527,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -15,6 +15,7 @@ export const CHANGELOG = [
   {"sha":"63d8e51","date":"2026-11-17","author":"Codebuff","subject":"Add Photo Puzzle, played on a picture kept in local storage"},
   {"sha":"c35682b","date":"2026-11-17","author":"Codebuff","subject":"Keep Transit Chaos train time proportional to each leg's distance"},
   {"sha":"1c2285a","date":"2026-11-17","author":"Codebuff","subject":"Keep the save rate-limit test inside a calendar-minute window"},
+  {"sha":"82e720b","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Gacha TD: Story, Squad and Battle screens","pr":180},
   {"sha":"fe3519f","date":"2026-11-16","author":"Daniel Lowe","subject":"Fix Poké Gacha artwork missing from main","pr":177},
   {"sha":"d08a20d","date":"2026-11-16","author":"Claude","subject":"Poké Gacha: Bored's mono font, and the egg list layout"},
   {"sha":"c475b01","date":"2026-11-16","author":"Codebuff","subject":"Fix retired-duel test, auto-merge Poké Gacha, extend scoped analytics"},
