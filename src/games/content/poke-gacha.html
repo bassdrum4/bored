@@ -103,6 +103,11 @@ canvas, img { image-rendering: pixelated; display: block }
 /* The banner: the 40x30 mini sprite at 1x, inside the plate. */
 #banner { position: absolute; width: 40px; height: 30px; pointer-events: none }
 
+/* Rates and pity: over the machine and the menu while it is open. */
+#rates { left: 8px; top: 8px; width: 484px; height: 264px; padding: 6px 12px; cursor: pointer }
+#rates .grid { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; max-width: 300px }
+#msg .more { margin-left: auto; cursor: pointer; text-decoration: underline; color: var(--dim); white-space: nowrap; align-self: flex-end }
+#tabs .alert { display: inline-block; vertical-align: middle; margin-left: 4px }
 #menu { left: 276px; top: 88px; width: 216px; padding: 4px 8px }
 .hit { position: absolute; cursor: pointer }
 
@@ -283,6 +288,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="hit" id="hit-right" style="left:496px;top:6px;width:144px;height:266px" title="Next machine"></div>
         <div class="hit" id="hit-machine" style="left:56px;top:6px;width:212px;height:266px" title="Open the voucher menu"></div>
         <div class="panel rows" id="menu" role="listbox"></div>
+        <div class="panel" id="rates" hidden></div>
       </section>
       <section id="scr-eggs" class="screen" hidden>
         <div class="panel" id="egg-pic"></div>
@@ -638,6 +644,34 @@ function haveFor(option) {
   if (option.cancel) return true;
   return (S.balance[option.voucher] || 0) >= (option.voucher === "regular" ? option.count : 1);
 }
+/* Rates and pity, as the engine (src/hub/gacha.js) rolls them: EGG_RATES out of
+   256 per tier, SHINY_ODDS, SP_ODDS and RARITY_PITY. The bridge does not carry
+   them, so they are copied here; tests/poke-gacha.test.cjs checks the copy
+   against gacha.js so the two cannot drift. */
+const RATES = { standard: [204, 44, 7, 1, 0], legend: [203, 44, 7, 1, 1] };
+const SHINY_IN = { shiny: 64, other: 128 }, SP_IN = 200, PITY = [9, 59, 412];
+let ratesOpen = false;
+const pct = n => (n / 256 * 100).toFixed(n * 100 % 256 ? (n / 256 * 100 < 1 ? 2 : 1) : 0) + "%";
+function ratesUpdate() {
+  const box = $("#rates");
+  box.hidden = !ratesOpen;
+  if (!ratesOpen) return;
+  const table = machine === "legend" ? RATES.legend : RATES.standard, grid = el("div", "grid");
+  ["Common", "Rare", "Epic", "Legendary", "Banner (" + name(S.banner) + ")"].forEach((t, i) => {
+    if (!table[i]) return;
+    grid.append(el("span", "", t + " egg"), el("span", "num", pct(table[i])));
+  });
+  grid.append(el("span", "", "Shiny on hatch"), el("span", "num", "1 in " + (machine === "shiny" ? SHINY_IN.shiny : SHINY_IN.other)));
+  if (machine === "shiny") grid.append(el("span", "", "SP skin on hatch"), el("span", "num", "1 in " + SP_IN));
+  if (machine === "move") grid.append(el("span", "", "Rare skill"), el("span", "num", "2x"));
+  const p = S.pity || { rare: 0, epic: 0, legendary: 0 }, pity = el("div");
+  pity.append("Pity: Rare ", el("span", "num", p.rare + "/" + PITY[0]), " · Epic ", el("span", "num", p.epic + "/" + PITY[1]),
+    " · Legendary ", el("span", "num", p.legendary + "/" + PITY[2]));
+  box.replaceChildren(el("div", "title", LOOK[machine].label.toUpperCase()), grid, pity,
+    el("div", "dim", machine === "legend" ? "Here each egg counts twice toward Legendary pity." : "Pity is shared by all three machines."),
+    el("div", "dim", "D or a click closes."));
+}
+function toggleRates() { ratesOpen = !ratesOpen; updateScene(); }
 function updateScene() {
   if (!S) return;
   $("#counts").replaceChildren(...["regular", "plus", "premium", "gold"].map(kind => {
@@ -668,6 +702,9 @@ function updateScene() {
     say(message ? message.text : !menuOpen ? "Select a machine. " + HINT
       : (option.cancel ? about : option.about + (haveFor(option) ? "" : " You don't have enough.")));
   }
+  // Rates and pity for the machine in front: a link in the message box, or D.
+  if (tab === "pull") { const more = el("span", "more", ratesOpen ? "Close rates (D)" : "Rates · pity (D)"); more.dataset.rates = 1; $("#msg").append(more); }
+  ratesUpdate();
   drawScene();
 }
 function switchMachine(step) {
@@ -712,6 +749,8 @@ function choose(i) {
 }
 function pullKey(e) {
   const k = e.key;
+  if (k === "d" || k === "D") { e.preventDefault(); return toggleRates(); }
+  if (ratesOpen && (k === "Enter" || k === "Backspace" || k === " ")) { e.preventDefault(); return toggleRates(); }
   if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); switchMachine(k === "ArrowLeft" ? -1 : 1); }
   else if (k === "ArrowUp" || k === "ArrowDown") {
     e.preventDefault();
@@ -1066,8 +1105,11 @@ function questItems() {
       about: td.weekly.some(m => m.later) ? "All five weekly missions pay 1 Gold. Locked until the Poké Idle boss mission opens." : "All five weekly missions pay 1 Gold." }])
     .concat(starters);
 }
+// Rewards paid so far: finished missions and trophies (all are paid when done).
+function questsDone() { try { return questItems().filter(q => q.done).length + G.trophies().length; } catch { return 0; } }
 function questsUpdate() {
   drawBackdrop();
+  if (questsDone() !== pref.questsSeen) { pref.questsSeen = questsDone(); keep(); refreshTop(); }
   const items = questItems();
   rows($("#quest-list"), items.map(q => ({ label: q.label, right: q.right, off: q.done || q.off })), questFocus === "missions" ? questAt : -1,
     i => { questAt = i; questFocus = "missions"; questsUpdate(); });
@@ -1145,6 +1187,28 @@ const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num
 const stageStars = starIcons;
 // The plain enemies: flyers, exploders and armored ones get their own lines.
 function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5] && !w[6] && !w[7]).map(w => w[1]))].map(name).join(", "); }
+/* Stage preview and loss hints. The recommended level follows the enemies' level
+   (1.0 in 1-1 up to about 2.5): (level - 1) x 2 + 1, so 1 early on and 3-4 late,
+   where type-matched level-3 squads win in the balance tests. */
+const recLevel = stage => Math.max(1, Math.min(T.maxLevel || 10, Math.round(((stage.level || 1) - 1) * 2 + 1)));
+const foeTypes = stage => [...new Set(stage.waves.flatMap(w => G.dex[w[1] - 1][1].split("/")))];
+// The attack types that hit the most of a stage's foes super effectively (counted per foe sent).
+function weakTo(stage) {
+  const score = {};
+  for (const w of stage.waves) {
+    const types = G.dex[w[1] - 1][1].split("/");
+    for (const t of G.types) if (T.typeMultiplier(t, types) > 1) score[t] = (score[t] || 0) + w[2];
+  }
+  return Object.entries(score).sort((a, c) => c[1] - a[1] || (a[0] < c[0] ? -1 : 1)).slice(0, 2).map(([t]) => t);
+}
+function lossHint(stage) {
+  const weak = weakTo(stage), notes = [];
+  if (weak.length) notes.push("Rocket's mons here are weak to " + weak.join(" and ") + ".");
+  if (flyersOf(stage).length) notes.push("Bring a Sniper for the flyers.");
+  if (explodersOf(stage).length) notes.push("Kill exploders before they reach a blocker.");
+  if (armoredOf(stage).length) notes.push("Casters go through armor.");
+  return notes.slice(0, 2).join(" ") || "Try another squad or placement.";
+}
 function storyUpdate() {
   drawBackdrop();
   const td = T.state();
@@ -1161,8 +1225,10 @@ function storyUpdate() {
     off: !isOpen(td, stage) })), storyAt, (i, click) => { storyAt = i; if (click) pickStage(); else storyUpdate(); });
   const stage = list[storyAt], best = td.best[stage.id] || 0;
   const info = $("#story-info");
-  info.replaceChildren(el("div", "title", stage.admin ? "ADMIN" : stage.boss ? "BOSS" : "STAGE"), el("div", "", stage.name), el("div", "dim", stage.waves.length + " waves · " + stage.lives + " lives"),
-    ...(enemiesOf(stage) ? [el("div", "dim", "Enemies: " + enemiesOf(stage))] : []));
+  // The preview: waves, lives and a recommended level, then the foes' types (their names are in battle).
+  const pre = el("div", "dim"); pre.append(stage.waves.length + " waves · " + stage.lives + " lives · Rec. Lv ", el("span", "num", recLevel(stage)));
+  info.replaceChildren(el("div", "title", stage.admin ? "ADMIN" : stage.boss ? "BOSS" : "STAGE"), el("div", "", stage.name), pre,
+    el("div", "dim", "Types: " + foeTypes(stage).join(", ")));
   // Flying enemies: only snipers can hit them, so a stage says so up front.
   // Short notes here; the advice goes in the message box, so the panel never overflows.
   if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ")));
@@ -1875,7 +1941,7 @@ function showResult() {
   if (bt.talk.length) { $("#battle-result").hidden = true; return; }
   const box = $("#battle-result");
   box.hidden = false;
-  const lines = [el("div", "title", res.stars ? "CLEARED" : "DEFEATED"), res.stars ? (() => { const d = el("div"); d.append(stageStars(res.stars)); return d; })() : el("div", "num", "Try another squad or placement")];
+  const lines = [el("div", "title", res.stars ? "CLEARED" : "DEFEATED"), res.stars ? (() => { const d = el("div"); d.append(stageStars(res.stars)); return d; })() : (() => { const d = el("div", "gold", lossHint(bt.stage)); d.style.whiteSpace = "normal"; d.style.lineHeight = "20px"; return d; })()];
   const waves = el("div"); waves.append("+", el("span", "num", res.waves), " hatch waves");
   lines.push(waves);
   const NAMES = { coins: ["coin", "coins"], regular: ["Regular voucher", "Regular vouchers"], plus: ["Plus voucher", "Plus vouchers"],
@@ -2168,12 +2234,14 @@ const SCREENS = { story: [storyUpdate, storyKey], pull: [updateScene, pullKey], 
 function refreshTop() {
   S = G.state();
   const ready = S.eggs.filter(e => e.ready).length;
+  // A red dot: an egg ready to hatch, or a reward paid since Quests was last opened.
+  const fresh = questsDone() > (Number(pref.questsSeen) || 0);
   $("#tabs").replaceChildren(...shownTabs().map(([id, label], i) => {
     const t = el("div", "panel" + (tab === id && !picking ? " on" : ""));
     t.append(el("span", "", label));
-    if (id === "eggs" && ready) t.append(" ", el("span", "num", ready));
+    if ((id === "eggs" && ready) || (id === "quests" && fresh)) { const d = mapCanvas("dot", { k: C.ink, 1: C.red }); d.classList.add("alert"); t.append(d); }
     t.dataset.tab = id;
-    t.title = label + " (" + (i + 1) + ")";
+    t.title = label + " (" + (i + 1) + ")" + (id === "eggs" && ready ? ": " + ready + " ready to hatch" : id === "quests" && fresh ? ": new rewards" : "");
     return t;
   }));
   const purse = el("div", "panel purse");
@@ -2185,7 +2253,7 @@ function refreshTop() {
 function go(id) {
   if (!SCREENS[id] || hatching || battle || picking || !shownTabs().some(([shown]) => shown === id)) return;
   tab = pref.tab = id; keep();
-  message = null;
+  message = null; ratesOpen = false;
   for (const [sid] of TABS) $("#scr-" + sid).hidden = sid !== id;
   // Only the squad screen hides the message box; every other screen has it.
   $("#msg").hidden = false;
@@ -2251,6 +2319,8 @@ if (!G) {
   $("#hit-left").onclick = () => switchMachine(-1);
   $("#hit-right").onclick = () => switchMachine(1);
   $("#hit-machine").onclick = () => { menuOpen = true; message = null; updateScene(); };
+  $("#msg").onclick = e => { if (e.target.closest("[data-rates]")) toggleRates(); };
+  $("#rates").onclick = () => toggleRates();
   $("#hatch").onclick = () => hatching && hatchKey({ key: "Enter", preventDefault() {} });
   // The Legendary UP timer is on screen whichever machine is in front.
   setInterval(() => { if (tab === "pull" && !hatching && !picking && !document.hidden) drawScene(); }, 1000);
