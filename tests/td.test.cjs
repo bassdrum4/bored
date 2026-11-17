@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
 const td = moduleUnderTest('src/hub/td.js', [
-  'classOf', 'STAGES', 'CHAPTERS', 'canHit', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
+  'classOf', 'STAGES', 'CHAPTERS', 'canHit', 'FUSE', 'BLAST', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
   'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H'
 ], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor });
 const { walletBalance, activateWallet, grantOnce } = rewards;
@@ -53,9 +53,13 @@ test('classes come from stats, with healers the only hand-written list', () => {
   assert.deepEqual([...classes].sort(), ['blocker', 'caster', 'guard', 'medic', 'sniper', 'vanguard']);
 });
 
-test('chapter 1 has 8 stages and chapter 2 has 6, each with a walkable path from every spawn to the goal', () => {
-  assert.deepEqual(td.CHAPTERS.map(c => c.stages.length), [8, 6]);
-  assert.equal(td.STAGES.length, 14, 'stages unlock in this one order across chapters');
+test('chapters 1-3 have 8, 6 and 6 stages, each with a walkable path from every spawn to the goal', () => {
+  assert.deepEqual(td.CHAPTERS.map(c => c.stages.length), [8, 6, 6]);
+  assert.equal(td.STAGES.length, 20, 'stages unlock in this one order across chapters');
+  const petrel = td.CHAPTERS[2].stages[5];
+  assert.ok(petrel.boss && petrel.admin, '3-6 is the Petrel admin boss');
+  assert.ok(td.CHAPTERS[2].stages.every(s => s.waves.some(w => w[6])), 'every chapter 3 stage has exploding waves');
+  assert.ok(td.STAGES.filter(s => (s.chapter || 1) < 3).every(s => s.waves.every(w => !w[6])), 'chapters 1 and 2 have none');
   assert.ok(td.CHAPTERS[0].stages[7].boss);
   const proton = td.CHAPTERS[1].stages[5];
   assert.ok(proton.boss && proton.admin, '2-6 is the Proton admin boss, worth 1 Gold');
@@ -179,8 +183,44 @@ test('snipers shoot flyers first, and everyone else the enemy with the least way
   b.energy = 99; td.deploy(b, 0, 4, 2);
   while (b.enemies.length < 2) td.step(b);
   const [rat, bat] = [b.enemies.find(e => !e.flying), b.enemies.find(e => e.flying)];
+  // Both in range, the Rattata further along: by distance alone it would be shot first.
+  Object.assign(rat, { x: 5, y: 1, seg: 5 }); Object.assign(bat, { x: 3, y: 1, seg: 0 });
+  rat.speed = bat.speed = 0;
   while (rat.hp === rat.maxHp && bat.hp === bat.maxHp && !b.over) td.step(b);
   assert.ok(bat.hp < bat.maxHp && rat.hp === rat.maxHp, 'the first shot hits the flyer');
+});
+
+test('exploders light a fuse when blocked and blow up on every unit nearby, unless killed first', () => {
+  const stage = { id: 'x', lives: 3, level: 1, map: ['##########', 'S........G', '##H#######', '##########', '##########'], waves: [[0, named('Koffing'), 1, 1, 0, 0, 1]] };
+  const onix = td.unitStats(named('Onix')), machamp = td.unitStats(named('Machamp'));
+  // A blocker alone: the Koffing is held, burns its fuse, and blasts the blocker and its neighbour.
+  let b = td.newBattle(stage, [onix, machamp]);
+  b.energy = 99;
+  td.deploy(b, 0, 3, 1); td.deploy(b, 1, 4, 1);
+  b.units.forEach(u => { u.atk = 0; });
+  const full = b.units.map(u => u.hp);
+  while (!b.enemies.length) td.step(b);
+  while (!b.enemies[0].fuse) td.step(b);
+  assert.ok(b.enemies[0].fuse <= td.FUSE, 'the fuse is lit once it is blocked');
+  while (b.enemies.length) td.step(b);
+  assert.equal(b.blasts, 1, 'it blew up');
+  assert.ok(b.units.every((u, i) => u.hp < full[i]), 'every unit within the blast is hurt');
+  assert.equal(b.leaks, 0, 'a blast is not a leak');
+  // Killed before the fuse runs out: no blast.
+  b = td.newBattle(stage, [onix, td.unitStats(named('Mewtwo'), { level: 10 })]);
+  b.energy = 99;
+  td.deploy(b, 0, 3, 1); td.deploy(b, 1, 2, 2);
+  for (let i = 0; i < 400 && !b.over; i++) td.step(b);
+  assert.equal(b.over, 'win');
+  assert.ok(!b.blasts, 'a Koffing shot down before its fuse runs out never explodes');
+  // The fuse goes out when its blocker leaves.
+  b = td.newBattle(stage, [onix]);
+  b.energy = 99; td.deploy(b, 0, 5, 1);
+  b.units[0].atk = 0;
+  while (!b.enemies.length || !b.enemies[0].fuse) td.step(b);
+  td.retreat(b, b.units[0].id);
+  td.step(b);
+  assert.equal(b.enemies[0].fuse, null, 'unblocked, it walks on with no fuse');
 });
 
 test('finishing pays waves every time, and first clear and first 3-star once', () => {

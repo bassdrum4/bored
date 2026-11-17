@@ -1,5 +1,6 @@
 // Poké Gacha tower defense: chapter 1 (Team Rocket grunts), chapter 2 (Proton,
-// with flying enemies), the battle simulation, and the TD rewards and missions.
+// with flying enemies), chapter 3 (Petrel, with enemies that explode), the
+// battle simulation, and the TD rewards and missions.
 //
 // The simulation is plain data stepped at a fixed rate, so it runs the same in
 // the page and in tests. Classes come from each species' stats; nothing is
@@ -50,10 +51,13 @@ export function classOf(num) {
 
 // Maps are 10×5 tiles: '#' no deploy, '.' ground (melee, and the path runs on
 // it), 'H' high ground (ranged), 'S' where enemies come in, 'G' the goal.
-// Waves: [seconds, species, count, gap between them, boss, flying]. Each line is
-// one wave. A boss has its HP times 4; flying enemies cross the map in a straight
-// line from their spawn to the goal, cannot be blocked, never attack, and only
-// snipers can hit them.
+// Waves: [seconds, species, count, gap between them, boss, flying, explodes].
+// Each line is one wave. A boss has its HP times 4; flying enemies cross the map
+// in a straight line from their spawn to the goal, cannot be blocked, never
+// attack, and only snipers can hit them. An exploding enemy lights a fuse when
+// it is blocked (FUSE seconds); when the fuse runs out it blows up, hitting every
+// unit within BLAST tiles for BLAST_POWER times its attack, and is gone. Killing
+// it first defuses it, so ranged units and fast hitters matter.
 export const CHAPTER = { id: 1, name: 'Team Rocket Grunts', boss: 'Grunt boss' };
 export const STAGES = [
   { id: '1-1', name: 'First patrol', lives: 3, level: 1, map: ['##H##H####', 'S........G', '##H##H####', '##########', '##########'],
@@ -114,13 +118,42 @@ export const STAGES = [
     map: ['#H#H#H#H##', 'S........G', '#H#H#.#H.#', 'S.......H#', '####H#####'],
     waves: [[3, 88, 3, 3], [14, 41, 4, 2.5, 0, 1], [26, 42, 4, 2, 0, 1], [36, 24, 4, 2.5], [48, 110, 1, 1, 1]],
     before: ['Proton: You got this far? Then I will stop you myself.', 'Proton: Weezing, cover them in smog!', 'The boss Weezing has four times the HP. Bats come over both lanes before it.'],
-    after: ['Proton: How...? Petrel will not be so soft on you.', 'Chapter 2 cleared. Team Rocket\'s other admins are waiting.'] }
+    after: ['Proton: How...? Petrel will not be so soft on you.', 'Chapter 2 cleared. Team Rocket\'s other admins are waiting.'] },
+
+  /* ── Chapter 3: Petrel (smoke, sparks, and things that blow up) ──────── */
+  { id: '3-1', chapter: 3, name: 'Smoke alarm', lives: 3, level: 2.2, map: ['#H##H##H##', 'S........G', '#H##H##H##', '##########', '##########'],
+    waves: [[3, 109, 3, 3, 0, 0, 1], [14, 88, 3, 3], [26, 109, 4, 2.5, 0, 0, 1]],
+    before: ['Petrel: Did you think Proton was the worst of us? Meet my Koffing.', 'Koffing light a fuse when they are blocked, then explode on everything nearby. Shoot them before they reach your blockers.'],
+    after: ['Petrel: Fine. That was a drill.'] },
+  { id: '3-2', chapter: 3, name: 'Spark plant', lives: 3, level: 2.3, map: ['S....H####', '####.H##H#', '#H#H.....G', '##########', '##########'],
+    waves: [[3, 81, 4, 2.5], [14, 100, 4, 2, 0, 0, 1], [28, 81, 4, 2], [38, 100, 5, 1.8, 0, 0, 1]],
+    before: ['Grunt: Voltorb! Magnemite! Short them out!', 'Ground moves hit Electric hard. A blocker with high HP survives a blast.'],
+    after: ['Grunt: The whole plant blew a fuse.'] },
+  { id: '3-3', chapter: 3, name: 'Sludge works', lives: 3, level: 2.4, map: ['#H#H##H#H#', 'S.........', '####H#H#.#', '#G.......#', '###H#H####'],
+    waves: [[3, 88, 4, 3], [12, 41, 3, 3, 0, 1], [22, 109, 4, 2.5, 0, 0, 1], [34, 89, 2, 4], [44, 41, 3, 2.5, 0, 1]],
+    before: ['Grunt: Muk is slow. Muk is also very, very hard to stop.', 'Bats overhead and Koffing on the path: snipers for one, casters for the other.'],
+    after: ['Grunt: I need a shower.'] },
+  { id: '3-4', chapter: 3, name: 'Two fuses', lives: 3, level: 2.5, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
+    waves: [[3, 100, 4, 2.5, 0, 0, 1], [12, 81, 4, 2.5], [24, 101, 4, 2, 0, 0, 1], [36, 82, 2, 4]],
+    before: ['Petrel: Electrode are fast, and they do not stop to think.', 'Two spawns. Electrode run, so hit them early.'],
+    after: ['Petrel: Grr. My radio tower is still mine!'] },
+  { id: '3-5', chapter: 3, name: 'Smog bank', lives: 3, level: 2.6, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#........G', '####H#####'],
+    waves: [[3, 89, 3, 3.5], [12, 110, 3, 3, 0, 0, 1], [24, 41, 3, 2.5, 0, 1], [34, 110, 4, 2.5, 0, 0, 1], [46, 89, 3, 3]],
+    before: ['Grunt: Weezing explode twice as hard as Koffing. Good luck.', 'Spread your blockers out: a blast hits every unit near it.'],
+    after: ['Grunt: The admin is upstairs. He is... not himself today.'] },
+  { id: '3-6', chapter: 3, name: 'Petrel', boss: true, admin: true, lives: 3, level: 2.8,
+    map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
+    waves: [[3, 109, 4, 2.5, 0, 0, 1], [12, 41, 3, 2.5, 0, 1], [24, 101, 4, 2, 0, 0, 1], [36, 89, 3, 3], [48, 110, 1, 1, 1]],
+    before: ['Petrel: Kneel before Giovanni! ...Fine. It is a costume.', 'Petrel: Weezing, smog them out!', 'The boss Weezing has four times the HP and does not explode. Its Koffing and Electrode do.'],
+    after: ['Petrel: Ariana will make you pay for this.', 'Chapter 3 cleared. One more admin stands between you and the boss.'] }
 ];
 // Chapters in order, each with its stages. Stages unlock in the order of STAGES.
 export const CHAPTERS = [
   { id: 1, name: 'Team Rocket Grunts', admin: 'Grunts', stages: STAGES.filter(s => (s.chapter || 1) === 1) },
-  { id: 2, name: 'Proton', admin: 'Proton', stages: STAGES.filter(s => s.chapter === 2) }
+  { id: 2, name: 'Proton', admin: 'Proton', stages: STAGES.filter(s => s.chapter === 2) },
+  { id: 3, name: 'Petrel', admin: 'Petrel', stages: STAGES.filter(s => s.chapter === 3) }
 ];
+export const FUSE = 2.5, BLAST = 1.5, BLAST_POWER = 3;
 export const stageById = id => STAGES.find(stage => stage.id === id) || null;
 export const W = 10, H = 5;
 
@@ -206,8 +239,8 @@ export const START_ENERGY = 10;
 export function newBattle(stage, squad) {
   const paths = pathsOf(stage);
   const queue = [];
-  stage.waves.forEach(([at, num, count, gap, boss, flying], wave) => {
-    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying });
+  stage.waves.forEach(([at, num, count, gap, boss, flying, explodes], wave) => {
+    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying, explodes: !!explodes });
   });
   queue.sort((a, b) => a.at - b.at);
   return { stage, paths, squad: squad.slice(0, 8), t: 0, energy: START_ENERGY, life: stage.lives, queue, spawned: 0,
@@ -282,7 +315,7 @@ export function step(b, dt = TICK) {
     // Flyers go straight from their spawn to the goal, over everything.
     const path = s.flying ? [ground[0], ground[ground.length - 1]] : ground;
     b.enemies.push({ ...enemyStats(s.num, b.stage.level, s.boss, s.flying), id: b.nextId++, wave: s.wave, boss: s.boss, path, seg: 0,
-      x: path[0][0], y: path[0][1], cd: 0, blockedBy: null, maxHp: 0 });
+      x: path[0][0], y: path[0][1], cd: 0, blockedBy: null, maxHp: 0, explodes: s.explodes, fuse: null });
     const e = b.enemies[b.enemies.length - 1];
     e.maxHp = e.hp;
     b.spawned++;
@@ -290,11 +323,13 @@ export function step(b, dt = TICK) {
   // Movement and blocking.
   for (const e of b.enemies) {
     if (e.blockedBy && !b.units.some(u => u.id === e.blockedBy)) e.blockedBy = null;
+    // A fuse burns only while its exploder is held; walk free and it goes out.
+    if (e.explodes) e.fuse = e.blockedBy ? (e.fuse === null ? FUSE : e.fuse) : null;
     if (e.blockedBy) continue;
     const tx = Math.round(e.x), ty = Math.round(e.y);
     const blocker = !e.flying && b.units.find(u => u.ground && u.x === tx && u.y === ty && Math.abs(e.x - tx) + Math.abs(e.y - ty) < 0.35 &&
       b.enemies.filter(o => o.blockedBy === u.id).length < u.block);
-    if (blocker) { e.blockedBy = blocker.id; continue; }
+    if (blocker) { e.blockedBy = blocker.id; if (e.explodes) e.fuse = FUSE; continue; }
     let move = e.speed * dt;
     while (move > 0 && e.seg < e.path.length - 1) {
       const [nx, ny] = e.path[e.seg + 1];
@@ -326,9 +361,17 @@ export function step(b, dt = TICK) {
     for (const e of victims) e.hp -= hit(u.atk, e.def, typeMultiplier(u.types[0], e.types));
     u.cd = u.interval;
   }
+  // Exploders count down instead of attacking, then blow up on every unit nearby.
+  for (const e of b.enemies) {
+    if (!e.explodes || e.fuse === null || e.hp <= 0) continue;
+    e.fuse -= dt;
+    if (e.fuse > 0) continue;
+    for (const u of b.units) if (dist(u, e.x, e.y) <= BLAST) u.hp -= hit(e.atk * BLAST_POWER, u.def, typeMultiplier(e.types[0], u.types));
+    e.hp = 0; e.blasted = true; b.blasts = (b.blasts || 0) + 1;
+  }
   // Enemies hit whoever blocks them.
   for (const e of b.enemies) {
-    if (!e.blockedBy) continue;
+    if (!e.blockedBy || e.explodes) continue;
     e.cd -= dt;
     if (e.cd > 0) continue;
     const u = b.units.find(unit => unit.id === e.blockedBy);
