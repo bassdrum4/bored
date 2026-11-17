@@ -86,6 +86,8 @@ test('Poké Gacha opens through the hub, and every screen draws without an error
 // A new wallet opens on the starter pick when the hub offers one: take the
 // first starter and clear the squad it fills, so a test starts from its own picks.
 const passStarter = game => game.evaluate(() => {
+  // These tests are about other screens: the tutorial is off (it has its own tests).
+  if (typeof tutorSkipAll === 'function') tutorSkipAll();
   if (typeof picking === 'undefined' || !picking) return false;
   starterEnter(); starterEnter();
   pref.squad = []; keep();
@@ -371,6 +373,8 @@ test('a new account picks a starter, clears 1-1 with the gifts, pulls and hatche
   assert.equal(await game.evaluate(() => picking.sure), false);
   await key(tab, 'Enter'); await key(tab, 'Enter');
   assert.equal(await game.evaluate(() => picking), null);
+  // The tutorial has its own tests; this one is about the pick and the first battle.
+  await game.evaluate(() => { if (typeof tutorSkipAll === 'function') tutorSkipAll(); });
   const owned = await game.evaluate(() => S.owned.map(name));
   assert.deepEqual(owned.slice().sort(), ['Audino', 'Charmander', 'Geodude', 'Pidgey'], 'the starter and its three gifts');
   assert.equal(await game.evaluate(() => tab), 'story');
@@ -682,5 +686,133 @@ test('battle: blocked enemies stand clear of the blocker, hits show numbers and 
   // The field is drawn in the 3/4 view: high ground stands above the floor.
   const lifted = await game.evaluate(() => { const st = battle.stage; for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) if (st.map[y][x] === 'H') return tileRect(st, x, y).y < MY + y * TH; return null; });
   assert.equal(lifted, true);
+  assert.deepEqual(errors, []);
+});
+
+/* ── The tutorial ──────────────────────────────────────────────────────── */
+async function freshGame(t) {
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
+  const site = await serve(path.join(root, 'src'));
+  const browser = await puppeteer.launch({ executablePath, headless: true, args: process.getuid && process.getuid() === 0 ? ['--no-sandbox'] : [] });
+  t.after(async () => { await browser.close(); await site.close(); });
+  const tab = await browser.newPage();
+  const errors = [];
+  tab.on('pageerror', error => errors.push(error.message));
+  await tab.setRequestInterception(true);
+  tab.on('request', request => { if (respondToAnalytics(request)) return; if (request.url().startsWith(site.origin)) request.continue(); else request.abort(); });
+  await tab.setViewport({ width: 1280, height: 800 });
+  await tab.goto(site.url);
+  await tab.waitForFunction(() => typeof openGame === 'function');
+  const hub = await tab.evaluate(() => typeof window.__boredGacha?.pickStarter === 'function' && !!window.__boredGacha?.td);
+  await tab.evaluate(() => openGame('poke-gacha'));
+  await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  const game = await (await tab.$('#frame')).contentFrame();
+  return { tab, game, errors, hub };
+}
+const tutorUp = game => game.evaluate(() => !document.querySelector('#tutor').hidden && tutor && { id: tutor.id, i: tutor.i, n: tutor.steps.length, text: document.querySelector('#tutor-box').textContent });
+const clickHole = async (tab, game) => {
+  const r = await game.evaluate(() => { const h = document.querySelector('#tutor-hole').getBoundingClientRect(); return { x: h.left + h.width / 2, y: h.top + h.height / 2 }; });
+  const f = await (await tab.$('#frame')).boundingBox();
+  await tab.mouse.click(f.x + r.x, f.y + r.y);
+  await pause(150);
+};
+test('tutorial: a new account goes through every tip, the guided 1-1 waits for each real step, and ? replays', async t => {
+  const { tab, game, errors, hub } = await freshGame(t);
+  if (!hub) return t.skip('the hub has no starter pick yet');
+  await game.waitForFunction(() => !document.querySelector('#scr-starter').hidden);
+  await key(tab, 'Enter'); await key(tab, 'Enter');
+  // The loop, in three boxes, read with Enter.
+  await game.waitForFunction(() => tutor && tutor.id === 'loop');
+  for (let i = 0; i < 3; i++) { assert.equal((await tutorUp(game)).id, 'loop'); await key(tab, 'Enter'); }
+  assert.equal(await tutorUp(game), false);
+  // Squad: its two boxes on the first visit.
+  await key(tab, 'Enter');
+  await game.waitForFunction(() => tutor && tutor.id === 'squad');
+  await key(tab, 'Enter'); await key(tab, 'Enter');
+  // The guided first battle.
+  await game.evaluate(() => { sq.zone = 'head'; sq.head = 3; squadUpdate(); });
+  await key(tab, 'Enter');
+  await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
+  for (let i = 0; i < 6 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
+  await game.waitForFunction(() => tutor && tutor.id === 'battle-1-1');
+  // 1: pick the blocker's card. Enter alone does not move on, and the battle waits.
+  await key(tab, 'Enter');
+  assert.equal((await tutorUp(game)).i, 0, 'a do-it step waits for the real action');
+  assert.equal(await game.evaluate(() => battle.paused), true);
+  await key(tab, '1');
+  await game.waitForFunction(() => tutor.i === 1);
+  // 2: place it on the framed path tile.
+  await clickHole(tab, game);
+  await game.waitForFunction(() => tutor.i === 2);
+  assert.equal(await game.evaluate(() => battle.b.units.length), 1);
+  // 3: energy, read with Enter. 4: the battle runs until an enemy is blocked.
+  await key(tab, 'Enter');
+  await game.waitForFunction(() => tutor.i === 4, { timeout: 30000 });
+  assert.ok(await game.evaluate(() => battle.b.enemies.some(e => e.blockedBy)));
+  // 5-6: the sniper on high ground.
+  await key(tab, '2');
+  await game.waitForFunction(() => tutor.i === 5);
+  await clickHole(tab, game);
+  await game.waitForFunction(() => tutor.i === 6);
+  // 7: the skill charges (hurried along here), then 8: ready, read with Enter.
+  await game.evaluate(() => { for (const u of battle.b.units) u.sp = u.spMax - 0.2; });
+  await game.waitForFunction(() => tutor.i === 7, { timeout: 10000 });
+  await key(tab, 'Enter');
+  assert.equal(await tutorUp(game), false);
+  assert.equal(await game.evaluate(() => tipsSeen['battle-1-1']), true);
+  assert.equal(await game.evaluate(() => battle.paused), false, 'the battle plays on');
+  // Finish the battle quickly and visit each screen once.
+  await game.evaluate(() => { const b = battle.b; b.queue = []; b.enemies = []; });
+  await game.waitForFunction(() => battle.done, { timeout: 5000 });
+  for (let i = 0; i < 6 && await game.evaluate(() => battle && battle.talk.length); i++) await key(tab, 'Enter');
+  await key(tab, 'Enter');
+  for (const [k, id, n] of [['2', 'pull', 3], ['3', 'eggs', 1], ['4', 'dex', 2], ['6', 'quests', 1]]) {
+    await key(tab, k);
+    await game.waitForFunction(i => tutor && tutor.id === i, {}, id);
+    for (let i = 0; i < n; i++) await key(tab, 'Enter');
+    assert.equal(await tutorUp(game), false, id + ' tips close');
+  }
+  // Each once: back to Pull, nothing. The ? replays it.
+  await key(tab, '2'); await pause(100);
+  assert.equal(await tutorUp(game), false, 'a tip shows once');
+  await game.evaluate(() => document.querySelector('#tabs [data-help]').click());
+  assert.equal((await tutorUp(game)).id, 'pull', '? replays this screen');
+  await key(tab, 'Enter'); await key(tab, 'Enter'); await key(tab, 'Enter');
+  assert.deepEqual(errors, []);
+});
+test('tutorial: Skip works from the first box, in a battle step and on a replay, and nothing comes back', async t => {
+  const { tab, game, errors, hub } = await freshGame(t);
+  if (!hub) return t.skip('the hub has no starter pick yet');
+  await game.waitForFunction(() => !document.querySelector('#scr-starter').hidden);
+  await key(tab, 'Enter'); await key(tab, 'Enter');
+  await game.waitForFunction(() => tutor && tutor.id === 'loop');
+  // Skip by its link: the overlay goes, and the flag is kept in localStorage.
+  await game.evaluate(() => document.querySelector('#tutor-box [data-skip]').click());
+  assert.equal(await tutorUp(game), false);
+  assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.tips'))._skip), true);
+  for (const k of ['2', '3', '4', '6']) { await key(tab, k); await pause(80); assert.equal(await tutorUp(game), false, 'no tip after Skip'); }
+  // In a battle step: replay is forced, so start the guided battle's tip by hand and skip with X.
+  await key(tab, '1'); await key(tab, 'Enter');
+  await game.evaluate(() => { sq.zone = 'head'; sq.head = 3; squadUpdate(); });
+  await key(tab, 'Enter');
+  await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
+  for (let i = 0; i < 6 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
+  assert.equal(await tutorUp(game), false, 'no guided battle after Skip');
+  await game.evaluate(() => { delete tipsSeen._skip; battleTips(); });
+  await game.waitForFunction(() => tutor && tutor.id === 'battle-1-1');
+  assert.equal(await game.evaluate(() => battle.paused), true);
+  await key(tab, 'x');
+  assert.equal(await tutorUp(game), false);
+  assert.equal(await game.evaluate(() => battle.paused), false, 'skipping lets the battle go on');
+  // On a replay (the ? button) too.
+  await game.evaluate(() => { const b = battle.b; b.queue = []; b.enemies = []; });
+  await game.waitForFunction(() => battle.done, { timeout: 5000 });
+  for (let i = 0; i < 6 && await game.evaluate(() => battle && battle.talk.length); i++) await key(tab, 'Enter');
+  await key(tab, 'Enter');
+  await key(tab, '2');
+  await game.evaluate(() => document.querySelector('#tabs [data-help]').click());
+  assert.equal((await tutorUp(game)).id, 'pull');
+  await game.evaluate(() => document.querySelector('#tutor-box [data-skip]').click());
+  assert.equal(await tutorUp(game), false);
   assert.deepEqual(errors, []);
 });
