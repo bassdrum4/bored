@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 546,
+  "count": 547,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -11,6 +11,7 @@ export const CHANGELOG_META = {
 export const CHANGELOG = [
   {"sha":"bfe1585","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: Dex filters and sorting","pr":192},
   {"sha":"3178370","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha TD: chapter 4 screens: armored enemies","pr":191},
+  {"sha":"7798efc","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 4, Ariana, with armored enemies (manual review)"},
   {"sha":"32f1c41","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: the chapter-switch page test reads any chapter count"},
   {"sha":"b006cee","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: tune chapter 3 (3-5 at 2.15, 3-6 at 2.3)"},
   {"sha":"3389d9f","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: the flyer-first test sets both enemies in range"},
