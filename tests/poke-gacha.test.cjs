@@ -295,6 +295,16 @@ test('Dex: F filters what is shown, T a type, S the order, and the choice is kep
   const type = await game.evaluate(() => dexView().type);
   assert.ok(type);
   assert.ok(await game.evaluate(t => dexList().every(num => G.dex[num - 1][1].split('/').includes(t)), type), 'every line shown is ' + type);
+  // A type only finds caught lines, so it never hints at an uncaught line's type.
+  await game.evaluate(() => { pref.dexFilter = 'All'; keep(); dexUpdate(); });
+  const typed = await game.evaluate(() => [...new Set(BASES.filter(n => S.lines[n]).flatMap(n => G.dex[n - 1][1].split('/')))]);
+  for (const t of typed) {
+    const seen = await game.evaluate(t => { pref.dexType = t; keep(); dexUpdate(); return dexList().map(n => [!!S.lines[n], G.dex[n - 1][1].split('/').includes(t)]); }, t);
+    assert.ok(seen.length > 0 && seen.every(([caught, has]) => caught && has), t + ': caught ' + t + ' lines only');
+  }
+  assert.equal(await game.evaluate(() => { pref.dexFilter = 'Not owned'; keep(); dexUpdate(); return dexList().length; }), 0, 'no uncaught line has a type to filter by');
+  assert.match(await game.$eval('#msg', n => n.textContent), /Nothing matches/);
+  await game.evaluate(() => { pref.dexType = ''; keep(); dexUpdate(); });
   // Back to all, any type; sort by name.
   await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; keep(); dexUpdate(); });
   await key(tab, 's');

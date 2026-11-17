@@ -987,7 +987,8 @@ function dexList() {
   const v = dexView(), tier = num => G.dex[num - 1][9];
   let list = BASES.filter(num => v.filter === "Owned" ? !!S.lines[num] : v.filter === "Not owned" ? !S.lines[num]
     : /★/.test(v.filter) ? tier(num) === Number(v.filter[0]) : true);
-  if (v.type) list = list.filter(num => G.dex[num - 1][1].split("/").includes(v.type));
+  // A type only finds caught lines: an uncaught line's type stays ??? like the rest of it.
+  if (v.type) list = list.filter(num => !!S.lines[num] && G.dex[num - 1][1].split("/").includes(v.type));
   if (v.sort === "Name") list = list.slice().sort((a, b) => (!S.lines[a] - !S.lines[b]) || (S.lines[a] ? name(a).localeCompare(name(b)) : a - b));
   if (v.sort === "Tier") list = list.slice().sort((a, b) => tier(b) - tier(a) || a - b);
   return list;
@@ -1000,7 +1001,7 @@ function cycleDex(what) {
   keep(); dexAt = 0; actAt = 0; dexFocus = "list"; dexUpdate();
   if (dexList().length) say(dexViewText() + " " + dexList().length + " shown.");
 }
-const dexViewText = () => { const v = dexView(); return "F: " + v.filter + " · T: " + (v.type || "any type") + " · S: " + v.sort + "."; };
+const dexViewText = () => { const v = dexView(); return "F: " + v.filter + " · T: " + (v.type ? v.type + " (caught)" : "any type") + " · S: " + v.sort + "."; };
 const lineForms = line => S.owned.filter(num => G.lineOf(num) === line);
 const tipOf = line => lineForms(line).sort((a, b) => G.stageOf(b) - G.stageOf(a) || a - b)[0] || line;
 function dexActions(line) {
