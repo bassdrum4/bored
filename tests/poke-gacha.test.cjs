@@ -71,6 +71,7 @@ test('Poké Gacha opens through the hub, and every screen draws without an error
   await tab.evaluate(() => openGame('poke-gacha'));
   await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
   const game = await (await tab.$('#frame')).contentFrame();
+  await passStarter(game);
   const ids = await game.evaluate(() => TABS.map(([id]) => id));
   for (const id of ids) {
     await game.evaluate(screen => go(screen), id);
@@ -80,6 +81,15 @@ test('Poké Gacha opens through the hub, and every screen draws without an error
   }
   assert.equal((await game.evaluate(() => __boredSnapshot())).slug, 'poke-gacha');
   assert.deepEqual(errors, []);
+});
+
+// A new wallet opens on the starter pick when the hub offers one: take the
+// first starter and clear the squad it fills, so a test starts from its own picks.
+const passStarter = game => game.evaluate(() => {
+  if (typeof picking === 'undefined' || !picking) return false;
+  starterEnter(); starterEnter();
+  pref.squad = []; keep();
+  return true;
 });
 
 /* ── Tower defense screens (Story, Squad, Battle, Quests) ─────────────────
@@ -105,6 +115,7 @@ async function openWithMons(t) {
   await tab.evaluate(() => openGame('poke-gacha'));
   await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
   const game = await (await tab.$('#frame')).contentFrame();
+  await passStarter(game);
   // The page has activated the wallet; fund it, pull 45 eggs, earn waves after the pulls, hatch them all.
   await game.evaluate(() => {
     const now = Math.floor(Date.now() / 1000);
@@ -298,5 +309,115 @@ test('tower defense: chapter 4 says which enemies are armored', async t => {
   assert.match(await game.$eval('#msg', n => n.textContent), /Casters go through armor/);
   const info = await game.$eval('#story-info', n => [n.scrollHeight, n.clientHeight]);
   assert.ok(info[0] <= info[1], 'the stage panel does not overflow');
+  assert.deepEqual(errors, []);
+});
+
+/* ── A brand new account, end to end ──────────────────────────────────────
+   Open Poké Gacha with an empty wallet: the starter pick comes first, the
+   four mons clear 1-1, and the first egg pulled hatches at once. Needs the
+   hub's starter API (__boredGacha.pickStarter). */
+test('a new account picks a starter, clears 1-1 with the gifts, pulls and hatches at once', async t => {
+  const executablePath = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(p => fs.existsSync(p));
+  assert.ok(executablePath, 'Set CHROME_PATH to run browser verification');
+  const site = await serve(path.join(root, 'src'));
+  const browser = await puppeteer.launch({ executablePath, headless: true, args: process.getuid && process.getuid() === 0 ? ['--no-sandbox'] : [] });
+  t.after(async () => { await browser.close(); await site.close(); });
+  const tab = await browser.newPage();
+  const errors = [];
+  tab.on('pageerror', error => errors.push(error.message));
+  await tab.setRequestInterception(true);
+  tab.on('request', request => {
+    if (respondToAnalytics(request)) return;
+    if (request.url().startsWith(site.origin)) request.continue(); else request.abort();
+  });
+  await tab.setViewport({ width: 1280, height: 800 });
+  await tab.goto(site.url);
+  await tab.waitForFunction(() => typeof openGame === 'function');
+  const hub = await tab.evaluate(() => typeof window.__boredGacha?.pickStarter === 'function' && !!window.__boredGacha?.td);
+  if (!hub) return t.skip('the hub has no starter pick yet');
+  assert.equal(await tab.evaluate(() => localStorage.getItem('bored.wallet')), null, 'a brand new browser, no wallet');
+  await tab.evaluate(() => openGame('poke-gacha'));
+  await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  const game = await (await tab.$('#frame')).contentFrame();
+
+  // 1. The pick screen is all there is: no mons, tabs locked, number keys stay put.
+  await game.waitForFunction(() => !document.querySelector('#scr-starter').hidden);
+  assert.deepEqual(await game.evaluate(() => S.owned), []);
+  assert.ok(await game.$eval('#tabs', n => n.classList.contains('locked')));
+  assert.equal(await game.$$eval('#starter-rows > div', rows => rows.length), 27, 'one first-stage starter from each of gens 1-9');
+  await key(tab, '3');
+  assert.equal(await game.evaluate(() => !!picking), true, 'number keys do not skip the pick');
+  // The starter screen fits its panels: every row whole, nothing spills.
+  const list = await rect(game, '#starter-list'), detail = await rect(game, '#starter-detail'), msg = await rect(game, '#msg');
+  assert.ok(apart(list, detail) && apart(list, msg) && apart(detail, msg), 'list, detail and message do not overlap');
+  const spill = await game.evaluate(() => [...document.querySelectorAll('#starter-detail, #starter-gifts, #starter-info')].filter(n => n.scrollHeight > n.clientHeight + 1).map(n => n.id));
+  assert.deepEqual(spill, []);
+
+  // Charmander, the second row: Enter asks, Backspace cancels, Enter twice takes it.
+  await key(tab, 'ArrowDown');
+  await key(tab, 'Enter');
+  assert.match(await game.$eval('#msg', n => n.textContent), /Take Charmander for good\?/);
+  await key(tab, 'Backspace');
+  assert.equal(await game.evaluate(() => picking.sure), false);
+  await key(tab, 'Enter'); await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => picking), null);
+  const owned = await game.evaluate(() => S.owned.map(name));
+  assert.deepEqual(owned.slice().sort(), ['Audino', 'Charmander', 'Geodude', 'Pidgey'], 'the starter and its three gifts');
+  assert.equal(await game.evaluate(() => tab), 'story');
+  assert.equal(await game.$eval('#tabs', n => n.classList.contains('locked')), false);
+  assert.match(await game.$eval('#msg', n => n.textContent), /Charmander joins you/);
+  // It never pays twice: a second pick is refused, and a reload goes straight past the screen.
+  assert.equal(await game.evaluate(() => G.pickStarter({ species: G.starters[2] }).reason), 'picked');
+
+  // 2. Play 1-1 with the four, deployed in the squad's order on the first free tile for each.
+  await key(tab, 'Enter');
+  assert.deepEqual(await game.evaluate(() => squadPick().map(name)), ['Geodude', 'Pidgey', 'Audino', 'Charmander']);
+  await game.evaluate(() => { squadAt = 0; squadUpdate(); });
+  await key(tab, 'Enter');
+  await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
+  for (let i = 0; i < 6 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
+  await game.evaluate(() => {
+    const b = battle.b, stage = b.stage || T.stages[0];
+    const high = [], ground = T.pathsOf(stage)[0].slice().reverse().filter(([x, y]) => stage.map[y][x] === '.');
+    stage.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H') high.push([x, y]); }));
+    const plan = b.squad.map((u, slot) => [slot, ...(u.ground ? ground.shift() : high.shift())]);
+    for (let i = 0; i < 20000 && !b.over; i++) {
+      for (const [slot, x, y] of plan) if (!b.units.some(o => o.slot === slot) && T.deploy(b, slot, x, y) === 'energy') break;
+      T.step(b);
+    }
+  });
+  await game.waitForFunction(() => battle.done, { timeout: 5000 });
+  assert.equal(await game.evaluate(() => battle.b.over), 'win', 'the starter squad clears 1-1');
+  for (let i = 0; i < 6 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => battle), null);
+  assert.ok(await game.evaluate(() => T.state().best['1-1'] > 0), 'the clear is recorded');
+
+  // 3. Pull one egg on the Pull screen, with a Regular from the login or the clear.
+  await key(tab, '2');
+  assert.equal(await game.evaluate(() => tab), 'pull');
+  assert.ok(await game.evaluate(() => S.balance.regular >= 1), 'a new player has a Regular to pull with');
+  await game.evaluate(() => { menuOpen = true; cursor = 0; updateScene(); });
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => S.pulls), 1);
+
+  // 4. The egg needs no waves: it hatches straight away on the Eggs screen.
+  await key(tab, '3');
+  const egg = await game.evaluate(() => S.eggs[0]);
+  assert.deepEqual([egg.need, egg.ready, egg.free], [0, true, true]);
+  assert.match(await game.$eval('#msg', n => n.textContent), /hatches right away/);
+  await key(tab, 'Enter');
+  assert.ok(await game.evaluate(() => !!hatching));
+  for (let i = 0; i < 6 && await game.evaluate(() => !!hatching); i++) { await pause(200); await key(tab, 'Enter'); }
+  assert.equal(await game.evaluate(() => hatching), null);
+  assert.equal(await game.evaluate(() => S.eggs.length), 0, 'the egg hatched');
+  assert.equal(await game.evaluate(() => S.hatched.length), 1);
+
+  // A reload goes straight to the game: the pick is kept on the account.
+  await tab.evaluate(() => openGame('poke-gacha'));
+  await pause(500);
+  const again = await (await tab.$('#frame')).contentFrame();
+  await again.waitForFunction(() => typeof S !== 'undefined' && S);
+  assert.equal(await again.evaluate(() => !!picking), false, 'no second pick');
   assert.deepEqual(errors, []);
 });

@@ -130,6 +130,16 @@ canvas, img { image-rendering: pixelated; display: block }
 #dex-detail .cell { width: 96px; height: 96px; background: var(--ink) }
 #dex-acts { grid-column: 1 / -1; height: 120px }
 
+/* Starter pick: the Dex layout, with the three gifts under the starter. */
+#starter-list { left: 8px; top: 8px; width: 248px; height: 264px; display: flex; flex-direction: column }
+/* 32px rows, 6 whole rows under the title, like the Dex. */
+#starter-rows { height: 192px }
+#starter-rows > div { height: 32px }
+#starter-detail { left: 264px; top: 8px; width: 368px; height: 264px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 96px 1fr; gap: 8px 12px }
+#starter-detail .cell { width: 96px; height: 96px; background: var(--ink) }
+#starter-gifts { grid-column: 1 / -1; height: 144px }
+#starter-gifts > div { height: 32px }
+
 /* Shop and quests share one layout */
 .left-panel { left: 8px; top: 8px; width: 400px; height: 264px; display: flex; flex-direction: column }
 .right-panel { left: 416px; top: 8px; width: 216px; height: 264px; display: flex; flex-direction: column; gap: 8px }
@@ -203,6 +213,10 @@ canvas, img { image-rendering: pixelated; display: block }
       <section id="scr-quests" class="screen" hidden>
         <div class="panel left-panel"><div class="title">MISSIONS</div><div class="rows scroll" id="quest-list"></div></div>
         <div class="panel right-panel"><div class="title" id="trophy-title">TROPHIES</div><div class="rows scroll" id="trophy-list"></div></div>
+      </section>
+      <section id="scr-starter" class="screen" hidden>
+        <div class="panel" id="starter-list"><div class="title" id="starter-title">STARTER</div><div class="rows scroll" id="starter-rows"></div></div>
+        <div class="panel" id="starter-detail"><div class="cell" id="starter-pic"></div><div id="starter-info"></div><div class="rows" id="starter-gifts"></div></div>
       </section>
       <div class="panel" id="msg" role="status"></div>
       <div class="panel" id="off" hidden>Open Poké Gacha from the Bored arcade: your wallet, eggs and dex live on your Bored profile.</div>
@@ -481,7 +495,7 @@ function pixelText(g, text, set, x, y, color, gap = 1) {
 // The mini sprite sheet, for the banner on a Legendary UP machine at the side.
 const ICON_SHEET = new Image();
 ICON_SHEET.src = ART_DIR + "icons.webp";
-ICON_SHEET.onload = () => { if (S && tab === "pull" && !hatching) drawScene(); };
+ICON_SHEET.onload = () => { if (S && tab === "pull" && !hatching && !picking) drawScene(); };
 // One machine's plate and pill, in machine pixels from its top-left corner.
 function drawPlate(g, left, id, front) {
   g.save();
@@ -615,7 +629,8 @@ let eggAt = 0, hatching = null;
 const EGG_SHOWN = ["eggs-tray", "egg-pic", "egg-name", "egg-day", "egg-from"];
 const weekday = day => { try { return new Date(day + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" }); } catch { return ""; } };
 function eggWords(egg) {
-  const part = egg.progress / egg.need;
+  const part = egg.need ? egg.progress / egg.need : 1;
+  if (egg.free) return "One of your first " + (G.freeHatches || 10) + " eggs: it hatches right away!";
   if (egg.ready) return "Something is moving inside. It's ready to hatch!";
   if (part >= 0.66) return "It's starting to move. It will hatch soon.";
   if (part >= 0.33) return "It makes small sounds now and then. Not long now.";
@@ -629,7 +644,7 @@ function eggsUpdate() {
     const cell = el("div", "egg");
     cell.dataset.egg = i;
     cell.append(eggImg(egg.tier));
-    const bar = el("i"); bar.style.width = Math.round(16 * egg.progress / egg.need) * 2 + "px";
+    const bar = el("i"); bar.style.width = (egg.need ? Math.round(16 * egg.progress / egg.need) : 16) * 2 + "px";
     cell.append(bar);
     if (i === eggAt) { const br = el("div", "bracket"); br.append(el("b"), el("b"), el("b"), el("b")); cell.append(br); }
     return cell;
@@ -646,7 +661,8 @@ function eggsUpdate() {
   const from = egg ? G.machines[egg.machine] + (egg.banner ? ": " + name(egg.banner) : "") : "Pull some on the Pull tab";
   $("#egg-from").replaceChildren(el("span", egg ? "" : "dim", from));
   const progress = egg ? el("span", "num", egg.progress + "/" + egg.need) : null;
-  if (egg) say(eggWords(egg) + " ", (() => { const d = el("div"); d.append(progress, " waves · ", ready ? "Enter hatches " + ready + " ready." : "Waves come from Poké Idle, Pokédoku and battles."); return d; })());
+  if (egg) say(eggWords(egg) + " ", (() => { const d = el("div"); if (egg.free) d.append("No waves needed · "); else d.append(progress, " waves · ");
+    d.append( ready ? "Enter hatches " + ready + " ready." : "Waves come from Poké Idle, Pokédoku and battles."); return d; })());
   else say("Eggs hatch on waves you earn: Poké Idle catches, Pokédoku boards, tower defense waves.");
 }
 function eggsKey(e) {
@@ -1216,6 +1232,60 @@ function tileAction(x, y) {
   if (!why) { const next = b.squad.findIndex((u, i) => !b.units.some(o => o.slot === i)); if (next >= 0) bt.slot = next; }
 }
 
+/* ── Starter pick: once per account, before anything else ──────────────── */
+// The hub offers one first-stage starter from every generation (gacha.js
+// STARTERS) and three commons with it, so the first squad is four and can
+// clear 1-1. Accounts from before the pick get it once too.
+let picking = null;
+const needsStarter = () => !!(G && G.pickStarter && G.starters && S && S.needsStarter);
+const giftNames = () => { const n = G.starterGifts.map(name); return n.slice(0, -1).join(", ") + " and " + n[n.length - 1]; };
+const roleOf = num => T && T.classes && T.classOf ? T.classes[T.classOf(num)] : null;
+function openStarter() {
+  picking = { at: 0, sure: false };
+  for (const [sid] of TABS) $("#scr-" + sid).hidden = true;
+  $("#scr-starter").hidden = false;
+  $("#tabs").classList.add("locked");
+  refreshTop();
+  starterUpdate();
+}
+function starterUpdate() {
+  drawBackdrop();
+  const list = G.starters, p = picking, num = list[p.at];
+  titled($("#starter-title"), "STARTER", list.length);
+  rows($("#starter-rows"), list.map(n => ({ icon: mini(n), label: String(n).padStart(4, "0") + " " + name(n) })), p.at,
+    (i, click) => { if (click && i === p.at) return starterEnter(); p.at = i; p.sure = false; starterUpdate(); });
+  $("#starter-pic").replaceChildren(sprite(num));
+  const role = roleOf(num);
+  $("#starter-info").replaceChildren(el("div", "title", name(num)),
+    el("div", "", "#" + String(num).padStart(4, "0") + " · " + G.dex[num - 1][1].replace("/", " / ")),
+    el("div", "dim", role ? role.name + ": " + role.about : "First stage."));
+  const gifts = G.starterGifts.map(n => ({ icon: mini(n), label: name(n), right: roleOf(n) ? roleOf(n).name : "" }));
+  gifts.push({ label: p.sure ? "Yes, take " + name(num) : "Choose " + name(num), right: p.sure ? "Enter" : "" });
+  rows($("#starter-gifts"), gifts, p.sure ? gifts.length - 1 : -1, (i, click) => { if (click && i === gifts.length - 1) starterEnter(); });
+  say(p.sure ? "Take " + name(num) + " for good? Enter: yes. Backspace: no."
+    : "Pick your first Pokémon. It comes with " + giftNames() + ", so your squad is four.");
+}
+function starterEnter() {
+  const p = picking, num = G.starters[p.at];
+  if (!p.sure) { p.sure = true; return starterUpdate(); }
+  const r = G.pickStarter({ species: num });
+  if (!r.ok && r.reason !== "picked") { p.sure = false; starterUpdate(); return say(REASONS[r.reason] || "Not now."); }
+  picking = null;
+  $("#scr-starter").hidden = true;
+  $("#tabs").classList.remove("locked");
+  // A squad of the four, the blocker first, for the first stage.
+  if (r.ok) { pref.squad = [...G.starterGifts, num]; keep(); }
+  go(T ? "story" : "pull");
+  if (r.ok) say(name(num) + " joins you, with " + giftNames() + "." + (T ? " Play 1-1 here." : "") + " Your first " + (G.freeHatches || 10) + " eggs hatch at once.");
+}
+function starterKey(e) {
+  const p = picking, n = G.starters.length;
+  const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -7, ArrowRight: 7 }[e.key];
+  if (step) { e.preventDefault(); p.at = Math.max(0, Math.min(n - 1, p.at + step)); p.sure = false; return starterUpdate(); }
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); return starterEnter(); }
+  if (e.key === "Backspace" && p.sure) { e.preventDefault(); p.sure = false; starterUpdate(); }
+}
+
 /* ── Frame, tabs and switching screens ─────────────────────────────────── */
 const TABS = [["story", "Story"], ["pull", "Pull"], ["eggs", "Eggs"], ["dex", "Dex"], ["shop", "Shop"], ["quests", "Quests"]];
 // The tabs shown: Story only once the hub has the tower defense engine.
@@ -1225,7 +1295,7 @@ function refreshTop() {
   S = G.state();
   const ready = S.eggs.filter(e => e.ready).length;
   $("#tabs").replaceChildren(...shownTabs().map(([id, label], i) => {
-    const t = el("div", "panel" + (tab === id ? " on" : ""));
+    const t = el("div", "panel" + (tab === id && !picking ? " on" : ""));
     t.append(el("span", "", label));
     if (id === "eggs" && ready) t.append(" ", el("span", "num", ready));
     t.dataset.tab = id;
@@ -1238,7 +1308,7 @@ function refreshTop() {
   $("#tabs").append(purse);
 }
 function go(id) {
-  if (!SCREENS[id] || hatching || battle || !shownTabs().some(([shown]) => shown === id)) return;
+  if (!SCREENS[id] || hatching || battle || picking || !shownTabs().some(([shown]) => shown === id)) return;
   tab = pref.tab = id; keep();
   message = null;
   for (const [sid] of TABS) $("#scr-" + sid).hidden = sid !== id;
@@ -1264,14 +1334,14 @@ function placeFrame() {
   const wrap = $("#wrap");
   Object.assign(wrap.style, { left: VIEW.x * k + "px", top: VIEW.y * k + "px", width: Math.floor(FRAME_W * k) + "px", height: Math.floor(FRAME_H * k) + "px" });
   $("#frame").style.transform = "scale(" + k + ")";
-  if (S && tab === "pull" && !hatching) drawScene(); else drawBackdrop();
+  if (S && tab === "pull" && !hatching && !picking) drawScene(); else drawBackdrop();
 }
 window.addEventListener("resize", placeFrame);
 try { document.fonts.load('20px "Jersey 10"').then(found => { if (!found.length) $("#frame").classList.add("no-pixel"); }, () => $("#frame").classList.add("no-pixel")); }
 catch { $("#frame").classList.add("no-pixel"); }
 placeFrame();
 // The eggs in the domes and in the hatching egg are drawn once their art arrives.
-machinesLoaded.then(() => { if (S && tab === "pull") drawScene(); });
+machinesLoaded.then(() => { if (S && tab === "pull" && !picking) drawScene(); });
 if (!G) {
   drawBackdrop();
   for (const [sid] of TABS) $("#scr-" + sid).hidden = true;
@@ -1279,6 +1349,7 @@ if (!G) {
 } else {
   document.addEventListener("keydown", e => {
     if (battle) return battleKey(e);
+    if (picking) return starterKey(e);
     if (/^[1-9]$/.test(e.key) && !hatching && shownTabs()[Number(e.key) - 1]) { e.preventDefault(); return go(shownTabs()[Number(e.key) - 1][0]); }
     if (hatching) return hatchKey(e);
     SCREENS[tab][1](e);
@@ -1299,17 +1370,19 @@ if (!G) {
   $("#hit-machine").onclick = () => { menuOpen = true; message = null; updateScene(); };
   $("#hatch").onclick = () => hatching && hatchKey({ key: "Enter", preventDefault() {} });
   // The Legendary UP timer is on screen whichever machine is in front.
-  setInterval(() => { if (tab === "pull" && !hatching && !document.hidden) drawScene(); }, 1000);
+  setInterval(() => { if (tab === "pull" && !hatching && !picking && !document.hidden) drawScene(); }, 1000);
   // Waves earned in another game, or a sync from another device, show up here.
   let seen = "";
   setInterval(() => {
-    if (document.hidden || hatching) return;
+    if (document.hidden || hatching || picking) return;
     const now = JSON.stringify(G.state());
     if (now !== seen) { seen = now; refreshTop(); SCREENS[tab][0](); }
   }, 3000);
   const login = G.claimLogin().ok;
   go(shownTabs().some(([id]) => id === tab) ? tab : "pull");
-  if (login) { if (tab === "pull") { message = { text: "Daily login: +3 Regular vouchers." }; updateScene(); } else say("Daily login: +3 Regular vouchers."); }
+  // The starter pick comes first, for a new player and once for an old one.
+  if (needsStarter()) openStarter();
+  else if (login) { if (tab === "pull") { message = { text: "Daily login: +3 Regular vouchers." }; updateScene(); } else say("Daily login: +3 Regular vouchers."); }
 }
 
 // The hub reads this. Unscored for now; the planned score is unique species caught.
