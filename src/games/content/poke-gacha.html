@@ -137,6 +137,12 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Scrolling lists hold whole rows only: 8 × 24px. */
 .left-panel .rows, .right-panel .rows { height: 192px }
 #off { position: absolute; left: 8px; right: 8px; top: 48px; padding: 12px }
+/* Story: the stage list needs less width than the stage panel, which lists up to
+   eight lines (name, waves, enemies, flying, exploding, armored, rewards), so the
+   split is 304 + 312 and the panel's lines sit without the 8px gaps. */
+#scr-story .left-panel { width: 304px }
+#scr-story .right-panel { left: 320px; width: 312px }
+#story-info { gap: 0 }
 
 /* Story and battles, on the 344px stage: HUD 4-36, field 40-280, deploy cards 284-336. */
 #tabs.locked .panel[data-tab] { color: var(--dim); cursor: default }
@@ -953,7 +959,8 @@ const armoredOf = stage => [...new Set(stage.waves.filter(w => w[7]).map(w => w[
 let shieldIcon = null;
 const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
 const stageStars = starIcons;
-function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5]).map(w => w[1]))].map(name).join(", "); }
+// The plain enemies: flyers, exploders and armored ones get their own lines.
+function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5] && !w[6] && !w[7]).map(w => w[1]))].map(name).join(", "); }
 function storyUpdate() {
   drawBackdrop();
   const td = T.state();
@@ -968,7 +975,7 @@ function storyUpdate() {
   const stage = list[storyAt], best = td.best[stage.id] || 0;
   const info = $("#story-info");
   info.replaceChildren(el("div", "title", stage.admin ? "ADMIN" : stage.boss ? "BOSS" : "STAGE"), el("div", "", stage.name), el("div", "dim", stage.waves.length + " waves · " + stage.lives + " lives"),
-    el("div", "dim", "Enemies: " + enemiesOf(stage)));
+    ...(enemiesOf(stage) ? [el("div", "dim", "Enemies: " + enemiesOf(stage))] : []));
   // Flying enemies: only snipers can hit them, so a stage says so up front.
   // Short notes here; the advice goes in the message box, so the panel never overflows.
   if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ")));
