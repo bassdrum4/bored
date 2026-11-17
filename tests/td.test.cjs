@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
 const td = moduleUnderTest('src/hub/td.js', [
-  'classOf', 'STAGES', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
+  'classOf', 'STAGES', 'CHAPTERS', 'canHit', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
   'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H'
 ], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor });
 const { walletBalance, activateWallet, grantOnce } = rewards;
@@ -53,9 +53,14 @@ test('classes come from stats, with healers the only hand-written list', () => {
   assert.deepEqual([...classes].sort(), ['blocker', 'caster', 'guard', 'medic', 'sniper', 'vanguard']);
 });
 
-test('chapter 1 has 8 stages, each with a walkable path from every spawn to the goal', () => {
-  assert.equal(td.STAGES.length, 8);
-  assert.ok(td.STAGES[7].boss);
+test('chapter 1 has 8 stages and chapter 2 has 6, each with a walkable path from every spawn to the goal', () => {
+  assert.deepEqual(td.CHAPTERS.map(c => c.stages.length), [8, 6]);
+  assert.equal(td.STAGES.length, 14, 'stages unlock in this one order across chapters');
+  assert.ok(td.CHAPTERS[0].stages[7].boss);
+  const proton = td.CHAPTERS[1].stages[5];
+  assert.ok(proton.boss && proton.admin, '2-6 is the Proton admin boss, worth 1 Gold');
+  assert.ok(td.CHAPTERS[1].stages.every(s => s.waves.some(w => w[5])), 'every chapter 2 stage has flying waves');
+  assert.ok(td.CHAPTERS[0].stages.every(s => s.waves.every(w => !w[5])), 'chapter 1 has none');
   for (const stage of td.STAGES) {
     assert.equal(stage.map.length, td.H, stage.id);
     for (const row of stage.map) assert.equal(row.length, td.W, stage.id);
@@ -112,17 +117,57 @@ test('an empty field loses stage 1-1, and a sensible squad clears it with 3 star
   assert.equal(won.wavesDone, stage.waves.length);
 });
 
+// The distance from a tile to the straight line a flyer takes from a spawn to the goal.
+function toFlightLines(stage, x, y) {
+  return Math.min(...td.pathsOf(stage).map(p => {
+    const [[ax, ay], [bx, by]] = [p[0], p[p.length - 1]];
+    const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
+    return Math.hypot(x - (ax + t * (bx - ax)), y - (ay + t * (by - ay)));
+  }));
+}
 test('every stage can be cleared by a strong, well-placed squad', () => {
-  const squad = ['Machamp', 'Alakazam', 'Onix', 'Blissey', 'Gyarados', 'Gengar', 'Dragonite', 'Snorlax'].map(n => td.unitStats(named(n), { level: 10 }));
+  const groundTeam = ['Machamp', 'Alakazam', 'Onix', 'Blissey', 'Gyarados', 'Gengar', 'Dragonite', 'Snorlax'];
+  // Flying stages need snipers: the same squad with three of them in place of casters and a guard.
+  const airTeam = ['Machamp', 'Archeops', 'Onix', 'Blissey', 'Salamence', 'Terrakion', 'Dragonite', 'Snorlax'];
   for (const stage of td.STAGES) {
-    // Block from the goal backwards, where every lane has merged, as a player would.
+    const flying = stage.waves.some(w => w[5]);
+    const squad = (flying ? airTeam : groundTeam).map(n => td.unitStats(named(n), { level: 10 }));
+    if (flying) assert.ok(squad.filter(u => u.cls === 'sniper').length >= 2, 'the flying squad has snipers');
+    // Block from the goal backwards, where every lane has merged, as a player would;
+    // on flying stages, take the high ground nearest the flight lines first.
     const high = [];
     stage.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H') high.push([x, y]); }));
+    if (flying) high.sort((a, b) => toFlightLines(stage, ...a) - toFlightLines(stage, ...b));
     const ground = td.pathsOf(stage)[0].slice().reverse().filter(([x, y]) => stage.map[y][x] === '.');
-    const plan = squad.map((u, slot) => [slot, ...(u.ground ? ground.shift() || [0, 0] : high.shift() || [0, 0])]);
+    // On flying stages the snipers go out first, as a player would.
+    const order = squad.map((u, slot) => slot).sort((a, b) => flying ? (squad[b].cls === 'sniper') - (squad[a].cls === 'sniper') : 0);
+    const plan = order.map(slot => [slot, ...(squad[slot].ground ? ground.shift() || [0, 0] : high.shift() || [0, 0])]);
     const b = play(stage, squad, plan);
     assert.equal(b.over, 'win', stage.id + ' should be winnable');
   }
+});
+
+test('flyers cross in a straight line, ignore blockers, and only snipers hit them', () => {
+  const stage = td.STAGES.find(s => s.id === '2-1');
+  const blocker = td.unitStats(named('Onix'), { level: 10 }), caster = td.unitStats(named('Alakazam'), { level: 10 });
+  const sniper = td.unitStats(named('Archeops'), { level: 10 });
+  assert.equal(sniper.cls, 'sniper');
+  assert.equal(td.canHit(sniper, { flying: true }), true);
+  assert.equal(td.canHit(caster, { flying: true }), false);
+  assert.equal(td.canHit(blocker, { flying: false }), true);
+  // Without a sniper, every Zubat gets through: the ground wave is held, the flyers leak.
+  const noAir = play(stage, [blocker, caster], [[0, 3, 1], [1, 2, 0]]);
+  const flyers = stage.waves.filter(w => w[5]).reduce((n, w) => n + w[2], 0);
+  assert.equal(noAir.over, 'lose');
+  assert.ok(noAir.leaks >= Math.min(flyers, stage.lives), 'flyers leak past a blocker and a caster');
+  // A spawned flyer's path is the straight line from spawn to goal.
+  const b = td.newBattle(stage, []);
+  while (!b.enemies.some(e => e.flying)) td.step(b);
+  const bat = b.enemies.find(e => e.flying);
+  assert.equal(bat.path.length, 2);
+  // With snipers on the high ground beside the line, the stage is cleared.
+  const won = play(stage, [blocker, sniper, td.unitStats(named('Salamence'), { level: 10 })], [[0, 4, 1], [1, 2, 0], [2, 5, 2]]);
+  assert.equal(won.over, 'win');
 });
 
 test('finishing pays waves every time, and first clear and first 3-star once', () => {
@@ -152,7 +197,7 @@ test('stages unlock in order', () => {
   assert.deepEqual(td.tdState(w, TODAY).unlocked.slice(0, 3), [true, true, false]);
 });
 
-test('4 daily missions are drawn from the seed, without admin stages in chapter 1', () => {
+test('4 daily missions are drawn from the seed, without the admin mission for now', () => {
   const a = td.dailyMissions(TODAY).map(m => m.id), b = td.dailyMissions(TODAY).map(m => m.id);
   assert.deepEqual(a, b);
   assert.equal(a.length, 4);
