@@ -708,7 +708,7 @@ const level = n => Math.min(lvlOf(S.box[n].xp), levelCap());
 function areaCap(loc = S.loc) {
   // Red and the Battle Tower hold nobody back.
   if (!loc || loc.kind === "summit" || loc.kind === "tower") return 100;
-  if (loc.kind === "final") return levelCap();
+  if (loc.kind === "final" || loc.kind === "daily") return levelCap();
   // Side quests, the Darkest Day, and the Ultra Wormhole and Area Zero come after a Champion: your level cap.
   if (loc.r === TRAIN_R || ((loc.kind === "route" || loc.kind === "dungeon" || loc.kind === "raid") && cleared(loc.r)) || loc.kind === "quest" || loc.kind === "darkest") return levelCap();
   const L = loc.kind === "champ" || loc.x || loc.kind === "quest" || loc.kind === "raid" ? champLevel(loc.r) : gymLevel(loc.r * 4 + (loc.kind === "dungeon" ? 2 : loc.k || 0));
@@ -820,6 +820,30 @@ function towerTeam(f) {
   return team;
 }
 const towerHp = f => TOWER_HP * Math.pow(TOWER_GROW, f - 1) * (tycoonFloor(f) ? 1.5 : 1);
+// ── Daily boss (Bored): one boss a day, the same for everyone, picked from the arcade's shared daily seed
+// (window.__boredSeed, which the hub puts in every game; a hash of today's date when played alone). It fights at your
+// level cap and is set like every boss here (see Boss HP): the strongest team you could have for it, built on its
+// weakness, only just wins idling (BOSS_USE of the clock), so a team that ignores the weakness runs out of time. A
+// fully evolved, non-legendary Pokémon with a clear weakness: one to three types hit it super effectively. Unlimited
+// tries; in Poké Idle it pays the usual money and EXP only (the arcade pays its own reward once a day, from the
+// snapshot's boss field).
+const DAILY_TIME = 75;
+function bossDay() {
+  const s = window.__boredSeed;
+  if (s && typeof s.date === "string" && Number.isFinite(Number(s.seed))) return { date: s.date, seed: Number(s.seed) >>> 0 };
+  const d = new Date(), date = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  let h = 2166136261; for (const c of date) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0;
+  return { date, seed: h };
+}
+const weakTo = m => D.types.filter(t => eff(t, m.types) >= 2);
+let dailyPool = null;
+function dailyBoss(seed = bossDay().seed) {
+  dailyPool = dailyPool || MON.filter(m => finalStage(m) && !legendary(m) && m.bst >= 470 && weakTo(m).length >= 1 && weakTo(m).length <= 3);
+  return dailyPool[(seed >>> 0) % dailyPool.length];
+}
+const dailyWon = () => !!(S.daily && S.daily.date === bossDay().date && S.daily.won);
+// The team it is set against: what you could have by now (the routes you have opened in your newest region).
+function dailyArea(r) { if (cleared(r)) return refArea(r, 3); let k = 0; while (k < 3 && badge(r, k)) k++; return [r, k]; }
 // Urshifu fights in one of two styles: Single Strike (Fighting/Dark, the usual one) or Rapid Strike (Fighting/Water),
 // same stats. Pick it in Urshifu's detail; its Gigantamax follows the style.
 const URSHIFU = 892;
@@ -1057,6 +1081,7 @@ function unlocked(loc) {
   const { kind, r, k } = loc;
   if (kind === "summit") return Object.keys(S.champs).length >= REGIONS.length;
   if (kind === "final") return finalOpen();
+  if (kind === "daily") return S.party.length > 0;
   if (kind === "darkest") return !!S.champs[PIECES_FROM] && (S.pieces || 0) >= PIECES_NEED;
   if (kind === "tower") return !!S.champs[TOWER_FROM];
   if (kind === "raid") return !!raidMon();
@@ -1071,6 +1096,7 @@ function unlocked(loc) {
 }
 function locName(loc) {
   if (loc.kind === "final") return "Prof Penguin's Lab";
+  if (loc.kind === "daily") return "Daily boss";
   if (loc.r === TRAIN_R) return `${TRAIN_TYPES[loc.k]} training area`;
   const R = REGIONS[loc.r];
   if (loc.kind === "route") return `${R.name} Route ${loc.k + 1}`;
@@ -1283,6 +1309,11 @@ function startLoc(loc) {
   else if (loc.kind === "quest") { const Q = QUEST[loc.q], L = Math.max(champLevel(r), levelCap()); B = { kind: "quest", q: Q.id, r, i: Math.max(r * 4 + 3, levelIndex(L)), queue: Q.foes, L, base: QUEST_TIME, time: questTime(Q), idx: 0 }; }
   else if (loc.kind === "darkest") { const L = Math.max(champLevel(r), levelCap()); B = { kind: "darkest", r, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [ETERNAMAX_FOE], L, base: DARKEST_TIME, time: darkTime(), idx: 0 }; }
   else if (loc.kind === "final") { const L = Math.max(champLevel(r), levelCap()); B = { kind: "final", r, phase: 1, i: Math.max(r * 4 + 3, levelIndex(L)), queue: FINAL_P1, L, base: FINAL_TIME, time: fightTime(FINAL_TIME, FINAL_P1, RED_OFFENSE, .8, 1.2), idx: 0 }; }
+  else if (loc.kind === "daily") {
+    const L = levelCap(), day = bossDay();
+    B = { kind: "daily", r, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [dailyBoss(day.seed)], L, base: DAILY_TIME, time: DAILY_TIME, idx: 0, day: day.date };
+    S.daily = S.daily && S.daily.date === day.date ? { ...S.daily, tries: (S.daily.tries || 0) + 1 } : { date: day.date, won: false, tries: 1 };
+  }
   else if (loc.kind === "tower") { B = { kind: "tower", r, i: 36, f: 1, queue: towerTeam(1), L: 100, base: TOWER_START, time: TOWER_START, idx: 0 }; S.tower.runs++; }
   else if (loc.kind === "champ") B = { kind: "champ", r, i: r * 4 + 3, queue: champTeam(r), L: champLevel(r), base: CHAMP_TIME, time: champTime(r), idx: 0 };
   else if (loc.kind === "raid") { const n = raidMon(), f = raidForm(n), L = Math.max(champLevel(r), levelCap()); B = { kind: "raid", r, n, i: Math.max(r * 4 + 3, levelIndex(L)), queue: [f], L, base: RAID_TIME, time: fightTime(RAID_TIME, [f], regionOffense(r), .9, 1.15), idx: 0 }; }
@@ -1302,7 +1333,8 @@ function startLoc(loc) {
   else if (B.kind === "quest") B.tune = tierTuning(B, QUEST[B.q].tier, refArea(B.r, 3));
   else if (B.kind === "darkest") B.tune = tierTuning(B, 0, refArea(B.r, 3));
   else if (B.kind === "final") B.tune = tierTuning(B, 1, refArea(B.r, 3));
-  if (B.kind !== "route") { B.total = B.time; say(B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
+  else if (B.kind === "daily") B.tune = tierTuning(B, 5, dailyArea(B.r));
+  if (B.kind !== "route") { B.total = B.time; say(B.kind === "daily" ? `Today's boss: ${B.queue[0].name} (${B.queue[0].types.join("/")}), Lv ${B.L}. It's weak to ${weakTo(B.queue[0]).join(", ")}: build your team on that. Unlimited tries.` : B.kind === "final" ? "Prof Penguin's final showdown, phase 1. Run out of time anywhere and it starts over from here." : B.kind === "tower" ? "Floor 1. Clear a floor to add time to the clock; how high can you get?" : B.kind === "dungeon" ? `${B.x ? `Beaten ${TRIP[B.x].what} might stay with you.` : "A legendary waits at the end."} It's ${B.queue[B.queue.length - 1].types.join("/")}, and it waits for you until you beat it.` : B.kind === "raid" ? `A Gigantamax ${mon(B.n).name} fills the den. Win and yours can Gigantamax.` : "Beat the clock: the right team wins on its own, and tapping helps a little."); }
   spawn(); renderLocs(); save();
 }
 function spawn() {
@@ -1523,6 +1555,11 @@ function next() {
     toast(`You won the Max Raid! ${mon(n).name} can Gigantamax now: turn it on in its detail in Party & Box. +$${fmt(prize)}.${joined}` + gainCells(CELL_BOSS) + galar);
   }
   if (B.kind === "final") finalWin();
+  if (B.kind === "daily") {
+    const first = !dailyWon(), prize = rewardFor(B.L, B.i, 15); S.money += prize;
+    S.daily = { ...(S.daily || {}), date: B.day, won: true };
+    toast(`You beat today's boss, ${B.queue[0].name}! +$${fmt(prize)}.${first ? " Back tomorrow for a new one." : ""}`);
+  }
   backToRoute(); save(); tutor();
 }
 // A cleared floor: count it, pay for it, add time, and send out the next floor's three.
@@ -1659,7 +1696,7 @@ function tick() {
     hit(partyDps(B.foe.m) * dt);
     if (B.time != null) {
       B.time -= dt * clockRate(B.foe.m);
-      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "dungeon" ? "The dungeon run ended." : B.kind === "final" ? "Prof Penguin's showdown starts over from phase 1." : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
+      if (B.time <= 0) { const f = B.f; say(B.kind === "tower" ? `Out of time on floor ${f}. Best: floor ${S.tower.best}.` : `Out of time. ${B.kind === "daily" ? `Try a team that hits ${weakTo(B.queue[0]).join(" or ")}.` : B.kind === "dungeon" ? "The dungeon run ended." : B.kind === "final" ? "Prof Penguin's showdown starts over from phase 1." : "Train up and try again."}`, true); if (B.kind === "tower" && f - 1 > 0) toast(`Battle Tower: you cleared ${f - 1} floor${f === 2 ? "" : "s"}. Best: ${S.tower.best}.`); else if (B.kind !== "route") S.stats.losses = (S.stats.losses || 0) + 1; backToRoute(); tutor(); }
     }
   }
   drawBattle();
@@ -1727,6 +1764,8 @@ function renderLocs() {
   const r = viewR, items = [], [sqGot, sqAll] = sideQuests();
   // Prof Penguin's Lab sits at the top of every list.
   items.push({ kind: "final", r: FINAL_R, note: S.beat ? `graduated ${S.beat}` : finalOpen() ? "2 phases, no ticket" : `${sqGot}/${sqAll} side quests`, done: !!S.beat });
+  // Today's boss, the same for every player, under the Lab in every list.
+  { const m = dailyBoss(); items.push({ kind: "daily", r: frontier(), types: m.types, note: dailyWon() ? "beaten today" : `${m.name} · Lv ${levelCap()}`, done: dailyWon() }); }
   if (r === TRAIN_R) TRAIN_TYPES.forEach((t, k) => items.push({ kind: "route", r, k, train: t, note: `Lv ${levelCap()} · ×${TRAIN_XP} XP` }));
   else {
     for (let k = 0; k < 4; k++) {
@@ -3097,10 +3136,12 @@ syncBoot();
 // The hub reads this: integer metrics, never null.
 // score is the board's number: one point per Pokédex entry and one more for each one you have shiny.
 // tower is the Battle Tower board's: the highest floor cleared.
+// boss is today's daily boss: { date, won }, for the arcade's once-a-day reward.
 window.__boredSnapshot = () => {
-  if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, badges: 0, tower: 0, finished: false };
+  const day = bossDay().date, boss = { date: day, won: !!(S && S.daily && S.daily.date === day && S.daily.won) };
+  if (S && S.test) return { slug: 'poke-idle', caught: 0, shinies: 0, score: 0, badges: 0, tower: 0, boss: { date: day, won: false }, finished: false };
   const caught = S ? Object.keys(S.box).length : 0, shinies = S ? Object.values(S.box).filter(b => b.shiny).length : 0;
-  return { slug: 'poke-idle', caught, shinies, score: caught + shinies, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, finished: !!S };
+  return { slug: 'poke-idle', caught, shinies, score: caught + shinies, badges: S ? Object.keys(S.badges).length : 0, tower: S && S.tower ? S.tower.best : 0, boss, finished: !!S };
 };
 </script>
 </body>
