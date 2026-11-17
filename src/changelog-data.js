@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 572,
+  "count": 573,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"9042c33","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: Vettel's SP skins, with sets, line drops and size prices"},
   {"sha":"26cfeeb","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha Dex: the type filter finds caught lines only","pr":213},
   {"sha":"9d5d8f5","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha Dex: hide uncaught names, silhouette detail with its egg, candy in words","pr":212},
   {"sha":"4556969","date":"2026-11-17","author":"Claude","subject":"Hub: pay the Poké Idle daily boss, its weekday streak and the TD weekly mission"},
