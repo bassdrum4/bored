@@ -39,8 +39,11 @@ const $=id=>document.getElementById(id);
 const COLORS=["#b64d43","#237d85","#ba9141","#76629f","#54784f"];
 const TYPES=["circle","triangle","square","diamond"];
 const TAU=Math.PI*2;
+// Trains travel at a fixed map speed, so crossing a long leg takes longer than
+// crossing a short one instead of every hop costing the same time.
+const TRAIN_SPEED=170;
 let stations=[],lines=[],selected=0,delivered=0,elapsed=0,spawnTimer=0,stationTimer=0,upgradeTimer=0,upgradeCount=0;
-let running=false,paused=false,finished=false,last=0,seed=0,uid=0,trainSpeed=0.58,trainCapacity=6;
+let running=false,paused=false,finished=false,last=0,seed=0,uid=0,trainSpeed=TRAIN_SPEED,trainCapacity=6;
 let pointerDown=false,dragStart=null,frame=0,overcrowdLimit=12;
 const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296};
 const choice=arr=>arr[Math.floor(random()*arr.length)];
@@ -57,7 +60,7 @@ function begin(){
   if(window.__boredResume)window.__boredResume.clear();
   seed=((Date.now()^Math.floor(Math.random()*4294967295))>>>0)||123456789;uid=0;
   stations=[];lines=[];selected=0;delivered=0;elapsed=0;spawnTimer=0;stationTimer=0;upgradeTimer=0;upgradeCount=0;
-  trainSpeed=.58;trainCapacity=6;overcrowdLimit=12;finished=false;paused=false;running=true;
+  trainSpeed=TRAIN_SPEED;trainCapacity=6;overcrowdLimit=12;finished=false;paused=false;running=true;
   ["circle","triangle","square","circle","triangle"].forEach(type=>makeStation(type));
   addLine();addLine();
   $("overlay").hidden=true;$("pause").textContent="Pause";$("status").textContent="Select a line, then click or drag through stations.";
@@ -150,6 +153,13 @@ function exchange(train,stopId,nextId){
     }else i++;
   }
 }
+// A leg's length in map pixels. `pos` stays a fractional stop index, but the
+// distance covered on a step is divided by this leg's length, so a train takes
+// proportionally longer between far-apart stops.
+function legLength(line,index){
+  const a=stations.find(s=>s.id===line.stops[index]),b=stations.find(s=>s.id===line.stops[index+1]);
+  return a&&b?Math.max(1,dist(a,b)):1;
+}
 function updateTrains(dt){
   for(const line of lines){
     const count=line.stops.length;if(count<2)continue;
@@ -159,17 +169,18 @@ function updateTrains(dt){
         exchange(train,line.stops[Math.round(train.pos)],line.stops[Math.round(train.pos)+train.dir]);
         train.started=true;
       }
-      let remaining=dt*trainSpeed;
-      while(remaining>0){
-        const target=train.dir>0?Math.floor(train.pos+1e-7)+1:Math.ceil(train.pos-1e-7)-1;
-        const goal=clamp(target,0,count-1),gap=Math.abs(goal-train.pos);
-        if(gap<1e-7){train.dir*=-1;break}
-        const step=Math.min(gap,remaining);train.pos+=train.dir*step;remaining-=step;
-        if(step+1e-7>=gap){
-          const index=Math.round(train.pos);
-          if(index===0||index===count-1)train.dir*=-1;
-          const next=index+train.dir;
-          exchange(train,line.stops[index],line.stops[next]);
+      let remaining=dt*trainSpeed,guard=0;
+      while(remaining>1e-7&&guard++<256){
+        const leg=train.dir>0?clamp(Math.floor(train.pos+1e-7),0,count-2):clamp(Math.ceil(train.pos-1e-7)-1,0,count-2);
+        const end=train.dir>0?leg+1:leg;
+        const length=legLength(line,leg),toEnd=Math.abs(end-train.pos)*length;
+        const step=Math.min(remaining,toEnd);
+        train.pos=end+(train.dir>0?-1:1)*(toEnd-step)/length;
+        remaining-=step;
+        if(step+1e-7>=toEnd){
+          train.pos=end;
+          if(end===0||end===count-1)train.dir*=-1;
+          exchange(train,line.stops[end],line.stops[end+train.dir]);
         }
       }
     }
@@ -337,7 +348,11 @@ function restoreRun(saved){
   elapsed=Number(game.elapsed)||0;
   spawnTimer=Number(game.spawnTimer)||0;stationTimer=Number(game.stationTimer)||0;
   upgradeTimer=Number(game.upgradeTimer)||0;upgradeCount=Math.max(0,game.upgradeCount|0);
-  trainSpeed=Number(game.trainSpeed)||.58;trainCapacity=Math.max(2,game.trainCapacity|0||6);
+  trainSpeed=Number(game.trainSpeed)||TRAIN_SPEED;
+  // Saves from before the distance fix stored stations per second; convert so a
+  // resumed run keeps its upgrades at the new pixel-based speed.
+  if(trainSpeed<20)trainSpeed*=TRAIN_SPEED/.58;
+  trainCapacity=Math.max(2,game.trainCapacity|0||6);
   overcrowdLimit=Number(game.overcrowdLimit)||12;
   finished=false;paused=false;running=true;last=0;pointerDown=false;dragStart=null;
   $("overlay").hidden=true;$("pause").textContent="Pause";
