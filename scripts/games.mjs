@@ -226,6 +226,12 @@ function addGame([slug, name, category, blurb], flags) {
   );
   if (noScore) nextCatalog = nextCatalog.replace('export const UNSCORED_GAMES = [',
     'export const UNSCORED_GAMES = [' + q(slug) + ', ');
+  // Popular gives a launch a few days above the ranked games, which needs the
+  // arrival date every new game is stamped with here.
+  const launchedAnchor = 'export const LAUNCHED = {\n';
+  if (!nextCatalog.includes(launchedAnchor)) usage('catalog.js has no LAUNCHED map; update the generator first');
+  nextCatalog = nextCatalog.replace(launchedAnchor,
+    launchedAnchor + '  ' + q(slug) + ': ' + q(new Date().toISOString().slice(0, 10)) + ',\n');
   const discoveryAnchor = 'export const DISCOVERY = {\n';
   const nextDiscovery = discovery.replace(discoveryAnchor,
     discoveryAnchor + '  ' + q(slug) + ": info('1–3 min', 'Competitive', ['Mouse', 'Touch'], { quick: true }),\n");

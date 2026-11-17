@@ -16,6 +16,23 @@ test('popular sorting uses distinct-player rank, not repeated starts', async () 
   assert.equal(rankings.get('clicker'), 2);
 });
 
+test('a new game is boosted above the ranked shelf until its window closes', async () => {
+  const { sortPopularGames } = await import('../src/hub/popularity.js');
+  const ranks = new Map([['clicker', 1], ['trackbound', 2]]);
+  const games = () => [['clicker','Clicker'], ['trackbound','Trackbound'], ['fresh','Fresh'], ['old','Old']];
+  const launches = { fresh: '2026-11-16' };
+  assert.deepEqual(
+    sortPopularGames(games(), ranks, { launches, now: Date.parse('2026-11-17T12:00:00Z') })
+      .map(row => row[0]),
+    ['fresh','clicker','trackbound','old']);
+  // Four days later the boost has ended and the unranked game drops back below
+  // the ranked ones, which is what the window is there to prevent.
+  assert.deepEqual(
+    sortPopularGames(games(), ranks, { launches, now: Date.parse('2026-11-20T12:00:00Z') })
+      .map(row => row[0]),
+    ['clicker','trackbound','fresh','old']);
+});
+
 test('popular fallback preserves newest order and ignores invalid ranking payloads', async () => {
   const { popularityRanks, sortPopularGames } = await import('../src/hub/popularity.js');
   const games = [['a','A'], ['b','B']];

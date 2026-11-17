@@ -27,6 +27,43 @@ export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
 export const FRESH_GAMES = ["photo-puzzle", "poke-gacha", "poke-idle", "air-hockey"];
+// When each game first arrived. Popular ranks the last seven days of plays, so a
+// game nobody has opened yet has no rank and used to sit under every ranked
+// game; a launch inside the boost window is shown above them instead. Only
+// recent launches matter, and `games:add` stamps every new game here.
+export const LAUNCHED = {
+  "photo-puzzle": "2026-11-17",
+  "poke-gacha": "2026-11-16",
+  "pokedoku": "2026-11-12",
+  "poke-idle": "2026-11-12",
+  "krillion": "2026-11-12",
+  "air-hockey": "2026-11-12",
+  "quickdraw": "2026-11-10",
+  "corner": "2026-11-10",
+  "clicker": "2026-11-10",
+  "ticket-to-ride": "2026-11-09",
+  "wallbound": "2026-11-03",
+  "scrabble": "2026-11-02",
+  "risk": "2026-11-02",
+  "downhill-mayhem": "2026-11-02",
+  "basket-random": "2026-11-02",
+  "brick-run": "2026-11-01",
+  "trackbound": "2026-10-31",
+  "typing-test": "2026-10-30",
+  "circuit": "2026-10-30",
+  "ashcrown": "2026-10-30",
+  "transit-chaos": "2026-10-29",
+  "signal-tower": "2026-10-29",
+  "fluid": "2026-10-29",
+  "prism-duel": "2026-10-28",
+  "rooftop-snipers": "2026-10-26",
+  "mahjong": "2026-10-23",
+  "chess": "2026-10-23",
+  "block-blast": "2026-10-23",
+  "minigolf": "2026-10-22",
+  "lights-out": "2026-10-20",
+  "deep": "2026-10-20"
+};
 export const META = {
   "photo-puzzle": ["Puzzle", "Upload a picture, break it into tiles, then swap them back into place."],
   "poke-gacha": ["Arcade", "Pull for Pokémon and build a collection. Work in progress."],
