@@ -131,7 +131,8 @@ canvas, img { image-rendering: pixelated; display: block }
 
 /* Starter pick: the Dex layout, with the three gifts under the starter. */
 #starter-list { left: 8px; top: 8px; width: 248px; height: 264px; display: flex; flex-direction: column }
-#starter-rows { height: 224px }
+/* 32px rows, 6 whole rows under the title, like the Dex. */
+#starter-rows { height: 192px }
 #starter-rows > div { height: 32px }
 #starter-detail { left: 264px; top: 8px; width: 368px; height: 264px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 96px 1fr; gap: 8px 12px }
 #starter-detail .cell { width: 96px; height: 96px; background: var(--ink) }
@@ -1225,12 +1226,14 @@ function tileAction(x, y) {
 // clear 1-1. Accounts from before the pick get it once too.
 let picking = null;
 const needsStarter = () => !!(G && G.pickStarter && G.starters && S && S.needsStarter);
+const giftNames = () => { const n = G.starterGifts.map(name); return n.slice(0, -1).join(", ") + " and " + n[n.length - 1]; };
 const roleOf = num => T && T.classes && T.classOf ? T.classes[T.classOf(num)] : null;
 function openStarter() {
   picking = { at: 0, sure: false };
   for (const [sid] of TABS) $("#scr-" + sid).hidden = true;
   $("#scr-starter").hidden = false;
   $("#tabs").classList.add("locked");
+  refreshTop();
   starterUpdate();
 }
 function starterUpdate() {
@@ -1248,7 +1251,7 @@ function starterUpdate() {
   gifts.push({ label: p.sure ? "Yes, take " + name(num) : "Choose " + name(num), right: p.sure ? "Enter" : "" });
   rows($("#starter-gifts"), gifts, p.sure ? gifts.length - 1 : -1, (i, click) => { if (click && i === gifts.length - 1) starterEnter(); });
   say(p.sure ? "Take " + name(num) + " for good? Enter: yes. Backspace: no."
-    : "Pick your first Pokémon. It comes with " + G.starterGifts.map(name).join(", ") + ", so your squad is four.");
+    : "Pick your first Pokémon. It comes with " + giftNames() + ", so your squad is four.");
 }
 function starterEnter() {
   const p = picking, num = G.starters[p.at];
@@ -1261,7 +1264,7 @@ function starterEnter() {
   // A squad of the four, the blocker first, for the first stage.
   if (r.ok) { pref.squad = [...G.starterGifts, num]; keep(); }
   go(T ? "story" : "pull");
-  if (r.ok) say(name(num) + " joins you, with " + G.starterGifts.map(name).join(", ") + "." + (T ? " Play 1-1 here." : "") + " Your first " + (G.freeHatches || 10) + " eggs hatch at once.");
+  if (r.ok) say(name(num) + " joins you, with " + giftNames() + "." + (T ? " Play 1-1 here." : "") + " Your first " + (G.freeHatches || 10) + " eggs hatch at once.");
 }
 function starterKey(e) {
   const p = picking, n = G.starters.length;
@@ -1280,7 +1283,7 @@ function refreshTop() {
   S = G.state();
   const ready = S.eggs.filter(e => e.ready).length;
   $("#tabs").replaceChildren(...shownTabs().map(([id, label], i) => {
-    const t = el("div", "panel" + (tab === id ? " on" : ""));
+    const t = el("div", "panel" + (tab === id && !picking ? " on" : ""));
     t.append(el("span", "", label));
     if (id === "eggs" && ready) t.append(" ", el("span", "num", ready));
     t.dataset.tab = id;
