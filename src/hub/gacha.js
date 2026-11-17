@@ -79,7 +79,7 @@ export const STARTER = { regular: 2 };
 export const STARTER_MISSIONS = [
   { id: 'pull', label: 'Pull your first egg' },
   { id: 'hatch', label: 'Hatch an egg' },
-  { id: 'stage', label: 'Clear stage 1-1 (tower defense, coming later)' },
+  { id: 'stage', label: 'Clear stage 1-1' },
   { id: 'buddy', label: 'Equip a buddy' }
 ];
 

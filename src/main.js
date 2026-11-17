@@ -18,6 +18,7 @@ import {
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
 import { readWallet, mergeStoredWallet, observeStoredSnapshot, activateStoredWallet } from './hub/rewards.js';
 import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, mon as gachaMon } from './hub/gacha.js';
+import { tdBridge } from './hub/td.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
 import { createLibraryView } from './hub/library-view.js';
@@ -657,7 +658,9 @@ function activateProfile() {
 
 // The page calls the gacha through `parent.__boredGacha`, so the hub's wallet
 // is the only copy: every pull, hatch and spend is written here and synced.
-window.__boredGacha = gachaBridge({ onChange: () => { requestCloudPush(); renderBuddy(); } });
+window.__boredGacha = { ...gachaBridge({ onChange: () => { requestCloudPush(); renderBuddy(); } }),
+  // Tower defense: battles, rewards and missions (src/hub/td.js).
+  td: tdBridge({ onChange: () => requestCloudPush() }) };
 // Pokédoku asks this for the look a player's line wears (normal, shiny or an SP skin).
 window.__boredLooks = storedLooks();
 
