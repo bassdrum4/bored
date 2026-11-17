@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 535,
+  "count": 536,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"bfe1585","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: Dex filters and sorting","pr":192},
   {"sha":"3178370","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha TD: chapter 4 screens: armored enemies","pr":191},
   {"sha":"710a68d","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 2, Proton, with flying enemies (manual review)"},
   {"sha":"588fd78","date":"2026-11-17","author":"Claude","subject":"Poké Gacha TD: chapter 1 engine and the hub bridge (manual review)"},
