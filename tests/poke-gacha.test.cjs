@@ -378,6 +378,64 @@ test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Ra
   assert.deepEqual(['Magikarp', 'Happiny', 'Munchlax', 'Feebas', 'Bonsly'].map(star), [4, 4, 4, 4, 3]);
 });
 
+test('Quests: four sub-tabs with reset clocks; rows show n/m, a bar and real reward icons; done rows sink; trophies group by game', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { for (const st of T.allStages.slice(0, 3)) T.finish({ stage: st.id, stars: 3, team: [S.owned[0]], waves: 1 }); refreshTop(); });
+  await key(tab, '6');
+  const tabs = await game.$$eval('#quest-tabs > span', n => n.map(t => [t.dataset.qtab, t.querySelector('.num').textContent, t.querySelector('.clock')?.textContent || '']));
+  assert.deepEqual(tabs.map(t => t[0]), ['daily', 'weekly', 'starter', 'trophies']);
+  for (const [, count] of tabs) assert.match(count, /^\d+\/(\d+|\?)$/);
+  assert.match(tabs[0][2], /^(\d+h )?\d+m$|^\d+h \d+m$/, 'Daily counts down to midnight');
+  assert.match(tabs[1][2], /^\d+d \d+h$|^\d+h \d+m$|^\d+m$/, 'Weekly counts down to Monday');
+  assert.deepEqual([tabs[2][2], tabs[3][2]], ['', ''], 'Starter and Trophies never reset');
+  // Each sub-tab: every row has n/m over a bar and its reward in icons (no S/M/B letters); done rows are last.
+  for (const id of ['daily', 'weekly', 'starter', 'trophies']) {
+    const rows = await game.evaluate(id => { questTab = id; questAt = 0; questsUpdate();
+      return [...document.querySelectorAll('#quest-list .q')].map(r => ({ done: r.classList.contains('done'), n: r.querySelector('.prog .n').textContent,
+        bar: !!r.querySelector('.bar i'), icons: r.querySelectorAll('.reward img').length, text: r.querySelector('.reward').textContent, check: !!r.querySelector('.reward canvas') })); }, id);
+    if (!rows.length) continue;
+    const firstDone = rows.findIndex(r => r.done);
+    if (firstDone >= 0) assert.ok(rows.slice(firstDone).every(r => r.done), id + ': done rows are at the bottom');
+    for (const r of rows) {
+      assert.match(r.n, /^(\d+\/\d+|later)$/);
+      assert.ok(r.bar && r.icons >= 1 && !/\b[SMB]\b/.test(r.text), id + ': progress bar and reward icons');
+      assert.equal(r.check, r.done, id + ': a check exactly on done rows');
+    }
+  }
+  // Clears ticked "Clear any stage" (when drawn today) and the 1-1 starter mission, and they sit below the open ones.
+  const daily = await game.evaluate(() => { questTab = 'daily'; questsUpdate(); return [...document.querySelectorAll('#quest-list .q')].map(r => [r.querySelector('.label').textContent, r.classList.contains('done')]); });
+  const clear = daily.find(r => r[0] === 'Clear any stage');
+  if (clear) assert.equal(clear[1], true);
+  // A star in a label is the text's own size.
+  // A star in a label is drawn no taller than the letters around it (both measured on screen).
+  const star = await game.evaluate(() => { const row = [...document.querySelectorAll('#quest-list .label')].find(n => n.querySelector('.st'));
+    if (!row) return null;
+    const range = document.createRange(), text = [...row.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
+    range.setStart(text, 0); range.setEnd(text, 1);
+    return [row.querySelector('.st').getBoundingClientRect().height, range.getBoundingClientRect().height]; });
+  if (star) assert.ok(star[0] <= star[1] * 1.05, 'the star is no taller than the text ' + JSON.stringify(star));
+  // Left/Right move between sub-tabs; Up/Down skip the trophy group headers.
+  await game.evaluate(() => { questTab = 'daily'; questsUpdate(); });
+  await key(tab, 'ArrowRight');
+  assert.equal(await game.evaluate(() => questTab), 'weekly');
+  await key(tab, 'ArrowLeft', 2);
+  assert.equal(await game.evaluate(() => questTab), 'trophies');
+  if (await game.evaluate(() => !!G.trophyList)) {
+    const groups = await game.$$eval('#quest-list .group', n => n.map(g => g.textContent));
+    assert.deepEqual(groups.map(g => g.replace(/\d+\/\d+$/, '')), ['Poké Idle', 'Pokédoku']);
+    const total = await game.evaluate(() => G.trophyList().length);
+    assert.match(await game.$eval('#quest-tabs [data-qtab="trophies"]', n => n.textContent), new RegExp('\\d+/' + total + '$'));
+    await key(tab, 'ArrowDown', 3);
+    assert.ok(await game.evaluate(() => !questRows('trophies')[questAt].head), 'the cursor never lands on a header');
+  }
+  // Nothing is cut or spills, and the message names the reset.
+  await game.evaluate(() => { questTab = 'weekly'; questAt = 0; questsUpdate(); });
+  const spill = await game.evaluate(() => [...document.querySelectorAll('#scr-quests *')].filter(n => n.offsetParent && n.clientWidth > 0 && n.scrollWidth > n.clientWidth + 1).map(n => n.className));
+  assert.deepEqual(spill, []);
+  assert.match(await game.$eval('#msg', n => n.textContent), /Resets in \d+[dhm]/);
+  assert.deepEqual(errors, []);
+});
+
 test('tower defense: chapter 4 says which enemies are armored', async t => {
   const { tab, game, errors } = await openWithMons(t);
   if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length > 3)) return t.skip('the hub engine has fewer than 4 chapters');

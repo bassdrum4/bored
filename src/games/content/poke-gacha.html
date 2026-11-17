@@ -163,6 +163,33 @@ canvas, img { image-rendering: pixelated; display: block }
 
 /* Shop and quests share one layout */
 .left-panel { left: 8px; top: 8px; width: 400px; height: 264px; display: flex; flex-direction: column }
+/* Quests: four sub-tabs with their reset clocks, then one list. A row is the mission (it
+   wraps, never cut), its progress (n/m over a bar) and its reward in real icons. Done rows
+   sink to the bottom, dimmed, with a check. Trophies come in groups, one per game. */
+#quest-tabs { left: 8px; top: 8px; width: 624px; height: 36px; padding: 2px 6px; display: flex; gap: 6px; align-items: center }
+#quest-tabs > span { padding: 0 8px; border: 1px solid var(--dim); line-height: 26px; cursor: pointer; white-space: nowrap }
+#quest-tabs > span.on { border-color: var(--gold); color: var(--gold) }
+#quest-tabs .clock { color: var(--dim); margin-left: 6px }
+#quest-tabs > span.on .clock { color: var(--paper) }
+#quest-box { left: 8px; top: 52px; width: 624px; height: 220px; padding: 4px 6px 4px 4px }
+#quest-list { height: 100%; scroll-snap-type: none }
+#quest-list .q { display: grid; grid-template-columns: 16px 1fr 128px 112px; column-gap: 8px; align-items: center; min-height: 34px; padding: 2px 4px 2px 0; position: relative; cursor: pointer }
+#quest-list .q.at::before { content: ""; position: absolute; left: 2px; top: calc(50% - 6px); border-style: solid; border-width: 6px 0 6px 8px; border-color: transparent transparent transparent var(--paper) }
+#quest-list .q .label { white-space: normal; line-height: 18px; padding: 2px 0 }
+#quest-list .q .prog { display: flex; flex-direction: column; gap: 2px }
+#quest-list .q .prog .n { line-height: 18px }
+#quest-list .q .bar { height: 6px; border: 1px solid var(--dim); background: var(--ink) }
+#quest-list .q .bar i { display: block; height: 100%; background: var(--gold) }
+#quest-list .q .reward { display: flex; align-items: center; justify-content: flex-end; gap: 3px; white-space: nowrap }
+#quest-list .q .ck { justify-self: end }
+#quest-list .q.done { color: var(--dim) }
+#quest-list .q.done .bar i { background: var(--dim) }
+#quest-list .q.done img, #quest-list .q.locked img { opacity: .5 }
+#quest-list .q.locked { color: var(--dim) }
+#quest-list .group { display: flex; justify-content: space-between; color: var(--gold); line-height: 24px; padding: 4px 4px 0 24px; border-bottom: 1px solid var(--dim); margin-bottom: 2px }
+/* A star inside text is drawn at the text's own size (the pixel font has no star). */
+.st { font-family: Arial, Helvetica, sans-serif; font-size: .8em; line-height: 1; vertical-align: .05em }
+#frame.no-pixel #quest-list, #frame.no-pixel #quest-tabs { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
 .right-panel { left: 416px; top: 8px; width: 216px; height: 264px; display: flex; flex-direction: column; gap: 8px }
 .right-panel .cell { width: 96px; height: 96px; background: var(--ink); align-self: center }
 /* Scrolling lists hold whole rows only: 8 × 24px. */
@@ -324,8 +351,8 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel right-panel" id="shop-preview"></div>
       </section>
       <section id="scr-quests" class="screen" hidden>
-        <div class="panel left-panel"><div class="title">MISSIONS</div><div class="rows scroll" id="quest-list"></div></div>
-        <div class="panel right-panel"><div class="title" id="trophy-title">TROPHIES</div><div class="rows scroll" id="trophy-list"></div></div>
+        <div class="panel" id="quest-tabs"></div>
+        <div class="panel" id="quest-box"><div class="scroll" id="quest-list"></div></div>
       </section>
       <section id="scr-starter" class="screen" hidden>
         <div class="panel" id="starter-list"><div class="title" id="starter-title">STARTER</div><div class="rows scroll" id="starter-rows"></div></div>
@@ -1134,58 +1161,133 @@ function shopKey(e) {
   else if (e.key === "Backspace") { e.preventDefault(); go("pull"); }
 }
 
-/* ── Quests: daily login, starter missions, trophies ───────────────────── */
-let questAt = 0, questFocus = "missions", trophyAt = 0;
+/* ── Quests: daily, weekly and starter missions, and trophies ──────────── */
+// Sub-tabs, in order; Left/Right switch them, Up/Down move in the list.
+const QUEST_TABS = [["daily", "Daily"], ["weekly", "Weekly"], ["starter", "Starter"], ["trophies", "Trophies"]];
+let questTab = "daily", questAt = 0;
+// Daily things reset at midnight in Detroit, weekly ones at midnight starting Monday.
+function resetIn(weekly) {
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Detroit", hourCycle: "h23", weekday: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      .formatToParts(new Date()).map(x => [x.type, x.value]));
+    const left = (24 * 3600 - (Number(p.hour) * 3600 + Number(p.minute) * 60 + Number(p.second))) * 1000;
+    const dow = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(p.weekday);
+    return left + (weekly ? (6 - dow) * 86400000 : 0);
+  } catch { return 0; }
+}
+const clockText = ms => { const m = Math.max(1, Math.ceil(ms / 60000)), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60); return d ? d + "d " + h + "h" : h ? h + "h " + (m % 60) + "m" : (m % 60) + "m"; };
+// Rewards: [[amount, kind]] drawn with their real icons.
+const REWARD_ICON = { coins: () => coin(), regular: () => ticket("regular"), plus: () => ticket("plus"), premium: () => ticket("premium"), gold: () => ticket("gold"), shards: () => shardIcon() };
+function rewardCell(reward) {
+  const r = el("span", "reward");
+  for (const [n, kind] of reward) r.append(el("span", "num", String(n)), REWARD_ICON[kind] ? REWARD_ICON[kind]() : el("span", "dim", kind));
+  return r;
+}
+// "Use a 5★ or better": the star at the text's size.
+function starText(text) {
+  const span = el("span", "label");
+  String(text).split("★").forEach((part, i) => { if (i) span.append(el("span", "st", "★")); span.append(part); });
+  return span;
+}
+const TROPHY_PAY = { S: "plus", M: "premium", B: "gold" };
+// Every mission, flat (the tests and the tab dot read it): label, group, have/need, reward, done.
 function questItems() {
-  const login = [{ label: "Daily login", right: [3, ticket("regular"), check(S.login)], about: "Open Poké Gacha each day for 3 Regular vouchers.", done: S.login }];
-  const starters = G.missions.map(m => ({ label: m.label.replace(" (tower defense, coming later)", ""), right: [2, ticket("regular"), check(S.missions[m.id])],
-    about: m.id === "stage" && !T ? "Starter mission. Tower defense is coming in the next update." : "Starter mission: 2 Regular vouchers, once.", done: S.missions[m.id] }));
-  if (!T) return login.concat(starters);
-  const td = T.state();
-  return login
-    .concat(td.daily.map(m => ({ label: m.label, right: [50, coin(), check(m.done)], about: "Daily: " + m.label + ". Pays 50 coins and 5 hatch waves.", done: m.done })))
-    .concat([{ label: "All 4 daily missions", right: [1, ticket("plus"), check(td.dailyAll)], about: "Finish today's four battle missions for 1 Plus.", done: td.dailyAll }])
-    .concat(td.weekly.map(m => ({ label: m.label, right: m.later ? ["later"] : [1, ticket("plus"), check(m.done)],
-      about: m.later ? "Weekly: " + m.label + ". Locked: the Poké Idle daily boss isn't built yet." : "Weekly (resets Monday): " + m.label + ". Pays 1 Plus.", done: m.done, off: m.later })))
+  const login = { group: "daily", label: "Daily login", have: S.login ? 1 : 0, need: 1, reward: [[3, "regular"]], done: !!S.login,
+    about: "Open Poké Gacha each day for 3 Regular vouchers." };
+  const starters = G.missions.map(m => ({ group: "starter", label: m.label.replace(" (tower defense, coming later)", ""), have: S.missions[m.id] ? 1 : 0, need: 1,
+    reward: [[2, "regular"]], done: !!S.missions[m.id],
+    about: m.id === "stage" && !T ? "Starter mission. Tower defense is coming in the next update." : "Starter mission: 2 Regular vouchers, once." }));
+  if (!T) return [login, ...starters];
+  const td = T.state(), weeklyLocked = td.weekly.some(m => m.later);
+  const daily = td.daily.map(m => ({ group: "daily", label: m.label, have: m.done ? 1 : 0, need: 1, reward: [[50, "coins"], [5, "waves"]], done: m.done,
+    about: "Daily: " + m.label + ". Pays 50 coins and 5 hatch waves." }));
+  // Weekly missions count up (the hub reports have/need; older hubs only done).
+  const weekly = td.weekly.map(m => ({ group: "weekly", label: m.label, have: m.later ? 0 : m.have ?? (m.done ? 1 : 0), need: m.need ?? 1, reward: [[1, "plus"]],
+    done: m.done, off: !!m.later,
+    about: m.later ? "Weekly: " + m.label + ". Locked: the Poké Idle daily boss isn't built yet." : "Weekly (resets Monday): " + m.label + ". Pays 1 Plus." }));
+  return [login, ...daily,
+    { group: "daily", label: "All 4 daily missions", have: daily.filter(m => m.done).length, need: daily.length, reward: [[1, "plus"]], done: td.dailyAll,
+      about: "Finish today's four battle missions for 1 Plus." },
+    ...weekly,
     // While one weekly mission waits on the Poké Idle boss, "all 5" cannot finish.
-    .concat([{ label: "All 5 weekly missions", right: [1, ticket("gold"), check(td.weeklyAll)], done: td.weeklyAll, off: td.weekly.some(m => m.later),
-      about: td.weekly.some(m => m.later) ? "All five weekly missions pay 1 Gold. Locked until the Poké Idle boss mission opens." : "All five weekly missions pay 1 Gold." }])
-    .concat(starters);
+    { group: "weekly", label: "All 5 weekly missions", have: weekly.filter(m => m.done).length, need: weekly.length, reward: [[1, "gold"]], done: td.weeklyAll, off: weeklyLocked,
+      about: weeklyLocked ? "All five weekly missions pay 1 Gold. Locked until the Poké Idle boss mission opens." : "All five weekly missions pay 1 Gold." },
+    ...starters];
+}
+// Every trophy with its progress; an older hub lists only the earned ones.
+function trophyItems() {
+  const list = G.trophyList ? G.trophyList() : G.trophies().map(t => ({ ...t, have: 1, need: 1, done: true }));
+  return list.map(t => ({ ...t, group: "trophies", label: t.name, reward: [[1, TROPHY_PAY[t.tier]]],
+    about: t.name + (t.done ? ": earned, paid 1 " : ": " + t.have + " of " + t.need + ". Pays 1 ") + TIER_NAME_OF[t.tier] + " voucher." }));
+}
+const TIER_NAME_OF = { S: "Plus", M: "Premium", B: "Gold" };
+const GAME_NAME = { "poke-idle": "Poké Idle", pokedoku: "Pokédoku" };
+// The rows of one sub-tab, open ones first (in their order), done ones last.
+function questRows(tab_) {
+  const list = tab_ === "trophies" ? trophyItems() : questItems().filter(q => q.group === tab_);
+  const sorted = list.filter(q => !q.done).concat(list.filter(q => q.done));
+  if (tab_ !== "trophies") return sorted;
+  // Trophies: grouped by game, each group open first then earned.
+  const games = [...new Set(list.map(t => t.game))];
+  return games.flatMap(g => { const of = list.filter(t => t.game === g); return [{ head: true, game: g, got: of.filter(t => t.done).length, all: of.length },
+    ...of.filter(t => !t.done), ...of.filter(t => t.done)]; });
 }
 // Rewards paid so far: finished missions and trophies (all are paid when done).
 function questsDone() { try { return questItems().filter(q => q.done).length + G.trophies().length; } catch { return 0; } }
+function questTabCount(id) {
+  if (id === "trophies") { const t = trophyItems(); return t.filter(x => x.done).length + "/" + (G.trophyList ? t.length : "?"); }
+  const q = questItems().filter(x => x.group === id);
+  return q.filter(x => x.done).length + "/" + q.length;
+}
 function questsUpdate() {
   drawBackdrop();
   if (questsDone() !== pref.questsSeen) { pref.questsSeen = questsDone(); keep(); refreshTop(); }
-  const items = questItems();
-  rows($("#quest-list"), items.map(q => ({ label: q.label, right: q.right, off: q.done || q.off })), questFocus === "missions" ? questAt : -1,
-    i => { questAt = i; questFocus = "missions"; questsUpdate(); });
-  const trophies = G.trophies();
-  titled($("#trophy-title"), "TROPHIES", trophies.length);
-  rows($("#trophy-list"), trophies.map(t => ({ label: t.name, right: t.tier })), questFocus === "trophies" ? trophyAt : -1,
-    i => { trophyAt = i; questFocus = "trophies"; questsUpdate(); });
-  if (!trophies.length) $("#trophy-list").replaceChildren(el("p", "dim", "None yet."));
-  const t = trophies[trophyAt];
-  say(questFocus === "trophies" && t ? t.name + ": tier " + t.tier + " (S = 1 Plus, M = 1 Premium, B = 1 Gold)."
-    : (items[questAt] ? items[questAt].about : "") + (trophies.length ? " Right: trophies." : ""));
+  // The sub-tabs: name, done/all, and the reset clock for Daily and Weekly.
+  $("#quest-tabs").replaceChildren(...QUEST_TABS.filter(([id]) => id !== "weekly" || T).map(([id, label]) => {
+    const t = el("span", id === questTab ? "on" : "");
+    t.dataset.qtab = id;
+    t.append(label + " ", el("span", "num", questTabCount(id)));
+    if (id === "daily" || id === "weekly") { const c = el("span", "clock", clockText(resetIn(id === "weekly"))); c.title = "Resets in"; t.append(c); }
+    return t;
+  }));
+  const list = questRows(questTab), pickable = list.map((q, i) => q.head ? -1 : i).filter(i => i >= 0);
+  if (!pickable.includes(questAt)) questAt = pickable[0] ?? 0;
+  $("#quest-list").replaceChildren(...list.map((q, i) => {
+    if (q.head) { const h = el("div", "group"); h.append(el("span", "", GAME_NAME[q.game] || q.game), el("span", "num", q.got + "/" + q.all)); return h; }
+    const r = el("div", "q" + (i === questAt ? " at" : "") + (q.done ? " done" : "") + (q.off ? " locked" : ""));
+    r.dataset.row = i;
+    const prog = el("span", "prog"), bar = el("span", "bar"), fill = el("i");
+    fill.style.width = Math.round(100 * Math.min(1, q.need ? q.have / q.need : 0)) + "%"; bar.append(fill);
+    prog.append(el("span", "n", q.off ? "later" : q.have + "/" + q.need), bar);
+    r.append(el("span"), starText(q.label), prog, q.done ? (() => { const w = el("span", "reward"); w.append(rewardCell(q.reward), check(true)); return w; })() : rewardCell(q.reward));
+    return r;
+  }));
+  if (!list.length) $("#quest-list").replaceChildren(el("p", "dim", questTab === "trophies" && !G.trophyList ? "No trophies yet. Trophies come from Poké Idle and Pokédoku." : "Nothing here yet."));
+  const row = $("#quest-list").children[questAt];
+  if (row && row.scrollIntoView) row.scrollIntoView({ block: "nearest" });
+  const q = list[questAt];
+  const when = questTab === "daily" ? " Resets in " + clockText(resetIn(false)) + "." : questTab === "weekly" ? " Resets in " + clockText(resetIn(true)) + " (Monday)." : "";
+  say((q && !q.head ? q.about : "") + when + " Left/Right: Daily, Weekly, Starter, Trophies.");
+}
+function questTabGo(d) {
+  const ids = QUEST_TABS.map(([id]) => id).filter(id => id !== "weekly" || T);
+  questTab = ids[(ids.indexOf(questTab) + d + ids.length) % ids.length]; questAt = 0; questsUpdate();
 }
 function questsKey(e) {
   const k = e.key;
-  if (k === "ArrowRight" && G.trophies().length) { e.preventDefault(); questFocus = "trophies"; return questsUpdate(); }
-  if (k === "ArrowLeft" || k === "Backspace") {
-    e.preventDefault();
-    if (questFocus === "trophies") { questFocus = "missions"; return questsUpdate(); }
-    if (k === "Backspace") go("pull");
-    return;
-  }
+  if (k === "ArrowRight" || k === "ArrowLeft") { e.preventDefault(); return questTabGo(k === "ArrowRight" ? 1 : -1); }
+  if (k === "Backspace") { e.preventDefault(); return go("pull"); }
   if (k === "ArrowUp" || k === "ArrowDown") {
     e.preventDefault();
-    const d = k === "ArrowUp" ? -1 : 1;
-    if (questFocus === "missions") { const n = questItems().length; questAt = (questAt + d + n) % n; }
-    else { const n = G.trophies().length; trophyAt = (trophyAt + d + n) % n; }
+    const list = questRows(questTab), pickable = list.map((q, i) => q.head ? -1 : i).filter(i => i >= 0);
+    if (!pickable.length) return;
+    const at = pickable.indexOf(questAt), d = k === "ArrowUp" ? -1 : 1;
+    questAt = pickable[(at + d + pickable.length) % pickable.length];
     questsUpdate();
   }
 }
+// The reset clocks tick while Quests is open.
+setInterval(() => { if (tab === "quests" && !hatching && !battle && !picking && $("#scr-quests") && !$("#scr-quests").hidden) questsUpdate(); }, 30000);
 
 /* ── Story: chapter 1, the squad, and battles ──────────────────────────────
    Story lists the stages; Enter picks one and opens the squad; Start runs the
@@ -2277,7 +2379,7 @@ const TIPS = {
     { at: () => boxOf("#squad-roster"), text: "Classes: Vanguard is cheap and gives energy, Guard hits in melee, Blocker holds 3, Sniper shoots flyers, Caster hits an area, Medic heals." },
     { at: () => boxOf("#squad-stage"), text: "These are the foes' types and traits. Pick counters: types that beat them, and snipers for flyers." }
   ],
-  quests: () => [{ at: () => boxOf("#scr-quests .left-panel"), text: "Daily missions reset at midnight (Detroit time), weekly ones on Monday. Rewards are paid when you finish them." }],
+  quests: () => [{ at: () => boxOf("#quest-tabs"), text: "Daily missions reset at midnight (Detroit time), weekly ones on Monday; the clocks count down. Rewards are paid when you finish them." }],
   shop: () => [{ at: () => boxOf("#scr-shop .left-panel"), text: "Coins buy Regular vouchers here; shards from duplicate hatches buy SP skins." }]
 };
 function screenTips(id) {
@@ -2436,6 +2538,8 @@ if (!G) {
   $("#battle-talk").onclick = () => battle && battleKey({ key: "Enter", preventDefault() {} });
   $("#battle-result").onclick = () => battle && battle.done && !battle.talk.length && leaveBattle();
   $("#menu").onmousemove = e => { const r = e.target.closest("[data-row]"); if (r && Number(r.dataset.row) !== cursor && !message) { cursor = Number(r.dataset.row); updateScene(); } };
+  $("#quest-tabs").onclick = e => { const t = e.target.closest("[data-qtab]"); if (t) { questTab = t.dataset.qtab; questAt = 0; questsUpdate(); } };
+  $("#quest-list").onclick = e => { const r = e.target.closest("[data-row]"); if (r) { questAt = Number(r.dataset.row); questsUpdate(); } };
   $("#hit-left").onclick = () => switchMachine(-1);
   $("#hit-right").onclick = () => switchMachine(1);
   $("#hit-machine").onclick = () => { menuOpen = true; message = null; updateScene(); };
