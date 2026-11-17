@@ -378,6 +378,40 @@ test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Ra
   assert.deepEqual(['Magikarp', 'Happiny', 'Munchlax', 'Feebas', 'Bonsly'].map(star), [4, 4, 4, 4, 3]);
 });
 
+test('SP skins: the shop prices sets by size, a set shows on each form, and a skin rolled for an evolution shows on it', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.waitForFunction(() => G.skins().length > 0);
+  // Every listed skin's art loads, at 96x96.
+  const sizes = await game.evaluate(async () => Promise.all(G.skins().flatMap(skin => skin.forms.map(num => new Promise(done => {
+    const img = sprite(num, skin.id); img.onload = () => done([skin.id, num, img.naturalWidth, img.naturalHeight]); img.onerror = () => done([skin.id, num, 0, 0]);
+  })))));
+  assert.ok(sizes.length >= 30);
+  for (const [id, num, w, h] of sizes) assert.deepEqual([w, h], [96, 96], id + ' on #' + num);
+  // The shop: Mew's line never hatches, so its skin is not for sale; prices go by forms.
+  const shop = await game.evaluate(() => shopItems().filter(i => i.kind === 'sp').map(i => [i.skin.id, i.price]));
+  assert.ok(!shop.some(([id]) => id === 'mew'));
+  assert.deepEqual(['charizard', 'clefairy-set', 'pidgey-set'].map(id => shop.find(r => r[0] === id)[1]), [300, 400, 500]);
+  // Own the Pidgey line, buy the set and wear it: Pidgey and Pidgeotto both draw it.
+  const worn = await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:sp'] = { at: now - 50, g: { shards: 500, 'candy:16': 50 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    refreshTop();
+    return { had: S.owned.includes(16), shards: S.balance.shards };
+  });
+  if (!worn.had) return t.skip('this roster has no Pidgey');
+  const r = await game.evaluate(() => [G.evolve({ from: 16, to: 17 }).ok, G.buySkin({ skin: 'pidgey-set' }).ok, G.setLook({ line: 16, look: 'pidgey-set' }).ok]);
+  assert.deepEqual(r, [true, true, true]);
+  await game.evaluate(() => refreshTop());
+  assert.deepEqual(await game.evaluate(() => [G.lookFor(16), G.lookFor(17), G.lookFor(18)]), ['pidgey-set', 'pidgey-set', 'pidgey-set']);
+  assert.match(await game.evaluate(() => spriteUrl(17, 'pidgey-set')), /sp\/pidgey-set-17\.png$/);
+  assert.equal(await game.evaluate(() => S.balance.shards), worn.shards - 500, 'a three-form set costs 500');
+  assert.equal(await game.evaluate(() => T.squad([17])[0].look), 'pidgey-set', 'battle draws the set on Pidgeotto');
+  // A Charizard skin rolled from a Charmander egg shows Charizard; a single skin stays on its own form.
+  assert.match(await game.evaluate(() => hatchSprite({ species: 4, sp: 'charizard' }).src), /sp\/charizard-6\.png$/);
+  assert.match(await game.evaluate(() => spriteUrl(4, 'charizard')), /sp\/charizard-6\.png$/);
+  assert.deepEqual(errors, []);
+});
+
 test('tower defense: chapter 4 says which enemies are armored', async t => {
   const { tab, game, errors } = await openWithMons(t);
   if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length > 3)) return t.skip('the hub engine has fewer than 4 chapters');
