@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 554,
+  "count": 556,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"69b84df","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: the owner's pixel star for stage stars, with a gray palette swap"},
+  {"sha":"bf1f43d","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: the weekly challenge page in Story"},
   {"sha":"2457fe7","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: the starter pick screen, with an end-to-end new-account test","pr":197},
   {"sha":"296df59","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: the chapter 3 and 4 stage panels fit again","pr":196},
   {"sha":"26b6341","date":"2026-11-17","author":"Claude","subject":"gacha-screen test: get past the starter pick before measuring the pull screen"},
