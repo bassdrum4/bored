@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 559,
+  "count": 560,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"872d182","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: a real library preview, the Pull screen","pr":202},
   {"sha":"886b8d8","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: the hatch plays the owner's egg-hatch frames","pr":200},
   {"sha":"5307032","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha weekly page: opens after 1-8, shows the risk milestones, feeds the board","pr":199},
   {"sha":"726ad91","date":"2026-11-17","author":"Claude","subject":"Poké Gacha weekly: opens after 1-8, risk milestones, and a board for the best risk"},
