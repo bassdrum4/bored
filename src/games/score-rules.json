@@ -89,11 +89,6 @@
     "better": "high",
     "max_value": 99
   },
-  "krillion": {
-    "label": "Points in a finished seven-prompt dive",
-    "better": "high",
-    "max_value": 700
-  },
   "lava": {
     "label": "Points scored against CPU (endless mode)",
     "better": "high",
