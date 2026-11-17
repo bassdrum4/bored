@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 523,
+  "count": 525,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"5f23353","date":"2026-11-17","author":"Codebuff","subject":"Give a new game three days above the ranked Popular order"},
+  {"sha":"5493212","date":"2026-11-17","author":"Codebuff","subject":"Let QuickDraw record reactions faster than its old 50 ms floor"},
   {"sha":"b415331","date":"2026-11-17","author":"Codebuff","subject":"Stop ranking Krillion on the shared board"},
   {"sha":"63d8e51","date":"2026-11-17","author":"Codebuff","subject":"Add Photo Puzzle, played on a picture kept in local storage"},
   {"sha":"c35682b","date":"2026-11-17","author":"Codebuff","subject":"Keep Transit Chaos train time proportional to each leg's distance"},
