@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 533,
+  "count": 534,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -17,6 +17,7 @@ export const CHANGELOG = [
   {"sha":"63d8e51","date":"2026-11-17","author":"Codebuff","subject":"Add Photo Puzzle, played on a picture kept in local storage"},
   {"sha":"c35682b","date":"2026-11-17","author":"Codebuff","subject":"Keep Transit Chaos train time proportional to each leg's distance"},
   {"sha":"1c2285a","date":"2026-11-17","author":"Codebuff","subject":"Keep the save rate-limit test inside a calendar-minute window"},
+  {"sha":"2f91ec3","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Gacha TD: chapter 3 screens: exploders and their fuses","pr":189},
   {"sha":"ef8c558","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Gacha: outlined pixel-map icons (candy, check, dot, stars)","pr":186},
   {"sha":"b4b428c","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Gacha TD: chapter screens for chapter 2 (hidden until the engine has it)","pr":184},
   {"sha":"d95f7bf","date":"2026-11-16","author":"Vettel Xu","subject":"Poké Gacha TD: browser tests for the Story, Squad, Battle and Quests screens","pr":182},
