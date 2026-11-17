@@ -68,10 +68,23 @@ canvas, img { image-rendering: pixelated; display: block }
 .unseen { filter: brightness(0) }
 [hidden] { display: none !important }
 
-#tabs { position: absolute; left: 8px; right: 8px; top: 4px; height: 32px; display: flex; gap: 8px }
+#tabs { position: absolute; left: 8px; right: 8px; top: 4px; height: 32px; display: flex; gap: 6px }
 #tabs .panel { position: static; height: 32px; padding: 4px 12px; cursor: pointer }
 #tabs .panel.on { background: var(--red) }
 #tabs .purse { margin-left: auto; display: flex; align-items: center; gap: 8px; cursor: default }
+#tabs .help { cursor: pointer; padding: 4px 7px }
+/* The tutorial: the whole frame dims except one gold-framed box, and its words sit
+   in a message box (at the bottom, or the top when the box is down there). Clicks
+   pass through, so the player does the real thing. */
+#tutor { position: absolute; inset: 0; pointer-events: none; z-index: 50 }
+#tutor-hole { position: absolute; box-shadow: 0 0 0 1000px rgba(28, 27, 44, .62); outline: 2px solid var(--gold); outline-offset: 1px }
+#tutor-hole.none { outline: none }
+/* The scene canvas runs past the frame's edges, so it dims with the tip as well. */
+#sky.dim { filter: brightness(.38) }
+#tutor-box { left: 8px; right: 8px; min-height: 56px; padding: 6px 12px; pointer-events: auto; line-height: 20px; white-space: normal }
+#tutor-box .foot { display: flex; justify-content: space-between; color: var(--dim); margin-top: 2px }
+#tutor-box .skip { cursor: pointer; text-decoration: underline }
+#frame.no-pixel #tutor-box { font-size: 14px; font-family: Arial, Helvetica, sans-serif }
 #msg { left: 8px; right: 8px; bottom: 8px; height: 56px; padding: 6px 12px; display: flex; gap: 8px; align-items: flex-start }
 #msg.with-eggs { align-items: center; padding-top: 0; padding-bottom: 0 }
 #msg.with-eggs > div { display: flex; gap: 12px; align-items: center }
@@ -241,6 +254,7 @@ canvas, img { image-rendering: pixelated; display: block }
 <div id="wrap" tabindex="0" aria-label="Poké Gacha. Arrow keys move, Enter picks, Backspace goes back, number keys switch screens.">
   <div id="frame">
     <div id="tabs"></div>
+    <div id="tutor" hidden><div id="tutor-hole"></div><div class="panel" id="tutor-box"></div></div>
     <div id="stage">
       <section id="scr-story" class="screen" hidden>
         <div class="panel left-panel" id="story-list-panel"><div class="title" id="story-title">CHAPTER</div><div class="rows scroll" id="story-list"></div></div>
@@ -1202,6 +1216,7 @@ function pickStage() {
   if (!isOpen(td, stage)) return say("Clear " + stageBefore(stage).id + " first.");
   if (!S.owned.length) return say("Hatch some eggs first: you need mons for your squad.");
   storyMode = "squad"; sq.zone = "grid"; sq.at = 0; sq.note = ""; storyUpdate();
+  setTimeout(() => screenTips("story"), 0);
 }
 /* ── Squad ───────────────────────────────────────────────────────────────
    Three saved teams (pref.squads, the active one in pref.team); pref.squad is
@@ -1478,8 +1493,9 @@ function stepWithFx(bt) {
   const b = bt.b, now = performance.now();
   const ub = new Map(b.units.map(u => [u.id, { hp: u.hp, cd: u.cd, x: u.x, y: u.y, u }]));
   const eb = new Map(b.enemies.map(e => [e.id, { hp: e.hp, cd: e.cd, x: e.x, y: e.y, e, seg: e.seg, path: e.path }]));
-  const leaks = b.leaks;
+  const leaks = b.leaks, seen = new Set(b.enemies.map(e => e.id));
   T.step(b);
+  for (const e of b.enemies) if (!seen.has(e.id) && (e.flying || e.explodes || e.armored)) foeTips(e);
   const ua = new Map(b.units.map(u => [u.id, u])), ea = new Map(b.enemies.map(e => [e.id, e]));
   const pos = o => feetOf(bt, o);
   // Who attacked this tick: a cooldown that went up.
@@ -1879,6 +1895,7 @@ function showResult() {
   box.replaceChildren(...lines);
 }
 function leaveBattle() {
+  if (tutor && tutor.id.startsWith("battle-") || tutor && tutor.id.startsWith("foe-")) tutorEnd(false);
   battle = null;
   $("#scr-battle").hidden = true; $("#battle-result").hidden = true; $("#msg").hidden = false; $("#tabs").classList.remove("locked");
   $("#frame").classList.remove("battling");
@@ -1887,14 +1904,14 @@ function leaveBattle() {
 function battleKey(e) {
   const bt = battle, b = bt.b, k = e.key;
   if (bt.talk.length) {
-    if (k === "Enter" || k === " ") { e.preventDefault(); bt.talk.shift(); battleTalk(); if (!bt.talk.length) { if (bt.done) showResult(); else bt.paused = false; } }
+    if (k === "Enter" || k === " ") { e.preventDefault(); bt.talk.shift(); battleTalk(); if (!bt.talk.length) { if (bt.done) showResult(); else { bt.paused = false; battleTips(); } } }
     return;
   }
   if (bt.done) { if (k === "Enter" || k === " ") { e.preventDefault(); leaveBattle(); } return; }
   if (k === " ") { e.preventDefault(); bt.paused = !bt.paused; return; }
   const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
   if (move) { e.preventDefault(); bt.cur = [Math.max(0, Math.min(T.W - 1, bt.cur[0] + move[0])), Math.max(0, Math.min(T.H - 1, bt.cur[1] + move[1]))]; bt.selected = b.units.find(o => o.x === bt.cur[0] && o.y === bt.cur[1]) ? bt.selected : null; return; }
-  if (/^[1-8]$/.test(k)) { e.preventDefault(); if (b.squad[Number(k) - 1]) bt.slot = Number(k) - 1; bt.selected = null; return; }
+  if (/^[1-8]$/.test(k)) { e.preventDefault(); if (b.squad[Number(k) - 1]) { bt.slot = Number(k) - 1; bt.cardTouched = true; } bt.selected = null; return; }
   if (k === "Enter") { e.preventDefault(); tileAction(bt.cur[0], bt.cur[1]); return; }
   if (k === "Backspace") { e.preventDefault(); bt.selected = null; }
 }
@@ -1956,6 +1973,8 @@ function starterEnter() {
   // A squad of the four, the blocker first, for the first stage.
   if (r.ok) { pref.squad = [...G.starterGifts, num]; keep(); }
   go(T ? "story" : "pull");
+  // Right after the pick: the loop, in a few boxes.
+  if (r.ok) setTimeout(() => tip("loop", TIPS.loop()), 0);
   if (r.ok) say(name(num) + " joins you, with " + giftNames() + "." + (T ? " Play 1-1 here." : "") + " Your first " + (G.freeHatches || 10) + " eggs hatch at once.");
 }
 function starterKey(e) {
@@ -1964,6 +1983,181 @@ function starterKey(e) {
   if (step) { e.preventDefault(); p.at = Math.max(0, Math.min(n - 1, p.at + step)); p.sure = false; return starterUpdate(); }
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); return starterEnter(); }
   if (e.key === "Backspace" && p.sure) { e.preventDefault(); p.sure = false; starterUpdate(); }
+}
+
+
+/* ── Tutorial: short, skippable, each tip once ─────────────────────────────
+   A tip is a list of steps. Each step frames one thing (at: a box in screen
+   pixels, or nothing), says what it is in the tutorial's message box, and
+   either waits for Enter or for the player to do it (done: a check run every
+   120ms). Steps marked run let a paused battle play on until done. Seen tips
+   are kept per device under bored.poke-gacha.tips; "Skip tutorial" (or X; Esc
+   belongs to the arcade, which closes the game) turns them all off, and the "?" in the tab bar replays the current screen's. */
+const TIPS_KEY = "bored.poke-gacha.tips";
+const tipsSeen = (() => { try { return JSON.parse(localStorage.getItem(TIPS_KEY) || "null") || {}; } catch { return {}; } })();
+const saveTips = () => { try { localStorage.setItem(TIPS_KEY, JSON.stringify(tipsSeen)); } catch {} };
+let tutor = null;
+const tutorQueue = [];
+const boxOf = sel => { const n = typeof sel === "string" ? $(sel) : sel; if (!n || n.hidden || !n.offsetParent && n !== $("#tabs")) return null; const b = n.getBoundingClientRect(); return b.width ? { l: b.left, t: b.top, r: b.right, b: b.bottom } : null; };
+const tabBox = id => boxOf(`#tabs [data-tab="${id}"]`);
+// A battle tile's box on screen (its raised top on high ground).
+function tileBox(x, y) {
+  const f = $("#field").getBoundingClientRect(), k = f.width / 640, r = tileRect(battle.stage, x, y);
+  return { l: f.left + r.x * k, t: f.top + r.y * k, r: f.left + (r.x + TW) * k, b: f.top + (r.y + TH + (r.high ? RAISE : 0)) * k };
+}
+function tip(id, steps, { force = false, after = null } = {}) {
+  if (!G) return false;
+  if (!force && (tipsSeen._skip || tipsSeen[id])) return false;
+  if (tutor) { if (tutor.id !== id && !tutorQueue.some(q => q[0] === id)) tutorQueue.push([id, steps, { force, after }]); return true; }
+  const list = steps.filter(st => !st.when || st.when());
+  if (!list.length) return false;
+  tutor = { id, steps: list, i: -1, after, poll: setInterval(tutorPoll, 120) };
+  tutorNext();
+  return true;
+}
+function tutorStep() { return tutor && tutor.steps[tutor.i]; }
+function tutorNext() {
+  if (!tutor) return;
+  tutor.i++;
+  const st = tutorStep();
+  if (!st) return tutorEnd(true);
+  if (st.enter_) st.enter_();
+  if (battle && !battle.done) battle.paused = !st.run;
+  tutorDraw();
+}
+function tutorDraw() {
+  const st = tutorStep(); if (!st) return;
+  const f = $("#frame").getBoundingClientRect(), k = f.width / 640;
+  const box = st.at ? st.at() : null, hole = $("#tutor-hole");
+  $("#tutor").hidden = false;
+  $("#sky").classList.add("dim");
+  if (box) {
+    Object.assign(hole.style, { left: (box.l - f.left) / k + "px", top: (box.t - f.top) / k + "px", width: (box.r - box.l) / k + "px", height: (box.b - box.t) / k + "px" });
+    hole.className = "";
+  } else { Object.assign(hole.style, { left: "320px", top: "192px", width: "0", height: "0" }); hole.className = "none"; }
+  const tb = $("#tutor-box"), low = box && (box.b - f.top) / k > 250;
+  Object.assign(tb.style, low ? { top: (battle ? 40 : 44) + "px", bottom: "auto" } : { top: "auto", bottom: "8px" });
+  const foot = el("div", "foot");
+  foot.append(el("span", "", st.done ? (st.run ? "Watch…" : "Do it to continue") : "Enter: next"), (() => { const sk = el("span", "skip", "Skip tutorial (X)"); sk.dataset.skip = 1; return sk; })());
+  tb.replaceChildren(el("div", "", typeof st.text === "function" ? st.text() : st.text), foot);
+}
+function tutorPoll() {
+  const st = tutorStep();
+  if (!st) return;
+  if (st.done && st.done()) return tutorNext();
+  tutorDraw();
+}
+function tutorEnd(seen) {
+  if (!tutor) return;
+  clearInterval(tutor.poll);
+  if (seen) { tipsSeen[tutor.id] = true; saveTips(); }
+  const after = tutor.after;
+  tutor = null;
+  $("#tutor").hidden = true;
+  $("#sky").classList.remove("dim");
+  if (battle && !battle.done && !battle.talk.length) battle.paused = false;
+  if (after) after();
+  const next = tutorQueue.shift();
+  if (next) tip(...next);
+}
+function tutorSkipAll() {
+  tipsSeen._skip = true; saveTips();
+  tutorQueue.length = 0;
+  tutorEnd(false);
+}
+// Keys while a tip is up: Enter moves on a read-only step, X skips the tutorial.
+// On a do-it step every other key goes through to the game.
+function tutorKey(e) {
+  const st = tutorStep();
+  if (!st) return false;
+  if (e.key === "x" || e.key === "X") { e.preventDefault(); tutorSkipAll(); return true; }
+  if (!st.done) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tutorNext(); } else e.preventDefault(); return true; }
+  return false;
+}
+// What each screen says on its first visit.
+const TIPS = {
+  loop: () => [
+    { at: () => boxOf("#tabs"), text: "Welcome! The loop: play Poké Idle, Pokédoku and these Story battles to earn coins, vouchers and waves." },
+    { at: () => tabBox("pull"), text: "Spend vouchers on Pull for eggs. Eggs hatch as you earn waves anywhere in Bored." },
+    { at: () => boxOf("#story-list-panel"), text: "New mons join your squad. Build one that beats Team Rocket here, starting with 1-1." }
+  ],
+  pull: () => [
+    { at: () => boxOf("#hit-machine"), text: "Three machines: Move UP doubles the rare-skill chance, Legendary UP adds today's banner legendary, Shiny UP makes shinies twice as likely and can roll SP skins." },
+    { at: () => boxOf("#counts"), text: "Your vouchers: Regular is 1 egg, Plus 5, Premium 10 with a Rare or better, Gold 25 with an Epic or better." },
+    { at: () => boxOf("#menu"), text: "Pity: if 9 eggs in a row have no Rare, the 10th is one; Epic comes by the 60th, Legendary by the 413th." }
+  ],
+  eggs: () => [{ at: () => boxOf("#eggs-tray"), text: "Eggs hatch on waves: Poké Idle catches, Pokédoku boards and battle waves all count. Your first 10 eggs hatch at once." }],
+  dex: () => [
+    { at: () => boxOf("#dex-list"), text: "Every line an egg can hatch. F, T and S filter and sort." },
+    { at: () => boxOf("#dex-detail"), text: "Candy from hatches evolves a line, unlocks its passive and cuts its deploy cost. Set a buddy to show it on the leaderboard." }
+  ],
+  squad: () => [
+    { at: () => boxOf("#squad-roster"), text: "Classes: Vanguard is cheap and gives energy, Guard hits in melee, Blocker holds 3, Sniper shoots flyers, Caster hits an area, Medic heals." },
+    { at: () => boxOf("#squad-stage"), text: "These are the foes' types and traits. Pick counters: types that beat them, and snipers for flyers." }
+  ],
+  quests: () => [{ at: () => boxOf("#scr-quests .left-panel"), text: "Daily missions reset at midnight (Detroit time), weekly ones on Monday. Rewards are paid when you finish them." }],
+  shop: () => [{ at: () => boxOf("#scr-shop .left-panel"), text: "Coins buy Regular vouchers here; shards from duplicate hatches buy SP skins." }]
+};
+function screenTips(id) {
+  if (!G || battle || picking) return;
+  if (id === "story" && storyMode === "squad") return tip("squad", TIPS.squad());
+  if (TIPS[id]) tip(id, TIPS[id]());
+}
+// The "?" in the tab bar: this screen's tips again.
+function replayTips() {
+  if (tutor) return;
+  const id = tab === "story" ? (storyMode === "squad" ? "squad" : "loop") : tab;
+  if (TIPS[id]) tip(id, TIPS[id](), { force: true });
+}
+// The guided first battle, then one new idea per stage, and a card for each new kind of foe.
+function battleTips() {
+  const bt = battle; if (!bt || bt.weekly) return;
+  const b = bt.b, st = bt.stage, sq_ = b.squad;
+  const gi = Math.max(sq_.findIndex(u => u.cls === "blocker"), sq_.findIndex(u => u.ground));
+  const si = sq_.findIndex(u => u.cls === "sniper") >= 0 ? sq_.findIndex(u => u.cls === "sniper") : sq_.findIndex(u => !u.ground);
+  const cardBox = i => boxOf(`#deploy [data-slot="${i}"]`);
+  const path = T.pathsOf(st)[0];
+  const pathTile = path.filter(([x, y]) => st.map[y][x] === ".")[2] || path[1];
+  const high = []; st.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === "H") high.push([x, y]); }));
+  high.sort((a, c) => Math.hypot(a[0] - pathTile[0], a[1] - pathTile[1]) - Math.hypot(c[0] - pathTile[0], c[1] - pathTile[1]));
+  const unitOn = i => b.units.find(o => o.slot === i);
+  // A guided placement waits while the battle is paused, so it tops energy up to that card's cost.
+  const afford = i => { b.energy = Math.max(b.energy, sq_[i].cost + (b.mods && b.mods.has && b.mods.has("cost") ? 3 : 0)); };
+  if (st.id === "1-1" && gi >= 0) {
+    const steps = [
+      { at: () => cardBox(gi), enter_: () => { bt.cardTouched = false; }, done: () => bt.slot === gi && bt.cardTouched,
+        text: () => "Your squad's cards. Pick " + name(sq_[gi].num) + ", a " + T.classes[sq_[gi].cls].name + ": tap its card or press " + (gi + 1) + "." },
+      { at: () => tileBox(...pathTile), enter_: () => afford(gi), done: () => !!unitOn(gi), text: "Now tap this path tile. Melee units stand on the path; gold marks show where a card can go." },
+      { at: () => boxOf("#deploy-info"), text: "Each deploy costs energy, and energy refills by 1 a second. Cards dim when you can't afford them." },
+      { at: () => unitOn(gi) && tileBox(unitOn(gi).x, unitOn(gi).y), run: true, done: () => b.enemies.some(e => e.blockedBy), text: "Blockers stop enemies that walk into them. Watch…" }
+    ];
+    if (si >= 0 && high.length) steps.push(
+      { at: () => cardBox(si), enter_: () => { bt.cardTouched = false; }, done: () => bt.slot === si && bt.cardTouched,
+        text: () => name(sq_[si].num) + " is a " + T.classes[sq_[si].cls].name + ": it fights from high ground" + (sq_[si].cls === "sniper" ? ", and only snipers hit flyers" : "") + ". Pick it." },
+      { at: () => tileBox(...high[0]), enter_: () => afford(si), done: () => !!unitOn(si), text: "Tap this raised tile to place it." },
+      { at: () => { const u = b.units.find(o => o.sp >= o.spMax) || unitOn(si); return u && tileBox(u.x, u.y); }, run: true, done: () => b.units.some(o => o.sp >= o.spMax),
+        text: "The gold bar under its health is its skill charging…" },
+      { at: () => { const u = b.units.find(o => o.sp >= o.spMax); return u && tileBox(u.x, u.y); },
+        text: "Ready! The bolt means a skill is ready; it fires by itself when a foe is in range. Space pauses; tap a unit twice to retreat it." });
+    return tip("battle-1-1", steps);
+  }
+  const ideas = {
+    "1-2": [{ at: () => { const m = sq_.findIndex(u => u.cls === "medic"); return m >= 0 ? cardBox(m) : boxOf("#deploy"); }, text: "Medics heal units in range. Put one on high ground behind your blocker." }],
+    "1-3": [{ at: () => mapBox(), text: "Type matchups: yellow numbers are super effective, gray ones resisted. Bring types that beat these foes." }],
+    "1-4": [{ at: () => boxOf("#deploy"), text: "Tap a unit twice to retreat it: you get half its cost back, and its card cools down for 18s before it can go back out." }],
+    "1-5": [{ at: () => boxOf("#deploy-info"), text: "Energy limits how many you can field at once, so place your cheapest units first and build up." }]
+  };
+  if (ideas[st.id]) tip("battle-" + st.id, ideas[st.id]);
+}
+const FOE_TIPS = {
+  flying: "Flying foes cross straight to your base over everything. Only Snipers can hit them.",
+  explodes: "An exploder lights a fuse when it is blocked, then blows up everyone nearby. Kill it before the fuse runs out.",
+  armored: "Armored foes shrug off physical hits. Casters go straight through armor."
+};
+// The first time each kind of foe shows up: a card on it.
+function foeTips(e) {
+  for (const kind of ["flying", "explodes", "armored"]) if (e[kind] && FOE_TIPS[kind])
+    tip("foe-" + kind, [{ at: () => { const [x, y] = enemySpot(battle, e); return tileBox(Math.round(x), Math.round(y)); }, text: name(e.num) + ": " + FOE_TIPS[kind] }]);
 }
 
 /* ── Frame, tabs and switching screens ─────────────────────────────────── */
@@ -1985,7 +2179,8 @@ function refreshTop() {
   const purse = el("div", "panel purse");
   purse.append(el("span", "num", S.balance.coins), coin(), el("span", "num", S.balance.shards), shardIcon());
   purse.title = "Coins and shards";
-  $("#tabs").append(purse);
+  const help = el("div", "panel help", "?"); help.title = "Tips for this screen"; help.dataset.help = 1;
+  $("#tabs").append(help, purse);
 }
 function go(id) {
   if (!SCREENS[id] || hatching || battle || picking || !shownTabs().some(([shown]) => shown === id)) return;
@@ -1997,6 +2192,7 @@ function go(id) {
   refreshTop();
   SCREENS[id][0]();
   $("#wrap").focus({ preventScroll: true });
+  setTimeout(() => screenTips(id), 0);
 }
 // The biggest scale that fits the window, in quarter steps (1, 1.25, 1.5 ... 2,
 // 2.25 ...), rendered pixelated, so a 1900x800 or larger embed fills its height
@@ -2030,13 +2226,14 @@ if (!G) {
   $("#msg").hidden = true; $("#off").hidden = false;
 } else {
   document.addEventListener("keydown", e => {
+    if (tutor && tutorKey(e)) return;
     if (battle) return battleKey(e);
     if (picking) return starterKey(e);
     if (/^[1-9]$/.test(e.key) && !hatching && shownTabs()[Number(e.key) - 1]) { e.preventDefault(); return go(shownTabs()[Number(e.key) - 1][0]); }
     if (hatching) return hatchKey(e);
     SCREENS[tab][1](e);
   });
-  $("#tabs").onclick = e => { const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
+  $("#tabs").onclick = e => { if (e.target.closest("[data-help]")) return replayTips(); const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
   const fieldPoint = e => { const box = $("#field").getBoundingClientRect(), k = box.width / 640; return tileFromPoint((e.clientX - box.left) / k, (e.clientY - box.top) / k); };
   $("#field").onclick = e => {
     if (!battle || battle.talk.length || battle.done) return;
@@ -2046,7 +2243,8 @@ if (!G) {
   $("#field").onmousemove = e => { if (battle) battle.hover = fieldPoint(e); };
   $("#field").onmouseleave = () => { if (battle) battle.hover = null; };
   $("#battle-pause").onclick = () => { if (battle && !battle.done && !battle.talk.length) battle.paused = !battle.paused; };
-  $("#deploy").onclick = e => { const c = e.target.closest("[data-slot]"); if (c && battle) { battle.slot = Number(c.dataset.slot); battle.selected = null; } };
+  $("#deploy").onclick = e => { const c = e.target.closest("[data-slot]"); if (c && battle) { battle.slot = Number(c.dataset.slot); battle.selected = null; battle.cardTouched = true; } };
+  $("#tutor-box").onclick = e => { if (e.target.closest("[data-skip]")) tutorSkipAll(); else if (tutorStep() && !tutorStep().done) tutorNext(); };
   $("#battle-talk").onclick = () => battle && battleKey({ key: "Enter", preventDefault() {} });
   $("#battle-result").onclick = () => battle && battle.done && !battle.talk.length && leaveBattle();
   $("#menu").onmousemove = e => { const r = e.target.closest("[data-row]"); if (r && Number(r.dataset.row) !== cursor && !message) { cursor = Number(r.dataset.row); updateScene(); } };
