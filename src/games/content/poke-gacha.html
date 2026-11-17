@@ -5,22 +5,25 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Poké Gacha</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+10&display=swap">
 <style>
 /* Poké Gacha screens. One fixed internal resolution (640×384: a 40px tab bar
    and a 640×344 stage), scaled by a whole number. 384 high so 2x (1280×768)
    fits the ~790px game area of the Google Sites embed. Rules every screen keeps:
    - one panel style (.panel), one list style (.rows) with one ▶ cursor
    - spacing on a 4px grid, 8px margins and gaps everywhere
-   - body text in Bored's own mono stack, 16px weight 600, numbers right-aligned;
-     headers in Silkscreen at exactly 24px (3x its 8px pixel grid)
+   - one pixel font for all text, Jersey 10 (OFL, in the spirit of PokéRogue's
+     text, not a copy of it): body at 20px and headers at 30px, 2x and 3x its
+     10px grid so it stays sharp; Bored's mono stack is the fallback. Numbers
+     right-aligned
    - the eight colors below and nothing else; egg tiers are fixed colors
    - every sprite at 1x, centered in a 96px cell (the largest sprite is 96px) */
 :root {
   --ink: #1c1b2c; --panel: #2c2a44; --red: #c8372f; --paper: #f4f1ff;
   --dim: #807c9a; --gold: #e3ad2b; --teal: #3f9e8a; --sky: #8fd3e8;
-  --body: 16px; --title: 24px;
+  --body: 20px; --title: 30px;
   --mono: ui-monospace, "Cascadia Mono", Consolas, "Courier New", monospace;
+  --pixel: "Jersey 10", var(--mono);
 }
 * { margin: 0; padding: 0; box-sizing: border-box }
 /* The frame is scaled by the biggest whole number that fits and centered; the
@@ -31,16 +34,21 @@ body { background: var(--ink); overflow: hidden }
 #sky { position: fixed; left: 0; top: 0; transform-origin: 0 0 }
 #wrap { position: fixed; left: 0; top: 0; overflow: hidden; outline: none; touch-action: manipulation; user-select: none }
 #frame { position: absolute; left: 0; top: 0; width: 640px; height: 384px; transform-origin: 0 0;
-         font: 600 var(--body)/20px var(--mono); color: var(--paper);
+         font: 400 var(--body)/20px var(--pixel); color: var(--paper);
          font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0 }
 canvas, img { image-rendering: pixelated; display: block }
 #stage { position: absolute; left: 0; top: 40px; width: 640px; height: 344px; overflow: hidden }
 
 .panel { position: absolute; background: var(--panel); border: 2px solid var(--red); outline: 2px solid var(--ink); padding: 8px }
-.title { font: 400 var(--title)/32px Silkscreen, var(--mono); margin-bottom: 4px }
+.title { font: 400 var(--title)/32px var(--pixel); margin-bottom: 4px }
 .head { margin-bottom: 4px }
 .num { color: var(--gold) }
-.title .count { font: 600 var(--body)/32px var(--mono) }
+.title .count { font: 400 var(--body)/32px var(--pixel) }
+/* If the pixel font cannot load, the mono fallback goes back to its own sizes (it is wider). */
+#frame.no-pixel { --body: 16px; --title: 24px; font-weight: 600 }
+/* Menu rows in columns: how many vouchers, then the number of pulls right-aligned. */
+.rows .c1 { display: inline-block; width: 36px }
+.rows .c2 { display: inline-block; width: 22px; text-align: right; margin-right: 6px }
 .dim { color: var(--dim) }
 .gold { color: var(--gold) }
 /* Lists scroll by whole 24px rows and never stop on a half-cut one. */
@@ -268,7 +276,9 @@ function rows(container, list, at, onPick) {
     const r = el("div", (i === at ? "at " : "") + (row.off ? "off" : ""));
     r.dataset.row = i;
     if (row.icon) { const ico = el("span", "ico"); ico.append(row.icon); r.append(ico); }
-    r.append(el("span", "grow", row.label));
+    const label = el("span", "grow");
+    label.append(row.label);
+    r.append(label);
     if (row.right !== undefined && row.right !== "") {
       const right = el("span", "right");
       for (const part of [].concat(row.right)) right.append(typeof part === "object" ? part : el("span", typeof part === "number" ? "num" : "", String(part)));
@@ -287,8 +297,7 @@ function say(text, extra) {
   $("#msg").replaceChildren(col);
   $("#msg").classList.remove("with-eggs");
 }
-// Headers: the word in Silkscreen, any count beside it in the body font's number style
-// (Silkscreen's 0 and O look alike).
+// Headers: the word at header size, any count beside it at body size.
 function titled(node, word, count) { node.replaceChildren(word, ...(count === undefined ? [] : [" ", el("span", "num count", count)])); return node; }
 const HINT = "Arrows move · Enter picks · Backspace goes back · 1–5 switch screens.";
 // The scene canvas covers the window. VIEW is where the frame sits on it, in
@@ -445,10 +454,12 @@ function untilMidnight() {
   const two = n => String(n).padStart(2, "0");
   return two(Math.floor(left / 3600)) + ":" + two(Math.floor(left / 60) % 60) + ":" + two(left % 60);
 }
-// "x1   1 Pull" / "x10 10 Pulls": the count and the number of pulls in columns
-// (non-breaking spaces, so the row keeps them).
-const NB = "\u00a0";
-const menuLine = o => o.times.padEnd(4, NB) + (/^\d/.test(o.label) ? o.label.padStart(o.label.length + 2 - o.label.indexOf(" "), NB) : o.label);
+// "x1   1 Pull" / "x10 10 Pulls": the count, then the number of pulls right-aligned.
+function menuLine(o) {
+  const line = el("span"), [n, ...rest] = o.label.split(" "), counted = /^\d+$/.test(n);
+  line.append(el("span", "c1", o.times), counted ? el("span", "c2", n) : "", counted ? rest.join(" ") : o.label);
+  return line;
+}
 function haveFor(option) {
   if (option.buy) return S.balance.coins >= 100;
   if (option.cancel) return true;
@@ -872,6 +883,8 @@ function placeFrame() {
   if (S && tab === "pull" && !hatching) drawScene(); else drawBackdrop();
 }
 window.addEventListener("resize", placeFrame);
+try { document.fonts.load('20px "Jersey 10"').then(found => { if (!found.length) $("#frame").classList.add("no-pixel"); }, () => $("#frame").classList.add("no-pixel")); }
+catch { $("#frame").classList.add("no-pixel"); }
 placeFrame();
 // The eggs in the domes and in the hatching egg are drawn once their art arrives.
 machinesLoaded.then(() => { if (S && tab === "pull") drawScene(); });
