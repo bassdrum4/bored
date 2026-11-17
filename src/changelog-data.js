@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 569,
+  "count": 571,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,7 +10,9 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"9d5d8f5","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha Dex: hide uncaught names, silhouette detail with its egg, candy in words","pr":212},
+  {"sha":"4556969","date":"2026-11-17","author":"Claude","subject":"Hub: pay the Poké Idle daily boss, its weekday streak and the TD weekly mission"},
   {"sha":"fc547cb","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Idle: daily boss from the arcade's shared seed","pr":210},
+  {"sha":"fe92972","date":"2026-11-17","author":"Claude","subject":"Poké Idle: daily boss from the arcade's shared seed"},
   {"sha":"e053515","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: role-aware stage preview and loss hints, rates + pity, tab dots","pr":208},
   {"sha":"e4b4b93","date":"2026-11-17","author":"Claude","subject":"scripts/economy-sim.mjs: a normal player's month in coins and vouchers (report only)"},
   {"sha":"501f952","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: a short, skippable tutorial","pr":207},
