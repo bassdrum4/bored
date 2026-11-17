@@ -1,5 +1,5 @@
-// Poké Gacha tower defense: chapter 1 (Team Rocket grunts), the battle
-// simulation, and the TD rewards and missions.
+// Poké Gacha tower defense: chapter 1 (Team Rocket grunts), chapter 2 (Proton,
+// with flying enemies), the battle simulation, and the TD rewards and missions.
 //
 // The simulation is plain data stepped at a fixed rate, so it runs the same in
 // the page and in tests. Classes come from each species' stats; nothing is
@@ -9,7 +9,7 @@
 //                               stage, stars (0 = lost), team (species deployed), day
 //   td:first:<stage>          first clear: 50 coins + 2 Regular
 //   td:star3:<stage>          first 3-star: 100 coins + 1 Plus
-//   td:admin:<stage>          first clear of a Rocket admin boss: 1 Gold (none in chapter 1)
+//   td:admin:<stage>          first clear of a Rocket admin boss: 1 Gold (2-6 Proton)
 //   td:daily:<day>:<id>|all   daily missions
 //   td:week:<monday>:<id>|all weekly missions
 //   spend:<uuid> x = { lv }   a level bought with coins
@@ -50,7 +50,10 @@ export function classOf(num) {
 
 // Maps are 10×5 tiles: '#' no deploy, '.' ground (melee, and the path runs on
 // it), 'H' high ground (ranged), 'S' where enemies come in, 'G' the goal.
-// Waves: [seconds, species, count, gap between them]. Each line is one wave.
+// Waves: [seconds, species, count, gap between them, boss, flying]. Each line is
+// one wave. A boss has its HP times 4; flying enemies cross the map in a straight
+// line from their spawn to the goal, cannot be blocked, never attack, and only
+// snipers can hit them.
 export const CHAPTER = { id: 1, name: 'Team Rocket Grunts', boss: 'Grunt boss' };
 export const STAGES = [
   { id: '1-1', name: 'First patrol', lives: 3, level: 1, map: ['##H##H####', 'S........G', '##H##H####', '##########', '##########'],
@@ -84,7 +87,39 @@ export const STAGES = [
   { id: '1-8', name: 'Grunt boss', boss: true, lives: 3, level: 1.5, map: ['##H#H#H###', 'S........#', '#H#H.#H#.#', '#.......H#', '#G..H#####'],
     waves: [[3, 19, 6, 1.5], [16, 23, 5, 2], [30, 52, 5, 1.6], [42, 20, 1, 1, 6]],
     before: ['Grunt Boss: So you are the one beating my grunts.', 'Grunt Boss: Raticate, show them what Team Rocket can do!', 'The boss Raticate has four times the HP. Save your skills for it.'],
-    after: ['Grunt Boss: Impossible... This is not over. The admins will deal with you.', 'Chapter 1 cleared. More of Team Rocket is coming.'] }
+    after: ['Grunt Boss: Impossible... This is not over. The admins will deal with you.', 'Chapter 1 cleared. More of Team Rocket is coming.'] },
+
+  /* ── Chapter 2: Proton (poison, and bats that fly) ───────────────────── */
+  { id: '2-1', chapter: 2, name: 'Bat cave', lives: 3, level: 1.55, map: ['##H##H####', 'S........G', '##H##H##H#', '##########', '##########'],
+    waves: [[3, 19, 3, 3], [12, 41, 3, 3, 0, 1], [26, 41, 4, 2.5, 0, 1]],
+    before: ['Proton: Team Rocket\'s scariest admin is here. That would be me.', 'Zubat fly over the path: blockers cannot stop them. Only snipers can hit flying enemies.'],
+    after: ['Proton: Lucky. My bats were only warming up.'] },
+  { id: '2-2', chapter: 2, name: 'Sludge pipe', lives: 3, level: 1.6, map: ['S...H#####', '###.H#####', '#H#.....H#', '####H##..G', '##########'],
+    waves: [[3, 88, 3, 3.5], [14, 41, 4, 2.5, 0, 1], [28, 88, 4, 3], [40, 41, 5, 2, 0, 1]],
+    before: ['Grunt: Grimer, ooze all over them!', 'Flying enemies cut straight across the map. Put snipers near that line.'],
+    after: ['Grunt: Ugh. Now I have to clean the pipe.'] },
+  { id: '2-3', chapter: 2, name: 'Bug net', lives: 3, level: 1.65, map: ['##H##H##H#', 'S........#', '#H##H###.#', '#####H...G', '##########'],
+    waves: [[3, 48, 4, 2.5], [15, 21, 4, 2, 0, 1], [28, 48, 5, 2], [40, 21, 5, 1.8, 0, 1]],
+    before: ['Grunt: Venonat on the ground, Spearow in the air. Pick one!', 'Fire and Flying moves hit Bug hard. Rock and Electric hit Flying.'],
+    after: ['Grunt: You were supposed to pick one.'] },
+  { id: '2-4', chapter: 2, name: 'Two skies', lives: 3, level: 1.75, map: ['S....H####', '####.H##H#', '#H#H......', 'S.......#G', '####H#####'],
+    waves: [[3, 23, 3, 3], [10, 42, 3, 3, 0, 1], [22, 23, 5, 2], [34, 42, 4, 2.5, 0, 1]],
+    before: ['Proton: Two entrances, and Golbat over both.', 'Enemies come from two spawns, and each flies its own line.'],
+    after: ['Proton: Hmph. Fine. The fog will finish you.'] },
+  { id: '2-5', chapter: 2, name: 'Toxic fog', lives: 3, level: 1.85, map: ['##H#H#H###', 'S........#', '#H##H##H.#', '#G.......#', '####H#####'],
+    waves: [[3, 109, 4, 3], [14, 42, 4, 2.2, 0, 1], [26, 24, 4, 2.5], [38, 109, 5, 2], [46, 42, 5, 1.8, 0, 1]],
+    before: ['Grunt: Koffing! Arbok! Make it hard to breathe!', 'A long winding path gives your casters time. Keep snipers for the Golbat.'],
+    after: ['Grunt: Cough. Get the admin. Cough.'] },
+  { id: '2-6', chapter: 2, name: 'Proton', boss: true, admin: true, lives: 3, level: 1.95,
+    map: ['#H#H#H#H##', 'S........G', '#H#H#.#H.#', 'S.......H#', '####H#####'],
+    waves: [[3, 88, 3, 3], [14, 41, 4, 2.5, 0, 1], [26, 42, 4, 2, 0, 1], [36, 24, 4, 2.5], [48, 110, 1, 1, 1]],
+    before: ['Proton: You got this far? Then I will stop you myself.', 'Proton: Weezing, cover them in smog!', 'The boss Weezing has four times the HP. Bats come over both lanes before it.'],
+    after: ['Proton: How...? Petrel will not be so soft on you.', 'Chapter 2 cleared. Team Rocket\'s other admins are waiting.'] }
+];
+// Chapters in order, each with its stages. Stages unlock in the order of STAGES.
+export const CHAPTERS = [
+  { id: 1, name: 'Team Rocket Grunts', admin: 'Grunts', stages: STAGES.filter(s => (s.chapter || 1) === 1) },
+  { id: 2, name: 'Proton', admin: 'Proton', stages: STAGES.filter(s => s.chapter === 2) }
 ];
 export const stageById = id => STAGES.find(stage => stage.id === id) || null;
 export const W = 10, H = 5;
@@ -148,10 +183,10 @@ export function unitStats(num, { level = 1, passive = false, costCut = 0, skills
     skill: skillsOf(num)[skillAt], rare: skillAt === 3
   };
 }
-export function enemyStats(num, level, boss = false) {
+export function enemyStats(num, level, boss = false, flying = false) {
   const m = mon(num);
   return {
-    num, name: m.name, types: m.types, flying: false,
+    num, name: m.name, types: m.types, flying: !!flying,
     hp: Math.round((m.hp * 3 + 50) * level * (boss ? 4 : 1)),
     atk: Math.round(m.atk * 0.9 * level * (boss ? 1.5 : 1)),
     def: Math.round(m.def * 0.5 * level),
@@ -171,8 +206,8 @@ export const START_ENERGY = 10;
 export function newBattle(stage, squad) {
   const paths = pathsOf(stage);
   const queue = [];
-  stage.waves.forEach(([at, num, count, gap, boss], wave) => {
-    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss });
+  stage.waves.forEach(([at, num, count, gap, boss, flying], wave) => {
+    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying });
   });
   queue.sort((a, b) => a.at - b.at);
   return { stage, paths, squad: squad.slice(0, 8), t: 0, energy: START_ENERGY, life: stage.lives, queue, spawned: 0,
@@ -210,6 +245,8 @@ export function retreat(b, id) {
   return true;
 }
 const dist = (a, x, y) => Math.hypot(a.x - x, a.y - y);
+// Only snipers reach flying enemies.
+export const canHit = (u, e) => !e.flying || !!CLASSES[u.cls]?.air;
 function finishWaveFor(b, e) {
   b.waveLeft[e.wave]--;
   if (b.waveLeft[e.wave] === 0) b.wavesDone++;
@@ -220,7 +257,7 @@ function useSkill(b, u) {
   else if (u.cls === 'blocker') u.hp = Math.min(u.maxHp, u.hp + Math.round(u.maxHp * 0.4 * power));
   else if (u.cls === 'medic') { for (const a of b.units) if (dist(a, u.x, u.y) <= u.range) a.hp = Math.min(a.maxHp, a.hp + Math.round(u.atk * 1.5 * power)); }
   else {
-    const targets = b.enemies.filter(e => dist(e, u.x, u.y) <= u.range + 0.5);
+    const targets = b.enemies.filter(e => canHit(u, e) && dist(e, u.x, u.y) <= u.range + 0.5);
     const list = u.cls === 'caster' ? targets : targets.slice(0, u.cls === 'sniper' ? 3 : 1);
     for (const e of list) e.hp -= hit(u.atk, e.def, typeMultiplier(u.types[0], e.types)) * (u.cls === 'guard' ? 3 : 1.5) * power;
   }
@@ -235,8 +272,10 @@ export function step(b, dt = TICK) {
   // Spawns.
   while (b.queue.length && b.queue[0].at <= b.t) {
     const s = b.queue.shift();
-    const path = b.paths[s.path];
-    b.enemies.push({ ...enemyStats(s.num, b.stage.level, s.boss), id: b.nextId++, wave: s.wave, boss: s.boss, path, seg: 0,
+    const ground = b.paths[s.path];
+    // Flyers go straight from their spawn to the goal, over everything.
+    const path = s.flying ? [ground[0], ground[ground.length - 1]] : ground;
+    b.enemies.push({ ...enemyStats(s.num, b.stage.level, s.boss, s.flying), id: b.nextId++, wave: s.wave, boss: s.boss, path, seg: 0,
       x: path[0][0], y: path[0][1], cd: 0, blockedBy: null, maxHp: 0 });
     const e = b.enemies[b.enemies.length - 1];
     e.maxHp = e.hp;
@@ -247,7 +286,7 @@ export function step(b, dt = TICK) {
     if (e.blockedBy && !b.units.some(u => u.id === e.blockedBy)) e.blockedBy = null;
     if (e.blockedBy) continue;
     const tx = Math.round(e.x), ty = Math.round(e.y);
-    const blocker = b.units.find(u => u.ground && u.x === tx && u.y === ty && Math.abs(e.x - tx) + Math.abs(e.y - ty) < 0.35 &&
+    const blocker = !e.flying && b.units.find(u => u.ground && u.x === tx && u.y === ty && Math.abs(e.x - tx) + Math.abs(e.y - ty) < 0.35 &&
       b.enemies.filter(o => o.blockedBy === u.id).length < u.block);
     if (blocker) { e.blockedBy = blocker.id; continue; }
     let move = e.speed * dt;
@@ -263,7 +302,7 @@ export function step(b, dt = TICK) {
   for (const u of b.units) {
     u.sp = Math.min(u.spMax, u.sp + dt);
     if (u.sp >= u.spMax && (u.cls === 'vanguard' || u.cls === 'blocker' && u.hp < u.maxHp * 0.6 || u.cls === 'medic' && b.units.some(a => a.hp < a.maxHp) ||
-        b.enemies.some(e => dist(e, u.x, u.y) <= u.range))) { useSkill(b, u); u.sp = 0; }
+        b.enemies.some(e => canHit(u, e) && dist(e, u.x, u.y) <= u.range))) { useSkill(b, u); u.sp = 0; }
     u.cd -= dt;
     if (u.cd > 0) continue;
     if (u.cls === 'medic') {
@@ -271,11 +310,11 @@ export function step(b, dt = TICK) {
       if (hurt) { hurt.hp = Math.min(hurt.maxHp, hurt.hp + Math.round(u.atk * 0.9)); u.cd = u.interval; }
       continue;
     }
-    const inRange = b.enemies.filter(e => e.blockedBy === u.id || dist(e, u.x, u.y) <= u.range);
+    const inRange = b.enemies.filter(e => canHit(u, e) && (e.blockedBy === u.id || dist(e, u.x, u.y) <= u.range));
     if (!inRange.length) continue;
     // The enemy closest to the goal first, as in Arknights.
     const target = inRange.sort((a, c) => (c.seg + (c.blockedBy === u.id ? 99 : 0)) - (a.seg + (a.blockedBy === u.id ? 99 : 0)))[0];
-    const victims = u.cls === 'caster' ? b.enemies.filter(e => dist(e, target.x, target.y) <= CLASSES.caster.splash) : [target];
+    const victims = u.cls === 'caster' ? b.enemies.filter(e => canHit(u, e) && dist(e, target.x, target.y) <= CLASSES.caster.splash) : [target];
     for (const e of victims) e.hp -= hit(u.atk, e.def, typeMultiplier(u.types[0], e.types));
     u.cd = u.interval;
   }
@@ -332,9 +371,13 @@ export function mondayOf(date) {
   const dow = new Date(date + 'T00:00:00Z').getUTCDay();
   return shiftDay(date, -((dow + 6) % 7));
 }
-/** Today's 4 daily missions, the same for everyone. Admin stages only once a chapter has one. */
+// "Clear a Rocket admin stage" stays out of the draw for now: 2-6 is the only
+// admin stage, so on most days most players could not finish it, and it would
+// block the all-4 Plus. Turn it on when the owner decides.
+export const ADMIN_DAILY = false;
+/** Today's 4 daily missions, the same for everyone. */
 export function dailyMissions(date) {
-  const pool = DAILY_POOL.filter(m => m.id !== 'admin' || STAGES.some(s => s.admin));
+  const pool = DAILY_POOL.filter(m => m.id !== 'admin' || (ADMIN_DAILY && STAGES.some(s => s.admin)));
   let seed = seedNumber('td:' + date) || 1;
   const rand = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
   const list = pool.slice();
@@ -405,6 +448,7 @@ export function tdState(wallet, today = dailyDate()) {
   return {
     best, levels,
     unlocked: STAGES.map((s, i) => i === 0 || (best[STAGES[i - 1].id] || 0) > 0),
+    unlockedById: Object.fromEntries(STAGES.map((s, i) => [s.id, i === 0 || (best[STAGES[i - 1].id] || 0) > 0])),
     daily: dailyMissions(today).map(m => ({ ...m, done: !!e['td:daily:' + today + ':' + m.id] })),
     dailyAll: !!e['td:daily:' + today + ':all'],
     weekly: WEEKLY.map(m => ({ ...m, done: !!e['td:week:' + monday + ':' + m.id] })),
@@ -463,8 +507,9 @@ export function tdBridge({ onChange = () => {} } = {}) {
     return result;
   };
   return {
-    stages: STAGES, chapter: CHAPTER, classes: CLASSES, W, H, TICK, REDEPLOY, maxLevel: MAX_LEVEL, levelCost,
-    classOf, pathsOf, newBattle, step, deploy, retreat, canDeploy, starsFor, typeMultiplier,
+    // `stages` stays chapter 1 for pages that predate chapters; `chapters` and `allStages` have every chapter.
+    stages: CHAPTERS[0].stages, chapter: CHAPTER, chapters: CHAPTERS, allStages: STAGES, classes: CLASSES, W, H, TICK, REDEPLOY, maxLevel: MAX_LEVEL, levelCost,
+    classOf, pathsOf, newBattle, step, deploy, retreat, canDeploy, canHit, starsFor, typeMultiplier,
     state: () => tdState(readWallet()),
     squad: species => squadFrom(readWallet(), species),
     finish: act((w, o) => tdFinish(w, o)),
