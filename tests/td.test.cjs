@@ -246,3 +246,46 @@ test('levels cost coins and raise stats; the squad reads candy upgrades', () => 
   assert.ok(unit.atk > td.unitStats(num).atk);
   assert.deepEqual(td.squadFrom(w, [named('Mew')], TODAY), [], 'only owned species');
 });
+
+// Difficulty: the late stages want a type-matched squad. From the commons and rares
+// (3★ and 4★ lines), take the 60 whose first type hits the stage's enemies hardest
+// (or worst), build a squad with a class mix, and play it at level 3 with the same
+// placement a player would use (snipers first and beside the flight lines when bats fly).
+function squadFor(stage, rank) {
+  const mult = (atk, defend) => td.typeMultiplier(atk, defend);
+  const foes = stage.waves.map(w => gacha.mon(w[1]).types);
+  const fit = num => foes.reduce((s, types) => s + Math.log2(mult(gacha.mon(num).types[0], types)), 0) / foes.length;
+  const pool = dex.DEX.map((row, i) => [row, i + 1]).filter(([row]) => row[9] === 3 || row[9] === 4).map(([, num]) => num);
+  const ranked = pool.map(num => [num, rank * fit(num) + (gacha.mon(num).bst || 0) / 2000]).sort((a, b) => b[1] - a[1]).map(([num]) => num).slice(0, 60);
+  const by = cls => ranked.filter(num => td.classOf(num) === cls);
+  const flying = stage.waves.some(w => w[5]);
+  const core = [...by('blocker').slice(0, 1), ...by('guard').slice(0, 2), ...by('vanguard').slice(0, 1),
+    ...(flying ? by('sniper').slice(0, 2) : by('caster').slice(0, 2)), ...by('sniper').slice(0, 1), ...by('medic').slice(0, 1), ...by('caster').slice(0, 1)];
+  return [...new Set([...core, ...ranked])].slice(0, 8).map(num => td.unitStats(num, { level: 3 }));
+}
+function placed(stage, squad) {
+  const flying = stage.waves.some(w => w[5]);
+  const high = [];
+  stage.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H') high.push([x, y]); }));
+  if (flying) high.sort((a, b) => toFlightLines(stage, ...a) - toFlightLines(stage, ...b));
+  const ground = td.pathsOf(stage)[0].slice().reverse().filter(([x, y]) => stage.map[y][x] === '.');
+  const order = squad.map((u, slot) => slot).sort((a, b) => flying ? (squad[b].cls === 'sniper') - (squad[a].cls === 'sniper') : 0);
+  return order.map(slot => [slot, ...(squad[slot].ground ? ground.shift() || [0, 0] : high.shift() || [0, 0])]);
+}
+// Deploy in the plan's order, waiting for energy for the next one, as a player with a plan does.
+function playInOrder(stage, squad, plan) {
+  const b = td.newBattle(stage, squad);
+  for (let guard = 0; !b.over && guard < 20 * 450; guard++) {
+    for (const [slot, x, y] of plan) if (td.deploy(b, slot, x, y) === 'energy') break;
+    td.step(b);
+  }
+  return b;
+}
+test('late stages want type-matched squads: matched level-3 commons and rares win, the worst-typed lose', () => {
+  for (const id of ['1-8', '2-3', '2-4', '2-5', '2-6']) {
+    const stage = td.STAGES.find(s => s.id === id);
+    const good = squadFor(stage, 1), bad = squadFor(stage, -1);
+    assert.equal(playInOrder(stage, good, placed(stage, good)).over, 'win', id + ': a type-matched level-3 squad wins');
+    assert.equal(playInOrder(stage, bad, placed(stage, bad)).over, 'lose', id + ': the worst-typed level-3 squad loses');
+  }
+});
