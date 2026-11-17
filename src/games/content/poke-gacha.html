@@ -251,12 +251,12 @@ const SHADE = {
   red: ["#8f2621", C.red, "#f0857a"], teal: ["#256656", C.teal, "#7fcdb7"]
 };
 // A canvas of w×h art pixels, each ART internal pixels across.
-function pixelCanvas(w, h, draw) {
+function pixelCanvas(w, h, draw, scale = ART) {
   const c = document.createElement("canvas");
-  c.width = w * ART; c.height = h * ART;
-  c.style.width = w * ART + "px"; c.style.height = h * ART + "px";
+  c.width = w * scale; c.height = h * scale;
+  c.style.width = w * scale + "px"; c.style.height = h * scale + "px";
   const g = c.getContext("2d");
-  g.scale(ART, ART);
+  g.scale(scale, scale);
   draw(g);
   return c;
 }
@@ -300,22 +300,26 @@ const PIXEL_MAPS = {
  "candy": ["..kkkk..", ".k2211k.", "k22w110k", "k2w1w10k", "k21w110k", "k111100k", ".k1000k.", "..kkkk.."],
  "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
  "dot": ["kkkk", "k11k", "k11k", "kkkk"],
- "star": ["...k...", "..k1k..", "kkk1kkk", "k11111k", ".k111k.", "k1kkk1k", "kk...kk"],
+ "star": ["........k........", ".......k3k.......", ".......k3k.......", "......k321k......", "......k321k......", ".kkkkk32221kkkkk.", "k333332222211111k", ".k3222222222221k.", "..k32222222221k..", "...k322222221k...", "....k3222221k....", "....k3222221k....", "...k322222221k...", "...k3211k2221k...", "..k321kk.kk221k..", "..k31k.....k21k..", "...kk.......kk..."],
  "shield": ["kkkkk", "k121k", "k111k", "k111k", ".k1k.", "..k.."]
 };
 /* PIXEL_MAPS:END */
 // Draw a pixel map: '.' is transparent, every other char looks its color up in `pal`.
-function mapCanvas(key, pal) {
+function mapCanvas(key, pal, scale = ART) {
   const map = PIXEL_MAPS[key];
-  return pixelCanvas(map[0].length, map.length, g => map.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") { g.fillStyle = pal[row[x]]; g.fillRect(x, y, 1, 1); } }));
+  return pixelCanvas(map[0].length, map.length, g => map.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") { g.fillStyle = pal[row[x]]; g.fillRect(x, y, 1, 1); } }), scale);
 }
 const candyIcon = () => mapCanvas("candy", { k: C.ink, 0: SHADE.red[0], 1: C.red, 2: SHADE.red[2], w: C.paper });
 const check = done => done ? mapCanvas("check", { k: C.ink, 1: C.gold }) : mapCanvas("dot", { k: C.ink, 1: C.dim });
-// Stage stars: gold when earned, dim when not, three in a row.
+// Stage stars: the owner's 17x17 star at 1x, like the coin and the shard. Earned
+// stars keep its yellows (3 light, 2 base, 1 shade); the rest are the same star
+// in grays, ending on the page's dim. Three in a row.
+const STAR_GOLD = { k: C.ink, 3: "#faec91", 2: "#f6d923", 1: "#f7ad25" };
+const STAR_GRAY = { k: C.ink, 3: "#d6d4e0", 2: "#a9a6bb", 1: C.dim };
 function starIcons(n) {
   const row = document.createElement("span");
   row.className = "stars"; row.title = n + " of 3 stars";
-  for (let i = 0; i < 3; i++) row.append(mapCanvas("star", { k: C.ink, 1: i < n ? C.gold : C.dim }));
+  for (let i = 0; i < 3; i++) row.append(mapCanvas("star", i < n ? STAR_GOLD : STAR_GRAY, 1));
   return row;
 }
 
@@ -973,6 +977,15 @@ const explodersOf = stage => [...new Set(stage.waves.filter(w => w[6]).map(w => 
 // Armored enemies (wave field 7, chapter 4 on): physical hits barely scratch them; casters go through.
 const armoredOf = stage => [...new Set(stage.waves.filter(w => w[7]).map(w => w[1]))];
 let shieldIcon = null;
+// The weekly challenge (td.js): one story map for everyone each week, and risks
+// to stack for a higher score. It is one more page after the last chapter.
+const hasWeekly = () => !!(T && T.risks && T.riskOf && T.finishWeekly && T.state().challenge);
+const pages = () => chapters().length + (hasWeekly() ? 1 : 0);
+const onWeekly = () => hasWeekly() && chapterAt >= chapters().length;
+const riskPick = () => (Array.isArray(pref.risks) ? pref.risks : []).filter(id => T.risks.some(r => r.id === id));
+// The weekly page opens once the first stage is cleared.
+const weeklyOpen = td => (td.best[allStages()[0].id] || 0) > 0;
+const stageNow = () => onWeekly() ? T.state().challenge : stagesNow()[storyAt];
 const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
 const stageStars = starIcons;
 // The plain enemies: flyers, exploders and armored ones get their own lines.
@@ -983,6 +996,7 @@ function storyUpdate() {
   $("#story-list-panel").hidden = $("#story-info").hidden = storyMode !== "stages";
   $("#squad-list-panel").hidden = $("#squad-info").hidden = storyMode !== "squad";
   if (storyMode === "squad") return squadUpdate();
+  if (onWeekly()) return weeklyUpdate();
   const chapter = chapters()[Math.min(chapterAt, chapters().length - 1)], list = stagesNow();
   if (storyAt >= list.length) storyAt = list.length - 1;
   titled($("#story-title"), "CHAPTER", chapter.id + (chapters().length > 1 ? "/" + chapters().length : ""));
@@ -1003,11 +1017,43 @@ function storyUpdate() {
   if (best < 3) { const r3 = el("div", "dim"); r3.append("First 3★: ", el("span", "num", "100"), " coins + 1 Plus"); info.append(r3); }
   const more = (flyersOf(stage).length ? " Only snipers hit flyers." : "") + (explodersOf(stage).length ? " Kill exploders before the fuse." : "") +
     (armoredOf(stage).length ? " Casters go through armor." : "") +
-    (chapters().length > 1 ? " Left/Right: chapter." : "");
+    (pages() > 1 ? " Left/Right: chapter." : "");
   say((isOpen(td, stage) ? stage.before[0] + " Enter: choose your squad." : "Clear " + stageBefore(stage).id + " to unlock this stage.") + more);
+}
+function weeklyUpdate() {
+  const td = T.state(), stage = td.challenge, picked = riskPick(), risk = T.riskOf(picked);
+  const n = T.risks.length + 1;
+  if (storyAt >= n) storyAt = n - 1;
+  titled($("#story-title"), "WEEKLY", "risk " + risk);
+  const start = { label: "Start this week's run", right: weeklyOpen(td) ? "" : "locked", off: !weeklyOpen(td) };
+  rows($("#story-list"), [start, ...T.risks.map(r => ({ label: r.label, right: ["+" + r.risk, check(picked.includes(r.id))] }))], storyAt,
+    (i, click) => { storyAt = i; if (click) pickStage(); else storyUpdate(); });
+  const info = $("#story-info");
+  const lives = picked.includes("onelife") ? 1 : stage.lives;
+  info.replaceChildren(el("div", "title", "THIS WEEK"), el("div", "", stage.name), el("div", "dim", "Map " + stage.base + " · " + stage.waves.length + " waves · " + lives + (lives === 1 ? " life" : " lives")),
+    ...(enemiesOf(stage) ? [el("div", "dim", "Enemies: " + enemiesOf(stage))] : []));
+  if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ")));
+  if (explodersOf(stage).length) info.append(el("div", "gold", "Explodes: " + explodersOf(stage).map(name).join(", ")));
+  if (armoredOf(stage).length) info.append(el("div", "gold", "Armored: " + armoredOf(stage).map(name).join(", ")));
+  const score = el("div"); score.append("Risk ", el("span", "num", risk), " · best this week ", el("span", "num", td.challengeBest || 0));
+  info.append(score);
+  if (!weeklyOpen(td)) return say("Clear " + allStages()[0].id + " first: the weekly challenge opens after the first stage. Left/Right: chapter.");
+  if (storyAt === 0) return say("The same map for everyone this week. Win to score your risk total; your best win counts. Enter: choose your squad.");
+  const r = T.risks[storyAt - 1];
+  say((picked.includes(r.id) ? "On" : "Off") + ": " + r.label + " (+" + r.risk + " risk). Enter toggles it. Risks stack.");
 }
 function pickStage() {
   const td = T.state();
+  if (onWeekly()) {
+    if (storyAt > 0) {
+      const id = T.risks[storyAt - 1].id, picked = riskPick();
+      pref.risks = picked.includes(id) ? picked.filter(x => x !== id) : picked.concat(id); keep();
+      return storyUpdate();
+    }
+    if (!weeklyOpen(td)) return say("Clear " + allStages()[0].id + " first.");
+    if (!S.owned.length) return say("Hatch some eggs first: you need mons for your squad.");
+    storyMode = "squad"; squadAt = 0; return storyUpdate();
+  }
   const stage = stagesNow()[storyAt];
   if (!isOpen(td, stage)) return say("Clear " + stageBefore(stage).id + " first.");
   if (!S.owned.length) return say("Hatch some eggs first: you need mons for your squad.");
@@ -1029,8 +1075,10 @@ function squadUpdate() {
     (i, click) => { squadAt = i; if (click) squadPick_(i); else squadUpdate(); });
   const row = list[squadAt], info = $("#squad-info");
   if (row.start) {
-    info.replaceChildren(el("div", "title", stagesNow()[storyAt].id), el("div", "", stagesNow()[storyAt].name),
+    const stage = stageNow();
+    info.replaceChildren(el("div", "title", onWeekly() ? "WEEKLY" : stage.id), el("div", "", stage.name),
       el("div", "dim", pick.map(name).join(", ") || "Nobody picked yet."));
+    if (onWeekly()) { const r = el("div", "gold"); r.append("Risk ", el("span", "num", T.riskOf(riskPick()))); info.append(r); }
     say("Enter: start. Ground classes (Van, Grd, Blk) stand on the path; ranged ones (Snp, Cst, Med) on high ground.");
     return;
   }
@@ -1054,10 +1102,10 @@ function squadPick_(i) {
 function storyKey(e) {
   const k = e.key;
   if (storyMode === "stages") {
-    const n = stagesNow().length;
+    const n = onWeekly() ? T.risks.length + 1 : stagesNow().length;
     if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); storyAt = (storyAt + (k === "ArrowUp" ? -1 : 1) + n) % n; storyUpdate(); }
-    else if ((k === "ArrowLeft" || k === "ArrowRight") && chapters().length > 1) {
-      e.preventDefault(); chapterAt = (chapterAt + (k === "ArrowLeft" ? -1 : 1) + chapters().length) % chapters().length; storyAt = 0; storyUpdate();
+    else if ((k === "ArrowLeft" || k === "ArrowRight") && pages() > 1) {
+      e.preventDefault(); chapterAt = (chapterAt + (k === "ArrowLeft" ? -1 : 1) + pages()) % pages(); storyAt = 0; storyUpdate();
     }
     else if (k === "Enter" || k === " ") { e.preventDefault(); pickStage(); }
     else if (k === "Backspace") { e.preventDefault(); go("pull"); }
@@ -1083,8 +1131,8 @@ function spriteFor(num, look) {
 function startBattle() {
   if (matchMedia("(pointer: coarse)").matches && !matchMedia("(pointer: fine)").matches) return say("Battles are desktop only: they need a mouse or keyboard.");
   const squad = T.squad(squadPick());
-  const stage = stagesNow()[storyAt];
-  battle = { b: T.newBattle(stage, squad), stage, slot: 0, cur: [0, 0], paused: true, talk: stage.before.slice(), last: performance.now(), acc: 0, done: false, selected: null };
+  const stage = stageNow(), weekly = onWeekly(), mods = weekly ? riskPick() : [];
+  battle = { b: T.newBattle(stage, squad, mods), stage, weekly, mods, slot: 0, cur: [0, 0], paused: true, talk: stage.before.slice(), last: performance.now(), acc: 0, done: false, selected: null };
   const ground = T.pathsOf(stage)[0];
   battle.cur = ground[Math.floor(ground.length / 2)].slice();
   for (const u of squad) spriteFor(u.num, u.look);
@@ -1161,15 +1209,18 @@ function drawField() {
 function battleHud() {
   const bt = battle, b = bt.b;
   const hud = $("#battle-hud");
-  const parts = [["", bt.stage.id], ["Energy ", Math.floor(b.energy)], ["Lives ", b.life], ["Wave ", Math.min(b.stage.waves.length, b.wavesDone + 1) + "/" + b.stage.waves.length]];
+  const parts = [["", bt.weekly ? "Weekly" : bt.stage.id], ["Energy ", Math.floor(b.energy)], ["Lives ", b.life], ["Wave ", Math.min(b.stage.waves.length, b.wavesDone + 1) + "/" + b.stage.waves.length]];
+  if (bt.weekly) parts.push(["Risk ", T.riskOf(bt.mods)]);
   hud.replaceChildren(...parts.map(([label, value]) => { const s = el("span"); s.append(label, typeof value === "number" || /\d/.test(String(value)) && label ? el("span", "num", value) : value); return s; }),
     el("span", "dim right", bt.done ? "" : bt.paused ? "Paused: Space" : bt.selected ? "Enter retreats" : "Space pauses"));
   $("#deploy").replaceChildren(...b.squad.map((u, i) => {
     const on = b.units.find(o => o.slot === i), cool = Math.max(0, Math.ceil((b.cooldown[i] || 0) - b.t));
-    const card = el("div", "card" + (i === bt.slot ? " on" : "") + (on || cool || b.energy < u.cost ? " off" : ""));
+    // Weekly risks: deploys can cost 3 more, and medics can be banned.
+    const cost = u.cost + (b.mods && b.mods.has && b.mods.has("cost") ? 3 : 0), banned = !!(b.mods && b.mods.has && b.mods.has("nomedic") && u.cls === "medic");
+    const card = el("div", "card" + (i === bt.slot ? " on" : "") + (on || cool || banned || b.energy < cost ? " off" : ""));
     card.dataset.slot = i;
     const top = el("div", "", (i + 1) + " " + name(u.num).slice(0, 5));
-    const low = el("div"); low.append(CLASS_SHORT[u.cls] + " ", el("span", "num", on ? "out" : cool ? cool + "s" : u.cost));
+    const low = el("div"); low.append(CLASS_SHORT[u.cls] + " ", el("span", "num", banned ? "no" : on ? "out" : cool ? cool + "s" : cost));
     card.append(top, low);
     return card;
   }));
@@ -1178,12 +1229,16 @@ function endBattle() {
   const bt = battle, b = bt.b;
   bt.done = true;
   const stars = T.starsFor(b);
-  const before = S.balance;
-  const r = T.finish({ stage: bt.stage.id, stars, team: [...b.deployed], waves: b.wavesDone });
+  // A fresh balance, so only what this battle paid counts as gained.
+  const before = G.state().balance;
+  const best = bt.weekly ? T.state().challengeBest || 0 : 0;
+  const r = bt.weekly ? T.finishWeekly({ mods: bt.mods, stars, waves: b.wavesDone })
+    : T.finish({ stage: bt.stage.id, stars, team: [...b.deployed], waves: b.wavesDone });
   refreshTop();
-  const gained = ["coins", "regular", "plus", "gold"].map(k => [k, S.balance[k] - before[k]]).filter(([, n]) => n > 0);
+  // The weekly run pays hatch waves only; its score is the risk.
+  const gained = bt.weekly ? [] : ["coins", "regular", "plus", "gold"].map(k => [k, S.balance[k] - before[k]]).filter(([, n]) => n > 0);
   if (stars) bt.talk = bt.stage.after.slice();
-  bt.result = { stars, waves: r.waves || 0, gained };
+  bt.result = { stars, waves: r.waves || 0, gained, weekly: bt.weekly, risk: r.risk || 0, best };
   battleTalk();
   showResult();
 }
@@ -1197,7 +1252,12 @@ function showResult() {
   lines.push(waves);
   const NAMES = { coins: ["coin", "coins"], regular: ["Regular voucher", "Regular vouchers"], plus: ["Plus voucher", "Plus vouchers"], gold: ["Gold voucher", "Gold vouchers"] };
   for (const [k, n] of res.gained) { const d = el("div"); d.append("+", el("span", "num", n), " " + NAMES[k][n === 1 ? 0 : 1]); lines.push(d); }
-  lines.push(el("div", "dim", "Enter: back to the chapter"));
+  if (res.weekly) {
+    const d = el("div", res.stars && res.risk > res.best ? "gold" : "");
+    d.append("Risk ", el("span", "num", res.risk), res.stars ? (res.risk > res.best ? " · new best" : " · best " + res.best) : " · not scored");
+    lines.push(d);
+  }
+  lines.push(el("div", "dim", res.weekly ? "Enter: back to the challenge" : "Enter: back to the chapter"));
   box.replaceChildren(...lines);
 }
 function leaveBattle() {
