@@ -251,12 +251,12 @@ const SHADE = {
   red: ["#8f2621", C.red, "#f0857a"], teal: ["#256656", C.teal, "#7fcdb7"]
 };
 // A canvas of w×h art pixels, each ART internal pixels across.
-function pixelCanvas(w, h, draw) {
+function pixelCanvas(w, h, draw, scale = ART) {
   const c = document.createElement("canvas");
-  c.width = w * ART; c.height = h * ART;
-  c.style.width = w * ART + "px"; c.style.height = h * ART + "px";
+  c.width = w * scale; c.height = h * scale;
+  c.style.width = w * scale + "px"; c.style.height = h * scale + "px";
   const g = c.getContext("2d");
-  g.scale(ART, ART);
+  g.scale(scale, scale);
   draw(g);
   return c;
 }
@@ -300,22 +300,26 @@ const PIXEL_MAPS = {
  "candy": ["..kkkk..", ".k2211k.", "k22w110k", "k2w1w10k", "k21w110k", "k111100k", ".k1000k.", "..kkkk.."],
  "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
  "dot": ["kkkk", "k11k", "k11k", "kkkk"],
- "star": ["...k...", "..k1k..", "kkk1kkk", "k11111k", ".k111k.", "k1kkk1k", "kk...kk"],
+ "star": ["........k........", ".......k3k.......", ".......k3k.......", "......k321k......", "......k321k......", ".kkkkk32221kkkkk.", "k333332222211111k", ".k3222222222221k.", "..k32222222221k..", "...k322222221k...", "....k3222221k....", "....k3222221k....", "...k322222221k...", "...k3211k2221k...", "..k321kk.kk221k..", "..k31k.....k21k..", "...kk.......kk..."],
  "shield": ["kkkkk", "k121k", "k111k", "k111k", ".k1k.", "..k.."]
 };
 /* PIXEL_MAPS:END */
 // Draw a pixel map: '.' is transparent, every other char looks its color up in `pal`.
-function mapCanvas(key, pal) {
+function mapCanvas(key, pal, scale = ART) {
   const map = PIXEL_MAPS[key];
-  return pixelCanvas(map[0].length, map.length, g => map.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") { g.fillStyle = pal[row[x]]; g.fillRect(x, y, 1, 1); } }));
+  return pixelCanvas(map[0].length, map.length, g => map.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") { g.fillStyle = pal[row[x]]; g.fillRect(x, y, 1, 1); } }), scale);
 }
 const candyIcon = () => mapCanvas("candy", { k: C.ink, 0: SHADE.red[0], 1: C.red, 2: SHADE.red[2], w: C.paper });
 const check = done => done ? mapCanvas("check", { k: C.ink, 1: C.gold }) : mapCanvas("dot", { k: C.ink, 1: C.dim });
-// Stage stars: gold when earned, dim when not, three in a row.
+// Stage stars: the owner's 17x17 star at 1x, like the coin and the shard. Earned
+// stars keep its yellows (3 light, 2 base, 1 shade); the rest are the same star
+// in grays, ending on the page's dim. Three in a row.
+const STAR_GOLD = { k: C.ink, 3: "#faec91", 2: "#f6d923", 1: "#f7ad25" };
+const STAR_GRAY = { k: C.ink, 3: "#d6d4e0", 2: "#a9a6bb", 1: C.dim };
 function starIcons(n) {
   const row = document.createElement("span");
   row.className = "stars"; row.title = n + " of 3 stars";
-  for (let i = 0; i < 3; i++) row.append(mapCanvas("star", { k: C.ink, 1: i < n ? C.gold : C.dim }));
+  for (let i = 0; i < 3; i++) row.append(mapCanvas("star", i < n ? STAR_GOLD : STAR_GRAY, 1));
   return row;
 }
 
