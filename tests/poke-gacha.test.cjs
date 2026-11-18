@@ -911,6 +911,51 @@ test('weekly challenge: risks stack, the run uses them, and a win scores the ris
 });
 
 /* ── The hatch: the owner's egg-hatch frames ───────────────────────────── */
+test('multi-pull reveal: every egg on one board, in order; Epic and up framed and flashed; NEW on first tiers; Enter finishes then closes', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:reveal'] = { at: now - 50, g: { gold: 1, premium: 1, regular: 3 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    refreshTop(); go('pull');
+    // Watch for the flash classes while the eggs pop in.
+    window.__flashes = []; new MutationObserver(list => { for (const m of list) if (m.target.classList && /flash/.test(m.target.className)) __flashes.push(m.target.className); })
+      .observe(document.querySelector('#reveal'), { attributes: true, subtree: true, attributeFilter: ['class'] });
+  });
+  // A single Regular is not a reveal.
+  await game.evaluate(() => { menuOpen = true; const i = OPTIONS.findIndex(o => o.voucher === 'regular' && o.count === 1); cursor = i; choose(i); });
+  assert.equal(await game.evaluate(() => reveal), null, 'one egg is not a reveal');
+  assert.match(await game.$eval('#msg', n => n.textContent), /^1 egg/, 'and keeps its plain message');
+  // Gold: 25 eggs, at least one Epic.
+  const before = await game.evaluate(() => ({ gold: S.balance.gold, seen: [...new Set([...S.eggs, ...S.hatched].map(e => e.tier))] }));
+  await game.evaluate(() => { menuOpen = true; const i = OPTIONS.findIndex(o => o.voucher === 'gold'); cursor = i; choose(i); });
+  const early = await game.evaluate(() => ({ cells: reveal.cells.length, shown: reveal.shown, menu: !$('#menu').hidden }));
+  assert.deepEqual([early.cells, early.shown, early.menu], [25, 0, false], 'the board opens empty over the machine, menu hidden');
+  await pause(900);
+  const mid = await game.evaluate(() => reveal.shown);
+  assert.ok(mid > 0 && mid < 25, 'eggs pop in one after another (' + mid + ' so far)');
+  await game.waitForFunction(() => reveal && reveal.done, { timeout: 8000 });
+  const board = await game.evaluate(() => ({ tiers: reveal.list.map(x => x.tier), news: reveal.list.filter(x => x.isNew).map(x => x.tier),
+    framed: [...document.querySelectorAll('#reveal .egg.t2, #reveal .egg.t3, #reveal .egg.t4')].length, msg: $('#msg').textContent, flashes: __flashes.slice() }));
+  const epicUp = board.tiers.filter(x => x >= 2).length;
+  assert.ok(epicUp >= 1, 'a Gold pull has an Epic or better');
+  assert.equal(board.framed, epicUp, 'each Epic or better has its frame');
+  assert.ok(board.flashes.some(c => /flash/.test(c)), 'a flash played');
+  const firsts = [...new Set(board.tiers.filter(x => x < 4 && !before.seen.includes(x)))].sort();
+  assert.deepEqual(board.news.filter(x => x < 4).sort(), firsts, 'NEW on the first egg of each tier never pulled before');
+  assert.match(board.msg, /Common.*Enter: close\./);
+  // Enter closes it, and does not pull again.
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => reveal), null);
+  assert.equal(await game.evaluate(() => S.balance.gold), before.gold - 1, 'exactly one Gold spent');
+  // Premium: Enter while it plays shows everything at once, a second Enter closes, and a click works too.
+  await game.evaluate(() => { menuOpen = true; const i = OPTIONS.findIndex(o => o.voucher === 'premium'); cursor = i; choose(i); });
+  await key(tab, 'Enter');
+  assert.deepEqual(await game.evaluate(() => [reveal.done, reveal.shown]), [true, 10]);
+  await (await game.$('#reveal')).click();
+  assert.equal(await game.evaluate(() => reveal), null);
+  assert.deepEqual(errors, []);
+});
+
 test('hatching plays the cracking egg, the rays and the shell shards from the hatch sheet', async t => {
   const { tab, game, errors } = await openWithMons(t);
   // The sheet is inline, so it is there without a network.
