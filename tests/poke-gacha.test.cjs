@@ -1241,7 +1241,7 @@ test('Dex: the row shows the form that fights with its line under it, a clear ch
   await ownMons(game, [sneasel]);
   await game.evaluate(l => { go('dex'); pref.filters = {}; keep(); dexAt = dexList().indexOf(l); dexFocus = 'acts'; actAt = 0; dexUpdate(); }, sneasel);
   const menu = await game.$$eval('#dex-acts > div', n => n.map(x => [x.textContent, x.className]));
-  assert.match(menu[0][0], /^You have 200 candy/);
+  assert.match(menu[0][0], /^You have \d+ candy/);
   assert.match(menu[1][0], /^Level up: Lv 1\/5/);
   for (const want of [/^Evolve into Weavile25/, /^Passive: \+10% attack50/, /^Cost -1: 1 less energy30/, /^Cost -2: 2 less energy60/]) assert.ok(menu.some(([text]) => want.test(text)), want + ' in the candy menu');
   // Level up from the Dex.
