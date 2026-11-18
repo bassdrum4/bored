@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 609,
+  "count": 610,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c3b7db3","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battle readability (high units on their block, block pips, stop bars on held foes)","pr":248},
   {"sha":"de46ff9","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: one filter panel for the Dex, Squad and candy picker (type grid of two, class and tier chips, sort, name search, Clear)","pr":245},
   {"sha":"b1332c5","date":"2026-11-18","author":"Codebuff","subject":"Krillion: sort the daily dive against the population, and fix Puffer Party's turn lag"},
   {"sha":"d9ff1c4","date":"2026-11-18","author":"Vettel Xu","subject":"Hub: Poké Gacha stage levels from the balance pass; 1-6, 1-7 and 3-6 waves where type matters","pr":241},
