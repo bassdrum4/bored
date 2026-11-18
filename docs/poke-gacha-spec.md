@@ -184,12 +184,11 @@ PokéRogue's Manaphy egg is left out; its 1/256 goes to Common.
 
 ### Species pool
 
-The pool is mostly **base forms**. Players evolve them with candy.
+The pool is **base forms** of a 208-line roster (`ROSTER` in `scripts/gacha-dex.mjs`; the list and the reasoning are in `docs/poke-gacha-roster.md`). Players evolve them with candy. Cut lines don't hatch, and owned ones were refunded once.
 
-- 6★: legendaries and the base forms of pseudo-legendaries (Dratini, Larvitar, Beldum, Gible and so on)
-- 5★: starters and strong base forms (Eevee, Riolu and so on)
-- 4★ and 3★: split by base stat total
-- Mythicals: not decided yet
+- 6★: 30 legendaries, 7 mythicals (same rates and pity) and the base forms of the 10 pseudo-legendaries
+- 5★: the 27 starters, fossils, Eevee and Riolu
+- 4★ and 3★: split by the line's best final-form base stat total (4★ from 505)
 
 Sprites come from `src/games/content/pokedoku/sprites/` (ids 1 to 1025 are all present).
 
@@ -249,7 +248,7 @@ No code changes are needed. Taking a line out of the list hides that skin again 
   - Guard: physical melee
   - Caster: high Special Attack, area damage
   - Sniper: ranged physical; the only class that can hit flying enemies
-  - Medic: healers (Chansey, Blissey)
+  - Medic: healers (the Chansey line, Audino, Alomomola, Comfey)
   - Vanguard: cheap to deploy, gives energy back
 - Type matchups apply to all damage. Each mon has one active skill that charges over time,
   taken from its unlocked skills
