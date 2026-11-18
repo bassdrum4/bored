@@ -324,7 +324,10 @@ test('account UI and score sync still work through the redesigned hub (mock back
     }
     if (url.pathname === '/rest/v1/daily_leaderboard') return reply([]);
     if (url.pathname === '/rest/v1/buddy_board') return reply([]);
-    if (url.pathname === '/rest/v1/feedback_entries' && method === 'POST') { notes.push(JSON.parse(request.postData())); return reply(null); }
+    if (url.pathname === '/rest/v1/feedback_entries' && method === 'POST') {
+      notes.push({ ...JSON.parse(request.postData()), authorization: request.headers().authorization });
+      return reply(null);
+    }
     if (url.pathname === '/auth/v1/logout') return reply(null);
     unexpected.push(method + ' ' + url.pathname);
     return request.abort();
@@ -417,6 +420,10 @@ test('account UI and score sync still work through the redesigned hub (mock back
   assert.equal(notes[0].body, 'Snake ate my whole afternoon.');
   assert.equal(notes[0].email, 'tester@example.test', 'a signed-in sender gets a reply address filled in');
   assert.equal(notes[0].handle, 'tester');
+  // The insert policy only accepts a user_id the token owns, so a signed-in
+  // note has to travel with the player's session rather than the public key.
+  assert.equal(notes[0].authorization, 'Bearer mock-access', 'a signed-in note uses the player session');
+  assert.equal(notes[0].user_id, 'test-user', 'the note carries the account the token belongs to');
   await page.click('#account-action');
   await page.waitForFunction(() => document.querySelector('#account-state').textContent.includes('guest'));
   assert.equal(await page.evaluate(() => localStorage.getItem('bored.session')), null);

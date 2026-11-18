@@ -140,3 +140,53 @@ test('lowest completion time wins even when two writes race', async () => {
   assert.equal(remote.get('memory'), 20);
   assert.ok([...a.calls, ...b.calls].every(method => method === 'RPC'));
 });
+
+function feedbackHarness({ session = null, fresh = session, handle = '' } = {}) {
+  const sent = [];
+  const deps = {
+    request: async (path, options) => { sent.push({ path, options }); return null; },
+    ANON_TOKEN: 'publishable-key',
+    getSession: () => session,
+    getHandle: () => handle,
+    freshSession: async () => fresh,
+    location: { pathname: '/games/content/risk.html', search: '?from=library' },
+    navigator: { userAgent: 'test-agent' }
+  };
+  return { sent, api: load('src/hub/feedback.js', ['sendFeedback'], deps) };
+}
+
+// The insert policy accepts a user_id only when the request's own token owns
+// that account, so sending the publishable key with a player's id is refused.
+test('a signed-in note travels with the player token, never the public key', async () => {
+  const session = { access_token: 'session-token', user: { id: 'alpha' } };
+  const { api, sent } = feedbackHarness({ session, handle: 'alpha' });
+  await api.sendFeedback({ message: '  A real note.  ', email: ' alpha@example.test ' });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].options.token, 'session-token');
+  assert.equal(sent[0].options.body.user_id, 'alpha');
+  assert.equal(sent[0].options.body.body, 'A real note.');
+  assert.equal(sent[0].options.body.email, 'alpha@example.test');
+  assert.equal(sent[0].options.body.handle, 'alpha');
+  assert.equal(sent[0].options.prefer, 'return=minimal');
+});
+
+test('a guest note uses the publishable key and carries no account', async () => {
+  const { api, sent } = feedbackHarness();
+  await api.sendFeedback({ message: 'Guest note' });
+  assert.equal(sent[0].options.token, 'publishable-key');
+  assert.equal(sent[0].options.body.user_id, null);
+});
+
+test('a note is not written when the account changed under it', async () => {
+  const session = { access_token: 'session-token', user: { id: 'alpha' } };
+  const { api, sent } = feedbackHarness({ session, fresh: { access_token: 'other', user: { id: 'beta' } } });
+  await assert.rejects(api.sendFeedback({ message: 'Too late' }), /Sign in again/);
+  assert.equal(sent.length, 0);
+});
+
+test('short and over-long notes never reach the server', async () => {
+  const { api, sent } = feedbackHarness();
+  await assert.rejects(api.sendFeedback({ message: 'hi' }), /little more/);
+  await assert.rejects(api.sendFeedback({ message: 'x'.repeat(2001) }), /2000/);
+  assert.equal(sent.length, 0);
+});
