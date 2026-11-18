@@ -116,7 +116,23 @@ canvas, img { image-rendering: pixelated; display: block }
 #msg .klabels { display: inline-flex; vertical-align: middle; margin-left: 8px }
 #frame.no-pixel .klabel { font: 600 13px/18px Arial, Helvetica, sans-serif }
 #story-title .pager { float: right; display: flex; gap: 4px; margin-top: 6px }
-#dex-keys { margin-top: 2px }
+/* Filters: a bar at the top of each list (the summary, then Clear) and one panel for all three lists. */
+.fbar { display: flex; gap: 4px; align-items: center; height: 20px; margin-bottom: 4px; white-space: nowrap; min-width: 0 }
+.fbar .klabel:first-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100% }
+#filters { left: 8px; top: 8px; width: 624px; height: 264px; padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; z-index: 5 }
+#filters .frow { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; min-height: 20px }
+#filters .frow > .dim:first-child { width: 44px; flex: none }
+#filters .types { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px }
+#filters .types .klabel { text-align: center }
+#filters .head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px }
+#filters .head .title { margin: 0 }
+#filters .head .gold { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+#filters input { font: 400 var(--body)/18px var(--pixel); color: var(--paper); background: var(--ink); border: 1px solid var(--dim); padding: 0 4px; width: 200px; height: 20px; outline: none }
+#filters input:focus { border-color: var(--gold) }
+#filters .sorts { position: relative }
+#filters .sortlist { position: absolute; left: 0; bottom: 22px; display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--dim); padding: 2px }
+#frame.no-pixel #filters, #frame.no-pixel #filters input { font: 600 13px/18px Arial, Helvetica, sans-serif }
+#scr-shop.candy .left-panel .rows { height: 168px }
 #rates { left: 8px; top: 8px; width: 484px; height: 264px; padding: 6px 12px; cursor: pointer }
 /* A pull of 5 or more: every egg on one board, popping in in pull order. An Epic flashes
    red and a Legendary gold (the cell, then the frame, fading out); NEW marks a tier's
@@ -263,9 +279,7 @@ canvas, img { image-rendering: pixelated; display: block }
 #squad-slots { left: 8px; top: 8px; width: 406px; height: 64px; padding: 2px 4px; display: grid; grid-template-columns: repeat(8, 49px) }
 #squad-roster { left: 8px; top: 80px; width: 406px; height: 256px; padding: 4px 6px }
 /* Filters are labels like the team tabs: a 1px dim frame, gold when one is set. */
-#squad-filters { display: flex; gap: 4px; height: 20px; margin-bottom: 4px; white-space: nowrap }
-#squad-filters span { cursor: pointer; border: 1px solid var(--dim); padding: 0 4px; line-height: 18px }
-#squad-filters span.on { color: var(--gold); border-color: var(--gold) }
+#squad-filters { margin-bottom: 4px }
 /* 7 columns of 56x55 cells; four rows show and the grid scrolls by whole rows. */
 #squad-grid { display: grid; grid-template-columns: repeat(7, 54px); grid-auto-rows: 53px; gap: 2px; height: 218px; overflow-y: auto;
               scrollbar-width: thin; scrollbar-color: var(--red) var(--panel); scroll-snap-type: y mandatory }
@@ -378,7 +392,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel right-panel" id="story-info"></div>
         <div id="squad" hidden>
           <div class="panel" id="squad-slots"></div>
-          <div class="panel" id="squad-roster"><div id="squad-filters"></div><div id="squad-grid"></div></div>
+          <div class="panel" id="squad-roster"><div class="fbar" id="squad-filters"></div><div id="squad-grid"></div></div>
           <div class="panel" id="squad-stage"></div>
           <div class="panel" id="squad-detail"></div>
         </div>
@@ -404,6 +418,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="rates" hidden></div>
         <div class="panel" id="reveal" hidden></div>
       </section>
+      <div class="panel" id="filters" hidden></div>
       <section id="scr-eggs" class="screen" hidden>
         <div class="panel" id="egg-pic"></div>
         <div class="panel title" id="egg-name"></div>
@@ -413,11 +428,11 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="hatch" hidden></div>
       </section>
       <section id="scr-dex" class="screen" hidden>
-        <div class="panel" id="dex-list"><div class="title" id="dex-title">DEX</div><div class="rows scroll" id="dex-rows"></div><div class="klabels" id="dex-keys"></div></div>
+        <div class="panel" id="dex-list"><div class="title" id="dex-title">DEX</div><div class="fbar" id="dex-keys"></div><div class="rows scroll" id="dex-rows"></div></div>
         <div class="panel" id="dex-detail"><div class="cell" id="dex-pic"></div><div id="dex-info"></div><div id="dex-tabs"></div><div class="rows scroll" id="dex-acts"></div><div id="dex-depth" hidden></div></div>
       </section>
       <section id="scr-shop" class="screen" hidden>
-        <div class="panel left-panel"><div class="title" id="shop-title">SHOP</div><div class="rows scroll" id="shop-list"></div></div>
+        <div class="panel left-panel"><div class="title" id="shop-title">SHOP</div><div class="fbar" id="candy-bar" hidden></div><div class="rows scroll" id="shop-list"></div></div>
         <div class="panel right-panel" id="shop-preview"></div>
       </section>
       <section id="scr-quests" class="screen" hidden>
@@ -1263,29 +1278,146 @@ function endHatch() { hatching = null; $("#hatch").hidden = true; for (const id 
 const BASES = G ? G.dex.map((row, i) => row[9] > 0 ? i + 1 : 0).filter(Boolean) : [];
 let dexAt = 0, dexFocus = "list", actAt = 0;
 // Filters and sorting: F cycles what is shown, T cycles a type, S cycles the order. Kept per device.
-const DEX_FILTERS = ["All", "Owned", "Not owned", "3★", "4★", "5★", "6★"], DEX_SORTS = ["Number", "Name", "Tier"];
 const DEX_TYPES = [...new Set(BASES.flatMap(num => G.dex[num - 1][1].split("/")))].sort();
-const dexView = () => ({ filter: DEX_FILTERS.includes(pref.dexFilter) ? pref.dexFilter : "All",
-  type: DEX_TYPES.includes(pref.dexType) ? pref.dexType : "", sort: DEX_SORTS.includes(pref.dexSort) ? pref.dexSort : "Number" });
-function dexList(v = dexView()) {
-  const tier = num => G.dex[num - 1][9];
-  let list = BASES.filter(num => v.filter === "Owned" ? !!S.lines[num] : v.filter === "Not owned" ? !S.lines[num]
-    : /★/.test(v.filter) ? tier(num) === Number(v.filter[0]) : true);
-  // A type only finds caught lines: an uncaught line's type stays ??? like the rest of it.
-  if (v.type) list = list.filter(num => !!S.lines[num] && G.dex[num - 1][1].split("/").includes(v.type));
-  if (v.sort === "Name") list = list.slice().sort((a, b) => (!S.lines[a] - !S.lines[b]) || (S.lines[a] ? name(a).localeCompare(name(b)) : a - b));
-  if (v.sort === "Tier") list = list.slice().sort((a, b) => tier(b) - tier(a) || a - b);
+/* ── Filters, one model for the Dex, the Squad roster and the candy picker ─
+   Per list (pref.filters[ctx]): up to two types, a class, a tier, a name search, the
+   owned filter (Dex) or in-squad (Squad), and a sort. Types, class and name only find
+   caught lines: an uncaught line stays ??? like the rest of it. */
+const FILTER_SORTS = { dex: ["number", "name", "tier", "level", "recent"], candy: ["number", "name", "tier", "level", "recent"],
+  squad: ["level", "cost", "number", "name", "tier", "recent"] };
+const SORT_NAME = { number: "Number", name: "Name", tier: "Tier", level: "Level", recent: "Recent", cost: "Cost" };
+const TIER_CHIPS = [3, 4, 5, 6], OWN_CHIPS = [["", "All"], ["owned", "Owned"], ["missing", "Not owned"]];
+function filt(ctx) {
+  const v = (pref.filters && pref.filters[ctx]) || {}, sorts = FILTER_SORTS[ctx];
+  return { types: (Array.isArray(v.types) ? v.types : []).filter(t => DEX_TYPES.includes(t)).slice(0, 2),
+    cls: CLASS_ORDER.includes(v.cls) ? v.cls : "", tier: TIER_CHIPS.includes(v.tier) ? v.tier : 0,
+    q: typeof v.q === "string" ? v.q.slice(0, 20) : "", own: ctx === "dex" && ["owned", "missing"].includes(v.own) ? v.own : "",
+    mine: ctx === "squad" && !!v.mine, sort: sorts.includes(v.sort) ? v.sort : sorts[0] };
+}
+function setFilt(ctx, patch) {
+  pref.filters = pref.filters || {};
+  pref.filters[ctx] = { ...filt(ctx), ...patch };
+  keep(); filtChanged(ctx);
+}
+const clsName = cls => (T && T.classes[cls] ? T.classes[cls].name : cls);
+// "Fire/Flying · Caster · 4★ · "pika"", or "All" when nothing is set.
+function filtSummary(ctx) {
+  const v = filt(ctx), parts = [];
+  if (v.types.length) parts.push(v.types.join("/"));
+  if (v.cls) parts.push(clsName(v.cls));
+  if (v.tier) parts.push(v.tier + "★");
+  if (v.own) parts.push(v.own === "owned" ? "Owned" : "Not owned");
+  if (v.mine) parts.push("In squad");
+  if (v.q) parts.push("\u201c" + v.q + "\u201d");
+  return parts.join(" · ") || "All";
+}
+const filtActive = ctx => filtSummary(ctx) !== "All";
+const classOfLine = line => (T && T.classOf ? T.classOf(tipOf(line)) : "");
+const lineLevel = line => (T ? T.state().levels[line] || 1 : 1);
+function lineRecent() { const at = {}; (S.hatched || []).forEach((h, i) => { at[G.lineOf(h.species)] = i + 1; }); return at; }
+function dexList(ctx = "dex") {
+  const v = filt(ctx), tier = num => G.dex[num - 1][9], q = v.q.toLowerCase();
+  let list = BASES.filter(num => {
+    const l = S.lines[num];
+    if (v.own === "owned" && !l || v.own === "missing" && l) return false;
+    if (v.tier && tier(num) !== v.tier) return false;
+    if ((v.types.length || v.cls || q) && !l) return false;
+    if (v.types.length) { const t = G.dex[num - 1][1].split("/"); if (!v.types.every(x => t.includes(x))) return false; }
+    if (v.cls && classOfLine(num) !== v.cls) return false;
+    if (q && !lineForms(num).some(n => name(n).toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const caughtFirst = (a, b) => !S.lines[a] - !S.lines[b];
+  if (v.sort === "name") list = list.slice().sort((a, b) => caughtFirst(a, b) || (S.lines[a] ? name(tipOf(a)).localeCompare(name(tipOf(b))) : a - b));
+  if (v.sort === "tier") list = list.slice().sort((a, b) => tier(b) - tier(a) || a - b);
+  if (v.sort === "level") list = list.slice().sort((a, b) => caughtFirst(a, b) || lineLevel(b) - lineLevel(a) || a - b);
+  if (v.sort === "recent") { const at = lineRecent(); list = list.slice().sort((a, b) => (at[b] || 0) - (at[a] || 0) || a - b); }
   return list;
 }
-function cycleDex(what) {
-  const v = dexView();
-  if (what === "f") pref.dexFilter = DEX_FILTERS[(DEX_FILTERS.indexOf(v.filter) + 1) % DEX_FILTERS.length];
-  if (what === "t") pref.dexType = ["", ...DEX_TYPES][(["", ...DEX_TYPES].indexOf(v.type) + 1) % (DEX_TYPES.length + 1)];
-  if (what === "s") pref.dexSort = DEX_SORTS[(DEX_SORTS.indexOf(v.sort) + 1) % DEX_SORTS.length];
-  keep(); dexAt = 0; actAt = 0; dexFocus = "list"; dexUpdate();
-  if (dexList().length) say(dexViewText() + " " + dexList().length + " shown.");
+// The keys, for keyboard players: C class, T type, R tier, S sort, F owned (Dex) or tier (candy),
+// Q in squad (Squad), / opens the panel at the name box, Delete clears.
+function filtKey(ctx, k) {
+  const v = filt(ctx), next = (list, cur) => list[(list.indexOf(cur) + 1) % list.length];
+  if (k === "c") return setFilt(ctx, { cls: next(["", ...CLASS_ORDER], v.cls) });
+  if (k === "t") return setFilt(ctx, { types: [next(["", ...DEX_TYPES], v.types[0] || "")].filter(Boolean) });
+  if (k === "r" || k === "f" && ctx === "candy") return setFilt(ctx, { tier: next([0, ...TIER_CHIPS], v.tier) });
+  if (k === "f" && ctx === "dex") return setFilt(ctx, { own: next(OWN_CHIPS.map(o => o[0]), v.own) });
+  if (k === "q" && ctx === "squad") return setFilt(ctx, { mine: !v.mine });
+  if (k === "s") return setFilt(ctx, { sort: next(FILTER_SORTS[ctx], v.sort) });
+  if (k === "/") return openFilters(ctx, true);
+  if (k === "Delete") return setFilt(ctx, { types: [], cls: "", tier: 0, q: "", own: "", mine: false });
+  return false;
 }
-const dexViewText = () => { const v = dexView(); return "F: " + v.filter + " · T: " + (v.type ? v.type + " (caught)" : "any type") + " · S: " + v.sort + "."; };
+const FILTER_KEYS = { dex: /^[ctrsf\/]$|^Delete$/i, squad: /^[ctrqs\/]$|^Delete$/i, candy: /^[ctrsf\/]$|^Delete$/i };
+// The bar at the top of a list: the summary (opens the panel) and Clear.
+function filtBar(ctx) {
+  const open = keyLabel("/", "Filter: " + filtSummary(ctx) + " · " + SORT_NAME[filt(ctx).sort], filtActive(ctx));
+  delete open.dataset.press; open.dataset.fopen = ctx; open.title = "Filters and sort (key: /)";
+  const bar = [open];
+  if (filtActive(ctx)) { const c = keyLabel("Delete", "Clear"); bar.push(c); }
+  return bar;
+}
+// The panel: name, type grid (two at most), class and tier chips, owned or in-squad, sort.
+let filtOpen = null, sortOpen = false;
+function openFilters(ctx, search = false) {
+  filtOpen = ctx; sortOpen = false;
+  renderFilters();
+  if (search) setTimeout(() => { const i = $("#filters input"); if (i) i.focus(); }, 0);
+}
+function closeFilters() { filtOpen = null; sortOpen = false; $("#filters").hidden = true; $("#wrap").focus({ preventScroll: true }); }
+function chip(f, text, on) { const c = el("span", "klabel" + (on ? " on" : ""), text); c.dataset.f = f; return c; }
+function renderFilters() {
+  const ctx = filtOpen, box = $("#filters");
+  if (!ctx) { box.hidden = true; return; }
+  const v = filt(ctx);
+  const head = el("div", "head");
+  // How many the list shows now, so the effect is visible behind the panel.
+  const shown = ctx === "dex" ? dexList().length : ctx === "candy" ? candyLines().length : roster().list.length;
+  head.append(el("span", "title", "FILTERS"), el("span", "gold", filtSummary(ctx)), el("span", "dim", shown + " shown"), chip("clear", "Clear", false), chip("done", "Done", false));
+  const nameRow = el("div", "frow"), input = document.createElement("input");
+  input.type = "text"; input.value = v.q; input.placeholder = "a caught mon's name"; input.maxLength = 20; input.spellcheck = false;
+  input.oninput = () => { setFilt(ctx, { q: input.value }); };
+  input.onkeydown = e => { e.stopPropagation(); if (e.key === "Enter") { e.preventDefault(); closeFilters(); } };
+  nameRow.append(el("span", "dim", "Name"), input);
+  if (ctx === "dex") for (const [id, label] of OWN_CHIPS) nameRow.append(chip("own:" + id, label, v.own === id));
+  if (ctx === "squad") nameRow.append(chip("mine", "In squad", v.mine));
+  const types = el("div", "types");
+  for (const t of DEX_TYPES) types.append(chip("type:" + t, t, v.types.includes(t)));
+  const typeRow = el("div", "frow"); typeRow.append(el("span", "dim", "Type"), el("span", "dim", "two at most; click again to clear"));
+  const clsRow = el("div", "frow"); clsRow.append(el("span", "dim", "Class"), chip("cls:", "All", !v.cls));
+  for (const c of ["blocker", "guard", "sniper", "caster", "medic", "vanguard"]) clsRow.append(chip("cls:" + c, clsName(c), v.cls === c));
+  const tierRow = el("div", "frow"); tierRow.append(el("span", "dim", "Tier"), chip("tier:0", "All", !v.tier));
+  for (const t of TIER_CHIPS) tierRow.append(chip("tier:" + t, t + "★", v.tier === t));
+  const sorts = el("span", "sorts"); sorts.append(chip("sort", "Sort: " + SORT_NAME[v.sort] + " ▾", false));
+  if (sortOpen) { const list = el("span", "sortlist"); for (const id of FILTER_SORTS[ctx]) list.append(chip("sort:" + id, SORT_NAME[id], v.sort === id)); sorts.append(list); }
+  const gap = el("span"); gap.style.flex = "1"; tierRow.append(gap, sorts);
+  box.replaceChildren(head, nameRow, typeRow, types, clsRow, tierRow);
+  box.hidden = false;
+}
+function filtClick(e) {
+  const t = e.target.closest("[data-f]"); if (!t || !filtOpen) return;
+  const ctx = filtOpen, v = filt(ctx), [k, val] = t.dataset.f.split(":");
+  if (k === "done") return closeFilters();
+  if (k === "clear") return setFilt(ctx, { types: [], cls: "", tier: 0, q: "", own: "", mine: false });
+  if (k === "sort" && val === undefined) { sortOpen = !sortOpen; return renderFilters(); }
+  if (k === "sort") { sortOpen = false; return setFilt(ctx, { sort: val }); }
+  if (k === "type") {
+    // Click picks it, again clears it; a third type replaces the second.
+    const types = v.types.includes(val) ? v.types.filter(x => x !== val) : v.types.length < 2 ? v.types.concat(val) : [v.types[0], val];
+    return setFilt(ctx, { types });
+  }
+  if (k === "cls") return setFilt(ctx, { cls: val || "" });
+  if (k === "tier") return setFilt(ctx, { tier: Number(val) || 0 });
+  if (k === "own") return setFilt(ctx, { own: val || "" });
+  if (k === "mine") return setFilt(ctx, { mine: !v.mine });
+}
+// After any change: the list starts from its top, and the screen and the panel redraw.
+function filtChanged(ctx) {
+  if (ctx === "dex") { dexAt = 0; actAt = 0; dexFocus = "list"; if (tab === "dex") dexUpdate(); }
+  if (ctx === "candy") { candyAt = 0; shopConfirm = null; if (tab === "shop") shopUpdate(); }
+  if (ctx === "squad") { sq.at = 0; sq.zone = "grid"; rosterCache = null; if (tab === "story" && storyMode === "squad") squadUpdate(); }
+  if (filtOpen === ctx) { const i = $("#filters input"), had = i && document.activeElement === i; renderFilters(); if (had) { const j = $("#filters input"); j.focus(); j.setSelectionRange(j.value.length, j.value.length); } }
+}
 const lineForms = line => S.owned.filter(num => G.lineOf(num) === line);
 const tipOf = line => lineForms(line).sort((a, b) => G.stageOf(b) - G.stageOf(a) || a - b)[0] || line;
 function dexActions(line) {
@@ -1330,16 +1462,14 @@ function dexActions(line) {
 }
 function dexUpdate() {
   drawBackdrop();
-  const owned = new Set(Object.keys(S.lines).map(Number)), list = dexList(), v = dexView();
+  const owned = new Set(Object.keys(S.lines).map(Number)), list = dexList();
   // The count: caught of all lines, or shown of all lines while a filter is on.
-  const filtered = v.filter !== "All" || v.type;
-  titled($("#dex-title"), "DEX", (filtered ? list.length + " shown" : owned.size + "/" + BASES.length + " caught"));
-  const view = dexViewText();
-  $("#dex-keys").replaceChildren(keyLabel("f", v.filter, v.filter !== "All"), keyLabel("t", v.type || "Any type", !!v.type), keyLabel("s", "Sort: " + v.sort));
+  titled($("#dex-title"), "DEX", (filtActive("dex") ? list.length + " shown" : owned.size + "/" + BASES.length + " caught"));
+  $("#dex-keys").replaceChildren(...filtBar("dex"));
   $("#dex-detail").hidden = !list.length;
   if (!list.length) {
     $("#dex-rows").replaceChildren(el("p", "dim", "No lines match."));
-    return say("Nothing matches " + view + " Press F, T or S to change it.");
+    return say("Nothing matches " + filtSummary("dex") + ". Clear the filters (Delete) or change them (/).");
   }
   if (dexAt >= list.length) dexAt = list.length - 1;
   // Caught: the line's mini sprite in colour, its name and a gold check. Not caught: a
@@ -1423,7 +1553,7 @@ function dexKey(e) {
   const k = e.key;
   if (dexFocus === "list") {
     const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -8, ArrowRight: 8 }[k], list = dexList();
-    if (/^[fts]$/i.test(k)) { e.preventDefault(); return cycleDex(k.toLowerCase()); }
+    if (FILTER_KEYS.dex.test(k)) { e.preventDefault(); return filtKey("dex", k.length === 1 ? k.toLowerCase() : k); }
     if (step) { e.preventDefault(); dexAt = Math.max(0, Math.min(list.length - 1, dexAt + step)); actAt = 0; return dexUpdate(); }
     if (k === "Enter" || k === " ") { e.preventDefault(); if (list[dexAt] && dexActions(list[dexAt]).length) { dexFocus = "acts"; actAt = 0; dexUpdate(); } }
     if (k === "Backspace") { e.preventDefault(); go("pull"); }
@@ -1437,11 +1567,8 @@ function dexKey(e) {
 
 /* ── Shop: coins for Regulars, and shards for listed SP skins ──────────── */
 let shopAt = 0, shopConfirm = null, shopMode = "list", candyAt = 0;
-// The candy picker lists caught lines with the Dex's filters (kept apart from the Dex's own).
-const CANDY_FILTERS = ["All", "3★", "4★", "5★", "6★"];
-const candyView = () => ({ filter: CANDY_FILTERS.includes(pref.candyFilter) ? pref.candyFilter : "All",
-  type: DEX_TYPES.includes(pref.candyType) ? pref.candyType : "", sort: DEX_SORTS.includes(pref.candySort) ? pref.candySort : "Number" });
-const candyLines = () => dexList(candyView()).filter(line => !!S.lines[line]);
+// The candy picker lists caught lines with the same filters (kept apart from the Dex's own).
+const candyLines = () => dexList("candy").filter(line => !!S.lines[line]);
 const candyLeft = line => G.coinShop ? G.coinShop.candy.perLineDay - ((S.shop && S.shop.candyToday[line]) || 0) : 0;
 function shopItems() {
   const items = [{ kind: "reg", label: "Regular voucher", price: 100, cur: "coins", icon: ticket("regular"),
@@ -1480,26 +1607,28 @@ function confirmText(it, line) {
   return "Buy " + (it.kind === "reg" ? "1 Regular voucher" : it.kind === "shards" ? G.coinShop.shards.shards + " shards" : "squad preset " + (S.shop.presets + 1)) + " for " + it.price + " coins?";
 }
 function candyUpdate() {
-  const list = candyLines(), v = candyView(), cs = G.coinShop.candy;
+  const list = candyLines(), cs = G.coinShop.candy;
+  $("#scr-shop").classList.add("candy"); $("#candy-bar").hidden = false; $("#candy-bar").replaceChildren(...filtBar("candy"));
   if (candyAt >= list.length) candyAt = Math.max(0, list.length - 1);
   titled($("#shop-title"), "CANDY", list.length + " lines");
   rows($("#shop-list"), list.map(line => ({ icon: mini(tipOf(line), S.lines[line].look), label: String(line).padStart(4, "0") + " " + name(tipOf(line)),
     right: shopConfirm === "candy:" + line ? ["Buy?"] : [el("span", "num", candyLeft(line) + "/" + cs.perLineDay), " today"],
     off: candyLeft(line) < cs.candy || S.balance.coins < cs.coins })), candyAt, (i, click) => { candyAt = i; if (click) buyNow(shopItems()[shopAt], list[i]); else candyUpdate(); });
-  if (!list.length) { $("#shop-list").replaceChildren(el("p", "dim", "No caught lines match. F, T and S change the filters.")); return say("Nothing matches F: " + v.filter + " · T: " + (v.type || "any type") + "."); }
+  if (!list.length) { $("#shop-list").replaceChildren(el("p", "dim", "No caught lines match.")); $("#shop-preview").replaceChildren(el("div", "title", "CANDY")); return say("Nothing matches " + filtSummary("candy") + ". Clear the filters (Delete) or change them (/)."); }
   const line = list[candyAt], l = S.lines[line];
   const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins · ", el("span", "num", l.candy), " candy");
   const left = el("div", "dim"); left.append(el("span", "num", candyLeft(line)), " of " + cs.perLineDay + " left today");
   const keys = el("div", "klabels");
   if (shopConfirm) keys.append(keyLabel("Enter", "Buy"), keyLabel("Backspace", "No"));
-  else keys.append(keyLabel("f", v.filter, v.filter !== "All"), keyLabel("t", v.type || "Type", !!v.type), keyLabel("s", "Sort"), keyLabel("Backspace", "Back"));
+  else keys.append(keyLabel("Backspace", "Back"));
   $("#shop-preview").replaceChildren(el("div", "title", "CANDY"), cellWith(sprite(tipOf(line), G.lookFor(tipOf(line)))), el("div", "", name(tipOf(line))), have, left, keys);
   say(shopConfirm ? confirmText(shopItems()[shopAt], line) + " Enter: buy · Backspace: no."
-    : cs.candy + " candy for " + cs.coins + " coins. Candy evolves a line and buys its upgrades in the Dex. F: " + v.filter + " · T: " + (v.type || "any type") + " · S: " + v.sort + ". Backspace: back.");
+    : cs.candy + " candy for " + cs.coins + " coins. Candy evolves a line and buys its upgrades in the Dex. Filter: " + filtSummary("candy") + ". Backspace: back.");
 }
 function shopUpdate() {
   drawBackdrop();
   if (shopMode === "candy" && G.coinShop) return candyUpdate();
+  $("#scr-shop").classList.remove("candy"); $("#candy-bar").hidden = true;
   const items = shopItems();
   if (shopAt >= items.length) shopAt = items.length - 1;
   $("#shop-title").textContent = "SHOP";
@@ -1536,14 +1665,7 @@ function shopKey(e) {
   const k = e.key;
   if (shopMode === "candy") {
     const list = candyLines();
-    if (/^[fts]$/i.test(k)) {
-      e.preventDefault(); shopConfirm = null; candyAt = 0;
-      const v = candyView();
-      if (k.toLowerCase() === "f") pref.candyFilter = CANDY_FILTERS[(CANDY_FILTERS.indexOf(v.filter) + 1) % CANDY_FILTERS.length];
-      if (k.toLowerCase() === "t") pref.candyType = ["", ...DEX_TYPES][(["", ...DEX_TYPES].indexOf(v.type) + 1) % (DEX_TYPES.length + 1)];
-      if (k.toLowerCase() === "s") pref.candySort = DEX_SORTS[(DEX_SORTS.indexOf(v.sort) + 1) % DEX_SORTS.length];
-      keep(); return shopUpdate();
-    }
+    if (FILTER_KEYS.candy.test(k)) { e.preventDefault(); return filtKey("candy", k.length === 1 ? k.toLowerCase() : k); }
     if ((k === "ArrowUp" || k === "ArrowDown") && list.length) { e.preventDefault(); shopConfirm = null; candyAt = (candyAt + (k === "ArrowUp" ? -1 : 1) + list.length) % list.length; return shopUpdate(); }
     if ((k === "Enter" || k === " ") && list[candyAt]) { e.preventDefault(); return buyNow(shopItems()[shopAt], list[candyAt]); }
     if (k === "Backspace") { e.preventDefault(); if (shopConfirm) shopConfirm = null; else shopMode = "list"; return shopUpdate(); }
@@ -1977,7 +2099,6 @@ function pickStage() {
 const CLASS_ORDER = ["vanguard", "guard", "blocker", "sniper", "caster", "medic"];
 const CLASS_COLOR = { vanguard: C.teal, guard: C.paper, blocker: C.sky, sniper: C.gold, caster: SHADE.red[2], medic: C.red };
 const classIcon = cls => { const c = mapCanvas("cls-" + cls, { k: C.ink, 1: CLASS_COLOR[cls] || C.paper }); c.title = T.classes[cls]?.name || cls; return c; };
-const SORTS = [["level", "Level"], ["cost", "Cost"], ["tier", "Tier"], ["recent", "Newest"]];
 const TIERS = [3, 4, 5, 6];
 const sq = { zone: "grid", at: 0, slot: 0, head: 3, note: "" };
 // Saved teams: 3 to start; the coin shop sells more, up to 5 (S.shop.presets, from the hub).
@@ -2003,34 +2124,19 @@ function joinedAt() {
   if (S.starter) for (const n of [S.starter.species, ...S.starter.gifts]) at[n] = Math.max(at[n] || 0, S.starter.at || 0);
   return at;
 }
-function sqView() {
-  const v = pref.squadView || {};
-  return { cls: CLASS_ORDER.includes(v.cls) ? v.cls : "", type: G.types.includes(v.type) ? v.type : "",
-    tier: TIERS.includes(v.tier) ? v.tier : 0, mine: !!v.mine, sort: SORTS.some(([id]) => id === v.sort) ? v.sort : "level" };
-}
 let rosterCache = null;
 function roster() {
   const units = [];
   for (let i = 0; i < S.owned.length; i += 8) units.push(...T.squad(S.owned.slice(i, i + 8)));
-  const v = sqView(), pick = squadPick(), when = joinedAt();
-  const list = units.filter(u => (!v.cls || u.cls === v.cls) && (!v.type || u.types.includes(v.type)) &&
-    (!v.tier || tierOf(u.num) === v.tier) && (!v.mine || pick.includes(u.num)));
-  const by = { level: u => -u.level, cost: u => u.cost, tier: u => -tierOf(u.num), recent: u => -(when[u.num] || 0) }[v.sort];
-  list.sort((a, b) => by(a) - by(b) || a.num - b.num);
+  const v = filt("squad"), pick = squadPick(), when = joinedAt(), q = v.q.toLowerCase();
+  const list = units.filter(u => (!v.cls || u.cls === v.cls) && v.types.every(t => u.types.includes(t)) &&
+    (!v.tier || tierOf(u.num) === v.tier) && (!v.mine || pick.includes(u.num)) && (!q || name(u.num).toLowerCase().includes(q)));
+  const by = { level: u => -u.level, cost: u => u.cost, number: u => u.num, tier: u => -tierOf(u.num), recent: u => -(when[u.num] || 0), name: () => 0 }[v.sort];
+  list.sort((a, b) => (v.sort === "name" ? name(a.num).localeCompare(name(b.num)) : by(a) - by(b)) || a.num - b.num);
   rosterCache = { list, units };
   return rosterCache;
 }
 const unitOf = num => (rosterCache ? rosterCache.units : T.squad([num])).find(u => u.num === num) || T.squad([num])[0];
-function cycleSquad(key) {
-  const v = sqView();
-  if (key === "c") v.cls = CLASS_ORDER[(CLASS_ORDER.indexOf(v.cls) + 2) % (CLASS_ORDER.length + 1) - 1] || "";
-  if (key === "t") v.type = G.types[(G.types.indexOf(v.type) + 2) % (G.types.length + 1) - 1] || "";
-  if (key === "r") v.tier = TIERS[(TIERS.indexOf(v.tier) + 2) % (TIERS.length + 1) - 1] || 0;
-  if (key === "q") v.mine = !v.mine;
-  if (key === "s") v.sort = SORTS[(SORTS.findIndex(([id]) => id === v.sort) + 1) % SORTS.length][0];
-  pref.squadView = v; keep();
-  sq.at = 0; sq.zone = "grid"; squadUpdate();
-}
 function card(u, { at = false, picked = false, empty = false, cost = true, fit = "" } = {}) {
   const c = el("div", "card" + (empty ? " empty" : "") + (picked ? " in" : "") + (fit ? " fit-" + fit : ""));
   if (fit) c.append(el("i", "fit"));
@@ -2056,7 +2162,7 @@ function stageFoes(stage) {
 }
 function squadUpdate() {
   teams();
-  const pick = squadPick(), { list } = roster(), v = sqView(), here = stageNow();
+  const pick = squadPick(), { list } = roster(), here = stageNow();
   if (sq.at >= list.length) sq.at = Math.max(0, list.length - 1);
   if (sq.zone === "grid" && !list.length) sq.zone = "slots";
   // Slots
@@ -2065,10 +2171,8 @@ function squadUpdate() {
     c.dataset.slot = i;
     return c;
   }));
-  // Filters
-  const f = (key, text, on) => { const n = el("span", on ? "on" : "", text); n.dataset.key = key; n.title = "Press " + key.toUpperCase(); return n; };
-  $("#squad-filters").replaceChildren(f("c", v.cls ? T.classes[v.cls].name : "Class", !!v.cls), f("t", v.type || "Type", !!v.type),
-    f("r", v.tier ? v.tier + "★" : "Tier", !!v.tier), f("q", "In squad", v.mine), f("s", "Sort: " + SORTS.find(([id]) => id === v.sort)[1], false));
+  // Filters: the same bar and panel as the Dex.
+  $("#squad-filters").replaceChildren(...filtBar("squad"));
   // Grid
   const grid = $("#squad-grid");
   grid.replaceChildren(...list.map((u, i) => { const c = card(u, { at: sq.zone === "grid" && sq.at === i, picked: pick.includes(u.num), fit: roleFit(u, here) }); c.dataset.at = i; return c; }));
@@ -2164,7 +2268,7 @@ function squadStart() {
 }
 function squadKey(e) {
   const k = e.key, { list } = rosterCache || roster(), cols = 7;
-  if (/^[ctrqs]$/i.test(k)) { e.preventDefault(); return cycleSquad(k.toLowerCase()); }
+  if (FILTER_KEYS.squad.test(k)) { e.preventDefault(); return filtKey("squad", k.length === 1 ? k.toLowerCase() : k); }
   if (k === "p" || k === "P") { e.preventDefault(); useTeam((pref.team + 1) % teamCount()); sq.note = ""; return squadUpdate(); }
   if (k === "Backspace") { e.preventDefault(); sq.note = ""; storyMode = "stages"; return storyUpdate(); }
   if (k === "l" || k === "L") {
@@ -2211,9 +2315,8 @@ function squadClick(e) {
       sq.note = r.ok ? "Skill: " + G.skillsOf(num)[k] + " (" + skillKindOf(k).name + ")" : r.reason === "owned" ? "" : REASONS[r.reason] || ""; squadUpdate(); }
     return;
   }
-  const t = e.target.closest("[data-slot],[data-at],[data-key],[data-team],[data-start]");
+  const t = e.target.closest("[data-slot],[data-at],[data-team],[data-start]");
   if (!t) return;
-  if (t.dataset.key) return cycleSquad(t.dataset.key);
   if (t.dataset.team) { useTeam(Number(t.dataset.team)); sq.zone = "head"; sq.head = Number(t.dataset.team); sq.note = ""; return squadUpdate(); }
   if (t.dataset.start) return squadStart();
   // First click selects (so Level up and Skill can act on it); a click on the selected card adds or drops it.
@@ -3085,7 +3188,7 @@ const TIPS = {
   ],
   eggs: () => [{ at: () => boxOf("#eggs-tray"), text: "Eggs hatch on waves: Poké Idle catches, Pokédoku boards and battle waves all count. Your first 10 eggs hatch at once." }],
   dex: () => [
-    { at: () => boxOf("#dex-list"), text: "Every line an egg can hatch. F, T and S filter and sort." },
+    { at: () => boxOf("#dex-list"), text: "Every line an egg can hatch. The bar above the list filters by type, class, tier or name, and sorts (keys: / and C, T, R, F, S)." },
     { at: () => boxOf("#dex-detail"), text: "Candy from hatches evolves a line, unlocks its passive and cuts its deploy cost. Set a buddy to show it on the leaderboard." }
   ],
   squad: () => [
@@ -3200,6 +3303,10 @@ function refreshTop() {
 }
 // Every key, from the keyboard or a [data-press] label.
 function onKey(e) {
+  // Typing in the filter panel's name box is text, not keys.
+  if (e.target && e.target.tagName === "INPUT") return;
+  // With the panel open, Enter or Backspace closes it; other keys still reach the list behind.
+  if (filtOpen && (e.key === "Enter" || e.key === "Backspace")) { e.preventDefault(); return closeFilters(); }
   if (tutor && tutorKey(e)) return;
   if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); return toggleSound(); }
   if (battle) return battleKey(e);
@@ -3215,6 +3322,7 @@ const keyLabel = (key, text, on = false) => { const s_ = el("span", "klabel" + (
 function go(id) {
   if (!SCREENS[id] || hatching || battle || picking || !shownTabs().some(([shown]) => shown === id)) return;
   if (reveal) endReveal();
+  if (filtOpen) closeFilters();
   tab = pref.tab = id; keep();
   message = null; ratesOpen = false; shopMode = "list"; shopConfirm = null;
   for (const [sid] of TABS) $("#scr-" + sid).hidden = sid !== id;
@@ -3259,7 +3367,10 @@ if (!G) {
   document.addEventListener("keydown", onKey);
   // A label with data-press="<key>" does exactly what that key does, so friends who
   // don't know the keys can click everything (captured first, so panels don't act twice).
+  $("#filters").onclick = filtClick;
   $("#frame").addEventListener("click", e => {
+    const o = e.target.closest("[data-fopen]");
+    if (o) { e.stopPropagation(); return openFilters(o.dataset.fopen); }
     const t = e.target.closest("[data-press]");
     if (!t) return;
     e.stopPropagation();
