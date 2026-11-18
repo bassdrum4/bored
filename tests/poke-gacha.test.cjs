@@ -462,6 +462,44 @@ test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad le
   assert.deepEqual(errors, []);
 });
 
+test('battle readability: 3 Meowths walk past a high-ground unit; only the blocked ones get a stop bar; the blocker shows pips; high units stay on their block', async t => {
+  const { game, errors } = await openWithMons(t);
+  // 1-1: a sniper on the high tile in front of the path, a caster behind it, a blocker down the path.
+  await game.evaluate(() => {
+    go('story'); chapterAt = 0; storyMode = 'stages'; storyAt = 0; storyUpdate(); pickStage();
+    const pick = cls => S.owned.find(n => T.classOf(n) === cls);
+    setSquad([pick('blocker'), pick('sniper'), pick('caster')].filter(Boolean)); startBattle(); battle.talk = []; battleTalk();
+    const b = battle.b; b.queue = []; b.energy = 99;
+    const slot = cls => b.squad.findIndex(u => u.cls === cls);
+    T.deploy(b, slot('blocker'), 7, 1); T.deploy(b, slot('sniper'), 2, 2); if (slot('caster') >= 0) T.deploy(b, slot('caster'), 5, 0);
+    for (const u of b.units) { u.atk = 0; u.spa = 0; }
+    for (let i = 0; i < 3; i++) b.queue.push({ at: b.t + i * 0.9, num: 52, wave: 0, path: 0, boss: false, flying: false, explodes: false, armored: false, fast: false });
+    b.waveLeft[0] = 99; battle.paused = true;
+  });
+  // Walk them in engine time until two are held and one still walks.
+  const state = await game.evaluate(() => {
+    const b = battle.b;
+    for (let i = 0; i < 4000 && !(b.enemies.filter(e => e.blockedBy).length >= 1 && b.enemies.some(e => !e.blockedBy && e.x > 2.5)); i++) T.step(b);
+    drawField();
+    const blocker = b.units.find(u => u.cls === 'blocker');
+    return { marks: battle.marks, held: b.enemies.filter(e => e.blockedBy).map(e => e.id), walking: b.enemies.filter(e => !e.blockedBy).map(e => e.id), blocker: blocker.id, of: blocker.block };
+  });
+  assert.ok(state.held.length >= 1 && state.walking.length >= 1, 'some held, some walking');
+  const stops = state.marks.filter(m => m.stop).map(m => m.stop).sort();
+  assert.deepEqual(stops, state.held.slice().sort(), 'a stop bar on each held foe, none on the ones walking past');
+  const pips = state.marks.find(m => m.pips === state.blocker);
+  assert.deepEqual([pips.held, pips.of], [state.held.length, state.of], 'the blocker\'s pips: held of what it can hold');
+  // No pips for units that cannot block.
+  assert.equal(state.marks.filter(m => m.pips !== undefined).length, 1);
+  // The high-ground sniper stands on its block, back from the path row behind it: its head stays out of the walkers' bodies.
+  const high = await game.evaluate(() => { const u = battle.b.units.find(o => o.cls === 'sniper'); const f = feetOf(battle, u), path = feet(battle.stage, 2, 1, false);
+    return { top: f[1] - HIGH_H, pathFeet: path[1], raised: f[1] > feet(battle.stage, 2, 2, true)[1] }; });
+  assert.ok(high.raised, 'moved toward the front of its block, away from the path behind');
+  assert.ok(high.top >= high.pathFeet - 8, 'its sprite stops at the walkers\' feet (' + high.top + ' vs ' + high.pathFeet + ')');
+  await game.evaluate(() => leaveBattle());
+  assert.deepEqual(errors, []);
+});
+
 test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Rare, Bonsly (Sudowoodo, 410) stays Common', async () => {
   const { DEX } = await import(path.join(root, 'src/hub/gacha-dex.js'));
   const bst = r => r[2] + r[3] + r[4] + r[5] + r[6] + r[7];
