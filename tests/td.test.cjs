@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools', 'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'stageOf', 'evolutionsOf', 'setSkill', 'evolve'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES, DEX_LEGACY: dex.DEX_LEGACY });
 const td = moduleUnderTest('src/hub/td.js', [
-  'classOf', 'STAGES', 'CHAPTERS', 'FAST', 'MAX_RISK', 'WEEKLY_MILESTONES', 'WEEKLY_UNLOCK', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
+  'classOf', 'STAGES', 'CHAPTERS', 'FAST', 'MAX_RISK', 'WEEKLY_MILESTONES', 'WEEKLY_UNLOCK', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'castSkill', 'canDeploy', 'starsFor', 'typeMultiplier',
   'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H', 'lineCap', 'LEVEL_CAPS', 'SKILL_KINDS'
 ], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor,
   stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
@@ -122,6 +122,21 @@ function play(stage, squad, plan) {
   }
   return b;
 }
+
+test('castSkill: a charged unit fires its skill now and empties its charge; an uncharged one, or an unknown id, does not', () => {
+  const stage = td.STAGES.find(s => s.id === '1-1');
+  const b = td.newBattle(stage, [td.unitStats(named('Onix'))]);
+  b.energy = 99; td.deploy(b, 0, 3, 1);
+  const u = b.units[0];
+  assert.equal(td.castSkill(b, u.id), false, 'not charged yet');
+  u.sp = u.spMax; u.hp = Math.round(u.maxHp * 0.9);
+  const hp = u.hp;
+  assert.equal(td.castSkill(b, u.id), true);
+  assert.equal(u.sp, 0, 'the charge is spent');
+  assert.ok(u.hp > hp, 'a Blocker heals itself, even above 60% where it would hold the skill');
+  assert.equal(b.log[b.log.length - 1].unit, u.id, 'logged like any skill');
+  assert.equal(td.castSkill(b, 9999), false, 'unknown unit');
+});
 
 test('an empty field loses stage 1-1, and a sensible squad clears it with 3 stars', () => {
   const stage = td.STAGES[0];
