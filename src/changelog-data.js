@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 605,
+  "count": 606,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1337c76","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battle polish (chapter scenery, WAVE n/m banner, stars that pop in)","pr":239},
   {"sha":"945f98d","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: mouse support everywhere (a clickable label for every key)","pr":240},
   {"sha":"afb8601","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: Dex depth (evolution chain with owned forms, class, range, cost, base stat bars)","pr":238},
   {"sha":"e5da33e","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: trainer card tab (buddy with its look, Dex %, chapters, stars, trophies, weekly risk, daily boss)","pr":237},
