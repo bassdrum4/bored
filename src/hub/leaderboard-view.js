@@ -245,7 +245,8 @@ function buddyImage(key) {
   if (!buddy) return null;
   const img = document.createElement('img');
   img.className = 'lb-buddy';
-  img.src = buddy.skin ? './games/content/poke-gacha/sp/' + buddy.skin + '.png'
+  // SP art is one file per skin and form: sp/<skin>-<species>.png (gacha.js skinFile).
+  img.src = buddy.skin ? './games/content/poke-gacha/sp/' + buddy.skin + '-' + buddy.species + '.png'
     : './games/content/pokedoku/sprites/' + (buddy.shiny ? 'shiny/' : '') + buddy.species + '.png';
   img.alt = '';
   img.width = 24; img.height = 24;

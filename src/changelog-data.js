@@ -2,13 +2,26 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 565,
+  "count": 578,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c94a9e1","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: Quests redo with sub-tabs, progress bars and real reward icons","pr":216},
+  {"sha":"4b1ca95","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: chapters 5-6 on the page: fast foes, a tidy preview, the ending","pr":221},
+  {"sha":"d88a531","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: sound, off until turned on","pr":215},
+  {"sha":"fe002d3","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: pick a skill (K), and the level cap in Squad and Dex","pr":219},
+  {"sha":"8fea3f1","date":"2026-11-17","author":"Codebuff","subject":"Poké Idle: the Dex survives the Training area"},
+  {"sha":"9042c33","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: Vettel's SP skins, with sets, line drops and size prices"},
+  {"sha":"26cfeeb","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha Dex: the type filter finds caught lines only","pr":213},
+  {"sha":"9d5d8f5","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha Dex: hide uncaught names, silhouette detail with its egg, candy in words","pr":212},
+  {"sha":"4556969","date":"2026-11-17","author":"Claude","subject":"Hub: pay the Poké Idle daily boss, its weekday streak and the TD weekly mission"},
+  {"sha":"fc547cb","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Idle: daily boss from the arcade's shared seed","pr":210},
+  {"sha":"fe92972","date":"2026-11-17","author":"Claude","subject":"Poké Idle: daily boss from the arcade's shared seed"},
+  {"sha":"e053515","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: role-aware stage preview and loss hints, rates + pity, tab dots","pr":208},
+  {"sha":"e4b4b93","date":"2026-11-17","author":"Claude","subject":"scripts/economy-sim.mjs: a normal player's month in coins and vouchers (report only)"},
   {"sha":"501f952","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: a short, skippable tutorial","pr":207},
   {"sha":"3ca86a3","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: battle redo, 3/4 camera + combat feel (queue item 1)","pr":206},
   {"sha":"8d77072","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Idle: a shiny counts for its whole evolution line; in-party border only for the party","pr":205},

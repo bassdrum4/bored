@@ -17,7 +17,7 @@ import {
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
 import { readWallet, mergeStoredWallet, observeStoredSnapshot, activateStoredWallet } from './hub/rewards.js';
-import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, mon as gachaMon } from './hub/gacha.js';
+import { gachaBridge, storedBuddy, storedLooks, setSkins, SKIN_DIR, skinFile, mon as gachaMon } from './hub/gacha.js';
 import { tdBridge } from './hub/td.js';
 import { submitDailyResult } from './hub/daily-sync.js';
 import { activatePlayerStorage, capturePlayerSnapshot, stashPendingSignup, adoptSignupProgress } from './hub/player-storage.js';
@@ -680,7 +680,7 @@ function renderBuddy() {
   try { syncBuddy(); } catch {}
   img.hidden = !species;
   if (!species) { img.removeAttribute('src'); return; }
-  img.src = buddy.skin ? './' + SKIN_DIR + buddy.skin + '.png'
+  img.src = buddy.skin ? './' + SKIN_DIR + skinFile(buddy.skin, buddy.species)
     : './games/content/pokedoku/sprites/' + (buddy.shiny ? 'shiny/' : '') + buddy.species + '.png';
   img.alt = 'Buddy: ' + (buddy.shiny ? 'shiny ' : '') + species.name;
   img.title = img.alt + (buddy.skin ? ' (SP)' : '');

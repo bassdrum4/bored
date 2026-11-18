@@ -20,7 +20,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const gacha = moduleUnderTest('src/hub/gacha.js', [
   'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin',
-  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf',
+  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf', 'skinFile', 'skinPrice', 'SP_PRICES',
   'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES'
 ], { ...daily, ...rewards, DEX, DEX_TYPES });
 const { mergeWallet, walletBalance, activateWallet, grantOnce } = rewards;
@@ -314,7 +314,57 @@ test('the shipped SP list is valid, and every listed skin has its PNG', () => {
   const list = JSON.parse(fs.readFileSync(path.join(dir, 'skins.json'), 'utf8'));
   assert.ok(Array.isArray(list));
   assert.equal(gacha.setSkins(list), list.length, 'every entry is well formed');
-  for (const skin of list) assert.ok(fs.existsSync(path.join(dir, skin.id + '.png')), skin.id + '.png is missing');
+  for (const skin of gacha.skinList()) for (const num of skin.forms) {
+    const file = path.join(dir, gacha.skinFile(skin.id, num));
+    assert.ok(fs.existsSync(file), gacha.skinFile(skin.id, num) + ' is missing');
+    // 96x96 PNGs at 1x, like every other sprite.
+    const png = fs.readFileSync(file);
+    assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [96, 96], gacha.skinFile(skin.id, num) + ' is 96x96');
+  }
+  // Every PNG in the folder belongs to a listed skin.
+  const files = new Set(gacha.skinList().flatMap(skin => skin.forms.map(num => gacha.skinFile(skin.id, num))));
+  assert.deepEqual(fs.readdirSync(dir).filter(f => f.endsWith('.png')).filter(f => !files.has(f)), []);
+  // Prices by size; Espeon and Umbreon are their own skins in the Eevee line.
+  const price = id => gacha.skinPrice(gacha.skinList().find(skin => skin.id === id));
+  assert.deepEqual(['charizard', 'clefairy-set', 'pidgey-set'].map(price), [300, 400, 500]);
+  assert.deepEqual(gacha.skinList().filter(skin => gacha.lineOf(skin.species) === 133).map(skin => skin.id).sort(), ['eevee', 'espeon', 'umbreon']);
+  gacha.setSkins([]);
+});
+
+test('SP sets: one skin covers each listed form, costs by size, and bad sets are dropped', () => {
+  const first = eggPools()[0].find(num => gacha.evolutionsOf(num).length), next = gacha.evolutionsOf(first)[0];
+  const other = eggPools()[0].find(num => gacha.lineOf(num) !== gacha.lineOf(first));
+  assert.equal(gacha.skinFile('pidgey-set', 17), 'pidgey-set-17.png');
+  assert.equal(gacha.setSkins([
+    { id: 'line-set', name: 'Set', species: first, forms: [first, next] },
+    { id: 'mixed', name: 'x', species: first, forms: [first, other] },
+    { id: 'missing', name: 'x', species: first, forms: [next] },
+    { id: 'too-big', name: 'x', species: first, forms: [first, next, first + 1000, 1] }
+  ]), 1, 'a set must hold its own species and only forms of its line');
+  assert.equal(gacha.skinPrice(gacha.skinList()[0]), 400);
+  let wallet = fresh({ regular: 1, waves: 0 });
+  wallet = pull(wallet, { machine: 'move', rand: always(0.001) }).wallet;
+  wallet = hatchReady(fund(wallet, { waves: 10 }), opts({ rand: always(0.001) })).wallet;
+  assert.equal(buySp(fund(wallet, { shards: 399 }), 'line-set', opts()).reason, 'shards', 'a two-form set is 400');
+  wallet = buySp(fund(wallet, { shards: 400 }), 'line-set', opts()).wallet;
+  const worn = gacha.setLook(wallet, first, 'line-set', opts()).wallet;
+  const state = gachaState(worn, TODAY);
+  assert.deepEqual([gacha.lookFor(state, first), gacha.lookFor(state, next)], ['line-set', 'line-set'], 'both forms wear the set');
+  assert.equal(setBuddy(worn, first, opts({ skin: 'line-set' })).ok, true);
+  gacha.setSkins([]);
+});
+
+test('Shiny UP rolls a skin for the line it hatches, even one drawn for an evolution, never one already owned', () => {
+  const first = eggPools()[0].find(num => gacha.evolutionsOf(num).length), next = gacha.evolutionsOf(first)[0];
+  gacha.setSkins([{ id: 'evolved', name: 'Evolved', species: next }, { id: 'base', name: 'Base', species: first }]);
+  let wallet = fresh({ regular: 3, waves: 0 });
+  for (let i = 0; i < 3; i++) wallet = pull(wallet, { machine: 'shiny', rand: always(0.001) }).wallet;
+  const out = hatchReady(fund(wallet, { waves: 30 }), opts({ rand: always(0.001) }));
+  assert.deepEqual(out.hatched.map(h => [h.species, h.sp]), [[first, 'evolved'], [first, 'base'], [first, null]],
+    'one of the line\'s skins at random, then the one left, then none');
+  assert.deepEqual(gachaState(out.wallet, TODAY).lines[first].skins, ['evolved', 'base']);
+  const look = gachaState(gacha.setLook(out.wallet, first, 'evolved', opts()).wallet, TODAY);
+  assert.deepEqual([gacha.lookFor(look, first), gacha.lookFor(look, next)], ['normal', 'evolved'], 'a single skin draws only on its own form');
   gacha.setSkins([]);
 });
 

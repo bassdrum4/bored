@@ -295,14 +295,300 @@ test('Dex: F filters what is shown, T a type, S the order, and the choice is kep
   const type = await game.evaluate(() => dexView().type);
   assert.ok(type);
   assert.ok(await game.evaluate(t => dexList().every(num => G.dex[num - 1][1].split('/').includes(t)), type), 'every line shown is ' + type);
+  // A type only finds caught lines, so it never hints at an uncaught line's type.
+  await game.evaluate(() => { pref.dexFilter = 'All'; keep(); dexUpdate(); });
+  const typed = await game.evaluate(() => [...new Set(BASES.filter(n => S.lines[n]).flatMap(n => G.dex[n - 1][1].split('/')))]);
+  for (const t of typed) {
+    const seen = await game.evaluate(t => { pref.dexType = t; keep(); dexUpdate(); return dexList().map(n => [!!S.lines[n], G.dex[n - 1][1].split('/').includes(t)]); }, t);
+    assert.ok(seen.length > 0 && seen.every(([caught, has]) => caught && has), t + ': caught ' + t + ' lines only');
+  }
+  assert.equal(await game.evaluate(() => { pref.dexFilter = 'Not owned'; keep(); dexUpdate(); return dexList().length; }), 0, 'no uncaught line has a type to filter by');
+  assert.match(await game.$eval('#msg', n => n.textContent), /Nothing matches/);
+  await game.evaluate(() => { pref.dexType = ''; keep(); dexUpdate(); });
   // Back to all, any type; sort by name.
   await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; keep(); dexUpdate(); });
   await key(tab, 's');
-  const names = await game.evaluate(() => dexList().map(name));
-  assert.deepEqual(names, names.slice().sort((a, b) => a.localeCompare(b)), 'S sorts by name');
+  // Caught lines by name, then the uncaught ones (their names are hidden) by number.
+  const sorted = await game.evaluate(() => dexList().map(num => [!!S.lines[num], name(num), num]));
+  const caught = sorted.filter(r => r[0]), missing = sorted.filter(r => !r[0]);
+  assert.deepEqual(sorted, [...caught, ...missing], 'caught lines first');
+  assert.deepEqual(caught.map(r => r[1]), caught.map(r => r[1]).sort((a, b) => a.localeCompare(b)), 'S sorts caught lines by name');
+  assert.deepEqual(missing.map(r => r[2]), missing.map(r => r[2]).sort((a, b) => a - b), 'and the rest by number');
   assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')).dexSort), 'Name', 'the choice is kept');
   assert.ok((await rowsNow()).length > 0);
   await game.evaluate(() => { pref.dexSort = 'Number'; keep(); });
+  assert.deepEqual(errors, []);
+});
+
+test('Dex: uncaught lines are ??? with a silhouette, the egg they hatch from and no type; caught ones are named and checked', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; pref.dexSort = 'Number'; keep(); go('dex'); });
+  // The list: a caught row has its name, a colour sprite and a check; an uncaught one only its number.
+  const rowsSeen = await game.evaluate(() => [...document.querySelectorAll('#dex-rows > div')].map((r, i) => {
+    const num = dexList()[i];
+    return { caught: !!S.lines[num], text: r.textContent.trim(), name: name(num), dark: !!r.querySelector('.unseen'), check: !!r.querySelector('canvas:not(.unseen)'),
+      tip: r.querySelector('.mini').title };
+  }));
+  assert.ok(rowsSeen.some(r => r.caught) && rowsSeen.some(r => !r.caught), 'the first rows hold both');
+  for (const r of rowsSeen) {
+    if (r.caught) { assert.ok(r.text.includes(r.name) && !r.dark && r.check, r.name + ' reads as caught'); }
+    else { assert.ok(!r.text.includes(r.name) && /\?\?\?/.test(r.text) && r.dark && r.tip === '???', r.text + ' hides its name'); }
+  }
+  // The detail for an uncaught line: a silhouette that fills the cell, the egg and its icon, type ???.
+  const line = await game.evaluate(() => { dexAt = dexList().findIndex(num => !S.lines[num]); dexUpdate(); return dexList()[dexAt]; });
+  await game.waitForFunction(() => { const c = document.querySelector('#dex-pic canvas.silhouette'); return c && c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some(v => v > 0); });
+  const pic = await game.evaluate(() => {
+    const c = document.querySelector('#dex-pic canvas.silhouette'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let x0 = c.width, x1 = -1, y0 = c.height, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    return { size: c.width, span: Math.max(x1 - x0, y1 - y0) + 1 };
+  });
+  assert.ok(pic.span >= pic.size * 0.8, 'the silhouette fills the box (' + pic.span + ' of ' + pic.size + ')');
+  const info = await game.evaluate(() => ({ text: $('#dex-info').textContent, egg: $('#dex-info .egg-line img')?.alt, all: document.querySelector('#dex-detail').textContent }));
+  const [want, types, nm] = await game.evaluate(n => [TIER_NAME[G.dex[n - 1][9] - 3] + ' egg', G.dex[n - 1][1], name(n)], line);
+  assert.equal(info.egg, want, 'the egg icon is the tier it hatches from');
+  assert.match(info.text, /^\?\?\?/);
+  assert.match(info.text, /Type \?\?\?/);
+  assert.ok(!info.all.includes(nm), 'no name in the detail');
+  assert.ok(!info.text.includes(types), 'no type in the detail');
+  // A caught line: name, egg, type and candy costs in words (no red candy icon).
+  await game.evaluate(() => { dexAt = dexList().findIndex(num => !!S.lines[num]); dexUpdate(); });
+  const shown = await game.evaluate(() => ({ text: $('#dex-info').textContent, n: name(tipOf(dexList()[dexAt])), type: G.dex[tipOf(dexList()[dexAt]) - 1][1], icons: $('#dex-acts').querySelectorAll('canvas').length,
+    acts: $('#dex-acts').textContent, spill: $('#dex-info').scrollHeight > $('#dex-info').clientHeight + 1 }));
+  assert.ok(shown.text.startsWith(shown.n) && shown.text.includes(shown.type), 'a caught line shows its name and type');
+  assert.match(shown.acts, /\d+ candy/);
+  assert.equal(shown.spill, false);
+  assert.deepEqual(errors, []);
+});
+
+test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Rare, Bonsly (Sudowoodo, 410) stays Common', async () => {
+  const { DEX } = await import(path.join(root, 'src/hub/gacha-dex.js'));
+  const bst = r => r[2] + r[3] + r[4] + r[5] + r[6] + r[7];
+  const kids = {};
+  DEX.forEach((r, i) => { if (r[8]) (kids[r[8]] ||= []).push(i + 1); });
+  const finals = n => kids[n] ? kids[n].flatMap(finals) : [n];
+  const off = [];
+  DEX.forEach((r, i) => {
+    if (r[9] !== 3 && r[9] !== 4) return;
+    const best = Math.max(...finals(i + 1).map(f => bst(DEX[f - 1])));
+    if ((best >= 500 ? 4 : 3) !== r[9]) off.push(r[0] + ' ' + r[9] + '★ (final ' + best + ')');
+  });
+  assert.deepEqual(off, [], 'every Common/Rare line is tiered by its final form');
+  const star = n => DEX.find(r => r[0] === n)[9];
+  assert.deepEqual(['Magikarp', 'Happiny', 'Munchlax', 'Feebas', 'Bonsly'].map(star), [4, 4, 4, 4, 3]);
+});
+
+test('Quests: four sub-tabs with reset clocks; rows show n/m, a bar and real reward icons; done rows sink; trophies group by game', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { for (const st of T.allStages.slice(0, 3)) T.finish({ stage: st.id, stars: 3, team: [S.owned[0]], waves: 1 }); refreshTop(); });
+  await key(tab, '6');
+  const tabs = await game.$$eval('#quest-tabs > span', n => n.map(t => [t.dataset.qtab, t.querySelector('.num').textContent, t.querySelector('.clock')?.textContent || '']));
+  assert.deepEqual(tabs.map(t => t[0]), ['daily', 'weekly', 'starter', 'trophies']);
+  for (const [, count] of tabs) assert.match(count, /^\d+\/(\d+|\?)$/);
+  assert.match(tabs[0][2], /^(\d+h )?\d+m$|^\d+h \d+m$/, 'Daily counts down to midnight');
+  assert.match(tabs[1][2], /^\d+d \d+h$|^\d+h \d+m$|^\d+m$/, 'Weekly counts down to Monday');
+  assert.deepEqual([tabs[2][2], tabs[3][2]], ['', ''], 'Starter and Trophies never reset');
+  // Each sub-tab: every row has n/m over a bar and its reward in icons (no S/M/B letters); done rows are last.
+  for (const id of ['daily', 'weekly', 'starter', 'trophies']) {
+    const rows = await game.evaluate(id => { questTab = id; questAt = 0; questsUpdate();
+      return [...document.querySelectorAll('#quest-list .q')].map(r => ({ done: r.classList.contains('done'), n: r.querySelector('.prog .n').textContent,
+        bar: !!r.querySelector('.bar i'), icons: r.querySelectorAll('.reward img').length, text: r.querySelector('.reward').textContent, check: !!r.querySelector('.reward canvas') })); }, id);
+    if (!rows.length) continue;
+    const firstDone = rows.findIndex(r => r.done);
+    if (firstDone >= 0) assert.ok(rows.slice(firstDone).every(r => r.done), id + ': done rows are at the bottom');
+    for (const r of rows) {
+      assert.match(r.n, /^(\d+\/\d+|later)$/);
+      assert.ok(r.bar && r.icons >= 1 && !/\b[SMB]\b/.test(r.text), id + ': progress bar and reward icons');
+      assert.equal(r.check, r.done, id + ': a check exactly on done rows');
+    }
+  }
+  // Clears ticked "Clear any stage" (when drawn today) and the 1-1 starter mission, and they sit below the open ones.
+  const daily = await game.evaluate(() => { questTab = 'daily'; questsUpdate(); return [...document.querySelectorAll('#quest-list .q')].map(r => [r.querySelector('.label').textContent, r.classList.contains('done')]); });
+  const clear = daily.find(r => r[0] === 'Clear any stage');
+  if (clear) assert.equal(clear[1], true);
+  // A star in a label is the text's own size.
+  // A star in a label is drawn no taller than the letters around it (both measured on screen).
+  const star = await game.evaluate(() => { const row = [...document.querySelectorAll('#quest-list .label')].find(n => n.querySelector('.st'));
+    if (!row) return null;
+    const range = document.createRange(), text = [...row.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
+    range.setStart(text, 0); range.setEnd(text, 1);
+    return [row.querySelector('.st').getBoundingClientRect().height, range.getBoundingClientRect().height]; });
+  if (star) assert.ok(star[0] <= star[1] * 1.05, 'the star is no taller than the text ' + JSON.stringify(star));
+  // Left/Right move between sub-tabs; Up/Down skip the trophy group headers.
+  await game.evaluate(() => { questTab = 'daily'; questsUpdate(); });
+  await key(tab, 'ArrowRight');
+  assert.equal(await game.evaluate(() => questTab), 'weekly');
+  await key(tab, 'ArrowLeft', 2);
+  assert.equal(await game.evaluate(() => questTab), 'trophies');
+  if (await game.evaluate(() => !!G.trophyList)) {
+    const groups = await game.$$eval('#quest-list .group', n => n.map(g => g.textContent));
+    assert.deepEqual(groups.map(g => g.replace(/\d+\/\d+$/, '')), ['Poké Idle', 'Pokédoku']);
+    const total = await game.evaluate(() => G.trophyList().length);
+    assert.match(await game.$eval('#quest-tabs [data-qtab="trophies"]', n => n.textContent), new RegExp('\\d+/' + total + '$'));
+    await key(tab, 'ArrowDown', 3);
+    assert.ok(await game.evaluate(() => !questRows('trophies')[questAt].head), 'the cursor never lands on a header');
+  }
+  // Nothing is cut or spills, and the message names the reset.
+  await game.evaluate(() => { questTab = 'weekly'; questAt = 0; questsUpdate(); });
+  const spill = await game.evaluate(() => [...document.querySelectorAll('#scr-quests *')].filter(n => n.offsetParent && n.clientWidth > 0 && n.scrollWidth > n.clientWidth + 1).map(n => n.className));
+  assert.deepEqual(spill, []);
+  assert.match(await game.$eval('#msg', n => n.textContent), /Resets in \d+[dhm]/);
+  assert.deepEqual(errors, []);
+});
+
+test('sound: off until turned on (M or the speaker), kept per device, and pulls, hatches and battles make their sounds', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  // Record which sounds would play, without needing speakers.
+  await game.evaluate(() => { window.__heard = []; for (const k of Object.keys(SOUNDS)) { const f = SOUNDS[k]; SOUNDS[k] = a => { __heard.push(k); f(a); }; } });
+  assert.equal(await game.evaluate(() => soundOn()), false, 'muted on a fresh device');
+  await game.evaluate(() => { go('pull'); turnCrank(); });
+  assert.deepEqual(await game.evaluate(() => [__heard.length, SFX.ctx]), [0, null], 'muted: nothing plays and no audio is opened');
+  // The speaker sits beside "?" and the tab bar still fits.
+  assert.equal(await game.$eval('#tabs .help .speaker', n => n.title), 'Sound off (M)');
+  await key(tab, 'm');
+  assert.equal(await game.evaluate(() => soundOn()), true);
+  assert.equal(await game.$eval('#tabs .help .speaker', n => n.title), 'Sound on (M)');
+  assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')).sound), true, 'kept on this device');
+  const tabs = await game.$eval('#tabs', n => [n.scrollWidth, n.clientWidth]);
+  assert.ok(tabs[0] <= tabs[1], 'the tab bar does not overflow');
+  // A pull, a hatch (four shakes, the crack, the burst and the reveal), then a battle.
+  await game.evaluate(() => { __heard = []; turnCrank(); });
+  assert.deepEqual(await game.evaluate(() => __heard), ['pull']);
+  await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:snd'] = { at: now - 50, g: { regular: 1 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    G.pull({ voucher: 'regular', count: 1, machine: 'move' });
+    // Waves earned after the pull hatch it.
+    const v = JSON.parse(parent.localStorage.getItem('bored.wallet')); v.entries['test:sndw'] = { at: now + 30, g: { waves: 50 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(v));
+    refreshTop(); go('eggs'); __heard = []; startHatch();
+  });
+  await game.waitForFunction(() => hatching && hatching.phase === 'shown', { timeout: 6000 });
+  const hatchHeard = await game.evaluate(() => __heard);
+  assert.deepEqual(hatchHeard.slice(0, 6), ['shake', 'shake', 'shake', 'shake', 'crack', 'burst']);
+  assert.ok(['hatch', 'epic', 'legend'].includes(hatchHeard[6]), 'the reveal: ' + hatchHeard[6]);
+  await game.evaluate(() => endHatch());
+  await game.evaluate(() => { __heard = []; go('story'); chapterAt = 0; storyAt = 0; storyUpdate(); pickStage(); setSquad(S.owned.slice(0, 4)); startBattle(); battle.talk = []; battleTalk();
+    const b = battle.b; b.energy = 99;
+    // The first squad member and tile it can take (a blocker on the path, a ranged unit up high).
+    found: for (let slot = 0; slot < b.squad.length; slot++) for (let y = 0; y < b.stage.map.length; y++) for (let x = 0; x < b.stage.map[y].length; x++)
+      if (!T.canDeploy(b, slot, x, y)) { battle.slot = slot; tileAction(x, y); break found; }
+    battle.paused = false; });
+  await game.waitForFunction(() => __heard.includes('hit'), { timeout: 30000 });
+  await game.evaluate(() => { battle.b.life = 0; });
+  await game.waitForFunction(() => battle.done, { timeout: 10000 });
+  const battleHeard = await game.evaluate(() => __heard);
+  assert.equal(battleHeard[0], 'deploy');
+  assert.ok(battleHeard.includes('win') || battleHeard.includes('lose'));
+  // M again turns it off.
+  await game.evaluate(() => leaveBattle && battle && battle.done && (battle.talk = [], leaveBattle()));
+  await key(tab, 'm');
+  assert.equal(await game.evaluate(() => soundOn()), false);
+  assert.deepEqual(errors, []);
+});
+
+test('SP skins: the shop prices sets by size, a set shows on each form, and a skin rolled for an evolution shows on it', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.waitForFunction(() => G.skins().length > 0);
+  // Every listed skin's art loads, at 96x96.
+  const sizes = await game.evaluate(async () => Promise.all(G.skins().flatMap(skin => skin.forms.map(num => new Promise(done => {
+    const img = sprite(num, skin.id); img.onload = () => done([skin.id, num, img.naturalWidth, img.naturalHeight]); img.onerror = () => done([skin.id, num, 0, 0]);
+  })))));
+  assert.ok(sizes.length >= 30);
+  for (const [id, num, w, h] of sizes) assert.deepEqual([w, h], [96, 96], id + ' on #' + num);
+  // The shop: Mew's line never hatches, so its skin is not for sale; prices go by forms.
+  const shop = await game.evaluate(() => shopItems().filter(i => i.kind === 'sp').map(i => [i.skin.id, i.price]));
+  assert.ok(!shop.some(([id]) => id === 'mew'));
+  assert.deepEqual(['charizard', 'clefairy-set', 'pidgey-set'].map(id => shop.find(r => r[0] === id)[1]), [300, 400, 500]);
+  // Own the Pidgey line, buy the set and wear it: Pidgey and Pidgeotto both draw it.
+  const worn = await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:sp'] = { at: now - 50, g: { shards: 500, 'candy:16': 50 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    refreshTop();
+    return { had: S.owned.includes(16), shards: S.balance.shards };
+  });
+  if (!worn.had) return t.skip('this roster has no Pidgey');
+  const r = await game.evaluate(() => [G.evolve({ from: 16, to: 17 }).ok, G.buySkin({ skin: 'pidgey-set' }).ok, G.setLook({ line: 16, look: 'pidgey-set' }).ok]);
+  assert.deepEqual(r, [true, true, true]);
+  await game.evaluate(() => refreshTop());
+  assert.deepEqual(await game.evaluate(() => [G.lookFor(16), G.lookFor(17), G.lookFor(18)]), ['pidgey-set', 'pidgey-set', 'pidgey-set']);
+  assert.match(await game.evaluate(() => spriteUrl(17, 'pidgey-set')), /sp\/pidgey-set-17\.png$/);
+  assert.equal(await game.evaluate(() => S.balance.shards), worn.shards - 500, 'a three-form set costs 500');
+  assert.equal(await game.evaluate(() => T.squad([17])[0].look), 'pidgey-set', 'battle draws the set on Pidgeotto');
+  // A Charizard skin rolled from a Charmander egg shows Charizard; a single skin stays on its own form.
+  assert.match(await game.evaluate(() => hatchSprite({ species: 4, sp: 'charizard' }).src), /sp\/charizard-6\.png$/);
+  assert.match(await game.evaluate(() => spriteUrl(4, 'charizard')), /sp\/charizard-6\.png$/);
+  assert.deepEqual(errors, []);
+});
+
+test('chapters 5-6: fast foes are named, nothing overflows, and the first clear of the final stage plays the ending once', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length >= 6)) return t.skip('the hub engine has fewer than 6 chapters');
+  await game.evaluate(() => { for (const st of T.allStages) { if (st.id === '6-6') break; T.finish({ stage: st.id, stars: 3, team: [S.owned[0]], waves: 1 }); } refreshTop(); });
+  await key(tab, '1');
+  // Every chapter 5-6 preview, its message and its squad box fit.
+  const bad = await game.evaluate(() => { const out = [];
+    for (const c of [4, 5]) { chapterAt = c; for (let i = 0; i < stagesNow().length; i++) { storyMode = 'stages'; storyAt = i; storyUpdate();
+      for (const id of ['#story-info', '#msg']) { const n = $(id); if (n.scrollHeight > n.clientHeight + 1) out.push(stagesNow()[i].id + id); }
+      pickStage(); const q = $('#squad-stage'); if (q.scrollHeight > q.clientHeight + 1 || [...q.children].some(n => n.scrollWidth > n.clientWidth + 1)) out.push(stagesNow()[i].id + ' squad'); } }
+    storyMode = 'stages'; return out; });
+  assert.deepEqual(bad, []);
+  await game.evaluate(() => { chapterAt = 4; storyAt = 0; storyUpdate(); });
+  assert.match(await game.$eval('#story-info', n => n.textContent), /Fast: Raticate/);
+  await game.evaluate(() => pickStage());
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /fast/);
+  // 6-6, first clear: Giovanni's words, then the ending, and THE END.
+  const play66 = async () => {
+    await game.evaluate(() => { storyMode = 'stages'; chapterAt = 5; storyAt = 5; storyUpdate(); pickStage(); setSquad(S.owned.slice(0, 4)); startBattle();
+      battle.talk = []; battleTalk(); battle.b.queue = []; battle.b.enemies = []; battle.paused = false; });
+    await game.waitForFunction(() => battle.done, { timeout: 10000 });
+    const talk = await game.evaluate(() => battle.talk.slice());
+    await game.evaluate(() => { battle.talk = []; battleTalk(); showResult(); });
+    const title = await game.$eval('#battle-result .title', n => n.textContent);
+    await game.evaluate(() => leaveBattle());
+    return [talk, title];
+  };
+  const [first, title] = await play66();
+  const ending = await game.evaluate(() => T.allStages.find(s => s.id === '6-6').ending);
+  assert.deepEqual(first.slice(-ending.length), ending, 'the ending follows the boss');
+  assert.equal(title, 'THE END');
+  const [again, title2] = await play66();
+  assert.ok(!again.some(line => ending.includes(line)), 'only once');
+  assert.equal(title2, 'CLEARED');
+  assert.deepEqual(errors, []);
+});
+
+test('progression: Squad and Dex show the level cap, and K picks which unlocked skill a line uses', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  // A line with two skills unlocked: a second hatch of the first owned line, rolled on its third skill.
+  const line = await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000), num = S.owned[0], w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['spend:prog2'] = { at: now - 90, g: { regular: 0 }, x: { m: 'move', e: [0], w: 0, n: 0, d: '2026-11-18' } };
+    w.entries['hatch:prog2.0'] = { at: now - 80, x: { s: num, t: 0, n: 0, k: 2 } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop();
+    return G.lineOf(num);
+  });
+  const cap = await game.evaluate(l => T.capOf ? T.capOf(l) : T.maxLevel, line);
+  await key(tab, '1');
+  await key(tab, 'Enter');
+  await game.evaluate(l => { setSquad([S.owned.find(n => G.lineOf(n) === l)]); sq.zone = 'slots'; sq.slot = 0; squadUpdate(); }, line);
+  assert.match(await game.$eval('#squad-detail', n => n.textContent), new RegExp('Lv \\d+/' + cap));
+  if (await game.evaluate(() => !!G.setSkill)) {
+    const before = await game.evaluate(() => unitOf(squadPick()[0]).skillAt ?? null);
+    await key(tab, 'k');
+    const after = await game.evaluate(() => { rosterCache = null; return [unitOf(squadPick()[0]).skillAt, document.querySelector('#squad-detail .skills .use')?.textContent, sq.note]; });
+    assert.notEqual(after[0], before, 'K switched the skill');
+    assert.equal(after[1].replace('*', ''), await game.evaluate(k => G.skillsOf(squadPick()[0])[k], after[0]), 'the skill in use is marked');
+    assert.match(after[2], /^Skill: /);
+    const spill = await game.$eval('#squad-detail', n => [...n.children].some(c => c.getBoundingClientRect().right > n.getBoundingClientRect().right + 1));
+    assert.equal(spill, false, 'the note fits the panel');
+  }
+  // The Dex: the battle level and its cap come first.
+  await game.evaluate(l => { storyMode = 'stages'; go('dex'); pref.dexFilter = 'All'; dexAt = dexList().indexOf(l); dexUpdate(); }, line);
+  if (await game.evaluate(() => !!(T.capOf && G.setSkill))) {
+    const first = await game.$eval('#dex-acts > div', n => n.textContent);
+    assert.match(first, new RegExp('^Battle level.*\\d+/' + cap + '$'));
+    assert.match(await game.$eval('#dex-acts', n => n.textContent), /Skill: /);
+  }
   assert.deepEqual(errors, []);
 });
 
@@ -558,7 +844,7 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
   assert.equal(await game.evaluate(() => storyMode), 'squad');
   assert.equal(await game.$eval('#msg', n => n.hidden), true, 'the squad screen uses the whole stage');
   // The stage it is for, and what it sends.
-  assert.match(await game.$eval('#squad-stage', n => n.textContent), /1-1.*Foes: Normal/);
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /1-1.*Tank Rock, Steel.*Dmg Fighting/);
   // Every roster card: class icon, level as "Lv n" and the deploy cost as its own badge, matching the engine.
   const cards = await game.evaluate(() => [...document.querySelectorAll('#squad-grid > .card')].map((c, i) => ({
     lv: c.querySelector('.low').textContent, cost: c.querySelector('.cost').textContent, icon: !!c.querySelector('canvas.ci'),
@@ -577,7 +863,7 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
   assert.ok(await game.evaluate(() => document.querySelector('#squad-grid > .card').classList.contains('in')));
   // The detail: types, class, range, level and its next cost, six stats and four skills.
   const detail = await game.$eval('#squad-detail', n => n.textContent);
-  assert.match(detail, /Range [\d.]+/); assert.match(detail, /Lv \d+\/10/); assert.match(detail, /cost \d+/);
+  assert.match(detail, /Range [\d.]+/); assert.match(detail, /Lv \d+\/(5|8|10)\b/); assert.match(detail, /cost \d+/);
   for (const k of ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe']) assert.match(detail, new RegExp(k + ' \\d+'));
   assert.equal(await game.$$eval('#squad-detail .skills > span', n => n.length), 4);
   // Filters: C cycles the class (spelled out), T a type, R a tier, Q only the squad.
@@ -816,5 +1102,101 @@ test('tutorial: Skip works from the first box, in a battle step and on a replay,
   assert.equal((await tutorUp(game)).id, 'pull');
   await game.evaluate(() => document.querySelector('#tutor-box [data-skip]').click());
   assert.equal(await tutorUp(game), false);
+  assert.deepEqual(errors, []);
+});
+
+/* ── Stage preview and loss hints ──────────────────────────────────────── */
+test('stage preview shows types, waves and a recommended level; a loss names what the foes are weak to', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '1');
+  const info = await game.$eval('#story-info', n => n.textContent);
+  assert.match(info, /2 waves · 3 lives · Rec\. Lv\s*1/);
+  assert.match(info, /Types: Normal/);
+  // Late stages ask for more.
+  assert.ok(await game.evaluate(() => recLevel(T.allStages.find(s => s.id === '3-4')) >= 3));
+  assert.deepEqual(await game.evaluate(() => weakTo(T.allStages.find(s => s.id === '1-1'))), ['Fighting']);
+  // Lose 1-1 on purpose: the result says what to bring.
+  await key(tab, 'Enter');
+  await game.evaluate(() => { sq.zone = 'head'; sq.head = 3; setSquad(S.owned.slice(0, 1)); squadUpdate(); });
+  await key(tab, 'Enter');
+  await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
+  await game.evaluate(() => { battle.talk = []; battleTalk(); battle.b.life = 1; battle.paused = false; });
+  await game.waitForFunction(() => battle.done, { timeout: 60000 });
+  for (let i = 0; i < 4 && await game.evaluate(() => battle.talk.length); i++) await key(tab, 'Enter');
+  const result = await game.$eval('#battle-result', n => [n.textContent, n.scrollHeight, n.clientHeight]);
+  assert.match(result[0], /DEFEATED.*Fighting/);
+  assert.ok(result[1] <= result[2], 'the hint fits the result box');
+  assert.deepEqual(errors, []);
+});
+
+test('roles: 1-1 asks for tanks that resist Normal and Fighting damage, the loss hint says which went wrong, Squad marks the fits', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '1');
+  const on11 = fn => game.evaluate(fn => new Function('stage', 'return ' + fn)(T.allStages.find(s => s.id === '1-1')), String(fn).replace(/^stage => /, ''));
+  // Rattata attacks with Normal: Rock and Steel resist it, Ghost is immune (Rock and Steel have more tanks).
+  assert.deepEqual(await on11(stage => attackTypes(stage)), ['Normal']);
+  assert.deepEqual(await on11(stage => tankTypes(stage, 3)), ['Rock', 'Steel', 'Ghost']);
+  assert.ok(await on11(stage => tankTypes(stage, 3).every(t => T.typeMultiplier('Normal', [t]) < 1)), 'every tank type resists Normal');
+  // Rattata is Normal: Fighting is super effective.
+  assert.deepEqual(await on11(stage => weakTo(stage)), ['Fighting']);
+  assert.ok(await on11(stage => T.typeMultiplier('Fighting', ['Normal']) > 1));
+  // The preview shows both.
+  assert.match(await game.$eval('#story-info .roles', n => n.textContent), /^Tanks: Rock, Steel\s*Damage: Fighting$/);
+  // The loss hint: a blocker that fell fast wants a tank, foes that leaked healthy want damage, else both roles.
+  assert.match(await on11(stage => lossHint(stage, { fell: [{ cls: 'blocker', lasted: 6 }], leakHp: [0.1] })), /blocker fell fast: try a tank that resists Normal \(Rock, Steel\)/);
+  assert.match(await on11(stage => lossHint(stage, { fell: [], leakHp: [0.9, 0.7] })), /most of their HP: bring Fighting damage/);
+  assert.match(await on11(stage => lossHint(stage, { fell: [{ cls: 'blocker', lasted: 60 }], leakHp: [0.2] })), /Tanks: Rock, Steel · Damage: Fighting/);
+  // Who fits: a Rock or Ghost blocker is a tank here, a Fighting caster or sniper is damage; others are neither.
+  assert.deepEqual(await on11(stage => [['blocker', ['Rock', 'Ground']], ['guard', ['Ghost']], ['blocker', ['Fighting']], ['caster', ['Fighting']], ['sniper', ['Fighting', 'Steel']],
+    ['caster', ['Fire']], ['medic', ['Rock']]].map(([cls, types]) => roleFit({ cls, types }, stage))), ['tank', 'tank', '', 'damage', 'damage', '', '']);
+  // Squad from 1-1 marks exactly the owned mons that fit, and its stage box names both roles.
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => storyMode), 'squad');
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /Tank Rock, Steel.*Dmg Fighting/);
+  const marks = await game.evaluate(() => [...document.querySelectorAll('#squad-grid .card')].map(c => c.classList.contains('fit-tank') ? 'tank' : c.classList.contains('fit-damage') ? 'damage' : ''));
+  const want = await game.evaluate(() => roster().list.map(u => roleFit(u, stageNow())));
+  assert.deepEqual(marks, want);
+  assert.ok(await game.evaluate(() => [...document.querySelectorAll('#squad-grid .card.fit-tank, #squad-grid .card.fit-damage')].every(c => c.querySelector('.fit').offsetHeight > 0)), 'fits show a bar');
+  assert.deepEqual(errors, []);
+});
+
+/* ── Rates and pity, and the tab dots ──────────────────────────────────── */
+test('the page copy of rates, shiny odds and pity matches the engine', () => {
+  const engine = fs.readFileSync(path.join(root, 'src/hub/gacha.js'), 'utf8');
+  const pick = (src, re) => src.match(re)[1].replace(/\s+/g, '');
+  assert.equal(pick(page, /const RATES = (\{[^;]*\});/), pick(engine, /export const EGG_RATES = (\{[^;]*\});/));
+  assert.equal(pick(page, /const SHINY_IN = (\{[^}]*\})/), pick(engine, /export const SHINY_ODDS = (\{[^}]*\})/));
+  assert.equal(pick(page, /SP_IN = (\d+)/), pick(engine, /export const SP_ODDS = (\d+)/));
+  assert.equal(pick(page, /PITY = (\[[^\]]*\])/), pick(engine, /export const RARITY_PITY = (\[[^\]]*\])/));
+});
+test('Pull shows each machine\'s rates and my pity; Eggs and Quests get a dot when something is waiting', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '2');
+  await key(tab, 'd');
+  assert.equal(await game.$eval('#rates', n => n.hidden), false);
+  const text = await game.$eval('#rates', n => n.textContent);
+  assert.match(text, /Common egg\s*79\.7%/);
+  assert.match(text, /Shiny on hatch\s*1 in (64|128)/);
+  const p = await game.evaluate(() => S.pity);
+  assert.ok(text.includes(`Rare ${p.rare}/9`) && text.includes(`Epic ${p.epic}/59`) && text.includes(`Legendary ${p.legendary}/412`), text);
+  const over = await game.$eval('#rates', n => n.scrollHeight > n.clientHeight + 1);
+  assert.equal(over, false, 'the rates panel fits');
+  await key(tab, 'd');
+  assert.equal(await game.$eval('#rates', n => n.hidden), true);
+  // An egg ready to hatch: a dot on Eggs.
+  await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000);
+    const w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:one'] = { at: now - 50, g: { regular: 1 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    G.pull({ voucher: 'regular', count: 1, machine: 'move' });
+    const w2 = JSON.parse(parent.localStorage.getItem('bored.wallet')); w2.entries['test:w'] = { at: now + 50, g: { waves: 100 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w2));
+    refreshTop();
+  });
+  assert.equal(await game.$$eval('#tabs [data-tab="eggs"] .alert', n => n.length), 1);
+  // Quests: a dot for rewards paid since the last visit, gone once it is opened.
+  await game.evaluate(() => { pref.questsSeen = 0; keep(); refreshTop(); });
+  assert.equal(await game.$$eval('#tabs [data-tab="quests"] .alert', n => n.length), 1);
+  await key(tab, '6');
+  assert.equal(await game.$$eval('#tabs [data-tab="quests"] .alert', n => n.length), 0);
   assert.deepEqual(errors, []);
 });
