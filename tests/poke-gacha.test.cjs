@@ -276,47 +276,69 @@ test('tower defense: chapter 3 says which enemies explode', async t => {
   assert.deepEqual(errors, []);
 });
 
-test('Dex: F filters what is shown, T a type, S the order, and the choice is kept', async t => {
+test('filters: the Dex bar opens one panel (type grid of two, class and tier chips, sort list, name search, Clear); keys still work; the choice is kept', async t => {
   const { tab, game, errors } = await openWithMons(t);
-  await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; pref.dexSort = 'Number'; keep(); go('dex'); });
-  const rowsNow = () => game.$$eval('#dex-rows > div', list => list.map(r => r.textContent.trim()));
+  await game.evaluate(() => { pref.filters = {}; keep(); go('dex'); });
   const all = await game.evaluate(() => dexList().length);
   assert.equal(all, await game.evaluate(() => BASES.length), 'All shows every line');
+  assert.match(await game.$eval('#dex-keys', n => n.textContent), /^Filter: All · Number/);
+  // Keys: F owned → not owned, then back; T a type; S the sort.
   await key(tab, 'f');
-  assert.deepEqual(await game.evaluate(() => dexList().every(num => !!S.lines[num])), true, 'Owned shows only owned lines');
-  assert.equal(await game.evaluate(() => dexList().length), await game.evaluate(() => Object.keys(S.lines).length));
-  assert.match(await game.$eval('#msg', n => n.textContent), /F: Owned/);
-  const msg = await game.$eval('#msg', n => [n.scrollHeight, n.clientHeight]);
-  assert.ok(msg[0] <= msg[1], 'the message box does not overflow');
+  assert.ok(await game.evaluate(() => dexList().every(num => !!S.lines[num])), 'F: owned lines only');
   await key(tab, 'f');
-  assert.ok(await game.evaluate(() => dexList().every(num => !S.lines[num])), 'Not owned shows only missing lines');
-  // A type: every line shown has it.
-  await key(tab, 't');
-  const type = await game.evaluate(() => dexView().type);
-  assert.ok(type);
-  assert.ok(await game.evaluate(t => dexList().every(num => G.dex[num - 1][1].split('/').includes(t)), type), 'every line shown is ' + type);
-  // A type only finds caught lines, so it never hints at an uncaught line's type.
-  await game.evaluate(() => { pref.dexFilter = 'All'; keep(); dexUpdate(); });
-  const typed = await game.evaluate(() => [...new Set(BASES.filter(n => S.lines[n]).flatMap(n => G.dex[n - 1][1].split('/')))]);
-  for (const t of typed) {
-    const seen = await game.evaluate(t => { pref.dexType = t; keep(); dexUpdate(); return dexList().map(n => [!!S.lines[n], G.dex[n - 1][1].split('/').includes(t)]); }, t);
-    assert.ok(seen.length > 0 && seen.every(([caught, has]) => caught && has), t + ': caught ' + t + ' lines only');
-  }
-  assert.equal(await game.evaluate(() => { pref.dexFilter = 'Not owned'; keep(); dexUpdate(); return dexList().length; }), 0, 'no uncaught line has a type to filter by');
-  assert.match(await game.$eval('#msg', n => n.textContent), /Nothing matches/);
-  await game.evaluate(() => { pref.dexType = ''; keep(); dexUpdate(); });
-  // Back to all, any type; sort by name.
-  await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; keep(); dexUpdate(); });
-  await key(tab, 's');
-  // Caught lines by name, then the uncaught ones (their names are hidden) by number.
-  const sorted = await game.evaluate(() => dexList().map(num => [!!S.lines[num], name(num), num]));
-  const caught = sorted.filter(r => r[0]), missing = sorted.filter(r => !r[0]);
-  assert.deepEqual(sorted, [...caught, ...missing], 'caught lines first');
-  assert.deepEqual(caught.map(r => r[1]), caught.map(r => r[1]).sort((a, b) => a.localeCompare(b)), 'S sorts caught lines by name');
-  assert.deepEqual(missing.map(r => r[2]), missing.map(r => r[2]).sort((a, b) => a - b), 'and the rest by number');
-  assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')).dexSort), 'Name', 'the choice is kept');
-  assert.ok((await rowsNow()).length > 0);
-  await game.evaluate(() => { pref.dexSort = 'Number'; keep(); });
+  assert.ok(await game.evaluate(() => dexList().every(num => !S.lines[num])), 'F again: missing lines only');
+  await key(tab, 'Delete');
+  assert.equal(await game.evaluate(() => filtSummary('dex')), 'All', 'Delete clears');
+  // The panel, by mouse.
+  await (await game.$('#dex-keys [data-fopen="dex"]')).click();
+  assert.equal(await game.evaluate(() => !document.querySelector('#filters').hidden), true, 'the bar opens the panel');
+  assert.equal(await game.$$eval('#filters .types .klabel', n => n.length), await game.evaluate(() => DEX_TYPES.length), 'every type in the grid');
+  // Two types: both must be there, caught lines only; a click again clears one; a third replaces the second.
+  const pair = await game.evaluate(() => { for (const n of BASES) if (S.lines[n] && G.dex[n - 1][1].includes('/')) return G.dex[n - 1][1].split('/'); });
+  for (const ty of pair) await (await game.$('#filters [data-f="type:' + ty + '"]')).click();
+  const two = await game.evaluate(() => ({ types: filt('dex').types, ok: dexList().every(n => S.lines[n] && filt('dex').types.every(t => G.dex[n - 1][1].split('/').includes(t))), n: dexList().length }));
+  assert.deepEqual(two.types, pair);
+  assert.ok(two.ok && two.n > 0, 'lines with both types');
+  assert.match(await game.$eval('#filters .head', n => n.textContent), new RegExp(pair.join('/')), 'the summary at the top');
+  await (await game.$('#filters [data-f="type:' + pair[1] + '"]')).click();
+  assert.deepEqual(await game.evaluate(() => filt('dex').types), [pair[0]], 'a second click clears it');
+  // Class and tier chips, one click each.
+  const cls = await game.evaluate(() => classOfLine(BASES.find(n => S.lines[n])));
+  await (await game.$('#filters [data-f="cls:' + cls + '"]')).click();
+  await (await game.$('#filters [data-f="type:' + pair[0] + '"]')).click();
+  assert.ok(await game.evaluate(c => dexList().length > 0 && dexList().every(n => classOfLine(n) === c), cls), 'one class');
+  await (await game.$('#filters [data-f="tier:4"]')).click();
+  assert.ok(await game.evaluate(() => dexList().every(n => G.dex[n - 1][9] === 4)), 'one tier');
+  assert.match(await game.evaluate(() => filtSummary('dex')), /4★/);
+  // Sort: the short list opens and picks.
+  await (await game.$('#filters [data-f="sort"]')).click();
+  assert.equal(await game.$$eval('#filters .sortlist .klabel', n => n.length), 5, 'number, name, tier, level, recent');
+  await (await game.$('#filters [data-f="sort:name"]')).click();
+  assert.equal(await game.evaluate(() => filt('dex').sort), 'name');
+  // Clear in the panel, then a name search: typing is text, not keys.
+  await (await game.$('#filters [data-f="clear"]')).click();
+  const nm = await game.evaluate(() => name(tipOf(BASES.find(n => S.lines[n]))));
+  await (await game.$('#filters input')).click();
+  await tab.keyboard.type(nm.slice(0, 4).toLowerCase());
+  assert.equal(await game.evaluate(() => tab), 'dex', 'number and letter keys in the box do not switch screens or filters');
+  assert.equal(await game.evaluate(() => filt('dex').q), nm.slice(0, 4).toLowerCase());
+  assert.ok(await game.evaluate(q => dexList().length > 0 && dexList().every(n => S.lines[n] && lineForms(n).some(f => name(f).toLowerCase().includes(q))), nm.slice(0, 4).toLowerCase()), 'caught names only');
+  await tab.keyboard.press('Enter');
+  assert.equal(await game.evaluate(() => document.querySelector('#filters').hidden), true, 'Enter closes the panel');
+  // Kept across visits, then Clear on the bar.
+  assert.ok(JSON.parse(await game.evaluate(() => localStorage.getItem('bored.poke-gacha.ui'))).filters.dex.q);
+  await (await game.$('#dex-keys [data-press="Delete"]')).click();
+  assert.equal(await game.evaluate(() => filtSummary('dex')), 'All');
+  // The Squad roster uses the same bar and panel.
+  await game.evaluate(() => { go('story'); chapterAt = 0; storyMode = 'stages'; storyAt = 0; storyUpdate(); pickStage(); });
+  await (await game.$('#squad-filters [data-fopen="squad"]')).click();
+  await (await game.$('#filters [data-f="cls:sniper"]')).click();
+  assert.ok(await game.evaluate(() => roster().list.length > 0 && roster().list.every(u => u.cls === 'sniper')), 'the roster filters the same way');
+  assert.match(await game.$eval('#squad-filters', n => n.textContent), /Sniper/);
+  await (await game.$('#filters [data-f="done"]')).click();
+  await key(tab, 'c');
+  assert.notEqual(await game.evaluate(() => filt('squad').cls), 'sniper', 'C still cycles the class');
+  await game.evaluate(() => { pref.filters = {}; keep(); });
   assert.deepEqual(errors, []);
 });
 
@@ -403,15 +425,14 @@ test('Dex depth: Info shows the evolution chain with owned forms, class, range a
 test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad level/skill, hatch skip, candy filters and Back, Card)', async t => {
   const { game, errors } = await openWithMons(t);
   const click = async sel => { const n = await game.$(sel); assert.ok(n, sel + ' is there'); await n.click(); await pause(40); };
-  // Dex: F, T and S.
-  await game.evaluate(() => { go('dex'); pref.dexFilter = 'All'; pref.dexType = ''; keep(); dexUpdate(); });
-  const before = await game.evaluate(() => ({ ...dexView() }));
-  await click('#dex-keys [data-press="f"]');
-  assert.notEqual(await game.evaluate(() => dexView().filter), before.filter, 'F by mouse');
-  await click('#dex-keys [data-press="t"]');
-  assert.notEqual(await game.evaluate(() => dexView().type), before.type, 'T by mouse');
-  await click('#dex-keys [data-press="s"]');
-  assert.notEqual(await game.evaluate(() => dexView().sort), before.sort, 'S by mouse');
+  // Dex: the filter bar opens the panel; a tier chip filters.
+  await game.evaluate(() => { go('dex'); pref.filters = {}; keep(); dexUpdate(); });
+  await click('#dex-keys [data-fopen="dex"]');
+  await click('#filters [data-f="tier:3"]');
+  assert.equal(await game.evaluate(() => filt('dex').tier), 3, 'a tier by mouse');
+  await click('#filters [data-f="done"]');
+  await click('#dex-keys [data-press="Delete"]');
+  assert.equal(await game.evaluate(() => filtSummary('dex')), 'All', 'Clear by mouse');
   // Story: › and ‹ change the chapter page.
   await game.evaluate(() => { for (const st of T.chapters[0].stages) T.finish({ stage: st.id, stars: 1, team: [S.owned[0]], waves: 1 }); refreshTop(); go('story'); chapterAt = 0; storyMode = 'stages'; storyUpdate(); });
   await click('#story-title [data-press="ArrowRight"]');
@@ -447,9 +468,10 @@ test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad le
   // Shop, candy picker: a filter and Back.
   if (await game.evaluate(() => !!G.coinShop)) {
     await game.evaluate(() => { go('shop'); shopMode = 'candy'; shopConfirm = null; candyAt = 0; shopUpdate(); });
-    const f0 = await game.evaluate(() => candyView().filter);
-    await click('#shop-preview [data-press="f"]');
-    assert.notEqual(await game.evaluate(() => candyView().filter), f0);
+    await click('#candy-bar [data-fopen="candy"]');
+    await click('#filters [data-f="tier:3"]');
+    assert.equal(await game.evaluate(() => filt('candy').tier), 3);
+    await click('#filters [data-f="done"]');
     await click('#shop-preview [data-press="Backspace"]');
     assert.equal(await game.evaluate(() => shopMode), 'list', 'Back by mouse');
   }
@@ -725,7 +747,7 @@ test('coin shop: candy for a picked line, shards and preset slots, each with a c
   assert.equal(await game.evaluate(l => S.lines[l].candy, line) - candy0, 5);
   assert.match(await game.$eval('#shop-list', n => n.textContent), /45\/50 today/);
   await key(tab, 't');
-  const type = await game.evaluate(() => candyView().type);
+  const type = await game.evaluate(() => filt('candy').types[0]);
   assert.ok(await game.evaluate(t => candyLines().every(n => G.dex[n - 1][1].split('/').includes(t)), type), 'T filters by type, like the Dex');
   await key(tab, 'Backspace');
   assert.equal(await game.evaluate(() => shopMode), 'list');
@@ -1184,19 +1206,19 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
   assert.equal(await game.$$eval('#squad-detail .skills > span', n => n.length), 4);
   // Filters: C cycles the class (spelled out), T a type, R a tier, Q only the squad.
   await key(tab, 'c');
-  const cls = await game.evaluate(() => sqView().cls);
+  const cls = await game.evaluate(() => filt('squad').cls);
   assert.equal(cls, 'vanguard');
   assert.match(await game.$eval('#squad-filters', n => n.textContent), /Vanguard/);
   assert.ok(await game.evaluate(c => rosterCache.list.every(u => u.cls === c), cls));
-  await game.evaluate(() => { pref.squadView = {}; keep(); squadUpdate(); });
+  await game.evaluate(() => { pref.filters = {}; keep(); squadUpdate(); });
   await key(tab, 'r');
   assert.ok(await game.evaluate(() => rosterCache.list.every(u => tierOf(u.num) === 3)));
   await key(tab, 'q');
   // Q: only squad members (still 3★ only).
   const shown = await game.evaluate(() => rosterCache.list.map(u => u.num).sort((a, b) => a - b));
   assert.deepEqual(shown, await game.evaluate(() => squadPick().filter(n => tierOf(n) === 3).sort((a, b) => a - b)));
-  await game.evaluate(() => { pref.squadView = {}; keep(); squadUpdate(); });
-  // Sorting: S goes Level, Cost, Tier, Newest.
+  await game.evaluate(() => { pref.filters = {}; keep(); squadUpdate(); });
+  // Sorting: S goes Level, Cost, Number, Name, Tier, Recent.
   await key(tab, 's');
   const costs = await game.evaluate(() => rosterCache.list.map(u => u.cost));
   assert.deepEqual(costs, costs.slice().sort((a, b) => a - b), 'sorted by cost');
