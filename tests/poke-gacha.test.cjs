@@ -1258,3 +1258,23 @@ test('Pull shows each machine\'s rates and my pity; Eggs and Quests get a dot wh
   assert.equal(await game.$$eval('#tabs [data-tab="quests"] .alert', n => n.length), 0);
   assert.deepEqual(errors, []);
 });
+
+test('fallback font: the Dex detail stays in its panel, an empty tray says so on one line, and battle talk covers the bars below it', async t => {
+  // The suite aborts the webfont, so this runs in the mono/Arial fallback (the narrowest case).
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => go('dex'));
+  const inside = await game.evaluate(() => { const d = $('#dex-detail').getBoundingClientRect(); return [...$('#dex-detail').querySelectorAll('*')].every(n => { const b = n.getBoundingClientRect(); return !b.width || b.right <= d.right + 1; }); });
+  assert.ok(inside, 'nothing in the Dex detail runs past its panel');
+  await game.evaluate(() => { while (S.eggs.length) G.hatch(); refreshTop(); go('eggs'); });
+  const empty = await game.$eval('#eggs-grid > p', n => n.scrollWidth <= n.clientWidth + 1);
+  assert.ok(empty, '"No eggs yet." is not clipped');
+  await game.evaluate(() => { go('story'); chapterAt = 0; storyMode = 'stages'; storyAt = 0; storyUpdate(); pickStage(); setSquad(S.owned.slice(0, 4)); startBattle(); battle.talk = ['A line long enough to need some room in the box, which wraps once.']; battleTalk(); });
+  const [talk, bar, tip] = await Promise.all(['#battle-talk', '#deploy', '#battle-tip'].map(s => rect(game, s)));
+  assert.ok(talk.t <= bar.t + 0.5 && talk.t <= tip.t + 0.5, 'the talk box is as tall as the deploy bar and the tip');
+  assert.ok(Math.abs(tip.t - bar.t) <= 0.5, 'the tip and the deploy bar line up at the top');
+  const fits = await game.$eval('#battle-talk', n => n.scrollHeight <= n.clientHeight + 1);
+  assert.ok(fits, 'the talk text fits its box');
+  await game.evaluate(() => { battle.talk = []; battleTalk(); leaveBattle(); });
+  void tab;
+  assert.deepEqual(errors, []);
+});
