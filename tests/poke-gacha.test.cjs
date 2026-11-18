@@ -592,6 +592,54 @@ test('progression: Squad and Dex show the level cap, and K picks which unlocked 
   assert.deepEqual(errors, []);
 });
 
+test('coin shop: candy for a picked line, shards and preset slots, each with a confirm step and its limit shown', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  if (!await game.evaluate(() => !!G.coinShop)) return t.skip('the hub has no coin shop');
+  await game.evaluate(() => { const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:coins'] = { at: now - 100, g: { coins: 20000 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop(); });
+  await key(tab, '5');
+  const labels = await game.evaluate(() => shopItems().map(i => i.kind + ':' + i.label));
+  assert.ok(labels.includes('shards:10 shards · 50/50 a week') && labels.some(l => l.startsWith('candy:')) && labels.includes('preset:Squad preset 4 of 5'));
+  const row = kind => game.evaluate(k => shopItems().findIndex(i => i.kind === k), kind);
+  // Shards: Enter asks, Backspace cancels without buying, Enter Enter buys; the weekly limit counts down.
+  await game.evaluate(i => { shopAt = i; shopUpdate(); }, await row('shards'));
+  const coins0 = await game.evaluate(() => S.balance.coins);
+  await key(tab, 'Enter');
+  assert.match(await game.$eval('#msg', n => n.textContent), /Buy 10 shards for 500 coins\? Enter: buy/);
+  await key(tab, 'Backspace');
+  assert.equal(await game.evaluate(() => S.balance.coins), coins0, 'cancelled: nothing bought');
+  assert.equal(await game.evaluate(() => tab), 'shop', 'Backspace on a question only cancels it');
+  for (let i = 0; i < 5; i++) { await key(tab, 'Enter'); await key(tab, 'Enter'); }
+  assert.deepEqual(await game.evaluate(c0 => [S.shop.shardsLeft, c0 - S.balance.coins], coins0), [0, 2500]);
+  assert.match(await game.evaluate(() => shopItems().find(i => i.kind === 'shards').label), /0\/50 a week/);
+  // Candy: Enter opens the caught lines with the Dex filters; Enter Enter buys for the line under the cursor.
+  await game.evaluate(i => { shopAt = i; shopUpdate(); }, await row('candy'));
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => shopMode), 'candy');
+  const lines = await game.evaluate(() => candyLines());
+  assert.ok(lines.length > 0 && await game.evaluate(l => l.every(n => !!S.lines[n]), lines), 'caught lines only');
+  const line = lines[0], candy0 = await game.evaluate(l => S.lines[l].candy, line);
+  await key(tab, 'Enter'); await key(tab, 'Enter');
+  assert.equal(await game.evaluate(l => S.lines[l].candy, line) - candy0, 5);
+  assert.match(await game.$eval('#shop-list', n => n.textContent), /45\/50 today/);
+  await key(tab, 't');
+  const type = await game.evaluate(() => candyView().type);
+  assert.ok(await game.evaluate(t => candyLines().every(n => G.dex[n - 1][1].split('/').includes(t)), type), 'T filters by type, like the Dex');
+  await key(tab, 'Backspace');
+  assert.equal(await game.evaluate(() => shopMode), 'list');
+  // Presets: 4th and 5th; then Squad shows T1-T5 and Start, and nothing spills.
+  await game.evaluate(i => { shopAt = i; shopUpdate(); }, await row('preset'));
+  await key(tab, 'Enter'); await key(tab, 'Enter'); await key(tab, 'Enter'); await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => S.shop.presets), 5);
+  assert.match(await game.evaluate(() => shopItems().find(i => i.kind === 'preset').label), /Squad presets: 5 of 5/);
+  const spill = await game.evaluate(() => [...document.querySelectorAll('#scr-shop *, #msg')].filter(n => n.offsetParent && n.clientWidth > 0 && n.scrollWidth > n.clientWidth + 1).map(n => n.className));
+  assert.deepEqual(spill, []);
+  await key(tab, '1'); await key(tab, 'Enter');
+  const head = await game.$eval('#squad-stage .teams', n => [n.textContent, n.scrollWidth <= n.clientWidth + 1]);
+  assert.deepEqual(head, ['T1T2T3T4T5Start', true]);
+  assert.deepEqual(errors, []);
+});
+
 test('tower defense: chapter 4 says which enemies are armored', async t => {
   const { tab, game, errors } = await openWithMons(t);
   if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length > 3)) return t.skip('the hub engine has fewer than 4 chapters');

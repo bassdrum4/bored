@@ -226,6 +226,9 @@ canvas, img { image-rendering: pixelated; display: block }
 #squad-stage .teams { display: flex; gap: 6px; align-items: center; margin-top: 2px }
 #squad-stage .teams span { padding: 0 4px; border: 1px solid var(--dim); cursor: pointer; line-height: 18px }
 #squad-stage .teams span.on { border-color: var(--gold); color: var(--gold) }
+/* Four or five saved teams (from the coin shop): a little tighter, so Start still fits. */
+#squad-stage .teams.many { gap: 3px }
+#squad-stage .teams.many span { padding: 0 2px }
 #squad-stage .teams span.at { outline: 2px solid var(--paper); outline-offset: 1px }
 #squad-stage .teams .start { margin-left: auto; background: var(--red); border-color: var(--red); color: var(--paper) }
 #squad-stage .teams .start.off { background: none; border-color: var(--dim); color: var(--dim) }
@@ -387,7 +390,7 @@ let tab = pref.tab || "pull", machine = pref.machine || "move", S = null;
 const name = num => G.dex[num - 1][0];
 const REASONS = { vouchers: "Not enough vouchers.", full: "Egg storage is full (99). Hatch some first.", inactive: "Your wallet is not open yet.",
   candy: "Not enough candy.", shards: "Not enough shards.", owned: "Already done.", order: "Cut the cost by 1 first.", locked: "That look is not unlocked.",
-  "not-owned": "You do not have that one yet.", cap: "At this form's level cap. Evolve it to raise the cap." };
+  "not-owned": "You do not have that one yet.", coins: "Not enough coins.", limit: "That limit is used up for now.", cap: "At this form's level cap. Evolve it to raise the cap." };
 
 /* ── The palette, and pixel art drawn at 2x from it ────────────────────── */
 const C = { ink: "#1c1b2c", panel: "#2c2a44", red: "#c8372f", paper: "#f4f1ff", dim: "#807c9a", gold: "#e3ad2b", teal: "#3f9e8a", sky: "#8fd3e8" };
@@ -1110,8 +1113,8 @@ const DEX_FILTERS = ["All", "Owned", "Not owned", "3★", "4★", "5★", "6★"
 const DEX_TYPES = [...new Set(BASES.flatMap(num => G.dex[num - 1][1].split("/")))].sort();
 const dexView = () => ({ filter: DEX_FILTERS.includes(pref.dexFilter) ? pref.dexFilter : "All",
   type: DEX_TYPES.includes(pref.dexType) ? pref.dexType : "", sort: DEX_SORTS.includes(pref.dexSort) ? pref.dexSort : "Number" });
-function dexList() {
-  const v = dexView(), tier = num => G.dex[num - 1][9];
+function dexList(v = dexView()) {
+  const tier = num => G.dex[num - 1][9];
   let list = BASES.filter(num => v.filter === "Owned" ? !!S.lines[num] : v.filter === "Not owned" ? !S.lines[num]
     : /★/.test(v.filter) ? tier(num) === Number(v.filter[0]) : true);
   // A type only finds caught lines: an uncaught line's type stays ??? like the rest of it.
@@ -1232,10 +1235,30 @@ function dexKey(e) {
 }
 
 /* ── Shop: coins for Regulars, and shards for listed SP skins ──────────── */
-let shopAt = 0;
+let shopAt = 0, shopConfirm = null, shopMode = "list", candyAt = 0;
+// The candy picker lists caught lines with the Dex's filters (kept apart from the Dex's own).
+const CANDY_FILTERS = ["All", "3★", "4★", "5★", "6★"];
+const candyView = () => ({ filter: CANDY_FILTERS.includes(pref.candyFilter) ? pref.candyFilter : "All",
+  type: DEX_TYPES.includes(pref.candyType) ? pref.candyType : "", sort: DEX_SORTS.includes(pref.candySort) ? pref.candySort : "Number" });
+const candyLines = () => dexList(candyView()).filter(line => !!S.lines[line]);
+const candyLeft = line => G.coinShop ? G.coinShop.candy.perLineDay - ((S.shop && S.shop.candyToday[line]) || 0) : 0;
 function shopItems() {
   const items = [{ kind: "reg", label: "Regular voucher", price: 100, cur: "coins", icon: ticket("regular"),
     about: "1 Regular voucher for 100 coins. Coins come from Poké Idle, Pokédoku and tower defense." }];
+  // The coin shop (from the hub): candy for a line, shards, and squad preset slots.
+  if (G.coinShop && S.shop) {
+    const cs = G.coinShop, sh = S.shop;
+    items.push({ kind: "candy", label: "Candy: " + cs.candy.candy + " for a line", price: cs.candy.coins, cur: "coins", icon: candyIcon(), locked: !Object.keys(S.lines).length,
+      about: "Pick a caught line: " + cs.candy.candy + " of its candy for " + cs.candy.coins + " coins, up to " + cs.candy.perLineDay + " per line a day. Enter: choose the line." });
+    items.push({ kind: "shards", label: cs.shards.shards + " shards · " + sh.shardsLeft + "/" + cs.shards.perWeek + " a week", price: cs.shards.coins, cur: "coins", icon: shardIcon(),
+      locked: sh.shardsLeft < cs.shards.shards,
+      about: cs.shards.shards + " shards for " + cs.shards.coins + " coins, up to " + cs.shards.perWeek + " a week (resets Monday). " + sh.shardsLeft + " left this week." });
+    const maxed = sh.nextPreset == null;
+    items.push({ kind: "preset", label: maxed ? "Squad presets: " + sh.presets + " of " + cs.presets.max : "Squad preset " + (sh.presets + 1) + " of " + cs.presets.max,
+      price: sh.nextPreset || 0, cur: "coins", icon: classIcon("guard"), owned: maxed,
+      about: maxed ? "You have every squad preset slot (" + sh.presets + "). Switch teams in Squad with P." : "A " + ordinal(sh.presets + 1) + " saved team in Squad, for good. Then " +
+        (cs.presets.prices[sh.presets + 1 - cs.presets.start] && sh.presets + 2 <= cs.presets.max ? cs.presets.prices[sh.presets + 1 - cs.presets.start] + " coins for the next." : "that's all of them.") });
+  }
   // Lines the eggs never hatch (Mew, for now) have no way in, so their skins wait off the list.
   for (const skin of skins().filter(skin => G.dex[G.lineOf(skin.species) - 1][9] > 0)) {
     const held = S.lines[G.lineOf(skin.species)], forms = skin.forms || [skin.species];
@@ -1248,31 +1271,83 @@ function shopItems() {
   }
   return items;
 }
+const ordinal = n => n + (n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th");
+// What the confirm step asks.
+function confirmText(it, line) {
+  if (it.kind === "candy") return "Buy " + G.coinShop.candy.candy + " " + name(tipOf(line)) + " candy for " + it.price + " coins?";
+  if (it.kind === "sp") return "Buy " + it.label + " for " + it.price + " shards?";
+  return "Buy " + (it.kind === "reg" ? "1 Regular voucher" : it.kind === "shards" ? G.coinShop.shards.shards + " shards" : "squad preset " + (S.shop.presets + 1)) + " for " + it.price + " coins?";
+}
+function candyUpdate() {
+  const list = candyLines(), v = candyView(), cs = G.coinShop.candy;
+  if (candyAt >= list.length) candyAt = Math.max(0, list.length - 1);
+  titled($("#shop-title"), "CANDY", list.length + " lines");
+  rows($("#shop-list"), list.map(line => ({ icon: mini(tipOf(line), S.lines[line].look), label: String(line).padStart(4, "0") + " " + name(tipOf(line)),
+    right: shopConfirm === "candy:" + line ? ["Buy?"] : [el("span", "num", candyLeft(line) + "/" + cs.perLineDay), " today"],
+    off: candyLeft(line) < cs.candy || S.balance.coins < cs.coins })), candyAt, (i, click) => { candyAt = i; if (click) buyNow(shopItems()[shopAt], list[i]); else candyUpdate(); });
+  if (!list.length) { $("#shop-list").replaceChildren(el("p", "dim", "No caught lines match. F, T and S change the filters.")); return say("Nothing matches F: " + v.filter + " · T: " + (v.type || "any type") + "."); }
+  const line = list[candyAt], l = S.lines[line];
+  const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins · ", el("span", "num", l.candy), " candy");
+  const left = el("div", "dim"); left.append(el("span", "num", candyLeft(line)), " of " + cs.perLineDay + " left today");
+  $("#shop-preview").replaceChildren(el("div", "title", "CANDY"), cellWith(sprite(tipOf(line), G.lookFor(tipOf(line)))), el("div", "", name(tipOf(line))), have, left);
+  say(shopConfirm ? confirmText(shopItems()[shopAt], line) + " Enter: buy · Backspace: no."
+    : cs.candy + " candy for " + cs.coins + " coins. Candy evolves a line and buys its upgrades in the Dex. F: " + v.filter + " · T: " + (v.type || "any type") + " · S: " + v.sort + ". Backspace: back.");
+}
 function shopUpdate() {
   drawBackdrop();
+  if (shopMode === "candy" && G.coinShop) return candyUpdate();
   const items = shopItems();
   if (shopAt >= items.length) shopAt = items.length - 1;
-  $("#shop-title").textContent = items.length > 1 ? "SHARD SHOP" : "SHOP";
-  rows($("#shop-list"), items.map(it => ({ icon: it.icon, label: it.label, right: it.owned ? [check(true)] : [it.price, it.cur === "coins" ? coin() : shardIcon()],
-    off: it.owned || it.locked || (it.cur === "coins" ? S.balance.coins : S.balance.shards) < it.price })), shopAt, (i, click) => { shopAt = i; if (click) buy(items[i]); else shopUpdate(); });
+  $("#shop-title").textContent = "SHOP";
+  rows($("#shop-list"), items.map((it, i) => ({ icon: it.icon, label: it.label,
+    right: it.owned ? [check(true)] : shopConfirm === "item:" + i ? ["Buy?"] : [it.price, it.cur === "coins" ? coin() : shardIcon()],
+    off: it.owned || it.locked || (it.cur === "coins" ? S.balance.coins : S.balance.shards) < it.price })), shopAt, (i, click) => { if (i !== shopAt) shopConfirm = null; shopAt = i; if (click) buy(items[i]); else shopUpdate(); });
   const it = items[shopAt];
   const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins");
   if (items.length > 1) have.append(" · ", el("span", "num", S.balance.shards), " shards");
-  $("#shop-preview").replaceChildren(el("div", "title", it.kind === "sp" ? "PREVIEW" : "VOUCHER"),
-    cellWith(it.kind === "sp" ? sprite((it.skin.forms || [it.skin.species]).slice(-1)[0], it.skin.id) : ticket("regular", 2)), el("div", "", it.kind === "sp" ? it.skin.name : "1 Regular = 1 egg"), have);
-  say(it.about);
+  const pic = it.kind === "sp" ? sprite((it.skin.forms || [it.skin.species]).slice(-1)[0], it.skin.id) : it.kind === "candy" ? candyIcon(4) : it.kind === "shards" ? shardIcon() : it.kind === "preset" ? classIcon("guard") : ticket("regular", 2);
+  const what = { sp: it.skin && it.skin.name, candy: "5 candy, any caught line", shards: "10 shards", preset: "A saved team", reg: "1 Regular = 1 egg" }[it.kind];
+  $("#shop-preview").replaceChildren(el("div", "title", it.kind === "sp" ? "PREVIEW" : it.kind === "reg" ? "VOUCHER" : "COINS"), cellWith(pic), el("div", "", what), have);
+  say(shopConfirm === "item:" + shopAt ? confirmText(it) + " Enter: buy · Backspace: no." : it.about);
 }
+// Every purchase asks first: Enter once shows "Buy?", Enter again buys, anything else cancels.
 function buy(it) {
   if (it.owned || it.locked) return say(it.about);
-  const r = it.kind === "reg" ? G.buyRegular({ count: 1 }) : G.buySkin({ skin: it.skin.id });
+  if (it.kind === "candy") { shopMode = "candy"; shopConfirm = null; candyAt = 0; return shopUpdate(); }
+  if (shopConfirm !== "item:" + shopAt) { shopConfirm = "item:" + shopAt; return shopUpdate(); }
+  buyNow(it);
+}
+function buyNow(it, line) {
+  if (it.kind === "candy" && shopConfirm !== "candy:" + line) { shopConfirm = "candy:" + line; return shopUpdate(); }
+  shopConfirm = null;
+  const r = it.kind === "reg" ? G.buyRegular({ count: 1 }) : it.kind === "sp" ? G.buySkin({ skin: it.skin.id }) : it.kind === "candy" ? G.buyCandy({ line })
+    : it.kind === "shards" ? G.buyShards() : G.buyPreset();
   refreshTop(); shopUpdate();
-  say(r.ok ? (it.kind === "reg" ? "Bought 1 Regular voucher." : "SP skin unlocked. Wear it from the Dex: Look.") : (REASONS[r.reason] || "Not now."));
+  const done = { reg: "Bought 1 Regular voucher.", sp: "SP skin unlocked. Wear it from the Dex: Look.", candy: "Bought " + (G.coinShop ? G.coinShop.candy.candy : 5) + " candy" + (line ? " for " + name(tipOf(line)) : "") + ".",
+    shards: "Bought " + (G.coinShop ? G.coinShop.shards.shards : 10) + " shards.", preset: "A new squad preset: pick it in Squad (T" + teamCount() + ", or P)." }[it.kind];
+  say(r.ok ? done : (REASONS[r.reason] || "Not now."));
 }
 function shopKey(e) {
+  const k = e.key;
+  if (shopMode === "candy") {
+    const list = candyLines();
+    if (/^[fts]$/i.test(k)) {
+      e.preventDefault(); shopConfirm = null; candyAt = 0;
+      const v = candyView();
+      if (k.toLowerCase() === "f") pref.candyFilter = CANDY_FILTERS[(CANDY_FILTERS.indexOf(v.filter) + 1) % CANDY_FILTERS.length];
+      if (k.toLowerCase() === "t") pref.candyType = ["", ...DEX_TYPES][(["", ...DEX_TYPES].indexOf(v.type) + 1) % (DEX_TYPES.length + 1)];
+      if (k.toLowerCase() === "s") pref.candySort = DEX_SORTS[(DEX_SORTS.indexOf(v.sort) + 1) % DEX_SORTS.length];
+      keep(); return shopUpdate();
+    }
+    if ((k === "ArrowUp" || k === "ArrowDown") && list.length) { e.preventDefault(); shopConfirm = null; candyAt = (candyAt + (k === "ArrowUp" ? -1 : 1) + list.length) % list.length; return shopUpdate(); }
+    if ((k === "Enter" || k === " ") && list[candyAt]) { e.preventDefault(); return buyNow(shopItems()[shopAt], list[candyAt]); }
+    if (k === "Backspace") { e.preventDefault(); if (shopConfirm) shopConfirm = null; else shopMode = "list"; return shopUpdate(); }
+    return;
+  }
   const items = shopItems();
-  if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); shopAt = (shopAt + (e.key === "ArrowUp" ? -1 : 1) + items.length) % items.length; shopUpdate(); }
-  else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); buy(items[shopAt]); }
-  else if (e.key === "Backspace") { e.preventDefault(); go("pull"); }
+  if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); shopConfirm = null; shopAt = (shopAt + (k === "ArrowUp" ? -1 : 1) + items.length) % items.length; shopUpdate(); }
+  else if (k === "Enter" || k === " ") { e.preventDefault(); buy(items[shopAt]); }
+  else if (k === "Backspace") { e.preventDefault(); if (shopConfirm) { shopConfirm = null; shopUpdate(); } else go("pull"); }
 }
 
 /* ── Quests: daily, weekly and starter missions, and trophies ──────────── */
@@ -1649,9 +1724,13 @@ const classIcon = cls => { const c = mapCanvas("cls-" + cls, { k: C.ink, 1: CLAS
 const SORTS = [["level", "Level"], ["cost", "Cost"], ["tier", "Tier"], ["recent", "Newest"]];
 const TIERS = [3, 4, 5, 6];
 const sq = { zone: "grid", at: 0, slot: 0, head: 3, note: "" };
+// Saved teams: 3 to start; the coin shop sells more, up to 5 (S.shop.presets, from the hub).
+const teamCount = () => Math.max(3, Math.min(5, (S && S.shop && S.shop.presets) || 3));
 function teams() {
-  if (!Array.isArray(pref.squads) || pref.squads.length !== 3) pref.squads = [Array.isArray(pref.squad) ? pref.squad.slice() : [], [], []];
-  if (![0, 1, 2].includes(pref.team)) pref.team = 0;
+  const n = teamCount();
+  if (!Array.isArray(pref.squads)) pref.squads = [Array.isArray(pref.squad) ? pref.squad.slice() : []];
+  while (pref.squads.length < n) pref.squads.push([]);
+  if (!(Number.isInteger(pref.team) && pref.team >= 0 && pref.team < n)) pref.team = 0;
   return pref.squads;
 }
 function setSquad(list) { teams(); pref.squad = list.slice(0, 8); pref.squads[pref.team] = pref.squad.slice(); keep(); }
@@ -1751,12 +1830,12 @@ function squadUpdate() {
   const SHORT = { flying: "fly", exploding: "boom", armored: "armor", fast: "fast" };
   const marks = foes.marks.length ? [el("div", "gold", "Watch: " + foes.marks.map(m => SHORT[m] || m).join(" · "))] : [];
   if (marks[0]) { marks[0].style.whiteSpace = "nowrap"; marks[0].title = "Watch for: " + foes.marks.join(", "); }
-  const row = el("div", "teams");
-  ["Team 1", "Team 2", "Team 3"].forEach((t, i) => {
+  const row = el("div", "teams" + (teamCount() > 3 ? " many" : ""));
+  Array.from({ length: teamCount() }, (_, i) => "Team " + (i + 1)).forEach((t, i) => {
     const b = el("span", (pref.team === i ? "on" : "") + (sq.zone === "head" && sq.head === i ? " at" : ""), t.replace("Team ", "T"));
     b.dataset.team = i; b.title = t + ": " + (pref.squads[i].length ? pref.squads[i].map(name).join(", ") : "empty"); row.append(b);
   });
-  const go_ = el("span", "start" + (pick.length ? "" : " off") + (sq.zone === "head" && sq.head === 3 ? " at" : ""), "Start");
+  const go_ = el("span", "start" + (pick.length ? "" : " off") + (sq.zone === "head" && sq.head === teamCount() ? " at" : ""), "Start");
   go_.dataset.start = 1; row.append(go_);
   box.replaceChildren(head, roleRow(stage, true), ...marks, row);
   // Four kinds can be too wide for "Watch: ": the gold words alone say it.
@@ -1827,7 +1906,7 @@ function squadStart() {
 function squadKey(e) {
   const k = e.key, { list } = rosterCache || roster(), cols = 7;
   if (/^[ctrqs]$/i.test(k)) { e.preventDefault(); return cycleSquad(k.toLowerCase()); }
-  if (k === "p" || k === "P") { e.preventDefault(); useTeam((pref.team + 1) % 3); sq.note = ""; return squadUpdate(); }
+  if (k === "p" || k === "P") { e.preventDefault(); useTeam((pref.team + 1) % teamCount()); sq.note = ""; return squadUpdate(); }
   if (k === "Backspace") { e.preventDefault(); sq.note = ""; storyMode = "stages"; return storyUpdate(); }
   if (k === "l" || k === "L") {
     const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null;
@@ -1845,7 +1924,7 @@ function squadKey(e) {
     e.preventDefault(); sq.note = "";
     const [dx, dy] = move;
     if (sq.zone === "head") {
-      if (dy > 0) sq.zone = "slots"; else sq.head = (sq.head + dx + 4) % 4;
+      if (dy > 0) sq.zone = "slots"; else sq.head = (Math.min(sq.head, teamCount()) + dx + teamCount() + 1) % (teamCount() + 1);
     } else if (sq.zone === "slots") {
       if (dy < 0) sq.zone = "head"; else if (dy > 0 && list.length) { sq.zone = "grid"; sq.at = Math.min(sq.slot, list.length - 1); } else sq.slot = (sq.slot + dx + 8) % 8;
     } else {
@@ -1857,7 +1936,7 @@ function squadKey(e) {
   }
   if (k === "Enter" || k === " ") {
     e.preventDefault();
-    if (sq.zone === "head") { if (sq.head === 3) return squadStart(); useTeam(sq.head); sq.note = ""; return squadUpdate(); }
+    if (sq.zone === "head") { if (sq.head >= teamCount()) return squadStart(); useTeam(sq.head); sq.note = ""; return squadUpdate(); }
     if (sq.zone === "slots") { const num = squadPick()[sq.slot]; if (num) squadToggle(num); return; }
     if (list[sq.at]) squadToggle(list[sq.at].num);
   }
@@ -2674,7 +2753,7 @@ function refreshTop() {
 function go(id) {
   if (!SCREENS[id] || hatching || battle || picking || !shownTabs().some(([shown]) => shown === id)) return;
   tab = pref.tab = id; keep();
-  message = null; ratesOpen = false;
+  message = null; ratesOpen = false; shopMode = "list"; shopConfirm = null;
   for (const [sid] of TABS) $("#scr-" + sid).hidden = sid !== id;
   // Only the squad screen hides the message box; every other screen has it.
   $("#msg").hidden = false;
