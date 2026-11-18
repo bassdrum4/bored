@@ -18,12 +18,13 @@ const dex = moduleUnderTest('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CH
 const rewards = moduleUnderTest('src/hub/rewards.js', [
   'mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
-const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools', 'pickStarter', 'STARTERS', 'STARTER_GIFTS'],
+const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools', 'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'stageOf', 'evolutionsOf', 'setSkill', 'evolve'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
 const td = moduleUnderTest('src/hub/td.js', [
   'classOf', 'STAGES', 'CHAPTERS', 'FAST', 'MAX_RISK', 'WEEKLY_MILESTONES', 'WEEKLY_UNLOCK', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
-  'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H'
-], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor });
+  'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H', 'lineCap', 'LEVEL_CAPS', 'SKILL_KINDS'
+], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor,
+  stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
 const { walletBalance, activateWallet, grantOnce } = rewards;
 
 const TODAY = '2026-11-16'; // a Monday
@@ -343,6 +344,21 @@ test('weekly: the Poké Idle daily boss on 5 days of the week opens the mission 
   assert.ok(td.tdState(w, TODAY).weekly.every(m => !m.later), 'no weekly mission is locked');
 });
 
+test('weekly missions report how far along they are', () => {
+  let w = owning([named('Machamp')]);
+  for (const d of ['2026-11-16', '2026-11-17']) w.entries['pi:boss:' + d] = { at: 1 };
+  for (let d = 16; d <= 18; d++) w.entries['pdoku:daily:doku:2026-11-' + d] = { at: 1 };
+  w = td.tdFinish(w, { stage: '1-1', stars: 1, team: [named('Machamp')], waves: 1 }, opts()).wallet;
+  const weekly = Object.fromEntries(td.tdState(w, TODAY).weekly.map(m => [m.id, [m.have, m.need, m.done]]));
+  assert.deepEqual(weekly.boss5, [2, 5, false]);
+  assert.deepEqual(weekly.doku10, [3, 10, false]);
+  assert.deepEqual(weekly.teams3, [1, 3, false]);
+  assert.deepEqual(weekly.star3x5, [0, 5, false]);
+  for (let d = 19; d <= 21; d++) w.entries['pi:boss:2026-11-' + d] = { at: 1 };
+  w = td.tdFinish(w, { stage: '1-1', stars: 1, team: [named('Machamp')], waves: 1 }, opts()).wallet;
+  assert.deepEqual(td.tdState(w, TODAY).weekly.find(m => m.id === 'boss5').have, 5, 'a claimed mission shows full');
+});
+
 test('levels cost coins and raise stats; the squad reads candy upgrades', () => {
   const num = named('Machamp');
   let w = owning([num]);
@@ -492,4 +508,44 @@ test('every starter with its three gifts clears 1-1 at level 1, deployed blocker
     const b = playInOrder(stage, squad, plan);
     assert.equal(b.over, 'win', gacha.mon(starter).name + ' and the gifts win 1-1');
   }
+});
+
+test('level caps rise with evolution: 5 for a base form, 8 for a middle one, 10 once a final form is owned', () => {
+  const [charmander, charmeleon, charizard, tauros] = ['Charmander', 'Charmeleon', 'Charizard', 'Tauros'].map(named);
+  const cap = nums => td.lineCap(gacha.gachaState(owning(nums), TODAY), gacha.lineOf(nums[0]));
+  assert.deepEqual([cap([charmander]), cap([charmander, charmeleon]), cap([charmander, charmeleon, charizard]), cap([tauros])], [5, 8, 10, 10]);
+  // Buying levels stops at the cap, with its own reason.
+  let w = fund(owning([charmander]), { coins: 5000 });
+  for (let i = 0; i < 4; i++) w = td.levelUp(w, charmander, opts()).wallet;
+  assert.equal(td.tdState(w, TODAY).levels[charmander], 5);
+  assert.equal(td.levelUp(w, charmander, opts()).reason, 'cap');
+  assert.equal(td.squadFrom(w, [charmander], TODAY)[0].cap, 5);
+  // A level bought before the caps (an old Lv 7) is kept: the cap only stops buying.
+  w.entries['spend:old-lv'] = { at: 2, g: { coins: 0 }, x: { lv: charmander, to: 7 } };
+  assert.equal(td.squadFrom(w, [charmander], TODAY)[0].level, 7);
+});
+
+test('a line uses the skill the player picks: quick charges sooner and hits softer, heavy the reverse; locked skills cannot be picked', () => {
+  const num = named('Machamp');
+  const base = td.unitStats(num, { skills: [true, true, true, false] });
+  assert.equal(base.skillKind, 'steady', 'no choice: the first skill, as before');
+  const quick = td.unitStats(num, { skills: [true, true, true, false], skill: 1 }), heavy = td.unitStats(num, { skills: [true, true, true, false], skill: 2 });
+  assert.ok(quick.spMax < base.spMax && quick.power < base.power);
+  assert.ok(heavy.spMax > base.spMax && heavy.power > base.power);
+  assert.equal(td.unitStats(num, { skills: [true, false, false, false], skill: 2 }).skillKind, 'steady', 'a locked pick falls back');
+  assert.equal(td.unitStats(num, { skills: [true, false, false, true] }).skillKind, 'rare', 'the rare skill is the default once unlocked');
+  // The choice is stored per line and only for an unlocked skill.
+  let w = owning([num]);
+  const line = gacha.lineOf(num);
+  assert.equal(gacha.setSkill(w, line, 2, opts()).reason, 'locked');
+  // A second hatch of the line that rolled its second skill (slot 1).
+  w.entries['spend:own2'] = { at: 1, g: { regular: 0 }, x: { m: 'move', e: [0], w: 0, n: 0, d: TODAY } };
+  w = rewards.mergeWallet(w);
+  w.entries['hatch:own2.0'] = { at: 2, x: { s: num, t: 0, n: 0, k: 1 } };
+  const unlocked = gacha.gachaState(w, TODAY).lines[line].skills;
+  const pick = unlocked.findIndex((on, i) => on && i > 0);
+  assert.ok(pick > 0, 'the hatch unlocked a second skill');
+  w = gacha.setSkill(w, line, pick, opts()).wallet;
+  assert.equal(gacha.gachaState(w, TODAY).lines[line].skill, pick);
+  assert.equal(td.squadFrom(w, [num], TODAY)[0].skillAt, pick, 'the squad uses the pick');
 });

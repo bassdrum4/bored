@@ -18,7 +18,7 @@
 import { DEX, DEX_CHART, DEX_TYPES } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
 import { mergeWallet, walletBalance, grantOnce, spendFrom, readWallet, writeWallet } from './rewards.js';
-import { gachaState, lineOf, mon, skillsOf, lookFor } from './gacha.js';
+import { gachaState, lineOf, mon, skillsOf, lookFor, stageOf, evolutionsOf } from './gacha.js';
 
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const seconds = now => Math.floor(now / 1000);
@@ -294,13 +294,34 @@ export function typeMultiplier(attack, defend) {
 }
 export const MAX_LEVEL = 10;
 export const levelCost = level => 40 * level;
+// Level caps by the most evolved form owned: 5 for a base form that can still evolve, 8 for a
+// middle form, 10 once a final form is owned (a line that never evolves is final at once).
+// Levels bought before the caps existed are kept; the cap only stops buying more.
+export const LEVEL_CAPS = [5, 8, MAX_LEVEL];
+export function lineCap(state, line) {
+  const forms = (state.owned || []).filter(num => lineOf(num) === line);
+  if (!forms.length) return LEVEL_CAPS[0];
+  if (forms.some(num => !evolutionsOf(num).length)) return MAX_LEVEL;
+  return LEVEL_CAPS[Math.min(LEVEL_CAPS.length, Math.max(...forms.map(stageOf))) - 1];
+}
+// The four skill slots play differently: power (damage, healing or energy) and charge (how much
+// SP the skill needs, against the class's own). Steady is today's effect; quick fires more often
+// for less; heavy hits harder and takes longer; the rare skill is stronger at the normal charge.
+export const SKILL_KINDS = [
+  { id: 'steady', name: 'Steady', power: 1, charge: 1 },
+  { id: 'quick', name: 'Quick', power: 0.8, charge: 0.7 },
+  { id: 'heavy', name: 'Heavy', power: 1.3, charge: 1.35 },
+  { id: 'rare', name: 'Rare', power: 1.3, charge: 1 }
+];
 
 /** A squad member's battle stats: level from coins, passive and cost cuts from candy. */
-export function unitStats(num, { level = 1, passive = false, costCut = 0, skills = [true, false, false, false] } = {}) {
+export function unitStats(num, { level = 1, passive = false, costCut = 0, skills = [true, false, false, false], skill = null } = {}) {
   const m = mon(num), cls = classOf(num), c = CLASSES[cls];
   const grow = 1 + 0.08 * (level - 1);
   const special = cls === 'caster' || cls === 'medic';
-  const skillAt = skills[3] ? 3 : [2, 1, 0].find(i => skills[i]) ?? 0;
+  // The chosen skill if it is unlocked; else the rare one if unlocked; else the first.
+  const skillAt = Number.isInteger(skill) && skills[skill] ? skill : skills[3] ? 3 : 0;
+  const kind = SKILL_KINDS[skillAt];
   return {
     num, cls, name: m.name, types: m.types,
     hp: Math.round((m.hp * 5 + 140) * grow * (c.hp || 1)),
@@ -308,8 +329,8 @@ export function unitStats(num, { level = 1, passive = false, costCut = 0, skills
     def: Math.round(m.def * 0.6 * grow),
     interval: Math.max(0.6, Math.min(1.6, 1.7 - m.spe / 140)),
     cost: Math.max(4, c.cost + Math.round(m.bst / 160) - 2 - costCut),
-    block: c.block, range: c.range, ground: c.ground, spMax: c.sp,
-    skill: skillsOf(num)[skillAt], rare: skillAt === 3
+    block: c.block, range: c.range, ground: c.ground, spMax: Math.round(c.sp * kind.charge),
+    skill: skillsOf(num)[skillAt], skillAt, skillKind: kind.id, power: kind.power, rare: skillAt === 3
   };
 }
 export function enemyStats(num, level, boss = false, flying = false) {
@@ -425,7 +446,7 @@ function finishWaveFor(b, e) {
   if (b.waveLeft[e.wave] === 0) b.wavesDone++;
 }
 function useSkill(b, u) {
-  const power = u.rare ? 1.3 : 1;
+  const power = u.power ?? (u.rare ? 1.3 : 1);
   if (u.cls === 'vanguard') b.energy = Math.min(99, b.energy + Math.round(8 * power));
   else if (u.cls === 'blocker') u.hp = Math.min(u.maxHp, u.hp + Math.round(u.maxHp * 0.4 * power));
   else if (u.cls === 'medic') { for (const a of b.units) if (dist(a, u.x, u.y) <= u.range) a.hp = Math.min(a.maxHp, a.hp + Math.round(u.atk * 1.5 * power)); }
@@ -596,20 +617,26 @@ function dailyDone(id, list) {
   if (id === 'big') return won.some(r => r.team.some(num => lineStar(num) >= 5));
   return false;
 }
-function weeklyDone(id, entries, list, monday) {
+// How far a weekly mission is this week: [have, need]. It is done at have >= need.
+function weeklyCount(id, entries, list, monday) {
   const inWeek = day => day >= monday && day < shiftDay(monday, 7);
   const week = list.filter(r => r.stars > 0 && inWeek(r.day));
-  if (id === 'star3x5') return new Set(week.filter(r => r.stars === 3).map(r => r.stage)).size >= 5;
-  if (id === 'daily5') return Object.keys(entries).filter(k => /^td:daily:\d{4}-\d{2}-\d{2}:all$/.test(k) && inWeek(k.slice(9, 19))).length >= 5;
+  const count = re => Object.keys(entries).filter(k => re.test(k) && inWeek(k.match(/\d{4}-\d{2}-\d{2}/)[0])).length;
+  if (id === 'star3x5') return [new Set(week.filter(r => r.stars === 3).map(r => r.stage)).size, 5];
+  if (id === 'daily5') return [count(/^td:daily:\d{4}-\d{2}-\d{2}:all$/), 5];
   if (id === 'teams3') {
     const teams = {};
     for (const r of week) (teams[r.stage] ||= new Set()).add(r.team.slice().sort((a, b) => a - b).join(','));
-    return Object.values(teams).some(set => set.size >= 3);
+    return [Math.max(0, ...Object.values(teams).map(set => set.size)), 3];
   }
   // Read from the wallet: rewards.js writes `pi:boss:<date>` when Poké Idle reports a daily boss win.
-  if (id === 'boss5') return Object.keys(entries).filter(k => /^pi:boss:\d{4}-\d{2}-\d{2}$/.test(k) && inWeek(k.slice(-10))).length >= 5;
-  if (id === 'doku10') return Object.keys(entries).filter(k => /^pdoku:daily:[a-z]+:\d{4}-\d{2}-\d{2}$/.test(k) && inWeek(k.slice(-10))).length >= 10;
-  return false;
+  if (id === 'boss5') return [count(/^pi:boss:\d{4}-\d{2}-\d{2}$/), 5];
+  if (id === 'doku10') return [count(/^pdoku:daily:[a-z]+:\d{4}-\d{2}-\d{2}$/), 10];
+  return [0, 1];
+}
+function weeklyDone(id, entries, list, monday) {
+  const [have, need] = weeklyCount(id, entries, list, monday);
+  return have >= need;
 }
 /** Grant whatever missions are now complete. */
 function claimMissions(wallet, today, now) {
@@ -643,7 +670,11 @@ export function tdState(wallet, today = dailyDate()) {
     unlockedById: Object.fromEntries(STAGES.map((s, i) => [s.id, i === 0 || (best[STAGES[i - 1].id] || 0) > 0])),
     daily: dailyMissions(today).map(m => ({ ...m, done: !!e['td:daily:' + today + ':' + m.id] })),
     dailyAll: !!e['td:daily:' + today + ':all'],
-    weekly: WEEKLY.map(m => ({ ...m, done: !!e['td:week:' + monday + ':' + m.id] })),
+    // have/need: how far each weekly mission is (a claimed one shows full).
+    weekly: WEEKLY.map(m => {
+      const done = !!e['td:week:' + monday + ':' + m.id], [have, need] = weeklyCount(m.id, e, list, monday);
+      return { ...m, done, have: done ? need : Math.min(have, need), need };
+    }),
     weeklyAll: !!e['td:week:' + monday + ':all'],
     // The weekly challenge: this week's stage and the best risk total won so far.
     challenge: weeklyStage(monday),
@@ -708,6 +739,7 @@ export function levelUp(wallet, line, { today = dailyDate(), now = Date.now() } 
   if (!state.lines[line]) return { wallet: mergeWallet(wallet), ok: false, reason: 'not-owned' };
   const level = tdState(wallet, today).levels[line] || 1;
   if (level >= MAX_LEVEL) return { wallet: mergeWallet(wallet), ok: false, reason: 'owned' };
+  if (level >= lineCap(state, line)) return { wallet: mergeWallet(wallet), ok: false, reason: 'cap' };
   const result = spendFrom(wallet, { coins: levelCost(level) }, { id: uuid(), now, x: { lv: line, to: level + 1 } });
   return result.ok ? { wallet: result.wallet, ok: true } : { wallet: mergeWallet(wallet), ok: false, reason: 'coins' };
 }
@@ -716,8 +748,8 @@ export function squadFrom(wallet, species, today = dailyDate()) {
   const state = gachaState(wallet, today), td = tdState(wallet, today);
   return species.filter(num => state.owned.includes(num)).slice(0, 8).map(num => {
     const l = state.lines[lineOf(num)] || {};
-    return { ...unitStats(num, { level: td.levels[lineOf(num)] || 1, passive: !!l.passive, costCut: l.cost || 0, skills: l.skills || [true, false, false, false] }),
-      look: lookFor(state, num), level: td.levels[lineOf(num)] || 1 };
+    return { ...unitStats(num, { level: td.levels[lineOf(num)] || 1, passive: !!l.passive, costCut: l.cost || 0, skills: l.skills || [true, false, false, false], skill: l.skill ?? null }),
+      look: lookFor(state, num), level: td.levels[lineOf(num)] || 1, cap: lineCap(state, lineOf(num)) };
   });
 }
 
@@ -731,6 +763,7 @@ export function tdBridge({ onChange = () => {} } = {}) {
   return {
     // `stages` stays chapter 1 for pages that predate chapters; `chapters` and `allStages` have every chapter.
     stages: CHAPTERS[0].stages, chapter: CHAPTER, chapters: CHAPTERS, allStages: STAGES, classes: CLASSES, W, H, TICK, REDEPLOY, maxLevel: MAX_LEVEL, levelCost,
+    levelCaps: LEVEL_CAPS, skillKinds: SKILL_KINDS, capOf: line => lineCap(gachaState(readWallet()), line),
     classOf, pathsOf, newBattle, step, deploy, retreat, canDeploy, canHit, starsFor, typeMultiplier,
     state: () => tdState(readWallet()),
     squad: species => squadFrom(readWallet(), species),
