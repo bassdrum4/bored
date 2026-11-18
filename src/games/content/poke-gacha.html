@@ -905,7 +905,9 @@ function choose(i) {
     message = { text: r.ok ? "Bought 1 Regular for 100 coins." : REASONS[r.reason] || "Not now." };
   } else {
     const r = G.pull({ voucher: option.voucher, count: option.count, machine });
-    if (r.ok) { turnCrank(); message = { text: r.eggs.length + (r.eggs.length === 1 ? " egg:" : " eggs:"), eggs: r.eggs }; }
+    // Free first hatches are ready at once: say where to open them.
+    const ready = r.ok && G.state().eggs.some(e => e.ready);
+    if (r.ok) { turnCrank(); message = { text: r.eggs.length + (r.eggs.length === 1 ? " egg" : " eggs") + (ready ? ", ready to hatch on Eggs:" : ":"), eggs: r.eggs }; }
     else message = { text: REASONS[r.reason] || "Not now." };
   }
   refreshTop(); updateScene();
@@ -966,6 +968,8 @@ function eggsUpdate() {
   const progress = egg ? el("span", "num", egg.progress + "/" + egg.need) : null;
   if (egg) say(eggWords(egg) + " ", (() => { const d = el("div"); if (egg.free) d.append("No waves needed · "); else d.append(progress, " waves · ");
     d.append( ready ? "Enter hatches " + ready + " ready." : "Waves come from Poké Idle, Pokédoku and battles."); return d; })());
+  // An empty tray before the first clear: the next thing to do is 1-1.
+  else if (T && !(T.state().best["1-1"] > 0) && S.owned.length) say("All hatched. Next: play 1-1 on the Story tab with your squad.");
   else say("Eggs hatch on waves you earn: Poké Idle catches, Pokédoku boards, tower defense waves.");
 }
 function eggsKey(e) {
@@ -980,6 +984,9 @@ function startHatch() {
   if (!r.ok || !r.hatched.length) { say("Nothing is ready yet. Eggs count down on waves you earn."); return; }
   hatching = { list: r.hatched, i: 0, phase: "shake", start: performance.now(), summary: false };
   refreshTop();
+  // A new line fills an empty slot of the active team, so a first squad grows with its hatches.
+  const squad = squadPick(), add = r.hatched.filter(h => h.fresh).map(h => h.species).filter(n => !squad.includes(n) && S.owned.includes(n));
+  if (squad.length < 8 && add.length) setSquad(squad.concat(add).slice(0, 8));
   $("#hatch").hidden = false;
   for (const id of EGG_SHOWN) $("#" + id).hidden = true;
   showHatch();
@@ -1595,6 +1602,9 @@ function lossHint(stage, bt) {
   const tanks = tankTypes(stage), dmg = weakTo(stage), hits = attackTypes(stage).slice(0, 2), notes = [];
   const fell = (bt && bt.fell || []).find(f => (f.cls === "blocker" || f.cls === "guard") && f.lasted < FELL_FAST);
   const leaked = bt && bt.leakHp || [], strong = leaked.length ? leaked.reduce((a, c) => a + c, 0) / leaked.length : 0;
+  // Under the recommended level, that comes first: types do not make up for it.
+  const lv = bt && bt.b && bt.b.squad.length ? Math.floor(bt.b.squad.reduce((n, u) => n + (u.level || 1), 0) / bt.b.squad.length) : 0;
+  if (lv && lv < recLevel(stage)) return "Squad Lv " + lv + ", this stage wants Lv " + recLevel(stage) + ": level up with coins (L in Squad).";
   if (fell && hits.length) notes.push("Your " + T.classes[fell.cls].name.toLowerCase() + " fell fast: try a tank that resists " + hits.join(" and ") + (tanks.length ? " (" + tanks.join(", ") + ")." : "."));
   if (strong >= 0.5 && dmg.length) notes.push("Foes got through with most of their HP: bring " + dmg.join(" or ") + " damage.");
   if (!notes.length && (tanks.length || dmg.length)) notes.push(rolesLine(stage) + ".");
@@ -2545,6 +2555,8 @@ function showResult() {
 }
 function leaveBattle() {
   if (tutor && tutor.id.startsWith("battle-") || tutor && tutor.id.startsWith("foe-")) tutorEnd(false);
+  // A first clear moves the cursor on to the stage it opened, in the same chapter.
+  if (battle && !battle.weekly && battle.result && battle.result.stars && !battle.clearedBefore && stagesNow()[storyAt + 1]) storyAt++;
   battle = null;
   $("#scr-battle").hidden = true; $("#battle-result").hidden = true; $("#msg").hidden = false; $("#tabs").classList.remove("locked");
   $("#frame").classList.remove("battling");
@@ -2623,9 +2635,8 @@ function starterEnter() {
   // A squad of the four, the blocker first, for the first stage.
   if (r.ok) { pref.squad = [...G.starterGifts, num]; keep(); }
   go(T ? "story" : "pull");
-  // Right after the pick: the loop, in a few boxes.
-  if (r.ok) setTimeout(() => tip("loop", TIPS.loop()), 0);
-  if (r.ok) say(name(num) + " joins you, with " + giftNames() + "." + (T ? " Play 1-1 here." : "") + " Your first " + (G.freeHatches || 10) + " eggs hatch at once.");
+  // Right after the pick, go("story") starts the loop tips, which end on the Pull tab.
+  if (r.ok) say(name(num) + " joins you, with " + giftNames() + ". Your first " + (G.freeHatches || 10) + " eggs hatch at once: pull them on the Pull tab, then play 1-1 here.");
 }
 function starterKey(e) {
   const p = picking, n = G.starters.length;
@@ -2706,7 +2717,8 @@ function tutorEnd(seen) {
   $("#tutor").hidden = true;
   $("#sky").classList.remove("dim");
   if (battle && !battle.done && !battle.talk.length) battle.paused = false;
-  if (after) after();
+  // The hand-over (the loop's to Pull) only follows a tip read to the end, not a Skip.
+  if (after && seen) after();
   const next = tutorQueue.shift();
   if (next) tip(...next);
 }
@@ -2730,9 +2742,9 @@ const TIPS = {
     { at: () => boxOf("#tabs"), text: "Welcome to Poké Gacha. You cannot buy Pokémon: you pull eggs with vouchers, and they hatch as you play the rest of Bored. Five steps, then it is yours." },
     { at: () => tabBox("pull"), text: "1 · Pull. One Regular egg costs 1 voucher, and your first ten eggs hatch the moment you get them. Open one now." },
     { at: () => tabBox("eggs"), text: "2 · Eggs. After those ten, an egg hatches on waves: Poké Idle catches, Pokédoku boards and battle waves all count." },
-    { at: () => tabBox("story"), text: "3 · Squad. New mons join your roster. Pick six that beat the foes' types here, and keep a sniper for flyers." },
+    { at: () => tabBox("story"), text: "3 · Squad. New mons join your roster. Pick up to eight that beat the foes' types here, and keep a sniper for flyers." },
     { at: () => boxOf("#story-list-panel"), text: "4 · Story. A win pays coins, vouchers and waves and opens the next stage. Coins buy more vouchers in the Shop tab." },
-    { at: () => boxOf("#quest-tabs"), text: "5 · Quests. Daily and weekly missions pay the most vouchers. That is the whole loop: story, eggs, squad, repeat." }
+    { at: () => tabBox("quests"), text: "5 · Quests. Daily and weekly missions pay the most vouchers. That is the whole loop: story, eggs, squad, repeat." }
   ],
   pull: () => [
     { at: () => boxOf("#hit-machine"), text: "Three machines: Move UP doubles the rare-skill chance, Legendary UP adds today's banner legendary, Shiny UP makes shinies twice as likely and can roll SP skins." },
@@ -2754,12 +2766,12 @@ const TIPS = {
 function screenTips(id) {
   if (!G || battle || picking) return;
   if (id === "story" && storyMode === "squad") return tip("squad", TIPS.squad());
-  if (!TIPS[id]) return;
   // The first visit to the map walks the whole loop and then hands over to the
   // Pull screen, so a new player is taken to the first thing they can do
-  // rather than being told about a tab they have not opened.
-  if (id === "story") return tip("loop", TIPS.loop(), { after: () => tip("pull", TIPS.pull()) });
-  tip(id, TIPS[id]());
+  // rather than being told about a tab they have not opened. (The loop is
+  // keyed "loop", not "story", so this goes before the TIPS lookup.)
+  if (id === "story") return tip("loop", TIPS.loop(), { after: () => go("pull") });
+  if (TIPS[id]) tip(id, TIPS[id]());
 }
 // The "?" in the tab bar: this screen's tips again.
 function replayTips() {
@@ -2912,6 +2924,8 @@ if (!G) {
   };
   $("#field").onmousemove = e => { if (battle) battle.hover = fieldPoint(e); };
   $("#field").onmouseleave = () => { if (battle) battle.hover = null; };
+  // The Squad screen: Start, team tabs, filter labels, slots, roster cards and skill picks.
+  $("#squad").onclick = e => storyMode === "squad" && !battle && squadClick(e);
   $("#battle-pause").onclick = () => { if (battle && !battle.done && !battle.talk.length) battle.paused = !battle.paused; };
   $("#deploy").onclick = e => { const c = e.target.closest("[data-slot]"); if (c && battle) { battle.slot = Number(c.dataset.slot); battle.selected = null; battle.cardTouched = true; } };
   $("#tutor-box").onclick = e => { if (e.target.closest("[data-skip]")) tutorSkipAll(); else if (tutorStep() && !tutorStep().done) tutorNext(); };
