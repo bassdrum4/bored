@@ -436,6 +436,56 @@ test('Quests: four sub-tabs with reset clocks; rows show n/m, a bar and real rew
   assert.deepEqual(errors, []);
 });
 
+test('sound: off until turned on (M or the speaker), kept per device, and pulls, hatches and battles make their sounds', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  // Record which sounds would play, without needing speakers.
+  await game.evaluate(() => { window.__heard = []; for (const k of Object.keys(SOUNDS)) { const f = SOUNDS[k]; SOUNDS[k] = a => { __heard.push(k); f(a); }; } });
+  assert.equal(await game.evaluate(() => soundOn()), false, 'muted on a fresh device');
+  await game.evaluate(() => { go('pull'); turnCrank(); });
+  assert.deepEqual(await game.evaluate(() => [__heard.length, SFX.ctx]), [0, null], 'muted: nothing plays and no audio is opened');
+  // The speaker sits beside "?" and the tab bar still fits.
+  assert.equal(await game.$eval('#tabs .help .speaker', n => n.title), 'Sound off (M)');
+  await key(tab, 'm');
+  assert.equal(await game.evaluate(() => soundOn()), true);
+  assert.equal(await game.$eval('#tabs .help .speaker', n => n.title), 'Sound on (M)');
+  assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')).sound), true, 'kept on this device');
+  const tabs = await game.$eval('#tabs', n => [n.scrollWidth, n.clientWidth]);
+  assert.ok(tabs[0] <= tabs[1], 'the tab bar does not overflow');
+  // A pull, a hatch (four shakes, the crack, the burst and the reveal), then a battle.
+  await game.evaluate(() => { __heard = []; turnCrank(); });
+  assert.deepEqual(await game.evaluate(() => __heard), ['pull']);
+  await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:snd'] = { at: now - 50, g: { regular: 1 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    G.pull({ voucher: 'regular', count: 1, machine: 'move' });
+    // Waves earned after the pull hatch it.
+    const v = JSON.parse(parent.localStorage.getItem('bored.wallet')); v.entries['test:sndw'] = { at: now + 30, g: { waves: 50 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(v));
+    refreshTop(); go('eggs'); __heard = []; startHatch();
+  });
+  await game.waitForFunction(() => hatching && hatching.phase === 'shown', { timeout: 6000 });
+  const hatchHeard = await game.evaluate(() => __heard);
+  assert.deepEqual(hatchHeard.slice(0, 6), ['shake', 'shake', 'shake', 'shake', 'crack', 'burst']);
+  assert.ok(['hatch', 'epic', 'legend'].includes(hatchHeard[6]), 'the reveal: ' + hatchHeard[6]);
+  await game.evaluate(() => endHatch());
+  await game.evaluate(() => { __heard = []; go('story'); chapterAt = 0; storyAt = 0; storyUpdate(); pickStage(); setSquad(S.owned.slice(0, 4)); startBattle(); battle.talk = []; battleTalk();
+    const b = battle.b; b.energy = 99;
+    // The first squad member and tile it can take (a blocker on the path, a ranged unit up high).
+    found: for (let slot = 0; slot < b.squad.length; slot++) for (let y = 0; y < b.stage.map.length; y++) for (let x = 0; x < b.stage.map[y].length; x++)
+      if (!T.canDeploy(b, slot, x, y)) { battle.slot = slot; tileAction(x, y); break found; }
+    battle.paused = false; });
+  await game.waitForFunction(() => __heard.includes('hit'), { timeout: 30000 });
+  await game.evaluate(() => { battle.b.life = 0; });
+  await game.waitForFunction(() => battle.done, { timeout: 10000 });
+  const battleHeard = await game.evaluate(() => __heard);
+  assert.equal(battleHeard[0], 'deploy');
+  assert.ok(battleHeard.includes('win') || battleHeard.includes('lose'));
+  // M again turns it off.
+  await game.evaluate(() => leaveBattle && battle && battle.done && (battle.talk = [], leaveBattle()));
+  await key(tab, 'm');
+  assert.equal(await game.evaluate(() => soundOn()), false);
+  assert.deepEqual(errors, []);
+});
+
 test('SP skins: the shop prices sets by size, a set shows on each form, and a skin rolled for an evolution shows on it', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.waitForFunction(() => G.skins().length > 0);
