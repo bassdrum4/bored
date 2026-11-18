@@ -320,6 +320,55 @@ async function bookForRun(run: Run): Promise<Book> {
   };
 }
 
+// The population curve. Every finished daily dive already sits in
+// krillion_runs as an anonymous row of round results, so the distribution is
+// drawn from the dives themselves: no names, no player identifiers, no extra
+// table to keep in step. It is read once a minute and refreshed as soon as a
+// dive finishes.
+const POPULATION_MIN = 3;
+const POPULATION_TTL = 60_000;
+let dailyCache: { date: string; at: number; rows: { id: string; score: number }[] } | null = null;
+
+const runScore = (results: unknown) => (Array.isArray(results) ? results : [])
+  .reduce((total, entry) => total + Number((entry as AnswerResult)?.score || 0), 0);
+
+async function dailyScores(date: string) {
+  if (dailyCache && dailyCache.date === date && Date.now() - dailyCache.at < POPULATION_TTL) return dailyCache.rows;
+  const response = await sb('krillion_runs?date=eq.' + encodeURIComponent(date) + '&mode=eq.daily&completed=eq.true&select=id,results&limit=2000');
+  if (!response.ok) throw new HttpError('The sounding is out of reach. Try again shortly.', 503);
+  const rows = await response.json();
+  const scores = (Array.isArray(rows) ? rows : []).map((row: any) => ({ id: String(row.id), score: runScore(row.results) }));
+  dailyCache = { date, at: Date.now(), rows: scores };
+  return scores;
+}
+
+// The chart wants 71 buckets of ten points each: a perfect dive is 700.
+function dailyComparison(run: Run, scores: { id: string; score: number }[]) {
+  const mine = runScore(run.results);
+  const others = scores.filter(entry => entry.id !== run.id);
+  const population = others.length;
+  const dist = Array(71).fill(0);
+  if (population < POPULATION_MIN) return { population, betterThan: null, dist };
+  for (const entry of others) dist[Math.max(0, Math.min(70, Math.floor(entry.score / 10)))] += 1;
+  const better = others.filter(entry => entry.score < mine).length;
+  return { population, betterThan: Math.round((better / population) * 100), dist };
+}
+
+// The anonymous daily board reads the same rows the curve does.
+function dailyBoard(run: Run, scores: { id: string; score: number }[]) {
+  const mine = runScore(run.results);
+  const ordered = scores.slice().sort((a, b) => b.score - a.score);
+  const index = ordered.findIndex(entry => entry.id === run.id);
+  return {
+    date: run.date,
+    total: ordered.length,
+    top: ordered.slice(0, 10).map((entry, rank) => ({ rank: rank + 1, score: entry.score, you: entry.id === run.id })),
+    yourRank: index < 0 ? null : index + 1,
+    yourScore: mine,
+    beaten: ordered.filter(entry => entry.score < mine).length
+  };
+}
+
 async function readRun(id: string): Promise<Run | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id || '')) return null;
   const response = await sb('krillion_runs?id=eq.' + encodeURIComponent(id) + '&select=' + RUN_COLUMNS + '&limit=1');
@@ -360,6 +409,8 @@ async function updateRun(id: string, patch: Record<string, unknown>): Promise<Ru
   if (!response.ok) throw new HttpError('The dive could not be saved. Try again shortly.', 503);
   const rows = await response.json();
   if (!rows?.[0]) throw new HttpError('Dive not found.', 404);
+  // A dive that just finished belongs in the curve now, not a minute from now.
+  if (patch.completed === true) dailyCache = null;
   return rows[0] as Run;
 }
 
@@ -403,6 +454,9 @@ Deno.serve(async (req: Request) => {
         const run = await readRun(url.searchParams.get('run') || '');
         if (!run?.completed) throw new HttpError('Finish your dive before opening the answer sheet.', 403);
         const book = await bookForRun(run);
+        const comparison = run.mode === 'daily'
+          ? dailyComparison(run, await dailyScores(run.date))
+          : { population: 0, betterThan: null, dist: Array(71).fill(0) };
         return reply({
           prompts: book.prompts.map(prompt => ({
             id: prompt.id,
@@ -412,15 +466,15 @@ Deno.serve(async (req: Request) => {
               .sort((a, b) => TIERS[b.tier].score - TIERS[a.tier].score || a.answer.localeCompare(b.answer))
               .map(answer => ({ ...answer, score: TIERS[answer.tier].score }))
           })),
-          population: 0,
-          betterThan: null,
-          dist: Array(71).fill(0)
+          ...comparison
         });
       }
       if (path === '/leaderboard') {
         const run = await readRun(url.searchParams.get('run') || '');
         if (!run?.completed) throw new HttpError('Finish your dive before opening the board.', 403);
-        return reply({ date: run.date, total: 0, top: [], yourRank: null, yourScore: null, beaten: 0 });
+        return reply(run.mode === 'daily'
+          ? dailyBoard(run, await dailyScores(run.date))
+          : { date: run.date, total: 0, top: [], yourRank: null, yourScore: runScore(run.results), beaten: 0 });
       }
       throw new HttpError('Unknown endpoint.', 404);
     }
