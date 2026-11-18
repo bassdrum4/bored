@@ -2,19 +2,22 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 579,
-  "newest": "2026-11-17",
+  "count": 582,
+  "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"6ddd996","date":"2026-11-18","author":"Claude","subject":"Hub: chapters 5 and 6 (Archer, Giovanni), fast waves, and the ending"},
+  {"sha":"9ad8d08","date":"2026-11-18","author":"Claude","subject":"Hub: skill choice per line and level caps that rise on evolve"},
   {"sha":"49cf7d4","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: tileset loader for the battle field","pr":224},
   {"sha":"c94a9e1","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: Quests redo with sub-tabs, progress bars and real reward icons","pr":216},
   {"sha":"4b1ca95","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: chapters 5-6 on the page: fast foes, a tidy preview, the ending","pr":221},
   {"sha":"d88a531","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: sound, off until turned on","pr":215},
   {"sha":"fe002d3","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: pick a skill (K), and the level cap in Squad and Dex","pr":219},
   {"sha":"8fea3f1","date":"2026-11-17","author":"Codebuff","subject":"Poké Idle: the Dex survives the Training area"},
+  {"sha":"340eb0d","date":"2026-11-17","author":"Claude","subject":"Hub: report progress for weekly missions and every trophy"},
   {"sha":"9042c33","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: Vettel's SP skins, with sets, line drops and size prices"},
   {"sha":"26cfeeb","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha Dex: the type filter finds caught lines only","pr":213},
   {"sha":"9d5d8f5","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha Dex: hide uncaught names, silhouette detail with its egg, candy in words","pr":212},
