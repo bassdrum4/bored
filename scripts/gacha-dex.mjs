@@ -5,10 +5,11 @@
 //   node scripts/gacha-dex.mjs --check  fail if the committed file is stale
 //
 // Star tiers (Poké Gacha spec): the pool is base forms only.
-//   6★ legendaries and pseudo-legendary bases
+//   6★ legendaries, mythicals and pseudo-legendary bases (the Legendary egg tier)
 //   5★ starters, fossils and a few strong base forms
 //   4★ / 3★ the rest, split by the best final-stage BST of the line
-// Mythicals are left out until that is decided (MYTHICALS below).
+// Mythicals hatch from Legendary eggs, at the same rates and pity as legendaries
+// (MYTHICALS below; the banner rotation stays legendaries only).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +18,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(root, 'src/games/content/poke-idle.html'), 'utf8');
 const OUT = path.join(root, 'src/hub/gacha-dex.js');
 
-const MYTHICALS = false;
+const MYTHICALS = true;
 const STRONG_BASES = [133, 447]; // Eevee, Riolu
 const FOUR_STAR_BST = 500;
 
@@ -40,7 +41,7 @@ const lineBst = m => Math.max(...finals(m.num).map(x => x.bst));
 function star(m) {
   if (from[m.num]) return 0;
   if (m.flags.has('my') && !MYTHICALS) return 0;
-  if (m.flags.has('lg') || m.flags.has('pseudo')) return 6;
+  if (m.flags.has('lg') || m.flags.has('pseudo') || m.flags.has('my')) return 6;
   if (m.flags.has('starter') || m.flags.has('fossil') || STRONG_BASES.includes(m.num)) return 5;
   return lineBst(m) >= FOUR_STAR_BST ? 4 : 3;
 }
