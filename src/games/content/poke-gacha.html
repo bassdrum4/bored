@@ -2810,7 +2810,10 @@ function battleTips() {
       { at: () => cardBox(si), enter_: () => { bt.cardTouched = false; }, done: () => bt.slot === si && bt.cardTouched,
         text: () => name(sq_[si].num) + " is a " + T.classes[sq_[si].cls].name + ": it fights from high ground" + (sq_[si].cls === "sniper" ? ", and only snipers hit flyers" : "") + ". Pick it." },
       { at: () => tileBox(...high[0]), enter_: () => afford(si), done: () => !!unitOn(si), text: "Tap this raised tile to place it." },
+      // The bars fill in about 3s here instead of the skills' full 10-20s, so the lesson is not a long wait
+      // (a unit that holds its skill, like the blocker, then shows the bolt for the next step).
       { at: () => { const u = b.units.find(o => o.sp >= o.spMax) || unitOn(si); return u && tileBox(u.x, u.y); }, run: true, done: () => b.units.some(o => o.sp >= o.spMax),
+        enter_: () => { for (const u of b.units) u.sp = Math.max(u.sp, u.spMax - 3); },
         text: "The gold bar under its health is its skill charging…" },
       { at: () => { const u = b.units.find(o => o.sp >= o.spMax); return u && tileBox(u.x, u.y); },
         text: "Ready! The bolt means a skill is ready; it fires by itself when a foe is in range. Space pauses; tap a unit twice to retreat it." });
