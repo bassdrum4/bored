@@ -18,7 +18,7 @@
 import { DEX, DEX_CHART, DEX_TYPES } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
 import { mergeWallet, walletBalance, grantOnce, spendFrom, readWallet, writeWallet } from './rewards.js';
-import { gachaState, lineOf, mon, skillsOf, lookFor } from './gacha.js';
+import { gachaState, lineOf, mon, skillsOf, lookFor, stageOf, evolutionsOf } from './gacha.js';
 
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const seconds = now => Math.floor(now / 1000);
@@ -174,19 +174,82 @@ export const STAGES = [
     map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
     waves: [[3, 74, 3, 3, 0, 0, 0, 1], [12, 198, 3, 2.5, 0, 1], [24, 45, 3, 3], [36, 95, 2, 4, 0, 0, 0, 1], [48, 24, 1, 1, 1, 0, 0, 1]],
     before: ['Ariana: You have beaten three admins. You will not beat the fourth.', 'Ariana: Arbok, wrap them up!', 'The boss Arbok has four times the HP and is armored: bring casters.'],
-    after: ['Ariana: Impossible... Giovanni must hear of this.', 'Chapter 4 cleared. Only Archer and the boss himself remain.'] }
+    after: ['Ariana: Impossible... Giovanni must hear of this.', 'Chapter 4 cleared. Only Archer and the boss himself remain.'] },
+
+  /* ── Chapter 5: Archer (Houndoom, fire and dark, and fast waves) ─────── */
+  // A ninth wave field: fast. Fast enemies run at 1.5x speed; block them early.
+  { id: '5-1', chapter: 5, name: 'Ember alley', lives: 3, level: 2.25, map: ['##H##H##H#', 'S........G', '##H##H##H#', '##########', '##########'],
+    waves: [[3, 228, 3, 2.5], [14, 20, 4, 1.5, 0, 0, 0, 0, 1], [26, 228, 4, 2], [38, 20, 5, 1.2, 0, 0, 0, 0, 1]],
+    before: ['Archer: Ariana let you through? I will not be so slow.', 'Fast enemies run half again as quick. Block them early on the path, before they build speed past your snipers.'],
+    after: ['Archer: Quick feet. We will see how long they last.'] },
+  { id: '5-2', chapter: 5, name: 'Racetrack', lives: 3, level: 2.6, map: ['##H#H#H###', 'S........#', '#H#H.#H#.#', '#.......H#', '#G..H#####'],
+    waves: [[3, 77, 3, 2, 0, 0, 0, 0, 1], [14, 58, 4, 2.5], [26, 77, 4, 1.6, 0, 0, 0, 0, 1], [40, 78, 2, 3, 0, 0, 0, 0, 1]],
+    before: ['Grunt: Ponyta are the fastest thing on four legs.', 'Water and Ground douse Fire. Rock stands up to it.'],
+    after: ['Grunt: They were supposed to win the race...'] },
+  { id: '5-3', chapter: 5, name: 'Black wings', lives: 3, level: 2.6, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#........G', '####H#####'],
+    waves: [[3, 198, 3, 2.5, 0, 1], [14, 228, 4, 2, 0, 0, 0, 0, 1], [26, 198, 3, 2, 0, 1], [38, 215, 3, 2, 0, 0, 0, 0, 1]],
+    before: ['Grunt: Murkrow overhead, Houndour underfoot.', 'Snipers for the Murkrow. Fighting hits Dark hard.'],
+    after: ['Grunt: The flock scattered!'] },
+  { id: '5-4', chapter: 5, name: 'Blackout', lives: 3, level: 2.5, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
+    waves: [[3, 109, 3, 3], [12, 101, 2, 3, 0, 0, 1, 0, 1], [24, 228, 4, 2, 0, 0, 0, 0, 1], [36, 101, 3, 2.5, 0, 0, 1, 0, 1]],
+    before: ['Archer: The power plant is ours. Electrode, light them up.', 'Electrode are fast and they explode. Kill them before they reach a blocker.'],
+    after: ['Archer: Lights out for my Electrode. Not for me.'] },
+  { id: '5-5', chapter: 5, name: 'Two fires', lives: 3, level: 2.6, map: ['S...H#####', '###....H##', '#H#H#.....', 'S.....H#.G', '#####H####'],
+    waves: [[3, 58, 4, 2.5], [10, 228, 4, 2, 0, 0, 0, 0, 1], [22, 215, 3, 2, 0, 0, 0, 0, 1], [34, 78, 3, 2.5, 0, 0, 0, 0, 1], [46, 198, 3, 2, 0, 1]],
+    before: ['Grunt: Fire from the left, fire from the right!', 'Two spawns, fast waves on both. A vanguard buys time while the energy comes in.'],
+    after: ['Grunt: Archer is going to be furious.'] },
+  { id: '5-6', chapter: 5, name: 'Archer', boss: true, admin: true, lives: 3, level: 2.6,
+    map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
+    waves: [[3, 228, 4, 2, 0, 0, 0, 0, 1], [14, 198, 3, 2, 0, 1], [26, 101, 2, 3, 0, 0, 1, 0, 1], [38, 215, 3, 2, 0, 0, 0, 0, 1], [50, 229, 1, 1, 1]],
+    before: ['Archer: I lead Team Rocket while Giovanni is away. You end here.', 'Archer: Houndoom, burn it all down!', 'The boss Houndoom has four times the HP. Fighting, Water, Ground and Rock hit it hard.'],
+    after: ['Archer: Giovanni... forgive me.', 'Chapter 5 cleared. Giovanni is waiting at the hideout.'] },
+
+  /* ── Chapter 6: Giovanni (ground, and everything Team Rocket has) ────── */
+  { id: '6-1', chapter: 6, name: 'Underground', lives: 3, level: 2.4, map: ['##########', 'S....H####', '####.H####', '#H.......G', '###H######'],
+    waves: [[3, 50, 4, 2, 0, 0, 0, 0, 1], [14, 27, 4, 2.5], [26, 50, 5, 1.5, 0, 0, 0, 0, 1], [38, 28, 3, 3]],
+    before: ['Grunt: The boss built his hideout under the ground. So do his mons.', 'Ground types: Water, Grass and Ice hit them hard. Flying units are not hit at all.'],
+    after: ['Grunt: You dug your way through?'] },
+  { id: '6-2', chapter: 6, name: 'Bone yard', lives: 3, level: 2.0, map: ['####H#####', 'S.......H#', '####H#.###', '#H.....H##', '#G...H####'],
+    waves: [[3, 104, 4, 2.5], [16, 41, 3, 2.5, 0, 1], [28, 105, 2, 3], [40, 104, 4, 2]],
+    before: ['Grunt: Cubone and Zubat. The boss keeps strange pets.', 'Snipers for the Zubat, and Water or Grass for the Marowak.'],
+    after: ['Grunt: Bones everywhere...'] },
+  { id: '6-3', chapter: 6, name: 'Earth tremor', lives: 3, level: 2.3, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#G.......#', '####H#####'],
+    waves: [[3, 33, 4, 2.5], [14, 111, 2, 4, 0, 0, 0, 1], [26, 32, 5, 2], [38, 111, 3, 3.5, 0, 0, 0, 1]],
+    before: ['Grunt: Rhyhorn charge, and nothing stops them.', 'Rhyhorn are armored. Casters go through; Water and Grass break them.'],
+    after: ['Grunt: The ground stopped shaking.'] },
+  { id: '6-4', chapter: 6, name: 'Silph basement', lives: 3, level: 2.05, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
+    waves: [[3, 51, 3, 2, 0, 0, 0, 0, 1], [12, 110, 2, 3.5, 0, 0, 1], [24, 31, 3, 3], [36, 51, 4, 1.8, 0, 0, 0, 0, 1], [46, 110, 2, 3, 0, 0, 1]],
+    before: ['Grunt: The boss is right through that door. You will never reach it.', 'Fast Dugtrio, exploding Weezing, and two ways in.'],
+    after: ['Grunt: Go on, then. He is expecting you.'] },
+  { id: '6-5', chapter: 6, name: 'Last guard', lives: 3, level: 2.0, map: ['##H##H##H#', 'S.........', '##H##H##.#', '#G.......#', '###H##H###'],
+    waves: [[3, 53, 3, 2, 0, 0, 0, 0, 1], [14, 41, 3, 2.5, 0, 1], [26, 111, 2, 3, 0, 0, 0, 1], [38, 33, 3, 2.5], [48, 53, 3, 1.8, 0, 0, 0, 0, 1]],
+    before: ['Grunt: Every grunt left in Kanto is in this hall.', 'Persian run fast, Zubat fly, Rhyhorn are armored. Bring a bit of everything.'],
+    after: ['Grunt: The boss... is all that is left.'] },
+  { id: '6-6', chapter: 6, name: 'Giovanni', boss: true, admin: true, final: true, lives: 3, level: 2.3,
+    map: ['S....H####', '####.H##H#', '#H#H......', 'S.......#G', '####H#####'],
+    waves: [[3, 51, 4, 2, 0, 0, 0, 0, 1], [14, 42, 3, 2, 0, 1], [26, 31, 3, 3], [36, 110, 2, 3, 0, 0, 1], [46, 34, 3, 3], [58, 112, 1, 1, 1, 0, 0, 1]],
+    before: ['Giovanni: So you are the one who took Team Rocket apart.', 'Giovanni: I am Giovanni. Rhydon, show this child what real power is.',
+      'The boss Rhydon has four times the HP and is armored: casters, and Water or Grass.'],
+    after: ['Giovanni: ...Ha. Ha ha. You have beaten me.', 'Giovanni: Team Rocket is finished. I will go, and train alone, until I am worthy of a rematch.'],
+    // Shown once, the first time 6-6 is cleared.
+    ending: ['Team Rocket is gone from Kanto. The routes are quiet again.', 'Your squad rests. The eggs keep hatching, and the weekly challenge still runs.',
+      'Thanks for playing the Poké Gacha story.'] }
 ];
 // Chapters in order, each with its stages. Stages unlock in the order of STAGES.
 export const CHAPTERS = [
   { id: 1, name: 'Team Rocket Grunts', admin: 'Grunts', stages: STAGES.filter(s => (s.chapter || 1) === 1) },
   { id: 2, name: 'Proton', admin: 'Proton', stages: STAGES.filter(s => s.chapter === 2) },
   { id: 3, name: 'Petrel', admin: 'Petrel', stages: STAGES.filter(s => s.chapter === 3) },
-  { id: 4, name: 'Ariana', admin: 'Ariana', stages: STAGES.filter(s => s.chapter === 4) }
+  { id: 4, name: 'Ariana', admin: 'Ariana', stages: STAGES.filter(s => s.chapter === 4) },
+  { id: 5, name: 'Archer', admin: 'Archer', stages: STAGES.filter(s => s.chapter === 5) },
+  { id: 6, name: 'Giovanni', admin: 'Giovanni', stages: STAGES.filter(s => s.chapter === 6) }
 ];
 // Armored enemies' Defense against physical attacks; casters ignore it.
 export const ARMOR = 3;
 const defenceAgainst = (u, e) => e.def * (e.armored && u.cls !== 'caster' ? ARMOR : 1);
 export const FUSE = 2.5, BLAST = 1.5, BLAST_POWER = 3;
+// Fast enemies' speed against their species' own.
+export const FAST = 1.5;
 export const stageById = id => STAGES.find(stage => stage.id === id) || null;
 export const W = 10, H = 5;
 
@@ -231,13 +294,34 @@ export function typeMultiplier(attack, defend) {
 }
 export const MAX_LEVEL = 10;
 export const levelCost = level => 40 * level;
+// Level caps by the most evolved form owned: 5 for a base form that can still evolve, 8 for a
+// middle form, 10 once a final form is owned (a line that never evolves is final at once).
+// Levels bought before the caps existed are kept; the cap only stops buying more.
+export const LEVEL_CAPS = [5, 8, MAX_LEVEL];
+export function lineCap(state, line) {
+  const forms = (state.owned || []).filter(num => lineOf(num) === line);
+  if (!forms.length) return LEVEL_CAPS[0];
+  if (forms.some(num => !evolutionsOf(num).length)) return MAX_LEVEL;
+  return LEVEL_CAPS[Math.min(LEVEL_CAPS.length, Math.max(...forms.map(stageOf))) - 1];
+}
+// The four skill slots play differently: power (damage, healing or energy) and charge (how much
+// SP the skill needs, against the class's own). Steady is today's effect; quick fires more often
+// for less; heavy hits harder and takes longer; the rare skill is stronger at the normal charge.
+export const SKILL_KINDS = [
+  { id: 'steady', name: 'Steady', power: 1, charge: 1 },
+  { id: 'quick', name: 'Quick', power: 0.8, charge: 0.7 },
+  { id: 'heavy', name: 'Heavy', power: 1.3, charge: 1.35 },
+  { id: 'rare', name: 'Rare', power: 1.3, charge: 1 }
+];
 
 /** A squad member's battle stats: level from coins, passive and cost cuts from candy. */
-export function unitStats(num, { level = 1, passive = false, costCut = 0, skills = [true, false, false, false] } = {}) {
+export function unitStats(num, { level = 1, passive = false, costCut = 0, skills = [true, false, false, false], skill = null } = {}) {
   const m = mon(num), cls = classOf(num), c = CLASSES[cls];
   const grow = 1 + 0.08 * (level - 1);
   const special = cls === 'caster' || cls === 'medic';
-  const skillAt = skills[3] ? 3 : [2, 1, 0].find(i => skills[i]) ?? 0;
+  // The chosen skill if it is unlocked; else the rare one if unlocked; else the first.
+  const skillAt = Number.isInteger(skill) && skills[skill] ? skill : skills[3] ? 3 : 0;
+  const kind = SKILL_KINDS[skillAt];
   return {
     num, cls, name: m.name, types: m.types,
     hp: Math.round((m.hp * 5 + 140) * grow * (c.hp || 1)),
@@ -245,8 +329,8 @@ export function unitStats(num, { level = 1, passive = false, costCut = 0, skills
     def: Math.round(m.def * 0.6 * grow),
     interval: Math.max(0.6, Math.min(1.6, 1.7 - m.spe / 140)),
     cost: Math.max(4, c.cost + Math.round(m.bst / 160) - 2 - costCut),
-    block: c.block, range: c.range, ground: c.ground, spMax: c.sp,
-    skill: skillsOf(num)[skillAt], rare: skillAt === 3
+    block: c.block, range: c.range, ground: c.ground, spMax: Math.round(c.sp * kind.charge),
+    skill: skillsOf(num)[skillAt], skillAt, skillKind: kind.id, power: kind.power, rare: skillAt === 3
   };
 }
 export function enemyStats(num, level, boss = false, flying = false) {
@@ -307,8 +391,8 @@ const costOf = (b, u) => u.cost + (b.mods.has('cost') ? 3 : 0);
 export function newBattle(stage, squad, mods = []) {
   const paths = pathsOf(stage);
   const queue = [];
-  stage.waves.forEach(([at, num, count, gap, boss, flying, explodes, armored], wave) => {
-    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying, explodes: !!explodes, armored: !!armored });
+  stage.waves.forEach(([at, num, count, gap, boss, flying, explodes, armored, fast], wave) => {
+    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying, explodes: !!explodes, armored: !!armored, fast: !!fast });
   });
   queue.sort((a, b) => a.at - b.at);
   const set = new Set(mods.filter(id => RISKS.some(r => r.id === id)));
@@ -362,7 +446,7 @@ function finishWaveFor(b, e) {
   if (b.waveLeft[e.wave] === 0) b.wavesDone++;
 }
 function useSkill(b, u) {
-  const power = u.rare ? 1.3 : 1;
+  const power = u.power ?? (u.rare ? 1.3 : 1);
   if (u.cls === 'vanguard') b.energy = Math.min(99, b.energy + Math.round(8 * power));
   else if (u.cls === 'blocker') u.hp = Math.min(u.maxHp, u.hp + Math.round(u.maxHp * 0.4 * power));
   else if (u.cls === 'medic') { for (const a of b.units) if (dist(a, u.x, u.y) <= u.range) a.hp = Math.min(a.maxHp, a.hp + Math.round(u.atk * 1.5 * power)); }
@@ -391,6 +475,8 @@ export function step(b, dt = TICK) {
     if (b.mods?.has('hp')) e.hp = Math.round(e.hp * 1.3);
     if (b.mods?.has('atk')) e.atk = Math.round(e.atk * 1.3);
     if (b.mods?.has('fast')) e.speed *= 1.2;
+    // Fast waves (chapter 5 on) run at 1.5x.
+    if (s.fast) { e.speed *= FAST; e.fast = true; }
     e.maxHp = e.hp;
     b.spawned++;
   }
@@ -535,20 +621,26 @@ function dailyDone(id, list) {
   if (id === 'big') return won.some(r => r.team.some(num => lineStar(num) >= 5));
   return false;
 }
-function weeklyDone(id, entries, list, monday) {
+// How far a weekly mission is this week: [have, need]. It is done at have >= need.
+function weeklyCount(id, entries, list, monday) {
   const inWeek = day => day >= monday && day < shiftDay(monday, 7);
   const week = list.filter(r => r.stars > 0 && inWeek(r.day));
-  if (id === 'star3x5') return new Set(week.filter(r => r.stars === 3).map(r => r.stage)).size >= 5;
-  if (id === 'daily5') return Object.keys(entries).filter(k => /^td:daily:\d{4}-\d{2}-\d{2}:all$/.test(k) && inWeek(k.slice(9, 19))).length >= 5;
+  const count = re => Object.keys(entries).filter(k => re.test(k) && inWeek(k.match(/\d{4}-\d{2}-\d{2}/)[0])).length;
+  if (id === 'star3x5') return [new Set(week.filter(r => r.stars === 3).map(r => r.stage)).size, 5];
+  if (id === 'daily5') return [count(/^td:daily:\d{4}-\d{2}-\d{2}:all$/), 5];
   if (id === 'teams3') {
     const teams = {};
     for (const r of week) (teams[r.stage] ||= new Set()).add(r.team.slice().sort((a, b) => a - b).join(','));
-    return Object.values(teams).some(set => set.size >= 3);
+    return [Math.max(0, ...Object.values(teams).map(set => set.size)), 3];
   }
   // Read from the wallet: rewards.js writes `pi:boss:<date>` when Poké Idle reports a daily boss win.
-  if (id === 'boss5') return Object.keys(entries).filter(k => /^pi:boss:\d{4}-\d{2}-\d{2}$/.test(k) && inWeek(k.slice(-10))).length >= 5;
-  if (id === 'doku10') return Object.keys(entries).filter(k => /^pdoku:daily:[a-z]+:\d{4}-\d{2}-\d{2}$/.test(k) && inWeek(k.slice(-10))).length >= 10;
-  return false;
+  if (id === 'boss5') return [count(/^pi:boss:\d{4}-\d{2}-\d{2}$/), 5];
+  if (id === 'doku10') return [count(/^pdoku:daily:[a-z]+:\d{4}-\d{2}-\d{2}$/), 10];
+  return [0, 1];
+}
+function weeklyDone(id, entries, list, monday) {
+  const [have, need] = weeklyCount(id, entries, list, monday);
+  return have >= need;
 }
 /** Grant whatever missions are now complete. */
 function claimMissions(wallet, today, now) {
@@ -584,7 +676,11 @@ export function tdState(wallet, today = dailyDate()) {
     dailyAll: !!e['td:daily:' + today + ':all'],
     // Repeat clears paid today, of REPEAT_PER_DAY.
     repeatToday: repeatsOn(e, today), repeatMax: REPEAT_PER_DAY, repeatPay: REPEAT_CLEAR.coins,
-    weekly: WEEKLY.map(m => ({ ...m, done: !!e['td:week:' + monday + ':' + m.id] })),
+    // have/need: how far each weekly mission is (a claimed one shows full).
+    weekly: WEEKLY.map(m => {
+      const done = !!e['td:week:' + monday + ':' + m.id], [have, need] = weeklyCount(m.id, e, list, monday);
+      return { ...m, done, have: done ? need : Math.min(have, need), need };
+    }),
     weeklyAll: !!e['td:week:' + monday + ':all'],
     // The weekly challenge: this week's stage and the best risk total won so far.
     challenge: weeklyStage(monday),
@@ -656,6 +752,7 @@ export function levelUp(wallet, line, { today = dailyDate(), now = Date.now() } 
   if (!state.lines[line]) return { wallet: mergeWallet(wallet), ok: false, reason: 'not-owned' };
   const level = tdState(wallet, today).levels[line] || 1;
   if (level >= MAX_LEVEL) return { wallet: mergeWallet(wallet), ok: false, reason: 'owned' };
+  if (level >= lineCap(state, line)) return { wallet: mergeWallet(wallet), ok: false, reason: 'cap' };
   const result = spendFrom(wallet, { coins: levelCost(level) }, { id: uuid(), now, x: { lv: line, to: level + 1 } });
   return result.ok ? { wallet: result.wallet, ok: true } : { wallet: mergeWallet(wallet), ok: false, reason: 'coins' };
 }
@@ -664,8 +761,8 @@ export function squadFrom(wallet, species, today = dailyDate()) {
   const state = gachaState(wallet, today), td = tdState(wallet, today);
   return species.filter(num => state.owned.includes(num)).slice(0, 8).map(num => {
     const l = state.lines[lineOf(num)] || {};
-    return { ...unitStats(num, { level: td.levels[lineOf(num)] || 1, passive: !!l.passive, costCut: l.cost || 0, skills: l.skills || [true, false, false, false] }),
-      look: lookFor(state, num), level: td.levels[lineOf(num)] || 1 };
+    return { ...unitStats(num, { level: td.levels[lineOf(num)] || 1, passive: !!l.passive, costCut: l.cost || 0, skills: l.skills || [true, false, false, false], skill: l.skill ?? null }),
+      look: lookFor(state, num), level: td.levels[lineOf(num)] || 1, cap: lineCap(state, lineOf(num)) };
   });
 }
 
@@ -679,6 +776,7 @@ export function tdBridge({ onChange = () => {} } = {}) {
   return {
     // `stages` stays chapter 1 for pages that predate chapters; `chapters` and `allStages` have every chapter.
     stages: CHAPTERS[0].stages, chapter: CHAPTER, chapters: CHAPTERS, allStages: STAGES, classes: CLASSES, W, H, TICK, REDEPLOY, maxLevel: MAX_LEVEL, levelCost,
+    levelCaps: LEVEL_CAPS, skillKinds: SKILL_KINDS, capOf: line => lineCap(gachaState(readWallet()), line),
     classOf, pathsOf, newBattle, step, deploy, retreat, canDeploy, canHit, starsFor, typeMultiplier,
     state: () => tdState(readWallet()),
     squad: species => squadFrom(readWallet(), species),

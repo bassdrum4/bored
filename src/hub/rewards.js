@@ -63,27 +63,26 @@ export const VOUCHER_VALUE = { regular: 100, plus: 500, premium: 1000, gold: 250
 export const BACKPAY = { gold: 1, premium: 2, cap: 2500 + 2 * 1000 };
 const TIER = { S: { plus: 1 }, M: { premium: 1 }, B: { gold: 1 } };
 
-const piAch = (field, label, steps) => steps.map(([n, tier]) => ({
-  id: `pi-${field}-${n}`, game: 'poke-idle', name: `${label} ${n}`, tier,
-  met: s => s.pi[field] >= n
-}));
+// Each trophy counts something (count) up to a goal (need); it is met at the goal.
+const ach = (id, game, name, tier, count, need) => ({ id, game, name, tier, count, need, met: s => count(s) >= need });
+const piAch = (field, label, steps) => steps.map(([n, tier]) => ach(`pi-${field}-${n}`, 'poke-idle', `${label} ${n}`, tier, s => s.pi[field], n));
 export const ACHIEVEMENTS = [
   ...piAch('caught', 'Caught', [[50, 'S'], [150, 'S'], [400, 'M'], [800, 'B']]),
   ...piAch('shinies', 'Shinies', [[1, 'S'], [3, 'M'], [10, 'B']]),
   ...piAch('badges', 'Badges', [[4, 'S'], [8, 'S'], [16, 'M'], [24, 'M'], [36, 'B']]),
   ...piAch('tower', 'Tower floor', [[10, 'S'], [25, 'M'], [50, 'B'], [100, 'B']]),
-  { id: 'doku-first', game: 'pokedoku', name: 'Pokédoku: first daily', tier: 'S', met: s => s.doku.doku.dailies >= 1 },
-  { id: 'doku-perfect', game: 'pokedoku', name: 'Pokédoku: perfect 9/9', tier: 'M', met: s => s.doku.doku.perfects >= 1 },
-  { id: 'doku-10', game: 'pokedoku', name: 'Pokédoku: 10 dailies', tier: 'M', met: s => s.doku.doku.dailies >= 10 },
-  { id: 'doku-30', game: 'pokedoku', name: 'Pokédoku: 30 dailies', tier: 'B', met: s => s.doku.doku.dailies >= 30 },
-  { id: 'doku-streak-7', game: 'pokedoku', name: 'Pokédoku: 7-day streak', tier: 'B', met: s => s.doku.doku.streak >= 7 },
-  { id: 'inverse-first', game: 'pokedoku', name: 'Inverse Doku: first daily', tier: 'S', met: s => s.doku.inverse.dailies >= 1 },
-  { id: 'inverse-all', game: 'pokedoku', name: 'Inverse Doku: find everything', tier: 'M', met: s => s.doku.inverse.perfects >= 1 },
-  { id: 'inverse-10', game: 'pokedoku', name: 'Inverse Doku: 10 dailies', tier: 'M', met: s => s.doku.inverse.dailies >= 10 },
-  { id: 'shiny-first', game: 'pokedoku', name: 'Shiny Hunt: first daily', tier: 'S', met: s => s.doku.shiny.dailies >= 1 },
-  { id: 'shiny-cutoff', game: 'pokedoku', name: 'Shiny Hunt: top score', tier: 'M', met: s => s.doku.shiny.perfects >= 1 },
-  { id: 'shiny-10', game: 'pokedoku', name: 'Shiny Hunt: 10 dailies', tier: 'M', met: s => s.doku.shiny.dailies >= 10 },
-  { id: 'doku-all3-7', game: 'pokedoku', name: 'All 3 dailies, 7 days in a row', tier: 'B', met: s => s.all3Streak >= 7 }
+  ach('doku-first', 'pokedoku', 'Pokédoku: first daily', 'S', s => s.doku.doku.dailies, 1),
+  ach('doku-perfect', 'pokedoku', 'Pokédoku: perfect 9/9', 'M', s => s.doku.doku.perfects, 1),
+  ach('doku-10', 'pokedoku', 'Pokédoku: 10 dailies', 'M', s => s.doku.doku.dailies, 10),
+  ach('doku-30', 'pokedoku', 'Pokédoku: 30 dailies', 'B', s => s.doku.doku.dailies, 30),
+  ach('doku-streak-7', 'pokedoku', 'Pokédoku: 7-day streak', 'B', s => s.doku.doku.streak, 7),
+  ach('inverse-first', 'pokedoku', 'Inverse Doku: first daily', 'S', s => s.doku.inverse.dailies, 1),
+  ach('inverse-all', 'pokedoku', 'Inverse Doku: find everything', 'M', s => s.doku.inverse.perfects, 1),
+  ach('inverse-10', 'pokedoku', 'Inverse Doku: 10 dailies', 'M', s => s.doku.inverse.dailies, 10),
+  ach('shiny-first', 'pokedoku', 'Shiny Hunt: first daily', 'S', s => s.doku.shiny.dailies, 1),
+  ach('shiny-cutoff', 'pokedoku', 'Shiny Hunt: top score', 'M', s => s.doku.shiny.perfects, 1),
+  ach('shiny-10', 'pokedoku', 'Shiny Hunt: 10 dailies', 'M', s => s.doku.shiny.dailies, 10),
+  ach('doku-all3-7', 'pokedoku', 'All 3 dailies, 7 days in a row', 'B', s => s.all3Streak, 7)
 ];
 
 const ID = /^[a-z0-9][a-z0-9:._-]{0,119}$/i;
@@ -367,6 +366,18 @@ export function buyRegular(wallet, count = 1, options = {}) {
 }
 
 /** The trophy list for a profile. */
+/**
+ * Every trophy with how far along it is, for the Quests screen: { id, game, name,
+ * tier, have, need, done }. done means it has paid; have counts up to need.
+ */
+export function walletTrophyList(wallet, today = dailyDate()) {
+  const entries = object(object(wallet).entries);
+  const live = walletStats(wallet, today);
+  return ACHIEVEMENTS.map(({ id, game, name, tier, count, need }) => {
+    const done = !!entries['ach:' + id];
+    return { id, game, name, tier, need, done, have: done ? need : Math.max(0, Math.min(need, int(count(live)))) };
+  });
+}
 export function walletTrophies(wallet) {
   const entries = object(object(wallet).entries);
   return ACHIEVEMENTS.filter(achievement => entries['ach:' + achievement.id])
