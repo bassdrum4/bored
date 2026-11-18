@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 const gacha = moduleUnderTest('src/hub/gacha.js', [
   'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin', 'candyOffer',
   'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf', 'buyCandy', 'buyShards', 'buyPreset', 'COIN_SHOP', 'skinFile', 'skinPrice', 'SP_PRICES',
-  'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES', 'WELCOME', 'WELCOME_ID', 'claimCutRefund', 'isCut', 'CUT_REFUND', 'CUT_CANDY'
+  'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES', 'WELCOME', 'WELCOME_ID', 'claimCutRefund', 'isCut', 'CUT_REFUND', 'CUT_CANDY', 'buyCandyEgg', 'CANDY_EGG', 'candyEggPrice'
 ], { ...daily, ...rewards, DEX, DEX_TYPES, DEX_LEGACY });
 const { mergeWallet, walletBalance, activateWallet, grantOnce } = rewards;
 const { gachaState, pullEggs, hatchReady, evolve, upgrade, buySp, setBuddy, claimLogin, eggPools, bannerFor } = gacha;
@@ -151,6 +151,28 @@ test('a cut buddy is dropped, a cut shiny keeps its look elsewhere in Bored, and
   assert.equal(hatched.length, 1);
   assert.equal(hatched[0].species, bannerFor(TODAY));
   assert.ok(!gacha.isCut(hatched[0].species));
+});
+
+test('a candy egg: an egg of an owned line for candy, priced by tier, with better rare-skill odds, outside the pity', () => {
+  const { buyCandyEgg, CANDY_EGG, candyEggPrice } = gacha;
+  const named = name => DEX.findIndex(row => row[0] === name) + 1;
+  const [machop, larvitar] = ['Machop', 'Larvitar'].map(named);
+  assert.deepEqual([candyEggPrice(machop), candyEggPrice(larvitar), candyEggPrice(named('Tauros'))], [CANDY_EGG.price[4], CANDY_EGG.price[6], 0], 'by tier; nothing for a cut line');
+  let w = hatchedWallet([[machop, 1]], 'ce');
+  assert.equal(buyCandyEgg(w, larvitar, opts()).reason, 'not-owned');
+  assert.equal(buyCandyEgg(w, machop, opts()).reason, 'candy', '10 candy is not enough');
+  w = fund(w, { ['candy:' + machop]: 100 });
+  const pityBefore = gachaState(w, TODAY).pity;
+  const r = buyCandyEgg(w, machop, opts());
+  assert.ok(r.ok);
+  const state = gachaState(r.wallet, TODAY);
+  assert.equal(state.lines[machop].candy, 110 - CANDY_EGG.price[4]);
+  assert.equal(state.eggs.length, 1);
+  assert.deepEqual([state.eggs[0].tier, state.eggs[0].species], [1, machop], 'a Rare egg of Machop');
+  assert.deepEqual(state.pity, pityBefore, 'the pity does not move');
+  // It hatches Machop, with the rare skill at 1 in 4 (0.2 < 1/4; a normal 4★ egg would need < 2/24).
+  const hatched = hatchReady(fund(r.wallet, { waves: 100 }), opts({ rand: always(0.2) })).hatched;
+  assert.deepEqual([hatched[0].species, hatched[0].skill], [machop, 3]);
 });
 
 test('the banner legendary comes from the shared daily seed', () => {

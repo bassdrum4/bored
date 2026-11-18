@@ -48,9 +48,10 @@ function challengeDate(...args) {
 }
 if (typeof window !== 'undefined') window.dailyDate = defaultDailyDate;
 
-// Games that use Esc themselves: Bored leaves its Esc-closes-the-game shortcut out of their document (the
-// game has its own Back to Bored button, in its Menu and on its title screen). Every other game still closes on Esc.
-const OWNS_ESCAPE = new Set(['ashcrown']);
+// Games that use Esc themselves: Bored leaves its Esc-closes-the-game shortcut out of their document. Civ Lite
+// has its own Back to Bored button; Poké Gacha uses Esc to go back a screen and pause battles, and is left
+// from the hub's menu (Back to Bored). Every other game still closes on Esc.
+const OWNS_ESCAPE = new Set(['ashcrown', 'poke-gacha']);
 
 /* ── DOM handles ──────────────────────────────────────────────────────────── */
 
