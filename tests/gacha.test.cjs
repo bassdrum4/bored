@@ -14,15 +14,15 @@ function moduleUnderTest(file, names, injections = {}) {
 }
 
 const daily = moduleUnderTest('src/daily.js', ['dailyDate', 'dailyStreak', 'seedNumber']);
-const { DEX, DEX_TYPES } = moduleUnderTest('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES']);
+const { DEX, DEX_TYPES, DEX_LEGACY } = moduleUnderTest('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_LEGACY']);
 const rewards = moduleUnderTest('src/hub/rewards.js', [
   'mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const gacha = moduleUnderTest('src/hub/gacha.js', [
-  'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin',
+  'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin', 'candyOffer',
   'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf', 'buyCandy', 'buyShards', 'buyPreset', 'COIN_SHOP', 'skinFile', 'skinPrice', 'SP_PRICES',
-  'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES'
-], { ...daily, ...rewards, DEX, DEX_TYPES });
+  'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES', 'claimCutRefund', 'isCut', 'CUT_REFUND', 'CUT_CANDY'
+], { ...daily, ...rewards, DEX, DEX_TYPES, DEX_LEGACY });
 const { mergeWallet, walletBalance, activateWallet, grantOnce } = rewards;
 const { gachaState, pullEggs, hatchReady, evolve, upgrade, buySp, setBuddy, claimLogin, eggPools, bannerFor } = gacha;
 
@@ -54,9 +54,9 @@ test('the egg pool is base forms only, mythicals hatch from Legendary eggs, and 
   for (const pool of pools) for (const num of pool) {
     assert.equal(DEX[num - 1][8], 0, DEX[num - 1][0] + ' is not a base form');
   }
-  // Mythicals: every base-form one is in the Legendary tier (same rates and pity), none in the other tiers.
-  const mythicals = DEX.map((row, i) => [row, i + 1]).filter(([row]) => row[10] === 'my' && !row[8]).map(([, num]) => num);
-  assert.ok(mythicals.length >= 20);
+  // Mythicals: every one still on the roster is in the Legendary tier (same rates and pity), none in the other tiers.
+  const mythicals = DEX.map((row, i) => [row, i + 1]).filter(([row]) => row[10] === 'my' && !row[8] && row[9]).map(([, num]) => num);
+  assert.ok(mythicals.length >= 5);
   assert.ok(mythicals.every(num => pools[3].includes(num)), 'every mythical hatches from Legendary eggs');
   assert.ok(pools.slice(0, 3).every(p => p.every(num => DEX[num - 1][10] !== 'my')), 'and from no other tier');
   const named = name => DEX.findIndex(row => row[0] === name) + 1;
@@ -64,6 +64,93 @@ test('the egg pool is base forms only, mythicals hatch from Legendary eggs, and 
   assert.ok(pools[2].includes(named('Eevee')) && pools[2].includes(named('Riolu')) && pools[2].includes(named('Bulbasaur')));
   assert.ok(!pools.flat().includes(named('Pikachu')), 'Pichu is the base form, not Pikachu');
   assert.ok(pools[4].every(num => pools[3].includes(num) && DEX[num - 1][10] === 'lg'), 'banners are legendaries');
+});
+
+/* ── The roster cut (docs/poke-gacha-roster.md) ─────────────────────────── */
+const named = name => DEX.findIndex(row => row[0] === name) + 1;
+// A wallet that hatched these species (tier = the egg tier each came from), with candy on each line.
+function hatchedWallet(list, tag = 'cut') {
+  let w = fresh({});
+  list.forEach(([num, tier], i) => {
+    w.entries['spend:' + tag + '-' + i] = { at: 1, g: { regular: 0 }, x: { m: 'move', e: [tier], w: 0, n: i, d: TODAY } };
+    w = mergeWallet(w);
+    w.entries['hatch:' + tag + '-' + i + '.0'] = { at: 2, g: { ['candy:' + gacha.lineOf(num)]: 10 }, x: { s: num, t: tier, n: 1, k: 0 } };
+  });
+  return mergeWallet(w);
+}
+test('the roster: about 200 lines, every starter, SP line and pseudo-legendary in, 30-40 legendaries and mythicals', () => {
+  const pools = eggPools(), lines = pools.slice(0, 4).flat();
+  assert.ok(lines.length >= 190 && lines.length <= 215, lines.length + ' lines');
+  for (const num of gacha.STARTERS) assert.ok(lines.includes(num), DEX[num - 1][0] + ' is a starter');
+  const skins = JSON.parse(fs.readFileSync(path.join(root, 'src/games/content/poke-gacha/sp/skins.json'), 'utf8'));
+  for (const skin of skins) assert.ok(lines.includes(gacha.lineOf(skin.species)), skin.id + ' has its line on the roster');
+  DEX.forEach((row, i) => { if (row[10] === 'pseudo' && !row[8]) assert.ok(lines.includes(i + 1), row[0] + ' is a pseudo-legendary'); });
+  const legends = pools[3].filter(num => DEX[num - 1][10] === 'lg' || DEX[num - 1][10] === 'my');
+  assert.ok(legends.length >= 30 && legends.length <= 40, legends.length + ' legendaries and mythicals');
+  // The commonest egg has the biggest pool, then each rarer one.
+  assert.ok(pools[0].length > pools[1].length && pools[1].length > pools[2].length);
+  // Cut lines are not in any pool, and every cut line was an egg line before.
+  const cut = new Set(DEX_LEGACY.map(([num]) => num));
+  assert.ok(cut.size > 300);
+  for (const num of cut) { assert.equal(DEX[num - 1][9], 0); assert.ok(!pools.flat().includes(num)); }
+  assert.equal(cut.size + lines.length, 552, 'every old egg line is either kept or cut');
+  assert.ok(gacha.isCut(named('Tauros')) && gacha.isCut(named('Archeops')) && !gacha.isCut(named('Charizard')));
+});
+test('a cut line leaves the dex and squads, and is refunded once: tier vouchers, candy, level coins', () => {
+  const [tauros, archen, kubfu, regieleki, charmander] = ['Tauros', 'Archen', 'Kubfu', 'Regieleki', 'Charmander'].map(named);
+  let w = hatchedWallet([[tauros, 0], [archen, 2], [kubfu, 3], [regieleki, 3], [charmander, 2]]);
+  w = fund(w, { [`candy:${tauros}`]: 45 }); // Tauros: 55 candy, 2 Regulars from candy
+  // Two levels bought on Tauros before the cut: 40 + 80 coins.
+  w = fund(w, { coins: 120 });
+  w.entries['spend:lv-1'] = { at: 3, g: { coins: -40 }, x: { lv: tauros, to: 2 } };
+  w.entries['spend:lv-2'] = { at: 4, g: { coins: -80 }, x: { lv: tauros, to: 3 } };
+  w = mergeWallet(w);
+  const state = gachaState(w, TODAY);
+  assert.deepEqual(state.owned, [charmander], 'only the kept line is owned');
+  assert.deepEqual(Object.keys(state.lines).map(Number), [charmander]);
+  assert.deepEqual(state.legacy.map(l => [l.line, l.star]), [[tauros, 3], [archen, 5], [kubfu, 6], [regieleki, 6]]);
+  assert.ok(evolve(w, archen, named('Archeops'), opts()).ok === false, 'a cut line cannot evolve');
+  const before = walletBalance(w);
+  const r = gacha.claimCutRefund(w, opts());
+  assert.ok(r.ok);
+  assert.deepEqual(r.total, { regular: 1 + 2, coins: 120, plus: 1, premium: 2 });
+  const after = walletBalance(r.wallet);
+  assert.equal(after.regular - before.regular, 3);
+  assert.equal(after.plus - before.plus, 1);
+  assert.equal(after.premium - before.premium, 2);
+  assert.equal(after.coins - before.coins, 120);
+  assert.equal(after['candy:' + tauros] || 0, 0, 'the candy it was paid for is spent');
+  assert.equal(after['candy:' + charmander], 10, 'kept lines keep their candy');
+  // Once: a second claim, on this device or after a merge with another that claimed too, pays nothing more.
+  assert.equal(gacha.claimCutRefund(r.wallet, opts()).ok, false);
+  const other = gacha.claimCutRefund(w, opts()).wallet;
+  assert.deepEqual(walletBalance(mergeWallet(r.wallet, other)), after);
+  assert.ok(gachaState(r.wallet, TODAY).legacy.every(l => l.refunded));
+  // A cut line that syncs in later is still refunded, once.
+  const late = mergeWallet(r.wallet, hatchedWallet([[named('Spearow'), 0]], 'late'));
+  const r2 = gacha.claimCutRefund(late, opts());
+  assert.ok(r2.ok);
+  assert.deepEqual(r2.lines.map(l => l.line), [named('Spearow')]);
+  assert.equal(gacha.claimCutRefund(r2.wallet, opts()).ok, false);
+});
+test('a cut buddy is dropped, a cut shiny keeps its look elsewhere in Bored, and a cut banner egg hatches a kept legendary', () => {
+  const [tauros] = ['Tauros'].map(named);
+  let w = hatchedWallet([[tauros, 0]]);
+  w.entries['hatch:cut-0.0'].x.sh = 1;
+  w.entries['cfg:buddy:t'] = { at: 5, x: { s: tauros } };
+  w.entries['cfg:look:t'] = { at: 6, x: { l: tauros, look: 'shiny' } };
+  w = mergeWallet(w);
+  const state = gachaState(w, TODAY);
+  assert.equal(state.buddy, null);
+  assert.equal(gacha.lookFor(state, tauros), 'shiny', 'Poké Idle still draws it shiny');
+  // An unhatched banner egg pulled for a legendary that is now cut.
+  let e = fresh({});
+  e.entries['spend:banner'] = { at: 1, g: { regular: 0 }, x: { m: 'legend', e: [4], w: 0, n: 0, d: TODAY, b: named('Kubfu') } };
+  e = mergeWallet(e);
+  const hatched = hatchReady(e, opts({ rand: always(0.5) })).hatched;
+  assert.equal(hatched.length, 1);
+  assert.equal(hatched[0].species, bannerFor(TODAY));
+  assert.ok(!gacha.isCut(hatched[0].species));
 });
 
 test('the banner legendary comes from the shared daily seed', () => {
@@ -424,6 +511,34 @@ test('a line wears one look across Bored, and only one it has unlocked', () => {
   plain = hatchReady(fund(plain, { waves: 10 }), opts({ rand: always(0.9) })).wallet;
   const own = gachaState(plain, TODAY).owned[0];
   assert.equal(gacha.setLook(plain, own, 'shiny', opts()).reason, 'locked');
+});
+
+test('candy by count: exactly the missing candy at 40 coins each, within 50 per line a day; refusals say how far off', () => {
+  const { buyCandy, candyOffer, COIN_SHOP } = gacha;
+  assert.equal(COIN_SHOP.candy.each, 40);
+  const owning = coins => { let w = fresh({ regular: 1, coins }); w = pull(w, { machine: 'move', rand: always(0.001) }).wallet;
+    return hatchReady(fund(w, { waves: 10 }), opts({ rand: always(0.001) })).wallet; };
+  let w = owning(2000);
+  const line = gacha.lineOf(gachaState(w, TODAY).owned[0]);
+  const before = gachaState(w, TODAY).lines[line].candy;
+  assert.deepEqual(candyOffer(w, line, 7, { today: TODAY }), { count: 7, coins: 280, left: 50, have: 2000, short: 0, fits: true });
+  const r = buyCandy(w, line, opts({ count: 7 }));
+  assert.ok(r.ok); assert.deepEqual([r.count, r.coins], [7, 280]);
+  w = r.wallet;
+  assert.equal(gachaState(w, TODAY).lines[line].candy - before, 7, 'exactly 7');
+  assert.equal(walletBalance(w).coins, 2000 - 280);
+  assert.equal(gachaState(w, TODAY).shop.candyToday[line], 7, 'the cap counts what was bought, not packs');
+  // The default is still the 5-pack for 200.
+  w = buyCandy(w, line, opts()).wallet;
+  assert.equal(gachaState(w, TODAY).shop.candyToday[line], 12);
+  // Over today's cap: refused, with what is left.
+  const over = buyCandy(w, line, opts({ count: 39 }));
+  assert.deepEqual([over.ok, over.reason, over.left], [false, 'limit', 38]);
+  // Short of coins: refused, with how many coins short.
+  const poor = owning(100);
+  const no = buyCandy(poor, line, opts({ count: 3 }));
+  assert.deepEqual([no.ok, no.reason, no.short], [false, 'coins', 20]);
+  assert.equal(candyOffer(poor, line, 3, { today: TODAY }).short, 20);
 });
 
 test('coin shop: candy for a caught line, 50 a line a day; shards, 50 a week; preset slots up to 5, permanent', () => {

@@ -26,8 +26,8 @@ const uuid = () => globalThis.crypto?.randomUUID?.() || 'x' + Date.now().toStrin
 
 /* ── Classes, derived from stats ─────────────────────────────────────── */
 
-// The only hand-written list: the healers.
-const HEALERS = new Set([113, 242, 440, 531]);
+// The only hand-written list: the healers (Chansey, Blissey, Happiny, Audino, Alomomola, Comfey).
+const HEALERS = new Set([113, 242, 440, 531, 594, 764]);
 export const CLASSES = {
   vanguard: { name: 'Vanguard', ground: true, block: 1, range: 1.2, cost: 8, sp: 10, about: 'Cheap; its skill gives energy back.' },
   guard: { name: 'Guard', ground: true, block: 2, range: 1.2, cost: 13, sp: 20, about: 'Physical melee; blocks 2.' },
@@ -458,6 +458,19 @@ function useSkill(b, u) {
   b.log.push({ t: b.t, skill: u.skill, unit: u.id });
 }
 
+/**
+ * Use a placed unit's skill now, by the player's hand (the page's Skill button), when it is
+ * fully charged. Skills still fire on their own; this lets a held one (a Blocker at full HP,
+ * a Medic with no one hurt) go early. Returns whether it fired.
+ */
+export function castSkill(b, id) {
+  const u = b.units.find(o => o.id === id);
+  if (!u || b.over || u.sp < u.spMax) return false;
+  useSkill(b, u);
+  u.sp = 0;
+  return true;
+}
+
 /** Advance the battle by one tick. Returns the battle. */
 export function step(b, dt = TICK) {
   if (b.over) return b;
@@ -777,7 +790,7 @@ export function tdBridge({ onChange = () => {} } = {}) {
     // `stages` stays chapter 1 for pages that predate chapters; `chapters` and `allStages` have every chapter.
     stages: CHAPTERS[0].stages, chapter: CHAPTER, chapters: CHAPTERS, allStages: STAGES, classes: CLASSES, W, H, TICK, REDEPLOY, maxLevel: MAX_LEVEL, levelCost,
     levelCaps: LEVEL_CAPS, skillKinds: SKILL_KINDS, capOf: line => lineCap(gachaState(readWallet()), line),
-    classOf, pathsOf, newBattle, step, deploy, retreat, canDeploy, canHit, starsFor, typeMultiplier,
+    classOf, pathsOf, newBattle, step, deploy, retreat, castSkill, canDeploy, canHit, starsFor, typeMultiplier,
     state: () => tdState(readWallet()),
     squad: species => squadFrom(readWallet(), species),
     finish: act((w, o) => tdFinish(w, o)),

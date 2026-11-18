@@ -364,6 +364,14 @@ canvas, img { image-rendering: pixelated; display: block }
 #deploy .card .low { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 3px; height: 20px }
 #deploy .card.on { box-shadow: inset 0 0 0 2px var(--paper) }
 #deploy .card.off .mini, #deploy .card.off .low { opacity: .4 }
+/* Not enough energy: the card dims, but its cost stays readable, in red. */
+#deploy .card.poor .low { opacity: 1 }
+#deploy .card.poor .low .num { color: var(--red) }
+#deploy .card { touch-action: none }
+/* A placed unit's popup: its name, then Skill (when charged) and Retreat. */
+#unit-pop { width: 112px; padding: 3px 6px; display: flex; flex-direction: column; gap: 3px; z-index: 4 }
+#unit-pop .klabels { gap: 3px }
+#battle-hud { cursor: pointer }
 #deploy .card .cool { position: absolute; inset: 0; background: rgba(28, 27, 44, .75); display: grid; place-items: center; color: var(--paper) }
 /* The tip grows upward to fit its text (it is anchored at the bottom). */
 #battle-tip { left: 8px; bottom: 8px; width: 176px; min-height: 62px; padding: 2px 8px; line-height: 18px; color: var(--dim); white-space: normal }
@@ -372,11 +380,15 @@ canvas, img { image-rendering: pixelated; display: block }
 /* As tall as the deploy bar and tip it covers, so neither peeks out above it. */
 #battle-talk { left: 8px; bottom: 8px; width: 624px; height: 62px; padding: 9px 12px; cursor: pointer }
 /* "WAVE 2/3" over the field for a moment when a wave starts; it never takes a click. */
-#wave-banner { left: 220px; top: 140px; width: 200px; height: 48px; text-align: center; font: 400 var(--title)/30px var(--pixel); pointer-events: none }
+#wave-banner { left: 220px; top: 44px; width: 200px; height: 40px; text-align: center; font: 400 var(--title)/30px var(--pixel); pointer-events: none }
 /* A clear's stars turn gold one by one, each with a short pop. */
 #battle-result .stars canvas.pop { animation: star-pop .3s steps(3) }
 @keyframes star-pop { from { transform: scale(1.8) } to { transform: scale(1) } }
 #battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
+/* The roster-cut refund: shown once, when the lines an account owned are refunded. */
+#cut-note { left: 120px; top: 24px; width: 400px; height: 296px; padding: 6px 12px; cursor: pointer; z-index: 40; display: flex; flex-direction: column }
+#cut-note .rows { flex: 1; overflow-y: auto; margin: 4px 0 }
+#cut-note .row { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap }
 #battle-result .reward-icons { display: flex; align-items: center; gap: 2px; white-space: nowrap }
 </style>
 </head>
@@ -404,6 +416,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="battle-tip"></div>
         <div class="panel" id="deploy-info"></div>
         <div class="panel" id="deploy"></div>
+        <div class="panel" id="unit-pop" hidden></div>
         <div class="panel" id="battle-talk" hidden></div>
         <div class="panel" id="wave-banner" hidden></div>
         <div class="panel" id="battle-result" hidden></div>
@@ -432,7 +445,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="dex-detail"><div class="cell" id="dex-pic"></div><div id="dex-info"></div><div id="dex-tabs"></div><div class="rows scroll" id="dex-acts"></div><div id="dex-depth" hidden></div></div>
       </section>
       <section id="scr-shop" class="screen" hidden>
-        <div class="panel left-panel"><div class="title" id="shop-title">SHOP</div><div class="rows scroll" id="shop-list"></div></div>
+        <div class="panel left-panel"><div class="title" id="shop-title">SHOP</div><div class="fbar" id="candy-bar" hidden></div><div class="rows scroll" id="shop-list"></div></div>
         <div class="panel right-panel" id="shop-preview"></div>
       </section>
       <section id="scr-quests" class="screen" hidden>
@@ -448,6 +461,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="starter-detail"><div class="cell" id="starter-pic"></div><div id="starter-info"></div><div class="rows" id="starter-gifts"></div></div>
       </section>
       <div class="panel" id="msg" role="status"></div>
+      <div class="panel" id="cut-note" hidden></div>
       <div class="panel" id="off" hidden>Open Poké Gacha from the Bored arcade: your wallet, eggs and dex live on your Bored profile.</div>
     </div>
   </div>
@@ -2489,7 +2503,7 @@ function heading(e) {
   const dx = p[i + 1][0] - p[i][0], dy = p[i + 1][1] - p[i][1], d = Math.hypot(dx, dy) || 1;
   return [dx / d, dy / d];
 }
-const facesRight = e => heading(e)[0] > 0;
+const facesRight = e => { const u = e.blockedBy && battle && battle.b.units.find(o => o.id === e.blockedBy); return u ? u.x > e.x : heading(e)[0] > 0; };
 // Where an enemy is drawn. Blocked ones stand at the edge of the blocker's tile,
 // facing it, side by side when one unit holds several; they never overlap it.
 function enemySpot(bt, e) {
@@ -2519,12 +2533,21 @@ function approach(e, u) {
   }
   return heading(e);
 }
+// A unit on high ground stands on its block's top, away from a walkable row beside it: toward
+// the back when the path runs in front, toward the front when it runs behind, so it never
+// looks like it stands among the foes walking past (it cannot block them).
+const walkable = (stage, x, y) => y >= 0 && y < T.H && "SG.".includes(tileAt(stage, x, y));
 function feetOf(bt, o) {
   const isUnit = bt.b.units.includes(o);
   const [x, y] = isUnit ? [o.x, o.y] : enemySpot(bt, o);
-  const [sx, sy] = feet(bt.stage, x, y, isUnit && isHigh(bt.stage, x, y));
+  const high = isUnit && isHigh(bt.stage, x, y);
+  let [sx, sy] = feet(bt.stage, x, y, high);
+  if (high) { const front = walkable(bt.stage, x, y + 1), back = walkable(bt.stage, x, y - 1);
+    sy += front && !back ? -TH * 0.22 : back && !front ? TH * 0.28 : 0; }
   return [sx, sy - (!isUnit && o.flying ? 20 : 0)];
 }
+// High-ground units are drawn a little shorter, so they stay on their block.
+const HIGH_H = 40;
 function battleFrame(now) {
   if (!battle) return;
   const bt = battle, b = bt.b;
@@ -2696,6 +2719,13 @@ function sceneryFor(stage) {
   SCENERY.set(ch, c);
   return c;
 }
+// Could the card stand on this tile once energy or cooldown allow? (the engine checks energy first)
+function placeable(b, slot, x, y) {
+  const why = T.canDeploy(b, slot, x, y), u = b.squad[slot];
+  if (!why) return true;
+  if (why !== "energy" && why !== "cooldown") return false;
+  return (u.ground ? tileAt(b.stage, x, y) === "." : tileAt(b.stage, x, y) === "H") && !b.units.some(o => o.x === x && o.y === y);
+}
 function drawField(now = performance.now()) {
   const bt = battle, b = bt.b, st = bt.stage, g = $("#field").getContext("2d");
   g.imageSmoothingEnabled = false;
@@ -2735,7 +2765,12 @@ function drawField(now = performance.now()) {
   }
   // Where the selected card can go, and its range from the hovered tile.
   const card = b.squad[bt.slot], hov = bt.hover || bt.cur;
-  if (card && !bt.selected) for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
+  if (bt.drag && card) for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
+    // Where it could stand lights up (even while energy is still short); the rest dims.
+    const ok = placeable(b, bt.slot, x, y), r = tileRect(st, x, y);
+    g.globalAlpha = ok ? 0.22 : 0.5; g.fillStyle = ok ? C.gold : C.ink; g.fillRect(r.x, r.y, TW, TH); g.globalAlpha = 1;
+  }
+  if (card && !bt.selected && (bt.armed || bt.drag)) for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
     const why = T.canDeploy(b, bt.slot, x, y);
     if (why && why !== "energy" && why !== "cooldown") continue;
     if (why && (card.ground ? tileAt(st, x, y) !== "." : tileAt(st, x, y) !== "H")) continue;
@@ -2760,7 +2795,7 @@ function drawField(now = performance.now()) {
   const hovered = b.units.find(o => o.x === hov[0] && o.y === hov[1]);
   if (sel) showRange(sel, sel.x, sel.y);
   else if (hovered) showRange(hovered, hovered.x, hovered.y);
-  else if (card && !T.canDeploy(b, bt.slot, hov[0], hov[1])) showRange(card, hov[0], hov[1]);
+  else if (card && (bt.armed || bt.drag) && placeable(b, bt.slot, hov[0], hov[1])) showRange(card, hov[0], hov[1]);
   // Everyone, back to front.
   // Props stand on their floor tile's centre and sort with everyone else.
   const props = propsOf(st, set).map(p => ({ prop: p, o: {}, at: feet(st, p.x, p.y, false) }));
@@ -2769,7 +2804,7 @@ function drawField(now = performance.now()) {
   const ghostsNow = bt.ghosts.filter(gh => now - gh.t0 < FX_TIME.fade);
   bt.ghosts = ghostsNow;
   for (const gh of ghostsNow) drawMon(g, gh.img, gh.at[0], gh.at[1], { flip: gh.flip, alpha: 1 - (now - gh.t0) / FX_TIME.fade });
-  const drawn = [], bars = [];
+  const drawn = [], bars = [], marks = [];
   for (const t of things) {
     if (t.prop) { const img = t.prop.img; g.drawImage(img, Math.round(t.at[0] - img.naturalWidth / 2), Math.round(t.at[1] + 6 - img.naturalHeight)); continue; }
     const { o, unit, at } = t;
@@ -2786,7 +2821,10 @@ function drawField(now = performance.now()) {
     // A skill that is ready: a gold ring at the feet.
     if (unit && o.sp >= o.spMax) { g.fillStyle = C.gold; for (const [dx, w] of [[-14, 6], [8, 6]]) g.fillRect(Math.round(at[0] + dx), Math.round(groundY + 2), w, 1); g.fillRect(Math.round(at[0] - 10), Math.round(groundY + 3), 20, 1); }
     const flash = a.flash && now - a.flash < FX_TIME.flash;
-    const top = drawMon(g, img, cx, cy, { flip: unit ? false : facesRight(o), white: flash });
+    const top = drawMon(g, img, cx, cy, { flip: unit ? false : facesRight(o), white: flash, maxH: unit && isHigh(st, o.x, o.y) ? HIGH_H : FIT_H });
+    // Block pips and stop bars go on top of every sprite, after this loop.
+    if (unit && o.block > 0) marks.push({ pips: o, x: at[0], y: groundY });
+    if (!unit && o.blockedBy && !o.flying) marks.push({ stop: o, x: cx, y: groundY });
     if (lastRect) drawn.push({ o, unit, img, rect: lastRect, flip: unit ? false : facesRight(o) });
     // Exploder fuse, armor, boss marks.
     if (!unit && o.fuse !== null && o.fuse !== undefined && Math.floor(now / 150) % 2) { g.fillStyle = C.red; g.fillRect(Math.round(cx) - 14, Math.round(groundY) - 1, 28, 2); }
@@ -2797,6 +2835,19 @@ function drawField(now = performance.now()) {
       for (const [dy, w] of [[-14, 8], [-8, 12], [-2, 8]]) g.fillRect(Math.round(cx + back * 22 - (back < 0 ? w : 0)), Math.round(groundY + dy), w, 2); }
     bars.push({ o, unit, x: Math.round(cx) - 18, y: top - 9 });
   }
+  // A blocker: one pip per foe it can hold, gold for each it holds now (under its feet).
+  // A blocked foe: a red stop bar on the side facing its blocker. Foes walking past have none.
+  for (const m of marks) {
+    if (m.pips) {
+      const n = m.pips.block, held = b.enemies.filter(e => e.blockedBy === m.pips.id).length, w = n * 7 - 2, x0 = Math.round(m.x - w / 2), py = Math.round(m.y + 5);
+      g.fillStyle = C.ink; g.fillRect(x0 - 2, py - 2, w + 4, 8);
+      for (let i = 0; i < n; i++) { g.fillStyle = i < held ? C.gold : SHADE.paper[0]; g.fillRect(x0 + i * 7, py, 5, 4); }
+    } else {
+      const side = facesRight(m.stop) ? 1 : -1, sx = Math.round(m.x + side * 15), sy = Math.round(m.y) - 18;
+      g.fillStyle = C.ink; g.fillRect(sx - 2, sy - 1, 6, 18); g.fillStyle = C.red; g.fillRect(sx - 1, sy, 4, 16);
+    }
+  }
+  bt.marks = marks.map(m => m.pips ? { pips: m.pips.id, held: b.enemies.filter(e => e.blockedBy === m.pips.id).length, of: m.pips.block } : { stop: m.stop.id });
   // A unit mostly hidden by sprites in front of it shows through as an outline.
   drawn.forEach((d, i) => {
     if (!d.unit) return;
@@ -2819,6 +2870,8 @@ function drawField(now = performance.now()) {
     if (bar.unit && o.sp >= o.spMax) { skillIcon ||= mapCanvas("skill", { k: C.ink, 1: C.gold }); g.drawImage(skillIcon, bx + 38, by - 6); }
   }
   bt.bars = placed.map((p, i) => ({ ...p, id: (bars[i].unit ? "u" : "e") + bars[i].o.id }));
+  // The dragged card's mon, at the cursor.
+  if (bt.drag && bt.drag.at && card) drawMon(g, spriteFor(card.num, card.look), bt.drag.at[0], bt.drag.at[1] + 16, { alpha: 0.7 });
   // Effects: projectiles, bursts and numbers.
   bt.fx = bt.fx.filter(f => now - f.t0 < (f.kind === "num" ? FX_TIME.num : f.kind === "burst" ? FX_TIME.burst : FX_TIME.shot));
   for (const f of bt.fx) {
@@ -2852,11 +2905,11 @@ let skillIcon = null, lastRect = null;
 const FIT_H = 48, FIT_W = 64;
 const fitOf = tr => Math.min(1, FIT_H / (tr.b - tr.t), FIT_W / (tr.r - tr.l));
 // Draw a sprite with its feet at (cx, by); returns the top of the Pokémon, for its HP bar.
-function drawMon(g, img, cx, by, { flip = false, alpha = 1, white = false } = {}) {
+function drawMon(g, img, cx, by, { flip = false, alpha = 1, white = false, maxH = FIT_H } = {}) {
   lastRect = null;
   if (!img.complete || !img.naturalWidth) return Math.round(by) - 40;
   const tr = trimOf(img) || { l: 0, t: 0, r: img.naturalWidth, b: img.naturalHeight };
-  const k = fitOf(tr), w = Math.round((tr.r - tr.l) * k), h = Math.round((tr.b - tr.t) * k);
+  const k = Math.min(fitOf(tr), maxH / (tr.b - tr.t)), w = Math.round((tr.r - tr.l) * k), h = Math.round((tr.b - tr.t) * k);
   const x = Math.round(cx - w / 2), y = Math.round(by - h);
   const src = white ? whiteOf(img) : img;
   g.save(); g.globalAlpha = alpha; g.imageSmoothingEnabled = false;
@@ -2899,6 +2952,33 @@ function mapBox() {
   const f = $("#field").getBoundingClientRect(), k = f.width / 640;
   return { l: f.left + MX * k, t: f.top + (MY - RAISE) * k, r: f.left + (MX + T.W * TW) * k, b: f.top + (MY + T.H * TH) * k };
 }
+// The selected unit's popup, beside it on the field: Skill (when charged; the hub fires it
+// with T.castSkill) and Retreat (half its cost back).
+function unitPopup(bt) {
+  const box = $("#unit-pop"), b = bt.b, u = bt.selected && b.units.find(o => o.id === bt.selected);
+  if (!u || bt.done || bt.talk.length || bt.drag) { box.hidden = true; return; }
+  const r = tileRect(bt.stage, u.x, u.y), right = r.x + TW + 120 < 640;
+  const charged = u.sp >= u.spMax, can = charged && !!T.castSkill;
+  const key = [u.id, charged, can].join(":");
+  if (box.dataset.key !== key) {
+    box.dataset.key = key;
+    const k = el("div", "klabels"), skill = el("span", "klabel" + (can ? " on" : ""), "Skill");
+    skill.dataset.pop = "skill"; skill.title = can ? "Use the skill now" : charged ? "Fires by itself when a foe is in range" : "Charging";
+    if (!can) skill.style.opacity = ".45";
+    const back = el("span", "klabel", "Retreat"); back.dataset.pop = "retreat"; back.title = "Back to the cards, half its cost back";
+    k.append(skill, back);
+    box.replaceChildren(el("div", "", name(u.num)), k);
+  }
+  Object.assign(box.style, { left: (right ? r.x + TW + 2 : r.x - 116) + "px", top: Math.max(44, r.y - 8) + "px" });
+  box.hidden = false;
+}
+function popAction(what) {
+  const bt = battle; if (!bt) return;
+  const b = bt.b, u = bt.selected && b.units.find(o => o.id === bt.selected);
+  if (!u) return;
+  if (what === "retreat") { bt.retreated.add(u.id); T.retreat(b, u.id); bt.selected = null; return; }
+  if (what === "skill" && T.castSkill && u.sp >= u.spMax) T.castSkill(b, u.id);
+}
 function battleHud() {
   const bt = battle, b = bt.b;
   // Top centre: enemies down / total, lives (and the weekly risk).
@@ -2919,7 +2999,8 @@ function battleHud() {
     const cool = Math.max(0, Math.ceil((b.cooldown[i] || 0) - b.t));
     // Weekly risks: deploys can cost 3 more, and medics can be banned.
     const cost = u.cost + (b.mods && b.mods.has && b.mods.has("cost") ? 3 : 0), banned = !!(b.mods && b.mods.has && b.mods.has("nomedic") && u.cls === "medic");
-    const card = el("div", "card" + (i === bt.slot ? " on" : "") + (out || cool || banned || b.energy < cost ? " off" : ""));
+    const poor = !out && !cool && !banned && b.energy < cost;
+    const card = el("div", "card" + (i === bt.slot && bt.armed ? " on" : "") + (out || cool || banned || poor ? " off" : "") + (poor ? " poor" : ""));
     card.dataset.slot = i; card.title = name(u.num) + " · " + T.classes[u.cls].name + " · cost " + cost;
     const low = el("div", "low"); low.append(classIcon(u.cls), el("span", "num", banned ? "no" : cost));
     card.append(mini(u.num, u.look), low);
@@ -2931,9 +3012,10 @@ function battleHud() {
   $("#deploy").replaceChildren(...cards);
   // Bottom left: what to do now, or why that tile did not take.
   const sel = bt.selected && b.units.find(o => o.id === bt.selected);
-  const why = { energy: "Not enough energy yet.", tile: "That class cannot stand there.", taken: "Someone is already there.", cooldown: "Still on cooldown.", banned: "No medics this week.", full: "At most 6 on the field.", deployed: "Already on the field." }[bt.note];
+  const why = { pick: "Pick a card first: click it, or drag it onto a tile.", cancel: "Cancelled: nothing placed.", energy: "Not enough energy yet.", tile: "That class cannot stand there.", taken: "Someone is already there.", cooldown: "Still on cooldown.", banned: "No medics this week.", full: "At most 6 on the field.", deployed: "Already on the field." }[bt.note];
   $("#battle-tip").textContent = why || (sel ? name(sel.num) + ": click again to retreat (half its cost back)." :
-    "Pick a card, then a tile: melee on the path, ranged up high.");
+    "Drag a card onto a tile: melee on the path, ranged up high.");
+  unitPopup(bt);
 }
 function endBattle() {
   const bt = battle, b = bt.b;
@@ -3010,7 +3092,7 @@ function battleKey(e) {
   if (k === " ") { e.preventDefault(); bt.paused = !bt.paused; return; }
   const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
   if (move) { e.preventDefault(); bt.cur = [Math.max(0, Math.min(T.W - 1, bt.cur[0] + move[0])), Math.max(0, Math.min(T.H - 1, bt.cur[1] + move[1]))]; bt.selected = b.units.find(o => o.x === bt.cur[0] && o.y === bt.cur[1]) ? bt.selected : null; return; }
-  if (/^[1-8]$/.test(k)) { e.preventDefault(); if (b.squad[Number(k) - 1]) { bt.slot = Number(k) - 1; bt.cardTouched = true; } bt.selected = null; return; }
+  if (/^[1-8]$/.test(k)) { e.preventDefault(); if (b.squad[Number(k) - 1]) { bt.slot = Number(k) - 1; bt.cardTouched = true; bt.armed = true; } bt.selected = null; return; }
   if (k === "Enter") { e.preventDefault(); tileAction(bt.cur[0], bt.cur[1]); return; }
   if (k === "Backspace") { e.preventDefault(); bt.selected = null; }
 }
@@ -3305,7 +3387,38 @@ function refreshTop() {
   $("#tabs").append(help, purse);
 }
 // Every key, from the keyboard or a [data-press] label.
+/* ── The roster cut ───────────────────────────────────────────────────────
+   Poké Gacha's eggs hatch about 200 lines now. Lines that were cut leave the
+   dex; the hub refunds each one this account owned, once (gacha:cut:<line>), and
+   this note lists what came back. Cut species also leave every saved team. */
+let cutNote = null;
+const REFUND_NAMES = { regular: "Regular", plus: "Plus", premium: "Premium", coins: "coins" };
+const refundText = g => ["regular", "plus", "premium", "coins"].filter(k => g[k] > 0).map(k => g[k] + " " + REFUND_NAMES[k]).join(", ");
+function purgeCutSquads() {
+  if (!G || !G.isCut) return;
+  const keepOf = list => (Array.isArray(list) ? list : []).filter(num => !G.isCut(num));
+  const before = JSON.stringify([pref.squad, pref.squads]);
+  if (Array.isArray(pref.squad)) pref.squad = keepOf(pref.squad);
+  if (Array.isArray(pref.squads)) pref.squads = pref.squads.map(keepOf);
+  if (JSON.stringify([pref.squad, pref.squads]) !== before) keep();
+}
+function showCutNote(r) {
+  cutNote = r;
+  const box = $("#cut-note"), rows = el("div", "rows");
+  for (const l of r.lines) {
+    const row = el("div", "row");
+    row.append(el("span", "", name(l.line) + " " + l.star + "★"), el("span", "", refundText(l.refund)));
+    rows.append(row);
+  }
+  box.replaceChildren(el("div", "title", "ROSTER CHANGE"),
+    el("div", "", "Eggs now hatch " + (G.dex.filter(row => row[9] > 0).length) + " lines. " + (r.lines.length === 1 ? "One line you had was" : r.lines.length + " lines you had were") +
+      " cut, and refunded in vouchers, candy left (1 Regular per " + G.cutCandy + ") and level coins:"),
+    rows, el("div", "", "In all: " + refundText(r.total) + ". Enter to close."));
+  box.hidden = false;
+}
+function closeCutNote() { cutNote = null; $("#cut-note").hidden = true; refreshTop(); if (SCREENS[tab]) SCREENS[tab][0](); }
 function onKey(e) {
+  if (cutNote) { if (["Enter", " ", "Escape", "Backspace"].includes(e.key)) { e.preventDefault(); closeCutNote(); } return; }
   // Typing in the filter panel's name box is text, not keys.
   if (e.target && e.target.tagName === "INPUT") return;
   // With the panel open, Enter or Backspace closes it; other keys still reach the list behind.
@@ -3383,15 +3496,56 @@ if (!G) {
   const fieldPoint = e => { const box = $("#field").getBoundingClientRect(), k = box.width / 640; return tileFromPoint((e.clientX - box.left) / k, (e.clientY - box.top) / k); };
   $("#field").onclick = e => {
     if (!battle || battle.talk.length || battle.done) return;
+    if (battle.dragged) { battle.dragged = false; return; }
     const t = fieldPoint(e);
-    if (t) { battle.cur = t; tileAction(t[0], t[1]); }
+    if (!t) return;
+    battle.cur = t;
+    const here = battle.b.units.some(o => o.x === t[0] && o.y === t[1]);
+    // An empty tile takes the picked card; with no card picked it only says so.
+    if (!here && !battle.armed) { battle.note = "pick"; return; }
+    tileAction(t[0], t[1]);
+    if (!here && !battle.note) battle.armed = false;
   };
+  const cancelPick = e => { if (!battle) return; e.preventDefault(); battle.armed = false; battle.selected = null; battle.drag = null; battle.note = ""; };
+  $("#field").oncontextmenu = cancelPick;
+  $("#deploy").oncontextmenu = cancelPick;
+  $("#battle-hud").onclick = () => { if (battle && !battle.done && !battle.talk.length) battle.paused = !battle.paused; };
+  $("#unit-pop").onclick = e => { const t = e.target.closest("[data-pop]"); if (t) popAction(t.dataset.pop); };
+  // Drag a card onto the field: it follows the cursor, valid tiles light up, invalid ones dim,
+  // and letting go on an invalid tile (or off the field) cancels.
+  $("#deploy").addEventListener("pointerdown", e => {
+    const c = e.target.closest("[data-slot]");
+    if (!c || !battle || battle.done || battle.talk.length || e.button !== 0) return;
+    battle.press = { slot: Number(c.dataset.slot), x: e.clientX, y: e.clientY };
+  });
+  document.addEventListener("pointermove", e => {
+    const bt = battle; if (!bt || !bt.press) return;
+    if (!bt.drag && Math.hypot(e.clientX - bt.press.x, e.clientY - bt.press.y) < 6) return;
+    if (!bt.drag) { bt.drag = { slot: bt.press.slot }; bt.slot = bt.press.slot; bt.armed = true; bt.selected = null; bt.cardTouched = true; }
+    const box = $("#field").getBoundingClientRect(), k = box.width / 640;
+    bt.drag.at = [(e.clientX - box.left) / k, (e.clientY - box.top) / k];
+    bt.hover = fieldPoint(e);
+  });
+  document.addEventListener("pointerup", e => {
+    const bt = battle; if (!bt || !bt.press) return;
+    const drag = bt.drag; bt.press = null;
+    if (!drag) return;
+    bt.drag = null; bt.dragged = true; setTimeout(() => { if (battle) battle.dragged = false; }, 0);
+    // A good tile places it (or says energy or cooldown is short); a wrong tile, or off the field, cancels.
+    const t = fieldPoint(e);
+    if (t && placeable(bt.b, drag.slot, t[0], t[1])) { bt.cur = t; tileAction(t[0], t[1]); }
+    else bt.note = "cancel";
+    bt.armed = false;
+  });
   $("#field").onmousemove = e => { if (battle) battle.hover = fieldPoint(e); };
   $("#field").onmouseleave = () => { if (battle) battle.hover = null; };
   // The Squad screen: Start, team tabs, filter labels, slots, roster cards and skill picks.
   $("#squad").onclick = e => storyMode === "squad" && !battle && squadClick(e);
   $("#battle-pause").onclick = () => { if (battle && !battle.done && !battle.talk.length) battle.paused = !battle.paused; };
-  $("#deploy").onclick = e => { const c = e.target.closest("[data-slot]"); if (c && battle) { battle.slot = Number(c.dataset.slot); battle.selected = null; battle.cardTouched = true; } };
+  // Click a card to pick it (it lights up); click it again to put it down.
+  $("#deploy").onclick = e => { const c = e.target.closest("[data-slot]"); if (!c || !battle || battle.dragged) return;
+    const i = Number(c.dataset.slot); if (battle.armed && battle.slot === i) { battle.armed = false; return; }
+    battle.slot = i; battle.selected = null; battle.cardTouched = true; battle.armed = true; };
   $("#tutor-box").onclick = e => { if (e.target.closest("[data-skip]")) tutorSkipAll(); else if (tutorStep() && !tutorStep().done) tutorNext(); };
   $("#battle-talk").onclick = () => battle && battleKey({ key: "Enter", preventDefault() {} });
   $("#battle-result").onclick = () => battle && battle.done && !battle.talk.length && leaveBattle();
@@ -3416,11 +3570,15 @@ if (!G) {
     const now = JSON.stringify(G.state());
     if (now !== seen) { seen = now; refreshTop(); SCREENS[tab][0](); }
   }, 3000);
+  purgeCutSquads();
+  const cut = G.claimCutRefund ? G.claimCutRefund() : { ok: false };
+  $("#cut-note").onclick = () => cutNote && closeCutNote();
   const login = G.claimLogin().ok;
   go(shownTabs().some(([id]) => id === tab) ? tab : "pull");
   // The starter pick comes first, for a new player and once for an old one.
   if (needsStarter()) openStarter();
   else if (login) { if (tab === "pull") { message = { text: "Daily login: +3 Regular vouchers." }; updateScene(); } else say("Daily login: +3 Regular vouchers."); }
+  if (cut.ok && cut.lines && cut.lines.length) showCutNote(cut);
 }
 
 // The hub reads this. Poké Gacha itself is unscored; weeklyRisk (this week's
