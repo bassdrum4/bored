@@ -2956,6 +2956,7 @@ function starterUpdate() {
   say(p.sure ? "Take " + name(num) + " for good? Enter: yes. Backspace: no."
     : "Pick your first Pokémon. It comes with " + giftNames() + ", so your squad is four.");
 }
+const welcomeText = w => "Welcome pack: +" + (w.gold || 0) + " Gold voucher" + ((w.gold || 0) === 1 ? "" : "s") + " and " + (w.coins || 0) + " coins.";
 function starterEnter() {
   const p = picking, num = G.starters[p.at];
   if (!p.sure) { p.sure = true; return starterUpdate(); }
@@ -2968,7 +2969,7 @@ function starterEnter() {
   if (r.ok) { pref.squad = [...G.starterGifts, num]; keep(); }
   go(T ? "story" : "pull");
   // Right after the pick, go("story") starts the loop tips, which end on the Pull tab.
-  if (r.ok) say(name(num) + " joins you, with " + giftNames() + ". Your first " + (G.freeHatches || 10) + " eggs hatch at once: pull them on the Pull tab, then play 1-1 here.");
+  if (r.ok) say(name(num) + " joins you, with " + giftNames() + "." + (r.welcome ? " " + welcomeText(r.welcome) : "") + " Your first " + (G.freeHatches || 10) + " eggs hatch at once: pull them on the Pull tab, then play 1-1 here.");
 }
 function starterKey(e) {
   const p = picking, n = G.starters.length;
@@ -3302,11 +3303,13 @@ if (!G) {
     const now = JSON.stringify(G.state());
     if (now !== seen) { seen = now; refreshTop(); SCREENS[tab][0](); }
   }, 3000);
-  const login = G.claimLogin().ok;
+  // The daily login, and (once, for accounts from before it) the welcome pack.
+  const claim = G.claimLogin(), login = claim.login ?? claim.ok;
+  const hello = [login ? "Daily login: +3 Regular vouchers." : "", claim.welcome ? welcomeText(claim.welcome) : ""].filter(Boolean).join(" ");
   go(shownTabs().some(([id]) => id === tab) ? tab : "pull");
   // The starter pick comes first, for a new player and once for an old one.
   if (needsStarter()) openStarter();
-  else if (login) { if (tab === "pull") { message = { text: "Daily login: +3 Regular vouchers." }; updateScene(); } else say("Daily login: +3 Regular vouchers."); }
+  else if (hello) { if (tab === "pull") { message = { text: hello }; updateScene(); } else say(hello); }
 }
 
 // The hub reads this. Poké Gacha itself is unscored; weeklyRisk (this week's
