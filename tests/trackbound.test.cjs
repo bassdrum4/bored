@@ -383,6 +383,47 @@ test('Trackbound daily track is the same track for the same seed', () => {
   assert.ok(first.mesh.tris.length > 0);
 });
 
+test('Trackbound files a daily run under its day, not under one shared id', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  T.useTrack(T.buildTrack(['start', 'sprint', 'straight', 'finish'], { id: 'daily', name: 'Daily', author: 32000 }));
+  for (let step = 0; step < 120 * 30; step++) {
+    T.stepRace(1 / 120, { gas: true });
+    if (T.race.state === 'finished') break;
+  }
+  assert.equal(T.race.state, 'finished', 'the short daily was completed');
+  const day = T.seedDate();
+  assert.equal(day, '2026-10-30', 'the day comes from the injected seed');
+  const record = T.dailyRecord(day);
+  assert.ok(record && record.ms > 0, 'the daily record is filed under its day');
+  assert.ok(Array.isArray(record.ghost) && record.ghost.length > 1, 'with its ghost');
+  assert.equal(record.layout, T.layoutOf(['start', 'sprint', 'straight', 'finish']), 'and its layout');
+  const mirror = JSON.parse(page.storage.get('bored.trackbound.daily'));
+  assert.ok(mirror[day] && mirror[day].ms === record.ms, 'the day is mirrored to storage');
+  const bests = page.storage.get('bored.trackbound.best');
+  assert.equal(bests && JSON.parse(bests).daily, undefined, 'nothing is filed under the shared daily id');
+  assert.equal(T.dailyStreak().current, 1, 'today counts as a one-day streak');
+  assert.equal(page.sandbox.__boredSnapshot().dailyMs, record.ms, 'the snapshot reports the daily time');
+});
+
+test('Trackbound packs a ghost to half the rate without moving the line', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const record = [];
+  for (let i = 0; i < 40; i++) record.push([i * 0.05, i * 0.1, 0.62, -i * 0.2, 0, 0, 1, 0, 1, 0]);
+  const packed = T.packGhost(record);
+  assert.equal(packed.length, 20, 'every second sample is kept');
+  // join, not deepEqual: an array built inside the game's context has that
+  // context's Array prototype, which strict deep equality refuses to match.
+  assert.equal(packed[0].join(','), '0,0,0.62,0,0,0,1,0,1,0', 'the first sample survives');
+  assert.equal(packed[3][0], 0.3, 'time is carried at a hundredth');
+  assert.equal(T.packGhost([[0, 0, 0]]), null, 'a short sample list is not a ghost');
+  assert.equal(T.packGhost('nope'), null);
+  assert.equal(T.unpackGhost(packed).length, 20, 'the packed ghost reads back');
+  assert.equal(T.unpackGhost([[1, 2, 3]]), null, 'a malformed ghost is dropped');
+  assert.equal(page.sandbox.__boredSnapshot().dailyGold, 0, 'no daily medal before a daily finish');
+});
+
 test('Trackbound renders a full frame without throwing', () => {
   const page = load({ webgl: true });
   const T = page.sandbox.__test;

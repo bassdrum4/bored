@@ -101,7 +101,12 @@ export const CHALLENGES = [
   { slug: 'ashcrown', label: 'Banner rising', goal: 'Grow one banner to {target} renown in a single campaign.', metric: 'renown', targets: [150, 300, 450], unit: 'renown' },
   // Corner's daily is the whole fortnight, not a mid-run till: the rule below
   // checks that the shop actually finished before the cash is counted.
-  { slug: 'corner', label: 'Open for business', goal: 'Finish all fourteen days with at least ${target} in the till.', metric: 'cash', targets: [180, 230, 280], rule: 'corner', unit: 'cash' }
+  { slug: 'corner', label: 'Open for business', goal: 'Finish all fourteen days with at least ${target} in the till.', metric: 'cash', targets: [180, 230, 280], rule: 'corner', unit: 'cash' },
+  // Trackmania's daily ribbon is built from the shared seed, so every player
+  // gets the same road and the same medal ladder. The goal is the medal rather
+  // than a second count: a fixed time would be trivial on a short layout and
+  // impossible on a long one, while the ladder already scales to the track.
+  { slug: 'trackbound', label: 'Clean line', goal: 'Finish today\u2019s daily track with a gold medal or better.', metric: 'dailyGold', targets: [1, 1, 1], rule: 'track', unit: 'gold on the daily' }
 ];
 // Frozen v3 calendar lineup; future additions must make a new schedule version
 // instead of silently moving previously published daily challenges.
@@ -162,6 +167,11 @@ const DAILY_SCHEDULE_V5_START = Date.parse('2026-11-05T00:00:00Z') / 86400000;
 // 2026-12-20.
 const DAILY_SCHEDULE_V6 = Object.freeze([...DAILY_SCHEDULE_V5, 'corner']);
 const DAILY_SCHEDULE_V6_START = Date.parse('2026-11-11T00:00:00Z') / 86400000;
+// V7 adds Trackmania. It opens the day after this release so the challenges
+// already published for 2026-11-18 keep their games; its first full circuit
+// begins on 2026-12-29.
+const DAILY_SCHEDULE_V7 = Object.freeze([...DAILY_SCHEDULE_V6, 'trackbound']);
+const DAILY_SCHEDULE_V7_START = Date.parse('2026-11-19T00:00:00Z') / 86400000;
 const DAILY_SCHEDULE_START = Date.parse('2026-10-28T00:00:00Z') / 86400000;
 // A one-day promotion plays its game instead of the calendar's on that date and
 // changes nothing else. The calendar itself is untouched, so the next day
@@ -181,12 +191,13 @@ export function dailyChallenge(date) {
     const target = definition.targets[circuit];
     return { ...definition, date, target, goal: definition.goal.replace('{target}', target), id: 'v2:' + date + ':' + definition.slug };
   }
+  const v7 = day >= DAILY_SCHEDULE_V7_START;
   const v6 = day >= DAILY_SCHEDULE_V6_START;
   const v5 = day >= DAILY_SCHEDULE_V5_START;
-  const schedule = v6 ? DAILY_SCHEDULE_V6 : v5 ? DAILY_SCHEDULE_V5 : day < DAILY_SCHEDULE_V4_START ? DAILY_SCHEDULE_V3 : DAILY_SCHEDULE_V4;
-  const version = v6 ? 6 : v5 ? 5 : day < DAILY_SCHEDULE_V4_START ? 3 : 4;
+  const schedule = v7 ? DAILY_SCHEDULE_V7 : v6 ? DAILY_SCHEDULE_V6 : v5 ? DAILY_SCHEDULE_V5 : day < DAILY_SCHEDULE_V4_START ? DAILY_SCHEDULE_V3 : DAILY_SCHEDULE_V4;
+  const version = v7 ? 7 : v6 ? 6 : v5 ? 5 : day < DAILY_SCHEDULE_V4_START ? 3 : 4;
   const size = schedule.length;
-  const offset = day - (v6 ? DAILY_SCHEDULE_V6_START : v5 ? DAILY_SCHEDULE_V5_START : DAILY_SCHEDULE_START);
+  const offset = day - (v7 ? DAILY_SCHEDULE_V7_START : v6 ? DAILY_SCHEDULE_V6_START : v5 ? DAILY_SCHEDULE_V5_START : DAILY_SCHEDULE_START);
   const cycleNumber = Math.floor(offset / size);
   let previous = [];
   // Deterministic seeded order per cycle: each game once per circuit.
@@ -200,7 +211,11 @@ export function dailyChallenge(date) {
       const j = state % (i + 1);
       [order[i], order[j]] = [order[j], order[i]];
     }
-    const recent = cycle ? previous.slice(-7) : v6
+    const recent = cycle ? previous.slice(-7) : v7
+      // Look back at the seven days v6 really published rather than a stand-in.
+      ? Array.from({ length: 7 }, (_, i) =>
+          dailyChallenge(new Date((DAILY_SCHEDULE_V7_START - 7 + i) * 86400000).toISOString().slice(0, 10)).slug)
+      : v6
       // Look back at the seven days v5 really published rather than a stand-in.
       ? Array.from({ length: 7 }, (_, i) =>
           dailyChallenge(new Date((DAILY_SCHEDULE_V6_START - 7 + i) * 86400000).toISOString().slice(0, 10)).slug)
@@ -259,6 +274,11 @@ export function dailyCheck(challenge, snapshot) {
     // The shop's goal is the fortnight's takings, so a good Wednesday does not
     // count until day fourteen is closed.
     case 'corner': complete = complete && snapshot.finished === true; notes.push(snapshot.finished ? 'fourteen days served' : 'finish all fourteen days'); break;
+    // The daily ribbon changes length every morning, so the gold rung is the
+    // goal: the game derives it from the layout, and only a finished run on
+    // today's daily can have earned one. A campaign track never counts.
+    case 'track': complete = snapshot.finished === true && snapshot.daily === true && snapshot.dailyGold === 1;
+      notes.push(snapshot.daily ? (snapshot.finished ? 'daily track finished' : 'finish the daily track') : 'play the daily track'); break;
   }
   return { complete, progress: value + ' ' + challenge.unit + ' · target ' + t + (notes.length ? ' · ' + notes.join(' · ') : '') };
 }

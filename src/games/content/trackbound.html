@@ -109,6 +109,9 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 .medalTable b{color:var(--ink);font-size:12px;font-variant-numeric:tabular-nums}
 .medalTable i{font-style:normal;font-size:10px;color:var(--dim)}
 .result .row{margin-top:14px}
+.dist{display:flex;align-items:flex-end;gap:2px;height:30px;margin:8px 0 0}
+.dist i{flex:1;min-height:2px;background:var(--rule)}
+.dist i.you{background:var(--accent)}
 
 #comboBar{position:absolute;left:50%;transform:translateX(-50%);bottom:72px;width:190px;height:3px;
   background:rgba(26,25,22,.16);display:none}
@@ -161,6 +164,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
               <button id="btnDaily" type="button">Daily track</button>
               <button id="btnFreeplay" type="button">Freeplay park</button>
             </div>
+            <p id="dailyNote" class="note"></p>
             <p class="note">Freeplay is a stunt park: gold rings, a vertical loop, and ramps built to be flown.</p>
           </div>
           <div>
@@ -200,9 +204,13 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
         <p id="resTime" class="bigTime">0.000</p>
         <p class="medalLine"><span id="resDot" class="dot"></span><span id="resMedal">No medal</span></p>
         <p id="resBest" class="note"></p>
+        <p id="resCrowd" class="note" hidden></p>
+        <div id="resDist" class="dist" hidden></div>
+        <p id="resRival" class="note" hidden></p>
         <div id="resBoard" class="medalTable"></div>
         <div class="row">
           <button id="resRestart" type="button">Race again</button>
+          <button id="resRivalBtn" type="button" hidden>Race the rival</button>
           <button id="resNext" type="button">Next track</button>
           <button id="resMenu" type="button">Menu</button>
         </div>
@@ -269,7 +277,7 @@ const toLocal = (parent, worldPoint) => {
    (some embeds do) the same values are kept through localStorage; if both are
    blocked the game plays without saved data and never complains. */
 const DATA = 'bored.trackbound';
-const saved = { best: {}, medals: {}, ghost: true, mute: false, freeplay: null, trackPoints: {} };
+const saved = { best: {}, medals: {}, ghost: true, mute: false, freeplay: null, trackPoints: {}, daily: {} };
 let db = null;
 
 function persist(name) {
@@ -284,7 +292,7 @@ function startSaved(onLoaded) {
   // Lift data a previous build kept in localStorage, then prefer what the
   // database holds. Saved tracks are gone, so that key can go too.
   try {
-    for (const name of ['best', 'medals', 'ghost', 'freeplay', 'trackPoints']) {
+    for (const name of ['best', 'medals', 'ghost', 'freeplay', 'trackPoints', 'daily']) {
       const raw = localStorage.getItem(DATA + '.' + name);
       if (raw) { const parsed = JSON.parse(raw); if (parsed) saved[name] = parsed; }
     }
@@ -320,6 +328,56 @@ function startSaved(onLoaded) {
       all.onerror = () => settle();
     } catch (error) { db = null; settle(); }
   };
+}
+
+/* The daily ribbon is a new road every morning, so its record is filed under the
+   day. Keeping it in `saved.best` under the single id "daily" meant a slow run
+   on a hard layout was compared against yesterday's fast one on a different
+   road, and the older ghost was never replaced. Fourteen days are kept: enough
+   for a streak to be read off them, small enough to stay a tiny record. */
+const DAILY_KEEP = 14;
+const pad2 = value => String(value).padStart(2, '0');
+
+// The hub injects the Detroit day every game document shares; a document opened
+// on its own still gets a date so the daily works in isolation.
+function seedDate() {
+  const injected = window.__boredSeed && window.__boredSeed.date;
+  if (typeof injected === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(injected)) return injected;
+  const now = new Date();
+  return now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate());
+}
+function dailyRecord(day) {
+  return (saved.daily && saved.daily[day]) || null;
+}
+// Day arithmetic on the date string, so a timezone shift mid-streak cannot
+// invent or lose a day.
+const shiftDay = (day, step) => {
+  const at = new Date(day + 'T00:00:00Z');
+  at.setUTCDate(at.getUTCDate() + step);
+  return at.toISOString().slice(0, 10);
+};
+function dailyStreak() {
+  const days = new Set(Object.keys(saved.daily || {}));
+  const today = seedDate();
+  const yesterday = shiftDay(today, -1);
+  // An unplayed today does not break a streak that ran through yesterday.
+  const start = days.has(today) ? today : days.has(yesterday) ? yesterday : null;
+  let current = 0;
+  for (let cursor = start; cursor && days.has(cursor); cursor = shiftDay(cursor, -1)) current++;
+  let best = 0;
+  for (const day of days) {
+    let run = 1;
+    for (let cursor = day; days.has(shiftDay(cursor, -1)); cursor = shiftDay(cursor, -1)) run++;
+    if (run > best) best = run;
+  }
+  return { current, best, played: days.size };
+}
+function saveDaily(day, record) {
+  if (!saved.daily) saved.daily = {};
+  saved.daily[day] = record;
+  const days = Object.keys(saved.daily).sort();
+  for (const old of days.slice(0, Math.max(0, days.length - DAILY_KEEP))) delete saved.daily[old];
+  persist('daily');
 }
 
 /* ── matrices (column major, as WebGL wants them) ────────────────────────── */
@@ -1329,6 +1387,19 @@ const CAMPAIGN = [
       'tunnel', 'straight', 'curveR', 'hairpinL', 'sprint', 'checkpoint', 'boost', 'straight',
       'curveL', 'up', 'straight', 'down', 'curveR', 'checkpoint', 'wallL', 'straight', 'wallR',
       'curveL', 'checkpoint', 'ice', 'straight', 'boost', 'loop', 'straight', 'curveR',
+      'sprint', 'finish'] },
+  // The last two are routes the campaign does not otherwise have: a cold store
+  // of ice, tunnels and rail-width straights where the line has to be set before
+  // the corner, and a climb that turns over and comes back down through a wall
+  // ride. Both were checked against trackFolds, so neither doubles back on
+  // itself.
+  { id: 'coldstore', name: 'Cold Store', author: 19200,
+    blocks: ['start', 'sprint', 'ice', 'curveL', 'tunnel', 'boost', 'straight', 'checkpoint',
+      'narrow', 'curveR', 'ice', 'whoops', 'sprint', 'curveL', 'checkpoint', 'tunnel',
+      'ice', 'straight', 'curveR', 'finish'] },
+  { id: 'updraft', name: 'Updraft', author: 17400,
+    blocks: ['start', 'sprint', 'up', 'whoops', 'curveL', 'boost', 'loop', 'straight',
+      'checkpoint', 'down', 'wallR', 'curveR', 'checkpoint', 'kicker', 'straight', 'curveL',
       'sprint', 'finish'] }
 ];
 
@@ -2257,7 +2328,7 @@ const race = {
   missing: 0, boostFlash: 0, thud: 0,
   tricks: 0, points: 0, air: 0, spinDeg: 0, flipDeg: 0, bestAir: 0, safeClock: 0,
   combo: 1, comboClock: 0, bestTrick: 0, lastPoints: 0, stuck: 0,
-  rings: 0, laps: 0, ringClock: 0, clean: 0
+  rings: 0, laps: 0, ringClock: 0, clean: 0, rival: null
 };
 let autopilot = null;
 
@@ -2313,11 +2384,13 @@ function useTrack(track) {
   race.laps = 0;
   race.ringClock = 0;
   race.clean = 0;
-  const best = saved.best[track.id];
+  const best = track.id === 'daily' ? dailyRecord(seedDate()) : saved.best[track.id];
   // Ghosts only line up if the track still looks the way it did on that day.
   const alive = best && Number.isFinite(best.ms) && (!best.layout || best.layout === layoutOf(track.blocks));
   race.best = alive ? best : null;
   race.ghost = race.best && Array.isArray(race.best.ghost) ? race.best.ghost : null;
+  // The fastest other run of the day, if one has been fetched for this record.
+  race.rival = alive && best.rival && Array.isArray(best.rival.ghost) ? best.rival : null;
   race.splits = [];
   rebuildRender();
   paintBest();
@@ -2573,25 +2646,32 @@ function finishRun() {
   race.finishedAt = race.t;
   const ms = Math.round(race.t * 1000);
   race.medal = medalFor(world.author, ms);
-  const bests = saved.best;
-  const previous = bests[world.id];
+  // A daily ribbon is filed under its day; a campaign track under its id.
+  const daily = world.id === 'daily';
+  const day = seedDate();
+  const previous = daily ? dailyRecord(day) : saved.best[world.id];
   const isBest = !previous || ms < previous.ms;
   race.previousBest = previous ? previous.ms : null;
   if (isBest) {
-    bests[world.id] = {
+    const record = {
       ms,
       medal: race.medal,
       ghost: race.record.map(sample => sample.map(value => Math.round(value * 100) / 100)),
       splits: race.splits.map(msSplit => Math.round(msSplit) || 0),
       pts: race.points,
       layout: world.layout,
-      date: (window.__boredSeed && window.__boredSeed.date) || ''
+      date: day
     };
-    persist('best');
-    race.best = bests[world.id];
-    race.ghost = race.best.ghost;
+    // The rival belongs to the day rather than the run, so a new personal best
+    // does not erase the ghost it was chasing.
+    if (previous && previous.rival) record.rival = previous.rival;
+    if (daily) saveDaily(day, record);
+    else { saved.best[world.id] = record; persist('best'); }
+    race.best = record;
+    race.ghost = record.ghost;
   }
-  if (race.medal) {
+  // A daily medal is a fact about one ribbon, not a campaign trophy.
+  if (race.medal && !daily) {
     const order = m => m ? MEDALS.findIndex(medal => medal.id === m) : 99;
     if (order(race.medal) < order(saved.medals[world.id])) { saved.medals[world.id] = race.medal; persist('medals'); }
   }
@@ -2609,6 +2689,9 @@ function finishRun() {
   paintMedals();
   showResult(isBest, ms);
   refreshMenu();
+  // The daily is the same road for everyone, so once it is finished ask where
+  // this time sits, and whether there is a ghost worth chasing next run.
+  if (daily) void reportDaily(ms, race.medal);
 }
 
 function showMessage(text, seconds) {
@@ -2712,8 +2795,8 @@ function stepRace(dt, override) {
 }
 
 /* ── ghost playback ───────────────────────────────────────────────────────── */
-function ghostAt(time) {
-  const record = race.ghost;
+function ghostAt(time, trail) {
+  const record = trail || race.ghost;
   if (!record || record.length < 2) return null;
   if (time > record[record.length - 1][0]) return null;
   let index = 0;
@@ -2914,6 +2997,14 @@ function drawCarAndGhost() {
       drawMesh(R.bufs.car, carMatrix, { alpha: 0.32, tint: [0.62, 0.8, 0.92], shine: 0.2 });
     }
   }
+  // The day's fastest run, when it is faster than the one being driven.
+  if (mode === 'race' && race.ghostOn && race.rival && race.rival.ghost && race.state === 'running') {
+    const sample = ghostAt(race.t, race.rival.ghost);
+    if (sample) {
+      frameMatrix(carMatrix, { p: sample.p, x: norm(cross(sample.u, sample.f)), y: sample.u, z: sample.f }, 1);
+      drawMesh(R.bufs.car, carMatrix, { alpha: 0.3, tint: [0.58, 0.73, 0.62], shine: 0.15 });
+    }
+  }
   if (car.grounded && car.contact) {
     const frame2 = { p: madd(car.contact.p, car.u, 0.03), x: right, y: car.u, z: car.f };
     frameMatrix(shadowMatrix, frame2, 1.75);
@@ -2986,6 +3077,12 @@ function paintBest() {
     return;
   }
   $('hudBest').textContent = race.best ? 'BEST ' + clock(race.best.ms) : 'BEST —';
+  // On the daily there is a second clock worth knowing: the fastest run today.
+  if (race.rival && world && world.id === 'daily') {
+    $('hudDelta').textContent = 'RIVAL ' + clock(race.rival.ms);
+    $('hudDelta').className = 'behind';
+    return;
+  }
   if (race.state === 'finished' && race.previousBest) {
     const diff = Math.round(race.finishedAt * 1000) - race.previousBest;
     const node = $('hudDelta');
@@ -3050,6 +3147,113 @@ function paintHud() {
   $('hudTrick').className = '';
 }
 
+/* ── the day's crowd ────────────────────────────────────────────────────────
+   The daily ribbon comes from the shared seed, so its times are comparable and
+   can be pooled without accounts: a run is a time and a path. Nothing here is
+   needed to play. A failed request leaves the result screen exactly as it would
+   have been without it, and a park with no network still races its own ghost. */
+const TRAX_URL = 'https://djdpttltfmwkofdrvkem.supabase.co/functions/v1/trackbound';
+const TRAX_KEY = 'sb_publishable_Ayx7pzjm55vlzQ4u8se9KA_O97WK-QZ';
+const BUCKET_MS = 5000, BUCKET_FROM = 10000, BUCKETS = 16;
+
+async function trackApi(path, body) {
+  if (typeof fetch !== 'function') return null;
+  try {
+    const response = await fetch(TRAX_URL + path, {
+      cache: 'no-store',
+      headers: Object.assign({ apikey: TRAX_KEY }, body ? { 'Content-Type': 'application/json' } : {}),
+      signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(9000) : undefined,
+      ...(body ? { method: 'POST', body: JSON.stringify(body) } : {})
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) { return null; }
+}
+
+// A ghost is recorded at 20 Hz with ten numbers a sample. Half of that is plenty
+// for another car on the same road, and a hundredth of a unit is finer than the
+// line anyone drives, so the upload is a tenth of the record.
+function packGhost(record) {
+  if (!Array.isArray(record) || record.length < 2) return null;
+  const out = [];
+  for (let i = 0; i < record.length; i += 2) {
+    const sample = record[i];
+    if (!Array.isArray(sample) || sample.length < 10) continue;
+    const row = [];
+    for (let k = 0; k < 10; k++) {
+      const value = Number(sample[k]);
+      if (!Number.isFinite(value)) return null;
+      // Normalise -0 to 0: it survives JSON but not an equality check.
+      const rounded = Math.round(value * 100) / 100;
+      row.push(rounded === 0 ? 0 : rounded);
+    }
+    out.push(row);
+    if (out.length >= 1200) break;
+  }
+  return out.length > 1 ? out : null;
+}
+
+// Anything coming back from the board is data, not a promise: it has to be a
+// usable ghost or it is dropped.
+function unpackGhost(value) {
+  if (!Array.isArray(value) || value.length < 2) return null;
+  const rows = [];
+  for (const sample of value) {
+    if (!Array.isArray(sample) || sample.length < 10) continue;
+    const row = sample.map(Number);
+    if (!row.every(Number.isFinite)) return null;
+    rows.push(row);
+  }
+  return rows.length > 1 ? rows : null;
+}
+
+function paintCrowd(data, ms) {
+  const line = $('resCrowd'), bars = $('resDist'), rivalLine = $('resRival');
+  if (!line || !bars || !world || world.id !== 'daily') return;
+  const population = Number(data.population) || 0;
+  const parts = [];
+  if (data.betterThan != null) parts.push('faster than ' + data.betterThan + '% of ' + population);
+  else parts.push(population + (population === 1 ? ' other time' : ' other times') + ' today');
+  if (data.yourRank) parts.push('#' + data.yourRank + ' of ' + population + 1);
+  line.textContent = 'TODAY · ' + parts.join(' · ');
+  line.hidden = false;
+
+  const dist = Array.isArray(data.dist) ? data.dist : [];
+  const peak = Math.max(1, ...dist);
+  bars.replaceChildren();
+  dist.forEach((count, index) => {
+    const bar = el('i', index === data.yourBucket ? 'you' : '');
+    bar.style.height = Math.max(2, Math.round((count / peak) * 100)) + '%';
+    bar.title = count + ' at ' + clock(BUCKET_FROM + index * BUCKET_MS + BUCKET_MS / 2) + 's';
+    bars.appendChild(bar);
+  });
+  bars.hidden = !dist.length;
+
+  const rival = data.best && Number(data.best.ms) < ms ? { ms: Number(data.best.ms), ghost: unpackGhost(data.best.ghost) } : null;
+  if (rival && rival.ghost) {
+    race.rival = rival;
+    const record = dailyRecord(seedDate());
+    if (record) { record.rival = rival; saveDaily(seedDate(), record); }
+    if (rivalLine) {
+      rivalLine.hidden = false;
+      rivalLine.textContent = 'RIVAL · ' + clock(rival.ms) + ' · fastest today, racing you next run';
+    }
+    const button = $('resRivalBtn');
+    if (button) button.hidden = false;
+  }
+}
+
+async function reportDaily(ms, medal) {
+  const ghost = packGhost(race.record);
+  if (!ghost) return;
+  const day = seedDate();
+  const data = await trackApi('/daily', { date: day, ms: Math.round(ms), medal: medal || null, ghost });
+  if (!data) return;
+  // The player may have left the result screen while the request was out.
+  if (race.state !== 'finished' || !world || world.id !== 'daily') return;
+  paintCrowd(data, ms);
+}
+
 /* ── screens ──────────────────────────────────────────────────────────────── */
 let mode = 'menu';
 let paused = false;
@@ -3100,6 +3304,18 @@ function refreshMenu() {
   $('menuNote').textContent = points + ' point' + (points === 1 ? '' : 's') + ' · ' +
     golds + ' gold medal' + (golds === 1 ? '' : 's') + ' · ' +
     Object.keys(bests).length + ' personal best' + (Object.keys(bests).length === 1 ? '' : 's');
+
+  // The daily gets its own line: the ribbon is new every morning, and a streak
+  // is the only thing about it that survives the night.
+  const note = $('dailyNote');
+  if (note) {
+    const today = dailyRecord(seedDate());
+    const streak = dailyStreak();
+    const tail = streak.current > 1 ? ' · ' + streak.current + '-day streak' : '';
+    note.textContent = today
+      ? 'today ' + clock(today.ms) + ' · ' + medalName(today.medal).toLowerCase() + tail
+      : 'today\u2019s ribbon is unrun' + (streak.current ? ' · keep a ' + streak.current + '-day streak alive' : '');
+  }
 }
 
 function showResult(isBest, ms) {
@@ -3118,6 +3334,17 @@ function showResult(isBest, ms) {
       : race.best
         ? 'Best ' + clock(race.best.ms) + ' · ' + (race.ghostOn ? 'ghost on' : 'ghost off')
         : 'Best on this layout is still unset.';
+  // The crowd arrives after the result is already on screen; clear the last
+  // race's numbers first so nothing stale is read as this run's.
+  $('resCrowd').hidden = true;
+  $('resDist').hidden = true;
+  $('resRival').hidden = true;
+  $('resRivalBtn').hidden = true;
+  if (race.rival && world.id === 'daily') {
+    $('resRival').hidden = false;
+    $('resRival').textContent = 'RIVAL · ' + clock(race.rival.ms) + ' · fastest today';
+    $('resRivalBtn').hidden = false;
+  }
   const board = $('resBoard');
   board.replaceChildren();
   for (const medal of medalTimes(world.author)) {
@@ -3272,6 +3499,13 @@ window.__boredSnapshot = () => ({
   seconds: race.state === 'finished' && race.finishedAt ? Math.round(race.finishedAt) : 0,
   track: world ? String(world.id) : '',
   daily: !!(world && world.id === 'daily'),
+  // The daily challenge's goal is the medal, not a second count: the ladder is
+  // derived from each morning's layout, so a fixed time cannot be fair.
+  dailyGold: world && world.id === 'daily' && race.state === 'finished' &&
+    (race.medal === 'gold' || race.medal === 'author') ? 1 : 0,
+  dailyMs: world && world.id === 'daily' && race.state === 'finished' && race.finishedAt
+    ? Math.round(race.finishedAt * 1000) : 0,
+  dailyStreak: dailyStreak().current,
   freeplay: isFreeplay(),
   tricks: race.tricks | 0,
   score: race.points | 0,
@@ -3325,6 +3559,7 @@ $('pauseGhost').addEventListener('click', () => {
 $('pauseMute').addEventListener('click', () => toggleMute());
 $('pauseMenu').addEventListener('click', () => openMenu());
 $('resRestart').addEventListener('click', () => restartRace());
+$('resRivalBtn').addEventListener('click', () => restartRace());
 $('resNext').addEventListener('click', () => {
   if (current.kind === 'campaign' && current.index < CAMPAIGN.length - 1) startCampaign(current.index + 1);
   else restartRace();
@@ -3350,6 +3585,7 @@ window.__test = {
   startFreeplay, freeplayWorld, parkHeight, isFreeplay, trackTricks, signedAngle,
   freeplayGates, collectRing, nextRing, ringMeshFor, pushRing,
   landFreeplay, bailed, freeplayBest, runBest, careerPoints,
+  seedDate, dailyRecord, dailyStreak, saveDaily, packGhost, unpackGhost, paintCrowd,
   openMenu, toggleMute,
   render: () => { updateCamera(1 / 60); drawScene(1 / 60); }
 };
@@ -3375,6 +3611,9 @@ function boot() {
       const entry = CAMPAIGN.find(item => item.id === key);
       if (entry && saved.best[key].layout !== layoutOf(entry.blocks)) { delete saved.best[key]; pruned++; }
     }
+    // Older builds filed every daily run under the single id "daily", which is
+    // how a stale ghost outlived its road. Those records belong to no day.
+    if (saved.best.daily) { delete saved.best.daily; pruned++; }
     if (pruned) persist('best');
     if (world && race.state === 'ready') {
       // A track is already on screen: hand it its best time and ghost now.

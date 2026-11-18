@@ -166,10 +166,10 @@ test('the daily rotation covers every challenge game, changes targets, and uses 
   assert.equal(dailyDate(new Date('2026-01-10T05:30:00Z')), '2026-01-10');
   // The spring-forward morning still produces one date per Detroit day.
   assert.equal(dailyDate(new Date('2026-03-08T06:30:00Z')), '2026-03-08');
-  // The v6 calendar starts on 2026-11-11 and runs circuits of its own size, so
-  // the first complete v6 circuit begins 2026-12-20. Test that whole circuit
+  // The v7 calendar starts on 2026-11-19 and runs circuits of its own size, so
+  // the first complete v7 circuit begins 2026-12-29. Test that whole circuit
   // after the transition, not a mixed partial cycle.
-  const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 11, 20 + n)).toISOString().slice(0, 10)));
+  const rotation = Array.from({ length: CHALLENGES.length }, (_, n) => dailyChallenge(new Date(Date.UTC(2026, 11, 29 + n)).toISOString().slice(0, 10)));
   assert.equal(new Set(rotation.map(c => c.slug)).size, CHALLENGES.length);
   assert.ok(rotation.every(c => !c.goal.includes('{target}')));
   assert.deepEqual(JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))), JSON.parse(JSON.stringify(dailyChallenge('2026-10-08'))));
