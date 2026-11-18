@@ -277,6 +277,8 @@ canvas, img { image-rendering: pixelated; display: block }
 #scr-story .left-panel { width: 304px }
 #scr-story .right-panel { left: 320px; width: 312px }
 #story-info { gap: 0 }
+#story-info .foes { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; line-height: 18px }
+#story-info .foes .klabel { cursor: pointer }
 /* Weekly milestones: two rows of two, a check, the risk and the reward's icon. */
 #story-info .milestones { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; margin-top: 4px }
 #story-info .milestones span { display: flex; align-items: center; gap: 4px; white-space: nowrap; height: 24px }
@@ -325,6 +327,9 @@ canvas, img { image-rendering: pixelated; display: block }
    and a squad member has a gold outline as well as its check. */
 #squad-grid .card { background: var(--ink) }
 #squad-slots .card.drop { box-shadow: inset 0 0 0 2px var(--gold) }
+#squad-filters .legend { margin-left: auto; display: flex; align-items: center; gap: 3px; color: var(--dim); border: 0; cursor: default }
+#squad-filters .legend i { display: inline-block; width: 12px; height: 3px; background: var(--teal); margin-left: 4px }
+#squad-filters .legend i.dmg { background: var(--red) }
 .drag-ghost { position: absolute; z-index: 60; pointer-events: none; opacity: .8 }
 #squad-grid .card.in { box-shadow: inset 0 0 0 2px var(--gold) }
 #squad .card .cost { position: absolute; right: 2px; top: 1px; color: var(--gold); line-height: 18px }
@@ -2052,6 +2057,13 @@ function lossHint(stage, bt) {
   return notes.slice(0, 2).join(" ") || "Try another squad or placement.";
 }
 // "Tanks: Rock, Steel · Damage: Fighting", the role names in their Squad marker colours.
+// "Foes:" and a label per kind of foe on the stage; a click shows that kind's card.
+function foesRow(stage) {
+  const d = el("div", "foes");
+  d.append(el("span", "dim", "Foes:"));
+  for (const k of stageKinds(stage)) { const n = el("span", "klabel", FOE_NAME[k]); n.dataset.foe = k; n.title = FOE_TIPS[k]; d.append(n); }
+  return d;
+}
 function roleRow(stage, short = false) {
   const d = el("div", "roles"), t = tankTypes(stage), w = weakTo(stage);
   const part = (cls, label, list) => { const n = el("span", "part"); n.append(el("span", cls, label), " " + (list.join(", ") || "any")); return n; };
@@ -2073,6 +2085,10 @@ function fitPreview(info, stage) {
   const one = el("div", "gold", kinds.map(([f, k]) => k + ": " + f(stage).map(name).join(", ")).join(" · "));
   one.style.whiteSpace = "normal"; one.style.lineHeight = "20px";
   lines[0].replaceWith(one); for (const n of lines.slice(1)) n.remove();
+  // Still too tall: the Foes list already names every kind (click one for its card), so the
+  // species line goes; then the 3-star line.
+  if (over()) one.remove();
+  if (over()) { const r3 = [...info.children].find(n => /^First 3/.test(n.textContent)); if (r3) r3.remove(); }
 }
 function storyUpdate() {
   drawBackdrop();
@@ -2094,7 +2110,7 @@ function storyUpdate() {
   // The preview: waves, lives and a recommended level, then the foes' types (their names are in battle).
   const pre = el("div", "dim"); pre.append(stage.waves.length + " waves · " + stage.lives + " lives · Rec. Lv ", el("span", "num", recLevel(stage)));
   info.replaceChildren(el("div", "title", stage.admin ? "ADMIN" : stage.boss ? "BOSS" : "STAGE"), el("div", "", stage.name), pre,
-    el("div", "dim", "Types: " + foeTypes(stage).join(", ")), roleRow(stage));
+    el("div", "dim", "Types: " + foeTypes(stage).join(", ")), roleRow(stage), foesRow(stage));
   // Flying enemies: only snipers can hit them, so a stage says so up front.
   // Short notes here; the advice goes in the message box, so the panel never overflows.
   if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ")));
@@ -2108,6 +2124,8 @@ function storyUpdate() {
   info.append(reward);
   if (best < 3) { const r3 = el("div", "dim"); r3.append("First 3★: ", el("span", "num", "100"), " coins + 1 Plus"); info.append(r3); }
   fitPreview(info, stage);
+  // Before the first stage where types decide it (1-3): what super effective and resisted mean.
+  if (stage.id === "1-3" && isOpen(td, stage)) setTimeout(typeTip, 0);
   // At most two hints about special foes (the preview lists them all), so the box never overflows.
   const hints = [flyersOf(stage).length && " Only snipers hit flyers.", explodersOf(stage).length && " Kill exploders before the fuse.",
     armoredOf(stage).length && " Casters go through armor.", fastOf(stage).length && " Fast foes run 1.5x: block them early."].filter(Boolean);
@@ -2245,7 +2263,10 @@ function squadUpdate() {
     return c;
   }));
   // Filters: the same bar and panel as the Dex.
-  $("#squad-filters").replaceChildren(...filtBar("squad"));
+  // The bars under the cards, in a few words.
+  const legend = el("span", "legend"); legend.append(el("i", "tank"), "tank", el("i", "dmg"), "dmg");
+  legend.title = "Green: a good tank on this stage. Red: good damage on this stage.";
+  $("#squad-filters").replaceChildren(...filtBar("squad"), legend);
   // Grid
   const grid = $("#squad-grid");
   grid.replaceChildren(...list.map((u, i) => { const c = card(u, { at: sq.zone === "grid" && sq.at === i, picked: pick.includes(u.num), fit: roleFit(u, here) }); c.dataset.at = i; return c; }));
@@ -2282,7 +2303,7 @@ function squadUpdate() {
 const capOf = line => T && T.capOf ? T.capOf(line) : T.maxLevel;
 const nextCap = cap => (T.levelCaps || []).find(c => c > cap);
 // The four skill slots play differently (power and charge); the hub lists them.
-const SKILL_ABOUT = { steady: "the class's usual skill", quick: "charges 30% sooner at 80% power", heavy: "130% power, charges 35% slower", rare: "130% power at the usual charge" };
+const SKILL_ABOUT = { steady: "the class's usual skill, usual charge and power", quick: "charges 30% sooner at 80% power", heavy: "130% power, charges 35% slower", rare: "130% power at the usual charge" };
 const skillKindOf = k => (T.skillKinds || [])[k] || null;
 // The skill a line uses: the pick if it is unlocked, else the rare one if unlocked, else the first.
 const skillUsed = l => Number.isInteger(l.skill) && l.skills && l.skills[l.skill] ? l.skill : l.skills && l.skills[3] ? 3 : 0;
@@ -2294,6 +2315,7 @@ function cycleSkill(num) {
   const next = open[(open.indexOf(skillUsed(l)) + 1) % open.length];
   const r = G.setSkill({ line, skill: next });
   refreshTop();
+  setTimeout(() => skillTip(tab === "dex" ? "#dex-acts" : "#squad-detail"), 0);
   const kind = skillKindOf(next);
   return r.ok ? "Skill: " + G.skillsOf(num)[next] + (kind ? " (" + kind.name + ")" : "") : REASONS[r.reason] || "Not now.";
 }
@@ -2404,7 +2426,7 @@ function squadClick(e) {
   const sk = e.target.closest("[data-skill]");
   if (sk) {
     const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? (rosterCache || roster()).list[sq.at]?.num : null, line = num && G.lineOf(num);
-    if (num && G.setSkill) { const k = Number(sk.dataset.skill), r = G.setSkill({ line, skill: k }); refreshTop(); rosterCache = null;
+    if (num && G.setSkill) { const k = Number(sk.dataset.skill), r = G.setSkill({ line, skill: k }); refreshTop(); rosterCache = null; setTimeout(() => skillTip("#squad-detail"), 0);
       sq.note = r.ok ? "Skill: " + G.skillsOf(num)[k] + " (" + skillKindOf(k).name + ")" : r.reason === "owned" ? "" : REASONS[r.reason] || ""; squadUpdate(); }
     return;
   }
@@ -2507,7 +2529,7 @@ function stepWithFx(bt) {
   const eb = new Map(b.enemies.map(e => [e.id, { hp: e.hp, cd: e.cd, x: e.x, y: e.y, e, seg: e.seg, path: e.path }]));
   const leaks = b.leaks, seen = new Set(b.enemies.map(e => e.id));
   T.step(b);
-  for (const e of b.enemies) if (!seen.has(e.id) && (e.flying || e.explodes || e.armored || e.fast)) foeTips(e);
+  for (const e of b.enemies) if (!seen.has(e.id)) foeTips(e);
   const ua = new Map(b.units.map(u => [u.id, u])), ea = new Map(b.enemies.map(e => [e.id, e]));
   if (bt.born) for (const u of b.units) if (!(u.id in bt.born)) bt.born[u.id] = b.t;
   const pos = o => feetOf(bt, o);
@@ -3437,7 +3459,9 @@ const TIPS = {
     { at: () => boxOf("#dex-detail"), text: "Candy from hatches evolves a line, unlocks its passive and cuts its deploy cost. Set a buddy to show it on the leaderboard." }
   ],
   squad: () => [
-    { at: () => boxOf("#squad-roster"), text: "Classes: Vanguard is cheap and gives energy, Guard hits in melee, Blocker holds 3, Sniper shoots flyers, Caster hits an area, Medic heals." },
+    { at: () => boxOf("#squad-roster"), text: "On the path: Blocker holds 3 foes and has the most HP. Guard hits hard up close and holds 2. Vanguard is cheap, and its skill gives energy back." },
+    { at: () => boxOf("#squad-roster"), text: "Up high: Sniper shoots far and is the only one that hits flyers. Caster hits an area and goes through armor. Medic heals allies in range." },
+    { at: () => boxOf("#squad-grid .card.fit-tank, #squad-grid .card.fit-damage") || boxOf("#squad-roster"), text: "The bar under a card: green means a good tank here (its type resists these foes), red means good damage here (its type hits them hard)." },
     { at: () => boxOf("#squad-stage"), text: "These are the foes' types and traits. Pick counters: types that beat them, and snipers for flyers." }
   ],
   quests: () => [{ at: () => boxOf("#quest-tabs"), text: "Daily missions reset at midnight (Detroit time), weekly ones on Monday; the clocks count down. Rewards are paid when you finish them." }],
@@ -3445,7 +3469,7 @@ const TIPS = {
 };
 function screenTips(id) {
   if (!G || battle || picking) return;
-  if (id === "story" && storyMode === "squad") return tip("squad", TIPS.squad());
+  if (id === "story" && storyMode === "squad") { const r = tip("squad", TIPS.squad()); if (!onWeekly() && stageNow().id === "1-3") typeTip(); return r; }
   // The first visit to the map walks the whole loop and then hands over to the
   // Pull screen, so a new player is taken to the first thing they can do
   // rather than being told about a tab they have not opened. (The loop is
@@ -3453,11 +3477,19 @@ function screenTips(id) {
   if (id === "story") return tip("loop", TIPS.loop(), { after: () => go("pull") });
   if (TIPS[id]) tip(id, TIPS[id]());
 }
+const TYPE_TIP = "Types: a super-effective hit does double damage (a yellow number), a resisted one half (gray). Tanks want types that resist these foes' attacks; damage dealers want types that hit them super effectively. This line says which.";
+function typeTip(force = false) {
+  const at = () => boxOf(storyMode === "squad" ? "#squad-stage .roles" : "#story-info .roles");
+  tip("types", [{ at, text: TYPE_TIP }], { force });
+}
+const SKILL_TIP = "Skills: Steady is the class's usual skill. Quick charges 30% sooner at 80% power. Heavy hits at 130% but charges 35% slower. Rare hits at 130% at the usual charge.";
+function skillTip(sel) { tip("skills", [{ at: () => boxOf(sel), text: SKILL_TIP }]); }
 // The "?" in the tab bar: this screen's tips again.
 function replayTips() {
   if (tutor) return;
   const id = tab === "story" ? (storyMode === "squad" ? "squad" : "loop") : tab;
   if (TIPS[id]) tip(id, TIPS[id](), { force: true });
+  if (id === "squad") { typeTip(true); tip("skills", [{ at: () => boxOf("#squad-detail"), text: SKILL_TIP }], { force: true }); }
 }
 // The guided first battle, then one new idea per stage, and a card for each new kind of foe.
 function battleTips() {
@@ -3502,16 +3534,32 @@ function battleTips() {
   };
   if (ideas[st.id]) tip("battle-" + st.id, ideas[st.id]);
 }
+// A card for each kind of foe: what it does, and the counter. Shown the first time one shows up
+// in battle, and again from the stage preview's Foes list.
+const FOE_KINDS = ["normal", "fast", "flying", "explodes", "armored", "boss"];
+const FOE_NAME = { normal: "Normal", fast: "Fast", flying: "Flyer", explodes: "Exploder", armored: "Armored", boss: "Boss" };
 const FOE_TIPS = {
-  flying: "Flying foes cross straight to your base over everything. Only Snipers can hit them.",
-  explodes: "An exploder lights a fuse when it is blocked, then blows up everyone nearby. Kill it before the fuse runs out.",
-  armored: "Armored foes shrug off physical hits. Casters go straight through armor.",
-  fast: "Fast foes run half again as quick. Block them early on the path."
+  normal: "Walks the path to your base. Counter: a blocker stops it while everyone else hits it.",
+  fast: "Runs half again as quick. Counter: block it early on the path, before it slips past.",
+  flying: "Flies straight to your base over everything, along its dotted route. Counter: only Snipers hit flyers.",
+  explodes: "Lights a fuse when blocked, then blows up everyone near it. Counter: kill it from range before the fuse runs out.",
+  armored: "Shrugs off physical hits. Counter: Casters' special attacks go straight through armor.",
+  boss: "Four times the HP and hits harder. Counter: save skills for it, and keep a medic on your blocker."
 };
+const foeKind = e => e.boss ? "boss" : e.flying ? "flying" : e.explodes ? "explodes" : e.armored ? "armored" : e.fast ? "fast" : "normal";
+// The kinds a stage sends, from its waves: [at, species, count, gap, boss, flying, explodes, armored, fast].
+const stageKinds = stage => FOE_KINDS.filter(k => stage.waves.some(w => k === "normal" ? !w[4] && !w[5] && !w[6] && !w[7] && !w[8]
+  : w[{ boss: 4, flying: 5, explodes: 6, armored: 7, fast: 8 }[k]]));
+const foeCard = (kind, who) => FOE_NAME[kind].toUpperCase() + (who ? " · " + who : "") + ": " + FOE_TIPS[kind];
 // The first time each kind of foe shows up: a card on it.
 function foeTips(e) {
-  for (const kind of ["flying", "explodes", "armored", "fast"]) if (e[kind] && FOE_TIPS[kind])
-    tip("foe-" + kind, [{ at: () => { const [x, y] = enemySpot(battle, e); return tileBox(Math.round(x), Math.round(y)); }, text: name(e.num) + ": " + FOE_TIPS[kind] }]);
+  const kind = foeKind(e);
+  tip("foe-" + kind, [{ at: () => { const [x, y] = enemySpot(battle, e); return tileBox(Math.round(x), Math.round(y)); }, text: foeCard(kind, name(e.num)) }]);
+}
+// The stage preview's Foes list: click one to see its card again.
+function showFoeCard(kind) {
+  const stage = stagesNow()[storyAt], who = stage && stage.waves.filter(w => stageKinds({ waves: [w] }).includes(kind)).map(w => name(w[1]));
+  tip("foe-" + kind, [{ at: () => boxOf("#story-info"), text: foeCard(kind, who && [...new Set(who)].join(", ")) }], { force: true });
 }
 
 /* ── Frame, tabs and switching screens ─────────────────────────────────── */
@@ -3708,6 +3756,7 @@ if (!G) {
   $("#field").onmousemove = e => { if (battle) battle.hover = fieldPoint(e); };
   $("#field").onmouseleave = () => { if (battle) battle.hover = null; };
   // The Squad screen: Start, team tabs, filter labels, slots, roster cards and skill picks.
+  $("#story-info").onclick = e => { const f = e.target.closest("[data-foe]"); if (f) showFoeCard(f.dataset.foe); };
   $("#squad").onclick = e => { if (sqDrag && sqDrag.moved) { sqDrag = null; return; } sqDrag = null; if (storyMode === "squad" && !battle) squadClick(e); };
   // Drag a mon between the 8 slots to swap them, or from the roster onto a slot (it takes that
   // slot; whoever was there leaves, or swaps if the dragged one was already in the team).
