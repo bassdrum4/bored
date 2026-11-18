@@ -1,10 +1,11 @@
 // Feedback is write-only from the browser: the publishable key may insert a row
 // and nothing else, so a submitted note can never be read back out of the page.
-// Reading it takes the service key, off this site.
+// The same table also holds the optional enjoyment rating; only an analytics
+// admin can read or delete either kind.
 
 import { request, ANON_TOKEN, getSession, getHandle } from './backend.js';
 
-const TABLE = '/rest/v1/feedback';
+const TABLE = '/rest/v1/feedback_entries';
 
 export function feedbackErrorMessage(err) {
   const message = String(err?.message || err);
@@ -30,7 +31,8 @@ export async function sendFeedback({ message, email } = {}) {
     token: ANON_TOKEN,
     prefer: 'return=minimal',
     body: {
-      message: text,
+      kind: 'note',
+      body: text,
       email: address || null,
       page: (location.pathname + location.search).slice(0, 200),
       handle: getHandle() || null,

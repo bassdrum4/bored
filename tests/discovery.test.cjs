@@ -324,7 +324,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
     }
     if (url.pathname === '/rest/v1/daily_leaderboard') return reply([]);
     if (url.pathname === '/rest/v1/buddy_board') return reply([]);
-    if (url.pathname === '/rest/v1/feedback' && method === 'POST') { notes.push(JSON.parse(request.postData())); return reply(null); }
+    if (url.pathname === '/rest/v1/feedback_entries' && method === 'POST') { notes.push(JSON.parse(request.postData())); return reply(null); }
     if (url.pathname === '/auth/v1/logout') return reply(null);
     unexpected.push(method + ' ' + url.pathname);
     return request.abort();

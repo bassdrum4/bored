@@ -105,7 +105,7 @@ cannot reliably distinguish an unmarked QA session from a genuine visitor.
 Signed-in members of `analytics_admins` are checked before client telemetry
 flushes. Their browsers are then quarantined persistently, including after
 sign-out. Supabase additionally rejects their authenticated writes to
-`play_events`, `product_events` and `enjoyment_feedback` using restrictive
+`play_events`, `product_events` and `feedback_entries` using restrictive
 insert policies. A previously unrecognized, signed-out admin browser cannot
 be identified server-side until sign-in, so use the QA URL for its first visit.
 Browser tests should continue mocking analytics requests as defense in depth.
@@ -171,9 +171,12 @@ browser. No capture tooling is shipped as a runtime dependency.
 ## Feedback
 
 **Send feedback** in the masthead opens a short dialog: a message, an optional
-reply address, and no account needed. It inserts a row into the `feedback` table
-with the publishable key, which may only insert — notes cannot be read back out
-of the page. Read them in the Supabase dashboard, or with the service key.
+reply address, and no account needed. It inserts a row into the
+`feedback_entries` table with the publishable key, which may only insert — notes
+cannot be read back out of the page. The same table holds the optional 1-5
+enjoyment rating, so there is one place to read both. Analytics admins can read
+and delete rows on the [analytics page](src/analytics.html); everyone else needs
+the service key or the Supabase dashboard.
 
 The table has to be created once:
 

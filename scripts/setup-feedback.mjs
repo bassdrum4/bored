@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Create the feedback table the "Send feedback" dialog posts to.
+// Create the feedback table the "Send feedback" dialog and the enjoyment
+// rating both post to.
 //
 //   node scripts/setup-feedback.mjs            # report state, print the SQL
 //   SUPABASE_ACCESS_TOKEN=sbp_... node scripts/setup-feedback.mjs --apply
@@ -38,7 +39,7 @@ function settings() {
 // With the publishable key: 404 means no table, 401/403 means the table is
 // there and correctly refuses to be read, 200 means anyone can read feedback.
 async function state({ url, key }) {
-  const res = await fetch(url + '/rest/v1/feedback?select=id&limit=1', {
+  const res = await fetch(url + '/rest/v1/feedback_entries?select=id&limit=1', {
     headers: { apikey: key, Authorization: 'Bearer ' + key }
   });
   if (res.status === 404) return 'missing';
@@ -87,4 +88,4 @@ if (after !== 'insert-only') {
   console.error('Expected the table to be insert-only for the publishable key. Check the policies.');
   process.exit(1);
 }
-console.log('\nFeedback is ready. The dialog posts to /rest/v1/feedback with the publishable key.');
+console.log('\nFeedback is ready. The dialog posts to /rest/v1/feedback_entries with the publishable key.');
