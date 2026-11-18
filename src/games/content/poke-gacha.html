@@ -385,6 +385,10 @@ canvas, img { image-rendering: pixelated; display: block }
 #battle-result .stars canvas.pop { animation: star-pop .3s steps(3) }
 @keyframes star-pop { from { transform: scale(1.8) } to { transform: scale(1) } }
 #battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
+/* The roster-cut refund: shown once, when the lines an account owned are refunded. */
+#cut-note { left: 120px; top: 24px; width: 400px; height: 296px; padding: 6px 12px; cursor: pointer; z-index: 40; display: flex; flex-direction: column }
+#cut-note .rows { flex: 1; overflow-y: auto; margin: 4px 0 }
+#cut-note .row { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap }
 #battle-result .reward-icons { display: flex; align-items: center; gap: 2px; white-space: nowrap }
 </style>
 </head>
@@ -457,6 +461,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="starter-detail"><div class="cell" id="starter-pic"></div><div id="starter-info"></div><div class="rows" id="starter-gifts"></div></div>
       </section>
       <div class="panel" id="msg" role="status"></div>
+      <div class="panel" id="cut-note" hidden></div>
       <div class="panel" id="off" hidden>Open Poké Gacha from the Bored arcade: your wallet, eggs and dex live on your Bored profile.</div>
     </div>
   </div>
@@ -3379,7 +3384,38 @@ function refreshTop() {
   $("#tabs").append(help, purse);
 }
 // Every key, from the keyboard or a [data-press] label.
+/* ── The roster cut ───────────────────────────────────────────────────────
+   Poké Gacha's eggs hatch about 200 lines now. Lines that were cut leave the
+   dex; the hub refunds each one this account owned, once (gacha:cut:<line>), and
+   this note lists what came back. Cut species also leave every saved team. */
+let cutNote = null;
+const REFUND_NAMES = { regular: "Regular", plus: "Plus", premium: "Premium", coins: "coins" };
+const refundText = g => ["regular", "plus", "premium", "coins"].filter(k => g[k] > 0).map(k => g[k] + " " + REFUND_NAMES[k]).join(", ");
+function purgeCutSquads() {
+  if (!G || !G.isCut) return;
+  const keepOf = list => (Array.isArray(list) ? list : []).filter(num => !G.isCut(num));
+  const before = JSON.stringify([pref.squad, pref.squads]);
+  if (Array.isArray(pref.squad)) pref.squad = keepOf(pref.squad);
+  if (Array.isArray(pref.squads)) pref.squads = pref.squads.map(keepOf);
+  if (JSON.stringify([pref.squad, pref.squads]) !== before) keep();
+}
+function showCutNote(r) {
+  cutNote = r;
+  const box = $("#cut-note"), rows = el("div", "rows");
+  for (const l of r.lines) {
+    const row = el("div", "row");
+    row.append(el("span", "", name(l.line) + " " + l.star + "★"), el("span", "", refundText(l.refund)));
+    rows.append(row);
+  }
+  box.replaceChildren(el("div", "title", "ROSTER CHANGE"),
+    el("div", "", "Eggs now hatch " + (G.dex.filter(row => row[9] > 0).length) + " lines. " + (r.lines.length === 1 ? "One line you had was" : r.lines.length + " lines you had were") +
+      " cut, and refunded in vouchers, candy left (1 Regular per " + G.cutCandy + ") and level coins:"),
+    rows, el("div", "", "In all: " + refundText(r.total) + ". Enter to close."));
+  box.hidden = false;
+}
+function closeCutNote() { cutNote = null; $("#cut-note").hidden = true; refreshTop(); if (SCREENS[tab]) SCREENS[tab][0](); }
 function onKey(e) {
+  if (cutNote) { if (["Enter", " ", "Escape", "Backspace"].includes(e.key)) { e.preventDefault(); closeCutNote(); } return; }
   // Typing in the filter panel's name box is text, not keys.
   if (e.target && e.target.tagName === "INPUT") return;
   // With the panel open, Enter or Backspace closes it; other keys still reach the list behind.
@@ -3531,11 +3567,15 @@ if (!G) {
     const now = JSON.stringify(G.state());
     if (now !== seen) { seen = now; refreshTop(); SCREENS[tab][0](); }
   }, 3000);
+  purgeCutSquads();
+  const cut = G.claimCutRefund ? G.claimCutRefund() : { ok: false };
+  $("#cut-note").onclick = () => cutNote && closeCutNote();
   const login = G.claimLogin().ok;
   go(shownTabs().some(([id]) => id === tab) ? tab : "pull");
   // The starter pick comes first, for a new player and once for an old one.
   if (needsStarter()) openStarter();
   else if (login) { if (tab === "pull") { message = { text: "Daily login: +3 Regular vouchers." }; updateScene(); } else say("Daily login: +3 Regular vouchers."); }
+  if (cut.ok && cut.lines && cut.lines.length) showCutNote(cut);
 }
 
 // The hub reads this. Poké Gacha itself is unscored; weeklyRisk (this week's

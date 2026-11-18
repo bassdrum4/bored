@@ -26,8 +26,8 @@ const uuid = () => globalThis.crypto?.randomUUID?.() || 'x' + Date.now().toStrin
 
 /* ── Classes, derived from stats ─────────────────────────────────────── */
 
-// The only hand-written list: the healers.
-const HEALERS = new Set([113, 242, 440, 531]);
+// The only hand-written list: the healers (Chansey, Blissey, Happiny, Audino, Alomomola, Comfey).
+const HEALERS = new Set([113, 242, 440, 531, 594, 764]);
 export const CLASSES = {
   vanguard: { name: 'Vanguard', ground: true, block: 1, range: 1.2, cost: 8, sp: 10, about: 'Cheap; its skill gives energy back.' },
   guard: { name: 'Guard', ground: true, block: 2, range: 1.2, cost: 13, sp: 20, about: 'Physical melee; blocks 2.' },

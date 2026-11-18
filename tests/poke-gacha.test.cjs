@@ -136,6 +136,46 @@ const key = async (tab, name, times = 1) => { for (let i = 0; i < times; i++) { 
 const rect = (frame, selector) => frame.$eval(selector, node => { const b = node.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; });
 const apart = (a, b) => a.r <= b.l + 0.5 || b.r <= a.l + 0.5 || a.b <= b.t + 0.5 || b.b <= a.t + 0.5;
 
+test('roster cut: an owned cut line is refunded once with a note, and leaves the dex and every saved team', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  const tauros = await game.evaluate(() => G.dex.findIndex(r => r[0] === 'Tauros') + 1);
+  const kept = await game.evaluate(() => S.owned[0]);
+  // An old hatch of Tauros (cut), 30 candy on it, and Tauros in two saved teams.
+  await game.evaluate((tauros, kept) => {
+    const now = Math.floor(Date.now() / 1000);
+    const w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['spend:old-tauros'] = { at: now - 50, g: { regular: 0 }, x: { m: 'move', e: [0], w: 0, n: 99, d: '2026-11-01' } };
+    w.entries['hatch:old-tauros.0'] = { at: now - 40, g: { ['candy:' + tauros]: 30 }, x: { s: tauros, t: 0, n: 1, k: 0 } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    const p = JSON.parse(localStorage.getItem('bored.poke-gacha.ui') || '{}');
+    p.squad = [tauros, kept]; p.squads = [[tauros, kept], [kept], [tauros]]; p.team = 0;
+    localStorage.setItem('bored.poke-gacha.ui', JSON.stringify(p));
+  }, tauros, kept);
+  const before = await game.evaluate(() => G.state().balance.regular);
+  await tab.evaluate(() => openGame('poke-gacha'));
+  await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  const again = await (await tab.$('#frame')).contentFrame();
+  await again.waitForFunction(() => !document.querySelector('#cut-note').hidden);
+  const note = await again.$eval('#cut-note', n => n.textContent);
+  assert.match(note, /Tauros 3★/);
+  assert.match(note, /2 Regular/, '1 for a 3★ line and 1 for 25 of its 30 candy');
+  assert.equal(await again.evaluate(() => G.state().balance.regular) - before, 2);
+  assert.equal(await again.evaluate(tauros => G.state().balance['candy:' + tauros] || 0, tauros), 0);
+  const prefs = await again.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')));
+  assert.deepEqual([prefs.squad, prefs.squads], [[kept], [[kept], [kept], []]], 'Tauros left every saved team');
+  assert.ok(!(await again.evaluate(tauros => BASES.includes(tauros) || S.owned.includes(tauros), tauros)), 'and the dex');
+  await key(tab, 'Enter');
+  assert.equal(await again.$eval('#cut-note', n => n.hidden), true);
+  // Once: opening again shows no note and pays nothing.
+  await tab.evaluate(() => openGame('poke-gacha'));
+  await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  const third = await (await tab.$('#frame')).contentFrame();
+  await pause(300);
+  assert.equal(await third.$eval('#cut-note', n => n.hidden), true);
+  assert.equal(await third.evaluate(() => G.state().balance.regular) - before, 2);
+  assert.deepEqual(errors, []);
+});
+
 test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1-1 clear pays and unlocks 1-2', async t => {
   const { tab, game, errors } = await openWithMons(t);
   const tabs = await game.$$eval('#tabs [data-tab]', nodes => nodes.map(n => n.dataset.tab));
@@ -484,7 +524,7 @@ test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad le
   assert.deepEqual(errors, []);
 });
 
-test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Rare, Bonsly (Sudowoodo, 410) stays Common', async () => {
+test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Rare, Psyduck (Golduck, 500) is Common under the 505 cutoff', async () => {
   const { DEX } = await import(path.join(root, 'src/hub/gacha-dex.js'));
   const bst = r => r[2] + r[3] + r[4] + r[5] + r[6] + r[7];
   const kids = {};
@@ -494,11 +534,11 @@ test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Ra
   DEX.forEach((r, i) => {
     if (r[9] !== 3 && r[9] !== 4) return;
     const best = Math.max(...finals(i + 1).map(f => bst(DEX[f - 1])));
-    if ((best >= 500 ? 4 : 3) !== r[9]) off.push(r[0] + ' ' + r[9] + '★ (final ' + best + ')');
+    if ((best >= 505 ? 4 : 3) !== r[9]) off.push(r[0] + ' ' + r[9] + '★ (final ' + best + ')');
   });
   assert.deepEqual(off, [], 'every Common/Rare line is tiered by its final form');
   const star = n => DEX.find(r => r[0] === n)[9];
-  assert.deepEqual(['Magikarp', 'Happiny', 'Munchlax', 'Feebas', 'Bonsly'].map(star), [4, 4, 4, 4, 3]);
+  assert.deepEqual(['Magikarp', 'Happiny', 'Munchlax', 'Feebas', 'Psyduck'].map(star), [4, 4, 4, 4, 3]);
 });
 
 test('Quests: four sub-tabs with reset clocks; rows show n/m, a bar and real reward icons; done rows sink; trophies group by game', async t => {
@@ -1769,10 +1809,10 @@ test('every stage is cleared by a type-matched squad at the page\'s recommended 
     return new Function(...Object.keys(inject), src + '\nreturn {' + names.join(',') + '};')(...Object.values(inject));
   };
   const daily = load('src/daily.js', ['dailyDate', 'dailyStreak', 'seedNumber']);
-  const dex = load('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CHART']);
+  const dex = load('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CHART', 'DEX_LEGACY']);
   const rewards = load('src/hub/rewards.js', ['mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'],
     { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
-  const gacha = load('src/hub/gacha.js', ['gachaState', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'stageOf', 'evolutionsOf'], { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
+  const gacha = load('src/hub/gacha.js', ['gachaState', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'stageOf', 'evolutionsOf'], { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES, DEX_LEGACY: dex.DEX_LEGACY });
   const td = load('src/hub/td.js', ['classOf', 'STAGES', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'typeMultiplier', 'MAX_LEVEL'],
     { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor, stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
   // The page's own formula, read from the page.
