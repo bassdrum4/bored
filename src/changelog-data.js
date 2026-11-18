@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 575,
+  "count": 576,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"d88a531","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: sound, off until turned on","pr":215},
   {"sha":"fe002d3","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: pick a skill (K), and the level cap in Squad and Dex","pr":219},
   {"sha":"8fea3f1","date":"2026-11-17","author":"Codebuff","subject":"Poké Idle: the Dex survives the Training area"},
   {"sha":"9042c33","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: Vettel's SP skins, with sets, line drops and size prices"},
