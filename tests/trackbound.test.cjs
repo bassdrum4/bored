@@ -144,7 +144,11 @@ function load(options) {
 
 // A crude driver that follows the centre line: enough to prove a track can be
 // completed and that the clock, checkpoints and finish line agree.
-function autopilot(page, index) {
+function autopilot(page, index, options = {}) {
+  const lookahead = options.lookahead || 12;
+  const brakeSpeed = options.brakeSpeed || 30;
+  const brakeAngle = options.brakeAngle || 0.4;
+  const liftAngle = options.liftAngle || 0;
   const T = page.sandbox.__test;
   T.startCampaign(index);
   const car = T.car();
@@ -158,7 +162,7 @@ function autopilot(page, index) {
     }
     nearest = best;
     let ahead = best, travelled = 0;
-    while (ahead < points.length - 1 && travelled < 12) {
+    while (ahead < points.length - 1 && travelled < lookahead) {
       travelled += Math.hypot(points[ahead + 1].p[0] - points[ahead].p[0],
         points[ahead + 1].p[1] - points[ahead].p[1], points[ahead + 1].p[2] - points[ahead].p[2]);
       ahead++;
@@ -171,9 +175,10 @@ function autopilot(page, index) {
     const forward = toTarget[0] * f[0] + toTarget[1] * f[1] + toTarget[2] * f[2];
     const angle = Math.atan2(lateral, forward);
     const speed = Math.hypot(car.v[0], car.v[1], car.v[2]);
-    const braking = speed > 30 && Math.abs(angle) > 0.4;
+    const braking = speed > brakeSpeed && Math.abs(angle) > brakeAngle;
+    const lifting = liftAngle > 0 && Math.abs(angle) > liftAngle;
     T.stepRace(1 / 120, {
-      gas: !braking,
+      gas: !braking && !lifting,
       brake: braking,
       steer: -Math.max(-1, Math.min(1, angle * 2.6)),
       handbrake: false
@@ -266,6 +271,34 @@ test('Trackbound medals are ordered and earned against the author time', () => {
   for (const entry of T.CAMPAIGN) {
     assert.ok(entry.author > 5000, entry.id + ' has a sane author time');
   }
+});
+
+test('Trackbound long campaign laps reach bronze with a clean line', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  // These five were published with author times 23-45% faster than a clean lap,
+  // so even bronze was out of reach. Drive them the way a careful player would:
+  // look further ahead, brake earlier through the bend, lift on the tightest.
+  for (const id of ['kicker', 'serpentine', 'highline', 'foundry', 'longway']) {
+    const index = T.CAMPAIGN.findIndex(entry => entry.id === id);
+    assert.ok(index >= 0, id + ' is still in the campaign');
+    const lap = autopilot(page, index, { lookahead: 20, brakeSpeed: 42, brakeAngle: 0.32, liftAngle: 0.22 });
+    assert.equal(lap.race.state, 'finished', id + ' can be finished');
+    const bronze = lap.medalTimes(lap.world().author).find(medal => medal.id === 'bronze').ms;
+    assert.ok(lap.snapshot().timeMs <= bronze,
+      id + ' medals at ' + lap.snapshot().timeMs + 'ms (bronze ' + bronze + 'ms)');
+  }
+});
+
+test('Trackbound daily medals come from the ribbon, not a flat 32 seconds', () => {
+  const page = load();
+  const T = page.sandbox.__test;
+  const track = T.dailyTrack(24680);
+  assert.equal(track.author, Math.round((track.length / 36) * 1000));
+  T.startDaily();
+  assert.equal(T.world().author, track.author, 'loadRace keeps the computed pace');
+  const bronze = T.medalTimes(T.world().author).find(medal => medal.id === 'bronze').ms;
+  assert.ok(bronze > 8000 && bronze < 40000, 'the rung follows the ribbon: ' + bronze + 'ms');
 });
 
 test('Trackbound reports a quiet snapshot before the lights go out', () => {

@@ -1172,16 +1172,19 @@ const boxOverlap = (a, b, slack) => {
 
 /* ── track assembly ───────────────────────────────────────────────────────── */
 
-// Author times are the author-medal target, and they were set from a clean line
-// at about two thirds of the car's top speed: an ordinary lap collected the
-// hardest medal. AUTHOR_PACE pulls every published time in 15%, which puts the
-// author medal on a genuinely tidy lap rather than a finished one. The gold
-// rung is tightened with it, so the ladder does not just move the top step.
+// Author times are the author-medal target: a tidy lap, not a finished one.
+// The first eight were set from a clean line at about two thirds of the car's
+// top speed; the long five were re-set from real player data, where a player's
+// best lap is about 1.05x the suite's centreline bot. AUTHOR_PACE pulls every
+// published time in 15%, so the campaign numbers below are typed 15% high. The
+// gold rung is tightened with it, so the ladder does not just move the top step.
 const AUTHOR_PACE = 0.85;
 // The daily ribbon is a different length every day, so its author time cannot be
-// a constant: it comes from the length the seed produced, at a hard but
-// holdable pace. The old flat 30 seconds made every daily medal trivial.
-const DAILY_PACE = 42;
+// a constant: it comes from the length the seed produced, at the pace a good lap
+// holds. Real finished daily runs (Supabase, November 2026) put a player's best
+// at about 1.05x the suite's centreline bot, which is roughly 36 units of ribbon
+// a second; the old flat 30-32 seconds made every daily medal trivial.
+const DAILY_PACE = 36; // ribbon units per second
 
 function buildTrack(typeIds, meta) {
   const road = meshNew(), scenery = meshNew();
@@ -1359,7 +1362,7 @@ const CAMPAIGN = [
   { id: 'dustbowl', name: 'Dust Bowl', author: 10750,
     blocks: ['start', 'straight', 'dirt', 'straight', 'curveR', 'narrow', 'checkpoint', 'straight',
       'curveL', 'dirt', 'narrow', 'checkpoint', 'curveL', 'dirt', 'straight', 'finish'] },
-  { id: 'kicker', name: 'Kicker', author: 14250, open: true,
+  { id: 'kicker', name: 'Kicker', author: 20701, open: true,
     blocks: ['start', 'sprint', 'kicker', 'curveR', 'sprint', 'down', 'checkpoint', 'straight',
       'curveL', 'sprint', 'kicker2', 'boost', 'straight', 'checkpoint', 'curveL', 'sprint',
       'straight', 'finish'] },
@@ -1372,17 +1375,17 @@ const CAMPAIGN = [
   // with the new ones (ice, tunnels, rollers and the steeper dive), so a lap is
   // not just more of the same road. Author times use the same clean-line
   // benchmark, so a medal means the same thing here as it does on Paddock.
-  { id: 'serpentine', name: 'Serpentine', author: 20500,
+  { id: 'serpentine', name: 'Serpentine', author: 25592,
     blocks: ['start', 'sprint', 'curveR', 'tunnel', 'curveL', 'hairpinR', 'straight',
       'checkpoint', 'sprint', 'boost', 'wallL', 'straight', 'curveL', 'curveR', 'whoops',
       'hairpinL', 'checkpoint', 'sprint', 'curveR', 'straight', 'curveL', 'narrow', 'curveR',
       'checkpoint', 'sprint', 'boost', 'straight', 'finish'] },
-  { id: 'highline', name: 'Highline', author: 20600,
+  { id: 'highline', name: 'Highline', author: 25920,
     blocks: ['start', 'sprint', 'up', 'curveL', 'up', 'whoops', 'down', 'boost', 'straight',
       'checkpoint', 'straight', 'curveR', 'boost', 'up', 'sprint', 'straight', 'curveL',
       'straight', 'checkpoint', 'curveR', 'boost', 'straight', 'tunnel', 'down', 'curveL',
       'sprint', 'finish'] },
-  { id: 'foundry', name: 'Foundry', author: 16300,
+  { id: 'foundry', name: 'Foundry', author: 20033,
     blocks: ['start', 'tunnel', 'boost', 'narrow', 'curveR', 'straight', 'narrow',
       'checkpoint', 'ice', 'boost', 'hairpinL', 'straight', 'curveR', 'narrow', 'boost',
       'checkpoint', 'curveL', 'straight', 'curveR', 'sprint', 'boost', 'narrow', 'checkpoint',
@@ -1392,7 +1395,7 @@ const CAMPAIGN = [
       'straight', 'curveR', 'up', 'tunnel', 'straight', 'curveL', 'checkpoint', 'straight',
       'straight', 'curveL', 'sprint', 'wallR', 'straight', 'checkpoint', 'curveR', 'hairpinL',
       'whoops', 'curveR', 'boost', 'sprint', 'checkpoint', 'straight', 'curveL', 'finish'] },
-  { id: 'longway', name: 'The Long Way', author: 23600,
+  { id: 'longway', name: 'The Long Way', author: 30852,
     blocks: ['start', 'sprint', 'straight', 'curveR', 'sprint', 'curveL', 'checkpoint',
       'tunnel', 'straight', 'curveR', 'hairpinL', 'sprint', 'checkpoint', 'boost', 'straight',
       'curveL', 'up', 'straight', 'down', 'curveR', 'checkpoint', 'wallL', 'straight', 'wallR',
@@ -1479,7 +1482,7 @@ function dailyTrack(seed) {
     }
     blocks.push('straight', 'finish');
     const track = buildTrack(blocks, { id: 'daily', name: 'Daily', author: 30000 });
-    track.author = Math.round(track.length / DAILY_PACE);
+    track.author = Math.round((track.length / DAILY_PACE) * 1000);
     if (!trackFolds(track)) return track;
   }
   return buildTrack(CAMPAIGN[0].blocks, CAMPAIGN[0]);
@@ -2355,7 +2358,9 @@ function loadRace(kind, value) {
     track = dailyTrack(seed);
     track.id = 'daily';
     track.name = 'Daily';
-    track.author = 32000;
+    // The author rung comes from dailyTrack(): the ribbon's own length. It used
+    // to be overwritten here with a flat 32 seconds, which every finished run
+    // beat.
     current = { kind: 'daily', index: 0, track };
   } else if (kind === 'freeplay') {
     const seed = Number.isFinite(value) ? (value >>> 0) : ((Math.random() * 0xFFFFFFFF) >>> 0);
