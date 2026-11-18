@@ -1,7 +1,7 @@
 // Add a note here using its exact game slug from catalog.js.
 // Notes are first-person stories, separate from searchable META blurbs.
 export const DEVELOPER_NOTES = Object.freeze({
-  'clicker': "This was made for andrew. Personally I think its a waste of time, but the customer knows best I guess.",
+  'clicker': "This was made for andrew. Personally I think its a waste of time, but the customer knows best I guess. I added another button!",
   'block-blast': "An easier version of Tetris. I remember watching Danielle playing this at a drumline party. It's very satisfying. I'm working on making this more like actual Block Blast.",
   'void-runner': "My first game I made. It's honestly not that great and I almost cut it, but I saved it solely because it was the first.",
   'rooftop-snipers': "Great game. The original is copyrighted, which makes hosting it a bit awkward. I'm working on being able to edit the code, because right now it's in binary :(",
@@ -17,7 +17,7 @@ export const DEVELOPER_NOTES = Object.freeze({
   'ashcrown': "My first colab, me and vettel are working on this together (mostly him taking charge :) which I'm ok with)",
   'transit-chaos': "Every run I swear I'll keep it simple and organized…..",
   'typing-test': "I'm not a great typer. One day i'll make the words actually go together instead of randomized.",
-  'circuit': "Honestly addictive compared to how simple it is. Check out its big brother trackbound.",
+  'circuit': "Honestly addictive compared to how simple it is. Check out its big brother, Trackmania.",
   'fluid': "This one's for Drake.",
   'signal-tower': "Tower defense is what I actually wanted to play, so I made the thing I wanted. I don't even miss Cup Pong.",
   'prism-duel': "Not my strongest game, but interesting concept.",
@@ -49,5 +49,19 @@ export const DEVELOPER_NOTES = Object.freeze({
   'gun-mayhem': "Another time waster, especially for me and Seth in Mr. Moberly's class (great guy)",
   'shadow-net': "Terminal game almost no one plays :( But I love hacking, I got into ethical hacking for a time.",
   'klang': "I keep the music player around even though it lives on another server and needs internet. So sad they blocked youtube, but this is good enough.",
+  'photo-puzzle': "I saw my sister playing an online puzzle game and thought i'd make one.",
+  'poke-gacha': 'Another great game by vettel, "basically gambling".',
+  'poke-idle': "Vettel's second game. (By the way, if you ever want to host a game on here, just send me an email or some feedback.)",
+  'air-hockey': "Better in real life :[",
+  'pokedoku': "Like sudoku.",
+  'krillion': "Such a great game, wonderful concept. (I had to remove scoring because people cheated — Fa 👎)",
+  'quickdraw': "Love the wild west.",
+  'ticket-to-ride': "I was told to make this, yet Bridget never actually played much…",
+  'wallbound': "Sticky ninja.",
+  'risk': "Practically my first game, something I worked very hard on.",
+  'scrabble': "My father is insane at this.",
+  'basket-random': "For Charles.",
+  'corner': "Go capitalism!",
+  'downhill-mayhem': "Fun.",
   '8ball': "I have a horrid break."
 });
