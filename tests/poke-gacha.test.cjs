@@ -945,6 +945,51 @@ test('trainer card: buddy with its look, Dex %, chapters, stars, trophies, weekl
   assert.deepEqual(errors, []);
 });
 
+test('multi-pull reveal: every egg on one board, in order; Epic and up framed and flashed; NEW on first tiers; Enter finishes then closes', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:reveal'] = { at: now - 50, g: { gold: 1, premium: 1, regular: 3 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    refreshTop(); go('pull');
+    // Watch for the flash classes while the eggs pop in.
+    window.__flashes = []; new MutationObserver(list => { for (const m of list) if (m.target.classList && /flash/.test(m.target.className)) __flashes.push(m.target.className); })
+      .observe(document.querySelector('#reveal'), { attributes: true, subtree: true, attributeFilter: ['class'] });
+  });
+  // A single Regular is not a reveal.
+  await game.evaluate(() => { menuOpen = true; const i = OPTIONS.findIndex(o => o.voucher === 'regular' && o.count === 1); cursor = i; choose(i); });
+  assert.equal(await game.evaluate(() => reveal), null, 'one egg is not a reveal');
+  assert.match(await game.$eval('#msg', n => n.textContent), /^1 egg/, 'and keeps its plain message');
+  // Gold: 25 eggs, at least one Epic.
+  const before = await game.evaluate(() => ({ gold: S.balance.gold, seen: [...new Set([...S.eggs, ...S.hatched].map(e => e.tier))] }));
+  await game.evaluate(() => { menuOpen = true; const i = OPTIONS.findIndex(o => o.voucher === 'gold'); cursor = i; choose(i); });
+  const early = await game.evaluate(() => ({ cells: reveal.cells.length, shown: reveal.shown, menu: !$('#menu').hidden }));
+  assert.deepEqual([early.cells, early.shown, early.menu], [25, 0, false], 'the board opens empty over the machine, menu hidden');
+  await pause(900);
+  const mid = await game.evaluate(() => reveal.shown);
+  assert.ok(mid > 0 && mid < 25, 'eggs pop in one after another (' + mid + ' so far)');
+  await game.waitForFunction(() => reveal && reveal.done, { timeout: 8000 });
+  const board = await game.evaluate(() => ({ tiers: reveal.list.map(x => x.tier), news: reveal.list.filter(x => x.isNew).map(x => x.tier),
+    framed: [...document.querySelectorAll('#reveal .egg.t2, #reveal .egg.t3, #reveal .egg.t4')].length, msg: $('#msg').textContent, flashes: __flashes.slice() }));
+  const epicUp = board.tiers.filter(x => x >= 2).length;
+  assert.ok(epicUp >= 1, 'a Gold pull has an Epic or better');
+  assert.equal(board.framed, epicUp, 'each Epic or better has its frame');
+  assert.ok(board.flashes.some(c => /flash/.test(c)), 'a flash played');
+  const firsts = [...new Set(board.tiers.filter(x => x < 4 && !before.seen.includes(x)))].sort();
+  assert.deepEqual(board.news.filter(x => x < 4).sort(), firsts, 'NEW on the first egg of each tier never pulled before');
+  assert.match(board.msg, /Common.*Enter: close\./);
+  // Enter closes it, and does not pull again.
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => reveal), null);
+  assert.equal(await game.evaluate(() => S.balance.gold), before.gold - 1, 'exactly one Gold spent');
+  // Premium: Enter while it plays shows everything at once, a second Enter closes, and a click works too.
+  await game.evaluate(() => { menuOpen = true; const i = OPTIONS.findIndex(o => o.voucher === 'premium'); cursor = i; choose(i); });
+  await key(tab, 'Enter');
+  assert.deepEqual(await game.evaluate(() => [reveal.done, reveal.shown]), [true, 10]);
+  await (await game.$('#reveal')).click();
+  assert.equal(await game.evaluate(() => reveal), null);
+  assert.deepEqual(errors, []);
+});
+
 test('hatching plays the cracking egg, the rays and the shell shards from the hatch sheet', async t => {
   const { tab, game, errors } = await openWithMons(t);
   // The sheet is inline, so it is there without a network.
@@ -1191,9 +1236,10 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   await game.waitForFunction(() => tutor.i === 5);
   await clickHole(tab, game);
   await game.waitForFunction(() => tutor.i === 6);
-  // 7: the skill charges (hurried along here), then 8: ready, read with Enter.
-  await game.evaluate(() => { for (const u of battle.b.units) u.sp = u.spMax - 0.2; });
+  // 7: the skill charges, about 3s in the tutorial (not the skill's full charge), then 8: ready, read with Enter.
+  const t0 = Date.now();
   await game.waitForFunction(() => tutor.i === 7, { timeout: 10000 });
+  assert.ok(Date.now() - t0 < 6000, 'the charging step is a short watch, not a long wait');
   await key(tab, 'Enter');
   assert.equal(await tutorUp(game), false);
   assert.equal(await game.evaluate(() => tipsSeen['battle-1-1']), true);
@@ -1439,4 +1485,56 @@ test('new player: a pull says the free egg is ready on Eggs, a hatch fills empty
   await game.evaluate(() => { while (hatching) endHatch(); eggsUpdate(); });
   assert.match(await game.$eval('#msg', n => n.textContent), /Next: play 1-1/);
   assert.deepEqual(errors, []);
+});
+
+/* ── The page's "Rec. Lv" is a promise ─────────────────────────────────────
+   Each stage preview recommends a level (recLevel in the page). With the engines
+   loaded the way tests/td.test.cjs loads them, a type-matched squad of commons and
+   rares at that level must clear every stage, so raising stage levels in td.js can
+   never make the page's advice wrong. The squad and placement follow td.test.cjs's
+   difficulty test; the worst-typed squad is only reported, not asserted. */
+test('every stage is cleared by a type-matched squad at the page\'s recommended level', () => {
+  const load = (file, names, inject = {}) => {
+    const src = fs.readFileSync(path.join(root, file), 'utf8').replace(/^import [\s\S]*?;\s*$/gm, '').replace(/\bexport\s+(?=(?:async\s+)?(?:function|const|let|class))/g, '');
+    return new Function(...Object.keys(inject), src + '\nreturn {' + names.join(',') + '};')(...Object.values(inject));
+  };
+  const daily = load('src/daily.js', ['dailyDate', 'dailyStreak', 'seedNumber']);
+  const dex = load('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CHART']);
+  const rewards = load('src/hub/rewards.js', ['mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'],
+    { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
+  const gacha = load('src/hub/gacha.js', ['gachaState', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'stageOf', 'evolutionsOf'], { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
+  const td = load('src/hub/td.js', ['classOf', 'STAGES', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'typeMultiplier', 'MAX_LEVEL'],
+    { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor, stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
+  // The page's own formula, read from the page.
+  const recLevel = new Function('T', 'return ' + page.match(/const recLevel = (stage => [^\n]*);/)[1])({ maxLevel: td.MAX_LEVEL });
+  const squadFor = (stage, rank, level) => {
+    const foes = stage.waves.map(w => gacha.mon(w[1]).types);
+    const fit = num => foes.reduce((s, types) => s + Math.log2(td.typeMultiplier(gacha.mon(num).types[0], types)), 0) / foes.length;
+    const pool = dex.DEX.map((row, i) => [row, i + 1]).filter(([row]) => row[9] === 3 || row[9] === 4).map(([, n]) => n);
+    const ranked = pool.map(n => [n, rank * fit(n) + (gacha.mon(n).bst || 0) / 2000]).sort((a, b) => b[1] - a[1]).map(([n]) => n).slice(0, 60);
+    const by = cls => ranked.filter(n => td.classOf(n) === cls);
+    const flying = stage.waves.some(w => w[5]);
+    const core = [...by('blocker').slice(0, 1), ...by('guard').slice(0, 2), ...by('vanguard').slice(0, 1),
+      ...(flying ? by('sniper').slice(0, 2) : by('caster').slice(0, 2)), ...by('sniper').slice(0, 1), ...by('medic').slice(0, 1), ...by('caster').slice(0, 1)];
+    return [...new Set([...core, ...ranked])].slice(0, 8).map(n => td.unitStats(n, { level }));
+  };
+  const placed = (stage, squad) => {
+    const high = []; stage.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H') high.push([x, y]); }));
+    const ground = td.pathsOf(stage)[0].slice().reverse().filter(([x, y]) => stage.map[y][x] === '.');
+    const flying = stage.waves.some(w => w[5]), armored = stage.waves.some(w => w[7]);
+    // Snipers next to the flight lines when bats fly (as td.test.cjs places them).
+    const toFlight = (x, y) => Math.min(...td.pathsOf(stage).map(p => { const [[ax, ay], [bx, by]] = [p[0], p[p.length - 1]];
+      const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2))); return Math.hypot(x - (ax + t * (bx - ax)), y - (ay + t * (by - ay))); }));
+    if (flying) high.sort((a, c) => toFlight(...a) - toFlight(...c));
+    // The order the guided 1-1 teaches: the blocker first, then the rest.
+    const pri = u => (armored && u.cls === 'vanguard' ? 2 : 0) + (flying && u.cls === 'sniper' ? 1 : 0) + (u.cls === 'blocker' ? 0.5 : 0);
+    return squad.map((u, slot) => slot).sort((a, b) => pri(squad[b]) - pri(squad[a])).map(slot => [slot, ...(squad[slot].ground ? ground.shift() || [0, 0] : high.shift() || [0, 0])]);
+  };
+  const play = (stage, squad) => {
+    const b = td.newBattle(stage, squad), plan = placed(stage, squad);
+    for (let guard = 0; !b.over && guard < 20 * 600; guard++) { for (const [slot, x, y] of plan) if (td.deploy(b, slot, x, y) === 'energy') break; td.step(b); }
+    return b.over;
+  };
+  const lost = td.STAGES.filter(stage => play(stage, squadFor(stage, 1, recLevel(stage))) !== 'win').map(s => s.id + ' (Rec. Lv ' + recLevel(s) + ')');
+  assert.deepEqual(lost, [], 'a type-matched squad at Rec. Lv loses these stages');
 });
