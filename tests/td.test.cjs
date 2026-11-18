@@ -373,11 +373,13 @@ test('levels cost coins and raise stats; the squad reads candy upgrades', () => 
   assert.deepEqual(td.squadFrom(w, [named('Mew')], TODAY), [], 'only owned species');
 });
 
+// The level the page recommends for a stage (recLevel in poke-gacha.html): (level - 1) x 2 + 1.
+const recLevel = stage => Math.max(1, Math.min(td.MAX_LEVEL || 10, Math.round(((stage.level || 1) - 1) * 2 + 1)));
 // Difficulty: the late stages want a type-matched squad. From the commons and rares
 // (3★ and 4★ lines), take the 60 whose first type hits the stage's enemies hardest
-// (or worst), build a squad with a class mix, and play it at level 3 with the same
+// (or worst), build a squad with a class mix, and play it at the stage's recommended level with the same
 // placement a player would use (snipers first and beside the flight lines when bats fly).
-function squadFor(stage, rank) {
+function squadFor(stage, rank, level = recLevel(stage)) {
   const mult = (atk, defend) => td.typeMultiplier(atk, defend);
   const foes = stage.waves.map(w => gacha.mon(w[1]).types);
   const fit = num => foes.reduce((s, types) => s + Math.log2(mult(gacha.mon(num).types[0], types)), 0) / foes.length;
@@ -387,7 +389,7 @@ function squadFor(stage, rank) {
   const flying = stage.waves.some(w => w[5]);
   const core = [...by('blocker').slice(0, 1), ...by('guard').slice(0, 2), ...by('vanguard').slice(0, 1),
     ...(flying ? by('sniper').slice(0, 2) : by('caster').slice(0, 2)), ...by('sniper').slice(0, 1), ...by('medic').slice(0, 1), ...by('caster').slice(0, 1)];
-  return [...new Set([...core, ...ranked])].slice(0, 8).map(num => td.unitStats(num, { level: 3 }));
+  return [...new Set([...core, ...ranked])].slice(0, 8).map(num => td.unitStats(num, { level }));
 }
 function placed(stage, squad) {
   const flying = stage.waves.some(w => w[5]);
@@ -410,14 +412,13 @@ function playInOrder(stage, squad, plan) {
   }
   return b;
 }
-test('late stages want type-matched squads: matched level-3 commons and rares win, the worst-typed lose', () => {
-  for (const id of ['1-8', '2-3', '2-4', '2-5', '2-6', '3-1', '3-2', '3-3', '3-4', '3-5', '3-6', '4-1', '4-2', '4-4', '4-5', '4-6',
+test('late stages want type-matched squads: matched commons and rares at the recommended level win, the worst-typed lose', () => {
+  for (const id of ['1-6', '1-7', '1-8', '2-3', '2-4', '2-5', '2-6', '3-1', '3-2', '3-3', '3-4', '3-5', '3-6', '4-1', '4-2', '4-4', '4-5', '4-6',
     '5-1', '5-2', '5-3', '5-4', '5-5', '5-6', '6-1', '6-2', '6-3', '6-4', '6-5', '6-6']) {
     const stage = td.STAGES.find(s => s.id === id);
     const good = squadFor(stage, 1), bad = squadFor(stage, -1);
-    assert.equal(playInOrder(stage, good, placed(stage, good)).over, 'win', id + ': a type-matched level-3 squad wins');
-    // The Petrel boss is the one stage a worst-typed squad can scrape through, with 1 star.
-    if (id !== '3-6') assert.equal(playInOrder(stage, bad, placed(stage, bad)).over, 'lose', id + ': the worst-typed level-3 squad loses');
+    assert.equal(playInOrder(stage, good, placed(stage, good)).over, 'win', id + ': a type-matched squad at Lv ' + recLevel(stage) + ' wins');
+    assert.equal(playInOrder(stage, bad, placed(stage, bad)).over, 'lose', id + ': the worst-typed squad at Lv ' + recLevel(stage) + ' loses');
   }
 });
 
