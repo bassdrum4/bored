@@ -990,6 +990,35 @@ test('multi-pull reveal: every egg on one board, in order; Epic and up framed an
   assert.deepEqual(errors, []);
 });
 
+test('battle polish: a scene per chapter behind the field, a WAVE n/m banner as waves start, and stars that turn gold one by one', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  void tab;
+  // Scenery: one per chapter, drawn once and kept, all different; the field draws it.
+  const scenes = await game.evaluate(() => { const ids = T.chapters.map(c => c.stages[0]); const urls = ids.map(st => sceneryFor(st).toDataURL());
+    return { n: new Set(urls).size, chapters: ids.length, cached: sceneryFor(ids[0]) === sceneryFor(ids[0]) }; });
+  assert.equal(scenes.n, Math.min(6, scenes.chapters), 'each chapter has its own scene');
+  assert.ok(scenes.cached);
+  // 1-2 has three waves: the banner names each as it starts, holds about 1.2s of battle time, then goes.
+  await game.evaluate(() => { go('story'); chapterAt = 0; storyMode = 'stages'; storyAt = 1; storyUpdate(); pickStage(); setSquad(S.owned.slice(0, 4)); startBattle(); battle.talk = []; battleTalk(); battle.paused = true; });
+  const waves = await game.evaluate(() => battle.stage.waves.map(w => w[0]));
+  assert.ok(waves.length >= 2);
+  const at = t_ => game.evaluate(t => { battle.b.t = t; waveBanner(battle); return { shown: !$('#wave-banner').hidden, text: $('#wave-banner').textContent }; }, t_);
+  assert.deepEqual(await at(waves[0] - 0.5), { shown: false, text: '' }, 'nothing before the first wave');
+  assert.deepEqual(await at(waves[1] + 0.1), { shown: true, text: 'WAVE 2/' + waves.length });
+  assert.equal((await at(waves[1] + 1.5)).shown, false, 'gone after a moment');
+  // Stars: gray when the result opens, gold one after another.
+  await game.evaluate(() => { battle.b.queue = []; battle.b.enemies = []; battle.paused = false; });
+  await game.waitForFunction(() => battle.done, { timeout: 10000 });
+  await game.evaluate(() => { battle.talk = []; battleTalk(); battle.result.stars = 3; showResult(); });
+  const gold = () => game.evaluate(() => [...document.querySelectorAll('#battle-result .stars canvas')].filter(c => c.classList.contains('pop')).length);
+  assert.equal(await gold(), 0, 'gray first');
+  await game.waitForFunction(() => document.querySelectorAll('#battle-result .stars canvas.pop').length === 3, { timeout: 3000 });
+  assert.equal(await game.$$eval('#battle-result .stars canvas', n => n.length), 3);
+  await game.evaluate(() => leaveBattle());
+  assert.equal(await game.evaluate(() => $('#wave-banner').hidden), true);
+  assert.deepEqual(errors, []);
+});
+
 test('hatching plays the cracking egg, the rays and the shell shards from the hatch sheet', async t => {
   const { tab, game, errors } = await openWithMons(t);
   // The sheet is inline, so it is there without a network.
