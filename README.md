@@ -4,7 +4,8 @@
 or server for the hub itself. Individual games may require an internet connection. The site is the [`src/`](src/) folder itself: [`src/index.html`](src/index.html)
 loads the hub modules as plain ES modules, and the games are ordinary HTML in
 [`src/games/content/`](src/games/content). The page downloads a game the first
-time you open its card, and never before.
+time you open its card, and never before. The catalog has 63 entries: 61 local
+(57 game documents plus the 4 built-in arcade games) and 2 online extras.
 
 GitHub Pages address: **https://bassdrum4.github.io/bored/**.
 There is no build: the deploy workflow publishes `src/` as written on every push
@@ -37,6 +38,10 @@ with `npm run test:rooftop`.
 | [`src/hub/feedback-ui.js`](src/hub/feedback-ui.js) | Feedback dialog |
 | [`src/hub/game-document.js`](src/hub/game-document.js) | Frame document helpers and seed injection |
 | [`src/hub/backend.js`](src/hub/backend.js) | Supabase request/session layer, score rules, auth helpers |
+| [`src/hub/gacha.js`](src/hub/gacha.js), [`td.js`](src/hub/td.js), [`rewards.js`](src/hub/rewards.js) | Poké Gacha: eggs and lines, the tower-defense engine, and the shared coin/candy/shard ledger |
+| [`src/hub/together-api.js`](src/hub/together-api.js), [`together-live.js`](src/hub/together-live.js) | Bored Together: matches, challenges, live rooms and their transport |
+| [`src/analytics.html`](src/analytics.html) | The admin gameplay dashboard (funnels, enjoyment, retention, CSV) |
+| [`docs/`](docs) | Design notes: Bored Together, Civ Lite saves, the Poké Gacha spec, Rooftop Snipers |
 | [`src/hub/cloud.js`](src/hub/cloud.js) | The `player_state` pull/push that lets an account follow the player |
 | [`src/hub/scores.js`](src/hub/scores.js) | Score specs, best capture, sync, and ranking |
 | [`src/hub/feedback.js`](src/hub/feedback.js) | The write-only feedback request (insert, never read) |
@@ -79,8 +84,8 @@ game documents with that stamp (`games/content/<slug>.html?v=<commit>`), and
 so a deploy is easy to confirm and a cached game document cannot outlive one. Keep that setting — a branch deploy can only
 serve the repo root or `/docs`, neither of which is this folder.
 
-If you use Infisical for local secrets, `npm run dev:infisical` wraps the Vite
-server; see [INFISICAL.md](INFISICAL.md).
+`npm run dev:infisical` runs the same Vite server through Infisical for local
+secrets.
 
 ## Keeping test and development traffic out of analytics
 
@@ -139,8 +144,8 @@ If storage is blocked, the games still work; progress may not persist.
 The layout supports phones, touch controls in the new games, keyboard navigation,
 visible focus states, and reduced-motion preferences.
 
-Every offline game has an actual captured preview; online extras use labeled
-panels and still require internet. Landscape captures fill the card edge to
+Every offline game has a card preview — a captured WebP where one exists, otherwise a
+labeled placeholder — and online extras use labeled panels and still require internet. Landscape captures fill the card edge to
 edge; square and phone-shaped boards (Commanders, Wordle, Tetris) keep the whole
 board and sit in paper instead, because cropping one would cut it. Session
 lengths are editorial estimates, and the cards list gameplay inputs rather than
@@ -157,7 +162,7 @@ CHROME_PATH=/path/to/chrome npm run test:visual      # includes a live F-14 embe
 ```
 
 Raw captures and verification screenshots go under ignored `_build/`. Commit
-the optimized `src/games/previews/*.webp`. The 36 previews total about 100 KB;
+the optimized `src/games/previews/*.webp`. The previews total about 440 KB;
 images below the first screen load
 lazily. `previews:optimize` also refits the previews already on disk when there
 are no raw captures, which is how the filled cards were produced without a
@@ -226,7 +231,7 @@ matches the frame, so a portrait phone sees tall rooms rather than a letterbox.
 
 ## Daily challenge
 
-The featured challenge rotates through **31 of the offline games**, with a distinct
+The featured challenge rotates through **39 of the local games**, with a distinct
 goal for each game. Everyone gets the same game and target for a given date;
 after a full circuit, most targets change difficulty. The day is **Eastern Time**:
 `dailyDate` formats the clock in `America/Detroit`, so the challenge rolls over at
@@ -326,16 +331,18 @@ For quick testing, turn off **Authentication → Providers → Email → Confirm
 otherwise players confirm by email before their first sign-in. Handles use 3–16
 letters, numbers, `_` or `-`.
 
-The board tracks a best score for **all 33 offline games**. The original eight
+The board tracks a best score for **52 of the 61 local games** (plus two extra boards
+fed by other games). The original eight
 (2048, Aim Lab, Memory, Snake, Pac-Man, Void Runner, Simon, and Minesweeper) use
 their existing saved bests. Every other offline game is read from live game
 state while playing and when you leave or restart: Tetris, Breakout,
 Frogger, Space Invaders, Q*bert, Asteroids and Commanders post their running
 score, Wordle guesses (solved runs only), Poker chips, and every other game's
-displayed points, waves, levels, wins, ships or other progress metric. 8 Ball,
-Sand and Eco stay off the board entirely: they are open-ended toys rather than
-runs with a finish line, so the hub keeps no best for them and their cards carry
-no score line.
+displayed points, waves, levels, wins, ships or other progress metric. The nine
+unscored local games (Poké Gacha, Prism Duel, Fluid, Rooftop Snipers, Basket
+Random, 8 Ball, Sand, Eco and Krillion) stay off the board entirely: they either
+have no single score to rank or keep their own progress system, so the hub keeps
+no best for them and their cards carry no score line.
 Connect Four and Tank 2 count wins against the computer; Minigolf counts total
 strokes only after all nine holes are sunk. The two remote extras are excluded because the hub cannot inspect
 their cross-origin state. Scores are submitted by the browser, so this is a
@@ -416,7 +423,8 @@ with no fonts, libraries, or images.
 
 ## Original offline games (25)
 
-Pulled from `https://sites.google.com/midlandps.org/vibecoding/`:
+The library holds 57 game documents plus the 4 built-in arcade games; these 25
+are the originals, pulled from `https://sites.google.com/midlandps.org/vibecoding/`:
 
 sumo, sand, poker, wordle, lava, volletball, solitaire, commanders, eco,
 void-runner, qbert, simon, frogger, pac-man, snake, tank, space-invaders, pong,
@@ -465,10 +473,10 @@ The rules and daily tests run without a browser. The browser block covers
 JavaScript syntax, 2048 merge rules and undo, Connect Four wins and computer
 tactics, actual browser gameplay, Memory completion and timer cleanup, Aim Lab
 accuracy and expiration, search/filter/sort, the jump palette, saved favorites,
-Escape and focus restoration, all 36 offline game boots, DEEP's seeded dungeon and boss gate, poker's
+Escape and focus restoration, all 61 local game boots, DEEP's seeded dungeon and boss gate, poker's
 simulated equity, no-peeking opponents and draw discards, 8 Ball's simulated shot planning
 (pots, safeties, escapes, no avoidable fouls or scratches, a whole self-played rack),
-all 34 daily challenges, per-game goal acceptance/rejection, real Memory
+all 39 daily challenges, per-game goal acceptance/rejection, real Memory
 challenge completion,
 saved results, sharing with clipboard fallback, Detroit-time rollover, 320px layouts,
 blocked storage, high-score capture, one shared board per game with the

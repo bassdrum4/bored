@@ -20,6 +20,16 @@ src/favicon*.svg         flattened awake/asleep Bo for the tab icon; keep in ste
 src/hub/game-document.js  game HTML and seed injection
 src/hub/backend.js       Supabase request/session layer, score rules, auth helpers
 src/hub/resume.js        continue-where-you-left-off: one save per game, injected before the game script
+src/hub/gacha.js         Poké Gacha wallet, eggs, lines, skills and SP skins
+src/hub/td.js            Poké Gacha tower defense: chapters, battles and missions
+src/hub/rewards.js       the coin, candy and shard ledger, trophies and achievements
+src/hub/gacha-dex.js     generated dex and type chart (scripts/gacha-dex.mjs --check)
+src/hub/together-*.js    Bored Together: matches, live rooms, the lobby and the player
+src/hub/realtime.js      live-room transport
+src/hub/saves-bridge.js  in-game saves to the cloud when an account is signed in
+src/hub/announcements-ui.js  the announcement banner (announcement-admin.js writes them)
+src/hub/analytics.js     the analytics collector; analytics-view.js and analytics-data.js draw the admin page
+src/analytics.html       the admin analytics dashboard
 src/hub/cloud.js         player_state pull/push — the account follows the player across browsers
 src/hub/scores.js        score specs, best capture, sync, ranking
 src/hub/feedback.js      write-only feedback insert (anon key, no reads)
@@ -28,6 +38,7 @@ src/daily.js             daily rotation, snapshot adapters, streak counting
 src/games/catalog.js     ORDER, META, EXTERNS, NEW_GAMES + the on-demand document loader
 src/games/score-rules.json  what each game's score means on the shared board (label, better, max)
 src/games/content/*.html one file per game — the game's entire source, and the payload
+src/games/previews/      small card captures (WebP, with SVG fallbacks for newer games)
 src/games/arcade.js      2048, Memory, Connect Four, Aim Lab — native JS, no payload
 src/games/discovery.js   session estimates, controls, collections, previews
 tests/serve.cjs          loopback static server the browser suites load through
@@ -35,6 +46,7 @@ tests/bored.test.cjs     node:test suite, runs src/ as the site in Chrome
 tests/discovery.test.cjs discovery, layout and mock-account flows
 tests/visual.test.cjs    release captures and the live F-14 embed (needs internet)
 .github/workflows/deploy.yml  regenerate changelog, stamp version, publish src/ to Pages
+.github/workflows/ci.yml  run the 55-file browser and logic suite on pushes and pull requests
 scripts/games.mjs        add a game / sync the shared board's rule list
 scripts/capture-previews.mjs  re-shoot the library previews in Chrome
 scripts/optimize-previews.py  resize them: fill landscape cards, keep portrait boards whole
@@ -67,7 +79,7 @@ Every push to `main` publishes the game files as committed, with fresh changelog
 there is no generated `index.html` and no commit back to the branch. Paths in `src/index.html` are relative (`./main.js`,
 `./styles.css`) because the site is served under `/bored/`; a root-absolute path would 404 there.
 The test suite serves `src/` through a loopback server in headless Chrome (set `CHROME_PATH` if it is
-not found) and takes about a minute; run it before committing anything that touches a game.
+not found) and takes several minutes (55 test files); run it before committing anything that touches a game.
 
 GitHub Pages is set to **Settings → Pages → Source: GitHub Actions**, which is what lets the
 workflow publish `src/`; a branch deploy can only serve the repo root or `/docs`. There is no
