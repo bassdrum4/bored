@@ -48,15 +48,19 @@ const pull = (wallet, extra) => {
   return result;
 };
 
-test('the egg pool is base forms only, with no mythicals, and every tier is filled', () => {
+test('the egg pool is base forms only, mythicals hatch from Legendary eggs, and every tier is filled', () => {
   const pools = eggPools();
   assert.deepEqual(pools.slice(0, 4).map(p => p.length > 0), [true, true, true, true]);
   for (const pool of pools) for (const num of pool) {
     assert.equal(DEX[num - 1][8], 0, DEX[num - 1][0] + ' is not a base form');
-    assert.notEqual(DEX[num - 1][10], 'my', DEX[num - 1][0] + ' is a mythical');
   }
+  // Mythicals: every base-form one is in the Legendary tier (same rates and pity), none in the other tiers.
+  const mythicals = DEX.map((row, i) => [row, i + 1]).filter(([row]) => row[10] === 'my' && !row[8]).map(([, num]) => num);
+  assert.ok(mythicals.length >= 20);
+  assert.ok(mythicals.every(num => pools[3].includes(num)), 'every mythical hatches from Legendary eggs');
+  assert.ok(pools.slice(0, 3).every(p => p.every(num => DEX[num - 1][10] !== 'my')), 'and from no other tier');
   const named = name => DEX.findIndex(row => row[0] === name) + 1;
-  assert.ok(pools[3].includes(named('Dratini')) && pools[3].includes(named('Mewtwo')));
+  assert.ok(pools[3].includes(named('Dratini')) && pools[3].includes(named('Mewtwo')) && pools[3].includes(named('Mew')));
   assert.ok(pools[2].includes(named('Eevee')) && pools[2].includes(named('Riolu')) && pools[2].includes(named('Bulbasaur')));
   assert.ok(!pools.flat().includes(named('Pikachu')), 'Pichu is the base form, not Pikachu');
   assert.ok(pools[4].every(num => pools[3].includes(num) && DEX[num - 1][10] === 'lg'), 'banners are legendaries');

@@ -10,7 +10,7 @@
 //             finishes 2 of the 4 daily missions, and the "3-star 5 stages" weekly.
 import { DOKU, PI_RATES, COINS_PER_REGULAR, VOUCHER_VALUE } from '../src/hub/rewards.js';
 import { LOGIN, COIN_SHOP } from '../src/hub/gacha.js';
-import { STAGES, FIRST_CLEAR, FIRST_STAR3, DAILY_REWARD, DAILY_ALL, WEEKLY_REWARD, WEEKLY_ALL, levelCost, MAX_LEVEL } from '../src/hub/td.js';
+import { STAGES, FIRST_CLEAR, FIRST_STAR3, REPEAT_CLEAR, REPEAT_PER_DAY, DAILY_REWARD, DAILY_ALL, WEEKLY_REWARD, WEEKLY_ALL, levelCost, MAX_LEVEL } from '../src/hub/td.js';
 
 export const PLAYER = { dokuDays: 4, dokuModes: 2, dokuRandom: 1, dokuPerfectPerWeek: 1, piCatchesPerDay: 20, piBadgesPerWeek: 1, piTowerPerWeek: 5,
   tdStagesPerDay: 2, star3Share: 0.5, dailyMissionsDone: 2, weeklyMissionsDone: 1 };
@@ -32,9 +32,14 @@ export function simulate(weeks = 4, p = PLAYER) {
     add(PI_RATES.tower, p.piTowerPerWeek);
     // Poké Gacha: login and tower defense
     add(LOGIN, 7);
-    for (let d = 0; d < 7; d++) for (let s = 0; s < p.tdStagesPerDay; s++) {
-      if (cleared < STAGES.length) { cleared++; add(FIRST_CLEAR); }
-      if (starred < Math.floor(cleared * p.star3Share)) { starred++; add(FIRST_STAR3); }
+    for (let d = 0; d < 7; d++) {
+      let repeats = 0;
+      for (let s = 0; s < p.tdStagesPerDay; s++) {
+        // A new stage while the story lasts; after that, replays pay the repeat-clear coins.
+        if (cleared < STAGES.length) { cleared++; add(FIRST_CLEAR); }
+        else if (repeats < REPEAT_PER_DAY) { repeats++; add(REPEAT_CLEAR); }
+        if (starred < Math.floor(cleared * p.star3Share)) { starred++; add(FIRST_STAR3); }
+      }
     }
     add(DAILY_REWARD, 7 * p.dailyMissionsDone);
     if (p.dailyMissionsDone >= 4) add(DAILY_ALL, 7);

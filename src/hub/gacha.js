@@ -11,6 +11,7 @@
 //                         x = { s, t, n, sh, sp, k } species, tier, new, shiny, SP skin id, skill
 //   cfg:buddy:<uuid>    the equipped buddy; the latest one counts
 //   cfg:look:<uuid>     the look a line wears across Bored (x = { l, look }); the latest counts
+//   cfg:skill:<uuid>    the skill a line uses in tower defense (x = { l, k }, k = 0-3); the latest counts
 //   cfg:starter         the starter pick, once per account: x = { s, c } the chosen starter and
 //                         the three gifted commons. The id is fixed, so it is written once and
 //                         a second device's pick loses to the earlier one in a merge.
@@ -22,7 +23,7 @@
 import { DEX, DEX_TYPES } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
 import {
-  mergeWallet, walletBalance, spendFrom, grantOnce, buyRegular, readWallet, writeWallet, walletTrophies
+  mergeWallet, walletBalance, spendFrom, grantOnce, buyRegular, readWallet, writeWallet, walletTrophies, walletTrophyList
 } from './rewards.js';
 
 // Egg tiers: 0 Common 3★, 1 Rare 4★, 2 Epic 5★, 3 Legendary 6★, 4 the banner legendary (6★).
@@ -274,7 +275,7 @@ export function gachaState(wallet, today = dailyDate()) {
   const lines = {};
   const owned = new Set();
   const line = num => (lines[num] ||= { line: num, hatches: 0, shiny: false, skins: [], skills: [false, false, false, false],
-    passive: false, cost: 0, look: 'normal' });
+    passive: false, cost: 0, look: 'normal', skill: null });
   // The starter and its gifts are owned with their first common skill, like a hatch.
   const starterPick = readStarter(entries['cfg:starter']);
   if (starterPick) for (const num of [starterPick.species, ...starterPick.gifts]) {
@@ -316,6 +317,10 @@ export function gachaState(wallet, today = dailyDate()) {
     if (id === 'cfg:starter') continue;
     if (id.startsWith('cfg:look:')) {
       if (lines[x.l] && typeof x.look === 'string') lines[x.l].look = x.look;
+      continue;
+    }
+    if (id.startsWith('cfg:skill:')) {
+      if (lines[x.l] && Number.isInteger(x.k) && x.k >= 0 && x.k <= 3) lines[x.l].skill = x.k;
       continue;
     }
     if (Array.isArray(x.ev) && validNum(x.ev[1])) owned.add(x.ev[1]);
@@ -542,6 +547,19 @@ export function setBuddy(wallet, species, { shiny = false, skin = null, today = 
 /** The looks a line can wear: normal, shiny if hatched shiny, and each SP skin it owns. */
 export const looksOf = held => ['normal'].concat(held.shiny ? ['shiny'] : [], held.skins || []);
 
+/** Choose which unlocked skill a line uses in tower defense (0-3; 3 is the rare one). */
+export function setSkill(wallet, line, k, { today = dailyDate(), now = Date.now() } = {}) {
+  const state = gachaState(wallet, today);
+  const held = state.lines[line];
+  if (!held) return refuse(wallet, 'not-owned');
+  if (!Number.isInteger(k) || k < 0 || k > 3) return refuse(wallet, 'unknown');
+  if (!held.skills[k]) return refuse(wallet, 'locked');
+  if (held.skill === k) return refuse(wallet, 'owned');
+  const next = mergeWallet(wallet);
+  next.entries['cfg:skill:' + Math.floor(now).toString(36).padStart(9, '0') + '-' + uuid()] = { at: seconds(now), x: { l: line, k } };
+  return { wallet: next, ok: true };
+}
+
 /** Choose the look a line wears in Poké Gacha, Pokédoku and the buddy slot. Cosmetic only. */
 export function setLook(wallet, line, look, { today = dailyDate(), now = Date.now() } = {}) {
   const state = gachaState(wallet, today);
@@ -593,6 +611,8 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     skillsOf, lineOf, stageOf, evolutionsOf,
     state: () => gachaState(readWallet(), dailyDate()),
     trophies: () => walletTrophies(readWallet()),
+    // Every trophy, earned or not, with its progress (have / need).
+    trophyList: () => walletTrophyList(readWallet()),
     pickStarter: act((w, o) => pickStarter(w, o.species, o)),
     pull: act((w, o) => pullEggs(w, o)),
     hatch: act((w, o) => hatchReady(w, o)),
@@ -608,6 +628,7 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     buyPreset: act((w, o) => buyPreset(w, o)),
     skins: () => skinList(), looksOf, lookFor: num => lookFor(gachaState(readWallet()), num), skinDir: SKIN_DIR, skinFile, skinPrice,
     setLook: act((w, o) => setLook(w, o.line, o.look, o)),
+    setSkill: act((w, o) => setSkill(w, o.line, o.skill, o)),
     claimLogin: act((w, o) => claimLogin(w, o))
   };
 }
