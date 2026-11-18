@@ -174,13 +174,16 @@ export const HIGH_SCORE_GAMES = [
   }),
   // Circuit ranks the whole three-lap race: the clock starts on the first
   // keypress and stops at the line, so a quick lap cannot offset a scrappy one.
-  // The board stores whole seconds and only a finished race posts; under
-  // fifteen seconds means the circuit was cut. Two-player races use the same
-  // clock on both cars, so the first car's time is still the same test.
-  highScore('circuit', 'Circuit', 'seconds', {
-    metric: 'seconds', lower: true, min: 15, max: 3600,
-    when: snapshot => snapshot.finished === true && snapshot.seconds > 0,
-    key: 'bored.high.circuit-race-v1'
+  // The board's value is an integer, so the race is posted in hundredths of a
+  // second rather than rounded to whole ones — two runs a tenth apart used to
+  // tie on the board and now do not. Under fifteen seconds means the circuit
+  // was cut. Two-player races share the clock, so the first car's time is still
+  // the same test. The storage key moved with the unit, because a saved best of
+  // "42" would otherwise outrank every real hundredth-of-a-second time.
+  highScore('circuit', 'Circuit', 'centiseconds', {
+    metric: 'centiseconds', lower: true, min: 1500, max: 360000,
+    when: snapshot => snapshot.finished === true && snapshot.centiseconds > 0,
+    key: 'bored.high.circuit-race-v2'
   }),
   // Typing Test only ranks a finished run at 90% accuracy or better: fast and
   // wrong is not a typing score.
@@ -344,6 +347,8 @@ export function bestValue(game) {
 export function formatScore(value, game) {
   const number = Number(value);
   if (!Number.isFinite(number)) return '0 ' + game.unit;
+  // Hundredths read as a stopwatch rather than as a raw count: 4237 is 42.37 s.
+  if (game.unit === 'centiseconds') return (Math.max(0, number) / 100).toFixed(2) + ' s';
   if (game.unit === 'seconds') {
     const total = Math.max(0, Math.round(number));
     return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');

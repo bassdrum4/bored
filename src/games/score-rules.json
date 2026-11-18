@@ -45,10 +45,10 @@
     "max_value": 999
   },
   "circuit": {
-    "label": "Seconds for a three-lap race",
+    "label": "Hundredths of a second for a three-lap race",
     "better": "low",
-    "min_value": 15,
-    "max_value": 3600
+    "min_value": 1500,
+    "max_value": 360000
   },
   "clicker": {
     "label": "Score",

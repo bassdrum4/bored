@@ -765,8 +765,11 @@ const bowlDef = dir => ({
 // straight, so the next corner has to be set up before entering it, and long
 // enough that the slide has to be held rather than dabbed at.
 const ICE_LEN = 32;
-const iceDef = { name: 'Ice', len: ICE_LEN, hw: 6.4, samples: 22, grip: 1.05,
-  paint: [0.6, 0.7, 0.79], top: [0.77, 0.84, 0.9],
+// One definition of the frozen surface: the Ice block uses it, and so does a
+// whole course that declares itself ice, so the two can never drift apart.
+const ICE_GRIP = 1.05, ICE_KERB = [0.6, 0.7, 0.79], ICE_PAINT = [0.77, 0.84, 0.9];
+const iceDef = { name: 'Ice', len: ICE_LEN, hw: 6.4, samples: 22, grip: ICE_GRIP,
+  paint: ICE_KERB, top: ICE_PAINT,
   curve: t => ({ p: [0, 0, ICE_LEN * t], f: [0, 0, 1], u: [0, 1, 0] }) };
 // A tunnel: the road runs between tall walls and under a roof, so it arrives as
 // a lit bore rather than a straight with a view.
@@ -1188,12 +1191,17 @@ function buildTrack(typeIds, meta) {
   const legs = [];
   const walls = [];
   const open = !!(meta && meta.open);
+  // A frozen course: every piece of road takes the ice paint and the ice grip,
+  // including the start, the checkpoints and the finish, so the whole ribbon is
+  // one surface rather than a few blocks named after it.
+  const ice = !!(meta && meta.ice);
   for (let i = 0; i < typeIds.length; i++) {
     const source = BLOCKS[typeIds[i]];
     if (!source) continue;
     // An open track has no guide walls at all: nothing keeps the car on the
     // ribbon, so the trick points banked in the air are part of the run.
-    const def = open ? Object.assign({}, source, { wall: 0 }) : source;
+    const surface = open ? Object.assign({}, source, { wall: 0 }) : source;
+    const def = ice ? Object.assign({}, surface, { grip: ICE_GRIP, paint: ICE_KERB, top: ICE_PAINT }) : surface;
     const exit = compose(entry, blockExit(def));
     const prevDef = BLOCKS[typeIds[i - 1]], nextDef = BLOCKS[typeIds[i + 1]];
     const box = emitBlock(road, scenery, entry, def, i, legs, walls,
@@ -1296,6 +1304,8 @@ function buildTrack(typeIds, meta) {
     mesh: road, scenery, triggers, checkpoints, finish,
     spawn: spawn || FRAME0, end: entry, chain, boxes,
     open,
+    // The surface the whole ribbon is made of, when it is not plain tarmac.
+    grip: ice ? ICE_GRIP : 0,
     poles: 0
   };
 }
@@ -1388,19 +1398,21 @@ const CAMPAIGN = [
       'curveL', 'up', 'straight', 'down', 'curveR', 'checkpoint', 'wallL', 'straight', 'wallR',
       'curveL', 'checkpoint', 'ice', 'straight', 'boost', 'loop', 'straight', 'curveR',
       'sprint', 'finish'] },
-  // The last two are routes the campaign does not otherwise have: a cold store
-  // of ice, tunnels and rail-width straights where the line has to be set before
-  // the corner, and a climb that turns over and comes back down through a wall
-  // ride. Both were checked against trackFolds, so neither doubles back on
-  // itself.
-  { id: 'coldstore', name: 'Cold Store', author: 19200,
-    blocks: ['start', 'sprint', 'ice', 'curveL', 'tunnel', 'boost', 'straight', 'checkpoint',
-      'narrow', 'curveR', 'ice', 'whoops', 'sprint', 'curveL', 'checkpoint', 'tunnel',
-      'ice', 'straight', 'curveR', 'finish'] },
-  { id: 'updraft', name: 'Updraft', author: 17400,
-    blocks: ['start', 'sprint', 'up', 'whoops', 'curveL', 'boost', 'loop', 'straight',
-      'checkpoint', 'down', 'wallR', 'curveR', 'checkpoint', 'kicker', 'straight', 'curveL',
-      'sprint', 'finish'] }
+  // The last two are routes the campaign does not otherwise have. Cold Store is
+  // a whole frozen course — `ice` gives every piece of road the ice paint and
+  // the ice grip, not just the blocks called Ice — so the line has to be set
+  // before the corner instead of during it. Downdraft starts on a drop and never
+  // climbs back: the loop sits in the descent and the wall ride comes out below
+  // it. Both were driven by the suite's centreline bot and checked against
+  // trackFolds, so neither is a track that cannot be finished.
+  { id: 'coldstore', name: 'Cold Store', author: 20000, ice: true,
+    blocks: ['start', 'sprint', 'curveL', 'ice', 'straight', 'sprint', 'curveR', 'checkpoint',
+      'sprint', 'boost', 'ice', 'curveL', 'straight', 'sprint', 'curveR', 'checkpoint',
+      'ice', 'straight', 'finish'] },
+  { id: 'downdraft', name: 'Downdraft', author: 14000,
+    blocks: ['start', 'sprint', 'down', 'whoops', 'curveR', 'boost', 'loop', 'checkpoint',
+      'straight', 'down', 'wallR', 'curveL', 'checkpoint', 'kicker', 'straight', 'sprint',
+      'finish'] }
 ];
 
 const MEDALS = [
@@ -2715,8 +2727,9 @@ function stepRace(dt, override) {
   }
   if (race.state === 'ready' || race.state === 'running') {
     if (race.state === 'running') race.t += dt;
-    // Dirt sections have less grip than tarmac.
-    let surfaceGrip = CAR.gripRoad;
+    // Dirt sections have less grip than tarmac. A frozen course is slippery
+    // everywhere, so its grip is the default the zones only refine.
+    let surfaceGrip = world.grip || CAR.gripRoad;
     for (const zone of world.triggers) {
       if (zone.type !== 'surface') continue;
       if (insideZone(zone.frame, zone.hw, zone.halfLen, car.p)) surfaceGrip = zone.grip || surfaceGrip;
@@ -3285,7 +3298,7 @@ function refreshMenu() {
     const button = el('button');
     button.type = 'button';
     button.appendChild(el('span', 'no', String(index + 1).padStart(2, '0')));
-    button.appendChild(el('span', '', entry.name + (entry.open ? ' · open' : '')));
+    button.appendChild(el('span', '', entry.name + (entry.open ? ' · open' : '') + (entry.ice ? ' · ice' : '')));
     const dots = el('span', 'med');
     const rank = RANK[storedMedals[entry.id]] || 0;
     ['bronze', 'silver', 'gold'].forEach((medal, slot) => dots.appendChild(el('i', rank >= slot + 1 ? medal : '')));
