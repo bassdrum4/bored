@@ -58,25 +58,40 @@ export const SHINY_ODDS = { shiny: 64, other: 128 };
 export const SP_ODDS = 200;
 
 /* ── SP skins ────────────────────────────────────────────────────────────
-   Hand-drawn skins for a few species, listed in
-   src/games/content/poke-gacha/sp/skins.json as { id, species, name } with
-   the art at sp/<id>.png. The hub loads the list with setSkins(). Shiny UP
-   rolls an SP skin only for a species that has one; the shard shop sells
-   only listed skins. With an empty list there is no SP anywhere. */
+   Hand-drawn skins, listed in src/games/content/poke-gacha/sp/skins.json as
+   { id, name, species, forms? }. A skin belongs to its species' evolution line
+   and is owned per line. `forms` makes it a set: one skin that covers every
+   form listed (Pidgey, Pidgeotto, Pidgeot); without it the skin covers
+   `species` alone. A line can have several skins (Eevee, Espeon, Umbreon).
+   The art for each form is sp/<id>-<species>.png. The hub loads the list
+   with setSkins(). Shiny UP rolls an SP skin for the line it hatches (one it
+   does not own yet, at random if several); the shard shop sells any listed
+   skin for a line you own, by size (SP_PRICES). With an empty list there is
+   no SP anywhere. */
 export const SKIN_DIR = 'games/content/poke-gacha/sp/';
 const SKIN_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
+// Shards for a skin covering 1, 2 or 3 forms.
+export const SP_PRICES = [300, 400, 500];
 let SKINS = [];
+const validSkin = skin => skin && SKIN_ID.test(skin.id) && validNum(skin.species) && typeof skin.name === 'string' && skin.name.trim() &&
+  (skin.forms === undefined || (Array.isArray(skin.forms) && skin.forms.length >= 1 && skin.forms.length <= SP_PRICES.length &&
+    skin.forms.includes(skin.species) && skin.forms.every(num => validNum(num) && lineOf(num) === lineOf(skin.species))));
 export function setSkins(list) {
   const seen = new Set();
-  SKINS = (Array.isArray(list) ? list : []).filter(skin => skin && SKIN_ID.test(skin.id) && !seen.has(skin.id) &&
-    Number.isInteger(skin.species) && skin.species >= 1 && skin.species <= DEX.length && typeof skin.name === 'string' && skin.name.trim() &&
-    seen.add(skin.id)).map(({ id, species, name }) => ({ id, species, name: name.trim().slice(0, 40) }));
+  SKINS = (Array.isArray(list) ? list : []).filter(skin => validSkin(skin) && !seen.has(skin.id) && seen.add(skin.id))
+    .map(({ id, species, name, forms }) => ({ id, species, name: name.trim().slice(0, 40), forms: [...new Set(forms || [species])] }));
   return SKINS.length;
 }
-export const skinList = () => SKINS.slice();
+export const skinList = () => SKINS.map(skin => ({ ...skin, forms: skin.forms.slice() }));
 export const skinById = id => SKINS.find(skin => skin.id === id) || null;
-const skinsOfSpecies = num => SKINS.filter(skin => skin.species === num);
-export const COSTS = { evolve: [25, 100], passive: 50, cost1: 30, cost2: 60, sp: 300 };
+const skinsOfLine = line => SKINS.filter(skin => lineOf(skin.species) === line);
+// Does this skin draw on this species?
+const skinCovers = (id, num) => !!skinById(id)?.forms.includes(num);
+/** The art file for a skin on one of its forms, relative to SKIN_DIR. */
+export const skinFile = (id, num) => id + '-' + num + '.png';
+/** Shards for a skin: 300 for one form, 400 for a two-form set, 500 for three. */
+export const skinPrice = skin => SP_PRICES[Math.min(skin.forms.length, SP_PRICES.length) - 1];
+export const COSTS = { evolve: [25, 100], passive: 50, cost1: 30, cost2: 60, sp: SP_PRICES[0] };
 export const LOGIN = { regular: 3 };
 export const STARTER = { regular: 2 };
 // The first time Poké Gacha opens, the player picks one first-stage starter and
@@ -296,7 +311,7 @@ export function gachaState(wallet, today = dailyDate()) {
     if ((l.look === 'shiny' && !l.shiny) || (l.look !== 'normal' && l.look !== 'shiny' && !l.skins.includes(l.look))) l.look = 'normal';
   }
   if (buddy && !owned.has(buddy.species)) buddy = null;
-  if (buddy && buddy.skin && !(lines[lineOf(buddy.species)]?.skins.includes(buddy.skin) && skinById(buddy.skin).species === buddy.species)) buddy.skin = null;
+  if (buddy && buddy.skin && !(lines[lineOf(buddy.species)]?.skins.includes(buddy.skin) && skinCovers(buddy.skin, buddy.species))) buddy.skin = null;
   return {
     balance, eggs, hatched, owned: [...owned].sort((a, b) => a - b), lines,
     pity: rarityCounters(pulls), dupe, buddy, pulls: pulls.length,
@@ -382,6 +397,7 @@ export function hatchReady(wallet, { today = dailyDate(), now = Date.now(), rand
   const owned = new Set(state.hatched.map(h => h.species));
   if (state.starter) for (const num of [state.starter.species, ...state.starter.gifts]) owned.add(num);
   const dupe = state.dupe.slice();
+  const spOwned = {};
   const pools = eggPools();
   const at = seconds(now);
   const results = [];
@@ -397,9 +413,11 @@ export function hatchReady(wallet, { today = dailyDate(), now = Date.now(), rand
     owned.add(species);
     if (tier < 4) dupe[tier] = fresh ? 0 : dupe[tier] + 1;
     const shiny = rand() < 1 / (machine === 'shiny' ? SHINY_ODDS.shiny : SHINY_ODDS.other);
-    // SP only on Shiny UP, and only for a species that has a skin in the list.
-    const skins = machine === 'shiny' ? skinsOfSpecies(species) : [];
+    // SP only on Shiny UP, for the line it hatched: a skin of that line it does not own yet, at random if several.
+    const line = lineOf(species), have = spOwned[line] ||= new Set(state.lines[line]?.skins || []);
+    const skins = machine === 'shiny' ? skinsOfLine(line).filter(skin => !have.has(skin.id)) : [];
     const sp = skins.length && rand() < 1 / SP_ODDS ? skins[Math.floor(rand() * skins.length)].id : null;
+    if (sp) have.add(sp);
     const rare = rand() < (machine === 'move' ? 2 : 1) / RARE_SKILL[tier];
     const skill = rare ? 3 : Math.floor(rand() * 3);
     const grant = { ['candy:' + lineOf(species)]: HATCH_CANDY[tier] };
@@ -437,7 +455,7 @@ export function upgrade(wallet, line, kind, { today = dailyDate(), now = Date.no
   return result.ok ? { wallet: result.wallet, ok: true } : refuse(wallet, 'candy');
 }
 
-/** The shard shop: a listed SP skin, for a species line you own. */
+/** The shard shop: a listed SP skin, for a species line you own, priced by how many forms it covers. */
 export function buySp(wallet, skinId, { today = dailyDate(), now = Date.now() } = {}) {
   const skin = skinById(skinId);
   if (!skin) return refuse(wallet, 'unknown');
@@ -445,7 +463,7 @@ export function buySp(wallet, skinId, { today = dailyDate(), now = Date.now() } 
   const held = state.lines[lineOf(skin.species)];
   if (!held) return refuse(wallet, 'not-owned');
   if (held.skins.includes(skin.id)) return refuse(wallet, 'owned');
-  const result = spendFrom(wallet, { shards: COSTS.sp }, { id: uuid(), now, x: { sp: skin.id } });
+  const result = spendFrom(wallet, { shards: skinPrice(skin) }, { id: uuid(), now, x: { sp: skin.id } });
   return result.ok ? { wallet: result.wallet, ok: true } : refuse(wallet, 'shards');
 }
 
@@ -454,7 +472,7 @@ export function setBuddy(wallet, species, { shiny = false, skin = null, today = 
   const state = gachaState(wallet, today);
   if (!state.owned.includes(species)) return refuse(wallet, 'not-owned');
   const held = state.lines[lineOf(species)] || {};
-  if ((shiny && !held.shiny) || (skin && !((held.skins || []).includes(skin) && skinById(skin)?.species === species))) return refuse(wallet, 'locked');
+  if ((shiny && !held.shiny) || (skin && !((held.skins || []).includes(skin) && skinCovers(skin, species)))) return refuse(wallet, 'locked');
   const next = mergeWallet(wallet);
   const x = { s: species };
   if (shiny) x.sh = 1;
@@ -482,13 +500,13 @@ export function setLook(wallet, line, look, { today = dailyDate(), now = Date.no
 
 /**
  * The look Bored should draw a species in: 'normal', 'shiny', or an SP skin id.
- * A skin is drawn only on its own species; the rest of the line stays normal.
+ * A skin is drawn only on the forms it covers; the rest of the line stays normal.
  */
 export function lookFor(state, num) {
   const line = state.lines[lineOf(num)];
   if (!line) return 'normal';
   if (line.look === 'normal' || line.look === 'shiny') return line.look;
-  return skinById(line.look)?.species === num ? line.look : 'normal';
+  return skinCovers(line.look, num) ? line.look : 'normal';
 }
 
 /** Three Regulars, once a day. */
@@ -526,7 +544,7 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     upgrade: act((w, o) => upgrade(w, o.line, o.kind, o)),
     setBuddy: act((w, o) => setBuddy(w, o.species, o)),
     buySkin: act((w, o) => buySp(w, o.skin, o)),
-    skins: () => skinList(), looksOf, lookFor: num => lookFor(gachaState(readWallet()), num), skinDir: SKIN_DIR,
+    skins: () => skinList(), looksOf, lookFor: num => lookFor(gachaState(readWallet()), num), skinDir: SKIN_DIR, skinFile, skinPrice,
     setLook: act((w, o) => setLook(w, o.line, o.look, o)),
     claimLogin: act((w, o) => claimLogin(w, o))
   };
@@ -543,7 +561,7 @@ export function storedLooks() {
     try {
       if (!cached || Date.now() - at > 3000) { cached = gachaState(readWallet()); at = Date.now(); }
       const look = validNum(Number(num)) ? lookFor(cached, Number(num)) : 'normal';
-      return look === 'normal' || look === 'shiny' ? look : new URL(SKIN_DIR + look + '.png', location.href).href;
+      return look === 'normal' || look === 'shiny' ? look : new URL(SKIN_DIR + skinFile(look, Number(num)), location.href).href;
     } catch { return 'normal'; }
   };
 }
