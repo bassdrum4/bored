@@ -97,6 +97,11 @@ export const skinFile = (id, num) => id + '-' + num + '.png';
 export const skinPrice = skin => SP_PRICES[Math.min(skin.forms.length, SP_PRICES.length) - 1];
 export const COSTS = { evolve: [25, 100], passive: 50, cost1: 30, cost2: 60, sp: SP_PRICES[0] };
 export const LOGIN = { regular: 3 };
+// A one-time welcome pack for every account, paid with the starter pick. Accounts that picked
+// before it existed get it on their next visit (claimLogin). One fixed ledger id, so a merge of
+// two devices pays it once.
+export const WELCOME = { gold: 1, coins: 1000 };
+export const WELCOME_ID = 'gacha:welcome';
 /* ── The coin shop ─────────────────────────────────────────────────────
    Coins buy candy for a caught line (5 for 200, 50 per line a day), shards (10 for
    500, 50 a week, so a 300-shard skin from coins alone takes about six weeks) and
@@ -470,7 +475,8 @@ export function pickStarter(wallet, species, { now = Date.now() } = {}) {
   if (next.entries['cfg:starter']) return refuse(wallet, 'picked');
   if (!STARTERS.includes(species)) return refuse(wallet, 'unknown');
   next.entries['cfg:starter'] = { at: seconds(now), x: { s: species, c: STARTER_GIFTS.slice() } };
-  return { wallet: next, ok: true, species, gifts: STARTER_GIFTS.slice() };
+  const welcome = grantOnce(next, WELCOME_ID, WELCOME, { now });
+  return { wallet: welcome.wallet, ok: true, species, gifts: STARTER_GIFTS.slice(), welcome: welcome.changed ? { ...WELCOME } : null };
 }
 
 function rollTier(rand, machine, count) {
@@ -665,7 +671,9 @@ export function lookFor(state, num) {
 export function claimLogin(wallet, { today = dailyDate(), now = Date.now() } = {}) {
   if (!mergeWallet(wallet).entries.on) return refuse(wallet, 'inactive');
   const result = grantOnce(wallet, 'gacha:login:' + today, LOGIN, { now });
-  return { wallet: result.wallet, ok: result.changed };
+  // An account that picked its starter before the welcome pack existed gets it once, here.
+  const welcome = result.wallet.entries['cfg:starter'] ? grantOnce(result.wallet, WELCOME_ID, WELCOME, { now }) : { wallet: result.wallet, changed: false };
+  return { wallet: welcome.wallet, ok: result.changed || welcome.changed, login: result.changed, welcome: welcome.changed ? { ...WELCOME } : null };
 }
 
 /* ── The bridge Poké Gacha's page calls through `parent.__boredGacha` ───── */

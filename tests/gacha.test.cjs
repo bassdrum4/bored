@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 const gacha = moduleUnderTest('src/hub/gacha.js', [
   'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin', 'candyOffer',
   'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf', 'buyCandy', 'buyShards', 'buyPreset', 'COIN_SHOP', 'skinFile', 'skinPrice', 'SP_PRICES',
-  'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES', 'claimCutRefund', 'isCut', 'CUT_REFUND', 'CUT_CANDY'
+  'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES', 'WELCOME', 'WELCOME_ID', 'claimCutRefund', 'isCut', 'CUT_REFUND', 'CUT_CANDY'
 ], { ...daily, ...rewards, DEX, DEX_TYPES, DEX_LEGACY });
 const { mergeWallet, walletBalance, activateWallet, grantOnce } = rewards;
 const { gachaState, pullEggs, hatchReady, evolve, upgrade, buySp, setBuddy, claimLogin, eggPools, bannerFor } = gacha;
@@ -249,6 +249,35 @@ test('the first ten eggs hatch at once, and later eggs count down on waves earne
   assert.equal(hatched.hatched.length, 1);
   assert.equal(gachaState(hatched.wallet, TODAY).eggs.length, 0);
   assert.equal(hatchReady(hatched.wallet, opts()).hatched.length, 0, 'an egg hatches once');
+});
+
+test('the welcome pack: 1 Gold and 1000 coins with the starter pick, once per account, and once for accounts that picked before it', () => {
+  const { pickStarter, WELCOME, WELCOME_ID } = gacha;
+  const named = name => DEX.findIndex(row => row[0] === name) + 1;
+  assert.deepEqual(WELCOME, { gold: 1, coins: 1000 });
+  // A new account: the pick pays it, and says so.
+  const picked = pickStarter(fresh({}), named('Charmander'), opts());
+  assert.deepEqual(picked.welcome, WELCOME);
+  assert.deepEqual([walletBalance(picked.wallet).gold, walletBalance(picked.wallet).coins], [1, 1000]);
+  // The daily login does not pay it again.
+  const later = claimLogin(picked.wallet, opts());
+  assert.equal(later.welcome, null);
+  assert.equal(walletBalance(later.wallet).gold, 1);
+  // An account that picked before the pack existed: its next visit pays it, once.
+  let old = pickStarter(fresh({}), named('Squirtle'), opts()).wallet;
+  delete old.entries[WELCOME_ID];
+  assert.equal(walletBalance(old).gold, 0);
+  const first = claimLogin(old, opts());
+  assert.deepEqual(first.welcome, WELCOME);
+  assert.equal(first.login, true);
+  const again = claimLogin(first.wallet, opts());
+  assert.equal(again.welcome, null, 'once');
+  assert.equal(walletBalance(again.wallet).gold, 1);
+  // No starter yet: nothing until the pick.
+  assert.equal(claimLogin(fresh({}), opts()).welcome, null);
+  // Two devices that each got it: the merge pays once.
+  const a = pickStarter(fresh({}), named('Charmander'), opts()).wallet, b = pickStarter(fresh({}), named('Charmander'), opts()).wallet;
+  assert.equal(walletBalance(mergeWallet(a, b)).coins, 1000);
 });
 
 test('the starter pick: one first-stage starter plus three gifted commons, once per account', () => {
