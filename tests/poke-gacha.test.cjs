@@ -139,7 +139,7 @@ const apart = (a, b) => a.r <= b.l + 0.5 || b.r <= a.l + 0.5 || a.b <= b.t + 0.5
 test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1-1 clear pays and unlocks 1-2', async t => {
   const { tab, game, errors } = await openWithMons(t);
   const tabs = await game.$$eval('#tabs [data-tab]', nodes => nodes.map(n => n.dataset.tab));
-  assert.deepEqual(tabs, ['story', 'pull', 'eggs', 'dex', 'shop', 'quests'], 'Story is the first of six tabs');
+  assert.deepEqual(tabs, ['story', 'pull', 'eggs', 'dex', 'shop', 'quests', 'card'], 'Story is the first of seven tabs');
   // The tab bar and the purse fit on one line inside the frame.
   const bar = await rect(game, '#tabs'), purse = await rect(game, '#tabs .purse'), last = await rect(game, '#tabs [data-tab="quests"]');
   assert.ok(purse.r <= bar.r + 0.5 && last.r <= purse.l, 'six tabs and the purse fit');
@@ -950,6 +950,40 @@ test('weekly challenge: risks stack, the run uses them, and a win scores the ris
 });
 
 /* ── The hatch: the owner's egg-hatch frames ───────────────────────────── */
+test('trainer card: buddy with its look, Dex %, chapters, stars, trophies, weekly risk, boss; the tab bar still fits', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '7');
+  assert.equal(await game.evaluate(() => tab), 'card', 'the seventh tab, on key 7');
+  const stat = id => game.evaluate(i => cardStats().find(x => x.id === i), id);
+  const dex = await stat('dex');
+  assert.equal(dex.value, await game.evaluate(() => BASES.filter(n => S.lines[n]).length));
+  assert.equal(dex.of, await game.evaluate(() => BASES.length));
+  assert.equal((await stat('chapters')).value, 0);
+  // Clear chapter 1 with 2 stars each: one chapter, its stars counted.
+  await game.evaluate(() => { for (const st of T.chapters[0].stages) T.finish({ stage: st.id, stars: 2, team: [S.owned[0]], waves: 1 }); refreshTop(); cardUpdate(); });
+  assert.equal((await stat('chapters')).value, 1);
+  assert.equal((await stat('stars')).value, await game.evaluate(() => T.chapters[0].stages.length * 2));
+  assert.equal((await stat('trophies')).value, await game.evaluate(() => G.trophies().length));
+  assert.equal((await stat('risk')).value, await game.evaluate(() => Number(T.state().challengeBest) || 0));
+  assert.match((await stat('boss')).label, /Daily boss/);
+  // No buddy, then a buddy: its name and look on the card.
+  assert.match(await game.$eval('#card-buddy', n => n.textContent), /No buddy yet/);
+  await game.evaluate(() => { G.setBuddy({ species: S.owned[0] }); refreshTop(); cardUpdate(); });
+  assert.match(await game.$eval('#card-buddy', n => n.textContent), new RegExp(await game.evaluate(() => name(S.owned[0]))));
+  assert.equal(await game.$eval('#card-buddy .cell img', n => !!n.src), true);
+  // Every row shows; nothing on the card or the tab bar leaves the frame, even with both dots and big balances.
+  assert.equal(await game.$$eval('#card-stats .stat', n => n.length), await game.evaluate(() => cardStats().length));
+  await game.evaluate(() => { for (const t of ['eggs', 'quests']) { const p = document.querySelector('#tabs [data-tab="' + t + '"]'); if (!p.querySelector('.alert')) { const d = mapCanvas('dot', { k: C.ink, 1: C.red }); d.classList.add('alert'); p.append(d); } } });
+  const spill = await game.evaluate(() => { const f = $('#frame').getBoundingClientRect(); return [...document.querySelectorAll('#scr-card *, #tabs *')].filter(n => { const b = n.getBoundingClientRect(); return b.width && (b.right > f.right + 1 || b.bottom > f.bottom + 1); }).map(n => n.id || n.className); });
+  assert.deepEqual(spill, []);
+  const rows = await game.evaluate(() => [...new Set([...document.querySelectorAll('#tabs > .panel')].map(n => Math.round(n.getBoundingClientRect().top)))].length);
+  assert.equal(rows, 1, 'the tabs stay on one line');
+  // Enter goes to the Dex, where the buddy is set.
+  await key(tab, 'Enter');
+  assert.equal(await game.evaluate(() => tab), 'dex');
+  assert.deepEqual(errors, []);
+});
+
 test('multi-pull reveal: every egg on one board, in order; Epic and up framed and flashed; NEW on first tiers; Enter finishes then closes', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.evaluate(() => {

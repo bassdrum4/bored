@@ -68,14 +68,15 @@ canvas, img { image-rendering: pixelated; display: block }
 .unseen { filter: brightness(0) }
 [hidden] { display: none !important }
 
-#tabs { position: absolute; left: 8px; right: 8px; top: 4px; height: 32px; display: flex; gap: 6px }
-#tabs .panel { position: static; height: 32px; padding: 4px 9px; cursor: pointer }
+#tabs { position: absolute; left: 8px; right: 8px; top: 4px; height: 32px; display: flex; gap: 4px }
+/* Seven tabs, their dots and the purse on one line: tabs never wrap or shrink. */
+#tabs .panel { position: static; height: 32px; padding: 4px 7px; cursor: pointer; white-space: nowrap; flex-shrink: 0 }
 #tabs .panel.on { background: var(--red) }
 #tabs .purse { margin-left: auto; display: flex; align-items: center; gap: 8px; cursor: default }
 #tabs .help { cursor: pointer; padding: 4px 7px; display: flex; align-items: center; gap: 7px }
 #tabs .help .speaker { cursor: pointer }
 /* The fallback font is wider: tighter tabs keep a five-digit purse on the bar. */
-#frame.no-pixel #tabs .panel { padding: 4px 6px }
+#frame.no-pixel #tabs .panel { padding: 4px 4px; font: 600 14px/22px Arial, Helvetica, sans-serif }
 #frame.no-pixel #tabs { gap: 4px }
 /* The tutorial: the whole frame dims except one gold-framed box, and its words sit
    in a message box (at the bottom, or the top when the box is down there). Clicks
@@ -201,6 +202,14 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Quests: four sub-tabs with their reset clocks, then one list. A row is the mission (it
    wraps, never cut), its progress (n/m over a bar) and its reward in real icons. Done rows
    sink to the bottom, dimmed, with a check. Trophies come in groups, one per game. */
+/* Trainer card: the buddy on the left, the numbers on the right. Display only. */
+#card-buddy { left: 8px; top: 8px; width: 232px; height: 264px; display: flex; flex-direction: column; align-items: center }
+#card-buddy .title { align-self: flex-start }
+#card-buddy .cell { width: 96px; height: 96px; background: var(--ink); display: grid; place-items: center; margin: 4px 0 8px }
+#card-buddy > div:not(.title):not(.cell) { text-align: center; white-space: normal }
+#card-stats { left: 248px; top: 8px; width: 384px; height: 264px }
+#card-stats .stat { display: flex; justify-content: space-between; align-items: center; height: 28px; border-bottom: 1px solid var(--ink) }
+#card-stats .stat:last-child { border-bottom: 0 }
 #quest-tabs { left: 8px; top: 8px; width: 624px; height: 36px; padding: 2px 8px; display: flex; gap: 8px; align-items: center }
 #quest-tabs > span { padding: 0 8px; border: 1px solid var(--dim); line-height: 26px; cursor: pointer; white-space: nowrap }
 #quest-tabs > span.on { border-color: var(--gold); color: var(--gold) }
@@ -400,6 +409,10 @@ canvas, img { image-rendering: pixelated; display: block }
       <section id="scr-quests" class="screen" hidden>
         <div class="panel" id="quest-tabs"></div>
         <div class="panel" id="quest-box"><div class="scroll" id="quest-list"></div></div>
+      </section>
+      <section id="scr-card" class="screen" hidden>
+        <div class="panel" id="card-buddy"></div>
+        <div class="panel" id="card-stats"></div>
       </section>
       <section id="scr-starter" class="screen" hidden>
         <div class="panel" id="starter-list"><div class="title" id="starter-title">STARTER</div><div class="rows scroll" id="starter-rows"></div></div>
@@ -1641,6 +1654,51 @@ function questsKey(e) {
 }
 // The reset clocks tick while Quests is open.
 setInterval(() => { if (tab === "quests" && !hatching && !battle && !picking && $("#scr-quests") && !$("#scr-quests").hidden) questsUpdate(); }, 30000);
+
+/* ── Trainer card: display only, from what the page already reads ──────── */
+// Every number, flat (the tests read it): label, value, and an optional "of" and note.
+function cardStats() {
+  const owned = BASES.filter(n => S.lines[n]).length;
+  const out = [{ id: "dex", label: "Dex", value: owned, of: BASES.length, note: Math.floor(100 * owned / Math.max(1, BASES.length)) + "%" }];
+  if (T) {
+    const td = T.state(), best = td.best || {}, all = T.allStages || T.stages, chapters = T.chapters || [{ stages: T.stages }];
+    out.push({ id: "chapters", label: "Chapters cleared", value: chapters.filter(c => c.stages.every(st => (best[st.id] || 0) > 0)).length, of: chapters.length });
+    out.push({ id: "stars", label: "Stage stars", value: all.reduce((n, st) => n + (best[st.id] || 0), 0), of: all.length * 3 });
+    out.push({ id: "risk", label: "Weekly best risk", value: Number(td.challengeBest) || 0, note: "this week" });
+  }
+  let trophies = 0, trophyTotal = 0;
+  try { trophies = G.trophies().length; trophyTotal = G.trophyList ? G.trophyList().length : 0; } catch {}
+  out.push({ id: "trophies", label: "Trophies", value: trophies, of: trophyTotal || undefined });
+  // The Poké Idle daily boss: the weekday streak when the hub reports one (G.bossStreak); otherwise
+  // this week's wins, which the weekly mission already counts; "not out yet" while the boss is locked.
+  const boss = T && T.state().weekly.find(m => m.id === "boss5");
+  const streak = typeof G.bossStreak === "function" ? Number(G.bossStreak()) || 0 : null;
+  out.push(streak !== null ? { id: "boss", label: "Daily boss streak", value: streak, note: "weekdays" }
+    : !boss || boss.later ? { id: "boss", label: "Daily boss", value: null, note: "not out yet" }
+    : { id: "boss", label: "Daily boss wins", value: boss.have ?? (boss.done ? boss.need ?? 5 : 0), note: "this week" });
+  out.push({ id: "hatched", label: "Eggs hatched", value: (S.hatched || []).length });
+  return out;
+}
+function cardUpdate() {
+  const box = $("#card-buddy"), b = S.buddy;
+  const look = b ? (b.skin || (b.shiny ? "shiny" : "normal")) : "normal";
+  const pic = el("div", "cell");
+  if (b) pic.append(sprite(b.species, look)); else pic.append(el("div", "dim", "?"));
+  box.replaceChildren(el("div", "title", "TRAINER"), pic,
+    el("div", "", b ? name(b.species) : "No buddy yet"),
+    el("div", b && look !== "normal" ? "gold" : "dim", b ? (look === "normal" ? "Buddy" : lookName(look)) : "Pick one in the Dex"));
+  const rows = cardStats().map(st => {
+    const r = el("div", "stat"), v = el("span");
+    if (st.value === null) v.append(el("span", "dim", st.note));
+    else { v.append(el("span", "num", st.value)); if (st.of) v.append(el("span", "dim", " / " + st.of)); if (st.note) v.append(el("span", "dim", " · " + st.note)); }
+    r.dataset.stat = st.id; r.append(el("span", "", st.label), v); return r;
+  });
+  $("#card-stats").replaceChildren(el("div", "title", "CARD"), ...rows);
+  say(b ? "Your buddy shows next to your name on Bored. Change it in the Dex: Enter on a line, then Make buddy."
+    : "Set a buddy in the Dex (Enter on a line, then Make buddy) to show it here and next to your name.");
+}
+// Enter: to the Dex, where the buddy is set.
+function cardKey(e) { if (e.key === "Enter") { e.preventDefault(); go("dex"); } }
 
 /* ── Story: chapter 1, the squad, and battles ──────────────────────────────
    Story lists the stages; Enter picks one and opens the squad; Start runs the
@@ -2992,10 +3050,10 @@ function foeTips(e) {
 }
 
 /* ── Frame, tabs and switching screens ─────────────────────────────────── */
-const TABS = [["story", "Story"], ["pull", "Pull"], ["eggs", "Eggs"], ["dex", "Dex"], ["shop", "Shop"], ["quests", "Quests"]];
+const TABS = [["story", "Story"], ["pull", "Pull"], ["eggs", "Eggs"], ["dex", "Dex"], ["shop", "Shop"], ["quests", "Quests"], ["card", "Card"]];
 // The tabs shown: Story only once the hub has the tower defense engine.
 const shownTabs = () => TABS.filter(([id]) => id !== "story" || T);
-const SCREENS = { story: [storyUpdate, storyKey], pull: [updateScene, pullKey], eggs: [eggsUpdate, eggsKey], dex: [dexUpdate, dexKey], shop: [shopUpdate, shopKey], quests: [questsUpdate, questsKey] };
+const SCREENS = { story: [storyUpdate, storyKey], pull: [updateScene, pullKey], eggs: [eggsUpdate, eggsKey], dex: [dexUpdate, dexKey], shop: [shopUpdate, shopKey], quests: [questsUpdate, questsKey], card: [cardUpdate, cardKey] };
 function refreshTop() {
   S = G.state();
   const ready = S.eggs.filter(e => e.ready).length;
