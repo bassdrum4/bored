@@ -1115,11 +1115,20 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   if (!hub) return t.skip('the hub has no starter pick yet');
   await game.waitForFunction(() => !document.querySelector('#scr-starter').hidden);
   await key(tab, 'Enter'); await key(tab, 'Enter');
-  // The loop, in three boxes, read with Enter.
+  // The loop, in six boxes, each framing something on screen, read with Enter.
   await game.waitForFunction(() => tutor && tutor.id === 'loop');
-  for (let i = 0; i < 3; i++) { assert.equal((await tutorUp(game)).id, 'loop'); await key(tab, 'Enter'); }
+  for (let i = 0; i < 6; i++) {
+    assert.equal((await tutorUp(game)).id, 'loop');
+    assert.ok(await game.evaluate(() => !!tutorStep().at()), 'loop box ' + i + ' frames its target');
+    await key(tab, 'Enter');
+  }
+  // Then it hands over to the Pull tab and its three boxes.
+  await game.waitForFunction(() => tutor && tutor.id === 'pull');
+  assert.equal(await game.evaluate(() => tab), 'pull');
+  for (let i = 0; i < 3; i++) { assert.equal((await tutorUp(game)).id, 'pull'); await key(tab, 'Enter'); }
   assert.equal(await tutorUp(game), false);
   // Squad: its two boxes on the first visit.
+  await game.evaluate(() => go('story'));
   await key(tab, 'Enter');
   await game.waitForFunction(() => tutor && tutor.id === 'squad');
   await key(tab, 'Enter'); await key(tab, 'Enter');
@@ -1160,7 +1169,8 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   await game.waitForFunction(() => battle.done, { timeout: 5000 });
   for (let i = 0; i < 6 && await game.evaluate(() => battle && battle.talk.length); i++) await key(tab, 'Enter');
   await key(tab, 'Enter');
-  for (const [k, id, n] of [['2', 'pull', 3], ['3', 'eggs', 1], ['4', 'dex', 2], ['6', 'quests', 1]]) {
+  // Pull's tips were read in the hand-over after the loop.
+  for (const [k, id, n] of [['3', 'eggs', 1], ['4', 'dex', 2], ['6', 'quests', 1]]) {
     await key(tab, k);
     await game.waitForFunction(i => tutor && tutor.id === i, {}, id);
     for (let i = 0; i < n; i++) await key(tab, 'Enter');
@@ -1304,5 +1314,75 @@ test('Pull shows each machine\'s rates and my pity; Eggs and Quests get a dot wh
   assert.equal(await game.$$eval('#tabs [data-tab="quests"] .alert', n => n.length), 1);
   await key(tab, '6');
   assert.equal(await game.$$eval('#tabs [data-tab="quests"] .alert', n => n.length), 0);
+  assert.deepEqual(errors, []);
+});
+
+test('new player: Skip (clicked) ends the tutorial at every step of every tip, and the loop hands over to Pull only when read', async t => {
+  const { tab, game, errors, hub } = await freshGame(t);
+  if (!hub) return t.skip('the hub has no starter pick yet');
+  await game.waitForFunction(() => !document.querySelector('#scr-starter').hidden);
+  await key(tab, 'Enter'); await key(tab, 'Enter');
+  await game.waitForFunction(() => tutor && tutor.id === 'loop');
+  const skipAt = async (open, i) => {
+    await game.evaluate(() => { tipsSeen._skip = false; });
+    await game.evaluate(open);
+    await game.evaluate(i => { for (let k = 0; k < i; k++) tutorNext(); }, i);
+    const before = await game.evaluate(() => ({ id: tutor && tutor.id, i: tutor && tutor.i, tab }));
+    await (await game.$('#tutor-box [data-skip]')).click();
+    const after = await game.evaluate(() => ({ up: !!tutor, hidden: document.querySelector('#tutor').hidden, skip: tipsSeen._skip, tab, paused: battle ? battle.paused : null }));
+    return { before, after };
+  };
+  // The loop: every box, and a Skip stays on Story (no hand-over).
+  for (let i = 0; i < 6; i++) {
+    const r = await skipAt(() => { go('story'); tip('loop', TIPS.loop(), { force: true, after: () => go('pull') }); }, i);
+    assert.deepEqual([r.before.id, r.before.i], ['loop', i]);
+    assert.deepEqual([r.after.up, r.after.hidden, r.after.skip, r.after.tab], [false, true, true, 'story'], 'loop box ' + i);
+  }
+  // Each screen's tips.
+  for (const id of ['pull', 'eggs', 'dex', 'shop', 'quests']) {
+    const n = await game.evaluate(id => TIPS[id]().length, id);
+    for (let i = 0; i < n; i++) {
+      const r = await skipAt(new Function(`go(${JSON.stringify(id)}); if (tutor) tutorEnd(false); tip(${JSON.stringify(id)}, TIPS[${JSON.stringify(id)}](), { force: true });`), i);
+      assert.equal(r.before.id, id);
+      assert.deepEqual([r.after.up, r.after.skip], [false, true], id + ' box ' + i);
+    }
+  }
+  // Squad: a click on Start (the mouse works on the Squad screen) opens 1-1.
+  await game.evaluate(() => { go('story'); chapterAt = 0; storyMode = 'stages'; storyAt = 0; storyUpdate(); pickStage(); });
+  assert.deepEqual(await game.evaluate(() => squadPick().length), 4, 'the starter and its gifts');
+  await (await game.$('#squad [data-start]')).click();
+  await game.waitForFunction(() => battle && !document.querySelector('#scr-battle').hidden);
+  await game.evaluate(() => { battle.talk = []; battleTalk(); });
+  // The guided 1-1: Skip at each of its steps; the battle plays on after.
+  const steps = await game.evaluate(() => { delete tipsSeen['battle-1-1']; tipsSeen._skip = false; battleTips(); const n = tutor.steps.length; tutorEnd(false); return n; });
+  assert.ok(steps >= 4, 'the guided 1-1 has its steps');
+  for (let i = 0; i < steps; i++) {
+    const r = await skipAt(() => { battleTips(); }, i);
+    assert.deepEqual([r.before.id, r.before.i], ['battle-1-1', i]);
+    assert.deepEqual([r.after.up, r.after.skip, r.after.paused], [false, true, false], 'battle step ' + i + ' skipped, the battle runs');
+  }
+  // After a first clear the cursor moves to 1-2.
+  await game.evaluate(() => { battle.b.queue = []; battle.b.enemies = []; });
+  await game.waitForFunction(() => battle.done, { timeout: 10000 });
+  await game.evaluate(() => { battle.talk = []; battleTalk(); showResult(); leaveBattle(); });
+  assert.equal(await game.evaluate(() => stagesNow()[storyAt].id), '1-2', 'the cursor moves on to the stage the clear opened');
+  assert.deepEqual(errors, []);
+});
+
+test('new player: a pull says the free egg is ready on Eggs, a hatch fills empty squad slots, the empty tray points to 1-1', async t => {
+  const { tab, game, errors, hub } = await freshGame(t);
+  if (!hub) return t.skip('the hub has no starter pick yet');
+  await game.waitForFunction(() => !document.querySelector('#scr-starter').hidden);
+  await key(tab, 'Enter'); await key(tab, 'Enter');
+  await game.evaluate(() => tutorSkipAll());
+  await game.evaluate(() => { go('pull'); menuOpen = true; cursor = OPTIONS.findIndex(o => o.voucher === 'regular' && o.count === 1); choose(cursor); });
+  assert.match(await game.$eval('#msg', n => n.textContent), /^1 egg, ready to hatch on Eggs:/);
+  const before = await game.evaluate(() => squadPick().length);
+  await game.evaluate(() => { go('eggs'); startHatch(); });
+  const grown = await game.evaluate(() => squadPick().length);
+  const fresh = await game.evaluate(() => hatching.list.filter(h => h.fresh).length);
+  assert.equal(grown, Math.min(8, before + fresh), 'a new line joins the squad');
+  await game.evaluate(() => { while (hatching) endHatch(); eggsUpdate(); });
+  assert.match(await game.$eval('#msg', n => n.textContent), /Next: play 1-1/);
   assert.deepEqual(errors, []);
 });
