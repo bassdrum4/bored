@@ -557,6 +557,10 @@ export function starsFor(b) {
 
 export const FIRST_CLEAR = { coins: 50, regular: 2 };
 export const FIRST_STAR3 = { coins: 100, plus: 1 };
+// After a stage's first clear, each later clear pays a little, up to a daily cap, so battles
+// still pay once the story is done. Ids td:rep:<day>:<0-9>; a merge can only drop one, never add.
+export const REPEAT_CLEAR = { coins: 15 }, REPEAT_PER_DAY = 10;
+const repeatsOn = (entries, today) => Object.keys(entries).filter(id => id.startsWith('td:rep:' + today + ':')).length;
 export const ADMIN_CLEAR = { gold: 1 };
 export const DAILY_REWARD = { coins: 50, waves: 5 };
 export const DAILY_ALL = { plus: 1 };
@@ -670,6 +674,8 @@ export function tdState(wallet, today = dailyDate()) {
     unlockedById: Object.fromEntries(STAGES.map((s, i) => [s.id, i === 0 || (best[STAGES[i - 1].id] || 0) > 0])),
     daily: dailyMissions(today).map(m => ({ ...m, done: !!e['td:daily:' + today + ':' + m.id] })),
     dailyAll: !!e['td:daily:' + today + ':all'],
+    // Repeat clears paid today, of REPEAT_PER_DAY.
+    repeatToday: repeatsOn(e, today), repeatMax: REPEAT_PER_DAY, repeatPay: REPEAT_CLEAR.coins,
     // have/need: how far each weekly mission is (a claimed one shows full).
     weekly: WEEKLY.map(m => {
       const done = !!e['td:week:' + monday + ':' + m.id], [have, need] = weeklyCount(m.id, e, list, monday);
@@ -701,6 +707,13 @@ export function tdFinish(wallet, { stage, stars, team = [], waves = 0 } = {}, { 
   let next = mergeWallet(wallet);
   next.entries['td:run:' + uuid()] = { at: seconds(now), ...(cleared ? { g: { waves: cleared } } : {}), x: { st: s.id, s: stars, tm: deployed, d: today } };
   const before = Object.keys(next.entries).length;
+  // A repeat clear: the stage was already cleared before this run.
+  if (stars > 0 && next.entries['td:first:' + s.id]) {
+    for (let i = 0; i < REPEAT_PER_DAY; i++) {
+      const id = 'td:rep:' + today + ':' + i;
+      if (!next.entries[id]) { next = grantOnce(next, id, REPEAT_CLEAR, { now }).wallet; break; }
+    }
+  }
   if (stars > 0) {
     next = grantOnce(next, 'td:first:' + s.id, FIRST_CLEAR, { now }).wallet;
     if (s.admin) next = grantOnce(next, 'td:admin:' + s.id, ADMIN_CLEAR, { now }).wallet;

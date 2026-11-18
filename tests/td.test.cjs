@@ -280,7 +280,8 @@ test('finishing pays waves every time, and first clear and first 3-star once', (
   const again = td.tdFinish(first.wallet, { stage: '1-1', stars: 3, team, waves: 2 }, opts());
   const b2 = walletBalance(again.wallet);
   assert.equal(b2.waves - b.waves, 2, 'replays still pay waves');
-  assert.equal(b2.coins, b.coins, 'but no second first-clear');
+  assert.equal(b2.coins - b.coins, 15, 'no second first-clear: only the repeat-clear coins');
+  assert.equal(b2.plus, b.plus, 'and no second first 3-star');
   assert.equal(td.tdFinish(w, { stage: '9-9', stars: 3, team }, opts()).ok, false);
   const lost = td.tdFinish(w, { stage: '1-2', stars: 0, team, waves: 1 }, opts());
   assert.equal(walletBalance(lost.wallet).coins, 0, 'a loss pays only the waves cleared');
@@ -508,6 +509,27 @@ test('every starter with its three gifts clears 1-1 at level 1, deployed blocker
     const b = playInOrder(stage, squad, plan);
     assert.equal(b.over, 'win', gacha.mon(starter).name + ' and the gifts win 1-1');
   }
+});
+
+test('repeat clears pay 15 coins each, ten a day; a first clear and a loss do not count', () => {
+  const num = named('Machamp');
+  let w = owning([num]);
+  const coins = wallet => walletBalance(wallet).coins;
+  const clear = (wallet, extra = {}) => td.tdFinish(wallet, { stage: '1-1', stars: 1, team: [num], waves: 2, ...extra }, opts()).wallet;
+  w = clear(w);
+  const afterFirst = coins(w);
+  assert.equal(td.tdState(w, TODAY).repeatToday, 0, 'the first clear is not a repeat');
+  w = clear(w, { stars: 0 });
+  assert.equal(coins(w), afterFirst, 'a loss pays no coins');
+  for (let i = 0; i < 12; i++) w = clear(w);
+  // Daily missions may also pay coins: count only the repeat grants.
+  const repeats = Object.entries(w.entries).filter(([id]) => id.startsWith('td:rep:' + TODAY + ':'));
+  assert.equal(repeats.length, 10, 'ten a day');
+  assert.ok(repeats.every(([, e]) => e.g.coins === 15));
+  assert.deepEqual([td.tdState(w, TODAY).repeatToday, td.tdState(w, TODAY).repeatMax], [10, 10]);
+  // A new day starts over.
+  const next = td.tdFinish(w, { stage: '1-1', stars: 1, team: [num], waves: 2 }, { today: '2026-11-17', now: later() }).wallet;
+  assert.ok(next.entries['td:rep:2026-11-17:0']);
 });
 
 test('level caps rise with evolution: 5 for a base form, 8 for a middle one, 10 once a final form is owned', () => {
