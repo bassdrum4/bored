@@ -86,7 +86,11 @@ function ringLayout(count) {
   bottom = Math.max(top + 140, bottom);
   const cy = Math.round((top + bottom) / 2);
   const ry = Math.max(40, (bottom - top) / 2 - 70);
-  const rx = Math.min(w * (count > 6 ? .34 : .31), 340);
+  // Perches sit as far out as the water allows: the ring is capped by the
+  // viewport edge minus half a seat rather than a flat 340px, so a krill never
+  // crowds the puffer in the middle.
+  const halfSeat = w < 760 ? 52 : 68;
+  const rx = Math.min(w * (count > 6 ? .42 : .40), 430, w / 2 - halfSeat);
   const scale = w < 760 ? .72 : w < 1100 ? .86 : 1;
   const points = [];
   for (let i = 0; i < count; i++) {
@@ -331,9 +335,11 @@ function paintPrompt(view) {
 }
 
 function paintTurn(view) {
-  const mine = view.status === 'playing' && view.turnPlayer;
+  const playing = view.status === 'playing';
+  const mine = playing && !!view.turnPlayer;
+  const watching = playing && !!view.me?.out;
   const line = $('turn-line');
-  if (view.status !== 'playing') {
+  if (!playing) {
     line.textContent = '';
   } else if (view.freeze) {
     line.innerHTML = '<b>POP!</b> a fresh fuse';
@@ -342,10 +348,16 @@ function paintTurn(view) {
   } else {
     line.innerHTML = `${esc(view.turn?.name || 'someone')} holds the puffer`;
   }
-  line.classList.toggle('mine', !!mine);
-  $('answer').disabled = !mine;
+  line.classList.toggle('mine', mine);
+  // Typing is always open: a draft waits in the field until the puffer is
+  // yours, so nobody types an answer after the fuse has already gone off.
+  const input = $('answer');
+  input.disabled = !playing || watching;
   $('submit-btn').disabled = !mine || state.busy;
-  $('answer').placeholder = mine ? 'type one answer…' : 'wait for the puffer…';
+  input.placeholder = !playing ? 'wait for the puffer…'
+    : watching ? 'you are watching this one'
+      : mine ? 'type one answer…'
+        : 'type ahead — the puffer is still out there';
 }
 
 function paintClock() {
@@ -642,12 +654,16 @@ $('answer-form').addEventListener('submit', async event => {
   const input = $('answer');
   const answer = input.value.trim();
   if (!answer || state.busy) return;
+  if (!state.view?.turnPlayer) { status('Not your turn yet — your answer is held.'); return; }
   state.busy = true;
   $('submit-btn').disabled = true;
   try {
     const view = await api('party/answer', { code: state.code, answer });
     input.value = '';
     paint(view);
+    // The room only hears about an answer over the wire, so tell it now
+    // instead of leaving everyone to wait for their next poll.
+    state.live?.broadcast?.(view.revision);
     status('');
   } catch (error) {
     status(error.message, 'bad');

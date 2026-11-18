@@ -191,8 +191,18 @@ function etDate(now = Date.now()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(now));
 }
 
+// A live room is read more than once a second per diver, so the day's book and
+// the room's ratings stay in the isolate instead of costing a database round
+// trip on every poll and every answer. Both are re-read when they can change:
+// the book after its TTL, the ratings whenever applyRatings writes them.
+let bookCache: { date: string; at: number; book: Book } | null = null;
+const BOOK_TTL = 5 * 60_000;
+const ratingsCache = new Map<string, { at: number; rows: Map<string, { rating: number; games: number }> }>();
+const RATINGS_TTL = 4_000;
+
 async function loadBook(): Promise<Book> {
   const date = etDate();
+  if (bookCache && bookCache.date === date && Date.now() - bookCache.at < BOOK_TTL) return bookCache.book;
   let response = await sb('krillion_books?date=eq.' + encodeURIComponent(date) + '&select=book&limit=1');
   let rows = response.ok ? await response.json() : [];
   if (!rows?.[0]?.book) {
@@ -202,6 +212,9 @@ async function loadBook(): Promise<Book> {
   const value = rows?.[0]?.book;
   const book = typeof value === 'string' ? JSON.parse(value) : value;
   if (!book?.prompts?.length || book.prompts.length !== ROUNDS) throw new HttpError('Puffer Party is between dives. Try again shortly.', 503);
+  // A book borrowed from an earlier day is not today's book, so it is never
+  // cached under today's date.
+  bookCache = { date: String(book.date || date), at: Date.now(), book };
   return book;
 }
 
@@ -334,18 +347,29 @@ async function ratingFor(token: string) {
 
 // The seat plate shows every diver's rating, so one query covers the room.
 async function ratingsFor(tokens: string[]) {
-  const unique = [...new Set(tokens.filter(token => /^[A-Za-z0-9_-]{8,80}$/.test(token || '')))];
+  const unique = [...new Set(tokens.filter(token => /^[A-Za-z0-9_-]{8,80}$/.test(token || '')))].sort();
+  const key = unique.join(',');
+  const hit = ratingsCache.get(key);
+  if (hit && Date.now() - hit.at < RATINGS_TTL) return hit.rows;
   const map = new Map<string, { rating: number; games: number }>();
   if (!unique.length) return map;
   const response = await sb('party_ratings?token=in.(' + unique.join(',') + ')&select=token,rating,games');
   const rows: any[] = response.ok ? await response.json() : [];
   for (const row of rows) map.set(row.token, { rating: Number(row.rating) || RATING_START, games: Number(row.games) || 0 });
+  // A failed read is not cached: a second of stale ratings is fine, a made-up
+  // 1200 for everyone is not.
+  if (response.ok) {
+    if (ratingsCache.size > 64) ratingsCache.clear();
+    ratingsCache.set(key, { at: Date.now(), rows: map });
+  }
   return map;
 }
 
 async function applyRatings(state: PartyState) {
   if (!state.rated || !state.winner || state.ratedApplied) return;
-  const values = await Promise.all(state.players.map(async player => ({ player, row: await ratingFor(player.token) })));
+  // One read for the whole room instead of one per diver.
+  const ratings = await ratingsFor(state.players.map(player => player.token));
+  const values = state.players.map(player => ({ player, row: ratings.get(player.token) ?? { rating: RATING_START, games: 0 } }));
   const mean = values.reduce((total, entry) => total + Number(entry.row.rating), 0) / Math.max(1, values.length);
   const now = new Date().toISOString();
   for (const { player, row } of values) {
@@ -362,6 +386,7 @@ async function applyRatings(state: PartyState) {
     if (!response.ok) throw new HttpError('The rating card could not be saved.', 503);
   }
   state.ratedApplied = true;
+  ratingsCache.clear();
 }
 
 async function snapshot(room: Room, state: PartyState, token: string, book: Book) {

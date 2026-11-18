@@ -26,8 +26,8 @@ const uuid = () => globalThis.crypto?.randomUUID?.() || 'x' + Date.now().toStrin
 
 /* ── Classes, derived from stats ─────────────────────────────────────── */
 
-// The only hand-written list: the healers.
-const HEALERS = new Set([113, 242, 440, 531]);
+// The only hand-written list: the healers (Chansey, Blissey, Happiny, Audino, Alomomola, Comfey).
+const HEALERS = new Set([113, 242, 440, 531, 594, 764]);
 export const CLASSES = {
   vanguard: { name: 'Vanguard', ground: true, block: 1, range: 1.2, cost: 8, sp: 10, about: 'Cheap; its skill gives energy back.' },
   guard: { name: 'Guard', ground: true, block: 2, range: 1.2, cost: 13, sp: 20, about: 'Physical melee; blocks 2.' },
@@ -83,12 +83,12 @@ export const STAGES = [
     before: ['Grunt: Meowth and Spearow are faster than you.', 'Fast waves need blockers early on the path.'],
     after: ['Grunt: How did you keep up with that?'] },
   { id: '1-6', name: 'Two lanes', lives: 3, level: 1.45, map: ['S...H#####', '###....H##', '#H#H#.....', 'S.....H#.G', '#####H####'],
-    waves: [[3, 23, 4, 2.5], [10, 41, 4, 2.5], [24, 19, 7, 1.5], [38, 27, 3, 3]],
-    before: ['Grunt: Two paths, and you can only block so many!', 'Enemies come in from both ends of the map.'],
+    waves: [[3, 23, 4, 2.5], [10, 109, 4, 2.5], [24, 88, 6, 1.6], [38, 32, 4, 2.5]],
+    before: ['Grunt: Two paths, and my poison crew on both!', 'Enemies come in from both ends of the map.'],
     after: ['Grunt: The boss will hear about this.'] },
   { id: '1-7', name: 'Night shift', lives: 3, level: 1.55, map: ['##H##H##H#', 'S.........', '##H##H##.#', '#G.......#', '###H##H###'],
-    waves: [[3, 52, 5, 1.8], [16, 23, 5, 2], [30, 27, 4, 2.5], [44, 41, 7, 1.2]],
-    before: ['Grunt: Everything we have, all at once!', 'Medics keep blockers standing through long waves.'],
+    waves: [[3, 261, 5, 1.8], [16, 509, 5, 2], [30, 228, 4, 2.5], [44, 570, 7, 1.2]],
+    before: ['Grunt: Lights out! My night crew hits from the dark.', 'Medics keep blockers standing through long waves.'],
     after: ['Grunt: Run! Tell the boss a trainer is coming!'] },
   { id: '1-8', name: 'Grunt boss', boss: true, lives: 3, level: 1.8, map: ['##H#H#H###', 'S........#', '#H#H.#H#.#', '#.......H#', '#G..H#####'],
     waves: [[3, 19, 6, 1.5], [16, 23, 5, 2], [30, 52, 5, 1.6], [42, 20, 1, 1, 6]],
@@ -96,73 +96,73 @@ export const STAGES = [
     after: ['Grunt Boss: Impossible... This is not over. The admins will deal with you.', 'Chapter 1 cleared. More of Team Rocket is coming.'] },
 
   /* ── Chapter 2: Proton (poison, and bats that fly) ───────────────────── */
-  { id: '2-1', chapter: 2, name: 'Bat cave', lives: 3, level: 1.55, map: ['##H##H####', 'S........G', '##H##H##H#', '##########', '##########'],
+  { id: '2-1', chapter: 2, name: 'Bat cave', lives: 3, level: 2.6, map: ['##H##H####', 'S........G', '##H##H##H#', '##########', '##########'],
     waves: [[3, 19, 3, 3], [12, 41, 3, 3, 0, 1], [26, 41, 4, 2.5, 0, 1]],
     before: ['Proton: Team Rocket\'s scariest admin is here. That would be me.', 'Zubat fly over the path: blockers cannot stop them. Only snipers can hit flying enemies.'],
     after: ['Proton: Lucky. My bats were only warming up.'] },
-  { id: '2-2', chapter: 2, name: 'Sludge pipe', lives: 3, level: 1.75, map: ['S...H#####', '###.H#####', '#H#.....H#', '####H##..G', '##########'],
+  { id: '2-2', chapter: 2, name: 'Sludge pipe', lives: 3, level: 2.25, map: ['S...H#####', '###.H#####', '#H#.....H#', '####H##..G', '##########'],
     waves: [[3, 88, 3, 3.5], [14, 41, 4, 2.5, 0, 1], [28, 88, 4, 3], [40, 41, 5, 2, 0, 1]],
     before: ['Grunt: Grimer, ooze all over them!', 'Flying enemies cut straight across the map. Put snipers near that line.'],
     after: ['Grunt: Ugh. Now I have to clean the pipe.'] },
-  { id: '2-3', chapter: 2, name: 'Bug net', lives: 3, level: 1.8, map: ['##H##H##H#', 'S........#', '#H##H###.#', '#####H...G', '##########'],
+  { id: '2-3', chapter: 2, name: 'Bug net', lives: 3, level: 2.3, map: ['##H##H##H#', 'S........#', '#H##H###.#', '#####H...G', '##########'],
     waves: [[3, 48, 4, 2.5], [15, 21, 4, 2, 0, 1], [28, 48, 5, 2], [40, 21, 5, 1.8, 0, 1]],
     before: ['Grunt: Venonat on the ground, Spearow in the air. Pick one!', 'Fire and Flying moves hit Bug hard. Rock and Electric hit Flying.'],
     after: ['Grunt: You were supposed to pick one.'] },
-  { id: '2-4', chapter: 2, name: 'Two skies', lives: 3, level: 1.9, map: ['S....H####', '####.H##H#', '#H#H......', 'S.......#G', '####H#####'],
+  { id: '2-4', chapter: 2, name: 'Two skies', lives: 3, level: 2.4, map: ['S....H####', '####.H##H#', '#H#H......', 'S.......#G', '####H#####'],
     waves: [[3, 23, 3, 3], [10, 42, 3, 3, 0, 1], [22, 23, 5, 2], [34, 42, 4, 2.5, 0, 1]],
     before: ['Proton: Two entrances, and Golbat over both.', 'Enemies come from two spawns, and each flies its own line.'],
     after: ['Proton: Hmph. Fine. The fog will finish you.'] },
-  { id: '2-5', chapter: 2, name: 'Toxic fog', lives: 3, level: 2.0, map: ['##H#H#H###', 'S........#', '#H##H##H.#', '#G.......#', '####H#####'],
+  { id: '2-5', chapter: 2, name: 'Toxic fog', lives: 3, level: 2.5, map: ['##H#H#H###', 'S........#', '#H##H##H.#', '#G.......#', '####H#####'],
     waves: [[3, 109, 4, 3], [14, 42, 4, 2.2, 0, 1], [26, 24, 4, 2.5], [38, 109, 5, 2], [46, 42, 5, 1.8, 0, 1]],
     before: ['Grunt: Koffing! Arbok! Make it hard to breathe!', 'A long winding path gives your casters time. Keep snipers for the Golbat.'],
     after: ['Grunt: Cough. Get the admin. Cough.'] },
-  { id: '2-6', chapter: 2, name: 'Proton', boss: true, admin: true, lives: 3, level: 2.25,
+  { id: '2-6', chapter: 2, name: 'Proton', boss: true, admin: true, lives: 3, level: 2.75,
     map: ['#H#H#H#H##', 'S........G', '#H#H#.#H.#', 'S.......H#', '####H#####'],
     waves: [[3, 88, 3, 3], [14, 41, 4, 2.5, 0, 1], [26, 42, 4, 2, 0, 1], [36, 24, 4, 2.5], [48, 110, 1, 1, 1]],
     before: ['Proton: You got this far? Then I will stop you myself.', 'Proton: Weezing, cover them in smog!', 'The boss Weezing has four times the HP. Bats come over both lanes before it.'],
     after: ['Proton: How...? Petrel will not be so soft on you.', 'Chapter 2 cleared. Team Rocket\'s other admins are waiting.'] },
 
   /* ── Chapter 3: Petrel (smoke, sparks, and things that blow up) ──────── */
-  { id: '3-1', chapter: 3, name: 'Smoke alarm', lives: 3, level: 2.2, map: ['#H##H##H##', 'S........G', '#H##H##H##', '##########', '##########'],
+  { id: '3-1', chapter: 3, name: 'Smoke alarm', lives: 3, level: 2.7, map: ['#H##H##H##', 'S........G', '#H##H##H##', '##########', '##########'],
     waves: [[3, 109, 3, 3, 0, 0, 1], [14, 88, 3, 3], [26, 109, 4, 2.5, 0, 0, 1]],
     before: ['Petrel: Did you think Proton was the worst of us? Meet my Koffing.', 'Koffing light a fuse when they are blocked, then explode on everything nearby. Shoot them before they reach your blockers.'],
     after: ['Petrel: Fine. That was a drill.'] },
-  { id: '3-2', chapter: 3, name: 'Spark plant', lives: 3, level: 2.3, map: ['S....H####', '####.H##H#', '#H#H.....G', '##########', '##########'],
+  { id: '3-2', chapter: 3, name: 'Spark plant', lives: 3, level: 2.8, map: ['S....H####', '####.H##H#', '#H#H.....G', '##########', '##########'],
     waves: [[3, 81, 4, 2.5], [14, 100, 4, 2, 0, 0, 1], [28, 81, 4, 2], [38, 100, 5, 1.8, 0, 0, 1]],
     before: ['Grunt: Voltorb! Magnemite! Short them out!', 'Ground moves hit Electric hard. A blocker with high HP survives a blast.'],
     after: ['Grunt: The whole plant blew a fuse.'] },
-  { id: '3-3', chapter: 3, name: 'Sludge works', lives: 3, level: 2.4, map: ['#H#H##H#H#', 'S.........', '####H#H#.#', '#G.......#', '###H#H####'],
+  { id: '3-3', chapter: 3, name: 'Sludge works', lives: 3, level: 2.9, map: ['#H#H##H#H#', 'S.........', '####H#H#.#', '#G.......#', '###H#H####'],
     waves: [[3, 88, 4, 3], [12, 41, 3, 3, 0, 1], [22, 109, 4, 2.5, 0, 0, 1], [34, 89, 2, 4], [44, 41, 3, 2.5, 0, 1]],
     before: ['Grunt: Muk is slow. Muk is also very, very hard to stop.', 'Bats overhead and Koffing on the path: snipers for one, casters for the other.'],
     after: ['Grunt: I need a shower.'] },
-  { id: '3-4', chapter: 3, name: 'Two fuses', lives: 3, level: 2.5, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
+  { id: '3-4', chapter: 3, name: 'Two fuses', lives: 3, level: 3, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
     waves: [[3, 100, 4, 2.5, 0, 0, 1], [12, 81, 4, 2.5], [24, 101, 4, 2, 0, 0, 1], [36, 82, 2, 4]],
     before: ['Petrel: Electrode are fast, and they do not stop to think.', 'Two spawns. Electrode run, so hit them early.'],
     after: ['Petrel: Grr. My radio tower is still mine!'] },
-  { id: '3-5', chapter: 3, name: 'Smog bank', lives: 3, level: 2.15, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#........G', '####H#####'],
+  { id: '3-5', chapter: 3, name: 'Smog bank', lives: 3, level: 2.35, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#........G', '####H#####'],
     waves: [[3, 89, 3, 3.5], [12, 110, 3, 3, 0, 0, 1], [24, 41, 3, 2.5, 0, 1], [34, 110, 4, 2.5, 0, 0, 1], [46, 89, 3, 3]],
     before: ['Grunt: Weezing explode twice as hard as Koffing. Good luck.', 'Spread your blockers out: a blast hits every unit near it.'],
     after: ['Grunt: The admin is upstairs. He is... not himself today.'] },
-  { id: '3-6', chapter: 3, name: 'Petrel', boss: true, admin: true, lives: 3, level: 2.3,
+  { id: '3-6', chapter: 3, name: 'Petrel', boss: true, admin: true, lives: 3, level: 2.65,
     map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
-    waves: [[3, 109, 4, 2.5, 0, 0, 1], [12, 41, 3, 2.5, 0, 1], [24, 101, 4, 2, 0, 0, 1], [36, 89, 3, 3], [48, 110, 1, 1, 1]],
-    before: ['Petrel: Kneel before Giovanni! ...Fine. It is a costume.', 'Petrel: Weezing, smog them out!', 'The boss Weezing has four times the HP and does not explode. Its Koffing and Electrode do.'],
+    waves: [[3, 109, 4, 2.5, 0, 0, 1], [12, 32, 3, 3], [24, 88, 4, 2, 0, 0, 1], [36, 89, 3, 3], [48, 110, 1, 1, 1]],
+    before: ['Petrel: Kneel before Giovanni! ...Fine. It is a costume.', 'Petrel: Weezing, smog them out!', 'The boss Weezing has four times the HP and does not explode. Its Koffing and Grimer do.'],
     after: ['Petrel: Ariana will make you pay for this.', 'Chapter 3 cleared. One more admin stands between you and the boss.'] },
 
   /* ── Chapter 4: Ariana (Arbok, and mons that shrug off hits) ─────────── */
-  { id: '4-1', chapter: 4, name: 'Rock wall', lives: 3, level: 2.3, map: ['##H##H##H#', 'S........G', '##H##H##H#', '##########', '##########'],
+  { id: '4-1', chapter: 4, name: 'Rock wall', lives: 3, level: 2.8, map: ['##H##H##H#', 'S........G', '##H##H##H#', '##########', '##########'],
     waves: [[3, 23, 3, 3], [14, 75, 2, 4, 0, 0, 0, 1], [28, 24, 3, 3], [40, 75, 3, 3, 0, 0, 0, 1]],
     before: ['Ariana: Petrel always did talk too much. I prefer walls.', 'Graveler are armored: physical hits barely scratch them. Casters\' special attacks go straight through.'],
     after: ['Ariana: A crack in the wall. Nothing more.'] },
-  { id: '4-2', chapter: 4, name: 'Garden of thorns', lives: 3, level: 2.25, map: ['S...H#####', '###.H##H##', '#H#......G', '#####H####', '##########'],
+  { id: '4-2', chapter: 4, name: 'Garden of thorns', lives: 3, level: 2.7, map: ['S...H#####', '###.H##H##', '#H#......G', '#####H####', '##########'],
     waves: [[3, 43, 3, 3], [14, 95, 2, 4, 0, 0, 0, 1], [26, 45, 3, 3], [38, 95, 2, 4, 0, 0, 0, 1]],
     before: ['Grunt: Vileplume in the garden, Onix in the rocks.', 'Fire and Flying burn Grass. Water and Grass wear down Rock.'],
     after: ['Grunt: My garden...'] },
-  { id: '4-3', chapter: 4, name: 'Night market', lives: 3, level: 1.9, map: ['#H#H#H#H##', 'S........G', '#H##.#H#H#', '####H#####', '##########'],
+  { id: '4-3', chapter: 4, name: 'Night market', lives: 3, level: 2.35, map: ['#H#H#H#H##', 'S........G', '#H##.#H#H#', '####H#####', '##########'],
     waves: [[3, 23, 3, 3], [12, 198, 2, 3, 0, 1], [24, 75, 2, 4, 0, 0, 0, 1], [36, 24, 3, 3], [44, 198, 3, 3, 0, 1]],
     before: ['Grunt: Murkrow steal from the sky. Arbok guard the stalls.', 'Snipers for the Murkrow, casters for the Graveler.'],
     after: ['Grunt: Closing time.'] },
-  { id: '4-4', chapter: 4, name: 'Quarry', lives: 3, level: 2.45, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
+  { id: '4-4', chapter: 4, name: 'Quarry', lives: 3, level: 2.95, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
     waves: [[3, 74, 3, 3, 0, 0, 0, 1], [12, 23, 4, 2.5], [24, 95, 2, 4, 0, 0, 0, 1], [36, 110, 2, 4, 0, 0, 1]],
     before: ['Ariana: Rock from both sides, and a Weezing for old times\' sake.', 'Two spawns. Armored mons on both, and a Weezing that explodes.'],
     after: ['Ariana: You are more stubborn than my Onix.'] },
@@ -170,7 +170,7 @@ export const STAGES = [
     waves: [[3, 74, 3, 3.5, 0, 0, 0, 1], [14, 198, 3, 2.5, 0, 1], [26, 24, 4, 2.5], [38, 95, 3, 3, 0, 0, 0, 1], [48, 45, 3, 3]],
     before: ['Grunt: The long way round. Every step of it guarded.', 'A long path gives casters time to wear the armor down.'],
     after: ['Grunt: The admin is waiting at the end of the path.'] },
-  { id: '4-6', chapter: 4, name: 'Ariana', boss: true, admin: true, lives: 3, level: 2.35,
+  { id: '4-6', chapter: 4, name: 'Ariana', boss: true, admin: true, lives: 3, level: 2.85,
     map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
     waves: [[3, 74, 3, 3, 0, 0, 0, 1], [12, 198, 3, 2.5, 0, 1], [24, 45, 3, 3], [36, 95, 2, 4, 0, 0, 0, 1], [48, 24, 1, 1, 1, 0, 0, 1]],
     before: ['Ariana: You have beaten three admins. You will not beat the fourth.', 'Ariana: Arbok, wrap them up!', 'The boss Arbok has four times the HP and is armored: bring casters.'],
@@ -178,42 +178,42 @@ export const STAGES = [
 
   /* ── Chapter 5: Archer (Houndoom, fire and dark, and fast waves) ─────── */
   // A ninth wave field: fast. Fast enemies run at 1.5x speed; block them early.
-  { id: '5-1', chapter: 5, name: 'Ember alley', lives: 3, level: 2.25, map: ['##H##H##H#', 'S........G', '##H##H##H#', '##########', '##########'],
+  { id: '5-1', chapter: 5, name: 'Ember alley', lives: 3, level: 2.55, map: ['##H##H##H#', 'S........G', '##H##H##H#', '##########', '##########'],
     waves: [[3, 228, 3, 2.5], [14, 20, 4, 1.5, 0, 0, 0, 0, 1], [26, 228, 4, 2], [38, 20, 5, 1.2, 0, 0, 0, 0, 1]],
     before: ['Archer: Ariana let you through? I will not be so slow.', 'Fast enemies run half again as quick. Block them early on the path, before they build speed past your snipers.'],
     after: ['Archer: Quick feet. We will see how long they last.'] },
-  { id: '5-2', chapter: 5, name: 'Racetrack', lives: 3, level: 2.6, map: ['##H#H#H###', 'S........#', '#H#H.#H#.#', '#.......H#', '#G..H#####'],
+  { id: '5-2', chapter: 5, name: 'Racetrack', lives: 3, level: 2.9, map: ['##H#H#H###', 'S........#', '#H#H.#H#.#', '#.......H#', '#G..H#####'],
     waves: [[3, 77, 3, 2, 0, 0, 0, 0, 1], [14, 58, 4, 2.5], [26, 77, 4, 1.6, 0, 0, 0, 0, 1], [40, 78, 2, 3, 0, 0, 0, 0, 1]],
     before: ['Grunt: Ponyta are the fastest thing on four legs.', 'Water and Ground douse Fire. Rock stands up to it.'],
     after: ['Grunt: They were supposed to win the race...'] },
-  { id: '5-3', chapter: 5, name: 'Black wings', lives: 3, level: 2.6, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#........G', '####H#####'],
+  { id: '5-3', chapter: 5, name: 'Black wings', lives: 3, level: 3.1, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#........G', '####H#####'],
     waves: [[3, 198, 3, 2.5, 0, 1], [14, 228, 4, 2, 0, 0, 0, 0, 1], [26, 198, 3, 2, 0, 1], [38, 215, 3, 2, 0, 0, 0, 0, 1]],
     before: ['Grunt: Murkrow overhead, Houndour underfoot.', 'Snipers for the Murkrow. Fighting hits Dark hard.'],
     after: ['Grunt: The flock scattered!'] },
-  { id: '5-4', chapter: 5, name: 'Blackout', lives: 3, level: 2.5, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
+  { id: '5-4', chapter: 5, name: 'Blackout', lives: 3, level: 2.8, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
     waves: [[3, 109, 3, 3], [12, 101, 2, 3, 0, 0, 1, 0, 1], [24, 228, 4, 2, 0, 0, 0, 0, 1], [36, 101, 3, 2.5, 0, 0, 1, 0, 1]],
     before: ['Archer: The power plant is ours. Electrode, light them up.', 'Electrode are fast and they explode. Kill them before they reach a blocker.'],
     after: ['Archer: Lights out for my Electrode. Not for me.'] },
-  { id: '5-5', chapter: 5, name: 'Two fires', lives: 3, level: 2.6, map: ['S...H#####', '###....H##', '#H#H#.....', 'S.....H#.G', '#####H####'],
+  { id: '5-5', chapter: 5, name: 'Two fires', lives: 3, level: 3.1, map: ['S...H#####', '###....H##', '#H#H#.....', 'S.....H#.G', '#####H####'],
     waves: [[3, 58, 4, 2.5], [10, 228, 4, 2, 0, 0, 0, 0, 1], [22, 215, 3, 2, 0, 0, 0, 0, 1], [34, 78, 3, 2.5, 0, 0, 0, 0, 1], [46, 198, 3, 2, 0, 1]],
     before: ['Grunt: Fire from the left, fire from the right!', 'Two spawns, fast waves on both. A vanguard buys time while the energy comes in.'],
     after: ['Grunt: Archer is going to be furious.'] },
-  { id: '5-6', chapter: 5, name: 'Archer', boss: true, admin: true, lives: 3, level: 2.6,
+  { id: '5-6', chapter: 5, name: 'Archer', boss: true, admin: true, lives: 3, level: 3.1,
     map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
     waves: [[3, 228, 4, 2, 0, 0, 0, 0, 1], [14, 198, 3, 2, 0, 1], [26, 101, 2, 3, 0, 0, 1, 0, 1], [38, 215, 3, 2, 0, 0, 0, 0, 1], [50, 229, 1, 1, 1]],
     before: ['Archer: I lead Team Rocket while Giovanni is away. You end here.', 'Archer: Houndoom, burn it all down!', 'The boss Houndoom has four times the HP. Fighting, Water, Ground and Rock hit it hard.'],
     after: ['Archer: Giovanni... forgive me.', 'Chapter 5 cleared. Giovanni is waiting at the hideout.'] },
 
   /* ── Chapter 6: Giovanni (ground, and everything Team Rocket has) ────── */
-  { id: '6-1', chapter: 6, name: 'Underground', lives: 3, level: 2.4, map: ['##########', 'S....H####', '####.H####', '#H.......G', '###H######'],
+  { id: '6-1', chapter: 6, name: 'Underground', lives: 3, level: 2.9, map: ['##########', 'S....H####', '####.H####', '#H.......G', '###H######'],
     waves: [[3, 50, 4, 2, 0, 0, 0, 0, 1], [14, 27, 4, 2.5], [26, 50, 5, 1.5, 0, 0, 0, 0, 1], [38, 28, 3, 3]],
     before: ['Grunt: The boss built his hideout under the ground. So do his mons.', 'Ground types: Water, Grass and Ice hit them hard. Flying units are not hit at all.'],
     after: ['Grunt: You dug your way through?'] },
-  { id: '6-2', chapter: 6, name: 'Bone yard', lives: 3, level: 2.0, map: ['####H#####', 'S.......H#', '####H#.###', '#H.....H##', '#G...H####'],
+  { id: '6-2', chapter: 6, name: 'Bone yard', lives: 3, level: 2.25, map: ['####H#####', 'S.......H#', '####H#.###', '#H.....H##', '#G...H####'],
     waves: [[3, 104, 4, 2.5], [16, 41, 3, 2.5, 0, 1], [28, 105, 2, 3], [40, 104, 4, 2]],
     before: ['Grunt: Cubone and Zubat. The boss keeps strange pets.', 'Snipers for the Zubat, and Water or Grass for the Marowak.'],
     after: ['Grunt: Bones everywhere...'] },
-  { id: '6-3', chapter: 6, name: 'Earth tremor', lives: 3, level: 2.3, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#G.......#', '####H#####'],
+  { id: '6-3', chapter: 6, name: 'Earth tremor', lives: 3, level: 2.8, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#G.......#', '####H#####'],
     waves: [[3, 33, 4, 2.5], [14, 111, 2, 4, 0, 0, 0, 1], [26, 32, 5, 2], [38, 111, 3, 3.5, 0, 0, 0, 1]],
     before: ['Grunt: Rhyhorn charge, and nothing stops them.', 'Rhyhorn are armored. Casters go through; Water and Grass break them.'],
     after: ['Grunt: The ground stopped shaking.'] },
@@ -221,11 +221,11 @@ export const STAGES = [
     waves: [[3, 51, 3, 2, 0, 0, 0, 0, 1], [12, 110, 2, 3.5, 0, 0, 1], [24, 31, 3, 3], [36, 51, 4, 1.8, 0, 0, 0, 0, 1], [46, 110, 2, 3, 0, 0, 1]],
     before: ['Grunt: The boss is right through that door. You will never reach it.', 'Fast Dugtrio, exploding Weezing, and two ways in.'],
     after: ['Grunt: Go on, then. He is expecting you.'] },
-  { id: '6-5', chapter: 6, name: 'Last guard', lives: 3, level: 2.0, map: ['##H##H##H#', 'S.........', '##H##H##.#', '#G.......#', '###H##H###'],
+  { id: '6-5', chapter: 6, name: 'Last guard', lives: 3, level: 2.25, map: ['##H##H##H#', 'S.........', '##H##H##.#', '#G.......#', '###H##H###'],
     waves: [[3, 53, 3, 2, 0, 0, 0, 0, 1], [14, 41, 3, 2.5, 0, 1], [26, 111, 2, 3, 0, 0, 0, 1], [38, 33, 3, 2.5], [48, 53, 3, 1.8, 0, 0, 0, 0, 1]],
     before: ['Grunt: Every grunt left in Kanto is in this hall.', 'Persian run fast, Zubat fly, Rhyhorn are armored. Bring a bit of everything.'],
     after: ['Grunt: The boss... is all that is left.'] },
-  { id: '6-6', chapter: 6, name: 'Giovanni', boss: true, admin: true, final: true, lives: 3, level: 2.3,
+  { id: '6-6', chapter: 6, name: 'Giovanni', boss: true, admin: true, final: true, lives: 3, level: 2.55,
     map: ['S....H####', '####.H##H#', '#H#H......', 'S.......#G', '####H#####'],
     waves: [[3, 51, 4, 2, 0, 0, 0, 0, 1], [14, 42, 3, 2, 0, 1], [26, 31, 3, 3], [36, 110, 2, 3, 0, 0, 1], [46, 34, 3, 3], [58, 112, 1, 1, 1, 0, 0, 1]],
     before: ['Giovanni: So you are the one who took Team Rocket apart.', 'Giovanni: I am Giovanni. Rhydon, show this child what real power is.',
@@ -456,6 +456,19 @@ function useSkill(b, u) {
     for (const e of list) e.hp -= hit(u.atk, defenceAgainst(u, e), typeMultiplier(u.types[0], e.types)) * (u.cls === 'guard' ? 3 : 1.5) * power;
   }
   b.log.push({ t: b.t, skill: u.skill, unit: u.id });
+}
+
+/**
+ * Use a placed unit's skill now, by the player's hand (the page's Skill button), when it is
+ * fully charged. Skills still fire on their own; this lets a held one (a Blocker at full HP,
+ * a Medic with no one hurt) go early. Returns whether it fired.
+ */
+export function castSkill(b, id) {
+  const u = b.units.find(o => o.id === id);
+  if (!u || b.over || u.sp < u.spMax) return false;
+  useSkill(b, u);
+  u.sp = 0;
+  return true;
 }
 
 /** Advance the battle by one tick. Returns the battle. */
@@ -777,7 +790,7 @@ export function tdBridge({ onChange = () => {} } = {}) {
     // `stages` stays chapter 1 for pages that predate chapters; `chapters` and `allStages` have every chapter.
     stages: CHAPTERS[0].stages, chapter: CHAPTER, chapters: CHAPTERS, allStages: STAGES, classes: CLASSES, W, H, TICK, REDEPLOY, maxLevel: MAX_LEVEL, levelCost,
     levelCaps: LEVEL_CAPS, skillKinds: SKILL_KINDS, capOf: line => lineCap(gachaState(readWallet()), line),
-    classOf, pathsOf, newBattle, step, deploy, retreat, canDeploy, canHit, starsFor, typeMultiplier,
+    classOf, pathsOf, newBattle, step, deploy, retreat, castSkill, canDeploy, canHit, starsFor, typeMultiplier,
     state: () => tdState(readWallet()),
     squad: species => squadFrom(readWallet(), species),
     finish: act((w, o) => tdFinish(w, o)),

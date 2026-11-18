@@ -136,6 +136,46 @@ const key = async (tab, name, times = 1) => { for (let i = 0; i < times; i++) { 
 const rect = (frame, selector) => frame.$eval(selector, node => { const b = node.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; });
 const apart = (a, b) => a.r <= b.l + 0.5 || b.r <= a.l + 0.5 || a.b <= b.t + 0.5 || b.b <= a.t + 0.5;
 
+test('roster cut: an owned cut line is refunded once with a note, and leaves the dex and every saved team', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  const tauros = await game.evaluate(() => G.dex.findIndex(r => r[0] === 'Tauros') + 1);
+  const kept = await game.evaluate(() => S.owned[0]);
+  // An old hatch of Tauros (cut), 30 candy on it, and Tauros in two saved teams.
+  await game.evaluate((tauros, kept) => {
+    const now = Math.floor(Date.now() / 1000);
+    const w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['spend:old-tauros'] = { at: now - 50, g: { regular: 0 }, x: { m: 'move', e: [0], w: 0, n: 99, d: '2026-11-01' } };
+    w.entries['hatch:old-tauros.0'] = { at: now - 40, g: { ['candy:' + tauros]: 30 }, x: { s: tauros, t: 0, n: 1, k: 0 } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    const p = JSON.parse(localStorage.getItem('bored.poke-gacha.ui') || '{}');
+    p.squad = [tauros, kept]; p.squads = [[tauros, kept], [kept], [tauros]]; p.team = 0;
+    localStorage.setItem('bored.poke-gacha.ui', JSON.stringify(p));
+  }, tauros, kept);
+  const before = await game.evaluate(() => G.state().balance.regular);
+  await tab.evaluate(() => openGame('poke-gacha'));
+  await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  const again = await (await tab.$('#frame')).contentFrame();
+  await again.waitForFunction(() => !document.querySelector('#cut-note').hidden);
+  const note = await again.$eval('#cut-note', n => n.textContent);
+  assert.match(note, /Tauros 3★/);
+  assert.match(note, /2 Regular/, '1 for a 3★ line and 1 for 25 of its 30 candy');
+  assert.equal(await again.evaluate(() => G.state().balance.regular) - before, 2);
+  assert.equal(await again.evaluate(tauros => G.state().balance['candy:' + tauros] || 0, tauros), 0);
+  const prefs = await again.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')));
+  assert.deepEqual([prefs.squad, prefs.squads], [[kept], [[kept], [kept], []]], 'Tauros left every saved team');
+  assert.ok(!(await again.evaluate(tauros => BASES.includes(tauros) || S.owned.includes(tauros), tauros)), 'and the dex');
+  await key(tab, 'Enter');
+  assert.equal(await again.$eval('#cut-note', n => n.hidden), true);
+  // Once: opening again shows no note and pays nothing.
+  await tab.evaluate(() => openGame('poke-gacha'));
+  await tab.waitForFunction(() => document.querySelector('#frame')?.contentDocument?.querySelector('#tabs .panel'));
+  const third = await (await tab.$('#frame')).contentFrame();
+  await pause(300);
+  assert.equal(await third.$eval('#cut-note', n => n.hidden), true);
+  assert.equal(await third.evaluate(() => G.state().balance.regular) - before, 2);
+  assert.deepEqual(errors, []);
+});
+
 test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1-1 clear pays and unlocks 1-2', async t => {
   const { tab, game, errors } = await openWithMons(t);
   const tabs = await game.$$eval('#tabs [data-tab]', nodes => nodes.map(n => n.dataset.tab));
@@ -276,47 +316,69 @@ test('tower defense: chapter 3 says which enemies explode', async t => {
   assert.deepEqual(errors, []);
 });
 
-test('Dex: F filters what is shown, T a type, S the order, and the choice is kept', async t => {
+test('filters: the Dex bar opens one panel (type grid of two, class and tier chips, sort list, name search, Clear); keys still work; the choice is kept', async t => {
   const { tab, game, errors } = await openWithMons(t);
-  await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; pref.dexSort = 'Number'; keep(); go('dex'); });
-  const rowsNow = () => game.$$eval('#dex-rows > div', list => list.map(r => r.textContent.trim()));
+  await game.evaluate(() => { pref.filters = {}; keep(); go('dex'); });
   const all = await game.evaluate(() => dexList().length);
   assert.equal(all, await game.evaluate(() => BASES.length), 'All shows every line');
+  assert.match(await game.$eval('#dex-keys', n => n.textContent), /^Filter: All · Number/);
+  // Keys: F owned → not owned, then back; T a type; S the sort.
   await key(tab, 'f');
-  assert.deepEqual(await game.evaluate(() => dexList().every(num => !!S.lines[num])), true, 'Owned shows only owned lines');
-  assert.equal(await game.evaluate(() => dexList().length), await game.evaluate(() => Object.keys(S.lines).length));
-  assert.match(await game.$eval('#msg', n => n.textContent), /F: Owned/);
-  const msg = await game.$eval('#msg', n => [n.scrollHeight, n.clientHeight]);
-  assert.ok(msg[0] <= msg[1], 'the message box does not overflow');
+  assert.ok(await game.evaluate(() => dexList().every(num => !!S.lines[num])), 'F: owned lines only');
   await key(tab, 'f');
-  assert.ok(await game.evaluate(() => dexList().every(num => !S.lines[num])), 'Not owned shows only missing lines');
-  // A type: every line shown has it.
-  await key(tab, 't');
-  const type = await game.evaluate(() => dexView().type);
-  assert.ok(type);
-  assert.ok(await game.evaluate(t => dexList().every(num => G.dex[num - 1][1].split('/').includes(t)), type), 'every line shown is ' + type);
-  // A type only finds caught lines, so it never hints at an uncaught line's type.
-  await game.evaluate(() => { pref.dexFilter = 'All'; keep(); dexUpdate(); });
-  const typed = await game.evaluate(() => [...new Set(BASES.filter(n => S.lines[n]).flatMap(n => G.dex[n - 1][1].split('/')))]);
-  for (const t of typed) {
-    const seen = await game.evaluate(t => { pref.dexType = t; keep(); dexUpdate(); return dexList().map(n => [!!S.lines[n], G.dex[n - 1][1].split('/').includes(t)]); }, t);
-    assert.ok(seen.length > 0 && seen.every(([caught, has]) => caught && has), t + ': caught ' + t + ' lines only');
-  }
-  assert.equal(await game.evaluate(() => { pref.dexFilter = 'Not owned'; keep(); dexUpdate(); return dexList().length; }), 0, 'no uncaught line has a type to filter by');
-  assert.match(await game.$eval('#msg', n => n.textContent), /Nothing matches/);
-  await game.evaluate(() => { pref.dexType = ''; keep(); dexUpdate(); });
-  // Back to all, any type; sort by name.
-  await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; keep(); dexUpdate(); });
-  await key(tab, 's');
-  // Caught lines by name, then the uncaught ones (their names are hidden) by number.
-  const sorted = await game.evaluate(() => dexList().map(num => [!!S.lines[num], name(num), num]));
-  const caught = sorted.filter(r => r[0]), missing = sorted.filter(r => !r[0]);
-  assert.deepEqual(sorted, [...caught, ...missing], 'caught lines first');
-  assert.deepEqual(caught.map(r => r[1]), caught.map(r => r[1]).sort((a, b) => a.localeCompare(b)), 'S sorts caught lines by name');
-  assert.deepEqual(missing.map(r => r[2]), missing.map(r => r[2]).sort((a, b) => a - b), 'and the rest by number');
-  assert.equal(await game.evaluate(() => JSON.parse(localStorage.getItem('bored.poke-gacha.ui')).dexSort), 'Name', 'the choice is kept');
-  assert.ok((await rowsNow()).length > 0);
-  await game.evaluate(() => { pref.dexSort = 'Number'; keep(); });
+  assert.ok(await game.evaluate(() => dexList().every(num => !S.lines[num])), 'F again: missing lines only');
+  await key(tab, 'Delete');
+  assert.equal(await game.evaluate(() => filtSummary('dex')), 'All', 'Delete clears');
+  // The panel, by mouse.
+  await (await game.$('#dex-keys [data-fopen="dex"]')).click();
+  assert.equal(await game.evaluate(() => !document.querySelector('#filters').hidden), true, 'the bar opens the panel');
+  assert.equal(await game.$$eval('#filters .types .klabel', n => n.length), await game.evaluate(() => DEX_TYPES.length), 'every type in the grid');
+  // Two types: both must be there, caught lines only; a click again clears one; a third replaces the second.
+  const pair = await game.evaluate(() => { for (const n of BASES) if (S.lines[n] && G.dex[n - 1][1].includes('/')) return G.dex[n - 1][1].split('/'); });
+  for (const ty of pair) await (await game.$('#filters [data-f="type:' + ty + '"]')).click();
+  const two = await game.evaluate(() => ({ types: filt('dex').types, ok: dexList().every(n => S.lines[n] && filt('dex').types.every(t => G.dex[n - 1][1].split('/').includes(t))), n: dexList().length }));
+  assert.deepEqual(two.types, pair);
+  assert.ok(two.ok && two.n > 0, 'lines with both types');
+  assert.match(await game.$eval('#filters .head', n => n.textContent), new RegExp(pair.join('/')), 'the summary at the top');
+  await (await game.$('#filters [data-f="type:' + pair[1] + '"]')).click();
+  assert.deepEqual(await game.evaluate(() => filt('dex').types), [pair[0]], 'a second click clears it');
+  // Class and tier chips, one click each.
+  const cls = await game.evaluate(() => classOfLine(BASES.find(n => S.lines[n])));
+  await (await game.$('#filters [data-f="cls:' + cls + '"]')).click();
+  await (await game.$('#filters [data-f="type:' + pair[0] + '"]')).click();
+  assert.ok(await game.evaluate(c => dexList().length > 0 && dexList().every(n => classOfLine(n) === c), cls), 'one class');
+  await (await game.$('#filters [data-f="tier:4"]')).click();
+  assert.ok(await game.evaluate(() => dexList().every(n => G.dex[n - 1][9] === 4)), 'one tier');
+  assert.match(await game.evaluate(() => filtSummary('dex')), /4★/);
+  // Sort: the short list opens and picks.
+  await (await game.$('#filters [data-f="sort"]')).click();
+  assert.equal(await game.$$eval('#filters .sortlist .klabel', n => n.length), 5, 'number, name, tier, level, recent');
+  await (await game.$('#filters [data-f="sort:name"]')).click();
+  assert.equal(await game.evaluate(() => filt('dex').sort), 'name');
+  // Clear in the panel, then a name search: typing is text, not keys.
+  await (await game.$('#filters [data-f="clear"]')).click();
+  const nm = await game.evaluate(() => name(tipOf(BASES.find(n => S.lines[n]))));
+  await (await game.$('#filters input')).click();
+  await tab.keyboard.type(nm.slice(0, 4).toLowerCase());
+  assert.equal(await game.evaluate(() => tab), 'dex', 'number and letter keys in the box do not switch screens or filters');
+  assert.equal(await game.evaluate(() => filt('dex').q), nm.slice(0, 4).toLowerCase());
+  assert.ok(await game.evaluate(q => dexList().length > 0 && dexList().every(n => S.lines[n] && lineForms(n).some(f => name(f).toLowerCase().includes(q))), nm.slice(0, 4).toLowerCase()), 'caught names only');
+  await tab.keyboard.press('Enter');
+  assert.equal(await game.evaluate(() => document.querySelector('#filters').hidden), true, 'Enter closes the panel');
+  // Kept across visits, then Clear on the bar.
+  assert.ok(JSON.parse(await game.evaluate(() => localStorage.getItem('bored.poke-gacha.ui'))).filters.dex.q);
+  await (await game.$('#dex-keys [data-press="Delete"]')).click();
+  assert.equal(await game.evaluate(() => filtSummary('dex')), 'All');
+  // The Squad roster uses the same bar and panel.
+  await game.evaluate(() => { go('story'); chapterAt = 0; storyMode = 'stages'; storyAt = 0; storyUpdate(); pickStage(); });
+  await (await game.$('#squad-filters [data-fopen="squad"]')).click();
+  await (await game.$('#filters [data-f="cls:sniper"]')).click();
+  assert.ok(await game.evaluate(() => roster().list.length > 0 && roster().list.every(u => u.cls === 'sniper')), 'the roster filters the same way');
+  assert.match(await game.$eval('#squad-filters', n => n.textContent), /Sniper/);
+  await (await game.$('#filters [data-f="done"]')).click();
+  await key(tab, 'c');
+  assert.notEqual(await game.evaluate(() => filt('squad').cls), 'sniper', 'C still cycles the class');
+  await game.evaluate(() => { pref.filters = {}; keep(); });
   assert.deepEqual(errors, []);
 });
 
@@ -403,15 +465,14 @@ test('Dex depth: Info shows the evolution chain with owned forms, class, range a
 test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad level/skill, hatch skip, candy filters and Back, Card)', async t => {
   const { game, errors } = await openWithMons(t);
   const click = async sel => { const n = await game.$(sel); assert.ok(n, sel + ' is there'); await n.click(); await pause(40); };
-  // Dex: F, T and S.
-  await game.evaluate(() => { go('dex'); pref.dexFilter = 'All'; pref.dexType = ''; keep(); dexUpdate(); });
-  const before = await game.evaluate(() => ({ ...dexView() }));
-  await click('#dex-keys [data-press="f"]');
-  assert.notEqual(await game.evaluate(() => dexView().filter), before.filter, 'F by mouse');
-  await click('#dex-keys [data-press="t"]');
-  assert.notEqual(await game.evaluate(() => dexView().type), before.type, 'T by mouse');
-  await click('#dex-keys [data-press="s"]');
-  assert.notEqual(await game.evaluate(() => dexView().sort), before.sort, 'S by mouse');
+  // Dex: the filter bar opens the panel; a tier chip filters.
+  await game.evaluate(() => { go('dex'); pref.filters = {}; keep(); dexUpdate(); });
+  await click('#dex-keys [data-fopen="dex"]');
+  await click('#filters [data-f="tier:3"]');
+  assert.equal(await game.evaluate(() => filt('dex').tier), 3, 'a tier by mouse');
+  await click('#filters [data-f="done"]');
+  await click('#dex-keys [data-press="Delete"]');
+  assert.equal(await game.evaluate(() => filtSummary('dex')), 'All', 'Clear by mouse');
   // Story: › and ‹ change the chapter page.
   await game.evaluate(() => { for (const st of T.chapters[0].stages) T.finish({ stage: st.id, stars: 1, team: [S.owned[0]], waves: 1 }); refreshTop(); go('story'); chapterAt = 0; storyMode = 'stages'; storyUpdate(); });
   await click('#story-title [data-press="ArrowRight"]');
@@ -447,9 +508,10 @@ test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad le
   // Shop, candy picker: a filter and Back.
   if (await game.evaluate(() => !!G.coinShop)) {
     await game.evaluate(() => { go('shop'); shopMode = 'candy'; shopConfirm = null; candyAt = 0; shopUpdate(); });
-    const f0 = await game.evaluate(() => candyView().filter);
-    await click('#shop-preview [data-press="f"]');
-    assert.notEqual(await game.evaluate(() => candyView().filter), f0);
+    await click('#candy-bar [data-fopen="candy"]');
+    await click('#filters [data-f="tier:3"]');
+    assert.equal(await game.evaluate(() => filt('candy').tier), 3);
+    await click('#filters [data-f="done"]');
     await click('#shop-preview [data-press="Backspace"]');
     assert.equal(await game.evaluate(() => shopMode), 'list', 'Back by mouse');
   }
@@ -462,7 +524,7 @@ test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad le
   assert.deepEqual(errors, []);
 });
 
-test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Rare, Bonsly (Sudowoodo, 410) stays Common', async () => {
+test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Rare, Psyduck (Golduck, 500) is Common under the 505 cutoff', async () => {
   const { DEX } = await import(path.join(root, 'src/hub/gacha-dex.js'));
   const bst = r => r[2] + r[3] + r[4] + r[5] + r[6] + r[7];
   const kids = {};
@@ -472,11 +534,11 @@ test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Ra
   DEX.forEach((r, i) => {
     if (r[9] !== 3 && r[9] !== 4) return;
     const best = Math.max(...finals(i + 1).map(f => bst(DEX[f - 1])));
-    if ((best >= 500 ? 4 : 3) !== r[9]) off.push(r[0] + ' ' + r[9] + '★ (final ' + best + ')');
+    if ((best >= 505 ? 4 : 3) !== r[9]) off.push(r[0] + ' ' + r[9] + '★ (final ' + best + ')');
   });
   assert.deepEqual(off, [], 'every Common/Rare line is tiered by its final form');
   const star = n => DEX.find(r => r[0] === n)[9];
-  assert.deepEqual(['Magikarp', 'Happiny', 'Munchlax', 'Feebas', 'Bonsly'].map(star), [4, 4, 4, 4, 3]);
+  assert.deepEqual(['Magikarp', 'Happiny', 'Munchlax', 'Feebas', 'Psyduck'].map(star), [4, 4, 4, 4, 3]);
 });
 
 test('Quests: four sub-tabs with reset clocks; rows show n/m, a bar and real reward icons; done rows sink; trophies group by game', async t => {
@@ -725,7 +787,7 @@ test('coin shop: candy for a picked line, shards and preset slots, each with a c
   assert.equal(await game.evaluate(l => S.lines[l].candy, line) - candy0, 5);
   assert.match(await game.$eval('#shop-list', n => n.textContent), /45\/50 today/);
   await key(tab, 't');
-  const type = await game.evaluate(() => candyView().type);
+  const type = await game.evaluate(() => filt('candy').types[0]);
   assert.ok(await game.evaluate(t => candyLines().every(n => G.dex[n - 1][1].split('/').includes(t)), type), 'T filters by type, like the Dex');
   await key(tab, 'Backspace');
   assert.equal(await game.evaluate(() => shopMode), 'list');
@@ -1121,6 +1183,85 @@ test('battle polish: a scene per chapter behind the field, a WAVE n/m banner as 
   assert.deepEqual(errors, []);
 });
 
+test('battle by mouse only: drag a card to deploy (an invalid drop cancels), click card then tile, right-click cancels, popup Skill and Retreat, HUD pauses, poor cards show red, and a win', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => {
+    go('story'); chapterAt = 0; storyMode = 'stages'; storyAt = 0; storyUpdate(); pickStage();
+    const pick = cls => S.owned.find(n => T.classOf(n) === cls);
+    setSquad([pick('blocker'), pick('sniper'), pick('caster')].filter(Boolean)); startBattle(); battle.talk = []; battleTalk();
+    // One spawn far off, so the battle stays open while the mouse works (an empty field is a win).
+    battle.b.queue = [{ at: 999, num: 52, wave: 0, path: 0, boss: false, flying: false, explodes: false, armored: false, fast: false }]; battle.b.energy = 99; battle.paused = false;
+  });
+  const frameBox = await (await tab.$('#frame')).boundingBox();
+  const at = async fn => { const b = await game.evaluate(fn); return [frameBox.x + (b.l + b.r) / 2, frameBox.y + (b.t + b.b) / 2]; };
+  const card = cls => at(new Function('return (() => { const i = battle.b.squad.findIndex(u => u.cls === ' + JSON.stringify(cls) + '); const b = document.querySelector(\'#deploy [data-slot="\' + i + \'"]\').getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; })()'));
+  const tile = (x, y) => at(new Function('return tileBox(' + x + ', ' + y + ')'));
+  const units = () => game.evaluate(() => battle.b.units.map(u => [u.cls, u.x, u.y]));
+  // 1. Drag the blocker onto the path: valid tiles light up while dragging, the range follows.
+  let [cx, cy] = await card('blocker');
+  await tab.mouse.move(cx, cy); await tab.mouse.down();
+  const [px, py] = await tile(6, 1);
+  await tab.mouse.move((cx + px) / 2, (cy + py) / 2, { steps: 4 }); await tab.mouse.move(px, py, { steps: 4 });
+  assert.deepEqual(await game.evaluate(() => [!!battle.drag, battle.hover]), [true, [6, 1]], 'dragging, over the path tile');
+  await tab.mouse.up(); await pause(60);
+  assert.deepEqual((await units()).find(u => u[0] === 'blocker'), ['blocker', 6, 1], 'dropped on the path: placed');
+  // 2. An invalid drop cancels: the sniper dragged onto the path.
+  [cx, cy] = await card('sniper');
+  await tab.mouse.move(cx, cy); await tab.mouse.down();
+  const [qx, qy] = await tile(4, 1);
+  await tab.mouse.move(qx, qy, { steps: 6 }); await tab.mouse.up(); await pause(60);
+  assert.ok(!(await units()).some(u => u[0] === 'sniper'), 'an invalid drop places nothing');
+  assert.equal(await game.$eval('#battle-tip', n => n.textContent), 'Cancelled: nothing placed.');
+  // 3. Click a card (it lights up), click it again (off); right-click cancels too; then card, tile.
+  await tab.mouse.click(cx, cy); await pause(40);
+  assert.equal(await game.evaluate(() => battle.armed), true);
+  assert.equal(await game.evaluate(() => document.querySelector('#deploy .card.on') !== null), true, 'the picked card lights up');
+  await tab.mouse.click(cx, cy); await pause(40);
+  assert.equal(await game.evaluate(() => battle.armed), false, 'clicking it again puts it down');
+  await tab.mouse.click(cx, cy); await pause(40);
+  await tab.mouse.click(qx, qy, { button: 'right' }); await pause(40);
+  assert.equal(await game.evaluate(() => battle.armed), false, 'right-click cancels');
+  const [hx, hy] = await tile(5, 2);
+  await tab.mouse.click(hx, hy); await pause(40);
+  assert.ok(!(await units()).some(u => u[0] === 'sniper'), 'no card picked: a tile click places nothing');
+  await tab.mouse.click(cx, cy); await tab.mouse.click(hx, hy); await pause(60);
+  assert.deepEqual((await units()).find(u => u[0] === 'sniper'), ['sniper', 5, 2], 'card, then tile');
+  // 4. Poor energy: the card dims, its cost in red.
+  await game.evaluate(() => { battle.b.energy = 0; });
+  await pause(80);
+  const poor = await game.evaluate(() => { const c = document.querySelector('#deploy .card.poor'); return c && getComputedStyle(c.querySelector('.low .num')).color; });
+  if (await game.evaluate(() => battle.b.squad.some((u, i) => !battle.b.units.some(o => o.slot === i)))) assert.equal(poor, 'rgb(200, 55, 47)', 'its cost in red');
+  await game.evaluate(() => { battle.b.energy = 99; });
+  // 5. Pause by clicking the HUD, and by the button.
+  const hud = await (await game.$('#battle-hud')).boundingBox();
+  await tab.mouse.click(hud.x + hud.width / 2, hud.y + hud.height / 2); await pause(40);
+  assert.equal(await game.evaluate(() => battle.paused), true, 'the HUD pauses');
+  await (await game.$('#battle-pause')).click(); await pause(40);
+  assert.equal(await game.evaluate(() => battle.paused), false, 'the button plays');
+  // 6. Click a unit: its popup with Skill and Retreat; Skill when charged (if the hub can cast).
+  await tab.mouse.click(hx, hy); await pause(80);
+  assert.equal(await game.evaluate(() => !document.querySelector('#unit-pop').hidden), true, 'the popup');
+  assert.match(await game.$eval('#unit-pop', n => n.textContent), /Skill.*Retreat/);
+  if (await game.evaluate(() => !!T.castSkill)) {
+    await game.evaluate(() => { const u = battle.b.units.find(o => o.cls === 'sniper'); u.sp = u.spMax; });
+    await pause(80);
+    const logs = await game.evaluate(() => battle.b.log.length);
+    await (await game.$('#unit-pop [data-pop="skill"]')).click(); await pause(40);
+    assert.equal(await game.evaluate(() => battle.b.log.length), logs + 1, 'Skill by mouse');
+  }
+  await (await game.$('#unit-pop [data-pop="retreat"]')).click(); await pause(60);
+  assert.ok(!(await units()).some(u => u[0] === 'sniper'), 'Retreat by mouse');
+  assert.equal(await game.evaluate(() => document.querySelector('#unit-pop').hidden), true);
+  // 7. Win, and leave by clicking the result.
+  await game.evaluate(() => { battle.b.queue = []; battle.b.enemies = []; });
+  await game.waitForFunction(() => battle.done, { timeout: 10000 });
+  for (let i = 0; i < 6 && await game.evaluate(() => battle.talk.length); i++) { await (await game.$('#battle-talk')).click(); await pause(40); }
+  assert.equal(await game.evaluate(() => battle.b.over), 'win');
+  await (await game.$('#battle-result')).click(); await pause(60);
+  assert.equal(await game.evaluate(() => battle), null, 'the result, clicked, goes back to the chapter');
+  assert.deepEqual(errors, []);
+});
+
 test('hatching plays the cracking egg, the rays and the shell shards from the hatch sheet', async t => {
   const { tab, game, errors } = await openWithMons(t);
   // The sheet is inline, so it is there without a network.
@@ -1184,19 +1325,19 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
   assert.equal(await game.$$eval('#squad-detail .skills > span', n => n.length), 4);
   // Filters: C cycles the class (spelled out), T a type, R a tier, Q only the squad.
   await key(tab, 'c');
-  const cls = await game.evaluate(() => sqView().cls);
+  const cls = await game.evaluate(() => filt('squad').cls);
   assert.equal(cls, 'vanguard');
   assert.match(await game.$eval('#squad-filters', n => n.textContent), /Vanguard/);
   assert.ok(await game.evaluate(c => rosterCache.list.every(u => u.cls === c), cls));
-  await game.evaluate(() => { pref.squadView = {}; keep(); squadUpdate(); });
+  await game.evaluate(() => { pref.filters = {}; keep(); squadUpdate(); });
   await key(tab, 'r');
   assert.ok(await game.evaluate(() => rosterCache.list.every(u => tierOf(u.num) === 3)));
   await key(tab, 'q');
   // Q: only squad members (still 3★ only).
   const shown = await game.evaluate(() => rosterCache.list.map(u => u.num).sort((a, b) => a - b));
   assert.deepEqual(shown, await game.evaluate(() => squadPick().filter(n => tierOf(n) === 3).sort((a, b) => a - b)));
-  await game.evaluate(() => { pref.squadView = {}; keep(); squadUpdate(); });
-  // Sorting: S goes Level, Cost, Tier, Newest.
+  await game.evaluate(() => { pref.filters = {}; keep(); squadUpdate(); });
+  // Sorting: S goes Level, Cost, Number, Name, Tier, Recent.
   await key(tab, 's');
   const costs = await game.evaluate(() => rosterCache.list.map(u => u.cost));
   assert.deepEqual(costs, costs.slice().sort((a, b) => a - b), 'sorted by cost');
@@ -1229,6 +1370,44 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
 });
 
 /* ── The battle's feel: blocking, effects and the 3/4 field ────────────── */
+test('battle readability: 3 Meowths walk past a high-ground unit; only the blocked ones get a stop bar; the blocker shows pips; high units stay on their block', async t => {
+  const { game, errors } = await openWithMons(t);
+  // 1-1: a sniper on the high tile in front of the path, a caster behind it, a blocker down the path.
+  await game.evaluate(() => {
+    go('story'); chapterAt = 0; storyMode = 'stages'; storyAt = 0; storyUpdate(); pickStage();
+    const pick = cls => S.owned.find(n => T.classOf(n) === cls);
+    setSquad([pick('blocker'), pick('sniper'), pick('caster')].filter(Boolean)); startBattle(); battle.talk = []; battleTalk();
+    const b = battle.b; b.queue = []; b.energy = 99;
+    const slot = cls => b.squad.findIndex(u => u.cls === cls);
+    T.deploy(b, slot('blocker'), 7, 1); T.deploy(b, slot('sniper'), 2, 2); if (slot('caster') >= 0) T.deploy(b, slot('caster'), 5, 0);
+    for (const u of b.units) { u.atk = 0; u.spa = 0; }
+    for (let i = 0; i < 3; i++) b.queue.push({ at: b.t + i * 0.9, num: 52, wave: 0, path: 0, boss: false, flying: false, explodes: false, armored: false, fast: false });
+    b.waveLeft[0] = 99; battle.paused = true;
+  });
+  // Walk them in engine time until two are held and one still walks.
+  const state = await game.evaluate(() => {
+    const b = battle.b;
+    for (let i = 0; i < 4000 && !(b.enemies.filter(e => e.blockedBy).length >= 1 && b.enemies.some(e => !e.blockedBy && e.x > 2.5)); i++) T.step(b);
+    drawField();
+    const blocker = b.units.find(u => u.cls === 'blocker');
+    return { marks: battle.marks, held: b.enemies.filter(e => e.blockedBy).map(e => e.id), walking: b.enemies.filter(e => !e.blockedBy).map(e => e.id), blocker: blocker.id, of: blocker.block };
+  });
+  assert.ok(state.held.length >= 1 && state.walking.length >= 1, 'some held, some walking');
+  const stops = state.marks.filter(m => m.stop).map(m => m.stop).sort();
+  assert.deepEqual(stops, state.held.slice().sort(), 'a stop bar on each held foe, none on the ones walking past');
+  const pips = state.marks.find(m => m.pips === state.blocker);
+  assert.deepEqual([pips.held, pips.of], [state.held.length, state.of], 'the blocker\'s pips: held of what it can hold');
+  // No pips for units that cannot block.
+  assert.equal(state.marks.filter(m => m.pips !== undefined).length, 1);
+  // The high-ground sniper stands on its block, back from the path row behind it: its head stays out of the walkers' bodies.
+  const high = await game.evaluate(() => { const u = battle.b.units.find(o => o.cls === 'sniper'); const f = feetOf(battle, u), path = feet(battle.stage, 2, 1, false);
+    return { top: f[1] - HIGH_H, pathFeet: path[1], raised: f[1] > feet(battle.stage, 2, 2, true)[1] }; });
+  assert.ok(high.raised, 'moved toward the front of its block, away from the path behind');
+  assert.ok(high.top >= high.pathFeet - 8, 'its sprite stops at the walkers\' feet (' + high.top + ' vs ' + high.pathFeet + ')');
+  await game.evaluate(() => leaveBattle());
+  assert.deepEqual(errors, []);
+});
+
 test('battle: blocked enemies stand clear of the blocker, hits show numbers and flashes, and the range previews', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await key(tab, '1');
@@ -1630,10 +1809,10 @@ test('every stage is cleared by a type-matched squad at the page\'s recommended 
     return new Function(...Object.keys(inject), src + '\nreturn {' + names.join(',') + '};')(...Object.values(inject));
   };
   const daily = load('src/daily.js', ['dailyDate', 'dailyStreak', 'seedNumber']);
-  const dex = load('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CHART']);
+  const dex = load('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CHART', 'DEX_LEGACY']);
   const rewards = load('src/hub/rewards.js', ['mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'],
     { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
-  const gacha = load('src/hub/gacha.js', ['gachaState', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'stageOf', 'evolutionsOf'], { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
+  const gacha = load('src/hub/gacha.js', ['gachaState', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'stageOf', 'evolutionsOf'], { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES, DEX_LEGACY: dex.DEX_LEGACY });
   const td = load('src/hub/td.js', ['classOf', 'STAGES', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'typeMultiplier', 'MAX_LEVEL'],
     { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor, stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
   // The page's own formula, read from the page.

@@ -12,6 +12,9 @@
 //   cfg:buddy:<uuid>    the equipped buddy; the latest one counts
 //   cfg:look:<uuid>     the look a line wears across Bored (x = { l, look }); the latest counts
 //   cfg:skill:<uuid>    the skill a line uses in tower defense (x = { l, k }, k = 0-3); the latest counts
+//   gacha:cut:<line>    the one-time refund for an owned line cut from the egg roster (claimCutRefund):
+//                         g = vouchers and coins, less the candy left on it; x = { l, s, c, k }
+//                         line, its old star, the candy and the level coins it was paid for
 //   cfg:starter         the starter pick, once per account: x = { s, c } the chosen starter and
 //                         the three gifted commons. The id is fixed, so it is written once and
 //                         a second device's pick loses to the earlier one in a merge.
@@ -20,10 +23,10 @@
 // an egg's progress is the waves earned since it was pulled.
 //
 // Pulls are cosmetic everywhere but Poké Gacha's own tower defense.
-import { DEX, DEX_TYPES } from './gacha-dex.js';
+import { DEX, DEX_TYPES, DEX_LEGACY } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
 import {
-  mergeWallet, walletBalance, spendFrom, grantOnce, buyRegular, readWallet, writeWallet, walletTrophies, walletTrophyList
+  mergeWallet, walletBalance, spendFrom, grantOnce, buyRegular, readWallet, writeWallet, walletTrophies, walletTrophyList, bossStreak
 } from './rewards.js';
 
 // Egg tiers: 0 Common 3★, 1 Rare 4★, 2 Epic 5★, 3 Legendary 6★, 4 the banner legendary (6★).
@@ -107,7 +110,8 @@ export const WELCOME_ID = 'gacha:welcome';
    Two devices buying offline merge to one entry per id, cost and goods together, so
    nothing is paid twice and no limit can be passed. */
 export const COIN_SHOP = {
-  candy: { coins: 200, candy: 5, perLineDay: 50 },
+  // Candy is 40 coins each, bought in any number up to 50 per line a day (5 for 200 is the old pack).
+  candy: { coins: 200, candy: 5, perLineDay: 50, each: 40 },
   shards: { coins: 500, shards: 10, perWeek: 50 },
   presets: { start: 3, max: 5, prices: [500, 1000] }
 };
@@ -119,7 +123,8 @@ function coinShop(entries, today) {
   for (const id of Object.keys(entries)) {
     if (!id.startsWith('spend:')) continue;
     const part = id.split(':');
-    if (part[1] === 'candy' && part[3] === today) candyToday[part[2]] = (candyToday[part[2]] || 0) + COIN_SHOP.candy.candy;
+    // Each purchase counts the candy it bought (older entries were all packs of 5).
+    if (part[1] === 'candy' && part[3] === today) candyToday[part[2]] = (candyToday[part[2]] || 0) + (Number(entries[id]?.g?.['candy:' + part[2]]) || COIN_SHOP.candy.candy);
     if (part[1] === 'shards' && part[2] === monday) shardsWeek += COIN_SHOP.shards.shards;
     if (part[1] === 'preset') { const n = Number(part[2]); if (n > COIN_SHOP.presets.start && n <= COIN_SHOP.presets.max) presets++; }
   }
@@ -226,6 +231,43 @@ export function bannerFor(date) {
   return legends[seedNumber(date) % legends.length];
 }
 
+/* ── The roster cut ──────────────────────────────────────────────────────
+   Lines cut from the egg roster (DEX_LEGACY, star 0 in the dex) never hatch
+   again and leave the Poké Gacha dex, squads and presets. Each cut line the
+   account owned is refunded once, under the fixed id gacha:cut:<line>, so two
+   devices merge to one payment, and a line whose hatches sync in later is still
+   paid when it arrives: its old tier in vouchers (CUT_REFUND), 1 Regular per
+   CUT_CANDY candy left on it (that candy is spent in the same entry), and the
+   coins its levels cost. */
+export const CUT_REFUND_PREFIX = 'gacha:cut:';
+export const CUT_REFUND = { 3: { regular: 1 }, 4: { regular: 2 }, 5: { plus: 1 }, 6: { premium: 1 } };
+export const CUT_CANDY = 25;
+const CUT = Object.fromEntries(DEX_LEGACY);
+/** Is this species in a line cut from the egg roster? */
+export const isCut = num => !!CUT[lineOf(num)];
+function cutRefundOf(l) {
+  const out = { ...(CUT_REFUND[l.star] || {}) };
+  const regular = Math.floor(l.candy / CUT_CANDY);
+  if (regular) out.regular = (out.regular || 0) + regular;
+  if (l.coins) out.coins = l.coins;
+  return out;
+}
+/** Refund every owned cut line not refunded yet. ok only when something is paid now. */
+export function claimCutRefund(wallet, { today = dailyDate(), now = Date.now() } = {}) {
+  const next = mergeWallet(wallet);
+  if (!next.entries.on) return refuse(wallet, 'inactive');
+  const due = gachaState(next, today).legacy.filter(l => !l.refunded);
+  if (!due.length) return refuse(wallet, 'none');
+  const total = {};
+  for (const l of due) {
+    const g = { ...l.refund };
+    for (const [k, n] of Object.entries(g)) total[k] = (total[k] || 0) + n;
+    if (l.candy) g['candy:' + l.line] = -l.candy;
+    next.entries[CUT_REFUND_PREFIX + l.line] = { at: seconds(now), g, x: { l: l.line, s: l.star, c: l.candy, k: l.coins } };
+  }
+  return { wallet: next, ok: true, lines: due.map(({ line, star, candy, coins, refund }) => ({ line, star, candy, coins, refund })), total };
+}
+
 /* ── Reading the ledger ──────────────────────────────────────────────────── */
 
 function readPulls(entries) {
@@ -279,6 +321,9 @@ export function gachaState(wallet, today = dailyDate()) {
   const dupe = [0, 0, 0, 0];
   const lines = {};
   const owned = new Set();
+  // Lines cut from the roster leave the state: no dex entry, no squad, no buddy.
+  // What the player held of them is in `legacy` (and refunded once, claimCutRefund).
+  const legacy = {};
   const line = num => (lines[num] ||= { line: num, hatches: 0, shiny: false, skins: [], skills: [false, false, false, false],
     passive: false, cost: 0, look: 'normal', skill: null });
   // The starter and its gifts are owned with their first common skill, like a hatch.
@@ -300,13 +345,20 @@ export function gachaState(wallet, today = dailyDate()) {
         return;
       }
       hatched.push({ ...egg, ...hatch });
+      if (tier < 4) dupe[tier] = hatch.fresh ? 0 : dupe[tier] + 1;
+      if (isCut(hatch.species)) {
+        const at = lineOf(hatch.species);
+        const held = legacy[at] ||= { line: at, star: CUT[at], hatches: 0, shiny: false, look: 'normal' };
+        held.hatches++;
+        if (hatch.shiny) held.shiny = true;
+        return;
+      }
       const l = line(lineOf(hatch.species));
       l.hatches++;
       l.skills[hatch.skill] = true;
       if (hatch.shiny) l.shiny = true;
       if (hatch.sp && !l.skins.includes(hatch.sp)) l.skins.push(hatch.sp);
       owned.add(hatch.species);
-      if (tier < 4) dupe[tier] = hatch.fresh ? 0 : dupe[tier] + 1;
     });
   }
   // Candy and shard spends, in the order they were made.
@@ -322,13 +374,16 @@ export function gachaState(wallet, today = dailyDate()) {
     if (id === 'cfg:starter') continue;
     if (id.startsWith('cfg:look:')) {
       if (lines[x.l] && typeof x.look === 'string') lines[x.l].look = x.look;
+      // A cut line keeps its shiny look elsewhere in Bored (Poké Idle draws every species).
+      if (legacy[x.l] && (x.look === 'normal' || x.look === 'shiny')) legacy[x.l].look = x.look;
       continue;
     }
     if (id.startsWith('cfg:skill:')) {
       if (lines[x.l] && Number.isInteger(x.k) && x.k >= 0 && x.k <= 3) lines[x.l].skill = x.k;
       continue;
     }
-    if (Array.isArray(x.ev) && validNum(x.ev[1])) owned.add(x.ev[1]);
+    if (Array.isArray(x.ev) && validNum(x.ev[1]) && !isCut(x.ev[1])) owned.add(x.ev[1]);
+    if (Number.isInteger(x.lv) && legacy[x.lv] && entry.g && entry.g.coins < 0) legacy[x.lv].coins = (legacy[x.lv].coins || 0) - entry.g.coins;
     if (typeof x.up === 'string' && lines[x.l]) {
       if (x.up === 'passive') lines[x.l].passive = true;
       if (x.up === 'cost1') lines[x.l].cost = Math.max(lines[x.l].cost, 1);
@@ -347,6 +402,14 @@ export function gachaState(wallet, today = dailyDate()) {
     l.skins = l.skins.filter(id => skinById(id));
     if ((l.look === 'shiny' && !l.shiny) || (l.look !== 'normal' && l.look !== 'shiny' && !l.skins.includes(l.look))) l.look = 'normal';
   }
+  for (const l of Object.values(legacy)) {
+    // Once refunded, the entry says what was paid (its candy is spent by then).
+    const paid = entries[CUT_REFUND_PREFIX + l.line];
+    l.refunded = !!paid;
+    l.candy = paid ? Number(object(paid.x).c) || 0 : Math.max(0, balance['candy:' + l.line] || 0);
+    l.coins = paid ? Number(object(paid.x).k) || 0 : l.coins || 0;
+    l.refund = cutRefundOf(l);
+  }
   if (buddy && !owned.has(buddy.species)) buddy = null;
   if (buddy && buddy.skin && !(lines[lineOf(buddy.species)]?.skins.includes(buddy.skin) && skinCovers(buddy.skin, buddy.species))) buddy.skin = null;
   return {
@@ -357,6 +420,7 @@ export function gachaState(wallet, today = dailyDate()) {
     login: !!entries['gacha:login:' + today],
     missions: Object.fromEntries(STARTER_MISSIONS.map(m => [m.id, !!entries['gacha:start:' + m.id]])),
     shop: coinShop(entries, today),
+    legacy: Object.values(legacy).sort((a, b) => a.line - b.line),
     active: !!entries.on
   };
 }
@@ -367,15 +431,24 @@ const refuse = (wallet, reason) => ({ wallet: mergeWallet(wallet), ok: false, re
 const starter = (wallet, id, now) => grantOnce(wallet, 'gacha:start:' + id, STARTER, { now }).wallet;
 
 /** Coin shop: 5 candy for a caught line, 200 coins, up to 50 for that line today. */
-export function buyCandy(wallet, line, { today = dailyDate(), now = Date.now() } = {}) {
+/** What buying `count` candy for a line would cost now: coins, what today's cap leaves, and any coins short. */
+export function candyOffer(wallet, line, count, { today = dailyDate() } = {}) {
+  const state = gachaState(wallet, today), c = COIN_SHOP.candy, n = Math.max(1, Math.floor(Number(count) || 0));
+  const left = Math.max(0, c.perLineDay - (state.shop.candyToday[line] || 0)), coins = n * c.each;
+  return { count: n, coins, left, have: state.balance.coins, short: Math.max(0, coins - state.balance.coins), fits: n <= left };
+}
+/** Buy `count` candy for a line (default the 5-pack) at 40 coins each, within 50 per line a day. */
+export function buyCandy(wallet, line, { count = COIN_SHOP.candy.candy, today = dailyDate(), now = Date.now() } = {}) {
   const state = gachaState(wallet, today), c = COIN_SHOP.candy;
   if (!state.lines[line]) return refuse(wallet, 'not-owned');
-  if ((state.shop.candyToday[line] || 0) + c.candy > c.perLineDay) return refuse(wallet, 'limit');
+  const offer = candyOffer(wallet, line, count, { today });
+  if (!offer.fits) return { ...refuse(wallet, 'limit'), left: offer.left };
+  if (offer.short) return { ...refuse(wallet, 'coins'), short: offer.short };
   const merged = mergeWallet(wallet);
   let slot = 0;
   while (merged.entries['spend:candy:' + line + ':' + today + ':' + slot]) slot++;
-  const r = spendFrom(merged, { coins: c.coins }, { id: 'candy:' + line + ':' + today + ':' + slot, now, gain: { ['candy:' + line]: c.candy } });
-  return r.ok ? { wallet: r.wallet, ok: true } : refuse(wallet, 'coins');
+  const r = spendFrom(merged, { coins: offer.coins }, { id: 'candy:' + line + ':' + today + ':' + slot, now, gain: { ['candy:' + line]: offer.count } });
+  return r.ok ? { wallet: r.wallet, ok: true, count: offer.count, coins: offer.coins } : { ...refuse(wallet, 'coins'), short: offer.short };
 }
 /** Coin shop: 10 shards for 500 coins, up to 50 shards a week (Monday to Sunday). */
 export function buyShards(wallet, { today = dailyDate(), now = Date.now() } = {}) {
@@ -471,7 +544,8 @@ export function hatchReady(wallet, { today = dailyDate(), now = Date.now(), rand
   const results = [];
   for (const egg of ready) {
     const { tier, machine } = egg;
-    let pool = tier === 4 ? [egg.banner] : pools[tier];
+    // A banner egg whose legendary was cut hatches as a kept one: that day's banner.
+    let pool = tier === 4 ? [validNum(egg.banner) && !isCut(egg.banner) ? egg.banner : bannerFor(egg.day || today)] : pools[tier];
     if (tier < 4 && dupe[tier] >= DUPE_PITY) {
       const unseen = pool.filter(num => !owned.has(num));
       if (unseen.length) pool = unseen;
@@ -585,7 +659,10 @@ export function setLook(wallet, line, look, { today = dailyDate(), now = Date.no
  */
 export function lookFor(state, num) {
   const line = state.lines[lineOf(num)];
-  if (!line) return 'normal';
+  if (!line) {
+    const cut = (state.legacy || []).find(l => l.line === lineOf(num));
+    return cut && cut.shiny && cut.look === 'shiny' ? 'shiny' : 'normal';
+  }
   if (line.look === 'normal' || line.look === 'shiny') return line.look;
   return skinCovers(line.look, num) ? line.look : 'normal';
 }
@@ -621,6 +698,8 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     trophies: () => walletTrophies(readWallet()),
     // Every trophy, earned or not, with its progress (have / need).
     trophyList: () => walletTrophyList(readWallet()),
+    // The Poké Idle daily boss streak (weekdays in a row), for the Trainer card.
+    bossStreak: () => bossStreak(readWallet(), dailyDate()),
     pickStarter: act((w, o) => pickStarter(w, o.species, o)),
     pull: act((w, o) => pullEggs(w, o)),
     hatch: act((w, o) => hatchReady(w, o)),
@@ -632,12 +711,17 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     // The coin shop: candy for a line, shards, squad preset slots (limits in state().shop).
     coinShop: COIN_SHOP,
     buyCandy: act((w, o) => buyCandy(w, o.line, o)),
+    // The missing-candy prompt: what count candy would cost now (no write).
+    candyOffer: o => candyOffer(readWallet(), o.line, o.count, { today: dailyDate() }),
     buyShards: act((w, o) => buyShards(w, o)),
     buyPreset: act((w, o) => buyPreset(w, o)),
     skins: () => skinList(), looksOf, lookFor: num => lookFor(gachaState(readWallet()), num), skinDir: SKIN_DIR, skinFile, skinPrice,
     setLook: act((w, o) => setLook(w, o.line, o.look, o)),
     setSkill: act((w, o) => setSkill(w, o.line, o.skill, o)),
-    claimLogin: act((w, o) => claimLogin(w, o))
+    claimLogin: act((w, o) => claimLogin(w, o)),
+    // The one-time refund for owned lines cut from the roster: { ok, lines, total }.
+    claimCutRefund: act((w, o) => claimCutRefund(w, o)),
+    cutRefund: CUT_REFUND, cutCandy: CUT_CANDY, isCut
   };
 }
 

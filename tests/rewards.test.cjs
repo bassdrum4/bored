@@ -16,7 +16,7 @@ function moduleUnderTest(file, names, injections = {}) {
 const { dailyDate, dailyStreak } = moduleUnderTest('src/daily.js', ['dailyDate', 'dailyStreak']);
 const rewards = moduleUnderTest('src/hub/rewards.js', [
   'mergeWallet', 'walletBalance', 'activateWallet', 'observeSnapshot', 'grantOnce',
-  'spendFrom', 'buyRegular', 'walletTrophies', 'walletStats', 'walletTrophyList'
+  'spendFrom', 'buyRegular', 'walletTrophies', 'walletStats', 'walletTrophyList', 'bossStreak'
 ], { dailyDate, dailyStreak, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const { mergeWallet, walletBalance, activateWallet, observeSnapshot, grantOnce, spendFrom, buyRegular, walletTrophies } = rewards;
 
@@ -196,6 +196,24 @@ test('the account copy carries the wallet through the cloud merge', () => {
   const merged = mergeCloudState({ wallet: a }, { wallet: b });
   assert.equal(walletBalance(merged.wallet).regular, 6);
   assert.equal('wallet' in mergeCloudState({}, {}), false, 'rows without a wallet stay as they were');
+});
+
+test('bossStreak: weekday boss wins in a row, as the Card shows; weekends skipped, today unbeaten does not break it', () => {
+  const { bossStreak } = rewards;
+  const day = d => '2026-11-' + String(d).padStart(2, '0');
+  const at = d => ({ today: day(d), now: Date.parse(day(d) + 'T15:00:00Z') });
+  const win = (w, d) => observeSnapshot(w, 'poke-idle', idle({ boss: { date: day(d), won: true } }), at(d)).wallet;
+  let w = activateWallet({}, at(16)).wallet;
+  assert.equal(bossStreak(w, day(16)), 0);
+  w = win(w, 16);
+  assert.equal(bossStreak(w, day(16)), 1, 'Monday');
+  assert.equal(bossStreak(w, day(17)), 1, 'Tuesday, not beaten yet: still 1');
+  for (const d of [17, 18, 19, 20]) w = win(w, d);
+  assert.equal(bossStreak(w, day(20)), 5);
+  assert.equal(bossStreak(w, day(22)), 5, 'the weekend neither counts nor breaks it');
+  w = win(w, 23);
+  assert.equal(bossStreak(w, day(23)), 6, 'across the weekend');
+  assert.equal(bossStreak(w, day(25)), 0, 'a missed weekday (the 24th) breaks it');
 });
 
 test('the Poké Idle daily boss pays once a day, and five weekday wins in a row pay a Premium; weekends neither count nor break it', () => {

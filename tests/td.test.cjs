@@ -14,14 +14,14 @@ function moduleUnderTest(file, names, injections = {}) {
 }
 
 const daily = moduleUnderTest('src/daily.js', ['dailyDate', 'dailyStreak', 'seedNumber']);
-const dex = moduleUnderTest('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CHART']);
+const dex = moduleUnderTest('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CHART', 'DEX_LEGACY']);
 const rewards = moduleUnderTest('src/hub/rewards.js', [
   'mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools', 'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'stageOf', 'evolutionsOf', 'setSkill', 'evolve'],
-  { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
+  { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES, DEX_LEGACY: dex.DEX_LEGACY });
 const td = moduleUnderTest('src/hub/td.js', [
-  'classOf', 'STAGES', 'CHAPTERS', 'FAST', 'MAX_RISK', 'WEEKLY_MILESTONES', 'WEEKLY_UNLOCK', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
+  'classOf', 'STAGES', 'CHAPTERS', 'FAST', 'MAX_RISK', 'WEEKLY_MILESTONES', 'WEEKLY_UNLOCK', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'castSkill', 'canDeploy', 'starsFor', 'typeMultiplier',
   'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H', 'lineCap', 'LEVEL_CAPS', 'SKILL_KINDS'
 ], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor,
   stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
@@ -122,6 +122,21 @@ function play(stage, squad, plan) {
   }
   return b;
 }
+
+test('castSkill: a charged unit fires its skill now and empties its charge; an uncharged one, or an unknown id, does not', () => {
+  const stage = td.STAGES.find(s => s.id === '1-1');
+  const b = td.newBattle(stage, [td.unitStats(named('Onix'))]);
+  b.energy = 99; td.deploy(b, 0, 3, 1);
+  const u = b.units[0];
+  assert.equal(td.castSkill(b, u.id), false, 'not charged yet');
+  u.sp = u.spMax; u.hp = Math.round(u.maxHp * 0.9);
+  const hp = u.hp;
+  assert.equal(td.castSkill(b, u.id), true);
+  assert.equal(u.sp, 0, 'the charge is spent');
+  assert.ok(u.hp > hp, 'a Blocker heals itself, even above 60% where it would hold the skill');
+  assert.equal(b.log[b.log.length - 1].unit, u.id, 'logged like any skill');
+  assert.equal(td.castSkill(b, 9999), false, 'unknown unit');
+});
 
 test('an empty field loses stage 1-1, and a sensible squad clears it with 3 stars', () => {
   const stage = td.STAGES[0];
@@ -373,11 +388,13 @@ test('levels cost coins and raise stats; the squad reads candy upgrades', () => 
   assert.deepEqual(td.squadFrom(w, [named('Mew')], TODAY), [], 'only owned species');
 });
 
+// The level the page recommends for a stage (recLevel in poke-gacha.html): (level - 1) x 2 + 1.
+const recLevel = stage => Math.max(1, Math.min(td.MAX_LEVEL || 10, Math.round(((stage.level || 1) - 1) * 2 + 1)));
 // Difficulty: the late stages want a type-matched squad. From the commons and rares
 // (3★ and 4★ lines), take the 60 whose first type hits the stage's enemies hardest
-// (or worst), build a squad with a class mix, and play it at level 3 with the same
+// (or worst), build a squad with a class mix, and play it at the stage's recommended level with the same
 // placement a player would use (snipers first and beside the flight lines when bats fly).
-function squadFor(stage, rank) {
+function squadFor(stage, rank, level = recLevel(stage)) {
   const mult = (atk, defend) => td.typeMultiplier(atk, defend);
   const foes = stage.waves.map(w => gacha.mon(w[1]).types);
   const fit = num => foes.reduce((s, types) => s + Math.log2(mult(gacha.mon(num).types[0], types)), 0) / foes.length;
@@ -387,7 +404,7 @@ function squadFor(stage, rank) {
   const flying = stage.waves.some(w => w[5]);
   const core = [...by('blocker').slice(0, 1), ...by('guard').slice(0, 2), ...by('vanguard').slice(0, 1),
     ...(flying ? by('sniper').slice(0, 2) : by('caster').slice(0, 2)), ...by('sniper').slice(0, 1), ...by('medic').slice(0, 1), ...by('caster').slice(0, 1)];
-  return [...new Set([...core, ...ranked])].slice(0, 8).map(num => td.unitStats(num, { level: 3 }));
+  return [...new Set([...core, ...ranked])].slice(0, 8).map(num => td.unitStats(num, { level }));
 }
 function placed(stage, squad) {
   const flying = stage.waves.some(w => w[5]);
@@ -410,14 +427,16 @@ function playInOrder(stage, squad, plan) {
   }
   return b;
 }
-test('late stages want type-matched squads: matched level-3 commons and rares win, the worst-typed lose', () => {
-  for (const id of ['1-8', '2-3', '2-4', '2-5', '2-6', '3-1', '3-2', '3-3', '3-4', '3-5', '3-6', '4-1', '4-2', '4-4', '4-5', '4-6',
+const WORST_MAY_WIN = ['1-8'];
+test('late stages want type-matched squads: matched commons and rares at the recommended level win, the worst-typed lose', () => {
+  for (const id of ['1-6', '1-7', '1-8', '2-3', '2-4', '2-5', '2-6', '3-1', '3-2', '3-3', '3-4', '3-5', '3-6', '4-1', '4-2', '4-4', '4-5', '4-6',
     '5-1', '5-2', '5-3', '5-4', '5-5', '5-6', '6-1', '6-2', '6-3', '6-4', '6-5', '6-6']) {
     const stage = td.STAGES.find(s => s.id === id);
     const good = squadFor(stage, 1), bad = squadFor(stage, -1);
-    assert.equal(playInOrder(stage, good, placed(stage, good)).over, 'win', id + ': a type-matched level-3 squad wins');
-    // The Petrel boss is the one stage a worst-typed squad can scrape through, with 1 star.
-    if (id !== '3-6') assert.equal(playInOrder(stage, bad, placed(stage, bad)).over, 'lose', id + ': the worst-typed level-3 squad loses');
+    assert.equal(playInOrder(stage, good, placed(stage, good)).over, 'win', id + ': a type-matched squad at Lv ' + recLevel(stage) + ' wins');
+    // With the 203-line roster the worst-typed pool for 1-8 is mostly Fighting and Ground,
+    // which still wins there; 1-8 is a chapter boss for new squads, not a type check.
+    if (!WORST_MAY_WIN.includes(id)) assert.equal(playInOrder(stage, bad, placed(stage, bad)).over, 'lose', id + ': the worst-typed squad at Lv ' + recLevel(stage) + ' loses');
   }
 });
 
@@ -533,9 +552,9 @@ test('repeat clears pay 15 coins each, ten a day; a first clear and a loss do no
 });
 
 test('level caps rise with evolution: 5 for a base form, 8 for a middle one, 10 once a final form is owned', () => {
-  const [charmander, charmeleon, charizard, tauros] = ['Charmander', 'Charmeleon', 'Charizard', 'Tauros'].map(named);
+  const [charmander, charmeleon, charizard, lapras] = ['Charmander', 'Charmeleon', 'Charizard', 'Lapras'].map(named);
   const cap = nums => td.lineCap(gacha.gachaState(owning(nums), TODAY), gacha.lineOf(nums[0]));
-  assert.deepEqual([cap([charmander]), cap([charmander, charmeleon]), cap([charmander, charmeleon, charizard]), cap([tauros])], [5, 8, 10, 10]);
+  assert.deepEqual([cap([charmander]), cap([charmander, charmeleon]), cap([charmander, charmeleon, charizard]), cap([lapras])], [5, 8, 10, 10]);
   // Buying levels stops at the cap, with its own reason.
   let w = fund(owning([charmander]), { coins: 5000 });
   for (let i = 0; i < 4; i++) w = td.levelUp(w, charmander, opts()).wallet;
