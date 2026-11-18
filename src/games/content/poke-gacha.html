@@ -2089,6 +2089,92 @@ function tileRect(stage, x, y) {
   const high = tileAt(stage, x, y) === "H";
   return { x: MX + x * TW, y: MY + y * TH - (high ? RAISE : 0), high };
 }
+/* ── Tilesets ───────────────────────────────────────────────────────────
+   Optional pixel-art tiles from poke-gacha/tiles/<theme>/, all at 1x:
+     floor-N, path-N, high-top-N      56x36 tops (N = 1, 2, ... variants)
+     high-front-N                     56x12 front face of high ground
+     path-edge-top/-bottom/-left/-right  56x36 overlays on a path tile where it meets floor
+     spawn, base                      56x36 overlays on the spawn and base tiles
+     prop-*                           any size, stood on floor tiles
+   A theme folder can list what it has in tiles.json ({ "floor": 3, "path": 2, "high-top": 2,
+   "high-front": 2, "props": ["rock", "bush"] }); without one, numbered files are probed
+   (floor-1, floor-2, ... and prop-1, prop-2, ...). A stage looks for its own theme
+   (stage.theme), then "chapter-N", then "default"; whatever is missing falls back to the
+   drawn tiles, piece by piece. Variants and props are picked by the stage's seed, so a stage
+   always looks the same. Map letters: '#' floor, '.' path, 'H' high ground, 'S' spawn, 'G' base. */
+const TILE_DIR = ART_DIR.replace("poke-gacha/art/", "poke-gacha/tiles/");
+const TILESETS = new Map();   // theme -> tileset | null (nothing there) | Promise (loading)
+const TILE_FAMILIES = ["floor", "path", "high-top", "high-front"];
+const TILE_ONES = ["path-edge-top", "path-edge-bottom", "path-edge-left", "path-edge-right", "spawn", "base"];
+const loadImg = src => new Promise(done => { const img = new Image(); img.onload = () => done(img.naturalWidth ? img : null); img.onerror = () => done(null); img.src = src; });
+async function loadTileset(theme) {
+  const dir = TILE_DIR + theme + "/";
+  let list = null;
+  try { const r = await fetch(dir + "tiles.json", { cache: "no-store" }); if (r.ok) list = await r.json(); } catch {}
+  const set = { theme, props: [] };
+  const family = async (name, count) => {
+    const out = [];
+    for (let i = 1; i <= (count ?? 8); i++) { const img = await loadImg(dir + name + "-" + i + ".png"); if (!img) { if (count == null) break; continue; } out.push(img); }
+    return out;
+  };
+  // No manifest and no floor-1: nothing in this folder.
+  if (!list) { const probe = await loadImg(dir + "floor-1.png"); if (!probe) return null; }
+  for (const f of TILE_FAMILIES) set[f] = await family(f, list ? Number(list[f]) || 0 : null);
+  for (const one of TILE_ONES) set[one] = await loadImg(dir + one + ".png");
+  if (list && Array.isArray(list.props)) for (const name of list.props) { const img = await loadImg(dir + "prop-" + name + ".png"); if (img) set.props.push(img); }
+  else if (!list) set.props = await family("prop", null);
+  const any = TILE_FAMILIES.some(f => set[f].length) || TILE_ONES.some(o => set[o]) || set.props.length;
+  return any ? set : null;
+}
+// The tileset for a stage, once loaded (null until then, or when there is none).
+function tilesetFor(stage) {
+  const themes = [stage.theme, "chapter-" + (stage.chapter || 1), "default"].filter(Boolean);
+  for (const theme of themes) {
+    const got = TILESETS.get(theme);
+    if (got === undefined) { TILESETS.set(theme, loadTileset(theme).then(set => { TILESETS.set(theme, set); return set; }, () => { TILESETS.set(theme, null); return null; })); return null; }
+    if (got instanceof Promise) return null;
+    if (got) return got;
+  }
+  return null;
+}
+// A stage's own seed, and a stable pick per tile from it.
+const stageSeed = stage => { let h = 2166136261; for (const c of String(stage.id || stage.name || "")) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h; };
+const tilePick = (seed, x, y, salt, n) => n ? (Math.imul(seed ^ Math.imul(x + 1, 73856093) ^ Math.imul(y + 1, 19349663) ^ Math.imul(salt + 1, 83492791), 2654435761) >>> 0) % n : -1;
+// Props: about one floor tile in four, never on the path, high ground, spawn or base.
+function propsOf(stage, set) {
+  if (!set || !set.props.length) return [];
+  const seed = stageSeed(stage), out = [];
+  for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++)
+    if (tileAt(stage, x, y) === "#" && tilePick(seed, x, y, 7, 4) === 0) out.push({ x, y, img: set.props[tilePick(seed, x, y, 8, set.props.length)] });
+  return out;
+}
+// One tile from the set; false when the set lacks that piece (the caller draws the fallback).
+function drawSetTile(g, set, stage, x, y, r, c) {
+  if (!set) return false;
+  const seed = stageSeed(stage), pick = (list, salt) => list && list.length ? list[tilePick(seed, x, y, salt, list.length)] : null;
+  if (c === "H") {
+    const top = pick(set["high-top"], 1);
+    if (!top) return false;
+    // The front face only where the tile in front is not high ground (or is off the map).
+    if (y + 1 >= T.H || tileAt(stage, x, y + 1) !== "H") { const front = pick(set["high-front"], 2); if (front) g.drawImage(front, r.x, r.y + TH, TW, RAISE); }
+    g.drawImage(top, r.x, r.y, TW, TH);
+    return true;
+  }
+  if (c === "#") { const f = pick(set.floor, 3); if (!f) return false; g.drawImage(f, r.x, r.y, TW, TH); return true; }
+  // Path, spawn and base: the path tile, its edges where it meets floor, then the marker.
+  const p = pick(set.path, 4);
+  if (!p) return false;
+  g.drawImage(p, r.x, r.y, TW, TH);
+  const floorAt = (dx, dy) => { const nx = x + dx, ny = y + dy; return nx >= 0 && ny >= 0 && nx < T.W && ny < T.H && tileAt(stage, nx, ny) === "#"; };
+  for (const [side, dx, dy] of [["top", 0, -1], ["bottom", 0, 1], ["left", -1, 0], ["right", 1, 0]]) {
+    const edge = set["path-edge-" + side];
+    if (edge && floorAt(dx, dy)) g.drawImage(edge, r.x, r.y, TW, TH);
+  }
+  const mark = c === "S" ? set.spawn : c === "G" ? set.base : null;
+  if (mark) g.drawImage(mark, r.x, r.y, TW, TH);
+  // A missing marker keeps the drawn frame, so spawn and base still read.
+  return !(c === "S" || c === "G") || !!mark;
+}
 // A pixel oval: rows of rects, no anti-aliasing.
 function oval(g, cx, cy, w, color) {
   g.fillStyle = color;
@@ -2101,8 +2187,11 @@ function drawField(now = performance.now()) {
   g.clearRect(0, 0, 640, FIELD_H);
   g.fillStyle = C.ink; g.fillRect(0, 0, 640, FIELD_H);
   // Floor, back row first; high ground is a raised block with a darker front face.
+  // A tileset (if this stage's theme has one) draws each tile; anything it lacks is drawn here.
+  const set = tilesetFor(st);
   for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
     const c = tileAt(st, x, y), r = tileRect(st, x, y);
+    if (drawSetTile(g, set, st, x, y, r, c)) continue;
     if (c === "H") {
       g.fillStyle = SHADE.sky[0]; g.fillRect(r.x, r.y + TH, TW, RAISE);
       g.fillStyle = C.sky; g.fillRect(r.x, r.y, TW, TH);
@@ -2157,13 +2246,17 @@ function drawField(now = performance.now()) {
   else if (hovered) showRange(hovered, hovered.x, hovered.y);
   else if (card && !T.canDeploy(b, bt.slot, hov[0], hov[1])) showRange(card, hov[0], hov[1]);
   // Everyone, back to front.
-  const things = [...b.units.map(o => ({ o, unit: true })), ...b.enemies.map(o => ({ o, unit: false }))]
-    .map(t => ({ ...t, at: feetOf(bt, t.o) })).sort((a, c) => (a.at[1] + (a.o.flying ? 20 : 0)) - (c.at[1] + (c.o.flying ? 20 : 0)));
+  // Props stand on their floor tile's centre and sort with everyone else.
+  const props = propsOf(st, set).map(p => ({ prop: p, o: {}, at: feet(st, p.x, p.y, false) }));
+  const things = [...props, ...b.units.map(o => ({ o, unit: true })), ...b.enemies.map(o => ({ o, unit: false }))]
+    .map(t => t.prop ? t : ({ ...t, at: feetOf(bt, t.o) })).sort((a, c) => (a.at[1] + (a.o.flying ? 20 : 0)) - (c.at[1] + (c.o.flying ? 20 : 0)));
   const ghostsNow = bt.ghosts.filter(gh => now - gh.t0 < FX_TIME.fade);
   bt.ghosts = ghostsNow;
   for (const gh of ghostsNow) drawMon(g, gh.img, gh.at[0], gh.at[1], { flip: gh.flip, alpha: 1 - (now - gh.t0) / FX_TIME.fade });
   const drawn = [], bars = [];
-  for (const { o, unit, at } of things) {
+  for (const t of things) {
+    if (t.prop) { const img = t.prop.img; g.drawImage(img, Math.round(t.at[0] - img.naturalWidth / 2), Math.round(t.at[1] + 6 - img.naturalHeight)); continue; }
+    const { o, unit, at } = t;
     const a = bt.anim[(unit ? "u" : "e") + o.id] || {};
     let [cx, cy] = at;
     // A lunge: a few pixels toward the target, there and back.
