@@ -437,9 +437,9 @@ test('SP skins: the shop prices sets by size, a set shows on each form, and a sk
   })))));
   assert.ok(sizes.length >= 30);
   for (const [id, num, w, h] of sizes) assert.deepEqual([w, h], [96, 96], id + ' on #' + num);
-  // The shop: Mew's line never hatches, so its skin is not for sale; prices go by forms.
+  // The shop: every listed skin whose line hatches is for sale (Mew too, now mythicals are in Legendary eggs); prices go by forms.
   const shop = await game.evaluate(() => shopItems().filter(i => i.kind === 'sp').map(i => [i.skin.id, i.price]));
-  assert.ok(!shop.some(([id]) => id === 'mew'));
+  assert.equal(shop.find(([id]) => id === 'mew')?.[1], 300, 'the Mew skin is on sale');
   assert.deepEqual(['charizard', 'clefairy-set', 'pidgey-set'].map(id => shop.find(r => r[0] === id)[1]), [300, 400, 500]);
   // Own the Pidgey line, buy the set and wear it: Pidgey and Pidgeotto both draw it.
   const worn = await game.evaluate(() => {
