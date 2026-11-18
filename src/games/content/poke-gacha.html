@@ -69,10 +69,14 @@ canvas, img { image-rendering: pixelated; display: block }
 [hidden] { display: none !important }
 
 #tabs { position: absolute; left: 8px; right: 8px; top: 4px; height: 32px; display: flex; gap: 6px }
-#tabs .panel { position: static; height: 32px; padding: 4px 12px; cursor: pointer }
+#tabs .panel { position: static; height: 32px; padding: 4px 9px; cursor: pointer }
 #tabs .panel.on { background: var(--red) }
 #tabs .purse { margin-left: auto; display: flex; align-items: center; gap: 8px; cursor: default }
-#tabs .help { cursor: pointer; padding: 4px 7px }
+#tabs .help { cursor: pointer; padding: 4px 7px; display: flex; align-items: center; gap: 7px }
+#tabs .help .speaker { cursor: pointer }
+/* The fallback font is wider: tighter tabs keep a five-digit purse on the bar. */
+#frame.no-pixel #tabs .panel { padding: 4px 6px }
+#frame.no-pixel #tabs { gap: 4px }
 /* The tutorial: the whole frame dims except one gold-framed box, and its words sit
    in a message box (at the bottom, or the top when the box is down there). Clicks
    pass through, so the player does the real thing. */
@@ -416,6 +420,8 @@ const PIXEL_MAPS = {
  "candy": ["..kkkk..", ".k2211k.", "k22w110k", "k2w1w10k", "k21w110k", "k111100k", ".k1000k.", "..kkkk.."],
  "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
  "dot": ["kkkk", "k11k", "k11k", "kkkk"],
+ "sound-on": ["....k.....", "...k1k..k.", "kkk11k.k1k", "k1111k.k1k", "k1111k.k1k", "kkk11k.k1k", "...k1k..k.", "....k....."],
+ "sound-off": ["....k.....", "...k1k....", "kkk11k....", "k1111k....", "k1111k....", "kkk11k....", "...k1k....", "....k....."],
  "star": ["........k........", ".......k3k.......", ".......k3k.......", "......k321k......", "......k321k......", ".kkkkk32221kkkkk.", "k333332222211111k", ".k3222222222221k.", "..k32222222221k..", "...k322222221k...", "....k3222221k....", "....k3222221k....", "...k322222221k...", "...k3211k2221k...", "..k321kk.kk221k..", "..k31k.....k21k..", "...kk.......kk..."],
  "shield": ["kkkkk", "k121k", "k111k", "k111k", ".k1k.", "..k.."],
  "skill": ["..kkk", ".k11k", "k11k.", "kk11k", ".k1k.", "k1k..", "kk..."],
@@ -772,7 +778,82 @@ function switchMachine(step) {
   updateScene();
   requestAnimationFrame(tick);
 }
+/* ── Sound ──────────────────────────────────────────────────────────────
+   Every sound is synthesized here with Web Audio: square and triangle blips and
+   filtered noise, chip-style, made for this page. Off until the player turns it
+   on (the speaker by "?", or M anywhere); the choice is kept on this device. */
+const SFX = { ctx: null, out: null, last: {} };
+const soundOn = () => pref.sound === true;
+function audio() {
+  if (!soundOn()) return null;
+  try {
+    if (!SFX.ctx) {
+      const A = window.AudioContext || window.webkitAudioContext;
+      if (!A) return null;
+      SFX.ctx = new A(); SFX.out = SFX.ctx.createGain(); SFX.out.gain.value = 0.22; SFX.out.connect(SFX.ctx.destination);
+    }
+    if (SFX.ctx.state === "suspended") { const r = SFX.ctx.resume(); if (r && r.catch) r.catch(() => {}); }
+    return SFX.ctx;
+  } catch { return null; }
+}
+// One note: a wave from `f` (sliding to `to`), `len` seconds, starting `at` seconds from now.
+function blip(f, len, { type = "square", vol = 0.5, to = 0, at = 0 } = {}) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + at, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t + len);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+  o.connect(g); g.connect(SFX.out); o.start(t); o.stop(t + len + 0.02);
+}
+// A burst of noise through a band-pass at `f`: cracks, hits, the crank.
+function hiss(len, { f = 2000, q = 1, vol = 0.5, at = 0 } = {}) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + at, n = Math.ceil(a.sampleRate * len), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  const src = a.createBufferSource(), bp = a.createBiquadFilter(), g = a.createGain();
+  src.buffer = buf; bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = q;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + len);
+  src.connect(bp); bp.connect(g); g.connect(SFX.out); src.start(t);
+}
+// A run of notes (Hz), `step` seconds apart.
+const tune = (notes, step, opts = {}) => notes.forEach((f, i) => f && blip(f, opts.len || step * 1.6, { ...opts, at: (opts.at || 0) + i * step }));
+const NOTE = { C4: 262, E4: 330, G4: 392, A4: 440, C5: 523, D5: 587, E5: 659, F5: 698, G5: 784, A5: 880, B5: 988, C6: 1047, E6: 1319, G6: 1568, Eb4: 311, Gb4: 370, Bb3: 233 };
+const SOUNDS = {
+  pull: () => { for (let i = 0; i < 3; i++) hiss(0.04, { f: 1400, q: 6, vol: 0.5, at: i * 0.09 }); blip(180, 0.12, { to: 90, at: 0.28, vol: 0.5 }); blip(NOTE.C5, 0.08, { at: 0.42, vol: 0.3 }); },
+  shake: () => { hiss(0.05, { f: 500, q: 3, vol: 0.6 }); blip(140, 0.06, { type: "triangle", vol: 0.5 }); },
+  crack: () => { hiss(0.09, { f: 3200, q: 2, vol: 0.7 }); blip(1200, 0.05, { to: 700, vol: 0.2 }); },
+  burst: () => { hiss(0.25, { f: 1800, q: 0.7, vol: 0.6 }); blip(400, 0.2, { to: 1600, type: "triangle", vol: 0.3 }); },
+  hatch: () => tune([NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6], 0.07, { type: "triangle", vol: 0.45 }),
+  epic: () => { tune([NOTE.G5, NOTE.C6, NOTE.E6], 0.09, { type: "square", vol: 0.25 }); tune([NOTE.C5, NOTE.E5, NOTE.G5], 0.09, { type: "triangle", vol: 0.4 }); blip(NOTE.G6, 0.5, { type: "triangle", vol: 0.25, at: 0.3 }); },
+  legend: () => {
+    tune([NOTE.C5, NOTE.C5, NOTE.G5, NOTE.E5, NOTE.G5, NOTE.C6], 0.11, { type: "square", vol: 0.22 });
+    tune([NOTE.C4, 0, NOTE.E4, 0, NOTE.G4, NOTE.C5], 0.11, { type: "triangle", vol: 0.45 });
+    blip(NOTE.C6, 0.9, { type: "triangle", vol: 0.3, at: 0.7 }); blip(NOTE.E6, 0.9, { type: "square", vol: 0.12, at: 0.7 });
+  },
+  shiny: () => tune([NOTE.E6, NOTE.G6, NOTE.E6, NOTE.G6], 0.05, { type: "triangle", vol: 0.25, at: 0.35 }),
+  hit: strong => hiss(0.05, { f: strong ? 2600 : 1300, q: 1.5, vol: strong ? 0.45 : 0.3 }),
+  deploy: () => { blip(NOTE.G4, 0.06, { vol: 0.35 }); blip(NOTE.C5, 0.1, { vol: 0.35, at: 0.06 }); },
+  win: () => { tune([NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6, 0, NOTE.G5, NOTE.C6], 0.1, { type: "square", vol: 0.25 }); tune([NOTE.C4, NOTE.G4, NOTE.C5], 0.2, { type: "triangle", vol: 0.4 }); },
+  lose: () => { tune([NOTE.G4, NOTE.Eb4, NOTE.C4], 0.22, { type: "triangle", vol: 0.45, len: 0.3 }); blip(NOTE.Bb3, 0.6, { type: "square", vol: 0.15, at: 0.66 }); },
+  toggle: () => blip(NOTE.A5, 0.06, { vol: 0.3 })
+};
+// Play a named sound; `gap` keeps a busy one (battle hits) from stacking up.
+function sfx(name, arg, gap = 0) {
+  if (!soundOn() || !SOUNDS[name]) return;
+  const now = performance.now();
+  if (gap && now - (SFX.last[name] || 0) < gap) return;
+  SFX.last[name] = now;
+  try { SOUNDS[name](arg); } catch {}
+}
+function toggleSound() {
+  pref.sound = !soundOn(); keep();
+  if (soundOn()) sfx("toggle");
+  else if (SFX.ctx) try { const r = SFX.ctx.suspend(); if (r && r.catch) r.catch(() => {}); } catch {}
+  refreshTop();
+  say(soundOn() ? "Sound on. M or the speaker turns it off; this device remembers." : "Sound off. M or the speaker turns it on.");
+}
 function turnCrank() {
+  sfx("pull");
   const start = performance.now();
   const tick = now => {
     const t = Math.min(1, (now - start) / 420);
@@ -948,6 +1029,8 @@ function showHatch() {
   panel.replaceChildren(titled(el("div", "title"), "EGG", (h.i + 1) + "/" + h.list.length), art, text);
   const reveal = () => {
     h.phase = "shown";
+    sfx(x.tier >= 3 ? "legend" : x.tier === 2 ? "epic" : "hatch");
+    if (x.shiny || x.sp) sfx("shiny");
     art.classList.remove("egg-phase");
     art.replaceChildren(hatchSprite(x));
     const candy = el("div"); candy.append(el("span", "num", "+" + x.candy), " candy");
@@ -961,9 +1044,13 @@ function showHatch() {
   say("Oh? The egg is moving...");
   // The first frame now, so the cell never shows the egg's old art for a frame.
   art.replaceChildren(HATCH_SHEET.complete && HATCH_SHEET.naturalWidth ? hatchFrame(x.tier, 0) : bigEgg(x.tier, 0, false));
+  let heard = -1;
   const tick = now => {
     if (hatching !== h || h.phase !== "shake" || h.list[h.i] !== x) return;
     const t = (now - h.start) / 1000;
+    // Sounds on the beats of the hatch sheet: shakes at 0, .3, .6, .9, the crack at 1.2, the burst at 1.6.
+    const beat = t < 1.2 ? Math.floor(t / 0.3) : t < 1.6 ? 4 : 5;
+    if (beat > heard) { heard = beat; sfx(beat < 4 ? "shake" : beat === 4 ? "crack" : "burst"); }
     if (t >= HATCH_TIME) return reveal();
     // The cracks and shards come from the hatch sheet; the owner's plain egg stands in until it loads.
     art.replaceChildren(HATCH_SHEET.complete && HATCH_SHEET.naturalWidth ? hatchFrame(x.tier, t)
@@ -1764,6 +1851,7 @@ function stepWithFx(bt) {
     const by = attackers.filter(u => u.cls !== "medic").sort((a, c) => dist(a, h.e) - dist(c, h.e))[0];
     const m = by ? T.typeMultiplier(by.types[0], h.e.types) : 1;
     bt.fx.push({ kind: "num", text: String(h.dmg), color: m > 1 ? C.gold : m < 1 ? C.dim : C.paper, at: stagger(bt, h.at, now), t0: now });
+    sfx("hit", m > 1, 70);
     bt.anim["e" + h.e.id] = { ...(bt.anim["e" + h.e.id] || {}), flash: now };
     if (by && !bt.anim["u" + by.id + ":" + now]) {
       if (by.ground) bt.anim["u" + by.id] = { ...(bt.anim["u" + by.id] || {}), lunge: now, toward: h.at };
@@ -2114,6 +2202,7 @@ function endBattle() {
   const gained = ["coins", "regular", "plus", "premium", "gold", "shards"].map(k => [k, S.balance[k] - before[k]]).filter(([, n]) => n > 0);
   if (stars) bt.talk = bt.stage.after.slice();
   bt.result = { stars, waves: r.waves || 0, gained, weekly: bt.weekly, risk: r.risk || 0, best };
+  sfx(stars ? "win" : "lose");
   battleTalk();
   showResult();
 }
@@ -2172,6 +2261,7 @@ function tileAction(x, y) {
   }
   const why = T.deploy(b, bt.slot, x, y);
   bt.note = why;
+  if (!why) sfx("deploy");
   if (!why) bt.fx.push({ kind: "burst", at: feet(bt.stage, x, y, tileAt(bt.stage, x, y) === "H"), t0: performance.now() });
   if (!why) { const next = b.squad.findIndex((u, i) => !b.units.some(o => o.slot === i)); if (next >= 0) bt.slot = next; }
 }
@@ -2432,7 +2522,11 @@ function refreshTop() {
   const purse = el("div", "panel purse");
   purse.append(el("span", "num", S.balance.coins), coin(), el("span", "num", S.balance.shards), shardIcon());
   purse.title = "Coins and shards";
-  const help = el("div", "panel help", "?"); help.title = "Tips for this screen"; help.dataset.help = 1;
+  // "?" and the speaker share one small panel: tips for this screen, and sound on or off.
+  const help = el("div", "panel help"), q = el("span", "", "?"), spk = mapCanvas(soundOn() ? "sound-on" : "sound-off", { k: C.ink, 1: soundOn() ? C.paper : C.dim });
+  q.title = "Tips for this screen"; q.dataset.help = 1;
+  spk.classList.add("speaker"); spk.dataset.sound = 1; spk.title = soundOn() ? "Sound on (M)" : "Sound off (M)";
+  help.append(q, spk);
   $("#tabs").append(help, purse);
 }
 function go(id) {
@@ -2480,13 +2574,14 @@ if (!G) {
 } else {
   document.addEventListener("keydown", e => {
     if (tutor && tutorKey(e)) return;
+    if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); return toggleSound(); }
     if (battle) return battleKey(e);
     if (picking) return starterKey(e);
     if (/^[1-9]$/.test(e.key) && !hatching && shownTabs()[Number(e.key) - 1]) { e.preventDefault(); return go(shownTabs()[Number(e.key) - 1][0]); }
     if (hatching) return hatchKey(e);
     SCREENS[tab][1](e);
   });
-  $("#tabs").onclick = e => { if (e.target.closest("[data-help]")) return replayTips(); const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
+  $("#tabs").onclick = e => { if (e.target.closest("[data-sound]")) return toggleSound(); if (e.target.closest("[data-help]")) return replayTips(); const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
   const fieldPoint = e => { const box = $("#field").getBoundingClientRect(), k = box.width / 640; return tileFromPoint((e.clientX - box.left) / k, (e.clientY - box.top) / k); };
   $("#field").onclick = e => {
     if (!battle || battle.talk.length || battle.done) return;
