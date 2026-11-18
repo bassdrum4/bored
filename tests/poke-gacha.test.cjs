@@ -1406,3 +1406,55 @@ test('new player: a pull says the free egg is ready on Eggs, a hatch fills empty
   assert.match(await game.$eval('#msg', n => n.textContent), /Next: play 1-1/);
   assert.deepEqual(errors, []);
 });
+
+/* ── The page's "Rec. Lv" is a promise ─────────────────────────────────────
+   Each stage preview recommends a level (recLevel in the page). With the engines
+   loaded the way tests/td.test.cjs loads them, a type-matched squad of commons and
+   rares at that level must clear every stage, so raising stage levels in td.js can
+   never make the page's advice wrong. The squad and placement follow td.test.cjs's
+   difficulty test; the worst-typed squad is only reported, not asserted. */
+test('every stage is cleared by a type-matched squad at the page\'s recommended level', () => {
+  const load = (file, names, inject = {}) => {
+    const src = fs.readFileSync(path.join(root, file), 'utf8').replace(/^import [\s\S]*?;\s*$/gm, '').replace(/\bexport\s+(?=(?:async\s+)?(?:function|const|let|class))/g, '');
+    return new Function(...Object.keys(inject), src + '\nreturn {' + names.join(',') + '};')(...Object.values(inject));
+  };
+  const daily = load('src/daily.js', ['dailyDate', 'dailyStreak', 'seedNumber']);
+  const dex = load('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CHART']);
+  const rewards = load('src/hub/rewards.js', ['mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'],
+    { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
+  const gacha = load('src/hub/gacha.js', ['gachaState', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'stageOf', 'evolutionsOf'], { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
+  const td = load('src/hub/td.js', ['classOf', 'STAGES', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'typeMultiplier', 'MAX_LEVEL'],
+    { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor, stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
+  // The page's own formula, read from the page.
+  const recLevel = new Function('T', 'return ' + page.match(/const recLevel = (stage => [^\n]*);/)[1])({ maxLevel: td.MAX_LEVEL });
+  const squadFor = (stage, rank, level) => {
+    const foes = stage.waves.map(w => gacha.mon(w[1]).types);
+    const fit = num => foes.reduce((s, types) => s + Math.log2(td.typeMultiplier(gacha.mon(num).types[0], types)), 0) / foes.length;
+    const pool = dex.DEX.map((row, i) => [row, i + 1]).filter(([row]) => row[9] === 3 || row[9] === 4).map(([, n]) => n);
+    const ranked = pool.map(n => [n, rank * fit(n) + (gacha.mon(n).bst || 0) / 2000]).sort((a, b) => b[1] - a[1]).map(([n]) => n).slice(0, 60);
+    const by = cls => ranked.filter(n => td.classOf(n) === cls);
+    const flying = stage.waves.some(w => w[5]);
+    const core = [...by('blocker').slice(0, 1), ...by('guard').slice(0, 2), ...by('vanguard').slice(0, 1),
+      ...(flying ? by('sniper').slice(0, 2) : by('caster').slice(0, 2)), ...by('sniper').slice(0, 1), ...by('medic').slice(0, 1), ...by('caster').slice(0, 1)];
+    return [...new Set([...core, ...ranked])].slice(0, 8).map(n => td.unitStats(n, { level }));
+  };
+  const placed = (stage, squad) => {
+    const high = []; stage.map.forEach((row, y) => [...row].forEach((c, x) => { if (c === 'H') high.push([x, y]); }));
+    const ground = td.pathsOf(stage)[0].slice().reverse().filter(([x, y]) => stage.map[y][x] === '.');
+    const flying = stage.waves.some(w => w[5]), armored = stage.waves.some(w => w[7]);
+    // Snipers next to the flight lines when bats fly (as td.test.cjs places them).
+    const toFlight = (x, y) => Math.min(...td.pathsOf(stage).map(p => { const [[ax, ay], [bx, by]] = [p[0], p[p.length - 1]];
+      const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2))); return Math.hypot(x - (ax + t * (bx - ax)), y - (ay + t * (by - ay))); }));
+    if (flying) high.sort((a, c) => toFlight(...a) - toFlight(...c));
+    // The order the guided 1-1 teaches: the blocker first, then the rest.
+    const pri = u => (armored && u.cls === 'vanguard' ? 2 : 0) + (flying && u.cls === 'sniper' ? 1 : 0) + (u.cls === 'blocker' ? 0.5 : 0);
+    return squad.map((u, slot) => slot).sort((a, b) => pri(squad[b]) - pri(squad[a])).map(slot => [slot, ...(squad[slot].ground ? ground.shift() || [0, 0] : high.shift() || [0, 0])]);
+  };
+  const play = (stage, squad) => {
+    const b = td.newBattle(stage, squad), plan = placed(stage, squad);
+    for (let guard = 0; !b.over && guard < 20 * 600; guard++) { for (const [slot, x, y] of plan) if (td.deploy(b, slot, x, y) === 'energy') break; td.step(b); }
+    return b.over;
+  };
+  const lost = td.STAGES.filter(stage => play(stage, squadFor(stage, 1, recLevel(stage))) !== 'win').map(s => s.id + ' (Rec. Lv ' + recLevel(s) + ')');
+  assert.deepEqual(lost, [], 'a type-matched squad at Rec. Lv loses these stages');
+});
