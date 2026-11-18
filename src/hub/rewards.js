@@ -319,6 +319,23 @@ export function observeSnapshot(wallet, slug, snapshot, { today = dailyDate(), n
 }
 
 /** A one-time grant from Poké Gacha itself (login, stage clears, missions). */
+/**
+ * The Poké Idle daily boss streak: weekday wins in a row up to today, by the same rule that
+ * pays PI_BOSS_STREAK (weekends neither count nor break it). Today does not break it while
+ * today's boss is still unbeaten.
+ */
+export function bossStreak(wallet, today = dailyDate()) {
+  const entries = mergeWallet(wallet).entries;
+  const weekend = day => [0, 6].includes(new Date(day + 'T00:00:00Z').getUTCDay());
+  let day = today, run = 0;
+  if (!entries['pi:boss:' + day]) day = shiftDay(day, -1);
+  for (let guard = 0; guard < 800; guard++, day = shiftDay(day, -1)) {
+    if (weekend(day)) continue;
+    if (!entries['pi:boss:' + day]) break;
+    run++;
+  }
+  return run;
+}
 export function grantOnce(wallet, id, grant, { now = Date.now() } = {}) {
   const next = mergeWallet(wallet);
   if (!ID.test(id) || next.entries[id] || RESERVED.test(id))
