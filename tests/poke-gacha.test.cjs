@@ -546,19 +546,17 @@ test('candy where it is spent: short on candy, the Dex offers exactly the missin
   const after = await game.evaluate(l => ({ coins: S.balance.coins, candy: S.lines[l].candy, owned: S.owned.length }), setup.line);
   assert.equal(coins0 - after.coins, need * 40, 'paid 40 a candy for exactly the missing ones');
   assert.equal(after.candy, 0, 'all of it spent on the evolve');
-  assert.match(await game.$eval('#msg', n => n.textContent), new RegExp('Bought ' + need + ' candy for ' + need * 40 + ' coins\\. Evolve done'));
+  assert.match(await game.$eval('#msg', n => n.textContent), new RegExp('Bought ' + need + ' candy for ' + need * 40 + ' coins\\. .+ evolved into .+!'));
   assert.deepEqual(errors, []);
 });
 
-test('the candy icon: a closed wrapped sweet, and every caught line shows its own candy (the generic one when it has none)', async t => {
+test('the candy icon: a closed wrapped sweet, in each line\'s type colours (a Fire line\'s candy is orange, a Water line\'s blue)', async t => {
   const { game, errors } = await openWithMons(t);
   const map = page.match(/ "candy": (\[[^\]]*\])/)[1];
   const rows = JSON.parse(map);
   assert.ok(rows[0].length > rows.length, 'wider than tall: the twisted ends on both sides');
-  const icons = await game.evaluate(() => BASES.filter(n => S.lines[n]).map(n => { const i = lineCandy(n); return [i.tagName === 'CANVAS' ? CANDY_SHEET.missing.has(n) : /candies\.webp/.test(i.style.backgroundImage), n]; }));
-  assert.ok(icons.length > 0);
-  assert.deepEqual(icons.filter(([ok]) => !ok), [], 'a sheet cell, or the wrapped one');
-  assert.equal(await game.evaluate(() => lineCandy(862).tagName), 'CANVAS', 'a line with no cell gets the wrapped candy');
+  const px = await game.evaluate(() => [4, 7].map(n => { const c = lineCandy(n), g = c.getContext('2d'), d = g.getImageData(Math.floor(c.width / 2), Math.floor(c.height / 2), 1, 1).data; return [c.tagName, d[0] > d[2]]; }));
+  assert.deepEqual(px, [['CANVAS', true], ['CANVAS', false]], 'Charmander\'s candy is warm, Squirtle\'s is cool');
   assert.deepEqual(errors, []);
 });
 
@@ -783,11 +781,12 @@ test('progression: Squad and Dex show the level cap, and K picks which unlocked 
     const spill = await game.$eval('#squad-detail', n => [...n.children].some(c => c.getBoundingClientRect().right > n.getBoundingClientRect().right + 1));
     assert.equal(spill, false, 'the note fits the panel');
   }
-  // The Dex: the battle level and its cap come first.
+  // The Dex: the candy this line has first, then Level up with the level and its cap.
   await game.evaluate(l => { storyMode = 'stages'; go('dex'); pref.dexFilter = 'All'; dexAt = dexList().indexOf(l); dexUpdate(); }, line);
   if (await game.evaluate(() => !!(T.capOf && G.setSkill))) {
-    const first = await game.$eval('#dex-acts > div', n => n.textContent);
-    assert.match(first, new RegExp('^Battle level.*\\d+/' + cap + '$'));
+    const [first, second] = await game.$$eval('#dex-acts > div', n => n.slice(0, 2).map(x => x.textContent));
+    assert.match(first, /^You have \d+ candy/);
+    assert.match(second, new RegExp('^Level up: Lv \\d+/' + cap));
     assert.match(await game.$eval('#dex-acts', n => n.textContent), /Skill: /);
   }
   assert.deepEqual(errors, []);
@@ -1233,6 +1232,37 @@ test('evolving changes the mon everywhere: Squad, saved teams and battle use the
   // The Dex can switch the line back to Sneasel.
   await game.evaluate(line => { const a = dexActions(line).find(x => /^Fights as/.test(x.label)); runDex(a); }, sneasel);
   assert.deepEqual(await game.evaluate(() => squadPick()), [sneasel], 'the picked form fights');
+  assert.deepEqual(errors, []);
+});
+
+test('Dex: the row shows the form that fights with its line under it, a clear chain, a candy menu that says what each does, and Level up', async t => {
+  const { game, errors } = await openWithMons(t);
+  const [sneasel, weavile] = await game.evaluate(() => ['Sneasel', 'Weavile'].map(n => G.dex.findIndex(r => r[0] === n) + 1));
+  await ownMons(game, [sneasel]);
+  await game.evaluate(l => { go('dex'); pref.filters = {}; keep(); dexAt = dexList().indexOf(l); dexFocus = 'acts'; actAt = 0; dexUpdate(); }, sneasel);
+  const menu = await game.$$eval('#dex-acts > div', n => n.map(x => [x.textContent, x.className]));
+  assert.match(menu[0][0], /^You have 200 candy/);
+  assert.match(menu[1][0], /^Level up: Lv 1\/5/);
+  for (const want of [/^Evolve into Weavile25/, /^Passive: \+10% attack50/, /^Cost -1: 1 less energy30/, /^Cost -2: 2 less energy60/]) assert.ok(menu.some(([text]) => want.test(text)), want + ' in the candy menu');
+  // Level up from the Dex.
+  const coins = await game.evaluate(() => S.balance.coins);
+  await game.evaluate(() => { actAt = 1; runDex(dexActions(dexList()[dexAt])[1]); });
+  assert.equal(await game.evaluate(l => T.state().levels[l], sneasel), 2, 'levelled up in the Dex');
+  assert.equal(coins - await game.evaluate(() => S.balance.coins), await game.evaluate(() => T.levelCost(1)));
+  // Evolve: the row now reads Weavile, with "Sneasel line" under it; the chain shows both, an arrow, checks under the sprites.
+  await game.evaluate(l => runDex(dexActions(l).find(a => /^Evolve/.test(a.label))), sneasel);
+  const row = await game.$eval('#dex-rows .at', n => n.textContent);
+  assert.match(row, /Weavile.*Sneasel line/);
+  await game.evaluate(() => { dexFocus = 'list'; dexUpdate(); });
+  const chain = await game.$eval('#dex-depth .chain', n => ({ text: n.textContent, forms: n.querySelectorAll('.form').length, over: [...n.querySelectorAll('.form')].some(f => { const [a, b] = f.children; return b && b.getBoundingClientRect().left < a.getBoundingClientRect().right - 1; }) }));
+  assert.match(chain.text, /→/);
+  assert.equal(chain.over, false, 'a check never sits on its sprite');
+  // A candy egg, once the hub sells one.
+  if (await game.evaluate(() => !!G.buyCandyEgg)) {
+    const eggs = await game.evaluate(() => S.eggs.length);
+    await game.evaluate(l => runDex(dexActions(l).find(a => /^Egg of/.test(a.label))), sneasel);
+    assert.equal(await game.evaluate(() => S.eggs.length), eggs + 1, 'an egg of Sneasel');
+  }
   assert.deepEqual(errors, []);
 });
 

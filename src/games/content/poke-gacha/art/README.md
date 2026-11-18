@@ -11,7 +11,6 @@ art; the page only shows it at whole-number scales (`image-rendering: pixelated`
 | `shard.png` | 17×18 | the owner's blue shard | 1x |
 | `machine-move.png`, `machine-legend.png`, `machine-shiny.png` | 106×129 | the owner's gacha machine (`egg_machine_red_blank.png`), brought back to its native size and recoloured per machine: grey Move UP, red Legendary UP, yellow Shiny UP. Only Legendary UP keeps the crown and the timer pill; the page draws the other emblems, the plate words and the timer in its own pixel letters | 2x on the Pull screen |
 | `icons.webp`, `icons-shiny.webp` | 1280×990 | PokéRogue's 40×30 mini sprites for species 1–1025, 32 a row, default form where a species only has forms | 1x in the Dex, 2x in the banner window |
-| `candies.webp` | 512×528 | PokéRogue's per-species candies (the owner's upload, 32×32 each), cropped to their 16×16 drawing and laid out one cell per dex number (cell = number − 1, 32 a row); regional forms (numbers above 1025) are left out, and the 11 lines with no candy there use the page's drawn wrapped candy | 1x next to candy counts |
 
 The upload's 132×142 "big" eggs are stretched copies of the small ones, so they are
 not used: the page scales the originals by whole numbers instead. The
