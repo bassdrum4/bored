@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 632,
+  "count": 633,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -10,6 +10,7 @@ export const CHANGELOG_META = {
 
 export const CHANGELOG = [
   {"sha":"d9fb1b6","date":"2026-11-18","author":"Codebuff","subject":"Sudoku: three levels, notes, and a time-only shared board"},
+  {"sha":"486d4c3","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: tutorials for classes and the bars, types before 1-3, a card for every kind of foe (and a Foes list), and skills"},
   {"sha":"5d1df22","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: Dex shows the form that fights, a clearer chain, a PokéRogue-style candy menu, Level up, candy that looks like candy, sprites without boxes"},
   {"sha":"9c2b058","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: evolved forms fight, Esc goes back, pause menu, mouse clicks that stick, own-tile unit marks, flyer routes, squad drag and overflow fixes","pr":253},
   {"sha":"c7ccee4","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: evolved forms fight, Esc goes back, pause menu, mouse clicks that stick, own-tile unit marks, flyer routes, squad drag and overflow fixes"},
