@@ -21,7 +21,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools', 'pickStarter', 'STARTERS', 'STARTER_GIFTS'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES });
 const td = moduleUnderTest('src/hub/td.js', [
-  'classOf', 'STAGES', 'CHAPTERS', 'MAX_RISK', 'WEEKLY_MILESTONES', 'WEEKLY_UNLOCK', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
+  'classOf', 'STAGES', 'CHAPTERS', 'FAST', 'MAX_RISK', 'WEEKLY_MILESTONES', 'WEEKLY_UNLOCK', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'canDeploy', 'starsFor', 'typeMultiplier',
   'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H'
 ], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor });
 const { walletBalance, activateWallet, grantOnce } = rewards;
@@ -53,9 +53,17 @@ test('classes come from stats, with healers the only hand-written list', () => {
   assert.deepEqual([...classes].sort(), ['blocker', 'caster', 'guard', 'medic', 'sniper', 'vanguard']);
 });
 
-test('chapters 1-4 have 8, 6, 6 and 6 stages, each with a walkable path from every spawn to the goal', () => {
-  assert.deepEqual(td.CHAPTERS.map(c => c.stages.length), [8, 6, 6, 6]);
-  assert.equal(td.STAGES.length, 26, 'stages unlock in this one order across chapters');
+test('chapters 1-6 have 8, 6, 6, 6, 6 and 6 stages, each with a walkable path from every spawn to the goal', () => {
+  assert.deepEqual(td.CHAPTERS.map(c => c.stages.length), [8, 6, 6, 6, 6, 6]);
+  assert.equal(td.STAGES.length, 38, 'stages unlock in this one order across chapters');
+  const archer = td.CHAPTERS[4].stages[5], giovanni = td.CHAPTERS[5].stages[5];
+  assert.ok(archer.boss && archer.admin && archer.waves.some(w => w[4] && w[1] === named('Houndoom')), '5-6 is the Archer admin boss, Houndoom');
+  assert.ok(td.CHAPTERS[4].stages.every(s => s.waves.some(w => w[8])), 'every chapter 5 stage has fast waves');
+  assert.ok(td.STAGES.filter(s => (s.chapter || 1) < 5).every(s => s.waves.every(w => !w[8])), 'chapters 1-4 have none');
+  assert.ok(giovanni.boss && giovanni.final && giovanni.waves.some(w => w[4] && w[7] && w[1] === named('Rhydon')), '6-6 is Giovanni, an armored Rhydon, the final stage');
+  assert.ok(giovanni.ending && giovanni.ending.length >= 2, 'the final stage carries the ending');
+  assert.equal(td.STAGES[td.STAGES.length - 1], giovanni, 'and it is the last stage');
+  assert.ok(td.CHAPTERS[5].stages.every(s => s.waves.every(w => ['Ground', 'Poison', 'Normal', 'Flying'].some(t => gacha.mon(w[1]).types.includes(t)))), 'chapter 6 is Giovanni\'s ground crew');
   const ariana = td.CHAPTERS[3].stages[5];
   assert.ok(ariana.boss && ariana.admin && ariana.waves.some(w => w[4] && w[7]), '4-6 is the Ariana admin boss, an armored Arbok');
   assert.ok(td.CHAPTERS[3].stages.every(s => s.waves.some(w => w[7])), 'every chapter 4 stage has armored waves');
@@ -229,6 +237,15 @@ test('exploders light a fuse when blocked and blow up on every unit nearby, unle
   assert.equal(b.enemies[0].fuse, null, 'unblocked, it walks on with no fuse');
 });
 
+test('fast waves run at 1.5x their species\' speed', () => {
+  const stage = td.STAGES.find(s => s.id === '5-1');
+  const b = td.newBattle(stage, []);
+  for (let i = 0; i < 20 * 20 && !b.enemies.some(e => e.fast); i++) td.step(b);
+  const fast = b.enemies.find(e => e.fast), plain = td.newBattle({ ...stage, waves: [[0, fast.num, 1, 1]] }, []);
+  td.step(plain);
+  assert.ok(Math.abs(fast.speed / plain.enemies[0].speed - td.FAST) < 1e-9, 'speed x' + td.FAST);
+});
+
 test('armor triples Defense against physical hits, and casters go straight through it', () => {
   const stage = { id: 'x', lives: 3, level: 1, map: ['##########', 'S........G', '####H#####', '##########', '##########'],
     waves: [[0, named('Graveler'), 1, 1, 0, 0, 0, 1]] };
@@ -377,7 +394,8 @@ function playInOrder(stage, squad, plan) {
   return b;
 }
 test('late stages want type-matched squads: matched level-3 commons and rares win, the worst-typed lose', () => {
-  for (const id of ['1-8', '2-3', '2-4', '2-5', '2-6', '3-1', '3-2', '3-3', '3-4', '3-5', '3-6', '4-1', '4-2', '4-4', '4-5', '4-6']) {
+  for (const id of ['1-8', '2-3', '2-4', '2-5', '2-6', '3-1', '3-2', '3-3', '3-4', '3-5', '3-6', '4-1', '4-2', '4-4', '4-5', '4-6',
+    '5-1', '5-2', '5-3', '5-4', '5-5', '5-6', '6-1', '6-2', '6-3', '6-4', '6-5', '6-6']) {
     const stage = td.STAGES.find(s => s.id === id);
     const good = squadFor(stage, 1), bad = squadFor(stage, -1);
     assert.equal(playInOrder(stage, good, placed(stage, good)).over, 'win', id + ': a type-matched level-3 squad wins');
