@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 612,
+  "count": 614,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -12,8 +12,10 @@ export const CHANGELOG = [
   {"sha":"3802257","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battles fully by mouse (drag or click to deploy, unit popup, HUD pause, energy on cards)","pr":250},
   {"sha":"7153005","date":"2026-11-18","author":"Vettel Xu","subject":"Hub: castSkill, so the battle popup's Skill button fires a charged skill now","pr":249},
   {"sha":"c3b7db3","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battle readability (high units on their block, block pips, stop bars on held foes)","pr":248},
+  {"sha":"7cdddb6","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: cut the egg roster to 208 lines, with a one-time refund"},
   {"sha":"de46ff9","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: one filter panel for the Dex, Squad and candy picker (type grid of two, class and tier chips, sort, name search, Clear)","pr":245},
   {"sha":"b1332c5","date":"2026-11-18","author":"Codebuff","subject":"Krillion: sort the daily dive against the population, and fix Puffer Party's turn lag"},
+  {"sha":"b743da9","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: roster cut draft for review (552 → 203 lines, no game changes)"},
   {"sha":"d9ff1c4","date":"2026-11-18","author":"Vettel Xu","subject":"Hub: Poké Gacha stage levels from the balance pass; 1-6, 1-7 and 3-6 waves where type matters","pr":241},
   {"sha":"1337c76","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battle polish (chapter scenery, WAVE n/m banner, stars that pop in)","pr":239},
   {"sha":"945f98d","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: mouse support everywhere (a clickable label for every key)","pr":240},
