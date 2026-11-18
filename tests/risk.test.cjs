@@ -177,6 +177,55 @@ test('CPU advances a bounded column, not the whole surviving stack',()=>{
     'only a capped column follows the conquest, not the 95 that survived');
 });
 
+test('Bored Together pays each seat its opening troops on its own first turn',()=>{
+  // A live match has no shared setup screen: seat one used to open with the
+  // whole setup grant while seat two only ever received ordinary income.
+  assert.match(html, /state\.openingPool = \[Math\.max\(0, 40 - held\(0\)\), Math\.max\(0, 40 - held\(1\)\)\]/);
+  assert.match(html, /state\.reserves = calculateReserves\(0\) \+ openingDeployment\(0\)/);
+  assert.match(html, /state\.reserves = calculateReserves\(state\.turnIndex\) \+ openingDeployment\(state\.turnIndex\)/);
+
+  const state = {
+    phase:'REINFORCE', turnIndex:0, reserves:0, conqueredThisTurn:false,
+    historyStack:[], selected:null, fortified:false, lastDice:{atk:[],def:[]},
+    openingPool:[19,19], setupPool:[0,0],
+    territories:{A:{owner:0,armies:1},B:{owner:1,armies:1},C:{owner:0,armies:1}},
+    players:[
+      {name:'One',isAI:false,cards:[],stats:{}},
+      {name:'Two',isAI:false,cards:[],stats:{}}
+    ],
+    logs:[], chat:[]
+  };
+  const context = vm.createContext({
+    state, isHost:true,
+    LOCS:[[0,0,'A',0],[1,0,'B',0],[2,0,'C',0]],
+    CONTINENTS:[],
+    broadcastState:()=>{},
+    ensureStats:pid=>{state.players[pid].stats=state.players[pid].stats||{};},
+    wlog:()=>{}, autoSaveOnEndTurn:()=>{}, executeAITurn:()=>{},
+    aiCommentOnState:()=>{}, setTimeout:()=>1,
+    console:{log(){},error(){}}
+  });
+  vm.runInContext(['openingDeployment','advancePhase','calculateReserves',
+    'getNextAlivePlayer','isPlayerDead'].map(functionSource).join('\n'), context);
+
+  // Seat one takes its grant when the match opens; ending its turn must hand
+  // seat two the same opening garrison on top of ordinary income.
+  state.reserves=vm.runInContext('calculateReserves(0) + openingDeployment(0)',context);
+  assert.equal(state.reserves,3+19,'seat one deploys its setup troops first');
+  assert.equal(state.openingPool[0],0);
+  state.phase='FORTIFY';
+  vm.runInContext('advancePhase()', context);
+  assert.equal(state.turnIndex,1);
+  assert.equal(state.openingPool[1],0,'seat two grant is consumed once');
+  assert.equal(state.reserves,3+19,'seat two gets income plus its 19 setup troops');
+
+  state.phase='FORTIFY';
+  vm.runInContext('advancePhase()', context);
+  assert.equal(state.turnIndex,0);
+  assert.equal(state.openingPool[0],0,'no second grant for a seat that already deployed');
+  assert.equal(state.reserves,3,'later turns are ordinary income only');
+});
+
 test('Risk only scores finished human world conquest',()=>{
   assert.match(html, /return \{slug:"risk", turns, won, finished:state\?\.phase === "GAME_OVER", cpu:true\}/);
   assert.match(html, /Object\.values\(state\.territories \|\| \{\}\)\.every\(t => t\.owner === 0\)/);

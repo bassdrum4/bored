@@ -5055,7 +5055,7 @@
            state.historyStack = [];
            if (state.phase !== "SETUP") {
               state.turnIndex = getNextAlivePlayer(state.turnIndex);
-              state.reserves = calculateReserves(state.turnIndex);
+              state.reserves = calculateReserves(state.turnIndex) + openingDeployment(state.turnIndex);
            }
         }
 
@@ -6285,6 +6285,15 @@
 const ONLINE = (() => { try { return window.__boredTogether || null; } catch (error) { return null; } })();
 let onlineSent = false;
 const onlineSeat = () => Number(ONLINE?.context?.seat) === 2 ? 2 : 1;
+// Setup troops are per seat. A live match has no shared setup screen, so each
+// seat's opening garrison is held here and paid out on that seat's own first
+// turn, then cleared so it is never granted twice.
+function openingDeployment(pid) {
+  const pool = state && state.openingPool;
+  const amount = Array.isArray(pool) ? Math.max(0, Number(pool[pid]) || 0) : 0;
+  if (amount > 0) pool[pid] = 0;
+  return amount;
+}
 function onlineWinnerIndex() {
   const owners = [...new Set(Object.values(state.territories || {}).map(t => t && t.owner))]
     .filter(owner => owner !== undefined && owner >= 0);
@@ -6329,10 +6338,12 @@ function onlineStart() {
     state.players = [commander(0), commander(1)];
     const deck = [...LOCS].sort(() => Math.random() - 0.5);
     deck.forEach((card, i) => { state.territories[card[2]] = { owner: i % 2, armies: 1 }; });
+    const held = pid => Object.values(state.territories).filter(t => t.owner === pid).length;
+    state.openingPool = [Math.max(0, 40 - held(0)), Math.max(0, 40 - held(1))];
     state.setupPool = [0, 0];
     state.phase = 'REINFORCE';
     state.turnIndex = 0;
-    state.reserves = Math.max(3, 40 - Object.values(state.territories).filter(t => t.owner === 0).length);
+    state.reserves = calculateReserves(0) + openingDeployment(0);
     state.logs.push('--- WAR STARTED ---');
     state.chat.push({ name: 'SYSTEM', msg: 'Two commanders. One world.' });
   }
