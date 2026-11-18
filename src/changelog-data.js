@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 588,
+  "count": 589,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"1c87739","date":"2026-11-18","author":"Codebuff","subject":"Docs: make README and AGENTS.md match the current catalog"},
   {"sha":"ff7c2e1","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: coin shop rows, a candy line picker, a confirm step, more squad presets"},
   {"sha":"f18e236","date":"2026-11-18","author":"Claude","subject":"Hub: coin shop presets are 500 then 1000, up to 5 in all"},
   {"sha":"e73ccb2","date":"2026-11-18","author":"Claude","subject":"Hub: coin shop for candy, shards and squad preset slots"},
