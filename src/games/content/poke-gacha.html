@@ -126,6 +126,7 @@ canvas, img { image-rendering: pixelated; display: block }
 #eggs-grid { display: grid; grid-template-columns: repeat(10, 36px); grid-auto-rows: 40px; height: 240px; overflow-y: auto;
              scrollbar-width: thin; scrollbar-color: var(--red) var(--panel); scroll-snap-type: y mandatory }
 #eggs-grid > * { scroll-snap-align: start }
+#eggs-grid > p { grid-column: 1 / -1 }
 #eggs-grid .egg { display: grid; place-items: start center; padding-top: 2px; position: relative; cursor: pointer }
 #eggs-grid .egg i { position: absolute; left: 2px; bottom: 2px; height: 2px; background: var(--gold) }
 #eggs-grid .bracket { position: absolute; inset: 0; pointer-events: none }
@@ -148,7 +149,9 @@ canvas, img { image-rendering: pixelated; display: block }
 #dex-rows { height: 192px }
 /* Dex rows hold the 40x30 mini sprite at 1x, so they are 32px tall: 6 whole rows. */
 #dex-rows > div { height: 32px }
-#dex-detail { left: 264px; top: 8px; width: 368px; height: 264px; display: grid; grid-template-columns: 96px 1fr; grid-template-rows: 96px 1fr; gap: 8px 12px }
+#dex-detail { left: 264px; top: 8px; width: 368px; height: 264px; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: 96px 1fr; gap: 8px 12px }
+#dex-info { min-width: 0 }
+#dex-info > div { overflow: hidden; text-overflow: ellipsis }
 #dex-detail .cell { width: 96px; height: 96px; background: var(--ink) }
 #dex-acts { grid-column: 1 / -1; height: 120px }
 #dex-info .egg-line { display: flex; align-items: center; gap: 4px; height: 36px; white-space: nowrap }
@@ -303,9 +306,11 @@ canvas, img { image-rendering: pixelated; display: block }
 #deploy .card.off .mini, #deploy .card.off .low { opacity: .4 }
 #deploy .card .cool { position: absolute; inset: 0; background: rgba(28, 27, 44, .75); display: grid; place-items: center; color: var(--paper) }
 /* The tip grows upward to fit its text (it is anchored at the bottom). */
-#battle-tip { left: 8px; bottom: 8px; width: 176px; min-height: 62px; padding: 3px 8px; line-height: 18px; color: var(--dim); white-space: normal }
-#frame.no-pixel #battle-tip, #frame.no-pixel #deploy .card .low, #frame.no-pixel #deploy-info { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
-#battle-talk { left: 8px; bottom: 8px; width: 624px; height: 52px; padding: 4px 12px; cursor: pointer }
+#battle-tip { left: 8px; bottom: 8px; width: 176px; min-height: 62px; padding: 2px 8px; line-height: 18px; color: var(--dim); white-space: normal }
+#frame.no-pixel #battle-tip, #frame.no-pixel #deploy .card .low, #frame.no-pixel #deploy-info, #frame.no-pixel #battle-talk,
+#frame.no-pixel #dex-rows, #frame.no-pixel #dex-info > div:not(.title), #frame.no-pixel #egg-from, #frame.no-pixel #eggs-grid > p, #frame.no-pixel #story-list { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
+/* As tall as the deploy bar and tip it covers, so neither peeks out above it. */
+#battle-talk { left: 8px; bottom: 8px; width: 624px; height: 62px; padding: 9px 12px; cursor: pointer }
 #battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
 #battle-result .reward-icons { display: flex; align-items: center; gap: 2px; white-space: nowrap }
 </style>
