@@ -357,6 +357,11 @@ canvas, img { image-rendering: pixelated; display: block }
 #frame.no-pixel #dex-rows, #frame.no-pixel #dex-info > div:not(.title), #frame.no-pixel #dex-depth, #frame.no-pixel #dex-tabs, #frame.no-pixel #egg-from, #frame.no-pixel #eggs-grid > p, #frame.no-pixel #story-list { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
 /* As tall as the deploy bar and tip it covers, so neither peeks out above it. */
 #battle-talk { left: 8px; bottom: 8px; width: 624px; height: 62px; padding: 9px 12px; cursor: pointer }
+/* "WAVE 2/3" over the field for a moment when a wave starts; it never takes a click. */
+#wave-banner { left: 220px; top: 140px; width: 200px; height: 48px; text-align: center; font: 400 var(--title)/30px var(--pixel); pointer-events: none }
+/* A clear's stars turn gold one by one, each with a short pop. */
+#battle-result .stars canvas.pop { animation: star-pop .3s steps(3) }
+@keyframes star-pop { from { transform: scale(1.8) } to { transform: scale(1) } }
 #battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
 #battle-result .reward-icons { display: flex; align-items: center; gap: 2px; white-space: nowrap }
 </style>
@@ -386,6 +391,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="deploy-info"></div>
         <div class="panel" id="deploy"></div>
         <div class="panel" id="battle-talk" hidden></div>
+        <div class="panel" id="wave-banner" hidden></div>
         <div class="panel" id="battle-result" hidden></div>
       </section>
       <section id="scr-pull" class="screen">
@@ -923,6 +929,8 @@ const SOUNDS = {
   shiny: () => tune([NOTE.E6, NOTE.G6, NOTE.E6, NOTE.G6], 0.05, { type: "triangle", vol: 0.25, at: 0.35 }),
   hit: strong => hiss(0.05, { f: strong ? 2600 : 1300, q: 1.5, vol: strong ? 0.45 : 0.3 }),
   deploy: () => { blip(NOTE.G4, 0.06, { vol: 0.35 }); blip(NOTE.C5, 0.1, { vol: 0.35, at: 0.06 }); },
+  star: n => { blip([NOTE.E5, NOTE.G5, NOTE.C6][n] || NOTE.C6, 0.09, { type: "square", vol: 0.3 }); blip(([NOTE.E5, NOTE.G5, NOTE.C6][n] || NOTE.C6) * 2, 0.06, { type: "triangle", vol: 0.25, at: 0.05 }); },
+  wave: () => { blip(NOTE.A4, 0.08, { vol: 0.3 }); blip(NOTE.A4, 0.08, { vol: 0.3, at: 0.12 }); },
   win: () => { tune([NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6, 0, NOTE.G5, NOTE.C6], 0.1, { type: "square", vol: 0.25 }); tune([NOTE.C4, NOTE.G4, NOTE.C5], 0.2, { type: "triangle", vol: 0.4 }); },
   lose: () => { tune([NOTE.G4, NOTE.Eb4, NOTE.C4], 0.22, { type: "triangle", vol: 0.45, len: 0.3 }); blip(NOTE.Bb3, 0.6, { type: "square", vol: 0.15, at: 0.66 }); },
   toggle: () => blip(NOTE.A5, 0.06, { vol: 0.3 })
@@ -2421,8 +2429,19 @@ function battleFrame(now) {
   }
   drawField(now);
   battleHud();
+  waveBanner(bt);
   if (b.over && !bt.done) endBattle();
   requestAnimationFrame(battleFrame);
+}
+// "WAVE n/m" as each wave starts (stages with more than one), from the engine's clock so a
+// pause holds it. It shows for about 1.2s of battle time.
+const WAVE_SHOW = 1.2;
+function waveBanner(bt) {
+  const b = bt.b, waves = bt.stage.waves, box = $("#wave-banner");
+  if (waves.length < 2 || b.over) { box.hidden = true; return; }
+  const started = waves.filter(w => w[0] <= b.t).length;
+  if (started > (bt.waveShown || 0)) { bt.waveShown = started; bt.waveAt = b.t; box.replaceChildren(el("span", "", "WAVE "), el("span", "num", started + "/" + waves.length)); sfx("wave"); }
+  box.hidden = !(bt.waveShown && b.t - bt.waveAt < WAVE_SHOW);
 }
 // Tiles in range of a unit standing at (x, y): the engine's range is a radius in tiles.
 const inRange = (u, x, y) => { const out = []; for (let ty = 0; ty < T.H; ty++) for (let tx = 0; tx < T.W; tx++) if (Math.hypot(tx - x, ty - y) <= u.range) out.push([tx, ty]); return out; };
@@ -2522,11 +2541,61 @@ function oval(g, cx, cy, w, color) {
   const rows = [[w * 0.5, -2], [w, -1], [w, 0], [w * 0.5, 1]];
   for (const [rw, dy] of rows) g.fillRect(Math.round(cx - rw / 2), Math.round(cy + dy), Math.round(rw), 1);
 }
+/* Scenery behind the field, one per chapter, drawn once and kept: simple original pixel
+   scenes in dark shades of the page's colours (2px art pixels), so the grid stays the
+   brightest thing. The tiles cover the middle; it shows in the margins and the band above.
+   1 a route with hills and trees, 2 a cave, 3 a forest at night, 4 city rooftops,
+   5 a harbour, 6 the Rocket base. */
+const SCENERY = new Map();
+const chapterOf = stage => stage.chapter || parseInt(String(stage.base || stage.id), 10) || 1;
+function sceneryFor(stage) {
+  const ch = Math.min(6, Math.max(1, chapterOf(stage)));
+  if (SCENERY.has(ch)) return SCENERY.get(ch);
+  const c = document.createElement("canvas"); c.width = 640; c.height = FIELD_H;
+  const g = c.getContext("2d");
+  let seed = ch * 9973; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const px = (x, y, w, h, color) => { g.fillStyle = color; g.fillRect(Math.round(x / 2) * 2, Math.round(y / 2) * 2, Math.max(2, Math.round(w / 2) * 2), Math.max(2, Math.round(h / 2) * 2)); };
+  const dots = (color, n, y0 = 0, y1 = FIELD_H) => { for (let i = 0; i < n; i++) px(rnd() * 640, y0 + rnd() * (y1 - y0), 2, 2, color); };
+  const SKY = 104, DIM_TEAL = "#1f3f39", DIM_SKY = "#2a4a5c", DARK = "#24223a", ROCK = "#3a3756";
+  if (ch === 1) { // Route: sky, rolling hills, a row of trees, grass below.
+    px(0, 0, 640, SKY, DARK); px(0, SKY, 640, FIELD_H - SKY, "#1d2b2a");
+    for (let x = 0; x < 640; x += 2) { const h = 26 + 10 * Math.sin(x / 70) + 6 * Math.sin(x / 23); px(x, SKY - h, 2, h, DIM_TEAL); }
+    for (let x = 6; x < 640; x += 22 + Math.floor(rnd() * 14)) { px(x + 4, SKY - 8, 4, 8, "#2b2433"); px(x, SKY - 22, 12, 14, "#24493f"); px(x + 2, SKY - 26, 8, 4, "#24493f"); }
+    dots("#284a3c", 260, SKY, FIELD_H);
+  } else if (ch === 2) { // Cave: rock walls, stalactites, a few crystals.
+    px(0, 0, 640, FIELD_H, "#1a1928"); px(0, 0, 640, 40, ROCK);
+    for (let x = 0; x < 640; x += 10 + Math.floor(rnd() * 12)) { const h = 10 + rnd() * 40; px(x, 40, 6, h, ROCK); px(x + 2, 40 + h, 2, 4, ROCK); }
+    for (let i = 0; i < 70; i++) px(rnd() * 640, 60 + rnd() * 320, 6, 4, "#26243a");
+    for (let i = 0; i < 9; i++) { const x = rnd() * 640, y = 50 + rnd() * 50; px(x, y, 2, 6, DIM_SKY); px(x - 2, y + 2, 6, 2, DIM_SKY); }
+  } else if (ch === 3) { // Forest at night: a moon, tall trunks, leaves.
+    px(0, 0, 640, FIELD_H, "#161827"); px(560, 50, 16, 16, "#6f5a22"); px(564, 46, 8, 24, "#6f5a22"); px(556, 54, 24, 8, "#6f5a22");
+    for (let x = 0; x < 640; x += 30 + Math.floor(rnd() * 20)) { px(x + 8, 20, 8, FIELD_H - 20, "#22202f"); px(x, 0, 26, 30 + rnd() * 30, "#1a3530"); }
+    dots("#1f3a33", 220, 0, FIELD_H); dots("#4b4a2a", 14, 0, 100);
+  } else if (ch === 4) { // City rooftops: buildings with lit windows, a street below.
+    px(0, 0, 640, SKY, "#1e1d33"); px(0, SKY, 640, FIELD_H - SKY, "#232233");
+    for (let x = 0; x < 640;) { const w = 30 + Math.floor(rnd() * 30), h = 30 + Math.floor(rnd() * 60); px(x, SKY - h, w - 4, h, "#2b2945");
+      for (let wy = SKY - h + 6; wy < SKY - 6; wy += 10) for (let wx = x + 4; wx < x + w - 8; wx += 8) if (rnd() < 0.3) px(wx, wy, 4, 4, "#5e4c22"); x += w; }
+    for (let y = SKY + 20; y < FIELD_H; y += 40) for (let x = 0; x < 640; x += 40) px(x, y, 20, 2, "#2c2b40");
+  } else if (ch === 5) { // Harbour: the sea in bands, small waves, dock posts.
+    px(0, 0, 640, FIELD_H, "#18263a");
+    for (let y = 8; y < FIELD_H; y += 12) for (let x = (y / 12 % 2) * 16; x < 640; x += 32) px(x, y, 8, 2, DIM_SKY);
+    for (let x = 12; x < 640; x += 48) { px(x, SKY - 30, 6, 30, "#3a2c2a"); px(x - 2, SKY - 32, 10, 4, "#3a2c2a"); }
+    px(0, SKY - 4, 640, 4, "#3a2c2a");
+  } else { // Rocket base: metal plates, warning stripes, pipes.
+    px(0, 0, 640, FIELD_H, "#1f1d2e");
+    for (let y = 0; y < FIELD_H; y += 32) for (let x = 0; x < 640; x += 64) { px(x, y, 64, 2, "#2a2840"); px(x, y, 2, 32, "#2a2840"); px(x + 6, y + 6, 2, 2, ROCK); px(x + 56, y + 6, 2, 2, ROCK); }
+    for (let x = 0; x < 640; x += 16) px(x, 60, 8, 8, "#5a2422");
+    px(0, 80, 640, 6, ROCK); px(0, 90, 640, 2, "#2a2840");
+  }
+  SCENERY.set(ch, c);
+  return c;
+}
 function drawField(now = performance.now()) {
   const bt = battle, b = bt.b, st = bt.stage, g = $("#field").getContext("2d");
   g.imageSmoothingEnabled = false;
   g.clearRect(0, 0, 640, FIELD_H);
-  g.fillStyle = C.ink; g.fillRect(0, 0, 640, FIELD_H);
+  // The chapter's scenery around the grid (the tiles cover the middle).
+  g.drawImage(sceneryFor(st), 0, 0);
   // Floor, back row first; high ground is a raised block with a darker front face.
   // A tileset (if this stage's theme has one) draws each tile; anything it lacks is drawn here.
   const set = tilesetFor(st);
@@ -2786,7 +2855,7 @@ function showResult() {
   if (bt.talk.length) { $("#battle-result").hidden = true; return; }
   const box = $("#battle-result");
   box.hidden = false;
-  const lines = [el("div", "title", res.ending ? "THE END" : res.stars ? "CLEARED" : "DEFEATED"), res.stars ? (() => { const d = el("div"); d.append(stageStars(res.stars)); return d; })() : (() => { const d = el("div", "gold", lossHint(bt.stage, bt)); d.style.whiteSpace = "normal"; d.style.lineHeight = "20px"; return d; })()];
+  const lines = [el("div", "title", res.ending ? "THE END" : res.stars ? "CLEARED" : "DEFEATED"), res.stars ? (() => { const d = el("div"); d.append(popStars(res.stars)); return d; })() : (() => { const d = el("div", "gold", lossHint(bt.stage, bt)); d.style.whiteSpace = "normal"; d.style.lineHeight = "20px"; return d; })()];
   const waves = el("div"); waves.append("+", el("span", "num", res.waves), " hatch waves");
   lines.push(waves);
   const NAMES = { coins: ["coin", "coins"], regular: ["Regular voucher", "Regular vouchers"], plus: ["Plus voucher", "Plus vouchers"],
@@ -2805,12 +2874,23 @@ function showResult() {
   lines.push(el("div", "dim", res.weekly ? "Enter: back to the challenge" : "Enter: back to the chapter"));
   box.replaceChildren(...lines);
 }
+// The earned stars, gray at first, turning gold one after another with a pop and a note.
+function popStars(n) {
+  const row = stageStars(0);
+  row.title = n + " of 3 stars";
+  for (let i = 0; i < n; i++) setTimeout(() => {
+    if (!row.isConnected) return;
+    const star = mapCanvas("star", STAR_GOLD, 1); star.classList.add("pop");
+    row.children[i].replaceWith(star); sfx("star", i);
+  }, 250 + i * 300);
+  return row;
+}
 function leaveBattle() {
   if (tutor && tutor.id.startsWith("battle-") || tutor && tutor.id.startsWith("foe-")) tutorEnd(false);
   // A first clear moves the cursor on to the stage it opened, in the same chapter.
   if (battle && !battle.weekly && battle.result && battle.result.stars && !battle.clearedBefore && stagesNow()[storyAt + 1]) storyAt++;
   battle = null;
-  $("#scr-battle").hidden = true; $("#battle-result").hidden = true; $("#msg").hidden = false; $("#tabs").classList.remove("locked");
+  $("#scr-battle").hidden = true; $("#battle-result").hidden = true; $("#wave-banner").hidden = true; $("#msg").hidden = false; $("#tabs").classList.remove("locked");
   $("#frame").classList.remove("battling");
   storyMode = "stages"; go("story");
 }
