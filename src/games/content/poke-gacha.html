@@ -2727,9 +2727,12 @@ function tutorKey(e) {
 // What each screen says on its first visit.
 const TIPS = {
   loop: () => [
-    { at: () => boxOf("#tabs"), text: "Welcome! The loop: play Poké Idle, Pokédoku and these Story battles to earn coins, vouchers and waves." },
-    { at: () => tabBox("pull"), text: "Spend vouchers on Pull for eggs. Eggs hatch as you earn waves anywhere in Bored." },
-    { at: () => boxOf("#story-list-panel"), text: "New mons join your squad. Build one that beats Team Rocket here, starting with 1-1." }
+    { at: () => boxOf("#tabs"), text: "Welcome to Poké Gacha. You cannot buy Pokémon: you pull eggs with vouchers, and they hatch as you play the rest of Bored. Five steps, then it is yours." },
+    { at: () => tabBox("pull"), text: "1 · Pull. One Regular egg costs 1 voucher, and your first ten eggs hatch the moment you get them. Open one now." },
+    { at: () => tabBox("eggs"), text: "2 · Eggs. After those ten, an egg hatches on waves: Poké Idle catches, Pokédoku boards and battle waves all count." },
+    { at: () => tabBox("story"), text: "3 · Squad. New mons join your roster. Pick six that beat the foes' types here, and keep a sniper for flyers." },
+    { at: () => boxOf("#story-list-panel"), text: "4 · Story. A win pays coins, vouchers and waves and opens the next stage. Coins buy more vouchers in the Shop tab." },
+    { at: () => boxOf("#quest-tabs"), text: "5 · Quests. Daily and weekly missions pay the most vouchers. That is the whole loop: story, eggs, squad, repeat." }
   ],
   pull: () => [
     { at: () => boxOf("#hit-machine"), text: "Three machines: Move UP doubles the rare-skill chance, Legendary UP adds today's banner legendary, Shiny UP makes shinies twice as likely and can roll SP skins." },
@@ -2751,7 +2754,12 @@ const TIPS = {
 function screenTips(id) {
   if (!G || battle || picking) return;
   if (id === "story" && storyMode === "squad") return tip("squad", TIPS.squad());
-  if (TIPS[id]) tip(id, TIPS[id]());
+  if (!TIPS[id]) return;
+  // The first visit to the map walks the whole loop and then hands over to the
+  // Pull screen, so a new player is taken to the first thing they can do
+  // rather than being told about a tab they have not opened.
+  if (id === "story") return tip("loop", TIPS.loop(), { after: () => tip("pull", TIPS.pull()) });
+  tip(id, TIPS[id]());
 }
 // The "?" in the tab bar: this screen's tips again.
 function replayTips() {
