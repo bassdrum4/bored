@@ -18,7 +18,7 @@
 import { DEX, DEX_CHART, DEX_TYPES } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
 import { mergeWallet, walletBalance, grantOnce, spendFrom, readWallet, writeWallet } from './rewards.js';
-import { gachaState, lineOf, mon, skillsOf, lookFor } from './gacha.js';
+import { gachaState, lineOf, mon, skillsOf, lookFor, stageOf, evolutionsOf } from './gacha.js';
 
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const seconds = now => Math.floor(now / 1000);
@@ -231,13 +231,34 @@ export function typeMultiplier(attack, defend) {
 }
 export const MAX_LEVEL = 10;
 export const levelCost = level => 40 * level;
+// Level caps by the most evolved form owned: 5 for a base form that can still evolve, 8 for a
+// middle form, 10 once a final form is owned (a line that never evolves is final at once).
+// Levels bought before the caps existed are kept; the cap only stops buying more.
+export const LEVEL_CAPS = [5, 8, MAX_LEVEL];
+export function lineCap(state, line) {
+  const forms = (state.owned || []).filter(num => lineOf(num) === line);
+  if (!forms.length) return LEVEL_CAPS[0];
+  if (forms.some(num => !evolutionsOf(num).length)) return MAX_LEVEL;
+  return LEVEL_CAPS[Math.min(LEVEL_CAPS.length, Math.max(...forms.map(stageOf))) - 1];
+}
+// The four skill slots play differently: power (damage, healing or energy) and charge (how much
+// SP the skill needs, against the class's own). Steady is today's effect; quick fires more often
+// for less; heavy hits harder and takes longer; the rare skill is stronger at the normal charge.
+export const SKILL_KINDS = [
+  { id: 'steady', name: 'Steady', power: 1, charge: 1 },
+  { id: 'quick', name: 'Quick', power: 0.8, charge: 0.7 },
+  { id: 'heavy', name: 'Heavy', power: 1.3, charge: 1.35 },
+  { id: 'rare', name: 'Rare', power: 1.3, charge: 1 }
+];
 
 /** A squad member's battle stats: level from coins, passive and cost cuts from candy. */
-export function unitStats(num, { level = 1, passive = false, costCut = 0, skills = [true, false, false, false] } = {}) {
+export function unitStats(num, { level = 1, passive = false, costCut = 0, skills = [true, false, false, false], skill = null } = {}) {
   const m = mon(num), cls = classOf(num), c = CLASSES[cls];
   const grow = 1 + 0.08 * (level - 1);
   const special = cls === 'caster' || cls === 'medic';
-  const skillAt = skills[3] ? 3 : [2, 1, 0].find(i => skills[i]) ?? 0;
+  // The chosen skill if it is unlocked; else the rare one if unlocked; else the first.
+  const skillAt = Number.isInteger(skill) && skills[skill] ? skill : skills[3] ? 3 : 0;
+  const kind = SKILL_KINDS[skillAt];
   return {
     num, cls, name: m.name, types: m.types,
     hp: Math.round((m.hp * 5 + 140) * grow * (c.hp || 1)),
@@ -245,8 +266,8 @@ export function unitStats(num, { level = 1, passive = false, costCut = 0, skills
     def: Math.round(m.def * 0.6 * grow),
     interval: Math.max(0.6, Math.min(1.6, 1.7 - m.spe / 140)),
     cost: Math.max(4, c.cost + Math.round(m.bst / 160) - 2 - costCut),
-    block: c.block, range: c.range, ground: c.ground, spMax: c.sp,
-    skill: skillsOf(num)[skillAt], rare: skillAt === 3
+    block: c.block, range: c.range, ground: c.ground, spMax: Math.round(c.sp * kind.charge),
+    skill: skillsOf(num)[skillAt], skillAt, skillKind: kind.id, power: kind.power, rare: skillAt === 3
   };
 }
 export function enemyStats(num, level, boss = false, flying = false) {
@@ -362,7 +383,7 @@ function finishWaveFor(b, e) {
   if (b.waveLeft[e.wave] === 0) b.wavesDone++;
 }
 function useSkill(b, u) {
-  const power = u.rare ? 1.3 : 1;
+  const power = u.power ?? (u.rare ? 1.3 : 1);
   if (u.cls === 'vanguard') b.energy = Math.min(99, b.energy + Math.round(8 * power));
   else if (u.cls === 'blocker') u.hp = Math.min(u.maxHp, u.hp + Math.round(u.maxHp * 0.4 * power));
   else if (u.cls === 'medic') { for (const a of b.units) if (dist(a, u.x, u.y) <= u.range) a.hp = Math.min(a.maxHp, a.hp + Math.round(u.atk * 1.5 * power)); }
@@ -653,6 +674,7 @@ export function levelUp(wallet, line, { today = dailyDate(), now = Date.now() } 
   if (!state.lines[line]) return { wallet: mergeWallet(wallet), ok: false, reason: 'not-owned' };
   const level = tdState(wallet, today).levels[line] || 1;
   if (level >= MAX_LEVEL) return { wallet: mergeWallet(wallet), ok: false, reason: 'owned' };
+  if (level >= lineCap(state, line)) return { wallet: mergeWallet(wallet), ok: false, reason: 'cap' };
   const result = spendFrom(wallet, { coins: levelCost(level) }, { id: uuid(), now, x: { lv: line, to: level + 1 } });
   return result.ok ? { wallet: result.wallet, ok: true } : { wallet: mergeWallet(wallet), ok: false, reason: 'coins' };
 }
@@ -661,8 +683,8 @@ export function squadFrom(wallet, species, today = dailyDate()) {
   const state = gachaState(wallet, today), td = tdState(wallet, today);
   return species.filter(num => state.owned.includes(num)).slice(0, 8).map(num => {
     const l = state.lines[lineOf(num)] || {};
-    return { ...unitStats(num, { level: td.levels[lineOf(num)] || 1, passive: !!l.passive, costCut: l.cost || 0, skills: l.skills || [true, false, false, false] }),
-      look: lookFor(state, num), level: td.levels[lineOf(num)] || 1 };
+    return { ...unitStats(num, { level: td.levels[lineOf(num)] || 1, passive: !!l.passive, costCut: l.cost || 0, skills: l.skills || [true, false, false, false], skill: l.skill ?? null }),
+      look: lookFor(state, num), level: td.levels[lineOf(num)] || 1, cap: lineCap(state, lineOf(num)) };
   });
 }
 
@@ -676,6 +698,7 @@ export function tdBridge({ onChange = () => {} } = {}) {
   return {
     // `stages` stays chapter 1 for pages that predate chapters; `chapters` and `allStages` have every chapter.
     stages: CHAPTERS[0].stages, chapter: CHAPTER, chapters: CHAPTERS, allStages: STAGES, classes: CLASSES, W, H, TICK, REDEPLOY, maxLevel: MAX_LEVEL, levelCost,
+    levelCaps: LEVEL_CAPS, skillKinds: SKILL_KINDS, capOf: line => lineCap(gachaState(readWallet()), line),
     classOf, pathsOf, newBattle, step, deploy, retreat, canDeploy, canHit, starsFor, typeMultiplier,
     state: () => tdState(readWallet()),
     squad: species => squadFrom(readWallet(), species),
