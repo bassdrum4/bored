@@ -13,7 +13,7 @@
 // four native arcade.js games came after the initial documents but before DEEP.
 // Keep their original NEW-badge chronology (Aim Lab, Connect Four, Memory,
 // 2048) between DEEP and SUMO; NEW_GAMES identifies the implementation type.
-export const ORDER = [["photo-puzzle", "Photo Puzzle"], ["poke-gacha", "Poké Gacha"], ["poke-idle", "Poké Idle"], ["air-hockey", "Air Hockey"], ["pokedoku", "Pokédoku"], ["krillion","Krillion"],["quickdraw","Quickdraw"],["clicker", "Clicker"], ["downhill-mayhem","Downhill Mayhem"],["corner","Corner"],["ticket-to-ride","Ticket to Ride"],["wallbound","Sticky Ninja"],["risk","Risk"],["scrabble","Scrabble"],["basket-random","Basket Random"],["brick-run","Brick Run"],["trackbound","Trackmania"],["ashcrown","Civ Lite"],["typing-test","Typing Test"],["circuit","Circuit"],["transit-chaos","Transit Chaos"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["lights-out","Lights Out"],["deep","DEEP"],["aim-lab","Aim Lab"],["connect-four","Connect Four"],["memory","Memory"],["2048","2048"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["tank2","Tank 2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
+export const ORDER = [["sudoku", "Sudoku"], ["photo-puzzle", "Photo Puzzle"], ["poke-gacha", "Poké Gacha"], ["poke-idle", "Poké Idle"], ["air-hockey", "Air Hockey"], ["pokedoku", "Pokédoku"], ["krillion","Krillion"],["quickdraw","Quickdraw"],["clicker", "Clicker"], ["downhill-mayhem","Downhill Mayhem"],["corner","Corner"],["ticket-to-ride","Ticket to Ride"],["wallbound","Sticky Ninja"],["risk","Risk"],["scrabble","Scrabble"],["basket-random","Basket Random"],["brick-run","Brick Run"],["trackbound","Trackmania"],["ashcrown","Civ Lite"],["typing-test","Typing Test"],["circuit","Circuit"],["transit-chaos","Transit Chaos"],["fluid","Fluid"],["signal-tower","Signal Tower"],["prism-duel","Prism Duel"],["rooftop-snipers","Rooftop Snipers: Boring Edition"],["block-blast","Block Blast"],["chess","Chess"],["mahjong","Mahjong"],["minigolf","Minigolf"],["lights-out","Lights Out"],["deep","DEEP"],["aim-lab","Aim Lab"],["connect-four","Connect Four"],["memory","Memory"],["2048","2048"],["sumo","SUMO"],["sand","Sand"],["poker","Card Table"],["wordle","Wordle"],["lava","Lava"],["volletball","VolletBall"],["solitaire","Solitaire"],["commanders","Commanders"],["eco","Eco"],["void-runner","Void Runner"],["qbert","Q*bert"],["simon","Simon"],["frogger","Frogger"],["pac-man","Pac-man"],["snake","Snake"],["tank","Tank"],["space-invaders","Space Invaders"],["pong","Pong"],["asteroids","Asteroids"],["breakout","Breakout"],["tetris","Tetris"],["minesweeper","Minesweeper"],["tank2","Tank 2"],["gun-mayhem","Gun Mayhem"],["shadow-net","shadow.net"],["f-14","F-14"],["klang","Klang"],["8ball","8 Ball"]];
 export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": "https://site-c34c9896e1dc43759ac9d67d703052cd.freebuff.page/"};
 // Offline games with no board of their own: they still play, but the hub keeps
 // no best for them. 8 Ball, Sand and Eco are open-ended toys, so a "high score"
@@ -26,12 +26,13 @@ export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into
 // arcade.js), so do not use one for the other.
-export const FRESH_GAMES = ["photo-puzzle", "poke-gacha", "poke-idle", "air-hockey"];
+export const FRESH_GAMES = ["sudoku", "photo-puzzle", "poke-gacha", "poke-idle"];
 // When each game first arrived. Popular ranks the last seven days of plays, so a
 // game nobody has opened yet has no rank and used to sit under every ranked
 // game; a launch inside the boost window is shown above them instead. Only
 // recent launches matter, and `games:add` stamps every new game here.
 export const LAUNCHED = {
+  "sudoku": "2026-11-18",
   "photo-puzzle": "2026-11-17",
   "poke-gacha": "2026-11-16",
   "pokedoku": "2026-11-12",
@@ -65,6 +66,7 @@ export const LAUNCHED = {
   "deep": "2026-10-20"
 };
 export const META = {
+  "sudoku": ["Puzzle", "Nine by nine, three levels: fill every row, column and box without a repeat."],
   "photo-puzzle": ["Puzzle", "Upload a picture, break it into tiles, then swap them back into place."],
   "poke-gacha": ["Arcade", "Pull eggs, hatch a team, and beat Team Rocket in tower defense."],
   "poke-idle": ["Strategy", "Build a party of 6, beat 36 gyms across nine regions, and fill the Pokédex."],
