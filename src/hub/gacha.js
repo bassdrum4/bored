@@ -26,7 +26,7 @@
 import { DEX, DEX_TYPES, DEX_LEGACY } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
 import {
-  mergeWallet, walletBalance, spendFrom, grantOnce, buyRegular, readWallet, writeWallet, walletTrophies, walletTrophyList
+  mergeWallet, walletBalance, spendFrom, grantOnce, buyRegular, readWallet, writeWallet, walletTrophies, walletTrophyList, bossStreak
 } from './rewards.js';
 
 // Egg tiers: 0 Common 3★, 1 Rare 4★, 2 Epic 5★, 3 Legendary 6★, 4 the banner legendary (6★).
@@ -679,6 +679,8 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     trophies: () => walletTrophies(readWallet()),
     // Every trophy, earned or not, with its progress (have / need).
     trophyList: () => walletTrophyList(readWallet()),
+    // The Poké Idle daily boss streak (weekdays in a row), for the Trainer card.
+    bossStreak: () => bossStreak(readWallet(), dailyDate()),
     pickStarter: act((w, o) => pickStarter(w, o.species, o)),
     pull: act((w, o) => pullEggs(w, o)),
     hatch: act((w, o) => hatchReady(w, o)),
