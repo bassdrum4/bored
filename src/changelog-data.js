@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 621,
+  "count": 622,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"fd02def","date":"2026-11-18","author":"Codebuff","subject":"Trackmania: a daily worth returning to, a rival ghost, and two new tracks"},
   {"sha":"f13f108","date":"2026-11-18","author":"Claude","subject":"Drop the candy picker's leftover filter bar"},
   {"sha":"3802257","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battles fully by mouse (drag or click to deploy, unit popup, HUD pause, energy on cards)","pr":250},
   {"sha":"7153005","date":"2026-11-18","author":"Vettel Xu","subject":"Hub: castSkill, so the battle popup's Skill button fires a charged skill now","pr":249},
