@@ -164,11 +164,25 @@ canvas, img { image-rendering: pixelated; display: block }
 #dex-rows { height: 192px }
 /* Dex rows hold the 40x30 mini sprite at 1x, so they are 32px tall: 6 whole rows. */
 #dex-rows > div { height: 32px }
-#dex-detail { left: 264px; top: 8px; width: 368px; height: 264px; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: 96px 1fr; gap: 8px 12px }
+#dex-detail { left: 264px; top: 8px; width: 368px; height: 264px; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: 96px 18px 120px; gap: 2px 12px }
 #dex-info { min-width: 0 }
 #dex-info > div { overflow: hidden; text-overflow: ellipsis }
 #dex-detail .cell { width: 96px; height: 96px; background: var(--ink) }
-#dex-acts { grid-column: 1 / -1; height: 120px }
+#dex-acts { grid-column: 1 / -1; grid-row: 3; height: 120px }
+/* Below the picture: Info (the line's chain, class and base stats) or Candy & looks (the actions). */
+#dex-tabs { grid-column: 1 / -1; grid-row: 2; display: flex; gap: 4px; margin-top: 6px; height: 18px }
+#dex-tabs span { border: 1px solid var(--dim); padding: 0 4px; line-height: 16px; cursor: pointer; white-space: nowrap }
+#dex-tabs span.on { color: var(--gold); border-color: var(--gold) }
+#dex-depth { grid-column: 1 / -1; grid-row: 3; height: 120px; display: flex; flex-direction: column; gap: 4px; padding-top: 6px; cursor: pointer }
+#dex-depth .chain { display: flex; align-items: center; gap: 2px; height: 30px; white-space: nowrap }
+#dex-depth .chain .form { position: relative }
+#dex-depth .chain .form canvas { position: absolute; right: -2px; bottom: 0 }
+#dex-depth .line { display: flex; align-items: center; gap: 4px; height: 20px; white-space: nowrap }
+#dex-depth .bars { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; row-gap: 0 }
+#dex-depth .bar { display: grid; grid-template-columns: 32px 1fr 28px; align-items: center; height: 18px; gap: 4px }
+#dex-depth .bar i { display: block; height: 8px; background: var(--ink) }
+#dex-depth .bar i b { display: block; height: 8px; background: var(--gold) }
+#dex-depth .bar span:last-child { text-align: right }
 #dex-info .egg-line { display: flex; align-items: center; gap: 4px; height: 36px; white-space: nowrap }
 #dex-info > div:last-child { white-space: nowrap }
 #dex-pic .silhouette { display: block }
@@ -332,7 +346,7 @@ canvas, img { image-rendering: pixelated; display: block }
 /* The tip grows upward to fit its text (it is anchored at the bottom). */
 #battle-tip { left: 8px; bottom: 8px; width: 176px; min-height: 62px; padding: 2px 8px; line-height: 18px; color: var(--dim); white-space: normal }
 #frame.no-pixel #battle-tip, #frame.no-pixel #deploy .card .low, #frame.no-pixel #deploy-info, #frame.no-pixel #battle-talk,
-#frame.no-pixel #dex-rows, #frame.no-pixel #dex-info > div:not(.title), #frame.no-pixel #egg-from, #frame.no-pixel #eggs-grid > p, #frame.no-pixel #story-list { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
+#frame.no-pixel #dex-rows, #frame.no-pixel #dex-info > div:not(.title), #frame.no-pixel #dex-depth, #frame.no-pixel #dex-tabs, #frame.no-pixel #egg-from, #frame.no-pixel #eggs-grid > p, #frame.no-pixel #story-list { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
 /* As tall as the deploy bar and tip it covers, so neither peeks out above it. */
 #battle-talk { left: 8px; bottom: 8px; width: 624px; height: 62px; padding: 9px 12px; cursor: pointer }
 #battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
@@ -386,7 +400,7 @@ canvas, img { image-rendering: pixelated; display: block }
       </section>
       <section id="scr-dex" class="screen" hidden>
         <div class="panel" id="dex-list"><div class="title" id="dex-title">DEX</div><div class="rows scroll" id="dex-rows"></div></div>
-        <div class="panel" id="dex-detail"><div class="cell" id="dex-pic"></div><div id="dex-info"></div><div class="rows scroll" id="dex-acts"></div></div>
+        <div class="panel" id="dex-detail"><div class="cell" id="dex-pic"></div><div id="dex-info"></div><div id="dex-tabs"></div><div class="rows scroll" id="dex-acts"></div><div id="dex-depth" hidden></div></div>
       </section>
       <section id="scr-shop" class="screen" hidden>
         <div class="panel left-panel"><div class="title" id="shop-title">SHOP</div><div class="rows scroll" id="shop-list"></div></div>
@@ -1325,6 +1339,16 @@ function dexUpdate() {
   if (!acts.length) dexFocus = "list";
   rows($("#dex-acts"), acts, dexFocus === "acts" ? actAt : -1, (i, click) => { actAt = i; dexFocus = "acts"; if (click) runDex(acts[i]); else dexUpdate(); });
   if (!l) $("#dex-acts").replaceChildren(el("p", "dim", "Hatch it from " + (stars === 5 ? "an " : "a ") + TIER_NAME[stars - 3] + " egg to see what it is."));
+  // A caught line: Info while browsing, Candy & looks once Enter (or its label) picks them.
+  const info_ = !!l && dexFocus !== "acts";
+  const tabs = $("#dex-tabs"); tabs.hidden = !l;
+  if (l) {
+    const t1 = el("span", info_ ? "on" : "", "Info"), t2 = el("span", info_ ? "" : "on", "Candy & looks");
+    t1.dataset.dexTab = "info"; t2.dataset.dexTab = "acts"; tabs.replaceChildren(t1, t2);
+  }
+  $("#dex-acts").hidden = info_;
+  $("#dex-depth").hidden = !info_;
+  if (info_) dexDepth(line, tip);
   const skills = G.skillsOf(line).map((skill, i) => (l && l.skills[i] ? skill : "(" + skill + ")") + (i === 3 ? "*" : ""));
   say(dexFocus === "acts" && acts[actAt] ? acts[actAt].about
     : (l ? "Skills: " + skills.join(", ") + ". Locked in brackets, * is rare. Enter: candy and looks." : "Hatch this line to unlock it. F, T and S filter and sort the Dex."));
@@ -1334,6 +1358,42 @@ function runDex(action) {
   const r = action.run();
   refreshTop(); dexUpdate();
   if (!r.ok) say(REASONS[r.reason] || "Not now.");
+}
+// The Info view: the evolution chain by stage (owned forms in colour with a check, the
+// rest dark), class, range and deploy cost of the form shown, and its base stats as bars.
+const DEX_CHAIN_MAX = 7;
+function dexForms(line) {
+  const out = [], walk = n => { out.push(n); for (const c of G.evolutionsOf(n)) walk(c); };
+  walk(line);
+  return out.sort((a, b) => G.stageOf(a) - G.stageOf(b) || a - b);
+}
+function dexDepth(line, tip) {
+  const forms = dexForms(line), own = new Set(S.owned);
+  const chain = el("div", "chain");
+  let last = 0;
+  forms.slice(0, DEX_CHAIN_MAX).forEach(n => {
+    if (last && G.stageOf(n) !== last) chain.append(el("span", "dim", "›"));
+    last = G.stageOf(n);
+    const f = el("span", "form"), has = own.has(n);
+    f.append(has ? mini(n, G.lookFor(n)) : mini(n, "normal", true));
+    if (has) f.append(check(true));
+    f.title = has ? name(n) : "???";
+    chain.append(f);
+  });
+  if (forms.length > DEX_CHAIN_MAX) chain.append(el("span", "dim", "+" + (forms.length - DEX_CHAIN_MAX)));
+  const owned = forms.filter(n => own.has(n)).length;
+  chain.append(el("span", "dim", " " + owned + "/" + forms.length + " owned"));
+  const parts = [chain];
+  const u = T && T.squad ? T.squad([tip])[0] : null, c = u && T.classes[u.cls];
+  if (u && c) { const ln = el("div", "line"); ln.append(classIcon(u.cls), c.name, " · Range ", el("span", "num", u.range), " · cost ", el("span", "num", u.cost)); parts.push(ln); }
+  const row = G.dex[tip - 1], bars = el("div", "bars");
+  [["HP", 2], ["Atk", 3], ["Def", 4], ["SpA", 5], ["SpD", 6], ["Spe", 7]].forEach(([k, i]) => {
+    const b = el("div", "bar"), track = el("i"), fill = el("b");
+    fill.style.width = Math.min(100, Math.round(100 * (row[i] || 0) / 180)) + "%";
+    track.append(fill); b.dataset.stat = k; b.append(el("span", "dim", k), track, el("span", "", row[i])); bars.append(b);
+  });
+  parts.push(bars);
+  $("#dex-depth").replaceChildren(...parts);
 }
 function dexKey(e) {
   const k = e.key;
@@ -3100,6 +3160,8 @@ if (!G) {
   $("#hit-machine").onclick = () => { menuOpen = true; message = null; updateScene(); };
   $("#msg").onclick = e => { if (e.target.closest("[data-rates]")) toggleRates(); };
   $("#rates").onclick = () => toggleRates();
+  $("#dex-tabs").onclick = e => { const t = e.target.closest("[data-dex-tab]"); if (!t) return; dexFocus = t.dataset.dexTab === "acts" ? "acts" : "list"; actAt = 0; dexUpdate(); };
+  $("#dex-depth").onclick = () => { dexFocus = "acts"; actAt = 0; dexUpdate(); };
   $("#reveal").onclick = () => reveal && revealKey({ key: "Enter", preventDefault() {} });
   $("#hatch").onclick = () => hatching && hatchKey({ key: "Enter", preventDefault() {} });
   // The Legendary UP timer is on screen whichever machine is in front.

@@ -361,6 +361,45 @@ test('Dex: uncaught lines are ??? with a silhouette, the egg they hatch from and
   assert.deepEqual(errors, []);
 });
 
+test('Dex depth: Info shows the evolution chain with owned forms, class, range and cost, and base stat bars; Enter or a label opens Candy & looks', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '4');
+  // A caught line with evolutions.
+  const line = await game.evaluate(() => { pref.dexFilter = 'All'; pref.dexType = ''; keep(); const l = dexList().find(n => S.lines[n] && G.evolutionsOf(n).length); dexFocus = 'list'; dexAt = dexList().indexOf(l); dexUpdate(); return l; });
+  assert.ok(line, 'some caught line evolves');
+  const view = await game.evaluate(() => ({ depth: !$('#dex-depth').hidden, acts: !$('#dex-acts').hidden, on: $('#dex-tabs .on').textContent }));
+  assert.deepEqual(view, { depth: true, acts: false, on: 'Info' }, 'browsing shows Info');
+  const chain = await game.evaluate(l => { const forms = dexForms(l); return { forms: forms.length, shown: $('#dex-depth .chain').querySelectorAll('.form').length,
+    lit: $('#dex-depth .chain').querySelectorAll('.form .mini:not(.unseen)').length, own: forms.slice(0, DEX_CHAIN_MAX).filter(n => S.owned.includes(n)).length, text: $('#dex-depth .chain').textContent }; }, line);
+  assert.equal(chain.shown, Math.min(chain.forms, 7), 'every form, up to seven');
+  assert.equal(chain.lit, chain.own, 'owned forms in colour, the rest dark');
+  assert.match(chain.text, new RegExp(chain.own + '/' + chain.forms + ' owned'));
+  const tip = await game.evaluate(() => tipOf(dexList()[dexAt]));
+  const u = await game.evaluate(n => T.squad([n])[0], tip);
+  const lineText = await game.$eval('#dex-depth .line', n => n.textContent);
+  assert.match(lineText, new RegExp(await game.evaluate(c => T.classes[c].name, u.cls) + ' · Range ' + u.range + ' · cost ' + u.cost));
+  const bars = await game.$$eval('#dex-depth .bar', list => list.map(b => [b.dataset.stat, Number(b.lastChild.textContent), parseFloat(b.querySelector('b').style.width)]));
+  const row = await game.evaluate(n => G.dex[n - 1].slice(2, 8), tip);
+  assert.deepEqual(bars.map(b => b[0]), ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe']);
+  assert.deepEqual(bars.map(b => b[1]), row, 'the base stats');
+  assert.ok(bars.every((b, i) => i === 0 || (b[1] > bars[0][1]) === (b[2] > bars[0][2]) || b[2] === 100 || bars[0][2] === 100), 'longer bars for bigger stats');
+  // Enter: Candy & looks; Backspace: back to Info; the labels and a click on Info work too.
+  await key(tab, 'Enter');
+  assert.deepEqual(await game.evaluate(() => [!$('#dex-acts').hidden, $('#dex-tabs .on').textContent]), [true, 'Candy & looks']);
+  await key(tab, 'Backspace');
+  assert.equal(await game.evaluate(() => !$('#dex-depth').hidden), true);
+  await (await game.$('#dex-tabs [data-dex-tab="acts"]')).click();
+  assert.equal(await game.evaluate(() => dexFocus), 'acts');
+  await (await game.$('#dex-tabs [data-dex-tab="info"]')).click();
+  assert.equal(await game.evaluate(() => dexFocus), 'list');
+  await (await game.$('#dex-depth')).click();
+  assert.equal(await game.evaluate(() => dexFocus), 'acts');
+  // An uncaught line: no tabs, the hatch hint, nothing given away.
+  await game.evaluate(() => { dexFocus = 'list'; dexAt = dexList().findIndex(n => !S.lines[n]); dexUpdate(); });
+  assert.deepEqual(await game.evaluate(() => [$('#dex-tabs').hidden, $('#dex-depth').hidden, /Hatch it from/.test($('#dex-acts').textContent)]), [true, true, true]);
+  assert.deepEqual(errors, []);
+});
+
 test('Dex tiers follow each line\'s final evolution: Magikarp and Happiny are Rare, Bonsly (Sudowoodo, 410) stays Common', async () => {
   const { DEX } = await import(path.join(root, 'src/hub/gacha-dex.js'));
   const bst = r => r[2] + r[3] + r[4] + r[5] + r[6] + r[7];
