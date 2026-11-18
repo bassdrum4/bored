@@ -102,7 +102,8 @@ export const LOGIN = { regular: 3 };
    Two devices buying offline merge to one entry per id, cost and goods together, so
    nothing is paid twice and no limit can be passed. */
 export const COIN_SHOP = {
-  candy: { coins: 200, candy: 5, perLineDay: 50 },
+  // Candy is 40 coins each, bought in any number up to 50 per line a day (5 for 200 is the old pack).
+  candy: { coins: 200, candy: 5, perLineDay: 50, each: 40 },
   shards: { coins: 500, shards: 10, perWeek: 50 },
   presets: { start: 3, max: 5, prices: [500, 1000] }
 };
@@ -114,7 +115,8 @@ function coinShop(entries, today) {
   for (const id of Object.keys(entries)) {
     if (!id.startsWith('spend:')) continue;
     const part = id.split(':');
-    if (part[1] === 'candy' && part[3] === today) candyToday[part[2]] = (candyToday[part[2]] || 0) + COIN_SHOP.candy.candy;
+    // Each purchase counts the candy it bought (older entries were all packs of 5).
+    if (part[1] === 'candy' && part[3] === today) candyToday[part[2]] = (candyToday[part[2]] || 0) + (Number(entries[id]?.g?.['candy:' + part[2]]) || COIN_SHOP.candy.candy);
     if (part[1] === 'shards' && part[2] === monday) shardsWeek += COIN_SHOP.shards.shards;
     if (part[1] === 'preset') { const n = Number(part[2]); if (n > COIN_SHOP.presets.start && n <= COIN_SHOP.presets.max) presets++; }
   }
@@ -362,15 +364,24 @@ const refuse = (wallet, reason) => ({ wallet: mergeWallet(wallet), ok: false, re
 const starter = (wallet, id, now) => grantOnce(wallet, 'gacha:start:' + id, STARTER, { now }).wallet;
 
 /** Coin shop: 5 candy for a caught line, 200 coins, up to 50 for that line today. */
-export function buyCandy(wallet, line, { today = dailyDate(), now = Date.now() } = {}) {
+/** What buying `count` candy for a line would cost now: coins, what today's cap leaves, and any coins short. */
+export function candyOffer(wallet, line, count, { today = dailyDate() } = {}) {
+  const state = gachaState(wallet, today), c = COIN_SHOP.candy, n = Math.max(1, Math.floor(Number(count) || 0));
+  const left = Math.max(0, c.perLineDay - (state.shop.candyToday[line] || 0)), coins = n * c.each;
+  return { count: n, coins, left, have: state.balance.coins, short: Math.max(0, coins - state.balance.coins), fits: n <= left };
+}
+/** Buy `count` candy for a line (default the 5-pack) at 40 coins each, within 50 per line a day. */
+export function buyCandy(wallet, line, { count = COIN_SHOP.candy.candy, today = dailyDate(), now = Date.now() } = {}) {
   const state = gachaState(wallet, today), c = COIN_SHOP.candy;
   if (!state.lines[line]) return refuse(wallet, 'not-owned');
-  if ((state.shop.candyToday[line] || 0) + c.candy > c.perLineDay) return refuse(wallet, 'limit');
+  const offer = candyOffer(wallet, line, count, { today });
+  if (!offer.fits) return { ...refuse(wallet, 'limit'), left: offer.left };
+  if (offer.short) return { ...refuse(wallet, 'coins'), short: offer.short };
   const merged = mergeWallet(wallet);
   let slot = 0;
   while (merged.entries['spend:candy:' + line + ':' + today + ':' + slot]) slot++;
-  const r = spendFrom(merged, { coins: c.coins }, { id: 'candy:' + line + ':' + today + ':' + slot, now, gain: { ['candy:' + line]: c.candy } });
-  return r.ok ? { wallet: r.wallet, ok: true } : refuse(wallet, 'coins');
+  const r = spendFrom(merged, { coins: offer.coins }, { id: 'candy:' + line + ':' + today + ':' + slot, now, gain: { ['candy:' + line]: offer.count } });
+  return r.ok ? { wallet: r.wallet, ok: true, count: offer.count, coins: offer.coins } : { ...refuse(wallet, 'coins'), short: offer.short };
 }
 /** Coin shop: 10 shards for 500 coins, up to 50 shards a week (Monday to Sunday). */
 export function buyShards(wallet, { today = dailyDate(), now = Date.now() } = {}) {
@@ -624,6 +635,8 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     // The coin shop: candy for a line, shards, squad preset slots (limits in state().shop).
     coinShop: COIN_SHOP,
     buyCandy: act((w, o) => buyCandy(w, o.line, o)),
+    // The missing-candy prompt: what count candy would cost now (no write).
+    candyOffer: o => candyOffer(readWallet(), o.line, o.count, { today: dailyDate() }),
     buyShards: act((w, o) => buyShards(w, o)),
     buyPreset: act((w, o) => buyPreset(w, o)),
     skins: () => skinList(), looksOf, lookFor: num => lookFor(gachaState(readWallet()), num), skinDir: SKIN_DIR, skinFile, skinPrice,

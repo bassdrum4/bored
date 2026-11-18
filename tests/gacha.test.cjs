@@ -20,7 +20,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const gacha = moduleUnderTest('src/hub/gacha.js', [
   'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin',
-  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf', 'buyCandy', 'buyShards', 'buyPreset', 'COIN_SHOP', 'skinFile', 'skinPrice', 'SP_PRICES',
+  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf', 'buyCandy', 'candyOffer', 'buyShards', 'buyPreset', 'COIN_SHOP', 'skinFile', 'skinPrice', 'SP_PRICES',
   'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES'
 ], { ...daily, ...rewards, DEX, DEX_TYPES });
 const { mergeWallet, walletBalance, activateWallet, grantOnce } = rewards;
@@ -424,6 +424,34 @@ test('a line wears one look across Bored, and only one it has unlocked', () => {
   plain = hatchReady(fund(plain, { waves: 10 }), opts({ rand: always(0.9) })).wallet;
   const own = gachaState(plain, TODAY).owned[0];
   assert.equal(gacha.setLook(plain, own, 'shiny', opts()).reason, 'locked');
+});
+
+test('candy by count: exactly the missing candy at 40 coins each, within 50 per line a day; refusals say how far off', () => {
+  const { buyCandy, candyOffer, COIN_SHOP } = gacha;
+  assert.equal(COIN_SHOP.candy.each, 40);
+  const owning = coins => { let w = fresh({ regular: 1, coins }); w = pull(w, { machine: 'move', rand: always(0.001) }).wallet;
+    return hatchReady(fund(w, { waves: 10 }), opts({ rand: always(0.001) })).wallet; };
+  let w = owning(2000);
+  const line = gacha.lineOf(gachaState(w, TODAY).owned[0]);
+  const before = gachaState(w, TODAY).lines[line].candy;
+  assert.deepEqual(candyOffer(w, line, 7, { today: TODAY }), { count: 7, coins: 280, left: 50, have: 2000, short: 0, fits: true });
+  const r = buyCandy(w, line, opts({ count: 7 }));
+  assert.ok(r.ok); assert.deepEqual([r.count, r.coins], [7, 280]);
+  w = r.wallet;
+  assert.equal(gachaState(w, TODAY).lines[line].candy - before, 7, 'exactly 7');
+  assert.equal(walletBalance(w).coins, 2000 - 280);
+  assert.equal(gachaState(w, TODAY).shop.candyToday[line], 7, 'the cap counts what was bought, not packs');
+  // The default is still the 5-pack for 200.
+  w = buyCandy(w, line, opts()).wallet;
+  assert.equal(gachaState(w, TODAY).shop.candyToday[line], 12);
+  // Over today's cap: refused, with what is left.
+  const over = buyCandy(w, line, opts({ count: 39 }));
+  assert.deepEqual([over.ok, over.reason, over.left], [false, 'limit', 38]);
+  // Short of coins: refused, with how many coins short.
+  const poor = owning(100);
+  const no = buyCandy(poor, line, opts({ count: 3 }));
+  assert.deepEqual([no.ok, no.reason, no.short], [false, 'coins', 20]);
+  assert.equal(candyOffer(poor, line, 3, { today: TODAY }).short, 20);
 });
 
 test('coin shop: candy for a caught line, 50 a line a day; shards, 50 a week; preset slots up to 5, permanent', () => {
