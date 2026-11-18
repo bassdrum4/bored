@@ -231,12 +231,14 @@ canvas, img { image-rendering: pixelated; display: block }
 #story-info .roles .part + .part::before { content: "· "; color: var(--paper) }
 #story-info .roles.wrapped .part + .part::before { content: none }
 #squad-stage .roles .part { display: block; line-height: 18px }
-#squad-stage .gold { line-height: 18px; white-space: normal }
+#squad-stage .gold { line-height: 18px; white-space: normal; overflow: hidden }
 #squad .card.empty .slot { width: 40px; height: 30px; margin-top: 3px; border: 1px dashed var(--dim) }
 /* The mono fallback is much wider than the pixel font, so the squad's dense panels
    use a narrow sans at 13px when the pixel font cannot load. */
 #frame.no-pixel #squad-detail, #frame.no-pixel #squad-stage, #frame.no-pixel #squad-filters, #frame.no-pixel #squad .card .low, #frame.no-pixel #squad .card .cost { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
 #frame.no-pixel #squad-detail .title { font-size: 20px }
+/* The message box too: the wide fallback runs three lines where the pixel font needs two. */
+#frame.no-pixel #msg { font-size: 13px; font-family: Arial, Helvetica, sans-serif; line-height: 20px }
 #squad .bracket { position: absolute; inset: 0; pointer-events: none }
 #squad .bracket b { position: absolute; width: 8px; height: 8px; border: 0 solid var(--paper) }
 #squad .bracket b:nth-child(1) { left: 0; top: 0; border-width: 2px 0 0 2px }
@@ -1216,6 +1218,8 @@ const flyersOf = stage => [...new Set(stage.waves.filter(w => w[5]).map(w => w[1
 const explodersOf = stage => [...new Set(stage.waves.filter(w => w[6]).map(w => w[1]))];
 // Armored enemies (wave field 7, chapter 4 on): physical hits barely scratch them; casters go through.
 const armoredOf = stage => [...new Set(stage.waves.filter(w => w[7]).map(w => w[1]))];
+// Fast enemies (wave field 8, chapter 5 on): they run at 1.5x, so block them early.
+const fastOf = stage => [...new Set(stage.waves.filter(w => w[8]).map(w => w[1]))];
 let shieldIcon = null;
 // The weekly challenge (td.js): one story map for everyone each week, and risks
 // to stack for a higher score. It is one more page after the last chapter.
@@ -1244,7 +1248,7 @@ const stageNow = () => onWeekly() ? T.state().challenge : stagesNow()[storyAt];
 const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
 const stageStars = starIcons;
 // The plain enemies: flyers, exploders and armored ones get their own lines.
-function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5] && !w[6] && !w[7]).map(w => w[1]))].map(name).join(", "); }
+function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5] && !w[6] && !w[7] && !w[8]).map(w => w[1]))].map(name).join(", "); }
 /* Stage preview and loss hints. The recommended level follows the enemies' level
    (1.0 in 1-1 up to about 2.5): (level - 1) x 2 + 1, so 1 early on and 3-4 late,
    where type-matched level-3 squads win in the balance tests. */
@@ -1319,6 +1323,7 @@ function lossHint(stage, bt) {
   if (flyersOf(stage).length) notes.push("Bring a Sniper for the flyers.");
   if (explodersOf(stage).length) notes.push("Kill exploders before they reach a blocker.");
   if (armoredOf(stage).length) notes.push("Casters go through armor.");
+  if (fastOf(stage).length) notes.push("Block fast foes early, near where they come in.");
   return notes.slice(0, 2).join(" ") || "Try another squad or placement.";
 }
 // "Tanks: Rock, Steel · Damage: Fighting", the role names in their Squad marker colours.
@@ -1328,6 +1333,21 @@ function roleRow(stage, short = false) {
   if (short) d.append(part("tank", "Tank", t), part("dmg", "Dmg", w));
   else d.append(part("tank", "Tanks:", t), part("dmg", "Damage:", w));
   return d;
+}
+// Late stages bring several kinds of special foe. If the preview would overflow, drop the
+// Types line (the role line already says what to bring), then put the special foes on one line.
+function fitPreview(info, stage) {
+  const over = () => info.scrollHeight > info.clientHeight + 1;
+  if (!over()) return;
+  const types = [...info.children].find(n => /^Types: /.test(n.textContent));
+  if (types) types.remove();
+  if (!over()) return;
+  const kinds = [[flyersOf, "Fly"], [explodersOf, "Boom"], [armoredOf, "Armor"], [fastOf, "Fast"]].filter(([f]) => f(stage).length);
+  const lines = [...info.children].filter(n => /^(Flying|Explodes|Armored|Fast): /.test(n.textContent));
+  if (!lines.length) return;
+  const one = el("div", "gold", kinds.map(([f, k]) => k + ": " + f(stage).map(name).join(", ")).join(" · "));
+  one.style.whiteSpace = "normal"; one.style.lineHeight = "20px";
+  lines[0].replaceWith(one); for (const n of lines.slice(1)) n.remove();
 }
 function storyUpdate() {
   drawBackdrop();
@@ -1354,16 +1374,23 @@ function storyUpdate() {
   if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ")));
   if (explodersOf(stage).length) info.append(el("div", "gold", "Explodes: " + explodersOf(stage).map(name).join(", ")));
   if (armoredOf(stage).length) info.append(el("div", "gold", "Armored: " + armoredOf(stage).map(name).join(", ")));
+  if (fastOf(stage).length) info.append(el("div", "gold", "Fast: " + fastOf(stage).map(name).join(", ")));
   { const r = info.querySelector(".roles"), [a, b] = r.children; r.classList.toggle("wrapped", b.offsetTop > a.offsetTop); }
   const reward = el("div"); reward.append(best ? "Best " : "First clear: ", best ? stageStars(best) : el("span", "num", "50"), best ? "" : " coins + 2 Regular");
   // An admin's first clear also pays a Gold voucher, on the same line.
   if (stage.admin && !best) reward.append(" + ", el("span", "num", "1"), " Gold");
   info.append(reward);
   if (best < 3) { const r3 = el("div", "dim"); r3.append("First 3★: ", el("span", "num", "100"), " coins + 1 Plus"); info.append(r3); }
-  const more = (flyersOf(stage).length ? " Only snipers hit flyers." : "") + (explodersOf(stage).length ? " Kill exploders before the fuse." : "") +
-    (armoredOf(stage).length ? " Casters go through armor." : "") +
-    (pages() > 1 ? " Left/Right: chapter." : "");
-  say((isOpen(td, stage) ? stage.before[0] + " Enter: choose your squad." : "Clear " + stageBefore(stage).id + " to unlock this stage.") + more);
+  fitPreview(info, stage);
+  // At most two hints about special foes (the preview lists them all), so the box never overflows.
+  const hints = [flyersOf(stage).length && " Only snipers hit flyers.", explodersOf(stage).length && " Kill exploders before the fuse.",
+    armoredOf(stage).length && " Casters go through armor.", fastOf(stage).length && " Fast foes run 1.5x: block them early."].filter(Boolean);
+  const lead = isOpen(td, stage) ? stage.before[0] + " Enter: choose your squad." : "Clear " + stageBefore(stage).id + " to unlock this stage.";
+  const nav = pages() > 1 ? " Left/Right: chapter." : "";
+  for (let n = Math.min(2, hints.length); n >= 0; n--) {
+    say(lead + hints.slice(0, n).join("") + nav);
+    const m = $("#msg"); if (m.scrollHeight <= m.clientHeight + 1) break;
+  }
 }
 function weeklyUpdate() {
   const td = T.state(), stage = td.challenge, picked = riskPick(), risk = T.riskOf(picked);
@@ -1380,6 +1407,7 @@ function weeklyUpdate() {
   if (flyersOf(stage).length) info.append(el("div", "gold", "Flying: " + flyersOf(stage).map(name).join(", ")));
   if (explodersOf(stage).length) info.append(el("div", "gold", "Explodes: " + explodersOf(stage).map(name).join(", ")));
   if (armoredOf(stage).length) info.append(el("div", "gold", "Armored: " + armoredOf(stage).map(name).join(", ")));
+  if (fastOf(stage).length) info.append(el("div", "gold", "Fast: " + fastOf(stage).map(name).join(", ")));
   const score = el("div"); score.append("Risk ", el("span", "num", risk), " · best this week ", el("span", "num", td.challengeBest || 0));
   info.append(score);
   if (T.milestones) info.append(milestoneGrid(td));
@@ -1485,7 +1513,7 @@ function card(u, { at = false, picked = false, empty = false, cost = true, fit =
 // The stage this squad is for: its name and what it sends, so the player can pick counters.
 function stageFoes(stage) {
   const types = [...new Set(stage.waves.flatMap(w => G.dex[w[1] - 1][1].split("/")))];
-  const marks = [flyersOf(stage).length && "flying", explodersOf(stage).length && "exploding", armoredOf(stage).length && "armored"].filter(Boolean);
+  const marks = [flyersOf(stage).length && "flying", explodersOf(stage).length && "exploding", armoredOf(stage).length && "armored", fastOf(stage).length && "fast"].filter(Boolean);
   return { types, marks };
 }
 function squadUpdate() {
@@ -1516,7 +1544,10 @@ function squadUpdate() {
   // What to bring rather than the whole foe list (that is in the stage preview, and on the
   // name's tooltip): a tank type and a damage type, then any special foes.
   head.title = "Foes: " + foes.types.join(", ");
-  const marks = foes.marks.length ? [el("div", "gold", "Watch: " + foes.marks.join(", "))] : [];
+  // Short words, so even four kinds fit on one line.
+  const SHORT = { flying: "fly", exploding: "boom", armored: "armor", fast: "fast" };
+  const marks = foes.marks.length ? [el("div", "gold", "Watch: " + foes.marks.map(m => SHORT[m] || m).join(" · "))] : [];
+  if (marks[0]) { marks[0].style.whiteSpace = "nowrap"; marks[0].title = "Watch for: " + foes.marks.join(", "); }
   const row = el("div", "teams");
   ["Team 1", "Team 2", "Team 3"].forEach((t, i) => {
     const b = el("span", (pref.team === i ? "on" : "") + (sq.zone === "head" && sq.head === i ? " at" : ""), t.replace("Team ", "T"));
@@ -1525,6 +1556,8 @@ function squadUpdate() {
   const go_ = el("span", "start" + (pick.length ? "" : " off") + (sq.zone === "head" && sq.head === 3 ? " at" : ""), "Start");
   go_.dataset.start = 1; row.append(go_);
   box.replaceChildren(head, roleRow(stage, true), ...marks, row);
+  // Four kinds can be too wide for "Watch: ": the gold words alone say it.
+  if (marks[0] && marks[0].scrollWidth > marks[0].clientWidth + 1) marks[0].textContent = foes.marks.map(m => SHORT[m] || m).join(" · ");
   // Detail
   squadDetail(sq.zone === "slots" ? pick[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null);
 }
@@ -1663,7 +1696,7 @@ function startBattle() {
   const squad = T.squad(squadPick());
   const stage = stageNow(), weekly = onWeekly(), mods = weekly ? riskPick() : [];
   battle = { b: T.newBattle(stage, squad, mods), stage, weekly, mods, slot: 0, cur: [0, 0], hover: null, paused: true, talk: stage.before.slice(), last: performance.now(), acc: 0, done: false, selected: null,
-    fx: [], anim: {}, ghosts: [], logSeen: 0, retreated: new Set(), born: {}, fell: [], leakHp: [], total: stage.waves.reduce((n, w) => n + w[2], 0) };
+    fx: [], anim: {}, ghosts: [], logSeen: 0, retreated: new Set(), born: {}, fell: [], leakHp: [], clearedBefore: !weekly && (T.state().best[stage.id] || 0) > 0, total: stage.waves.reduce((n, w) => n + w[2], 0) };
   const ground = T.pathsOf(stage)[0];
   battle.cur = ground[Math.floor(ground.length / 2)].slice();
   for (const u of squad) spriteFor(u.num, u.look);
@@ -1686,7 +1719,7 @@ function stepWithFx(bt) {
   const eb = new Map(b.enemies.map(e => [e.id, { hp: e.hp, cd: e.cd, x: e.x, y: e.y, e, seg: e.seg, path: e.path }]));
   const leaks = b.leaks, seen = new Set(b.enemies.map(e => e.id));
   T.step(b);
-  for (const e of b.enemies) if (!seen.has(e.id) && (e.flying || e.explodes || e.armored)) foeTips(e);
+  for (const e of b.enemies) if (!seen.has(e.id) && (e.flying || e.explodes || e.armored || e.fast)) foeTips(e);
   const ua = new Map(b.units.map(u => [u.id, u])), ea = new Map(b.enemies.map(e => [e.id, e]));
   if (bt.born) for (const u of b.units) if (!(u.id in bt.born)) bt.born[u.id] = b.t;
   const pos = o => feetOf(bt, o);
@@ -1906,6 +1939,9 @@ function drawField(now = performance.now()) {
     if (!unit && o.fuse !== null && o.fuse !== undefined && Math.floor(now / 150) % 2) { g.fillStyle = C.red; g.fillRect(Math.round(cx) - 14, Math.round(groundY) - 1, 28, 2); }
     if (!unit && o.armored) { shieldIcon ||= mapCanvas("shield", { k: C.ink, 1: C.dim, 2: C.paper }); g.drawImage(shieldIcon, Math.round(cx) - 26, top + 2); }
     if (!unit && o.boss) { g.fillStyle = C.gold; g.fillRect(Math.round(cx) - 4, top - 14, 8, 3); }
+    // Fast foes: three speed lines trailing behind them.
+    if (!unit && o.fast) { const back = facesRight(o) ? -1 : 1; g.fillStyle = C.paper;
+      for (const [dy, w] of [[-14, 8], [-8, 12], [-2, 8]]) g.fillRect(Math.round(cx + back * 22 - (back < 0 ? w : 0)), Math.round(groundY + dy), w, 2); }
     bars.push({ o, unit, x: Math.round(cx) - 18, y: top - 9 });
   }
   // A unit mostly hidden by sprites in front of it shows through as an outline.
@@ -2059,7 +2095,10 @@ function endBattle() {
   // A weekly win also pays any risk milestone it reaches for the first time this week.
   const gained = ["coins", "regular", "plus", "premium", "gold", "shards"].map(k => [k, S.balance[k] - before[k]]).filter(([, n]) => n > 0);
   if (stars) bt.talk = bt.stage.after.slice();
-  bt.result = { stars, waves: r.waves || 0, gained, weekly: bt.weekly, risk: r.risk || 0, best };
+  // The final stage's first clear: the story's ending, after the boss's last words.
+  const ending = !!(stars && bt.stage.ending && !bt.weekly && !bt.clearedBefore);
+  if (ending) bt.talk = bt.talk.concat(bt.stage.ending);
+  bt.result = { stars, waves: r.waves || 0, gained, weekly: bt.weekly, risk: r.risk || 0, best, ending };
   battleTalk();
   showResult();
 }
@@ -2068,7 +2107,7 @@ function showResult() {
   if (bt.talk.length) { $("#battle-result").hidden = true; return; }
   const box = $("#battle-result");
   box.hidden = false;
-  const lines = [el("div", "title", res.stars ? "CLEARED" : "DEFEATED"), res.stars ? (() => { const d = el("div"); d.append(stageStars(res.stars)); return d; })() : (() => { const d = el("div", "gold", lossHint(bt.stage, bt)); d.style.whiteSpace = "normal"; d.style.lineHeight = "20px"; return d; })()];
+  const lines = [el("div", "title", res.ending ? "THE END" : res.stars ? "CLEARED" : "DEFEATED"), res.stars ? (() => { const d = el("div"); d.append(stageStars(res.stars)); return d; })() : (() => { const d = el("div", "gold", lossHint(bt.stage, bt)); d.style.whiteSpace = "normal"; d.style.lineHeight = "20px"; return d; })()];
   const waves = el("div"); waves.append("+", el("span", "num", res.waves), " hatch waves");
   lines.push(waves);
   const NAMES = { coins: ["coin", "coins"], regular: ["Regular voucher", "Regular vouchers"], plus: ["Plus voucher", "Plus vouchers"],
@@ -2345,11 +2384,12 @@ function battleTips() {
 const FOE_TIPS = {
   flying: "Flying foes cross straight to your base over everything. Only Snipers can hit them.",
   explodes: "An exploder lights a fuse when it is blocked, then blows up everyone nearby. Kill it before the fuse runs out.",
-  armored: "Armored foes shrug off physical hits. Casters go straight through armor."
+  armored: "Armored foes shrug off physical hits. Casters go straight through armor.",
+  fast: "Fast foes run half again as quick. Block them early on the path."
 };
 // The first time each kind of foe shows up: a card on it.
 function foeTips(e) {
-  for (const kind of ["flying", "explodes", "armored"]) if (e[kind] && FOE_TIPS[kind])
+  for (const kind of ["flying", "explodes", "armored", "fast"]) if (e[kind] && FOE_TIPS[kind])
     tip("foe-" + kind, [{ at: () => { const [x, y] = enemySpot(battle, e); return tileBox(Math.round(x), Math.round(y)); }, text: name(e.num) + ": " + FOE_TIPS[kind] }]);
 }
 
