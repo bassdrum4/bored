@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 592,
+  "count": 593,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"efaa1cd","date":"2026-11-18","author":"Codebuff","subject":"Bound every leaderboard board and record each submission."},
   {"sha":"80bc59c","date":"2026-11-18","author":"Codebuff","subject":"Keep the feedback migration safe for the minimal Together database."},
   {"sha":"656da92","date":"2026-11-18","author":"Codebuff","subject":"Unify feedback into one table and expire stale Together invites."},
   {"sha":"b5e8b81","date":"2026-11-18","author":"Codebuff","subject":"Auto-merge the Poké Gacha modules and stop a card-tooltip test racing the board refresh."},
