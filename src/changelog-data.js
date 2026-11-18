@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 610,
+  "count": 612,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"3802257","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battles fully by mouse (drag or click to deploy, unit popup, HUD pause, energy on cards)","pr":250},
+  {"sha":"7153005","date":"2026-11-18","author":"Vettel Xu","subject":"Hub: castSkill, so the battle popup's Skill button fires a charged skill now","pr":249},
   {"sha":"c3b7db3","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battle readability (high units on their block, block pips, stop bars on held foes)","pr":248},
   {"sha":"de46ff9","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: one filter panel for the Dex, Squad and candy picker (type grid of two, class and tier chips, sort, name search, Clear)","pr":245},
   {"sha":"b1332c5","date":"2026-11-18","author":"Codebuff","subject":"Krillion: sort the daily dive against the population, and fix Puffer Party's turn lag"},
