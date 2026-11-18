@@ -9,7 +9,7 @@
 //             stage each time until the story runs out, 3-starring half of them;
 //             finishes 2 of the 4 daily missions, and the "3-star 5 stages" weekly.
 import { DOKU, PI_RATES, COINS_PER_REGULAR, VOUCHER_VALUE } from '../src/hub/rewards.js';
-import { LOGIN } from '../src/hub/gacha.js';
+import { LOGIN, COIN_SHOP } from '../src/hub/gacha.js';
 import { STAGES, FIRST_CLEAR, FIRST_STAR3, REPEAT_CLEAR, REPEAT_PER_DAY, DAILY_REWARD, DAILY_ALL, WEEKLY_REWARD, WEEKLY_ALL, levelCost, MAX_LEVEL } from '../src/hub/td.js';
 
 export const PLAYER = { dokuDays: 4, dokuModes: 2, dokuRandom: 1, dokuPerfectPerWeek: 1, piCatchesPerDay: 20, piBadgesPerWeek: 1, piTowerPerWeek: 5,
@@ -60,4 +60,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('\nLevel costs (40 x level): one mon to Lv 3 = ' + levelBill(3) + ', Lv 5 = ' + levelBill(5) + ', Lv ' + MAX_LEVEL + ' = ' + levelBill(MAX_LEVEL) +
     '; a squad of 8 to Lv 3 = ' + 8 * levelBill(3) + ', to Lv 5 = ' + 8 * levelBill(5) + ', to Lv ' + MAX_LEVEL + ' = ' + 8 * levelBill(MAX_LEVEL));
   console.log('Voucher value in coins: ' + JSON.stringify(VOUCHER_VALUE));
+  // The coin shop: what a week's coins buy if they all go to one thing, within its limits.
+  const { candy, shards, presets } = COIN_SHOP;
+  console.log('\nCoin shop, if every coin of the week went to one thing:');
+  console.log('week | coins | shards (cap ' + shards.perWeek + '/wk) | candy for one line (cap ' + candy.perLineDay * 7 + '/wk) | or Regulars');
+  for (const r of rows) {
+    const sh = Math.min(shards.perWeek, Math.floor(r.coins / shards.coins) * shards.shards);
+    const cy = Math.min(candy.perLineDay * 7, Math.floor(r.coins / candy.coins) * candy.candy);
+    console.log([r.week, r.coins, sh + ' (' + (sh / shards.shards * shards.coins) + ' coins)', cy + ' (' + (cy / candy.candy * candy.coins) + ' coins)', r.coinPulls].join(' | '));
+  }
+  const late = rows[rows.length - 1].coins, perWeek = Math.min(shards.perWeek, Math.floor(late / shards.coins) * shards.shards);
+  console.log('A 300-shard SP skin from coins alone (after the story): ' + Math.ceil(300 / perWeek) + ' weeks at ' + perWeek + ' shards a week (' + (300 / shards.shards * shards.coins) + ' coins)');
+  console.log('Evolving a 3-stage line from coins alone (25 + 100 candy): ' + (125 / candy.candy * candy.coins) + ' coins, at least ' + Math.ceil(125 / candy.perLineDay) + ' days');
+  const presetTotal = presets.prices.slice(0, presets.max - presets.start).reduce((a, c) => a + c, 0);
+  console.log('Squad presets ' + (presets.start + 1) + '-' + presets.max + ': ' + presetTotal + ' coins once (' + presets.prices.slice(0, presets.max - presets.start).join(' + ') + ')');
 }

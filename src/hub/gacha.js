@@ -94,6 +94,33 @@ export const skinFile = (id, num) => id + '-' + num + '.png';
 export const skinPrice = skin => SP_PRICES[Math.min(skin.forms.length, SP_PRICES.length) - 1];
 export const COSTS = { evolve: [25, 100], passive: 50, cost1: 30, cost2: 60, sp: SP_PRICES[0] };
 export const LOGIN = { regular: 3 };
+/* ── The coin shop ─────────────────────────────────────────────────────
+   Coins buy candy for a caught line (5 for 200, 50 per line a day), shards (10 for
+   500, 50 a week, so a 300-shard skin from coins alone takes about six weeks) and
+   squad preset slots (3 to start, up to 5 in all: the 4th for 500, the 5th for 1000). Every purchase has a fixed ledger id, one per slot of its
+   limit: spend:candy:<line>:<day>:<0-9>, spend:shards:<monday>:<0-4>, spend:preset:<n>.
+   Two devices buying offline merge to one entry per id, cost and goods together, so
+   nothing is paid twice and no limit can be passed. */
+export const COIN_SHOP = {
+  candy: { coins: 200, candy: 5, perLineDay: 50 },
+  shards: { coins: 500, shards: 10, perWeek: 50 },
+  presets: { start: 3, max: 5, prices: [500, 1000] }
+};
+const mondayOfDay = date => { const d = new Date(date + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+// What the coin shop has sold today and this week, and the preset slots owned.
+function coinShop(entries, today) {
+  const monday = mondayOfDay(today), candyToday = {};
+  let shardsWeek = 0, presets = COIN_SHOP.presets.start;
+  for (const id of Object.keys(entries)) {
+    if (!id.startsWith('spend:')) continue;
+    const part = id.split(':');
+    if (part[1] === 'candy' && part[3] === today) candyToday[part[2]] = (candyToday[part[2]] || 0) + COIN_SHOP.candy.candy;
+    if (part[1] === 'shards' && part[2] === monday) shardsWeek += COIN_SHOP.shards.shards;
+    if (part[1] === 'preset') { const n = Number(part[2]); if (n > COIN_SHOP.presets.start && n <= COIN_SHOP.presets.max) presets++; }
+  }
+  const p = COIN_SHOP.presets, next = presets < p.max ? p.prices[presets - p.start] : null;
+  return { candyToday, shardsWeek, shardsLeft: Math.max(0, COIN_SHOP.shards.perWeek - shardsWeek), presets, nextPreset: next, monday };
+}
 export const STARTER = { regular: 2 };
 // The first time Poké Gacha opens, the player picks one first-stage starter and
 // gets three commons with it, so the first squad is four and clears 1-1 (a
@@ -324,6 +351,7 @@ export function gachaState(wallet, today = dailyDate()) {
     banner: bannerFor(today), today,
     login: !!entries['gacha:login:' + today],
     missions: Object.fromEntries(STARTER_MISSIONS.map(m => [m.id, !!entries['gacha:start:' + m.id]])),
+    shop: coinShop(entries, today),
     active: !!entries.on
   };
 }
@@ -332,6 +360,35 @@ export function gachaState(wallet, today = dailyDate()) {
 
 const refuse = (wallet, reason) => ({ wallet: mergeWallet(wallet), ok: false, reason });
 const starter = (wallet, id, now) => grantOnce(wallet, 'gacha:start:' + id, STARTER, { now }).wallet;
+
+/** Coin shop: 5 candy for a caught line, 200 coins, up to 50 for that line today. */
+export function buyCandy(wallet, line, { today = dailyDate(), now = Date.now() } = {}) {
+  const state = gachaState(wallet, today), c = COIN_SHOP.candy;
+  if (!state.lines[line]) return refuse(wallet, 'not-owned');
+  if ((state.shop.candyToday[line] || 0) + c.candy > c.perLineDay) return refuse(wallet, 'limit');
+  const merged = mergeWallet(wallet);
+  let slot = 0;
+  while (merged.entries['spend:candy:' + line + ':' + today + ':' + slot]) slot++;
+  const r = spendFrom(merged, { coins: c.coins }, { id: 'candy:' + line + ':' + today + ':' + slot, now, gain: { ['candy:' + line]: c.candy } });
+  return r.ok ? { wallet: r.wallet, ok: true } : refuse(wallet, 'coins');
+}
+/** Coin shop: 10 shards for 500 coins, up to 50 shards a week (Monday to Sunday). */
+export function buyShards(wallet, { today = dailyDate(), now = Date.now() } = {}) {
+  const state = gachaState(wallet, today), c = COIN_SHOP.shards;
+  if (state.shop.shardsLeft < c.shards) return refuse(wallet, 'limit');
+  const merged = mergeWallet(wallet);
+  let slot = 0;
+  while (merged.entries['spend:shards:' + state.shop.monday + ':' + slot]) slot++;
+  const r = spendFrom(merged, { coins: c.coins }, { id: 'shards:' + state.shop.monday + ':' + slot, now, gain: { shards: c.shards } });
+  return r.ok ? { wallet: r.wallet, ok: true } : refuse(wallet, 'coins');
+}
+/** Coin shop: the next squad preset slot, up to COIN_SHOP.presets.max. Permanent. */
+export function buyPreset(wallet, { today = dailyDate(), now = Date.now() } = {}) {
+  const state = gachaState(wallet, today);
+  if (state.shop.nextPreset == null) return refuse(wallet, 'owned');
+  const r = spendFrom(wallet, { coins: state.shop.nextPreset }, { id: 'preset:' + (state.shop.presets + 1), now });
+  return r.ok ? { wallet: r.wallet, ok: true, presets: state.shop.presets + 1 } : refuse(wallet, 'coins');
+}
 
 /** Pick the starter, once per account; the three gifts come with it. */
 export function pickStarter(wallet, species, { now = Date.now() } = {}) {
@@ -564,6 +621,11 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     upgrade: act((w, o) => upgrade(w, o.line, o.kind, o)),
     setBuddy: act((w, o) => setBuddy(w, o.species, o)),
     buySkin: act((w, o) => buySp(w, o.skin, o)),
+    // The coin shop: candy for a line, shards, squad preset slots (limits in state().shop).
+    coinShop: COIN_SHOP,
+    buyCandy: act((w, o) => buyCandy(w, o.line, o)),
+    buyShards: act((w, o) => buyShards(w, o)),
+    buyPreset: act((w, o) => buyPreset(w, o)),
     skins: () => skinList(), looksOf, lookFor: num => lookFor(gachaState(readWallet()), num), skinDir: SKIN_DIR, skinFile, skinPrice,
     setLook: act((w, o) => setLook(w, o.line, o.look, o)),
     setSkill: act((w, o) => setSkill(w, o.line, o.skill, o)),
