@@ -1229,6 +1229,85 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
 });
 
 /* ── The battle's feel: blocking, effects and the 3/4 field ────────────── */
+test('battle by mouse only: drag a card to deploy (an invalid drop cancels), click card then tile, right-click cancels, popup Skill and Retreat, HUD pauses, poor cards show red, and a win', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => {
+    go('story'); chapterAt = 0; storyMode = 'stages'; storyAt = 0; storyUpdate(); pickStage();
+    const pick = cls => S.owned.find(n => T.classOf(n) === cls);
+    setSquad([pick('blocker'), pick('sniper'), pick('caster')].filter(Boolean)); startBattle(); battle.talk = []; battleTalk();
+    // One spawn far off, so the battle stays open while the mouse works (an empty field is a win).
+    battle.b.queue = [{ at: 999, num: 52, wave: 0, path: 0, boss: false, flying: false, explodes: false, armored: false, fast: false }]; battle.b.energy = 99; battle.paused = false;
+  });
+  const frameBox = await (await tab.$('#frame')).boundingBox();
+  const at = async fn => { const b = await game.evaluate(fn); return [frameBox.x + (b.l + b.r) / 2, frameBox.y + (b.t + b.b) / 2]; };
+  const card = cls => at(new Function('return (() => { const i = battle.b.squad.findIndex(u => u.cls === ' + JSON.stringify(cls) + '); const b = document.querySelector(\'#deploy [data-slot="\' + i + \'"]\').getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; })()'));
+  const tile = (x, y) => at(new Function('return tileBox(' + x + ', ' + y + ')'));
+  const units = () => game.evaluate(() => battle.b.units.map(u => [u.cls, u.x, u.y]));
+  // 1. Drag the blocker onto the path: valid tiles light up while dragging, the range follows.
+  let [cx, cy] = await card('blocker');
+  await tab.mouse.move(cx, cy); await tab.mouse.down();
+  const [px, py] = await tile(6, 1);
+  await tab.mouse.move((cx + px) / 2, (cy + py) / 2, { steps: 4 }); await tab.mouse.move(px, py, { steps: 4 });
+  assert.deepEqual(await game.evaluate(() => [!!battle.drag, battle.hover]), [true, [6, 1]], 'dragging, over the path tile');
+  await tab.mouse.up(); await pause(60);
+  assert.deepEqual((await units()).find(u => u[0] === 'blocker'), ['blocker', 6, 1], 'dropped on the path: placed');
+  // 2. An invalid drop cancels: the sniper dragged onto the path.
+  [cx, cy] = await card('sniper');
+  await tab.mouse.move(cx, cy); await tab.mouse.down();
+  const [qx, qy] = await tile(4, 1);
+  await tab.mouse.move(qx, qy, { steps: 6 }); await tab.mouse.up(); await pause(60);
+  assert.ok(!(await units()).some(u => u[0] === 'sniper'), 'an invalid drop places nothing');
+  assert.equal(await game.$eval('#battle-tip', n => n.textContent), 'Cancelled: nothing placed.');
+  // 3. Click a card (it lights up), click it again (off); right-click cancels too; then card, tile.
+  await tab.mouse.click(cx, cy); await pause(40);
+  assert.equal(await game.evaluate(() => battle.armed), true);
+  assert.equal(await game.evaluate(() => document.querySelector('#deploy .card.on') !== null), true, 'the picked card lights up');
+  await tab.mouse.click(cx, cy); await pause(40);
+  assert.equal(await game.evaluate(() => battle.armed), false, 'clicking it again puts it down');
+  await tab.mouse.click(cx, cy); await pause(40);
+  await tab.mouse.click(qx, qy, { button: 'right' }); await pause(40);
+  assert.equal(await game.evaluate(() => battle.armed), false, 'right-click cancels');
+  const [hx, hy] = await tile(5, 2);
+  await tab.mouse.click(hx, hy); await pause(40);
+  assert.ok(!(await units()).some(u => u[0] === 'sniper'), 'no card picked: a tile click places nothing');
+  await tab.mouse.click(cx, cy); await tab.mouse.click(hx, hy); await pause(60);
+  assert.deepEqual((await units()).find(u => u[0] === 'sniper'), ['sniper', 5, 2], 'card, then tile');
+  // 4. Poor energy: the card dims, its cost in red.
+  await game.evaluate(() => { battle.b.energy = 0; });
+  await pause(80);
+  const poor = await game.evaluate(() => { const c = document.querySelector('#deploy .card.poor'); return c && getComputedStyle(c.querySelector('.low .num')).color; });
+  if (await game.evaluate(() => battle.b.squad.some((u, i) => !battle.b.units.some(o => o.slot === i)))) assert.equal(poor, 'rgb(200, 55, 47)', 'its cost in red');
+  await game.evaluate(() => { battle.b.energy = 99; });
+  // 5. Pause by clicking the HUD, and by the button.
+  const hud = await (await game.$('#battle-hud')).boundingBox();
+  await tab.mouse.click(hud.x + hud.width / 2, hud.y + hud.height / 2); await pause(40);
+  assert.equal(await game.evaluate(() => battle.paused), true, 'the HUD pauses');
+  await (await game.$('#battle-pause')).click(); await pause(40);
+  assert.equal(await game.evaluate(() => battle.paused), false, 'the button plays');
+  // 6. Click a unit: its popup with Skill and Retreat; Skill when charged (if the hub can cast).
+  await tab.mouse.click(hx, hy); await pause(80);
+  assert.equal(await game.evaluate(() => !document.querySelector('#unit-pop').hidden), true, 'the popup');
+  assert.match(await game.$eval('#unit-pop', n => n.textContent), /Skill.*Retreat/);
+  if (await game.evaluate(() => !!T.castSkill)) {
+    await game.evaluate(() => { const u = battle.b.units.find(o => o.cls === 'sniper'); u.sp = u.spMax; });
+    await pause(80);
+    const logs = await game.evaluate(() => battle.b.log.length);
+    await (await game.$('#unit-pop [data-pop="skill"]')).click(); await pause(40);
+    assert.equal(await game.evaluate(() => battle.b.log.length), logs + 1, 'Skill by mouse');
+  }
+  await (await game.$('#unit-pop [data-pop="retreat"]')).click(); await pause(60);
+  assert.ok(!(await units()).some(u => u[0] === 'sniper'), 'Retreat by mouse');
+  assert.equal(await game.evaluate(() => document.querySelector('#unit-pop').hidden), true);
+  // 7. Win, and leave by clicking the result.
+  await game.evaluate(() => { battle.b.queue = []; battle.b.enemies = []; });
+  await game.waitForFunction(() => battle.done, { timeout: 10000 });
+  for (let i = 0; i < 6 && await game.evaluate(() => battle.talk.length); i++) { await (await game.$('#battle-talk')).click(); await pause(40); }
+  assert.equal(await game.evaluate(() => battle.b.over), 'win');
+  await (await game.$('#battle-result')).click(); await pause(60);
+  assert.equal(await game.evaluate(() => battle), null, 'the result, clicked, goes back to the chapter');
+  assert.deepEqual(errors, []);
+});
+
 test('battle: blocked enemies stand clear of the blocker, hits show numbers and flashes, and the range previews', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await key(tab, '1');

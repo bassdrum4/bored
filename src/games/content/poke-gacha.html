@@ -350,6 +350,14 @@ canvas, img { image-rendering: pixelated; display: block }
 #deploy .card .low { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 0 3px; height: 20px }
 #deploy .card.on { box-shadow: inset 0 0 0 2px var(--paper) }
 #deploy .card.off .mini, #deploy .card.off .low { opacity: .4 }
+/* Not enough energy: the card dims, but its cost stays readable, in red. */
+#deploy .card.poor .low { opacity: 1 }
+#deploy .card.poor .low .num { color: var(--red) }
+#deploy .card { touch-action: none }
+/* A placed unit's popup: its name, then Skill (when charged) and Retreat. */
+#unit-pop { width: 112px; padding: 3px 6px; display: flex; flex-direction: column; gap: 3px; z-index: 4 }
+#unit-pop .klabels { gap: 3px }
+#battle-hud { cursor: pointer }
 #deploy .card .cool { position: absolute; inset: 0; background: rgba(28, 27, 44, .75); display: grid; place-items: center; color: var(--paper) }
 /* The tip grows upward to fit its text (it is anchored at the bottom). */
 #battle-tip { left: 8px; bottom: 8px; width: 176px; min-height: 62px; padding: 2px 8px; line-height: 18px; color: var(--dim); white-space: normal }
@@ -390,6 +398,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="battle-tip"></div>
         <div class="panel" id="deploy-info"></div>
         <div class="panel" id="deploy"></div>
+        <div class="panel" id="unit-pop" hidden></div>
         <div class="panel" id="battle-talk" hidden></div>
         <div class="panel" id="wave-banner" hidden></div>
         <div class="panel" id="battle-result" hidden></div>
@@ -2590,6 +2599,13 @@ function sceneryFor(stage) {
   SCENERY.set(ch, c);
   return c;
 }
+// Could the card stand on this tile once energy or cooldown allow? (the engine checks energy first)
+function placeable(b, slot, x, y) {
+  const why = T.canDeploy(b, slot, x, y), u = b.squad[slot];
+  if (!why) return true;
+  if (why !== "energy" && why !== "cooldown") return false;
+  return (u.ground ? tileAt(b.stage, x, y) === "." : tileAt(b.stage, x, y) === "H") && !b.units.some(o => o.x === x && o.y === y);
+}
 function drawField(now = performance.now()) {
   const bt = battle, b = bt.b, st = bt.stage, g = $("#field").getContext("2d");
   g.imageSmoothingEnabled = false;
@@ -2629,7 +2645,12 @@ function drawField(now = performance.now()) {
   }
   // Where the selected card can go, and its range from the hovered tile.
   const card = b.squad[bt.slot], hov = bt.hover || bt.cur;
-  if (card && !bt.selected) for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
+  if (bt.drag && card) for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
+    // Where it could stand lights up (even while energy is still short); the rest dims.
+    const ok = placeable(b, bt.slot, x, y), r = tileRect(st, x, y);
+    g.globalAlpha = ok ? 0.22 : 0.5; g.fillStyle = ok ? C.gold : C.ink; g.fillRect(r.x, r.y, TW, TH); g.globalAlpha = 1;
+  }
+  if (card && !bt.selected && (bt.armed || bt.drag)) for (let y = 0; y < T.H; y++) for (let x = 0; x < T.W; x++) {
     const why = T.canDeploy(b, bt.slot, x, y);
     if (why && why !== "energy" && why !== "cooldown") continue;
     if (why && (card.ground ? tileAt(st, x, y) !== "." : tileAt(st, x, y) !== "H")) continue;
@@ -2654,7 +2675,7 @@ function drawField(now = performance.now()) {
   const hovered = b.units.find(o => o.x === hov[0] && o.y === hov[1]);
   if (sel) showRange(sel, sel.x, sel.y);
   else if (hovered) showRange(hovered, hovered.x, hovered.y);
-  else if (card && !T.canDeploy(b, bt.slot, hov[0], hov[1])) showRange(card, hov[0], hov[1]);
+  else if (card && (bt.armed || bt.drag) && placeable(b, bt.slot, hov[0], hov[1])) showRange(card, hov[0], hov[1]);
   // Everyone, back to front.
   // Props stand on their floor tile's centre and sort with everyone else.
   const props = propsOf(st, set).map(p => ({ prop: p, o: {}, at: feet(st, p.x, p.y, false) }));
@@ -2713,6 +2734,8 @@ function drawField(now = performance.now()) {
     if (bar.unit && o.sp >= o.spMax) { skillIcon ||= mapCanvas("skill", { k: C.ink, 1: C.gold }); g.drawImage(skillIcon, bx + 38, by - 6); }
   }
   bt.bars = placed.map((p, i) => ({ ...p, id: (bars[i].unit ? "u" : "e") + bars[i].o.id }));
+  // The dragged card's mon, at the cursor.
+  if (bt.drag && bt.drag.at && card) drawMon(g, spriteFor(card.num, card.look), bt.drag.at[0], bt.drag.at[1] + 16, { alpha: 0.7 });
   // Effects: projectiles, bursts and numbers.
   bt.fx = bt.fx.filter(f => now - f.t0 < (f.kind === "num" ? FX_TIME.num : f.kind === "burst" ? FX_TIME.burst : FX_TIME.shot));
   for (const f of bt.fx) {
@@ -2793,6 +2816,33 @@ function mapBox() {
   const f = $("#field").getBoundingClientRect(), k = f.width / 640;
   return { l: f.left + MX * k, t: f.top + (MY - RAISE) * k, r: f.left + (MX + T.W * TW) * k, b: f.top + (MY + T.H * TH) * k };
 }
+// The selected unit's popup, beside it on the field: Skill (when charged; the hub fires it
+// with T.castSkill) and Retreat (half its cost back).
+function unitPopup(bt) {
+  const box = $("#unit-pop"), b = bt.b, u = bt.selected && b.units.find(o => o.id === bt.selected);
+  if (!u || bt.done || bt.talk.length || bt.drag) { box.hidden = true; return; }
+  const r = tileRect(bt.stage, u.x, u.y), right = r.x + TW + 120 < 640;
+  const charged = u.sp >= u.spMax, can = charged && !!T.castSkill;
+  const key = [u.id, charged, can].join(":");
+  if (box.dataset.key !== key) {
+    box.dataset.key = key;
+    const k = el("div", "klabels"), skill = el("span", "klabel" + (can ? " on" : ""), "Skill");
+    skill.dataset.pop = "skill"; skill.title = can ? "Use the skill now" : charged ? "Fires by itself when a foe is in range" : "Charging";
+    if (!can) skill.style.opacity = ".45";
+    const back = el("span", "klabel", "Retreat"); back.dataset.pop = "retreat"; back.title = "Back to the cards, half its cost back";
+    k.append(skill, back);
+    box.replaceChildren(el("div", "", name(u.num)), k);
+  }
+  Object.assign(box.style, { left: (right ? r.x + TW + 2 : r.x - 116) + "px", top: Math.max(44, r.y - 8) + "px" });
+  box.hidden = false;
+}
+function popAction(what) {
+  const bt = battle; if (!bt) return;
+  const b = bt.b, u = bt.selected && b.units.find(o => o.id === bt.selected);
+  if (!u) return;
+  if (what === "retreat") { bt.retreated.add(u.id); T.retreat(b, u.id); bt.selected = null; return; }
+  if (what === "skill" && T.castSkill && u.sp >= u.spMax) T.castSkill(b, u.id);
+}
 function battleHud() {
   const bt = battle, b = bt.b;
   // Top centre: enemies down / total, lives (and the weekly risk).
@@ -2813,7 +2863,8 @@ function battleHud() {
     const cool = Math.max(0, Math.ceil((b.cooldown[i] || 0) - b.t));
     // Weekly risks: deploys can cost 3 more, and medics can be banned.
     const cost = u.cost + (b.mods && b.mods.has && b.mods.has("cost") ? 3 : 0), banned = !!(b.mods && b.mods.has && b.mods.has("nomedic") && u.cls === "medic");
-    const card = el("div", "card" + (i === bt.slot ? " on" : "") + (out || cool || banned || b.energy < cost ? " off" : ""));
+    const poor = !out && !cool && !banned && b.energy < cost;
+    const card = el("div", "card" + (i === bt.slot && bt.armed ? " on" : "") + (out || cool || banned || poor ? " off" : "") + (poor ? " poor" : ""));
     card.dataset.slot = i; card.title = name(u.num) + " · " + T.classes[u.cls].name + " · cost " + cost;
     const low = el("div", "low"); low.append(classIcon(u.cls), el("span", "num", banned ? "no" : cost));
     card.append(mini(u.num, u.look), low);
@@ -2825,9 +2876,10 @@ function battleHud() {
   $("#deploy").replaceChildren(...cards);
   // Bottom left: what to do now, or why that tile did not take.
   const sel = bt.selected && b.units.find(o => o.id === bt.selected);
-  const why = { energy: "Not enough energy yet.", tile: "That class cannot stand there.", taken: "Someone is already there.", cooldown: "Still on cooldown.", banned: "No medics this week.", full: "At most 6 on the field.", deployed: "Already on the field." }[bt.note];
+  const why = { pick: "Pick a card first: click it, or drag it onto a tile.", cancel: "Cancelled: nothing placed.", energy: "Not enough energy yet.", tile: "That class cannot stand there.", taken: "Someone is already there.", cooldown: "Still on cooldown.", banned: "No medics this week.", full: "At most 6 on the field.", deployed: "Already on the field." }[bt.note];
   $("#battle-tip").textContent = why || (sel ? name(sel.num) + ": click again to retreat (half its cost back)." :
-    "Pick a card, then a tile: melee on the path, ranged up high.");
+    "Drag a card onto a tile: melee on the path, ranged up high.");
+  unitPopup(bt);
 }
 function endBattle() {
   const bt = battle, b = bt.b;
@@ -2904,7 +2956,7 @@ function battleKey(e) {
   if (k === " ") { e.preventDefault(); bt.paused = !bt.paused; return; }
   const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
   if (move) { e.preventDefault(); bt.cur = [Math.max(0, Math.min(T.W - 1, bt.cur[0] + move[0])), Math.max(0, Math.min(T.H - 1, bt.cur[1] + move[1]))]; bt.selected = b.units.find(o => o.x === bt.cur[0] && o.y === bt.cur[1]) ? bt.selected : null; return; }
-  if (/^[1-8]$/.test(k)) { e.preventDefault(); if (b.squad[Number(k) - 1]) { bt.slot = Number(k) - 1; bt.cardTouched = true; } bt.selected = null; return; }
+  if (/^[1-8]$/.test(k)) { e.preventDefault(); if (b.squad[Number(k) - 1]) { bt.slot = Number(k) - 1; bt.cardTouched = true; bt.armed = true; } bt.selected = null; return; }
   if (k === "Enter") { e.preventDefault(); tileAction(bt.cur[0], bt.cur[1]); return; }
   if (k === "Backspace") { e.preventDefault(); bt.selected = null; }
 }
@@ -3269,15 +3321,56 @@ if (!G) {
   const fieldPoint = e => { const box = $("#field").getBoundingClientRect(), k = box.width / 640; return tileFromPoint((e.clientX - box.left) / k, (e.clientY - box.top) / k); };
   $("#field").onclick = e => {
     if (!battle || battle.talk.length || battle.done) return;
+    if (battle.dragged) { battle.dragged = false; return; }
     const t = fieldPoint(e);
-    if (t) { battle.cur = t; tileAction(t[0], t[1]); }
+    if (!t) return;
+    battle.cur = t;
+    const here = battle.b.units.some(o => o.x === t[0] && o.y === t[1]);
+    // An empty tile takes the picked card; with no card picked it only says so.
+    if (!here && !battle.armed) { battle.note = "pick"; return; }
+    tileAction(t[0], t[1]);
+    if (!here && !battle.note) battle.armed = false;
   };
+  const cancelPick = e => { if (!battle) return; e.preventDefault(); battle.armed = false; battle.selected = null; battle.drag = null; battle.note = ""; };
+  $("#field").oncontextmenu = cancelPick;
+  $("#deploy").oncontextmenu = cancelPick;
+  $("#battle-hud").onclick = () => { if (battle && !battle.done && !battle.talk.length) battle.paused = !battle.paused; };
+  $("#unit-pop").onclick = e => { const t = e.target.closest("[data-pop]"); if (t) popAction(t.dataset.pop); };
+  // Drag a card onto the field: it follows the cursor, valid tiles light up, invalid ones dim,
+  // and letting go on an invalid tile (or off the field) cancels.
+  $("#deploy").addEventListener("pointerdown", e => {
+    const c = e.target.closest("[data-slot]");
+    if (!c || !battle || battle.done || battle.talk.length || e.button !== 0) return;
+    battle.press = { slot: Number(c.dataset.slot), x: e.clientX, y: e.clientY };
+  });
+  document.addEventListener("pointermove", e => {
+    const bt = battle; if (!bt || !bt.press) return;
+    if (!bt.drag && Math.hypot(e.clientX - bt.press.x, e.clientY - bt.press.y) < 6) return;
+    if (!bt.drag) { bt.drag = { slot: bt.press.slot }; bt.slot = bt.press.slot; bt.armed = true; bt.selected = null; bt.cardTouched = true; }
+    const box = $("#field").getBoundingClientRect(), k = box.width / 640;
+    bt.drag.at = [(e.clientX - box.left) / k, (e.clientY - box.top) / k];
+    bt.hover = fieldPoint(e);
+  });
+  document.addEventListener("pointerup", e => {
+    const bt = battle; if (!bt || !bt.press) return;
+    const drag = bt.drag; bt.press = null;
+    if (!drag) return;
+    bt.drag = null; bt.dragged = true; setTimeout(() => { if (battle) battle.dragged = false; }, 0);
+    // A good tile places it (or says energy or cooldown is short); a wrong tile, or off the field, cancels.
+    const t = fieldPoint(e);
+    if (t && placeable(bt.b, drag.slot, t[0], t[1])) { bt.cur = t; tileAction(t[0], t[1]); }
+    else bt.note = "cancel";
+    bt.armed = false;
+  });
   $("#field").onmousemove = e => { if (battle) battle.hover = fieldPoint(e); };
   $("#field").onmouseleave = () => { if (battle) battle.hover = null; };
   // The Squad screen: Start, team tabs, filter labels, slots, roster cards and skill picks.
   $("#squad").onclick = e => storyMode === "squad" && !battle && squadClick(e);
   $("#battle-pause").onclick = () => { if (battle && !battle.done && !battle.talk.length) battle.paused = !battle.paused; };
-  $("#deploy").onclick = e => { const c = e.target.closest("[data-slot]"); if (c && battle) { battle.slot = Number(c.dataset.slot); battle.selected = null; battle.cardTouched = true; } };
+  // Click a card to pick it (it lights up); click it again to put it down.
+  $("#deploy").onclick = e => { const c = e.target.closest("[data-slot]"); if (!c || !battle || battle.dragged) return;
+    const i = Number(c.dataset.slot); if (battle.armed && battle.slot === i) { battle.armed = false; return; }
+    battle.slot = i; battle.selected = null; battle.cardTouched = true; battle.armed = true; };
   $("#tutor-box").onclick = e => { if (e.target.closest("[data-skip]")) tutorSkipAll(); else if (tutorStep() && !tutorStep().done) tutorNext(); };
   $("#battle-talk").onclick = () => battle && battleKey({ key: "Enter", preventDefault() {} });
   $("#battle-result").onclick = () => battle && battle.done && !battle.talk.length && leaveBattle();
