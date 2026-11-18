@@ -1157,9 +1157,10 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   await game.waitForFunction(() => tutor.i === 5);
   await clickHole(tab, game);
   await game.waitForFunction(() => tutor.i === 6);
-  // 7: the skill charges (hurried along here), then 8: ready, read with Enter.
-  await game.evaluate(() => { for (const u of battle.b.units) u.sp = u.spMax - 0.2; });
+  // 7: the skill charges, about 3s in the tutorial (not the skill's full charge), then 8: ready, read with Enter.
+  const t0 = Date.now();
   await game.waitForFunction(() => tutor.i === 7, { timeout: 10000 });
+  assert.ok(Date.now() - t0 < 6000, 'the charging step is a short watch, not a long wait');
   await key(tab, 'Enter');
   assert.equal(await tutorUp(game), false);
   assert.equal(await game.evaluate(() => tipsSeen['battle-1-1']), true);
