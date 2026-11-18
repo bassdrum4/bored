@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 628,
+  "count": 630,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"d9fb1b6","date":"2026-11-18","author":"Codebuff","subject":"Sudoku: three levels, notes, and a time-only shared board"},
+  {"sha":"9c2b058","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: evolved forms fight, Esc goes back, pause menu, mouse clicks that stick, own-tile unit marks, flyer routes, squad drag and overflow fixes","pr":253},
   {"sha":"fac8c78","date":"2026-11-18","author":"Codebuff","subject":"Trackmania: set the long medal ladders from real player times"},
   {"sha":"6707a5b","date":"2026-11-18","author":"Codebuff","subject":"Feedback: write signed-in notes with the player's own session"},
   {"sha":"c766877","date":"2026-11-18","author":"Codebuff","subject":"Risk: give both Bored Together seats their opening troops"},

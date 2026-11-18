@@ -88,6 +88,15 @@ const highScore = (id, name, unit, extra = {}) => ({
 });
 
 export const HIGH_SCORE_GAMES = [
+  // Sudoku ranks the clock, nothing else: whoever finishes a board fastest holds
+  // the seat, whatever they picked on the selector — Easy is the default and we
+  // are not going to pretend difficulty levels are comparable. The clock starts
+  // on the first digit, so a board opened and left alone has no time at all.
+  highScore('sudoku', 'Sudoku', 'seconds', {
+    metric: 'seconds', lower: true, min: 20, max: 86400,
+    when: snapshot => snapshot.won === true,
+    key: 'bored.high.sudoku-time-v1'
+  }),
   // A photo puzzle ranks the time to solve the standard 4x4 board on a picture
   // the player uploaded: the built-in sample is the same picture for everyone,
   // and the other grid sizes are a different test, so neither can post.
