@@ -6,6 +6,7 @@
 //   spend:<uuid>        a pull: vouchers spent, x = { m, e, b, w, n, d }
 //                         m machine, e egg tiers, b banner species, w waves
 //                         total when pulled, n pulls before it, d day
+//   spend:<uuid>        a candy egg: candy spent, x = { m, e, w, n, d, s } like a pull, s = the line
 //   spend:<uuid>        candy and shard spends: x = { ev } | { up, l } | { sp: skin id }
 //   hatch:<uuid>.<i>    egg i of that pull hatched: g = shards + candy,
 //                         x = { s, t, n, sh, sp, k } species, tier, new, shiny, SP skin id, skill
@@ -278,8 +279,11 @@ function readPulls(entries) {
     const eggs = x.e.filter(t => Number.isInteger(t) && t >= 0 && t <= 4);
     if (eggs.length !== x.e.length || !eggs.length) continue;
     if (eggs.includes(4) && !validNum(x.b)) continue;
+    // A candy egg (buyCandyEgg) names its line: x.s, a base form on the roster.
+    const species = validNum(x.s) && !DEX[x.s - 1][8] && DEX[x.s - 1][9] > 0 ? x.s : 0;
+    if (x.s !== undefined && !species) continue;
     pulls.push({ id, key: id.slice(6), at: entry.at, n: Number(x.n) || 0, machine: x.m, eggs,
-      banner: x.b || 0, waves: Number(x.w) || 0, day: typeof x.d === 'string' ? x.d : '' });
+      banner: x.b || 0, waves: Number(x.w) || 0, day: typeof x.d === 'string' ? x.d : '', species });
   }
   return pulls.sort((a, b) => a.n - b.n || a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
@@ -300,7 +304,8 @@ function readHatch(entry) {
 /** Pity counters after replaying every egg ever pulled, in order. */
 function rarityCounters(pulls) {
   const count = { rare: 0, epic: 0, legendary: 0 };
-  for (const pull of pulls) for (const tier of pull.eggs) countEgg(count, tier, pull.machine);
+  // Candy eggs are bought for a line already owned: they neither count toward nor reset the pity.
+  for (const pull of pulls) if (!pull.species) for (const tier of pull.eggs) countEgg(count, tier, pull.machine);
   return count;
 }
 function countEgg(count, tier, machine) {
@@ -335,7 +340,7 @@ export function gachaState(wallet, today = dailyDate()) {
   let nth = 0;
   for (const pull of pulls) {
     pull.eggs.forEach((tier, i) => {
-      const egg = { id: pull.key + '.' + i, tier, machine: pull.machine, banner: tier === 4 ? pull.banner : 0, day: pull.day };
+      const egg = { id: pull.key + '.' + i, tier, machine: pull.machine, banner: tier === 4 ? pull.banner : 0, day: pull.day, species: pull.species || 0 };
       const hatch = readHatch(entries['hatch:' + egg.id]);
       // The first eggs ever pulled need no waves, so a new player hatches straight away.
       const need = nth++ < FREE_HATCHES ? 0 : HATCH_WAVES[tier];
@@ -345,7 +350,7 @@ export function gachaState(wallet, today = dailyDate()) {
         return;
       }
       hatched.push({ ...egg, ...hatch });
-      if (tier < 4) dupe[tier] = hatch.fresh ? 0 : dupe[tier] + 1;
+      if (tier < 4 && !egg.species) dupe[tier] = hatch.fresh ? 0 : dupe[tier] + 1;
       if (isCut(hatch.species)) {
         const at = lineOf(hatch.species);
         const held = legacy[at] ||= { line: at, star: CUT[at], hatches: 0, shiny: false, look: 'normal' };
@@ -546,21 +551,23 @@ export function hatchReady(wallet, { today = dailyDate(), now = Date.now(), rand
     const { tier, machine } = egg;
     // A banner egg whose legendary was cut hatches as a kept one: that day's banner.
     let pool = tier === 4 ? [validNum(egg.banner) && !isCut(egg.banner) ? egg.banner : bannerFor(egg.day || today)] : pools[tier];
-    if (tier < 4 && dupe[tier] >= DUPE_PITY) {
+    if (egg.species) pool = [egg.species];
+    else if (tier < 4 && dupe[tier] >= DUPE_PITY) {
       const unseen = pool.filter(num => !owned.has(num));
       if (unseen.length) pool = unseen;
     }
     const species = pool[Math.floor(rand() * pool.length)];
     const fresh = !owned.has(species);
     owned.add(species);
-    if (tier < 4) dupe[tier] = fresh ? 0 : dupe[tier] + 1;
+    if (tier < 4 && !egg.species) dupe[tier] = fresh ? 0 : dupe[tier] + 1;
     const shiny = rand() < 1 / (machine === 'shiny' ? SHINY_ODDS.shiny : SHINY_ODDS.other);
     // SP only on Shiny UP, for the line it hatched: a skin of that line it does not own yet, at random if several.
     const line = lineOf(species), have = spOwned[line] ||= new Set(state.lines[line]?.skins || []);
     const skins = machine === 'shiny' ? skinsOfLine(line).filter(skin => !have.has(skin.id)) : [];
     const sp = skins.length && rand() < 1 / SP_ODDS ? skins[Math.floor(rand() * skins.length)].id : null;
     if (sp) have.add(sp);
-    const rare = rand() < (machine === 'move' ? 2 : 1) / RARE_SKILL[tier];
+    // A candy egg's better odds of the rare skill (CANDY_EGG.rare), on any machine.
+    const rare = rand() < (egg.species ? 1 / CANDY_EGG.rare : (machine === 'move' ? 2 : 1) / RARE_SKILL[tier]);
     const skill = rare ? 3 : Math.floor(rand() * 3);
     const grant = { ['candy:' + lineOf(species)]: HATCH_CANDY[tier] };
     if (!fresh) grant.shards = DUPE_SHARDS[tier];
@@ -582,6 +589,25 @@ export function evolve(wallet, from, to, { today = dailyDate(), now = Date.now()
   const cost = COSTS.evolve[Math.min(stageOf(from), 2) - 1];
   const result = spendFrom(wallet, { ['candy:' + lineOf(from)]: cost }, { id: uuid(), now, x: { ev: [from, to] } });
   return result.ok ? { wallet: result.wallet, ok: true } : refuse(wallet, 'candy');
+}
+
+/* ── Candy eggs ──────────────────────────────────────────────────────────
+   Candy buys an egg of a line you own (PokéRogue's same-species egg): it hatches that
+   line's base form after the usual waves for its tier, with a 1 in CANDY_EGG.rare chance of
+   the rare skill (a normal egg's is 1 in 48 for a 3★ to 1 in 6 for a 6★, halved on Move UP).
+   Price by the line's tier, about two hatches' candy. It is a pull entry (spend:<uuid>, x.s =
+   the line) paid in candy; it never counts toward rarity or dupe pity. */
+export const CANDY_EGG = { price: { 3: 20, 4: 40, 5: 60, 6: 100 }, rare: 4 };
+export const candyEggPrice = line => CANDY_EGG.price[(DEX[line - 1] || [])[9]] || 0;
+export function buyCandyEgg(wallet, line, { today = dailyDate(), now = Date.now() } = {}) {
+  const state = gachaState(wallet, today), price = candyEggPrice(line);
+  if (!state.active) return refuse(wallet, 'inactive');
+  if (!state.lines[line] || !price) return refuse(wallet, 'not-owned');
+  if (state.eggs.length >= MAX_EGGS) return refuse(wallet, 'full');
+  const tier = EGG_STARS.indexOf(DEX[line - 1][9]);
+  const x = { m: 'move', e: [tier], w: state.balance.waves, n: state.pulls, d: today, s: line };
+  const result = spendFrom(wallet, { ['candy:' + line]: price }, { id: uuid(), now, x });
+  return result.ok ? { wallet: result.wallet, ok: true, tier, price } : refuse(wallet, 'candy');
 }
 
 /** Unlock a line's passive, or cut its deploy cost by 1 and then by 2. */
@@ -721,6 +747,8 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     claimLogin: act((w, o) => claimLogin(w, o)),
     // The one-time refund for owned lines cut from the roster: { ok, lines, total }.
     claimCutRefund: act((w, o) => claimCutRefund(w, o)),
+    // An egg of an owned line, for candy (better odds of the rare skill).
+    buyCandyEgg: act((w, o) => buyCandyEgg(w, o.line, o)), candyEgg: CANDY_EGG, candyEggPrice,
     cutRefund: CUT_REFUND, cutCandy: CUT_CANDY, isCut
   };
 }
