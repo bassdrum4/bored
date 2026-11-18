@@ -109,6 +109,20 @@ canvas, img { image-rendering: pixelated; display: block }
 
 /* Rates and pity: over the machine and the menu while it is open. */
 #rates { left: 8px; top: 8px; width: 484px; height: 264px; padding: 6px 12px; cursor: pointer }
+/* A pull of 5 or more: every egg on one board, popping in in pull order. An Epic flashes
+   red and a Legendary gold (the cell, then the frame, fading out); NEW marks a tier's
+   first egg ever, or a banner legendary not owned yet. */
+#reveal { left: 8px; top: 8px; width: 624px; height: 264px; padding: 4px 8px; display: flex; flex-direction: column; cursor: pointer; transition: border-color .6s }
+#reveal .grid { flex: 1; display: grid; grid-template-columns: repeat(var(--cols), var(--cell)); grid-auto-rows: calc(var(--cell) + 16px); gap: 2px 4px; justify-content: center; align-content: center }
+#reveal .egg { display: flex; flex-direction: column; align-items: center; justify-content: center; visibility: hidden; border: 1px solid transparent; transition: background-color .6s, border-color .6s }
+#reveal .egg.in { visibility: visible }
+#reveal .egg .tag { height: 16px; line-height: 16px }
+#reveal .egg.t2 { border-color: var(--red) }
+#reveal .egg.t3, #reveal .egg.t4 { border-color: var(--gold) }
+#reveal .egg.flash.t2 { background-color: var(--red) }
+#reveal .egg.flash.t3, #reveal .egg.flash.t4 { background-color: var(--gold) }
+#reveal.flash2 { border-color: var(--paper) }
+#reveal.flash3 { border-color: var(--gold) }
 #rates .grid { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; max-width: 300px }
 #msg .more { margin-left: auto; cursor: pointer; text-decoration: underline; color: var(--dim); white-space: nowrap; align-self: flex-end }
 #tabs .alert { display: inline-block; vertical-align: middle; margin-left: 4px }
@@ -351,6 +365,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="hit" id="hit-machine" style="left:56px;top:6px;width:212px;height:266px" title="Open the voucher menu"></div>
         <div class="panel rows" id="menu" role="listbox"></div>
         <div class="panel" id="rates" hidden></div>
+        <div class="panel" id="reveal" hidden></div>
       </section>
       <section id="scr-eggs" class="screen" hidden>
         <div class="panel" id="egg-pic"></div>
@@ -779,7 +794,9 @@ function updateScene() {
   $("#banner").hidden = !legend;
   // Today's banner legendary: its mini sprite at exactly 2x, filling the machine's window.
   if (legend) { miniStyle($("#banner"), S.banner, "normal", 1); $("#banner").title = name(S.banner); }
-  $("#menu").hidden = !menuOpen;
+  $("#menu").hidden = !menuOpen || !!reveal;
+  // The reveal owns the message box until it closes.
+  if (reveal) return drawScene();
   // Each row, as on the machine screens it follows: the voucher, how many it spends, what it buys.
   rows($("#menu"), OPTIONS.map(o => ({ icon: o.cancel ? null : o.buy ? coin() : ticket(o.voucher),
     label: o.cancel ? o.label : menuLine(o), off: !haveFor(o) })), cursor, (i, click) => click ? choose(i) : null);
@@ -910,13 +927,87 @@ function choose(i) {
     const r = G.buyRegular({ count: 1 });
     message = { text: r.ok ? "Bought 1 Regular for 100 coins." : REASONS[r.reason] || "Not now." };
   } else {
+    // What was pulled before, for the NEW tags: tiers with an egg waiting or hatched, and lines owned.
+    const seen = new Set([...S.eggs, ...(S.hatched || [])].map(e => e.tier)), owned = new Set(S.owned);
     const r = G.pull({ voucher: option.voucher, count: option.count, machine });
     // Free first hatches are ready at once: say where to open them.
     const ready = r.ok && G.state().eggs.some(e => e.ready);
     if (r.ok) { turnCrank(); message = { text: r.eggs.length + (r.eggs.length === 1 ? " egg" : " eggs") + (ready ? ", ready to hatch on Eggs:" : ":"), eggs: r.eggs }; }
     else message = { text: REASONS[r.reason] || "Not now." };
+    // Five eggs or more: the reveal board.
+    if (r.ok && r.eggs.length >= REVEAL_MIN) startReveal(r.eggs, seen, owned);
   }
   refreshTop(); updateScene();
+}
+/* ── The multi-pull reveal ─────────────────────────────────────────────── */
+const REVEAL_MIN = 5;
+let reveal = null;
+function startReveal(eggs, seen, owned) {
+  if (reveal) for (const t of reveal.timers) clearTimeout(t);
+  const firsts = new Set();
+  const list = eggs.map(egg => {
+    const isNew = egg.tier === 4 ? !!egg.banner && !owned.has(egg.banner) : !seen.has(egg.tier) && !firsts.has(egg.tier);
+    if (egg.tier < 4 && isNew) firsts.add(egg.tier);
+    return { tier: egg.tier, banner: egg.banner || 0, isNew };
+  });
+  // Up to ten eggs at 2x in rows of five; a Gold pull's 25 at 1x in rows of ten.
+  const big = list.length <= 10, box = $("#reveal");
+  box.style.setProperty("--cols", big ? Math.min(5, list.length) : 10);
+  box.style.setProperty("--cell", big ? "72px" : "52px");
+  const grid = el("div", "grid");
+  const cells = list.map(x => {
+    const c = el("div", "egg t" + x.tier);
+    c.title = x.tier === 4 && x.banner ? name(x.banner) + " egg" : TIER_NAME[x.tier] + " egg";
+    c.append(eggImg(x.tier, big ? 2 : 1), el("div", "tag " + (x.isNew ? "gold" : "dim"), x.isNew ? "NEW" : ""));
+    grid.append(c); return c;
+  });
+  const counts = [0, 0, 0, 0, 0]; for (const x of list) counts[x.tier]++;
+  const head = el("div", "head");
+  head.append(el("span", "gold", list.length + " EGGS"), el("span", "dim", "  " + LOOK[machine].label));
+  box.replaceChildren(head, grid);
+  box.className = "panel"; box.hidden = false; $("#menu").hidden = true;
+  // One egg every beat after the crank; a short hush before a Legendary.
+  const beat = big ? 110 : 60;
+  let at = 420;
+  const times = list.map(x => { if (x.tier >= 3) at += 350; const t = at; at += beat; return t; });
+  reveal = { list, cells, counts, shown: 0, done: false, timers: [] };
+  list.forEach((x, i) => reveal.timers.push(setTimeout(() => showEgg(i), times[i])));
+  reveal.timers.push(setTimeout(finishReveal, at + 150));
+  say("The machine rattles…");
+}
+function showEgg(i) {
+  const rv = reveal; if (!rv || !rv.cells[i] || rv.cells[i].classList.contains("in")) return;
+  const x = rv.list[i], c = rv.cells[i];
+  c.classList.add("in"); rv.shown++;
+  if (x.tier >= 2 && !rv.quiet) {
+    sfx(x.tier >= 3 ? "legend" : "epic");
+    c.classList.add("flash"); setTimeout(() => c.classList.remove("flash"), 450);
+    const box = $("#reveal"), cls = x.tier >= 3 ? "flash3" : "flash2";
+    box.classList.add(cls); setTimeout(() => box.classList.remove(cls), 450);
+  }
+}
+function finishReveal() {
+  const rv = reveal; if (!rv) return;
+  for (const t of rv.timers) clearTimeout(t);
+  rv.quiet = true;
+  rv.list.forEach((x, i) => showEgg(i));
+  rv.done = true;
+  const parts = [], c = rv.counts;
+  for (let t = 4; t >= 0; t--) if (c[t]) parts.push(c[t] + " " + (t === 4 ? "Banner" : TIER_NAME[t]));
+  const fresh = rv.list.filter(x => x.isNew).length;
+  say(parts.join(", ") + (fresh ? " · " + fresh + " NEW" : "") + ". Enter: close.");
+}
+function endReveal() {
+  if (!reveal) return;
+  for (const t of reveal.timers) clearTimeout(t);
+  reveal = null;
+  $("#reveal").hidden = true;
+  if (tab === "pull") updateScene();
+}
+// Enter or a click: everything at once, then close.
+function revealKey(e) {
+  if (e.key === "Enter" || e.key === " " || e.key === "Backspace") { e.preventDefault(); if (reveal.done) endReveal(); else finishReveal(); }
+  else if (/^[1-9]$/.test(e.key)) endReveal();
 }
 function pullKey(e) {
   const k = e.key;
@@ -2874,6 +2965,7 @@ function refreshTop() {
 }
 function go(id) {
   if (!SCREENS[id] || hatching || battle || picking || !shownTabs().some(([shown]) => shown === id)) return;
+  if (reveal) endReveal();
   tab = pref.tab = id; keep();
   message = null; ratesOpen = false; shopMode = "list"; shopConfirm = null;
   for (const [sid] of TABS) $("#scr-" + sid).hidden = sid !== id;
@@ -2920,6 +3012,8 @@ if (!G) {
     if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); return toggleSound(); }
     if (battle) return battleKey(e);
     if (picking) return starterKey(e);
+    // Keys go to the reveal; only a number key closes it and goes on to switch screens.
+    if (reveal) { const num = /^[1-9]$/.test(e.key); revealKey(e); if (reveal || !num) return; }
     if (/^[1-9]$/.test(e.key) && !hatching && shownTabs()[Number(e.key) - 1]) { e.preventDefault(); return go(shownTabs()[Number(e.key) - 1][0]); }
     if (hatching) return hatchKey(e);
     SCREENS[tab][1](e);
@@ -2948,6 +3042,7 @@ if (!G) {
   $("#hit-machine").onclick = () => { menuOpen = true; message = null; updateScene(); };
   $("#msg").onclick = e => { if (e.target.closest("[data-rates]")) toggleRates(); };
   $("#rates").onclick = () => toggleRates();
+  $("#reveal").onclick = () => reveal && revealKey({ key: "Enter", preventDefault() {} });
   $("#hatch").onclick = () => hatching && hatchKey({ key: "Enter", preventDefault() {} });
   // The Legendary UP timer is on screen whichever machine is in front.
   setInterval(() => { if (tab === "pull" && !hatching && !picking && !document.hidden) drawScene(); }, 1000);
