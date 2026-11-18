@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 597,
+  "count": 598,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -25,6 +25,7 @@ export const CHANGELOG = [
   {"sha":"b1a3a5e","date":"2026-11-18","author":"Claude","subject":"Hub: repeat stage clears pay 15 coins, ten a day"},
   {"sha":"6ddd996","date":"2026-11-18","author":"Claude","subject":"Hub: chapters 5 and 6 (Archer, Giovanni), fast waves, and the ending"},
   {"sha":"9ad8d08","date":"2026-11-18","author":"Claude","subject":"Hub: skill choice per line and level caps that rise on evolve"},
+  {"sha":"3e57e49","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: bug sweep at 1900×790 (talk box, tip height, fallback-font Dex and Eggs)","pr":231},
   {"sha":"70e6a47","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: new-player run-through (loop hands over to Pull, Squad clicks, Skip everywhere)","pr":232},
   {"sha":"49cf7d4","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: tileset loader for the battle field","pr":224},
   {"sha":"c94a9e1","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: Quests redo with sub-tabs, progress bars and real reward icons","pr":216},
