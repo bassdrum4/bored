@@ -2,13 +2,19 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 582,
+  "count": 588,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"ff7c2e1","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: coin shop rows, a candy line picker, a confirm step, more squad presets"},
+  {"sha":"f18e236","date":"2026-11-18","author":"Claude","subject":"Hub: coin shop presets are 500 then 1000, up to 5 in all"},
+  {"sha":"e73ccb2","date":"2026-11-18","author":"Claude","subject":"Hub: coin shop for candy, shards and squad preset slots"},
+  {"sha":"0ef4fa8","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: tileset loader for the battle field"},
+  {"sha":"28367e3","date":"2026-11-18","author":"Claude","subject":"Hub: mythicals hatch from Legendary eggs"},
+  {"sha":"b1a3a5e","date":"2026-11-18","author":"Claude","subject":"Hub: repeat stage clears pay 15 coins, ten a day"},
   {"sha":"6ddd996","date":"2026-11-18","author":"Claude","subject":"Hub: chapters 5 and 6 (Archer, Giovanni), fast waves, and the ending"},
   {"sha":"9ad8d08","date":"2026-11-18","author":"Claude","subject":"Hub: skill choice per line and level caps that rise on evolve"},
   {"sha":"49cf7d4","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: tileset loader for the battle field","pr":224},
