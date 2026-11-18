@@ -372,6 +372,10 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.waitForFunction(() => document.querySelector('#grid [data-slug="lights-out"] .card-best')?.textContent.includes('rival'));
   assert.equal(await page.$eval('#grid [data-slug="lights-out"] .card-best', el => el.textContent), 'Best 9 boards · rival');
   assert.equal(await page.$eval('#grid [data-slug="8ball"]', card => card.querySelector('.card-best')), null);
+  // The tooltip exists only when the refreshed board carries both rows. The
+  // byline above is already true from the pre-score fetch, so wait for the
+  // wrap itself rather than reading the card mid-repaint.
+  await page.waitForFunction(() => document.querySelector('#grid [data-slug="lights-out"] .card-best-wrap'));
   const detail = await page.$eval('#grid [data-slug="lights-out"] .card-best-wrap', node => ({
     count: node.querySelectorAll('.card-best-tip-row').length,
     names: [...node.querySelectorAll('.card-best-tip-name')].map(el => el.textContent)

@@ -8,6 +8,10 @@ const allowedExact = new Set([
   'src/games/content/pokedoku.html',
   'src/games/content/poke-idle.html',
   'src/games/content/poke-gacha.html',
+  // The Poké Gacha engine: the dex/egg/skin wallet, the tower-defense rules and
+  // their logic tests. Nothing outside Poké Gacha imports these modules.
+  'src/hub/gacha.js',
+  'src/hub/td.js',
   'src/games/previews/ashcrown.webp',
   'src/games/previews/pokedoku.svg',
   'src/games/previews/poke-idle.svg',
@@ -16,6 +20,7 @@ const allowedExact = new Set([
   'tests/pokedoku.test.cjs',
   'tests/poke-idle.test.cjs',
   'tests/poke-gacha.test.cjs',
+  'tests/td.test.cjs',
 ]);
 const allowedSprite = /^src\/games\/content\/pokedoku\/sprites\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.(?:png|webp|jpg|jpeg|gif)$/;
 
