@@ -436,6 +436,75 @@ test('Quests: four sub-tabs with reset clocks; rows show n/m, a bar and real rew
   assert.deepEqual(errors, []);
 });
 
+test('SP skins: the shop prices sets by size, a set shows on each form, and a skin rolled for an evolution shows on it', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.waitForFunction(() => G.skins().length > 0);
+  // Every listed skin's art loads, at 96x96.
+  const sizes = await game.evaluate(async () => Promise.all(G.skins().flatMap(skin => skin.forms.map(num => new Promise(done => {
+    const img = sprite(num, skin.id); img.onload = () => done([skin.id, num, img.naturalWidth, img.naturalHeight]); img.onerror = () => done([skin.id, num, 0, 0]);
+  })))));
+  assert.ok(sizes.length >= 30);
+  for (const [id, num, w, h] of sizes) assert.deepEqual([w, h], [96, 96], id + ' on #' + num);
+  // The shop: Mew's line never hatches, so its skin is not for sale; prices go by forms.
+  const shop = await game.evaluate(() => shopItems().filter(i => i.kind === 'sp').map(i => [i.skin.id, i.price]));
+  assert.ok(!shop.some(([id]) => id === 'mew'));
+  assert.deepEqual(['charizard', 'clefairy-set', 'pidgey-set'].map(id => shop.find(r => r[0] === id)[1]), [300, 400, 500]);
+  // Own the Pidgey line, buy the set and wear it: Pidgey and Pidgeotto both draw it.
+  const worn = await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:sp'] = { at: now - 50, g: { shards: 500, 'candy:16': 50 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w));
+    refreshTop();
+    return { had: S.owned.includes(16), shards: S.balance.shards };
+  });
+  if (!worn.had) return t.skip('this roster has no Pidgey');
+  const r = await game.evaluate(() => [G.evolve({ from: 16, to: 17 }).ok, G.buySkin({ skin: 'pidgey-set' }).ok, G.setLook({ line: 16, look: 'pidgey-set' }).ok]);
+  assert.deepEqual(r, [true, true, true]);
+  await game.evaluate(() => refreshTop());
+  assert.deepEqual(await game.evaluate(() => [G.lookFor(16), G.lookFor(17), G.lookFor(18)]), ['pidgey-set', 'pidgey-set', 'pidgey-set']);
+  assert.match(await game.evaluate(() => spriteUrl(17, 'pidgey-set')), /sp\/pidgey-set-17\.png$/);
+  assert.equal(await game.evaluate(() => S.balance.shards), worn.shards - 500, 'a three-form set costs 500');
+  assert.equal(await game.evaluate(() => T.squad([17])[0].look), 'pidgey-set', 'battle draws the set on Pidgeotto');
+  // A Charizard skin rolled from a Charmander egg shows Charizard; a single skin stays on its own form.
+  assert.match(await game.evaluate(() => hatchSprite({ species: 4, sp: 'charizard' }).src), /sp\/charizard-6\.png$/);
+  assert.match(await game.evaluate(() => spriteUrl(4, 'charizard')), /sp\/charizard-6\.png$/);
+  assert.deepEqual(errors, []);
+});
+
+test('progression: Squad and Dex show the level cap, and K picks which unlocked skill a line uses', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  // A line with two skills unlocked: a second hatch of the first owned line, rolled on its third skill.
+  const line = await game.evaluate(() => {
+    const now = Math.floor(Date.now() / 1000), num = S.owned[0], w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['spend:prog2'] = { at: now - 90, g: { regular: 0 }, x: { m: 'move', e: [0], w: 0, n: 0, d: '2026-11-18' } };
+    w.entries['hatch:prog2.0'] = { at: now - 80, x: { s: num, t: 0, n: 0, k: 2 } };
+    parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop();
+    return G.lineOf(num);
+  });
+  const cap = await game.evaluate(l => T.capOf ? T.capOf(l) : T.maxLevel, line);
+  await key(tab, '1');
+  await key(tab, 'Enter');
+  await game.evaluate(l => { setSquad([S.owned.find(n => G.lineOf(n) === l)]); sq.zone = 'slots'; sq.slot = 0; squadUpdate(); }, line);
+  assert.match(await game.$eval('#squad-detail', n => n.textContent), new RegExp('Lv \\d+/' + cap));
+  if (await game.evaluate(() => !!G.setSkill)) {
+    const before = await game.evaluate(() => unitOf(squadPick()[0]).skillAt ?? null);
+    await key(tab, 'k');
+    const after = await game.evaluate(() => { rosterCache = null; return [unitOf(squadPick()[0]).skillAt, document.querySelector('#squad-detail .skills .use')?.textContent, sq.note]; });
+    assert.notEqual(after[0], before, 'K switched the skill');
+    assert.equal(after[1].replace('*', ''), await game.evaluate(k => G.skillsOf(squadPick()[0])[k], after[0]), 'the skill in use is marked');
+    assert.match(after[2], /^Skill: /);
+    const spill = await game.$eval('#squad-detail', n => [...n.children].some(c => c.getBoundingClientRect().right > n.getBoundingClientRect().right + 1));
+    assert.equal(spill, false, 'the note fits the panel');
+  }
+  // The Dex: the battle level and its cap come first.
+  await game.evaluate(l => { storyMode = 'stages'; go('dex'); pref.dexFilter = 'All'; dexAt = dexList().indexOf(l); dexUpdate(); }, line);
+  if (await game.evaluate(() => !!(T.capOf && G.setSkill))) {
+    const first = await game.$eval('#dex-acts > div', n => n.textContent);
+    assert.match(first, new RegExp('^Battle level.*\\d+/' + cap + '$'));
+    assert.match(await game.$eval('#dex-acts', n => n.textContent), /Skill: /);
+  }
+  assert.deepEqual(errors, []);
+});
+
 test('tower defense: chapter 4 says which enemies are armored', async t => {
   const { tab, game, errors } = await openWithMons(t);
   if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length > 3)) return t.skip('the hub engine has fewer than 4 chapters');
@@ -707,7 +776,7 @@ test('squad: slots and a roster grid with real level and cost, filters, sorting,
   assert.ok(await game.evaluate(() => document.querySelector('#squad-grid > .card').classList.contains('in')));
   // The detail: types, class, range, level and its next cost, six stats and four skills.
   const detail = await game.$eval('#squad-detail', n => n.textContent);
-  assert.match(detail, /Range [\d.]+/); assert.match(detail, /Lv \d+\/10/); assert.match(detail, /cost \d+/);
+  assert.match(detail, /Range [\d.]+/); assert.match(detail, /Lv \d+\/(5|8|10)\b/); assert.match(detail, /cost \d+/);
   for (const k of ['HP', 'Atk', 'Def', 'SpA', 'SpD', 'Spe']) assert.match(detail, new RegExp(k + ' \\d+'));
   assert.equal(await game.$$eval('#squad-detail .skills > span', n => n.length), 4);
   // Filters: C cycles the class (spelled out), T a type, R a tier, Q only the squad.

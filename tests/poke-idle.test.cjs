@@ -98,3 +98,28 @@ test('the daily boss is tuned for a counter team: one built on its weakness wins
   }
   assert.deepEqual(errors, []);
 });
+
+// All nine Champions down and standing in the Training area. TRAIN_R (9) is past the last region, so the
+// Dex must never adopt it as one: regionMons(9) read REGIONS[9].gen and threw on every render for the rest
+// of the session, which is what the field errors were.
+test('the Dex opens on a real region from the Training area', async t => {
+  const { tab, errors } = await openIdle(t, '2026-11-21');
+  await tab.evaluate(() => {
+    S = fresh(); S.box[25] = { xp: 1e9 }; S.party = [25]; S.full = 1;
+    for (let r = 0; r < REGIONS.length; r++) { for (let k = 0; k < 4; k++) S.badges[r + '-' + k] = 1; S.champs[r] = 1; }
+    S.loc = { kind: 'route', r: TRAIN_R, k: 0 };
+    save(); renderLocs();
+  });
+  const regions = await tab.evaluate(() => REGIONS.length);
+  assert.ok(await tab.evaluate(() => TRAIN_R) >= regions, 'the Training area is past the last region');
+  assert.equal(await tab.evaluate(() => regionMons(TRAIN_R).length), 0, 'the Training area has no regional dex');
+  assert.ok(await tab.evaluate(() => regionMons(0).length) > 0, 'a real region still lists its Pokémon');
+  const shown = await tab.evaluate(() => {
+    openTab('dex');
+    return { dexR, cells: document.querySelectorAll('#dexgrid [data-wpk]').length, sum: document.querySelector('#dexsum').textContent.trim() };
+  });
+  assert.ok(Number.isInteger(shown.dexR) && shown.dexR >= 0 && shown.dexR < regions, 'the Dex kept a real region');
+  assert.ok(shown.cells > 0, 'the Dex still lists a region');
+  assert.ok(shown.sum.length > 0, 'the summary still renders');
+  assert.deepEqual(errors, []);
+});

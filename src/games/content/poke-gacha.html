@@ -230,6 +230,9 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Skills flow two to a line, and a long pair wraps onto a third line rather than being cut. */
 #squad-detail .skills { display: flex; flex-wrap: wrap; column-gap: 10px }
 #squad-detail .skills span, #squad-detail .stats span { white-space: nowrap }
+#squad-detail .skills span[data-skill] { cursor: pointer }
+/* The skill in use: underlined in the text's colour. */
+#squad-detail .skills .use { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px }
 #squad-detail .line { display: flex; align-items: center; gap: 4px; white-space: nowrap }
 /* A card: the mini sprite at 1x with its class icon top left and a check top right
    when it is in the squad; level bottom left, deploy cost bottom right. */
@@ -378,7 +381,7 @@ let tab = pref.tab || "pull", machine = pref.machine || "move", S = null;
 const name = num => G.dex[num - 1][0];
 const REASONS = { vouchers: "Not enough vouchers.", full: "Egg storage is full (99). Hatch some first.", inactive: "Your wallet is not open yet.",
   candy: "Not enough candy.", shards: "Not enough shards.", owned: "Already done.", order: "Cut the cost by 1 first.", locked: "That look is not unlocked.",
-  "not-owned": "You do not have that one yet." };
+  "not-owned": "You do not have that one yet.", cap: "At this form's level cap. Evolve it to raise the cap." };
 
 /* ── The palette, and pixel art drawn at 2x from it ────────────────────── */
 const C = { ink: "#1c1b2c", panel: "#2c2a44", red: "#c8372f", paper: "#f4f1ff", dim: "#807c9a", gold: "#e3ad2b", teal: "#3f9e8a", sky: "#8fd3e8" };
@@ -424,7 +427,7 @@ const EGG_PICS = [0, 1, 2, 3].map(i => { const img = new Image(); img.src = ART_
 /* Mini sprites: 40x30 icons in two atlases (scripts/gacha-art.py), 32 a row. */
 const MINI = [40, 30], MINI_COLS = 32, MINI_SHEET = [1280, 990];
 function miniStyle(node, num, look = "normal", scale = 1) {
-  const n = isSkin(look) ? (skinOf(look)?.species || num) : num;
+  const n = isSkin(look) ? skinForm(look, num) : num;
   const i = n - 1;
   Object.assign(node.style, {
     width: MINI[0] * scale + "px", height: MINI[1] * scale + "px",
@@ -477,7 +480,12 @@ const SKIN_DIR = SPRITE_DIR.replace("pokedoku/sprites/", "poke-gacha/sp/");
 const skins = () => (G ? G.skins() : []);
 const skinOf = id => skins().find(skin => skin.id === id) || null;
 const isSkin = look => look !== "normal" && look !== "shiny";
-const spriteUrl = (num, look) => isSkin(look) ? SKIN_DIR + look + ".png" : SPRITE_DIR + (look === "shiny" ? "shiny/" : "") + num + ".png";
+// A skin's art is one file per form it covers: sp/<id>-<species>.png. A set covers several forms.
+const skinFileOf = (id, num) => G && G.skinFile ? G.skinFile(id, num) : id + "-" + num + ".png";
+const skinCovers = (id, num) => !!skinOf(id)?.forms?.includes(num);
+// The form a skin is drawn on: this one if the skin covers it, else the form it was drawn for.
+const skinForm = (id, num) => skinCovers(id, num) ? num : skinOf(id)?.species || num;
+const spriteUrl = (num, look) => isSkin(look) ? SKIN_DIR + skinFileOf(look, skinForm(look, num)) : SPRITE_DIR + (look === "shiny" ? "shiny/" : "") + num + ".png";
 const lookName = look => look === "normal" ? "Normal" : look === "shiny" ? "Shiny" : "SP " + (skinOf(look)?.name || "skin");
 // Every Pokémon sprite at 1x, never scaled or cropped: cells are 96px, the largest sprite.
 const CELL = 96;
@@ -945,12 +953,15 @@ function bigEgg(tier, wobble, crack) {
   return c;
 }
 const hatchLook = x => x.sp ? x.sp : x.shiny ? "shiny" : "normal";
+// What a hatch shows: the species, or for an SP skin the skin on the form it covers (a Charizard
+// skin rolled from a Charmander egg shows Charizard).
+const hatchSprite = x => sprite(x.sp ? skinForm(x.sp, x.species) : x.species, hatchLook(x));
 function showHatch() {
   const h = hatching, panel = $("#hatch");
   if (h.summary) {
     const grid = el("div", "grid");
     // NEW sits under the cell, never on the sprite.
-    for (const x of h.list.slice(0, 12)) { const item = el("div"); item.append(cellWith(sprite(x.species, hatchLook(x))), el("div", "tag " + (x.fresh ? "gold" : "dim"), x.fresh ? "NEW" : "+" + x.shards)); grid.append(item); }
+    for (const x of h.list.slice(0, 12)) { const item = el("div"); item.append(cellWith(hatchSprite(x)), el("div", "tag " + (x.fresh ? "gold" : "dim"), x.fresh ? "NEW" : "+" + x.shards)); grid.append(item); }
     panel.classList.add("sum");
     panel.replaceChildren(el("div", "head gold", "HATCHED " + h.list.length), grid);
     const fresh = h.list.filter(x => x.fresh).length;
@@ -965,13 +976,13 @@ function showHatch() {
   const reveal = () => {
     h.phase = "shown";
     art.classList.remove("egg-phase");
-    art.replaceChildren(sprite(x.species, hatchLook(x)));
+    art.replaceChildren(hatchSprite(x));
     const candy = el("div"); candy.append(el("span", "num", "+" + x.candy), " candy");
     if (x.shards) candy.append(" · ", el("span", "num", "+" + x.shards), " shards");
     text.replaceChildren(el("div", "title", name(x.species)), el("div", x.fresh ? "gold" : "dim", x.fresh ? "New for your dex" : "Already in your dex"),
       el("div", "", TIER_NAME[x.tier] + " " + G.stars[x.tier] + "★ · " + G.dex[x.species - 1][1].replace("/", " / ")), candy,
       el("div", x.skill === 3 ? "gold" : "", "Skill: " + G.skillsOf(x.species)[x.skill] + (x.skill === 3 ? " (rare)" : "")),
-      ...(x.shiny ? [el("div", "gold", "Shiny!")] : []), ...(x.sp ? [el("div", "gold", "SP skin: " + (skinOf(x.sp)?.name || x.sp) + "!")] : []));
+      ...(x.shiny ? [el("div", "gold", "Shiny!")] : []), ...(x.sp ? [el("div", "gold", "SP skin: " + (skinOf(x.sp)?.name || x.sp) + "! Wear it from the Dex.")] : []));
     say("Enter: next egg · Backspace: skip to the end.");
   };
   say("Oh? The egg is moving...");
@@ -1046,16 +1057,28 @@ function dexActions(line) {
   up("passive", "Passive", l.passive, G.costs.passive, "Unlock this line's passive for tower defense.");
   up("cost1", "Cost -1", l.cost >= 1, G.costs.cost1, "Deploy this line for 1 less energy in tower defense.");
   up("cost2", "Cost -2", l.cost >= 2, G.costs.cost2, "Deploy for 2 less energy. Needs Cost -1 first.", l.cost < 1);
+  // Tower defense: which unlocked skill this line uses, and its level against the cap.
+  if (T && G.setSkill) {
+    const used = skillUsed(l), kind = skillKindOf(used), open = [0, 1, 2, 3].filter(i => l.skills[i]);
+    list.push({ label: "Skill: " + G.skillsOf(line)[used] + (kind ? " (" + kind.name + ")" : ""), off: open.length < 2,
+      about: (kind ? kind.name + ": " + SKILL_ABOUT[kind.id] + ". " : "") + (open.length > 1 ? "Enter switches to another unlocked skill." : "Hatch more of this line to unlock other skills."),
+      run: () => { const msg = cycleSkill(tipOf(line)); return { ok: true, msg }; } });
+    const lv = T.state().levels[line] || 1, cap = capOf(line), more = nextCap(cap);
+    // First in the list, so the cap shows without scrolling.
+    list.unshift({ label: "Battle level" + (more ? " (evolve: " + more + ")" : ""), right: [lv + "/" + cap], off: true,
+      about: "Level " + lv + " of " + cap + " in tower defense (coins buy levels in Squad). " + (more ? "Evolving this line raises the cap to " + more + "." : "This is the top cap.") });
+  }
   const looks = G.looksOf(l);
   list.push({ label: "Look: " + lookName(l.look), off: looks.length < 2,
     about: looks.length > 1 ? "Change the look this line wears here, in Pokédoku and as your buddy." : "Hatch it shiny to unlock another look.",
     run: () => G.setLook({ line, look: looks[(looks.indexOf(l.look) + 1) % looks.length] }) });
-  // A skin belongs to one species, so the buddy is that species when the line wears one.
+  // With a skin on, the buddy is the line's newest form the skin covers (it must be owned).
   const skin = isSkin(l.look) ? skinOf(l.look) : null;
-  const who = skin ? skin.species : tipOf(line);
+  const who = skin ? (lineForms(line).filter(num => skinCovers(skin.id, num)).sort((a, b) => G.stageOf(b) - G.stageOf(a))[0] || skin.species) : tipOf(line);
+  const can = S.owned.includes(who);
   const isBuddy = S.buddy && S.buddy.species === who && S.buddy.shiny === (l.look === "shiny") && (S.buddy.skin || null) === (skin ? skin.id : null);
-  list.push({ label: isBuddy ? "Your buddy" : "Make buddy", right: isBuddy ? [check(true)] : "", off: isBuddy,
-    about: "Show " + name(who) + " next to your name on Bored and the leaderboard.",
+  list.push({ label: isBuddy ? "Your buddy" : "Make buddy", right: isBuddy ? [check(true)] : "", off: isBuddy || !can,
+    about: can ? "Show " + name(who) + " next to your name on Bored and the leaderboard." : "Evolve into " + name(who) + " to show this skin as your buddy.",
     run: () => G.setBuddy({ species: who, shiny: l.look === "shiny", skin: skin ? skin.id : null }) });
   return list;
 }
@@ -1078,7 +1101,7 @@ function dexUpdate() {
     label: String(num).padStart(4, "0") + " " + (owned.has(num) ? name(num) : "???"), right: owned.has(num) ? [check(true)] : "", off: !owned.has(num) })),
     dexAt, i => { dexAt = i; actAt = 0; dexFocus = "list"; dexUpdate(); });
   const line = list[dexAt], l = S.lines[line], tip = l ? tipOf(line) : line;
-  const shown = l && isSkin(l.look) && skinOf(l.look) ? skinOf(l.look).species : tip;
+  const shown = l && isSkin(l.look) && skinOf(l.look) ? skinForm(l.look, tip) : tip;
   $("#dex-pic").replaceChildren(l ? sprite(shown, G.lookFor(shown)) : silhouette(line));
   const info = $("#dex-info"), stars = G.dex[line - 1][9], egg = el("div", "egg-line");
   // Which egg it hatches from, with that egg's icon: Common 3★, Rare 4★, Epic 5★, Legendary 6★.
@@ -1124,13 +1147,15 @@ let shopAt = 0;
 function shopItems() {
   const items = [{ kind: "reg", label: "Regular voucher", price: 100, cur: "coins", icon: ticket("regular"),
     about: "1 Regular voucher for 100 coins. Coins come from Poké Idle, Pokédoku and tower defense." }];
-  for (const skin of skins()) {
-    const held = S.lines[G.lineOf(skin.species)];
+  // Lines the eggs never hatch (Mew, for now) have no way in, so their skins wait off the list.
+  for (const skin of skins().filter(skin => G.dex[G.lineOf(skin.species) - 1][9] > 0)) {
+    const held = S.lines[G.lineOf(skin.species)], forms = skin.forms || [skin.species];
     const owned = held && held.skins.includes(skin.id);
-    items.push({ kind: "sp", skin, label: "SP " + skin.name + ": " + name(skin.species), price: G.costs.sp, cur: "shards", icon: shardIcon(),
-      owned, locked: !held,
+    const covers = forms.length > 1 ? "a set for " + forms.map(name).join(", ") : "for " + name(skin.species);
+    items.push({ kind: "sp", skin, label: "SP " + skin.name + (forms.length > 1 ? " (" + forms.length + " forms)" : ""),
+      price: G.skinPrice ? G.skinPrice({ forms }) : G.costs.sp, cur: "shards", icon: shardIcon(), owned, locked: !held,
       about: owned ? "You own this skin. Wear it from the Dex: Look." : !held ? "Hatch the " + name(G.lineOf(skin.species)) + " line first to buy this skin."
-        : "SP skin for " + name(skin.species) + ": its own art here, in Pokédoku and as your buddy. Looks only." });
+        : "SP skin, " + covers + ": its own art here, in battle, in Pokédoku and as your buddy. Looks only. Shiny UP can also drop it (1 in " + SP_IN + ")." });
   }
   return items;
 }
@@ -1145,7 +1170,7 @@ function shopUpdate() {
   const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins");
   if (items.length > 1) have.append(" · ", el("span", "num", S.balance.shards), " shards");
   $("#shop-preview").replaceChildren(el("div", "title", it.kind === "sp" ? "PREVIEW" : "VOUCHER"),
-    cellWith(it.kind === "sp" ? sprite(it.skin.species, it.skin.id) : ticket("regular", 2)), el("div", "", it.kind === "sp" ? it.skin.name : "1 Regular = 1 egg"), have);
+    cellWith(it.kind === "sp" ? sprite((it.skin.forms || [it.skin.species]).slice(-1)[0], it.skin.id) : ticket("regular", 2)), el("div", "", it.kind === "sp" ? it.skin.name : "1 Regular = 1 egg"), have);
   say(it.about);
 }
 function buy(it) {
@@ -1619,24 +1644,51 @@ function squadUpdate() {
   // Detail
   squadDetail(sq.zone === "slots" ? pick[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null);
 }
+// Level caps rise as a line evolves (the hub decides: 5, 8, then 10 with a final form).
+const capOf = line => T && T.capOf ? T.capOf(line) : T.maxLevel;
+const nextCap = cap => (T.levelCaps || []).find(c => c > cap);
+// The four skill slots play differently (power and charge); the hub lists them.
+const SKILL_ABOUT = { steady: "the class's usual skill", quick: "charges 30% sooner at 80% power", heavy: "130% power, charges 35% slower", rare: "130% power at the usual charge" };
+const skillKindOf = k => (T.skillKinds || [])[k] || null;
+// The skill a line uses: the pick if it is unlocked, else the rare one if unlocked, else the first.
+const skillUsed = l => Number.isInteger(l.skill) && l.skills && l.skills[l.skill] ? l.skill : l.skills && l.skills[3] ? 3 : 0;
+function cycleSkill(num) {
+  const line = G.lineOf(num), l = S.lines[line];
+  if (!l || !G.setSkill) return "";
+  const open = [0, 1, 2, 3].filter(i => l.skills[i]);
+  if (open.length < 2) return "Only one skill unlocked. Hatch more of this line for others.";
+  const next = open[(open.indexOf(skillUsed(l)) + 1) % open.length];
+  const r = G.setSkill({ line, skill: next });
+  refreshTop();
+  const kind = skillKindOf(next);
+  return r.ok ? "Skill: " + G.skillsOf(num)[next] + (kind ? " (" + kind.name + ")" : "") : REASONS[r.reason] || "Not now.";
+}
 function squadDetail(num) {
   const box = $("#squad-detail");
   // One line of keys for where the cursor is, or what just went wrong.
   const hint = el("div", sq.note ? "gold" : "dim", sq.note || (sq.zone === "head" ? "Enter team or Start · P team" :
-    sq.zone === "slots" ? "Enter remove · L level up" : "Enter add · L level · S sort"));
+    sq.zone === "slots" ? "Enter remove · L level · K skill" : "Enter add · L level · K skill"));
   hint.style.whiteSpace = "nowrap";
   if (!num) { box.replaceChildren(el("div", "title", "SQUAD"), el("div", "", squadPick().length + " of 8 picked"), hint); return; }
   const u = unitOf(num), row = G.dex[num - 1], c = T.classes[u.cls], l = S.lines[G.lineOf(num)] || {};
   const head = el("div", "title", name(num));
   const kind = el("div", "line"); kind.append(classIcon(u.cls), c.name, el("span", "dim", "· " + row[1].replace("/", " / ")));
   const fight = el("div", "line"); fight.append("Range ", el("span", "num", u.range), ...(c.block ? [" · block ", el("span", "num", c.block)] : []), " · cost ", el("span", "num", u.cost));
-  const lv = T.state().levels[G.lineOf(num)] || 1;
-  const level = el("div", "line"); level.append("Lv ", el("span", "num", lv + "/" + T.maxLevel));
-  if (lv < T.maxLevel) level.append(" · next ", el("span", "num", T.levelCost(lv)), coin()); else level.append(el("span", "dim", " · max"));
+  // Level and its cap: the cap rises when the line evolves.
+  const lv = T.state().levels[G.lineOf(num)] || 1, cap = capOf(G.lineOf(num)), more = nextCap(cap);
+  const level = el("div", "line"); level.append("Lv ", el("span", "num", lv + "/" + cap));
+  if (lv < cap) level.append(" · next ", el("span", "num", T.levelCost(lv)), coin());
+  else level.append(el("span", "dim", more ? " · evolve for " + more : " · max"));
   const stats = el("div", "stats");
   [["HP", 2], ["Atk", 3], ["Def", 4], ["SpA", 5], ["SpD", 6], ["Spe", 7]].forEach(([k, i]) => { const s_ = el("span"); s_.append(el("span", "dim", k + " "), el("span", "", row[i])); stats.append(s_); });
   const skills = el("div", "skills");
-  G.skillsOf(num).forEach((sk, i) => skills.append(el("span", (l.skills && l.skills[i]) ? (i === 3 ? "gold" : "") : "dim", sk + (i === 3 ? "*" : ""))));
+  // The skill in use is marked; K (or a click) picks another unlocked one.
+  const used = skillUsed(l);
+  G.skillsOf(num).forEach((sk, i) => {
+    const open = l.skills && l.skills[i], n = el("span", (open ? (i === 3 ? "gold" : "") : "dim") + (open && i === used ? " use" : ""), sk + (i === 3 ? "*" : ""));
+    if (open) { n.dataset.skill = i; n.title = (skillKindOf(i)?.name || "") + ": " + (SKILL_ABOUT[skillKindOf(i)?.id] || ""); }
+    skills.append(n);
+  });
   box.replaceChildren(head, kind, fight, level, stats, skills, hint);
 }
 function squadToggle(num) {
@@ -1659,7 +1711,13 @@ function squadKey(e) {
   if (k === "Backspace") { e.preventDefault(); sq.note = ""; storyMode = "stages"; return storyUpdate(); }
   if (k === "l" || k === "L") {
     const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null;
-    if (num) { const r = T.levelUp({ line: G.lineOf(num) }); refreshTop(); sq.note = r.ok ? "" : r.reason === "coins" ? "Not enough coins." : "Already at max level."; squadUpdate(); }
+    if (num) { const r = T.levelUp({ line: G.lineOf(num) }); refreshTop(); sq.note = r.ok ? "" : r.reason === "coins" ? "Not enough coins." : r.reason === "cap" ? "Level cap. Evolve to raise it." : "Already at max level."; squadUpdate(); }
+    return;
+  }
+  if (k === "k" || k === "K") {
+    e.preventDefault();
+    const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null;
+    if (num) { sq.note = cycleSkill(num); rosterCache = null; squadUpdate(); }
     return;
   }
   const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
@@ -1685,6 +1743,13 @@ function squadKey(e) {
   }
 }
 function squadClick(e) {
+  const sk = e.target.closest("[data-skill]");
+  if (sk) {
+    const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? (rosterCache || roster()).list[sq.at]?.num : null, line = num && G.lineOf(num);
+    if (num && G.setSkill) { const k = Number(sk.dataset.skill), r = G.setSkill({ line, skill: k }); refreshTop(); rosterCache = null;
+      sq.note = r.ok ? "Skill: " + G.skillsOf(num)[k] + " (" + skillKindOf(k).name + ")" : r.reason === "owned" ? "" : REASONS[r.reason] || ""; squadUpdate(); }
+    return;
+  }
   const t = e.target.closest("[data-slot],[data-at],[data-key],[data-team],[data-start]");
   if (!t) return;
   if (t.dataset.key) return cycleSquad(t.dataset.key);
