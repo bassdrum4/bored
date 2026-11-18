@@ -552,20 +552,26 @@ function dailyDone(id, list) {
   if (id === 'big') return won.some(r => r.team.some(num => lineStar(num) >= 5));
   return false;
 }
-function weeklyDone(id, entries, list, monday) {
+// How far a weekly mission is this week: [have, need]. It is done at have >= need.
+function weeklyCount(id, entries, list, monday) {
   const inWeek = day => day >= monday && day < shiftDay(monday, 7);
   const week = list.filter(r => r.stars > 0 && inWeek(r.day));
-  if (id === 'star3x5') return new Set(week.filter(r => r.stars === 3).map(r => r.stage)).size >= 5;
-  if (id === 'daily5') return Object.keys(entries).filter(k => /^td:daily:\d{4}-\d{2}-\d{2}:all$/.test(k) && inWeek(k.slice(9, 19))).length >= 5;
+  const count = re => Object.keys(entries).filter(k => re.test(k) && inWeek(k.match(/\d{4}-\d{2}-\d{2}/)[0])).length;
+  if (id === 'star3x5') return [new Set(week.filter(r => r.stars === 3).map(r => r.stage)).size, 5];
+  if (id === 'daily5') return [count(/^td:daily:\d{4}-\d{2}-\d{2}:all$/), 5];
   if (id === 'teams3') {
     const teams = {};
     for (const r of week) (teams[r.stage] ||= new Set()).add(r.team.slice().sort((a, b) => a - b).join(','));
-    return Object.values(teams).some(set => set.size >= 3);
+    return [Math.max(0, ...Object.values(teams).map(set => set.size)), 3];
   }
   // Read from the wallet: rewards.js writes `pi:boss:<date>` when Poké Idle reports a daily boss win.
-  if (id === 'boss5') return Object.keys(entries).filter(k => /^pi:boss:\d{4}-\d{2}-\d{2}$/.test(k) && inWeek(k.slice(-10))).length >= 5;
-  if (id === 'doku10') return Object.keys(entries).filter(k => /^pdoku:daily:[a-z]+:\d{4}-\d{2}-\d{2}$/.test(k) && inWeek(k.slice(-10))).length >= 10;
-  return false;
+  if (id === 'boss5') return [count(/^pi:boss:\d{4}-\d{2}-\d{2}$/), 5];
+  if (id === 'doku10') return [count(/^pdoku:daily:[a-z]+:\d{4}-\d{2}-\d{2}$/), 10];
+  return [0, 1];
+}
+function weeklyDone(id, entries, list, monday) {
+  const [have, need] = weeklyCount(id, entries, list, monday);
+  return have >= need;
 }
 /** Grant whatever missions are now complete. */
 function claimMissions(wallet, today, now) {
@@ -599,7 +605,11 @@ export function tdState(wallet, today = dailyDate()) {
     unlockedById: Object.fromEntries(STAGES.map((s, i) => [s.id, i === 0 || (best[STAGES[i - 1].id] || 0) > 0])),
     daily: dailyMissions(today).map(m => ({ ...m, done: !!e['td:daily:' + today + ':' + m.id] })),
     dailyAll: !!e['td:daily:' + today + ':all'],
-    weekly: WEEKLY.map(m => ({ ...m, done: !!e['td:week:' + monday + ':' + m.id] })),
+    // have/need: how far each weekly mission is (a claimed one shows full).
+    weekly: WEEKLY.map(m => {
+      const done = !!e['td:week:' + monday + ':' + m.id], [have, need] = weeklyCount(m.id, e, list, monday);
+      return { ...m, done, have: done ? need : Math.min(have, need), need };
+    }),
     weeklyAll: !!e['td:week:' + monday + ':all'],
     // The weekly challenge: this week's stage and the best risk total won so far.
     challenge: weeklyStage(monday),
