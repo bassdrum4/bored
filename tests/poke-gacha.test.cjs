@@ -592,6 +592,64 @@ test('progression: Squad and Dex show the level cap, and K picks which unlocked 
   assert.deepEqual(errors, []);
 });
 
+test('tilesets: tiles by stage seed, path edges at floor, front faces only before low ground, props on floor, drawn tiles as the fallback', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await key(tab, '1');
+  // No tiles folder in the repo yet: the field draws as before.
+  await game.evaluate(() => { pickStage(); setSquad(S.owned.slice(0, 2)); startBattle(); battle.talk = []; battleTalk(); battle.paused = true; });
+  const px = (x, y) => game.evaluate(([x, y]) => [...document.querySelector('#field').getContext('2d').getImageData(x, y, 1, 1).data].slice(0, 3).join(','), [x, y]);
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
+  const centre = (x, y) => game.evaluate(([x, y]) => { const r = tileRect(battle.stage, x, y); return [r.x + 28, r.y + 18]; }, [x, y]);
+  const pathTile = await game.evaluate(() => { const p = T.pathsOf(battle.stage)[0]; return p[Math.floor(p.length / 2)]; });
+  await game.evaluate(() => drawField());
+  assert.equal(await px(...await centre(...pathTile)), hex(await game.evaluate(() => SHADE.paper[0])), 'without a tileset the drawn path shows');
+  // A test tileset: one solid colour per piece (edges are a 4px strip on their side).
+  await game.evaluate(() => {
+    const solid = (w, h, color, strip) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.fillStyle = color;
+      if (strip === 'top') g.fillRect(0, 0, w, 4); else if (strip === 'bottom') g.fillRect(0, h - 4, w, 4); else if (strip === 'left') g.fillRect(0, 0, 4, h); else if (strip === 'right') g.fillRect(w - 4, 0, 4, h);
+      else if (strip === 'dot') g.fillRect(w / 2 - 6, h / 2 - 6, 12, 12); else g.fillRect(0, 0, w, h); c.naturalWidth = w; c.naturalHeight = h; return c; };
+    const set = { theme: 'test', floor: [solid(56, 36, '#101010'), solid(56, 36, '#202020')], path: [solid(56, 36, '#303030')], 'high-top': [solid(56, 36, '#404040')], 'high-front': [solid(56, 12, '#505050')],
+      'path-edge-top': solid(56, 36, '#606060', 'top'), 'path-edge-bottom': solid(56, 36, '#616161', 'bottom'), 'path-edge-left': solid(56, 36, '#626262', 'left'), 'path-edge-right': solid(56, 36, '#636363', 'right'),
+      spawn: solid(56, 36, '#707070', 'dot'), base: solid(56, 36, '#717171', 'dot'), props: [solid(10, 30, '#808080')] };
+    for (const theme of ['chapter-1', 'default']) TILESETS.set(theme, set);
+    drawField();
+  });
+  const map = await game.evaluate(() => battle.stage.map);
+  const at = (x, y) => (map[y] || '')[x];
+  const props = await game.evaluate(() => propsOf(battle.stage, tilesetFor(battle.stage)).map(p => [p.x, p.y]));
+  const propAt = new Set(props.map(p => p.join(',')));
+  assert.ok(props.length > 0 && props.every(([x, y]) => at(x, y) === '#'), 'props stand on floor tiles only');
+  const floors = new Set();
+  for (let y = 0; y < map.length; y++) for (let x = 0; x < map[y].length; x++) {
+    const c = at(x, y), [cx, cy] = await centre(x, y);
+    if (c === '#') { if (propAt.has(x + ',' + y)) continue; const got = await px(cx, cy); assert.ok(['16,16,16', '32,32,32'].includes(got), 'floor ' + x + ',' + y + ': ' + got); floors.add(got); }
+    if (c === '.') {
+      assert.equal(await px(cx, cy), '48,48,48', 'path ' + x + ',' + y);
+      // The edge strip shows on a side that meets floor, and not on a side that meets path or high ground.
+      const top = await px(cx, cy - 16);
+      assert.equal(top === '96,96,96', at(x, y - 1) === '#' && y > 0, 'top edge at ' + x + ',' + y);
+    }
+    if (c === 'H') {
+      assert.equal(await px(cx, cy), '64,64,64', 'high top ' + x + ',' + y);
+      const front = await px(cx, cy + 18 + 6);
+      // A prop standing on the tile in front may cover the face: that is the right depth order.
+      if (propAt.has(x + ',' + (y + 1))) continue;
+      if (y + 1 < map.length && at(x, y + 1) !== 'H') assert.equal(front, '80,80,80', 'front face before low ground at ' + x + ',' + y);
+      if (y + 1 < map.length && at(x, y + 1) === 'H') assert.notEqual(front, '80,80,80', 'no front face before more high ground at ' + x + ',' + y);
+    }
+    if (c === 'S') assert.equal(await px(cx, cy), '112,112,112', 'spawn marker');
+    if (c === 'G') assert.equal(await px(cx, cy), '113,113,113', 'base marker');
+  }
+  assert.equal(floors.size, 2, 'both floor variants are used');
+  // The stage seed decides it: the same stage picks the same, another stage can differ.
+  assert.equal(await game.evaluate(() => JSON.stringify(propsOf(battle.stage, tilesetFor(battle.stage)).map(p => [p.x, p.y]))), JSON.stringify(props));
+  assert.ok(await game.evaluate(() => T.allStages.slice(0, 8).some(s => tilePick(stageSeed(s), 1, 1, 3, 2) !== tilePick(stageSeed(battle.stage), 1, 1, 3, 2))));
+  // A piece the set lacks falls back to the drawn tile.
+  await game.evaluate(() => { tilesetFor(battle.stage).path = []; drawField(); });
+  assert.equal(await px(...await centre(...pathTile)), hex(await game.evaluate(() => SHADE.paper[0])), 'a set without path tiles draws the path as before');
+  assert.deepEqual(errors, []);
+});
+
 test('tower defense: chapter 4 says which enemies are armored', async t => {
   const { tab, game, errors } = await openWithMons(t);
   if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length > 3)) return t.skip('the hub engine has fewer than 4 chapters');
