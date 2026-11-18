@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 624,
+  "count": 625,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"c3ea585","date":"2026-11-18","author":"Codebuff","subject":"Developer notes: fill in the last 14 games and point Circuit at Trackmania"},
   {"sha":"bfeb098","date":"2026-11-18","author":"Codebuff","subject":"Trackmania: take the bumps out of Downdraft's opening drop"},
   {"sha":"a591f5d","date":"2026-11-18","author":"Codebuff","subject":"Trackmania: a whole frozen Cold Store, a Downdraft that only goes down, and Circuit in hundredths"},
   {"sha":"fd02def","date":"2026-11-18","author":"Codebuff","subject":"Trackmania: a daily worth returning to, a rival ghost, and two new tracks"},
