@@ -1266,6 +1266,43 @@ test('Dex: the row shows the form that fights with its line under it, a clear ch
   assert.deepEqual(errors, []);
 });
 
+test('tutorials: the six classes and the bars in Squad, types before 1-3, a card for each kind of foe (and a Foes list), and skills', async t => {
+  const { game, errors } = await openWithMons(t);
+  const fresh = () => game.evaluate(() => { while (tutor) tutorEnd(false); tutorQueue.length = 0; for (const k of Object.keys(tipsSeen)) delete tipsSeen[k]; });
+  const texts = () => game.evaluate(() => { const out = []; if (tutor) { out.push(tutor.id + ': ' + tutor.steps.map(st => typeof st.text === 'function' ? st.text() : st.text).join(' | ')); } for (const q of tutorQueue) out.push(q[0] + ': ' + q[1].map(st => typeof st.text === 'function' ? st.text() : st.text).join(' | ')); return out.join('\n'); });
+  // Squad, first time: every class in one line each, and the bars.
+  await fresh();
+  await game.evaluate(() => { go('story'); storyAt = 0; storyMode = 'squad'; rosterCache = null; storyUpdate(); screenTips('story'); });
+  const squad = await texts();
+  for (const cls of ['Blocker', 'Guard', 'Vanguard', 'Sniper', 'Caster', 'Medic']) assert.match(squad, new RegExp(cls), cls + ' is explained');
+  assert.match(squad, /green means a good tank here.*red means good damage here/);
+  assert.match(await game.$eval('#squad-filters .legend', n => n.textContent), /tank.*dmg/, 'a tiny legend beside the filters');
+  // Types: before 1-3, on the Tank/Dmg line of the preview.
+  await fresh();
+  await game.evaluate(() => { for (const id of ['1-1', '1-2']) T.finish({ stage: id, stars: 3, team: [S.owned[0]], waves: 1 }); refreshTop(); while (tutor) tutorEnd(false); tutorQueue.length = 0; storyMode = 'stages'; storyAt = 2; storyUpdate(); });
+  await pause(150);
+  assert.match(await texts(), /^types: .*super-effective.*resisted.*Tanks want types that resist.*super effectively/s);
+  assert.deepEqual(await game.evaluate(() => { const a = tutorStep().at(), b = document.querySelector('#story-info .roles').getBoundingClientRect(); return [Math.round(a.t), Math.round(a.l)]; }),
+    await game.evaluate(() => { const b = document.querySelector('#story-info .roles').getBoundingClientRect(); return [Math.round(b.top), Math.round(b.left)]; }), 'it points at the Tank/Dmg line');
+  // Foes: a card per kind, the first time each shows up, with the counter.
+  await fresh();
+  const cards = await game.evaluate(() => { const out = {};
+    for (const [kind, e] of [['normal', {}], ['fast', { fast: true }], ['flying', { flying: true }], ['explodes', { explodes: true }], ['armored', { armored: true }], ['boss', { boss: true }]]) out[kind] = foeCard(foeKind({ num: 19, ...e }), 'Rattata');
+    return out; });
+  assert.match(cards.flying, /^FLYER · Rattata: .*only Snipers hit flyers/);
+  for (const [kind, text] of Object.entries(cards)) assert.match(text, /Counter: /, kind + ' says how to counter it');
+  // The preview's Foes list shows them again.
+  const kinds = await game.evaluate(() => [...document.querySelectorAll('#story-info .foes [data-foe]')].map(n => n.dataset.foe));
+  assert.ok(kinds.length >= 1, 'a Foes list in the stage preview');
+  await game.evaluate(() => { while (tutor) tutorEnd(true); document.querySelector('#story-info [data-foe]').click(); });
+  assert.match(await texts(), /^foe-/, 'clicking one shows its card');
+  // Skills: what the four kinds mean, the first time a skill is picked.
+  await fresh();
+  await game.evaluate(() => { skillTip('#squad-detail'); });
+  assert.match(await texts(), /Steady.*Quick charges 30% sooner at 80% power.*Heavy hits at 130% but charges 35% slower.*Rare hits at 130%/);
+  assert.deepEqual(errors, []);
+});
+
 test('Squad by mouse: drag between slots swaps them, a roster card dragged onto a slot takes it, and that order deploys', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.evaluate(() => { go('story'); storyMode = 'squad'; sq.zone = 'grid'; sq.at = 0; rosterCache = null; setSquad(roster().list.slice(0, 3).map(u => u.num)); storyUpdate(); });
@@ -1664,7 +1701,8 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   await game.evaluate(() => go('story'));
   await key(tab, 'Enter');
   await game.waitForFunction(() => tutor && tutor.id === 'squad');
-  await key(tab, 'Enter'); await key(tab, 'Enter');
+  // The classes on the path, up high, the bars, then the foes' types.
+  await key(tab, 'Enter', 4);
   // The guided first battle.
   await game.evaluate(() => { sq.zone = 'head'; sq.head = 3; squadUpdate(); });
   await key(tab, 'Enter');
@@ -1694,6 +1732,10 @@ test('tutorial: a new account goes through every tip, the guided 1-1 waits for e
   const t0 = Date.now();
   await game.waitForFunction(() => tutor.i === 7, { timeout: 10000 });
   assert.ok(Date.now() - t0 < 6000, 'the charging step is a short watch, not a long wait');
+  await key(tab, 'Enter');
+  // Then the card for the first kind of foe met (the Rattata walking in): what it does, the counter.
+  assert.equal(await game.evaluate(() => tutor && tutor.id), 'foe-normal');
+  assert.match(await game.$eval('#tutor-box', n => n.textContent), /^NORMAL · .*Counter: /);
   await key(tab, 'Enter');
   assert.equal(await tutorUp(game), false);
   assert.equal(await game.evaluate(() => tipsSeen['battle-1-1']), true);
