@@ -281,7 +281,9 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Filters are labels like the team tabs: a 1px dim frame, gold when one is set. */
 #squad-filters { margin-bottom: 4px }
 /* 7 columns of 56x55 cells; four rows show and the grid scrolls by whole rows. */
-#squad-grid { display: grid; grid-template-columns: repeat(7, 54px); grid-auto-rows: 53px; gap: 2px; height: 218px; overflow-y: auto;
+/* Seven whole cards across with room for a scrollbar (Windows draws it inside the box), and four
+   whole rows: it only ever scrolls down. */
+#squad-grid { display: grid; grid-template-columns: repeat(7, 52px); grid-auto-rows: 53px; gap: 2px; height: 218px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable;
               scrollbar-width: thin; scrollbar-color: var(--red) var(--panel); scroll-snap-type: y mandatory }
 #squad-grid > * { scroll-snap-align: start }
 #squad-stage { left: 422px; top: 8px; width: 210px; height: 104px; padding: 4px 6px }
@@ -295,7 +297,8 @@ canvas, img { image-rendering: pixelated; display: block }
 #squad-stage .teams span.at { outline: 2px solid var(--paper); outline-offset: 1px }
 #squad-stage .teams .start { margin-left: auto; background: var(--red); border-color: var(--red); color: var(--paper) }
 #squad-stage .teams .start.off { background: none; border-color: var(--dim); color: var(--dim) }
-#squad-detail { left: 422px; top: 120px; width: 210px; height: 216px; padding: 4px 6px }
+#squad-detail { left: 422px; top: 120px; width: 210px; height: 216px; padding: 4px 6px; line-height: 18px }
+#squad-detail .title { margin-bottom: 0 }
 #squad-detail .stats { display: grid; grid-template-columns: repeat(3, 1fr) }
 /* Skills flow two to a line, and a long pair wraps onto a third line rather than being cut. */
 #squad-detail .skills { display: flex; flex-wrap: wrap; column-gap: 10px }
@@ -313,6 +316,8 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Roster cells sit on their own ink tiles; the deploy cost is a gold badge top right,
    and a squad member has a gold outline as well as its check. */
 #squad-grid .card { background: var(--ink) }
+#squad-slots .card.drop { box-shadow: inset 0 0 0 2px var(--gold) }
+.drag-ghost { position: absolute; z-index: 60; pointer-events: none; opacity: .8 }
 #squad-grid .card.in { box-shadow: inset 0 0 0 2px var(--gold) }
 #squad .card .cost { position: absolute; right: 2px; top: 1px; color: var(--gold); line-height: 18px }
 #squad .card .low { display: flex; align-items: center; width: 100%; padding: 0 3px; height: 20px; white-space: nowrap }
@@ -357,7 +362,7 @@ canvas, img { image-rendering: pixelated; display: block }
 #battle-hud { left: 200px; top: 4px; width: 240px; height: 32px; padding: 4px 10px; display: flex; gap: 12px; align-items: center; justify-content: center; white-space: nowrap }
 #battle-hud span { display: flex; align-items: center; gap: 4px }
 #battle-pause { right: 8px; top: 4px; width: 104px; height: 32px; padding: 4px 8px; text-align: center; cursor: pointer; white-space: nowrap }
-#deploy-info { right: 8px; bottom: 74px; height: 24px; padding: 0 8px; line-height: 20px; white-space: nowrap; display: flex; gap: 10px; align-items: center }
+#deploy-info { right: 8px; bottom: 74px; height: 26px; padding: 0 8px; line-height: 22px; white-space: nowrap; display: flex; gap: 10px; align-items: center }
 #deploy { right: 8px; bottom: 8px; height: 62px; display: flex; gap: 2px; padding: 2px 4px }
 #deploy .card { position: relative; width: 49px; height: 54px; background: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center }
 #deploy .card .mini { margin-top: 2px }
@@ -378,13 +383,17 @@ canvas, img { image-rendering: pixelated; display: block }
 #frame.no-pixel #battle-tip, #frame.no-pixel #deploy .card .low, #frame.no-pixel #deploy-info, #frame.no-pixel #battle-talk,
 #frame.no-pixel #dex-rows, #frame.no-pixel #dex-info > div:not(.title), #frame.no-pixel #dex-depth, #frame.no-pixel #dex-tabs, #frame.no-pixel #egg-from, #frame.no-pixel #eggs-grid > p, #frame.no-pixel #story-list { font-size: 13px; font-family: Arial, Helvetica, sans-serif }
 /* As tall as the deploy bar and tip it covers, so neither peeks out above it. */
-#battle-talk { left: 8px; bottom: 8px; width: 624px; height: 62px; padding: 9px 12px; cursor: pointer }
+/* Anchored at the bottom and as tall as its line needs, so a two-line line keeps its key. */
+#battle-talk { left: 8px; bottom: 8px; width: 624px; min-height: 62px; padding: 6px 12px; cursor: pointer; line-height: 22px }
 /* "WAVE 2/3" over the field for a moment when a wave starts; it never takes a click. */
 #wave-banner { left: 220px; top: 44px; width: 200px; height: 40px; text-align: center; font: 400 var(--title)/30px var(--pixel); pointer-events: none }
 /* A clear's stars turn gold one by one, each with a short pop. */
 #battle-result .stars canvas.pop { animation: star-pop .3s steps(3) }
 @keyframes star-pop { from { transform: scale(1.8) } to { transform: scale(1) } }
 #battle-result { left: 160px; top: 56px; width: 320px; height: 200px; padding: 8px 16px; cursor: pointer }
+/* The pause menu: Resume, Retry, Leave battle (Leave asks first; it counts as a loss). */
+#battle-menu { left: 200px; top: 72px; width: 240px; padding: 8px 16px; z-index: 30 }
+#battle-menu .row { cursor: pointer; line-height: 30px }
 /* The roster-cut refund: shown once, when the lines an account owned are refunded. */
 #cut-note { left: 120px; top: 24px; width: 400px; height: 296px; padding: 6px 12px; cursor: pointer; z-index: 40; display: flex; flex-direction: column }
 #cut-note .rows { flex: 1; overflow-y: auto; margin: 4px 0 }
@@ -420,6 +429,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="battle-talk" hidden></div>
         <div class="panel" id="wave-banner" hidden></div>
         <div class="panel" id="battle-result" hidden></div>
+        <div class="panel" id="battle-menu" hidden></div>
       </section>
       <section id="scr-pull" class="screen">
         <div id="counts"></div>
@@ -1166,7 +1176,7 @@ function startHatch() {
   hatching = { list: r.hatched, i: 0, phase: "shake", start: performance.now(), summary: false };
   refreshTop();
   // A new line fills an empty slot of the active team, so a first squad grows with its hatches.
-  const squad = squadPick(), add = r.hatched.filter(h => h.fresh).map(h => h.species).filter(n => !squad.includes(n) && S.owned.includes(n));
+  const squad = squadPick(), add = [...new Set(r.hatched.filter(h => h.fresh).map(h => G.lineOf(h.species)))].filter(l => !squad.some(n => G.lineOf(n) === l) && S.lines[l]).map(formOf);
   if (squad.length < 8 && add.length) setSquad(squad.concat(add).slice(0, 8));
   $("#hatch").hidden = false;
   for (const id of EGG_SHOWN) $("#" + id).hidden = true;
@@ -1445,6 +1455,10 @@ function filtChanged(ctx) {
 }
 const lineForms = line => S.owned.filter(num => G.lineOf(num) === line);
 const tipOf = line => lineForms(line).sort((a, b) => G.stageOf(b) - G.stageOf(a) || a - b)[0] || line;
+// The form a line fights as: the one picked in the Dex (pref.forms), else its most evolved owned form.
+// Squads, presets and battles all go through it, so evolving updates every saved team.
+const formOf = line => { const f = pref.forms && pref.forms[line]; return f && S.owned.includes(f) && G.lineOf(f) === line ? f : tipOf(line); };
+function setForm(line, num) { pref.forms = pref.forms && typeof pref.forms === "object" ? pref.forms : {}; if (num) pref.forms[line] = num; else delete pref.forms[line]; keep(); rosterCache = null; }
 function dexActions(line) {
   const l = S.lines[line];
   if (!l) return [];
@@ -1454,7 +1468,8 @@ function dexActions(line) {
     const cost = G.costs.evolve[Math.min(G.stageOf(from), 2) - 1];
     // Short on candy is not off: choosing it offers to buy what is missing.
     list.push({ label: "Evolve: " + name(to), right: [cost, lineCandy(line)], cost, line,
-      about: "Evolve " + name(from) + " into " + name(to) + " for " + cost + " candy. Both stay in your dex.", run: () => G.evolve({ from, to }) });
+      about: "Evolve " + name(from) + " into " + name(to) + " for " + cost + " candy. Both stay in your dex; " + name(to) + " fights from now on.",
+      run: () => { const r = G.evolve({ from, to }); if (r.ok) { setForm(line, null); r.msg = name(from) + " evolved into " + name(to) + "!"; } return r; } });
   }
   const up = (kind, label, done, cost, about, blocked) => list.push({ label, right: done ? [check(true)] : [cost, lineCandy(line)],
     off: done || blocked, cost: done ? 0 : cost, line, about, run: () => G.upgrade({ line, kind }) });
@@ -1467,6 +1482,11 @@ function dexActions(line) {
     list.push({ label: "Skill: " + G.skillsOf(line)[used] + (kind ? " (" + kind.name + ")" : ""), off: open.length < 2,
       about: (kind ? kind.name + ": " + SKILL_ABOUT[kind.id] + ". " : "") + (open.length > 1 ? "Enter: switch to another unlocked skill." : "Hatch more of this line to unlock other skills."),
       run: () => { const msg = cycleSkill(tipOf(line)); return { ok: true, msg }; } });
+    // Which owned form fights in Squad and battle (the most evolved, unless picked here).
+    const forms = lineForms(line).sort((a, b) => G.stageOf(a) - G.stageOf(b) || a - b);
+    if (forms.length > 1) list.push({ label: "Fights as: " + name(formOf(line)), off: false,
+      about: "Squad and battle use " + name(formOf(line)) + ". Enter: switch to " + name(forms[(forms.indexOf(formOf(line)) + 1) % forms.length]) + ".",
+      run: () => { const next = forms[(forms.indexOf(formOf(line)) + 1) % forms.length]; setForm(line, next === tipOf(line) ? null : next); return { ok: true, msg: name(next) + " fights for this line now." }; } });
     const lv = T.state().levels[line] || 1, cap = capOf(line), more = nextCap(cap);
     // First in the list, so the cap shows without scrolling.
     list.unshift({ label: "Battle level" + (more ? " (evolve: " + more + ")" : ""), right: [lv + "/" + cap], off: true,
@@ -1543,6 +1563,7 @@ function runDex(action) {
   const r = action.run();
   refreshTop(); dexUpdate();
   if (!r.ok) say(REASONS[r.reason] || "Not now.");
+  else if (r.msg) say(r.msg);
 }
 // "Not enough candy: need 7 more. Use 280 coins?" (40 a candy, 50 a line a day, from the hub).
 function offerCandy(action, need) {
@@ -1913,7 +1934,9 @@ function milestoneGrid(td) {
   return grid;
 }
 const stageNow = () => onWeekly() ? T.state().challenge : stagesNow()[storyAt];
-const squadPick = () => (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num)).slice(0, 8);
+// The active team: one entry per line, each in its battle form (formOf), so an evolved line shows evolved.
+const squadPick = () => { const seen = new Set(); return (Array.isArray(pref.squad) ? pref.squad : []).filter(num => S.owned.includes(num))
+  .map(num => formOf(G.lineOf(num))).filter(num => !seen.has(G.lineOf(num)) && seen.add(G.lineOf(num))).slice(0, 8); };
 const stageStars = starIcons;
 // The plain enemies: flyers, exploders and armored ones get their own lines.
 function enemiesOf(stage) { return [...new Set(stage.waves.filter(w => !w[5] && !w[6] && !w[7] && !w[8]).map(w => w[1]))].map(name).join(", "); }
@@ -2144,7 +2167,9 @@ function joinedAt() {
 let rosterCache = null;
 function roster() {
   const units = [];
-  for (let i = 0; i < S.owned.length; i += 8) units.push(...T.squad(S.owned.slice(i, i + 8)));
+  // One card per line, in the form it fights as.
+  const forms = [...new Set(S.owned.map(G.lineOf))].map(formOf);
+  for (let i = 0; i < forms.length; i += 8) units.push(...T.squad(forms.slice(i, i + 8)));
   const v = filt("squad"), pick = squadPick(), when = joinedAt(), q = v.q.toLowerCase();
   const list = units.filter(u => (!v.cls || u.cls === v.cls) && v.types.every(t => u.types.includes(t)) &&
     (!v.tier || tierOf(u.num) === v.tier) && (!v.mine || pick.includes(u.num)) && (!q || name(u.num).toLowerCase().includes(q)));
@@ -2200,6 +2225,8 @@ function squadUpdate() {
   const stage = stageNow(), foes = stageFoes(stage), box = $("#squad-stage");
   const head = el("div", "line"); head.append(el("span", "", onWeekly() ? "Weekly" : stage.id), el("span", "dim", stage.name));
   if (onWeekly()) head.append(el("span", "gold", "Risk " + T.riskOf(riskPick())));
+  // Back to the stage list (Backspace or Esc, or click).
+  const back = keyLabel("Backspace", "Back"); back.style.marginLeft = "auto"; head.append(back);
   // What to bring rather than the whole foe list (that is in the stage preview, and on the
   // name's tooltip): a tank type and a damage type, then any special foes.
   head.title = "Foes: " + foes.types.join(", ");
@@ -2210,7 +2237,7 @@ function squadUpdate() {
   const row = el("div", "teams" + (teamCount() > 3 ? " many" : ""));
   Array.from({ length: teamCount() }, (_, i) => "Team " + (i + 1)).forEach((t, i) => {
     const b = el("span", (pref.team === i ? "on" : "") + (sq.zone === "head" && sq.head === i ? " at" : ""), t.replace("Team ", "T"));
-    b.dataset.team = i; b.title = t + ": " + (pref.squads[i].length ? pref.squads[i].map(name).join(", ") : "empty"); row.append(b);
+    b.dataset.team = i; b.title = t + ": " + (pref.squads[i].length ? pref.squads[i].filter(n => S.owned.includes(n)).map(n => name(formOf(G.lineOf(n)))).join(", ") : "empty"); row.append(b);
   });
   const go_ = el("span", "start" + (pick.length ? "" : " off") + (sq.zone === "head" && sq.head === teamCount() ? " at" : ""), "Start");
   go_.dataset.start = 1; row.append(go_);
@@ -2232,7 +2259,7 @@ function cycleSkill(num) {
   const line = G.lineOf(num), l = S.lines[line];
   if (!l || !G.setSkill) return "";
   const open = [0, 1, 2, 3].filter(i => l.skills[i]);
-  if (open.length < 2) return "Only one skill unlocked. Hatch more of this line for others.";
+  if (open.length < 2) return "One skill so far: hatch more for others.";
   const next = open[(open.indexOf(skillUsed(l)) + 1) % open.length];
   const r = G.setSkill({ line, skill: next });
   refreshTop();
@@ -2247,7 +2274,8 @@ function squadDetail(num) {
     if (sq.zone === "head") hint.append(keyLabel("Enter", sq.head === 3 ? "Start" : "Use team"), keyLabel("p", "Next team"));
     else hint.append(keyLabel("Enter", sq.zone === "slots" ? "Drop" : squadPick().includes((rosterCache || roster()).list[sq.at]?.num) ? "Drop" : "Add"), keyLabel("l", "Level up"), keyLabel("k", "Skill"));
   }
-  hint.style.whiteSpace = "nowrap";
+  // Key labels stay on one line; a note wraps, so a long one never runs off the panel.
+  if (!sq.note) hint.style.whiteSpace = "nowrap";
   if (!num) { box.replaceChildren(el("div", "title", "SQUAD"), el("div", "", squadPick().length + " of 8 picked"), hint); return; }
   const u = unitOf(num), row = G.dex[num - 1], c = T.classes[u.cls], l = S.lines[G.lineOf(num)] || {};
   const head = el("div", "title", name(num));
@@ -2323,6 +2351,23 @@ function squadKey(e) {
     if (sq.zone === "slots") { const num = squadPick()[sq.slot]; if (num) squadToggle(num); return; }
     if (list[sq.at]) squadToggle(list[sq.at].num);
   }
+}
+let sqDrag = null;
+function squadDrop(d, to) {
+  const pick = squadPick().slice();
+  if (d.from >= 0) {
+    // Slot to slot: swap (onto an empty slot past the end, it moves to the end).
+    if (to >= pick.length) pick.push(pick.splice(d.from, 1)[0]);
+    else [pick[d.from], pick[to]] = [pick[to], pick[d.from]];
+  } else {
+    const at = pick.findIndex(n => G.lineOf(n) === G.lineOf(d.num));
+    if (at >= 0) { if (to < pick.length) [pick[at], pick[to]] = [pick[to], pick[at]]; }
+    else if (to < pick.length) pick[to] = d.num;
+    else pick.push(d.num);
+  }
+  setSquad(pick.filter(Boolean));
+  sq.zone = "slots"; sq.slot = Math.min(to, pick.length - 1); sq.note = "";
+  squadUpdate();
 }
 function squadClick(e) {
   const sk = e.target.closest("[data-skill]");
@@ -2574,6 +2619,21 @@ function waveBanner(bt) {
 }
 // Tiles in range of a unit standing at (x, y): the engine's range is a radius in tiles.
 const inRange = (u, x, y) => { const out = []; for (let ty = 0; ty < T.H; ty++) for (let tx = 0; tx < T.W; tx++) if (Math.hypot(tx - x, ty - y) <= u.range) out.push([tx, ty]); return out; };
+// Inside a unit's own tile, along its top: the HP and skill bar, then the block pips under it.
+const MARK_H = 15;
+const unitBarAt = r => ({ x: Math.round(r.x + (TW - 36) / 2), y: Math.round(r.y + 1) });
+function unitMarks(g, b, o, r, now) {
+  const { x: bx, y: by } = unitBarAt(r);
+  if (o.block > 0) {
+    const n = o.block, held = b.enemies.filter(e => e.blockedBy === o.id).length, w = n * 7 - 2, x0 = Math.round(r.x + (TW - w) / 2), py = by + 10;
+    g.fillStyle = C.ink; g.fillRect(x0 - 1, py - 1, w + 2, 6);
+    for (let i = 0; i < n; i++) { g.fillStyle = i < held ? C.gold : SHADE.paper[0]; g.fillRect(x0 + i * 7, py, 5, 4); }
+  }
+  g.fillStyle = C.ink; g.fillRect(bx, by, 36, 8);
+  g.fillStyle = C.teal; g.fillRect(bx + 1, by + 1, Math.max(0, Math.round(34 * o.hp / o.maxHp)), 3);
+  g.fillStyle = C.gold; g.fillRect(bx + 1, by + 5, Math.round(34 * Math.min(1, o.sp / o.spMax)), 2);
+  if (o.sp >= o.spMax) { skillIcon ||= mapCanvas("skill", { k: C.ink, 1: C.gold }); g.drawImage(skillIcon, bx + 38, by); }
+}
 function tileRect(stage, x, y) {
   const high = tileAt(stage, x, y) === "H";
   return { x: MX + x * TW, y: MY + y * TH - (high ? RAISE : 0), high };
@@ -2796,6 +2856,19 @@ function drawField(now = performance.now()) {
   if (sel) showRange(sel, sel.x, sel.y);
   else if (hovered) showRange(hovered, hovered.x, hovered.y);
   else if (card && (bt.armed || bt.drag) && placeable(b, bt.slot, hov[0], hov[1])) showRange(card, hov[0], hov[1]);
+  // Flyers cross straight from their spawn to the goal, each on its own route: a dotted light
+  // blue line per route while any flyer is still to come or in the air, so snipers can go beside it.
+  if (b.queue.some(q => q.flying) || b.enemies.some(e => e.flying)) {
+    // Queued foes hold a route index; spawned ones hold the route itself.
+    const routes = new Set(b.queue.filter(q => q.flying).map(q => b.paths[q.path]).concat(b.enemies.filter(e => e.flying).map(e => e.path)));
+    for (const p of routes) {
+      if (!p || !p.length) continue;
+      const [ax, ay] = p[0], [zx, zy] = p[p.length - 1];
+      const x0 = MX + (ax + 0.5) * TW, y0 = MY + (ay + 0.5) * TH, x1 = MX + (zx + 0.5) * TW, y1 = MY + (zy + 0.5) * TH, len = Math.hypot(x1 - x0, y1 - y0);
+      for (let d = 0; d < len; d += 9) { const px = Math.round(x0 + (x1 - x0) * d / len) - 2, py = Math.round(y0 + (y1 - y0) * d / len) - 1;
+        g.fillStyle = C.ink; g.fillRect(px - 1, py - 1, 6, 5); g.fillStyle = C.sky; g.fillRect(px, py, 4, 3); }
+    }
+  }
   // Everyone, back to front.
   // Props stand on their floor tile's centre and sort with everyone else.
   const props = propsOf(st, set).map(p => ({ prop: p, o: {}, at: feet(st, p.x, p.y, false) }));
@@ -2804,7 +2877,7 @@ function drawField(now = performance.now()) {
   const ghostsNow = bt.ghosts.filter(gh => now - gh.t0 < FX_TIME.fade);
   bt.ghosts = ghostsNow;
   for (const gh of ghostsNow) drawMon(g, gh.img, gh.at[0], gh.at[1], { flip: gh.flip, alpha: 1 - (now - gh.t0) / FX_TIME.fade });
-  const drawn = [], bars = [], marks = [];
+  const drawn = [], bars = [], marks = [], unitBars = [];
   for (const t of things) {
     if (t.prop) { const img = t.prop.img; g.drawImage(img, Math.round(t.at[0] - img.naturalWidth / 2), Math.round(t.at[1] + 6 - img.naturalHeight)); continue; }
     const { o, unit, at } = t;
@@ -2821,9 +2894,14 @@ function drawField(now = performance.now()) {
     // A skill that is ready: a gold ring at the feet.
     if (unit && o.sp >= o.spMax) { g.fillStyle = C.gold; for (const [dx, w] of [[-14, 6], [8, 6]]) g.fillRect(Math.round(at[0] + dx), Math.round(groundY + 2), w, 1); g.fillRect(Math.round(at[0] - 10), Math.round(groundY + 3), 20, 1); }
     const flash = a.flash && now - a.flash < FX_TIME.flash;
-    const top = drawMon(g, img, cx, cy, { flip: unit ? false : facesRight(o), white: flash, maxH: unit && isHigh(st, o.x, o.y) ? HIGH_H : FIT_H });
-    // Block pips and stop bars go on top of every sprite, after this loop.
-    if (unit && o.block > 0) marks.push({ pips: o, x: at[0], y: groundY });
+    // A unit right in front of another (the tile behind it holds a unit) is drawn short enough
+    // to stop below the marks along the top of that tile.
+    let maxH = unit && isHigh(st, o.x, o.y) ? HIGH_H : FIT_H;
+    if (unit && o.y > 0 && b.units.some(v => v.x === o.x && v.y === o.y - 1)) maxH = Math.max(20, Math.min(maxH, Math.floor(cy - (tileRect(st, o.x, o.y - 1).y + MARK_H + 1))));
+    const top = drawMon(g, img, cx, cy, { flip: unit ? false : facesRight(o), white: flash, maxH });
+    // A unit's own marks (HP and skill bar, block pips) sit along the top of its own tile, drawn
+    // over every sprite after this loop (the unit in front is kept below them, above).
+    if (unit) { unitBars.push({ o, ...unitBarAt(tileRect(st, o.x, o.y)) }); if (o.block > 0) marks.push({ pips: o, own: true }); }
     if (!unit && o.blockedBy && !o.flying) marks.push({ stop: o, x: cx, y: groundY });
     if (lastRect) drawn.push({ o, unit, img, rect: lastRect, flip: unit ? false : facesRight(o) });
     // Exploder fuse, armor, boss marks.
@@ -2833,11 +2911,13 @@ function drawField(now = performance.now()) {
     // Fast foes: three speed lines trailing behind them.
     if (!unit && o.fast) { const back = facesRight(o) ? -1 : 1; g.fillStyle = C.paper;
       for (const [dy, w] of [[-14, 8], [-8, 12], [-2, 8]]) g.fillRect(Math.round(cx + back * 22 - (back < 0 ? w : 0)), Math.round(groundY + dy), w, 2); }
-    bars.push({ o, unit, x: Math.round(cx) - 18, y: top - 9 });
+    if (!unit) bars.push({ o, unit, x: Math.round(cx) - 18, y: top - 9 });
   }
+  for (const u of unitBars) unitMarks(g, b, u.o, tileRect(st, u.o.x, u.o.y), now);
   // A blocker: one pip per foe it can hold, gold for each it holds now (under its feet).
   // A blocked foe: a red stop bar on the side facing its blocker. Foes walking past have none.
   for (const m of marks) {
+    if (m.own) continue;
     if (m.pips) {
       const n = m.pips.block, held = b.enemies.filter(e => e.blockedBy === m.pips.id).length, w = n * 7 - 2, x0 = Math.round(m.x - w / 2), py = Math.round(m.y + 5);
       g.fillStyle = C.ink; g.fillRect(x0 - 2, py - 2, w + 4, 8);
@@ -2869,7 +2949,7 @@ function drawField(now = performance.now()) {
     if (bar.unit) { g.fillStyle = C.gold; g.fillRect(bx + 1, by + 5, Math.round(34 * Math.min(1, o.sp / o.spMax)), 2); }
     if (bar.unit && o.sp >= o.spMax) { skillIcon ||= mapCanvas("skill", { k: C.ink, 1: C.gold }); g.drawImage(skillIcon, bx + 38, by - 6); }
   }
-  bt.bars = placed.map((p, i) => ({ ...p, id: (bars[i].unit ? "u" : "e") + bars[i].o.id }));
+  bt.bars = placed.map((p, i) => ({ ...p, id: "e" + bars[i].o.id })).concat(unitBars.map(u => ({ x: u.x, y: u.y, h: 8, id: "u" + u.o.id, own: true })));
   // The dragged card's mon, at the cursor.
   if (bt.drag && bt.drag.at && card) drawMon(g, spriteFor(card.num, card.look), bt.drag.at[0], bt.drag.at[1] + 16, { alpha: 0.7 });
   // Effects: projectiles, bursts and numbers.
@@ -2993,6 +3073,13 @@ function battleHud() {
   const info = $("#deploy-info"); const en = el("span"); en.append(el("span", "dim", "Energy "), el("span", "num", Math.floor(b.energy)));
   const ul = el("span"); ul.append(el("span", "dim", "Units left "), el("span", "num", left));
   info.replaceChildren(en, ul);
+  // Rebuilt only when something on a card changes: a node swapped mid-click loses the click
+  // (the press lands on the old card and the release on the new one).
+  const cardKey = b.squad.map((u, i) => [b.units.some(o => o.slot === i), Math.ceil((b.cooldown[i] || 0) - b.t) > 0 ? Math.ceil((b.cooldown[i] || 0) - b.t) : 0,
+    b.energy < u.cost + (b.mods && b.mods.has && b.mods.has("cost") ? 3 : 0), i === bt.slot && bt.armed].join(",")).join("|");
+  const deck = $("#deploy");
+  if (deck.dataset.key === cardKey && deck.children.length) return battleTip(bt);
+  deck.dataset.key = cardKey;
   const cards = [];
   b.squad.forEach((u, i) => {
     const out = b.units.some(o => o.slot === i);
@@ -3009,7 +3096,11 @@ function battleHud() {
     else if (cool) card.append(el("div", "cool", cool + "s"));
     cards.push(card);
   });
-  $("#deploy").replaceChildren(...cards);
+  deck.replaceChildren(...cards);
+  battleTip(bt);
+}
+function battleTip(bt) {
+  const b = bt.b;
   // Bottom left: what to do now, or why that tile did not take.
   const sel = bt.selected && b.units.find(o => o.id === bt.selected);
   const why = { pick: "Pick a card first: click it, or drag it onto a tile.", cancel: "Cancelled: nothing placed.", energy: "Not enough energy yet.", tile: "That class cannot stand there.", taken: "Someone is already there.", cooldown: "Still on cooldown.", banned: "No medics this week.", full: "At most 6 on the field.", deployed: "Already on the field." }[bt.note];
@@ -3088,13 +3179,50 @@ function battleKey(e) {
     if (k === "Enter" || k === " ") { e.preventDefault(); bt.talk.shift(); battleTalk(); if (!bt.talk.length) { if (bt.done) showResult(); else { bt.paused = false; battleTips(); } } }
     return;
   }
-  if (bt.done) { if (k === "Enter" || k === " ") { e.preventDefault(); leaveBattle(); } return; }
+  if (bt.done) { if (k === "Enter" || k === " " || k === "Escape") { e.preventDefault(); leaveBattle(); } return; }
+  if (bt.menu) return menuKey(e);
+  if (k === "Escape") { e.preventDefault(); return openPauseMenu(); }
   if (k === " ") { e.preventDefault(); bt.paused = !bt.paused; return; }
   const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
   if (move) { e.preventDefault(); bt.cur = [Math.max(0, Math.min(T.W - 1, bt.cur[0] + move[0])), Math.max(0, Math.min(T.H - 1, bt.cur[1] + move[1]))]; bt.selected = b.units.find(o => o.x === bt.cur[0] && o.y === bt.cur[1]) ? bt.selected : null; return; }
   if (/^[1-8]$/.test(k)) { e.preventDefault(); if (b.squad[Number(k) - 1]) { bt.slot = Number(k) - 1; bt.cardTouched = true; bt.armed = true; } bt.selected = null; return; }
   if (k === "Enter") { e.preventDefault(); tileAction(bt.cur[0], bt.cur[1]); return; }
   if (k === "Backspace") { e.preventDefault(); bt.selected = null; }
+}
+/* ── The pause menu (Esc or the Pause button): Resume, Retry, Leave battle ── */
+const PAUSE_ROWS = [["resume", "Resume"], ["retry", "Retry"], ["leave", "Leave battle"]];
+function openPauseMenu() { const bt = battle; if (!bt || bt.done || bt.talk.length) return; bt.paused = true; bt.menu = { at: 0, sure: false }; drawPauseMenu(); }
+function closePauseMenu() { const bt = battle; if (!bt) return; bt.menu = null; bt.paused = false; $("#battle-menu").hidden = true; }
+function drawPauseMenu() {
+  const bt = battle, m = bt && bt.menu, box = $("#battle-menu");
+  if (!m) { box.hidden = true; return; }
+  const list = el("div", "rows");
+  PAUSE_ROWS.forEach(([id, label], i) => {
+    const r = el("div", "row" + (i === m.at ? " at" : ""));
+    r.append(el("span", i === m.at ? "gold" : "", (i === m.at ? "▶ " : "  ") + (id === "leave" && m.sure ? "Leave? It counts as a loss" : label)));
+    r.dataset.pause = id; list.append(r);
+  });
+  const keys = el("div", "klabels"); keys.append(keyLabel("Enter", m.sure ? "Yes, leave" : "Pick"), keyLabel("Escape", m.sure ? "No" : "Resume"));
+  box.replaceChildren(el("div", "title", "PAUSED"), list, keys);
+  box.hidden = false;
+}
+function pausePick(id) {
+  const bt = battle, m = bt && bt.menu;
+  if (!m) return;
+  if (id === "resume") return closePauseMenu();
+  if (id === "retry") { $("#battle-menu").hidden = true; battle = null; return startBattle(); }
+  if (id === "leave") {
+    if (!m.sure) { m.sure = true; m.at = 2; return drawPauseMenu(); }
+    // Leaving counts as a loss: the result is recorded (waves cleared still pay), then back to the stages.
+    $("#battle-menu").hidden = true; bt.menu = null; bt.b.over = "lose"; endBattle(); bt.talk = []; leaveBattle();
+  }
+}
+function menuKey(e) {
+  const m = battle.menu, k = e.key;
+  e.preventDefault();
+  if (k === "ArrowUp" || k === "ArrowDown") { m.at = (m.at + (k === "ArrowUp" ? 2 : 1)) % 3; m.sure = false; return drawPauseMenu(); }
+  if (k === "Enter" || k === " ") return pausePick(PAUSE_ROWS[m.at][0]);
+  if (k === "Escape" || k === "Backspace") { if (m.sure) { m.sure = false; return drawPauseMenu(); } return closePauseMenu(); }
 }
 function tileAction(x, y) {
   const bt = battle, b = bt.b;
@@ -3420,8 +3548,14 @@ function showCutNote(r) {
 function closeCutNote() { cutNote = null; $("#cut-note").hidden = true; refreshTop(); if (SCREENS[tab]) SCREENS[tab][0](); }
 function onKey(e) {
   if (cutNote) { if (["Enter", " ", "Escape", "Backspace"].includes(e.key)) { e.preventDefault(); closeCutNote(); } return; }
-  // Typing in the filter panel's name box is text, not keys.
-  if (e.target && e.target.tagName === "INPUT") return;
+  // Typing in the filter panel's name box is text, not keys (Esc still leaves the box).
+  if (e.target && e.target.tagName === "INPUT" && e.key !== "Escape") return;
+  // Esc never leaves Poké Gacha (the hub lets it through, like Civ Lite): it closes a
+  // popup, then goes back a screen; in battle it opens the pause menu.
+  if (e.key === "Escape") {
+    if (tutor && tutorStep()) { e.preventDefault(); tutorEnd(true); return; }
+    if (!battle) { const back = e; e = { key: "Backspace", target: back.target, preventDefault: () => back.preventDefault(), ctrlKey: false, metaKey: false, altKey: false }; }
+  }
   // With the panel open, Enter or Backspace closes it; other keys still reach the list behind.
   if (filtOpen && (e.key === "Enter" || e.key === "Backspace")) { e.preventDefault(); return closeFilters(); }
   if (tutor && tutorKey(e)) return;
@@ -3511,7 +3645,8 @@ if (!G) {
   $("#field").oncontextmenu = cancelPick;
   $("#deploy").oncontextmenu = cancelPick;
   $("#battle-hud").onclick = () => { if (battle && !battle.done && !battle.talk.length) battle.paused = !battle.paused; };
-  $("#unit-pop").onclick = e => { const t = e.target.closest("[data-pop]"); if (t) popAction(t.dataset.pop); };
+  // On press, not click: the popup can redraw between press and release.
+  $("#unit-pop").addEventListener("pointerdown", e => { const t = e.target.closest("[data-pop]"); if (t && e.button === 0) { e.preventDefault(); e.stopPropagation(); popAction(t.dataset.pop); } });
   // Drag a card onto the field: it follows the cursor, valid tiles light up, invalid ones dim,
   // and letting go on an invalid tile (or off the field) cancels.
   $("#deploy").addEventListener("pointerdown", e => {
@@ -3529,8 +3664,9 @@ if (!G) {
   });
   document.addEventListener("pointerup", e => {
     const bt = battle; if (!bt || !bt.press) return;
-    const drag = bt.drag; bt.press = null;
-    if (!drag) return;
+    const drag = bt.drag, press = bt.press; bt.press = null;
+    // A press and release on the cards without moving is a click: pick that card, or put it down.
+    if (!drag) { if (!bt.done && !bt.talk.length) { const i = press.slot; if (bt.armed && bt.slot === i) bt.armed = false; else { bt.slot = i; bt.selected = null; bt.cardTouched = true; bt.armed = true; } } return; }
     bt.drag = null; bt.dragged = true; setTimeout(() => { if (battle) battle.dragged = false; }, 0);
     // A good tile places it (or says energy or cooldown is short); a wrong tile, or off the field, cancels.
     const t = fieldPoint(e);
@@ -3541,12 +3677,38 @@ if (!G) {
   $("#field").onmousemove = e => { if (battle) battle.hover = fieldPoint(e); };
   $("#field").onmouseleave = () => { if (battle) battle.hover = null; };
   // The Squad screen: Start, team tabs, filter labels, slots, roster cards and skill picks.
-  $("#squad").onclick = e => storyMode === "squad" && !battle && squadClick(e);
-  $("#battle-pause").onclick = () => { if (battle && !battle.done && !battle.talk.length) battle.paused = !battle.paused; };
-  // Click a card to pick it (it lights up); click it again to put it down.
-  $("#deploy").onclick = e => { const c = e.target.closest("[data-slot]"); if (!c || !battle || battle.dragged) return;
-    const i = Number(c.dataset.slot); if (battle.armed && battle.slot === i) { battle.armed = false; return; }
-    battle.slot = i; battle.selected = null; battle.cardTouched = true; battle.armed = true; };
+  $("#squad").onclick = e => { if (sqDrag && sqDrag.moved) { sqDrag = null; return; } sqDrag = null; if (storyMode === "squad" && !battle) squadClick(e); };
+  // Drag a mon between the 8 slots to swap them, or from the roster onto a slot (it takes that
+  // slot; whoever was there leaves, or swaps if the dragged one was already in the team).
+  // The slot order is the deploy card order in battle.
+  $("#squad").addEventListener("pointerdown", e => {
+    if (storyMode !== "squad" || battle || e.button !== 0) return;
+    const c = e.target.closest("#squad-slots [data-slot], #squad-grid [data-at]");
+    if (!c) return;
+    const num = c.dataset.slot !== undefined ? squadPick()[Number(c.dataset.slot)] : (rosterCache || roster()).list[Number(c.dataset.at)]?.num;
+    if (num) sqDrag = { num, from: c.dataset.slot !== undefined ? Number(c.dataset.slot) : -1, x: e.clientX, y: e.clientY, moved: false };
+  });
+  document.addEventListener("pointermove", e => {
+    const d = sqDrag; if (!d) return;
+    if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) return;
+    if (!d.moved) { d.moved = true; d.ghost = mini(d.num, S.lines[G.lineOf(d.num)]?.look || "normal"); d.ghost.classList.add("drag-ghost"); $("#frame").append(d.ghost); }
+    const f = $("#frame").getBoundingClientRect(), k = f.width / 640;
+    Object.assign(d.ghost.style, { left: (e.clientX - f.left) / k - 20 + "px", top: (e.clientY - f.top) / k - 15 + "px" });
+    for (const n of document.querySelectorAll("#squad-slots .card")) n.classList.toggle("drop", n === document.elementFromPoint(e.clientX, e.clientY)?.closest("#squad-slots .card"));
+  });
+  document.addEventListener("pointerup", e => {
+    const d = sqDrag; if (!d || !d.moved) { if (d && !d.moved) sqDrag = null; return; }
+    if (d.ghost) d.ghost.remove();
+    const to = document.elementFromPoint(e.clientX, e.clientY)?.closest("#squad-slots [data-slot]");
+    if (to) squadDrop(d, Number(to.dataset.slot));
+    else squadUpdate();
+    // The click that follows this release is eaten by the handler above.
+    setTimeout(() => { sqDrag = null; }, 0);
+  });
+  // Paused: play on. Playing: pause and open the menu (Resume, Retry, Leave battle).
+  $("#battle-pause").onclick = () => { if (battle && !battle.done && !battle.talk.length) { if (battle.menu || battle.paused) closePauseMenu(); else openPauseMenu(); } };
+  $("#battle-menu").onclick = e => { const r = e.target.closest("[data-pause]"); if (r) pausePick(r.dataset.pause); };
+  // Click a card to pick it (it lights up); click it again to put it down: handled on pointerup above.
   $("#tutor-box").onclick = e => { if (e.target.closest("[data-skip]")) tutorSkipAll(); else if (tutorStep() && !tutorStep().done) tutorNext(); };
   $("#battle-talk").onclick = () => battle && battleKey({ key: "Enter", preventDefault() {} });
   $("#battle-result").onclick = () => battle && battle.done && !battle.talk.length && leaveBattle();

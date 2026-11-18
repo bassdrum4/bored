@@ -1207,6 +1207,96 @@ test('battle polish: a scene per chapter behind the field, a WAVE n/m banner as 
   assert.deepEqual(errors, []);
 });
 
+// Own these species (one old hatch each, 200 candy on the line).
+const ownMons = (game, nums) => game.evaluate(nums => {
+  const w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+  nums.forEach((n, i) => { w.entries['spend:own-' + n] = { at: 1 + i, g: { regular: 0 }, x: { m: 'move', e: [0], w: 0, n: 900 + i, d: '2026-11-01' } };
+    w.entries['hatch:own-' + n + '.0'] = { at: 2 + i, g: { ['candy:' + G.lineOf(n)]: 200 }, x: { s: n, t: 0, n: 1, k: 0 } }; });
+  parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); S = G.state(); rosterCache = null;
+}, nums);
+
+test('evolving changes the mon everywhere: Squad, saved teams and battle use the evolved form (or the one picked in the Dex)', async t => {
+  const { game, errors } = await openWithMons(t);
+  const [sneasel, weavile] = await game.evaluate(() => ['Sneasel', 'Weavile'].map(n => G.dex.findIndex(r => r[0] === n) + 1));
+  await ownMons(game, [sneasel]);
+  await game.evaluate(n => { teams(); setSquad([n]); pref.squads[1] = [n]; keep(); }, sneasel);
+  // Evolve from the Dex.
+  const msg = await game.evaluate(line => { go('dex'); const a = dexActions(line).find(x => /^Evolve/.test(x.label)); runDex(a); return document.querySelector('#msg').textContent; }, sneasel);
+  assert.match(msg, /Sneasel evolved into Weavile!/);
+  const after = await game.evaluate(() => ({ pick: squadPick(), team2: pref.squads[1].map(n => formOf(G.lineOf(n))), roster: (rosterCache = null, roster().list.filter(u => G.lineOf(u.num) === G.lineOf(squadPick()[0])).map(u => u.num)) }));
+  assert.deepEqual(after.pick, [weavile], 'the squad fights as Weavile');
+  assert.deepEqual(after.team2, [weavile], 'and so does a saved team');
+  assert.deepEqual(after.roster, [weavile], 'one roster card per line, in its battle form');
+  const unit = await game.evaluate(() => T.squad(squadPick())[0]);
+  assert.equal(unit.num, weavile);
+  assert.equal(unit.atk, await game.evaluate(w => T.squad([w])[0].atk, weavile), 'with Weavile\'s stats');
+  // The Dex can switch the line back to Sneasel.
+  await game.evaluate(line => { const a = dexActions(line).find(x => /^Fights as/.test(x.label)); runDex(a); }, sneasel);
+  assert.deepEqual(await game.evaluate(() => squadPick()), [sneasel], 'the picked form fights');
+  assert.deepEqual(errors, []);
+});
+
+test('Squad by mouse: drag between slots swaps them, a roster card dragged onto a slot takes it, and that order deploys', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { go('story'); storyMode = 'squad'; sq.zone = 'grid'; sq.at = 0; rosterCache = null; setSquad(roster().list.slice(0, 3).map(u => u.num)); storyUpdate(); });
+  const before = await game.evaluate(() => squadPick());
+  const mid = async sel => { const b = await (await game.$(sel)).boundingBox(); return [b.x + b.width / 2, b.y + b.height / 2]; };
+  const drag = async (from, to) => { const [ax, ay] = await mid(from), [bx, by] = await mid(to);
+    await tab.mouse.move(ax, ay); await tab.mouse.down(); await tab.mouse.move(ax + 10, ay + 10, { steps: 3 }); await tab.mouse.move(bx, by, { steps: 6 }); await tab.mouse.up(); await pause(60); };
+  await drag('#squad-slots [data-slot="0"]', '#squad-slots [data-slot="2"]');
+  assert.deepEqual(await game.evaluate(() => squadPick()), [before[2], before[1], before[0]], 'slot 1 and slot 3 swapped');
+  const newcomer = await game.evaluate(p => roster().list.find(u => !p.includes(u.num)).num, before);
+  const at = await game.evaluate(n => (rosterCache || roster()).list.findIndex(u => u.num === n), newcomer);
+  await drag('#squad-grid [data-at="' + at + '"]', '#squad-slots [data-slot="1"]');
+  const now = await game.evaluate(() => squadPick());
+  assert.equal(now[1], newcomer, 'a roster card dropped on a slot takes it');
+  assert.equal(now.length, 3);
+  assert.equal(await game.evaluate(() => !!document.querySelector('.drag-ghost')), false, 'the ghost is gone');
+  assert.deepEqual(await game.evaluate(() => T.squad(squadPick()).map(u => u.num)), now, 'deploy cards follow the slots');
+  assert.deepEqual(errors, []);
+});
+
+test('Esc stays in Poké Gacha: Squad goes back to the stages, battle opens Resume / Retry / Leave, and Leave counts as a loss', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { go('story'); storyAt = 0; storyMode = 'squad'; rosterCache = null; setSquad(roster().list.slice(0, 4).map(u => u.num)); squadUpdate(); });
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /Back/, 'a Back label on the squad screen');
+  await game.evaluate(() => onKey({ key: 'Escape', preventDefault() {}, target: document.body }));
+  assert.equal(await game.evaluate(() => storyMode), 'stages', 'Esc: back to the stage list');
+  await game.evaluate(() => { storyMode = 'squad'; squadStart(); battle.talk = []; battleTalk(); battle.paused = false; });
+  await game.evaluate(() => onKey({ key: 'Escape', preventDefault() {}, target: document.body }));
+  assert.deepEqual(await game.evaluate(() => [!!battle.menu, battle.paused, !document.querySelector('#battle-menu').hidden]), [true, true, true], 'Esc in battle: paused, with the menu');
+  assert.match(await game.$eval('#battle-menu', n => n.textContent), /Resume.*Retry.*Leave battle/);
+  await game.evaluate(() => onKey({ key: 'Escape', preventDefault() {}, target: document.body }));
+  assert.deepEqual(await game.evaluate(() => [!!battle.menu, battle.paused]), [false, false], 'Esc again resumes');
+  // Retry: a fresh battle on the same stage.
+  await game.evaluate(() => { openPauseMenu(); pausePick('retry'); });
+  assert.deepEqual(await game.evaluate(() => [!!battle, battle.b.t, battle.stage.id]), [true, 0, '1-1']);
+  // Leave asks first, then records a loss and goes back to the stages.
+  const runs = await game.evaluate(() => Object.keys(JSON.parse(parent.localStorage.getItem('bored.wallet')).entries).filter(k => k.startsWith('td:run:')).length);
+  await game.evaluate(() => { battle.talk = []; battleTalk(); openPauseMenu(); pausePick('leave'); });
+  assert.match(await game.$eval('#battle-menu', n => n.textContent), /counts as a loss/);
+  await (await game.$('#battle-menu [data-pause="leave"]')).click(); await pause(60);
+  assert.equal(await game.evaluate(() => battle), null, 'left');
+  assert.equal(await game.evaluate(() => Object.keys(JSON.parse(parent.localStorage.getItem('bored.wallet')).entries).filter(k => k.startsWith('td:run:')).length), runs + 1, 'the run is recorded');
+  assert.equal(await game.evaluate(() => T.state().best['1-1'] || 0), 0, 'as a loss');
+  assert.deepEqual(errors, []);
+});
+
+test('battle clicks survive a held press, unit marks stay in their own tile, and flyer routes are drawn', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  await game.evaluate(() => { go('story'); storyAt = 0; storyMode = 'squad'; rosterCache = null; setSquad(roster().list.slice(0, 4).map(u => u.num)); squadStart(); battle.talk = []; battleTalk(); battle.paused = false; battle.b.energy = 99; });
+  const b = await (await game.$('#deploy [data-slot="0"]')).boundingBox();
+  // A real click is held for a while; the cards redraw every frame.
+  await tab.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { delay: 150 }); await pause(40);
+  assert.equal(await game.evaluate(() => battle.armed), true, 'a 150 ms click still picks the card');
+  await game.evaluate(() => { const st = battle.stage; for (const [i, [x, y]] of [[0, [3, 1]], [1, [2, 0]], [2, [5, 0]]]) { battle.b.squad[i].ground = st.map[y][x] === '.'; T.deploy(battle.b, i, x, y); } });
+  await pause(200);
+  const off = await game.evaluate(() => (battle.bars || []).filter(p => p.own).filter(p => { const u = battle.b.units.find(o => 'u' + o.id === p.id), r = tileRect(battle.stage, u.x, u.y);
+    return p.x < r.x || p.x + 36 > r.x + TW || p.y < r.y || p.y + MARK_H > r.y + TH; }));
+  assert.deepEqual(off, [], 'every unit bar and its pips sit inside the unit\'s tile');
+  assert.deepEqual(errors, []);
+});
+
 test('battle by mouse only: drag a card to deploy (an invalid drop cancels), click card then tile, right-click cancels, popup Skill and Retreat, HUD pauses, poor cards show red, and a win', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.evaluate(() => {
