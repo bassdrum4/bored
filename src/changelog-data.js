@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 601,
+  "count": 602,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -25,6 +25,7 @@ export const CHANGELOG = [
   {"sha":"b1a3a5e","date":"2026-11-18","author":"Claude","subject":"Hub: repeat stage clears pay 15 coins, ten a day"},
   {"sha":"6ddd996","date":"2026-11-18","author":"Claude","subject":"Hub: chapters 5 and 6 (Archer, Giovanni), fast waves, and the ending"},
   {"sha":"9ad8d08","date":"2026-11-18","author":"Claude","subject":"Hub: skill choice per line and level caps that rise on evolve"},
+  {"sha":"a257150","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: multi-pull reveal board (eggs pop in, Epic/Legendary flash, NEW tags)","pr":236},
   {"sha":"d3ddee9","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: the guided 1-1's skill step is a 3s watch, not 20s","pr":235},
   {"sha":"7ece916","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: polish (one key-hint format, Squad filters as labels, 8px Quests padding)","pr":234},
   {"sha":"547e6e1","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: test that a type-matched squad at the page's Rec. Lv clears every stage","pr":233},
