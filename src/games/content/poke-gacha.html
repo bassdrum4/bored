@@ -203,6 +203,9 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Skills flow two to a line, and a long pair wraps onto a third line rather than being cut. */
 #squad-detail .skills { display: flex; flex-wrap: wrap; column-gap: 10px }
 #squad-detail .skills span, #squad-detail .stats span { white-space: nowrap }
+#squad-detail .skills span[data-skill] { cursor: pointer }
+/* The skill in use: underlined in the text's colour. */
+#squad-detail .skills .use { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px }
 #squad-detail .line { display: flex; align-items: center; gap: 4px; white-space: nowrap }
 /* A card: the mini sprite at 1x with its class icon top left and a check top right
    when it is in the squad; level bottom left, deploy cost bottom right. */
@@ -353,7 +356,7 @@ let tab = pref.tab || "pull", machine = pref.machine || "move", S = null;
 const name = num => G.dex[num - 1][0];
 const REASONS = { vouchers: "Not enough vouchers.", full: "Egg storage is full (99). Hatch some first.", inactive: "Your wallet is not open yet.",
   candy: "Not enough candy.", shards: "Not enough shards.", owned: "Already done.", order: "Cut the cost by 1 first.", locked: "That look is not unlocked.",
-  "not-owned": "You do not have that one yet." };
+  "not-owned": "You do not have that one yet.", cap: "At this form's level cap. Evolve it to raise the cap." };
 
 /* ── The palette, and pixel art drawn at 2x from it ────────────────────── */
 const C = { ink: "#1c1b2c", panel: "#2c2a44", red: "#c8372f", paper: "#f4f1ff", dim: "#807c9a", gold: "#e3ad2b", teal: "#3f9e8a", sky: "#8fd3e8" };
@@ -1029,6 +1032,17 @@ function dexActions(line) {
   up("passive", "Passive", l.passive, G.costs.passive, "Unlock this line's passive for tower defense.");
   up("cost1", "Cost -1", l.cost >= 1, G.costs.cost1, "Deploy this line for 1 less energy in tower defense.");
   up("cost2", "Cost -2", l.cost >= 2, G.costs.cost2, "Deploy for 2 less energy. Needs Cost -1 first.", l.cost < 1);
+  // Tower defense: which unlocked skill this line uses, and its level against the cap.
+  if (T && G.setSkill) {
+    const used = skillUsed(l), kind = skillKindOf(used), open = [0, 1, 2, 3].filter(i => l.skills[i]);
+    list.push({ label: "Skill: " + G.skillsOf(line)[used] + (kind ? " (" + kind.name + ")" : ""), off: open.length < 2,
+      about: (kind ? kind.name + ": " + SKILL_ABOUT[kind.id] + ". " : "") + (open.length > 1 ? "Enter switches to another unlocked skill." : "Hatch more of this line to unlock other skills."),
+      run: () => { const msg = cycleSkill(tipOf(line)); return { ok: true, msg }; } });
+    const lv = T.state().levels[line] || 1, cap = capOf(line), more = nextCap(cap);
+    // First in the list, so the cap shows without scrolling.
+    list.unshift({ label: "Battle level" + (more ? " (evolve: " + more + ")" : ""), right: [lv + "/" + cap], off: true,
+      about: "Level " + lv + " of " + cap + " in tower defense (coins buy levels in Squad). " + (more ? "Evolving this line raises the cap to " + more + "." : "This is the top cap.") });
+  }
   const looks = G.looksOf(l);
   list.push({ label: "Look: " + lookName(l.look), off: looks.length < 2,
     about: looks.length > 1 ? "Change the look this line wears here, in Pokédoku and as your buddy." : "Hatch it shiny to unlock another look.",
@@ -1561,24 +1575,51 @@ function squadUpdate() {
   // Detail
   squadDetail(sq.zone === "slots" ? pick[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null);
 }
+// Level caps rise as a line evolves (the hub decides: 5, 8, then 10 with a final form).
+const capOf = line => T && T.capOf ? T.capOf(line) : T.maxLevel;
+const nextCap = cap => (T.levelCaps || []).find(c => c > cap);
+// The four skill slots play differently (power and charge); the hub lists them.
+const SKILL_ABOUT = { steady: "the class's usual skill", quick: "charges 30% sooner at 80% power", heavy: "130% power, charges 35% slower", rare: "130% power at the usual charge" };
+const skillKindOf = k => (T.skillKinds || [])[k] || null;
+// The skill a line uses: the pick if it is unlocked, else the rare one if unlocked, else the first.
+const skillUsed = l => Number.isInteger(l.skill) && l.skills && l.skills[l.skill] ? l.skill : l.skills && l.skills[3] ? 3 : 0;
+function cycleSkill(num) {
+  const line = G.lineOf(num), l = S.lines[line];
+  if (!l || !G.setSkill) return "";
+  const open = [0, 1, 2, 3].filter(i => l.skills[i]);
+  if (open.length < 2) return "Only one skill unlocked. Hatch more of this line for others.";
+  const next = open[(open.indexOf(skillUsed(l)) + 1) % open.length];
+  const r = G.setSkill({ line, skill: next });
+  refreshTop();
+  const kind = skillKindOf(next);
+  return r.ok ? "Skill: " + G.skillsOf(num)[next] + (kind ? " (" + kind.name + ")" : "") : REASONS[r.reason] || "Not now.";
+}
 function squadDetail(num) {
   const box = $("#squad-detail");
   // One line of keys for where the cursor is, or what just went wrong.
   const hint = el("div", sq.note ? "gold" : "dim", sq.note || (sq.zone === "head" ? "Enter team or Start · P team" :
-    sq.zone === "slots" ? "Enter remove · L level up" : "Enter add · L level · S sort"));
+    sq.zone === "slots" ? "Enter remove · L level · K skill" : "Enter add · L level · K skill"));
   hint.style.whiteSpace = "nowrap";
   if (!num) { box.replaceChildren(el("div", "title", "SQUAD"), el("div", "", squadPick().length + " of 8 picked"), hint); return; }
   const u = unitOf(num), row = G.dex[num - 1], c = T.classes[u.cls], l = S.lines[G.lineOf(num)] || {};
   const head = el("div", "title", name(num));
   const kind = el("div", "line"); kind.append(classIcon(u.cls), c.name, el("span", "dim", "· " + row[1].replace("/", " / ")));
   const fight = el("div", "line"); fight.append("Range ", el("span", "num", u.range), ...(c.block ? [" · block ", el("span", "num", c.block)] : []), " · cost ", el("span", "num", u.cost));
-  const lv = T.state().levels[G.lineOf(num)] || 1;
-  const level = el("div", "line"); level.append("Lv ", el("span", "num", lv + "/" + T.maxLevel));
-  if (lv < T.maxLevel) level.append(" · next ", el("span", "num", T.levelCost(lv)), coin()); else level.append(el("span", "dim", " · max"));
+  // Level and its cap: the cap rises when the line evolves.
+  const lv = T.state().levels[G.lineOf(num)] || 1, cap = capOf(G.lineOf(num)), more = nextCap(cap);
+  const level = el("div", "line"); level.append("Lv ", el("span", "num", lv + "/" + cap));
+  if (lv < cap) level.append(" · next ", el("span", "num", T.levelCost(lv)), coin());
+  else level.append(el("span", "dim", more ? " · evolve for " + more : " · max"));
   const stats = el("div", "stats");
   [["HP", 2], ["Atk", 3], ["Def", 4], ["SpA", 5], ["SpD", 6], ["Spe", 7]].forEach(([k, i]) => { const s_ = el("span"); s_.append(el("span", "dim", k + " "), el("span", "", row[i])); stats.append(s_); });
   const skills = el("div", "skills");
-  G.skillsOf(num).forEach((sk, i) => skills.append(el("span", (l.skills && l.skills[i]) ? (i === 3 ? "gold" : "") : "dim", sk + (i === 3 ? "*" : ""))));
+  // The skill in use is marked; K (or a click) picks another unlocked one.
+  const used = skillUsed(l);
+  G.skillsOf(num).forEach((sk, i) => {
+    const open = l.skills && l.skills[i], n = el("span", (open ? (i === 3 ? "gold" : "") : "dim") + (open && i === used ? " use" : ""), sk + (i === 3 ? "*" : ""));
+    if (open) { n.dataset.skill = i; n.title = (skillKindOf(i)?.name || "") + ": " + (SKILL_ABOUT[skillKindOf(i)?.id] || ""); }
+    skills.append(n);
+  });
   box.replaceChildren(head, kind, fight, level, stats, skills, hint);
 }
 function squadToggle(num) {
@@ -1601,7 +1642,13 @@ function squadKey(e) {
   if (k === "Backspace") { e.preventDefault(); sq.note = ""; storyMode = "stages"; return storyUpdate(); }
   if (k === "l" || k === "L") {
     const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null;
-    if (num) { const r = T.levelUp({ line: G.lineOf(num) }); refreshTop(); sq.note = r.ok ? "" : r.reason === "coins" ? "Not enough coins." : "Already at max level."; squadUpdate(); }
+    if (num) { const r = T.levelUp({ line: G.lineOf(num) }); refreshTop(); sq.note = r.ok ? "" : r.reason === "coins" ? "Not enough coins." : r.reason === "cap" ? "Level cap. Evolve to raise it." : "Already at max level."; squadUpdate(); }
+    return;
+  }
+  if (k === "k" || k === "K") {
+    e.preventDefault();
+    const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null;
+    if (num) { sq.note = cycleSkill(num); rosterCache = null; squadUpdate(); }
     return;
   }
   const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
@@ -1627,6 +1674,13 @@ function squadKey(e) {
   }
 }
 function squadClick(e) {
+  const sk = e.target.closest("[data-skill]");
+  if (sk) {
+    const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? (rosterCache || roster()).list[sq.at]?.num : null, line = num && G.lineOf(num);
+    if (num && G.setSkill) { const k = Number(sk.dataset.skill), r = G.setSkill({ line, skill: k }); refreshTop(); rosterCache = null;
+      sq.note = r.ok ? "Skill: " + G.skillsOf(num)[k] + " (" + skillKindOf(k).name + ")" : r.reason === "owned" ? "" : REASONS[r.reason] || ""; squadUpdate(); }
+    return;
+  }
   const t = e.target.closest("[data-slot],[data-at],[data-key],[data-team],[data-start]");
   if (!t) return;
   if (t.dataset.key) return cycleSquad(t.dataset.key);
