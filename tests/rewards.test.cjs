@@ -16,7 +16,7 @@ function moduleUnderTest(file, names, injections = {}) {
 const { dailyDate, dailyStreak } = moduleUnderTest('src/daily.js', ['dailyDate', 'dailyStreak']);
 const rewards = moduleUnderTest('src/hub/rewards.js', [
   'mergeWallet', 'walletBalance', 'activateWallet', 'observeSnapshot', 'grantOnce',
-  'spendFrom', 'buyRegular', 'walletTrophies', 'walletStats'
+  'spendFrom', 'buyRegular', 'walletTrophies', 'walletStats', 'walletTrophyList'
 ], { dailyDate, dailyStreak, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const { mergeWallet, walletBalance, activateWallet, observeSnapshot, grantOnce, spendFrom, buyRegular, walletTrophies } = rewards;
 
@@ -232,4 +232,17 @@ test('the Poké Idle daily boss pays once a day, and five weekday wins in a row 
   assert.ok(observeSnapshot(activateWallet({}, at(17)).wallet, 'poke-idle', idle({ boss: { date: day(16), won: true } }), at(17)).wallet.entries['pi:boss:' + day(16)]);
   assert.equal(observeSnapshot(activateWallet({}, at(18)).wallet, 'poke-idle', idle({ boss: { date: day(16), won: true } }), at(18)).wallet.entries['pi:boss:' + day(16)], undefined);
   assert.equal(grantOnce(w, 'pi:boss:' + day(28), { coins: 150 }).changed, false, 'pi: ids are the hub\'s own');
+});
+
+test('the trophy list has every trophy with its progress, and an earned one shows full', () => {
+  let w = observe(on(), 'poke-idle', idle({ caught: 0 }));
+  w = observe(w, 'poke-idle', idle({ caught: 60 }));
+  const list = rewards.walletTrophyList(w, TODAY);
+  assert.equal(list.length, 28, 'every trophy, earned or not');
+  assert.deepEqual([...new Set(list.map(t => t.game))], ['poke-idle', 'pokedoku']);
+  const at = id => { const t = list.find(x => x.id === id); return [t.have, t.need, t.done]; };
+  assert.deepEqual(at('pi-caught-50'), [50, 50, true], 'earned: full');
+  assert.deepEqual(at('pi-caught-150'), [60, 150, false], 'in progress');
+  assert.deepEqual(at('doku-10'), [0, 10, false]);
+  assert.equal(list.filter(t => t.done).length, walletTrophies(w).length, 'done matches the earned list');
 });
