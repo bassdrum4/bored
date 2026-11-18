@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 615,
+  "count": 617,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -14,6 +14,8 @@ export const CHANGELOG = [
   {"sha":"c3b7db3","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battle readability (high units on their block, block pips, stop bars on held foes)","pr":248},
   {"sha":"7cdddb6","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: cut the egg roster to 208 lines, with a one-time refund"},
   {"sha":"de46ff9","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: one filter panel for the Dex, Squad and candy picker (type grid of two, class and tier chips, sort, name search, Clear)","pr":245},
+  {"sha":"b42557d","date":"2026-11-18","author":"Claude","subject":"Hub: candyOffer in the test list on a line of its own"},
+  {"sha":"3fad064","date":"2026-11-18","author":"Claude","subject":"Hub: buy candy by count (40 coins each, 50 per line a day), with an offer for the missing-candy prompt"},
   {"sha":"b1332c5","date":"2026-11-18","author":"Codebuff","subject":"Krillion: sort the daily dive against the population, and fix Puffer Party's turn lag"},
   {"sha":"f51d1e4","date":"2026-11-18","author":"Claude","subject":"Hub: G.bossStreak() for the Trainer card (weekday boss wins in a row)"},
   {"sha":"b743da9","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: roster cut draft for review (552 → 203 lines, no game changes)"},
