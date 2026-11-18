@@ -1,7 +1,8 @@
 -- Feedback for Bored: one table for free-form notes and the optional 1-5
 -- enjoyment rating. It replaces the old public.feedback and
--- public.enjoyment_feedback tables, which 20261118130000_unified_feedback.sql
--- copied here and moved to bored_archive.
+-- public.enjoyment_feedback tables: 20261118130000_unified_feedback.sql copied
+-- their rows here, then 20261118150000_drop_legacy_feedback_tables.sql removed
+-- them.
 --
 -- Paste this into the Supabase SQL editor, or run:
 --   npm run feedback:setup            # shows the table's state and this SQL
