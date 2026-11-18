@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 606,
+  "count": 607,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"d9ff1c4","date":"2026-11-18","author":"Vettel Xu","subject":"Hub: Poké Gacha stage levels from the balance pass; 1-6, 1-7 and 3-6 waves where type matters","pr":241},
   {"sha":"1337c76","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: battle polish (chapter scenery, WAVE n/m banner, stars that pop in)","pr":239},
   {"sha":"945f98d","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: mouse support everywhere (a clickable label for every key)","pr":240},
   {"sha":"afb8601","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha: Dex depth (evolution chain with owned forms, class, range, cost, base stat bars)","pr":238},
