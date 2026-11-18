@@ -386,6 +386,25 @@ export function recordBest(slug, snapshot, options) {
   return true;
 }
 
+/**
+ * The best number this page could post right now, which is how telemetry
+ * corroborates the shared board. A snapshot game reports the live run; a page
+ * that feeds a second board (Poké Gacha's weekly challenge) reports that board
+ * too; and the native games that keep their own storage key report the best
+ * they have saved, because they have no snapshot for anyone to read.
+ */
+export function reportedValue(slug, snapshot) {
+  let best = scoreValue(slug, snapshot);
+  for (const id of boardsOn(slug)) {
+    if (id !== slug) best = Math.max(best, scoreValue(id, snapshot));
+  }
+  if (!best) {
+    const legacy = LEGACY_GAMES.find(game => game.id === slug);
+    if (legacy) best = bestValue(legacy);
+  }
+  return best;
+}
+
 /* ── Syncing to the shared board ───────────────────────────────────────────── */
 
 let postedListener = () => {};
@@ -432,10 +451,11 @@ export async function syncScores() {
     if (!score || !Number.isFinite(score)) continue;
     score = Math.round(score);
     const rule = scoreRules.get(game.id);
+    const floor = Number.isFinite(game.min) ? game.min : rule?.min_value;
     const ceiling = Number.isFinite(game.max) ? game.max : rule?.max_value;
     // Stored scores can come from older clients or a cloud restore; apply
     // the same bounds at upload time as when capturing new gameplay.
-    if (score <= 0 || (Number.isFinite(game.min) && score < game.min) ||
+    if (score <= 0 || (Number.isFinite(floor) && score < floor) ||
         (Number.isFinite(ceiling) && score > ceiling)) continue;
     const previous = Number(submitted[game.id]);
     if (Number.isFinite(previous) && previous > 0 &&

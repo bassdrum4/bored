@@ -324,7 +324,7 @@ test('account UI and score sync still work through the redesigned hub (mock back
     }
     if (url.pathname === '/rest/v1/daily_leaderboard') return reply([]);
     if (url.pathname === '/rest/v1/buddy_board') return reply([]);
-    if (url.pathname === '/rest/v1/feedback' && method === 'POST') { notes.push(JSON.parse(request.postData())); return reply(null); }
+    if (url.pathname === '/rest/v1/feedback_entries' && method === 'POST') { notes.push(JSON.parse(request.postData())); return reply(null); }
     if (url.pathname === '/auth/v1/logout') return reply(null);
     unexpected.push(method + ' ' + url.pathname);
     return request.abort();
@@ -372,6 +372,10 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.waitForFunction(() => document.querySelector('#grid [data-slug="lights-out"] .card-best')?.textContent.includes('rival'));
   assert.equal(await page.$eval('#grid [data-slug="lights-out"] .card-best', el => el.textContent), 'Best 9 boards · rival');
   assert.equal(await page.$eval('#grid [data-slug="8ball"]', card => card.querySelector('.card-best')), null);
+  // The tooltip exists only when the refreshed board carries both rows. The
+  // byline above is already true from the pre-score fetch, so wait for the
+  // wrap itself rather than reading the card mid-repaint.
+  await page.waitForFunction(() => document.querySelector('#grid [data-slug="lights-out"] .card-best-wrap'));
   const detail = await page.$eval('#grid [data-slug="lights-out"] .card-best-wrap', node => ({
     count: node.querySelectorAll('.card-best-tip-row').length,
     names: [...node.querySelectorAll('.card-best-tip-name')].map(el => el.textContent)
@@ -409,7 +413,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.click('#feedback-submit');
   await page.waitForFunction(() => document.querySelector('#feedback-open').textContent.includes('Thanks'));
   assert.equal(notes.length, 1, 'feedback posts once');
-  assert.equal(notes[0].message, 'Snake ate my whole afternoon.');
+  assert.equal(notes[0].kind, 'note');
+  assert.equal(notes[0].body, 'Snake ate my whole afternoon.');
   assert.equal(notes[0].email, 'tester@example.test', 'a signed-in sender gets a reply address filled in');
   assert.equal(notes[0].handle, 'tester');
   await page.click('#account-action');

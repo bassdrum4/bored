@@ -12,7 +12,7 @@ import {
 } from './hub/backend.js';
 import {
   LB_GAMES, HIGH_SCORE_GAMES, accountStandings, rankPoints, boardGames,
-  isLocalOnly, bestValue, formatScore, recordBest, scoreValue, boardsOn,
+  isLocalOnly, bestValue, formatScore, recordBest, scoreValue, reportedValue, boardsOn,
   syncScores, onScoresPosted, boardLeaders
 } from './hub/scores.js';
 import { pullPlayerState, pushPlayerState, cloudScoreKey } from './hub/cloud.js';
@@ -151,7 +151,7 @@ function closeMenu(options) {
   setMenu(false, options);
 }
 
-const analytics = createAnalytics({ frame: gameFrame, snapshot: snapshotFor, score: scoreValue, isLower: slug => !!LB_GAMES.find(g => g.id === slug)?.lower, paused: () => !menuPanel.hidden });
+const analytics = createAnalytics({ frame: gameFrame, snapshot: snapshotFor, score: reportedValue, isLower: slug => !!LB_GAMES.find(g => g.id === slug)?.lower, paused: () => !menuPanel.hidden });
 window.addEventListener('bored:together-telemetry', event => analytics.track(event.detail?.kind, event.detail));
 const enjoyment = createEnjoymentUI({ analytics });
 gameFrame.addEventListener('load', () => { if (activeSlug) analytics.ready(!!EXTERNS[activeSlug]); });

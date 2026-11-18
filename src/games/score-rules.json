@@ -2,7 +2,7 @@
   "2048": {
     "label": "Score",
     "better": "high",
-    "max_value": 10000000
+    "max_value": 4000000
   },
   "aim-lab": {
     "label": "Total hits over Normal + Blindfire",
@@ -47,6 +47,7 @@
   "circuit": {
     "label": "Seconds for a three-lap race",
     "better": "low",
+    "min_value": 15,
     "max_value": 3600
   },
   "clicker": {
@@ -77,6 +78,7 @@
   "downhill-mayhem": {
     "label": "Fastest Classic mountain race on Mayhem difficulty (seconds)",
     "better": "low",
+    "min_value": 15,
     "max_value": 3600
   },
   "frogger": {
@@ -102,21 +104,25 @@
   "mahjong": {
     "label": "Seconds to clear all 144 tiles",
     "better": "low",
+    "min_value": 60,
     "max_value": 86400
   },
   "memory": {
     "label": "Fewest moves to finish a board",
     "better": "low",
+    "min_value": 8,
     "max_value": 10000
   },
   "minesweeper": {
     "label": "Seconds to clear a board",
     "better": "low",
+    "min_value": 2,
     "max_value": 99999
   },
   "minigolf": {
     "label": "Strokes over nine holes",
     "better": "low",
+    "min_value": 9,
     "max_value": 9999
   },
   "pac-man": {
@@ -127,6 +133,7 @@
   "photo-puzzle": {
     "label": "Fastest 4x4 solve on an uploaded picture",
     "better": "low",
+    "min_value": 8,
     "max_value": 3600
   },
   "poke-idle": {
@@ -167,11 +174,13 @@
   "quickdraw": {
     "label": "Solo reaction time (ms)",
     "better": "low",
+    "min_value": 10,
     "max_value": 2000
   },
   "risk": {
     "label": "Fewest human turns to conquer the world vs CPU",
     "better": "low",
+    "min_value": 3,
     "max_value": 999
   },
   "scrabble": {
@@ -202,6 +211,7 @@
   "solitaire": {
     "label": "Seconds to clear all 52 cards",
     "better": "low",
+    "min_value": 20,
     "max_value": 86400
   },
   "space-invaders": {
@@ -247,6 +257,7 @@
   "typing-test": {
     "label": "Words per minute",
     "better": "high",
+    "min_value": 5,
     "max_value": 300
   },
   "void-runner": {
@@ -267,6 +278,7 @@
   "wordle": {
     "label": "Guesses to solve",
     "better": "low",
-    "max_value": 99
+    "min_value": 1,
+    "max_value": 6
   }
 }

@@ -4,7 +4,7 @@ import { ORDER } from '../games/catalog.js';
 import { summarizeEvents, summarizeEngagement, eventsCSV, excludeAdmins } from './analytics-data.js';
 const $ = selector => document.querySelector(selector);
 const announcementAdmin = createAnnouncementAdmin();
-let events = [], productEvents = [], surveyRows = [], togetherSummary = null, aggregateSummary = null, aggregateCohorts = [], handles = {}, report = null, page = 0, loading = false, epoch = 0;
+let events = [], productEvents = [], feedbackRows = [], togetherSummary = null, aggregateSummary = null, aggregateCohorts = [], handles = {}, report = null, page = 0, loading = false, epoch = 0;
 const names = { ...Object.fromEntries(ORDER), 'f-14': 'F-14 Simulator' }, PAGE_SIZE = 40, MAX_EVENTS = 20000;
 const duration = ms => ms >= 3600000 ? (ms / 3600000).toFixed(1) + ' h' : ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
 const dateTime = iso => new Date(iso).toLocaleString([], { timeZone: 'America/Detroit', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -57,7 +57,7 @@ const gameColumns = ['Game','Sessions','Accounts','Active time','Visible time','
 function renderEngagement(rows) {
   const selected = $('#person').value;
   const products = productEvents.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
-  const feedback = surveyRows.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
+  const feedback = feedbackRows.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
   const data = summarizeEngagement(rows, products, feedback, new Date(detroitMidnight(shiftDay($('#through').value, 1)) - 1));
   const percent = (numerator, denominator) => denominator ? Math.round(numerator / denominator * 100) + '%' : 'Not enough history';
   const stats = [
@@ -102,10 +102,35 @@ function renderEngagement(rows) {
     ['Positive (4 or 5)',data.survey.positive],
     ['Positive share',percent(data.survey.positive,data.survey.responses)]];
   table('#engagement-feedback',['Measure','Value'],sentiment);
-  table('#engagement-comments',['Date','Rating','Comment'],feedback
-    .filter(row => typeof row.comment === 'string' && row.comment.trim())
-    .slice(-25).reverse()
-    .map(row => [dateTime(row.created_at),row.rating,row.comment]));
+  table('#engagement-comments',['Date','Type','Rating','Player','Game','Feedback',''],feedback
+    .slice(-50).reverse()
+    .map(row => [
+      dateTime(row.created_at),
+      row.kind === 'rating' ? 'Rating' : 'Note',
+      row.kind === 'rating' ? row.rating : '—',
+      row.user_id ? (handles[row.user_id] || row.handle || row.user_id.slice(0, 8)) : (row.handle || 'Guest'),
+      row.game ? (names[row.game] || row.game) : '—',
+      row.body || '',
+      action('Delete', () => void deleteFeedback(row))
+    ]));
+}
+
+// Deletion is admin-only in the database too: the delete policy asks
+// is_analytics_admin(), so this button cannot remove a row for anyone else.
+async function deleteFeedback(row) {
+  if (!window.confirm('Delete this feedback? This cannot be undone.')) return;
+  try {
+    const session = await freshSession();
+    if (!session?.access_token) throw new Error('Sign in again to delete feedback.');
+    await request('/rest/v1/feedback_entries?id=eq.' + encodeURIComponent(row.id), {
+      method: 'DELETE', token: session.access_token
+    });
+    feedbackRows = feedbackRows.filter(item => item.id !== row.id);
+    render();
+    $('#status').textContent = 'Feedback deleted.';
+  } catch (error) {
+    $('#status').textContent = error.message || 'Could not delete that feedback.';
+  }
 }
 
 /** Flight-specific aggregates use the same admin-protected events as Bored.
@@ -313,7 +338,7 @@ async function load() {
     const [productLoaded,feedbackLoaded,authoritativeTogether,serverRollup,serverCohorts] = await Promise.all([
       request('/rest/v1/product_events?select=*&received_at=gte.' + start.toISOString() +
         '&received_at=lt.' + end.toISOString() + '&order=received_at.asc&limit=20000'),
-      request('/rest/v1/enjoyment_feedback?select=*&created_at=gte.' + start.toISOString() +
+      request('/rest/v1/feedback_entries?select=*&created_at=gte.' + start.toISOString() +
         '&created_at=lt.' + end.toISOString() + '&order=created_at.asc&limit=20000'),
       request('/rest/v1/rpc/analytics_together_summary',{method:'POST',
         body:{p_from:start.toISOString(),p_to:end.toISOString()}}),
@@ -332,7 +357,7 @@ async function load() {
     events = [...loaded,...flightLoaded].filter(e => allowed.has(e))
       .sort((a,b) => a.received_at.localeCompare(b.received_at) || a.id.localeCompare(b.id));
     productEvents = productLoaded.filter(e => allowed.has(e));
-    surveyRows = feedbackLoaded.filter(e => allowed.has(e));
+    feedbackRows = feedbackLoaded.filter(e => allowed.has(e));
     togetherSummary = authoritativeTogether;
     aggregateSummary = serverRollup;
     aggregateCohorts = Array.isArray(serverCohorts) ? serverCohorts : [];
@@ -349,7 +374,7 @@ async function load() {
       events.length.toLocaleString() + ' player events loaded · refreshed ' + dateTime(cutoff) + emptyReason +
       (excluded ? ' · ' + excluded.toLocaleString() + ' staff/admin events recorded and excluded' : '');
   } catch (error) {
-    events = []; productEvents = []; surveyRows = []; togetherSummary = null; aggregateSummary = null; aggregateCohorts = []; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
+    events = []; productEvents = []; feedbackRows = []; togetherSummary = null; aggregateSummary = null; aggregateCohorts = []; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
     if (authorized) render();
     $('#status').textContent = error.message || 'Could not load analytics. Try again.';
   } finally { loading = false; $('#refresh').disabled = false; }
@@ -377,5 +402,5 @@ $('#export').onclick = () => {
   const link = el('a'); link.href = url; link.download = 'bored-activity.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 // Clear sensitive DOM when a different tab signs out or switches account.
-window.addEventListener('storage', event => { if (event.key === 'bored.session') { epoch++; events = []; productEvents = []; surveyRows = []; togetherSummary = null; report = null; $('#dashboard').replaceChildren(); $('#dashboard').hidden = true; $('#status').textContent = 'Account changed. Reload to check access again.'; } });
+window.addEventListener('storage', event => { if (event.key === 'bored.session') { epoch++; events = []; productEvents = []; feedbackRows = []; togetherSummary = null; report = null; $('#dashboard').replaceChildren(); $('#dashboard').hidden = true; $('#status').textContent = 'Account changed. Reload to check access again.'; } });
 void load();

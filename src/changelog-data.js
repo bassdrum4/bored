@@ -2,19 +2,37 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 579,
-  "newest": "2026-11-17",
+  "count": 597,
+  "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"45efa85","date":"2026-11-18","author":"Codebuff","subject":"Make Trackmania's medals earnable and teach Poké Gacha's loop."},
+  {"sha":"d0f379b","date":"2026-11-18","author":"Codebuff","subject":"Skip the score-bounds migration when score_rules is absent."},
+  {"sha":"efaa1cd","date":"2026-11-18","author":"Codebuff","subject":"Bound every leaderboard board and record each submission."},
+  {"sha":"880116e","date":"2026-11-18","author":"Codebuff","subject":"Drop the archived copies of the old feedback tables."},
+  {"sha":"80bc59c","date":"2026-11-18","author":"Codebuff","subject":"Keep the feedback migration safe for the minimal Together database."},
+  {"sha":"656da92","date":"2026-11-18","author":"Codebuff","subject":"Unify feedback into one table and expire stale Together invites."},
+  {"sha":"b5e8b81","date":"2026-11-18","author":"Codebuff","subject":"Auto-merge the Poké Gacha modules and stop a card-tooltip test racing the board refresh."},
+  {"sha":"1c87739","date":"2026-11-18","author":"Codebuff","subject":"Docs: make README and AGENTS.md match the current catalog"},
+  {"sha":"ff7c2e1","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: coin shop rows, a candy line picker, a confirm step, more squad presets"},
+  {"sha":"f18e236","date":"2026-11-18","author":"Claude","subject":"Hub: coin shop presets are 500 then 1000, up to 5 in all"},
+  {"sha":"e73ccb2","date":"2026-11-18","author":"Claude","subject":"Hub: coin shop for candy, shards and squad preset slots"},
+  {"sha":"0ef4fa8","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: tileset loader for the battle field"},
+  {"sha":"28367e3","date":"2026-11-18","author":"Claude","subject":"Hub: mythicals hatch from Legendary eggs"},
+  {"sha":"b1a3a5e","date":"2026-11-18","author":"Claude","subject":"Hub: repeat stage clears pay 15 coins, ten a day"},
+  {"sha":"6ddd996","date":"2026-11-18","author":"Claude","subject":"Hub: chapters 5 and 6 (Archer, Giovanni), fast waves, and the ending"},
+  {"sha":"9ad8d08","date":"2026-11-18","author":"Claude","subject":"Hub: skill choice per line and level caps that rise on evolve"},
+  {"sha":"70e6a47","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: new-player run-through (loop hands over to Pull, Squad clicks, Skip everywhere)","pr":232},
   {"sha":"49cf7d4","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: tileset loader for the battle field","pr":224},
   {"sha":"c94a9e1","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: Quests redo with sub-tabs, progress bars and real reward icons","pr":216},
   {"sha":"4b1ca95","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: chapters 5-6 on the page: fast foes, a tidy preview, the ending","pr":221},
   {"sha":"d88a531","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: sound, off until turned on","pr":215},
   {"sha":"fe002d3","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: pick a skill (K), and the level cap in Squad and Dex","pr":219},
   {"sha":"8fea3f1","date":"2026-11-17","author":"Codebuff","subject":"Poké Idle: the Dex survives the Training area"},
+  {"sha":"340eb0d","date":"2026-11-17","author":"Claude","subject":"Hub: report progress for weekly missions and every trophy"},
   {"sha":"9042c33","date":"2026-11-17","author":"Claude","subject":"Poké Gacha: Vettel's SP skins, with sets, line drops and size prices"},
   {"sha":"26cfeeb","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha Dex: the type filter finds caught lines only","pr":213},
   {"sha":"9d5d8f5","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha Dex: hide uncaught names, silhouette detail with its egg, candy in words","pr":212},

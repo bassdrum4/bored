@@ -1110,6 +1110,18 @@ const boxOverlap = (a, b, slack) => {
 };
 
 /* ── track assembly ───────────────────────────────────────────────────────── */
+
+// Author times are the author-medal target, and they were set from a clean line
+// at about two thirds of the car's top speed: an ordinary lap collected the
+// hardest medal. AUTHOR_PACE pulls every published time in 15%, which puts the
+// author medal on a genuinely tidy lap rather than a finished one. The gold
+// rung is tightened with it, so the ladder does not just move the top step.
+const AUTHOR_PACE = 0.85;
+// The daily ribbon is a different length every day, so its author time cannot be
+// a constant: it comes from the length the seed produced, at a hard but
+// holdable pace. The old flat 30 seconds made every daily medal trivial.
+const DAILY_PACE = 42;
+
 function buildTrack(typeIds, meta) {
   const road = meshNew(), scenery = meshNew();
   const triggers = [], boxes = [], chain = [];
@@ -1190,18 +1202,27 @@ function buildTrack(typeIds, meta) {
   }
   const mass = flat.reduce((soFar, p) => [soFar[0] + p[0], soFar[1] + p[1], soFar[2] + p[2]], [0, 0, 0]);
   const center = [mass[0] / flat.length, GROUND_Y, mass[2] / flat.length];
+  // A hill whose base overlaps the ribbon pushes its flank up through the
+  // tarmac, and a long route reaches the ring these hills sit on: two campaign
+  // tracks had terrain poking through the road. Place a hill only when its
+  // whole base clears every sample of the track.
+  const hillClears = (x, z, radius) => clearOf([x, GROUND_Y, z]) > radius + 9;
   for (let i = 0; i < 16; i++) {
     const a = i / 16 * TAU + 0.28;
     const r = 150 + 50 * rand(i * 47 + 29);
-    pushCone(scenery, [center[0] + Math.cos(a) * r, GROUND_Y, center[2] + Math.sin(a) * r],
-      16 + 24 * rand(i * 53 + 31), 30 + 26 * rand(i * 59 + 37),
+    const x = center[0] + Math.cos(a) * r, z = center[2] + Math.sin(a) * r;
+    const radius = 16 + 24 * rand(i * 53 + 31);
+    if (!hillClears(x, z, radius)) continue;
+    pushCone(scenery, [x, GROUND_Y, z], radius, 30 + 26 * rand(i * 59 + 37),
       shade([0.66, 0.56, 0.42], 0.82 + 0.3 * rand(i * 61 + 41)));          // rolling hills
   }
   for (let i = 0; i < 30; i++) {
     const a = i / 30 * TAU + 0.11;
     const r = 310 + 66 * rand(i * 31 + 13);
-    pushCone(scenery, [center[0] + Math.cos(a) * r, GROUND_Y, center[2] + Math.sin(a) * r],
-      34 + 60 * rand(i * 37 + 17), 36 + 38 * rand(i * 41 + 19),
+    const x = center[0] + Math.cos(a) * r, z = center[2] + Math.sin(a) * r;
+    const radius = 34 + 60 * rand(i * 37 + 17);
+    if (!hillClears(x, z, radius)) continue;
+    pushCone(scenery, [x, GROUND_Y, z], radius, 36 + 38 * rand(i * 41 + 19),
       shade([0.45, 0.5, 0.58], 0.6 + 0.45 * rand(i * 43 + 23)));          // hazy ridge
   }
 
@@ -1210,7 +1231,8 @@ function buildTrack(typeIds, meta) {
   return {
     id: (meta && meta.id) || 'track',
     name: (meta && meta.name) || 'Track',
-    author: (meta && meta.author) || 30000,
+    author: Math.round(((meta && meta.author) || 30000) * AUTHOR_PACE),
+    length: travelled,
     layout: layoutOf(typeIds),
     blocks: typeIds.slice(),
     mesh: road, scenery, triggers, checkpoints, finish,
@@ -1312,9 +1334,9 @@ const CAMPAIGN = [
 
 const MEDALS = [
   { id: 'author', name: 'Author', factor: 1.0 },
-  { id: 'gold', name: 'Gold', factor: 1.05 },
-  { id: 'silver', name: 'Silver', factor: 1.16 },
-  { id: 'bronze', name: 'Bronze', factor: 1.30 }
+  { id: 'gold', name: 'Gold', factor: 1.02 },
+  { id: 'silver', name: 'Silver', factor: 1.12 },
+  { id: 'bronze', name: 'Bronze', factor: 1.24 }
 ];
 function medalTimes(author) {
   return MEDALS.map(medal => ({ id: medal.id, name: medal.name, ms: Math.round(author * medal.factor) }));
@@ -1374,6 +1396,7 @@ function dailyTrack(seed) {
     }
     blocks.push('straight', 'finish');
     const track = buildTrack(blocks, { id: 'daily', name: 'Daily', author: 30000 });
+    track.author = Math.round(track.length / DAILY_PACE);
     if (!trackFolds(track)) return track;
   }
   return buildTrack(CAMPAIGN[0].blocks, CAMPAIGN[0]);
@@ -2057,6 +2080,11 @@ function catchFall(car, mesh) {
   if (!hit || dot(hit.n, up) < 0.25) return;      // a wall face is not a floor
   const floor = hit.p[1] + CAR.ride;
   if (car.p[1] > floor + 0.3) return;             // still flying over it
+  // The ray starts above the car, so on a curve it can find the deck of the
+  // road the car just fell beside: snapping to that lifted the car back up
+  // through the tarmac. Only catch a car that is already at or under the
+  // surface; anything deeper is a fall, and a fall respawns.
+  if (floor > car.p[1] + 0.35) return;
   car.p = [car.p[0], floor, car.p[2]];
   const drop = dot(car.v, up);
   if (drop < 0) car.v = sub(car.v, mul(up, drop));

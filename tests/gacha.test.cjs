@@ -20,7 +20,7 @@ const rewards = moduleUnderTest('src/hub/rewards.js', [
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const gacha = moduleUnderTest('src/hub/gacha.js', [
   'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin',
-  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf', 'skinFile', 'skinPrice', 'SP_PRICES',
+  'eggPools', 'bannerFor', 'lineOf', 'stageOf', 'evolutionsOf', 'skillsOf', 'RARITY_PITY', 'setLook', 'lookFor', 'setSkins', 'skinList', 'looksOf', 'buyCandy', 'buyShards', 'buyPreset', 'COIN_SHOP', 'skinFile', 'skinPrice', 'SP_PRICES',
   'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'FREE_HATCHES'
 ], { ...daily, ...rewards, DEX, DEX_TYPES });
 const { mergeWallet, walletBalance, activateWallet, grantOnce } = rewards;
@@ -48,15 +48,19 @@ const pull = (wallet, extra) => {
   return result;
 };
 
-test('the egg pool is base forms only, with no mythicals, and every tier is filled', () => {
+test('the egg pool is base forms only, mythicals hatch from Legendary eggs, and every tier is filled', () => {
   const pools = eggPools();
   assert.deepEqual(pools.slice(0, 4).map(p => p.length > 0), [true, true, true, true]);
   for (const pool of pools) for (const num of pool) {
     assert.equal(DEX[num - 1][8], 0, DEX[num - 1][0] + ' is not a base form');
-    assert.notEqual(DEX[num - 1][10], 'my', DEX[num - 1][0] + ' is a mythical');
   }
+  // Mythicals: every base-form one is in the Legendary tier (same rates and pity), none in the other tiers.
+  const mythicals = DEX.map((row, i) => [row, i + 1]).filter(([row]) => row[10] === 'my' && !row[8]).map(([, num]) => num);
+  assert.ok(mythicals.length >= 20);
+  assert.ok(mythicals.every(num => pools[3].includes(num)), 'every mythical hatches from Legendary eggs');
+  assert.ok(pools.slice(0, 3).every(p => p.every(num => DEX[num - 1][10] !== 'my')), 'and from no other tier');
   const named = name => DEX.findIndex(row => row[0] === name) + 1;
-  assert.ok(pools[3].includes(named('Dratini')) && pools[3].includes(named('Mewtwo')));
+  assert.ok(pools[3].includes(named('Dratini')) && pools[3].includes(named('Mewtwo')) && pools[3].includes(named('Mew')));
   assert.ok(pools[2].includes(named('Eevee')) && pools[2].includes(named('Riolu')) && pools[2].includes(named('Bulbasaur')));
   assert.ok(!pools.flat().includes(named('Pikachu')), 'Pichu is the base form, not Pikachu');
   assert.ok(pools[4].every(num => pools[3].includes(num) && DEX[num - 1][10] === 'lg'), 'banners are legendaries');
@@ -420,4 +424,48 @@ test('a line wears one look across Bored, and only one it has unlocked', () => {
   plain = hatchReady(fund(plain, { waves: 10 }), opts({ rand: always(0.9) })).wallet;
   const own = gachaState(plain, TODAY).owned[0];
   assert.equal(gacha.setLook(plain, own, 'shiny', opts()).reason, 'locked');
+});
+
+test('coin shop: candy for a caught line, 50 a line a day; shards, 50 a week; preset slots up to 5, permanent', () => {
+  const { buyCandy, buyShards, buyPreset, COIN_SHOP } = gacha;
+  let w = fresh({ regular: 1, coins: 20000 });
+  w = pull(w, { machine: 'move', rand: always(0.001) }).wallet;
+  w = hatchReady(fund(w, { waves: 10 }), opts({ rand: always(0.001) })).wallet;
+  const line = gacha.lineOf(gachaState(w, TODAY).owned[0]);
+  const candy = wallet => walletBalance(wallet)['candy:' + line] || 0, coins = wallet => walletBalance(wallet).coins;
+  // Candy: 200 coins for 5, only for a line you have, ten buys (50 candy) a day.
+  assert.equal(buyCandy(w, 99999, opts()).reason, 'not-owned');
+  const c0 = candy(w), m0 = coins(w);
+  for (let i = 0; i < 10; i++) w = buyCandy(w, line, opts()).wallet;
+  assert.equal(candy(w) - c0, 50);
+  assert.equal(m0 - coins(w), 2000);
+  assert.equal(buyCandy(w, line, opts()).reason, 'limit', 'the 11th buy today is refused');
+  assert.equal(gachaState(w, TODAY).shop.candyToday[line], 50);
+  assert.ok(buyCandy(w, line, { today: '2026-11-17', now: later() }).ok, 'a new day opens again');
+  // Shards: 500 coins for 10, five buys a week; next Monday opens again.
+  const s0 = walletBalance(w).shards || 0;
+  for (let i = 0; i < 5; i++) w = buyShards(w, opts()).wallet;
+  assert.equal((walletBalance(w).shards || 0) - s0, 50);
+  assert.equal(buyShards(w, opts()).reason, 'limit');
+  assert.equal(gachaState(w, TODAY).shop.shardsLeft, 0);
+  assert.equal(buyShards(w, { today: '2026-11-22', now: later() }).reason, 'limit', 'Sunday is the same week');
+  assert.ok(buyShards(w, { today: '2026-11-23', now: later() }).ok, 'Monday is a new week');
+  // Presets: 3 to start; the 4th costs 500, the 5th 1000; then no more.
+  assert.equal(gachaState(w, TODAY).shop.presets, COIN_SHOP.presets.start);
+  let m = coins(w);
+  w = buyPreset(w, opts()).wallet;
+  assert.equal(m - coins(w), 500);
+  m = coins(w);
+  w = buyPreset(w, opts()).wallet;
+  assert.equal(m - coins(w), 1000);
+  assert.equal(gachaState(w, TODAY).shop.presets, 5);
+  assert.equal(buyPreset(w, opts()).reason, 'owned');
+  // Not enough coins is refused and charges nothing.
+  const poor = fresh({ coins: 100 });
+  assert.equal(buyShards(poor, opts()).reason, 'coins');
+  // Two devices buying the same slot offline merge to one purchase, not two.
+  const a = buyShards(w, { today: '2026-11-30', now: later() }).wallet, b = buyShards(w, { today: '2026-11-30', now: later() }).wallet;
+  const merged = mergeWallet(a, b);
+  assert.equal(Object.keys(merged.entries).filter(id => id.startsWith('spend:shards:2026-11-30')).length, 1);
+  assert.equal(walletBalance(merged).shards, walletBalance(a).shards, 'paid and received once');
 });

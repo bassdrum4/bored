@@ -72,7 +72,11 @@ test('speedrun cloud score versions preserve legacy records without restoring th
   assert.match(main, /\.map\(game => \[cloudScoreKey\(game.id\), bestValue\(game\)\]\)/);
   assert.match(main, /data\.bests\?\.\[cloudScoreKey\(game.id\)\]/);
   const scores = fs.readFileSync(path.join(root, 'src/hub/scores.js'), 'utf8');
-  assert.match(scores, /score < game\.min/, 'sync enforces new speedrun minimums');
+  // The floor is the game's own minimum, or the board's when the game keeps
+  // none itself (the native games have no snapshot to read it from).
+  assert.match(scores, /Number\.isFinite\(game\.min\) \? game\.min : rule\?\.min_value/,
+    'sync reads the board floor for games without one of their own');
+  assert.match(scores, /score < floor/, 'sync enforces the score floor');
 });
 
 test('simultaneous devices retry stale writes rather than overwriting one another', async () => {
