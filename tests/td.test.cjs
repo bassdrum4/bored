@@ -326,6 +326,21 @@ test('weekly: the Poké Idle daily boss on 5 days of the week opens the mission 
   assert.ok(td.tdState(w, TODAY).weekly.every(m => !m.later), 'no weekly mission is locked');
 });
 
+test('weekly missions report how far along they are', () => {
+  let w = owning([named('Machamp')]);
+  for (const d of ['2026-11-16', '2026-11-17']) w.entries['pi:boss:' + d] = { at: 1 };
+  for (let d = 16; d <= 18; d++) w.entries['pdoku:daily:doku:2026-11-' + d] = { at: 1 };
+  w = td.tdFinish(w, { stage: '1-1', stars: 1, team: [named('Machamp')], waves: 1 }, opts()).wallet;
+  const weekly = Object.fromEntries(td.tdState(w, TODAY).weekly.map(m => [m.id, [m.have, m.need, m.done]]));
+  assert.deepEqual(weekly.boss5, [2, 5, false]);
+  assert.deepEqual(weekly.doku10, [3, 10, false]);
+  assert.deepEqual(weekly.teams3, [1, 3, false]);
+  assert.deepEqual(weekly.star3x5, [0, 5, false]);
+  for (let d = 19; d <= 21; d++) w.entries['pi:boss:2026-11-' + d] = { at: 1 };
+  w = td.tdFinish(w, { stage: '1-1', stars: 1, team: [named('Machamp')], waves: 1 }, opts()).wallet;
+  assert.deepEqual(td.tdState(w, TODAY).weekly.find(m => m.id === 'boss5').have, 5, 'a claimed mission shows full');
+});
+
 test('levels cost coins and raise stats; the squad reads candy upgrades', () => {
   const num = named('Machamp');
   let w = owning([num]);
