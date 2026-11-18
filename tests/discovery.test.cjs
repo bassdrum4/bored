@@ -413,7 +413,8 @@ test('account UI and score sync still work through the redesigned hub (mock back
   await page.click('#feedback-submit');
   await page.waitForFunction(() => document.querySelector('#feedback-open').textContent.includes('Thanks'));
   assert.equal(notes.length, 1, 'feedback posts once');
-  assert.equal(notes[0].message, 'Snake ate my whole afternoon.');
+  assert.equal(notes[0].kind, 'note');
+  assert.equal(notes[0].body, 'Snake ate my whole afternoon.');
   assert.equal(notes[0].email, 'tester@example.test', 'a signed-in sender gets a reply address filled in');
   assert.equal(notes[0].handle, 'tester');
   await page.click('#account-action');

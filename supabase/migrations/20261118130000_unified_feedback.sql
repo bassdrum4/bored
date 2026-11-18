@@ -5,6 +5,10 @@
 -- moved to bored_archive, so nothing is lost and no player-facing write has two
 -- possible destinations. Notes stay write-only for players; only an analytics
 -- admin may read or delete a row.
+--
+-- The isolated Bored Together fixture applies every migration to a minimal
+-- database with no analytics tables (and skips the analytics migrations), so the
+-- admin policies, the copy and the archive step are guarded.
 begin;
 
 create table if not exists public.feedback_entries (
@@ -51,50 +55,69 @@ create policy feedback_entries_append on public.feedback_entries
   for insert to anon, authenticated
   with check (user_id is not distinct from (select auth.uid()));
 
-drop policy if exists feedback_entries_admin_read on public.feedback_entries;
-create policy feedback_entries_admin_read on public.feedback_entries
-  for select to authenticated
-  using ((select public.is_analytics_admin()));
+do $admin$
+begin
+  if to_regprocedure('public.is_analytics_admin()') is not null then
+    execute $sql$drop policy if exists feedback_entries_admin_read on public.feedback_entries$sql$;
+    execute $sql$create policy feedback_entries_admin_read on public.feedback_entries
+      for select to authenticated using ((select public.is_analytics_admin()))$sql$;
 
-drop policy if exists feedback_entries_admin_delete on public.feedback_entries;
-create policy feedback_entries_admin_delete on public.feedback_entries
-  for delete to authenticated
-  using ((select public.is_analytics_admin()));
+    execute $sql$drop policy if exists feedback_entries_admin_delete on public.feedback_entries$sql$;
+    execute $sql$create policy feedback_entries_admin_delete on public.feedback_entries
+      for delete to authenticated using ((select public.is_analytics_admin()))$sql$;
 
--- Staff activity is not player feedback, and a scoped game reader's own survey
--- answers for the games they read stay out of the reports.
-drop policy if exists analytics_exclude_admin_insert on public.feedback_entries;
-create policy analytics_exclude_admin_insert on public.feedback_entries
-  as restrictive for insert to authenticated
-  with check (not (select public.is_analytics_admin()));
+    -- Staff activity is not player feedback.
+    execute $sql$drop policy if exists analytics_exclude_admin_insert on public.feedback_entries$sql$;
+    execute $sql$create policy analytics_exclude_admin_insert on public.feedback_entries
+      as restrictive for insert to authenticated
+      with check (not (select public.is_analytics_admin()))$sql$;
+  end if;
 
-drop policy if exists exclude_game_reader_feedback_insert on public.feedback_entries;
-create policy exclude_game_reader_feedback_insert on public.feedback_entries
-  as restrictive for insert to authenticated
-  with check (not exists (
-    select 1 from public.game_analytics_readers r
-    where r.user_id = (select auth.uid())
-      and (feedback_entries.game is null or r.game = feedback_entries.game)
-  ));
+  -- A scoped game reader's own survey answers for the games they read stay out
+  -- of the reports.
+  if to_regclass('public.game_analytics_readers') is not null then
+    execute $sql$drop policy if exists exclude_game_reader_feedback_insert on public.feedback_entries$sql$;
+    execute $sql$create policy exclude_game_reader_feedback_insert on public.feedback_entries
+      as restrictive for insert to authenticated
+      with check (not exists (
+        select 1 from public.game_analytics_readers r
+        where r.user_id = (select auth.uid())
+          and (feedback_entries.game is null or r.game = feedback_entries.game)
+      ))$sql$;
+  end if;
+end $admin$;
 
-insert into public.feedback_entries
-  (id, created_at, kind, user_id, body, email, page, handle, user_agent)
-select id, created_at, 'note', user_id, message, email, page, handle, user_agent
-from public.feedback
-on conflict (id) do nothing;
-
-insert into public.feedback_entries
-  (id, created_at, kind, user_id, visitor_id, game, rating, body)
-select id, created_at, 'rating', user_id, visitor_id, game, rating,
-       nullif(trim(comment), '')
-from public.enjoyment_feedback
-on conflict (id) do nothing;
+do $copy$
+begin
+  if to_regclass('public.feedback') is not null then
+    execute $sql$insert into public.feedback_entries
+        (id, created_at, kind, user_id, body, email, page, handle, user_agent)
+      select id, created_at, 'note', user_id, message, email, page, handle, user_agent
+      from public.feedback
+      on conflict (id) do nothing$sql$;
+  end if;
+  if to_regclass('public.enjoyment_feedback') is not null then
+    execute $sql$insert into public.feedback_entries
+        (id, created_at, kind, user_id, visitor_id, game, rating, body)
+      select id, created_at, 'rating', user_id, visitor_id, game, rating,
+             nullif(trim(comment), '')
+      from public.enjoyment_feedback
+      on conflict (id) do nothing$sql$;
+  end if;
+end $copy$;
 
 comment on table public.feedback_entries is
   'Player feedback: free-form notes and 1-5 enjoyment ratings. Players append only; analytics admins read and delete.';
 
-alter table public.feedback set schema bored_archive;
-alter table public.enjoyment_feedback set schema bored_archive;
+do $archive$
+begin
+  if to_regclass('public.feedback') is not null and to_regnamespace('bored_archive') is not null then
+    execute 'alter table public.feedback set schema bored_archive';
+  end if;
+  if to_regclass('public.enjoyment_feedback') is not null and to_regnamespace('bored_archive') is not null then
+    execute 'alter table public.enjoyment_feedback set schema bored_archive';
+  end if;
+end $archive$;
 
 notify pgrst,'reload schema';
 commit;
