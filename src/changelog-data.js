@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 578,
+  "count": 579,
   "newest": "2026-11-17",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"49cf7d4","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: tileset loader for the battle field","pr":224},
   {"sha":"c94a9e1","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: Quests redo with sub-tabs, progress bars and real reward icons","pr":216},
   {"sha":"4b1ca95","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: chapters 5-6 on the page: fast foes, a tidy preview, the ending","pr":221},
   {"sha":"d88a531","date":"2026-11-17","author":"Vettel Xu","subject":"Poké Gacha: sound, off until turned on","pr":215},
