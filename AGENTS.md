@@ -60,9 +60,10 @@ games and favorites for returning players, or four playable starter choices to n
 visitors (popular ranking with an offline fallback). Do not bring back a second
 editorial shelf or an empty first-visit history message.
 
-Feedback posts through `src/hub/feedback.js` with the publishable key. The `feedback` table is
+Feedback posts through `src/hub/feedback.js` with the publishable key. `feedback_entries` is
 insert-only for that key (`npm run feedback:setup`), so the page can send a note and never read
-one; check the table in the Supabase dashboard.
+one. The optional enjoyment rating (`src/hub/enjoyment-ui.js`) writes to the same table. Read and
+delete rows as an analytics admin on `src/analytics.html`, or in the Supabase dashboard.
 
 ## Build and verify
 

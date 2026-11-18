@@ -313,12 +313,12 @@ test('browser test telemetry is answered locally instead of reaching live analyt
   assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events')), true);
   assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events?select=*')), true);
   assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/product_events')), true);
-  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/enjoyment_feedback')), true);
+  assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/feedback_entries')), true);
   assert.equal(respondToAnalytics(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/score_rules')), false);
   await isolateAnalytics({ setRequestInterception: async enabled => assert.equal(enabled, true), on: (name, fn) => { assert.equal(name, 'request'); handler = fn; } });
   handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/play_events'));
   handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/product_events'));
-  handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/enjoyment_feedback'));
+  handler(request('https://djdpttltfmwkofdrvkem.supabase.co/rest/v1/feedback_entries'));
   handler(request('http://127.0.0.1/index.html'));
   assert.equal(replied, 7);
   assert.equal(continued, 1);

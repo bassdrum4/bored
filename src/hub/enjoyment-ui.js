@@ -27,10 +27,11 @@ export function createEnjoymentUI({ analytics }) {
       const before = getSession()?.user?.id || null;
       const session = before ? await freshSession() : null;
       if (before && session?.user?.id !== before) throw Error('Please try again after signing in.');
-      await request('/rest/v1/enjoyment_feedback', {
+      await request('/rest/v1/feedback_entries', {
         method: 'POST', token: session?.access_token || ANON_TOKEN,
-        body: { id: crypto.randomUUID(), user_id: before, visitor_id: analytics.visitorId(),
-          game: promptGame, rating, comment: form.elements.comment.value.trim().slice(0, 500) || null }
+        body: { id: crypto.randomUUID(), kind: 'rating', user_id: before,
+          visitor_id: analytics.visitorId(), game: promptGame, rating,
+          body: form.elements.comment.value.trim().slice(0, 500) || null }
       });
       form.reset(); close();
     } catch { status.textContent = 'Could not send. Try again or skip.'; }

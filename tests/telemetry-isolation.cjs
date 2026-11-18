@@ -16,7 +16,7 @@ function respondToAnalytics(request) {
       contentType: 'application/json', body: preflight ? '' : '[]' });
     return true;
   }
-  if (!['/rest/v1/play_events','/rest/v1/product_events','/rest/v1/enjoyment_feedback'].includes(url.pathname)) return false;
+  if (!['/rest/v1/play_events','/rest/v1/product_events','/rest/v1/feedback_entries'].includes(url.pathname)) return false;
   void request.respond({ status: 204, headers });
   return true;
 }

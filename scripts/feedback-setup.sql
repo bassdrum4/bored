@@ -1,32 +1,55 @@
--- Feedback for Bored.
+-- Feedback for Bored: one table for free-form notes and the optional 1-5
+-- enjoyment rating. It replaces the old public.feedback and
+-- public.enjoyment_feedback tables, which 20261118130000_unified_feedback.sql
+-- copied here and moved to bored_archive.
+--
 -- Paste this into the Supabase SQL editor, or run:
 --   npm run feedback:setup            # shows the table's state and this SQL
 --   SUPABASE_ACCESS_TOKEN=sbp_... npm run feedback:setup -- --apply
 --
--- Anyone may send a note through the site's publishable key. Nobody may read
--- the notes back with it: selects are revoked, so only the service key (or the
--- dashboard) can read the table.
+-- Players may append with the publishable key and never read a row back.
+-- Analytics admins may select and delete through the dashboard page.
 
-create table if not exists public.feedback (
+create table if not exists public.feedback_entries (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
-  message text not null check (char_length(message) between 4 and 2000),
-  email text check (email is null or (char_length(email) between 3 and 120 and email like '%@%')),
-  page text check (page is null or char_length(page) <= 200),
-  handle text check (handle is null or char_length(handle) <= 40),
-  user_id uuid references auth.users (id) on delete set null,
-  user_agent text check (user_agent is null or char_length(user_agent) <= 300)
+  kind text not null check (kind in ('note','rating')),
+  user_id uuid,
+  visitor_id uuid,
+  game text,
+  rating smallint check (rating between 1 and 5),
+  body text check (body is null or length(body) <= 2000),
+  email text,
+  page text,
+  handle text,
+  user_agent text,
+  check ((kind = 'note' and body is not null and rating is null)
+      or (kind = 'rating' and rating is not null))
 );
 
-create index if not exists feedback_created_at_idx on public.feedback (created_at desc);
+create index if not exists feedback_entries_created_idx
+  on public.feedback_entries(created_at desc);
+create index if not exists feedback_entries_game_idx
+  on public.feedback_entries(game, created_at desc) where game is not null;
 
-alter table public.feedback enable row level security;
+alter table public.feedback_entries enable row level security;
+revoke all on public.feedback_entries from public, anon, authenticated;
+grant insert on public.feedback_entries to anon, authenticated;
+grant select, delete on public.feedback_entries to authenticated;
 
-drop policy if exists "anyone may send feedback" on public.feedback;
-create policy "anyone may send feedback" on public.feedback
+drop policy if exists feedback_entries_append on public.feedback_entries;
+create policy feedback_entries_append on public.feedback_entries
   for insert to anon, authenticated
-  with check (true);
+  with check (user_id is not distinct from (select auth.uid()));
 
--- Insert only. Without this revoke, the publishable key could read every note.
-revoke all on public.feedback from anon, authenticated;
-grant insert on public.feedback to anon, authenticated;
+-- is_analytics_admin() comes from the analytics migrations. The dashboard is
+-- the only reader; scoped game readers never see feedback.
+drop policy if exists feedback_entries_admin_read on public.feedback_entries;
+create policy feedback_entries_admin_read on public.feedback_entries
+  for select to authenticated
+  using ((select public.is_analytics_admin()));
+
+drop policy if exists feedback_entries_admin_delete on public.feedback_entries;
+create policy feedback_entries_admin_delete on public.feedback_entries
+  for delete to authenticated
+  using ((select public.is_analytics_admin()));
