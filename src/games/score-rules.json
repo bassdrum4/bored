@@ -219,6 +219,12 @@
     "better": "high",
     "max_value": 10000000
   },
+  "sudoku": {
+    "label": "Seconds to solve a puzzle",
+    "better": "low",
+    "min_value": 20,
+    "max_value": 86400
+  },
   "sumo": {
     "label": "Rounds won",
     "better": "high",
