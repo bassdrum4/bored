@@ -96,15 +96,14 @@ export const LOGIN = { regular: 3 };
 /* ── The coin shop ─────────────────────────────────────────────────────
    Coins buy candy for a caught line (5 for 200, 50 per line a day), shards (10 for
    500, 50 a week, so a 300-shard skin from coins alone takes about six weeks) and
-   squad preset slots (3 to start, up to 5: 500, then 1000; the 1500 is for a 6th if
-   the cap is ever raised). Every purchase has a fixed ledger id, one per slot of its
+   squad preset slots (3 to start, up to 5 in all: the 4th for 500, the 5th for 1000). Every purchase has a fixed ledger id, one per slot of its
    limit: spend:candy:<line>:<day>:<0-9>, spend:shards:<monday>:<0-4>, spend:preset:<n>.
    Two devices buying offline merge to one entry per id, cost and goods together, so
    nothing is paid twice and no limit can be passed. */
 export const COIN_SHOP = {
   candy: { coins: 200, candy: 5, perLineDay: 50 },
   shards: { coins: 500, shards: 10, perWeek: 50 },
-  presets: { start: 3, max: 5, prices: [500, 1000, 1500] }
+  presets: { start: 3, max: 5, prices: [500, 1000] }
 };
 const mondayOfDay = date => { const d = new Date(date + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
 // What the coin shop has sold today and this week, and the preset slots owned.
