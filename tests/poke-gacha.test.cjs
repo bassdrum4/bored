@@ -462,6 +462,43 @@ test('SP skins: the shop prices sets by size, a set shows on each form, and a sk
   assert.deepEqual(errors, []);
 });
 
+test('chapters 5-6: fast foes are named, nothing overflows, and the first clear of the final stage plays the ending once', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  if (!await game.evaluate(() => Array.isArray(T.chapters) && T.chapters.length >= 6)) return t.skip('the hub engine has fewer than 6 chapters');
+  await game.evaluate(() => { for (const st of T.allStages) { if (st.id === '6-6') break; T.finish({ stage: st.id, stars: 3, team: [S.owned[0]], waves: 1 }); } refreshTop(); });
+  await key(tab, '1');
+  // Every chapter 5-6 preview, its message and its squad box fit.
+  const bad = await game.evaluate(() => { const out = [];
+    for (const c of [4, 5]) { chapterAt = c; for (let i = 0; i < stagesNow().length; i++) { storyMode = 'stages'; storyAt = i; storyUpdate();
+      for (const id of ['#story-info', '#msg']) { const n = $(id); if (n.scrollHeight > n.clientHeight + 1) out.push(stagesNow()[i].id + id); }
+      pickStage(); const q = $('#squad-stage'); if (q.scrollHeight > q.clientHeight + 1 || [...q.children].some(n => n.scrollWidth > n.clientWidth + 1)) out.push(stagesNow()[i].id + ' squad'); } }
+    storyMode = 'stages'; return out; });
+  assert.deepEqual(bad, []);
+  await game.evaluate(() => { chapterAt = 4; storyAt = 0; storyUpdate(); });
+  assert.match(await game.$eval('#story-info', n => n.textContent), /Fast: Raticate/);
+  await game.evaluate(() => pickStage());
+  assert.match(await game.$eval('#squad-stage', n => n.textContent), /fast/);
+  // 6-6, first clear: Giovanni's words, then the ending, and THE END.
+  const play66 = async () => {
+    await game.evaluate(() => { storyMode = 'stages'; chapterAt = 5; storyAt = 5; storyUpdate(); pickStage(); setSquad(S.owned.slice(0, 4)); startBattle();
+      battle.talk = []; battleTalk(); battle.b.queue = []; battle.b.enemies = []; battle.paused = false; });
+    await game.waitForFunction(() => battle.done, { timeout: 10000 });
+    const talk = await game.evaluate(() => battle.talk.slice());
+    await game.evaluate(() => { battle.talk = []; battleTalk(); showResult(); });
+    const title = await game.$eval('#battle-result .title', n => n.textContent);
+    await game.evaluate(() => leaveBattle());
+    return [talk, title];
+  };
+  const [first, title] = await play66();
+  const ending = await game.evaluate(() => T.allStages.find(s => s.id === '6-6').ending);
+  assert.deepEqual(first.slice(-ending.length), ending, 'the ending follows the boss');
+  assert.equal(title, 'THE END');
+  const [again, title2] = await play66();
+  assert.ok(!again.some(line => ending.includes(line)), 'only once');
+  assert.equal(title2, 'CLEARED');
+  assert.deepEqual(errors, []);
+});
+
 test('progression: Squad and Dex show the level cap, and K picks which unlocked skill a line uses', async t => {
   const { tab, game, errors } = await openWithMons(t);
   // A line with two skills unlocked: a second hatch of the first owned line, rolled on its third skill.
