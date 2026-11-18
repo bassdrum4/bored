@@ -644,7 +644,8 @@ test('coin shop: candy for a picked line, shards and preset slots, each with a c
   await game.evaluate(i => { shopAt = i; shopUpdate(); }, await row('shards'));
   const coins0 = await game.evaluate(() => S.balance.coins);
   await key(tab, 'Enter');
-  assert.match(await game.$eval('#msg', n => n.textContent), /Buy 10 shards for 500 coins\? Enter: buy/);
+  assert.match(await game.$eval('#msg', n => n.textContent), /Buy 10 shards for 500 coins\?/);
+  assert.deepEqual(await game.$$eval('#msg [data-press]', n => n.map(x => x.dataset.press + ':' + x.textContent)), ['Enter:Buy', 'Backspace:No'], 'the answer is a label to click, or its key');
   await key(tab, 'Backspace');
   assert.equal(await game.evaluate(() => S.balance.coins), coins0, 'cancelled: nothing bought');
   assert.equal(await game.evaluate(() => tab), 'shop', 'Backspace on a question only cancels it');
@@ -1026,6 +1027,68 @@ test('multi-pull reveal: every egg on one board, in order; Epic and up framed an
   assert.deepEqual(await game.evaluate(() => [reveal.done, reveal.shown]), [true, 10]);
   await (await game.$('#reveal')).click();
   assert.equal(await game.evaluate(() => reveal), null);
+  assert.deepEqual(errors, []);
+});
+
+test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad level/skill, hatch skip, candy filters and Back, Card)', async t => {
+  const { game, errors } = await openWithMons(t);
+  const click = async sel => { const n = await game.$(sel); assert.ok(n, sel + ' is there'); await n.click(); await pause(40); };
+  // Dex: F, T and S.
+  await game.evaluate(() => { go('dex'); pref.dexFilter = 'All'; pref.dexType = ''; keep(); dexUpdate(); });
+  const before = await game.evaluate(() => ({ ...dexView() }));
+  await click('#dex-keys [data-press="f"]');
+  assert.notEqual(await game.evaluate(() => dexView().filter), before.filter, 'F by mouse');
+  await click('#dex-keys [data-press="t"]');
+  assert.notEqual(await game.evaluate(() => dexView().type), before.type, 'T by mouse');
+  await click('#dex-keys [data-press="s"]');
+  assert.notEqual(await game.evaluate(() => dexView().sort), before.sort, 'S by mouse');
+  // Story: › and ‹ change the chapter page.
+  await game.evaluate(() => { for (const st of T.chapters[0].stages) T.finish({ stage: st.id, stars: 1, team: [S.owned[0]], waves: 1 }); refreshTop(); go('story'); chapterAt = 0; storyMode = 'stages'; storyUpdate(); });
+  await click('#story-title [data-press="ArrowRight"]');
+  assert.equal(await game.evaluate(() => chapterAt), 1);
+  await click('#story-title [data-press="ArrowLeft"]');
+  assert.equal(await game.evaluate(() => chapterAt), 0);
+  // Squad: a click selects, a second click adds; Level up and Skill act on the selected card.
+  await game.evaluate(() => { storyAt = 0; storyUpdate(); pickStage(); setSquad([]); storyUpdate(); });
+  // The cursor starts on card 0; card 1 shows the select-then-act click.
+  await click('#squad-grid [data-at="1"]');
+  assert.deepEqual(await game.evaluate(() => [sq.zone, sq.at, squadPick().length]), ['grid', 1, 0], 'the first click only selects');
+  await click('#squad-grid [data-at="1"]');
+  assert.equal(await game.evaluate(() => squadPick().length), 1, 'a second click adds it');
+  const num = await game.evaluate(() => roster().list[1].num);
+  const lv = () => game.evaluate(n => T.state().levels[G.lineOf(n)] || 1, num);
+  const lv0 = await lv();
+  await click('#squad-detail [data-press="l"]');
+  assert.equal(await lv(), lv0 + 1, 'Level up by mouse');
+  assert.equal(await game.evaluate(n => roster().list[sq.at].num, num), num, 'the cursor follows the mon when levelling re-sorts the roster');
+  await click('#squad-detail [data-press="k"]');
+  await click('#squad-grid [data-at="' + await game.evaluate(() => sq.at) + '"]');
+  assert.equal(await game.evaluate(() => squadPick().length), 0, 'clicking the selected card again drops it');
+  // Hatching: Skip to the end, then Close.
+  await game.evaluate(() => { const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
+    w.entries['test:mouse'] = { at: now - 10, g: { premium: 1 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop();
+    G.pull({ voucher: 'premium', count: 1, machine: 'move' }); w.entries['test:mouse-w'] = { at: now + 5, g: { waves: 999 } };
+    const w2 = JSON.parse(parent.localStorage.getItem('bored.wallet')); w2.entries['test:mouse-w'] = { at: now + 5, g: { waves: 999 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w2));
+    refreshTop(); storyMode = 'stages'; go('eggs'); startHatch(); });
+  await click('#msg [data-press="Backspace"]');
+  assert.equal(await game.evaluate(() => hatching && hatching.summary), true, 'Skip to the end by mouse');
+  await click('#msg [data-press="Enter"]');
+  assert.equal(await game.evaluate(() => hatching), null, 'Close by mouse');
+  // Shop, candy picker: a filter and Back.
+  if (await game.evaluate(() => !!G.coinShop)) {
+    await game.evaluate(() => { go('shop'); shopMode = 'candy'; shopConfirm = null; candyAt = 0; shopUpdate(); });
+    const f0 = await game.evaluate(() => candyView().filter);
+    await click('#shop-preview [data-press="f"]');
+    assert.notEqual(await game.evaluate(() => candyView().filter), f0);
+    await click('#shop-preview [data-press="Backspace"]');
+    assert.equal(await game.evaluate(() => shopMode), 'list', 'Back by mouse');
+  }
+  // Card: to the Dex.
+  await game.evaluate(() => go('card'));
+  await click('#card-buddy [data-press="Enter"]');
+  assert.equal(await game.evaluate(() => tab), 'dex');
+  // Every label's key is one the page handles (no dead labels): each carries a title naming it.
+  assert.ok(await game.evaluate(() => [...document.querySelectorAll('[data-press]')].every(n => /^Key: /.test(n.title))));
   assert.deepEqual(errors, []);
 });
 

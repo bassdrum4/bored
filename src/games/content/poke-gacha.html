@@ -109,6 +109,14 @@ canvas, img { image-rendering: pixelated; display: block }
 #banner { position: absolute; width: 40px; height: 30px; pointer-events: none }
 
 /* Rates and pity: over the machine and the menu while it is open. */
+/* Clickable key labels (see keyLabel): one style everywhere, like the tabs and Squad's filters. */
+.klabel { display: inline-block; border: 1px solid var(--dim); padding: 0 4px; line-height: 18px; cursor: pointer; white-space: nowrap; font: 400 var(--body)/18px var(--pixel) }
+.klabel.on { color: var(--gold); border-color: var(--gold) }
+.klabels { display: flex; gap: 4px; align-items: center; height: 20px; white-space: nowrap }
+#msg .klabels { display: inline-flex; vertical-align: middle; margin-left: 8px }
+#frame.no-pixel .klabel { font: 600 13px/18px Arial, Helvetica, sans-serif }
+#story-title .pager { float: right; display: flex; gap: 4px; margin-top: 6px }
+#dex-keys { margin-top: 2px }
 #rates { left: 8px; top: 8px; width: 484px; height: 264px; padding: 6px 12px; cursor: pointer }
 /* A pull of 5 or more: every egg on one board, popping in in pull order. An Epic flashes
    red and a Legendary gold (the cell, then the frame, fading out); NEW marks a tier's
@@ -399,7 +407,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="hatch" hidden></div>
       </section>
       <section id="scr-dex" class="screen" hidden>
-        <div class="panel" id="dex-list"><div class="title" id="dex-title">DEX</div><div class="rows scroll" id="dex-rows"></div></div>
+        <div class="panel" id="dex-list"><div class="title" id="dex-title">DEX</div><div class="rows scroll" id="dex-rows"></div><div class="klabels" id="dex-keys"></div></div>
         <div class="panel" id="dex-detail"><div class="cell" id="dex-pic"></div><div id="dex-info"></div><div id="dex-tabs"></div><div class="rows scroll" id="dex-acts"></div><div id="dex-depth" hidden></div></div>
       </section>
       <section id="scr-shop" class="screen" hidden>
@@ -1182,7 +1190,7 @@ function showHatch() {
     panel.classList.add("sum");
     panel.replaceChildren(el("div", "head gold", "HATCHED " + h.list.length), grid);
     const fresh = h.list.filter(x => x.fresh).length;
-    say(h.list.length + " eggs: " + fresh + " new, " + h.list.reduce((t, x) => t + x.shards, 0) + " shards from dupes" + (h.list.length > 12 ? ". First 12 shown; all are in the Dex." : ".") + " Enter: close.");
+    say(h.list.length + " eggs: " + fresh + " new, " + h.list.reduce((t, x) => t + x.shards, 0) + " shards from dupes" + (h.list.length > 12 ? ". First 12 shown; all are in the Dex." : "."), (() => { const k = el("span", "klabels"); k.append(keyLabel("Enter", "Close")); return k; })());
     return;
   }
   const x = h.list[h.i];
@@ -1202,9 +1210,9 @@ function showHatch() {
       el("div", "", TIER_NAME[x.tier] + " " + G.stars[x.tier] + "★ · " + G.dex[x.species - 1][1].replace("/", " / ")), candy,
       el("div", x.skill === 3 ? "gold" : "", "Skill: " + G.skillsOf(x.species)[x.skill] + (x.skill === 3 ? " (rare)" : "")),
       ...(x.shiny ? [el("div", "gold", "Shiny!")] : []), ...(x.sp ? [el("div", "gold", "SP skin: " + (skinOf(x.sp)?.name || x.sp) + "! Wear it from the Dex.")] : []));
-    say("Enter: next egg · Backspace: skip to the end.");
+    say("", hatchLabels(h, "Next egg"));
   };
-  say("Oh? The egg is moving...");
+  say("Oh? The egg is moving...", hatchLabels(h, "Open it"));
   // The first frame now, so the cell never shows the egg's old art for a frame.
   art.replaceChildren(HATCH_SHEET.complete && HATCH_SHEET.naturalWidth ? hatchFrame(x.tier, 0) : bigEgg(x.tier, 0, false));
   let heard = -1;
@@ -1222,6 +1230,13 @@ function showHatch() {
   };
   requestAnimationFrame(tick);
   h.reveal = reveal;
+}
+// The hatch's keys as labels: Enter (open, or the next egg) and, with more to come, Backspace.
+function hatchLabels(h, enter) {
+  const k = el("span", "klabels");
+  k.append(keyLabel("Enter", h.i + 1 < h.list.length || h.phase === "shake" ? enter : "Done"));
+  if (h.list.length > 1 && h.i + 1 < h.list.length) k.append(keyLabel("Backspace", "Skip to the end"));
+  return k;
 }
 function hatchKey(e) {
   const h = hatching;
@@ -1312,6 +1327,7 @@ function dexUpdate() {
   const filtered = v.filter !== "All" || v.type;
   titled($("#dex-title"), "DEX", (filtered ? list.length + " shown" : owned.size + "/" + BASES.length + " caught"));
   const view = dexViewText();
+  $("#dex-keys").replaceChildren(keyLabel("f", v.filter, v.filter !== "All"), keyLabel("t", v.type || "Any type", !!v.type), keyLabel("s", "Sort: " + v.sort));
   $("#dex-detail").hidden = !list.length;
   if (!list.length) {
     $("#dex-rows").replaceChildren(el("p", "dim", "No lines match."));
@@ -1466,7 +1482,10 @@ function candyUpdate() {
   const line = list[candyAt], l = S.lines[line];
   const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins · ", el("span", "num", l.candy), " candy");
   const left = el("div", "dim"); left.append(el("span", "num", candyLeft(line)), " of " + cs.perLineDay + " left today");
-  $("#shop-preview").replaceChildren(el("div", "title", "CANDY"), cellWith(sprite(tipOf(line), G.lookFor(tipOf(line)))), el("div", "", name(tipOf(line))), have, left);
+  const keys = el("div", "klabels");
+  if (shopConfirm) keys.append(keyLabel("Enter", "Buy"), keyLabel("Backspace", "No"));
+  else keys.append(keyLabel("f", v.filter, v.filter !== "All"), keyLabel("t", v.type || "Type", !!v.type), keyLabel("s", "Sort"), keyLabel("Backspace", "Back"));
+  $("#shop-preview").replaceChildren(el("div", "title", "CANDY"), cellWith(sprite(tipOf(line), G.lookFor(tipOf(line)))), el("div", "", name(tipOf(line))), have, left, keys);
   say(shopConfirm ? confirmText(shopItems()[shopAt], line) + " Enter: buy · Backspace: no."
     : cs.candy + " candy for " + cs.coins + " coins. Candy evolves a line and buys its upgrades in the Dex. F: " + v.filter + " · T: " + (v.type || "any type") + " · S: " + v.sort + ". Backspace: back.");
 }
@@ -1485,7 +1504,8 @@ function shopUpdate() {
   const pic = it.kind === "sp" ? sprite((it.skin.forms || [it.skin.species]).slice(-1)[0], it.skin.id) : it.kind === "candy" ? candyIcon(4) : it.kind === "shards" ? shardIcon() : it.kind === "preset" ? classIcon("guard") : ticket("regular", 2);
   const what = { sp: it.skin && it.skin.name, candy: "5 candy, any caught line", shards: "10 shards", preset: "A saved team", reg: "1 Regular = 1 egg" }[it.kind];
   $("#shop-preview").replaceChildren(el("div", "title", it.kind === "sp" ? "PREVIEW" : it.kind === "reg" ? "VOUCHER" : "COINS"), cellWith(pic), el("div", "", what), have);
-  say(shopConfirm === "item:" + shopAt ? confirmText(it) + " Enter: buy · Backspace: no." : it.about);
+  if (shopConfirm === "item:" + shopAt) { const k = el("span", "klabels"); k.append(keyLabel("Enter", "Buy"), keyLabel("Backspace", "No")); say(confirmText(it), k); }
+  else say(it.about);
 }
 // Every purchase asks first: Enter once shows "Buy?", Enter again buys, anything else cancels.
 function buy(it) {
@@ -1686,7 +1706,8 @@ function cardUpdate() {
   if (b) pic.append(sprite(b.species, look)); else pic.append(el("div", "dim", "?"));
   box.replaceChildren(el("div", "title", "TRAINER"), pic,
     el("div", "", b ? name(b.species) : "No buddy yet"),
-    el("div", b && look !== "normal" ? "gold" : "dim", b ? (look === "normal" ? "Buddy" : lookName(look)) : "Pick one in the Dex"));
+    el("div", b && look !== "normal" ? "gold" : "dim", b ? (look === "normal" ? "Buddy" : lookName(look)) : "Pick one in the Dex"),
+    (() => { const k = el("div", "klabels"); k.style.marginTop = "8px"; k.append(keyLabel("Enter", b ? "Change buddy" : "Open the Dex")); return k; })());
   const rows = cardStats().map(st => {
     const r = el("div", "stat"), v = el("span");
     if (st.value === null) v.append(el("span", "dim", st.note));
@@ -1864,6 +1885,7 @@ function storyUpdate() {
   const chapter = chapters()[Math.min(chapterAt, chapters().length - 1)], list = stagesNow();
   if (storyAt >= list.length) storyAt = list.length - 1;
   titled($("#story-title"), "CHAPTER", chapter.id + (chapters().length > 1 ? "/" + chapters().length : ""));
+  storyPager();
   rows($("#story-list"), list.map(stage => ({ label: stage.id + " " + stage.name, right: isOpen(td, stage) ? stageStars(td.best[stage.id] || 0) : "locked",
     off: !isOpen(td, stage) })), storyAt, (i, click) => { storyAt = i; if (click) pickStage(); else storyUpdate(); });
   const stage = list[storyAt], best = td.best[stage.id] || 0;
@@ -1900,6 +1922,7 @@ function weeklyUpdate() {
   const n = T.risks.length + 1;
   if (storyAt >= n) storyAt = n - 1;
   titled($("#story-title"), "WEEKLY", "risk " + risk);
+  storyPager();
   const start = { label: "Start this week's run", right: weeklyOpen(td) ? "" : "locked", off: !weeklyOpen(td) };
   rows($("#story-list"), [start, ...T.risks.map(r => ({ label: r.label, right: ["+" + r.risk, check(picked.includes(r.id))] }))], storyAt,
     (i, click) => { storyAt = i; if (click) pickStage(); else storyUpdate(); });
@@ -2090,8 +2113,11 @@ function cycleSkill(num) {
 function squadDetail(num) {
   const box = $("#squad-detail");
   // One line of keys for where the cursor is, or what just went wrong.
-  const hint = el("div", sq.note ? "gold" : "dim", sq.note || (sq.zone === "head" ? "Enter: team or Start · P: team" :
-    sq.zone === "slots" ? "Enter: drop · L: level · K: skill" : "Enter: add · L: level · K: skill"));
+  const hint = sq.note ? el("div", "gold", sq.note) : el("div", "klabels");
+  if (!sq.note) {
+    if (sq.zone === "head") hint.append(keyLabel("Enter", sq.head === 3 ? "Start" : "Use team"), keyLabel("p", "Next team"));
+    else hint.append(keyLabel("Enter", sq.zone === "slots" ? "Drop" : squadPick().includes((rosterCache || roster()).list[sq.at]?.num) ? "Drop" : "Add"), keyLabel("l", "Level up"), keyLabel("k", "Skill"));
+  }
   hint.style.whiteSpace = "nowrap";
   if (!num) { box.replaceChildren(el("div", "title", "SQUAD"), el("div", "", squadPick().length + " of 8 picked"), hint); return; }
   const u = unitOf(num), row = G.dex[num - 1], c = T.classes[u.cls], l = S.lines[G.lineOf(num)] || {};
@@ -2135,7 +2161,10 @@ function squadKey(e) {
   if (k === "Backspace") { e.preventDefault(); sq.note = ""; storyMode = "stages"; return storyUpdate(); }
   if (k === "l" || k === "L") {
     const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null;
-    if (num) { const r = T.levelUp({ line: G.lineOf(num) }); refreshTop(); sq.note = r.ok ? "" : r.reason === "coins" ? "Not enough coins." : r.reason === "cap" ? "Level cap. Evolve to raise it." : "Already at max level."; squadUpdate(); }
+    if (num) { const r = T.levelUp({ line: G.lineOf(num) }); refreshTop(); sq.note = r.ok ? "" : r.reason === "coins" ? "Not enough coins." : r.reason === "cap" ? "Level cap. Evolve to raise it." : "Already at max level.";
+      // Sorted by level, the card can move: the cursor stays on the same mon.
+      if (r.ok && sq.zone === "grid") { rosterCache = null; const at = roster().list.findIndex(u => u.num === num); if (at >= 0) sq.at = at; }
+      squadUpdate(); }
     return;
   }
   if (k === "k" || k === "K") {
@@ -2179,10 +2208,18 @@ function squadClick(e) {
   if (t.dataset.key) return cycleSquad(t.dataset.key);
   if (t.dataset.team) { useTeam(Number(t.dataset.team)); sq.zone = "head"; sq.head = Number(t.dataset.team); sq.note = ""; return squadUpdate(); }
   if (t.dataset.start) return squadStart();
-  if (t.dataset.slot) { sq.zone = "slots"; sq.slot = Number(t.dataset.slot); const num = squadPick()[sq.slot]; if (num) squadToggle(num); else squadUpdate(); return; }
-  sq.zone = "grid"; sq.at = Number(t.dataset.at);
-  const u = (rosterCache || roster()).list[sq.at];
-  if (u) squadToggle(u.num);
+  // First click selects (so Level up and Skill can act on it); a click on the selected card adds or drops it.
+  if (t.dataset.slot) { const i = Number(t.dataset.slot), again = sq.zone === "slots" && sq.slot === i; sq.zone = "slots"; sq.slot = i; const num = squadPick()[i]; if (num && again) squadToggle(num); else squadUpdate(); return; }
+  const i = Number(t.dataset.at), again = sq.zone === "grid" && sq.at === i;
+  sq.zone = "grid"; sq.at = i;
+  const u = (rosterCache || roster()).list[i];
+  if (u && again) squadToggle(u.num); else squadUpdate();
+}
+// ‹ › beside the chapter title: Left and Right, by mouse.
+function storyPager() {
+  if (pages() < 2) return;
+  const p_ = el("span", "pager"); p_.append(keyLabel("ArrowLeft", "‹"), keyLabel("ArrowRight", "›"));
+  $("#story-title").append(p_);
 }
 function storyKey(e) {
   const k = e.key;
@@ -3081,6 +3118,20 @@ function refreshTop() {
   help.append(q, spk);
   $("#tabs").append(help, purse);
 }
+// Every key, from the keyboard or a [data-press] label.
+function onKey(e) {
+  if (tutor && tutorKey(e)) return;
+  if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); return toggleSound(); }
+  if (battle) return battleKey(e);
+  if (picking) return starterKey(e);
+  // Keys go to the reveal; only a number key closes it and goes on to switch screens.
+  if (reveal) { const num = /^[1-9]$/.test(e.key); revealKey(e); if (reveal || !num) return; }
+  if (/^[1-9]$/.test(e.key) && !hatching && shownTabs()[Number(e.key) - 1]) { e.preventDefault(); return go(shownTabs()[Number(e.key) - 1][0]); }
+  if (hatching) return hatchKey(e);
+  SCREENS[tab][1](e);
+}
+// A clickable label for a key: the same 1px frame as the tabs, gold when on.
+const keyLabel = (key, text, on = false) => { const s_ = el("span", "klabel" + (on ? " on" : ""), text); s_.dataset.press = key; s_.title = "Key: " + (key === " " ? "Space" : key.length === 1 ? key.toUpperCase() : key.replace("Arrow", "")); return s_; };
 function go(id) {
   if (!SCREENS[id] || hatching || battle || picking || !shownTabs().some(([shown]) => shown === id)) return;
   if (reveal) endReveal();
@@ -3125,17 +3176,15 @@ if (!G) {
   for (const [sid] of TABS) $("#scr-" + sid).hidden = true;
   $("#msg").hidden = true; $("#off").hidden = false;
 } else {
-  document.addEventListener("keydown", e => {
-    if (tutor && tutorKey(e)) return;
-    if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); return toggleSound(); }
-    if (battle) return battleKey(e);
-    if (picking) return starterKey(e);
-    // Keys go to the reveal; only a number key closes it and goes on to switch screens.
-    if (reveal) { const num = /^[1-9]$/.test(e.key); revealKey(e); if (reveal || !num) return; }
-    if (/^[1-9]$/.test(e.key) && !hatching && shownTabs()[Number(e.key) - 1]) { e.preventDefault(); return go(shownTabs()[Number(e.key) - 1][0]); }
-    if (hatching) return hatchKey(e);
-    SCREENS[tab][1](e);
-  });
+  document.addEventListener("keydown", onKey);
+  // A label with data-press="<key>" does exactly what that key does, so friends who
+  // don't know the keys can click everything (captured first, so panels don't act twice).
+  $("#frame").addEventListener("click", e => {
+    const t = e.target.closest("[data-press]");
+    if (!t) return;
+    e.stopPropagation();
+    onKey({ key: t.dataset.press, preventDefault() {}, ctrlKey: false, metaKey: false, altKey: false });
+  }, true);
   $("#tabs").onclick = e => { if (e.target.closest("[data-sound]")) return toggleSound(); if (e.target.closest("[data-help]")) return replayTips(); const t = e.target.closest("[data-tab]"); if (t) go(t.dataset.tab); };
   const fieldPoint = e => { const box = $("#field").getBoundingClientRect(), k = box.width / 640; return tileFromPoint((e.clientX - box.left) / k, (e.clientY - box.top) / k); };
   $("#field").onclick = e => {
