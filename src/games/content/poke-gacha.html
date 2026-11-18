@@ -110,6 +110,7 @@ canvas, img { image-rendering: pixelated; display: block }
 
 /* Rates and pity: over the machine and the menu while it is open. */
 /* Clickable key labels (see keyLabel): one style everywhere, like the tabs and Squad's filters. */
+.candy-ico { display: inline-block; vertical-align: middle; flex: none; image-rendering: pixelated; background-repeat: no-repeat }
 .klabel { display: inline-block; border: 1px solid var(--dim); padding: 0 4px; line-height: 18px; cursor: pointer; white-space: nowrap; font: 400 var(--body)/18px var(--pixel) }
 .klabel.on { color: var(--gold); border-color: var(--gold) }
 .klabels { display: flex; gap: 4px; align-items: center; height: 20px; white-space: nowrap }
@@ -132,7 +133,6 @@ canvas, img { image-rendering: pixelated; display: block }
 #filters .sorts { position: relative }
 #filters .sortlist { position: absolute; left: 0; bottom: 22px; display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--dim); padding: 2px }
 #frame.no-pixel #filters, #frame.no-pixel #filters input { font: 600 13px/18px Arial, Helvetica, sans-serif }
-#scr-shop.candy .left-panel .rows { height: 168px }
 #rates { left: 8px; top: 8px; width: 484px; height: 264px; padding: 6px 12px; cursor: pointer }
 /* A pull of 5 or more: every egg on one board, popping in in pull order. An Epic flashes
    red and a Legendary gold (the cell, then the frame, fading out); NEW marks a tier's
@@ -432,7 +432,7 @@ canvas, img { image-rendering: pixelated; display: block }
         <div class="panel" id="dex-detail"><div class="cell" id="dex-pic"></div><div id="dex-info"></div><div id="dex-tabs"></div><div class="rows scroll" id="dex-acts"></div><div id="dex-depth" hidden></div></div>
       </section>
       <section id="scr-shop" class="screen" hidden>
-        <div class="panel left-panel"><div class="title" id="shop-title">SHOP</div><div class="fbar" id="candy-bar" hidden></div><div class="rows scroll" id="shop-list"></div></div>
+        <div class="panel left-panel"><div class="title" id="shop-title">SHOP</div><div class="rows scroll" id="shop-list"></div></div>
         <div class="panel right-panel" id="shop-preview"></div>
       </section>
       <section id="scr-quests" class="screen" hidden>
@@ -526,7 +526,7 @@ function miniStyle(node, num, look = "normal", scale = 1) {
 const mini = (num, look, dark = false) => { const d = miniStyle(el("span", "mini" + (dark ? " unseen" : "")), num, look); d.title = dark ? "???" : name(num); return d; };
 /* PIXEL_MAPS:BEGIN — hand-placed icons, one char per pixel. tests/poke-gacha.test.cjs checks the outlines. */
 const PIXEL_MAPS = {
- "candy": ["..kkkk..", ".k2211k.", "k22w110k", "k2w1w10k", "k21w110k", "k111100k", ".k1000k.", "..kkkk.."],
+ "candy": ["kk..kkkkk..kk", "k1kk22w11kk1k", "k11k2w111k11k", "k11011110011k", "k11k11100k11k", "k1kk01000kk1k", "kk..kkkkk..kk"],
  "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
  "dot": ["kkkk", "k11k", "k11k", "kkkk"],
  "sound-on": ["....k.....", "...k1k..k.", "kkk11k.k1k", "k1111k.k1k", "k1111k.k1k", "kkk11k.k1k", "...k1k..k.", "....k....."],
@@ -547,7 +547,19 @@ function mapCanvas(key, pal, scale = ART) {
   const map = PIXEL_MAPS[key];
   return pixelCanvas(map[0].length, map.length, g => map.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") { g.fillStyle = pal[row[x]]; g.fillRect(x, y, 1, 1); } }), scale);
 }
-const candyIcon = () => mapCanvas("candy", { k: C.ink, 0: SHADE.red[0], 1: C.red, 2: SHADE.red[2], w: C.paper });
+// Candy: a wrapped sweet, drawn here, for candy in general and the few lines without their own.
+const candyIcon = (scale = 1) => { const c = mapCanvas("candy", { k: C.ink, 0: SHADE.red[0], 1: C.red, 2: SHADE.red[2], w: C.paper }, scale); c.classList.add("candy-ico"); c.title = "Candy"; return c; };
+// A line's own candy: 16x16 from art/candies.webp (PokéRogue's per-species candies, one cell
+// per dex number, 32 a row). The lines with no cell there get the wrapped one.
+const CANDY_SHEET = { cell: 16, cols: 32, missing: new Set([809, 862, 863, 864, 865, 866, 867, 902, 903, 904, 980]) };
+function lineCandy(line) {
+  if (!line || CANDY_SHEET.missing.has(line) || line > 1025) return candyIcon();
+  const c = CANDY_SHEET, d = el("span", "candy-ico");
+  Object.assign(d.style, { width: c.cell + "px", height: c.cell + "px", backgroundImage: "url(" + ART_DIR + "candies.webp)",
+    backgroundPosition: -((line - 1) % c.cols) * c.cell + "px " + -Math.floor((line - 1) / c.cols) * c.cell + "px" });
+  d.title = name(line) + " candy";
+  return d;
+}
 const check = done => done ? mapCanvas("check", { k: C.ink, 1: C.gold }) : mapCanvas("dot", { k: C.ink, 1: C.dim });
 // Stage stars: the owner's 17x17 star at 1x, like the coin and the shard. Earned
 // stars keep its yellows (3 light, 2 base, 1 shade); the rest are the same star
@@ -1227,7 +1239,7 @@ function showHatch() {
     if (x.shiny || x.sp) sfx("shiny");
     art.classList.remove("egg-phase");
     art.replaceChildren(hatchSprite(x));
-    const candy = el("div"); candy.append(el("span", "num", "+" + x.candy), " candy");
+    const candy = el("div"); candy.append(el("span", "num", "+" + x.candy), " ", lineCandy(G.lineOf(x.species)), " candy");
     if (x.shards) candy.append(" · ", el("span", "num", "+" + x.shards), " shards");
     text.replaceChildren(el("div", "title", name(x.species)), el("div", x.fresh ? "gold" : "dim", x.fresh ? "New for your dex" : "Already in your dex"),
       el("div", "", TIER_NAME[x.tier] + " " + G.stars[x.tier] + "★ · " + G.dex[x.species - 1][1].replace("/", " / ")), candy,
@@ -1283,7 +1295,7 @@ const DEX_TYPES = [...new Set(BASES.flatMap(num => G.dex[num - 1][1].split("/"))
    Per list (pref.filters[ctx]): up to two types, a class, a tier, a name search, the
    owned filter (Dex) or in-squad (Squad), and a sort. Types, class and name only find
    caught lines: an uncaught line stays ??? like the rest of it. */
-const FILTER_SORTS = { dex: ["number", "name", "tier", "level", "recent"], candy: ["number", "name", "tier", "level", "recent"],
+const FILTER_SORTS = { dex: ["number", "name", "tier", "level", "recent"],
   squad: ["level", "cost", "number", "name", "tier", "recent"] };
 const SORT_NAME = { number: "Number", name: "Name", tier: "Tier", level: "Level", recent: "Recent", cost: "Cost" };
 const TIER_CHIPS = [3, 4, 5, 6], OWN_CHIPS = [["", "All"], ["owned", "Owned"], ["missing", "Not owned"]];
@@ -1340,7 +1352,7 @@ function filtKey(ctx, k) {
   const v = filt(ctx), next = (list, cur) => list[(list.indexOf(cur) + 1) % list.length];
   if (k === "c") return setFilt(ctx, { cls: next(["", ...CLASS_ORDER], v.cls) });
   if (k === "t") return setFilt(ctx, { types: [next(["", ...DEX_TYPES], v.types[0] || "")].filter(Boolean) });
-  if (k === "r" || k === "f" && ctx === "candy") return setFilt(ctx, { tier: next([0, ...TIER_CHIPS], v.tier) });
+  if (k === "r") return setFilt(ctx, { tier: next([0, ...TIER_CHIPS], v.tier) });
   if (k === "f" && ctx === "dex") return setFilt(ctx, { own: next(OWN_CHIPS.map(o => o[0]), v.own) });
   if (k === "q" && ctx === "squad") return setFilt(ctx, { mine: !v.mine });
   if (k === "s") return setFilt(ctx, { sort: next(FILTER_SORTS[ctx], v.sort) });
@@ -1348,7 +1360,7 @@ function filtKey(ctx, k) {
   if (k === "Delete") return setFilt(ctx, { types: [], cls: "", tier: 0, q: "", own: "", mine: false });
   return false;
 }
-const FILTER_KEYS = { dex: /^[ctrsf\/]$|^Delete$/i, squad: /^[ctrqs\/]$|^Delete$/i, candy: /^[ctrsf\/]$|^Delete$/i };
+const FILTER_KEYS = { dex: /^[ctrsf\/]$|^Delete$/i, squad: /^[ctrqs\/]$|^Delete$/i };
 // The bar at the top of a list: the summary (opens the panel) and Clear.
 function filtBar(ctx) {
   const open = keyLabel("/", "Filter: " + filtSummary(ctx) + " · " + SORT_NAME[filt(ctx).sort], filtActive(ctx));
@@ -1372,7 +1384,7 @@ function renderFilters() {
   const v = filt(ctx);
   const head = el("div", "head");
   // How many the list shows now, so the effect is visible behind the panel.
-  const shown = ctx === "dex" ? dexList().length : ctx === "candy" ? candyLines().length : roster().list.length;
+  const shown = ctx === "dex" ? dexList().length : roster().list.length;
   head.append(el("span", "title", "FILTERS"), el("span", "gold", filtSummary(ctx)), el("span", "dim", shown + " shown"), chip("clear", "Clear", false), chip("done", "Done", false));
   const nameRow = el("div", "frow"), input = document.createElement("input");
   input.type = "text"; input.value = v.q; input.placeholder = "a caught mon's name"; input.maxLength = 20; input.spellcheck = false;
@@ -1414,7 +1426,6 @@ function filtClick(e) {
 // After any change: the list starts from its top, and the screen and the panel redraw.
 function filtChanged(ctx) {
   if (ctx === "dex") { dexAt = 0; actAt = 0; dexFocus = "list"; if (tab === "dex") dexUpdate(); }
-  if (ctx === "candy") { candyAt = 0; shopConfirm = null; if (tab === "shop") shopUpdate(); }
   if (ctx === "squad") { sq.at = 0; sq.zone = "grid"; rosterCache = null; if (tab === "story" && storyMode === "squad") squadUpdate(); }
   if (filtOpen === ctx) { const i = $("#filters input"), had = i && document.activeElement === i; renderFilters(); if (had) { const j = $("#filters input"); j.focus(); j.setSelectionRange(j.value.length, j.value.length); } }
 }
@@ -1427,11 +1438,12 @@ function dexActions(line) {
   for (const from of lineForms(line)) for (const to of G.evolutionsOf(from)) {
     if (S.owned.includes(to)) continue;
     const cost = G.costs.evolve[Math.min(G.stageOf(from), 2) - 1];
-    list.push({ label: "Evolve: " + name(to), right: [cost, " candy"], off: l.candy < cost,
+    // Short on candy is not off: choosing it offers to buy what is missing.
+    list.push({ label: "Evolve: " + name(to), right: [cost, lineCandy(line)], cost, line,
       about: "Evolve " + name(from) + " into " + name(to) + " for " + cost + " candy. Both stay in your dex.", run: () => G.evolve({ from, to }) });
   }
-  const up = (kind, label, done, cost, about, blocked) => list.push({ label, right: done ? [check(true)] : [cost, " candy"],
-    off: done || blocked || l.candy < cost, about, run: () => G.upgrade({ line, kind }) });
+  const up = (kind, label, done, cost, about, blocked) => list.push({ label, right: done ? [check(true)] : [cost, lineCandy(line)],
+    off: done || blocked, cost: done ? 0 : cost, line, about, run: () => G.upgrade({ line, kind }) });
   up("passive", "Passive", l.passive, G.costs.passive, "Unlock this line's passive for tower defense.");
   up("cost1", "Cost -1", l.cost >= 1, G.costs.cost1, "Deploy this line for 1 less energy in tower defense.");
   up("cost2", "Cost -2", l.cost >= 2, G.costs.cost2, "Deploy for 2 less energy. Needs Cost -1 first.", l.cost < 1);
@@ -1462,6 +1474,8 @@ function dexActions(line) {
 }
 function dexUpdate() {
   drawBackdrop();
+  // Any redraw cancels a pending "use coins?" offer, so a later Enter never buys for an old choice.
+  dexBuy = null;
   const owned = new Set(Object.keys(S.lines).map(Number)), list = dexList();
   // The count: caught of all lines, or shown of all lines while a filter is on.
   titled($("#dex-title"), "DEX", (filtActive("dex") ? list.length + " shown" : owned.size + "/" + BASES.length + " caught"));
@@ -1485,7 +1499,7 @@ function dexUpdate() {
   egg.append("#" + String(tip).padStart(4, "0") + " ·", eggImg(stars - 3), TIER_NAME[stars - 3] + " egg · " + stars + "★");
   // Then the type (??? until caught), and for a caught line its candy.
   const more = el("div", l ? "" : "dim");
-  if (l) more.append(el("span", "dim", G.dex[tip - 1][1]), " · ", el("span", "num", l.candy), " candy · hatched ", el("span", "num", l.hatches));
+  if (l) more.append(el("span", "dim", G.dex[tip - 1][1]), " · ", el("span", "num", l.candy), " ", lineCandy(line), " · hatched ", el("span", "num", l.hatches));
   else more.append("Type ??? · not caught");
   info.replaceChildren(el("div", "title", l ? name(tip) : "???"), egg, more);
   const acts = dexActions(line);
@@ -1507,11 +1521,35 @@ function dexUpdate() {
   say(dexFocus === "acts" && acts[actAt] ? acts[actAt].about
     : (l ? "Skills: " + skills.join(", ") + ". Locked in brackets, * is rare. Enter: candy and looks." : "Hatch this line to unlock it. F, T and S filter and sort the Dex."));
 }
+let dexBuy = null;
 function runDex(action) {
   if (!action || action.off) return;
+  const l = action.line && S.lines[action.line], need = l && action.cost ? action.cost - l.candy : 0;
+  if (need > 0) return offerCandy(action, need);
   const r = action.run();
   refreshTop(); dexUpdate();
   if (!r.ok) say(REASONS[r.reason] || "Not now.");
+}
+// "Not enough candy: need 7 more. Use 280 coins?" (40 a candy, 50 a line a day, from the hub).
+function offerCandy(action, need) {
+  dexBuy = null;
+  if (!G.candyOffer) return say("Not enough candy: need " + need + " more. Hatch more of this line.");
+  const o = G.candyOffer({ line: action.line, count: need });
+  if (!o.fits) return say("Not enough candy: need " + need + " more, and only " + o.left + " more can be bought for this line today.");
+  if (o.short) return say("Not enough candy: need " + need + " more (" + o.coins + " coins), and you're " + o.short + " coins short.");
+  dexBuy = { action, need, coins: o.coins };
+  const k = el("span", "klabels"); k.append(keyLabel("Enter", "Yes"), keyLabel("Backspace", "No"));
+  say("Not enough candy: need " + need + " more. Use " + o.coins + " coins?", k);
+}
+function answerCandy(yes) {
+  const b = dexBuy; dexBuy = null;
+  if (!b) return;
+  if (!yes) { dexUpdate(); return say("Kept your coins."); }
+  const bought = G.buyCandy({ line: b.action.line, count: b.need });
+  if (!bought.ok) { refreshTop(); dexUpdate(); return say(bought.reason === "coins" ? "Not enough coins: " + bought.short + " short." : bought.reason === "limit" ? "Only " + bought.left + " more candy can be bought for this line today." : REASONS[bought.reason] || "Not now."); }
+  const r = b.action.run();
+  refreshTop(); dexUpdate();
+  say(r.ok ? "Bought " + b.need + " candy for " + b.coins + " coins. " + b.action.label.replace(/:.*/, "") + " done." : REASONS[r.reason] || "Not now.");
 }
 // The Info view: the evolution chain by stage (owned forms in colour with a check, the
 // rest dark), class, range and deploy cost of the form shown, and its base stats as bars.
@@ -1551,6 +1589,7 @@ function dexDepth(line, tip) {
 }
 function dexKey(e) {
   const k = e.key;
+  if (dexBuy) { e.preventDefault(); return answerCandy(k === "Enter" || k === " "); }
   if (dexFocus === "list") {
     const step = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -8, ArrowRight: 8 }[k], list = dexList();
     if (FILTER_KEYS.dex.test(k)) { e.preventDefault(); return filtKey("dex", k.length === 1 ? k.toLowerCase() : k); }
@@ -1566,18 +1605,14 @@ function dexKey(e) {
 }
 
 /* ── Shop: coins for Regulars, and shards for listed SP skins ──────────── */
-let shopAt = 0, shopConfirm = null, shopMode = "list", candyAt = 0;
-// The candy picker lists caught lines with the same filters (kept apart from the Dex's own).
-const candyLines = () => dexList("candy").filter(line => !!S.lines[line]);
-const candyLeft = line => G.coinShop ? G.coinShop.candy.perLineDay - ((S.shop && S.shop.candyToday[line]) || 0) : 0;
+let shopAt = 0, shopConfirm = null;
 function shopItems() {
   const items = [{ kind: "reg", label: "Regular voucher", price: 100, cur: "coins", icon: ticket("regular"),
     about: "1 Regular voucher for 100 coins. Coins come from Poké Idle, Pokédoku and tower defense." }];
-  // The coin shop (from the hub): candy for a line, shards, and squad preset slots.
+  // The coin shop (from the hub): shards and squad preset slots. Candy is bought where it is
+  // spent: the Dex offers the missing candy for coins when an evolve or upgrade is short.
   if (G.coinShop && S.shop) {
     const cs = G.coinShop, sh = S.shop;
-    items.push({ kind: "candy", label: "Candy: " + cs.candy.candy + " for a line", price: cs.candy.coins, cur: "coins", icon: candyIcon(), locked: !Object.keys(S.lines).length,
-      about: "Pick a caught line: " + cs.candy.candy + " of its candy for " + cs.candy.coins + " coins, up to " + cs.candy.perLineDay + " per line a day. Enter: choose the line." });
     items.push({ kind: "shards", label: cs.shards.shards + " shards · " + sh.shardsLeft + "/" + cs.shards.perWeek + " a week", price: cs.shards.coins, cur: "coins", icon: shardIcon(),
       locked: sh.shardsLeft < cs.shards.shards,
       about: cs.shards.shards + " shards for " + cs.shards.coins + " coins, up to " + cs.shards.perWeek + " a week (resets Monday). " + sh.shardsLeft + " left this week." });
@@ -1602,33 +1637,11 @@ function shopItems() {
 const ordinal = n => n + (n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th");
 // What the confirm step asks.
 function confirmText(it, line) {
-  if (it.kind === "candy") return "Buy " + G.coinShop.candy.candy + " " + name(tipOf(line)) + " candy for " + it.price + " coins?";
   if (it.kind === "sp") return "Buy " + it.label + " for " + it.price + " shards?";
   return "Buy " + (it.kind === "reg" ? "1 Regular voucher" : it.kind === "shards" ? G.coinShop.shards.shards + " shards" : "squad preset " + (S.shop.presets + 1)) + " for " + it.price + " coins?";
 }
-function candyUpdate() {
-  const list = candyLines(), cs = G.coinShop.candy;
-  $("#scr-shop").classList.add("candy"); $("#candy-bar").hidden = false; $("#candy-bar").replaceChildren(...filtBar("candy"));
-  if (candyAt >= list.length) candyAt = Math.max(0, list.length - 1);
-  titled($("#shop-title"), "CANDY", list.length + " lines");
-  rows($("#shop-list"), list.map(line => ({ icon: mini(tipOf(line), S.lines[line].look), label: String(line).padStart(4, "0") + " " + name(tipOf(line)),
-    right: shopConfirm === "candy:" + line ? ["Buy?"] : [el("span", "num", candyLeft(line) + "/" + cs.perLineDay), " today"],
-    off: candyLeft(line) < cs.candy || S.balance.coins < cs.coins })), candyAt, (i, click) => { candyAt = i; if (click) buyNow(shopItems()[shopAt], list[i]); else candyUpdate(); });
-  if (!list.length) { $("#shop-list").replaceChildren(el("p", "dim", "No caught lines match.")); $("#shop-preview").replaceChildren(el("div", "title", "CANDY")); return say("Nothing matches " + filtSummary("candy") + ". Clear the filters (Delete) or change them (/)."); }
-  const line = list[candyAt], l = S.lines[line];
-  const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins · ", el("span", "num", l.candy), " candy");
-  const left = el("div", "dim"); left.append(el("span", "num", candyLeft(line)), " of " + cs.perLineDay + " left today");
-  const keys = el("div", "klabels");
-  if (shopConfirm) keys.append(keyLabel("Enter", "Buy"), keyLabel("Backspace", "No"));
-  else keys.append(keyLabel("Backspace", "Back"));
-  $("#shop-preview").replaceChildren(el("div", "title", "CANDY"), cellWith(sprite(tipOf(line), G.lookFor(tipOf(line)))), el("div", "", name(tipOf(line))), have, left, keys);
-  say(shopConfirm ? confirmText(shopItems()[shopAt], line) + " Enter: buy · Backspace: no."
-    : cs.candy + " candy for " + cs.coins + " coins. Candy evolves a line and buys its upgrades in the Dex. Filter: " + filtSummary("candy") + ". Backspace: back.");
-}
 function shopUpdate() {
   drawBackdrop();
-  if (shopMode === "candy" && G.coinShop) return candyUpdate();
-  $("#scr-shop").classList.remove("candy"); $("#candy-bar").hidden = true;
   const items = shopItems();
   if (shopAt >= items.length) shopAt = items.length - 1;
   $("#shop-title").textContent = "SHOP";
@@ -1638,7 +1651,7 @@ function shopUpdate() {
   const it = items[shopAt];
   const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins");
   if (items.length > 1) have.append(" · ", el("span", "num", S.balance.shards), " shards");
-  const pic = it.kind === "sp" ? sprite((it.skin.forms || [it.skin.species]).slice(-1)[0], it.skin.id) : it.kind === "candy" ? candyIcon(4) : it.kind === "shards" ? shardIcon() : it.kind === "preset" ? classIcon("guard") : ticket("regular", 2);
+  const pic = it.kind === "sp" ? sprite((it.skin.forms || [it.skin.species]).slice(-1)[0], it.skin.id) : it.kind === "shards" ? shardIcon() : it.kind === "preset" ? classIcon("guard") : ticket("regular", 2);
   const what = { sp: it.skin && it.skin.name, candy: "5 candy, any caught line", shards: "10 shards", preset: "A saved team", reg: "1 Regular = 1 egg" }[it.kind];
   $("#shop-preview").replaceChildren(el("div", "title", it.kind === "sp" ? "PREVIEW" : it.kind === "reg" ? "VOUCHER" : "COINS"), cellWith(pic), el("div", "", what), have);
   if (shopConfirm === "item:" + shopAt) { const k = el("span", "klabels"); k.append(keyLabel("Enter", "Buy"), keyLabel("Backspace", "No")); say(confirmText(it), k); }
@@ -1647,14 +1660,12 @@ function shopUpdate() {
 // Every purchase asks first: Enter once shows "Buy?", Enter again buys, anything else cancels.
 function buy(it) {
   if (it.owned || it.locked) return say(it.about);
-  if (it.kind === "candy") { shopMode = "candy"; shopConfirm = null; candyAt = 0; return shopUpdate(); }
   if (shopConfirm !== "item:" + shopAt) { shopConfirm = "item:" + shopAt; return shopUpdate(); }
   buyNow(it);
 }
 function buyNow(it, line) {
-  if (it.kind === "candy" && shopConfirm !== "candy:" + line) { shopConfirm = "candy:" + line; return shopUpdate(); }
   shopConfirm = null;
-  const r = it.kind === "reg" ? G.buyRegular({ count: 1 }) : it.kind === "sp" ? G.buySkin({ skin: it.skin.id }) : it.kind === "candy" ? G.buyCandy({ line })
+  const r = it.kind === "reg" ? G.buyRegular({ count: 1 }) : it.kind === "sp" ? G.buySkin({ skin: it.skin.id })
     : it.kind === "shards" ? G.buyShards() : G.buyPreset();
   refreshTop(); shopUpdate();
   const done = { reg: "Bought 1 Regular voucher.", sp: "SP skin unlocked. Wear it from the Dex: Look.", candy: "Bought " + (G.coinShop ? G.coinShop.candy.candy : 5) + " candy" + (line ? " for " + name(tipOf(line)) : "") + ".",
@@ -1663,14 +1674,6 @@ function buyNow(it, line) {
 }
 function shopKey(e) {
   const k = e.key;
-  if (shopMode === "candy") {
-    const list = candyLines();
-    if (FILTER_KEYS.candy.test(k)) { e.preventDefault(); return filtKey("candy", k.length === 1 ? k.toLowerCase() : k); }
-    if ((k === "ArrowUp" || k === "ArrowDown") && list.length) { e.preventDefault(); shopConfirm = null; candyAt = (candyAt + (k === "ArrowUp" ? -1 : 1) + list.length) % list.length; return shopUpdate(); }
-    if ((k === "Enter" || k === " ") && list[candyAt]) { e.preventDefault(); return buyNow(shopItems()[shopAt], list[candyAt]); }
-    if (k === "Backspace") { e.preventDefault(); if (shopConfirm) shopConfirm = null; else shopMode = "list"; return shopUpdate(); }
-    return;
-  }
   const items = shopItems();
   if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); shopConfirm = null; shopAt = (shopAt + (k === "ArrowUp" ? -1 : 1) + items.length) % items.length; shopUpdate(); }
   else if (k === "Enter" || k === " ") { e.preventDefault(); buy(items[shopAt]); }
@@ -3324,7 +3327,7 @@ function go(id) {
   if (reveal) endReveal();
   if (filtOpen) closeFilters();
   tab = pref.tab = id; keep();
-  message = null; ratesOpen = false; shopMode = "list"; shopConfirm = null;
+  message = null; ratesOpen = false; shopConfirm = null;
   for (const [sid] of TABS) $("#scr-" + sid).hidden = sid !== id;
   // Only the squad screen hides the message box; every other screen has it.
   $("#msg").hidden = false;

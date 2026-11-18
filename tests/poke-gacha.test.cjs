@@ -378,7 +378,7 @@ test('Dex: uncaught lines are ??? with a silhouette, the egg they hatch from and
   const shown = await game.evaluate(() => ({ text: $('#dex-info').textContent, n: name(tipOf(dexList()[dexAt])), type: G.dex[tipOf(dexList()[dexAt]) - 1][1], icons: $('#dex-acts').querySelectorAll('canvas').length,
     acts: $('#dex-acts').textContent, spill: $('#dex-info').scrollHeight > $('#dex-info').clientHeight + 1 }));
   assert.ok(shown.text.startsWith(shown.n) && shown.text.includes(shown.type), 'a caught line shows its name and type');
-  assert.match(shown.acts, /\d+ candy/);
+  assert.ok(await game.evaluate(() => document.querySelectorAll('#dex-acts .candy-ico').length > 0), 'candy costs show the candy icon');
   assert.equal(shown.spill, false);
   assert.deepEqual(errors, []);
 });
@@ -422,7 +422,7 @@ test('Dex depth: Info shows the evolution chain with owned forms, class, range a
   assert.deepEqual(errors, []);
 });
 
-test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad level/skill, hatch skip, candy filters and Back, Card)', async t => {
+test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad level/skill, hatch skip, Card)', async t => {
   const { game, errors } = await openWithMons(t);
   const click = async sel => { const n = await game.$(sel); assert.ok(n, sel + ' is there'); await n.click(); await pause(40); };
   // Dex: the filter bar opens the panel; a tier chip filters.
@@ -465,22 +465,60 @@ test('mouse: every key has a label to click (Dex F/T/S, chapter arrows, Squad le
   assert.equal(await game.evaluate(() => hatching && hatching.summary), true, 'Skip to the end by mouse');
   await click('#msg [data-press="Enter"]');
   assert.equal(await game.evaluate(() => hatching), null, 'Close by mouse');
-  // Shop, candy picker: a filter and Back.
-  if (await game.evaluate(() => !!G.coinShop)) {
-    await game.evaluate(() => { go('shop'); shopMode = 'candy'; shopConfirm = null; candyAt = 0; shopUpdate(); });
-    await click('#candy-bar [data-fopen="candy"]');
-    await click('#filters [data-f="tier:3"]');
-    assert.equal(await game.evaluate(() => filt('candy').tier), 3);
-    await click('#filters [data-f="done"]');
-    await click('#shop-preview [data-press="Backspace"]');
-    assert.equal(await game.evaluate(() => shopMode), 'list', 'Back by mouse');
-  }
   // Card: to the Dex.
   await game.evaluate(() => go('card'));
   await click('#card-buddy [data-press="Enter"]');
   assert.equal(await game.evaluate(() => tab), 'dex');
   // Every label's key is one the page handles (no dead labels): each carries a title naming it.
   assert.ok(await game.evaluate(() => [...document.querySelectorAll('[data-press]')].every(n => /^Key: /.test(n.title))));
+  assert.deepEqual(errors, []);
+});
+
+test('candy where it is spent: short on candy, the Dex offers exactly the missing candy for coins (Yes buys and evolves), or says how many coins are short', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  if (!await game.evaluate(() => !!G.candyOffer)) return t.skip('the hub has no candyOffer yet (bassdrum4/bored#246)');
+  // A caught line that can evolve, with no candy.
+  const setup = await game.evaluate(() => {
+    pref.filters = {}; keep(); go('dex');
+    const line = dexList().find(n => S.lines[n] && dexActions(n).some(a => /^Evolve/.test(a.label)));
+    dexAt = dexList().indexOf(line); dexFocus = 'acts'; actAt = dexActions(line).findIndex(a => /^Evolve/.test(a.label)); dexUpdate();
+    const a = dexActions(line)[actAt]; return { line, cost: a.cost, have: S.lines[line].candy, label: a.label };
+  });
+  assert.ok(setup.line, 'a line that can evolve');
+  const need = setup.cost - setup.have;
+  assert.ok(need > 0, 'short on candy');
+  assert.equal(await game.evaluate(() => document.querySelectorAll('#dex-acts .candy-ico').length > 0), true, 'the cost shows the line\'s candy');
+  // Not enough coins: it says how many are short, and nothing is bought.
+  await game.evaluate(() => { const w = JSON.parse(parent.localStorage.getItem('bored.wallet')); w.entries['test:spendall'] = { at: Math.floor(Date.now() / 1000), g: { coins: -S.balance.coins } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop(); });
+  await key(tab, 'Enter');
+  assert.match(await game.$eval('#msg', n => n.textContent), new RegExp('need ' + need + ' more \\(' + need * 40 + ' coins\\), and you\'re ' + need * 40 + ' coins short'));
+  assert.equal(await game.evaluate(() => dexBuy), null);
+  // With coins: the offer, No keeps them, Yes buys exactly the missing candy and evolves.
+  await game.evaluate(() => { const w = JSON.parse(parent.localStorage.getItem('bored.wallet')); delete w.entries['test:spendall']; w.entries['test:rich'] = { at: Math.floor(Date.now() / 1000), g: { coins: 5000 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop(); dexUpdate(); });
+  const coins0 = await game.evaluate(() => S.balance.coins);
+  await key(tab, 'Enter');
+  assert.match(await game.$eval('#msg', n => n.textContent), new RegExp('Not enough candy: need ' + need + ' more\\. Use ' + need * 40 + ' coins\\?'));
+  assert.deepEqual(await game.$$eval('#msg [data-press]', n => n.map(x => x.textContent)), ['Yes', 'No']);
+  await key(tab, 'Backspace');
+  assert.equal(await game.evaluate(() => S.balance.coins), coins0, 'No: nothing bought');
+  await key(tab, 'Enter');
+  await (await game.$('#msg [data-press="Enter"]')).click();
+  const after = await game.evaluate(l => ({ coins: S.balance.coins, candy: S.lines[l].candy, owned: S.owned.length }), setup.line);
+  assert.equal(coins0 - after.coins, need * 40, 'paid 40 a candy for exactly the missing ones');
+  assert.equal(after.candy, 0, 'all of it spent on the evolve');
+  assert.match(await game.$eval('#msg', n => n.textContent), new RegExp('Bought ' + need + ' candy for ' + need * 40 + ' coins\\. Evolve done'));
+  assert.deepEqual(errors, []);
+});
+
+test('the candy icon: a closed wrapped sweet, and every caught line shows its own candy (the generic one when it has none)', async t => {
+  const { game, errors } = await openWithMons(t);
+  const map = page.match(/ "candy": (\[[^\]]*\])/)[1];
+  const rows = JSON.parse(map);
+  assert.ok(rows[0].length > rows.length, 'wider than tall: the twisted ends on both sides');
+  const icons = await game.evaluate(() => BASES.filter(n => S.lines[n]).map(n => { const i = lineCandy(n); return [i.tagName === 'CANVAS' ? CANDY_SHEET.missing.has(n) : /candies\.webp/.test(i.style.backgroundImage), n]; }));
+  assert.ok(icons.length > 0);
+  assert.deepEqual(icons.filter(([ok]) => !ok), [], 'a sheet cell, or the wrapped one');
+  assert.equal(await game.evaluate(() => lineCandy(862).tagName), 'CANVAS', 'a line with no cell gets the wrapped candy');
   assert.deepEqual(errors, []);
 });
 
@@ -715,14 +753,15 @@ test('progression: Squad and Dex show the level cap, and K picks which unlocked 
   assert.deepEqual(errors, []);
 });
 
-test('coin shop: candy for a picked line, shards and preset slots, each with a confirm step and its limit shown', async t => {
+test('coin shop: shards and preset slots, each with a confirm step and its limit shown (no candy row)', async t => {
   const { tab, game, errors } = await openWithMons(t);
   if (!await game.evaluate(() => !!G.coinShop)) return t.skip('the hub has no coin shop');
   await game.evaluate(() => { const now = Math.floor(Date.now() / 1000), w = JSON.parse(parent.localStorage.getItem('bored.wallet'));
     w.entries['test:coins'] = { at: now - 100, g: { coins: 20000 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop(); });
   await key(tab, '5');
   const labels = await game.evaluate(() => shopItems().map(i => i.kind + ':' + i.label));
-  assert.ok(labels.includes('shards:10 shards · 50/50 a week') && labels.some(l => l.startsWith('candy:')) && labels.includes('preset:Squad preset 4 of 5'));
+  assert.ok(labels.includes('shards:10 shards · 50/50 a week') && labels.includes('preset:Squad preset 4 of 5'));
+  assert.ok(!labels.some(l => l.startsWith('candy:')), 'no candy row: candy is bought in the Dex, where it is spent');
   const row = kind => game.evaluate(k => shopItems().findIndex(i => i.kind === k), kind);
   // Shards: Enter asks, Backspace cancels without buying, Enter Enter buys; the weekly limit counts down.
   await game.evaluate(i => { shopAt = i; shopUpdate(); }, await row('shards'));
@@ -736,21 +775,6 @@ test('coin shop: candy for a picked line, shards and preset slots, each with a c
   for (let i = 0; i < 5; i++) { await key(tab, 'Enter'); await key(tab, 'Enter'); }
   assert.deepEqual(await game.evaluate(c0 => [S.shop.shardsLeft, c0 - S.balance.coins], coins0), [0, 2500]);
   assert.match(await game.evaluate(() => shopItems().find(i => i.kind === 'shards').label), /0\/50 a week/);
-  // Candy: Enter opens the caught lines with the Dex filters; Enter Enter buys for the line under the cursor.
-  await game.evaluate(i => { shopAt = i; shopUpdate(); }, await row('candy'));
-  await key(tab, 'Enter');
-  assert.equal(await game.evaluate(() => shopMode), 'candy');
-  const lines = await game.evaluate(() => candyLines());
-  assert.ok(lines.length > 0 && await game.evaluate(l => l.every(n => !!S.lines[n]), lines), 'caught lines only');
-  const line = lines[0], candy0 = await game.evaluate(l => S.lines[l].candy, line);
-  await key(tab, 'Enter'); await key(tab, 'Enter');
-  assert.equal(await game.evaluate(l => S.lines[l].candy, line) - candy0, 5);
-  assert.match(await game.$eval('#shop-list', n => n.textContent), /45\/50 today/);
-  await key(tab, 't');
-  const type = await game.evaluate(() => filt('candy').types[0]);
-  assert.ok(await game.evaluate(t => candyLines().every(n => G.dex[n - 1][1].split('/').includes(t)), type), 'T filters by type, like the Dex');
-  await key(tab, 'Backspace');
-  assert.equal(await game.evaluate(() => shopMode), 'list');
   // Presets: 4th and 5th; then Squad shows T1-T5 and Start, and nothing spills.
   await game.evaluate(i => { shopAt = i; shopUpdate(); }, await row('preset'));
   await key(tab, 'Enter'); await key(tab, 'Enter'); await key(tab, 'Enter'); await key(tab, 'Enter');
