@@ -122,7 +122,7 @@ export async function request(path, { method = 'GET', body, prefer, token, keepa
 export async function loadRules() {
   if (rulesReady) return true;
   try {
-    const rows = await request('/rest/v1/score_rules?select=game,label,better,max_value', { token: API_KEY });
+    const rows = await request('/rest/v1/score_rules?select=game,label,better,min_value,max_value', { token: API_KEY });
     if (!Array.isArray(rows) || !rows.length) return false;
     for (const row of rows) scoreRules.set(row.game, row);
     rulesReady = true;

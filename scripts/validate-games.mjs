@@ -82,6 +82,10 @@ for (const [id, spec] of specs) {
   if (!rule) continue;
   check(rule.better === (spec.lower ? 'low' : 'high'), id + ': score direction disagrees with database rule');
   check(Number.isSafeInteger(rule.max_value) && rule.max_value > 0, id + ': invalid score ceiling');
+  if (rule.min_value !== undefined) {
+    check(Number.isSafeInteger(rule.min_value) && rule.min_value >= 1 && rule.min_value <= rule.max_value,
+      id + ': invalid score floor');
+  }
   if (high.has(id)) check(typeof spec.metric === 'string' && spec.metric.length > 0, id + ': no capture metric');
 }
 for (const id of challenges) check(!online.has(id), id + ': daily challenge needs a local game');
