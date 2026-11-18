@@ -173,12 +173,12 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Quests: four sub-tabs with their reset clocks, then one list. A row is the mission (it
    wraps, never cut), its progress (n/m over a bar) and its reward in real icons. Done rows
    sink to the bottom, dimmed, with a check. Trophies come in groups, one per game. */
-#quest-tabs { left: 8px; top: 8px; width: 624px; height: 36px; padding: 2px 6px; display: flex; gap: 6px; align-items: center }
+#quest-tabs { left: 8px; top: 8px; width: 624px; height: 36px; padding: 2px 8px; display: flex; gap: 8px; align-items: center }
 #quest-tabs > span { padding: 0 8px; border: 1px solid var(--dim); line-height: 26px; cursor: pointer; white-space: nowrap }
 #quest-tabs > span.on { border-color: var(--gold); color: var(--gold) }
 #quest-tabs .clock { color: var(--dim); margin-left: 6px }
 #quest-tabs > span.on .clock { color: var(--paper) }
-#quest-box { left: 8px; top: 52px; width: 624px; height: 220px; padding: 4px 6px 4px 4px }
+#quest-box { left: 8px; top: 52px; width: 624px; height: 220px; padding: 4px 8px 4px 4px }
 #quest-list { height: 100%; scroll-snap-type: none }
 #quest-list .q { display: grid; grid-template-columns: 16px 1fr 128px 112px; column-gap: 8px; align-items: center; min-height: 34px; padding: 2px 4px 2px 0; position: relative; cursor: pointer }
 #quest-list .q.at::before { content: ""; position: absolute; left: 2px; top: calc(50% - 6px); border-style: solid; border-width: 6px 0 6px 8px; border-color: transparent transparent transparent var(--paper) }
@@ -217,9 +217,10 @@ canvas, img { image-rendering: pixelated; display: block }
    teams and Start top right, the detail under them. */
 #squad-slots { left: 8px; top: 8px; width: 406px; height: 64px; padding: 2px 4px; display: grid; grid-template-columns: repeat(8, 49px) }
 #squad-roster { left: 8px; top: 80px; width: 406px; height: 256px; padding: 4px 6px }
-#squad-filters { display: flex; gap: 10px; height: 20px; margin-bottom: 4px; white-space: nowrap }
-#squad-filters span { cursor: pointer }
-#squad-filters span.on { color: var(--gold) }
+/* Filters are labels like the team tabs: a 1px dim frame, gold when one is set. */
+#squad-filters { display: flex; gap: 4px; height: 20px; margin-bottom: 4px; white-space: nowrap }
+#squad-filters span { cursor: pointer; border: 1px solid var(--dim); padding: 0 4px; line-height: 18px }
+#squad-filters span.on { color: var(--gold); border-color: var(--gold) }
 /* 7 columns of 56x55 cells; four rows show and the grid scrolls by whole rows. */
 #squad-grid { display: grid; grid-template-columns: repeat(7, 54px); grid-auto-rows: 53px; gap: 2px; height: 218px; overflow-y: auto;
               scrollbar-width: thin; scrollbar-color: var(--red) var(--panel); scroll-snap-type: y mandatory }
@@ -972,7 +973,7 @@ function eggsUpdate() {
   $("#egg-from").replaceChildren(el("span", egg ? "" : "dim", from));
   const progress = egg ? el("span", "num", egg.progress + "/" + egg.need) : null;
   if (egg) say(eggWords(egg) + " ", (() => { const d = el("div"); if (egg.free) d.append("No waves needed · "); else d.append(progress, " waves · ");
-    d.append( ready ? "Enter hatches " + ready + " ready." : "Waves come from Poké Idle, Pokédoku and battles."); return d; })());
+    d.append( ready ? "Enter: hatch " + ready + " ready." : "Waves come from Poké Idle, Pokédoku and battles."); return d; })());
   // An empty tray before the first clear: the next thing to do is 1-1.
   else if (T && !(T.state().best["1-1"] > 0) && S.owned.length) say("All hatched. Next: play 1-1 on the Story tab with your squad.");
   else say("Eggs hatch on waves you earn: Poké Idle catches, Pokédoku boards, tower defense waves.");
@@ -1063,7 +1064,7 @@ function showHatch() {
     panel.classList.add("sum");
     panel.replaceChildren(el("div", "head gold", "HATCHED " + h.list.length), grid);
     const fresh = h.list.filter(x => x.fresh).length;
-    say(h.list.length + " eggs: " + fresh + " new, " + h.list.reduce((t, x) => t + x.shards, 0) + " shards from dupes" + (h.list.length > 12 ? ". First 12 shown; all are in the Dex." : ".") + " Enter closes.");
+    say(h.list.length + " eggs: " + fresh + " new, " + h.list.reduce((t, x) => t + x.shards, 0) + " shards from dupes" + (h.list.length > 12 ? ". First 12 shown; all are in the Dex." : ".") + " Enter: close.");
     return;
   }
   const x = h.list[h.i];
@@ -1165,7 +1166,7 @@ function dexActions(line) {
   if (T && G.setSkill) {
     const used = skillUsed(l), kind = skillKindOf(used), open = [0, 1, 2, 3].filter(i => l.skills[i]);
     list.push({ label: "Skill: " + G.skillsOf(line)[used] + (kind ? " (" + kind.name + ")" : ""), off: open.length < 2,
-      about: (kind ? kind.name + ": " + SKILL_ABOUT[kind.id] + ". " : "") + (open.length > 1 ? "Enter switches to another unlocked skill." : "Hatch more of this line to unlock other skills."),
+      about: (kind ? kind.name + ": " + SKILL_ABOUT[kind.id] + ". " : "") + (open.length > 1 ? "Enter: switch to another unlocked skill." : "Hatch more of this line to unlock other skills."),
       run: () => { const msg = cycleSkill(tipOf(line)); return { ok: true, msg }; } });
     const lv = T.state().levels[line] || 1, cap = capOf(line), more = nextCap(cap);
     // First in the list, so the cap shows without scrolling.
@@ -1707,7 +1708,7 @@ function weeklyUpdate() {
   if (!weeklyOpen(td)) return say("Clear " + weeklyUnlock() + " first: the weekly challenge opens after the chapter 1 boss. Left/Right: chapter.");
   if (storyAt === 0) return say("The same map for everyone this week. Win to score your risk; each reward pays once a week. Enter: choose your squad.");
   const r = T.risks[storyAt - 1];
-  say((picked.includes(r.id) ? "On" : "Off") + ": " + r.label + " (+" + r.risk + " risk). Enter toggles it. Risks stack.");
+  say((picked.includes(r.id) ? "On" : "Off") + ": " + r.label + " (+" + r.risk + " risk). Risks stack. Enter: toggle it.");
 }
 function pickStage() {
   const td = T.state();
@@ -1880,8 +1881,8 @@ function cycleSkill(num) {
 function squadDetail(num) {
   const box = $("#squad-detail");
   // One line of keys for where the cursor is, or what just went wrong.
-  const hint = el("div", sq.note ? "gold" : "dim", sq.note || (sq.zone === "head" ? "Enter team or Start · P team" :
-    sq.zone === "slots" ? "Enter remove · L level · K skill" : "Enter add · L level · K skill"));
+  const hint = el("div", sq.note ? "gold" : "dim", sq.note || (sq.zone === "head" ? "Enter: team or Start · P: team" :
+    sq.zone === "slots" ? "Enter: drop · L: level · K: skill" : "Enter: add · L: level · K: skill"));
   hint.style.whiteSpace = "nowrap";
   if (!num) { box.replaceChildren(el("div", "title", "SQUAD"), el("div", "", squadPick().length + " of 8 picked"), hint); return; }
   const u = unitOf(num), row = G.dex[num - 1], c = T.classes[u.cls], l = S.lines[G.lineOf(num)] || {};
@@ -2047,7 +2048,7 @@ function startBattle() {
 function battleTalk() {
   const t = battle.talk;
   $("#battle-talk").hidden = !t.length;
-  if (t.length) $("#battle-talk").replaceChildren(el("div", "", t[0]), el("div", "dim", "Enter to continue"));
+  if (t.length) $("#battle-talk").replaceChildren(el("div", "", t[0]), el("div", "dim", "Enter: continue"));
 }
 // One engine tick, and the effects it implies.
 function stepWithFx(bt) {
