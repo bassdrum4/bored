@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 626,
+  "count": 628,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"fac8c78","date":"2026-11-18","author":"Codebuff","subject":"Trackmania: set the long medal ladders from real player times"},
+  {"sha":"6707a5b","date":"2026-11-18","author":"Codebuff","subject":"Feedback: write signed-in notes with the player's own session"},
   {"sha":"c766877","date":"2026-11-18","author":"Codebuff","subject":"Risk: give both Bored Together seats their opening troops"},
   {"sha":"c3ea585","date":"2026-11-18","author":"Codebuff","subject":"Developer notes: fill in the last 14 games and point Circuit at Trackmania"},
   {"sha":"bfeb098","date":"2026-11-18","author":"Codebuff","subject":"Trackmania: take the bumps out of Downdraft's opening drop"},
