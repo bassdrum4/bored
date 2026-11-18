@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 595,
+  "count": 596,
   "newest": "2026-11-18",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"45efa85","date":"2026-11-18","author":"Codebuff","subject":"Make Trackmania's medals earnable and teach Poké Gacha's loop."},
   {"sha":"d0f379b","date":"2026-11-18","author":"Codebuff","subject":"Skip the score-bounds migration when score_rules is absent."},
   {"sha":"efaa1cd","date":"2026-11-18","author":"Codebuff","subject":"Bound every leaderboard board and record each submission."},
   {"sha":"880116e","date":"2026-11-18","author":"Codebuff","subject":"Drop the archived copies of the old feedback tables."},
