@@ -175,6 +175,22 @@ export function walletBalance(wallet) {
   return total;
 }
 
+/* Other modules add trophies of their own (Poké Gacha's, from gacha.js and td.js) with a stats
+   reader over the ledger entries; walletStats merges what they read into s.ext. Their play is
+   all after activation, so it never goes into the capped backpay: a trophy already met when it
+   is added pays in full, once, on the next claim. */
+const STAT_SOURCES = [];
+export function addAchievements(list, stats) {
+  for (const a of list) if (!ACHIEVEMENTS.some(x => x.id === a.id)) ACHIEVEMENTS.push(a);
+  if (stats && !STAT_SOURCES.includes(stats)) STAT_SOURCES.push(stats);
+}
+export const achievement = ach;
+/** Pay every trophy that is met and not paid yet. ok when something paid. */
+export function claimTrophies(wallet, { today = dailyDate(), now = Date.now() } = {}) {
+  const next = mergeWallet(wallet);
+  if (!next.entries.on) return { wallet: next, ok: false };
+  return { wallet: next, ok: checkAchievements(next, today, seconds(now)) };
+}
 /** What achievements read. `historic` counts only play from before activation. */
 export function walletStats(wallet, today, historic = false) {
   const entries = object(object(wallet).entries);
@@ -196,7 +212,9 @@ export function walletStats(wallet, today, historic = false) {
     else if (doku[mode] && kind === 'perfect') doku[mode].perfects++;
   }
   for (const mode of DOKU_MODES) doku[mode].streak = dailyStreak(dates[mode], today).best;
-  return { pi, doku, all3Streak: dailyStreak(dates.all3, today).best };
+  const ext = {};
+  if (!historic) for (const read of STAT_SOURCES) { try { Object.assign(ext, read(entries)); } catch {} }
+  return { pi, doku, all3Streak: dailyStreak(dates.all3, today).best, ext };
 }
 
 function checkAchievements(wallet, today, at) {

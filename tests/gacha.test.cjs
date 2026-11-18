@@ -16,7 +16,8 @@ function moduleUnderTest(file, names, injections = {}) {
 const daily = moduleUnderTest('src/daily.js', ['dailyDate', 'dailyStreak', 'seedNumber']);
 const { DEX, DEX_TYPES, DEX_LEGACY } = moduleUnderTest('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_LEGACY']);
 const rewards = moduleUnderTest('src/hub/rewards.js', [
-  'mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'
+  'mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies',
+  'addAchievements', 'achievement', 'claimTrophies', 'walletTrophyList', 'bossStreak'
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
 const gacha = moduleUnderTest('src/hub/gacha.js', [
   'gachaState', 'pullEggs', 'hatchReady', 'evolve', 'upgrade', 'buySp', 'setBuddy', 'claimLogin', 'candyOffer',
@@ -634,4 +635,24 @@ test('coin shop: candy for a caught line, 50 a line a day; shards, 50 a week; pr
   const merged = mergeWallet(a, b);
   assert.equal(Object.keys(merged.entries).filter(id => id.startsWith('spend:shards:2026-11-30')).length, 1);
   assert.equal(walletBalance(merged).shards, walletBalance(a).shards, 'paid and received once');
+});
+test('Poké Gacha trophies: Dex %, first Epic, Legendary, shiny and SP skin; ones already earned pay once on the next claim', () => {
+  const { claimTrophies, walletTrophyList } = rewards;
+  const named = name => DEX.findIndex(row => row[0] === name) + 1;
+  // A first Epic and a first shiny hatched before the trophies existed.
+  let w = fresh({});
+  w.entries['spend:t-1'] = { at: 1, g: { regular: 0 }, x: { m: 'move', e: [2], w: 0, n: 0, d: TODAY } };
+  w = mergeWallet(w);
+  w.entries['hatch:t-1.0'] = { at: 2, g: {}, x: { s: named('Charmander'), t: 2, n: 1, k: 0, sh: 1 } };
+  w = mergeWallet(w);
+  const list = walletTrophyList(w, TODAY).filter(t => t.game === 'poke-gacha');
+  assert.ok(list.some(t => t.id === 'pg-dex-25') && list.some(t => t.id === 'pg-sp'), 'the gacha trophies are listed (td.js adds the story ones)');
+  const before = walletBalance(w);
+  const r = claimTrophies(w, { today: TODAY, now: later() });
+  assert.ok(r.ok);
+  const after = walletBalance(r.wallet);
+  assert.equal(after.plus - before.plus, 1, 'first Epic (S): 1 Plus');
+  assert.equal(after.premium - before.premium, 1, 'first shiny (M): 1 Premium');
+  assert.equal(claimTrophies(r.wallet, { today: TODAY, now: later() }).ok, false, 'once');
+  assert.deepEqual(walletTrophyList(r.wallet, TODAY).filter(t => t.done).map(t => t.id).sort(), ['pg-epic', 'pg-shiny']);
 });

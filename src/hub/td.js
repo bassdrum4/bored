@@ -17,7 +17,7 @@
 // 1 TD wave cleared = 1 hatch wave.
 import { DEX, DEX_CHART, DEX_TYPES } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
-import { mergeWallet, walletBalance, grantOnce, spendFrom, readWallet, writeWallet } from './rewards.js';
+import { mergeWallet, walletBalance, grantOnce, spendFrom, readWallet, writeWallet, addAchievements, achievement, claimTrophies } from './rewards.js';
 import { gachaState, lineOf, mon, skillsOf, lookFor, stageOf, evolutionsOf } from './gacha.js';
 
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -235,6 +235,82 @@ export const STAGES = [
     ending: ['Team Rocket is gone from Kanto. The routes are quiet again.', 'Your squad rests. The eggs keep hatching, and the weekly challenge still runs.',
       'Thanks for playing the Poké Gacha story.'] }
 ];
+/* ── Part 2: the Gym Challenge (opens after 6-6) ─────────────────────────
+   Eight gym leaders, the Elite Four and a Champion, picked best-of across the regions so their
+   teams cover all 18 types. A gym is two Trainer stages, an Ace Trainer and the Leader, whose
+   first clear pays a badge and a held item (GYM_ITEMS). The Elite Four are four boss stages in a
+   row, then the Champion. Each gym brings one of the six newer kinds of foe (TRAITS). Stages are
+   built from these lists; their levels were tuned so a type-matched squad of commons and rares
+   at the recommended level wins and the worst-typed one loses (tests/td.test.cjs). */
+// [chapter id, gym id, leader, gym, region, types, trait, weak species, strong species, ace, item, a line for each stage]
+export const GYMS = [
+  [7, 'G1', 'Brock', 'Pewter Gym', 'Kanto', 'Rock, Ground', 'shield', [74, 27, 50], [95, 111, 75], 95, 'sash'],
+  [8, 'G2', 'Bugsy', 'Azalea Gym', 'Johto', 'Bug', 'split', [10, 13, 48], [123, 127, 214], 212, 'lens'],
+  [9, 'G3', 'Misty', 'Cerulean Gym', 'Kanto', 'Water', 'heal', [54, 118, 116], [120, 55, 91], 121, 'leftovers'],
+  [10, 'G4', 'Lt. Surge', 'Vermilion Gym', 'Kanto', 'Electric, Steel', 'ranged', [100, 81, 25], [125, 82, 101], 26, 'claw'],
+  [11, 'G5', 'Winona', 'Fortree Gym', 'Hoenn', 'Flying, Normal, Steel', 'rally', [16, 333, 276], [227, 17, 277], 334, 'helmet'],
+  [12, 'G6', 'Sabrina', 'Saffron Gym', 'Kanto', 'Psychic, Fairy', 'stealth', [63, 96, 280], [64, 122, 281], 65, 'band'],
+  [13, 'G7', 'Blaine', 'Cinnabar Gym', 'Kanto', 'Fire', 'ranged', [58, 77, 37], [126, 78, 38], 59, 'belt'],
+  [14, 'G8', 'Clair', 'Blackthorn Gym', 'Johto', 'Dragon', 'shield', [147, 116, 443], [148, 117, 444], 230, 'bell']
+];
+// The Elite Four and the Champion: [id, name, types, traits, species, ace, item].
+export const LEAGUE = [
+  ['E1', 'Lorelei', 'Ice', ['heal', 'shield'], [86, 90, 124, 87], 131, 'leftovers'],
+  ['E2', 'Bruno', 'Fighting', ['rally', 'split'], [66, 67, 106, 107], 68, 'band'],
+  ['E3', 'Agatha', 'Ghost, Poison', ['stealth', 'split'], [92, 93, 42, 24], 94, 'sash'],
+  ['E4', 'Karen', 'Dark', ['ranged', 'stealth'], [198, 215, 228, 197], 229, 'lens'],
+  // Cynthia's team as it was on the way up (Gible, Riolu, Togetic, Roselia), Milotic, and her Garchomp.
+  ['C1', 'Cynthia', 'Ground, Dragon, Steel, Water, Fairy, Grass', ['heal', 'ranged', 'shield', 'rally'], [443, 447, 350, 176, 315], 445, 'belt']
+];
+// Which species fly (their waves cross straight to the goal, so only snipers hit them).
+const FLIES = new Set([16, 17, 333, 334, 276, 277, 227, 42, 198, 468, 176, 123, 212, 12, 49]);
+// [level, thinning] by stage, tuned against the balance guard (see the note above). Thinning n takes n
+// foes off each non-boss wave and spreads the rest 12% wider per step.
+export const GYM_TUNE = { 'G1-1': [2.6, 0], 'G1-2': [2.65, 0], 'G1-3': [2.7, 0], 'G1-4': [2.75, 0], 'G2-1': [2.8, 0], 'G2-2': [2.85, 0], 'G2-3': [2.9, 1], 'G2-4': [2.25, 0], 'G3-1': [3, 0], 'G3-2': [3.05, 0], 'G3-3': [3.05, 0], 'G3-4': [3.15, 0], 'G4-1': [3.2, 0], 'G4-2': [3.25, 0], 'G4-3': [3.3, 0], 'G4-4': [3.35, 0], 'G5-1': [3.4, 0], 'G5-2': [2.4, 0], 'G5-3': [3.4, 1], 'G5-4': [2.35, 0], 'G6-1': [3.6, 0], 'G6-2': [2.45, 0], 'G6-3': [2.55, 0], 'G6-4': [3.35, 0], 'G7-1': [3.25, 0], 'G7-2': [3.25, 0], 'G7-3': [2.85, 0], 'G7-4': [2.3, 0], 'G8-1': [2.3, 0], 'G8-2': [2.35, 1], 'G8-3': [2, 3], 'G8-4': [2.8, 2], 'E1': [2.9, 0], 'E2': [2.25, 2], 'E3': [4.3, 0], 'E4': [2.85, 0], 'C1': [3.4, 2] };
+// Gyms use part 1's one-spawn maps (a gym has one door), in turn.
+const ONE_DOOR = STAGES.filter(st => st.map.join('').split('S').length === 2).map(st => st.map);
+function gymMaps(i) { return ONE_DOOR[(i * 5 + 2) % ONE_DOOR.length]; }
+function wave(at, num, count, gap, { boss = 0, fast = 0, armored = 0, explodes = 0, trait = '' } = {}) {
+  return [at, num, count, gap, boss ? 1 : 0, FLIES.has(num) ? 1 : 0, explodes ? 1 : 0, armored ? 1 : 0, fast ? 1 : 0, trait];
+}
+const gymStages = [];
+GYMS.forEach(([chapter, gid, leader, gym, region, types, trait, weak, strong, ace], g) => {
+  const [a, b, c] = weak, [d, e, f] = strong;
+  const plan = [
+    { id: gid + '-1', name: gym + ': Trainer', waves: [wave(3, a, 3, 3), wave(14, b, 3, 2.5, { trait }), wave(26, c, 4, 2.2), wave(38, a, 3, 2.5, { trait })],
+      before: ['Trainer: ' + leader + ' trains ' + types + ' types here. You will have to get past me first.', 'New foes ahead: check the Foes list for what they do.'] },
+    { id: gid + '-2', name: gym + ': Trainer', waves: [wave(3, b, 4, 2.5), wave(12, d, 2, 4, { trait }), wave(24, c, 4, 2), wave(36, e, 2, 3.5), wave(46, a, 3, 2, { trait })],
+      before: ['Trainer: The second trainer in ' + gym + '. ' + leader + ' is watching.'] },
+    { id: gid + '-3', name: gym + ': Ace Trainer', waves: [wave(3, d, 3, 3, { trait }), wave(14, b, 4, 2, { fast: g % 2 }), wave(26, e, 3, 3, { trait }), wave(38, f, 2, 4), wave(50, c, 4, 1.8, { trait })],
+      before: ['Ace Trainer: Only the best get to face ' + leader + '. Prove it.'] },
+    { id: gid + '-4', name: leader, boss: true, leader: true, waves: [wave(3, a, 4, 2.5, { trait }), wave(14, d, 3, 3), wave(26, e, 3, 2.5, { trait }), wave(38, f, 2, 4, { trait }), wave(50, ace, 1, 1, { boss: 1, trait })],
+      before: [leader + ': Welcome to ' + gym + '. Let us see what your squad is made of.', 'The Leader\'s ace has four times the HP. Bring types that beat ' + types + '.'],
+      after: [leader + ': You earned this badge. Take this too: it will help.'] }
+  ];
+  for (const st of plan) gymStages.push({ chapter, gym: gid, lives: 3, map: gymMaps(gymStages.length), after: ['Trainer: You are as good as they say.'], ...st });
+});
+LEAGUE.forEach(([id, name, types, traits, list, ace], i) => {
+  const champion = id === 'C1', [t1, t2 = t1, t3 = t1, t4 = t2] = traits, [a, b, c, d, e = a] = list;
+  const waves = [wave(3, a, 4, 2.5, { trait: t1 }), wave(13, b, 3, 2.5, { trait: t2 }), wave(24, c, 3, 3), wave(34, d, 3, 2.5, { trait: t3 }), wave(45, e, 3, 2.5, { trait: t4 })];
+  if (champion) waves.push(wave(55, b, 3, 2, { trait: t1 }));
+  waves.push(wave(champion ? 66 : 56, ace, 1, 1, { boss: 1, trait: t2 }));
+  gymStages.push({ chapter: champion ? 16 : 15, gym: id, id, name: champion ? 'Champion ' + name : 'Elite Four ' + name, boss: true, admin: true, leader: true, lives: 3,
+    map: gymMaps(gymStages.length), waves, final2: champion,
+    before: [name + ': ' + (champion ? 'I am the Champion. Show me everything your squad has learned.' : 'Welcome to the Elite Four. ' + types + ' types are my specialty.')],
+    after: champion ? [name + ': ... You are the new Champion.', 'The Gym Challenge is complete. Thank you for playing.'] : [name + ': Go on. The next of the Elite Four is waiting.'] });
+});
+for (const st of gymStages) {
+  const [level, thin] = GYM_TUNE[st.id] || [2.4, 0];
+  st.level = level;
+  if (thin) st.waves = st.waves.map(w => w[4] ? w : [w[0], w[1], Math.max(1, w[2] - thin), +(w[3] * (1 + 0.12 * thin)).toFixed(2), ...w.slice(4)]);
+  STAGES.push(st);
+}
+// The first clear of a Leader, an Elite Four member or the Champion pays a held item; a Leader's also a badge.
+export const GYM_ITEMS = Object.fromEntries([...GYMS.map(g => [g[1] + '-4', g[10]]), ...LEAGUE.map(l => [l[0], l[6]])]);
+// Part 1 also drops items on some first clears.
+export const ITEM_DROPS = { '1-4': 'claw', '2-6': 'helmet', '3-6': 'bell', '4-6': 'belt', '5-6': 'band', '6-6': 'leftovers', ...GYM_ITEMS };
+export const BADGES = GYMS.map(([, gid, leader, gym]) => ({ id: gid, stage: gid + '-4', leader, gym }));
+
 // Chapters in order, each with its stages. Stages unlock in the order of STAGES.
 export const CHAPTERS = [
   { id: 1, name: 'Team Rocket Grunts', admin: 'Grunts', stages: STAGES.filter(s => (s.chapter || 1) === 1) },
@@ -242,7 +318,11 @@ export const CHAPTERS = [
   { id: 3, name: 'Petrel', admin: 'Petrel', stages: STAGES.filter(s => s.chapter === 3) },
   { id: 4, name: 'Ariana', admin: 'Ariana', stages: STAGES.filter(s => s.chapter === 4) },
   { id: 5, name: 'Archer', admin: 'Archer', stages: STAGES.filter(s => s.chapter === 5) },
-  { id: 6, name: 'Giovanni', admin: 'Giovanni', stages: STAGES.filter(s => s.chapter === 6) }
+  { id: 6, name: 'Giovanni', admin: 'Giovanni', stages: STAGES.filter(s => s.chapter === 6) },
+  // Part 2: one chapter per gym, then the Elite Four, then the Champion.
+  ...GYMS.map(([id, gid, leader, gym]) => ({ id, name: gym + ' (' + leader + ')', admin: leader, part: 2, gym: gid, stages: STAGES.filter(s => s.chapter === id) })),
+  { id: 15, name: 'Elite Four', admin: 'Elite Four', part: 2, stages: STAGES.filter(s => s.chapter === 15) },
+  { id: 16, name: 'Champion', admin: 'Cynthia', part: 2, stages: STAGES.filter(s => s.chapter === 16) }
 ];
 // Armored enemies' Defense against physical attacks; casters ignore it.
 export const ARMOR = 3;
@@ -315,7 +395,7 @@ export const SKILL_KINDS = [
 ];
 
 /** A squad member's battle stats: level from coins, passive and cost cuts from candy. */
-export function unitStats(num, { level = 1, passive = false, costCut = 0, skills = [true, false, false, false], skill = null } = {}) {
+export function unitStats(num, { level = 1, passive = false, costCut = 0, skills = [true, false, false, false], skill = null, item = null } = {}) {
   const m = mon(num), cls = classOf(num), c = CLASSES[cls];
   const grow = 1 + 0.08 * (level - 1);
   const special = cls === 'caster' || cls === 'medic';
@@ -325,11 +405,11 @@ export function unitStats(num, { level = 1, passive = false, costCut = 0, skills
   return {
     num, cls, name: m.name, types: m.types,
     hp: Math.round((m.hp * 5 + 140) * grow * (c.hp || 1)),
-    atk: Math.round((special ? m.spa : m.atk) * 1.3 * grow * (passive ? 1.1 : 1)),
+    atk: Math.round((special ? m.spa : m.atk) * 1.3 * grow * (passive ? 1.1 : 1) * (item === 'band' ? 1.25 : 1)),
     def: Math.round(m.def * 0.6 * grow),
-    interval: Math.max(0.6, Math.min(1.6, 1.7 - m.spe / 140)),
+    interval: Math.max(0.6, Math.min(1.6, 1.7 - m.spe / 140)) * (item === 'claw' ? 0.85 : 1),
     cost: Math.max(4, c.cost + Math.round(m.bst / 160) - 2 - costCut),
-    block: c.block, range: c.range, ground: c.ground, spMax: Math.round(c.sp * kind.charge),
+    block: c.block, range: c.range, ground: c.ground, spMax: Math.round(c.sp * kind.charge * (item === 'band' ? 1.3 : 1)), item: ITEMS[item] ? item : null,
     skill: skillsOf(num)[skillAt], skillAt, skillKind: kind.id, power: kind.power, rare: skillAt === 3
   };
 }
@@ -391,14 +471,14 @@ const costOf = (b, u) => u.cost + (b.mods.has('cost') ? 3 : 0);
 export function newBattle(stage, squad, mods = []) {
   const paths = pathsOf(stage);
   const queue = [];
-  stage.waves.forEach(([at, num, count, gap, boss, flying, explodes, armored, fast], wave) => {
-    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying, explodes: !!explodes, armored: !!armored, fast: !!fast });
+  stage.waves.forEach(([at, num, count, gap, boss, flying, explodes, armored, fast, trait], wave) => {
+    for (let i = 0; i < count; i++) queue.push({ at: at + i * gap, num, wave, path: (i + wave) % paths.length, boss: !!boss, flying: !!flying, explodes: !!explodes, armored: !!armored, fast: !!fast, trait: TRAITS[trait] ? trait : '' });
   });
   queue.sort((a, b) => a.at - b.at);
   const set = new Set(mods.filter(id => RISKS.some(r => r.id === id)));
   return { stage, paths, squad: squad.slice(0, 8), t: 0, energy: START_ENERGY, life: set.has('onelife') ? 1 : stage.lives, queue, spawned: 0,
     units: [], enemies: [], waveLeft: stage.waves.map(w => w[2]), wavesDone: 0, leaks: 0, kills: 0,
-    deployed: new Set(), cooldown: {}, nextId: 1, over: null, log: [], mods: set };
+    deployed: new Set(), cooldown: {}, nextId: 1, over: null, log: [], mods: set, splits: 0 };
 }
 const tileAt = (b, x, y) => (b.stage.map[y] || '')[x] || '#';
 export function canDeploy(b, slot, x, y) {
@@ -439,11 +519,57 @@ function distanceLeft(e) {
   for (let i = e.seg + 2; i < e.path.length; i++) left += Math.hypot(e.path[i][0] - e.path[i - 1][0], e.path[i][1] - e.path[i - 1][1]);
   return left;
 }
-// Only snipers reach flying enemies.
-export const canHit = (u, e) => !e.flying || !!CLASSES[u.cls]?.air;
+// Only snipers reach flying enemies. A stealthy one is hidden from everyone but snipers
+// until it is next to a unit or a sniper has just hit it.
+export const seen = (b, e) => !e.trait || e.trait !== 'stealth' || !b || (e.revealed || 0) > b.t || b.units.some(u => dist(u, e.x, e.y) <= STEALTH_SEEN);
+export const canHit = (u, e, b) => (!e.flying || !!CLASSES[u.cls]?.air) && (u.cls === 'sniper' || seen(b, e));
 function finishWaveFor(b, e) {
   b.waveLeft[e.wave]--;
   if (b.waveLeft[e.wave] === 0) b.wavesDone++;
+}
+/* ── The six newer kinds of foe (a wave's 10th field) ──────────────────────
+   heal: every HEAL.every s it heals foes within HEAL.range (itself too) by HEAL.share of their HP.
+   ranged: shoots the nearest unit within RANGED.range, high ground too, so ranged units can fall.
+   shield: a shield of SHIELD.share of its HP soaks hits first; casters break it faster.
+   split: when it falls it splits into two small ones (SPLIT.hp of its HP) where it stood.
+   stealth: hidden until next to a unit or hit by a sniper (snipers always see it).
+   rally: foes within RALLY.range move RALLY.speed times faster (not itself). */
+export const TRAITS = { heal: 'Healer', ranged: 'Ranged', shield: 'Shielded', split: 'Splitter', stealth: 'Stealth', rally: 'Rallier' };
+export const HEAL = { every: 2.5, range: 1.6, share: 0.08 };
+export const RANGED = { range: 2.6, power: 0.7, every: 1.8 };
+export const SHIELD = { share: 0.6, physical: 0.5, caster: 1.5 };
+export const SPLIT = { hp: 0.3 };
+export const STEALTH_SEEN = 1.2;
+export const RALLY = { range: 1.6, speed: 1.3 };
+/* ── Held items: one per line (equipped in Squad or the Dex) ─────────────── */
+export const ITEMS = {
+  leftovers: { name: 'Leftovers', about: 'Heals 1.5% of its HP every second.', price: 1500 },
+  sash: { name: 'Focus Sash', about: 'Survives one hit that would knock it out, once a battle.', price: 1200 },
+  band: { name: 'Choice Band', about: '+25% damage, but its skill charges 30% slower.', price: 2000 },
+  claw: { name: 'Quick Claw', about: 'Attacks 15% faster.', price: 1500 },
+  lens: { name: 'Scope Lens', about: 'Every 4th hit is a critical hit for 1.5x damage.', price: 1500 },
+  helmet: { name: 'Rocky Helmet', about: 'Foes that hit it in melee take 30% of that damage back.', price: 1200 },
+  belt: { name: 'Expert Belt', about: 'Super-effective hits do 25% more.', price: 1800 },
+  bell: { name: 'Shell Bell', about: 'Heals 15% of the damage it deals.', price: 1500 }
+};
+// A unit's hit on a foe: type, items, shield and stealth all go through here.
+function strike(b, u, e, base, mult = 1) {
+  let dmg = base * (u.item === 'belt' && mult > 1 ? 1.25 : 1);
+  if (u.item === 'lens' && (u.hits = (u.hits || 0) + 1) % 4 === 0) { dmg *= 1.5; b.crits = (b.crits || 0) + 1; }
+  if (e.shield > 0) {
+    const rate = u.cls === 'caster' ? SHIELD.caster : SHIELD.physical, soak = Math.min(e.shield, dmg * rate);
+    e.shield -= soak; dmg -= soak / rate;
+  }
+  e.hp -= dmg;
+  if (u.item === 'bell') u.hp = Math.min(u.maxHp, u.hp + dmg * 0.15);
+  if (u.cls === 'sniper' && e.trait === 'stealth') e.revealed = b.t + 3;
+  return dmg;
+}
+// A foe's hit on a unit (melee when it is the blocker's).
+function struck(b, e, u, dmg, melee) {
+  u.hp -= dmg;
+  if (melee && u.item === 'helmet') e.hp -= dmg * 0.3;
+  if (u.hp <= 0 && u.item === 'sash' && !u.sashUsed) { u.hp = 1; u.sashUsed = true; }
 }
 function useSkill(b, u) {
   const power = u.power ?? (u.rare ? 1.3 : 1);
@@ -451,9 +577,9 @@ function useSkill(b, u) {
   else if (u.cls === 'blocker') u.hp = Math.min(u.maxHp, u.hp + Math.round(u.maxHp * 0.4 * power));
   else if (u.cls === 'medic') { for (const a of b.units) if (dist(a, u.x, u.y) <= u.range) a.hp = Math.min(a.maxHp, a.hp + Math.round(u.atk * 1.5 * power)); }
   else {
-    const targets = b.enemies.filter(e => canHit(u, e) && dist(e, u.x, u.y) <= u.range + 0.5);
+    const targets = b.enemies.filter(e => canHit(u, e, b) && dist(e, u.x, u.y) <= u.range + 0.5);
     const list = u.cls === 'caster' ? targets : targets.slice(0, u.cls === 'sniper' ? 3 : 1);
-    for (const e of list) e.hp -= hit(u.atk, defenceAgainst(u, e), typeMultiplier(u.types[0], e.types)) * (u.cls === 'guard' ? 3 : 1.5) * power;
+    for (const e of list) { const m = typeMultiplier(u.types[0], e.types); strike(b, u, e, hit(u.atk, defenceAgainst(u, e), m) * (u.cls === 'guard' ? 3 : 1.5) * power, m); }
   }
   b.log.push({ t: b.t, skill: u.skill, unit: u.id });
 }
@@ -490,6 +616,9 @@ export function step(b, dt = TICK) {
     if (b.mods?.has('fast')) e.speed *= 1.2;
     // Fast waves (chapter 5 on) run at 1.5x.
     if (s.fast) { e.speed *= FAST; e.fast = true; }
+    e.trait = s.trait || '';
+    if (s.small) { e.hp = Math.max(1, Math.round(s.small)); e.small = true; e.x = s.x; e.y = s.y; e.seg = s.seg; e.path = s.pathArr || path; }
+    if (e.trait === 'shield') e.shield = e.maxShield = Math.round(e.hp * SHIELD.share);
     e.maxHp = e.hp;
     b.spawned++;
   }
@@ -503,7 +632,8 @@ export function step(b, dt = TICK) {
     const blocker = !e.flying && b.units.find(u => u.ground && u.x === tx && u.y === ty && Math.abs(e.x - tx) + Math.abs(e.y - ty) < 0.35 &&
       b.enemies.filter(o => o.blockedBy === u.id).length < u.block);
     if (blocker) { e.blockedBy = blocker.id; if (e.explodes) e.fuse = FUSE; continue; }
-    let move = e.speed * dt;
+    const rallied = !e.flying && b.enemies.some(o => o !== e && o.trait === 'rally' && o.hp > 0 && Math.hypot(o.x - e.x, o.y - e.y) <= RALLY.range);
+    let move = e.speed * dt * (rallied ? RALLY.speed : 1);
     while (move > 0 && e.seg < e.path.length - 1) {
       const [nx, ny] = e.path[e.seg + 1];
       const d = Math.hypot(nx - e.x, ny - e.y);
@@ -515,8 +645,9 @@ export function step(b, dt = TICK) {
   // Units act.
   for (const u of b.units) {
     u.sp = Math.min(u.spMax, u.sp + dt);
+    if (u.item === 'leftovers') u.hp = Math.min(u.maxHp, u.hp + u.maxHp * 0.015 * dt);
     if (u.sp >= u.spMax && (u.cls === 'vanguard' || u.cls === 'blocker' && u.hp < u.maxHp * 0.6 || u.cls === 'medic' && b.units.some(a => a.hp < a.maxHp) ||
-        b.enemies.some(e => canHit(u, e) && dist(e, u.x, u.y) <= u.range))) { useSkill(b, u); u.sp = 0; }
+        b.enemies.some(e => canHit(u, e, b) && dist(e, u.x, u.y) <= u.range))) { useSkill(b, u); u.sp = 0; }
     u.cd -= dt;
     if (u.cd > 0) continue;
     if (u.cls === 'medic') {
@@ -524,14 +655,14 @@ export function step(b, dt = TICK) {
       if (hurt) { hurt.hp = Math.min(hurt.maxHp, hurt.hp + Math.round(u.atk * 0.9)); u.cd = u.interval; }
       continue;
     }
-    const inRange = b.enemies.filter(e => canHit(u, e) && (e.blockedBy === u.id || dist(e, u.x, u.y) <= u.range));
+    const inRange = b.enemies.filter(e => canHit(u, e, b) && (e.blockedBy === u.id || dist(e, u.x, u.y) <= u.range));
     if (!inRange.length) continue;
     // Whoever it is blocking first, then (for snipers) flyers, since nothing else can
     // hit them; then the enemy with the least distance left to the goal, as in Arknights.
     const rank = e => (e.blockedBy === u.id ? -1e6 : 0) + (e.flying && CLASSES[u.cls].air ? -1e3 : 0) + distanceLeft(e);
     const target = inRange.sort((a, c) => rank(a) - rank(c))[0];
-    const victims = u.cls === 'caster' ? b.enemies.filter(e => canHit(u, e) && dist(e, target.x, target.y) <= CLASSES.caster.splash) : [target];
-    for (const e of victims) e.hp -= hit(u.atk, defenceAgainst(u, e), typeMultiplier(u.types[0], e.types));
+    const victims = u.cls === 'caster' ? b.enemies.filter(e => canHit(u, e, b) && dist(e, target.x, target.y) <= CLASSES.caster.splash) : [target];
+    for (const e of victims) { const m = typeMultiplier(u.types[0], e.types); strike(b, u, e, hit(u.atk, defenceAgainst(u, e), m), m); }
     u.cd = u.interval;
   }
   // Exploders count down instead of attacking, then blow up on every unit nearby.
@@ -539,7 +670,7 @@ export function step(b, dt = TICK) {
     if (!e.explodes || e.fuse === null || e.hp <= 0) continue;
     e.fuse -= dt;
     if (e.fuse > 0) continue;
-    for (const u of b.units) if (dist(u, e.x, e.y) <= BLAST) u.hp -= hit(e.atk * BLAST_POWER, u.def, typeMultiplier(e.types[0], u.types));
+    for (const u of b.units) if (dist(u, e.x, e.y) <= BLAST) struck(b, e, u, hit(e.atk * BLAST_POWER, u.def, typeMultiplier(e.types[0], u.types)), false);
     e.hp = 0; e.blasted = true; b.blasts = (b.blasts || 0) + 1;
   }
   // Enemies hit whoever blocks them.
@@ -548,10 +679,29 @@ export function step(b, dt = TICK) {
     e.cd -= dt;
     if (e.cd > 0) continue;
     const u = b.units.find(unit => unit.id === e.blockedBy);
-    if (u) u.hp -= hit(e.atk, u.def, typeMultiplier(e.types[0], u.types));
+    if (u) struck(b, e, u, hit(e.atk, u.def, typeMultiplier(e.types[0], u.types)), true);
     e.cd = e.interval;
   }
-  // The fallen.
+  // Healers mend the foes around them; ranged foes shoot the nearest unit, wherever it stands.
+  for (const e of b.enemies) {
+    if (e.hp <= 0) continue;
+    if (e.trait === 'heal' && (e.healCd = (e.healCd ?? HEAL.every) - dt) <= 0) {
+      e.healCd = HEAL.every;
+      for (const o of b.enemies) if (o.hp > 0 && Math.hypot(o.x - e.x, o.y - e.y) <= HEAL.range) o.hp = Math.min(o.maxHp, o.hp + o.maxHp * HEAL.share);
+      b.heals = (b.heals || 0) + 1;
+    }
+    if (e.trait === 'ranged' && !e.blockedBy && (e.shot = (e.shot ?? RANGED.every) - dt) <= 0) {
+      const u = b.units.filter(o => dist(o, e.x, e.y) <= RANGED.range).sort((a, c) => dist(a, e.x, e.y) - dist(c, e.x, e.y))[0];
+      if (u) { e.shot = RANGED.every; struck(b, e, u, hit(e.atk * RANGED.power, u.def, typeMultiplier(e.types[0], u.types)), false); b.shots = (b.shots || 0) + 1; }
+      else e.shot = 0;
+    }
+  }
+  // The fallen. A splitter leaves two small ones where it stood (they count toward its wave).
+  for (const e of b.enemies) if (e.hp <= 0 && e.trait === 'split' && !e.small && !e.blasted) {
+    b.waveLeft[e.wave] += 2; b.splits += 2;
+    for (let i = 0; i < 2; i++) b.queue.unshift({ at: b.t, num: e.num, wave: e.wave, path: 0, boss: false, flying: e.flying, explodes: false, armored: false, fast: e.fast, trait: '',
+      small: e.maxHp * SPLIT.hp, x: e.x, y: e.y, seg: e.seg, pathArr: e.path });
+  }
   for (const e of b.enemies) if (e.hp <= 0) { b.kills++; finishWaveFor(b, e); }
   b.enemies = b.enemies.filter(e => e.hp > 0);
   for (const u of b.units) if (u.hp <= 0) b.cooldown[u.slot] = b.t + REDEPLOY;
@@ -669,6 +819,46 @@ function claimMissions(wallet, today, now) {
   return next;
 }
 /** Mission and stage progress for the screens. */
+/* ── Held items in the ledger ──────────────────────────────────────────────
+   Owned items are derived, so stages cleared before items existed already count: one per
+   first clear of a stage in ITEM_DROPS (td:first:<stage>), plus one per purchase (spend:<uuid>,
+   x = { item }). cfg:item:<uuid> (x = { l, i }) puts item i on line l, or takes it off (i null);
+   the latest counts. A copy can be on one line at a time: equipping the last free copy elsewhere
+   takes it off the line that has had it longest. */
+export function itemsOf(entries) {
+  const owned = Object.fromEntries(Object.keys(ITEMS).map(id => [id, 0]));
+  for (const [stage, id] of Object.entries(ITEM_DROPS)) if (entries['td:first:' + stage] && ITEMS[id]) owned[id]++;
+  for (const [id, entry] of Object.entries(entries)) { const x = object(entry.x); if (id.startsWith('spend:') && ITEMS[x.item] && x.buy) owned[x.item]++; }
+  const equip = {}, since = {};
+  const sets = Object.entries(entries).filter(([id]) => id.startsWith('cfg:item:')).sort((a, b) => a[1].at - b[1].at || (a[0] < b[0] ? -1 : 1));
+  for (const [, entry] of sets) {
+    const x = object(entry.x);
+    if (!Number.isInteger(x.l)) continue;
+    delete equip[x.l];
+    if (!ITEMS[x.i] || !owned[x.i]) continue;
+    const holders = Object.keys(equip).filter(l => equip[l] === x.i).sort((a, b) => since[a] - since[b]);
+    if (holders.length >= owned[x.i]) delete equip[holders[0]];
+    equip[x.l] = x.i; since[x.l] = entry.at;
+  }
+  const used = {};
+  for (const id of Object.values(equip)) used[id] = (used[id] || 0) + 1;
+  return { owned, equip, free: Object.fromEntries(Object.keys(ITEMS).map(id => [id, owned[id] - (used[id] || 0)])) };
+}
+/** Buy a held item in the Shop for coins (ITEMS[id].price). */
+export function buyItem(wallet, id, { now = Date.now() } = {}) {
+  if (!ITEMS[id]) return { wallet: mergeWallet(wallet), ok: false, reason: 'unknown' };
+  const r = spendFrom(wallet, { coins: ITEMS[id].price }, { id: uuid(), now, x: { item: id, buy: 1 } });
+  return r.ok ? { wallet: r.wallet, ok: true } : { wallet: mergeWallet(wallet), ok: false, reason: 'coins' };
+}
+/** Put an owned item on a line (or take it off with id null). */
+export function equipItem(wallet, line, id, { today = dailyDate(), now = Date.now() } = {}) {
+  const state = gachaState(wallet, today);
+  if (!state.lines[line]) return { wallet: mergeWallet(wallet), ok: false, reason: 'not-owned' };
+  if (id !== null && !(itemsOf(mergeWallet(wallet).entries).owned[id] > 0)) return { wallet: mergeWallet(wallet), ok: false, reason: 'locked' };
+  const next = mergeWallet(wallet);
+  next.entries['cfg:item:' + uuid()] = { at: seconds(now), x: { l: line, i: id } };
+  return { wallet: next, ok: true };
+}
 export function tdState(wallet, today = dailyDate()) {
   const merged = mergeWallet(wallet);
   const e = merged.entries;
@@ -682,7 +872,9 @@ export function tdState(wallet, today = dailyDate()) {
     if (Number.isInteger(x.lv) && Number.isInteger(x.to)) levels[x.lv] = Math.max(levels[x.lv] || 1, Math.min(MAX_LEVEL, x.to));
   }
   return {
-    best, levels,
+    best, levels, items: itemsOf(e),
+    // Badges: a Leader's first clear. The Elite Four and the Champion count as cleared like any stage.
+    badges: BADGES.filter(bd => e['td:first:' + bd.stage]).map(bd => bd.id),
     unlocked: STAGES.map((s, i) => i === 0 || (best[STAGES[i - 1].id] || 0) > 0),
     unlockedById: Object.fromEntries(STAGES.map((s, i) => [s.id, i === 0 || (best[STAGES[i - 1].id] || 0) > 0])),
     daily: dailyMissions(today).map(m => ({ ...m, done: !!e['td:daily:' + today + ':' + m.id] })),
@@ -733,8 +925,11 @@ export function tdFinish(wallet, { stage, stars, team = [], waves = 0 } = {}, { 
     if (s.id === '1-1') next = grantOnce(next, 'gacha:start:stage', { regular: 2 }, { now }).wallet;
   }
   if (stars === 3) next = grantOnce(next, 'td:star3:' + s.id, FIRST_STAR3, { now }).wallet;
+  const firstNow = stars > 0 && !mergeWallet(wallet).entries['td:first:' + s.id];
   next = claimMissions(next, today, now);
-  return { wallet: next, ok: true, waves: cleared, newGrants: Object.keys(next.entries).length - before };
+  // A first clear's held item (it is owned from the td:first entry) and a Leader's badge.
+  return { wallet: next, ok: true, waves: cleared, newGrants: Object.keys(next.entries).length - before,
+    item: firstNow && ITEM_DROPS[s.id] || null, badge: firstNow && BADGES.find(bd => bd.stage === s.id)?.id || null };
 }
 /**
  * Record a weekly challenge run: waves cleared pay hatch waves like any battle,
@@ -774,7 +969,7 @@ export function squadFrom(wallet, species, today = dailyDate()) {
   const state = gachaState(wallet, today), td = tdState(wallet, today);
   return species.filter(num => state.owned.includes(num)).slice(0, 8).map(num => {
     const l = state.lines[lineOf(num)] || {};
-    return { ...unitStats(num, { level: td.levels[lineOf(num)] || 1, passive: !!l.passive, costCut: l.cost || 0, skills: l.skills || [true, false, false, false], skill: l.skill ?? null }),
+    return { ...unitStats(num, { level: td.levels[lineOf(num)] || 1, passive: !!l.passive, costCut: l.cost || 0, skills: l.skills || [true, false, false, false], skill: l.skill ?? null, item: td.items.equip[lineOf(num)] || null }),
       look: lookFor(state, num), level: td.levels[lineOf(num)] || 1, cap: lineCap(state, lineOf(num)) };
   });
 }
@@ -782,7 +977,8 @@ export function squadFrom(wallet, species, today = dailyDate()) {
 /* ── The bridge, merged into parent.__boredGacha.td ─────────────────── */
 export function tdBridge({ onChange = () => {} } = {}) {
   const act = run => (options = {}) => {
-    const { wallet, ...result } = run(readWallet(), options);
+    let { wallet, ...result } = run(readWallet(), options);
+    if (result.ok && wallet && typeof claimTrophies === 'function') wallet = claimTrophies(wallet).wallet;
     if (result.ok && wallet) { writeWallet(wallet); try { onChange(); } catch {} }
     return result;
   };
@@ -797,6 +993,34 @@ export function tdBridge({ onChange = () => {} } = {}) {
     levelUp: act((w, o) => levelUp(w, o.line)),
     // The weekly challenge (draft): stage and risks, and recording a run.
     risks: RISKS, riskOf, weeklyStage, maxRisk: MAX_RISK, milestones: WEEKLY_MILESTONES, weeklyUnlock: WEEKLY_UNLOCK,
-    finishWeekly: act((w, o) => tdWeekly(w, o))
+    finishWeekly: act((w, o) => tdWeekly(w, o)),
+    // Part 2: new kinds of foe, held items and badges.
+    traits: TRAITS, items: ITEMS, itemDrops: ITEM_DROPS, badges: BADGES, gyms: GYMS, league: LEAGUE, seen,
+    buyItem: act((w, o) => buyItem(w, o.item)),
+    equipItem: act((w, o) => equipItem(w, o.line, o.item ?? null))
   };
 }
+
+/* ── Tower defense trophies ──────────────────────────────────────────────── */
+export function tdTrophyStats(entries) {
+  const out = {};
+  for (const ch of CHAPTERS.filter(c => c.id <= 6)) {
+    out['ch' + ch.id] = ch.stages.filter(st => entries['td:first:' + st.id]).length;
+    out['star' + ch.id] = ch.stages.filter(st => entries['td:star3:' + st.id]).length;
+  }
+  out.badges = BADGES.filter(bd => entries['td:first:' + bd.stage]).length;
+  out.e4 = ['E1', 'E2', 'E3', 'E4'].filter(id => entries['td:first:' + id]).length;
+  out.champion = entries['td:first:C1'] ? 1 : 0;
+  out.risk = Math.max(0, ...Object.entries(entries).filter(([id, e]) => id.startsWith('td:wk:') && object(e.x).s > 0).map(([, e]) => Number(e.x.r) || 0));
+  return out;
+}
+if (typeof addAchievements === 'function' && typeof achievement === 'function') addAchievements([
+  ...CHAPTERS.filter(c => c.id <= 6).map(c => achievement('pg-ch' + c.id, 'poke-gacha', 'Poké Gacha: clear chapter ' + c.id, c.id === 6 ? 'B' : 'S', s => s.ext['ch' + c.id] || 0, c.stages.length)),
+  ...CHAPTERS.filter(c => c.id <= 6).map(c => achievement('pg-star' + c.id, 'poke-gacha', 'Poké Gacha: 3-star chapter ' + c.id, 'M', s => s.ext['star' + c.id] || 0, c.stages.length)),
+  achievement('pg-risk13', 'poke-gacha', 'Poké Gacha: weekly challenge at risk ' + MAX_RISK, 'B', s => s.ext.risk || 0, MAX_RISK),
+  achievement('pg-badge1', 'poke-gacha', 'Poké Gacha: first badge', 'S', s => s.ext.badges || 0, 1),
+  achievement('pg-badge4', 'poke-gacha', 'Poké Gacha: 4 badges', 'M', s => s.ext.badges || 0, 4),
+  achievement('pg-badge8', 'poke-gacha', 'Poké Gacha: all 8 badges', 'B', s => s.ext.badges || 0, 8),
+  achievement('pg-e4', 'poke-gacha', 'Poké Gacha: beat the Elite Four', 'B', s => s.ext.e4 || 0, 4),
+  achievement('pg-champion', 'poke-gacha', 'Poké Gacha: Champion', 'B', s => s.ext.champion || 0, 1)
+], tdTrophyStats);
