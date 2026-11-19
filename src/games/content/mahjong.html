@@ -78,7 +78,7 @@
   <section id="tutorial" hidden aria-label="Mahjong tutorial">
     <h2>Tutorial</h2>
     <ol>
-      <li id="step-free">A tile is free when nothing rests on it and its left or right side is open.</li>
+      <li id="step-free">Free means nothing on top and a side open. Match two free tiles of the same kind.</li>
       <li id="step-match">Two free tiles of the same kind match. Tap one, then its pair.</li>
       <li id="step-clear">Clear all six pairs on this small board.</li>
     </ol>
@@ -719,7 +719,7 @@ if (RESUME) {
   if (saved) RESUME.ask(saved.label, () => { if (!restoreRun(saved)) { RESUME.clear(); setTutorial(false); } }, () => setTutorial(false));
   RESUME.arm(savedRun);
 }
-statusEl.textContent = 'Match two free tiles of the same kind. A tile is free when nothing rests on it and its left or right side is open.';
+statusEl.textContent = 'Match two free tiles of the same kind. Free means nothing on top and a side open.';
 </script>
 </body>
 </html>

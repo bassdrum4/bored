@@ -68,7 +68,7 @@ export const CHALLENGES = [
   { slug: 'breakout', label: 'Brick demolition', goal: 'Clear {target} complete brick layouts in one run.', metric: 'layouts', targets: [1, 2, 3], unit: 'layouts cleared' },
   { slug: 'memory', label: 'Sharp memory', goal: 'Find all eight pairs in {target} moves or fewer.', metric: 'moves', targets: [20, 16, 12], rule: 'memory', unit: 'moves' },
   { slug: 'frogger', label: 'Homeward hops', goal: 'Fill {target} lily pads in the same level.', metric: 'homes', targets: [3, 4, 5], unit: 'lily pads' },
-  { slug: 'connect-four', label: 'Outsmart the computer', goal: 'Win as Red against the computer—not two-player mode.', metric: 'won', targets: [1, 1, 1], rule: 'connect', unit: 'computer wins' },
+  { slug: 'connect-four', label: 'Outsmart the computer', goal: 'Win as Red against the computer, not two-player mode.', metric: 'won', targets: [1, 1, 1], rule: 'connect', unit: 'computer wins' },
   { slug: 'asteroids', label: 'Rock breaker', goal: 'Clear {target} asteroid waves in one run.', metric: 'waves', targets: [2, 3, 4], unit: 'waves cleared' },
   { slug: 'pac-man', label: 'Ghost-town feast', goal: 'Earn {target} points in one maze run.', metric: 'score', targets: [1500, 2500, 4000], unit: 'points' },
   { slug: 'aim-lab', label: 'Precision under pressure', goal: 'Finish both Aim Lab rounds with at least {target} Normal-round hits and 80% Normal accuracy.', metric: 'hits', targets: [20, 25, 30], rule: 'aim', unit: 'hits' },
@@ -254,12 +254,12 @@ export function dailyCheck(challenge, snapshot) {
   const notes = [];
   switch (challenge.rule) {
     case 'word': complete = snapshot.solved === true && value <= t; notes.push(snapshot.solved ? 'word solved' : 'not solved yet'); break;
-    case 'merge': complete = complete && snapshot.undoUsed === false; if (snapshot.undoUsed) notes.push('Undo used—start a fresh run'); break;
+    case 'merge': complete = complete && snapshot.undoUsed === false; if (snapshot.undoUsed) notes.push('Undo used, start a fresh run'); break;
     case 'memory': complete = snapshot.pairs === 8 && value <= t; notes.push(snapshot.pairs + '/8 pairs'); break;
     case 'connect': complete = snapshot.won === 1 && snapshot.cpu === true; if (!snapshot.cpu) notes.push('computer mode required'); break;
     case 'cpu': complete = complete && snapshot.cpu === true; if (!snapshot.cpu) notes.push('CPU mode required'); break;
     case 'aim': { const accuracy = Number.isFinite(snapshot.normalAccuracy) ? snapshot.normalAccuracy : snapshot.accuracy; complete = complete && snapshot.finished === true && accuracy >= 80 && snapshot.normal === true; notes.push(Math.round(accuracy) + '% Normal accuracy', snapshot.finished ? 'finished' : 'finish both rounds'); if (!snapshot.normal) notes.push('normal targets required'); break; }
-    case 'mines': complete = snapshot.won === true && snapshot.standard === true && snapshot.hints === 0 && value <= t; notes.push(snapshot.won ? 'board cleared' : 'still playing'); if (snapshot.hints) notes.push('hints used—start a fresh board'); if (!snapshot.standard) notes.push('standard board required'); break;
+    case 'mines': complete = snapshot.won === true && snapshot.standard === true && snapshot.hints === 0 && value <= t; notes.push(snapshot.won ? 'board cleared' : 'still playing'); if (snapshot.hints) notes.push('hints used, start a fresh board'); if (!snapshot.standard) notes.push('standard board required'); break;
     case 'poker': complete = complete && snapshot.handOver === true; notes.push(snapshot.handOver ? 'hand finished' : 'finish the hand'); break;
     case 'sand': complete = complete && snapshot.materials >= 4; notes.push(snapshot.materials + '/4 materials'); break;
     case 'eco': complete = complete && snapshot.seconds >= 60 && snapshot.herbs >= 20 && snapshot.predators >= 3; notes.push(Math.floor(snapshot.seconds) + '/60s', snapshot.herbs + '/20 herbivores', snapshot.predators + '/3 predators'); break;

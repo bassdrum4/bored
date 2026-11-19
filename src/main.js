@@ -192,13 +192,13 @@ function openStandalone() {
 function fullscreenUnavailable() {
   if (!isEmbedded()) {
     showHint(/iPad|iPhone|iPod/.test(navigator.userAgent)
-      ? 'This browser cannot fullscreen a page. Add the arcade to your Home Screen instead.'
-      : 'This browser cannot fullscreen a page.');
+      ? 'This browser won\'t do fullscreen. Add the arcade to your home screen instead.'
+      : 'This browser won\'t do fullscreen.');
     return;
   }
   showHint(openStandalone()
-    ? 'Fullscreen is blocked inside this embedded view. The arcade is open in its own tab.'
-    : 'Fullscreen is blocked inside this embedded view. Open the arcade in its own tab.');
+    ? 'Fullscreen is blocked in this embed. The arcade is open in its own tab.'
+    : 'Fullscreen is blocked in this embed. Open the arcade in its own tab.');
 }
 
 async function toggleFullscreen() {
@@ -337,7 +337,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
     const fail = () => {
       if (token !== loadToken) return;
       gameFrame.srcdoc = frameStandIn(name + ' did not load.',
-        'A game only downloads the first time you open it. Check the connection and choose it again.');
+        'Couldn\'t grab that game. Check your connection and pick it again.');
       analytics.event('error', { code: 'load_failed' });
       analytics.end('load_failed');
       showHint('That game could not be downloaded.');
@@ -803,7 +803,7 @@ function renderDaily() {
   }
   $('#daily-status').textContent = result
     ? '✓ Automatically verified. Your completed result is saved.'
-    : 'One goal for everyone. Retry as often as you like. Your result is checked automatically.';
+    : 'Same goal for everyone. Retry as much as you want.';
   $('#daily-play').textContent = result ? 'Play again →' : 'Play today’s challenge →';
   $('#daily-share').hidden = !result;
   if ($('#daily-result').dataset.challenge !== challenge.id) $('#daily-result').hidden = true;
@@ -870,7 +870,7 @@ async function shareDailyResult() {
   if (!result) return;
   const box = $('#daily-result');
   box.value = 'Bored Daily · ' + challenge.date + '\n' + ORDER.find(([slug]) => slug === challenge.slug)[1] +
-    ' — ' + challenge.label + '\n✓ ' + challenge.goal + '\n' +
+    ' · ' + challenge.label + '\n✓ ' + challenge.goal + '\n' +
     dailyCheck(challenge, result.snapshot).progress + '\nhttps://bassdrum4.github.io/bored/';
   box.dataset.challenge = challenge.id;
   box.hidden = false;

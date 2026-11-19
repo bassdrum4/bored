@@ -292,9 +292,9 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     const intro = node('div', undefined, 'bt-enrollment');
     intro.append(node('h3', renew ? 'A change to Bored Together' : 'Play a turn. Come back whenever.'),
       node('p', renew
-        ? 'Games now start with your turn and go to the other player when you save it. Members are picked from a list, so you can see who else is here without typing an address.'
-        : 'Send a game by playing the first turn. It reaches the other player as theirs to play, and it waits for both of you between turns. A few games are a single run instead: the same board for both, and the higher score wins.'),
-      node('p', 'Joining puts your display name and email in the member list, where other members can see and pick you. Leaving removes you from it.', 'bt-caption'),
+        ? 'Games start on your turn now and go over when you save. You pick people from a list instead of typing an email.'
+        : 'Play the first turn and it\'s their move. It waits there until they play. A couple of games are one run each instead: same board, higher score wins.'),
+      node('p', 'Joining puts your name and email in the member list. Leaving takes them out.', 'bt-caption'),
       button(renew ? 'Review and continue' : 'Join Bored Together', async () => {
         if (!hasIdentity()) { openAuthDialog('signin'); return; }
         await ensureProfile(); await togetherRPC('enroll', { consent_version: CONSENT_VERSION });
@@ -320,7 +320,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     else {
       for (const p of data.blocks || []) more.append(button('Unblock ' + p.handle, () => togetherRPC('unblock', { user_id: p.id })));
       const leave = node('details'); leave.append(node('summary', 'Leave Bored Together'),
-        node('p', 'Leaving removes you from the member list, cancels games you have not sent and forfeits ones in progress.', 'bt-caption'),
+        node('p', 'Leaving takes you off the member list, cancels games you have not sent and forfeits the ones in progress.', 'bt-caption'),
         button('Confirm leave', () => togetherRPC('leave')));
       more.append(leave);
     }
@@ -333,7 +333,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     const box = node('section', undefined, 'bt-start bt-live-start');
     box.setAttribute('aria-label', 'Play Civ Lite live');
     box.append(node('p', 'Play live', 'eyebrow'), node('h4', name('ashcrown') + ' · live room'),
-      node('p', 'Everyone plays at the same time. Create a room and share its six-character code, or invite members below. Set up the game and start when everyone is ready.', 'bt-caption'));
+      node('p', 'Everyone plays at once. Make a room, share the six-character code, start when everyone is in.', 'bt-caption'));
 
     const countLabel = node('label', 'Human players ', 'bt-game-picker');
     const count = node('select'); count.id = 'bt-live-capacity';
@@ -402,8 +402,8 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     }, true));
     else {
       box.append(node('p', TOGETHER_GAMES[selectedGame]?.mode === 'duel'
-        ? 'Pick a member. You both get the same board and the higher run wins; neither score is shown until both are in.'
-        : 'Pick a member and play the first turn. It reaches them as their game, so nothing is sent until your turn is saved.', 'bt-caption'));
+        ? 'Pick someone. Same board for both, higher run wins. Nobody sees a score until you\'ve both gone.'
+        : 'Pick someone and play the first turn. It goes over as their game, so nothing is sent until you save.', 'bt-caption'));
       if (!people) box.append(node('p', 'Loading members…', 'bt-caption'));
       else if (!people.length) box.append(node('p', 'Nobody else has joined yet. Anyone who joins appears here.', 'bt-caption'));
       else {
@@ -516,7 +516,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
       node('p', 'with ' + (m.opponent?.handle || 'Former member'), 'bt-opponent'),
       node('p', duel ? runLine(m, turn)
         : m.status === 'active' ? (unsent
-          ? 'Play your first turn to send it. Unplayed games are cleared after 7 days.'
+          ? 'Play the first turn to send it. Unplayed games disappear after 7 days.'
           : turn ? 'Your turn' : 'Their turn')
         : m.winner === owner ? 'You won' : m.winner ? 'You lost' : 'Draw', 'bt-caption'));
     const actions = node('div', undefined, 'bt-actions');
@@ -595,7 +595,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
         node('p', duel ? runLine(match, true)
           : unsent ? 'Play your first turn and it goes to ' + (match.opponent?.handle || 'them') + '.'
           : 'The turn is yours.', 'bt-hero-line'),
-        node('p', unsent ? 'An unplayed game is cleared after 7 days.'
+        node('p', unsent ? 'An unplayed game disappears after 7 days.'
           : yours.length > 1 ? (yours.length - 1) + ' more waiting below.' : 'Take it when you are ready.', 'bt-caption'));
       hero.append(gamePreview(match.game, 'bt-hero-art'), copy,
         button(unsent ? 'Play first turn' : duel ? 'Play run' : 'Play turn', () => launch(match.id), true));
@@ -609,7 +609,7 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
     const start = node('section', undefined, 'bt-start-panel');
     start.append(node('p', 'Start something', 'eyebrow'),
       node('h3', 'Start a game'),
-      node('p', 'Pick a game and a partner. Take turns whenever you like; Civ Lite also has live rooms for friends online together.', 'bt-caption'));
+      node('p', 'Pick a game and who you\'re playing. Take turns whenever. Civ Lite can also run live if you\'re both online.', 'bt-caption'));
     // Once a game is chosen the picker takes over below, so there is only ever
     // one game control on screen.
     if (!flow) {

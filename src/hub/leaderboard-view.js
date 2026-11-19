@@ -95,7 +95,7 @@ function renderLeaderboard() {
   $('#lb-refresh').disabled = !backendReady();
 
   if (!backendReady()) {
-    $('#lb-note').textContent = 'The shared leaderboard is offline until Supabase is configured.';
+    $('#lb-note').textContent = 'The leaderboard is down. Everything else still works.';
     empty.hidden = false;
     empty.textContent = 'Playing as a guest? Your local bests still work.';
     $('#lb-mine').textContent = '';
@@ -107,8 +107,8 @@ function renderLeaderboard() {
   const rows = accountStandings(all);
   const played = new Set(all.map(row => row.game).filter(id => LB_GAMES.some(entry => entry.id === id))).size;
   $('#lb-note').textContent = 'Players ranked across ' + LB_GAMES.length + ' games · ' + rows.length +
-    (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores · ' + rankPoints(1) +
-    ' points for a first place, down to 1 for fifth. Pick a name to see its games.';
+    (rows.length === 1 ? ' account' : ' accounts') + ' · ' + played + ' with scores. ' + rankPoints(1) +
+    ' points for a first place, 1 for fifth. Tap a name for their games.';
 
   if (cached?.error) {
     empty.hidden = false;

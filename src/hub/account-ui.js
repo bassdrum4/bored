@@ -22,7 +22,7 @@ function renderAccount() {
   const rename = $('#account-rename');
   state.replaceChildren();
   if (!backendReady()) {
-    state.textContent = 'Shared leaderboard is offline until Supabase is connected.';
+    state.textContent = 'The leaderboard is down. Your local bests still work.';
     action.hidden = true;
     rename.hidden = true;
     return;
@@ -51,8 +51,8 @@ function openAuthDialog(mode = 'signin') {
   const naming = authMode === 'name';
   $('#auth-title').textContent = authMode === 'signup' ? 'Create an account' : naming ? 'Display name' : 'Sign in';
   $('#auth-blurb').textContent = authMode === 'signup'
-    ? 'Pick a name for the leaderboard. Email is used to sign in; optional Bored Together enrollment has its own privacy notice.'
-    : naming ? 'This is the name other players see. 1–16 characters: letters, numbers or emoji, no spaces.' : 'Save your best scores and see how everyone else is doing.';
+    ? 'Pick a name for the board. The email is just for signing in.'
+    : naming ? 'What other players see. 1 to 16 characters, no spaces.' : 'Keep your scores between devices, and see who\'s beating you.';
   $('#auth-email-row').hidden = naming;
   $('#auth-pass-row').hidden = naming;
   $('#auth-name-row').hidden = authMode === 'signin';

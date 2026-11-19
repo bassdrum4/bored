@@ -123,12 +123,11 @@ try {
   </section>
 
   <section id="leaderboard" aria-labelledby="leaderboard-heading">
-    <p class="eyebrow">A little friendly competition</p>
     <h2 id="leaderboard-heading">Leaderboard</h2>
     <div class="lb-bar">
       <button id="lb-refresh" class="action" type="button">Refresh</button>
     </div>
-    <p id="lb-note">Ranked by points: 5 for a first place in a game, down to 1 for fifth.</p>
+    <p id="lb-note">5 points for a first place in a game, 1 for fifth.</p>
     <ol id="lb-list"></ol>
     <p id="lb-empty" hidden></p>
     <p id="lb-mine"></p>
@@ -143,32 +142,31 @@ try {
       <div class="settings-panels">
         <section class="settings-panel" aria-labelledby="appearance-heading">
           <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">◐</span><div>
-            <h3 id="appearance-heading">Appearance</h3><p>Make Bored comfortable to look at.</p>
+            <h3 id="appearance-heading">Appearance</h3>
           </div></div>
-          <div class="settings-row"><div><label for="setting-theme">Theme</label><p>Warm paper, or a soft charcoal for darker rooms.</p></div>
+          <div class="settings-row"><div><label for="setting-theme">Theme</label><p>Paper, or dark for a dark room.</p></div>
             <select id="setting-theme"><option value="light">Light</option><option value="dark">Dark</option></select></div>
-          <div class="settings-row"><div><label for="setting-density">Game card size</label><p>Fit more games on screen with compact cards.</p></div>
+          <div class="settings-row"><div><label for="setting-density">Game card size</label></div>
             <select id="setting-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></div>
-          <div class="settings-row"><div><label for="setting-descriptions">Show game descriptions</label><p>Keep short summaries below game titles.</p></div>
+          <div class="settings-row"><div><label for="setting-descriptions">Show game descriptions</label></div>
             <input id="setting-descriptions" class="settings-checkbox" type="checkbox" checked></div>
         </section>
         <section class="settings-panel" aria-labelledby="comfort-heading">
           <div class="settings-panel-header"><span class="settings-icon" aria-hidden="true">✳</span><div>
-            <h3 id="comfort-heading">Comfort &amp; privacy</h3><p>A couple of things worth controlling.</p>
+            <h3 id="comfort-heading">Comfort &amp; privacy</h3>
           </div></div>
-          <div class="settings-row"><div><label for="setting-reduced-motion">Reduce animations</label><p>Remove hover movement and unnecessary transitions.</p></div>
+          <div class="settings-row"><div><label for="setting-reduced-motion">Reduce animations</label></div>
             <input id="setting-reduced-motion" class="settings-checkbox" type="checkbox"></div>
-          <div class="settings-row"><div><label for="analytics-enabled">Share gameplay analytics</label><p>Help improve Bored using gameplay events. Turn it off anytime.</p></div>
+          <div class="settings-row"><div><label for="analytics-enabled">Share gameplay analytics</label><p>Which games get played, and for how long.</p></div>
             <input id="analytics-enabled" class="settings-checkbox" type="checkbox" checked></div>
         </section>
       </div>
       <aside class="settings-sidebar">
         <div class="settings-aside"><p class="eyebrow">Just this browser</p><h3>Nothing to sign in for.</h3>
-          <p>These appearance and privacy preferences are saved in local storage on this device. They don't sync across devices.</p>
           <p id="settings-saved" class="settings-saved" role="status" aria-live="polite">Your changes save automatically.</p>
         </div>
         <div class="settings-aside"><p class="eyebrow">Start fresh</p><h3>Clear local preferences</h3>
-          <p>Clear your saved favorite games or restore your display settings to their defaults. Neither action deletes your account or scores.</p>
+          <p>Neither one touches your account or scores.</p>
           <div class="settings-actions"><button type="button" id="settings-clear-favorites" class="action">Clear favorites</button>
           <button type="button" id="settings-reset" class="action">Reset settings</button></div>
         </div>
