@@ -102,7 +102,7 @@ export function summarizeEngagement(events, productEvents = [], survey = [], cut
     s.meaningful = s.active >= 60000 || s.finished;
     meaningful += Number(s.meaningful);
     if (!games.has(s.game)) games.set(s.game, { game:s.game, sessions:0, meaningful:0, players:new Set(),
-      returners:new Set(), days:new Map() });
+      returners:new Set(), days:new Map(), repeatEligible:0, repeatReturns:0 });
     const g = games.get(s.game);
     g.sessions++; g.meaningful += Number(s.meaningful);
     if (!s.meaningful || !s.who) continue;
@@ -135,8 +135,8 @@ export function summarizeEngagement(events, productEvents = [], survey = [], cut
     for (const [who, dates] of g.days) {
       const first = [...dates].sort()[0];
       if (cutoffMs - dateMs(first) < 7*86400000) continue;
-      repeatEligible++;
-      if ([...dates].some(d => d > first)) { repeatReturns++; g.returners.add(who); }
+      repeatEligible++; g.repeatEligible++;
+      if ([...dates].some(d => d > first)) { repeatReturns++; g.repeatReturns++; g.returners.add(who); }
     }
   }
   const visitors = new Map();
@@ -159,12 +159,123 @@ export function summarizeEngagement(events, productEvents = [], survey = [], cut
   }
   const ratings = survey.filter(e => Number.isInteger(Number(e.rating)) && e.rating>=1 && e.rating<=5);
   const average = ratings.length ? ratings.reduce((n,e)=>n+Number(e.rating),0)/ratings.length : null;
+  // A game's own average is the closest thing to "what people like" in the data.
+  const rated = new Map();
+  for (const e of ratings) {
+    if (!e.game) continue;
+    if (!rated.has(e.game)) rated.set(e.game, { game:e.game, ratings:0, total:0 });
+    const row = rated.get(e.game); row.ratings++; row.total += Number(e.rating);
+  }
   return {
     sessions:sessions.size, loaded, interacting, meaningful, identifiedEngaged:people.size,
     uniqueVisitors:visitors.size, visitorsByDay:[...visitorDays.values()].sort((a,b)=>a.day.localeCompare(b.day)),
     retention:{eligible,returned:nextWeekReturns},repeatGame:{eligible:repeatEligible,returned:repeatReturns},
     games:[...games.values()].map(g=>({game:g.game,sessions:g.sessions,meaningful:g.meaningful,
-      engagedPlayers:g.players.size,repeatPlayers:g.returners.size})).sort((a,b)=>b.meaningful-a.meaningful || b.sessions-a.sessions),
-    survey:{responses:ratings.length,average,positive:ratings.filter(e=>Number(e.rating)>=4).length}
+      engagedPlayers:g.players.size,repeatPlayers:g.returners.size,
+      repeatEligible:g.repeatEligible,repeatReturns:g.repeatReturns})).sort((a,b)=>b.meaningful-a.meaningful || b.sessions-a.sessions),
+    survey:{responses:ratings.length,average,positive:ratings.filter(e=>Number(e.rating)>=4).length,
+      byGame:[...rated.values()].map(g=>({game:g.game,ratings:g.ratings,average:g.total/g.ratings}))
+        .sort((a,b)=>b.average-a.average || b.ratings-a.ratings)}
   };
+}
+
+// One row per game joining play time with the signals that explain it: how
+// often a session becomes real play, how often a player comes back, and how
+// much attention the library card earned. Charts and advice read from here.
+export function buildGameSignals({ report, engagement } = {}) {
+  const rows = new Map();
+  for (const g of report?.games || []) rows.set(g.id, {
+    id: g.id, active: g.active, visible: g.visible, sessions: g.sessions,
+    players: g.users?.size || 0, errors: g.errors, completed: g.completed,
+    meaningful: 0, repeatEligible: 0, repeatReturns: 0
+  });
+  for (const g of engagement?.games || []) {
+    if (!rows.has(g.game)) rows.set(g.game, {
+      id: g.game, active: 0, visible: 0, sessions: g.sessions, players: 0, errors: 0,
+      completed: 0, meaningful: 0, repeatEligible: 0, repeatReturns: 0
+    });
+    const row = rows.get(g.game);
+    row.meaningful = g.meaningful || 0;
+    row.repeatEligible = g.repeatEligible || 0;
+    row.repeatReturns = g.repeatReturns || 0;
+  }
+  const total = [...rows.values()].reduce((n, row) => n + row.active, 0);
+  return [...rows.values()].map(row => ({
+    ...row,
+    share: total ? row.active / total : 0,
+    perSession: row.sessions ? row.active / row.sessions : 0,
+    hookRate: row.sessions ? row.meaningful / row.sessions : 0,
+    returnRate: row.repeatEligible ? row.repeatReturns / row.repeatEligible : null
+  })).sort((a, b) => b.active - a.active || b.sessions - a.sessions);
+}
+
+// Turns the aggregates into a short, ranked reading list for the admin:
+// what is carrying the site, what is leaking, and where the next move is.
+// Every claim is derived from the selected range, never from a baseline.
+export function buildInsights({ signals = [], hours = [], sources = [], survey = {}, totals = {} } = {}, names = {}, limit = 6) {
+  const name = id => names[id] || id;
+  const pct = ratio => Number.isFinite(ratio) ? Math.round(ratio * 100) + '%' : '—';
+  const span = ms => ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
+  // Three sessions is noise, not a finding: the board stays empty until the
+  // range holds a real sample, and per-game cards need one per game.
+  const MIN_SESSIONS = 10, MIN_RETURN_COHORT = 5;
+  const active = signals.filter(row => row.sessions > 0);
+  if (!active.length || !(totals.sessions >= MIN_SESSIONS)) return [];
+  const found = [], used = new Set();
+  const add = (item, game) => { if (game) used.add(game); found.push(item); };
+
+  const anchor = active[0];
+  if (anchor.sessions >= MIN_SESSIONS && anchor.share >= 0.15) add({ tone: 'good', metric: pct(anchor.share),
+    title: name(anchor.id) + ' carries the site',
+    detail: pct(anchor.share) + ' of play time over ' + anchor.sessions + ' sessions, ' + span(anchor.perSession) + ' each. The next content drop belongs here.' }, anchor.id);
+
+  const leak = active.filter(row => row.sessions >= MIN_SESSIONS && !used.has(row.id))
+    .sort((a, b) => a.hookRate - b.hookRate)[0];
+  if (leak && leak.hookRate < 0.5) add({ tone: 'watch', metric: pct(leak.hookRate),
+    title: name(leak.id) + ' opens but does not hook',
+    detail: 'Only ' + pct(leak.hookRate) + ' of ' + leak.sessions + ' sessions reach a minute of play. Explain the goal on the first screen and get players moving sooner.' }, leak.id);
+
+  const comeback = active.filter(row => row.repeatEligible >= MIN_RETURN_COHORT && !used.has(row.id))
+    .sort((a, b) => (b.returnRate || 0) - (a.returnRate || 0))[0];
+  if (comeback && comeback.returnRate >= 0.3) add({ tone: 'good', metric: pct(comeback.returnRate),
+    title: name(comeback.id) + ' brings people back',
+    detail: comeback.repeatReturns + ' of ' + comeback.repeatEligible + ' players returned on another day. A daily, a streak or a second mode would land on ready ground.' }, comeback.id);
+
+  const broken = active.filter(row => row.sessions >= MIN_SESSIONS && !used.has(row.id))
+    .sort((a, b) => b.errors / b.sessions - a.errors / a.sessions)[0];
+  if (broken && broken.errors && broken.errors / broken.sessions >= 0.2) add({ tone: 'watch', metric: pct(broken.errors / broken.sessions),
+    title: name(broken.id) + ' throws errors',
+    detail: broken.errors + ' of ' + broken.sessions + ' sessions recorded a runtime error. Fixing it is cheaper than anything new.' }, broken.id);
+
+  const rated = (survey.byGame || []).filter(row => row.ratings >= 2);
+  if (rated.length) {
+    const best = rated[0];
+    if (best.average >= 4) add({ tone: 'good', metric: best.average.toFixed(1) + ' / 5',
+      title: 'Players rate ' + name(best.game) + ' highest',
+      detail: best.ratings + ' ratings average ' + best.average.toFixed(1) + '. This is the formula to repeat in the quieter games.' }, best.game);
+    const worst = rated[rated.length - 1];
+    if (rated.length > 1 && worst.average < 3) add({ tone: 'watch', metric: worst.average.toFixed(1) + ' / 5',
+      title: name(worst.game) + ' lands flat',
+      detail: worst.ratings + ' ratings average ' + worst.average.toFixed(1) + '. Ask what is missing before adding more of it.' }, worst.game);
+  }
+
+  const busiest = [...hours].filter(row => row.active > 0).sort((a, b) => b.active - a.active)[0];
+  if (busiest) {
+    const next = String((Number(busiest.id) + 1) % 24).padStart(2, '0');
+    add({ tone: 'idea', metric: busiest.id + ':00',
+      title: 'Play peaks at ' + busiest.id + ':00 Detroit',
+      detail: 'New games, announcements and daily resets are seen most between ' + busiest.id + ':00 and ' + next + ':00.' });
+  }
+
+  const sourceTotal = sources.reduce((n, row) => n + row.active, 0);
+  const top = [...sources].sort((a, b) => b.active - a.active)[0];
+  if (top && sourceTotal && top.active / sourceTotal >= 0.4) add({ tone: 'idea', metric: pct(top.active / sourceTotal),
+    title: 'Most play starts from ' + (top.id === 'unknown' ? 'an unknown source' : top.id),
+    detail: pct(top.active / sourceTotal) + ' of play time. Put launch work there before trying a new channel.' });
+
+  if (anchor.share >= 0.6 && active.length > 2) add({ tone: 'watch', metric: pct(anchor.share),
+    title: 'One game is most of the site',
+    detail: name(anchor.id) + ' holds ' + pct(anchor.share) + ' of play time. A quiet week there is a quiet week everywhere.' }, anchor.id);
+
+  return found.slice(0, limit);
 }

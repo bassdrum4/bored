@@ -1,7 +1,7 @@
 import { request, freshSession, getSession } from './backend.js';
 import { createAnnouncementAdmin } from './announcement-admin.js';
 import { ORDER } from '../games/catalog.js';
-import { summarizeEvents, summarizeEngagement, eventsCSV, excludeAdmins } from './analytics-data.js';
+import { summarizeEvents, summarizeEngagement, eventsCSV, excludeAdmins, buildGameSignals, buildInsights } from './analytics-data.js';
 const $ = selector => document.querySelector(selector);
 const announcementAdmin = createAnnouncementAdmin();
 let events = [], productEvents = [], feedbackRows = [], togetherSummary = null, aggregateSummary = null, aggregateCohorts = [], handles = {}, report = null, page = 0, loading = false, epoch = 0;
@@ -50,15 +50,191 @@ function bars(target, rows, label) {
   }));
   if (!rows.length) $(target).append(el('p', 'No activity recorded yet.'));
 }
+const SVGNS = 'http://www.w3.org/2000/svg';
+const pct = ratio => Number.isFinite(ratio) ? Math.round(ratio * 100) + '%' : '—';
+function svgNode(tag, attrs = {}) {
+  const node = document.createElementNS(SVGNS, tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  return node;
+}
+function svgLabel(x, y, text, anchor = 'start', className = 'analytics-svg-label') {
+  const node = svgNode('text', { x, y, 'text-anchor': anchor, class: className });
+  node.textContent = text; return node;
+}
+function meter(label, ratio, text) {
+  const row = el('div'); row.className = 'analytics-love-meter';
+  row.append(el('span', label), el('b', text));
+  const track = el('div'); track.className = 'analytics-love-track';
+  const fill = el('div'); fill.className = 'analytics-love-fill';
+  fill.style.width = Math.round(Math.max(0, Math.min(1, ratio || 0)) * 100) + '%';
+  track.append(fill); row.append(track); return row;
+}
+// Share of play, hook rate and return rate side by side, one block per game.
+// Long bars rank the games; the two thin bars say whether the time is earned.
+function loveChart(target, signals) {
+  const host = $(target), rows = signals.filter(row => row.sessions > 0);
+  if (!rows.length) { host.replaceChildren(el('p', 'No activity recorded yet.')); return; }
+  host.replaceChildren(...rows.map(row => {
+    const wrap = el('div'); wrap.className = 'analytics-love';
+    const head = el('div'); head.className = 'analytics-love-head';
+    head.append(el('strong', names[row.id] || row.id),
+      el('span', pct(row.share) + ' of play · ' + duration(row.perSession) + ' avg · ' + row.sessions + ' sessions'));
+    const meters = el('div'); meters.className = 'analytics-love-meters';
+    meters.append(
+      meter('Play time', row.share, pct(row.share)),
+      meter('Hooked · 60s+', row.hookRate, pct(row.hookRate)),
+      meter('Came back another day', row.returnRate || 0, row.returnRate === null ? 'not enough history' : pct(row.returnRate)));
+    wrap.append(head, meters); return wrap;
+  }));
+}
+// Where each game sits between "opens a lot" and "keeps people": the four
+// corners are four different next moves, not four scores.
+function quadrantChart(target, signals) {
+  const host = $(target), rows = signals.filter(row => row.sessions > 0);
+  if (!rows.length) { host.replaceChildren(el('p', 'No activity recorded yet.')); return; }
+  const W = 760, H = 340, pad = { l: 64, r: 30, t: 46, b: 54 };
+  const longest = Math.max(60000, ...rows.map(row => row.perSession));
+  const split = rows.reduce((n, row) => n + row.perSession, 0) / rows.length;
+  const x = rate => pad.l + Math.max(0, Math.min(1, rate)) * (W - pad.l - pad.r);
+  const y = value => pad.t + (H - pad.t - pad.b) * (1 - Math.min(1, value / longest));
+  const root = svgNode('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'analytics-svg analytics-scatter',
+    role: 'img', 'aria-label': 'Games by share of sessions that reach a minute of play and average session length' });
+  root.append(svgNode('line', { x1: pad.l, x2: W - pad.r, y1: y(0), y2: y(0), class: 'analytics-axis-line' }));
+  root.append(svgNode('line', { x1: x(0.5), x2: x(0.5), y1: pad.t, y2: y(0), class: 'analytics-grid-line', 'stroke-dasharray': '4 4' }));
+  root.append(svgNode('line', { x1: pad.l, x2: W - pad.r, y1: y(split), y2: y(split), class: 'analytics-grid-line', 'stroke-dasharray': '4 4' }));
+  root.append(svgLabel(pad.l, H - 32, '0% hook', 'start'));
+  root.append(svgLabel(x(0.5), H - 32, 'half of sessions reach 60s+', 'middle'));
+  root.append(svgLabel(W - pad.r, H - 32, '100% hook', 'end'));
+  for (const value of [0, split, longest])
+    root.append(svgLabel(pad.l - 8, y(value) + 3, duration(value), 'end'));
+  // The four corner words live outside the plot, so the busiest game — which
+  // sits in one of those corners by definition — cannot cover them.
+  const taken = [];
+  const corner = (cx, cy, text, anchor) => {
+    root.append(svgLabel(cx, cy, text, anchor, 'analytics-quadrant-label'));
+    const width = text.length * 5.9, left = anchor === 'end' ? cx - width : anchor === 'middle' ? cx - width / 2 : cx;
+    taken.push({ left, right: left + width, top: cy - 9, bottom: cy + 2 });
+  };
+  corner(W - pad.r, 14, 'KEEP INVESTING', 'end');
+  corner(pad.l, 14, 'REWARD THE COMMITTED', 'start');
+  corner(W - pad.r, H - 6, 'ADD DEPTH', 'end');
+  corner(pad.l, H - 6, 'FIX THE FIRST MINUTE', 'start');
+  const overlaps = box => taken.some(other => box.left < other.right + 2 && box.right + 2 > other.left &&
+    box.top < other.bottom + 2 && box.bottom + 2 > other.top);
+  // Biggest bubbles keep their names; a crowded neighbour loses its label
+  // rather than drawing it across another one.
+  for (const row of [...rows].sort((a, b) => b.sessions - a.sessions)) {
+    const radius = 4 + Math.min(11, Math.sqrt(row.sessions) * 2);
+    const cx = x(row.hookRate), cy = y(row.perSession);
+    const bubble = svgNode('circle', { cx, cy, r: radius, class: 'analytics-bubble' });
+    const title = svgNode('title');
+    title.textContent = (names[row.id] || row.id) + ' · ' + pct(row.hookRate) + ' hook · ' +
+      duration(row.perSession) + ' avg · ' + row.sessions + ' sessions' +
+      (row.returnRate === null ? '' : ' · ' + pct(row.returnRate) + ' returned');
+    bubble.append(title); root.append(bubble);
+    const label = names[row.id] || row.id, width = label.length * 6.1;
+    for (const baseline of [cy + radius + 10, cy - radius - 4]) {
+      const box = { left: cx - width / 2, right: cx + width / 2, top: baseline - 9, bottom: baseline + 2 };
+      if (box.left < 2 || box.right > W - 2 || overlaps(box)) continue;
+      root.append(svgLabel(cx, baseline, label, 'middle', 'analytics-bubble-label'));
+      taken.push(box); break;
+    }
+  }
+  host.replaceChildren(root);
+}
+function lineChart(target, rows) {
+  const host = $(target);
+  if (!rows.length) { host.replaceChildren(el('p', 'No activity recorded yet.')); return; }
+  const W = 760, H = 230, pad = { l: 58, r: 18, t: 16, b: 30 };
+  const max = Math.max(1, ...rows.map(row => row.active));
+  const x = index => rows.length > 1 ? pad.l + index * (W - pad.l - pad.r) / (rows.length - 1) : (pad.l + W - pad.r) / 2;
+  const y = value => pad.t + (H - pad.t - pad.b) * (1 - value / max);
+  const root = svgNode('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'analytics-svg',
+    role: 'img', 'aria-label': 'Active play time by Detroit day' });
+  for (const level of [0, 0.5, 1]) {
+    root.append(svgNode('line', { x1: pad.l, x2: W - pad.r, y1: y(max * level), y2: y(max * level),
+      class: level ? 'analytics-grid-line' : 'analytics-axis-line' }));
+    root.append(svgLabel(pad.l - 8, y(max * level) + 3, duration(max * level), 'end'));
+  }
+  const tick = Math.max(1, Math.ceil(rows.length / 7));
+  rows.forEach((row, index) => {
+    if (index % tick === 0 || index === rows.length - 1) root.append(svgLabel(x(index), H - 10, row.id.slice(5), 'middle'));
+  });
+  const points = rows.map((row, index) => x(index) + ',' + y(row.active));
+  if (rows.length > 1) {
+    root.append(svgNode('polygon', { points: pad.l + ',' + y(0) + ' ' + points.join(' ') + ' ' + x(rows.length - 1) + ',' + y(0),
+      class: 'analytics-trend-area' }));
+    root.append(svgNode('polyline', { points: points.join(' '), class: 'analytics-trend-line' }));
+  }
+  // A trailing week keeps a single spike from rewriting the story.
+  if (rows.length >= 4) {
+    const average = rows.map((row, index) => {
+      const window = rows.slice(Math.max(0, index - 6), index + 1);
+      return window.reduce((sum, item) => sum + item.active, 0) / window.length;
+    });
+    root.append(svgNode('polyline', { points: average.map((value, index) => x(index) + ',' + y(value)).join(' '),
+      class: 'analytics-trend-average' }));
+  }
+  rows.forEach((row, index) => {
+    const dot = svgNode('circle', { cx: x(index), cy: y(row.active), r: rows.length > 45 ? 2 : 3.5, class: 'analytics-trend-dot' });
+    const title = svgNode('title');
+    title.textContent = row.id + ' · ' + duration(row.active) + ' · ' + row.sessions.size + ' sessions';
+    dot.append(title); root.append(dot);
+  });
+  host.replaceChildren(root);
+}
+function ratingChart(target, rows) {
+  const host = $(target);
+  const rated = (rows || []).filter(row => row.ratings > 0);
+  if (!rated.length) { host.replaceChildren(el('p', 'No enjoyment ratings in this selection.')); return; }
+  host.replaceChildren(...rated.map(row => {
+    const wrap = el('div'); wrap.className = 'analytics-love';
+    const head = el('div'); head.className = 'analytics-love-head';
+    head.append(el('strong', names[row.game] || row.game),
+      el('span', row.average.toFixed(1) + ' / 5 · ' + row.ratings + ' rating' + (row.ratings === 1 ? '' : 's')));
+    const meters = el('div'); meters.className = 'analytics-love-meters analytics-love-single';
+    meters.append(meter('Average rating', row.average / 5, row.average.toFixed(1) + ' / 5'));
+    wrap.append(head, meters); return wrap;
+  }));
+}
+function insightCard(item) {
+  const card = el('article'); card.className = 'analytics-insight'; card.dataset.tone = item.tone;
+  const head = el('div'); head.className = 'analytics-insight-head';
+  head.append(el('span', item.tone === 'good' ? 'Working' : item.tone === 'watch' ? 'Watch' : 'Try next'),
+    el('strong', item.metric || ''));
+  head.firstChild.className = 'analytics-insight-kicker'; head.lastChild.className = 'analytics-insight-metric';
+  card.append(head, el('h3', item.title), el('p', item.detail));
+  return card;
+}
+function renderHours(hours) {
+  const maxHour = Math.max(1, ...hours.map(h => h.active));
+  $('#hour-chart').replaceChildren(...hours.map(h => {
+    const n = el('div'); n.className = 'analytics-hour';
+    n.style.backgroundColor = `rgba(69,102,83,${(h.active / maxHour * .2).toFixed(3)})`;
+    n.append(el('span', h.id + ':00'), el('strong', duration(h.active))); return n;
+  }));
+}
+// Charts first, then the same numbers as tables further down the tab.
+function renderOverview(engagement) {
+  const signals = buildGameSignals({ report, engagement });
+  const insights = buildInsights({ signals, hours: report.hours,
+    sources: report.sources, survey: engagement.survey, totals: report.totals }, names);
+  $('#insights').replaceChildren(...(insights.length ? insights.map(insightCard)
+    : [el('p', 'No advice yet: it needs at least 10 sessions, and 10 sessions of a game before naming it. Widen the dates to collect more activity.')]));
+  loveChart('#love-chart', signals);
+  quadrantChart('#quadrant-chart', signals);
+  lineChart('#trend-chart', report.days);
+  ratingChart('#rating-chart', engagement.survey.byGame || []);
+  bars('#source-chart', report.sources, r => (r.id === 'unknown' ? 'unknown source' : r.id) + ' · ' + r.sessions + ' sessions');
+  bars('#device-chart', report.devices, r => r.id);
+  bars('#mode-chart', report.modes, r => r.id + ' · ' + r.sessions + ' sessions');
+  renderHours(report.hours);
+}
 function gameRows(games) {
   return games.map(g => [names[g.id] || g.id, g.sessions, g.users.size, duration(g.active), duration(g.visible), duration(g.active / g.sessions), g.completed, g.errors]);
 }
 const gameColumns = ['Game','Sessions','Accounts','Active time','Visible time','Avg active / session','Daily completions','Errors'];
-function renderEngagement(rows) {
-  const selected = $('#person').value;
-  const products = productEvents.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
-  const feedback = feedbackRows.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
-  const data = summarizeEngagement(rows, products, feedback, new Date(detroitMidnight(shiftDay($('#through').value, 1)) - 1));
+function renderEngagement(data, products, feedback) {
   const percent = (numerator, denominator) => denominator ? Math.round(numerator / denominator * 100) + '%' : 'Not enough history';
   const stats = [
     ['Visitors with an ID', data.uniqueVisitors], ['Meaningful sessions', data.meaningful],
@@ -237,22 +413,15 @@ function renderHistory() {
 }
 function render() {
   const selected = $('#person').value;
-  const rows = events.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
+  const matching = event => !selected || (selected === 'guest' ? !event.user_id : event.user_id === selected);
+  const rows = events.filter(matching), products = productEvents.filter(matching), feedback = feedbackRows.filter(matching);
   report = summarizeEvents(rows, handles);
+  const engagement = summarizeEngagement(rows, products, feedback,
+    new Date(detroitMidnight(shiftDay($('#through').value, 1)) - 1));
   const t = report.totals;
   const stats = [['Active time', duration(t.active)], ['Sessions', t.sessions], ['Signed-in accounts', t.accounts], ['Guest sessions', t.guests], ['Visible time', duration(t.visible)], ['Repeat accounts', t.repeatAccounts], ['Daily completions', t.completed], ['Errors', t.errors]];
   $('#totals').replaceChildren(...stats.map(([label, value]) => { const n = el('div'); n.className = 'analytics-stat'; n.append(el('strong', value), el('span', label)); return n; }));
-  bars('#game-chart', report.games, r => names[r.id] || r.id);
-  bars('#day-chart', report.days, r => r.id);
-  bars('#source-chart', report.sources, r => r.id + ' · ' + r.sessions + ' sessions');
-  bars('#device-chart', report.devices, r => r.id);
-  bars('#mode-chart', report.modes, r => r.id);
-  const maxHour = Math.max(1, ...report.hours.map(h => h.active));
-  $('#hour-chart').replaceChildren(...report.hours.map(h => {
-    const n = el('div'); n.className = 'analytics-hour';
-    n.style.backgroundColor = `rgba(69,102,83,${(h.active / maxHour * .2).toFixed(3)})`;
-    n.append(el('span', h.id + ':00'), el('strong', duration(h.active))); return n;
-  }));
+  renderOverview(engagement);
   table('#games-table', gameColumns, gameRows(report.games));
   renderF14(rows);
   table('#players-table', ['Player','Sessions','Games','Days active','Active time','Avg / session','Last seen'], report.players.map(p => [
@@ -262,7 +431,7 @@ function render() {
   $('#player-detail').hidden = !selected;
   $('#player-heading').textContent = selected === 'guest' ? 'Unidentified guests' : handles[selected] || selected;
   if (selected) table('#player-games', gameColumns, gameRows(report.games));
-  renderEngagement(rows);
+  renderEngagement(engagement, products, feedback);
   renderSessions(); $('#export').disabled = !rows.length;
 }
 function renderSessions() {
