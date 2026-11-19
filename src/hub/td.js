@@ -154,7 +154,7 @@ export const STAGES = [
     waves: [[3, 23, 3, 3], [14, 75, 2, 4, 0, 0, 0, 1], [28, 24, 3, 3], [40, 75, 3, 3, 0, 0, 0, 1]],
     before: ['Ariana: Petrel always did talk too much. I prefer walls.', 'Graveler are armored: physical hits barely scratch them. Casters\' special attacks go straight through.'],
     after: ['Ariana: A crack in the wall. Nothing more.'] },
-  { id: '4-2', chapter: 4, name: 'Garden of thorns', lives: 3, level: 2.7, map: ['S...H#####', '###.H##H##', '#H#......G', '#####H####', '##########'],
+  { id: '4-2', chapter: 4, name: 'Garden of thorns', lives: 3, level: 2.65, map: ['S...H#####', '###.H##H##', '#H#......G', '#####H####', '##########'],
     waves: [[3, 43, 3, 3], [14, 95, 2, 4, 0, 0, 0, 1], [26, 45, 3, 3], [38, 95, 2, 4, 0, 0, 0, 1]],
     before: ['Grunt: Vileplume in the garden, Onix in the rocks.', 'Fire and Flying burn Grass. Water and Grass wear down Rock.'],
     after: ['Grunt: My garden...'] },
@@ -178,7 +178,7 @@ export const STAGES = [
 
   /* ── Chapter 5: Archer (Houndoom, fire and dark, and fast waves) ─────── */
   // A ninth wave field: fast. Fast enemies run at 1.5x speed; block them early.
-  { id: '5-1', chapter: 5, name: 'Ember alley', lives: 3, level: 2.55, map: ['##H##H##H#', 'S........G', '##H##H##H#', '##########', '##########'],
+  { id: '5-1', chapter: 5, name: 'Ember alley', lives: 3, level: 2.5, map: ['##H##H##H#', 'S........G', '##H##H##H#', '##########', '##########'],
     waves: [[3, 228, 3, 2.5], [14, 20, 4, 1.5, 0, 0, 0, 0, 1], [26, 228, 4, 2], [38, 20, 5, 1.2, 0, 0, 0, 0, 1]],
     before: ['Archer: Ariana let you through? I will not be so slow.', 'Fast enemies run half again as quick. Block them early on the path, before they build speed past your snipers.'],
     after: ['Archer: Quick feet. We will see how long they last.'] },
@@ -225,7 +225,7 @@ export const STAGES = [
     waves: [[3, 53, 3, 2, 0, 0, 0, 0, 1], [14, 41, 3, 2.5, 0, 1], [26, 111, 2, 3, 0, 0, 0, 1], [38, 33, 3, 2.5], [48, 53, 3, 1.8, 0, 0, 0, 0, 1]],
     before: ['Grunt: Every grunt left in Kanto is in this hall.', 'Persian run fast, Zubat fly, Rhyhorn are armored. Bring a bit of everything.'],
     after: ['Grunt: The boss... is all that is left.'] },
-  { id: '6-6', chapter: 6, name: 'Giovanni', boss: true, admin: true, final: true, lives: 3, level: 2.55,
+  { id: '6-6', chapter: 6, name: 'Giovanni', boss: true, admin: true, final: true, lives: 3, level: 2.45,
     map: ['S....H####', '####.H##H#', '#H#H......', 'S.......#G', '####H#####'],
     waves: [[3, 51, 4, 2, 0, 0, 0, 0, 1], [14, 42, 3, 2, 0, 1], [26, 31, 3, 3], [36, 110, 2, 3, 0, 0, 1], [46, 34, 3, 3], [58, 112, 1, 1, 1, 0, 0, 1]],
     before: ['Giovanni: So you are the one who took Team Rocket apart.', 'Giovanni: I am Giovanni. Rhydon, show this child what real power is.',
@@ -244,29 +244,31 @@ export const STAGES = [
    at the recommended level wins and the worst-typed one loses (tests/td.test.cjs). */
 // [chapter id, gym id, leader, gym, region, types, trait, weak species, strong species, ace, item, a line for each stage]
 export const GYMS = [
+  // Species climb from gym to gym: basic forms at Brock's, final forms by Blaine's and Clair's.
   [7, 'G1', 'Brock', 'Pewter Gym', 'Kanto', 'Rock, Ground', 'shield', [74, 27, 50], [95, 111, 75], 95, 'sash'],
-  [8, 'G2', 'Bugsy', 'Azalea Gym', 'Johto', 'Bug', 'split', [10, 13, 48], [123, 127, 214], 212, 'lens'],
-  [9, 'G3', 'Misty', 'Cerulean Gym', 'Kanto', 'Water', 'heal', [54, 118, 116], [120, 55, 91], 121, 'leftovers'],
-  [10, 'G4', 'Lt. Surge', 'Vermilion Gym', 'Kanto', 'Electric, Steel', 'ranged', [100, 81, 25], [125, 82, 101], 26, 'claw'],
-  [11, 'G5', 'Winona', 'Fortree Gym', 'Hoenn', 'Flying, Normal, Steel', 'rally', [16, 333, 276], [227, 17, 277], 334, 'helmet'],
-  [12, 'G6', 'Sabrina', 'Saffron Gym', 'Kanto', 'Psychic, Fairy', 'stealth', [63, 96, 280], [64, 122, 281], 65, 'band'],
-  [13, 'G7', 'Blaine', 'Cinnabar Gym', 'Kanto', 'Fire', 'ranged', [58, 77, 37], [126, 78, 38], 59, 'belt'],
-  [14, 'G8', 'Clair', 'Blackthorn Gym', 'Johto', 'Dragon', 'shield', [147, 116, 443], [148, 117, 444], 230, 'bell']
+  [8, 'G2', 'Bugsy', 'Azalea Gym', 'Johto', 'Bug', 'split', [10, 13, 48], [15, 49, 123], 123, 'lens'],
+  [9, 'G3', 'Misty', 'Cerulean Gym', 'Kanto', 'Water', 'heal', [54, 118, 120], [55, 119, 90], 121, 'leftovers'],
+  [10, 'G4', 'Lt. Surge', 'Vermilion Gym', 'Kanto', 'Electric, Steel', 'ranged', [100, 81, 25], [101, 82, 125], 26, 'claw'],
+  [11, 'G5', 'Winona', 'Fortree Gym', 'Hoenn', 'Flying, Normal, Steel', 'rally', [333, 276, 17], [277, 18, 227], 334, 'helmet'],
+  [12, 'G6', 'Sabrina', 'Saffron Gym', 'Kanto', 'Psychic, Fairy', 'stealth', [64, 96, 281], [97, 122, 282], 65, 'band'],
+  [13, 'G7', 'Blaine', 'Cinnabar Gym', 'Kanto', 'Fire', 'ranged', [58, 77, 126], [78, 38, 59], 467, 'belt'],
+  [14, 'G8', 'Clair', 'Blackthorn Gym', 'Johto', 'Dragon', 'rally', [147, 610, 704], [148, 334, 371], 230, 'bell']
 ];
-// The Elite Four and the Champion: [id, name, types, traits, species, ace, item].
+// The Elite Four and the Champion: [id, name, types, traits, species, ace, item]. Their real teams.
 export const LEAGUE = [
-  ['E1', 'Lorelei', 'Ice', ['heal', 'shield'], [86, 90, 124, 87], 131, 'leftovers'],
-  ['E2', 'Bruno', 'Fighting', ['rally', 'split'], [66, 67, 106, 107], 68, 'band'],
-  ['E3', 'Agatha', 'Ghost, Poison', ['stealth', 'split'], [92, 93, 42, 24], 94, 'sash'],
-  ['E4', 'Karen', 'Dark', ['ranged', 'stealth'], [198, 215, 228, 197], 229, 'lens'],
-  // Cynthia's team as it was on the way up (Gible, Riolu, Togetic, Roselia), Milotic, and her Garchomp.
-  ['C1', 'Cynthia', 'Ground, Dragon, Steel, Water, Fairy, Grass', ['heal', 'ranged', 'shield', 'rally'], [443, 447, 350, 176, 315], 445, 'belt']
+  ['E1', 'Lorelei', 'Ice', ['heal', 'shield'], [87, 91, 124, 80], 131, 'leftovers'],
+  ['E2', 'Bruno', 'Fighting', ['rally', 'split'], [67, 106, 107, 237], 68, 'band'],
+  ['E3', 'Agatha', 'Ghost, Poison', ['stealth', 'split'], [93, 42, 24, 429], 94, 'sash'],
+  ['E4', 'Karen', 'Dark', ['ranged', 'stealth'], [197, 430, 461, 359], 229, 'lens'],
+  // Cynthia's Sinnoh team: Spiritomb, Lucario, Togekiss, Roserade, Milotic, and Garchomp to finish.
+  ['C1', 'Cynthia', 'Ghost, Dark, Fighting, Steel, Fairy, Flying, Grass, Water, Dragon, Ground', ['shield', 'ranged', 'heal', 'rally'], [442, 448, 468, 407, 350], 445, 'belt']
 ];
 // Which species fly (their waves cross straight to the goal, so only snipers hit them).
-const FLIES = new Set([16, 17, 333, 334, 276, 277, 227, 42, 198, 468, 176, 123, 212, 12, 49]);
-// [level, thinning] by stage, tuned against the balance guard (see the note above). Thinning n takes n
-// foes off each non-boss wave and spreads the rest 12% wider per step.
-export const GYM_TUNE = { 'G1-1': [2.6, 0], 'G1-2': [2.65, 0], 'G1-3': [2.7, 0], 'G1-4': [2.75, 0], 'G2-1': [2.8, 0], 'G2-2': [2.85, 0], 'G2-3': [2.9, 1], 'G2-4': [2.25, 0], 'G3-1': [3, 0], 'G3-2': [3.05, 0], 'G3-3': [3.05, 0], 'G3-4': [3.15, 0], 'G4-1': [3.2, 0], 'G4-2': [3.25, 0], 'G4-3': [3.3, 0], 'G4-4': [3.35, 0], 'G5-1': [3.4, 0], 'G5-2': [2.4, 0], 'G5-3': [3.4, 1], 'G5-4': [2.35, 0], 'G6-1': [3.6, 0], 'G6-2': [2.45, 0], 'G6-3': [2.55, 0], 'G6-4': [3.35, 0], 'G7-1': [3.25, 0], 'G7-2': [3.25, 0], 'G7-3': [2.85, 0], 'G7-4': [2.3, 0], 'G8-1': [2.3, 0], 'G8-2': [2.35, 1], 'G8-3': [2, 3], 'G8-4': [2.8, 2], 'E1': [2.9, 0], 'E2': [2.25, 2], 'E3': [4.3, 0], 'E4': [2.85, 0], 'C1': [3.4, 2] };
+const FLIES = new Set([16, 17, 18, 333, 334, 276, 277, 227, 42, 198, 430, 468, 176, 123, 212, 12, 49, 330]);
+// [level, thinning, pacing, lives, map] by stage (applyGymTune). The level climbs a steady 0.045 a stage from
+// G1-1 to the Champion; the species do the rest. The other knobs were tuned so that, at each level, a
+// type-matched squad of commons wins at the recommended level, with every held item too, and the worst-typed loses.
+export const GYM_TUNE = { 'G1-1': [2.4, 0, 1, 3, -1], 'G1-2': [2.44, 0, 1, 3, -1], 'G1-3': [2.49, 0, 1, 3, -1], 'G1-4': [2.54, 0, 1, 3, -1], 'G2-1': [2.58, 0, 1, 3, 0], 'G2-2': [2.63, 0, 1, 3, -1], 'G2-3': [2.67, 1, 1, 3, -1], 'G2-4': [2.71, 0, 1, 3, -1], 'G3-1': [2.76, 0, 1, 3, -1], 'G3-2': [2.8, 0, 1, 3, -1], 'G3-3': [2.85, 2, 1, 3, -1], 'G3-4': [2.9, 0, 1, 3, -1], 'G4-1': [2.94, 0, 1, 3, -1], 'G4-2': [2.98, 0, 1, 3, -1], 'G4-3': [3.03, 0, 1, 3, -1], 'G4-4': [3.07, 0, 1, 3, -1], 'G5-1': [3.12, 0, 1, 3, -1], 'G5-2': [3.17, 0, 1, 3, -1], 'G5-3': [3.21, 2, 1, 5, -1], 'G5-4': [3.25, 1, 1, 4, -1], 'G6-1': [3.3, 1, 1, 3, -1], 'G6-2': [3.34, 3, 1, 3, -1], 'G6-3': [3.39, 2, 1, 3, -1], 'G6-4': [3.43, 2, 1, 3, -1], 'G7-1': [3.48, 1, 1, 3, -1], 'G7-2': [3.52, 2, 1, 3, -1], 'G7-3': [3.57, 2, 1, 3, -1], 'G7-4': [3.61, 3, 1, 3, -1], 'G8-1': [3.66, 1, 1.15, 3, 2], 'G8-2': [3.71, 1, 1, 3, 5], 'G8-3': [3.75, 1, 1.6, 5, 13], 'G8-4': [3.79, 0, 1.6, 5, 6], 'E1': [3.84, 3, 1.15, 4, 2], 'E2': [3.88, 2, 1.6, 4, 2], 'E3': [3.93, 2, 1, 3, -1], 'E4': [3.97, 3, 1, 3, -1], 'C1': [4.02, 3, 1.15, 5, 1] };
 // Gyms use part 1's one-spawn maps (a gym has one door), in turn.
 const ONE_DOOR = STAGES.filter(st => st.map.join('').split('S').length === 2).map(st => st.map);
 function gymMaps(i) { return ONE_DOOR[(i * 5 + 2) % ONE_DOOR.length]; }
@@ -299,11 +301,17 @@ LEAGUE.forEach(([id, name, types, traits, list, ace], i) => {
     before: [name + ': ' + (champion ? 'I am the Champion. Show me everything your squad has learned.' : 'Welcome to the Elite Four. ' + types + ' types are my specialty.')],
     after: champion ? [name + ': ... You are the new Champion.', 'The Gym Challenge is complete. Thank you for playing.'] : [name + ': Go on. The next of the Elite Four is waiting.'] });
 });
-for (const st of gymStages) {
-  const [level, thin] = GYM_TUNE[st.id] || [2.4, 0];
-  st.level = level;
-  if (thin) st.waves = st.waves.map(w => w[4] ? w : [w[0], w[1], Math.max(1, w[2] - thin), +(w[3] * (1 + 0.12 * thin)).toFixed(2), ...w.slice(4)]);
-  STAGES.push(st);
+for (const st of gymStages) applyGymTune(st, GYM_TUNE[st.id]);
+for (const st of gymStages) STAGES.push(st);
+// [level, thinning, pacing, lives, map]: thinning n takes n foes off each non-boss wave; pacing p
+// spreads the waves and the foes in them p times wider; map m is ONE_DOOR[m] (else the stage's own).
+export function applyGymTune(st, tune) {
+  const [level = 2.4, thin = 0, pace = 1, lives = 3, map = -1] = tune || [];
+  st.base ||= { waves: st.waves.map(w => w.slice()), map: st.map };
+  st.level = level; st.lives = lives; st.map = map >= 0 ? ONE_DOOR[map % ONE_DOOR.length] : st.base.map;
+  st.waves = st.base.waves.map(w => { const c = w.slice(); c[0] = +(c[0] * pace).toFixed(2); c[3] = +(c[3] * pace).toFixed(2);
+    if (thin && !c[4]) { c[2] = Math.max(1, c[2] - thin); c[3] = +(c[3] * (1 + 0.12 * thin)).toFixed(2); } return c; });
+  return st;
 }
 // The first clear of a Leader, an Elite Four member or the Champion pays a held item; a Leader's also a badge.
 export const GYM_ITEMS = Object.fromEntries([...GYMS.map(g => [g[1] + '-4', g[10]]), ...LEAGUE.map(l => [l[0], l[6]])]);
@@ -405,7 +413,7 @@ export function unitStats(num, { level = 1, passive = false, costCut = 0, skills
   return {
     num, cls, name: m.name, types: m.types,
     hp: Math.round((m.hp * 5 + 140) * grow * (c.hp || 1)),
-    atk: Math.round((special ? m.spa : m.atk) * 1.3 * grow * (passive ? 1.1 : 1) * (item === 'band' ? 1.25 : 1)),
+    atk: Math.round((special ? m.spa : m.atk) * 1.3 * grow * (passive ? 1.1 : 1) * (item === 'band' ? 1.15 : 1)),
     def: Math.round(m.def * 0.6 * grow),
     interval: Math.max(0.6, Math.min(1.6, 1.7 - m.spe / 140)) * (item === 'claw' ? 0.85 : 1),
     cost: Math.max(4, c.cost + Math.round(m.bst / 160) - 2 - costCut),
@@ -541,11 +549,12 @@ export const SHIELD = { share: 0.6, physical: 0.5, caster: 1.5 };
 export const SPLIT = { hp: 0.3 };
 export const STEALTH_SEEN = 1.2;
 export const RALLY = { range: 1.6, speed: 1.3 };
+export const SASH_ENDURE = 1.5;
 /* ── Held items: one per line (equipped in Squad or the Dex) ─────────────── */
 export const ITEMS = {
   leftovers: { name: 'Leftovers', about: 'Heals 1.5% of its HP every second.', price: 1500 },
-  sash: { name: 'Focus Sash', about: 'Survives one hit that would knock it out, once a battle.', price: 1200 },
-  band: { name: 'Choice Band', about: '+25% damage, but its skill charges 30% slower.', price: 2000 },
+  sash: { name: 'Focus Sash', about: 'Once a battle, a hit that would knock it out leaves it at 1 HP, and it shrugs off hits for 1.5s.', price: 1200 },
+  band: { name: 'Choice Band', about: '+15% damage, but its skill charges 30% slower.', price: 2000 },
   claw: { name: 'Quick Claw', about: 'Attacks 15% faster.', price: 1500 },
   lens: { name: 'Scope Lens', about: 'Every 4th hit is a critical hit for 1.5x damage.', price: 1500 },
   helmet: { name: 'Rocky Helmet', about: 'Foes that hit it in melee take 30% of that damage back.', price: 1200 },
@@ -567,9 +576,11 @@ function strike(b, u, e, base, mult = 1) {
 }
 // A foe's hit on a unit (melee when it is the blocker's).
 function struck(b, e, u, dmg, melee) {
+  // A Focus Sash that has just held: a moment to retreat or be healed (else it falls to the next hit).
+  if ((u.endure || 0) > b.t) return;
   u.hp -= dmg;
   if (melee && u.item === 'helmet') e.hp -= dmg * 0.3;
-  if (u.hp <= 0 && u.item === 'sash' && !u.sashUsed) { u.hp = 1; u.sashUsed = true; }
+  if (u.hp <= 0 && u.item === 'sash' && !u.sashUsed) { u.hp = 1; u.sashUsed = true; u.endure = b.t + SASH_ENDURE; }
 }
 function useSkill(b, u) {
   const power = u.power ?? (u.rare ? 1.3 : 1);
