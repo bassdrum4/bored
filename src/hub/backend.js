@@ -184,10 +184,30 @@ export async function freshSession() {
   return session;
 }
 
+// What a display name may keep: letters and numbers from any script, combining
+// marks, emoji (with their joiners and variation selectors), underscore and
+// hyphen. Everything else — spaces, quotes, brackets — is dropped.
+const NAME_CHAR = /[\p{L}\p{N}\p{M}\p{Extended_Pictographic}\p{Emoji_Modifier}\u200d\ufe0e\ufe0f_-]/u;
+
+// Split by grapheme where the browser can, so a name is never cut inside an
+// emoji sequence.
+function nameParts(value) {
+  const text = String(value || '').normalize('NFC');
+  try {
+    return Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), part => part.segment);
+  } catch {
+    return Array.from(text);
+  }
+}
+
+// A name keeps its own script and emoji. Stripping to ASCII turned "✈" into
+// nothing and then padded it with underscores, which is how a player ended up
+// called "___" on the board.
 function cleanHandle(value) {
-  let cleaned = String(value || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 16);
-  while (cleaned.length < 3) cleaned += '_';
-  return cleaned.slice(0, 16);
+  const kept = nameParts(value)
+    .filter(part => Array.from(part).every(char => NAME_CHAR.test(char)))
+    .slice(0, 16);
+  return kept.join('') || 'player';
 }
 
 export function suggestedHandle() {
@@ -234,6 +254,7 @@ export function authErrorMessage(err) {
   if (/user already registered/i.test(message)) return 'That email already has an account. Try signing in.';
   if (/email not confirmed/i.test(message)) return 'Check your email to confirm the account first.';
   if (/password should be at least/i.test(message)) return 'Use at least 6 characters for the password.';
+  if (/names use 1 to 16/i.test(message)) return 'Names use 1–16 characters: letters, numbers or emoji, no spaces.';
   if (/names use 3 to 16/i.test(message)) return 'Names use 3–16 letters, numbers, _ or -.';
   if (/taken|already in use|duplicate/i.test(message)) return 'That name is taken. Try another.';
   if (/failed to fetch/i.test(message)) return 'Could not reach the leaderboard server.';

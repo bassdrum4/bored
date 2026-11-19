@@ -5,7 +5,7 @@ loads `main.js` and the hub modules as native ES modules, and the games are sepa
 documents in `src/games/content/` that the hub fetches over HTTP when you open one. Nothing is
 built or bundled — `src/` is both the source and the deployed tree. There is no framework, no
 router, no server. Read this before adding or editing a game — a game that misses these hooks
-silently disappears from scores, the daily challenge, or the build.
+silently disappears from scores, the daily challenge, or the build. When you need to make backend changes, use the supabase integration to apply the changes.
 
 ```
 src/main.js              hub wiring: library, player chrome, daily, leaderboard + account UI
@@ -284,7 +284,7 @@ Confirm the served copy matches the repo (compare a hash of `src/index.html`), t
 `https://bassdrum4.github.io/bored/version.json` names the commit you pushed — the deploy
 overwrites that file with `$GITHUB_SHA`, which is also the `?v=` stamp on game documents, so a
 stale stamp means the deploy has not landed yet — and that the page still boots before calling it
-done.
+done. PUSH EVERYTHING WHEN DONE.
 
 ## Source boundaries
 

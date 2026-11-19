@@ -12,6 +12,11 @@ const allowedExact = new Set([
   // their logic tests. Nothing outside Poké Gacha imports these modules.
   'src/hub/gacha.js',
   'src/hub/td.js',
+  'src/hub/gacha-dex.js',
+  'scripts/economy-sim.mjs',
+  'scripts/gacha-dex.mjs',
+  'scripts/gacha-art.py',
+  'tests/gacha.test.cjs',
   'src/games/previews/ashcrown.webp',
   'src/games/previews/pokedoku.svg',
   'src/games/previews/poke-idle.svg',
@@ -22,10 +27,13 @@ const allowedExact = new Set([
   'tests/poke-gacha.test.cjs',
   'tests/td.test.cjs',
 ]);
+const allowedGachaContent = /^src\/games\/content\/poke-gacha\/.+$/;
+const allowedGachaDocs = /^docs\/poke-gacha-[^/]+\.md$/;
 const allowedSprite = /^src\/games\/content\/pokedoku\/sprites\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.(?:png|webp|jpg|jpeg|gif)$/;
 
 export function isAllowedGameFile(filename) {
-  return allowedExact.has(filename) || allowedSprite.test(filename);
+  return allowedExact.has(filename) || allowedSprite.test(filename) ||
+    allowedGachaContent.test(filename) || allowedGachaDocs.test(filename);
 }
 
 const log = message => console.log(message);

@@ -2,13 +2,27 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 633,
-  "newest": "2026-11-18",
+  "count": 647,
+  "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"aacd3f3","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: blocked foes keep the red stop bar"},
+  {"sha":"ced5e9f","date":"2026-11-19","author":"Codebuff","subject":"fix(hub): keep emoji and Unicode display names"},
+  {"sha":"b812b97","date":"2026-11-19","author":"Codebuff","subject":"feat(scrabble): scale the board and its lettering up"},
+  {"sha":"3f71907","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: animated sprites, typed attack effects, and the shield on blocked foes"},
+  {"sha":"b748a65","date":"2026-11-19","author":"Claude","subject":"Gym Challenge: a steady climb, Cynthia's real team, items that never cost a win, a gentler Choice Band"},
+  {"sha":"4536f2e","date":"2026-11-19","author":"Codebuff","subject":"fix(risk): deploy opening armies in alternating turns"},
+  {"sha":"3f6b5c7","date":"2026-11-19","author":"Claude","subject":"Tests: the chapter count and the trophy groups grow with the Gym Challenge"},
+  {"sha":"7363e4c","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: Gym Challenge in the page, the six new foes, held items, pull history, banner calendar, trophies, crowd spread"},
+  {"sha":"21a7060","date":"2026-11-18","author":"Daniel Lowe","subject":"Expand Vettel auto-merge allowlist for Poké Gacha files"},
+  {"sha":"c6d0ec8","date":"2026-11-18","author":"Vettel Xu","subject":"Gym Challenge: a steady climb, Cynthia's real team, items that never cost a win, a gentler Choice Band","pr":260},
+  {"sha":"3933692","date":"2026-11-18","author":"Daniel Lowe","subject":"Update AGENTS.md with backend and push instructions"},
+  {"sha":"c2acc2f","date":"2026-11-18","author":"Daniel Lowe","subject":"test(poke-gacha): assert displayed candy against actual line balance"},
+  {"sha":"69156ee","date":"2026-11-18","author":"Claude","subject":"Hub: Gym Challenge (8 gyms, Elite Four, Champion), six new kinds of foe, held items, badges, Poké Gacha trophies, banner calendar"},
+  {"sha":"0952800","date":"2026-11-18","author":"Claude","subject":"Hub: candy eggs (an egg of an owned line, for candy)"},
   {"sha":"d9fb1b6","date":"2026-11-18","author":"Codebuff","subject":"Sudoku: three levels, notes, and a time-only shared board"},
   {"sha":"486d4c3","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: tutorials for classes and the bars, types before 1-3, a card for every kind of foe (and a Foes list), and skills"},
   {"sha":"5d1df22","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: Dex shows the form that fights, a clearer chain, a PokéRogue-style candy menu, Level up, candy that looks like candy, sprites without boxes"},

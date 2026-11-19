@@ -177,17 +177,20 @@ test('CPU advances a bounded column, not the whole surviving stack',()=>{
     'only a capped column follows the conquest, not the 95 that survived');
 });
 
-test('Bored Together pays each seat its opening troops on its own first turn',()=>{
-  // A live match has no shared setup screen: seat one used to open with the
-  // whole setup grant while seat two only ever received ordinary income.
-  assert.match(html, /state\.openingPool = \[Math\.max\(0, 40 - held\(0\)\), Math\.max\(0, 40 - held\(1\)\)\]/);
-  assert.match(html, /state\.reserves = calculateReserves\(0\) \+ openingDeployment\(0\)/);
-  assert.match(html, /state\.reserves = calculateReserves\(state\.turnIndex\) \+ openingDeployment\(state\.turnIndex\)/);
+test('Bored Together deploys each seat in turn before the first real turn',()=>{
+  // Deployment is the opening turn of a live match: seat one places its whole
+  // garrison, seat two places theirs, and only then does seat one take the
+  // first reinforcement/attack/fortify turn. It used to be folded into each
+  // seat's first reinforcement, so placement and play arrived together.
+  assert.match(html, /state\.setupPool = \[Math\.max\(0, 40 - held\(0\)\), Math\.max\(0, 40 - held\(1\)\)\]/);
+  assert.match(html, /state\.phase = 'SETUP'/);
+  assert.doesNotMatch(html, /openingDeployment|openingPool/);
+  assert.match(html, /state\.phase === "SETUP" && !ONLINE \? "READY" : "PHASE"/);
 
   const state = {
-    phase:'REINFORCE', turnIndex:0, reserves:0, conqueredThisTurn:false,
+    phase:'SETUP', turnIndex:0, reserves:0, conqueredThisTurn:false,
     historyStack:[], selected:null, fortified:false, lastDice:{atk:[],def:[]},
-    openingPool:[19,19], setupPool:[0,0],
+    setupPool:[19,19], leaderIndex:null,
     territories:{A:{owner:0,armies:1},B:{owner:1,armies:1},C:{owner:0,armies:1}},
     players:[
       {name:'One',isAI:false,cards:[],stats:{}},
@@ -205,24 +208,34 @@ test('Bored Together pays each seat its opening troops on its own first turn',()
     aiCommentOnState:()=>{}, setTimeout:()=>1,
     console:{log(){},error(){}}
   });
-  vm.runInContext(['openingDeployment','advancePhase','calculateReserves',
+  vm.runInContext(['advancePhase','calculateReserves',
     'getNextAlivePlayer','isPlayerDead'].map(functionSource).join('\n'), context);
 
-  // Seat one takes its grant when the match opens; ending its turn must hand
-  // seat two the same opening garrison on top of ordinary income.
-  state.reserves=vm.runInContext('calculateReserves(0) + openingDeployment(0)',context);
-  assert.equal(state.reserves,3+19,'seat one deploys its setup troops first');
-  assert.equal(state.openingPool[0],0);
-  state.phase='FORTIFY';
+  // Seat one cannot hand the map over while it still holds troops.
   vm.runInContext('advancePhase()', context);
-  assert.equal(state.turnIndex,1);
-  assert.equal(state.openingPool[1],0,'seat two grant is consumed once');
-  assert.equal(state.reserves,3+19,'seat two gets income plus its 19 setup troops');
-
-  state.phase='FORTIFY';
-  vm.runInContext('advancePhase()', context);
+  assert.equal(state.phase,'SETUP','a held pool keeps the deployment turn');
   assert.equal(state.turnIndex,0);
-  assert.equal(state.openingPool[0],0,'no second grant for a seat that already deployed');
+  assert.equal(state.setupPool[0],19,'unplaced troops are not handed over');
+
+  // Finishing deployment passes the turn to seat two's deployment, not play.
+  state.setupPool[0]=0;
+  vm.runInContext('advancePhase()', context);
+  assert.equal(state.phase,'SETUP','seat two deploys before any real turn');
+  assert.equal(state.turnIndex,1);
+  assert.equal(state.reserves,0,'deployment is still not a reinforcement turn');
+
+  // Both garrisons placed: play begins with seat one and ordinary income only.
+  state.setupPool[1]=0;
+  vm.runInContext('advancePhase()', context);
+  assert.equal(state.phase,'REINFORCE','play begins only after both deployments');
+  assert.equal(state.turnIndex,0,'seat one owns the first real turn');
+  assert.equal(state.reserves,3,'the opening garrison is not paid twice');
+
+  // The round-robin that follows is ordinary income, with no leftover grant.
+  state.phase='FORTIFY';
+  vm.runInContext('advancePhase()', context);
+  assert.equal(state.phase,'REINFORCE');
+  assert.equal(state.turnIndex,1);
   assert.equal(state.reserves,3,'later turns are ordinary income only');
 });
 
