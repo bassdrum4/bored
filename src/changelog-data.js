@@ -2,15 +2,18 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 643,
+  "count": 646,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"aacd3f3","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: blocked foes keep the red stop bar"},
   {"sha":"ced5e9f","date":"2026-11-19","author":"Codebuff","subject":"fix(hub): keep emoji and Unicode display names"},
   {"sha":"b812b97","date":"2026-11-19","author":"Codebuff","subject":"feat(scrabble): scale the board and its lettering up"},
+  {"sha":"3f71907","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: animated sprites, typed attack effects, and the shield on blocked foes"},
+  {"sha":"b748a65","date":"2026-11-19","author":"Claude","subject":"Gym Challenge: a steady climb, Cynthia's real team, items that never cost a win, a gentler Choice Band"},
   {"sha":"4536f2e","date":"2026-11-19","author":"Codebuff","subject":"fix(risk): deploy opening armies in alternating turns"},
   {"sha":"3f6b5c7","date":"2026-11-19","author":"Claude","subject":"Tests: the chapter count and the trophy groups grow with the Gym Challenge"},
   {"sha":"7363e4c","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: Gym Challenge in the page, the six new foes, held items, pull history, banner calendar, trophies, crowd spread"},
