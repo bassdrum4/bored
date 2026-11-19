@@ -2055,3 +2055,18 @@ test('Ashcrown 5.1: a win by any teammate is the whole team’s, by conquest, by
   assert.deepEqual(jsonOf(ffa, 'G.over'), { winner: 1, why: 'x', turn: 5 });
 });
 
+
+test('Poké Gacha ranks on its own board: species caught plus stage stars, from the first catch', async () => {
+  const { HIGH_SCORE_GAMES, scoreValue } = await import('../src/hub/scores.js');
+  const { UNSCORED_GAMES } = await import('../src/games/catalog.js');
+  const rules = JSON.parse(load('src/games/score-rules.json'));
+  const spec = HIGH_SCORE_GAMES.find(game => game.id === 'poke-gacha');
+  assert.ok(spec && !UNSCORED_GAMES.includes('poke-gacha'), 'it is scored');
+  assert.equal(spec.metric, 'score');
+  assert.equal(rules['poke-gacha'].better, 'high');
+  assert.equal(rules['poke-gacha'].max_value, spec.max, 'the rule and the spec agree on the ceiling');
+  const snap = { slug: 'poke-gacha', caught: 30, stars: 12, score: 42, finished: false };
+  assert.equal(scoreValue('poke-gacha', snap), 42, 'no finished run needed: the account counts up');
+  assert.equal(scoreValue('poke-gacha', { ...snap, caught: 0, stars: 0, score: 0 }), 0, 'nothing caught posts nothing');
+  assert.equal(scoreValue('poke-gacha-weekly', { ...snap, weeklyRisk: 4 }), 4, 'the weekly board still reads the same page');
+});
