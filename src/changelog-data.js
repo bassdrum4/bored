@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 650,
+  "count": 651,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"b257781","date":"2026-11-19","author":"Codebuff","subject":"feat(sudoku): open on a setup screen and start the clock with the board"},
   {"sha":"5eec4e3","date":"2026-11-19","author":"Codebuff","subject":"feat(analytics): three ways to read the overview"},
   {"sha":"9aebd12","date":"2026-11-19","author":"Codebuff","subject":"feat(analytics): chart the Overview, and only advise on a real sample"},
   {"sha":"aacd3f3","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: blocked foes keep the red stop bar"},
