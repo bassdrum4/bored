@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 651,
+  "count": 652,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"d22514f","date":"2026-11-19","author":"Vettel Xu","subject":"Poké Gacha: attack effects from the effect pack (one sprite sheet, typed by attacker)","pr":263},
   {"sha":"b257781","date":"2026-11-19","author":"Codebuff","subject":"feat(sudoku): open on a setup screen and start the clock with the board"},
   {"sha":"5eec4e3","date":"2026-11-19","author":"Codebuff","subject":"feat(analytics): three ways to read the overview"},
   {"sha":"9aebd12","date":"2026-11-19","author":"Codebuff","subject":"feat(analytics): chart the Overview, and only advise on a real sample"},
