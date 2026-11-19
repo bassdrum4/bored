@@ -87,6 +87,18 @@ select{padding:8px 10px;font-size:13px}
 .chip.sab{color:#e08a80;border-color:#5a2a26}
 .task-bar{flex:0 0 auto;height:4px;border:1px solid var(--line);border-radius:2px;background:var(--panel);overflow:hidden}
 .task-bar i{display:block;height:100%;width:0;background:#f2df6a;transition:width .25s ease}
+/* During a round the ship fills the window: the shell loses its margins, the
+   stage goes full bleed, and the room tag and Leave float over the top right. */
+#shell.playing{max-width:none;padding:0;gap:0}
+#shell.playing .wordmark{display:none}
+#shell.playing header.top{position:fixed;top:8px;right:10px;z-index:30;pointer-events:none}
+#shell.playing header.top>*{pointer-events:auto}
+#shell.playing .room-tag{margin-left:0;background:rgba(13,14,16,.82)}
+#shell.playing .game-wrap{position:relative}
+#shell.playing .hud-row{position:absolute;left:68px;top:8px;right:224px;z-index:8;flex-wrap:wrap;row-gap:6px}
+#shell.playing .task-bar{position:absolute;left:10px;right:10px;top:46px;z-index:8}
+#shell.playing .sab-note{top:56px}
+#shell.playing .stage{border:0;border-radius:0}
 .stage{position:relative;flex:1 1 auto;min-height:160px;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#05060a}
 .stage canvas{display:block;width:100%;height:100%;touch-action:none}
 .actions{position:absolute;right:10px;bottom:10px;z-index:6;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:70%}
@@ -1879,6 +1891,7 @@ window.ImposterNet = (function () {
       element.hidden = id !== name;
     }
     $('leave').hidden = name === 'menu';
+    if (name === 'menu') $('shell').classList.remove('playing');
   }
 
   function menuStatus(text, bad) {
@@ -2034,6 +2047,8 @@ window.ImposterNet = (function () {
     tag.textContent = 'Room: ' + (publicRoom ? 'PUBLIC' : next.code || '----');
 
     show('game');
+    // A round owns the whole window; the lobby keeps its dock.
+    $('shell').classList.toggle('playing', next.phase !== 'lobby');
 
     if (next.phase === 'lobby') {
       $('lobby-bar').hidden = false;
