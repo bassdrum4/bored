@@ -214,6 +214,11 @@ export function skillsOf(num) {
   const first = TYPE_SKILLS[a], second = TYPE_SKILLS[b];
   return second ? [first[0], first[1], second[0], first[3]] : first.slice();
 }
+/** Each skill's type, in skillsOf order: a two-type line's third skill is its second type's. */
+export function skillTypesOf(num) {
+  const [a, b] = mon(lineOf(num)).types;
+  return b && TYPE_SKILLS[b] ? [a, a, b, a] : [a, a, a, a];
+}
 let pools = null;
 /** The species an egg of each tier can hatch. */
 export function eggPools() {
@@ -722,7 +727,7 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     dex: DEX, types: DEX_TYPES, tiers: EGG_TIERS, stars: EGG_STARS, machines: MACHINES, vouchers: VOUCHERS,
     costs: COSTS, missions: STARTER_MISSIONS, maxEggs: MAX_EGGS, batch: REGULAR_BATCH,
     starters: STARTERS, starterGifts: STARTER_GIFTS, freeHatches: FREE_HATCHES,
-    skillsOf, lineOf, stageOf, evolutionsOf,
+    skillsOf, skillTypesOf, lineOf, stageOf, evolutionsOf,
     state: () => gachaState(readWallet(), dailyDate()),
     trophies: () => walletTrophies(readWallet()),
     // Every trophy, earned or not, with its progress (have / need).

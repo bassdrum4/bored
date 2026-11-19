@@ -18,13 +18,13 @@ const dex = moduleUnderTest('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CH
 const rewards = moduleUnderTest('src/hub/rewards.js', [
   'mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'
 ], { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
-const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'eggPools', 'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'stageOf', 'evolutionsOf', 'setSkill', 'evolve'],
+const gacha = moduleUnderTest('src/hub/gacha.js', ['gachaState', 'pullEggs', 'hatchReady', 'lineOf', 'mon', 'skillsOf', 'skillTypesOf', 'lookFor', 'eggPools', 'pickStarter', 'STARTERS', 'STARTER_GIFTS', 'stageOf', 'evolutionsOf', 'setSkill', 'evolve'],
   { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES, DEX_LEGACY: dex.DEX_LEGACY });
 const td = moduleUnderTest('src/hub/td.js', [
   'classOf', 'STAGES', 'CHAPTERS', 'FAST', 'MAX_RISK', 'WEEKLY_MILESTONES', 'WEEKLY_UNLOCK', 'canHit', 'FUSE', 'BLAST', 'ARMOR', 'RISKS', 'riskOf', 'weeklyStage', 'tdWeekly', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'retreat', 'castSkill', 'canDeploy', 'starsFor', 'typeMultiplier',
   'tdFinish', 'tdState', 'dailyMissions', 'mondayOf', 'levelUp', 'squadFrom', 'levelCost', 'W', 'H', 'lineCap', 'LEVEL_CAPS', 'SKILL_KINDS',
   'GYMS', 'LEAGUE', 'TRAITS', 'HEAL', 'RANGED', 'SHIELD', 'SPLIT', 'RALLY', 'ITEMS', 'ITEM_DROPS', 'BADGES', 'itemsOf', 'buyItem', 'equipItem', 'seen'
-], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor,
+], { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, skillTypesOf: gacha.skillTypesOf, lookFor: gacha.lookFor,
   stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
 const { walletBalance, activateWallet, grantOnce } = rewards;
 
@@ -290,6 +290,27 @@ test('armor triples Defense against physical hits, and casters go straight throu
     const e = b.enemies[0]; Object.assign(e, { x: 4, y: 1, seg: 4, speed: 0 }); while (e.hp === e.maxHp) td.step(b); return e.maxHp - e.hp; };
   assert.ok(damage(sniper) < plainDamage(sniper), 'a sniper does less to an armored Graveler');
   assert.equal(damage(caster), plainDamage(caster), 'a caster does the same either way');
+});
+
+test('attacks use the chosen move\'s type against both of the foe\'s types: Weavile\'s Powder Snow is Ice, super effective on Golbat', () => {
+  const weavile = named('Weavile'), all = [true, true, true, true];
+  const ice = td.unitStats(weavile, { level: 5, skills: all, skill: 2 }), dark = td.unitStats(weavile, { level: 5, skills: all, skill: 0 });
+  assert.equal(ice.skill, 'Powder Snow'); assert.equal(ice.moveType, 'Ice');
+  assert.equal(dark.skill, 'Bite'); assert.equal(dark.moveType, 'Dark');
+  assert.equal(td.unitStats(weavile, { level: 5 }).moveType, 'Dark', 'the default move is the first type, so default squads hit as before');
+  assert.equal(td.typeMultiplier('Ice', ['Poison', 'Flying']), 2, 'Ice vs Poison/Flying: both types count');
+  assert.equal(td.typeMultiplier('Dark', ['Poison', 'Flying']), 1);
+  assert.equal(td.typeMultiplier('Ice', ['Fire', 'Flying']), 1, 'a resist on one type cancels a weakness on the other');
+  const stage = { id: 'x', lives: 3, level: 1, map: ['##########', 'S........G', '#####H####', '##########', '##########'], waves: [[0, named('Golbat'), 1, 1]] };
+  const damage = unit => {
+    const b = td.newBattle(stage, [unit]); b.energy = 99; assert.equal(unit.ground ? td.deploy(b, 0, 5, 1) : td.deploy(b, 0, 5, 2), null);
+    while (!b.enemies.length) td.step(b);
+    const e = b.enemies[0]; Object.assign(e, { x: 4, y: 1, seg: 4, speed: 0, def: 50 });
+    while (e.hp === e.maxHp) td.step(b);
+    return e.maxHp - e.hp;
+  };
+  const a = damage(ice), d = damage(dark);
+  assert.ok(Math.abs(a / d - 2) < 0.15, 'Powder Snow hits twice as hard as Bite: ' + a + ' vs ' + d);
 });
 
 test('finishing pays waves every time, and first clear and first 3-star once', () => {

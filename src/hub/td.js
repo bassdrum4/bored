@@ -18,7 +18,7 @@
 import { DEX, DEX_CHART, DEX_TYPES } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
 import { mergeWallet, walletBalance, grantOnce, spendFrom, readWallet, writeWallet, addAchievements, achievement, claimTrophies } from './rewards.js';
-import { gachaState, lineOf, mon, skillsOf, lookFor, stageOf, evolutionsOf } from './gacha.js';
+import { gachaState, lineOf, mon, skillsOf, skillTypesOf, lookFor, stageOf, evolutionsOf } from './gacha.js';
 
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const seconds = now => Math.floor(now / 1000);
@@ -419,7 +419,9 @@ export function unitStats(num, { level = 1, passive = false, costCut = 0, skills
     interval: Math.max(0.6, Math.min(1.6, 1.7 - m.spe / 140)) * (item === 'claw' ? 0.85 : 1),
     cost: Math.max(4, c.cost + Math.round(m.bst / 160) - 2 - costCut),
     block: c.block, range: c.range, ground: c.ground, spMax: Math.round(c.sp * kind.charge * (item === 'band' ? 1.3 : 1)), item: ITEMS[item] ? item : null,
-    skill: skillsOf(num)[skillAt], skillAt, skillKind: kind.id, power: kind.power, rare: skillAt === 3
+    skill: skillsOf(num)[skillAt], skillAt, skillKind: kind.id, power: kind.power, rare: skillAt === 3,
+    // Normal attacks and the skill both hit with the chosen move's type (Weavile's Powder Snow is Ice).
+    moveType: skillTypesOf(num)[skillAt]
   };
 }
 export function enemyStats(num, level, boss = false, flying = false) {
@@ -591,7 +593,7 @@ function useSkill(b, u) {
   else {
     const targets = b.enemies.filter(e => canHit(u, e, b) && dist(e, u.x, u.y) <= u.range + 0.5);
     const list = u.cls === 'caster' ? targets : targets.slice(0, u.cls === 'sniper' ? 3 : 1);
-    for (const e of list) { const m = typeMultiplier(u.types[0], e.types); strike(b, u, e, hit(u.atk, defenceAgainst(u, e), m) * (u.cls === 'guard' ? 3 : 1.5) * power, m); }
+    for (const e of list) { const m = typeMultiplier(u.moveType || u.types[0], e.types); strike(b, u, e, hit(u.atk, defenceAgainst(u, e), m) * (u.cls === 'guard' ? 3 : 1.5) * power, m); }
   }
   b.log.push({ t: b.t, skill: u.skill, unit: u.id });
 }
@@ -674,7 +676,7 @@ export function step(b, dt = TICK) {
     const rank = e => (e.blockedBy === u.id ? -1e6 : 0) + (e.flying && CLASSES[u.cls].air ? -1e3 : 0) + distanceLeft(e);
     const target = inRange.sort((a, c) => rank(a) - rank(c))[0];
     const victims = u.cls === 'caster' ? b.enemies.filter(e => canHit(u, e, b) && dist(e, target.x, target.y) <= CLASSES.caster.splash) : [target];
-    for (const e of victims) { const m = typeMultiplier(u.types[0], e.types); strike(b, u, e, hit(u.atk, defenceAgainst(u, e), m), m); }
+    for (const e of victims) { const m = typeMultiplier(u.moveType || u.types[0], e.types); strike(b, u, e, hit(u.atk, defenceAgainst(u, e), m), m); }
     u.cd = u.interval;
   }
   // Exploders count down instead of attacking, then blow up on every unit nearby.
