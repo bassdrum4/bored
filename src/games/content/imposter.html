@@ -32,7 +32,7 @@
   --surface:rgba(255,255,255,.08); --sunk:rgba(10,20,38,.9);
   --mono:ui-monospace,"Cascadia Mono",Consolas,"Courier New",monospace;
   --display:"AmongUs","Trebuchet MS",Arial,sans-serif;
-  --space:none; --meeting-art:none; --lobby-art:none;
+  --space:none; --meeting-art:none;
   color-scheme:dark;
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -89,13 +89,20 @@ button.ghost{background:rgba(255,255,255,.06);border-color:var(--rule);color:var
 .join-row{display:flex;gap:8px}
 .join-row input{flex:1;text-transform:uppercase;letter-spacing:.3em;font-size:16px}
 .join-row button{flex:0 0 auto}
-.lobby-card{width:min(500px,100%);align-items:stretch}
-.code-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
-.code{font:700 26px/1 var(--mono);letter-spacing:.32em;padding-left:.1em;color:var(--green);
+/* While the room fills, the ship itself is the lobby: the map above is live and
+   walkable, and this dock holds the code, the roster and the start switch. */
+.lobby-bar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:14px;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+  max-height:40vh;overflow:auto}
+.lobby-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lobby-top .primary{margin-left:auto}
+.code{font:700 20px/1 var(--mono);letter-spacing:.3em;padding-left:.05em;color:var(--green);
   text-shadow:0 0 16px rgba(76,224,165,.45)}
-.code.public{letter-spacing:.14em;font-size:20px;color:var(--gold);text-shadow:0 0 16px rgba(255,215,0,.35)}
-.lobby-art{height:88px;border-radius:12px;border:1px solid rgba(255,255,255,.14);
-  background:#0a1222 var(--lobby-art) center/cover no-repeat}
+.code.public{letter-spacing:.12em;font-size:17px;color:var(--gold);text-shadow:0 0 16px rgba(255,215,0,.35)}
+.roster.chips{flex-direction:row;flex-wrap:wrap;gap:6px}
+.roster.chips li{flex:0 0 auto;padding:5px 10px;border-radius:999px;font-size:12px;gap:6px}
+.roster.chips .dot{width:11px;height:11px;border-width:1px}
+.roster.chips .name{flex:0 1 auto}
 .roster{list-style:none;display:flex;flex-direction:column;gap:7px;text-align:left}
 .roster li{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:10px;
   background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:13.5px}
@@ -110,7 +117,7 @@ button.ghost{background:rgba(255,255,255,.06);border-color:var(--rule);color:var
   text-transform:uppercase;color:rgba(255,255,255,.65)}
 #screen-game{align-items:center;justify-content:center;position:relative;gap:0;padding:0}
 .game-wrap{width:100%;display:flex;flex-direction:column;align-items:stretch;gap:8px;
-  max-width:calc((100vh - 116px) * 520 / 360);max-width:calc((100dvh - 116px) * 520 / 360)}
+  max-width:calc((100vh - 190px) * 520 / 360);max-width:calc((100dvh - 190px) * 520 / 360)}
 #hud{position:static;align-self:flex-start;display:inline-flex;flex-wrap:wrap;gap:8px;
   max-width:100%;padding:7px 12px;border-radius:999px;background:rgba(6,11,22,.75);
   border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(6px);
@@ -193,46 +200,6 @@ button.ghost{background:rgba(255,255,255,.06);border-color:var(--rule);color:var
       </div>
     </section>
 
-    <section id="screen-lobby" class="screen" hidden>
-      <div class="card lobby-card">
-        <div class="code-row">
-          <span id="lobby-code" class="code">----</span>
-          <button id="copy" class="ghost" type="button">Copy code</button>
-        </div>
-        <div class="lobby-art" aria-hidden="true"></div>
-        <ul id="roster" class="roster" aria-label="Players"></ul>
-        <div id="host-settings" class="settings" hidden>
-          <label>Impostors
-            <select id="set-impostors">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-            </select>
-          </label>
-          <label>Kill cooldown
-            <select id="set-cooldown">
-              <option value="10">10s</option>
-              <option value="15">15s</option>
-              <option value="20">20s</option>
-              <option value="25">25s</option>
-              <option value="30">30s</option>
-              <option value="40">40s</option>
-            </select>
-          </label>
-          <label>Tasks each
-            <select id="set-tasks">
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-            </select>
-          </label>
-        </div>
-        <button id="start" class="primary" type="button" hidden>Start round</button>
-        <p id="lobby-note" class="hint"></p>
-      </div>
-    </section>
 
     <section id="screen-game" class="screen" hidden>
       <div class="game-wrap">
@@ -246,6 +213,43 @@ button.ghost{background:rgba(255,255,255,.06);border-color:var(--rule);color:var
           <button id="act-report" type="button" hidden><img id="icon-report" alt=""><span>Report</span></button>
           <button id="act-button" type="button" hidden><span>Emergency</span></button>
           </div>
+        </div>
+        <div id="lobby-bar" class="lobby-bar" hidden>
+          <div class="lobby-top">
+            <span id="lobby-code" class="code">----</span>
+            <button id="copy" class="ghost" type="button">Copy code</button>
+            <button id="start" class="primary" type="button" hidden>Start round</button>
+          </div>
+          <ul id="roster" class="roster chips" aria-label="Players"></ul>
+          <div id="host-settings" class="settings" hidden>
+            <label>Impostors
+              <select id="set-impostors">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </label>
+            <label>Kill cooldown
+              <select id="set-cooldown">
+                <option value="10">10s</option>
+                <option value="15">15s</option>
+                <option value="20">20s</option>
+                <option value="25">25s</option>
+                <option value="30">30s</option>
+                <option value="40">40s</option>
+              </select>
+            </label>
+            <label>Tasks each
+              <select id="set-tasks">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+            </label>
+          </div>
+          <p id="lobby-note" class="hint"></p>
         </div>
       </div>
     </section>
@@ -483,7 +487,14 @@ window.ImposterCore = (function () {
     if (state.players.length >= MAX_PLAYERS) return null;
 
     const running = state.phase === 'play' || state.phase === 'meeting';
-    const spot = running ? STATIONS[Math.floor(rng() * STATIONS.length)] : SPAWN;
+    // The lobby is the ship itself, so newcomers land in the cafeteria beside
+    // whoever is already walking around instead of on top of them.
+    const spot = running
+      ? STATIONS[Math.floor(rng() * STATIONS.length)]
+      : {
+        x: SPAWN.x + ((state.players.length % 5) - 2) * 24,
+        y: SPAWN.y + (state.players.length >= 5 ? 24 : 0),
+      };
     const player = {
       id,
       name: cleanName(name),
@@ -795,11 +806,15 @@ window.ImposterCore = (function () {
       return;
     }
 
-    if (state.phase !== 'play') return;
+    if (state.phase !== 'play' && state.phase !== 'lobby') return;
 
     for (const player of state.players) {
-      if (player.cooldown > 0) player.cooldown = Math.max(0, player.cooldown - dt);
-      if (player.ventCooldown > 0) player.ventCooldown = Math.max(0, player.ventCooldown - dt);
+      if (state.phase === 'play') {
+        if (player.cooldown > 0) player.cooldown = Math.max(0, player.cooldown - dt);
+        if (player.ventCooldown > 0) player.ventCooldown = Math.max(0, player.ventCooldown - dt);
+      }
+      // Walking is the point of the lobby: the ship is open to explore while
+      // the room fills, and the round starts from wherever people stand.
       movePlayer(player, dt);
     }
   }
@@ -819,7 +834,7 @@ window.ImposterCore = (function () {
 
     switch (message.t) {
       case 'walk': {
-        if (state.phase !== 'play') return rejected('not-playing');
+        if (state.phase !== 'play' && state.phase !== 'lobby') return rejected('not-playing');
         const dx = clamp(Number(message.dx) || 0, -1, 1);
         const dy = clamp(Number(message.dy) || 0, -1, 1);
         player.goto = null;
@@ -827,7 +842,7 @@ window.ImposterCore = (function () {
         return { ok: true };
       }
       case 'goto': {
-        if (state.phase !== 'play') return rejected('not-playing');
+        if (state.phase !== 'play' && state.phase !== 'lobby') return rejected('not-playing');
         const target = nearestFloorPoint(Number(message.x) || 0, Number(message.y) || 0);
         player.goto = {
           x: clamp(target.x, PLAYER_RADIUS, WORLD.w - PLAYER_RADIUS),
@@ -1669,7 +1684,7 @@ window.ImposterNet = (function () {
   const C = window.ImposterCore;
   const N = window.ImposterNet;
   const $ = id => document.getElementById(id);
-  const screens = { menu: $('screen-menu'), lobby: $('screen-lobby'), game: $('screen-game') };
+  const screens = { menu: $('screen-menu'), game: $('screen-game') };
   const ERRORS = {
     'not-in-lobby': 'That only works in the lobby.',
     'host-only': 'Only the host can do that.',
@@ -1718,7 +1733,6 @@ window.ImposterNet = (function () {
     const root = document.documentElement.style;
     root.setProperty('--space', 'url("' + asset('background.jpg') + '")');
     root.setProperty('--meeting-art', 'url("' + asset('meeting.png') + '")');
-    root.setProperty('--lobby-art', 'url("' + asset('lobby.png') + '")');
   } catch (error) { /* images stay absent, the layout still reads */ }
   try {
     const face = new FontFace('AmongUs', 'url(' + asset('amongus.ttf') + ')');
@@ -1825,7 +1839,10 @@ window.ImposterNet = (function () {
     $('host-settings').hidden = true;
     $('start').hidden = true;
     snap = null;
-    show('lobby');
+    $('lobby-bar').hidden = false;
+    $('hud').hidden = true;
+    $('actions').hidden = true;
+    show('game');
     $('roster').replaceChildren();
     listKeys.clear();
     $('lobby-note').textContent = mode === 'public' ? 'Joining the public room…' : 'Connecting to the host…';
@@ -1842,6 +1859,7 @@ window.ImposterNet = (function () {
     $('overlay-meeting').hidden = true;
     $('overlay-over').hidden = true;
     $('room-tag').hidden = true;
+    $('lobby-bar').hidden = true;
     $('roster').replaceChildren();
     show('menu');
   }
@@ -1903,7 +1921,10 @@ window.ImposterNet = (function () {
     tag.textContent = 'Room: ' + (publicRoom ? 'PUBLIC' : next.code || '----');
 
     if (next.phase === 'lobby') {
-      show('lobby');
+      show('game');
+      $('lobby-bar').hidden = false;
+      $('hud').hidden = true;
+      $('actions').hidden = true;
       $('overlay-meeting').hidden = true;
       $('overlay-over').hidden = true;
       renderLobby(next, hosting, publicRoom);
@@ -1911,6 +1932,9 @@ window.ImposterNet = (function () {
     }
 
     show('game');
+    $('lobby-bar').hidden = true;
+    $('hud').hidden = false;
+    $('actions').hidden = false;
     renderHud(next);
     $('lobby-note').textContent = '';
 
