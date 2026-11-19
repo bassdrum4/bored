@@ -2,14 +2,16 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 635,
-  "newest": "2026-11-18",
+  "count": 637,
+  "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"3f6b5c7","date":"2026-11-19","author":"Claude","subject":"Tests: the chapter count and the trophy groups grow with the Gym Challenge"},
   {"sha":"c2acc2f","date":"2026-11-18","author":"Daniel Lowe","subject":"test(poke-gacha): assert displayed candy against actual line balance"},
+  {"sha":"69156ee","date":"2026-11-18","author":"Claude","subject":"Hub: Gym Challenge (8 gyms, Elite Four, Champion), six new kinds of foe, held items, badges, Poké Gacha trophies, banner calendar"},
   {"sha":"0952800","date":"2026-11-18","author":"Claude","subject":"Hub: candy eggs (an egg of an owned line, for candy)"},
   {"sha":"d9fb1b6","date":"2026-11-18","author":"Codebuff","subject":"Sudoku: three levels, notes, and a time-only shared board"},
   {"sha":"486d4c3","date":"2026-11-18","author":"Claude","subject":"Poké Gacha: tutorials for classes and the bars, types before 1-3, a card for every kind of foe (and a Foes list), and skills"},
