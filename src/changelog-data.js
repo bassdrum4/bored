@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 646,
+  "count": 647,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -17,6 +17,7 @@ export const CHANGELOG = [
   {"sha":"4536f2e","date":"2026-11-19","author":"Codebuff","subject":"fix(risk): deploy opening armies in alternating turns"},
   {"sha":"3f6b5c7","date":"2026-11-19","author":"Claude","subject":"Tests: the chapter count and the trophy groups grow with the Gym Challenge"},
   {"sha":"7363e4c","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: Gym Challenge in the page, the six new foes, held items, pull history, banner calendar, trophies, crowd spread"},
+  {"sha":"21a7060","date":"2026-11-18","author":"Daniel Lowe","subject":"Expand Vettel auto-merge allowlist for Poké Gacha files"},
   {"sha":"c6d0ec8","date":"2026-11-18","author":"Vettel Xu","subject":"Gym Challenge: a steady climb, Cynthia's real team, items that never cost a win, a gentler Choice Band","pr":260},
   {"sha":"3933692","date":"2026-11-18","author":"Daniel Lowe","subject":"Update AGENTS.md with backend and push instructions"},
   {"sha":"c2acc2f","date":"2026-11-18","author":"Daniel Lowe","subject":"test(poke-gacha): assert displayed candy against actual line balance"},
