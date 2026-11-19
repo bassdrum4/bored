@@ -34,3 +34,29 @@ they are not ours to license.
 The blocked-foe marker is the owner's 6×10 shield sprite (`shield_1x.png`), embedded in
 `poke-gacha.html` as a data URL and drawn 1x across and 2x tall (6×20: the old stop bar's
 width and about its 18px height) with smoothing off, centred where the bar was.
+
+## Attack effects (`attacks.webp`)
+
+One 512×574 lossless WebP (28 KB) packs 53 short effects cut from the owner's
+`effect_graphics` pack (PokéRogue's battle-animation sheets: 96px cells, five across).
+Each effect is a few cells of one sheet, cropped to the box they share, laid out as a
+horizontal strip. The page holds their index (`FX_ATLAS` in `poke-gacha.html`:
+`[x, y, frame w, h, frames, ms per frame, anchor x, anchor y]`) and draws them at 1x with
+smoothing off. Hits and bursts take 3 to 6 frames, always under 300 ms; projectiles loop
+their frames while they fly.
+
+| Role | Used for | Sheets |
+|---|---|---|
+| `slash:<Type>` | melee units (blockers, guards, vanguards) | PRAS- Slash, Razor Shell, Grass, Elemental Fangs, Ice, Strike, Poison Jab, Earth Power, Megahorn, Rock Smash, Shadow Claw, Dragon Claw, Bite; Aerial Ace; Psycho Cut |
+| `shot:<Type>` | snipers' and casters' projectiles | PRAS- Swift, Fire, Water, Grass, Electro Ball, Ice, Aura Sphere, Sludge Bomb, Mud Shot, Air Cutter, Psybeam, Rock, Dark Pulse, Dragon Pulse, Flash Cannon, Moonblast |
+| `burst:<Type>` | casters' hits | PRAS- Explosions, Fire, Water, Energy Ball, Electric, Ice, Strike, Poison, Earth Power, Twister, Psystrike, Bug Buzz, Rock, Shadow Ball, Dragon Pulse, Night Daze, Magnet bomb |
+| `heal` | medics | PRAS- Recovery |
+
+A role with no entry (a Bug shot, a Fairy burst), or a sheet that has not loaded, uses the
+page's own drawn effect in the attacker's type colour. The source sheet and cells of each entry
+are listed in the PR that added them.
+
+Credit: the effect sheets are PokéRogue's (pagefaultgames/pokerogue); most (the `PRAS-`,
+`GEN8-` and `Majesty -` sheets) come from the Pokémon Essentials fan community, and the pack
+names no author for them. Its `scratchbattle` sheet credits NoLeafClover0987 ("Ripped and
+Composed By"); that sheet is not used here. The moves are from Pokémon by Nintendo / Game Freak.
