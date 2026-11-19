@@ -27,7 +27,8 @@
 import { DEX, DEX_TYPES, DEX_LEGACY } from './gacha-dex.js';
 import { dailyDate, seedNumber } from '../daily.js';
 import {
-  mergeWallet, walletBalance, spendFrom, grantOnce, buyRegular, readWallet, writeWallet, walletTrophies, walletTrophyList, bossStreak
+  mergeWallet, walletBalance, spendFrom, grantOnce, buyRegular, readWallet, writeWallet, walletTrophies, walletTrophyList, bossStreak,
+  addAchievements, achievement, claimTrophies
 } from './rewards.js';
 
 // Egg tiers: 0 Common 3★, 1 Rare 4★, 2 Epic 5★, 3 Legendary 6★, 4 the banner legendary (6★).
@@ -711,7 +712,9 @@ export function claimLogin(wallet, { today = dailyDate(), now = Date.now() } = {
  */
 export function gachaBridge({ onChange = () => {} } = {}) {
   const act = run => (options = {}) => {
-    const { wallet, ...result } = run(readWallet(), { ...options, today: dailyDate(), now: Date.now() });
+    let { wallet, ...result } = run(readWallet(), { ...options, today: dailyDate(), now: Date.now() });
+    // Any change can meet a trophy (a hatch, a skin, a clear): pay it in the same write.
+    if (result.ok && wallet && typeof claimTrophies === 'function') wallet = claimTrophies(wallet).wallet;
     if (result.ok && wallet) { writeWallet(wallet); try { onChange(); } catch {} }
     return result;
   };
@@ -747,6 +750,10 @@ export function gachaBridge({ onChange = () => {} } = {}) {
     claimLogin: act((w, o) => claimLogin(w, o)),
     // The one-time refund for owned lines cut from the roster: { ok, lines, total }.
     claimCutRefund: act((w, o) => claimCutRefund(w, o)),
+    // Trophies met but not paid yet (ones that existed before their trophy did, for instance).
+    claimTrophies: act((w, o) => claimTrophies(w, o)),
+    // The Legendary UP banner on any day (it comes from the shared daily seed).
+    bannerFor,
     // An egg of an owned line, for candy (better odds of the rare skill).
     buyCandyEgg: act((w, o) => buyCandyEgg(w, o.line, o)), candyEgg: CANDY_EGG, candyEggPrice,
     cutRefund: CUT_REFUND, cutCandy: CUT_CANDY, isCut
@@ -773,3 +780,25 @@ export function storedLooks() {
 export function storedBuddy() {
   try { return gachaState(readWallet()).buddy; } catch { return null; }
 }
+
+/* ── Poké Gacha trophies (the Trophies tab; S, M and B pay 1 Plus, 1 Premium, 1 Gold) ── */
+const ROSTER_LINES = DEX.map((row, i) => (!row[8] && row[9] > 0 ? i + 1 : 0)).filter(Boolean);
+export function gachaTrophyStats(entries) {
+  const lines = new Set();
+  let epic = 0, legend = 0, shiny = 0, sp = 0;
+  const add = num => { if (validNum(num) && DEX[lineOf(num) - 1][9] > 0) lines.add(lineOf(num)); };
+  for (const [id, entry] of Object.entries(entries)) {
+    const x = object(entry.x);
+    if (id.startsWith('hatch:')) { add(x.s); if (x.t >= 2) epic = 1; if (x.t >= 3) legend = 1; if (x.sh) shiny = 1; if (x.sp) sp = 1; }
+    else if (id === 'cfg:starter') { add(x.s); for (const n of x.c || []) add(n); }
+    else if (id.startsWith('spend:') && typeof x.sp === 'string' && x.sp) sp = 1;
+  }
+  return { dexPct: Math.floor(100 * lines.size / ROSTER_LINES.length), epic, legend, shiny, sp };
+}
+if (typeof addAchievements === 'function' && typeof achievement === 'function') addAchievements([
+  ...[[25, 'S'], [50, 'M'], [75, 'M'], [100, 'B']].map(([n, tier]) => achievement('pg-dex-' + n, 'poke-gacha', 'Poké Gacha: Dex ' + n + '%', tier, s => s.ext.dexPct || 0, n)),
+  achievement('pg-epic', 'poke-gacha', 'Poké Gacha: first Epic', 'S', s => s.ext.epic || 0, 1),
+  achievement('pg-legend', 'poke-gacha', 'Poké Gacha: first Legendary', 'M', s => s.ext.legend || 0, 1),
+  achievement('pg-shiny', 'poke-gacha', 'Poké Gacha: first shiny', 'M', s => s.ext.shiny || 0, 1),
+  achievement('pg-sp', 'poke-gacha', 'Poké Gacha: first SP skin', 'B', s => s.ext.sp || 0, 1)
+], gachaTrophyStats);
