@@ -20,7 +20,7 @@ const gameGrid = $('#grid');
 // Popularity is a public, aggregated seven-day ranking — never raw analytics.
 // Cache one ranking per Detroit day so library visits do not repeatedly query
 // the database or rearrange the cards as a visitor browses.
-const POPULARITY_CACHE_KEY = 'bored.popularity.v1';
+const POPULARITY_CACHE_KEY = 'bored.popularity.v2';
 const detroitDay = () => new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Detroit', year: 'numeric', month: '2-digit', day: '2-digit'
 }).format(new Date());
