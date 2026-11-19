@@ -2,7 +2,7 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 639,
+  "count": 640,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
@@ -12,6 +12,7 @@ export const CHANGELOG = [
   {"sha":"4536f2e","date":"2026-11-19","author":"Codebuff","subject":"fix(risk): deploy opening armies in alternating turns"},
   {"sha":"3f6b5c7","date":"2026-11-19","author":"Claude","subject":"Tests: the chapter count and the trophy groups grow with the Gym Challenge"},
   {"sha":"7363e4c","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: Gym Challenge in the page, the six new foes, held items, pull history, banner calendar, trophies, crowd spread"},
+  {"sha":"3933692","date":"2026-11-18","author":"Daniel Lowe","subject":"Update AGENTS.md with backend and push instructions"},
   {"sha":"c2acc2f","date":"2026-11-18","author":"Daniel Lowe","subject":"test(poke-gacha): assert displayed candy against actual line balance"},
   {"sha":"69156ee","date":"2026-11-18","author":"Claude","subject":"Hub: Gym Challenge (8 gyms, Elite Four, Champion), six new kinds of foe, held items, badges, Poké Gacha trophies, banner calendar"},
   {"sha":"0952800","date":"2026-11-18","author":"Claude","subject":"Hub: candy eggs (an egg of an owned line, for candy)"},
