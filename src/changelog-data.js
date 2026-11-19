@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 672,
+  "count": 673,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"fdd3a9f","date":"2026-11-19","author":"Codebuff","subject":"Rank F-14 by its own play data on the Popular shelf."},
   {"sha":"cca1df6","date":"2026-11-19","author":"Codebuff","subject":"Remove the GitHub Sponsors link and funding config."},
   {"sha":"8f001c0","date":"2026-11-19","author":"Codebuff","subject":"Add a GitHub Sponsors link in the footer"},
   {"sha":"f2a9766","date":"2026-11-19","author":"Codebuff","subject":"Give a running round the whole window"},
