@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 638,
+  "count": 639,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"4536f2e","date":"2026-11-19","author":"Codebuff","subject":"fix(risk): deploy opening armies in alternating turns"},
   {"sha":"3f6b5c7","date":"2026-11-19","author":"Claude","subject":"Tests: the chapter count and the trophy groups grow with the Gym Challenge"},
   {"sha":"7363e4c","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: Gym Challenge in the page, the six new foes, held items, pull history, banner calendar, trophies, crowd spread"},
   {"sha":"c2acc2f","date":"2026-11-18","author":"Daniel Lowe","subject":"test(poke-gacha): assert displayed candy against actual line balance"},
