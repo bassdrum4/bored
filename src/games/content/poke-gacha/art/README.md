@@ -28,8 +28,5 @@ is cropped to the box all of its frames share, so the feet stay put from frame t
 frame times are clamped to 80–300 ms. Species or looks without a strip (SP skins, forms)
 use the still sprite as before.
 
-The blocked-foe shield is the owner's 6×10 shield sprite, kept as the `guard` pixel map
-and drawn at 3x.
-
 Sprites are PokéRogue's (pagefaultgames/pokerogue), from Pokémon by Nintendo / Game Freak;
 they are not ours to license.

@@ -571,7 +571,6 @@ function miniStyle(node, num, look = "normal", scale = 1) {
 const mini = (num, look, dark = false) => { const d = miniStyle(el("span", "mini" + (dark ? " unseen" : "")), num, look); d.title = dark ? "???" : name(num); return d; };
 /* PIXEL_MAPS:BEGIN — hand-placed icons, one char per pixel. tests/poke-gacha.test.cjs checks the outlines. */
 const PIXEL_MAPS = {
- "guard": ["kk..kk", "k1kk2k", "k1122k", "k1342k", "k1351k", "k6351k", ".k65k.", ".k64k.", ".k66k.", "..kk.."],
  "item": [".kkkkk.", "kk111kk", "k12111k", "k11111k", "k11111k", "kk111kk", ".kkkkk."],
  "candy": ["kk..kkkkk..kk", "kekk22w11kkek", "keek2w111keek", "kee0111100eek", "keek11100keek", "kekk01000kkek", "kk..kkkkk..kk"],
  "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
@@ -3096,8 +3095,7 @@ function drawField(now = performance.now()) {
   }
   for (const u of unitBars) unitMarks(g, b, u.o, tileRect(st, u.o.x, u.o.y), now);
   // A blocker: one pip per foe it can hold, gold for each it holds now (under its feet).
-  // A blocked foe: a shield between it and its blocker, above the bars. Foes walking past have none.
-  const guards = [];
+  // A blocked foe: a red stop bar on the side facing its blocker. Foes walking past have none.
   for (const m of marks) {
     if (m.own) continue;
     if (m.pips) {
@@ -3105,9 +3103,8 @@ function drawField(now = performance.now()) {
       g.fillStyle = C.ink; g.fillRect(x0 - 2, py - 2, w + 4, 8);
       for (let i = 0; i < n; i++) { g.fillStyle = i < held ? C.gold : SHADE.paper[0]; g.fillRect(x0 + i * 7, py, 5, 4); }
     } else {
-      // A blocked foe: the owner's shield on the side facing its blocker.
-      const side = facesRight(m.stop) ? 1 : -1, icon = guardIcon ||= mapCanvas("guard", { k: "#000000", 1: "#8892a0", 2: "#c6d1e6", 3: "#8a4e2a", 4: "#c48a50", 5: "#ffc575", 6: "#4c5668" }, 3);
-      guards.push([icon, Math.round(m.x + side * 20 - icon.width / 2), Math.round(m.y) - 44]);
+      const side = facesRight(m.stop) ? 1 : -1, sx = Math.round(m.x + side * 15), sy = Math.round(m.y) - 18;
+      g.fillStyle = C.ink; g.fillRect(sx - 2, sy - 1, 6, 18); g.fillStyle = C.red; g.fillRect(sx - 1, sy, 4, 16);
     }
   }
   bt.marks = marks.map(m => m.pips ? { pips: m.pips.id, held: b.enemies.filter(e => e.blockedBy === m.pips.id).length, of: m.pips.block } : { stop: m.stop.id });
@@ -3119,8 +3116,6 @@ function drawField(now = performance.now()) {
     for (const f of drawn.slice(i + 1)) covered += Math.max(0, Math.min(r.x + r.w, f.rect.x + f.rect.w) - Math.max(r.x, f.rect.x)) * Math.max(0, Math.min(r.y + r.h, f.rect.y + f.rect.h) - Math.max(r.y, f.rect.y));
     if (covered > area * 0.4) { g.globalAlpha = 0.85; g.drawImage(outlineOf(d.img, r.w, r.h, d.flip), r.x - 1, r.y - 1); g.globalAlpha = 1; }
   });
-  // Shields go over the sprites and their outlines.
-  for (const [icon, x, y] of guards) g.drawImage(icon, x, y);
   // HP and skill bars on top of every sprite; a bar that would sit on another steps up.
   const placed = [];
   bars.sort((a, c) => c.y - a.y);
@@ -3186,7 +3181,7 @@ function drawField(now = performance.now()) {
   for (const [ax, ay, w, h] of [[0, 0, 10, 2], [0, 0, 2, 8], [TW - 10, 0, 10, 2], [TW - 2, 0, 2, 8], [0, TH - 2, 10, 2], [0, TH - 8, 2, 8], [TW - 10, TH - 2, 10, 2], [TW - 2, TH - 8, 2, 8]])
     g.fillRect(r.x + ax, r.y + ay, w, h);
 }
-let skillIcon = null, lastRect = null, guardIcon = null;
+let skillIcon = null, lastRect = null;
 // Every Pokémon fits the same box on its tile: at most 48px tall and 64px wide
 // (about 1.3 tiles), bottom centred, scaled down only, never up, so the big ones
 // (Snorlax, Wailord, Steelix) stand about as tall as the small ones.
