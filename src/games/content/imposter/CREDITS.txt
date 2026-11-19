@@ -1,0 +1,9 @@
+Art in this folder
+
+  map.jpg    the Skeld, from AI0702/Among-Us-clone (Assets/Maps/map2back.png)
+  walk.png   the same project's mini-map, used as the collision mask
+  crew-*.png crewmate frames, recoloured from that project's player sprites
+  button.png the emergency button icon (Assets/Images/UI/emergency_icon.png)
+
+  Source: https://github.com/AI0702/Among-Us-clone (Unlicense)
+  The artwork itself is Innersloth's; this is an unofficial fan arcade.

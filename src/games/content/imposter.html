@@ -19,206 +19,179 @@
   room lives at a fixed peer id, so the same election is what keeps it "always
   open" when the current host closes the tab.
 
-  Front end: the screens, the starfield, the crew frames, the vent grate, the
-  meeting screen, the lobby art, the HUD icons and the display font come from
-  arizkhalid/among-us-clone (MIT, http://github.com/arizkhalid/among-us-clone);
-  the copies sit in imposter/ with that licence, unmodified. The ship map, the
-  tasks, the vents and the netcode are this game's own.
+  Art: the Skeld map, the per-colour crewmate frames, the task markers and the
+  emergency button are the ripped set shipped with AI0702/Among-Us-clone
+  (Unlicense repo, https://github.com/AI0702/Among-Us-clone; the artwork itself
+  is Innersloth's). Its mini-map is also the collision mask, so the walls on
+  screen are the walls the simulation uses. The tasks, the vents, the rules and
+  the netcode are this game's own.
 -->
 <style>
+/* Quiet chrome around loud art: the ship is AI0702's ripped Among Us set, so
+   the frame stays flat, square-ish and out of the way. */
 :root{
-  --paper:#070b16; --ink:#ffffff; --dim:#9db0cf; --rule:rgba(255,255,255,.16);
-  --red:#e94560; --green:#4ce0a5; --gold:#ffd700;
-  --surface:rgba(255,255,255,.08); --sunk:rgba(10,20,38,.9);
-  --mono:ui-monospace,"Cascadia Mono",Consolas,"Courier New",monospace;
-  --display:"AmongUs","Trebuchet MS",Arial,sans-serif;
-  --space:none; --meeting-art:none;
+  --bg:#0d0e10; --panel:#141518; --panel-2:#191b1f; --line:#2a2c31;
+  --ink:#e7e5e0; --dim:#8b8e94; --accent:#c0392b; --accent-ink:#fff;
+  --font-body:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   color-scheme:dark;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
-body{background:#000 var(--space) center/cover no-repeat;color:var(--ink);
-  font:15px/1.5 Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
-body::before{content:"";position:fixed;inset:0;background:rgba(3,7,15,.38);pointer-events:none}
-#shell{position:relative;height:100%;max-width:1040px;margin:0 auto;padding:10px 12px 12px;
-  display:flex;flex-direction:column;gap:10px}
-header{display:flex;align-items:center;gap:10px;flex:0 0 auto}
-h1{font:400 24px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;color:#fff;
-  text-shadow:0 0 18px rgba(76,224,165,.45)}
-h2{font:400 28px/1.15 var(--display);letter-spacing:.06em}
-.room-tag{margin-left:auto;padding:7px 14px;border-radius:999px;background:rgba(22,33,62,.85);
-  border:1px solid rgba(76,224,165,.35);color:var(--green);font:13px/1 var(--mono);letter-spacing:.08em}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font-body);overflow:hidden}
+#shell{height:100%;max-width:1080px;margin:0 auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px}
+header.top{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.wordmark{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
+.room-tag{margin-left:auto;font:11px var(--mono);letter-spacing:.08em;color:var(--dim);
+  border:1px solid var(--line);border-radius:3px;padding:4px 8px}
 #screens{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
-.screen{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;
-  padding:4px;overflow:auto;overscroll-behavior:contain}
-.card{width:min(460px,100%);display:flex;flex-direction:column;gap:12px;padding:26px;
-  border-radius:20px;background:rgba(255,255,255,.08);backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18);
-  box-shadow:0 12px 42px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.15);text-align:center}
-.brand{font-family:var(--display);font-size:42px;line-height:.95;letter-spacing:.12em;color:#fff;
-  text-transform:uppercase;text-shadow:0 0 26px rgba(76,224,165,.4),0 3px 0 rgba(0,0,0,.5)}
-.tagline{color:var(--dim);font-size:12.5px}
-.field{display:flex;flex-direction:column;gap:6px;text-align:left;font-size:10.5px;
-  letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.7)}
-input,select{width:100%;padding:12px 14px;border-radius:10px;border:1px solid rgba(76,224,165,.4);
-  background:rgba(255,255,255,.08);color:#fff;font:15px var(--mono);text-align:center;outline:none}
-input::placeholder{color:rgba(255,255,255,.45)}
-input:focus-visible,select:focus-visible{border-color:var(--green);box-shadow:0 0 16px rgba(76,224,165,.35)}
-select{text-align:left;padding:9px 10px;font-size:13px}
-button{font:600 14px/1 var(--display);letter-spacing:.09em;text-transform:uppercase;cursor:pointer;
-  color:#fff;background:rgba(76,224,165,.24);border:1px solid rgba(76,224,165,.55);
-  border-radius:11px;padding:12px 18px;white-space:nowrap;touch-action:manipulation;
-  transition:background .18s ease,transform .18s ease,box-shadow .18s ease}
-button:hover:not(:disabled){background:rgba(76,224,165,.38);border-color:var(--green);
-  transform:translateY(-2px);box-shadow:0 6px 20px rgba(76,224,165,.28)}
-button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
-button:disabled{opacity:.45;cursor:default}
-button.primary{background:rgba(233,69,96,.3);border-color:rgba(233,69,96,.6);font-size:16px;padding:14px 18px}
-button.primary:hover:not(:disabled){background:rgba(233,69,96,.5);border-color:var(--red);
-  box-shadow:0 6px 22px rgba(233,69,96,.35)}
-button.danger{background:var(--red);border-color:var(--red);font-size:12px;padding:9px 13px}
-button.danger:hover:not(:disabled){background:#f0576f;box-shadow:0 6px 20px rgba(233,69,96,.4)}
-button.ghost{background:rgba(255,255,255,.06);border-color:var(--rule);color:var(--dim);
-  font-size:12px;padding:8px 12px}
+.screen{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:4px;overflow:auto}
+
+/* menu */
+.menu{width:min(400px,100%);display:flex;flex-direction:column;gap:10px;text-align:left}
+.logo{font-size:30px;line-height:1;letter-spacing:.24em;text-transform:uppercase;font-weight:700}
+.logo span{color:var(--ink)}
+.logo span:last-child{color:var(--accent)}
+.tagline{color:var(--dim);font-size:12.5px;margin-bottom:6px}
+.field{display:flex;flex-direction:column;gap:5px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+input,select{width:100%;padding:10px 12px;border-radius:3px;border:1px solid var(--line);
+  background:var(--panel);color:var(--ink);font:14px var(--font-body);outline:none}
+input:focus-visible,select:focus-visible{border-color:#4c5057}
+select{padding:8px 10px;font-size:13px}
+.btn{font:600 12px/1 var(--font-body);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+  color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:4px;
+  padding:12px 14px;white-space:nowrap;transition:background .12s ease,border-color .12s ease}
+.btn:hover:not(:disabled){background:#202329;border-color:#3a3d44}
+.btn:focus-visible{outline:2px solid #4c5057;outline-offset:2px}
+.btn:disabled{opacity:.45;cursor:default}
+.btn-primary{background:var(--accent);border-color:#8f2a20;color:var(--accent-ink)}
+.btn-primary:hover:not(:disabled){background:#cf4434;border-color:#8f2a20}
+.btn-secondary{background:#23262c}
+.btn-danger{background:transparent;border-color:#5a2a26;color:#e08a80}
+.btn-danger:hover:not(:disabled){background:#2a1a18;border-color:#7a3a34}
+.btn-large{padding:15px;font-size:13px}
 .hint{color:var(--dim);font-size:11.5px;line-height:1.55}
-.status{font-size:11.5px;color:var(--dim)}
-.status.bad{color:#ff8b9b}
-.or{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.4);font-size:10px;
-  letter-spacing:.2em;text-transform:uppercase}
-.or::before,.or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.16)}
+.status{font-size:12px;color:var(--dim);min-height:0}
+.status.bad{color:#e08a80}
+.or{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:10px;letter-spacing:.2em;text-transform:uppercase;margin:2px 0}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
 .join-row{display:flex;gap:8px}
-.join-row input{flex:1;text-transform:uppercase;letter-spacing:.3em;font-size:16px}
-.join-row button{flex:0 0 auto}
-/* While the room fills, the ship itself is the lobby: the map above is live and
-   walkable, and this dock holds the code, the roster and the start switch. */
-.lobby-bar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:14px;
-  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
-  max-height:40vh;overflow:auto}
-.lobby-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.lobby-top .primary{margin-left:auto}
-.code{font:700 20px/1 var(--mono);letter-spacing:.3em;padding-left:.05em;color:var(--green);
-  text-shadow:0 0 16px rgba(76,224,165,.45)}
-.code.public{letter-spacing:.12em;font-size:17px;color:var(--gold);text-shadow:0 0 16px rgba(255,215,0,.35)}
-.roster.chips{flex-direction:row;flex-wrap:wrap;gap:6px}
-.roster.chips li{flex:0 0 auto;padding:5px 10px;border-radius:999px;font-size:12px;gap:6px}
-.roster.chips .dot{width:11px;height:11px;border-width:1px}
-.roster.chips .name{flex:0 1 auto}
-.roster{list-style:none;display:flex;flex-direction:column;gap:7px;text-align:left}
-.roster li{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:10px;
-  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:13.5px}
-.roster .dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;
-  border:2px solid rgba(255,255,255,.5);box-shadow:0 0 10px rgba(0,0,0,.5)}
-.roster .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
-.roster .tail{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
-.roster .vote{padding:6px 12px;font-size:11px}
-.row-item.is-impostor .tail{color:var(--red)}
-.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;text-align:left}
-.settings label{display:flex;flex-direction:column;gap:5px;font-size:10px;letter-spacing:.12em;
-  text-transform:uppercase;color:rgba(255,255,255,.65)}
-#screen-game{align-items:center;justify-content:center;position:relative;gap:0;padding:0}
-.game-wrap{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;
-  align-items:stretch;justify-content:center;gap:8px}
-#hud{position:static;align-self:flex-start;display:inline-flex;flex-wrap:wrap;gap:8px;
-  max-width:100%;padding:7px 12px;border-radius:999px;background:rgba(6,11,22,.75);
-  border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(6px);
-  font:11px/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
-#hud b{color:var(--gold);font-weight:600}
-.stage{position:relative;flex:1 1 auto;width:100%;min-height:120px;max-height:100%;
-  border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.14);
-  background:#05090f var(--space) center/cover no-repeat;box-shadow:inset 0 0 60px rgba(0,0,0,.7)}
+.join-row input{flex:1;text-transform:uppercase;letter-spacing:.28em;font-family:var(--mono)}
+.join-row .btn{flex:0 0 auto}
+
+/* game frame */
+#screen-game{align-items:center;justify-content:center;padding:0}
+.game-wrap{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:8px}
+.hud{align-self:flex-start;font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--dim);border:1px solid var(--line);border-radius:3px;padding:6px 9px;background:var(--panel)}
+.hud b{color:var(--ink);font-weight:600}
+.stage{position:relative;flex:0 0 auto;width:100%;min-height:120px;max-width:100%;max-height:100%;
+  margin:0 auto;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#000}
 .stage canvas{display:block;width:100%;height:100%;touch-action:none}
-.actions{position:absolute;right:10px;bottom:10px;z-index:6;display:flex;gap:10px;flex-wrap:wrap;
-  justify-content:flex-end}
-.actions button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  width:66px;height:66px;padding:0;border-radius:50%;background:rgba(6,11,22,.8);
-  border:2px solid rgba(76,224,165,.5)}
-.actions button img{width:34px;height:34px;object-fit:contain;pointer-events:none}
-.actions button span{font:9px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:#fff}
-.actions #act-kill,.actions #act-button{border-color:rgba(233,69,96,.7);background:rgba(90,10,24,.78)}
-.actions #act-report{border-color:rgba(255,215,0,.6)}
-.actions #act-button span{color:var(--gold)}
-.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;
-  padding:16px;background:rgba(3,7,15,.82);overflow:auto}
-.panel{width:min(430px,100%);display:flex;flex-direction:column;gap:12px;padding:24px;
-  border-radius:18px;background:rgba(255,255,255,.08);backdrop-filter:blur(10px);
-  border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.55)}
-.eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--green)}
-.timer{font:700 22px/1 var(--mono);color:var(--gold);text-align:center}
-.meeting-panel{width:min(560px,100%);padding:30px 34px;display:flex;flex-direction:column;gap:10px;
-  border-radius:20px;border:1px solid rgba(255,255,255,.22);
-  background:linear-gradient(rgba(6,11,22,.74),rgba(6,11,22,.84)),
-    var(--meeting-art) center/100% 100% no-repeat,#0b1424;
-  box-shadow:0 26px 70px rgba(0,0,0,.65)}
-.meeting-title{font-family:var(--display);font-size:30px;letter-spacing:.1em;text-align:center;
-  text-transform:uppercase;text-shadow:0 0 20px rgba(0,0,0,.6)}
-.meeting-note{text-align:center;color:var(--dim);font-size:12px}
-#toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;
-  background:rgba(233,69,96,.92);color:#fff;padding:9px 15px;border-radius:10px;
-  font-size:12.5px;box-shadow:0 10px 30px rgba(0,0,0,.45);max-width:88vw;text-align:center}
+.actions{position:absolute;right:10px;bottom:10px;z-index:6;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.actions .btn{min-width:78px;height:44px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(16,17,19,.86);border:1px solid #3a3d44;font-size:11px;border-radius:4px}
+.actions #act-kill,.actions #act-button{background:#8f2a20;border-color:#a83a2e}
+.actions #act-report{border-color:#6b6326;color:#e8dfa0}
+.actions #act-vent,.actions #act-use{background:rgba(16,17,19,.9);color:#cfd2d7;border-color:#3a3d44}
+
+/* lobby dock */
+.lobby-bar{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line);
+  border-radius:4px;background:var(--panel);max-height:42vh;overflow:auto}
+.lobby-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.code{font:600 13px var(--mono);letter-spacing:.22em;color:var(--ink)}
+.code.public{color:#d8cfa8}
+.lobby-top .btn-primary{margin-left:auto}
+#copy{font-size:11px;padding:9px 11px}
+.roster{list-style:none;display:flex;flex-direction:column;gap:0;text-align:left}
+.roster li{display:flex;align-items:center;gap:8px;padding:6px 2px;border-top:1px solid var(--line);font-size:13px}
+.roster li:first-child{border-top:0}
+.roster .dot{width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:var(--c)}
+.roster .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.roster .tail{font:10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.roster .vote{border-radius:3px;padding:4px 9px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+  background:transparent;border:1px solid var(--line);color:var(--ink);cursor:pointer;font-family:var(--font-body)}
+.roster .vote:hover:not(:disabled){background:#202329}
+.roster .vote:disabled{opacity:.4;cursor:default}
+.roster.chips{flex-direction:row;flex-wrap:wrap;gap:6px}
+.roster.chips li{flex:0 0 auto;border:1px solid var(--line);border-radius:3px;padding:4px 8px;font-size:12px}
+.roster.chips .name{flex:0 1 auto}
+.row-item.is-impostor .tail{color:#e08a80}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
+.settings label{display:flex;flex-direction:column;gap:4px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+
+/* overlays */
+.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:rgba(6,7,8,.9);overflow:auto}
+.panel{width:min(440px,100%);display:flex;flex-direction:column;gap:10px;padding:18px;
+  border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.eyebrow{font:10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.panel h2{font-size:19px;line-height:1.2;font-weight:600}
+.meeting-title{font-size:18px;font-weight:600;text-transform:uppercase;letter-spacing:.1em}
+.meeting-note{color:var(--dim);font-size:12px}
+.timer{font:600 15px var(--mono);color:var(--ink)}
+#toast{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:60;background:#202329;
+  border:1px solid #3a3d44;color:var(--ink);padding:8px 12px;border-radius:3px;font-size:12.5px;max-width:88vw;text-align:center}
 [hidden]{display:none!important}
 @media (max-width:520px){
-  .card{padding:20px}
-  .brand{font-size:34px}
-  .actions button{width:56px;height:56px}
-  .actions button img{width:28px;height:28px}
-  .meeting-panel{padding:22px 18px}
-  .meeting-title{font-size:22px}
+  .logo{font-size:24px}
+  .actions .btn{min-width:62px;height:40px;font-size:10px}
+  .panel{padding:14px}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
 </head>
 <body>
 <main id="shell">
-  <header>
-    <h1>Among Us</h1>
+  <header class="top">
+    <span class="wordmark">Among Us</span>
     <span id="room-tag" class="room-tag" hidden></span>
-    <button id="leave" class="danger" type="button" hidden>Leave</button>
+    <button id="leave" class="btn btn-danger" type="button" hidden>Leave</button>
   </header>
 
   <div id="screens">
     <section id="screen-menu" class="screen">
-      <div class="card">
-        <p class="brand">Among Us</p>
-        <p class="tagline">Fix the ship, find the impostor. Three players start a round, and anyone can walk in mid-round.</p>
+      <div class="menu">
+        <h1 class="logo"><span>Among</span><span>Us</span></h1>
+        <p class="tagline">Light &amp; sound. Trust no one.</p>
 
         <label class="field">Your name
           <input id="name" maxlength="12" autocomplete="nickname" placeholder="Crewmate">
         </label>
 
-        <button id="public-join" class="primary" type="button">Join the public room</button>
+        <button id="public-join" class="btn btn-primary btn-large" type="button">Join the public room</button>
         <p class="hint">One room, always open. It starts as soon as three are in, and late arrivals play straight away.</p>
 
         <div class="or">or</div>
 
-        <button id="create" type="button">Create a private room</button>
+        <button id="create" class="btn btn-secondary" type="button">Create a private room</button>
         <div class="join-row">
           <input id="code" maxlength="4" inputmode="text" autocapitalize="characters" placeholder="CODE" aria-label="Room code">
-          <button id="join" type="button">Join</button>
+          <button id="join" class="btn btn-secondary" type="button">Join</button>
         </div>
 
         <p id="menu-status" class="status" role="status"></p>
       </div>
     </section>
 
-
     <section id="screen-game" class="screen" hidden>
       <div class="game-wrap">
-        <div id="hud"></div>
+        <div id="hud" class="hud"></div>
         <div class="stage">
           <canvas id="board" aria-label="Ship map"></canvas>
           <div id="actions" class="actions">
-          <button id="act-use" type="button" hidden><img id="icon-use" alt=""><span id="use-label">Use</span></button>
-          <button id="act-kill" type="button" hidden><img id="icon-kill" alt=""><span>Kill</span></button>
-          <button id="act-vent" type="button" hidden><img id="icon-vent" alt=""><span>Vent</span></button>
-          <button id="act-report" type="button" hidden><img id="icon-report" alt=""><span>Report</span></button>
-          <button id="act-button" type="button" hidden><span>Emergency</span></button>
+            <button id="act-use" class="btn" type="button" hidden>Use</button>
+            <button id="act-kill" class="btn" type="button" hidden>Kill</button>
+            <button id="act-vent" class="btn" type="button" hidden>Vent</button>
+            <button id="act-report" class="btn" type="button" hidden>Report</button>
+            <button id="act-button" class="btn" type="button" hidden>Button</button>
           </div>
         </div>
         <div id="lobby-bar" class="lobby-bar" hidden>
           <div class="lobby-top">
             <span id="lobby-code" class="code">----</span>
-            <button id="copy" class="ghost" type="button">Copy code</button>
-            <button id="start" class="primary" type="button" hidden>Start round</button>
+            <button id="copy" class="btn btn-secondary" type="button">Copy code</button>
+            <button id="start" class="btn btn-primary" type="button" hidden>Start game</button>
           </div>
           <ul id="roster" class="roster chips" aria-label="Players"></ul>
           <div id="host-settings" class="settings" hidden>
@@ -257,13 +230,13 @@ button.ghost{background:rgba(255,255,255,.06);border-color:var(--rule);color:var
 </main>
 
 <section id="overlay-meeting" class="overlay" hidden>
-  <div class="meeting-panel">
+  <div class="panel">
     <p class="eyebrow" id="meeting-reason"></p>
-    <h2 class="meeting-title">Who is the Imposter?</h2>
+    <h2 class="meeting-title">Who is the imposter?</h2>
     <p class="meeting-note" id="meeting-note"></p>
     <p class="timer" id="meeting-timer">45s</p>
     <ul id="votes" class="roster"></ul>
-    <button id="skip" class="ghost" type="button">Skip vote</button>
+    <button id="skip" class="btn" type="button">Skip vote</button>
   </div>
 </section>
 
@@ -272,7 +245,7 @@ button.ghost{background:rgba(255,255,255,.06);border-color:var(--rule);color:var
     <p class="eyebrow" id="over-eyebrow"></p>
     <h2 id="over-title"></h2>
     <ul id="over-roles" class="roster"></ul>
-    <button id="back-lobby" class="primary" type="button" hidden>Back to lobby</button>
+    <button id="back-lobby" class="btn btn-primary" type="button" hidden>Back to lobby</button>
     <p class="hint" id="over-note"></p>
   </div>
 </section>
@@ -287,73 +260,59 @@ window.ImposterCore = (function () {
 
   /* ── the ship ─────────────────────────────────────────────────────────── */
 
-  const WORLD = { w: 520, h: 360 };
+  const WORLD = { w: 1000, h: 547 };
 
+  // Rooms are labels and task buckets; the walls are not geometry but the
+  // mini-map the ship art was drawn from, sampled per pixel (see pointInFloor).
   const ROOMS = [
-    { id: 'upperEngine', name: 'Upper Engine', x: 20, y: 20, w: 120, h: 100 },
-    { id: 'cafeteria', name: 'Cafeteria', x: 180, y: 20, w: 160, h: 100 },
-    { id: 'medbay', name: 'MedBay', x: 380, y: 20, w: 120, h: 80 },
-    { id: 'reactor', name: 'Reactor', x: 20, y: 140, w: 100, h: 80 },
-    { id: 'electrical', name: 'Electrical', x: 180, y: 140, w: 80, h: 80 },
-    { id: 'security', name: 'Security', x: 380, y: 140, w: 120, h: 80 },
-    { id: 'lowerEngine', name: 'Lower Engine', x: 20, y: 240, w: 120, h: 100 },
-    { id: 'storage', name: 'Storage', x: 180, y: 240, w: 140, h: 100 },
-    { id: 'navigation', name: 'Navigation', x: 380, y: 240, w: 120, h: 100 },
+    { id: 'upperEngine', name: 'Upper Engine' },
+    { id: 'cafeteria', name: 'Cafeteria' },
+    { id: 'medbay', name: 'MedBay' },
+    { id: 'reactor', name: 'Reactor' },
+    { id: 'electrical', name: 'Electrical' },
+    { id: 'security', name: 'Security' },
+    { id: 'lowerEngine', name: 'Lower Engine' },
+    { id: 'storage', name: 'Storage' },
+    { id: 'navigation', name: 'Navigation' },
   ];
 
-  const CORRIDORS = [
-    { x: 140, y: 40, w: 40, h: 40 },
-    { x: 340, y: 40, w: 40, h: 40 },
-    { x: 400, y: 100, w: 40, h: 40 },
-    { x: 60, y: 120, w: 40, h: 20 },
-    { x: 220, y: 120, w: 40, h: 20 },
-    { x: 120, y: 160, w: 60, h: 40 },
-    { x: 260, y: 160, w: 120, h: 40 },
-    { x: 60, y: 220, w: 40, h: 20 },
-    { x: 200, y: 220, w: 40, h: 20 },
-    { x: 400, y: 220, w: 40, h: 20 },
-    { x: 140, y: 260, w: 40, h: 40 },
-    { x: 320, y: 260, w: 60, h: 40 },
-  ];
-
-  const FLOOR = ROOMS.map(({ x, y, w, h }) => ({ x, y, w, h })).concat(CORRIDORS);
-
-  const SPAWN = { x: 260, y: 70 };
-  const BUTTON = { x: 260, y: 104, label: 'Emergency' };
+  const SPAWN = { x: 560, y: 235 };
+  const BUTTON = { x: 565, y: 150, label: 'Emergency' };
 
   const STATIONS = [
-    { id: 'wires-caf', room: 'cafeteria', label: 'Wires', x: 205, y: 48 },
-    { id: 'cards-caf', room: 'cafeteria', label: 'Card swipe', x: 312, y: 48 },
-    { id: 'fuel-upper', room: 'upperEngine', label: 'Fuel', x: 44, y: 44 },
-    { id: 'align-upper', room: 'upperEngine', label: 'Align engine', x: 112, y: 96 },
-    { id: 'scan-med', room: 'medbay', label: 'MedBay scan', x: 442, y: 44 },
-    { id: 'sample-med', room: 'medbay', label: 'Samples', x: 404, y: 84 },
-    { id: 'start-reactor', room: 'reactor', label: 'Start reactor', x: 36, y: 164 },
-    { id: 'hand-reactor', room: 'reactor', label: 'Hand scan', x: 96, y: 204 },
-    { id: 'wires-elec', room: 'electrical', label: 'Wires', x: 202, y: 160 },
-    { id: 'divert-elec', room: 'electrical', label: 'Divert power', x: 240, y: 200 },
-    { id: 'cams-sec', room: 'security', label: 'Cameras', x: 402, y: 160 },
-    { id: 'logs-sec', room: 'security', label: 'Logs', x: 464, y: 204 },
-    { id: 'fuel-lower', room: 'lowerEngine', label: 'Fuel', x: 40, y: 264 },
-    { id: 'align-lower', room: 'lowerEngine', label: 'Align engine', x: 112, y: 320 },
-    { id: 'box-storage', room: 'storage', label: 'Sort crates', x: 200, y: 264 },
-    { id: 'fuel-storage', room: 'storage', label: 'Fuel', x: 292, y: 316 },
-    { id: 'course-nav', room: 'navigation', label: 'Plot course', x: 402, y: 264 },
-    { id: 'chart-nav', room: 'navigation', label: 'Charts', x: 462, y: 316 },
+    { id: 'wires-caf', room: 'cafeteria', label: 'Wires', x: 520, y: 120 },
+    { id: 'cards-caf', room: 'cafeteria', label: 'Card swipe', x: 630, y: 150 },
+    { id: 'fuel-upper', room: 'upperEngine', label: 'Fuel', x: 215, y: 120 },
+    { id: 'align-upper', room: 'upperEngine', label: 'Align engine', x: 255, y: 150 },
+    { id: 'scan-med', room: 'medbay', label: 'MedBay scan', x: 420, y: 200 },
+    { id: 'sample-med', room: 'medbay', label: 'Samples', x: 390, y: 240 },
+    { id: 'start-reactor', room: 'reactor', label: 'Start reactor', x: 140, y: 220 },
+    { id: 'hand-reactor', room: 'reactor', label: 'Hand scan', x: 165, y: 270 },
+    { id: 'wires-elec', room: 'electrical', label: 'Wires', x: 430, y: 330 },
+    { id: 'divert-elec', room: 'electrical', label: 'Divert power', x: 450, y: 340 },
+    { id: 'cams-sec', room: 'security', label: 'Cameras', x: 320, y: 230 },
+    { id: 'logs-sec', room: 'security', label: 'Logs', x: 335, y: 265 },
+    { id: 'fuel-lower', room: 'lowerEngine', label: 'Fuel', x: 215, y: 380 },
+    { id: 'align-lower', room: 'lowerEngine', label: 'Align engine', x: 255, y: 350 },
+    { id: 'box-storage', room: 'storage', label: 'Sort crates', x: 530, y: 390 },
+    { id: 'fuel-storage', room: 'storage', label: 'Fuel', x: 580, y: 430 },
+    { id: 'course-nav', room: 'navigation', label: 'Plot course', x: 940, y: 220 },
+    { id: 'chart-nav', room: 'navigation', label: 'Charts', x: 955, y: 265 },
   ];
 
   // Vents come in pairs and only the impostor may use them. A vent is a physical
   // object on the map: crewmates see the grate, and a jump between grates is
   // visible to anyone watching the two rooms.
   const VENTS = [
-    { id: 'vent-upper', pair: 'vent-elec', room: 'upperEngine', x: 105, y: 105 },
-    { id: 'vent-elec', pair: 'vent-upper', room: 'electrical', x: 238, y: 150 },
-    { id: 'vent-med', pair: 'vent-nav', room: 'medbay', x: 470, y: 70 },
-    { id: 'vent-nav', pair: 'vent-med', room: 'navigation', x: 410, y: 320 },
-    { id: 'vent-reactor', pair: 'vent-lower', room: 'reactor', x: 90, y: 150 },
-    { id: 'vent-lower', pair: 'vent-reactor', room: 'lowerEngine', x: 105, y: 330 },
+    { id: 'vent-caf', pair: 'vent-elec', room: 'cafeteria', x: 640, y: 190 },
+    { id: 'vent-elec', pair: 'vent-caf', room: 'electrical', x: 455, y: 360 },
+    { id: 'vent-med', pair: 'vent-sec', room: 'medbay', x: 405, y: 255 },
+    { id: 'vent-sec', pair: 'vent-med', room: 'security', x: 330, y: 255 },
+    { id: 'vent-reactor', pair: 'vent-upper', room: 'reactor', x: 150, y: 290 },
+    { id: 'vent-upper', pair: 'vent-reactor', room: 'upperEngine', x: 240, y: 110 },
   ];
 
+  const BUTTON_RANGE = 30;
   const stationById = id => STATIONS.find(station => station.id === id) || null;
   const ventById = id => VENTS.find(vent => vent.id === id) || null;
   const pairedVent = id => {
@@ -363,41 +322,56 @@ window.ImposterCore = (function () {
 
   /* ── rules ────────────────────────────────────────────────────────────── */
 
-  const SPEED = 92;
-  const KILL_RANGE = 34;
-  const TASK_RANGE = 30;
-  const REPORT_RANGE = 44;
-  const BUTTON_RANGE = 34;
-  const VENT_RANGE = 26;
+  // Speeds are per second in world units. The ship is wider than the old
+  // hand-drawn layout, so the walk speed scales with it.
+  const SPEED = 150;
+  const KILL_RANGE = 38;
+  const TASK_RANGE = 34;
+  const REPORT_RANGE = 48;
+  const VENT_RANGE = 30;
   const VENT_COOLDOWN = 2;
   const MEETING_MS = 45_000;
   const RESET_MS = 9_000;
   const ABSENT_MS = 12_000;
   const MIN_PLAYERS = 3;
   const MAX_PLAYERS = 10;
-  const PLAYER_RADIUS = 7;
+  const PLAYER_RADIUS = 6;
 
   const DEFAULTS = { impostors: 1, killCooldownSec: 20, tasksPerPlayer: 4, auto: false };
 
   const COLORS = [
-    { id: 'red', hex: '#b3261e' },
-    { id: 'blue', hex: '#2f5d8a' },
-    { id: 'green', hex: '#3f6b3a' },
-    { id: 'pink', hex: '#c47a8a' },
-    { id: 'orange', hex: '#c07a2c' },
-    { id: 'yellow', hex: '#b89b32' },
-    { id: 'purple', hex: '#6a4b7c' },
-    { id: 'cyan', hex: '#3c7d7d' },
-    { id: 'white', hex: '#d9d2c3' },
-    { id: 'black', hex: '#2a2723' },
+    { id: 'red', hex: '#c51111' },
+    { id: 'blue', hex: '#2b52d8' },
+    { id: 'green', hex: '#16963a' },
+    { id: 'pink', hex: '#ee54bb' },
+    { id: 'orange', hex: '#f07d0d' },
+    { id: 'yellow', hex: '#f6f658' },
+    { id: 'purple', hex: '#8b4bd8' },
+    { id: 'brown', hex: '#8b5a2b' },
+    { id: 'white', hex: '#e8ecf4' },
+    { id: 'black', hex: '#3c4046' },
   ];
 
   const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const round = value => Math.round(value * 10) / 10;
 
+  // The walk mask: green pixels of the mini-map, read once into a byte array.
+  // Until it loads, the whole ship is standable so seeding never blocks on IO.
+  const WALK = { data: null, w: 0, h: 0 };
+
+  function setWalkMask(data, width, height) {
+    WALK.data = data;
+    WALK.w = width;
+    WALK.h = height;
+  }
+
   function pointInFloor(x, y) {
-    return FLOOR.some(rect => x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h);
+    if (!WALK.data) return x >= 0 && y >= 0 && x <= WORLD.w && y <= WORLD.h;
+    const px = Math.floor((x / WORLD.w) * WALK.w);
+    const py = Math.floor((y / WORLD.h) * WALK.h);
+    if (px < 0 || py < 0 || px >= WALK.w || py >= WALK.h) return false;
+    return WALK.data[(py * WALK.w + px) * 4 + 1] > 60;
   }
 
   function canStand(x, y, radius = PLAYER_RADIUS) {
@@ -411,18 +385,16 @@ window.ImposterCore = (function () {
   }
 
   function nearestFloorPoint(x, y) {
-    let best = { x: SPAWN.x, y: SPAWN.y };
-    let bestDistance = Infinity;
-    for (const rect of FLOOR) {
-      const cx = clamp(x, rect.x, rect.x + rect.w);
-      const cy = clamp(y, rect.y, rect.y + rect.h);
-      const distance = (cx - x) ** 2 + (cy - y) ** 2;
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = { x: cx, y: cy };
+    if (pointInFloor(x, y)) return { x, y };
+    for (let radius = 2; radius <= 80; radius += 2) {
+      for (let step = 0; step < 16; step += 1) {
+        const angle = (step / 16) * Math.PI * 2;
+        const cx = x + Math.cos(angle) * radius;
+        const cy = y + Math.sin(angle) * radius;
+        if (pointInFloor(cx, cy)) return { x: cx, y: cy };
       }
     }
-    return best;
+    return { x: SPAWN.x, y: SPAWN.y };
   }
 
   function shuffle(list, rng) {
@@ -550,7 +522,7 @@ window.ImposterCore = (function () {
 
   function configure(state, id, patch) {
     const player = getPlayer(state, id);
-    if (!player || !player.host) return { ok: false, error: 'host-only' };
+    if (!player) return { ok: false, error: 'unknown-player' };
     if (state.phase !== 'lobby') return { ok: false, error: 'already-started' };
     const next = Object.assign({}, state.settings);
     if (patch.impostors !== undefined) next.impostors = clamp(Math.round(Number(patch.impostors) || 1), 1, 3);
@@ -564,9 +536,9 @@ window.ImposterCore = (function () {
     const living = state.players.filter(player => player.alive);
     living.forEach((player, index) => {
       const angle = (index / Math.max(1, living.length)) * Math.PI * 2;
-      const x = SPAWN.x + Math.cos(angle) * 24;
-      const y = SPAWN.y + Math.sin(angle) * 24;
-      const spot = canStand(x, y) ? { x, y } : SPAWN;
+      const x = SPAWN.x + Math.cos(angle) * 52;
+      const y = SPAWN.y + Math.sin(angle) * 52;
+      const spot = canStand(x, y) ? { x, y } : nearestFloorPoint(x, y);
       player.x = spot.x;
       player.y = spot.y;
       player.dir = { x: 0, y: 0 };
@@ -607,9 +579,11 @@ window.ImposterCore = (function () {
     return { ok: true };
   }
 
+  // Any seat may deal the next round or tune the room. Who won the host
+  // election is a networking detail, so it never becomes a permission a player
+  // has to know about.
   function start(state, byId, rng = Math.random) {
-    const host = getPlayer(state, byId);
-    if (!host || !host.host) return { ok: false, error: 'host-only' };
+    if (!getPlayer(state, byId)) return { ok: false, error: 'unknown-player' };
     return beginRound(state, rng);
   }
 
@@ -621,10 +595,7 @@ window.ImposterCore = (function () {
   }
 
   function backToLobby(state, byId = null) {
-    if (byId !== null) {
-      const host = getPlayer(state, byId);
-      if (!host || !host.host) return { ok: false, error: 'host-only' };
-    }
+    if (byId !== null && !getPlayer(state, byId)) return { ok: false, error: 'unknown-player' };
     state.phase = 'lobby';
     state.bodies = [];
     state.meeting = null;
@@ -1154,11 +1125,11 @@ window.ImposterCore = (function () {
       return ring().indexOf(id) + 1;
     }
 
-    function stamp(snapshot, id) {
+    function stamp(snapshot, id, next = successor()) {
       snapshot.net = {
         publicRoom: Boolean(publicRoom),
         rank: rankOf(id),
-        next: successor() === id,
+        next: next === id,
         players: state.players.length,
       };
       return snapshot;
@@ -1168,11 +1139,33 @@ window.ImposterCore = (function () {
       return JSON.parse(JSON.stringify(state));
     }
 
+    // What a snapshot can differ in from one tick to the next. If none of it
+    // moved, the host would be building and serialising N payloads to say
+    // nothing, which is exactly the work that makes hosting feel heavy.
+    let lastKey = '';
+    function signature() {
+      const players = state.players.map(player =>
+        [player.id, Math.round(player.x), Math.round(player.y), player.alive ? 1 : 0,
+          player.teammate ? 1 : 0, player.ready ? 1 : 0, player.revealed ? 1 : 0,
+          Math.ceil(player.cooldown || 0), Math.ceil(player.ventCooldown || 0),
+          player.tasksDone.length].join(',')).join(';');
+      const votes = state.meeting && state.meeting.votes ? Object.keys(state.meeting.votes).length : 0;
+      return [state.phase, players, state.bodies.length, votes,
+        Math.ceil(((state.meeting && state.meeting.msLeft) || 0) / 1000),
+        Math.ceil(((state.over && state.over.msLeft) || 0) / 1000)].join('|');
+    }
+
     function publish(force = false) {
       if (!force && sinceSnapshot < SNAPSHOT_MS) return;
       sinceSnapshot = 0;
-      fire('snapshot', stamp(snapshotFor(state, hostId), hostId));
-      for (const [id, send] of links) send({ t: 'snap', s: stamp(snapshotFor(state, id), id) });
+      if (!force) {
+        const key = signature();
+        if (key === lastKey) return;
+        lastKey = key;
+      }
+      const next = successor();
+      fire('snapshot', stamp(snapshotFor(state, hostId), hostId, next));
+      for (const [id, send] of links) send({ t: 'snap', s: stamp(snapshotFor(state, id), id, next) });
     }
 
     function sendMirror(force = false) {
@@ -1296,7 +1289,7 @@ window.ImposterCore = (function () {
   }
 
   return {
-    WORLD, ROOMS, CORRIDORS, FLOOR, SPAWN, BUTTON, STATIONS, VENTS, COLORS,
+    WORLD, ROOMS, SPAWN, BUTTON, STATIONS, VENTS, COLORS, setWalkMask,
     SPEED, KILL_RANGE, TASK_RANGE, REPORT_RANGE, BUTTON_RANGE, VENT_RANGE, VENT_COOLDOWN,
     MEETING_MS, RESET_MS, ABSENT_MS, MIN_PLAYERS, MAX_PLAYERS, PLAYER_RADIUS, DEFAULTS, SNAPSHOT_MS,
     stationById, ventById, pairedVent, pointInFloor, canStand, nearestFloorPoint,
@@ -1687,7 +1680,7 @@ window.ImposterNet = (function () {
   const screens = { menu: $('screen-menu'), game: $('screen-game') };
   const ERRORS = {
     'not-in-lobby': 'That only works in the lobby.',
-    'host-only': 'Only the host can do that.',
+    'host-only': 'That did not go through. Try again in a moment.',
     'already-started': 'The round already started.',
     'need-3-players': 'Three players minimum.',
     'not-playing': 'The round is paused.',
@@ -1723,30 +1716,6 @@ window.ImposterNet = (function () {
   let sentDir = { x: 0, y: 0 };
   let lastGoto = 0;
   const listKeys = new Map();
-
-  // Their chrome: starfield, meeting screen, lobby art, icon buttons and font.
-  const IMAGE_BASE = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI)
-    ? 'imposter/'
-    : 'games/content/imposter/';
-  const asset = name => new URL(IMAGE_BASE + name, document.baseURI).href;
-  try {
-    const root = document.documentElement.style;
-    root.setProperty('--space', 'url("' + asset('background.jpg') + '")');
-    root.setProperty('--meeting-art', 'url("' + asset('meeting.png') + '")');
-  } catch (error) { /* images stay absent, the layout still reads */ }
-  try {
-    const face = new FontFace('AmongUs', 'url(' + asset('amongus.ttf') + ')');
-    face.load().then(loaded => document.fonts.add(loaded)).catch(() => {});
-  } catch (error) { /* keep the fallback face */ }
-  for (const [id, file] of [
-    ['icon-use', 'ui-useIcon.png'],
-    ['icon-kill', 'ui-kill_icon.png'],
-    ['icon-report', 'ui-reportBtn.png'],
-    ['icon-vent', 'vent.png'],
-  ]) {
-    const icon = document.getElementById(id);
-    if (icon) icon.src = asset(file);
-  }
 
   function show(name) {
     shown = name;
@@ -1845,7 +1814,7 @@ window.ImposterNet = (function () {
     show('game');
     $('roster').replaceChildren();
     listKeys.clear();
-    $('lobby-note').textContent = mode === 'public' ? 'Joining the public room…' : 'Connecting to the host…';
+    $('lobby-note').textContent = mode === 'public' ? 'Joining the public room…' : 'Connecting…';
   }
 
   function leave() {
@@ -1868,22 +1837,16 @@ window.ImposterNet = (function () {
     if (!status) return;
     switch (status.state) {
       case 'hosting':
-        if (status.promoted) toast('The host left — you are the host now.');
-        $('lobby-note').textContent = snap && snap.phase !== 'lobby'
-          ? ''
-          : status.promoted
-            ? 'You took over the room. The round carries on.'
-            : 'You are hosting. If you leave, another player takes over.';
+        if (snap && snap.phase === 'lobby') $('lobby-note').textContent = '';
         menuStatus('');
         break;
       case 'joined':
         menuStatus('');
         break;
       case 'promoted':
-        toast('You are the host now.');
         break;
       case 'lost':
-        toast('The host went quiet. Reconnecting…');
+        toast('Connection hiccup. Reconnecting…');
         break;
       case 'taken':
         toast('Somebody else took the room. Rejoining…');
@@ -1914,6 +1877,7 @@ window.ImposterNet = (function () {
     if (!next) return;
     snap = next;
     if (next.you?.id) selfId = next.you.id;
+    seedView(next);
     const hosting = Boolean(next.you?.host);
     const publicRoom = Boolean(next.net?.publicRoom);
     const tag = $('room-tag');
@@ -1962,22 +1926,21 @@ window.ImposterNet = (function () {
     const players = s.players;
     setList($('roster'), players.map(player => `${player.id}:${player.name}:${player.host}`).join('|'), list => {
       for (const player of players) {
-        list.append(playerRow(player, player.host ? 'host' : player.id === selfId ? 'you' : ''));
+        list.append(playerRow(player, player.id === selfId ? 'you' : ''));
       }
     });
 
     const need = Math.max(0, C.MIN_PLAYERS - players.length);
     $('lobby-note').textContent = publicRoom
       ? `${players.length} / ${C.MAX_PLAYERS} in the public room · ` +
-        (need ? `${need} more to start` : 'starting…') +
-        (hosting ? ' · you hold the host chair' : '')
+        (need ? `${need} more to start` : 'starting…')
       : `${players.length} / ${C.MAX_PLAYERS} · ` +
-        (need ? `${need} more to start` : hosting ? 'ready when you are' : 'waiting for the host');
+        (need ? `${need} more to start` : 'ready when you are');
 
-    $('host-settings').hidden = !hosting || publicRoom;
-    $('start').hidden = !hosting || publicRoom;
+    $('host-settings').hidden = publicRoom;
+    $('start').hidden = publicRoom;
     $('start').disabled = players.length < C.MIN_PLAYERS;
-    if (hosting && !publicRoom) applySettingsToForm(s.settings);
+    if (!publicRoom) applySettingsToForm(s.settings);
   }
 
   function applySettingsToForm(settings) {
@@ -2010,7 +1973,7 @@ window.ImposterNet = (function () {
     use.hidden = !s.actions.use;
     if (s.actions.use) {
       const station = C.STATIONS.find(candidate => candidate.id === s.actions.use);
-      $('use-label').textContent = station ? station.label : 'Use';
+      use.textContent = station ? station.label : 'Use';
     }
     $('act-kill').hidden = !s.actions.kill;
     $('act-vent').hidden = !s.actions.vent;
@@ -2071,13 +2034,11 @@ window.ImposterNet = (function () {
       }
     });
 
-    $('back-lobby').hidden = !hosting || publicRoom;
+    $('back-lobby').hidden = publicRoom;
     const seconds = Math.max(0, Math.ceil((s.over?.msLeft || 0) / 1000));
     $('over-note').textContent = publicRoom
       ? `The public room reshuffles in ${seconds}s. Stay in and you are dealt the next round.`
-      : hosting
-        ? 'Back to lobby deals a new round with the same players.'
-        : 'Waiting for the host.';
+      : 'Back to lobby deals a new round with the same players.';
   }
 
   function handleEvent(event) {
@@ -2114,55 +2075,99 @@ window.ImposterNet = (function () {
 
   /* ── drawing ─────────────────────────────────────────────────────────── */
 
-  /* ── art ─────────────────────────────────────────────────────────────── */
+/* ── art ─────────────────────────────────────────────────────────────── */
 
-  // Frames, vent grate, dead body, meeting screen, lobby art and the display
-  // font are the ones from arizkhalid/among-us-clone (MIT, see imposter/LICENSE).
-  const ART = { idle: new Image(), walk: [], vent: new Image(), body: new Image() };
-  ART.idle.src = asset('crew-idle.png');
-  ART.vent.src = asset('vent.png');
-  ART.body.src = asset('body.png');
-  for (let frame = 1; frame <= 12; frame += 1) {
+  // Ship art, crewmate sprites, task marks and the emergency button come from
+  // AI0702/Among-Us-clone (Unlicense repo; artwork belongs to Innersloth). The
+  // mini-map is used as the collision mask, so what looks like wall is wall.
+  const IMAGE_BASE = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI)
+    ? 'imposter/'
+    : 'games/content/imposter/';
+  const asset = name => new URL(IMAGE_BASE + name, document.baseURI).href;
+  const MAP_ART = new Image();
+  MAP_ART.src = asset('map.jpg');
+  const BUTTON_ART = new Image();
+  BUTTON_ART.src = asset('button.png');
+  const CREW = new Map();
+  for (const color of C.COLORS) {
     const image = new Image();
-    image.src = asset('crew-walk-' + String(frame).padStart(2, '0') + '.png');
-    ART.walk.push(image);
+    image.src = asset('crew-' + color.id + '.png');
+    CREW.set(color.id, image);
   }
-  const drawn = image => image.complete && image.naturalWidth > 0;
 
-  function theme() {
-    if (!palette) {
-      const css = getComputedStyle(document.documentElement);
-      const read = name => css.getPropertyValue(name).trim();
-      palette = {
-        paper: read('--paper'), ink: read('--ink'), dim: read('--dim'),
-        rule: read('--rule'), red: read('--red'), green: read('--green'),
-        gold: read('--gold'), sunk: read('--sunk'),
-      };
+  // One read of the green mask into a byte array; every collision test after
+  // that is a single array lookup.
+  function loadWalkMask() {
+    const image = new Image();
+    image.src = asset('walk.png');
+    image.decode().then(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(image, 0, 0);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      C.setWalkMask(data, canvas.width, canvas.height);
+    }).catch(() => {});
+  }
+
+  // Snapshots land ten times a second. Remote seats ease toward the newest
+  // position so nobody stutters between packets; the seat you drive moves from
+  // your own keys immediately and only snaps when the host disagrees badly.
+  const view = new Map();
+  let selfView = null;
+  let lastFrame = performance.now();
+
+  function seedView(state) {
+    for (const player of state.players) {
+      const entry = view.get(player.id);
+      if (entry) {
+        entry.tx = player.x;
+        entry.ty = player.y;
+      } else {
+        view.set(player.id, { x: player.x, y: player.y, tx: player.x, ty: player.y, dir: 0 });
+      }
     }
-    return palette;
+    for (const id of view.keys()) {
+      if (!state.players.some(player => player.id === id)) view.delete(id);
+    }
+    const me = state.players.find(player => player.id === selfId);
+    if (me && (!selfView || Math.hypot(selfView.x - me.x, selfView.y - me.y) > 22)) {
+      selfView = { x: me.x, y: me.y };
+    }
   }
 
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath(); ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
+  // Frames run down, left, right, up inside each colour sheet.
+  function frameFor(dx, dy, fallback) {
+    if (dy > 0.35) return 0;
+    if (dy < -0.35) return 3;
+    if (dx < -0.35) return 1;
+    if (dx > 0.35) return 2;
+    return fallback || 0;
   }
 
-  // The crew sheet is one fixed colour, so a seat's colour rides on the ring
-  // under each player rather than repainting the art.
-  const seats = new Map();
+  function drawCrew(ctx, colorId, x, y, frame, alpha) {
+    const image = CREW.get(colorId);
+    if (!image || !image.complete || !image.naturalWidth) return false;
+    const frameWidth = image.naturalWidth / 4;
+    const height = image.naturalHeight;
+    const scale = 0.55;
+    const width = frameWidth * scale;
+    const tall = height * scale;
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+    ctx.drawImage(image, frame * frameWidth, 0, frameWidth, height, x - width / 2, y - tall + tall * 0.08, width, tall);
+    ctx.restore();
+    return true;
+  }
 
-  function look(player) {
-    const previous = seats.get(player.id);
-    const dx = previous ? player.x - previous.x : 0;
-    const dy = previous ? player.y - previous.y : 0;
-    const moving = Math.hypot(dx, dy) > 0.3;
-    const face = dx < -0.15 ? -1 : dx > 0.15 ? 1 : previous ? previous.face : 1;
-    seats.set(player.id, { x: player.x, y: player.y, face });
-    return { moving, face };
+  function label(ctx, text, x, y, color) {
+    ctx.font = '600 13px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,.6)';
+    ctx.fillText(text, x + 0.6, y + 0.6);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
   }
 
   function draw() {
@@ -2172,9 +2177,29 @@ window.ImposterNet = (function () {
 
     const canvas = $('board');
     const stage = canvas.parentElement;
+
+    // The frame hugs the map: the largest box with the ship's aspect that still
+    // leaves the HUD and the lobby dock their room.
+    const wrap = stage.parentElement;
+    const chrome = ($('hud').hidden ? 0 : $('hud').offsetHeight + 8) +
+      ($('lobby-bar').hidden ? 0 : $('lobby-bar').offsetHeight + 8);
+    const availW = wrap.clientWidth;
+    const availH = Math.max(140, wrap.clientHeight - chrome);
+    const fit = Math.min(availW / C.WORLD.w, availH / C.WORLD.h);
+    const boxW = Math.max(1, Math.round(C.WORLD.w * fit));
+    const boxH = Math.max(1, Math.round(C.WORLD.h * fit));
+    if (stage.clientWidth !== boxW || stage.clientHeight !== boxH) {
+      stage.style.width = boxW + 'px';
+      stage.style.height = boxH + 'px';
+    }
+
     const width = stage.clientWidth;
     const height = stage.clientHeight;
     if (!width || !height) return;
+
+    const now = performance.now();
+    const dt = Math.min(0.1, (now - lastFrame) / 1000);
+    lastFrame = now;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const pixelWidth = Math.round(width * dpr);
@@ -2185,7 +2210,6 @@ window.ImposterNet = (function () {
     }
 
     const ctx = canvas.getContext('2d');
-    const colors = theme();
     const scale = Math.min(width / C.WORLD.w, height / C.WORLD.h);
     const offX = (width - C.WORLD.w * scale) / 2;
     const offY = (height - C.WORLD.h * scale) / 2;
@@ -2197,146 +2221,135 @@ window.ImposterNet = (function () {
     ctx.translate(offX, offY);
     ctx.scale(scale, scale);
 
-    ctx.fillStyle = colors.sunk;
-    for (const rect of C.FLOOR) ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-
-    ctx.strokeStyle = 'rgba(120,190,255,.22)';
-    ctx.lineWidth = 1.2;
-    for (const room of C.ROOMS) ctx.strokeRect(room.x + 0.5, room.y + 0.5, room.w - 1, room.h - 1);
-
-    ctx.fillStyle = 'rgba(198,222,255,.75)';
-    ctx.font = '11px "AmongUs", Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (const room of C.ROOMS) {
-      ctx.fillText(room.name.toUpperCase(), room.x + room.w / 2, room.y + 13);
+    if (MAP_ART.complete && MAP_ART.naturalWidth) {
+      ctx.drawImage(MAP_ART, 0, 0, C.WORLD.w, C.WORLD.h);
+    } else {
+      ctx.fillStyle = '#15171a';
+      ctx.fillRect(0, 0, C.WORLD.w, C.WORLD.h);
     }
 
     const you = snap.you;
+
+    // Task marks: a yellow tag on your own stations, faded once done.
     for (const station of C.STATIONS) {
       const mine = you?.tasks?.some(task => task.id === station.id);
       const done = you?.tasks?.some(task => task.id === station.id && task.done);
-      if (mine && !done) {
-        ctx.fillStyle = colors.gold;
-        ctx.fillRect(station.x - 3.5, station.y - 3.5, 7, 7);
-        ctx.font = '9px "AmongUs", Arial, sans-serif';
-        ctx.fillStyle = '#ffe98a';
-        ctx.fillText(station.label, station.x, station.y + 12);
-      } else if (done) {
-        ctx.strokeStyle = 'rgba(76,224,165,.55)';
-        ctx.lineWidth = 1.4;
-        ctx.strokeRect(station.x - 3.5, station.y - 3.5, 7, 7);
-      } else {
-        ctx.strokeStyle = 'rgba(160,190,230,.35)';
-        ctx.lineWidth = 1.1;
-        ctx.strokeRect(station.x - 3, station.y - 3, 6, 6);
-      }
+      if (!mine && !done) continue;
+      ctx.globalAlpha = done ? 0.35 : 1;
+      ctx.fillStyle = '#f2df6a';
+      ctx.strokeStyle = 'rgba(0,0,0,.65)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(station.x, station.y - 7);
+      ctx.lineTo(station.x + 7, station.y);
+      ctx.lineTo(station.x, station.y + 7);
+      ctx.lineTo(station.x - 7, station.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (!done) label(ctx, station.label, station.x, station.y - 13, '#f7efc2');
     }
 
-    // Vents: a grate everyone can see; only the impostor gets the prompt and
-    // the jump between the pair.
+    // Vents read as a grate to everyone; the impostor gets the prompt.
     for (const vent of C.VENTS) {
       const near = snap.actions.vent === vent.id;
-      if (drawn(ART.vent)) {
-        // A dark plate under the vent pose so a grate never reads as a player.
-        ctx.fillStyle = 'rgba(6,11,22,.92)';
-        roundRect(ctx, vent.x - 9, vent.y - 8, 18, 16, 4);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(120,190,255,.35)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        const ventHeight = 17;
-        const ventWidth = ventHeight * (ART.vent.naturalWidth / ART.vent.naturalHeight);
-        if (you?.role === 'impostor') {
-          ctx.beginPath();
-          ctx.ellipse(vent.x, vent.y + 5, ventWidth * 0.7, 3.2, 0, 0, Math.PI * 2);
-          ctx.strokeStyle = near ? colors.red : 'rgba(233,69,96,.45)';
-          ctx.lineWidth = 1.4;
-          ctx.stroke();
-        }
-        ctx.drawImage(ART.vent, vent.x - ventWidth / 2, vent.y - ventHeight / 2, ventWidth, ventHeight);
-      } else {
-        ctx.strokeStyle = you?.role === 'impostor' ? colors.red : colors.dim;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(vent.x - 6, vent.y - 4, 12, 8);
-      }
-      if (near) {
-        ctx.font = '10px "AmongUs", Arial, sans-serif';
-        ctx.fillStyle = colors.red;
-        ctx.fillText('VENT', vent.x, vent.y - 14);
-      }
-    }
-
-    ctx.beginPath();
-    ctx.arc(C.BUTTON.x, C.BUTTON.y, 10, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(233,69,96,.85)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.7)';
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-
-    for (const body of snap.bodies) {
-      if (drawn(ART.body)) {
-        const bodyHeight = 20;
-        const bodyWidth = bodyHeight * (ART.body.naturalWidth / ART.body.naturalHeight);
-        ctx.save();
-        ctx.translate(body.x, body.y);
-        ctx.rotate(Math.PI / 2);
-        ctx.drawImage(ART.body, -bodyWidth / 2, -bodyHeight / 2, bodyWidth, bodyHeight);
-        ctx.restore();
-      } else {
-        ctx.strokeStyle = colors.red;
-        ctx.lineWidth = 2;
+      const impostor = you?.role === 'impostor';
+      ctx.fillStyle = 'rgba(10,11,12,.85)';
+      ctx.strokeStyle = impostor ? 'rgba(192,57,43,.9)' : 'rgba(20,21,24,.9)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.ellipse(vent.x, vent.y, 9, 5.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = impostor ? 'rgba(224,138,128,.8)' : 'rgba(120,124,130,.5)';
+      for (let i = -1; i <= 1; i += 1) {
         ctx.beginPath();
-        ctx.moveTo(body.x - 6, body.y - 6);
-        ctx.lineTo(body.x + 6, body.y + 6);
-        ctx.moveTo(body.x + 6, body.y - 6);
-        ctx.lineTo(body.x - 6, body.y + 6);
+        ctx.moveTo(vent.x - 5.5, vent.y + i * 2.2);
+        ctx.lineTo(vent.x + 5.5, vent.y + i * 2.2);
         ctx.stroke();
+      }
+      if (near) label(ctx, 'Vent', vent.x, vent.y - 13, '#e08a80');
+    }
+
+    if (BUTTON_ART.complete && BUTTON_ART.naturalWidth) {
+      const size = 26;
+      ctx.drawImage(BUTTON_ART, C.BUTTON.x - size / 2, C.BUTTON.y - size / 2, size, size * (BUTTON_ART.naturalHeight / BUTTON_ART.naturalWidth));
+    } else {
+      ctx.fillStyle = '#c0392b';
+      ctx.beginPath();
+      ctx.arc(C.BUTTON.x, C.BUTTON.y, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const corpse = snap.players;
+    for (const body of snap.bodies) {
+      const owner = corpse.find(player => player.id === body.of);
+      ctx.save();
+      ctx.translate(body.x, body.y);
+      ctx.rotate(Math.PI / 2);
+      if (!drawCrew(ctx, owner?.color || 'white', 0, 4, 0, 0.75)) {
+        ctx.fillStyle = colorHex(owner?.color || 'white');
+        ctx.fillRect(-6, -4, 12, 8);
+      }
+      ctx.restore();
+    }
+
+    // Your own seat, predicted locally from the keys so movement answers the
+    // keyboard immediately instead of waiting for a round trip.
+    const me = snap.players.find(player => player.id === selfId);
+    if (me?.alive && selfView) {
+      const dir = walkVector();
+      if (dir.x || dir.y) {
+        const length = Math.hypot(dir.x, dir.y) || 1;
+        const step = C.SPEED * dt;
+        const nx = selfView.x + (dir.x / length) * step;
+        const ny = selfView.y + (dir.y / length) * step;
+        if (C.canStand(nx, selfView.y)) selfView.x = nx;
+        if (C.canStand(selfView.x, ny)) selfView.y = ny;
       }
     }
 
-    const phase = Math.floor(performance.now() / 95);
     for (const player of snap.players) {
       const isSelf = player.id === selfId;
       if (!player.alive && !isSelf) continue;
-      const style = look(player);
-      ctx.globalAlpha = player.alive ? 1 : 0.32;
-
-      ctx.beginPath();
-      ctx.ellipse(player.x, player.y + 9, 10, 3.6, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = colorHex(player.color);
-      ctx.lineWidth = 2.6;
-      ctx.stroke();
-
-      const image = style.moving ? ART.walk[phase % ART.walk.length] : ART.idle;
-      if (drawn(image)) {
-        const crewHeight = 27;
-        const crewWidth = crewHeight * (image.naturalWidth / image.naturalHeight);
-        const bob = style.moving ? Math.sin(phase * 0.9) : 0;
-        ctx.save();
-        ctx.translate(player.x, player.y + bob);
-        ctx.scale(style.face, 1);
-        ctx.drawImage(image, -crewWidth / 2, 8 - crewHeight, crewWidth, crewHeight);
-        ctx.restore();
+      const entry = view.get(player.id) || { x: player.x, y: player.y, tx: player.x, ty: player.y, dir: 0 };
+      let px;
+      let py;
+      if (isSelf && selfView && player.alive) {
+        px = selfView.x;
+        py = selfView.y;
+        entry.x = px;
+        entry.y = py;
+        entry.tx = player.x;
+        entry.ty = player.y;
       } else {
+        const ease = 1 - Math.exp(-dt * 18);
+        entry.x += (entry.tx - entry.x) * ease;
+        entry.y += (entry.ty - entry.y) * ease;
+        px = entry.x;
+        py = entry.y;
+      }
+      const dx = entry.tx - entry.x;
+      const dy = entry.ty - entry.y;
+      if (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05) entry.dir = frameFor(dx, dy, entry.dir);
+
+      const moving = Math.abs(dx) + Math.abs(dy) > 0.05;
+      const bob = moving ? Math.round(Math.sin(now / 110) * 1.2) : 0;
+      if (!drawCrew(ctx, player.color, px, py + bob, entry.dir, player.alive ? 1 : 0.45)) {
         ctx.fillStyle = colorHex(player.color);
-        roundRect(ctx, player.x - 7, player.y - 9, 14, 18, 5);
+        ctx.beginPath();
+        ctx.arc(px, py, 5, 0, Math.PI * 2);
         ctx.fill();
       }
-
       if (player.teammate) {
+        ctx.strokeStyle = 'rgba(192,57,43,.85)';
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.arc(player.x, player.y - 18, 11, 0, Math.PI * 2);
-        ctx.strokeStyle = colors.red;
-        ctx.lineWidth = 2;
+        ctx.ellipse(px, py + 2, 11, 5, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
-
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = isSelf ? colors.gold : '#eaf2ff';
-      ctx.font = (isSelf ? 'bold ' : '') + '10px "AmongUs", Arial, sans-serif';
-      ctx.fillText(player.name, player.x, player.y + 20);
+      label(ctx, player.name, px, py + 20, isSelf ? '#f2df6a' : '#e7e5e0');
     }
 
     ctx.restore();
@@ -2494,6 +2507,7 @@ window.ImposterNet = (function () {
     ? { phase: snap.phase, code: snap.code, net: snap.net, you: snap.you, players: snap.players, bodies: snap.bodies, meeting: snap.meeting }
     : null);
 
+  loadWalkMask();
   show('menu');
   menuStatus('');
   if (typeof Peer === 'undefined') {
