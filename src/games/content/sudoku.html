@@ -161,32 +161,75 @@
     color: var(--muted);
   }
   #status.done { color: var(--ink); }
+  #setup {
+    width: var(--board);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #setup[hidden], #game[hidden], #hud[hidden] { display: none; }
+  #lede {
+    font-size: 12.5px;
+    color: var(--muted);
+    padding-top: 2px;
+  }
+  #note {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  #go {
+    font: 12px/1 var(--sans);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--bg);
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    padding: 11px 4px;
+    cursor: pointer;
+  }
+  #go:hover { background: #3a3a33; border-color: #3a3a33; }
+  #game {
+    width: var(--board);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
 </style>
 </head>
 <body>
 <main id="app">
   <header>
     <h1>Sudoku</h1>
-    <div id="hud" aria-live="off">
+    <div id="hud" aria-live="off" hidden>
       <span>time <b id="clock">0:00</b></span>
       <span id="level">easy</span>
     </div>
   </header>
 
-  <div id="levels" role="group" aria-label="Difficulty">
-    <button type="button" data-level="easy" aria-pressed="true">Easy</button>
-    <button type="button" data-level="medium" aria-pressed="false">Medium</button>
-    <button type="button" data-level="hard" aria-pressed="false">Hard</button>
-  </div>
+  <section id="setup">
+    <p id="lede">Fill every row, column and box with 1–9. Pick a level, then start the clock with the board.</p>
+    <div id="levels" role="group" aria-label="Difficulty">
+      <button type="button" data-level="easy" aria-pressed="true">Easy</button>
+      <button type="button" data-level="medium" aria-pressed="false">Medium</button>
+      <button type="button" data-level="hard" aria-pressed="false">Hard</button>
+    </div>
+    <button type="button" id="go">Start</button>
+    <p id="note">The board is dealt when you start, so no time is lost thinking ahead.</p>
+  </section>
 
-  <div id="board" role="grid" aria-label="Sudoku board"></div>
-  <div id="pad" role="group" aria-label="Numbers"></div>
-  <div id="tools">
-    <button type="button" id="notes" aria-pressed="false">Notes</button>
-    <button type="button" id="erase">Erase</button>
-    <button type="button" id="new">New</button>
+  <div id="game" hidden>
+    <div id="board" role="grid" aria-label="Sudoku board"></div>
+    <div id="pad" role="group" aria-label="Numbers"></div>
+    <div id="tools">
+      <button type="button" id="notes" aria-pressed="false">Notes</button>
+      <button type="button" id="erase">Erase</button>
+      <button type="button" id="new">New</button>
+    </div>
+    <p id="status" role="status">Fill every row, column and box with 1–9.</p>
   </div>
-  <p id="status" role="status">Fill every row, column and box with 1–9.</p>
 </main>
 
 <script>
@@ -321,6 +364,10 @@ const padEl = document.getElementById('pad');
 const clockEl = document.getElementById('clock');
 const levelEl = document.getElementById('level');
 const statusEl = document.getElementById('status');
+const setupEl = document.getElementById('setup');
+const gameEl = document.getElementById('game');
+const hudEl = document.getElementById('hud');
+const goButton = document.getElementById('go');
 const notesButton = document.getElementById('notes');
 const levelButtons = [...document.querySelectorAll('#levels button')];
 const SEED_KEY = 'bored.sudoku.daily';
@@ -334,6 +381,7 @@ let givens = 0;
 let selected = 40;
 let notesMode = false;
 let won = false;
+let running = false;
 let startedAt = 0;
 let elapsed = 0;
 let dailyDeal = false;
@@ -472,8 +520,7 @@ function finish() {
 }
 
 function place(value) {
-  if (won || puzzle[selected]) return;
-  if (!startedAt) startedAt = Date.now();
+  if (!running || won || puzzle[selected]) return;
   if (notesMode) {
     if (values[selected]) return;
     if (notes[selected].has(value)) notes[selected].delete(value);
@@ -492,7 +539,7 @@ function place(value) {
 }
 
 function erase() {
-  if (won || puzzle[selected]) return;
+  if (!running || won || puzzle[selected]) return;
   values[selected] = 0;
   notes[selected].clear();
   render();
@@ -520,21 +567,62 @@ function deal(nextLevel) {
   notesMode = false;
   statusEl.classList.remove('done');
   statusEl.textContent = level[0].toUpperCase() + level.slice(1) + ' puzzle, ' + givens + ' givens.';
+}
+
+/* Nothing is dealt and no clock runs until Start: the setup screen is all a
+   player sees, so there is no board to read before the timer begins. */
+function startRound(nextLevel) {
+  deal(nextLevel);
+  running = true;
+  startedAt = Date.now();
+  setupEl.hidden = true;
+  gameEl.hidden = false;
+  hudEl.hidden = false;
   render();
 }
 
+function toSetup() {
+  running = false;
+  solution = new Int8Array(81);
+  puzzle = new Int8Array(81);
+  values = new Int8Array(81);
+  notes = Array.from({ length: 81 }, () => new Set());
+  givens = 0;
+  selected = 40;
+  won = false;
+  startedAt = 0;
+  elapsed = 0;
+  dailyDeal = false;
+  notesMode = false;
+  clockEl.textContent = '0:00';
+  levelEl.textContent = level;
+  statusEl.classList.remove('done');
+  gameEl.hidden = true;
+  hudEl.hidden = true;
+  setupEl.hidden = false;
+}
+
 levelButtons.forEach(button => {
-  button.addEventListener('click', () => deal(button.dataset.level));
+  button.addEventListener('click', () => {
+    level = button.dataset.level;
+    levelEl.textContent = level;
+    for (const other of levelButtons) {
+      other.setAttribute('aria-pressed', String(other.dataset.level === level));
+    }
+  });
 });
+
+goButton.addEventListener('click', () => startRound(level));
 
 notesButton.addEventListener('click', () => {
   notesMode = !notesMode;
   render();
 });
 document.getElementById('erase').addEventListener('click', erase);
-document.getElementById('new').addEventListener('click', () => deal(level));
+document.getElementById('new').addEventListener('click', toSetup);
 
 document.addEventListener('keydown', event => {
+  if (!running) return;
   const key = event.key;
   if (/^[1-9]$/.test(key)) { place(Number(key)); event.preventDefault(); return; }
   if (key === 'Backspace' || key === 'Delete' || key === '0') { erase(); event.preventDefault(); return; }
@@ -551,7 +639,7 @@ document.addEventListener('keydown', event => {
 });
 
 setInterval(() => {
-  if (!won) clockEl.textContent = clockText(secondsNow());
+  if (running && !won) clockEl.textContent = clockText(secondsNow());
 }, 250);
 
 /* The hub reads this: the current board, never null, integers only. */
@@ -570,7 +658,7 @@ window.__boredSnapshot = () => {
   };
 };
 
-deal('easy');
+toSetup();
 </script>
 </body>
 </html>

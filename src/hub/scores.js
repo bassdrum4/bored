@@ -90,8 +90,9 @@ const highScore = (id, name, unit, extra = {}) => ({
 export const HIGH_SCORE_GAMES = [
   // Sudoku ranks the clock, nothing else: whoever finishes a board fastest holds
   // the seat, whatever they picked on the selector — Easy is the default and we
-  // are not going to pretend difficulty levels are comparable. The clock starts
-  // on the first digit, so a board opened and left alone has no time at all.
+  // are not going to pretend difficulty levels are comparable. Nothing is dealt
+  // until Start, and the clock runs from the moment the board appears, so there
+  // is no reading time before the first digit.
   highScore('sudoku', 'Sudoku', 'seconds', {
     metric: 'seconds', lower: true, min: 20, max: 86400,
     when: snapshot => snapshot.won === true,

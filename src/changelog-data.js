@@ -2,13 +2,16 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 647,
+  "count": 651,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"b257781","date":"2026-11-19","author":"Codebuff","subject":"feat(sudoku): open on a setup screen and start the clock with the board"},
+  {"sha":"5eec4e3","date":"2026-11-19","author":"Codebuff","subject":"feat(analytics): three ways to read the overview"},
+  {"sha":"9aebd12","date":"2026-11-19","author":"Codebuff","subject":"feat(analytics): chart the Overview, and only advise on a real sample"},
   {"sha":"aacd3f3","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: blocked foes keep the red stop bar"},
   {"sha":"ced5e9f","date":"2026-11-19","author":"Codebuff","subject":"fix(hub): keep emoji and Unicode display names"},
   {"sha":"b812b97","date":"2026-11-19","author":"Codebuff","subject":"feat(scrabble): scale the board and its lettering up"},
@@ -17,6 +20,7 @@ export const CHANGELOG = [
   {"sha":"4536f2e","date":"2026-11-19","author":"Codebuff","subject":"fix(risk): deploy opening armies in alternating turns"},
   {"sha":"3f6b5c7","date":"2026-11-19","author":"Claude","subject":"Tests: the chapter count and the trophy groups grow with the Gym Challenge"},
   {"sha":"7363e4c","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: Gym Challenge in the page, the six new foes, held items, pull history, banner calendar, trophies, crowd spread"},
+  {"sha":"67cf80f","date":"2026-11-18","author":"Vettel Xu","subject":"Poké Gacha battles: shield marker, flyer route previews, airborne flyers, soft shadows, centred units","pr":262},
   {"sha":"21a7060","date":"2026-11-18","author":"Daniel Lowe","subject":"Expand Vettel auto-merge allowlist for Poké Gacha files"},
   {"sha":"c6d0ec8","date":"2026-11-18","author":"Vettel Xu","subject":"Gym Challenge: a steady climb, Cynthia's real team, items that never cost a win, a gentler Choice Band","pr":260},
   {"sha":"3933692","date":"2026-11-18","author":"Daniel Lowe","subject":"Update AGENTS.md with backend and push instructions"},
