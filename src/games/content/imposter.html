@@ -14,7 +14,8 @@
   meltdown, 30 s meetings, eight missions at their original trigger points.
   The art is that repo's ripped set (artwork is Innersloth's).
 
-  Network: PeerJS 1.5.5 from jsDelivr plus its public broker at 0.peerjs.com.
+  Network: PeerJS 1.5.5 vendored beside this file (imposter/peerjs.min.js, MIT),
+  using its public broker at 0.peerjs.com.
   The room host owns the rules and sends each player a snapshot with roles
   stripped. The host chair is not fixed: every snapshot names the next player in
   the ring, that player keeps a checkpoint, and if the host disappears it claims
@@ -185,7 +186,7 @@ select{padding:8px 10px;font-size:13px}
   .lever{width:48px;height:48px}
 }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="imposter/peerjs.min.js"></script>
 </head>
 <body>
 <main id="shell">

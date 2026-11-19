@@ -20,3 +20,7 @@ The rules are a port of that repo's Python (game.py, sprites.py, map.tmx):
 ship size, walk speed, wall rectangles, vent positions, the eight mission
 trigger points and their screens, kill/sabotage/meeting timers. The netcode,
 host election and room handling are this game's own.
+
+peerjs.min.js is PeerJS 1.5.5 (MIT), unmodified, from
+https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js. It is vendored so
+the game does not depend on a CDN being reachable from the arcade's origin.
