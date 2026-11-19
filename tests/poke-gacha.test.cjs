@@ -1381,9 +1381,9 @@ test('animation: sprites play their frame strips, blocked foes show the shield s
       if (at) T.deploy(b, slot, ...at); });
     for (const u of b.units) { u.hp = u.maxHp = 99999; u.atk = Math.max(1, Math.round(u.atk / 6)); } });
   await game.waitForFunction(() => { battle.fx.forEach(f => __kinds.add(f.kind)); return battle.b.enemies.some(e => e.blockedBy) && __kinds.has('num'); }, { timeout: 30000, polling: 50 });
-  const fx = await game.evaluate(() => ({ kinds: [...__kinds], marks: battle.marks.some(m => m.stop), times: Object.keys(FX_TIME), stop: [STOP_IMG.src.startsWith('data:image/png'), STOP_IMG.naturalWidth, STOP_IMG.naturalHeight, STOP_SCALE] }));
+  const fx = await game.evaluate(() => ({ kinds: [...__kinds], marks: battle.marks.some(m => m.stop), times: Object.keys(FX_TIME), stop: [STOP_IMG.src.startsWith('data:image/png'), STOP_IMG.naturalWidth, STOP_IMG.naturalHeight, STOP_SX, STOP_SY] }));
   assert.ok(fx.marks, 'the blocked foe is marked');
-  assert.deepEqual(fx.stop, [true, 6, 10, 2], 'the shield is an embedded 6x10 PNG drawn at a whole-number scale');
+  assert.deepEqual(fx.stop, [true, 6, 10, 1, 2], 'the shield is an embedded 6x10 PNG drawn 1x across, 2x tall');
   for (const k of ['slash', 'orb', 'ring', 'shot', 'heal', 'spark', 'knock']) assert.ok(fx.times.includes(k), k + ' has a duration');
   assert.ok(fx.kinds.some(k => ['slash', 'orb', 'shot'].includes(k)), 'an attack draws its effect: ' + fx.kinds);
   assert.deepEqual(errors, []);
