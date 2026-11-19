@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 655,
+  "count": 656,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"54cf9ad","date":"2026-11-19","author":"Codebuff","subject":"revert(analytics): drop the chart-first Overview"},
   {"sha":"bece3a4","date":"2026-11-19","author":"Vettel Xu","subject":"Poké Gacha: attacks hit with the chosen move's type","pr":266},
   {"sha":"b699819","date":"2026-11-19","author":"Vettel Xu","subject":"Poké Gacha: every hatch listed, Gen 6+ battle animations, units face their foes, score snapshot","pr":265},
   {"sha":"1825b01","date":"2026-11-19","author":"Codebuff","subject":"revert(analytics): put the Overview back to the chart-first view"},
