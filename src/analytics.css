@@ -1,7 +1,7 @@
 .analytics-page{max-width:1400px;margin:auto;padding:28px 24px}.analytics-header{display:flex;align-items:center;justify-content:space-between;gap:20px}.analytics-header h1{font-size:2rem;margin:18px 0}.analytics-filters{display:flex;flex-wrap:wrap;align-items:end;gap:12px;padding:20px 0;border-block:1px solid var(--line,#ccc)}.analytics-filters label{display:grid;gap:6px;font-size:.8rem}.analytics-filters input,.analytics-filters select{min-height:38px;max-width:240px;font:inherit;padding:6px;background:transparent;border:1px solid #aaa}.analytics-page button{font:inherit;cursor:pointer;padding:8px 12px;background:transparent;border:1px solid #aaa;border-radius:3px}.analytics-page button:disabled{opacity:.45;cursor:default}.analytics-note,.analytics-definitions{font-size:.8rem;line-height:1.6;color:#555}.analytics-totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:24px 0}.analytics-stat{border-top:2px solid #333;padding:10px 0}.analytics-stat strong{display:block;font-size:1.7rem}.analytics-stat span{font-size:.8rem}.analytics-tabs{display:flex;gap:10px;flex-wrap:wrap;border-bottom:1px solid #ccc;padding:0 0 18px;margin:30px 0}.analytics-tabs [aria-pressed=true]{background:#222;color:#fff}.analytics-charts{display:grid;grid-template-columns:1fr 1fr;gap:30px}.analytics-charts section:last-child{grid-column:1/-1}.analytics-page h2{font-size:1.1rem;margin-top:24px}.analytics-bar-row{display:grid;grid-template-columns:minmax(90px,150px) 1fr 75px;align-items:center;gap:10px;margin:9px 0;font-size:.8rem}.analytics-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.analytics-bar-track{background:#e5e0d7;height:15px}.analytics-bar{height:100%;background:#456653;min-width:0}.analytics-bar-value{text-align:right}.analytics-table-wrap{overflow:auto;max-width:100%;margin:15px 0}.analytics-page table{width:100%;border-collapse:collapse;font-size:.8rem;text-align:left;white-space:nowrap}.analytics-page th,.analytics-page td{border-bottom:1px solid #d5d0c5;padding:10px 12px}.analytics-page th{font-weight:600}.analytics-page table button{padding:3px 6px;text-align:left}.analytics-pagination{display:flex;align-items:center;gap:16px;margin:16px 0}.analytics-page pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.75rem;background:#ede9e0;padding:14px;max-height:500px;overflow:auto}.analytics-definitions{border-top:1px solid #ccc;margin-top:28px;padding:18px 0}.activity-notice{font-size:.8rem;margin-top:28px;line-height:1.6}.activity-notice p{max-width:750px}.analytics-page [hidden]{display:none!important}@media(max-width:650px){.analytics-page{padding:16px 12px}.analytics-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-charts{grid-template-columns:1fr}.analytics-header h1{font-size:1.6rem}.analytics-bar-row{grid-template-columns:100px 1fr 60px}.analytics-filters label{max-width:100%}.analytics-filters select{max-width:180px}}
 
-#hour-chart{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}
-@media(max-width:900px){#hour-chart{grid-template-columns:repeat(8,minmax(0,1fr))}}.analytics-hour{padding:8px 4px;border:1px solid var(--rule);text-align:center;font:11px/1.6 var(--mono)}.analytics-hour span,.analytics-hour strong{display:block}@media(max-width:650px){#hour-chart{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.analytics-hours{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}
+@media(max-width:900px){.analytics-hours{grid-template-columns:repeat(8,minmax(0,1fr))}}.analytics-hour{padding:8px 4px;border:1px solid var(--rule);text-align:center;font:11px/1.6 var(--mono)}.analytics-hour span,.analytics-hour strong{display:block}@media(max-width:650px){.analytics-hours{grid-template-columns:repeat(6,minmax(0,1fr))}}
 
 
 
@@ -26,12 +26,36 @@
 .announcement-admin-item .action{margin-top:8px}
 @media(max-width:650px){.announcement-form-row{grid-template-columns:1fr}.announcement-form{padding:12px}}
 
-/* Overview is chart-first: the reading list, then comparable meters, then
-   the same numbers as tables further down. Quiet chrome, one accent. */
+/* Overview: the same numbers as a written briefing, a sortable standings board,
+   or one card per game. Quiet chrome, one accent, nothing decorative that is
+   not data. */
 #totals .analytics-stat strong{font-size:1.3rem}
 #totals .analytics-stat span{font-size:.72rem}
-.analytics-insights{margin:26px 0 6px}
-.analytics-insight-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+.analytics-layouts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:22px 0 0}
+.analytics-layouts>span{font:10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#6b6558}
+.analytics-layouts button{font:12px/1 var(--mono);padding:7px 11px}
+.analytics-layouts [aria-pressed=true]{background:#222;color:#fff;border-color:#222}
+.analytics-panel{margin:26px 0;min-width:0}
+.analytics-panel h2{font-size:1.1rem;margin:0 0 4px}
+.analytics-panel>.analytics-note{margin:0 0 12px}
+.analytics-panel-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px;min-width:0}
+/* Half-width column: six hour cells per row, not twelve. */
+.analytics-panel-grid .analytics-hours{grid-template-columns:repeat(6,minmax(0,1fr))}
+.analytics-panel-grid>.analytics-panel{margin:0;min-width:0}
+.analytics-brief-lead{font:400 19px/1.5 var(--display);max-width:78ch;margin:0 0 16px}
+.analytics-ranked{list-style:none;margin:0;padding:0}
+.analytics-ranked-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:0 10px;padding:12px 0;
+  border-bottom:1px solid var(--rule)}
+.analytics-ranked-row:last-child{border-bottom:0}
+.analytics-ranked-body{min-width:0}
+.analytics-rank{font:11px var(--mono);color:#8f8b80;padding-top:2px}
+.analytics-ranked-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.analytics-ranked-head strong{font:600 15px/1.3 var(--display)}
+.analytics-ranked-head span{font:11px var(--mono);color:#6b6558}
+.analytics-ranked-bar{height:9px;background:#e5e0d7;margin:8px 0 6px}
+.analytics-ranked-fill{height:100%;background:#456653}
+.analytics-ranked-meta{margin:0;font:11px/1.6 var(--mono);color:#6b6558}
+.analytics-insight-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .analytics-insight{border:1px solid var(--rule);border-top:3px solid var(--ink);background:#fffdf7;padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0}
 .analytics-insight[data-tone=good]{border-top-color:#456653}
 .analytics-insight[data-tone=watch]{border-top-color:#b3261e}
@@ -41,7 +65,27 @@
 .analytics-insight-metric{font:15px/1 var(--mono);color:var(--ink)}
 .analytics-insight h3{font:400 16px/1.3 var(--display);margin:0}
 .analytics-insight p{margin:0;font-size:.8rem;line-height:1.5;color:#555}
-.analytics-wide{grid-column:1/-1}
+.analytics-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;min-width:0}
+.analytics-tile{border:1px solid var(--rule);background:#fffdf7;padding:12px 14px;display:grid;gap:8px;align-content:start;min-width:0}
+.analytics-tile-wide{grid-column:1/-1}
+.analytics-tile h2{font-size:1rem;margin:0}
+.analytics-tile>p{margin:0}
+.analytics-tile-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.analytics-tile-head strong{font:600 15px/1.3 var(--display)}
+.analytics-tile-head span{font:11px var(--mono);color:#6b6558}
+.analytics-tile dl{display:grid;grid-template-columns:1fr auto;gap:3px 10px;margin:0;font:11px/1.5 var(--mono);color:#6b6558}
+.analytics-tile dt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.analytics-tile dd{margin:0;color:var(--ink);text-align:right}
+.analytics-spark{display:block;width:100%;height:34px}
+.analytics-spark-line{fill:none;stroke:#456653;stroke-width:1.5;stroke-linejoin:round}
+.analytics-chartbox{min-width:0}
+.analytics-board-table .analytics-board-game{font-weight:600}
+.analytics-board-table th button{border:0;background:transparent;padding:0;font:inherit;cursor:pointer;
+  text-decoration:underline dotted;text-underline-offset:3px}
+.analytics-board-table th button:hover{color:#456653}
+.analytics-cell-barwrap{display:flex;align-items:center;gap:8px}
+.analytics-cell-bar{width:80px;height:6px;background:#e5e0d7}
+.analytics-cell-fill{height:100%;background:#456653}
 .analytics-love{border-bottom:1px solid var(--rule);padding:11px 0;min-width:0}
 .analytics-love:last-child{border-bottom:0}
 .analytics-love-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
@@ -66,12 +110,11 @@
 .analytics-bubble:hover{fill-opacity:.3}
 .analytics-bubble-label{font:10px var(--mono);fill:#33302a}
 .analytics-quadrant-label{font:9px var(--mono);letter-spacing:.1em;fill:#8f8b80}
-@media(max-width:900px){.analytics-insight-grid{grid-template-columns:1fr 1fr}.analytics-love-meters{grid-template-columns:1fr}}
-@media(max-width:760px){.analytics-charts{grid-template-columns:1fr}
-  /* A 760-unit scatter shrunk into 300px is four-pixel labels. Keep the drawing
-     at its real size and let each chart pan inside its own box. */
-  .analytics-charts>*,#quadrant-chart,#trend-chart{min-width:0}
-  #quadrant-chart,#trend-chart{overflow-x:auto}
-  #quadrant-chart .analytics-svg,#trend-chart .analytics-svg{min-width:700px}}
-@media(max-width:650px){.analytics-insight-grid{grid-template-columns:1fr}}
-@media(max-width:520px){#hour-chart{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:900px){.analytics-insight-grid,.analytics-tiles{grid-template-columns:1fr 1fr}
+  .analytics-love-meters{grid-template-columns:1fr}}
+@media(max-width:760px){.analytics-panel-grid{grid-template-columns:1fr}
+  /* A 700-unit drawing squashed into 300px is four-pixel labels: keep its real
+     width and let its own box pan, so the document itself never widens. */
+  .analytics-chartbox{overflow-x:auto}
+  .analytics-chartbox .analytics-svg{min-width:700px}}
+@media(max-width:650px){.analytics-insight-grid,.analytics-tiles{grid-template-columns:1fr}}

@@ -10,7 +10,7 @@ export function excludeAdmins(events, adminIds) {
 
 // Pure aggregation shared by the admin page and regression tests. No fixture data.
 export function summarizeEvents(events, handles = {}) {
-  const sessions = new Map(), days = new Map(), hours = new Map();
+  const sessions = new Map(), days = new Map(), hours = new Map(), gameDays = new Map();
   for (const event of events) {
     const key = event.session_id + ':' + (event.user_id || 'guest');
     if (!sessions.has(key)) sessions.set(key, { id: event.session_id, user: event.user_id, game: event.game,
@@ -33,6 +33,9 @@ export function summarizeEvents(events, handles = {}) {
       const bucket = map.get(id); bucket.active += event.active_ms; bucket.sessions.add(key);
       if (event.user_id) bucket.users.add(event.user_id);
     }
+    if (!gameDays.has(event.game)) gameDays.set(event.game, new Map());
+    const perDay = gameDays.get(event.game);
+    perDay.set(day, (perDay.get(day) || 0) + event.active_ms);
   }
   const list = [...sessions.values()].sort((a, b) => b.last.localeCompare(a.last));
   const groups = (keyFor) => {
@@ -56,6 +59,7 @@ export function summarizeEvents(events, handles = {}) {
     modes: groups(s => s.latest?.details?.daily ? 'Daily challenge' : 'Free play'),
     days: [...days.values()].sort((a, b) => a.id.localeCompare(b.id)),
     hours: Array.from({ length: 24 }, (_, hour) => hours.get(String(hour).padStart(2, '0')) || { id: String(hour).padStart(2, '0'), active: 0, users: new Set(), sessions: new Set() }),
+    gameDays: Object.fromEntries([...gameDays].map(([game, perDay]) => [game, Object.fromEntries(perDay)])),
     totals: { active: list.reduce((n, s) => n + s.active, 0), visible: list.reduce((n, s) => n + s.visible, 0),
       sessions: list.length, accounts: signed.length, repeatAccounts: signed.filter(p => p.days.size > 1).length,
       guests: list.filter(s => !s.user).length, errors: list.reduce((n, s) => n + s.errors, 0), completed: list.filter(s => s.completed).length }
