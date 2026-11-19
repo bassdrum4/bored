@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 667,
+  "count": 668,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"80bbf21","date":"2026-11-19","author":"Daniel Lowe","subject":"test: verify Bored Together enrollment disclosure without exact copy"},
   {"sha":"95744be","date":"2026-11-19","author":"Codebuff","subject":"Vendor PeerJS beside the game so the arcade origin can load it"},
   {"sha":"1eda060","date":"2026-11-19","author":"Codebuff","subject":"Port the clone's Python rules onto the Skeld and keep the p2p rooms"},
   {"sha":"37ee531","date":"2026-11-19","author":"Codebuff","subject":"Trackmania: rank the wall-free tracks on the clock and clear the trick careers"},
