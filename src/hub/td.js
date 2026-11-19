@@ -105,8 +105,8 @@ export const STAGES = [
     before: ['Grunt: Grimer, ooze all over them!', 'Flying enemies cut straight across the map. Put snipers near that line.'],
     after: ['Grunt: Ugh. Now I have to clean the pipe.'] },
   { id: '2-3', chapter: 2, name: 'Bug net', lives: 3, level: 2.3, map: ['##H##H##H#', 'S........#', '#H##H###.#', '#####H...G', '##########'],
-    waves: [[3, 48, 4, 2.5], [15, 21, 4, 2, 0, 1], [28, 48, 5, 2], [40, 21, 5, 1.8, 0, 1]],
-    before: ['Grunt: Venonat on the ground, Spearow in the air. Pick one!', 'Fire and Flying moves hit Bug hard. Rock and Electric hit Flying.'],
+    waves: [[3, 48, 4, 2.5], [15, 714, 4, 2, 0, 1], [28, 48, 5, 2], [40, 714, 5, 1.8, 0, 1]],
+    before: ['Grunt: Venonat on the ground, Noibat in the air. Pick one!', 'Fire and Flying moves hit Bug hard. Rock and Ice hit Noibat.'],
     after: ['Grunt: You were supposed to pick one.'] },
   { id: '2-4', chapter: 2, name: 'Two skies', lives: 3, level: 2.4, map: ['S....H####', '####.H##H#', '#H#H......', 'S.......#G', '####H#####'],
     waves: [[3, 23, 3, 3], [10, 42, 3, 3, 0, 1], [22, 23, 5, 2], [34, 42, 4, 2.5, 0, 1]],
@@ -159,20 +159,20 @@ export const STAGES = [
     before: ['Grunt: Vileplume in the garden, Onix in the rocks.', 'Fire and Flying burn Grass. Water and Grass wear down Rock.'],
     after: ['Grunt: My garden...'] },
   { id: '4-3', chapter: 4, name: 'Night market', lives: 3, level: 2.35, map: ['#H#H#H#H##', 'S........G', '#H##.#H#H#', '####H#####', '##########'],
-    waves: [[3, 23, 3, 3], [12, 198, 2, 3, 0, 1], [24, 75, 2, 4, 0, 0, 0, 1], [36, 24, 3, 3], [44, 198, 3, 3, 0, 1]],
-    before: ['Grunt: Murkrow steal from the sky. Arbok guard the stalls.', 'Snipers for the Murkrow, casters for the Graveler.'],
+    waves: [[3, 23, 3, 3], [12, 207, 2, 3, 0, 1], [24, 75, 2, 4, 0, 0, 0, 1], [36, 24, 3, 3], [44, 207, 3, 3, 0, 1]],
+    before: ['Grunt: Gligar glide in from the sky. Arbok guard the stalls.', 'Snipers for the Gligar, casters for the Graveler.'],
     after: ['Grunt: Closing time.'] },
   { id: '4-4', chapter: 4, name: 'Quarry', lives: 3, level: 2.95, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
     waves: [[3, 74, 3, 3, 0, 0, 0, 1], [12, 23, 4, 2.5], [24, 95, 2, 4, 0, 0, 0, 1], [36, 110, 2, 4, 0, 0, 1]],
     before: ['Ariana: Rock from both sides, and a Weezing for old times\' sake.', 'Two spawns. Armored mons on both, and a Weezing that explodes.'],
     after: ['Ariana: You are more stubborn than my Onix.'] },
   { id: '4-5', chapter: 4, name: 'Iron path', lives: 3, level: 1.95, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#G.......#', '####H#####'],
-    waves: [[3, 74, 3, 3.5, 0, 0, 0, 1], [14, 198, 3, 2.5, 0, 1], [26, 24, 4, 2.5], [38, 95, 3, 3, 0, 0, 0, 1], [48, 45, 3, 3]],
+    waves: [[3, 74, 3, 3.5, 0, 0, 0, 1], [14, 207, 3, 2.5, 0, 1], [26, 24, 4, 2.5], [38, 95, 3, 3, 0, 0, 0, 1], [48, 45, 3, 3]],
     before: ['Grunt: The long way round. Every step of it guarded.', 'A long path gives casters time to wear the armor down.'],
     after: ['Grunt: The admin is waiting at the end of the path.'] },
   { id: '4-6', chapter: 4, name: 'Ariana', boss: true, admin: true, lives: 3, level: 2.85,
     map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
-    waves: [[3, 74, 3, 3, 0, 0, 0, 1], [12, 198, 3, 2.5, 0, 1], [24, 45, 3, 3], [36, 95, 2, 4, 0, 0, 0, 1], [48, 24, 1, 1, 1, 0, 0, 1]],
+    waves: [[3, 74, 3, 3, 0, 0, 0, 1], [12, 207, 3, 2.5, 0, 1], [24, 45, 3, 3], [36, 95, 2, 4, 0, 0, 0, 1], [48, 24, 1, 1, 1, 0, 0, 1]],
     before: ['Ariana: You have beaten three admins. You will not beat the fourth.', 'Ariana: Arbok, wrap them up!', 'The boss Arbok has four times the HP and is armored: bring casters.'],
     after: ['Ariana: Impossible... Giovanni must hear of this.', 'Chapter 4 cleared. Only Archer and the boss himself remain.'] },
 
@@ -187,20 +187,20 @@ export const STAGES = [
     before: ['Grunt: Ponyta are the fastest thing on four legs.', 'Water and Ground douse Fire. Rock stands up to it.'],
     after: ['Grunt: They were supposed to win the race...'] },
   { id: '5-3', chapter: 5, name: 'Black wings', lives: 3, level: 3.1, map: ['##H##H##H#', 'S........#', '#H#H#H#H.#', '#........G', '####H#####'],
-    waves: [[3, 198, 3, 2.5, 0, 1], [14, 228, 4, 2, 0, 0, 0, 0, 1], [26, 198, 3, 2, 0, 1], [38, 215, 3, 2, 0, 0, 0, 0, 1]],
-    before: ['Grunt: Murkrow overhead, Houndour underfoot.', 'Snipers for the Murkrow. Fighting hits Dark hard.'],
+    waves: [[3, 207, 3, 2.5, 0, 1], [14, 228, 4, 2, 0, 0, 0, 0, 1], [26, 207, 3, 2, 0, 1], [38, 215, 3, 2, 0, 0, 0, 0, 1]],
+    before: ['Grunt: Gligar overhead, Houndour underfoot.', 'Snipers for the Gligar. Fighting hits Dark hard.'],
     after: ['Grunt: The flock scattered!'] },
   { id: '5-4', chapter: 5, name: 'Blackout', lives: 3, level: 2.8, map: ['S...H#####', '###.H##H##', '#H#......G', 'S.....H#.#', '#####H####'],
     waves: [[3, 109, 3, 3], [12, 101, 2, 3, 0, 0, 1, 0, 1], [24, 228, 4, 2, 0, 0, 0, 0, 1], [36, 101, 3, 2.5, 0, 0, 1, 0, 1]],
     before: ['Archer: The power plant is ours. Electrode, light them up.', 'Electrode are fast and they explode. Kill them before they reach a blocker.'],
     after: ['Archer: Lights out for my Electrode. Not for me.'] },
   { id: '5-5', chapter: 5, name: 'Two fires', lives: 3, level: 3.1, map: ['S...H#####', '###....H##', '#H#H#.....', 'S.....H#.G', '#####H####'],
-    waves: [[3, 58, 4, 2.5], [10, 228, 4, 2, 0, 0, 0, 0, 1], [22, 215, 3, 2, 0, 0, 0, 0, 1], [34, 78, 3, 2.5, 0, 0, 0, 0, 1], [46, 198, 3, 2, 0, 1]],
+    waves: [[3, 58, 4, 2.5], [10, 228, 4, 2, 0, 0, 0, 0, 1], [22, 215, 3, 2, 0, 0, 0, 0, 1], [34, 78, 3, 2.5, 0, 0, 0, 0, 1], [46, 207, 3, 2, 0, 1]],
     before: ['Grunt: Fire from the left, fire from the right!', 'Two spawns, fast waves on both. A vanguard buys time while the energy comes in.'],
     after: ['Grunt: Archer is going to be furious.'] },
   { id: '5-6', chapter: 5, name: 'Archer', boss: true, admin: true, lives: 3, level: 3.1,
     map: ['S...H#H###', '###.....H#', '#H#H.#H.##', 'S.....H..G', '####H#####'],
-    waves: [[3, 228, 4, 2, 0, 0, 0, 0, 1], [14, 198, 3, 2, 0, 1], [26, 101, 2, 3, 0, 0, 1, 0, 1], [38, 215, 3, 2, 0, 0, 0, 0, 1], [50, 229, 1, 1, 1]],
+    waves: [[3, 228, 4, 2, 0, 0, 0, 0, 1], [14, 207, 3, 2, 0, 1], [26, 101, 2, 3, 0, 0, 1, 0, 1], [38, 215, 3, 2, 0, 0, 0, 0, 1], [50, 229, 1, 1, 1]],
     before: ['Archer: I lead Team Rocket while Giovanni is away. You end here.', 'Archer: Houndoom, burn it all down!', 'The boss Houndoom has four times the HP. Fighting, Water, Ground and Rock hit it hard.'],
     after: ['Archer: Giovanni... forgive me.', 'Chapter 5 cleared. Giovanni is waiting at the hideout.'] },
 
@@ -246,29 +246,30 @@ export const STAGES = [
 export const GYMS = [
   // Species climb from gym to gym: basic forms at Brock's, final forms by Blaine's and Clair's.
   [7, 'G1', 'Brock', 'Pewter Gym', 'Kanto', 'Rock, Ground', 'shield', [74, 27, 50], [95, 111, 75], 95, 'sash'],
-  [8, 'G2', 'Bugsy', 'Azalea Gym', 'Johto', 'Bug', 'split', [10, 13, 48], [15, 49, 123], 123, 'lens'],
+  [8, 'G2', 'Bugsy', 'Azalea Gym', 'Johto', 'Bug', 'split', [10, 13, 48], [15, 49, 12], 637, 'lens'],
   [9, 'G3', 'Misty', 'Cerulean Gym', 'Kanto', 'Water', 'heal', [54, 118, 120], [55, 119, 90], 121, 'leftovers'],
   [10, 'G4', 'Lt. Surge', 'Vermilion Gym', 'Kanto', 'Electric, Steel', 'ranged', [100, 81, 25], [101, 82, 125], 26, 'claw'],
-  [11, 'G5', 'Winona', 'Fortree Gym', 'Hoenn', 'Flying, Normal, Steel', 'rally', [333, 276, 17], [277, 18, 227], 334, 'helmet'],
+  [11, 'G5', 'Winona', 'Fortree Gym', 'Hoenn', 'Flying, Normal, Steel', 'rally', [333, 714, 17], [42, 142, 375], 472, 'helmet'],
   [12, 'G6', 'Sabrina', 'Saffron Gym', 'Kanto', 'Psychic, Fairy', 'stealth', [64, 96, 281], [97, 122, 282], 65, 'band'],
   [13, 'G7', 'Blaine', 'Cinnabar Gym', 'Kanto', 'Fire', 'ranged', [58, 77, 126], [78, 38, 59], 467, 'belt'],
-  [14, 'G8', 'Clair', 'Blackthorn Gym', 'Johto', 'Dragon', 'rally', [147, 610, 704], [148, 334, 371], 230, 'bell']
+  [14, 'G8', 'Clair', 'Blackthorn Gym', 'Johto', 'Dragon', 'rally', [147, 610, 704], [148, 330, 371], 230, 'bell']
 ];
 // The Elite Four and the Champion: [id, name, types, traits, species, ace, item]. Their real teams.
 export const LEAGUE = [
   ['E1', 'Lorelei', 'Ice', ['heal', 'shield'], [87, 91, 124, 80], 131, 'leftovers'],
   ['E2', 'Bruno', 'Fighting', ['rally', 'split'], [67, 106, 107, 237], 68, 'band'],
   ['E3', 'Agatha', 'Ghost, Poison', ['stealth', 'split'], [93, 42, 24, 429], 94, 'sash'],
-  ['E4', 'Karen', 'Dark', ['ranged', 'stealth'], [197, 430, 461, 359], 229, 'lens'],
+  ['E4', 'Karen', 'Dark', ['ranged', 'stealth'], [197, 169, 461, 359], 229, 'lens'],
   // Cynthia's Sinnoh team: Spiritomb, Lucario, Togekiss, Roserade, Milotic, and Garchomp to finish.
   ['C1', 'Cynthia', 'Ghost, Dark, Fighting, Steel, Fairy, Flying, Grass, Water, Dragon, Ground', ['shield', 'ranged', 'heal', 'rally'], [442, 448, 468, 407, 350], 445, 'belt']
 ];
 // Which species fly (their waves cross straight to the goal, so only snipers hit them).
-const FLIES = new Set([16, 17, 18, 333, 334, 276, 277, 227, 42, 198, 430, 468, 176, 123, 212, 12, 49, 330]);
+// Each one has an airborne animation (wings or hovering), so it reads as flying.
+const FLIES = new Set([17, 333, 42, 468, 12, 49, 330, 714, 207, 637, 142, 375, 472, 169]);
 // [level, thinning, pacing, lives, map] by stage (applyGymTune). The level climbs a steady 0.045 a stage from
 // G1-1 to the Champion; the species do the rest. The other knobs were tuned so that, at each level, a
 // type-matched squad of commons wins at the recommended level, with every held item too, and the worst-typed loses.
-export const GYM_TUNE = { 'G1-1': [2.4, 0, 1, 3, -1], 'G1-2': [2.44, 0, 1, 3, -1], 'G1-3': [2.49, 0, 1, 3, -1], 'G1-4': [2.54, 0, 1, 3, -1], 'G2-1': [2.58, 0, 1, 3, 0], 'G2-2': [2.63, 0, 1, 3, -1], 'G2-3': [2.67, 1, 1, 3, -1], 'G2-4': [2.71, 0, 1, 3, -1], 'G3-1': [2.76, 0, 1, 3, -1], 'G3-2': [2.8, 0, 1, 3, -1], 'G3-3': [2.85, 2, 1, 3, -1], 'G3-4': [2.9, 0, 1, 3, -1], 'G4-1': [2.94, 0, 1, 3, -1], 'G4-2': [2.98, 0, 1, 3, -1], 'G4-3': [3.03, 0, 1, 3, -1], 'G4-4': [3.07, 0, 1, 3, -1], 'G5-1': [3.12, 0, 1, 3, -1], 'G5-2': [3.17, 0, 1, 3, -1], 'G5-3': [3.21, 2, 1, 5, -1], 'G5-4': [3.25, 1, 1, 4, -1], 'G6-1': [3.3, 1, 1, 3, -1], 'G6-2': [3.34, 3, 1, 3, -1], 'G6-3': [3.39, 2, 1, 3, -1], 'G6-4': [3.43, 2, 1, 3, -1], 'G7-1': [3.48, 1, 1, 3, -1], 'G7-2': [3.52, 2, 1, 3, -1], 'G7-3': [3.57, 2, 1, 3, -1], 'G7-4': [3.61, 3, 1, 3, -1], 'G8-1': [3.66, 1, 1.15, 3, 2], 'G8-2': [3.71, 1, 1, 3, 5], 'G8-3': [3.75, 1, 1.6, 5, 13], 'G8-4': [3.79, 0, 1.6, 5, 6], 'E1': [3.84, 3, 1.15, 4, 2], 'E2': [3.88, 2, 1.6, 4, 2], 'E3': [3.93, 2, 1, 3, -1], 'E4': [3.97, 3, 1, 3, -1], 'C1': [4.02, 3, 1.15, 5, 1] };
+export const GYM_TUNE = { 'G1-1': [2.4, 0, 1, 3, -1], 'G1-2': [2.44, 0, 1, 3, -1], 'G1-3': [2.49, 0, 1, 3, -1], 'G1-4': [2.54, 0, 1, 3, -1], 'G2-1': [2.58, 0, 1, 3, 0], 'G2-2': [2.63, 0, 1, 3, -1], 'G2-3': [2.67, 1, 1, 3, -1], 'G2-4': [2.71, 0, 1, 3, -1], 'G3-1': [2.76, 0, 1, 3, -1], 'G3-2': [2.8, 0, 1, 3, -1], 'G3-3': [2.85, 2, 1, 3, -1], 'G3-4': [2.9, 0, 1, 3, -1], 'G4-1': [2.94, 0, 1, 3, -1], 'G4-2': [2.98, 0, 1, 3, -1], 'G4-3': [3.03, 0, 1, 3, -1], 'G4-4': [3.07, 0, 1, 3, -1], 'G5-1': [3.12, 2, 1, 3, -1], 'G5-2': [3.17, 0, 1, 3, -1], 'G5-3': [3.21, 1, 1, 4, 3], 'G5-4': [3.25, 1, 1, 4, -1], 'G6-1': [3.3, 1, 1, 3, -1], 'G6-2': [3.34, 3, 1, 3, -1], 'G6-3': [3.39, 2, 1, 3, -1], 'G6-4': [3.43, 2, 1, 3, -1], 'G7-1': [3.48, 1, 1, 3, -1], 'G7-2': [3.52, 2, 1, 3, -1], 'G7-3': [3.57, 2, 1, 3, -1], 'G7-4': [3.61, 3, 1, 3, -1], 'G8-1': [3.66, 1, 1.15, 3, 2], 'G8-2': [3.71, 1, 1, 3, 5], 'G8-3': [3.75, 1, 1.6, 5, 13], 'G8-4': [3.79, 0, 1.6, 5, 6], 'E1': [3.84, 3, 1.15, 4, 2], 'E2': [3.88, 2, 1.6, 4, 2], 'E3': [3.93, 2, 1, 3, -1], 'E4': [3.97, 3, 1, 3, 0], 'C1': [4.02, 3, 1.15, 5, 1] };
 // Gyms use part 1's one-spawn maps (a gym has one door), in turn.
 const ONE_DOOR = STAGES.filter(st => st.map.join('').split('S').length === 2).map(st => st.map);
 function gymMaps(i) { return ONE_DOOR[(i * 5 + 2) % ONE_DOOR.length]; }

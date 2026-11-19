@@ -1,5 +1,15 @@
-# GIF -> one horizontal WebP strip per species (frames cropped to their union box), plus an index.
+# GIF -> one horizontal WebP strip per species (frames cropped to their union box), plus an index:
+# [frame w, h, frames, ms per frame, ax], ax being how far right of the strip's centre the body
+# sits (the median over frames of its opaque pixels' mean x), so the page can stand it on its tile.
 import json, os, sys, math
+
+def body_x(fr):
+    a = fr.getchannel('A'); w, h = a.size; px = a.load(); sx = n = 0
+    for y in range(h):
+        for x in range(w):
+            if px[x, y] > 40: sx += x; n += 1
+    return sx / n if n else w / 2
+
 from PIL import Image, ImageSequence
 src, out, cap = sys.argv[1], sys.argv[2], int(sys.argv[3])
 index = {}
@@ -20,6 +30,7 @@ for sub, key in [('front', ''), ('shiny', 's')]:
         for i, fr in enumerate(frames): strip.paste(fr.crop(box), (i * w, 0))
         name = key + str(n) + '.webp'
         strip.save(os.path.join(out, name), 'WEBP', lossless=True, method=6)
-        index[key + str(n)] = [w, h, len(frames), ms]
+        xs = sorted(body_x(fr.crop(box)) for fr in frames)
+        index[key + str(n)] = [w, h, len(frames), ms, round(xs[len(xs) // 2] - w / 2)]
 json.dump(index, open(os.path.join(out, 'index.json'), 'w'), separators=(',', ':'))
 print(len(index), 'strips')
