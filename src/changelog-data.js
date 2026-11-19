@@ -2,13 +2,15 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 640,
+  "count": 642,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"ced5e9f","date":"2026-11-19","author":"Codebuff","subject":"fix(hub): keep emoji and Unicode display names"},
+  {"sha":"b812b97","date":"2026-11-19","author":"Codebuff","subject":"feat(scrabble): scale the board and its lettering up"},
   {"sha":"4536f2e","date":"2026-11-19","author":"Codebuff","subject":"fix(risk): deploy opening armies in alternating turns"},
   {"sha":"3f6b5c7","date":"2026-11-19","author":"Claude","subject":"Tests: the chapter count and the trophy groups grow with the Gym Challenge"},
   {"sha":"7363e4c","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: Gym Challenge in the page, the six new foes, held items, pull history, banner calendar, trophies, crowd spread"},
