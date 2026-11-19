@@ -258,7 +258,7 @@
   "trackbound": {
     "label": "Career points",
     "better": "high",
-    "max_value": 1000000
+    "max_value": 65
   },
   "transit-chaos": {
     "label": "Passengers delivered",

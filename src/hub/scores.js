@@ -175,8 +175,15 @@ export const HIGH_SCORE_GAMES = [
   // Trackbound ranks the career, not one clock: every medal is worth points
   // (author 4, gold 3, silver 2, bronze 1), and only a finished run earns one,
   // so the board fills as the campaign falls rather than rewarding a single
-  // lucky lap on the shortest map.
-  highScore('trackbound', 'Trackmania', 'points', { metric: 'points', when: snapshot => snapshot.finished === true }),
+  // lucky lap on the shortest map. The wall-free tracks rank on the clock like
+  // the rest — their stunts pay in freeplay, not in the career — so medals are
+  // the ceiling: 15 tracks x 4. Sweeping all sixteen park rings once adds five,
+  // which makes 65 the whole board. Trick-earned totals above it are stale and
+  // are refused here rather than re-posted.
+  highScore('trackbound', 'Trackmania', 'points', {
+    metric: 'points', max: 65,
+    when: snapshot => snapshot.finished === true
+  }),
   highScore("transit-chaos", "Transit Chaos", "passengers", { metric: "delivered", when: snapshot => snapshot.finished === true }),
   // Compare completed races on the fixed Classic mountain at standard Mayhem difficulty.
   highScore('downhill-mayhem', 'Downhill Mayhem', 'seconds', {
@@ -475,7 +482,11 @@ export async function syncScores() {
     if (score <= 0 || (Number.isFinite(floor) && score < floor) ||
         (Number.isFinite(ceiling) && score > ceiling)) continue;
     const previous = Number(submitted[game.id]);
-    if (Number.isFinite(previous) && previous > 0 &&
+    // A cached confirmation above the board's ceiling cannot have come from the
+    // rule set in front of us (a ceiling lowered by a release, or a restored
+    // cloud value). Treat it as stale instead of letting it block every post.
+    const stalePrevious = Number.isFinite(ceiling) && Number.isFinite(previous) && previous > ceiling;
+    if (!stalePrevious && Number.isFinite(previous) && previous > 0 &&
         (game.lower ? score >= previous : score <= previous)) continue;
     if (getSession()?.user?.id !== session.user.id) return false;
     try {
