@@ -186,7 +186,18 @@ select{padding:8px 10px;font-size:13px}
   .lever{width:48px;height:48px}
 }
 </style>
-<script src="imposter/peerjs.min.js"></script>
+<!-- The hub drops this document into a srcdoc frame, where a relative address
+     resolves against the arcade root; opened on its own it sits beside the
+     vendored library instead. Writing the tag here, before the game script, keeps
+     the load synchronous so Peer exists by the time the menu checks for it. -->
+<script>
+(function () {
+  var base = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI) ? 'imposter/' : 'games/content/imposter/';
+  var tag = '<scr' + 'ipt src="' + new URL(base + 'peerjs.min.js', document.baseURI).href + '"><\/scr' + 'ipt>';
+  if (document.readyState === 'loading') document.write(tag);
+  else document.head.insertAdjacentHTML('beforeend', tag);
+})();
+</script>
 </head>
 <body>
 <main id="shell">
@@ -334,7 +345,7 @@ window.ImposterCore = (function () {
   /* ── the ship, in the Python's own coordinates ────────────────────────── */
 
   const WORLD = { w: 5792, h: 3168 };
-  const VIEW = { w: 1280, h: 640 };
+  const VIEW = { w: 1280, h: 640, zoom: 1.5 };
   const SPEED = 400;
   const PLAYER_W = 64;
   const PLAYER_H = 86;
@@ -2316,9 +2327,9 @@ window.ImposterNet = (function () {
     }
 
     // The Python drew 1280x640 of ship at a time and followed the player. Fit
-    // that whole view into the stage and let the extra space show more ship, so
-    // a tall panel is not zoomed into the floor tiles.
-    const scale = Math.min(width / C.VIEW.w, height / C.VIEW.h);
+    // that frame to the stage, then push in so the crew and the room read at a
+    // glance; the camera keeps the player centred and stops at the hull.
+    const scale = Math.min(width / C.VIEW.w, height / C.VIEW.h) * C.VIEW.zoom;
     viewW = width / scale;
     viewH = height / scale;
 
@@ -2892,7 +2903,7 @@ window.ImposterNet = (function () {
     const canvas = $('board');
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
-    const scale = Math.min(rect.width / C.VIEW.w, rect.height / C.VIEW.h);
+    const scale = Math.min(rect.width / C.VIEW.w, rect.height / C.VIEW.h) * C.VIEW.zoom;
     const viewW = rect.width / scale;
     const viewH = rect.height / scale;
     const me = snap?.players.find(player => player.id === selfId);
