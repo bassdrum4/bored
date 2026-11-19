@@ -1356,6 +1356,38 @@ test('crowds spread: each foe keeps one small drawing offset (±4 across, ±5 up
   assert.deepEqual(errors, []);
 });
 
+test('animation: sprites play their frame strips, blocked foes keep their stop bar, and attacks draw typed effects', async t => {
+  const { game, errors } = await openWithMons(t);
+  await game.waitForFunction(() => Object.keys(ANIM).length > 100, { timeout: 15000 });
+  await game.evaluate(() => { window.__animN = Number(Object.keys(ANIM).find(k => /^\d+$/.test(k) && ANIM[k][2] > 2)); spriteFor(__animN, 'normal'); });
+  await game.waitForFunction(() => spriteFor(__animN, 'normal').complete, { timeout: 15000 });
+  const strip = await game.evaluate(() => {
+    const n = __animN, img = spriteFor(n, 'normal'), meta = ANIM[n];
+    img.tick(0); const a = img.toDataURL(); img.tick(meta[3] * 1.5); const b = img.toDataURL();
+    const plain = spriteFor(n, 'sp-test-none');
+    return { animated: typeof img.tick === 'function', changes: a !== b, size: [img.width, img.height], meta, plain: !plain.tick,
+      ms: Object.values(ANIM).every(m => m[3] >= 80 && m[3] <= 300) };
+  });
+  assert.ok(strip.animated && strip.changes, 'frames advance with time');
+  assert.equal(strip.size[0], strip.meta[0]); assert.equal(strip.size[1], strip.meta[1]);
+  assert.ok(strip.plain, 'a look with no strip falls back to the still sprite');
+  assert.ok(strip.ms, 'frame times stay between 80 and 300 ms');
+  await ownMons(game, [95, 6, 65]);
+  await game.evaluate(() => { go('story'); storyAt = 0; setSquad([95, 6, 65]); startBattle(); battle.talk = []; battleTalk(); battle.paused = false;
+    const b = battle.b; b.energy = 99; window.__kinds = new Set();
+    const path = new Set(b.paths.flat().map(([x, y]) => Math.round(x) + ',' + Math.round(y)));
+    b.squad.forEach((u, slot) => { let at = null;
+      b.stage.map.forEach((row, y) => [...row].forEach((c, x) => { if (at || T.canDeploy(b, slot, x, y)) return;
+        if (u.ground ? path.has(x + ',' + y) && x > 4 : [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => path.has((x + dx) + ',' + (y + dy)))) at = [x, y]; }));
+      if (at) T.deploy(b, slot, ...at); });
+    for (const u of b.units) { u.hp = u.maxHp = 99999; u.atk = Math.max(1, Math.round(u.atk / 6)); } });
+  await game.waitForFunction(() => { battle.fx.forEach(f => __kinds.add(f.kind)); return battle.b.enemies.some(e => e.blockedBy) && __kinds.has('num'); }, { timeout: 30000, polling: 50 });
+  const fx = await game.evaluate(() => ({ kinds: [...__kinds], marks: battle.marks.some(m => m.stop), times: Object.keys(FX_TIME) }));
+  assert.ok(fx.marks, 'the blocked foe is marked');
+  for (const k of ['slash', 'orb', 'ring', 'shot', 'heal', 'spark', 'knock']) assert.ok(fx.times.includes(k), k + ' has a duration');
+  assert.ok(fx.kinds.some(k => ['slash', 'orb', 'shot'].includes(k)), 'an attack draws its effect: ' + fx.kinds);
+  assert.deepEqual(errors, []);
+});
 test('Squad by mouse: drag between slots swaps them, a roster card dragged onto a slot takes it, and that order deploys', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.evaluate(() => { go('story'); storyMode = 'squad'; sq.zone = 'grid'; sq.at = 0; rosterCache = null; setSquad(roster().list.slice(0, 3).map(u => u.num)); storyUpdate(); });

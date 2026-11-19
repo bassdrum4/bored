@@ -2549,10 +2549,27 @@ function storyKey(e) {
    gone, skills in b.log. From that come lunges, projectiles, hit flashes,
    floating numbers, death fades and skill bursts, all under 300ms. */
 const TW = 56, TH = 36, RAISE = 12, MX = 40, MY = 104, FIELD_H = 384;
-const FX_TIME = { lunge: 140, shot: 140, flash: 90, num: 300, fade: 250, burst: 220 };
+const FX_TIME = { lunge: 140, shot: 140, orb: 260, flash: 90, num: 300, fade: 250, burst: 220, ring: 240, slash: 170, heal: 420, spark: 160, knock: 120 };
 const spriteCache = {}, trimCache = {}, whiteCache = {};
+// Idle animations: PokéRogue's front sprites as frame strips (poke-gacha/anim/, scripts/gacha-anim.py).
+// A strip's battle sprite is a small canvas that shows the current frame; drawMon steps it.
+const ANIM_DIR = SPRITE_DIR.replace("pokedoku/sprites/", "poke-gacha/anim/");
+let ANIM = {};
+try { fetch(ANIM_DIR + "index.json").then(r => r.ok ? r.json() : {}).then(d => { ANIM = d && typeof d === "object" ? d : {}; }, () => {}); } catch {}
+function animSprite(num, look, meta) {
+  const [w, h, n, ms] = meta, c = document.createElement("canvas"), strip = new Image();
+  c.width = w; c.height = h; c.src = "anim:" + look + ":" + num; c.complete = false; c.naturalWidth = 0; c.naturalHeight = 0;
+  trimCache[c.src] = { l: 0, t: 0, r: w, b: h };
+  let shown = -1, phase = Math.floor(Math.random() * n);
+  strip.onload = () => { c.complete = true; c.naturalWidth = w; c.naturalHeight = h; c.tick(performance.now()); };
+  strip.src = ANIM_DIR + (look === "shiny" ? "s" : "") + num + ".webp";
+  c.tick = now => { if (!c.complete) return; const f = (Math.floor(now / ms) + phase) % n; if (f === shown) return; shown = f;
+    const g = c.getContext("2d"); g.clearRect(0, 0, w, h); g.drawImage(strip, f * w, 0, w, h, 0, 0, w, h); };
+  return c;
+}
 function spriteFor(num, look) {
-  const key = num + ":" + look;
+  const key = num + ":" + look, meta = (look === "normal" || look === "shiny") && ANIM[(look === "shiny" ? "s" : "") + num];
+  if (meta && !(spriteCache[key] && spriteCache[key].tick)) { spriteCache[key] = animSprite(num, look, meta); return spriteCache[key]; }
   if (!spriteCache[key]) { const img = new Image(); img.src = spriteUrl(num, look); spriteCache[key] = img; }
   return spriteCache[key];
 }
@@ -2616,7 +2633,7 @@ function stepWithFx(bt) {
   const attackers = b.units.filter(u => ub.has(u.id) && u.cd > ub.get(u.id).cd + 0.01);
   for (const u of b.units.filter(u => ub.has(u.id) && u.cd > ub.get(u.id).cd + 0.01 && u.cls === "medic")) {
     const healed = b.units.find(o => ub.has(o.id) && o.hp > ub.get(o.id).hp);
-    if (healed) bt.fx.push({ kind: "shot", from: pos(u), to: pos(healed), color: C.teal, t0: now });
+    if (healed) bt.fx.push({ kind: "heal", at: pos(healed), color: C.teal, t0: now });
   }
   // Enemies that lost HP (or died): a number, a flash, and who hit them.
   const hits = [];
@@ -2633,10 +2650,14 @@ function stepWithFx(bt) {
     const m = by ? T.typeMultiplier(by.types[0], h.e.types) : 1;
     bt.fx.push({ kind: "num", text: String(h.dmg), color: m > 1 ? C.gold : m < 1 ? C.dim : C.paper, at: stagger(bt, h.at, now), t0: now });
     sfx("hit", m > 1, 70);
-    bt.anim["e" + h.e.id] = { ...(bt.anim["e" + h.e.id] || {}), flash: now };
+    // The hit foe flashes and is knocked back a few pixels, away from whoever hit it.
+    bt.anim["e" + h.e.id] = { ...(bt.anim["e" + h.e.id] || {}), flash: now, knock: now, from: by ? pos(by) : null };
+    const tint = by ? TYPE_HEX[by.types[0]] || C.gold : C.gold;
     if (by && !bt.anim["u" + by.id + ":" + now]) {
-      if (by.ground) bt.anim["u" + by.id] = { ...(bt.anim["u" + by.id] || {}), lunge: now, toward: h.at };
-      else bt.fx.push({ kind: "shot", from: pos(by), to: h.at, color: by.cls === "caster" ? SHADE.red[2] : C.gold, t0: now });
+      // Melee: a lunge and a slash across the target. Snipers: a fast bolt. Casters: an orb, then a splash ring.
+      if (by.ground) { bt.anim["u" + by.id] = { ...(bt.anim["u" + by.id] || {}), lunge: now, toward: h.at }; bt.fx.push({ kind: "slash", at: h.at, color: tint, t0: now, flip: h.at[0] < pos(by)[0] }); }
+      else if (by.cls === "caster") { bt.fx.push({ kind: "orb", from: pos(by), to: h.at, color: tint, t0: now }); bt.fx.push({ kind: "ring", at: h.at, color: tint, t0: now + FX_TIME.orb }); }
+      else bt.fx.push({ kind: "shot", from: pos(by), to: h.at, color: tint, t0: now });
       bt.anim["u" + by.id + ":" + now] = true;
     }
     if (h.gone) bt.ghosts.push({ img: spriteFor(h.e.num, "normal"), at: h.at, flip: facesRight(h.e), flying: h.e.flying, t0: now });
@@ -2651,7 +2672,8 @@ function stepWithFx(bt) {
       continue;
     }
     const d = Math.round(after.hp - before.hp);
-    if (d < 0) { bt.fx.push({ kind: "num", text: String(-d), color: C.red, at: stagger(bt, pos(after), now), t0: now }); bt.anim["u" + id] = { ...(bt.anim["u" + id] || {}), flash: now }; }
+    if (d < 0) { bt.fx.push({ kind: "num", text: String(-d), color: C.red, at: stagger(bt, pos(after), now), t0: now }); bt.anim["u" + id] = { ...(bt.anim["u" + id] || {}), flash: now };
+      bt.fx.push({ kind: "spark", at: pos(after), color: C.paper, t0: now }); }
     if (d > 0) bt.fx.push({ kind: "num", text: "+" + d, color: C.teal, at: stagger(bt, pos(after), now), t0: now });
   }
   // Enemies that struck their blocker lunge at it.
@@ -3032,6 +3054,11 @@ function drawField(now = performance.now()) {
     const { o, unit, at } = t;
     const a = bt.anim[(unit ? "u" : "e") + o.id] || {};
     let [cx, cy] = at;
+    // A knock: a hit foe is pushed back a few pixels, away from whoever hit it, and settles.
+    if (a.knock && now - a.knock < FX_TIME.knock && a.from) {
+      const p = 1 - (now - a.knock) / FX_TIME.knock, d = Math.hypot(cx - a.from[0], cy - a.from[1]) || 1;
+      cx += (cx - a.from[0]) / d * 3 * p; cy += (cy - a.from[1]) / d * 2 * p;
+    }
     // A lunge: a few pixels toward the target, there and back.
     if (a.lunge && now - a.lunge < FX_TIME.lunge && a.toward) {
       const p = Math.sin((now - a.lunge) / FX_TIME.lunge * Math.PI) * 6, d = Math.hypot(a.toward[0] - cx, a.toward[1] - cy) || 1;
@@ -3107,12 +3134,34 @@ function drawField(now = performance.now()) {
   // The dragged card's mon, at the cursor.
   if (bt.drag && bt.drag.at && card) drawMon(g, spriteFor(card.num, card.look), bt.drag.at[0], bt.drag.at[1] + 16, { alpha: 0.7 });
   // Effects: projectiles, bursts and numbers.
-  bt.fx = bt.fx.filter(f => now - f.t0 < (f.kind === "num" ? FX_TIME.num : f.kind === "burst" ? FX_TIME.burst : FX_TIME.shot));
+  bt.fx = bt.fx.filter(f => now - f.t0 < (FX_TIME[f.kind] || FX_TIME.shot));
+  const dot = (x, y, r, c) => { g.fillStyle = C.ink; g.fillRect(Math.round(x) - r - 1, Math.round(y) - r - 1, 2 * r + 2, 2 * r + 2); g.fillStyle = c; g.fillRect(Math.round(x) - r, Math.round(y) - r, 2 * r, 2 * r); };
   for (const f of bt.fx) {
-    const p = (now - f.t0) / (f.kind === "num" ? FX_TIME.num : f.kind === "burst" ? FX_TIME.burst : FX_TIME.shot);
-    if (f.kind === "shot") {
-      const x = f.from[0] + (f.to[0] - f.from[0]) * p, y = f.from[1] - 20 + (f.to[1] - 20 - (f.from[1] - 20)) * p;
-      g.fillStyle = C.ink; g.fillRect(Math.round(x) - 3, Math.round(y) - 3, 6, 6); g.fillStyle = f.color; g.fillRect(Math.round(x) - 2, Math.round(y) - 2, 4, 4);
+    if (now < f.t0) continue;
+    const p = (now - f.t0) / (FX_TIME[f.kind] || FX_TIME.shot);
+    if (f.kind === "shot" || f.kind === "orb") {
+      // A bolt flies straight with a short trail; an orb arcs over and grows as it lands.
+      const at = q => { const x = f.from[0] + (f.to[0] - f.from[0]) * q, y = f.from[1] - 20 + (f.to[1] - f.from[1]) * q - (f.kind === "orb" ? Math.sin(q * Math.PI) * 18 : 0); return [x, y]; };
+      for (const [k, r] of f.kind === "orb" ? [[0.16, 1], [0.08, 2]] : [[0.2, 1], [0.1, 1]]) { const [x, y] = at(Math.max(0, p - k)); g.globalAlpha = 0.6; dot(x, y, r, f.color); g.globalAlpha = 1; }
+      const [x, y] = at(p); dot(x, y, f.kind === "orb" ? 3 + Math.round(p) : 2, f.color);
+    } else if (f.kind === "ring") {
+      const r = 6 + p * 18; g.globalAlpha = 1 - p; g.fillStyle = f.color;
+      for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; g.fillRect(Math.round(f.at[0] + Math.cos(a) * r) - 1, Math.round(f.at[1] - 16 + Math.sin(a) * r * 0.5) - 1, 3, 2); }
+      g.globalAlpha = 1;
+    } else if (f.kind === "slash") {
+      // Three short strokes sweeping down across the target.
+      const s_ = f.flip ? -1 : 1; g.fillStyle = f.color; g.globalAlpha = p < 0.7 ? 1 : (1 - p) / 0.3;
+      for (let k = 0; k < 5; k++) { const q = Math.min(1, p * 1.6) * (k + 1) / 5; g.fillRect(Math.round(f.at[0] - s_ * 12 + s_ * q * 24) - 1, Math.round(f.at[1] - 36 + q * 22), 3, 3); }
+      g.globalAlpha = 1;
+    } else if (f.kind === "heal") {
+      g.globalAlpha = 1 - p;
+      for (const [dx, d0] of [[-8, 0], [6, 0.25], [0, 0.5]]) { const y = f.at[1] - 20 - (p + d0) % 1 * 26; g.fillStyle = C.ink; g.fillRect(f.at[0] + dx - 2, y - 3, 5, 7); g.fillRect(f.at[0] + dx - 3, y - 2, 7, 5);
+        g.fillStyle = f.color; g.fillRect(f.at[0] + dx - 1, y - 2, 3, 5); g.fillRect(f.at[0] + dx - 2, y - 1, 5, 3); }
+      g.globalAlpha = 1;
+    } else if (f.kind === "spark") {
+      g.fillStyle = f.color; g.globalAlpha = 1 - p;
+      for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + k * Math.PI / 2, r = 4 + p * 8; g.fillRect(Math.round(f.at[0] + Math.cos(a) * r) - 1, Math.round(f.at[1] - 22 + Math.sin(a) * r) - 1, 2, 2); }
+      g.globalAlpha = 1;
     } else if (f.kind === "burst") {
       const r = 6 + p * 22; g.fillStyle = C.gold;
       for (let k = 0; k < 8; k++) { const ang = k * Math.PI / 4; g.fillRect(Math.round(f.at[0] + Math.cos(ang) * r) - 1, Math.round(f.at[1] - 24 + Math.sin(ang) * r * 0.6) - 1, 3, 3); }
@@ -3141,6 +3190,7 @@ const fitOf = tr => Math.min(1, FIT_H / (tr.b - tr.t), FIT_W / (tr.r - tr.l));
 // Draw a sprite with its feet at (cx, by); returns the top of the Pokémon, for its HP bar.
 function drawMon(g, img, cx, by, { flip = false, alpha = 1, white = false, maxH = FIT_H } = {}) {
   lastRect = null;
+  if (img.tick) img.tick(performance.now());
   if (!img.complete || !img.naturalWidth) return Math.round(by) - 40;
   const tr = trimOf(img) || { l: 0, t: 0, r: img.naturalWidth, b: img.naturalHeight };
   const k = Math.min(fitOf(tr), maxH / (tr.b - tr.t)), w = Math.round((tr.r - tr.l) * k), h = Math.round((tr.b - tr.t) * k);

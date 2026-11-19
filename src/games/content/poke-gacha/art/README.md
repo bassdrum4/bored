@@ -16,3 +16,17 @@ The upload's 132×142 "big" eggs are stretched copies of the small ones, so they
 not used: the page scales the originals by whole numbers instead. The
 500×609 machine is the 106×129 drawing stretched about 4.72x; the script takes each
 native pixel back as the most common colour in its cell.
+
+## Battle animations (`../anim/`)
+
+`anim/<num>.webp` and `anim/s<num>.webp` (shiny) are PokéRogue's animated front sprites,
+turned from GIFs into one horizontal strip of frames each by `scripts/gacha-anim.py`
+(`python3 -I scripts/gacha-anim.py <gif dir> <out dir> 24`). A canvas only ever shows a
+GIF's first frame, so the page draws one cell of the strip per tick instead. Every strip
+is cropped to the box all of its frames share, so the feet stay put from frame to frame.
+`anim/index.json` maps `"<num>"` / `"s<num>"` to `[frame width, height, frames, ms per frame]`;
+frame times are clamped to 80–300 ms. Species or looks without a strip (SP skins, forms)
+use the still sprite as before.
+
+Sprites are PokéRogue's (pagefaultgames/pokerogue), from Pokémon by Nintendo / Game Freak;
+they are not ours to license.
