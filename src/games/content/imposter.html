@@ -18,81 +18,145 @@
   the host disappears it claims the room's peer id and carries on. The public
   room lives at a fixed peer id, so the same election is what keeps it "always
   open" when the current host closes the tab.
+
+  Front end: the screens, the starfield, the crew frames, the vent grate, the
+  meeting screen, the lobby art, the HUD icons and the display font come from
+  arizkhalid/among-us-clone (MIT, http://github.com/arizkhalid/among-us-clone);
+  the copies sit in imposter/ with that licence, unmodified. The ship map, the
+  tasks, the vents and the netcode are this game's own.
 -->
 <style>
 :root{
-  --paper:#f5f2ea; --ink:#191713; --dim:#6b6558; --rule:#d8d2c4; --red:#b3261e;
-  --surface:#fffdf7; --sunk:#eee9de;
+  --paper:#070b16; --ink:#ffffff; --dim:#9db0cf; --rule:rgba(255,255,255,.16);
+  --red:#e94560; --green:#4ce0a5; --gold:#ffd700;
+  --surface:rgba(255,255,255,.08); --sunk:rgba(10,20,38,.9);
   --mono:ui-monospace,"Cascadia Mono",Consolas,"Courier New",monospace;
-  --display:Georgia,"Times New Roman",serif;
-  color-scheme:light;
-}
-@media (prefers-color-scheme:dark){
-  :root{--paper:#17150f;--ink:#ece6d8;--dim:#a39b8a;--rule:#37322a;--red:#d97a6b;
-    --surface:#1e1b15;--sunk:#1a1712;color-scheme:dark}
+  --display:"AmongUs","Trebuchet MS",Arial,sans-serif;
+  --space:none; --meeting-art:none; --lobby-art:none;
+  color-scheme:dark;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
-body{background:var(--paper);color:var(--ink);font:14px/1.45 var(--mono);
-  -webkit-font-smoothing:antialiased;overflow:hidden}
-#shell{height:100%;max-width:620px;margin:0 auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-header{display:flex;align-items:center;justify-content:space-between;gap:10px;
-  border-bottom:1px solid var(--rule);padding-bottom:7px;flex:0 0 auto}
-h1{font:600 17px/1.1 var(--display);letter-spacing:-.01em}
-h2{font:600 17px/1.2 var(--display);margin-bottom:8px}
-#screens{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
-.screen{display:flex;flex-direction:column;gap:8px;padding-bottom:10px}
-.mono{font-family:var(--mono)}
-.dim{color:var(--dim)}
-.small{font-size:11px;line-height:1.6}
-.bad{color:var(--red)}
-.rule{border:0;border-top:1px solid var(--rule);margin:2px 0}
-.field{display:flex;flex-direction:column;gap:4px;font-size:10px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--dim)}
-input,select{font:13px var(--mono);color:var(--ink);background:var(--surface);
-  border:1px solid var(--rule);border-radius:2px;padding:8px 9px;min-width:0}
-input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
-button{font:11.5px var(--mono);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;
-  color:var(--ink);background:var(--surface);border:1px solid var(--ink);border-radius:2px;
-  padding:9px 13px;white-space:nowrap;touch-action:manipulation}
-button:hover:not(:disabled){background:var(--sunk)}
+body{background:#000 var(--space) center/cover no-repeat;color:var(--ink);
+  font:15px/1.5 Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+body::before{content:"";position:fixed;inset:0;background:rgba(3,7,15,.38);pointer-events:none}
+#shell{position:relative;height:100%;max-width:1040px;margin:0 auto;padding:10px 12px 12px;
+  display:flex;flex-direction:column;gap:10px}
+header{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+h1{font:400 24px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;color:#fff;
+  text-shadow:0 0 18px rgba(76,224,165,.45)}
+h2{font:400 28px/1.15 var(--display);letter-spacing:.06em}
+.room-tag{margin-left:auto;padding:7px 14px;border-radius:999px;background:rgba(22,33,62,.85);
+  border:1px solid rgba(76,224,165,.35);color:var(--green);font:13px/1 var(--mono);letter-spacing:.08em}
+#screens{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.screen{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;
+  padding:4px;overflow:auto;overscroll-behavior:contain}
+.card{width:min(460px,100%);display:flex;flex-direction:column;gap:12px;padding:26px;
+  border-radius:20px;background:rgba(255,255,255,.08);backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.18);
+  box-shadow:0 12px 42px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.15);text-align:center}
+.brand{font-family:var(--display);font-size:42px;line-height:.95;letter-spacing:.12em;color:#fff;
+  text-transform:uppercase;text-shadow:0 0 26px rgba(76,224,165,.4),0 3px 0 rgba(0,0,0,.5)}
+.tagline{color:var(--dim);font-size:12.5px}
+.field{display:flex;flex-direction:column;gap:6px;text-align:left;font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.7)}
+input,select{width:100%;padding:12px 14px;border-radius:10px;border:1px solid rgba(76,224,165,.4);
+  background:rgba(255,255,255,.08);color:#fff;font:15px var(--mono);text-align:center;outline:none}
+input::placeholder{color:rgba(255,255,255,.45)}
+input:focus-visible,select:focus-visible{border-color:var(--green);box-shadow:0 0 16px rgba(76,224,165,.35)}
+select{text-align:left;padding:9px 10px;font-size:13px}
+button{font:600 14px/1 var(--display);letter-spacing:.09em;text-transform:uppercase;cursor:pointer;
+  color:#fff;background:rgba(76,224,165,.24);border:1px solid rgba(76,224,165,.55);
+  border-radius:11px;padding:12px 18px;white-space:nowrap;touch-action:manipulation;
+  transition:background .18s ease,transform .18s ease,box-shadow .18s ease}
+button:hover:not(:disabled){background:rgba(76,224,165,.38);border-color:var(--green);
+  transform:translateY(-2px);box-shadow:0 6px 20px rgba(76,224,165,.28)}
+button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 button:disabled{opacity:.45;cursor:default}
-button.go{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-button.go:hover:not(:disabled){background:var(--dim);border-color:var(--dim)}
-button.danger{background:var(--red);border-color:var(--red);color:var(--paper)}
-button.ghost{border-color:var(--rule);background:none;color:var(--dim);padding:6px 9px;font-size:10.5px}
-.join-row{display:flex;gap:6px}
-.join-row input{flex:1;text-transform:uppercase;letter-spacing:.28em;font-size:15px;padding:7px 10px}
-.code-row{display:flex;align-items:baseline;gap:10px}
-.code{font:22px/1 var(--mono);letter-spacing:.3em;padding-left:.05em;border-bottom:1px solid var(--ink)}
-.code.public{letter-spacing:.16em;font-size:16px;border-bottom-style:dotted}
-.row{display:flex;gap:6px;flex-wrap:wrap}
-.roster{list-style:none;display:flex;flex-direction:column;border-top:1px solid var(--rule)}
-.roster li{display:flex;align-items:center;gap:8px;padding:7px 1px;border-bottom:1px solid var(--rule);font-size:12.5px}
-.row-item .dot{width:10px;height:10px;border-radius:50%;border:1px solid var(--ink);flex:0 0 auto}
-.row-item .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row-item .tail{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
-.row-item .vote{padding:4px 10px;font-size:10px}
+button.primary{background:rgba(233,69,96,.3);border-color:rgba(233,69,96,.6);font-size:16px;padding:14px 18px}
+button.primary:hover:not(:disabled){background:rgba(233,69,96,.5);border-color:var(--red);
+  box-shadow:0 6px 22px rgba(233,69,96,.35)}
+button.danger{background:var(--red);border-color:var(--red);font-size:12px;padding:9px 13px}
+button.danger:hover:not(:disabled){background:#f0576f;box-shadow:0 6px 20px rgba(233,69,96,.4)}
+button.ghost{background:rgba(255,255,255,.06);border-color:var(--rule);color:var(--dim);
+  font-size:12px;padding:8px 12px}
+.hint{color:var(--dim);font-size:11.5px;line-height:1.55}
+.status{font-size:11.5px;color:var(--dim)}
+.status.bad{color:#ff8b9b}
+.or{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.4);font-size:10px;
+  letter-spacing:.2em;text-transform:uppercase}
+.or::before,.or::after{content:"";flex:1;height:1px;background:rgba(255,255,255,.16)}
+.join-row{display:flex;gap:8px}
+.join-row input{flex:1;text-transform:uppercase;letter-spacing:.3em;font-size:16px}
+.join-row button{flex:0 0 auto}
+.lobby-card{width:min(500px,100%);align-items:stretch}
+.code-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.code{font:700 26px/1 var(--mono);letter-spacing:.32em;padding-left:.1em;color:var(--green);
+  text-shadow:0 0 16px rgba(76,224,165,.45)}
+.code.public{letter-spacing:.14em;font-size:20px;color:var(--gold);text-shadow:0 0 16px rgba(255,215,0,.35)}
+.lobby-art{height:88px;border-radius:12px;border:1px solid rgba(255,255,255,.14);
+  background:#0a1222 var(--lobby-art) center/cover no-repeat}
+.roster{list-style:none;display:flex;flex-direction:column;gap:7px;text-align:left}
+.roster li{display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:10px;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:13.5px}
+.roster .dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;
+  border:2px solid rgba(255,255,255,.5);box-shadow:0 0 10px rgba(0,0,0,.5)}
+.roster .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.roster .tail{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.roster .vote{padding:6px 12px;font-size:11px}
 .row-item.is-impostor .tail{color:var(--red)}
-.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
-.settings label{display:flex;flex-direction:column;gap:4px;font-size:10px;letter-spacing:.06em;
-  text-transform:uppercase;color:var(--dim)}
-#screen-game{display:flex;flex-direction:column;gap:6px;height:100%;padding-bottom:6px}
-#hud{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);
-  border-bottom:1px solid var(--rule);padding-bottom:5px;flex:0 0 auto}
-#hud b{color:var(--ink);font-weight:600}
-.stage{position:relative;flex:1 1 auto;min-height:120px;border:1px solid var(--rule);background:var(--sunk);overflow:hidden}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;text-align:left}
+.settings label{display:flex;flex-direction:column;gap:5px;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:rgba(255,255,255,.65)}
+#screen-game{align-items:center;justify-content:center;position:relative;gap:0;padding:0}
+.game-wrap{width:100%;display:flex;flex-direction:column;align-items:stretch;gap:8px;
+  max-width:calc((100vh - 116px) * 520 / 360);max-width:calc((100dvh - 116px) * 520 / 360)}
+#hud{position:static;align-self:flex-start;display:inline-flex;flex-wrap:wrap;gap:8px;
+  max-width:100%;padding:7px 12px;border-radius:999px;background:rgba(6,11,22,.75);
+  border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(6px);
+  font:11px/1.2 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+#hud b{color:var(--gold);font-weight:600}
+.stage{position:relative;flex:0 0 auto;width:100%;aspect-ratio:520 / 360;min-height:0;
+  border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.14);
+  background:#05090f var(--space) center/cover no-repeat;box-shadow:inset 0 0 60px rgba(0,0,0,.7)}
 .stage canvas{display:block;width:100%;height:100%;touch-action:none}
-.actions{display:flex;gap:6px;flex-wrap:wrap;flex:0 0 auto}
-.actions button{padding:8px 11px}
-.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-start;justify-content:center;
-  padding:14px;background:rgba(20,18,14,.6);overflow:auto}
-.panel{width:100%;max-width:400px;background:var(--paper);border:1px solid var(--ink);padding:16px}
-.eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
-.timer{font-size:18px;margin:4px 0 10px}
-#toast{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:60;background:var(--ink);
-  color:var(--paper);padding:7px 12px;border-radius:2px;max-width:88vw;text-align:center;font-size:11.5px}
+.actions{position:absolute;right:10px;bottom:10px;z-index:6;display:flex;gap:10px;flex-wrap:wrap;
+  justify-content:flex-end}
+.actions button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  width:66px;height:66px;padding:0;border-radius:50%;background:rgba(6,11,22,.8);
+  border:2px solid rgba(76,224,165,.5)}
+.actions button img{width:34px;height:34px;object-fit:contain;pointer-events:none}
+.actions button span{font:9px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:#fff}
+.actions #act-kill,.actions #act-button{border-color:rgba(233,69,96,.7);background:rgba(90,10,24,.78)}
+.actions #act-report{border-color:rgba(255,215,0,.6)}
+.actions #act-button span{color:var(--gold)}
+.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;
+  padding:16px;background:rgba(3,7,15,.82);overflow:auto}
+.panel{width:min(430px,100%);display:flex;flex-direction:column;gap:12px;padding:24px;
+  border-radius:18px;background:rgba(255,255,255,.08);backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.18);box-shadow:0 18px 50px rgba(0,0,0,.55)}
+.eyebrow{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--green)}
+.timer{font:700 22px/1 var(--mono);color:var(--gold);text-align:center}
+.meeting-panel{width:min(560px,100%);padding:30px 34px;display:flex;flex-direction:column;gap:10px;
+  border-radius:20px;border:1px solid rgba(255,255,255,.22);
+  background:linear-gradient(rgba(6,11,22,.74),rgba(6,11,22,.84)),
+    var(--meeting-art) center/100% 100% no-repeat,#0b1424;
+  box-shadow:0 26px 70px rgba(0,0,0,.65)}
+.meeting-title{font-family:var(--display);font-size:30px;letter-spacing:.1em;text-align:center;
+  text-transform:uppercase;text-shadow:0 0 20px rgba(0,0,0,.6)}
+.meeting-note{text-align:center;color:var(--dim);font-size:12px}
+#toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;
+  background:rgba(233,69,96,.92);color:#fff;padding:9px 15px;border-radius:10px;
+  font-size:12.5px;box-shadow:0 10px 30px rgba(0,0,0,.45);max-width:88vw;text-align:center}
 [hidden]{display:none!important}
+@media (max-width:520px){
+  .card{padding:20px}
+  .brand{font-size:34px}
+  .actions button{width:56px;height:56px}
+  .actions button img{width:28px;height:28px}
+  .meeting-panel{padding:22px 18px}
+  .meeting-title{font-size:22px}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
 </head>
@@ -100,96 +164,102 @@ button.ghost{border-color:var(--rule);background:none;color:var(--dim);padding:6
 <main id="shell">
   <header>
     <h1>Imposter</h1>
-    <button id="leave" class="ghost" type="button" hidden>Leave</button>
+    <span id="room-tag" class="room-tag" hidden></span>
+    <button id="leave" class="danger" type="button" hidden>Leave</button>
   </header>
 
   <div id="screens">
     <section id="screen-menu" class="screen">
-      <label class="field">Name
-        <input id="name" maxlength="12" autocomplete="nickname" placeholder="Crewmate">
-      </label>
+      <div class="card">
+        <p class="brand">Imposter</p>
+        <p class="tagline">Fix the ship, find the impostor. Three players start a round, and anyone can walk in mid-round.</p>
 
-      <button id="public-join" class="go" type="button">Join the public room</button>
-      <p class="mono dim small">One room, always open. It starts as soon as three are in and people who
-        arrive mid-round join straight away.</p>
+        <label class="field">Your name
+          <input id="name" maxlength="12" autocomplete="nickname" placeholder="Crewmate">
+        </label>
 
-      <hr class="rule">
+        <button id="public-join" class="primary" type="button">Join the public room</button>
+        <p class="hint">One room, always open. It starts as soon as three are in, and late arrivals play straight away.</p>
 
-      <button id="create" type="button">Create a private room</button>
-      <div class="join-row">
-        <input id="code" maxlength="4" inputmode="text" autocapitalize="characters" placeholder="CODE" aria-label="Room code">
-        <button id="join" type="button">Join</button>
+        <div class="or">or</div>
+
+        <button id="create" type="button">Create a private room</button>
+        <div class="join-row">
+          <input id="code" maxlength="4" inputmode="text" autocapitalize="characters" placeholder="CODE" aria-label="Room code">
+          <button id="join" type="button">Join</button>
+        </div>
+
+        <p id="menu-status" class="status" role="status"></p>
       </div>
-
-      <p id="menu-status" class="mono dim small" role="status"></p>
-      <p class="mono dim small">Peer-to-peer through a public broker, so there is no server and no account:
-        the tab that hosts relays for everyone else, and the room elects a new host when it leaves.</p>
     </section>
 
     <section id="screen-lobby" class="screen" hidden>
-      <div class="code-row">
-        <span id="lobby-code" class="code">----</span>
-        <button id="copy" class="ghost" type="button">Copy code</button>
+      <div class="card lobby-card">
+        <div class="code-row">
+          <span id="lobby-code" class="code">----</span>
+          <button id="copy" class="ghost" type="button">Copy code</button>
+        </div>
+        <div class="lobby-art" aria-hidden="true"></div>
+        <ul id="roster" class="roster" aria-label="Players"></ul>
+        <div id="host-settings" class="settings" hidden>
+          <label>Impostors
+            <select id="set-impostors">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </select>
+          </label>
+          <label>Kill cooldown
+            <select id="set-cooldown">
+              <option value="10">10s</option>
+              <option value="15">15s</option>
+              <option value="20">20s</option>
+              <option value="25">25s</option>
+              <option value="30">30s</option>
+              <option value="40">40s</option>
+            </select>
+          </label>
+          <label>Tasks each
+            <select id="set-tasks">
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+          </label>
+        </div>
+        <button id="start" class="primary" type="button" hidden>Start round</button>
+        <p id="lobby-note" class="hint"></p>
       </div>
-      <ul id="roster" class="roster" aria-label="Players"></ul>
-      <div id="host-settings" class="settings" hidden>
-        <label>Impostors
-          <select id="set-impostors">
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-          </select>
-        </label>
-        <label>Kill cooldown
-          <select id="set-cooldown">
-            <option value="10">10s</option>
-            <option value="15">15s</option>
-            <option value="20">20s</option>
-            <option value="25">25s</option>
-            <option value="30">30s</option>
-            <option value="40">40s</option>
-          </select>
-        </label>
-        <label>Tasks each
-          <select id="set-tasks">
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-          </select>
-        </label>
-      </div>
-      <div class="row">
-        <button id="start" class="go" type="button" hidden>Start round</button>
-      </div>
-      <p id="lobby-note" class="mono dim small"></p>
     </section>
 
     <section id="screen-game" class="screen" hidden>
-      <div id="hud"></div>
-      <div class="stage"><canvas id="board" aria-label="Ship map"></canvas></div>
-      <div id="actions" class="actions">
-        <button id="act-use" class="go" type="button" hidden>Use</button>
-        <button id="act-kill" class="danger" type="button" hidden>Kill</button>
-        <button id="act-vent" type="button" hidden>Vent</button>
-        <button id="act-report" type="button" hidden>Report</button>
-        <button id="act-button" type="button" hidden>Emergency</button>
+      <div class="game-wrap">
+        <div id="hud"></div>
+        <div class="stage">
+          <canvas id="board" aria-label="Ship map"></canvas>
+          <div id="actions" class="actions">
+          <button id="act-use" type="button" hidden><img id="icon-use" alt=""><span id="use-label">Use</span></button>
+          <button id="act-kill" type="button" hidden><img id="icon-kill" alt=""><span>Kill</span></button>
+          <button id="act-vent" type="button" hidden><img id="icon-vent" alt=""><span>Vent</span></button>
+          <button id="act-report" type="button" hidden><img id="icon-report" alt=""><span>Report</span></button>
+          <button id="act-button" type="button" hidden><span>Emergency</span></button>
+          </div>
+        </div>
       </div>
     </section>
   </div>
 </main>
 
 <section id="overlay-meeting" class="overlay" hidden>
-  <div class="panel">
+  <div class="meeting-panel">
     <p class="eyebrow" id="meeting-reason"></p>
-    <h2>Who is it?</h2>
-    <p class="dim small" id="meeting-note"></p>
+    <h2 class="meeting-title">Who is the Imposter?</h2>
+    <p class="meeting-note" id="meeting-note"></p>
     <p class="timer" id="meeting-timer">45s</p>
     <ul id="votes" class="roster"></ul>
-    <div class="row">
-      <button id="skip" class="ghost" type="button">Skip vote</button>
-    </div>
+    <button id="skip" class="ghost" type="button">Skip vote</button>
   </div>
 </section>
 
@@ -198,10 +268,8 @@ button.ghost{border-color:var(--rule);background:none;color:var(--dim);padding:6
     <p class="eyebrow" id="over-eyebrow"></p>
     <h2 id="over-title"></h2>
     <ul id="over-roles" class="roster"></ul>
-    <div class="row">
-      <button id="back-lobby" class="go" type="button" hidden>Back to lobby</button>
-    </div>
-    <p class="dim small" id="over-note"></p>
+    <button id="back-lobby" class="primary" type="button" hidden>Back to lobby</button>
+    <p class="hint" id="over-note"></p>
   </div>
 </section>
 
@@ -1641,6 +1709,31 @@ window.ImposterNet = (function () {
   let lastGoto = 0;
   const listKeys = new Map();
 
+  // Their chrome: starfield, meeting screen, lobby art, icon buttons and font.
+  const IMAGE_BASE = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI)
+    ? 'imposter/'
+    : 'games/content/imposter/';
+  const asset = name => new URL(IMAGE_BASE + name, document.baseURI).href;
+  try {
+    const root = document.documentElement.style;
+    root.setProperty('--space', 'url("' + asset('background.jpg') + '")');
+    root.setProperty('--meeting-art', 'url("' + asset('meeting.png') + '")');
+    root.setProperty('--lobby-art', 'url("' + asset('lobby.png') + '")');
+  } catch (error) { /* images stay absent, the layout still reads */ }
+  try {
+    const face = new FontFace('AmongUs', 'url(' + asset('amongus.ttf') + ')');
+    face.load().then(loaded => document.fonts.add(loaded)).catch(() => {});
+  } catch (error) { /* keep the fallback face */ }
+  for (const [id, file] of [
+    ['icon-use', 'ui-useIcon.png'],
+    ['icon-kill', 'ui-kill_icon.png'],
+    ['icon-report', 'ui-reportBtn.png'],
+    ['icon-vent', 'vent.png'],
+  ]) {
+    const icon = document.getElementById(id);
+    if (icon) icon.src = asset(file);
+  }
+
   function show(name) {
     shown = name;
     for (const [id, element] of Object.entries(screens)) element.hidden = id !== name;
@@ -1748,6 +1841,7 @@ window.ImposterNet = (function () {
     listKeys.clear();
     $('overlay-meeting').hidden = true;
     $('overlay-over').hidden = true;
+    $('room-tag').hidden = true;
     $('roster').replaceChildren();
     show('menu');
   }
@@ -1804,6 +1898,9 @@ window.ImposterNet = (function () {
     if (next.you?.id) selfId = next.you.id;
     const hosting = Boolean(next.you?.host);
     const publicRoom = Boolean(next.net?.publicRoom);
+    const tag = $('room-tag');
+    tag.hidden = false;
+    tag.textContent = 'Room: ' + (publicRoom ? 'PUBLIC' : next.code || '----');
 
     if (next.phase === 'lobby') {
       show('lobby');
@@ -1889,7 +1986,7 @@ window.ImposterNet = (function () {
     use.hidden = !s.actions.use;
     if (s.actions.use) {
       const station = C.STATIONS.find(candidate => candidate.id === s.actions.use);
-      use.textContent = station ? `Use ${station.label}` : 'Use';
+      $('use-label').textContent = station ? station.label : 'Use';
     }
     $('act-kill').hidden = !s.actions.kill;
     $('act-vent').hidden = !s.actions.vent;
@@ -1993,26 +2090,55 @@ window.ImposterNet = (function () {
 
   /* ── drawing ─────────────────────────────────────────────────────────── */
 
+  /* ── art ─────────────────────────────────────────────────────────────── */
+
+  // Frames, vent grate, dead body, meeting screen, lobby art and the display
+  // font are the ones from arizkhalid/among-us-clone (MIT, see imposter/LICENSE).
+  const ART = { idle: new Image(), walk: [], vent: new Image(), body: new Image() };
+  ART.idle.src = asset('crew-idle.png');
+  ART.vent.src = asset('vent.png');
+  ART.body.src = asset('body.png');
+  for (let frame = 1; frame <= 12; frame += 1) {
+    const image = new Image();
+    image.src = asset('crew-walk-' + String(frame).padStart(2, '0') + '.png');
+    ART.walk.push(image);
+  }
+  const drawn = image => image.complete && image.naturalWidth > 0;
+
   function theme() {
     if (!palette) {
       const css = getComputedStyle(document.documentElement);
       const read = name => css.getPropertyValue(name).trim();
       palette = {
         paper: read('--paper'), ink: read('--ink'), dim: read('--dim'),
-        rule: read('--rule'), red: read('--red'), sunk: read('--sunk'),
+        rule: read('--rule'), red: read('--red'), green: read('--green'),
+        gold: read('--gold'), sunk: read('--sunk'),
       };
     }
     return palette;
   }
 
   function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
+    ctx.beginPath(); ctx.moveTo(x + r, y);
     ctx.arcTo(x + w, y, x + w, y + h, r);
     ctx.arcTo(x + w, y + h, x, y + h, r);
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
+  }
+
+  // The crew sheet is one fixed colour, so a seat's colour rides on the ring
+  // under each player rather than repainting the art.
+  const seats = new Map();
+
+  function look(player) {
+    const previous = seats.get(player.id);
+    const dx = previous ? player.x - previous.x : 0;
+    const dy = previous ? player.y - previous.y : 0;
+    const moving = Math.hypot(dx, dy) > 0.3;
+    const face = dx < -0.15 ? -1 : dx > 0.15 ? 1 : previous ? previous.face : 1;
+    seats.set(player.id, { x: player.x, y: player.y, face });
+    return { moving, face };
   }
 
   function draw() {
@@ -2041,8 +2167,7 @@ window.ImposterNet = (function () {
     const offY = (height - C.WORLD.h * scale) / 2;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = colors.paper;
-    ctx.fillRect(0, 0, width, height);
+    ctx.clearRect(0, 0, width, height);
 
     ctx.save();
     ctx.translate(offX, offY);
@@ -2051,88 +2176,143 @@ window.ImposterNet = (function () {
     ctx.fillStyle = colors.sunk;
     for (const rect of C.FLOOR) ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
 
-    ctx.strokeStyle = colors.rule;
+    ctx.strokeStyle = 'rgba(120,190,255,.22)';
     ctx.lineWidth = 1.2;
     for (const room of C.ROOMS) ctx.strokeRect(room.x + 0.5, room.y + 0.5, room.w - 1, room.h - 1);
 
-    ctx.fillStyle = colors.dim;
-    ctx.font = '9px ui-monospace, monospace';
+    ctx.fillStyle = 'rgba(198,222,255,.75)';
+    ctx.font = '11px "AmongUs", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (const room of C.ROOMS) {
-      ctx.fillText(room.name.toUpperCase(), room.x + room.w / 2, room.y + 12);
+      ctx.fillText(room.name.toUpperCase(), room.x + room.w / 2, room.y + 13);
     }
 
     const you = snap.you;
     for (const station of C.STATIONS) {
       const mine = you?.tasks?.some(task => task.id === station.id);
       const done = you?.tasks?.some(task => task.id === station.id && task.done);
-      ctx.lineWidth = 1.4;
       if (mine && !done) {
-        ctx.fillStyle = colors.ink;
-        ctx.fillRect(station.x - 4, station.y - 4, 8, 8);
-        ctx.font = '7px ui-monospace, monospace';
+        ctx.fillStyle = colors.gold;
+        ctx.fillRect(station.x - 3.5, station.y - 3.5, 7, 7);
+        ctx.font = '9px "AmongUs", Arial, sans-serif';
+        ctx.fillStyle = '#ffe98a';
         ctx.fillText(station.label, station.x, station.y + 12);
       } else if (done) {
-        ctx.strokeStyle = colors.rule;
+        ctx.strokeStyle = 'rgba(76,224,165,.55)';
+        ctx.lineWidth = 1.4;
         ctx.strokeRect(station.x - 3.5, station.y - 3.5, 7, 7);
       } else {
-        ctx.strokeStyle = colors.dim;
+        ctx.strokeStyle = 'rgba(160,190,230,.35)';
+        ctx.lineWidth = 1.1;
         ctx.strokeRect(station.x - 3, station.y - 3, 6, 6);
       }
     }
 
-    // Vents: a grate with two slits. Everyone can see them; only the impostor
-    // gets the prompt and the jump.
+    // Vents: a grate everyone can see; only the impostor gets the prompt and
+    // the jump between the pair.
     for (const vent of C.VENTS) {
-      ctx.strokeStyle = you?.role === 'impostor' ? colors.red : colors.dim;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(vent.x - 6, vent.y - 4, 12, 8);
-      ctx.beginPath();
-      ctx.moveTo(vent.x - 4, vent.y - 1.5);
-      ctx.lineTo(vent.x + 4, vent.y - 1.5);
-      ctx.moveTo(vent.x - 4, vent.y + 1.5);
-      ctx.lineTo(vent.x + 4, vent.y + 1.5);
-      ctx.stroke();
-      if (snap.actions.vent === vent.id) {
-        ctx.font = '7px ui-monospace, monospace';
+      const near = snap.actions.vent === vent.id;
+      if (drawn(ART.vent)) {
+        // A dark plate under the vent pose so a grate never reads as a player.
+        ctx.fillStyle = 'rgba(6,11,22,.92)';
+        roundRect(ctx, vent.x - 9, vent.y - 8, 18, 16, 4);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(120,190,255,.35)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        const ventHeight = 17;
+        const ventWidth = ventHeight * (ART.vent.naturalWidth / ART.vent.naturalHeight);
+        if (you?.role === 'impostor') {
+          ctx.beginPath();
+          ctx.ellipse(vent.x, vent.y + 5, ventWidth * 0.7, 3.2, 0, 0, Math.PI * 2);
+          ctx.strokeStyle = near ? colors.red : 'rgba(233,69,96,.45)';
+          ctx.lineWidth = 1.4;
+          ctx.stroke();
+        }
+        ctx.drawImage(ART.vent, vent.x - ventWidth / 2, vent.y - ventHeight / 2, ventWidth, ventHeight);
+      } else {
+        ctx.strokeStyle = you?.role === 'impostor' ? colors.red : colors.dim;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(vent.x - 6, vent.y - 4, 12, 8);
+      }
+      if (near) {
+        ctx.font = '10px "AmongUs", Arial, sans-serif';
         ctx.fillStyle = colors.red;
-        ctx.fillText('vent', vent.x, vent.y - 9);
+        ctx.fillText('VENT', vent.x, vent.y - 14);
       }
     }
 
     ctx.beginPath();
-    ctx.arc(C.BUTTON.x, C.BUTTON.y, 9, 0, Math.PI * 2);
-    ctx.strokeStyle = colors.red;
+    ctx.arc(C.BUTTON.x, C.BUTTON.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(233,69,96,.85)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.7)';
     ctx.lineWidth = 1.6;
     ctx.stroke();
 
     for (const body of snap.bodies) {
-      ctx.strokeStyle = colors.red;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(body.x - 6, body.y - 6);
-      ctx.lineTo(body.x + 6, body.y + 6);
-      ctx.moveTo(body.x + 6, body.y - 6);
-      ctx.lineTo(body.x - 6, body.y + 6);
-      ctx.stroke();
+      if (drawn(ART.body)) {
+        const bodyHeight = 20;
+        const bodyWidth = bodyHeight * (ART.body.naturalWidth / ART.body.naturalHeight);
+        ctx.save();
+        ctx.translate(body.x, body.y);
+        ctx.rotate(Math.PI / 2);
+        ctx.drawImage(ART.body, -bodyWidth / 2, -bodyHeight / 2, bodyWidth, bodyHeight);
+        ctx.restore();
+      } else {
+        ctx.strokeStyle = colors.red;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(body.x - 6, body.y - 6);
+        ctx.lineTo(body.x + 6, body.y + 6);
+        ctx.moveTo(body.x + 6, body.y - 6);
+        ctx.lineTo(body.x - 6, body.y + 6);
+        ctx.stroke();
+      }
     }
 
+    const phase = Math.floor(performance.now() / 95);
     for (const player of snap.players) {
       const isSelf = player.id === selfId;
       if (!player.alive && !isSelf) continue;
-      ctx.globalAlpha = player.alive ? 1 : 0.35;
-      ctx.fillStyle = colorHex(player.color);
-      roundRect(ctx, player.x - 7, player.y - 9, 14, 18, 5);
-      ctx.fill();
-      ctx.strokeStyle = player.teammate ? colors.red : isSelf ? colors.ink : colors.paper;
-      ctx.lineWidth = player.teammate || isSelf ? 2 : 1.2;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
+      const style = look(player);
+      ctx.globalAlpha = player.alive ? 1 : 0.32;
 
-      ctx.fillStyle = isSelf ? colors.ink : colors.dim;
-      ctx.font = `${isSelf ? 'bold ' : ''}8px ui-monospace, monospace`;
-      ctx.fillText(player.name, player.x, player.y + 16);
+      ctx.beginPath();
+      ctx.ellipse(player.x, player.y + 9, 10, 3.6, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = colorHex(player.color);
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+
+      const image = style.moving ? ART.walk[phase % ART.walk.length] : ART.idle;
+      if (drawn(image)) {
+        const crewHeight = 27;
+        const crewWidth = crewHeight * (image.naturalWidth / image.naturalHeight);
+        const bob = style.moving ? Math.sin(phase * 0.9) : 0;
+        ctx.save();
+        ctx.translate(player.x, player.y + bob);
+        ctx.scale(style.face, 1);
+        ctx.drawImage(image, -crewWidth / 2, 8 - crewHeight, crewWidth, crewHeight);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = colorHex(player.color);
+        roundRect(ctx, player.x - 7, player.y - 9, 14, 18, 5);
+        ctx.fill();
+      }
+
+      if (player.teammate) {
+        ctx.beginPath();
+        ctx.arc(player.x, player.y - 18, 11, 0, Math.PI * 2);
+        ctx.strokeStyle = colors.red;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = isSelf ? colors.gold : '#eaf2ff';
+      ctx.font = (isSelf ? 'bold ' : '') + '10px "AmongUs", Arial, sans-serif';
+      ctx.fillText(player.name, player.x, player.y + 20);
     }
 
     ctx.restore();
