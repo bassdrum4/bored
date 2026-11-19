@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 661,
+  "count": 662,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"40356f2","date":"2026-11-19","author":"Codebuff","subject":"fix(imposter): fit the lobby dock without scrolling the frame"},
   {"sha":"fd8df4c","date":"2026-11-19","author":"Codebuff","subject":"feat(imposter): make the lobby the ship, so the wait is walkable"},
   {"sha":"d6895ab","date":"2026-11-19","author":"Codebuff","subject":"feat(imposter): wear the among-us-clone front end"},
   {"sha":"aaeb35c","date":"2026-11-19","author":"Codebuff","subject":"feat(imposter): an always-open public room with a round-robin host election"},
