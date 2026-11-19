@@ -5,30 +5,23 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Among Us</title>
 <!--
-  Among Us — a peer-to-peer social deduction round.
+  Among Us — a peer-to-peer social deduction round on the Skeld.
 
-  Network: PeerJS 1.5.5 from jsDelivr (script below) plus its public broker at
-  0.peerjs.com. There is no game server and no key: peers only need the broker to
-  find each other, and everything after that travels on a WebRTC data channel.
-  Internet is required; without it the menu says so instead of failing silently.
+  Rules, ship coordinates, walls, vents, missions, sabotage timings and task
+  screens are ported from AI0702/Among-Us-clone's Python (game.py, sprites.py,
+  settings.py, tasks.py, map.tmx): 5792x3168 ship, 400 px/s walk, the tmx wall
+  rectangles as collision, 15 s kill and sabotage cooldowns, 20 s reactor
+  meltdown, 30 s meetings, eight missions at their original trigger points.
+  The art is that repo's ripped set (artwork is Innersloth's).
 
-  Authority: the room host owns the rules and sends each player a snapshot with
-  the other players' roles stripped. The host chair is not fixed: every snapshot
-  names the next player in the ring, that player keeps a full checkpoint, and if
-  the host disappears it claims the room's peer id and carries on. The public
-  room lives at a fixed peer id, so the same election is what keeps it "always
-  open" when the current host closes the tab.
-
-  Art: the Skeld map, the per-colour crewmate frames, the task markers and the
-  emergency button are the ripped set shipped with AI0702/Among-Us-clone
-  (Unlicense repo, https://github.com/AI0702/Among-Us-clone; the artwork itself
-  is Innersloth's). Its mini-map is also the collision mask, so the walls on
-  screen are the walls the simulation uses. The tasks, the vents, the rules and
-  the netcode are this game's own.
+  Network: PeerJS 1.5.5 from jsDelivr plus its public broker at 0.peerjs.com.
+  The room host owns the rules and sends each player a snapshot with roles
+  stripped. The host chair is not fixed: every snapshot names the next player in
+  the ring, that player keeps a checkpoint, and if the host disappears it claims
+  the room's peer id and carries on. The public room lives at a fixed peer id,
+  so the same election keeps it open when the current host closes the tab.
 -->
 <style>
-/* Quiet chrome around loud art: the ship is AI0702's ripped Among Us set, so
-   the frame stays flat, square-ish and out of the way. */
 :root{
   --bg:#0d0e10; --panel:#141518; --panel-2:#191b1f; --line:#2a2c31;
   --ink:#e7e5e0; --dim:#8b8e94; --accent:#c0392b; --accent-ink:#fff;
@@ -39,7 +32,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--font-body);overflow:hidden}
-#shell{height:100%;max-width:1080px;margin:0 auto;padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px}
+#shell{height:100%;max-width:1280px;margin:0 auto;padding:8px 10px 10px;display:flex;flex-direction:column;gap:8px}
 header.top{display:flex;align-items:center;gap:10px;flex:0 0 auto}
 .wordmark{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--dim)}
 .room-tag{margin-left:auto;font:11px var(--mono);letter-spacing:.08em;color:var(--dim);
@@ -80,24 +73,34 @@ select{padding:8px 10px;font-size:13px}
 .join-row .btn{flex:0 0 auto}
 
 /* game frame */
-#screen-game{align-items:center;justify-content:center;padding:0}
-.game-wrap{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:8px}
-.hud{align-self:flex-start;font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
+#screen-game{align-items:stretch;justify-content:stretch;padding:0}
+.game-wrap{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;gap:6px}
+.hud-row{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.hud{font:11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;
   color:var(--dim);border:1px solid var(--line);border-radius:3px;padding:6px 9px;background:var(--panel)}
 .hud b{color:var(--ink);font-weight:600}
-.stage{position:relative;flex:0 0 auto;width:100%;min-height:120px;max-width:100%;max-height:100%;
-  margin:0 auto;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#000}
+.hud-tools{margin-left:auto;display:flex;gap:6px}
+.chip{font:600 10px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;
+  color:var(--dim);background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:7px 9px}
+.chip:hover{color:var(--ink);border-color:#3a3d44}
+.chip.sab{color:#e08a80;border-color:#5a2a26}
+.task-bar{flex:0 0 auto;height:4px;border:1px solid var(--line);border-radius:2px;background:var(--panel);overflow:hidden}
+.task-bar i{display:block;height:100%;width:0;background:#f2df6a;transition:width .25s ease}
+.stage{position:relative;flex:1 1 auto;min-height:160px;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#05060a}
 .stage canvas{display:block;width:100%;height:100%;touch-action:none}
-.actions{position:absolute;right:10px;bottom:10px;z-index:6;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.actions .btn{min-width:78px;height:44px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;
-  background:rgba(16,17,19,.86);border:1px solid #3a3d44;font-size:11px;border-radius:4px}
-.actions #act-kill,.actions #act-button{background:#8f2a20;border-color:#a83a2e}
+.actions{position:absolute;right:10px;bottom:10px;z-index:6;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:70%}
+.actions .btn{min-width:72px;height:40px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(16,17,19,.86);border:1px solid #3a3d44;font-size:10.5px;border-radius:4px}
+.actions #act-kill{background:#8f2a20;border-color:#a83a2e}
+.actions #act-button{background:#8f2a20;border-color:#a83a2e}
 .actions #act-report{border-color:#6b6326;color:#e8dfa0}
-.actions #act-vent,.actions #act-use{background:rgba(16,17,19,.9);color:#cfd2d7;border-color:#3a3d44}
+.actions #act-fix{background:#6b5a1e;border-color:#8e7a2a;color:#fff}
+.sab-note{position:absolute;left:10px;top:10px;z-index:5;font:600 11px/1.3 var(--mono);
+  color:#ffd7cf;background:rgba(80,18,12,.85);border:1px solid #8f2a20;border-radius:3px;padding:6px 8px;max-width:60%}
 
 /* lobby dock */
-.lobby-bar{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--line);
-  border-radius:4px;background:var(--panel);max-height:42vh;overflow:auto}
+.lobby-bar{display:flex;flex-direction:column;gap:8px;padding:9px;border:1px solid var(--line);
+  border-radius:4px;background:var(--panel);max-height:38vh;overflow:auto;flex:0 0 auto}
 .lobby-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .code{font:600 13px var(--mono);letter-spacing:.22em;color:var(--ink)}
 .code.public{color:#d8cfa8}
@@ -106,7 +109,7 @@ select{padding:8px 10px;font-size:13px}
 .roster{list-style:none;display:flex;flex-direction:column;gap:0;text-align:left}
 .roster li{display:flex;align-items:center;gap:8px;padding:6px 2px;border-top:1px solid var(--line);font-size:13px}
 .roster li:first-child{border-top:0}
-.roster .dot{width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:var(--c)}
+.roster .dot{width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:var(--c);text-align:center;font-size:10px;line-height:9px;color:#0d0e10}
 .roster .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .roster .tail{font:10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
 .roster .vote{border-radius:3px;padding:4px 9px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
@@ -117,13 +120,16 @@ select{padding:8px 10px;font-size:13px}
 .roster.chips li{flex:0 0 auto;border:1px solid var(--line);border-radius:3px;padding:4px 8px;font-size:12px}
 .roster.chips .name{flex:0 1 auto}
 .row-item.is-impostor .tail{color:#e08a80}
-.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px}
+.tasks-list .row-item{border-top:1px solid var(--line)}
+.tasks-list .row-item:first-child{border-top:0}
+.tasks-list .dot{font-family:var(--mono);color:#0d0e10}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
 .settings label{display:flex;flex-direction:column;gap:4px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
 
 /* overlays */
-.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;
+.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:14px;
   background:rgba(6,7,8,.9);overflow:auto}
-.panel{width:min(440px,100%);display:flex;flex-direction:column;gap:10px;padding:18px;
+.panel{width:min(440px,100%);display:flex;flex-direction:column;gap:10px;padding:16px;
   border:1px solid var(--line);border-radius:4px;background:var(--panel)}
 .eyebrow{font:10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
 .panel h2{font-size:19px;line-height:1.2;font-weight:600}
@@ -132,11 +138,51 @@ select{padding:8px 10px;font-size:13px}
 .timer{font:600 15px var(--mono);color:var(--ink)}
 #toast{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:60;background:#202329;
   border:1px solid #3a3d44;color:var(--ink);padding:8px 12px;border-radius:3px;font-size:12.5px;max-width:88vw;text-align:center}
+
+/* task windows: the Python's screens, sized to the panel */
+.overlay.task{background:rgba(4,5,6,.94)}
+.panel.task-panel{width:min(960px,96vw);max-height:94vh;overflow:auto;padding:12px}
+.task-head{display:flex;align-items:center;gap:10px}
+.task-head h2{font-size:15px;letter-spacing:.08em;text-transform:uppercase}
+.task-head .btn{margin-left:auto;padding:8px 11px;font-size:10.5px}
+.task-body{display:flex;flex-direction:column;gap:10px}
+.task-art{position:relative;border:1px solid var(--line);border-radius:3px;overflow:hidden;background:#0a0b0d}
+.task-board{display:block;width:100%;height:auto}
+.lever{position:absolute;right:6%;bottom:10%;width:64px;height:64px;padding:0;border:0;background:transparent;cursor:pointer}
+.lever-img{width:100%;height:100%;object-fit:contain}
+.lever-img.wide{width:220px;height:auto;position:relative;right:60px}
+.lever.pulled{transform:translateY(6px)}
+.task-help{color:var(--dim);font-size:11.5px;text-align:center}
+.wires .wire-rack{position:absolute;left:4%;top:8%;display:flex;flex-direction:column;gap:8px}
+.wire-btn{padding:4px 10px;border:2px solid #2a2c31;border-radius:3px;background:rgba(0,0,0,.55);cursor:pointer;opacity:.55}
+.wire-btn .wire-img{display:block;height:22px;width:150px;object-fit:contain}
+.wire-btn.done{opacity:1;border-color:#4f8f4f}
+.align{align-items:stretch;display:flex;flex-direction:column;gap:8px;position:relative;padding:8px}
+.align .task-board{opacity:.55}
+.align-row{display:flex;align-items:center;gap:10px;position:relative;z-index:2}
+.align-tag{font:10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);width:70px;flex:0 0 auto}
+.align-slider{flex:1;accent-color:#c0392b}
+.align-slider.aligned{accent-color:#4f8f4f}
+.fuel-gauge{position:absolute;right:12%;top:12%;width:34px;height:60%;border:2px solid #2a2c31;background:#0a0b0d;border-radius:2px;overflow:hidden}
+.fuel-gauge i{position:absolute;left:0;right:0;bottom:0;height:0;background:#ebc334;transition:height .08s linear}
+.task-art .btn{position:absolute;left:50%;bottom:8%;transform:translateX(-50%);z-index:2}
+.wifi-on{position:absolute;right:14%;top:18%;width:70px}
+.task-art.nav .nav-pad{position:absolute;left:50%;top:50%;width:min(320px,60%);aspect-ratio:1;transform:translate(-50%,-50%);
+  border:1px solid rgba(120,124,130,.5);border-radius:50%;touch-action:none;cursor:crosshair;background:rgba(10,11,13,.35)}
+.nav-centre{position:absolute;left:50%;top:50%;width:28px;height:28px;transform:translate(-50%,-50%);opacity:.8}
+.nav-target{position:absolute;width:54px;height:54px;transform:translate(-50%,-50%);cursor:grab}
+.nav-target.locked{filter:drop-shadow(0 0 4px #4f8f4f)}
+.asteroid-stage{border:1px solid var(--line);border-radius:3px;overflow:hidden;background:#05070c}
+.asteroid-canvas{display:block;width:100%;height:auto;cursor:crosshair}
+.map-canvas{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:3px;background:#0a0b0d}
 [hidden]{display:none!important}
-@media (max-width:520px){
+@media (max-width:640px){
   .logo{font-size:24px}
-  .actions .btn{min-width:62px;height:40px;font-size:10px}
-  .panel{padding:14px}
+  .actions{max-width:88%;gap:5px;right:6px;bottom:6px}
+  .actions .btn{min-width:58px;height:36px;font-size:9.5px;padding:0 7px}
+  .panel{padding:12px}
+  .panel.task-panel{padding:8px}
+  .lever{width:48px;height:48px}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
@@ -176,11 +222,23 @@ select{padding:8px 10px;font-size:13px}
 
     <section id="screen-game" class="screen" hidden>
       <div class="game-wrap">
-        <div id="hud" class="hud"></div>
+        <div class="hud-row">
+          <div id="hud" class="hud"></div>
+          <div class="hud-tools">
+            <button id="sab-lights" class="chip sab" type="button" hidden>Lights</button>
+            <button id="sab-reactor" class="chip sab" type="button" hidden>Reactor</button>
+            <button id="open-tasks" class="chip" type="button">Tasks</button>
+            <button id="open-map" class="chip" type="button">Map</button>
+          </div>
+        </div>
+        <div id="task-bar" class="task-bar" hidden><i></i></div>
         <div class="stage">
-          <canvas id="board" aria-label="Ship map"></canvas>
+          <canvas id="board" aria-label="The Skeld"></canvas>
+          <p id="sabotage-note" class="sab-note" hidden></p>
           <div id="actions" class="actions">
             <button id="act-use" class="btn" type="button" hidden>Use</button>
+            <button id="act-gas" class="btn" type="button" hidden>Gas can</button>
+            <button id="act-fix" class="btn" type="button" hidden>Fix</button>
             <button id="act-kill" class="btn" type="button" hidden>Kill</button>
             <button id="act-vent" class="btn" type="button" hidden>Vent</button>
             <button id="act-report" class="btn" type="button" hidden>Report</button>
@@ -205,20 +263,10 @@ select{padding:8px 10px;font-size:13px}
             <label>Kill cooldown
               <select id="set-cooldown">
                 <option value="10">10s</option>
-                <option value="15">15s</option>
+                <option value="15" selected>15s</option>
                 <option value="20">20s</option>
-                <option value="25">25s</option>
                 <option value="30">30s</option>
                 <option value="40">40s</option>
-              </select>
-            </label>
-            <label>Tasks each
-              <select id="set-tasks">
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
               </select>
             </label>
           </div>
@@ -229,12 +277,32 @@ select{padding:8px 10px;font-size:13px}
   </div>
 </main>
 
+<section id="overlay-task" class="overlay task" hidden>
+  <div class="panel task-panel">
+    <div class="task-head">
+      <h2 id="task-title">Task</h2>
+      <button id="task-close" class="btn btn-secondary" type="button">Close</button>
+    </div>
+    <div id="task-body" class="task-body"></div>
+  </div>
+</section>
+
+<section id="overlay-list" class="overlay" hidden>
+  <div class="panel">
+    <div class="task-head">
+      <h2 id="list-title">Tasks</h2>
+      <button id="list-close" class="btn btn-secondary" type="button">Close</button>
+    </div>
+    <div id="list-body"></div>
+  </div>
+</section>
+
 <section id="overlay-meeting" class="overlay" hidden>
   <div class="panel">
     <p class="eyebrow" id="meeting-reason"></p>
     <h2 class="meeting-title">Who is the imposter?</h2>
     <p class="meeting-note" id="meeting-note"></p>
-    <p class="timer" id="meeting-timer">45s</p>
+    <p class="timer" id="meeting-timer">30s</p>
     <ul id="votes" class="roster"></ul>
     <button id="skip" class="btn" type="button">Skip vote</button>
   </div>
@@ -253,91 +321,67 @@ select{padding:8px 10px;font-size:13px}
 <p id="toast" hidden></p>
 
 <script id="imposter-core">
-/* Pure game logic: the map, the rules and the transport-free host room.
-   It touches no DOM, so the same code runs in a browser and in a test harness. */
+/* Rules ported from AI0702/Among-Us-clone's Python (game.py, sprites.py, settings.py):
+   the same ship coordinates (5792x3168), the same 400 px/s walk, the same wall
+   rectangles from map.tmx, the same 15 s kill cooldown, 15 s sabotage cooldown,
+   20 s reactor meltdown, 30 s meeting, the same 8 missions at their original
+   trigger points, and the same vent list. The room/election half is this game's
+   own, unchanged from the previous build. Touches no DOM. */
 window.ImposterCore = (function () {
   'use strict';
 
-  /* ── the ship ─────────────────────────────────────────────────────────── */
+  /* ── the ship, in the Python's own coordinates ────────────────────────── */
 
-  const WORLD = { w: 1000, h: 547 };
+  const WORLD = { w: 5792, h: 3168 };
+  const VIEW = { w: 1280, h: 640 };
+  const SPEED = 400;
+  const PLAYER_W = 64;
+  const PLAYER_H = 86;
 
-  // Rooms are labels and task buckets; the walls are not geometry but the
-  // mini-map the ship art was drawn from, sampled per pixel (see pointInFloor).
-  const ROOMS = [
-    { id: 'upperEngine', name: 'Upper Engine' },
-    { id: 'cafeteria', name: 'Cafeteria' },
-    { id: 'medbay', name: 'MedBay' },
-    { id: 'reactor', name: 'Reactor' },
-    { id: 'electrical', name: 'Electrical' },
-    { id: 'security', name: 'Security' },
-    { id: 'lowerEngine', name: 'Lower Engine' },
-    { id: 'storage', name: 'Storage' },
-    { id: 'navigation', name: 'Navigation' },
+  // Every wall rectangle from map.tmx's "Obstacles" layer, which is what the
+  // Python collided against. Unchanged numbers, so the walls match the art.
+  const WALLS = [[1673,527,923.3,56],[1665.5,2057,399.4,56],[1707.5,2308.3,168.9,375.4],[1673,775,572.7,88],[2407,775,188.7,88],[3408,1352,992,201.3],[2977,1352,280,483],[3857.7,1255,47.3,218.7],[4357.7,1312,99.4,815],[4940.7,1072,340.3,203.7],[4939.7,1472,341.4,225.7],[4265,2604,304,41.7],[4128.7,2359,134.4,89.7],[4128.7,2393,74.4,87.7],[3538,2361,397.7,87.7],[3538,2059,815,84],[2961,2909,634.7,23.7],[3712.7,2909,373.7,23.7],[4819.7,1943,51.4,310.7],[4657,1672,296,320],[4648,2088,192.3,95],[4648,2375,65,144],[2596.2,224.7,76.7,359],[2777,12.7,1016,60.7],[4014.7,252.7,249,323.7],[4015.7,775,49.3,288],[4817.8,528,56.3,400.9],[2595.7,775,75.2,386.7],[2002,843,78,902.9],[2176,1512,634,45],[2179,1611,634,63],[2802,1367,42,186],[2806,1611,42,212],[2763,1952,46,478],[2659,1943,46,256],[1665.1,1694,414.9,52],[1876.7,2632,928.2,52],[2374.7,2304,388.3,126],[1664.8,2308.3,42.7,256.3],[1665.3,1885.3,42.7,227.6],[2065,1637.1,125.6,793.2],[1156.8,1581.5,168.6,355.1],[1522.9,1583,185.1,360.7],[965.4,1740.3,202.6,58.3],[1071.9,1878.3,253.4,58.3],[801,1942.3,209,42.3],[1233,2513.3,474.4,51],[1072.3,509.2,34.7,558.5],[1071.4,1888.3,44.6,534.7],[965.4,1798.8,44.6,185.7],[972.4,950.5,44.6,199.9],[581.4,1065.8,44.6,813.2],[1673,775,36.7,282.9],[1673,354.7,36.7,228.2],[1522.3,1008,160.7,355.7],[1156.8,1008,170.2,366.7],[1193,354.4,516.8,75.2],[1072,1008,254.6,56.1],[762.3,949.9,254.6,46.8],[972.3,1150.5,195.6,56.1],[4392.7,1312,351.7,176.3],[4657,927,343.7,184.3],[4264,256,313.7,72],[4205,2448.9,58,352.1],[3538,2448.9,58,483.1],[3538,1845.8,118,224.2],[3435.7,1755,220.3,90.7],[2590.3,1163.7,168,78],[4353,2055,56,96],[4265,2143,91,40],[4265,2359,91,64],[4281,2399,115,48],[4281,2423,155,24],[4641,2519,40,32],[4617,2543,40,32],[4593,2567,40,32],[4569,2591,40,32],[4065,775,392,336],[5281,1631,240,38],[5281,1047,232,32],[625,1111,72,744],[681,991,88,64],[769,991,48,32],[737,1055,32,32],[697,1087,40,24],[681,1055,56,56],[625,999,56,112],[721,951,40,40],[769,1023,32,32],[1961,1095,40,48],[641,1855,72,48],[664,1873,72,48],[689,1888,72,48],[716,1906,72,48],[747,1926,72,48],[1137,399,64,56],[1081,423,64,56],[1043,454,64,56],[2737,55,80,64],[2713,79,80,64],[2689,103,80,64],[2665,127,80,64],[2641,151,80,64],[2761,31,80,64],[2609,183,80,64],[3745,31,104,72],[3777,63,104,72],[3809,95,104,72],[3841,119,104,72],[3873,151,104,72],[3897,183,104,72],[3929,215,104,72],[3969,247,104,72],[3993,279,104,72],[4577,271,56,57],[4601,295,56,56],[4625,319,56,56],[4649,343,56,56],[4681,375,56,56],[4713,407,56,56],[4745,439,56,56],[4777,471,56,56],[3977,1087,72,40],[4001,1063,64,48],[3945,1119,103,41],[3913,1151,87,40],[3881,1183,95,40],[3849,1215,103,40],[3825,1239,72,40],[3801,1263,72,40],[3777,1287,72,40],[3753,1311,72,40],[3729,1335,72,40],[3904,1312,456,40],[2689,1239,64,40],[2721,1271,64,40],[2753,1303,64,40],[2753,1327,64,40],[2641,1079,56,48],[2051,1423,56,48],[2075,1455,56,48],[2099,1487,56,48],[2121,1512,56,47],[2673,1111,56,48],[2705,1143,56,48],[2737,1175,56,48],[2769,1207,56,48],[2809,1247,56,48],[2849,1287,56,48],[2889,1327,56,48],[2921,1359,56,48],[3889,1551,40,24],[4017,1551,40,24],[4121,1551,40,56],[4233,1967,120,48],[4209,1999,112,48],[4185,2023,112,48],[4161,2047,112,48],[4689,2183,128,192],[4257,1551,96,416],[3601,2455,176,48],[3617,2807,64,56],[2769,2687,64,56],[2801,2719,64,56],[2833,2751,64,56],[2865,2783,64,56],[2897,2815,64,56],[2929,2847,64,56],[2961,2871,64,56],[1073,2423,64,40],[1129,2447,48,40],[1161,2471,48,40],[1193,2495,48,40],[2777,1823,120,48],[2841,1791,88,48],[2849,1767,128,48],[2745,1855,120,48],[2946,1835,120,84],[2865.3,1864.3,121.3,79.3],[2826.7,1903,114,79.3],[2809.3,1971.7,70,79.3],[2713,1887,120,48],[2689,1911,120,48],[5513,1063,48,40],[5553,1079,48,40],[5585,1103,48,40],[5641,1151,48,40],[5673,1479,48,40],[5649,1511,48,40],[5625,1535,48,40],[5577,1583,48,40],[5553,1607,48,40],[5521,1631,48,40],[5673,1183,48,40],[5705,1215,48,272],[5609,1127,48,40],[2633,2199,72,56],[2601,2231,64,56],[2569,2263,64,56],[2545,2287,64,56]];
+
+  // The Python spawned players on this ring (game.py player_pos) and its vents
+  // are the tmx vent rectangles; the centres are kept here.
+  const SPAWNS = [[3288,873],[3046,791],[3046,651],[3563,653],[3563,762],[2968,530],[3566,553],[3400,900],[3000,900],[3650,900]];
+  const VENTS = [[3929,863],[4475,435],[4542,1602],[4557,2535],[3725,2016],[2152,1327],[1618,527],[1616,2475],[2252,1786],[962,1695],[832,1230],[1923,1654],[5334,1213],[5335,1595]];
+  const BUTTON = { x: 3320, y: 716, label: 'Emergency' };
+
+  // The eight missions in tasks.py, at the exact trigger points game.py polls.
+  const TASKS = [
+    { id: 'navigation', label: 'Stabilize Navigation', game: 'nav', x: 5610, y: 1290, range: 150, room: 'Navigation' },
+    { id: 'garbage', label: 'Empty Garbage', game: 'garbage', x: 3940, y: 321, range: 80, room: 'Cafeteria' },
+    { id: 'wifi', label: 'Reboot Wifi', game: 'wifi', x: 3700, y: 1554, range: 70, room: 'Electrical' },
+    { id: 'wires', label: 'Fix Wiring', game: 'wires', x: 3166, y: 1846, range: 70, room: 'Electrical' },
+    { id: 'divert', label: 'Divert Power', game: 'divert', x: 1031, y: 1216, range: 70, room: 'Reactor' },
+    { id: 'align', label: 'Align Engine', game: 'align', x: 1117, y: 837, range: 70, room: 'Upper Engine' },
+    { id: 'fuel', label: 'Fuel Engines', game: 'fuel', x: 1226, y: 2300, range: 70, room: 'Lower Engine' },
+    { id: 'asteroids', label: 'Clear Asteroids', game: 'asteroids', x: 4513, y: 450, range: 260, room: 'Weapons' },
   ];
-
-  const SPAWN = { x: 560, y: 235 };
-  const BUTTON = { x: 565, y: 150, label: 'Emergency' };
-
-  const STATIONS = [
-    { id: 'wires-caf', room: 'cafeteria', label: 'Wires', x: 520, y: 120 },
-    { id: 'cards-caf', room: 'cafeteria', label: 'Card swipe', x: 630, y: 150 },
-    { id: 'fuel-upper', room: 'upperEngine', label: 'Fuel', x: 215, y: 120 },
-    { id: 'align-upper', room: 'upperEngine', label: 'Align engine', x: 255, y: 150 },
-    { id: 'scan-med', room: 'medbay', label: 'MedBay scan', x: 420, y: 200 },
-    { id: 'sample-med', room: 'medbay', label: 'Samples', x: 390, y: 240 },
-    { id: 'start-reactor', room: 'reactor', label: 'Start reactor', x: 140, y: 220 },
-    { id: 'hand-reactor', room: 'reactor', label: 'Hand scan', x: 165, y: 270 },
-    { id: 'wires-elec', room: 'electrical', label: 'Wires', x: 430, y: 330 },
-    { id: 'divert-elec', room: 'electrical', label: 'Divert power', x: 450, y: 340 },
-    { id: 'cams-sec', room: 'security', label: 'Cameras', x: 320, y: 230 },
-    { id: 'logs-sec', room: 'security', label: 'Logs', x: 335, y: 265 },
-    { id: 'fuel-lower', room: 'lowerEngine', label: 'Fuel', x: 215, y: 380 },
-    { id: 'align-lower', room: 'lowerEngine', label: 'Align engine', x: 255, y: 350 },
-    { id: 'box-storage', room: 'storage', label: 'Sort crates', x: 530, y: 390 },
-    { id: 'fuel-storage', room: 'storage', label: 'Fuel', x: 580, y: 430 },
-    { id: 'course-nav', room: 'navigation', label: 'Plot course', x: 940, y: 220 },
-    { id: 'chart-nav', room: 'navigation', label: 'Charts', x: 955, y: 265 },
-  ];
-
-  // Vents come in pairs and only the impostor may use them. A vent is a physical
-  // object on the map: crewmates see the grate, and a jump between grates is
-  // visible to anyone watching the two rooms.
-  const VENTS = [
-    { id: 'vent-caf', pair: 'vent-elec', room: 'cafeteria', x: 640, y: 190 },
-    { id: 'vent-elec', pair: 'vent-caf', room: 'electrical', x: 455, y: 360 },
-    { id: 'vent-med', pair: 'vent-sec', room: 'medbay', x: 405, y: 255 },
-    { id: 'vent-sec', pair: 'vent-med', room: 'security', x: 330, y: 255 },
-    { id: 'vent-reactor', pair: 'vent-upper', room: 'reactor', x: 150, y: 290 },
-    { id: 'vent-upper', pair: 'vent-reactor', room: 'upperEngine', x: 240, y: 110 },
-  ];
-
-  const BUTTON_RANGE = 30;
-  const stationById = id => STATIONS.find(station => station.id === id) || null;
-  const ventById = id => VENTS.find(vent => vent.id === id) || null;
-  const pairedVent = id => {
-    const vent = ventById(id);
-    return vent ? ventById(vent.pair) : null;
+  // The gas can is a prerequisite, not a mission (game.py does not count it).
+  const GASCAN = { id: 'gascan', label: 'Find a gas can', x: 3056, y: 2433, range: 70, room: 'Storage' };
+  // Sabotage repair points, from game.py's Ctrl / Shift handlers.
+  const FIX = {
+    lights: { x: 2472, y: 1721, range: 70, label: 'Fix lights' },
+    reactor: { x: 889, y: 999, range: 70, label: 'Reset reactor' },
   };
 
-  /* ── rules ────────────────────────────────────────────────────────────── */
-
-  // Speeds are per second in world units. The ship is wider than the old
-  // hand-drawn layout, so the walk speed scales with it.
-  const SPEED = 150;
-  const KILL_RANGE = 38;
-  const TASK_RANGE = 34;
-  const REPORT_RANGE = 48;
-  const VENT_RANGE = 30;
-  const VENT_COOLDOWN = 2;
-  const MEETING_MS = 45_000;
+  const KILL_COOLDOWN = 15;
+  const SABOTAGE_COOLDOWN = 15;
+  const REACTOR_MS = 20_000;
+  const KILL_RANGE = 110;
+  const REPORT_RANGE = 110;
+  const BUTTON_RANGE = 150;
+  const VENT_RANGE = 90;
+  const VENT_COOLDOWN = 1.2;
+  const MEETING_MS = 30_000;
   const RESET_MS = 9_000;
   const ABSENT_MS = 12_000;
   const MIN_PLAYERS = 3;
   const MAX_PLAYERS = 10;
-  const PLAYER_RADIUS = 6;
 
-  const DEFAULTS = { impostors: 1, killCooldownSec: 20, tasksPerPlayer: 4, auto: false };
+  const DEFAULTS = { impostors: 1, killCooldownSec: 15 };
 
   const COLORS = [
     { id: 'red', hex: '#c51111' },
@@ -354,47 +398,34 @@ window.ImposterCore = (function () {
 
   const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value));
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const centre = player => ({ x: player.x + PLAYER_W / 2, y: player.y + PLAYER_H / 2 });
   const round = value => Math.round(value * 10) / 10;
+  const centreOf = spot => ({ x: spot.x + PLAYER_W / 2, y: spot.y + PLAYER_H / 2 });
 
-  // The walk mask: green pixels of the mini-map, read once into a byte array.
-  // Until it loads, the whole ship is standable so seeding never blocks on IO.
-  const WALK = { data: null, w: 0, h: 0 };
-
-  function setWalkMask(data, width, height) {
-    WALK.data = data;
-    WALK.w = width;
-    WALK.h = height;
-  }
-
-  function pointInFloor(x, y) {
-    if (!WALK.data) return x >= 0 && y >= 0 && x <= WORLD.w && y <= WORLD.h;
-    const px = Math.floor((x / WORLD.w) * WALK.w);
-    const py = Math.floor((y / WORLD.h) * WALK.h);
-    if (px < 0 || py < 0 || px >= WALK.w || py >= WALK.h) return false;
-    return WALK.data[(py * WALK.w + px) * 4 + 1] > 60;
-  }
-
-  function canStand(x, y, radius = PLAYER_RADIUS) {
-    return (
-      pointInFloor(x, y) &&
-      pointInFloor(x - radius, y) &&
-      pointInFloor(x + radius, y) &&
-      pointInFloor(x, y - radius) &&
-      pointInFloor(x, y + radius)
-    );
-  }
-
-  function nearestFloorPoint(x, y) {
-    if (pointInFloor(x, y)) return { x, y };
-    for (let radius = 2; radius <= 80; radius += 2) {
-      for (let step = 0; step < 16; step += 1) {
-        const angle = (step / 16) * Math.PI * 2;
-        const cx = x + Math.cos(angle) * radius;
-        const cy = y + Math.sin(angle) * radius;
-        if (pointInFloor(cx, cy)) return { x: cx, y: cy };
+  function overlapsWall(x, y) {
+    for (const wall of WALLS) {
+      if (x < wall[0] + wall[2] && x + PLAYER_W > wall[0] && y < wall[1] + wall[3] && y + PLAYER_H > wall[1]) {
+        return wall;
       }
     }
-    return { x: SPAWN.x, y: SPAWN.y };
+    return null;
+  }
+
+  function stationById(id) {
+    return TASKS.find(task => task.id === id) || null;
+  }
+
+  function nearestVent(point) {
+    let best = null;
+    let bestDistance = Infinity;
+    for (const vent of VENTS) {
+      const d = Math.hypot(vent[0] - point.x, vent[1] - point.y);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = vent;
+      }
+    }
+    return best && bestDistance <= VENT_RANGE ? { x: best[0], y: best[1], d: bestDistance } : null;
   }
 
   function shuffle(list, rng) {
@@ -421,6 +452,8 @@ window.ImposterCore = (function () {
     return events;
   }
 
+  /* ── state ───────────────────────────────────────────────────────────── */
+
   function createGame({ code = 'TEST', settings = {} } = {}) {
     return {
       code,
@@ -431,6 +464,9 @@ window.ImposterCore = (function () {
       meeting: null,
       winner: null,
       over: null,
+      tasksDone: [],
+      sabotage: null,
+      sabotageCooldown: 0,
       time: 0,
       events: [],
     };
@@ -447,9 +483,15 @@ window.ImposterCore = (function () {
     return free ? free.id : COLORS[state.players.length % COLORS.length].id;
   }
 
-  // A player may walk in at any time. In the lobby they wait for the deal; in a
-  // running round they arrive as a crewmate with a full task list, standing at a
-  // station, ready to play that second.
+  function spawnSeat(state, running, rng) {
+    if (running) {
+      const task = TASKS[Math.floor(rng() * TASKS.length)];
+      return { x: task.x - PLAYER_W / 2, y: task.y - PLAYER_H / 2 };
+    }
+    const spot = SPAWNS[state.players.length % SPAWNS.length];
+    return { x: spot[0] - PLAYER_W / 2, y: spot[1] - PLAYER_H / 2 };
+  }
+
   function addPlayer(state, { id, name, host = false, rng = Math.random }) {
     const existing = getPlayer(state, id);
     if (existing) {
@@ -459,14 +501,7 @@ window.ImposterCore = (function () {
     if (state.players.length >= MAX_PLAYERS) return null;
 
     const running = state.phase === 'play' || state.phase === 'meeting';
-    // The lobby is the ship itself, so newcomers land in the cafeteria beside
-    // whoever is already walking around instead of on top of them.
-    const spot = running
-      ? STATIONS[Math.floor(rng() * STATIONS.length)]
-      : {
-        x: SPAWN.x + ((state.players.length % 5) - 2) * 24,
-        y: SPAWN.y + (state.players.length >= 5 ? 24 : 0),
-      };
+    const spot = spawnSeat(state, running, rng);
     const player = {
       id,
       name: cleanName(name),
@@ -479,17 +514,13 @@ window.ImposterCore = (function () {
       y: spot.y,
       dir: { x: 0, y: 0 },
       goto: null,
-      tasks: [],
-      tasksDone: [],
+      gas: false,
       cooldown: 0,
       ventCooldown: 0,
       emergencyUsed: false,
       revealed: false,
       seen: state.time,
     };
-    if (running) {
-      player.tasks = shuffle(STATIONS.map(station => station.id), rng).slice(0, state.settings.tasksPerPlayer);
-    }
     state.players.push(player);
     if (running) emit(state, { t: 'join', id, name: player.name });
     return player;
@@ -526,19 +557,20 @@ window.ImposterCore = (function () {
     if (state.phase !== 'lobby') return { ok: false, error: 'already-started' };
     const next = Object.assign({}, state.settings);
     if (patch.impostors !== undefined) next.impostors = clamp(Math.round(Number(patch.impostors) || 1), 1, 3);
-    if (patch.killCooldownSec !== undefined) next.killCooldownSec = clamp(Math.round(Number(patch.killCooldownSec) || 20), 5, 60);
-    if (patch.tasksPerPlayer !== undefined) next.tasksPerPlayer = clamp(Math.round(Number(patch.tasksPerPlayer) || 4), 1, 6);
+    if (patch.killCooldownSec !== undefined) next.killCooldownSec = clamp(Math.round(Number(patch.killCooldownSec) || 15), 5, 60);
     state.settings = next;
     return { ok: true };
   }
 
-  function scatterCrew(state) {
+  function placeRing(state) {
     const living = state.players.filter(player => player.alive);
     living.forEach((player, index) => {
       const angle = (index / Math.max(1, living.length)) * Math.PI * 2;
-      const x = SPAWN.x + Math.cos(angle) * 52;
-      const y = SPAWN.y + Math.sin(angle) * 52;
-      const spot = canStand(x, y) ? { x, y } : nearestFloorPoint(x, y);
+      let spot = {
+        x: SPAWNS[0][0] + Math.cos(angle) * 90 - PLAYER_W / 2,
+        y: SPAWNS[0][1] + Math.sin(angle) * 60 - PLAYER_H / 2,
+      };
+      if (overlapsWall(spot.x, spot.y)) spot = { x: SPAWNS[index % SPAWNS.length][0], y: SPAWNS[index % SPAWNS.length][1] };
       player.x = spot.x;
       player.y = spot.y;
       player.dir = { x: 0, y: 0 };
@@ -562,11 +594,7 @@ window.ImposterCore = (function () {
       player.cooldown = state.settings.killCooldownSec;
       player.ventCooldown = 0;
       player.emergencyUsed = false;
-      player.tasksDone = [];
-      player.tasks =
-        player.role === 'crew'
-          ? shuffle(STATIONS.map(station => station.id), rng).slice(0, state.settings.tasksPerPlayer)
-          : [];
+      player.gas = false;
     }
 
     state.phase = 'play';
@@ -574,14 +602,14 @@ window.ImposterCore = (function () {
     state.meeting = null;
     state.winner = null;
     state.over = null;
-    scatterCrew(state);
+    state.tasksDone = [];
+    state.sabotage = null;
+    state.sabotageCooldown = 0;
+    placeRing(state);
     emit(state, { t: 'start' });
     return { ok: true };
   }
 
-  // Any seat may deal the next round or tune the room. Who won the host
-  // election is a networking detail, so it never becomes a permission a player
-  // has to know about.
   function start(state, byId, rng = Math.random) {
     if (!getPlayer(state, byId)) return { ok: false, error: 'unknown-player' };
     return beginRound(state, rng);
@@ -601,13 +629,15 @@ window.ImposterCore = (function () {
     state.meeting = null;
     state.winner = null;
     state.over = null;
+    state.tasksDone = [];
+    state.sabotage = null;
+    state.sabotageCooldown = 0;
     for (const player of state.players) {
       player.alive = true;
       player.role = 'crew';
       player.ready = false;
       player.revealed = false;
-      player.tasks = [];
-      player.tasksDone = [];
+      player.gas = false;
       player.cooldown = 0;
       player.ventCooldown = 0;
       player.emergencyUsed = false;
@@ -628,6 +658,7 @@ window.ImposterCore = (function () {
       msLeft: MEETING_MS,
     };
     state.bodies = [];
+    state.sabotage = null;
     for (const player of state.players) {
       player.dir = { x: 0, y: 0 };
       player.goto = null;
@@ -668,7 +699,7 @@ window.ImposterCore = (function () {
 
     if (!checkWin(state)) {
       state.phase = 'play';
-      scatterCrew(state);
+      placeRing(state);
       for (const player of state.players) {
         if (player.role === 'impostor') player.cooldown = state.settings.killCooldownSec;
       }
@@ -685,17 +716,11 @@ window.ImposterCore = (function () {
     const crew = living.filter(player => player.role === 'crew');
 
     let winner = null;
-    if (!state.players.some(player => player.role === 'impostor')) {
-      // The impostor walked out of the room: there is nothing left to hide from.
-      winner = 'crew';
-    } else if (impostors.length === 0) winner = 'crew';
+    if (!state.players.some(player => player.role === 'impostor')) winner = 'crew';
+    else if (impostors.length === 0) winner = 'crew';
     else if (crew.length === 0) winner = 'impostor';
     else if (impostors.length >= crew.length) winner = 'impostor';
-    else {
-      const remaining = crew.reduce((total, player) => total + player.tasks.length - player.tasksDone.length, 0);
-      const assigned = crew.reduce((total, player) => total + player.tasks.length, 0);
-      if (assigned > 0 && remaining === 0) winner = 'crew';
-    }
+    else if (state.tasksDone.length >= TASKS.length) winner = 'crew';
 
     if (winner) {
       state.phase = 'over';
@@ -715,21 +740,21 @@ window.ImposterCore = (function () {
     return winner;
   }
 
+  /* ── movement, straight out of sprites.py ────────────────────────────── */
+
   function movePlayer(player, dt) {
     if (player.goto) {
-      const dx = player.goto.x - player.x;
-      const dy = player.goto.y - player.y;
+      const target = centreOf({ x: player.goto.x, y: player.goto.y });
+      const dx = target.x - (player.x + PLAYER_W / 2);
+      const dy = target.y - (player.y + PLAYER_H / 2);
       const length = Math.hypot(dx, dy);
-      if (length <= 2) {
-        player.x = player.goto.x;
-        player.y = player.goto.y;
+      if (length <= 10) {
         player.goto = null;
         player.dir = { x: 0, y: 0 };
         return;
       }
       player.dir = { x: dx / length, y: dy / length };
     }
-
     if (!player.dir.x && !player.dir.y) return;
 
     let dirX = player.dir.x;
@@ -740,25 +765,54 @@ window.ImposterCore = (function () {
       dirY /= magnitude;
     }
 
+    const ghostsWalkThroughWalls = !player.alive;
     const stepX = dirX * SPEED * dt;
     const stepY = dirY * SPEED * dt;
-    let moved = false;
-    if (stepX && canStand(player.x + stepX, player.y)) {
-      player.x += stepX;
-      moved = true;
+
+    if (stepX) {
+      const nextX = player.x + stepX;
+      const hit = ghostsWalkThroughWalls ? null : overlapsWall(nextX, player.y);
+      if (hit) {
+        player.x = stepX > 0 ? hit[0] - PLAYER_W : hit[0] + hit[2];
+        player.dir = { x: 0, y: player.dir.y };
+      } else {
+        player.x = nextX;
+      }
     }
-    if (stepY && canStand(player.x, player.y + stepY)) {
-      player.y += stepY;
-      moved = true;
+    if (stepY) {
+      const nextY = player.y + stepY;
+      const hit = ghostsWalkThroughWalls ? null : overlapsWall(player.x, nextY);
+      if (hit) {
+        player.y = stepY > 0 ? hit[1] - PLAYER_H : hit[1] + hit[3];
+        player.dir = { x: player.dir.x, y: 0 };
+      } else {
+        player.y = nextY;
+      }
     }
-    player.x = clamp(player.x, PLAYER_RADIUS, WORLD.w - PLAYER_RADIUS);
-    player.y = clamp(player.y, PLAYER_RADIUS, WORLD.h - PLAYER_RADIUS);
-    if (!moved && player.goto) player.goto = null;
+    player.x = clamp(player.x, 0, WORLD.w - PLAYER_W);
+    player.y = clamp(player.y, 0, WORLD.h - PLAYER_H);
   }
 
   function step(state, dtMs, rng = Math.random) {
     const dt = clamp(dtMs, 0, 250) / 1000;
     state.time += clamp(dtMs, 0, 250);
+
+    if (state.sabotageCooldown > 0) state.sabotageCooldown = Math.max(0, state.sabotageCooldown - dt);
+
+    if (state.sabotage && state.sabotage.kind === 'reactor') {
+      state.sabotage.msLeft -= clamp(dtMs, 0, 250);
+      if (state.sabotage.msLeft <= 0) {
+        state.sabotage = null;
+        state.winner = 'impostor';
+        state.phase = 'over';
+        state.over = {
+          winner: 'impostor',
+          msLeft: RESET_MS,
+          roles: state.players.map(player => ({ id: player.id, name: player.name, role: player.role, alive: player.alive })),
+        };
+        emit(state, { t: 'win', winner: 'impostor' });
+      }
+    }
 
     if (state.meeting) {
       state.meeting.msLeft -= clamp(dtMs, 0, 250);
@@ -784,11 +838,11 @@ window.ImposterCore = (function () {
         if (player.cooldown > 0) player.cooldown = Math.max(0, player.cooldown - dt);
         if (player.ventCooldown > 0) player.ventCooldown = Math.max(0, player.ventCooldown - dt);
       }
-      // Walking is the point of the lobby: the ship is open to explore while
-      // the room fills, and the round starts from wherever people stand.
       movePlayer(player, dt);
     }
   }
+
+  /* ── rules ───────────────────────────────────────────────────────────── */
 
   const rejected = error => ({ ok: false, error });
 
@@ -796,6 +850,40 @@ window.ImposterCore = (function () {
     const player = getPlayer(state, id);
     if (!player) return null;
     return player.alive ? player : null;
+  }
+
+  function canSabotage(state, kind) {
+    if (!state.sabotage && state.sabotageCooldown <= 0) return true;
+    return Boolean(state.sabotage && state.sabotage.kind === kind);
+  }
+
+  function sabotage(state, id, kind) {
+    const actor = alive(state, id);
+    if (!actor) return rejected('dead');
+    if (state.phase !== 'play') return rejected('not-playing');
+    if (actor.role !== 'impostor') return rejected('not-impostor');
+    if (state.sabotage) return rejected('already-sabotaged');
+    if (state.sabotageCooldown > 0) return rejected('sabotage-cooling');
+    if (kind !== 'lights' && kind !== 'reactor') return rejected('unknown-sabotage');
+    state.sabotage = { kind, by: id, msLeft: kind === 'reactor' ? REACTOR_MS : 0 };
+    state.sabotageCooldown = SABOTAGE_COOLDOWN;
+    emit(state, { t: 'sabotage', kind });
+    return { ok: true };
+  }
+
+  function fix(state, id) {
+    const actor = alive(state, id);
+    if (!actor) return rejected('dead');
+    if (state.phase !== 'play') return rejected('not-playing');
+    if (!state.sabotage) return rejected('nothing-to-fix');
+    const point = FIX[state.sabotage.kind];
+    if (!point) return rejected('nothing-to-fix');
+    if (dist(centreOf(actor), point) > point.range) return rejected('too-far');
+    const kind = state.sabotage.kind;
+    state.sabotage = null;
+    state.sabotageCooldown = SABOTAGE_COOLDOWN;
+    emit(state, { t: 'fixed', kind });
+    return { ok: true };
   }
 
   function apply(state, id, message) {
@@ -814,10 +902,9 @@ window.ImposterCore = (function () {
       }
       case 'goto': {
         if (state.phase !== 'play' && state.phase !== 'lobby') return rejected('not-playing');
-        const target = nearestFloorPoint(Number(message.x) || 0, Number(message.y) || 0);
         player.goto = {
-          x: clamp(target.x, PLAYER_RADIUS, WORLD.w - PLAYER_RADIUS),
-          y: clamp(target.y, PLAYER_RADIUS, WORLD.h - PLAYER_RADIUS),
+          x: clamp(Number(message.x) || 0, 0, WORLD.w - PLAYER_W),
+          y: clamp(Number(message.y) || 0, 0, WORLD.h - PLAYER_H),
         };
         player.dir = { x: 0, y: 0 };
         return { ok: true };
@@ -835,18 +922,25 @@ window.ImposterCore = (function () {
         return start(state, id);
       case 'lobby':
         return backToLobby(state, id);
-      case 'task': {
+      case 'use': {
         const actor = alive(state, id);
         if (!actor) return rejected('dead');
         if (state.phase !== 'play') return rejected('not-playing');
         if (actor.role !== 'crew') return rejected('not-crew');
-        const station = stationById(message.station);
-        if (!station) return rejected('no-station');
-        if (!actor.tasks.includes(station.id)) return rejected('not-your-task');
-        if (actor.tasksDone.includes(station.id)) return rejected('already-done');
-        if (dist(actor, station) > TASK_RANGE) return rejected('too-far');
-        actor.tasksDone.push(station.id);
-        emit(state, { t: 'task', id, station: station.id });
+        if (message.station === GASCAN.id) {
+          if (dist(centreOf(actor), GASCAN) > GASCAN.range) return rejected('too-far');
+          actor.gas = true;
+          emit(state, { t: 'gas', id });
+          return { ok: true };
+        }
+        const task = stationById(message.station);
+        if (!task) return rejected('no-station');
+        if (state.tasksDone.includes(task.id)) return rejected('already-done');
+        if (dist(centreOf(actor), task) > task.range) return rejected('too-far');
+        if (task.id === 'fuel' && !actor.gas) return rejected('need-gas');
+        state.tasksDone.push(task.id);
+        actor.gas = false;
+        emit(state, { t: 'task', id, station: task.id });
         checkWin(state);
         return { ok: true };
       }
@@ -855,11 +949,12 @@ window.ImposterCore = (function () {
         if (!actor) return rejected('dead');
         if (state.phase !== 'play') return rejected('not-playing');
         if (actor.role !== 'impostor') return rejected('not-impostor');
+        if (state.sabotage && state.sabotage.kind === 'reactor') return rejected('reactor-locked');
         if (actor.cooldown > 0) return rejected('cooling-down');
         const victim = alive(state, message.target);
         if (!victim) return rejected('no-target');
         if (victim.role === 'impostor') return rejected('teammate');
-        if (dist(actor, victim) > KILL_RANGE) return rejected('too-far');
+        if (dist(centreOf(actor), centreOf(victim)) > KILL_RANGE) return rejected('too-far');
         victim.alive = false;
         victim.dir = { x: 0, y: 0 };
         victim.goto = null;
@@ -875,25 +970,30 @@ window.ImposterCore = (function () {
         if (state.phase !== 'play') return rejected('not-playing');
         if (actor.role !== 'impostor') return rejected('not-impostor');
         if (actor.ventCooldown > 0) return rejected('venting-cooldown');
-        const from = ventById(message.vent);
-        if (!from) return rejected('no-vent');
-        if (dist(actor, from) > VENT_RANGE) return rejected('too-far');
-        const to = pairedVent(from.id);
-        if (!to) return rejected('no-vent');
-        actor.x = to.x;
-        actor.y = to.y;
+        const here = nearestVent(centreOf(actor));
+        if (!here) return rejected('no-vent');
+        // game.py hops to random.choice(self.vent); same ship-wide network here.
+        const destination = VENTS[Math.floor(Math.random() * VENTS.length)];
+        actor.x = destination[0] - PLAYER_W / 2;
+        actor.y = destination[1] - PLAYER_H / 2;
         actor.dir = { x: 0, y: 0 };
         actor.goto = null;
         actor.ventCooldown = VENT_COOLDOWN;
+        emit(state, { t: 'vent', id });
         return { ok: true };
       }
+      case 'sabotage':
+        return sabotage(state, id, message.kind);
+      case 'fix':
+        return fix(state, id);
       case 'report': {
         const actor = alive(state, id);
         if (!actor) return rejected('dead');
         if (state.phase !== 'play') return rejected('not-playing');
+        if (actor.role === 'impostor' && state.sabotage) return rejected('sabotage-running');
         const body = state.bodies.find(candidate => candidate.id === message.body);
         if (!body) return rejected('no-body');
-        if (dist(actor, body) > REPORT_RANGE) return rejected('too-far');
+        if (dist(centreOf(actor), centreOf(body)) > REPORT_RANGE) return rejected('too-far');
         startMeeting(state, { caller: id, reason: 'body', bodyOf: body.of });
         return { ok: true };
       }
@@ -902,7 +1002,7 @@ window.ImposterCore = (function () {
         if (!actor) return rejected('dead');
         if (state.phase !== 'play') return rejected('not-playing');
         if (actor.emergencyUsed) return rejected('already-used');
-        if (dist(actor, BUTTON) > BUTTON_RANGE) return rejected('too-far');
+        if (dist(centreOf(actor), BUTTON) > BUTTON_RANGE) return rejected('too-far');
         actor.emergencyUsed = true;
         startMeeting(state, { caller: id, reason: 'button' });
         return { ok: true };
@@ -928,34 +1028,43 @@ window.ImposterCore = (function () {
   }
 
   function actionHints(state, viewer) {
-    const hints = { use: null, kill: null, vent: null, report: null, button: false };
+    const hints = {
+      use: null, gas: false, kill: null, vent: null, report: null,
+      button: false, fix: false,
+      sabotage: { lights: false, reactor: false },
+    };
     if (state.phase !== 'play' || !viewer || !viewer.alive) return hints;
+    const at = centreOf(viewer);
 
     if (viewer.role === 'crew') {
-      const open = viewer.tasks.filter(id => !viewer.tasksDone.includes(id));
-      const near = STATIONS.filter(station => open.includes(station.id) && dist(viewer, station) <= TASK_RANGE);
-      hints.use = near.sort((a, b) => dist(viewer, a) - dist(viewer, b))[0]?.id || null;
+      const open = TASKS
+        .filter(task => !state.tasksDone.includes(task.id) && dist(at, task) <= task.range)
+        .sort((a, b) => dist(at, a) - dist(at, b));
+      hints.use = open.length ? open[0].id : null;
+      hints.gas = !viewer.gas && dist(at, GASCAN) <= GASCAN.range;
     }
 
     if (viewer.role === 'impostor') {
       if (viewer.cooldown <= 0) {
         const targets = state.players.filter(
-          player => player.alive && player.role === 'crew' && player.id !== viewer.id && dist(viewer, player) <= KILL_RANGE,
+          player => player.alive && player.role === 'crew' && dist(at, centreOf(player)) <= KILL_RANGE,
         );
-        hints.kill = targets.sort((a, b) => dist(viewer, a) - dist(viewer, b))[0]?.id || null;
+        hints.kill = targets.sort((a, b) => dist(at, centreOf(a)) - dist(at, centreOf(b)))[0]?.id || null;
       }
-      if (viewer.ventCooldown <= 0) {
-        const vent = VENTS.filter(candidate => dist(viewer, candidate) <= VENT_RANGE)
-          .sort((a, b) => dist(viewer, a) - dist(viewer, b))[0];
-        hints.vent = vent ? vent.id : null;
-      }
+      if (viewer.ventCooldown <= 0 && nearestVent(at)) hints.vent = 'vent';
+      hints.sabotage.lights = canSabotage(state, 'lights');
+      hints.sabotage.reactor = canSabotage(state, 'reactor');
     }
 
     const body = state.bodies
-      .filter(candidate => dist(viewer, candidate) <= REPORT_RANGE)
-      .sort((a, b) => dist(viewer, a) - dist(viewer, b))[0];
+      .filter(candidate => dist(at, centreOf(candidate)) <= REPORT_RANGE)
+      .sort((a, b) => dist(at, centreOf(a)) - dist(at, centreOf(b)))[0];
     hints.report = body ? body.id : null;
-    hints.button = !viewer.emergencyUsed && dist(viewer, BUTTON) <= BUTTON_RANGE;
+    hints.button = !viewer.emergencyUsed && dist(at, BUTTON) <= BUTTON_RANGE;
+    if (state.sabotage) {
+      const point = FIX[state.sabotage.kind];
+      hints.fix = Boolean(point && dist(at, point) <= point.range);
+    }
     return hints;
   }
 
@@ -969,9 +1078,20 @@ window.ImposterCore = (function () {
       winner: state.winner,
       over: state.over,
       settings: state.settings,
-      map: { w: WORLD.w, h: WORLD.h },
+      map: { w: WORLD.w, h: WORLD.h, view: VIEW },
       button: BUTTON,
-      vents: VENTS.map(vent => ({ id: vent.id, x: vent.x, y: vent.y, pair: vent.pair })),
+      vents: VENTS.map(vent => ({ x: vent[0], y: vent[1] })),
+      tasks: { done: state.tasksDone.slice(), total: TASKS.length },
+      stations: TASKS.map(task => ({
+        id: task.id, label: task.label, x: task.x, y: task.y, range: task.range,
+        done: state.tasksDone.includes(task.id),
+      })),
+      gas: GASCAN,
+      fix: state.sabotage ? FIX[state.sabotage.kind] : null,
+      sabotage: state.sabotage
+        ? { kind: state.sabotage.kind, msLeft: Math.max(0, Math.round(state.sabotage.msLeft)) }
+        : null,
+      sabotageCooldown: Math.ceil(state.sabotageCooldown),
       you: viewer
         ? {
             id: viewer.id,
@@ -979,15 +1099,12 @@ window.ImposterCore = (function () {
             alive: viewer.alive,
             ready: viewer.ready,
             host: viewer.host,
-            done: viewer.tasksDone.length,
-            total: viewer.tasks.length,
+            gas: viewer.gas,
+            done: state.tasksDone.length,
+            total: TASKS.length,
             cooldown: Math.ceil(viewer.cooldown),
             ventCooldown: Math.ceil(viewer.ventCooldown),
             emergencyUsed: viewer.emergencyUsed,
-            tasks: viewer.tasks.map(id => {
-              const station = stationById(id);
-              return { id, label: station.label, room: station.room, x: station.x, y: station.y, done: viewer.tasksDone.includes(id) };
-            }),
           }
         : null,
       players: state.players.map(player => ({
@@ -1018,18 +1135,12 @@ window.ImposterCore = (function () {
     };
   }
 
-  /* ── the room ─────────────────────────────────────────────────────────── */
+  /* ── the room (unchanged transport-facing half) ──────────────────────── */
 
   const SNAPSHOT_MS = 100;
   const MIRROR_MS = 1200;
-  // Event types a client may see. A kill names the killer, so it stays on the
-  // host; the body itself arrives with the next snapshot.
-  const PUBLIC_EVENTS = new Set(['start', 'meeting', 'eject', 'win', 'vote', 'task', 'join', 'lobby']);
+  const PUBLIC_EVENTS = new Set(['start', 'meeting', 'eject', 'win', 'vote', 'task', 'join', 'lobby', 'sabotage', 'fixed', 'gas']);
 
-  // Rehydrate a checkpoint on a new host. The old host's seat is dropped through
-  // the normal removal path (so parity, the task bar and a short-handed lobby all
-  // behave), then the new host's own seat is re-keyed from its client id to the
-  // host seat and anything that referenced it is re-pointed.
   function adoptState(source, { newHostId = null, hostId = 'host' } = {}) {
     let state;
     try {
@@ -1045,6 +1156,7 @@ window.ImposterCore = (function () {
     state.events = [];
     state.settings = Object.assign({}, DEFAULTS, state.settings || {});
     if (!Array.isArray(state.bodies)) state.bodies = [];
+    if (!Array.isArray(state.tasksDone)) state.tasksDone = [];
 
     const oldHost = newHostId
       ? state.players.find(player => player.host && player.id !== newHostId)
@@ -1086,12 +1198,9 @@ window.ImposterCore = (function () {
     state.settings.auto = Boolean(publicRoom) || Boolean(state.settings.auto);
     if (!getPlayer(state, hostId)) addPlayer(state, { id: hostId, name, host: true });
 
-    // Seats are keyed by a player id the client keeps for the whole session; a
-    // connection id only lives as long as one data channel. That is what lets a
-    // reconnecting player (or a promoted host) keep its role, tasks and body.
-    const links = new Map(); // playerId -> send
-    const connections = new Map(); // connectionId -> playerId
-    const owners = new Map(); // playerId -> connectionId
+    const links = new Map();
+    const connections = new Map();
+    const owners = new Map();
     const listeners = { snapshot: [], event: [] };
     let sinceSnapshot = SNAPSHOT_MS;
     let sinceMirror = MIRROR_MS;
@@ -1107,8 +1216,6 @@ window.ImposterCore = (function () {
       for (const handler of listeners[kind]) handler(payload);
     }
 
-    // The ring is the seating order after the host, so "next in line" rotates as
-    // people come and go instead of always landing on the same player.
     function ring() {
       const ids = state.players.map(player => player.id);
       const at = ids.indexOf(hostId);
@@ -1139,18 +1246,15 @@ window.ImposterCore = (function () {
       return JSON.parse(JSON.stringify(state));
     }
 
-    // What a snapshot can differ in from one tick to the next. If none of it
-    // moved, the host would be building and serialising N payloads to say
-    // nothing, which is exactly the work that makes hosting feel heavy.
     let lastKey = '';
     function signature() {
       const players = state.players.map(player =>
         [player.id, Math.round(player.x), Math.round(player.y), player.alive ? 1 : 0,
-          player.teammate ? 1 : 0, player.ready ? 1 : 0, player.revealed ? 1 : 0,
-          Math.ceil(player.cooldown || 0), Math.ceil(player.ventCooldown || 0),
-          player.tasksDone.length].join(',')).join(';');
+          player.ready ? 1 : 0, player.revealed ? 1 : 0, player.gas ? 1 : 0,
+          Math.ceil(player.cooldown || 0), Math.ceil(player.ventCooldown || 0)].join(',')).join(';');
       const votes = state.meeting && state.meeting.votes ? Object.keys(state.meeting.votes).length : 0;
-      return [state.phase, players, state.bodies.length, votes,
+      return [state.phase, players, state.bodies.length, votes, state.tasksDone.length,
+        state.sabotage ? state.sabotage.kind : '-', Math.ceil(state.sabotageCooldown),
         Math.ceil(((state.meeting && state.meeting.msLeft) || 0) / 1000),
         Math.ceil(((state.over && state.over.msLeft) || 0) / 1000)].join('|');
     }
@@ -1239,8 +1343,6 @@ window.ImposterCore = (function () {
     function detach(connectionId) {
       const seatId = connections.get(connectionId) || connectionId;
       connections.delete(connectionId);
-      // A newer channel may already own this seat (a reconnect that raced the
-      // old channel's close); only the current owner may free it.
       if (owners.get(seatId) !== connectionId) return;
       owners.delete(seatId);
       links.delete(seatId);
@@ -1264,8 +1366,6 @@ window.ImposterCore = (function () {
       checkpoint,
       successor,
       rankOf,
-      // `step` clamps one call to 250 ms, so a throttled tab that comes back
-      // after a second of sleep still advances a full second of game time.
       tick(dtMs) {
         let remaining = Math.max(0, dtMs);
         while (remaining > 0) {
@@ -1289,15 +1389,15 @@ window.ImposterCore = (function () {
   }
 
   return {
-    WORLD, ROOMS, SPAWN, BUTTON, STATIONS, VENTS, COLORS, setWalkMask,
-    SPEED, KILL_RANGE, TASK_RANGE, REPORT_RANGE, BUTTON_RANGE, VENT_RANGE, VENT_COOLDOWN,
-    MEETING_MS, RESET_MS, ABSENT_MS, MIN_PLAYERS, MAX_PLAYERS, PLAYER_RADIUS, DEFAULTS, SNAPSHOT_MS,
-    stationById, ventById, pairedVent, pointInFloor, canStand, nearestFloorPoint,
-    createGame, addPlayer, removePlayer, getPlayer, setReady, configure, start, beginRound,
-    maybeAutoStart, backToLobby, endMeeting, checkWin, apply, step, snapshotFor, drainEvents,
-    adoptState, createHostRoom,
+    WORLD, VIEW, SPEED, PLAYER_W, PLAYER_H, WALLS, SPAWNS, VENTS, BUTTON, TASKS, GASCAN, FIX,
+    COLORS, DEFAULTS, SNAPSHOT_MS, KILL_COOLDOWN, SABOTAGE_COOLDOWN, REACTOR_MS, KILL_RANGE,
+    REPORT_RANGE, BUTTON_RANGE, VENT_RANGE, MEETING_MS, RESET_MS, ABSENT_MS, MIN_PLAYERS, MAX_PLAYERS,
+    stationById, overlapsWall, nearestVent, createGame, addPlayer, removePlayer, getPlayer, setReady,
+    configure, start, beginRound, maybeAutoStart, backToLobby, endMeeting, checkWin, apply, step,
+    snapshotFor, drainEvents, adoptState, createHostRoom,
   };
 })();
+
 </script>
 
 <script id="imposter-net">
@@ -1677,20 +1777,20 @@ window.ImposterNet = (function () {
   const C = window.ImposterCore;
   const N = window.ImposterNet;
   const $ = id => document.getElementById(id);
-  const screens = { menu: $('screen-menu'), game: $('screen-game') };
   const ERRORS = {
     'not-in-lobby': 'That only works in the lobby.',
-    'host-only': 'That did not go through. Try again in a moment.',
     'already-started': 'The round already started.',
     'need-3-players': 'Three players minimum.',
     'not-playing': 'The round is paused.',
     dead: 'You are a ghost.',
     'not-crew': 'Impostors cannot do tasks.',
-    'not-your-task': 'That is not one of your tasks.',
+    'no-station': 'Nothing here.',
     'already-done': 'Already done.',
     'too-far': 'Get closer.',
+    'need-gas': 'Find a gas can in Storage first.',
     'not-impostor': 'Only the impostor can do that.',
     'cooling-down': 'Still cooling down.',
+    'reactor-locked': 'Fix the reactor first.',
     'venting-cooldown': 'The vent is still closing.',
     'no-vent': 'No vent here.',
     'no-target': 'Nobody there.',
@@ -1700,6 +1800,11 @@ window.ImposterNet = (function () {
     'dead-cannot-vote': 'Ghosts do not vote.',
     'already-voted': 'You already voted.',
     'no-meeting': 'No meeting running.',
+    'already-sabotaged': 'A sabotage is already running.',
+    'sabotage-cooling': 'Sabotage is recharging.',
+    'sabotage-running': 'You cannot report during a sabotage.',
+    'unknown-sabotage': 'Unknown sabotage.',
+    'nothing-to-fix': 'Nothing to fix.',
     'room-full': 'The room is full (10).',
     'already-joined': 'You are already in this room.',
     'unknown-player': 'The host lost your seat.',
@@ -1710,16 +1815,57 @@ window.ImposterNet = (function () {
   let selfId = 'host';
   let shown = 'menu';
   let toastUntil = 0;
-  let palette = null;
+  let taskOpen = null;
 
   const keys = new Set();
   let sentDir = { x: 0, y: 0 };
-  let lastGoto = 0;
   const listKeys = new Map();
+
+  /* ── art ─────────────────────────────────────────────────────────────── */
+
+  // The ship, the crew frames, the task boards and the interface icons are the
+  // ripped set from AI0702/Among-Us-clone (artwork belongs to Innersloth).
+  const IMAGE_BASE = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI)
+    ? 'imposter/'
+    : 'games/content/imposter/';
+  const asset = name => new URL(IMAGE_BASE + name, document.baseURI).href;
+
+  function loadImage(name) {
+    const image = new Image();
+    image.src = asset(name);
+    return image;
+  }
+
+  const MAP_ART = loadImage('map.jpg');
+  const MINI_ART = loadImage('mini.png');
+  const BUTTON_ART = loadImage('button.png');
+  const GAS_ART = loadImage('gas-can.png');
+  const CREW = new Map();
+  for (const color of C.COLORS) CREW.set(color.id, loadImage('crew-' + color.id + '.png'));
+
+  /* ── small dom helpers ───────────────────────────────────────────────── */
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function img(name, className) {
+    const node = new Image();
+    node.src = asset(name);
+    node.className = className || '';
+    node.draggable = false;
+    node.alt = '';
+    return node;
+  }
 
   function show(name) {
     shown = name;
-    for (const [id, element] of Object.entries(screens)) element.hidden = id !== name;
+    for (const [id, element] of Object.entries({ menu: $('screen-menu'), game: $('screen-game') })) {
+      element.hidden = id !== name;
+    }
     $('leave').hidden = name === 'menu';
   }
 
@@ -1734,7 +1880,7 @@ window.ImposterNet = (function () {
     const element = $('toast');
     element.textContent = text;
     element.hidden = false;
-    toastUntil = performance.now() + 3600;
+    toastUntil = performance.now() + 3400;
   }
 
   function tickToast() {
@@ -1766,21 +1912,12 @@ window.ImposterNet = (function () {
   }
 
   function playerRow(player, suffix) {
-    const row = document.createElement('li');
-    row.className = 'row-item';
-    const dot = document.createElement('span');
-    dot.className = 'dot';
+    const row = el('li', 'row-item');
+    const dot = el('span', 'dot');
     dot.style.background = colorHex(player.color);
-    const name = document.createElement('span');
-    name.className = 'name';
-    name.textContent = player.name;
+    const name = el('span', 'name', player.name);
     row.append(dot, name);
-    if (suffix) {
-      const tail = document.createElement('span');
-      tail.className = 'tail';
-      tail.textContent = suffix;
-      row.append(tail);
-    }
+    if (suffix) row.append(el('span', 'tail', suffix));
     return row;
   }
 
@@ -1825,8 +1962,10 @@ window.ImposterNet = (function () {
     snap = null;
     selfId = 'host';
     listKeys.clear();
+    closeTask();
     $('overlay-meeting').hidden = true;
     $('overlay-over').hidden = true;
+    $('overlay-list').hidden = true;
     $('room-tag').hidden = true;
     $('lobby-bar').hidden = true;
     $('roster').replaceChildren();
@@ -1842,8 +1981,6 @@ window.ImposterNet = (function () {
         break;
       case 'joined':
         menuStatus('');
-        break;
-      case 'promoted':
         break;
       case 'lost':
         toast('Connection hiccup. Reconnecting…');
@@ -1884,27 +2021,33 @@ window.ImposterNet = (function () {
     tag.hidden = false;
     tag.textContent = 'Room: ' + (publicRoom ? 'PUBLIC' : next.code || '----');
 
+    show('game');
+
     if (next.phase === 'lobby') {
-      show('game');
       $('lobby-bar').hidden = false;
       $('hud').hidden = true;
       $('actions').hidden = true;
+      $('task-bar').hidden = true;
+      $('sab-lights').hidden = true;
+      $('sab-reactor').hidden = true;
       $('overlay-meeting').hidden = true;
       $('overlay-over').hidden = true;
+      closeTask();
       renderLobby(next, hosting, publicRoom);
       return;
     }
 
-    show('game');
     $('lobby-bar').hidden = true;
     $('hud').hidden = false;
     $('actions').hidden = false;
+    $('task-bar').hidden = false;
     renderHud(next);
     $('lobby-note').textContent = '';
 
     if (next.phase === 'meeting') {
       $('overlay-over').hidden = true;
       $('overlay-meeting').hidden = false;
+      closeTask();
       renderMeeting(next);
     } else {
       $('overlay-meeting').hidden = true;
@@ -1912,6 +2055,7 @@ window.ImposterNet = (function () {
 
     if (next.phase === 'over') {
       $('overlay-over').hidden = false;
+      closeTask();
       renderOver(next, hosting, publicRoom);
     } else {
       $('overlay-over').hidden = true;
@@ -1925,17 +2069,13 @@ window.ImposterNet = (function () {
 
     const players = s.players;
     setList($('roster'), players.map(player => `${player.id}:${player.name}:${player.host}`).join('|'), list => {
-      for (const player of players) {
-        list.append(playerRow(player, player.id === selfId ? 'you' : ''));
-      }
+      for (const player of players) list.append(playerRow(player, player.id === selfId ? 'you' : ''));
     });
 
     const need = Math.max(0, C.MIN_PLAYERS - players.length);
     $('lobby-note').textContent = publicRoom
-      ? `${players.length} / ${C.MAX_PLAYERS} in the public room · ` +
-        (need ? `${need} more to start` : 'starting…')
-      : `${players.length} / ${C.MAX_PLAYERS} · ` +
-        (need ? `${need} more to start` : 'ready when you are');
+      ? `${players.length} / ${C.MAX_PLAYERS} in the public room · ` + (need ? `${need} more to start` : 'starting…')
+      : `${players.length} / ${C.MAX_PLAYERS} · ` + (need ? `${need} more to start` : 'ready when you are');
 
     $('host-settings').hidden = publicRoom;
     $('start').hidden = publicRoom;
@@ -1944,11 +2084,7 @@ window.ImposterNet = (function () {
   }
 
   function applySettingsToForm(settings) {
-    for (const [id, value] of [
-      ['set-impostors', settings.impostors],
-      ['set-cooldown', settings.killCooldownSec],
-      ['set-tasks', settings.tasksPerPlayer],
-    ]) {
+    for (const [id, value] of [['set-impostors', settings.impostors], ['set-cooldown', settings.killCooldownSec]]) {
       const field = $(id);
       if (field && document.activeElement !== field) field.value = String(value);
     }
@@ -1967,18 +2103,36 @@ window.ImposterNet = (function () {
     if (you.role === 'impostor' && you.alive) {
       parts.push(you.cooldown > 0 ? `kill ${you.cooldown}s` : 'kill ready');
     }
+    if (s.sabotage?.kind === 'lights') parts.push('lights out');
+    if (s.sabotage?.kind === 'reactor') parts.push(`reactor ${Math.ceil(s.sabotage.msLeft / 1000)}s`);
     $('hud').textContent = parts.join(' · ');
 
-    const use = $('act-use');
-    use.hidden = !s.actions.use;
-    if (s.actions.use) {
-      const station = C.STATIONS.find(candidate => candidate.id === s.actions.use);
-      use.textContent = station ? station.label : 'Use';
+    const fill = $('task-bar').firstElementChild;
+    fill.style.width = `${Math.round((s.tasks.done.length / s.tasks.total) * 100)}%`;
+
+    const actions = s.actions;
+    $('act-use').hidden = !actions.use;
+    $('act-gas').hidden = !actions.gas;
+    $('act-kill').hidden = !actions.kill;
+    $('act-vent').hidden = !actions.vent;
+    $('act-report').hidden = !actions.report;
+    $('act-button').hidden = !actions.button;
+    $('act-fix').hidden = !actions.fix;
+
+    const canSabotage = you.role === 'impostor' && you.alive && s.phase === 'play';
+    $('sab-lights').hidden = !canSabotage || !actions.sabotage.lights;
+    $('sab-reactor').hidden = !canSabotage || !actions.sabotage.reactor;
+
+    const note = $('sabotage-note');
+    if (s.sabotage?.kind === 'reactor') {
+      note.hidden = false;
+      note.textContent = `Reactor meltdown in ${Math.ceil(s.sabotage.msLeft / 1000)}s — reset it in Reactor.`;
+    } else if (s.sabotage?.kind === 'lights') {
+      note.hidden = false;
+      note.textContent = 'Lights out — fix the breaker in Electrical.';
+    } else {
+      note.hidden = true;
     }
-    $('act-kill').hidden = !s.actions.kill;
-    $('act-vent').hidden = !s.actions.vent;
-    $('act-report').hidden = !s.actions.report;
-    $('act-button').hidden = !s.actions.button;
   }
 
   function renderMeeting(s) {
@@ -2000,18 +2154,14 @@ window.ImposterNet = (function () {
     const key = `${reason}|${alive.map(player => player.id).join(',')}|${meeting.voted.join(',')}|${you?.alive}|${canVote}`;
     setList($('votes'), key, list => {
       if (!you?.alive || !canVote) {
-        const note = document.createElement('li');
-        note.textContent = you?.alive ? 'Waiting for the next meeting.' : 'Ghosts watch. They do not vote.';
-        list.append(note);
+        list.append(el('li', '', you?.alive ? 'Waiting for the next meeting.' : 'Ghosts watch. They do not vote.'));
         return;
       }
       for (const player of alive) {
         if (player.id === selfId) continue;
         const row = playerRow(player, meeting.voted.includes(player.id) ? 'voted' : '');
-        const button = document.createElement('button');
-        button.className = 'vote';
+        const button = el('button', 'vote', 'Vote');
         button.type = 'button';
-        button.textContent = 'Vote';
         button.disabled = voted;
         button.addEventListener('click', () => send({ t: 'vote', target: player.id }));
         row.append(button);
@@ -2065,6 +2215,15 @@ window.ImposterNet = (function () {
       case 'task':
         if (event.id === selfId) toast('Task complete.');
         break;
+      case 'gas':
+        if (event.id === selfId) toast('Gas can in hand. Take it to the engine.');
+        break;
+      case 'sabotage':
+        toast(event.kind === 'reactor' ? 'Reactor meltdown.' : 'Lights cut.');
+        break;
+      case 'fixed':
+        toast(event.kind === 'reactor' ? 'Reactor reset.' : 'Lights back on.');
+        break;
       case 'rejected':
         toast(ERRORS[event.error] || event.error);
         break;
@@ -2075,45 +2234,6 @@ window.ImposterNet = (function () {
 
   /* ── drawing ─────────────────────────────────────────────────────────── */
 
-/* ── art ─────────────────────────────────────────────────────────────── */
-
-  // Ship art, crewmate sprites, task marks and the emergency button come from
-  // AI0702/Among-Us-clone (Unlicense repo; artwork belongs to Innersloth). The
-  // mini-map is used as the collision mask, so what looks like wall is wall.
-  const IMAGE_BASE = /\/games\/content\/[^/]+\.html([?#].*)?$/.test(document.baseURI)
-    ? 'imposter/'
-    : 'games/content/imposter/';
-  const asset = name => new URL(IMAGE_BASE + name, document.baseURI).href;
-  const MAP_ART = new Image();
-  MAP_ART.src = asset('map.jpg');
-  const BUTTON_ART = new Image();
-  BUTTON_ART.src = asset('button.png');
-  const CREW = new Map();
-  for (const color of C.COLORS) {
-    const image = new Image();
-    image.src = asset('crew-' + color.id + '.png');
-    CREW.set(color.id, image);
-  }
-
-  // One read of the green mask into a byte array; every collision test after
-  // that is a single array lookup.
-  function loadWalkMask() {
-    const image = new Image();
-    image.src = asset('walk.png');
-    image.decode().then(() => {
-      const canvas = document.createElement('canvas');
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(image, 0, 0);
-      const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-      C.setWalkMask(data, canvas.width, canvas.height);
-    }).catch(() => {});
-  }
-
-  // Snapshots land ten times a second. Remote seats ease toward the newest
-  // position so nobody stutters between packets; the seat you drive moves from
-  // your own keys immediately and only snaps when the host disagrees badly.
   const view = new Map();
   let selfView = null;
   let lastFrame = performance.now();
@@ -2132,7 +2252,7 @@ window.ImposterNet = (function () {
       if (!state.players.some(player => player.id === id)) view.delete(id);
     }
     const me = state.players.find(player => player.id === selfId);
-    if (me && (!selfView || Math.hypot(selfView.x - me.x, selfView.y - me.y) > 22)) {
+    if (me && (!selfView || Math.hypot(selfView.x - me.x, selfView.y - me.y) > 220)) {
       selfView = { x: me.x, y: me.y };
     }
   }
@@ -2151,48 +2271,33 @@ window.ImposterNet = (function () {
     if (!image || !image.complete || !image.naturalWidth) return false;
     const frameWidth = image.naturalWidth / 4;
     const height = image.naturalHeight;
-    const scale = 0.55;
-    const width = frameWidth * scale;
-    const tall = height * scale;
     ctx.save();
     ctx.globalAlpha *= alpha;
-    ctx.drawImage(image, frame * frameWidth, 0, frameWidth, height, x - width / 2, y - tall + tall * 0.08, width, tall);
+    ctx.drawImage(image, frame * frameWidth, 0, frameWidth, height, x - C.PLAYER_W / 2, y - C.PLAYER_H, C.PLAYER_W, C.PLAYER_H);
     ctx.restore();
     return true;
   }
 
-  function label(ctx, text, x, y, color) {
-    ctx.font = '600 13px ui-monospace, Menlo, monospace';
+  function label(ctx, text, x, y, color, size) {
+    const px = size || 30;
+    ctx.font = `600 ${px}px ui-monospace, Menlo, monospace`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(0,0,0,.6)';
-    ctx.fillText(text, x + 0.6, y + 0.6);
+    ctx.fillStyle = 'rgba(0,0,0,.72)';
+    ctx.fillText(text, x + px * 0.05, y + px * 0.05);
     ctx.fillStyle = color;
     ctx.fillText(text, x, y);
   }
 
+  let viewW = C.VIEW.w;
+  let viewH = C.VIEW.h;
+
   function draw() {
     requestAnimationFrame(draw);
     tickToast();
-    if (!snap || screens.game.hidden) return;
+    if (!snap || $('screen-game').hidden) return;
 
     const canvas = $('board');
     const stage = canvas.parentElement;
-
-    // The frame hugs the map: the largest box with the ship's aspect that still
-    // leaves the HUD and the lobby dock their room.
-    const wrap = stage.parentElement;
-    const chrome = ($('hud').hidden ? 0 : $('hud').offsetHeight + 8) +
-      ($('lobby-bar').hidden ? 0 : $('lobby-bar').offsetHeight + 8);
-    const availW = wrap.clientWidth;
-    const availH = Math.max(140, wrap.clientHeight - chrome);
-    const fit = Math.min(availW / C.WORLD.w, availH / C.WORLD.h);
-    const boxW = Math.max(1, Math.round(C.WORLD.w * fit));
-    const boxH = Math.max(1, Math.round(C.WORLD.h * fit));
-    if (stage.clientWidth !== boxW || stage.clientHeight !== boxH) {
-      stage.style.width = boxW + 'px';
-      stage.style.height = boxH + 'px';
-    }
-
     const width = stage.clientWidth;
     const height = stage.clientHeight;
     if (!width || !height) return;
@@ -2209,17 +2314,26 @@ window.ImposterNet = (function () {
       canvas.height = pixelHeight;
     }
 
-    const ctx = canvas.getContext('2d');
-    const scale = Math.min(width / C.WORLD.w, height / C.WORLD.h);
-    const offX = (width - C.WORLD.w * scale) / 2;
-    const offY = (height - C.WORLD.h * scale) / 2;
+    // The Python drew 1280x640 of ship at a time and followed the player. Fit
+    // that whole view into the stage and let the extra space show more ship, so
+    // a tall panel is not zoomed into the floor tiles.
+    const scale = Math.min(width / C.VIEW.w, height / C.VIEW.h);
+    viewW = width / scale;
+    viewH = height / scale;
 
+    const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
-
     ctx.save();
-    ctx.translate(offX, offY);
     ctx.scale(scale, scale);
+
+    const me = snap.players.find(player => player.id === selfId);
+    const focus = selfView || { x: me?.x || 0, y: me?.y || 0 };
+    const centreX = focus.x + C.PLAYER_W / 2;
+    const centreY = focus.y + C.PLAYER_H / 2;
+    const camX = C.WORLD.w <= viewW ? (C.WORLD.w - viewW) / 2 : Math.min(Math.max(0, centreX - viewW / 2), C.WORLD.w - viewW);
+    const camY = C.WORLD.h <= viewH ? (C.WORLD.h - viewH) / 2 : Math.min(Math.max(0, centreY - viewH / 2), C.WORLD.h - viewH);
+    ctx.translate(-camX, -camY);
 
     if (MAP_ART.complete && MAP_ART.naturalWidth) {
       ctx.drawImage(MAP_ART, 0, 0, C.WORLD.w, C.WORLD.h);
@@ -2230,74 +2344,89 @@ window.ImposterNet = (function () {
 
     const you = snap.you;
 
-    // Task marks: a yellow tag on your own stations, faded once done.
-    for (const station of C.STATIONS) {
-      const mine = you?.tasks?.some(task => task.id === station.id);
-      const done = you?.tasks?.some(task => task.id === station.id && task.done);
-      if (!mine && !done) continue;
-      ctx.globalAlpha = done ? 0.35 : 1;
-      ctx.fillStyle = '#f2df6a';
-      ctx.strokeStyle = 'rgba(0,0,0,.65)';
-      ctx.lineWidth = 1;
+    // Emergency button.
+    if (BUTTON_ART.complete && BUTTON_ART.naturalWidth) {
+      const bw = 110;
+      const bh = bw * (BUTTON_ART.naturalHeight / BUTTON_ART.naturalWidth);
+      ctx.drawImage(BUTTON_ART, C.BUTTON.x - bw / 2, C.BUTTON.y - bh / 2, bw, bh);
+    }
+
+    // Vents.
+    for (const vent of C.VENTS) {
+      ctx.fillStyle = 'rgba(10,11,12,.72)';
+      ctx.strokeStyle = you?.role === 'impostor' ? 'rgba(192,57,43,.85)' : 'rgba(20,21,24,.9)';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(station.x, station.y - 7);
-      ctx.lineTo(station.x + 7, station.y);
-      ctx.lineTo(station.x, station.y + 7);
-      ctx.lineTo(station.x - 7, station.y);
+      ctx.roundRect(vent[0] - 34, vent[1] - 26, 68, 52, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = you?.role === 'impostor' ? 'rgba(224,138,128,.65)' : 'rgba(120,124,130,.4)';
+      ctx.lineWidth = 2;
+      for (let i = -1; i <= 1; i += 1) {
+        ctx.beginPath();
+        ctx.moveTo(vent[0] - 20, vent[1] + i * 9);
+        ctx.lineTo(vent[0] + 20, vent[1] + i * 9);
+        ctx.stroke();
+      }
+    }
+
+    // Task marks: yellow diamonds for the crew, faded once done.
+    for (const station of snap.stations) {
+      if (station.done) continue;
+      const crew = you?.role === 'crew';
+      ctx.globalAlpha = crew ? 1 : 0.5;
+      ctx.fillStyle = crew ? '#f2df6a' : '#8b8e94';
+      ctx.strokeStyle = 'rgba(0,0,0,.7)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(station.x, station.y - 18);
+      ctx.lineTo(station.x + 18, station.y);
+      ctx.lineTo(station.x, station.y + 18);
+      ctx.lineTo(station.x - 18, station.y);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
       ctx.globalAlpha = 1;
-      if (!done) label(ctx, station.label, station.x, station.y - 13, '#f7efc2');
+      const near = Math.hypot(centreX - station.x, centreY - station.y) < 520;
+      if (near) label(ctx, station.label, station.x, station.y - 28, crew ? '#f7efc2' : '#b9bcc2', 28);
     }
 
-    // Vents read as a grate to everyone; the impostor gets the prompt.
-    for (const vent of C.VENTS) {
-      const near = snap.actions.vent === vent.id;
-      const impostor = you?.role === 'impostor';
-      ctx.fillStyle = 'rgba(10,11,12,.85)';
-      ctx.strokeStyle = impostor ? 'rgba(192,57,43,.9)' : 'rgba(20,21,24,.9)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.ellipse(vent.x, vent.y, 9, 5.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = impostor ? 'rgba(224,138,128,.8)' : 'rgba(120,124,130,.5)';
-      for (let i = -1; i <= 1; i += 1) {
-        ctx.beginPath();
-        ctx.moveTo(vent.x - 5.5, vent.y + i * 2.2);
-        ctx.lineTo(vent.x + 5.5, vent.y + i * 2.2);
-        ctx.stroke();
+    // Gas can, only while the crew still needs it.
+    if (you?.role === 'crew' && !you.gas && snap.tasks.done.indexOf('fuel') === -1) {
+      const gas = snap.gas;
+      if (GAS_ART.complete && GAS_ART.naturalWidth) ctx.drawImage(GAS_ART, gas.x - 26, gas.y - 34, 52, 52);
+      else {
+        ctx.fillStyle = '#f2df6a';
+        ctx.fillRect(gas.x - 14, gas.y - 18, 28, 30);
       }
-      if (near) label(ctx, 'Vent', vent.x, vent.y - 13, '#e08a80');
+      if (Math.hypot(centreX - gas.x, centreY - gas.y) < 520) label(ctx, 'Gas can', gas.x, gas.y - 44, '#f7efc2', 28);
     }
 
-    if (BUTTON_ART.complete && BUTTON_ART.naturalWidth) {
-      const size = 26;
-      ctx.drawImage(BUTTON_ART, C.BUTTON.x - size / 2, C.BUTTON.y - size / 2, size, size * (BUTTON_ART.naturalHeight / BUTTON_ART.naturalWidth));
-    } else {
-      ctx.fillStyle = '#c0392b';
+    // Sabotage repair point.
+    if (snap.fix) {
+      const fix = snap.fix;
+      ctx.strokeStyle = snap.sabotage.kind === 'reactor' ? '#e08a80' : '#e8dfa0';
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.arc(C.BUTTON.x, C.BUTTON.y, 8, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(fix.x, fix.y, 46, 0, Math.PI * 2);
+      ctx.stroke();
+      label(ctx, fix.label, fix.x, fix.y - 56, '#e8dfa0', 28);
     }
 
-    const corpse = snap.players;
+    // Bodies.
     for (const body of snap.bodies) {
-      const owner = corpse.find(player => player.id === body.of);
+      const owner = snap.players.find(player => player.id === body.of);
       ctx.save();
-      ctx.translate(body.x, body.y);
+      ctx.translate(body.x + C.PLAYER_W / 2, body.y + C.PLAYER_H / 2);
       ctx.rotate(Math.PI / 2);
-      if (!drawCrew(ctx, owner?.color || 'white', 0, 4, 0, 0.75)) {
+      if (!drawCrew(ctx, owner?.color || 'white', 0, C.PLAYER_H / 2 - 6, 0, 0.85)) {
         ctx.fillStyle = colorHex(owner?.color || 'white');
-        ctx.fillRect(-6, -4, 12, 8);
+        ctx.fillRect(-20, -12, 40, 24);
       }
       ctx.restore();
     }
 
-    // Your own seat, predicted locally from the keys so movement answers the
-    // keyboard immediately instead of waiting for a round trip.
-    const me = snap.players.find(player => player.id === selfId);
+    // Your own seat, predicted locally from the keys.
     if (me?.alive && selfView) {
       const dir = walkVector();
       if (dir.x || dir.y) {
@@ -2305,8 +2434,10 @@ window.ImposterNet = (function () {
         const step = C.SPEED * dt;
         const nx = selfView.x + (dir.x / length) * step;
         const ny = selfView.y + (dir.y / length) * step;
-        if (C.canStand(nx, selfView.y)) selfView.x = nx;
-        if (C.canStand(selfView.x, ny)) selfView.y = ny;
+        const hitX = C.overlapsWall(nx, selfView.y);
+        const hitY = C.overlapsWall(selfView.x, ny);
+        if (!hitX) selfView.x = Math.min(Math.max(0, nx), C.WORLD.w - C.PLAYER_W);
+        if (!hitY) selfView.y = Math.min(Math.max(0, ny), C.WORLD.h - C.PLAYER_H);
       }
     }
 
@@ -2324,7 +2455,7 @@ window.ImposterNet = (function () {
         entry.tx = player.x;
         entry.ty = player.y;
       } else {
-        const ease = 1 - Math.exp(-dt * 18);
+        const ease = 1 - Math.exp(-dt * 16);
         entry.x += (entry.tx - entry.x) * ease;
         entry.y += (entry.ty - entry.y) * ease;
         px = entry.x;
@@ -2332,27 +2463,387 @@ window.ImposterNet = (function () {
       }
       const dx = entry.tx - entry.x;
       const dy = entry.ty - entry.y;
-      if (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05) entry.dir = frameFor(dx, dy, entry.dir);
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) entry.dir = frameFor(dx, dy, entry.dir);
 
-      const moving = Math.abs(dx) + Math.abs(dy) > 0.05;
-      const bob = moving ? Math.round(Math.sin(now / 110) * 1.2) : 0;
-      if (!drawCrew(ctx, player.color, px, py + bob, entry.dir, player.alive ? 1 : 0.45)) {
+      const moving = Math.abs(dx) + Math.abs(dy) > 1;
+      const bob = moving ? Math.round(Math.sin(now / 110) * 3) : 0;
+      const ghost = !player.alive;
+      if (!drawCrew(ctx, player.color, px + C.PLAYER_W / 2, py + C.PLAYER_H + bob, entry.dir, ghost ? 0.45 : 1)) {
         ctx.fillStyle = colorHex(player.color);
         ctx.beginPath();
-        ctx.arc(px, py, 5, 0, Math.PI * 2);
+        ctx.arc(px + C.PLAYER_W / 2, py + C.PLAYER_H / 2, 22, 0, Math.PI * 2);
         ctx.fill();
       }
       if (player.teammate) {
         ctx.strokeStyle = 'rgba(192,57,43,.85)';
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.ellipse(px, py + 2, 11, 5, 0, 0, Math.PI * 2);
+        ctx.ellipse(px + C.PLAYER_W / 2, py + C.PLAYER_H, 30, 12, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
-      label(ctx, player.name, px, py + 20, isSelf ? '#f2df6a' : '#e7e5e0');
+      label(ctx, player.name, px + C.PLAYER_W / 2, py - 14, isSelf ? '#f2df6a' : '#e7e5e0', 30);
+    }
+
+    // Lights out: everything but a circle round the player goes dark, which is
+    // the Python's light mask done with a gradient.
+    if (snap.sabotage?.kind === 'lights') {
+      const cx = centreX;
+      const cy = centreY;
+      const gradient = ctx.createRadialGradient(cx, cy, 40, cx, cy, 620);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(0.35, 'rgba(0,0,0,0.25)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0.94)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(camX - 10, camY - 10, viewW + 20, viewH + 20);
+    }
+
+    // Reactor: a red wash and the countdown, like the Python's alarm tint.
+    if (snap.sabotage?.kind === 'reactor') {
+      const pulse = 0.12 + 0.08 * Math.sin(now / 220);
+      ctx.fillStyle = `rgba(190,30,20,${pulse})`;
+      ctx.fillRect(camX - 10, camY - 10, viewW + 20, viewH + 20);
+      label(ctx, `REACTOR ${Math.ceil(snap.sabotage.msLeft / 1000)}`, camX + viewW / 2, camY + 90, '#ffb3a8', 52);
     }
 
     ctx.restore();
+  }
+
+  /* ── tasks, ported from game.py's windows ─────────────────────────────── */
+
+  const GAMES = {
+    wires(root, done) {
+      const board = el('div', 'task-art wires');
+      board.append(img('task-wires.png', 'task-board'));
+      const rack = el('div', 'wire-rack');
+      const colors = ['red', 'blue', 'yellow', 'pink'];
+      let fixed = 0;
+      for (const color of colors) {
+        const button = el('button', 'wire-btn');
+        button.type = 'button';
+        button.append(img(`wire-${color}.png`, 'wire-img'));
+        button.addEventListener('click', () => {
+          if (button.classList.contains('done')) return;
+          button.classList.add('done');
+          fixed += 1;
+          if (fixed >= colors.length) done();
+        });
+        rack.append(button);
+      }
+      board.append(rack);
+      root.append(board, el('p', 'task-help', 'Click each wire to connect it.'));
+    },
+
+    garbage(root, done) {
+      const board = el('div', 'task-art');
+      const picture = img('task-garbage-full.png', 'task-board');
+      const lever = el('button', 'lever');
+      lever.type = 'button';
+      lever.append(img('lever-up.png', 'lever-img'));
+      lever.addEventListener('click', () => {
+        lever.classList.add('pulled');
+        picture.src = asset('task-garbage-empty.png');
+        lever.replaceChildren(img('lever-down.png', 'lever-img'));
+        done();
+      });
+      board.append(picture, lever);
+      root.append(board, el('p', 'task-help', 'Pull the lever to empty the chute.'));
+    },
+
+    wifi(root, done) {
+      const board = el('div', 'task-art');
+      const picture = img('task-wifi.png', 'task-board');
+      const lever = el('button', 'lever');
+      lever.type = 'button';
+      lever.append(img('wifi-lever.png', 'lever-img'));
+      const on = img('wifi-on.png', 'wifi-on');
+      on.hidden = true;
+      lever.addEventListener('click', () => {
+        lever.classList.add('pulled');
+        picture.classList.add('fixed');
+        on.hidden = false;
+        done();
+      });
+      board.append(picture, lever, on);
+      root.append(board, el('p', 'task-help', 'Pull the lever to reboot the wifi.'));
+    },
+
+    divert(root, done) {
+      const board = el('div', 'task-art');
+      const picture = img('task-divert.png', 'task-board');
+      const lever = el('button', 'lever divert');
+      lever.type = 'button';
+      lever.append(img('divert-lever.png', 'lever-img wide'));
+      lever.addEventListener('click', () => {
+        lever.classList.add('pulled');
+        picture.src = asset('task-diverted.png');
+        done();
+      });
+      board.append(picture, lever);
+      root.append(board, el('p', 'task-help', 'Throw the switch to divert power to the reactor.'));
+    },
+
+    align(root, done) {
+      const board = el('div', 'task-art align');
+      board.append(img('task-align.png', 'task-board'));
+      const track = el('div', 'align-track');
+      const marker = el('span', 'align-centre');
+      track.append(marker);
+      const sliders = [];
+      let solved = 0;
+      for (let index = 0; index < 2; index += 1) {
+        const row = el('div', 'align-row');
+        row.append(el('span', 'align-tag', `Engine ${index + 1}`));
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = '0';
+        input.max = '100';
+        input.value = String(index ? 88 : 12);
+        input.className = 'align-slider';
+        input.addEventListener('input', () => {
+          const aligned = Math.abs(Number(input.value) - 50) <= 5;
+          input.classList.toggle('aligned', aligned);
+          sliders[index] = aligned;
+          if (sliders[0] && sliders[1]) done();
+        });
+        row.append(input);
+        board.append(row);
+      }
+      root.append(board, el('p', 'task-help', 'Line up both outputs with the centre marks.'));
+    },
+
+    fuel(root, done) {
+      const board = el('div', 'task-art');
+      board.append(img('task-fuel.png', 'task-board'));
+      const gauge = el('div', 'fuel-gauge');
+      const fill = el('i');
+      gauge.append(fill);
+      const button = el('button', 'btn btn-primary', 'Fill');
+      button.type = 'button';
+      let level = 0;
+      let timer = 0;
+      const pour = () => {
+        level = Math.min(100, level + 4);
+        fill.style.height = level + '%';
+        if (level >= 100) {
+          clearInterval(timer);
+          button.disabled = true;
+          done();
+        }
+      };
+      button.addEventListener('click', pour);
+      board.append(gauge, button);
+      root.append(board, el('p', 'task-help', 'Hold Fill until the engine tank is full.'));
+    },
+
+    asteroids(root, done) {
+      let destroyed = 0;
+      const target = 30;
+      const stage = el('div', 'asteroid-stage');
+      const canvas = document.createElement('canvas');
+      canvas.width = 960;
+      canvas.height = 540;
+      canvas.className = 'asteroid-canvas';
+      const count = el('p', 'task-help', `Destroyed 0 / ${target}`);
+      stage.append(canvas);
+      root.append(stage, count, el('p', 'task-help', 'Click the rocks. Thirty clears the field.'));
+
+      const ctx = canvas.getContext('2d');
+      const rocks = [];
+      const art = [1, 2, 3, 4].map(number => loadImage(`asteroid${number}.png`));
+      const ship = loadImage('starship.png');
+      let frame = 0;
+      let running = true;
+
+      const spawn = () => {
+        rocks.push({
+          x: 40 + Math.random() * (canvas.width - 80),
+          y: -60,
+          r: 18 + Math.random() * 22,
+          vy: 40 + Math.random() * 70,
+          art: art[Math.floor(Math.random() * 4)],
+        });
+      };
+
+      let last = performance.now();
+      const loop = now => {
+        if (!running) return;
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        frame += dt;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#05070c';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (ship.complete && ship.naturalWidth) {
+          const sw = 200;
+          const sh = sw * (ship.naturalHeight / ship.naturalWidth);
+          ctx.drawImage(ship, canvas.width / 2 - sw / 2, canvas.height - sh + 40, sw, sh);
+        }
+        if (frame > 0.5) {
+          frame = 0;
+          spawn();
+        }
+        for (const rock of rocks) {
+          rock.y += rock.vy * dt;
+          if (rock.art.complete) ctx.drawImage(rock.art, rock.x - rock.r, rock.y - rock.r, rock.r * 2, rock.r * 2);
+          else {
+            ctx.fillStyle = '#8b8e94';
+            ctx.beginPath();
+            ctx.arc(rock.x, rock.y, rock.r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        for (let index = rocks.length - 1; index >= 0; index -= 1) {
+          if (rocks[index].y > canvas.height + 80) rocks.splice(index, 1);
+        }
+        requestAnimationFrame(loop);
+      };
+      requestAnimationFrame(loop);
+
+      canvas.addEventListener('pointerdown', event => {
+        const rect = canvas.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
+        const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+        for (let index = rocks.length - 1; index >= 0; index -= 1) {
+          if (Math.hypot(rocks[index].x - x, rocks[index].y - y) <= rocks[index].r + 10) {
+            rocks.splice(index, 1);
+            destroyed += 1;
+            count.textContent = `Destroyed ${destroyed} / ${target}`;
+            if (destroyed >= target) {
+              running = false;
+              done();
+            }
+            return;
+          }
+        }
+      });
+      return () => {
+        running = false;
+      };
+    },
+
+    nav(root, done) {
+      const board = el('div', 'task-art nav');
+      board.append(img('task-nav.png', 'task-board'));
+      const pad = el('div', 'nav-pad');
+      const centre = img('nav-centre.png', 'nav-centre');
+      const target = img('nav-target.png', 'nav-target');
+      target.style.left = '24%';
+      target.style.top = '70%';
+      pad.append(centre, target);
+      board.append(pad);
+      let dragging = false;
+      const move = event => {
+        if (!dragging) return;
+        const rect = pad.getBoundingClientRect();
+        const x = Math.min(rect.width, Math.max(0, event.clientX - rect.left));
+        const y = Math.min(rect.height, Math.max(0, event.clientY - rect.top));
+        target.style.left = ((x / rect.width) * 100) + '%';
+        target.style.top = ((y / rect.height) * 100) + '%';
+        const distance = Math.hypot(x - rect.width / 2, y - rect.height / 2);
+        if (distance < 26) {
+          dragging = false;
+          target.classList.add('locked');
+          done();
+        }
+      };
+      pad.addEventListener('pointerdown', event => {
+        dragging = true;
+        move(event);
+      });
+      pad.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', () => { dragging = false; });
+      root.append(board, el('p', 'task-help', 'Drag the ship marker onto the centre crosshair.'));
+    },
+  };
+
+  function openTask(station) {
+    const task = C.stationById(station);
+    if (!task || !GAMES[task.game]) return;
+    closeTask();
+    $('task-title').textContent = task.label;
+    const body = $('task-body');
+    body.replaceChildren();
+    $('overlay-task').hidden = false;
+    const cleanup = GAMES[task.game](body, () => {
+      send({ t: 'use', station: task.id });
+      closeTask();
+      toast('Task complete.');
+    });
+    taskOpen = { cleanup: typeof cleanup === 'function' ? cleanup : null };
+  }
+
+  function closeTask() {
+    if (taskOpen?.cleanup) taskOpen.cleanup();
+    taskOpen = null;
+    $('overlay-task').hidden = true;
+    $('task-body').replaceChildren();
+  }
+
+  function openList(kind) {
+    $('overlay-list').hidden = false;
+    $('list-title').textContent = kind === 'map' ? 'The Skeld' : 'Tasks';
+    const body = $('list-body');
+    body.replaceChildren();
+    if (kind === 'map') {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = Math.round(1024 * (C.WORLD.h / C.WORLD.w));
+      canvas.className = 'map-canvas';
+      body.append(canvas);
+      drawMap(canvas);
+      return;
+    }
+    const you = snap?.you;
+    const list = el('ul', 'roster tasks-list');
+    for (const station of snap?.stations || []) {
+      const row = el('li', 'row-item');
+      row.append(el('span', 'dot', station.done ? '✓' : '·'));
+      row.firstElementChild.style.background = station.done ? '#4f8f4f' : 'transparent';
+      row.append(el('span', 'name', station.label));
+      row.append(el('span', 'tail', station.room));
+      list.append(row);
+    }
+    if (you?.role === 'crew' && !you.gas && !snap?.tasks.done.includes('fuel')) {
+      const row = el('li', 'row-item');
+      row.append(el('span', 'dot'));
+      row.append(el('span', 'name', 'Find a gas can'));
+      row.append(el('span', 'tail', 'Storage'));
+      list.append(row);
+    }
+    body.append(list);
+    body.append(el('p', 'hint', you?.role === 'impostor'
+      ? 'Your list is a decoy. Sabotage, vent and kill; the crew has to finish eight missions.'
+      : `${snap?.tasks.done.length || 0} of ${snap?.tasks.total || 8} missions done.`));
+  }
+
+  function drawMap(canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (MINI_ART.complete && MINI_ART.naturalWidth) {
+      ctx.drawImage(MINI_ART, 0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.fillStyle = '#15171a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    const sx = canvas.width / C.WORLD.w;
+    const sy = canvas.height / C.WORLD.h;
+    for (const station of snap?.stations || []) {
+      if (station.done) continue;
+      ctx.fillStyle = '#f2df6a';
+      ctx.beginPath();
+      ctx.arc(station.x * sx, station.y * sy, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (const player of snap?.players || []) {
+      if (!player.alive) continue;
+      ctx.fillStyle = player.id === selfId ? '#ffffff' : colorHex(player.color);
+      ctx.strokeStyle = '#0d0e10';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc((player.x + C.PLAYER_W / 2) * sx, (player.y + C.PLAYER_H / 2) * sy, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
   }
 
   /* ── input ───────────────────────────────────────────────────────────── */
@@ -2382,37 +2873,91 @@ window.ImposterNet = (function () {
 
   function trigger(action) {
     if (!snap) return;
-    if (action === 'use' && snap.actions.use) send({ t: 'task', station: snap.actions.use });
+    if (action === 'use' && snap.actions.use) openTask(snap.actions.use);
+    if (action === 'gas' && snap.actions.gas) send({ t: 'use', station: 'gascan' });
     if (action === 'kill' && snap.actions.kill) send({ t: 'kill', target: snap.actions.kill });
     if (action === 'vent' && snap.actions.vent) {
-      send({ t: 'vent', vent: snap.actions.vent });
+      send({ t: 'vent' });
       toast('Through the vent.');
     }
     if (action === 'report' && snap.actions.report) send({ t: 'report', body: snap.actions.report });
     if (action === 'button' && snap.actions.button) send({ t: 'button' });
+    if (action === 'fix' && snap.actions.fix) send({ t: 'fix' });
+    if (action === 'lights') send({ t: 'sabotage', kind: 'lights' });
+    if (action === 'reactor') send({ t: 'sabotage', kind: 'reactor' });
   }
 
   function pointerTarget(event) {
     const canvas = $('board');
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
-    const scale = Math.min(rect.width / C.WORLD.w, rect.height / C.WORLD.h);
-    const offX = (rect.width - C.WORLD.w * scale) / 2;
-    const offY = (rect.height - C.WORLD.h * scale) / 2;
+    const scale = Math.min(rect.width / C.VIEW.w, rect.height / C.VIEW.h);
+    const viewW = rect.width / scale;
+    const viewH = rect.height / scale;
+    const me = snap?.players.find(player => player.id === selfId);
+    const focus = selfView || { x: me?.x || 0, y: me?.y || 0 };
+    const centreX = focus.x + C.PLAYER_W / 2;
+    const centreY = focus.y + C.PLAYER_H / 2;
+    const camX = C.WORLD.w <= viewW ? (C.WORLD.w - viewW) / 2 : Math.min(Math.max(0, centreX - viewW / 2), C.WORLD.w - viewW);
+    const camY = C.WORLD.h <= viewH ? (C.WORLD.h - viewH) / 2 : Math.min(Math.max(0, centreY - viewH / 2), C.WORLD.h - viewH);
     return {
-      x: (event.clientX - rect.left - offX) / scale,
-      y: (event.clientY - rect.top - offY) / scale,
+      x: (event.clientX - rect.left) / scale + camX,
+      y: (event.clientY - rect.top) / scale + camY,
     };
   }
 
-  const keyActions = { e: 'use', q: 'kill', f: 'vent', r: 'report', m: 'button' };
+  const overlayOpen = () => !$('overlay-task').hidden || !$('overlay-list').hidden;
 
   window.addEventListener('keydown', event => {
     if (event.target instanceof HTMLElement && event.target.matches('input, select, textarea')) return;
     const key = event.key.toLowerCase();
-    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(key)) event.preventDefault();
-    if (keyActions[key]) {
-      trigger(keyActions[key]);
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'tab'].includes(key)) event.preventDefault();
+
+    if (key === 'escape') {
+      if (!$('overlay-list').hidden) $('overlay-list').hidden = true;
+      else if (!$('overlay-task').hidden) closeTask();
+      return;
+    }
+    if (overlayOpen()) return;
+
+    if (key === 'tab' || key === 't') {
+      if (snap && snap.phase !== 'lobby') openList('tasks');
+      return;
+    }
+    if (key === 'm') {
+      if (snap && snap.phase !== 'lobby') openList('map');
+      return;
+    }
+    // game.py's keys: Space interacts/uses, Enter kills, Alt changes vent,
+    // Ctrl cuts the lights, Shift sabotages the reactor.
+    if (key === ' ' || key === 'spacebar') {
+      if (snap?.actions.fix) trigger('fix');
+      else if (snap?.actions.use) trigger('use');
+      else trigger('button');
+      return;
+    }
+    if (key === 'enter') {
+      trigger('kill');
+      return;
+    }
+    if (key === 'r') {
+      trigger('report');
+      return;
+    }
+    if (key === 'alt') {
+      trigger('vent');
+      return;
+    }
+    if (key === ' ') {
+      trigger('vent');
+      return;
+    }
+    if (key === 'control') {
+      trigger('lights');
+      return;
+    }
+    if (key === 'shift') {
+      trigger('reactor');
       return;
     }
     if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
@@ -2431,20 +2976,23 @@ window.ImposterNet = (function () {
     pushWalk();
   });
 
+  // Touch: drag anywhere on the ship and the crewmate walks that way.
+  let lastGoto = 0;
   $('board').addEventListener('pointerdown', event => {
+    if (overlayOpen()) return;
     const target = pointerTarget(event);
     if (!target) return;
     lastGoto = performance.now();
-    send({ t: 'goto', x: target.x, y: target.y });
+    send({ t: 'goto', x: target.x - C.PLAYER_W / 2, y: target.y - C.PLAYER_H / 2 });
   });
 
   $('board').addEventListener('pointermove', event => {
-    if (!event.buttons) return;
+    if (!event.buttons || overlayOpen()) return;
     if (performance.now() - lastGoto < 90) return;
     const target = pointerTarget(event);
     if (!target) return;
     lastGoto = performance.now();
-    send({ t: 'goto', x: target.x, y: target.y });
+    send({ t: 'goto', x: target.x - C.PLAYER_W / 2, y: target.y - C.PLAYER_H / 2 });
   });
 
   $('public-join').addEventListener('click', () => openSession({ mode: 'public', code: '', intent: 'join' }));
@@ -2464,29 +3012,36 @@ window.ImposterNet = (function () {
   $('start').addEventListener('click', () => send({ t: 'start' }));
   $('back-lobby').addEventListener('click', () => send({ t: 'lobby' }));
   $('act-use').addEventListener('click', () => trigger('use'));
+  $('act-gas').addEventListener('click', () => trigger('gas'));
   $('act-kill').addEventListener('click', () => trigger('kill'));
   $('act-vent').addEventListener('click', () => trigger('vent'));
   $('act-report').addEventListener('click', () => trigger('report'));
   $('act-button').addEventListener('click', () => trigger('button'));
+  $('act-fix').addEventListener('click', () => trigger('fix'));
+  $('sab-lights').addEventListener('click', () => trigger('lights'));
+  $('sab-reactor').addEventListener('click', () => trigger('reactor'));
+  $('open-tasks').addEventListener('click', () => openList('tasks'));
+  $('open-map').addEventListener('click', () => openList('map'));
   $('skip').addEventListener('click', () => send({ t: 'vote', target: 'skip' }));
+  $('task-close').addEventListener('click', closeTask);
+  $('list-close').addEventListener('click', () => { $('overlay-list').hidden = true; });
 
   $('copy').addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(session ? snap?.code || '' : '');
+      await navigator.clipboard.writeText(snap?.code || '');
       toast('Code copied.');
     } catch {
       toast(`Code: ${snap?.code || ''}`);
     }
   });
 
-  for (const id of ['set-impostors', 'set-cooldown', 'set-tasks']) {
+  for (const id of ['set-impostors', 'set-cooldown']) {
     $(id).addEventListener('change', () => {
       send({
         t: 'settings',
         settings: {
           impostors: Number($('set-impostors').value),
           killCooldownSec: Number($('set-cooldown').value),
-          tasksPerPlayer: Number($('set-tasks').value),
         },
       });
     });
@@ -2502,12 +3057,14 @@ window.ImposterNet = (function () {
     $('name').value = localStorage.getItem('bored.imposter.name') || '';
   } catch {}
 
-  // The snapshot a player already holds, read-only, for the browser suites.
+  // Test hooks: the snapshot is read-only, and the task windows can be opened
+  // on their own so a suite can check the ported screens without a round.
+  window.__imposterOpenTask = id => openTask(id);
+  window.__imposterOpenMap = () => openList('map');
   window.__imposterTest = () => (snap
-    ? { phase: snap.phase, code: snap.code, net: snap.net, you: snap.you, players: snap.players, bodies: snap.bodies, meeting: snap.meeting }
+    ? { phase: snap.phase, code: snap.code, net: snap.net, you: snap.you, players: snap.players, bodies: snap.bodies, meeting: snap.meeting, tasks: snap.tasks, sabotage: snap.sabotage, actions: snap.actions }
     : null);
 
-  loadWalkMask();
   show('menu');
   menuStatus('');
   if (typeof Peer === 'undefined') {
@@ -2515,6 +3072,7 @@ window.ImposterNet = (function () {
   }
   requestAnimationFrame(draw);
 })();
+
 </script>
 </body>
 </html>

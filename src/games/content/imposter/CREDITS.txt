@@ -1,9 +1,22 @@
-Art in this folder
+Art: AI0702/Among-Us-clone (https://github.com/AI0702/Among-Us-clone), Unlicense.
+The artwork itself belongs to Innersloth; this is a fan clone, not an official game.
 
-  map.jpg    the Skeld, from AI0702/Among-Us-clone (Assets/Maps/map2back.png)
-  walk.png   the same project's mini-map, used as the collision mask
-  crew-*.png crewmate frames, recoloured from that project's player sprites
-  button.png the emergency button icon (Assets/Images/UI/emergency_icon.png)
+Files here are taken from that repo's Assets/ folder:
+  map.jpg        Assets/Maps/map2.png, halved to 2896x1584
+  mini.png       Assets/Maps/mini_map.PNG, scaled to 1024 wide
+  button.png     Assets/Images/UI/emergency_icon.png
+  crew-*.png     Assets/Images/Player/<Colour>/*_walk step frames, four directions
+                 per colour, recoloured from the red sheet
+  ui-*.png       Assets/Images/UI icons (kill, sabotage, emergency, lights, map)
+  task-*.png     Assets/Images/Tasks/* task windows (wiring, garbage, wifi,
+                 divert power, align engine, fuel engines, stabilize steering)
+  wire-*.png     Assets/Images/Tasks/Fix Wiring coloured wires
+  wire-*.png lever-*.png gas-can.png divert-lever.png wifi-lever.png wifi-on.png
+  align-handle.png nav-target.png nav-centre.png laser.png asteroid1-4.png
+                 further pieces of those same task windows
+  starship.png   Assets/Images/Tasks/Clear Asteroids/starship2.png, 300 wide
 
-  Source: https://github.com/AI0702/Among-Us-clone (Unlicense)
-  The artwork itself is Innersloth's; this is an unofficial fan arcade.
+The rules are a port of that repo's Python (game.py, sprites.py, map.tmx):
+ship size, walk speed, wall rectangles, vent positions, the eight mission
+trigger points and their screens, kill/sabotage/meeting timers. The netcode,
+host election and room handling are this game's own.
