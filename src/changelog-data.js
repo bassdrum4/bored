@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 671,
+  "count": 672,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"cca1df6","date":"2026-11-19","author":"Codebuff","subject":"Remove the GitHub Sponsors link and funding config."},
   {"sha":"8f001c0","date":"2026-11-19","author":"Codebuff","subject":"Add a GitHub Sponsors link in the footer"},
   {"sha":"f2a9766","date":"2026-11-19","author":"Codebuff","subject":"Give a running round the whole window"},
   {"sha":"42e0d42","date":"2026-11-19","author":"Codebuff","subject":"Load PeerJS from the arcade root and pull the camera in"},
