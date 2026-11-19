@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 664,
+  "count": 665,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"37ee531","date":"2026-11-19","author":"Codebuff","subject":"Trackmania: rank the wall-free tracks on the clock and clear the trick careers"},
   {"sha":"b170c0f","date":"2026-11-19","author":"Codebuff","subject":"Rebuild Among Us on the real Skeld artwork and make hosting invisible"},
   {"sha":"250fdaf","date":"2026-11-19","author":"Codebuff","subject":"feat(among-us): call the game Among Us and put the crewmate on its card"},
   {"sha":"40356f2","date":"2026-11-19","author":"Codebuff","subject":"fix(imposter): fit the lobby dock without scrolling the frame"},
