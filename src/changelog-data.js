@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 658,
+  "count": 659,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"aaeb35c","date":"2026-11-19","author":"Codebuff","subject":"feat(imposter): an always-open public room with a round-robin host election"},
   {"sha":"2b865fa","date":"2026-11-19","author":"Codebuff","subject":"copy: write the site's blurbs the way the author talks"},
   {"sha":"54cf9ad","date":"2026-11-19","author":"Codebuff","subject":"revert(analytics): drop the chart-first Overview"},
   {"sha":"bece3a4","date":"2026-11-19","author":"Vettel Xu","subject":"Poké Gacha: attacks hit with the chosen move's type","pr":266},
