@@ -262,6 +262,11 @@ test('tower defense: Story lists chapter 1, Squad lists every owned mon, and a 1
     assert.ok(!quests.find(q => /Poké Idle daily boss/.test(q.label)).off, 'the boss mission is open');
     assert.ok(quests.find(q => q.label === 'Clear stage 1-1').done, 'the 1-1 starter mission is done');
   }
+  // The hub's score: species caught plus stage stars, so the 1-1 clear counts.
+  const snap = await game.evaluate(() => ({ ...__boredSnapshot(), owned: G.state().owned.length, best: T.state().best['1-1'] }));
+  assert.ok(snap.best >= 1 && snap.stars >= snap.best, 'the clear\'s stars count');
+  assert.equal(snap.caught, snap.owned);
+  assert.equal(snap.score, snap.caught + snap.stars, 'score = species caught + stage stars');
   assert.deepEqual(errors, []);
 });
 
@@ -1463,6 +1468,67 @@ test('attack effects come from one sprite sheet: every frame is inside it, sheet
   assert.deepEqual(r.slash, [], 'every type has its own melee slash');
   assert.ok(r.heal, 'medics heal with the sheet');
   assert.equal(r.none, null, 'a type the sheet does not cover gets null, so the drawn effect is used');
+  assert.deepEqual(errors, []);
+});
+test('hatch results: every egg of a big hatch is listed (NEW first, then rarest), and the list scrolls by wheel or Down', async t => {
+  const { game, errors } = await openWithMons(t);
+  const r = await game.evaluate(() => {
+    const list = Array.from({ length: 56 }, (_, i) => ({ species: BASES[i % BASES.length], tier: i % 5, fresh: i % 7 === 0, shiny: i % 11 === 0, sp: null, shards: i % 7 ? 2 : 0 }));
+    go('eggs'); hatching = { list, i: 55, phase: 'done', start: 0, summary: true }; $('#hatch').hidden = false; showHatch();
+    const g = $('#hatch-grid'), cells = [...g.children], order = hatchOrder(list);
+    const firstOld = order.findIndex(x => !x.fresh), freshFirst = order.slice(0, firstOld).every(x => x.fresh) && order.slice(firstOld).every(x => !x.fresh);
+    const tiersDown = [order.slice(0, firstOld), order.slice(firstOld)].every(run => run.every((x, k) => !k || run[k - 1].tier >= x.tier));
+    const before = g.scrollTop; hatchKey({ key: 'ArrowDown', preventDefault() {} });
+    return { dbg: [g.scrollHeight, g.clientHeight, g.scrollTop, getComputedStyle(document.documentElement).scrollBehavior, getComputedStyle(g).scrollBehavior], n: cells.length, newTags: cells.slice(0, 8).filter(c => c.textContent.includes('NEW')).length, freshFirst, tiersDown, scrolls: g.scrollHeight > g.clientHeight, moved: g.scrollTop > before, side: g.scrollWidth - g.clientWidth };
+  });
+  assert.equal(r.n, 56, 'all 56 are shown, not the first 12');
+  assert.ok(r.freshFirst && r.newTags === 8, 'NEW ones come first');
+  assert.ok(r.tiersDown, 'then rarest first');
+  assert.ok(r.scrolls && r.moved, 'the list scrolls, and Down moves it: ' + r.dbg);
+  assert.ok(r.side <= 0, 'no sideways scroll');
+  await game.evaluate(() => endHatch());
+  assert.deepEqual(errors, []);
+});
+test('facing: units face where foes come from (a held foe, else up the nearest stretch of path), and the four right-facing stills are mirrored', async t => {
+  const { game, errors } = await openWithMons(t);
+  const r = await game.evaluate(() => {
+    const out = [];
+    for (const st of T.allStages.filter(s => !s.gym).slice(0, 24)) {
+      chapterAt = (st.chapter || 1) - 1; go('story'); setSquad([S.owned[0]]); storyAt = stagesNow().findIndex(s => s.id === st.id); startBattle(); battle.talk = []; battleTalk(); battle.paused = true;
+      const b = battle.b;
+      for (const p of b.paths) for (let i = 1; i + 1 < p.length; i++) {
+        const [ax, ay] = p[i - 1], [mx, my] = p[i], [bx, by] = p[i + 1];
+        if (ay !== my || my !== by || Math.sign(mx - ax) !== Math.sign(bx - mx)) continue;
+        // A unit on a tile in the middle of a level run (a blocker) faces back up it.
+        const mid = { id: 9000 + out.length, x: mx, y: my };
+        battle.face = {}; out.push([st.id, bx > ax, unitFacesRight(battle, mid)]);
+      }
+    }
+    const held = (() => { const b = battle.b, u = { id: 7777, x: 5, y: 1 }; b.enemies = [{ id: 1, x: 6, y: 1, blockedBy: 7777, path: b.paths[0], seg: 0 }]; battle.face = {}; return unitFacesRight(battle, u); })();
+    const mirrored = [657, 841, 959, 1000].every(n => sprite(n).classList.contains('mirror')) && !sprite(646).classList.contains('mirror');
+    return { out, held, mirrored, scale: getComputedStyle(Object.assign(sprite(657), {})).scale };
+  });
+  const wrong = r.out.filter(([, rightward, facesRight]) => facesRight === rightward);
+  assert.ok(r.out.length > 20 && r.out.some(x => !x[1]), 'stretches both ways were checked');
+  assert.deepEqual(wrong, [], 'a unit faces against the way foes walk past it');
+  assert.equal(r.held, true, 'a unit faces the foe it holds');
+  assert.ok(r.mirrored, 'only the right-facing stills carry the mirror');
+  assert.deepEqual(errors, []);
+});
+test('battle strips: every line form and every foe has one, Rockruff and the gen 6+ lines animate, and only species with no animated sprite stay still', async t => {
+  const { game, errors } = await openWithMons(t);
+  await game.waitForFunction(() => Object.keys(ANIM).length > 100, { timeout: 15000 });
+  const r = await game.evaluate(() => {
+    const forms = new Set(), walk = n => { if (forms.has(n)) return; forms.add(n); for (const e of G.evolutionsOf(n) || []) walk(typeof e === 'number' ? e : e.to || e.num || e[0]); };
+    for (const b of BASES) walk(b);
+    for (const s of T.allStages) for (const w of s.waves) forms.add(w[1]);
+    const all = [...forms];
+    return { missing: all.filter(n => !ANIM[n] || !ANIM['s' + n]), still: all.filter(n => ANIM[n] && ANIM[n][2] < 2).sort((a, b) => a - b), rock: [ANIM[744][2], ANIM[745][2], ANIM.s744[2]] };
+  });
+  assert.deepEqual(r.missing, [], 'every form and foe has a normal and a shiny strip');
+  assert.ok(r.rock.every(n => n > 1), 'Rockruff and Lycanroc animate');
+  // No animated sprite for these in the uploaded PokéRogue sets (no exp GIF, and the front GIF is a still).
+  assert.deepEqual(r.still, [652, 653, 654, 655, 657, 658, 701, 840, 841, 842, 870, 906, 907, 908, 921, 922, 923, 932, 935, 936, 937, 957, 958, 959, 984, 990, 992, 996, 997, 998, 999, 1000, 1007, 1008, 1011]);
   assert.deepEqual(errors, []);
 });
 test('Squad by mouse: drag between slots swaps them, a roster card dragged onto a slot takes it, and that order deploys', async t => {

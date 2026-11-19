@@ -186,7 +186,9 @@ canvas, img { image-rendering: pixelated; display: block }
 #hatch .cell { width: 96px; height: 96px; background: var(--ink) }
 #hatch .cell.egg-phase { background: var(--panel) }
 #hatch-text div { min-height: 20px }
-#hatch .grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 96px); gap: 4px 4px; overflow: hidden }
+#hatch .grid { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, 96px); grid-auto-rows: max-content; gap: 4px 2px; overflow: hidden auto; min-height: 0; align-content: start;
+               scrollbar-width: thin; scrollbar-color: var(--red) var(--panel); scroll-snap-type: y mandatory }
+#hatch .grid > div { scroll-snap-align: start }
 #hatch .grid .tag { height: 16px; line-height: 16px; text-align: center }
 
 /* Dex */
@@ -271,6 +273,7 @@ canvas, img { image-rendering: pixelated; display: block }
 .right-panel .cell { width: 96px; height: 96px; align-self: center }
 /* A mon's picture stands straight on the panel (no box behind it), a little bigger, with a small shadow. */
 #dex-detail .cell, #starter-detail .cell, #card-buddy .cell, .right-panel .cell { overflow: visible }
+img.mirror { scale: -1 1 }
 #dex-detail .cell > img, #starter-detail .cell > img, #card-buddy .cell > img, .right-panel .cell > img { transform: scale(1.15); filter: drop-shadow(0 3px 0 rgba(28, 27, 44, .6)) }
 @keyframes evolved { 0% { filter: brightness(4) } 100% { filter: drop-shadow(0 3px 0 rgba(28, 27, 44, .6)) } }
 #dex-pic > img.evolved { animation: evolved .7s ease-out }
@@ -646,8 +649,11 @@ function sprite(num, look = "normal", dark = false) {
   img.draggable = false;
   if (dark) img.className = "unseen";
   img.src = spriteUrl(num, look);
+  // These four stills face right; every other sprite, and every battle strip, faces left.
+  if (PNG_FACES_RIGHT.has(num)) img.classList.add("mirror");
   return img;
 }
+const PNG_FACES_RIGHT = new Set([657, 841, 959, 1000]);
 // An uncaught line's shape, cropped to the sprite and scaled up to fill a cell (nearest
 // neighbour, so the edge stays pixel-sharp). Drawn once the sprite loads.
 function silhouette(num, size = CELL, pad = 6) {
@@ -1304,13 +1310,15 @@ const hatchSprite = x => sprite(x.sp ? skinForm(x.sp, x.species) : x.species, ha
 function showHatch() {
   const h = hatching, panel = $("#hatch");
   if (h.summary) {
-    const grid = el("div", "grid");
-    // NEW sits under the cell, never on the sprite.
-    for (const x of h.list.slice(0, 12)) { const item = el("div"); item.append(cellWith(hatchSprite(x)), el("div", "tag " + (x.fresh ? "gold" : "dim"), x.fresh ? "NEW" : "+" + x.shards)); grid.append(item); }
+    const grid = el("div", "grid"); grid.id = "hatch-grid";
+    // Every egg, NEW first, then rarest first; the grid scrolls (wheel, or Up and Down). NEW sits under the cell, never on the sprite.
+    for (const x of hatchOrder(h.list)) { const item = el("div"); item.append(cellWith(hatchSprite(x)), el("div", "tag " + (x.fresh ? "gold" : "dim"), x.fresh ? "NEW" : "+" + x.shards)); grid.append(item); }
     panel.classList.add("sum");
     panel.replaceChildren(el("div", "head gold", "HATCHED " + h.list.length), grid);
     const fresh = h.list.filter(x => x.fresh).length;
-    say(h.list.length + " eggs: " + fresh + " new, " + h.list.reduce((t, x) => t + x.shards, 0) + " shards from dupes" + (h.list.length > 12 ? ". First 12 shown; all are in the Dex." : "."), (() => { const k = el("span", "klabels"); k.append(keyLabel("Enter", "Close")); return k; })());
+    say(h.list.length + " eggs: " + fresh + " new, " + h.list.reduce((t, x) => t + x.shards, 0) + " shards from dupes.", (() => { const k = el("span", "klabels");
+      if (h.list.length > 12) k.append(keyLabel("ArrowDown", "Down: more"));
+      k.append(keyLabel("Enter", "Close")); return k; })());
     return;
   }
   const x = h.list[h.i];
@@ -1358,8 +1366,12 @@ function hatchLabels(h, enter) {
   if (h.list.length > 1 && h.i + 1 < h.list.length) k.append(keyLabel("Backspace", "Skip to the end"));
   return k;
 }
+// NEW first, then rarest: tier, then shiny, then an SP skin.
+const hatchOrder = list => [...list].sort((a, b) => (b.fresh - a.fresh) || (b.tier - a.tier) || (b.shiny - a.shiny) || (!!b.sp - !!a.sp));
+function hatchScroll(dir) { const g = $("#hatch-grid"); if (g) g.scrollBy({ top: dir * 116 }); }  // one row: a 96px cell, its 16px tag, 4px gap
 function hatchKey(e) {
   const h = hatching;
+  if (h.summary && (e.key === "ArrowDown" || e.key === "ArrowUp")) { e.preventDefault(); return hatchScroll(e.key === "ArrowDown" ? 1 : -1); }
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
     if (h.summary) return endHatch();
@@ -2700,7 +2712,7 @@ function stepWithFx(bt) {
     const after = ua.get(id);
     if (!after) {
       if (!bt.retreated.has(id) && bt.fell) bt.fell.push({ cls: before.u.cls, num: before.u.num, lasted: b.t - (bt.born[id] ?? b.t) });
-      if (!bt.retreated.has(id)) bt.ghosts.push({ img: spriteFor(before.u.num, before.u.look), at: pos(before.u), flip: false, t0: now });
+      if (!bt.retreated.has(id)) bt.ghosts.push({ img: spriteFor(before.u.num, before.u.look), at: pos(before.u), flip: unitFacesRight(bt, before.u), t0: now });
       continue;
     }
     const d = Math.round(after.hp - before.hp);
@@ -2733,6 +2745,23 @@ function heading(e) {
   const p = e.path, i = Math.min(e.seg, p.length - 2);
   const dx = p[i + 1][0] - p[i][0], dy = p[i + 1][1] - p[i][1], d = Math.hypot(dx, dy) || 1;
   return [dx / d, dy / d];
+}
+// Our units face where foes come from: a foe they are holding, else up the nearest stretch of
+// path (foes walk each route from spawn to goal, so they come from its earlier point). Every
+// battle strip faces left, so facing right is a mirror. Fixed per unit; paths do not move.
+function unitFacesRight(bt, u) {
+  const b = bt.b, held = b.enemies.find(e => e.blockedBy === u.id);
+  if (held) return held.x > u.x;
+  bt.face ||= {};
+  if (u.id in bt.face) return bt.face[u.id];
+  let best = Infinity, right = false;
+  for (const p of b.paths) for (let i = 0; i + 1 < p.length; i++) {
+    const [ax, ay] = p[i], [bx, by] = p[i + 1], vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy || 1;
+    const t = Math.max(0, Math.min(1, ((u.x - ax) * vx + (u.y - ay) * vy) / L)), d = Math.hypot(ax + vx * t - u.x, ay + vy * t - u.y);
+    // A level stretch: face against its way. An up-and-down one: face its start's side.
+    if (d < best - 1e-6) { best = d; right = vx ? vx < 0 : p[0][0] > u.x; }
+  }
+  return (bt.face[u.id] = right);
 }
 const facesRight = e => { const u = e.blockedBy && battle && battle.b.units.find(o => o.id === e.blockedBy); return u ? u.x > e.x : heading(e)[0] > 0; };
 // Where an enemy is drawn. Blocked ones stand at the edge of the blocker's tile,
@@ -3131,12 +3160,12 @@ function drawField(now = performance.now()) {
     if (unit && o.y > 0 && b.units.some(v => v.x === o.x && v.y === o.y - 1)) maxH = Math.max(20, Math.min(maxH, Math.floor(cy - (tileRect(st, o.x, o.y - 1).y + MARK_H + 1))));
     // A stealthy foe no one can see yet is a faint shimmer.
     const hidden = !unit && o.trait === "stealth" && T.seen && !T.seen(b, o);
-    const top = drawMon(g, img, cx, cy, { flip: unit ? false : facesRight(o), white: flash, maxH, alpha: hidden ? 0.25 : 1 });
+    const top = drawMon(g, img, cx, cy, { flip: unit ? unitFacesRight(bt, o) : facesRight(o), white: flash, maxH, alpha: hidden ? 0.25 : 1 });
     // A unit's own marks (HP and skill bar, block pips) sit along the top of its own tile, drawn
     // over every sprite after this loop (the unit in front is kept below them, above).
     if (unit) { unitBars.push({ o, ...unitBarAt(tileRect(st, o.x, o.y)) }); if (o.block > 0) marks.push({ pips: o, own: true }); }
     if (!unit && o.blockedBy && !o.flying) marks.push({ stop: o, x: cx, y: groundY });
-    if (lastRect) drawn.push({ o, unit, img, rect: lastRect, flip: unit ? false : facesRight(o) });
+    if (lastRect) drawn.push({ o, unit, img, rect: lastRect, flip: unit ? unitFacesRight(bt, o) : facesRight(o) });
     // Exploder fuse, armor, boss marks.
     if (!unit && o.fuse !== null && o.fuse !== undefined && Math.floor(now / 150) % 2) { g.fillStyle = C.red; g.fillRect(Math.round(cx) - 14, Math.round(groundY) - 1, 28, 2); }
     if (!unit && o.armored) { shieldIcon ||= mapCanvas("shield", { k: C.ink, 1: C.dim, 2: C.paper }); g.drawImage(shieldIcon, Math.round(cx) - 26, top + 2); }
@@ -4067,11 +4096,13 @@ if (!G) {
 
 // The hub reads this. Poké Gacha itself is unscored; weeklyRisk (this week's
 // best risk won) feeds its second board, poke-gacha-weekly.
+// The hub's board: species caught plus every star earned on the stages (each stage's best).
 window.__boredSnapshot = () => {
-  let weeklyRisk = 0;
-  try { weeklyRisk = T && T.state ? Number(T.state().challengeBest) || 0 : 0; } catch {}
-  try { const s = S || (G && G.state()); return { slug: "poke-gacha", caught: s ? s.owned.length : 0, pulls: s ? s.pulls : 0, weeklyRisk, finished: false }; }
-  catch { return { slug: "poke-gacha", caught: 0, pulls: 0, weeklyRisk, finished: false }; }
+  let weeklyRisk = 0, stars = 0, caught = 0, pulls = 0;
+  try { const t = T && T.state ? T.state() : null; weeklyRisk = t ? Number(t.challengeBest) || 0 : 0;
+    stars = t ? Object.values(t.best || {}).reduce((n, v) => n + (Math.max(0, Math.min(3, Number(v) || 0))), 0) : 0; } catch {}
+  try { const s = S || (G && G.state()); caught = s ? s.owned.length : 0; pulls = s ? s.pulls : 0; } catch {}
+  return { slug: "poke-gacha", caught, stars, score: caught + stars, pulls, weeklyRisk, finished: false };
 };
 </script>
 </body>
