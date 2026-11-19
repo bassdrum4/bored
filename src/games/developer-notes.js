@@ -63,5 +63,6 @@ export const DEVELOPER_NOTES = Object.freeze({
   'basket-random': "For Charles.",
   'corner': "Go capitalism!",
   'downhill-mayhem': "Fun.",
-  '8ball': "I have a horrid break."
+  '8ball': "I have a horrid break.",
+  'imposter': "Work in progress, but still pretty good!"
 });
