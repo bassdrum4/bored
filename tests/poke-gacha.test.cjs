@@ -621,7 +621,7 @@ test('Quests: four sub-tabs with reset clocks; rows show n/m, a bar and real rew
   assert.equal(await game.evaluate(() => questTab), 'trophies');
   if (await game.evaluate(() => !!G.trophyList)) {
     const groups = await game.$$eval('#quest-list .group', n => n.map(g => g.textContent));
-    assert.deepEqual(groups.map(g => g.replace(/\d+\/\d+$/, '')), ['Poké Idle', 'Pokédoku']);
+    assert.deepEqual(groups.map(g => g.replace(/\d+\/\d+$/, '')), ['Poké Idle', 'Pokédoku', 'Poké Gacha']);
     const total = await game.evaluate(() => G.trophyList().length);
     assert.match(await game.$eval('#quest-tabs [data-qtab="trophies"]', n => n.textContent), new RegExp('\\d+/' + total + '$'));
     await key(tab, 'ArrowDown', 3);
@@ -1303,6 +1303,58 @@ test('tutorials: the six classes and the bars in Squad, types before 1-3, a card
   assert.deepEqual(errors, []);
 });
 
+test('Part 2 in the page: gym chapters, cards for the six new foes, held items on cards and in the Shop, pull history and the banner calendar', async t => {
+  const { tab, game, errors } = await openWithMons(t);
+  if (!await game.evaluate(() => !!(T.items && T.traits && G.bannerFor))) return t.skip('the hub has no Gym Challenge yet');
+  // Gym chapters: their own title, and every new kind of foe has a card with its counter.
+  await game.evaluate(() => { for (const st of T.allStages.filter(s => !s.gym)) T.finish({ stage: st.id, stars: 1, team: [S.owned[0]], waves: 1 }); refreshTop(); tutorSkipAll();
+    go('story'); storyMode = 'stages'; chapterAt = chapters().findIndex(c => c.gym === 'G3'); storyAt = 0; storyUpdate(); });
+  assert.match(await game.$eval('#story-title', n => n.textContent), /^GYM ?3\/8 · Misty/);
+  assert.ok((await game.evaluate(() => [...document.querySelectorAll('#story-info [data-foe]')].map(n => n.dataset.foe))).includes('heal'), 'Misty\'s gym lists its healers');
+  for (const kind of ['heal', 'ranged', 'shield', 'split', 'stealth', 'rally']) assert.match(await game.evaluate(k => foeCard(k, 'X'), kind), /Counter: /, kind + ' has a card with a counter');
+  assert.equal(await game.evaluate(() => foeKind({ trait: 'stealth', fast: true })), 'stealth');
+  // Items: the Shop sells all eight; a bought one goes on a line with I, and shows on its card.
+  await game.evaluate(() => { const w = JSON.parse(parent.localStorage.getItem('bored.wallet')); w.entries['test:rich'] = { at: Math.floor(Date.now() / 1000), g: { coins: 9000 } }; parent.localStorage.setItem('bored.wallet', JSON.stringify(w)); refreshTop(); go('shop'); });
+  const shop = await game.evaluate(() => shopItems().filter(i => i.kind === 'item').map(i => i.id));
+  assert.equal(shop.length, 8);
+  const bands = await game.evaluate(() => T.state().items.owned.band); // 5-6's first clear already dropped one
+  await game.evaluate(() => { const i = shopItems().findIndex(x => x.id === 'band'); buyNow(shopItems()[i]); });
+  assert.equal(await game.evaluate(() => T.state().items.owned.band), bands + 1, 'bought one');
+  await game.evaluate(() => { go('story'); storyMode = 'squad'; rosterCache = null; setSquad([S.owned[0]]); sq.zone = 'slots'; sq.slot = 0; storyUpdate(); squadKey({ key: 'i', preventDefault() {} }); });
+  assert.match(await game.$eval('#squad-detail', n => n.textContent), /Item: (Leftovers|Focus Sash|Choice Band|Quick Claw|Scope Lens|Rocky Helmet|Expert Belt|Shell Bell)/);
+  assert.ok(await game.evaluate(() => !!document.querySelector('#squad-slots .card .ii')), 'the item on its card');
+  await game.evaluate(() => { squadStart(); battle.talk = []; battleTalk(); battle.paused = false; });
+  await pause(100);
+  assert.ok(await game.evaluate(() => !!document.querySelector('#deploy .card .ii')), 'and on its deploy card');
+  await game.evaluate(() => leaveBattle());
+  // Pull: History and Banners.
+  await game.evaluate(() => { go('pull'); pullKey({ key: 'h', preventDefault() {} }); });
+  assert.match(await game.$eval('#rates', n => n.textContent), /PULL HISTORY.*Pity: Rare/);
+  assert.ok(await game.evaluate(() => document.querySelectorAll('#rates .hist > div').length) > 0);
+  assert.match(await game.$eval('#rates', n => n.textContent), /NEW/, 'first hatches are tagged NEW');
+  await game.evaluate(() => pullKey({ key: 'b', preventDefault() {} }));
+  const bans = await game.evaluate(() => [...document.querySelectorAll('#rates .ban')].map(n => n.textContent));
+  assert.equal(bans.length, 7);
+  assert.equal(await game.evaluate(() => name(G.bannerFor(S.today))), (await game.evaluate(() => name(S.banner))), 'today matches the banner on the machine');
+  assert.deepEqual(errors, []);
+});
+
+test('crowds spread: each foe keeps one small drawing offset (±4 across, ±5 up and down); the engine positions stay on the tile', async t => {
+  const { game, errors } = await openWithMons(t);
+  const r = await game.evaluate(() => { go('story'); storyAt = 0; setSquad([S.owned[0]]); startBattle(); battle.talk = []; battleTalk(); battle.paused = false;
+    for (let i = 0; i < 60; i++) T.step(battle.b);
+    const offs = [], same = [], b = battle.b;
+    for (let id = 1; id <= 200; id++) { const o = { id }; const a = foeJitter(o).slice(); offs.push(a); same.push(foeJitter(o).join() === a.join()); }
+    const e = b.enemies[0], drawn = e && feetOf(battle, e), plain = e && feet(battle.stage, ...enemySpot(battle, e), false);
+    return { offs, same: same.every(Boolean), dx: e ? drawn[0] - plain[0] : 0, ex: e ? [e.x, e.y] : null, spread: new Set(offs.map(o => o.join())).size };
+  });
+  assert.ok(r.offs.every(([x, y]) => Math.abs(x) <= 4 && Math.abs(y) <= 5), 'within ±4 / ±5');
+  assert.ok(r.same, 'picked once: the same offset every frame');
+  assert.ok(r.spread > 20, 'foes get different offsets');
+  assert.ok(Math.abs(r.dx) <= 4, 'the drawn feet are the tile spot plus the offset');
+  assert.deepEqual(errors, []);
+});
+
 test('Squad by mouse: drag between slots swaps them, a roster card dragged onto a slot takes it, and that order deploys', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.evaluate(() => { go('story'); storyMode = 'squad'; sq.zone = 'grid'; sq.at = 0; rosterCache = null; setSquad(roster().list.slice(0, 3).map(u => u.num)); storyUpdate(); });
@@ -1620,7 +1672,7 @@ test('battle: blocked enemies stand clear of the blocker, hits show numbers and 
         const bar = (battle.bars || []).find(p => p.id === 'e' + e.id);
         blocked = { gap: Math.hypot(ex - u.x, ey - u.y), facing: facesRight(e) === (u.x > ex) || facesRight(e) === (u.x >= ex),
           tile: st.map[Math.round(ey)][Math.round(ex)], sameRow: Math.round(ey) === u.y || Math.round(ex) === u.x,
-          rowOffset: Math.abs(ey - Math.round(ey)), raised: fy !== gy || fx !== gx, bar: !!bar && bar.y > 0 };
+          rowOffset: Math.abs(ey - Math.round(ey)), raised: fy - foeJitter(e)[1] !== gy || fx - foeJitter(e)[0] !== gx, bar: !!bar && bar.y > 0 }; // less its fixed crowd offset
       }
       if (blocked && sawNum && sawFlash) break;
     }
