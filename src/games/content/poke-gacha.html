@@ -148,6 +148,12 @@ canvas, img { image-rendering: pixelated; display: block }
 #reveal .egg.flash.t3, #reveal .egg.flash.t4 { background-color: var(--gold) }
 #reveal.flash2 { border-color: var(--paper) }
 #reveal.flash3 { border-color: var(--gold) }
+#rates .hist { height: 168px; margin: 2px 0 }
+#rates .hist > div { height: 32px; gap: 10px; padding-left: 0; cursor: default }
+#rates .hist .who { display: flex; align-items: center; gap: 4px }
+#rates .bans { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 8px 0 }
+#rates .ban { display: flex; flex-direction: column; align-items: center; text-align: center; border: 1px solid var(--dim); padding: 4px 0; overflow: hidden; white-space: nowrap }
+#rates .ban.now { border-color: var(--gold) }
 #rates .grid { display: grid; grid-template-columns: 1fr auto; column-gap: 16px; max-width: 300px }
 #msg .more { margin-left: auto; cursor: pointer; text-decoration: underline; color: var(--dim); white-space: nowrap; align-self: flex-end }
 #tabs .alert { display: inline-block; vertical-align: middle; margin-left: 4px }
@@ -326,6 +332,8 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Roster cells sit on their own ink tiles; the deploy cost is a gold badge top right,
    and a squad member has a gold outline as well as its check. */
 #squad-grid .card { background: var(--ink) }
+#squad .card .ii, #deploy .card .ii { position: absolute; left: 2px; bottom: 22px }
+.item-ico { image-rendering: pixelated; vertical-align: middle }
 #squad-slots .card.drop { box-shadow: inset 0 0 0 2px var(--gold) }
 #squad-filters .legend { margin-left: auto; display: flex; align-items: center; gap: 3px; color: var(--dim); border: 0; cursor: default }
 #squad-filters .legend i { display: inline-block; width: 12px; height: 3px; background: var(--teal); margin-left: 4px }
@@ -399,7 +407,7 @@ canvas, img { image-rendering: pixelated; display: block }
 /* Anchored at the bottom and as tall as its line needs, so a two-line line keeps its key. */
 #battle-talk { left: 8px; bottom: 8px; width: 624px; min-height: 62px; padding: 6px 12px; cursor: pointer; line-height: 22px }
 /* "WAVE 2/3" over the field for a moment when a wave starts; it never takes a click. */
-#wave-banner { left: 220px; top: 44px; width: 200px; height: 40px; text-align: center; font: 400 var(--title)/30px var(--pixel); pointer-events: none }
+#wave-banner { left: 220px; top: 44px; width: 200px; height: 44px; text-align: center; font: 400 var(--title)/30px var(--pixel); pointer-events: none }
 /* A clear's stars turn gold one by one, each with a short pop. */
 #battle-result .stars canvas.pop { animation: star-pop .3s steps(3) }
 @keyframes star-pop { from { transform: scale(1.8) } to { transform: scale(1) } }
@@ -563,6 +571,7 @@ function miniStyle(node, num, look = "normal", scale = 1) {
 const mini = (num, look, dark = false) => { const d = miniStyle(el("span", "mini" + (dark ? " unseen" : "")), num, look); d.title = dark ? "???" : name(num); return d; };
 /* PIXEL_MAPS:BEGIN — hand-placed icons, one char per pixel. tests/poke-gacha.test.cjs checks the outlines. */
 const PIXEL_MAPS = {
+ "item": [".kkkkk.", "kk111kk", "k12111k", "k11111k", "k11111k", "kk111kk", ".kkkkk."],
  "candy": ["kk..kkkkk..kk", "kekk22w11kkek", "keek2w111keek", "kee0111100eek", "keek11100keek", "kekk01000kkek", "kk..kkkkk..kk"],
  "check": ["......kk", ".....k1k", "kk..k1k.", "k1kk1k..", ".k11k...", "..kk...."],
  "dot": ["kkkk", "k11k", "k11k", "kkkk"],
@@ -584,6 +593,9 @@ function mapCanvas(key, pal, scale = ART) {
   const map = PIXEL_MAPS[key];
   return pixelCanvas(map[0].length, map.length, g => map.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== ".") { g.fillStyle = pal[row[x]]; g.fillRect(x, y, 1, 1); } }), scale);
 }
+// A held item: a small round charm in the item's colour.
+const ITEM_HEX = { leftovers: "#7ac74c", sash: "#ee8130", band: "#c8372f", claw: "#e3ad2b", lens: "#6390f0", helmet: "#a07514", belt: "#705746", bell: "#f4a6c0" };
+const itemIcon = (id, scale = 2) => { const c = mapCanvas("item", { k: C.ink, 1: ITEM_HEX[id] || C.paper, 2: C.paper }, scale); c.classList.add("item-ico"); c.title = (T && T.items && T.items[id] ? T.items[id].name + ": " + T.items[id].about : id); return c; };
 // Candy: a wrapped sweet, drawn here, for candy in general and the few lines without their own.
 const candyIcon = (scale = 2) => { const c = mapCanvas("candy", { k: C.ink, 0: SHADE.red[0], 1: C.red, 2: SHADE.red[2], e: SHADE.red[0], w: C.paper }, scale); c.classList.add("candy-ico"); c.title = "Candy"; return c; };
 // Each type's colour, for a line's candy: the sweet in its first type, the twisted ends in its second.
@@ -872,6 +884,8 @@ function ratesUpdate() {
   const box = $("#rates");
   box.hidden = !ratesOpen;
   if (!ratesOpen) return;
+  if (ratesOpen === "history") return historyUpdate(box);
+  if (ratesOpen === "banners") return bannersUpdate(box);
   const table = machine === "legend" ? RATES.legend : RATES.standard, grid = el("div", "grid");
   ["Common", "Rare", "Epic", "Legendary", "Banner (" + name(S.banner) + ")"].forEach((t, i) => {
     if (!table[i]) return;
@@ -887,7 +901,35 @@ function ratesUpdate() {
     el("div", "dim", machine === "legend" ? "Here each egg counts twice toward Legendary pity." : "Pity is shared by all three machines."),
     el("div", "dim", "D or a click closes."));
 }
-function toggleRates() { ratesOpen = !ratesOpen; updateScene(); }
+function toggleRates(mode = "rates") { ratesOpen = ratesOpen === mode ? false : mode; updateScene(); }
+// Pull history: the last 100 eggs, newest first: machine, tier, what hatched (NEW, shiny), date; and the pity.
+function historyUpdate(box) {
+  const eggs = (S.hatched || []).map(h => ({ ...h, done: true })).concat((S.eggs || []).map(e => ({ ...e, done: false }))).slice(-100).reverse();
+  const list = el("div", "rows scroll hist");
+  for (const e of eggs) {
+    const r = el("div");
+    r.append(el("span", "dim", (e.day || "").slice(5) || "—"), el("span", "", LOOK[e.machine] ? LOOK[e.machine].label : e.machine), el("span", "gold", TIER_NAME[Math.min(e.tier, 3)] + (e.tier === 4 ? " (banner)" : "")));
+    if (e.done) { const w = el("span", "who"); w.append(mini(e.species, e.shiny ? "shiny" : "normal"), name(e.species)); r.append(w); if (e.fresh) r.append(el("span", "gold", "NEW")); if (e.shiny) r.append(el("span", "gold", "shiny")); }
+    else r.append(el("span", "dim", "hatching"));
+    list.append(r);
+  }
+  if (!eggs.length) list.append(el("p", "dim", "No pulls yet."));
+  const p = S.pity || { rare: 0, epic: 0, legendary: 0 }, pity = el("div");
+  pity.append("Pity: Rare ", el("span", "num", p.rare + "/" + PITY[0]), " · Epic ", el("span", "num", p.epic + "/" + PITY[1]), " · Legendary ", el("span", "num", p.legendary + "/" + PITY[2]));
+  box.replaceChildren(el("div", "title", "PULL HISTORY"), list, pity, el("div", "dim", "H or a click closes."));
+}
+// The next 7 days of Legendary UP banners (they come from the shared daily seed, so they are known ahead).
+function bannersUpdate(box) {
+  const grid = el("div", "bans");
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(S.today + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + i);
+    const day = d.toISOString().slice(0, 10), num = G.bannerFor ? G.bannerFor(day) : i ? 0 : S.banner;
+    const c = el("div", "ban" + (i ? "" : " now"));
+    c.append(num ? mini(num, "normal") : el("span", "dim", "?"), el("span", "", num ? name(num) : "?"), el("span", "dim", i ? day.slice(5) : "today"));
+    grid.append(c);
+  }
+  box.replaceChildren(el("div", "title", "BANNERS"), el("div", "dim", "Legendary UP's banner legendary, day by day (Detroit time)."), grid, el("div", "dim", "B or a click closes."));
+}
 function updateScene() {
   if (!S) return;
   $("#counts").replaceChildren(...["regular", "plus", "premium", "gold"].map(kind => {
@@ -921,7 +963,9 @@ function updateScene() {
       : (option.cancel ? about : option.about + (haveFor(option) ? "" : " You don't have enough.")));
   }
   // Rates and pity for the machine in front: a link in the message box, or D.
-  if (tab === "pull") { const more = el("span", "more", ratesOpen ? "Close rates (D)" : "Rates · pity (D)"); more.dataset.rates = 1; $("#msg").append(more); }
+  if (tab === "pull") { const more = el("span", "more", ratesOpen === "rates" ? "Close rates (D)" : "Rates · pity (D)"); more.dataset.rates = "rates";
+    const hist = el("span", "more", "History (H)"); hist.dataset.rates = "history"; const ban = el("span", "more", "Banners (B)"); ban.dataset.rates = "banners";
+    $("#msg").append(hist, ban, more); }
   ratesUpdate();
   drawScene();
 }
@@ -1120,8 +1164,10 @@ function revealKey(e) {
 }
 function pullKey(e) {
   const k = e.key;
-  if (k === "d" || k === "D") { e.preventDefault(); return toggleRates(); }
-  if (ratesOpen && (k === "Enter" || k === "Backspace" || k === " ")) { e.preventDefault(); return toggleRates(); }
+  if (k === "d" || k === "D") { e.preventDefault(); return toggleRates("rates"); }
+  if (k === "h" || k === "H") { e.preventDefault(); return toggleRates("history"); }
+  if (k === "b" || k === "B") { e.preventDefault(); return toggleRates("banners"); }
+  if (ratesOpen && (k === "Enter" || k === "Backspace" || k === " ")) { e.preventDefault(); return toggleRates(ratesOpen); }
   if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); switchMachine(k === "ArrowLeft" ? -1 : 1); }
   else if (k === "ArrowUp" || k === "ArrowDown") {
     e.preventDefault();
@@ -1505,6 +1551,10 @@ function dexActions(line) {
     list.push({ label: "Skill: " + G.skillsOf(line)[used] + (kind ? " (" + kind.name + ")" : ""), off: open.length < 2,
       about: (kind ? kind.name + ": " + SKILL_ABOUT[kind.id] + ". " : "") + (open.length > 1 ? "Enter: switch to another unlocked skill." : "Hatch more of this line to unlock other skills."),
       run: () => { const msg = cycleSkill(tipOf(line)); return { ok: true, msg }; } });
+    // Its held item (one per line).
+    if (T.equipItem) { const id = T.state().items.equip[line];
+      list.push({ label: "Held item: " + (id ? T.items[id].name : "none"), right: id ? [itemIcon(id)] : "", about: (id ? T.items[id].about + " " : "") + "Enter: switch to another item you own.",
+        run: () => ({ ok: true, msg: cycleItem(line) }) }); }
     // Which owned form fights in Squad and battle (the most evolved, unless picked here).
     const forms = lineForms(line).sort((a, b) => G.stageOf(a) - G.stageOf(b) || a - b);
     if (forms.length > 1) list.push({ label: "Fights as: " + name(formOf(line)), off: false,
@@ -1703,12 +1753,18 @@ function shopItems() {
       about: owned ? "You own this skin. Wear it from the Dex: Look." : !held ? "Hatch the " + name(G.lineOf(skin.species)) + " line first to buy this skin."
         : "SP skin, " + covers + ": its own art here, in battle, in Pokédoku and as your buddy. Looks only. Shiny UP can also drop it (1 in " + SP_IN + ")." });
   }
+  // Held items for coins (the hub's prices); first clears drop them too.
+  if (T && T.items && T.buyItem) for (const [id, it] of Object.entries(T.items)) {
+    const n = T.state().items.owned[id] || 0;
+    items.push({ kind: "item", id, label: it.name + (n ? " · own " + n : ""), price: it.price, cur: "coins", icon: itemIcon(id), about: it.name + ": " + it.about + " Equip it in Squad (I) or the Dex." });
+  }
   return items;
 }
 const ordinal = n => n + (n % 10 === 1 && n % 100 !== 11 ? "st" : n % 10 === 2 && n % 100 !== 12 ? "nd" : n % 10 === 3 && n % 100 !== 13 ? "rd" : "th");
 // What the confirm step asks.
 function confirmText(it, line) {
   if (it.kind === "sp") return "Buy " + it.label + " for " + it.price + " shards?";
+  if (it.kind === "item") return "Buy " + T.items[it.id].name + " for " + it.price + " coins?";
   return "Buy " + (it.kind === "reg" ? "1 Regular voucher" : it.kind === "shards" ? G.coinShop.shards.shards + " shards" : "squad preset " + (S.shop.presets + 1)) + " for " + it.price + " coins?";
 }
 function shopUpdate() {
@@ -1722,8 +1778,8 @@ function shopUpdate() {
   const it = items[shopAt];
   const have = el("div"); have.append(el("span", "num", S.balance.coins), " coins");
   if (items.length > 1) have.append(" · ", el("span", "num", S.balance.shards), " shards");
-  const pic = it.kind === "sp" ? sprite((it.skin.forms || [it.skin.species]).slice(-1)[0], it.skin.id) : it.kind === "shards" ? shardIcon() : it.kind === "preset" ? classIcon("guard") : ticket("regular", 2);
-  const what = { sp: it.skin && it.skin.name, candy: "5 candy, any caught line", shards: "10 shards", preset: "A saved team", reg: "1 Regular = 1 egg" }[it.kind];
+  const pic = it.kind === "item" ? itemIcon(it.id, 8) : it.kind === "sp" ? sprite((it.skin.forms || [it.skin.species]).slice(-1)[0], it.skin.id) : it.kind === "shards" ? shardIcon() : it.kind === "preset" ? classIcon("guard") : ticket("regular", 2);
+  const what = { item: it.id && T.items ? T.items[it.id].about : "", sp: it.skin && it.skin.name, candy: "5 candy, any caught line", shards: "10 shards", preset: "A saved team", reg: "1 Regular = 1 egg" }[it.kind];
   $("#shop-preview").replaceChildren(el("div", "title", it.kind === "sp" ? "PREVIEW" : it.kind === "reg" ? "VOUCHER" : "COINS"), cellWith(pic), el("div", "", what), have);
   if (shopConfirm === "item:" + shopAt) { const k = el("span", "klabels"); k.append(keyLabel("Enter", "Buy"), keyLabel("Backspace", "No")); say(confirmText(it), k); }
   else say(it.about);
@@ -1736,11 +1792,11 @@ function buy(it) {
 }
 function buyNow(it, line) {
   shopConfirm = null;
-  const r = it.kind === "reg" ? G.buyRegular({ count: 1 }) : it.kind === "sp" ? G.buySkin({ skin: it.skin.id })
+  const r = it.kind === "item" ? T.buyItem({ item: it.id }) : it.kind === "reg" ? G.buyRegular({ count: 1 }) : it.kind === "sp" ? G.buySkin({ skin: it.skin.id })
     : it.kind === "shards" ? G.buyShards() : G.buyPreset();
   refreshTop(); shopUpdate();
   const done = { reg: "Bought 1 Regular voucher.", sp: "SP skin unlocked. Wear it from the Dex: Look.", candy: "Bought " + (G.coinShop ? G.coinShop.candy.candy : 5) + " candy" + (line ? " for " + name(tipOf(line)) : "") + ".",
-    shards: "Bought " + (G.coinShop ? G.coinShop.shards.shards : 10) + " shards.", preset: "A new squad preset: pick it in Squad (T" + teamCount() + ", or P)." }[it.kind];
+    item: it.id && T.items ? "Bought " + T.items[it.id].name + ". Equip it in Squad (I) or the Dex." : "", shards: "Bought " + (G.coinShop ? G.coinShop.shards.shards : 10) + " shards.", preset: "A new squad preset: pick it in Squad (T" + teamCount() + ", or P)." }[it.kind];
   say(r.ok ? done : (REASONS[r.reason] || "Not now."));
 }
 function shopKey(e) {
@@ -1811,7 +1867,7 @@ function trophyItems() {
     about: t.name + (t.done ? ": earned, paid 1 " : ": " + t.have + " of " + t.need + ". Pays 1 ") + TIER_NAME_OF[t.tier] + " voucher." }));
 }
 const TIER_NAME_OF = { S: "Plus", M: "Premium", B: "Gold" };
-const GAME_NAME = { "poke-idle": "Poké Idle", pokedoku: "Pokédoku" };
+const GAME_NAME = { "poke-idle": "Poké Idle", pokedoku: "Pokédoku", "poke-gacha": "Poké Gacha" };
 // The rows of one sub-tab, open ones first (in their order), done ones last.
 function questRows(tab_) {
   const list = tab_ === "trophies" ? trophyItems() : questItems().filter(q => q.group === tab_);
@@ -2101,7 +2157,10 @@ function storyUpdate() {
   if (onWeekly()) return weeklyUpdate();
   const chapter = chapters()[Math.min(chapterAt, chapters().length - 1)], list = stagesNow();
   if (storyAt >= list.length) storyAt = list.length - 1;
-  titled($("#story-title"), "CHAPTER", chapter.id + (chapters().length > 1 ? "/" + chapters().length : ""));
+  // Part 1's six chapters, then the Gym Challenge: eight gyms, the Elite Four, the Champion.
+  const part1 = chapters().filter(c => !c.part).length, gymNo = chapter.gym ? chapters().filter(c => c.gym).indexOf(chapter) + 1 : 0;
+  if (!chapter.part) titled($("#story-title"), "CHAPTER", chapter.id + (part1 > 1 ? "/" + part1 : ""));
+  else titled($("#story-title"), chapter.gym ? "GYM" : chapter.id === 15 ? "ELITE FOUR" : "CHAMPION", chapter.gym ? gymNo + "/8 · " + chapter.admin : "");
   storyPager();
   rows($("#story-list"), list.map(stage => ({ label: stage.id + " " + stage.name, right: isOpen(td, stage) ? stageStars(td.best[stage.id] || 0) : "locked",
     off: !isOpen(td, stage) })), storyAt, (i, click) => { storyAt = i; if (click) pickStage(); else storyUpdate(); });
@@ -2128,7 +2187,8 @@ function storyUpdate() {
   if (stage.id === "1-3" && isOpen(td, stage)) setTimeout(typeTip, 0);
   // At most two hints about special foes (the preview lists them all), so the box never overflows.
   const hints = [flyersOf(stage).length && " Only snipers hit flyers.", explodersOf(stage).length && " Kill exploders before the fuse.",
-    armoredOf(stage).length && " Casters go through armor.", fastOf(stage).length && " Fast foes run 1.5x: block them early."].filter(Boolean);
+    armoredOf(stage).length && " Casters go through armor.", fastOf(stage).length && " Fast foes run 1.5x: block them early.",
+    ...["heal", "ranged", "shield", "split", "stealth", "rally"].filter(k => stage.waves.some(w => w[9] === k)).map(k => " " + FOE_NAME[k] + ": " + FOE_TIPS[k].split("Counter: ")[1])].filter(Boolean);
   const lead = isOpen(td, stage) ? stage.before[0] + " Enter: choose your squad." : "Clear " + stageBefore(stage).id + " to unlock this stage.";
   const nav = pages() > 1 ? " Left/Right: chapter." : "";
   for (let n = Math.min(2, hints.length); n >= 0; n--) {
@@ -2236,6 +2296,7 @@ function card(u, { at = false, picked = false, empty = false, cost = true, fit =
     c.append(mini(u.num, u.look), (() => { const i = classIcon(u.cls); i.classList.add("ci"); return i; })());
     if (cost) { const co = el("span", "cost", String(u.cost)); co.title = "Deploy cost"; c.append(co); }
     if (picked) { const k = check(true); k.classList.add("ck"); c.append(k); }
+    if (u.item) { const it = itemIcon(u.item); it.classList.add("ii"); c.append(it); }
     const low = el("div", "low"), lv = el("span");
     lv.append(el("span", "dim", "Lv"), el("span", "", u.level));
     low.append(lv);
@@ -2307,6 +2368,16 @@ const SKILL_ABOUT = { steady: "the class's usual skill, usual charge and power",
 const skillKindOf = k => (T.skillKinds || [])[k] || null;
 // The skill a line uses: the pick if it is unlocked, else the rare one if unlocked, else the first.
 const skillUsed = l => Number.isInteger(l.skill) && l.skills && l.skills[l.skill] ? l.skill : l.skills && l.skills[3] ? 3 : 0;
+// Held items: the next owned item with a free copy (or the one on it), then none.
+function cycleItem(line) {
+  const it = T.state().items, now = it.equip[line] || null;
+  const choices = [null, ...Object.keys(T.items).filter(id => id === now || it.free[id] > 0 || (it.owned[id] > 0 && !Object.values(it.equip).includes(id)))];
+  if (choices.length < 2) return "No held items yet: first clears drop them, and the Shop sells them.";
+  const next = choices[(choices.indexOf(now) + 1) % choices.length];
+  const r = T.equipItem({ line, item: next });
+  refreshTop();
+  return !r.ok ? REASONS[r.reason] || "Not now." : next ? "Item: " + T.items[next].name + (tab === "dex" ? ". " + T.items[next].about : "") : "No held item.";
+}
 function cycleSkill(num) {
   const line = G.lineOf(num), l = S.lines[line];
   if (!l || !G.setSkill) return "";
@@ -2325,7 +2396,7 @@ function squadDetail(num) {
   const hint = sq.note ? el("div", "gold", sq.note) : el("div", "klabels");
   if (!sq.note) {
     if (sq.zone === "head") hint.append(keyLabel("Enter", sq.head === 3 ? "Start" : "Use team"), keyLabel("p", "Next team"));
-    else hint.append(keyLabel("Enter", sq.zone === "slots" ? "Drop" : squadPick().includes((rosterCache || roster()).list[sq.at]?.num) ? "Drop" : "Add"), keyLabel("l", "Level up"), keyLabel("k", "Skill"));
+    else hint.append(keyLabel("Enter", sq.zone === "slots" ? "Drop" : squadPick().includes((rosterCache || roster()).list[sq.at]?.num) ? "Drop" : "Add"), keyLabel("l", "Lv up"), keyLabel("k", "Skill"), ...(T.equipItem ? [keyLabel("i", "Item")] : []));
   }
   // Key labels stay on one line; a note wraps, so a long one never runs off the panel.
   if (!sq.note) hint.style.whiteSpace = "nowrap";
@@ -2349,6 +2420,8 @@ function squadDetail(num) {
     if (open) { n.dataset.skill = i; n.title = (skillKindOf(i)?.name || "") + ": " + (SKILL_ABOUT[skillKindOf(i)?.id] || ""); }
     skills.append(n);
   });
+  // Its held item, beside its name (I cycles through the free ones).
+  if (u.item && T.items) { const it = itemIcon(u.item); it.style.marginLeft = "6px"; head.append(it); }
   box.replaceChildren(head, kind, fight, level, stats, skills, hint);
 }
 function squadToggle(num) {
@@ -2381,6 +2454,12 @@ function squadKey(e) {
     e.preventDefault();
     const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null;
     if (num) { sq.note = cycleSkill(num); rosterCache = null; squadUpdate(); }
+    return;
+  }
+  if ((k === "i" || k === "I") && T.equipItem) {
+    e.preventDefault();
+    const num = sq.zone === "slots" ? squadPick()[sq.slot] : sq.zone === "grid" ? list[sq.at]?.num : null;
+    if (num) { sq.note = cycleItem(G.lineOf(num)); rosterCache = null; squadUpdate(); }
     return;
   }
   const move = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[k];
@@ -2642,7 +2721,16 @@ function feetOf(bt, o) {
   let [sx, sy] = feet(bt.stage, x, y, high);
   if (high) { const front = walkable(bt.stage, x, y + 1), back = walkable(bt.stage, x, y - 1);
     sy += front && !back ? -TH * 0.22 : back && !front ? TH * 0.28 : 0; }
-  return [sx, sy - (!isUnit && o.flying ? 20 : 0)];
+  // Crowds spread out a little (like Kingdom Rush): each foe keeps one small offset inside its
+  // tile for its whole life, from its id. Drawing only; blocking, range and hits use the tile centre.
+  const [jx, jy] = isUnit ? [0, 0] : foeJitter(o);
+  return [sx + jx, sy + jy - (!isUnit && o.flying ? 20 : 0)];
+}
+// A foe's fixed offset in pixels: up to ±4 across and ±5 up and down, picked once at spawn.
+function foeJitter(o) {
+  if (!o.jit) { let h = (o.id * 2654435761) >>> 0; const r = () => { h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0; return h / 4294967296; };
+    o.jit = [Math.round(r() * 8 - 4), Math.round(r() * 10 - 5)]; }
+  return o.jit;
 }
 // High-ground units are drawn a little shorter, so they stay on their block.
 const HIGH_H = 40;
@@ -2686,6 +2774,14 @@ function unitMarks(g, b, o, r, now) {
   g.fillStyle = C.teal; g.fillRect(bx + 1, by + 1, Math.max(0, Math.round(34 * o.hp / o.maxHp)), 3);
   g.fillStyle = C.gold; g.fillRect(bx + 1, by + 5, Math.round(34 * Math.min(1, o.sp / o.spMax)), 2);
   if (o.sp >= o.spMax) { skillIcon ||= mapCanvas("skill", { k: C.ink, 1: C.gold }); g.drawImage(skillIcon, bx + 38, by); }
+}
+function traitMark(g, trait, x, y) {
+  const box = (c, rects) => { g.fillStyle = C.ink; for (const [a, b_, w, h] of rects) g.fillRect(x + a - 1, y + b_ - 1, w + 2, h + 2); g.fillStyle = c; for (const [a, b_, w, h] of rects) g.fillRect(x + a, y + b_, w, h); };
+  if (trait === "heal") box(C.teal, [[2, 0, 2, 6], [0, 2, 6, 2]]);
+  else if (trait === "rally") box(C.gold, [[0, 0, 1, 7], [1, 0, 5, 3]]);
+  else if (trait === "ranged") box(C.red, [[2, 0, 2, 2], [0, 2, 2, 2], [4, 2, 2, 2], [2, 4, 2, 2]]);
+  else if (trait === "split") box(C.paper, [[0, 2, 2, 2], [4, 2, 2, 2]]);
+  else if (trait === "shield") box(C.sky, [[0, 0, 6, 2], [1, 2, 4, 3], [2, 5, 2, 1]]);
 }
 function tileRect(stage, x, y) {
   const high = tileAt(stage, x, y) === "H";
@@ -2951,7 +3047,9 @@ function drawField(now = performance.now()) {
     // to stop below the marks along the top of that tile.
     let maxH = unit && isHigh(st, o.x, o.y) ? HIGH_H : FIT_H;
     if (unit && o.y > 0 && b.units.some(v => v.x === o.x && v.y === o.y - 1)) maxH = Math.max(20, Math.min(maxH, Math.floor(cy - (tileRect(st, o.x, o.y - 1).y + MARK_H + 1))));
-    const top = drawMon(g, img, cx, cy, { flip: unit ? false : facesRight(o), white: flash, maxH });
+    // A stealthy foe no one can see yet is a faint shimmer.
+    const hidden = !unit && o.trait === "stealth" && T.seen && !T.seen(b, o);
+    const top = drawMon(g, img, cx, cy, { flip: unit ? false : facesRight(o), white: flash, maxH, alpha: hidden ? 0.25 : 1 });
     // A unit's own marks (HP and skill bar, block pips) sit along the top of its own tile, drawn
     // over every sprite after this loop (the unit in front is kept below them, above).
     if (unit) { unitBars.push({ o, ...unitBarAt(tileRect(st, o.x, o.y)) }); if (o.block > 0) marks.push({ pips: o, own: true }); }
@@ -2960,6 +3058,8 @@ function drawField(now = performance.now()) {
     // Exploder fuse, armor, boss marks.
     if (!unit && o.fuse !== null && o.fuse !== undefined && Math.floor(now / 150) % 2) { g.fillStyle = C.red; g.fillRect(Math.round(cx) - 14, Math.round(groundY) - 1, 28, 2); }
     if (!unit && o.armored) { shieldIcon ||= mapCanvas("shield", { k: C.ink, 1: C.dim, 2: C.paper }); g.drawImage(shieldIcon, Math.round(cx) - 26, top + 2); }
+    // The newer kinds: a green + for a healer, a gold flag for a rallier, crosshairs for a ranged foe, two dots for a splitter.
+    if (!unit && o.trait) traitMark(g, o.trait, Math.round(cx) + 18, top + 4);
     if (!unit && o.boss) { g.fillStyle = C.gold; g.fillRect(Math.round(cx) - 4, top - 14, 8, 3); }
     // Fast foes: three speed lines trailing behind them.
     if (!unit && o.fast) { const back = facesRight(o) ? -1 : 1; g.fillStyle = C.paper;
@@ -2999,6 +3099,7 @@ function drawField(now = performance.now()) {
     const o = bar.o, bx = bar.x, by = bar.y;
     g.fillStyle = C.ink; g.fillRect(bx, by, 36, h);
     g.fillStyle = bar.unit ? C.teal : C.red; g.fillRect(bx + 1, by + 1, Math.max(0, Math.round(34 * o.hp / o.maxHp)), 3);
+    if (!bar.unit && o.maxShield && o.shield > 0) { g.fillStyle = C.sky; g.fillRect(bx + 1, by + 1, Math.max(1, Math.round(34 * o.shield / o.maxShield)), 2); }
     if (bar.unit) { g.fillStyle = C.gold; g.fillRect(bx + 1, by + 5, Math.round(34 * Math.min(1, o.sp / o.spMax)), 2); }
     if (bar.unit && o.sp >= o.spMax) { skillIcon ||= mapCanvas("skill", { k: C.ink, 1: C.gold }); g.drawImage(skillIcon, bx + 38, by - 6); }
   }
@@ -3115,7 +3216,7 @@ function popAction(what) {
 function battleHud() {
   const bt = battle, b = bt.b;
   // Top centre: enemies down / total, lives (and the weekly risk).
-  const kills = el("span"); kills.append(el("span", "dim", "Foes"), el("span", "num", b.kills + "/" + bt.total));
+  const kills = el("span"); kills.append(el("span", "dim", "Foes"), el("span", "num", b.kills + "/" + (bt.total + (b.splits || 0))));
   const lives = el("span"); lives.append(el("span", "dim", "Lives"), el("span", "num", Math.max(0, b.life)));
   const parts = [kills, lives];
   if (bt.weekly) { const r = el("span"); r.append(el("span", "dim", "Risk"), el("span", "num", T.riskOf(bt.mods))); parts.push(r); }
@@ -3144,6 +3245,7 @@ function battleHud() {
     card.dataset.slot = i; card.title = name(u.num) + " · " + T.classes[u.cls].name + " · cost " + cost;
     const low = el("div", "low"); low.append(classIcon(u.cls), el("span", "num", banned ? "no" : cost));
     card.append(mini(u.num, u.look), low);
+    if (u.item) { const it = itemIcon(u.item); it.classList.add("ii"); card.append(it); }
     // On the field: dimmed and marked; after a retreat or a fall: the cooldown.
     if (out) card.append(el("div", "cool", "On"));
     else if (cool) card.append(el("div", "cool", cool + "s"));
@@ -3177,7 +3279,7 @@ function endBattle() {
   // The final stage's first clear: the story's ending, after the boss's last words.
   const ending = !!(stars && bt.stage.ending && !bt.weekly && !bt.clearedBefore);
   if (ending) bt.talk = bt.talk.concat(bt.stage.ending);
-  bt.result = { stars, waves: r.waves || 0, gained, weekly: bt.weekly, risk: r.risk || 0, best, ending };
+  bt.result = { stars, waves: r.waves || 0, gained, weekly: bt.weekly, risk: r.risk || 0, best, ending, item: r.item || null, badge: r.badge || null };
   sfx(stars ? "win" : "lose");
   battleTalk();
   showResult();
@@ -3198,6 +3300,9 @@ function showResult() {
     for (const [k, n] of res.gained) d.append("+", el("span", "num", n), MILESTONE_ICON[k] ? MILESTONE_ICON[k]() : " " + NAMES[k][1], " ");
     lines.push(d);
   } else for (const [k, n] of res.gained) { const d = el("div"); d.append("+", el("span", "num", n), " " + NAMES[k][n === 1 ? 0 : 1]); lines.push(d); }
+  // A first clear's held item, and a Leader's badge.
+  if (res.item && T.items && T.items[res.item]) { const d = el("div", "gold"); d.append("+", itemIcon(res.item), " " + T.items[res.item].name + " (held item)"); lines.push(d); }
+  if (res.badge) { const g_ = (T.badges || []).find(b_ => b_.id === res.badge); const d = el("div", "gold"); d.append("+ " + (g_ ? g_.leader + "'s badge" : "a badge") + " · " + T.state().badges.length + "/8"); lines.push(d); }
   if (res.weekly) {
     const d = el("div", res.stars && res.risk > res.best ? "gold" : "");
     d.append("Risk ", el("span", "num", res.risk), res.stars ? (res.risk > res.best ? " · new best" : " · best " + res.best) : " · not scored");
@@ -3536,20 +3641,27 @@ function battleTips() {
 }
 // A card for each kind of foe: what it does, and the counter. Shown the first time one shows up
 // in battle, and again from the stage preview's Foes list.
-const FOE_KINDS = ["normal", "fast", "flying", "explodes", "armored", "boss"];
-const FOE_NAME = { normal: "Normal", fast: "Fast", flying: "Flyer", explodes: "Exploder", armored: "Armored", boss: "Boss" };
+const FOE_KINDS = ["normal", "fast", "flying", "explodes", "armored", "boss", "heal", "ranged", "shield", "split", "stealth", "rally"];
+const FOE_NAME = { normal: "Normal", fast: "Fast", flying: "Flyer", explodes: "Exploder", armored: "Armored", boss: "Boss",
+  heal: "Healer", ranged: "Ranged", shield: "Shielded", split: "Splitter", stealth: "Stealth", rally: "Rallier" };
 const FOE_TIPS = {
   normal: "Walks the path to your base. Counter: a blocker stops it while everyone else hits it.",
   fast: "Runs half again as quick. Counter: block it early on the path, before it slips past.",
   flying: "Flies straight to your base over everything, along its dotted route. Counter: only Snipers hit flyers.",
   explodes: "Lights a fuse when blocked, then blows up everyone near it. Counter: kill it from range before the fuse runs out.",
   armored: "Shrugs off physical hits. Counter: Casters' special attacks go straight through armor.",
-  boss: "Four times the HP and hits harder. Counter: save skills for it, and keep a medic on your blocker."
+  boss: "Four times the HP and hits harder. Counter: save skills for it, and keep a medic on your blocker.",
+  heal: "Heals the foes around it (a green +). Counter: kill it first, with snipers from range.",
+  ranged: "Shoots your units from a distance, high ground too, so they can fall. Counter: block it fast; keep a medic up high.",
+  shield: "A shield (the blue bar) soaks hits until it breaks. Counter: Casters break shields three times as fast.",
+  split: "Splits into two small ones when it falls. Counter: a Caster's area hits, and a blocker that holds 3.",
+  stealth: "Invisible until it is next to one of your units, or a Sniper hits it. Counter: Snipers see it; block the path.",
+  rally: "Speeds up the foes around it (a gold flag). Counter: kill it early, before the wave rushes your blockers."
 };
-const foeKind = e => e.boss ? "boss" : e.flying ? "flying" : e.explodes ? "explodes" : e.armored ? "armored" : e.fast ? "fast" : "normal";
+const foeKind = e => e.trait && FOE_TIPS[e.trait] ? e.trait : e.boss ? "boss" : e.flying ? "flying" : e.explodes ? "explodes" : e.armored ? "armored" : e.fast ? "fast" : "normal";
 // The kinds a stage sends, from its waves: [at, species, count, gap, boss, flying, explodes, armored, fast].
-const stageKinds = stage => FOE_KINDS.filter(k => stage.waves.some(w => k === "normal" ? !w[4] && !w[5] && !w[6] && !w[7] && !w[8]
-  : w[{ boss: 4, flying: 5, explodes: 6, armored: 7, fast: 8 }[k]]));
+const stageKinds = stage => FOE_KINDS.filter(k => stage.waves.some(w => k === "normal" ? !w[4] && !w[5] && !w[6] && !w[7] && !w[8] && !w[9]
+  : k in { boss: 1, flying: 1, explodes: 1, armored: 1, fast: 1 } ? w[{ boss: 4, flying: 5, explodes: 6, armored: 7, fast: 8 }[k]] : w[9] === k));
 const foeCard = (kind, who) => FOE_NAME[kind].toUpperCase() + (who ? " · " + who : "") + ": " + FOE_TIPS[kind];
 // The first time each kind of foe shows up: a card on it.
 function foeTips(e) {
@@ -3798,8 +3910,8 @@ if (!G) {
   $("#hit-left").onclick = () => switchMachine(-1);
   $("#hit-right").onclick = () => switchMachine(1);
   $("#hit-machine").onclick = () => { menuOpen = true; message = null; updateScene(); };
-  $("#msg").onclick = e => { if (e.target.closest("[data-rates]")) toggleRates(); };
-  $("#rates").onclick = () => toggleRates();
+  $("#msg").onclick = e => { const r = e.target.closest("[data-rates]"); if (r) toggleRates(r.dataset.rates || "rates"); };
+  $("#rates").onclick = () => toggleRates(ratesOpen || "rates");
   $("#dex-tabs").onclick = e => { const t = e.target.closest("[data-dex-tab]"); if (!t) return; dexFocus = t.dataset.dexTab === "acts" ? "acts" : "list"; actAt = 0; dexUpdate(); };
   $("#dex-depth").onclick = () => { dexFocus = "acts"; actAt = 0; dexUpdate(); };
   $("#reveal").onclick = () => reveal && revealKey({ key: "Enter", preventDefault() {} });
@@ -3815,6 +3927,8 @@ if (!G) {
   }, 3000);
   purgeCutSquads();
   const cut = G.claimCutRefund ? G.claimCutRefund() : { ok: false };
+  // Trophies already met (ones added after the play that meets them) pay now, once.
+  if (G.claimTrophies) G.claimTrophies();
   $("#cut-note").onclick = () => cutNote && closeCutNote();
   // The daily login, and (once, for accounts from before it) the welcome pack.
   const claim = G.claimLogin(), login = claim.login ?? claim.ok;
