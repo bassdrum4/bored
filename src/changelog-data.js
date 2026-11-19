@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 662,
+  "count": 663,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"250fdaf","date":"2026-11-19","author":"Codebuff","subject":"feat(among-us): call the game Among Us and put the crewmate on its card"},
   {"sha":"40356f2","date":"2026-11-19","author":"Codebuff","subject":"fix(imposter): fit the lobby dock without scrolling the frame"},
   {"sha":"fd8df4c","date":"2026-11-19","author":"Codebuff","subject":"feat(imposter): make the lobby the ship, so the wait is walkable"},
   {"sha":"d6895ab","date":"2026-11-19","author":"Codebuff","subject":"feat(imposter): wear the among-us-clone front end"},
