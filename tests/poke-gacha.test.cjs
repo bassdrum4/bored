@@ -1386,7 +1386,7 @@ test('animation: sprites play their frame strips, blocked foes show the shield s
   assert.ok(fx.marks, 'the blocked foe is marked');
   assert.deepEqual(fx.stop, [true, 6, 10, 1, 2], 'the shield is an embedded 6x10 PNG drawn 1x across, 2x tall');
   for (const k of ['slash', 'orb', 'ring', 'shot', 'heal', 'spark', 'knock']) assert.ok(fx.times.includes(k), k + ' has a duration');
-  assert.ok(fx.kinds.some(k => ['slash', 'orb', 'shot'].includes(k)), 'an attack draws its effect: ' + fx.kinds);
+  assert.ok(fx.kinds.some(k => ['slash', 'orb', 'shot', 'pack', 'packshot'].includes(k)), 'an attack draws its effect: ' + fx.kinds);
   assert.deepEqual(errors, []);
 });
 test('flyer routes: no line stays; arrows and a "!" show 2 s before take-off and fade once it is up; hovering its spawn shows it again', async t => {
@@ -1443,6 +1443,26 @@ test('shadows and centring: units stand on their tile centre with no crowd offse
   assert.ok(r.flyShadow[2] < r.unitShadow[2] && r.flyShadow[4] < r.unitShadow[4], 'a flyer\'s is smaller and lighter');
   assert.notEqual(r.ax, 0, 'Charizard\'s strip leans to one side');
   assert.ok(Math.abs(r.body - 100) <= 1, 'its body is drawn on cx: ' + r.body);
+  assert.deepEqual(errors, []);
+});
+test('attack effects come from one sprite sheet: every frame is inside it, sheet animations stay under 300 ms, and anything missing falls back', async t => {
+  const { game, errors } = await openWithMons(t);
+  await game.waitForFunction(() => FX_SHEET.complete && FX_SHEET.naturalWidth > 0, { timeout: 15000 });
+  const r = await game.evaluate(() => {
+    const W = FX_SHEET.naturalWidth, H = FX_SHEET.naturalHeight, bad = [], long = [];
+    for (const [k, [x, y, w, h, n, ms]] of Object.entries(FX_ATLAS)) {
+      if (x < 0 || y < 0 || x + w * n > W || y + h > H || !Number.isInteger(x + y + w + h)) bad.push(k);
+      if (!k.startsWith('shot') && n * ms >= 300) long.push(k);
+    }
+    const types = Object.keys(TYPE_HEX);
+    return { bad, long, src: FX_SHEET.src, slash: types.filter(t => !packFx('slash', t)), heal: !!packFx('heal', ''), none: packFx('shot', 'Bug') };
+  });
+  assert.deepEqual(r.bad, [], 'every frame lies inside the sheet, on whole pixels');
+  assert.deepEqual(r.long, [], 'sheet animations finish under 300 ms');
+  assert.ok(r.src.endsWith('/poke-gacha/art/attacks.webp'));
+  assert.deepEqual(r.slash, [], 'every type has its own melee slash');
+  assert.ok(r.heal, 'medics heal with the sheet');
+  assert.equal(r.none, null, 'a type the sheet does not cover gets null, so the drawn effect is used');
   assert.deepEqual(errors, []);
 });
 test('Squad by mouse: drag between slots swaps them, a roster card dragged onto a slot takes it, and that order deploys', async t => {
