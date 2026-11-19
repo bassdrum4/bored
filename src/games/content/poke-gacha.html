@@ -3095,7 +3095,8 @@ function drawField(now = performance.now()) {
   }
   for (const u of unitBars) unitMarks(g, b, u.o, tileRect(st, u.o.x, u.o.y), now);
   // A blocker: one pip per foe it can hold, gold for each it holds now (under its feet).
-  // A blocked foe: a red stop bar on the side facing its blocker. Foes walking past have none.
+  // A blocked foe: a shield on the side facing its blocker. Foes walking past have none.
+  const stops = [];
   for (const m of marks) {
     if (m.own) continue;
     if (m.pips) {
@@ -3104,7 +3105,9 @@ function drawField(now = performance.now()) {
       for (let i = 0; i < n; i++) { g.fillStyle = i < held ? C.gold : SHADE.paper[0]; g.fillRect(x0 + i * 7, py, 5, 4); }
     } else {
       const side = facesRight(m.stop) ? 1 : -1, sx = Math.round(m.x + side * 15), sy = Math.round(m.y) - 18;
-      g.fillStyle = C.ink; g.fillRect(sx - 2, sy - 1, 6, 18); g.fillStyle = C.red; g.fillRect(sx - 1, sy, 4, 16);
+      // The shield sprite at a whole-number scale, centred where the 6x18 stop bar was; the bar until it loads.
+      if (STOP_IMG.complete && STOP_IMG.naturalWidth) stops.push([sx + 1 - STOP_IMG.naturalWidth * STOP_SCALE / 2, sy + 8 - STOP_IMG.naturalHeight * STOP_SCALE / 2]);
+      else { g.fillStyle = C.ink; g.fillRect(sx - 2, sy - 1, 6, 18); g.fillStyle = C.red; g.fillRect(sx - 1, sy, 4, 16); }
     }
   }
   bt.marks = marks.map(m => m.pips ? { pips: m.pips.id, held: b.enemies.filter(e => e.blockedBy === m.pips.id).length, of: m.pips.block } : { stop: m.stop.id });
@@ -3116,6 +3119,9 @@ function drawField(now = performance.now()) {
     for (const f of drawn.slice(i + 1)) covered += Math.max(0, Math.min(r.x + r.w, f.rect.x + f.rect.w) - Math.max(r.x, f.rect.x)) * Math.max(0, Math.min(r.y + r.h, f.rect.y + f.rect.h) - Math.max(r.y, f.rect.y));
     if (covered > area * 0.4) { g.globalAlpha = 0.85; g.drawImage(outlineOf(d.img, r.w, r.h, d.flip), r.x - 1, r.y - 1); g.globalAlpha = 1; }
   });
+  // Shields go over the sprites and the outlines of hidden units, crisp at their whole-number scale.
+  g.imageSmoothingEnabled = false;
+  for (const [x, y] of stops) g.drawImage(STOP_IMG, Math.round(x), Math.round(y), STOP_IMG.naturalWidth * STOP_SCALE, STOP_IMG.naturalHeight * STOP_SCALE);
   // HP and skill bars on top of every sprite; a bar that would sit on another steps up.
   const placed = [];
   bars.sort((a, c) => c.y - a.y);
@@ -3182,6 +3188,9 @@ function drawField(now = performance.now()) {
     g.fillRect(r.x + ax, r.y + ay, w, h);
 }
 let skillIcon = null, lastRect = null;
+// The blocked-foe marker: the owner's 6x10 shield sprite, drawn at 2x (12x20, about the stop bar's 18px height).
+const STOP_IMG = new Image(), STOP_SCALE = 2;
+STOP_IMG.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAAKCAYAAACXDi8zAAAAZklEQVR4XmNkYGD4zwABjFAazGcCER2TFoAokMD/YxefgeXBEjBJmCCKBNOeLoZ/O7Ng6hA6QMDaWpXh0MFdCB1HjpyAq0QH/33CMv7/P1oKdgCKHSBw9Oht7HZ0nJHAaiTcGBAAACRtIhowuyXuAAAAAElFTkSuQmCC";
 // Every Pokémon fits the same box on its tile: at most 48px tall and 64px wide
 // (about 1.3 tiles), bottom centred, scaled down only, never up, so the big ones
 // (Snorlax, Wailord, Steelix) stand about as tall as the small ones.
