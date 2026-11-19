@@ -779,7 +779,7 @@ test('progression: Squad and Dex show the level cap, and K picks which unlocked 
   if (await game.evaluate(() => !!G.setSkill)) {
     const before = await game.evaluate(() => unitOf(squadPick()[0]).skillAt ?? null);
     await key(tab, 'k');
-    const after = await game.evaluate(() => { rosterCache = null; return [unitOf(squadPick()[0]).skillAt, document.querySelector('#squad-detail .skills .use')?.textContent, sq.note]; });
+    const after = await game.evaluate(() => { rosterCache = null; return [unitOf(squadPick()[0]).skillAt, document.querySelector('#squad-detail .skills .use .nm')?.textContent, sq.note]; });
     assert.notEqual(after[0], before, 'K switched the skill');
     assert.equal(after[1].replace('*', ''), await game.evaluate(k => G.skillsOf(squadPick()[0])[k], after[0]), 'the skill in use is marked');
     assert.match(after[2], /^Skill: /);
@@ -1531,6 +1531,37 @@ test('battle strips: every line form and every foe has one, Rockruff and the gen
   assert.deepEqual(r.still, [652, 653, 654, 655, 657, 658, 701, 840, 841, 842, 870, 906, 907, 908, 921, 922, 923, 932, 935, 936, 937, 957, 958, 959, 984, 990, 992, 996, 997, 998, 999, 1000, 1007, 1008, 1011]);
   assert.deepEqual(errors, []);
 });
+test('moves: attacks hit with the chosen move\'s type (Weavile\'s Powder Snow on Golbat: gold numbers, an Ice effect), and Squad shows each move\'s type', async t => {
+  const { game, errors } = await openWithMons(t);
+  await ownMons(game, [461]);
+  await game.waitForFunction(() => FX_SHEET.complete && FX_SHEET.naturalWidth > 0, { timeout: 15000 });
+  // Squad: a swatch per move in its type, and the move in use spells its type.
+  const detail = await game.evaluate(() => { go('story'); storyMode = 'squad'; rosterCache = null; setSquad([461]); squadDetail(461);
+    const box = $('#squad-detail'); return { swatches: [...box.querySelectorAll('.skills .mtype')].map(n => n.style.background), text: box.querySelector('.skills').textContent, types: G.skillTypesOf(461) }; });
+  assert.deepEqual(detail.types, ['Dark', 'Dark', 'Ice', 'Dark']);
+  assert.equal(detail.swatches.length, 4, 'every move shows its type');
+  assert.match(detail.text, /Powder Snow/); assert.match(detail.text, /· Dark/, 'the move in use names its type');
+  const r = await game.evaluate(() => {
+    storyMode = 'stages'; storyAt = 0; setSquad([461]); startBattle(); battle.talk = []; battleTalk(); battle.paused = false;
+    const b = battle.b; b.energy = 99;
+    // Powder Snow chosen: the squad member carries the move's type.
+    b.squad[0] = { ...b.squad[0], skill: 'Powder Snow', skillAt: 2, moveType: 'Ice', hp: 99999 };
+    for (const q of b.queue) q.num = 42;
+    const path = new Set(b.paths.flat().map(([x, y]) => x + ',' + y)); let at = null;
+    b.stage.map.forEach((row, y) => [...row].forEach((c, x) => { if (!at && !T.canDeploy(b, 0, x, y) && (b.squad[0].ground ? path.has(x + ',' + y) && x > 3 : [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => path.has((x + dx) + ',' + (y + dy))))) at = [x, y]; }));
+    T.deploy(b, 0, ...at); b.units[0].hp = b.units[0].maxHp = 99999;
+    window.__seen = { gold: 0, ice: 0, dark: 0 };
+    const ice = Object.entries(FX_ATLAS).filter(([k]) => k.endsWith(':Ice')).map(([, v]) => v), dark = Object.entries(FX_ATLAS).filter(([k]) => k.endsWith(':Dark')).map(([, v]) => v);
+    window.__fxWatch = setInterval(() => { for (const f of battle.fx) { if (f.counted) continue; f.counted = true;
+      if (f.kind === 'num' && f.color === C.gold) __seen.gold++; if (f.a && ice.includes(f.a)) __seen.ice++; if (f.a && dark.includes(f.a)) __seen.dark++; } }, 20);
+    return { m: T.typeMultiplier('Ice', G.dex[41][1].split('/')) };
+  });
+  assert.equal(r.m, 2, 'Ice is super effective on Poison/Flying Golbat');
+  await game.waitForFunction(() => __seen.gold > 0 && __seen.ice > 0, { timeout: 30000, polling: 100 });
+  const seen = await game.evaluate(() => { clearInterval(__fxWatch); return __seen; });
+  assert.equal(seen.dark, 0, 'no Dark effect for an Ice move');
+  assert.deepEqual(errors, []);
+});
 test('Squad by mouse: drag between slots swaps them, a roster card dragged onto a slot takes it, and that order deploys', async t => {
   const { tab, game, errors } = await openWithMons(t);
   await game.evaluate(() => { go('story'); storyMode = 'squad'; sq.zone = 'grid'; sq.at = 0; rosterCache = null; setSquad(roster().list.slice(0, 3).map(u => u.num)); storyUpdate(); });
@@ -2226,9 +2257,9 @@ test('every stage is cleared by a type-matched squad at the page\'s recommended 
   const dex = load('src/hub/gacha-dex.js', ['DEX', 'DEX_TYPES', 'DEX_CHART', 'DEX_LEGACY']);
   const rewards = load('src/hub/rewards.js', ['mergeWallet', 'walletBalance', 'activateWallet', 'spendFrom', 'grantOnce', 'buyRegular', 'readWallet', 'writeWallet', 'walletTrophies'],
     { ...daily, readStored: () => null, writeStored: () => true, readStoredPrefix: () => ({}) });
-  const gacha = load('src/hub/gacha.js', ['gachaState', 'lineOf', 'mon', 'skillsOf', 'lookFor', 'stageOf', 'evolutionsOf'], { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES, DEX_LEGACY: dex.DEX_LEGACY });
+  const gacha = load('src/hub/gacha.js', ['gachaState', 'lineOf', 'mon', 'skillsOf', 'skillTypesOf', 'lookFor', 'stageOf', 'evolutionsOf'], { ...daily, ...rewards, DEX: dex.DEX, DEX_TYPES: dex.DEX_TYPES, DEX_LEGACY: dex.DEX_LEGACY });
   const td = load('src/hub/td.js', ['classOf', 'STAGES', 'pathsOf', 'unitStats', 'newBattle', 'step', 'deploy', 'typeMultiplier', 'MAX_LEVEL'],
-    { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, lookFor: gacha.lookFor, stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
+    { ...daily, ...rewards, ...dex, gachaState: gacha.gachaState, lineOf: gacha.lineOf, mon: gacha.mon, skillsOf: gacha.skillsOf, skillTypesOf: gacha.skillTypesOf, lookFor: gacha.lookFor, stageOf: gacha.stageOf, evolutionsOf: gacha.evolutionsOf });
   // The page's own formula, read from the page.
   const recLevel = new Function('T', 'return ' + page.match(/const recLevel = (stage => [^\n]*);/)[1])({ maxLevel: td.MAX_LEVEL });
   const squadFor = (stage, rank, level) => {

@@ -323,8 +323,9 @@ img.mirror { scale: -1 1 }
 #squad-detail .skills { display: flex; flex-wrap: wrap; column-gap: 10px }
 #squad-detail .skills span, #squad-detail .stats span { white-space: nowrap }
 #squad-detail .skills span[data-skill] { cursor: pointer }
+#squad-detail .skills .mtype { display: inline-block; width: 8px; height: 8px; margin-right: 4px; border: 1px solid var(--ink); vertical-align: 1px }
 /* The skill in use: underlined in the text's colour. */
-#squad-detail .skills .use { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px }
+#squad-detail .skills .use .nm { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px }
 #squad-detail .line { display: flex; align-items: center; gap: 4px; white-space: nowrap }
 /* A card: the mini sprite at 1x with its class icon top left and a check top right
    when it is in the squad; level bottom left, deploy cost bottom right. */
@@ -2094,7 +2095,7 @@ function roleFit(u, stage) {
   }
   if (u.cls === "caster" || u.cls === "sniper") {
     let sum = 0, n = 0;
-    for (const w of stage.waves) { if (w[5] && u.cls !== "sniper") continue; sum += w[2] * T.typeMultiplier(u.types[0], G.dex[w[1] - 1][1].split("/")); n += w[2]; }
+    for (const w of stage.waves) { if (w[5] && u.cls !== "sniper") continue; sum += w[2] * T.typeMultiplier(u.moveType || u.types[0], G.dex[w[1] - 1][1].split("/")); n += w[2]; }
     return n && sum / n > 1 ? "damage" : "";
   }
   return "";
@@ -2427,9 +2428,15 @@ function squadDetail(num) {
   const skills = el("div", "skills");
   // The skill in use is marked; K (or a click) picks another unlocked one.
   const used = skillUsed(l);
+  // Each move carries its type (a swatch; the one in use spells it out): attacks and the skill hit with it.
+  const moveTypes = G.skillTypesOf ? G.skillTypesOf(num) : [];
   G.skillsOf(num).forEach((sk, i) => {
-    const open = l.skills && l.skills[i], n = el("span", (open ? (i === 3 ? "gold" : "") : "dim") + (open && i === used ? " use" : ""), sk + (i === 3 ? "*" : ""));
-    if (open) { n.dataset.skill = i; n.title = (skillKindOf(i)?.name || "") + ": " + (SKILL_ABOUT[skillKindOf(i)?.id] || ""); }
+    const open = l.skills && l.skills[i], type = moveTypes[i], n = el("span", (open ? (i === 3 ? "gold" : "") : "dim") + (open && i === used ? " use" : ""));
+    if (type) { const sw = el("i", "mtype"); sw.style.background = TYPE_HEX[type] || C.dim; n.append(sw); }
+    n.append(el("span", "nm", sk + (i === 3 ? "*" : "")));
+    if (open && i === used && type) n.append(el("span", "dim mt", " · " + type));
+    if (open) { n.dataset.skill = i; n.title = (type ? type + " move. " : "") + (skillKindOf(i)?.name || "") + ": " + (SKILL_ABOUT[skillKindOf(i)?.id] || ""); }
+    else if (type) n.title = type + " move";
     skills.append(n);
   });
   // Its held item, beside its name (I cycles through the free ones).
@@ -2686,16 +2693,16 @@ function stepWithFx(bt) {
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   for (const h of hits) {
     const by = attackers.filter(u => u.cls !== "medic").sort((a, c) => dist(a, h.e) - dist(c, h.e))[0];
-    const m = by ? T.typeMultiplier(by.types[0], h.e.types) : 1;
+    const m = by ? T.typeMultiplier(by.moveType || by.types[0], h.e.types) : 1;
     bt.fx.push({ kind: "num", text: String(h.dmg), color: m > 1 ? C.gold : m < 1 ? C.dim : C.paper, at: stagger(bt, h.at, now), t0: now });
     sfx("hit", m > 1, 70);
     // The hit foe flashes and is knocked back a few pixels, away from whoever hit it.
     bt.anim["e" + h.e.id] = { ...(bt.anim["e" + h.e.id] || {}), flash: now, knock: now, from: by ? pos(by) : null };
-    const tint = by ? TYPE_HEX[by.types[0]] || C.gold : C.gold;
+    const tint = by ? TYPE_HEX[by.moveType || by.types[0]] || C.gold : C.gold;
     if (by && !bt.anim["u" + by.id + ":" + now]) {
       // Melee: a lunge and a slash across the target. Snipers: a fast bolt. Casters: an orb, then a burst.
       // Each in the attacker's type from the effect sheet, or drawn in its colour where the sheet has none.
-      const type = by.types[0], flip = h.at[0] < pos(by)[0];
+      const type = by.moveType || by.types[0], flip = h.at[0] < pos(by)[0];
       if (by.ground) { bt.anim["u" + by.id] = { ...(bt.anim["u" + by.id] || {}), lunge: now, toward: h.at };
         const a = packFx("slash", type); bt.fx.push(a ? { kind: "pack", a, at: h.at, t0: now, dur: a[4] * a[5], flip } : { kind: "slash", at: h.at, color: tint, t0: now, flip }); }
       else if (by.cls === "caster") { const a = packFx("shot", type), z = packFx("burst", type);
