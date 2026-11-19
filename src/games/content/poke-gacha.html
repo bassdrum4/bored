@@ -2556,12 +2556,25 @@ const spriteCache = {}, trimCache = {}, whiteCache = {};
 const ANIM_DIR = SPRITE_DIR.replace("pokedoku/sprites/", "poke-gacha/anim/");
 let ANIM = {};
 try { fetch(ANIM_DIR + "index.json").then(r => r.ok ? r.json() : {}).then(d => { ANIM = d && typeof d === "object" ? d : {}; }, () => {}); } catch {}
+// How far right of a strip's centre the body sits: the median over frames of its opaque pixels'
+// mean x. A strip is cropped to all its frames' box, which leans toward a swinging tail or wing.
+function bodyLean(strip, w, h, n) {
+  const c = document.createElement("canvas"); c.width = w * n; c.height = h;
+  const g = c.getContext("2d"); g.drawImage(strip, 0, 0);
+  let d; try { d = g.getImageData(0, 0, w * n, h).data; } catch { return 0; }
+  const xs = [];
+  for (let f = 0; f < n; f++) { let sx = 0, k = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w * n + f * w + x) * 4 + 3] > 40) { sx += x; k++; }
+    if (k) xs.push(sx / k); }
+  xs.sort((a, b) => a - b);
+  return xs.length ? Math.round(xs[xs.length >> 1] - w / 2) : 0;
+}
 function animSprite(num, look, meta) {
   const [w, h, n, ms] = meta, c = document.createElement("canvas"), strip = new Image();
-  c.width = w; c.height = h; c.src = "anim:" + look + ":" + num; c.complete = false; c.naturalWidth = 0; c.naturalHeight = 0; c.ax = meta[4] || 0;
+  c.width = w; c.height = h; c.src = "anim:" + look + ":" + num; c.complete = false; c.naturalWidth = 0; c.naturalHeight = 0; c.ax = 0;
   trimCache[c.src] = { l: 0, t: 0, r: w, b: h };
   let shown = -1, phase = Math.floor(Math.random() * n);
-  strip.onload = () => { c.complete = true; c.naturalWidth = w; c.naturalHeight = h; c.tick(performance.now()); };
+  strip.onload = () => { c.ax = bodyLean(strip, w, h, n); c.complete = true; c.naturalWidth = w; c.naturalHeight = h; c.tick(performance.now()); };
   strip.src = ANIM_DIR + (look === "shiny" ? "s" : "") + num + ".webp";
   c.tick = now => { if (!c.complete) return; const f = (Math.floor(now / ms) + phase) % n; if (f === shown) return; shown = f;
     const g = c.getContext("2d"); g.clearRect(0, 0, w, h); g.drawImage(strip, f * w, 0, w, h, 0, 0, w, h); };
