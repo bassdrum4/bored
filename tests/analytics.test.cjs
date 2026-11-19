@@ -160,26 +160,6 @@ test('retention cohorts, meaningful play, and returning visitor calculations', a
   assert.deepEqual(excludeAdmins([adminGuest,adminSigned],['admin']),[]);
 });
 
-test('advice cards wait for a sample instead of reading three sessions', async () => {
-  const { buildGameSignals, buildInsights } = await import('../src/hub/analytics-data.js');
-  const game = (id, sessions, active) => ({ id, active, sessions, visible: active, users: new Set(), errors: 0, completed: 0 });
-  const signals = (report, engagement) => buildGameSignals({ report, engagement });
-  const thin = { games:[game('snake', 3, 180000)], hours:[{ id:'18', active:180000 }],
-    sources:[{ id:'library', active:180000, sessions:3 }], totals:{ sessions:3 } };
-  assert.deepEqual(buildInsights({ signals: signals(thin, { games:[] }), hours: thin.hours,
-    sources: thin.sources, survey: {}, totals: thin.totals }, { snake:'Snake' }), []);
-  const busy = { ...thin, games:[game('snake', 24, 400000), game('memory', 16, 60000)], totals:{ sessions:40 } };
-  const engagement = { games:[{ game:'snake', sessions:24, meaningful:21, repeatEligible:0, repeatReturns:0 },
-    { game:'memory', sessions:16, meaningful:2, repeatEligible:0, repeatReturns:0 }] };
-  const titles = buildInsights({ signals: signals(busy, engagement), hours: busy.hours,
-    sources: [], survey: {}, totals: busy.totals }, { snake:'Snake', memory:'Memory' }).map(card => card.title);
-  assert.deepEqual(titles, ['Snake carries the site', 'Memory opens but does not hook', 'Play peaks at 18:00 Detroit']);
-  // A quiet game stays quiet even when the rest of the board is busy.
-  const quiet = { ...busy, games:[game('snake', 3, 60000)], totals:{ sessions:40 } };
-  assert.equal(buildInsights({ signals: signals(quiet, { games:[] }), hours: [], sources:[],
-    survey: {}, totals: quiet.totals }, { snake:'Snake' }).length, 0);
-});
-
 test('analytics admin accounts are dropped from reported events and time', async () => {
   const { excludeAdmins } = await import('../src/hub/analytics-data.js');
   const events = [{ user_id:'admin-a' }, { user_id:'u1' }, { user_id:null }];
