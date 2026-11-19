@@ -207,6 +207,13 @@ test('flyers cross in a straight line, ignore blockers, and only snipers hit the
   assert.equal(won.over, 'win');
 });
 
+test('flying foes are species that look airborne: perched birds and walkers never take a flying wave', () => {
+  // Their sprites stand on the ground, so they were swapped for flyers with wings or a hover.
+  const perched = [21, 198, 276, 277, 18, 227, 334, 430, 123];
+  const flying = new Set(td.STAGES.flatMap(s => s.waves.filter(w => w[5]).map(w => w[1])));
+  assert.deepEqual(perched.filter(n => flying.has(n)), []);
+  for (const n of [714, 207, 12, 637, 42, 142, 375, 472, 330, 169]) assert.ok(flying.has(n), n + ' flies somewhere');
+});
 test('snipers shoot flyers first, and everyone else the enemy with the least way left to go', () => {
   // A Rattata on the path and a Zubat in the air, both in a sniper's range: the Zubat is shot first.
   const stage = { id: 'x', lives: 3, level: 1, map: ['##########', 'S........G', '####H#####', '##########', '##########'],

@@ -2543,7 +2543,7 @@ function storyKey(e) {
 
 /* The battle, in a 3/4 view kept pixel-crisp: tiles are 56x36 (wider than tall,
    so the floor tilts away), high ground is a block raised 12px with a darker
-   front face, and sprites stand upright on their tile with an oval shadow,
+   front face, and sprites stand upright on their tile with a soft shadow,
    drawn back row first. The engine (td.js) has no hit events, so each tick is
    diffed: HP that fell or rose, attack cooldowns that reset, units and enemies
    gone, skills in b.log. From that come lunges, projectiles, hit flashes,
@@ -2556,12 +2556,25 @@ const spriteCache = {}, trimCache = {}, whiteCache = {};
 const ANIM_DIR = SPRITE_DIR.replace("pokedoku/sprites/", "poke-gacha/anim/");
 let ANIM = {};
 try { fetch(ANIM_DIR + "index.json").then(r => r.ok ? r.json() : {}).then(d => { ANIM = d && typeof d === "object" ? d : {}; }, () => {}); } catch {}
+// How far right of a strip's centre the body sits: the median over frames of its opaque pixels'
+// mean x. A strip is cropped to all its frames' box, which leans toward a swinging tail or wing.
+function bodyLean(strip, w, h, n) {
+  const c = document.createElement("canvas"); c.width = w * n; c.height = h;
+  const g = c.getContext("2d"); g.drawImage(strip, 0, 0);
+  let d; try { d = g.getImageData(0, 0, w * n, h).data; } catch { return 0; }
+  const xs = [];
+  for (let f = 0; f < n; f++) { let sx = 0, k = 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w * n + f * w + x) * 4 + 3] > 40) { sx += x; k++; }
+    if (k) xs.push(sx / k); }
+  xs.sort((a, b) => a - b);
+  return xs.length ? Math.round(xs[xs.length >> 1] - w / 2) : 0;
+}
 function animSprite(num, look, meta) {
   const [w, h, n, ms] = meta, c = document.createElement("canvas"), strip = new Image();
-  c.width = w; c.height = h; c.src = "anim:" + look + ":" + num; c.complete = false; c.naturalWidth = 0; c.naturalHeight = 0;
+  c.width = w; c.height = h; c.src = "anim:" + look + ":" + num; c.complete = false; c.naturalWidth = 0; c.naturalHeight = 0; c.ax = 0;
   trimCache[c.src] = { l: 0, t: 0, r: w, b: h };
   let shown = -1, phase = Math.floor(Math.random() * n);
-  strip.onload = () => { c.complete = true; c.naturalWidth = w; c.naturalHeight = h; c.tick(performance.now()); };
+  strip.onload = () => { c.ax = bodyLean(strip, w, h, n); c.complete = true; c.naturalWidth = w; c.naturalHeight = h; c.tick(performance.now()); };
   strip.src = ANIM_DIR + (look === "shiny" ? "s" : "") + num + ".webp";
   c.tick = now => { if (!c.complete) return; const f = (Math.floor(now / ms) + phase) % n; if (f === shown) return; shown = f;
     const g = c.getContext("2d"); g.clearRect(0, 0, w, h); g.drawImage(strip, f * w, 0, w, h, 0, 0, w, h); };
@@ -2754,6 +2767,34 @@ function foeJitter(o) {
     o.jit = [Math.round(r() * 8 - 4), Math.round(r() * 10 - 5)]; }
   return o.jit;
 }
+// Flyer route previews: { from, to, alpha } per route, keyed by its two ends.
+const FLY_WARN = 2, FLY_IN = 0.4, FLY_FADE = 0.6;
+function flyerRoutes(bt, hov) {
+  const b = bt.b, out = new Map();
+  const add = (p, a) => { if (!p || p.length < 2 || a <= 0) return; const from = p[0], to = p[p.length - 1], key = from + ">" + to, r = out.get(key);
+    if (r) r.alpha = Math.max(r.alpha, a); else out.set(key, { from, to, alpha: Math.min(1, a) }); };
+  bt.flyAt ||= {};
+  for (const e of b.enemies) if (e.flying && !(e.id in bt.flyAt)) bt.flyAt[e.id] = b.t;
+  for (const q of b.queue) if (q.flying) { const d = q.at - b.t; if (d <= FLY_WARN) add(b.paths[q.path], (FLY_WARN - d) / FLY_IN); }
+  for (const e of b.enemies) if (e.flying) add(e.path, 1 - (b.t - bt.flyAt[e.id]) / FLY_FADE);
+  if (hov) for (const q of b.queue) if (q.flying) { const p = b.paths[q.path]; if (p && p[0][0] === hov[0] && p[0][1] === hov[1]) add(p, 1); }
+  return out;
+}
+function drawFlyRoute(g, r, now) {
+  const [ax, ay] = r.from, [zx, zy] = r.to;
+  const x0 = MX + (ax + 0.5) * TW, y0 = MY + (ay + 0.5) * TH, x1 = MX + (zx + 0.5) * TW, y1 = MY + (zy + 0.5) * TH;
+  const len = Math.hypot(x1 - x0, y1 - y0), ux = (x1 - x0) / len, uy = (y1 - y0) / len, gap = 26, shift = (now / 1000 * 40) % gap;
+  g.save(); g.globalAlpha = 0.5 * r.alpha; g.strokeStyle = C.sky; g.lineWidth = 2; g.lineJoin = "miter";
+  for (let d = 18 + shift; d < len - 10; d += gap) {
+    const cx = x0 + ux * d, cy = y0 + uy * d;
+    g.beginPath(); g.moveTo(cx - ux * 4 - uy * 4, cy - uy * 4 + ux * 4); g.lineTo(cx + ux * 2, cy + uy * 2); g.lineTo(cx - ux * 4 + uy * 4, cy - uy * 4 - ux * 4); g.stroke();
+  }
+  // The warning on its spawn: a "!" in a small box above the tile.
+  g.globalAlpha = r.alpha;
+  const bx = Math.round(x0) - 4, by = Math.round(MY + ay * TH) - 14;
+  g.fillStyle = C.ink; g.fillRect(bx, by, 9, 14); g.fillStyle = C.gold; g.fillRect(bx + 3, by + 2, 3, 6); g.fillRect(bx + 3, by + 10, 3, 2);
+  g.restore();
+}
 // High-ground units are drawn a little shorter, so they stay on their block.
 const HIGH_H = 40;
 function battleFrame(now) {
@@ -2895,11 +2936,12 @@ function drawSetTile(g, set, stage, x, y, r, c) {
   // A missing marker keeps the drawn frame, so spawn and base still read.
   return !(c === "S" || c === "G") || !!mark;
 }
-// A pixel oval: rows of rects, no anti-aliasing.
-function oval(g, cx, cy, w, color) {
-  g.fillStyle = color;
-  const rows = [[w * 0.5, -2], [w, -1], [w, 0], [w * 0.5, 1]];
-  for (const [rw, dy] of rows) g.fillRect(Math.round(cx - rw / 2), Math.round(cy + dy), Math.round(rw), 1);
+// A soft dark ellipse: a radial fade, squashed flat.
+function softShadow(g, x, y, rx, ry, alpha) {
+  g.save(); g.translate(Math.round(x), Math.round(y)); g.scale(1, ry / rx);
+  const grad = g.createRadialGradient(0, 0, 0, 0, 0, rx);
+  grad.addColorStop(0, `rgba(28,27,44,${alpha})`); grad.addColorStop(0.55, `rgba(28,27,44,${alpha * 0.75})`); grad.addColorStop(1, "rgba(28,27,44,0)");
+  g.fillStyle = grad; g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.fill(); g.restore();
 }
 /* Scenery behind the field, one per chapter, drawn once and kept: simple original pixel
    scenes in dark shades of the page's colours (2px art pixels), so the grid stays the
@@ -3027,19 +3069,12 @@ function drawField(now = performance.now()) {
   if (sel) showRange(sel, sel.x, sel.y);
   else if (hovered) showRange(hovered, hovered.x, hovered.y);
   else if (card && (bt.armed || bt.drag) && placeable(b, bt.slot, hov[0], hov[1])) showRange(card, hov[0], hov[1]);
-  // Flyers cross straight from their spawn to the goal, each on its own route: a dotted light
-  // blue line per route while any flyer is still to come or in the air, so snipers can go beside it.
-  if (b.queue.some(q => q.flying) || b.enemies.some(e => e.flying)) {
-    // Queued foes hold a route index; spawned ones hold the route itself.
-    const routes = new Set(b.queue.filter(q => q.flying).map(q => b.paths[q.path]).concat(b.enemies.filter(e => e.flying).map(e => e.path)));
-    for (const p of routes) {
-      if (!p || !p.length) continue;
-      const [ax, ay] = p[0], [zx, zy] = p[p.length - 1];
-      const x0 = MX + (ax + 0.5) * TW, y0 = MY + (ay + 0.5) * TH, x1 = MX + (zx + 0.5) * TW, y1 = MY + (zy + 0.5) * TH, len = Math.hypot(x1 - x0, y1 - y0);
-      for (let d = 0; d < len; d += 9) { const px = Math.round(x0 + (x1 - x0) * d / len) - 2, py = Math.round(y0 + (y1 - y0) * d / len) - 1;
-        g.fillStyle = C.ink; g.fillRect(px - 1, py - 1, 6, 5); g.fillStyle = C.sky; g.fillRect(px, py, 4, 3); }
-    }
-  }
+  // Flyers cross straight from their spawn to the goal. No line stays on the field: from
+  // FLY_WARN s before a flyer takes off, its route shows as faint arrows moving toward the goal
+  // with a "!" on its spawn, and it fades out once the flyer is up. Hovering a spawn shows the
+  // routes of the flyers still to come from it.
+  const routes = flyerRoutes(bt, bt.hover);
+  for (const r of routes.values()) drawFlyRoute(g, r, now);
   // Everyone, back to front.
   // Props stand on their floor tile's centre and sort with everyone else.
   const props = propsOf(st, set).map(p => ({ prop: p, o: {}, at: feet(st, p.x, p.y, false) }));
@@ -3065,7 +3100,8 @@ function drawField(now = performance.now()) {
       cx += (a.toward[0] - cx) / d * p; cy += (a.toward[1] - cy) / d * p;
     }
     const groundY = !unit && o.flying ? cy + 20 : cy;
-    oval(g, at[0], groundY + 1, o.flying ? 16 : 26, "rgba(28,27,44,.55)");
+    // A small soft shadow straight under the feet; a flyer's is smaller and lighter, as it is higher up.
+    softShadow(g, cx, groundY + 1, o.flying ? 7 : 11, o.flying ? 2 : 3.5, o.flying ? 0.22 : 0.4);
     const img = spriteFor(o.num, unit ? o.look : "normal");
     // A skill that is ready: a gold ring at the feet.
     if (unit && o.sp >= o.spMax) { g.fillStyle = C.gold; for (const [dx, w] of [[-14, 6], [8, 6]]) g.fillRect(Math.round(at[0] + dx), Math.round(groundY + 2), w, 1); g.fillRect(Math.round(at[0] - 10), Math.round(groundY + 3), 20, 1); }
@@ -3095,7 +3131,8 @@ function drawField(now = performance.now()) {
   }
   for (const u of unitBars) unitMarks(g, b, u.o, tileRect(st, u.o.x, u.o.y), now);
   // A blocker: one pip per foe it can hold, gold for each it holds now (under its feet).
-  // A blocked foe: a red stop bar on the side facing its blocker. Foes walking past have none.
+  // A blocked foe: a shield on the side facing its blocker. Foes walking past have none.
+  const stops = [];
   for (const m of marks) {
     if (m.own) continue;
     if (m.pips) {
@@ -3104,7 +3141,9 @@ function drawField(now = performance.now()) {
       for (let i = 0; i < n; i++) { g.fillStyle = i < held ? C.gold : SHADE.paper[0]; g.fillRect(x0 + i * 7, py, 5, 4); }
     } else {
       const side = facesRight(m.stop) ? 1 : -1, sx = Math.round(m.x + side * 15), sy = Math.round(m.y) - 18;
-      g.fillStyle = C.ink; g.fillRect(sx - 2, sy - 1, 6, 18); g.fillStyle = C.red; g.fillRect(sx - 1, sy, 4, 16);
+      // The shield sprite at whole-number scales, centred where the 6x18 stop bar was; the bar until it loads.
+      if (STOP_IMG.complete && STOP_IMG.naturalWidth) stops.push([sx + 1 - STOP_IMG.naturalWidth * STOP_SX / 2, sy + 8 - STOP_IMG.naturalHeight * STOP_SY / 2]);
+      else { g.fillStyle = C.ink; g.fillRect(sx - 2, sy - 1, 6, 18); g.fillStyle = C.red; g.fillRect(sx - 1, sy, 4, 16); }
     }
   }
   bt.marks = marks.map(m => m.pips ? { pips: m.pips.id, held: b.enemies.filter(e => e.blockedBy === m.pips.id).length, of: m.pips.block } : { stop: m.stop.id });
@@ -3116,6 +3155,9 @@ function drawField(now = performance.now()) {
     for (const f of drawn.slice(i + 1)) covered += Math.max(0, Math.min(r.x + r.w, f.rect.x + f.rect.w) - Math.max(r.x, f.rect.x)) * Math.max(0, Math.min(r.y + r.h, f.rect.y + f.rect.h) - Math.max(r.y, f.rect.y));
     if (covered > area * 0.4) { g.globalAlpha = 0.85; g.drawImage(outlineOf(d.img, r.w, r.h, d.flip), r.x - 1, r.y - 1); g.globalAlpha = 1; }
   });
+  // Shields go over the sprites and the outlines of hidden units, crisp at their whole-number scales.
+  g.imageSmoothingEnabled = false;
+  for (const [x, y] of stops) g.drawImage(STOP_IMG, Math.round(x), Math.round(y), STOP_IMG.naturalWidth * STOP_SX, STOP_IMG.naturalHeight * STOP_SY);
   // HP and skill bars on top of every sprite; a bar that would sit on another steps up.
   const placed = [];
   bars.sort((a, c) => c.y - a.y);
@@ -3182,6 +3224,9 @@ function drawField(now = performance.now()) {
     g.fillRect(r.x + ax, r.y + ay, w, h);
 }
 let skillIcon = null, lastRect = null;
+// The blocked-foe marker: the owner's 6x10 shield sprite, 1x across and 2x tall (6x20: the stop bar's width, about its 18px height).
+const STOP_IMG = new Image(), STOP_SX = 1, STOP_SY = 2;
+STOP_IMG.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAYAAAAKCAYAAACXDi8zAAAAZklEQVR4XmNkYGD4zwABjFAazGcCER2TFoAokMD/YxefgeXBEjBJmCCKBNOeLoZ/O7Ng6hA6QMDaWpXh0MFdCB1HjpyAq0QH/33CMv7/P1oKdgCKHSBw9Oht7HZ0nJHAaiTcGBAAACRtIhowuyXuAAAAAElFTkSuQmCC";
 // Every Pokémon fits the same box on its tile: at most 48px tall and 64px wide
 // (about 1.3 tiles), bottom centred, scaled down only, never up, so the big ones
 // (Snorlax, Wailord, Steelix) stand about as tall as the small ones.
@@ -3194,7 +3239,9 @@ function drawMon(g, img, cx, by, { flip = false, alpha = 1, white = false, maxH 
   if (!img.complete || !img.naturalWidth) return Math.round(by) - 40;
   const tr = trimOf(img) || { l: 0, t: 0, r: img.naturalWidth, b: img.naturalHeight };
   const k = Math.min(fitOf(tr), maxH / (tr.b - tr.t)), w = Math.round((tr.r - tr.l) * k), h = Math.round((tr.b - tr.t) * k);
-  const x = Math.round(cx - w / 2), y = Math.round(by - h);
+  // An animated strip's box can lean to one side (a tail or a wing); stand the body itself on cx.
+  const ax = Math.round((img.ax || 0) * k) * (flip ? -1 : 1);
+  const x = Math.round(cx - w / 2 - ax), y = Math.round(by - h);
   const src = white ? whiteOf(img) : img;
   g.save(); g.globalAlpha = alpha; g.imageSmoothingEnabled = false;
   if (flip) { g.translate(x + w, y); g.scale(-1, 1); g.drawImage(src, tr.l, tr.t, tr.r - tr.l, tr.b - tr.t, 0, 0, w, h); }
@@ -3697,7 +3744,7 @@ const FOE_NAME = { normal: "Normal", fast: "Fast", flying: "Flyer", explodes: "E
 const FOE_TIPS = {
   normal: "Walks the path to your base. Counter: a blocker stops it while everyone else hits it.",
   fast: "Runs half again as quick. Counter: block it early on the path, before it slips past.",
-  flying: "Flies straight to your base over everything, along its dotted route. Counter: only Snipers hit flyers.",
+  flying: "Flies straight to your base over everything. Its route flashes up just before it takes off (hover a spawn to see it again). Counter: only Snipers hit flyers.",
   explodes: "Lights a fuse when blocked, then blows up everyone near it. Counter: kill it from range before the fuse runs out.",
   armored: "Shrugs off physical hits. Counter: Casters' special attacks go straight through armor.",
   boss: "Four times the HP and hits harder. Counter: save skills for it, and keep a medic on your blocker.",

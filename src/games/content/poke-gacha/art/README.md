@@ -30,3 +30,7 @@ use the still sprite as before.
 
 Sprites are PokéRogue's (pagefaultgames/pokerogue), from Pokémon by Nintendo / Game Freak;
 they are not ours to license.
+
+The blocked-foe marker is the owner's 6×10 shield sprite (`shield_1x.png`), embedded in
+`poke-gacha.html` as a data URL and drawn 1x across and 2x tall (6×20: the old stop bar's
+width and about its 18px height) with smoothing off, centred where the bar was.

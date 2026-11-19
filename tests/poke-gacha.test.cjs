@@ -1356,7 +1356,7 @@ test('crowds spread: each foe keeps one small drawing offset (±4 across, ±5 up
   assert.deepEqual(errors, []);
 });
 
-test('animation: sprites play their frame strips, blocked foes keep their stop bar, and attacks draw typed effects', async t => {
+test('animation: sprites play their frame strips, blocked foes show the shield sprite, and attacks draw typed effects', async t => {
   const { game, errors } = await openWithMons(t);
   await game.waitForFunction(() => Object.keys(ANIM).length > 100, { timeout: 15000 });
   await game.evaluate(() => { window.__animN = Number(Object.keys(ANIM).find(k => /^\d+$/.test(k) && ANIM[k][2] > 2)); spriteFor(__animN, 'normal'); });
@@ -1382,10 +1382,67 @@ test('animation: sprites play their frame strips, blocked foes keep their stop b
       if (at) T.deploy(b, slot, ...at); });
     for (const u of b.units) { u.hp = u.maxHp = 99999; u.atk = Math.max(1, Math.round(u.atk / 6)); } });
   await game.waitForFunction(() => { battle.fx.forEach(f => __kinds.add(f.kind)); return battle.b.enemies.some(e => e.blockedBy) && __kinds.has('num'); }, { timeout: 30000, polling: 50 });
-  const fx = await game.evaluate(() => ({ kinds: [...__kinds], marks: battle.marks.some(m => m.stop), times: Object.keys(FX_TIME) }));
+  const fx = await game.evaluate(() => ({ kinds: [...__kinds], marks: battle.marks.some(m => m.stop), times: Object.keys(FX_TIME), stop: [STOP_IMG.src.startsWith('data:image/png'), STOP_IMG.naturalWidth, STOP_IMG.naturalHeight, STOP_SX, STOP_SY] }));
   assert.ok(fx.marks, 'the blocked foe is marked');
+  assert.deepEqual(fx.stop, [true, 6, 10, 1, 2], 'the shield is an embedded 6x10 PNG drawn 1x across, 2x tall');
   for (const k of ['slash', 'orb', 'ring', 'shot', 'heal', 'spark', 'knock']) assert.ok(fx.times.includes(k), k + ' has a duration');
   assert.ok(fx.kinds.some(k => ['slash', 'orb', 'shot'].includes(k)), 'an attack draws its effect: ' + fx.kinds);
+  assert.deepEqual(errors, []);
+});
+test('flyer routes: no line stays; arrows and a "!" show 2 s before take-off and fade once it is up; hovering its spawn shows it again', async t => {
+  const { game, errors } = await openWithMons(t);
+  const r = await game.evaluate(() => {
+    const st = T.allStages.find(s => s.id === '2-1'); chapterAt = st.chapter - 1; storyAt = stagesNow().findIndex(s => s.id === '2-1');
+    go('story'); setSquad([S.owned[0]]); startBattle(); battle.talk = []; battleTalk(); battle.paused = true;
+    const b = battle.b, first = b.queue.find(q => q.flying), spawn = b.paths[first.path][0], n = () => flyerRoutes(battle, null).size;
+    const out = { start: n() };
+    b.t = first.at - 3; out.early = n();
+    b.t = first.at - 1; out.warn = n(); out.alpha = [...flyerRoutes(battle, null).values()][0].alpha;
+    out.hover = flyerRoutes(battle, spawn).size; b.t = 0; out.hoverEarly = flyerRoutes(battle, spawn).size;
+    return out;
+  });
+  assert.equal(r.start, 0, 'no route at the start');
+  assert.equal(r.early, 0, 'nothing 3 s before take-off');
+  assert.equal(r.warn, 1, 'the route shows 1 s before');
+  assert.ok(r.alpha > 0 && r.alpha <= 1);
+  assert.equal(r.hoverEarly, 1, 'hovering the spawn shows its flyers\' route any time');
+  // Once a flyer is up, its route fades out within FLY_FADE.
+  const fade = await game.evaluate(() => { const b = battle.b; b.queue = b.queue.filter(q => !q.flying);
+    const e = { ...b.enemies[0], id: 9999, flying: true, path: [[0, 1], [9, 1]] }; b.enemies = [e]; battle.flyAt = { 9999: b.t };
+    const now = flyerRoutes(battle, null).size; b.t += FLY_FADE + 0.1; return [now, flyerRoutes(battle, null).size]; });
+  assert.deepEqual(fade, [1, 0], 'fades out after take-off');
+  assert.deepEqual(errors, []);
+});
+
+test('shadows and centring: units stand on their tile centre with no crowd offset, and each shadow sits straight under its mon, smaller and lighter for flyers', async t => {
+  const { game, errors } = await openWithMons(t);
+  await ownMons(game, [6, 41]);
+  await game.waitForFunction(() => Object.keys(ANIM).length > 100, { timeout: 15000 });
+  const r = await game.evaluate(async () => {
+    const st = T.allStages.find(s => s.id === '2-1'); chapterAt = st.chapter - 1; storyAt = stagesNow().findIndex(s => s.id === '2-1');
+    go('story'); setSquad([6]); startBattle(); battle.talk = []; battleTalk(); battle.paused = true;
+    const b = battle.b; b.energy = 99;
+    for (let y = 0; y < T.H && !b.units.length; y++) for (let x = 0; x < 12 && !b.units.length; x++) T.deploy(b, 0, x, y);
+    const u = b.units[0];
+    for (let i = 0; i < 30 && !b.enemies.some(e => e.flying); i++) { b.t = (b.queue.find(q => q.flying) || { at: b.t }).at; T.step(b); }
+    const img = spriteFor(6, 'normal'); await new Promise(res => { const w = () => img.complete ? res() : setTimeout(w, 30); w(); });
+    const calls = [], real = softShadow; softShadow = (...a) => { calls.push(a.slice(1)); return real(...a); };
+    battleFrame(performance.now()); softShadow = real;
+    const uf = feetOf(battle, u), tile = feet(battle.stage, u.x, u.y, isHigh(battle.stage, u.x, u.y));
+    const flyer = b.enemies.find(e => e.flying), flyFeet = flyer && feetOf(battle, flyer);
+    // The drawn body of an off-centre strip lands on cx.
+    const c = document.createElement('canvas').getContext('2d'); drawMon(c, img, 100, 100); const rect = lastRect, k = rect.w / img.width;
+    return { ax: img.ax, ux: uf[0], tileX: tile[0], jit: u.jit || null, unitShadow: calls.find(a => Math.abs(a[0] - uf[0]) < 0.6), flyShadow: flyFeet && calls.find(a => Math.abs(a[0] - flyFeet[0]) < 0.6 && a[2] < 9),
+      body: rect.x + rect.w / 2 + img.ax * k };
+  });
+  assert.equal(r.ux, r.tileX, 'a unit stands on its tile centre');
+  assert.equal(r.jit, null, 'units never take the crowd offset');
+  assert.ok(r.unitShadow, 'the unit\'s shadow is straight under it');
+  assert.ok(r.unitShadow[2] > 8 && r.unitShadow[4] >= 0.3, 'a ground shadow is a small soft ellipse');
+  assert.ok(r.flyShadow, 'a flyer is up and has a shadow');
+  assert.ok(r.flyShadow[2] < r.unitShadow[2] && r.flyShadow[4] < r.unitShadow[4], 'a flyer\'s is smaller and lighter');
+  assert.notEqual(r.ax, 0, 'Charizard\'s strip leans to one side');
+  assert.ok(Math.abs(r.body - 100) <= 1, 'its body is drawn on cx: ' + r.body);
   assert.deepEqual(errors, []);
 });
 test('Squad by mouse: drag between slots swaps them, a roster card dragged onto a slot takes it, and that order deploys', async t => {
