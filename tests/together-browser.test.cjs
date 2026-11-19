@@ -139,7 +139,10 @@ test('two embedded browser accounts play, save, auto-return, resume and rematch 
   }
   const guest=await player();await open(guest);
   assert.equal(calls.length,0,'guest makes no multiplayer requests');
-  assert.match(await guest.$eval('#together-content',e=>e.textContent),/display name and email in the member list/);
+  // Check that enrollment discloses what other members can see, without tying consent to exact copy.
+  const disclosure=await guest.$eval('#together-content .bt-enrollment .bt-caption',e=>e.textContent);
+  assert.match(disclosure,/\bname\b/i,'enrollment notice must disclose the member name');
+  assert.match(disclosure,/\bemail\b/i,'enrollment notice must disclose the account email');
   await click(guest,'Join Bored Together');assert.ok(await guest.$eval('#auth-dialog',e=>e.open));
   const a=await player(ids[0]),b=await player(ids[1]);await open(a);await open(b);
   await click(a,'Join Bored Together');await click(b,'Join Bored Together');
