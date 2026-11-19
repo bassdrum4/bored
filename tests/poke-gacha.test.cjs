@@ -276,9 +276,9 @@ test('tower defense: Left and Right switch chapters, and chapter 2 says which en
     refreshTop();
   });
   await key(tab, '1');
-  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/[2-9]/);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/\d+/);
   await key(tab, 'ArrowRight');
-  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*2\/[2-9]/);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*2\/\d+/);
   const rows = await game.$$eval('#story-list > div', list => list.map(r => r.textContent));
   assert.equal(rows.length, 6);
   assert.match(rows[0], /^2-1 /);
@@ -289,7 +289,7 @@ test('tower defense: Left and Right switch chapters, and chapter 2 says which en
   await key(tab, 'ArrowDown', 5);
   assert.match(await game.$eval('#story-info', n => n.textContent), /ADMIN/, '2-6 is the admin stage');
   await key(tab, 'ArrowLeft');
-  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/[2-9]/);
+  assert.match(await game.$eval('#story-title', n => n.textContent), /CHAPTER\s*1\/\d+/);
   assert.deepEqual(errors, []);
 });
 
