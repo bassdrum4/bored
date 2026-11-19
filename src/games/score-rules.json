@@ -146,6 +146,11 @@
     "better": "high",
     "max_value": 100000
   },
+  "poke-gacha": {
+    "label": "Species caught plus stage stars",
+    "better": "high",
+    "max_value": 1250
+  },
   "poke-gacha-weekly": {
     "label": "Highest risk won in a Poké Gacha weekly challenge",
     "better": "high",

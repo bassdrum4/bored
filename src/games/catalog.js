@@ -21,7 +21,7 @@ export const EXTERNS = {"f-14": "https://bassdrum4.github.io/f-14-4/", "klang": 
 // Rooftop Snipers is the compiled original Unity export: it exposes no score API.
 // Krillion's dive total proved too easy to game from the client, so it keeps no
 // board here even though the game still shows the score it just earned.
-export const UNSCORED_GAMES = ["poke-gacha", "prism-duel", "fluid", "rooftop-snipers", "basket-random", "8ball", "eco", "sand", "krillion"];
+export const UNSCORED_GAMES = ["prism-duel", "fluid", "rooftop-snipers", "basket-random", "8ball", "eco", "sand", "krillion"];
 export const NEW_GAMES = ['2048', 'memory', 'connect-four', 'aim-lab'];
 // The NEW badge: newest first, four at most. A new game joins the front and the
 // oldest falls off. NEW_GAMES above is a different list (games built into

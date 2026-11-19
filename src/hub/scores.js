@@ -111,8 +111,10 @@ export const HIGH_SCORE_GAMES = [
   // Poké Idle's Battle Tower ranks on its own board: the highest floor cleared. It has no page of its own, so
   // `page` names the game whose snapshot feeds it (see boardsOn).
   highScore("poke-idle-tower", "Poké Idle: Battle Tower", "floors", { page: "poke-idle", metric: "tower", min: 1, max: 100000, when: snapshot => snapshot.finished === true }),
+  // Poké Gacha: species caught (any form owned counts once) plus every stage's best stars, out of
+  // 1025 species and 75 stages x 3 stars. It counts up as the account plays, so there is no finished run.
+  highScore("poke-gacha", "Poké Gacha", "points", { metric: "score", min: 1, max: 1250, when: snapshot => snapshot.score > 0 }),
   // Poké Gacha's weekly challenge: the highest risk total won in any week (13 is every risk at once).
-  // Poké Gacha itself is unscored, so this is the only board its page feeds.
   highScore("poke-gacha-weekly", "Poké Gacha: Weekly Challenge", "risk", { page: "poke-gacha", metric: "weeklyRisk", min: 1, max: 13, when: snapshot => snapshot.weeklyRisk > 0 }),
   // A finished match against the computer ranks the winning margin, so 7–1
   // beats 7–6. Local two-player games and abandoned matches never post.
