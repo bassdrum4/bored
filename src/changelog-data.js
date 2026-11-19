@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 648,
+  "count": 649,
   "newest": "2026-11-19",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"9aebd12","date":"2026-11-19","author":"Codebuff","subject":"feat(analytics): chart the Overview, and only advise on a real sample"},
   {"sha":"aacd3f3","date":"2026-11-19","author":"Claude","subject":"Poké Gacha: blocked foes keep the red stop bar"},
   {"sha":"ced5e9f","date":"2026-11-19","author":"Codebuff","subject":"fix(hub): keep emoji and Unicode display names"},
   {"sha":"b812b97","date":"2026-11-19","author":"Codebuff","subject":"feat(scrabble): scale the board and its lettering up"},
