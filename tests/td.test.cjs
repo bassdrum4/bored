@@ -605,6 +605,25 @@ test('the Gym Challenge: 8 gyms of 4 stages, the Elite Four, the Champion, after
   const traits = new Set(part2.flatMap(s => s.waves.map(w => w[9]).filter(Boolean)));
   assert.deepEqual([...traits].sort(), Object.keys(td.TRAITS).sort(), 'every new kind of foe shows up');
   assert.ok(part2.every(s => s.map.join('').split('S').length === 2), 'one door per gym');
+  // Difficulty climbs steadily: every stage's level is above the one before, gym 1 to the Champion.
+  assert.ok(part2.every((s, i) => !i || s.level > part2[i - 1].level), 'levels rise stage by stage');
+  // The Champion brings Cynthia's real team.
+  const c1 = part2.find(s => s.id === 'C1'), team = new Set(c1.waves.map(w => gacha.mon(w[1]).name));
+  for (const n of ['Garchomp', 'Spiritomb', 'Lucario', 'Togekiss', 'Roserade', 'Milotic']) assert.ok(team.has(n), 'Cynthia brings ' + n);
+});
+
+test('held items never lose a stage the plain squad wins (matched commons at the recommended level, each item on all of them)', () => {
+  const items = Object.keys(td.ITEMS);
+  const flips = [];
+  for (const stage of td.STAGES) {
+    const good = squadFor(stage, 1);
+    if (playInOrder(stage, good, placed(stage, good)).over !== 'win') continue;
+    for (const item of items) {
+      const kit = good.map(u => td.unitStats(u.num, { level: u.level || recLevel(stage), item }));
+      if (playInOrder(stage, kit, placed(stage, kit)).over !== 'win') flips.push(stage.id + ' ' + item);
+    }
+  }
+  assert.deepEqual(flips, []);
 });
 
 function oneFoe(stage, num, trait, extra = {}) {
