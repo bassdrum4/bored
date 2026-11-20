@@ -2,13 +2,14 @@
 // Rebuild with: npm run changelog
 
 export const CHANGELOG_META = {
-  "count": 685,
+  "count": 686,
   "newest": "2026-11-20",
   "oldest": "2026-10-04",
   "repo": "https://github.com/bassdrum4/bored"
 };
 
 export const CHANGELOG = [
+  {"sha":"5e9bbd4","date":"2026-11-20","author":"Codebuff","subject":"Fix the Among Us room problems the review turned up."},
   {"sha":"d2ac00b","date":"2026-11-20","author":"Codebuff","subject":"Remove Trackbound's share-by-code editor controls."},
   {"sha":"c32d822","date":"2026-11-20","author":"Codebuff","subject":"Read invites once per page and account, and let Trackbound share custom tracks."},
   {"sha":"fcdfab8","date":"2026-11-20","author":"Codebuff","subject":"Start Imposter's name field with the name the player already uses."},
