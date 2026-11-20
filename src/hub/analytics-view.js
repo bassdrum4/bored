@@ -4,7 +4,7 @@ import { ORDER } from '../games/catalog.js';
 import { summarizeEvents, summarizeEngagement, eventsCSV, excludeAdmins } from './analytics-data.js';
 const $ = selector => document.querySelector(selector);
 const announcementAdmin = createAnnouncementAdmin();
-let events = [], productEvents = [], feedbackRows = [], togetherSummary = null, aggregateSummary = null, aggregateCohorts = [], handles = {}, report = null, page = 0, loading = false, epoch = 0;
+let events = [], productEvents = [], feedbackRows = [], togetherSummary = null, popularitySummary = null, aggregateSummary = null, aggregateCohorts = [], handles = {}, report = null, page = 0, loading = false, epoch = 0;
 const names = { ...Object.fromEntries(ORDER), 'f-14': 'F-14 Simulator' }, PAGE_SIZE = 40, MAX_EVENTS = 20000;
 const duration = ms => ms >= 3600000 ? (ms / 3600000).toFixed(1) + ' h' : ms >= 60000 ? (ms / 60000).toFixed(1) + ' min' : Math.round(ms / 1000) + ' s';
 const dateTime = iso => new Date(iso).toLocaleString([], { timeZone: 'America/Detroit', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -54,6 +54,19 @@ function gameRows(games) {
   return games.map(g => [names[g.id] || g.id, g.sessions, g.users.size, duration(g.active), duration(g.visible), duration(g.active / g.sessions), g.completed, g.errors]);
 }
 const gameColumns = ['Game','Sessions','Accounts','Active time','Visible time','Avg active / session','Daily completions','Errors'];
+// This is the actual per-game popularity ranking. Reopening a multiplayer
+// iframe is not a new match and does not improve a game's solo rank.
+function renderPopularity() {
+  if (!Array.isArray(popularitySummary?.games)) {
+    $('#game-popularity').replaceChildren(el('p', 'Authoritative popularity breakdown is unavailable.'));
+    return;
+  }
+  const selectedGame = $('#game').value;
+  const rows = popularitySummary.games.filter(r => !selectedGame || r.game === selectedGame);
+  table('#game-popularity', ['Game','Standalone launches','Standalone browser IDs','Together opens','Organic matches','Organic turns'],
+    rows.map(r => [names[r.game] || r.game, r.standalone_launches, r.standalone_browsers,
+      r.together_opens, r.matches_started, r.turns_played]));
+}
 function renderEngagement(rows) {
   const selected = $('#person').value;
   const products = productEvents.filter(e => !selected || (selected === 'guest' ? !e.user_id : e.user_id === selected));
@@ -201,8 +214,16 @@ function renderHistory() {
       $(id).replaceChildren(el('p', 'No aggregate data available.'));
     return;
   }
+  const popularGames = Array.isArray(popularitySummary?.games) ? popularitySummary.games : null;
+  const total = field => popularGames.reduce((n, row) => n + Number(row[field] || 0), 0);
   const items = [
-    ['Game launches', totals.launches], ['Meaningful sessions', totals.meaningful],
+    ...(popularGames
+      ? [['Standalone launches', total('standalone_launches')],
+        ['Together reopens', total('together_opens')],
+        ['Organic matches created', total('matches_started')],
+        ['Organic turns played', total('turns_played')]]
+      : [['Game opens (including Together)', totals.launches]]),
+    ['Meaningful sessions', totals.meaningful],
     ['Tracked browsers', totals.browsers], ['Active game time', duration(totals.active_ms)],
     ['Error sessions', totals.error_sessions], ['Site visits', aggregateSummary.site?.visits || 0]
   ];
@@ -212,12 +233,26 @@ function renderHistory() {
   }));
   const percentage = (numerator, denominator) =>
     denominator ? Math.round(numerator * 100 / denominator) + '%' : '—';
-  const gameRows = (aggregateSummary.games || []).map(g => [
-    names[g.game] || g.game, g.launches, g.meaningful,
-    percentage(g.meaningful,g.sessions), g.browsers, duration(g.active_ms),
-    duration(g.median_active_ms), g.errors
-  ]);
-  table('#history-games', ['Game','Launches','Meaningful','Meaningful rate','Browser IDs','Active time','Median active','Errors'], gameRows);
+  const byGame = new Map((aggregateSummary.games || []).map(g => [g.game, g]));
+  if (popularGames) {
+    // Server orders by standalone launches, never by reopens of old matches.
+    const gameRows = popularGames.map(g => {
+      const detail = byGame.get(g.game) || {};
+      return [names[g.game] || g.game,g.standalone_launches,g.standalone_browsers,
+        g.together_opens,g.matches_started,g.turns_played,
+        detail.meaningful || 0,duration(detail.active_ms || 0)];
+    });
+    table('#history-games', ['Game','Standalone launches','Standalone browsers','Together opens',
+      'Organic matches','Organic turns','Meaningful · all modes','Active · all modes'], gameRows);
+  } else {
+    const gameRows = (aggregateSummary.games || []).map(g => [
+      names[g.game] || g.game, g.launches, g.meaningful,
+      percentage(g.meaningful,g.sessions), g.browsers, duration(g.active_ms),
+      duration(g.median_active_ms), g.errors
+    ]);
+    table('#history-games', ['Game','All-mode opens','Meaningful','Meaningful rate',
+      'Browser IDs','Active time','Median active','Errors'], gameRows);
+  }
   table('#history-sources', ['Launch source','Launches','Meaningful','Active time'],
     (aggregateSummary.sources || []).map(r => [r.source,r.launches,r.meaningful,duration(r.active_ms)]));
   const actions = (aggregateSummary.ui_events || [])
@@ -253,6 +288,7 @@ function render() {
     n.style.backgroundColor = `rgba(69,102,83,${(h.active / maxHour * .2).toFixed(3)})`;
     n.append(el('span', h.id + ':00'), el('strong', duration(h.active))); return n;
   }));
+  renderPopularity();
   table('#games-table', gameColumns, gameRows(report.games));
   renderF14(rows);
   table('#players-table', ['Player','Sessions','Games','Days active','Active time','Avg / session','Last seen'], report.players.map(p => [
@@ -335,7 +371,7 @@ async function load() {
       }
     }
     // Independent visit/survey events do not inflate game-session totals.
-    const [productLoaded,feedbackLoaded,authoritativeTogether,serverRollup,serverCohorts] = await Promise.all([
+    const [productLoaded,feedbackLoaded,authoritativeTogether,serverRollup,serverCohorts,serverPopularity] = await Promise.all([
       request('/rest/v1/product_events?select=*&received_at=gte.' + start.toISOString() +
         '&received_at=lt.' + end.toISOString() + '&order=received_at.asc&limit=20000'),
       request('/rest/v1/feedback_entries?select=*&created_at=gte.' + start.toISOString() +
@@ -345,7 +381,9 @@ async function load() {
       request('/rest/v1/rpc/analytics_rollup_v1',{method:'POST',
         body:{p_from:start.toISOString(),p_to:end.toISOString()}}).catch(() => null),
       request('/rest/v1/rpc/analytics_retention_cohorts_v1',{method:'POST',
-        body:{p_from:start.toISOString(),p_to:end.toISOString()}}).catch(() => [])
+        body:{p_from:start.toISOString(),p_to:end.toISOString()}}).catch(() => []),
+      request('/rest/v1/rpc/analytics_game_popularity_v1',{method:'POST',
+        body:{p_from:start.toISOString(),p_to:end.toISOString()}}).catch(() => null)
     ]);
     const profiles = await request('/rest/v1/profiles?select=id,handle&order=id&limit=1000');
     // Admin accounts are staff, not players: their events never enter a report.
@@ -359,6 +397,7 @@ async function load() {
     productEvents = productLoaded.filter(e => allowed.has(e));
     feedbackRows = feedbackLoaded.filter(e => allowed.has(e));
     togetherSummary = authoritativeTogether;
+    popularitySummary = serverPopularity;
     aggregateSummary = serverRollup;
     aggregateCohorts = Array.isArray(serverCohorts) ? serverCohorts : [];
     const excluded = loaded.length + flightLoaded.length - events.length;
@@ -374,7 +413,7 @@ async function load() {
       events.length.toLocaleString() + ' player events loaded · refreshed ' + dateTime(cutoff) + emptyReason +
       (excluded ? ' · ' + excluded.toLocaleString() + ' staff/admin events recorded and excluded' : '');
   } catch (error) {
-    events = []; productEvents = []; feedbackRows = []; togetherSummary = null; aggregateSummary = null; aggregateCohorts = []; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
+    events = []; productEvents = []; feedbackRows = []; togetherSummary = null; popularitySummary = null; aggregateSummary = null; aggregateCohorts = []; report = null; $('#dashboard').hidden = !authorized; $('#access').hidden = authorized;
     if (authorized) render();
     $('#status').textContent = error.message || 'Could not load analytics. Try again.';
   } finally { loading = false; $('#refresh').disabled = false; }
@@ -402,5 +441,5 @@ $('#export').onclick = () => {
   const link = el('a'); link.href = url; link.download = 'bored-activity.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 // Clear sensitive DOM when a different tab signs out or switches account.
-window.addEventListener('storage', event => { if (event.key === 'bored.session') { epoch++; events = []; productEvents = []; feedbackRows = []; togetherSummary = null; report = null; $('#dashboard').replaceChildren(); $('#dashboard').hidden = true; $('#status').textContent = 'Account changed. Reload to check access again.'; } });
+window.addEventListener('storage', event => { if (event.key === 'bored.session') { epoch++; events = []; productEvents = []; feedbackRows = []; togetherSummary = null; popularitySummary = null; aggregateSummary = null; report = null; $('#dashboard').replaceChildren(); $('#dashboard').hidden = true; $('#status').textContent = 'Account changed. Reload to check access again.'; } });
 void load();
