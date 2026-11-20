@@ -140,6 +140,57 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 #customTrackList li button{display:inline-flex;width:auto;padding:6px}
 #customTrackList li{display:flex;align-items:center;gap:7px;padding:3px}
 #customTrackList li span{flex:1;font-size:11px}
+
+/* A clear first choice, then one scrollable library. No second campaign column. */
+#screenMenu .menuPanel{width:min(100%,670px);padding:18px 20px}
+.menuModes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:14px 0 12px}
+.menuModes button{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:70px;padding:12px;text-align:left;border:1px solid var(--rule);background:var(--paper)}
+.menuModes button:hover{border-color:var(--accent);color:var(--ink);background:#f1e9d8}
+.menuModes strong{font-size:12px;font-weight:700;letter-spacing:.015em}
+.menuModes span{color:var(--dim);font-size:10px;line-height:1.35;letter-spacing:0;font-weight:400}
+.menuTabs{display:flex;border-bottom:1px solid var(--rule);gap:14px}
+.menuTabs button{border:0;border-bottom:2px solid transparent;border-radius:0;padding:9px 2px 8px;color:var(--dim);font-size:11px}
+.menuTabs button.active{border-color:var(--accent);color:var(--ink)}
+.menuTabs button:hover{background:transparent;color:var(--accent)}
+.menuLibrary{padding-top:4px}
+.menuLibrary .list{max-height:min(37vh,290px);min-height:85px;overflow-y:auto;scrollbar-width:thin}
+.menuLibrary .list button{padding:6px 6px}
+.menuLibraryIntro{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:10px;color:var(--dim);padding:5px 0}
+.menuFooter{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:9px}
+.menuFooter .note{margin:0}
+.menuHelp{font-size:10px;color:var(--dim);max-width:240px}
+.menuHelp summary{cursor:pointer;text-align:right}
+.menuHelp p{margin:5px 0 0;text-align:right}
+#customTrackList li button{border:1px solid var(--rule);border-radius:3px;padding:5px 7px}
+#customTrackList li{gap:5px}
+#customTrackList li span{overflow-wrap:anywhere}
+@media(max-width:540px){
+  #screenMenu .menuPanel{padding:13px}
+  .menuModes{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .menuModes button:last-child{grid-column:span 2;min-height:50px}
+  .menuModes button{min-height:62px;padding:9px}
+  .menuLibrary .list{max-height:31vh}
+  .menuFooter{flex-direction:column;gap:5px}
+  .menuHelp summary,.menuHelp p{text-align:left}
+}
+/* Editing shows the road, not only its overhead route. */
+#screenEditor .panel{width:min(100%,1040px)}
+.editorGrid{grid-template-columns:minmax(220px,.85fr) minmax(320px,1.15fr);align-items:start}
+.editorPreviewHeader{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.editorPreviewHeader h3{margin:8px 0}
+.editorPreviewActions{display:flex;gap:4px}
+.editorPreviewActions button{padding:4px 7px}
+#editorPreview{position:static;display:block;width:100%;height:auto;aspect-ratio:660/420;background:#d4d9d5;border:1px solid var(--rule);border-radius:3px;touch-action:none;cursor:grab}
+#editorPreview.dragging{cursor:grabbing}
+.editorPreviewHelp{font-size:10px;color:var(--dim);margin:4px 0 9px}
+.editorMapDetails{font-size:10px;color:var(--dim);padding-bottom:6px}
+.editorMapDetails summary{cursor:pointer}
+.editorMapDetails #editorMap{width:100%;max-height:180px;object-fit:contain;margin-top:7px}
+#editorPieces li.selected{background:#f8ecd8;box-shadow:inset 3px 0 0 var(--accent)}
+#editorPieces .editorSelect{border:0;text-align:left;flex:1;min-width:0;font-weight:500}
+#editorPieces li.selected .editorSelect{color:#995007}
+#editorPieces li .partNumber{flex:none}
+@media(max-width:750px){.editorGrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -172,38 +223,46 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
     </div>
 
     <section id="screenMenu" class="screen">
-      <div class="panel">
+      <div class="panel menuPanel">
         <header class="panelHead">
           <h2>Time attack</h2>
-          <p>Blocks, a clock, and a ghost that remembers your best line.</p>
+          <p>Pick a track. Beat your time. Repeat.</p>
         </header>
-        <div class="cols">
-          <div>
-            <h3>Campaign</h3>
-            <ol id="trackList" class="list"></ol>
-            <div class="row">
-              <button id="btnDaily" type="button">Daily track</button>
-              <button id="btnFreeplay" type="button">Freeplay park</button>
-              <button id="btnEditor" type="button">Track editor</button>
-            </div>
-            <p id="dailyNote" class="note"></p>
-            <p class="note">Freeplay is a stunt park: gold rings, a vertical loop, and ramps built to be flown.</p>
-            <h3>My tracks</h3>
-            <ol id="customTrackList" class="list"></ol>
-            <p class="note">Your tracks are saved on this device. Share codes work across devices.</p>
-          </div>
-          <div>
-            <h3>Controls</h3>
-            <dl class="keys">
-              <div><dt>Drive</dt><dd>W A S D / arrows</dd></div>
-              <div><dt>Handbrake</dt><dd>Space</dd></div>
-              <div><dt>Respawn</dt><dd>Backspace</dd></div>
-              <div><dt>Restart</dt><dd>R</dd></div>
-              <div><dt>Pause</dt><dd>Esc</dd></div>
-            </dl>
-            <p id="menuNote" class="note"></p>
-          </div>
+        <nav class="menuModes" aria-label="Race modes">
+          <button id="btnDaily" type="button">
+            <strong>Daily track</strong>
+            <span id="dailyNote">A new course each day</span>
+          </button>
+          <button id="btnFreeplay" type="button">
+            <strong>Stunt park</strong>
+            <span>Explore, jump, collect rings</span>
+          </button>
+          <button id="btnEditor" type="button">
+            <strong>Track editor</strong>
+            <span>Build and share a course</span>
+          </button>
+        </nav>
+        <div class="menuTabs" role="group" aria-label="Track library">
+          <button id="menuCampaignTab" type="button" class="active" aria-pressed="true">Campaign · 15</button>
+          <button id="menuCustomTab" type="button" class="quiet" aria-pressed="false">My tracks · 0</button>
         </div>
+        <div id="menuCampaignPanel" class="menuLibrary">
+          <ol id="trackList" class="list"></ol>
+        </div>
+        <div id="menuCustomPanel" class="menuLibrary" hidden>
+          <div class="menuLibraryIntro">
+            <span>Saved on this device · use codes to share</span>
+            <button id="menuNewTrack" type="button" class="quiet">+ Create track</button>
+          </div>
+          <ol id="customTrackList" class="list"></ol>
+        </div>
+        <footer class="menuFooter">
+          <p id="menuNote" class="note"></p>
+          <details class="menuHelp">
+            <summary>Controls</summary>
+            <p>WASD / arrows drive · Space handbrake · R restart · Backspace respawn · Esc pause · M sound</p>
+          </details>
+        </footer>
       </div>
     </section>
 
@@ -228,8 +287,22 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
             <p id="editorCount" class="note"></p>
           </div>
           <div>
-            <h3>Course map</h3>
-            <canvas id="editorMap" width="440" height="260" aria-label="Top-down map of your custom course"></canvas>
+
+            <div class="editorPreviewHeader">
+              <h3>Live 3D course</h3>
+              <div class="editorPreviewActions">
+                <button id="previewZoomOut" class="quiet" type="button" aria-label="Zoom out">−</button>
+                <button id="previewZoomIn" class="quiet" type="button" aria-label="Zoom in">+</button>
+                <button id="previewReset" class="quiet" type="button">Reset view</button>
+              </div>
+            </div>
+            <canvas id="editorPreview" width="660" height="420"
+              aria-label="Interactive three dimensional course preview. Drag to rotate; scroll to zoom; click to select a section."></canvas>
+            <p class="editorPreviewHelp">Drag to orbit · Scroll to zoom · Click a section to select it</p>
+            <details class="editorMapDetails">
+              <summary>Top-down route map</summary>
+              <canvas id="editorMap" width="440" height="220" aria-label="Top-down map of your custom course"></canvas>
+            </details>
             <p id="editorStatus" class="note" role="status" aria-live="polite"></p>
             <div class="editorActions">
               <button id="editorTest" type="button">Test drive</button>
