@@ -1652,7 +1652,10 @@ window.ImposterCore = (function () {
 
   /* ── the room (unchanged transport-facing half) ──────────────────────── */
 
-  const SNAPSHOT_MS = 100;
+  // The host loop ticks every 50 ms, so 45 lets every tick publish without
+  // depending on the timer firing early: 20 snapshots a second, the fastest the
+  // loop can carry. Idle rooms still send nothing (publish skips unchanged state).
+  const SNAPSHOT_MS = 45;
   const MIRROR_MS = 1200;
   const PUBLIC_EVENTS = new Set(['start', 'meeting', 'eject', 'win', 'vote', 'task', 'join', 'lobby', 'sabotage', 'fixed', 'gas', 'chat', 'doors', 'hold']);
 
