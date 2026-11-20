@@ -137,9 +137,9 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 #editorStatus{min-height:24px}
 #editorStatus.invalid{color:#9b332a}
 .editorActions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-#customTrackList li button{display:inline-flex;width:auto;padding:6px}
-#customTrackList li{display:flex;align-items:center;gap:7px;padding:3px}
-#customTrackList li span{flex:1;font-size:11px}
+#customTrackList li button,#publicTrackList li button{display:inline-flex;width:auto;padding:6px}
+#customTrackList li,#publicTrackList li{display:flex;align-items:center;gap:7px;padding:3px}
+#customTrackList li span,#publicTrackList li span{flex:1;font-size:11px}
 
 /* A clear first choice, then one scrollable library. No second campaign column. */
 #screenMenu .menuPanel{width:min(100%,670px);padding:18px 20px}
@@ -161,9 +161,9 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
 .menuHelp{font-size:10px;color:var(--dim);max-width:240px}
 .menuHelp summary{cursor:pointer;text-align:right}
 .menuHelp p{margin:5px 0 0;text-align:right}
-#customTrackList li button{border:1px solid var(--rule);border-radius:3px;padding:5px 7px}
-#customTrackList li{gap:5px}
-#customTrackList li span{overflow-wrap:anywhere}
+#customTrackList li button,#publicTrackList li button{border:1px solid var(--rule);border-radius:3px;padding:5px 7px}
+#customTrackList li,#publicTrackList li{gap:5px}
+#customTrackList li span,#publicTrackList li span{overflow-wrap:anywhere}
 @media(max-width:540px){
   #screenMenu .menuPanel{padding:13px}
   .menuModes{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -245,6 +245,7 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
         <div class="menuTabs" role="group" aria-label="Track library">
           <button id="menuCampaignTab" type="button" class="active" aria-pressed="true">Campaign · 15</button>
           <button id="menuCustomTab" type="button" class="quiet" aria-pressed="false">My tracks · 0</button>
+          <button id="menuPublicTab" type="button" class="quiet" aria-pressed="false">Public tracks</button>
         </div>
         <div id="menuCampaignPanel" class="menuLibrary">
           <ol id="trackList" class="list"></ol>
@@ -255,6 +256,14 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
             <button id="menuNewTrack" type="button" class="quiet">+ Create track</button>
           </div>
           <ol id="customTrackList" class="list"></ol>
+        </div>
+        <div id="menuPublicPanel" class="menuLibrary" hidden>
+          <div class="menuLibraryIntro">
+            <span>Courses shared by Bored players</span>
+            <button id="menuPublicReload" type="button" class="quiet">Reload</button>
+          </div>
+          <p id="menuPublicNote" class="note" role="status" aria-live="polite"></p>
+          <ol id="publicTrackList" class="list"></ol>
         </div>
         <footer class="menuFooter">
           <p id="menuNote" class="note"></p>
@@ -307,8 +316,10 @@ input{font:inherit;font-size:11px;color:inherit;background:var(--panel);border:1
             <div class="editorActions">
               <button id="editorTest" type="button">Test drive</button>
               <button id="editorSave" type="button">Save track</button>
+              <button id="editorPost" type="button">Post for others</button>
               <button id="editorBack" class="quiet" type="button">Back to menu</button>
             </div>
+            <p class="note">Posting shares this track's code with everyone in Bored, under your display name. Nothing else is shared.</p>
             <h3>Share</h3>
             <label class="editorField" for="editorCode">YOUR TRACK CODE
               <input id="editorCode" type="text" readonly aria-label="Shareable track code">
@@ -3840,6 +3851,7 @@ function refreshEditor() {
     : validation.error;
   $('editorTest').disabled = !validation.ok;
   $('editorSave').disabled = !validation.ok;
+  $('editorPost').disabled = !validation.ok;
   $('editorCopy').disabled = !validation.ok;
   $('editorCode').value = validation.ok ? encodeTrackCode(editor.blocks) : '';
   let previewTrack = validation.track || null;
@@ -3956,16 +3968,128 @@ async function copyCustomCode() {
   }
 }
 
+/* ── public tracks ──────────────────────────────────────────────────────────
+   The hub owns the account and the network, so the game asks it for the public
+   list and for a post over the channel it injects, and never sees a token. A
+   bare copy of this document (the browser suite, a saved page) has no hub and
+   says so instead of failing. A posted track is only a code: driving one goes
+   through the same import path as a pasted code, and is never a campaign run. */
+let publicTracks = null, publicBusy = false, publicNote = '';
+function tracksAPI() {
+  const api = typeof window === 'undefined' ? null : window.__boredTracks;
+  return api && typeof api.call === 'function' ? api : null;
+}
+function publicStatus(text, invalid) {
+  publicNote = text || '';
+  const note = $('menuPublicNote');
+  if (!note) return;
+  note.textContent = publicNote;
+  note.className = 'note' + (invalid ? ' invalid' : '');
+}
+function renderPublicList(rows) {
+  const tab = $('menuPublicTab');
+  if (tab) tab.textContent = 'Public tracks' + (rows.length ? ' · ' + rows.length : '');
+  const list = $('publicTrackList');
+  if (!list) return;
+  list.replaceChildren();
+  if (!rows.length) {
+    const empty = el('li');
+    empty.appendChild(el('span', 'empty', publicNote || 'No public tracks yet.'));
+    list.appendChild(empty);
+    return;
+  }
+  rows.forEach(row => {
+    const li = el('li');
+    li.appendChild(el('span', '', row.name + ' · ' + row.handle));
+    const drive = el('button', 'quiet', 'Drive');
+    drive.type = 'button';
+    drive.addEventListener('click', () => drivePublic(row));
+    li.appendChild(drive);
+    list.appendChild(li);
+  });
+}
+async function refreshPublicList() {
+  const api = tracksAPI();
+  if (!api) {
+    publicTracks = [];
+    renderPublicList([]);
+    publicStatus('Public tracks are shared through Bored: open the game from the arcade.');
+    return;
+  }
+  if (publicBusy) return;
+  publicBusy = true;
+  publicStatus('Loading public tracks…');
+  try {
+    const result = await api.call('list');
+    const rows = Array.isArray(result && result.tracks) ? result.tracks : [];
+    publicTracks = rows.filter(row => row && typeof row.code === 'string' && row.name);
+    publicStatus(publicTracks.length ? '' : 'Nothing shared yet. Post the first from the editor.');
+    renderPublicList(publicTracks);
+  } catch (error) {
+    // Left unset so opening the tab (or Reload) tries again rather than caching the failure.
+    publicTracks = null;
+    renderPublicList([]);
+    publicStatus(error.message || 'Public tracks are out of reach. Try again shortly.', true);
+  } finally { publicBusy = false; }
+}
+function drivePublic(row) {
+  let blocks;
+  try { blocks = decodeTrackCode(row.code); }
+  catch (error) { publicStatus(error.message, true); return false; }
+  const validation = validateCustom(blocks);
+  if (!validation.ok) { publicStatus(validation.error, true); return false; }
+  return startCustomTrack({ name: row.name, blocks });
+}
+async function postPublicTrack() {
+  const validation = refreshEditor();
+  if (!validation.ok) return false;
+  const note = $('editorStatus');
+  const api = tracksAPI();
+  if (!api) {
+    note.className = 'note invalid';
+    note.textContent = 'Posting needs Bored: open the game from the arcade.';
+    return false;
+  }
+  const name = cleanTrackName($('editorName').value);
+  const code = encodeTrackCode(editor.blocks);
+  if (!code) { note.className = 'note invalid'; note.textContent = 'Only a complete track can be posted.'; return false; }
+  const button = $('editorPost');
+  if (button) button.disabled = true;
+  note.className = 'note';
+  note.textContent = 'Posting…';
+  try {
+    const who = await api.call('status');
+    if (!who || !who.signedIn) {
+      note.className = 'note invalid';
+      note.textContent = 'Sign in to Bored to post a track.';
+      return false;
+    }
+    await api.call('post', { name, code });
+    editor.name = name;
+    $('editorName').value = name;
+    publicTracks = null;
+    note.textContent = 'Posted · other players can drive ' + name + ' from the public list.';
+    return true;
+  } catch (error) {
+    note.className = 'note invalid';
+    note.textContent = error.message || 'The track could not be posted.';
+    return false;
+  } finally { if (button) button.disabled = false; }
+}
+
 let menuLibraryTab = 'campaign';
 function showMenuLibrary(tab) {
-  menuLibraryTab = tab === 'custom' ? 'custom' : 'campaign';
-  const campaign = menuLibraryTab === 'campaign';
-  $('menuCampaignPanel').hidden = !campaign;
-  $('menuCustomPanel').hidden = campaign;
-  $('menuCampaignTab').className = campaign ? 'active' : 'quiet';
-  $('menuCustomTab').className = campaign ? 'quiet' : 'active';
-  $('menuCampaignTab').setAttribute('aria-pressed', String(campaign));
-  $('menuCustomTab').setAttribute('aria-pressed', String(!campaign));
+  menuLibraryTab = tab === 'custom' || tab === 'public' ? tab : 'campaign';
+  const panels = { campaign: 'menuCampaignPanel', custom: 'menuCustomPanel', public: 'menuPublicPanel' };
+  const tabs = { campaign: 'menuCampaignTab', custom: 'menuCustomTab', public: 'menuPublicTab' };
+  for (const key of Object.keys(panels)) {
+    const on = key === menuLibraryTab;
+    $(panels[key]).hidden = !on;
+    const button = $(tabs[key]);
+    if (!button) continue;
+    button.className = on ? 'active' : 'quiet';
+    button.setAttribute('aria-pressed', String(on));
+  }
 }
 function refreshMenu() {
   const storedMedals = saved.medals;
@@ -3973,6 +4097,7 @@ function refreshMenu() {
   const bests = saved.best;
   refreshCustomList();
   showMenuLibrary(menuLibraryTab);
+  if (menuLibraryTab === 'public' && !publicTracks && !publicBusy) void refreshPublicList();
   const list = $('trackList');
   list.replaceChildren();
   CAMPAIGN.forEach((entry, index) => {
@@ -4255,12 +4380,18 @@ $('previewZoomOut').addEventListener('click', () => changeEditorZoom(1 / 1.25));
 $('previewReset').addEventListener('click', resetEditorCamera);
 $('menuCampaignTab').addEventListener('click', () => showMenuLibrary('campaign'));
 $('menuCustomTab').addEventListener('click', () => showMenuLibrary('custom'));
+$('menuPublicTab').addEventListener('click', () => {
+  showMenuLibrary('public');
+  if (!publicTracks) void refreshPublicList();
+});
+$('menuPublicReload').addEventListener('click', () => { publicTracks = null; void refreshPublicList(); });
 $('menuNewTrack').addEventListener('click', () => openEditor({ name: 'My track', blocks: EDITOR_STARTER }, null));
 $('editorNew').addEventListener('click', () => openEditor({ name: 'My track', blocks: EDITOR_STARTER }, null));
 $('editorBack').addEventListener('click', () => openMenu());
 $('editorTest').addEventListener('click', () =>
   startCustomTrack({ name: $('editorName').value, blocks: editor.blocks }));
 $('editorSave').addEventListener('click', () => saveCustomTrack());
+$('editorPost').addEventListener('click', () => { void postPublicTrack(); });
 $('editorCopy').addEventListener('click', () => { void copyCustomCode(); });
 $('editorImportBtn').addEventListener('click', () => importCustomCode());
 $('btnEditor').addEventListener('click', () => openEditor());
@@ -4318,6 +4449,7 @@ window.__test = {
   EDITOR_PIECES, EDITOR_MIN, EDITOR_MAX, validateCustom, encodeTrackCode, decodeTrackCode,
   customTrackId, openEditor, refreshEditor, importCustomCode, saveCustomTrack, startCustomTrack,
   editorDraft: () => editor, customTracks: () => saved.custom, showMenuLibrary,
+  refreshPublicList, drivePublic, postPublicTrack, publicTracks: () => publicTracks,
   editorView, previewCameraLayout, editorPreviewGeometry, previewPick, selectEditorPiece,
   renderEditorPreview, changeEditorZoom, resetEditorCamera,
   render: () => { updateCamera(1 / 60); drawScene(1 / 60); }

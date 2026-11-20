@@ -742,11 +742,20 @@ export function createTogetherUI({ openAuthDialog, playMatch, playLive }) {
   $('#together-refresh').onclick = () => run(() => refresh(true));
   $('#together-back').onclick = () => { close(); try { history.replaceState(null, '', '#library'); } catch {} $('#library').scrollIntoView(); };
   for (const link of document.querySelectorAll('.site-nav a:not(#together-nav)')) link.addEventListener('click', close);
+  // The notice belongs to the site, not to a game: it shows on the first page
+  // load, and again when a different account signs in. The account UI dispatches
+  // bored:identity on every repaint, so this remembers which account the list was
+  // last read for instead of asking the server again on each of them.
+  let inviteCheckedFor;
+  function scheduleInviteCheck() {
+    const who = hasIdentity() ? getSession()?.user?.id : null;
+    if (who === inviteCheckedFor) return;
+    inviteCheckedFor = who;
+    setTimeout(checkInvites, 400);
+  }
   window.addEventListener('bored:identity', () => {
     resetIdentity(); refresh(true);
-    // The notice belongs to the site, not to a game: it shows on the first page
-    // load, and again for whichever account just signed in.
-    setTimeout(checkInvites, 400);
+    scheduleInviteCheck();
   });
   window.addEventListener('bored:together-open', event => {
     if (TOGETHER_ADAPTERS[event.detail?.game]) selectedGame = event.detail.game;

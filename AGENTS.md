@@ -27,6 +27,7 @@ src/hub/gacha-dex.js     generated dex and type chart (scripts/gacha-dex.mjs --c
 src/hub/together-*.js    Bored Together: matches, live rooms, the lobby and the player
 src/hub/realtime.js      live-room transport
 src/hub/saves-bridge.js  in-game saves to the cloud when an account is signed in
+src/hub/tracks-bridge.js Trackbound's public tracks: the list and a post, through the account
 src/hub/announcements-ui.js  the announcement banner (announcement-admin.js writes them)
 src/hub/analytics.js     the analytics collector; analytics-view.js and analytics-data.js draw the admin page
 src/analytics.html       the admin analytics dashboard

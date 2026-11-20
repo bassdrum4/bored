@@ -36,6 +36,7 @@ import { createEnjoymentUI } from './hub/enjoyment-ui.js';
 import { createGameDocument } from './hub/game-document.js';
 import { resumeScript } from './hub/resume.js';
 import { createSavesBridge, SAVE_GAMES } from './hub/saves-bridge.js';
+import { createTracksBridge } from './hub/tracks-bridge.js';
 import { initVoice } from './hub/voice.js';
 import { initPreferences } from './hub/preferences.js';
 import { createHubNavigation } from './hub/navigation.js';
@@ -224,6 +225,9 @@ let activeSaves = null;
 // The saves bridge of the game that just closed: it still takes that game's parting save for a moment.
 let closingSaves = null;
 const closeSaves = () => { if (activeSaves) { activeSaves.dispose(); closingSaves = activeSaves; activeSaves = null; } };
+// Trackbound's public tracks go through the hub: it is the only side holding the account.
+let activeTracks = null;
+const closeTracks = () => { if (activeTracks) { activeTracks.dispose(); activeTracks = null; } };
 // Civ Lite's Multiplayer screen talks to the hub through this bridge whenever the game is open and is not itself a
 // match or a live game. Each document gets its own, with its own channel.
 let activeLobby = null;
@@ -250,6 +254,7 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
   activeTogether = multiplayer;
   if (previousTogether && previousTogether !== multiplayer) previousTogether.dispose();
   closeSaves();
+  closeTracks();
   if (activeLobby) { activeLobby.dispose(); activeLobby = null; }
   $('#back span').textContent = multiplayer ? '‹ Bored Together' : '‹ All games';
   $('#restart').hidden = !!multiplayer;
@@ -305,6 +310,8 @@ function openGame(slug, challenge = null, origin = null, multiplayer = null) {
       // Civ Lite and Poké Idle keep their saves in the player's account. A live or turn-by-turn match lives on the
       // server and never touches saves, so only a solo document is offered the bridge.
       if (SAVE_GAMES[slug] && !multiplayer) { activeSaves = createSavesBridge({ frame: gameFrame, game: slug }); html = activeSaves.document(html); }
+      // Public tracks: the game asks the hub for the list and for a post, so no account or token enters the page.
+      if (slug === 'trackbound' && !multiplayer) { activeTracks = createTracksBridge({ frame: gameFrame }); html = activeTracks.document(html); }
       let head = '<scr' + 'ipt>addEventListener("keydown",function(e){var t=e.target||{};' + (OWNS_ESCAPE.has(slug) ? '' : 'if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:close"},"*");return}') + 'if(e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t.isContentEditable&&!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||"")){if(e.key==="R"||e.key==="r"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:restart"},"*")}else if(e.key==="F"||e.key==="f"){e.preventDefault();e.stopImmediatePropagation();parent.postMessage({type:"bored:fullscreen"},"*")}}},true);document.addEventListener("pointerdown",function(){parent.postMessage({type:"bored:menuclose"},"*")},true);<\/scr' + 'ipt>';
       gameFrame.removeAttribute('src');
       // The resume helper runs before the game's own script, so a game can offer a
@@ -424,6 +431,7 @@ function closeGame({ force = false } = {}) {
   if (together) together.dispose();
   // A save the game asked for as it closed is already on its way; this only stops the bridge hearing more.
   closeSaves();
+  closeTracks();
   if (activeLobby) { activeLobby.dispose(); activeLobby = null; }
   if ($('#invite-dialog')?.open) $('#invite-dialog').close();
   const wasDaily = activeChallenge;
@@ -999,6 +1007,7 @@ addEventListener('message', event => {
   if (!activeSlug || EXTERNS[activeSlug] || event.source !== gameFrame.contentWindow) return;
   if (activeTogether) activeTogether.message(event);
   if (activeSaves) activeSaves.message(event);
+  if (activeTracks) activeTracks.message(event);
   if (activeLobby) activeLobby.message(event);
   switch (event.data?.type) {
     case 'bored:close':
