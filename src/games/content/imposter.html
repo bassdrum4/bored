@@ -1331,7 +1331,7 @@ window.ImposterCore = (function () {
       connections.set(connectionId, seatId);
       owners.set(seatId, connectionId);
       links.set(seatId, send);
-      send({ t: 'welcome', protocol: 'bored-imposter/2', s: stamp(snapshotFor(state, seatId), seatId) });
+      send({ t: 'welcome', protocol: 'bored-imposter/3', s: stamp(snapshotFor(state, seatId), seatId) });
       if (state.settings.auto) maybeAutoStart(state, rng);
       flushEvents();
       publish(true);
@@ -1683,12 +1683,10 @@ window.ImposterNet = (function () {
     let host = null;
     let link = null;            // the one channel a client has, to the host
     let hostPeer = '';
-    let hostSince = 0;
     let lastHostSeen = 0;
     let claimRank = 0;
     let mirror = null;
     let rank = 0;
-    let knocks = 0;
     let joinedAt = 0;
     let lastSnap = 0;
     let closed = false;
@@ -1845,7 +1843,6 @@ window.ImposterNet = (function () {
           lastSnap = Date.now();
           recovery = null;
           rank = 0;
-          knocks = 0;
           stopKnock();
           try {
             channel.send(JSON.stringify({ t: 'hello', protocol: PROTOCOL, name, playerId: clientId }));
@@ -1923,7 +1920,6 @@ window.ImposterNet = (function () {
 
     function knock() {
       if (closed || host) return;
-      knocks += 1;
       sendRelay('hello', { from: clientId, name });
     }
 
@@ -1935,7 +1931,6 @@ window.ImposterNet = (function () {
     function startKnock() {
       if (knockTimer || closed) return;
       joinedAt = Date.now();
-      knocks = 0;
       knock();
       knockTimer = setInterval(() => {
         if (closed || host) return;
@@ -1956,7 +1951,7 @@ window.ImposterNet = (function () {
 
     function announceHost() {
       if (!host) return;
-      sendRelay('host', { from: clientId, since: hostSince, rank: claimRank });
+      sendRelay('host', { from: clientId, rank: claimRank });
     }
 
     function startAlive() {
@@ -1988,7 +1983,6 @@ window.ImposterNet = (function () {
         name,
         resume: resume ? { state: resume, playerId: clientId } : null,
       });
-      hostSince = Date.now();
       claimRank = rank > 0 ? rank : 0;
 
       host.on('snapshot', snapshot => {
