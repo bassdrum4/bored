@@ -3448,6 +3448,11 @@ const EDITOR_PIECES = [
 const EDITOR_MIN = 3, EDITOR_MAX = 36, EDITOR_LIMIT = 30;
 const EDITOR_STARTER = ['sprint', 'curveR', 'straight', 'checkpoint', 'curveL', 'sprint'];
 let editor = { name: 'My track', blocks: EDITOR_STARTER.slice(), slot: null };
+const editorView = {
+  yaw: 0.72, pitch: 0.68, zoom: 1,
+  selected: null, track: null, faces: [], samples: [],
+  projectedSegments: [], drag: null
+};
 
 function cleanTrackName(value) {
   return String(value || '').trim().slice(0, 32) || 'My track';
@@ -3500,6 +3505,253 @@ function validateCustom(blocks) {
     return { ok: false, error: 'That combination could not be built. Try different pieces.' };
   }
 }
+
+/* ── orbitable 3D editor preview ─────────────────────────────────────────────
+   Sample the very same composed block frames as emitBlock, rather than inventing
+   a 3D-looking route from map points. Faces include road thickness, kerbs,
+   walls, tunnel roofs and start/checkpoint/finish gates. A lightweight
+   orthographic/painter renderer keeps this usable even in a Sites iframe. */
+function previewMaterial(id) {
+  if (id === 'ice') return '#a5cedf';
+  if (id === 'dirt') return '#937453';
+  if (id === 'boost') return '#5791ae';
+  if (id === 'checkpoint') return '#85af87';
+  if (id === 'finish') return '#d8d2ac';
+  if (id === 'start') return '#849f8a';
+  if (id === 'narrow') return '#60646a';
+  return '#777d7d';
+}
+function editorPreviewGeometry(track) {
+  const faces = [], samples = [];
+  if (!track || !track.chain) return { faces, samples };
+  const put = (corners, color, index, order, kind) =>
+    faces.push({ corners, color, index, order, kind });
+  const from = (link, t) => compose(link.entry, localCurveFrame(link.def, t));
+  track.chain.forEach((link, linkIndex) => {
+    const {def, id} = link;
+    const index = linkIndex - 1; // start = -1; player blocks = 0..N-1
+    const count = Math.max(8, Math.min(30, Math.ceil((def.samples || 12) / 1.4)));
+    const hw = def.hw || 6;
+    const wall = def.wall === undefined ? 0.95 : def.wall;
+    const row = t => {
+      const w = from(link, t);
+      const left = madd(w.p, w.x, -hw);
+      const right = madd(w.p, w.x, hw);
+      return {
+        p: w.p, left, right,
+        leftIn: madd(w.p, w.x, -(hw - 0.55)),
+        rightIn: madd(w.p, w.x, hw - 0.55),
+        centerL: madd(w.p, w.x, -0.11),
+        centerR: madd(w.p, w.x, 0.11),
+        underL: madd(left, w.y, -0.65),
+        underR: madd(right, w.y, -0.65),
+        wallL: madd(left, w.y, wall),
+        wallR: madd(right, w.y, wall)
+      };
+    };
+    let prev = row(0);
+    for (let i = 1; i <= count; i++) {
+      const next = row(i / count);
+      samples.push({ a: prev.p, b: next.p, index });
+      put([prev.underL, next.underL, next.left, prev.left], '#696d68', index, 0, 'side');
+      put([prev.right, next.right, next.underR, prev.underR], '#535b59', index, 0, 'side');
+      put([prev.left, prev.right, next.right, next.left], previewMaterial(id), index, 1, 'road');
+      put([prev.left, prev.leftIn, next.leftIn, next.left], '#ddd5c0', index, 2, 'kerb');
+      put([prev.rightIn, prev.right, next.right, next.rightIn], '#ddd5c0', index, 2, 'kerb');
+      if (i % 3 !== 0) put([prev.centerL, prev.centerR, next.centerR, next.centerL],
+        '#e4e2d2', index, 3, 'stripe');
+      if (wall > 0.03) {
+        put([prev.left, next.left, next.wallL, prev.wallL], '#c5bcb0', index, 4, 'wall');
+        put([prev.wallR, next.wallR, next.right, prev.right], '#a49d8f', index, 4, 'wall');
+      }
+      if (def.ceiling) {
+        put([prev.wallL, prev.wallR, next.wallR, next.wallL],
+          '#777982', index, 5, 'roof');
+      }
+      prev = next;
+    }
+    // The gates are visible in the preview, so checkpoints are not anonymous road.
+    if (def.trigger || def.start) {
+      const gate = from(link, def.start ? 0.07 : 0.2);
+      const x = gate.x, y = gate.y, z = gate.z, p = gate.p;
+      const left = madd(p, x, -hw + 0.4), right = madd(p, x, hw - 0.4);
+      const wide = 0.29, high = 4.2;
+      const gateColor = def.start ? '#4a936a' : def.trigger === 'finish' ? '#deae52' : '#91c2a1';
+      const post = pt => {
+        const top = madd(pt, y, high);
+        put([madd(pt,x,-wide),madd(pt,x,wide),madd(top,x,wide),madd(top,x,-wide)],
+          gateColor,index,6,'gate');
+      };
+      post(left); post(right);
+      const beamL = madd(left,y,high), beamR=madd(right,y,high);
+      put([madd(beamL,y,-wide),madd(beamR,y,-wide),beamR,beamL],gateColor,index,6,'gate');
+    }
+  });
+  return { faces, samples };
+}
+function previewAxes(view) {
+  const cy = Math.cos(view.yaw), sy = Math.sin(view.yaw);
+  const cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
+  return point => {
+    const x = point[0], y = point[1], z = point[2];
+    const right = x * cy - z * sy;
+    const radial = x * sy + z * cy;
+    return [right, radial * sp - y * cp, radial * cp + y * sp];
+  };
+}
+function previewCameraLayout(points, view, width, height) {
+  const rotate = previewAxes(view);
+  if (!points.length) return { project: () => [width / 2, height / 2, 0], scale: 1 };
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  // Camera-fit is recomputed when rotating, so long roads never vanish offscreen.
+  for (const point of points) {
+    const p = rotate(point);
+    minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+    minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+  }
+  const scale = Math.min((width - 42) / Math.max(16, maxX - minX),
+    (height - 42) / Math.max(16, maxY - minY)) * view.zoom;
+  const centerX = (minX + maxX) / 2, centerY = (minY + maxY) / 2;
+  return {
+    scale,
+    project: point => {
+      const p = rotate(point);
+      return [width / 2 + (p[0] - centerX) * scale,
+        height / 2 + (p[1] - centerY) * scale, p[2]];
+    }
+  };
+}
+function renderEditorPreview() {
+  const canvas = $('editorPreview');
+  if (!canvas || typeof canvas.getContext !== 'function') return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx || typeof ctx.beginPath !== 'function') return;
+  const w = canvas.width || 660, h = canvas.height || 420;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#d7e0dd'; ctx.fillRect(0, 0, w, h);
+  if (!editorView.faces.length) return;
+  const points = [];
+  for (const face of editorView.faces) for (const p of face.corners) points.push(p);
+  const camera = previewCameraLayout(points, editorView, w, h);
+  const project = camera.project;
+  // Sort whole polygons by camera depth. Highlight is a color on the existing
+  // geometry, not an overlay that can glow through a tunnel or raised road.
+  const polygons = editorView.faces.map(face => {
+    const poly = face.corners.map(project);
+    return { face, poly, depth: poly.reduce((sum, p) => sum + p[2], 0) / poly.length };
+  });
+  polygons.sort((a, b) => a.depth - b.depth || a.face.order - b.face.order);
+  for (const {face, poly} of polygons) {
+    const selected = face.index >= 0 && editorView.selected === face.index;
+    ctx.beginPath();
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i][0], poly[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = selected ?
+      (face.kind === 'road' ? '#e5a347' :
+       face.kind === 'kerb' || face.kind === 'stripe' ? '#ffdb8b' : '#c88539') :
+      face.color;
+    ctx.fill();
+    if (selected && face.kind === 'road') {
+      ctx.lineWidth = 1.1; ctx.strokeStyle = '#ffe0a4'; ctx.stroke();
+    }
+  }
+  editorView.projectedSegments = editorView.samples.map(segment => {
+    const a = project(segment.a), b = project(segment.b);
+    return { a, b, index: segment.index };
+  });
+}
+function drawEditorPreview(track) {
+  editorView.track = track;
+  const geometry = editorPreviewGeometry(track);
+  editorView.faces = geometry.faces;
+  editorView.samples = geometry.samples;
+  renderEditorPreview();
+}
+function selectEditorPiece(index) {
+  editorView.selected = Number.isInteger(index) && index >= 0 && index < editor.blocks.length
+    ? index : null;
+  const list = $('editorPieces');
+  if (list.children) Array.from(list.children).forEach((li, i) => {
+    li.classList.toggle('selected', i === editorView.selected);
+    const button = li.querySelector && li.querySelector('.editorSelect');
+    if (button) button.setAttribute('aria-pressed', String(i === editorView.selected));
+  });
+  renderEditorPreview();
+  drawEditorMap(editorView.track);
+}
+function previewPick(x, y) {
+  let best = -1, distance = Infinity;
+  for (const segment of editorView.projectedSegments) {
+    if (segment.index < 0 || segment.index >= editor.blocks.length) continue;
+    const dx = segment.b[0] - segment.a[0], dy = segment.b[1] - segment.a[1];
+    const lenSq = dx * dx + dy * dy || 1;
+    const t = clamp(((x - segment.a[0]) * dx + (y - segment.a[1]) * dy) / lenSq, 0, 1);
+    const px = segment.a[0] + dx * t, py = segment.a[1] + dy * t;
+    const d = Math.hypot(x - px, y - py);
+    if (d < distance) { distance = d; best = segment.index; }
+  }
+  return distance <= 19 ? best : -1;
+}
+function changeEditorZoom(factor) {
+  editorView.zoom = clamp(editorView.zoom * factor, 0.55, 3.5);
+  renderEditorPreview();
+}
+function resetEditorCamera() {
+  editorView.yaw = 0.72; editorView.pitch = 0.68; editorView.zoom = 1;
+  renderEditorPreview();
+}
+function wireEditorPreview() {
+  const canvas = $('editorPreview');
+  const location = event => {
+    const box = canvas.getBoundingClientRect();
+    return {
+      x: (event.clientX - box.left) * canvas.width / Math.max(1, box.width),
+      y: (event.clientY - box.top) * canvas.height / Math.max(1, box.height)
+    };
+  };
+  canvas.addEventListener('pointerdown', event => {
+    if (event.button !== undefined && event.button !== 0) return;
+    const p = location(event);
+    editorView.drag = { pointerId: event.pointerId, x: p.x, y: p.y, moved: 0 };
+    if (canvas.setPointerCapture) canvas.setPointerCapture(event.pointerId);
+    canvas.classList.add('dragging');
+    event.preventDefault();
+  });
+  canvas.addEventListener('pointermove', event => {
+    const drag = editorView.drag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const p = location(event), dx = p.x - drag.x, dy = p.y - drag.y;
+    drag.x = p.x; drag.y = p.y; drag.moved += Math.hypot(dx,dy);
+    if (drag.moved > 3) {
+      editorView.yaw += dx * 0.009;
+      editorView.pitch = clamp(editorView.pitch + dy * 0.008, 0.13, 1.48);
+      renderEditorPreview();
+    }
+    event.preventDefault();
+  });
+  const end = event => {
+    const drag = editorView.drag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    editorView.drag = null;
+    canvas.classList.remove('dragging');
+    if (event.type === 'pointerup' && drag.moved < 5) {
+      const p = location(event);
+      const chosen = previewPick(p.x,p.y);
+      if (chosen !== -1) selectEditorPiece(chosen);
+    }
+    if (canvas.releasePointerCapture && canvas.hasPointerCapture &&
+        canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+  };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  canvas.addEventListener('lostpointercapture', end);
+  canvas.addEventListener('wheel', event => {
+    event.preventDefault();
+    changeEditorZoom(Math.exp(-event.deltaY * 0.0012));
+  }, { passive: false });
+}
+
 function drawEditorMap(track) {
   const canvas = $('editorMap');
   if (!canvas || typeof canvas.getContext !== 'function') return;
